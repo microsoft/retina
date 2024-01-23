@@ -1,0 +1,46 @@
+exporters:
+  prometheus:
+    endpoint: "127.0.0.1:9091"
+    const_labels:
+      cluster: $AZMON_CLUSTER_LABEL
+  file:
+    path: /opt/microsoft/otelcollector/promotel.json
+  otlp:
+    endpoint: 127.0.0.1:55680
+    tls:
+      insecure: true
+    compression: "gzip"
+    retry_on_failure:
+      enabled: false
+    timeout: 12s
+processors:
+  batch:
+    send_batch_size: 7000
+    timeout: 200ms
+    send_batch_max_size: 7000
+  resource:
+    attributes:
+    - key: cluster
+      value: "$AZMON_CLUSTER_LABEL"
+      action: "upsert"
+    - key: job
+      from_attribute: service.name
+      action: insert
+    - key: instance
+      from_attribute: service.instance.id
+      action: insert
+receivers:
+    prometheus:
+      config:
+service:
+  pipelines:
+    metrics:
+      receivers: [prometheus]
+      exporters: [otlp]
+      processors: [batch, resource]
+  telemetry:
+    logs:
+      level: warn
+      encoding: json
+    metrics:
+      level: detailed

@@ -1,0 +1,16 @@
+apiVersion: retina.io/v1alpha1
+kind: MetricsConfiguration
+metadata:
+  name: sample-metricsconfig
+spec:
+  contextOptions:
+    - metricName: requests_total
+      sourceLabels:
+        - source
+      additionalLabels:
+        - direction
+  namespaces:
+    include:
+      - default
+    exclude:
+      - kube-system

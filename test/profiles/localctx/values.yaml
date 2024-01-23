@@ -1,0 +1,8 @@
+operator:
+  enabled: false
+# Plugins will default to deploy/manifests/controller/helm/retina/values.yaml
+# TODO add all plugins that we want to test here for local context.
+remoteContext: false
+enablePodLevel: true
+enableAnnotations: true
+enabledPlugin_linux: '["dropreason","packetforward","packetparser", "dns"]'

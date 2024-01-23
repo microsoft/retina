@@ -1,0 +1,24 @@
+global:
+  scrape_interval: 60s
+scrape_configs:
+  - job_name: "retina-pods"
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_container_name]
+        action: keep
+        regex: retina(.*)
+      - source_labels:
+          [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        separator: ":"
+        regex: ([^:]+)(?::\d+)?
+        target_label: __address__
+        replacement: ${1}:${2}
+        action: replace
+      - source_labels: [__meta_kubernetes_pod_node_name]
+        action: replace
+        target_label: instance
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        action: keep
+        regex: (.*)

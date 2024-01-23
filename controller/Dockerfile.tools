@@ -1,0 +1,41 @@
+# Stage: Prepare clang and tools
+# Bullseye -> debian11
+FROM mcr.microsoft.com/mirror/docker/library/debian:bullseye@sha256:a648e10e02af129706b1fb89e1ac9694ae3db7f2b8439aa906321e68cc281bc0
+LABEL Name=retina-tools Version=0.0.1
+
+WORKDIR /tmp
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    curl xz-utils binutils wget gnupg2 \
+    ca-certificates tcpdump iproute2 iptables
+
+RUN mkdir -p /usr/local
+
+ARG GOARCH=amd64
+ENV GOARCH=${GOARCH}
+
+RUN if [ "$GOARCH" = "amd64" ] ; then \
+    # Download clang and llvm.
+    wget https://releases.llvm.org/release-keys.asc; \
+    gpg2 --import release-keys.asc; \
+    wget -O clang+llvm.tar.xz https://github.com/llvm/llvm-project/releases/download/llvmorg-14.0.0/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz; \
+    wget -O clang+llvm.tar.xz.sig https://github.com/llvm/llvm-project/releases/download/llvmorg-14.0.0/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz.sig; \
+    gpg2 --verify clang+llvm.tar.xz.sig clang+llvm.tar.xz; \
+    tar -C /usr/local -xJf ./clang+llvm.tar.xz --no-same-owner; \
+    mv /usr/local/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04 /usr/local/clang+llvm; \
+    else \
+    # GOARCH=Arm64.
+    # Download clang and llvm.
+    wget -O clang+llvm.tar.xz https://github.com/llvm/llvm-project/releases/download/llvmorg-14.0.0/clang+llvm-14.0.0-aarch64-linux-gnu.tar.xz; \
+    tar -C /usr/local -xJf ./clang+llvm.tar.xz --no-same-owner; \
+    mv /usr/local/clang+llvm-14.0.0-aarch64-linux-gnu /usr/local/clang+llvm; \
+    # Prepare dependencies for clang to be copied to base.
+    apt-get install -y --no-install-recommends libncurses5; \
+    fi
+
+# Copy tools.
+RUN mkdir -p /tmp/bin
+RUN arr="tcpdump ip ss iptables-legacy iptables-legacy-save iptables-nft iptables-nft-save cp uname" ;\
+    for i in $arr; do    \
+    cp $(which $i) /tmp/bin;   \
+    done

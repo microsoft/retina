@@ -1,0 +1,74 @@
+name: Integration Tests For Retina
+on:
+  workflow_dispatch:
+jobs:
+  integ-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Free up disk space
+        run: |
+          # https://github.com/actions/runner-images/issues/2840#issuecomment-790492173
+          # du -sh /*        2> /dev/null | sort -rh  2> /dev/null | head
+          # du -h -d2 /usr   2> /dev/null | sort -rh  2> /dev/null | head
+          echo "Check free disk space before cleanup."
+          df -h
+          echo "Removing non-essential tools and libraries."
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/share/boost
+          # delete libraries for Android (12G), PowerShell (1.3G), Swift (1.7G)
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/local/share/powershell
+          sudo rm -rf /usr/share/swift
+          echo "Check free disk space after cleanup."
+          df -h
+
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - uses: actions/setup-go@v2
+        with:
+          go-version: "^1.18"
+
+      - name: Make retina image
+        run: |
+          export CONTAINER_BUILDER=docker
+          export CONTAINER_RUNTIME=docker
+          make all-images-local
+          make install-kubectl-retina
+          make base-images-remove
+          curl -LO https://github.com/kvaps/kubectl-node-shell/raw/master/kubectl-node_shell
+          chmod +x ./kubectl-node_shell
+          sudo mv ./kubectl-node_shell /usr/local/bin/kubectl-node_shell
+          docker system prune -f
+
+      - name: Deploy Kind
+        run: make kind-setup
+
+      - name: Install retina
+        run: make kind-install
+
+      - name: Run tests
+        run: make retina-integration
+
+      - name: Export Kubernetes logs
+        if: failure()
+        run: make retina-export-logs
+
+      - name: Archive Kubernetes logs
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: kubernetes-node-logs
+          path: kubernetes-logs
+
+      - name: Archive iptable and ipset
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: iptable-ipset-snapshot
+          path: ./test/integration/plugin-simulations/npm-iptables
+      - name: Cleanup
+        if: always()
+        run: make kind-clean

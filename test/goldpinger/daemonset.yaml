@@ -1,0 +1,173 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: goldpinger-host
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: goldpinger
+      type: goldpinger-host
+  template:
+    metadata:
+      labels:
+        app: goldpinger
+        type: goldpinger-host
+    spec:
+      tolerations:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
+          operator: Exists
+      hostNetwork: true
+      serviceAccount: "goldpinger-serviceaccount"
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values:
+                      - amd64
+                      #- arm64
+                      #- ppc64le
+                      #- s390x
+                  - key: kubernetes.io/os
+                    operator: In
+                    values:
+                      - linux
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: "app"
+                      operator: In
+                      values:
+                        - goldpinger
+                topologyKey: "kubernetes.io/hostname"
+      containers:
+        - name: goldpinger-vm
+          env:
+            - name: HOST
+              value: "0.0.0.0"
+            - name: PORT
+              value: "7070"
+            - name: PING_TIMEOUT
+              value: "10s"
+            - name: CHECK_TIMEOUT
+              value: "20s"
+            - name: CHECK_ALL_TIMEOUT
+              value: "20s"
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          #            - name: HOSTS_TO_RESOLVE
+          #              value: "1.1.1.1 8.8.8.8 www.bing.com"
+          image: acnpublic.azurecr.io/goldpinger:v2.0.2
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+          ports:
+            - containerPort: 7070
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 7070
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 7070
+            initialDelaySeconds: 5
+            periodSeconds: 5
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: goldpinger-windows
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: goldpinger
+      type: goldpinger-windows
+  template:
+    metadata:
+      labels:
+        app: goldpinger
+        type: goldpinger-windows
+    spec:
+      tolerations:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
+          operator: Exists
+      serviceAccount: "goldpinger-serviceaccount"
+
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values:
+                      - amd64
+                      #- arm64
+                      #- ppc64le
+                      #- s390x
+                  - key: kubernetes.io/os
+                    operator: In
+                    values:
+                      - windows
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: "app"
+                      operator: In
+                      values:
+                        - goldpinger
+                topologyKey: "kubernetes.io/hostname"
+      containers:
+        - name: goldpinger-vm
+          env:
+            - name: HOST
+              value: "0.0.0.0"
+            - name: PORT
+              value: "7070"
+            - name: PING_TIMEOUT
+              value: "10s"
+            - name: CHECK_TIMEOUT
+              value: "20s"
+            - name: CHECK_ALL_TIMEOUT
+              value: "20s"
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          #            - name: HOSTS_TO_RESOLVE
+          #              value: "1.1.1.1 8.8.8.8 www.bing.com"
+          image: "acnpublic.azurecr.io/goldpinger-win:v2.0.2"
+          command: ["\\goldpinger.exe"]
+          ports:
+            - containerPort: 7070
+              name: http

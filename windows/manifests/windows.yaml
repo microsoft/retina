@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: retina
+  name: retina-win
+  namespace: kube-system
+  annotations:
+    prometheus.io/port: "10093"
+    prometheus.io/scrape: "true"
+spec:
+  selector:
+    matchLabels:
+      app: retina
+  template:
+    metadata:
+      labels:
+        app: retina
+      name: retina
+      namespace: retina
+    spec:
+      serviceAccountName: retina-agent
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      securityContext:
+        windowsOptions:
+          hostProcess: true
+          runAsUserName: "NT AUTHORITY\\SYSTEM"
+        runAsNonRoot: false
+      hostNetwork: true
+      containers:
+        - name: retinawin
+          image: mcr.microsoft.com/containernetworking/retina-agent:v0.0.6
+          ports:
+            - containerPort: 10093
+          command:
+            - powershell.exe
+            - -command
+            - .\setkubeconfigpath.ps1; ./controller.exe --config ./retina/config.yaml --kubeconfig ./kubeconfig
+            # .\setkubeconfigpath.ps1; Start-Sleep -s 1000
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: retina-config-win
+              mountPath: retina
+      nodeSelector:
+        kubernetes.io/os: windows
+      volumes:
+        - name: retina-config-win
+          configMap:
+            name: retina-config-win
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: retina-config-win
+  namespace: kube-system
+data:
+  config.yaml: |-
+    apiServer:
+      host: "0.0.0.0"
+      port: 10093
+    logLevel: info
+    enabledPlugin: ["hnsstats"] 
+    metricsInterval: 10

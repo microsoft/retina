@@ -1,0 +1,33 @@
+version: 2
+updates:
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    reviewers:
+      - "microsoft/retina"
+    commit-message:
+      prefix: "ci"
+    labels: [ "ci", "dependencies" ]
+    open-pull-requests-limit: 10
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    reviewers:
+      - "microsoft/retina"
+    commit-message:
+      prefix: "ci"
+    labels: [ "ci", "dependencies" ]
+    open-pull-requests-limit: 10
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    reviewers:
+      - "microsoft/retina"
+    commit-message:
+      prefix: "deps"
+    ignore:
+      - dependency-name: "github.com/inspektor-gadget/inspektor-gadget"
+    open-pull-requests-limit: 10

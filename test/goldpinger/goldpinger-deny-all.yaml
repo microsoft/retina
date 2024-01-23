@@ -1,0 +1,12 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: goldpinger-deny-all
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: goldpinger
+  policyTypes:
+  - Egress
+status: {}

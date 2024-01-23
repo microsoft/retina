@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "retina.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ include "retina.name" . }}
+spec:
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+  selector:
+    app: {{ include "retina.name" . }}

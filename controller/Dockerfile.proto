@@ -1,0 +1,15 @@
+FROM --platform=linux/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.21 AS builder
+LABEL Name=retina-builder Version=0.0.1
+
+RUN apt-get update &&\
+    apt-get -y install lsb-release wget software-properties-common gnupg file git make unzip
+
+WORKDIR /tmp
+
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v24.2/protoc-24.2-linux-x86_64.zip
+RUN unzip protoc-24.2-linux-x86_64.zip -d protoc
+RUN mv protoc/bin/protoc /usr/bin/protoc
+
+WORKDIR /app
+ENTRYPOINT protoc -I=. --go_out=paths=source_relative:. ./pkg/utils/metadata.proto

@@ -1,0 +1,372 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.12.1
+  name: captures.retina.io
+spec:
+  group: retina.io
+  names:
+    categories:
+    - retina
+    kind: Capture
+    listKind: CaptureList
+    plural: captures
+    singular: capture
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Capture indicates the settings of a network trace.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: CaptureSpec indicates the specification of Capture.
+            properties:
+              captureConfiguration:
+                description: CaptureConfiguration indicates the configurations of
+                  the network capture.
+                properties:
+                  captureOption:
+                    description: CaptureOption lists the options of the capture.
+                    properties:
+                      duration:
+                        description: Duration indicates length of time that the capture
+                          should continue for.
+                        pattern: ^([0-9]+(\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$
+                        type: string
+                      maxCaptureSize:
+                        default: 100
+                        description: MaxCaptureSize limits the capture file to MB
+                          in size.
+                        type: integer
+                      packetSize:
+                        description: PacketSize limits the each packet to bytes in
+                          size and packets longer than PacketSize will be truncated.
+                        type: integer
+                    type: object
+                  captureTarget:
+                    description: CaptureTarget indicates the target on which the network
+                      packets capture will be performed.
+                    properties:
+                      namespaceSelector:
+                        description: NamespaceSelector selects Namespaces using cluster-scoped
+                          labels. This field follows standard label selector semantics.
+                          NamespaceSelector and PodSelector pair selects a pod to
+                          capture pod network namespace traffic.
+                        properties:
+                          matchExpressions:
+                            description: matchExpressions is a list of label selector
+                              requirements. The requirements are ANDed.
+                            items:
+                              description: A label selector requirement is a selector
+                                that contains values, a key, and an operator that
+                                relates the key and values.
+                              properties:
+                                key:
+                                  description: key is the label key that the selector
+                                    applies to.
+                                  type: string
+                                operator:
+                                  description: operator represents a key's relationship
+                                    to a set of values. Valid operators are In, NotIn,
+                                    Exists and DoesNotExist.
+                                  type: string
+                                values:
+                                  description: values is an array of string values.
+                                    If the operator is In or NotIn, the values array
+                                    must be non-empty. If the operator is Exists or
+                                    DoesNotExist, the values array must be empty.
+                                    This array is replaced during a strategic merge
+                                    patch.
+                                  items:
+                                    type: string
+                                  type: array
+                              required:
+                              - key
+                              - operator
+                              type: object
+                            type: array
+                          matchLabels:
+                            additionalProperties:
+                              type: string
+                            description: matchLabels is a map of {key,value} pairs.
+                              A single {key,value} in the matchLabels map is equivalent
+                              to an element of matchExpressions, whose key field is
+                              "key", the operator is "In", and the values array contains
+                              only "value". The requirements are ANDed.
+                            type: object
+                        type: object
+                        x-kubernetes-map-type: atomic
+                      nodeSelector:
+                        description: NodeSelector is a selector which select the node
+                          to capture network packets. Selector which must match a
+                          node's labels. NodeSelector is incompatible with NamespaceSelector/PodSelector
+                          pair.
+                        properties:
+                          matchExpressions:
+                            description: matchExpressions is a list of label selector
+                              requirements. The requirements are ANDed.
+                            items:
+                              description: A label selector requirement is a selector
+                                that contains values, a key, and an operator that
+                                relates the key and values.
+                              properties:
+                                key:
+                                  description: key is the label key that the selector
+                                    applies to.
+                                  type: string
+                                operator:
+                                  description: operator represents a key's relationship
+                                    to a set of values. Valid operators are In, NotIn,
+                                    Exists and DoesNotExist.
+                                  type: string
+                                values:
+                                  description: values is an array of string values.
+                                    If the operator is In or NotIn, the values array
+                                    must be non-empty. If the operator is Exists or
+                                    DoesNotExist, the values array must be empty.
+                                    This array is replaced during a strategic merge
+                                    patch.
+                                  items:
+                                    type: string
+                                  type: array
+                              required:
+                              - key
+                              - operator
+                              type: object
+                            type: array
+                          matchLabels:
+                            additionalProperties:
+                              type: string
+                            description: matchLabels is a map of {key,value} pairs.
+                              A single {key,value} in the matchLabels map is equivalent
+                              to an element of matchExpressions, whose key field is
+                              "key", the operator is "In", and the values array contains
+                              only "value". The requirements are ANDed.
+                            type: object
+                        type: object
+                        x-kubernetes-map-type: atomic
+                      podSelector:
+                        description: This is a label selector which selects Pods.
+                          This field follows standard label selector semantics.
+                        properties:
+                          matchExpressions:
+                            description: matchExpressions is a list of label selector
+                              requirements. The requirements are ANDed.
+                            items:
+                              description: A label selector requirement is a selector
+                                that contains values, a key, and an operator that
+                                relates the key and values.
+                              properties:
+                                key:
+                                  description: key is the label key that the selector
+                                    applies to.
+                                  type: string
+                                operator:
+                                  description: operator represents a key's relationship
+                                    to a set of values. Valid operators are In, NotIn,
+                                    Exists and DoesNotExist.
+                                  type: string
+                                values:
+                                  description: values is an array of string values.
+                                    If the operator is In or NotIn, the values array
+                                    must be non-empty. If the operator is Exists or
+                                    DoesNotExist, the values array must be empty.
+                                    This array is replaced during a strategic merge
+                                    patch.
+                                  items:
+                                    type: string
+                                  type: array
+                              required:
+                              - key
+                              - operator
+                              type: object
+                            type: array
+                          matchLabels:
+                            additionalProperties:
+                              type: string
+                            description: matchLabels is a map of {key,value} pairs.
+                              A single {key,value} in the matchLabels map is equivalent
+                              to an element of matchExpressions, whose key field is
+                              "key", the operator is "In", and the values array contains
+                              only "value". The requirements are ANDed.
+                            type: object
+                        type: object
+                        x-kubernetes-map-type: atomic
+                    type: object
+                  filters:
+                    description: Filters represent a range of filters to be included/excluded
+                      in the capture.
+                    properties:
+                      exclude:
+                        description: Exclude specifies what IP or IP:port is excluded
+                          in the capture with wildcard support. See Include for detailed
+                          explanation.
+                        items:
+                          type: string
+                        type: array
+                      include:
+                        description: 'Include specifies what IP or IP:port is included
+                          in the capture with wildcard support. If a port not specified
+                          or is *, the port filter is excluded. If an IP is specified
+                          as *, the host filter should be included. Include and Exclude
+                          arguments will finally be translated into a logic like:
+                          (include1 or include2) and not (exclude1 or exclude2)'
+                        items:
+                          type: string
+                        type: array
+                    type: object
+                  includeMetadata:
+                    default: true
+                    description: 'IncludeMetadata represents whether or not networking
+                      metadata should be captured. Networking metadata will consists
+                      of the following info, but is expected to grow: - IP address
+                      configuration - IP neighbor status - IPtables rule dumps - Network
+                      statistics information'
+                    type: boolean
+                  tcpdumpFilter:
+                    description: TcpdumpFilter is a raw tcpdump filter string.
+                    type: string
+                required:
+                - captureTarget
+                type: object
+              outputConfiguration:
+                description: OutputConfiguration indicates the location capture will
+                  be stored.
+                properties:
+                  blobUpload:
+                    description: BlobUpload is a secret containing the blob SAS URL
+                      to the given blob container.
+                    type: string
+                  hostPath:
+                    description: HostPath stores the capture files into the specified
+                      host filesystem. If nothing exists at the given path of the
+                      host, an empty directory will be created there.
+                    type: string
+                  persistentVolumeClaim:
+                    description: PersistentVolumeClaim mounts the supplied PVC into
+                      the pod on `/capture` and write the capture files there.
+                    type: string
+                type: object
+            required:
+            - captureConfiguration
+            type: object
+          status:
+            description: CaptureStatus describes the status of the capture.
+            properties:
+              active:
+                description: The number of pending and running jobs.
+                format: int32
+                type: integer
+              completionTime:
+                description: Represents time when the Capture was completed, and it
+                  is determined by the last completed capture job. The completion
+                  time is only set when the Capture finishes successfully.
+                format: date-time
+                type: string
+              conditions:
+                items:
+                  description: "Condition contains details for one aspect of the current
+                    state of this API Resource. --- This struct is intended for direct
+                    use as an array at the field path .status.conditions.  For example,
+                    \n type FooStatus struct{ // Represents the observations of a
+                    foo's current state. // Known .status.conditions.type are: \"Available\",
+                    \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge
+                    // +listType=map // +listMapKey=type Conditions []metav1.Condition
+                    `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\"
+                    protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }"
+                  properties:
+                    lastTransitionTime:
+                      description: lastTransitionTime is the last time the condition
+                        transitioned from one status to another. This should be when
+                        the underlying condition changed.  If that is not known, then
+                        using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: message is a human readable message indicating
+                        details about the transition. This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: observedGeneration represents the .metadata.generation
+                        that the condition was set based upon. For instance, if .metadata.generation
+                        is currently 12, but the .status.conditions[x].observedGeneration
+                        is 9, the condition is out of date with respect to the current
+                        state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: reason contains a programmatic identifier indicating
+                        the reason for the condition's last transition. Producers
+                        of specific condition types may define expected values and
+                        meanings for this field, and whether the values are considered
+                        a guaranteed API. The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                        --- Many .condition.type values are consistent across resources
+                        like Available, but because arbitrary conditions can be useful
+                        (see .node.status.conditions), the ability to deconflict is
+                        important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              failed:
+                description: The number of failed jobs.
+                format: int32
+                type: integer
+              startTime:
+                description: Represents time when the Capture controller started processing
+                  a job.
+                format: date-time
+                type: string
+              succeeded:
+                description: The number of completed jobs.
+                format: int32
+                type: integer
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

@@ -1,0 +1,20 @@
+# apiVersion: networking.azure.com/v1alpha1
+# kind: ClusterObserver
+# metadata:
+#   name: retina
+#   namespace: retina
+# spec:
+#   ignoreAllowed: true
+#   exportList:
+#     - otelAgent
+#   observeList:
+#     namespaceSelector:
+#       matchLabels:
+#     podSelector:
+#       matchLabels:
+#     direction: 
+#   ignoreList:
+#     namespaceSelector:
+#       matchLabels:
+#     podSelector:
+#       matchLabels:

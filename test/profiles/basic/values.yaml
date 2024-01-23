@@ -1,0 +1,4 @@
+enablePodLevel: false
+operator:
+  enabled: false
+# Plugins

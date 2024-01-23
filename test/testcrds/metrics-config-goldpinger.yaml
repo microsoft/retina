@@ -1,0 +1,33 @@
+apiVersion: retina.io/v1alpha1
+kind: MetricsConfiguration
+metadata:
+  name: metricsconfigurationaaaaa
+spec:
+  namespaces:
+    include:
+      - default
+  contextOptions:
+    - metricName: forward_count
+      sourceLabels:
+        - podName
+        - ip
+      destinationLabels:
+        - podName
+        - ip
+        - workload
+    - metricName: drop_count
+      sourceLabels:
+        - podName
+        - ip
+      destinationLabels:
+        - podName
+        - ip
+        - workload
+    - metricName: tcp_retransmission_count
+      sourceLabels:
+        - podName
+        - ip
+      destinationLabels:
+        - podName
+        - ip
+        - workload

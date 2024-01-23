@@ -1,0 +1,38 @@
+# Simple workflow for deploying static content to GitHub Pages
+name: Build and Deploy Retina.sh
+on:
+  push:
+    branches: ["docs", "main", "ghpages"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+jobs:
+  deploy:
+    environment:
+      name: retina.sh 
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Pages
+        uses: actions/configure-pages@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 20
+      - name: build
+        run: |
+          npm install --prefix site/
+          npm run build --prefix site/
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: "./site/build"
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v1

@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: agnhost
+    agnhost: a
+  name: agnhost-a
+  namespace: kube-system
+spec:
+  nodeName: aks-nodepool1-12809644-vmss000000
+  containers:
+    - name: a1
+      image: k8s.gcr.io/e2e-test-images/agnhost:2.36
+      command: ["/agnhost"]
+      args: ["serve-hostname", "--http", "--port", "80"]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: agnhost
+    agnhost: b
+  name: agnhost-b
+  namespace: kube-system
+spec:
+  nodeName: aks-nodepool1-12809644-vmss000001
+  containers:
+    - name: b1
+      image: k8s.gcr.io/e2e-test-images/agnhost:2.36
+      command: ["/agnhost"]
+      args: ["serve-hostname", "--http", "--port", "80"]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: agnhost
+    agnhost: c
+  name: agnhost-c
+  namespace: kube-system
+spec:
+  nodeName: aks-nodepool1-12809644-vmss000002
+  containers:
+    - name: c1
+      image: k8s.gcr.io/e2e-test-images/agnhost:2.36
+      command: ["/agnhost"]
+      args: ["serve-hostname", "--http", "--port", "80"]

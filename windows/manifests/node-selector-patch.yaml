@@ -1,0 +1,5 @@
+spec:
+  template:
+    spec:
+      nodeSelector:
+        kubernetes.io/os: linux

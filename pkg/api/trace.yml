@@ -1,0 +1,134 @@
+openapi: "3.0.0"
+info:
+  version: 0.0.1
+  title: Trace
+  description: Retina Trace API
+  contact:
+    name: Azure Container Networking
+    email: acn@microsoft.com
+  license:
+    name: MIT License
+    url: https://github.com/microsoft/retina/blob/main/LICENSE
+servers:
+  - url: http://{host}:{port}
+paths:
+  /trace:
+    post:
+      description: Start network trace
+      operationId: startTrace
+      requestBody:
+        description: operation {start}, filter, duration?
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TraceOperation'
+      responses:
+        '202':
+          description: operation ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trace'
+        '200':
+          description: operation completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trace'
+        '500':
+          description: plugin/gadget not set/init
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /trace/{operationid}:
+    post:
+      description: Stop network trace
+      operationId: stop trace
+      parameters:
+      - name: operationid
+        in: path
+        description: ID of network trace to fetch
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: trace stopped
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trace'
+        '404':
+          description: trace operation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    get:
+      description: Returns trace output correlating to operation ID
+      operationId: get trace
+      parameters:
+      - name: operationid
+        in: path
+        description: ID of network trace to fetch
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: trace response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trace'
+        '404':
+          description: trace operation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Trace:
+      type: object 
+      properties:
+        operation:
+          type: string
+        operationID:
+          type: string
+        filter:
+          type: string
+        result:
+          type: string  
+
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+          format: int32
+        message:
+          type: string

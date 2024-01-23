@@ -1,0 +1,37 @@
+name: Test Retina Image
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+  deployments: read
+  packages: none
+  pull-requests: write
+  security-events: write
+  issues: write
+jobs:
+  test-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - uses: actions/setup-go@v2
+        with:
+          go-version: "^1.20"
+
+      - name: Make Retina Test image
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          make retina-test-image PLATFORM=linux/amd64
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-files
+          path: ./coverage*
