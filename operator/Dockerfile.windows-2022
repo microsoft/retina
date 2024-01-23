@@ -1,0 +1,23 @@
+FROM --platform=linux/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.20 as builder
+
+# Build args
+ARG VERSION
+ARG APP_INSIGHTS_ID
+
+ENV GOOS=windows
+ENV GOARCH=amd64 
+
+WORKDIR /usr/src/retina
+# Copy the source
+COPY . .
+
+RUN go build -v  -ldflags "-X main.version="$VERSION" -X "main.applicationInsightsID"="$APP_INSIGHTS_ID"" -o -o /usr/bin/retina-operator.exe retina-operator operator/main.go
+
+# Copy into final image
+FROM  mcr.microsoft.com/windows/nanoserver:ltsc2022
+COPY --from=builder /usr/src/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
+COPY --from=builder /usr/src/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
+
+COPY --from=builder /usr/bin/retina-operator.exe retina-operator.exe
+
+CMD ["controller.exe", "start", "--kubeconfig=.\\kubeconfig"]

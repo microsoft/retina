@@ -1,0 +1,20 @@
+FROM --platform=linux/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.21 as builder
+
+# Cache go modules so they won't be downloaded at each build
+COPY go.mod go.sum /retina/
+RUN cd /retina && go mod download
+
+# Build args
+ARG VERSION
+ARG APP_INSIGHTS_ID
+
+ENV GOOS=linux
+ENV GOARCH=amd64
+
+# This COPY is limited by .dockerignore
+COPY ./ /retina
+RUN cd /retina && make kubectl-retina-binary-${GOOS}-${GOARCH}
+RUN mv /retina/output/kubectl-retina/kubectl-retina-${GOOS}-${GOARCH} /retina/output/kubectl-retina/kubectl-retina
+
+FROM --platform=linux/amd64 mcr.microsoft.com/mirror/docker/library/alpine:3.14
+COPY --from=builder /retina/output/kubectl-retina/kubectl-retina /bin/kubectl-retina

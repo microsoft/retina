@@ -1,0 +1,10 @@
+apiServer:
+  host: "0.0.0.0"
+  port: 10093
+# Supported - debug, info, error, warn, panic, fatal.
+logLevel: info
+enabledPlugin: ["hnsstats"]
+# Interval, in seconds, to scrape/publish metrics.
+metricsInterval: 10
+# used to export telemetry to AppInsights
+telemetryEnabled: true

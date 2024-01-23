@@ -1,0 +1,20 @@
+apiVersion: retina.io/v1alpha1
+kind: Capture
+metadata:
+  name: capture-pod-blobupload
+spec:
+  captureConfiguration:
+    captureOption:
+      duration: 10m
+    captureTarget:
+      podSelector:
+        matchLabels:
+          k8s-app: cloud-node-manager
+      namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+  outputConfiguration:
+    # the artifact will be copied to hostpath
+    # and uploaded to azure storage account
+    hostPath: "/tmp/retina"
+    blobUpload: blobsassecret

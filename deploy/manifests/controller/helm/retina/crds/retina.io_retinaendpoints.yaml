@@ -1,0 +1,96 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  name: retinaendpoints.retina.io
+spec:
+  group: retina.io
+  names:
+    kind: RetinaEndpoint
+    listKind: RetinaEndpointList
+    plural: retinaendpoints
+    shortNames:
+    - ke
+    singular: retinaendpoint
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.podIP
+      name: Pod IP
+      type: string
+    - jsonPath: .spec.ownerReferences
+      name: Referenced By
+      priority: 1
+      type: string
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: RetinaEndpoint is the Schema for the retinaendpoints API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: RetinaEndpointSpec defines the desired state of RetinaEndpoint
+            properties:
+              annotations:
+                additionalProperties:
+                  type: string
+                type: object
+              containers:
+                items:
+                  properties:
+                    id:
+                      type: string
+                    name:
+                      type: string
+                  type: object
+                type: array
+              labels:
+                additionalProperties:
+                  type: string
+                type: object
+              nodeIP:
+                type: string
+              ownerReferences:
+                items:
+                  properties:
+                    apiVersion:
+                      type: string
+                    kind:
+                      type: string
+                    name:
+                      type: string
+                  type: object
+                type: array
+              podIP:
+                type: string
+              podIPs:
+                items:
+                  type: string
+                type: array
+            type: object
+          status:
+            description: RetinaEndpointStatus defines the observed state of RetinaEndpoint
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

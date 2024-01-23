@@ -1,0 +1,11 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+networking:
+  apiServerAddress: "0.0.0.0"
+nodes:
+  - role: control-plane
+    image: kindest/node:v1.25.3
+  - role: worker
+    image: kindest/node:v1.25.3
+  - role: worker
+    image: kindest/node:v1.25.3

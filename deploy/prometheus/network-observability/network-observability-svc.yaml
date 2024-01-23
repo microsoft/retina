@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: network-observability
+spec:
+  ports:
+    # control which ports we enable via which ports we define here
+    - name: hubble
+      protocol: TCP
+      port: 9965
+      targetPort: 9965
+    - name: retina
+      protocol: TCP
+      port: 10093
+      targetPort: 10093
+  

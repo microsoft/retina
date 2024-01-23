@@ -1,0 +1,41 @@
+{{- if .Values.os.linux}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "retina.name" . }}-config
+  namespace: {{ .Values.namespace }}
+data:
+  config.yaml: |-
+    apiServer:
+      host: {{ .Values.apiServer.host }}
+      port: {{ .Values.retinaPort }}
+    logLevel: {{ .Values.logLevel }}
+    enabledPlugin: {{ .Values.enabledPlugin_linux }}
+    metricsInterval: {{ .Values.metricsInterval }}
+    enableTelemetry: {{ .Values.enableTelemetry }}
+    enablePodLevel: {{ .Values.enablePodLevel }}
+    remoteContext: {{ .Values.remoteContext }}
+    enableAnnotations: {{ .Values.enableAnnotations }}
+{{- end}}
+---
+{{- if .Values.os.windows}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "retina.name" . }}-config-win
+  namespace: {{ .Values.namespace }}
+data:
+  config.yaml: |-
+    apiServer:
+      host: {{ .Values.apiServer.host }}
+      port: {{ .Values.retinaPort }}
+    logLevel: {{ .Values.logLevel }}
+    enabledPlugin: {{ .Values.enabledPlugin_win }}
+    metricsInterval: {{ .Values.metricsInterval }}
+    enableTelemetry: {{ .Values.enableTelemetry }}
+    enablePodLevel: {{ .Values.enablePodLevel }}
+    remoteContext: {{ .Values.remoteContext }}
+{{- end}}
+
+
+

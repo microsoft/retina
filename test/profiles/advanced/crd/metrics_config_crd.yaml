@@ -1,0 +1,23 @@
+apiVersion: retina.io/v1alpha1
+kind: MetricsConfiguration
+metadata:
+  name: metricsconfigcrd
+spec:
+  contextOptions:
+    - metricName: drop_count
+      sourceLabels:
+        - ip
+        - pod
+        - port
+      additionalLabels:
+        - direction
+    - metricName: forward_count
+      sourceLabels:
+        - ip
+        - pod
+        - port
+      additionalLabels:
+        - direction
+  namespaces:
+    exclude:
+      - kube-system

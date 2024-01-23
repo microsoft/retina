@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: goldpinger-pod
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: goldpinger
+      type: goldpinger-pod
+  template:
+    metadata:
+      labels:
+        app: goldpinger
+        type: goldpinger-pod
+    spec:
+      serviceAccount: "goldpinger-serviceaccount"
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values:
+                      - amd64
+                      #- arm64
+                      #- ppc64le
+                      #- s390x
+                  - key: kubernetes.io/os
+                    operator: In
+                    values:
+                      - linux
+
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: "app"
+                      operator: In
+                      values:
+                        - goldpinger
+                topologyKey: "kubernetes.io/hostname"
+      containers:
+        - name: goldpinger
+          env:
+            - name: HOST
+              value: "0.0.0.0"
+            - name: PORT
+              value: "7070"
+            - name: PING_TIMEOUT
+              value: "10s"
+            - name: CHECK_TIMEOUT
+              value: "20s"
+            - name: CHECK_ALL_TIMEOUT
+              value: "20s"
+            - name: DNS_TARGETS_TIMEOUT
+              value: "10s"
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: HOSTS_TO_RESOLVE
+              value: "1.1.1.1 8.8.8.8 www.bing.com"
+          image: "mcr.microsoft.com/aks/e2e/bloomberg-goldpinger:v3.7.0"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+          ports:
+            - containerPort: 7070
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 7070
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 7070
+            initialDelaySeconds: 5
+            periodSeconds: 5

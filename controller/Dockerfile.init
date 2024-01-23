@@ -1,0 +1,25 @@
+ARG builderImage="acnpublic.azurecr.io/retina-builder:0.0.1"
+ARG toolsImage="acnpublic.azurecr.io/retina-tools:0.0.1"
+
+# Stage: Builder
+FROM ${builderImage} as builder
+
+# ----------------------------------------------------------------------------------- #
+
+# Stage: Tools
+FROM ${toolsImage} as tools
+
+# ----------------------------------------------------------------------------------- #
+
+# Stage: Base distroless image
+FROM mcr.microsoft.com/mirror/gcr/distroless/cc-debian11:latest@sha256:b53fbf5f81f4a120a489fedff2092e6fcbeacf7863fce3e45d99cc58dc230ccc as base
+LABEL Name=retina-filtermap-init Version=0.0.1
+
+COPY --from=builder /go/bin/retina/initretina /retina/initretina
+
+# Copy dependencies for mount. Needed for initretina.
+COPY --from=tools /lib/ /lib
+COPY --from=tools /usr/lib/ /usr/lib
+COPY --from=tools /bin/mount /bin/mount
+
+ENTRYPOINT ["./retina/initretina"]

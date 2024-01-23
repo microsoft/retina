@@ -1,0 +1,194 @@
+{{- if .Values.os.linux}}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ .Values.agent.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    k8s-app: {{ include "retina.name" . }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "retina.name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "retina.name" . }}
+        k8s-app: {{ include "retina.name" . }}
+      annotations:
+        prometheus.io/port: "{{ .Values.retinaPort }}"
+        prometheus.io/scrape: "true"
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      hostNetwork: true
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      nodeSelector:
+        kubernetes.io/os: linux
+      initContainers:
+        - name: init-retina
+          image: {{ .Values.image.initRepository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          terminationMessagePolicy: FallbackToLogsOnError
+          securityContext:
+            privileged: true
+          volumeMounts:
+          - name: bpf
+            mountPath: /sys/fs/bpf
+            mountPropagation: Bidirectional
+      containers:
+        - name: {{ include "retina.name" . }} 
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: {{ .Values.retinaPort }}
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.daemonset.container.retina.command }}
+          command:
+          {{- range .Values.daemonset.container.retina.command }}
+          - {{ . }}
+          {{- end }}
+          {{- end }}
+          {{- if .Values.daemonset.container.retina.args}}
+          args:
+          - --health-probe-bind-address={{ .Values.daemonset.container.retina.healthProbeBindAddress }}
+          - --metrics-bind-address={{ .Values.daemonset.container.retina.metricsBindAddress }}
+          {{- range $.Values.daemonset.container.retina.args}}
+          - {{ . | quote }}
+          {{- end}}
+          {{- end}}
+          ports:
+          - containerPort: {{ .Values.retinaPort }}
+          resources:
+            limits:
+              memory: {{ .Values.resources.limits.memory | quote }}
+              cpu: {{ .Values.resources.limits.cpu | quote }}
+          env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.name
+          - name: NODE_NAME
+            valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+          - name: NODE_IP
+            valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.hostIP
+          securityContext:
+            capabilities:
+              add:
+              {{- range .Values.securityContext.capabilities.add }}
+              - {{ . }}
+              {{- end }}
+            privileged: {{ .Values.securityContext.privileged }}
+        {{- if .Values.volumeMounts }}
+          volumeMounts:
+          {{- range $name, $mountPath := .Values.volumeMounts }}
+            - name: {{ $name }}
+              mountPath: {{ $mountPath }}
+          {{- end }}
+        {{- end }}
+      terminationGracePeriodSeconds: 90 # Allow for retina to cleanup plugin resources.
+      volumes:
+      {{- range $name, $hostPath := .Values.volumeMounts}}
+      - name: {{ $name }}
+      {{ if eq $name "config" }}
+        configMap:
+          name: {{ $.Values.nameOverride }}-config
+      {{ else if eq $name "tmp"}}
+        emptyDir: {}
+      {{ else }}
+        hostPath:
+          path: {{ $hostPath }}
+      {{ end }}
+      {{- end }}
+      nodeSelector:
+        kubernetes.io/os: linux
+{{- end }}
+---
+{{- if .Values.os.windows}}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    k8s-app: {{ include "retina.name" . }}
+  name: {{ .Values.agent_win.name }}
+  namespace: {{ .Values.namespace }}
+  annotations:
+    prometheus.io/port: "{{ .Values.retinaPort }}"
+    prometheus.io/scrape: "true"
+    checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+spec:
+  selector:
+    matchLabels:
+      k8s-app: {{ include "retina.name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "retina.name" . }}
+        k8s-app: {{ include "retina.name" . }}
+      name: {{ include "retina.name" . }}
+      namespace: {{ .Values.namespace }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      securityContext:
+        windowsOptions:
+          hostProcess: true
+          runAsUserName: {{ .Values.securityContext.windowsOptions.runAsUserName}}
+        runAsNonRoot: false
+      hostNetwork: true
+      containers:
+        - name: retinawin
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          ports:
+            - containerPort: {{ .Values.retinaPort }}
+          command:
+            - powershell.exe
+            - -command
+            - .\setkubeconfigpath.ps1; ./controller.exe --config ./retina/config.yaml --kubeconfig ./kubeconfig
+          env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.name
+          - name: NODE_NAME
+            valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+          - name: NODE_IP
+            valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.hostIP
+          securityContext:
+            capabilities:
+              add:
+              {{- range .Values.securityContext.capabilities.add }}
+              - {{ . }}
+              {{- end }}
+            privileged: {{ .Values.securityContext.privileged }}
+        {{- if .Values.volumeMounts_win }}
+          volumeMounts:
+          {{- range $name, $mountPath := .Values.volumeMounts_win }}
+            - name: {{ $name }}
+              mountPath: {{ $mountPath }}
+          {{- end }}
+        {{- end }}
+      nodeSelector:
+        kubernetes.io/os: windows
+      volumes:
+      {{- range $name, $mountPath := .Values.volumeMounts_win }}
+        - name: {{ $name }}
+          configMap:
+            name: {{ $name }}
+      {{- end }}
+{{- end }}

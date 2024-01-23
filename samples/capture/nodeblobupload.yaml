@@ -1,0 +1,23 @@
+apiVersion: retina.io/v1alpha1
+kind: Capture
+metadata:
+  name: capture-node-blobupload
+spec:
+  captureConfiguration:
+    captureOption:
+      duration: 10m
+    captureTarget:
+      nodeSelector:
+        matchExpressions:
+          - {
+              key: kubernetes.io/hostname,
+              operator: In,
+              values:
+                [
+                  aks-nodepool1-11396069-vmss000001,
+                  aks-nodepool1-11396069-vmss000000,
+                ],
+            }
+  outputConfiguration:
+    hostPath: "/tmp/retina"
+    blobUpload: blobsassecret

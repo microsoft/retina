@@ -1,0 +1,40 @@
+issues:
+  max-same-issues: 0
+  max-issues-per-linter: 0
+  new-from-rev: origin/master
+linters:
+  presets: 
+  - bugs
+  - error
+  - format
+  - performance
+  - unused
+  disable:
+  - maligned
+  - scopelint
+  enable:
+  - exportloopref
+  - goconst
+  - gocritic
+  - gocyclo
+  - gofmt
+  - gomnd
+  - goprintffuncname
+  - gosimple
+  - lll
+  - misspell
+  - nakedret
+  - promlinter
+  - revive
+linters-settings:
+  gocritic:
+    enabled-tags:
+    - "diagnostic"
+    - "style"
+    - "performance"
+    disabled-checks:
+    - "hugeParam"
+  govet:
+    check-shadowing: true
+  lll:
+    line-length: 200

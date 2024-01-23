@@ -1,0 +1,29 @@
+apiVersion: retina.io/v1alpha1
+kind: Capture
+metadata:
+  name: capture-pod-blobupload
+spec:
+  captureConfiguration:
+    captureOption:
+      duration: 10m
+    captureTarget:
+      nodeSelector:
+        matchExpressions:
+          - {
+              key: kubernetes.io/hostname,
+              operator: In,
+              values: [aks-nodepool1-11396069-vmss000001],
+            }
+    filters:
+      # Include packets from/to the following IP addresses or IP:Port pairs
+      include:
+        - 10.224.0.128:80
+        - 10.224.0.129
+      # Comment the following code out to exclude packets from/to IMDS server
+      # exclude:
+      #   - 169.254.169.254
+  outputConfiguration:
+    # the artifact will be copied to hostpath
+    # and uploaded to azure storage account
+    hostPath: "/tmp/retina"
+    blobUpload: blobsassecret
