@@ -25,6 +25,6 @@ jobs:
       uses: golangci/golangci-lint-action@v4
       with:
         version: v1.55
-        args: --concurrency 4 --verbose --new-from-rev=origin/master --config=.golangci.yml --timeout=25m 
+        args: --concurrency 4 --verbose --config=.golangci.yaml --timeout=25m 
         only-new-issues: true
         skip-cache: true
