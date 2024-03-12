@@ -15,18 +15,18 @@ import (
 )
 
 const (
-	RetinaCapturesYAMLpath       = "retina.io_captures.yaml"
-	RetinaEndpointsYAMLpath      = "retina.io_retinaendpoints.yaml"
-	MetricsConfigurationYAMLpath = "retina.io_metricsconfigurations.yaml"
+	RetinaCapturesYAMLpath       = "retina.sh_captures.yaml"
+	RetinaEndpointsYAMLpath      = "retina.sh_retinaendpoints.yaml"
+	MetricsConfigurationYAMLpath = "retina.sh_metricsconfigurations.yaml"
 )
 
-//go:embed manifests/controller/helm/retina/crds/retina.io_captures.yaml
+//go:embed manifests/controller/helm/retina/crds/retina.sh_captures.yaml
 var RetinaCapturesYAML []byte
 
-//go:embed manifests/controller/helm/retina/crds/retina.io_retinaendpoints.yaml
+//go:embed manifests/controller/helm/retina/crds/retina.sh_retinaendpoints.yaml
 var RetinaEndpointsYAML []byte
 
-//go:embed manifests/controller/helm/retina/crds/retina.io_metricsconfigurations.yaml
+//go:embed manifests/controller/helm/retina/crds/retina.sh_metricsconfigurations.yaml
 var MetricsConfgurationYAML []byte
 
 func GetRetinaCapturesCRD() (*apiextensionsv1.CustomResourceDefinition, error) {

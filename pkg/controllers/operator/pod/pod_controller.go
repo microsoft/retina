@@ -63,9 +63,9 @@ func New(client client.Client, scheme *k8sruntime.Scheme, podchannel chan<- cach
 	}
 }
 
-//+kubebuilder:rbac:groups=operator.retina.io,resources=pods,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=operator.retina.io,resources=pods/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=operator.retina.io,resources=pods/finalizers,verbs=update
+//+kubebuilder:rbac:groups=operator.retina.sh,resources=pods,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=operator.retina.sh,resources=pods/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=operator.retina.sh,resources=pods/finalizers,verbs=update
 
 func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	pod := &corev1.Pod{}

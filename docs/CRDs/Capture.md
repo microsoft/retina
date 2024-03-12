@@ -9,11 +9,11 @@ To use the `Capture` CRD, [install Retina](../installation/setup.md) with captur
 
 ## CRD Specification
 
-The full specification for the `Capture` CRD can be found in the [Capture CRD](https://github.com/microsoft/retina/blob/main/deploy/manifests/controller/helm/retina/crds/retina.io_captures.yaml) file.
+The full specification for the `Capture` CRD can be found in the [Capture CRD](https://github.com/microsoft/retina/blob/main/deploy/manifests/controller/helm/retina/crds/retina.sh_captures.yaml) file.
 
 The `Capture` CRD is defined with the following specifications:
 
-- **API Group:** retina.io
+- **API Group:** retina.sh
 - **API Version:** v1alpha1
 - **Kind:** Capture
 - **Plural:** captures
@@ -43,7 +43,7 @@ The `Capture` CRD is defined with the following specifications:
 To create a `Capture`, create a YAML manifest file with the desired specifications and apply it to the cluster using `kubectl apply`:
 
 ```yaml
-apiVersion: retina.io/v1alpha1
+apiVersion: retina.sh/v1alpha1
 kind: Capture
 metadata:
   name: example-capture

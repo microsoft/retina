@@ -35,7 +35,7 @@ func New(client client.Client, cache *cache.Cache) *RetinaEndpointReconciler {
 	}
 }
 
-// +kubebuilder:rbac:groups=retina.io,resources=retinaendpoints,verbs=get;list;watch
+// +kubebuilder:rbac:groups=retina.sh,resources=retinaendpoints,verbs=get;list;watch
 func (r *RetinaEndpointReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	startTime := time.Now()
 	r.l.Info("Reconciling RetinaEndpoint", zap.String("RetinaEndpoint", req.NamespacedName.String()))

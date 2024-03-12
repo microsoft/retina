@@ -1,4 +1,4 @@
-apiVersion: retina.io/v1alpha1
+apiVersion: retina.sh/v1alpha1
 kind: Capture
 metadata:
   name: capture-pod-blobupload
