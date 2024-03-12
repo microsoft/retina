@@ -53,6 +53,7 @@ These are initialized in the linuxutil.go file.
 ## Label Values for `tcp_connection_stats`
 
 Below is a running list of all statistics for the metric `tcp_connection_stats`, captured from the `netstats` utility:
+
 - `DelayedACKLocked`
 - `DelayedACKLost`
 - `DelayedACKs`

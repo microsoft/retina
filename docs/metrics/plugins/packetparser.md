@@ -24,6 +24,7 @@ In Advanced mode (see [Metric Modes](../modes.md)), the plugin turns an eBPF res
 Code path: *pkg/module/metrics/forward.go*
 
 Metrics produced:
+
 - `adv_forward_count`
 - `adv_forward_bytes`
 
@@ -32,6 +33,7 @@ Metrics produced:
 Code path: *pkg/module/metrics/tcpflags.go*
 
 Metrics produced:
+
 - `adv_forward_count`
 - `adv_forward_bytes`
 
@@ -40,6 +42,7 @@ Metrics produced:
 Code path: *pkg/module/metrics/latency.go*
 
 Metrics produced:
+
 - `adv_node_apiserver_latency`
 - `adv_node_apiserver_no_response`
 - `adv_node_apiserver_tcp_handshake_latency`

@@ -30,5 +30,6 @@ FIXME add published dashboard links
 ## Pre-Installed Dashboards
 
 If you're using [Azure-Hosted Prometheus/Grafana](prometheus-azure-managed.md), versions of these dashbaords are pre-installed under:
+
 - Dashboards > Managed Prometheus > Kubernetes / Networking / Clusters
 - Dashboards > Managed Prometheus > Kubernetes / Networking / DNS

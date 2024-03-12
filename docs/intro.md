@@ -24,6 +24,7 @@ Retina lets you **investigate network issues on-demand** and **continuously moni
 *Why can't my Pods connect to each other any more?* **Typical investigation is time-intensive** and involves performing packet captures, where one must identify the Nodes involved, gain access to each Node, run `tcpdump` commands, and export the results off of each Node.
 
 With Retina, you can **automate this process** with a **single CLI command** or CRD/YAML that can:
+
 - Run captures on all Nodes hosting the Pods of interest.
 - Upload each Node's results to a storage blob.
 
@@ -45,6 +46,7 @@ Retina uses two types of telemetry: metrics and captures.
 ### Metrics
 
 Retina metrics provide **continuous observability** into:
+
 - Incoming/outcoming traffic
 - Dropped packets
 - TCP/UDP
@@ -53,6 +55,7 @@ Retina metrics provide **continuous observability** into:
 - Node/interface statistics
 
 Retina provides both:
+
 - **Basic metrics** (default, Node-Level metrics) and
 - **Advanced/Pod-Level metrics** (if enabled).
 
