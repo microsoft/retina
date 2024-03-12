@@ -58,14 +58,14 @@ jobs:
 
       - name: Archive Kubernetes logs
         if: failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: kubernetes-node-logs
           path: kubernetes-logs
 
       - name: Archive iptable and ipset
         if: failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: iptable-ipset-snapshot
           path: ./test/integration/plugin-simulations/npm-iptables
