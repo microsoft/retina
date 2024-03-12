@@ -54,9 +54,9 @@ func New(client client.Client, scheme *runtime.Scheme) *MetricsConfigurationReco
 	}
 }
 
-//+kubebuilder:rbac:groups=operator.retina.io,resources=metricsconfigurations,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=operator.retina.io,resources=metricsconfigurations/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=operator.retina.io,resources=metricsconfigurations/finalizers,verbs=update
+//+kubebuilder:rbac:groups=operator.retina.sh,resources=metricsconfigurations,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=operator.retina.sh,resources=metricsconfigurations/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=operator.retina.sh,resources=metricsconfigurations/finalizers,verbs=update
 
 func (r *MetricsConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	mcc := &retinav1alpha1.MetricsConfiguration{}

@@ -8,11 +8,11 @@ In large-scale API servers, each Retina Pod needs to learn about cluster state, 
 
 ## CRD Specification
 
-The full specification for the `RetinaEndpoint` CRD can be found in the [RetinaEndpoint CRD]( https://github.com/microsoft/retina/blob/main/deploy/manifests/controller/helm/retina/crds/retina.io_retinaendpoints.yaml) file.
+The full specification for the `RetinaEndpoint` CRD can be found in the [RetinaEndpoint CRD]( https://github.com/microsoft/retina/blob/main/deploy/manifests/controller/helm/retina/crds/retina.sh_retinaendpoints.yaml) file.
 
 The `RetinaEndpoint` CRD is defined with the following specifications:
 
-- **API Group:** retina.io
+- **API Group:** retina.sh
 - **API Version:** v1alpha1
 - **Kind:** RetinaEndpoint
 - **Plural:** retinaendpoints
@@ -38,7 +38,7 @@ The `RetinaEndpoint` CRD is defined with the following specifications:
 To create a `RetinaEndpoint`, create a YAML manifest file with the desired specifications and apply it to the cluster using `kubectl apply`:
 
 ```yaml
-apiVersion: retina.io/v1alpha1
+apiVersion: retina.sh/v1alpha1
 kind: RetinaEndpoint
 metadata:
   name: example-retinaendpoint

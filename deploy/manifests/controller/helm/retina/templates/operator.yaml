@@ -135,7 +135,7 @@ rules:
       - list
       - watch
   - apiGroups:
-      - retina.io
+      - retina.sh
     resources:
       - retinaendpoints
     verbs:
@@ -147,7 +147,7 @@ rules:
       - update
       - watch
   - apiGroups:
-      - retina.io
+      - retina.sh
     resources:
       - metricsconfigurations
     verbs:
@@ -159,7 +159,7 @@ rules:
       - update
       - watch
   - apiGroups:
-      - retina.io
+      - retina.sh
     resources:
       - metricsconfigurations/status
     verbs:
@@ -171,13 +171,13 @@ rules:
       - update
       - watch
   - apiGroups:
-      - retina.io
+      - retina.sh
     resources:
       - retinaendpoints/finalizers
     verbs:
       - update
   - apiGroups:
-      - retina.io
+      - retina.sh
     resources:
       - retinaendpoints/status
     verbs:
@@ -214,7 +214,7 @@ rules:
     verbs:
     - get
   - apiGroups:
-    - retina.io
+    - retina.sh
     resources:
     - captures
     verbs:
@@ -226,13 +226,13 @@ rules:
     - update
     - watch
   - apiGroups:
-      - retina.io
+      - retina.sh
     resources:
     - captures/finalizers
     verbs:
     - update
   - apiGroups:
-      - retina.io
+      - retina.sh
     resources:
     - captures/status
     verbs:
