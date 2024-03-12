@@ -9,6 +9,7 @@ All metrics have the prefix `networkobservability_`.
 ## Universal Labels
 
 All metrics include node and Cluster metadata with the labels:
+
 - `cluster`
 - `instance` (Node name)
 
@@ -26,6 +27,7 @@ Metrics enabled when `packetforward` plugin is enabled (see [Metrics Configurati
 #### Label Values
 
 Possible values for `direction`:
+
 - `ingress` (incoming traffic)
 - `egress` (outgoing traffic)
 
@@ -41,10 +43,12 @@ Metrics enabled when `dropreason` plugin is enabled (see [Metrics Configuration]
 #### Label Values
 
 Possible values for `direction`:
+
 - `ingress` (incoming traffic)
 - `egress` (outgoing traffic)
 
 Possible values for `reason`:
+
 - `IPTABLE_RULE_DROP`
 - `IPTABLE_NAT_DROP`
 - `TCP_CONNECT_BASIC`
@@ -69,6 +73,7 @@ Metrics enabled when `linuxutil` plugin is enabled (see [Metrics Configuration](
 #### Label Values
 
 Possible values for TCP `state`:
+
 - `UNKNOWN`
 - `ESTABLISHED`
 - `SYN_SENT`
@@ -83,21 +88,25 @@ Possible values for TCP `state`:
 - `CLOSING`
 
 Possible values for `statistic_name` (for metric `tcp_connection_stats`):
+
 - `TCPTimeouts`
 - `TCPTSReorder`
 - `ResetCount`
 - and many others (full list [here](./plugins/linuxutil.md#label-values-for-tcp_connection_stats))
 
 Possible values for `statistic_name` (for metric `ip_connection_stats`):
+
 - `InNoECTPkts`
 - `InNoRoutes`
 - `InOctets`
 - `OutOctets`
 
 Possible values for `statistic_name` (for metric `udp_connection_stats`):
+
 - `ACTIVE` (currently active socket count)
 
 Possible values for `statistic_name` (for metric `interface_stats`):
+
 - `tx_packets`
 - `rx_packets`
 - `rx0_cache_full` (or `rx1_`, etc.)
@@ -133,14 +142,17 @@ Metrics enabled when `hnsstats` plugin is enabled (see [Metrics Configuration](.
 #### Label Values
 
 Possible values for `direction`:
+
 - `ingress` (incoming traffic)
 - `egress` (outgoing traffic)
 
 Possible values for `reason`:
+
 - `endpoint` (dropped by HNS endpoint)
 - `aclrule` (dropped by ACL firewall rule in VFP)
 
 Possible values for `statistic_name` (for metric `tcp_connection_stats`):
+
 - `ResetCount`
 - `ClosedFin`
 - `ResetSyn`
@@ -150,6 +162,7 @@ Possible values for `statistic_name` (for metric `tcp_connection_stats`):
 - `TimeWaitExpiredCount`
 
 Possible values for TCP `flag`:
+
 - `SYN`
 - `SYNACK`
 - `FIN`
