@@ -15,6 +15,7 @@ To test, run `make docs` to spin up local webserver and view changes with hot re
 Install `yarn` (e.g. for Ubuntu, try [this guide](https://www.linuxcapable.com/how-to-install-yarn-on-ubuntu-linux/#install-yarn-on-ubuntu-2204-or-2004-via-nodesource)).
 
 In this directory (*retina/site/*), run:
+
 ```bash
 yarn
 ```

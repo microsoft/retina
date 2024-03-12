@@ -37,6 +37,7 @@ make helm-install-advanced-local-context
 ## Next Steps: Configuring Prometheus/Grafana
 
 Follow the guide relevant to your setup:
+
 - [Unmanaged Prometheus/Grafana](./prometheus-unmanaged.md)
 - [Azure-Hosted Prometheus/Grafana](./prometheus-azure-managed.md)
 

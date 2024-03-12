@@ -2,7 +2,7 @@
 
 ## Overview
 
-Basic metrics is covered by the [Metrics](../metrics/intro.md) section of the Retina documentation. This guide is intended to help you troubleshoot issues with basic metrics.
+Basic metrics is covered by the [Metrics](../metrics/basic.md) section of the Retina documentation. This guide is intended to help you troubleshoot issues with basic metrics.
 
 ## Metrics are not being generated or showing up in Grafana dashboards
 

@@ -78,4 +78,4 @@
 
 ## Configuring Grafana
 
-In the Azure Portal, find your Grafana instance. Click on the Grafana Endpoint URL, then follow [Configuring Grafana](./configuring-grafana.md).
+In the Azure Portal, find your Grafana instance. Click on the Grafana Endpoint URL, then follow [Configuring Grafana](./grafana.md).
