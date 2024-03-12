@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.14.0
-  name: tracesconfigurations.retina.io
+  name: tracesconfigurations.retina.sh
 spec:
-  group: retina.io
+  group: retina.sh
   names:
     categories:
     - retina

@@ -90,7 +90,7 @@ func TestRetinaEndpointReconciler_ReconcilePod(t *testing.T) {
 				},
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "RetinaEndpoint",
-					APIVersion: "retina.io/v1alpha1",
+					APIVersion: "retina.sh/v1alpha1",
 				},
 			},
 		},
@@ -150,7 +150,7 @@ func TestRetinaEndpointReconciler_ReconcilePod(t *testing.T) {
 			wantedRetinaEndpoint: &retinav1alpha1.RetinaEndpoint{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "RetinaEndpoint",
-					APIVersion: "retina.io/v1alpha1",
+					APIVersion: "retina.sh/v1alpha1",
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:            "pod",

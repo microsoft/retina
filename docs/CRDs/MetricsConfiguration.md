@@ -6,11 +6,11 @@ Retina by default emits node level metrics, however, customers can apply `Metric
 
 ## CRD Specification
 
-The full specification for the `MetricsConfiguration` CRD can be found in the [MetricsConfiguration CRD](https://github.com/microsoft/retina/blob/main/deploy/manifests/controller/helm/retina/crds/retina.io_metricsconfigurations.yaml) file.
+The full specification for the `MetricsConfiguration` CRD can be found in the [MetricsConfiguration CRD](https://github.com/microsoft/retina/blob/main/deploy/manifests/controller/helm/retina/crds/retina.sh_metricsconfigurations.yaml) file.
 
 The `MetricsConfiguration` CRD is defined with the following specifications:
 
-- **API Group:** retina.io
+- **API Group:** retina.sh
 - **API Version:** v1alpha1
 - **Kind:** MetricsConfiguration
 - **Plural:** metricsconfigurations
@@ -38,7 +38,7 @@ The `MetricsConfiguration` CRD is defined with the following specifications:
 To create a `MetricsConfiguration`, create a YAML manifest file with the desired specifications and apply it to the cluster using `kubectl apply`:
 
 ```yaml
-apiVersion: retina.io/v1alpha1
+apiVersion: retina.sh/v1alpha1
 kind: MetricsConfiguration
 metadata:
   name: metricsconfigcrd
