@@ -30,7 +30,7 @@ jobs:
           npm install --prefix site/
           npm run build --prefix site/
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v1
+        uses: actions/upload-pages-artifact@v3
         with:
           path: "./site/build"
       - name: Deploy to GitHub Pages
