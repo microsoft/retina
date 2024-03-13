@@ -32,6 +32,7 @@ IMAGE_REGISTRY    ?= acnpublic.azurecr.io
 OS                ?= $(GOOS)
 ARCH              ?= $(GOARCH)
 PLATFORM          ?= $(OS)/$(ARCH)
+PLATFORMS 		  ?= linux/amd64 linux/arm64 windows/amd64
 
 CONTAINER_BUILDER ?= docker
 CONTAINER_RUNTIME ?= docker
@@ -42,11 +43,11 @@ ALL_ARCH.windows = amd64
 
 # TAG is OS and platform agonstic, which can be used for binary version and image manifest tag,
 # while RETINA_PLATFORM_TAG is platform specific, which can be used for image built for specific platforms.
-RETINA_PLATFORM_TAG        ?= $(subst /,-,$(PLATFORM))-$(TAG)
+RETINA_PLATFORM_TAG        ?= $(TAG)-$(subst /,-,$(PLATFORM))
 
 # for windows os, add year to the platform tag
 ifeq ($(OS),windows)
-RETINA_PLATFORM_TAG        = windows-ltsc$(YEAR)-amd64-$(TAG)
+RETINA_PLATFORM_TAG        = $(TAG)-windows-ltsc$(YEAR)-amd64
 endif
 
 qemu-user-static: ## Set up the host to run qemu multiplatform container builds.
@@ -218,7 +219,17 @@ retina-skopeo-export:
 		IMG=$(RETINA_IMAGE)
 		TAG=$(RETINA_PLATFORM_TAG)
 
-container-docker: # util target to build container images using docker buildx. do not invoke directly.
+buildx:
+	if docker buildx inspect retina > /dev/null 2>&1; then \
+		echo "Buildx instance retina already exists."; \
+	else \
+		echo "Creating buildx instance retina..."; \
+		docker buildx create --name retina --use --platform $$(echo "$(PLATFORMS)" | tr ' ' ','); \
+		docker buildx use retina; \
+		echo "Buildx instance retina created."; \
+	fi;
+
+container-docker: buildx # util target to build container images using docker buildx. do not invoke directly.
 	echo "Building for platform $(PLATFORM)"
 	os=$$(echo $(PLATFORM) | cut -d'/' -f1); \
 	arch=$$(echo $(PLATFORM) | cut -d'/' -f2); \
@@ -235,7 +246,7 @@ container-docker: # util target to build container images using docker buildx. d
 		-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
 		$(CONTEXT_DIR)
 
-retina-image: ## This pulls dependecies from registry. Use retina-image-local to build dependencies first locally.
+retina-image: ## build the retina linux container image.
 	echo "Building for $(PLATFORM)"
 	for target in init agent; do \
 		echo "Building for $$target"; \
@@ -257,20 +268,22 @@ retina-image: ## This pulls dependecies from registry. Use retina-image-local to
 				ACTION=--push; \
 	done
 
-kubectl-retina-image: ## build the kubectl-retina image. 
-	echo "Building for $(PLATFORM)"
-	$(MAKE) container-$(CONTAINER_BUILDER) \
-			PLATFORM=$(PLATFORM) \
-			DOCKERFILE=cli/Dockerfile.kubectl-retina \
-			REGISTRY=$(IMAGE_REGISTRY) \
-			IMAGE=$(KUBECTL_RETINA_IMAGE) \
-			VERSION=$(TAG) \
-			TAG=$(RETINA_PLATFORM_TAG) \
-			APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
-			CONTEXT_DIR=$(REPO_ROOT) \
-			ACTION=--push
+retina-image-win: ## build the retina Windows container image.
+	for year in 2019 2022; do \
+		tag=$(TAG)-windows-ltsc$$year-amd64; \
+		echo "Building $(RETINA_PLATFORM_TAG)"; \
+		$(MAKE) container-$(CONTAINER_BUILDER) \
+				PLATFORM=windows/amd64 \
+				DOCKERFILE=controller/Dockerfile.windows-$$year \
+				REGISTRY=$(IMAGE_REGISTRY) \
+				IMAGE=$(RETINA_IMAGE) \
+				VERSION=$(TAG) \
+				TAG=$$tag \
+				CONTEXT_DIR=$(REPO_ROOT) \
+				ACTION=--push; \
+	done
 
-retina-operator-image:  ## build the retina operator image.
+retina-operator-image:  ## build the retina linux operator image.
 	echo "Building for $(PLATFORM)"
 	$(MAKE) container-$(CONTAINER_BUILDER) \
 			PLATFORM=$(PLATFORM) \
@@ -283,14 +296,16 @@ retina-operator-image:  ## build the retina operator image.
 			CONTEXT_DIR=$(REPO_ROOT) \
 			ACTION=--push
 
-retina-image-win: ## build the retina Windows container image.
+kubectl-retina-image: ## build the kubectl-retina image. 
+	echo "Building for $(PLATFORM)"
 	$(MAKE) container-$(CONTAINER_BUILDER) \
-			PLATFORM=windows/amd64 \
-			DOCKERFILE=controller/Dockerfile.windows-$(YEAR) \
+			PLATFORM=$(PLATFORM) \
+			DOCKERFILE=cli/Dockerfile.kubectl-retina \
 			REGISTRY=$(IMAGE_REGISTRY) \
-			IMAGE=$(RETINA_IMAGE) \
+			IMAGE=$(KUBECTL_RETINA_IMAGE) \
 			VERSION=$(TAG) \
 			TAG=$(RETINA_PLATFORM_TAG) \
+			APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
 			CONTEXT_DIR=$(REPO_ROOT) \
 			ACTION=--push
 
@@ -312,6 +327,32 @@ go-gen: ## run go generate at the repository root
 all-gen: ## generate all code
 	$(MAKE) proto-gen
 	$(MAKE) go-gen
+
+##@ Multiplatform
+
+manifest-retina-image: ## create a multiplatform manifest for the retina image
+	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_IMAGE):$(TAG))
+	$(eval FULL_INIT_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE):$(TAG))
+	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64 windows-ltsc2019-amd64 windows-ltsc2022-amd64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+	docker buildx imagetools create -t $(FULL_INIT_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+
+manifest-operator-image: ## create a multiplatform manifest for the operator image
+	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE):$(TAG))
+	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+
+manifest-kubectl-retina-image: ## create a multiplatform manifest for the kubectl-retina image
+	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(KUBECTL_RETINA_IMAGE):$(TAG))
+	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+
+manifest:
+	echo "Building for $(COMPONENT)"
+	if [ "$(COMPONENT)" = "retina" ]; then \
+		$(MAKE) manifest-retina-image; \
+	elif [ "$(COMPONENT)" = "operator" ]; then \
+		$(MAKE) manifest-operator-image; \
+	elif [ "$(COMPONENT)" = "kubectl-retina" ]; then \
+		$(MAKE) manifest-kubectl-retina-image; \
+	fi
 
 ##@ Tests
 # Make sure the layer has only one directory.
@@ -359,93 +400,6 @@ retina-cc: # Code coverage.
 	fi;
 
 ## Reusable targets for building multiplat container image manifests.
-
-IMAGE_ARCHIVE_DIR ?= $(shell pwd)
-
-manifest-create: # util target to compose multiarch container manifests from platform specific images.
-	$(CONTAINER_BUILDER) manifest create $(IMAGE_REGISTRY)/$(IMAGE):$(TAG)
-	for PLATFORM in $(PLATFORMS); do $(MAKE) manifest-add PLATFORM=$$PLATFORM IMAGE=$(IMAGE) TAG=$(TAG); done
-
-manifest-add:
-	if [ "$(PLATFORM)" = "windows/amd64/2022" ]; then \
-		echo "Adding windows/amd64/2022"; \
-		$(CONTAINER_BUILDER) manifest add --os-version=$(WINVER2022) --os=windows $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) docker://$(IMAGE_REGISTRY)/$(IMAGE):windows-ltsc2022-amd64-$(TAG); \
-	elif [ "$(PLATFORM)" = "windows/amd64/2019" ]; then \
-		echo "Adding windows/amd64/2019"; \
-		$(CONTAINER_BUILDER) manifest add --os-version=$(WINVER2019) --os=windows $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) docker://$(IMAGE_REGISTRY)/$(IMAGE):windows-ltsc2019-amd64-$(TAG); \
-	else \
-		echo "Adding $(PLATFORM)"; \
-		$(CONTAINER_BUILDER) manifest add $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) docker://$(IMAGE_REGISTRY)/$(IMAGE):$(subst /,-,$(PLATFORM))-$(TAG); \
-	fi;
-
-manifest-push: # util target to push multiarch container manifest.
-	$(CONTAINER_BUILDER) manifest inspect $(IMAGE_REGISTRY)/$(IMAGE):$(TAG)
-	$(CONTAINER_BUILDER) manifest push --all $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) docker://$(IMAGE_REGISTRY)/$(IMAGE):$(TAG)
-
-manifest-skopeo-archive: # util target to export tar archive of multiarch container manifest.
-	skopeo copy --all docker://$(IMAGE_REGISTRY)/$(IMAGE):$(TAG) oci-archive:$(IMAGE_ARCHIVE_DIR)/$(IMAGE)-$(TAG).tar
-
-## Build specific multiplat images.
-
-retina-init-manifest-create: ## build retina multiplat container manifest.
-	$(MAKE) manifest-create \
-		PLATFORMS="$(PLATFORMS)" \
-		IMAGE=$(RETINA_INIT_IMAGE) \
-		TAG=$(TAG)
-
-retina-init-manifest-push: ## push retina multiplat container manifest
-	$(MAKE) manifest-push \
-		IMAGE=$(RETINA_INIT_IMAGE) \
-		TAG=$(TAG)
-
-retina-agent-manifest-create: ## build retina multiplat container manifest.
-	$(MAKE) manifest-create \
-		PLATFORMS="$(PLATFORMS)" \
-		IMAGE=$(RETINA_IMAGE) \
-		TAG=$(TAG)
-
-retina-agent-manifest-push: ## push retina multiplat container manifest
-	$(MAKE) manifest-push \
-		IMAGE=$(RETINA_IMAGE) \
-		TAG=$(TAG)
-
-retina-agent-skopeo-archive: ## export tar archive of retina multiplat container manifest.
-	$(MAKE) manifest-skopeo-archive \
-		IMAGE=$(RETINA_IMAGE) \
-		TAG=$(TAG) 
-
-retina-operator-manifest-create: ## build retina multiplat container manifest.
-	$(MAKE) manifest-create \
-		PLATFORMS="$(PLATFORMS)" \
-		IMAGE=$(RETINA_OPERATOR_IMAGE) \
-		TAG=$(TAG)
-
-retina-operator-manifest-push: ## push retina multiplat container manifest
-	$(MAKE) manifest-push \
-		IMAGE=$(RETINA_OPERATOR_IMAGE) \
-		TAG=$(TAG)
-
-retina-operator-skopeo-archive: ## export tar archive of retina multiplat container manifest.
-	$(MAKE) manifest-skopeo-archive \
-		IMAGE=$(RETINA_OPERATOR_IMAGE) \
-		TAG=$(TAG) 
-		
-kubectl-retina-manifest-create: ## build kubectl plugin multiplat container manifest.
-	$(MAKE) manifest-create \
-		PLATFORMS="$(PLATFORMS)" \
-		IMAGE=$(KUBECTL_RETINA_IMAGE) \
-		TAG=$(TAG)
-
-kubectl-retina-manifest-push: ## push kubectl plugin multiplat container manifest.
-	$(MAKE) manifest-push \
-		IMAGE=$(KUBECTL_RETINA_IMAGE) \
-		TAG=$(TAG)
-
-kubectl-retina-skopeo-archive: ## export tar archive of retina kubectl plugin container manifest.
-	$(MAKE) manifest-skopeo-archive \
-		IMAGE=$(KUBECTL_RETINA_IMAGE) \
-		TAG=$(TAG) 
-
 
 .PHONY: manifests
 manifests: 
