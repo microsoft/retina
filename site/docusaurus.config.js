@@ -7,7 +7,7 @@ const darkCodeTheme = require('prism-react-renderer').themes.dracula;
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'Retina',
-  tagline: 'REal-TIme Network Analytics',
+  tagline: 'Kubernetes Network Observability',
   favicon: 'img/favicon.ico',
 
   // Set the production url of your site here
