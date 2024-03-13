@@ -223,7 +223,7 @@ require (
 	github.com/Azure/azure-container-networking/zapai v0.0.3
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.2.1
-	github.com/Microsoft/hcsshim v0.12.0-rc.3
+	github.com/Microsoft/hcsshim v0.12.0
 	github.com/cakturk/go-netstat v0.0.0-20200220111822-e5b49efee7a5
 	github.com/cilium/cilium v1.15.1
 	github.com/cilium/ebpf v0.13.2
