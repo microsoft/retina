@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/oss/go/microsoft/golang:1.21
+FROM mcr.microsoft.com/oss/go/microsoft/golang:1.21 as gogen-tools
 
 # Default linux/architecture.
 ARG GOOS=linux
@@ -10,6 +10,7 @@ ENV GOARCH=${GOARCH}
 RUN apt-get update &&\
     apt-get -y install lsb-release wget software-properties-common gnupg file git make
 
+# Install clang and llvm.
 RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
 RUN add-apt-repository "deb http://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-14 main"
 RUN apt-get update
@@ -21,4 +22,5 @@ RUN ln -s /usr/bin/clang-14 /usr/bin/clang
 
 WORKDIR /app
 
-ENTRYPOINT mkdir /tmp/.cache && export GOCACHE=/tmp/.cache && go generate ./...
+# Generate go code.
+ENTRYPOINT mkdir /tmp/.cache && export GOCACHE=/tmp/.cache && CGO_ENABLED=0 go generate ./...
