@@ -368,18 +368,7 @@ retina-test-image: ## build the retina container image for testing.
 			IMAGE=$(RETINA_IMAGE) \
 			CONTEXT_DIR=$(REPO_ROOT) \
 			TAG=$(RETINA_PLATFORM_TAG) \
-
-	docker save -o archives.tar $(IMAGE_REGISTRY)/$(RETINA_IMAGE):$(RETINA_PLATFORM_TAG) && \
-	mkdir -p archivelayers && \
-	cp archives.tar archivelayers/archives.tar && \
-	cd archivelayers/ && \
-	pwd && \
-	tar -xvf archives.tar && \
-	cd `ls -d */` && \
-	pwd && \
-	tar -xvf layer.tar && \
-	cp coverage.out ../../
-	$(MAKE) retina-cc
+			ACTION=--load
 
 COVER_PKG ?= .
 
