@@ -9,8 +9,6 @@ REPO_ROOT = $(shell git rev-parse --show-toplevel)
 ifndef TAG
 	TAG ?= $(shell git describe --tags --always)
 endif
-GOOS ?= $(shell go env GOOS)
-GOARCH ?= $(shell go env GOARCH)
 OUTPUT_DIR = $(REPO_ROOT)/output
 BUILD_DIR = $(OUTPUT_DIR)/$(GOOS)_$(GOARCH)
 RETINA_BUILD_DIR = $(BUILD_DIR)/retina
@@ -27,30 +25,20 @@ APP_INSIGHTS_ID ?= ""
 GENERATE_TARGET_DIRS = \
 	./pkg/plugin/linuxutil
 
+# Default platform is linux/amd64
+GOOS ?= linux
+GOARCH ?= amd64
 IMAGE_REGISTRY    ?= acnpublic.azurecr.io
 OS                ?= $(GOOS)
 ARCH              ?= $(GOARCH)
 PLATFORM          ?= $(OS)/$(ARCH)
 
-CONTAINER_BUILDER ?= buildah
-CONTAINER_RUNTIME ?= podman
+CONTAINER_BUILDER ?= docker
+CONTAINER_RUNTIME ?= docker
 YEAR 			  ?=2022
 
 ALL_ARCH.linux = amd64 arm64
 ALL_ARCH.windows = amd64
-
-# prefer buildah, if available, but fall back to docker if that binary is not in the path.
-ifeq (, $(shell which $(CONTAINER_BUILDER)))
-CONTAINER_BUILDER = docker
-endif
-# use docker if platform is windows
-ifeq ($(OS),windows)
-CONTAINER_BUILDER = docker
-endif
-# prefer podman, if available, but fall back to docker if that binary is not in the path.
-ifeq (, $(shell which $(CONTAINER_RUNTIME)))
-CONTAINER_RUNTIME = docker
-endif
 
 # TAG is OS and platform agonstic, which can be used for binary version and image manifest tag,
 # while RETINA_PLATFORM_TAG is platform specific, which can be used for image built for specific platforms.
@@ -156,10 +144,9 @@ retina: ## builds both retina and kapctl binaries
 	$(MAKE) retina-binary kubectl-retina
 
 retina-binary: ## build the Retina binary
-	go generate ./... &&\
-	cd $(RETINA_DIR) &&\
-	CGO_ENABLED=0 &&\
-	go build -v -o $(RETINA_BUILD_DIR)/retina$(EXE_EXT) -gcflags="-dwarflocationlists=true" -ldflags "-X main.version=$(TAG) -X main.applicationInsightsID=$(APP_INSIGHTS_ID)"
+	go generate ./...
+	export CGO_ENABLED=0
+	go build -v -o $(RETINA_BUILD_DIR)/retina$(EXE_EXT) -gcflags="-dwarflocationlists=true" -ldflags "-X main.version=$(TAG) -X main.applicationInsightsID=$(APP_INSIGHTS_ID)" $(RETINA_DIR)/main.go
 
 all-kubectl-retina: $(addprefix kubectl-retina-linux-,${ALL_ARCH.linux})  $(addprefix kubectl-retina-windows-,${ALL_ARCH.windows}) ## build kubectl plugin for all platforms
 
@@ -231,93 +218,44 @@ retina-skopeo-export:
 		IMG=$(RETINA_IMAGE)
 		TAG=$(RETINA_PLATFORM_TAG)
 
-# VERSION vs TAG: VERSION is the version of the binary, TAG is the version of the container image
-# which may contain OS and ARCH information.
-container-buildah: # util target to build container images using buildah. do not invoke directly.
-	buildah bud \
-		--jobs 16 \
-		--platform $(PLATFORM) \
-		-f $(DOCKERFILE) \
-		--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
-		--build-arg GOOS=$(GOOS) \
-		--build-arg GOARCH=$(GOARCH) \
-		--build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
-		--build-arg builderImage=$(IMAGE_REGISTRY)/$(RETINA_BUILDER_IMAGE):$(TAG) \
-		--build-arg toolsImage=$(IMAGE_REGISTRY)/$(RETINA_TOOLS_IMAGE):$(TAG) \
-		-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
-		$(CONTEXT_DIR)
-
 container-docker: # util target to build container images using docker buildx. do not invoke directly.
+	echo "Building for platform $(PLATFORM)"
+	os=$$(echo $(PLATFORM) | cut -d'/' -f1); \
+	arch=$$(echo $(PLATFORM) | cut -d'/' -f2); \
+	echo "Building for $$os/$$arch"; \
 	docker buildx build \
 		$(ACTION) \
 		--platform $(PLATFORM) \
 		-f $(DOCKERFILE) \
 		--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
-		--build-arg GOOS=$(GOOS) \
-		--build-arg GOARCH=$(GOARCH) \
+		--build-arg GOOS=$$os \
+		--build-arg GOARCH=$$arch \
 		--build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
-		--build-arg builderImage=$(IMAGE_REGISTRY)/$(RETINA_BUILDER_IMAGE):$(TAG) \
-		--build-arg toolsImage=$(IMAGE_REGISTRY)/$(RETINA_TOOLS_IMAGE):$(TAG) \
+		--target=$(TARGET) \
 		-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
 		$(CONTEXT_DIR)
 
-retina-builder-image: ## build the retina builder container image.
-	echo "Building for $(PLATFORM)"
-	$(MAKE) container-$(CONTAINER_BUILDER) \
-			PLATFORM=$(PLATFORM) \
-			DOCKERFILE=controller/Dockerfile.builder \
-			REGISTRY=$(IMAGE_REGISTRY) \
-			IMAGE=$(RETINA_BUILDER_IMAGE) \
-			VERSION=$(TAG) \
-			TAG=$(RETINA_PLATFORM_TAG) \
-			APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
-			CONTEXT_DIR=$(REPO_ROOT) \
-			ACTION=--load
-
-retina-builder-image-remove:
-	$(CONTAINER_BUILDER) rmi $(IMAGE_REGISTRY)/$(RETINA_BUILDER_IMAGE):$(RETINA_PLATFORM_TAG)
-
-retina-tools-image: ## build the retina container image.
-	echo "Building for $(PLATFORM)"
-	$(MAKE) container-$(CONTAINER_BUILDER) \
-			PLATFORM=$(PLATFORM) \
-			DOCKERFILE=controller/Dockerfile.tools \
-			REGISTRY=$(IMAGE_REGISTRY) \
-			IMAGE=$(RETINA_TOOLS_IMAGE) \
-			VERSION=$(TAG) \
-			TAG=$(RETINA_PLATFORM_TAG) \
-			APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
-			CONTEXT_DIR=$(REPO_ROOT) \
-			ACTION=--load
-
-retina-tools-image-remove:
-	$(CONTAINER_BUILDER) rmi $(IMAGE_REGISTRY)/$(RETINA_TOOLS_IMAGE):$(RETINA_PLATFORM_TAG)
-
 retina-image: ## This pulls dependecies from registry. Use retina-image-local to build dependencies first locally.
 	echo "Building for $(PLATFORM)"
-	$(MAKE) container-$(CONTAINER_BUILDER) \
-			PLATFORM=$(PLATFORM) \
-			DOCKERFILE=controller/Dockerfile.controller \
-			REGISTRY=$(IMAGE_REGISTRY) \
-			IMAGE=$(RETINA_IMAGE) \
-			VERSION=$(TAG) \
-			TAG=$(RETINA_PLATFORM_TAG) \
-			APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
-			CONTEXT_DIR=$(REPO_ROOT) \
-			ACTION=--load
-
-retina-init-image: ## build the retina container image.
-	echo "Building for $(PLATFORM)"
-	$(MAKE) container-$(CONTAINER_BUILDER) \
-			PLATFORM=$(PLATFORM) \
-			DOCKERFILE=controller/Dockerfile.init \
-			REGISTRY=$(IMAGE_REGISTRY) \
-			IMAGE=$(RETINA_INIT_IMAGE) \
-			VERSION=$(TAG) \
-			TAG=$(RETINA_PLATFORM_TAG) \
-			APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
-			CONTEXT_DIR=$(REPO_ROOT) \
-			ACTION=--load
+	for target in init agent; do \
+		echo "Building for $$target"; \
+		if [ "$$target" = "init" ]; then \
+			image_name=$(RETINA_INIT_IMAGE); \
+		else \
+			image_name=$(RETINA_IMAGE); \
+		fi; \
+		$(MAKE) container-$(CONTAINER_BUILDER) \
+				PLATFORM=$(PLATFORM) \
+				DOCKERFILE=controller/Dockerfile.controller \
+				REGISTRY=$(IMAGE_REGISTRY) \
+				IMAGE=$$image_name \
+				VERSION=$(TAG) \
+				TAG=$(RETINA_PLATFORM_TAG) \
+				APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
+				CONTEXT_DIR=$(REPO_ROOT) \
+				TARGET=$$target \
+				ACTION=--push; \
+	done
 
 kubectl-retina-image: ## build the kubectl-retina image. 
 	echo "Building for $(PLATFORM)"
@@ -330,7 +268,7 @@ kubectl-retina-image: ## build the kubectl-retina image.
 			TAG=$(RETINA_PLATFORM_TAG) \
 			APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
 			CONTEXT_DIR=$(REPO_ROOT) \
-			ACTION=--load
+			ACTION=--push
 
 retina-operator-image:  ## build the retina operator image.
 	echo "Building for $(PLATFORM)"
@@ -343,50 +281,9 @@ retina-operator-image:  ## build the retina operator image.
 			TAG=$(RETINA_PLATFORM_TAG) \
 			APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
 			CONTEXT_DIR=$(REPO_ROOT) \
-			ACTION=--load
-
-kubectl-retina-image-push: ## push kubectl-retina container image.
-	$(MAKE) container-push \
-		IMAGE=$(KUBECTL_RETINA_IMAGE) \
-		TAG=$(RETINA_PLATFORM_TAG)
-
-retina-image-push: ## push the retina container image.
-	$(MAKE) container-push \
-		IMAGE=$(RETINA_IMAGE) \
-		TAG=$(RETINA_PLATFORM_TAG)
-
-retina-builder-image-push: ## push the retina builder container image.
-	$(MAKE) container-push \
-		IMAGE=$(RETINA_BUILDER_IMAGE) \
-		TAG=$(RETINA_PLATFORM_TAG)
-
-retina-tools-image-push: ## push the retina tools container image.
-	$(MAKE) container-push \
-		IMAGE=$(RETINA_TOOLS_IMAGE) \
-		TAG=$(RETINA_PLATFORM_TAG)
-
-retina-init-image-push: ## push the retina container image.
-	$(MAKE) container-push \
-		IMAGE=$(RETINA_INIT_IMAGE) \
-		TAG=$(RETINA_PLATFORM_TAG)
-
-retina-operator-image-push: ## push the retina container image.
-	$(MAKE) container-push \
-		IMAGE=$(RETINA_OPERATOR_IMAGE) \
-		TAG=$(RETINA_PLATFORM_TAG)
+			ACTION=--push
 
 retina-image-win: ## build the retina Windows container image.
-	$(MAKE) container-$(CONTAINER_BUILDER) \
-			PLATFORM=windows/amd64 \
-			DOCKERFILE=controller/Dockerfile.windows-$(YEAR) \
-			REGISTRY=$(IMAGE_REGISTRY) \
-			IMAGE=$(RETINA_IMAGE) \
-			VERSION=$(TAG) \
-			TAG=$(RETINA_PLATFORM_TAG) \
-			CONTEXT_DIR=$(REPO_ROOT) \
-			ACTION=--load
-
-retina-image-win-push: ## push the retina Windows container image.
 	$(MAKE) container-$(CONTAINER_BUILDER) \
 			PLATFORM=windows/amd64 \
 			DOCKERFILE=controller/Dockerfile.windows-$(YEAR) \
@@ -416,27 +313,6 @@ all-gen: ## generate all code
 	$(MAKE) proto-gen
 	$(MAKE) go-gen
 
-all-images-local:
-	$(MAKE) -j4 retina-builder-image retina-tools-image retina-operator-image kubectl-retina-image
-	$(MAKE) -j2 retina-image retina-init-image 
-
-all-images-local-push:
-	$(MAKE) -j3 retina-builder-image-push retina-tools-image-push retina-operator-image-push
-	$(MAKE) -j3 retina-image-push retina-init-image-push kubectl-retina-image-push
-
-base-images-remove:
-	$(MAKE) -j2 retina-builder-image-remove retina-tools-image-remove
-
-# Build images locally.
-# Don't use this in pipeline, we want to pull images from registry.
-retina-image-local:
-	$(MAKE) -j2 retina-builder-image retina-tools-image
-	$(MAKE) retina-image
-
-retina-init-image-local:
-	$(MAKE) -j2 retina-builder-image retina-tools-image
-	$(MAKE) retina-init-image
-
 ##@ Tests
 # Make sure the layer has only one directory.
 # the test DockerFile needs to build the scratch stage with all the output files 
@@ -464,25 +340,6 @@ retina-test-image: ## build the retina container image for testing.
 
 COVER_PKG ?= .
 
-retina-integration-test-image: # Build the retina container image for integration testing.
-	docker build \
-		-t $(IMAGE_REGISTRY)/$(RETINA_INTEGRATION_TEST_IMAGE):$(RETINA_PLATFORM_TAG) \
-		-f test/integration/Dockerfile.integration \
-		--build-arg kubeconfig=$(HOME)/.kube/config \
-		--build-arg ENABLE_POD_LEVEL=$(ENABLE_POD_LEVEL) \
-		.
-
-retina-integration-docker-deploy:
-	docker rm -f retina-integ-container 2> /dev/null
-	docker run \
-		-e RETINA_AGENT_IMAGE=$(IMAGE_REGISTRY)/$(RETINA_IMAGE):$(TAG) \
-		-e ENABLE_POD_LEVEL=$(ENABLE_POD_LEVEL) \
-		-v $(HOME)/.kube/config:/root/.kube/config \
-		--name retina-integ-container \
-		$(IMAGE_REGISTRY)/$(RETINA_INTEGRATION_TEST_IMAGE):$(RETINA_PLATFORM_TAG) \
-		|| true
-	docker cp retina-integ-container:/tmp/retina-integration-logs .
-
 retina-ut: $(ENVTEST) # Run unit tests.
 	go build -o test-summary ./test/utsummary/main.go
 	CGO_ENABLED=0 KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit -coverprofile=coverage.out -v -json ./... | ./test-summary --progress --verbose
@@ -501,58 +358,11 @@ retina-cc: # Code coverage.
 		python3 scripts/coverage/compare_cov.py; \
 	fi;
 
-retina-integration: $(GINKGO) # Integration tests.
-	export ACK_GINKGO_RC=true && $(GINKGO) -keepGoing -tags=integration ./test/integration/... -v -progress -trace -cover -coverprofile=coverage.out
-
-retina-export-logs: # Export worker node logs.
-	mkdir kubernetes-logs
-	kubectl get pods -A -o wide > kubernetes-logs/pods.txt
-	docker cp retina-cluster-worker:/var/log kubernetes-logs
-
-##@ kind
-
-kind-setup: ## Deploy kind cluster.
-	$(KIND) create cluster --name $(KIND_CLUSTER) --config ./test/kind/kind.yaml
-#	Install NPM
-	kubectl  apply -f https://raw.githubusercontent.com/Azure/azure-container-networking/master/npm/azure-npm.yaml
-	sleep 5s
-	kubectl -n kube-system wait --for=condition=ready --timeout=120s pod -l k8s-app=azure-npm
-
-kind-clean: ## Delete kind cluster.
-	$(KIND) delete cluster --name $(KIND_CLUSTER)
-
-kind-load-image: ## Load local image to kind nodes.
-#	$(MAKE) retina-image
-	$(KIND) load docker-image --name $(KIND_CLUSTER) $(IMAGE_REGISTRY)/$(RETINA_IMAGE):$(RETINA_PLATFORM_TAG)
-	$(KIND) load docker-image --name $(KIND_CLUSTER) $(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE):$(RETINA_PLATFORM_TAG)
-	$(KIND) load docker-image --name $(KIND_CLUSTER) $(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE):$(RETINA_PLATFORM_TAG)
-
-kind-install: kind-load-image # Install Retina in kind cluster.
-	helm install retina ./deploy/manifests/controller/helm/retina/ \
-	--set image.repository=$(IMAGE_REGISTRY)/$(RETINA_IMAGE) \
-	--set image.tag=$(RETINA_PLATFORM_TAG) \
-	--set operator.repository=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE) \
-	--set operator.tag=$(RETINA_PLATFORM_TAG) \
-	--set image.initRepository=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE) \
-	--set image.pullPolicy=Never \
-	--set logLevel=debug \
-	--set os.windows=false \
-	--namespace kube-system --dependency-update
-	sleep 5s
-# 	Wait for retina agent to be ready.
-	kubectl -n kube-system wait --for=condition=ready --timeout=120s pod -l app=retina
-# 	Port forward the retina api server.
-	kubectl -n kube-system port-forward svc/retina-svc 8889:10093  2>&1 >/dev/null &
-
-kind-uninstall: # Uninstall Retina from kind cluster.
-	helm uninstall retina -n kube-system
-
 ## Reusable targets for building multiplat container image manifests.
 
 IMAGE_ARCHIVE_DIR ?= $(shell pwd)
 
 manifest-create: # util target to compose multiarch container manifests from platform specific images.
-	cat /usr/share/containers/containers.conf
 	$(CONTAINER_BUILDER) manifest create $(IMAGE_REGISTRY)/$(IMAGE):$(TAG)
 	for PLATFORM in $(PLATFORMS); do $(MAKE) manifest-add PLATFORM=$$PLATFORM IMAGE=$(IMAGE) TAG=$(TAG); done
 
@@ -577,38 +387,6 @@ manifest-skopeo-archive: # util target to export tar archive of multiarch contai
 
 ## Build specific multiplat images.
 
-retina-builder-manifest-create: ## build retina multiplat container manifest.
-	$(MAKE) manifest-create \
-		PLATFORMS="$(PLATFORMS)" \
-		IMAGE=$(RETINA_BUILDER_IMAGE) \
-		TAG=$(TAG)
-
-retina-builder-manifest-push: ## push retina multiplat container manifest
-	$(MAKE) manifest-push \
-		IMAGE=$(RETINA_BUILDER_IMAGE) \
-		TAG=$(TAG)
-
-retina-builder-skopeo-archive: ## export tar archive of retina multiplat container manifest.
-	$(MAKE) manifest-skopeo-archive \
-		IMAGE=$(RETINA_BUILDER_IMAGE) \
-		TAG=$(TAG)
-
-retina-tools-manifest-create: ## build retina multiplat container manifest.
-	$(MAKE) manifest-create \
-		PLATFORMS="$(PLATFORMS)" \
-		IMAGE=$(RETINA_TOOLS_IMAGE) \
-		TAG=$(TAG)
-
-retina-tools-manifest-push: ## push retina multiplat container manifest
-	$(MAKE) manifest-push \
-		IMAGE=$(RETINA_TOOLS_IMAGE) \
-		TAG=$(TAG)
-
-retina-tools-skopeo-archive: ## export tar archive of retina multiplat container manifest.
-	$(MAKE) manifest-skopeo-archive \
-		IMAGE=$(RETINA_TOOLS_IMAGE) \
-		TAG=$(TAG)
-		
 retina-init-manifest-create: ## build retina multiplat container manifest.
 	$(MAKE) manifest-create \
 		PLATFORMS="$(PLATFORMS)" \
@@ -617,11 +395,6 @@ retina-init-manifest-create: ## build retina multiplat container manifest.
 
 retina-init-manifest-push: ## push retina multiplat container manifest
 	$(MAKE) manifest-push \
-		IMAGE=$(RETINA_INIT_IMAGE) \
-		TAG=$(TAG)
-
-retina-init-skopeo-archive: ## export tar archive of retina multiplat container manifest.
-	$(MAKE) manifest-skopeo-archive \
 		IMAGE=$(RETINA_INIT_IMAGE) \
 		TAG=$(TAG)
 
@@ -691,22 +464,6 @@ helm-install: manifests
 		--set operator.enabled=false \
 		--set enabledPlugin_linux="[\"dropreason\"\,\"packetforward\"\,\"linuxutil\"\,\"dns\"]"
 
-helm-install-with-operator: manifests
-	helm install retina ./deploy/manifests/controller/helm/retina/ \
-		--namespace kube-system \
-		--set image.repository=$(IMAGE_REGISTRY)/$(RETINA_IMAGE) \
-		--set image.tag=$(RETINA_PLATFORM_TAG) \
-		--set image.initRepository=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE) \
-		--set image.pullPolicy=Always \
-		--set logLevel=info \
-		--set os.windows=true \
-		--set operator.enabled=true \
-		--set operator.enableRetinaEndpoint=true \
-		--set operator.tag=$(RETINA_PLATFORM_TAG) \
-		--set operator.repository=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE) \
-		--skip-crds \
-		--set enabledPlugin_linux="[\"dropreason\"\,\"packetforward\"\,\"linuxutil\"\,\"dns\"]"
-
 # advanced/pod-level mode with scale limitations, where metrics are aggregated by source and destination Pod
 helm-install-advanced-remote-context: manifests
 	helm install retina ./deploy/manifests/controller/helm/retina/ \
@@ -757,7 +514,9 @@ docs:
 .PHONY: docs-pod
 docs-prod:
 	docker run -i -p 3000:3000 -v $(PWD):/retina -w /retina/ node:20-alpine npm install --prefix site && npm run build --prefix site
- 
+
+# Kapinger is a tool to generate traffic for testing Retina.
+
 kapinger-image: ## build the retina container image.
 	echo "Building for $(PLATFORM)"
 	$(MAKE) container-$(CONTAINER_BUILDER) \
