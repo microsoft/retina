@@ -16,6 +16,20 @@
   }
 }
 
+@media only screen and (max-width: 600px) {
+  .columns {
+    display: flex;
+    align-items: center; 
+    word-break: break-word;
+    padding: 4rem 1.5rem;
+
+} 
+.column2 {
+  flex-grow: 2; 
+  font-size: 0.75rem;
+}
+}
+
 .buttons {
   display: flex;
   align-items: center;
@@ -26,18 +40,20 @@
     display: flex;
     align-items: center; 
     padding: 4rem 1.5rem;
+    word-break: break-word
 }
 
 .column1 {
+  text-align: center;
   flex: none; 
   width: 33.3333%;
   font-weight: 600; 
-  font-size: 3rem;
+  font-size: calc(1rem + 1.8vw);
 }
 
 .column2 {
   flex-grow: 2; 
-  font-size: 1.25rem;
+  font-size: calc(1rem + 0.3vw);
 }
 
 .paragraph1 {
@@ -46,5 +62,8 @@
 
 .features {
   display: block;
-  margin: 0 auto;
+  margin: 20px auto;
+  width: 100%;
+  max-width: 926px;
+  height: auto;
 }
