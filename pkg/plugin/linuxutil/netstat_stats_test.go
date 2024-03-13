@@ -98,16 +98,15 @@ func TestReadConnStats(t *testing.T) {
 			wantErr:   false,
 			checkVals: true,
 		},
-		// TODO: Fix the test
-		// {
-		// 	name:     "test wrong",
-		// 	filePath: "testdata/wrong-netstat",
-		// 	result: &ConnectionStats{
-		// 		TcpExt: map[string]uint64{},
-		// 		IpExt:  map[string]uint64{},
-		// 	},
-		// 	wantErr: true,
-		// },
+		{
+			name:     "test wrong",
+			filePath: "testdata/wrong-netstat",
+			result: &ConnectionStats{
+				TcpExt: map[string]uint64{},
+				IpExt:  map[string]uint64{},
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
