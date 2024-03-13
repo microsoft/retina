@@ -55,17 +55,17 @@ func TestInstallOrUpdateCRDs(t *testing.T) {
 			name:                 "install all CRDs",
 			enableRetinaEndpoint: true,
 			want: map[string]*apiextensionsv1.CustomResourceDefinition{
-				"captures.retina.io":              capture,
-				"retinaendpoints.retina.io":       endpoint,
-				"metricsconfigurations.retina.io": metrics,
+				"captures.retina.sh":              capture,
+				"retinaendpoints.retina.sh":       endpoint,
+				"metricsconfigurations.retina.sh": metrics,
 			},
 		},
 		{
 			name:                 "disable retina endpoint",
 			enableRetinaEndpoint: false,
 			want: map[string]*apiextensionsv1.CustomResourceDefinition{
-				"captures.retina.io":              capture,
-				"metricsconfigurations.retina.io": metrics,
+				"captures.retina.sh":              capture,
+				"metricsconfigurations.retina.sh": metrics,
 			},
 		},
 	}

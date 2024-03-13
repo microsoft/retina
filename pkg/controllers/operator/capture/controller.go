@@ -69,9 +69,9 @@ func NewCaptureReconciler(client client.Client, scheme *runtime.Scheme, kubeClie
 	return cr
 }
 
-//+kubebuilder:rbac:groups=retina.io,resources=captures,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=retina.io,resources=captures/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=retina.io,resources=captures/finalizers,verbs=update
+//+kubebuilder:rbac:groups=retina.sh,resources=captures,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=retina.sh,resources=captures/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=retina.sh,resources=captures/finalizers,verbs=update
 //+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete;deletecollection
 //+kubebuilder:rbac:groups=batch,resources=jobs/status,verbs=get
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list

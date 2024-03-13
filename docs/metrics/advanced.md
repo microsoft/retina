@@ -12,6 +12,7 @@ All metrics have the prefix `networkobservability_`.
 ## Universal Labels
 
 Node and Cluster metadata are included with the labels:
+
 - `cluster`
 - `instance` (Node name)
 
@@ -24,6 +25,7 @@ To customize context labels, see [MetricsConfiguration CRD](../CRDs/MetricsConfi
 ### Remote Context
 
 For Advanced mode with *remote context*, default context labels are the following:
+
 - `source_ip`
 - `source_namespace`
 - `source_pod`
@@ -36,12 +38,14 @@ For Advanced mode with *remote context*, default context labels are the followin
 ### Local Context
 
 For Advanced mode with *local context*, default context labels are the following for *outgoing* traffic:
+
 - `source_ip`
 - `source_namespace`
 - `source_pod`
 - `source_workload`
 
 For *incoming* traffic:
+
 - `destination_ip`
 - `destination_namespace`
 - `destination_pod`
@@ -65,13 +69,16 @@ Metrics enabled when `dropreason` plugin is enabled (see [Metrics Configuration]
 | `adv_drop_bytes`        | ***Advanced/Pod-Level***: dropped byte count   | `direction`, `reason`, context labels |
 
 #### Label Values
+
 See [Context Labels](#context-labels).
 
 Possible values for `direction`:
+
 - `ingress` (incoming traffic)
 - `egress` (outgoing traffic)
 
 Possible values for `reason`:
+
 - `IPTABLE_RULE_DROP`
 - `IPTABLE_NAT_DROP`
 - `TCP_CONNECT_BASIC`
@@ -120,10 +127,12 @@ The metrics were born out of a real-life incident, where Node-to-API-server late
 See [Context Labels](#context-labels).
 
 Possible values for `direction`:
+
 - `ingress` (incoming traffic)
 - `egress` (outgoing traffic)
 
 Possible values for `flag`:
+
 - `FIN`
 - `SYN`
 - `RST`
@@ -135,6 +144,7 @@ Possible values for `flag`:
 - `NS`
 
 Possible values for `le` (for API server metrics). Units are in *milliseconds*. `le` stands for "less than or equal". See [Prometheus histogram documentation](https://prometheus.io/docs/concepts/metric_types/#histogram) for more info.
+
 - `0`
 - `0.5`
 - `1` through `4.5` in increments of 0.5
@@ -149,4 +159,5 @@ Metrics enabled when `tcpretrans` plugin is enabled (see [Metrics Configuration]
 | `adv_tcpretrans_count` | ***Advanced/Pod-Level***: TCP retransmitted packet count | context labels |
 
 #### Label Values
+
 See [Context Labels](#context-labels).

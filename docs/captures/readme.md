@@ -9,6 +9,7 @@ Captures are on-demand and can be output to the host filesystem, a storage blob,
 ## Usage
 
 There are two methods for triggering a Capture:
+
 - [CLI command](#option-1-retina-cli) or
 - [CRD/YAML configuration](#option-2-capture-crd-custom-resource-definition).
 
@@ -63,7 +64,7 @@ type: Opaque
 Create a Capture specifying the secret created as blobUpload, this example will also store the artifact on the node host path
 
 ```yaml
-apiVersion: retina.io/v1alpha1
+apiVersion: retina.sh/v1alpha1
 kind: Capture
 metadata:
   name: capture-test

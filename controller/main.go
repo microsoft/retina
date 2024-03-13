@@ -138,7 +138,7 @@ func main() {
 		// Port:                   9443, // retina-agent is host-networked, we don't want to abuse the port for conflicts.
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "ecaf1259.retina.io",
+		LeaderElectionID:       "ecaf1259.retina.sh",
 	}
 
 	// Local context has its meaning only when pod level(advanced) metrics is enabled.

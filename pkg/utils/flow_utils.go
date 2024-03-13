@@ -6,9 +6,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/microsoft/retina/pkg/log"
 	"github.com/cilium/cilium/api/v1/flow"
 	"github.com/cilium/cilium/pkg/monitor/api"
+	"github.com/microsoft/retina/pkg/log"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -19,7 +19,7 @@ import (
 const (
 	Verdict_RETRANSMISSION flow.Verdict = 15
 	Verdict_DNS            flow.Verdict = 16
-	TypeUrl                string       = "retina.io"
+	TypeUrl                string       = "retina.sh"
 )
 
 // ToFlow returns a flow.Flow object.

@@ -74,4 +74,4 @@
 
 ## Configuring Grafana
 
-Create a Grafana instance at [grafana.com](https://www.grafana.com) and follow [Configuring Grafana](./configuring-grafana.md).
+Create a Grafana instance at [grafana.com](https://www.grafana.com) and follow [Configuring Grafana](./grafana.md).
