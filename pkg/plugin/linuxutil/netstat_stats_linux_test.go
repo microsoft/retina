@@ -29,6 +29,7 @@ func TestNewNetstatReader(t *testing.T) {
 	assert.NotNil(t, nr)
 }
 
+//nolint:testifylint // not making linter changes to preserve exact behavior
 func TestReadConnStats(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	opts := &NetstatOpts{

@@ -54,6 +54,7 @@ func (nr *NetstatReader) readAndUpdate() error {
 	return nil
 }
 
+//nolint:gomnd // magic numbers are sufficiently explained in this function
 func (nr *NetstatReader) readConnectionStats(path string) error {
 	// Read the contents of the file into a string
 	data, err := os.ReadFile(path)
@@ -112,6 +113,7 @@ func (nr *NetstatReader) readConnectionStats(path string) error {
 			continue
 		}
 
+		//nolint:gocritic // this should be rewritten, but won't be at time of this writing
 		// knowing that there are two well-formed sets of statistics, it's now
 		// possible to examine the signifier and process the statistics into a
 		// semantic collection:
