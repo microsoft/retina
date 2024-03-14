@@ -44,7 +44,7 @@ const config = {
           path: '../docs',
           //routeBasePath: '../docs',
           editUrl:
-            'https://github.com/microsoft/retina/docs',
+            'https://github.com/microsoft/retina/blob/main/docs',
         },
         theme: {
           customCss: require.resolve('./src/css/custom.css'),

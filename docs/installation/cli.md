@@ -19,5 +19,5 @@ make install-kubectl-retina
 
 Requirements:
 
-- go 1.18 or newer
+- go 1.21 or newer
 - GNU make

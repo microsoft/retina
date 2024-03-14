@@ -146,7 +146,8 @@ If you are using managed Prometheus, you can check if it is scraping the retina 
     http://localhost:9090/targets
     ```
 
-    ![alt text](imgs/prometheus-retina-targets.png)
+    ![alt text](imgs/prometheus-retina-targets1.png)
+    ![alt text](imgs/prometheus-retina-targets2.png)
 
     a. check if service discovery is recognizing retina Pods
 
@@ -154,7 +155,8 @@ If you are using managed Prometheus, you can check if it is scraping the retina 
     http://localhost:9090/service-discovery#retina-pods
     ```
 
-    ![alt text](imgs/prom-retina-service-discovery.png)
+    ![alt text](imgs/prom-retina-service-discovery1.png)
+    ![alt text](imgs/prom-retina-service-discovery2.png)
 
 4. If Retina Pods are not discovered then please check prometheus configuration and make sure the Retina Pod's job is added to the scrape config.
 

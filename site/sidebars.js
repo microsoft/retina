@@ -27,6 +27,7 @@ const sidebars = {
         'installation/setup',
         'installation/prometheus-unmanaged',
         'installation/prometheus-azure-managed',
+        'installation/grafana',
         'installation/cli',
         'installation/config',
       ],

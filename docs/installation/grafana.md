@@ -25,8 +25,6 @@ Make sure that you're still port-forwarding your server to localhost:9090, or co
 
    ![alt text](img/grafana-dashboard.png)
 
-FIXME add published dashboard links
-
 ## Pre-Installed Dashboards
 
 If you're using [Azure-Hosted Prometheus/Grafana](prometheus-azure-managed.md), versions of these dashbaords are pre-installed under:

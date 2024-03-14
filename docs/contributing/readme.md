@@ -16,8 +16,6 @@ contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additio
 
 ### Configurations
 
-FIXME just link the Config page
-
 Configurations are passed through `retina-config` configmap in `retina` namespace. Following configurations are currently supported:
 
 - `apiserver.port` : the port for `retina-agent` Pod
@@ -27,9 +25,11 @@ Configurations are passed through `retina-config` configmap in `retina` namespac
 
 Note: Changes to configmap after retina is deployed would require re-deployment of `retina-agent`.
 
+See the [Configuration](https://retina.sh/docs/metrics/configuration) page for further details.
+
 ### Supported Metrics Plugins
 
-FIXME just link metrics page
+See the [Plugins](https://retina.sh/docs/metrics/plugins/packetforward) pages for a list of supported plugins.
 
 ### Pre-Requisites
 
