@@ -14,20 +14,20 @@ Retina is currently supported in AKS. It has two major features:
 
 ### Metrics
 
-[Read more](docs/metrics/intro.md)
+[Read more](https://retina.sh/docs/metrics/modes)
 
 ### Quick Install Guide
 
 1. Create a Kubernetes cluster with a minimum of 2 nodes. Retina supports Linux (Ubuntu) and Windows (2019 and 2022) nodes.
-2. Follow steps in [Using Managed Prometheus and Grafana](https://retina.sh/docs/metrics/managed-retina)
+2. Follow steps in [Using Managed Prometheus and Grafana](https://retina.sh/docs/installation/prometheus-azure-managed)
 
 ### Captures
 
-[Read more](docs/captures/readme.md)
+[Read more](https://retina.sh/docs/captures)
 
 ## Contributing
 
-[Read more](docs/contributing/readme.md)
+[Read more](https://retina.sh/docs/contributing)
 
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a
 Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
