@@ -35,7 +35,7 @@ spec:
       hostNetwork: true
       containers:
         - name: retinawin
-          image: mcr.microsoft.com/containernetworking/retina-agent:v0.0.6
+          image: ghcr.io/microsoft/retina/retina-agent:v0.0.1-pre
           ports:
             - containerPort: 10093
           command:

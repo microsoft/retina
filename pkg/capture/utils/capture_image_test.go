@@ -25,7 +25,7 @@ func TestCaptureWorkloadImage(t *testing.T) {
 			env:           map[string]string{},
 			sourceVersion: "v1.0.0",
 			versionSource: VersionSourceCLIVersion,
-			expectedImage: "mcr.microsoft.com/containernetworking/retina-agent:v1.0.0",
+			expectedImage: "ghcr.io/microsoft/retina/retina-agent:v1.0.0",
 		},
 		{
 			name: "Debug mode: image determined by CLI version",
@@ -35,7 +35,7 @@ func TestCaptureWorkloadImage(t *testing.T) {
 			sourceVersion: "v1.0.0",
 			versionSource: VersionSourceCLIVersion,
 
-			expectedImage: "acnpublic.azurecr.io/retina-agent:v1.0.0",
+			expectedImage: "ghcr.io/microsoft/retina/retina-agent:v1.0.0",
 		},
 		{
 			name:          "Debug mode: image determined by environment variable RETINA_AGENT_IMAGE",

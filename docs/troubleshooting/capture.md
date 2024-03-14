@@ -24,7 +24,7 @@ kubectl get pod -n <capture namespace> --seletor job-name=<capture job name>
 
 ## Capture Pod ImagePullBackOff
 
-By default, kubectl retina plugin will eventually create Capture Pods from the [MCR](https://mcr.microsoft.com/) image with the same version as the kubectl plugin. If the kubectl plugin is built from a local environment, the MCR image cannot be found. Check [capture CLI Debug Mode](../captures/cli.md#Debug_mode) for local development and testing.
+By default, kubectl retina plugin will eventually create Capture Pods from the [GHCR](https://github.com/microsoft/retina) image with the same version as the kubectl plugin. If the kubectl plugin is built from a local environment, the GHCR image cannot be found. Check [capture CLI Debug Mode](../captures/cli.md#Debug_mode) for local development and testing.
 
 ## Windows node allows only one capture job running at one time
 

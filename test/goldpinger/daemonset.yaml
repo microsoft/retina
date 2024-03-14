@@ -74,7 +74,7 @@ spec:
                   fieldPath: status.podIP
           #            - name: HOSTS_TO_RESOLVE
           #              value: "1.1.1.1 8.8.8.8 www.bing.com"
-          image: acnpublic.azurecr.io/goldpinger:v2.0.2
+          image: docker.io/bloomberg/goldpinger:v3.9.0
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -166,7 +166,7 @@ spec:
                   fieldPath: status.podIP
           #            - name: HOSTS_TO_RESOLVE
           #              value: "1.1.1.1 8.8.8.8 www.bing.com"
-          image: "acnpublic.azurecr.io/goldpinger-win:v2.0.2"
+          image: "docker.io/bloomberg/goldpinger:v3.9.0"
           command: ["\\goldpinger.exe"]
           ports:
             - containerPort: 7070

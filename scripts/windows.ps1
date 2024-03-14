@@ -26,6 +26,6 @@ function retina-image {
     if ($null -eq $env:TAG) { $env:TAG = $args[0] } 
     docker build `
         -f .\Dockerfile.windows `
-        -t acnpublic.azurecr.io/retina-agent:$env:TAG `
+        -t ghcr.io/microsoft/retina/retina-agent:$env:TAG `
         .
 }

@@ -32,7 +32,7 @@ import (
 )
 
 const (
-	retinaAgentImageForTest = "acnpublic.azurecr.io/retina-agent:v0.0.6-52-g07caaaf"
+	retinaAgentImageForTest = "ghcr.io/microsoft/retina/retina-agent:v0.0.1-pre"
 	apiServerURL            = "https://retina-test-c4528d-zn0ugsna.hcp.southeastasia.azmk8s.io:443"
 )
 

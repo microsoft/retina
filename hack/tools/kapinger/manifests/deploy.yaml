@@ -60,7 +60,7 @@ spec:
                 topologyKey: "kubernetes.io/hostname"
       containers:
         - name: kapinger
-          image: acnpublic.azurecr.io/kapinger:latest
+          image: ghcr.io/microsoft/retina/kapinger:latest
           resources:
             limits:
               memory: 20Mi
@@ -119,7 +119,7 @@ spec:
                 topologyKey: "kubernetes.io/hostname"
       containers:
         - name: kapinger
-          image: acnpublic.azurecr.io/kapinger:windows-ltsc2022-amd64-v35
+          image: ghcr.io/microsoft/retina/kapinger:windows-ltsc2022-amd64-v35
           env:
             - name: TARGET_TYPE
               value: "service"
@@ -173,7 +173,7 @@ spec:
                 topologyKey: "kubernetes.io/hostname"
       containers:
         - name: kapinger
-          image: acnpublic.azurecr.io/kapinger:latest
+          image: ghcr.io/microsoft/retina/kapinger:latest
           resources:
             limits:
               memory: 20Mi
