@@ -1,13 +1,10 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
-package constants
+package common
 
 const (
-	TCP         = "IPPROTO_TCP"
-	UDP         = "IPPROTO_UDP"
-	LocalhostIP = "127.0.0.1"
-	ZeroIP      = "0.0.0.0"
-
+	// FilterMapPath is the path to the BPF filter map.
 	FilterMapPath = "/sys/fs/bpf"
+	// FilterMapName is the name of the BPF filter map
 	FilterMapName = "retina_filter_map"
 )

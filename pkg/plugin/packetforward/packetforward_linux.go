@@ -1,5 +1,8 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
+
+// package packetforward contains the Retina packetforward plugin. It utilizes eBPF to measures
+// packets and bytes passing through the eth0 interface of each node, along with the direction of the packets.
 package packetforward
 
 import (

@@ -5,15 +5,15 @@ package dropreason
 import (
 	"sync"
 
+	hubblev1 "github.com/cilium/cilium/pkg/hubble/api/v1"
+	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/link"
+	"github.com/cilium/ebpf/perf"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/api"
-	hubblev1 "github.com/cilium/cilium/pkg/hubble/api/v1"
-	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/link"
-	"github.com/cilium/ebpf/perf"
 )
 
 const (
@@ -43,7 +43,6 @@ type dropReason struct {
 	KNfConntrackConfirm    link.Link
 	KRetNfConntrackConfirm link.Link
 	metricsMapData         IMap
-	event                  chan<- api.PluginEvent
 	isRunning              bool
 	reader                 IPerfReader
 	enricher               enricher.EnricherInterface

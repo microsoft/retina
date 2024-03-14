@@ -1,5 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
+
+// Package dns contains the Retina DNS plugin. It uses the Inspektor Gadget DNS tracer to capture DNS events.
 package dns
 
 import (
@@ -9,6 +11,11 @@ import (
 	"os"
 	"strings"
 
+	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
+	"github.com/cilium/ebpf/rlimit"
+	"github.com/inspektor-gadget/inspektor-gadget/pkg/gadgets/trace/dns/tracer"
+	"github.com/inspektor-gadget/inspektor-gadget/pkg/gadgets/trace/dns/types"
+	"github.com/inspektor-gadget/inspektor-gadget/pkg/utils/host"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
@@ -16,11 +23,6 @@ import (
 	"github.com/microsoft/retina/pkg/plugin/api"
 	"github.com/microsoft/retina/pkg/plugin/common"
 	"github.com/microsoft/retina/pkg/utils"
-	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
-	"github.com/cilium/ebpf/rlimit"
-	"github.com/inspektor-gadget/inspektor-gadget/pkg/gadgets/trace/dns/tracer"
-	"github.com/inspektor-gadget/inspektor-gadget/pkg/gadgets/trace/dns/types"
-	"github.com/inspektor-gadget/inspektor-gadget/pkg/utils/host"
 	"go.uber.org/zap"
 )
 

@@ -104,9 +104,9 @@ type kprobeMapSpecs struct {
 	AcceptPids       *ebpf.MapSpec `ebpf:"accept_pids"`
 	DropPids         *ebpf.MapSpec `ebpf:"drop_pids"`
 	DropreasonEvents *ebpf.MapSpec `ebpf:"dropreason_events"`
-	RetinaFilterMap  *ebpf.MapSpec `ebpf:"retina_filter_map"`
 	MetricsMap       *ebpf.MapSpec `ebpf:"metrics_map"`
 	NatdropPids      *ebpf.MapSpec `ebpf:"natdrop_pids"`
+	RetinaFilterMap  *ebpf.MapSpec `ebpf:"retina_filter_map"`
 }
 
 // kprobeObjects contains all objects after they have been loaded into the kernel.
@@ -131,9 +131,9 @@ type kprobeMaps struct {
 	AcceptPids       *ebpf.Map `ebpf:"accept_pids"`
 	DropPids         *ebpf.Map `ebpf:"drop_pids"`
 	DropreasonEvents *ebpf.Map `ebpf:"dropreason_events"`
-	RetinaFilterMap  *ebpf.Map `ebpf:"retina_filter_map"`
 	MetricsMap       *ebpf.Map `ebpf:"metrics_map"`
 	NatdropPids      *ebpf.Map `ebpf:"natdrop_pids"`
+	RetinaFilterMap  *ebpf.Map `ebpf:"retina_filter_map"`
 }
 
 func (m *kprobeMaps) Close() error {
@@ -141,9 +141,9 @@ func (m *kprobeMaps) Close() error {
 		m.AcceptPids,
 		m.DropPids,
 		m.DropreasonEvents,
-		m.RetinaFilterMap,
 		m.MetricsMap,
 		m.NatdropPids,
+		m.RetinaFilterMap,
 	)
 }
 

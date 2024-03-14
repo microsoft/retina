@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
+// package packetparser contains the Retina packetparser plugin. It utilizes eBPF to parse packets and generate flow events.
 package packetparser
 
 import (
@@ -28,7 +29,6 @@ import (
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/api"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
-	"github.com/microsoft/retina/pkg/plugin/constants"
 	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/microsoft/retina/pkg/watchers/endpoint"
@@ -137,7 +137,7 @@ func (p *packetParser) Init() error {
 	//nolint:typecheck
 	if err := spec.LoadAndAssign(objs, &ebpf.CollectionOptions{ //nolint:typecheck
 		Maps: ebpf.MapOptions{
-			PinPath: constants.FilterMapPath,
+			PinPath: plugincommon.FilterMapPath,
 		},
 	}); err != nil { //nolint:typecheck
 		p.l.Error("Error loading objects: %w", zap.Error(err))

@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
+// Package filter contains the Retina filter plugin. It utilizes eBPF to filter packets based on IP addresses.
 package filter
 
 import (
@@ -9,10 +10,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/microsoft/retina/pkg/log"
-	"github.com/microsoft/retina/pkg/plugin/constants"
-	"github.com/microsoft/retina/pkg/utils"
 	"github.com/cilium/ebpf"
+	"github.com/microsoft/retina/pkg/log"
+	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
+	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
 
 	_ "github.com/microsoft/retina/pkg/plugin/filter/_cprog" // nolint
@@ -46,7 +47,7 @@ func Init() (*FilterMap, error) {
 	obj := &filterObjects{}                                //nolint:typecheck
 	err := loadFilterObjects(obj, &ebpf.CollectionOptions{ //nolint:typecheck
 		Maps: ebpf.MapOptions{
-			PinPath: constants.FilterMapPath,
+			PinPath: plugincommon.FilterMapPath,
 		},
 	})
 	if err != nil {

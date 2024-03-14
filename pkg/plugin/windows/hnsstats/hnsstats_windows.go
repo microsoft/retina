@@ -1,5 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
+
+// Package hnsstats contains the hnsstats plugin. It gathers TCP statistics and counts number of packets/bytes forwarded or dropped in HNS and VFP from Windows nodes.
 package hnsstats
 
 import (
@@ -10,12 +12,12 @@ import (
 
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/hcn"
+	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/api"
 	"github.com/microsoft/retina/pkg/utils"
-	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"go.uber.org/zap"
 )
 

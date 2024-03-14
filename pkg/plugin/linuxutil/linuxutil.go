@@ -1,5 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
+
+// Package linuxutil contains the Retina linuxutil plugin. It gathers TCP/UDP statistics and network interface statistics from the netstats and ethtool node utilities (respectively).
 package linuxutil
 
 import (
@@ -10,9 +12,9 @@ import (
 
 	kcfg "github.com/microsoft/retina/pkg/config"
 
+	hubblev1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/plugin/api"
-	hubblev1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/safchain/ethtool"
 	"go.uber.org/zap"
 )
