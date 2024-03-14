@@ -15,7 +15,7 @@ jobs:
         language: [go]
         go-version: ["1.21"]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 90
     permissions:
       actions: read
       contents: read
