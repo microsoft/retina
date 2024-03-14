@@ -1,5 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
+
+// Package dropreason contains the Retina DropReason plugin. It measures the number of packets/bytes dropped and the reason and the direction of the drop.
 package dropreason
 
 import (
@@ -27,7 +29,6 @@ import (
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/api"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
-	"github.com/microsoft/retina/pkg/plugin/constants"
 	"go.uber.org/zap"
 
 	_ "github.com/microsoft/retina/pkg/plugin/dropreason/_cprog" // nolint
@@ -148,7 +149,7 @@ func (dr *dropReason) Init() error {
 			LogLevel: 2,
 		},
 		Maps: ebpf.MapOptions{
-			PinPath: constants.FilterMapPath,
+			PinPath: plugincommon.FilterMapPath,
 		},
 	}); err != nil {
 		dr.l.Error("Error loading objects: %w", zap.Error(err))

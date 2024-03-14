@@ -1,5 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
+
+// package common contains common functions and types used by all Retina plugins.
 package common
 
 import (

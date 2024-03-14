@@ -1,5 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
+
+// Package registry contains the plugin registry for Retina. It is used for plugin registration and instantiation.
 package registry
 
 import (
