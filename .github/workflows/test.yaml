@@ -29,7 +29,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          make retina-test-image PLATFORM=linux/amd64
+          make retina-test-image IMAGE_NAMESPACE=${{ github.repository }} PLATFORM=linux/amd64
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
