@@ -7,15 +7,14 @@ on:
     branches: [ main ]
 
 jobs:
-  images:
-    name: Build Images
+  retina-images:
+    name: Build Linux Images
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
         platform: ["linux"]
         arch: ["amd64", "arm64"]
-        component: ["agent", "operator"]
 
     # required for AZ login/SP
     permissions:
@@ -37,9 +36,7 @@ jobs:
       - name: Az CLI login
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+            creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Build/Push Images
         shell: bash
@@ -47,17 +44,133 @@ jobs:
           set -euo pipefail
           az acr login -n ${{ secrets.ACR_NAME }}
           echo "TAG=$(make version)" >> $GITHUB_ENV
-          make build PLATFORMS=${{ matrix.platform }}/${{ matrix.arch }} COMPONENT=${{ matrix.component }}
+          make retina-image PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
 
+  retina-win-images:
+    name: Build Windows Images
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        platform: ["windows"]
+        arch: ["amd64"]
+
+    # required for AZ login/SP
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: ">=1.21.0"
+      - run: go version
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Az CLI login
+        uses: azure/login@v2
+        with:
+            creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Build/Push Images
+        shell: bash
+        run: |
+          set -euo pipefail
+          az acr login -n ${{ secrets.ACR_NAME }}
+          echo "TAG=$(make version)" >> $GITHUB_ENV
+          make retina-image-win PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
+
+  operator-images:
+    name: Build Operator Images
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        platform: ["linux"]
+        arch: ["amd64", "arm64"]
+
+    # required for AZ login/SP
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: ">=1.21.0"
+      - run: go version
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Az CLI login
+        uses: azure/login@v2
+        with:
+            creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Build/Push Images
+        shell: bash
+        run: |
+          set -euo pipefail
+          az acr login -n ${{ secrets.ACR_NAME }}
+          echo "TAG=$(make version)" >> $GITHUB_ENV
+          make retina-operator-image PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
+
+  kubectl-retina-images:
+    name: Build kubectl-retina Images
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        platform: ["linux"]
+        arch: ["amd64", "arm64"]
+
+    # required for AZ login/SP
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: ">=1.21.0"
+      - run: go version
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Az CLI login
+        uses: azure/login@v2
+        with:
+            creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Build/Push Images
+        shell: bash
+        run: |
+          set -euo pipefail
+          az acr login -n ${{ secrets.ACR_NAME }}
+          echo "TAG=$(make version)" >> $GITHUB_ENV
+          make kubectl-retina-image PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
 
   manifests:
     name: Generate Manifests
     runs-on: ubuntu-latest
-    needs: images
+    needs: [retina-images, retina-win-images, operator-images, kubectl-retina-images]
 
     strategy:
       matrix:
-        component: ["agent", "operator"]
+        component: ["retina", "operator", "kubectl-retina"]
 
     # required for AZ login/SP
     permissions:
@@ -74,9 +187,7 @@ jobs:
       - name: Az CLI login
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+            creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Generate Manifests
         shell: bash

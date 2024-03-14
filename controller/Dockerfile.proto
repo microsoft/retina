@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.21 AS builder
+FROM --platform=linux/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.21 AS proto-tools
 LABEL Name=retina-builder Version=0.0.1
 
 RUN apt-get update &&\
@@ -6,7 +6,7 @@ RUN apt-get update &&\
 
 WORKDIR /tmp
 
-RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.31.0
 RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v24.2/protoc-24.2-linux-x86_64.zip
 RUN unzip protoc-24.2-linux-x86_64.zip -d protoc
 RUN mv protoc/bin/protoc /usr/bin/protoc
