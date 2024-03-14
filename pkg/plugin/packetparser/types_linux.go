@@ -8,13 +8,13 @@ import (
 
 	kcfg "github.com/microsoft/retina/pkg/config"
 
-	"github.com/microsoft/retina/pkg/enricher"
-	"github.com/microsoft/retina/pkg/log"
-	"github.com/microsoft/retina/pkg/plugin/api"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/perf"
 	tc "github.com/florianl/go-tc"
+	"github.com/microsoft/retina/pkg/enricher"
+	"github.com/microsoft/retina/pkg/log"
+	"github.com/microsoft/retina/pkg/plugin/api"
 	"github.com/vishvananda/netlink"
 )
 

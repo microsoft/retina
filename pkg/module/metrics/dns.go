@@ -7,13 +7,12 @@ import (
 	"fmt"
 	"strings"
 
+	v1 "github.com/cilium/cilium/api/v1/flow"
 	api "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/pkg/exporter"
 	"github.com/microsoft/retina/pkg/log"
 	metricsinit "github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/utils"
-	"github.com/cilium/cilium/api/v1/flow"
-	v1 "github.com/cilium/cilium/api/v1/flow"
 	"go.uber.org/zap"
 )
 
@@ -83,7 +82,7 @@ func (d *DNSMetrics) getLabels() []string {
 	return labels
 }
 
-func (d *DNSMetrics) values(flow *flow.Flow) []string {
+func (d *DNSMetrics) values(flow *v1.Flow) []string {
 	flowDns, dnsType, numResponses := utils.GetDns(flow)
 	if flowDns == nil {
 		return nil

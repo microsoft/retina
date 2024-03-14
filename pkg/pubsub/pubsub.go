@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/microsoft/retina/pkg/log"
 	"github.com/google/uuid"
+	"github.com/microsoft/retina/pkg/log"
 	"go.uber.org/zap"
 )
 

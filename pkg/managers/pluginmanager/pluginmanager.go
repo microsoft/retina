@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/managers/watchermanager"
@@ -15,7 +16,6 @@ import (
 	"github.com/microsoft/retina/pkg/plugin/api"
 	"github.com/microsoft/retina/pkg/plugin/registry"
 	"github.com/microsoft/retina/pkg/telemetry"
-	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"

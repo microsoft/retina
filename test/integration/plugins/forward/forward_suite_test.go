@@ -244,7 +244,7 @@ func testLinuxPacketForward(testMode string, ingressCountLabels, ingressByteLabe
 			l.Info("Metrics count", zap.String("node", node.Name), zap.String("dir", dir), zap.Uint64("baseline", baselineCount), zap.Uint64("spike", spikeCount))
 			Expect(spikeCount).Should(BeNumerically(">", baselineCount))
 
-			// For node level, the probes do not significanly increase the bytes sent or received.
+			// For node level, the probes do not significantly increase the bytes sent or received.
 			// Hence, we are not checking for difference between baseline and spike.
 			baselineBytes := metrics[node.Name][dir][1][1]
 			spikeBytes := metrics[node.Name][dir][2][1]

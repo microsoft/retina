@@ -3,9 +3,9 @@ package linuxutil
 import (
 	"testing"
 
+	gomock "github.com/golang/mock/gomock"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
-	gomock "github.com/golang/mock/gomock"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 )

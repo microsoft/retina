@@ -3,8 +3,8 @@
 package metrics
 
 import (
-	"github.com/microsoft/retina/pkg/log"
 	"github.com/cilium/cilium/api/v1/flow"
+	"github.com/microsoft/retina/pkg/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 )

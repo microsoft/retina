@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cilium/cilium/api/v1/flow"
 	api "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/crd/api/v1alpha1/validations"
 	"github.com/microsoft/retina/pkg/common"
@@ -21,7 +22,6 @@ import (
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/microsoft/retina/pkg/utils"
-	"github.com/cilium/cilium/api/v1/flow"
 	"go.uber.org/zap"
 )
 

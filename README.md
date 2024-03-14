@@ -1,8 +1,12 @@
 # Retina
 
+[![goreport][goreport-img]][goreport] ![GitHub release][release-img] [![retina-publish][godoc-badge]][godoc] ![license] [![retina-test][retina-test-image-badge]][retina-test-image] [![retinash][retinash-badge]][retinash] [![retina-publish][retina-publish-badge]][retina-publish] [![retina-publish-ghcr][retina-publish-ghcr-badge]][retina-publish-ghcr] ![retina-codeql-img][retina-codeql-badge] ![retina-golangci-lint-img][retina-golangci-lint-badge]
+
 ## Overview
 
 Retina is a cloud and vendor agnostic container workload observability platform which helps customers with enterprise grade DevOps, SecOps and compliance use cases. It is designed to cater to cluster network administrators, cluster security administrators and DevOps engineers by providing a centralized platform for monitoring application and network health, and security. Retina is capable of collecting telemetry data from multiple sources and aggregating it into a single time-series database. Retina is also capable of sending data to multiple destinations, such as Prometheus, Azure Monitor, and other vendors, and visualizing the data in a variety of ways, like Grafana, Azure Monitor, Azure log analytics, and more.
+
+![Retina features](/site/static/img/retina-features.png)
 
 ## Documentation
 
@@ -59,3 +63,20 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 ## Contact
 
 "Retina Devs" <retina@microsoft.com>
+
+[goreport-img]: https://goreportcard.com/badge/github.com/microsoft/retina
+[goreport]: https://goreportcard.com/report/github.com/microsoft/retina
+[godoc]: https://godoc.org/github.com/microsoft/retina
+[godoc-badge]: https://godoc.org/github.com/microsoft/retina?status.svg
+[release-img]: https://img.shields.io/github/v/release/microsoft/retina.svg
+[license]: https://img.shields.io/badge/license-MIT-blue?link=https%3A%2F%2Fgithub.com%2Fmicrosoft%2Fretina%2Fblob%2Fmain%2FLICENSE
+[retina-test-image-badge]: https://github.com/microsoft/retina/actions/workflows/test.yaml/badge.svg?branch=main
+[retina-test-image]: https://github.com/microsoft/retina/actions/workflows/test.yaml?query=branch%3Amain
+[retinash-badge]: https://github.com/microsoft/retina/actions/workflows/docs.yaml/badge.svg?branch=main
+[retinash]: https://retina.sh/
+[retina-publish-badge]: https://github.com/microsoft/retina/actions/workflows/images.yaml/badge.svg?branch=main
+[retina-publish]: https://github.com/microsoft/retina/actions/workflows/images.yaml?query=branch%3Amain
+[retina-publish-ghcr-badge]: https://github.com/microsoft/retina/actions/workflows/images-ghcr.yaml/badge.svg?branch=main
+[retina-publish-ghcr]: https://github.com/microsoft/retina/actions/workflows/images-ghcr.yaml?query=branch%3Amain
+[retina-codeql-badge]: https://github.com/microsoft/retina/actions/workflows/codeql.yaml/badge.svg?branch=main
+[retina-golangci-lint-badge]: https://github.com/microsoft/retina/actions/workflows/golangci-lint.yaml/badge.svg?branch=main

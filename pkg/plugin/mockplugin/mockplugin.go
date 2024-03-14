@@ -6,11 +6,10 @@ import (
 	"context"
 	"fmt"
 
+	hubblev1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	kcfg "github.com/microsoft/retina/pkg/config"
-
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/plugin/api"
-	hubblev1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 )
 
 const (

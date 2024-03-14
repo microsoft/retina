@@ -229,13 +229,13 @@ func TestPluginInit(t *testing.T) {
 		wantErr    bool
 	}{
 		{
-			name:       "Plugin init successs Pod Level Disabled",
+			name:       "Plugin init successes Pod Level Disabled",
 			cfg:        cfgPodLevelDisabled,
 			pluginName: "mockplugin",
 			wantErr:    false,
 		},
 		{
-			name:       "Plugin init successs Pod Level Enabled",
+			name:       "Plugin init successes Pod Level Enabled",
 			cfg:        cfgPodLevelEnabled,
 			pluginName: "mockplugin",
 			wantErr:    false,
@@ -268,14 +268,14 @@ func TestPluginStartWithoutInit(t *testing.T) {
 		initPlugin bool
 	}{
 		{
-			name:       "Plugin start successs Pod Level Disabled",
+			name:       "Plugin start successes Pod Level Disabled",
 			cfg:        cfgPodLevelDisabled,
 			pluginName: "mockplugin",
 			wantErr:    true,
 			initPlugin: false,
 		},
 		{
-			name:       "Plugin start successs Pod Level Enabled",
+			name:       "Plugin start successes Pod Level Enabled",
 			cfg:        cfgPodLevelEnabled,
 			pluginName: "mockplugin",
 			wantErr:    false,
@@ -315,7 +315,7 @@ func TestPluginStop(t *testing.T) {
 		startPlugin  bool
 	}{
 		{
-			name:         "Plugin stop successs Pod Level Disabled",
+			name:         "Plugin stop successes Pod Level Disabled",
 			cfg:          cfgPodLevelDisabled,
 			pluginName:   "mockplugin",
 			wantStartErr: false,
@@ -342,7 +342,7 @@ func TestPluginStop(t *testing.T) {
 			startPlugin:  true,
 		},
 		{
-			name:         "Plugin stop successs Pod Level Enabled",
+			name:         "Plugin stop successes Pod Level Enabled",
 			cfg:          cfgPodLevelEnabled,
 			pluginName:   "mockplugin",
 			wantStartErr: false,

@@ -3,11 +3,10 @@
 package linuxutil
 
 import (
+	"github.com/cakturk/go-netstat/netstat"
 	kcfg "github.com/microsoft/retina/pkg/config"
-
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/plugin/api"
-	"github.com/cakturk/go-netstat/netstat"
 )
 
 const (

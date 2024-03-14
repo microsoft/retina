@@ -75,7 +75,7 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(filter string, duration,
 	)
 
 	// We should split arguments organized in a string delimited by spaces as
-	// seperate ones, otherwise the whole string will be treated as one argument.
+	// separate ones, otherwise the whole string will be treated as one argument.
 	// For example, given the following filter, exec lib will treat IPv4.Address
 	// as the argument and the rest as the value of IPv4.Address.
 	// "IPv4.Address=(10.244.1.85,10.244.1.235) IPv6.Address=(fd5c:d9f1:79c5:fd83::1bc,fd5c:d9f1:79c5:fd83::11b)"

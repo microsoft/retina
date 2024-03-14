@@ -88,7 +88,7 @@ func TestHeartbeat(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := &TelemetryClient{
-				RWMutex:    sync.RWMutex{}, //nolint:copylocks
+				RWMutex:    sync.RWMutex{},
 				properties: tt.fields.properties,
 			}
 			tr.heartbeat(tt.args.ctx)
