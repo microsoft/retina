@@ -11,7 +11,7 @@ import (
 )
 
 func TestWindowsGetKernelVersion(t *testing.T) {
-	InitAppInsights("")
+	InitAppInsights("", "")
 	ctx := context.TODO()
 
 	str, err := KernelVersion(ctx)
