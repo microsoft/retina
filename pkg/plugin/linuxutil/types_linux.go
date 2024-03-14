@@ -3,8 +3,6 @@
 package linuxutil
 
 import (
-	kcfg "github.com/microsoft/retina/pkg/config"
-
 	"github.com/cakturk/go-netstat/netstat"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
