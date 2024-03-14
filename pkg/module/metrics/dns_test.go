@@ -11,10 +11,9 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
+	"github.com/microsoft/retina/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	"gotest.tools/v3/assert"
-
-	"github.com/microsoft/retina/pkg/utils"
 )
 
 func TestGetLabels(t *testing.T) {

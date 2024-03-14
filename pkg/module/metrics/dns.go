@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cilium/cilium/api/v1/flow"
 	v1 "github.com/cilium/cilium/api/v1/flow"
 	api "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/pkg/exporter"
@@ -83,7 +82,7 @@ func (d *DNSMetrics) getLabels() []string {
 	return labels
 }
 
-func (d *DNSMetrics) values(flow *flow.Flow) []string {
+func (d *DNSMetrics) values(flow *v1.Flow) []string {
 	flowDns, dnsType, numResponses := utils.GetDns(flow)
 	if flowDns == nil {
 		return nil

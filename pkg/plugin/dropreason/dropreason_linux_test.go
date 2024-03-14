@@ -17,6 +17,7 @@ import (
 
 	"github.com/cilium/ebpf/perf"
 	"github.com/golang/mock/gomock"
+	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
