@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/pkg/common"
 	"github.com/microsoft/retina/pkg/controllers/cache"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/module/metrics"
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

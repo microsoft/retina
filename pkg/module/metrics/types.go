@@ -7,10 +7,10 @@ import (
 	"net"
 	"strings"
 
+	"github.com/cilium/cilium/api/v1/flow"
 	api "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/pkg/common"
 	"github.com/microsoft/retina/pkg/utils"
-	"github.com/cilium/cilium/api/v1/flow"
 )
 
 const (
@@ -324,7 +324,7 @@ func DefaultCtxOptions() []string {
 		// ignoring service option as we have not added right logic around it
 		// TODO add service specific enrichment and logic, #610
 		// serviceCtxOption,
-		// Port adds a ton of extra dimention to metrics
+		// Port adds a ton of extra dimension to metrics
 		// so not adding it as a default option
 		// portCtxOption,
 	}

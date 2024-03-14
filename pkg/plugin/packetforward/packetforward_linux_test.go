@@ -16,10 +16,10 @@ import (
 
 	kcfg "github.com/microsoft/retina/pkg/config"
 
+	"github.com/golang/mock/gomock"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	mocks "github.com/microsoft/retina/pkg/plugin/packetforward/mocks"
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 )

@@ -8,10 +8,10 @@ import (
 	"net/http/pprof"
 	"time"
 
-	"github.com/microsoft/retina/pkg/exporter"
-	"github.com/microsoft/retina/pkg/log"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
+	"github.com/microsoft/retina/pkg/exporter"
+	"github.com/microsoft/retina/pkg/log"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"

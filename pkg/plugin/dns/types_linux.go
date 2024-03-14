@@ -3,13 +3,13 @@
 package dns
 
 import (
+	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/api"
 	"github.com/microsoft/retina/pkg/plugin/common"
-	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 )
 
 const (

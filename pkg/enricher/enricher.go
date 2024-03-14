@@ -8,12 +8,12 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/microsoft/retina/pkg/common"
-	"github.com/microsoft/retina/pkg/controllers/cache"
-	"github.com/microsoft/retina/pkg/log"
 	"github.com/cilium/cilium/api/v1/flow"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/cilium/pkg/hubble/container"
+	"github.com/microsoft/retina/pkg/common"
+	"github.com/microsoft/retina/pkg/controllers/cache"
+	"github.com/microsoft/retina/pkg/log"
 	"go.uber.org/zap"
 )
 

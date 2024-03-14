@@ -8,9 +8,9 @@ import (
 	"net"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/plugin/filter/mocks"
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
 

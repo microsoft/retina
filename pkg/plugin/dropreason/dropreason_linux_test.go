@@ -15,12 +15,12 @@ import (
 
 	kcfg "github.com/microsoft/retina/pkg/config"
 
+	"github.com/cilium/ebpf/perf"
+	"github.com/golang/mock/gomock"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	mocks "github.com/microsoft/retina/pkg/plugin/dropreason/mocks"
-	"github.com/cilium/ebpf/perf"
-	"github.com/golang/mock/gomock"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"

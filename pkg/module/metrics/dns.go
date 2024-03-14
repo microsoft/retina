@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/cilium/cilium/api/v1/flow"
+	v1 "github.com/cilium/cilium/api/v1/flow"
 	api "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/pkg/exporter"
 	"github.com/microsoft/retina/pkg/log"
 	metricsinit "github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/utils"
-	"github.com/cilium/cilium/api/v1/flow"
-	v1 "github.com/cilium/cilium/api/v1/flow"
 	"go.uber.org/zap"
 )
 

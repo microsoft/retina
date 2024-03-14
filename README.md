@@ -1,5 +1,7 @@
 # Retina
 
+[![goreport][goreport-img]][goreport] ![GitHub release][release-img]
+
 ## Overview
 
 Retina is a cloud and vendor agnostic container workload observability platform which helps customers with enterprise grade DevOps, SecOps and compliance use cases. It is designed to cater to cluster network administrators, cluster security administrators and DevOps engineers by providing a centralized platform for monitoring application and network health, and security. Retina is capable of collecting telemetry data from multiple sources and aggregating it into a single time-series database. Retina is also capable of sending data to multiple destinations, such as Prometheus, Azure Monitor, and other vendors, and visualizing the data in a variety of ways, like Grafana, Azure Monitor, Azure log analytics, and more.
@@ -59,3 +61,7 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 ## Contact
 
 "Retina Devs" <retina@microsoft.com>
+
+[goreport-img]: https://goreportcard.com/badge/github.com/microsoft/retina
+[goreport]: https://goreportcard.com/report/github.com/microsoft/retina
+[release-img]: https://img.shields.io/github/v/release/microsoft/retina.svg

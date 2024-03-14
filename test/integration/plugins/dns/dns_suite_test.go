@@ -124,7 +124,7 @@ func testDnsMetrics(testMode string, requestLabels, responseLabels common.Metric
 		return
 	}
 	l.Info("Node chosen", zap.String("node", node.Name))
-	// Use the node choosen to deploy server/client.
+	// Use the node chosen to deploy server/client.
 	n := common.NewModelNode(node)
 
 	err = k.InitializeClusterFromModel(common.NewModelNamespace(namespace,

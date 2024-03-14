@@ -343,7 +343,7 @@ func TestGetPodOwner(t *testing.T) {
 			ownerKind: "Deployment",
 		},
 		{
-			name: "Test unkown owner",
+			name: "Test unknown owner",
 			args: args{
 				obj: &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{

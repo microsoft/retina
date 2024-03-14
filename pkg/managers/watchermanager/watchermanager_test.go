@@ -7,9 +7,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/microsoft/retina/pkg/log"
 	mock "github.com/microsoft/retina/pkg/managers/watchermanager/mocks"
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 )

@@ -8,10 +8,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cakturk/go-netstat/netstat"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/utils"
-	"github.com/cakturk/go-netstat/netstat"
 	"go.uber.org/zap"
 )
 

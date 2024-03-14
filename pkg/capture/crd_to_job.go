@@ -158,7 +158,7 @@ func (translator *CaptureToPodTranslator) initJobTemplate(capture *retinav1alpha
 							},
 							// Usually, the Capture Pod takes no more than 10m CPU
 							// and 10Mi memory. And considering the Capture Pod
-							// does not consumes much resources as requried by
+							// does not consumes much resources as required by
 							// the workload, it's safe to hard-code the resource
 							// requests and limits.
 							Resources: corev1.ResourceRequirements{
@@ -791,7 +791,7 @@ func filterToIPPortsMap(filters []string) (map[string][]string, error) {
 			}
 			continue
 		}
-		// If any(* or emtpy) port is specified with an ip address, we should ignore the other ports with combination
+		// If any(* or empty) port is specified with an ip address, we should ignore the other ports with combination
 		// with this ip address, and the final combination for this ip address will be this_ipaddress:*.
 		if portFilter == anyIPOrPort {
 			filterIPPorts[ipAddressFilter] = map[string]struct{}{

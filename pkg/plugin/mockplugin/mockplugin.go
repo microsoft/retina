@@ -8,9 +8,9 @@ import (
 
 	kcfg "github.com/microsoft/retina/pkg/config"
 
+	hubblev1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/plugin/api"
-	hubblev1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 )
 
 const (

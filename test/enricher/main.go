@@ -7,12 +7,12 @@ package main
 import (
 	"context"
 
+	"github.com/cilium/cilium/api/v1/flow"
+	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/microsoft/retina/pkg/controllers/cache"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/pubsub"
-	"github.com/cilium/cilium/api/v1/flow"
-	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )

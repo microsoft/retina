@@ -7,8 +7,8 @@ import (
 	"net"
 	"testing"
 
-	"github.com/microsoft/retina/pkg/log"
 	"github.com/cilium/cilium/api/v1/flow"
+	"github.com/microsoft/retina/pkg/log"
 	"github.com/stretchr/testify/assert"
 )
 

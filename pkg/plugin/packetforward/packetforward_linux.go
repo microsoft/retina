@@ -97,7 +97,7 @@ func (p *packetForward) Name() string {
 }
 
 func (p *packetForward) Generate(ctx context.Context) error {
-	// Use this funtion to parse p and generate header files under cprog.
+	// Use this function to parse p and generate header files under cprog.
 	// Example: https://github.com/anubhabMajumdar/Retina/blob/c4bc06e7f922124f92536ffb5312bada5c2dfe99/pkg/plugin/custom/packetforward/packetforward.go#L77
 	p.l.Info("Packet forwarding metric header generated")
 	return nil
