@@ -1,6 +1,6 @@
 # Retina
 
-[![goreport][goreport-img]][goreport] ![GitHub release][release-img]
+[![goreport][goreport-img]][goreport] ![GitHub release][release-img] ![godoc-img]
 
 ## Overview
 
@@ -64,4 +64,5 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 
 [goreport-img]: https://goreportcard.com/badge/github.com/microsoft/retina
 [goreport]: https://goreportcard.com/report/github.com/microsoft/retina
+[godoc-img]: https://godoc.org/github.com/microsoft/retina?status.svg
 [release-img]: https://img.shields.io/github/v/release/microsoft/retina.svg
