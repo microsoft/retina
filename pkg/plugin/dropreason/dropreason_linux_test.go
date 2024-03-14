@@ -13,8 +13,6 @@ import (
 	"testing"
 	"time"
 
-	kcfg "github.com/microsoft/retina/pkg/config"
-
 	"github.com/cilium/ebpf/perf"
 	"github.com/golang/mock/gomock"
 	kcfg "github.com/microsoft/retina/pkg/config"
