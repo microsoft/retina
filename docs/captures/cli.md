@@ -154,11 +154,11 @@ Blob-upload requires a Blob Shared Access Signature with the write permission to
 
 ### Debug mode
 
-With debug mode, when `--debug` is specified, we can overwrite the capture job Pod image from the default official `MCR` one.
+With debug mode, when `--debug` is specified, we can overwrite the capture job Pod image from the default official `GHCR` one.
 
 #### Examples
 
-- use `acnpublic` ACR in default debug mode
+- use `ghcr.io` image in default debug mode
 
 `kubectl retina capture create --host-path /mnt/test --namespace capture --node-selectors "kubernetes.io/os=linux" --debug`
 

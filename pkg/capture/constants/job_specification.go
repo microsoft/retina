@@ -27,8 +27,8 @@ const (
 	CaptureOutputLocationBlobUploadSecretKey string = "blob-upload-url"
 
 	// CaptureWorkloadImageName defines the official capture workload image repo and image name
-	CaptureWorkloadImageName string = "mcr.microsoft.com/containernetworking/retina-agent"
+	CaptureWorkloadImageName string = "ghcr.io/microsoft/retina/retina-agent"
 
 	// DebugCaptureWorkloadImageName defines the capture workload image for testing and debugging
-	DebugCaptureWorkloadImageName string = "acnpublic.azurecr.io/retina-agent"
+	DebugCaptureWorkloadImageName string = "ghcr.io/microsoft/retina/retina-agent"
 )

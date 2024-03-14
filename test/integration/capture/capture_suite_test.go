@@ -70,7 +70,7 @@ var _ = Describe("Capture flag tests", func() {
 		// by user.
 		if retinaAgentImagePreset := os.Getenv("RETINA_AGENT_IMAGE"); len(retinaAgentImagePreset) == 0 {
 			retinaVersion := assertExecCommandOutput("kubectl", "retina", "version")
-			retinaAgentImage := fmt.Sprintf("acnpublic.azurecr.io/retina-agent:%s", strings.TrimSpace(retinaVersion))
+			retinaAgentImage := fmt.Sprintf("ghcr.io/microsoft/retina/retina-agent:%s", strings.TrimSpace(retinaVersion))
 			os.Setenv("RETINA_AGENT_IMAGE", retinaAgentImage)
 			unsetRetinaAgentEnv = true
 		}
