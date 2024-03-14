@@ -37,7 +37,8 @@ ARG APP_INSIGHTS_ID
 
 RUN go build -v -o /go/bin/retina/controller -ldflags "-X main.version="$VERSION" -X "main.applicationInsightsID"="$APP_INSIGHTS_ID"" controller/main.go 
 RUN go build -v -o /go/bin/retina/captureworkload -ldflags "-X main.version="$VERSION" -X "main.applicationInsightsID"="$APP_INSIGHTS_ID"" captureworkload/main.go
-RUN go build -v -o /go/bin/retina/initretina -ldflags "-X main.version="$VERSION" -X "main.applicationInsightsID"="$APP_INSIGHTS_ID"" ././init/retina/main.go
+# We only build initretina for linux.
+RUN go build -v -o /go/bin/retina/initretina -ldflags "-X main.version="$VERSION" -X "main.applicationInsightsID"="$APP_INSIGHTS_ID"" ././init/retina/main_linux.go
 
 
 # ----------------------------------------------------------------------------------- #
