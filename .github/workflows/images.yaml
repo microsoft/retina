@@ -3,12 +3,17 @@ name: Build and Publish Retina Container Images
 on:
   push:
     branches: [ main ]
+    tags: [ "v*" ]
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   retina-images:
-    name: Build Linux Images
+    name: Build Agent Images
     runs-on: ubuntu-latest
 
     strategy:
@@ -16,11 +21,6 @@ jobs:
         platform: ["linux"]
         arch: ["amd64", "arm64"]
 
-    # required for AZ login/SP
-    permissions:
-      id-token: write
-      contents: read
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -33,21 +33,20 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: Az CLI login
-        uses: azure/login@v2
-        with:
-            creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Log in to registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
 
       - name: Build/Push Images
         shell: bash
         run: |
           set -euo pipefail
-          az acr login -n ${{ secrets.ACR_NAME }}
           echo "TAG=$(make version)" >> $GITHUB_ENV
-          make retina-image PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
+          make retina-image \
+            IMAGE_NAMESPACE=${{ github.repository }} \
+            PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
 
   retina-win-images:
-    name: Build Windows Images
+    name: Build Agent Images
     runs-on: ubuntu-latest
 
     strategy:
@@ -55,11 +54,6 @@ jobs:
         platform: ["windows"]
         arch: ["amd64"]
 
-    # required for AZ login/SP
-    permissions:
-      id-token: write
-      contents: read
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -71,19 +65,18 @@ jobs:
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-
-      - name: Az CLI login
-        uses: azure/login@v2
-        with:
-            creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+      - name: Log in to registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
 
       - name: Build/Push Images
         shell: bash
         run: |
           set -euo pipefail
-          az acr login -n ${{ secrets.ACR_NAME }}
           echo "TAG=$(make version)" >> $GITHUB_ENV
-          make retina-image-win PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
+          make retina-image-win \
+            IMAGE_NAMESPACE=${{ github.repository }} \
+            PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
 
   operator-images:
     name: Build Operator Images
@@ -94,11 +87,6 @@ jobs:
         platform: ["linux"]
         arch: ["amd64", "arm64"]
 
-    # required for AZ login/SP
-    permissions:
-      id-token: write
-      contents: read
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -110,19 +98,18 @@ jobs:
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-
-      - name: Az CLI login
-        uses: azure/login@v2
-        with:
-            creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+      - name: Log in to registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
 
       - name: Build/Push Images
         shell: bash
         run: |
           set -euo pipefail
-          az acr login -n ${{ secrets.ACR_NAME }}
           echo "TAG=$(make version)" >> $GITHUB_ENV
-          make retina-operator-image PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
+          make retina-operator-image \
+            IMAGE_NAMESPACE=${{ github.repository }} \
+            PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
 
   kubectl-retina-images:
     name: Build kubectl-retina Images
@@ -133,11 +120,6 @@ jobs:
         platform: ["linux"]
         arch: ["amd64", "arm64"]
 
-    # required for AZ login/SP
-    permissions:
-      id-token: write
-      contents: read
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -149,19 +131,18 @@ jobs:
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-
-      - name: Az CLI login
-        uses: azure/login@v2
-        with:
-            creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+      - name: Log in to registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
 
       - name: Build/Push Images
         shell: bash
         run: |
           set -euo pipefail
-          az acr login -n ${{ secrets.ACR_NAME }}
           echo "TAG=$(make version)" >> $GITHUB_ENV
-          make kubectl-retina-image PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
+          make kubectl-retina-image \
+            IMAGE_NAMESPACE=${{ github.repository }} \
+            PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
 
   manifests:
     name: Generate Manifests
@@ -172,26 +153,20 @@ jobs:
       matrix:
         component: ["retina", "operator", "kubectl-retina"]
 
-    # required for AZ login/SP
-    permissions:
-      id-token: write
-      contents: read
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-
-      - name: Az CLI login
-        uses: azure/login@v2
-        with:
-            creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+      - name: Log in to registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
 
       - name: Generate Manifests
         shell: bash
         run: |
           set -euo pipefail
-          az acr login -n ${{ secrets.ACR_NAME }}
-          make manifest COMPONENT=${{ matrix.component }}
+          make manifest \
+            IMAGE_NAMESPACE=${{ github.repository }} \
+            COMPONENT=${{ matrix.component }}

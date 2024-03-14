@@ -26,17 +26,16 @@ GENERATE_TARGET_DIRS = \
 	./pkg/plugin/linuxutil
 
 # Default platform is linux/amd64
-GOOS ?= linux
-GOARCH ?= amd64
-IMAGE_REGISTRY    ?= acnpublic.azurecr.io
-OS                ?= $(GOOS)
-ARCH              ?= $(GOARCH)
-PLATFORM          ?= $(OS)/$(ARCH)
-PLATFORMS 		  ?= linux/amd64 linux/arm64 windows/amd64
+GOOS			?= linux
+GOARCH			?= amd64
+OS				?= $(GOOS)
+ARCH			?= $(GOARCH)
+PLATFORM		?= $(OS)/$(ARCH)
+PLATFORMS		?= linux/amd64 linux/arm64 windows/amd64
 
 CONTAINER_BUILDER ?= docker
 CONTAINER_RUNTIME ?= docker
-YEAR 			  ?=2022
+YEAR 			  ?= 2022
 
 ALL_ARCH.linux = amd64 arm64
 ALL_ARCH.windows = amd64
@@ -188,16 +187,19 @@ retina-capture-workload: ## build the Retina capture workload
 
 ##@ Containers
 
-RETINA_BUILDER_IMAGE = retina-builder
-RETINA_TOOLS_IMAGE = retina-tools
-RETINA_IMAGE = retina-agent
-RETINA_INIT_IMAGE = retina-init
-KUBECTL_RETINA_IMAGE=kubectl-retina
-RETINA_OPERATOR_IMAGE=retina-operator
-RETINA_INTEGRATION_TEST_IMAGE=retina-integration-test
-RETINA_PROTO_IMAGE=retina-proto-gen
-RETINA_GO_GEN_IMAGE=retina-go-gen
-KAPINGER_IMAGE = kapinger
+IMAGE_REGISTRY	?= ghcr.io
+IMAGE_NAMESPACE	?= $(git remote get-url origin | sed -e 's/git@github.com://g' -e 's/\.git$//') # attempts to extract the upstream for image namespacing
+
+RETINA_BUILDER_IMAGE			= $(IMAGE_NAMESPACE)/retina-builder
+RETINA_TOOLS_IMAGE				= $(IMAGE_NAMESPACE)/retina-tools
+RETINA_IMAGE 					= $(IMAGE_NAMESPACE)/retina-agent
+RETINA_INIT_IMAGE				= $(IMAGE_NAMESPACE)/retina-init
+KUBECTL_RETINA_IMAGE			= $(IMAGE_NAMESPACE)/kubectl-retina
+RETINA_OPERATOR_IMAGE			= $(IMAGE_NAMESPACE)/retina-operator
+RETINA_INTEGRATION_TEST_IMAGE	= $(IMAGE_NAMESPACE)/retina-integration-test
+RETINA_PROTO_IMAGE				= $(IMAGE_NAMESPACE)/retina-proto-gen
+RETINA_GO_GEN_IMAGE				= $(IMAGE_NAMESPACE)/retina-go-gen
+KAPINGER_IMAGE 					= $(IMAGE_NAMESPACE)/kapinger
 
 skopeo-export: # util target to copy a container from containers-storage to the docker daemon.
 	skopeo copy \
