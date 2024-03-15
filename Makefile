@@ -395,12 +395,16 @@ coverage: # Code coverage.
 manifests: 
 	cd crd && make manifests && make generate
 
+HELM_IMAGE_TAG ?= v0.0.1-pre.1
+
 # basic/node-level mode
 helm-install: manifests
 	helm upgrade --install retina ./deploy/manifests/controller/helm/retina/ \
 		--namespace kube-system \
 		--set image.repository=$(IMAGE_REGISTRY)/$(RETINA_IMAGE) \
 		--set image.initRepository=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE) \
+		--set image.tag=$(HELM_IMAGE_TAG) \
+		--set operator.tag=$(HELM_IMAGE_TAG) \
 		--set image.pullPolicy=Always \
 		--set logLevel=info \
 		--set os.windows=true \
@@ -413,6 +417,8 @@ helm-install-advanced-remote-context: manifests
 		--namespace kube-system \
 		--set image.repository=$(IMAGE_REGISTRY)/$(RETINA_IMAGE) \
 		--set image.initRepository=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE) \
+		--set image.tag=$(HELM_IMAGE_TAG) \
+		--set operator.tag=$(HELM_IMAGE_TAG) \
 		--set image.pullPolicy=Always \
 		--set logLevel=info \
 		--set os.windows=true \
@@ -430,6 +436,8 @@ helm-install-advanced-local-context: manifests
 		--namespace kube-system \
 		--set image.repository=$(IMAGE_REGISTRY)/$(RETINA_IMAGE) \
 		--set image.initRepository=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE) \
+		--set image.tag=$(HELM_IMAGE_TAG) \
+		--set operator.tag=$(HELM_IMAGE_TAG) \
 		--set image.pullPolicy=Always \
 		--set logLevel=info \
 		--set os.windows=true \
