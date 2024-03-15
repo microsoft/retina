@@ -232,9 +232,9 @@ buildx:
 	fi;
 
 container-docker: buildx # util target to build container images using docker buildx. do not invoke directly.
-	@os=$$(echo $(PLATFORM) | cut -d'/' -f1); \
-	@arch=$$(echo $(PLATFORM) | cut -d'/' -f2); \
-	@echo "Building for $$os/$$arch"; \
+	os=$$(echo $(PLATFORM) | cut -d'/' -f1); \
+	arch=$$(echo $(PLATFORM) | cut -d'/' -f2); \
+	echo "Building for $$os/$$arch"; \
 	docker buildx build \
 		$(ACTION) \
 		--platform $(PLATFORM) \
@@ -335,11 +335,11 @@ manifest-retina-image: ## create a multiplatform manifest for the retina image
 	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_IMAGE):$(TAG))
 	$(eval FULL_INIT_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE):$(TAG))
 	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64 windows-ltsc2019-amd64 windows-ltsc2022-amd64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
-	docker buildx imagetools create -t $(FULL_INIT_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+	docker buildx imagetools create -t $(FULL_INIT_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_INIT_IMAGE_NAME)-$(subst /,-,$(platform)))
 
 manifest-operator-image: ## create a multiplatform manifest for the operator image
 	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE):$(TAG))
-	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
 
 manifest-kubectl-retina-image: ## create a multiplatform manifest for the kubectl-retina image
 	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(KUBECTL_RETINA_IMAGE):$(TAG))

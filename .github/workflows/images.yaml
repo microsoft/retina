@@ -46,7 +46,7 @@ jobs:
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
 
   retina-win-images:
-    name: Build Agent Images
+    name: Build Agent Windows Images
     runs-on: ubuntu-latest
 
     strategy:
@@ -85,7 +85,7 @@ jobs:
     strategy:
       matrix:
         platform: ["linux"]
-        arch: ["amd64", "arm64"]
+        arch: ["amd64"]
 
     steps:
       - name: Checkout code
