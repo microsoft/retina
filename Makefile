@@ -188,7 +188,7 @@ retina-capture-workload: ## build the Retina capture workload
 ##@ Containers
 
 IMAGE_REGISTRY	?= ghcr.io
-IMAGE_NAMESPACE ?= $(shell git config --get remote.origin.url | sed -E 's/.*github\.com[\/:]([^\/]+)\/([^\/.]+).git/\1\/\2/') # attempts to extract the upstream for image namespacing
+IMAGE_NAMESPACE ?= $(shell git config --get remote.origin.url | sed -E 's/.*github\.com[\/:]([^\/]+)\/([^\/.]+).git/\1\/\2/')
 
 RETINA_BUILDER_IMAGE			= $(IMAGE_NAMESPACE)/retina-builder
 RETINA_TOOLS_IMAGE				= $(IMAGE_NAMESPACE)/retina-tools
@@ -435,7 +435,7 @@ helm-install-advanced-remote-context: manifests
 		--set operator.tag=$(RETINA_PLATFORM_TAG) \
 		--set operator.repository=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE) \
 		--skip-crds \
-		--set enabledPlugin_linux="[\"dropreason\"\,\"packetforward\"\,\"linuxutil\"\,\"dns\",\"packetparser\"\]" \
+		--set enabledPlugin_linux="[\"dropreason\",\"packetforward\",\"linuxutil\",\"dns\",\"packetparser\"\]" \
 		--set enablePodLevel=true \
 		--set remoteContext=true
 
@@ -454,7 +454,7 @@ helm-install-advanced-local-context: manifests
 		--set operator.tag=$(RETINA_PLATFORM_TAG) \
 		--set operator.repository=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE) \
 		--skip-crds \
-		--set enabledPlugin_linux="[\"dropreason\"\,\"packetforward\"\,\"linuxutil\"\,\"dns\",\"packetparser\"\]" \
+		--set enabledPlugin_linux="[\"dropreason\",\"packetforward\",\"linuxutil\",\"dns\",\"packetparser\"]" \
 		--set enablePodLevel=true \
 		--set enableAnnotations=true \
 		--set bypassLookupIPOfInterest=false
