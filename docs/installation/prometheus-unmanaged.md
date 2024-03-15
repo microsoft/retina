@@ -17,7 +17,6 @@
 
 2. Save **[these Prometheus values](https://github.com/microsoft/retina/blob/main/deploy/prometheus/values.yaml)** below to `deploy/prometheus/values.yaml`
 
-
 3. Install the Prometheus chart
 
   ```shell
@@ -32,7 +31,6 @@ Or if you already have the chart installed, upgrade how you see fit, providing t
 
 Node: Grafana and kube-state metrics may schedule on Windows nodes, the current chart doesn't have node affinity for those components. Some manual intervention may be required.
 
-
 6. Verify that the Retina Pods are being scraped by port-forwarding the Prometheus server:
 
   ```shell
@@ -44,7 +42,6 @@ Node: Grafana and kube-state metrics may schedule on Windows nodes, the current 
 ![alt text](img/prometheus-retina-pods.png)
 
 ## Configuring Grafana
-
 
 Create a Grafana instance at [grafana.com](https://www.grafana.com) and follow [Configuring Grafana](./grafana.md), or use the one installed from above.
 
