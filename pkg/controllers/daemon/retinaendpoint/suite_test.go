@@ -37,6 +37,10 @@ var (
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
+	if testing.Short() {
+		t.Skip("skipping more involved tests with -short")
+	}
+
 	RunSpecs(t, "Capture Controller Suite")
 }
 

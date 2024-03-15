@@ -1,6 +1,8 @@
 # Retina
 
-[![goreport][goreport-img]][goreport] ![GitHub release][release-img] [![retina-publish][godoc-badge]][godoc] ![license] [![retina-test][retina-test-image-badge]][retina-test-image] [![retinash][retinash-badge]][retinash] [![retina-publish][retina-publish-badge]][retina-publish] [![retina-publish-ghcr][retina-publish-ghcr-badge]][retina-publish-ghcr] ![retina-codeql-img][retina-codeql-badge] ![retina-golangci-lint-img][retina-golangci-lint-badge]
+[![goreport][goreport-img]][goreport] ![GitHub release][release-img] [![retina-publish][godoc-badge]][godoc] ![license]
+
+[![retina-test][retina-test-image-badge]][retina-test-image] [![retinash][retinash-badge]][retinash] [![retina-publish][retina-publish-badge]][retina-publish] ![retina-codeql-img][retina-codeql-badge] ![retina-golangci-lint-img][retina-golangci-lint-badge]
 
 ## Overview
 
@@ -22,8 +24,15 @@ Retina is currently supported in AKS. It has two major features:
 
 ### Quick Install Guide
 
-1. Create a Kubernetes cluster with a minimum of 2 nodes. Retina supports Linux (Ubuntu) and Windows (2019 and 2022) nodes.
-2. Follow steps in [Using Managed Prometheus and Grafana](https://retina.sh/docs/installation/prometheus-azure-managed)
+Prerequisites: Go, Helm
+
+1. Clone the repo, then install Retina on your Kubernetes cluster
+
+    ```bash
+    make helm-install
+    ```
+
+2. Follow steps in [Using Managed Prometheus and Grafana](https://retina.sh/docs/installation/prometheus-azure-managed) to set up metrics collection and visualization.
 
 ### Captures
 
@@ -32,6 +41,10 @@ Retina is currently supported in AKS. It has two major features:
 ## Contributing
 
 [Read more](https://retina.sh/docs/contributing)
+
+## Office Hours and Community Meetings
+
+[Read more](https://retina.sh/docs/contributing/#office-hours-and-community-meetings)
 
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a
 Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
@@ -76,7 +89,5 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 [retinash]: https://retina.sh/
 [retina-publish-badge]: https://github.com/microsoft/retina/actions/workflows/images.yaml/badge.svg?branch=main
 [retina-publish]: https://github.com/microsoft/retina/actions/workflows/images.yaml?query=branch%3Amain
-[retina-publish-ghcr-badge]: https://github.com/microsoft/retina/actions/workflows/images-ghcr.yaml/badge.svg?branch=main
-[retina-publish-ghcr]: https://github.com/microsoft/retina/actions/workflows/images-ghcr.yaml?query=branch%3Amain
 [retina-codeql-badge]: https://github.com/microsoft/retina/actions/workflows/codeql.yaml/badge.svg?branch=main
 [retina-golangci-lint-badge]: https://github.com/microsoft/retina/actions/workflows/golangci-lint.yaml/badge.svg?branch=main

@@ -19,7 +19,7 @@ WORKDIR /go/src/github.com/microsoft/retina
 # RUN go mod edit -module retina
 # RUN make all generate
 #RUN go generate ./...
-RUN make retina-ut
+RUN make test
 #RUN go test -covermode count -coverprofile /home/runner/work/_temp/go.cov -coverpkg ./... ./...
 
 RUN cat coverage.out
