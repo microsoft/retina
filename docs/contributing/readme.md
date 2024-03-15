@@ -43,8 +43,8 @@ Download [Helm](https://helm.sh/) as well.
 ### Test
 
 ```bash
-make retina-ut # run unit-test locally
-make retina-test-image # run tests in docker container
+make test # run unit-test locally
+make test-image # run tests in docker container
 ```
 
 ### Build

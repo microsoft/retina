@@ -233,10 +233,9 @@ buildx:
 	fi;
 
 container-docker: buildx # util target to build container images using docker buildx. do not invoke directly.
-	echo "Building for platform $(PLATFORM)"
-	os=$$(echo $(PLATFORM) | cut -d'/' -f1); \
-	arch=$$(echo $(PLATFORM) | cut -d'/' -f2); \
-	echo "Building for $$os/$$arch"; \
+	@os=$$(echo $(PLATFORM) | cut -d'/' -f1); \
+	@arch=$$(echo $(PLATFORM) | cut -d'/' -f2); \
+	@echo "Building for $$os/$$arch"; \
 	docker buildx build \
 		$(ACTION) \
 		--platform $(PLATFORM) \
@@ -361,7 +360,7 @@ manifest:
 # Make sure the layer has only one directory.
 # the test DockerFile needs to build the scratch stage with all the output files 
 # and we will untar the archive and copy the files from scratch stage
-retina-test-image: ## build the retina container image for testing.
+test-image: ## build the retina container image for testing.
 	$(MAKE) container-docker \
 			PLATFORM=$(PLATFORM) \
 			DOCKERFILE=./test/image/Dockerfile \
@@ -369,26 +368,15 @@ retina-test-image: ## build the retina container image for testing.
 			IMAGE=$(RETINA_IMAGE) \
 			CONTEXT_DIR=$(REPO_ROOT) \
 			TAG=$(RETINA_PLATFORM_TAG) \
-
-	docker save -o archives.tar $(IMAGE_REGISTRY)/$(RETINA_IMAGE):$(RETINA_PLATFORM_TAG) && \
-	mkdir -p archivelayers && \
-	cp archives.tar archivelayers/archives.tar && \
-	cd archivelayers/ && \
-	pwd && \
-	tar -xvf archives.tar && \
-	cd `ls -d */` && \
-	pwd && \
-	tar -xvf layer.tar && \
-	cp coverage.out ../../
-	$(MAKE) retina-cc
+			ACTION=--load
 
 COVER_PKG ?= .
 
-retina-ut: $(ENVTEST) # Run unit tests.
+test: $(ENVTEST) # Run unit tests.
 	go build -o test-summary ./test/utsummary/main.go
 	CGO_ENABLED=0 KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit -coverprofile=coverage.out -v -json ./... | ./test-summary --progress --verbose
 
-retina-cc: # Code coverage.
+coverage: # Code coverage.
 #	go generate ./... && go test -tags=unit -coverprofile=coverage.out.tmp ./...
 	cat coverage.out | grep -v "_bpf.go\|_bpfel_x86.go\|_bpfel_arm64.go|_generated.go|mock_" | grep -v mock > coveragenew.out
 	go tool cover -html coveragenew.out -o coverage.html
