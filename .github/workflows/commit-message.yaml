@@ -1,7 +1,5 @@
 name: commit-message
 on:
-  push:
-    branches: [ main ]
   pull_request:
     branches: [ main ]
     types:
