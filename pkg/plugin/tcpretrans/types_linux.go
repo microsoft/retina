@@ -3,6 +3,8 @@
 package tcpretrans
 
 import (
+	"errors"
+
 	gadgetcontext "github.com/inspektor-gadget/inspektor-gadget/pkg/gadget-context"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/gadgets/trace/tcpretrans/tracer"
 	kcfg "github.com/microsoft/retina/pkg/config"
@@ -22,3 +24,5 @@ type tcpretrans struct {
 	gadgetCtx *gadgetcontext.GadgetContext
 	enricher  enricher.EnricherInterface
 }
+
+var errEnricherNotInitialized = errors.New("enricher not initialized")

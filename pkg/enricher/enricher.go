@@ -18,8 +18,9 @@ import (
 )
 
 var (
-	e    *Enricher
-	once sync.Once
+	e           *Enricher
+	once        sync.Once
+	initialized bool
 )
 
 type Enricher struct {
@@ -50,7 +51,7 @@ func New(ctx context.Context, cache cache.CacheInterface) *Enricher {
 			Reader:     container.NewRingReader(ir, ir.OldestWrite()),
 			outputRing: container.NewRing(container.Capacity1023),
 		}
-		e.init()
+		initialized = true
 	})
 
 	return e
@@ -60,8 +61,8 @@ func Instance() *Enricher {
 	return e
 }
 
-func (e *Enricher) init() {
-	// todo
+func IsInitialized() bool {
+	return initialized
 }
 
 func (e *Enricher) Run() {
