@@ -50,7 +50,7 @@ apiServer:
 # Supported - debug, info, error, warn, panic, fatal.
 logLevel: debug
 
-enabledPlugin_linux: '["dropreason","packetforward","linuxutil", "dns"]'
+enabledPlugin_linux: '["dropreason","packetforward","linuxutil","dns"]'
 enabledPlugin_win: '["hnsstats"]'
 
 enableTelemetry: true
@@ -84,7 +84,7 @@ volumeMounts:
   tmp: /tmp
   config: /retina/config
 
-#volume mounts for indows
+#volume mounts for windows
 volumeMounts_win:
   retina-config-win: retina
 

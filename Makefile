@@ -398,11 +398,9 @@ manifests:
 
 # basic/node-level mode
 helm-install: manifests
-	echo "Deploying with $(TAG)"
-	helm install retina ./deploy/manifests/controller/helm/retina/ \
+	helm upgrade --install retina ./deploy/manifests/controller/helm/retina/ \
 		--namespace kube-system \
 		--set image.repository=$(IMAGE_REGISTRY)/$(RETINA_IMAGE) \
-		--set image.tag=$(TAG) \
 		--set image.initRepository=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE) \
 		--set image.pullPolicy=Always \
 		--set logLevel=info \
@@ -412,39 +410,35 @@ helm-install: manifests
 
 # advanced/pod-level mode with scale limitations, where metrics are aggregated by source and destination Pod
 helm-install-advanced-remote-context: manifests
-	helm install retina ./deploy/manifests/controller/helm/retina/ \
+	helm upgrade --install retina ./deploy/manifests/controller/helm/retina/ \
 		--namespace kube-system \
 		--set image.repository=$(IMAGE_REGISTRY)/$(RETINA_IMAGE) \
-		--set image.tag=$(TAG) \
 		--set image.initRepository=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE) \
 		--set image.pullPolicy=Always \
 		--set logLevel=info \
 		--set os.windows=true \
 		--set operator.enabled=true \
 		--set operator.enableRetinaEndpoint=true \
-		--set operator.tag=$(TAG) \
 		--set operator.repository=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE) \
 		--skip-crds \
-		--set enabledPlugin_linux="[\"dropreason\"\,\"packetforward\"\,\"linuxutil\"\,\"dns\",\"packetparser\"\]" \
+		--set enabledPlugin_linux="[\"dropreason\",\"packetforward\",\"linuxutil\",\"dns\",\"packetparser\"\]" \
 		--set enablePodLevel=true \
 		--set remoteContext=true
 
 # advanced/pod-level mode designed for scale, where metrics are aggregated by "local" Pod (source for outgoing traffic, destination for incoming traffic)
 helm-install-advanced-local-context: manifests
-	helm install retina ./deploy/manifests/controller/helm/retina/ \
+	helm upgrade --install retina ./deploy/manifests/controller/helm/retina/ \
 		--namespace kube-system \
 		--set image.repository=$(IMAGE_REGISTRY)/$(RETINA_IMAGE) \
-		--set image.tag=$(TAG) \
 		--set image.initRepository=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE) \
 		--set image.pullPolicy=Always \
 		--set logLevel=info \
 		--set os.windows=true \
 		--set operator.enabled=true \
 		--set operator.enableRetinaEndpoint=true \
-		--set operator.tag=$(TAG) \
 		--set operator.repository=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE) \
 		--skip-crds \
-		--set enabledPlugin_linux="[\"dropreason\"\,\"packetforward\"\,\"linuxutil\"\,\"dns\",\"packetparser\"\]" \
+		--set enabledPlugin_linux="[\"dropreason\",\"packetforward\",\"linuxutil\",\"dns\",\"packetparser\"]" \
 		--set enablePodLevel=true \
 		--set enableAnnotations=true \
 		--set bypassLookupIPOfInterest=false
