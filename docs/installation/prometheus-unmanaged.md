@@ -18,7 +18,6 @@
 2. Save **[these Prometheus values](https://github.com/microsoft/retina/blob/main/deploy/prometheus/values.yaml)** below to `deploy/prometheus/values.yaml`
 
 
-
 3. Install the Prometheus chart
 
   ```shell
