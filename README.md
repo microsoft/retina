@@ -1,6 +1,8 @@
 # Retina
 
-[![goreport][goreport-img]][goreport] ![GitHub release][release-img] [![retina-publish][godoc-badge]][godoc] ![license] [![retina-test][retina-test-image-badge]][retina-test-image] [![retinash][retinash-badge]][retinash] [![retina-publish][retina-publish-badge]][retina-publish] [![retina-publish-ghcr][retina-publish-ghcr-badge]][retina-publish-ghcr] ![retina-codeql-img][retina-codeql-badge] ![retina-golangci-lint-img][retina-golangci-lint-badge]
+[![goreport][goreport-img]][goreport] ![GitHub release][release-img] [![retina-publish][godoc-badge]][godoc] ![license]
+
+[![retina-test][retina-test-image-badge]][retina-test-image] [![retinash][retinash-badge]][retinash] [![retina-publish][retina-publish-badge]][retina-publish] ![retina-codeql-img][retina-codeql-badge] ![retina-golangci-lint-img][retina-golangci-lint-badge]
 
 ## Overview
 
@@ -76,7 +78,5 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 [retinash]: https://retina.sh/
 [retina-publish-badge]: https://github.com/microsoft/retina/actions/workflows/images.yaml/badge.svg?branch=main
 [retina-publish]: https://github.com/microsoft/retina/actions/workflows/images.yaml?query=branch%3Amain
-[retina-publish-ghcr-badge]: https://github.com/microsoft/retina/actions/workflows/images-ghcr.yaml/badge.svg?branch=main
-[retina-publish-ghcr]: https://github.com/microsoft/retina/actions/workflows/images-ghcr.yaml?query=branch%3Amain
 [retina-codeql-badge]: https://github.com/microsoft/retina/actions/workflows/codeql.yaml/badge.svg?branch=main
 [retina-golangci-lint-badge]: https://github.com/microsoft/retina/actions/workflows/golangci-lint.yaml/badge.svg?branch=main
