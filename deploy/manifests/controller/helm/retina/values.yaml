@@ -10,7 +10,7 @@ os:
 operator:
   enabled: false
   repository: ghcr.io/microsoft/retina/retina-operator
-  tag: "v0.0.1-pre"
+  tag: "v0.0.1-pre.1"
   installCRDs: true
   enableRetinaEndpoint: false
   capture:
@@ -22,7 +22,7 @@ image:
   initRepository: ghcr.io/microsoft/retina/retina-init
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "v0.0.1-pre"
+  tag: "v0.0.1-pre.1"
 
 enablePodLevel: false
 remoteContext: false
