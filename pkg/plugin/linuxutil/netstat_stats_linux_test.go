@@ -29,6 +29,7 @@ func TestNewNetstatReader(t *testing.T) {
 	assert.NotNil(t, nr)
 }
 
+//nolint:testifylint // not making linter changes to preserve exact behavior
 func TestReadConnStats(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	opts := &NetstatOpts{
@@ -110,43 +111,46 @@ func TestReadConnStats(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		if tt.addValZero {
-			opts.AddZeroVal = true
-		} else {
-			opts.AddZeroVal = false
-		}
-
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		ns := NewMockNetstatInterface(ctrl)
-		nr := NewNetstatReader(opts, ns)
-		InitalizeMetricsForTesting(ctrl)
-
-		testmetric := prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "testmetric",
-			Help: "testmetric",
-		})
-
-		MockGaugeVec.EXPECT().WithLabelValues(gomock.Any()).Return(testmetric).AnyTimes()
-
-		assert.NotNil(t, nr)
-		err := nr.readConnectionStats(tt.filePath)
-		if tt.wantErr {
-			assert.NotNil(t, err, "Expected error but got nil tetsname: %s", tt.name)
-		} else {
-			assert.Nil(t, err, "Expected nil but got err tetsname: %s", tt.name)
-			assert.NotNil(t, nr.connStats, "Expected data got nil tetsname: %s", tt.name)
-			if tt.checkVals {
-				assert.Equal(t, tt.result, nr.connStats, "Expected data got nil tetsname: %s", tt.name)
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.addValZero {
+				opts.AddZeroVal = true
 			} else {
-				assert.Equal(t, len(nr.connStats.TcpExt), tt.totalsCheck["TcpExt"], "Read values are not equal to expected tetsname: %s", tt.name)
-				assert.Equal(t, len(nr.connStats.IpExt), tt.totalsCheck["IpExt"], "Read values are not equal to expected tetsname: %s", tt.name)
-				assert.Equal(t, len(nr.connStats.MPTcpExt), tt.totalsCheck["MPTcpExt"], "Read values are not equal to expected tetsname: %s", tt.name)
+				opts.AddZeroVal = false
 			}
 
-			nr.updateMetrics()
-		}
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			ns := NewMockNetstatInterface(ctrl)
+			nr := NewNetstatReader(opts, ns)
+			InitalizeMetricsForTesting(ctrl)
+
+			testmetric := prometheus.NewGauge(prometheus.GaugeOpts{
+				Name: "testmetric",
+				Help: "testmetric",
+			})
+
+			MockGaugeVec.EXPECT().WithLabelValues(gomock.Any()).Return(testmetric).AnyTimes()
+
+			assert.NotNil(t, nr)
+			err := nr.readConnectionStats(tt.filePath)
+			if tt.wantErr {
+				assert.NotNil(t, err, "Expected error but got nil")
+			} else {
+				assert.Nil(t, err, "Expected nil but got err")
+				assert.NotNil(t, nr.connStats, "Expected data got nil")
+				if tt.checkVals {
+					assert.Equal(t, tt.result, nr.connStats, "Expected data got nil")
+				} else {
+					assert.Equal(t, len(nr.connStats.TcpExt), tt.totalsCheck["TcpExt"], "Read values are not equal to expected")
+					assert.Equal(t, len(nr.connStats.IpExt), tt.totalsCheck["IpExt"], "Read values are not equal to expected")
+					assert.Equal(t, len(nr.connStats.MPTcpExt), tt.totalsCheck["MPTcpExt"], "Read values are not equal to expected")
+				}
+
+				nr.updateMetrics()
+			}
+		})
 	}
 }
 

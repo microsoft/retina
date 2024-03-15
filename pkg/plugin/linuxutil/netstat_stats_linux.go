@@ -54,6 +54,7 @@ func (nr *NetstatReader) readAndUpdate() error {
 	return nil
 }
 
+//nolint:gomnd // magic numbers are sufficiently explained in this function
 func (nr *NetstatReader) readConnectionStats(path string) error {
 	// Read the contents of the file into a string
 	data, err := os.ReadFile(path)
@@ -62,43 +63,71 @@ func (nr *NetstatReader) readConnectionStats(path string) error {
 		return err
 	}
 
-	// Split the string into lines
+	// The netstat proc file (typically found at /proc/net/netstat) is composed
+	// of pairs of lines describing various statistics. The reference
+	// implementation for this file is found at
+	// https://sourceforge.net/p/net-tools/code/ci/master/tree/statistics.c.
+	// Given that these statistics are separated across lines the file must first
+	// be divided into lines in order to be processed:
 	lines := strings.Split(string(data), "\n")
 
-	if len(lines) < 2 && len(lines)%2 != 0 {
+	// files often end with a trailing newline. After splitting, this would
+	// present itself as a single empty string at the end. If this is the case,
+	// we want to omit this case from the logic that follows
+	if last := len(lines) - 1; lines[last] == "" {
+		lines = lines[0:last]
+	}
+
+	if len(lines) == 1 {
 		return fmt.Errorf("invalid netstat file")
 	}
 
+	// Each pair of lines must then be considered together to properly extract
+	// statistics:
 	for i := 0; i < len(lines); i += 2 {
-		fields1 := strings.Fields(lines[i])
-		if len(fields1) < 2 {
+		// the format of each stat line pair begins with some signifier like
+		// "TcpExt:" followed by one or more statistics. The first line contains
+		// the headers for these statistics and the second line contains the
+		// corresponding value in the same position. In order to access each
+		// statistic, both of these lines must be processed into sets of
+		// whitespace-delineated fields:
+		headers := strings.Fields(lines[i])
+		if len(headers) < 2 {
 			continue
 		}
 
-		fields2 := strings.Fields(lines[i+1])
-		if len(fields2) < 2 {
+		values := strings.Fields(lines[i+1])
+		if len(values) < 2 {
 			continue
 		}
 
-		if fields1[0] != fields2[0] {
+		// The signifiers for each pair of headers and values must match in order
+		// to be properly considered together.
+		if headers[0] != values[0] {
 			continue
 		}
 
-		if len(fields1) != len(fields2) {
+		// Also, the set of statistics is malformed if there is not a corresponding
+		// header for each value:
+		if len(headers) != len(values) {
 			continue
 		}
 
-		if strings.HasPrefix(fields1[0], "TcpExt") && strings.HasPrefix(fields2[0], "TcpExt") {
+		//nolint:gocritic // this should be rewritten, but won't be at time of this writing
+		// knowing that there are two well-formed sets of statistics, it's now
+		// possible to examine the signifier and process the statistics into a
+		// semantic collection:
+		if strings.HasPrefix(headers[0], "TcpExt") && strings.HasPrefix(values[0], "TcpExt") {
 			nr.l.Debug("TcpExt found for netstat ")
-			nr.connStats.TcpExt = nr.processConnFields(fields1, fields2)
-		} else if strings.HasPrefix(fields1[0], "IpExt") && strings.HasPrefix(fields2[0], "IpExt") {
+			nr.connStats.TcpExt = nr.processConnFields(headers, values)
+		} else if strings.HasPrefix(headers[0], "IpExt") && strings.HasPrefix(values[0], "IpExt") {
 			nr.l.Debug("IpExt found for netstat ")
-			nr.connStats.IpExt = nr.processConnFields(fields1, fields2)
-		} else if strings.HasPrefix(fields1[0], "MPTcpExt") && strings.HasPrefix(fields2[0], "MPTcpExt") {
+			nr.connStats.IpExt = nr.processConnFields(headers, values)
+		} else if strings.HasPrefix(headers[0], "MPTcpExt") && strings.HasPrefix(values[0], "MPTcpExt") {
 			nr.l.Debug("MPTcpExt found for netstat ")
-			nr.connStats.MPTcpExt = nr.processConnFields(fields1, fields2)
+			nr.connStats.MPTcpExt = nr.processConnFields(headers, values)
 		} else {
-			nr.l.Info("Unknown field found for netstat ", zap.Any("F1", fields1[0]), zap.Any("F2", fields2[0]))
+			nr.l.Info("Unknown field found for netstat ", zap.Any("F1", headers[0]), zap.Any("F2", values[0]))
 			continue
 		}
 
