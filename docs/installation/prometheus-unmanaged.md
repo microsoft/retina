@@ -15,52 +15,24 @@
   helm repo update
   ```
 
-2. Install the Prometheus chart
+2. Save **[these Prometheus values](https://github.com/microsoft/retina/blob/main/deploy/prometheus/values.yaml)** below to `deploy/prometheus/values.yaml`
+
+
+
+3. Install the Prometheus chart
 
   ```shell
   helm install prometheus -n kube-system -f deploy/prometheus/values.yaml prometheus-community/kube-prometheus-stack
   ```
 
-3. Save the Prometheus values below to `deploy/prometheus/values.yaml`
-
-  ```yaml
-  prometheus:
-    prometheusSpec:
-      additionalScrapeConfigs: |
-        - job_name: "retina-pods"
-          kubernetes_sd_configs:
-            - role: pod
-          relabel_configs:
-            - source_labels: [__meta_kubernetes_pod_container_name]
-              action: keep
-              regex: retina(.*)
-            - source_labels:
-                [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
-              separator: ":"
-              regex: ([^:]+)(?::\d+)?
-              target_label: __address__
-              replacement: ${1}:${2}
-              action: replace
-            - source_labels: [__meta_kubernetes_pod_node_name]
-              action: replace
-              target_label: instance
-          metric_relabel_configs:
-            - source_labels: [__name__]
-              action: keep
-              regex: (.*)
-  ```
-
-4. Upgrade deployment with
+Or if you already have the chart installed, upgrade how you see fit, providing the new job name as an additional scrape config, ex:
 
   ```shell
   helm upgrade prometheus -n kube-system -f deploy/prometheus/values.yaml prometheus-community/kube-prometheus-stack
   ```
 
-5. Install Retina
+Node: Grafana and kube-state metrics may schedule on Windows nodes, the current chart doesn't have node affinity for those components. Some manual intervention may be required.
 
-  ```shell
-  helm install retina ./deploy/manifests/controller/helm/retina/ --namespace kube-system --dependency-update
-  ```
 
 6. Verify that the Retina Pods are being scraped by port-forwarding the Prometheus server:
 
@@ -74,4 +46,17 @@
 
 ## Configuring Grafana
 
-Create a Grafana instance at [grafana.com](https://www.grafana.com) and follow [Configuring Grafana](./grafana.md).
+
+Create a Grafana instance at [grafana.com](https://www.grafana.com) and follow [Configuring Grafana](./grafana.md), or use the one installed from above.
+
+8. Get the Grafana password:
+
+```shell
+kubectl get secret -n kube-system prometheus-grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+```
+
+9. Import the new dashboard from **[here](https://grafana.com/grafana/dashboards/18814/)**.
+
+10. Metrics should be visible:
+
+![alt text](img/grafana-dashboard-metrics.png)
