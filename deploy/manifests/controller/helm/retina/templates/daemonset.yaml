@@ -35,10 +35,6 @@ spec:
           - name: bpf
             mountPath: /sys/fs/bpf
             mountPropagation: Bidirectional
-        {{- range $name, $mountPath := .Values.volumeMounts }}
-          - name: {{ $name }}
-            mountPath: {{ $mountPath }}
-        {{- end }}
       containers:
         - name: {{ include "retina.name" . }} 
           livenessProbe:

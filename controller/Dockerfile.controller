@@ -113,7 +113,7 @@ COPY --from=tools /lib/ /lib
 COPY --from=tools /usr/lib/ /usr/lib
 
 # Copy clang+llvm.
-COPY --from=tools /usr/local/clang+llvm/bin/clang /bin
+COPY --from=tools /usr/local/clang+llvm/bin/clang /bin/clang
 
 # Copy tools.
 COPY --from=tools /tmp/bin/ /bin
