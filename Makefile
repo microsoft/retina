@@ -188,7 +188,7 @@ retina-capture-workload: ## build the Retina capture workload
 ##@ Containers
 
 IMAGE_REGISTRY	?= ghcr.io
-IMAGE_NAMESPACE	?= $(git remote get-url origin | sed -e 's/git@github.com://g' -e 's/\.git$//') # attempts to extract the upstream for image namespacing
+IMAGE_NAMESPACE ?= $(shell git config --get remote.origin.url | sed -E 's/.*github\.com[\/:]([^\/]+)\/([^\/.]+).git/\1\/\2/') # attempts to extract the upstream for image namespacing
 
 RETINA_BUILDER_IMAGE			= $(IMAGE_NAMESPACE)/retina-builder
 RETINA_TOOLS_IMAGE				= $(IMAGE_NAMESPACE)/retina-tools
