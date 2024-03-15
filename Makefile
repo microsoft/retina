@@ -233,9 +233,9 @@ buildx:
 	fi;
 
 container-docker: buildx # util target to build container images using docker buildx. do not invoke directly.
-	@os=$$(echo $(PLATFORM) | cut -d'/' -f1); \
-	@arch=$$(echo $(PLATFORM) | cut -d'/' -f2); \
-	@echo "Building for $$os/$$arch"; \
+	os=$$(echo $(PLATFORM) | cut -d'/' -f1); \
+	arch=$$(echo $(PLATFORM) | cut -d'/' -f2); \
+	echo "Building for $$os/$$arch"; \
 	docker buildx build \
 		$(ACTION) \
 		--platform $(PLATFORM) \
@@ -398,6 +398,7 @@ manifests:
 
 # basic/node-level mode
 helm-install: manifests
+	echo "Deploying with $(TAG)"
 	helm install retina ./deploy/manifests/controller/helm/retina/ \
 		--namespace kube-system \
 		--set image.repository=$(IMAGE_REGISTRY)/$(RETINA_IMAGE) \
