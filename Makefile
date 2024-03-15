@@ -405,7 +405,7 @@ helm-install: manifests
 		--set logLevel=info \
 		--set os.windows=true \
 		--set operator.enabled=false \
-		--set enabledPlugin_linux="[\"dropreason\"\,\"packetforward\"\,\"linuxutil\"\,\"dns\"]"
+		--set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\]"
 
 # advanced/pod-level mode with scale limitations, where metrics are aggregated by source and destination Pod
 helm-install-advanced-remote-context: manifests
@@ -420,7 +420,7 @@ helm-install-advanced-remote-context: manifests
 		--set operator.enableRetinaEndpoint=true \
 		--set operator.repository=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE) \
 		--skip-crds \
-		--set enabledPlugin_linux="[\"dropreason\",\"packetforward\",\"linuxutil\",\"dns\",\"packetparser\"\]" \
+		--set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\,packetparser\]" \
 		--set enablePodLevel=true \
 		--set remoteContext=true
 
@@ -437,7 +437,7 @@ helm-install-advanced-local-context: manifests
 		--set operator.enableRetinaEndpoint=true \
 		--set operator.repository=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE) \
 		--skip-crds \
-		--set enabledPlugin_linux="[\"dropreason\",\"packetforward\",\"linuxutil\",\"dns\",\"packetparser\"]" \
+		--set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\,packetparser\]" \
 		--set enablePodLevel=true \
 		--set enableAnnotations=true \
 		--set bypassLookupIPOfInterest=false
