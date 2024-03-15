@@ -190,11 +190,11 @@ func (p *packetParser) Start(ctx context.Context) error {
 	p.l.Info("Starting packet parser")
 
 	p.l.Info("setting up enricher since pod level is enabled")
-	// Setup enricher.
-	p.enricher = enricher.Instance()
-	if p.enricher == nil {
-		p.l.Warn("Retina enricher is nil")
-		// return errors.New("enricher is nil")
+	// Set up enricher.
+	if enricher.IsInitialized() {
+		p.enricher = enricher.Instance()
+	} else {
+		p.l.Warn("retina enricher is not initialized")
 	}
 
 	// Get Pubsub instance.

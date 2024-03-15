@@ -19,7 +19,6 @@ import (
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/plugin/api"
 	"github.com/microsoft/retina/pkg/utils"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
 )
@@ -66,10 +65,12 @@ func (t *tcpretrans) Start(ctx context.Context) error {
 		t.l.Warn("tcpretrans will not start because pod level is disabled")
 		return nil
 	}
-	t.enricher = enricher.Instance()
-	if t.enricher == nil {
-		t.l.Error("Failed to get enricher instance")
-		return errors.New("failed to get enricher instance")
+	// Set up enricher
+	if enricher.IsInitialized() {
+		t.enricher = enricher.Instance()
+	} else {
+		t.l.Error(errEnricherNotInitialized.Error())
+		return errEnricherNotInitialized
 	}
 	t.gadgetCtx = gadgetcontext.New(ctx, "tcpretrans", nil, nil, nil, nil, nil, nil, nil, nil, 0, nil)
 

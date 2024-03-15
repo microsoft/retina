@@ -250,10 +250,11 @@ func (dr *dropReason) Start(ctx context.Context) error {
 		dr.recordsChannel = make(chan perf.Record, buffer)
 
 		dr.l.Info("setting up enricher since pod level is enabled")
-		// Setup enricher.
-		dr.enricher = enricher.Instance()
-		if dr.enricher == nil {
-			dr.l.Warn("Retina enricher is nil")
+		// Set up enricher.
+		if enricher.IsInitialized() {
+			dr.enricher = enricher.Instance()
+		} else {
+			dr.l.Warn("retina enricher is not initialized")
 		}
 	} else {
 		dr.l.Info("will not set up enricher since pod level is disabled")

@@ -67,9 +67,10 @@ func (d *dns) Init() error {
 
 func (d *dns) Start(ctx context.Context) error {
 	if d.cfg.EnablePodLevel {
-		d.enricher = enricher.Instance()
-		if d.enricher == nil {
-			d.l.Warn("Failed to get enricher instance")
+		if enricher.IsInitialized() {
+			d.enricher = enricher.Instance()
+		} else {
+			d.l.Warn("retina enricher is not initialized")
 		}
 	}
 	if err := d.tracer.Attach(d.pid); err != nil {
