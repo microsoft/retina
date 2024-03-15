@@ -40,7 +40,7 @@ func NewCaptureToPodTranslatorForTest(kubeClient kubernetes.Interface) *CaptureT
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	config := config.CaptureConfig{
 		CaptureDebug:              true,
-		CaptureImageVersion:       "v0.0.6-52-g07caaaf",
+		CaptureImageVersion:       "v0.0.1-pre",
 		CaptureImageVersionSource: captureUtils.VersionSourceOperatorImageVersion,
 		CaptureJobNumLimit:        10,
 	}
