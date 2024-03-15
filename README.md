@@ -24,8 +24,15 @@ Retina is currently supported in AKS. It has two major features:
 
 ### Quick Install Guide
 
-1. Create a Kubernetes cluster with a minimum of 2 nodes. Retina supports Linux (Ubuntu) and Windows (2019 and 2022) nodes.
-2. Follow steps in [Using Managed Prometheus and Grafana](https://retina.sh/docs/installation/prometheus-azure-managed)
+Prerequisites: Go, Helm
+
+1. Clone the repo, then install Retina on your Kubernetes cluster
+
+    ```bash
+    make helm-install
+    ```
+
+2. Follow steps in [Using Managed Prometheus and Grafana](https://retina.sh/docs/installation/prometheus-azure-managed) to set up metrics collection and visualization.
 
 ### Captures
 
