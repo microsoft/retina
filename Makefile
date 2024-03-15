@@ -188,7 +188,8 @@ retina-capture-workload: ## build the Retina capture workload
 ##@ Containers
 
 IMAGE_REGISTRY	?= ghcr.io
-IMAGE_NAMESPACE ?= $(shell git config --get remote.origin.url | sed -E 's/.*github\.com[\/:]([^\/]+)\/([^\/.]+).git/\1\/\2/') # attempts to extract the upstream for image namespacing
+# IMAGE_NAMESPACE ?= $(shell git config --get remote.origin.url |sed -E 's/.*github\.com[\/:]([^\/]+)\/([^\/.]+).git/\1\/\2/') # attempts to extract the upstream for image namespacing
+IMAGE_NAMESPACE ?= microsoft/retina
 
 RETINA_BUILDER_IMAGE			= $(IMAGE_NAMESPACE)/retina-builder
 RETINA_TOOLS_IMAGE				= $(IMAGE_NAMESPACE)/retina-tools
@@ -336,7 +337,7 @@ manifest-retina-image: ## create a multiplatform manifest for the retina image
 	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_IMAGE):$(TAG))
 	$(eval FULL_INIT_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE):$(TAG))
 	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64 windows-ltsc2019-amd64 windows-ltsc2022-amd64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
-	docker buildx imagetools create -t $(FULL_INIT_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+	docker buildx imagetools create -t $(FULL_INIT_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_INIT_IMAGE_NAME)-$(subst /,-,$(platform)))
 
 manifest-operator-image: ## create a multiplatform manifest for the operator image
 	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE):$(TAG))
