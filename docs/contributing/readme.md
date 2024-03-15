@@ -14,18 +14,18 @@ contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additio
 
 ## Office Hours and Community Meetings
 
-### Office Hours occur Every Friday at 09:00 AM PST
+### Office Hours occur Every Friday at 11:30 AM PST
 
-[Meeting Link](https://teams.microsoft.com/l/meetup-join/19%3ameeting_YjRjNDBjZDYtMDRiYi00Y2U0LTk1YzgtMDBjYTBkZGUwMmEw%40thread.v2/0?context=%7b%22Tid%22%3a%2272f988bf-86f1-41af-91ab-2d7cd011db47%22%2c%22Oid%22%3a%22e430e8c5-dd91-4c3c-88c2-6e258812501b%22%7d)
+[Meeting Link](https://teams.microsoft.com/l/meetup-join/19%3ameeting_OGE5ZTljM2ItNmNmMC00ZmMzLThjMjktNmNjZGE3ODAyZDVj%40thread.v2/0?context=%7b%22Tid%22%3a%2272f988bf-86f1-41af-91ab-2d7cd011db47%22%2c%22Oid%22%3a%22e430e8c5-dd91-4c3c-88c2-6e258812501b%22%7d)
 
 ```shell
-Meeting ID: 270 606 526 245
-Passcode: mtvFZc 
+Meeting ID: 212 979 978 795 
+Passcode: YjWUEA 
 ________________________________________
 Dial-in by phone 
-+1 323-849-4874,,956290509# United States, Los Angeles 
++1 323-849-4874,,951863362# United States, Los Angeles 
 Find a local number 
-Phone conference ID: 956 290 509# 
+Phone conference ID: 951 863 362# 
 ```
 
 ## Development
