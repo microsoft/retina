@@ -6,9 +6,45 @@
 
 ## Overview
 
-Retina is a cloud and vendor agnostic container workload observability platform which helps customers with enterprise grade DevOps, SecOps and compliance use cases. It is designed to cater to cluster network administrators, cluster security administrators and DevOps engineers by providing a centralized platform for monitoring application and network health, and security. Retina is capable of collecting telemetry data from multiple sources and aggregating it into a single time-series database. Retina is also capable of sending data to multiple destinations, such as Prometheus, Azure Monitor, and other vendors, and visualizing the data in a variety of ways, like Grafana, Azure Monitor, Azure log analytics, and more.
+ Retina is a cloud-agnostic, open-source **Kubernetes network observability platform** that provides a **centralized hub for monitoring application health, network health, and security**. It provides actionable insights to cluster network administrators, cluster security administrators, and DevOps engineers navigating DevOps, SecOps, and compliance use cases. 
+ 
+ Retina **collects customizable telemetry**, which can be exported to **multiple storage options** (such as Prometheus, Azure Monitor, and other vendors) and **visualized in a variety of ways** (like Grafana, Azure Log Analytics, and other vendors). 
 
-![Retina features](/site/static/img/retina-features.png)
+## Features
+
+- **[eBPF](https://ebpf.io/what-is-ebpf#what-is-ebpf)-based** Network Observability platform for Kubernetes workloads.
+- **On-Demand** and **Configurable**.
+- Actionable, industry-standard **Prometheus metrics**.
+- Streamlined **Packet Captures** for deep dives.
+- **Cloud-agnostic**, supporting multiple OS (like Linux, Windows, Azure Linux).
+
+## Why Retina?
+
+Retina lets you **investigate network issues on-demand** and **continuously monitor your clusters**. For scenarios where Retina shines, see the intro docs [here](https://retina.sh/docs/intro)
+
+## CLI Setup
+
+Currently, Retina CLI only supports Linux.
+
+For CLI usage, see [Capture with Retina CLI](../captures/cli.md).
+
+## Option 1: Download from Release
+
+Download `kubectl-retina` from the latest [Retina release](https://github.com/microsoft/retina/releases).
+Feel free to move the binary to `/usr/local/bin/`, or add it to your `PATH` otherwise.
+
+## Option 2: Build from source
+
+Clone the Retina repo and execute:
+
+```shell
+make install-kubectl-retina
+```
+
+Requirements:
+
+- go 1.21 or newer
+- GNU make
 
 ## Documentation
 

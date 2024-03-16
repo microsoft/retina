@@ -18,7 +18,7 @@ function HomepageHeader() {
           <Link
             className="button button--secondary button--lg"
             to="/docs/intro">
-            Get Started 
+            Get Started
           </Link>
         </div>
       </div>
@@ -36,12 +36,22 @@ export default function Home() {
       <main>
             <div className={styles.columns}>
               <div className={styles.column1}>What is Retina?</div>
-              <div className={styles.column2}>              
+              <div className={styles.column2}>
                 <div className={styles.paragraph1}>Retina is a cloud-agnostic, open-source Kubernetes Network Observability platform which helps with DevOps, SecOps and compliance use cases. It provides a centralized hub for monitoring application and network health and security, catering to Cluster Network Administrators, Cluster Security Administrators and DevOps Engineers.</div>
                 <div>Retina collects customizable telemetry, which can be exported to multiple storage options (such as Prometheus, Azure Monitor, and other vendors) and visualized in a variety of ways (like Grafana, Azure Log Analytics, and other vendors).</div>
                 </div>
             </div>
+            <div className={styles.columns2}>
         <img className={styles.features} src={featuresImage} alt={"Retina features"}/>
+<ul className={styles.featurelist}>
+ <li>Traffic Insights</li>
+ <li>eBPF Based</li>
+ <li>Metric & Flow Logs</li>
+ <li>Distributed Packet Captures</li>
+ <li>Any CNI</li>
+ <li>Any Kubernetes Platform</li>
+</ul>
+            </div>
       </main>
     </Layout>
   );

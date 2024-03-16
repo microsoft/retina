@@ -19,13 +19,12 @@
 @media only screen and (max-width: 600px) {
   .columns {
     display: flex;
-    align-items: center; 
+    align-items: center;
     word-break: break-word;
     padding: 4rem 1.5rem;
-
-} 
+}
 .column2 {
-  flex-grow: 2; 
+  flex-grow: 2;
   font-size: 0.75rem;
 }
 }
@@ -38,21 +37,21 @@
 
 .columns {
     display: flex;
-    align-items: center; 
+    align-items: center;
     padding: 4rem 1.5rem;
     word-break: break-word
 }
 
 .column1 {
   text-align: center;
-  flex: none; 
+  flex: none;
   width: 33.3333%;
-  font-weight: 600; 
+  font-weight: 600;
   font-size: calc(1rem + 1.8vw);
 }
 
 .column2 {
-  flex-grow: 2; 
+  flex-grow: 2;
   font-size: calc(1rem + 0.3vw);
 }
 
@@ -61,9 +60,21 @@
 }
 
 .features {
-  display: block;
-  margin: 20px auto;
-  width: 100%;
-  max-width: 1226px;
-  height: auto;
+  margin: 0 2vw;
+  width: 50%;
+}
+
+.columns2 {
+    display: flex;
+    align-items: center;
+    padding: 4rem 1.5rem;
+    word-break: break-word;
+    margin: 0 calc(0rem + 5vw);
+}
+
+.featurelist {
+font-size: calc(0rem + 2vw);
+flex-grow: 1;
+margin-left: calc(0rem + 3vw);
+list-style-position: inside;
 }
