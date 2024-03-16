@@ -22,11 +22,12 @@
     align-items: center;
     word-break: break-word;
     padding: 4rem 1.5rem;
-}
-.column2 {
-  flex-grow: 2;
-  font-size: 0.75rem;
-}
+  }
+
+  .column2 {
+    flex-grow: 2;
+    font-size: 0.75rem;
+  }
 }
 
 .buttons {
@@ -36,10 +37,10 @@
 }
 
 .columns {
-    display: flex;
-    align-items: center;
-    padding: 4rem 1.5rem;
-    word-break: break-word
+  display: flex;
+  align-items: center;
+  padding: 4rem 1.5rem;
+  word-break: break-word
 }
 
 .column1 {
@@ -56,7 +57,7 @@
 }
 
 .paragraph1 {
-   margin: 0 0 20px
+  margin: 0 0 20px
 }
 
 .features {
@@ -65,16 +66,16 @@
 }
 
 .columns2 {
-    display: flex;
-    align-items: center;
-    padding: 4rem 1.5rem;
-    word-break: break-word;
-    margin: 0 calc(0rem + 5vw);
+  display: flex;
+  align-items: center;
+  padding: 4rem 1.5rem;
+  word-break: break-word;
+  margin: 0 calc(0rem + 5vw);
 }
 
 .featurelist {
-font-size: calc(0rem + 2vw);
-flex-grow: 1;
-margin-left: calc(0rem + 3vw);
-list-style-position: inside;
+  font-size: calc(0rem + 2vw);
+  flex-grow: 1;
+  margin-left: calc(0rem + 3vw);
+  list-style-position: inside;
 }
