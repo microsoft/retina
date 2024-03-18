@@ -123,7 +123,7 @@ func main() {
 
 	var tel telemetry.Telemetry
 	if config.EnableTelemetry && applicationInsightsID != "" {
-		mainLogger.Infof("telemetry enabled, using Application Insights ID: %s", applicationInsightsID)
+		mainLogger.Info("telemetry enabled", zap.String("applicationInsightsID", applicationInsightsID))
 		tel = telemetry.NewAppInsightsTelemetryClient("retina-agent", map[string]string{
 			"version":   version,
 			"apiserver": cfg.Host,

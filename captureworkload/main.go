@@ -36,7 +36,7 @@ func main() {
 
 	var tel telemetry.Telemetry
 	if applicationInsightsID != "" {
-		l.Info("Start telemetry with Azure App Insights Monitor", zap.String("applicationInsightsID", applicationInsightsID))
+		l.Info("telemetry enabled", zap.String("applicationInsightsID", applicationInsightsID))
 		telemetry.InitAppInsights(applicationInsightsID, version)
 		defer telemetry.ShutdownAppInsights()
 		tel = telemetry.NewAppInsightsTelemetryClient("retina-capture", map[string]string{

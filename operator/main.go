@@ -169,7 +169,7 @@ func main() {
 			"version":                   version,
 			telemetry.PropertyApiserver: apiserverURL,
 		}
-		tel = telemetry.NewAppInsightsTelemetryClient("retina-agent", properties)
+		tel = telemetry.NewAppInsightsTelemetryClient("retina-operator", properties)
 	} else {
 		mainLogger.Info("telemetry disabled", zap.String("apiserver", apiserverURL))
 		tel = telemetry.NewNoopTelemetry()
