@@ -248,7 +248,7 @@ require (
 	gotest.tools/v3 v3.5.1
 	k8s.io/apiextensions-apiserver v0.29.3
 	k8s.io/cli-runtime v0.29.3
-	k8s.io/kubectl v0.29.1
+	k8s.io/kubectl v0.29.3
 	sigs.k8s.io/controller-runtime v0.16.3
 )
 
