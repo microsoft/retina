@@ -22,43 +22,18 @@ Retina **collects customizable telemetry**, which can be exported to **multiple 
 
 Retina lets you **investigate network issues on-demand** and **continuously monitor your clusters**. For scenarios where Retina shines, see the intro docs [here](https://retina.sh/docs/intro)
 
-## CLI Setup
-
-Currently, Retina CLI only supports Linux.
-
-For CLI usage, see [Capture with Retina CLI](../captures/cli.md).
-
-## Option 1: Download from Release
-
-Download `kubectl-retina` from the latest [Retina release](https://github.com/microsoft/retina/releases).
-Feel free to move the binary to `/usr/local/bin/`, or add it to your `PATH` otherwise.
-
-## Option 2: Build from source
-
-Clone the Retina repo and execute:
-
-```shell
-make install-kubectl-retina
-```
-
-Requirements:
-
-- go 1.21 or newer
-- GNU make
-
 ## Documentation
 
-See [retina.sh](http://retina.sh) for more information and examples.
+See [retina.sh](http://retina.sh) for documentation and examples.
 
 ## Capabilities
 
-Retina is currently supported in AKS. It has two major features:
+Retina has two major features:
 
-### Metrics
+- [Metrics](https://retina.sh/docs/metrics/modes)
+- [Captures](https://retina.sh/docs/captures)
 
-[Read more](https://retina.sh/docs/metrics/modes)
-
-### Quick Install Guide
+### Metrics Quick Install Guide
 
 Prerequisites: Go, Helm
 
@@ -68,19 +43,53 @@ Prerequisites: Go, Helm
     make helm-install
     ```
 
-2. Follow steps in [Using Managed Prometheus and Grafana](https://retina.sh/docs/installation/prometheus-azure-managed) to set up metrics collection and visualization.
+2. Follow steps in [Using Prometheus and Grafana](https://retina.sh/docs/installation/prometheus-unmanaged) to set up metrics collection and visualization.
 
-### Captures
+### Captures Quick Start Guide
 
-[Read more](https://retina.sh/docs/captures)
+#### Captures via CLI
+
+Currently, Retina CLI only supports Linux.
+
+- Option 1: Download from Release
+
+  Download `kubectl-retina` from the latest [Retina release](https://github.com/microsoft/retina/releases).
+  Feel free to move the binary to `/usr/local/bin/`, or add it to your `PATH` otherwise.
+
+- Option 2: Build from source
+
+  Requirements:
+
+  - go 1.21 or newer
+  - GNU make
+
+  Clone the Retina repo and execute:
+
+  ```shell
+  make install-kubectl-retina
+  ```
+
+Execute Retina:
+
+```shell
+kubectl-retina capture create --help
+```
+
+For further CLI documentation, see [Capture with Retina CLI](../captures/cli.md).
+
+#### Captures via CRD
+
+Prerequisites: Go, Helm
+
+1. Clone the repo, then install Retina with Capture operator support on your Kubernetes cluster
+
+    ```bash
+    make helm-install-with-operator
+    ```
+
+2. Follow steps in [Capture CRD](https://retina.sh/docs/captures/#option-2-capture-crd-custom-resource-definition) for documentation of the CRD and examples for setting up Captures.
 
 ## Contributing
-
-[Read more](https://retina.sh/docs/contributing)
-
-## Office Hours and Community Meetings
-
-[Read more](https://retina.sh/docs/contributing/#office-hours-and-community-meetings)
 
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a
 Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
@@ -94,6 +103,12 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
 contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
 
+[Read more about how to begin contributing here.](https://retina.sh/docs/contributing)
+
+### Office Hours and Community Meetings
+
+We host a periodic open community meeting. [Read more here.](https://retina.sh/docs/contributing/#office-hours-and-community-meetings)
+
 ## Trademarks
 
 This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft
@@ -103,7 +118,7 @@ Any use of third-party trademarks or logos are subject to those third-party's po
 
 ## License
 
-See [LICENSE](LICENSE).
+See the [LICENSE](LICENSE).
 
 ## Code of Conduct
 
