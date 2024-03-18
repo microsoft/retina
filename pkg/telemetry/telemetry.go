@@ -46,7 +46,7 @@ func InitAppInsights(appinsightsId, appVersion string) {
 
 func ShutdownAppInsights() {
 	select {
-	case <-Client.Channel().Close(5 * time.Second):
+	case <-Client.Channel().Close(5 * time.Second): //nolint:gomnd // ignore
 		// Five second timeout for retries.
 
 		// If we got here, then all telemetry was submitted
