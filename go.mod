@@ -225,7 +225,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.2.1
 	github.com/Microsoft/hcsshim v0.12.0-rc.3
 	github.com/cakturk/go-netstat v0.0.0-20200220111822-e5b49efee7a5
-	github.com/cilium/cilium v1.15.1
+	github.com/cilium/cilium v1.15.2
 	github.com/cilium/ebpf v0.13.2
 	github.com/florianl/go-tc v0.4.3
 	github.com/golang/mock v1.6.0

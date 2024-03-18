@@ -92,8 +92,8 @@ github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e/go.mod h1:nSuG5e5P
 github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1/go.mod h1:Q3SI9o4m/ZMnBNeIyt5eFwwo7qiLfzFZmjNmxjkiQlU=
 github.com/cilium/checkmate v1.0.3 h1:CQC5eOmlAZeEjPrVZY3ZwEBH64lHlx9mXYdUehEwI5w=
 github.com/cilium/checkmate v1.0.3/go.mod h1:KiBTasf39/F2hf2yAmHw21YFl3hcEyP4Yk6filxc12A=
-github.com/cilium/cilium v1.15.1 h1:RnNgjVFmu7MgSs3rJXo/8Js/2Fv7q3sJ+DLQcudSJc8=
-github.com/cilium/cilium v1.15.1/go.mod h1:MJ6X0Qo3Hem2CP+yCcVI5EDcvh4yT6+2cq55A6AKpnA=
+github.com/cilium/cilium v1.15.2 h1:3VGUWfMHHUzBdapD5ZA98u5xIDbXhucpzwxJT02ErTw=
+github.com/cilium/cilium v1.15.2/go.mod h1:cq4hdNxXW8JxTbJmVL/ZHs9s46jfZSG0+MvOWycFGcw=
 github.com/cilium/ebpf v0.5.0/go.mod h1:4tRaxcgiL706VnOzHOdBlY8IEAIdxINsQBcU4xJJXRs=
 github.com/cilium/ebpf v0.7.0/go.mod h1:/oI2+1shJiTGAMgl6/RgJr36Eo1jzrRcAWbcXO2usCA=
 github.com/cilium/ebpf v0.8.1/go.mod h1:f5zLIM0FSNuAkSyLAN7X+Hy6yznlF1mNiWUMfxMtrgk=
