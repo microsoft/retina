@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	client  appinsights.TelemetryClient
+	Client  appinsights.TelemetryClient
 	version string
 )
 
@@ -32,13 +32,13 @@ type Telemetry interface {
 }
 
 func InitAppInsights(appinsightsId, appVersion string) {
-	if client != nil {
+	if Client != nil {
 		fmt.Printf("appinsights client already initialized")
 		return
 	}
 	telemetryConfig := appinsights.NewTelemetryConfiguration(appinsightsId)
 	telemetryConfig.MaxBatchInterval = 1 * time.Second
-	client = appinsights.NewTelemetryClientFromConfig(telemetryConfig)
+	Client = appinsights.NewTelemetryClientFromConfig(telemetryConfig)
 
 	// Set the app version
 	version = appVersion
@@ -46,7 +46,7 @@ func InitAppInsights(appinsightsId, appVersion string) {
 
 func ShutdownAppInsights() {
 	select {
-	case <-client.Channel().Close(5 * time.Second):
+	case <-Client.Channel().Close(5 * time.Second):
 		// Five second timeout for retries.
 
 		// If we got here, then all telemetry was submitted
@@ -72,7 +72,7 @@ type TelemetryClient struct {
 }
 
 func NewAppInsightsTelemetryClient(processName string, additionalproperties map[string]string) *TelemetryClient {
-	if client == nil {
+	if Client == nil {
 		fmt.Println("appinsights client not initialized")
 	}
 
@@ -98,7 +98,7 @@ func TrackPanic() {
 		trace.Properties["version"] = version
 
 		// Create trace and track it
-		client.Track(trace)
+		Client.Track(trace)
 
 		// Close zapai and flush logs
 		if logger := log.Logger(); logger != nil {
@@ -159,7 +159,7 @@ func (t *TelemetryClient) TrackEvent(name string, properties map[string]string) 
 		t.RUnlock()
 	}
 
-	client.Track(event)
+	Client.Track(event)
 }
 
 func (t *TelemetryClient) TrackMetric(metricname string, value float64, properties map[string]string) {
@@ -178,7 +178,7 @@ func (t *TelemetryClient) TrackMetric(metricname string, value float64, properti
 		t.RUnlock()
 	}
 
-	client.Track(metric)
+	Client.Track(metric)
 }
 
 func (t *TelemetryClient) TrackTrace(name string, severity contracts.SeverityLevel, properties map[string]string) {
@@ -197,7 +197,7 @@ func (t *TelemetryClient) TrackTrace(name string, severity contracts.SeverityLev
 		t.RUnlock()
 	}
 
-	client.Track(trace)
+	Client.Track(trace)
 }
 
 func (t *TelemetryClient) TrackException(exception *appinsights.ExceptionTelemetry) {
@@ -211,7 +211,7 @@ func (t *TelemetryClient) TrackException(exception *appinsights.ExceptionTelemet
 
 		t.RUnlock()
 	}
-	client.Track(exception)
+	Client.Track(exception)
 }
 
 type PerformanceCounter struct {

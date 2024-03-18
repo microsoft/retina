@@ -54,7 +54,10 @@ const (
 var (
 	scheme = k8sruntime.NewScheme()
 
-	applicationInsightsID string //nolint // aiMetadata is set in Makefile
+	// applicationInsightsID is the instrumentation key for Azure Application Insights
+	// It is set during the build process using the -ldflags flag
+	// If it is set, the application will send telemetry to the corresponding Application Insights resource.
+	applicationInsightsID string
 	version               string
 
 	cfgFile string
@@ -76,10 +79,11 @@ func main() {
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 
-	// initialize Application Insights
-	telemetry.InitAppInsights(applicationInsightsID, version)
-
-	defer telemetry.TrackPanic()
+	if applicationInsightsID != "" {
+		telemetry.InitAppInsights(applicationInsightsID, version)
+		defer telemetry.ShutdownAppInsights()
+		defer telemetry.TrackPanic()
+	}
 
 	flag.StringVar(&cfgFile, "config", configFileName, "config file")
 	flag.Parse()
@@ -118,7 +122,7 @@ func main() {
 	mainLogger = log.Logger().Named("main").Sugar()
 
 	var tel telemetry.Telemetry
-	if config.EnableTelemetry {
+	if config.EnableTelemetry && applicationInsightsID != "" {
 		mainLogger.Infof("telemetry enabled, using Application Insights ID: %s", applicationInsightsID)
 		tel = telemetry.NewAppInsightsTelemetryClient("retina-agent", map[string]string{
 			"version":   version,

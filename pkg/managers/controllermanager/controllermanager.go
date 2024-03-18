@@ -97,7 +97,10 @@ func (m *Controller) Init(ctx context.Context) error {
 }
 
 func (m *Controller) Start(ctx context.Context) {
-	defer telemetry.TrackPanic()
+	// Only track panics if telemetry is enabled
+	if telemetry.Client != nil {
+		defer telemetry.TrackPanic()
+	}
 
 	var g *errgroup.Group
 
