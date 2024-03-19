@@ -1,6 +1,6 @@
 # `dns` (Linux)
 
-Counts number of packets/bytes dropped on a Node, along with the direction and reason for drop.
+Tracks incoming and outgoing DNS traffic, providing various metrics and details about the DNS queries and responses.
 
 ## Metrics
 
@@ -8,9 +8,9 @@ See metrics for [Basic Mode](../basic.md#plugin-dns-linux) or [Advanced Mode](..
 
 ## Architecture
 
-The plugin utilizes eBPF to gather data.
-The plugin generates Basic metrics from an eBPF result.
-In Advanced mode (see [Metric Modes](../modes.md)), the plugin turns this eBPF result into an enriched `Flow` (adding Pod information based on IP), then sends the `Flow` to an external channel so that a dns module can create extra Pod-Level metrics.
+This plugin uses [Inspektor Gadget](https://github.com/inspektor-gadget/inspektor-gadget)'s DNS Tracer to track DNS traffic and generate basic metrics derived from the captured events.
+
+In [Advanced mode](https://retina.sh/docs/metrics/modes), the plugin further processes the capture results into an enriched Flow with additional Pod information. Subsequently, the Flow is transmitted to an external channel. This allows a DNS module to generate additional Pod-Level metrics.
 
 ### Code locations
 
