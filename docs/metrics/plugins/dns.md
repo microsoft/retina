@@ -8,9 +8,9 @@ See metrics for [Basic Mode](../basic.md#plugin-dns-linux) or [Advanced Mode](..
 
 ## Architecture
 
-This plugin fundamentally relies on [Inspektor Gadget](https://github.com/inspektor-gadget/inspektor-gadget)'s DNS Tracer for monitoring DNS traffic. It uses eBPF (Extended Berkeley Packet Filter) to efficiently track DNS events. Following the capture of these events, the plugin generates basic metrics derived from the eBPF results.
+This plugin uses [Inspektor Gadget](https://github.com/inspektor-gadget/inspektor-gadget)'s DNS Tracer to track DNS traffic and generate basic metrics derived from the captured events.
 
-In its Advanced mode (refer to [Metric Modes](https://retina.sh/docs/metrics/modes) for more details), the plugin further processes the eBPF results into an enriched Flow. This Flow includes additional Pod information, determined by IP. Subsequently, the Flow is transmitted to an external channel. This allows a DNS module to generate additional Pod-Level metrics.
+In [Advanced mode](https://retina.sh/docs/metrics/modes), the plugin further processes the capture results into an enriched Flow with additional Pod information. Subsequently, the Flow is transmitted to an external channel. This allows a DNS module to generate additional Pod-Level metrics.
 
 ### Code locations
 
