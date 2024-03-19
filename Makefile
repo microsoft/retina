@@ -188,7 +188,7 @@ retina-capture-workload: ## build the Retina capture workload
 ##@ Containers
 
 IMAGE_REGISTRY	?= ghcr.io
-IMAGE_NAMESPACE ?= $(shell git config --get remote.origin.url | sed -E 's/.*github\.com[\/:]([^\/]+)\/([^\/.]+).git/\1\/\2/')
+IMAGE_NAMESPACE ?= $(shell git config --get remote.origin.url | sed -E 's/.*github\.com[\/:]([^\/]+)\/([^\/.]+).git/\1\/\2/' | tr '[:upper:]' '[:lower:]')
 
 RETINA_BUILDER_IMAGE			= $(IMAGE_NAMESPACE)/retina-builder
 RETINA_TOOLS_IMAGE				= $(IMAGE_NAMESPACE)/retina-tools
@@ -395,7 +395,7 @@ coverage: # Code coverage.
 manifests: 
 	cd crd && make manifests && make generate
 
-HELM_IMAGE_TAG ?= v0.0.1-pre.1
+HELM_IMAGE_TAG ?= v0.0.1
 
 # basic/node-level mode
 helm-install: manifests
@@ -447,8 +447,7 @@ helm-install-advanced-local-context: manifests
 		--skip-crds \
 		--set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\,packetparser\]" \
 		--set enablePodLevel=true \
-		--set enableAnnotations=true \
-		--set bypassLookupIPOfInterest=false
+		--set enableAnnotations=true
 
 helm-uninstall:
 	helm uninstall retina -n kube-system
@@ -461,50 +460,3 @@ docs:
 .PHONY: docs-pod
 docs-prod:
 	docker run -i -p 3000:3000 -v $(PWD):/retina -w /retina/ node:20-alpine npm install --prefix site && npm run build --prefix site
-
-# Kapinger is a tool to generate traffic for testing Retina.
-
-kapinger-image: ## build the retina container image.
-	echo "Building for $(PLATFORM)"
-	$(MAKE) container-$(CONTAINER_BUILDER) \
-			PLATFORM=$(PLATFORM) \
-			DOCKERFILE=hack/tools/kapinger/Dockerfile \
-			REGISTRY=$(IMAGE_REGISTRY) \
-			IMAGE=$(KAPINGER_IMAGE) \
-			VERSION=$(TAG) \
-			TAG=$(RETINA_PLATFORM_TAG) \
-			APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
-			CONTEXT_DIR=$(REPO_ROOT) \
-			ACTION=--load
-
-kapinger-image-push:
-	$(MAKE) container-push \
-		IMAGE=$(KAPINGER_IMAGE) \
-		TAG=$(RETINA_PLATFORM_TAG)
-
-kapinger-manifest-create:
-	$(MAKE) manifest-create \
-		PLATFORMS="$(PLATFORMS)" \
-		IMAGE=$(KAPINGER_IMAGE) \
-		TAG=$(TAG)
-
-kapinger-manifest-push:
-	$(MAKE) manifest-push \
-		IMAGE=$(KAPINGER_IMAGE) \
-		TAG=$(TAG)
-
-kapinger-image-win-push: 
-	$(MAKE) container-$(CONTAINER_BUILDER) \
-			PLATFORM=windows/amd64 \
-			DOCKERFILE=hack/tools/kapinger/Dockerfile.windows \
-			REGISTRY=$(IMAGE_REGISTRY) \
-			IMAGE=$(KAPINGER_IMAGE) \
-			VERSION=$(TAG) \
-			TAG=$(RETINA_PLATFORM_TAG) \
-			CONTEXT_DIR=$(REPO_ROOT) \
-			ACTION=--push
-
-kapinger-skopeo-archive: 
-	$(MAKE) manifest-skopeo-archive \
-		IMAGE=$(KAPINGER_IMAGE) \
-		TAG=$(TAG)
