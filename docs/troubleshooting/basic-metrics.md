@@ -55,7 +55,7 @@ data:
     logLevel: info
     enabledPlugin: ["dropreason","packetforward","linuxutil"]
     metricsInterval: 10
-    enableTelemetry: true
+    enableTelemetry: false
 kind: ConfigMap
 metadata:
   annotations:

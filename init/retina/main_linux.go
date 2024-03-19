@@ -11,19 +11,26 @@ import (
 )
 
 var (
-	applicationInsightsID string //nolint // aiMetadata is set in Makefile
+	// applicationInsightsID is the instrumentation key for Azure Application Insights
+	// It is set during the build process using the -ldflags flag
+	// If it is set, the application will send telemetry to the corresponding Application Insights resource.
+	applicationInsightsID string
 	version               string
 )
 
 func main() {
-	// Initialize application insights
-	telemetry.InitAppInsights(applicationInsightsID, version)
-	defer telemetry.TrackPanic()
-
 	// Initialize logger
 	opts := log.GetDefaultLogOpts()
-	opts.ApplicationInsightsID = applicationInsightsID
-	opts.EnableTelemetry = true
+
+	// Enable telemetry if applicationInsightsID is provided
+	if applicationInsightsID != "" {
+		opts.EnableTelemetry = true
+		opts.ApplicationInsightsID = applicationInsightsID
+		// Initialize application insights
+		telemetry.InitAppInsights(applicationInsightsID, version)
+		defer telemetry.ShutdownAppInsights()
+		defer telemetry.TrackPanic()
+	}
 
 	log.SetupZapLogger(opts)
 	log.Logger().AddFields(zap.String("version", version))

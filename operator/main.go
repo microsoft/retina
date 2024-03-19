@@ -67,7 +67,10 @@ var (
 
 	version = "undefined"
 
-	applicationInsightsID string //nolint // aiMetadata is set in Makefile
+	// applicationInsightsID is the instrumentation key for Azure Application Insights
+	// It is set during the build process using the -ldflags flag
+	// If it is set, the application will send telemetry to the corresponding Application Insights resource.
+	applicationInsightsID string
 )
 
 func init() {
@@ -160,15 +163,15 @@ func main() {
 	}
 
 	var tel telemetry.Telemetry
-	if oconfig.EnableTelemetry {
+	if oconfig.EnableTelemetry && applicationInsightsID != "" {
 		mainLogger.Info("telemetry enabled", zap.String("applicationInsightsID", applicationInsightsID))
 		properties := map[string]string{
 			"version":                   version,
 			telemetry.PropertyApiserver: apiserverURL,
 		}
-		tel = telemetry.NewAppInsightsTelemetryClient("retina-agent", properties)
+		tel = telemetry.NewAppInsightsTelemetryClient("retina-operator", properties)
 	} else {
-		mainLogger.Info("telemetry disabled for:", zap.String("apiserver", apiserverURL))
+		mainLogger.Info("telemetry disabled", zap.String("apiserver", apiserverURL))
 		tel = telemetry.NewNoopTelemetry()
 	}
 

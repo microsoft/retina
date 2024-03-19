@@ -46,7 +46,7 @@ func InitAppInsights(appinsightsId, appVersion string) {
 
 func ShutdownAppInsights() {
 	select {
-	case <-client.Channel().Close(5 * time.Second):
+	case <-client.Channel().Close(5 * time.Second): //nolint:gomnd // ignore
 		// Five second timeout for retries.
 
 		// If we got here, then all telemetry was submitted
@@ -91,6 +91,10 @@ func NewAppInsightsTelemetryClient(processName string, additionalproperties map[
 // TrackPanic function sends the stacktrace and flushes logs only in a goroutine where its call is deferred.
 // Panics in other goroutines will not be caught by this recover function.
 func TrackPanic() {
+	// no telemetry means client is not initialized
+	if client == nil {
+		return
+	}
 	if r := recover(); r != nil {
 		message := fmt.Sprintf("Panic caused by: %v , Stacktrace %s", r, string(debug.Stack()))
 		trace := appinsights.NewTraceTelemetry(message, appinsights.Critical)

@@ -67,6 +67,7 @@ func (cm *CaptureManager) CaptureNetwork(sigChan <-chan os.Signal) (string, erro
 		}
 	}
 
+	// no-op telemetry client will not send any telemetry
 	cm.tel.TrackEvent("capturenetwork", map[string]string{
 		"captureName": cm.captureName(),
 		"nodeName":    cm.captureNodeHostName(),
