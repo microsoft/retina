@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	Client  appinsights.TelemetryClient
+	client  appinsights.TelemetryClient
 	version string
 )
 
@@ -32,13 +32,13 @@ type Telemetry interface {
 }
 
 func InitAppInsights(appinsightsId, appVersion string) {
-	if Client != nil {
+	if client != nil {
 		fmt.Printf("appinsights client already initialized")
 		return
 	}
 	telemetryConfig := appinsights.NewTelemetryConfiguration(appinsightsId)
 	telemetryConfig.MaxBatchInterval = 1 * time.Second
-	Client = appinsights.NewTelemetryClientFromConfig(telemetryConfig)
+	client = appinsights.NewTelemetryClientFromConfig(telemetryConfig)
 
 	// Set the app version
 	version = appVersion
@@ -46,7 +46,7 @@ func InitAppInsights(appinsightsId, appVersion string) {
 
 func ShutdownAppInsights() {
 	select {
-	case <-Client.Channel().Close(5 * time.Second): //nolint:gomnd // ignore
+	case <-client.Channel().Close(5 * time.Second): //nolint:gomnd // ignore
 		// Five second timeout for retries.
 
 		// If we got here, then all telemetry was submitted
@@ -72,7 +72,7 @@ type TelemetryClient struct {
 }
 
 func NewAppInsightsTelemetryClient(processName string, additionalproperties map[string]string) *TelemetryClient {
-	if Client == nil {
+	if client == nil {
 		fmt.Println("appinsights client not initialized")
 	}
 
@@ -91,6 +91,10 @@ func NewAppInsightsTelemetryClient(processName string, additionalproperties map[
 // TrackPanic function sends the stacktrace and flushes logs only in a goroutine where its call is deferred.
 // Panics in other goroutines will not be caught by this recover function.
 func TrackPanic() {
+	// no telemetry means client is not initialized
+	if client == nil {
+		return
+	}
 	if r := recover(); r != nil {
 		message := fmt.Sprintf("Panic caused by: %v , Stacktrace %s", r, string(debug.Stack()))
 		trace := appinsights.NewTraceTelemetry(message, appinsights.Critical)
@@ -98,7 +102,7 @@ func TrackPanic() {
 		trace.Properties["version"] = version
 
 		// Create trace and track it
-		Client.Track(trace)
+		client.Track(trace)
 
 		// Close zapai and flush logs
 		if logger := log.Logger(); logger != nil {
@@ -159,7 +163,7 @@ func (t *TelemetryClient) TrackEvent(name string, properties map[string]string) 
 		t.RUnlock()
 	}
 
-	Client.Track(event)
+	client.Track(event)
 }
 
 func (t *TelemetryClient) TrackMetric(metricname string, value float64, properties map[string]string) {
@@ -178,7 +182,7 @@ func (t *TelemetryClient) TrackMetric(metricname string, value float64, properti
 		t.RUnlock()
 	}
 
-	Client.Track(metric)
+	client.Track(metric)
 }
 
 func (t *TelemetryClient) TrackTrace(name string, severity contracts.SeverityLevel, properties map[string]string) {
@@ -197,7 +201,7 @@ func (t *TelemetryClient) TrackTrace(name string, severity contracts.SeverityLev
 		t.RUnlock()
 	}
 
-	Client.Track(trace)
+	client.Track(trace)
 }
 
 func (t *TelemetryClient) TrackException(exception *appinsights.ExceptionTelemetry) {
@@ -211,7 +215,7 @@ func (t *TelemetryClient) TrackException(exception *appinsights.ExceptionTelemet
 
 		t.RUnlock()
 	}
-	Client.Track(exception)
+	client.Track(exception)
 }
 
 type PerformanceCounter struct {
