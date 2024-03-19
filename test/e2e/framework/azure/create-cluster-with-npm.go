@@ -18,9 +18,11 @@ var (
 )
 
 const (
-	clusterTimeout    = 10 * time.Minute
-	AgentARMSKU       = "Standard_D4pls_v5"
-	AuxilaryNodeCount = 1
+	clusterTimeout      = 10 * time.Minute
+	clusterCreateTicker = 30 * time.Second
+	pollFrequency       = 5 * time.Second
+	AgentARMSKU         = "Standard_D4pls_v5"
+	AuxilaryNodeCount   = 1
 )
 
 type CreateNPMCluster struct {
@@ -49,7 +51,8 @@ func (c *CreateNPMCluster) Run() error {
 
 	npmCluster.Properties.NetworkProfile.NetworkPolicy = to.Ptr(armcontainerservice.NetworkPolicyAzure)
 
-	npmCluster.Properties.AgentPoolProfiles = append(npmCluster.Properties.AgentPoolProfiles, &armcontainerservice.ManagedClusterAgentPoolProfile{
+	//nolint:appendCombine // separate for verbosity
+	npmCluster.Properties.AgentPoolProfiles = append(npmCluster.Properties.AgentPoolProfiles, &armcontainerservice.ManagedClusterAgentPoolProfile{ //nolint:all
 		Type:               to.Ptr(armcontainerservice.AgentPoolTypeVirtualMachineScaleSets),
 		AvailabilityZones:  []*string{to.Ptr("1")},
 		Count:              to.Ptr[int32](AuxilaryNodeCount),
@@ -64,6 +67,7 @@ func (c *CreateNPMCluster) Run() error {
 	})
 
 	/* todo: add azlinux node pool
+	//nolint:appendCombine // separate for verbosity
 	npmCluster.Properties.AgentPoolProfiles = append(npmCluster.Properties.AgentPoolProfiles, &armcontainerservice.ManagedClusterAgentPoolProfile{
 		Type:               to.Ptr(armcontainerservice.AgentPoolTypeVirtualMachineScaleSets),
 		AvailabilityZones:  []*string{to.Ptr("1")},
@@ -78,7 +82,8 @@ func (c *CreateNPMCluster) Run() error {
 		MaxPods:            to.Ptr(int32(azure.MaxPodsPerNode)),
 	})
 	*/
-	npmCluster.Properties.AgentPoolProfiles = append(npmCluster.Properties.AgentPoolProfiles, &armcontainerservice.ManagedClusterAgentPoolProfile{
+	//nolint:appendCombine // separate for verbosity
+	npmCluster.Properties.AgentPoolProfiles = append(npmCluster.Properties.AgentPoolProfiles, &armcontainerservice.ManagedClusterAgentPoolProfile{ //nolint:all
 		Type:               to.Ptr(armcontainerservice.AgentPoolTypeVirtualMachineScaleSets),
 		AvailabilityZones:  []*string{to.Ptr("1")},
 		Count:              to.Ptr[int32](AuxilaryNodeCount),
@@ -116,7 +121,7 @@ func (c *CreateNPMCluster) Run() error {
 	notifychan := make(chan struct{})
 	go func() {
 		_, err = poller.PollUntilDone(ctx, &runtime.PollUntilDoneOptions{
-			Frequency: 5 * time.Second,
+			Frequency: pollFrequency,
 		})
 		if err != nil {
 			log.Printf("failed to create cluster: %v\n", err)
@@ -126,7 +131,7 @@ func (c *CreateNPMCluster) Run() error {
 		close(notifychan)
 	}()
 
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(clusterCreateTicker)
 	defer ticker.Stop()
 	for {
 		select {
@@ -135,7 +140,7 @@ func (c *CreateNPMCluster) Run() error {
 		case <-ticker.C:
 			log.Printf("waiting for cluster %s to be ready...\n", c.ClusterName)
 		case <-notifychan:
-			return err
+			return fmt.Errorf("received notification, failed to create cluster: %w", err)
 		}
 	}
 }

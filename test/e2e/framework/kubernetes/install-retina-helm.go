@@ -17,7 +17,10 @@ const (
 	deleteTimeout = 60 * time.Second
 )
 
-var errEmptyTag = fmt.Errorf("tag is empty")
+var (
+	errEmptyTag          = fmt.Errorf("tag is empty")
+	errDirectoryNotFound = fmt.Errorf("directory not found")
+)
 
 type InstallHelmChart struct {
 	Namespace          string
@@ -99,8 +102,8 @@ func (i *InstallHelmChart) Prevalidate() error {
 		if err != nil {
 			return fmt.Errorf("failed to get current working directory %s: %w", cwd, err)
 		}
-		fmt.Printf("the current working directory %s", cwd)
-		return fmt.Errorf("directory not found at %s:  working directory: %s", i.ChartPath, cwd)
+		log.Printf("the current working directory %s", cwd)
+		return fmt.Errorf("directory not found at %s:  working directory: %s: %w", i.ChartPath, cwd, errDirectoryNotFound)
 	}
 	log.Printf("found chart at %s", i.ChartPath)
 

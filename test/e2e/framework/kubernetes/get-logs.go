@@ -12,7 +12,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-func PrintPodLogs(kubeconfigpath string, namespace string, labelSelector string) {
+func PrintPodLogs(kubeconfigpath, namespace, labelSelector string) {
 	// Load the kubeconfig file to get the configuration to access the cluster
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfigpath)
 	if err != nil {
@@ -34,7 +34,8 @@ func PrintPodLogs(kubeconfigpath string, namespace string, labelSelector string)
 	}
 
 	// Iterate over the pods and get the logs for each pod
-	for _, pod := range pods.Items {
+	for i := range pods.Items {
+		pod := pods.Items[i]
 		fmt.Printf("############################## logs for pod %s #########################\n", pod.Name)
 
 		// Get the logs for the pod
@@ -43,13 +44,14 @@ func PrintPodLogs(kubeconfigpath string, namespace string, labelSelector string)
 		if err != nil {
 			fmt.Printf("error getting logs for pod %s: %s\n", pod.Name, err)
 		}
-		defer podLogs.Close()
 
 		// Read the logs
 		buf, err := io.ReadAll(podLogs)
 		if err != nil {
 			log.Printf("error reading logs for pod %s: %s\n", pod.Name, err)
 		}
+
+		podLogs.Close()
 
 		// Print the logs
 		log.Println(string(buf))

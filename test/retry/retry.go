@@ -3,6 +3,7 @@ package retry
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -32,7 +33,11 @@ func (r Retrier) Do(ctx context.Context, f func() error) error {
 
 	select {
 	case <-ctx.Done():
-		return ctx.Err()
+		ctxErr := ctx.Err()
+		if ctxErr != nil {
+			return fmt.Errorf("context error: %w", ctxErr)
+		}
+		return nil
 	case <-done:
 		return err
 	}

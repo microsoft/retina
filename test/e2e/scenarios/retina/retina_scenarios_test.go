@@ -67,9 +67,9 @@ func TestE2ERetinaMetrics(t *testing.T) {
 
 	// todo: enable mutating images in helm chart
 	job.AddStep(&kubernetes.InstallHelmChart{
-		Namespace:       "kube-system",
-		ReleaseName:     "retina",
-		ChartPath:       "../../../../deploy/manifests/controller/helm/retina/",
+		Namespace:   "kube-system",
+		ReleaseName: "retina",
+		ChartPath:   "../../../../deploy/manifests/controller/helm/retina/",
 	}, nil)
 
 	job.AddScenario(drop.ValidateDropMetric())

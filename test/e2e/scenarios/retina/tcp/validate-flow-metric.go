@@ -14,7 +14,7 @@ const (
 
 	established = "ESTABLISHED"
 	listen      = "LISTEN"
-	time_wait   = "TIME_WAIT"
+	timewait    = "TIME_WAIT"
 )
 
 type ValidateRetinaTCPStateMetric struct {
@@ -27,7 +27,7 @@ func (v *ValidateRetinaTCPStateMetric) Run() error {
 	validMetrics := []map[string]string{
 		{state: established},
 		{state: listen},
-		{state: time_wait},
+		{state: timewait},
 	}
 
 	for _, metric := range validMetrics {

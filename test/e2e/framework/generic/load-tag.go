@@ -9,6 +9,8 @@ import (
 
 const DefaultTagEnv = "TAG"
 
+var ErrTagNotSet = fmt.Errorf("tag not set")
+
 type LoadTag struct {
 	TagEnv string
 }
@@ -32,9 +34,8 @@ func (s *LoadTag) Prevalidate() error {
 			log.Printf("using version \"%s\" from flag", tag)
 			os.Setenv(s.TagEnv, tag)
 			return nil
-		} else {
-			return fmt.Errorf("tag is not set from flag nor env %s", s.TagEnv)
 		}
+		return fmt.Errorf("tag is not set from flag nor env %s: %w", s.TagEnv, ErrTagNotSet)
 	}
 	return nil
 }

@@ -21,7 +21,7 @@ var (
 	defaultRetryAttempts = 60
 )
 
-func CheckMetric(promAddress string, metricName string, validMetric map[string]string) error {
+func CheckMetric(promAddress, metricName string, validMetric map[string]string) error {
 	defaultRetrier := retry.Retrier{Attempts: defaultRetryAttempts, Delay: defaultRetryDelay}
 
 	ctx := context.Background()
