@@ -1,6 +1,6 @@
 # `dns` (Linux)
 
-Captures both incoming and outgoing DNS traffic, providing various metrics and details about the DNS queries and responses.
+Tracks incoming and outgoing DNS traffic, providing various metrics and details about the DNS queries and responses.
 
 ## Metrics
 
