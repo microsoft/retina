@@ -89,30 +89,6 @@ Prerequisites: Go, Helm
 
 2. Follow steps in [Capture CRD](https://retina.sh/docs/captures/#option-2-capture-crd-custom-resource-definition) for documentation of the CRD and examples for setting up Captures.
 
-#### CLI Setup
-
-Currently, Retina CLI only supports Linux.
-
-For CLI usage, see [Capture with Retina CLI](../captures/cli.md).
-
-#### Option 1: Download from Release
-
-Download `kubectl-retina` from the latest [Retina release](https://github.com/microsoft/retina/releases).
-Feel free to move the binary to `/usr/local/bin/`, or add it to your `PATH` otherwise.
-
-#### Option 2: Build from source
-
-Clone the Retina repo and execute:
-
-```shell
-make install-kubectl-retina
-```
-
-Requirements:
-
-- go 1.21 or newer
-- GNU make
-
 ## Contributing
 
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a
@@ -131,7 +107,7 @@ contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additio
 
 ### Office Hours and Community Meetings
 
-We host a periodic open community meeting. [Read more here.](https://retina.sh/docs/contributing/#office-hours-and-community-meetings)
+We host a periodic open community meeting. [Find the details here.](https://retina.sh/docs/contributing/#office-hours-and-community-meetings)
 
 ## Trademarks
 
@@ -150,7 +126,9 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 
 ## Contact
 
-"Retina Devs" <retina@microsoft.com>
+For bugs or feature requests, open an [issue](https://github.com/microsoft/retina/issues).  
+For security or vulnerability concerns, see [SECURITY.md](SECURITY.md).  
+For other communication, contact the maintainers at <retina@microsoft.com>  
 
 [goreport-img]: https://goreportcard.com/badge/github.com/microsoft/retina
 [goreport]: https://goreportcard.com/report/github.com/microsoft/retina
