@@ -54,7 +54,9 @@ export LLVM_VERSION=14
 curl -sL https://apt.llvm.org/llvm.sh  | sudo bash -s "$LLVM_VERSION"
 ```
 
-Download [Helm](https://helm.sh/) as well.
+- Download [Helm](https://helm.sh/)
+- Fork the repository
+- If you want to use [ghcr.io](https://github.com/features/packages) as container registry, login following instructions [here](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-with-a-personal-access-token-classic)
 
 ### Test
 
@@ -80,7 +82,8 @@ make retina
 To build a `retina-agent` container image with specific tag:
 
 ```bash
-TAG=<tag> make retina-image
+make retina-image # also pushes to image registy
+make retina-operator-image 
 ```
 
 To build binary of a plugin and test it
@@ -101,19 +104,10 @@ debug   packetforward   Received PacketForward data     {"Data": "IngressBytes:8
 ...
 ```
 
-### Deploying Locally on Kind
-
-```bash
-make kind-setup # This deploys a Kind cluster and installs azure NPM
-make retina-image && make kind-install # Skip building image if already done
-make kind-clean # Delete Kind cluster
-```
-
-### Deploying on Other Kubernetes Cluster
+### Deploying on Kubernetes Cluster
 
 1. Create Kubernetes cluster.
-2. Build and push the docker image for Retina: `make retina-image-push IMAGE_REGISTRY=<your-image-registry>`
-3. Install Retina: `make helm-install IMAGE_REGISTRY=<your-image-registry>`
+2. Install Retina: `make helm-install`
 
 ### Verify Deployment
 
@@ -152,20 +146,13 @@ anubhab   614516  0.0  0.1 759000 41796 pts/3    Sl+  14:34   0:00 kubectl port-
 $
 $ curl http://localhost:9090/metrics | grep retina
 ...
-# HELP retina_drop_bytes Total dropped bytes
-# TYPE retina_drop_bytes gauge
-retina_drop_bytes{direction="unknown",reason="IPTABLE_RULE_DROP"} 480
-# HELP retina_drop_count Total dropped packets
-# TYPE retina_drop_count gauge
-retina_drop_count{direction="unknown",reason="IPTABLE_RULE_DROP"} 12
-# HELP retina_forward_bytes Total forwarded bytes
-# TYPE retina_forward_bytes gauge
-retina_forward_bytes{direction="egress"} 1.28357355e+08
-retina_forward_bytes{direction="ingress"} 3.9520696e+08
-# HELP retina_forward_count Total forwarded packets
-# TYPE retina_forward_count gauge
-retina_forward_count{direction="egress"} 126462
-retina_forward_count{direction="ingress"} 156793
+networkobservability_drop_bytes{direction="unknown",reason="IPTABLE_RULE_DROP"} 480
+networkobservability_drop_count{direction="unknown",reason="IPTABLE_RULE_DROP"} 12
+networkobservability_forward_bytes{direction="egress"} 1.28357355e+08
+networkobservability_forward_bytes{direction="ingress"} 3.9520696e+08
+networkobservability_forward_count{direction="egress"} 126462
+networkobservability_forward_count{direction="ingress"} 156793
+...
 ```
 
 ### Dashboard/Prometheus/Grafana
@@ -182,7 +169,7 @@ Documentation for these technologies:
 Uninstall `Retina`:
 
 ```bash
-helm uninstall retina -n kube-system
+make helm-uninstall
 ```
 
 ## Contact
