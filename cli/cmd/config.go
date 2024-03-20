@@ -5,7 +5,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -29,7 +29,7 @@ func configSet() *cobra.Command {
 			endpoint, _ := cmd.Flags().GetString("endpoint")
 			config := Config{RetinaEndpoint: endpoint}
 			b, _ := json.MarshalIndent(config, "", "  ")
-			err := ioutil.WriteFile(ClientConfigPath, b, 0o644)
+			err := os.WriteFile(ClientConfigPath, b, 0o644)
 			if err == nil {
 				fmt.Print(string(b))
 			}
