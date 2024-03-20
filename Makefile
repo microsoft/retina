@@ -188,7 +188,7 @@ retina-capture-workload: ## build the Retina capture workload
 ##@ Containers
 
 IMAGE_REGISTRY	?= ghcr.io
-IMAGE_NAMESPACE ?= $(shell git config --get remote.origin.url | sed -E 's/.*github\.com[\/:]([^\/]+)\/([^\/.]+).git/\1\/\2/' | tr '[:upper:]' '[:lower:]')
+IMAGE_NAMESPACE ?= $(shell git config --get remote.origin.url | sed -E 's/.*github\.com[\/:]([^\/]+)\/([^\/.]+)(.git)?/\1\/\2/' | tr '[:upper:]' '[:lower:]')
 
 RETINA_BUILDER_IMAGE			= $(IMAGE_NAMESPACE)/retina-builder
 RETINA_TOOLS_IMAGE				= $(IMAGE_NAMESPACE)/retina-tools
@@ -236,7 +236,7 @@ container-docker: buildx # util target to build container images using docker bu
 	arch=$$(echo $(PLATFORM) | cut -d'/' -f2); \
 	echo "Building for $$os/$$arch"; \
 	docker buildx build \
-		$(ACTION) \
+		$(BUILDX_ACTION) \
 		--platform $(PLATFORM) \
 		-f $(DOCKERFILE) \
 		--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
@@ -265,8 +265,7 @@ retina-image: ## build the retina linux container image.
 				TAG=$(RETINA_PLATFORM_TAG) \
 				APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
 				CONTEXT_DIR=$(REPO_ROOT) \
-				TARGET=$$target \
-				ACTION=--push; \
+				TARGET=$$target; \
 	done
 
 retina-image-win: ## build the retina Windows container image.
@@ -280,8 +279,7 @@ retina-image-win: ## build the retina Windows container image.
 				IMAGE=$(RETINA_IMAGE) \
 				VERSION=$(TAG) \
 				TAG=$$tag \
-				CONTEXT_DIR=$(REPO_ROOT) \
-				ACTION=--push; \
+				CONTEXT_DIR=$(REPO_ROOT); \
 	done
 
 retina-operator-image:  ## build the retina linux operator image.
@@ -294,8 +292,7 @@ retina-operator-image:  ## build the retina linux operator image.
 			VERSION=$(TAG) \
 			TAG=$(RETINA_PLATFORM_TAG) \
 			APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
-			CONTEXT_DIR=$(REPO_ROOT) \
-			ACTION=--push
+			CONTEXT_DIR=$(REPO_ROOT)
 
 kubectl-retina-image: ## build the kubectl-retina image. 
 	echo "Building for $(PLATFORM)"
@@ -307,8 +304,7 @@ kubectl-retina-image: ## build the kubectl-retina image.
 			VERSION=$(TAG) \
 			TAG=$(RETINA_PLATFORM_TAG) \
 			APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
-			CONTEXT_DIR=$(REPO_ROOT) \
-			ACTION=--push
+			CONTEXT_DIR=$(REPO_ROOT)
 
 proto-gen: ## generate protobuf code
 	docker build --platform=linux/amd64 \
@@ -366,8 +362,7 @@ test-image: ## build the retina container image for testing.
 			REGISTRY=$(IMAGE_REGISTRY) \
 			IMAGE=$(RETINA_IMAGE) \
 			CONTEXT_DIR=$(REPO_ROOT) \
-			TAG=$(RETINA_PLATFORM_TAG) \
-			ACTION=--load
+			TAG=$(RETINA_PLATFORM_TAG)
 
 COVER_PKG ?= .
 
