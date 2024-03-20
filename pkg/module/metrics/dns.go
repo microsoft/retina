@@ -55,7 +55,7 @@ func (d *DNSMetrics) Init(metricName string) {
 			exporter.AdvancedRegistry,
 			DNSRequestCountName,
 			DNSRequestCountDesc,
-			d.getLabels()...,
+			d.getReqLabels()...,
 		)
 	case utils.DNSResponseCounterName:
 		d.dnsMetrics = exporter.CreatePrometheusCounterVecForMetric(
@@ -65,6 +65,21 @@ func (d *DNSMetrics) Init(metricName string) {
 			d.getLabels()...,
 		)
 	}
+}
+
+func (d *DNSMetrics) getReqLabels() []string {
+	labels := utils.DNSReqLabels
+	if d.srcCtx != nil {
+		labels = append(labels, d.srcCtx.getLabels()...)
+		d.l.Info("src labels", zap.Any("labels", labels))
+	}
+
+	if d.dstCtx != nil {
+		labels = append(labels, d.dstCtx.getLabels()...)
+		d.l.Info("dst labels", zap.Any("labels", labels))
+	}
+
+	return labels
 }
 
 func (d *DNSMetrics) getLabels() []string {
