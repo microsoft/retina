@@ -2,7 +2,7 @@ name: Build Retina Container Images
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 permissions:
   contents: read
@@ -58,7 +58,7 @@ jobs:
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-        
+
       - name: Build Images
         shell: bash
         run: |
@@ -88,42 +88,12 @@ jobs:
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-        
+
       - name: Build Images
         shell: bash
         run: |
           set -euo pipefail
           echo "TAG=$(make version)" >> $GITHUB_ENV
           make retina-operator-image \
-            IMAGE_NAMESPACE=${{ github.repository }} \
-            PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
-
-  kubectl-retina-images:
-    name: Build kubectl-retina Images
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        platform: ["linux"]
-        arch: ["amd64", "arm64"]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v4
-        with:
-          go-version: ">=1.21.0"
-      - run: go version
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        
-      - name: Build Images
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "TAG=$(make version)" >> $GITHUB_ENV
-          make kubectl-retina-image \
             IMAGE_NAMESPACE=${{ github.repository }} \
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
