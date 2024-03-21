@@ -148,16 +148,6 @@ retina-binary: ## build the Retina binary
 	export CGO_ENABLED=0
 	go build -v -o $(RETINA_BUILD_DIR)/retina$(EXE_EXT) -gcflags="-dwarflocationlists=true" -ldflags "-X main.version=$(TAG) -X main.applicationInsightsID=$(APP_INSIGHTS_ID)" $(RETINA_DIR)/main.go
 
-all-kubectl-retina: $(addprefix kubectl-retina-linux-,${ALL_ARCH.linux})  $(addprefix kubectl-retina-windows-,${ALL_ARCH.windows}) ## build kubectl plugin for all platforms
-
-kubectl-retina: # build kubectl plugin for current platform
-	if [ "$(BUILD_LOCALLY)" = "true" ]; then \
-		$(MAKE) kubectl-retina-binary-$(GOOS)-$(GOARCH); \
-	else \
-		$(MAKE) kubectl-retina-$(GOOS)-$(GOARCH); \
-	fi
-	cp $(KUBECTL_RETINA_BUILD_DIR)/kubectl-retina-$(GOOS)-$(GOARCH) $(KUBECTL_RETINA_BUILD_DIR)/kubectl-gadget
-
 kubectl-retina-binary-%: ## build kubectl plugin locally.
 	export CGO_ENABLED=0 && \
 	export GOOS=$(shell echo $* |cut -f1 -d-) GOARCH=$(shell echo $* |cut -f2 -d-) && \
@@ -166,21 +156,6 @@ kubectl-retina-binary-%: ## build kubectl plugin locally.
 		-gcflags="-dwarflocationlists=true" \
 		-ldflags "-X github.com/microsoft/retina/cli/cmd.Version=$(TAG)" \
 		github.com/microsoft/retina/cli
-
-kubectl-retina-%: ## build kubectl plugin
-	CONTAINER_BUILDER=docker $(MAKE) kubectl-retina-image
-#	copy the binary from the container image.
-	mkdir -p output/kubectl-retina
-	docker run --rm --platform=linux/amd64 \
-		--user $(shell id -u):$(shell id -g) \
-		-v $(PWD):/app \
-		$(IMAGE_REGISTRY)/$(KUBECTL_RETINA_IMAGE):$(RETINA_PLATFORM_TAG) \
-		sh -c "cp /bin/kubectl-retina /app/output/kubectl-retina/kubectl-gadget && cp /bin/kubectl-retina /app/output/kubectl-retina/kubectl-retina-$(GOOS)-$(GOARCH)"
-
-install-kubectl-retina: kubectl-retina ## install kubectl plugin
-	chmod +x $(KUBECTL_RETINA_BUILD_DIR)/kubectl-gadget
-	sudo cp $(KUBECTL_RETINA_BUILD_DIR)/kubectl-gadget /usr/local/bin/kubectl-retina
-	kubectl retina --help
 
 retina-capture-workload: ## build the Retina capture workload
 	cd $(CAPTURE_WORKLOAD_DIR) && CGO_ENABLED=0 go build -v -o $(RETINA_BUILD_DIR)/captureworkload$(EXE_EXT) -gcflags="-dwarflocationlists=true"  -ldflags "-X main.version=$(TAG)"
@@ -194,7 +169,6 @@ RETINA_BUILDER_IMAGE			= $(IMAGE_NAMESPACE)/retina-builder
 RETINA_TOOLS_IMAGE				= $(IMAGE_NAMESPACE)/retina-tools
 RETINA_IMAGE 					= $(IMAGE_NAMESPACE)/retina-agent
 RETINA_INIT_IMAGE				= $(IMAGE_NAMESPACE)/retina-init
-KUBECTL_RETINA_IMAGE			= $(IMAGE_NAMESPACE)/kubectl-retina
 RETINA_OPERATOR_IMAGE			= $(IMAGE_NAMESPACE)/retina-operator
 RETINA_INTEGRATION_TEST_IMAGE	= $(IMAGE_NAMESPACE)/retina-integration-test
 RETINA_PROTO_IMAGE				= $(IMAGE_NAMESPACE)/retina-proto-gen

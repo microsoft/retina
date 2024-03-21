@@ -1,5 +1,4 @@
-//go:build linux
-// +build linux
+//go:build unix
 
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
@@ -111,7 +110,6 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(filter string, duration,
 	}()
 
 	err = captureStartCmd.Start()
-
 	if err != nil {
 		ncp.l.Error("Failed to start tcpdump", zap.Error(err))
 		return err
