@@ -17,7 +17,6 @@ import (
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/gadgets/trace/dns/types"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/utils/host"
 	kcfg "github.com/microsoft/retina/pkg/config"
-	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/api"
@@ -66,13 +65,6 @@ func (d *dns) Init() error {
 }
 
 func (d *dns) Start(ctx context.Context) error {
-	if d.cfg.EnablePodLevel {
-		if enricher.IsInitialized() {
-			d.enricher = enricher.Instance()
-		} else {
-			d.l.Warn("retina enricher is not initialized")
-		}
-	}
 	if err := d.tracer.Attach(d.pid); err != nil {
 		d.l.Error("Failed to attach tracer", zap.Error(err))
 		return err
@@ -139,9 +131,6 @@ func (d *dns) eventHandler(event *types.Event) {
 		Event:     f,
 		Timestamp: f.Time,
 	})
-	if d.enricher != nil {
-		d.enricher.Write(ev)
-	}
 
 	// Send event to external channel.
 	if d.externalChannel != nil {

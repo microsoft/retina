@@ -15,7 +15,6 @@ import (
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/gadgets/trace/tcpretrans/tracer"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/gadgets/trace/tcpretrans/types"
 	kcfg "github.com/microsoft/retina/pkg/config"
-	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/plugin/api"
 	"github.com/microsoft/retina/pkg/utils"
@@ -64,13 +63,6 @@ func (t *tcpretrans) Start(ctx context.Context) error {
 	if !t.cfg.EnablePodLevel {
 		t.l.Warn("tcpretrans will not start because pod level is disabled")
 		return nil
-	}
-	// Set up enricher
-	if enricher.IsInitialized() {
-		t.enricher = enricher.Instance()
-	} else {
-		t.l.Error(errEnricherNotInitialized.Error())
-		return errEnricherNotInitialized
 	}
 	t.gadgetCtx = gadgetcontext.New(ctx, "tcpretrans", nil, nil, nil, nil, nil, nil, nil, nil, 0, nil)
 
@@ -133,12 +125,6 @@ func (t *tcpretrans) eventHandler(event *types.Event) {
 	// This is only for development purposes.
 	// Removing this makes logs way too chatter-y.
 	// dr.l.Debug("DropReason Packet Received", zap.Any("flow", fl), zap.Any("Raw Bpf Event", bpfEvent), zap.Uint32("drop type", bpfEvent.Key.DropType))
-
-	// Write the event to the enricher.
-	t.enricher.Write(&v1.Event{
-		Event:     fl,
-		Timestamp: fl.Time,
-	})
 }
 
 func getTcpFlags(flags string) (syn, ack, fin, rst, psh, urg uint16) {

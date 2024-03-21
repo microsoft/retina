@@ -16,6 +16,8 @@ RETINA_DIR = $(REPO_ROOT)/controller
 KUBECTL_RETINA_BUILD_DIR = $(OUTPUT_DIR)/kubectl-retina
 OPERATOR_DIR=$(REPO_ROOT)/operator
 CAPTURE_WORKLOAD_DIR = $(REPO_ROOT)/captureworkload
+COVER_PKG ?= .
+
 
 KIND = /usr/local/bin/kind
 KIND_CLUSTER = retina-cluster
@@ -329,6 +331,7 @@ manifest:
 # Make sure the layer has only one directory.
 # the test DockerFile needs to build the scratch stage with all the output files 
 # and we will untar the archive and copy the files from scratch stage
+.PHONY: test-image
 test-image: ## build the retina container image for testing.
 	$(MAKE) container-docker \
 			PLATFORM=$(PLATFORM) \
@@ -338,12 +341,12 @@ test-image: ## build the retina container image for testing.
 			CONTEXT_DIR=$(REPO_ROOT) \
 			TAG=$(RETINA_PLATFORM_TAG)
 
-COVER_PKG ?= .
-
+.PHONY: test
 test: $(ENVTEST) # Run unit tests.
 	go build -o test-summary ./test/utsummary/main.go
 	CGO_ENABLED=0 KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit -skip=TestE2E* -coverprofile=coverage.out -v -json ./... | ./test-summary --progress --verbose
 
+.PHONY: test-e2e
 coverage: # Code coverage.
 #	go generate ./... && go test -tags=unit -coverprofile=coverage.out.tmp ./...
 	cat coverage.out | grep -v "_bpf.go\|_bpfel_x86.go\|_bpfel_arm64.go|_generated.go|mock_" | grep -v mock > coveragenew.out

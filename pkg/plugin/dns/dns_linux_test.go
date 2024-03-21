@@ -16,12 +16,9 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/gadgets/trace/dns/types"
 	"github.com/microsoft/retina/pkg/config"
-	"github.com/microsoft/retina/pkg/controllers/cache"
-	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/common/mocks"
-	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
@@ -53,11 +50,6 @@ func TestStart(t *testing.T) {
 
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 
-	c := cache.New(pubsub.New())
-	e := enricher.New(ctxTimeout, c)
-	e.Run()
-	defer e.Reader.Close()
-
 	d := &dns{
 		l:   log.Logger().Named(string(Name)),
 		pid: 1234,
@@ -73,9 +65,6 @@ func TestStart(t *testing.T) {
 	d.tracer = m
 	err := d.Start(ctxTimeout)
 	assert.Equal(t, err, nil)
-	if d.enricher == nil {
-		t.Fatal("enricher is nil")
-	}
 
 	// Test error case.
 	expected := errors.New("Error")
@@ -111,11 +100,13 @@ func TestRequestEventHandler(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	metrics.InitializeMetrics()
 
+	exCh := make(chan *v1.Event, 1)
 	d := &dns{
 		l: log.Logger().Named(string(Name)),
 		cfg: &config.Config{
 			EnablePodLevel: true,
 		},
+		externalChannel: exCh,
 	}
 
 	// Test event with Query type.
@@ -146,26 +137,31 @@ func TestRequestEventHandler(t *testing.T) {
 	metrics.DNSRequestCounter = mockCV
 
 	// Advanced metrics.
-	mockEnricher := enricher.NewMockEnricherInterface(ctrl)
-	mockEnricher.EXPECT().Write(EventMatched(
-		utils.DNSType_QUERY, 0, event.DNSName, []string{event.QType}, 0, []string{},
-	)).Times(1)
-	d.enricher = mockEnricher
-
 	d.eventHandler(event)
 	after := value(c)
 	assert.Equal(t, after-before, float64(1))
+
+	// Test External channel.
+	em := EventMatched(utils.DNSType_QUERY, 0, "test.com", []string{"A"}, 0, []string{})
+	select {
+	case ev := <-exCh:
+		assert.Assert(t, em.Matches(ev))
+	case <-time.After(3 * time.Second):
+		t.Fatal("Timeout waiting for event")
+	}
 }
 
 func TestResponseEventHandler(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	metrics.InitializeMetrics()
 
+	exCh := make(chan *v1.Event, 1)
 	d := &dns{
 		l: log.Logger().Named(string(Name)),
 		cfg: &config.Config{
 			EnablePodLevel: true,
 		},
+		externalChannel: exCh,
 	}
 
 	// Test event with Query type.
@@ -196,15 +192,19 @@ func TestResponseEventHandler(t *testing.T) {
 	metrics.DNSResponseCounter = mockCV
 
 	// Advanced metrics.
-	mockEnricher := enricher.NewMockEnricherInterface(ctrl)
-	mockEnricher.EXPECT().Write(EventMatched(
-		utils.DNSType_RESPONSE, 0, event.DNSName, []string{event.QType}, 2, []string{"1.1.1.1", "2.2.2.2"},
-	)).Times(1)
-	d.enricher = mockEnricher
-
 	d.eventHandler(event)
 	after := value(c)
 	assert.Equal(t, after-before, float64(1))
+
+	// Test External channel.
+	em := EventMatched(utils.DNSType_RESPONSE, 0, "test.com", []string{"A"}, 2, []string{"1.1.1.1", "2.2.2.2"})
+	select {
+	case ev := <-exCh:
+		assert.Assert(t, em.Matches(ev), "Expected event to match")
+	case <-time.After(3 * time.Second):
+		t.Fatal("Timeout waiting for event")
+	}
+
 }
 
 func value(c prometheus.Counter) float64 {
@@ -241,7 +241,7 @@ func (m *EventMatcher) String() string {
 	return "is anything"
 }
 
-func EventMatched(qType utils.DNSType, rCode uint32, query string, qTypes []string, numAnswers uint32, ips []string) gomock.Matcher {
+func EventMatched(qType utils.DNSType, rCode uint32, query string, qTypes []string, numAnswers uint32, ips []string) *EventMatcher {
 	return &EventMatcher{
 		qType:      qType,
 		rCode:      rCode,

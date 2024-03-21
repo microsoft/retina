@@ -23,7 +23,6 @@ import (
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
 	"github.com/cilium/ebpf/rlimit"
-	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/loader"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
@@ -248,14 +247,6 @@ func (dr *dropReason) Start(ctx context.Context) error {
 	if dr.cfg.EnablePodLevel {
 		// Setup records channel.
 		dr.recordsChannel = make(chan perf.Record, buffer)
-
-		dr.l.Info("setting up enricher since pod level is enabled")
-		// Set up enricher.
-		if enricher.IsInitialized() {
-			dr.enricher = enricher.Instance()
-		} else {
-			dr.l.Warn("retina enricher is not initialized")
-		}
 	} else {
 		dr.l.Info("will not set up enricher since pod level is disabled")
 	}
@@ -377,13 +368,9 @@ func (dr *dropReason) processRecord(ctx context.Context, id int) {
 			// Removing this makes logs way too chatter-y.
 			dr.l.Debug("DropReason Packet Received", zap.Any("flow", fl), zap.Any("Raw Bpf Event", bpfEvent), zap.Uint32("drop type", bpfEvent.Key.DropType))
 
-			// Write the event to the enricher.
 			ev := &hubblev1.Event{
 				Event:     fl,
 				Timestamp: fl.Time,
-			}
-			if dr.enricher != nil {
-				dr.enricher.Write(ev)
 			}
 
 			// Send event to external channel.

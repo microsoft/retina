@@ -16,11 +16,11 @@ import (
 	"github.com/cilium/ebpf/perf"
 	"github.com/golang/mock/gomock"
 	kcfg "github.com/microsoft/retina/pkg/config"
-	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	mocks "github.com/microsoft/retina/pkg/plugin/dropreason/mocks"
 	dto "github.com/prometheus/client_model/go"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 )
@@ -192,7 +192,6 @@ func TestDropReasonRun(t *testing.T) {
 	mockedMap := mocks.NewMockIMap(ctrl)
 	mockedMapIterator := mocks.NewMockIMapIterator(ctrl)
 	mockedPerfReader := mocks.NewMockIPerfReader(ctrl)
-	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
 
 	// reasign helper function so that it returns the mockedMapIterator
 	iMapIterator = func(x IMap) IMapIterator {
@@ -214,10 +213,8 @@ func TestDropReasonRun(t *testing.T) {
 		l:              log.Logger().Named(string(Name)),
 		metricsMapData: mockedMap,
 		reader:         mockedPerfReader,
-		enricher:       menricher,
 		recordsChannel: make(chan perf.Record, buffer),
 	}
-	menricher.EXPECT().Write(gomock.Any()).MinTimes(1)
 
 	// Create a context with a short timeout for testing purposes
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -246,7 +243,6 @@ func TestDropReasonReadDataPodLevelEnabled(t *testing.T) {
 
 	mockedMap := mocks.NewMockIMap(ctrl)
 	mockedPerfReader := mocks.NewMockIPerfReader(ctrl)
-	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
 
 	// mock perf reader record
 	mockedPerfRecord := perf.Record{
@@ -255,7 +251,6 @@ func TestDropReasonReadDataPodLevelEnabled(t *testing.T) {
 		LostSamples: 0,
 	}
 	mockedPerfReader.EXPECT().Read().Return(mockedPerfRecord, nil).MinTimes(1)
-	menricher.EXPECT().Write(gomock.Any()).MinTimes(1)
 
 	// Create drop reason instance
 	dr := &dropReason{
@@ -263,7 +258,6 @@ func TestDropReasonReadDataPodLevelEnabled(t *testing.T) {
 		l:              log.Logger().Named(string(Name)),
 		metricsMapData: mockedMap,
 		reader:         mockedPerfReader,
-		enricher:       menricher,
 		recordsChannel: make(chan perf.Record, buffer),
 	}
 
@@ -316,7 +310,8 @@ func TestDropReasonReadData_WithEmptyPerfArray(t *testing.T) {
 
 	// Start the drop reason routine in a goroutine
 	go func() {
-		dr.readEventArrayData()
+		err := dr.readEventArrayData()
+		assert.Nil(t, err, "Expected error but got nil")
 	}()
 
 	// Wait for a short period of time for the routine to start
@@ -347,13 +342,16 @@ func TestDropReasonReadData_WithPerfArrayLostSamples(t *testing.T) {
 		reader:         mockedPerfReader,
 	}
 
-	// Create a context with a short timeout for testing purposes
+	metrics.InitializeMetrics()
+
+	// Create a  with a short timeout for testing purposes
 	_, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	// Start the drop reason routine in a goroutine
 	go func() {
-		dr.readEventArrayData()
+		err := dr.readEventArrayData()
+		assert.Nil(t, err, "Expected error but got nil")
 	}()
 
 	// Wait for a short period of time for the routine to start
@@ -388,9 +386,12 @@ func TestDropReasonReadData_WithUnknownError(t *testing.T) {
 	_, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
+	metrics.InitializeMetrics()
+
 	// Start the drop reason routine in a goroutine
 	go func() {
-		dr.readEventArrayData()
+		err := dr.readEventArrayData()
+		assert.NotNil(t, err, "Expected error but got nil")
 	}()
 
 	// Wait for a short period of time for the routine to start

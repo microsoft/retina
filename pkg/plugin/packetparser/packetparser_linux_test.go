@@ -21,7 +21,6 @@ import (
 	"github.com/florianl/go-tc"
 	"github.com/golang/mock/gomock"
 	kcfg "github.com/microsoft/retina/pkg/config"
-	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/packetparser/mocks"
@@ -277,9 +276,6 @@ func TestReadData_Error(t *testing.T) {
 	mperf := mocks.NewMockIPerf(ctrl)
 	mperf.EXPECT().Read().Return(perf.Record{}, errors.New("error")).AnyTimes()
 
-	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
-	menricher.EXPECT().Write(gomock.Any()).Times(0)
-
 	p := &packetParser{
 		cfg:    cfgPodLevelEnabled,
 		l:      log.Logger().Named("test"),
@@ -316,14 +312,10 @@ func TestReadDataPodLevelEnabled(t *testing.T) {
 	mperf := mocks.NewMockIPerf(ctrl)
 	mperf.EXPECT().Read().Return(record, nil).MinTimes(1)
 
-	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
-	menricher.EXPECT().Write(gomock.Any()).MinTimes(1)
-
 	p := &packetParser{
 		cfg:            cfgPodLevelEnabled,
 		l:              log.Logger().Named("test"),
 		reader:         mperf,
-		enricher:       menricher,
 		recordsChannel: make(chan perf.Record, buffer),
 	}
 

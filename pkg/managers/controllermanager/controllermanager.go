@@ -4,6 +4,7 @@ package controllermanager
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	kcfg "github.com/microsoft/retina/pkg/config"
@@ -15,6 +16,7 @@ import (
 	"github.com/microsoft/retina/pkg/plugin/api"
 	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/microsoft/retina/pkg/telemetry"
+	"github.com/microsoft/retina/pkg/track"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -23,7 +25,8 @@ import (
 )
 
 const (
-	ResyncTime time.Duration = 5 * time.Minute
+	ResyncTime     time.Duration = 5 * time.Minute
+	errFailedTrack               = "Failed to create track instance"
 )
 
 type Controller struct {
@@ -35,6 +38,7 @@ type Controller struct {
 	pubsub        *pubsub.PubSub
 	cache         *cache.Cache
 	enricher      *enricher.Enricher
+	t             *track.Track
 }
 
 func NewControllerManager(conf *kcfg.Config, kubeclient kubernetes.Interface, tel telemetry.Telemetry) (*Controller, error) {
@@ -91,6 +95,14 @@ func (m *Controller) Init(ctx context.Context) error {
 
 		// create enricher instance
 		m.enricher = enricher.New(ctx, m.cache)
+
+		// create track instance
+		m.t = track.New()
+		if m.t == nil {
+			return errors.New(errFailedTrack)
+		}
+		// Setup with plugins.
+		m.pluginManager.SetupChannel(m.t.Channel())
 	}
 
 	return nil
@@ -103,6 +115,17 @@ func (m *Controller) Start(ctx context.Context) {
 	var g *errgroup.Group
 
 	g, ctx = errgroup.WithContext(ctx)
+
+	if m.conf.EnablePodLevel {
+		// Start tracking events.
+		// Check is necessary because tracking is useless without pod level enabled.
+		if m.t != nil {
+			g.Go(func() error {
+				m.t.Start(ctx)
+				return nil
+			})
+		}
+	}
 
 	// defer m.otelAgent.Start(ctx)()
 	g.Go(func() error {
@@ -123,5 +146,9 @@ func (m *Controller) Start(ctx context.Context) {
 func (m *Controller) Stop(ctx context.Context) {
 	// Stop the plugin manager. This will help clean up the plugin resources.
 	m.pluginManager.Stop()
+	// Stop tracking events.
+	if m.t != nil {
+		m.t.Stop()
+	}
 	m.l.Info("Stopped controller manager")
 }

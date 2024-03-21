@@ -8,7 +8,6 @@ import (
 	gadgetcontext "github.com/inspektor-gadget/inspektor-gadget/pkg/gadget-context"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/gadgets/trace/tcpretrans/tracer"
 	kcfg "github.com/microsoft/retina/pkg/config"
-	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/plugin/api"
 )
@@ -22,7 +21,6 @@ type tcpretrans struct {
 	l         *log.ZapLogger
 	tracer    *tracer.Tracer
 	gadgetCtx *gadgetcontext.GadgetContext
-	enricher  enricher.EnricherInterface
 }
 
 var errEnricherNotInitialized = errors.New("enricher not initialized")

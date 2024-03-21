@@ -12,7 +12,6 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/perf"
 	tc "github.com/florianl/go-tc"
-	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/plugin/api"
 	"github.com/vishvananda/netlink"
@@ -92,9 +91,8 @@ type packetParser struct {
 	callbackID string
 	objs       *packetparserObjects //nolint:typecheck
 	// tcMap is a map of key to *val.
-	tcMap    *sync.Map
-	reader   IPerf
-	enricher enricher.EnricherInterface
+	tcMap  *sync.Map
+	reader IPerf
 	// interfaceLockMap is a map of key to *sync.Mutex.
 	interfaceLockMap    *sync.Map
 	endpointIngressInfo *ebpf.ProgramInfo

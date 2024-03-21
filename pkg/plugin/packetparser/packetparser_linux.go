@@ -23,7 +23,6 @@ import (
 	helper "github.com/florianl/go-tc/core"
 	"github.com/microsoft/retina/pkg/common"
 	kcfg "github.com/microsoft/retina/pkg/config"
-	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/loader"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
@@ -188,14 +187,6 @@ func (p *packetParser) Start(ctx context.Context) error {
 	}
 
 	p.l.Info("Starting packet parser")
-
-	p.l.Info("setting up enricher since pod level is enabled")
-	// Set up enricher.
-	if enricher.IsInitialized() {
-		p.enricher = enricher.Instance()
-	} else {
-		p.l.Warn("retina enricher is not initialized")
-	}
 
 	// Get Pubsub instance.
 	ps := pubsub.New()
@@ -563,13 +554,9 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 
 			p.l.Debug("Received packet", zap.Any("flow", fl))
 
-			// Write the event to the enricher.
 			ev := &v1.Event{
 				Event:     fl,
 				Timestamp: fl.Time,
-			}
-			if p.enricher != nil {
-				p.enricher.Write(ev)
 			}
 
 			// Write the event to the external channel.
