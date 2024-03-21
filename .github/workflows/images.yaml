@@ -127,3 +127,33 @@ jobs:
           make kubectl-retina-image \
             IMAGE_NAMESPACE=${{ github.repository }} \
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
+
+  e2e:
+    name: Run E2E Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ">=1.21.0"
+      - run: go version
+
+      - name: Az CLI login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID_NETWORK_AGENT_TEST }}
+
+      - name: Run E2E Tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          export TAG=$(make version)
+          export AZURE_SUBSCRIPTION_ID=${{ secrets.AZURE_SUBSCRIPTION_ID_NETWORK_AGENT_TEST }}
+          export AZURE_ACR_SUBSCRIPTION_ID=${{ secrets.AZURE_SUBSCRIPTION_ID_NETWORK_AGENT_TEST }}
+          go test -v ./test/e2e/scenarios/retina/*.go -timeout 30m -tags=e2e -count=1
