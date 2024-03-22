@@ -216,19 +216,30 @@ container-docker: buildx # util target to build container images using docker bu
 	os=$$(echo $(PLATFORM) | cut -d'/' -f1); \
 	arch=$$(echo $(PLATFORM) | cut -d'/' -f2); \
 	echo "Building for $$os/$$arch"; \
-	docker buildx build \
-		$(BUILDX_ACTION) \
-		--platform $(PLATFORM) \
-		-f $(DOCKERFILE) \
-		--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
-		--build-arg GOOS=$$os \
-		--build-arg GOARCH=$$arch \
-		--build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
-		--target=$(TARGET) \
-		if [ "$(DESTINATION)" = "acr" ]; then \
-			--push; \
-		fi
-		$(CONTEXT_DIR)
+	if [ "$(DESTINATION)" = "acr" ]; then \
+		docker buildx build \
+			$(BUILDX_ACTION) \
+			--platform $(PLATFORM) \
+			-f $(DOCKERFILE) \
+			--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
+			--build-arg GOOS=$$os \
+			--build-arg GOARCH=$$arch \
+			--build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
+			--target=$(TARGET) \
+			--push \
+			$(CONTEXT_DIR); \
+	else \
+		docker buildx build \
+			$(BUILDX_ACTION) \
+			--platform $(PLATFORM) \
+			-f $(DOCKERFILE) \
+			--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
+			--build-arg GOOS=$$os \
+			--build-arg GOARCH=$$arch \
+			--build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
+			--target=$(TARGET) \
+			$(CONTEXT_DIR); \
+	fi;
 
 retina-image: ## build the retina linux container image.
 	echo "Building for $(PLATFORM)"
