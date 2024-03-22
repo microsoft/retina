@@ -1,0 +1,20 @@
+FROM --platform=linux/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.21 as builder
+
+# Cache go modules so they won't be downloaded at each build
+COPY go.mod go.sum /kappie/
+RUN cd /kappie && go mod download
+
+# Build args
+ARG VERSION
+ARG APP_INSIGHTS_ID
+
+ENV GOOS=linux
+ENV GOARCH=amd64
+
+# This COPY is limited by .dockerignore
+COPY ./ /kappie
+RUN cd /kappie && make kubectl-kappie-binary-${GOOS}-${GOARCH}
+RUN mv /kappie/output/kubectl-kappie/kubectl-kappie-${GOOS}-${GOARCH} /kappie/output/kubectl-kappie/kubectl-kappie
+
+FROM --platform=linux/amd64 mcr.microsoft.com/mirror/docker/library/alpine:3.14
+COPY --from=builder /kappie/output/kubectl-kappie/kubectl-kappie /bin/kubectl-kappie

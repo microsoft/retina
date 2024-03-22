@@ -181,6 +181,7 @@ RETINA_INTEGRATION_TEST_IMAGE	= $(IMAGE_NAMESPACE)/retina-integration-test
 RETINA_PROTO_IMAGE				= $(IMAGE_NAMESPACE)/retina-proto-gen
 RETINA_GO_GEN_IMAGE				= $(IMAGE_NAMESPACE)/retina-go-gen
 KAPINGER_IMAGE 					= $(IMAGE_NAMESPACE)/kapinger
+KUBECTL_RETINA_IMAGE			= $(IMAGE_NAMESPACE)/kubectl-retina
 
 skopeo-export: # util target to copy a container from containers-storage to the docker daemon.
 	skopeo copy \
