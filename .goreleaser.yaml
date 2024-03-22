@@ -26,9 +26,11 @@ builds:
     main: cli/main.go
 
 archives:
-  - format: binary
-    name_template: "{{ .Binary }}_{{ .Version }}"
+  - name_template: "{{ .Binary }}-v{{ .Version }}"
     wrap_in_directory: false
+    format_overrides:
+    - goos: windows
+      format: zip
 
 changelog:
   sort: asc
