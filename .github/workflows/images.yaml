@@ -42,7 +42,7 @@ jobs:
           echo "TAG=$(make version)" >> $GITHUB_ENV
           make retina-image \
             IMAGE_NAMESPACE=${{ github.repository }} \
-            PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
+            PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
             DESTINATION=acr
 
   retina-win-images:
@@ -79,7 +79,7 @@ jobs:
           echo "TAG=$(make version)" >> $GITHUB_ENV
           make retina-image-win \
             IMAGE_NAMESPACE=${{ github.repository }} \
-            PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
+            PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}  \
             DESTINATION=acr
 
   operator-images:
@@ -116,7 +116,7 @@ jobs:
           echo "TAG=$(make version)" >> $GITHUB_ENV
           make retina-operator-image \
             IMAGE_NAMESPACE=${{ github.repository }} \
-            PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
+            PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}  \
             DESTINATION=acr
 
   kubectl-retina-images:
@@ -153,7 +153,7 @@ jobs:
           echo "TAG=$(make version)" >> $GITHUB_ENV
           make retina-operator-image \
             IMAGE_NAMESPACE=${{ github.repository }} \
-            PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
+            PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}  \
             DESTINATION=acr
 
   manifests:
