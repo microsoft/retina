@@ -220,6 +220,7 @@ container-docker: buildx # util target to build container images using docker bu
 		docker buildx build \
 			$(BUILDX_ACTION) \
 			--platform $(PLATFORM) \
+			-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
 			-f $(DOCKERFILE) \
 			--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
 			--build-arg GOOS=$$os \
