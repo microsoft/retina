@@ -29,3 +29,5 @@ hack/tools/bin
 
 #vscode 
 .vscode/
+
+dist/
