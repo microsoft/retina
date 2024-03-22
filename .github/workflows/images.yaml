@@ -2,7 +2,7 @@ name: Build Retina Container Images
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 permissions:
   contents: read
@@ -60,7 +60,7 @@ jobs:
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-        
+
       - name: Build Images
         shell: bash
         run: |
@@ -122,16 +122,13 @@ jobs:
           go-version: ">=1.21.0"
       - run: go version
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        
       - name: Build Images
         shell: bash
         run: |
           set -euo pipefail
           az acr login -n acnpublic
           echo "TAG=$(make version)" >> $GITHUB_ENV
-          make kubectl-retina-image \
+          make retina-operator-image \
             IMAGE_NAMESPACE=${{ github.repository }} \
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
             DESTINATION=acr
