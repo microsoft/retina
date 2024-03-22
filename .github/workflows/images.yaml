@@ -151,7 +151,7 @@ jobs:
           set -euo pipefail
           az acr login -n acnpublic
           echo "TAG=$(make version)" >> $GITHUB_ENV
-          make retina-operator-image \
+          make kubectl-retina-image \
             IMAGE_NAMESPACE=${{ github.repository }} \
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}  \
             DESTINATION=acr
@@ -183,6 +183,7 @@ jobs:
           set -euo pipefail
           az acr login -n acnpublic 
           make manifest COMPONENT=${{ matrix.components }} \
+          DESTINATION=acr \
       
   e2e:
     name: Run E2E Tests
