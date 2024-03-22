@@ -11,7 +11,7 @@ schedules:
 
 stages:
   - stage: setup
-    displayName: Kappie Setup
+    displayName: Retina Setup
     jobs:
       - job: env
         displayName: Setup
