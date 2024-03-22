@@ -33,10 +33,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          az acr login -n acnpublic
           echo "TAG=$(make version)" >> $GITHUB_ENV
           make retina-image \
             IMAGE_NAMESPACE=${{ github.repository }} \
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
+            DESTINATION=acr
 
   retina-win-images:
     name: Build Agent Windows Images
@@ -63,10 +65,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          az acr login -n acnpublic
           echo "TAG=$(make version)" >> $GITHUB_ENV
           make retina-image-win \
             IMAGE_NAMESPACE=${{ github.repository }} \
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
+            DESTINATION=acr
 
   operator-images:
     name: Build Operator Images
@@ -93,10 +97,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          az acr login -n acnpublic
           echo "TAG=$(make version)" >> $GITHUB_ENV
           make retina-operator-image \
             IMAGE_NAMESPACE=${{ github.repository }} \
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
+            DESTINATION=acr
 
   kubectl-retina-images:
     name: Build kubectl-retina Images
@@ -123,10 +129,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          az acr login -n acnpublic
           echo "TAG=$(make version)" >> $GITHUB_ENV
           make kubectl-retina-image \
             IMAGE_NAMESPACE=${{ github.repository }} \
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
+            DESTINATION=acr
 
   manifests:
     name: Generate Manifests

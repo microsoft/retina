@@ -25,6 +25,8 @@ APP_INSIGHTS_ID ?= ""
 GENERATE_TARGET_DIRS = \
 	./pkg/plugin/linuxutil
 
+DESTINATION ?= local
+
 # Default platform is linux/amd64
 GOOS			?= linux
 GOARCH			?= amd64
@@ -187,7 +189,12 @@ retina-capture-workload: ## build the Retina capture workload
 
 ##@ Containers
 
-IMAGE_REGISTRY	?= ghcr.io
+ifeq ($(DESTINATION), acr)
+IMAGE_REGISTRY	?= acnpublic.azurecr.io
+else
+IMAGE_REGISTRY ?= ghcr.io 
+endif
+
 IMAGE_NAMESPACE ?= $(shell git config --get remote.origin.url | sed -E 's/.*github\.com[\/:]([^\/]+)\/([^\/.]+)(.git)?/\1\/\2/' | tr '[:upper:]' '[:lower:]')
 
 RETINA_BUILDER_IMAGE			= $(IMAGE_NAMESPACE)/retina-builder
@@ -244,7 +251,9 @@ container-docker: buildx # util target to build container images using docker bu
 		--build-arg GOARCH=$$arch \
 		--build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
 		--target=$(TARGET) \
-		-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
+		if [ "$(DESTINATION)" = "acr" ]; then \
+			--push; \
+		fi
 		$(CONTEXT_DIR)
 
 retina-image: ## build the retina linux container image.
@@ -266,6 +275,7 @@ retina-image: ## build the retina linux container image.
 				APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
 				CONTEXT_DIR=$(REPO_ROOT) \
 				TARGET=$$target; \
+				DESTINATION=$(DESTINATION); \
 	done
 
 retina-image-win: ## build the retina Windows container image.
@@ -280,6 +290,7 @@ retina-image-win: ## build the retina Windows container image.
 				VERSION=$(TAG) \
 				TAG=$$tag \
 				CONTEXT_DIR=$(REPO_ROOT); \
+				DESTINATION=$(DESTINATION); \
 	done
 
 retina-operator-image:  ## build the retina linux operator image.
@@ -293,6 +304,7 @@ retina-operator-image:  ## build the retina linux operator image.
 			TAG=$(RETINA_PLATFORM_TAG) \
 			APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
 			CONTEXT_DIR=$(REPO_ROOT)
+			DESTINATION=$(DESTINATION)
 
 kubectl-retina-image: ## build the kubectl-retina image. 
 	echo "Building for $(PLATFORM)"
@@ -305,6 +317,7 @@ kubectl-retina-image: ## build the kubectl-retina image.
 			TAG=$(RETINA_PLATFORM_TAG) \
 			APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
 			CONTEXT_DIR=$(REPO_ROOT)
+			DESTINATION=$(DESTINATION)
 
 proto-gen: ## generate protobuf code
 	docker build --platform=linux/amd64 \
