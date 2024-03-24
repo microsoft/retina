@@ -46,6 +46,7 @@ RUN go build -v -o /go/bin/retina/initretina -ldflags "-X main.version="$VERSION
 # Stage: Prepare clang and tools
 # Bullseye -> debian11
 FROM  --platform=$BUILDPLATFORM mcr.microsoft.com/mirror/docker/library/debian:bullseye@sha256:a648e10e02af129706b1fb89e1ac9694ae3db7f2b8439aa906321e68cc281bc0 AS tools
+
 LABEL Name=retina-tools Version=0.0.1
 
 WORKDIR /tmp
@@ -71,6 +72,15 @@ RUN if [ "$GOARCH" = "amd64" ] ; then \
     mv /usr/local/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04 /usr/local/clang+llvm; \
     else \
     # GOARCH=Arm64.
+    # Download clang and llvm.
+    # Need more dependencies for Arm64.
+    dpkg --add-architecture arm64; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends libc6:arm64 zlib1g:arm64 libncurses5:arm64; \
+    apt-get install -y --no-install-recommends apt-file; \
+    apt-file update; \
+    apt-file find libstdc++.so.6; \
+    apt-get install -y --no-install-recommends libstdc++6:arm64; \
     # Download clang and llvm.
     wget -O clang+llvm.tar.xz https://github.com/llvm/llvm-project/releases/download/llvmorg-14.0.0/clang+llvm-14.0.0-aarch64-linux-gnu.tar.xz; \
     tar -C /usr/local -xJf ./clang+llvm.tar.xz --no-same-owner; \
