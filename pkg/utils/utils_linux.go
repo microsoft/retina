@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"syscall"
+	"unsafe"
 
 	"github.com/pkg/errors"
 	"github.com/vishvananda/netlink"
@@ -37,7 +38,7 @@ func OpenRawSocket(index int) (int, error) {
 func htons(i uint16) uint16 {
 	b := make([]byte, 2)
 	binary.BigEndian.PutUint16(b, i)
-	return binary.BigEndian.Uint16(b)
+	return *(*uint16)(unsafe.Pointer(&b[0]))
 }
 
 // https://gist.github.com/ammario/649d4c0da650162efd404af23e25b86b
@@ -77,7 +78,7 @@ func HostToNetShort(i uint16) uint16 {
 func determineEndian() binary.ByteOrder {
 	var endian binary.ByteOrder
 	buf := [2]byte{}
-	binary.BigEndian.PutUint16(buf[:], uint16(0xABCD))
+	*(*uint16)(unsafe.Pointer(&buf[0])) = uint16(0xABCD)
 
 	switch buf {
 	case [2]byte{0xCD, 0xAB}:
