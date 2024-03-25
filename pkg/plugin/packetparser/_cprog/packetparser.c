@@ -49,59 +49,67 @@ struct
 const struct packet *unused __attribute__((unused));
 
 /*
- * Full credit to authors of pping_kern.c for the parse_tcp_ts function.
- * https://github.com/xdp-project/bpf-examples/blob/bc9df640cb9e5a541a7425ca2e66174ae22a18e3/pping/pping_kern.c#L316
- * 
  * Parses the TSval and TSecr values from the TCP options field. If sucessful
  * the TSval and TSecr values will be stored at tsval and tsecr (in network
  * byte order).
  * Returns 0 if sucessful and -1 on failure
  */
-static int parse_tcp_ts(struct tcphdr *tcph, void *data_end, __u32 *tsval,
-			__u32 *tsecr)
-{
-	int len = tcph->doff << 2;
-	void *opt_end = (void *)tcph + len;
-	__u8 *pos = (__u8 *)(tcph + 1); //Current pos in TCP options
-	__u8 i, opt;
-	volatile __u8
-		opt_size; // Seems to ensure it's always read of from stack as u8
+static int parse_tcp_ts(struct tcphdr *tcph, void *data_end, __u32 *tsval, __u32 *tsecr){
+	// Get pointer to the start of the options fields in the TCP header
+	// In a TCP header, the options field starts immediately after the header. 
+	// The size of the TCP header is given by the doff field, which is the 
+	// number of 32-bit words in the header.
 
-	if (tcph + 1 > data_end || len <= sizeof(struct tcphdr))
+	// Check if the options field is present
+	// either the data_end is before the start of the options field or the options field is not present
+	if ((void *)(tcph + 1) > data_end) || (tcph->doff * 4 <= sizeof(struct tcphdr)){
 		return -1;
-#pragma unroll //temporary solution until we can identify why the non-unrolled loop gets stuck in an infinite loop
-	for (i = 0; i < MAX_TCP_OPTIONS; i++) {
-		if (pos + 1 > opt_end || pos + 1 > data_end)
-			return -1;
+	}
 
-		opt = *pos;
-		if (opt == 0) // Reached end of TCP options
-			return -1;
+	// Get pointer to the start of the options field
+	// The options field starts immediately after the header
+	void *opt_ptr = (void *)(tcph + 1);
 
-		if (opt == 1) { // TCP NOP option - advance one byte
-			pos++;
+	// Iterate through the options field to find the TSval and TSecr values
+	// util we reach the end of the options field or the end of the packet
+	while (opt_ptr < data_end) || (opt_ptr < (void *)(tcph + tcph->doff * 4)){
+		// Check if the option is the end of the options field. The kind field should be 0
+		if (*(__u8 *)opt_ptr == 0){
+			break;
+		}
+
+		// Check if the option is a NOP. The kind field should be 1
+		if (*(__u8 *)opt_ptr == 1){
+			opt_ptr++;
 			continue;
 		}
 
-		// Option > 1, should have option size
-		if (pos + 2 > opt_end || pos + 2 > data_end)
-			return -1;
-		opt_size = *(pos + 1);
-		if (opt_size < 2) // Stop parsing options if opt_size has an invalid value
-			return -1;
-
-		// Option-kind is TCP timestap (yey!)
-		if (opt == 8 && opt_size == 10) {
-			if (pos + 10 > opt_end || pos + 10 > data_end)
+		// Check if the option is the timestamp option. The kind field should be 8
+		if (*(__u8 *)opt_ptr == 8){
+			// Check if the option is the correct size. The timestamp option is 10 bytes long
+			if ((opt_ptr + 10) > data_end){
 				return -1;
-			*tsval = bpf_ntohl(*(__u32 *)(pos + 2));
-			*tsecr = bpf_ntohl(*(__u32 *)(pos + 6));
+			}
+
+			// Check if the option is the correct format. Adding 1 to the pointer
+			// will get us to the length field.
+			if (*(__u8 *)(opt_ptr + 1) != 10){
+				return -1;
+			}
+
+			// Get the TSval and TSecr values, assiging them to the tsval and tsecr pointers
+			*tsval = bpf_ntohl(*(__u32 *)(opt_ptr + 2));
+			*tsecr = bpf_ntohl(*(__u32 *)(opt_ptr + 6));
+
 			return 0;
 		}
 
-		// Some other TCP option - advance option-length bytes
-		pos += opt_size;
+		// For all other options, the length field is the next byte after the kind field
+		// We need to add 1 to the pointer to get to the length field and then add the length
+		// to the pointer to get to the next option
+		opt_ptr += *(__u8 *)(opt_ptr + 1);
 	}
+
 	return -1;
 }
 
