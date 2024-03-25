@@ -62,38 +62,38 @@ static int parse_tcp_ts(struct tcphdr *tcph, void *data_end, __u32 *tsval, __u32
 
 	// Check if the options field is present
 	// either the data_end is before the start of the options field or the options field is not present
-	if ((void *)(tcph + 1) > data_end) || (tcph->doff * 4 <= sizeof(struct tcphdr)){
+	if ((void *)(tcph + 1) > data_end || tcph->doff * 4 <= sizeof(struct tcphdr)){
 		return -1;
 	}
 
 	// Get pointer to the start of the options field
 	// The options field starts immediately after the header
-	void *opt_ptr = (void *)(tcph + 1);
+	__u8 *opt_ptr = (__u8 *)(tcph + 1);
 
 	// Iterate through the options field to find the TSval and TSecr values
 	// util we reach the end of the options field or the end of the packet
-	while (opt_ptr < data_end) || (opt_ptr < (void *)(tcph + tcph->doff * 4)){
+	while (opt_ptr < (__u8 *)data_end || opt_ptr < (__u8 *)(tcph + tcph->doff * 4)){
 		// Check if the option is the end of the options field. The kind field should be 0
-		if (*(__u8 *)opt_ptr == 0){
+		if (*opt_ptr == 0){
 			break;
 		}
 
 		// Check if the option is a NOP. The kind field should be 1
-		if (*(__u8 *)opt_ptr == 1){
+		if (*opt_ptr == 1){
 			opt_ptr++;
 			continue;
 		}
 
 		// Check if the option is the timestamp option. The kind field should be 8
-		if (*(__u8 *)opt_ptr == 8){
+		if (*opt_ptr == 8){
 			// Check if the option is the correct size. The timestamp option is 10 bytes long
-			if ((opt_ptr + 10) > data_end){
+			if ((opt_ptr + 10) > (__u8 *)data_end){
 				return -1;
 			}
 
 			// Check if the option is the correct format. Adding 1 to the pointer
 			// will get us to the length field.
-			if (*(__u8 *)(opt_ptr + 1) != 10){
+			if (*(opt_ptr + 1) != 10){
 				return -1;
 			}
 
@@ -107,7 +107,7 @@ static int parse_tcp_ts(struct tcphdr *tcph, void *data_end, __u32 *tsval, __u32
 		// For all other options, the length field is the next byte after the kind field
 		// We need to add 1 to the pointer to get to the length field and then add the length
 		// to the pointer to get to the next option
-		opt_ptr += *(__u8 *)(opt_ptr + 1);
+		opt_ptr += *(opt_ptr + 1);
 	}
 
 	return -1;
