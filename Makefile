@@ -209,17 +209,17 @@ container-docker: buildx # util target to build container images using docker bu
 	os=$$(echo $(PLATFORM) | cut -d'/' -f1); \
 	arch=$$(echo $(PLATFORM) | cut -d'/' -f2); \
 	echo "Building for $$os/$$arch"; \
-		docker buildx build \
-			$(BUILDX_ACTION) \
-			--platform $(PLATFORM) \
-			-f $(DOCKERFILE) \
-			--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
-			--build-arg GOOS=$$os \
-			--build-arg GOARCH=$$arch \
-			--build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
-			--target=$(TARGET) \
-			-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
-			$(CONTEXT_DIR); \
+	docker buildx build \
+		$(BUILDX_ACTION) \
+		--platform $(PLATFORM) \
+		-f $(DOCKERFILE) \
+		--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
+		--build-arg GOOS=$$os \
+		--build-arg GOARCH=$$arch \
+		--build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
+		--target=$(TARGET) \
+		-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
+		$(CONTEXT_DIR)
 
 
 retina-image: ## build the retina linux container image.
