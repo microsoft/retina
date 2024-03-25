@@ -1,0 +1,40 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
+
+version: 1
+
+before:
+  hooks:
+    # You may remove this if you don't use go modules.
+    - go mod tidy
+
+builds:
+  - binary: kubectl-retina-{{ .Os }}-{{ .Arch }}
+    env:
+      - CGO_ENABLED=0
+    goarch:
+      - amd64
+      - arm64
+    gcflags:
+      - -dwarflocationlists=true
+    goos:
+      - linux
+      - windows
+      - darwin
+    ldflags:
+      - -X cli/cmd.Version={{.Version}}
+    main: cli/main.go
+
+archives:
+  - name_template: "{{ .Binary }}-v{{ .Version }}"
+    wrap_in_directory: false
+    format_overrides:
+    - goos: windows
+      format: zip
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"

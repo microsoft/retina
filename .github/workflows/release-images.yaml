@@ -2,8 +2,8 @@ name: Release Retina Container Images
 
 on:
   push:
-    branches: [ main ]
-    tags: [ "v*" ]
+    branches: [main]
+    tags: ["v*"]
 
 permissions:
   contents: read
@@ -64,7 +64,7 @@ jobs:
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-        
+
       - name: Log in to registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
 
@@ -98,7 +98,7 @@ jobs:
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-        
+
       - name: Log in to registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
 
@@ -112,48 +112,14 @@ jobs:
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
             BUILDX_ACTION=--push
 
-  kubectl-retina-images:
-    name: Build kubectl-retina Images
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        platform: ["linux"]
-        arch: ["amd64", "arm64"]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v4
-        with:
-          go-version: ">=1.21.0"
-      - run: go version
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        
-      - name: Log in to registry
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
-
-      - name: Build/Push Images
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "TAG=$(make version)" >> $GITHUB_ENV
-          make kubectl-retina-image \
-            IMAGE_NAMESPACE=${{ github.repository }} \
-            PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
-            BUILDX_ACTION=--push
-
   manifests:
     name: Generate Manifests
     runs-on: ubuntu-latest
-    needs: [retina-images, retina-win-images, operator-images, kubectl-retina-images]
+    needs: [retina-images, retina-win-images, operator-images]
 
     strategy:
       matrix:
-        component: ["retina", "operator", "kubectl-retina"]
+        component: ["retina", "operator"]
 
     steps:
       - name: Checkout code
@@ -161,7 +127,7 @@ jobs:
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-        
+
       - name: Log in to registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
 

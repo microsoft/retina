@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.

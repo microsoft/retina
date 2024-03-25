@@ -2,29 +2,29 @@ name: golangci-lint
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 jobs:
   golangci:
     strategy:
       fail-fast: false
       matrix:
-        go-version: ['1.21.x']
+        go-version: ["1.21.x"]
         os: [ubuntu-latest, windows-latest]
     name: Lint
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/setup-go@v5
-      with:
-        go-version: ${{ matrix.go-version }}
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-    - name: golangci-lint
-      uses: golangci/golangci-lint-action@v4
-      with:
-        version: v1.55
-        args: --concurrency 4 --verbose --config=.golangci.yaml --timeout=25m 
-        only-new-issues: true
-        skip-cache: true
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: v1.55
+          args: --concurrency 4 --verbose --config=.golangci.yaml --timeout=25m
+          only-new-issues: true
+          skip-cache: true
