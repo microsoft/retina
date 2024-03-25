@@ -163,7 +163,6 @@ retina-capture-workload: ## build the Retina capture workload
 ##@ Containers
 
 IMAGE_REGISTRY ?= ghcr.io 
-
 IMAGE_NAMESPACE ?= $(shell git config --get remote.origin.url | sed -E 's/.*github\.com[\/:]([^\/]+)\/([^\/.]+)(.git)?/\1\/\2/' | tr '[:upper:]' '[:lower:]')
 
 RETINA_BUILDER_IMAGE			= $(IMAGE_NAMESPACE)/retina-builder
@@ -175,7 +174,6 @@ RETINA_INTEGRATION_TEST_IMAGE	= $(IMAGE_NAMESPACE)/retina-integration-test
 RETINA_PROTO_IMAGE				= $(IMAGE_NAMESPACE)/retina-proto-gen
 RETINA_GO_GEN_IMAGE				= $(IMAGE_NAMESPACE)/retina-go-gen
 KAPINGER_IMAGE 					= $(IMAGE_NAMESPACE)/kapinger
-KUBECTL_RETINA_IMAGE			= $(IMAGE_NAMESPACE)/kubectl-retina
 
 skopeo-export: # util target to copy a container from containers-storage to the docker daemon.
 	skopeo copy \
