@@ -1,74 +1,184 @@
-name: Integration Tests For Retina
+name: Run E2e Tests on retina builds. 
+
 on:
   workflow_dispatch:
+
+permissions:
+  contents: read
+
 jobs:
-  integ-test:
+  retina-images:
+    name: Build Agent Images
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        platform: ["linux"]
+        arch: ["amd64", "arm64"]
+
     steps:
-      - name: Free up disk space
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: ">=1.21.0"
+      - run: go version
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Az CLI login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Build Images
+        shell: bash
         run: |
-          # https://github.com/actions/runner-images/issues/2840#issuecomment-790492173
-          # du -sh /*        2> /dev/null | sort -rh  2> /dev/null | head
-          # du -h -d2 /usr   2> /dev/null | sort -rh  2> /dev/null | head
-          echo "Check free disk space before cleanup."
-          df -h
-          echo "Removing non-essential tools and libraries."
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/share/boost
-          # delete libraries for Android (12G), PowerShell (1.3G), Swift (1.7G)
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /usr/local/share/powershell
-          sudo rm -rf /usr/share/swift
-          echo "Check free disk space after cleanup."
-          df -h
+          set -euo pipefail
+          az acr login -n acnpublic
+          echo "TAG=$(make version)" >> $GITHUB_ENV
+          make retina-image \
+            IMAGE_NAMESPACE=${{ github.repository }} \
+            PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
+            IMAGE_REGISTRY=acnpublic.azurecr.io \
+            BUILDX_ACTION=--push
 
-      - name: Checkout
-        uses: actions/checkout@v3
+  retina-win-images:
+    name: Build Agent Windows Images
+    runs-on: ubuntu-latest
 
-      - uses: actions/setup-go@v5
+    strategy:
+      matrix:
+        platform: ["windows"]
+        arch: ["amd64"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v4
         with:
-          go-version: "^1.18"
+          go-version: ">=1.21.0"
+      - run: go version
 
-      - name: Make retina image
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      
+      - name: Az CLI login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+      - name: Build Images
+        shell: bash
         run: |
-          export CONTAINER_BUILDER=docker
-          export CONTAINER_RUNTIME=docker
-          make all-images-local
-          make install-kubectl-retina
-          make base-images-remove
-          curl -LO https://github.com/kvaps/kubectl-node-shell/raw/master/kubectl-node_shell
-          chmod +x ./kubectl-node_shell
-          sudo mv ./kubectl-node_shell /usr/local/bin/kubectl-node_shell
-          docker system prune -f
+          set -euo pipefail
+          az acr login -n acnpublic
+          echo "TAG=$(make version)" >> $GITHUB_ENV
+          make retina-image-win \
+            IMAGE_NAMESPACE=${{ github.repository }} \
+            PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}  \
+            IMAGE_REGISTRY=acnpublic.azurecr.io \
+            BUILDX_ACTION=--push
 
-      - name: Deploy Kind
-        run: make kind-setup
+  operator-images:
+    name: Build Operator Images
+    runs-on: ubuntu-latest
 
-      - name: Install retina
-        run: make kind-install
+    strategy:
+      matrix:
+        platform: ["linux"]
+        arch: ["amd64"]
 
-      - name: Run tests
-        run: make retina-integration
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Export Kubernetes logs
-        if: failure()
-        run: make retina-export-logs
-
-      - name: Archive Kubernetes logs
-        if: failure()
-        uses: actions/upload-artifact@v4
+      - uses: actions/setup-go@v4
         with:
-          name: kubernetes-node-logs
-          path: kubernetes-logs
+          go-version: ">=1.21.0"
+      - run: go version
 
-      - name: Archive iptable and ipset
-        if: failure()
-        uses: actions/upload-artifact@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Az CLI login
+        uses: azure/login@v1
         with:
-          name: iptable-ipset-snapshot
-          path: ./test/integration/plugin-simulations/npm-iptables
-      - name: Cleanup
-        if: always()
-        run: make kind-clean
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+      - name: Build Images
+        shell: bash
+        run: |
+          set -euo pipefail
+          az acr login -n acnpublic
+          echo "TAG=$(make version)" >> $GITHUB_ENV
+          make retina-operator-image \
+            IMAGE_NAMESPACE=${{ github.repository }} \
+            PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}  \
+            IMAGE_REGISTRY=acnpublic.azurecr.io \
+            BUILDX_ACTION=--push
+
+  manifests:
+    name: Generate Manifests
+    runs-on: ubuntu-latest
+    needs: [retina-images, retina-win-images, operator-images]
+
+    strategy:
+      matrix:
+        components: ["retina", "operator"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+      
+      - name: Azure CLI login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Generate Manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          az acr login -n acnpublic 
+          make manifest COMPONENT=${{ matrix.components }} \
+          IMAGE_REGISTRY=acnpublic.azurecr.io \
+      
+  e2e:
+    name: Run E2E Tests
+    runs-on: ubuntu-latest
+    needs: [manifests]
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ">=1.21.0"
+      - run: go version
+
+      - name: Az CLI login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Run E2E Tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          export TAG=$(make version)
+          export AZURE_SUBSCRIPTION_ID=${{ secrets.AZURE_SUBSCRIPTION }}
+          export AZURE_ACR_SUBSCRIPTION_ID=${{ secrets.AZURE_SUBSCRIPTION }}
+          go test -v ./test/e2e/scenarios/retina/*.go -timeout 30m -tags=e2e -count=1
