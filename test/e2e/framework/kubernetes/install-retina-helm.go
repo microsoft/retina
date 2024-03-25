@@ -13,10 +13,10 @@ import (
 )
 
 const (
-	createTimeout   = 240 * time.Second // windpws is slow
-	deleteTimeout   = 60 * time.Second
-	IMAGE_REGISTRY  = "acnpublic.azurecr.io"
-	IMAGE_NAMESPACE = "microsoft/retina"
+	createTimeout  = 240 * time.Second // windpws is slow
+	deleteTimeout  = 60 * time.Second
+	imageRegistry  = "acnpublic.azurecr.io"
+	imageNamespace = "microsoft/retina"
 )
 
 var (
@@ -61,9 +61,9 @@ func (i *InstallHelmChart) Run() error {
 	chart.Values["operator"].(map[string]interface{})["tag"] = tag
 
 	// update helm chart to use images from acnrepo.azurecr.io when running e2e tests
-	chart.Values["image"].(map[string]interface{})["repository"] = IMAGE_REGISTRY + "/" + IMAGE_NAMESPACE + "/retina"
-	chart.Values["image"].(map[string]interface{})["initRepository"] = IMAGE_REGISTRY + "/" + IMAGE_NAMESPACE + "/retina-init"
-	chart.Values["operator"].(map[string]interface{})["repository"] = IMAGE_REGISTRY + "/" + IMAGE_NAMESPACE + "/retina-operator"
+	chart.Values["image"].(map[string]interface{})["repository"] = imageRegistry + "/" + imageNamespace + "/retina"
+	chart.Values["image"].(map[string]interface{})["initRepository"] = imageRegistry + "/" + imageNamespace + "/retina-init"
+	chart.Values["operator"].(map[string]interface{})["repository"] = imageRegistry + "/" + imageNamespace + "/retina-operator"
 
 	getclient := action.NewGet(actionConfig)
 	release, err := getclient.Run(i.ReleaseName)
