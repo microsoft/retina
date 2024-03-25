@@ -13,10 +13,8 @@ import (
 )
 
 const (
-	createTimeout  = 240 * time.Second // windpws is slow
-	deleteTimeout  = 60 * time.Second
-	imageRegistry  = "acnpublic.azurecr.io"
-	imageNamespace = "microsoft/retina"
+	createTimeout = 240 * time.Second // windpws is slow
+	deleteTimeout = 60 * time.Second
 )
 
 var (
@@ -44,6 +42,16 @@ func (i *InstallHelmChart) Run() error {
 
 	tag := os.Getenv(i.TagEnv)
 
+	imageRegistry := os.Getenv("IMAGE_REGISTRY")
+	if imageRegistry == "" {
+		return fmt.Errorf("image registry is not set: %w", errEmptyTag)
+	}
+
+	imageNamespace := os.Getenv("IMAGE_NAMESPACE")
+	if imageNamespace == "" {
+		return fmt.Errorf("image namespace is not set: %w", errEmptyTag)
+	}
+
 	// load chart from the path
 	chart, err := loader.Load(i.ChartPath)
 	if err != nil {
@@ -59,8 +67,6 @@ func (i *InstallHelmChart) Run() error {
 	chart.Values["image"].(map[string]interface{})["tag"] = tag
 	chart.Values["image"].(map[string]interface{})["pullPolicy"] = "Always"
 	chart.Values["operator"].(map[string]interface{})["tag"] = tag
-
-	// update helm chart to use images from acnrepo.azurecr.io when running e2e tests
 	chart.Values["image"].(map[string]interface{})["repository"] = imageRegistry + "/" + imageNamespace + "/retina"
 	chart.Values["image"].(map[string]interface{})["initRepository"] = imageRegistry + "/" + imageNamespace + "/retina-init"
 	chart.Values["operator"].(map[string]interface{})["repository"] = imageRegistry + "/" + imageNamespace + "/retina-operator"

@@ -221,7 +221,6 @@ container-docker: buildx # util target to build container images using docker bu
 		-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
 		$(CONTEXT_DIR)
 
-
 retina-image: ## build the retina linux container image.
 	echo "Building for $(PLATFORM)"
 	for target in init agent; do \

@@ -181,4 +181,6 @@ jobs:
           export TAG=$(make version)
           export AZURE_SUBSCRIPTION_ID=${{ secrets.AZURE_SUBSCRIPTION }}
           export AZURE_ACR_SUBSCRIPTION_ID=${{ secrets.AZURE_SUBSCRIPTION }}
+          export IMAGE_REGISTRY=acnpublic.azurecr.io
+          export IMAGE_NAMESPACE=${{ github.repository }}
           go test -v ./test/e2e/scenarios/retina/*.go -timeout 30m -tags=e2e -count=1
