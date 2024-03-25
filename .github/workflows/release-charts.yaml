@@ -1,0 +1,33 @@
+name: Release Retina Charts
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  push-retina-charts:
+    name: Publish Retina Helm Charts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4.1.0
+        id: install
+
+      - name: Log in to registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u $ --password-stdin
+
+      - name: Build/Push Chart
+        shell: bash
+        run: |
+          set -euo pipefail
+          export TAG=$(make version)
+          helm package ./deploy/manifests/controller/helm/retina --version $TAG
+          helm push retina-*.tgz oci://ghcr.io/${{ github.repository }}/charts
