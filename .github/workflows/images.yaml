@@ -43,7 +43,7 @@ jobs:
           make retina-image \
             IMAGE_NAMESPACE=${{ github.repository }} \
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
-            IMAGE_REGISTRY	?= acnpublic.azurecr.io \
+            IMAGE_REGISTRY=acnpublic.azurecr.io \
 
   retina-win-images:
     name: Build Agent Windows Images
@@ -80,7 +80,7 @@ jobs:
           make retina-image-win \
             IMAGE_NAMESPACE=${{ github.repository }} \
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}  \
-            IMAGE_REGISTRY	?= acnpublic.azurecr.io \
+            IMAGE_REGISTRY=acnpublic.azurecr.io \
 
   operator-images:
     name: Build Operator Images
@@ -117,7 +117,7 @@ jobs:
           make retina-operator-image \
             IMAGE_NAMESPACE=${{ github.repository }} \
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}  \
-            IMAGE_REGISTRY	?= acnpublic.azurecr.io \
+            IMAGE_REGISTRY=acnpublic.azurecr.io \
 
   manifests:
     name: Generate Manifests
@@ -146,7 +146,7 @@ jobs:
           set -euo pipefail
           az acr login -n acnpublic 
           make manifest COMPONENT=${{ matrix.components }} \
-          IMAGE_REGISTRY	?= acnpublic.azurecr.io \
+          IMAGE_REGISTRY=acnpublic.azurecr.io \
       
   e2e:
     name: Run E2E Tests
