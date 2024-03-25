@@ -1,4 +1,4 @@
-name: Run E2e Tests on retina builds. 
+name: Buidl and Run E2e Tests. 
 
 on:
   workflow_dispatch:
