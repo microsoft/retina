@@ -162,7 +162,7 @@ retina-capture-workload: ## build the Retina capture workload
 
 ##@ Containers
 
-IMAGE_REGISTRY ?= ghcr.io 
+IMAGE_REGISTRY	?= ghcr.io
 IMAGE_NAMESPACE ?= $(shell git config --get remote.origin.url | sed -E 's/.*github\.com[\/:]([^\/]+)\/([^\/.]+)(.git)?/\1\/\2/' | tr '[:upper:]' '[:lower:]')
 
 RETINA_BUILDER_IMAGE			= $(IMAGE_NAMESPACE)/retina-builder
@@ -209,31 +209,33 @@ container-docker: buildx # util target to build container images using docker bu
 	os=$$(echo $(PLATFORM) | cut -d'/' -f1); \
 	arch=$$(echo $(PLATFORM) | cut -d'/' -f2); \
 	echo "Building for $$os/$$arch"; \
-	if [ "$(IMAGE_REGISTRY)" != "ghcr.io" ]; then \
-		docker buildx build \
-			$(BUILDX_ACTION) \
-			--platform $(PLATFORM) \
-			-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
-			-f $(DOCKERFILE) \
-			--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
-			--build-arg GOOS=$$os \
-			--build-arg GOARCH=$$arch \
-			--build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
-			--target=$(TARGET) \
-			--push \
-			$(CONTEXT_DIR); \
+	if [ $(IMAGE_REGISTRY) = "ghcr.io" ]; then \
+			docker buildx build \
+				$(BUILDX_ACTION) \
+				--platform $(PLATFORM) \
+				-f $(DOCKERFILE) \
+				--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
+				--build-arg GOOS=$$os \
+				--build-arg GOARCH=$$arch \
+				--build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
+				--target=$(TARGET) \
+				-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
+				$(CONTEXT_DIR); \
 	else \
-		docker buildx build \
-			$(BUILDX_ACTION) \
-			--platform $(PLATFORM) \
-			-f $(DOCKERFILE) \
-			--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
-			--build-arg GOOS=$$os \
-			--build-arg GOARCH=$$arch \
-			--build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
-			--target=$(TARGET) \
-			$(CONTEXT_DIR); \
-	fi;
+			docker buildx build \
+				$(BUILDX_ACTION) \
+				--platform $(PLATFORM) \
+				-f $(DOCKERFILE) \
+				--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
+				--build-arg GOOS=$$os \
+				--build-arg GOARCH=$$arch \
+				--build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
+				--target=$(TARGET) \
+				-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
+				--push \
+				$(CONTEXT_DIR); \
+	fi; \
+
 
 retina-image: ## build the retina linux container image.
 	echo "Building for $(PLATFORM)"
