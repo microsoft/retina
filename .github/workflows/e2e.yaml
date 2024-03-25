@@ -43,6 +43,7 @@ jobs:
             IMAGE_NAMESPACE=${{ github.repository }} \
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
             IMAGE_REGISTRY=acnpublic.azurecr.io \
+            BUILDX_ACTION=--push
 
   retina-win-images:
     name: Build Agent Windows Images
@@ -80,6 +81,7 @@ jobs:
             IMAGE_NAMESPACE=${{ github.repository }} \
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}  \
             IMAGE_REGISTRY=acnpublic.azurecr.io \
+            BUILDX_ACTION=--push
 
   operator-images:
     name: Build Operator Images
@@ -117,6 +119,7 @@ jobs:
             IMAGE_NAMESPACE=${{ github.repository }} \
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}  \
             IMAGE_REGISTRY=acnpublic.azurecr.io \
+            BUILDX_ACTION=--push
 
   manifests:
     name: Generate Manifests
