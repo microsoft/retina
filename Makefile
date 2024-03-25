@@ -284,18 +284,6 @@ retina-operator-image:  ## build the retina linux operator image.
 			APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
 			CONTEXT_DIR=$(REPO_ROOT)
 
-kubectl-retina-image: ## build the kubectl-retina image. 
-	echo "Building for $(PLATFORM)"
-	$(MAKE) container-$(CONTAINER_BUILDER) \
-			PLATFORM=$(PLATFORM) \
-			DOCKERFILE=cli/Dockerfile.kubectl-retina \
-			REGISTRY=$(IMAGE_REGISTRY) \
-			IMAGE=$(KUBECTL_RETINA_IMAGE) \
-			VERSION=$(TAG) \
-			TAG=$(RETINA_PLATFORM_TAG) \
-			APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
-			CONTEXT_DIR=$(REPO_ROOT)
-
 proto-gen: ## generate protobuf code
 	docker build --platform=linux/amd64 \
 		-t $(IMAGE_REGISTRY)/$(RETINA_PROTO_IMAGE):$(RETINA_PLATFORM_TAG) \

@@ -119,51 +119,14 @@ jobs:
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}  \
             IMAGE_REGISTRY	?= acnpublic.azurecr.io \
 
-  kubectl-retina-images:
-    name: Build kubectl-retina Images
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        platform: ["linux"]
-        arch: ["amd64", "arm64"]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v4
-        with:
-          go-version: ">=1.21.0"
-      - run: go version
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Az CLI login
-        uses: azure/login@v1
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-        
-      - name: Build Images
-        shell: bash
-        run: |
-          set -euo pipefail
-          az acr login -n acnpublic
-          echo "TAG=$(make version)" >> $GITHUB_ENV
-          make kubectl-retina-image \
-            IMAGE_NAMESPACE=${{ github.repository }} \
-            PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}  \
-            IMAGE_REGISTRY	?= acnpublic.azurecr.io \ 
-
   manifests:
     name: Generate Manifests
     runs-on: ubuntu-latest
-    needs: [retina-images, retina-win-images, operator-images, kubectl-retina-images]
+    needs: [retina-images, retina-win-images, operator-images]
 
     strategy:
       matrix:
-        components: ["retina", "operator", "kubectl-retina"]
+        components: ["retina", "operator"]
 
     steps:
       - name: Checkout code
