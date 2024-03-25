@@ -67,7 +67,7 @@ func (i *InstallHelmChart) Run() error {
 	chart.Values["image"].(map[string]interface{})["tag"] = tag
 	chart.Values["image"].(map[string]interface{})["pullPolicy"] = "Always"
 	chart.Values["operator"].(map[string]interface{})["tag"] = tag
-	chart.Values["image"].(map[string]interface{})["repository"] = imageRegistry + "/" + imageNamespace + "/retina"
+	chart.Values["image"].(map[string]interface{})["repository"] = imageRegistry + "/" + imageNamespace + "/retina-agent"
 	chart.Values["image"].(map[string]interface{})["initRepository"] = imageRegistry + "/" + imageNamespace + "/retina-init"
 	chart.Values["operator"].(map[string]interface{})["repository"] = imageRegistry + "/" + imageNamespace + "/retina-operator"
 
