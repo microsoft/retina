@@ -1,4 +1,4 @@
-name: Build Retina Container Images
+name: Run E2e Tests on retina builds. 
 
 on:
   workflow_dispatch:
