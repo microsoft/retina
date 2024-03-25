@@ -58,6 +58,11 @@ func (i *InstallHelmChart) Run() error {
 	chart.Values["image"].(map[string]interface{})["pullPolicy"] = "Always"
 	chart.Values["operator"].(map[string]interface{})["tag"] = tag
 
+	// update helm chart to use images from acnrepo.azurecr.io when running e2e tests
+	chart.Values["image"].(map[string]interface{})["repository"] = "acnpublic.azurecr.io/microsoft/retina/retina-agent"
+	chart.Values["image"].(map[string]interface{})["initRepository"] = "acnpublic.azurecr.io/microsoft/retina/retina-init"
+	chart.Values["operator"].(map[string]interface{})["repository"] = "acnpublic.azurecr.io/microsoft/retina/retina-operator"
+
 	getclient := action.NewGet(actionConfig)
 	release, err := getclient.Run(i.ReleaseName)
 	if err == nil && release != nil {
