@@ -370,7 +370,6 @@ func TestDropReasonReadData_WithPerfArrayLostSamples(t *testing.T) {
 		t.Fatalf("Timed out waiting for test to finish")
 	case <-done:
 	}
-
 }
 
 func TestDropReasonReadData_WithUnknownError(t *testing.T) {
