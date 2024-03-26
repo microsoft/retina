@@ -1,6 +1,7 @@
 name: Build images and run E2E tests. 
 
 on:
+  merge_group:
   workflow_dispatch:
 
 permissions:
