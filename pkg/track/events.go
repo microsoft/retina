@@ -12,8 +12,9 @@ import (
 	"github.com/microsoft/retina/pkg/log"
 )
 
+// Track is a singleton that listens for events on an external channel and writes them to the enricher.
+// There could be more actions, besides writing to the enricher, that could be added in the future.
 type Track struct {
-	ctx             context.Context
 	cancel          context.CancelFunc
 	externalChannel chan *v1.Event
 	l               *log.ZapLogger
@@ -55,10 +56,10 @@ func (t *Track) Channel() chan *v1.Event {
 // Start is a blocking function that listens for events on the external channel.
 func (t *Track) Start(ctx context.Context) {
 	t.l.Info("Started tracking events")
-	t.ctx, t.cancel = context.WithCancel(ctx)
+	_, t.cancel = context.WithCancel(ctx)
 	for {
 		select {
-		case <-t.ctx.Done():
+		case <-ctx.Done():
 			t.l.Info("context cancelled, stopping track")
 			return
 		case ev := <-t.externalChannel:

@@ -304,18 +304,25 @@ func TestDropReasonReadData_WithEmptyPerfArray(t *testing.T) {
 		reader:         mockedPerfReader,
 	}
 
-	// Create a context with a short timeout for testing purposes
-	_, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	// Create a context for testing purposes.
+	deadline, _ := t.Deadline()
+	ctx, cancel := context.WithDeadline(context.Background(), deadline)
 	defer cancel()
 
+	done := make(chan struct{})
 	// Start the drop reason routine in a goroutine
 	go func() {
 		err := dr.readEventArrayData()
 		assert.Nil(t, err, "Expected error but got nil")
+		done <- struct{}{}
 	}()
 
 	// Wait for a short period of time for the routine to start
-	time.Sleep(2 * time.Second)
+	select {
+	case <-ctx.Done():
+		t.Fatalf("Timed out waiting for test to finish")
+	case <-done:
+	}
 }
 
 func TestDropReasonReadData_WithPerfArrayLostSamples(t *testing.T) {
@@ -344,18 +351,26 @@ func TestDropReasonReadData_WithPerfArrayLostSamples(t *testing.T) {
 
 	metrics.InitializeMetrics()
 
-	// Create a  with a short timeout for testing purposes
-	_, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	// Create a context for testing purposes.
+	deadline, _ := t.Deadline()
+	ctx, cancel := context.WithDeadline(context.Background(), deadline)
 	defer cancel()
 
+	done := make(chan struct{})
 	// Start the drop reason routine in a goroutine
 	go func() {
 		err := dr.readEventArrayData()
 		assert.Nil(t, err, "Expected error but got nil")
+		done <- struct{}{}
 	}()
 
 	// Wait for a short period of time for the routine to start
-	time.Sleep(2 * time.Second)
+	select {
+	case <-ctx.Done():
+		t.Fatalf("Timed out waiting for test to finish")
+	case <-done:
+	}
+
 }
 
 func TestDropReasonReadData_WithUnknownError(t *testing.T) {
@@ -388,14 +403,23 @@ func TestDropReasonReadData_WithUnknownError(t *testing.T) {
 
 	metrics.InitializeMetrics()
 
+	deadline, _ := t.Deadline()
+	ctx, cancel := context.WithDeadline(context.Background(), deadline)
+	defer cancel()
+
+	done := make(chan struct{})
 	// Start the drop reason routine in a goroutine
 	go func() {
 		err := dr.readEventArrayData()
 		assert.NotNil(t, err, "Expected error but got nil")
+		done <- struct{}{}
 	}()
 
-	// Wait for a short period of time for the routine to start
-	time.Sleep(2 * time.Second)
+	select {
+	case <-ctx.Done():
+		t.Fatalf("Timed out waiting for test to finish")
+	case <-done:
+	}
 }
 
 func TestDropReasonGenerate(t *testing.T) {

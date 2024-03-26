@@ -100,6 +100,10 @@ func TestRequestEventHandler(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	metrics.InitializeMetrics()
 
+	deadline, _ := t.Deadline()
+	ctx, cancelFunc := context.WithDeadline(context.Background(), deadline)
+	defer cancelFunc()
+
 	exCh := make(chan *v1.Event, 1)
 	d := &dns{
 		l: log.Logger().Named(string(Name)),
@@ -118,7 +122,7 @@ func TestRequestEventHandler(t *testing.T) {
 		Qr:         "Q",
 		Rcode:      "NOERROR",
 		QType:      "A",
-		DNSName:    "test.com",
+		DNSName:    "example.com",
 		Addresses:  []string{},
 		NumAnswers: 0,
 		PktType:    "OUTGOING",
@@ -142,11 +146,11 @@ func TestRequestEventHandler(t *testing.T) {
 	assert.Equal(t, after-before, float64(1))
 
 	// Test External channel.
-	em := EventMatched(utils.DNSType_QUERY, 0, "test.com", []string{"A"}, 0, []string{})
+	em := EventMatched(utils.DNSType_QUERY, 0, "example.com", []string{"A"}, 0, []string{})
 	select {
 	case ev := <-exCh:
 		assert.Assert(t, em.Matches(ev))
-	case <-time.After(3 * time.Second):
+	case <-ctx.Done():
 		t.Fatal("Timeout waiting for event")
 	}
 }
@@ -154,6 +158,10 @@ func TestRequestEventHandler(t *testing.T) {
 func TestResponseEventHandler(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	metrics.InitializeMetrics()
+
+	deadline, _ := t.Deadline()
+	ctx, cancelFunc := context.WithDeadline(context.Background(), deadline)
+	defer cancelFunc()
 
 	exCh := make(chan *v1.Event, 1)
 	d := &dns{
@@ -173,7 +181,7 @@ func TestResponseEventHandler(t *testing.T) {
 		Qr:         "R",
 		Rcode:      "NOERROR",
 		QType:      "A",
-		DNSName:    "test.com",
+		DNSName:    "example.com",
 		Addresses:  []string{"1.1.1.1", "2.2.2.2"},
 		NumAnswers: 2,
 		PktType:    "HOST",
@@ -197,11 +205,11 @@ func TestResponseEventHandler(t *testing.T) {
 	assert.Equal(t, after-before, float64(1))
 
 	// Test External channel.
-	em := EventMatched(utils.DNSType_RESPONSE, 0, "test.com", []string{"A"}, 2, []string{"1.1.1.1", "2.2.2.2"})
+	em := EventMatched(utils.DNSType_RESPONSE, 0, "example.com", []string{"A"}, 2, []string{"1.1.1.1", "2.2.2.2"})
 	select {
 	case ev := <-exCh:
 		assert.Assert(t, em.Matches(ev), "Expected event to match")
-	case <-time.After(3 * time.Second):
+	case <-ctx.Done():
 		t.Fatal("Timeout waiting for event")
 	}
 }
