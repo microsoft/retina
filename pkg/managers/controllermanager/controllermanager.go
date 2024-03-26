@@ -25,9 +25,10 @@ import (
 )
 
 const (
-	ResyncTime     time.Duration = 5 * time.Minute
-	errFailedTrack               = "Failed to create track instance"
+	ResyncTime time.Duration = 5 * time.Minute
 )
+
+var errFailedTrack = errors.New("failed to create track instance")
 
 type Controller struct {
 	l             *log.ZapLogger
@@ -99,7 +100,7 @@ func (m *Controller) Init(ctx context.Context) error {
 		// create track instance
 		m.t = track.New()
 		if m.t == nil {
-			return errors.New(errFailedTrack)
+			return errFailedTrack
 		}
 		// Setup with plugins.
 		m.pluginManager.SetupChannel(m.t.Channel())
