@@ -204,7 +204,6 @@ func TestResponseEventHandler(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("Timeout waiting for event")
 	}
-
 }
 
 func value(c prometheus.Counter) float64 {
