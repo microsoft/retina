@@ -55,24 +55,32 @@ const struct packet *unused __attribute__((unused));
  * Returns 0 if sucessful and -1 on failure
  */
 static int parse_tcp_ts(struct tcphdr *tcph, void *data_end, __u32 *tsval, __u32 *tsecr){
-	// Get pointer to the start of the options fields in the TCP header
-	// In a TCP header, the options field starts immediately after the header. 
-	// The size of the TCP header is given by the doff field, which is the 
-	// number of 32-bit words in the header.
-
 	// Check if the options field is present
 	// either the data_end is before the start of the options field or the options field is not present
-	if ((void *)(tcph + 1) > data_end || tcph->doff * 4 <= sizeof(struct tcphdr)){
+	// The options field is present if the doff field is greater than 5.
+	if ((void *)tcph + 1 > data_end || tcph->doff <= 5) {
 		return -1;
 	}
 
-	// Get pointer to the start of the options field
-	// The options field starts immediately after the header
+	// Get pointer to the start of the options fields in the TCP header
+	// In a TCP header, the options field starts immediately after the header. 
 	__u8 *opt_ptr = (__u8 *)(tcph + 1);
+
+	// Get pointer to where the options field ends
+	// derived from doff field in the TCP header
+	__u8 *opt_end = (__u8 *)tcph + tcph->doff * 4;
+
+	// Get the size of the options field
+	// The size of the options field is the difference between the opt_end and opt_ptr pointers
+	// The size of the options field should be less than or equal to 40 bytes
+	if (opt_end - opt_ptr > 40) {
+		return -1;
+	}
 
 	// Iterate through the options field to find the TSval and TSecr values
 	// util we reach the end of the options field or the end of the packet
-	while (opt_ptr < (__u8 *)data_end || opt_ptr < (__u8 *)(tcph + tcph->doff * 4)){
+	// or we looped through over the maximum number of options
+	while (opt_ptr + 1 <= (__u8 *)data_end || opt_ptr + 1 <= opt_end || opt_ptr + 1 <= (__u8 *)tcph + 40) {
 		// Check if the option is the end of the options field. The kind field should be 0
 		if (*opt_ptr == 0){
 			break;
@@ -84,15 +92,25 @@ static int parse_tcp_ts(struct tcphdr *tcph, void *data_end, __u32 *tsval, __u32
 			continue;
 		}
 
+		// Else this is a valid option. Check if we would go beyond the end of the packet
+		// if we read the length field
+		if ((opt_ptr + 2 > (__u8 *)data_end) || (opt_ptr + 2 > opt_end)) {
+			return -1;
+		}
+
+		// Check if the option is the correct size. The minimum size of an option is 2 bytes
+		if (*(opt_ptr + 1) < 2){
+			return -1;
+		}
+
 		// Check if the option is the timestamp option. The kind field should be 8
 		if (*opt_ptr == 8){
-			// Check if the option is the correct size. The timestamp option is 10 bytes long
-			if ((opt_ptr + 10) > (__u8 *)data_end){
+			// Add checks to ensure we don't read beyond the end of the packet
+			if ((opt_ptr + 10 > (__u8 *)data_end) || (opt_ptr + 10 > opt_end)) {
 				return -1;
 			}
 
-			// Check if the option is the correct format. Adding 1 to the pointer
-			// will get us to the length field.
+			// Check if the option is the correct size. The timestamp option is 10 bytes long
 			if (*(opt_ptr + 1) != 10){
 				return -1;
 			}
