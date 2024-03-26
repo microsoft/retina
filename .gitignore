@@ -31,3 +31,4 @@ hack/tools/bin
 .vscode/
 
 dist/
+bin/
