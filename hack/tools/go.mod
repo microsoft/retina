@@ -7,7 +7,7 @@ require (
 	github.com/golangci/golangci-lint v1.45.2
 	github.com/goreleaser/goreleaser v1.24.0
 	github.com/onsi/ginkgo v1.16.5
-	mvdan.cc/gofumpt v0.3.1
+	mvdan.cc/gofumpt v0.6.0
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20211110210527-619e6b92dab9
 	sigs.k8s.io/controller-tools v0.14.0
 )
