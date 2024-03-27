@@ -167,7 +167,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang-jwt/jwt/v5 v5.1.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/golang/protobuf v1.5.3 // indirect
+	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golangci/check v0.0.0-20180506172741-cfe4005ccda2 // indirect
 	github.com/golangci/dupl v0.0.0-20180902072040-3e9179ac440a // indirect
 	github.com/golangci/go-misc v0.0.0-20180628070357-927a3d87b613 // indirect
@@ -371,7 +371,7 @@ require (
 	honnef.co/go/tools v0.2.2 // indirect
 	k8s.io/api v0.29.0 // indirect
 	k8s.io/apiextensions-apiserver v0.29.0 // indirect
-	k8s.io/apimachinery v0.29.0 // indirect
+	k8s.io/apimachinery v0.29.3 // indirect
 	k8s.io/klog/v2 v2.110.1 // indirect
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b // indirect
 	mvdan.cc/interfacer v0.0.0-20180901003855-c20040233aed // indirect
