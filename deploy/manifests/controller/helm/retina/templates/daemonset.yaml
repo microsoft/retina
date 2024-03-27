@@ -109,8 +109,6 @@ spec:
           path: {{ $hostPath }}
       {{ end }}
       {{- end }}
-      nodeSelector:
-        kubernetes.io/os: linux
 {{- end }}
 ---
 {{- if .Values.os.windows}}
