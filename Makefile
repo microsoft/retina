@@ -144,8 +144,8 @@ retina: ## builds both retina and kapctl binaries
 	$(MAKE) retina-binary kubectl-retina
 
 retina-binary: ## build the Retina binary
-	go generate ./...
-	export CGO_ENABLED=0
+	export CGO_ENABLED=0 && \
+	go generate ./... && \
 	go build -v -o $(RETINA_BUILD_DIR)/retina$(EXE_EXT) -gcflags="-dwarflocationlists=true" -ldflags "-X main.version=$(TAG) -X main.applicationInsightsID=$(APP_INSIGHTS_ID)" $(RETINA_DIR)/main.go
 
 kubectl-retina-binary-%: ## build kubectl plugin locally.
