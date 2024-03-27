@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: azure/setup-helm@v4.1.0
         id: install
@@ -29,5 +31,6 @@ jobs:
         run: |
           set -euo pipefail
           export TAG=$(make version)
+          echo $TAG
           helm package ./deploy/manifests/controller/helm/retina --version $TAG
-          helm push retina-*.tgz oci://ghcr.io/${{ github.repository }}/charts
+          helm push retina-$TAG.tgz oci://ghcr.io/${{ github.repository }}/charts
