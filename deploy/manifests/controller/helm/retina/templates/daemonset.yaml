@@ -112,10 +112,10 @@ spec:
       nodeSelector:
         kubernetes.io/os: linux
         {{- if .Values.nodeSelector }}
-        {{- .Values.nodeSelector | nindent 8 }}
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
         {{- end }}
       {{- if .Values.tolerations }}
-      tolerations: {{- .Values.tolerations | nindent 8 }}
+      tolerations: {{- toYaml .Values.tolerations | nindent 8 }}
       {{- end }}
 {{- end }}
 ---
@@ -192,10 +192,10 @@ spec:
       nodeSelector:
         kubernetes.io/os: windows
         {{- if .Values.nodeSelector }}
-        {{- .Values.nodeSelector | nindent 8 }}
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
         {{- end }}
       {{- if .Values.tolerations }}
-      tolerations: {{- .Values.tolerations | nindent 8 }}
+      tolerations: {{- toYaml .Values.tolerations | nindent 8 }}
       {{- end }}
       volumes:
       {{- range $name, $mountPath := .Values.volumeMounts_win }}
