@@ -22,8 +22,6 @@ spec:
     spec:
       hostNetwork: true
       serviceAccountName: {{ .Values.serviceAccount.name }}
-      nodeSelector:
-        kubernetes.io/os: linux
       initContainers:
         - name: init-retina
           image: {{ .Values.image.initRepository }}:{{ .Values.image.tag }}
