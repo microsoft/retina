@@ -2,7 +2,6 @@ name: Release Retina Charts
 
 on:
   push:
-    branches: [main]
     tags: ["v*"]
 
 permissions:
@@ -25,7 +24,7 @@ jobs:
 
       - uses: azure/setup-helm@v4.2.0
         id: install
-      
+
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3.5.0
 
@@ -33,7 +32,7 @@ jobs:
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u $ --password-stdin
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
-      
+
       - name: Build, Push and Sign chart
         id: build_chart
         shell: bash
@@ -45,4 +44,3 @@ jobs:
           helm push retina-$TAG.tgz oci://ghcr.io/${{ github.repository }}/charts >> helm_push_result.txt 2>&1
           cat helm_push_result.txt
           cosign sign --yes ghcr.io/${{ github.repository }}/charts/retina@$(tail -n 1 helm_push_result.txt | awk '{ print $2 }')
-
