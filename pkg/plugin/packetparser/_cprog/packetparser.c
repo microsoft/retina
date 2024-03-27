@@ -93,56 +93,50 @@ static int parse_tcp_ts(struct tcphdr *tcph, void *data_end, __u32 *tsval, __u32
 	// Loop through the options field to find the TSval and TSecr values.
 	// MAX_TCP_TS_OPTIONS_LEN is used to prevent infinite loops and the fact that the timestamp option is at most 10 bytes long.
 #pragma unroll
-    for (i = 0; i < MAX_TCP_TS_OPTIONS_LEN; i++) {
+	for (i = 0; i < MAX_TCP_TS_OPTIONS_LEN; i++) {
 		// Verify that adding 1 to the current pointer will not go past the end of the packet.
 		if (tcp_options_cur_ptr + 1 > tcp_opt_end_ptr || tcp_options_cur_ptr + 1 > data_end) {
 			return -1;
 		}
-        // Dereference the pointer to get the option kind.
-        opt_kind = *tcp_options_cur_ptr;
-
-        // switch case to check the option kind.
-        switch (opt_kind) {
-            case 0:
-                // End of options list.
-                return -1;
-            case 1:
-                // No operation.
-				tcp_options_cur_ptr++;
-                continue;
-            default:
-				// Some kind of option.
-				
-				// Since each option is at least 2 bytes long, we need to check that adding 2 to the pointer will not go past the end of the packet.
-                if (tcp_options_cur_ptr + 2 > tcp_opt_end_ptr || tcp_options_cur_ptr + 2 > data_end) {
-                    return -1;
-                }
-
-                // Get the length of the option.
-                opt_len = *(tcp_options_cur_ptr + 1);
-
-				// Check that the option length is valid. It should be at least 2 bytes long.
-				if (opt_len < 2) {
+	        // Dereference the pointer to get the option kind.
+	        opt_kind = *tcp_options_cur_ptr;
+	        // switch case to check the option kind.
+	        switch (opt_kind) {
+	            case 0:
+	                // End of options list.
+	                return -1;
+	            case 1:
+	                // No operation.
+			tcp_options_cur_ptr++;
+	                continue;
+	            default:
+			// Some kind of option.
+			// Since each option is at least 2 bytes long, we need to check that adding 2 to the pointer will not go past the end of the packet.
+	                if (tcp_options_cur_ptr + 2 > tcp_opt_end_ptr || tcp_options_cur_ptr + 2 > data_end) {
+	                    return -1;
+	                }
+	                // Get the length of the option.
+	                opt_len = *(tcp_options_cur_ptr + 1);
+			// Check that the option length is valid. It should be at least 2 bytes long.
+			if (opt_len < 2) {
+				return -1;
+			}
+			// Check if the option is the timestamp option. The timestamp option has a kind of 8 and a length of 10 bytes.
+	                if (opt_kind == 8 && opt_len == 10) {
+				// Verify that adding the option's length to the pointer will not go past the end of the packet.
+				if (tcp_options_cur_ptr + 10 > tcp_opt_end_ptr || tcp_options_cur_ptr + 10 > data_end) {
 					return -1;
 				}
-
-				// Check if the option is the timestamp option. The timestamp option has a kind of 8 and a length of 10 bytes.
-                if (opt_kind == 8 && opt_len == 10) {
-					// Verify that adding the option's length to the pointer will not go past the end of the packet.
-					if (tcp_options_cur_ptr + 10 > tcp_opt_end_ptr || tcp_options_cur_ptr + 10 > data_end) {
-						return -1;
-					}
-					// Found the TSval and TSecr values. Store them in the tsval and tsecr pointers.
-					*tsval = bpf_ntohl(*(__u32 *)(tcp_options_cur_ptr + 2));
-					*tsecr = bpf_ntohl(*(__u32 *)(tcp_options_cur_ptr + 6));
-
-					return 0;
-				}
-
-				// Move the pointer to the next option.
-				tcp_options_cur_ptr += opt_len;
-        }
-    }
+				// Found the TSval and TSecr values. Store them in the tsval and tsecr pointers.
+				*tsval = bpf_ntohl(*(__u32 *)(tcp_options_cur_ptr + 2));
+				*tsecr = bpf_ntohl(*(__u32 *)(tcp_options_cur_ptr + 6));
+	
+				return 0;
+			}
+			// Move the pointer to the next option.
+			tcp_options_cur_ptr += opt_len;
+	        }
+    	}
 	return -1;
 }
 
