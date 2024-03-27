@@ -107,7 +107,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -167,11 +167,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (cluster) (rate(networkobservability_forward_bytes[$__rate_interval]))",
+          "expr": "sum by (cluster) (rate(networkobservability_forward_bytes{instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]))",
           "format": "table",
           "instant": true,
           "legendFormat": "__auto",
@@ -201,7 +201,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -276,10 +276,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum by (cluster) (rate(networkobservability_forward_bytes[$__rate_interval]))",
+          "expr": "sum by (cluster) (rate(networkobservability_forward_bytes{instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -291,7 +291,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -351,11 +351,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (cluster) (rate(networkobservability_drop_bytes[$__rate_interval]))",
+          "expr": "sum by (cluster) (rate(networkobservability_drop_bytes{instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]))",
           "format": "table",
           "instant": true,
           "legendFormat": "__auto",
@@ -385,7 +385,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "description": "",
       "fieldConfig": {
@@ -460,10 +460,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum by (cluster) (rate(networkobservability_drop_bytes[$__rate_interval]))",
+          "expr": "sum by (cluster) (rate(networkobservability_drop_bytes{instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -475,7 +475,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -549,10 +549,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum by (cluster) (rate(networkobservability_drop_count[$__rate_interval]))",
+          "expr": "sum by (cluster) (rate(networkobservability_drop_count{instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -577,7 +577,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -624,10 +624,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_forward_bytes{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_forward_bytes{direction=\"egress\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]))",
           "legendFormat": "Max Egress Bytes",
           "range": true,
           "refId": "A"
@@ -639,7 +639,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -686,11 +686,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum(rate(networkobservability_forward_bytes{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_forward_bytes{direction=\"egress\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]))",
           "format": "time_series",
           "instant": false,
           "legendFormat": "Min Egress Bytes",
@@ -704,7 +704,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -750,10 +750,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_forward_count{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_forward_count{direction=\"egress\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]))",
           "legendFormat": "Max Egress Packets",
           "range": true,
           "refId": "A"
@@ -765,7 +765,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -811,10 +811,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_forward_count{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_forward_count{direction=\"egress\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]))",
           "legendFormat": "Min Egress Packets",
           "range": true,
           "refId": "A"
@@ -826,7 +826,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -873,10 +873,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_forward_bytes{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_forward_bytes{direction=\"ingress\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]))",
           "legendFormat": "Max Ingress Bytes",
           "range": true,
           "refId": "A"
@@ -888,7 +888,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -935,10 +935,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_forward_bytes{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_forward_bytes{direction=\"ingress\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]))",
           "legendFormat": "Min Ingress Bytes",
           "range": true,
           "refId": "A"
@@ -950,7 +950,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -996,10 +996,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_forward_count{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_forward_count{direction=\"ingress\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]))",
           "legendFormat": "Max Ingress Packets",
           "range": true,
           "refId": "A"
@@ -1011,7 +1011,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1057,10 +1057,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_forward_count{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_forward_count{direction=\"ingress\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]))",
           "legendFormat": "Min Ingress Packets",
           "range": true,
           "refId": "A"
@@ -1072,7 +1072,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1147,10 +1147,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_forward_bytes{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_forward_bytes{direction=\"egress\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]))",
           "legendFormat": "Egress Bytes",
           "range": true,
           "refId": "A"
@@ -1162,7 +1162,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1237,10 +1237,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_forward_count{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_forward_count{direction=\"egress\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]))",
           "legendFormat": "Egress Packets",
           "range": true,
           "refId": "A"
@@ -1252,7 +1252,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1327,10 +1327,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_forward_bytes{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_forward_bytes{direction=\"ingress\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]))",
           "legendFormat": "Ingress Bytes",
           "range": true,
           "refId": "A"
@@ -1342,7 +1342,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1417,10 +1417,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_forward_count{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_forward_count{direction=\"ingress\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]))",
           "legendFormat": "Ingress Packets",
           "range": true,
           "refId": "A"
@@ -1445,7 +1445,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1520,10 +1520,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_drop_count{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_drop_count{direction=\"egress\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]))",
           "legendFormat": "Dropped Packets (Egress)",
           "range": true,
           "refId": "A"
@@ -1535,7 +1535,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1610,10 +1610,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_drop_count{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_drop_count{direction=\"ingress\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]))",
           "legendFormat": "Dropped Packets (Ingress)",
           "range": true,
           "refId": "A"
@@ -1625,7 +1625,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "description": "",
       "fieldConfig": {
@@ -1701,10 +1701,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_drop_count{direction=\"unknown\", instance=~\"$Nodes\", cluster=\"$cluster\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_drop_count{direction=\"unknown\", instance=~\"($Nodes):[0-9]+\", cluster=\"$cluster\"}[$__rate_interval]))",
           "legendFormat": "Dropped Packets (Unknown)",
           "range": true,
           "refId": "A"
@@ -1716,7 +1716,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "description": "Linux only. Values:\n- iptable_rule_drop: packet dropped in iptables, e.g., because of a NetworkPolicy if using --network-policy=azure\n- iptable_nat_drop: packet dropped in iptables during NAT (Network Address Translation)\n- tcp_connect_basic: packet dropped by tcp connect\n- tcp_accept_basic: packet dropped by tcp accept\n- tcp_close_basic: packet dropped by tcp close\n- conntrack_add_drop: packet dropped while conntrack (connection tracking) was adding the connection",
       "fieldConfig": {
@@ -1791,10 +1791,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum by (reason) (rate(networkobservability_drop_bytes{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0",
+          "expr": "sum by (reason) (rate(networkobservability_drop_bytes{cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval])) > 0",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1806,7 +1806,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "description": "Values:\n- Linux:\n  - iptable_rule_drop: packet dropped in iptables, e.g., because of a NetworkPolicy if using --network-policy=azure\n  - iptable_nat_drop: packet dropped in iptables during NAT (Network Address Translation)\n  - tcp_connect_basic: packet dropped by tcp connect\n  - tcp_accept_basic: packet dropped by tcp accept\n  - tcp_close_basic: packet dropped by tcp close\n  - conntrack_add_drop: packet dropped while conntrack (connection tracking) was adding the connection\n  - rx_dropped: an interface dropped a received packet\n  - tx_dropped: an interface dropped a transmitted packet\n- Windows:\n  - aclrule: dropped by an ACL rule in VFP, e.g., because of a NetworkPolicy\n  - endpoint: dropped by an HNS Pod Endpoint ",
       "fieldConfig": {
@@ -1881,10 +1881,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum by (reason) (rate(networkobservability_drop_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0\r\nor\r\nsum by (reason) (\r\n  label_replace(\r\n    rate(networkobservability_interface_stats{statistic_name=\"rx_dropped\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]),\r\n    \"reason\",\r\n    \"$1\",\r\n    \"statistic_name\",\r\n    \"(.*)\"\r\n  )\r\n)\r\nor # cannot combine these interface_stats expressions into one using regex, since regex would capture anything with rx_dropped or tx_dropped in it\r\nsum by (reason) (\r\n  label_replace(\r\n    rate(networkobservability_interface_stats{statistic_name=\"tx_dropped\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]),\r\n    \"reason\",\r\n    \"$1\",\r\n    \"statistic_name\",\r\n    \"(.*)\"\r\n  )\r\n)",
+          "expr": "sum by (reason) (rate(networkobservability_drop_count{cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval])) > 0\r\nor\r\nsum by (reason) (\r\n  label_replace(\r\n    rate(networkobservability_interface_stats{statistic_name=\"rx_dropped\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]),\r\n    \"reason\",\r\n    \"$1\",\r\n    \"statistic_name\",\r\n    \"(.*)\"\r\n  )\r\n)\r\nor # cannot combine these interface_stats expressions into one using regex, since regex would capture anything with rx_dropped or tx_dropped in it\r\nsum by (reason) (\r\n  label_replace(\r\n    rate(networkobservability_interface_stats{statistic_name=\"tx_dropped\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]),\r\n    \"reason\",\r\n    \"$1\",\r\n    \"statistic_name\",\r\n    \"(.*)\"\r\n  )\r\n)",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1896,7 +1896,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "description": "",
       "fieldConfig": {
@@ -1975,10 +1975,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum by(instance) (rate(networkobservability_drop_bytes{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0",
+          "expr": "sum by(instance) (rate(networkobservability_drop_bytes{cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval])) > 0",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1990,7 +1990,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -2068,10 +2068,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum by(instance) (rate(networkobservability_drop_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0",
+          "expr": "sum by(instance) (rate(networkobservability_drop_count{cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval])) > 0",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -2093,7 +2093,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "",
           "fieldConfig": {
@@ -2167,10 +2167,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "${datasource}"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "sum by(state) (networkobservability_tcp_state{cluster=\"$cluster\", instance=~\"$Nodes\"})",
+              "expr": "sum by(state) (networkobservability_tcp_state{cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"})",
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
@@ -2182,7 +2182,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "",
           "fieldConfig": {
@@ -2256,10 +2256,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "${datasource}"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "sum by(address) (networkobservability_tcp_connection_remote{cluster=\"$cluster\", instance=~\"$Nodes\", address!~\"127.0.0.1|0.0.0.0\"})",
+              "expr": "sum by(address) (networkobservability_tcp_connection_remote{cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\", address!~\"127.0.0.1|0.0.0.0\"})",
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
@@ -2271,7 +2271,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "",
           "fieldConfig": {
@@ -2345,10 +2345,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "${datasource}"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "sum(rate(networkobservability_tcp_connection_stats{statistic_name=\"tcptimeouts\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+              "expr": "sum(rate(networkobservability_tcp_connection_stats{statistic_name=\"tcptimeouts\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]))",
               "legendFormat": "TCP Timeouts",
               "range": true,
               "refId": "A"
@@ -2360,7 +2360,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "",
           "fieldConfig": {
@@ -2434,10 +2434,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "${datasource}"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "sum(rate(networkobservability_tcp_connection_stats{statistic_name=\"resetcount\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+              "expr": "sum(rate(networkobservability_tcp_connection_stats{statistic_name=\"resetcount\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]))",
               "legendFormat": "TCP Resets",
               "range": true,
               "refId": "A"
@@ -2449,7 +2449,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "",
           "fieldConfig": {
@@ -2523,10 +2523,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "${datasource}"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "sum(rate(networkobservability_tcp_connection_stats{statistic_name=\"tcptsreorder\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+              "expr": "sum(rate(networkobservability_tcp_connection_stats{statistic_name=\"tcptsreorder\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]))",
               "legendFormat": "TCP Reorders",
               "range": true,
               "refId": "A"
@@ -2538,7 +2538,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "Windows only",
           "fieldConfig": {
@@ -2613,10 +2613,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "${datasource}"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "sum(rate(networkobservability_tcp_flag_counters{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+              "expr": "sum(rate(networkobservability_tcp_flag_counters{cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]))",
               "legendFormat": "TCP packets",
               "range": true,
               "refId": "A"
@@ -2628,7 +2628,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "Windows only",
           "fieldConfig": {
@@ -2703,10 +2703,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "${datasource}"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "sum(rate(networkobservability_tcp_flag_counters{flag=\"rst\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+              "expr": "sum(rate(networkobservability_tcp_flag_counters{flag=\"rst\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]))",
               "legendFormat": "TCP Reset Packets",
               "range": true,
               "refId": "A"
@@ -2718,7 +2718,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "Windows only",
           "fieldConfig": {
@@ -2793,10 +2793,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "${datasource}"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "sum(rate(networkobservability_tcp_flag_counters{flag=\"synack\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+              "expr": "sum(rate(networkobservability_tcp_flag_counters{flag=\"synack\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]))",
               "legendFormat": "TCP SYN-ACK packets",
               "range": true,
               "refId": "A"
@@ -2808,7 +2808,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "",
           "fieldConfig": {
@@ -2882,10 +2882,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "${datasource}"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "sum(networkobservability_udp_connection_stats{statistic_name=\"active\", cluster=\"$cluster\", instance=~\"$Nodes\"})",
+              "expr": "sum(networkobservability_udp_connection_stats{statistic_name=\"active\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"})",
               "legendFormat": "Total UDP Connections",
               "range": true,
               "refId": "A"
@@ -2911,7 +2911,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "Linux only",
           "fieldConfig": {
@@ -2990,10 +2990,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "${datasource}"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "sum by (interface_name) (rate(networkobservability_interface_stats{statistic_name=\"rx_packets\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+              "expr": "sum by (interface_name) (rate(networkobservability_interface_stats{statistic_name=\"rx_packets\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]))",
               "legendFormat": "{{interface_name}}",
               "range": true,
               "refId": "A"
@@ -3005,7 +3005,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "Linux only",
           "fieldConfig": {
@@ -3084,10 +3084,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "${datasource}"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "sum by (interface_name) (rate(networkobservability_interface_stats{statistic_name=\"tx_packets\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+              "expr": "sum by (interface_name) (rate(networkobservability_interface_stats{statistic_name=\"tx_packets\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval]))",
               "legendFormat": "{{interface_name}}",
               "range": true,
               "refId": "A"
@@ -3099,7 +3099,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "Linux only",
           "fieldConfig": {
@@ -3177,10 +3177,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "${datasource}"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "sum by (instance) (rate(networkobservability_interface_stats{statistic_name=~\"rx[0-9]+_cache_full\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0",
+              "expr": "sum by (instance) (rate(networkobservability_interface_stats{statistic_name=~\"rx[0-9]+_cache_full\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval])) > 0",
               "legendFormat": "{{instance}}",
               "range": true,
               "refId": "A"
@@ -3192,7 +3192,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "Linux only",
           "fieldConfig": {
@@ -3270,10 +3270,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "${datasource}"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "sum by (instance) (rate(networkobservability_interface_stats{statistic_name=~\"tx[0-9]+_nop\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0",
+              "expr": "sum by (instance) (rate(networkobservability_interface_stats{statistic_name=~\"tx[0-9]+_nop\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval])) > 0",
               "hide": false,
               "legendFormat": "{{instance}}",
               "range": true,
@@ -3286,7 +3286,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "Linux only",
           "fieldConfig": {
@@ -3365,10 +3365,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "${datasource}"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "sum by (instance) (rate(networkobservability_interface_stats{statistic_name=\"rx_dropped\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0",
+              "expr": "sum by (instance) (rate(networkobservability_interface_stats{statistic_name=\"rx_dropped\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval])) > 0",
               "legendFormat": "{{instance}}",
               "range": true,
               "refId": "A"
@@ -3380,7 +3380,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "Linux only",
           "fieldConfig": {
@@ -3459,10 +3459,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "${datasource}"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "sum by (instance) (rate(networkobservability_interface_stats{statistic_name=\"tx_dropped\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0",
+              "expr": "sum by (instance) (rate(networkobservability_interface_stats{statistic_name=\"tx_dropped\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval])) > 0",
               "legendFormat": "{{instance}}",
               "range": true,
               "refId": "A"
@@ -3474,7 +3474,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "Linux only",
           "fieldConfig": {
@@ -3553,10 +3553,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "${datasource}"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "sum by (instance) (rate(networkobservability_interface_stats{statistic_name=\"rx_comp_full\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0",
+              "expr": "sum by (instance) (rate(networkobservability_interface_stats{statistic_name=\"rx_comp_full\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval])) > 0",
               "legendFormat": "{{instance}}",
               "range": true,
               "refId": "A"
@@ -3568,7 +3568,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "Linux only",
           "fieldConfig": {
@@ -3647,10 +3647,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "${datasource}"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "sum by (instance) (rate(networkobservability_interface_stats{statistic_name=\"tx_send_full\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0",
+              "expr": "sum by (instance) (rate(networkobservability_interface_stats{statistic_name=\"tx_send_full\", cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval])) > 0",
               "legendFormat": "{{instance}}",
               "range": true,
               "refId": "A"
@@ -3679,7 +3679,7 @@
         "includeAll": false,
         "label": "Data Source",
         "multi": false,
-        "name": "datasource",
+        "name": "DS_PROMETHEUS",
         "options": [],
         "query": "prometheus",
         "queryValue": "",
@@ -3693,7 +3693,7 @@
         "current": {},
         "datasource": {
           "type": "prometheus",
-          "uid": "${datasource}"
+          "uid": "${DS_PROMETHEUS}"
         },
         "definition": "label_values(kube_node_info, cluster)",
         "hide": 0,
@@ -3717,9 +3717,9 @@
         "current": {},
         "datasource": {
           "type": "prometheus",
-          "uid": "${datasource}"
+          "uid": "${DS_PROMETHEUS}"
         },
-        "definition": "label_values(kube_node_info{cluster=\"$cluster\"},node)",
+        "definition": "label_values(kube_node_info{cluster=\"$cluster\"},internal_ip)",
         "hide": 0,
         "includeAll": true,
         "label": "Nodes",
@@ -3727,7 +3727,7 @@
         "name": "Nodes",
         "options": [],
         "query": {
-          "query": "label_values(kube_node_info{cluster=\"$cluster\"},node)",
+          "query": "label_values(kube_node_info{cluster=\"$cluster\"},internal_ip)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
