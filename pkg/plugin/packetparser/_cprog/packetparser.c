@@ -63,6 +63,7 @@ const struct packet *unused __attribute__((unused));
  * - https://github.com/xdp-project/bpf-examples
  * - https://www.ietf.org/rfc/rfc9293.html
  * - https://www.rfc-editor.org/rfc/pdfrfc/rfc7323.txt.pdf
+ * May explore using bpf_loop() in the future (kernel 5.17+)
 */
 static int parse_tcp_ts(struct tcphdr *tcph, void *data_end, __u32 *tsval, __u32 *tsecr) {
 	// Get the length of the TCP header.
@@ -111,7 +112,7 @@ static int parse_tcp_ts(struct tcphdr *tcph, void *data_end, __u32 *tsval, __u32
                 continue;
             default:
 				// Some kind of option.
-
+				
 				// Since each option is at least 2 bytes long, we need to check that adding 2 to the pointer will not go past the end of the packet.
                 if (tcp_options_cur_ptr + 2 > tcp_opt_end_ptr || tcp_options_cur_ptr + 2 > data_end) {
                     return -1;
