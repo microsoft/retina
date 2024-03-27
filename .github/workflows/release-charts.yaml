@@ -22,15 +22,22 @@ jobs:
 
       - uses: azure/setup-helm@v4.1.0
         id: install
+      
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.4.0
 
       - name: Log in to registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u $ --password-stdin
+      
+      - name: Install helm-sigstore plugin
+        run: helm plugin install https://github.com/sigstore/helm-sigstore
 
-      - name: Build/Push Chart
+      - name: Build, Sign and Push Chart
         shell: bash
         run: |
           set -euo pipefail
           export TAG=$(make version)
           echo $TAG
           helm package ./deploy/manifests/controller/helm/retina --version $TAG
+          cosign --sign-blob --yes 
           helm push retina-$TAG.tgz oci://ghcr.io/${{ github.repository }}/charts
