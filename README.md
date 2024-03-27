@@ -41,9 +41,9 @@ Prerequisites: Go, Helm
 
 1. Clone the repo, then install Retina on your Kubernetes cluster
 
-    ```bash
-    make helm-install
-    ```
+   ```bash
+   make helm-install
+   ```
 
 2. Follow steps in [Using Prometheus and Grafana](https://retina.sh/docs/installation/prometheus-unmanaged) to set up metrics collection and visualization.
 
@@ -55,7 +55,7 @@ Currently, Retina CLI only supports Linux.
 
 - Option 1: Download from Release
 
-  Download `kubectl-retina` from the latest [Retina release](https://github.com/microsoft/retina/releases).
+  Download the correct `kubectl-retina` package for your platform from the latest [Retina release](https://github.com/microsoft/retina/releases).
   Feel free to move the binary to `/usr/local/bin/`, or add it to your `PATH` otherwise.
 
 - Option 2: Build from source
@@ -63,13 +63,14 @@ Currently, Retina CLI only supports Linux.
   Requirements:
 
   - go 1.21 or newer
-  - GNU make
 
   Clone the Retina repo and execute:
 
   ```shell
-  make install-kubectl-retina
+  go build -o bin/kubectl-retina cli/main.go
   ```
+
+  and move bin/kubectl-retina in to your $PATH.
 
 Execute Retina:
 
@@ -85,15 +86,15 @@ Prerequisites: Go, Helm
 
 1. Clone the repo, then install Retina with Capture operator support on your Kubernetes cluster
 
-    ```bash
-    make helm-install-with-operator
-    ```
+   ```bash
+   make helm-install-with-operator
+   ```
 
 2. Follow steps in [Capture CRD](https://retina.sh/docs/captures/#option-2-capture-crd-custom-resource-definition) for documentation of the CRD and examples for setting up Captures.
 
 ## Contributing
 
-This project welcomes contributions and suggestions.  Most contributions require you to agree to a
+This project welcomes contributions and suggestions. Most contributions require you to agree to a
 Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
 the rights to use your contribution. For details, visit <https://cla.opensource.microsoft.com>.
 
@@ -130,7 +131,7 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 
 For bugs or feature requests, open an [issue](https://github.com/microsoft/retina/issues).  
 For security or vulnerability concerns, see [SECURITY.md](SECURITY.md).  
-For other communication, contact the maintainers at <retina@microsoft.com>  
+For other communication, contact the maintainers at <retina@microsoft.com>
 
 [goreport-img]: https://goreportcard.com/badge/github.com/microsoft/retina
 [goreport]: https://goreportcard.com/report/github.com/microsoft/retina
