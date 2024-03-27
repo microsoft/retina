@@ -137,7 +137,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "sum (rate(networkobservability_dns_request_count{cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval])) by (query_type) > 0",
@@ -152,7 +152,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "description": "",
       "fieldConfig": {
@@ -227,7 +227,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "sum (rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval])) by (query_type) > 0",
@@ -242,7 +242,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "description": "",
       "fieldConfig": {
@@ -317,7 +317,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "(\r\n    1 - (\r\n        sum (networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}) by (query_type) / sum (networkobservability_dns_request_count{cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}) by (query_type)\r\n    )\r\n) * 100 * (\r\n    (\r\n        sum (rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval])) by (query_type)\r\n    ) > bool 0\r\n) > 0",
@@ -332,7 +332,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "description": "",
       "fieldConfig": {
@@ -411,7 +411,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "sum(rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\", return_code=\"NoError\"}[$__rate_interval])) by (num_response) > 0",
@@ -426,7 +426,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "description": "",
       "fieldConfig": {
@@ -501,7 +501,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "label_replace(\r\n    label_replace(\r\n        sum by (return_code, query_type) (\r\n            rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\", return_code!=\"NoError\"}[$__rate_interval])\r\n        ) > 0, \"return_code\", \"non-existent domain\", \"return_code\", \"nxdomain\"\r\n    ), \"return_code\", \"server failure\", \"return_code\", \"servfail\"\r\n)",
@@ -516,7 +516,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "description": "",
       "fieldConfig": {
@@ -596,7 +596,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "round(topk(10, sum (60*rate(networkobservability_dns_request_count{cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval])) by (query, query_type)), 1)",
@@ -612,7 +612,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "description": "",
       "fieldConfig": {
@@ -691,7 +691,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "round(topk(10, sum (60*rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"($Nodes):[0-9]+\"}[$__rate_interval])) by (query, query_type)), 1)",
@@ -707,7 +707,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "description": "",
       "fieldConfig": {
@@ -771,7 +771,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -846,7 +846,7 @@
         "includeAll": false,
         "label": "Data Source",
         "multi": false,
-        "name": "datasource",
+        "name": "DS_PROMETHEUS",
         "options": [],
         "query": "prometheus",
         "queryValue": "",
@@ -859,7 +859,7 @@
         "current": {},
         "datasource": {
           "type": "prometheus",
-          "uid": "${datasource}"
+          "uid": "${DS_PROMETHEUS}"
         },
         "definition": "label_values(kube_node_info, cluster)",
         "hide": 0,
@@ -882,7 +882,7 @@
         "current": {},
         "datasource": {
           "type": "prometheus",
-          "uid": "${datasource}"
+          "uid": "${DS_PROMETHEUS}"
         },
         "definition": "label_values(kube_node_info{cluster=\"$cluster\"},internal_ip)",
         "hide": 0,
