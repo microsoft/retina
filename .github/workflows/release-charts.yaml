@@ -2,7 +2,6 @@ name: Release Retina Charts
 
 on:
   push:
-    branches: [main]
     tags: ["v*"]
 
 permissions:
@@ -30,4 +29,4 @@ jobs:
           set -euo pipefail
           export TAG=$(make version)
           helm package ./deploy/manifests/controller/helm/retina --version $TAG
-          helm push retina-*.tgz oci://ghcr.io/${{ github.repository }}/charts
+          helm push retina-$TAG.tgz oci://ghcr.io/${{ github.repository }}/charts
