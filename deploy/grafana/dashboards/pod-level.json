@@ -1085,7 +1085,7 @@
         "definition": "query_result(networkobservability_adv_forward_count)",
         "hide": 1,
         "includeAll": true,
-        "label": "Pod Name ",
+        "label": "Pod Name",
         "multi": false,
         "name": "pod",
         "options": [],
@@ -1094,7 +1094,7 @@
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
-        "regex": "/.*_podname=\"([^\"]*).*/",
+        "regex": "/.*podname=\"([^\"]*).*/",
         "skipUrlSync": false,
         "sort": 0,
         "type": "query"
