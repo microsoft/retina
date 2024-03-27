@@ -79,11 +79,11 @@ static int parse_tcp_ts(struct tcphdr *tcph, void *data_end, __u32 *tsval, __u32
 	}
 
 	// Get the pointer to the end of the TCP header options field.
-	void *tcp_opt_end_ptr = (void *)tcph + tcp_header_len;
+	__u8 *tcp_opt_end_ptr = (__u8 *)tcph + tcp_header_len;
 
 	// Check that adding 1 to the start of the TCP header will not go past the end of the packet.
 	// We need this to get to the start of the options field.
-	if (tcph + 1 > data_end) {
+	if ((__u8 *)tcph + 1 > (__u8 *)data_end) {
 		return -1;
 	}
 
@@ -95,7 +95,7 @@ static int parse_tcp_ts(struct tcphdr *tcph, void *data_end, __u32 *tsval, __u32
 #pragma unroll
 	for (i = 0; i < MAX_TCP_TS_OPTIONS_LEN; i++) {
 		// Verify that adding 1 to the current pointer will not go past the end of the packet.
-		if (tcp_options_cur_ptr + 1 > tcp_opt_end_ptr || tcp_options_cur_ptr + 1 > data_end) {
+		if (tcp_options_cur_ptr + 1 > (__u8 *)tcp_opt_end_ptr || tcp_options_cur_ptr + 1 > (__u8 *)data_end) {
 			return -1;
 		}
 	        // Dereference the pointer to get the option kind.
@@ -112,7 +112,7 @@ static int parse_tcp_ts(struct tcphdr *tcph, void *data_end, __u32 *tsval, __u32
 	            default:
 			// Some kind of option.
 			// Since each option is at least 2 bytes long, we need to check that adding 2 to the pointer will not go past the end of the packet.
-	                if (tcp_options_cur_ptr + 2 > tcp_opt_end_ptr || tcp_options_cur_ptr + 2 > data_end) {
+	                if (tcp_options_cur_ptr + 2 > tcp_opt_end_ptr || tcp_options_cur_ptr + 2 > (__u8 *)data_end) {
 	                    return -1;
 	                }
 	                // Get the length of the option.
@@ -124,7 +124,7 @@ static int parse_tcp_ts(struct tcphdr *tcph, void *data_end, __u32 *tsval, __u32
 			// Check if the option is the timestamp option. The timestamp option has a kind of 8 and a length of 10 bytes.
 	                if (opt_kind == 8 && opt_len == 10) {
 				// Verify that adding the option's length to the pointer will not go past the end of the packet.
-				if (tcp_options_cur_ptr + 10 > tcp_opt_end_ptr || tcp_options_cur_ptr + 10 > data_end) {
+				if (tcp_options_cur_ptr + 10 > tcp_opt_end_ptr || tcp_options_cur_ptr + 10 > (__u8 *)data_end) {
 					return -1;
 				}
 				// Found the TSval and TSecr values. Store them in the tsval and tsecr pointers.
