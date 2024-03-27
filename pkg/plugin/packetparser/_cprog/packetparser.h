@@ -2,7 +2,7 @@
 // Licensed under the MIT license.
 
 #define ETH_P_IP	0x0800
-#define MAX_TCP_OPTIONS 10
+#define MAX_TCP_TS_OPTIONS_LEN 10
 
 typedef enum
 {

@@ -11,6 +11,7 @@
 char __license[] SEC("license") = "Dual MIT/GPL";
 
 
+
 struct tcpmetadata {
 	__u32 seq; // TCP sequence number
 	__u32 ack_num; // TCP ack number
@@ -53,81 +54,94 @@ const struct packet *unused __attribute__((unused));
  * the TSval and TSecr values will be stored at tsval and tsecr (in network
  * byte order).
  * Returns 0 if sucessful and -1 on failure
- */
-static int parse_tcp_ts(struct tcphdr *tcph, void *data_end, __u32 *tsval, __u32 *tsecr){
-	// Check if the options field is present
-	// either the data_end is before the start of the options field or the options field is not present
-	// The options field is present if the doff field is greater than 5.
-	if ((void *)tcph + 1 > data_end || tcph->doff <= 5) {
+ *
+   +-------+-------+---------------------+---------------------+
+   |Kind=8 |  10   | TS Value (TSval)    |TS Echo Reply (TSecr)|
+   +-------+-------+---------------------+---------------------+
+	  1       1               4                      4
+ * Reference: 
+ * - https://github.com/xdp-project/bpf-examples
+ * - https://www.ietf.org/rfc/rfc9293.html
+ * - https://www.rfc-editor.org/rfc/pdfrfc/rfc7323.txt.pdf
+*/
+static int parse_tcp_ts(struct tcphdr *tcph, void *data_end, __u32 *tsval, __u32 *tsecr) {
+	// Get the length of the TCP header.
+	// The length is in 4-byte words, so we need to multiply it by 4 (bit shift left 2) to get the length in bytes.
+	__u8 tcp_header_len = tcph->doff << 2;
+	volatile __u8 opt_len;
+	__u8 opt_kind, i;
+
+	// Verify that the options field is present.
+	// If the header length is less than or equal to the default size of the TCP header, then there are no options.
+	if (tcp_header_len <= sizeof(struct tcphdr)) {
 		return -1;
 	}
 
-	// Get pointer to the start of the options fields in the TCP header
-	// In a TCP header, the options field starts immediately after the header. 
-	__u8 *opt_ptr = (__u8 *)(tcph + 1);
+	// Get the pointer to the end of the TCP header options field.
+	void *tcp_opt_end_ptr = (void *)tcph + tcp_header_len;
 
-	// Get pointer to where the options field ends
-	// derived from doff field in the TCP header
-	__u8 *opt_end = (__u8 *)tcph + tcph->doff * 4;
-
-	// Get the size of the options field
-	// The size of the options field is the difference between the opt_end and opt_ptr pointers
-	// The size of the options field should be less than or equal to 40 bytes
-	if (opt_end - opt_ptr > 40) {
+	// Check that adding 1 to the start of the TCP header will not go past the end of the packet.
+	// We need this to get to the start of the options field.
+	if (tcph + 1 > data_end) {
 		return -1;
 	}
 
-	// Iterate through the options field to find the TSval and TSecr values
-	// util we reach the end of the options field or the end of the packet
-	// or we looped through over the maximum number of options
-	while (opt_ptr + 1 <= (__u8 *)data_end || opt_ptr + 1 <= opt_end || opt_ptr + 1 <= (__u8 *)tcph + 40) {
-		// Check if the option is the end of the options field. The kind field should be 0
-		if (*opt_ptr == 0){
-			break;
-		}
+	// Get the pointer to the start of the options field.
+	__u8 *tcp_options_cur_ptr = (__u8 *)(tcph + 1);
 
-		// Check if the option is a NOP. The kind field should be 1
-		if (*opt_ptr == 1){
-			opt_ptr++;
-			continue;
-		}
-
-		// Else this is a valid option. Check if we would go beyond the end of the packet
-		// if we read the length field
-		if ((opt_ptr + 2 > (__u8 *)data_end) || (opt_ptr + 2 > opt_end)) {
+	// Loop through the options field to find the TSval and TSecr values.
+	// MAX_TCP_TS_OPTIONS_LEN is used to prevent infinite loops and the fact that the timestamp option is at most 10 bytes long.
+#pragma unroll
+    for (i = 0; i < MAX_TCP_TS_OPTIONS_LEN; i++) {
+		// Verify that adding 1 to the current pointer will not go past the end of the packet.
+		if (tcp_options_cur_ptr + 1 > tcp_opt_end_ptr || tcp_options_cur_ptr + 1 > data_end) {
 			return -1;
 		}
+        // Dereference the pointer to get the option kind.
+        opt_kind = *tcp_options_cur_ptr;
 
-		// Check if the option is the correct size. The minimum size of an option is 2 bytes
-		if (*(opt_ptr + 1) < 2){
-			return -1;
-		}
+        // switch case to check the option kind.
+        switch (opt_kind) {
+            case 0:
+                // End of options list.
+                return -1;
+            case 1:
+                // No operation.
+				tcp_options_cur_ptr++;
+                continue;
+            default:
+				// Some kind of option.
 
-		// Check if the option is the timestamp option. The kind field should be 8
-		if (*opt_ptr == 8){
-			// Add checks to ensure we don't read beyond the end of the packet
-			if ((opt_ptr + 10 > (__u8 *)data_end) || (opt_ptr + 10 > opt_end)) {
-				return -1;
-			}
+				// Since each option is at least 2 bytes long, we need to check that adding 2 to the pointer will not go past the end of the packet.
+                if (tcp_options_cur_ptr + 2 > tcp_opt_end_ptr || tcp_options_cur_ptr + 2 > data_end) {
+                    return -1;
+                }
 
-			// Check if the option is the correct size. The timestamp option is 10 bytes long
-			if (*(opt_ptr + 1) != 10){
-				return -1;
-			}
+                // Get the length of the option.
+                opt_len = *(tcp_options_cur_ptr + 1);
 
-			// Get the TSval and TSecr values, assiging them to the tsval and tsecr pointers
-			*tsval = bpf_ntohl(*(__u32 *)(opt_ptr + 2));
-			*tsecr = bpf_ntohl(*(__u32 *)(opt_ptr + 6));
+				// Check that the option length is valid. It should be at least 2 bytes long.
+				if (opt_len < 2) {
+					return -1;
+				}
 
-			return 0;
-		}
+				// Check if the option is the timestamp option. The timestamp option has a kind of 8 and a length of 10 bytes.
+                if (opt_kind == 8 && opt_len == 10) {
+					// Verify that adding the option's length to the pointer will not go past the end of the packet.
+					if (tcp_options_cur_ptr + 10 > tcp_opt_end_ptr || tcp_options_cur_ptr + 10 > data_end) {
+						return -1;
+					}
+					// Found the TSval and TSecr values. Store them in the tsval and tsecr pointers.
+					*tsval = bpf_ntohl(*(__u32 *)(tcp_options_cur_ptr + 2));
+					*tsecr = bpf_ntohl(*(__u32 *)(tcp_options_cur_ptr + 6));
 
-		// For all other options, the length field is the next byte after the kind field
-		// We need to add 1 to the pointer to get to the length field and then add the length
-		// to the pointer to get to the next option
-		opt_ptr += *(opt_ptr + 1);
-	}
+					return 0;
+				}
 
+				// Move the pointer to the next option.
+				tcp_options_cur_ptr += opt_len;
+        }
+    }
 	return -1;
 }
 
