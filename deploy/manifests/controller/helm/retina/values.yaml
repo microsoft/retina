@@ -113,3 +113,12 @@ resources:
   limits:
     memory: "300Mi"
     cpu: "500m"
+
+## @param nodeSelector [object] Node labels for pod assignment
+## Ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
+##
+nodeSelector: {}
+## @param tolerations [array] Tolerations for pod assignment
+## Ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+##
+tolerations: []
