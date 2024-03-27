@@ -4,6 +4,7 @@
 RMDIR := rm -rf
 
 ## Globals
+GIT_CURRENT_BRANCH_NAME	:= $(shell git rev-parse --abbrev-ref HEAD) 
 
 REPO_ROOT = $(shell git rev-parse --show-toplevel)
 ifndef TAG
@@ -13,7 +14,6 @@ OUTPUT_DIR = $(REPO_ROOT)/output
 BUILD_DIR = $(OUTPUT_DIR)/$(GOOS)_$(GOARCH)
 RETINA_BUILD_DIR = $(BUILD_DIR)/retina
 RETINA_DIR = $(REPO_ROOT)/controller
-KUBECTL_RETINA_BUILD_DIR = $(OUTPUT_DIR)/kubectl-retina
 OPERATOR_DIR=$(REPO_ROOT)/operator
 CAPTURE_WORKLOAD_DIR = $(REPO_ROOT)/captureworkload
 
@@ -63,15 +63,16 @@ help: ## Display this help
 
 ##@ Tools 
 
-TOOLS_DIR     = $(REPO_ROOT)/hack/tools
-TOOLS_BIN_DIR = $(TOOLS_DIR)/bin
-GOFUMPT       := $(TOOLS_BIN_DIR)/gofumpt
-GOLANGCI_LINT := $(TOOLS_BIN_DIR)/golangci-lint
-CONTROLLER_GEN := $(TOOLS_BIN_DIR)/controller-gen
-GINKGO 		  := $(TOOLS_BIN_DIR)/ginkgo
-MOCKGEN         := $(TOOLS_BIN_DIR)/mockgen
-ENVTEST         := $(TOOLS_BIN_DIR)/setup-envtest
-GIT_CURRENT_BRANCH_NAME := $(shell git rev-parse --abbrev-ref HEAD) 
+TOOLS_DIR		= $(REPO_ROOT)/hack/tools
+TOOLS_BIN_DIR	= $(TOOLS_DIR)/bin
+
+GOFUMPT			= $(TOOLS_BIN_DIR)/gofumpt
+GOLANGCI_LINT	= $(TOOLS_BIN_DIR)/golangci-lint
+GORELEASER		= $(TOOLS_BIN_DIR)/goreleaser
+CONTROLLER_GEN	= $(TOOLS_BIN_DIR)/controller-gen
+GINKGO			= $(TOOLS_BIN_DIR)/ginkgo
+MOCKGEN			= $(TOOLS_BIN_DIR)/mockgen
+ENVTEST			= $(TOOLS_BIN_DIR)/setup-envtest
 
 $(TOOLS_DIR)/go.mod:
 	cd $(TOOLS_DIR); go mod init && go mod tidy
@@ -88,6 +89,11 @@ golangci-lint: $(GOLANGCI_LINT) ## Build golangci-lint
 
 $(CONTROLLER_GEN): $(TOOLS_DIR)/go.mod
 	cd $(TOOLS_DIR); go mod download; go build -tags=tools -o bin/controller-gen sigs.k8s.io/controller-tools/cmd/controller-gen
+
+goreleaser: $(GORELEASER) ## Build goreleaser
+
+$(GORELEASER): $(TOOLS_DIR)/go.mod
+	cd $(TOOLS_DIR); go mod download; go build -tags=tools -o bin/goreleaser github.com/goreleaser/goreleaser
 
 controller-gen: $(CONTROLLER_GEN) ## Build controller-gen
 
@@ -140,22 +146,13 @@ clean: ## clean build artifacts
 
 ##@ Build Binaries
 
-retina: ## builds both retina and kapctl binaries
-	$(MAKE) retina-binary kubectl-retina
+retina: ## builds retina binary
+	$(MAKE) retina-binary 
 
 retina-binary: ## build the Retina binary
 	go generate ./...
 	export CGO_ENABLED=0
 	go build -v -o $(RETINA_BUILD_DIR)/retina$(EXE_EXT) -gcflags="-dwarflocationlists=true" -ldflags "-X main.version=$(TAG) -X main.applicationInsightsID=$(APP_INSIGHTS_ID)" $(RETINA_DIR)/main.go
-
-kubectl-retina-binary-%: ## build kubectl plugin locally.
-	export CGO_ENABLED=0 && \
-	export GOOS=$(shell echo $* |cut -f1 -d-) GOARCH=$(shell echo $* |cut -f2 -d-) && \
-	go build -v \
-		-o $(KUBECTL_RETINA_BUILD_DIR)/kubectl-retina-$${GOOS}-$${GOARCH} \
-		-gcflags="-dwarflocationlists=true" \
-		-ldflags "-X github.com/microsoft/retina/cli/cmd.Version=$(TAG)" \
-		github.com/microsoft/retina/cli
 
 retina-capture-workload: ## build the Retina capture workload
 	cd $(CAPTURE_WORKLOAD_DIR) && CGO_ENABLED=0 go build -v -o $(RETINA_BUILD_DIR)/captureworkload$(EXE_EXT) -gcflags="-dwarflocationlists=true"  -ldflags "-X main.version=$(TAG)"
@@ -299,18 +296,12 @@ manifest-operator-image: ## create a multiplatform manifest for the operator ima
 	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE):$(TAG))
 	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
 
-manifest-kubectl-retina-image: ## create a multiplatform manifest for the kubectl-retina image
-	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(KUBECTL_RETINA_IMAGE):$(TAG))
-	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
-
 manifest:
 	echo "Building for $(COMPONENT)"
 	if [ "$(COMPONENT)" = "retina" ]; then \
 		$(MAKE) manifest-retina-image; \
 	elif [ "$(COMPONENT)" = "operator" ]; then \
 		$(MAKE) manifest-operator-image; \
-	elif [ "$(COMPONENT)" = "kubectl-retina" ]; then \
-		$(MAKE) manifest-kubectl-retina-image; \
 	fi
 
 ##@ Tests
