@@ -1,7 +1,8 @@
-# This workflow is triggered by a manual trigger or when a check is requested on a PR.
+# Workflow to build images and run E2E tests
 name: Build images and run E2E tests. 
 
 on:
+  pull_request:
   merge_group:
     types: [checks_requested]
   workflow_dispatch:
@@ -154,6 +155,7 @@ jobs:
           IMAGE_REGISTRY=acnpublic.azurecr.io \
       
   e2e:
+    if: ${{ github.event_name == 'merge_group' }}
     name: Run E2E Tests
     runs-on: ubuntu-latest
     needs: [manifests]
