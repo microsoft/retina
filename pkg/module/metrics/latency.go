@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cilium/cilium/api/v1/flow"
 	v1 "github.com/cilium/cilium/api/v1/flow"
 	ttlcache "github.com/jellydator/ttlcache/v3"
 	api "github.com/microsoft/retina/crd/api/v1alpha1"
