@@ -34,7 +34,6 @@ helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
     --set os.windows=true \
     --set operator.enabled=true \
     --set operator.enableRetinaEndpoint=true \
-    --set operator.repository=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE) \
     --skip-crds \
     --set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\,packetparser\]"
 ```
@@ -54,7 +53,6 @@ helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
     --set os.windows=true \
     --set operator.enabled=true \
     --set operator.enableRetinaEndpoint=true \
-    --set operator.repository=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE) \
     --skip-crds \
     --set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\,packetparser\]" \
     --set enablePodLevel=true \
@@ -76,7 +74,6 @@ helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
     --set os.windows=true \
     --set operator.enabled=true \
     --set operator.enableRetinaEndpoint=true \
-    --set operator.repository=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE) \
     --skip-crds \
     --set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\,packetparser\]" \
     --set enablePodLevel=true \
