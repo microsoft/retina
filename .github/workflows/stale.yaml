@@ -18,13 +18,15 @@ jobs:
           ascending: true
           close-issue-message: "Issue closed due to inactivity."
           close-pr-message: "Pull request closed due to inactivity."
-          days-before-close: 7
-          days-before-stale: 7
+          days-before-issue-stale: -1 # don't automatically stale issues.
+          days-before-issue-close: 7 # manually staled issues may be closed after 7 days.
+          days-before-pr-close: 7
+          days-before-pr-stale: 30
           delete-branch: true
           stale-issue-label: "meta/waiting-for-author"
           stale-pr-labels: "meta/waiting-for-author"
           operations-per-run: 100
-          stale-issue-message: "This issue is stale because it has been open for 7 days with no activity. Remove stale label or comment or this will be closed in 7 days"
-          stale-pr-message: "This pull request is stale because it has been open for 7 days with no activity. Remove stale label or comment or this will be closed in 7 days"
+          stale-issue-message: "This issue will be closed in 7 days due to inactivity."
+          stale-pr-message: "This PR will be closed in 7 days due to inactivity."
       - name: Print outputs
         run: echo ${{ join(steps.stale.outputs.*, ',') }}
