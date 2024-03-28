@@ -40,25 +40,25 @@ jobs:
 
       - name: Build Images
         shell: bash
-        env:
-          IS_MERGE_GROUP : ${{ github.event_name == 'merge_group' }}
         run: |
           set -euo pipefail
-          if [ $IS_MERGE_GROUP == true ]; then
+          if [ "$IS_MERGE_GROUP" == "true" ]; then
             az acr login -n acnpublic
             echo "TAG=$(make version)" >> $GITHUB_ENV
             make retina-image \
-              IMAGE_NAMESPACE=${{ github.repository }} \
-              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
+              IMAGE_NAMESPACE=microsoft/retina \
+              PLATFORM=linux/arm64 \
               IMAGE_REGISTRY=acnpublic.azurecr.io \
               BUILDX_ACTION=--push
           else
             az acr login -n acnpublic
             echo "TAG=$(make version)" >> $GITHUB_ENV
             make retina-image \
-              IMAGE_NAMESPACE=${{ github.repository }} \
-              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
+              IMAGE_NAMESPACE=microsoft/retina \
+              PLATFORM=linux/arm64
           fi
+        env:
+          IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
 
 
   retina-win-images:
