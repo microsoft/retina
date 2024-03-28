@@ -58,7 +58,8 @@ spec:
           {{- end}}
           {{- end}}
           ports:
-          - containerPort: {{ .Values.retinaPort }}
+          - name: retina
+            containerPort: {{ .Values.retinaPort }}
           resources:
             limits:
               memory: {{ .Values.resources.limits.memory | quote }}
@@ -152,7 +153,8 @@ spec:
         - name: retinawin
           image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
           ports:
-            - containerPort: {{ .Values.retinaPort }}
+          - name: retina
+            containerPort: {{ .Values.retinaPort }}
           command:
             - powershell.exe
             - -command
