@@ -303,7 +303,7 @@ int BPF_KRETPROBE(nf_hook_slow_ret, int retVal)
 This function checks the return value of tcp_v4_connect and
  update the metrics map accordingly.
 
- tcp_v4_connect does not have any lenth attached to it.
+ tcp_v4_connect does not have any length attached to it.
 */
 
 SEC("kretprobe/tcp_v4_connect")
