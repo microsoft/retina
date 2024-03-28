@@ -343,7 +343,7 @@ coverage: # Code coverage.
 manifests: 
 	cd crd && make manifests && make generate
 
-HELM_IMAGE_TAG ?= v0.0.1
+HELM_IMAGE_TAG ?= v0.0.2
 
 # basic/node-level mode
 helm-install: manifests
