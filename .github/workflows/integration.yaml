@@ -42,20 +42,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          echo "TAG=$(make version)" >> $GITHUB_ENV
           if [ "$IS_MERGE_GROUP" == "true" ]; then
             az acr login -n acnpublic
-            echo "TAG=$(make version)" >> $GITHUB_ENV
             make retina-image \
               IMAGE_NAMESPACE=microsoft/retina \
-              PLATFORM=linux/arm64 \
+              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               IMAGE_REGISTRY=acnpublic.azurecr.io \
               BUILDX_ACTION=--push
           else
-            az acr login -n acnpublic
-            echo "TAG=$(make version)" >> $GITHUB_ENV
             make retina-image \
-              IMAGE_NAMESPACE=microsoft/retina \
-              PLATFORM=linux/arm64
+              IMAGE_NAMESPACE=${{ github.repository }} \
+              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
           fi
         env:
           IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
@@ -92,13 +90,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          az acr login -n acnpublic
           echo "TAG=$(make version)" >> $GITHUB_ENV
-          make retina-image-win \
-            IMAGE_NAMESPACE=${{ github.repository }} \
-            PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}  \
-            IMAGE_REGISTRY=acnpublic.azurecr.io \
-            BUILDX_ACTION=--push
+          if [ "$IS_MERGE_GROUP" == "true" ]; then
+            az acr login -n acnpublic
+            make retina-image-win \
+              IMAGE_NAMESPACE=microsoft/retina \
+              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
+              IMAGE_REGISTRY=acnpublic.azurecr.io \
+              BUILDX_ACTION=--push
+          else
+            make retina-image-win \
+              IMAGE_NAMESPACE=${{ github.repository }} \
+              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
+          fi
+        env:
+          IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
 
   operator-images:
     name: Build Operator Images
@@ -131,15 +137,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          az acr login -n acnpublic
           echo "TAG=$(make version)" >> $GITHUB_ENV
-          make retina-operator-image \
-            IMAGE_NAMESPACE=${{ github.repository }} \
-            PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}  \
-            IMAGE_REGISTRY=acnpublic.azurecr.io \
-            BUILDX_ACTION=--push
+          if [ "$IS_MERGE_GROUP" == "true" ]; then
+            az acr login -n acnpublic
+            make operator-image \
+              IMAGE_NAMESPACE=microsoft/retina \
+              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
+              IMAGE_REGISTRY=acnpublic.azurecr.io \
+              BUILDX_ACTION=--push
+          else
+            make operator-image \
+              IMAGE_NAMESPACE=${{ github.repository }} \
+              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
+          fi
+        env:
+          IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
 
   manifests:
+    if: ${{ github.event_name == 'merge_group' }}
     name: Generate Manifests
     runs-on: ubuntu-latest
     needs: [retina-images, retina-win-images, operator-images]
