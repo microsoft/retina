@@ -22,8 +22,6 @@ spec:
     spec:
       hostNetwork: true
       serviceAccountName: {{ .Values.serviceAccount.name }}
-      nodeSelector:
-        kubernetes.io/os: linux
       initContainers:
         - name: init-retina
           image: {{ .Values.image.initRepository }}:{{ .Values.image.tag }}
@@ -109,6 +107,14 @@ spec:
           path: {{ $hostPath }}
       {{ end }}
       {{- end }}
+      nodeSelector:
+        kubernetes.io/os: linux
+        {{- if .Values.nodeSelector }}
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+        {{- end }}
+      {{- if .Values.tolerations }}
+      tolerations: {{- toYaml .Values.tolerations | nindent 8 }}
+      {{- end }}
 {{- end }}
 ---
 {{- if .Values.os.windows}}
@@ -183,6 +189,12 @@ spec:
         {{- end }}
       nodeSelector:
         kubernetes.io/os: windows
+        {{- if .Values.nodeSelector }}
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+        {{- end }}
+      {{- if .Values.tolerations }}
+      tolerations: {{- toYaml .Values.tolerations | nindent 8 }}
+      {{- end }}
       volumes:
       {{- range $name, $mountPath := .Values.volumeMounts_win }}
         - name: {{ $name }}

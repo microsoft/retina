@@ -10,7 +10,7 @@ os:
 operator:
   enabled: false
   repository: ghcr.io/microsoft/retina/retina-operator
-  tag: "v0.0.1"
+  tag: "v0.0.2"
   installCRDs: true
   enableRetinaEndpoint: false
   capture:
@@ -22,7 +22,7 @@ image:
   initRepository: ghcr.io/microsoft/retina/retina-init
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "v0.0.1"
+  tag: "v0.0.2"
 
 enablePodLevel: false
 remoteContext: false
@@ -113,3 +113,12 @@ resources:
   limits:
     memory: "300Mi"
     cpu: "500m"
+
+## @param nodeSelector [object] Node labels for pod assignment
+## Ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
+##
+nodeSelector: {}
+## @param tolerations [array] Tolerations for pod assignment
+## Ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+##
+tolerations: []

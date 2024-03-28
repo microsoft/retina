@@ -11,8 +11,8 @@ WORKDIR /usr/src/retina
 # Copy the source
 COPY . .
 
-RUN go build -v -o /usr/bin/controller.exe -ldflags "-X main.version="$VERSION" -X "main.applicationInsightsID"="$APP_INSIGHTS_ID"" ./controller/
-RUN go build -v -o /usr/bin/captureworkload.exe ./captureworkload/
+RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /usr/bin/controller.exe -ldflags "-X main.version="$VERSION" -X "main.applicationInsightsID"="$APP_INSIGHTS_ID"" ./controller/
+RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /usr/bin/captureworkload.exe ./captureworkload/
 
 # Copy into final image
 FROM  mcr.microsoft.com/windows/servercore:ltsc2022

@@ -1,6 +1,6 @@
 # Contributing
 
-This project welcomes contributions and suggestions.  Most contributions require you to agree to a
+This project welcomes contributions and suggestions. Most contributions require you to agree to a
 Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
 the rights to use your contribution. For details, visit [https://cla.opensource.microsoft.com](https://cla.opensource.microsoft.com).
 
@@ -19,13 +19,13 @@ contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additio
 [Meeting Link](https://teams.microsoft.com/l/meetup-join/19%3ameeting_OGE5ZTljM2ItNmNmMC00ZmMzLThjMjktNmNjZGE3ODAyZDVj%40thread.v2/0?context=%7b%22Tid%22%3a%2272f988bf-86f1-41af-91ab-2d7cd011db47%22%2c%22Oid%22%3a%22e430e8c5-dd91-4c3c-88c2-6e258812501b%22%7d)
 
 ```shell
-Meeting ID: 212 979 978 795 
-Passcode: YjWUEA 
+Meeting ID: 212 979 978 795
+Passcode: YjWUEA
 ________________________________________
-Dial-in by phone 
-+1 323-849-4874,,951863362# United States, Los Angeles 
-Find a local number 
-Phone conference ID: 951 863 362# 
+Dial-in by phone
++1 323-849-4874,,951863362# United States, Los Angeles
+Find a local number
+Phone conference ID: 951 863 362#
 ```
 
 ## Development
@@ -83,7 +83,7 @@ To build a `retina-agent` container image with specific tag:
 
 ```bash
 make retina-image # also pushes to image registy
-make retina-operator-image 
+make retina-operator-image
 ```
 
 To build binary of a plugin and test it
@@ -91,7 +91,7 @@ To build binary of a plugin and test it
 ```bash
 # Test packetforward.
 $ cd <Retina_repository>/test/plugin/packetforward
-$ 
+$
 $ go build . && sudo ./packetforward
 info    metrics Metrics initialized
 info    packetforward   Packet forwarding metric initialized
@@ -107,7 +107,16 @@ debug   packetforward   Received PacketForward data     {"Data": "IngressBytes:8
 ### Deploying on Kubernetes Cluster
 
 1. Create Kubernetes cluster.
-2. Install Retina: `make helm-install`
+2. Install Retina using Helm:
+
+   ```bash
+   helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
+       --version v0.0.2 \
+        --set image.tag=v0.0.2 \
+        --set operator.tag=v0.0.2 \
+        --set logLevel=info \
+        --set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\]"
+   ```
 
 ### Verify Deployment
 
