@@ -6,7 +6,6 @@ package outputlocation
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -95,7 +94,7 @@ func readBlobURL() (string, error) {
 		}
 		secretPath = filepath.Join(containerSandboxMountPoint, captureConstants.CaptureOutputLocationBlobUploadSecretPath, captureConstants.CaptureOutputLocationBlobUploadSecretKey)
 	}
-	secretBytes, err := ioutil.ReadFile(secretPath)
+	secretBytes, err := os.ReadFile(secretPath)
 	return string(secretBytes), err
 }
 
