@@ -91,9 +91,9 @@ static int parse_tcp_ts(struct tcphdr *tcph, void *data_end, __u32 *tsval, __u32
 	__u8 *tcp_options_cur_ptr = (__u8 *)(tcph + 1);
 
 	// Loop through the options field to find the TSval and TSecr values.
-	// MAX_TCP_TS_OPTIONS_LEN is used to prevent infinite loops and the fact that the timestamp option is at most 10 bytes long.
+	// MAX_TCP_OPTIONS_LEN is used to prevent infinite loops and the fact that the options field is at most 40 bytes long.
 #pragma unroll
-	for (i = 0; i < MAX_TCP_TS_OPTIONS_LEN; i++) {
+	for (i = 0; i < MAX_TCP_OPTIONS_LEN; i++) {
 		// Verify that adding 1 to the current pointer will not go past the end of the packet.
 		if (tcp_options_cur_ptr + 1 > (__u8 *)tcp_opt_end_ptr || tcp_options_cur_ptr + 1 > (__u8 *)data_end) {
 			return -1;

@@ -2,7 +2,8 @@
 // Licensed under the MIT license.
 
 #define ETH_P_IP	0x0800
-#define MAX_TCP_TS_OPTIONS_LEN 10
+// The maximum length of the TCP options field.
+#define MAX_TCP_OPTIONS_LEN 40
 
 typedef enum
 {
