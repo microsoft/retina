@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/google/go-cmp/cmp"
+	"go.uber.org/mock/gomock"
 
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
 	"github.com/microsoft/retina/pkg/capture/provider"

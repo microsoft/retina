@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
 	pm "github.com/microsoft/retina/pkg/managers/pluginmanager"
@@ -17,6 +16,7 @@ import (
 	"github.com/microsoft/retina/pkg/telemetry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 )
 

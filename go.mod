@@ -265,7 +265,6 @@ require (
 	github.com/cilium/cilium v1.15.3
 	github.com/cilium/ebpf v0.14.0
 	github.com/florianl/go-tc v0.4.3
-	github.com/golang/mock v1.6.0
 	github.com/inspektor-gadget/inspektor-gadget v0.25.1-0.20240223044605-4ac24c3e3b7f
 	github.com/jellydator/ttlcache/v3 v3.1.1
 	github.com/jsternberg/zap-logfmt v1.3.0
@@ -282,6 +281,7 @@ require (
 	go.opentelemetry.io/otel v1.23.1
 	go.opentelemetry.io/otel/metric v1.23.1
 	go.opentelemetry.io/otel/trace v1.23.1
+	go.uber.org/mock v0.4.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gotest.tools v2.2.0+incompatible
 	gotest.tools/v3 v3.5.1
