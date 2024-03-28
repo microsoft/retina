@@ -1,3 +1,4 @@
+# This workflow is triggered by a manual trigger or when a check is requested on a PR.
 name: Build images and run E2E tests. 
 
 on:
