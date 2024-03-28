@@ -40,10 +40,6 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ">=1.21.0"
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@v3.4.0
-      - name: Write signing key to disk (only needed for `cosign sign --key`)
-        run: echo "${{ secrets.SIGNING_SECRET }}" > cosign.key
       - name: Run GoReleaser release
         uses: goreleaser/goreleaser-action@v5
         with:
@@ -52,12 +48,3 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Sign container image
-        run: |
-          export TAG=(make version)
-          cosign sign --key cosign.key \
-            ghcr.io/${{ github.repository }}/kubectl-retina:$TAG \
-            ghcr.io/${{ github.repository }}/kubectl-retina:$TAG-linux-amd64 \
-            ghcr.io/${{ github.repository }}/kubectl-retina:$TAG-linux-arm64
-        env:
-          COSIGN_PASSWORD: "" 
