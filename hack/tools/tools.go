@@ -13,10 +13,10 @@ $ go install ...
 package tools
 
 import (
-	_ "github.com/golang/mock/mockgen"
 	_ "github.com/golangci/golangci-lint/cmd/golangci-lint"
 	_ "github.com/goreleaser/goreleaser"
 	_ "github.com/onsi/ginkgo"
+	_ "go.uber.org/mock/mockgen"
 	_ "mvdan.cc/gofumpt"
 	_ "sigs.k8s.io/controller-runtime/tools/setup-envtest"
 	_ "sigs.k8s.io/controller-tools/cmd/controller-gen"

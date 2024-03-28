@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/cilium/cilium/pkg/hubble/container"
-	"github.com/golang/mock/gomock"
 	api "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/pkg/common"
 	kcfg "github.com/microsoft/retina/pkg/config"
@@ -19,6 +18,7 @@ import (
 	"github.com/microsoft/retina/pkg/managers/filtermanager"
 	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
 )
 

@@ -8,12 +8,12 @@ import (
 	"testing"
 
 	"github.com/cilium/cilium/api/v1/flow"
-	"github.com/golang/mock/gomock"
 	"github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/pkg/log"
 	metricsinit "github.com/microsoft/retina/pkg/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
 )
 
