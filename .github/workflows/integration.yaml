@@ -1,3 +1,4 @@
+# Workflow to build images and run E2E tests
 name: Build images and run E2E tests. 
 
 on:
