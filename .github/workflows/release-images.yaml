@@ -8,6 +8,9 @@ on:
 permissions:
   contents: read
   packages: write
+  # This is used to complete the identity challenge
+  # with sigstore/fulcio when running outside of PRs.
+  id-token: write
 
 jobs:
   retina-images:
@@ -27,6 +30,9 @@ jobs:
         with:
           go-version: ">=1.21.0"
       - run: go version
+    
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.4.0
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -43,6 +49,18 @@ jobs:
             IMAGE_NAMESPACE=${{ github.repository }} \
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
             BUILDX_ACTION=--push
+      
+      - name: Sign container image
+        run: |
+          for image in \
+            ghcr.io/${{ github.repository }}/retina-agent:$TAG \
+            ghcr.io/${{ github.repository }}/retina-agent:$TAG-${{ matrix.platform }}-${{ matrix.arch }} \
+            ghcr.io/${{ github.repository }}/retina-init:$TAG \ 
+            ghcr.io/${{ github.repository }}/retina-init:$TAG-${{ matrix.platform }}-${{ matrix.arch }} \
+          ; do
+            DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${image})
+            cosign sign --yes ${DIGEST} 
+          done
 
   retina-win-images:
     name: Build Agent Windows Images
@@ -62,6 +80,9 @@ jobs:
           go-version: ">=1.21.0"
       - run: go version
 
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.4.0
+      
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -77,6 +98,18 @@ jobs:
             IMAGE_NAMESPACE=${{ github.repository }} \
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
             BUILDX_ACTION=--push
+
+      - name: Sign container image
+        run: |
+          for image in \
+            ghcr.io/${{ github.repository }}/retina-agent:$TAG-windows-ltsc2019-${{ matrix.arch }} \
+            ghcr.io/${{ github.repository }}/retina-init:$TAG-windows-ltsc2019-${{ matrix.arch }} \
+            ghcr.io/${{ github.repository }}/retina-agent:$TAG-windows-ltsc2022-${{ matrix.arch }} \
+            ghcr.io/${{ github.repository }}/retina-init:$TAG-windows-ltsc2022-${{ matrix.arch }} \
+          ; do 
+            DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${image})
+            cosign sign --yes ${DIGEST}
+          done
 
   operator-images:
     name: Build Operator Images
@@ -95,6 +128,9 @@ jobs:
         with:
           go-version: ">=1.21.0"
       - run: go version
+    
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.4.0
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -111,6 +147,16 @@ jobs:
             IMAGE_NAMESPACE=${{ github.repository }} \
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
             BUILDX_ACTION=--push
+          
+      - name: Sign container image
+        run: |
+          for image in \
+            ghcr.io/${{ github.repository }}/retina-operator:$TAG \
+            ghcr.io/${{ github.repository }}/retina-operator:$TAG-${{ matrix.platform }}-${{ matrix.arch }} \
+          ; do
+            DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${image})
+            cosign sign --yes ${DIGEST}
+          done
 
   manifests:
     name: Generate Manifests

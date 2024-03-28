@@ -8,6 +8,9 @@ on:
 permissions:
   contents: read
   packages: write
+  # This is used to complete the identity challenge
+  # with sigstore/fulcio when running outside of PRs.
+  id-token: write
 
 jobs:
   push-retina-charts:
@@ -22,15 +25,28 @@ jobs:
 
       - uses: azure/setup-helm@v4.1.0
         id: install
+      
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.4.0
 
       - name: Log in to registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u $ --password-stdin
-
-      - name: Build/Push Chart
+      
+      - name: Build, Sign and Push Chart
+        id: build_chart
         shell: bash
         run: |
           set -euo pipefail
           export TAG=$(make version)
+          echo "TAG=$TAG" >> $GITHUB_OUTPUT
           echo $TAG
           helm package ./deploy/manifests/controller/helm/retina --version $TAG
+          cosign sign-blob --yes retina-$TAG.tgz --bundle retina-$TAG.cosign.bundle
           helm push retina-$TAG.tgz oci://ghcr.io/${{ github.repository }}/charts
+      
+      - name: Archive cosign bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: retina-${{ steps.build_chart.outputs.TAG }}.cosign.bundle
+          path: |
+            retina-$TAG.cosign.bundle
