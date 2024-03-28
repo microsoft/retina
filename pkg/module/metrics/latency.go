@@ -35,8 +35,8 @@ const (
 	TTL                             time.Duration = 500 * time.Millisecond
 	LIMIT                           uint64        = 100000
 	// Bucket size.
-	start = 0
-	width = 0.5
+	start = 0.5
+	width = 1
 	count = 10
 )
 
