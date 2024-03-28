@@ -37,15 +37,20 @@ Retina has two major features:
 
 ### Metrics Quick Install Guide
 
-Prerequisites: Go, Helm
+Retina can be installed using the Helm chart from GHCR:
 
-1. Clone the repo, then install Retina on your Kubernetes cluster
+```bash
+helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
+    --version v0.0.2 \
+		--set image.tag=v0.0.2 \
+		--set operator.tag=v0.0.2 \
+		--set logLevel=info \
+		--set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\]"
+```
 
-   ```bash
-   make helm-install
-   ```
+Set the `version` and image `tag` arguments to the desired version, if different.
 
-2. Follow steps in [Using Prometheus and Grafana](https://retina.sh/docs/installation/prometheus-unmanaged) to set up metrics collection and visualization.
+After Helm install, follow steps in [Using Prometheus and Grafana](https://retina.sh/docs/installation/prometheus-unmanaged) to set up metrics collection and visualization.
 
 ### Captures Quick Start Guide
 
@@ -82,15 +87,23 @@ For further CLI documentation, see [Capture with Retina CLI](https://retina.sh/d
 
 #### Captures via CRD
 
-Prerequisites: Go, Helm
+Install Retina using Helm:
 
-1. Clone the repo, then install Retina with Capture operator support on your Kubernetes cluster
+```bash
+helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
+    --version v0.0.2 \
+    --set image.tag=v0.0.2 \
+    --set operator.tag=v0.0.2 \
+    --set image.pullPolicy=Always \
+    --set logLevel=info \
+    --set os.windows=true \
+    --set operator.enabled=true \
+    --set operator.enableRetinaEndpoint=true \
+    --skip-crds \
+    --set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\,packetparser\]"
+```
 
-   ```bash
-   make helm-install-with-operator
-   ```
-
-2. Follow steps in [Capture CRD](https://retina.sh/docs/captures/#option-2-capture-crd-custom-resource-definition) for documentation of the CRD and examples for setting up Captures.
+Then follow steps in [Capture CRD](https://retina.sh/docs/captures/#option-2-capture-crd-custom-resource-definition) for documentation of the CRD and examples for setting up Captures.
 
 ## Contributing
 
@@ -129,9 +142,9 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 
 ## Contact
 
-For bugs or feature requests, open an [issue](https://github.com/microsoft/retina/issues).  
-For security or vulnerability concerns, see [SECURITY.md](SECURITY.md).  
-For other communication, contact the maintainers at <retina@microsoft.com>
+For bugs or feature requests, open an [issue](https://github.com/microsoft/retina/issues).
+For security or vulnerability concerns, see [SECURITY.md](SECURITY.md).
+For other communication, contact the maintainers at <retina@microsoft.com>.
 
 [goreport-img]: https://goreportcard.com/badge/github.com/microsoft/retina
 [goreport]: https://goreportcard.com/report/github.com/microsoft/retina
