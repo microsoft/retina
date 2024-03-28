@@ -140,7 +140,10 @@ func (c *CreateNPMCluster) Run() error {
 		case <-ticker.C:
 			log.Printf("waiting for cluster %s to be ready...\n", c.ClusterName)
 		case <-notifychan:
-			return fmt.Errorf("received notification, failed to create cluster: %w", err)
+			if err != nil {
+				return fmt.Errorf("received notification, failed to create cluster: %w", err)
+			}
+			return nil
 		}
 	}
 }
