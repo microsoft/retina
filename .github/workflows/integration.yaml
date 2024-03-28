@@ -2,7 +2,6 @@
 name: Build images and run E2E tests. 
 
 on:
-  pull_request:
   merge_group:
     types: [checks_requested]
   workflow_dispatch:
