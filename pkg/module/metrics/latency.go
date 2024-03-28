@@ -107,7 +107,6 @@ func NewLatencyMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger,
 			exporter.AdvancedRegistry,
 			noResponseFromNodeAPIServerName,
 			noResponseFromNodeAPIServerDesc,
-			"count",
 		)
 	}
 
@@ -125,10 +124,10 @@ func (lm *LatencyMetrics) Init(metricName string) {
 		if reason == ttlcache.EvictionReasonExpired {
 			// Didn't get the corresponding packet.
 			lm.l.Debug("Evicted item", zap.Any("item", item))
-			if lm.noResponseMetric != nil {
-				lm.noResponseMetric.WithLabelValues("no_response").Inc()
-				lm.l.Debug("Incremented no response metric", zap.Any("metric", lm.noResponseMetric))
-			}
+			// if lm.noResponseMetric != nil {
+			// 	lm.noResponseMetric.WithLabelValues("no_response").Inc()
+			// 	lm.l.Debug("Incremented no response metric", zap.Any("metric", lm.noResponseMetric))
+			// }
 		}
 	})
 

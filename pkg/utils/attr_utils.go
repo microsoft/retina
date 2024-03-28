@@ -81,7 +81,8 @@ var (
 	Windows   = "windows"
 
 	// DNS labels.
-	DNSLabels = []string{"return_code", "query_type", "query", "response", "num_response"}
+	DNSLabels    = []string{"return_code", "query_type", "query", "response", "num_response"}
+	DNSReqLabels = []string{"query_type", "query"}
 )
 
 func GetPluginEventAttributes(attrs []attribute.KeyValue, pluginName, eventName, timestamp string) []attribute.KeyValue {
