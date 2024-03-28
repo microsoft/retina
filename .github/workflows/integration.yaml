@@ -3,6 +3,7 @@ name: Build images and run E2E tests.
 
 on:
   merge_group:
+    types: [checks_requested]
   workflow_dispatch:
 
 permissions:
