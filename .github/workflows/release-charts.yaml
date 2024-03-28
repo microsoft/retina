@@ -29,15 +29,21 @@ jobs:
       - name: Log in to registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u $ --password-stdin
       
-      - name: Install helm-sigstore plugin
-        run: helm plugin install https://github.com/sigstore/helm-sigstore
-
       - name: Build, Sign and Push Chart
+        id: build_chart
         shell: bash
         run: |
           set -euo pipefail
           export TAG=$(make version)
+          echo "TAG=$TAG" >> $GITHUB_OUTPUT
           echo $TAG
           helm package ./deploy/manifests/controller/helm/retina --version $TAG
-          cosign --sign-blob --yes 
+          cosign sign-blob --yes retina-$TAG.tgz --bundle retina-$TAG.cosign.bundle
           helm push retina-$TAG.tgz oci://ghcr.io/${{ github.repository }}/charts
+      
+      - name: Archive cosign bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: retina-${{ steps.build_chart.outputs.TAG }}.cosign.bundle
+          path: |
+            retina-$TAG.cosign.bundle
