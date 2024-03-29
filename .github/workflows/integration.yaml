@@ -140,7 +140,7 @@ jobs:
           echo "TAG=$(make version)" >> $GITHUB_ENV
           if [ "$IS_MERGE_GROUP" == "true" ]; then
             az acr login -n acnpublic
-            make retina-operator-image \
+            make retina-operato-image \
               IMAGE_NAMESPACE=microsoft/retina \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               IMAGE_REGISTRY=acnpublic.azurecr.io \
