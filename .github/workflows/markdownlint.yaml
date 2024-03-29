@@ -1,7 +1,7 @@
 name: Markdown Lint
 on:
   pull_request:
-    branches: [main]
+    branches: [main, test]
 jobs:
   markdownlint:
     name: markdownlint
