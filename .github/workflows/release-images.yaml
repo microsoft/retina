@@ -53,9 +53,7 @@ jobs:
       - name: Sign container image
         run: |
           for image in \
-            ghcr.io/${{ github.repository }}/retina-agent:$TAG \
             ghcr.io/${{ github.repository }}/retina-agent:$TAG-${{ matrix.platform }}-${{ matrix.arch }} \
-            ghcr.io/${{ github.repository }}/retina-init:$TAG \ 
             ghcr.io/${{ github.repository }}/retina-init:$TAG-${{ matrix.platform }}-${{ matrix.arch }} \
           ; do
             DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${image})
@@ -151,7 +149,6 @@ jobs:
       - name: Sign container image
         run: |
           for image in \
-            ghcr.io/${{ github.repository }}/retina-operator:$TAG \
             ghcr.io/${{ github.repository }}/retina-operator:$TAG-${{ matrix.platform }}-${{ matrix.arch }} \
           ; do
             DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${image})
