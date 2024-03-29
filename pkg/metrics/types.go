@@ -13,10 +13,6 @@ const (
 	pluginManagerFailedToReconcileCounterName = "plugin_manager_failed_to_reconcile"
 	lostEventsCounterName                     = "lost_events_counter"
 
-	// Windows
-	hnsStats            = "windows_hns_stats"
-	hnsStatsDescription = "Include many different metrics from packets sent/received to closed connections"
-
 	// Linux only metrics (for now).
 	nodeApiServerHandshakeLatencyHistName = "node_apiserver_handshake_latency_ms"
 
@@ -54,8 +50,6 @@ var (
 	DropBytesCounter    IGaugeVec
 	ForwardCounter      IGaugeVec
 	ForwardBytesCounter IGaugeVec
-
-	WindowsCounter IGaugeVec
 
 	// Common gauges across os distributions
 	NodeConnectivityStatusGauge  IGaugeVec

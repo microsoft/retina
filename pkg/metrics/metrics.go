@@ -40,12 +40,6 @@ func InitializeMetrics() {
 		utils.ForwardBytesTotalName,
 		forwardBytesTotalDescription,
 		utils.Direction)
-	WindowsCounter = exporter.CreatePrometheusGaugeVecForMetric(
-		exporter.DefaultRegistry,
-		hnsStats,
-		hnsStatsDescription,
-		utils.Direction,
-	)
 	NodeConnectivityStatusGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
 		utils.NodeConnectivityStatusName,
