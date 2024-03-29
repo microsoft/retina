@@ -3,6 +3,7 @@ name: Build images and run E2E tests.
 
 on:
   pull_request:
+    branches: [test]
   merge_group:
     types: [checks_requested]
   workflow_dispatch:
@@ -140,7 +141,7 @@ jobs:
           echo "TAG=$(make version)" >> $GITHUB_ENV
           if [ "$IS_MERGE_GROUP" == "true" ]; then
             az acr login -n ${{ vars.ACR_NAME }} 
-            make retina-operato-image \
+            make retina-operator-image \
               IMAGE_NAMESPACE=${{ github.repository }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               IMAGE_REGISTRY=${{ vars.ACR_NAME }} \
