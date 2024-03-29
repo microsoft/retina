@@ -44,11 +44,11 @@ jobs:
           set -euo pipefail
           echo "TAG=$(make version)" >> $GITHUB_ENV
           if [ "$IS_MERGE_GROUP" == "true" ]; then
-            az acr login -n acnpublic
+            az acr login -n ${{ vars.ACR_NAME }} 
             make retina-image \
               IMAGE_NAMESPACE=${{ github.repository }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
-              IMAGE_REGISTRY=acnpublic.azurecr.io \
+              IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
               BUILDX_ACTION=--push
           else
             make retina-image \
@@ -92,11 +92,11 @@ jobs:
           set -euo pipefail
           echo "TAG=$(make version)" >> $GITHUB_ENV
           if [ "$IS_MERGE_GROUP" == "true" ]; then
-            az acr login -n acnpublic
+            az acr login -n ${{ vars.ACR_NAME }} 
             make retina-image-win \
               IMAGE_NAMESPACE=${{ github.repository }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
-              IMAGE_REGISTRY=acnpublic.azurecr.io \
+              IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
               BUILDX_ACTION=--push
           else
             make retina-image-win \
@@ -139,11 +139,11 @@ jobs:
           set -euo pipefail
           echo "TAG=$(make version)" >> $GITHUB_ENV
           if [ "$IS_MERGE_GROUP" == "true" ]; then
-            az acr login -n acnpublic
+            az acr login -n ${{ vars.ACR_NAME }} 
             make retina-operator-image \
               IMAGE_NAMESPACE=${{ github.repository }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
-              IMAGE_REGISTRY=acnpublic.azurecr.io \
+              IMAGE_REGISTRY=${{ vars.ACR_NAME }} \
               BUILDX_ACTION=--push
           else
             make retina-operator-image \
@@ -179,9 +179,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          az acr login -n acnpublic 
+          az acr login -n ${{ vars.ACR_NAME }}  
           make manifest COMPONENT=${{ matrix.components }} \
-          IMAGE_REGISTRY=acnpublic.azurecr.io \
+          IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
       
   e2e:
     if: ${{ github.event_name == 'merge_group' }}
@@ -214,4 +214,4 @@ jobs:
         run: |
           set -euo pipefail
           export AZURE_SUBSCRIPTION_ID=${{ secrets.AZURE_SUBSCRIPTION }}
-          go test -v ./test/e2e/scenarios/retina/*.go -timeout 30m -tags=e2e -count=1  -args -image-tag=$(make version) -image-registry=acnpublic.azurecr.io -image-namespace=${{ github.repository}}
+          go test -v ./test/e2e/scenarios/retina/*.go -timeout 30m -tags=e2e -count=1  -args -image-tag=$(make version) -image-registry=${{ vars.ACR_NAME }}  -image-namespace=${{ github.repository}}
