@@ -6,16 +6,15 @@ Note: you can also run captures with just the [CLI](./cli.md).
 
 ## Installation
 
-When installing with helm, substitute the `version` and image `tag` arguments to the desired version, if different.
-
 ### Basic Mode
 
 ```shell
+VERSION=$( curl -sL https://api.github.com/repos/microsoft/retina/releases/latest | jq -r .name)
 helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
-    --version v0.0.2 \
+    --version $VERSION \
     --namespace kube-system \
-    --set image.tag=v0.0.2 \
-    --set operator.tag=v0.0.2 \
+    --set image.tag=$VERSION \
+    --set operator.tag=$VERSION \
     --set logLevel=info \
     --set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\]"
 ```
@@ -23,11 +22,12 @@ helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
 ### Basic Mode (with Capture support)
 
 ```shell
+VERSION=$( curl -sL https://api.github.com/repos/microsoft/retina/releases/latest | jq -r .name)
 helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
-    --version v0.0.2 \
+    --version $VERSION \
     --namespace kube-system \
-    --set image.tag=v0.0.2 \
-    --set operator.tag=v0.0.2 \
+    --set image.tag=$VERSION \
+    --set operator.tag=$VERSION \
     --set logLevel=info \
     --set image.pullPolicy=Always \
     --set logLevel=info \
@@ -43,11 +43,12 @@ helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
 See [Metric Modes](../metrics/modes.md).
 
 ```shell
+VERSION=$( curl -sL https://api.github.com/repos/microsoft/retina/releases/latest | jq -r .name)
 helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
-    --version v0.0.2 \
+    --version $VERSION \
     --namespace kube-system \
-    --set image.tag=v0.0.2 \
-    --set operator.tag=v0.0.2 \
+    --set image.tag=$VERSION \
+    --set operator.tag=$VERSION \
     --set image.pullPolicy=Always \
     --set logLevel=info \
     --set os.windows=true \
@@ -64,11 +65,12 @@ helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
 See [Metric Modes](../metrics/modes.md).
 
 ```shell
+VERSION=$( curl -sL https://api.github.com/repos/microsoft/retina/releases/latest | jq -r .name)
 helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
-    --version v0.0.2 \
+    --version $VERSION \
     --namespace kube-system \
-    --set image.tag=v0.0.2 \
-    --set operator.tag=v0.0.2 \
+    --set image.tag=$VERSION \
+    --set operator.tag=$VERSION \
     --set image.pullPolicy=Always \
     --set logLevel=info \
     --set os.windows=true \
