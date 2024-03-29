@@ -22,7 +22,7 @@ builds:
       - windows
       - darwin
     ldflags:
-      - -X github.com/microsoft/retina/cli/cmd.Version={{.Version}}
+      - -X github.com/microsoft/retina/cli/cmd.Version=v{{.Version}}
     main: cli/main.go
 
 archives:
