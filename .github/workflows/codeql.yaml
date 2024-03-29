@@ -17,6 +17,8 @@ jobs:
         language: [go]
         go-version: ["1.21"]
     runs-on: ${{ matrix.os }}
+    env:
+      IS_NOT_MERGE_GROUP: ${{ github.event_name != 'merge_group' }}
     timeout-minutes: 90
     permissions:
       actions: read
@@ -24,18 +26,23 @@ jobs:
       security-events: write
     steps:
     - name: Setup go
+      if: env.IS_NOT_MERGE_GROUP
       uses: actions/setup-go@v5
       with:
         go-version: ${{ matrix.go-version }}
     - name: Checkout repository
+      if: env.IS_NOT_MERGE_GROUP
       uses: actions/checkout@v4
     - name: Initialize CodeQL
+      if: env.IS_NOT_MERGE_GROUP
       uses: github/codeql-action/init@v3
       with:
         languages: ${{ matrix.language }}
     - name: Autobuild
+      if: env.IS_NOT_MERGE_GROUP
       uses: github/codeql-action/autobuild@v3
     - name: Perform CodeQL Analysis
+      if: env.IS_NOT_MERGE_GROUP
       uses: github/codeql-action/analyze@v3
       with:
         category: "/language:${{matrix.language}}"
