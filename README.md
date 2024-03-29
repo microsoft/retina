@@ -40,10 +40,12 @@ Retina has two major features:
 Retina can be installed using the Helm chart from GHCR:
 
 ```bash
+# Set the version to a specific version here or get latest version from GitHub API.
+VERSION=$( curl -sL https://api.github.com/repos/microsoft/retina/releases/latest | jq -r .name)
 helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
-    --version v0.0.2 \
-		--set image.tag=v0.0.2 \
-		--set operator.tag=v0.0.2 \
+    --version $VERSION \
+		--set image.tag=$VERSION \
+		--set operator.tag=$VERSION \
 		--set logLevel=info \
 		--set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\]"
 ```
@@ -56,31 +58,25 @@ After Helm install, follow steps in [Using Prometheus and Grafana](https://retin
 
 #### Captures via CLI
 
-Currently, Retina CLI only supports Linux.
+The preferred way to install the Retina CLI using [Krew](https://krew.sigs.k8s.io/).
 
-- Option 1: Download from Release
+```bash
+kubectl krew install retina
+```
 
-  Download the correct `kubectl-retina` package for your platform from the latest [Retina release](https://github.com/microsoft/retina/releases).
-  Feel free to move the binary to `/usr/local/bin/`, or add it to your `PATH` otherwise.
+Other installation options are documented in [CLI Installation](https://retina.sh/docs/installation/cli).
 
-- Option 2: Build from source
+Verify installation:
 
-  Requirements:
+```bash
+$ kubectl retina version
+v0.0.4 # or latest version
+```
 
-  - go 1.21 or newer
+To quickly start creating a capture:
 
-  Clone the Retina repo and execute:
-
-  ```shell
-  go build -o bin/kubectl-retina cli/main.go
-  ```
-
-  and move bin/kubectl-retina in to your $PATH.
-
-Execute Retina:
-
-```shell
-kubectl-retina capture create --help
+```bash
+kubectl retina capture create --name <my-capture> --namespace <my-namespace> --selector <app=my-app>
 ```
 
 For further CLI documentation, see [Capture with Retina CLI](https://retina.sh/docs/captures/cli).
@@ -90,10 +86,11 @@ For further CLI documentation, see [Capture with Retina CLI](https://retina.sh/d
 Install Retina using Helm:
 
 ```bash
+VERSION=$( curl -sL https://api.github.com/repos/microsoft/retina/releases/latest | jq -r .name)
 helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
-    --version v0.0.2 \
-    --set image.tag=v0.0.2 \
-    --set operator.tag=v0.0.2 \
+    --version $VERSION \
+    --set image.tag=$VERSION \
+    --set operator.tag=$VERSION \
     --set image.pullPolicy=Always \
     --set logLevel=info \
     --set os.windows=true \
