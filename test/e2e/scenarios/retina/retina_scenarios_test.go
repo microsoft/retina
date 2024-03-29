@@ -60,9 +60,10 @@ func TestE2ERetinaMetrics(t *testing.T) {
 		KubeConfigFilePath: "./test.pem",
 	}, nil)
 
-	// todo: after loading tag, consume it in subsequent steps
-	job.AddStep(&generic.LoadTag{
-		TagEnv: generic.DefaultTagEnv,
+	job.AddStep(&generic.LoadFlags{
+		TagEnv:            generic.DefaultTagEnv,
+		ImageNamespaceEnv: generic.DefaultImageNamespace,
+		ImageRegistryEnv:  generic.DefaultImageRegistry,
 	}, nil)
 
 	// todo: enable mutating images in helm chart

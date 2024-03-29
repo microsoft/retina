@@ -8,7 +8,7 @@ If this pull request is related to any issue, please mention it here. Additional
 
 ## Checklist
 
-- [ ] I have read the [contributing documantation](https://retina.sh/docs/contributing).
+- [ ] I have read the [contributing documentation](https://retina.sh/docs/contributing).
 - [ ] I signed and signed-off the commits (`git commit -S -s ...`)
 - [ ] I have correctly attributed the author(s) of the code.
 - [ ] I have tested the changes locally.
@@ -16,7 +16,7 @@ If this pull request is related to any issue, please mention it here. Additional
 - [ ] I have updated the documentation, if necessary.
 - [ ] I have added tests, if applicable.
 
-## Screenshots (if applicable)
+## Screenshots (if applicable) or Testing Completed
 
 Please add any relevant screenshots or GIFs to showcase the changes made.
 

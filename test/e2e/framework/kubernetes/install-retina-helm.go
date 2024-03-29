@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	generic "github.com/microsoft/retina/test/e2e/framework/generic"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/cli"
@@ -18,7 +19,7 @@ const (
 )
 
 var (
-	errEmptyTag          = fmt.Errorf("tag is empty")
+	errEmpty             = fmt.Errorf("is empty")
 	errDirectoryNotFound = fmt.Errorf("directory not found")
 )
 
@@ -40,7 +41,19 @@ func (i *InstallHelmChart) Run() error {
 		return fmt.Errorf("failed to initialize helm action config: %w", err)
 	}
 
-	tag := os.Getenv(i.TagEnv)
+	tag := os.Getenv(generic.DefaultTagEnv)
+	if tag == "" {
+		return fmt.Errorf("tag is not set: %w", errEmpty)
+	}
+	imageRegistry := os.Getenv(generic.DefaultImageRegistry)
+	if imageRegistry == "" {
+		return fmt.Errorf("image registry is not set: %w", errEmpty)
+	}
+
+	imageNamespace := os.Getenv(generic.DefaultImageNamespace)
+	if imageNamespace == "" {
+		return fmt.Errorf("image namespace is not set: %w", errEmpty)
+	}
 
 	// load chart from the path
 	chart, err := loader.Load(i.ChartPath)
@@ -57,6 +70,9 @@ func (i *InstallHelmChart) Run() error {
 	chart.Values["image"].(map[string]interface{})["tag"] = tag
 	chart.Values["image"].(map[string]interface{})["pullPolicy"] = "Always"
 	chart.Values["operator"].(map[string]interface{})["tag"] = tag
+	chart.Values["image"].(map[string]interface{})["repository"] = imageRegistry + "/" + imageNamespace + "/retina-agent"
+	chart.Values["image"].(map[string]interface{})["initRepository"] = imageRegistry + "/" + imageNamespace + "/retina-init"
+	chart.Values["operator"].(map[string]interface{})["repository"] = imageRegistry + "/" + imageNamespace + "/retina-operator"
 
 	getclient := action.NewGet(actionConfig)
 	release, err := getclient.Run(i.ReleaseName)
@@ -108,7 +124,7 @@ func (i *InstallHelmChart) Prevalidate() error {
 	log.Printf("found chart at %s", i.ChartPath)
 
 	if os.Getenv(i.TagEnv) == "" {
-		return fmt.Errorf("tag is not set from env \"%s\": %w", i.TagEnv, errEmptyTag)
+		return fmt.Errorf("tag is not set from env \"%s\": %w", i.TagEnv, errEmpty)
 	}
 
 	return nil
