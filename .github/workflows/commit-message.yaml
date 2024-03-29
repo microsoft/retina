@@ -1,7 +1,7 @@
 name: commit-message
 on:
   pull_request:
-    branches: [ main ]
+    branches: [ main, test ]
     types:
       - opened
       - synchronize
