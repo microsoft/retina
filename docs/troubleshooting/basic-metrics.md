@@ -37,9 +37,11 @@ you should see log lines like the following:
 2023-04-16T00:10:55.598Z        info    linuxutil       linuxutil/linuxutil.go:100      Updated ethTool metrics
 ```
 
+If you don't see the log lines, then the plugin is not running correctly.
+
 ### Check Retina ConfigMap
 
-If not then the plugin is not running correctly. Please check retina config map and make sure the plugins is enabled.
+Please check `retina-config` ConfigMap and make sure the plugins is enabled.
 
 ```shell
 kubectl get configmap retina-config -n kube-system -oyaml
