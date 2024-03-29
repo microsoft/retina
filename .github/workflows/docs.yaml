@@ -4,6 +4,7 @@ on:
   push:
     branches: ["main"]
   workflow_dispatch:
+  merge_group:
 permissions:
   contents: read
   pages: write
@@ -13,6 +14,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   deploy:
+    if: ${{ github.event_name != 'merge_group' }}
     environment:
       name: retina.sh 
       url: ${{ steps.deployment.outputs.page_url }}
