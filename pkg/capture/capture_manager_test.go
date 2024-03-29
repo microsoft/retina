@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/retina/pkg/capture/provider"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/telemetry"
+	"go.uber.org/mock/gomock"
 )
 
 func TestCaptureNetwork(t *testing.T) {
