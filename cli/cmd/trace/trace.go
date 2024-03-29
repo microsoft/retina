@@ -3,9 +3,8 @@
 package trace
 
 import (
-	"github.com/pkg/errors"
-
 	retinacmd "github.com/microsoft/retina/cli/cmd"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 

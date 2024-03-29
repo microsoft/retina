@@ -84,7 +84,7 @@ func TestInstallOrUpdateCRDs(t *testing.T) {
 			apiExtensionsClient := &apiextv1fake.FakeApiextensionsV1{
 				Fake: &kubeClient.Fake,
 			}
-			got, err := InstallOrUpdateCRDs(context.Background(), tt.enableRetinaEndpoint, apiExtensionsClient, false)
+			got, err := InstallOrUpdateCRDs(context.Background(), tt.enableRetinaEndpoint, apiExtensionsClient, true)
 			if (err != nil) != tt.wantErr {
 				require.NoError(t, err)
 				return
