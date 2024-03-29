@@ -1,9 +1,11 @@
 name: Markdown Lint
 on:
+  merge_group:
   pull_request:
     branches: [main]
 jobs:
   markdownlint:
+    if: ${{ github.event_name != 'merge_group' }}
     name: markdownlint
     runs-on: ubuntu-latest
     steps:

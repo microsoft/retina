@@ -46,7 +46,7 @@ jobs:
           if [ "$IS_MERGE_GROUP" == "true" ]; then
             az acr login -n acnpublic
             make retina-image \
-              IMAGE_NAMESPACE=microsoft/retina \
+              IMAGE_NAMESPACE=${{ github.repository }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               IMAGE_REGISTRY=acnpublic.azurecr.io \
               BUILDX_ACTION=--push
@@ -94,7 +94,7 @@ jobs:
           if [ "$IS_MERGE_GROUP" == "true" ]; then
             az acr login -n acnpublic
             make retina-image-win \
-              IMAGE_NAMESPACE=microsoft/retina \
+              IMAGE_NAMESPACE=${{ github.repository }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               IMAGE_REGISTRY=acnpublic.azurecr.io \
               BUILDX_ACTION=--push
@@ -141,7 +141,7 @@ jobs:
           if [ "$IS_MERGE_GROUP" == "true" ]; then
             az acr login -n acnpublic
             make retina-operator-image \
-              IMAGE_NAMESPACE=microsoft/retina \
+              IMAGE_NAMESPACE=${{ github.repository }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               IMAGE_REGISTRY=acnpublic.azurecr.io \
               BUILDX_ACTION=--push
