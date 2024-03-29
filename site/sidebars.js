@@ -70,6 +70,13 @@ const sidebars = {
         'CRDs/Capture',
         'CRDs/RetinaEndpoint',
         'CRDs/MetricsConfiguration',
+        {
+          type: 'category',
+          label: 'Experimental/WIP',
+          items: [
+            'CRDs/TracesConfiguration',
+          ],
+        },
       ],
     },
     {

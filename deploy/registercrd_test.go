@@ -23,6 +23,7 @@ func TestGetCRD(t *testing.T) {
 	require.FileExists(t, fmt.Sprintf(full, RetinaCapturesYAMLpath))
 	require.FileExists(t, fmt.Sprintf(full, RetinaEndpointsYAMLpath))
 	require.FileExists(t, fmt.Sprintf(full, MetricsConfigurationYAMLpath))
+	require.FileExists(t, fmt.Sprintf(full, TracesConfigurationYAMLpath))
 
 	capture, err := GetRetinaCapturesCRD()
 	require.NoError(t, err)
@@ -38,12 +39,18 @@ func TestGetCRD(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, metrics)
 	require.NotEmpty(t, metrics.TypeMeta.Kind)
+
+	traces, err := GetRetinaTracesConfigurationCRD()
+	require.NoError(t, err)
+	require.NotNil(t, traces)
+	require.NotEmpty(t, traces.TypeMeta.Kind)
 }
 
 func TestInstallOrUpdateCRDs(t *testing.T) {
 	capture, _ := GetRetinaCapturesCRD()
 	endpoint, _ := GetRetinaEndpointCRD()
 	metrics, _ := GetRetinaMetricsConfigurationCRD()
+	traces, _ := GetRetinaTracesConfigurationCRD()
 
 	tests := []struct {
 		name                 string
@@ -58,6 +65,7 @@ func TestInstallOrUpdateCRDs(t *testing.T) {
 				"captures.retina.sh":              capture,
 				"retinaendpoints.retina.sh":       endpoint,
 				"metricsconfigurations.retina.sh": metrics,
+				"tracesconfigurations.retina.sh":  traces,
 			},
 		},
 		{
@@ -66,6 +74,7 @@ func TestInstallOrUpdateCRDs(t *testing.T) {
 			want: map[string]*apiextensionsv1.CustomResourceDefinition{
 				"captures.retina.sh":              capture,
 				"metricsconfigurations.retina.sh": metrics,
+				"tracesconfigurations.retina.sh":  traces,
 			},
 		},
 	}
@@ -75,7 +84,7 @@ func TestInstallOrUpdateCRDs(t *testing.T) {
 			apiExtensionsClient := &apiextv1fake.FakeApiextensionsV1{
 				Fake: &kubeClient.Fake,
 			}
-			got, err := InstallOrUpdateCRDs(context.Background(), tt.enableRetinaEndpoint, apiExtensionsClient)
+			got, err := InstallOrUpdateCRDs(context.Background(), tt.enableRetinaEndpoint, apiExtensionsClient, false)
 			if (err != nil) != tt.wantErr {
 				require.NoError(t, err)
 				return

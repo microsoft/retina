@@ -20,6 +20,11 @@ type MetricsConfigurationCacheObject struct {
 	MetricsConfiguration *retinav1alpha1.MetricsConfiguration
 }
 
+type TraceConfigurationCacheObject struct {
+	Key                string // cache.MetaNamespaceKeyFunc
+	TraceConfiguration *retinav1alpha1.TraceConfiguration
+}
+
 type RetinaEndpoint struct {
 	sync.RWMutex
 	Name       string

@@ -52,7 +52,7 @@ func New(client client.Client, podchannel chan cache.PodCacheObject) *RetinaEndp
 
 // NOTE(mainrerd): Chances are that pod cache channel lost pods events during controller manager restart, we need to
 // have full-set reconciliation to make sure all RetinaEndpoints are reconciled to Pods.
-// when a pod reaches here, it indicates that there is a metricsconfiguration that references it,
+// when a pod reaches here, it indicates that there is a metricsconfiguration (or tracesconfiguration if enabled) that references it,
 // or doesn't and a RetinaEndpoint needs to be created or updated.
 // This is a blocking function, and will wait on the pod channel until a pod is received.
 func (r *RetinaEndpointReconciler) ReconcilePod(pctx context.Context) {

@@ -18,6 +18,7 @@ const (
 	RetinaCapturesYAMLpath       = "retina.sh_captures.yaml"
 	RetinaEndpointsYAMLpath      = "retina.sh_retinaendpoints.yaml"
 	MetricsConfigurationYAMLpath = "retina.sh_metricsconfigurations.yaml"
+	TracesConfigurationYAMLpath  = "retina.sh_tracesconfigurations.yaml"
 )
 
 //go:embed manifests/controller/helm/retina/crds/retina.sh_captures.yaml
@@ -28,6 +29,9 @@ var RetinaEndpointsYAML []byte
 
 //go:embed manifests/controller/helm/retina/crds/retina.sh_metricsconfigurations.yaml
 var MetricsConfgurationYAML []byte
+
+//go:embed manifests/controller/helm/retina/crds/retina.sh_tracesconfigurations.yaml
+var TracesConfigurationYAML []byte
 
 func GetRetinaCapturesCRD() (*apiextensionsv1.CustomResourceDefinition, error) {
 	retinaCapturesCRD := &apiextensionsv1.CustomResourceDefinition{}
@@ -55,7 +59,21 @@ func GetRetinaMetricsConfigurationCRD() (*apiextensionsv1.CustomResourceDefiniti
 	return retinaMetricsConfigurationCRD, nil
 }
 
-func InstallOrUpdateCRDs(ctx context.Context, enableRetinaEndpoint bool, apiExtensionsClient apiextv1.ApiextensionsV1Interface) (map[string]*apiextensionsv1.CustomResourceDefinition, error) {
+func GetRetinaTracesConfigurationCRD() (*apiextensionsv1.CustomResourceDefinition, error) {
+	retinaTracesConfigurationCRD := &apiextensionsv1.CustomResourceDefinition{}
+	if err := yaml.Unmarshal(TracesConfigurationYAML, &retinaTracesConfigurationCRD); err != nil {
+		return nil, errors.Wrap(err, "error unmarshalling embedded tracesconfiguration")
+	}
+	return retinaTracesConfigurationCRD, nil
+}
+
+func InstallOrUpdateCRDs(
+	ctx context.Context,
+	enableRetinaEndpoint bool,
+	apiExtensionsClient apiextv1.ApiextensionsV1Interface,
+	enableTrace bool,
+) (map[string]*apiextensionsv1.CustomResourceDefinition, error) {
+
 	crds := make(map[string]*apiextensionsv1.CustomResourceDefinition, 4)
 
 	retinaCapture, err := GetRetinaCapturesCRD()
@@ -77,6 +95,14 @@ func InstallOrUpdateCRDs(ctx context.Context, enableRetinaEndpoint bool, apiExte
 		return nil, err
 	}
 	crds[retinaMetricsConfiguration.GetObjectMeta().GetName()] = retinaMetricsConfiguration
+
+	if enableTrace {
+		retinaTracesConfiguration, err := GetRetinaTracesConfigurationCRD()
+		if err != nil {
+			return nil, err
+		}
+		crds[retinaTracesConfiguration.GetObjectMeta().GetName()] = retinaTracesConfiguration
+	}
 
 	for name, crd := range crds {
 		current, err := apiExtensionsClient.CustomResourceDefinitions().Create(ctx, crd, v1.CreateOptions{})

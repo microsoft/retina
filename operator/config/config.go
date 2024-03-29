@@ -10,5 +10,7 @@ type OperatorConfig struct {
 	LogLevel        string `yaml:"logLevel"`
 	// EnableRetinaEndpoint indicates whether to enable RetinaEndpoint
 	EnableRetinaEndpoint bool `yaml:"enableRetinaEndpoint"`
-	RemoteContext        bool `yaml:"remoteContext"`
+	// EnableTrace indicates whether to enable trace. This is a WIP feature.
+	EnableTrace   bool `yaml:"enableTrace"`
+	RemoteContext bool `yaml:"remoteContext"`
 }

@@ -1,8 +1,9 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
-package cmd
+package trace
 
 import (
+	retinacmd "github.com/microsoft/retina/cli/cmd"
 	"github.com/spf13/cobra"
 )
 
@@ -19,9 +20,13 @@ func getTrace() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "get",
 		Short: "Retrieve network trace results with operation ID",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			operationID, _ := cmd.Flags().GetString("operationID")
-			return RetinaClient.GetTrace(operationID)
+			err := retinacmd.RetinaClient.GetTrace(operationID)
+			if err != nil {
+				return err
+			}
+			return nil
 		},
 	}
 	cmd.Flags().String("operationID", "", "Network Trace Operation ID")

@@ -9,6 +9,7 @@ import (
 
 func main() {
 	rootCmd := cmd.NewRootCmd()
+	// rootCmd.AddCommand(trace.TraceCmd())
 	rootCmd.AddCommand(capture.CaptureCmd())
 	rootCmd.AddCommand(cmd.VersionCmd())
 	rootCmd.Execute() //nolint:errcheck
