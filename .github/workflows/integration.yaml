@@ -40,6 +40,8 @@ jobs:
 
       - name: Build Images
         shell: bash
+        env:
+          IS_MERGE_GROUP : ${{ github.event_name == 'merge_group' }}
         run: |
           set -euo pipefail
           echo "TAG=$(make version)" >> $GITHUB_ENV
