@@ -1,5 +1,6 @@
 name: "CodeQL"
 on:
+  merge_group:
   workflow_dispatch:
   push:
     branches: [ main ]
@@ -7,6 +8,7 @@ on:
     branches: [ main ]
 jobs:
   analyze:
+    if: ${{ github.event_name != 'merge_group' }}
     name: Analyze
     strategy:
       fail-fast: false
