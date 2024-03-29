@@ -1,5 +1,6 @@
 name: commit-message
 on:
+  merge_group:
   pull_request:
     branches: [ main, test ]
     types:
