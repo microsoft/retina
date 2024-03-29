@@ -1,5 +1,6 @@
 name: golangci-lint
 on:
+  merge_group:
   workflow_dispatch:
   push:
     branches: [main]
@@ -14,14 +15,19 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     name: Lint
     runs-on: ${{ matrix.os }}
+    env:
+      IS_NOT_MERGE_GROUP: ${{ github.event_name != 'merge_group' }}
     steps:
       - uses: actions/setup-go@v5
+        if: env.IS_NOT_MERGE_GROUP
         with:
           go-version: ${{ matrix.go-version }}
       - uses: actions/checkout@v4
+        if: env.IS_NOT_MERGE_GROUP
         with:
           fetch-depth: 0
       - name: golangci-lint
+        if: env.IS_NOT_MERGE_GROUP
         uses: golangci/golangci-lint-action@v4
         with:
           version: v1.55
