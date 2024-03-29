@@ -1,0 +1,53 @@
+apiVersion: krew.googlecontainertools.github.com/v1alpha2
+kind: Plugin
+metadata:
+  name: retina
+spec:
+  version: {{ .TagName }}
+  homepage: https://github.com/microsoft/retina
+  shortDescription: Distributed network captures and telemetry
+  description: |
+    The Retina CLI plugin enables users to collect distributed network captures in an
+    OS and vendor-agnostic way. Capture jobs can be created via the CLI to target specific
+    nodes or pods in a time-limited or size limited way. Capture jobs can also filter specific
+    network traffic based on the given configurations; more info on the configurations can be 
+    found on the official docs. The captures are collected in formats like pcap, etl and 
+    text files, and can then be stored at remote storage destinations.
+  platforms:
+  - selector:
+      matchLabels:
+        os: darwin
+        arch: amd64
+    {{addURIAndSha "https://github.com/microsoft/retina/releases/download/{{ .TagName }}/kubectl-retina-darwin-amd64-{{ .TagName }}.tar.gz" .TagName }}
+    bin: kubectl-retina-darwin-amd64
+  - selector:
+      matchLabels:
+        os: darwin
+        arch: arm64
+    {{addURIAndSha "https://github.com/microsoft/retina/releases/download/{{ .TagName }}/kubectl-retina-darwin-arm64-{{ .TagName }}.tar.gz" .TagName }}
+    bin: kubectl-retina-darwin-arm64
+  - selector:
+      matchLabels:
+        os: linux
+        arch: amd64
+    {{addURIAndSha "https://github.com/microsoft/retina/releases/download/{{ .TagName }}/kubectl-retina-linux-amd64-{{ .TagName }}.tar.gz" .TagName }}
+    bin: kubectl-retina-linux-amd64
+  - selector:
+      matchLabels:
+        os: linux
+        arch: arm64
+    {{addURIAndSha "https://github.com/microsoft/retina/releases/download/{{ .TagName }}/kubectl-retina-linux-arm64-{{ .TagName }}.tar.gz" .TagName }}
+    bin: kubectl-retina-linux-arm64
+  - selector:
+      matchLabels:
+        os: windows
+        arch: amd64
+    {{addURIAndSha "https://github.com/microsoft/retina/releases/download/{{ .TagName }}/kubectl-retina-windows-amd64-{{ .TagName }}.zip" .TagName }}
+    bin: kubectl-retina-windows-amd64.exe
+  - selector:
+      matchLabels:
+        os: windows
+        arch: arm64
+    {{addURIAndSha "https://github.com/microsoft/retina/releases/download/{{ .TagName }}/kubectl-retina-windows-arm64-{{ .TagName }}.zip" .TagName }}
+    bin: kubectl-retina-windows-arm64.exe
+
