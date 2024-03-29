@@ -73,7 +73,6 @@ func InstallOrUpdateCRDs(
 	apiExtensionsClient apiextv1.ApiextensionsV1Interface,
 	enableTrace bool,
 ) (map[string]*apiextensionsv1.CustomResourceDefinition, error) {
-
 	crds := make(map[string]*apiextensionsv1.CustomResourceDefinition, 4)
 
 	retinaCapture, err := GetRetinaCapturesCRD()

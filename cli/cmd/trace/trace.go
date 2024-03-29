@@ -3,11 +3,13 @@
 package trace
 
 import (
+	"github.com/pkg/errors"
+
 	retinacmd "github.com/microsoft/retina/cli/cmd"
 	"github.com/spf13/cobra"
 )
 
-func TraceCmd() *cobra.Command {
+func Cmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "trace",
 		Short: "retrieve status or results from Retina",
@@ -24,7 +26,7 @@ func getTrace() *cobra.Command {
 			operationID, _ := cmd.Flags().GetString("operationID")
 			err := retinacmd.RetinaClient.GetTrace(operationID)
 			if err != nil {
-				return err
+				return errors.Wrap(err, "failed to get trace")
 			}
 			return nil
 		},
