@@ -8,10 +8,10 @@ import (
 	"testing"
 
 	"github.com/cakturk/go-netstat/netstat"
-	gomock "github.com/golang/mock/gomock"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
+	gomock "go.uber.org/mock/gomock"
 )
 
 func TestNewNetstatReader(t *testing.T) {
