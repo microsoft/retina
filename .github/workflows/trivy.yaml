@@ -1,0 +1,44 @@
+name: trivy
+on:
+  schedule:
+    - cron: "40 11 * * 0"
+  workflow_dispatch:
+  workflow_run:
+    workflows:
+      - Release Retina Container Images
+    types:
+      - completed
+permissions:
+  contents: read
+jobs:
+  scan:
+    permissions:
+      contents: read
+      security-events: write
+    name: Trivy Scan
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["retina-agent", "retina-init", "retina-operator"]
+    runs-on: ubuntu-latest # trivy only supports running on Linux
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Get Tag
+        run: |
+          echo "TAG=$(make version)" >> $GITHUB_ENV
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@7b7aa264d83dc58691451798b4d117d53d21edfe
+        with:
+          image-ref: "ghcr.io/${{ github.repository }}/${{ matrix.image }}:${{ env.TAG }}"
+          format: "template"
+          template: "@/contrib/sarif.tpl"
+          output: "trivy-results.sarif"
+          severity: "CRITICAL,HIGH"
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: "trivy-results.sarif"
