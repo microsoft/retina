@@ -20,7 +20,7 @@ const (
 	responseKey    = "response"
 )
 
-type DnsMetric struct {
+type Metric struct {
 	DNSRetinaPort string
 	NumResponse   string
 	Query         string
@@ -30,11 +30,11 @@ type DnsMetric struct {
 }
 
 type ValidateDNSRequest struct {
-	DnsMetric
+	Metric
 }
 
 type ValidateDNSResponse struct {
-	DnsMetric
+	Metric
 }
 
 func (v *ValidateDNSRequest) Run() error {
@@ -45,7 +45,7 @@ func (v *ValidateDNSResponse) Run() error {
 	return v.runMetric(dnsResponseCountMetricName)
 }
 
-func (v *DnsMetric) runMetric(metricName string) error {
+func (v *Metric) runMetric(metricName string) error {
 	promAddress := fmt.Sprintf("http://localhost:%s/metrics", v.DNSRetinaPort)
 
 	metric := map[string]string{
