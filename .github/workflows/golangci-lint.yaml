@@ -14,14 +14,12 @@ jobs:
         goos: ["linux", "windows"]
         goarch: ["amd64", "arm64"]
     name: Lint
-    runs-on: ubuntu-latest
-    env:
-      IS_NOT_MERGE_GROUP: ${{ github.event_name != 'merge_group' }}
-      GOOS: ${{ matrix.goos }}
-      GOARCH: ${{ matrix.goarch }}
+    runs-on: ${{ matrix.os }}
     steps:
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
       - uses: actions/checkout@v4
-        if: env.IS_NOT_MERGE_GROUP
         with:
           fetch-depth: 0
       - uses: actions/setup-go@v5

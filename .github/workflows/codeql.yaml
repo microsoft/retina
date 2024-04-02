@@ -26,24 +26,24 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - name: Checkout repository
-        if: env.IS_NOT_MERGE_GROUP
-        uses: actions/checkout@v4
-      - name: Setup go
-        if: env.IS_NOT_MERGE_GROUP
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-      - name: Initialize CodeQL
-        if: env.IS_NOT_MERGE_GROUP
-        uses: github/codeql-action/init@v3
-        with:
-          languages: ${{ matrix.language }}
-      - name: Autobuild
-        if: env.IS_NOT_MERGE_GROUP
-        uses: github/codeql-action/autobuild@v3
-      - name: Perform CodeQL Analysis
-        if: env.IS_NOT_MERGE_GROUP
-        uses: github/codeql-action/analyze@v3
-        with:
-          category: "/language:${{matrix.language}}"
+    - name: Setup go
+      if: ${{ env.IS_NOT_MERGE_GROUP == 'true' }}
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+    - name: Checkout repository
+      if: ${{ env.IS_NOT_MERGE_GROUP == 'true' }}
+      uses: actions/checkout@v4
+    - name: Initialize CodeQL
+      if: ${{ env.IS_NOT_MERGE_GROUP == 'true' }}
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+    - name: Autobuild
+      if: ${{ env.IS_NOT_MERGE_GROUP == 'true' }}
+      uses: github/codeql-action/autobuild@v3
+    - name: Perform CodeQL Analysis
+      if: ${{ env.IS_NOT_MERGE_GROUP == 'true' }}
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:${{matrix.language}}"

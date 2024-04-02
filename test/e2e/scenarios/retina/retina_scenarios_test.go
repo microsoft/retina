@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/retina/test/e2e/framework/generic"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/types"
+	dns "github.com/microsoft/retina/test/e2e/scenarios/retina/dns"
 	"github.com/microsoft/retina/test/e2e/scenarios/retina/drop"
 	tcp "github.com/microsoft/retina/test/e2e/scenarios/retina/tcp"
 )
@@ -71,12 +72,26 @@ func TestE2ERetinaMetrics(t *testing.T) {
 		Namespace:   "kube-system",
 		ReleaseName: "retina",
 		ChartPath:   "../../../../deploy/manifests/controller/helm/retina/",
-	}, nil)
+	}, &types.StepOptions{
+		SkipSavingParamatersToJob: true,
+	})
 
 	job.AddScenario(drop.ValidateDropMetric())
 
 	// todo: handle multiple scenarios back to back
 	job.AddScenario(tcp.ValidateTCPMetrics())
+
+	//check advanced metrics
+	job.AddScenario(dns.ValidateDNSMetric())
+
+	// enable advanced metrics
+	job.AddStep(&kubernetes.UpgradeRetinaHelmChart{
+		Namespace:   "kube-system",
+		ReleaseName: "retina",
+		ChartPath:   "../../../../deploy/manifests/controller/helm/retina/",
+	}, &types.StepOptions{
+		SkipSavingParamatersToJob: true,
+	})
 
 	job.AddStep(&azure.DeleteResourceGroup{}, nil)
 }
