@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/rlimit"
 	"github.com/microsoft/retina/pkg/log"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
 	"github.com/microsoft/retina/pkg/utils"
@@ -42,6 +43,12 @@ func Init() (*FilterMap, error) {
 	}
 	if f.obj != nil {
 		return f, nil
+	}
+
+	// Allow the current process to lock memory for eBPF resources.
+	if err := rlimit.RemoveMemlock(); err != nil {
+		f.l.Error("RemoveMemlock failed", zap.Error(err))
+		return f, err
 	}
 
 	obj := &filterObjects{}                                //nolint:typecheck

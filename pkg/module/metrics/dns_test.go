@@ -8,11 +8,11 @@ import (
 	"testing"
 
 	"github.com/cilium/cilium/api/v1/flow"
-	"github.com/golang/mock/gomock"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 )
 
