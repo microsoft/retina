@@ -3,7 +3,7 @@ module github.com/microsoft/retina/hack/tools
 go 1.21.8
 
 require (
-	github.com/golangci/golangci-lint v1.57.1
+	github.com/golangci/golangci-lint v1.57.2
 	github.com/goreleaser/goreleaser v1.24.0
 	github.com/onsi/ginkgo v1.16.5
 	go.uber.org/mock v0.4.0
