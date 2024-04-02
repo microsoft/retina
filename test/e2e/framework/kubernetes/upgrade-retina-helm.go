@@ -40,7 +40,7 @@ func (u *UpgradeRetinaHelmChart) Run() error {
 	chart.Values["enableAnnotations"] = true
 	chart.Values["enabledPlugin_linux"] = []string{"dropreason", "packetforward", "packetparser", "dns"}
 
-	//upgrade chart
+	// upgrade chart
 	rel, err := client.Run(u.ReleaseName, chart, chart.Values)
 	if err != nil {
 		PrintPodLogs(u.KubeConfigFilePath, u.Namespace, "k8s-app=retina")

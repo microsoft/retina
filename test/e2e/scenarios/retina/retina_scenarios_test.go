@@ -81,7 +81,7 @@ func TestE2ERetinaMetrics(t *testing.T) {
 	// todo: handle multiple scenarios back to back
 	job.AddScenario(tcp.ValidateTCPMetrics())
 
-	//check advanced metrics
+	// check advanced metrics
 	job.AddScenario(dns.ValidateDNSMetric())
 
 	// enable advanced metrics

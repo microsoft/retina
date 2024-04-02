@@ -47,9 +47,9 @@ func ValidateDNSMetric() *types.Scenario {
 			},
 		},
 		{
-			Step: &ValidateDnsRequest{
+			Step: &ValidateDNSRequest{
 				DnsMetric: DnsMetric{
-					DnsRetinaPort: "10093",
+					DNSRetinaPort: "10093",
 					NumResponse:   "0",
 					Query:         "kubernetes.default.svc.cluster.local.",
 					QueryType:     "AAAA",
@@ -61,9 +61,9 @@ func ValidateDNSMetric() *types.Scenario {
 			},
 		},
 		{
-			Step: &ValidateDnsResponse{
+			Step: &ValidateDNSResponse{
 				DnsMetric: DnsMetric{
-					DnsRetinaPort: "10093",
+					DNSRetinaPort: "10093",
 					NumResponse:   "0",
 					Query:         "kubernetes.default.svc.cluster.local.",
 					QueryType:     "AAAA",

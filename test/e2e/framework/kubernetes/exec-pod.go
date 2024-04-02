@@ -80,7 +80,6 @@ func ExecPod(ctx context.Context, kubeConfigFilePath, namespace, podName, comman
 		Stdout: os.Stdout,
 		Stderr: os.Stderr,
 	})
-
 	if err != nil {
 		return fmt.Errorf("error executing command: %w", err)
 	}

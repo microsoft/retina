@@ -21,7 +21,7 @@ const (
 )
 
 type DnsMetric struct {
-	DnsRetinaPort string
+	DNSRetinaPort string
 	NumResponse   string
 	Query         string
 	QueryType     string
@@ -29,24 +29,24 @@ type DnsMetric struct {
 	Response      string
 }
 
-type ValidateDnsRequest struct {
+type ValidateDNSRequest struct {
 	DnsMetric
 }
 
-type ValidateDnsResponse struct {
+type ValidateDNSResponse struct {
 	DnsMetric
 }
 
-func (v *ValidateDnsRequest) Run() error {
+func (v *ValidateDNSRequest) Run() error {
 	return v.runMetric(dnsRequestCountMetricName)
 }
 
-func (v *ValidateDnsResponse) Run() error {
+func (v *ValidateDNSResponse) Run() error {
 	return v.runMetric(dnsResponseCountMetricName)
 }
 
 func (v *DnsMetric) runMetric(metricName string) error {
-	promAddress := fmt.Sprintf("http://localhost:%s/metrics", v.DnsRetinaPort)
+	promAddress := fmt.Sprintf("http://localhost:%s/metrics", v.DNSRetinaPort)
 
 	metric := map[string]string{
 		numResponseKey: v.NumResponse, queryKey: v.Query, queryTypeKey: v.QueryType, returnCodeKey: v.ReturnCode, responseKey: v.Response,
@@ -61,18 +61,18 @@ func (v *DnsMetric) runMetric(metricName string) error {
 	return nil
 }
 
-func (v *ValidateDnsRequest) Prevalidate() error {
+func (v *ValidateDNSRequest) Prevalidate() error {
 	return nil
 }
 
-func (v *ValidateDnsRequest) Stop() error {
+func (v *ValidateDNSRequest) Stop() error {
 	return nil
 }
 
-func (v *ValidateDnsResponse) Prevalidate() error {
+func (v *ValidateDNSResponse) Prevalidate() error {
 	return nil
 }
 
-func (v *ValidateDnsResponse) Stop() error {
+func (v *ValidateDNSResponse) Stop() error {
 	return nil
 }

@@ -269,7 +269,7 @@ func (j *Job) validateStep(step *StepWrapper) error {
 
 	default:
 		// validate dns steps
-		if strings.Contains(val.Type().Name(), "Dns") {
+		if strings.Contains(val.Type().Name(), "DNS") {
 			val = val.Field(0)
 		}
 		for i, f := range reflect.VisibleFields(val.Type()) {
