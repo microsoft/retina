@@ -104,15 +104,19 @@ func determineEndian() binary.ByteOrder {
 // executing an equivalent to `ip route get <External IP>`
 // and fall back to `ip link show type veth`
 func GetOutgoingInterface(fallbackInterfaceName string, interfaceType string) (netlink.Link, error) {
-	if routes, err := routeGet(externalIP); err == nil && len(routes) > 0 {
-		if link, err := linkByIndex(routes[0].LinkIndex); err == nil && link.Type() == interfaceType {
-			return link, nil
+	if routes, err := routeGet(externalIP); err == nil {
+		for _, route := range routes {
+			if link, err := linkByIndex(route.LinkIndex); err == nil && link.Type() == interfaceType {
+				return link, nil
+			}
 		}
 	}
 
-	if routes, err := routeGet(externalIPv6); err == nil && len(routes) > 0 {
-		if link, err := linkByIndex(routes[0].LinkIndex); err == nil && link.Type() == interfaceType {
-			return link, nil
+	if routes, err := routeGet(externalIPv6); err == nil {
+		for _, route := range routes {
+			if link, err := linkByIndex(route.LinkIndex); err == nil && link.Type() == interfaceType {
+				return link, nil
+			}
 		}
 	}
 
