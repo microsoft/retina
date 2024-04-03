@@ -17,7 +17,7 @@ const (
 	IPTableRuleDrop = "IPTABLE_RULE_DROP"
 )
 
-func ValidateDropMetric(mode string) *types.Scenario {
+func ValidateDropMetric() *types.Scenario {
 	name := "Drop Metrics"
 	steps := []*types.StepWrapper{
 		{

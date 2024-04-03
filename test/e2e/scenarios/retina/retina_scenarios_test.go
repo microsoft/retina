@@ -81,7 +81,7 @@ func TestE2ERetinaMetrics(t *testing.T) {
 		SkipSavingParamatersToJob: true,
 	})
 
-	job.AddScenario(drop.ValidateDropMetric(basicMode))
+	job.AddScenario(drop.ValidateDropMetric())
 
 	// todo: handle multiple scenarios back to back
 	job.AddScenario(tcp.ValidateTCPMetrics())

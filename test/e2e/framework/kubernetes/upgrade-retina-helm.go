@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
@@ -13,6 +14,8 @@ import (
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/getter"
 )
+
+const upgradeTimeout = 60 * time.Second
 
 type UpgradeRetinaHelmChart struct {
 	Namespace          string
@@ -33,12 +36,15 @@ func (u *UpgradeRetinaHelmChart) Run() error {
 	}
 
 	client := action.NewUpgrade(actionConfig)
+	client.Wait = true
+	client.WaitForJobs = true
+	client.Timeout = upgradeTimeout
 
 	chart, err := loader.Load(u.ChartPath)
 	if err != nil {
 		return fmt.Errorf("failed to load chart: %w", err)
 	}
-	// enable pod level
+	// enable advanced metrics profile
 	options := values.Options{
 		ValueFiles: []string{"../../../profiles/localctx/values.yaml"},
 	}
@@ -48,7 +54,6 @@ func (u *UpgradeRetinaHelmChart) Run() error {
 		return fmt.Errorf("failed to merge values: %w", err)
 	}
 
-	// upgrade chart
 	rel, err := client.Run(u.ReleaseName, chart, values)
 	if err != nil {
 		PrintPodLogs(u.KubeConfigFilePath, u.Namespace, "k8s-app=retina")
