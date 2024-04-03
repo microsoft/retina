@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 package retina
 
 import (
@@ -11,14 +13,17 @@ import (
 	"github.com/microsoft/retina/test/e2e/framework/generic"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/types"
-	dns "github.com/microsoft/retina/test/e2e/scenarios/retina/dns"
+	"github.com/microsoft/retina/test/e2e/scenarios/retina/dns"
 	"github.com/microsoft/retina/test/e2e/scenarios/retina/drop"
+	lat "github.com/microsoft/retina/test/e2e/scenarios/retina/latency"
 	tcp "github.com/microsoft/retina/test/e2e/scenarios/retina/tcp"
 )
 
 const (
 	// netObsRGtag is used to tag resources created by this test suite
-	netObsRGtag = "-e2e-netobs-"
+	netObsRGtag      = "-e2e-netobs-"
+	basicMode        = "basic"
+	localContextMode = "localContext"
 )
 
 // Test against AKS cluster with NPM enabled,
@@ -76,7 +81,7 @@ func TestE2ERetinaMetrics(t *testing.T) {
 		SkipSavingParamatersToJob: true,
 	})
 
-	job.AddScenario(drop.ValidateDropMetric())
+	job.AddScenario(drop.ValidateDropMetric(basicMode))
 
 	// todo: handle multiple scenarios back to back
 	job.AddScenario(tcp.ValidateTCPMetrics())
@@ -92,6 +97,9 @@ func TestE2ERetinaMetrics(t *testing.T) {
 	}, &types.StepOptions{
 		SkipSavingParamatersToJob: true,
 	})
+
+	//Check api server latency metrics
+	job.AddScenario(lat.ValidateLatencyMetric())
 
 	job.AddStep(&azure.DeleteResourceGroup{}, nil)
 }

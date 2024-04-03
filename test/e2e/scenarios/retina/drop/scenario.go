@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 package drop
 
 import (
@@ -15,7 +17,7 @@ const (
 	IPTableRuleDrop = "IPTABLE_RULE_DROP"
 )
 
-func ValidateDropMetric() *types.Scenario {
+func ValidateDropMetric(mode string) *types.Scenario {
 	name := "Drop Metrics"
 	steps := []*types.StepWrapper{
 		{

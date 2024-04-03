@@ -1,6 +1,6 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
-package dns
+package latency
 
 import (
 	"time"
@@ -11,24 +11,13 @@ import (
 
 const sleepDelay = 5 * time.Second
 
-func ValidateDNSMetric() *types.Scenario {
-	name := "DNS Metrics"
+func ValidateLatencyMetric() *types.Scenario {
+	name := "Latency Metrics"
 	steps := []*types.StepWrapper{
 		{
 			Step: &kubernetes.CreateAgnhostStatefulSet{
 				AgnhostName:      "agnhost-a",
 				AgnhostNamespace: "kube-system",
-			},
-		},
-		{
-			Step: &kubernetes.ExecInPod{
-				PodName:      "agnhost-a-0",
-				PodNamespace: "kube-system",
-				Command:      "nslookup kubernetes.default",
-			},
-			Opts: &types.StepOptions{
-				ExpectError:               false,
-				SkipSavingParamatersToJob: true,
 			},
 		},
 		{
@@ -45,40 +34,19 @@ func ValidateDNSMetric() *types.Scenario {
 				OptionalLabelAffinity: "app=agnhost-a", // port forward to a pod on a node that also has this pod with this label, assuming same namespace
 			},
 			Opts: &types.StepOptions{
-				RunInBackgroundWithID: "dns-port-forward",
+				RunInBackgroundWithID: "latency-port-forward",
 			},
 		},
 		{
-			Step: &ValidateDNSRequest{
-				Metric: Metric{
-					DNSRetinaPort: "10093",
-					NumResponse:   "0",
-					Query:         "kubernetes.default.svc.cluster.local.",
-					QueryType:     "AAAA",
-					ReturnCode:    "",
-					Response:      "",
-				},
-			}, Opts: &types.StepOptions{
-				SkipSavingParamatersToJob: true,
-			},
-		},
-		{
-			Step: &ValidateDNSResponse{
-				Metric: Metric{
-					DNSRetinaPort: "10093",
-					NumResponse:   "0",
-					Query:         "kubernetes.default.svc.cluster.local.",
-					QueryType:     "AAAA",
-					ReturnCode:    "NoError",
-					Response:      "",
-				},
+			Step: &ValidateApiServerLatencyMetric{
+				PortForwardedRetinaPort: "10093",
 			}, Opts: &types.StepOptions{
 				SkipSavingParamatersToJob: true,
 			},
 		},
 		{
 			Step: &types.Stop{
-				BackgroundID: "dns-port-forward",
+				BackgroundID: "latency-port-forward",
 			},
 		},
 	}

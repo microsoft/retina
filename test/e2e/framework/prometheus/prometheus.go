@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 package prom
 
 import (
@@ -61,7 +63,6 @@ func verifyValidMetricPresent(metricName string, data map[string]*promclient.Met
 	for _, metric := range data {
 		if metric.GetName() == metricName {
 			for _, metric := range metric.GetMetric() {
-
 				// get all labels and values on the metric
 				metricLabels := map[string]string{}
 				for _, label := range metric.GetLabel() {
