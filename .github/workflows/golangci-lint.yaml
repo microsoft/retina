@@ -14,7 +14,10 @@ jobs:
         goos: ["linux", "windows"]
         goarch: ["amd64", "arm64"]
     name: Lint
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
+    env:
+      GOOS: ${{ matrix.goos }}
+      GOARCH: ${{ matrix.goarch }}
     steps:
       - uses: actions/setup-go@v5
         with:
