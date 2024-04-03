@@ -4,12 +4,17 @@
 package utils
 
 import (
+	"errors"
+	"fmt"
 	"net"
 	"testing"
 
 	"github.com/cilium/cilium/api/v1/flow"
-	"github.com/microsoft/retina/pkg/log"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/vishvananda/netlink"
+
+	"github.com/microsoft/retina/pkg/log"
 )
 
 func TestToFlow(t *testing.T) {
@@ -90,4 +95,59 @@ func TestTcpID(t *testing.T) {
 		443, 80, 6, uint32(1), flow.Verdict_FORWARDED, 0)
 	AddTcpID(f, uint64(1234))
 	assert.EqualValues(t, GetTcpID(f), uint64(1234))
+}
+
+func TestGetOutgoingInterface_RouteResolves(t *testing.T) {
+	const (
+		InterfaceName  = "Eth0"
+		InterfaceType  = "veth"
+		InterfaceIndex = 42
+	)
+
+	knownLink := &netlink.Veth{LinkAttrs: netlink.LinkAttrs{Name: InterfaceName, Index: InterfaceIndex}}
+
+	routeGet = func(_ net.IP) ([]netlink.Route, error) {
+		return []netlink.Route{{LinkIndex: InterfaceIndex}}, nil
+	}
+	linkByIndex = func(index int) (netlink.Link, error) {
+		if index == InterfaceIndex {
+			return knownLink, nil
+		}
+		return nil, fmt.Errorf("route not found")
+	}
+	showLink = func() ([]netlink.Link, error) {
+		t.Error("should never get here")
+		return nil, fmt.Errorf("this function should not be called")
+	}
+
+	link, err := GetOutgoingInterface(InterfaceName, InterfaceType)
+	require.NoError(t, err)
+	require.Equal(t, knownLink, link)
+}
+
+func TestGetOutgoingInterface_RouteDoesNotResolves(t *testing.T) {
+	const (
+		InterfaceName  = "Eth0"
+		InterfaceType  = "veth"
+		InterfaceIndex = 42
+	)
+
+	knownLink := &netlink.Veth{LinkAttrs: netlink.LinkAttrs{Name: InterfaceName, Index: InterfaceIndex}}
+
+	routeGet = func(_ net.IP) ([]netlink.Route, error) {
+		return nil, errors.New("route not found")
+	}
+	linkByIndex = func(index int) (netlink.Link, error) {
+		if index == InterfaceIndex {
+			return knownLink, nil
+		}
+		return nil, fmt.Errorf("route not found")
+	}
+	showLink = func() ([]netlink.Link, error) {
+		return []netlink.Link{knownLink}, nil
+	}
+
+	link, err := GetOutgoingInterface(InterfaceName, InterfaceType)
+	require.NoError(t, err)
+	require.Equal(t, knownLink, link)
 }

@@ -13,7 +13,16 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-var showLink = netlink.LinkList
+var (
+	routeGet    = netlink.RouteGet
+	linkByIndex = netlink.LinkByIndex
+	showLink    = netlink.LinkList
+)
+
+var (
+	externalIP   = net.ParseIP("1.1.1.1")
+	externalIPv6 = net.ParseIP("2606:4700:4700::1111")
+)
 
 // Both openRawSock and htons are available in
 // https://github.com/cilium/ebpf/blob/master/example_sock_elf_test.go.
@@ -91,9 +100,22 @@ func determineEndian() binary.ByteOrder {
 	return endian
 }
 
-// Get all the veth interfaces.
-// Similar to ip link show type veth
-func GetInterface(name string, interfaceType string) (netlink.Link, error) {
+// GetOutgoingInterface gets the outgoing interface by first trying
+// executing an equivalent to `ip route get <External IP>`
+// and fall back to `ip link show type veth`
+func GetOutgoingInterface(fallbackInterfaceName string, interfaceType string) (netlink.Link, error) {
+	if routes, err := routeGet(externalIP); err == nil && len(routes) > 0 {
+		if link, err := linkByIndex(routes[0].LinkIndex); err == nil && link.Type() == interfaceType {
+			return link, nil
+		}
+	}
+
+	if routes, err := routeGet(externalIPv6); err == nil && len(routes) > 0 {
+		if link, err := linkByIndex(routes[0].LinkIndex); err == nil && link.Type() == interfaceType {
+			return link, nil
+		}
+	}
+
 	links, err := showLink()
 	if err != nil {
 		return nil, err
@@ -102,10 +124,10 @@ func GetInterface(name string, interfaceType string) (netlink.Link, error) {
 	for _, link := range links {
 		// Ref for types: https://github.com/vishvananda/netlink/blob/ced5aaba43e3f25bb5f04860641d3e3dd04a8544/link.go#L367
 		// Version of netlink tested - https://github.com/vishvananda/netlink/tree/v1.2.1-beta.2
-		if link.Type() == interfaceType && link.Attrs().Name == name {
+		if link.Type() == interfaceType && link.Attrs().Name == fallbackInterfaceName {
 			return link, nil
 		}
 	}
 
-	return nil, fmt.Errorf("interface %s of type %s not found", name, interfaceType)
+	return nil, fmt.Errorf("interface %s of type %s not found", fallbackInterfaceName, interfaceType)
 }

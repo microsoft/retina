@@ -19,8 +19,12 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/perf"
 	"github.com/cilium/ebpf/rlimit"
-	tc "github.com/florianl/go-tc"
+	"github.com/florianl/go-tc"
 	helper "github.com/florianl/go-tc/core"
+	"github.com/vishvananda/netlink"
+	"go.uber.org/zap"
+	"golang.org/x/sys/unix"
+
 	"github.com/microsoft/retina/pkg/common"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
@@ -32,9 +36,6 @@ import (
 	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/microsoft/retina/pkg/watchers/endpoint"
-	"github.com/vishvananda/netlink"
-	"go.uber.org/zap"
-	"golang.org/x/sys/unix"
 
 	_ "github.com/microsoft/retina/pkg/plugin/lib/_amd64"             // nolint
 	_ "github.com/microsoft/retina/pkg/plugin/lib/_arm64"             // nolint
@@ -135,7 +136,8 @@ func (p *packetParser) Init() error {
 		return err
 	}
 	//nolint:typecheck
-	if err := spec.LoadAndAssign(objs, &ebpf.CollectionOptions{ //nolint:typecheck
+	if err := spec.LoadAndAssign(objs, &ebpf.CollectionOptions{
+		//nolint:typecheck
 		Maps: ebpf.MapOptions{
 			PinPath: plugincommon.FilterMapPath,
 		},
@@ -208,14 +210,12 @@ func (p *packetParser) Start(ctx context.Context) error {
 		p.callbackID = ps.Subscribe(common.PubSubEndpoints, &fn)
 	}
 
-	// Attach to eth0 for latency.
-	eth0Link, err := utils.GetInterface(Eth0, Device)
-	// eth0Link, err := retinautils.GetInterface("azvb22061c2658", "veth")
+	outgoingLink, err := utils.GetOutgoingInterface(Eth0, Device)
 	if err != nil {
 		return err
 	}
-	p.l.Info("Attaching Packetparser to eth0", zap.Any("eth0Link", eth0Link.Attrs()))
-	p.createQdiscAndAttach(*eth0Link.Attrs(), Device)
+	p.l.Info("Attaching Packetparser", zap.Any("outgoingLink", outgoingLink.Attrs()))
+	p.createQdiscAndAttach(*outgoingLink.Attrs(), Device)
 
 	// Create the channel.
 	p.recordsChannel = make(chan perf.Record, buffer)
