@@ -2,7 +2,7 @@ name: Release Retina Container Images
 
 on:
   push:
-    branches: ["sign-released-images"]
+    branches: [main]
     tags: ["v*"]
 
 permissions:
