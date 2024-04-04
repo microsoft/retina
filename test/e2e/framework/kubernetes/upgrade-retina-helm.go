@@ -11,7 +11,7 @@ import (
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/cli"
-	"helm.sh/helm/v3/pkg/cli/values"
+	helmValues "helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/getter"
 )
 
@@ -45,7 +45,7 @@ func (u *UpgradeRetinaHelmChart) Run() error {
 		return fmt.Errorf("failed to load chart: %w", err)
 	}
 	// enable advanced metrics profile
-	options := values.Options{
+	options := helmValues.Options{
 		ValueFiles: []string{"../../../profiles/localctx/values.yaml"},
 	}
 	provider := getter.All(settings)

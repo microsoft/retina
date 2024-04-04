@@ -98,7 +98,7 @@ func TestE2ERetinaMetrics(t *testing.T) {
 		SkipSavingParamatersToJob: true,
 	})
 
-	//Check api server latency metrics
+	// Check api server latency metrics
 	job.AddScenario(lat.ValidateLatencyMetric())
 
 	job.AddStep(&azure.DeleteResourceGroup{}, nil)

@@ -38,7 +38,7 @@ func ValidateLatencyMetric() *types.Scenario {
 			},
 		},
 		{
-			Step: &ValidateApiServerLatencyMetric{
+			Step: &ValidateAPIServerLatencyMetric{
 				PortForwardedRetinaPort: "10093",
 			}, Opts: &types.StepOptions{
 				SkipSavingParamatersToJob: true,

@@ -9,19 +9,17 @@ import (
 	prom "github.com/microsoft/retina/test/e2e/framework/prometheus"
 )
 
-var (
-	latencyBucketMetricName = "networkobservability_adv_node_apiserver_tcp_handshake_latency"
-)
+var latencyBucketMetricName = "networkobservability_adv_node_apiserver_tcp_handshake_latency"
 
-type ValidateApiServerLatencyMetric struct {
+type ValidateAPIServerLatencyMetric struct {
 	PortForwardedRetinaPort string
 }
 
-func (v *ValidateApiServerLatencyMetric) Prevalidate() error {
+func (v *ValidateAPIServerLatencyMetric) Prevalidate() error {
 	return nil
 }
 
-func (v *ValidateApiServerLatencyMetric) Run() error {
+func (v *ValidateAPIServerLatencyMetric) Run() error {
 	promAddress := fmt.Sprintf("http://localhost:%s/metrics", v.PortForwardedRetinaPort)
 
 	metric := map[string]string{}
@@ -34,6 +32,6 @@ func (v *ValidateApiServerLatencyMetric) Run() error {
 	return nil
 }
 
-func (v *ValidateApiServerLatencyMetric) Stop() error {
+func (v *ValidateAPIServerLatencyMetric) Stop() error {
 	return nil
 }
