@@ -128,7 +128,7 @@ NAME                                                     READY   STATUS    RESTA
 retina-agent-kq54d                                       1/1     Running   0          88s
 ...
 $
-$ k -n kube-system logs retina-agent-kq54d -f
+$ kubectl -n kube-system logs retina-agent-kq54d -f
 info    main    Reading config ...
 info    main    Initializing metrics
 info    metrics Metrics initialized
