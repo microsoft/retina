@@ -29,10 +29,12 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3.4.0
 
-      - name: Log in to registry
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u $ --password-stdin
+      - name: Log in to registry (Helm for pushing chart, Docker for signing and push signature)
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u $ --password-stdin
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
       
-      - name: Build, Sign and Push Chart
+      - name: Build, Push and Sign chart
         id: build_chart
         shell: bash
         run: |
@@ -41,12 +43,7 @@ jobs:
           echo "TAG=$TAG" >> $GITHUB_OUTPUT
           echo $TAG
           helm package ./deploy/manifests/controller/helm/retina --version $TAG
-          cosign sign-blob --yes retina-$TAG.tgz --bundle retina-$TAG.cosign.bundle
-          helm push retina-$TAG.tgz oci://ghcr.io/${{ github.repository }}/charts
-      
-      - name: Archive cosign bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: retina-${{ steps.build_chart.outputs.TAG }}.cosign.bundle
-          path: |
-            retina-$TAG.cosign.bundle
+          helm push retina-$TAG.tgz oci://ghcr.io/${{ github.repository }}/charts >> helm_push_result.txt 2>&1
+          cat helm_push_result.txt
+          cosign sign --yes ghcr.io/${{ github.repository }}/charts/retina@$(tail -n 1 helm_push_result.txt | awk '{ print $2 }')
+

@@ -52,13 +52,11 @@ jobs:
       
       - name: Sign container image
         run: |
-          for image in \
-            ghcr.io/${{ github.repository }}/retina-agent:$TAG-${{ matrix.platform }}-${{ matrix.arch }} \
-            ghcr.io/${{ github.repository }}/retina-init:$TAG-${{ matrix.platform }}-${{ matrix.arch }} \
-          ; do
-            DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${image})
-            cosign sign --yes ${DIGEST} 
-          done
+          for image in retina-agent retina-init; do
+          IMAGE_PATH="ghcr.io/${{ github.repository }}/$image:$TAG-${{ matrix.platform }}-${{ matrix.arch }}"
+          DIGEST=$(jq -r '.["containerimage.digest"]' image-metadata-$image-$TAG-${{ matrix.platform }}-${{ matrix.arch }}.json) 
+          cosign sign --yes ${IMAGE_PATH}@${DIGEST} 
+
 
   retina-win-images:
     name: Build Agent Windows Images
@@ -99,14 +97,12 @@ jobs:
 
       - name: Sign container image
         run: |
-          for image in \
-            ghcr.io/${{ github.repository }}/retina-agent:$TAG-windows-ltsc2019-${{ matrix.arch }} \
-            ghcr.io/${{ github.repository }}/retina-init:$TAG-windows-ltsc2019-${{ matrix.arch }} \
-            ghcr.io/${{ github.repository }}/retina-agent:$TAG-windows-ltsc2022-${{ matrix.arch }} \
-            ghcr.io/${{ github.repository }}/retina-init:$TAG-windows-ltsc2022-${{ matrix.arch }} \
-          ; do 
-            DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${image})
-            cosign sign --yes ${DIGEST}
+          for year in 2019 2022; do
+            for image in retina-agent ; do
+              IMAGE_PATH="ghcr.io/${{ github.repository }}/$image:$TAG-windows-ltsc$year-${{ matrix.arch }}"
+              DIGEST=$(jq -r '.["containerimage.digest"]' image-metadata-$image-$TAG-windows-ltsc$year-${{ matrix.arch }}.json) 
+              cosign sign --yes ${IMAGE_PATH}@${DIGEST} 
+            done
           done
 
   operator-images:
@@ -148,12 +144,12 @@ jobs:
           
       - name: Sign container image
         run: |
-          for image in \
-            ghcr.io/${{ github.repository }}/retina-operator:$TAG-${{ matrix.platform }}-${{ matrix.arch }} \
-          ; do
-            DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${image})
-            cosign sign --yes ${DIGEST}
+          for image in retina-operator ; do
+              IMAGE_PATH="ghcr.io/${{ github.repository }}/$image:$TAG-${{ matrix.platform }}-${{ matrix.arch }}"
+              DIGEST=$(jq -r '.["containerimage.digest"]' image-metadata-$image-$TAG-${{ matrix.platform }}-${{ matrix.arch }}.json) 
+              cosign sign --yes ${IMAGE_PATH}@${DIGEST} 
           done
+
 
   manifests:
     name: Generate Manifests
@@ -170,6 +166,9 @@ jobs:
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
+      
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.4.0
 
       - name: Log in to registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
@@ -181,3 +180,16 @@ jobs:
           make manifest \
             IMAGE_NAMESPACE=${{ github.repository }} \
             COMPONENT=${{ matrix.component }}
+
+      - name: Sign manifest
+        run: |
+          export TAG="$(make version)"
+          images=("retina-agent" "retina-init")
+          if [[ ${{ matrix.component }} == "operator" ]]; then
+            images=("retina-operator")
+          fi
+          for image in "${images[@]}"; do
+            IMAGE_PATH="ghcr.io/${{ github.repository }}/$image:$TAG"
+            DIGEST=$(docker buildx imagetools inspect $IMAGE_PATH --format "{{json .Manifest}}" | jq -r .digest)
+            cosign sign --yes ${IMAGE_PATH}@${DIGEST} 
+          done
