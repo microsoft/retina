@@ -4,7 +4,7 @@ go 1.21.8
 
 require (
 	github.com/golangci/golangci-lint v1.57.2
-	github.com/goreleaser/goreleaser v1.25.0
+	github.com/goreleaser/goreleaser v1.25.1
 	github.com/onsi/ginkgo v1.16.5
 	go.uber.org/mock v0.4.0
 	mvdan.cc/gofumpt v0.6.0
