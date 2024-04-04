@@ -103,7 +103,7 @@ $(GINKGO): $(TOOLS_DIR)/go.mod
 ginkgo: $(GINKGO) ## Build ginkgo
 
 $(MOCKGEN): $(TOOLS_DIR)/go.mod
-	cd $(TOOLS_DIR); go mod download; go build -tags=$(TOOL_TAG) -o bin/mockgen github.com/golang/mock/mockgen
+	cd $(TOOLS_DIR); go mod download; go build -tags=$(TOOL_TAG) -o bin/mockgen go.uber.org/mock/mockgen
 
 mockgen: $(MOCKGEN) ## Build mockgen
 

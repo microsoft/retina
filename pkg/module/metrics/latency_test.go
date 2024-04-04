@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/cilium/cilium/api/v1/flow"
-	"github.com/golang/mock/gomock"
 	api "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/pkg/exporter"
 	"github.com/microsoft/retina/pkg/log"
@@ -17,6 +16,7 @@ import (
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 )
 

@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/cilium/ebpf/perf"
-	"github.com/golang/mock/gomock"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
@@ -22,6 +21,7 @@ import (
 	mocks "github.com/microsoft/retina/pkg/plugin/dropreason/mocks"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	"golang.org/x/sync/errgroup"
 )
 
