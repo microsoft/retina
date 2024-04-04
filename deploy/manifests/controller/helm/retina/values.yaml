@@ -10,7 +10,7 @@ os:
 operator:
   enabled: false
   repository: ghcr.io/microsoft/retina/retina-operator
-  tag: "v0.0.1-pre.1"
+  tag: "v0.0.2"
   installCRDs: true
   enableRetinaEndpoint: false
   capture:
@@ -22,7 +22,7 @@ image:
   initRepository: ghcr.io/microsoft/retina/retina-init
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "v0.0.1-pre.1"
+  tag: "v0.0.2"
 
 enablePodLevel: false
 remoteContext: false
@@ -113,3 +113,49 @@ resources:
   limits:
     memory: "300Mi"
     cpu: "500m"
+
+## @param nodeSelector [object] Node labels for pod assignment
+## Ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
+##
+nodeSelector: {}
+## @param tolerations [array] Tolerations for pod assignment
+## Ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+##
+tolerations: []
+
+metrics:
+  ## Prometheus Service Monitor
+  ## ref: https://github.com/coreos/prometheus-operator/blob/master/Documentation/api.md#endpoint
+  ##
+  podMonitor:
+    ## @param metrics.podMonitor.enabled Create PodMonitor Resource for scraping metrics using PrometheusOperator
+    ##
+    enabled: false
+    ## @param metrics.podMonitor.namespace Namespace in which the PodMonitor should be created
+    ##
+    namespace: ~
+    ## @param metrics.podMonitor.interval Specify the interval at which metrics should be scraped
+    ##
+    interval: 30s
+    ## @param metrics.podMonitor.scrapeTimeout Specify the timeout after which the scrape is ended
+    ##
+    scrapeTimeout: 30s
+    ## @param metrics.podMonitor.additionalLabels [object] Additional labels that can be used so PodMonitors will be discovered by Prometheus
+    ## ref: https://github.com/coreos/prometheus-operator/blob/master/Documentation/api.md#prometheusspec
+    ##
+    additionalLabels: {}
+    ## @param metrics.podMonitor.scheme Scheme to use for scraping
+    ##
+    scheme: http
+    ## @param metrics.podMonitor.tlsConfig [object] TLS configuration used for scrape endpoints used by Prometheus
+    ## ref: https://github.com/prometheus-operator/prometheus-operator/blob/master/Documentation/api.md#tlsconfig
+    ## e.g:
+    ## tlsConfig:
+    ##   ca:
+    ##     secret:
+    ##       name: existingSecretName
+    ##
+    tlsConfig: {}
+    ## @param metrics.podMonitor.relabelings [array] Prometheus relabeling rules
+    ##
+    relabelings: []

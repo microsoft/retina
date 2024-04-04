@@ -13,7 +13,6 @@ import (
 
 	"github.com/cilium/cilium/api/v1/flow"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
-	"github.com/golang/mock/gomock"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/gadgets/trace/dns/types"
 	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/controllers/cache"
@@ -25,6 +24,7 @@ import (
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 )
 

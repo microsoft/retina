@@ -7,8 +7,8 @@ updates:
     reviewers:
       - "microsoft/retina"
     commit-message:
-      prefix: "ci"
-    labels: [ "ci", "dependencies" ]
+      prefix: "deps"
+    labels: ["area/infra", "area/dependencies"]
     open-pull-requests-limit: 10
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -17,8 +17,8 @@ updates:
     reviewers:
       - "microsoft/retina"
     commit-message:
-      prefix: "ci"
-    labels: [ "ci", "dependencies" ]
+      prefix: "deps"
+    labels: ["area/infra", "area/dependencies"]
     open-pull-requests-limit: 10
   - package-ecosystem: "gomod"
     directory: "/"
@@ -28,6 +28,17 @@ updates:
       - "microsoft/retina"
     commit-message:
       prefix: "deps"
+    labels: ["lang/go", "area/dependencies"]
     ignore:
       - dependency-name: "github.com/inspektor-gadget/inspektor-gadget"
+    open-pull-requests-limit: 10
+  - package-ecosystem: "gomod"
+    directory: "/hack/tools"
+    schedule:
+      interval: "daily"
+    reviewers:
+      - "microsoft/retina"
+    commit-message:
+      prefix: "deps"
+    labels: ["lang/go", "area/infra", "area/dependencies"]
     open-pull-requests-limit: 10

@@ -35,7 +35,7 @@ type ApiServerWatcher struct {
 
 var a *ApiServerWatcher
 
-// NewApiServerWatcher creates a new apiserver watcher.
+// Watcher creates a new apiserver watcher.
 func Watcher() *ApiServerWatcher {
 	if a == nil {
 		a = &ApiServerWatcher{

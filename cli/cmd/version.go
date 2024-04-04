@@ -10,7 +10,8 @@ import (
 )
 
 // This variable is used by the "version" command and is set during build.
-var Version = "undefined"
+// Defaults to a safe value if not set.
+var Version = "v0.0.2"
 
 func VersionCmd() *cobra.Command {
 	cmd := &cobra.Command{
