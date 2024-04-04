@@ -79,6 +79,7 @@ func (h *hnsstats) SetupChannel(ch chan *v1.Event) error {
 func pullHnsStats(ctx context.Context, h *hnsstats) error {
 	ticker := time.NewTicker(h.cfg.MetricsInterval)
 	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -96,27 +97,31 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 			if err != nil {
 				h.l.Error("Getting Vswitch ports failed", zap.Error(err))
 			}
+
 			for _, ep := range endpoints {
 				if len(ep.IpConfigurations) < 1 {
 					h.l.Info("Skipping endpoint without IPAddress", zap.String("EndpointID", ep.Id))
 					continue
 				}
-				var mac string = ep.MacAddress
-				var ip string = ep.IpConfigurations[0].IpAddress
-				// var id string = ep.Id
-				if stats, err := hcsshim.GetHNSEndpointStats(ep.Id); err != nil {
-					h.l.Error("Getting endpoint stats failed for endpoint ID "+ep.Id, zap.Error(err))
+
+				id := ep.Id
+				mac := ep.MacAddress
+				ip := ep.IpConfigurations[0].IpAddress
+
+				if stats, err := hcsshim.GetHNSEndpointStats(id); err != nil {
+					h.l.Error("Getting endpoint stats failed for endpoint ID "+id, zap.Error(err))
 				} else {
 					hnsStatsData := &HnsStatsData{hnscounters: stats, IPAddress: ip}
-					// h.l.Info(fmt.Sprintf("Fetched HNS endpoints stats for ID: %s, IP %s, MAC %s", id, ip, mac))
+					h.l.Info(fmt.Sprintf("Fetched HNS endpoints stats for ID: %s, IP %s, MAC %s", id, ip, mac))
 					// h.l.Info(hnsStatsData.String())
+
 					// Get VFP port counters for matching port (MAC address of endpoint as the key)
 					portguid := kv[mac]
 					if countersRaw, err := getVfpPortCountersRaw(portguid); len(portguid) > 0 && err == nil {
 						if vfpcounters, err := parseVfpPortCounters(countersRaw); err == nil {
 							// Attach VFP port counters
 							hnsStatsData.vfpCounters = vfpcounters
-							// h.l.Info("Attached VFP port counters for Port " + portguid)
+							h.l.Info("Attached VFP port counters", zap.String("Port", portguid))
 							// h.l.Info(vfpcounters.String())
 						} else {
 							h.l.Error("Unable to parse VFP port counters for Port "+portguid, zap.Error(err))
@@ -124,6 +129,7 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 					} else {
 						h.l.Error("Unable to find VFP port counters for MAC "+mac, zap.Error(err))
 					}
+
 					notifyHnsStats(h, hnsStatsData)
 				}
 			}
