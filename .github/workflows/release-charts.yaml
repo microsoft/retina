@@ -2,7 +2,7 @@ name: Release Retina Charts
 
 on:
   push:
-    branches: [main]
+    branches: ["sign-released-images"]
     tags: ["v*"]
 
 permissions:
