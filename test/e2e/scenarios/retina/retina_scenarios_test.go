@@ -24,6 +24,8 @@ const (
 	netObsRGtag      = "-e2e-netobs-"
 	basicMode        = "basic"
 	localContextMode = "localContext"
+	chartPath        = "../../../../deploy/manifests/controller/helm/retina/"
+	ValuesFile       = "../../../profiles/localctx/values.yaml"
 )
 
 // Test against AKS cluster with NPM enabled,
@@ -64,6 +66,10 @@ func TestE2ERetinaMetrics(t *testing.T) {
 
 	job.AddStep(&azure.GetAKSKubeConfig{
 		KubeConfigFilePath: "./test.pem",
+		// SubscriptionID:     "9b8218f9-902a-4d20-a65c-e98acec5362f",
+		// ResourceGroupName:  "jacquesmassa-e2e-netobs-1712253259",
+		// ClusterName:        "jacquesmassa-e2e-netobs-1712253259",
+		// Location:           "eastus",
 	}, nil)
 
 	job.AddStep(&generic.LoadFlags{
@@ -76,7 +82,7 @@ func TestE2ERetinaMetrics(t *testing.T) {
 	job.AddStep(&kubernetes.InstallHelmChart{
 		Namespace:   "kube-system",
 		ReleaseName: "retina",
-		ChartPath:   "../../../../deploy/manifests/controller/helm/retina/",
+		ChartPath:   chartPath,
 	}, &types.StepOptions{
 		SkipSavingParamatersToJob: true,
 	})
@@ -93,7 +99,8 @@ func TestE2ERetinaMetrics(t *testing.T) {
 	job.AddStep(&kubernetes.UpgradeRetinaHelmChart{
 		Namespace:   "kube-system",
 		ReleaseName: "retina",
-		ChartPath:   "../../../../deploy/manifests/controller/helm/retina/",
+		ChartPath:   chartPath,
+		ValuesFile:  ValuesFile,
 	}, &types.StepOptions{
 		SkipSavingParamatersToJob: true,
 	})

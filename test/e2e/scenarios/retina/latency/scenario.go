@@ -15,12 +15,6 @@ func ValidateLatencyMetric() *types.Scenario {
 	name := "Latency Metrics"
 	steps := []*types.StepWrapper{
 		{
-			Step: &kubernetes.CreateAgnhostStatefulSet{
-				AgnhostName:      "agnhost-a",
-				AgnhostNamespace: "kube-system",
-			},
-		},
-		{
 			Step: &types.Sleep{
 				Duration: sleepDelay,
 			},
@@ -31,7 +25,7 @@ func ValidateLatencyMetric() *types.Scenario {
 				LabelSelector:         "k8s-app=retina",
 				LocalPort:             "10093",
 				RemotePort:            "10093",
-				OptionalLabelAffinity: "app=agnhost-a", // port forward to a pod on a node that also has this pod with this label, assuming same namespace
+				OptionalLabelAffinity: " ",
 			},
 			Opts: &types.StepOptions{
 				RunInBackgroundWithID: "latency-port-forward",

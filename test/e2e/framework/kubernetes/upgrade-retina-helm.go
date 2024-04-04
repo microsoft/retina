@@ -23,6 +23,7 @@ type UpgradeRetinaHelmChart struct {
 	KubeConfigFilePath string
 	ChartPath          string
 	TagEnv             string
+	ValuesFile         string
 }
 
 func (u *UpgradeRetinaHelmChart) Run() error {
@@ -46,7 +47,7 @@ func (u *UpgradeRetinaHelmChart) Run() error {
 	}
 	// enable advanced metrics profile
 	options := helmValues.Options{
-		ValueFiles: []string{"../../../profiles/localctx/values.yaml"},
+		ValueFiles: []string{u.ValuesFile},
 	}
 	provider := getter.All(settings)
 	values, err := options.MergeValues(provider)
