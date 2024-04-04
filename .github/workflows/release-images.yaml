@@ -53,9 +53,10 @@ jobs:
       - name: Sign container image
         run: |
           for image in retina-agent retina-init; do
-          IMAGE_PATH="ghcr.io/${{ github.repository }}/$image:$TAG-${{ matrix.platform }}-${{ matrix.arch }}"
-          DIGEST=$(jq -r '.["containerimage.digest"]' image-metadata-$image-$TAG-${{ matrix.platform }}-${{ matrix.arch }}.json) 
-          cosign sign --yes ${IMAGE_PATH}@${DIGEST} 
+            IMAGE_PATH="ghcr.io/${{ github.repository }}/$image:$TAG-${{ matrix.platform }}-${{ matrix.arch }}"
+            DIGEST=$(jq -r '.["containerimage.digest"]' image-metadata-$image-$TAG-${{ matrix.platform }}-${{ matrix.arch }}.json) 
+            cosign sign --yes ${IMAGE_PATH}@${DIGEST} 
+          done
 
 
   retina-win-images:
