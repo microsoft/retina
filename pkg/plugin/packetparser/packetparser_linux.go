@@ -19,8 +19,12 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/perf"
 	"github.com/cilium/ebpf/rlimit"
-	tc "github.com/florianl/go-tc"
+	"github.com/florianl/go-tc"
 	helper "github.com/florianl/go-tc/core"
+	"github.com/vishvananda/netlink"
+	"go.uber.org/zap"
+	"golang.org/x/sys/unix"
+
 	"github.com/microsoft/retina/pkg/common"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
@@ -32,9 +36,6 @@ import (
 	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/microsoft/retina/pkg/watchers/endpoint"
-	"github.com/vishvananda/netlink"
-	"go.uber.org/zap"
-	"golang.org/x/sys/unix"
 
 	_ "github.com/microsoft/retina/pkg/plugin/lib/_amd64"             // nolint
 	_ "github.com/microsoft/retina/pkg/plugin/lib/_arm64"             // nolint
@@ -208,7 +209,7 @@ func (p *packetParser) Start(ctx context.Context) error {
 		p.callbackID = ps.Subscribe(common.PubSubEndpoints, &fn)
 	}
 
-	outgoingLink, err := utils.GetOutgoingInterface(Eth0, Device)
+	outgoingLink, err := utils.GetOutgoingInterface()
 	if err != nil {
 		return err
 	}

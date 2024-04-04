@@ -14,14 +14,8 @@ import (
 )
 
 var (
-	routeGet    = netlink.RouteGet
+	routeList   = netlink.RouteList
 	linkByIndex = netlink.LinkByIndex
-	showLink    = netlink.LinkList
-)
-
-var (
-	externalIP   = net.ParseIP("1.1.1.1")
-	externalIPv6 = net.ParseIP("2606:4700:4700::1111")
 )
 
 // Both openRawSock and htons are available in
@@ -100,38 +94,30 @@ func determineEndian() binary.ByteOrder {
 	return endian
 }
 
-// GetOutgoingInterface gets the outgoing interface by first trying
-// executing an equivalent to `ip route get <External IP>`
-// and fall back to `ip link show type veth`
-func GetOutgoingInterface(fallbackInterfaceName string, interfaceType string) (netlink.Link, error) {
-	if routes, err := routeGet(externalIP); err == nil {
-		for _, route := range routes {
-			if link, err := linkByIndex(route.LinkIndex); err == nil && link.Type() == interfaceType {
-				return link, nil
-			}
-		}
-	}
-
-	if routes, err := routeGet(externalIPv6); err == nil {
-		for _, route := range routes {
-			if link, err := linkByIndex(route.LinkIndex); err == nil && link.Type() == interfaceType {
-				return link, nil
-			}
-		}
-	}
-
-	links, err := showLink()
+// GetOutgoingInterface gets the outgoing interface by executing an equivalent to `ip route show default`
+func GetOutgoingInterface() (netlink.Link, error) {
+	routes, err := routeList(nil, netlink.FAMILY_V4)
 	if err != nil {
-		return nil, err
-	}
-
-	for _, link := range links {
-		// Ref for types: https://github.com/vishvananda/netlink/blob/ced5aaba43e3f25bb5f04860641d3e3dd04a8544/link.go#L367
-		// Version of netlink tested - https://github.com/vishvananda/netlink/tree/v1.2.1-beta.2
-		if link.Type() == interfaceType && link.Attrs().Name == fallbackInterfaceName {
-			return link, nil
+		// Try to fall back to getting IPv6 routes
+		routes, err = routeList(nil, netlink.FAMILY_V6)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get both IPv4 and IPv6 ")
 		}
 	}
 
-	return nil, fmt.Errorf("interface %s of type %s not found", fallbackInterfaceName, interfaceType)
+	for _, route := range routes {
+		// Default route has no destination
+		if route.Dst != nil {
+			continue
+		}
+
+		link, err := linkByIndex(route.LinkIndex)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get default gateway: %w", err)
+		}
+
+		return link, nil
+	}
+
+	return nil, errors.New("failed to detect default gateway")
 }

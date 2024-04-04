@@ -4,7 +4,6 @@
 package utils
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"testing"
@@ -100,14 +99,16 @@ func TestTcpID(t *testing.T) {
 func TestGetOutgoingInterface_RouteResolves(t *testing.T) {
 	const (
 		InterfaceName  = "Eth0"
-		InterfaceType  = "veth"
 		InterfaceIndex = 42
 	)
 
 	knownLink := &netlink.Veth{LinkAttrs: netlink.LinkAttrs{Name: InterfaceName, Index: InterfaceIndex}}
 
-	routeGet = func(_ net.IP) ([]netlink.Route, error) {
-		return []netlink.Route{{LinkIndex: InterfaceIndex}}, nil
+	routeList = func(_ netlink.Link, _ int) ([]netlink.Route, error) {
+		return []netlink.Route{
+			{LinkIndex: 1, Dst: &net.IPNet{IP: net.IPv4(192, 168, 0, 0), Mask: net.IPv4Mask(0xff, 0xff, 0xff, 0)}},
+			{LinkIndex: InterfaceIndex, Dst: nil},
+		}, nil
 	}
 	linkByIndex = func(index int) (netlink.Link, error) {
 		if index == InterfaceIndex {
@@ -115,39 +116,8 @@ func TestGetOutgoingInterface_RouteResolves(t *testing.T) {
 		}
 		return nil, fmt.Errorf("route not found")
 	}
-	showLink = func() ([]netlink.Link, error) {
-		t.Error("should never get here")
-		return nil, fmt.Errorf("this function should not be called")
-	}
 
-	link, err := GetOutgoingInterface(InterfaceName, InterfaceType)
-	require.NoError(t, err)
-	require.Equal(t, knownLink, link)
-}
-
-func TestGetOutgoingInterface_RouteDoesNotResolves(t *testing.T) {
-	const (
-		InterfaceName  = "Eth0"
-		InterfaceType  = "veth"
-		InterfaceIndex = 42
-	)
-
-	knownLink := &netlink.Veth{LinkAttrs: netlink.LinkAttrs{Name: InterfaceName, Index: InterfaceIndex}}
-
-	routeGet = func(_ net.IP) ([]netlink.Route, error) {
-		return nil, errors.New("route not found")
-	}
-	linkByIndex = func(index int) (netlink.Link, error) {
-		if index == InterfaceIndex {
-			return knownLink, nil
-		}
-		return nil, fmt.Errorf("route not found")
-	}
-	showLink = func() ([]netlink.Link, error) {
-		return []netlink.Link{knownLink}, nil
-	}
-
-	link, err := GetOutgoingInterface(InterfaceName, InterfaceType)
+	link, err := GetOutgoingInterface()
 	require.NoError(t, err)
 	require.Equal(t, knownLink, link)
 }
