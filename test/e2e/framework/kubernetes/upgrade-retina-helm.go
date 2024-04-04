@@ -15,7 +15,7 @@ import (
 	"helm.sh/helm/v3/pkg/getter"
 )
 
-const upgradeTimeout = 60 * time.Second
+const upgradeTimeout = 300 * time.Second // longer timeout to accomodate slow windows node terminating and restarting.
 
 type UpgradeRetinaHelmChart struct {
 	Namespace          string

@@ -38,6 +38,7 @@ spec:
           image: ghcr.io/microsoft/retina/retina-agent:v0.0.1-pre
           ports:
             - containerPort: 10093
+          workingDir: $env:CONTAINER_SANDBOX_MOUNT_POINT
           command:
             - powershell.exe
             - -command
