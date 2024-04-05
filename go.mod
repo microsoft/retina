@@ -252,7 +252,7 @@ require (
 require (
 	github.com/Azure/azure-container-networking/zapai v0.0.3
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible
-	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.11.0
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.11.1
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.5.1
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v4 v4.8.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/dashboard/armdashboard v1.2.0
@@ -274,7 +274,7 @@ require (
 	github.com/onsi/gomega v1.32.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_model v0.6.0
-	github.com/prometheus/common v0.51.1
+	github.com/prometheus/common v0.52.2
 	github.com/safchain/ethtool v0.3.0
 	github.com/spf13/viper v1.18.2
 	github.com/vishvananda/netlink v1.2.1-beta.2.0.20231127184239-0ced8385386a
