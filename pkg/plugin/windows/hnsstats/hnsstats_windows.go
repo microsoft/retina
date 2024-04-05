@@ -7,7 +7,6 @@ package hnsstats
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/Microsoft/hcsshim"
@@ -149,16 +148,16 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 func notifyHnsStats(h *hnsstats, stats *HnsStatsData) {
 	// hns signals
 	metrics.ForwardCounter.WithLabelValues(ingressLabel).Set(float64(stats.hnscounters.PacketsReceived))
-	h.l.Debug(fmt.Sprintf("emitting label %s for value %v", PacketsReceived, stats.hnscounters.PacketsReceived))
+	h.l.Debug("emitting packets received count metric", zap.Uint64(PacketsReceived, stats.hnscounters.PacketsReceived))
 
 	metrics.ForwardCounter.WithLabelValues(egressLabel).Set(float64(stats.hnscounters.PacketsSent))
-	h.l.Debug(fmt.Sprintf("emitting label %s for value %v", PacketsSent, stats.hnscounters.PacketsSent))
+	h.l.Debug("emitting packets sent count metric", zap.Uint64(PacketsSent, stats.hnscounters.PacketsSent))
 
 	metrics.ForwardBytesCounter.WithLabelValues(egressLabel).Set(float64(stats.hnscounters.BytesSent))
-	h.l.Debug(fmt.Sprintf("emitting label %s for value %v", BytesSent, stats.hnscounters.BytesSent))
+	h.l.Debug("emitting bytes sent count metric", zap.Uint64(BytesSent, stats.hnscounters.BytesSent))
 
 	metrics.ForwardBytesCounter.WithLabelValues(ingressLabel).Set(float64(stats.hnscounters.BytesReceived))
-	h.l.Debug(fmt.Sprintf("emitting label %s for value %v", BytesReceived, stats.hnscounters.BytesReceived))
+	h.l.Debug("emitting bytes received count metric", zap.Uint64(BytesReceived, stats.hnscounters.BytesReceived))
 
 	metrics.WindowsCounter.WithLabelValues(PacketsReceived).Set(float64(stats.hnscounters.PacketsReceived))
 	metrics.WindowsCounter.WithLabelValues(PacketsSent).Set(float64(stats.hnscounters.PacketsSent))
