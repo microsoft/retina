@@ -36,6 +36,14 @@ const (
 	HCN_ENDPOINT_STATE_DESTROYED
 )
 
+const (
+	zapEndpointIDField = "endpointID"
+	zapIPField         = "ip"
+	zapMACField        = "mac"
+	zapPluginField     = "plugin"
+	zapPortField       = "port"
+)
+
 func (h *hnsstats) Name() string {
 	return string(Name)
 }
@@ -72,7 +80,7 @@ func (h *hnsstats) Init() error {
 }
 
 func (h *hnsstats) SetupChannel(ch chan *v1.Event) error {
-	h.l.Warn("Plugin does not support SetupChannel", zap.String("plugin", string(Name)))
+	h.l.Warn("Plugin does not support SetupChannel", zap.String(zapPluginField, string(Name)))
 	return nil
 }
 
@@ -100,7 +108,7 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 
 			for _, ep := range endpoints {
 				if len(ep.IpConfigurations) < 1 {
-					h.l.Info("Skipping endpoint without IPAddress", zap.String("EndpointID", ep.Id))
+					h.l.Info("Skipping endpoint without IPAddress", zap.String(zapEndpointIDField, ep.Id))
 					continue
 				}
 
@@ -109,10 +117,11 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 				ip := ep.IpConfigurations[0].IpAddress
 
 				if stats, err := hcsshim.GetHNSEndpointStats(id); err != nil {
-					h.l.Error("Getting endpoint stats failed for endpoint ID "+id, zap.Error(err))
+					h.l.Error("Getting endpoint stats failed", zap.String(zapEndpointIDField, id), zap.Error(err))
 				} else {
 					hnsStatsData := &HnsStatsData{hnscounters: stats, IPAddress: ip}
-					h.l.Info(fmt.Sprintf("Fetched HNS endpoints stats for ID: %s, IP %s, MAC %s", id, ip, mac))
+					h.l.Info("Fetched HNS endpoints stats", zap.String(zapEndpointIDField, id),
+						zap.String(zapIPField, ip), zap.String(zapMACField, mac))
 					// h.l.Info(hnsStatsData.String())
 
 					// Get VFP port counters for matching port (MAC address of endpoint as the key)
@@ -121,13 +130,13 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 						if vfpcounters, err := parseVfpPortCounters(countersRaw); err == nil {
 							// Attach VFP port counters
 							hnsStatsData.vfpCounters = vfpcounters
-							h.l.Info("Attached VFP port counters", zap.String("Port", portguid))
+							h.l.Info("Attached VFP port counters", zap.String(zapPortField, portguid))
 							// h.l.Info(vfpcounters.String())
 						} else {
-							h.l.Error("Unable to parse VFP port counters for Port "+portguid, zap.Error(err))
+							h.l.Error("Unable to parse VFP port counters", zap.String(zapPortField, portguid), zap.Error(err))
 						}
 					} else {
-						h.l.Error("Unable to find VFP port counters for MAC "+mac, zap.Error(err))
+						h.l.Error("Unable to find VFP port counters", zap.String(zapMACField, mac), zap.Error(err))
 					}
 
 					notifyHnsStats(h, hnsStatsData)
