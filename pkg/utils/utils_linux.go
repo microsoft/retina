@@ -18,10 +18,6 @@ var (
 	linkByIndex = netlink.LinkByIndex
 )
 
-var (
-	errCouldNotDetectDefaultGateway = errors.New("failed to detect default gateway")
-)
-
 // Both openRawSock and htons are available in
 // https://github.com/cilium/ebpf/blob/master/example_sock_elf_test.go.
 // MIT license.
@@ -98,30 +94,27 @@ func determineEndian() binary.ByteOrder {
 	return endian
 }
 
-// GetOutgoingInterface gets the outgoing interface by executing an equivalent to `ip route show default`
-func GetOutgoingInterface() (netlink.Link, error) {
-	routes, err := routeList(nil, netlink.FAMILY_V4)
+// GetDefaultOutgoingLinks gets the outgoing interface by executing an equivalent to `ip route show default`
+func GetDefaultOutgoingLinks() ([]netlink.Link, error) {
+	routes, err := routeList(nil, netlink.FAMILY_ALL)
 	if err != nil {
-		// Try to fall back to getting IPv6 routes
-		routes, err = routeList(nil, netlink.FAMILY_V6)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get either IPv4 or IPv6: %w", err)
-		}
+		return nil, fmt.Errorf("failed to get route list: %w", err)
 	}
 
+	defaultLinks := make([]netlink.Link, 0, len(routes))
 	for i := range routes {
-		// Default route has no destination
 		if routes[i].Dst != nil {
+			// Default routes have no destinations
 			continue
 		}
 
 		link, err := linkByIndex(routes[i].LinkIndex)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get default gateway: %w", err)
+			return nil, fmt.Errorf("failed to get link by index: %w", err)
 		}
 
-		return link, nil
+		defaultLinks = append(defaultLinks, link)
 	}
 
-	return nil, errCouldNotDetectDefaultGateway
+	return defaultLinks, nil
 }

@@ -106,7 +106,7 @@ func TestGetOutgoingInterface_RouteResolves(t *testing.T) {
 
 	routeList = func(_ netlink.Link, _ int) ([]netlink.Route, error) {
 		return []netlink.Route{
-			{LinkIndex: 1, Dst: &net.IPNet{IP: net.IPv4(192, 168, 0, 0), Mask: net.IPv4Mask(0xff, 0xff, 0xff, 0)}},
+			{LinkIndex: 1, Dst: &net.IPNet{IP: net.IPv4(192, 168, 0, 0), Mask: net.IPv4Mask(255, 255, 255, 0)}},
 			{LinkIndex: InterfaceIndex, Dst: nil},
 		}, nil
 	}
@@ -117,7 +117,7 @@ func TestGetOutgoingInterface_RouteResolves(t *testing.T) {
 		return nil, fmt.Errorf("route not found")
 	}
 
-	link, err := GetOutgoingInterface()
+	link, err := GetDefaultOutgoingLinks()
 	require.NoError(t, err)
 	require.Equal(t, knownLink, link)
 }

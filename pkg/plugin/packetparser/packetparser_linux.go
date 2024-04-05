@@ -45,6 +45,10 @@ import (
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cc clang-14 -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type packet packetparser ./_cprog/packetparser.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../filter/_cprog/
 
+var (
+	errNoOutgoingLinks = errors.New("could not determine any outgoing links")
+)
+
 // New creates a packetparser plugin.
 func New(cfg *kcfg.Config) api.Plugin {
 	return &packetParser{
@@ -209,11 +213,16 @@ func (p *packetParser) Start(ctx context.Context) error {
 		p.callbackID = ps.Subscribe(common.PubSubEndpoints, &fn)
 	}
 
-	outgoingLink, err := utils.GetOutgoingInterface()
+	outgoingLinks, err := utils.GetDefaultOutgoingLinks()
 	if err != nil {
 		return err
 	}
-	p.l.Info("Attaching Packetparser", zap.Any("outgoingLink", outgoingLink.Attrs()))
+	if len(outgoingLinks) == 0 {
+		return errNoOutgoingLinks
+	}
+	outgoingLink := outgoingLinks[0] // Take first link until multi-link support is implemented
+
+	p.l.Info("Attaching Packetparser", zap.Any("outgoingLinks", outgoingLink.Attrs()))
 	p.createQdiscAndAttach(*outgoingLink.Attrs(), Device)
 
 	// Create the channel.
