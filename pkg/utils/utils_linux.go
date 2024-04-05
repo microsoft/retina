@@ -107,21 +107,22 @@ func GetDefaultOutgoingLinks() ([]netlink.Link, error) {
 	}
 
 	defaultLinks := make(map[int]netlink.Link)
-	for _, route := range routes {
-		if _, ok := defaultLinks[route.LinkIndex]; ok {
+	for i := range routes {
+		routeLinkIndex := routes[i].LinkIndex
+		if _, ok := defaultLinks[routeLinkIndex]; ok {
 			continue
 		}
 
-		if !isDefaultRoute(route) {
+		if !isDefaultRoute(routes[i]) {
 			continue
 		}
 
-		link, err := linkByIndex(route.LinkIndex)
+		link, err := linkByIndex(routeLinkIndex)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get link %d by index: %w", route.LinkIndex, err)
+			return nil, fmt.Errorf("failed to get link %d by index: %w", routeLinkIndex, err)
 		}
 
-		defaultLinks[route.LinkIndex] = link
+		defaultLinks[routeLinkIndex] = link
 	}
 
 	return maps.Values(defaultLinks), nil
