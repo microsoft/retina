@@ -1,10 +1,12 @@
 # Setup
 
-Clone the [Retina repo](https://github.com/microsoft/retina), then run a `make` command below for your scenario.
+Install the helm chart below for your scenario.
 
 Note: you can also run captures with just the [CLI](./cli.md).
 
 ## Installation
+
+Requires Helm version >= v3.8.0.
 
 ### Basic Mode
 
