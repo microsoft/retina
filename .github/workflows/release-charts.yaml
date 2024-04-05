@@ -8,6 +8,9 @@ on:
 permissions:
   contents: read
   packages: write
+  # This is used to complete the identity challenge
+  # with sigstore/fulcio when running outside of PRs.
+  id-token: write
 
 jobs:
   push-retina-charts:
@@ -22,15 +25,24 @@ jobs:
 
       - uses: azure/setup-helm@v4.1.0
         id: install
+      
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.4.0
 
-      - name: Log in to registry
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u $ --password-stdin
-
-      - name: Build/Push Chart
+      - name: Log in to registry (Helm for pushing chart, Docker for signing and push signature)
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u $ --password-stdin
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+      
+      - name: Build, Push and Sign chart
+        id: build_chart
         shell: bash
         run: |
           set -euo pipefail
           export TAG=$(make version)
-          echo $TAG
           helm package ./deploy/manifests/controller/helm/retina --version $TAG
-          helm push retina-$TAG.tgz oci://ghcr.io/${{ github.repository }}/charts
+          # Get Helm chart's SHA digest from helm push cmd output
+          helm push retina-$TAG.tgz oci://ghcr.io/${{ github.repository }}/charts >> helm_push_result.txt 2>&1
+          cat helm_push_result.txt
+          cosign sign --yes ghcr.io/${{ github.repository }}/charts/retina@$(tail -n 1 helm_push_result.txt | awk '{ print $2 }')
+
