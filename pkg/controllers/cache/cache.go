@@ -5,6 +5,7 @@ package cache
 import (
 	"fmt"
 	"net"
+	"sort"
 	"sync"
 
 	"github.com/microsoft/retina/pkg/common"
@@ -483,5 +484,6 @@ func (c *Cache) GetAnnotatedNamespaces() []string {
 	for k := range c.nsAnnotated {
 		ns = append(ns, k)
 	}
+	sort.Strings(ns)
 	return ns
 }
