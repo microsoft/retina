@@ -119,7 +119,7 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 					h.l.Error("Getting endpoint stats failed", zap.String(zapEndpointIDField, id), zap.Error(err))
 				} else {
 					hnsStatsData := &HnsStatsData{hnscounters: stats, IPAddress: ip}
-					h.l.Info("Fetched HNS endpoints stats", zap.String(zapEndpointIDField, id),
+					h.l.Debug("Fetched HNS endpoints stats", zap.String(zapEndpointIDField, id),
 						zap.String(zapIPField, ip), zap.String(zapMACField, mac))
 					// h.l.Info(hnsStatsData.String())
 
@@ -129,7 +129,7 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 						if vfpcounters, err := parseVfpPortCounters(countersRaw); err == nil {
 							// Attach VFP port counters
 							hnsStatsData.vfpCounters = vfpcounters
-							h.l.Info("Attached VFP port counters", zap.String(zapPortField, portguid))
+							h.l.Debug("Attached VFP port counters", zap.String(zapPortField, portguid))
 							// h.l.Info(vfpcounters.String())
 						} else {
 							h.l.Error("Unable to parse VFP port counters", zap.String(zapPortField, portguid), zap.Error(err))
