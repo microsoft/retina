@@ -6,16 +6,21 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
+	"strings"
 	"syscall"
 	"unsafe"
 
 	"github.com/pkg/errors"
 	"github.com/vishvananda/netlink"
+	"golang.org/x/exp/maps"
 )
 
 var (
 	routeList   = netlink.RouteList
 	linkByIndex = netlink.LinkByIndex
+
+	ipv4ZeroSubnet = "0.0.0.0/0"
+	ipv6ZeroSubnet = "::/0"
 )
 
 // Both openRawSock and htons are available in
@@ -101,20 +106,41 @@ func GetDefaultOutgoingLinks() ([]netlink.Link, error) {
 		return nil, fmt.Errorf("failed to get route list: %w", err)
 	}
 
-	defaultLinks := make([]netlink.Link, 0, len(routes))
-	for i := range routes {
-		if routes[i].Dst != nil {
-			// Default routes have no destinations
+	defaultLinks := make(map[int]netlink.Link)
+	for _, route := range routes {
+		if _, ok := defaultLinks[route.LinkIndex]; ok {
 			continue
 		}
 
-		link, err := linkByIndex(routes[i].LinkIndex)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get link by index: %w", err)
+		if !isDefaultRoute(route) {
+			continue
 		}
 
-		defaultLinks = append(defaultLinks, link)
+		link, err := linkByIndex(route.LinkIndex)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get link %d by index: %w", route.LinkIndex, err)
+		}
+
+		defaultLinks[route.LinkIndex] = link
 	}
 
-	return defaultLinks, nil
+	return maps.Values(defaultLinks), nil
+}
+
+func isDefaultRoute(route netlink.Route) bool {
+	if route.Dst == nil {
+		return true
+	}
+
+	destination := route.Dst.String()
+
+	if strings.EqualFold(destination, ipv4ZeroSubnet) {
+		return true
+	}
+
+	if strings.EqualFold(destination, ipv6ZeroSubnet) {
+		return true
+	}
+
+	return false
 }
