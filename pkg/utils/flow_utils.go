@@ -147,6 +147,21 @@ func AddTCPFlags(f *flow.Flow, syn, ack, fin, rst, psh, urg uint16) {
 	}
 }
 
+func AddTcpFlagsBool(f *flow.Flow, syn, ack, fin, rst, psh, urg bool) {
+	if f.L4.GetTCP() == nil {
+		return
+	}
+
+	f.L4.GetTCP().Flags = &flow.TCPFlags{
+		SYN: syn,
+		ACK: ack,
+		FIN: fin,
+		RST: rst,
+		PSH: psh,
+		URG: urg,
+	}
+}
+
 // Add TSval/TSecr to the flow's metadata as TCP ID.
 // The TSval/TSecr works as ID for the flow.
 // We will use this ID to calculate latency.

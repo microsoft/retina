@@ -5,7 +5,6 @@
 
 ARG BUILDER_IMAGE
 FROM --platform=windows/amd64 ${BUILDER_IMAGE} as builder
-# Build args
 WORKDIR C:\\retina
 RUN gcc.exe --version
 RUN go version
