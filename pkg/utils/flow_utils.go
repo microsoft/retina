@@ -271,3 +271,10 @@ func decodeTime(nanoseconds int64) (pbTime *timestamppb.Timestamp, err error) {
 	}
 	return pbTime, nil
 }
+
+func AddCpu(f *flow.Flow, cpu uint32) {
+	k := &RetinaMetadata{}      //nolint:typecheck
+	f.Extensions.UnmarshalTo(k) //nolint:errcheck
+	k.Cpu = cpu
+	f.Extensions, _ = anypb.New(k) //nolint:errcheck
+}

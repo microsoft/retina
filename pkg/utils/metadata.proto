@@ -12,6 +12,9 @@ message RetinaMetadata {
 
     // TCP ID. Either Tsval or Tsecr will be set.
     uint64 tcp_id = 4;
+
+    // CPU number.
+    uint32 cpu = 5;
 }
 
 enum DNSType {

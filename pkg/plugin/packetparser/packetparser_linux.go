@@ -553,6 +553,9 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 			tcpMetadata := bpfEvent.TcpMetadata
 			utils.AddTcpFlags(fl, tcpMetadata.Syn, tcpMetadata.Ack, tcpMetadata.Fin, tcpMetadata.Rst, tcpMetadata.Psh, tcpMetadata.Urg)
 
+			// Add CPU metadata to the flow.
+			utils.AddCpu(fl, uint32(record.CPU))
+
 			// For packets originating from node, we use tsval as the tcpID.
 			// Packets coming back has the tsval echoed in tsecr.
 			if fl.TraceObservationPoint == flow.TraceObservationPoint_TO_NETWORK {

@@ -25,6 +25,7 @@ import (
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/packetparser/mocks"
+	"github.com/microsoft/retina/pkg/utils"
 	"github.com/microsoft/retina/pkg/watchers/endpoint"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
@@ -203,19 +204,19 @@ func TestCreateQdiscAndAttach(t *testing.T) {
 	mtcnl := mocks.NewMockITc(ctrl)
 	mtcnl.EXPECT().Qdisc().Return(nil).AnyTimes()
 
-	getQdisc = func(tcnl ITc) IQdisc {
+	getQdisc = func(_ ITc) IQdisc {
 		return mq
 	}
 
-	getFilter = func(tcnl ITc) IFilter {
+	getFilter = func(_ ITc) IFilter {
 		return mfilter
 	}
 
-	tcOpen = func(c *tc.Config) (ITc, error) {
+	tcOpen = func(_ *tc.Config) (ITc, error) {
 		return mtcnl, nil
 	}
 
-	getFD = func(e *ebpf.Program) int {
+	getFD = func(_ *ebpf.Program) int {
 		return 1
 	}
 
@@ -309,6 +310,7 @@ func TestReadDataPodLevelEnabled(t *testing.T) {
 	}
 	bytes, _ := json.Marshal(bpfEvent)
 	record := perf.Record{
+		CPU:         1,
 		LostSamples: 0,
 		RawSample:   bytes,
 	}
@@ -341,7 +343,12 @@ func TestReadDataPodLevelEnabled(t *testing.T) {
 
 	// Test we get the event.
 	select {
-	case <-exCh:
+	case ev := <-exCh:
+		k := &utils.RetinaMetadata{} //nolint:typecheck
+		require.NotNil(t, ev.GetFlow())
+		require.NotNil(t, ev.GetFlow().Extensions)
+		ev.GetFlow().Extensions.UnmarshalTo(k)
+		require.Equal(t, uint(1), k.Cpu)
 	default:
 		t.Fatal("Expected event in external channel, got none")
 	}
