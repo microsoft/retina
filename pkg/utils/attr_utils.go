@@ -37,6 +37,7 @@ var (
 	Type           = "type"
 	Reason         = "reason"
 	Direction      = "direction"
+	Protocol       = "protocol"
 	SourceNodeName = "source_node_name"
 	TargetNodeName = "target_node_name"
 	State          = "state"

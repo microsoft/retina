@@ -67,6 +67,7 @@ func (f *ForwardMetrics) Init(metricName string) {
 func (f *ForwardMetrics) getLabels() []string {
 	labels := []string{
 		utils.Direction,
+		utils.Protocol,
 	}
 
 	if !f.advEnable {
@@ -114,6 +115,7 @@ func (f *ForwardMetrics) ProcessFlow(flow *v1.Flow) {
 
 	labels := []string{
 		flow.TrafficDirection.String(),
+		flow.L4.String(),
 	}
 
 	if !f.advEnable {

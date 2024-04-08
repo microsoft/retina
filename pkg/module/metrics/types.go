@@ -161,11 +161,9 @@ func (c *ContextOptions) getLabels() []string {
 	if c.Workload {
 		labels = append(labels, prefix+workloadKindCtxOption, prefix+workloadNameCtxOption)
 	}
-
 	if c.Service {
 		labels = append(labels, prefix+serviceCtxOption)
 	}
-
 	if c.Port {
 		labels = append(labels, prefix+portCtxOption)
 	}
