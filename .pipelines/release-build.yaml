@@ -1,0 +1,57 @@
+pr:
+  branches:
+    include:
+      - master
+  paths:
+    exclude:
+      - ".devcontainer"
+      - ".hooks"
+      - ".vscode"
+      - ".github"
+      - docs
+
+stages:
+  - stage: build
+    displayName: Build Images
+    jobs:
+      - job: build
+        pool:
+          name: "$(BUILD_POOL_NAME_DEFAULT)"
+        strategy:
+          matrix:
+            agent-amd64:
+              component: agent
+              os: linux
+              arch: amd64
+
+            agent-arm64:
+              component: agent
+              os: linux
+              arch: arm64
+
+            operator-amd64:
+              component: operator
+              os: linux
+              arch: amd64
+            operator-arm64:
+              component: operator
+              os: linux
+              arch: arm64
+        steps:
+          - checkout: self
+            persistCredentials: true
+
+          - bash: |
+              make build VERSION=$(make version) COMPONENT=$(component) PLATFORMS=$(os)/$(arch) DESTINATION=local APP_INSIGHTS_ID=$APP_INSIGHTS_ID
+            displayName: "Build Image"
+
+          - bash: |
+              mkdir -p $(Build.ArtifactStagingDirectory)
+              cp -r output/* $(Build.ArtifactStagingDirectory)
+            displayName: "Copy binaries to the binaries artifact folder"
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              artifactName: output
+              pathtoPublish: "$(Build.ArtifactStagingDirectory)"
+            condition: succeeded()
