@@ -1,46 +1,106 @@
-pr: none
-trigger: none
+# pr: none
+# trigger: none
 
-schedules:
-- cron: '0 0 * * *'
-  displayName: Daily midnight Retina OSS CG pipeline
+# schedules:
+# - cron: '0 0 * * *'
+#   displayName: Daily midnight Retina OSS CG pipeline
+#   branches:
+#     include:
+#     - main
+#     - vakr/newadocg
+
+# stages:
+#   - stage: setup
+#     displayName: Retina Setup
+#     jobs:
+#       - job: env
+#         displayName: Setup
+#         pool:
+#           name: "$(BUILD_POOL_NAME_DEFAULT)"
+#         steps:
+#           - checkout: self
+#             fetchTags: true
+#           - script: |
+#               BUILD_NUMBER=$(Build.BuildNumber)
+#               if [ "$(Build.Reason)" = "Schedule" ]
+#               then
+#                 echo "##vso[task.setvariable variable=Tag;isOutput=true]latest"
+#               else
+#                 echo "##vso[task.setvariable variable=Tag;isOutput=true]$(make version)"
+#               fi
+
+#               if [[ -z $(git status -s) ]]; then
+#                   if [[ -n $(git describe --exact-match --tags HEAD 2>/dev/null) ]]; then
+#                       echo "the current folder is clean and has a tag."
+#                       echo "##vso[task.setvariable variable=ApplicationInsightsID;isOutput=true]$(PROD_AI)"
+#                   else
+#                       echo "the current folder is clean but does not have a tag."
+#                       echo "##vso[task.setvariable variable=ApplicationInsightsID;isOutput=true]$(TEST_AI)"
+#                   fi
+#               else
+#                   echo "the current folder is not clean."
+#                   echo "##vso[task.setvariable variable=ApplicationInsightsID;isOutput=true]$(TEST_AI)"
+#               fi
+#             name: "EnvironmentalVariables"
+#             displayName: "Set environmental variables"
+#             condition: always()
+
+
+
+pr:
   branches:
     include:
-    - main
-    - vakr/newadocg
+      - master
+  paths:
+    exclude:
+      - ".devcontainer"
+      - ".hooks"
+      - ".vscode"
+      - ".github"
+      - docs
 
 stages:
-  - stage: setup
-    displayName: Retina Setup
+  - stage: build
+    displayName: Build Images
     jobs:
-      - job: env
-        displayName: Setup
+      - job: build
         pool:
           name: "$(BUILD_POOL_NAME_DEFAULT)"
+        strategy:
+          matrix:
+            agent-amd64:
+              component: agent
+              os: linux
+              arch: amd64
+
+            agent-arm64:
+              component: agent
+              os: linux
+              arch: arm64
+
+            operator-amd64:
+              component: operator
+              os: linux
+              arch: amd64
+            operator-arm64:
+              component: operator
+              os: linux
+              arch: arm64
         steps:
           - checkout: self
-            fetchTags: true
-          - script: |
-              BUILD_NUMBER=$(Build.BuildNumber)
-              if [ "$(Build.Reason)" = "Schedule" ]
-              then
-                echo "##vso[task.setvariable variable=Tag;isOutput=true]latest"
-              else
-                echo "##vso[task.setvariable variable=Tag;isOutput=true]$(make version)"
-              fi
+            persistCredentials: true
 
-              if [[ -z $(git status -s) ]]; then
-                  if [[ -n $(git describe --exact-match --tags HEAD 2>/dev/null) ]]; then
-                      echo "the current folder is clean and has a tag."
-                      echo "##vso[task.setvariable variable=ApplicationInsightsID;isOutput=true]$(PROD_AI)"
-                  else
-                      echo "the current folder is clean but does not have a tag."
-                      echo "##vso[task.setvariable variable=ApplicationInsightsID;isOutput=true]$(TEST_AI)"
-                  fi
-              else
-                  echo "the current folder is not clean."
-                  echo "##vso[task.setvariable variable=ApplicationInsightsID;isOutput=true]$(TEST_AI)"
-              fi
-            name: "EnvironmentalVariables"
-            displayName: "Set environmental variables"
-            condition: always()
+          - bash: |
+              make build VERSION=$(make version) COMPONENT=$(component) PLATFORMS=$(os)/$(arch) DESTINATION=local APP_INSIGHTS_ID=$APP_INSIGHTS_ID
+            displayName: "Build Image"
+
+          - bash: |
+              mkdir -p $(Build.ArtifactStagingDirectory)
+              cp -r output/* $(Build.ArtifactStagingDirectory)
+            displayName: "Copy binaries to the binaries artifact folder"
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              artifactName: output
+              pathtoPublish: "$(Build.ArtifactStagingDirectory)"
+            condition: succeeded()
