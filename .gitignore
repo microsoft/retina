@@ -32,3 +32,5 @@ output
 
 dist/
 bin/
+
+image-metadata-*.json
