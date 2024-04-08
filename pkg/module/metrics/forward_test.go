@@ -290,7 +290,7 @@ func TestNewForward(t *testing.T) {
 				assert.NotNil(t, f, "forward metrics should not be nil Test Name: %s", tc.name)
 			}
 
-			forwardMock := metricsinit.NewMockIGaugeVec(ctrl) //nolint:typecheck
+			forwardMock := metricsinit.NewMockICounterVec(ctrl) //nolint:typecheck
 
 			f.forwardMetric = forwardMock
 

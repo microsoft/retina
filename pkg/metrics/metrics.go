@@ -30,12 +30,12 @@ func InitializeMetrics() {
 		dropBytesTotalDescription,
 		utils.Reason,
 		utils.Direction)
-	ForwardCounter = exporter.CreatePrometheusGaugeVecForMetric(
+	ForwardCounter = exporter.CreatePrometheusCounterVecForMetric(
 		exporter.DefaultRegistry,
 		utils.ForwardCountTotalName,
 		forwardCountTotalDescription,
 		utils.Direction)
-	ForwardBytesCounter = exporter.CreatePrometheusGaugeVecForMetric(
+	ForwardBytesCounter = exporter.CreatePrometheusCounterVecForMetric(
 		exporter.DefaultRegistry,
 		utils.ForwardBytesTotalName,
 		forwardBytesTotalDescription,

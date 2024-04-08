@@ -53,8 +53,8 @@ var (
 	// Common counters across os distributions
 	DropCounter         IGaugeVec
 	DropBytesCounter    IGaugeVec
-	ForwardCounter      IGaugeVec
-	ForwardBytesCounter IGaugeVec
+	ForwardCounter      ICounterVec
+	ForwardBytesCounter ICounterVec
 
 	WindowsCounter IGaugeVec
 
