@@ -10,7 +10,6 @@ import (
 
 	"github.com/cilium/cilium/api/v1/flow"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/vishvananda/netlink"
 
 	"github.com/microsoft/retina/pkg/log"
@@ -96,28 +95,21 @@ func TestTcpID(t *testing.T) {
 	assert.EqualValues(t, GetTcpID(f), uint64(1234))
 }
 
-func TestGetOutgoingInterface_RouteResolves(t *testing.T) {
-	const (
-		InterfaceName  = "Eth0"
-		InterfaceIndex = 42
-	)
-
-	knownLink := &netlink.Veth{LinkAttrs: netlink.LinkAttrs{Name: InterfaceName, Index: InterfaceIndex}}
-
-	routeList = func(_ netlink.Link, _ int) ([]netlink.Route, error) {
-		return []netlink.Route{
-			{LinkIndex: 1, Dst: &net.IPNet{IP: net.IPv4(192, 168, 0, 0), Mask: net.IPv4Mask(255, 255, 255, 0)}},
-			{LinkIndex: InterfaceIndex, Dst: nil},
-		}, nil
-	}
-	linkByIndex = func(index int) (netlink.Link, error) {
-		if index == InterfaceIndex {
-			return knownLink, nil
-		}
-		return nil, fmt.Errorf("route not found")
+func TestIsDefaultRoute(t *testing.T) {
+	tests := []struct {
+		Route netlink.Route
+		ShouldBeDefault bool
+	}{
+		{Route: netlink.Route{Dst: nil}, ShouldBeDefault: true},
+		{Route: netlink.Route{Dst: &net.IPNet{IP: net.IPv4zero, Mask: net.CIDRMask(0, 32)}}, ShouldBeDefault: true},
+		{Route: netlink.Route{Dst: &net.IPNet{IP: net.IPv6zero, Mask: net.CIDRMask(0, 128)}}, ShouldBeDefault: true},
+		{Route: netlink.Route{Dst: &net.IPNet{IP: net.IPv4(168, 192, 1, 0), Mask: net.CIDRMask(8, 32)}}, ShouldBeDefault: false},
+		{Route: netlink.Route{Dst: &net.IPNet{IP: net.IPv6loopback, Mask: net.CIDRMask(64, 128)}}, ShouldBeDefault: false},
 	}
 
-	link, err := GetDefaultOutgoingLinks()
-	require.NoError(t, err)
-	require.Equal(t, knownLink, link)
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%s should be default: %t", test.Route.Dst, test.ShouldBeDefault), func(t *testing.T) {
+			assert.Equal(t, test.ShouldBeDefault, isDefaultRoute(test.Route))
+		})
+	}
 }

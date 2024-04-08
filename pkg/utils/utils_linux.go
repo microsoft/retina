@@ -15,10 +15,7 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-var (
-	routeList   = netlink.RouteList
-	linkByIndex = netlink.LinkByIndex
-
+const (
 	ipv4ZeroSubnet = "0.0.0.0/0"
 	ipv6ZeroSubnet = "::/0"
 )
@@ -101,7 +98,7 @@ func determineEndian() binary.ByteOrder {
 
 // GetDefaultOutgoingLinks gets the outgoing interface by executing an equivalent to `ip route show default`
 func GetDefaultOutgoingLinks() ([]netlink.Link, error) {
-	routes, err := routeList(nil, netlink.FAMILY_ALL)
+	routes, err := netlink.RouteList(nil, netlink.FAMILY_ALL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get route list: %w", err)
 	}
@@ -117,7 +114,7 @@ func GetDefaultOutgoingLinks() ([]netlink.Link, error) {
 			continue
 		}
 
-		link, err := linkByIndex(routeLinkIndex)
+		link, err := netlink.LinkByIndex(routeLinkIndex)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get link %d by index: %w", routeLinkIndex, err)
 		}
