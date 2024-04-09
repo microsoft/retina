@@ -78,10 +78,16 @@ stages:
               os: linux
               arch: arm64
 
+            agent-amd64:
+              component: agent
+              os: windows
+              arch: amd64
+
             operator-amd64:
               component: operator
               os: linux
               arch: amd64
+
             operator-arm64:
               component: operator
               os: linux
