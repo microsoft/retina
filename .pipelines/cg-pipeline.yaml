@@ -78,7 +78,7 @@ stages:
               os: linux
               arch: arm64
 
-            agent-amd64:
+            agent-win-amd64:
               component: agent
               os: windows
               arch: amd64
