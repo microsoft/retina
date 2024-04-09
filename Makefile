@@ -237,8 +237,9 @@ build-all: buildx
 					--push . ; \
 			fi; \
 		else \
-			mkdir -p ./output/images/$${os}/$${arch}; \
-			DOCKER_BUILDKIT=1 docker buildx build \
+			if [ $(os) != "windows"]; then\
+				mkdir -p ./output/images/$${os}/$${arch}; \
+				DOCKER_BUILDKIT=1 docker buildx build \
 				-t $${image_tag} \
 				--platform $${platform} \
 				--build-arg GOARCH=$${arch} \
@@ -246,17 +247,29 @@ build-all: buildx
 				--target=controller \
 				-f $(COMPONENT)/Dockerfile.$${os} \
 				-o type=docker,dest=- . > ./output/images/$${os}/$${arch}/retina-$(COMPONENT)-$(VERSION).tar ; \
-			if [ -d $(COMPONENT)/init ]; then \
-				image_tag_init=$(REGISTRY)/retina-$(COMPONENT)-init-enterprise:$(VERSION)-$${os}-$${arch}; \
-				DOCKER_BUILDKIT=1 docker buildx build \
-					-t $${image_tag_init} \
+				if [ -d $(COMPONENT)/init ]; then \
+					image_tag_init=$(REGISTRY)/retina-$(COMPONENT)-init-enterprise:$(VERSION)-$${os}-$${arch}; \
+					DOCKER_BUILDKIT=1 docker buildx build \
+						-t $${image_tag_init} \
+						--platform $${platform} \
+						--target=init \
+						--build-arg GOARCH=$${arch} \
+						--build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
+						--build-arg VERSION=$(VERSION) \
+						-f $(COMPONENT)/Dockerfile.$${os} \
+						-o type=docker,dest=- . > ./output/images/$${os}/$${arch}/retina-$(COMPONENT)-init-$(VERSION).tar ; \
+				fi; \
+			else \
+				for year in 2019 2022; do \
+					DOCKER_BUILDKIT=1 docker buildx build \
+					-t $${image_tag} \
 					--platform $${platform} \
-					--target=init \
 					--build-arg GOARCH=$${arch} \
-					--build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
 					--build-arg VERSION=$(VERSION) \
-					-f $(COMPONENT)/Dockerfile.$${os} \
-					-o type=docker,dest=- . > ./output/images/$${os}/$${arch}/retina-$(COMPONENT)-init-$(VERSION).tar ; \
+					--target=controller \
+					-f $(COMPONENT)/Dockerfile.$${os}-$$year \
+					-o type=docker,dest=- . > ./output/images/$${os}/$${arch}/retina-$(COMPONENT)-$(VERSION)-windows-ltsc$$year-$${arch}.tar; \
+				done; \
 			fi; \
 		fi; \
 	done;
