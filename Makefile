@@ -217,47 +217,25 @@ build-all: buildx
 		echo "OS: $$os, Arch: $$arch"; \
 		echo "Image Tag: $${image_tag}"; \
 		if [ $(DESTINATION) = "remote" ]; then \
-			DOCKER_BUILDKIT=1 docker buildx build \
-				-t $${image_tag} \
-				--platform $${platform} \
-				--build-arg GOARCH=$${arch} \
-				--build-arg VERSION=$(VERSION) \
-				--target=controller \
-				-f $(COMPONENT)/Dockerfile.$${os} \
-				--push .; \
-			if [ -d $(COMPONENT)/init ]; then \
-				image_tag_init=$(FULL_IMAGE_INIT_NAME)-$${os}-$${arch}; \
+			if [ "$$os" = "linux"]; then \
 				DOCKER_BUILDKIT=1 docker buildx build \
-					-t $${image_tag_init} \
+					-t $${image_tag} \
 					--platform $${platform} \
-					--target=init \
 					--build-arg GOARCH=$${arch} \
 					--build-arg VERSION=$(VERSION) \
-					-f $(COMPONENT)/Dockerfile.$${os} \
-					--push . ; \
-			fi; \
-		else \
-			mkdir -p ./output/images/$${os}/$${arch}; \
-			if [ "$$os" = "linux" ]; then\
-				DOCKER_BUILDKIT=1 docker buildx build \
-				-t $${image_tag} \
-				--platform $${platform} \
-				--build-arg GOARCH=$${arch} \
-				--build-arg VERSION=$(VERSION) \
-				--target=controller \
-				-f $(COMPONENT)/Dockerfile.$${os} \
-				-o type=docker,dest=- . > ./output/images/$${os}/$${arch}/retina-$(COMPONENT)-$(VERSION).tar ; \
+					--target=agent \
+					-f controller/Dockerfile.controller \
+					--push .; \
 				if [ -d $(COMPONENT)/init ]; then \
-					image_tag_init=$(REGISTRY)/retina-$(COMPONENT)-init-enterprise:$(VERSION)-$${os}-$${arch}; \
+					image_tag_init=$(FULL_IMAGE_INIT_NAME)-$${os}-$${arch}; \
 					DOCKER_BUILDKIT=1 docker buildx build \
 						-t $${image_tag_init} \
 						--platform $${platform} \
 						--target=init \
 						--build-arg GOARCH=$${arch} \
-						--build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
 						--build-arg VERSION=$(VERSION) \
-						-f $(COMPONENT)/Dockerfile.$${os} \
-						-o type=docker,dest=- . > ./output/images/$${os}/$${arch}/retina-$(COMPONENT)-init-$(VERSION).tar ; \
+						-f controller/Dockerfile.$${os} \
+						--push . ; \
 				fi; \
 			else \
 				for year in 2019 2022; do \
@@ -267,8 +245,43 @@ build-all: buildx
 					--build-arg GOOS=$$os \
 					--build-arg GOARCH=$${arch} \
 					--build-arg VERSION=$(VERSION) \
+					--target=agent \
+					-f controller/Dockerfile.$${os}-$$year \
+					--push . ; \
+				done; \
+			fi; \
+		else \
+			mkdir -p ./output/images/$${os}/$${arch}; \
+			if [ "$$os" = "linux" ]; then\
+				DOCKER_BUILDKIT=1 docker buildx build \
+				-t $${image_tag} \
+				--platform $${platform} \
+				--build-arg GOARCH=$${arch} \
+				--build-arg VERSION=$(VERSION) \
+				--target=agent \
+				-f controller/Dockerfile.controller \
+				-o type=docker,dest=- . > ./output/images/$${os}/$${arch}/retina-$(COMPONENT)-$(VERSION).tar ; \
+				if [ -d $(COMPONENT)/init ]; then \
+					image_tag_init=$(REGISTRY)/retina-$(COMPONENT)-init:$(VERSION)-$${os}-$${arch}; \
+					DOCKER_BUILDKIT=1 docker buildx build \
+						-t $${image_tag_init} \
+						--platform $${platform} \
+						--target=init \
+						--build-arg GOARCH=$${arch} \
+						--build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
+						--build-arg VERSION=$(VERSION) \
+						-f controller/Dockerfile.$${os} \
+						-o type=docker,dest=- . > ./output/images/$${os}/$${arch}/retina-$(COMPONENT)-init-$(VERSION).tar ; \
+				fi; \
+			else \
+				for year in 2019 2022; do \
+					DOCKER_BUILDKIT=1 docker buildx build \
+					-t $${image_tag} \
+					--platform $${platform} \
+					--build-arg GOARCH=$${arch} \
+					--build-arg VERSION=$(VERSION) \
 					--target=controller \
-					-f $(COMPONENT)/Dockerfile.$${os}-$$year \
+					-f controller/Dockerfile.$${os}-$$year \
 					-o type=docker,dest=- . > ./output/images/$${os}/$${arch}/retina-$(COMPONENT)-$(VERSION)-windows-ltsc$${year}-$${arch}.tar; \
 				done; \
 			fi; \
