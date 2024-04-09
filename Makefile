@@ -237,8 +237,8 @@ build-all: buildx
 					--push . ; \
 			fi; \
 		else \
+			mkdir -p ./output/images/$${os}/$${arch}; \
 			if [ $(os) != "windows"]; then\
-				mkdir -p ./output/images/$${os}/$${arch}; \
 				DOCKER_BUILDKIT=1 docker buildx build \
 				-t $${image_tag} \
 				--platform $${platform} \
