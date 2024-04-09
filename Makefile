@@ -264,11 +264,12 @@ build-all: buildx
 					DOCKER_BUILDKIT=1 docker buildx build \
 					-t $${image_tag} \
 					--platform $${platform} \
+					--build-arg GOOS=$$os \
 					--build-arg GOARCH=$${arch} \
 					--build-arg VERSION=$(VERSION) \
 					--target=controller \
 					-f $(COMPONENT)/Dockerfile.$${os}-$$year \
-					-o type=docker,dest=- . > ./output/images/$${os}/$${arch}/retina-$(COMPONENT)-$(VERSION)-windows-ltsc$$year-$${arch}.tar; \
+					-o type=docker,dest=- . > ./output/images/$${os}/$${arch}/retina-$(COMPONENT)-$(VERSION)-windows-ltsc$${year}-$${arch}.tar; \
 				done; \
 			fi; \
 		fi; \
