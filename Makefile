@@ -238,7 +238,8 @@ build-all: buildx
 			fi; \
 		else \
 			mkdir -p ./output/images/$${os}/$${arch}; \
-			if [ $(os) != "windows"]; then\
+			if [ "$os" = "linux" ]; then\
+				echo "Here for windows: $os" \
 				DOCKER_BUILDKIT=1 docker buildx build \
 				-t $${image_tag} \
 				--platform $${platform} \
