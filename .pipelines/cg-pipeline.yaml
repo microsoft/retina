@@ -2,12 +2,12 @@ pr: none
 trigger: none
 
 schedules:
-- cron: '0 0 * * *'
-  displayName: Daily midnight Retina OSS CG pipeline
-  branches:
-    include:
-    - main
-    - vakr/newadocg
+  - cron: "0 0 * * *"
+    displayName: Daily midnight Retina OSS CG pipeline
+    branches:
+      include:
+        - main
+        - vakr/newadocg
 
 stages:
   - stage: setup
@@ -44,3 +44,99 @@ stages:
             name: "EnvironmentalVariables"
             displayName: "Set environmental variables"
             condition: always()
+
+      - job: retinaagentimages
+        displayName: Build Retina Agent Images
+        pool:
+          name: "$(BUILD_POOL_NAME_DEFAULT)"
+        strategy:
+          matrix:
+            agent-linux-arm:
+              platform: "linux"
+              arch: "arm64"
+              target: "agent"
+
+            agent-linux-amd64:
+              platform: "linux"
+              arch: "amd64"
+              target: "agent"
+
+            init-linux-arm:
+              platform: "linux"
+              arch: "arm64"
+              target: "init"
+
+            init-linux-amd64:
+              platform: "linux"
+              arch: "amd64"
+              target: "init"
+
+        steps:
+          - checkout: self
+            fetchTags: true
+          - script: |
+              set -euo pipefail
+              echo "VERSION=$(make version)"
+              export VERSION=$(make version)
+              mkdir -p ./output/images/$(platform)/$(arch)/$(year)
+              make retina-image \
+                AGENT_TARGETS=$(target) \
+                TAG=$(make version) \
+                IMAGE_NAMESPACE=retina \
+                PLATFORM=$(platform)/$(arch) \
+                IMAGE_REGISTRY=ghcr.io/microsoft  \
+                BUILDX_ACTION="-o type=docker,dest=./output/images/$(platform)/$(arch)/retina-$(target)-$VERSION.tar"
+            displayName: "Build Retina Linux Images"
+
+          - bash: |
+              mkdir -p $(Build.ArtifactStagingDirectory)
+              cp -r output/* $(Build.ArtifactStagingDirectory)
+            displayName: "Copy binaries to the binaries artifact folder"
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              artifactName: output
+              pathtoPublish: "$(Build.ArtifactStagingDirectory)"
+            condition: succeeded()
+
+      - job: retinaagentimageswin
+        displayName: Build Retina Windows Images
+        pool:
+          name: "$(BUILD_POOL_NAME_DEFAULT)"
+        strategy:
+          matrix:
+            windows-ltsc2022:
+              platform: "windows"
+              arch: "amd64"
+              year: "2022"
+
+            windows-ltsc2019:
+              platform: "windows"
+              arch: "amd64"
+              year: "2019"
+
+        steps:
+          - checkout: self
+            fetchTags: true
+          - script: |
+              set -euo pipefail
+              echo "VERSION=$(make version)"
+              export VERSION=$(make version)
+              mkdir -p ./output/images/$(platform)/$(arch)/$(year)
+              make retina-image-win \
+                TARGET=final \
+                WINDOWS_YEARS=$(year) \
+                TAG=$(make version) \
+                BUILDX_ACTION="-o type=docker,dest=./output/images/$(platform)/$(arch)/$(year)/retina-agent-$VERSION.tar"
+            displayName: "Build Retina Windows Image"
+
+          - bash: |
+              mkdir -p $(Build.ArtifactStagingDirectory)
+              cp -r output/* $(Build.ArtifactStagingDirectory)
+            displayName: "Copy binaries to the binaries artifact folder"
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              artifactName: output
+              pathtoPublish: "$(Build.ArtifactStagingDirectory)"
+            condition: succeeded()

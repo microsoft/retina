@@ -66,6 +66,7 @@ jobs:
       matrix:
         platform: ["windows"]
         arch: ["amd64"]
+        year: ["2019", "2022"]
 
     steps:
       - name: Checkout code
@@ -96,11 +97,13 @@ jobs:
               IMAGE_NAMESPACE=${{ github.repository }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
+              YEAR=${{ matrix.year }} \
               BUILDX_ACTION=--push
           else
             make retina-image-win \
               IMAGE_NAMESPACE=${{ github.repository }} \
-              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
+              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
+              WINDOWS_YEARS=${{ matrix.year }} 
           fi
         env:
           IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
@@ -215,4 +218,5 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          export AZURE_SUBSCRIPTION_ID=${{ secrets.AZURE_SUBSCRIPTION }}
           go test -v ./test/e2e/scenarios/retina/*.go -timeout 30m -tags=e2e -count=1  -args -image-tag=$(make version) -image-registry=${{ vars.ACR_NAME }}  -image-namespace=${{ github.repository}}

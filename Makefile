@@ -45,6 +45,11 @@ ALL_ARCH.windows = amd64
 # while RETINA_PLATFORM_TAG is platform specific, which can be used for image built for specific platforms.
 RETINA_PLATFORM_TAG        ?= $(TAG)-$(subst /,-,$(PLATFORM))
 
+# used for looping through components in container build
+AGENT_TARGETS ?= init agent
+
+WINDOWS_YEARS ?= "2019 2022"
+
 # for windows os, add year to the platform tag
 ifeq ($(OS),windows)
 RETINA_PLATFORM_TAG        = $(TAG)-windows-ltsc$(YEAR)-amd64
@@ -203,6 +208,8 @@ buildx:
 		echo "Buildx instance retina created."; \
 	fi;
 
+
+
 container-docker: buildx # util target to build container images using docker buildx. do not invoke directly.
 	os=$$(echo $(PLATFORM) | cut -d'/' -f1); \
 	arch=$$(echo $(PLATFORM) | cut -d'/' -f2); \
@@ -211,7 +218,6 @@ container-docker: buildx # util target to build container images using docker bu
 	touch $$image_metadata_filename; \
 	echo "Building $$image_name for $$os/$$arch "; \
 	docker buildx build \
-		$(BUILDX_ACTION) \
 		--platform $(PLATFORM) \
 		--metadata-file=$$image_metadata_filename \
 		-f $(DOCKERFILE) \
@@ -222,12 +228,13 @@ container-docker: buildx # util target to build container images using docker bu
 		--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
 		--target=$(TARGET) \
 		-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
-		$(CONTEXT_DIR)
+		$(BUILDX_ACTION) \
+		$(CONTEXT_DIR) 
+
 
 retina-image: ## build the retina linux container image.
 	echo "Building for $(PLATFORM)"
-	set -e ; \
-	for target in init agent; do \
+	for target in $(AGENT_TARGETS); do \
 		echo "Building for $$target"; \
 		if [ "$$target" = "init" ]; then \
 			image_name=$(RETINA_INIT_IMAGE); \
@@ -247,7 +254,7 @@ retina-image: ## build the retina linux container image.
 	done
 
 retina-image-win: ## build the retina Windows container image.
-	for year in 2019 2022; do \
+	for year in $(WINDOWS_YEARS); do \
 		tag=$(TAG)-windows-ltsc$$year-amd64; \
 		echo "Building $(RETINA_PLATFORM_TAG)"; \
 		set -e ; \
