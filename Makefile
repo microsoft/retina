@@ -192,7 +192,8 @@ retina-skopeo-export:
 		IMG=$(RETINA_IMAGE)
 		TAG=$(RETINA_PLATFORM_TAG)
 
-buildx:
+.PHONY: build
+build: buildx
 	if docker buildx inspect retina > /dev/null 2>&1; then \
 		echo "Buildx instance retina already exists."; \
 	else \
