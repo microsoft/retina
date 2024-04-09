@@ -192,8 +192,7 @@ retina-skopeo-export:
 		IMG=$(RETINA_IMAGE)
 		TAG=$(RETINA_PLATFORM_TAG)
 
-.PHONY: build
-build: buildx
+buildx:
 	if docker buildx inspect retina > /dev/null 2>&1; then \
 		echo "Buildx instance retina already exists."; \
 	else \
@@ -202,6 +201,65 @@ build: buildx
 		docker buildx use retina; \
 		echo "Buildx instance retina created."; \
 	fi;
+
+.PHONY: build
+build-all: buildx
+	#$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/retina-$(COMPONENT):$(VERSION))
+	#$(eval FULL_IMAGE_INIT_NAME=$(IMAGE_REGISTRY)/retina-$(COMPONENT)-init:$(VERSION))
+	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_IMAGE):$(TAG))
+	$(eval FULL_INIT_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE):$(TAG))
+	echo "Building $(FULL_IMAGE_NAME)"
+
+	for platform in $$(echo "$(PLATFORMS)" | tr ',' '\n'); do \
+		os=$${platform%/*}; \
+		arch=$${platform#*/}; \
+		image_tag=$(FULL_IMAGE_NAME)-$${os}-$${arch}; \
+		echo "OS: $$os, Arch: $$arch"; \
+		echo "Image Tag: $${image_tag}"; \
+		if [ $(DESTINATION) = "remote" ]; then \
+			DOCKER_BUILDKIT=1 docker buildx build \
+				-t $${image_tag} \
+				--platform $${platform} \
+				--build-arg GOARCH=$${arch} \
+				--build-arg VERSION=$(VERSION) \
+				--target=controller \
+				-f $(COMPONENT)/Dockerfile.$${os} \
+				--push .; \
+			if [ -d $(COMPONENT)/init ]; then \
+				image_tag_init=$(FULL_IMAGE_INIT_NAME)-$${os}-$${arch}; \
+				DOCKER_BUILDKIT=1 docker buildx build \
+					-t $${image_tag_init} \
+					--platform $${platform} \
+					--target=init \
+					--build-arg GOARCH=$${arch} \
+					--build-arg VERSION=$(VERSION) \
+					-f $(COMPONENT)/Dockerfile.$${os} \
+					--push . ; \
+			fi; \
+		else \
+			mkdir -p ./output/images/$${os}/$${arch}; \
+			DOCKER_BUILDKIT=1 docker buildx build \
+				-t $${image_tag} \
+				--platform $${platform} \
+				--build-arg GOARCH=$${arch} \
+				--build-arg VERSION=$(VERSION) \
+				--target=controller \
+				-f $(COMPONENT)/Dockerfile.$${os} \
+				-o type=docker,dest=- . > ./output/images/$${os}/$${arch}/retina-$(COMPONENT)-$(VERSION).tar ; \
+			if [ -d $(COMPONENT)/init ]; then \
+				image_tag_init=$(REGISTRY)/retina-$(COMPONENT)-init-enterprise:$(VERSION)-$${os}-$${arch}; \
+				DOCKER_BUILDKIT=1 docker buildx build \
+					-t $${image_tag_init} \
+					--platform $${platform} \
+					--target=init \
+					--build-arg GOARCH=$${arch} \
+					--build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
+					--build-arg VERSION=$(VERSION) \
+					-f $(COMPONENT)/Dockerfile.$${os} \
+					-o type=docker,dest=- . > ./output/images/$${os}/$${arch}/retina-$(COMPONENT)-init-$(VERSION).tar ; \
+			fi; \
+		fi; \
+	done;
 
 container-docker: buildx # util target to build container images using docker buildx. do not invoke directly.
 	os=$$(echo $(PLATFORM) | cut -d'/' -f1); \
