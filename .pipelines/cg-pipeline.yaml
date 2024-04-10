@@ -70,11 +70,11 @@ stages:
               platform: "linux"
               arch: "amd64"
               target: "init"
-
+            
             operator-linux-amd64:
-            platform: "linux"
-            arch: "amd64"
-            target: "operator"
+              platform: "linux"
+              arch: "amd64"
+              target: "operator"
 
         steps:
           - checkout: self
