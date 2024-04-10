@@ -104,7 +104,7 @@ stages:
             persistCredentials: true
 
           - bash: |
-              make build-all VERSION=$(make version) COMPONENT=$(component) PLATFORMS=$(os)/$(arch) DESTINATION=local APP_INSIGHTS_ID=$APP_INSIGHTS_ID
+              make build-all VERSION=$(make version) COMPONENT=$(component) PLATFORMS=$(platform)/$(arch) DESTINATION=local APP_INSIGHTS_ID=$APP_INSIGHTS_ID
             displayName: "Build Image"
 
           - bash: |
