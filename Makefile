@@ -57,8 +57,14 @@ endif
 qemu-user-static: ## Set up the host to run qemu multiplatform container builds.
 	sudo $(CONTAINER_RUNTIME) run --rm --privileged multiarch/qemu-user-static --reset -p yes
 
-version: ## prints the root version
-	@echo $(TAG)
+.PHONY: version ## prints the root version
+version:
+	@if [ "$(shell git tag --points-at HEAD)" != "" ]; then \
+		export VERSION="$$(git tag --points-at HEAD)"; \
+	else \
+		export VERSION="$$(git rev-parse --short HEAD)"; \
+	fi; \
+	echo "$${VERSION}"
 
 ##@ Help 
 
