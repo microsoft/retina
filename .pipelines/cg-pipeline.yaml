@@ -45,45 +45,6 @@ stages:
             displayName: "Set environmental variables"
             condition: always()
 
-      - job: retinaoperatorimages
-        displayName: Build Retina Agent Images
-        pool:
-          name: "$(BUILD_POOL_NAME_DEFAULT)"
-        strategy:
-          matrix:            
-            operator-linux-amd64:
-              platform: "linux"
-              arch: "amd64"
-              target: "operator"
-
-        steps:
-          - checkout: self
-            fetchTags: true
-          - script: |
-              set -euo pipefail
-              echo "VERSION=$(make version)"
-              export VERSION=$(make version)
-              mkdir -p ./output/images/$(platform)/$(arch)/$(year)
-              make retina-operator-image \
-                AGENT_TARGETS=$(target) \
-                TAG=$(make version) \
-                IMAGE_NAMESPACE=retina \
-                PLATFORM=$(platform)/$(arch) \
-                IMAGE_REGISTRY=ghcr.io/microsoft  \
-                BUILDX_ACTION="-o type=docker,dest=./output/images/$(platform)/$(arch)/retina-operator-$VERSION.tar"
-            displayName: "Build Retina Operator Linux Images"
-
-          - bash: |
-              mkdir -p $(Build.ArtifactStagingDirectory)
-              cp -r output/* $(Build.ArtifactStagingDirectory)
-            displayName: "Copy binaries to the binaries artifact folder"
-
-          - task: PublishBuildArtifacts@1
-            inputs:
-              artifactName: output
-              pathtoPublish: "$(Build.ArtifactStagingDirectory)"
-            condition: succeeded()
-
       - job: retinaagentimages
         displayName: Build Retina Agent Images
         pool:
@@ -109,11 +70,6 @@ stages:
               platform: "linux"
               arch: "amd64"
               target: "init"
-            
-            operator-linux-amd64:
-              platform: "linux"
-              arch: "amd64"
-              target: "operator"
 
         steps:
           - checkout: self
@@ -129,8 +85,47 @@ stages:
                 IMAGE_NAMESPACE=retina \
                 PLATFORM=$(platform)/$(arch) \
                 IMAGE_REGISTRY=ghcr.io/microsoft  \
-                BUILDX_ACTION="-o type=docker,dest=./output/images/$(platform)/$(arch)/retina-$(target)-$VERSION.tar"
+                BUILDX_ACTION="-o type=docker,dest=./output/images/$(platform)/$(arch)/retina-$(target)-$VERSION-linux-$(arch).tar"
             displayName: "Build Retina Linux Images"
+
+          - bash: |
+              mkdir -p $(Build.ArtifactStagingDirectory)
+              cp -r output/* $(Build.ArtifactStagingDirectory)
+            displayName: "Copy binaries to the binaries artifact folder"
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              artifactName: output
+              pathtoPublish: "$(Build.ArtifactStagingDirectory)"
+            condition: succeeded()
+
+      - job: retinaoperatorimages
+        displayName: Build Retina Agent Images
+        pool:
+          name: "$(BUILD_POOL_NAME_DEFAULT)"
+        strategy:
+          matrix:            
+            operator-linux-amd64:
+              platform: "linux"
+              arch: "amd64"
+              target: "operator"
+
+        steps:
+          - checkout: self
+            fetchTags: true
+          - script: |
+              set -euo pipefail
+              echo "VERSION=$(make version)"
+              export VERSION=$(make version)
+              mkdir -p ./output/images/$(platform)/$(arch)/$(year)
+              retina-operator-image \
+                AGENT_TARGETS=$(target) \
+                TAG=$(make version) \
+                IMAGE_NAMESPACE=retina \
+                PLATFORM=$(platform)/$(arch) \
+                IMAGE_REGISTRY=ghcr.io/microsoft  \
+                BUILDX_ACTION="-o type=docker,dest=./output/images/$(platform)/$(arch)/retina-$(target)-$VERSION.tar"
+            displayName: "Build Retina Operator Linux Images"
 
           - bash: |
               mkdir -p $(Build.ArtifactStagingDirectory)
