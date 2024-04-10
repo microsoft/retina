@@ -52,7 +52,21 @@ func (ep *RetinaEndpoint) DeepCopy() interface{} {
 	return newEp
 }
 
-func (ep *RetinaEndpoint) IPs() *IPAddresses {
+func (e *RetinaEndpoint) IPs() ([]string, error) {
+	e.RLock()
+	defer e.RUnlock()
+
+	if e.ips != nil {
+		ips := e.ips.GetIPs()
+		if len(ips) > 0 {
+			return ips, nil
+		}
+	}
+
+	return []string{}, fmt.Errorf("no IP found for endpoint %s", e.Key())
+}
+
+func (ep *RetinaEndpoint) NetIPs() *IPAddresses {
 	ep.RLock()
 	defer ep.RUnlock()
 
