@@ -100,7 +100,7 @@ stages:
             condition: succeeded()
 
       - job: retinaoperatorimages
-        displayName: Build Retina Agent Images
+        displayName: Build Retina Operator Images
         pool:
           name: "$(BUILD_POOL_NAME_DEFAULT)"
         strategy:
@@ -118,7 +118,7 @@ stages:
               echo "VERSION=$(make version)"
               export VERSION=$(make version)
               mkdir -p ./output/images/$(platform)/$(arch)/$(year)
-              retina-operator-image \
+              make retina-operator-image \
                 AGENT_TARGETS=$(target) \
                 TAG=$(make version) \
                 IMAGE_NAMESPACE=retina \
