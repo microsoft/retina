@@ -108,7 +108,6 @@ stages:
             operator-linux-amd64:
               platform: "linux"
               arch: "amd64"
-              target: "operator"
 
         steps:
           - checkout: self
@@ -119,12 +118,11 @@ stages:
               export VERSION=$(make version)
               mkdir -p ./output/images/$(platform)/$(arch)/$(year)
               make retina-operator-image \
-                AGENT_TARGETS=$(target) \
                 TAG=$(make version) \
                 IMAGE_NAMESPACE=retina \
                 PLATFORM=$(platform)/$(arch) \
                 IMAGE_REGISTRY=ghcr.io/microsoft  \
-                BUILDX_ACTION="-o type=docker,dest=./output/images/$(platform)/$(arch)/retina-$(target)-$VERSION.tar"
+                BUILDX_ACTION="-o type=docker,dest=./output/images/$(platform)/$(arch)/retina-operator-$VERSION.tar"
             displayName: "Build Retina Operator Linux Images"
 
           - bash: |
