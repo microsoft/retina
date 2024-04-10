@@ -44,6 +44,11 @@ ALL_ARCH.windows = amd64
 # while RETINA_PLATFORM_TAG is platform specific, which can be used for image built for specific platforms.
 RETINA_PLATFORM_TAG        ?= $(TAG)-$(subst /,-,$(PLATFORM))
 
+# used for looping through components in container build
+AGENT_TARGETS ?= init agent
+
+WINDOWS_YEARS ?= "2019 2022"
+
 # for windows os, add year to the platform tag
 ifeq ($(OS),windows)
 RETINA_PLATFORM_TAG        = $(TAG)-windows-ltsc$(YEAR)-amd64
@@ -202,90 +207,7 @@ buildx:
 		echo "Buildx instance retina created."; \
 	fi;
 
-.PHONY: build
-build-all: buildx
-	#$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/retina-$(COMPONENT):$(VERSION))
-	#$(eval FULL_IMAGE_INIT_NAME=$(IMAGE_REGISTRY)/retina-$(COMPONENT)-init:$(VERSION))
-	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_IMAGE):$(TAG))
-	$(eval FULL_INIT_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE):$(TAG))
-	echo "Building $(FULL_IMAGE_NAME)"
 
-	for platform in $$(echo "$(PLATFORMS)" | tr ',' '\n'); do \
-		os=$${platform%/*}; \
-		arch=$${platform#*/}; \
-		image_tag=$(FULL_IMAGE_NAME)-$${os}-$${arch}; \
-		echo "OS: $$os, Arch: $$arch"; \
-		echo "Image Tag: $${image_tag}"; \
-		if [ $(DESTINATION) = "remote" ]; then \
-			if [ "$$os" = "linux"]; then \
-				DOCKER_BUILDKIT=1 docker buildx build \
-					-t $${image_tag} \
-					--platform $${platform} \
-					--build-arg GOARCH=$${arch} \
-					--build-arg VERSION=$(VERSION) \
-					--target=agent \
-					-f controller/Dockerfile.controller \
-					--push .; \
-				if [ -d $(COMPONENT)/init ]; then \
-					image_tag_init=$(FULL_IMAGE_INIT_NAME)-$${os}-$${arch}; \
-					DOCKER_BUILDKIT=1 docker buildx build \
-						-t $${image_tag_init} \
-						--platform $${platform} \
-						--target=init \
-						--build-arg GOARCH=$${arch} \
-						--build-arg VERSION=$(VERSION) \
-						-f controller/Dockerfile.$${os} \
-						--push . ; \
-				fi; \
-			else \
-				for year in 2019 2022; do \
-					DOCKER_BUILDKIT=1 docker buildx build \
-					-t $${image_tag} \
-					--platform $${platform} \
-					--build-arg GOOS=$$os \
-					--build-arg GOARCH=$${arch} \
-					--build-arg VERSION=$(VERSION) \
-					-f controller/Dockerfile.$${os}-$$year \
-					--push . ; \
-				done; \
-			fi; \
-		else \
-			mkdir -p ./output/images/$${os}/$${arch}; \
-			if [ "$$os" = "linux" ]; then\
-				DOCKER_BUILDKIT=1 docker buildx build \
-				-t $${image_tag} \
-				--platform $${platform} \
-				--build-arg GOARCH=$${arch} \
-				--build-arg VERSION=$(VERSION) \
-				--target=agent \
-				-f controller/Dockerfile.controller \
-				-o type=docker,dest=- . > ./output/images/$${os}/$${arch}/retina-$(COMPONENT)-$(VERSION).tar ; \
-				if [ -d $(COMPONENT)/init ]; then \
-					image_tag_init=$(REGISTRY)/retina-$(COMPONENT)-init:$(VERSION)-$${os}-$${arch}; \
-					DOCKER_BUILDKIT=1 docker buildx build \
-						-t $${image_tag_init} \
-						--platform $${platform} \
-						--target=init \
-						--build-arg GOARCH=$${arch} \
-						--build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
-						--build-arg VERSION=$(VERSION) \
-						-f controller/Dockerfile.$${os} \
-						-o type=docker,dest=- . > ./output/images/$${os}/$${arch}/retina-$(COMPONENT)-init-$(VERSION).tar ; \
-				fi; \
-			else \
-				for year in 2019 2022; do \
-					DOCKER_BUILDKIT=1 docker buildx build \
-					-t $${image_tag} \
-					--platform $${platform} \
-					--build-arg GOARCH=$${arch} \
-					--build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
-					--build-arg VERSION=$(VERSION) \
-					-f controller/Dockerfile.$${os}-$$year \
-					-o type=docker,dest=- . > ./output/images/$${os}/$${arch}/retina-$(COMPONENT)-$(VERSION)-windows-ltsc$${year}-$${arch}.tar; \
-				done; \
-			fi; \
-		fi; \
-	done;
 
 container-docker: buildx # util target to build container images using docker buildx. do not invoke directly.
 	os=$$(echo $(PLATFORM) | cut -d'/' -f1); \
@@ -295,7 +217,6 @@ container-docker: buildx # util target to build container images using docker bu
 	touch $$image_metadata_filename; \
 	echo "Building $$image_name for $$os/$$arch "; \
 	docker buildx build \
-		$(BUILDX_ACTION) \
 		--platform $(PLATFORM) \
 		--metadata-file=$$image_metadata_filename \
 		-f $(DOCKERFILE) \
@@ -305,11 +226,13 @@ container-docker: buildx # util target to build container images using docker bu
 		--build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
 		--target=$(TARGET) \
 		-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
-		$(CONTEXT_DIR)
+		$(BUILDX_ACTION) \
+		$(CONTEXT_DIR) 
+
 
 retina-image: ## build the retina linux container image.
 	echo "Building for $(PLATFORM)"
-	for target in init agent; do \
+	for target in $(AGENT_TARGETS); do \
 		echo "Building for $$target"; \
 		if [ "$$target" = "init" ]; then \
 			image_name=$(RETINA_INIT_IMAGE); \
@@ -329,7 +252,7 @@ retina-image: ## build the retina linux container image.
 	done
 
 retina-image-win: ## build the retina Windows container image.
-	for year in 2019 2022; do \
+	for year in $(WINDOWS_YEARS); do \
 		tag=$(TAG)-windows-ltsc$$year-amd64; \
 		echo "Building $(RETINA_PLATFORM_TAG)"; \
 		$(MAKE) container-$(CONTAINER_BUILDER) \
