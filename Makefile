@@ -245,7 +245,6 @@ build-all: buildx
 					--build-arg GOOS=$$os \
 					--build-arg GOARCH=$${arch} \
 					--build-arg VERSION=$(VERSION) \
-					--target=agent \
 					-f controller/Dockerfile.$${os}-$$year \
 					--push . ; \
 				done; \
@@ -279,8 +278,8 @@ build-all: buildx
 					-t $${image_tag} \
 					--platform $${platform} \
 					--build-arg GOARCH=$${arch} \
+					--build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
 					--build-arg VERSION=$(VERSION) \
-					--target=controller \
 					-f controller/Dockerfile.$${os}-$$year \
 					-o type=docker,dest=- . > ./output/images/$${os}/$${arch}/retina-$(COMPONENT)-$(VERSION)-windows-ltsc$${year}-$${arch}.tar; \
 				done; \
