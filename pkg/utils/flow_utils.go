@@ -37,7 +37,6 @@ func ToFlow(
 	proto uint8,
 	observationPoint uint32,
 	verdict flow.Verdict,
-	dropReason uint32,
 ) *flow.Flow { //nolint:typecheck
 	var (
 		l4           *flow.Layer4
@@ -116,7 +115,6 @@ func ToFlow(
 		TraceObservationPoint: checkpoint,
 		TrafficDirection:      direction,
 		Verdict:               verdict,
-		DropReason:            dropReason,
 		Extensions:            ext,
 		IsReply:               &wrapperspb.BoolValue{Value: false}, // Setting false by default as we don't have a better way to determine flow direction.
 	}
@@ -258,6 +256,50 @@ func PacketSize(f *flow.Flow) uint64 {
 	k := &RetinaMetadata{}      //nolint:typecheck
 	f.Extensions.UnmarshalTo(k) //nolint:errcheck
 	return k.Bytes
+}
+
+func AddDropReason(f *flow.Flow, dropReason uint32) {
+	if f == nil {
+		return
+	}
+
+	f.Verdict = flow.Verdict_DROPPED
+	f.EventType = &flow.CiliumEventType{
+		Type:    int32(api.MessageTypeDrop),
+		SubType: int32(api.TraceToNetwork), // This is a drop event and direction is determined later.
+	}
+
+	// Set the drop reason.
+	// Retina drop reasons are different from the drop reasons available in flow library.
+	// We map the ones available in flow library to the ones available in Retina.
+	// Rest are set to UNKNOWN. The details are added in the metadata.
+	switch dropReason {
+	case 0:
+		f.DropReasonDesc = flow.DropReason_POLICY_DENIED
+	case 1:
+		f.DropReasonDesc = flow.DropReason_SNAT_NO_MAP_FOUND
+	case 5:
+		f.DropReasonDesc = flow.DropReason_UNKNOWN_CONNECTION_TRACKING_STATE
+	default:
+		f.DropReasonDesc = flow.DropReason_DROP_REASON_UNKNOWN
+	}
+
+	// Deprecated upstream. Will be removed in the future.
+	f.DropReason = uint32(f.DropReasonDesc)
+
+	k := &RetinaMetadata{}      //nolint:typecheck
+	f.Extensions.UnmarshalTo(k) //nolint:errcheck
+	k.DropReason = DropReason(dropReason)
+	f.Extensions, _ = anypb.New(k)
+}
+
+func DropReasonDescription(f *flow.Flow) string {
+	if f == nil {
+		return ""
+	}
+	k := &RetinaMetadata{}      //nolint:typecheck
+	f.Extensions.UnmarshalTo(k) //nolint:errcheck
+	return k.DropReason.String()
 }
 
 func decodeTime(nanoseconds int64) (pbTime *timestamppb.Timestamp, err error) {
