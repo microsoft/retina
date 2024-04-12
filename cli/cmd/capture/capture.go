@@ -4,21 +4,18 @@
 package capture
 
 import (
+	"github.com/microsoft/retina/cli/cmd"
 	"github.com/spf13/cobra"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
-func CaptureCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "capture",
-		Short: "Retina Capture - capture network traffic",
-		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Help() //nolint:errcheck
-		},
-	}
+var capture = &cobra.Command{
+	Use:   "capture",
+	Short: "capture network traffic",
+}
 
-	cmd.AddCommand(CaptureCmdCreate())
-	cmd.AddCommand(CaptureCmdList())
-	cmd.AddCommand(CaptureCmdDelete())
-
-	return cmd
+func init() {
+	cmd.Retina.AddCommand(capture)
+	configFlags = genericclioptions.NewConfigFlags(true)
+	configFlags.AddFlags(capture.PersistentFlags())
 }

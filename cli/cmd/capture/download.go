@@ -15,35 +15,29 @@ import (
 	"github.com/spf13/viper"
 )
 
-const (
-	BLOB_URL = "BLOB_URL"
+const BlobURL = "BLOB_URL"
+
+var (
+	ErrEmptyBlobURL = fmt.Errorf("BLOB_URL must be set/exported")
+	captureName     string
 )
 
-var ErrEmptyBlobURL = fmt.Errorf("BLOB_URL must be set/exported")
-
-func CaptureCmdDownload() *cobra.Command {
-	var captureName string
-	cmd := &cobra.Command{
-		Use:   "download",
-		Short: "Download Retina Captures",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			_, err := Download(cmd, &captureName)
-			return err
-		},
-	}
-
-	cmd.Flags().StringVarP(&captureName, "capture-name", "n", "", "name of capture to download")
-
-	return cmd
+var download = &cobra.Command{
+	Use:   "download",
+	Short: "Download Retina Captures",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		_, err := downloadF(cmd, captureName)
+		return err
+	},
 }
 
-func Download(cmd *cobra.Command, captureName *string) (string, error) {
-	blobURL := viper.GetString(BLOB_URL)
+func downloadF(cmd *cobra.Command, captureName string) (string, error) {
+	blobURL := viper.GetString(BlobURL)
 	if blobURL == "" {
 		return "", ErrEmptyBlobURL
 	}
 
-	bloburl := viper.GetString(BLOB_URL)
+	bloburl := viper.GetString(BlobURL)
 	if bloburl == "" {
 		return "", ErrEmptyBlobURL
 	}
@@ -64,14 +58,14 @@ func Download(cmd *cobra.Command, captureName *string) (string, error) {
 	splitPath := strings.SplitN(containerPath, "/", 2)
 	containerName := splitPath[0]
 
-	params := storage.ListBlobsParameters{Prefix: *captureName}
+	params := storage.ListBlobsParameters{Prefix: captureName}
 	blobList, err := blobService.GetContainerReference(containerName).ListBlobs(params)
 	if err != nil {
 		return "", fmt.Errorf("failed to list blobstore with: %+v", err)
 	}
 
 	if len(blobList.Blobs) == 0 {
-		return "", fmt.Errorf("no blobs found with prefix: %s", *captureName)
+		return "", fmt.Errorf("no blobs found with prefix: %s", captureName)
 	}
 
 	blobName := ""
@@ -98,4 +92,9 @@ func Download(cmd *cobra.Command, captureName *string) (string, error) {
 		fmt.Println("Downloaded blob: ", v.Name)
 	}
 	return blobName, nil
+}
+
+func init() {
+	capture.AddCommand(download)
+	download.Flags().StringVarP(&captureName, "capture-name", "n", "", "name of capture to download")
 }
