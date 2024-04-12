@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -14,9 +15,9 @@ var trace = &cobra.Command{
 var getTrace = &cobra.Command{
 	Use:   "get",
 	Short: "Retrieve network trace results with operation ID",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		operationID, _ := cmd.Flags().GetString("operationID")
-		return RetinaClient.GetTrace(operationID)
+		return errors.Wrap(RetinaClient.GetTrace(operationID), "failed to get traces")
 	},
 }
 

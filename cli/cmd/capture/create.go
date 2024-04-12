@@ -15,6 +15,7 @@ import (
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
 	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	"github.com/microsoft/retina/pkg/config"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	batchv1 "k8s.io/api/batch/v1"
@@ -76,26 +77,22 @@ const (
 	defaultWaitPeriod  time.Duration = 1 * time.Minute
 )
 
-var create = &cobra.Command{
+var createCapture = &cobra.Command{
 	Use:     "create",
 	Short:   "create a Retina Capture",
 	Example: createExample,
-	RunE: func(cmd *cobra.Command, _ []string) error {
-		fmt.Println("create")
-		cmd.DebugFlags()
-		fmt.Println(*configFlags.KubeConfig)
-
+	RunE: func(*cobra.Command, []string) error {
 		kubeConfig, err := configFlags.ToRESTConfig()
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to compose k8s rest config")
 		}
 
 		kubeClient, err := kubernetes.NewForConfig(kubeConfig)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to initialize kubernetes client")
 		}
 
-		capture, err := createCapture(kubeClient)
+		capture, err := createCaptureF(kubeClient)
 		if err != nil {
 			return err
 		}
@@ -130,7 +127,8 @@ var create = &cobra.Command{
 
 			err = deleteSecret(kubeClient, capture.Spec.OutputConfiguration.BlobUpload)
 			if err != nil {
-				retinacmd.Logger.Error("Failed to delete capture secret, please manually delete it", zap.String("namespace", namespace), zap.String("secret name", *capture.Spec.OutputConfiguration.BlobUpload), zap.Error(err))
+				retinacmd.Logger.Error("Failed to delete capture secret, please manually delete it",
+					zap.String("namespace", namespace), zap.String("secret name", *capture.Spec.OutputConfiguration.BlobUpload), zap.Error(err))
 			}
 
 			if len(jobsFailedToDelete) == 0 && err == nil {
@@ -175,7 +173,7 @@ func deleteSecret(kubeClient kubernetes.Interface, secretName *string) error {
 	return kubeClient.CoreV1().Secrets(namespace).Delete(context.TODO(), *secretName, metav1.DeleteOptions{})
 }
 
-func createCapture(kubeClient kubernetes.Interface) (*retinav1alpha1.Capture, error) {
+func createCaptureF(kubeClient kubernetes.Interface) (*retinav1alpha1.Capture, error) {
 	captureName := fmt.Sprintf("retina-capture-%s", utilrand.String(5))
 	capture := &retinav1alpha1.Capture{
 		ObjectMeta: metav1.ObjectMeta{
@@ -381,26 +379,27 @@ func deleteJobs(kubeClient kubernetes.Interface, jobs []batchv1.Job) []string {
 }
 
 func init() {
-	capture.AddCommand(create)
-	create.Flags().DurationVar(&duration, "duration", 60*time.Second, "Duration of capturing packets")
-	create.Flags().IntVar(&maxSize, "max-size", 100, "Limit the capture file to MB in size which works only for Linux")
-	create.Flags().IntVar(&packetSize, "packet-size", 0, "Limits the each packet to bytes in size which works only for Linux")
-	create.Flags().StringVar(&nodeNames, "node-names", "", "A comma-separated list of node names to select nodes on which the network capture will be performed")
-	create.Flags().StringVar(&nodeSelectors, "node-selectors", "", "A comma-separated list of node labels to select nodes on which the network capture will be performed")
-	create.Flags().StringVar(&podSelectors, "pod-selectors", "", "A comma-separated list of pod labels together with namespace-selector to select pods on which the network capture will be performed")
-	create.Flags().StringVar(&namespaceSelectors, "namespace-selectors", "",
-		"A comma-separated list of namespace labels together with pod-selector to select pods on which the network capture will be performed. By default, the pod namespace is specified by the flag namespace")
-	create.Flags().StringVar(&hostPath, "host-path", "", "HostPath of the node to store the capture files")
-	create.Flags().StringVar(&pvc, "pvc", "", "PersistentVolumeClaim under the specified or default namespace to store capture files")
-	create.Flags().StringVar(&blobUpload, "blob-upload", "", "Blob SAS URL with write permission to upload capture files")
-	create.Flags().StringVar(&tcpdumpFilter, "tcpdump-filter", "", "Raw tcpdump flags which works only for Linux")
-	create.Flags().StringVar(&excludeFilter, "exclude-filter", "", "A comma-separated list of IP:Port pairs that are "+
+	capture.AddCommand(createCapture)
+	createCapture.Flags().DurationVar(&duration, "duration", time.Minute, "Duration of capturing packets")
+	createCapture.Flags().IntVar(&maxSize, "max-size", 100, "Limit the capture file to MB in size which works only for Linux") //nolint:gomnd // default
+	createCapture.Flags().IntVar(&packetSize, "packet-size", 0, "Limits the each packet to bytes in size which works only for Linux")
+	createCapture.Flags().StringVar(&nodeNames, "node-names", "", "A comma-separated list of node names to select nodes on which the network capture will be performed")
+	createCapture.Flags().StringVar(&nodeSelectors, "node-selectors", "", "A comma-separated list of node labels to select nodes on which the network capture will be performed")
+	createCapture.Flags().StringVar(&podSelectors, "pod-selectors", "",
+		"A comma-separated list of pod labels to select pods on which the network capture will be performed")
+	createCapture.Flags().StringVar(&namespaceSelectors, "namespace-selectors", "",
+		"A comma-separated list of namespace labels in which to apply the pod-selectors. By default, the pod namespace is specified by the flag namespace")
+	createCapture.Flags().StringVar(&hostPath, "host-path", "", "HostPath of the node to store the capture files")
+	createCapture.Flags().StringVar(&pvc, "pvc", "", "PersistentVolumeClaim under the specified or default namespace to store capture files")
+	createCapture.Flags().StringVar(&blobUpload, "blob-upload", "", "Blob SAS URL with write permission to upload capture files")
+	createCapture.Flags().StringVar(&tcpdumpFilter, "tcpdump-filter", "", "Raw tcpdump flags which works only for Linux")
+	createCapture.Flags().StringVar(&excludeFilter, "exclude-filter", "", "A comma-separated list of IP:Port pairs that are "+
 		"excluded from capturing network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:*")
-	create.Flags().StringVar(&includeFilter, "include-filter", "", "A comma-separated list of IP:Port pairs that are "+
+	createCapture.Flags().StringVar(&includeFilter, "include-filter", "", "A comma-separated list of IP:Port pairs that are "+
 		"used to filter capture network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:*")
-	create.Flags().BoolVar(&includeMetadata, "include-metadata", true, "If true, collect static network metadata into capture file")
-	create.Flags().StringVarP(&namespace, "namespace", "n", "default", "Namespace to host capture job")
-	create.Flags().IntVar(&jobNumLimit, "job-num-limit", 0, "The maximum number of jobs can be created for each capture. 0 means no limit")
-	create.Flags().BoolVar(&nowait, "no-wait", true, "Do not wait for the long-running capture job to finish")
-	create.Flags().BoolVar(&debug, "debug", false, "When debug is true, a customized retina-agent image, determined by the environment variable RETINA_AGENT_IMAGE, is set")
+	createCapture.Flags().BoolVar(&includeMetadata, "include-metadata", true, "If true, collect static network metadata into capture file")
+	createCapture.Flags().StringVarP(&namespace, "namespace", "n", "default", "Namespace to host capture job")
+	createCapture.Flags().IntVar(&jobNumLimit, "job-num-limit", 0, "The maximum number of jobs can be created for each capture. 0 means no limit")
+	createCapture.Flags().BoolVar(&nowait, "no-wait", true, "Do not wait for the long-running capture job to finish")
+	createCapture.Flags().BoolVar(&debug, "debug", false, "When debug is true, a customized retina-agent image, determined by the environment variable RETINA_AGENT_IMAGE, is set")
 }

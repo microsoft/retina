@@ -6,10 +6,12 @@ package capture
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	retinacmd "github.com/microsoft/retina/cli/cmd"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
 	"github.com/microsoft/retina/pkg/label"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,23 +28,23 @@ var deleteExample = templates.Examples(i18n.T(`
 		kubectl retina capture delete --name retina-capture-8v6wd --namespace capture
 		`))
 
-var delete = &cobra.Command{
+var deleteCapture = &cobra.Command{
 	Use:     "delete",
 	Short:   "Delete a Retina capture",
 	Example: deleteExample,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(*cobra.Command, []string) error {
 		kubeConfig, err := configFlags.ToRESTConfig()
 		if err != nil {
-			return err
+			return errors.Wrap(err, "")
 		}
 
 		kubeClient, err := kubernetes.NewForConfig(kubeConfig)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "")
 		}
 
-		if len(name) == 0 {
-			return fmt.Errorf("Capture name is not specified")
+		if strings.TrimSpace(name) == "" {
+			return errors.New("capture name is not specified")
 		}
 
 		captureJobSelector := &metav1.LabelSelector{
@@ -58,10 +60,10 @@ var delete = &cobra.Command{
 
 		jobList, err := kubeClient.BatchV1().Jobs(namespace).List(context.TODO(), jobListOpt)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to list capture jobs")
 		}
 		if len(jobList.Items) == 0 {
-			return fmt.Errorf("Capture %s in namespace %s is not found", name, namespace)
+			return errors.Errorf("capture %s in namespace %s was not found", name, namespace)
 		}
 
 		for _, job := range jobList.Items {
@@ -76,7 +78,7 @@ var delete = &cobra.Command{
 		for _, volume := range jobList.Items[0].Spec.Template.Spec.Volumes {
 			if volume.Secret != nil {
 				if err := kubeClient.CoreV1().Secrets(namespace).Delete(context.TODO(), volume.Secret.SecretName, metav1.DeleteOptions{}); err != nil {
-					return err
+					return errors.Wrap(err, "failed to delete capture secret")
 				}
 				break
 			}
@@ -88,7 +90,7 @@ var delete = &cobra.Command{
 }
 
 func init() {
-	capture.AddCommand(delete)
-	delete.Flags().StringVar(&name, "name", "", "name of the Retina Capture")
-	delete.Flags().StringVarP(&namespace, "namespace", "n", "default", "Namespace to host capture job")
+	capture.AddCommand(deleteCapture)
+	deleteCapture.Flags().StringVar(&name, "name", "", "name of the Retina Capture")
+	deleteCapture.Flags().StringVarP(&namespace, "namespace", "n", "default", "Namespace to host capture job")
 }

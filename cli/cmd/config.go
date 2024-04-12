@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -25,7 +26,7 @@ var setConfig = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return os.WriteFile(ClientConfigPath, b, 0o644) // nolint: gosec // no sensitive data
+		return errors.Wrap(os.WriteFile(ClientConfigPath, b, 0o644), "failed to write config file") // nolint:gosec,gomnd // no sensitive data
 	},
 }
 
@@ -35,7 +36,7 @@ var viewConfig = &cobra.Command{
 	RunE: func(*cobra.Command, []string) error {
 		b, err := os.ReadFile(ClientConfigPath)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to read config path")
 		}
 		fmt.Println(string(b))
 		return nil
@@ -44,7 +45,7 @@ var viewConfig = &cobra.Command{
 
 func init() {
 	setConfig.Flags().String("endpoint", "", "Set Retina server")
-	setConfig.MarkFlagRequired("endpoint") //nolint:errcheck
+	_ = setConfig.MarkFlagRequired("endpoint")
 	config.AddCommand(setConfig)
 	config.AddCommand(viewConfig)
 	Retina.AddCommand(config)
