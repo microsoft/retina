@@ -16,6 +16,13 @@ operator:
   capture:
     debug: "true"
     jobNumLimit: 0
+  resources:
+    limits:
+      cpu: 500m
+      memory: 128Mi
+    requests:
+      cpu: 10m
+      memory: 128Mi
 
 image:
   repository: ghcr.io/microsoft/retina/retina-agent
@@ -113,6 +120,9 @@ resources:
   limits:
     memory: "300Mi"
     cpu: "500m"
+  requests:
+    memory: "300Mi"
+    cpu: "100m"
 
 ## @param nodeSelector [object] Node labels for pod assignment
 ## Ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
