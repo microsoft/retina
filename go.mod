@@ -262,7 +262,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.3.2
 	github.com/Microsoft/hcsshim v0.12.0-rc.3
 	github.com/cakturk/go-netstat v0.0.0-20200220111822-e5b49efee7a5
-	github.com/cilium/cilium v1.15.3
+	github.com/cilium/cilium v1.15.4
 	github.com/cilium/ebpf v0.14.0
 	github.com/florianl/go-tc v0.4.3
 	github.com/inspektor-gadget/inspektor-gadget v0.25.1-0.20240223044605-4ac24c3e3b7f
@@ -274,7 +274,7 @@ require (
 	github.com/onsi/gomega v1.32.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_model v0.6.0
-	github.com/prometheus/common v0.52.2
+	github.com/prometheus/common v0.52.3
 	github.com/safchain/ethtool v0.3.0
 	github.com/spf13/viper v1.18.2
 	github.com/vishvananda/netlink v1.2.1-beta.2.0.20231127184239-0ced8385386a
@@ -285,7 +285,7 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gotest.tools v2.2.0+incompatible
 	gotest.tools/v3 v3.5.1
-	helm.sh/helm/v3 v3.14.3
+	helm.sh/helm/v3 v3.14.4
 	k8s.io/apiextensions-apiserver v0.29.3
 	k8s.io/cli-runtime v0.29.3
 	k8s.io/kubectl v0.29.3
