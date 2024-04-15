@@ -203,6 +203,11 @@ retina-skopeo-export:
 		REF=$(IMAGE_REGISTRY)/$(RETINA_IMAGE):$(RETINA_PLATFORM_TAG) \
 		IMG=$(RETINA_IMAGE)
 		TAG=$(RETINA_PLATFORM_TAG)
+		
+
+manifest-skopeo-archive: # util target to export tar archive of multiarch container manifest.
+	skopeo copy --all docker://$(IMAGE_REGISTRY)/$(IMAGE):$(TAG) oci-archive:$(IMAGE_ARCHIVE_DIR)/$(IMAGE)-$(TAG).tar --debug
+
 
 buildx:
 	if docker buildx inspect retina > /dev/null 2>&1; then \
