@@ -61,9 +61,7 @@ spec:
           - name: retina
             containerPort: {{ .Values.retinaPort }}
           resources:
-            limits:
-              memory: {{ .Values.resources.limits.memory | quote }}
-              cpu: {{ .Values.resources.limits.cpu | quote }}
+            {{- toYaml .Values.resources | nindent 12 }}
           env:
           - name: POD_NAME
             valueFrom:

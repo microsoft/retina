@@ -11,91 +11,83 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/storage"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-const (
-	BLOB_URL = "BLOB_URL"
+const BlobURL = "BLOB_URL"
+
+var (
+	ErrEmptyBlobURL = errors.New("BLOB_URL must be set/exported")
+	captureName     string
 )
 
-var ErrEmptyBlobURL = fmt.Errorf("BLOB_URL must be set/exported")
+var downloadCapture = &cobra.Command{
+	Use:   "download",
+	Short: "Download Retina Captures",
+	RunE: func(*cobra.Command, []string) error {
+		blobURL := viper.GetString(BlobURL)
+		if blobURL == "" {
+			return ErrEmptyBlobURL
+		}
 
-func CaptureCmdDownload() *cobra.Command {
-	var captureName string
-	cmd := &cobra.Command{
-		Use:   "download",
-		Short: "Download Retina Captures",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			_, err := Download(cmd, &captureName)
-			return err
-		},
-	}
+		bloburl := viper.GetString(BlobURL)
+		if bloburl == "" {
+			return ErrEmptyBlobURL
+		}
 
-	cmd.Flags().StringVarP(&captureName, "capture-name", "n", "", "name of capture to download")
+		u, err := url.Parse(bloburl)
+		if err != nil {
+			return errors.Wrapf(err, "failed to parse SAS URL %s", blobURL)
+		}
 
-	return cmd
+		// blobService, err := storage.NewAccountSASClientFromEndpointToken(u.String(), u.Query().Encode()).GetBlobService()
+		b, err := storage.NewAccountSASClientFromEndpointToken(u.String(), u.Query().Encode())
+		if err != nil {
+			return errors.Wrap(err, "failed to create storage account client")
+		}
+
+		blobService := b.GetBlobService()
+		containerPath := strings.TrimLeft(u.Path, "/")
+		splitPath := strings.SplitN(containerPath, "/", 2) //nolint:gomnd // TODO string splitting probably isn't the right way to parse this URL?
+		containerName := splitPath[0]
+
+		params := storage.ListBlobsParameters{Prefix: captureName}
+		blobList, err := blobService.GetContainerReference(containerName).ListBlobs(params)
+		if err != nil {
+			return errors.Wrap(err, "failed to list blobstore ")
+		}
+
+		if len(blobList.Blobs) == 0 {
+			return errors.Errorf("no blobs found with prefix: %s", captureName)
+		}
+
+		for _, v := range blobList.Blobs {
+			blob := blobService.GetContainerReference(containerName).GetBlobReference(v.Name)
+			readCloser, err := blob.Get(&storage.GetBlobOptions{})
+			if err != nil {
+				return errors.Wrap(err, "failed to read from blobstore")
+			}
+
+			defer readCloser.Close()
+
+			blobData, err := io.ReadAll(readCloser)
+			if err != nil {
+				return errors.Wrap(err, "failed to obtain blob from blobstore")
+			}
+
+			err = os.WriteFile(v.Name, blobData, 0o644) //nolint:gosec,gomnd // intentionally permissive bitmask
+			if err != nil {
+				return errors.Wrap(err, "failed to write file")
+			}
+			fmt.Println("Downloaded blob: ", v.Name)
+		}
+		return nil
+	},
 }
 
-func Download(cmd *cobra.Command, captureName *string) (string, error) {
-	blobURL := viper.GetString(BLOB_URL)
-	if blobURL == "" {
-		return "", ErrEmptyBlobURL
-	}
-
-	bloburl := viper.GetString(BLOB_URL)
-	if bloburl == "" {
-		return "", ErrEmptyBlobURL
-	}
-
-	u, err := url.Parse(bloburl)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse SAS URL: %+v", err)
-	}
-
-	// blobService, err := storage.NewAccountSASClientFromEndpointToken(u.String(), u.Query().Encode()).GetBlobService()
-	b, err := storage.NewAccountSASClientFromEndpointToken(u.String(), u.Query().Encode())
-	if err != nil {
-		return "", fmt.Errorf("failed to create storage account client: %+v", err)
-	}
-
-	blobService := b.GetBlobService()
-	containerPath := strings.TrimLeft(u.Path, "/")
-	splitPath := strings.SplitN(containerPath, "/", 2)
-	containerName := splitPath[0]
-
-	params := storage.ListBlobsParameters{Prefix: *captureName}
-	blobList, err := blobService.GetContainerReference(containerName).ListBlobs(params)
-	if err != nil {
-		return "", fmt.Errorf("failed to list blobstore with: %+v", err)
-	}
-
-	if len(blobList.Blobs) == 0 {
-		return "", fmt.Errorf("no blobs found with prefix: %s", *captureName)
-	}
-
-	blobName := ""
-	for _, v := range blobList.Blobs {
-		blob := blobService.GetContainerReference(containerName).GetBlobReference(v.Name)
-		readCloser, err := blob.Get(&storage.GetBlobOptions{})
-		if err != nil {
-			return "", fmt.Errorf("failed to read from blobstore with: %+v", err)
-		}
-
-		defer readCloser.Close()
-
-		blobData, err := io.ReadAll(readCloser)
-		if err != nil {
-			return "", fmt.Errorf("failed to obtain blob from blobstore with: %+v", err)
-		}
-
-		err = os.WriteFile(v.Name, blobData, 0o644)
-		if err != nil {
-			return "", fmt.Errorf("failed to write file with: %+v", err)
-		}
-
-		blobName = v.Name
-		fmt.Println("Downloaded blob: ", v.Name)
-	}
-	return blobName, nil
+func init() {
+	capture.AddCommand(downloadCapture)
+	downloadCapture.Flags().StringVarP(&captureName, "capture-name", "n", "", "name of capture to download")
 }
