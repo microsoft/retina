@@ -1,29 +1,29 @@
 {
-  "__inputs": [],
   "__elements": {},
+  "__inputs": [],
   "__requires": [
     {
-      "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
-      "version": "9.5.15"
+      "type": "grafana",
+      "version": "9.5.17"
     },
     {
-      "type": "datasource",
       "id": "prometheus",
       "name": "Prometheus",
+      "type": "datasource",
       "version": "1.0.0"
     },
     {
-      "type": "panel",
       "id": "table",
       "name": "Table",
+      "type": "panel",
       "version": ""
     },
     {
-      "type": "panel",
       "id": "timeseries",
       "name": "Time series",
+      "type": "panel",
       "version": ""
     }
   ],
@@ -60,6 +60,17 @@
   "liveNow": true,
   "panels": [
     {
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 153,
+      "title": "Cluster Snapshot",
+      "type": "row"
+    },
+    {
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -68,7 +79,8 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "fixedColor": "blue",
+            "mode": "fixed"
           },
           "custom": {
             "axisCenteredZero": false,
@@ -110,15 +122,80 @@
               }
             ]
           },
-          "unit": "req/s"
+          "unit": "r/s"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Requests missing Response (%)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.gradientMode",
+                "value": "none"
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 3
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "dash": [
+                    10,
+                    10
+                  ],
+                  "fill": "dash"
+                }
+              },
+              {
+                "id": "custom.axisColorMode",
+                "value": "series"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Requests"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
-        "h": 5,
-        "w": 8,
+        "h": 8,
+        "w": 24,
         "x": 0,
-        "y": 0
+        "y": 1
       },
       "id": 135,
       "options": {
@@ -140,13 +217,39 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum (rate(networkobservability_dns_request_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query_type) > 0",
-          "legendFormat": "{{query_type}}",
+          "expr": "sum (rate(hubble_dns_queries_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum (rate(networkobservability_dns_request_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "legendFormat": "Requests",
           "range": true,
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum (rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum (rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "hide": false,
+          "legendFormat": "Responses",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "clamp_min((\r\n    1 - (\r\n        sum (rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) / sum (rate(hubble_dns_queries_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\n    )\r\n) * 100 * (\r\n    (\r\n        sum (rate(hubble_dns_queries_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\n    ) > bool 0\r\n), 0) # so that the legend always shows, do not filter > 0\r\nor\r\nclamp_min((\r\n    1 - (\r\n        sum (rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) / sum (rate(networkobservability_dns_request_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\n    )\r\n) * 100 * (\r\n    (\r\n        sum (rate(networkobservability_dns_request_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\n    ) > bool 0\r\n), 0) # so that the legend always shows, do not filter > 0",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "Requests missing Response (%)",
+          "range": true,
+          "refId": "C"
         }
       ],
-      "title": "DNS Requests",
+      "title": "DNS Requests and Responses",
       "type": "timeseries"
     },
     {
@@ -205,12 +308,12 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 5,
-        "w": 8,
-        "x": 8,
-        "y": 0
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 9
       },
-      "id": 136,
+      "id": 138,
       "options": {
         "legend": {
           "calcs": [],
@@ -230,13 +333,13 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum (rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query_type) > 0",
-          "legendFormat": "{{query_type}}",
+          "expr": "(sum by (rcode, qtypes) (\r\n    rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\", rcode!=\"no error\"}[$__rate_interval])\r\n) > 0)\r\nor\r\nlabel_replace(\r\n    label_replace(\r\n        sum by (return_code, query_type) (\r\n            rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\", rcode!=\"NoError\"}[$__rate_interval])\r\n        ) > 0, \"rcode\", \"$1\", \"return_code\", \"(.*)\"\r\n    ), \"qtypes\", \"$1\", \"query_type\", \"(.*)\"\r\n)",
+          "legendFormat": "{{rcode}} ({{qtypes}})",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "DNS Responses",
+      "title": "DNS Errors",
       "type": "timeseries"
     },
     {
@@ -290,17 +393,17 @@
               }
             ]
           },
-          "unit": "percent"
+          "unit": "resp/s"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 5,
-        "w": 8,
-        "x": 16,
-        "y": 0
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 9
       },
-      "id": 137,
+      "id": 152,
       "options": {
         "legend": {
           "calcs": [],
@@ -320,14 +423,27 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "(\r\n    1 - (\r\n        sum (networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\"}) by (query_type) / sum (networkobservability_dns_request_count{cluster=\"$cluster\", instance=~\"$Nodes\"}) by (query_type)\r\n    )\r\n) * 100 * (\r\n    (\r\n        sum (rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query_type)\r\n    ) > bool 0\r\n) > 0",
-          "legendFormat": "{{query_type}}",
+          "expr": "(sum by (instance) (\r\n    rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\", rcode!=\"no error\"}[$__rate_interval])\r\n) > 0)\r\nor\r\n(sum by (instance) (\r\n    rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\", return_code!=\"NoError\"}[$__rate_interval])\r\n) > 0)",
+          "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "DNS Missing Response",
+      "title": "DNS Errors by Node",
       "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
+      "id": 147,
+      "panels": [],
+      "title": "Cluster-Level",
+      "type": "row"
     },
     {
       "datasource": {
@@ -392,7 +508,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 5
+        "y": 18
       },
       "id": 139,
       "options": {
@@ -414,8 +530,8 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\", return_code=\"NoError\"}[$__rate_interval])) by (num_response) > 0",
-          "legendFormat": "{{num_response}}",
+          "expr": "(sum(rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\", rcode=\"no error\"}[$__rate_interval])) by (ips_returned) > 0)\r\nor\r\n(sum(rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\", return_code=\"NoError\"}[$__rate_interval])) by (num_response) > 0)",
+          "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
@@ -474,7 +590,7 @@
               }
             ]
           },
-          "unit": "resp/s"
+          "unit": "percent"
         },
         "overrides": []
       },
@@ -482,9 +598,9 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 5
+        "y": 18
       },
-      "id": 138,
+      "id": 137,
       "options": {
         "legend": {
           "calcs": [],
@@ -504,13 +620,13 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "label_replace(\r\n    label_replace(\r\n        sum by (return_code, query_type) (\r\n            rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\", return_code!=\"NoError\"}[$__rate_interval])\r\n        ) > 0, \"return_code\", \"non-existent domain\", \"return_code\", \"nxdomain\"\r\n    ), \"return_code\", \"server failure\", \"return_code\", \"servfail\"\r\n)",
-          "legendFormat": "{{return_code}} ({{query_type}})",
+          "expr": "((\r\n    1 - (\r\n        sum (rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (qtypes)\r\n        / sum (rate(hubble_dns_queries_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (qtypes)\r\n    )\r\n) * 100 * (\r\n    (\r\n        sum (rate(hubble_dns_queries_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (qtypes)\r\n    ) > bool 0\r\n) > 0)\r\nor\r\nclamp_min((\r\n    1 - (\r\n        sum (rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query_type)\r\n        / sum (rate(networkobservability_dns_request_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query_type)\r\n    )\r\n) * 100 * (\r\n    (\r\n        sum (rate(networkobservability_dns_request_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query_type)\r\n    ) > bool 0\r\n), 0) # so that the legend always shows, do not filter > 0",
+          "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "DNS Errors",
+      "title": "DNS Missing Response by Query Type",
       "type": "timeseries"
     },
     {
@@ -572,14 +688,13 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 12
+        "y": 25
       },
       "id": 140,
       "options": {
         "legend": {
           "calcs": [
-            "max",
-            "last"
+            "max"
           ],
           "displayMode": "table",
           "placement": "right",
@@ -599,9 +714,9 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "round(topk(10, sum (60*rate(networkobservability_dns_request_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query, query_type)), 1)",
+          "expr": "topk(\r\n    10,\r\n    60 * sum (rate(hubble_dns_queries_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query, qtypes)\r\n    or\r\n    label_replace(\r\n        60 * sum (rate(networkobservability_dns_request_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query, query_type), \"qtypes\", \"$1\", \"query_type\", \"(.*)\"\r\n    )\r\n)",
           "interval": "",
-          "legendFormat": "{{query}} ({{query_type}})",
+          "legendFormat": "{{query}} ({{qtypes}})",
           "range": true,
           "refId": "A"
         }
@@ -655,7 +770,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -667,14 +783,13 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 20
+        "y": 33
       },
       "id": 144,
       "options": {
         "legend": {
           "calcs": [
-            "max",
-            "last"
+            "max"
           ],
           "displayMode": "table",
           "placement": "right",
@@ -694,9 +809,9 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "round(topk(10, sum (60*rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query, query_type)), 1)",
+          "expr": "topk(\r\n    10,\r\n    sum (60*rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query, qtypes)\r\n    or\r\n    label_replace(\r\n        60 * sum (rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query, query_type), \"qtypes\", \"$1\", \"query_type\", \"(.*)\"\r\n    )\r\n)",
           "interval": "",
-          "legendFormat": "{{query}} ({{query_type}})",
+          "legendFormat": "{{query}} ({{qtypes}})",
           "range": true,
           "refId": "A"
         }
@@ -709,7 +824,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "",
+      "description": "Non-Cilium only",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -722,13 +837,13 @@
             },
             "inspect": false
           },
-          "decimals": 0,
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -744,7 +859,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 28
+        "y": 41
       },
       "id": 143,
       "options": {
@@ -775,7 +890,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "label_replace(\r\n  label_replace(\r\n      sum by (query, query_type, response, return_code) (\r\n        60*rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\", num_response!=\"0\", response!=\"\"}[$__rate_interval])\r\n      ), \"return_code\", \"non-existent domain\", \"return_code\", \"nxdomain\"\r\n  ), \"return_code\", \"success\", \"return_code\", \"noerror\"\r\n)",
+          "expr": "# label_replace(\r\n#   label_replace(\r\nsum by (query, query_type, response, return_code) (\r\n  60*rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\", num_response!=\"0\", response!=\"\"}[$__range])\r\n) > 0\r\n# , \"return_code\", \"non-existent domain\", \"return_code\", \"nxdomain\"\r\n#   ), \"return_code\", \"success\", \"return_code\", \"noerror\"\r\n# )",
           "instant": true,
           "interval": "",
           "legendFormat": "__auto",
@@ -789,11 +904,9 @@
           "id": "labelsToFields",
           "options": {
             "keepLabels": [
-              "num_response",
               "query",
               "query_type",
-              "response",
-              "return_code"
+              "response"
             ]
           }
         },
@@ -806,19 +919,18 @@
           "options": {
             "excludeByName": {
               "Time": true,
-              "Value": true
+              "Value": false,
+              "return_code": true
             },
             "indexByName": {
               "Time": 0,
-              "Value": 1,
-              "num_response": 5,
-              "query": 2,
-              "query_type": 3,
-              "response": 6,
-              "return_code": 4
+              "Value": 4,
+              "query": 1,
+              "query_type": 2,
+              "response": 3
             },
             "renameByName": {
-              "Value": "Responses/Min",
+              "Value": "Avg Resp/Min",
               "num_response": "IPs in Response",
               "query": "Query",
               "query_type": "Type",
@@ -829,6 +941,207 @@
         }
       ],
       "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 49
+      },
+      "id": 148,
+      "panels": [],
+      "title": "Top Pods (all namespaces)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "resp/min"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 50
+      },
+      "id": 141,
+      "options": {
+        "legend": {
+          "calcs": [
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Max",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "topk(\r\n    10,\r\n    60*sum(rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\", rcode!=\"No Error\", destination=~\"/\"}[$__rate_interval])) by (destination)\r\n    or\r\n    60*sum(rate(networkobservability_adv_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\", return_code!=\"NoError\"}[$__rate_interval])) by (namespace, podname)\r\n)",
+          "interval": "",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Top Pods with DNS Errors",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "req/min"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 58
+      },
+      "id": 149,
+      "options": {
+        "legend": {
+          "calcs": [
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Max",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "topk(\r\n    10,\r\n    60*sum(rate(hubble_dns_queries_total{cluster=\"$cluster\", instance=~\"$Nodes\", source=~\"/\"}[$__rate_interval])) by (source)\r\n    or\r\n    60*sum(rate(networkobservability_adv_dns_request_count{cluster=\"$cluster\", instance=~\"$Nodes\", return_code!=\"NoError\"}[$__rate_interval])) by (namespace, podname)\r\n)",
+          "interval": "",
+          "legendFormat": "{{destination}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Pods with the Most Requests",
+      "type": "timeseries"
     }
   ],
   "refresh": "",
@@ -861,16 +1174,16 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(kube_node_info, cluster)",
+        "definition": "label_values(kube_node_info,cluster)",
         "hide": 0,
-        "includeAll": true,
+        "includeAll": false,
         "label": "Cluster",
         "multi": false,
         "name": "cluster",
         "options": [],
         "query": {
-          "query": "label_values(kube_node_info, cluster)",
-          "refId": "StandardVariableQuery"
+          "query": "label_values(kube_node_info,cluster)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
         "regex": "",
@@ -879,12 +1192,13 @@
         "type": "query"
       },
       {
+        "allValue": "(.*)",
         "current": {},
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(kube_node_info, node)",
+        "definition": "label_values(kube_node_info{cluster=\"$cluster\"},node)",
         "hide": 0,
         "includeAll": true,
         "label": "Nodes",
@@ -892,8 +1206,8 @@
         "name": "Nodes",
         "options": [],
         "query": {
-          "query": "label_values(kube_node_info, node)",
-          "refId": "StandardVariableQuery"
+          "query": "label_values(kube_node_info{cluster=\"$cluster\"},node)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
         "regex": "",
@@ -922,7 +1236,7 @@
     ]
   },
   "timezone": "",
-  "title": "Kubernetes / Networking / DNS",
+  "title": "Kubernetes / Networking / DNS (Cluster)",
   "uid": "Retina55",
-  "version": 1
+  "version": 2
 }
