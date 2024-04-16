@@ -6,7 +6,6 @@ package capture
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	retinacmd "github.com/microsoft/retina/cli/cmd"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
@@ -20,8 +19,6 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
-
-var name string
 
 var deleteExample = templates.Examples(i18n.T(`
 		# Delete the Retina Capture "retina-capture-8v6wd" in namespace "capture"
@@ -41,10 +38,6 @@ var deleteCapture = &cobra.Command{
 		kubeClient, err := kubernetes.NewForConfig(kubeConfig)
 		if err != nil {
 			return errors.Wrap(err, "")
-		}
-
-		if strings.TrimSpace(name) == "" {
-			return errors.New("capture name is not specified")
 		}
 
 		captureJobSelector := &metav1.LabelSelector{
@@ -91,6 +84,4 @@ var deleteCapture = &cobra.Command{
 
 func init() {
 	capture.AddCommand(deleteCapture)
-	deleteCapture.Flags().StringVar(&name, "name", "", "name of the Retina Capture")
-	deleteCapture.Flags().StringVarP(&namespace, "namespace", "n", "default", "Namespace to host capture job")
 }

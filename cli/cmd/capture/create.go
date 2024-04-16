@@ -22,7 +22,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
@@ -174,10 +173,9 @@ func deleteSecret(kubeClient kubernetes.Interface, secretName *string) error {
 }
 
 func createCaptureF(kubeClient kubernetes.Interface) (*retinav1alpha1.Capture, error) {
-	captureName := fmt.Sprintf("retina-capture-%s", utilrand.String(5))
 	capture := &retinav1alpha1.Capture{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      captureName,
+			Name:      name,
 			Namespace: namespace,
 		},
 		Spec: retinav1alpha1.CaptureSpec{
@@ -255,7 +253,7 @@ func createCaptureF(kubeClient kubernetes.Interface) (*retinav1alpha1.Capture, e
 
 	if len(blobUpload) != 0 {
 		// Mount blob url as secret onto the capture pod for security concern if blob url is not empty.
-		secretName, err := createSecretFromBlobUpload(kubeClient, blobUpload, captureName)
+		secretName, err := createSecretFromBlobUpload(kubeClient, blobUpload, name)
 		if err != nil {
 			return nil, err
 		}
@@ -398,7 +396,6 @@ func init() {
 	createCapture.Flags().StringVar(&includeFilter, "include-filter", "", "A comma-separated list of IP:Port pairs that are "+
 		"used to filter capture network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:*")
 	createCapture.Flags().BoolVar(&includeMetadata, "include-metadata", true, "If true, collect static network metadata into capture file")
-	createCapture.Flags().StringVarP(&namespace, "namespace", "n", "default", "Namespace to host capture job")
 	createCapture.Flags().IntVar(&jobNumLimit, "job-num-limit", 0, "The maximum number of jobs can be created for each capture. 0 means no limit")
 	createCapture.Flags().BoolVar(&nowait, "no-wait", true, "Do not wait for the long-running capture job to finish")
 	createCapture.Flags().BoolVar(&debug, "debug", false, "When debug is true, a customized retina-agent image, determined by the environment variable RETINA_AGENT_IMAGE, is set")
