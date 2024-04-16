@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/retina/pkg/plugin/api"
 	"github.com/microsoft/retina/pkg/plugin/dns"
 	"github.com/microsoft/retina/pkg/plugin/dropreason"
+	"github.com/microsoft/retina/pkg/plugin/infiniband"
 	"github.com/microsoft/retina/pkg/plugin/linuxutil"
 	"github.com/microsoft/retina/pkg/plugin/mockplugin"
 	"github.com/microsoft/retina/pkg/plugin/packetforward"
@@ -26,6 +27,7 @@ func RegisterPlugins() {
 	PluginHandler[dropreason.Name] = dropreason.New
 	PluginHandler[packetforward.Name] = packetforward.New
 	PluginHandler[linuxutil.Name] = linuxutil.New
+	PluginHandler[infiniband.Name] = infiniband.New
 	PluginHandler[packetparser.Name] = packetparser.New
 	PluginHandler[dns.Name] = dns.New
 	PluginHandler[tcpretrans.Name] = tcpretrans.New
