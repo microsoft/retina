@@ -2,7 +2,7 @@ ARG builderImage="ghcr.io/microsoft/retina/retina-builder:0.0.1"
 ARG toolsImage="ghcr.io/microsoft/retina/retina-tools:0.0.1"
 
 # Stage: Build binary
-FROM --platform=$TARGETPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.21 AS builder
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.21 AS builder
 LABEL Name=retina-builder Version=0.0.1
 
 RUN apt-get update &&\
@@ -44,16 +44,14 @@ RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/ret
 
 # Stage: Prepare clang and tools
 # Bullseye -> debian11
-FROM  --platform=$TARGETPLATFORM mcr.microsoft.com/mirror/docker/library/debian:bullseye@sha256:a648e10e02af129706b1fb89e1ac9694ae3db7f2b8439aa906321e68cc281bc0 AS tools
+FROM  --platform=$BUILDPLATFORM mcr.microsoft.com/mirror/docker/library/debian:bullseye@sha256:a648e10e02af129706b1fb89e1ac9694ae3db7f2b8439aa906321e68cc281bc0 AS tools
 
 LABEL Name=retina-tools Version=0.0.1
 
 WORKDIR /tmp
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    curl xz-utils binutils wget gnupg2
-RUN apt-get install -y --no-install-recommends \
-    ca-certificates tcpdump iproute2 iptables
+    curl xz-utils binutils wget gnupg2 ca-certificates
 
 RUN mkdir -p /usr/local
 
@@ -69,16 +67,21 @@ RUN if [ "$GOARCH" = "amd64" ] ; then \
     gpg2 --verify clang+llvm.tar.xz.sig clang+llvm.tar.xz; \
     tar -C /usr/local -xJf ./clang+llvm.tar.xz --no-same-owner; \
     mv /usr/local/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04 /usr/local/clang+llvm; \
+    dpkg --add-architecture amd64; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends tcpdump:amd64 iproute2:amd64 iptables:amd64; \
     else \
     # GOARCH=Arm64.
     # Download clang and llvm.
     # Need more dependencies for Arm64.
+    dpkg --add-architecture arm64; \
     apt-get update; \
-    apt-get install -y --no-install-recommends libc6 zlib1g libncurses5; \
+    apt-get install -y --no-install-recommends libc6:arm64 zlib1g:arm64 libncurses5:arm64; \
     apt-get install -y --no-install-recommends apt-file; \
     apt-file update; \
     apt-file find libstdc++.so.6; \
-    apt-get install -y --no-install-recommends libstdc++6; \
+    apt-get install -y --no-install-recommends libstdc++6:arm64; \
+    apt-get install -y --no-install-recommends tcpdump:arm64 iproute2:arm64 iptables:arm64; \
     # Download clang and llvm.
     wget -O clang+llvm.tar.xz https://github.com/llvm/llvm-project/releases/download/llvmorg-14.0.0/clang+llvm-14.0.0-aarch64-linux-gnu.tar.xz; \
     tar -C /usr/local -xJf ./clang+llvm.tar.xz --no-same-owner; \
