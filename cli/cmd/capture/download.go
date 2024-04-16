@@ -18,10 +18,7 @@ import (
 
 const BlobURL = "BLOB_URL"
 
-var (
-	ErrEmptyBlobURL = errors.New("BLOB_URL must be set/exported")
-	captureName     string
-)
+var ErrEmptyBlobURL = errors.New("BLOB_URL must be set/exported")
 
 var downloadCapture = &cobra.Command{
 	Use:   "download",
@@ -32,12 +29,7 @@ var downloadCapture = &cobra.Command{
 			return ErrEmptyBlobURL
 		}
 
-		bloburl := viper.GetString(BlobURL)
-		if bloburl == "" {
-			return ErrEmptyBlobURL
-		}
-
-		u, err := url.Parse(bloburl)
+		u, err := url.Parse(blobURL)
 		if err != nil {
 			return errors.Wrapf(err, "failed to parse SAS URL %s", blobURL)
 		}
@@ -53,14 +45,14 @@ var downloadCapture = &cobra.Command{
 		splitPath := strings.SplitN(containerPath, "/", 2) //nolint:gomnd // TODO string splitting probably isn't the right way to parse this URL?
 		containerName := splitPath[0]
 
-		params := storage.ListBlobsParameters{Prefix: captureName}
+		params := storage.ListBlobsParameters{Prefix: name}
 		blobList, err := blobService.GetContainerReference(containerName).ListBlobs(params)
 		if err != nil {
 			return errors.Wrap(err, "failed to list blobstore ")
 		}
 
 		if len(blobList.Blobs) == 0 {
-			return errors.Errorf("no blobs found with prefix: %s", captureName)
+			return errors.Errorf("no blobs found with prefix: %s", name)
 		}
 
 		for _, v := range blobList.Blobs {
@@ -89,5 +81,4 @@ var downloadCapture = &cobra.Command{
 
 func init() {
 	capture.AddCommand(downloadCapture)
-	downloadCapture.Flags().StringVarP(&captureName, "capture-name", "n", "", "name of capture to download")
 }
