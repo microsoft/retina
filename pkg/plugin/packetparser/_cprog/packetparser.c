@@ -147,7 +147,7 @@ static void parse(struct __sk_buff *skb, direction d)
 	__builtin_memset(&p, 0, sizeof(p));
 
 	// Get current time in nanoseconds.
-	p.ts = bpf_ktime_get_ns();
+	p.ts = bpf_ktime_get_boot_ns();
 	
 	p.dir = d;
 	p.bytes = skb->len;
