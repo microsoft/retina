@@ -25,12 +25,13 @@ jobs:
       contents: read
       security-events: write
     steps:
+      - name: Checkout repository
+        if: env.IS_NOT_MERGE_GROUP
+        uses: actions/checkout@v4
       - name: Setup go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go-version }}
-      - name: Checkout repository
-        uses: actions/checkout@v4
+          go-version-file: go.mod
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
