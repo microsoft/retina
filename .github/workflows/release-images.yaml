@@ -28,9 +28,9 @@ jobs:
 
       - uses: actions/setup-go@v4
         with:
-          go-version: ">=1.21.0"
+          go-version-file: go.mod
       - run: go version
-    
+
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3.5.0
 
@@ -49,7 +49,7 @@ jobs:
             IMAGE_NAMESPACE=${{ github.repository }} \
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
             BUILDX_ACTION=--push
-      
+
       - name: Sign container image
         run: |
           for image in retina-agent retina-init; do
@@ -57,7 +57,6 @@ jobs:
             DIGEST=$(jq -r '.["containerimage.digest"]' image-metadata-$image-$TAG-${{ matrix.platform }}-${{ matrix.arch }}.json) 
             cosign sign --yes ${IMAGE_PATH}@${DIGEST} 
           done
-
 
   retina-win-images:
     name: Build Agent Windows Images
@@ -74,12 +73,12 @@ jobs:
 
       - uses: actions/setup-go@v4
         with:
-          go-version: ">=1.21.0"
+          go-version-file: go.mod
       - run: go version
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3.5.0
-      
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -121,9 +120,9 @@ jobs:
 
       - uses: actions/setup-go@v4
         with:
-          go-version: ">=1.21.0"
+          go-version-file: go.mod
       - run: go version
-    
+
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3.5.0
 
@@ -142,7 +141,7 @@ jobs:
             IMAGE_NAMESPACE=${{ github.repository }} \
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
             BUILDX_ACTION=--push
-          
+
       - name: Sign container image
         run: |
           for image in retina-operator ; do
@@ -150,7 +149,6 @@ jobs:
               DIGEST=$(jq -r '.["containerimage.digest"]' image-metadata-$image-$TAG-${{ matrix.platform }}-${{ matrix.arch }}.json) 
               cosign sign --yes ${IMAGE_PATH}@${DIGEST} 
           done
-
 
   manifests:
     name: Generate Manifests
@@ -167,7 +165,7 @@ jobs:
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-      
+
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3.5.0
 
