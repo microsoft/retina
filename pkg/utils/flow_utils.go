@@ -263,6 +263,11 @@ func AddDropReason(f *flow.Flow, dropReason uint32) {
 		return
 	}
 
+	k := &RetinaMetadata{}      //nolint:typecheck // Not required to check type as we are setting it.
+	f.Extensions.UnmarshalTo(k) //nolint:errcheck // Not required to check error as we are setting it.
+	k.DropReason = DropReason(dropReason)
+	f.Extensions, _ = anypb.New(k)
+
 	f.Verdict = flow.Verdict_DROPPED
 	f.EventType = &flow.CiliumEventType{
 		Type:    int32(api.MessageTypeDrop),
@@ -273,33 +278,28 @@ func AddDropReason(f *flow.Flow, dropReason uint32) {
 	// Retina drop reasons are different from the drop reasons available in flow library.
 	// We map the ones available in flow library to the ones available in Retina.
 	// Rest are set to UNKNOWN. The details are added in the metadata.
-	switch dropReason {
-	case 0:
+	switch k.DropReason {
+	case DropReason_IPTABLE_RULE_DROP:
 		f.DropReasonDesc = flow.DropReason_POLICY_DENIED
-	case 1:
+	case DropReason_IPTABLE_NAT_DROP:
 		f.DropReasonDesc = flow.DropReason_SNAT_NO_MAP_FOUND
-	case 5:
+	case DropReason_CONNTRACK_ADD_DROP:
 		f.DropReasonDesc = flow.DropReason_UNKNOWN_CONNECTION_TRACKING_STATE
 	default:
 		f.DropReasonDesc = flow.DropReason_DROP_REASON_UNKNOWN
 	}
 
 	// Deprecated upstream. Will be removed in the future.
-	f.DropReason = uint32(f.DropReasonDesc)
-
-	k := &RetinaMetadata{}      //nolint:typecheck
-	f.Extensions.UnmarshalTo(k) //nolint:errcheck
-	k.DropReason = DropReason(dropReason)
-	f.Extensions, _ = anypb.New(k)
+	f.DropReason = uint32(f.GetDropReasonDesc())
 }
 
 func DropReasonDescription(f *flow.Flow) string {
 	if f == nil {
 		return ""
 	}
-	k := &RetinaMetadata{}      //nolint:typecheck
-	f.Extensions.UnmarshalTo(k) //nolint:errcheck
-	return k.DropReason.String()
+	k := &RetinaMetadata{}      //nolint:typecheck // Not required to check type as we are setting it.
+	f.Extensions.UnmarshalTo(k) //nolint:errcheck // Not required to check error as we are setting it.
+	return k.GetDropReason().String()
 }
 
 func decodeTime(nanoseconds int64) (pbTime *timestamppb.Timestamp, err error) {
