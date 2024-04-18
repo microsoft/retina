@@ -21,6 +21,7 @@ import (
 	"github.com/cilium/ebpf/rlimit"
 	tc "github.com/florianl/go-tc"
 	helper "github.com/florianl/go-tc/core"
+	"github.com/microsoft/retina/internal/ktime"
 	"github.com/microsoft/retina/pkg/common"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
@@ -29,17 +30,16 @@ import (
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/api"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
+	_ "github.com/microsoft/retina/pkg/plugin/lib/_amd64"             // nolint
+	_ "github.com/microsoft/retina/pkg/plugin/lib/_arm64"             // nolint
+	_ "github.com/microsoft/retina/pkg/plugin/lib/common/libbpf/_src" // nolint
+	_ "github.com/microsoft/retina/pkg/plugin/packetparser/_cprog"    // nolint
 	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/microsoft/retina/pkg/watchers/endpoint"
 	"github.com/vishvananda/netlink"
 	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
-
-	_ "github.com/microsoft/retina/pkg/plugin/lib/_amd64"             // nolint
-	_ "github.com/microsoft/retina/pkg/plugin/lib/_arm64"             // nolint
-	_ "github.com/microsoft/retina/pkg/plugin/lib/common/libbpf/_src" // nolint
-	_ "github.com/microsoft/retina/pkg/plugin/packetparser/_cprog"    // nolint
 )
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cc clang-14 -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type packet packetparser ./_cprog/packetparser.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../filter/_cprog/
@@ -534,7 +534,7 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 			destinationPortShort := uint32(utils.HostToNetShort(bpfEvent.DstPort))
 
 			fl := utils.ToFlow(
-				int64(bpfEvent.Ts),
+				ktime.MonotonicOffset.Nanoseconds()+int64(bpfEvent.Ts),
 				utils.Int2ip(bpfEvent.SrcIp).To4(), // Precautionary To4() call.
 				utils.Int2ip(bpfEvent.DstIp).To4(), // Precautionary To4() call.
 				sourcePortShort,

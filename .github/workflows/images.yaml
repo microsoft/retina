@@ -1,4 +1,4 @@
-name: Build images and run E2E tests. 
+name: Build images and run E2E tests.
 
 on:
   pull_request:
@@ -26,7 +26,7 @@ jobs:
 
       - uses: actions/setup-go@v4
         with:
-          go-version: ">=1.21.0"
+          go-version-file: go.mod
       - run: go version
 
       - name: Set up QEMU
@@ -58,7 +58,6 @@ jobs:
         env:
           IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
 
-
   retina-win-images:
     name: Build Agent Windows Images
     runs-on: ubuntu-latest
@@ -74,18 +73,18 @@ jobs:
 
       - uses: actions/setup-go@v4
         with:
-          go-version: ">=1.21.0"
+          go-version-file: go.mod
       - run: go version
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-      
+
       - name: Az CLI login
         uses: azure/login@v1
         if: ${{ github.event_name == 'merge_group' }}
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
-        
+
       - name: Build Images
         shell: bash
         run: |
@@ -121,7 +120,7 @@ jobs:
 
       - uses: actions/setup-go@v4
         with:
-          go-version: ">=1.21.0"
+          go-version-file: go.mod
       - run: go version
 
       - name: Set up QEMU
@@ -132,7 +131,7 @@ jobs:
         if: ${{ github.event_name == 'merge_group' }}
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
-        
+
       - name: Build Images
         shell: bash
         run: |
@@ -169,7 +168,7 @@ jobs:
 
       - name: Setup QEMU
         uses: docker/setup-qemu-action@v3
-      
+
       - name: Azure CLI login
         uses: azure/login@v1
         with:
@@ -182,7 +181,7 @@ jobs:
           az acr login -n ${{ vars.ACR_NAME }}  
           make manifest COMPONENT=${{ matrix.components }} \
           IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
-      
+
   e2e:
     if: ${{ github.event_name == 'merge_group' }}
     name: Run E2E Tests
@@ -200,7 +199,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v4
         with:
-          go-version: ">=1.21.0"
+          go-version-file: go.mod
       - run: go version
 
       - name: Az CLI login
