@@ -263,8 +263,9 @@ func AddDropReason(f *flow.Flow, dropReason uint32) {
 		return
 	}
 
-	k := &RetinaMetadata{}      //nolint:typecheck // Not required to check type as we are setting it.
-	f.Extensions.UnmarshalTo(k) //nolint:errcheck // Not required to check error as we are setting it.
+	k := &RetinaMetadata{}           //nolint:typecheck // Not required to check type as we are setting it.
+	f.GetExtensions().UnmarshalTo(k) //nolint:errcheck // Not required to check error as we are setting it.
+	return k.GetDropReason().String()
 	k.DropReason = DropReason(dropReason)
 	f.Extensions, _ = anypb.New(k)
 
@@ -278,7 +279,7 @@ func AddDropReason(f *flow.Flow, dropReason uint32) {
 	// Retina drop reasons are different from the drop reasons available in flow library.
 	// We map the ones available in flow library to the ones available in Retina.
 	// Rest are set to UNKNOWN. The details are added in the metadata.
-	switch k.DropReason {
+	switch k.GetDropReason() {
 	case DropReason_IPTABLE_RULE_DROP:
 		f.DropReasonDesc = flow.DropReason_POLICY_DENIED
 	case DropReason_IPTABLE_NAT_DROP:
@@ -290,15 +291,16 @@ func AddDropReason(f *flow.Flow, dropReason uint32) {
 	}
 
 	// Deprecated upstream. Will be removed in the future.
-	f.DropReason = uint32(f.GetDropReasonDesc())
+	f.DropReason = uint32(f.GetDropReasonDesc()) //nolint:staticcheck // Deprecated upstream. Will be removed in the future.:w
+
 }
 
 func DropReasonDescription(f *flow.Flow) string {
 	if f == nil {
 		return ""
 	}
-	k := &RetinaMetadata{}      //nolint:typecheck // Not required to check type as we are setting it.
-	f.Extensions.UnmarshalTo(k) //nolint:errcheck // Not required to check error as we are setting it.
+	k := &RetinaMetadata{}           //nolint:typecheck // Not required to check type as we are setting it.
+	f.GetExtensions().UnmarshalTo(k) //nolint:errcheck // Not required to check error as we are setting it.
 	return k.GetDropReason().String()
 }
 
