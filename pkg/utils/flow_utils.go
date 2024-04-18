@@ -278,7 +278,7 @@ func AddDropReason(f *flow.Flow, dropReason uint32) {
 	// Retina drop reasons are different from the drop reasons available in flow library.
 	// We map the ones available in flow library to the ones available in Retina.
 	// Rest are set to UNKNOWN. The details are added in the metadata.
-	switch k.GetDropReason() {
+	switch k.GetDropReason() { //nolint:exhaustive // We are handling all the cases.
 	case DropReason_IPTABLE_RULE_DROP:
 		f.DropReasonDesc = flow.DropReason_POLICY_DENIED
 	case DropReason_IPTABLE_NAT_DROP:
@@ -291,7 +291,6 @@ func AddDropReason(f *flow.Flow, dropReason uint32) {
 
 	// Deprecated upstream. Will be removed in the future.
 	f.DropReason = uint32(f.GetDropReasonDesc()) //nolint:staticcheck // Deprecated upstream. Will be removed in the future.:w
-
 }
 
 func DropReasonDescription(f *flow.Flow) string {
