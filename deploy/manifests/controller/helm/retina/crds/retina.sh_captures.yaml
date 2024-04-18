@@ -263,6 +263,28 @@ spec:
                     description: PersistentVolumeClaim mounts the supplied PVC into
                       the pod on `/capture` and write the capture files there.
                     type: string
+                  s3Upload:
+                    description: S3Upload configures the details for uploading capture
+                      files to an S3-compatible storage service.
+                    properties:
+                      bucket:
+                        description: Bucket in which to store the capture.
+                        type: string
+                      endpoint:
+                        description: Endpoint of S3 compatible storage service.
+                        type: string
+                      path:
+                        description: 'Path is the full path where the backup is saved.
+                          The format of the path must be: “/”.'
+                        type: string
+                      region:
+                        description: Region in which the S3 compatible bucket is located.
+                        type: string
+                      secretName:
+                        description: SecretName is the name of secret which stores
+                          S3 compliant storage access key and secret key.
+                        type: string
+                    type: object
                 type: object
             required:
             - captureConfiguration

@@ -11,6 +11,10 @@ type (
 const (
 	CaptureOutputLocationEnvKeyHostPath              CaptureOutputLocationEnvKey = "HOSTPATH"
 	CaptureOutputLocationEnvKeyPersistentVolumeClaim CaptureOutputLocationEnvKey = "PERSISTENT_VOLUME_CLAIM"
+	CaptureOutputLocationEnvKeyS3Endpoint            CaptureOutputLocationEnvKey = "S3_ENDPOINT"
+	CaptureOutputLocationEnvKeyS3Region              CaptureOutputLocationEnvKey = "S3_REGION"
+	CaptureOutputLocationEnvKeyS3Bucket              CaptureOutputLocationEnvKey = "S3_BUCKET"
+	CaptureOutputLocationEnvKeyS3Path                CaptureOutputLocationEnvKey = "S3_PATH"
 
 	CaptureNameEnvKey  string = "CAPTURE_NAME"
 	NodeHostNameEnvKey string = "NODE_HOST_NAME"
