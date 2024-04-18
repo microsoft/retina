@@ -265,7 +265,6 @@ func AddDropReason(f *flow.Flow, dropReason uint32) {
 
 	k := &RetinaMetadata{}           //nolint:typecheck // Not required to check type as we are setting it.
 	f.GetExtensions().UnmarshalTo(k) //nolint:errcheck // Not required to check error as we are setting it.
-	return k.GetDropReason().String()
 	k.DropReason = DropReason(dropReason)
 	f.Extensions, _ = anypb.New(k)
 
