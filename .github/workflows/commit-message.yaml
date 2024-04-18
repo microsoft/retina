@@ -2,7 +2,7 @@ name: commit-message
 on:
   merge_group:
   pull_request:
-    branches: [ main ]
+    branches: [main]
     types:
       - opened
       - synchronize
@@ -13,33 +13,26 @@ jobs:
     if: ${{ github.event_name != 'merge_group' }}
     runs-on: ubuntu-20.04
     steps:
-    - name: verify_commit_message
-      run: |
-        if [[ "${{ github.event_name }}" == pull_request ]]; then
-          commit_msg_header="${{ github.event.pull_request.title }}"
-        else
-          # get first line of commit message
-          commit_msg_header=`echo "${{ github.event.head_commit.message }}" | head -n 1`
-        fi
+      - name: verify_commit_message
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          commit_msg_type_regex='feat|fix|refactor|style|test|docs|build|tool|chore|deps'
+          commit_msg_scope_regex='.{1,20}'
+          commit_msg_subject_regex='.{1,150}'
+          commit_msg_regex="^(${commit_msg_type_regex})(\(${commit_msg_scope_regex}\))?: (${commit_msg_subject_regex})\$"
+          merge_msg_regex="^Merge branch '.+' into .+\$"
+          full_regex="(${commit_msg_regex})|(${merge_msg_regex})"
 
-        commit_msg_type_regex='feat|fix|refactor|style|test|docs|build|tool|chore|deps'
-        commit_msg_scope_regex='.{1,20}'
-        commit_msg_subject_regex='.{1,150}'
-        commit_msg_regex="^(${commit_msg_type_regex})(\(${commit_msg_scope_regex}\))?: (${commit_msg_subject_regex})\$"
-        merge_msg_regex="^Merge branch '.+' into .+\$"
-        full_regex="(${commit_msg_regex})|(${merge_msg_regex})"
-
-        echo $commit_msg_header | grep -qP "$full_regex" || {
-          echo "ERROR: Invalid commit message header. Please fix format of your PR title or the commit pushed to main."
-          echo "Current value:"
-          echo "$commit_msg_header"
-          echo
-          echo "Examples of valid commits:"
-          echo 'example 1: "feat(cli): new feature"'
-          echo 'example 2: "fix(advanced-metrics): bug fix"'
-          echo 'example 3: "docs: update readme"'
-          echo
-          echo "Valid types are: $commit_msg_type_regex"
-          echo "For more details, see .github/workflows/commit-message.yaml"
-          exit 1
-        }
+          grep -qP "$full_regex" <<< "$TITLE" || {
+            echo "ERROR: Invalid commit message header. Please fix format of your PR title."
+            echo
+            echo "Examples of valid commits:"
+            echo 'example 1: "feat(cli): new feature"'
+            echo 'example 2: "fix(advanced-metrics): bug fix"'
+            echo 'example 3: "docs: update readme"'
+            echo
+            echo "Valid types are: $commit_msg_type_regex"
+            echo "For more details, see .github/workflows/commit-message.yaml"
+            exit 1
+          }
