@@ -157,7 +157,7 @@ type S3Upload struct {
 	// Region in which the S3 compatible bucket is located.
 	// +optional
 	Region *string `json:"region,omitempty"`
-	// Path is the full path where the backup is saved. The format of the path must be: “/”.
+	// Path specifies the prefix path within the S3 bucket where captures will be stored, e.g., "retina/captures".
 	// +optional
 	Path *string `json:"path,omitempty"`
 }

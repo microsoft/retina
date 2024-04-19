@@ -274,8 +274,8 @@ spec:
                         description: Endpoint of S3 compatible storage service.
                         type: string
                       path:
-                        description: 'Path is the full path where the backup is saved.
-                          The format of the path must be: “/”.'
+                        description: Path is Prefix path within the S3 bucket where
+                          captures will be stored.
                         type: string
                       region:
                         description: Region in which the S3 compatible bucket is located.
