@@ -19,7 +19,7 @@ func (i *IPAddresses) AddIPv6(ip net.IP) {
 	i.OtherIPv6s = append(i.OtherIPv6s, ip)
 }
 
-func (i *IPAddresses) GetIPs() []net.IP {
+func (i *IPAddresses) GetNetIPs() []net.IP {
 	ips := []net.IP{}
 	if i.IPv4 != nil {
 		ips = append(ips, i.IPv4)
@@ -32,7 +32,24 @@ func (i *IPAddresses) GetIPs() []net.IP {
 	return ips
 }
 
-func (i *IPAddresses) GetIPv4s() []net.IP {
+func (i *IPAddresses) GetIPs() []string {
+	ips := []string{}
+	if i.IPv4 != nil {
+		ips = append(ips, i.IPv4.String())
+	}
+	if i.IPv6 != nil {
+		ips = append(ips, i.IPv6.String())
+	}
+	for _, ip := range i.OtherIPv4s {
+		ips = append(ips, ip.String())
+	}
+	for _, ip := range i.OtherIPv6s {
+		ips = append(ips, ip.String())
+	}
+	return ips
+}
+
+func (i *IPAddresses) GetNetIPv4s() []net.IP {
 	ips := []net.IP{}
 	if i.IPv4 != nil {
 		ips = append(ips, i.IPv4)
@@ -41,7 +58,7 @@ func (i *IPAddresses) GetIPv4s() []net.IP {
 	return ips
 }
 
-func (i *IPAddresses) GetIPv6s() []net.IP {
+func (i *IPAddresses) GetNetIPv6s() []net.IP {
 	ips := []net.IP{}
 	if i.IPv6 != nil {
 		ips = append(ips, i.IPv6)
