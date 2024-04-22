@@ -131,7 +131,7 @@ func (d *dns) eventHandler(event *types.Event) {
 	f := utils.ToFlow(int64(event.Timestamp), net.ParseIP(event.SrcIP),
 		net.ParseIP(event.DstIP), uint32(event.SrcPort), uint32(event.DstPort),
 		uint8(common.ProtocolToFlow(event.Protocol)),
-		dir, utils.Verdict_DNS, 0)
+		dir, utils.Verdict_DNS)
 	utils.AddDnsInfo(f, string(event.Qr), common.RCodeToFlow(event.Rcode), event.DNSName, []string{event.QType}, event.NumAnswers, event.Addresses)
 	// d.l.Debug("DNS Flow", zap.Any("flow", f))
 

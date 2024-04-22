@@ -7,7 +7,6 @@ package hnsstats
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/Microsoft/hcsshim"
@@ -34,6 +33,14 @@ const (
 	HCN_ENDPOINT_STATE_DETACHED
 	HCN_ENDPOINT_STATE_DEGRADED
 	HCN_ENDPOINT_STATE_DESTROYED
+)
+
+const (
+	zapEndpointIDField = "endpointID"
+	zapIPField         = "ip"
+	zapMACField        = "mac"
+	zapPluginField     = "plugin"
+	zapPortField       = "port"
 )
 
 func (h *hnsstats) Name() string {
@@ -72,13 +79,14 @@ func (h *hnsstats) Init() error {
 }
 
 func (h *hnsstats) SetupChannel(ch chan *v1.Event) error {
-	h.l.Warn("Plugin does not support SetupChannel", zap.String("plugin", string(Name)))
+	h.l.Warn("Plugin does not support SetupChannel", zap.String(zapPluginField, string(Name)))
 	return nil
 }
 
 func pullHnsStats(ctx context.Context, h *hnsstats) error {
 	ticker := time.NewTicker(h.cfg.MetricsInterval)
 	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -96,34 +104,40 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 			if err != nil {
 				h.l.Error("Getting Vswitch ports failed", zap.Error(err))
 			}
+
 			for _, ep := range endpoints {
 				if len(ep.IpConfigurations) < 1 {
-					h.l.Info("Skipping endpoint without IPAddress", zap.String("EndpointID", ep.Id))
+					h.l.Info("Skipping endpoint without IPAddress", zap.String(zapEndpointIDField, ep.Id))
 					continue
 				}
-				var mac string = ep.MacAddress
-				var ip string = ep.IpConfigurations[0].IpAddress
-				// var id string = ep.Id
-				if stats, err := hcsshim.GetHNSEndpointStats(ep.Id); err != nil {
-					h.l.Error("Getting endpoint stats failed for endpoint ID "+ep.Id, zap.Error(err))
+
+				id := ep.Id
+				mac := ep.MacAddress
+				ip := ep.IpConfigurations[0].IpAddress
+
+				if stats, err := hcsshim.GetHNSEndpointStats(id); err != nil {
+					h.l.Error("Getting endpoint stats failed", zap.String(zapEndpointIDField, id), zap.Error(err))
 				} else {
 					hnsStatsData := &HnsStatsData{hnscounters: stats, IPAddress: ip}
-					// h.l.Info(fmt.Sprintf("Fetched HNS endpoints stats for ID: %s, IP %s, MAC %s", id, ip, mac))
+					h.l.Debug("Fetched HNS endpoints stats", zap.String(zapEndpointIDField, id),
+						zap.String(zapIPField, ip), zap.String(zapMACField, mac))
 					// h.l.Info(hnsStatsData.String())
+
 					// Get VFP port counters for matching port (MAC address of endpoint as the key)
 					portguid := kv[mac]
 					if countersRaw, err := getVfpPortCountersRaw(portguid); len(portguid) > 0 && err == nil {
 						if vfpcounters, err := parseVfpPortCounters(countersRaw); err == nil {
 							// Attach VFP port counters
 							hnsStatsData.vfpCounters = vfpcounters
-							// h.l.Info("Attached VFP port counters for Port " + portguid)
+							h.l.Debug("Attached VFP port counters", zap.String(zapPortField, portguid))
 							// h.l.Info(vfpcounters.String())
 						} else {
-							h.l.Error("Unable to parse VFP port counters for Port "+portguid, zap.Error(err))
+							h.l.Error("Unable to parse VFP port counters", zap.String(zapPortField, portguid), zap.Error(err))
 						}
 					} else {
-						h.l.Error("Unable to find VFP port counters for MAC "+mac, zap.Error(err))
+						h.l.Error("Unable to find VFP port counters", zap.String(zapMACField, mac), zap.Error(err))
 					}
+
 					notifyHnsStats(h, hnsStatsData)
 				}
 			}
@@ -134,16 +148,16 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 func notifyHnsStats(h *hnsstats, stats *HnsStatsData) {
 	// hns signals
 	metrics.ForwardCounter.WithLabelValues(ingressLabel).Set(float64(stats.hnscounters.PacketsReceived))
-	h.l.Debug(fmt.Sprintf("emitting label %s for value %v", PacketsReceived, stats.hnscounters.PacketsReceived))
+	h.l.Debug("emitting packets received count metric", zap.Uint64(PacketsReceived, stats.hnscounters.PacketsReceived))
 
 	metrics.ForwardCounter.WithLabelValues(egressLabel).Set(float64(stats.hnscounters.PacketsSent))
-	h.l.Debug(fmt.Sprintf("emitting label %s for value %v", PacketsSent, stats.hnscounters.PacketsSent))
+	h.l.Debug("emitting packets sent count metric", zap.Uint64(PacketsSent, stats.hnscounters.PacketsSent))
 
 	metrics.ForwardBytesCounter.WithLabelValues(egressLabel).Set(float64(stats.hnscounters.BytesSent))
-	h.l.Debug(fmt.Sprintf("emitting label %s for value %v", BytesSent, stats.hnscounters.BytesSent))
+	h.l.Debug("emitting bytes sent count metric", zap.Uint64(BytesSent, stats.hnscounters.BytesSent))
 
 	metrics.ForwardBytesCounter.WithLabelValues(ingressLabel).Set(float64(stats.hnscounters.BytesReceived))
-	h.l.Debug(fmt.Sprintf("emitting label %s for value %v", BytesReceived, stats.hnscounters.BytesReceived))
+	h.l.Debug("emitting bytes received count metric", zap.Uint64(BytesReceived, stats.hnscounters.BytesReceived))
 
 	metrics.WindowsCounter.WithLabelValues(PacketsReceived).Set(float64(stats.hnscounters.PacketsReceived))
 	metrics.WindowsCounter.WithLabelValues(PacketsSent).Set(float64(stats.hnscounters.PacketsSent))

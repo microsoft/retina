@@ -14,24 +14,23 @@ import (
 	"time"
 	"unsafe"
 
-	kcfg "github.com/microsoft/retina/pkg/config"
-	"github.com/microsoft/retina/pkg/utils"
-
 	"github.com/cilium/cilium/api/v1/flow"
 	hubblev1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
 	"github.com/cilium/ebpf/rlimit"
+	"github.com/microsoft/retina/internal/ktime"
+	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/loader"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/api"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
-	"go.uber.org/zap"
-
 	_ "github.com/microsoft/retina/pkg/plugin/dropreason/_cprog" // nolint
+	"github.com/microsoft/retina/pkg/utils"
+	"go.uber.org/zap"
 )
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cc clang-14 -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type metrics_map_value -type drop_reason_t -type packet kprobe ./_cprog/drop_reason.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../filter/_cprog/
@@ -356,7 +355,7 @@ func (dr *dropReason) processRecord(ctx context.Context, id int) {
 			dropKey := (dropMetricKey)(bpfEvent.Key)
 
 			fl := utils.ToFlow(
-				int64(bpfEvent.Ts),
+				ktime.MonotonicOffset.Nanoseconds()+int64(bpfEvent.Ts),
 				utils.Int2ip(bpfEvent.SrcIp).To4(), // Precautionary To4() call.
 				utils.Int2ip(bpfEvent.DstIp).To4(), // Precautionary To4() call.
 				sourcePortShort,
@@ -364,18 +363,21 @@ func (dr *dropReason) processRecord(ctx context.Context, id int) {
 				bpfEvent.Proto,
 				2, // drop reason packet doesn't have a direction yet, so we set it to 2
 				flow.Verdict_DROPPED,
-				dropKey.DropType,
 			)
 			if fl == nil {
 				dr.l.Warn("Could not convert bpfEvent to flow", zap.Any("bpfEvent", bpfEvent))
 				continue
 			}
-			fl.DropReasonDesc = flow.DropReason(bpfEvent.Key.DropType)
+
+			// Add drop reason to the flow.
+			utils.AddDropReason(fl, dropKey.DropType)
+
+			// Add packet size to the flow.
 			utils.AddPacketSize(fl, bpfEvent.SkbLen)
 
 			// This is only for development purposes.
 			// Removing this makes logs way too chatter-y.
-			dr.l.Debug("DropReason Packet Received", zap.Any("flow", fl), zap.Any("Raw Bpf Event", bpfEvent), zap.Uint32("drop type", bpfEvent.Key.DropType))
+			dr.l.Debug("DropReason Packet Received", zap.Any("flow", fl), zap.Any("Raw Bpf Event", bpfEvent), zap.Uint32("drop type", dropKey.DropType))
 
 			// Write the event to the enricher.
 			ev := &hubblev1.Event{

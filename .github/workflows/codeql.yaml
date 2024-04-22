@@ -15,7 +15,6 @@ jobs:
         goos: [linux, windows]
         goarch: [amd64, arm64]
         language: [go]
-        go-version: ["1.21"]
     runs-on: ubuntu-latest
     env:
       IS_NOT_MERGE_GROUP: ${{ github.event_name != 'merge_group' }}
@@ -27,14 +26,14 @@ jobs:
       contents: read
       security-events: write
     steps:
+      - name: Checkout repository
+        if: env.IS_NOT_MERGE_GROUP
+        uses: actions/checkout@v4
       - name: Setup go
         if: env.IS_NOT_MERGE_GROUP
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go-version }}
-      - name: Checkout repository
-        if: env.IS_NOT_MERGE_GROUP
-        uses: actions/checkout@v4
+          go-version-file: go.mod
       - name: Initialize CodeQL
         if: env.IS_NOT_MERGE_GROUP
         uses: github/codeql-action/init@v3

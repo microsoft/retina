@@ -147,7 +147,7 @@ static void parse(struct __sk_buff *skb, direction d)
 	__builtin_memset(&p, 0, sizeof(p));
 
 	// Get current time in nanoseconds.
-	p.ts = bpf_ktime_get_ns();
+	p.ts = bpf_ktime_get_boot_ns();
 	
 	p.dir = d;
 	p.bytes = skb->len;
@@ -236,8 +236,8 @@ int endpoint_ingress_filter(struct __sk_buff *skb)
 	// This is attached to the interface on the host side.
 	// So ingress on host is egress on endpoint and vice versa.
 	parse(skb, FROM_ENDPOINT);
-	// Always return 0 to allow packet to pass.
-	return 0;
+	// Always return TC_ACT_UNSPEC to allow packet to pass to the next BPF program.
+	return TC_ACT_UNSPEC;
 }
 
 SEC("classifier_endpoint_egress")
@@ -246,22 +246,22 @@ int endpoint_egress_filter(struct __sk_buff *skb)
 	// This is attached to the interface on the host side.
 	// So egress on host is ingress on endpoint and vice versa.
 	parse(skb, TO_ENDPOINT);
-	// Always return 0 to allow packet to pass.
-	return 0;
+	// Always return TC_ACT_UNSPEC to allow packet to pass to the next BPF program.
+	return TC_ACT_UNSPEC;
 }
 
 SEC("classifier_host_ingress")
 int host_ingress_filter(struct __sk_buff *skb)
 {
 	parse(skb, FROM_NETWORK);
-	// Always return 0 to allow packet to pass.
-	return 0;
+	// Always return TC_ACT_UNSPEC to allow packet to pass to the next BPF program.
+	return TC_ACT_UNSPEC;
 }
 
 SEC("classifier_host_egress")
 int host_egress_filter(struct __sk_buff *skb)
 {
 	parse(skb, TO_NETWORK);
-	// Always return 0 to allow packet to pass.
-	return 0;
+	// Always return TC_ACT_UNSPEC to allow packet to pass to the next BPF program.
+	return TC_ACT_UNSPEC;
 }

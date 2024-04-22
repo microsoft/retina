@@ -8,7 +8,7 @@ require (
 	github.com/prometheus/client_golang v1.19.0
 	github.com/spf13/cobra v1.8.0
 	go.uber.org/zap v1.26.0
-	k8s.io/client-go v0.29.3
+	k8s.io/client-go v0.29.4
 )
 
 require (
@@ -23,7 +23,7 @@ require (
 	github.com/Azure/go-autorest/autorest/date v0.3.0 // indirect
 	github.com/Azure/go-autorest/logger v0.2.1 // indirect
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
-	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.1 // indirect
+	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.2 // indirect
 	github.com/BurntSushi/toml v1.3.2 // indirect
 	github.com/MakeNowJust/heredoc v1.0.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
@@ -88,7 +88,7 @@ require (
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gofrs/uuid v4.2.0+incompatible // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
-	github.com/golang-jwt/jwt/v5 v5.2.0 // indirect
+	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/btree v1.1.2 // indirect
 	github.com/google/gnostic-models v0.6.9-0.20230804172637-c7be7c783f49 // indirect
@@ -208,8 +208,8 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
-	k8s.io/apiserver v0.29.3 // indirect
-	k8s.io/component-base v0.29.3 // indirect
+	k8s.io/apiserver v0.29.4 // indirect
+	k8s.io/component-base v0.29.4 // indirect
 	k8s.io/cri-api v0.29.2 // indirect
 	oras.land/oras-go v1.2.5 // indirect
 	sigs.k8s.io/kustomize/api v0.14.0 // indirect
@@ -230,17 +230,17 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/net v0.22.0 // indirect
+	golang.org/x/net v0.23.0 // indirect
 	golang.org/x/oauth2 v0.18.0 // indirect
-	golang.org/x/sync v0.6.0
-	golang.org/x/sys v0.18.0
+	golang.org/x/sync v0.7.0
+	golang.org/x/sys v0.19.0
 	golang.org/x/term v0.18.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/protobuf v1.33.0
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/api v0.29.3
-	k8s.io/apimachinery v0.29.3
+	k8s.io/api v0.29.4
+	k8s.io/apimachinery v0.29.4
 	k8s.io/klog/v2 v2.120.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20240105020646-a37d4de58910 // indirect
 	k8s.io/utils v0.0.0-20240102154912-e7106e64919e
@@ -253,16 +253,16 @@ require (
 	github.com/Azure/azure-container-networking/zapai v0.0.3
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.11.1
-	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.5.1
+	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.5.2
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v4 v4.8.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/dashboard/armdashboard v1.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor v0.11.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v5 v5.1.1
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.2.0
-	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.2.1
+	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.3.2
 	github.com/Microsoft/hcsshim v0.12.0-rc.3
 	github.com/cakturk/go-netstat v0.0.0-20200220111822-e5b49efee7a5
-	github.com/cilium/cilium v1.15.3
+	github.com/cilium/cilium v1.15.4
 	github.com/cilium/ebpf v0.14.0
 	github.com/florianl/go-tc v0.4.3
 	github.com/inspektor-gadget/inspektor-gadget v0.25.1-0.20240223044605-4ac24c3e3b7f
@@ -271,24 +271,24 @@ require (
 	github.com/microsoft/ApplicationInsights-Go v0.4.4
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/ginkgo/v2 v2.17.1
-	github.com/onsi/gomega v1.32.0
+	github.com/onsi/gomega v1.33.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_model v0.6.0
-	github.com/prometheus/common v0.52.2
+	github.com/prometheus/common v0.53.0
 	github.com/safchain/ethtool v0.3.0
 	github.com/spf13/viper v1.18.2
 	github.com/vishvananda/netlink v1.2.1-beta.2.0.20231127184239-0ced8385386a
-	go.opentelemetry.io/otel v1.23.1
-	go.opentelemetry.io/otel/metric v1.23.1
-	go.opentelemetry.io/otel/trace v1.23.1
+	go.opentelemetry.io/otel v1.25.0
+	go.opentelemetry.io/otel/metric v1.25.0
+	go.opentelemetry.io/otel/trace v1.25.0
 	go.uber.org/mock v0.4.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gotest.tools v2.2.0+incompatible
 	gotest.tools/v3 v3.5.1
-	helm.sh/helm/v3 v3.14.3
-	k8s.io/apiextensions-apiserver v0.29.3
-	k8s.io/cli-runtime v0.29.3
-	k8s.io/kubectl v0.29.3
+	helm.sh/helm/v3 v3.14.4
+	k8s.io/apiextensions-apiserver v0.29.4
+	k8s.io/cli-runtime v0.29.4
+	k8s.io/kubectl v0.29.4
 	sigs.k8s.io/controller-runtime v0.16.3
 )
 
