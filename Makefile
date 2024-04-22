@@ -428,3 +428,12 @@ docs:
 .PHONY: docs-pod
 docs-prod:
 	docker run -i -p 3000:3000 -v $(PWD):/retina -w /retina/ node:20-alpine npm install --prefix site && npm run build --prefix site
+
+.PHONY: quick-build
+quick-build:
+	$(MAKE) retina-image PLATFORM=linux/amd64 BUILDX_ACTION=--push
+	$(MAKE) retina-operator-image PLATFORM=linux/amd64 BUILDX_ACTION=--push
+
+.PHONY: quick-deploy
+quick-deploy:
+	$(MAKE) helm-install-advanced-local-context HELM_IMAGE_TAG=$(TAG)-linux-amd64

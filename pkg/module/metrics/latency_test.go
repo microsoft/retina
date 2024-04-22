@@ -121,14 +121,14 @@ func TestProcessFlow(t *testing.T) {
 	 * Test case 1: TCP handshake.
 	 */
 	// Node -> Api server.
-	f1 := utils.ToFlow(t1, apiSeverIp, nodeIp, 80, 443, 6, 3, 0, 0)
+	f1 := utils.ToFlow(t1, apiSeverIp, nodeIp, 80, 443, 6, 3, 0)
 	utils.AddTcpID(f1, 1234)
 	utils.AddTcpFlags(f1, 1, 0, 0, 0, 0, 0)
 	f1.Destination = &flow.Endpoint{
 		PodName: "kubernetes-apiserver",
 	}
 	// Api server -> Node.
-	f2 := utils.ToFlow(t2, nodeIp, apiSeverIp, 443, 80, 6, 2, 0, 0)
+	f2 := utils.ToFlow(t2, nodeIp, apiSeverIp, 443, 80, 6, 2, 0)
 	utils.AddTcpID(f2, 1234)
 	utils.AddTcpFlags(f2, 1, 1, 0, 0, 0, 0)
 	f2.Source = &flow.Endpoint{
