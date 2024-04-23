@@ -27,9 +27,9 @@ const (
 	CaptureOutputLocationBlobUploadSecretKey string = "blob-upload-url"
 
 	// CaptureOutputLocationS3UploadSecretName is the name of the secret that stores the s3 credentials.
-	CaptureOutputLocationS3UploadSecretName string = "capture-s3-upload-secret"
+	CaptureOutputLocationS3UploadSecretName string = "capture-s3-upload-secret" // #nosec G101
 	// CaptureOutputLocationS3UploadSecretPath is the path of the secret that stores the s3 credentials.
-	CaptureOutputLocationS3UploadSecretPath string = "/etc/s3-upload-secret"
+	CaptureOutputLocationS3UploadSecretPath string = "/etc/s3-upload-secret" // #nosec G101
 	// CaptureOutputLocationS3UploadAccessKeyID is the key of the secret that stores the s3 access key id.
 	CaptureOutputLocationS3UploadAccessKeyID string = "s3-access-key-id"
 	// CaptureOutputLocationS3UploadSecretAccessKey is the key of the secret that stores the s3 secret access key.

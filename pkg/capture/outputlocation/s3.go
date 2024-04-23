@@ -5,6 +5,7 @@ package outputlocation
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -15,10 +16,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"go.uber.org/zap"
-
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
 	"github.com/microsoft/retina/pkg/log"
+	"go.uber.org/zap"
 )
 
 type S3Upload struct {
@@ -33,6 +33,7 @@ type S3Upload struct {
 }
 
 var _ Location = &S3Upload{}
+var ErrSandboxMountPathNotFound = errors.New("failed to find sandbox mount path")
 
 func NewS3Upload(logger *log.ZapLogger) Location {
 	return &S3Upload{l: logger}
@@ -146,7 +147,7 @@ func (su *S3Upload) getClient() (*s3.Client, error) {
 		opts...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load AWS config: %v", err)
+		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
 	return s3.NewFromConfig(cfg), nil
@@ -157,7 +158,7 @@ func readAccessKeyID() (string, error) {
 	if runtime.GOOS == "windows" {
 		containerSandboxMountPoint := os.Getenv(captureConstants.ContainerSandboxMountPointEnvKey)
 		if containerSandboxMountPoint == "" {
-			return "", fmt.Errorf("failed to find sandbox mount path through env %s", captureConstants.ContainerSandboxMountPointEnvKey)
+			return "", fmt.Errorf("%w through env %s", ErrSandboxMountPathNotFound, captureConstants.ContainerSandboxMountPointEnvKey)
 		}
 		secretPath = filepath.Join(containerSandboxMountPoint, captureConstants.CaptureOutputLocationS3UploadSecretPath, captureConstants.CaptureOutputLocationS3UploadAccessKeyID)
 	}
@@ -170,7 +171,7 @@ func readSecretAccessKey() (string, error) {
 	if runtime.GOOS == "windows" {
 		containerSandboxMountPoint := os.Getenv(captureConstants.ContainerSandboxMountPointEnvKey)
 		if containerSandboxMountPoint == "" {
-			return "", fmt.Errorf("failed to find sandbox mount path through env %s", captureConstants.ContainerSandboxMountPointEnvKey)
+			return "", fmt.Errorf("%w through env %s", ErrSandboxMountPathNotFound, captureConstants.ContainerSandboxMountPointEnvKey)
 		}
 		secretPath = filepath.Join(containerSandboxMountPoint, captureConstants.CaptureOutputLocationS3UploadSecretPath, captureConstants.CaptureOutputLocationS3UploadSecretAccessKey)
 	}

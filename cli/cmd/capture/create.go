@@ -155,7 +155,11 @@ var createCapture = &cobra.Command{
 
 			err = deleteSecret(kubeClient, &capture.Spec.OutputConfiguration.S3Upload.SecretName)
 			if err != nil {
-				retinacmd.Logger.Error("Failed to delete capture secret, please manually delete it", zap.String("namespace", namespace), zap.String("secret name", capture.Spec.OutputConfiguration.S3Upload.SecretName), zap.Error(err))
+				retinacmd.Logger.Error("Failed to delete capture secret, please manually delete it",
+					zap.String("namespace", namespace),
+					zap.String("secret name", capture.Spec.OutputConfiguration.S3Upload.SecretName),
+					zap.Error(err),
+				)
 			}
 
 			if len(jobsFailedToDelete) == 0 && err == nil {
@@ -206,7 +210,7 @@ func createSecretFromS3Upload(kubeClient kubernetes.Interface, s3AccessKeyID, s3
 	}
 	secret, err := kubeClient.CoreV1().Secrets(namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to create s3 upload secret: %w", err)
 	}
 	return secret.Name, nil
 }
@@ -452,7 +456,8 @@ func init() {
 	createCapture.Flags().StringVar(&pvc, "pvc", "", "PersistentVolumeClaim under the specified or default namespace to store capture files")
 	createCapture.Flags().StringVar(&blobUpload, "blob-upload", "", "Blob SAS URL with write permission to upload capture files")
 	createCapture.Flags().StringVar(&s3Region, "s3-region", "", "Region where the S3 compatible bucket is located")
-	createCapture.Flags().StringVar(&s3Endpoint, "s3-endpoint", "", "Endpoint for an S3 compatible storage service. Use this if you are using a custom or private S3 service that requires a specific endpoint")
+	createCapture.Flags().StringVar(&s3Endpoint, "s3-endpoint", "",
+		"Endpoint for an S3 compatible storage service. Use this if you are using a custom or private S3 service that requires a specific endpoint")
 	createCapture.Flags().StringVar(&s3Bucket, "s3-bucket", "", "Bucket in which to store capture files")
 	createCapture.Flags().StringVar(&s3Path, "s3-path", "retina/captures", "Prefix path within the S3 bucket where captures will be stored")
 	createCapture.Flags().StringVar(&s3AccessKeyID, "s3-access-key-id", "", "S3 access key id to upload capture files")
