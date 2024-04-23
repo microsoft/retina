@@ -542,7 +542,6 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 				bpfEvent.Proto,
 				bpfEvent.Dir,
 				flow.Verdict_FORWARDED,
-				0,
 			)
 			if fl == nil {
 				p.l.Warn("Could not convert bpfEvent to flow", zap.Any("bpfEvent", bpfEvent))

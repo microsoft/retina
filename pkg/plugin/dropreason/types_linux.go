@@ -12,8 +12,8 @@ import (
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
-	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/api"
+	"github.com/microsoft/retina/pkg/utils"
 )
 
 const (
@@ -82,14 +82,14 @@ type dropMetricValues []kprobeMetricsMapValue //nolint:typecheck
 
 func (dk *dropMetricKey) getType() string {
 	//nolint:typecheck
-	return metrics.GetDropType(dk.DropType).String()
+	return utils.DropReason(dk.DropType).String()
 }
 
 func (dk *dropMetricKey) getDirection() string {
 	switch dk.getType() {
-	case metrics.TCP_CONNECT_BASIC.String():
+	case utils.DropReason_TCP_CONNECT_BASIC.String():
 		return "egress"
-	case metrics.TCP_ACCEPT_BASIC.String():
+	case utils.DropReason_TCP_ACCEPT_BASIC.String():
 		return "ingress"
 	}
 	return "unknown"

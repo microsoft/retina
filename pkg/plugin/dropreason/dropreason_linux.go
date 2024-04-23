@@ -363,18 +363,21 @@ func (dr *dropReason) processRecord(ctx context.Context, id int) {
 				bpfEvent.Proto,
 				2, // drop reason packet doesn't have a direction yet, so we set it to 2
 				flow.Verdict_DROPPED,
-				dropKey.DropType,
 			)
 			if fl == nil {
 				dr.l.Warn("Could not convert bpfEvent to flow", zap.Any("bpfEvent", bpfEvent))
 				continue
 			}
-			fl.DropReasonDesc = flow.DropReason(bpfEvent.Key.DropType)
+
+			// Add drop reason to the flow.
+			utils.AddDropReason(fl, dropKey.DropType)
+
+			// Add packet size to the flow.
 			utils.AddPacketSize(fl, bpfEvent.SkbLen)
 
 			// This is only for development purposes.
 			// Removing this makes logs way too chatter-y.
-			dr.l.Debug("DropReason Packet Received", zap.Any("flow", fl), zap.Any("Raw Bpf Event", bpfEvent), zap.Uint32("drop type", bpfEvent.Key.DropType))
+			dr.l.Debug("DropReason Packet Received", zap.Any("flow", fl), zap.Any("Raw Bpf Event", bpfEvent), zap.Uint32("drop type", dropKey.DropType))
 
 			// Write the event to the enricher.
 			ev := &hubblev1.Event{

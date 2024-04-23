@@ -107,7 +107,7 @@ func (d *DropCountMetrics) ProcessFlow(flow *v1.Flow) {
 	}
 
 	labels := []string{
-		metrics.GetDropTypeFlowDropReason(flow.DropReasonDesc).String(),
+		utils.DropReasonDescription(flow),
 		flow.TrafficDirection.String(),
 	}
 
@@ -141,7 +141,7 @@ func (d *DropCountMetrics) processLocalCtxFlow(flow *v1.Flow) {
 	if labelValuesMap == nil {
 		return
 	}
-	dropReason := metrics.GetDropTypeFlowDropReason(flow.DropReasonDesc).String()
+	dropReason := utils.DropReasonDescription(flow)
 
 	// Ingress values
 	if l := len(labelValuesMap[ingress]); l > 0 {

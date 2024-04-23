@@ -120,7 +120,6 @@ func (t *tcpretrans) eventHandler(event *types.Event) {
 		unix.IPPROTO_TCP, // only TCP can  have retransmissions
 		0,                // drop reason packet doesn't have a direction yet, so we set it to 0
 		utils.Verdict_RETRANSMISSION,
-		0,
 	)
 
 	if fl == nil {

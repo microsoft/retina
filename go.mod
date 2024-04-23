@@ -281,7 +281,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.53.1
 	github.com/cakturk/go-netstat v0.0.0-20200220111822-e5b49efee7a5
 	github.com/cilium/cilium v1.15.4
-	github.com/cilium/ebpf v0.14.0
+	github.com/cilium/ebpf v0.15.0
 	github.com/florianl/go-tc v0.4.3
 	github.com/inspektor-gadget/inspektor-gadget v0.25.1-0.20240223044605-4ac24c3e3b7f
 	github.com/jellydator/ttlcache/v3 v3.1.1
@@ -289,7 +289,7 @@ require (
 	github.com/microsoft/ApplicationInsights-Go v0.4.4
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/ginkgo/v2 v2.17.1
-	github.com/onsi/gomega v1.32.0
+	github.com/onsi/gomega v1.33.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_model v0.6.0
 	github.com/prometheus/common v0.53.0
