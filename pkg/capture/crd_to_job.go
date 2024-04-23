@@ -887,9 +887,9 @@ func (translator *CaptureToPodTranslator) obtainCaptureOutputEnv(outputConfigura
 	}
 	if outputConfiguration.S3Upload != nil {
 		outputEnv[captureConstants.CaptureOutputLocationEnvKeyS3Endpoint] = outputConfiguration.S3Upload.Endpoint
-		outputEnv[captureConstants.CaptureOutputLocationEnvKeyS3Region] = *outputConfiguration.S3Upload.Region
+		outputEnv[captureConstants.CaptureOutputLocationEnvKeyS3Region] = outputConfiguration.S3Upload.Region
 		outputEnv[captureConstants.CaptureOutputLocationEnvKeyS3Bucket] = outputConfiguration.S3Upload.Bucket
-		outputEnv[captureConstants.CaptureOutputLocationEnvKeyS3Path] = *outputConfiguration.S3Upload.Path
+		outputEnv[captureConstants.CaptureOutputLocationEnvKeyS3Path] = outputConfiguration.S3Upload.Path
 	}
 
 	if len(outputEnv) == 0 && (outputConfiguration.BlobUpload == nil || *outputConfiguration.BlobUpload == "") {

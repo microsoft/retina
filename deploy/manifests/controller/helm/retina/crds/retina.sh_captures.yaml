@@ -274,8 +274,8 @@ spec:
                         description: Endpoint of S3 compatible storage service.
                         type: string
                       path:
-                        description: Path is Prefix path within the S3 bucket where
-                          captures will be stored.
+                        description: Path specifies the prefix path within the S3
+                          bucket where captures will be stored, e.g., "retina/captures".
                         type: string
                       region:
                         description: Region in which the S3 compatible bucket is located.

@@ -146,7 +146,7 @@ type OutputConfiguration struct {
 
 type S3Upload struct {
 	// Endpoint of S3 compatible storage service.
-	// +required
+	// +optional
 	Endpoint string `json:"endpoint,omitempty"`
 	// Bucket in which to store the capture.
 	// +required
@@ -156,10 +156,10 @@ type S3Upload struct {
 	SecretName string `json:"secretName,omitempty"`
 	// Region in which the S3 compatible bucket is located.
 	// +optional
-	Region *string `json:"region,omitempty"`
+	Region string `json:"region,omitempty"`
 	// Path specifies the prefix path within the S3 bucket where captures will be stored, e.g., "retina/captures".
 	// +optional
-	Path *string `json:"path,omitempty"`
+	Path string `json:"path,omitempty"`
 }
 
 // CaptureSpec indicates the specification of Capture.

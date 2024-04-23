@@ -316,8 +316,8 @@ func createCaptureF(kubeClient kubernetes.Interface) (*retinav1alpha1.Capture, e
 			Endpoint:   s3Endpoint,
 			Bucket:     s3Bucket,
 			SecretName: secretName,
-			Region:     &s3Region,
-			Path:       &s3Path,
+			Region:     s3Region,
+			Path:       s3Path,
 		}
 	}
 
