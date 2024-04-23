@@ -535,7 +535,10 @@ func (translator *CaptureToPodTranslator) validateCapture(capture *retinav1alpha
 		return fmt.Errorf("Neither duration nor maxCaptureSize is set to stop the capture")
 	}
 
-	if capture.Spec.OutputConfiguration.BlobUpload == nil && capture.Spec.OutputConfiguration.HostPath == nil && capture.Spec.OutputConfiguration.PersistentVolumeClaim == nil && capture.Spec.OutputConfiguration.S3Upload == nil {
+	if capture.Spec.OutputConfiguration.BlobUpload == nil &&
+		capture.Spec.OutputConfiguration.HostPath == nil &&
+		capture.Spec.OutputConfiguration.PersistentVolumeClaim == nil &&
+		capture.Spec.OutputConfiguration.S3Upload == nil {
 		return fmt.Errorf("At least one output configuration should be set")
 	}
 	return nil

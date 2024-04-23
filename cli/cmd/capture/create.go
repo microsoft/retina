@@ -77,10 +77,18 @@ var createExample = templates.Examples(i18n.T(`
 		kubectl retina capture create --node-selectors="agentpool=agentpool" --blob-upload=https://testaccount.blob.core.windows.net/<token>
 
 		# Capture network packets on nodes using node-selector and upload the artifacts to AWS S3
-		kubectl retina capture create --node-selectors="agentpool=agentpool" --s3-bucket "your-bucket-name" --s3-region "eu-central-1" --s3-access-key-id "your-access-key-id" --s3-secret-access-key "your-secret-access-key"
+		kubectl retina capture create --node-selectors="agentpool=agentpool" \
+			--s3-bucket "your-bucket-name" \
+			--s3-region "eu-central-1"\
+			--s3-access-key-id "your-access-key-id" \
+			--s3-secret-access-key "your-secret-access-key"
 
 		# Capture network packets on nodes using node-selector and upload the artifacts to S3-compatible service (like MinIO)
-		kubectl retina capture create --node-selectors="agentpool=agentpool" --s3-bucket "your-bucket-name" --s3-endpoint "https://play.min.io:9000" --s3-access-key-id "your-access-key-id" --s3-secret-access-key "your-secret-access-key"
+		kubectl retina capture create --node-selectors="agentpool=agentpool" \
+			--s3-bucket "your-bucket-name" \
+			--s3-endpoint "https://play.min.io:9000" \
+			--s3-access-key-id "your-access-key-id" \
+			--s3-secret-access-key "your-secret-access-key"
 		`))
 
 const (
@@ -184,7 +192,7 @@ func createSecretFromBlobUpload(kubeClient kubernetes.Interface, blobUpload, cap
 	return secret.Name, nil
 }
 
-func createSecretFromS3Upload(kubeClient kubernetes.Interface, s3AccessKeyId, s3SecretAccessKey, captureName string) (string, error) {
+func createSecretFromS3Upload(kubeClient kubernetes.Interface, s3AccessKeyID, s3SecretAccessKey, captureName string) (string, error) {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: captureConstants.CaptureOutputLocationS3UploadSecretName,
@@ -192,7 +200,7 @@ func createSecretFromS3Upload(kubeClient kubernetes.Interface, s3AccessKeyId, s3
 		},
 		Type: corev1.SecretTypeOpaque,
 		Data: map[string][]byte{
-			captureConstants.CaptureOutputLocationS3UploadAccessKeyID:     []byte(s3AccessKeyId),
+			captureConstants.CaptureOutputLocationS3UploadAccessKeyID:     []byte(s3AccessKeyID),
 			captureConstants.CaptureOutputLocationS3UploadSecretAccessKey: []byte(s3SecretAccessKey),
 		},
 	}
@@ -299,7 +307,7 @@ func createCaptureF(kubeClient kubernetes.Interface) (*retinav1alpha1.Capture, e
 		capture.Spec.OutputConfiguration.BlobUpload = &secretName
 	}
 
-	if len(s3Bucket) != 0 {
+	if s3Bucket != "" {
 		secretName, err := createSecretFromS3Upload(kubeClient, s3AccessKeyID, s3SecretAccessKey, name)
 		if err != nil {
 			return nil, err

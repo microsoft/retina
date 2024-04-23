@@ -59,7 +59,7 @@ func (su *S3Upload) Enabled() bool {
 	su.path = os.Getenv(string(captureConstants.CaptureOutputLocationEnvKeyS3Path))
 
 	var err error
-	su.accessKeyID, err = readAccessKeyId()
+	su.accessKeyID, err = readAccessKeyID()
 	if err != nil {
 		su.l.Error("Failed to obtain access key id from secret", zap.Error(err))
 		return false
@@ -152,11 +152,11 @@ func (su *S3Upload) getClient() (*s3.Client, error) {
 	return s3.NewFromConfig(cfg), nil
 }
 
-func readAccessKeyId() (string, error) {
+func readAccessKeyID() (string, error) {
 	secretPath := filepath.Join(captureConstants.CaptureOutputLocationS3UploadSecretPath, captureConstants.CaptureOutputLocationS3UploadAccessKeyID)
 	if runtime.GOOS == "windows" {
 		containerSandboxMountPoint := os.Getenv(captureConstants.ContainerSandboxMountPointEnvKey)
-		if len(containerSandboxMountPoint) == 0 {
+		if containerSandboxMountPoint == "" {
 			return "", fmt.Errorf("failed to find sandbox mount path through env %s", captureConstants.ContainerSandboxMountPointEnvKey)
 		}
 		secretPath = filepath.Join(containerSandboxMountPoint, captureConstants.CaptureOutputLocationS3UploadSecretPath, captureConstants.CaptureOutputLocationS3UploadAccessKeyID)
@@ -169,7 +169,7 @@ func readSecretAccessKey() (string, error) {
 	secretPath := filepath.Join(captureConstants.CaptureOutputLocationS3UploadSecretPath, captureConstants.CaptureOutputLocationS3UploadSecretAccessKey)
 	if runtime.GOOS == "windows" {
 		containerSandboxMountPoint := os.Getenv(captureConstants.ContainerSandboxMountPointEnvKey)
-		if len(containerSandboxMountPoint) == 0 {
+		if containerSandboxMountPoint == "" {
 			return "", fmt.Errorf("failed to find sandbox mount path through env %s", captureConstants.ContainerSandboxMountPointEnvKey)
 		}
 		secretPath = filepath.Join(containerSandboxMountPoint, captureConstants.CaptureOutputLocationS3UploadSecretPath, captureConstants.CaptureOutputLocationS3UploadSecretAccessKey)
