@@ -262,7 +262,7 @@ func (translator *CaptureToPodTranslator) initJobTemplate(capture *retinav1alpha
 		}
 		if err != nil {
 			translator.l.Error("Failed to get secrets for Capture", zap.Error(err), zap.String("CaptureName", capture.Name), zap.String("secretName", capture.Spec.OutputConfiguration.S3Upload.SecretName))
-			return err
+			return fmt.Errorf("failed to get secrets for Capture: %w", err)
 		}
 
 		secretVolume := corev1.Volume{

@@ -32,8 +32,10 @@ type S3Upload struct {
 	secretAccessKey string
 }
 
-var _ Location = &S3Upload{}
-var ErrSandboxMountPathNotFound = errors.New("failed to find sandbox mount path")
+var (
+	_                           Location = &S3Upload{}
+	ErrSandboxMountPathNotFound          = errors.New("failed to find sandbox mount path")
+)
 
 func NewS3Upload(logger *log.ZapLogger) Location {
 	return &S3Upload{l: logger}
@@ -93,8 +95,9 @@ func (su *S3Upload) Output(srcFilePath string) error {
 
 	s3File, err := os.Open(srcFilePath)
 	if err != nil {
-		su.l.Error("Failed to open capture file", zap.Error(err))
-		return err
+		wrappedErr := fmt.Errorf("failed to open src file %s: %w", srcFilePath, err)
+		su.l.Error("Failed to open capture file", zap.Error(wrappedErr))
+		return wrappedErr
 	}
 	defer s3File.Close()
 
@@ -104,13 +107,14 @@ func (su *S3Upload) Output(srcFilePath string) error {
 		Body:   s3File,
 	})
 	if err != nil {
+		wrappedErr := fmt.Errorf("failed to upload file to S3: %w", err)
 		su.l.Error("Couldn't upload file",
 			zap.String("srcFilePath", srcFilePath),
 			zap.String("bucketName", su.bucket),
 			zap.String("objectKey", objectKey),
-			zap.Error(err))
+			zap.Error(wrappedErr))
 	}
-	return err
+	return nil
 }
 
 func (su *S3Upload) getClient() (*s3.Client, error) {
