@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.21 as builder
+FROM --platform=linux/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.22 as builder
 # Build args
 ARG VERSION
 ARG APP_INSIGHTS_ID
