@@ -2,7 +2,7 @@ ARG builderImage="ghcr.io/microsoft/retina/retina-builder:0.0.1"
 ARG toolsImage="ghcr.io/microsoft/retina/retina-tools:0.0.1"
 
 # Stage: Build binary
-FROM --platform=$TARGETPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.21 AS builder
+FROM --platform=$TARGETPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.22 AS builder
 LABEL Name=retina-builder Version=0.0.1
 
 RUN apt-get update &&\

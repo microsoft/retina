@@ -1,5 +1,5 @@
 # build stage
-FROM mcr.microsoft.com/oss/go/microsoft/golang:1.21 AS builder
+FROM mcr.microsoft.com/oss/go/microsoft/golang:1.22 AS builder
 
 RUN apt-get update &&\
     apt-get -y install lsb-release wget software-properties-common gnupg file git make
