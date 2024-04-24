@@ -126,15 +126,13 @@ func ToFlow(
 	return f
 }
 
+// AddRetinaMetadata adds the RetinaMetadata to the flow's extensions field.
 func AddRetinaMetadata(f *flow.Flow, meta *RetinaMetadata) {
-	if f.Extensions == nil {
-		ext, _ := anypb.New(&RetinaMetadata{})
-		f.Extensions = ext
-	}
-	f.Extensions.UnmarshalTo(meta) //nolint:errcheck
+	ext, _ := anypb.New(meta)
+	f.Extensions = ext
 }
 
-func AddTcpFlags(f *flow.Flow, syn, ack, fin, rst, psh, urg uint16) {
+func AddTCPFlags(f *flow.Flow, syn, ack, fin, rst, psh, urg uint16) {
 	if f.L4.GetTCP() == nil {
 		return
 	}
