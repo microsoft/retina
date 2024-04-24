@@ -1,3 +1,5 @@
+//go:build e2eframework
+
 // todo: matmerr, this is just going to remain broken until it can be validated with scenarios pr
 
 package kubernetes

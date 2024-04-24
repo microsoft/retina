@@ -1,3 +1,5 @@
+//go:build e2eframework
+
 // todo: there are more robust retry packages out there, discuss with team
 package retry
 

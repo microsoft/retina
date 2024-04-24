@@ -1,3 +1,5 @@
+//go:build e2eframework
+
 package retina
 
 import (
