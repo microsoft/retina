@@ -133,11 +133,11 @@ func AddRetinaMetadata(f *flow.Flow, meta *RetinaMetadata) {
 }
 
 func AddTCPFlags(f *flow.Flow, syn, ack, fin, rst, psh, urg uint16) {
-	if f.L4.GetTCP() == nil {
+	if f.GetL4().GetTCP() == nil {
 		return
 	}
 
-	f.L4.GetTCP().Flags = &flow.TCPFlags{
+	f.GetL4().GetTCP().Flags = &flow.TCPFlags{
 		SYN: syn == uint16(1),
 		ACK: ack == uint16(1),
 		FIN: fin == uint16(1),
@@ -155,7 +155,7 @@ func (meta *RetinaMetadata) AddTCPID(id uint64) {
 }
 
 func GetTCPID(f *flow.Flow) uint64 {
-	if f.L4 == nil || f.L4.GetTCP() == nil {
+	if f.GetL4() == nil || f.GetL4().GetTCP() == nil {
 		return 0
 	}
 	k := &RetinaMetadata{}      //nolint:typecheck

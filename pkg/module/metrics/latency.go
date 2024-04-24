@@ -179,7 +179,7 @@ func (lm *LatencyMetrics) Clean() {
 }
 
 func (lm *LatencyMetrics) ProcessFlow(f *v1.Flow) {
-	if f == nil || f.L4 == nil || f.L4.GetTCP() == nil || utils.GetTCPID(f) == 0 || f.IP == nil {
+	if f == nil || f.GetL4() == nil || f.GetL4().GetTCP() == nil || utils.GetTCPID(f) == 0 || f.GetIP() == nil {
 		return
 	}
 
@@ -264,23 +264,23 @@ func (lm *LatencyMetrics) calculateLatency(f *v1.Flow) {
 		k := key{
 			srcIP: f.IP.Source,
 			dstIP: f.IP.Destination,
-			srcP:  f.L4.GetTCP().SourcePort,
-			dstP:  f.L4.GetTCP().DestinationPort,
+			srcP:  f.GetL4().GetTCP().SourcePort,
+			dstP:  f.GetL4().GetTCP().DestinationPort,
 			id:    utils.GetTCPID(f),
 		}
 		// There will be multiple identical packets with same ID. Store only the first one.
 		if item := lm.cache.Get(k); item == nil {
 			lm.cache.Set(k, &val{
 				t:     f.Time.Nanos,
-				flags: f.L4.GetTCP().Flags,
+				flags: f.GetL4().GetTCP().Flags,
 			}, TTL)
 		}
 	} else if f.TraceObservationPoint == v1.TraceObservationPoint_FROM_NETWORK {
 		k := key{
 			srcIP: f.IP.Destination,
 			dstIP: f.IP.Source,
-			srcP:  f.L4.GetTCP().DestinationPort,
-			dstP:  f.L4.GetTCP().SourcePort,
+			srcP:  f.GetL4().GetTCP().DestinationPort,
+			dstP:  f.GetL4().GetTCP().SourcePort,
 			id:    utils.GetTCPID(f),
 		}
 		if item := lm.cache.Get(k); item != nil {
@@ -294,7 +294,7 @@ func (lm *LatencyMetrics) calculateLatency(f *v1.Flow) {
 
 			// Determine if this is the first reply packet, and if so, log handshake latency.
 			prevFlowflags := item.Value().flags
-			curFlowflags := f.L4.GetTCP().Flags
+			curFlowflags := f.GetL4().GetTCP().Flags
 			if lm.nodeApiServerHandshakeLatency != nil && prevFlowflags != nil && prevFlowflags.SYN && curFlowflags != nil && curFlowflags.SYN && curFlowflags.ACK {
 				// This is the first reply packet.
 				lm.nodeApiServerHandshakeLatency.Observe(latency)

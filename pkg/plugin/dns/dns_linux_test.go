@@ -227,13 +227,13 @@ type EventMatcher struct {
 
 func (m *EventMatcher) Matches(x interface{}) bool {
 	inputFlow := x.(*v1.Event).Event.(*flow.Flow)
-	expectedDns, expectedDnsType, expectedNumResponses := utils.GetDNS(inputFlow)
-	return expectedDns != nil &&
-		expectedDns.Rcode == m.rCode &&
-		expectedDns.Query == m.query &&
-		reflect.DeepEqual(expectedDns.Ips, m.ips) &&
-		reflect.DeepEqual(expectedDns.Qtypes, m.qTypes) &&
-		expectedDnsType == m.qType &&
+	expectedDNS, expectedDNSType, expectedNumResponses := utils.GetDNS(inputFlow)
+	return expectedDNS != nil &&
+		expectedDNS.GetRcode() == m.rCode &&
+		expectedDNS.GetQuery() == m.query &&
+		reflect.DeepEqual(expectedDNS.GetIps(), m.ips) &&
+		reflect.DeepEqual(expectedDNS.GetQtypes(), m.qTypes) &&
+		expectedDNSType == m.qType &&
 		expectedNumResponses == m.numAnswers
 }
 
