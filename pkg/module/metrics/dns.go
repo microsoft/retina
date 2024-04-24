@@ -5,6 +5,7 @@ package metrics
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	v1 "github.com/cilium/cilium/api/v1/flow"
@@ -99,7 +100,10 @@ func (d *DNSMetrics) values(flow *v1.Flow) []string {
 	// Also ref: https://github.com/inspektor-gadget/inspektor-gadget/blob/main/docs/gadgets/trace/dns.md#limitations .
 	labels := []string{
 		utils.DNSRcodeToString(flow),
-		strings.Join(flowDNS.GetQtypes(), ","), flowDNS.GetQuery(), strings.Join(flowDNS.GetIps(), ","), fmt.Sprintf("%d", numResponses),
+		strings.Join(flowDNS.GetQtypes(), ","),
+		flowDNS.GetQuery(),
+		strings.Join(flowDNS.GetIps(), ","),
+		strconv.FormatUint(uint64(numResponses), 10),
 	}
 	return labels
 }

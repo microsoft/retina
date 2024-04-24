@@ -97,8 +97,6 @@ func ToFlow(
 		verdict = flow.Verdict_FORWARDED
 	}
 
-	ext, _ := anypb.New(&RetinaMetadata{}) //nolint:typecheck
-
 	f := &flow.Flow{
 		Type: flow.FlowType_L3_L4,
 		EventType: &flow.CiliumEventType{
@@ -115,7 +113,6 @@ func ToFlow(
 		TraceObservationPoint: checkpoint,
 		TrafficDirection:      direction,
 		Verdict:               verdict,
-		Extensions:            ext,
 		IsReply:               &wrapperspb.BoolValue{Value: false}, // Setting false by default as we don't have a better way to determine flow direction.
 	}
 	if t, err := decodeTime(ts); err == nil {
