@@ -213,4 +213,4 @@ jobs:
         run: |
           set -euo pipefail
           export AZURE_SUBSCRIPTION_ID=${{ secrets.AZURE_SUBSCRIPTION }}
-          go test -v ./test/e2e/scenarios/retina/*.go -timeout 30m -tags=e2e -count=1  -args -image-tag=$(make version) -image-registry=${{ vars.ACR_NAME }}  -image-namespace=${{ github.repository}}
+          go test -v ./test/e2e/scenarios/retina/*.go -timeout 30m -tags=e2e,e2eframework -count=1  -args -image-tag=$(make version) -image-registry=${{ vars.ACR_NAME }}  -image-namespace=${{ github.repository}}
