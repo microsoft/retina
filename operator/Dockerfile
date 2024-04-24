@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/oss/go/microsoft/golang:1.21 AS builder
+FROM mcr.microsoft.com/oss/go/microsoft/golang:1.22 AS builder
 
 ARG VERSION
 ARG APP_INSIGHTS_ID
