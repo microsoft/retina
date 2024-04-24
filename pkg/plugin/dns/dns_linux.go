@@ -141,7 +141,7 @@ func (d *dns) eventHandler(event *types.Event) {
 
 	meta := &utils.RetinaMetadata{}
 
-	meta.AddDNSInfo(fl, string(event.Qr), common.RCodeToFlow(event.Rcode), event.DNSName, []string{event.QType}, event.NumAnswers, event.Addresses)
+	utils.AddDNSInfo(fl, meta, string(event.Qr), common.RCodeToFlow(event.Rcode), event.DNSName, []string{event.QType}, event.NumAnswers, event.Addresses)
 
 	// Add metadata to the flow.
 	utils.AddRetinaMetadata(fl, meta)

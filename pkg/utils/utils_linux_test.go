@@ -84,7 +84,7 @@ func TestAddPacketSize(t *testing.T) {
 		flow.Verdict_FORWARDED,
 	)
 	meta := &RetinaMetadata{}
-	meta.AddPacketSize(uint64(100))
+	AddPacketSize(meta, uint64(100))
 	AddRetinaMetadata(fl, meta)
 
 	res := PacketSize(fl)
@@ -107,7 +107,7 @@ func TestTcpID(t *testing.T) {
 	)
 
 	meta := &RetinaMetadata{}
-	meta.AddTCPID(uint64(1234))
+	AddTCPID(meta, uint64(1234))
 	AddRetinaMetadata(fl, meta)
 	assert.EqualValues(t, GetTCPID(fl), uint64(1234))
 }
@@ -150,7 +150,7 @@ func TestAddDropReason(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			f := &flow.Flow{}
 			meta := &RetinaMetadata{}
-			meta.AddDropReason(f, tc.dropReason)
+			AddDropReason(f, meta, tc.dropReason)
 			AddRetinaMetadata(f, meta)
 			assert.Equal(t, f.DropReasonDesc, tc.expectedDesc)
 			assert.Equal(t, f.Verdict, flow.Verdict_DROPPED)

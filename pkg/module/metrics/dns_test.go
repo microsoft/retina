@@ -67,17 +67,17 @@ func TestGetLabels(t *testing.T) {
 func TestValues(t *testing.T) {
 	testR := &flow.Flow{}
 	metaR := &utils.RetinaMetadata{}
-	metaR.AddDNSInfo(testR, "R", 0, "bing.com", []string{"A"}, 1, []string{"1.1.1.1"})
+	utils.AddDNSInfo(testR, metaR, "R", 0, "bing.com", []string{"A"}, 1, []string{"1.1.1.1"})
 	utils.AddRetinaMetadata(testR, metaR)
 
 	testQ := &flow.Flow{}
 	metaQ := &utils.RetinaMetadata{}
-	metaQ.AddDNSInfo(testQ, "Q", 0, "bing.com", []string{"A"}, 0, []string{})
+	utils.AddDNSInfo(testQ, metaQ, "Q", 0, "bing.com", []string{"A"}, 0, []string{})
 	utils.AddRetinaMetadata(testQ, metaQ)
 
 	testU := &flow.Flow{}
 	metaU := &utils.RetinaMetadata{}
-	metaU.AddDNSInfo(testU, "U", 0, "bing.com", []string{"A"}, 0, []string{})
+	utils.AddDNSInfo(testU, metaU, "U", 0, "bing.com", []string{"A"}, 0, []string{})
 	utils.AddRetinaMetadata(testU, metaU)
 
 	tests := []struct {
@@ -162,17 +162,17 @@ func TestProcessLocalCtx(t *testing.T) {
 
 	testR := &flow.Flow{}
 	metaR := &utils.RetinaMetadata{}
-	metaR.AddDNSInfo(testR, "R", 0, "bing.com", []string{"A"}, 1, []string{"1.1.1.1"})
+	utils.AddDNSInfo(testR, metaR, "R", 0, "bing.com", []string{"A"}, 1, []string{"1.1.1.1"})
 	utils.AddRetinaMetadata(testR, metaR)
 
 	testIngress := &flow.Flow{TrafficDirection: flow.TrafficDirection_INGRESS}
 	metaIngress := &utils.RetinaMetadata{}
-	metaIngress.AddDNSInfo(testIngress, "R", 0, "bing.com", []string{"A"}, 1, []string{"1.1.1.1"})
+	utils.AddDNSInfo(testIngress, metaIngress, "R", 0, "bing.com", []string{"A"}, 1, []string{"1.1.1.1"})
 	utils.AddRetinaMetadata(testIngress, metaIngress)
 
 	testEgress := &flow.Flow{TrafficDirection: flow.TrafficDirection_EGRESS}
 	metaEgress := &utils.RetinaMetadata{}
-	metaEgress.AddDNSInfo(testEgress, "R", 0, "bing.com", []string{"A"}, 1, []string{"1.1.1.1"})
+	utils.AddDNSInfo(testEgress, metaEgress, "R", 0, "bing.com", []string{"A"}, 1, []string{"1.1.1.1"})
 	utils.AddRetinaMetadata(testEgress, metaEgress)
 
 	tests := []struct {

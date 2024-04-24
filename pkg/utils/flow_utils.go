@@ -150,7 +150,10 @@ func AddTCPFlags(f *flow.Flow, syn, ack, fin, rst, psh, urg uint16) {
 // Add TSval/TSecr to the flow's metadata as TCP ID.
 // The TSval/TSecr works as ID for the flow.
 // We will use this ID to calculate latency.
-func (meta *RetinaMetadata) AddTCPID(id uint64) {
+func AddTCPID(meta *RetinaMetadata, id uint64) {
+	if meta == nil {
+		return
+	}
 	meta.TcpId = id
 }
 
@@ -164,8 +167,8 @@ func GetTCPID(f *flow.Flow) uint64 {
 }
 
 // AddDNSInfo adds DNS information to the flow's metadata.
-func (meta *RetinaMetadata) AddDNSInfo(f *flow.Flow, qType string, rCode uint32, query string, qTypes []string, numAnswers int, ips []string) {
-	if f == nil {
+func AddDNSInfo(f *flow.Flow, meta *RetinaMetadata, qType string, rCode uint32, query string, qTypes []string, numAnswers int, ips []string) {
+	if f == nil || meta == nil {
 		return
 	}
 	// Set type to L7.
@@ -238,7 +241,10 @@ func DNSRcodeToString(f *flow.Flow) string {
 }
 
 // AddPacketSize adds the packet size to the flow's metadata.
-func (meta *RetinaMetadata) AddPacketSize(packetSize uint64) {
+func AddPacketSize(meta *RetinaMetadata, packetSize uint64) {
+	if meta == nil {
+		return
+	}
 	meta.Bytes = packetSize
 }
 
@@ -252,8 +258,8 @@ func PacketSize(f *flow.Flow) uint64 {
 }
 
 // AddDropReason adds the drop reason to the flow's metadata.
-func (meta *RetinaMetadata) AddDropReason(f *flow.Flow, dropReason uint32) {
-	if f == nil {
+func AddDropReason(f *flow.Flow, meta *RetinaMetadata, dropReason uint32) {
+	if f == nil || meta == nil {
 		return
 	}
 

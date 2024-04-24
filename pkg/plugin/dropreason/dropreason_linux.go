@@ -371,11 +371,11 @@ func (dr *dropReason) processRecord(ctx context.Context, id int) {
 
 			meta := &utils.RetinaMetadata{}
 
-			// Add drop reason to the flow.
-			meta.AddDropReason(fl, dropKey.DropType)
+			// Add drop reason to the flow's metadata.
+			utils.AddDropReason(fl, meta, dropKey.DropType)
 
-			// Add packet size to the flow.
-			meta.AddPacketSize(bpfEvent.SkbLen)
+			// Add packet size to the flow's metadata.
+			utils.AddPacketSize(meta, bpfEvent.SkbLen)
 
 			// Add metadata to the flow.
 			utils.AddRetinaMetadata(fl, meta)

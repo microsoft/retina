@@ -551,7 +551,7 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 			meta := &utils.RetinaMetadata{}
 
 			// Add packet size to the flow's metadata.
-			meta.AddPacketSize(bpfEvent.Bytes)
+			utils.AddPacketSize(meta, bpfEvent.Bytes)
 
 			// Add the TCP metadata to the flow.
 			tcpMetadata := bpfEvent.TcpMetadata
@@ -560,9 +560,9 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 			// For packets originating from node, we use tsval as the tcpID.
 			// Packets coming back has the tsval echoed in tsecr.
 			if fl.TraceObservationPoint == flow.TraceObservationPoint_TO_NETWORK {
-				meta.AddTCPID(uint64(tcpMetadata.Tsval))
+				utils.AddTCPID(meta, uint64(tcpMetadata.Tsval))
 			} else if fl.TraceObservationPoint == flow.TraceObservationPoint_FROM_NETWORK {
-				meta.AddTCPID(uint64(tcpMetadata.Tsecr))
+				utils.AddTCPID(meta, uint64(tcpMetadata.Tsecr))
 			}
 
 			// Add metadata to the flow.
