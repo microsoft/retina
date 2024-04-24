@@ -1,0 +1,26 @@
+FROM --platform=linux/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.22 as builder
+
+# Build args
+ARG VERSION
+ARG APP_INSIGHTS_ID
+
+ENV GOOS=windows
+ENV GOARCH=amd64 
+
+WORKDIR /usr/src/retina
+# Copy the source
+COPY . .
+
+RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /usr/bin/controller.exe -ldflags "-X main.version="$VERSION" -X "main.applicationInsightsID"="$APP_INSIGHTS_ID"" ./controller/
+RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /usr/bin/captureworkload.exe ./captureworkload/
+
+# Copy into final image
+FROM  mcr.microsoft.com/windows/servercore:ltsc2022
+COPY --from=builder /usr/src/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
+COPY --from=builder /usr/src/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
+COPY --from=builder /usr/bin/controller.exe controller.exe
+COPY --from=builder /usr/bin/captureworkload.exe captureworkload.exe
+
+ADD https://github.com/microsoft/etl2pcapng/releases/download/v1.10.0/etl2pcapng.exe /etl2pcapng.exe
+
+CMD ["controller.exe", "start", "--kubeconfig=.\\kubeconfig"]

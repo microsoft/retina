@@ -1,6 +1,5 @@
 # build stage
 FROM mcr.microsoft.com/oss/go/microsoft/golang:1.22 AS builder
-
 ENV CGO_ENABLED=0
 
 RUN apt-get update &&\
