@@ -126,6 +126,14 @@ func ToFlow(
 	return f
 }
 
+func AddRetinaMetadata(f *flow.Flow, meta *RetinaMetadata) {
+	if f.Extensions == nil {
+		ext, _ := anypb.New(&RetinaMetadata{})
+		f.Extensions = ext
+	}
+	f.Extensions.UnmarshalTo(meta) //nolint:errcheck
+}
+
 func AddTcpFlags(f *flow.Flow, syn, ack, fin, rst, psh, urg uint16) {
 	if f.L4.GetTCP() == nil {
 		return
@@ -141,20 +149,14 @@ func AddTcpFlags(f *flow.Flow, syn, ack, fin, rst, psh, urg uint16) {
 	}
 }
 
-// Add TSval/TSecr to the flow as TCP ID.
+// Add TSval/TSecr to the flow's metadata as TCP ID.
 // The TSval/TSecr works as ID for the flow.
 // We will use this ID to calculate latency.
-func AddTcpID(f *flow.Flow, id uint64) {
-	if f.L4 == nil || f.L4.GetTCP() == nil {
-		return
-	}
-	k := &RetinaMetadata{}      //nolint:typecheck
-	f.Extensions.UnmarshalTo(k) //nolint:errcheck
-	k.TcpId = id
-	f.Extensions, _ = anypb.New(k) //nolint:errcheck
+func (meta *RetinaMetadata) AddTCPID(id uint64) {
+	meta.TcpId = id
 }
 
-func GetTcpID(f *flow.Flow) uint64 {
+func GetTCPID(f *flow.Flow) uint64 {
 	if f.L4 == nil || f.L4.GetTCP() == nil {
 		return 0
 	}
@@ -163,7 +165,8 @@ func GetTcpID(f *flow.Flow) uint64 {
 	return k.TcpId
 }
 
-func AddDnsInfo(f *flow.Flow, qType string, rCode uint32, query string, qTypes []string, numAnswers int, ips []string) {
+// AddDNSInfo adds DNS information to the flow's metadata.
+func (meta *RetinaMetadata) AddDNSInfo(f *flow.Flow, qType string, rCode uint32, query string, qTypes []string, numAnswers int, ips []string) {
 	if f == nil {
 		return
 	}
@@ -184,25 +187,22 @@ func AddDnsInfo(f *flow.Flow, qType string, rCode uint32, query string, qTypes [
 	f.L7 = &flow.Layer7{
 		Record: &l7,
 	}
-	k := &RetinaMetadata{}      //nolint:typecheck
-	f.Extensions.UnmarshalTo(k) //nolint:errcheck
 	switch qType {
 	case "Q":
-		k.DnsType = DNSType_QUERY
+		meta.DnsType = DNSType_QUERY
 		f.L7.Type = flow.L7FlowType_REQUEST
 	case "R":
-		k.DnsType = DNSType_RESPONSE
+		meta.DnsType = DNSType_RESPONSE
 		f.L7.Type = flow.L7FlowType_RESPONSE
 		f.IsReply = &wrapperspb.BoolValue{Value: true} // we can definitely say that this is a reply
 	default:
-		k.DnsType = DNSType_UNKNOWN
+		meta.DnsType = DNSType_UNKNOWN
 		f.L7.Type = flow.L7FlowType_UNKNOWN_L7_TYPE
 	}
-	k.NumResponses = uint32(numAnswers)
-	f.Extensions, _ = anypb.New(k)
+	meta.NumResponses = uint32(numAnswers)
 }
 
-func GetDns(f *flow.Flow) (*flow.DNS, DNSType, uint32) {
+func GetDNS(f *flow.Flow) (*flow.DNS, DNSType, uint32) {
 	if f == nil || f.L7 == nil || f.L7.GetDns() == nil {
 		return nil, DNSType_UNKNOWN, 0
 	}
@@ -217,7 +217,7 @@ func GetDns(f *flow.Flow) (*flow.DNS, DNSType, uint32) {
 }
 
 // DNS Return code to string.
-func DnsRcodeToString(f *flow.Flow) string {
+func DNSRcodeToString(f *flow.Flow) string {
 	if f == nil || f.L7 == nil || f.L7.GetDns() == nil {
 		return ""
 	}
@@ -239,14 +239,9 @@ func DnsRcodeToString(f *flow.Flow) string {
 	}
 }
 
-func AddPacketSize(f *flow.Flow, packetSize uint64) {
-	if f.Extensions == nil {
-		return
-	}
-	k := &RetinaMetadata{}      //nolint:typecheck
-	f.Extensions.UnmarshalTo(k) //nolint:errcheck
-	k.Bytes = packetSize
-	f.Extensions, _ = anypb.New(k)
+// AddPacketSize adds the packet size to the flow's metadata.
+func (meta *RetinaMetadata) AddPacketSize(packetSize uint64) {
+	meta.Bytes = packetSize
 }
 
 func PacketSize(f *flow.Flow) uint64 {
@@ -258,15 +253,13 @@ func PacketSize(f *flow.Flow) uint64 {
 	return k.Bytes
 }
 
-func AddDropReason(f *flow.Flow, dropReason uint32) {
+// AddDropReason adds the drop reason to the flow's metadata.
+func (meta *RetinaMetadata) AddDropReason(f *flow.Flow, dropReason uint32) {
 	if f == nil {
 		return
 	}
 
-	k := &RetinaMetadata{}           //nolint:typecheck // Not required to check type as we are setting it.
-	f.GetExtensions().UnmarshalTo(k) //nolint:errcheck // Not required to check error as we are setting it.
-	k.DropReason = DropReason(dropReason)
-	f.Extensions, _ = anypb.New(k)
+	meta.DropReason = DropReason(dropReason)
 
 	f.Verdict = flow.Verdict_DROPPED
 	f.EventType = &flow.CiliumEventType{
@@ -278,7 +271,7 @@ func AddDropReason(f *flow.Flow, dropReason uint32) {
 	// Retina drop reasons are different from the drop reasons available in flow library.
 	// We map the ones available in flow library to the ones available in Retina.
 	// Rest are set to UNKNOWN. The details are added in the metadata.
-	switch k.GetDropReason() { //nolint:exhaustive // We are handling all the cases.
+	switch meta.GetDropReason() { //nolint:exhaustive // We are handling all the cases.
 	case DropReason_IPTABLE_RULE_DROP:
 		f.DropReasonDesc = flow.DropReason_POLICY_DENIED
 	case DropReason_IPTABLE_NAT_DROP:
@@ -288,9 +281,6 @@ func AddDropReason(f *flow.Flow, dropReason uint32) {
 	default:
 		f.DropReasonDesc = flow.DropReason_DROP_REASON_UNKNOWN
 	}
-
-	// Deprecated upstream. Will be removed in the future.
-	f.DropReason = uint32(f.GetDropReasonDesc()) //nolint:staticcheck // Deprecated upstream. Will be removed in the future.:w
 }
 
 func DropReasonDescription(f *flow.Flow) string {

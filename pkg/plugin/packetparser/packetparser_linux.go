@@ -547,7 +547,12 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 				p.l.Warn("Could not convert bpfEvent to flow", zap.Any("bpfEvent", bpfEvent))
 				continue
 			}
-			utils.AddPacketSize(fl, bpfEvent.Bytes)
+
+			meta := &utils.RetinaMetadata{}
+
+			// Add packet size to the flow's metadata.
+			meta.AddPacketSize(bpfEvent.Bytes)
+
 			// Add the TCP metadata to the flow.
 			tcpMetadata := bpfEvent.TcpMetadata
 			utils.AddTcpFlags(fl, tcpMetadata.Syn, tcpMetadata.Ack, tcpMetadata.Fin, tcpMetadata.Rst, tcpMetadata.Psh, tcpMetadata.Urg)
@@ -555,17 +560,20 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 			// For packets originating from node, we use tsval as the tcpID.
 			// Packets coming back has the tsval echoed in tsecr.
 			if fl.TraceObservationPoint == flow.TraceObservationPoint_TO_NETWORK {
-				utils.AddTcpID(fl, uint64(tcpMetadata.Tsval))
+				meta.AddTCPID(uint64(tcpMetadata.Tsval))
 			} else if fl.TraceObservationPoint == flow.TraceObservationPoint_FROM_NETWORK {
-				utils.AddTcpID(fl, uint64(tcpMetadata.Tsecr))
+				meta.AddTCPID(uint64(tcpMetadata.Tsecr))
 			}
+
+			// Add metadata to the flow.
+			utils.AddRetinaMetadata(fl, meta)
 
 			p.l.Debug("Received packet", zap.Any("flow", fl))
 
 			// Write the event to the enricher.
 			ev := &v1.Event{
 				Event:     fl,
-				Timestamp: fl.Time,
+				Timestamp: fl.GetTime(),
 			}
 			if p.enricher != nil {
 				p.enricher.Write(ev)

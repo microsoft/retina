@@ -83,7 +83,7 @@ func (d *DNSMetrics) getLabels() []string {
 }
 
 func (d *DNSMetrics) values(flow *v1.Flow) []string {
-	flowDns, dnsType, numResponses := utils.GetDns(flow)
+	flowDns, dnsType, numResponses := utils.GetDNS(flow)
 	if flowDns == nil {
 		return nil
 	}
@@ -98,7 +98,7 @@ func (d *DNSMetrics) values(flow *v1.Flow) []string {
 	// https://github.com/inspektor-gadget/inspektor-gadget/issues/2008 .
 	// Also ref: https://github.com/inspektor-gadget/inspektor-gadget/blob/main/docs/gadgets/trace/dns.md#limitations .
 	labels := []string{
-		utils.DnsRcodeToString(flow),
+		utils.DNSRcodeToString(flow),
 		strings.Join(flowDns.Qtypes, ","), flowDns.Query, strings.Join(flowDns.Ips, ","), fmt.Sprintf("%d", numResponses),
 	}
 	return labels

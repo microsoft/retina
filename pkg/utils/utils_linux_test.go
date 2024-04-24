@@ -73,12 +73,21 @@ func TestAddPacketSize(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 
 	ts := int64(1649748687588864)
-	f := ToFlow(ts, net.ParseIP("1.1.1.1").To4(),
+	fl := ToFlow(
+		ts,
+		net.ParseIP("1.1.1.1").To4(),
 		net.ParseIP("2.2.2.2").To4(),
-		443, 80, 6, uint32(1), flow.Verdict_FORWARDED)
-	AddPacketSize(f, uint64(100))
+		443,
+		80,
+		6,
+		uint32(1),
+		flow.Verdict_FORWARDED,
+	)
+	meta := &RetinaMetadata{}
+	meta.AddPacketSize(uint64(100))
+	AddRetinaMetadata(fl, meta)
 
-	res := PacketSize(f)
+	res := PacketSize(fl)
 	assert.EqualValues(t, res, uint64(100))
 }
 
@@ -86,11 +95,21 @@ func TestTcpID(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 
 	ts := int64(1649748687588864)
-	f := ToFlow(ts, net.ParseIP("1.1.1.1").To4(),
+	fl := ToFlow(
+		ts,
+		net.ParseIP("1.1.1.1").To4(),
 		net.ParseIP("2.2.2.2").To4(),
-		443, 80, 6, uint32(1), flow.Verdict_FORWARDED)
-	AddTcpID(f, uint64(1234))
-	assert.EqualValues(t, GetTcpID(f), uint64(1234))
+		443,
+		80,
+		6,
+		uint32(1),
+		flow.Verdict_FORWARDED,
+	)
+
+	meta := &RetinaMetadata{}
+	meta.AddTCPID(uint64(1234))
+	AddRetinaMetadata(fl, meta)
+	assert.EqualValues(t, GetTCPID(fl), uint64(1234))
 }
 
 func TestAddDropReason(t *testing.T) {
@@ -130,7 +149,9 @@ func TestAddDropReason(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			f := &flow.Flow{}
-			AddDropReason(f, tc.dropReason)
+			meta := &RetinaMetadata{}
+			meta.AddDropReason(f, tc.dropReason)
+			AddRetinaMetadata(f, meta)
 			assert.Equal(t, f.DropReasonDesc, tc.expectedDesc)
 			assert.Equal(t, f.Verdict, flow.Verdict_DROPPED)
 			assert.NotNil(t, f.EventType.Type, 1)

@@ -227,7 +227,7 @@ type EventMatcher struct {
 
 func (m *EventMatcher) Matches(x interface{}) bool {
 	inputFlow := x.(*v1.Event).Event.(*flow.Flow)
-	expectedDns, expectedDnsType, expectedNumResponses := utils.GetDns(inputFlow)
+	expectedDns, expectedDnsType, expectedNumResponses := utils.GetDNS(inputFlow)
 	return expectedDns != nil &&
 		expectedDns.Rcode == m.rCode &&
 		expectedDns.Query == m.query &&

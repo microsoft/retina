@@ -369,11 +369,16 @@ func (dr *dropReason) processRecord(ctx context.Context, id int) {
 				continue
 			}
 
+			meta := &utils.RetinaMetadata{}
+
 			// Add drop reason to the flow.
-			utils.AddDropReason(fl, dropKey.DropType)
+			meta.AddDropReason(fl, dropKey.DropType)
 
 			// Add packet size to the flow.
-			utils.AddPacketSize(fl, bpfEvent.SkbLen)
+			meta.AddPacketSize(bpfEvent.SkbLen)
+
+			// Add metadata to the flow.
+			utils.AddRetinaMetadata(fl, meta)
 
 			// This is only for development purposes.
 			// Removing this makes logs way too chatter-y.
@@ -382,7 +387,7 @@ func (dr *dropReason) processRecord(ctx context.Context, id int) {
 			// Write the event to the enricher.
 			ev := &hubblev1.Event{
 				Event:     fl,
-				Timestamp: fl.Time,
+				Timestamp: fl.GetTime(),
 			}
 			if dr.enricher != nil {
 				dr.enricher.Write(ev)
