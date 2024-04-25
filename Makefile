@@ -324,7 +324,7 @@ test-image: ## build the retina container image for testing.
 COVER_PKG ?= .
 
 test: $(ENVTEST) # Run unit tests.
-	go build -o test-summary ./test/utsummary/main.go
+	go build -tags=localtest -o test-summary ./test/utsummary/main.go
 	CGO_ENABLED=0 KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit,dashboard -skip=TestE2E* -coverprofile=coverage.out -v -json ./... | ./test-summary --progress --verbose
 
 coverage: # Code coverage.
