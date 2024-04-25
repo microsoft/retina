@@ -1,3 +1,5 @@
+//go:build localtest
+
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 package main

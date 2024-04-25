@@ -1,3 +1,5 @@
+//go:build localtest
+
 // Copyright 2022 The Inspektor Gadget authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
