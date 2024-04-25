@@ -202,25 +202,29 @@ func (c *Cache) UpdateRetinaEndpoint(ep *common.RetinaEndpoint) error {
 
 // updateEndpoint updates the cache with the given retina endpoint.
 func (c *Cache) updateEndpoint(ep *common.RetinaEndpoint) error {
-	ip, err := ep.PrimaryIP()
+	ips, err := ep.IPs()
 	if err != nil {
-		c.l.Error("updateEndpoint: error getting primary IP for pod", zap.String("pod", ep.Key()), zap.Error(err))
+		c.l.Error("updateEndpoint: error getting IPs for pod", zap.String("pod", ep.Key()), zap.Error(err))
 		return err
 	}
-	// delete if any existing object is using this IP
+	// delete if any existing object is using any IP
 	// send a delete event for the existing object
-	err = c.deleteByIP(ip, ep.Key())
-	if err != nil {
-		c.l.Error("updateEndpoint: error deleting existing object for IP",
-			zap.String("pod", ep.Key()),
-			zap.String("ip", ip),
-			zap.Error(err),
-		)
-		return err
+	for _, ip := range ips {
+		err = c.deleteByIP(ip, ep.Key())
+		if err != nil {
+			c.l.Error("updateEndpoint: error deleting existing object for IP",
+				zap.String("pod", ep.Key()),
+				zap.String("ip", ip),
+				zap.Error(err),
+			)
+			return err
+		}
 	}
 
 	c.epMap[ep.Key()] = ep
-	c.ipToEpKey[ip] = ep.Key()
+	for _, ip := range ips {
+		c.ipToEpKey[ip] = ep.Key()
+	}
 
 	// notify pubsub that the endpoint has been updated
 	c.publish(EventTypePodAdded, ep)
@@ -316,14 +320,16 @@ func (c *Cache) deleteEndpoint(epKey string) error {
 		return nil
 	}
 
-	ip, err := ep.PrimaryIP()
+	ips, err := ep.IPs()
 	if err != nil {
 		c.l.Error("error getting primary IP for pod", zap.String("pod", ep.Key()), zap.Error(err))
 		return err
 	}
 
 	delete(c.epMap, epKey)
-	delete(c.ipToEpKey, ip)
+	for _, ip := range ips {
+		delete(c.ipToEpKey, ip)
+	}
 
 	c.publish(EventTypePodDeleted, ep)
 

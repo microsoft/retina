@@ -127,7 +127,7 @@ func (t *tcpretrans) eventHandler(event *types.Event) {
 		return
 	}
 	syn, ack, fin, rst, psh, urg := getTcpFlags(event.Tcpflags)
-	utils.AddTcpFlags(fl, syn, ack, fin, rst, psh, urg)
+	utils.AddTCPFlags(fl, syn, ack, fin, rst, psh, urg)
 
 	// This is only for development purposes.
 	// Removing this makes logs way too chatter-y.

@@ -41,8 +41,8 @@ func TestToFlow(t *testing.T) {
 	assert.Equal(t, f.IP.Source, "1.1.1.1")
 	assert.Equal(t, f.IP.Destination, "2.2.2.2")
 	assert.Equal(t, f.IP.IpVersion, flow.IPVersion_IPv4)
-	assert.EqualValues(t, f.L4.Protocol.(*flow.Layer4_TCP).TCP.SourcePort, uint32(443))
-	assert.EqualValues(t, f.L4.Protocol.(*flow.Layer4_TCP).TCP.DestinationPort, uint32(80))
+	assert.EqualValues(t, f.GetL4().Protocol.(*flow.Layer4_TCP).TCP.SourcePort, uint32(443))
+	assert.EqualValues(t, f.GetL4().Protocol.(*flow.Layer4_TCP).TCP.DestinationPort, uint32(80))
 	assert.NotNil(t, f.Time)
 	assert.NotNil(t, f.Extensions)
 	assert.Equal(t, f.Type, flow.FlowType_L3_L4)
@@ -73,12 +73,21 @@ func TestAddPacketSize(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 
 	ts := int64(1649748687588864)
-	f := ToFlow(ts, net.ParseIP("1.1.1.1").To4(),
+	fl := ToFlow(
+		ts,
+		net.ParseIP("1.1.1.1").To4(),
 		net.ParseIP("2.2.2.2").To4(),
-		443, 80, 6, uint32(1), flow.Verdict_FORWARDED)
-	AddPacketSize(f, uint64(100))
+		443,
+		80,
+		6,
+		uint32(1),
+		flow.Verdict_FORWARDED,
+	)
+	meta := &RetinaMetadata{}
+	AddPacketSize(meta, uint64(100))
+	AddRetinaMetadata(fl, meta)
 
-	res := PacketSize(f)
+	res := PacketSize(fl)
 	assert.EqualValues(t, res, uint64(100))
 }
 
@@ -86,11 +95,21 @@ func TestTcpID(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 
 	ts := int64(1649748687588864)
-	f := ToFlow(ts, net.ParseIP("1.1.1.1").To4(),
+	fl := ToFlow(
+		ts,
+		net.ParseIP("1.1.1.1").To4(),
 		net.ParseIP("2.2.2.2").To4(),
-		443, 80, 6, uint32(1), flow.Verdict_FORWARDED)
-	AddTcpID(f, uint64(1234))
-	assert.EqualValues(t, GetTcpID(f), uint64(1234))
+		443,
+		80,
+		6,
+		uint32(1),
+		flow.Verdict_FORWARDED,
+	)
+
+	meta := &RetinaMetadata{}
+	AddTCPID(meta, uint64(1234))
+	AddRetinaMetadata(fl, meta)
+	assert.EqualValues(t, GetTCPID(fl), uint64(1234))
 }
 
 func TestAddDropReason(t *testing.T) {
@@ -130,7 +149,9 @@ func TestAddDropReason(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			f := &flow.Flow{}
-			AddDropReason(f, tc.dropReason)
+			meta := &RetinaMetadata{}
+			AddDropReason(f, meta, tc.dropReason)
+			AddRetinaMetadata(f, meta)
 			assert.Equal(t, f.DropReasonDesc, tc.expectedDesc)
 			assert.Equal(t, f.Verdict, flow.Verdict_DROPPED)
 			assert.NotNil(t, f.EventType.Type, 1)
