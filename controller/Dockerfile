@@ -25,6 +25,7 @@ ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
 COPY . /go/src/github.com/microsoft/retina 
 WORKDIR /go/src/github.com/microsoft/retina
+RUN GOOS=linux go generate /go/src/github.com/microsoft/retina/pkg/plugin/...
 RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/retina/controller -ldflags "-X main.version="$VERSION" -X main.applicationInsightsID="$APP_INSIGHTS_ID"" controller/main.go 
 
 
