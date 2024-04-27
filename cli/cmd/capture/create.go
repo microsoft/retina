@@ -314,7 +314,7 @@ func createCaptureF(kubeClient kubernetes.Interface) (*retinav1alpha1.Capture, e
 	if s3Bucket != "" {
 		secretName, err := createSecretFromS3Upload(kubeClient, s3AccessKeyID, s3SecretAccessKey, name)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create s3 upload secret: %w")
+			return nil, fmt.Errorf("failed to create s3 upload secret: %w", err)
 		}
 		capture.Spec.OutputConfiguration.S3Upload = &retinav1alpha1.S3Upload{
 			Endpoint:   s3Endpoint,
