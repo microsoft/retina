@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/cilium/cilium/api/v1/flow"
-	"github.com/golang/mock/gomock"
 	api "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/pkg/exporter"
 	"github.com/microsoft/retina/pkg/log"
@@ -17,6 +16,7 @@ import (
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 )
 
@@ -121,16 +121,21 @@ func TestProcessFlow(t *testing.T) {
 	 * Test case 1: TCP handshake.
 	 */
 	// Node -> Api server.
-	f1 := utils.ToFlow(t1, apiSeverIp, nodeIp, 80, 443, 6, 3, 0, 0)
-	utils.AddTcpID(f1, 1234)
-	utils.AddTcpFlags(f1, 1, 0, 0, 0, 0, 0)
+	f1 := utils.ToFlow(t1, apiSeverIp, nodeIp, 80, 443, 6, 3, 0)
+	metaf1 := &utils.RetinaMetadata{}
+	utils.AddTCPID(metaf1, 1234)
+	utils.AddTCPFlags(f1, 1, 0, 0, 0, 0, 0)
+	utils.AddRetinaMetadata(f1, metaf1)
 	f1.Destination = &flow.Endpoint{
 		PodName: "kubernetes-apiserver",
 	}
+
 	// Api server -> Node.
-	f2 := utils.ToFlow(t2, nodeIp, apiSeverIp, 443, 80, 6, 2, 0, 0)
-	utils.AddTcpID(f2, 1234)
-	utils.AddTcpFlags(f2, 1, 1, 0, 0, 0, 0)
+	f2 := utils.ToFlow(t2, nodeIp, apiSeverIp, 443, 80, 6, 2, 0)
+	metaf2 := &utils.RetinaMetadata{}
+	utils.AddTCPID(metaf2, 1234)
+	utils.AddTCPFlags(f2, 1, 1, 0, 0, 0, 0)
+	utils.AddRetinaMetadata(f2, metaf2)
 	f2.Source = &flow.Endpoint{
 		PodName: "kubernetes-apiserver",
 	}
@@ -142,9 +147,9 @@ func TestProcessFlow(t *testing.T) {
 	 * Test case 2: Existing TCP connection.
 	 */
 	// Node -> Api server.
-	utils.AddTcpFlags(f1, 1, 0, 0, 0, 0, 0)
+	utils.AddTCPFlags(f1, 1, 0, 0, 0, 0, 0)
 	// Api server -> Node.
-	utils.AddTcpFlags(f2, 0, 1, 0, 0, 0, 0)
+	utils.AddTCPFlags(f2, 0, 1, 0, 0, 0, 0)
 	// Process flow.
 	lm.ProcessFlow(f1)
 	lm.ProcessFlow(f2)

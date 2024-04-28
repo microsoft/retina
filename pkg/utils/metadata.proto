@@ -12,6 +12,9 @@ message RetinaMetadata {
 
     // TCP ID. Either Tsval or Tsecr will be set.
     uint64 tcp_id = 4;
+
+    // Drop reason in Retina.
+    DropReason drop_reason = 5;
 }
 
 enum DNSType {
@@ -19,3 +22,15 @@ enum DNSType {
     QUERY = 1;
     RESPONSE = 2;
 }
+
+// Ref: pkg/plugin/dropreason/_cprog/drop_reason.h.
+enum DropReason {
+    IPTABLE_RULE_DROP = 0;
+    IPTABLE_NAT_DROP = 1;
+    TCP_CONNECT_BASIC = 2;
+    TCP_ACCEPT_BASIC = 3;
+    TCP_CLOSE_BASIC = 4;
+    CONNTRACK_ADD_DROP = 5;
+    UNKNOWN_DROP = 6;
+}
+

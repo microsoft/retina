@@ -13,7 +13,6 @@ import (
 
 	"github.com/cilium/cilium/api/v1/flow"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
-	"github.com/golang/mock/gomock"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/gadgets/trace/dns/types"
 	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/controllers/cache"
@@ -25,6 +24,7 @@ import (
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 )
 
@@ -227,13 +227,13 @@ type EventMatcher struct {
 
 func (m *EventMatcher) Matches(x interface{}) bool {
 	inputFlow := x.(*v1.Event).Event.(*flow.Flow)
-	expectedDns, expectedDnsType, expectedNumResponses := utils.GetDns(inputFlow)
-	return expectedDns != nil &&
-		expectedDns.Rcode == m.rCode &&
-		expectedDns.Query == m.query &&
-		reflect.DeepEqual(expectedDns.Ips, m.ips) &&
-		reflect.DeepEqual(expectedDns.Qtypes, m.qTypes) &&
-		expectedDnsType == m.qType &&
+	expectedDNS, expectedDNSType, expectedNumResponses := utils.GetDNS(inputFlow)
+	return expectedDNS != nil &&
+		expectedDNS.GetRcode() == m.rCode &&
+		expectedDNS.GetQuery() == m.query &&
+		reflect.DeepEqual(expectedDNS.GetIps(), m.ips) &&
+		reflect.DeepEqual(expectedDNS.GetQtypes(), m.qTypes) &&
+		expectedDNSType == m.qType &&
 		expectedNumResponses == m.numAnswers
 }
 

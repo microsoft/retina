@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.21 AS proto-tools
+FROM --platform=linux/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.22 AS proto-tools
 LABEL Name=retina-builder Version=0.0.1
 
 RUN apt-get update &&\

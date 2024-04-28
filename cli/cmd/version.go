@@ -10,15 +10,17 @@ import (
 )
 
 // This variable is used by the "version" command and is set during build.
-var Version = "undefined"
+// Defaults to a safe value if not set.
+var Version = "v0.0.5"
 
-func VersionCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "version",
-		Short: "Show version",
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println(Version)
-		},
-	}
-	return cmd
+var version = &cobra.Command{
+	Use:   "version",
+	Short: "Show version",
+	Run: func(*cobra.Command, []string) {
+		fmt.Println(Version)
+	},
+}
+
+func init() {
+	Retina.AddCommand(version)
 }

@@ -184,7 +184,7 @@ static void get_packet_from_skb(struct packet *p, struct sk_buff *skb)
     p->src_ip = iphdr.saddr;
     p->dst_ip = iphdr.daddr;
     // get current timestamp in ns
-    p->ts = bpf_ktime_get_ns();
+    p->ts = bpf_ktime_get_boot_ns();
 
     if (iphdr.protocol == IPPROTO_TCP)
     {
@@ -229,7 +229,7 @@ static void get_packet_from_sock(struct packet *p, struct sock *sk)
 	#endif
 
     // get current timestamp in ns
-    p->ts = bpf_ktime_get_ns();
+    p->ts = bpf_ktime_get_boot_ns();
     p->in_filtermap = true;
     p->src_ip = saddr;
     p->dst_ip = daddr;

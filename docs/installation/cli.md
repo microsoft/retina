@@ -1,23 +1,37 @@
 # CLI Setup
 
-Currently, Retina CLI only supports Linux.
+Currently, Retina CLI supports Linux, Windows, and MacOS on x86_64 and ARM64 platforms.
 
 For CLI usage, see [Capture with Retina CLI](../captures/cli.md).
 
-## Option 1: Download from Release
+## Option 1: Install using Krew
 
-Download `kubectl-retina` from the latest [Retina release](https://github.com/microsoft/retina/releases).
-Feel free to move the binary to `/usr/local/bin/`, or add it to your `PATH` otherwise.
+Retina CLI is available as a [Krew plugin](https://krew.sigs.k8s.io/)! To install it, run:
+
+```bash
+kubectl krew install retina
+```
+
+## Option 2: Download the binary from the latest release on GitHub
+
+Download the `kubectl-retina` package for your platform from the latest [Retina release](https://github.com/microsoft/retina/releases/latest).
 
 ## Option 2: Build from source
 
-Clone the Retina repo and execute:
+Building the CLI requires go1.21 or greater.
 
-```shell
-make install-kubectl-retina
+To build the CLI simply and quickly with Go:
+
+```bash
+go build -o bin/kubectl-retina cli/main.go
 ```
 
-Requirements:
+The release pipeline uses [GoReleaser](https://goreleaser.com/), which is the recommended way to build the CLI.
 
-- go 1.21 or newer
-- GNU make
+To build the CLI with GoReleaser:
+
+```bash
+goreleaser build --snapshot --clean [--single-target]
+```
+
+Note: --single-target is optional and can be used to build for the current platform only. Omit it to cross-compile for all supported platforms.

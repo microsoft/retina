@@ -5,7 +5,7 @@ package provider
 
 import "os"
 
-//go:generate go run github.com/golang/mock/mockgen@v1.6.0 -source=interface.go -destination=mock_network_capture.go -package=provider Interface
+//go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=interface.go -destination=mock_network_capture.go -package=provider Interface
 type NetworkCaptureProviderInterface interface {
 	// Setup prepares the provider with folder to store network capture for temporary.
 	Setup(captureJobName, nodeHostname string) (string, error)

@@ -22,8 +22,6 @@ spec:
     spec:
       hostNetwork: true
       serviceAccountName: {{ .Values.serviceAccount.name }}
-      nodeSelector:
-        kubernetes.io/os: linux
       initContainers:
         - name: init-retina
           image: {{ .Values.image.initRepository }}:{{ .Values.image.tag }}
@@ -60,11 +58,10 @@ spec:
           {{- end}}
           {{- end}}
           ports:
-          - containerPort: {{ .Values.retinaPort }}
+          - name: retina
+            containerPort: {{ .Values.retinaPort }}
           resources:
-            limits:
-              memory: {{ .Values.resources.limits.memory | quote }}
-              cpu: {{ .Values.resources.limits.cpu | quote }}
+            {{- toYaml .Values.resources | nindent 12 }}
           env:
           - name: POD_NAME
             valueFrom:
@@ -111,6 +108,12 @@ spec:
       {{- end }}
       nodeSelector:
         kubernetes.io/os: linux
+        {{- if .Values.nodeSelector }}
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+        {{- end }}
+      {{- if .Values.tolerations }}
+      tolerations: {{- toYaml .Values.tolerations | nindent 8 }}
+      {{- end }}
 {{- end }}
 ---
 {{- if .Values.os.windows}}
@@ -148,7 +151,8 @@ spec:
         - name: retinawin
           image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
           ports:
-            - containerPort: {{ .Values.retinaPort }}
+          - name: retina
+            containerPort: {{ .Values.retinaPort }}
           command:
             - powershell.exe
             - -command
@@ -185,6 +189,12 @@ spec:
         {{- end }}
       nodeSelector:
         kubernetes.io/os: windows
+        {{- if .Values.nodeSelector }}
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+        {{- end }}
+      {{- if .Values.tolerations }}
+      tolerations: {{- toYaml .Values.tolerations | nindent 8 }}
+      {{- end }}
       volumes:
       {{- range $name, $mountPath := .Values.volumeMounts_win }}
         - name: {{ $name }}

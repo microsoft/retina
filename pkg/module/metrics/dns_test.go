@@ -8,11 +8,11 @@ import (
 	"testing"
 
 	"github.com/cilium/cilium/api/v1/flow"
-	"github.com/golang/mock/gomock"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 )
 
@@ -66,13 +66,19 @@ func TestGetLabels(t *testing.T) {
 
 func TestValues(t *testing.T) {
 	testR := &flow.Flow{}
-	utils.AddDnsInfo(testR, "R", 0, "bing.com", []string{"A"}, 1, []string{"1.1.1.1"})
+	metaR := &utils.RetinaMetadata{}
+	utils.AddDNSInfo(testR, metaR, "R", 0, "bing.com", []string{"A"}, 1, []string{"1.1.1.1"})
+	utils.AddRetinaMetadata(testR, metaR)
 
 	testQ := &flow.Flow{}
-	utils.AddDnsInfo(testQ, "Q", 0, "bing.com", []string{"A"}, 0, []string{})
+	metaQ := &utils.RetinaMetadata{}
+	utils.AddDNSInfo(testQ, metaQ, "Q", 0, "bing.com", []string{"A"}, 0, []string{})
+	utils.AddRetinaMetadata(testQ, metaQ)
 
 	testU := &flow.Flow{}
-	utils.AddDnsInfo(testU, "U", 0, "bing.com", []string{"A"}, 0, []string{})
+	metaU := &utils.RetinaMetadata{}
+	utils.AddDNSInfo(testU, metaU, "U", 0, "bing.com", []string{"A"}, 0, []string{})
+	utils.AddRetinaMetadata(testU, metaU)
 
 	tests := []struct {
 		name   string
@@ -155,13 +161,19 @@ func TestProcessLocalCtx(t *testing.T) {
 	defer ctrl.Finish()
 
 	testR := &flow.Flow{}
-	utils.AddDnsInfo(testR, "R", 0, "bing.com", []string{"A"}, 1, []string{"1.1.1.1"})
+	metaR := &utils.RetinaMetadata{}
+	utils.AddDNSInfo(testR, metaR, "R", 0, "bing.com", []string{"A"}, 1, []string{"1.1.1.1"})
+	utils.AddRetinaMetadata(testR, metaR)
 
 	testIngress := &flow.Flow{TrafficDirection: flow.TrafficDirection_INGRESS}
-	utils.AddDnsInfo(testIngress, "R", 0, "bing.com", []string{"A"}, 1, []string{"1.1.1.1"})
+	metaIngress := &utils.RetinaMetadata{}
+	utils.AddDNSInfo(testIngress, metaIngress, "R", 0, "bing.com", []string{"A"}, 1, []string{"1.1.1.1"})
+	utils.AddRetinaMetadata(testIngress, metaIngress)
 
 	testEgress := &flow.Flow{TrafficDirection: flow.TrafficDirection_EGRESS}
-	utils.AddDnsInfo(testEgress, "R", 0, "bing.com", []string{"A"}, 1, []string{"1.1.1.1"})
+	metaEgress := &utils.RetinaMetadata{}
+	utils.AddDNSInfo(testEgress, metaEgress, "R", 0, "bing.com", []string{"A"}, 1, []string{"1.1.1.1"})
+	utils.AddRetinaMetadata(testEgress, metaEgress)
 
 	tests := []struct {
 		name           string

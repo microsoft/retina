@@ -11,6 +11,7 @@
 char __license[] SEC("license") = "Dual MIT/GPL";
 
 
+
 struct tcpmetadata {
 	__u32 seq; // TCP sequence number
 	__u32 ack_num; // TCP ack number
@@ -49,59 +50,93 @@ struct
 const struct packet *unused __attribute__((unused));
 
 /*
- * Full credit to authors of pping_kern.c for the parse_tcp_ts function.
- * https://github.com/xdp-project/bpf-examples/blob/bc9df640cb9e5a541a7425ca2e66174ae22a18e3/pping/pping_kern.c#L316
- * 
  * Parses the TSval and TSecr values from the TCP options field. If sucessful
  * the TSval and TSecr values will be stored at tsval and tsecr (in network
  * byte order).
  * Returns 0 if sucessful and -1 on failure
- */
-static int parse_tcp_ts(struct tcphdr *tcph, void *data_end, __u32 *tsval,
-			__u32 *tsecr)
-{
-	int len = tcph->doff << 2;
-	void *opt_end = (void *)tcph + len;
-	__u8 *pos = (__u8 *)(tcph + 1); //Current pos in TCP options
-	__u8 i, opt;
-	volatile __u8
-		opt_size; // Seems to ensure it's always read of from stack as u8
+ *
+   +-------+-------+---------------------+---------------------+
+   |Kind=8 |  10   | TS Value (TSval)    |TS Echo Reply (TSecr)|
+   +-------+-------+---------------------+---------------------+
+	  1       1               4                      4
+ * Reference: 
+ * - https://github.com/xdp-project/bpf-examples
+ * - https://www.ietf.org/rfc/rfc9293.html
+ * - https://www.rfc-editor.org/rfc/pdfrfc/rfc7323.txt.pdf
+ * May explore using bpf_loop() in the future (kernel 5.17+)
+*/
+static int parse_tcp_ts(struct tcphdr *tcph, void *data_end, __u32 *tsval, __u32 *tsecr) {
+	// Get the length of the TCP header.
+	// The length is in 4-byte words, so we need to multiply it by 4 (bit shift left 2) to get the length in bytes.
+	__u8 tcp_header_len = tcph->doff << 2;
+	volatile __u8 opt_len;
+	__u8 opt_kind, i;
 
-	if (tcph + 1 > data_end || len <= sizeof(struct tcphdr))
+	// Verify that the options field is present.
+	// If the header length is less than or equal to the default size of the TCP header, then there are no options.
+	if (tcp_header_len <= sizeof(struct tcphdr)) {
 		return -1;
-#pragma unroll //temporary solution until we can identify why the non-unrolled loop gets stuck in an infinite loop
-	for (i = 0; i < MAX_TCP_OPTIONS; i++) {
-		if (pos + 1 > opt_end || pos + 1 > data_end)
-			return -1;
-
-		opt = *pos;
-		if (opt == 0) // Reached end of TCP options
-			return -1;
-
-		if (opt == 1) { // TCP NOP option - advance one byte
-			pos++;
-			continue;
-		}
-
-		// Option > 1, should have option size
-		if (pos + 2 > opt_end || pos + 2 > data_end)
-			return -1;
-		opt_size = *(pos + 1);
-		if (opt_size < 2) // Stop parsing options if opt_size has an invalid value
-			return -1;
-
-		// Option-kind is TCP timestap (yey!)
-		if (opt == 8 && opt_size == 10) {
-			if (pos + 10 > opt_end || pos + 10 > data_end)
-				return -1;
-			*tsval = bpf_ntohl(*(__u32 *)(pos + 2));
-			*tsecr = bpf_ntohl(*(__u32 *)(pos + 6));
-			return 0;
-		}
-
-		// Some other TCP option - advance option-length bytes
-		pos += opt_size;
 	}
+
+	// Get the pointer to the end of the TCP header options field.
+	__u8 *tcp_opt_end_ptr = (__u8 *)tcph + tcp_header_len;
+
+	// Check that adding 1 to the start of the TCP header will not go past the end of the packet.
+	// We need this to get to the start of the options field.
+	if ((__u8 *)tcph + 1 > (__u8 *)data_end) {
+		return -1;
+	}
+
+	// Get the pointer to the start of the options field.
+	__u8 *tcp_options_cur_ptr = (__u8 *)(tcph + 1);
+
+	// Loop through the options field to find the TSval and TSecr values.
+	// MAX_TCP_OPTIONS_LEN is used to prevent infinite loops and the fact that the options field is at most 40 bytes long.
+#pragma unroll
+	for (i = 0; i < MAX_TCP_OPTIONS_LEN; i++) {
+		// Verify that adding 1 to the current pointer will not go past the end of the packet.
+		if (tcp_options_cur_ptr + 1 > (__u8 *)tcp_opt_end_ptr || tcp_options_cur_ptr + 1 > (__u8 *)data_end) {
+			return -1;
+		}
+	        // Dereference the pointer to get the option kind.
+	        opt_kind = *tcp_options_cur_ptr;
+	        // switch case to check the option kind.
+	        switch (opt_kind) {
+	            case 0:
+	                // End of options list.
+	                return -1;
+	            case 1:
+	                // No operation.
+			tcp_options_cur_ptr++;
+	                continue;
+	            default:
+			// Some kind of option.
+			// Since each option is at least 2 bytes long, we need to check that adding 2 to the pointer will not go past the end of the packet.
+	                if (tcp_options_cur_ptr + 2 > tcp_opt_end_ptr || tcp_options_cur_ptr + 2 > (__u8 *)data_end) {
+	                    return -1;
+	                }
+	                // Get the length of the option.
+	                opt_len = *(tcp_options_cur_ptr + 1);
+			// Check that the option length is valid. It should be at least 2 bytes long.
+			if (opt_len < 2) {
+				return -1;
+			}
+			// Check if the option is the timestamp option. The timestamp option has a kind of 8 and a length of 10 bytes.
+	                if (opt_kind == 8 && opt_len == 10) {
+				// Verify that adding the option's length to the pointer will not go past the end of the packet.
+				if (tcp_options_cur_ptr + 10 > tcp_opt_end_ptr || tcp_options_cur_ptr + 10 > (__u8 *)data_end) {
+					return -1;
+				}
+				// Found the TSval and TSecr values. Store them in the tsval and tsecr pointers.
+				*tsval = bpf_ntohl(*(__u32 *)(tcp_options_cur_ptr + 2));
+				*tsecr = bpf_ntohl(*(__u32 *)(tcp_options_cur_ptr + 6));
+	
+				return 0;
+			}
+			// Move the pointer to the next option.
+			tcp_options_cur_ptr += opt_len;
+	        }
+    	}
 	return -1;
 }
 
@@ -112,7 +147,7 @@ static void parse(struct __sk_buff *skb, direction d)
 	__builtin_memset(&p, 0, sizeof(p));
 
 	// Get current time in nanoseconds.
-	p.ts = bpf_ktime_get_ns();
+	p.ts = bpf_ktime_get_boot_ns();
 	
 	p.dir = d;
 	p.bytes = skb->len;
@@ -201,8 +236,8 @@ int endpoint_ingress_filter(struct __sk_buff *skb)
 	// This is attached to the interface on the host side.
 	// So ingress on host is egress on endpoint and vice versa.
 	parse(skb, FROM_ENDPOINT);
-	// Always return 0 to allow packet to pass.
-	return 0;
+	// Always return TC_ACT_UNSPEC to allow packet to pass to the next BPF program.
+	return TC_ACT_UNSPEC;
 }
 
 SEC("classifier_endpoint_egress")
@@ -211,22 +246,22 @@ int endpoint_egress_filter(struct __sk_buff *skb)
 	// This is attached to the interface on the host side.
 	// So egress on host is ingress on endpoint and vice versa.
 	parse(skb, TO_ENDPOINT);
-	// Always return 0 to allow packet to pass.
-	return 0;
+	// Always return TC_ACT_UNSPEC to allow packet to pass to the next BPF program.
+	return TC_ACT_UNSPEC;
 }
 
 SEC("classifier_host_ingress")
 int host_ingress_filter(struct __sk_buff *skb)
 {
 	parse(skb, FROM_NETWORK);
-	// Always return 0 to allow packet to pass.
-	return 0;
+	// Always return TC_ACT_UNSPEC to allow packet to pass to the next BPF program.
+	return TC_ACT_UNSPEC;
 }
 
 SEC("classifier_host_egress")
 int host_egress_filter(struct __sk_buff *skb)
 {
 	parse(skb, TO_NETWORK);
-	// Always return 0 to allow packet to pass.
-	return 0;
+	// Always return TC_ACT_UNSPEC to allow packet to pass to the next BPF program.
+	return TC_ACT_UNSPEC;
 }

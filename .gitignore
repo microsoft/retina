@@ -26,8 +26,11 @@ site/.docusaurus/
 site/node_modules/
 
 hack/tools/bin
-
+output
 #vscode 
 .vscode/
 
 dist/
+bin/
+
+image-metadata-*.json

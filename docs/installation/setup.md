@@ -1,21 +1,43 @@
 # Setup
 
-Clone the [Retina repo](https://github.com/microsoft/retina), then run a `make` command below for your scenario.
+Install the helm chart below for your scenario.
 
 Note: you can also run captures with just the [CLI](./cli.md).
 
 ## Installation
 
+Requires Helm version >= v3.8.0.
+
 ### Basic Mode
 
 ```shell
-make helm-install
+VERSION=$( curl -sL https://api.github.com/repos/microsoft/retina/releases/latest | jq -r .name)
+helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
+    --version $VERSION \
+    --namespace kube-system \
+    --set image.tag=$VERSION \
+    --set operator.tag=$VERSION \
+    --set logLevel=info \
+    --set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\]"
 ```
 
 ### Basic Mode (with Capture support)
 
 ```shell
-make helm-install-with-operator
+VERSION=$( curl -sL https://api.github.com/repos/microsoft/retina/releases/latest | jq -r .name)
+helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
+    --version $VERSION \
+    --namespace kube-system \
+    --set image.tag=$VERSION \
+    --set operator.tag=$VERSION \
+    --set logLevel=info \
+    --set image.pullPolicy=Always \
+    --set logLevel=info \
+    --set os.windows=true \
+    --set operator.enabled=true \
+    --set operator.enableRetinaEndpoint=true \
+    --skip-crds \
+    --set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\,packetparser\]"
 ```
 
 ### Advanced Mode with Remote Context (with Capture support)
@@ -23,7 +45,21 @@ make helm-install-with-operator
 See [Metric Modes](../metrics/modes.md).
 
 ```shell
-make helm-install-advanced-remote-context
+VERSION=$( curl -sL https://api.github.com/repos/microsoft/retina/releases/latest | jq -r .name)
+helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
+    --version $VERSION \
+    --namespace kube-system \
+    --set image.tag=$VERSION \
+    --set operator.tag=$VERSION \
+    --set image.pullPolicy=Always \
+    --set logLevel=info \
+    --set os.windows=true \
+    --set operator.enabled=true \
+    --set operator.enableRetinaEndpoint=true \
+    --skip-crds \
+    --set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\,packetparser\]" \
+    --set enablePodLevel=true \
+    --set remoteContext=true
 ```
 
 ### Advanced Mode with Local Context (with Capture support)
@@ -31,7 +67,21 @@ make helm-install-advanced-remote-context
 See [Metric Modes](../metrics/modes.md).
 
 ```shell
-make helm-install-advanced-local-context
+VERSION=$( curl -sL https://api.github.com/repos/microsoft/retina/releases/latest | jq -r .name)
+helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
+    --version $VERSION \
+    --namespace kube-system \
+    --set image.tag=$VERSION \
+    --set operator.tag=$VERSION \
+    --set image.pullPolicy=Always \
+    --set logLevel=info \
+    --set os.windows=true \
+    --set operator.enabled=true \
+    --set operator.enableRetinaEndpoint=true \
+    --skip-crds \
+    --set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\,packetparser\]" \
+    --set enablePodLevel=true \
+    --set enableAnnotations=true
 ```
 
 ## Next Steps: Configuring Prometheus/Grafana

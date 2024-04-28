@@ -1,5 +1,7 @@
 name: Test Retina Image
 on:
+  merge_group:
+    types: [checks_requested]
   push:
     branches: [main]
   pull_request:
@@ -22,7 +24,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "^1.21"
+          go-version-file: go.mod
 
       - name: Make Retina Test image
         env:

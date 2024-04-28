@@ -128,16 +128,27 @@ func (d *dns) eventHandler(event *types.Event) {
 	}
 
 	// Update advanced metrics.
-	f := utils.ToFlow(int64(event.Timestamp), net.ParseIP(event.SrcIP),
-		net.ParseIP(event.DstIP), uint32(event.SrcPort), uint32(event.DstPort),
+	fl := utils.ToFlow(
+		int64(event.Timestamp),
+		net.ParseIP(event.SrcIP),
+		net.ParseIP(event.DstIP),
+		uint32(event.SrcPort),
+		uint32(event.DstPort),
 		uint8(common.ProtocolToFlow(event.Protocol)),
-		dir, utils.Verdict_DNS, 0)
-	utils.AddDnsInfo(f, string(event.Qr), common.RCodeToFlow(event.Rcode), event.DNSName, []string{event.QType}, event.NumAnswers, event.Addresses)
-	// d.l.Debug("DNS Flow", zap.Any("flow", f))
+		dir,
+		utils.Verdict_DNS,
+	)
+
+	meta := &utils.RetinaMetadata{}
+
+	utils.AddDNSInfo(fl, meta, string(event.Qr), common.RCodeToFlow(event.Rcode), event.DNSName, []string{event.QType}, event.NumAnswers, event.Addresses)
+
+	// Add metadata to the flow.
+	utils.AddRetinaMetadata(fl, meta)
 
 	ev := (&v1.Event{
-		Event:     f,
-		Timestamp: f.Time,
+		Event:     fl,
+		Timestamp: fl.GetTime(),
 	})
 	if d.enricher != nil {
 		d.enricher.Write(ev)

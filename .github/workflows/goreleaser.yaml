@@ -18,9 +18,9 @@ jobs:
         with:
           fetch-depth: 0
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: ">=1.21.0"
+          go-version-file: go.mod
       - name: Run GoReleaser build
         uses: goreleaser/goreleaser-action@v5
         with:
@@ -37,9 +37,9 @@ jobs:
         with:
           fetch-depth: 0
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: ">=1.21.0"
+          go-version-file: go.mod
       - name: Run GoReleaser release
         uses: goreleaser/goreleaser-action@v5
         with:
@@ -48,3 +48,5 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Update new version in krew-index
+        uses: rajatjindal/krew-release-bot@v0.0.46

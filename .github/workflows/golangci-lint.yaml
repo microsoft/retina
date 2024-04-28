@@ -1,5 +1,6 @@
 name: golangci-lint
 on:
+  merge_group:
   workflow_dispatch:
   push:
     branches: [main]
@@ -10,19 +11,26 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: ["1.21.x"]
-        os: [ubuntu-latest, windows-latest]
+        goos: ["linux", "windows"]
+        goarch: ["amd64", "arm64"]
     name: Lint
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
+    env:
+      IS_NOT_MERGE_GROUP: ${{ github.event_name != 'merge_group' }}
+      GOOS: ${{ matrix.goos }}
+      GOARCH: ${{ matrix.goarch }}
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ matrix.go-version }}
       - uses: actions/checkout@v4
+        if: env.IS_NOT_MERGE_GROUP
         with:
           fetch-depth: 0
+      - uses: actions/setup-go@v5
+        if: env.IS_NOT_MERGE_GROUP
+        with:
+          go-version-file: go.mod
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v4
+        if: env.IS_NOT_MERGE_GROUP
+        uses: golangci/golangci-lint-action@v5
         with:
           version: v1.55
           args: --concurrency 4 --verbose --config=.golangci.yaml --timeout=25m

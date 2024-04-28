@@ -4,6 +4,7 @@
 RMDIR := rm -rf
 
 ## Globals
+GIT_CURRENT_BRANCH_NAME	:= $(shell git rev-parse --abbrev-ref HEAD) 
 
 REPO_ROOT = $(shell git rev-parse --show-toplevel)
 ifndef TAG
@@ -13,7 +14,6 @@ OUTPUT_DIR = $(REPO_ROOT)/output
 BUILD_DIR = $(OUTPUT_DIR)/$(GOOS)_$(GOARCH)
 RETINA_BUILD_DIR = $(BUILD_DIR)/retina
 RETINA_DIR = $(REPO_ROOT)/controller
-KUBECTL_RETINA_BUILD_DIR = $(OUTPUT_DIR)/kubectl-retina
 OPERATOR_DIR=$(REPO_ROOT)/operator
 CAPTURE_WORKLOAD_DIR = $(REPO_ROOT)/captureworkload
 
@@ -32,6 +32,7 @@ OS				?= $(GOOS)
 ARCH			?= $(GOARCH)
 PLATFORM		?= $(OS)/$(ARCH)
 PLATFORMS		?= linux/amd64 linux/arm64 windows/amd64
+OS_VERSION		?= ltsc2019
 
 CONTAINER_BUILDER ?= docker
 CONTAINER_RUNTIME ?= docker
@@ -63,15 +64,16 @@ help: ## Display this help
 
 ##@ Tools 
 
-TOOLS_DIR     = $(REPO_ROOT)/hack/tools
-TOOLS_BIN_DIR = $(TOOLS_DIR)/bin
-GOFUMPT       := $(TOOLS_BIN_DIR)/gofumpt
-GOLANGCI_LINT := $(TOOLS_BIN_DIR)/golangci-lint
-CONTROLLER_GEN := $(TOOLS_BIN_DIR)/controller-gen
-GINKGO 		  := $(TOOLS_BIN_DIR)/ginkgo
-MOCKGEN         := $(TOOLS_BIN_DIR)/mockgen
-ENVTEST         := $(TOOLS_BIN_DIR)/setup-envtest
-GIT_CURRENT_BRANCH_NAME := $(shell git rev-parse --abbrev-ref HEAD) 
+TOOLS_DIR		= $(REPO_ROOT)/hack/tools
+TOOLS_BIN_DIR	= $(TOOLS_DIR)/bin
+
+GOFUMPT			= $(TOOLS_BIN_DIR)/gofumpt
+GOLANGCI_LINT	= $(TOOLS_BIN_DIR)/golangci-lint
+GORELEASER		= $(TOOLS_BIN_DIR)/goreleaser
+CONTROLLER_GEN	= $(TOOLS_BIN_DIR)/controller-gen
+GINKGO			= $(TOOLS_BIN_DIR)/ginkgo
+MOCKGEN			= $(TOOLS_BIN_DIR)/mockgen
+ENVTEST			= $(TOOLS_BIN_DIR)/setup-envtest
 
 $(TOOLS_DIR)/go.mod:
 	cd $(TOOLS_DIR); go mod init && go mod tidy
@@ -89,6 +91,11 @@ golangci-lint: $(GOLANGCI_LINT) ## Build golangci-lint
 $(CONTROLLER_GEN): $(TOOLS_DIR)/go.mod
 	cd $(TOOLS_DIR); go mod download; go build -tags=tools -o bin/controller-gen sigs.k8s.io/controller-tools/cmd/controller-gen
 
+goreleaser: $(GORELEASER) ## Build goreleaser
+
+$(GORELEASER): $(TOOLS_DIR)/go.mod
+	cd $(TOOLS_DIR); go mod download; go build -tags=tools -o bin/goreleaser github.com/goreleaser/goreleaser
+
 controller-gen: $(CONTROLLER_GEN) ## Build controller-gen
 
 $(GINKGO): $(TOOLS_DIR)/go.mod
@@ -97,7 +104,7 @@ $(GINKGO): $(TOOLS_DIR)/go.mod
 ginkgo: $(GINKGO) ## Build ginkgo
 
 $(MOCKGEN): $(TOOLS_DIR)/go.mod
-	cd $(TOOLS_DIR); go mod download; go build -tags=$(TOOL_TAG) -o bin/mockgen github.com/golang/mock/mockgen
+	cd $(TOOLS_DIR); go mod download; go build -tags=$(TOOL_TAG) -o bin/mockgen go.uber.org/mock/mockgen
 
 mockgen: $(MOCKGEN) ## Build mockgen
 
@@ -140,22 +147,13 @@ clean: ## clean build artifacts
 
 ##@ Build Binaries
 
-retina: ## builds both retina and kapctl binaries
-	$(MAKE) retina-binary kubectl-retina
+retina: ## builds retina binary
+	$(MAKE) retina-binary 
 
 retina-binary: ## build the Retina binary
-	go generate ./...
-	export CGO_ENABLED=0
-	go build -v -o $(RETINA_BUILD_DIR)/retina$(EXE_EXT) -gcflags="-dwarflocationlists=true" -ldflags "-X main.version=$(TAG) -X main.applicationInsightsID=$(APP_INSIGHTS_ID)" $(RETINA_DIR)/main.go
-
-kubectl-retina-binary-%: ## build kubectl plugin locally.
 	export CGO_ENABLED=0 && \
-	export GOOS=$(shell echo $* |cut -f1 -d-) GOARCH=$(shell echo $* |cut -f2 -d-) && \
-	go build -v \
-		-o $(KUBECTL_RETINA_BUILD_DIR)/kubectl-retina-$${GOOS}-$${GOARCH} \
-		-gcflags="-dwarflocationlists=true" \
-		-ldflags "-X github.com/microsoft/retina/cli/cmd.Version=$(TAG)" \
-		github.com/microsoft/retina/cli
+	go generate ./... && \
+	go build -v -o $(RETINA_BUILD_DIR)/retina$(EXE_EXT) -gcflags="-dwarflocationlists=true" -ldflags "-X main.version=$(TAG) -X main.applicationInsightsID=$(APP_INSIGHTS_ID)" $(RETINA_DIR)/main.go
 
 retina-capture-workload: ## build the Retina capture workload
 	cd $(CAPTURE_WORKLOAD_DIR) && CGO_ENABLED=0 go build -v -o $(RETINA_BUILD_DIR)/captureworkload$(EXE_EXT) -gcflags="-dwarflocationlists=true"  -ldflags "-X main.version=$(TAG)"
@@ -208,15 +206,20 @@ buildx:
 container-docker: buildx # util target to build container images using docker buildx. do not invoke directly.
 	os=$$(echo $(PLATFORM) | cut -d'/' -f1); \
 	arch=$$(echo $(PLATFORM) | cut -d'/' -f2); \
-	echo "Building for $$os/$$arch"; \
+	image_name=$$(basename $(IMAGE)); \
+	image_metadata_filename="image-metadata-$$image_name-$(TAG).json"; \
+	touch $$image_metadata_filename; \
+	echo "Building $$image_name for $$os/$$arch "; \
 	docker buildx build \
 		$(BUILDX_ACTION) \
 		--platform $(PLATFORM) \
+		--metadata-file=$$image_metadata_filename \
 		-f $(DOCKERFILE) \
-		--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
-		--build-arg GOOS=$$os \
-		--build-arg GOARCH=$$arch \
 		--build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
+		--build-arg GOARCH=$$arch \
+		--build-arg GOOS=$$os \
+		--build-arg OS_VERSION=$(OS_VERSION) \
+		--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
 		--target=$(TARGET) \
 		-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
 		$(CONTEXT_DIR)
@@ -232,7 +235,7 @@ retina-image: ## build the retina linux container image.
 		fi; \
 		$(MAKE) container-$(CONTAINER_BUILDER) \
 				PLATFORM=$(PLATFORM) \
-				DOCKERFILE=controller/Dockerfile.controller \
+				DOCKERFILE=controller/Dockerfile \
 				REGISTRY=$(IMAGE_REGISTRY) \
 				IMAGE=$$image_name \
 				VERSION=$(TAG) \
@@ -248,11 +251,13 @@ retina-image-win: ## build the retina Windows container image.
 		echo "Building $(RETINA_PLATFORM_TAG)"; \
 		$(MAKE) container-$(CONTAINER_BUILDER) \
 				PLATFORM=windows/amd64 \
-				DOCKERFILE=controller/Dockerfile.windows-$$year \
+				DOCKERFILE=controller/Dockerfile \
 				REGISTRY=$(IMAGE_REGISTRY) \
 				IMAGE=$(RETINA_IMAGE) \
+				OS_VERSION=ltsc$$year \
 				VERSION=$(TAG) \
 				TAG=$$tag \
+				TARGET=agent-win \
 				CONTEXT_DIR=$(REPO_ROOT); \
 	done
 
@@ -263,18 +268,6 @@ retina-operator-image:  ## build the retina linux operator image.
 			DOCKERFILE=operator/Dockerfile \
 			REGISTRY=$(IMAGE_REGISTRY) \
 			IMAGE=$(RETINA_OPERATOR_IMAGE) \
-			VERSION=$(TAG) \
-			TAG=$(RETINA_PLATFORM_TAG) \
-			APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
-			CONTEXT_DIR=$(REPO_ROOT)
-
-kubectl-retina-image: ## build the kubectl-retina image. 
-	echo "Building for $(PLATFORM)"
-	$(MAKE) container-$(CONTAINER_BUILDER) \
-			PLATFORM=$(PLATFORM) \
-			DOCKERFILE=cli/Dockerfile.kubectl-retina \
-			REGISTRY=$(IMAGE_REGISTRY) \
-			IMAGE=$(KUBECTL_RETINA_IMAGE) \
 			VERSION=$(TAG) \
 			TAG=$(RETINA_PLATFORM_TAG) \
 			APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
@@ -311,18 +304,12 @@ manifest-operator-image: ## create a multiplatform manifest for the operator ima
 	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE):$(TAG))
 	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
 
-manifest-kubectl-retina-image: ## create a multiplatform manifest for the kubectl-retina image
-	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(KUBECTL_RETINA_IMAGE):$(TAG))
-	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
-
 manifest:
 	echo "Building for $(COMPONENT)"
 	if [ "$(COMPONENT)" = "retina" ]; then \
 		$(MAKE) manifest-retina-image; \
 	elif [ "$(COMPONENT)" = "operator" ]; then \
 		$(MAKE) manifest-operator-image; \
-	elif [ "$(COMPONENT)" = "kubectl-retina" ]; then \
-		$(MAKE) manifest-kubectl-retina-image; \
 	fi
 
 ##@ Tests
@@ -342,7 +329,7 @@ COVER_PKG ?= .
 
 test: $(ENVTEST) # Run unit tests.
 	go build -o test-summary ./test/utsummary/main.go
-	CGO_ENABLED=0 KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit -skip=TestE2E* -coverprofile=coverage.out -v -json ./... | ./test-summary --progress --verbose
+	CGO_ENABLED=0 KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit,dashboard -skip=TestE2E* -coverprofile=coverage.out -v -json ./... | ./test-summary --progress --verbose
 
 coverage: # Code coverage.
 #	go generate ./... && go test -tags=unit -coverprofile=coverage.out.tmp ./...
@@ -364,7 +351,7 @@ coverage: # Code coverage.
 manifests: 
 	cd crd && make manifests && make generate
 
-HELM_IMAGE_TAG ?= v0.0.1
+HELM_IMAGE_TAG ?= v0.0.2
 
 # basic/node-level mode
 helm-install: manifests
@@ -445,3 +432,16 @@ docs:
 .PHONY: docs-pod
 docs-prod:
 	docker run -i -p 3000:3000 -v $(PWD):/retina -w /retina/ node:20-alpine npm install --prefix site && npm run build --prefix site
+
+.PHONY: quick-build
+quick-build:
+	$(MAKE) retina-image PLATFORM=linux/amd64 BUILDX_ACTION=--push
+	$(MAKE) retina-operator-image PLATFORM=linux/amd64 BUILDX_ACTION=--push
+
+.PHONY: quick-deploy
+quick-deploy:
+	$(MAKE) helm-install-advanced-local-context HELM_IMAGE_TAG=$(TAG)-linux-amd64
+
+.PHONY: simplify-dashboards
+simplify-dashboards:
+	cd deploy/grafana/dashboards/ && go test . -tags=dashboard,simplifydashboard -v

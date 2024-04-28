@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	gomock "github.com/golang/mock/gomock"
 	"github.com/microsoft/retina/pkg/common"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/stretchr/testify/assert"
+	gomock "go.uber.org/mock/gomock"
 )
 
 const (
@@ -50,7 +50,8 @@ func TestCacheEndpoints(t *testing.T) {
 	assert.Error(t, err)
 
 	addEndpoints.SetIPs(&common.IPAddresses{
-		IPv4: net.IPv4(1, 2, 3, 4),
+		IPv4:       net.IPv4(1, 2, 3, 4),
+		OtherIPv4s: []net.IP{net.IPv4(1, 2, 3, 5)},
 	})
 
 	err = c.UpdateRetinaEndpoint(addEndpoints)
@@ -59,17 +60,33 @@ func TestCacheEndpoints(t *testing.T) {
 	obj := c.GetObjByIP("1.2.3.4")
 	assert.NotNil(t, obj)
 	ep := obj.(*common.RetinaEndpoint)
-	assert.Equal(t, addEndpoints.Name(), ep.Name())
-	assert.Equal(t, addEndpoints.Namespace(), ep.Namespace())
-	assert.Equal(t, addEndpoints.Labels()["app"], ep.Labels()["app"])
-	assert.Equal(t, addEndpoints.Annotations()[common.RetinaPodAnnotation], ep.Annotations()[common.RetinaPodAnnotation])
+	assert.Equal(t, ep.Name(), addEndpoints.Name())
+	assert.Equal(t, ep.Namespace(), addEndpoints.Namespace())
+	assert.Equal(t, ep.Labels()["app"], addEndpoints.Labels()["app"])
+	assert.Equal(t, ep.Annotations()[common.RetinaPodAnnotation], addEndpoints.Annotations()[common.RetinaPodAnnotation])
 
-	// normal get
+	// normal get by PrimaryIP
 	ep = c.GetPodByIP("1.2.3.4")
-	assert.Equal(t, addEndpoints.Name(), ep.Name())
-	assert.Equal(t, addEndpoints.Namespace(), ep.Namespace())
-	assert.Equal(t, addEndpoints.Labels()["app"], ep.Labels()["app"])
-	assert.Equal(t, addEndpoints.Annotations()[common.RetinaPodAnnotation], ep.Annotations()[common.RetinaPodAnnotation])
+	assert.Equal(t, ep.Name(), addEndpoints.Name())
+	assert.Equal(t, ep.Namespace(), addEndpoints.Namespace())
+	assert.Equal(t, ep.Labels()["app"], addEndpoints.Labels()["app"])
+	assert.Equal(t, ep.Annotations()[common.RetinaPodAnnotation], addEndpoints.Annotations()[common.RetinaPodAnnotation])
+
+	// get by secondary IP
+	obj = c.GetObjByIP("1.2.3.5")
+	assert.NotNil(t, obj)
+	ep = obj.(*common.RetinaEndpoint)
+	assert.Equal(t, ep.Name(), addEndpoints.Name())
+	assert.Equal(t, ep.Namespace(), addEndpoints.Namespace())
+	assert.Equal(t, ep.Labels()["app"], addEndpoints.Labels()["app"])
+	assert.Equal(t, ep.Annotations()[common.RetinaPodAnnotation], addEndpoints.Annotations()[common.RetinaPodAnnotation])
+
+	// normal get by secondary IP
+	ep = c.GetPodByIP("1.2.3.5")
+	assert.Equal(t, ep.Name(), addEndpoints.Name())
+	assert.Equal(t, ep.Namespace(), addEndpoints.Namespace())
+	assert.Equal(t, ep.Labels()["app"], addEndpoints.Labels()["app"])
+	assert.Equal(t, ep.Annotations()[common.RetinaPodAnnotation], addEndpoints.Annotations()[common.RetinaPodAnnotation])
 
 	// delete
 	err = c.DeleteRetinaEndpoint(addEndpoints.Key())
