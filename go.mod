@@ -83,7 +83,7 @@ require (
 	github.com/go-openapi/strfmt v0.21.9 // indirect
 	github.com/go-openapi/swag v0.22.10 // indirect
 	github.com/go-openapi/validate v0.22.3 // indirect
-	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
+	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gofrs/uuid v4.2.0+incompatible // indirect
@@ -93,7 +93,7 @@ require (
 	github.com/google/btree v1.1.2 // indirect
 	github.com/google/gnostic-models v0.6.9-0.20230804172637-c7be7c783f49 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
-	github.com/google/pprof v0.0.0-20210720184732-4bb14d4b1be1 // indirect
+	github.com/google/pprof v0.0.0-20240424215950-a892ee059fd6 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/gorilla/websocket v1.5.1 // indirect
@@ -195,12 +195,12 @@ require (
 	go.starlark.net v0.0.0-20230814145427-12f4cb8177e4 // indirect
 	go.uber.org/dig v1.17.1 // indirect
 	go4.org/netipx v0.0.0-20231129151722-fdeea329fbba // indirect
-	golang.org/x/crypto v0.21.0 // indirect
+	golang.org/x/crypto v0.22.0 // indirect
 	golang.org/x/exp v0.0.0-20240222234643-814bf88cf225 // indirect
-	golang.org/x/mod v0.15.0 // indirect
+	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
-	golang.org/x/tools v0.18.0 // indirect
+	golang.org/x/tools v0.20.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/genproto v0.0.0-20240123012728-ef4313101c80 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240123012728-ef4313101c80 // indirect
@@ -231,11 +231,11 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/net v0.23.0 // indirect
+	golang.org/x/net v0.24.0 // indirect
 	golang.org/x/oauth2 v0.18.0 // indirect
 	golang.org/x/sync v0.7.0
 	golang.org/x/sys v0.19.0
-	golang.org/x/term v0.18.0 // indirect
+	golang.org/x/term v0.19.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/protobuf v1.33.0
 	gopkg.in/yaml.v2 v2.4.0
@@ -271,7 +271,7 @@ require (
 	github.com/jsternberg/zap-logfmt v1.3.0
 	github.com/microsoft/ApplicationInsights-Go v0.4.4
 	github.com/onsi/ginkgo v1.16.5
-	github.com/onsi/ginkgo/v2 v2.17.1
+	github.com/onsi/ginkgo/v2 v2.17.2
 	github.com/onsi/gomega v1.33.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_model v0.6.0
