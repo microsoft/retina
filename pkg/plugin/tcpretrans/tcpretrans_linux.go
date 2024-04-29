@@ -6,6 +6,7 @@ package tcpretrans
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"strings"
 
@@ -59,8 +60,8 @@ func (t *tcpretrans) Init() error {
 	t.tracer.SetEventHandler(t.eventHandler)
 	socketEnricher, err := socketenricher.NewSocketEnricher()
 	if err != nil {
-		t.l.Error("NewSocketEnricher failed", zap.Error(err))
-		return err
+		t.l.Error("failed to new socketEnricher", zap.Error(err))
+		return fmt.Errorf("failed to new socketEnricher: %w", err)
 	}
 	t.tracer.SetSocketEnricherMap(socketEnricher.SocketsMap())
 	t.l.Info("Initialized tcpretrans plugin")
