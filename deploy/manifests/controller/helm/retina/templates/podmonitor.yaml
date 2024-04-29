@@ -7,7 +7,7 @@ metadata:
   labels:
     k8s-app: {{ include "retina.name" . }}
     {{- if .Values.metrics.podMonitor.additionalLabels }}
-    {{- .Values.metrics.podMonitor.additionalLabels | nindent 4 }}
+    {{- toYaml .Values.metrics.podMonitor.additionalLabels | nindent 4 }}
     {{- end }}
 spec:
   podMetricsEndpoints:
