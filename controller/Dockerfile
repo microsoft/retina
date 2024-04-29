@@ -25,6 +25,16 @@ ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
 COPY . /go/src/github.com/microsoft/retina 
 WORKDIR /go/src/github.com/microsoft/retina
+RUN if [ "$GOOS" = "linux" ] ; then \
+    apt-get update && apt-get -y install lsb-release wget software-properties-common gnupg file git make; \
+    wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -; \
+    add-apt-repository "deb http://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-14 main"; \
+    apt-get update; \
+    apt-get install -y clang-14 lldb-14 lld-14 clangd-14; \
+    apt-get install -y bpftool libbpf-dev; \
+    ln -s /usr/bin/clang-14 /usr/bin/clang; \
+    go generate /go/src/github.com/microsoft/retina/pkg/plugin/...; \
+    fi
 RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/retina/controller -ldflags "-X main.version="$VERSION" -X main.applicationInsightsID="$APP_INSIGHTS_ID"" controller/main.go 
 
 
