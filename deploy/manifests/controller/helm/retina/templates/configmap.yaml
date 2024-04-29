@@ -2,6 +2,10 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  labels:
+    {{- include "retina.labels" . | nindent 4 }}
+    app.kubernetes.io/component: config
+    k8s-app: {{ include "retina.name" . }}
   name: {{ include "retina.name" . }}-config
   namespace: {{ .Values.namespace }}
 data:
@@ -22,6 +26,10 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  labels:
+    {{- include "retina.labels" . | nindent 4 }}
+    app.kubernetes.io/component: config
+    k8s-app: {{ include "retina.name" . }}
   name: {{ include "retina.name" . }}-config-win
   namespace: {{ .Values.namespace }}
 data:
