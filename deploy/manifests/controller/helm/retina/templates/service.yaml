@@ -4,10 +4,13 @@ metadata:
   name: {{ include "retina.fullname" . }}
   namespace: {{ .Values.namespace }}
   labels:
-    app: {{ include "retina.name" . }}
+    k8s-app: {{ include "retina.name" . }}
+    {{- include "retina.labels" . | nindent 4 }}
+    app.kubernetes.io/component: networking
 spec:
   ports:
     - port: {{ .Values.service.port }}
       targetPort: {{ .Values.service.targetPort }}
   selector:
-    app: {{ include "retina.name" . }}
+    {{- include "retina.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: workload
