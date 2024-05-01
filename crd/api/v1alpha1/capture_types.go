@@ -139,6 +139,27 @@ type OutputConfiguration struct {
 	// BlobUpload is a secret containing the blob SAS URL to the given blob container.
 	// +optional
 	BlobUpload *string `json:"blobUpload,omitempty"`
+	// S3Upload configures the details for uploading capture files to an S3-compatible storage service.
+	// +optional
+	S3Upload *S3Upload `json:"s3Upload,omitempty"`
+}
+
+type S3Upload struct {
+	// Endpoint of S3 compatible storage service.
+	// +optional
+	Endpoint string `json:"endpoint,omitempty"`
+	// Bucket in which to store the capture.
+	// +required
+	Bucket string `json:"bucket,omitempty"`
+	// SecretName is the name of secret which stores S3 compliant storage access key and secret key.
+	// +required
+	SecretName string `json:"secretName,omitempty"`
+	// Region in which the S3 compatible bucket is located.
+	// +optional
+	Region string `json:"region,omitempty"`
+	// Path specifies the prefix path within the S3 bucket where captures will be stored, e.g., "retina/captures".
+	// +optional
+	Path string `json:"path,omitempty"`
 }
 
 // CaptureSpec indicates the specification of Capture.

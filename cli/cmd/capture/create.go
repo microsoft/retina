@@ -42,6 +42,12 @@ var (
 	hostPath           string
 	pvc                string
 	blobUpload         string
+	s3Region           string
+	s3Endpoint         string
+	s3Bucket           string
+	s3Path             string
+	s3AccessKeyID      string
+	s3SecretAccessKey  string
 	tcpdumpFilter      string
 	excludeFilter      string
 	includeFilter      string
@@ -69,6 +75,20 @@ var createExample = templates.Examples(i18n.T(`
 
 		# Capture network packets on nodes using node-selector and upload the artifacts to blob storage with SAS URL https://testaccount.blob.core.windows.net/<token>
 		kubectl retina capture create --node-selectors="agentpool=agentpool" --blob-upload=https://testaccount.blob.core.windows.net/<token>
+
+		# Capture network packets on nodes using node-selector and upload the artifacts to AWS S3
+		kubectl retina capture create --node-selectors="agentpool=agentpool" \
+			--s3-bucket "your-bucket-name" \
+			--s3-region "eu-central-1"\
+			--s3-access-key-id "your-access-key-id" \
+			--s3-secret-access-key "your-secret-access-key"
+
+		# Capture network packets on nodes using node-selector and upload the artifacts to S3-compatible service (like MinIO)
+		kubectl retina capture create --node-selectors="agentpool=agentpool" \
+			--s3-bucket "your-bucket-name" \
+			--s3-endpoint "https://play.min.io:9000" \
+			--s3-access-key-id "your-access-key-id" \
+			--s3-secret-access-key "your-secret-access-key"
 		`))
 
 const (
@@ -106,6 +126,9 @@ var createCapture = &cobra.Command{
 			if capture.Spec.OutputConfiguration.BlobUpload != nil {
 				retinacmd.Logger.Info("Please manually delete capture secret", zap.String("namespace", namespace), zap.String("secret name", *capture.Spec.OutputConfiguration.BlobUpload))
 			}
+			if capture.Spec.OutputConfiguration.S3Upload != nil && capture.Spec.OutputConfiguration.S3Upload.SecretName != "" {
+				retinacmd.Logger.Info("Please manually delete capture secret", zap.String("namespace", namespace), zap.String("secret name", capture.Spec.OutputConfiguration.S3Upload.SecretName))
+			}
 			printCaptureResult(jobsCreated)
 			return nil
 		}
@@ -128,6 +151,15 @@ var createCapture = &cobra.Command{
 			if err != nil {
 				retinacmd.Logger.Error("Failed to delete capture secret, please manually delete it",
 					zap.String("namespace", namespace), zap.String("secret name", *capture.Spec.OutputConfiguration.BlobUpload), zap.Error(err))
+			}
+
+			err = deleteSecret(kubeClient, &capture.Spec.OutputConfiguration.S3Upload.SecretName)
+			if err != nil {
+				retinacmd.Logger.Error("Failed to delete capture secret, please manually delete it",
+					zap.String("namespace", namespace),
+					zap.String("secret name", capture.Spec.OutputConfiguration.S3Upload.SecretName),
+					zap.Error(err),
+				)
 			}
 
 			if len(jobsFailedToDelete) == 0 && err == nil {
@@ -160,6 +192,25 @@ func createSecretFromBlobUpload(kubeClient kubernetes.Interface, blobUpload, cap
 	secret, err := kubeClient.CoreV1().Secrets(namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
 	if err != nil {
 		return "", err
+	}
+	return secret.Name, nil
+}
+
+func createSecretFromS3Upload(kubeClient kubernetes.Interface, s3AccessKeyID, s3SecretAccessKey, captureName string) (string, error) {
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: captureConstants.CaptureOutputLocationS3UploadSecretName,
+			Labels:       captureUtils.GetSerectLabelsFromCaptureName(captureName),
+		},
+		Type: corev1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			captureConstants.CaptureOutputLocationS3UploadAccessKeyID:     []byte(s3AccessKeyID),
+			captureConstants.CaptureOutputLocationS3UploadSecretAccessKey: []byte(s3SecretAccessKey),
+		},
+	}
+	secret, err := kubeClient.CoreV1().Secrets(namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to create s3 upload secret: %w", err)
 	}
 	return secret.Name, nil
 }
@@ -258,6 +309,20 @@ func createCaptureF(kubeClient kubernetes.Interface) (*retinav1alpha1.Capture, e
 			return nil, err
 		}
 		capture.Spec.OutputConfiguration.BlobUpload = &secretName
+	}
+
+	if s3Bucket != "" {
+		secretName, err := createSecretFromS3Upload(kubeClient, s3AccessKeyID, s3SecretAccessKey, name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create s3 upload secret: %w", err)
+		}
+		capture.Spec.OutputConfiguration.S3Upload = &retinav1alpha1.S3Upload{
+			Endpoint:   s3Endpoint,
+			Bucket:     s3Bucket,
+			SecretName: secretName,
+			Region:     s3Region,
+			Path:       s3Path,
+		}
 	}
 
 	if len(excludeFilter) != 0 {
@@ -390,6 +455,13 @@ func init() {
 	createCapture.Flags().StringVar(&hostPath, "host-path", "", "HostPath of the node to store the capture files")
 	createCapture.Flags().StringVar(&pvc, "pvc", "", "PersistentVolumeClaim under the specified or default namespace to store capture files")
 	createCapture.Flags().StringVar(&blobUpload, "blob-upload", "", "Blob SAS URL with write permission to upload capture files")
+	createCapture.Flags().StringVar(&s3Region, "s3-region", "", "Region where the S3 compatible bucket is located")
+	createCapture.Flags().StringVar(&s3Endpoint, "s3-endpoint", "",
+		"Endpoint for an S3 compatible storage service. Use this if you are using a custom or private S3 service that requires a specific endpoint")
+	createCapture.Flags().StringVar(&s3Bucket, "s3-bucket", "", "Bucket in which to store capture files")
+	createCapture.Flags().StringVar(&s3Path, "s3-path", "retina/captures", "Prefix path within the S3 bucket where captures will be stored")
+	createCapture.Flags().StringVar(&s3AccessKeyID, "s3-access-key-id", "", "S3 access key id to upload capture files")
+	createCapture.Flags().StringVar(&s3SecretAccessKey, "s3-secret-access-key", "", "S3 access secret key to upload capture files")
 	createCapture.Flags().StringVar(&tcpdumpFilter, "tcpdump-filter", "", "Raw tcpdump flags which works only for Linux")
 	createCapture.Flags().StringVar(&excludeFilter, "exclude-filter", "", "A comma-separated list of IP:Port pairs that are "+
 		"excluded from capturing network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:*")

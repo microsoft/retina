@@ -178,6 +178,9 @@ func (cm *CaptureManager) enabledOutputLocations() []captureOutput.Location {
 	if pvc := captureOutput.NewPersistentVolumeClaim(cm.l); pvc.Enabled() {
 		locations = append(locations, pvc)
 	}
+	if s3 := captureOutput.NewS3Upload(cm.l); s3.Enabled() {
+		locations = append(locations, s3)
+	}
 	return locations
 }
 

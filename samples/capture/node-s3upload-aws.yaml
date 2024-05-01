@@ -1,0 +1,35 @@
+apiVersion: retina.sh/v1alpha1
+kind: Capture
+metadata:
+  name: capture-node-blobupload
+spec:
+  captureConfiguration:
+    captureOption:
+      duration: 10m
+    captureTarget:
+      nodeSelector:
+        matchExpressions:
+          - {
+              key: kubernetes.io/hostname,
+              operator: In,
+              values:
+                [
+                  aks-nodepool1-11396069-vmss000001,
+                  aks-nodepool1-11396069-vmss000000,
+                ],
+            }
+  outputConfiguration:
+    hostPath: "/tmp/retina"
+    s3Upload:
+      bucket: retina-bucket
+      region: ap-northeast-2
+      path: retina/captures
+      secretName: capture-s3-upload-secret
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: capture-s3-upload-secret
+data:
+  s3-access-key-id: <based-encode-s3-access-key-id>
+  s3-secret-access-key: <based-encode-s3-secret-access-key>
