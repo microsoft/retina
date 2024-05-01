@@ -7,11 +7,11 @@ package common
 import (
 	"errors"
 	"os"
-	"strings"
 	"syscall"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/perf"
+	"github.com/google/gopacket/layers"
 	"github.com/microsoft/retina/pkg/log"
 	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
@@ -41,18 +41,21 @@ func ProtocolToFlow(protocol string) int {
 }
 
 // Refer: https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-6
+// Inspektor gadget uses Gopacket pkg for DNS response codes.
+// Ref: https://github.com/google/gopacket/blob/32ee38206866f44a74a6033ec26aeeb474506804/layers/dns.go#L129
 func RCodeToFlow(rCode string) uint32 {
-	if strings.EqualFold(rCode, "NoError") {
+	switch rCode {
+	case layers.DNSResponseCodeNoErr.String():
 		return 0
-	} else if strings.EqualFold(rCode, "FormErr") {
+	case layers.DNSResponseCodeFormErr.String():
 		return 1
-	} else if strings.EqualFold(rCode, "ServFail") {
+	case layers.DNSResponseCodeServFail.String():
 		return 2
-	} else if strings.EqualFold(rCode, "NXDomain") {
+	case layers.DNSResponseCodeNXDomain.String():
 		return 3
-	} else if strings.EqualFold(rCode, "NotImp") {
+	case layers.DNSResponseCodeNotImp.String():
 		return 4
-	} else if strings.EqualFold(rCode, "Refused") {
+	case layers.DNSResponseCodeRefused.String():
 		return 5
 	}
 	return 24

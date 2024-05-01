@@ -125,7 +125,7 @@ func TestRequestEventHandler(t *testing.T) {
 
 	event := &types.Event{
 		Qr:         "Q",
-		Rcode:      "NOERROR",
+		Rcode:      "No Error",
 		QType:      "A",
 		DNSName:    "test.com",
 		Addresses:  []string{},
@@ -175,7 +175,7 @@ func TestResponseEventHandler(t *testing.T) {
 
 	event := &types.Event{
 		Qr:         "R",
-		Rcode:      "NOERROR",
+		Rcode:      "No Error",
 		QType:      "A",
 		DNSName:    "test.com",
 		Addresses:  []string{"1.1.1.1", "2.2.2.2"},
