@@ -96,7 +96,7 @@ func determineEndian() binary.ByteOrder {
 	return endian
 }
 
-// GetDefaultOutgoingLinks gets the outgoing interface by executing an equivalent to `ip route show default`
+// GetDefaultOutgoingLinks gets the outgoing interface by executing an equivalent to `ip route show default 0.0.0.0/0`
 func GetDefaultOutgoingLinks() ([]netlink.Link, error) {
 	routes, err := netlink.RouteList(nil, netlink.FAMILY_ALL)
 	if err != nil {

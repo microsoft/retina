@@ -97,7 +97,7 @@ func TestTcpID(t *testing.T) {
 
 func TestIsDefaultRoute(t *testing.T) {
 	tests := []struct {
-		Route netlink.Route
+		Route           netlink.Route
 		ShouldBeDefault bool
 	}{
 		{Route: netlink.Route{Dst: nil}, ShouldBeDefault: true},

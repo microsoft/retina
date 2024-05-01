@@ -222,7 +222,12 @@ func (p *packetParser) Start(ctx context.Context) error {
 	}
 	outgoingLink := outgoingLinks[0] // Take first link until multi-link support is implemented
 
-	p.l.Info("Attaching Packetparser", zap.Any("outgoingLinks", outgoingLink.Attrs()))
+	outgoingLinkAttributes := outgoingLink.Attrs()
+	p.l.Info("Attaching Packetparser",
+		zap.Int("outgoingLink.Index", outgoingLinkAttributes.Index),
+		zap.String("outgoingLink.Name", outgoingLinkAttributes.Name),
+		zap.Stringer("outgoingLink.HardwareAddr", outgoingLinkAttributes.HardwareAddr),
+	)
 	p.createQdiscAndAttach(*outgoingLink.Attrs(), Device)
 
 	// Create the channel.
