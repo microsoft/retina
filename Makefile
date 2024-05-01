@@ -210,7 +210,6 @@ container-docker: buildx # util target to build container images using docker bu
 	image_metadata_filename="image-metadata-$$image_name-$(TAG).json"; \
 	touch $$image_metadata_filename; \
 	echo "Building $$image_name for $$os/$$arch "; \
-	set -e ; \
 	docker buildx build \
 		$(BUILDX_ACTION) \
 		--platform $(PLATFORM) \
@@ -227,6 +226,7 @@ container-docker: buildx # util target to build container images using docker bu
 
 retina-image: ## build the retina linux container image.
 	echo "Building for $(PLATFORM)"
+	set -e ; \
 	for target in init agent; do \
 		echo "Building for $$target"; \
 		if [ "$$target" = "init" ]; then \
@@ -250,6 +250,7 @@ retina-image-win: ## build the retina Windows container image.
 	for year in 2019 2022; do \
 		tag=$(TAG)-windows-ltsc$$year-amd64; \
 		echo "Building $(RETINA_PLATFORM_TAG)"; \
+		set -e ; \
 		$(MAKE) container-$(CONTAINER_BUILDER) \
 				PLATFORM=windows/amd64 \
 				DOCKERFILE=controller/Dockerfile \
@@ -264,6 +265,7 @@ retina-image-win: ## build the retina Windows container image.
 
 retina-operator-image:  ## build the retina linux operator image.
 	echo "Building for $(PLATFORM)"
+	set -e ; \
 	$(MAKE) container-$(CONTAINER_BUILDER) \
 			PLATFORM=$(PLATFORM) \
 			DOCKERFILE=operator/Dockerfile \
