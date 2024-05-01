@@ -1,5 +1,26 @@
 ARG OS_VERSION=ltsc2019
 
+# intermediate go generate stage
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.22 AS intermediate
+ARG APP_INSIGHTS_ID # set to enable AI telemetry
+ARG GOARCH=amd64 # default to amd64
+ARG GOOS=linux # default to linux
+ENV CGO_ENABLED=0
+ENV GOARCH=${GOARCH}
+ENV GOOS=${GOOS}
+COPY . /go/src/github.com/microsoft/retina
+WORKDIR /go/src/github.com/microsoft/retina
+RUN if [ "$GOOS" = "linux" ] ; then \
+    apt-get update && apt-get -y install lsb-release wget software-properties-common gnupg file git make; \
+    wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -; \
+    add-apt-repository "deb http://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-14 main"; \
+    apt-get update; \
+    apt-get install -y clang-14 lldb-14 lld-14 clangd-14; \
+    apt-get install -y bpftool libbpf-dev; \
+    ln -s /usr/bin/clang-14 /usr/bin/clang; \
+    go generate /go/src/github.com/microsoft/retina/pkg/plugin/...; \
+    fi
+
 # capture binary
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.22 AS capture-bin
 ARG APP_INSIGHTS_ID # set to enable AI telemetry
@@ -15,7 +36,7 @@ RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/ret
 
 
 # controller binary
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.22 AS controller-bin
+FROM intermediate AS controller-bin
 ARG APP_INSIGHTS_ID # set to enable AI telemetry
 ARG GOARCH=amd64 # default to amd64
 ARG GOOS=linux # default to linux
@@ -23,23 +44,11 @@ ARG VERSION
 ENV CGO_ENABLED=0
 ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
-COPY . /go/src/github.com/microsoft/retina 
-WORKDIR /go/src/github.com/microsoft/retina
-RUN if [ "$GOOS" = "linux" ] ; then \
-    apt-get update && apt-get -y install lsb-release wget software-properties-common gnupg file git make; \
-    wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -; \
-    add-apt-repository "deb http://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-14 main"; \
-    apt-get update; \
-    apt-get install -y clang-14 lldb-14 lld-14 clangd-14; \
-    apt-get install -y bpftool libbpf-dev; \
-    ln -s /usr/bin/clang-14 /usr/bin/clang; \
-    go generate /go/src/github.com/microsoft/retina/pkg/plugin/...; \
-    fi
 RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/retina/controller -ldflags "-X main.version="$VERSION" -X main.applicationInsightsID="$APP_INSIGHTS_ID"" controller/main.go 
 
 
 # init binary
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.22 AS init-bin
+FROM intermediate AS init-bin
 ARG APP_INSIGHTS_ID # set to enable AI telemetry
 ARG GOARCH=amd64 # default to amd64
 ARG GOOS=linux # default to linux
@@ -47,8 +56,6 @@ ARG VERSION
 ENV CGO_ENABLED=0
 ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
-COPY . /go/src/github.com/microsoft/retina 
-WORKDIR /go/src/github.com/microsoft/retina
 RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/retina/initretina -ldflags "-X main.version="$VERSION" -X main.applicationInsightsID="$APP_INSIGHTS_ID"" init/retina/main_linux.go
 
 

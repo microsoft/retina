@@ -96,8 +96,6 @@ func main() {
 		panic(err)
 	}
 
-	metrics.InitializeMetrics()
-
 	fmt.Println("init client-go")
 	cfg, err := kcfg.GetConfig()
 	if err != nil {
@@ -124,6 +122,8 @@ func main() {
 	}
 	defer zl.Close()
 	mainLogger := zl.Named("main").Sugar()
+
+	metrics.InitializeMetrics()
 
 	var tel telemetry.Telemetry
 	if config.EnableTelemetry && applicationInsightsID != "" {
