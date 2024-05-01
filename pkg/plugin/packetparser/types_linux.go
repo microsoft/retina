@@ -11,11 +11,12 @@ import (
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/perf"
-	tc "github.com/florianl/go-tc"
+	"github.com/florianl/go-tc"
+	"github.com/vishvananda/netlink"
+
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/plugin/api"
-	"github.com/vishvananda/netlink"
 )
 
 const (
@@ -24,7 +25,6 @@ const (
 	fromEndpoint          string         = "fromEndpoint"
 	Veth                  string         = "veth"
 	Device                string         = "device"
-	Eth0                  string         = "eth0"
 	workers               int            = 2
 	buffer                int            = 10000
 	bpfSourceDir          string         = "_cprog"
