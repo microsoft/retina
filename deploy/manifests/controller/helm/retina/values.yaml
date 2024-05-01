@@ -16,6 +16,13 @@ operator:
   capture:
     debug: "true"
     jobNumLimit: 0
+  resources:
+    limits:
+      cpu: 500m
+      memory: 128Mi
+    requests:
+      cpu: 10m
+      memory: 128Mi
 
 image:
   repository: ghcr.io/microsoft/retina/retina-agent
@@ -111,6 +118,9 @@ serviceAccount:
 
 resources:
   limits:
+    memory: "300Mi"
+    cpu: "500m"
+  requests:
     memory: "300Mi"
     cpu: "500m"
 

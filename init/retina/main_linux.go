@@ -32,9 +32,11 @@ func main() {
 		defer telemetry.TrackPanic()
 	}
 
-	log.SetupZapLogger(opts)
-	log.Logger().AddFields(zap.String("version", version))
-	l := log.Logger().Named("init-retina")
+	zl, err := log.SetupZapLogger(opts)
+	if err != nil {
+		panic(err)
+	}
+	l := zl.Named("init-retina").With(zap.String("version", version))
 
 	// Setup BPF
 	bpf.Setup(l)

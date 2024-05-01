@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/oss/go/microsoft/golang:1.21 AS integration
+FROM mcr.microsoft.com/oss/go/microsoft/golang:1.22 AS integration
 LABEL Name=retina-integration Version=0.0.1
 
 RUN apt-get update &&\

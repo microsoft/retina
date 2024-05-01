@@ -29,6 +29,7 @@ const sidebars = {
         'installation/grafana',
         'installation/cli',
         'installation/config',
+        'installation/verify-signed-images'
       ],
     },
     {
@@ -80,7 +81,14 @@ const sidebars = {
         'troubleshooting/basic-metrics',
       ],
     },
-    'contributing/readme',
+    {
+      type: 'category',
+      label: 'Contributing',
+      items: [
+        'contributing/readme',
+        'contributing/developing',
+      ],
+    }
   ],
 
 };

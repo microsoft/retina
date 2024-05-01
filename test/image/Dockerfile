@@ -1,5 +1,7 @@
 # build stage
-FROM mcr.microsoft.com/oss/go/microsoft/golang:1.21 AS builder
+FROM mcr.microsoft.com/oss/go/microsoft/golang:1.22 AS builder
+
+ENV CGO_ENABLED=0
 
 RUN apt-get update &&\
     apt-get -y install lsb-release wget software-properties-common gnupg file git make
@@ -15,6 +17,8 @@ RUN ln -s /usr/bin/clang-14 /usr/bin/clang
 
 COPY . /go/src/github.com/microsoft/retina 
 WORKDIR /go/src/github.com/microsoft/retina
+
+RUN go generate /go/src/github.com/microsoft/retina/pkg/plugin/...
 
 # RUN go mod edit -module retina
 # RUN make all generate

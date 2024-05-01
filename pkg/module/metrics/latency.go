@@ -179,7 +179,7 @@ func (lm *LatencyMetrics) Clean() {
 }
 
 func (lm *LatencyMetrics) ProcessFlow(f *v1.Flow) {
-	if f == nil || f.L4 == nil || f.L4.GetTCP() == nil || utils.GetTcpID(f) == 0 || f.IP == nil {
+	if f == nil || f.GetL4() == nil || f.GetL4().GetTCP() == nil || utils.GetTCPID(f) == 0 || f.GetIP() == nil {
 		return
 	}
 
@@ -264,24 +264,24 @@ func (lm *LatencyMetrics) calculateLatency(f *v1.Flow) {
 		k := key{
 			srcIP: f.IP.Source,
 			dstIP: f.IP.Destination,
-			srcP:  f.L4.GetTCP().SourcePort,
-			dstP:  f.L4.GetTCP().DestinationPort,
-			id:    utils.GetTcpID(f),
+			srcP:  f.GetL4().GetTCP().GetSourcePort(),
+			dstP:  f.GetL4().GetTCP().GetDestinationPort(),
+			id:    utils.GetTCPID(f),
 		}
 		// There will be multiple identical packets with same ID. Store only the first one.
 		if item := lm.cache.Get(k); item == nil {
 			lm.cache.Set(k, &val{
 				t:     f.Time.Nanos,
-				flags: f.L4.GetTCP().Flags,
+				flags: f.GetL4().GetTCP().GetFlags(),
 			}, TTL)
 		}
 	} else if f.TraceObservationPoint == v1.TraceObservationPoint_FROM_NETWORK {
 		k := key{
 			srcIP: f.IP.Destination,
 			dstIP: f.IP.Source,
-			srcP:  f.L4.GetTCP().DestinationPort,
-			dstP:  f.L4.GetTCP().SourcePort,
-			id:    utils.GetTcpID(f),
+			srcP:  f.GetL4().GetTCP().GetDestinationPort(),
+			dstP:  f.GetL4().GetTCP().GetSourcePort(),
+			id:    utils.GetTCPID(f),
 		}
 		if item := lm.cache.Get(k); item != nil {
 			// Calculate latency in milliseconds.

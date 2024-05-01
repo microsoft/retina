@@ -5,15 +5,19 @@ metadata:
   name: {{ .Values.agent.name }}
   namespace: {{ .Values.namespace }}
   labels:
+    {{- include "retina.labels" . | nindent 4 }}
+    app.kubernetes.io/component: workload
     k8s-app: {{ include "retina.name" . }}
 spec:
   selector:
     matchLabels:
-      app: {{ include "retina.name" . }}
+      {{- include "retina.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: workload
   template:
     metadata:
       labels:
-        app: {{ include "retina.name" . }}
+        {{- include "retina.labels" . | nindent 8 }}
+        app.kubernetes.io/component: workload
         k8s-app: {{ include "retina.name" . }}
       annotations:
         prometheus.io/port: "{{ .Values.retinaPort }}"
@@ -61,9 +65,7 @@ spec:
           - name: retina
             containerPort: {{ .Values.retinaPort }}
           resources:
-            limits:
-              memory: {{ .Values.resources.limits.memory | quote }}
-              cpu: {{ .Values.resources.limits.cpu | quote }}
+            {{- toYaml .Values.resources | nindent 12 }}
           env:
           - name: POD_NAME
             valueFrom:
@@ -123,6 +125,8 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   labels:
+    {{- include "retina.labels" . | nindent 4 }}
+    app.kubernetes.io/component: workload
     k8s-app: {{ include "retina.name" . }}
   name: {{ .Values.agent_win.name }}
   namespace: {{ .Values.namespace }}
@@ -133,11 +137,13 @@ metadata:
 spec:
   selector:
     matchLabels:
-      k8s-app: {{ include "retina.name" . }}
+      {{- include "retina.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: workload
   template:
     metadata:
       labels:
-        app: {{ include "retina.name" . }}
+        {{- include "retina.labels" . | nindent 8 }}
+        app.kubernetes.io/component: workload
         k8s-app: {{ include "retina.name" . }}
       name: {{ include "retina.name" . }}
       namespace: {{ .Values.namespace }}

@@ -75,12 +75,7 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 10
           resources:
-            limits:
-              cpu: 500m
-              memory: 128Mi
-            requests:
-              cpu: 10m
-              memory: 64Mi
+            {{- toYaml .Values.operator.resources | nindent 12 }}
       serviceAccountName: retina-operator
       terminationGracePeriodSeconds: 10
       volumes:

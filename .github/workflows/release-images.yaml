@@ -8,6 +8,9 @@ on:
 permissions:
   contents: read
   packages: write
+  # This is used to complete the identity challenge
+  # with sigstore/fulcio when running outside of PRs.
+  id-token: write
 
 jobs:
   retina-images:
@@ -23,10 +26,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
-          go-version: ">=1.21.0"
+          go-version-file: go.mod
       - run: go version
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.5.0
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -44,6 +50,14 @@ jobs:
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
             BUILDX_ACTION=--push
 
+      - name: Sign container image
+        run: |
+          for image in retina-agent retina-init; do
+            IMAGE_PATH="ghcr.io/${{ github.repository }}/$image:$TAG-${{ matrix.platform }}-${{ matrix.arch }}"
+            DIGEST=$(jq -r '.["containerimage.digest"]' image-metadata-$image-$TAG-${{ matrix.platform }}-${{ matrix.arch }}.json) 
+            cosign sign --yes ${IMAGE_PATH}@${DIGEST} 
+          done
+
   retina-win-images:
     name: Build Agent Windows Images
     runs-on: ubuntu-latest
@@ -57,10 +71,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
-          go-version: ">=1.21.0"
+          go-version-file: go.mod
       - run: go version
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.5.0
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -78,6 +95,16 @@ jobs:
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
             BUILDX_ACTION=--push
 
+      - name: Sign container image
+        run: |
+          for year in 2019 2022; do
+            for image in retina-agent ; do
+              IMAGE_PATH="ghcr.io/${{ github.repository }}/$image:$TAG-windows-ltsc$year-${{ matrix.arch }}"
+              DIGEST=$(jq -r '.["containerimage.digest"]' image-metadata-$image-$TAG-windows-ltsc$year-${{ matrix.arch }}.json) 
+              cosign sign --yes ${IMAGE_PATH}@${DIGEST} 
+            done
+          done
+
   operator-images:
     name: Build Operator Images
     runs-on: ubuntu-latest
@@ -91,10 +118,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
-          go-version: ">=1.21.0"
+          go-version-file: go.mod
       - run: go version
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.5.0
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -112,6 +142,14 @@ jobs:
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
             BUILDX_ACTION=--push
 
+      - name: Sign container image
+        run: |
+          for image in retina-operator ; do
+              IMAGE_PATH="ghcr.io/${{ github.repository }}/$image:$TAG-${{ matrix.platform }}-${{ matrix.arch }}"
+              DIGEST=$(jq -r '.["containerimage.digest"]' image-metadata-$image-$TAG-${{ matrix.platform }}-${{ matrix.arch }}.json) 
+              cosign sign --yes ${IMAGE_PATH}@${DIGEST} 
+          done
+
   manifests:
     name: Generate Manifests
     runs-on: ubuntu-latest
@@ -128,6 +166,9 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.5.0
+
       - name: Log in to registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
 
@@ -138,3 +179,16 @@ jobs:
           make manifest \
             IMAGE_NAMESPACE=${{ github.repository }} \
             COMPONENT=${{ matrix.component }}
+
+      - name: Sign manifest
+        run: |
+          export TAG="$(make version)"
+          images=("retina-agent" "retina-init")
+          if [[ ${{ matrix.component }} == "operator" ]]; then
+            images=("retina-operator")
+          fi
+          for image in "${images[@]}"; do
+            IMAGE_PATH="ghcr.io/${{ github.repository }}/$image:$TAG"
+            DIGEST=$(docker buildx imagetools inspect $IMAGE_PATH --format "{{json .Manifest}}" | jq -r .digest)
+            cosign sign --yes ${IMAGE_PATH}@${DIGEST} 
+          done

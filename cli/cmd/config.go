@@ -5,50 +5,48 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
-// ConfigCmd :- Configure retina CLI
-func ConfigCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "config",
-		Short: "Configure retina CLI",
-	}
-	cmd.AddCommand(configView())
-	cmd.AddCommand(configSet())
-	return cmd
+var config = &cobra.Command{
+	Use:   "config",
+	Short: "Configure retina CLI",
 }
 
-func configSet() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "set",
-		Short: "Configure Retina client",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			endpoint, _ := cmd.Flags().GetString("endpoint")
-			config := Config{RetinaEndpoint: endpoint}
-			b, _ := json.MarshalIndent(config, "", "  ")
-			err := ioutil.WriteFile(ClientConfigPath, b, 0o644)
-			if err == nil {
-				fmt.Print(string(b))
-			}
-
+var setConfig = &cobra.Command{
+	Use:   "set",
+	Short: "Configure Retina client",
+	RunE: func(cmd *cobra.Command, _ []string) error {
+		endpoint, _ := cmd.Flags().GetString("endpoint")
+		config := Config{RetinaEndpoint: endpoint}
+		b, err := json.MarshalIndent(config, "", "  ")
+		if err != nil {
 			return err
-		},
-	}
-	cmd.Flags().String("endpoint", "", "Set Retina server")
-	cmd.MarkFlagRequired("endpoint") //nolint:errcheck
-
-	return cmd
+		}
+		return errors.Wrap(os.WriteFile(ClientConfigPath, b, 0o644), "failed to write config file") // nolint:gosec,gomnd // no sensitive data
+	},
 }
 
-func configView() *cobra.Command {
-	return &cobra.Command{
-		Use:   "view",
-		Short: "View Retina client config",
-		Run: func(cmd *cobra.Command, args []string) {
-			// print client config
-		},
-	}
+var viewConfig = &cobra.Command{
+	Use:   "view",
+	Short: "View Retina client config",
+	RunE: func(*cobra.Command, []string) error {
+		b, err := os.ReadFile(ClientConfigPath)
+		if err != nil {
+			return errors.Wrap(err, "failed to read config path")
+		}
+		fmt.Println(string(b))
+		return nil
+	},
+}
+
+func init() {
+	setConfig.Flags().String("endpoint", "", "Set Retina server")
+	_ = setConfig.MarkFlagRequired("endpoint")
+	config.AddCommand(setConfig)
+	config.AddCommand(viewConfig)
+	Retina.AddCommand(config)
 }

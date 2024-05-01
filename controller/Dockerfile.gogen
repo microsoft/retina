@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/oss/go/microsoft/golang:1.21 as gogen-tools
+FROM mcr.microsoft.com/oss/go/microsoft/golang:1.22 as gogen-tools
 
 # Default linux/architecture.
 ARG GOOS=linux
