@@ -90,10 +90,6 @@ func (p *packetParser) Compile(ctx context.Context) error {
 		return err
 	}
 
-	// Generate dynamic header file.
-	if err := p.Generate(ctx); err != nil {
-		p.l.Error("failed to generate PacketParser dynamic header:%w", zap.Error(err))
-	}
 	bpfSourceFile := fmt.Sprintf("%s/%s/%s", dir, bpfSourceDir, bpfSourceFileName)
 	bpfOutputFile := fmt.Sprintf("%s/%s", dir, bpfObjectFileName)
 	arch := runtime.GOARCH

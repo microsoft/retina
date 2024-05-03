@@ -95,11 +95,6 @@ func (dr *dropReason) Compile(ctx context.Context) error {
 		return err
 	}
 
-	// Generate dynamic header file.
-	if err := dr.Generate(ctx); err != nil {
-		dr.l.Error("failed to generate DropReason dynamic header:%w", zap.Error(err))
-	}
-
 	bpfSourceFile := fmt.Sprintf("%s/%s/%s", dir, bpfSourceDir, bpfSourceFileName)
 	bpfOutputFile := fmt.Sprintf("%s/%s", dir, bpfObjectFileName)
 
