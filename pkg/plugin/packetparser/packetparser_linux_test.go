@@ -425,6 +425,11 @@ func TestCompile(t *testing.T) {
 		t.Fatalf("Expected no error. Error: %+v", err)
 	}
 
+	err = p.Generate(context.Background())
+	if err != nil {
+		t.Fatalf("Expected no error. Error: %+v", err)
+	}
+
 	err = p.Compile(context.Background())
 	if err != nil {
 		t.Fatalf("Expected no error. Error: %+v", err)
