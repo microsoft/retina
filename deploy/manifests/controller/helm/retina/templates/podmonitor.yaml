@@ -36,5 +36,5 @@ spec:
       - {{ .Values.namespace }}
   selector:
     matchLabels:
-      app: {{ include "retina.name" . }}
+      {{- include "retina.selectorLabels" . | nindent 6 }}
 {{- end }}
