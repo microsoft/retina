@@ -32,11 +32,15 @@ func TestE2ERetinaMetrics(t *testing.T) {
 
 	testName := curuser.Username + netObsRGtag + strconv.FormatInt(time.Now().Unix(), 10)
 	sub := os.Getenv("AZURE_SUBSCRIPTION_ID")
+	loc := os.Getenv("AZURE_LOCATION")
+	if loc == "" {
+		loc = "eastus"
+	}
 
 	job.AddStep(&azure.CreateResourceGroup{
 		SubscriptionID:    sub,
 		ResourceGroupName: testName,
-		Location:          "eastus",
+		Location:          loc,
 	}, nil)
 
 	job.AddStep(&azure.CreateVNet{
