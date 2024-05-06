@@ -17,6 +17,7 @@ jobs:
         language: [go]
     runs-on: ubuntu-latest
     env:
+      IS_NOT_MERGE_GROUP: ${{ github.event_name != 'merge_group' }}
       GOOS: ${{ matrix.goos }}
       GOARCH: ${{ matrix.goarch }}
     timeout-minutes: 90
@@ -29,16 +30,20 @@ jobs:
         if: env.IS_NOT_MERGE_GROUP
         uses: actions/checkout@v4
       - name: Setup go
+        if: env.IS_NOT_MERGE_GROUP
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
       - name: Initialize CodeQL
+        if: env.IS_NOT_MERGE_GROUP
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
       - name: Autobuild
+        if: env.IS_NOT_MERGE_GROUP
         uses: github/codeql-action/autobuild@v3
       - name: Perform CodeQL Analysis
+        if: env.IS_NOT_MERGE_GROUP
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:${{matrix.language}}"

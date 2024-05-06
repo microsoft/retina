@@ -16,10 +16,12 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     env:
+      IS_NOT_MERGE_GROUP: ${{ github.event_name != 'merge_group' }}
       GOOS: ${{ matrix.goos }}
       GOARCH: ${{ matrix.goarch }}
     steps:
       - uses: actions/checkout@v4
+        if: env.IS_NOT_MERGE_GROUP
         with:
           fetch-depth: 0
       - uses: actions/setup-go@v5
