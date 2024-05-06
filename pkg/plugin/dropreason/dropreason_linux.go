@@ -33,7 +33,7 @@ import (
 	"go.uber.org/zap"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cc clang-14 -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type metrics_map_value -type drop_reason_t -type packet kprobe ./_cprog/drop_reason.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../filter/_cprog/
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type metrics_map_value -type drop_reason_t -type packet kprobe ./_cprog/drop_reason.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../filter/_cprog/
 const (
 	nfHookSlowFn         = "nf_hook_slow"
 	tcpConnectFn         = "tcp_v4_connect"
@@ -93,11 +93,6 @@ func (dr *dropReason) Compile(ctx context.Context) error {
 	dir, err := absPath()
 	if err != nil {
 		return err
-	}
-
-	// Generate dynamic header file.
-	if err := dr.Generate(ctx); err != nil {
-		dr.l.Error("failed to generate DropReason dynamic header:%w", zap.Error(err))
 	}
 
 	bpfSourceFile := fmt.Sprintf("%s/%s/%s", dir, bpfSourceDir, bpfSourceFileName)
