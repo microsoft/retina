@@ -11,7 +11,7 @@ import (
 
 const sleepDelay = 5 * time.Second
 
-func ValidateDNSMetric() *types.Scenario {
+func ValidateDNSMetrics() *types.Scenario {
 	name := "DNS Metrics"
 	steps := []*types.StepWrapper{
 		{
@@ -49,32 +49,10 @@ func ValidateDNSMetric() *types.Scenario {
 			},
 		},
 		{
-			Step: &ValidateDNSRequest{
-				Metric: Metric{
-					DNSRetinaPort: "10093",
-					NumResponse:   "0",
-					Query:         "kubernetes.default.svc.cluster.local.",
-					QueryType:     "AAAA",
-					ReturnCode:    "",
-					Response:      "",
-				},
-			}, Opts: &types.StepOptions{
-				SkipSavingParamatersToJob: true,
-			},
+			Step: &ValidateDNSRequestMetrics{},
 		},
 		{
-			Step: &ValidateDNSResponse{
-				Metric: Metric{
-					DNSRetinaPort: "10093",
-					NumResponse:   "0",
-					Query:         "kubernetes.default.svc.cluster.local.",
-					QueryType:     "AAAA",
-					ReturnCode:    "NoError",
-					Response:      "",
-				},
-			}, Opts: &types.StepOptions{
-				SkipSavingParamatersToJob: true,
-			},
+			Step: &ValidateDNSResponseMetrics{},
 		},
 		{
 			Step: &types.Stop{

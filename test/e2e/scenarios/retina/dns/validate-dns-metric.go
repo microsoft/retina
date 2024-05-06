@@ -6,75 +6,77 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/microsoft/retina/test/e2e/common"
 	prom "github.com/microsoft/retina/test/e2e/framework/prometheus"
 )
 
-var (
-	dnsRequestCountMetricName  = "networkobservability_dns_request_count"
-	dnsResponseCountMetricName = "networkobservability_dns_response_count"
-)
-
 const (
-	numResponseKey = "num_response"
-	queryKey       = "query"
-	queryTypeKey   = "query_type"
-	returnCodeKey  = "return_code"
-	responseKey    = "response"
+	numResponse = "num_response"
+	query       = "query"
+	queryType   = "query_type"
+	returnCode  = "return_code"
+	response    = "response"
 )
 
-type Metric struct {
-	DNSRetinaPort string
-	NumResponse   string
-	Query         string
-	QueryType     string
-	ReturnCode    string
-	Response      string
-}
-
-type ValidateDNSRequest struct {
-	Metric
-}
-
-type ValidateDNSResponse struct {
-	Metric
-}
-
-func (v *ValidateDNSRequest) Run() error {
-	return v.runMetric(dnsRequestCountMetricName)
-}
-
-func (v *ValidateDNSResponse) Run() error {
-	return v.runMetric(dnsResponseCountMetricName)
-}
-
-func (v *Metric) runMetric(metricName string) error {
-	promAddress := fmt.Sprintf("http://localhost:%s/metrics", v.DNSRetinaPort)
-
-	metric := map[string]string{
-		numResponseKey: v.NumResponse, queryKey: v.Query, queryTypeKey: v.QueryType, returnCodeKey: v.ReturnCode, responseKey: v.Response,
+var (
+	dnsRequestCountMetricName   = "networkobservability_dns_request_count"
+	dnsResponseCountMetricName  = "networkobservability_dns_response_count"
+	validDNSRequestMetricLabels = map[string]string{
+		numResponse: "0",
+		query:       "kubernetes.default.svc.cluster.local.",
+		queryType:   "AAAA",
+		returnCode:  "",
+		response:    "",
 	}
+	validDNSResponseMetricLabels = map[string]string{
+		numResponse: "0",
+		query:       "kubernetes.default.svc.cluster.local.",
+		queryType:   "AAAA",
+		returnCode:  "NoError",
+		response:    "",
+	}
+)
 
-	err := prom.CheckMetric(promAddress, metricName, metric)
+type ValidateDNSRequestMetrics struct{}
+
+func (v *ValidateDNSRequestMetrics) Run() error {
+	metricsEndpoint := fmt.Sprintf("http://localhost:%d/metrics", common.RetinaPort)
+
+	err := prom.CheckMetric(metricsEndpoint, dnsRequestCountMetricName, validDNSRequestMetricLabels)
 	if err != nil {
-		return fmt.Errorf("failed to verify prometheus metrics %s: %w", metricName, err)
+		return fmt.Errorf("failed to verify prometheus metrics %s: %w", dnsRequestCountMetricName, err)
 	}
+	log.Printf("found metrics matching %+v\n", dnsRequestCountMetricName)
 
-	log.Printf("found metrics matching %+v\n", metric)
 	return nil
 }
 
-func (v *ValidateDNSRequest) Prevalidate() error {
+func (v *ValidateDNSRequestMetrics) Prevalidate() error {
 	return nil
 }
 
-func (v *ValidateDNSRequest) Stop() error {
+func (v *ValidateDNSRequestMetrics) Stop() error {
 	return nil
 }
 
-func (v *ValidateDNSResponse) Prevalidate() error {
+type ValidateDNSResponseMetrics struct{}
+
+func (v *ValidateDNSResponseMetrics) Run() error {
+	metricsEndpoint := fmt.Sprintf("http://localhost:%d/metrics", common.RetinaPort)
+
+	err := prom.CheckMetric(metricsEndpoint, dnsResponseCountMetricName, validDNSResponseMetricLabels)
+	if err != nil {
+		return fmt.Errorf("failed to verify prometheus metrics %s: %w", dnsResponseCountMetricName, err)
+	}
+	log.Printf("found metrics matching %+v\n", dnsResponseCountMetricName)
+
 	return nil
 }
 
-func (v *ValidateDNSResponse) Stop() error {
+func (v *ValidateDNSResponseMetrics) Prevalidate() error {
+	return nil
+}
+
+func (v *ValidateDNSResponseMetrics) Stop() error {
 	return nil
 }

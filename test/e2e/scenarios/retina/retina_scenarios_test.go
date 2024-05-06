@@ -93,7 +93,7 @@ func TestE2ERetinaMetrics(t *testing.T) {
 	job.AddScenario(tcp.ValidateTCPMetrics())
 
 	// check advanced metrics
-	job.AddScenario(dns.ValidateDNSMetric())
+	job.AddScenario(dns.ValidateDNSMetrics())
 
 	// enable advanced metrics
 	job.AddStep(&kubernetes.UpgradeRetinaHelmChart{

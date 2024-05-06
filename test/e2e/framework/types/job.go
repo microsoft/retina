@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"reflect"
-	"strings"
 )
 
 var (
@@ -268,10 +267,6 @@ func (j *Job) validateStep(step *StepWrapper) error {
 		return nil
 
 	default:
-		// validate dns steps
-		if strings.Contains(val.Type().Name(), "DNS") {
-			val = val.Field(0)
-		}
 		for i, f := range reflect.VisibleFields(val.Type()) {
 			// skip saving unexported fields
 			if !f.IsExported() {
