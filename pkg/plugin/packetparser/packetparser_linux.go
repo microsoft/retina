@@ -90,10 +90,6 @@ func (p *packetParser) Compile(ctx context.Context) error {
 		return err
 	}
 
-	// Generate dynamic header file.
-	if err := p.Generate(ctx); err != nil {
-		p.l.Error("failed to generate PacketParser dynamic header:%w", zap.Error(err))
-	}
 	bpfSourceFile := fmt.Sprintf("%s/%s/%s", dir, bpfSourceDir, bpfSourceFileName)
 	bpfOutputFile := fmt.Sprintf("%s/%s", dir, bpfObjectFileName)
 	arch := runtime.GOARCH
@@ -233,7 +229,6 @@ func (p *packetParser) Start(ctx context.Context) error {
 	p.recordsChannel = make(chan perf.Record, buffer)
 	p.l.Debug("Created records channel")
 
-	p.l.Info("Started packet parser")
 	return p.run(ctx)
 }
 
@@ -499,8 +494,6 @@ func (p *packetParser) createQdiscAndAttach(iface netlink.LinkAttrs, ifaceType s
 }
 
 func (p *packetParser) run(ctx context.Context) error {
-	p.l.Info("Starting packet parser")
-
 	// Start perf record handlers (consumers).
 	for i := 0; i < workers; i++ {
 		p.wg.Add(1)
@@ -511,6 +504,8 @@ func (p *packetParser) run(ctx context.Context) error {
 	// The perf reader Read call blocks until there is data available in the perf buffer.
 	// That call is unblocked when Reader is closed.
 	go p.handleEvents(ctx)
+
+	p.l.Info("Started packet parser")
 
 	// Wait for the context to be done.
 	// This will block till all consumers exit.
