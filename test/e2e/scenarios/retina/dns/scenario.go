@@ -147,5 +147,4 @@ func ValidateAdvanceDNSMetrics() *types.Scenario {
 		},
 	}
 	return types.NewScenario(name, steps...)
-
 }
