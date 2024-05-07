@@ -3,8 +3,10 @@
 package dns
 
 import (
+	"strconv"
 	"time"
 
+	"github.com/microsoft/retina/test/e2e/common"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/types"
 )
@@ -41,8 +43,8 @@ func ValidateBasicDNSMetrics() *types.Scenario {
 			Step: &kubernetes.PortForward{
 				Namespace:             "kube-system",
 				LabelSelector:         "k8s-app=retina",
-				LocalPort:             "10093",
-				RemotePort:            "10093",
+				LocalPort:             strconv.Itoa(common.RetinaPort),
+				RemotePort:            strconv.Itoa(common.RetinaPort),
 				OptionalLabelAffinity: "app=agnhost-a", // port forward to a pod on a node that also has this pod with this label, assuming same namespace
 			},
 			Opts: &types.StepOptions{
@@ -106,8 +108,8 @@ func ValidateAdvanceDNSMetrics() *types.Scenario {
 			Step: &kubernetes.PortForward{
 				Namespace:             "kube-system",
 				LabelSelector:         "k8s-app=retina",
-				LocalPort:             "10093",
-				RemotePort:            "10093",
+				LocalPort:             strconv.Itoa(common.RetinaPort),
+				RemotePort:            strconv.Itoa(common.RetinaPort),
 				OptionalLabelAffinity: "app=agnhost-b", // port forward to a pod on a node that also has this pod with this label, assuming same namespace
 			},
 			Opts: &types.StepOptions{
