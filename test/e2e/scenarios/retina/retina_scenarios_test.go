@@ -39,12 +39,12 @@ func TestE2ERetinaBasicMetrics(t *testing.T) {
 	}, nil)
 
 	job.AddStep(&azure.CreateVNet{
-		VnetName:         "testvnet",
+		VnetName:         "testvnet_adv",
 		VnetAddressSpace: "10.0.0.0/9",
 	}, nil)
 
 	job.AddStep(&azure.CreateSubnet{
-		SubnetName:         "testsubnet",
+		SubnetName:         "testsubnet_adv",
 		SubnetAddressSpace: "10.0.0.0/12",
 	}, nil)
 
