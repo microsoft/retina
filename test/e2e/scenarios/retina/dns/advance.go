@@ -35,7 +35,7 @@ func (v *ValidateAdvanceDNSRequestMetrics) Run() error {
 	// Get Pod IP address
 	podIP, err := kubernetes.GetPodIP("", v.Namespace, v.PodName)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to get pod IP address")
 	}
 	v.IP = podIP
 
@@ -87,7 +87,7 @@ func (v *ValidateAdvanceDNSResponseMetrics) Run() error {
 	// Get Pod IP address
 	podIP, err := kubernetes.GetPodIP("", v.Namespace, v.PodName)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to get pod IP address")
 	}
 	v.IP = podIP
 
