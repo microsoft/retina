@@ -7,17 +7,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/microsoft/retina/test/e2e/common"
 	"github.com/microsoft/retina/test/e2e/framework/azure"
 	"github.com/microsoft/retina/test/e2e/framework/generic"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/types"
+	"github.com/microsoft/retina/test/e2e/scenarios/retina/dns"
 	"github.com/microsoft/retina/test/e2e/scenarios/retina/drop"
 	tcp "github.com/microsoft/retina/test/e2e/scenarios/retina/tcp"
-)
-
-const (
-	// netObsRGtag is used to tag resources created by this test suite
-	netObsRGtag = "-e2e-netobs-"
 )
 
 // Test against AKS cluster with NPM enabled,
@@ -30,13 +27,17 @@ func TestE2ERetinaMetrics(t *testing.T) {
 
 	curuser, _ := user.Current()
 
-	testName := curuser.Username + netObsRGtag + strconv.FormatInt(time.Now().Unix(), 10)
+	testName := curuser.Username + common.NetObsRGtag + strconv.FormatInt(time.Now().Unix(), 10)
 	sub := os.Getenv("AZURE_SUBSCRIPTION_ID")
+	loc := os.Getenv("AZURE_LOCATION")
+	if loc == "" {
+		loc = "eastus"
+	}
 
 	job.AddStep(&azure.CreateResourceGroup{
 		SubscriptionID:    sub,
 		ResourceGroupName: testName,
-		Location:          "eastus",
+		Location:          loc,
 	}, nil)
 
 	job.AddStep(&azure.CreateVNet{
@@ -75,8 +76,19 @@ func TestE2ERetinaMetrics(t *testing.T) {
 
 	job.AddScenario(drop.ValidateDropMetric())
 
-	// todo: handle multiple scenarios back to back
 	job.AddScenario(tcp.ValidateTCPMetrics())
+
+	job.AddScenario(dns.ValidateBasicDNSMetrics())
+
+	// enable advanced metrics
+	job.AddStep(&kubernetes.UpgradeRetinaHelmChart{
+		Namespace:   "kube-system",
+		ReleaseName: "retina",
+		ChartPath:   "../../../../deploy/manifests/controller/helm/retina/",
+		ValuesFile:  "../../../profiles/localctx/values.yaml",
+	}, nil)
+
+	job.AddScenario(dns.ValidateAdvanceDNSMetrics())
 
 	job.AddStep(&azure.DeleteResourceGroup{}, nil)
 }

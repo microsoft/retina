@@ -36,10 +36,10 @@ const (
 	portCtxOption = "port"
 
 	// workloads context option
-	workloadKindCtxOption = "workloadKind"
+	workloadKindCtxOption = "workload_kind"
 
 	// workload context option
-	workloadNameCtxOption = "workloadName"
+	workloadNameCtxOption = "workload_name"
 
 	// workload context option
 	workloadCtxOption = "workload"
