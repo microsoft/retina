@@ -246,10 +246,10 @@ require (
 	golang.org/x/net v0.24.0 // indirect
 	golang.org/x/oauth2 v0.18.0 // indirect
 	golang.org/x/sync v0.7.0
-	golang.org/x/sys v0.19.0
+	golang.org/x/sys v0.20.0
 	golang.org/x/term v0.19.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
-	google.golang.org/protobuf v1.34.0
+	google.golang.org/protobuf v1.34.1
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/api v0.29.4
@@ -288,7 +288,7 @@ require (
 	github.com/jsternberg/zap-logfmt v1.3.0
 	github.com/microsoft/ApplicationInsights-Go v0.4.4
 	github.com/onsi/ginkgo v1.16.5
-	github.com/onsi/ginkgo/v2 v2.17.2
+	github.com/onsi/ginkgo/v2 v2.17.3
 	github.com/onsi/gomega v1.33.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_model v0.6.0
