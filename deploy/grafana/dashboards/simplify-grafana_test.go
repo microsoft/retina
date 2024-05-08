@@ -4,8 +4,7 @@ package dashboard
 
 import (
 	"testing"
-
-	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"reflect"
@@ -14,7 +13,7 @@ import (
 // TestDashboardsAreSimplified ensures that all dashboards are simplified
 func TestDashboardsAreSimplified(t *testing.T) {
 	// get all json's in this folder
-	files, err := ioutil.ReadDir("./")
+	files, err := os.ReadDir("./")
 	if err != nil {
 		t.Fatal(err)
 	}
