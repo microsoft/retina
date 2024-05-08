@@ -1,13 +1,8 @@
 package retina
 
 import (
-	"os"
-	"os/user"
-	"strconv"
-	"time"
-
-	"github.com/microsoft/retina/test/e2e/common"
 	"github.com/microsoft/retina/test/e2e/framework/azure"
+	"github.com/microsoft/retina/test/e2e/framework/generic"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/types"
 	"github.com/microsoft/retina/test/e2e/scenarios/retina/dns"
@@ -15,21 +10,13 @@ import (
 	tcp "github.com/microsoft/retina/test/e2e/scenarios/retina/tcp"
 )
 
-func CreateTestInfra() *types.Job {
+func CreateTestInfra(subID, clusterName, location string) *types.Job {
 	job := types.NewJob("Create e2e test infrastructure")
-	curuser, _ := user.Current()
-
-	testName := curuser.Username + common.NetObsRGtag + strconv.FormatInt(time.Now().Unix(), 10)
-	sub := os.Getenv("AZURE_SUBSCRIPTION_ID")
-	loc := os.Getenv("AZURE_LOCATION")
-	if loc == "" {
-		loc = "eastus"
-	}
 
 	job.AddStep(&azure.CreateResourceGroup{
-		SubscriptionID:    sub,
-		ResourceGroupName: testName,
-		Location:          loc,
+		SubscriptionID:    subID,
+		ResourceGroupName: clusterName,
+		Location:          location,
 	}, nil)
 
 	job.AddStep(&azure.CreateVNet{
@@ -43,7 +30,7 @@ func CreateTestInfra() *types.Job {
 	}, nil)
 
 	job.AddStep(&azure.CreateNPMCluster{
-		ClusterName:  testName,
+		ClusterName:  clusterName,
 		PodCidr:      "10.128.0.0/9",
 		DNSServiceIP: "192.168.0.10",
 		ServiceCidr:  "192.168.0.0/28",
@@ -53,19 +40,22 @@ func CreateTestInfra() *types.Job {
 		KubeConfigFilePath: "./test.pem",
 	}, nil)
 
+	job.AddStep(&generic.LoadFlags{
+		TagEnv:            generic.DefaultTagEnv,
+		ImageNamespaceEnv: generic.DefaultImageNamespace,
+		ImageRegistryEnv:  generic.DefaultImageRegistry,
+	}, nil)
+
 	return job
 }
 
-func DeleteTestInfra() *types.Job {
+func DeleteTestInfra(subID, clusterName, location string) *types.Job {
 	job := types.NewJob("Delete e2e test infrastructure")
-	curuser, _ := user.Current()
-
-	testName := curuser.Username + common.NetObsRGtag + strconv.FormatInt(time.Now().Unix(), 10)
-	sub := os.Getenv("AZURE_SUBSCRIPTION_ID")
 
 	job.AddStep(&azure.DeleteResourceGroup{
-		SubscriptionID:    sub,
-		ResourceGroupName: testName,
+		SubscriptionID:    subID,
+		ResourceGroupName: clusterName,
+		Location:          location,
 	}, nil)
 
 	return job
@@ -73,6 +63,7 @@ func DeleteTestInfra() *types.Job {
 
 func InstallAndTestRetinaWithBasicMetrics() *types.Job {
 	job := types.NewJob("Install and test Retina with basic metrics")
+
 	job.AddStep(&kubernetes.InstallHelmChart{
 		Namespace:   "kube-system",
 		ReleaseName: "retina",
