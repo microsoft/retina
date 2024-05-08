@@ -72,3 +72,9 @@ Captures are **on-demand** and can be output to multiple destinations. For more 
 Retina supports **several options for storage and insights/visualization**. Below is the high-level architecture for Retina, conveying some of these options.
 
 ![Overview of Retina](retina-components.png "Overview of Retina")
+
+## Minimum System Requirements
+
+The following are known system requirements for installing Retina:
+
+- Minimum Linux Kernel Version: v5.4.0
