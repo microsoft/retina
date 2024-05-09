@@ -138,7 +138,7 @@ stages:
 
       # windows 2019 only in buildx, windows server 2022 requires native windows container build because of cgo
       - job: retinaagentimageswin2019
-        displayName: Build Retina Windows Images (BuildX)
+        displayName: Build Retina Windows Images (buildx)
         pool:
           name: "$(BUILD_POOL_NAME_DEFAULT)"
         strategy:
@@ -163,19 +163,14 @@ stages:
                 BUILDX_ACTION="-o type=docker,dest=./output/images/$(platform)/$(arch)/$(year)/retina-agent-$VERSION-windows-ltsc$(year).tar"
             displayName: "Build Retina Windows Image"
 
-          - bash: |
-              mkdir -p $(Build.ArtifactStagingDirectory)
-              cp -r output/* $(Build.ArtifactStagingDirectory)
-            displayName: "Copy binaries to the binaries artifact folder"
-
           - task: PublishBuildArtifacts@1
             inputs:
               artifactName: output
-              pathtoPublish: "$(Build.ArtifactStagingDirectory)"
+              pathtoPublish: ./output
             condition: succeeded()
 
       - job: windowsnative
-        displayName: Build Retina Windows Images (Native)
+        displayName: Build Retina Windows Images (native)
         pool:
           name: "$(BUILD_POOL_NAME_WINDOWS_DEFAULT)"
         steps:

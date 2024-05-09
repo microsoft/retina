@@ -55,29 +55,6 @@ function Build-RetinaAgentImage {
     --build-arg APP_INSIGHTS_ID="$appInsightsID" .
 }
 
-function Build-RetinaBuilderImage {
-    param(
-        [string]$imageName = "retina-builder",
-        [string]$version = $(Get-GitVersion),
-        [Parameter(Mandatory = $true)][string]$registry = ""
-    )
-
-    # Get the version using the Get-GitVersion function
-    $version = Get-GitVersion
-
-    # Hardcoded file path for Retina builder Dockerfile
-    $filePath = "controller/Dockerfile.windows-cgo"
-
-    # Full image name with registry, image name, and version
-    $fullImageName = "${registry}/${imageName}:$version"
-
-    Write-Host "Building Retina builder Docker image $fullImageName"
-    # Building the Retina builder Docker image
-    docker build -f $filePath -t $fullImageName --target builder .
-
-    Write-Host "Retina builder Docker image $fullImageName built"
-}
-
 
 function Save-Image {
     param(
