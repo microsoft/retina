@@ -57,7 +57,6 @@ func (u *UpgradeRetinaHelmChart) Run() error {
 
 	rel, err := client.Run(u.ReleaseName, chart, values)
 	if err != nil {
-		PrintPodLogs(u.KubeConfigFilePath, u.Namespace, "k8s-app=retina")
 		return fmt.Errorf("failed to upgrade chart: %w", err)
 	}
 

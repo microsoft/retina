@@ -20,8 +20,6 @@ type validateBasicDNSRequestMetrics struct {
 	NumResponse string
 	Query       string
 	QueryType   string
-	ReturnCode  string
-	Response    string
 }
 
 func (v *validateBasicDNSRequestMetrics) Run() error {
@@ -31,8 +29,8 @@ func (v *validateBasicDNSRequestMetrics) Run() error {
 		"num_response": v.NumResponse,
 		"query":        v.Query,
 		"query_type":   v.QueryType,
-		"return_code":  v.ReturnCode,
-		"response":     v.Response,
+		"return_code":  "",
+		"response":     "",
 	}
 
 	err := prom.CheckMetric(metricsEndpoint, dnsBasicRequestCountMetricName, validBasicDNSRequestMetricLabels)

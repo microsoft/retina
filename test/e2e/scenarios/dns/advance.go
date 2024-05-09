@@ -18,36 +18,34 @@ var (
 )
 
 type ValidateAdvanceDNSRequestMetrics struct {
-	IP           string
 	Namespace    string
 	NumResponse  string
 	PodName      string
 	Query        string
 	QueryType    string
-	Response     string
-	ReturnCode   string
 	WorkloadKind string
 	WorkloadName string
+
+	KubeConfigFilePath string
 }
 
 func (v *ValidateAdvanceDNSRequestMetrics) Run() error {
 	metricsEndpoint := fmt.Sprintf("http://localhost:%d/metrics", common.RetinaPort)
 	// Get Pod IP address
-	podIP, err := kubernetes.GetPodIP("", v.Namespace, v.PodName)
+	podIP, err := kubernetes.GetPodIP(v.KubeConfigFilePath, v.Namespace, v.PodName)
 	if err != nil {
 		return errors.Wrapf(err, "failed to get pod IP address")
 	}
-	v.IP = podIP
 
 	validateAdvanceDNSRequestMetrics := map[string]string{
-		"ip":            v.IP,
+		"ip":            podIP,
 		"namespace":     v.Namespace,
 		"num_response":  v.NumResponse,
 		"podname":       v.PodName,
 		"query":         v.Query,
 		"query_type":    v.QueryType,
-		"response":      v.Response,
-		"return_code":   v.ReturnCode,
+		"response":      "",
+		"return_code":   "",
 		"workload_kind": v.WorkloadKind,
 		"workload_name": v.WorkloadName,
 	}
@@ -70,7 +68,6 @@ func (v *ValidateAdvanceDNSRequestMetrics) Stop() error {
 }
 
 type ValidateAdvanceDNSResponseMetrics struct {
-	IP           string
 	Namespace    string
 	NumResponse  string
 	PodName      string
@@ -80,19 +77,20 @@ type ValidateAdvanceDNSResponseMetrics struct {
 	ReturnCode   string
 	WorkloadKind string
 	WorkloadName string
+
+	KubeConfigFilePath string
 }
 
 func (v *ValidateAdvanceDNSResponseMetrics) Run() error {
 	metricsEndpoint := fmt.Sprintf("http://localhost:%d/metrics", common.RetinaPort)
 	// Get Pod IP address
-	podIP, err := kubernetes.GetPodIP("", v.Namespace, v.PodName)
+	podIP, err := kubernetes.GetPodIP(v.KubeConfigFilePath, v.Namespace, v.PodName)
 	if err != nil {
 		return errors.Wrapf(err, "failed to get pod IP address")
 	}
-	v.IP = podIP
 
 	validateAdvanceDNSResponseMetrics := map[string]string{
-		"ip":            v.IP,
+		"ip":            podIP,
 		"namespace":     v.Namespace,
 		"num_response":  v.NumResponse,
 		"podname":       v.PodName,

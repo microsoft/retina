@@ -5,12 +5,12 @@ import (
 	"github.com/microsoft/retina/test/e2e/framework/generic"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/types"
-	"github.com/microsoft/retina/test/e2e/scenarios/retina/dns"
-	"github.com/microsoft/retina/test/e2e/scenarios/retina/drop"
-	tcp "github.com/microsoft/retina/test/e2e/scenarios/retina/tcp"
+	"github.com/microsoft/retina/test/e2e/scenarios/dns"
+	"github.com/microsoft/retina/test/e2e/scenarios/drop"
+	tcp "github.com/microsoft/retina/test/e2e/scenarios/tcp"
 )
 
-func CreateTestInfra(subID, clusterName, location string) *types.Job {
+func CreateTestInfra(subID, clusterName, location, kubeConfigFilePath string) *types.Job {
 	job := types.NewJob("Create e2e test infrastructure")
 
 	job.AddStep(&azure.CreateResourceGroup{
@@ -37,7 +37,7 @@ func CreateTestInfra(subID, clusterName, location string) *types.Job {
 	}, nil)
 
 	job.AddStep(&azure.GetAKSKubeConfig{
-		KubeConfigFilePath: "./test.pem",
+		KubeConfigFilePath: kubeConfigFilePath,
 	}, nil)
 
 	job.AddStep(&generic.LoadFlags{
@@ -61,13 +61,15 @@ func DeleteTestInfra(subID, clusterName, location string) *types.Job {
 	return job
 }
 
-func InstallAndTestRetinaWithBasicMetrics() *types.Job {
+func InstallAndTestRetinaWithBasicMetrics(kubeConfigFilePath, chartPath string) *types.Job {
 	job := types.NewJob("Install and test Retina with basic metrics")
 
 	job.AddStep(&kubernetes.InstallHelmChart{
-		Namespace:   "kube-system",
-		ReleaseName: "retina",
-		ChartPath:   "../../../deploy/manifests/controller/helm/retina/",
+		Namespace:          "kube-system",
+		ReleaseName:        "retina",
+		KubeConfigFilePath: kubeConfigFilePath,
+		ChartPath:          chartPath,
+		TagEnv:             generic.DefaultTagEnv,
 	}, nil)
 
 	job.AddScenario(drop.ValidateDropMetric())
@@ -79,17 +81,19 @@ func InstallAndTestRetinaWithBasicMetrics() *types.Job {
 	return job
 }
 
-func UpgradeAndTestRetinaWithAdvancedMetrics() *types.Job {
+func UpgradeAndTestRetinaWithAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFilePath string) *types.Job {
 	job := types.NewJob("Install and test Retina with advanced metrics")
 	// enable advanced metrics
 	job.AddStep(&kubernetes.UpgradeRetinaHelmChart{
-		Namespace:   "kube-system",
-		ReleaseName: "retina",
-		ChartPath:   "../../../deploy/manifests/controller/helm/retina/",
-		ValuesFile:  "../../profiles/localctx/values.yaml",
+		Namespace:          "kube-system",
+		ReleaseName:        "retina",
+		KubeConfigFilePath: kubeConfigFilePath,
+		ChartPath:          chartPath,
+		TagEnv:             generic.DefaultTagEnv,
+		ValuesFile:         valuesFilePath,
 	}, nil)
 
-	job.AddScenario(dns.ValidateAdvanceDNSMetrics())
+	job.AddScenario(dns.ValidateAdvanceDNSMetrics(kubeConfigFilePath))
 
 	return job
 }

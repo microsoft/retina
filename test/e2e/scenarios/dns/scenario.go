@@ -56,8 +56,9 @@ func ValidateBasicDNSMetrics() *types.Scenario {
 				NumResponse: "0",
 				Query:       "kubernetes.default.svc.cluster.local.",
 				QueryType:   "A",
-				ReturnCode:  "",
-				Response:    "",
+			},
+			Opts: &types.StepOptions{
+				SkipSavingParamatersToJob: true,
 			},
 		},
 		{
@@ -67,6 +68,9 @@ func ValidateBasicDNSMetrics() *types.Scenario {
 				QueryType:   "A",
 				ReturnCode:  "No Error",
 				Response:    "10.0.0.1",
+			},
+			Opts: &types.StepOptions{
+				SkipSavingParamatersToJob: true,
 			},
 		},
 		{
@@ -79,7 +83,7 @@ func ValidateBasicDNSMetrics() *types.Scenario {
 }
 
 // ValidateAdvanceDNSMetrics validates the advanced DNS metrics
-func ValidateAdvanceDNSMetrics() *types.Scenario {
+func ValidateAdvanceDNSMetrics(kubeConfigFilePath string) *types.Scenario {
 	name := "Validate Advance DNS Metrics"
 	steps := []*types.StepWrapper{
 		{
@@ -118,28 +122,34 @@ func ValidateAdvanceDNSMetrics() *types.Scenario {
 		},
 		{
 			Step: &ValidateAdvanceDNSRequestMetrics{
-				Namespace:    "kube-system",
-				NumResponse:  "0",
-				PodName:      "agnhost-b-0",
-				Query:        "kubernetes.default.svc.cluster.local.",
-				QueryType:    "A",
-				Response:     "",
-				ReturnCode:   "",
-				WorkloadKind: "ReplicaSet",
-				WorkloadName: "agnhost-b",
+				Namespace:          "kube-system",
+				NumResponse:        "0",
+				PodName:            "agnhost-b-0",
+				Query:              "kubernetes.default.svc.cluster.local.",
+				QueryType:          "A",
+				WorkloadKind:       "ReplicaSet",
+				WorkloadName:       "agnhost-b",
+				KubeConfigFilePath: kubeConfigFilePath,
+			},
+			Opts: &types.StepOptions{
+				SkipSavingParamatersToJob: true,
 			},
 		},
 		{
 			Step: &ValidateAdvanceDNSResponseMetrics{
-				Namespace:    "kube-system",
-				NumResponse:  "1",
-				PodName:      "agnhost-b-0",
-				Query:        "kubernetes.default.svc.cluster.local.",
-				QueryType:    "A",
-				Response:     "10.0.0.1",
-				ReturnCode:   "NOERROR",
-				WorkloadKind: "ReplicaSet",
-				WorkloadName: "agnhost-b",
+				Namespace:          "kube-system",
+				NumResponse:        "1",
+				PodName:            "agnhost-b-0",
+				Query:              "kubernetes.default.svc.cluster.local.",
+				QueryType:          "A",
+				Response:           "10.0.0.1",
+				ReturnCode:         "NOERROR",
+				WorkloadKind:       "ReplicaSet",
+				WorkloadName:       "agnhost-b",
+				KubeConfigFilePath: kubeConfigFilePath,
+			},
+			Opts: &types.StepOptions{
+				SkipSavingParamatersToJob: true,
 			},
 		},
 		{
