@@ -19,6 +19,7 @@ RUN go mod verify
 ADD . .
 RUN cp -r c:/pktmon/ pkg/plugin/windows/pktmon/packetmonitorsupport/
 RUN ls pkg/plugin/windows/pktmon/packetmonitorsupport/
+RUN Write-Host "Building building version $VERSION"
 RUN go build -v -o controller.exe -ldflags "-X main.version="$VERSION" -X "main.applicationInsightsID"="$APP_INSIGHTS_ID"" .\\controller
 RUN go build -v -o /usr/bin/captureworkload.exe ./captureworkload/
 
