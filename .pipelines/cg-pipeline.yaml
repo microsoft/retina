@@ -85,7 +85,7 @@ stages:
                 PLATFORM=$(platform)/$(arch) \
                 IMAGE_REGISTRY=ghcr.io/microsoft  \
                 BUILDX_ACTION="-o type=docker,dest=./output/images/$(platform)/$(arch)/retina-$(target)-$VERSION.tar"
-                make manifest-skopeo-archive IMAGE_ARCHIVE_DIR=$(Build.ArtifactStagingDirectory)/images
+            # make manifest-skopeo-archive IMAGE_ARCHIVE_DIR=$(Build.ArtifactStagingDirectory)/images
             displayName: "Build Retina Linux Images"
 
           - bash: |
