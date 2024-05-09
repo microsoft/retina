@@ -10,7 +10,7 @@ schedules:
         - vakr/newadocg
 stages:
   - stage: setup
-    displayName: Retina Setup
+    displayName: Linux Buildx
     jobs:
       - job: env
         displayName: Setup
@@ -104,7 +104,7 @@ stages:
         pool:
           name: "$(BUILD_POOL_NAME_DEFAULT)"
         strategy:
-          matrix:            
+          matrix:
             operator-linux-amd64:
               platform: "linux"
               arch: "amd64"
@@ -136,17 +136,13 @@ stages:
               pathtoPublish: "$(Build.ArtifactStagingDirectory)"
             condition: succeeded()
 
-      - job: retinaagentimageswin
-        displayName: Build Retina Windows Images
+      # windows 2019 only in buildx, windows server 2022 requires native windows container build because of cgo
+      - job: retinaagentimageswin2019
+        displayName: Build Retina Windows Images (BuildX)
         pool:
           name: "$(BUILD_POOL_NAME_DEFAULT)"
         strategy:
           matrix:
-            windows-ltsc2022:
-              platform: "windows"
-              arch: "amd64"
-              year: "2022"
-
             windows-ltsc2019:
               platform: "windows"
               arch: "amd64"
@@ -176,4 +172,26 @@ stages:
             inputs:
               artifactName: output
               pathtoPublish: "$(Build.ArtifactStagingDirectory)"
+            condition: succeeded()
+
+      - job: windowsnative
+        displayName: Build Retina Windows Images (Native)
+        pool:
+          name: "$(BUILD_POOL_NAME_WINDOWS_DEFAULT)"
+        steps:
+          - checkout: self
+            fetchTags: true
+          - task: PowerShell@2
+            displayName: "Build Retina Windows Image (LTSC2022)"
+            inputs:
+              targetType: "inline"
+              script: |
+                Import-Module -Name "$(Build.SourcesDirectory)\windows\docker\DockerBuildModule.psm1" -Force
+                Build-RetinaAgentImage -fullBuilderImageName $(WINDOWS_BUILDER_IMAGE) -registry $(BUILD_REGISTRY)
+                Save-Image -imageName retina-agent -registry $(BUILD_REGISTRY)
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              artifactName: output
+              pathtoPublish: ./output
             condition: succeeded()
