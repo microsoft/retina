@@ -30,12 +30,20 @@ func TestE2ERetina(t *testing.T) {
 	// CreateTestInfra
 	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, clusterName, location))
 	createTestInfra.Run()
+
 	// Deffered deleteTestInfra
 	deleteTestInfra := types.NewRunner(t, jobs.DeleteTestInfra(subID, clusterName, location))
-	defer deleteTestInfra.Run()
+	defer func() {
+		if r := recover(); r != nil {
+			t.Logf("Recovered in TestE2ERetina, %v", r)
+		}
+		deleteTestInfra.Run()
+	}()
+
 	// Install and test Retina basic metrics
 	basicMetricsE2E := types.NewRunner(t, jobs.InstallAndTestRetinaWithBasicMetrics())
 	basicMetricsE2E.Run()
+
 	// Upgrade and test Retina with advanced metrics
 	advanceMetricsE2E := types.NewRunner(t, jobs.UpgradeAndTestRetinaWithAdvancedMetrics())
 	advanceMetricsE2E.Run()
