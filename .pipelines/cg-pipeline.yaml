@@ -7,7 +7,6 @@ schedules:
     branches:
       include:
         - main
-        - vakr/newadocg
 stages:
   - stage: setup
     displayName: Linux Buildx
@@ -84,7 +83,7 @@ stages:
                 IMAGE_NAMESPACE=retina \
                 PLATFORM=$(platform)/$(arch) \
                 IMAGE_REGISTRY=ghcr.io/microsoft  \
-                BUILDX_ACTION="-o type=docker,dest=./output/images/$(platform)/$(arch)/retina-$(target)-$VERSION.tar"
+                BUILDX_ACTION="-o type=docker,dest=./output/images/$(platform)/$(arch)/retina-$(target)-$VERSION-$(platform)-$(arch).tar"
             # make manifest-skopeo-archive IMAGE_ARCHIVE_DIR=$(Build.ArtifactStagingDirectory)/images
             displayName: "Build Retina Linux Images"
 
@@ -122,7 +121,7 @@ stages:
                 IMAGE_NAMESPACE=retina \
                 PLATFORM=$(platform)/$(arch) \
                 IMAGE_REGISTRY=ghcr.io/microsoft  \
-                BUILDX_ACTION="-o type=docker,dest=./output/images/$(platform)/$(arch)/retina-operator-$VERSION.tar"
+                BUILDX_ACTION="-o type=docker,dest=./output/images/$(platform)/$(arch)/retina-operator-$VERSION-$(platform)-$(arch).tar"
             displayName: "Build Retina Operator Linux Images"
 
           - bash: |
@@ -160,7 +159,7 @@ stages:
                 TARGET=final \
                 WINDOWS_YEARS=$(year) \
                 TAG=$(make version) \
-                BUILDX_ACTION="-o type=docker,dest=./output/images/$(platform)/$(arch)/$(year)/retina-agent-$VERSION-windows-ltsc$(year).tar"
+                BUILDX_ACTION="-o type=docker,dest=./output/images/$(platform)/$(arch)/$(year)/retina-agent-$VERSION-windows-ltsc$(year)-$(arch).tar"
             displayName: "Build Retina Windows Image"
 
           - task: PublishBuildArtifacts@1

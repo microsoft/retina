@@ -16,12 +16,7 @@ function Get-GitVersion {
     }
     else {
         # If the current commit is not tagged, return the current tag followed by the SHA
-        if ($tag) {
-            return "$tag-$sha"
-        }
-        else {
-            return $sha
-        }
+        return $sha
     }
 }
 
@@ -29,7 +24,7 @@ function Get-GitVersion {
 function Build-RetinaAgentImage {
     param(
         [string]$imageName = "retina-agent",
-        [string]$tag = "$(Get-GitVersion)-windows-amd64",
+        [string]$tag = "$(Get-GitVersion)-windows-ltsc2022-amd64",
         [string]$appInsightsID = "",
         [Parameter(Mandatory = $true)][string]$fullBuilderImageName = "",
         [Parameter(Mandatory = $true)][string]$registry = ""
@@ -47,19 +42,14 @@ function Build-RetinaAgentImage {
     Write-Host "Building Retina agent Docker image $fullImageName with builder image $fullBuilderImageName"
 
     # Building the Retina agent Docker image with a build argument
-    docker build -f $filePath `
-    -t $fullImageName `
-    --target final `
-    --build-arg BUILDER_IMAGE="$fullBuilderImageName" `
-    --build-arg VERSION="$version" `
-    --build-arg APP_INSIGHTS_ID="$appInsightsID" .
+    docker build -f $filePath -t $fullImageName --target final --build-arg BUILDER_IMAGE="$fullBuilderImageName" --build-arg VERSION=$version --build-arg APP_INSIGHTS_ID="$appInsightsID" .
 }
 
 
 function Save-Image {
     param(
         [Parameter(Mandatory = $true)][string]$imageName,
-        [string]$version = $(Get-GitVersion),
+        [string]$tag = "$(Get-GitVersion)-windows-ltsc2022-amd64",
         [Parameter(Mandatory = $true)][string]$registry = "",
         [string]$directory = "./output/images/windows/amd64/2022"
     )
@@ -67,9 +57,9 @@ function Save-Image {
 
     New-Item -ItemType Directory -Path $directory -Force
 
-    $savePath = "$directory/$imageName-windows-amd64-$version.tar"
+    $savePath = "$directory/$imageName-$tag.tar"
 
-    $fullImageName = "${registry}/${imageName}:$version"
+    $fullImageName = "${registry}/${imageName}:$tag"
 
     Write-Host "Saving Docker image $fullImageName to $savePath"
 
