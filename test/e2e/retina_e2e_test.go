@@ -44,12 +44,12 @@ func TestE2ERetina(t *testing.T) {
 	createTestInfra.Run()
 
 	// Hacky way to ensure that the test infra is deleted even if the test panics
-	// defer func() {
-	// 	if r := recover(); r != nil {
-	// 		t.Logf("Recovered in TestE2ERetina, %v", r)
-	// 	}
-	// 	_ = jobs.DeleteTestInfra(subID, clusterName, location).Run()
-	// }()
+	defer func() {
+		if r := recover(); r != nil {
+			t.Logf("Recovered in TestE2ERetina, %v", r)
+		}
+		_ = jobs.DeleteTestInfra(subID, clusterName, location).Run()
+	}()
 
 	// Install and test Retina basic metrics
 	basicMetricsE2E := types.NewRunner(t, jobs.InstallAndTestRetinaWithBasicMetrics(kubeConfigFilePath, chartPath))
