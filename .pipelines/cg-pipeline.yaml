@@ -159,7 +159,7 @@ stages:
                 TARGET=final \
                 WINDOWS_YEARS=$(year) \
                 TAG=$(make version) \
-                BUILDX_ACTION="-o type=docker,dest=./output/images/$(platform)/$(arch)/$(year)/retina-agent-$VERSION-windows-ltsc$(year).tar"
+                BUILDX_ACTION="-o type=docker,dest=./output/images/$(platform)/$(arch)/$(year)/retina-agent-$VERSION-windows-ltsc$(year)-$(arch).tar"
             displayName: "Build Retina Windows Image"
 
           - task: PublishBuildArtifacts@1

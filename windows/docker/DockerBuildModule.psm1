@@ -16,12 +16,7 @@ function Get-GitVersion {
     }
     else {
         # If the current commit is not tagged, return the current tag followed by the SHA
-        if ($tag) {
-            return "$tag-$sha"
-        }
-        else {
-            return $sha
-        }
+        return $sha
     }
 }
 
