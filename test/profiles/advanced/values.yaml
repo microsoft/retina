@@ -3,3 +3,4 @@ enableAnnotations: true
 operator:
   enabled: true
   enableRetinaEndpoint: true
+  
