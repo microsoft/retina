@@ -16,6 +16,7 @@ import (
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/gadgets/trace/tcpretrans/tracer"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/gadgets/trace/tcpretrans/types"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/socketenricher"
+	"github.com/inspektor-gadget/inspektor-gadget/pkg/utils/host"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
@@ -56,6 +57,10 @@ func (t *tcpretrans) Init() error {
 	}
 
 	// Create tracer. In this case no parameters are passed.
+	if err := host.Init(host.Config{}); err != nil {
+		t.l.Error("failed to init host", zap.Error(err))
+		return fmt.Errorf("failed to init host: %w", err)
+	}
 	t.tracer = &tracer.Tracer{}
 	t.tracer.SetEventHandler(t.eventHandler)
 	socketEnricher, err := socketenricher.NewSocketEnricher()
