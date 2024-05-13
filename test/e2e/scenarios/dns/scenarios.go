@@ -70,6 +70,7 @@ func ValidateBasicDNSMetrics(scenarioName string, req *RequestValidationParams, 
 				LabelSelector:         "k8s-app=retina",
 				LocalPort:             strconv.Itoa(common.RetinaPort),
 				RemotePort:            strconv.Itoa(common.RetinaPort),
+				Endpoint:              "metrics",
 				OptionalLabelAffinity: "app=" + agnhostName, // port forward to a pod on a node that also has this pod with this label, assuming same namespace
 			},
 			Opts: &types.StepOptions{
@@ -113,6 +114,11 @@ func ValidateBasicDNSMetrics(scenarioName string, req *RequestValidationParams, 
 				SkipSavingParamatersToJob: true,
 			},
 		},
+		{
+			Step: &types.Sleep{
+				Duration: sleepDelay,
+			},
+		},
 	}
 	return types.NewScenario(scenarioName, steps...)
 }
@@ -152,6 +158,7 @@ func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParam
 				LabelSelector:         "k8s-app=retina",
 				LocalPort:             strconv.Itoa(common.RetinaPort),
 				RemotePort:            strconv.Itoa(common.RetinaPort),
+				Endpoint:              "metrics",
 				OptionalLabelAffinity: "app=" + agnhostName, // port forward to a pod on a node that also has this pod with this label, assuming same namespace
 			},
 			Opts: &types.StepOptions{
@@ -203,6 +210,11 @@ func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParam
 				ResourceNamespace: "kube-system",
 			}, Opts: &types.StepOptions{
 				SkipSavingParamatersToJob: true,
+			},
+		},
+		{
+			Step: &types.Sleep{
+				Duration: sleepDelay,
 			},
 		},
 	}
