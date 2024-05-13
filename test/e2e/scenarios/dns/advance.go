@@ -89,6 +89,10 @@ func (v *ValidateAdvanceDNSResponseMetrics) Run() error {
 		return errors.Wrapf(err, "failed to get pod IP address")
 	}
 
+	if v.Response == EmptyResponse {
+		v.Response = ""
+	}
+
 	validateAdvanceDNSResponseMetrics := map[string]string{
 		"ip":            podIP,
 		"namespace":     v.Namespace,

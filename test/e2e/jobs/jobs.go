@@ -61,7 +61,7 @@ func DeleteTestInfra(subID, clusterName, location string) *types.Job {
 	return job
 }
 
-func InstallAndTestRetinaWithBasicMetrics(kubeConfigFilePath, chartPath string) *types.Job {
+func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string) *types.Job {
 	job := types.NewJob("Install and test Retina with basic metrics")
 
 	job.AddStep(&kubernetes.InstallHelmChart{
@@ -76,13 +76,56 @@ func InstallAndTestRetinaWithBasicMetrics(kubeConfigFilePath, chartPath string) 
 
 	job.AddScenario(tcp.ValidateTCPMetrics())
 
-	job.AddScenario(dns.ValidateBasicDNSMetrics())
+	dnsScenarios := []struct {
+		name string
+		req  *dns.RequestValidationParams
+		resp *dns.ResponseValidationParams
+	}{
+		{
+			name: "Validate basic DNS request and response metrics for a valid domain",
+			req: &dns.RequestValidationParams{
+				NumResponse: "0",
+				Query:       "kubernetes.default.svc.cluster.local.",
+				QueryType:   "A",
+				Command:     "nslookup kubernetes.default",
+				ExpectError: false,
+			},
+			resp: &dns.ResponseValidationParams{
+				NumResponse: "1",
+				Query:       "kubernetes.default.svc.cluster.local.",
+				QueryType:   "A",
+				ReturnCode:  "No Error",
+				Response:    "10.0.0.1",
+			},
+		},
+		{
+			name: "Validate basic DNS request and response metrics for a non-existent domain",
+			req: &dns.RequestValidationParams{
+				NumResponse: "0",
+				Query:       "some.non.existent.domain.",
+				QueryType:   "A",
+				Command:     "nslookup some.non.existent.domain",
+				ExpectError: true,
+			},
+			resp: &dns.ResponseValidationParams{
+				NumResponse: "0",
+				Query:       "some.non.existent.domain.",
+				QueryType:   "A",
+				Response:    dns.EmptyResponse, // hacky way to bypass the framework for now
+				ReturnCode:  "Non-Existent Domain",
+			},
+		},
+	}
+
+	for _, scenario := range dnsScenarios {
+		job.AddScenario(dns.ValidateBasicDNSMetrics(scenario.name, scenario.req, scenario.resp))
+	}
 
 	return job
 }
 
-func UpgradeAndTestRetinaWithAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFilePath string) *types.Job {
-	job := types.NewJob("Install and test Retina with advanced metrics")
+func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFilePath string) *types.Job {
+	job := types.NewJob("Upgrade and test Retina with advanced metrics")
 	// enable advanced metrics
 	job.AddStep(&kubernetes.UpgradeRetinaHelmChart{
 		Namespace:          "kube-system",
@@ -93,7 +136,50 @@ func UpgradeAndTestRetinaWithAdvancedMetrics(kubeConfigFilePath, chartPath, valu
 		ValuesFile:         valuesFilePath,
 	}, nil)
 
-	job.AddScenario(dns.ValidateAdvanceDNSMetrics(kubeConfigFilePath))
+	dnsScenarios := []struct {
+		name string
+		req  *dns.RequestValidationParams
+		resp *dns.ResponseValidationParams
+	}{
+		{
+			name: "Validate advanced DNS request and response metrics for a valid domain",
+			req: &dns.RequestValidationParams{
+				NumResponse: "0",
+				Query:       "kubernetes.default.svc.cluster.local.",
+				QueryType:   "A",
+				Command:     "nslookup kubernetes.default",
+				ExpectError: false,
+			},
+			resp: &dns.ResponseValidationParams{
+				NumResponse: "1",
+				Query:       "kubernetes.default.svc.cluster.local.",
+				QueryType:   "A",
+				ReturnCode:  "NOERROR",
+				Response:    "10.0.0.1",
+			},
+		},
+		{
+			name: "Validate advanced DNS request and response metrics for a non-existent domain",
+			req: &dns.RequestValidationParams{
+				NumResponse: "0",
+				Query:       "some.non.existent.domain.",
+				QueryType:   "A",
+				Command:     "nslookup some.non.existent.domain.",
+				ExpectError: true,
+			},
+			resp: &dns.ResponseValidationParams{
+				NumResponse: "0",
+				Query:       "some.non.existent.domain.",
+				QueryType:   "A",
+				Response:    dns.EmptyResponse, // hacky way to bypass the framework for now
+				ReturnCode:  "NXDOMAIN",
+			},
+		},
+	}
+
+	for _, scenario := range dnsScenarios {
+		job.AddScenario(dns.ValidateAdvancedDNSMetrics(scenario.name, scenario.req, scenario.resp, kubeConfigFilePath))
+	}
 
 	return job
 }

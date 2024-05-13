@@ -24,5 +24,8 @@ func GetPodIP(kubeConfigFilePath, namespace, podName string) (string, error) {
 	if err != nil {
 		return "", errors.Wrapf(err, "error getting pod %s in namespace %s", podName, namespace)
 	}
+	if pod.Status.PodIP == "" {
+		return "", errors.Errorf("pod %s in namespace %s has no IP", podName, namespace)
+	}
 	return pod.Status.PodIP, nil
 }

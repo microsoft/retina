@@ -50,7 +50,7 @@ func (v *validateBasicDNSRequestMetrics) Stop() error {
 	return nil
 }
 
-type ValidateBasicDNSResponseMetrics struct {
+type validateBasicDNSResponseMetrics struct {
 	NumResponse string
 	Query       string
 	QueryType   string
@@ -58,8 +58,12 @@ type ValidateBasicDNSResponseMetrics struct {
 	Response    string
 }
 
-func (v *ValidateBasicDNSResponseMetrics) Run() error {
+func (v *validateBasicDNSResponseMetrics) Run() error {
 	metricsEndpoint := fmt.Sprintf("http://localhost:%d/metrics", common.RetinaPort)
+
+	if v.Response == EmptyResponse {
+		v.Response = ""
+	}
 
 	validBasicDNSResponseMetricLabels := map[string]string{
 		"num_response": v.NumResponse,
@@ -78,10 +82,10 @@ func (v *ValidateBasicDNSResponseMetrics) Run() error {
 	return nil
 }
 
-func (v *ValidateBasicDNSResponseMetrics) Prevalidate() error {
+func (v *validateBasicDNSResponseMetrics) Prevalidate() error {
 	return nil
 }
 
-func (v *ValidateBasicDNSResponseMetrics) Stop() error {
+func (v *validateBasicDNSResponseMetrics) Stop() error {
 	return nil
 }

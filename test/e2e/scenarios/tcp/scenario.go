@@ -3,6 +3,7 @@ package flow
 import (
 	"time"
 
+	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	k8s "github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/types"
 )
@@ -83,6 +84,15 @@ func ValidateTCPMetrics() *types.Scenario {
 		{
 			Step: &types.Stop{
 				BackgroundID: "drop-flow-forward",
+			},
+		},
+		{
+			Step: &kubernetes.DeleteKubernetesResource{
+				ResourceType:      kubernetes.TypeString(kubernetes.StatefulSet),
+				ResourceName:      "agnhost-a",
+				ResourceNamespace: "kube-system",
+			}, Opts: &types.StepOptions{
+				SkipSavingParamatersToJob: true,
 			},
 		},
 	}
