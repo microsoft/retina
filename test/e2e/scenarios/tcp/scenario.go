@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
-	k8s "github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/types"
 )
 
@@ -20,19 +19,19 @@ func ValidateTCPMetrics() *types.Scenario {
 	Name := "Flow Metrics"
 	Steps := []*types.StepWrapper{
 		{
-			Step: &k8s.CreateKapingerDeployment{
+			Step: &kubernetes.CreateKapingerDeployment{
 				KapingerNamespace: "kube-system",
 				KapingerReplicas:  "1",
 			},
 		},
 		{
-			Step: &k8s.CreateAgnhostStatefulSet{
+			Step: &kubernetes.CreateAgnhostStatefulSet{
 				AgnhostName:      "agnhost-a",
 				AgnhostNamespace: "kube-system",
 			},
 		},
 		{
-			Step: &k8s.ExecInPod{
+			Step: &kubernetes.ExecInPod{
 				PodName:      "agnhost-a-0",
 				PodNamespace: "kube-system",
 				Command:      "curl -s -m 5 bing.com",
@@ -46,7 +45,7 @@ func ValidateTCPMetrics() *types.Scenario {
 			},
 		},
 		{
-			Step: &k8s.ExecInPod{
+			Step: &kubernetes.ExecInPod{
 				PodName:      "agnhost-a-0",
 				PodNamespace: "kube-system",
 				Command:      "curl -s -m 5 bing.com",
@@ -55,7 +54,7 @@ func ValidateTCPMetrics() *types.Scenario {
 			},
 		},
 		{
-			Step: &k8s.PortForward{
+			Step: &kubernetes.PortForward{
 				LabelSelector:         "k8s-app=retina",
 				Namespace:             "kube-system",
 				LocalPort:             "10093",
