@@ -116,7 +116,6 @@ func (dr *dropReason) Compile(ctx context.Context) error {
 }
 
 func (dr *dropReason) Init() error {
-
 	err := rlimit.RemoveMemlock()
 	if err != nil {
 		dr.l.Error("RemoveMemLock failed:%w", zap.Error(err))

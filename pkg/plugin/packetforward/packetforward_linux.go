@@ -131,14 +131,13 @@ func (p *packetForward) Compile(ctx context.Context) error {
 }
 
 func (p *packetForward) Init() error {
-
 	err := rlimit.RemoveMemlock()
 	if err != nil {
 		p.l.Error("RemoveMemLock failed:%w", zap.Error(err))
 		return err
 	}
 
-	objs := &packetforwardObjects{} //nolint:typecheck
+	objs := &packetforwardObjects{}
 
 	err = loadPacketforwardObjects(objs, nil)
 	if err != nil {
