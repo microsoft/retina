@@ -116,29 +116,16 @@ func (dr *dropReason) Compile(ctx context.Context) error {
 }
 
 func (dr *dropReason) Init() error {
-	var err error
 
-	if err = rlimit.RemoveMemlock(); err != nil {
+	err := rlimit.RemoveMemlock()
+	if err != nil {
 		dr.l.Error("RemoveMemLock failed:%w", zap.Error(err))
 		return err
 	}
 
-	// Get the absolute path to this file during runtime.
-	dir, err := absPath()
-	if err != nil {
-		return err
-	}
-
-	bpfOutputFile := fmt.Sprintf("%s/%s", dir, bpfObjectFileName)
-
-	objs := &kprobeObjects{} //nolint:typecheck
-	spec, err := ebpf.LoadCollectionSpec(bpfOutputFile)
-	if err != nil {
-		return err
-	}
-
+	objs := &kprobeObjects{}
 	// TODO remove the opts
-	if err := spec.LoadAndAssign(objs, &ebpf.CollectionOptions{
+	if err = loadKprobeObjects(objs, &ebpf.CollectionOptions{
 		Programs: ebpf.ProgramOptions{
 			LogLevel: 2,
 		},

@@ -17,7 +17,6 @@ import (
 	kcfg "github.com/microsoft/retina/pkg/config"
 
 	hubblev1 "github.com/cilium/cilium/pkg/hubble/api/v1"
-	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/rlimit"
 	"github.com/microsoft/retina/pkg/loader"
 	"github.com/microsoft/retina/pkg/log"
@@ -132,28 +131,18 @@ func (p *packetForward) Compile(ctx context.Context) error {
 }
 
 func (p *packetForward) Init() error {
-	if err := rlimit.RemoveMemlock(); err != nil {
+
+	err := rlimit.RemoveMemlock()
+	if err != nil {
 		p.l.Error("RemoveMemLock failed:%w", zap.Error(err))
 		return err
 	}
 
-	// Get the absolute path to this file during runtime.
-	dir, err := absPath()
-	if err != nil {
-		return err
-	}
-
-	bpfOutputFile := fmt.Sprintf("%s/%s", dir, bpfObjectFileName)
-
 	objs := &packetforwardObjects{} //nolint:typecheck
-	spec, err := ebpf.LoadCollectionSpec(bpfOutputFile)
-	if err != nil {
-		p.l.Error("Error loading collection specs: %w", zap.Error(err))
-		return err
-	}
 
-	if err := spec.LoadAndAssign(objs, nil); err != nil {
-		p.l.Error("Error assigning specs: %w", zap.Error(err))
+	err = loadPacketforwardObjects(objs, nil)
+	if err != nil {
+		p.l.Error("Error loading packetforward objects: %w", zap.Error(err))
 		return err
 	}
 
