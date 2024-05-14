@@ -133,7 +133,7 @@ func (p *packetForward) Compile(ctx context.Context) error {
 func (p *packetForward) Init() error {
 	err := rlimit.RemoveMemlock()
 	if err != nil {
-		p.l.Error("RemoveMemLock failed:%w", zap.Error(err))
+		p.l.Error("remove memlock failed", zap.Error(err))
 		return err
 	}
 
@@ -141,7 +141,7 @@ func (p *packetForward) Init() error {
 
 	err = loadPacketforwardObjects(objs, nil)
 	if err != nil {
-		p.l.Error("Error loading packetforward objects: %w", zap.Error(err))
+		p.l.Error("failed to load packetforward objects", zap.Error(err))
 		return err
 	}
 

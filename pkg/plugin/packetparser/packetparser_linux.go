@@ -115,7 +115,7 @@ func (p *packetParser) Init() error {
 
 	err := rlimit.RemoveMemlock()
 	if err != nil {
-		p.l.Error("RemoveMemLock failed:%w", zap.Error(err))
+		p.l.Error("remove memlock failed", zap.Error(err))
 		return err
 	}
 
@@ -126,7 +126,7 @@ func (p *packetParser) Init() error {
 			PinPath: plugincommon.FilterMapPath,
 		},
 	}); err != nil {
-		p.l.Error("Error loading objects: %w", zap.Error(err))
+		p.l.Error("failed to load packetparser objects", zap.Error(err))
 		return err
 	}
 	p.objs = objs

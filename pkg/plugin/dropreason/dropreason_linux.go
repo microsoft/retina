@@ -118,7 +118,7 @@ func (dr *dropReason) Compile(ctx context.Context) error {
 func (dr *dropReason) Init() error {
 	err := rlimit.RemoveMemlock()
 	if err != nil {
-		dr.l.Error("RemoveMemLock failed:%w", zap.Error(err))
+		dr.l.Error("remove memlock failed", zap.Error(err))
 		return err
 	}
 
@@ -132,7 +132,7 @@ func (dr *dropReason) Init() error {
 			PinPath: plugincommon.FilterMapPath,
 		},
 	}); err != nil {
-		dr.l.Error("Error loading objects: %w", zap.Error(err))
+		dr.l.Error("failed to load kprobe objects", zap.Error(err))
 		return err
 	}
 
