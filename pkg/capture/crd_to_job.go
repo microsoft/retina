@@ -252,6 +252,38 @@ func (translator *CaptureToPodTranslator) initJobTemplate(capture *retinav1alpha
 		translator.jobTemplate.Spec.Template.Spec.Containers[0].VolumeMounts = append(translator.jobTemplate.Spec.Template.Spec.Containers[0].VolumeMounts, secretVolumeMount)
 	}
 
+	if capture.Spec.OutputConfiguration.S3Upload != nil && capture.Spec.OutputConfiguration.S3Upload.SecretName != "" {
+		translator.l.Info("S3Upload is not empty")
+		secret, err := translator.kubeClient.CoreV1().Secrets(capture.Namespace).Get(context.Background(), capture.Spec.OutputConfiguration.S3Upload.SecretName, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			err := SecretNotFoundError{SecretName: capture.Spec.OutputConfiguration.S3Upload.SecretName, Namespace: capture.Namespace}
+			translator.l.Error(err.Error())
+			return err
+		}
+		if err != nil {
+			translator.l.Error("Failed to get secrets for Capture", zap.Error(err), zap.String("CaptureName", capture.Name), zap.String("secretName", capture.Spec.OutputConfiguration.S3Upload.SecretName))
+			return fmt.Errorf("failed to get secrets for Capture: %w", err)
+		}
+
+		secretVolume := corev1.Volume{
+			Name: capture.Spec.OutputConfiguration.S3Upload.SecretName,
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: secret.Name,
+				},
+			},
+		}
+		translator.jobTemplate.Spec.Template.Spec.Volumes = append(translator.jobTemplate.Spec.Template.Spec.Volumes, secretVolume)
+
+		secretVolumeMount := corev1.VolumeMount{
+			Name:      capture.Spec.OutputConfiguration.S3Upload.SecretName,
+			ReadOnly:  true,
+			MountPath: captureConstants.CaptureOutputLocationS3UploadSecretPath,
+		}
+
+		translator.jobTemplate.Spec.Template.Spec.Containers[0].VolumeMounts = append(translator.jobTemplate.Spec.Template.Spec.Containers[0].VolumeMounts, secretVolumeMount)
+	}
+
 	if capture.Spec.OutputConfiguration.PersistentVolumeClaim != nil && *capture.Spec.OutputConfiguration.PersistentVolumeClaim != "" {
 		translator.l.Info("PersistentVolumeClaim is not empty", zap.String("PersistentVolumeClaim", *capture.Spec.OutputConfiguration.PersistentVolumeClaim))
 
@@ -503,7 +535,10 @@ func (translator *CaptureToPodTranslator) validateCapture(capture *retinav1alpha
 		return fmt.Errorf("Neither duration nor maxCaptureSize is set to stop the capture")
 	}
 
-	if capture.Spec.OutputConfiguration.BlobUpload == nil && capture.Spec.OutputConfiguration.HostPath == nil && capture.Spec.OutputConfiguration.PersistentVolumeClaim == nil {
+	if capture.Spec.OutputConfiguration.BlobUpload == nil &&
+		capture.Spec.OutputConfiguration.HostPath == nil &&
+		capture.Spec.OutputConfiguration.PersistentVolumeClaim == nil &&
+		capture.Spec.OutputConfiguration.S3Upload == nil {
 		return fmt.Errorf("At least one output configuration should be set")
 	}
 	return nil
@@ -849,6 +884,12 @@ func (translator *CaptureToPodTranslator) obtainCaptureOutputEnv(outputConfigura
 	}
 	if outputConfiguration.PersistentVolumeClaim != nil {
 		outputEnv[captureConstants.CaptureOutputLocationEnvKeyPersistentVolumeClaim] = *outputConfiguration.PersistentVolumeClaim
+	}
+	if outputConfiguration.S3Upload != nil {
+		outputEnv[captureConstants.CaptureOutputLocationEnvKeyS3Endpoint] = outputConfiguration.S3Upload.Endpoint
+		outputEnv[captureConstants.CaptureOutputLocationEnvKeyS3Region] = outputConfiguration.S3Upload.Region
+		outputEnv[captureConstants.CaptureOutputLocationEnvKeyS3Bucket] = outputConfiguration.S3Upload.Bucket
+		outputEnv[captureConstants.CaptureOutputLocationEnvKeyS3Path] = outputConfiguration.S3Upload.Path
 	}
 
 	if len(outputEnv) == 0 && (outputConfiguration.BlobUpload == nil || *outputConfiguration.BlobUpload == "") {

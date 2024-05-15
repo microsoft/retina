@@ -1,7 +1,26 @@
 ARG OS_VERSION=ltsc2019
 
+# intermediate go generate stage
+# mcr.microsoft.com/oss/go/microsoft/golang:1.22.2-1-cbl-mariner2.0
+# mcr.microsoft.com/oss/go/microsoft/golang@sha256:87e7359c0b4b4e3ca0d4be7fe5099423ec3431d6c44021a84569dba71ac5463e
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:87e7359c0b4b4e3ca0d4be7fe5099423ec3431d6c44021a84569dba71ac5463e AS intermediate 
+ARG APP_INSIGHTS_ID # set to enable AI telemetry
+ARG GOARCH=amd64 # default to amd64
+ARG GOOS=linux # default to linux
+ENV CGO_ENABLED=0
+ENV GOARCH=${GOARCH}
+ENV GOOS=${GOOS}
+COPY . /go/src/github.com/microsoft/retina
+WORKDIR /go/src/github.com/microsoft/retina
+RUN if [ "$GOOS" = "linux" ] ; then \
+    tdnf install -y clang16 lld16 bpftool libbpf-devel; \
+    go generate -x /go/src/github.com/microsoft/retina/pkg/plugin/...; \
+    fi
+
 # capture binary
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.22 AS capture-bin
+# mcr.microsoft.com/oss/go/microsoft/golang:1.22.2-1-cbl-mariner2.0
+# mcr.microsoft.com/oss/go/microsoft/golang@sha256:87e7359c0b4b4e3ca0d4be7fe5099423ec3431d6c44021a84569dba71ac5463e
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:87e7359c0b4b4e3ca0d4be7fe5099423ec3431d6c44021a84569dba71ac5463e AS capture-bin
 ARG APP_INSIGHTS_ID # set to enable AI telemetry
 ARG GOARCH=amd64 # default to amd64
 ARG GOOS=linux # default to linux
@@ -15,7 +34,7 @@ RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/ret
 
 
 # controller binary
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.22 AS controller-bin
+FROM intermediate AS controller-bin
 ARG APP_INSIGHTS_ID # set to enable AI telemetry
 ARG GOARCH=amd64 # default to amd64
 ARG GOOS=linux # default to linux
@@ -23,13 +42,11 @@ ARG VERSION
 ENV CGO_ENABLED=0
 ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
-COPY . /go/src/github.com/microsoft/retina 
-WORKDIR /go/src/github.com/microsoft/retina
 RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/retina/controller -ldflags "-X main.version="$VERSION" -X main.applicationInsightsID="$APP_INSIGHTS_ID"" controller/main.go 
 
 
 # init binary
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.22 AS init-bin
+FROM intermediate AS init-bin
 ARG APP_INSIGHTS_ID # set to enable AI telemetry
 ARG GOARCH=amd64 # default to amd64
 ARG GOOS=linux # default to linux
@@ -37,23 +54,19 @@ ARG VERSION
 ENV CGO_ENABLED=0
 ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
-COPY . /go/src/github.com/microsoft/retina 
-WORKDIR /go/src/github.com/microsoft/retina
 RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/retina/initretina -ldflags "-X main.version="$VERSION" -X main.applicationInsightsID="$APP_INSIGHTS_ID"" init/retina/main_linux.go
 
 
 # tools image
-FROM  --platform=$TARGETPLATFORM mcr.microsoft.com/mirror/docker/library/debian:bookworm@sha256:1aadfee8d292f64b045adb830f8a58bfacc15789ae5f489a0fedcd517a862cb9 AS tools
-RUN apt-get update && \
-    apt-get install -y \
-    apt-file \
-    clang \
-    curl \
-    gnupg2 \
-    iproute2 \
+# mcr.microsoft.com/cbl-mariner/base/core:2.0
+# mcr.microsoft.com/cbl-mariner/base/core@sha256:77651116f2e83cf50fddd8a0316945499f8ce6521ff8e94e67539180d1e5975a
+FROM  --platform=$TARGETPLATFORM mcr.microsoft.com/cbl-mariner/base/core@sha256:77651116f2e83cf50fddd8a0316945499f8ce6521ff8e94e67539180d1e5975a AS tools
+RUN tdnf install -y \
+    clang16 \
+    iproute \
     iptables \
-    tcpdump 
-
+    tcpdump \
+    which
 RUN mkdir -p /tmp/bin
 RUN arr="clang tcpdump ip ss iptables-legacy iptables-legacy-save iptables-nft iptables-nft-save cp uname" ;\
     for i in $arr; do    \
@@ -62,16 +75,19 @@ RUN arr="clang tcpdump ip ss iptables-legacy iptables-legacy-save iptables-nft i
 
 
 # init final image
-FROM --platform=$TARGETPLATFORM gcr.io/distroless/cc-debian12:debug as init
+# mcr.microsoft.com/cbl-mariner/distroless/minimal:2.0
+# mcr.microsoft.com/cbl-mariner/distroless/minimal@sha256:63a0a70ceaa1320bc6eb98b81106667d43e46b674731ea8d28e4de1b87e0747f
+FROM --platform=$TARGETPLATFORM mcr.microsoft.com/cbl-mariner/distroless/minimal@sha256:63a0a70ceaa1320bc6eb98b81106667d43e46b674731ea8d28e4de1b87e0747f as init
 COPY --from=init-bin /go/bin/retina/initretina /retina/initretina
 COPY --from=tools /lib/ /lib
 COPY --from=tools /usr/lib/ /usr/lib
-COPY --from=tools /bin/mount /bin/mount
 ENTRYPOINT ["./retina/initretina"]
 
 
 # agent final image
-FROM --platform=$TARGETPLATFORM gcr.io/distroless/cc-debian12:debug as agent
+# mcr.microsoft.com/cbl-mariner/distroless/minimal:2.0
+# mcr.microsoft.com/cbl-mariner/distroless/minimal@sha256:63a0a70ceaa1320bc6eb98b81106667d43e46b674731ea8d28e4de1b87e0747f
+FROM --platform=$TARGETPLATFORM mcr.microsoft.com/cbl-mariner/distroless/minimal@sha256:63a0a70ceaa1320bc6eb98b81106667d43e46b674731ea8d28e4de1b87e0747f as agent
 COPY --from=tools /lib/ /lib
 COPY --from=tools /usr/lib/ /usr/lib
 COPY --from=tools /tmp/bin/ /bin

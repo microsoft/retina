@@ -6,14 +6,19 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
+	"strings"
 	"syscall"
 	"unsafe"
 
 	"github.com/pkg/errors"
 	"github.com/vishvananda/netlink"
+	"golang.org/x/exp/maps"
 )
 
-var showLink = netlink.LinkList
+const (
+	ipv4ZeroSubnet = "0.0.0.0/0"
+	ipv6ZeroSubnet = "::/0"
+)
 
 // Both openRawSock and htons are available in
 // https://github.com/cilium/ebpf/blob/master/example_sock_elf_test.go.
@@ -91,21 +96,49 @@ func determineEndian() binary.ByteOrder {
 	return endian
 }
 
-// Get all the veth interfaces.
-// Similar to ip link show type veth
-func GetInterface(name string, interfaceType string) (netlink.Link, error) {
-	links, err := showLink()
+// GetDefaultOutgoingLinks gets the outgoing interface by executing an equivalent to `ip route show default 0.0.0.0/0`
+func GetDefaultOutgoingLinks() ([]netlink.Link, error) {
+	routes, err := netlink.RouteList(nil, netlink.FAMILY_ALL)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get route list: %w", err)
 	}
 
-	for _, link := range links {
-		// Ref for types: https://github.com/vishvananda/netlink/blob/ced5aaba43e3f25bb5f04860641d3e3dd04a8544/link.go#L367
-		// Version of netlink tested - https://github.com/vishvananda/netlink/tree/v1.2.1-beta.2
-		if link.Type() == interfaceType && link.Attrs().Name == name {
-			return link, nil
+	defaultLinks := make(map[int]netlink.Link)
+	for i := range routes {
+		routeLinkIndex := routes[i].LinkIndex
+		if _, ok := defaultLinks[routeLinkIndex]; ok {
+			continue
 		}
+
+		if !isDefaultRoute(routes[i]) {
+			continue
+		}
+
+		link, err := netlink.LinkByIndex(routeLinkIndex)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get link %d by index: %w", routeLinkIndex, err)
+		}
+
+		defaultLinks[routeLinkIndex] = link
 	}
 
-	return nil, fmt.Errorf("interface %s of type %s not found", name, interfaceType)
+	return maps.Values(defaultLinks), nil
+}
+
+func isDefaultRoute(route netlink.Route) bool {
+	if route.Dst == nil {
+		return true
+	}
+
+	destination := route.Dst.String()
+
+	if strings.EqualFold(destination, ipv4ZeroSubnet) {
+		return true
+	}
+
+	if strings.EqualFold(destination, ipv6ZeroSubnet) {
+		return true
+	}
+
+	return false
 }

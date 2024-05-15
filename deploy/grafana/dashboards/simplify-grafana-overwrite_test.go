@@ -5,14 +5,14 @@ package dashboard
 import (
 	"testing"
 
-	"io/ioutil"
+	"os"
 	"path/filepath"
 )
 
 // TestOverwriteDashboards simplifies and overwrites Grafana dashboards in this folder.
 func TestOverwriteDashboards(t *testing.T) {
 	// get all json's in this folder
-	files, err := ioutil.ReadDir("./")
+	files, err := os.ReadDir("./")
 	if err != nil {
 		t.Fatal(err)
 	}

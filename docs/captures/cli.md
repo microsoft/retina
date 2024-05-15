@@ -152,6 +152,14 @@ Blob-upload requires a Blob Shared Access Signature with the write permission to
 
 `kubectl retina capture create --blob-upload <Blob SAS URL with write permission> --node-selectors "kubernetes.io/os=linux"`
 
+- store the capture file to AWS S3
+
+`kubectl retina capture create --s3-bucket "your-bucket-name" --s3-region "eu-central-1" --s3-access-key-id "your-access-key-id" --s3-secret-access-key "your-secret-access-key" --node-selectors "kubernetes.io/os=linux"`
+
+- store the capture file to S3-compatible service (like MinIO)
+
+`kubectl retina capture create --s3-bucket "your-bucket-name" --s3-endpoint "https://play.min.io:9000" --s3-access-key-id "your-access-key-id" --s3-secret-access-key "your-secret-access-key" --node-selectors "kubernetes.io/os=linux"`
+
 ### Debug mode
 
 With debug mode, when `--debug` is specified, we can overwrite the capture job Pod image from the default official `GHCR` one.

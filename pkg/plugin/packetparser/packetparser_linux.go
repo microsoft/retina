@@ -19,7 +19,7 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/perf"
 	"github.com/cilium/ebpf/rlimit"
-	tc "github.com/florianl/go-tc"
+	"github.com/florianl/go-tc"
 	helper "github.com/florianl/go-tc/core"
 	"github.com/microsoft/retina/internal/ktime"
 	"github.com/microsoft/retina/pkg/common"
@@ -42,7 +42,9 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cc clang-14 -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type packet packetparser ./_cprog/packetparser.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../filter/_cprog/
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type packet packetparser ./_cprog/packetparser.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../filter/_cprog/
+
+var errNoOutgoingLinks = errors.New("could not determine any outgoing links")
 
 // New creates a packetparser plugin.
 func New(cfg *kcfg.Config) api.Plugin {
@@ -86,10 +88,6 @@ func (p *packetParser) Compile(ctx context.Context) error {
 		return err
 	}
 
-	// Generate dynamic header file.
-	if err := p.Generate(ctx); err != nil {
-		p.l.Error("failed to generate PacketParser dynamic header:%w", zap.Error(err))
-	}
 	bpfSourceFile := fmt.Sprintf("%s/%s/%s", dir, bpfSourceDir, bpfSourceFileName)
 	bpfOutputFile := fmt.Sprintf("%s/%s", dir, bpfObjectFileName)
 	arch := runtime.GOARCH
@@ -208,20 +206,27 @@ func (p *packetParser) Start(ctx context.Context) error {
 		p.callbackID = ps.Subscribe(common.PubSubEndpoints, &fn)
 	}
 
-	// Attach to eth0 for latency.
-	eth0Link, err := utils.GetInterface(Eth0, Device)
-	// eth0Link, err := retinautils.GetInterface("azvb22061c2658", "veth")
+	outgoingLinks, err := utils.GetDefaultOutgoingLinks()
 	if err != nil {
 		return err
 	}
-	p.l.Info("Attaching Packetparser to eth0", zap.Any("eth0Link", eth0Link.Attrs()))
-	p.createQdiscAndAttach(*eth0Link.Attrs(), Device)
+	if len(outgoingLinks) == 0 {
+		return errNoOutgoingLinks
+	}
+	outgoingLink := outgoingLinks[0] // Take first link until multi-link support is implemented
+
+	outgoingLinkAttributes := outgoingLink.Attrs()
+	p.l.Info("Attaching Packetparser",
+		zap.Int("outgoingLink.Index", outgoingLinkAttributes.Index),
+		zap.String("outgoingLink.Name", outgoingLinkAttributes.Name),
+		zap.Stringer("outgoingLink.HardwareAddr", outgoingLinkAttributes.HardwareAddr),
+	)
+	p.createQdiscAndAttach(*outgoingLink.Attrs(), Device)
 
 	// Create the channel.
 	p.recordsChannel = make(chan perf.Record, buffer)
 	p.l.Debug("Created records channel")
 
-	p.l.Info("Started packet parser")
 	return p.run(ctx)
 }
 
@@ -487,8 +492,6 @@ func (p *packetParser) createQdiscAndAttach(iface netlink.LinkAttrs, ifaceType s
 }
 
 func (p *packetParser) run(ctx context.Context) error {
-	p.l.Info("Starting packet parser")
-
 	// Start perf record handlers (consumers).
 	for i := 0; i < workers; i++ {
 		p.wg.Add(1)
@@ -499,6 +502,8 @@ func (p *packetParser) run(ctx context.Context) error {
 	// The perf reader Read call blocks until there is data available in the perf buffer.
 	// That call is unblocked when Reader is closed.
 	go p.handleEvents(ctx)
+
+	p.l.Info("Started packet parser")
 
 	// Wait for the context to be done.
 	// This will block till all consumers exit.

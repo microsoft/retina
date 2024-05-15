@@ -5,12 +5,15 @@
 package utils
 
 import (
+	"fmt"
 	"net"
 	"testing"
 
 	"github.com/cilium/cilium/api/v1/flow"
-	"github.com/microsoft/retina/pkg/log"
 	"github.com/stretchr/testify/assert"
+	"github.com/vishvananda/netlink"
+
+	"github.com/microsoft/retina/pkg/log"
 )
 
 func TestToFlow(t *testing.T) {
@@ -156,6 +159,25 @@ func TestAddDropReason(t *testing.T) {
 			assert.Equal(t, f.Verdict, flow.Verdict_DROPPED)
 			assert.NotNil(t, f.EventType.Type, 1)
 			assert.NotNil(t, DropReasonDescription(f), DropReason_name[int32(tc.dropReason)])
+		})
+	}
+}
+
+func TestIsDefaultRoute(t *testing.T) {
+	tests := []struct {
+		Route           netlink.Route
+		ShouldBeDefault bool
+	}{
+		{Route: netlink.Route{Dst: nil}, ShouldBeDefault: true},
+		{Route: netlink.Route{Dst: &net.IPNet{IP: net.IPv4zero, Mask: net.CIDRMask(0, 32)}}, ShouldBeDefault: true},
+		{Route: netlink.Route{Dst: &net.IPNet{IP: net.IPv6zero, Mask: net.CIDRMask(0, 128)}}, ShouldBeDefault: true},
+		{Route: netlink.Route{Dst: &net.IPNet{IP: net.IPv4(168, 192, 1, 0), Mask: net.CIDRMask(8, 32)}}, ShouldBeDefault: false},
+		{Route: netlink.Route{Dst: &net.IPNet{IP: net.IPv6loopback, Mask: net.CIDRMask(64, 128)}}, ShouldBeDefault: false},
+	}
+
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%s should be default: %t", test.Route.Dst, test.ShouldBeDefault), func(t *testing.T) {
+			assert.Equal(t, test.ShouldBeDefault, isDefaultRoute(test.Route))
 		})
 	}
 }

@@ -6,8 +6,10 @@ metadata:
   namespace: {{ ternary .Values.metrics.podMonitor.namespace .Values.namespace (not (empty .Values.metrics.podMonitor.namespace)) }}
   labels:
     k8s-app: {{ include "retina.name" . }}
+    {{- include "retina.labels" . | nindent 4 }}
+    app.kubernetes.io/component: metrics
     {{- if .Values.metrics.podMonitor.additionalLabels }}
-    {{- .Values.metrics.podMonitor.additionalLabels | nindent 4 }}
+    {{- toYaml .Values.metrics.podMonitor.additionalLabels | nindent 4 }}
     {{- end }}
 spec:
   podMetricsEndpoints:
@@ -34,5 +36,6 @@ spec:
       - {{ .Values.namespace }}
   selector:
     matchLabels:
-      app: {{ include "retina.name" . }}
+      {{- include "retina.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: workload
 {{- end }}
