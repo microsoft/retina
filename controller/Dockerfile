@@ -96,9 +96,14 @@ COPY --from=controller-bin /go/src/github.com/microsoft/retina/pkg/plugin /go/sr
 COPY --from=capture-bin /go/bin/retina/captureworkload /retina/captureworkload
 ENTRYPOINT ["./retina/controller"]
 
+# intermediate for win-ltsc2019
+FROM --platform=$TARGETPLATFORM mcr.microsoft.com/windows/servercore@sha256:6fdf140282a2f809dae9b13fe441635867f0a27c33a438771673b8da8f3348a4 as ltsc2019
+
+# intermediate for win-ltsc2022
+FROM --platform=$TARGETPLATFORM mcr.microsoft.com/windows/servercore@sha256:45952938708fbde6ec0b5b94de68bcdec3f8c838be018536b1e9e5bd95e6b943 as ltsc2022
 
 # agent final image for win2019
-FROM --platform=$TARGETPLATFORM mcr.microsoft.com/windows/servercore:${OS_VERSION} as agent-win
+FROM --platform=$TARGETPLATFORM ${OS_VERSION} as agent-win
 COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
 COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
 COPY --from=controller-bin /go/bin/retina/controller controller.exe
