@@ -184,6 +184,16 @@ func (nr *NetstatReader) readSockStats() error {
 		return err
 	} else {
 		sockStats := processSocks(socks)
+		// Compare existing tcp socket connections with updated ones, remove the ones that are not seen in the new sockStats map
+		for remoteAddr := range nr.connStats.TcpSockets.socketByRemoteAddr {
+			addr, port := getAddrAndPort(remoteAddr)
+			// Check if the remote address is in the new sockStats map
+			if _, ok := sockStats.socketByRemoteAddr[remoteAddr]; !ok {
+				// If not, set the value to 0
+				metrics.TCPConnectionRemoteGauge.WithLabelValues(addr, port).Set(0)
+			}
+		}
+
 		nr.connStats.TcpSockets = *sockStats
 	}
 
@@ -231,15 +241,7 @@ func (nr *NetstatReader) updateMetrics() {
 	}
 
 	for remoteAddr, v := range nr.connStats.TcpSockets.socketByRemoteAddr {
-		addr := ""
-		port := ""
-		splitAddr := strings.Split(remoteAddr, ":")
-		if len(splitAddr) == 2 {
-			addr = splitAddr[0]
-			port = splitAddr[1]
-		} else {
-			addr = remoteAddr
-		}
+		addr, port := getAddrAndPort(remoteAddr)
 		if !validateRemoteAddr(addr) {
 			continue
 		}
@@ -249,6 +251,19 @@ func (nr *NetstatReader) updateMetrics() {
 
 	// UDP COnnection State metrics
 	metrics.UDPConnectionStats.WithLabelValues(utils.Active).Set(float64(nr.connStats.UdpSockets.totalActiveSockets))
+}
+
+func getAddrAndPort(remoteAddr string) (addr, port string) {
+	splitAddr := strings.Split(remoteAddr, ":")
+	// Check if the remote address is in the format of addr:port
+	if len(splitAddr) == 2 { // nolint:gomnd // magic number is sufficiently explained
+		addr = splitAddr[0]
+		port = splitAddr[1]
+	} else {
+		addr = remoteAddr
+	}
+
+	return addr, port
 }
 
 func validateRemoteAddr(addr string) bool {
