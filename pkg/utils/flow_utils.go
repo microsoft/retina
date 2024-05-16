@@ -148,7 +148,7 @@ func AddTCPFlags(f *flow.Flow, syn, ack, fin, rst, psh, urg uint16) {
 }
 
 func AddTcpFlagsBool(f *flow.Flow, syn, ack, fin, rst, psh, urg bool) {
-	if f.L4.GetTCP() == nil {
+	if f.GetL4().GetTCP() == nil {
 		return
 	}
 

@@ -12,6 +12,7 @@ import (
 type PktMon interface {
 	Initialize() error
 	GetNextPacket() (*flow.Flow, *utils.RetinaMetadata, gopacket.Packet, error)
+	ParseDNS(*flow.Flow, *utils.RetinaMetadata, gopacket.Packet) error
 }
 
 type MockPktMon struct{}

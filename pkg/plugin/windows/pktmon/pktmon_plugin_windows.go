@@ -30,39 +30,18 @@ type PktMonPlugin struct {
 	l               *log.ZapLogger
 }
 
-func (p *PktMonPlugin) Compile(ctx context.Context) error {
-	return nil
-}
-
-func (p *PktMonPlugin) Generate(ctx context.Context) error {
-	return nil
-}
-
 func (p *PktMonPlugin) Init() error {
+	pktmonlogger := log.Logger().Named(Name)
 	p.pkt = &WinPktMon{
-		l: log.Logger().Named(Name),
+		l: pktmonlogger,
 	}
-	p.l = log.Logger().Named(Name)
+	p.l = pktmonlogger
 
 	return nil
 }
 
 func (p *PktMonPlugin) Name() string {
 	return "pktmon"
-}
-
-func (p *PktMonPlugin) SetupChannel(ch chan *v1.Event) error {
-	p.externalChannel = ch
-	return nil
-}
-
-func New(cfg *kcfg.Config) api.Plugin {
-	return &PktMonPlugin{}
-}
-
-type DNSRequest struct {
-	SourceIP      byte
-	DestinationIP byte
 }
 
 func (p *PktMonPlugin) Start(ctx context.Context) error {
@@ -96,9 +75,9 @@ func (p *PktMonPlugin) Start(ctx context.Context) error {
 
 			// do this here instead of GetNextPacket to keep higher level
 			// packet parsing out of L4 parsing
-			err = parseDNS(fl, meta, packet)
+			err = p.pkt.ParseDNS(fl, meta, packet)
 			if err != nil {
-				golog.Printf("Error parsing DNS: %v\n", err)
+				golog.Printf("Error parsing DNS: %v\n ", err)
 				continue
 			}
 
@@ -110,7 +89,7 @@ func (p *PktMonPlugin) Start(ctx context.Context) error {
 			if p.enricher != nil {
 				p.enricher.Write(ev)
 			} else {
-				fmt.Printf("enricher is nil when writing\n")
+				fmt.Printf("enricher is nil when writing\n  ")
 			}
 
 			// Write the event to the external channel.
@@ -127,6 +106,23 @@ func (p *PktMonPlugin) Start(ctx context.Context) error {
 	}
 }
 
+func (p *PktMonPlugin) SetupChannel(ch chan *v1.Event) error {
+	p.externalChannel = ch
+	return nil
+}
+
+func New(cfg *kcfg.Config) api.Plugin {
+	return &PktMonPlugin{}
+}
+
 func (p *PktMonPlugin) Stop() error {
+	return nil
+}
+
+func (p *PktMonPlugin) Compile(ctx context.Context) error {
+	return nil
+}
+
+func (p *PktMonPlugin) Generate(ctx context.Context) error {
 	return nil
 }
