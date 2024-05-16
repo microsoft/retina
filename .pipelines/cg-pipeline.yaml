@@ -175,6 +175,14 @@ stages:
         steps:
           - checkout: self
             fetchTags: true
+
+          - task: Docker@2
+            displayName: Docker Login
+            inputs:
+              containerRegistry: $(WINDOWS_BUILDER_REGISTRY)
+              command: "login"
+              addPipelineData: false
+
           - task: PowerShell@2
             displayName: "Build Retina Windows Image (LTSC2022)"
             inputs:
