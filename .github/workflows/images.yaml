@@ -1,4 +1,4 @@
-name: Build images and run E2E tests.
+name: Build Images
 
 on:
   pull_request:
