@@ -160,7 +160,7 @@ retina-capture-workload: ## build the Retina capture workload
 
 ##@ Containers
 
-IMAGE_REGISTRY	?= ghcr.io
+IMAGE_REGISTRY	?= acnpublic.azurecr.io
 IMAGE_NAMESPACE ?= $(shell git config --get remote.origin.url | sed -E 's/.*github\.com[\/:]([^\/]+)\/([^\/.]+)(.git)?/\1\/\2/' | tr '[:upper:]' '[:lower:]')
 
 RETINA_BUILDER_IMAGE			= $(IMAGE_NAMESPACE)/retina-builder
@@ -368,7 +368,7 @@ helm-install: manifests
 		--set logLevel=info \
 		--set os.windows=true \
 		--set operator.enabled=false \
-		--set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\]"
+		--set enabledPlugin_linux="\[linuxutil\]"
 
 helm-install-with-operator: manifests
 	helm upgrade --install retina ./deploy/manifests/controller/helm/retina/ \
