@@ -187,6 +187,9 @@ func (nr *NetstatReader) readSockStats() error {
 	} else {
 		sockStats := processSocks(socks)
 		// Compare existing tcp socket connections with updated ones, remove the ones that are not seen in the new sockStats map
+		// Log the socketByRemoteAddr map
+		nr.l.Info("Current TCP Sockets", zap.Any("socketByRemoteAddr", nr.connStats.TcpSockets.socketByRemoteAddr))
+		nr.l.Info("New TCP Sockets", zap.Any("socketByRemoteAddr", sockStats.socketByRemoteAddr))
 		for remoteAddr := range nr.connStats.TcpSockets.socketByRemoteAddr {
 			addrPort, err := netip.ParseAddrPort(remoteAddr)
 			if err != nil {
