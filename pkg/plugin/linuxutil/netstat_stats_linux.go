@@ -40,20 +40,20 @@ func NewNetstatReader(opts *NetstatOpts, ns NetstatInterface) *NetstatReader {
 	}
 }
 
-func (nr *NetstatReader) readAndUpdate() error {
+func (nr *NetstatReader) readAndUpdate() (*SocketStats, error) {
 	if err := nr.readConnectionStats(pathNetNetstat); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Get Socket stats
 	if err := nr.readSockStats(); err != nil {
-		return err
+		return nil, err
 	}
 
 	nr.updateMetrics()
 	nr.l.Debug("Done reading and updating connections stats")
 
-	return nil
+	return &nr.connStats.TcpSockets, nil
 }
 
 //nolint:gomnd // magic numbers are sufficiently explained in this function
@@ -188,20 +188,20 @@ func (nr *NetstatReader) readSockStats() error {
 		sockStats := processSocks(socks)
 		// Compare existing tcp socket connections with updated ones, remove the ones that are not seen in the new sockStats map
 		// Log the socketByRemoteAddr map
-		nr.l.Info("Current TCP Sockets", zap.Any("socketByRemoteAddr", nr.connStats.TcpSockets.socketByRemoteAddr))
-		nr.l.Info("New TCP Sockets", zap.Any("socketByRemoteAddr", sockStats.socketByRemoteAddr))
-		for remoteAddr := range nr.connStats.TcpSockets.socketByRemoteAddr {
-			addrPort, err := netip.ParseAddrPort(remoteAddr)
-			if err != nil {
-				return errors.Wrapf(err, "failed to parse remote address %s", remoteAddr)
-			}
-			addr := addrPort.Addr().String()
-			port := strconv.Itoa(int(addrPort.Port()))
-			// Check if the remote address is in the new sockStats map
-			if _, ok := sockStats.socketByRemoteAddr[remoteAddr]; !ok {
-				nr.l.Info("Removing remote address from metrics", zap.String("remoteAddr", remoteAddr))
-				// If not, set the value to 0
-				metrics.TCPConnectionRemoteGauge.WithLabelValues(addr, port).Set(0)
+		if nr.opts.PrevTCPSockStats != nil {
+			for remoteAddr := range nr.opts.PrevTCPSockStats.socketByRemoteAddr {
+				addrPort, err := netip.ParseAddrPort(remoteAddr)
+				if err != nil {
+					return errors.Wrapf(err, "failed to parse remote address %s", remoteAddr)
+				}
+				addr := addrPort.Addr().String()
+				port := strconv.Itoa(int(addrPort.Port()))
+				// Check if the remote address is in the new sockStats map
+				if _, ok := sockStats.socketByRemoteAddr[remoteAddr]; !ok {
+					nr.l.Info("Removing remote address from metrics", zap.String("remoteAddr", remoteAddr))
+					// If not, set the value to 0
+					metrics.TCPConnectionRemoteGauge.WithLabelValues(addr, port).Set(0)
+				}
 			}
 		}
 

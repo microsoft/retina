@@ -65,9 +65,10 @@ func (lu *linuxUtil) run(ctx context.Context) error {
 			return nil
 		case <-ticker.C:
 			opts := &NetstatOpts{
-				CuratedKeys: false,
-				AddZeroVal:  false,
-				ListenSock:  false,
+				CuratedKeys:      false,
+				AddZeroVal:       false,
+				ListenSock:       false,
+				PrevTCPSockStats: lu.prevTCPSockStats,
 			}
 			var wg sync.WaitGroup
 
@@ -76,10 +77,11 @@ func (lu *linuxUtil) run(ctx context.Context) error {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err := nsReader.readAndUpdate()
+				tcpSocketStats, err := nsReader.readAndUpdate()
 				if err != nil {
 					lu.l.Error("Reading netstat failed", zap.Error(err))
 				}
+				lu.prevTCPSockStats = tcpSocketStats
 			}()
 
 			ethtoolOpts := &EthtoolOpts{
