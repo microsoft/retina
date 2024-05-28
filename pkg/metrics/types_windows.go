@@ -6,20 +6,15 @@ import (
 	"github.com/cilium/cilium/api/v1/flow"
 )
 
-func GetDropTypeFlowDropReason(dr flow.DropReason) DropReasonType {
-	if v, ok := dropReasons[uint32(dr)]; ok {
-		return v.Reason
-	}
-
-	return fmt.Sprintf("UnknownDropReason(%d)", dr)
+func GetDropTypeFlowDropReason(dr flow.DropReason) string {
+	return dr.String()
 }
 
 func GetDropReason(reason uint32) DropReasonType {
 	if v, ok := dropReasons[reason]; ok {
 		return v.Reason
 	}
-
-	return fmt.Sprintf("UnknownDropReason(%d)", reason)
+	return Drop_Unknown
 }
 
 func (d DropReasonType) String() string {
@@ -76,7 +71,7 @@ var dropReasons = map[uint32]DropReasonWin{
 	38: {Drop_LowPower, "Drop_LowPower"},
 
 	//
-	//Generalerrors
+	// Generalerrors
 	//
 	201: {Drop_Pause, "Drop_Pause"},
 	202: {Drop_Reset, "Drop_Reset"},
@@ -107,7 +102,7 @@ var dropReasons = map[uint32]DropReasonWin{
 	228: {Drop_SteeringMismatch, "Drop_SteeringMismatch"},
 
 	//
-	//NetVscerrors
+	// NetVscerrors
 	//
 	401: {Drop_MicroportError, "Drop_MicroportError"},
 	402: {Drop_VfNotReady, "Drop_VfNotReady"},
@@ -115,7 +110,7 @@ var dropReasons = map[uint32]DropReasonWin{
 	404: {Drop_VMBusError, "Drop_VMBusError"},
 
 	//
-	//TcpipFLerrors
+	// TcpipFLerrors
 	//
 	601: {Drop_FL_LoopbackPacket, "Drop_FL_LoopbackPacket"},
 	602: {Drop_FL_InvalidSnapHeader, "Drop_FL_InvalidSnapHeader"},
@@ -134,7 +129,7 @@ var dropReasons = map[uint32]DropReasonWin{
 	615: {Drop_FL_FlsNpiClientDrop, "Drop_FL_FlsNpiClientDrop"},
 
 	//
-	//VFPerrors
+	// VFPerrors
 	//
 	701: {Drop_ArpGuard, "Drop_ArpGuard"},
 	702: {Drop_ArpLimiter, "Drop_ArpLimiter"},
@@ -157,7 +152,7 @@ var dropReasons = map[uint32]DropReasonWin{
 	719: {Drop_NicSuspended, "Drop_NicSuspended"},
 
 	//
-	//TcpipNLerrors
+	// TcpipNLerrors
 	//
 	901: {Drop_NL_BadSourceAddress, "Drop_NL_BadSourceAddress"},
 	902: {Drop_NL_NotLocallyDestined, "Drop_NL_NotLocallyDestined"},
@@ -268,7 +263,7 @@ var dropReasons = map[uint32]DropReasonWin{
 	1002: {Drop_NL_SwUsoFailure, "Drop_NL_SwUsoFailure"},
 
 	//
-	//INETdiscardreasons
+	// INETdiscardreasons
 	//
 	1200: {Drop_INET_SourceUnspecified, "Drop_INET_SourceUnspecified"},
 	1201: {Drop_INET_DestinationMulticast, "Drop_INET_DestinationMulticast"},
@@ -305,7 +300,7 @@ var dropReasons = map[uint32]DropReasonWin{
 	1232: {Drop_INET_AcceptRedirection, "Drop_INET_AcceptRedirection"},
 
 	//
-	//SlbmuxError
+	// SlbmuxError
 	//
 	1301: {Drop_SlbMux_ParsingFailure, "Drop_SlbMux_ParsingFailure"},
 	1302: {Drop_SlbMux_FirstFragmentMiss, "Drop_SlbMux_FirstFragmentMiss"},
@@ -336,7 +331,7 @@ var dropReasons = map[uint32]DropReasonWin{
 	1327: {Drop_SlbMux_UnableToHandleRedirect, "Drop_SlbMux_UnableToHandleRedirect"},
 
 	//
-	//IpsecErrors
+	// IpsecErrors
 	//
 	1401: {Drop_Ipsec_BadSpi, "Drop_Ipsec_BadSpi"},
 	1402: {Drop_Ipsec_SALifetimeExpired, "Drop_Ipsec_SALifetimeExpired"},
@@ -358,7 +353,7 @@ var dropReasons = map[uint32]DropReasonWin{
 	1418: {Drop_Ipsec_Unsuccessful, "Drop_Ipsec_Unsuccessful"},
 
 	//
-	//NetCxDropReasons
+	// NetCxDropReasons
 	//
 	1501: {Drop_NetCx_NetPacketLayoutParseFailure, "Drop_NetCx_NetPacketLayoutParseFailure"},
 	1502: {Drop_NetCx_SoftwareChecksumFailure, "Drop_NetCx_SoftwareChecksumFailure"},
@@ -369,13 +364,13 @@ var dropReasons = map[uint32]DropReasonWin{
 	1507: {Drop_NetCx_BufferBounceFailureAndPacketIgnore, "Drop_NetCx_BufferBounceFailureAndPacketIgnore"},
 
 	//
-	//Httperrors3000-4000.
-	//Thesemustbeinsyncwithcmd\resource.h
+	// Httperrors3000-4000.
+	// Thesemustbeinsyncwithcmd\resource.h
 	//
 	3000: {Drop_Http_Begin, "Drop_Http_Begin"},
 
 	//
-	//UlErrors
+	// UlErrors
 	//
 	3001: {Drop_Http_UlError_Begin, "Drop_Http_UlError_Begin"},
 	3002: {Drop_Http_UlError, "Drop_Http_UlError"},
@@ -412,7 +407,7 @@ var dropReasons = map[uint32]DropReasonWin{
 	3030: {Drop_Http_UlError_End, "Drop_Http_UlError_End"},
 
 	//
-	//Stream-specificfaultcodes.
+	// Stream-specificfaultcodes.
 	//
 
 	3400: {Drop_Http_UxDuoFaultBegin, "Drop_Http_UxDuoFaultBegin"},
@@ -481,12 +476,12 @@ var dropReasons = map[uint32]DropReasonWin{
 	3463: {Drop_Http_UxDuoFaultEnd, "Drop_Http_UxDuoFaultEnd"},
 
 	//
-	//WSKlayerdrops
+	// WSKlayerdrops
 	//
 	3600: {Drop_Http_ReceiveSuppressed, "Drop_Http_ReceiveSuppressed"},
 
 	//
-	//Http/SSLlayerdrops
+	// Http/SSLlayerdrops
 	//
 	3800: {Drop_Http_Generic, "Drop_Http_Generic"},
 	3801: {Drop_Http_InvalidParameter, "Drop_Http_InvalidParameter"},
