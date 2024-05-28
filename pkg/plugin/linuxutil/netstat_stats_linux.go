@@ -198,7 +198,7 @@ func (nr *NetstatReader) readSockStats() error {
 				port := strconv.Itoa(int(addrPort.Port()))
 				// Check if the remote address is in the new sockStats map
 				if _, ok := sockStats.socketByRemoteAddr[remoteAddr]; !ok {
-					nr.l.Info("Removing remote address from metrics", zap.String("remoteAddr", remoteAddr))
+					nr.l.Debug("Removing remote address from metrics", zap.String("remoteAddr", remoteAddr))
 					// If not, set the value to 0
 					metrics.TCPConnectionRemoteGauge.WithLabelValues(addr, port).Set(0)
 				}

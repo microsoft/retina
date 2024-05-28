@@ -9,7 +9,6 @@ import (
 
 	"github.com/cakturk/go-netstat/netstat"
 	"github.com/microsoft/retina/pkg/log"
-	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -353,24 +352,28 @@ func TestReadSockStatsRemoveClosedConnection(t *testing.T) {
 
 	ns := NewMockNetstatInterface(ctrl)
 	nr := NewNetstatReader(opts, ns)
+	assert.NotNil(t, nr)
 	InitalizeMetricsForTesting(ctrl)
 
 	testmetric := prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "testmetric",
 		Help: "testmetric",
 	})
-	// We are expecting the gauge to be called twice, once for the initial set and once for the removal (set to 0)
-	MockGaugeVec.EXPECT().WithLabelValues("127.0.0.1", "80").Return(testmetric).Times(2)
 
 	// Initial value
-	metrics.TCPConnectionRemoteGauge.WithLabelValues("127.0.0.1", "80").Set(float64(1))
-	nr.connStats.TcpSockets.socketByRemoteAddr = map[string]int{"127.0.0.1:80": 1}
+	nr.opts.PrevTCPSockStats = &SocketStats{
+		socketByRemoteAddr: map[string]int{
+			"127.0.0.1:80": 1,
+		},
+	}
 
+	// Latest read would not contain the IP in PrevTCPSockStats
 	ns.EXPECT().TCPSocks(gomock.Any()).Return([]netstat.SockTabEntry{}, nil).Times(1)
 	ns.EXPECT().UDPSocks(gomock.Any()).Return([]netstat.SockTabEntry{}, nil).Times(1)
-	assert.NotNil(t, nr)
+
+	// We are expecting the gauge to be called once for this value as it is removed
+	MockGaugeVec.EXPECT().WithLabelValues("127.0.0.1", "80").Return(testmetric).Times(1)
+
 	err = nr.readSockStats()
 	require.NoError(t, err)
-
-	assert.Empty(t, nr.connStats.TcpSockets.socketByRemoteAddr)
 }
