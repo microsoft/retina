@@ -178,13 +178,13 @@ func (r *RetinaEndpointReconciler) reconcileRetinaEndpointFromPod(ctx context.Co
 
 		// since the retina endpoint doesn't exist, then we need to create it
 		new := &retinav1alpha1.RetinaEndpoint{
+			TypeMeta: v1.TypeMeta{
+				Kind:       "RetinaEndpoint",
+				APIVersion: "retina.sh/v1alpha1",
+			},
 			ObjectMeta: v1.ObjectMeta{
 				Name:      pod.Key.Name,
 				Namespace: pod.Key.Namespace,
-			},
-			TypeMeta: v1.TypeMeta{
-				Kind:       "RetinaEndpoint",
-				APIVersion: "v1alpha1",
 			},
 			Spec: retinav1alpha1.RetinaEndpointSpec{
 				PodIP:           pod.Pod.Status.PodIP,

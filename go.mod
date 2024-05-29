@@ -221,9 +221,9 @@ require (
 	google.golang.org/grpc v1.62.1 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
-	k8s.io/apiserver v0.30.0 // indirect
+	k8s.io/apiserver v0.30.1 // indirect
 	k8s.io/component-base v0.30.1 // indirect
-	k8s.io/cri-api v0.29.3 // indirect
+	k8s.io/cri-api v0.30.1 // indirect
 	oras.land/oras-go v1.2.5 // indirect
 	sigs.k8s.io/kustomize/api v0.14.0 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.14.3 // indirect
@@ -304,10 +304,10 @@ require (
 	gotest.tools v2.2.0+incompatible
 	gotest.tools/v3 v3.5.1
 	helm.sh/helm/v3 v3.14.4
-	k8s.io/apiextensions-apiserver v0.30.0
+	k8s.io/apiextensions-apiserver v0.30.1
 	k8s.io/cli-runtime v0.30.1
 	k8s.io/kubectl v0.30.1
-	sigs.k8s.io/controller-runtime v0.18.0
+	sigs.k8s.io/controller-runtime v0.18.3
 )
 
 replace github.com/vishvananda/netns => github.com/inspektor-gadget/netns v0.0.5-0.20230524185006-155d84c555d6
