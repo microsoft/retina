@@ -24,7 +24,7 @@ See [Capture Command](../captures/cli.md) for more details.
 This example captures network traffic for all Linux Nodes, storing the output in the folder */mnt/capture* on each Node.
 
 ```shell
-kubectl-retina capture create --host-path /mnt/capture --node-selectors "kubernetes.io/os=linux"
+kubectl-retina capture create --name capture-test --host-path /mnt/capture --node-selectors "kubernetes.io/os=linux"
 ```
 
 #### Architecture
