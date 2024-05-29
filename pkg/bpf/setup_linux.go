@@ -8,7 +8,6 @@ import (
 	"os"
 
 	"github.com/cilium/cilium/pkg/mountinfo"
-	"github.com/microsoft/retina/pkg/log"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
 	"github.com/microsoft/retina/pkg/plugin/filter"
 	"go.uber.org/zap"
@@ -54,7 +53,7 @@ func mountBpfFs() error {
 	return nil
 }
 
-func Setup(l *log.ZapLogger) {
+func Setup(l *zap.Logger) {
 	err := mountBpfFs()
 	if err != nil {
 		l.Panic("Failed to mount bpf filesystem", zap.Error(err))

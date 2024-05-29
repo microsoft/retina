@@ -55,6 +55,12 @@ func TestEnabled(t *testing.T) {
 			enabled:        false,
 			outputLocation: NewBlobUpload(log.Logger().Named("blob")),
 		},
+		{
+			name:           "S3 output location is disabled",
+			env:            map[string]string{},
+			enabled:        false,
+			outputLocation: NewS3Upload(log.Logger().Named("s3")),
+		},
 	}
 
 	for _, tt := range cases {

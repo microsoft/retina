@@ -1,6 +1,10 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
+  labels:
+    k8s-app: {{ include "retina.name" . }}
+    {{- include "retina.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rbac
   namespace: {{ .Values.namespace }}
   name: retina-cluster-reader
 rules:
@@ -73,6 +77,10 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
+  labels:
+    k8s-app: {{ include "retina.name" . }}
+    {{- include "retina.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rbac
   name: retina-cluster-reader-binding
   namespace: {{ .Values.namespace }}
 subjects:

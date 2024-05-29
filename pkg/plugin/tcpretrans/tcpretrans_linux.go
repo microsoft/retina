@@ -6,6 +6,7 @@ package tcpretrans
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"strings"
 
@@ -14,6 +15,8 @@ import (
 	gadgetcontext "github.com/inspektor-gadget/inspektor-gadget/pkg/gadget-context"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/gadgets/trace/tcpretrans/tracer"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/gadgets/trace/tcpretrans/types"
+	"github.com/inspektor-gadget/inspektor-gadget/pkg/socketenricher"
+	"github.com/inspektor-gadget/inspektor-gadget/pkg/utils/host"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
@@ -54,8 +57,18 @@ func (t *tcpretrans) Init() error {
 	}
 
 	// Create tracer. In this case no parameters are passed.
+	if err := host.Init(host.Config{}); err != nil {
+		t.l.Error("failed to init host", zap.Error(err))
+		return fmt.Errorf("failed to init host: %w", err)
+	}
 	t.tracer = &tracer.Tracer{}
 	t.tracer.SetEventHandler(t.eventHandler)
+	socketEnricher, err := socketenricher.NewSocketEnricher()
+	if err != nil {
+		t.l.Error("failed to new socketEnricher", zap.Error(err))
+		return fmt.Errorf("failed to new socketEnricher: %w", err)
+	}
+	t.tracer.SetSocketEnricherMap(socketEnricher.SocketsMap())
 	t.l.Info("Initialized tcpretrans plugin")
 	return nil
 }
@@ -127,7 +140,7 @@ func (t *tcpretrans) eventHandler(event *types.Event) {
 		return
 	}
 	syn, ack, fin, rst, psh, urg := getTcpFlags(event.Tcpflags)
-	utils.AddTcpFlags(fl, syn, ack, fin, rst, psh, urg)
+	utils.AddTCPFlags(fl, syn, ack, fin, rst, psh, urg)
 
 	// This is only for development purposes.
 	// Removing this makes logs way too chatter-y.

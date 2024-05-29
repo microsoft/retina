@@ -32,6 +32,7 @@ OS				?= $(GOOS)
 ARCH			?= $(GOARCH)
 PLATFORM		?= $(OS)/$(ARCH)
 PLATFORMS		?= linux/amd64 linux/arm64 windows/amd64
+OS_VERSION		?= ltsc2019
 
 CONTAINER_BUILDER ?= docker
 CONTAINER_RUNTIME ?= docker
@@ -214,16 +215,18 @@ container-docker: buildx # util target to build container images using docker bu
 		--platform $(PLATFORM) \
 		--metadata-file=$$image_metadata_filename \
 		-f $(DOCKERFILE) \
-		--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
-		--build-arg GOOS=$$os \
-		--build-arg GOARCH=$$arch \
 		--build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
+		--build-arg GOARCH=$$arch \
+		--build-arg GOOS=$$os \
+		--build-arg OS_VERSION=$(OS_VERSION) \
+		--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
 		--target=$(TARGET) \
 		-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
 		$(CONTEXT_DIR)
 
 retina-image: ## build the retina linux container image.
 	echo "Building for $(PLATFORM)"
+	set -e ; \
 	for target in init agent; do \
 		echo "Building for $$target"; \
 		if [ "$$target" = "init" ]; then \
@@ -233,7 +236,7 @@ retina-image: ## build the retina linux container image.
 		fi; \
 		$(MAKE) container-$(CONTAINER_BUILDER) \
 				PLATFORM=$(PLATFORM) \
-				DOCKERFILE=controller/Dockerfile.controller \
+				DOCKERFILE=controller/Dockerfile \
 				REGISTRY=$(IMAGE_REGISTRY) \
 				IMAGE=$$image_name \
 				VERSION=$(TAG) \
@@ -247,18 +250,22 @@ retina-image-win: ## build the retina Windows container image.
 	for year in 2019 2022; do \
 		tag=$(TAG)-windows-ltsc$$year-amd64; \
 		echo "Building $(RETINA_PLATFORM_TAG)"; \
+		set -e ; \
 		$(MAKE) container-$(CONTAINER_BUILDER) \
 				PLATFORM=windows/amd64 \
-				DOCKERFILE=controller/Dockerfile.windows-$$year \
+				DOCKERFILE=controller/Dockerfile \
 				REGISTRY=$(IMAGE_REGISTRY) \
 				IMAGE=$(RETINA_IMAGE) \
+				OS_VERSION=ltsc$$year \
 				VERSION=$(TAG) \
 				TAG=$$tag \
+				TARGET=agent-win \
 				CONTEXT_DIR=$(REPO_ROOT); \
 	done
 
 retina-operator-image:  ## build the retina linux operator image.
 	echo "Building for $(PLATFORM)"
+	set -e ; \
 	$(MAKE) container-$(CONTAINER_BUILDER) \
 			PLATFORM=$(PLATFORM) \
 			DOCKERFILE=operator/Dockerfile \
@@ -325,7 +332,7 @@ COVER_PKG ?= .
 
 test: $(ENVTEST) # Run unit tests.
 	go build -o test-summary ./test/utsummary/main.go
-	CGO_ENABLED=0 KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit -skip=TestE2E* -coverprofile=coverage.out -v -json ./... | ./test-summary --progress --verbose
+	CGO_ENABLED=0 KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit,dashboard -skip=TestE2E* -coverprofile=coverage.out -v -json ./... | ./test-summary --progress --verbose
 
 coverage: # Code coverage.
 #	go generate ./... && go test -tags=unit -coverprofile=coverage.out.tmp ./...
@@ -437,3 +444,7 @@ quick-build:
 .PHONY: quick-deploy
 quick-deploy:
 	$(MAKE) helm-install-advanced-local-context HELM_IMAGE_TAG=$(TAG)-linux-amd64
+
+.PHONY: simplify-dashboards
+simplify-dashboards:
+	cd deploy/grafana/dashboards/ && go test . -tags=dashboard,simplifydashboard -v

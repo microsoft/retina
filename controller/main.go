@@ -4,6 +4,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -71,6 +72,7 @@ func init() {
 }
 
 func main() {
+	fmt.Printf("starting Retina %v", version)
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
@@ -89,38 +91,40 @@ func main() {
 	flag.StringVar(&cfgFile, "config", configFileName, "config file")
 	flag.Parse()
 
+	fmt.Printf("loading config %s\n", cfgFile)
 	config, err := config.GetConfig(cfgFile)
 	if err != nil {
 		panic(err)
 	}
 
-	err = initLogging(config, applicationInsightsID)
-	if err != nil {
-		panic(err)
-	}
-
-	mainLogger := log.Logger().Named("main").Sugar()
-
-	mainLogger.Infof("starting Retina version: %s", version)
-	mainLogger.Info("Reading config ...")
-
-	mainLogger.Info("Initializing metrics")
-	metrics.InitializeMetrics()
-
-	mainLogger.Info("Initializing Kubernetes client-go ...")
+	fmt.Println("init client-go")
 	cfg, err := kcfg.GetConfig()
 	if err != nil {
 		panic(err)
 	}
-	additionalLoggerFields := []zap.Field{
+
+	fmt.Println("init logger")
+	zl, err := log.SetupZapLogger(&log.LogOpts{
+		Level:                 config.LogLevel,
+		File:                  false,
+		FileName:              logFileName,
+		MaxFileSizeMB:         100, //nolint:gomnd // defaults
+		MaxBackups:            3,   //nolint:gomnd // defaults
+		MaxAgeDays:            30,  //nolint:gomnd // defaults
+		ApplicationInsightsID: applicationInsightsID,
+		EnableTelemetry:       config.EnableTelemetry,
+	},
 		zap.String("version", version),
 		zap.String("apiserver", cfg.Host),
 		zap.String("plugins", strings.Join(config.EnabledPlugin, `,`)),
+	)
+	if err != nil {
+		panic(err)
 	}
+	defer zl.Close()
+	mainLogger := zl.Named("main").Sugar()
 
-	// Setup the logger to log the version, apiserver and enabled plugin.
-	log.Logger().AddFields(additionalLoggerFields...)
-	mainLogger = log.Logger().Named("main").Sugar()
+	metrics.InitializeMetrics()
 
 	var tel telemetry.Telemetry
 	if config.EnableTelemetry && applicationInsightsID != "" {
@@ -298,20 +302,4 @@ func main() {
 	}
 
 	mainLogger.Info("Network observability exiting. Till next time!")
-}
-
-func initLogging(config *config.Config, applicationInsightsID string) error {
-	logOpts := &log.LogOpts{
-		Level:                 config.LogLevel,
-		File:                  false,
-		FileName:              logFileName,
-		MaxFileSizeMB:         100,
-		MaxBackups:            3,
-		MaxAgeDays:            30,
-		ApplicationInsightsID: applicationInsightsID,
-		EnableTelemetry:       config.EnableTelemetry,
-	}
-
-	log.SetupZapLogger(logOpts)
-	return nil
 }

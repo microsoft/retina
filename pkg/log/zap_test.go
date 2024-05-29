@@ -26,9 +26,9 @@ func TestLogFileRotation(t *testing.T) {
 
 	logsToPrint := 10
 	for i := 0; i < logsToPrint; i++ {
-		l.Info("test", zap.Int("i", i))
+		global.Info("test", zap.Int("i", i))
 	}
-	l.Close()
+	global.Close()
 
 	_, err := os.Stat(lOpts.FileName)
 	assert.NoError(t, err, "Test log file is not found")
@@ -40,7 +40,7 @@ func TestLogFileRotation(t *testing.T) {
 	assert.NoError(t, err, "Getwd failed with err")
 
 	err = filepath.Walk(p, func(path string, info os.FileInfo, err error) error {
-		l.Info("Filename: ", zap.String("path", path), zap.String("name", info.Name()))
+		global.Info("Filename: ", zap.String("path", path), zap.String("name", info.Name()))
 		if !info.IsDir() {
 			if strings.HasPrefix(info.Name(), "test") && strings.HasSuffix(info.Name(), ".log") {
 				curReplicas++

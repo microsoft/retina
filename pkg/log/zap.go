@@ -12,12 +12,13 @@ import (
 	"github.com/go-chi/chi/middleware"
 	logfmt "github.com/jsternberg/zap-logfmt"
 	"github.com/microsoft/ApplicationInsights-Go/appinsights"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-var l *ZapLogger
+var global *ZapLogger
 
 const (
 	defaultFileName   = "retina.log"
@@ -45,33 +46,13 @@ func GetDefaultLogOpts() *LogOpts {
 }
 
 func Logger() *ZapLogger {
-	return l
+	return global
 }
 
 type ZapLogger struct {
 	*zap.Logger
-	lvl         zapcore.Level
-	opts        *LogOpts
-	closeAISink func()
-}
-
-func toLevel(lvl string) zapcore.Level {
-	switch lvl {
-	case "info":
-		return zapcore.InfoLevel
-	case "warn":
-		return zapcore.WarnLevel
-	case "error":
-		return zapcore.ErrorLevel
-	case "panic":
-		return zapcore.PanicLevel
-	case "fatal":
-		return zapcore.FatalLevel
-	case "debug":
-		return zapcore.DebugLevel
-	default:
-		panic("Log level not supported")
-	}
+	lvl    zapcore.Level
+	closeF []func()
 }
 
 func EncoderConfig() zapcore.EncoderConfig {
@@ -80,32 +61,36 @@ func EncoderConfig() zapcore.EncoderConfig {
 	return encoderCfg
 }
 
-func SetupZapLogger(lOpts *LogOpts) {
-	if l != nil {
-		return
+func SetupZapLogger(lOpts *LogOpts, persistentFields ...zap.Field) (*ZapLogger, error) {
+	if global != nil {
+		return global, nil
 	}
+	logger := &ZapLogger{}
 
 	lOpts.validate()
 	// Setup logger level.
-	atom := zap.NewAtomicLevel()
-	atom.SetLevel(toLevel(lOpts.Level))
+	lev, err := zap.ParseAtomicLevel(lOpts.Level)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse log level")
+	}
 	encoderCfg := EncoderConfig()
-	var core, logFmtCore, fileCore, aiCore zapcore.Core
 
 	// Setup a default stdout logger
-	logFmtCore = zapcore.NewCore(
+	core := zapcore.NewCore(
 		logfmt.NewEncoder(encoderCfg),
 		zapcore.Lock(os.Stdout),
-		atom,
+		lev,
 	)
-	l = &ZapLogger{
-		Logger: zap.New(logFmtCore, zap.AddCaller()),
-		lvl:    atom.Level(),
-		opts:   lOpts,
-	}
-	l.Logger.Debug("Stdout logger enabled")
 
 	if lOpts.ApplicationInsightsID != "" && lOpts.EnableTelemetry {
+		persistentFields = append(persistentFields,
+			zap.String("goversion", runtime.Version()),
+			zap.String("os", runtime.GOOS),
+			zap.String("arch", runtime.GOARCH),
+			zap.Int("numcores", runtime.NumCPU()),
+			zap.String("hostname", os.Getenv("HOSTNAME")),
+			zap.String("podname", os.Getenv("POD_NAME")),
+		)
 		// build the AI config
 		aiTelemetryConfig := appinsights.NewTelemetryConfiguration(lOpts.ApplicationInsightsID)
 		sinkcfg := zapai.SinkConfig{
@@ -115,70 +100,45 @@ func SetupZapLogger(lOpts *LogOpts) {
 		sinkcfg.MaxBatchSize = 10000
 		sinkcfg.MaxBatchInterval = 10 * time.Second //nolint:gomnd // ignore
 
-		// open the AI zap sink
-		aisink, aiclose, err := zap.Open(sinkcfg.URI()) //nolint:govet // intentional shadow
+		// open the AI zap aiSink
+		aiSink, closeAI, err := zap.Open(sinkcfg.URI()) //nolint:govet // intentional shadow
 		if err != nil {
-			l.Logger.Error("failed to open AI sink", zap.Error(err))
-			return
+			return nil, errors.Wrap(err, "failed to open AI sink")
 		}
-		// set the AI sink closer
-		l.closeAISink = aiclose
-		// build the AI core
-		aiCore = zapai.NewCore(toLevel(lOpts.Level), aisink).WithFieldMappers(zapai.DefaultMappers)
-		l.Logger.Debug("Application Insights logger enabled")
+		logger.closeF = append(logger.closeF, closeAI)
+		// build the AI aicore
+		aicore := zapai.NewCore(lev, aiSink).
+			WithFieldMappers(zapai.DefaultMappers).
+			With(persistentFields)
+		core = zapcore.NewTee(core, aicore)
 	}
 
 	if lOpts.File {
-		// Setup a file logger if it is enabled
-		// lumberjack is Zap endorsed logger rotation library
-		fw := zapcore.AddSync(&lumberjack.Logger{
+		l := &lumberjack.Logger{
 			Filename:   lOpts.FileName,
 			MaxSize:    lOpts.MaxFileSizeMB, // megabytes
-			MaxBackups: l.opts.MaxBackups,
-			MaxAge:     l.opts.MaxAgeDays, // days
-		})
-		fileCore = zapcore.NewCore(
+			MaxBackups: lOpts.MaxBackups,
+			MaxAge:     lOpts.MaxAgeDays, // days
+		}
+		logger.closeF = append(logger.closeF, func() { l.Close() })
+		fw := zapcore.AddSync(l)
+		filecore := zapcore.NewCore(
 			zapcore.NewJSONEncoder(encoderCfg),
 			fw,
-			atom,
+			lev,
 		)
-		l.Logger.Debug("File logger enabled")
+		core = zapcore.NewTee(core, filecore)
 	}
-	// Create a new teecore including all the enabled zap cores
-	if fileCore != nil && aiCore != nil {
-		core = zapcore.NewTee(logFmtCore, fileCore, aiCore)
-	} else if fileCore != nil {
-		core = zapcore.NewTee(logFmtCore, fileCore)
-	} else if aiCore != nil {
-		core = zapcore.NewTee(logFmtCore, aiCore)
-	} else {
-		core = zapcore.NewTee(logFmtCore)
-	}
-	l.Logger = zap.New(core, zap.AddCaller())
-	l.Logger = l.Logger.With(
-		zap.String("goversion", runtime.Version()),
-		zap.String("os", runtime.GOOS),
-		zap.String("arch", runtime.GOARCH),
-		zap.Int("numcores", runtime.NumCPU()),
-		zap.String("hostname", os.Getenv("HOSTNAME")),
-		zap.String("podname", os.Getenv("POD_NAME")),
-	)
-}
-
-func (l *ZapLogger) SetLevel(lvl string) {
-	l.lvl = toLevel(lvl)
-	_ = l.Logger.Sync()
-}
-
-func (l *ZapLogger) Level() int {
-	return int(l.lvl)
+	logger.Logger = zap.New(core, zap.AddCaller())
+	global = logger
+	return global, nil
 }
 
 func (l *ZapLogger) Close() {
-	if l.closeAISink != nil {
-		l.closeAISink()
-	}
 	_ = l.Logger.Sync()
+	for _, close := range l.closeF {
+		close()
+	}
 }
 
 func (l *ZapLogger) Named(name string) *ZapLogger {
@@ -241,9 +201,4 @@ func (lOpts *LogOpts) validate() {
 			lOpts.MaxAgeDays = defaultMaxAge
 		}
 	}
-}
-
-// AddFields adds custom fields to the logger
-func (l *ZapLogger) AddFields(fields ...zap.Field) {
-	l.Logger = l.Logger.With(fields...)
 }

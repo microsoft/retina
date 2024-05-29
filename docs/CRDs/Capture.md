@@ -33,6 +33,7 @@ The `Capture` CRD is defined with the following specifications:
   - `blobUpload`: Specifies a secret containing the blob SAS URL for storing the capture data.
   - `hostPath`: Stores the capture files into the specified host filesystem.
   - `persistentVolumeClaim`: Mounts a PersistentVolumeClaim into the Pod to store capture files.
+  - `s3Upload`: Specifies the configuration for uploading capture files to an S3-compatible storage service, including the bucket name, region, and optional custom endpoint.
 
 - **status:** Describes the status of the capture, including the number of active, failed, and completed jobs, completion time, conditions, and more. Check [capture lifecycle](#capture-lifecycle) for more details.
 
@@ -60,6 +61,19 @@ spec:
   outputConfiguration:
     hostPath: /captures
     blobUpload: blob-sas-url
+    s3Upload:
+      bucket: retina-bucket
+      region: ap-northeast-2
+      path: retina/captures
+      secretName: capture-s3-upload-secret
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: capture-s3-upload-secret
+data:
+  s3-access-key-id: <based-encode-s3-access-key-id>
+  s3-secret-access-key: <based-encode-s3-secret-access-key>
 ```
 
 ### Capture Lifecycle

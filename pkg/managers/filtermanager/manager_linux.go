@@ -4,13 +4,13 @@
 package filtermanager
 
 import (
-	"errors"
 	"net"
 	"sync"
 
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/plugin/filter"
 	"github.com/microsoft/retina/pkg/utils"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
@@ -56,7 +56,7 @@ func Init(retry int) (*FilterManager, error) {
 		f.c = newCache()
 	}
 	f.fm, err = filter.Init()
-	return f, err
+	return f, errors.Wrapf(err, "failed to initialize filter map")
 }
 
 func (f *FilterManager) AddIPs(ips []net.IP, r Requestor, m RequestMetadata) error {

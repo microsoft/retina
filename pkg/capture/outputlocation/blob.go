@@ -6,7 +6,6 @@ package outputlocation
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -35,7 +34,7 @@ func (bu *BlobUpload) Name() string {
 }
 
 func (bu *BlobUpload) Enabled() bool {
-	_, err := readBlobURL()
+	_, err := readBlobSASURL()
 	if err != nil {
 		bu.l.Debug("Output location is not enabled", zap.String("location", bu.Name()))
 		return false
@@ -45,13 +44,13 @@ func (bu *BlobUpload) Enabled() bool {
 
 func (bu *BlobUpload) Output(srcFilePath string) error {
 	bu.l.Info("Upload capture file to blob.", zap.String("location", bu.Name()))
-	blobURL, err := readBlobURL()
+	blobURL, err := readBlobSASURL()
 	if err != nil {
 		bu.l.Error("Failed to read blob url", zap.Error(err))
 		return err
 	}
 
-	if err = validateBlobURL(blobURL); err != nil {
+	if err = validateBlobSASURL(blobURL); err != nil {
 		bu.l.Error("Failed to validate blob url", zap.Error(err))
 		return err
 	}
@@ -86,7 +85,18 @@ func (bu *BlobUpload) Output(srcFilePath string) error {
 	return nil
 }
 
-func readBlobURL() (string, error) {
+func trimBlobSASURL(blobSASURL string) string {
+	// Blob SAS URL from the secret created from a file can have a newline and is surrounded by double quotes,
+	// so we need to trim \" and \n and trimming spaces is for unexpected spaces in the URL by customers.
+	// For example:
+	// "\"https://$storage-account-url/$container-name?$blob-sas-token\"\n"
+	trimedSecret := strings.Trim(blobSASURL, "\"\n")
+	trimedSecret = strings.TrimSpace(trimedSecret)
+
+	return trimedSecret
+}
+
+func readBlobSASURL() (string, error) {
 	secretPath := filepath.Join(captureConstants.CaptureOutputLocationBlobUploadSecretPath, captureConstants.CaptureOutputLocationBlobUploadSecretKey)
 	if runtime.GOOS == "windows" {
 		containerSandboxMountPoint := os.Getenv(captureConstants.ContainerSandboxMountPointEnvKey)
@@ -95,12 +105,16 @@ func readBlobURL() (string, error) {
 		}
 		secretPath = filepath.Join(containerSandboxMountPoint, captureConstants.CaptureOutputLocationBlobUploadSecretPath, captureConstants.CaptureOutputLocationBlobUploadSecretKey)
 	}
-	secretBytes, err := ioutil.ReadFile(secretPath)
-	return string(secretBytes), err
+	secretBytes, err := os.ReadFile(secretPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read file %s: %w", secretPath, err)
+	}
+	secretStr := string(secretBytes)
+	return trimBlobSASURL(secretStr), nil
 }
 
-func validateBlobURL(blobURL string) error {
-	u, err := url.Parse(blobURL)
+func validateBlobSASURL(blobSASURL string) error {
+	u, err := url.Parse(blobSASURL)
 	if err != nil {
 		return err
 	}
@@ -108,7 +122,7 @@ func validateBlobURL(blobURL string) error {
 	// Split the path into storage account container and blob
 	path := strings.TrimPrefix(u.Path, "/")
 	if path == "" {
-		return fmt.Errorf("invalid blob URL")
+		return fmt.Errorf("invalid blob SAS URL") //nolint:goerr113 //no specific handling expected
 	}
 
 	return nil
