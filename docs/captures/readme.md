@@ -49,17 +49,11 @@ This example creates a Capture and stores the Capture artifacts into a storage a
 
 Create a secret to store blob SAS URL:
 
-```yaml
-apiVersion: v1
-data:
-  ## Data key is required to be "blob-upload-url"
-  blob-upload-url: <based-encode-blob-sas-url>
-kind: Secret
-metadata:
-  name: blob-sas-url
-  namespace: default
-type: Opaque
+```bash
+kubectl create secret generic blob-sas-url --from-file=blob-upload-url=./blob-upload-url.txt
 ```
+
+in which blob-upload-url.txt stores the Blob SAS URL
 
 Create a Capture specifying the secret created as blobUpload, this example will also store the artifact on the node host path
 
