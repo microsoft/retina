@@ -20,26 +20,27 @@ import (
 )
 
 var (
-	ErrNilEnricher error = errors.New("enricher is nil")
-	client         *pktMonClient
-	socket         = "/tmp/retina-pktmon.sock"
+	ErrNilEnricher    error = errors.New("enricher is nil")
+	ErrUnexpectedExit error = errors.New("unexpected exit")
+
+	socket = "/tmp/retina-pktmon.sock"
 )
 
 const (
-	Name = "pktmon"
+	Name                    = "pktmon"
+	connectionRetryAttempts = 3
 )
 
 type PktMonPlugin struct {
 	enricher        enricher.EnricherInterface
 	externalChannel chan *v1.Event
-	pkt             PktMon
 	l               *log.ZapLogger
 	pktmonCmd       *exec.Cmd
 	stdWriter       *zapio.Writer
+	errWriter       *zapio.Writer
 }
 
 func (p *PktMonPlugin) Init() error {
-
 	return nil
 }
 
@@ -67,19 +68,20 @@ func NewClient() (*pktMonClient, error) {
 
 	conn, err := grpc.Dial(fmt.Sprintf("%s:%s", "unix", socket), grpc.WithInsecure(), grpc.WithDefaultServiceConfig(retryPolicy))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to dial pktmon server: %w", err)
 	}
 
 	return &pktMonClient{observerv1.NewObserverClient(conn)}, nil
 }
 
-func (p *PktMonPlugin) Start(ctx context.Context) error {
+func (p *PktMonPlugin) RunPktMonServer() error {
 	p.stdWriter = &zapio.Writer{Log: p.l.Logger, Level: zap.InfoLevel}
+	p.errWriter = &zapio.Writer{Log: p.l.Logger, Level: zap.ErrorLevel}
 	defer p.stdWriter.Close()
 	p.pktmonCmd = exec.Command("controller-pktmon.exe")
 	p.pktmonCmd.Args = append(p.pktmonCmd.Args, "--socketpath", socket)
 	p.pktmonCmd.Stdout = p.stdWriter
-	p.pktmonCmd.Stderr = p.stdWriter
+	p.pktmonCmd.Stderr = p.errWriter
 
 	p.l.Info("setting up enricher since pod level is enabled \n")
 	p.enricher = enricher.Instance()
@@ -88,37 +90,56 @@ func (p *PktMonPlugin) Start(ctx context.Context) error {
 	}
 
 	p.l.Info("calling start on pktmon stream server", zap.String("cmd", p.pktmonCmd.String()))
-	err := p.pktmonCmd.Start()
+
+	// block this thread, and should it ever return, it's a problem
+	err := p.pktmonCmd.Run()
 	if err != nil {
-		return fmt.Errorf("failed to start pktmon stream server: %w", err)
+		return fmt.Errorf("pktmon server exited when it should not have: %w", err)
 	}
 
-	p.l.Info("creating pktmon client")
+	// we never want to return happy from this
+	return fmt.Errorf("pktmon server exited unexpectedly: %w", ErrUnexpectedExit)
+}
+
+func (p *PktMonPlugin) Start(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	go func() {
+		err := p.RunPktMonServer()
+		if err != nil {
+			p.l.Error("failed to run pktmon server", zap.Error(err))
+		}
+
+		// if the pktmon server process exits, cancel the context, we need to crash
+		cancel()
+	}()
+
+	var str observerv1.Observer_GetFlowsClient
 	fn := func() error {
-		client, err = NewClient()
+		p.l.Info("creating pktmon client")
+		client, err := NewClient()
 		if err != nil {
 			return err
 		}
+
+		str, err = client.GetFlows(ctx, &observerv1.GetFlowsRequest{})
+		if err != nil {
+			return fmt.Errorf("failed to open pktmon stream: %w", err)
+		}
 		return nil
 	}
-	err = utils.Retry(fn, 10)
+	err := utils.Retry(fn, connectionRetryAttempts)
 	if err != nil {
 		return fmt.Errorf("failed to create pktmon client: %w", err)
-	}
-
-	str, err := client.GetFlows(ctx, &observerv1.GetFlowsRequest{})
-	if err != nil {
-		return fmt.Errorf("failed to open pktmon stream: %w", err)
 	}
 
 	for {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("pktmon context cancelled: %v", ctx.Err())
+			return fmt.Errorf("pktmon context cancelled: %w", ctx.Err())
 		default:
 			event, err := str.Recv()
 			if err != nil {
-				p.l.Error("failed to receive pktmon event", zap.Error(err))
+				return fmt.Errorf("failed to receive pktmon event: %w", err)
 			}
 
 			fl := event.GetFlow()
@@ -129,7 +150,7 @@ func (p *PktMonPlugin) Start(ctx context.Context) error {
 
 			ev := &v1.Event{
 				Event:     event.GetFlow(),
-				Timestamp: event.GetFlow().Time,
+				Timestamp: event.GetFlow().GetTime(),
 			}
 
 			if p.enricher != nil {
@@ -164,9 +185,8 @@ func New(cfg *kcfg.Config) api.Plugin {
 }
 
 func (p *PktMonPlugin) Stop() error {
-	//p.pktmonCmd.Process.Kill()
-	//p.pktmonCmd.Wait()
-	//p.stdWriter.Close()
+	// p.pktmonCmd.Wait()
+	// p.stdWriter.Close()
 	return nil
 }
 
