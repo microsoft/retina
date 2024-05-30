@@ -99,7 +99,6 @@ func (i *InstallHelmChart) Run() error {
 	// install the chart here
 	rel, err := client.Run(chart, chart.Values)
 	if err != nil {
-		PrintPodLogs(i.KubeConfigFilePath, i.Namespace, "k8s-app=retina")
 		return fmt.Errorf("failed to install chart: %w", err)
 	}
 

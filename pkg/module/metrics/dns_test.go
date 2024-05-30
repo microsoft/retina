@@ -37,7 +37,7 @@ func TestGetLabels(t *testing.T) {
 		},
 		{
 			name: "local context",
-			want: append(utils.DNSLabels, "ip", "namespace", "podname", "workloadKind", "workloadName", "service", "port"),
+			want: append(utils.DNSLabels, "ip", "namespace", "podname", "workload_kind", "workload_name", "service", "port"),
 			d: &DNSMetrics{
 				baseMetricObject: baseMetricObject{
 					srcCtx: &ContextOptions{

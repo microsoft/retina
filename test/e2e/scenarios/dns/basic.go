@@ -1,0 +1,91 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+package dns
+
+import (
+	"fmt"
+	"log"
+
+	"github.com/microsoft/retina/test/e2e/common"
+	prom "github.com/microsoft/retina/test/e2e/framework/prometheus"
+	"github.com/pkg/errors"
+)
+
+var (
+	dnsBasicRequestCountMetricName  = "networkobservability_dns_request_count"
+	dnsBasicResponseCountMetricName = "networkobservability_dns_response_count"
+)
+
+type validateBasicDNSRequestMetrics struct {
+	NumResponse string
+	Query       string
+	QueryType   string
+}
+
+func (v *validateBasicDNSRequestMetrics) Run() error {
+	metricsEndpoint := fmt.Sprintf("http://localhost:%d/metrics", common.RetinaPort)
+
+	validBasicDNSRequestMetricLabels := map[string]string{
+		"num_response": v.NumResponse,
+		"query":        v.Query,
+		"query_type":   v.QueryType,
+		"return_code":  "",
+		"response":     "",
+	}
+
+	err := prom.CheckMetric(metricsEndpoint, dnsBasicRequestCountMetricName, validBasicDNSRequestMetricLabels)
+	if err != nil {
+		return errors.Wrapf(err, "failed to verify basic dns request metrics %s", dnsBasicRequestCountMetricName)
+	}
+	log.Printf("found metrics matching %+v\n", dnsBasicRequestCountMetricName)
+
+	return nil
+}
+
+func (v *validateBasicDNSRequestMetrics) Prevalidate() error {
+	return nil
+}
+
+func (v *validateBasicDNSRequestMetrics) Stop() error {
+	return nil
+}
+
+type validateBasicDNSResponseMetrics struct {
+	NumResponse string
+	Query       string
+	QueryType   string
+	ReturnCode  string
+	Response    string
+}
+
+func (v *validateBasicDNSResponseMetrics) Run() error {
+	metricsEndpoint := fmt.Sprintf("http://localhost:%d/metrics", common.RetinaPort)
+
+	if v.Response == EmptyResponse {
+		v.Response = ""
+	}
+
+	validBasicDNSResponseMetricLabels := map[string]string{
+		"num_response": v.NumResponse,
+		"query":        v.Query,
+		"query_type":   v.QueryType,
+		"return_code":  v.ReturnCode,
+		"response":     v.Response,
+	}
+
+	err := prom.CheckMetric(metricsEndpoint, dnsBasicResponseCountMetricName, validBasicDNSResponseMetricLabels)
+	if err != nil {
+		return errors.Wrapf(err, "failed to verify basic dns response metrics %s", dnsBasicResponseCountMetricName)
+	}
+	log.Printf("found metrics matching %+v\n", dnsBasicResponseCountMetricName)
+
+	return nil
+}
+
+func (v *validateBasicDNSResponseMetrics) Prevalidate() error {
+	return nil
+}
+
+func (v *validateBasicDNSResponseMetrics) Stop() error {
+	return nil
+}
