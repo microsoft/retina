@@ -15,6 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -26,6 +27,8 @@ import (
 var fakescheme = runtime.NewScheme()
 
 func TestRetinaEndpointReconciler_ReconcilePod(t *testing.T) {
+	utilruntime.Must(clientgoscheme.AddToScheme(fakescheme))
+	utilruntime.Must(retinav1alpha1.AddToScheme(fakescheme))
 	_ = clientgoscheme.AddToScheme(fakescheme)
 	fakescheme.AddKnownTypes(retinav1alpha1.GroupVersion, &retinav1alpha1.RetinaEndpoint{})
 
@@ -43,6 +46,10 @@ func TestRetinaEndpointReconciler_ReconcilePod(t *testing.T) {
 			fields: fields{
 				existingObjects: []client.Object{
 					&retinav1alpha1.RetinaEndpoint{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       "RetinaEndpoint",
+							APIVersion: "retina.sh/v1alpha1",
+						},
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "pod",
 							Namespace: "default",

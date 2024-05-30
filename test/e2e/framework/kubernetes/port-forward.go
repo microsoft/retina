@@ -34,6 +34,7 @@ type PortForward struct {
 	LabelSelector         string
 	LocalPort             string
 	RemotePort            string
+	Endpoint              string
 	KubeConfigFilePath    string
 	OptionalLabelAffinity string
 
@@ -98,7 +99,7 @@ func (p *PortForward) Run() error {
 		client := http.Client{
 			Timeout: defaultHTTPClientTimeout,
 		}
-		resp, err := client.Get(p.pf.Address()) //nolint
+		resp, err := client.Get(p.pf.Address() + "/" + p.Endpoint) //nolint
 		if err != nil {
 			log.Printf("port forward validation HTTP request to %s failed: %v\n", p.pf.Address(), err)
 			p.pf.Stop()
