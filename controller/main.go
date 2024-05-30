@@ -22,6 +22,7 @@ import (
 	kcfg "sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	crmgr "sigs.k8s.io/controller-runtime/pkg/manager"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/pkg/config"
@@ -141,9 +142,10 @@ func main() {
 	// Create a manager for controller-runtime
 
 	mgrOption := crmgr.Options{
-		Scheme:             scheme,
-		MetricsBindAddress: metricsAddr,
-		// Port:                   9443, // retina-agent is host-networked, we don't want to abuse the port for conflicts.
+		Scheme: scheme,
+		Metrics: metricsserver.Options{
+			BindAddress: metricsAddr,
+		},
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "ecaf1259.retina.sh",
@@ -175,13 +177,13 @@ func main() {
 		podSelector := fields.AndSelectors(podNodeNameSelector, podNodeIPNotMatchSelector)
 
 		mainLogger.Info("pod selector when remote context is disabled", zap.String("pod selector", podSelector.String()))
-		mgrOption.NewCache = crcache.BuilderWithOptions(crcache.Options{
+		mgrOption.Cache = crcache.Options{
 			ByObject: map[client.Object]crcache.ByObject{
 				&corev1.Pod{}: {
 					Field: podSelector,
 				},
 			},
-		})
+		}
 	}
 
 	mgr, err := crmgr.New(cfg, mgrOption)
