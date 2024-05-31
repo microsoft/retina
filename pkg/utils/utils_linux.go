@@ -49,7 +49,7 @@ func htons(i uint16) uint16 {
 // https://gist.github.com/ammario/649d4c0da650162efd404af23e25b86b
 func Int2ip(nn uint32) net.IP {
 	ip := make(net.IP, 4)
-	switch determineEndian() {
+	switch DetermineEndian() {
 	case binary.BigEndian:
 		binary.BigEndian.PutUint32(ip, nn)
 	default:
@@ -63,7 +63,7 @@ func Ip2int(ip []byte) (res uint32, err error) {
 	if len(ip) == 16 {
 		return res, errors.New("IPv6 not supported")
 	}
-	switch determineEndian() {
+	switch DetermineEndian() {
 	case binary.BigEndian:
 		res = binary.BigEndian.Uint32(ip)
 	default:
@@ -80,19 +80,18 @@ func HostToNetShort(i uint16) uint16 {
 	return binary.BigEndian.Uint16(b)
 }
 
-func determineEndian() binary.ByteOrder {
+func DetermineEndian() binary.ByteOrder {
 	var endian binary.ByteOrder
-	buf := [2]byte{}
-	*(*uint16)(unsafe.Pointer(&buf[0])) = uint16(0xABCD)
+	buf := make([]byte, 2)                  // nolint:gomnd // 2 bytes
+	binary.BigEndian.PutUint16(buf, 0xABCD) // nolint:gomnd // 0xABCD
 
-	switch buf {
-	case [2]byte{0xCD, 0xAB}:
-		endian = binary.LittleEndian
-	case [2]byte{0xAB, 0xCD}:
-		endian = binary.BigEndian
-	default:
-		fmt.Println("Couldn't determine endianness")
+	if buf[0] == 0xAB && buf[1] == 0xCD {
+		return binary.BigEndian
 	}
+	if buf[0] == 0xCD && buf[1] == 0xAB {
+		return binary.LittleEndian
+	}
+	fmt.Println("Couldn't determine endianness")
 	return endian
 }
 
