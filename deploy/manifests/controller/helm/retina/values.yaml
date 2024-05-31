@@ -75,6 +75,7 @@ daemonset:
       command:
         - "/retina/controller"
       args:
+        - "legacy-control-plane"
         - "--config"
         - "/retina/config/config.yaml"
       healthProbeBindAddress: ":18081"

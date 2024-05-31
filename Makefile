@@ -13,7 +13,7 @@ endif
 OUTPUT_DIR = $(REPO_ROOT)/output
 BUILD_DIR = $(OUTPUT_DIR)/$(GOOS)_$(GOARCH)
 RETINA_BUILD_DIR = $(BUILD_DIR)/retina
-RETINA_DIR = $(REPO_ROOT)/controller
+RETINA_DIR = $(REPO_ROOT)/agent
 OPERATOR_DIR=$(REPO_ROOT)/operator
 CAPTURE_WORKLOAD_DIR = $(REPO_ROOT)/captureworkload
 
@@ -236,7 +236,7 @@ retina-image: ## build the retina linux container image.
 		fi; \
 		$(MAKE) container-$(CONTAINER_BUILDER) \
 				PLATFORM=$(PLATFORM) \
-				DOCKERFILE=controller/Dockerfile \
+				DOCKERFILE=agent/Dockerfile \
 				REGISTRY=$(IMAGE_REGISTRY) \
 				IMAGE=$$image_name \
 				VERSION=$(TAG) \
@@ -253,7 +253,7 @@ retina-image-win: ## build the retina Windows container image.
 		set -e ; \
 		$(MAKE) container-$(CONTAINER_BUILDER) \
 				PLATFORM=windows/amd64 \
-				DOCKERFILE=controller/Dockerfile \
+				DOCKERFILE=agent/Dockerfile \
 				REGISTRY=$(IMAGE_REGISTRY) \
 				IMAGE=$(RETINA_IMAGE) \
 				OS_VERSION=ltsc$$year \
@@ -279,7 +279,7 @@ retina-operator-image:  ## build the retina linux operator image.
 proto-gen: ## generate protobuf code
 	docker build --platform=linux/amd64 \
 		-t $(IMAGE_REGISTRY)/$(RETINA_PROTO_IMAGE):$(RETINA_PLATFORM_TAG) \
-		-f controller/Dockerfile.proto .
+		-f agent/Dockerfile.proto .
 	docker run --rm --platform=linux/amd64 \
 		--user $(shell id -u):$(shell id -g) \
 		-v $(PWD):/app $(IMAGE_REGISTRY)/$(RETINA_PROTO_IMAGE):$(RETINA_PLATFORM_TAG)
@@ -288,7 +288,7 @@ go-gen: ## run go generate at the repository root
 	docker build -t $(IMAGE_REGISTRY)/$(RETINA_GO_GEN_IMAGE):$(RETINA_PLATFORM_TAG) \
 		--build-arg GOOS=$(GOOS) \
 		--build-arg GOARCH=$(GOARCH) \
-		-f controller/Dockerfile.gogen .
+		-f agent/Dockerfile.gogen .
 	docker run --rm --user $(shell id -u):$(shell id -g) -v $(PWD):/app $(IMAGE_REGISTRY)/$(RETINA_GO_GEN_IMAGE):$(RETINA_PLATFORM_TAG)
 
 all-gen: ## generate all code
