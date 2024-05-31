@@ -23,16 +23,17 @@ func ValidateLatencyMetric() *types.Scenario {
 				LabelSelector:         "k8s-app=retina",
 				LocalPort:             "10093",
 				RemotePort:            "10093",
-				OptionalLabelAffinity: " ",
+				Endpoint:              "metrics",
+				OptionalLabelAffinity: "k8s-app=retina",
 			},
 			Opts: &types.StepOptions{
-				RunInBackgroundWithID: "latency-port-forward",
+				SkipSavingParamatersToJob: true,
+				RunInBackgroundWithID:     "latency-port-forward",
 			},
 		},
 		{
-			Step: &ValidateAPIServerLatencyMetric{
-				PortForwardedRetinaPort: "10093",
-			}, Opts: &types.StepOptions{
+			Step: &ValidateAPIServerLatencyMetric{},
+			Opts: &types.StepOptions{
 				SkipSavingParamatersToJob: true,
 			},
 		},

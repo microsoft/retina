@@ -65,6 +65,22 @@ func ValidateBasicDNSMetrics(scenarioName string, req *RequestValidationParams, 
 			},
 		},
 		{
+			Step: &kubernetes.ExecInPod{
+				PodName:      podName,
+				PodNamespace: "kube-system",
+				Command:      req.Command,
+			},
+			Opts: &types.StepOptions{
+				ExpectError:               req.ExpectError,
+				SkipSavingParamatersToJob: true,
+			},
+		},
+		{
+			Step: &types.Sleep{
+				Duration: sleepDelay,
+			},
+		},
+		{
 			Step: &kubernetes.PortForward{
 				Namespace:             "kube-system",
 				LabelSelector:         "k8s-app=retina",
@@ -167,7 +183,7 @@ func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParam
 			},
 		},
 		{
-			Step: &ValidateAdvanceDNSRequestMetrics{
+			Step: &ValidateAdvancedDNSRequestMetrics{
 				Namespace:          "kube-system",
 				NumResponse:        req.NumResponse,
 				PodName:            podName,

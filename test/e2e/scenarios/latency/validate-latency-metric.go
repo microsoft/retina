@@ -4,26 +4,26 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/microsoft/retina/test/e2e/common"
 	prom "github.com/microsoft/retina/test/e2e/framework/prometheus"
+	"github.com/pkg/errors"
 )
 
 var latencyBucketMetricName = "networkobservability_adv_node_apiserver_tcp_handshake_latency"
 
-type ValidateAPIServerLatencyMetric struct {
-	PortForwardedRetinaPort string
-}
+type ValidateAPIServerLatencyMetric struct{}
 
 func (v *ValidateAPIServerLatencyMetric) Prevalidate() error {
 	return nil
 }
 
 func (v *ValidateAPIServerLatencyMetric) Run() error {
-	promAddress := fmt.Sprintf("http://localhost:%s/metrics", v.PortForwardedRetinaPort)
+	promAddress := fmt.Sprintf("http://localhost:%d/metrics", common.RetinaPort)
 
 	metric := map[string]string{}
 	err := prom.CheckMetric(promAddress, latencyBucketMetricName, metric)
 	if err != nil {
-		return fmt.Errorf("failed to verify prometheus metrics %s: %w", latencyBucketMetricName, err)
+		return errors.Wrapf(err, "failed to verify latency metrics %s", latencyBucketMetricName)
 	}
 
 	log.Printf("found metrics matching %s\n", latencyBucketMetricName)
