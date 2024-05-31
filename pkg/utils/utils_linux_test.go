@@ -158,6 +158,7 @@ func TestAddDropReason(t *testing.T) {
 			assert.Equal(t, f.DropReasonDesc, tc.expectedDesc)
 			assert.Equal(t, f.Verdict, flow.Verdict_DROPPED)
 			assert.NotNil(t, f.EventType.Type, 1)
+			assert.EqualValues(t, f.EventType.GetSubType(), int32(tc.expectedDesc))
 			assert.NotNil(t, DropReasonDescription(f), DropReason_name[int32(tc.dropReason)])
 		})
 	}
