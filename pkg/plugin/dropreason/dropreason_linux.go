@@ -5,14 +5,15 @@
 package dropreason
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"os"
 	"path"
 	"runtime"
 	"time"
-	"unsafe"
 
 	"github.com/cilium/cilium/api/v1/flow"
 	hubblev1 "github.com/cilium/cilium/pkg/hubble/api/v1"
@@ -344,7 +345,12 @@ func (dr *dropReason) processRecord(ctx context.Context, id int) {
 			dr.l.Info("Context is done, dropreason worker will stop running", zap.Int("id", id))
 			return
 		case record := <-dr.recordsChannel:
-			bpfEvent := (*kprobePacket)(unsafe.Pointer(&record.RawSample[0])) //nolint:typecheck
+			var bpfEvent kprobePacket
+			err := binary.Read(bytes.NewReader(record.RawSample), binary.LittleEndian, &bpfEvent)
+			if err != nil {
+				dr.l.Error("Error reading bpf event", zap.Error(err))
+				continue
+			}
 			sourcePortShort := uint32(utils.HostToNetShort(bpfEvent.SrcPort))
 			destinationPortShort := uint32(utils.HostToNetShort(bpfEvent.DstPort))
 			dropKey := (dropMetricKey)(bpfEvent.Key)

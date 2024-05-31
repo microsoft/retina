@@ -8,7 +8,6 @@ import (
 	"net"
 	"strings"
 	"syscall"
-	"unsafe"
 
 	"github.com/pkg/errors"
 	"github.com/vishvananda/netlink"
@@ -43,7 +42,7 @@ func OpenRawSocket(index int) (int, error) {
 func htons(i uint16) uint16 {
 	b := make([]byte, 2)
 	binary.BigEndian.PutUint16(b, i)
-	return *(*uint16)(unsafe.Pointer(&b[0]))
+	return binary.BigEndian.Uint16(b)
 }
 
 // https://gist.github.com/ammario/649d4c0da650162efd404af23e25b86b
@@ -82,17 +81,16 @@ func HostToNetShort(i uint16) uint16 {
 
 func determineEndian() binary.ByteOrder {
 	var endian binary.ByteOrder
-	buf := [2]byte{}
-	*(*uint16)(unsafe.Pointer(&buf[0])) = uint16(0xABCD)
+	buf := make([]byte, 2)                  // nolint:gomnd // 2 bytes
+	binary.BigEndian.PutUint16(buf, 0xABCD) // nolint:gomnd // 0xABCD
 
-	switch buf {
-	case [2]byte{0xCD, 0xAB}:
-		endian = binary.LittleEndian
-	case [2]byte{0xAB, 0xCD}:
-		endian = binary.BigEndian
-	default:
-		fmt.Println("Couldn't determine endianness")
+	if buf[0] == 0xAB && buf[1] == 0xCD {
+		return binary.BigEndian
 	}
+	if buf[0] == 0xCD && buf[1] == 0xAB {
+		return binary.LittleEndian
+	}
+	fmt.Println("Couldn't determine endianness")
 	return endian
 }
 
