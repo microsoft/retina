@@ -80,7 +80,6 @@ func Cmd() *cobra.Command {
 		Use:   "legacy-control-plane",
 		Short: "Start Retina Agent with legacy control plane",
 		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Flags().Parse(args)
 			start()
 		},
 	}
@@ -237,7 +236,7 @@ func start() {
 			mainLogger.Error("unable to create filter manager", zap.Error(err))
 			os.Exit(1)
 		}
-		defer fm.Stop()
+		defer fm.Stop() //nolint:errcheck // best effort
 		enrich.Run()
 		metricsModule := mm.InitModule(ctx, config, pubSub, enrich, fm, controllerCache)
 
