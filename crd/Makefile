@@ -4,7 +4,7 @@ REPO_ROOT = $(shell git rev-parse --show-toplevel)
 TOOLS_DIR = $(REPO_ROOT)/hack/tools
 TOOLS_BIN_DIR = $(TOOLS_DIR)/bin
 CONTROLLER_GEN = $(TOOLS_BIN_DIR)/controller-gen
-HELM_CRD_DIR = $(REPO_ROOT)/deploy/manifests/controller/helm/retina/crds
+HELM_CRD_DIR = $(REPO_ROOT)/deploy/legacy/manifests/controller/helm/retina/crds
 
 .PHONY: generate manifests
 
