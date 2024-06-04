@@ -6,7 +6,7 @@ Retina by default emits node level metrics, however, customers can apply `Metric
 
 ## CRD Specification
 
-The full specification for the `MetricsConfiguration` CRD can be found in the [MetricsConfiguration CRD](https://github.com/microsoft/retina/blob/main/deploy/manifests/controller/helm/retina/crds/retina.sh_metricsconfigurations.yaml) file.
+The full specification for the `MetricsConfiguration` CRD can be found in the [MetricsConfiguration CRD](https://github.com/microsoft/retina/blob/main/deploy/legacy/manifests/controller/helm/retina/crds/retina.sh_metricsconfigurations.yaml) file.
 
 The `MetricsConfiguration` CRD is defined with the following specifications:
 
