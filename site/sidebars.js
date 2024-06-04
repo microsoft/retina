@@ -48,6 +48,7 @@ const sidebars = {
             'metrics/plugins/packetforward',
             'metrics/plugins/dropreason',
             'metrics/plugins/linuxutil',
+            'metrics/plugins/infiniband',
             'metrics/plugins/dns',
             'metrics/plugins/hnsstats',
             'metrics/plugins/packetparser',
