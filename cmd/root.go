@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/microsoft/retina/cmd/hubble"
 	"github.com/microsoft/retina/cmd/legacy"
 	"github.com/spf13/cobra"
 )
@@ -22,6 +23,7 @@ var rootCmd = &cobra.Command{
 
 func Execute() {
 	rootCmd.AddCommand(legacy.Cmd())
+	rootCmd.AddCommand(hubble.Cmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
