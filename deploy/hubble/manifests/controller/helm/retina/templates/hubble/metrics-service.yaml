@@ -1,0 +1,36 @@
+{{- if and .Values.hubble.enabled .Values.hubble.metrics.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: network-observability
+  namespace: {{ .Release.Namespace }}
+  labels:
+    k8s-app: networkobservability
+    app.kubernetes.io/name: networkobservability
+    app.kubernetes.io/part-of: retina
+  annotations:
+    {{- with .Values.hubble.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with .Values.hubble.metrics.serviceAnnotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- if not .Values.hubble.metrics.serviceMonitor.enabled }}
+    prometheus.io/scrape: "true"
+    prometheus.io/port: {{ .Values.hubble.metrics.port | quote }}
+    {{- end }}
+spec:
+  clusterIP: None
+  type: ClusterIP
+  ports:
+  - name: hubble
+    port: {{ .Values.hubble.metrics.port }}
+    protocol: TCP
+    targetPort: {{ .Values.hubble.metrics.port }}
+  - name: retina
+    port: {{ .Values.retinaPort }}
+    protocol: TCP
+    targetPort: {{ .Values.retinaPort }}
+  selector:
+    k8s-app: retina
+{{- end }}
