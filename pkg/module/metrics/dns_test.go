@@ -16,28 +16,46 @@ import (
 	"gotest.tools/v3/assert"
 )
 
+const (
+	request  = "request"
+	response = "response"
+)
+
 func TestGetLabels(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	l := log.Logger().Named("testGetLabels")
 
 	tests := []struct {
-		name string
-		want []string
-		d    *DNSMetrics
+		name       string
+		want       []string
+		d          *DNSMetrics
+		labelTypes string
 	}{
 		{
-			name: "basic context",
-			want: utils.DNSLabels,
+			name: "basic context request labels",
+			want: utils.DNSRequestLabels,
 			d: &DNSMetrics{
 				baseMetricObject: baseMetricObject{
 					srcCtx: nil,
 					dstCtx: nil,
 				},
 			},
+			labelTypes: request,
 		},
 		{
-			name: "local context",
-			want: append(utils.DNSLabels, "ip", "namespace", "podname", "workload_kind", "workload_name", "service", "port"),
+			name: "basic context response labels",
+			want: utils.DNSResponseLabels,
+			d: &DNSMetrics{
+				baseMetricObject: baseMetricObject{
+					srcCtx: nil,
+					dstCtx: nil,
+				},
+			},
+			labelTypes: response,
+		},
+		{
+			name: "local context request labels",
+			want: append(utils.DNSRequestLabels, "ip", "namespace", "podname", "workload_kind", "workload_name", "service", "port"),
 			d: &DNSMetrics{
 				baseMetricObject: baseMetricObject{
 					srcCtx: &ContextOptions{
@@ -53,12 +71,22 @@ func TestGetLabels(t *testing.T) {
 					l:      l,
 				},
 			},
+			labelTypes: request,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.d.getLabels(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetLabels() = %v, want %v", got, tt.want)
+			switch tt.labelTypes {
+			case request:
+				if got := tt.d.getRequestLabels(); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("GetRequestLabels() = %v, want %v", got, tt.want)
+				}
+			case response:
+				if got := tt.d.getResponseLabels(); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("GetResponseLabels() = %v, want %v", got, tt.want)
+				}
+			default:
+				t.Errorf("Invalid label type")
 			}
 		})
 	}

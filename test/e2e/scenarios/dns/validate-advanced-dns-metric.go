@@ -19,7 +19,6 @@ var (
 
 type ValidateAdvancedDNSRequestMetrics struct {
 	Namespace    string
-	NumResponse  string
 	PodName      string
 	Query        string
 	QueryType    string
@@ -40,12 +39,9 @@ func (v *ValidateAdvancedDNSRequestMetrics) Run() error {
 	validateAdvancedDNSRequestMetrics := map[string]string{
 		"ip":            podIP,
 		"namespace":     v.Namespace,
-		"num_response":  v.NumResponse,
 		"podname":       v.PodName,
 		"query":         v.Query,
 		"query_type":    v.QueryType,
-		"response":      "",
-		"return_code":   "",
 		"workload_kind": v.WorkloadKind,
 		"workload_name": v.WorkloadName,
 	}

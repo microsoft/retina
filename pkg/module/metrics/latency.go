@@ -107,7 +107,6 @@ func NewLatencyMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger,
 			exporter.AdvancedRegistry,
 			noResponseFromNodeAPIServerName,
 			noResponseFromNodeAPIServerDesc,
-			"count",
 		)
 	}
 
