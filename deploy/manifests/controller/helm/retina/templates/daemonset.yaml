@@ -161,6 +161,7 @@ spec:
           ports:
           - name: retina
             containerPort: {{ .Values.retinaPort }}
+          workingDir: $env:CONTAINER_SANDBOX_MOUNT_POINT
           command:
             - controller.exe --config ./retina/config.yaml 
           env:
