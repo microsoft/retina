@@ -242,11 +242,10 @@ require (
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/net v0.25.0 // indirect
-	golang.org/x/oauth2 v0.18.0 // indirect
+	golang.org/x/oauth2 v0.19.0 // indirect
 	golang.org/x/sync v0.7.0
 	golang.org/x/sys v0.21.0
 	golang.org/x/term v0.20.0 // indirect
-	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/protobuf v1.34.1
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
@@ -288,8 +287,8 @@ require (
 	github.com/onsi/ginkgo/v2 v2.19.0
 	github.com/onsi/gomega v1.33.1
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_model v0.6.0
-	github.com/prometheus/common v0.53.0
+	github.com/prometheus/client_model v0.6.1
+	github.com/prometheus/common v0.54.0
 	github.com/safchain/ethtool v0.3.0
 	github.com/spf13/viper v1.19.0
 	github.com/vishvananda/netlink v1.2.1-beta.2.0.20231127184239-0ced8385386a
