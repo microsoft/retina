@@ -1,0 +1,35 @@
+# This dockerfile requires building natively on windows
+# It can't be placed in the other Windows Dockerfile, as those use
+# buildx targets, and this one requires legacy build.
+# Maybe one day: https://github.com/moby/buildkit/issues/616
+
+ARG BUILDER_IMAGE
+FROM --platform=windows/amd64 ${BUILDER_IMAGE} as builder
+# Build args
+WORKDIR C:\\retina
+RUN gcc.exe --version
+RUN go version
+COPY go.mod .
+COPY go.sum .
+ENV CGO_ENABLED=1
+RUN go mod download
+RUN go mod verify
+ADD . .
+RUN cp -r c:/pktmon/ pkg/plugin/windows/pktmon/packetmonitorsupport/
+RUN ls pkg/plugin/windows/pktmon/packetmonitorsupport/
+ARG VERSION
+ARG APP_INSIGHTS_ID
+SHELL ["cmd", "/S", "/C"]
+ENV VERSION=$VERSION
+ENV APP_INSIGHTS_ID=$APP_INSIGHTS_ID
+
+RUN go build -v -o controller.exe -ldflags="-X main.version=%VERSION% -X main.applicationInsightsID=%APP_INSIGHTS_ID%" .\controller
+RUN go build -v -o captureworkload.exe -ldflags="-X main.version=%VERSION% -X main.applicationInsightsID=%APP_INSIGHTS_ID%" .\captureworkload
+
+
+FROM --platform=windows/amd64 mcr.microsoft.com/windows/nanoserver:ltsc2022 as final
+ADD https://github.com/microsoft/etl2pcapng/releases/download/v1.10.0/etl2pcapng.exe /etl2pcapng.exe
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'Continue';"]
+COPY --from=builder C:\\retina\\controller.exe controller.exe
+COPY --from=builder C:\\retina\\captureworkload.exe captureworkload.exe
+CMD ["controller.exe"]
