@@ -156,16 +156,19 @@ func (d *DNSMetrics) ProcessFlow(flow *v1.Flow) {
 	var labels []string
 	// Get the DNS query type
 	meta := utils.RetinaMetadata{}
-	if err := flow.Extensions.UnmarshalTo(&meta); err != nil {
+	if err := flow.GetExtensions().UnmarshalTo(&meta); err != nil {
 		d.l.Error("Failed to unmarshal flow extensions", zap.Error(err))
 		return
 	}
-	switch meta.DnsType {
+	switch meta.GetDnsType() {
 	case utils.DNSType_QUERY:
 		labels = d.requestValues(flow)
 	case utils.DNSType_RESPONSE:
 		labels = d.responseValues(flow)
+	case utils.DNSType_UNKNOWN:
 	default:
+		d.l.Error("Invalid DNS type", zap.Int32("type", int32(meta.GetDnsType())))
+		return
 	}
 
 	if len(labels) == 0 {
@@ -198,16 +201,19 @@ func (d *DNSMetrics) processLocalCtxFlow(flow *v1.Flow) {
 	var labels []string
 	// Get the DNS query type
 	meta := utils.RetinaMetadata{}
-	if err := flow.Extensions.UnmarshalTo(&meta); err != nil {
+	if err := flow.GetExtensions().UnmarshalTo(&meta); err != nil {
 		d.l.Error("Failed to unmarshal flow extensions", zap.Error(err))
 		return
 	}
-	switch meta.DnsType {
+	switch meta.GetDnsType() {
 	case utils.DNSType_QUERY:
 		labels = d.requestValues(flow)
 	case utils.DNSType_RESPONSE:
 		labels = d.responseValues(flow)
+	case utils.DNSType_UNKNOWN:
 	default:
+		d.l.Error("Invalid DNS type", zap.Int32("type", int32(meta.GetDnsType())))
+		return
 	}
 
 	if len(labels) == 0 {
