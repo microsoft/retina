@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/cilium/cilium/api/v1/flow"
-	v1 "github.com/cilium/cilium/api/v1/flow"
 	ttlcache "github.com/jellydator/ttlcache/v3"
 	api "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/pkg/common"
@@ -178,7 +177,7 @@ func (lm *LatencyMetrics) Clean() {
 	}
 }
 
-func (lm *LatencyMetrics) ProcessFlow(f *v1.Flow) {
+func (lm *LatencyMetrics) ProcessFlow(f *flow.Flow) {
 	if f == nil || f.GetL4() == nil || f.GetL4().GetTCP() == nil || utils.GetTCPID(f) == 0 || f.GetIP() == nil {
 		return
 	}
@@ -255,12 +254,12 @@ func (lm *LatencyMetrics) ProcessFlow(f *v1.Flow) {
 |                                                 |
 +-------------------------------------------------+
 */
-func (lm *LatencyMetrics) calculateLatency(f *v1.Flow) {
+func (lm *LatencyMetrics) calculateLatency(f *flow.Flow) {
 	// Ignore all packets observed at endpoint.
 	// We only care about node-apiserver packets observed at eth0.
 	// TO_NETWORK: Packets leaving node via eth0.
 	// FROM_NETWORK: Packets entering node via eth0.
-	if f.TraceObservationPoint == v1.TraceObservationPoint_TO_NETWORK {
+	if f.GetTraceObservationPoint() == flow.TraceObservationPoint_TO_NETWORK {
 		k := key{
 			srcIP: f.IP.Source,
 			dstIP: f.IP.Destination,
@@ -275,7 +274,7 @@ func (lm *LatencyMetrics) calculateLatency(f *v1.Flow) {
 				flags: f.GetL4().GetTCP().GetFlags(),
 			}, TTL)
 		}
-	} else if f.TraceObservationPoint == v1.TraceObservationPoint_FROM_NETWORK {
+	} else if f.GetTraceObservationPoint() == flow.TraceObservationPoint_FROM_NETWORK {
 		k := key{
 			srcIP: f.IP.Destination,
 			dstIP: f.IP.Source,
