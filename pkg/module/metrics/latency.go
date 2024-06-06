@@ -259,7 +259,7 @@ func (lm *LatencyMetrics) calculateLatency(f *flow.Flow) {
 	// We only care about node-apiserver packets observed at eth0.
 	// TO_NETWORK: Packets leaving node via eth0.
 	// FROM_NETWORK: Packets entering node via eth0.
-	if f.TraceObservationPoint == flow.TraceObservationPoint_TO_NETWORK {
+	if f.GetTraceObservationPoint() == flow.TraceObservationPoint_TO_NETWORK {
 		k := key{
 			srcIP: f.IP.Source,
 			dstIP: f.IP.Destination,
@@ -274,7 +274,7 @@ func (lm *LatencyMetrics) calculateLatency(f *flow.Flow) {
 				flags: f.GetL4().GetTCP().GetFlags(),
 			}, TTL)
 		}
-	} else if f.TraceObservationPoint == flow.TraceObservationPoint_FROM_NETWORK {
+	} else if f.GetTraceObservationPoint() == flow.TraceObservationPoint_FROM_NETWORK {
 		k := key{
 			srcIP: f.IP.Destination,
 			dstIP: f.IP.Source,
