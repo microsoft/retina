@@ -274,7 +274,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.27.1
 	github.com/aws/aws-sdk-go-v2/config v1.27.17
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.17
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.54.4
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.55.0
 	github.com/cakturk/go-netstat v0.0.0-20200220111822-e5b49efee7a5
 	github.com/cilium/cilium v1.15.5
 	github.com/cilium/ebpf v0.15.0
