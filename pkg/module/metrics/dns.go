@@ -98,7 +98,25 @@ func (d *DNSMetrics) getResponseLabels() []string {
 	return labels
 }
 
-func (d *DNSMetrics) values(flow *v1.Flow) []string {
+func (d *DNSMetrics) requestValues(flow *v1.Flow) []string {
+	flowDNS, dnsType, _ := utils.GetDNS(flow)
+	if flowDNS == nil {
+		return nil
+	}
+	if dnsType == utils.DNSType_UNKNOWN ||
+		(d.metricName == utils.DNSRequestCounterName && dnsType != utils.DNSType_QUERY) ||
+		(d.metricName == utils.DNSResponseCounterName && dnsType != utils.DNSType_RESPONSE) {
+		return nil
+	}
+
+	labels := []string{
+		strings.Join(flowDNS.GetQtypes(), ","),
+		flowDNS.GetQuery(),
+	}
+	return labels
+}
+
+func (d *DNSMetrics) responseValues(flow *v1.Flow) []string {
 	flowDNS, dnsType, numResponses := utils.GetDNS(flow)
 	if flowDNS == nil {
 		return nil
@@ -109,10 +127,6 @@ func (d *DNSMetrics) values(flow *v1.Flow) []string {
 		return nil
 	}
 
-	// Ref: DNSLabels {"return_code", "query_type", "query", "response", "num_response"}
-	// "Response" label for DNS maybe empty. This is to avoid
-	// https://github.com/inspektor-gadget/inspektor-gadget/issues/2008 .
-	// Also ref: https://github.com/inspektor-gadget/inspektor-gadget/blob/main/docs/gadgets/trace/dns.md#limitations .
 	labels := []string{
 		utils.DNSRcodeToString(flow),
 		strings.Join(flowDNS.GetQtypes(), ","),
@@ -139,8 +153,22 @@ func (d *DNSMetrics) ProcessFlow(flow *v1.Flow) {
 		return
 	}
 
-	labels := d.values(flow)
-	if labels == nil {
+	var labels []string
+	// Get the DNS query type
+	meta := utils.RetinaMetadata{}
+	if err := flow.Extensions.UnmarshalTo(&meta); err != nil {
+		d.l.Error("Failed to unmarshal flow extensions", zap.Error(err))
+		return
+	}
+	switch meta.DnsType {
+	case utils.DNSType_QUERY:
+		labels = d.requestValues(flow)
+	case utils.DNSType_RESPONSE:
+		labels = d.responseValues(flow)
+	default:
+	}
+
+	if len(labels) == 0 {
 		return
 	}
 	if d.srcCtx != nil {
@@ -167,8 +195,22 @@ func (d *DNSMetrics) processLocalCtxFlow(flow *v1.Flow) {
 		return
 	}
 
-	labels := d.values(flow)
-	if labels == nil {
+	var labels []string
+	// Get the DNS query type
+	meta := utils.RetinaMetadata{}
+	if err := flow.Extensions.UnmarshalTo(&meta); err != nil {
+		d.l.Error("Failed to unmarshal flow extensions", zap.Error(err))
+		return
+	}
+	switch meta.DnsType {
+	case utils.DNSType_QUERY:
+		labels = d.requestValues(flow)
+	case utils.DNSType_RESPONSE:
+		labels = d.responseValues(flow)
+	default:
+	}
+
+	if len(labels) == 0 {
 		return
 	}
 

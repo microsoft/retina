@@ -124,7 +124,7 @@ func TestValues(t *testing.T) {
 		},
 		{
 			name:   "Query",
-			want:   []string{"NOERROR", "A", "bing.com", "", "0"},
+			want:   []string{"A", "bing.com"},
 			d:      &DNSMetrics{metricName: utils.DNSRequestCounterName},
 			input:  testQ,
 			l7Type: flow.L7FlowType_REQUEST,
@@ -167,8 +167,22 @@ func TestValues(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.d.values(tt.input); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Values() = %v, want %v", got, tt.want)
+			switch tt.l7Type {
+			case flow.L7FlowType_REQUEST:
+				if got := tt.d.requestValues(tt.input); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("RequestValues() = %v, want %v", got, tt.want)
+				}
+			case flow.L7FlowType_RESPONSE:
+				if got := tt.d.responseValues(tt.input); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("ResponseValues() = %v, want %v", got, tt.want)
+				}
+			case flow.L7FlowType_UNKNOWN_L7_TYPE:
+				if got := tt.d.responseValues(tt.input); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("ResponseValues() = %v, want %v", got, tt.want)
+				}
+			case flow.L7FlowType_SAMPLE:
+			default:
+				t.Errorf("Invalid L7FlowType")
 			}
 			if tt.input == nil {
 				return
