@@ -524,12 +524,12 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 			p.l.Info("Context is done, stopping Worker", zap.Int("worker_id", id))
 			return
 		case record := <-p.recordsChannel:
-			p.l.Debug("Received record",
-				zap.Int("cpu", record.CPU),
-				zap.Uint64("lost_samples", record.LostSamples),
-				zap.Int("bytes_remaining", record.Remaining),
-				zap.Int("worker_id", id),
-			)
+			// p.l.Debug("Received record",
+			// 	zap.Int("cpu", record.CPU),
+			// 	zap.Uint64("lost_samples", record.LostSamples),
+			// 	zap.Int("bytes_remaining", record.Remaining),
+			// 	zap.Int("worker_id", id),
+			// )
 
 			bpfEvent := (*packetparserPacket)(unsafe.Pointer(&record.RawSample[0])) //nolint:typecheck
 
@@ -573,7 +573,7 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 			// Add metadata to the flow.
 			utils.AddRetinaMetadata(fl, meta)
 
-			p.l.Debug("Received packet", zap.Any("flow", fl))
+			// p.l.Debug("Received packet", zap.Any("flow", fl))
 
 			// Write the event to the enricher.
 			ev := &v1.Event{
@@ -633,7 +633,7 @@ func (p *packetParser) readData() {
 
 	select {
 	case p.recordsChannel <- record:
-		p.l.Debug("Sent record to channel", zap.Any("record", record))
+		// p.l.Debug("Sent record to channel", zap.Any("record", record))
 	default:
 		// Channel is full, drop the record.
 		// We shouldn't slow down the perf array reader.

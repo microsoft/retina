@@ -12,7 +12,6 @@ import (
 	"github.com/cilium/cilium/pkg/k8s/client"
 	"github.com/cilium/cilium/pkg/k8s/synced"
 	"github.com/cilium/cilium/pkg/k8s/watchers"
-	"github.com/cilium/cilium/pkg/k8s/watchers/resources"
 	"github.com/cilium/cilium/pkg/logging"
 	"github.com/cilium/cilium/pkg/logging/logfields"
 	"github.com/cilium/cilium/pkg/option"
@@ -23,10 +22,11 @@ const (
 )
 
 var (
-	once         sync.Once
-	w            *watchers.K8sWatcher
-	logger       = logging.DefaultLogger.WithField(logfields.LogSubsys, "k8s-watcher")
-	k8sResources = []string{K8sAPIGroupCiliumEndpointV2, resources.K8sAPIGroupServiceV1Core}
+	once   sync.Once
+	w      *watchers.K8sWatcher
+	logger = logging.DefaultLogger.WithField(logfields.LogSubsys, "k8s-watcher")
+	//k8sResources = []string{K8sAPIGroupCiliumEndpointV2, resources.K8sAPIGroupServiceV1Core}
+	k8sResources = []string{}
 )
 
 type watcherParams struct {
