@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/retina/pkg/log"
 	metricsinit "github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/utils"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
@@ -137,6 +138,25 @@ func (d *DNSMetrics) responseValues(flow *v1.Flow) []string {
 	return labels
 }
 
+func (d *DNSMetrics) getLabelsForProcessFlow(flow *v1.Flow) ([]string, error) {
+	var labels []string
+	// Get the DNS query type
+	meta := utils.RetinaMetadata{}
+	if err := flow.GetExtensions().UnmarshalTo(&meta); err != nil {
+		return labels, errors.Wrapf(err, "failed to unmarshal flow extensions")
+	}
+	switch meta.GetDnsType() {
+	case utils.DNSType_QUERY:
+		labels = d.requestValues(flow)
+	case utils.DNSType_RESPONSE:
+		labels = d.responseValues(flow)
+	case utils.DNSType_UNKNOWN:
+	default:
+		return labels, errors.Errorf("invalid DNS type %d", int32(meta.GetDnsType()))
+	}
+	return labels, nil
+}
+
 func (d *DNSMetrics) ProcessFlow(flow *v1.Flow) {
 	if flow == nil {
 		return
@@ -153,27 +173,16 @@ func (d *DNSMetrics) ProcessFlow(flow *v1.Flow) {
 		return
 	}
 
-	var labels []string
-	// Get the DNS query type
-	meta := utils.RetinaMetadata{}
-	if err := flow.GetExtensions().UnmarshalTo(&meta); err != nil {
-		d.l.Error("Failed to unmarshal flow extensions", zap.Error(err))
-		return
-	}
-	switch meta.GetDnsType() {
-	case utils.DNSType_QUERY:
-		labels = d.requestValues(flow)
-	case utils.DNSType_RESPONSE:
-		labels = d.responseValues(flow)
-	case utils.DNSType_UNKNOWN:
-	default:
-		d.l.Error("Invalid DNS type", zap.Int32("type", int32(meta.GetDnsType())))
+	labels, err := d.getLabelsForProcessFlow(flow)
+	if err != nil {
+		d.l.Error("Failed to get labels for process flow", zap.Error(err))
 		return
 	}
 
 	if len(labels) == 0 {
 		return
 	}
+
 	if d.srcCtx != nil {
 		srcLabels := d.srcCtx.getValues(flow)
 		if len(srcLabels) > 0 {
@@ -198,21 +207,9 @@ func (d *DNSMetrics) processLocalCtxFlow(flow *v1.Flow) {
 		return
 	}
 
-	var labels []string
-	// Get the DNS query type
-	meta := utils.RetinaMetadata{}
-	if err := flow.GetExtensions().UnmarshalTo(&meta); err != nil {
-		d.l.Error("Failed to unmarshal flow extensions", zap.Error(err))
-		return
-	}
-	switch meta.GetDnsType() {
-	case utils.DNSType_QUERY:
-		labels = d.requestValues(flow)
-	case utils.DNSType_RESPONSE:
-		labels = d.responseValues(flow)
-	case utils.DNSType_UNKNOWN:
-	default:
-		d.l.Error("Invalid DNS type", zap.Int32("type", int32(meta.GetDnsType())))
+	labels, err := d.getLabelsForProcessFlow(flow)
+	if err != nil {
+		d.l.Error("Failed to get labels for process flow", zap.Error(err))
 		return
 	}
 
