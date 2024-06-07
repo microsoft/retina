@@ -38,8 +38,9 @@ agent:
   container:
     retina:
       command:
-        - "/controller"
+        - "/retina/controller"
       args:
+        - "hubble-control-plane"
         - "--config-dir"
         - "/retina/config"
       healthProbeBindAddress: ":18081"

@@ -34,6 +34,8 @@ PLATFORM		?= $(OS)/$(ARCH)
 PLATFORMS		?= linux/amd64 linux/arm64 windows/amd64
 OS_VERSION		?= ltsc2019
 
+HUBBLE_VERSION ?= v0.13.0
+
 CONTAINER_BUILDER ?= docker
 CONTAINER_RUNTIME ?= docker
 YEAR 			  ?= 2022
@@ -225,6 +227,7 @@ container-docker: buildx # util target to build container images using docker bu
 		--build-arg GOARCH=$$arch \
 		--build-arg GOOS=$$os \
 		--build-arg OS_VERSION=$(OS_VERSION) \
+		--build-arg HUBBLE_VERSION=$(HUBBLE_VERSION) \
 		--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
 		--target=$(TARGET) \
 		-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
@@ -450,8 +453,36 @@ helm-install-hubble:
 		--set hubble.tls.auto.certValidityDuration=1 \
 		--set hubble.tls.auto.schedule="*/10 * * * *"	
 
+helm-install-without-tls: clean-certs
+	$(MAKE) helm-install-hubble ENABLE_TLS=false
+
 helm-uninstall:
 	helm uninstall retina -n kube-system
+
+.PHONY: get-certs
+get-certs:
+	mkdir -p $(CERT_DIR)
+	$(foreach kv,$(CERT_FILES),\
+			$(eval FILE=$(word 1,$(subst :, ,$(kv)))) \
+			$(eval CONFIG_KEY=$(word 2,$(subst :, ,$(kv)))) \
+			kubectl get secret $(TLS_SECRET_NAME) \
+				-n kube-system \
+				-o jsonpath="{.data['$(call escape_dot,$(FILE))']}" \
+			| base64 -d > $(CERT_DIR)/$(FILE);\
+			hubble config set $(CONFIG_KEY) $(CERT_DIR)/$(FILE);\
+		)
+	hubble config set tls true
+	hubble config set tls-server-name instance.hubble-relay.cilium.io
+
+.PHONY: clean-certs
+clean-certs:
+	rm -rf $(CERT_DIR)
+	$(foreach kv,$(CERT_FILES),\
+		$(eval CONFIG_KEY=$(word 2,$(subst :, ,$(kv)))) \
+		hubble config reset $(CONFIG_KEY);\
+	)
+	hubble config set tls false
+	hubble config reset tls-server-name
 
 .PHONY: docs
 docs: 
@@ -470,6 +501,11 @@ quick-build:
 .PHONY: quick-deploy
 quick-deploy:
 	$(MAKE) helm-install-advanced-local-context HELM_IMAGE_TAG=$(TAG)-linux-amd64
+
+.PHONY: quick-deploy-hubble
+quick-deploy-hubble:
+	$(MAKE) helm-uninstall || true
+	$(MAKE) helm-install-without-tls HELM_IMAGE_TAG=$(TAG)-linux-amd64
 
 .PHONY: simplify-dashboards
 simplify-dashboards:
