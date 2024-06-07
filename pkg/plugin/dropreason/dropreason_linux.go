@@ -348,7 +348,11 @@ func (dr *dropReason) processRecord(ctx context.Context, id int) {
 			var bpfEvent kprobePacket
 			err := binary.Read(bytes.NewReader(record.RawSample), binary.LittleEndian, &bpfEvent)
 			if err != nil {
-				dr.l.Error("Error reading bpf event", zap.Error(err))
+				if binary.Size(bpfEvent) != len(record.RawSample) {
+					dr.l.Error("Error reading bpf event due to size mismatch", zap.Error(err), zap.Int("expected", binary.Size(bpfEvent)), zap.Int("actual", len(record.RawSample)))
+				} else {
+					dr.l.Error("Error reading bpf event", zap.Error(err))
+				}
 				continue
 			}
 			sourcePortShort := uint32(utils.HostToNetShort(bpfEvent.SrcPort))
