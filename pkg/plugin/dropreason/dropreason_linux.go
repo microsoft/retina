@@ -346,7 +346,7 @@ func (dr *dropReason) processRecord(ctx context.Context, id int) {
 			return
 		case record := <-dr.recordsChannel:
 			var bpfEvent kprobePacket
-			err := binary.Read(bytes.NewReader(record.RawSample), utils.DetermineEndian(), &bpfEvent)
+			err := binary.Read(bytes.NewReader(record.RawSample), binary.LittleEndian, &bpfEvent)
 			if err != nil {
 				dr.l.Error("Error reading bpf event", zap.Error(err))
 				continue

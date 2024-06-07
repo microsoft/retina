@@ -533,7 +533,7 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 			)
 
 			var bpfEvent packetparserPacket
-			err := binary.Read(bytes.NewReader(record.RawSample), utils.DetermineEndian(), &bpfEvent)
+			err := binary.Read(bytes.NewReader(record.RawSample), binary.LittleEndian, &bpfEvent)
 			if err != nil {
 				p.l.Error("Error reading bpfEvent", zap.Error(err))
 				continue
