@@ -49,13 +49,7 @@ func htons(i uint16) uint16 {
 // https://gist.github.com/ammario/649d4c0da650162efd404af23e25b86b
 func Int2ip(nn uint32) net.IP {
 	ip := make(net.IP, 4)
-	switch determineEndian() {
-	case binary.BigEndian:
-		binary.BigEndian.PutUint32(ip, nn)
-	default:
-		// default is little endian
-		binary.LittleEndian.PutUint32(ip, nn)
-	}
+	binary.LittleEndian.PutUint32(ip, nn)
 	return ip
 }
 
@@ -63,14 +57,7 @@ func Ip2int(ip []byte) (res uint32, err error) {
 	if len(ip) == 16 {
 		return res, errors.New("IPv6 not supported")
 	}
-	switch determineEndian() {
-	case binary.BigEndian:
-		res = binary.BigEndian.Uint32(ip)
-	default:
-		// default is little endian.
-		res = binary.LittleEndian.Uint32(ip)
-	}
-	return res, nil
+	return binary.LittleEndian.Uint32(ip), nil
 }
 
 // HostToNetShort converts a 16-bit integer from host to network byte order, aka "htons"
@@ -78,22 +65,6 @@ func HostToNetShort(i uint16) uint16 {
 	b := make([]byte, 2)
 	binary.LittleEndian.PutUint16(b, i)
 	return binary.BigEndian.Uint16(b)
-}
-
-func determineEndian() binary.ByteOrder {
-	var endian binary.ByteOrder
-	buf := [2]byte{}
-	*(*uint16)(unsafe.Pointer(&buf[0])) = uint16(0xABCD)
-
-	switch buf {
-	case [2]byte{0xCD, 0xAB}:
-		endian = binary.LittleEndian
-	case [2]byte{0xAB, 0xCD}:
-		endian = binary.BigEndian
-	default:
-		fmt.Println("Couldn't determine endianness")
-	}
-	return endian
 }
 
 // GetDefaultOutgoingLinks gets the outgoing interface by executing an equivalent to `ip route show default 0.0.0.0/0`
