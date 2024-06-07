@@ -12,8 +12,8 @@ import (
 	"go.etcd.io/etcd/version"
 )
 
-func Cmd() *cobra.Command {
-	agentHive := hive.New(Agent)
+func Cmd(agentHive *hive.Hive) *cobra.Command {
+	// agentHive := hive.New(Agent)
 	hubbleCmd := &cobra.Command{
 		Use:   "hubble-control-plane",
 		Short: "Start Hubble control plane",
