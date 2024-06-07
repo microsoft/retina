@@ -4,6 +4,7 @@ import (
 	"context"
 
 	agentK8s "github.com/cilium/cilium/daemon/k8s"
+	daemonk8s "github.com/cilium/cilium/daemon/k8s"
 	"github.com/cilium/cilium/pkg/hive/cell"
 	"github.com/cilium/cilium/pkg/identity/cache"
 	"github.com/cilium/cilium/pkg/ipcache"
@@ -16,6 +17,7 @@ import (
 	slim_corev1 "github.com/cilium/cilium/pkg/k8s/slim/k8s/api/core/v1"
 	slim_networkingv1 "github.com/cilium/cilium/pkg/k8s/slim/k8s/api/networking/v1"
 	"github.com/cilium/cilium/pkg/k8s/synced"
+	"github.com/cilium/cilium/pkg/k8s/types"
 	"github.com/cilium/cilium/pkg/k8s/watchers"
 	"github.com/cilium/cilium/pkg/node"
 	"github.com/cilium/cilium/pkg/option"
@@ -53,6 +55,21 @@ var Cell = cell.Module(
 		},
 		func() resource.Resource[*cilium_api_v2alpha1.CiliumCIDRGroup] {
 			return &fakeresource[*cilium_api_v2alpha1.CiliumCIDRGroup]{}
+		},
+		func() resource.Resource[*cilium_api_v2alpha1.CiliumEndpointSlice] {
+			return &fakeresource[*cilium_api_v2alpha1.CiliumEndpointSlice]{}
+		},
+		func() resource.Resource[*types.CiliumEndpoint] {
+			return &fakeresource[*types.CiliumEndpoint]{}
+		},
+		func() resource.Resource[*cilium_api_v2.CiliumNode] {
+			return &fakeresource[*cilium_api_v2.CiliumNode]{}
+		},
+		func() daemonk8s.ServiceNonHeadless {
+			return &fakeresource[*slim_corev1.Service]{}
+		},
+		func() daemonk8s.EndpointsNonHeadless {
+			return &fakeresource[*ciliumk8s.Endpoints]{}
 		},
 		func() watchers.WatcherConfiguration {
 			return &watcherconfig{}
