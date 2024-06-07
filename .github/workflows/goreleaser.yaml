@@ -22,7 +22,7 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Run GoReleaser build
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
           version: latest
@@ -41,7 +41,7 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Run GoReleaser release
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
           version: latest

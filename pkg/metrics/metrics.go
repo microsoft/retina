@@ -147,6 +147,24 @@ func InitializeMetrics() {
 		utils.DNSLabels...,
 	)
 
+	// InfiniBand Metrics
+	InfinibandCounterStats = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.DefaultRegistry,
+		utils.InfinibandCounterStatsName,
+		infinibandCounterStatsDescription,
+		utils.StatName,
+		utils.Device,
+		utils.Port,
+	)
+
+	InfinibandStatusParams = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.DefaultRegistry,
+		utils.InfinibandStatusParamsName,
+		infinibandStatusParamsDescription,
+		utils.StatName,
+		utils.InterfaceName,
+	)
+
 	isInitialized = true
 	metricsLogger.Info("Metrics initialized")
 }

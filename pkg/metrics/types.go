@@ -38,6 +38,8 @@ const (
 	nodeApiServerHandshakeLatencyDesc         = "Histogram depicting latency of the TCP handshake between nodes and Kubernetes API server measured in milliseconds"
 	dnsRequestCounterDescription              = "DNS requests by statistics"
 	dnsResponseCounterDescription             = "DNS responses by statistics"
+	infinibandCounterStatsDescription         = "InfiniBand Counter Statistics"
+	infinibandStatusParamsDescription         = "InfiniBand Status Parameters"
 
 	// Control plane metrics
 	pluginManagerFailedToReconcileCounterDescription = "Number of times the plugin manager failed to reconcile the plugins"
@@ -86,6 +88,9 @@ var (
 	// DNS Metrics.
 	DNSRequestCounter  ICounterVec
 	DNSResponseCounter ICounterVec
+
+	InfinibandCounterStats IGaugeVec
+	InfinibandStatusParams IGaugeVec
 )
 
 func ToPrometheusType(metric interface{}) prometheus.Collector {
