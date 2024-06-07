@@ -69,6 +69,7 @@ jobs:
       matrix:
         platform: ["windows"]
         arch: ["amd64"]
+        year: ["2019", "2022"]
 
     steps:
       - name: Checkout code
@@ -101,11 +102,13 @@ jobs:
               IMAGE_NAMESPACE=${{ github.repository }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
+              YEAR=${{ matrix.year }} \
               BUILDX_ACTION=--push
           else
             make retina-image-win \
               IMAGE_NAMESPACE=${{ github.repository }} \
-              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
+              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
+              WINDOWS_YEARS=${{ matrix.year }} 
           fi
         env:
           IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
