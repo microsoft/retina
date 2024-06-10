@@ -8,7 +8,6 @@ import (
 
 	"github.com/cilium/cilium/pkg/hive"
 	"github.com/microsoft/retina/cmd/hubble"
-	"github.com/microsoft/retina/cmd/legacy"
 	"github.com/spf13/cobra"
 )
 
@@ -23,7 +22,7 @@ var rootCmd = &cobra.Command{
 }
 
 func Execute(h *hive.Hive) {
-	rootCmd.AddCommand(legacy.Cmd())
+	// rootCmd.AddCommand(legacy.Cmd())
 	rootCmd.AddCommand(hubble.Cmd(h))
 
 	if err := rootCmd.Execute(); err != nil {

@@ -75,7 +75,7 @@ type Daemon struct {
 	configFile           string
 }
 
-func newDaemon(metricsAddr, probeAddr, configFile string, enableLeaderElection bool) *Daemon {
+func NewDaemon(metricsAddr, probeAddr, configFile string, enableLeaderElection bool) *Daemon {
 	return &Daemon{
 		metricsAddr:          metricsAddr,
 		probeAddr:            probeAddr,
@@ -84,7 +84,7 @@ func newDaemon(metricsAddr, probeAddr, configFile string, enableLeaderElection b
 	}
 }
 
-func (d *Daemon) start() {
+func (d *Daemon) Start() {
 	fmt.Printf("starting Retina daemon with legacy control plane %v\n", version)
 
 	if applicationInsightsID != "" {
