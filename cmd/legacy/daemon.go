@@ -8,6 +8,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-logr/zapr"
+	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
+	"github.com/microsoft/retina/pkg/config"
+	controllercache "github.com/microsoft/retina/pkg/controllers/cache"
+	mcc "github.com/microsoft/retina/pkg/controllers/daemon/metricsconfiguration"
+	namespacecontroller "github.com/microsoft/retina/pkg/controllers/daemon/namespace"
+	nc "github.com/microsoft/retina/pkg/controllers/daemon/node"
+	pc "github.com/microsoft/retina/pkg/controllers/daemon/pod"
+	kec "github.com/microsoft/retina/pkg/controllers/daemon/retinaendpoint"
+	sc "github.com/microsoft/retina/pkg/controllers/daemon/service"
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -22,16 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	crmgr "sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
-
-	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
-	"github.com/microsoft/retina/pkg/config"
-	controllercache "github.com/microsoft/retina/pkg/controllers/cache"
-	mcc "github.com/microsoft/retina/pkg/controllers/daemon/metricsconfiguration"
-	namespacecontroller "github.com/microsoft/retina/pkg/controllers/daemon/namespace"
-	nc "github.com/microsoft/retina/pkg/controllers/daemon/node"
-	pc "github.com/microsoft/retina/pkg/controllers/daemon/pod"
-	kec "github.com/microsoft/retina/pkg/controllers/daemon/retinaendpoint"
-	sc "github.com/microsoft/retina/pkg/controllers/daemon/service"
 
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
@@ -217,6 +217,7 @@ func (d *Daemon) start() {
 	// Setup RetinaEndpoint controller.
 	// TODO(mainred): This is to temporarily create a cache and pubsub for RetinaEndpoint, need to refactor this.
 	ctx := ctrl.SetupSignalHandler()
+	ctrl.SetLogger(zapr.NewLogger(zl.Logger.Named("controller-runtime")))
 
 	if config.EnablePodLevel {
 		pubSub := pubsub.New()

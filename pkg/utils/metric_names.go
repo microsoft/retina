@@ -29,6 +29,8 @@ const (
 	NodeApiServerLatencyName             = "node_apiserver_latency"
 	NodeApiServerTcpHandshakeLatencyName = "node_apiserver_handshake_latency"
 	NoResponseFromApiServerName          = "node_apiserver_no_response"
+	InfinibandCounterStatsName           = "infiniband_counter_stats"
+	InfinibandStatusParamsName           = "infiniband_status_params"
 
 	// Common Gauges across os distributions
 	NodeConnectivityStatusName         = "node_connectivity_status"

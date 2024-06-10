@@ -4,6 +4,7 @@ package linuxutil
 
 import (
 	"fmt"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/utils"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
@@ -38,20 +40,20 @@ func NewNetstatReader(opts *NetstatOpts, ns NetstatInterface) *NetstatReader {
 	}
 }
 
-func (nr *NetstatReader) readAndUpdate() error {
+func (nr *NetstatReader) readAndUpdate() (*SocketStats, error) {
 	if err := nr.readConnectionStats(pathNetNetstat); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Get Socket stats
 	if err := nr.readSockStats(); err != nil {
-		return err
+		return nil, err
 	}
 
 	nr.updateMetrics()
 	nr.l.Debug("Done reading and updating connections stats")
 
-	return nil
+	return &nr.connStats.TcpSockets, nil
 }
 
 //nolint:gomnd // magic numbers are sufficiently explained in this function
@@ -184,6 +186,25 @@ func (nr *NetstatReader) readSockStats() error {
 		return err
 	} else {
 		sockStats := processSocks(socks)
+		// Compare existing tcp socket connections with updated ones, remove the ones that are not seen in the new sockStats map
+		// Log the socketByRemoteAddr map
+		if nr.opts.PrevTCPSockStats != nil {
+			for remoteAddr := range nr.opts.PrevTCPSockStats.socketByRemoteAddr {
+				addrPort, err := netip.ParseAddrPort(remoteAddr)
+				if err != nil {
+					return errors.Wrapf(err, "failed to parse remote address %s", remoteAddr)
+				}
+				addr := addrPort.Addr().String()
+				port := strconv.Itoa(int(addrPort.Port()))
+				// Check if the remote address is in the new sockStats map
+				if _, ok := sockStats.socketByRemoteAddr[remoteAddr]; !ok {
+					nr.l.Debug("Removing remote address from metrics", zap.String("remoteAddr", remoteAddr))
+					// If not, set the value to 0
+					metrics.TCPConnectionRemoteGauge.WithLabelValues(addr, port).Set(0)
+				}
+			}
+		}
+
 		nr.connStats.TcpSockets = *sockStats
 	}
 
@@ -231,15 +252,13 @@ func (nr *NetstatReader) updateMetrics() {
 	}
 
 	for remoteAddr, v := range nr.connStats.TcpSockets.socketByRemoteAddr {
-		addr := ""
-		port := ""
-		splitAddr := strings.Split(remoteAddr, ":")
-		if len(splitAddr) == 2 {
-			addr = splitAddr[0]
-			port = splitAddr[1]
-		} else {
-			addr = remoteAddr
+		addrPort, err := netip.ParseAddrPort(remoteAddr)
+		if err != nil {
+			nr.l.Error("Failed to parse remote address", zap.Error(err))
+			continue
 		}
+		addr := addrPort.Addr().String()
+		port := strconv.Itoa(int(addrPort.Port()))
 		if !validateRemoteAddr(addr) {
 			continue
 		}
