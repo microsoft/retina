@@ -265,7 +265,7 @@ retina-image: ## build the retina linux container image.
 	done
 
 retina-image-win: ## build the retina Windows container image.
-	for year in "$(WINDOWS_YEARS)"; do \
+	for year in $(WINDOWS_YEARS); do \
 		tag=$(TAG)-windows-ltsc$$year-amd64; \
 		echo "Building $(RETINA_PLATFORM_TAG)"; \
 		set -e ; \
