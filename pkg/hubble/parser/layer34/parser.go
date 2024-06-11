@@ -6,7 +6,6 @@ import (
 
 	"github.com/cilium/cilium/api/v1/flow"
 	"github.com/cilium/cilium/pkg/ipcache"
-	"github.com/cilium/cilium/pkg/k8s"
 	"github.com/microsoft/retina/pkg/hubble/common"
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/sirupsen/logrus"
@@ -17,14 +16,12 @@ import (
 type Parser struct {
 	l  *logrus.Entry
 	ep common.EpDecoder
-	// svc common.SvcDecoder
 }
 
-func New(l *logrus.Entry, c *ipcache.IPCache, sc *k8s.ServiceCache) *Parser {
+func New(l *logrus.Entry, c *ipcache.IPCache) *Parser {
 	p := &Parser{
 		l:  l.WithField("subsys", "layer34"),
 		ep: common.NewEpDecoder(c),
-		// svc: common.NewSvcDecoder(sc),
 	}
 	// Log the localHostIP for debugging purposes.
 	return p
@@ -35,16 +32,16 @@ func (p *Parser) Decode(f *flow.Flow) *flow.Flow {
 	if f == nil {
 		return nil
 	}
-	if f.IP == nil {
+	if f.GetIP() == nil {
 		p.l.Warn("Failed to get IP from flow", zap.Any("flow", f))
 		return f
 	}
-	sourceIP, err := netip.ParseAddr(f.IP.Source)
+	sourceIP, err := netip.ParseAddr(f.GetIP().GetSource())
 	if err != nil {
 		p.l.Warn("Failed to parse source IP", zap.Error(err))
 		return f
 	}
-	destIP, err := netip.ParseAddr(f.IP.Destination)
+	destIP, err := netip.ParseAddr(f.GetIP().GetDestination())
 	if err != nil {
 		p.l.Warn("Failed to parse destination IP", zap.Error(err))
 		return f
@@ -71,7 +68,7 @@ func (p *Parser) decodeSummary(f *flow.Flow) {
 		// Setting subtype to DROPPED for huuble cli.
 		if f.GetEventType() != nil {
 			f.GetEventType().SubType = int32(f.GetDropReasonDesc())
-			f.Summary = fmt.Sprintf("Drop Reason: %s\nNote: This reason is most accurate. Prefer over others while using Hubble CLI.", utils.DropReasonDescription(f))
+			f.Summary = fmt.Sprintf("Drop Reason: %s\nNote: This reason is most accurate. Prefer over others while using Hubble CLI.", utils.DropReasonDescription(f)) // nolint:staticcheck // We need summary for now.
 		}
 		return
 
@@ -79,15 +76,15 @@ func (p *Parser) decodeSummary(f *flow.Flow) {
 
 	// Add Summary based off of L4 protocol.
 	// Needed for huuble cli.
-	if f.GetL4() != nil && f.GetL4().Protocol != nil {
-		switch f.GetL4().Protocol.(type) {
+	if f.GetL4() != nil && f.GetL4().GetProtocol() != nil {
+		switch f.GetL4().GetProtocol().(type) {
 		case *flow.Layer4_TCP:
 			tcpFlags := f.GetL4().GetTCP().GetFlags()
 			if tcpFlags != nil {
-				f.Summary = "TCP Flags: " + tcpFlags.String()
+				f.Summary = "TCP Flags: " + tcpFlags.String() // nolint:staticcheck // We need summary for now.
 			}
 		case *flow.Layer4_UDP:
-			f.Summary = "UDP"
+			f.Summary = "UDP" // nolint:staticcheck // We need summary for now.
 		}
 	}
 }
@@ -105,7 +102,7 @@ func (p *Parser) decodeIsReply(f *flow.Flow) {
 	}
 
 	if f.GetL4() != nil && f.GetL4().Protocol != nil {
-		switch f.GetL4().Protocol.(type) { // nolint: singleCaseSwitch
+		switch f.GetL4().Protocol.(type) { // nolint:gocritic
 		case *flow.Layer4_TCP:
 			tcpFlags := f.GetL4().GetTCP().GetFlags()
 			if tcpFlags != nil {
@@ -113,7 +110,7 @@ func (p *Parser) decodeIsReply(f *flow.Flow) {
 			}
 		}
 	}
-	f.IsReply = &wrapperspb.BoolValue{Value: f.Reply}
+	f.IsReply = &wrapperspb.BoolValue{Value: f.GetReply()}
 }
 
 // decodeTrafficDirection decodes the traffic direction of the flow.
@@ -128,7 +125,7 @@ func (p *Parser) decodeTrafficDirection(f *flow.Flow) {
 	}
 
 	// If the source EP's node is the same as the current node, then the traffic is outbound.
-	if p.ep.IsEndpointOnLocalHost(f.IP.Source) {
+	if p.ep.IsEndpointOnLocalHost(f.GetIP().GetSource()) {
 		f.TrafficDirection = flow.TrafficDirection_EGRESS
 		return
 	}

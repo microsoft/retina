@@ -20,15 +20,15 @@ import (
 
 type fakeresource[T k8sRuntime.Object] struct{}
 
-func (f *fakeresource[T]) Events(ctx context.Context, opts ...resource.EventsOpt) <-chan resource.Event[T] {
+func (f *fakeresource[T]) Events(_ context.Context, opts ...resource.EventsOpt) <-chan resource.Event[T] {
 	return make(<-chan resource.Event[T])
 }
 
-func (f *fakeresource[T]) Store(ctx context.Context) (resource.Store[T], error) {
+func (f *fakeresource[T]) Store(_ context.Context) (resource.Store[T], error) {
 	return nil, nil
 }
 
-func (f *fakeresource[T]) Observe(ctx context.Context, next func(resource.Event[T]), complete func(error)) {
+func (f *fakeresource[T]) Observe(context.Context, func(resource.Event[T]), func(error)) {
 }
 
 type watcherconfig struct {
@@ -67,7 +67,7 @@ func (e *epmgr) GetEndpointsByPodName(string) []*endpoint.Endpoint {
 	return nil
 }
 
-func (e *epmgr) WaitForEndpointsAtPolicyRev(ctx context.Context, rev uint64) error {
+func (e *epmgr) WaitForEndpointsAtPolicyRev(context.Context, uint64) error {
 	return nil
 }
 
@@ -83,17 +83,17 @@ func (n *nodediscovermgr) NodeDeleted(nodetypes.Node) {}
 
 func (n *nodediscovermgr) NodeUpdated(nodetypes.Node) {}
 
-func (n *nodediscovermgr) ClusterSizeDependantInterval(baseInterval time.Duration) time.Duration {
+func (n *nodediscovermgr) ClusterSizeDependantInterval(time.Duration) time.Duration {
 	return time.Duration(0)
 }
 
 type cgrpmgr struct{}
 
-func (c *cgrpmgr) OnAddPod(pod *slim_corev1.Pod) {}
+func (c *cgrpmgr) OnAddPod(*slim_corev1.Pod) {}
 
-func (c *cgrpmgr) OnUpdatePod(oldPod, newPod *slim_corev1.Pod) {}
+func (c *cgrpmgr) OnUpdatePod(*slim_corev1.Pod, *slim_corev1.Pod) {}
 
-func (c *cgrpmgr) OnDeletePod(pod *slim_corev1.Pod) {}
+func (c *cgrpmgr) OnDeletePod(*slim_corev1.Pod) {}
 
 type nodeaddressing struct{}
 
@@ -107,7 +107,7 @@ func (n *nodeaddressing) IPv4() datapathtypes.NodeAddressingFamily {
 
 type identityAllocatorOwner struct{}
 
-func (i *identityAllocatorOwner) UpdateIdentities(added, deleted cache.IdentityCache) {}
+func (i *identityAllocatorOwner) UpdateIdentities(cache.IdentityCache, cache.IdentityCache) {}
 
 func (i *identityAllocatorOwner) GetNodeSuffix() string {
 	return ""
@@ -118,16 +118,16 @@ type cachingIdentityAllocator struct {
 	ipcache *ipcache.IPCache
 }
 
-func (c cachingIdentityAllocator) AllocateCIDRsForIPs(ips []net.IP, newlyAllocatedIdentities map[netip.Prefix]*identity.Identity) ([]*identity.Identity, error) {
+func (c cachingIdentityAllocator) AllocateCIDRsForIPs([]net.IP, map[netip.Prefix]*identity.Identity) ([]*identity.Identity, error) {
 	return nil, nil
 }
 
-func (c cachingIdentityAllocator) ReleaseCIDRIdentitiesByID(ctx context.Context, identities []identity.NumericIdentity) {
+func (c cachingIdentityAllocator) ReleaseCIDRIdentitiesByID(context.Context, []identity.NumericIdentity) {
 }
 
 type policyhandler struct{}
 
-func (p *policyhandler) UpdateIdentities(added, deleted cache.IdentityCache, wg *sync.WaitGroup) {}
+func (p *policyhandler) UpdateIdentities(cache.IdentityCache, cache.IdentityCache, *sync.WaitGroup) {}
 
 type datapathhandler struct{}
 

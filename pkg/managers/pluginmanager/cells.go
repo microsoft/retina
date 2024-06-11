@@ -59,7 +59,7 @@ func newPluginManager(params pluginManagerParams) (*PluginManager, error) {
 
 	var wg sync.WaitGroup
 	params.Lifecycle.Append(cell.Hook{
-		OnStart: func(hctx cell.HookContext) error {
+		OnStart: func(cell.HookContext) error {
 			var err error
 			wg.Add(1)
 			go func() {

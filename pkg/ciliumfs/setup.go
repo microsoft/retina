@@ -16,7 +16,7 @@ func Setup(l *zap.Logger) {
 		if os.IsNotExist(err) {
 			l.Info("Directory does not exist", zap.String("dir path", ciliumDir), zap.Error(err))
 			// Path does not exist. Create it.
-			err = os.MkdirAll("/var/run/cilium", 0o755)
+			err = os.MkdirAll("/var/run/cilium", 0o755) //nolint:gomnd // 0o755 is the permission mode.
 			if err != nil {
 				l.Error("Failed to create directory", zap.String("dir path", ciliumDir), zap.Error(err))
 				l.Panic("Failed to create directory", zap.String("dir path", ciliumDir), zap.Error(err))

@@ -44,7 +44,6 @@ import (
 )
 
 const (
-	configFileName    = "/retina/config/config.yaml"
 	logFileName       = "retina.log"
 	heartbeatInterval = 5 * time.Minute
 
@@ -93,7 +92,7 @@ func (d *Daemon) Start() {
 		defer telemetry.TrackPanic()
 	}
 
-	config, err := config.GetConfig(d.configFile)
+	daemonConfig, err := config.GetConfig(d.configFile)
 	if err != nil {
 		panic(err)
 	}
@@ -106,18 +105,18 @@ func (d *Daemon) Start() {
 
 	fmt.Println("init logger")
 	zl, err := log.SetupZapLogger(&log.LogOpts{
-		Level:                 config.LogLevel,
+		Level:                 daemonConfig.LogLevel,
 		File:                  false,
 		FileName:              logFileName,
 		MaxFileSizeMB:         100, //nolint:gomnd // defaults
 		MaxBackups:            3,   //nolint:gomnd // defaults
 		MaxAgeDays:            30,  //nolint:gomnd // defaults
 		ApplicationInsightsID: applicationInsightsID,
-		EnableTelemetry:       config.EnableTelemetry,
+		EnableTelemetry:       daemonConfig.EnableTelemetry,
 	},
 		zap.String("version", version),
 		zap.String("apiserver", cfg.Host),
-		zap.String("plugins", strings.Join(config.EnabledPlugin, `,`)),
+		zap.String("plugins", strings.Join(daemonConfig.EnabledPlugin, `,`)),
 	)
 	if err != nil {
 		panic(err)
@@ -128,12 +127,12 @@ func (d *Daemon) Start() {
 	metrics.InitializeMetrics()
 
 	var tel telemetry.Telemetry
-	if config.EnableTelemetry && applicationInsightsID != "" {
+	if daemonConfig.EnableTelemetry && applicationInsightsID != "" {
 		mainLogger.Info("telemetry enabled", zap.String("applicationInsightsID", applicationInsightsID))
 		tel = telemetry.NewAppInsightsTelemetryClient("retina-agent", map[string]string{
 			"version":   version,
 			"apiserver": cfg.Host,
-			"plugins":   strings.Join(config.EnabledPlugin, `,`),
+			"plugins":   strings.Join(daemonConfig.EnabledPlugin, `,`),
 		})
 	} else {
 		mainLogger.Info("telemetry disabled")
@@ -153,16 +152,15 @@ func (d *Daemon) Start() {
 	}
 
 	// Local context has its meaning only when pod level(advanced) metrics is enabled.
-	if config.EnablePodLevel && !config.RemoteContext {
+	if daemonConfig.EnablePodLevel && !daemonConfig.RemoteContext {
 		mainLogger.Info("Remote context is disabled, only pods deployed on the same node as retina-agent will be monitored")
 		// the new cache sets Selector options on the Manager cache which are used
 		// to perform *server-side* filtering of the cached objects. This is very important
 		// for high node/pod count clusters, as it keeps us from watching objects at the
 		// whole cluster scope when we are only interested in the Node's scope.
 		nodeName := os.Getenv(nodeNameEnvKey)
-		if len(nodeName) == 0 {
-			mainLogger.Error("failed to get node name from environment variable", zap.String("node name env key", nodeNameEnvKey))
-			os.Exit(1)
+		if nodeName == "" {
+			mainLogger.Fatal("failed to get node name from environment variable", zap.String("node name env key", nodeNameEnvKey))
 		}
 		podNodeNameSelector := fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName})
 		// Ignore hostnetwork pods which share the same IP with the node and pods on the same node.
@@ -170,9 +168,8 @@ func (d *Daemon) Start() {
 		// We use status.podIP to filter out hostnetwork pods.
 		// https://github.com/kubernetes/kubernetes/blob/41da26dbe15207cbe5b6c36b48a31d2cd3344123/pkg/apis/core/v1/conversion.go#L36
 		nodeIP := os.Getenv(nodeIPEnvKey)
-		if len(nodeIP) == 0 {
-			mainLogger.Error("failed to get node IP from environment variable", zap.String("node IP env key", nodeIPEnvKey))
-			os.Exit(1)
+		if nodeIP == "" {
+			mainLogger.Fatal("failed to get node IP from environment variable", zap.String("node IP env key", nodeIPEnvKey))
 		}
 		podNodeIPNotMatchSelector := fields.OneTermNotEqualSelector("status.podIP", nodeIP)
 		podSelector := fields.AndSelectors(podNodeNameSelector, podNodeIPNotMatchSelector)
@@ -195,13 +192,11 @@ func (d *Daemon) Start() {
 
 	//+kubebuilder:scaffold:builder
 
-	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		mainLogger.Error("Unable to set up health check", zap.Error(err))
-		os.Exit(1)
+	if healthCheckErr := mgr.AddHealthzCheck("healthz", healthz.Ping); healthCheckErr != nil {
+		mainLogger.Fatal("Unable to set up health check", zap.Error(healthCheckErr))
 	}
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		mainLogger.Error("Unable to set up ready check", zap.Error(err))
-		os.Exit(1)
+	if addReadyCheckErr := mgr.AddReadyzCheck("readyz", healthz.Ping); addReadyCheckErr != nil {
+		mainLogger.Fatal("Unable to set up ready check", zap.Error(addReadyCheckErr))
 	}
 
 	// k8s Client used for informers
@@ -219,35 +214,32 @@ func (d *Daemon) Start() {
 	ctx := ctrl.SetupSignalHandler()
 	ctrl.SetLogger(zapr.NewLogger(zl.Logger.Named("controller-runtime")))
 
-	if config.EnablePodLevel {
+	if daemonConfig.EnablePodLevel {
 		pubSub := pubsub.New()
 		controllerCache := controllercache.New(pubSub)
 		enrich := enricher.New(ctx, controllerCache)
-		fm, err := filtermanager.Init(5)
+		fm, err := filtermanager.Init(5) //nolint:gomnd // defaults
 		if err != nil {
-			mainLogger.Error("unable to create filter manager", zap.Error(err))
-			os.Exit(1)
+			mainLogger.Fatal("unable to create filter manager", zap.Error(err))
 		}
-		defer fm.Stop()
+		defer fm.Stop() //nolint:errcheck // best effort
 		enrich.Run()
-		metricsModule := mm.InitModule(ctx, config, pubSub, enrich, fm, controllerCache)
+		metricsModule := mm.InitModule(ctx, daemonConfig, pubSub, enrich, fm, controllerCache)
 
-		if !config.RemoteContext {
+		if !daemonConfig.RemoteContext {
 			mainLogger.Info("Initializing Pod controller")
 
 			podController := pc.New(mgr.GetClient(), controllerCache)
 			if err := podController.SetupWithManager(mgr); err != nil {
 				mainLogger.Fatal("unable to create PodController", zap.Error(err))
 			}
-		} else {
-			if config.EnableRetinaEndpoint {
-				mainLogger.Info("RetinaEndpoint is enabled")
-				mainLogger.Info("Initializing RetinaEndpoint controller")
+		} else if daemonConfig.EnableRetinaEndpoint {
+			mainLogger.Info("RetinaEndpoint is enabled")
+			mainLogger.Info("Initializing RetinaEndpoint controller")
 
-				retinaEndpointController := kec.New(mgr.GetClient(), controllerCache)
-				if err := retinaEndpointController.SetupWithManager(mgr); err != nil {
-					mainLogger.Fatal("unable to create retinaEndpointController", zap.Error(err))
-				}
+			retinaEndpointController := kec.New(mgr.GetClient(), controllerCache)
+			if err := retinaEndpointController.SetupWithManager(mgr); err != nil {
+				mainLogger.Fatal("unable to create retinaEndpointController", zap.Error(err))
 			}
 		}
 
@@ -263,7 +255,7 @@ func (d *Daemon) Start() {
 			mainLogger.Fatal("unable to create svcController", zap.Error(err))
 		}
 
-		if config.EnableAnnotations {
+		if daemonConfig.EnableAnnotations {
 			mainLogger.Info("Initializing MetricsConfig namespaceController")
 			namespaceController := namespacecontroller.New(mgr.GetClient(), controllerCache, metricsModule)
 			if err := namespaceController.SetupWithManager(mgr); err != nil {
@@ -279,7 +271,7 @@ func (d *Daemon) Start() {
 		}
 	}
 
-	controllerMgr, err := cm.NewControllerManager(config, cl, tel)
+	controllerMgr, err := cm.NewControllerManager(daemonConfig, cl, tel)
 	if err != nil {
 		mainLogger.Fatal("Failed to create controller manager", zap.Error(err))
 	}

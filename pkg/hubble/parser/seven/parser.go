@@ -7,7 +7,6 @@ import (
 
 	"github.com/cilium/cilium/api/v1/flow"
 	"github.com/cilium/cilium/pkg/ipcache"
-	"github.com/cilium/cilium/pkg/k8s"
 	"github.com/google/gopacket/layers"
 	"github.com/microsoft/retina/pkg/hubble/common"
 	"github.com/sirupsen/logrus"
@@ -17,14 +16,12 @@ import (
 type Parser struct {
 	l  *logrus.Entry
 	ep common.EpDecoder
-	// svc common.SvcDecoder
 }
 
-func New(l *logrus.Entry, c *ipcache.IPCache, sc *k8s.ServiceCache) *Parser {
+func New(l *logrus.Entry, c *ipcache.IPCache) *Parser {
 	return &Parser{
 		l:  l.WithField("subsys", "seven"),
 		ep: common.NewEpDecoder(c),
-		// svc: common.NewSvcDecoder(sc),
 	}
 }
 

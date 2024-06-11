@@ -43,10 +43,10 @@ type watcherParams struct {
 }
 
 func NewWatcher(params watcherParams) (*watchers.K8sWatcher, error) {
-	return instance(params.C, params.ResourcesSynced, params.APIGroups, params.R, params.IPcache, params.SvcCache, params.Wcfg)
+	return newInstance(params.C, params.ResourcesSynced, params.APIGroups, params.R, params.IPcache, params.SvcCache, params.Wcfg)
 }
 
-func instance(c client.Clientset, resourcesSynced *synced.Resources, apiGroups *synced.APIGroups, r agentK8s.Resources, ipcache *ipcache.IPCache, svcCache *k8s.ServiceCache, wcfg watchers.WatcherConfiguration) (*watchers.K8sWatcher, error) {
+func newInstance(c client.Clientset, resourcesSynced *synced.Resources, apiGroups *synced.APIGroups, r agentK8s.Resources, ipc *ipcache.IPCache, svcCache *k8s.ServiceCache, wcfg watchers.WatcherConfiguration) (*watchers.K8sWatcher, error) {
 	option.Config.BGPAnnounceLBIP = false
 	once.Do(func() {
 		w = watchers.NewK8sWatcher(
@@ -62,7 +62,7 @@ func instance(c client.Clientset, resourcesSynced *synced.Resources, apiGroups *
 			nil,                // redirectPolicyManager
 			nil,                // bgpSpeakerManager
 			wcfg,               // WatcherConfiguration
-			ipcache,            // ipcacheManager
+			ipc,                // ipcacheManager
 			&cgrpmgr{},         // cgroupManager
 			r,                  // agentK8s.Resources
 			svcCache,           // *k8s.ServiceCache

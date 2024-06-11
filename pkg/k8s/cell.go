@@ -30,7 +30,7 @@ var Cell = cell.Module(
 	"Kubernetes watchers needed by the agent",
 
 	cell.Provide(
-		func(lc cell.Lifecycle, cs client.Clientset) (daemonk8s.LocalPodResource, error) {
+		func(cell.Lifecycle, client.Clientset) (daemonk8s.LocalPodResource, error) {
 			return &fakeresource[*slim_corev1.Pod]{}, nil
 		},
 		func() resource.Resource[*slim_corev1.Namespace] {
@@ -89,7 +89,7 @@ var Cell = cell.Module(
 				K8sServiceProxyName:    "",
 			},
 			cs,
-			func(opts *metav1.ListOptions) {},
+			func(*metav1.ListOptions) {},
 		)
 	}),
 
@@ -124,10 +124,10 @@ var Cell = cell.Module(
 
 	cell.Provide(NewWatcher),
 
-	cell.Provide(newApiServerEventHandler),
+	cell.Provide(newAPIServerEventHandler),
 	cell.Invoke(func(a *ApiServerEventHandler) {
 		ps := pubsub.New()
-		fn := pubsub.CallBackFunc(a.handleApiServerEvent)
+		fn := pubsub.CallBackFunc(a.handleAPIServerEvent)
 		uuid := ps.Subscribe(common.PubSubAPIServer, &fn)
 		a.l.WithFields(logrus.Fields{
 			"uuid": uuid,

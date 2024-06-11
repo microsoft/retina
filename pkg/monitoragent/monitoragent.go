@@ -16,6 +16,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var (
+	monitorAgentNotSetupErr = fmt.Errorf("monitor agent is not set up")
+	unexpectedEventTypeErr  = errors.New("unexpected event type for MessageTypeAgent")
+)
+
 // isCtxDone is a utility function that returns true when the context's Done()
 // channel is closed. It is intended to simplify goroutines that need to check
 // this multiple times in their loop.
@@ -42,13 +47,13 @@ type monitorAgent struct {
 	consumers map[consumer.MonitorConsumer]struct{}
 }
 
-func (a *monitorAgent) AttachToEventsMap(nPages int) error {
+func (a *monitorAgent) AttachToEventsMap(int) error {
 	return nil
 }
 
 func (a *monitorAgent) SendEvent(typ int, event interface{}) error {
 	if a == nil {
-		return fmt.Errorf("monitor agent is not set up")
+		return monitorAgentNotSetupErr
 	}
 
 	// Two types of clients are currently supported: consumers and listeners.
@@ -70,7 +75,7 @@ func (a *monitorAgent) SendEvent(typ int, event interface{}) error {
 	if typ == api.MessageTypeAgent {
 		msg, ok := event.(api.AgentNotifyMessage)
 		if !ok {
-			return errors.New("unexpected event type for MessageTypeAgent")
+			return unexpectedEventTypeErr
 		}
 		var err error
 		event, err = msg.ToJSON()
@@ -108,10 +113,9 @@ func (a *monitorAgent) RegisterNewListener(newListener listener.MonitorListener)
 	}
 
 	version := newListener.Version()
-	switch newListener.Version() {
+	switch newListener.Version() { //nolint:exhaustive
 	case listener.Version1_2:
 		a.listeners[newListener] = struct{}{}
-
 	default:
 		newListener.Close()
 		log.WithField("version", version).Error("Closing listener from unsupported monitor client version")
@@ -187,14 +191,6 @@ func (a *monitorAgent) hasListeners() bool {
 	a.Lock()
 	defer a.Unlock()
 	return len(a.listeners) != 0
-}
-
-// notifyPerfEventLocked notifies all consumers about a perf event.
-// The caller must hold the monitor lock.
-func (a *monitorAgent) notifyPerfEventLocked(data []byte, cpu int) {
-	for mc := range a.consumers {
-		mc.NotifyPerfEvent(data, cpu)
-	}
 }
 
 // notifyEventToConsumersLocked notifies all consumers about lost events.

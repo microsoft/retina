@@ -11,21 +11,21 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNonCacheEvent(t *testing.T) {
-	a := newApiServerEventHandler(params{
+func TestNonCacheEvent(_ *testing.T) {
+	a := newAPIServerEventHandler(params{
 		Logger: logrus.New(),
 	})
-	a.handleApiServerEvent("test")
+	a.handleAPIServerEvent("test")
 }
 
 func TestHandler(t *testing.T) {
-	a := newApiServerEventHandler(params{
+	a := newAPIServerEventHandler(params{
 		Logger:  logrus.New(),
 		IPCache: ipcache.NewIPCache(&ipcache.Configuration{}),
 	})
 
 	// Add API server IPs.
-	a.handleApiServerEvent(&cc.CacheEvent{
+	a.handleAPIServerEvent(&cc.CacheEvent{
 		Type: cc.EventTypeAddAPIServerIPs,
 		Obj:  common.NewAPIServerObject([]string{"52.0.0.1"}),
 	})
@@ -35,7 +35,7 @@ func TestHandler(t *testing.T) {
 	assert.Equal(t, ip.ID, identity.ReservedIdentityKubeAPIServer)
 
 	// Delete API server IPs.
-	a.handleApiServerEvent(&cc.CacheEvent{
+	a.handleAPIServerEvent(&cc.CacheEvent{
 		Type: cc.EventTypeDeleteAPIServerIPs,
 		Obj:  common.NewAPIServerObject([]string{"52.0.0.1"}),
 	})

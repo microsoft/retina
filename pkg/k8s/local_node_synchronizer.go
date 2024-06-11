@@ -15,7 +15,7 @@ type nodeSynchronizer struct {
 	l *logrus.Entry
 }
 
-func (n *nodeSynchronizer) InitLocalNode(ctx context.Context, ln *node.LocalNode) error {
+func (n *nodeSynchronizer) InitLocalNode(_ context.Context, ln *node.LocalNode) error {
 	if ln == nil {
 		n.l.Warn("Local node is nil")
 		return nil

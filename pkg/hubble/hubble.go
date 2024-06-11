@@ -45,7 +45,6 @@ type hubbleParams struct {
 	Client         client.Client
 	MonitorAgent   monitoragent.Agent
 	IPCache        *ipcache.IPCache
-	SvcCache       *k8s.ServiceCache
 	NodeReconciler *rnode.NodeReconciler
 	Log            logrus.FieldLogger
 }
@@ -56,7 +55,6 @@ func newRetinaHubble(params hubbleParams) *RetinaHubble {
 		client:         params.Client,
 		monitorAgent:   params.MonitorAgent,
 		ipc:            params.IPCache,
-		sc:             params.SvcCache,
 		nodeReconciler: params.NodeReconciler,
 	}
 	rh.log.Logger.SetLevel(logrus.InfoLevel)
@@ -115,7 +113,7 @@ func (rh *RetinaHubble) start(ctx context.Context) error {
 	)
 
 	// TODO: Replace with our custom parser.
-	payloadParser := parser.New(rh.log, rh.ipc, rh.sc)
+	payloadParser := parser.New(rh.log, rh.ipc)
 
 	namespaceManager := observer.NewNamespaceManager()
 	go namespaceManager.Run(ctx)

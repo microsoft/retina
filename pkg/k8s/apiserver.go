@@ -18,7 +18,7 @@ type params struct {
 	Lifecycle cell.Lifecycle
 }
 
-func newApiServerEventHandler(p params) *ApiServerEventHandler {
+func newAPIServerEventHandler(p params) *ApiServerEventHandler {
 	a := &ApiServerEventHandler{
 		c: p.IPCache,
 		l: p.Logger,
@@ -31,7 +31,7 @@ type ApiServerEventHandler struct {
 	l logrus.FieldLogger
 }
 
-func (a *ApiServerEventHandler) handleApiServerEvent(event interface{}) {
+func (a *ApiServerEventHandler) handleAPIServerEvent(event interface{}) {
 	cacheEvent, ok := event.(*cc.CacheEvent)
 	if !ok {
 		a.l.WithField("Event", event).Warn("Received unknown event type")

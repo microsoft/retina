@@ -22,7 +22,7 @@ type epDecoder struct {
 	ipcache     *ipc.IPCache
 }
 
-func NewEpDecoder(c *ipc.IPCache) *epDecoder {
+func NewEpDecoder(c *ipc.IPCache) *epDecoder { //nolint:revive // This is a factory function.
 	return &epDecoder{
 		localHostIP: os.Getenv("NODE_IP"),
 		ipcache:     c,
@@ -43,7 +43,7 @@ func (e *epDecoder) Decode(ip netip.Addr) *flow.Endpoint {
 	ep.ID = id.ID.Uint32()
 	ep.Identity = id.ID.Uint32()
 
-	switch id.ID {
+	switch id.ID { //nolint:exhaustive // We don't need all the cases.
 	case identity.ReservedIdentityHost:
 		ep.Labels = labels.LabelHost.GetModel()
 	case identity.ReservedIdentityKubeAPIServer:

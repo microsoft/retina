@@ -2,6 +2,7 @@ package servermanager
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/cilium/cilium/pkg/hive/cell"
@@ -32,7 +33,7 @@ func newServerManager(params serverParams) (*sm.HTTPServer, error) {
 	if err := serverManager.Init(); err != nil {
 		logger.WithError(err).Error("Unable to initialize Http server")
 		cancelCtx()
-		return nil, err
+		return nil, fmt.Errorf("unable to initialize Http server: %w", err)
 	}
 
 	wg := sync.WaitGroup{}

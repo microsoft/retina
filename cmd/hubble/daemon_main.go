@@ -89,10 +89,10 @@ func InitGlobalFlags(cmd *cobra.Command, vp *viper.Viper) {
 	flags.String(option.HubbleTLSKeyFile, "", "Path to the private key file for the Hubble server. The file must contain PEM encoded data.")
 	option.BindEnv(vp, option.HubbleTLSKeyFile)
 
-	flags.StringSlice(option.HubbleTLSClientCAFiles, []string{}, "Paths to one or more public key files of client CA certificates to use for TLS with mutual authentication (mTLS). The files must contain PEM encoded data. When provided, this option effectively enables mTLS.")
+	flags.StringSlice(option.HubbleTLSClientCAFiles, []string{}, "Paths to one or more public key files of client CA certificates to use for TLS with mutual authentication (mTLS). The files must contain PEM encoded data. When provided, this option effectively enables mTLS.") //nolint:lll // long line (over 80 characters).
 	option.BindEnv(vp, option.HubbleTLSClientCAFiles)
 
-	flags.Int(option.HubbleEventBufferCapacity, observeroption.Default.MaxFlows.AsInt(), "Capacity of Hubble events buffer. The provided value must be one less than an integer power of two and no larger than 65535 (ie: 1, 3, ..., 2047, 4095, ..., 65535)")
+	flags.Int(option.HubbleEventBufferCapacity, observeroption.Default.MaxFlows.AsInt(), "Capacity of Hubble events buffer. The provided value must be one less than an integer power of two and no larger than 65535 (ie: 1, 3, ..., 2047, 4095, ..., 65535)") //nolint:lll // long line.
 	option.BindEnv(vp, option.HubbleEventBufferCapacity)
 
 	flags.Int(option.HubbleEventQueueSize, 0, "Buffer size of the channel to receive monitor events.")
@@ -224,9 +224,9 @@ func newDaemonPromise(params daemonParams) promise.Promise[*Daemon] {
 
 func initLogging() {
 	logger := setupDefaultLogger()
-	config, _ := getRetinaConfig(logger)
+	retinaConfig, _ := getRetinaConfig(logger)
 	k8sCfg, _ := sharedconfig.GetK8sConfig()
-	zapLogger := setupZapLogger(config, k8sCfg)
+	zapLogger := setupZapLogger(retinaConfig, k8sCfg)
 	setupLoggingHooks(logger, zapLogger)
 	bootstrapLogging(logger)
 }
@@ -248,25 +248,28 @@ func getRetinaConfig(logger *logrus.Logger) (*config.Config, error) {
 	return conf, nil
 }
 
-func setupZapLogger(config *config.Config, k8sCfg *rest.Config) *log.ZapLogger {
+func setupZapLogger(retinaConfig *config.Config, k8sCfg *rest.Config) *log.ZapLogger {
 	logOpts := &log.LogOpts{
-		Level:                 config.LogLevel,
+		Level:                 retinaConfig.LogLevel,
 		File:                  false,
 		FileName:              logFileName,
 		MaxFileSizeMB:         100,
 		MaxBackups:            3,
 		MaxAgeDays:            30,
 		ApplicationInsightsID: applicationInsightsID,
-		EnableTelemetry:       config.EnableTelemetry,
+		EnableTelemetry:       retinaConfig.EnableTelemetry,
 	}
 
 	persistentFields := []zap.Field{
 		zap.String("version", retinaVersion),
 		zap.String("apiserver", k8sCfg.Host),
-		zap.Strings("plugins", config.EnabledPlugin),
+		zap.Strings("plugins", retinaConfig.EnabledPlugin),
 	}
 
-	log.SetupZapLogger(logOpts, persistentFields...)
+	_, err := log.SetupZapLogger(logOpts, persistentFields...)
+	if err != nil {
+		logger.Fatalf("Failed to setup zap logger: %v", err)
+	}
 
 	namedLogger := log.Logger().Named("retina-enterprise")
 	namedLogger.Info("Traces telemetry initialized with zapai", zap.String("version", retinaVersion), zap.String("appInsightsID", applicationInsightsID))

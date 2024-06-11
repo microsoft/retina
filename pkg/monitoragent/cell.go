@@ -75,10 +75,10 @@ func newMonitorAgent(params agentParams) ciliumagent.Agent {
 					}
 				}
 
-				err := ciliumagent.ServeMonitorAPI(ctx, agent, queueSize)
-				if err != nil {
-					log.WithError(err).Error("encountered error serving monitor agent API")
-					return fmt.Errorf("encountered error serving monitor agent API: %w", err)
+				monitorErr := ciliumagent.ServeMonitorAPI(ctx, agent, queueSize)
+				if monitorErr != nil {
+					log.WithError(monitorErr).Error("encountered error serving monitor agent API")
+					return fmt.Errorf("encountered error serving monitor agent API: %w", monitorErr)
 				}
 			}
 			return err
