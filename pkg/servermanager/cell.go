@@ -10,12 +10,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var (
-	Cell = cell.Module(
-		"servermanager",
-		"Manages Retina basic metrics server",
-		cell.Provide(newServerManager),
-	)
+var Cell = cell.Module(
+	"servermanager",
+	"Manages Retina basic metrics server",
+	cell.Provide(newServerManager),
 )
 
 type serverParams struct {

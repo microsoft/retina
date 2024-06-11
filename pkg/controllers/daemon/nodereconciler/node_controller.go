@@ -52,7 +52,6 @@ func isNodeUpdated(n1, n2 types.Node) bool {
 		return true
 	}
 	return false
-
 }
 
 func (r *NodeReconciler) addNode(node *corev1.Node) {

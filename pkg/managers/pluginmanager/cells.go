@@ -19,15 +19,13 @@ const (
 	DefaultExternalEventChannelSize = 10000
 )
 
-var (
-	Cell = cell.Module(
-		"pluginmanager",
-		"Manages Retina eBPF plugins",
-		cell.Provide(func() chan *v1.Event {
-			return make(chan *v1.Event, DefaultExternalEventChannelSize)
-		}),
-		cell.Provide(newPluginManager),
-	)
+var Cell = cell.Module(
+	"pluginmanager",
+	"Manages Retina eBPF plugins",
+	cell.Provide(func() chan *v1.Event {
+		return make(chan *v1.Event, DefaultExternalEventChannelSize)
+	}),
+	cell.Provide(newPluginManager),
 )
 
 type pluginManagerParams struct {

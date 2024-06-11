@@ -35,5 +35,4 @@ func init() {
 	legacyCmd.Flags().StringVar(&probeAddr, "health-probe-bind-address", ":18081", "The address the probe endpoint binds to.")
 	legacyCmd.Flags().BoolVar(&enableLeaderElection, "leader-elect", false, "Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
 	legacyCmd.Flags().StringVar(&cfgFile, "config", configFileName, "config file")
-
 }

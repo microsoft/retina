@@ -25,7 +25,7 @@ var (
 	once   sync.Once
 	w      *watchers.K8sWatcher
 	logger = logging.DefaultLogger.WithField(logfields.LogSubsys, "k8s-watcher")
-	//k8sResources = []string{K8sAPIGroupCiliumEndpointV2, resources.K8sAPIGroupServiceV1Core}
+	// k8sResources = []string{K8sAPIGroupCiliumEndpointV2, resources.K8sAPIGroupServiceV1Core}
 	k8sResources = []string{}
 )
 
