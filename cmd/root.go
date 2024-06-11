@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cilium/cilium/pkg/hive"
-	"github.com/microsoft/retina/cmd/hubble"
 	"github.com/spf13/cobra"
 )
 
@@ -21,10 +19,7 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-func Execute(h *hive.Hive) {
-	// rootCmd.AddCommand(legacy.Cmd())
-	rootCmd.AddCommand(hubble.Cmd(h))
-
+func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
