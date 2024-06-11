@@ -275,7 +275,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.18
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.55.1
 	github.com/cakturk/go-netstat v0.0.0-20200220111822-e5b49efee7a5
-	github.com/cilium/cilium v1.15.5
+	github.com/cilium/cilium v1.15.6
 	github.com/cilium/ebpf v0.15.0
 	github.com/florianl/go-tc v0.4.3
 	github.com/go-logr/zapr v1.3.0
@@ -291,7 +291,7 @@ require (
 	github.com/prometheus/common v0.54.0
 	github.com/safchain/ethtool v0.3.0
 	github.com/spf13/viper v1.19.0
-	github.com/vishvananda/netlink v1.2.1-beta.2.0.20231127184239-0ced8385386a
+	github.com/vishvananda/netlink v1.2.1-beta.2.0.20240524165444-4d4ba1473f21
 	go.opentelemetry.io/otel v1.27.0
 	go.opentelemetry.io/otel/metric v1.27.0
 	go.opentelemetry.io/otel/trace v1.27.0
