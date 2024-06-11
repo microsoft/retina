@@ -43,22 +43,10 @@ type watcherParams struct {
 }
 
 func NewWatcher(params watcherParams) (*watchers.K8sWatcher, error) {
-	return new(params.C, params.ResourcesSynced, params.APIGroups, params.R, params.IPcache, params.SvcCache, params.Wcfg)
+	return instance(params.C, params.ResourcesSynced, params.APIGroups, params.R, params.IPcache, params.SvcCache, params.Wcfg)
 }
 
-func new(c client.Clientset, resourcesSynced *synced.Resources, apiGroups *synced.APIGroups, r agentK8s.Resources, ipcache *ipcache.IPCache, svcCache *k8s.ServiceCache, wcfg watchers.WatcherConfiguration) (*watchers.K8sWatcher, error) {
-	// db := statedb.New()
-	// nodeAddrs, err := datapathTables.NewNodeAddressTable()
-	// if err != nil {
-	// 	logger.WithError(err).Fatal("Failed to create node address table")
-	// 	return nil, err
-	// }
-	// err = db.RegisterTable(nodeAddrs)
-	// if err != nil {
-	// 	logger.WithError(err).Fatal("Failed to register node address table")
-	// 	return nil, err
-	// }
-
+func instance(c client.Clientset, resourcesSynced *synced.Resources, apiGroups *synced.APIGroups, r agentK8s.Resources, ipcache *ipcache.IPCache, svcCache *k8s.ServiceCache, wcfg watchers.WatcherConfiguration) (*watchers.K8sWatcher, error) {
 	option.Config.BGPAnnounceLBIP = false
 	once.Do(func() {
 		w = watchers.NewK8sWatcher(
@@ -73,15 +61,12 @@ func new(c client.Clientset, resourcesSynced *synced.Resources, apiGroups *synce
 			nil,                // Datapath
 			nil,                // redirectPolicyManager
 			nil,                // bgpSpeakerManager
-			// nil,                // envoyConfigManager
-			wcfg,       // WatcherConfiguration
-			ipcache,    // ipcacheManager
-			&cgrpmgr{}, // cgroupManager
-			r,          // agentK8s.Resources
-			svcCache,   // *k8s.ServiceCache
-			nil,        // bandwidth.Manager
-			// db,                 // DB
-			// nodeAddrs,          // NodeAddressTable
+			wcfg,               // WatcherConfiguration
+			ipcache,            // ipcacheManager
+			&cgrpmgr{},         // cgroupManager
+			r,                  // agentK8s.Resources
+			svcCache,           // *k8s.ServiceCache
+			nil,                // bandwidth.Manager
 		)
 	})
 	return w, nil

@@ -54,9 +54,6 @@ func (p *Parser) Decode(f *flow.Flow) *flow.Flow {
 	f.Source = p.ep.Decode(sourceIP)
 	f.Destination = p.ep.Decode(destIP)
 
-	// f.SourceService = p.svc.Decode(sourceIP)
-	// f.DestinationService = p.svc.Decode(destIP)
-
 	// Add IsReply to flow.
 	p.decodeIsReply(f)
 
@@ -108,7 +105,7 @@ func (p *Parser) decodeIsReply(f *flow.Flow) {
 	}
 
 	if f.GetL4() != nil && f.GetL4().Protocol != nil {
-		switch f.GetL4().Protocol.(type) {
+		switch f.GetL4().Protocol.(type) { // nolint: singleCaseSwitch
 		case *flow.Layer4_TCP:
 			tcpFlags := f.GetL4().GetTCP().GetFlags()
 			if tcpFlags != nil {

@@ -13,6 +13,8 @@ import (
 	"github.com/cilium/cilium/pkg/logging"
 	"github.com/cilium/cilium/pkg/logging/logfields"
 	ciliumagent "github.com/cilium/cilium/pkg/monitor/agent"
+	"github.com/cilium/cilium/pkg/monitor/agent/consumer"
+	"github.com/cilium/cilium/pkg/monitor/agent/listener"
 )
 
 var (
@@ -54,7 +56,12 @@ type agentParams struct {
 
 func newMonitorAgent(params agentParams) ciliumagent.Agent {
 	ctx, cancel := context.WithCancel(context.Background())
-	agent := new(ctx)
+	agent := &monitorAgent{
+		ctx:              ctx,
+		listeners:        make(map[listener.MonitorListener]struct{}),
+		consumers:        make(map[consumer.MonitorConsumer]struct{}),
+		perfReaderCancel: func() {}, // no-op to avoid doing null checks everywhere
+	}
 
 	params.Lifecycle.Append(cell.Hook{
 		OnStart: func(cell.HookContext) error {

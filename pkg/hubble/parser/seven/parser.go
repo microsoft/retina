@@ -30,7 +30,7 @@ func New(l *logrus.Entry, c *ipcache.IPCache, sc *k8s.ServiceCache) *Parser {
 
 func (p *Parser) Decode(f *flow.Flow) *flow.Flow {
 	if f == nil {
-		return f
+		return nil
 	}
 
 	// Decode the flow's IP addresses to their respective endpoints.
@@ -79,9 +79,6 @@ func (p *Parser) decodeIP(f *flow.Flow) {
 
 	f.Source = p.ep.Decode(sourceIP)
 	f.Destination = p.ep.Decode(destIP)
-
-	// f.SourceService = p.svc.Decode(sourceIP)
-	// f.DestinationService = p.svc.Decode(destIP)
 }
 
 func (p *Parser) decodeDNS(f *flow.Flow) *flow.Flow {

@@ -50,7 +50,13 @@ func (a *ApiServerEventHandler) handleApiServerEvent(event interface{}) {
 			return
 		}
 		for _, ip := range ips {
-			a.c.Upsert(ip.String(), nil, 0, nil, ipcache.Identity{ID: identity.ReservedIdentityKubeAPIServer, Source: source.Kubernetes})
+			_, err := a.c.Upsert(ip.String(), nil, 0, nil, ipcache.Identity{ID: identity.ReservedIdentityKubeAPIServer, Source: source.Kubernetes})
+			if err != nil {
+				a.l.WithError(err).WithFields(logrus.Fields{
+					"IP": ips[0].String(),
+				}).Error("Failed to add API server IPs to ipcache")
+				return
+			}
 		}
 		a.l.WithFields(logrus.Fields{
 			"IP": ips[0].String(),

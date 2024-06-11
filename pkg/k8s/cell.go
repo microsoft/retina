@@ -3,12 +3,10 @@ package k8s
 import (
 	"context"
 
-	agentK8s "github.com/cilium/cilium/daemon/k8s"
 	daemonk8s "github.com/cilium/cilium/daemon/k8s"
 	"github.com/cilium/cilium/pkg/hive/cell"
 	"github.com/cilium/cilium/pkg/identity/cache"
 	"github.com/cilium/cilium/pkg/ipcache"
-	"github.com/cilium/cilium/pkg/k8s"
 	ciliumk8s "github.com/cilium/cilium/pkg/k8s"
 	cilium_api_v2 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2"
 	cilium_api_v2alpha1 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2alpha1"
@@ -32,16 +30,16 @@ var Cell = cell.Module(
 	"Kubernetes watchers needed by the agent",
 
 	cell.Provide(
-		func(lc cell.Lifecycle, cs client.Clientset) (agentK8s.LocalPodResource, error) {
+		func(lc cell.Lifecycle, cs client.Clientset) (daemonk8s.LocalPodResource, error) {
 			return &fakeresource[*slim_corev1.Pod]{}, nil
 		},
 		func() resource.Resource[*slim_corev1.Namespace] {
 			return &fakeresource[*slim_corev1.Namespace]{}
 		},
-		func() agentK8s.LocalNodeResource {
+		func() daemonk8s.LocalNodeResource {
 			return &fakeresource[*slim_corev1.Node]{}
 		},
-		func() agentK8s.LocalCiliumNodeResource {
+		func() daemonk8s.LocalCiliumNodeResource {
 			return &fakeresource[*cilium_api_v2.CiliumNode]{}
 		},
 		func() resource.Resource[*slim_networkingv1.NetworkPolicy] {
@@ -77,16 +75,16 @@ var Cell = cell.Module(
 	),
 
 	cell.Provide(func(lc cell.Lifecycle, cs client.Clientset) (resource.Resource[*ciliumk8s.Endpoints], error) {
-		return k8s.EndpointsResource(lc, k8s.Config{
+		return ciliumk8s.EndpointsResource(lc, ciliumk8s.Config{
 			EnableK8sEndpointSlice: true,
 			K8sServiceProxyName:    "",
 		}, cs)
 	}),
 
 	cell.Provide(func(lc cell.Lifecycle, cs client.Clientset) (resource.Resource[*slim_corev1.Service], error) {
-		return k8s.ServiceResource(
+		return ciliumk8s.ServiceResource(
 			lc,
-			k8s.Config{
+			ciliumk8s.Config{
 				EnableK8sEndpointSlice: false,
 				K8sServiceProxyName:    "",
 			},
@@ -110,9 +108,9 @@ var Cell = cell.Module(
 		})
 	}),
 
-	cell.Provide(func() *k8s.ServiceCache {
+	cell.Provide(func() *ciliumk8s.ServiceCache {
 		option.Config.K8sServiceCacheSize = 1000
-		return k8s.NewServiceCache(&nodeaddressing{})
+		return ciliumk8s.NewServiceCache(&nodeaddressing{})
 	}),
 
 	cell.Provide(func() node.LocalNodeSynchronizer {

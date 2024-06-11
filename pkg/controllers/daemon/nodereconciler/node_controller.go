@@ -145,7 +145,8 @@ func (r *NodeReconciler) Subscribe(nh datapath.NodeHandler) {
 	defer r.m.RUnlock()
 
 	r.handlers[nh.Name()] = nh
-	for _, node := range r.nodes {
+	for i := range r.nodes {
+		node := r.nodes[i]
 		if err := nh.NodeAdd(node); err != nil {
 			r.l.Error("Failed to add Node to datapath handler", zap.Error(err), zap.String("Node", node.Name))
 		}
@@ -161,7 +162,6 @@ func (r *NodeReconciler) Unsubscribe(nh datapath.NodeHandler) {
 
 // +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list
 func (r *NodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	// startTime := time.Now()
 	r.l.Debug("Reconciling Node", zap.String("Node", req.NamespacedName.String()))
 
 	node := &corev1.Node{}

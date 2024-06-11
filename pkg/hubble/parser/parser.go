@@ -36,7 +36,7 @@ func New(l *logrus.Entry, c *ipc.IPCache, sc *k8s.ServiceCache) *Parser {
 }
 
 func (p *Parser) Decode(monitorEvent *observer.MonitorEvent) (*v1.Event, error) {
-	switch monitorEvent.Payload.(type) {
+	switch monitorEvent.Payload.(type) { //nolint:typeSwitchVar
 	case *observer.AgentEvent:
 		payload := monitorEvent.Payload.(*observer.AgentEvent)
 		ev, ok := payload.Message.(*v1.Event)

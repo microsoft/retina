@@ -44,7 +44,10 @@ func newNodeController(params params) (*NodeReconciler, error) {
 	// we are going to do this within infra module, in which during runtime this will throw a nil pointer err.
 	// see if we can avoid this?
 	opts := log.GetDefaultLogOpts()
-	log.SetupZapLogger(opts)
+	_, err := log.SetupZapLogger(opts)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to setup logger")
+	}
 	n := &NodeReconciler{
 		Client:      params.Client,
 		clusterName: params.Config.ClusterName,

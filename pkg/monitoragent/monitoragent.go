@@ -28,17 +28,6 @@ func isCtxDone(ctx context.Context) bool {
 	}
 }
 
-// newmonitorAgent starts a new monitor agent instance which distributes monitor events
-// to registered listeners.
-func new(ctx context.Context) *monitorAgent {
-	return &monitorAgent{
-		ctx:              ctx,
-		listeners:        make(map[listener.MonitorListener]struct{}),
-		consumers:        make(map[consumer.MonitorConsumer]struct{}),
-		perfReaderCancel: func() {}, // no-op to avoid doing null checks everywhere
-	}
-}
-
 type monitorAgent struct {
 	lock.Mutex
 	models.MonitorStatus
