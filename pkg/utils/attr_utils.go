@@ -48,6 +48,7 @@ var (
 	Endpoint       = "endpoint"
 	AclRule        = "aclrule"
 	Active         = "ACTIVE"
+	Device         = "device"
 
 	// TCP Connection Statistic Names
 	ResetCount           = "ResetCount"

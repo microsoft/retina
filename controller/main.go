@@ -24,6 +24,7 @@ import (
 	crmgr "sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+	"github.com/go-logr/zapr"
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/pkg/config"
 	controllercache "github.com/microsoft/retina/pkg/controllers/cache"
@@ -216,6 +217,7 @@ func main() {
 	// Setup RetinaEndpoint controller.
 	// TODO(mainred): This is to temporarily create a cache and pubsub for RetinaEndpoint, need to refactor this.
 	ctx := ctrl.SetupSignalHandler()
+	ctrl.SetLogger(zapr.NewLogger(zl.Logger.Named("controller-runtime")))
 
 	if config.EnablePodLevel {
 		pubSub := pubsub.New()

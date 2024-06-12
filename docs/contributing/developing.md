@@ -11,7 +11,7 @@ The easiest way to set up your Development Environment is to use the provided Gi
 To manually configure your DevEnv:
 
 ```bash
-export LLVM_VERSION=14
+export LLVM_VERSION=16
 curl -sL https://apt.llvm.org/llvm.sh  | sudo bash -s "$LLVM_VERSION"
 ```
 

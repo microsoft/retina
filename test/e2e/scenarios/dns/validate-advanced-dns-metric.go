@@ -17,7 +17,7 @@ var (
 	dnsAdvResponseCountMetricName = "networkobservability_adv_dns_response_count"
 )
 
-type ValidateAdvanceDNSRequestMetrics struct {
+type ValidateAdvancedDNSRequestMetrics struct {
 	Namespace    string
 	NumResponse  string
 	PodName      string
@@ -29,7 +29,7 @@ type ValidateAdvanceDNSRequestMetrics struct {
 	KubeConfigFilePath string
 }
 
-func (v *ValidateAdvanceDNSRequestMetrics) Run() error {
+func (v *ValidateAdvancedDNSRequestMetrics) Run() error {
 	metricsEndpoint := fmt.Sprintf("http://localhost:%d/metrics", common.RetinaPort)
 	// Get Pod IP address
 	podIP, err := kubernetes.GetPodIP(v.KubeConfigFilePath, v.Namespace, v.PodName)
@@ -37,7 +37,7 @@ func (v *ValidateAdvanceDNSRequestMetrics) Run() error {
 		return errors.Wrapf(err, "failed to get pod IP address")
 	}
 
-	validateAdvanceDNSRequestMetrics := map[string]string{
+	validateAdvancedDNSRequestMetrics := map[string]string{
 		"ip":            podIP,
 		"namespace":     v.Namespace,
 		"num_response":  v.NumResponse,
@@ -50,7 +50,7 @@ func (v *ValidateAdvanceDNSRequestMetrics) Run() error {
 		"workload_name": v.WorkloadName,
 	}
 
-	err = prom.CheckMetric(metricsEndpoint, dnsAdvRequestCountMetricName, validateAdvanceDNSRequestMetrics)
+	err = prom.CheckMetric(metricsEndpoint, dnsAdvRequestCountMetricName, validateAdvancedDNSRequestMetrics)
 	if err != nil {
 		return errors.Wrapf(err, "failed to verify advance dns request metrics %s", dnsAdvRequestCountMetricName)
 	}
@@ -59,11 +59,11 @@ func (v *ValidateAdvanceDNSRequestMetrics) Run() error {
 	return nil
 }
 
-func (v *ValidateAdvanceDNSRequestMetrics) Prevalidate() error {
+func (v *ValidateAdvancedDNSRequestMetrics) Prevalidate() error {
 	return nil
 }
 
-func (v *ValidateAdvanceDNSRequestMetrics) Stop() error {
+func (v *ValidateAdvancedDNSRequestMetrics) Stop() error {
 	return nil
 }
 

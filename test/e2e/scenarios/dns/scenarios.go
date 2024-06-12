@@ -64,6 +64,23 @@ func ValidateBasicDNSMetrics(scenarioName string, req *RequestValidationParams, 
 				Duration: sleepDelay,
 			},
 		},
+		// Ref: https://github.com/microsoft/retina/issues/415
+		{
+			Step: &kubernetes.ExecInPod{
+				PodName:      podName,
+				PodNamespace: "kube-system",
+				Command:      req.Command,
+			},
+			Opts: &types.StepOptions{
+				ExpectError:               req.ExpectError,
+				SkipSavingParamatersToJob: true,
+			},
+		},
+		{
+			Step: &types.Sleep{
+				Duration: sleepDelay,
+			},
+		},
 		{
 			Step: &kubernetes.PortForward{
 				Namespace:             "kube-system",
@@ -152,6 +169,23 @@ func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParam
 				Duration: sleepDelay,
 			},
 		},
+		// Ref: https://github.com/microsoft/retina/issues/415
+		{
+			Step: &kubernetes.ExecInPod{
+				PodName:      podName,
+				PodNamespace: "kube-system",
+				Command:      req.Command,
+			},
+			Opts: &types.StepOptions{
+				ExpectError:               req.ExpectError,
+				SkipSavingParamatersToJob: true,
+			},
+		},
+		{
+			Step: &types.Sleep{
+				Duration: sleepDelay,
+			},
+		},
 		{
 			Step: &kubernetes.PortForward{
 				Namespace:             "kube-system",
@@ -167,7 +201,7 @@ func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParam
 			},
 		},
 		{
-			Step: &ValidateAdvanceDNSRequestMetrics{
+			Step: &ValidateAdvancedDNSRequestMetrics{
 				Namespace:          "kube-system",
 				NumResponse:        req.NumResponse,
 				PodName:            podName,

@@ -5,14 +5,15 @@
 package packetparser
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"os"
 	"path"
 	"runtime"
 	"sync"
-	"unsafe"
 
 	"github.com/cilium/cilium/api/v1/flow"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
@@ -519,7 +520,12 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 				zap.Int("worker_id", id),
 			)
 
-			bpfEvent := (*packetparserPacket)(unsafe.Pointer(&record.RawSample[0])) //nolint:typecheck
+			var bpfEvent packetparserPacket
+			err := binary.Read(bytes.NewReader(record.RawSample), binary.LittleEndian, &bpfEvent)
+			if err != nil {
+				p.l.Error("Error reading bpfEvent", zap.Error(err))
+				continue
+			}
 
 			// Post processing of the bpfEvent.
 			// Anything after this is required only for Pod level metrics.

@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/retina/test/e2e/framework/types"
 	"github.com/microsoft/retina/test/e2e/scenarios/dns"
 	"github.com/microsoft/retina/test/e2e/scenarios/drop"
+	"github.com/microsoft/retina/test/e2e/scenarios/latency"
 	tcp "github.com/microsoft/retina/test/e2e/scenarios/tcp"
 )
 
@@ -180,6 +181,8 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 	for _, scenario := range dnsScenarios {
 		job.AddScenario(dns.ValidateAdvancedDNSMetrics(scenario.name, scenario.req, scenario.resp, kubeConfigFilePath))
 	}
+
+	job.AddScenario(latency.ValidateLatencyMetric())
 
 	return job
 }
