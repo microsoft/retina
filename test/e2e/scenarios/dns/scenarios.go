@@ -97,9 +97,8 @@ func ValidateBasicDNSMetrics(scenarioName string, req *RequestValidationParams, 
 		},
 		{
 			Step: &validateBasicDNSRequestMetrics{
-				NumResponse: req.NumResponse,
-				Query:       req.Query,
-				QueryType:   req.QueryType,
+				Query:     req.Query,
+				QueryType: req.QueryType,
 			},
 			Opts: &types.StepOptions{
 				SkipSavingParamatersToJob: true,
@@ -203,7 +202,6 @@ func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParam
 		{
 			Step: &ValidateAdvancedDNSRequestMetrics{
 				Namespace:          "kube-system",
-				NumResponse:        req.NumResponse,
 				PodName:            podName,
 				Query:              req.Query,
 				QueryType:          req.QueryType,
