@@ -2,6 +2,7 @@ package hubble
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cilium/cilium/api/v1/flow"
 	"github.com/cilium/cilium/pkg/crypto/certloader"
@@ -73,7 +74,11 @@ func (rh *RetinaHubble) defaultOptions() {
 }
 
 func (rh *RetinaHubble) getHubbleEventBufferCapacity() (container.Capacity, error) {
-	return container.NewCapacity(option.Config.HubbleEventBufferCapacity)
+	kap, err := container.NewCapacity(option.Config.HubbleEventBufferCapacity)
+	if err != nil {
+		return nil, fmt.Errorf("creating container capacity: %w", err)
+	}
+	return kap, nil
 }
 
 func (rh *RetinaHubble) start(ctx context.Context) error {
@@ -89,7 +94,7 @@ func (rh *RetinaHubble) start(ctx context.Context) error {
 	grpcMetrics := grpc_prometheus.NewServerMetrics()
 	if err := metrics.EnableMetrics(rh.log, option.Config.HubbleMetricsServer, option.Config.HubbleMetrics, grpcMetrics, option.Config.EnableHubbleOpenMetrics); err != nil {
 		rh.log.Error("Failed to enable metrics", zap.Error(err))
-		return err
+		return fmt.Errorf("enabling metrics: %w", err)
 	}
 
 	// ---------------------------------------------------------------------------------------------------------------------------------------------------- //
@@ -103,10 +108,10 @@ func (rh *RetinaHubble) start(ctx context.Context) error {
 		observeroption.WithMaxFlows(maxFlows),
 		observeroption.WithMonitorBuffer(option.Config.HubbleEventQueueSize),
 		observeroption.WithOnDecodedFlowFunc(func(ctx context.Context, flow *flow.Flow) (bool, error) {
-			err := metrics.ProcessFlow(ctx, flow)
+			err = metrics.ProcessFlow(ctx, flow)
 			if err != nil {
 				rh.log.Error("Failed to process flow", zap.Any("flow", flow), zap.Error(err))
-				return false, err
+				return false, fmt.Errorf("processing flow: %w", err)
 			}
 			return false, nil
 		}),
@@ -126,7 +131,7 @@ func (rh *RetinaHubble) start(ctx context.Context) error {
 	)
 	if err != nil {
 		rh.log.Error("Failed to create Hubble observer", zap.Error(err))
-		return err
+		return fmt.Errorf("starting local server: %w", err)
 	}
 	go hubbleObserver.Start()
 
@@ -166,11 +171,12 @@ func (rh *RetinaHubble) start(ctx context.Context) error {
 	localSrv, err := server.NewServer(rh.log, localSrvOpts...)
 	if err != nil {
 		rh.log.Error("Failed to initialize local Hubble server", zap.Error(err))
-		return err
+		return fmt.Errorf("starting peer service: %w", err)
 	}
 	rh.log.Info("Started local Hubble server", zap.String("address", sockPath))
 
 	go func() {
+		//nolint:govet // shadowing the err is intentional here
 		if err := localSrv.Serve(); err != nil {
 			rh.log.Error("Error while serving from local Hubble server", zap.Error(err))
 		}
@@ -197,7 +203,7 @@ func (rh *RetinaHubble) start(ctx context.Context) error {
 	srv, err := server.NewServer(rh.log, remoteOpts...)
 	if err != nil {
 		rh.log.Error("Failed to initialize Hubble remote server", zap.Error(err))
-		return err
+		return fmt.Errorf("starting remote server: %w", err)
 	}
 	rh.log.Info("Started Hubble remote server", zap.String("address", address))
 

@@ -17,8 +17,8 @@ import (
 )
 
 var (
-	monitorAgentNotSetupErr = fmt.Errorf("monitor agent is not set up")
-	unexpectedEventTypeErr  = errors.New("unexpected event type for MessageTypeAgent")
+	errMonitorAgentNotSetup = fmt.Errorf("monitor agent is not set up")
+	errUnexpectedEvent      = errors.New("unexpected event type for MessageTypeAgent")
 )
 
 // isCtxDone is a utility function that returns true when the context's Done()
@@ -53,7 +53,7 @@ func (a *monitorAgent) AttachToEventsMap(int) error {
 
 func (a *monitorAgent) SendEvent(typ int, event interface{}) error {
 	if a == nil {
-		return monitorAgentNotSetupErr
+		return errMonitorAgentNotSetup
 	}
 
 	// Two types of clients are currently supported: consumers and listeners.
@@ -75,7 +75,7 @@ func (a *monitorAgent) SendEvent(typ int, event interface{}) error {
 	if typ == api.MessageTypeAgent {
 		msg, ok := event.(api.AgentNotifyMessage)
 		if !ok {
-			return unexpectedEventTypeErr
+			return errUnexpectedEvent
 		}
 		var err error
 		event, err = msg.ToJSON()

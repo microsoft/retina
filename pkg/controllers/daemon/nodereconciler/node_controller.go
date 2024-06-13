@@ -5,6 +5,7 @@ package nodereconciler
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"reflect"
 	"sync"
@@ -54,7 +55,7 @@ func isNodeUpdated(n1, n2 types.Node) bool {
 	return false
 }
 
-func (r *NodeReconciler) addNode(node *corev1.Node) {
+func (r *NodeReconciler) addNode(node *corev1.Node) error {
 	r.m.Lock()
 	defer r.m.Unlock()
 
@@ -108,11 +109,15 @@ func (r *NodeReconciler) addNode(node *corev1.Node) {
 		}
 	}
 	for _, address := range nd.IPAddresses {
-		r.c.Upsert(address.ToString(), nil, 0, nil, ipc.Identity{ID: id, Source: source.Kubernetes})
+		_, err := r.c.Upsert(address.ToString(), nil, 0, nil, ipc.Identity{ID: id, Source: source.Kubernetes})
+		if err != nil {
+			return fmt.Errorf("upserting to IP cache: %w", err)
+		}
 		r.l.Debug("Added IP to ipcache", zap.String("IP", address.ToString()))
 	}
 
 	r.l.Info("Added Node", zap.String("Node", node.Name))
+	return nil
 }
 
 func (r *NodeReconciler) deleteNode(node *corev1.Node) {
@@ -166,7 +171,11 @@ func (r *NodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	node := &corev1.Node{}
 	if err := apiretry.Do(
 		func() error {
-			return r.Client.Get(ctx, req.NamespacedName, node)
+			err := r.Client.Get(ctx, req.NamespacedName, node)
+			if err != nil {
+				return fmt.Errorf("getting node: %w", err)
+			}
+			return nil
 		},
 	); err != nil {
 		if errors.IsNotFound(err) {
@@ -177,7 +186,7 @@ func (r *NodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			return ctrl.Result{}, nil
 		}
 		r.l.Error("Failed to fetch Node", zap.Error(err), zap.String("Node", req.NamespacedName.String()))
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		return ctrl.Result{}, fmt.Errorf("retrieving node info: %w", err)
 	}
 
 	if !node.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -186,7 +195,10 @@ func (r *NodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, nil
 	}
 
-	r.addNode(node)
+	err := r.addNode(node)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("adding node: %w", err)
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -194,7 +206,11 @@ func (r *NodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 // SetupWithManager sets up the controller with the Manager.
 func (r *NodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.l.Debug("Setting up Node controller")
-	return ctrl.NewControllerManagedBy(mgr).
+	err := ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Node{}).
 		Complete(r)
+	if err != nil {
+		return fmt.Errorf("setting up node controller: %w", err)
+	}
+	return nil
 }
