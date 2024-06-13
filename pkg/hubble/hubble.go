@@ -17,7 +17,6 @@ import (
 	"github.com/cilium/cilium/pkg/hubble/server"
 	"github.com/cilium/cilium/pkg/hubble/server/serveroption"
 	"github.com/cilium/cilium/pkg/ipcache"
-	"github.com/cilium/cilium/pkg/k8s"
 	"github.com/cilium/cilium/pkg/logging/logfields"
 	monitoragent "github.com/cilium/cilium/pkg/monitor/agent"
 	"github.com/cilium/cilium/pkg/option"
@@ -36,7 +35,6 @@ type RetinaHubble struct {
 	client         client.Client
 	monitorAgent   monitoragent.Agent
 	ipc            *ipcache.IPCache
-	sc             *k8s.ServiceCache
 	nodeReconciler *rnode.NodeReconciler
 }
 

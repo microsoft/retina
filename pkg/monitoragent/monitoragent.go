@@ -193,14 +193,6 @@ func (a *monitorAgent) hasListeners() bool {
 	return len(a.listeners) != 0
 }
 
-// notifyEventToConsumersLocked notifies all consumers about lost events.
-// The caller must hold the monitor lock.
-func (a *monitorAgent) notifyPerfEventLostLocked(numLostEvents uint64, cpu int) {
-	for mc := range a.consumers {
-		mc.NotifyPerfEventLost(numLostEvents, cpu)
-	}
-}
-
 // sendToListeners enqueues the payload to all listeners.
 func (a *monitorAgent) sendToListeners(pl *payload.Payload) {
 	a.Lock()
