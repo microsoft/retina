@@ -22,6 +22,12 @@ func Cmd(agentHive *hive.Hive) *cobra.Command {
 				fmt.Printf("%s %s\n", cobraCmd.Name(), version.Version)
 				os.Exit(0)
 			}
+
+			// Populate the config and initialize the logger early as these
+			// are shared by all commands.
+			initDaemonConfig(agentHive.Viper())
+			initLogging()
+
 			if err := agentHive.Run(); err != nil {
 				logger.Fatal(err)
 			}
@@ -35,17 +41,7 @@ func Cmd(agentHive *hive.Hive) *cobra.Command {
 	)
 
 	InitGlobalFlags(hubbleCmd, agentHive.Viper())
-
-	cobra.OnInitialize(
-		option.InitConfig(hubbleCmd, "retina-agent", "retina", agentHive.Viper()),
-
-		// Populate the config and initialize the logger early as these
-		// are shared by all commands.
-		func() {
-			initDaemonConfig(agentHive.Viper())
-		},
-		initLogging,
-	)
+	option.InitConfig(hubbleCmd, "retina-agent", "retina", agentHive.Viper())
 
 	return hubbleCmd
 }
