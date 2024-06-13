@@ -59,16 +59,16 @@ func (p *Parser) decodeIP(f *flow.Flow) {
 	}
 
 	// Decode the flow's source and destination IPs to their respective endpoints.
-	if f.IP == nil {
+	if f.GetIP() == nil {
 		p.l.Warn("Failed to get IP from flow", zap.Any("flow", f))
 		return
 	}
-	sourceIP, err := netip.ParseAddr(f.IP.Source)
+	sourceIP, err := netip.ParseAddr(f.GetIP().GetSource())
 	if err != nil {
 		p.l.Warn("Failed to parse source IP", zap.Error(err))
 		return
 	}
-	destIP, err := netip.ParseAddr(f.IP.Destination)
+	destIP, err := netip.ParseAddr(f.GetIP().GetDestination())
 	if err != nil {
 		p.l.Warn("Failed to parse destination IP", zap.Error(err))
 		return
@@ -109,16 +109,16 @@ func (p *Parser) decodeHTTP(f *flow.Flow) *flow.Flow {
 }
 
 func dnsSummary(dns *flow.DNS, flowtype flow.L7FlowType) string {
-	if len(dns.Qtypes) == 0 {
+	if len(dns.GetQtypes()) == 0 {
 		return ""
 	}
-	qTypeStr := strings.Join(dns.Qtypes, ",")
+	qTypeStr := strings.Join(dns.GetQtypes(), ",")
 
 	switch flowtype {
 	case flow.L7FlowType_REQUEST:
-		return fmt.Sprintf("DNS Query %s %s", dns.Query, qTypeStr)
+		return fmt.Sprintf("DNS Query %s %s", dns.GetQuery(), qTypeStr)
 	case flow.L7FlowType_RESPONSE:
-		rcode := layers.DNSResponseCode(dns.Rcode)
+		rcode := layers.DNSResponseCode(dns.GetRcode())
 
 		var answer string
 		if rcode != layers.DNSResponseCodeNoErr {
@@ -126,12 +126,12 @@ func dnsSummary(dns *flow.DNS, flowtype flow.L7FlowType) string {
 		} else {
 			parts := make([]string, 0)
 
-			if len(dns.Ips) > 0 {
-				parts = append(parts, fmt.Sprintf("%q", strings.Join(dns.Ips, ",")))
+			if len(dns.GetIps()) > 0 {
+				parts = append(parts, fmt.Sprintf("%q", strings.Join(dns.GetIps(), ",")))
 			}
 
-			if len(dns.Cnames) > 0 {
-				parts = append(parts, fmt.Sprintf("CNAMEs: %q", strings.Join(dns.Cnames, ",")))
+			if len(dns.GetCnames()) > 0 {
+				parts = append(parts, fmt.Sprintf("CNAMEs: %q", strings.Join(dns.GetCnames(), ",")))
 			}
 
 			answer = strings.Join(parts, " ")
@@ -139,7 +139,7 @@ func dnsSummary(dns *flow.DNS, flowtype flow.L7FlowType) string {
 
 		sourceType := "Query"
 
-		return fmt.Sprintf("DNS Answer %s (%s %s %s)", answer, sourceType, dns.Query, qTypeStr)
+		return fmt.Sprintf("DNS Answer %s (%s %s %s)", answer, sourceType, dns.GetQuery(), qTypeStr)
 	}
 
 	return ""
