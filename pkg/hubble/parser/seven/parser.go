@@ -114,7 +114,7 @@ func dnsSummary(dns *flow.DNS, flowtype flow.L7FlowType) string {
 	}
 	qTypeStr := strings.Join(dns.GetQtypes(), ",")
 
-	switch flowtype {
+	switch flowtype { //nolint:exhaustive // the other two types are "sample", and "unknown" which we can ignore
 	case flow.L7FlowType_REQUEST:
 		return fmt.Sprintf("DNS Query %s %s", dns.GetQuery(), qTypeStr)
 	case flow.L7FlowType_RESPONSE:

@@ -113,7 +113,7 @@ func (a *monitorAgent) RegisterNewListener(newListener listener.MonitorListener)
 	}
 
 	version := newListener.Version()
-	switch newListener.Version() { //nolint:exhaustive
+	switch newListener.Version() { //nolint:exhaustive // the only other case is unsupported which is covered by default
 	case listener.Version1_2:
 		a.listeners[newListener] = struct{}{}
 	default:
