@@ -16,6 +16,7 @@ import (
 
 	zaphook "github.com/Sytten/logrus-zap-hook"
 	"github.com/cilium/cilium/pkg/defaults"
+	"github.com/cilium/cilium/pkg/hive"
 	"github.com/cilium/cilium/pkg/hive/cell"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/cilium/pkg/hubble/exporter/exporteroption"
@@ -301,4 +302,17 @@ func initDaemonConfig(vp *viper.Viper) {
 	}
 
 	time.MaxInternalTimerDelay = vp.GetDuration(option.MaxInternalTimerDelay)
+}
+
+func Execute(cobraCmd *cobra.Command, h *hive.Hive) {
+	fn := option.InitConfig(cobraCmd, "retina-agent", "retina", h.Viper())
+	fn()
+	initDaemonConfig(h.Viper())
+	initLogging()
+
+	// initEnv(h.Viper())
+
+	if err := h.Run(); err != nil {
+		logger.Fatal(err)
+	}
 }
