@@ -138,13 +138,13 @@ func InitializeMetrics() {
 		exporter.DefaultRegistry,
 		utils.DNSRequestCounterName,
 		dnsRequestCounterDescription,
-		utils.DNSLabels...,
+		utils.DNSRequestLabels...,
 	)
 	DNSResponseCounter = exporter.CreatePrometheusCounterVecForMetric(
 		exporter.DefaultRegistry,
 		utils.DNSResponseCounterName,
 		dnsResponseCounterDescription,
-		utils.DNSLabels...,
+		utils.DNSResponseLabels...,
 	)
 
 	// InfiniBand Metrics

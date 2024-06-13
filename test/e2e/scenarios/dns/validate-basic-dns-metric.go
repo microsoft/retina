@@ -17,20 +17,16 @@ var (
 )
 
 type validateBasicDNSRequestMetrics struct {
-	NumResponse string
-	Query       string
-	QueryType   string
+	Query     string
+	QueryType string
 }
 
 func (v *validateBasicDNSRequestMetrics) Run() error {
 	metricsEndpoint := fmt.Sprintf("http://localhost:%d/metrics", common.RetinaPort)
 
 	validBasicDNSRequestMetricLabels := map[string]string{
-		"num_response": v.NumResponse,
-		"query":        v.Query,
-		"query_type":   v.QueryType,
-		"return_code":  "",
-		"response":     "",
+		"query":      v.Query,
+		"query_type": v.QueryType,
 	}
 
 	err := prom.CheckMetric(metricsEndpoint, dnsBasicRequestCountMetricName, validBasicDNSRequestMetricLabels)
