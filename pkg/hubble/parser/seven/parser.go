@@ -86,6 +86,7 @@ func (p *Parser) decodeDNS(f *flow.Flow) *flow.Flow {
 
 	dns := l7.GetDns()
 	if dns != nil {
+		//nolint:staticcheck // TODO(timraymond): no good migration path documented
 		f.Summary = dnsSummary(dns, l7.GetType())
 	}
 

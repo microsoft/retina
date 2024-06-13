@@ -137,6 +137,7 @@ func (r *NodeReconciler) deleteNode(node *corev1.Node) {
 		}
 	}
 	for _, address := range nd.IPAddresses {
+		//nolint:staticcheck // TODO(timraymond): unhelpful deprecation notice: migration path unclear
 		r.c.Delete(address.ToString(), source.Kubernetes)
 		r.l.Debug("Deleted IP from ipcache", zap.String("IP", address.ToString()))
 	}
