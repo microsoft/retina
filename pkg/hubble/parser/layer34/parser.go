@@ -68,6 +68,7 @@ func (p *Parser) decodeSummary(f *flow.Flow) {
 		// Setting subtype to DROPPED for huuble cli.
 		if f.GetEventType() != nil {
 			f.GetEventType().SubType = int32(f.GetDropReasonDesc())
+			//nolint:lll // long line is long
 			f.Summary = fmt.Sprintf("Drop Reason: %s\nNote: This reason is most accurate. Prefer over others while using Hubble CLI.", utils.DropReasonDescription(f)) // nolint:staticcheck // We need summary for now.
 		}
 		return

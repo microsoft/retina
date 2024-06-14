@@ -46,7 +46,15 @@ func NewWatcher(params watcherParams) (*watchers.K8sWatcher, error) {
 	return newInstance(params.C, params.ResourcesSynced, params.APIGroups, params.R, params.IPcache, params.SvcCache, params.Wcfg)
 }
 
-func newInstance(c client.Clientset, resourcesSynced *synced.Resources, apiGroups *synced.APIGroups, r agentK8s.Resources, ipc *ipcache.IPCache, svcCache *k8s.ServiceCache, wcfg watchers.WatcherConfiguration) (*watchers.K8sWatcher, error) {
+func newInstance(
+	c client.Clientset,
+	resourcesSynced *synced.Resources,
+	apiGroups *synced.APIGroups,
+	r agentK8s.Resources,
+	ipc *ipcache.IPCache,
+	svcCache *k8s.ServiceCache,
+	wcfg watchers.WatcherConfiguration,
+) (*watchers.K8sWatcher, error) {
 	option.Config.BGPAnnounceLBIP = false
 	once.Do(func() {
 		w = watchers.NewK8sWatcher(
