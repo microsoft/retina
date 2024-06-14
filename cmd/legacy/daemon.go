@@ -218,6 +218,7 @@ func (d *Daemon) Start() error {
 		pubSub := pubsub.New()
 		controllerCache := controllercache.New(pubSub)
 		enrich := enricher.New(ctx, controllerCache)
+		//nolint:govet // shadowing this err is fine
 		fm, err := filtermanager.Init(5) //nolint:gomnd // defaults
 		if err != nil {
 			mainLogger.Fatal("unable to create filter manager", zap.Error(err))
