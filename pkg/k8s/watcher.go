@@ -75,7 +75,7 @@ func newInstance(c client.Clientset, resourcesSynced *synced.Resources, apiGroup
 func Start(ctx context.Context, k *watchers.K8sWatcher) {
 	logger.Info("Starting Kubernetes watcher")
 
-	option.Config.K8sSyncTimeout = 3 * time.Minute
+	option.Config.K8sSyncTimeout = 3 * time.Minute //nolint:gomnd // this duration is self-explanatory
 	syncdCache := make(chan struct{})
 	go k.InitK8sSubsystem(ctx, k8sResources, []string{}, syncdCache)
 	logger.WithField("k8s resources", k8sResources).Info("Kubernetes watcher started, will wait for cache sync")
