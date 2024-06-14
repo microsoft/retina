@@ -251,9 +251,9 @@ func setupZapLogger(retinaConfig *config.Config, k8sCfg *rest.Config) *log.ZapLo
 		Level:                 retinaConfig.LogLevel,
 		File:                  false,
 		FileName:              logFileName,
-		MaxFileSizeMB:         100,
-		MaxBackups:            3,
-		MaxAgeDays:            30,
+		MaxFileSizeMB:         100, //nolint:gomnd // this is obvious from usage
+		MaxBackups:            3,   //nolint:gomnd // this is obvious from usage
+		MaxAgeDays:            30,  //nolint:gomnd // this is obvious from usage
 		ApplicationInsightsID: applicationInsightsID,
 		EnableTelemetry:       retinaConfig.EnableTelemetry,
 	}
@@ -295,7 +295,7 @@ func bootstrapLogging(logger *logrus.Logger) {
 func initDaemonConfig(vp *viper.Viper) {
 	option.Config.Populate(vp)
 	if option.Config.HubbleEventBufferCapacity == 0 {
-		option.Config.HubbleEventBufferCapacity = int(math.Pow(2, 14) - 1)
+		option.Config.HubbleEventBufferCapacity = int(math.Pow(2, 14) - 1) //nolint:gomnd // this is just math
 	}
 
 	time.MaxInternalTimerDelay = vp.GetDuration(option.MaxInternalTimerDelay)
