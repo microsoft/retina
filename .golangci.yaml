@@ -12,6 +12,7 @@ linters:
   disable:
   - maligned
   - scopelint
+  - gci
   enable:
   - exportloopref
   - goconst
