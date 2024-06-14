@@ -83,7 +83,7 @@ func NewDaemon(metricsAddr, probeAddr, configFile string, enableLeaderElection b
 	}
 }
 
-func (d *Daemon) Start() {
+func (d *Daemon) Start() error {
 	fmt.Printf("starting Retina daemon with legacy control plane %v\n", version)
 
 	if applicationInsightsID != "" {
@@ -187,7 +187,7 @@ func (d *Daemon) Start() {
 	mgr, err := crmgr.New(cfg, mgrOption)
 	if err != nil {
 		mainLogger.Error("Unable to start manager", zap.Error(err))
-		os.Exit(1)
+		return fmt.Errorf("creating controller-runtime manager: %w", err)
 	}
 
 	//+kubebuilder:scaffold:builder
@@ -296,4 +296,5 @@ func (d *Daemon) Start() {
 	}
 
 	mainLogger.Info("Network observability exiting. Till next time!")
+	return nil
 }

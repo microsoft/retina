@@ -24,12 +24,14 @@ var (
 		Use:   "retina-agent",
 		Short: "Retina Agent",
 		Long:  "Start Retina Agent",
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			// Do Stuff Here
 			fmt.Println("Starting Retina Agent")
 			d := legacy.NewDaemon(metricsAddr, probeAddr, cfgFile, enableLeaderElection)
-			d.Start()
-
+			if err := d.Start(); err != nil {
+				return fmt.Errorf("starting daemon: %w", err)
+			}
+			return nil
 		},
 	}
 )
