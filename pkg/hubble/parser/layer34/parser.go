@@ -101,8 +101,8 @@ func (p *Parser) decodeIsReply(f *flow.Flow) {
 		return
 	}
 
-	if f.GetL4() != nil && f.GetL4().Protocol != nil {
-		switch f.GetL4().Protocol.(type) { // nolint:gocritic
+	if f.GetL4() != nil && f.GetL4().GetProtocol() != nil {
+		switch f.GetL4().GetProtocol().(type) { // nolint:gocritic
 		case *flow.Layer4_TCP:
 			tcpFlags := f.GetL4().GetTCP().GetFlags()
 			if tcpFlags != nil {
