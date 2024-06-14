@@ -241,7 +241,7 @@ func getRetinaConfig(logger *logrus.Logger) (*config.Config, error) {
 	conf, err := config.GetConfig(retinaConfigFile)
 	if err != nil {
 		logger.WithError(err).Error("Failed to get config file")
-		return nil, err
+		return nil, fmt.Errorf("getting config from file %q: %w", configFileName, err)
 	}
 	return conf, nil
 }

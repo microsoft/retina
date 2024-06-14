@@ -2,6 +2,7 @@ package hubble
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -58,7 +59,7 @@ var (
 			ctrlManager, err := ctrl.NewManager(k8sCfg, mgrOption)
 			if err != nil {
 				logger.Error("failed to create manager")
-				return nil, nil, err
+				return nil, nil, fmt.Errorf("creating new controller-runtime manager: %w", err)
 			}
 
 			return ctrlManager, ctrlManager.GetClient(), nil
