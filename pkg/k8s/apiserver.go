@@ -37,7 +37,7 @@ func (a *APIServerEventHandler) handleAPIServerEvent(event interface{}) {
 		a.l.WithField("Event", event).Warn("Received unknown event type")
 		return
 	}
-	switch cacheEvent.Type {
+	switch cacheEvent.Type { //nolint:exhaustive // the default case adequately handles these
 	case cc.EventTypeAddAPIServerIPs:
 		apiserverObj, ok := cacheEvent.Obj.(*common.APIServerObject)
 		if !ok {
