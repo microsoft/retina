@@ -55,7 +55,7 @@ func isNodeUpdated(n1, n2 types.Node) bool {
 	return false
 }
 
-func (r *NodeReconciler) addNode(node *corev1.Node) error {
+func (r *NodeReconciler) addNode(node *corev1.Node) {
 	r.m.Lock()
 	defer r.m.Unlock()
 
@@ -89,7 +89,6 @@ func (r *NodeReconciler) addNode(node *corev1.Node) error {
 	// Check if the node already exists.
 	if curNode, ok := r.nodes[node.Name]; ok && !isNodeUpdated(curNode, nd) {
 		r.l.Debug("Node already exists", zap.String("Node", node.Name))
-		return
 	}
 
 	r.nodes[node.Name] = nd
@@ -111,13 +110,12 @@ func (r *NodeReconciler) addNode(node *corev1.Node) error {
 	for _, address := range nd.IPAddresses {
 		_, err := r.c.Upsert(address.ToString(), nil, 0, nil, ipc.Identity{ID: id, Source: source.Kubernetes})
 		if err != nil {
-			return fmt.Errorf("upserting to IP cache: %w", err)
+			r.l.Debug("failed to add IP to ipcache", zap.Error(err))
 		}
 		r.l.Debug("Added IP to ipcache", zap.String("IP", address.ToString()))
 	}
 
 	r.l.Info("Added Node", zap.String("Node", node.Name))
-	return nil
 }
 
 func (r *NodeReconciler) deleteNode(node *corev1.Node) {
@@ -196,10 +194,7 @@ func (r *NodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, nil
 	}
 
-	err := r.addNode(node)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("adding node: %w", err)
-	}
+	r.addNode(node)
 
 	return ctrl.Result{}, nil
 }
