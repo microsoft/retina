@@ -105,7 +105,7 @@ type Daemon struct {
 	svcCache       *k8s.ServiceCache
 }
 
-func newDaemon(params *daemonParams) (*Daemon, error) {
+func newDaemon(params *daemonParams) *Daemon {
 	return &Daemon{
 		monitorAgent:   params.MonitorAgent,
 		pluginManager:  params.PluginManager,
@@ -118,7 +118,7 @@ func newDaemon(params *daemonParams) (*Daemon, error) {
 		localNodeStore: params.Lnds,
 		ipc:            params.IPC,
 		svcCache:       params.SvcCache,
-	}, nil
+	}
 }
 
 func (d *Daemon) Run(ctx context.Context) error {

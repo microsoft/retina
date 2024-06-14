@@ -200,15 +200,12 @@ func newDaemonPromise(params daemonParams) promise.Promise[*Daemon] {
 	var daemon *Daemon
 	params.Lifecycle.Append(cell.Hook{
 		OnStart: func(cell.HookContext) error {
-			d, err := newDaemon(&params)
-			if err != nil {
-				return fmt.Errorf("daemon creation failed: %w", err)
-			}
+			d := newDaemon(&params)
 			daemon = d
 			daemonResolver.Resolve(daemon)
 
 			d.log.Info("starting Retina Enterprise version: ", retinaVersion)
-			err = d.Run(daemonCtx)
+			err := d.Run(daemonCtx)
 			if err != nil {
 				return fmt.Errorf("daemon run failed: %w", err)
 			}
