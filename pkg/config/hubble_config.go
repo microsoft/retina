@@ -7,10 +7,9 @@ import (
 
 	"github.com/cilium/cilium/pkg/hive/cell"
 	"github.com/cilium/cilium/pkg/option"
+	sharedconfig "github.com/microsoft/retina/pkg/shared/config"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
-
-	sharedconfig "github.com/microsoft/retina/pkg/shared/config"
 )
 
 const configFileName string = "config.yaml"

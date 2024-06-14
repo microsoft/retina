@@ -4,9 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/pflag"
-
 	"github.com/cilium/cilium/pkg/common"
 	"github.com/cilium/cilium/pkg/defaults"
 	"github.com/cilium/cilium/pkg/hive/cell"
@@ -15,6 +12,8 @@ import (
 	ciliumagent "github.com/cilium/cilium/pkg/monitor/agent"
 	"github.com/cilium/cilium/pkg/monitor/agent/consumer"
 	"github.com/cilium/cilium/pkg/monitor/agent/listener"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/pflag"
 )
 
 var (
