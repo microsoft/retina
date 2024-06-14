@@ -49,7 +49,7 @@ import (
 
 const (
 	configFileName string = "config.yaml"
-	logFileName           = "retina.log"
+	logFileName    string = "retina.log"
 )
 
 var (
