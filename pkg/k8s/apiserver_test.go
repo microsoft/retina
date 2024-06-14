@@ -32,7 +32,7 @@ func TestHandler(t *testing.T) {
 
 	ip, ok := a.c.LookupByIP("52.0.0.1")
 	assert.True(t, ok)
-	assert.Equal(t, ip.ID, identity.ReservedIdentityKubeAPIServer)
+	assert.Equal(t, identity.ReservedIdentityKubeAPIServer, ip.ID)
 
 	// Delete API server IPs.
 	a.handleAPIServerEvent(&cc.CacheEvent{
