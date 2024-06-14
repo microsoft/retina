@@ -106,11 +106,10 @@ func (p *Parser) decodeIsReply(f *flow.Flow) {
 		case *flow.Layer4_TCP:
 			tcpFlags := f.GetL4().GetTCP().GetFlags()
 			if tcpFlags != nil {
-				f.Reply = tcpFlags.GetACK()
+				f.IsReply = &wrapperspb.BoolValue{Value: tcpFlags.GetACK()}
 			}
 		}
 	}
-	f.IsReply = &wrapperspb.BoolValue{Value: f.GetReply()}
 }
 
 // decodeTrafficDirection decodes the traffic direction of the flow.
