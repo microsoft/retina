@@ -75,6 +75,7 @@ var Cell = cell.Module(
 	),
 
 	cell.Provide(func(lc cell.Lifecycle, cs client.Clientset) (resource.Resource[*ciliumk8s.Endpoints], error) {
+		//nolint:wrapcheck // a wrapped error here is of dubious value
 		return ciliumk8s.EndpointsResource(lc, ciliumk8s.Config{
 			EnableK8sEndpointSlice: true,
 			K8sServiceProxyName:    "",
@@ -82,6 +83,7 @@ var Cell = cell.Module(
 	}),
 
 	cell.Provide(func(lc cell.Lifecycle, cs client.Clientset) (resource.Resource[*slim_corev1.Service], error) {
+		//nolint:wrapcheck // a wrapped error here is of dubious value
 		return ciliumk8s.ServiceResource(
 			lc,
 			ciliumk8s.Config{
