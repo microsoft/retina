@@ -13,7 +13,6 @@ import (
 )
 
 func Cmd(agentHive *hive.Hive) *cobra.Command {
-	// agentHive := hive.New(Agent)
 	hubbleCmd := &cobra.Command{
 		Use:   "hubble-control-plane",
 		Short: "Start Hubble control plane",

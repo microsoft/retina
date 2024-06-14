@@ -310,6 +310,7 @@ func Execute(cobraCmd *cobra.Command, h *hive.Hive) {
 	initDaemonConfig(h.Viper())
 	initLogging()
 
+	//nolint:gocritic // without granular commits this commented-out code may be lost
 	// initEnv(h.Viper())
 
 	if err := h.Run(); err != nil {
