@@ -108,7 +108,7 @@ func (r *NodeReconciler) addNode(node *corev1.Node) {
 		}
 	}
 	for _, address := range nd.IPAddresses {
-		_, err := r.c.Upsert(address.ToString(), nil, 0, nil, ipc.Identity{ID: id, Source: source.Kubernetes})
+		_, err := r.c.Upsert(address.ToString(), nil, 0, nil, ipc.Identity{ID: id, Source: source.Kubernetes}) //nolint:staticcheck // TODO(timraymond): no clear upgrade path
 		if err != nil {
 			r.l.Debug("failed to add IP to ipcache", zap.Error(err))
 		}

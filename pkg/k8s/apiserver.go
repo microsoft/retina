@@ -50,6 +50,7 @@ func (a *ApiServerEventHandler) handleAPIServerEvent(event interface{}) {
 			return
 		}
 		for _, ip := range ips {
+			//nolint:staticcheck // TODO(timraymond): unclear how to migrate this
 			_, err := a.c.Upsert(ip.String(), nil, 0, nil, ipcache.Identity{ID: identity.ReservedIdentityKubeAPIServer, Source: source.Kubernetes})
 			if err != nil {
 				a.l.WithError(err).WithFields(logrus.Fields{
@@ -73,6 +74,7 @@ func (a *ApiServerEventHandler) handleAPIServerEvent(event interface{}) {
 			return
 		}
 		for _, ip := range ips {
+			//nolint:staticcheck // TODO(timraymond): unclear how to migrate this
 			a.c.Delete(ip.String(), source.Kubernetes)
 		}
 		a.l.WithFields(logrus.Fields{
