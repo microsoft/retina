@@ -125,7 +125,7 @@ var Cell = cell.Module(
 	cell.Provide(NewWatcher),
 
 	cell.Provide(newAPIServerEventHandler),
-	cell.Invoke(func(a *ApiServerEventHandler) {
+	cell.Invoke(func(a *APIServerEventHandler) {
 		ps := pubsub.New()
 		fn := pubsub.CallBackFunc(a.handleAPIServerEvent)
 		uuid := ps.Subscribe(common.PubSubAPIServer, &fn)
