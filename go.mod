@@ -289,7 +289,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_model v0.6.1
 	github.com/prometheus/common v0.54.0
-	github.com/safchain/ethtool v0.3.0
+	github.com/safchain/ethtool v0.4.0
 	github.com/spf13/viper v1.19.0
 	github.com/vishvananda/netlink v1.2.1-beta.2.0.20240524165444-4d4ba1473f21
 	go.opentelemetry.io/otel v1.27.0
