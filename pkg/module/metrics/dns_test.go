@@ -16,28 +16,46 @@ import (
 	"gotest.tools/v3/assert"
 )
 
+const (
+	request  = "request"
+	response = "response"
+)
+
 func TestGetLabels(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	l := log.Logger().Named("testGetLabels")
 
 	tests := []struct {
-		name string
-		want []string
-		d    *DNSMetrics
+		name       string
+		want       []string
+		d          *DNSMetrics
+		labelTypes string
 	}{
 		{
-			name: "basic context",
-			want: utils.DNSLabels,
+			name: "basic context request labels",
+			want: utils.DNSRequestLabels,
 			d: &DNSMetrics{
 				baseMetricObject: baseMetricObject{
 					srcCtx: nil,
 					dstCtx: nil,
 				},
 			},
+			labelTypes: request,
 		},
 		{
-			name: "local context",
-			want: append(utils.DNSLabels, "ip", "namespace", "podname", "workloadKind", "workloadName", "service", "port"),
+			name: "basic context response labels",
+			want: utils.DNSResponseLabels,
+			d: &DNSMetrics{
+				baseMetricObject: baseMetricObject{
+					srcCtx: nil,
+					dstCtx: nil,
+				},
+			},
+			labelTypes: response,
+		},
+		{
+			name: "local context request labels",
+			want: append(utils.DNSRequestLabels, "ip", "namespace", "podname", "workload_kind", "workload_name", "service", "port"),
 			d: &DNSMetrics{
 				baseMetricObject: baseMetricObject{
 					srcCtx: &ContextOptions{
@@ -53,12 +71,22 @@ func TestGetLabels(t *testing.T) {
 					l:      l,
 				},
 			},
+			labelTypes: request,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.d.getLabels(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetLabels() = %v, want %v", got, tt.want)
+			switch tt.labelTypes {
+			case request:
+				if got := tt.d.getRequestLabels(); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("GetRequestLabels() = %v, want %v", got, tt.want)
+				}
+			case response:
+				if got := tt.d.getResponseLabels(); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("GetResponseLabels() = %v, want %v", got, tt.want)
+				}
+			default:
+				t.Errorf("Invalid label type")
 			}
 		})
 	}
@@ -96,7 +124,7 @@ func TestValues(t *testing.T) {
 		},
 		{
 			name:   "Query",
-			want:   []string{"NOERROR", "A", "bing.com", "", "0"},
+			want:   []string{"A", "bing.com"},
 			d:      &DNSMetrics{metricName: utils.DNSRequestCounterName},
 			input:  testQ,
 			l7Type: flow.L7FlowType_REQUEST,
@@ -139,8 +167,22 @@ func TestValues(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.d.values(tt.input); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Values() = %v, want %v", got, tt.want)
+			switch tt.l7Type {
+			case flow.L7FlowType_REQUEST:
+				if got := tt.d.requestValues(tt.input); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("RequestValues() = %v, want %v", got, tt.want)
+				}
+			case flow.L7FlowType_RESPONSE:
+				if got := tt.d.responseValues(tt.input); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("ResponseValues() = %v, want %v", got, tt.want)
+				}
+			case flow.L7FlowType_UNKNOWN_L7_TYPE:
+				if got := tt.d.responseValues(tt.input); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("ResponseValues() = %v, want %v", got, tt.want)
+				}
+			case flow.L7FlowType_SAMPLE:
+			default:
+				t.Errorf("Invalid L7FlowType")
 			}
 			if tt.input == nil {
 				return

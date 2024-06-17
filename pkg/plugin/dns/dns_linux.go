@@ -6,9 +6,9 @@ package dns
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
@@ -102,13 +102,23 @@ func (d *dns) eventHandler(event *types.Event) {
 	}
 	d.l.Debug("Event received", zap.Any("event", event))
 
+	responses := strings.Join(event.Addresses, ",")
+
+	// Update basic metrics. If the event is a request, the we don't need num_response, response, or return_code
 	if event.Qr == types.DNSPktTypeQuery {
 		m = metrics.DNSRequestCounter
+		m.WithLabelValues(event.QType, event.DNSName).Inc()
 	} else if event.Qr == types.DNSPktTypeResponse {
 		m = metrics.DNSResponseCounter
+		m.WithLabelValues(event.Rcode, event.QType, event.DNSName, responses, strconv.Itoa(event.NumAnswers)).Inc()
 	} else {
 		return
 	}
+
+	if !d.cfg.EnablePodLevel {
+		return
+	}
+
 	var dir uint32
 	if event.PktType == "HOST" {
 		// Ingress.
@@ -117,13 +127,6 @@ func (d *dns) eventHandler(event *types.Event) {
 		// Egress.
 		dir = 3
 	} else {
-		return
-	}
-	responses := strings.Join(event.Addresses, ",")
-	// Update basic metrics.
-	m.WithLabelValues(event.Rcode, event.QType, event.DNSName, responses, fmt.Sprintf("%d", event.NumAnswers)).Inc()
-
-	if !d.cfg.EnablePodLevel {
 		return
 	}
 

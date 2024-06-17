@@ -1,6 +1,5 @@
 enablePodLevel: true
-remoteContext: true
-logLevel: info
+enableAnnotations: true
 operator:
   enabled: true
-enabledPlugin_linux: '["dropreason","packetforward","packetparser"]'
+  enableRetinaEndpoint: true

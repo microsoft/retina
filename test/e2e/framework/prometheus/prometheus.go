@@ -30,7 +30,7 @@ func CheckMetric(promAddress, metricName string, validMetric map[string]string) 
 
 	metrics := map[string]*promclient.MetricFamily{}
 	scrapeMetricsFn := func() error {
-		log.Printf("checking for drop metrics on %s", promAddress)
+		log.Printf("checking for metrics on %s", promAddress)
 		var err error
 
 		// obtain a full dump of all metrics on the endpoint

@@ -1,0 +1,20 @@
+FROM  --platform=windows/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.22.2-windowsservercore-ltsc2022 as cgo
+
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+
+RUN [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+    Invoke-WebRequest -UseBasicParsing -uri "https://github.com/msys2/msys2-installer/releases/download/2024-01-13/msys2-base-x86_64-20240113.sfx.exe" -OutFile msys2.exe; \
+    .\msys2.exe -y -oC:\; \
+    Remove-Item msys2.exe ; \
+    function msys() { C:\msys64\usr\bin\bash.exe @('-lc') + @Args; } \
+    msys ' '; \
+    msys 'pacman --noconfirm -Syuu'; \
+    msys 'pacman --noconfirm -S mingw-w64-x86_64-gcc'; \
+    msys 'pacman --noconfirm -Scc'; 
+
+# pure magic: https://github.com/MicrosoftDocs/Virtualization-Documentation/blob/3f7c7ed7ef8d582c74ec740414c54f25bf5850c0/windows-container-samples/golang/Dockerfile#L15C1-L15C179
+RUN setx path "C:\msys64\mingw64\bin"
+
+FROM cgo as builder
+WORKDIR C:\\pktmon
+COPY .\\pkg\\plugin\\windows\\pktmon\\packetmonitorsupport .

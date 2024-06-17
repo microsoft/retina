@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   retina-images:
@@ -36,7 +37,9 @@ jobs:
         uses: azure/login@v2
         if: ${{ github.event_name == 'merge_group' }}
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION }}
 
       - name: Build Images
         shell: bash
@@ -66,6 +69,7 @@ jobs:
       matrix:
         platform: ["windows"]
         arch: ["amd64"]
+        year: ["2019", "2022"]
 
     steps:
       - name: Checkout code
@@ -83,7 +87,9 @@ jobs:
         uses: azure/login@v2
         if: ${{ github.event_name == 'merge_group' }}
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION }}
 
       - name: Build Images
         shell: bash
@@ -96,11 +102,13 @@ jobs:
               IMAGE_NAMESPACE=${{ github.repository }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
+              WINDOWS_YEARS=${{ matrix.year }} \
               BUILDX_ACTION=--push
           else
             make retina-image-win \
               IMAGE_NAMESPACE=${{ github.repository }} \
-              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
+              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
+              WINDOWS_YEARS=${{ matrix.year }} 
           fi
         env:
           IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
@@ -130,7 +138,9 @@ jobs:
         uses: azure/login@v2
         if: ${{ github.event_name == 'merge_group' }}
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION }}
 
       - name: Build Images
         shell: bash
@@ -153,7 +163,7 @@ jobs:
           IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
 
   manifests:
-    if: ${{ github.event_name == 'merge_group' }}
+    if: ${{ github.event_name == 'merge_group' && success('retina-images') && success('retina-win-images') && success('operator-images')}} 
     name: Generate Manifests
     runs-on: ubuntu-latest
     needs: [retina-images, retina-win-images, operator-images]
@@ -172,7 +182,9 @@ jobs:
       - name: Azure CLI login
         uses: azure/login@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION }}
 
       - name: Generate Manifests
         shell: bash
@@ -183,14 +195,10 @@ jobs:
           IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
 
   e2e:
-    if: ${{ github.event_name == 'merge_group' }}
+    if: ${{ github.event_name == 'merge_group' && success('manifests')}}
     name: Run E2E Tests
     runs-on: ubuntu-latest
     needs: [manifests]
-
-    permissions:
-      id-token: write
-      contents: read
 
     steps:
       - name: Checkout code
@@ -206,7 +214,9 @@ jobs:
         uses: azure/login@v2
         if: ${{ github.event_name == 'merge_group' }}
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION }}
 
       - name: Run E2E Tests
         env:
@@ -215,4 +225,4 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          go test -v ./test/e2e/scenarios/retina/*.go -timeout 30m -tags=e2e -count=1  -args -image-tag=$(make version) -image-registry=${{ vars.ACR_NAME }}  -image-namespace=${{ github.repository}}
+          go test -v ./test/e2e/*.go -timeout 30m -tags=e2e -count=1  -args -image-tag=$(make version) -image-registry=${{ vars.ACR_NAME }}  -image-namespace=${{ github.repository}}

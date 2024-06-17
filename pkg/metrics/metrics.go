@@ -138,13 +138,31 @@ func InitializeMetrics() {
 		exporter.DefaultRegistry,
 		utils.DNSRequestCounterName,
 		dnsRequestCounterDescription,
-		utils.DNSLabels...,
+		utils.DNSRequestLabels...,
 	)
 	DNSResponseCounter = exporter.CreatePrometheusCounterVecForMetric(
 		exporter.DefaultRegistry,
 		utils.DNSResponseCounterName,
 		dnsResponseCounterDescription,
-		utils.DNSLabels...,
+		utils.DNSResponseLabels...,
+	)
+
+	// InfiniBand Metrics
+	InfinibandCounterStats = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.DefaultRegistry,
+		utils.InfinibandCounterStatsName,
+		infinibandCounterStatsDescription,
+		utils.StatName,
+		utils.Device,
+		utils.Port,
+	)
+
+	InfinibandStatusParams = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.DefaultRegistry,
+		utils.InfinibandStatusParamsName,
+		infinibandStatusParamsDescription,
+		utils.StatName,
+		utils.InterfaceName,
 	)
 
 	isInitialized = true
