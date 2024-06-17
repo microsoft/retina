@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"unsafe"
 
+	"github.com/cilium/cilium/api/v1/flow"
 	"github.com/pkg/errors"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/exp/maps"
@@ -112,4 +113,21 @@ func isDefaultRoute(route netlink.Route) bool {
 	}
 
 	return false
+}
+
+func GetDropReasonDesc(dr DropReason) flow.DropReason {
+	// Set the drop reason.
+	// Retina drop reasons are different from the drop reasons available in flow library.
+	// We map the ones available in flow library to the ones available in Retina.
+	// Rest are set to UNKNOWN. The details are added in the metadata.
+	switch dr { //nolint:exhaustive // We are handling all the cases.
+	case DropReason_IPTABLE_RULE_DROP:
+		return flow.DropReason_POLICY_DENIED
+	case DropReason_IPTABLE_NAT_DROP:
+		return flow.DropReason_SNAT_NO_MAP_FOUND
+	case DropReason_CONNTRACK_ADD_DROP:
+		return flow.DropReason_UNKNOWN_CONNECTION_TRACKING_STATE
+	default:
+		return flow.DropReason_DROP_REASON_UNKNOWN
+	}
 }
