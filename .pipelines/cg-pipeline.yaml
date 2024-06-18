@@ -176,12 +176,13 @@ stages:
           - checkout: self
             fetchTags: true
 
-          - task: Docker@2
-            displayName: Docker Login
+          - task: AzureCLI@1
+            displayName: "Docker Login"
             inputs:
-              containerRegistry: $(WINDOWS_BUILDER_REGISTRY)
-              command: "login"
-              addPipelineData: false
+              azureSubscription: $(SERVICE_CONNECTION)
+              scriptLocation: "inlineScript"
+              inlineScript: |
+                az acr login -n $(WINDOWS_BUILDER_REGISTRY)
 
           - task: PowerShell@2
             displayName: "Build Retina Windows Image (LTSC2022)"
@@ -197,3 +198,10 @@ stages:
               artifactName: output
               pathtoPublish: ./output
             condition: succeeded()
+
+          - task: PowerShell@2
+            displayName: "Logout"
+            inputs:
+              targetType: "inline"
+              script: |
+                docker logout
