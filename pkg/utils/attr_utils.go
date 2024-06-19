@@ -48,6 +48,7 @@ var (
 	Endpoint       = "endpoint"
 	AclRule        = "aclrule"
 	Active         = "ACTIVE"
+	Device         = "device"
 
 	// TCP Connection Statistic Names
 	ResetCount           = "ResetCount"
@@ -81,7 +82,8 @@ var (
 	Windows   = "windows"
 
 	// DNS labels.
-	DNSLabels = []string{"return_code", "query_type", "query", "response", "num_response"}
+	DNSRequestLabels  = []string{"query_type", "query"}
+	DNSResponseLabels = []string{"return_code", "query_type", "query", "response", "num_response"}
 )
 
 func GetPluginEventAttributes(attrs []attribute.KeyValue, pluginName, eventName, timestamp string) []attribute.KeyValue {

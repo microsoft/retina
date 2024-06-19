@@ -22,7 +22,9 @@ import (
 	kcfg "sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	crmgr "sigs.k8s.io/controller-runtime/pkg/manager"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+	"github.com/go-logr/zapr"
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/pkg/config"
 	controllercache "github.com/microsoft/retina/pkg/controllers/cache"
@@ -141,9 +143,10 @@ func main() {
 	// Create a manager for controller-runtime
 
 	mgrOption := crmgr.Options{
-		Scheme:             scheme,
-		MetricsBindAddress: metricsAddr,
-		// Port:                   9443, // retina-agent is host-networked, we don't want to abuse the port for conflicts.
+		Scheme: scheme,
+		Metrics: metricsserver.Options{
+			BindAddress: metricsAddr,
+		},
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "ecaf1259.retina.sh",
@@ -175,13 +178,13 @@ func main() {
 		podSelector := fields.AndSelectors(podNodeNameSelector, podNodeIPNotMatchSelector)
 
 		mainLogger.Info("pod selector when remote context is disabled", zap.String("pod selector", podSelector.String()))
-		mgrOption.NewCache = crcache.BuilderWithOptions(crcache.Options{
+		mgrOption.Cache = crcache.Options{
 			ByObject: map[client.Object]crcache.ByObject{
 				&corev1.Pod{}: {
 					Field: podSelector,
 				},
 			},
-		})
+		}
 	}
 
 	mgr, err := crmgr.New(cfg, mgrOption)
@@ -214,6 +217,7 @@ func main() {
 	// Setup RetinaEndpoint controller.
 	// TODO(mainred): This is to temporarily create a cache and pubsub for RetinaEndpoint, need to refactor this.
 	ctx := ctrl.SetupSignalHandler()
+	ctrl.SetLogger(zapr.NewLogger(zl.Logger.Named("controller-runtime")))
 
 	if config.EnablePodLevel {
 		pubSub := pubsub.New()

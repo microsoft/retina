@@ -1,0 +1,497 @@
+syntax = "proto3";
+package utils;
+
+option go_package = "github.com/microsoft/retina/pkg/utils";
+
+message RetinaMetadata {
+    uint64 bytes = 1;
+
+    // DNS metadata.
+    DNSType dns_type = 2;
+    uint32 num_responses = 3;
+
+    // TCP ID. Either Tsval or Tsecr will be set.
+    uint64 tcp_id = 4;
+
+    // Drop reason in Retina.
+    DropReason drop_reason = 5;
+}
+
+enum DNSType {
+    UNKNOWN = 0;
+    QUERY = 1;
+    RESPONSE = 2;
+}
+
+enum DropReason {
+    Drop_Unknown                      = 0;
+    Drop_InvalidData                  = 1;
+    Drop_InvalidPacket                = 2;
+    Drop_Resources                    = 3;
+    Drop_NotReady                     = 4;
+    Drop_Disconnected                 = 5;
+    Drop_NotAccepted                  = 6;
+    Drop_Busy                         = 7;
+    Drop_Filtered                     = 8;
+    Drop_FilteredVLAN                 = 9;
+    Drop_UnauthorizedVLAN             = 10;
+    Drop_UnauthorizedMAC              = 11;
+    Drop_FailedSecurityPolicy         = 12;
+    Drop_FailedPvlanSetting           = 13;
+    Drop_Qos                          = 14;
+    Drop_Ipsec                        = 15;
+    Drop_MacSpoofing                  = 16;
+    Drop_DhcpGuard                    = 17;
+    Drop_RouterGuard                  = 18;
+    Drop_BridgeReserved               = 19;
+    Drop_VirtualSubnetId              = 20;
+    Drop_RequiredExtensionMissing     = 21;
+    Drop_InvalidConfig                = 22;
+    Drop_MTUMismatch                  = 23;
+    Drop_NativeFwdingReq              = 24;
+    Drop_InvalidVlanFormat            = 25;
+    Drop_InvalidDestMac               = 26;
+    Drop_InvalidSourceMac             = 27;
+    Drop_InvalidFirstNBTooSmall       = 28;
+    Drop_Wnv                          = 29;
+    Drop_StormLimit                   = 30;
+    Drop_InjectedIcmp                 = 31;
+    Drop_FailedDestinationListUpdate  = 32;
+    Drop_NicDisabled                  = 33;
+    Drop_FailedPacketFilter           = 34;
+    Drop_SwitchDataFlowDisabled       = 35;
+    Drop_FilteredIsolationUntagged    = 36;
+    Drop_InvalidPDQueue               = 37;
+    Drop_LowPower                     = 38;
+
+    //
+    // General errors
+    //
+    Drop_Pause                        = 201;
+    Drop_Reset                        = 202;
+    Drop_SendAborted                  = 203;
+    Drop_ProtocolNotBound             = 204;
+    Drop_Failure                      = 205;
+    Drop_InvalidLength                = 206;
+    Drop_HostOutOfMemory              = 207;
+    Drop_FrameTooLong                 = 208;
+    Drop_FrameTooShort                = 209;
+    Drop_FrameLengthError             = 210;
+    Drop_CrcError                     = 211;
+    Drop_BadFrameChecksum             = 212;
+    Drop_FcsError                     = 213;
+    Drop_SymbolError                  = 214;
+    Drop_HeadQTimeout                 = 215;
+    Drop_StalledDiscard               = 216;
+    Drop_RxQFull                      = 217;
+    Drop_PhysLayerError               = 218;
+    Drop_DmaError                     = 219;
+    Drop_FirmwareError                = 220;
+    Drop_DecryptionFailed             = 221;
+    Drop_BadSignature                 = 222;
+    Drop_CoalescingError              = 223;
+    Drop_VlanSpoofing                 = 225;
+    Drop_UnallowedEtherType           = 226;
+    Drop_VportDown                    = 227;
+    Drop_SteeringMismatch             = 228;
+
+    //
+    // NetVsc errors
+    //
+    Drop_MicroportError               = 401;
+    Drop_VfNotReady                   = 402;
+    Drop_MicroportNotReady            = 403;
+    Drop_VMBusError                   = 404;
+
+    //
+    // Tcpip FL errors
+    //
+    Drop_FL_LoopbackPacket            = 601;
+    Drop_FL_InvalidSnapHeader         = 602;
+    Drop_FL_InvalidEthernetType       = 603;
+    Drop_FL_InvalidPacketLength       = 604;
+    Drop_FL_HeaderNotContiguous       = 605;
+    Drop_FL_InvalidDestinationType    = 606;
+    Drop_FL_InterfaceNotReady         = 607;
+    Drop_FL_ProviderNotReady          = 608;
+    Drop_FL_InvalidLsoInfo            = 609;
+    Drop_FL_InvalidUsoInfo            = 610;
+    Drop_FL_InvalidMedium             = 611;
+    Drop_FL_InvalidArpHeader          = 612;
+    Drop_FL_NoClientInterface         = 613;
+    Drop_FL_TooManyNetBuffers         = 614;
+    Drop_FL_FlsNpiClientDrop          = 615;
+
+    //
+    // VFP errors
+    //
+    Drop_ArpGuard                     = 701;
+    Drop_ArpLimiter                   = 702;
+    Drop_DhcpLimiter                  = 703;
+    Drop_BlockBroadcast               = 704;
+    Drop_BlockNonIp                   = 705;
+    Drop_ArpFilter                    = 706;
+    Drop_Ipv4Guard                    = 707;
+    Drop_Ipv6Guard                    = 708;
+    Drop_MacGuard                     = 709;
+    Drop_BroadcastNoDestinations      = 710;
+    Drop_UnicastNoDestination         = 711;
+    Drop_UnicastPortNotReady          = 712;
+    Drop_SwitchCallbackFailed         = 713;
+    Drop_Icmpv6Limiter                = 714;
+    Drop_Intercept                    = 715;
+    Drop_InterceptBlock               = 716;
+    Drop_NDPGuard                     = 717;
+    Drop_PortBlocked                  = 718;
+    Drop_NicSuspended                 = 719;
+
+    //
+    // Tcpip NL errors
+    //
+    Drop_NL_BadSourceAddress                          = 901;
+    Drop_NL_NotLocallyDestined                        = 902;
+    Drop_NL_ProtocolUnreachable                       = 903;
+    Drop_NL_PortUnreachable                           = 904;
+    Drop_NL_BadLength                                 = 905;
+    Drop_NL_MalformedHeader                           = 906;
+    Drop_NL_NoRoute                                   = 907;
+    Drop_NL_BeyondScope                               = 908;
+    Drop_NL_InspectionDrop                            = 909;
+    Drop_NL_TooManyDecapsulations                     = 910;
+    Drop_NL_AdministrativelyProhibited                = 911;
+    Drop_NL_BadChecksum                               = 912;
+    Drop_NL_ReceivePathMax                            = 913;
+    Drop_NL_HopLimitExceeded                          = 914;
+    Drop_NL_AddressUnreachable                        = 915;
+    Drop_NL_RscPacket                                 = 916;
+    Drop_NL_ForwardPathMax                            = 917;
+    Drop_NL_ArbitrationUnhandled                      = 918;
+    Drop_NL_InspectionAbsorb                          = 919;
+    Drop_NL_DontFragmentMtuExceeded                   = 920;
+    Drop_NL_BufferLengthExceeded                      = 921;
+    Drop_NL_AddressResolutionTimeout                  = 922;
+    Drop_NL_AddressResolutionFailure                  = 923;
+    Drop_NL_IpsecFailure                              = 924;
+    Drop_NL_ExtensionHeadersFailure                   = 925;
+    Drop_NL_IpsnpiClientDrop                          = 926;
+    Drop_NL_UnsupportedOffload                        = 927;
+    Drop_NL_RoutingFailure                            = 928;
+    Drop_NL_AncillaryDataFailure                      = 929;
+    Drop_NL_RawDataFailure                            = 930;
+    Drop_NL_SessionStateFailure                       = 931;
+    Drop_NL_IpsnpiModifiedButNotForwarded             = 932;
+    Drop_NL_IpsnpiNoNextHop                           = 933;
+    Drop_NL_IpsnpiNoCompartment                       = 934;
+    Drop_NL_IpsnpiNoInterface                         = 935;
+    Drop_NL_IpsnpiNoSubInterface                      = 936;
+    Drop_NL_IpsnpiInterfaceDisabled                   = 937;
+    Drop_NL_IpsnpiSegmentationFailed                  = 938;
+    Drop_NL_IpsnpiNoEthernetHeader                    = 939;
+    Drop_NL_IpsnpiUnexpectedFragment                  = 940;
+    Drop_NL_IpsnpiUnsupportedInterfaceType            = 941;
+    Drop_NL_IpsnpiInvalidLsoInfo                      = 942;
+    Drop_NL_IpsnpiInvalidUsoInfo                      = 943;
+    Drop_NL_InternalError                             = 944;
+    Drop_NL_AdministrativelyConfigured                = 945;
+    Drop_NL_BadOption                                 = 946;
+    Drop_NL_LoopbackDisallowed                        = 947;
+    Drop_NL_SmallerScope                              = 948;
+    Drop_NL_QueueFull                                 = 949;
+    Drop_NL_InterfaceDisabled                         = 950;
+
+    Drop_NL_IcmpGeneric                               = 951;
+    Drop_NL_IcmpTruncatedHeader                       = 952;
+    Drop_NL_IcmpInvalidChecksum                       = 953;
+    Drop_NL_IcmpInspection                            = 954;
+    Drop_NL_IcmpNeighborDiscoveryLoopback             = 955;
+    Drop_NL_IcmpUnknownType                           = 956;
+    Drop_NL_IcmpTruncatedIpHeader                     = 957;
+    Drop_NL_IcmpOversizedIpHeader                     = 958;
+    Drop_NL_IcmpNoHandler                             = 959;
+    Drop_NL_IcmpRespondingToError                     = 960;
+    Drop_NL_IcmpInvalidSource                         = 961;
+    Drop_NL_IcmpInterfaceRateLimit                    = 962;
+    Drop_NL_IcmpPathRateLimit                         = 963;
+    Drop_NL_IcmpNoRoute                               = 964;
+    Drop_NL_IcmpMatchingRequestNotFound               = 965;
+    Drop_NL_IcmpBufferTooSmall                        = 966;
+    Drop_NL_IcmpAncillaryDataQuery                    = 967;
+    Drop_NL_IcmpIncorrectHopLimit                     = 968;
+    Drop_NL_IcmpUnknownCode                           = 969;
+    Drop_NL_IcmpSourceNotLinkLocal                    = 970;
+    Drop_NL_IcmpTruncatedNdHeader                     = 971;
+    Drop_NL_IcmpInvalidNdOptSourceLinkAddr            = 972;
+    Drop_NL_IcmpInvalidNdOptMtu                       = 973;
+    Drop_NL_IcmpInvalidNdOptPrefixInformation         = 974;
+    Drop_NL_IcmpInvalidNdOptRouteInformation          = 975;
+    Drop_NL_IcmpInvalidNdOptRdnss                     = 976;
+    Drop_NL_IcmpInvalidNdOptDnssl                     = 977;
+    Drop_NL_IcmpPacketParsingFailure                  = 978;
+    Drop_NL_IcmpDisallowed                            = 979;
+    Drop_NL_IcmpInvalidRouterAdvertisement            = 980;
+    Drop_NL_IcmpSourceFromDifferentLink               = 981;
+    Drop_NL_IcmpInvalidRedirectDestinationOrTarget    = 982;
+    Drop_NL_IcmpInvalidNdTarget                       = 983;
+    Drop_NL_IcmpNaMulticastAndSolicited               = 984;
+    Drop_NL_IcmpNdLinkLayerAddressIsLocal             = 985;
+    Drop_NL_IcmpDuplicateEchoRequest                  = 986;
+    Drop_NL_IcmpNotAPotentialRouter                   = 987;
+    Drop_NL_IcmpInvalidMldQuery                       = 988;
+    Drop_NL_IcmpInvalidMldReport                      = 989;
+    Drop_NL_IcmpLocallySourcedMldReport               = 990;
+    Drop_NL_IcmpNotLocallyDestined                    = 991;
+
+    Drop_NL_ArpInvalidSource                          = 992;
+    Drop_NL_ArpInvalidTarget                          = 993;
+    Drop_NL_ArpDlSourceIsLocal                        = 994;
+    Drop_NL_ArpNotLocallyDestined                     = 995;
+
+    Drop_NL_NlClientDiscard                           = 996;
+
+    Drop_NL_IpsnpiUroSegmentSizeExceedsMtu            = 997;
+
+    Drop_NL_IcmpFragmentedPacket                      = 998;
+    Drop_NL_FirstFragmentIncomplete                   = 999;
+    Drop_NL_SourceViolation                           = 1000;
+    Drop_NL_IcmpJumbogram                             = 1001;
+    Drop_NL_SwUsoFailure                              = 1002;
+
+    //
+    // INET discard reasons
+    //
+    Drop_INET_SourceUnspecified                       = 1200;
+    Drop_INET_DestinationMulticast                    = 1201;
+    Drop_INET_HeaderInvalid                           = 1202;
+    Drop_INET_ChecksumInvalid                         = 1203;
+    Drop_INET_EndpointNotFound                        = 1204;
+    Drop_INET_ConnectedPath                           = 1205;
+    Drop_INET_SessionState                            = 1206;
+    Drop_INET_ReceiveInspection                       = 1207;
+    Drop_INET_AckInvalid                              = 1208;
+    Drop_INET_ExpectedSyn                             = 1209;
+    Drop_INET_Rst                                     = 1210;
+    Drop_INET_SynRcvdSyn                              = 1211;
+    Drop_INET_SimultaneousConnect                     = 1212;
+    Drop_INET_PawsFailed                              = 1213;
+    Drop_INET_LandAttack                              = 1214;
+    Drop_INET_MissedReset                             = 1215;
+    Drop_INET_OutsideWindow                           = 1216;
+    Drop_INET_DuplicateSegment                        = 1217;
+    Drop_INET_ClosedWindow                            = 1218;
+    Drop_INET_TcbRemoved                              = 1219;
+    Drop_INET_FinWait2                                = 1220;
+    Drop_INET_ReassemblyConflict                      = 1221;
+    Drop_INET_FinReceived                             = 1222;
+    Drop_INET_ListenerInvalidFlags                    = 1223;
+    Drop_INET_TcbNotInTcbTable                        = 1224;
+    Drop_INET_TimeWaitTcbReceivedRstOutsideWindow     = 1225;
+    Drop_INET_TimeWaitTcbSynAndOtherFlags             = 1226;
+    Drop_INET_TimeWaitTcb                             = 1227;
+    Drop_INET_SynAckWithFastopenCookieRequest         = 1228;
+    Drop_INET_PauseAccept                             = 1229;
+    Drop_INET_SynAttack                               = 1230;
+    Drop_INET_AcceptInspection                        = 1231;
+    Drop_INET_AcceptRedirection                       = 1232;
+
+    //
+    // Slbmux Error
+    //
+    Drop_SlbMux_ParsingFailure                            = 1301;
+    Drop_SlbMux_FirstFragmentMiss                         = 1302;
+    Drop_SlbMux_ICMPErrorPayloadValidationFailure         = 1303;
+    Drop_SlbMux_ICMPErrorPacketMatchNoSession             = 1304;
+    Drop_SlbMux_ExternalHairpinNexthopLookupFailure       = 1305;
+    Drop_SlbMux_NoMatchingStaticMapping                   = 1306;
+    Drop_SlbMux_NexthopReferenceFailure                   = 1307;
+    Drop_SlbMux_CloningFailure                            = 1308;
+    Drop_SlbMux_TranslationFailure                        = 1309;
+    Drop_SlbMux_HopLimitExceeded                          = 1310;
+    Drop_SlbMux_PacketBiggerThanMTU                       = 1311;
+    Drop_SlbMux_UnexpectedRouteLookupFailure              = 1312;
+    Drop_SlbMux_NoRoute                                   = 1313;
+    Drop_SlbMux_SessionCreationFailure                    = 1314;
+    Drop_SlbMux_NexthopNotOverExternalInterface           = 1315;
+    Drop_SlbMux_NexthopExternalInterfaceMissNATInstance   = 1316;
+    Drop_SlbMux_NATItselfCantBeInternalNexthop            = 1317;
+    Drop_SlbMux_PacketRoutableInItsArrivalCompartment     = 1318;
+    Drop_SlbMux_PacketTransportProtocolNotSupported       = 1319;
+    Drop_SlbMux_PacketIsDestinedLocally                   = 1320;
+    Drop_SlbMux_PacketDestinationIPandPortNotSubjectToNAT = 1321;
+    Drop_SlbMux_MuxReject                                 = 1322;
+    Drop_SlbMux_DipLookupFailure                          = 1323;
+    Drop_SlbMux_MuxEncapsulationFailure                   = 1324;
+    Drop_SlbMux_InvalidDiagPacketEncapType                = 1325;
+    Drop_SlbMux_DiagPacketIsRedirect                      = 1326;
+    Drop_SlbMux_UnableToHandleRedirect                    = 1327;
+
+    //
+    // Ipsec Errors
+    //
+    Drop_Ipsec_BadSpi                                     = 1401;
+    Drop_Ipsec_SALifetimeExpired                          = 1402;
+    Drop_Ipsec_WrongSA                                    = 1403;
+    Drop_Ipsec_ReplayCheckFailed                          = 1404;
+    Drop_Ipsec_InvalidPacket                              = 1405;
+    Drop_Ipsec_IntegrityCheckFailed                       = 1406;
+    Drop_Ipsec_ClearTextDrop                              = 1407;
+    Drop_Ipsec_AuthFirewallDrop                           = 1408;
+    Drop_Ipsec_ThrottleDrop                               = 1409;
+    Drop_Ipsec_Dosp_Block                                 = 1410;
+    Drop_Ipsec_Dosp_ReceivedMulticast                     = 1411;
+    Drop_Ipsec_Dosp_InvalidPacket                         = 1412;
+    Drop_Ipsec_Dosp_StateLookupFailed                     = 1413;
+    Drop_Ipsec_Dosp_MaxEntries                            = 1414;
+    Drop_Ipsec_Dosp_KeymodNotAllowed                      = 1415;
+    Drop_Ipsec_Dosp_MaxPerIpRateLimitQueues               = 1416;
+    Drop_Ipsec_NoMemory                                   = 1417;
+    Drop_Ipsec_Unsuccessful                               = 1418;
+
+    //
+    // NetCx Drop Reasons
+    //
+    Drop_NetCx_NetPacketLayoutParseFailure                = 1501;
+    Drop_NetCx_SoftwareChecksumFailure                    = 1502;
+    Drop_NetCx_NicQueueStop                               = 1503;
+    Drop_NetCx_InvalidNetBufferLength                     = 1504;
+    Drop_NetCx_LSOFailure                                 = 1505;
+    Drop_NetCx_USOFailure                                 = 1506;
+    Drop_NetCx_BufferBounceFailureAndPacketIgnore         = 1507;
+
+    //
+    // Http errors  3000 - 4000.
+    // These must be in sync with cmd\resource.h
+    //
+    Drop_Http_Begin                                       = 3000;
+
+    //
+    // UlErrors
+    //
+    Drop_Http_UlError_Begin                               = 3001;
+    Drop_Http_UlError                                     = 3002;
+    Drop_Http_UlErrorVerb                                 = 3003;
+    Drop_Http_UlErrorUrl                                  = 3004;
+    Drop_Http_UlErrorHeader                               = 3005;
+    Drop_Http_UlErrorHost                                 = 3006;
+    Drop_Http_UlErrorNum                                  = 3007;
+    Drop_Http_UlErrorFieldLength                          = 3008;
+    Drop_Http_UlErrorRequestLength                        = 3009;
+    Drop_Http_UlErrorUnauthorized                         = 3010;
+
+    Drop_Http_UlErrorForbiddenUrl                         = 3011;
+    Drop_Http_UlErrorNotFound                             = 3012;
+    Drop_Http_UlErrorContentLength                        = 3013;
+    Drop_Http_UlErrorPreconditionFailed                   = 3014;
+    Drop_Http_UlErrorEntityTooLarge                       = 3015;
+    Drop_Http_UlErrorUrlLength                            = 3016;
+    Drop_Http_UlErrorRangeNotSatisfiable                  = 3017;
+    Drop_Http_UlErrorMisdirectedRequest                   = 3018;
+
+    Drop_Http_UlErrorInternalServer                       = 3019;
+    Drop_Http_UlErrorNotImplemented                       = 3020;
+    Drop_Http_UlErrorUnavailable                          = 3021;
+    Drop_Http_UlErrorConnectionLimit                      = 3022;
+    Drop_Http_UlErrorRapidFailProtection                  = 3023;
+    Drop_Http_UlErrorRequestQueueFull                     = 3024;
+    Drop_Http_UlErrorDisabledByAdmin                      = 3025;
+    Drop_Http_UlErrorDisabledByApp                        = 3026;
+    Drop_Http_UlErrorJobObjectFired                       = 3027;
+    Drop_Http_UlErrorAppPoolBusy                          = 3028;
+
+    Drop_Http_UlErrorVersion                              = 3029;
+    Drop_Http_UlError_End                                 = 3030;
+
+    //
+    // Stream-specific fault codes.
+    //
+
+    Drop_Http_UxDuoFaultBegin                             = 3400;
+    Drop_Http_UxDuoFaultUserAbort                         = 3401;
+    Drop_Http_UxDuoFaultCollection                        = 3402;
+    Drop_Http_UxDuoFaultClientResetStream                 = 3403;
+    Drop_Http_UxDuoFaultMethodNotFound                    = 3404;
+    Drop_Http_UxDuoFaultSchemeMismatch                    = 3405;
+    Drop_Http_UxDuoFaultSchemeNotFound                    = 3406;
+    Drop_Http_UxDuoFaultDataAfterEnd                      = 3407;
+    Drop_Http_UxDuoFaultPathNotFound                      = 3408;
+    Drop_Http_UxDuoFaultHalfClosedLocal                   = 3409;
+    Drop_Http_UxDuoFaultIncompatibleAuth                  = 3410;
+    Drop_Http_UxDuoFaultDeprecated3                       = 3411;
+    Drop_Http_UxDuoFaultClientCertBlocked                 = 3412;
+    Drop_Http_UxDuoFaultHeaderNameEmpty                   = 3413;
+    Drop_Http_UxDuoFaultIllegalSend                       = 3414;
+    Drop_Http_UxDuoFaultPushUpperAttach                   = 3415;
+    Drop_Http_UxDuoFaultStreamUpperAttach                 = 3416;
+    Drop_Http_UxDuoFaultActiveStreamLimit                 = 3417;
+    Drop_Http_UxDuoFaultAuthorityNotFound                 = 3418;
+    Drop_Http_UxDuoFaultUnexpectedTail                    = 3419;
+    Drop_Http_UxDuoFaultTruncated                         = 3420;
+    Drop_Http_UxDuoFaultResponseHold                      = 3421;
+    Drop_Http_UxDuoFaultRequestChunked                    = 3422;
+    Drop_Http_UxDuoFaultRequestContentLength              = 3423;
+    Drop_Http_UxDuoFaultResponseChunked                   = 3424;
+    Drop_Http_UxDuoFaultResponseContentLength             = 3425;
+    Drop_Http_UxDuoFaultResponseTransferEncoding          = 3426;
+    Drop_Http_UxDuoFaultResponseLine                      = 3427;
+    Drop_Http_UxDuoFaultResponseHeader                    = 3428;
+    Drop_Http_UxDuoFaultConnect                           = 3429;
+    Drop_Http_UxDuoFaultChunkStart                        = 3430;
+    Drop_Http_UxDuoFaultChunkLength                       = 3431;
+    Drop_Http_UxDuoFaultChunkStop                         = 3432;
+    Drop_Http_UxDuoFaultHeadersAfterTrailers              = 3433;
+    Drop_Http_UxDuoFaultHeadersAfterEnd                   = 3434;
+    Drop_Http_UxDuoFaultEndlessTrailer                    = 3435;
+    Drop_Http_UxDuoFaultTransferEncoding                  = 3436;
+    Drop_Http_UxDuoFaultMultipleTransferCodings           = 3437;
+    Drop_Http_UxDuoFaultPushBody                          = 3438;
+    Drop_Http_UxDuoFaultStreamAbandoned                   = 3439;
+    Drop_Http_UxDuoFaultMalformedHost                     = 3440;
+    Drop_Http_UxDuoFaultDecompressionOverflow             = 3441;
+    Drop_Http_UxDuoFaultIllegalHeaderName                 = 3442;
+    Drop_Http_UxDuoFaultIllegalHeaderValue                = 3443;
+    Drop_Http_UxDuoFaultConnHeaderDisallowed              = 3444;
+    Drop_Http_UxDuoFaultConnHeaderMalformed               = 3445;
+    Drop_Http_UxDuoFaultCookieReassembly                  = 3446;
+    Drop_Http_UxDuoFaultStatusHeader                      = 3447;
+    Drop_Http_UxDuoFaultSchemeDisallowed                  = 3448;
+    Drop_Http_UxDuoFaultPathDisallowed                    = 3449;
+    Drop_Http_UxDuoFaultPushHost                          = 3450;
+    Drop_Http_UxDuoFaultGoawayReceived                    = 3451;
+    Drop_Http_UxDuoFaultAbortLegacyApp                    = 3452;
+    Drop_Http_UxDuoFaultUpgradeHeaderDisallowed           = 3453;
+    Drop_Http_UxDuoFaultResponseUpgradeHeader             = 3454;
+    Drop_Http_UxDuoFaultKeepAliveHeaderDisallowed         = 3455;
+    Drop_Http_UxDuoFaultResponseKeepAliveHeader           = 3456;
+    Drop_Http_UxDuoFaultProxyConnHeaderDisallowed         = 3457;
+    Drop_Http_UxDuoFaultResponseProxyConnHeader           = 3458;
+    Drop_Http_UxDuoFaultConnectionGoingAway               = 3459;
+    Drop_Http_UxDuoFaultTransferEncodingDisallowed        = 3460;
+    Drop_Http_UxDuoFaultContentLengthDisallowed           = 3461;
+    Drop_Http_UxDuoFaultTrailerDisallowed                 = 3462;
+    Drop_Http_UxDuoFaultEnd                               = 3463;
+
+    //
+    //  WSK layer drops
+    //
+    Drop_Http_ReceiveSuppressed                           = 3600;
+
+    //
+    //  Http/SSL layer drops
+    //
+    Drop_Http_Generic                                     = 3800;
+    Drop_Http_InvalidParameter                            = 3801;
+    Drop_Http_InsufficientResources                       = 3802;
+    Drop_Http_InvalidHandle                               = 3803;
+    Drop_Http_NotSupported                                = 3804;
+    Drop_Http_BadNetworkPath                              = 3805;
+    Drop_Http_InternalError                               = 3806;
+    Drop_Http_NoSuchPackage                               = 3807;
+    Drop_Http_PrivilegeNotHeld                            = 3808;
+    Drop_Http_CannotImpersonate                           = 3809;
+    Drop_Http_LogonFailure                                = 3810;
+    Drop_Http_NoSuchLogonSession                          = 3811;
+    Drop_Http_AccessDenied                                = 3812;
+    Drop_Http_NoLogonServers                              = 3813;
+    Drop_Http_TimeDifferenceAtDc                          = 3814;
+
+    Drop_Http_End                                         = 4000;
+}

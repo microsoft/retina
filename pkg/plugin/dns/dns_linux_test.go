@@ -141,7 +141,7 @@ func TestRequestEventHandler(t *testing.T) {
 
 	// Basic metrics.
 	mockCV := metrics.NewMockICounterVec(ctrl)
-	mockCV.EXPECT().WithLabelValues(event.Rcode, event.QType, event.DNSName, "", "0").Return(c).Times(1)
+	mockCV.EXPECT().WithLabelValues(event.QType, event.DNSName).Return(c).Times(1)
 	before := value(c)
 	metrics.DNSRequestCounter = mockCV
 

@@ -1,9 +1,27 @@
-ARG OS_VERSION=ltsc2019
+ARG OS_VERSION
+
+# pinned base images
+
+# mcr.microsoft.com/oss/go/microsoft/golang:1.22.3-1-cbl-mariner2.0
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:8253def0216b87b2994b7ad689aeec7440f6eb67f981e438071d8d67e36ff69f as golang
+
+# mcr.microsoft.com/cbl-mariner/base/core:2.0
+FROM --platform=$TARGETPLATFORM mcr.microsoft.com/cbl-mariner/base/core@sha256:77651116f2e83cf50fddd8a0316945499f8ce6521ff8e94e67539180d1e5975a as mariner-core
+
+# mcr.microsoft.com/cbl-mariner/distroless/minimal:2.0
+FROM --platform=$TARGETPLATFORM mcr.microsoft.com/cbl-mariner/distroless/minimal@sha256:63a0a70ceaa1320bc6eb98b81106667d43e46b674731ea8d28e4de1b87e0747f as mariner-distroless
+
+# mcr.microsoft.com/windows/servercore:ltsc2019 
+FROM --platform=$TARGETPLATFORM mcr.microsoft.com/windows/servercore@sha256:6fdf140282a2f809dae9b13fe441635867f0a27c33a438771673b8da8f3348a4 as ltsc2019
+
+# mcr.microsoft.com/windows/servercore:ltsc2022
+FROM --platform=$TARGETPLATFORM mcr.microsoft.com/windows/servercore@sha256:45952938708fbde6ec0b5b94de68bcdec3f8c838be018536b1e9e5bd95e6b943 as ltsc2022
+
+
+# build stages
 
 # intermediate go generate stage
-# mcr.microsoft.com/oss/go/microsoft/golang:1.22.2-1-cbl-mariner2.0
-# mcr.microsoft.com/oss/go/microsoft/golang@sha256:87e7359c0b4b4e3ca0d4be7fe5099423ec3431d6c44021a84569dba71ac5463e
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:87e7359c0b4b4e3ca0d4be7fe5099423ec3431d6c44021a84569dba71ac5463e AS intermediate 
+FROM golang AS intermediate 
 ARG APP_INSIGHTS_ID # set to enable AI telemetry
 ARG GOARCH=amd64 # default to amd64
 ARG GOOS=linux # default to linux
@@ -18,9 +36,7 @@ RUN if [ "$GOOS" = "linux" ] ; then \
     fi
 
 # capture binary
-# mcr.microsoft.com/oss/go/microsoft/golang:1.22.2-1-cbl-mariner2.0
-# mcr.microsoft.com/oss/go/microsoft/golang@sha256:87e7359c0b4b4e3ca0d4be7fe5099423ec3431d6c44021a84569dba71ac5463e
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:87e7359c0b4b4e3ca0d4be7fe5099423ec3431d6c44021a84569dba71ac5463e AS capture-bin
+FROM golang AS capture-bin
 ARG APP_INSIGHTS_ID # set to enable AI telemetry
 ARG GOARCH=amd64 # default to amd64
 ARG GOOS=linux # default to linux
@@ -58,9 +74,7 @@ RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/ret
 
 
 # tools image
-# mcr.microsoft.com/cbl-mariner/base/core:2.0
-# mcr.microsoft.com/cbl-mariner/base/core@sha256:77651116f2e83cf50fddd8a0316945499f8ce6521ff8e94e67539180d1e5975a
-FROM  --platform=$TARGETPLATFORM mcr.microsoft.com/cbl-mariner/base/core@sha256:77651116f2e83cf50fddd8a0316945499f8ce6521ff8e94e67539180d1e5975a AS tools
+FROM mariner-core AS tools
 RUN tdnf install -y \
     clang16 \
     iproute \
@@ -75,9 +89,7 @@ RUN arr="clang tcpdump ip ss iptables-legacy iptables-legacy-save iptables-nft i
 
 
 # init final image
-# mcr.microsoft.com/cbl-mariner/distroless/minimal:2.0
-# mcr.microsoft.com/cbl-mariner/distroless/minimal@sha256:63a0a70ceaa1320bc6eb98b81106667d43e46b674731ea8d28e4de1b87e0747f
-FROM --platform=$TARGETPLATFORM mcr.microsoft.com/cbl-mariner/distroless/minimal@sha256:63a0a70ceaa1320bc6eb98b81106667d43e46b674731ea8d28e4de1b87e0747f as init
+FROM mariner-distroless as init
 COPY --from=init-bin /go/bin/retina/initretina /retina/initretina
 COPY --from=tools /lib/ /lib
 COPY --from=tools /usr/lib/ /usr/lib
@@ -87,7 +99,7 @@ ENTRYPOINT ["./retina/initretina"]
 # agent final image
 # mcr.microsoft.com/cbl-mariner/distroless/minimal:2.0
 # mcr.microsoft.com/cbl-mariner/distroless/minimal@sha256:63a0a70ceaa1320bc6eb98b81106667d43e46b674731ea8d28e4de1b87e0747f
-FROM --platform=$TARGETPLATFORM mcr.microsoft.com/cbl-mariner/distroless/minimal@sha256:63a0a70ceaa1320bc6eb98b81106667d43e46b674731ea8d28e4de1b87e0747f as agent
+FROM mariner-distroless as agent
 COPY --from=tools /lib/ /lib
 COPY --from=tools /usr/lib/ /usr/lib
 COPY --from=tools /tmp/bin/ /bin
@@ -96,14 +108,9 @@ COPY --from=controller-bin /go/src/github.com/microsoft/retina/pkg/plugin /go/sr
 COPY --from=capture-bin /go/bin/retina/captureworkload /retina/captureworkload
 ENTRYPOINT ["./retina/controller"]
 
-# intermediate for win-ltsc2019
-FROM --platform=$TARGETPLATFORM mcr.microsoft.com/windows/servercore@sha256:6fdf140282a2f809dae9b13fe441635867f0a27c33a438771673b8da8f3348a4 as ltsc2019
 
-# intermediate for win-ltsc2022
-FROM --platform=$TARGETPLATFORM mcr.microsoft.com/windows/servercore@sha256:45952938708fbde6ec0b5b94de68bcdec3f8c838be018536b1e9e5bd95e6b943 as ltsc2022
-
-# agent final image for win2019
-FROM --platform=$TARGETPLATFORM ${OS_VERSION} as agent-win
+# agent final image for windows 
+FROM ${OS_VERSION} as agent-win
 COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
 COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
 COPY --from=controller-bin /go/bin/retina/controller controller.exe

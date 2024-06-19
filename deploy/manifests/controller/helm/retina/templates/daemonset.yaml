@@ -161,10 +161,9 @@ spec:
           ports:
           - name: retina
             containerPort: {{ .Values.retinaPort }}
+          workingDir: $env:CONTAINER_SANDBOX_MOUNT_POINT
           command:
-            - powershell.exe
-            - -command
-            - .\setkubeconfigpath.ps1; ./controller.exe --config ./retina/config.yaml --kubeconfig ./kubeconfig
+            - controller.exe --config ./retina/config.yaml 
           env:
           - name: POD_NAME
             valueFrom:

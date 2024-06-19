@@ -9,17 +9,13 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   e2e:
     if: ${{ github.event_name == 'merge_group' }}
     name: E2E
     runs-on: ubuntu-latest
-    needs: [manifests]
-
-    permissions:
-      id-token: write
-      contents: read
 
     steps:
       - name: Checkout code
@@ -35,7 +31,9 @@ jobs:
         uses: azure/login@v2
         if: ${{ github.event_name == 'merge_group' }}
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION }}
 
       - name: Run E2E
         env:
@@ -44,4 +42,4 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          go test -v ./test/e2e/scenarios/retina/*.go -timeout 30m -tags=e2e -count=1  -args -image-tag=$(make version) -image-registry=${{ vars.ACR_NAME }}  -image-namespace=${{ github.repository}}
+          go test -v ./test/e2e/*.go -timeout 30m -tags=e2e -count=1  -args -image-tag=$(make version) -image-registry=${{vars.ACR_NAME}} -image-namespace=${{github.repository}}

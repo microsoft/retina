@@ -9,7 +9,45 @@ import (
 	"testing"
 )
 
-func TestValidateBlobURL(t *testing.T) {
+func TestTrimBlobSASURL(t *testing.T) {
+	tests := []struct {
+		name               string
+		inputURL           string
+		expectedTrimmedURL string
+	}{
+		{
+			name:               "valid input URL with sas token that have a newline and is surrounded by double quotes",
+			inputURL:           "\"https://retina.blob.core.windows.net/container/blob?sas-token\"\n",
+			expectedTrimmedURL: "https://retina.blob.core.windows.net/container/blob?sas-token",
+		},
+		{
+			name:               "valid input URL with sas token that have a newline and is surrounded by double quotes and extra spaces",
+			inputURL:           "\"https://retina.blob.core.windows.net/container/blob?sas-token  \"\n",
+			expectedTrimmedURL: "https://retina.blob.core.windows.net/container/blob?sas-token",
+		},
+		{
+			name:               "valid input URL with sas token that has extra spaces",
+			inputURL:           "https://retina.blob.core.windows.net/container/blob?sas-token  ",
+			expectedTrimmedURL: "https://retina.blob.core.windows.net/container/blob?sas-token",
+		},
+		{
+			name:               "valid input URL with sas token",
+			inputURL:           "\"https://retina.blob.core.windows.net/container/blob?sas-token\"\n",
+			expectedTrimmedURL: "https://retina.blob.core.windows.net/container/blob?sas-token",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actualTrimmedBlobSASURL := trimBlobSASURL(tt.inputURL)
+			if actualTrimmedBlobSASURL != tt.expectedTrimmedURL {
+				t.Errorf("Expected trimmed Blob SAS URL %s, but got %s", tt.expectedTrimmedURL, actualTrimmedBlobSASURL)
+			}
+		})
+	}
+}
+
+func TestValidateBlobSASURL(t *testing.T) {
 	tests := []struct {
 		name          string
 		inputURL      string
@@ -17,7 +55,7 @@ func TestValidateBlobURL(t *testing.T) {
 	}{
 		{
 			name:          "valid input URL with sas token",
-			inputURL:      "https://retina.blob.core.windows.net/container/blob?sp=r&st=2023-02-17T19:13:30Z&se=2023-02-18T03:13:30Z&spr=https&sv=2021-06-08&sr=c&sig=NtSxlRK5Vs4kVs1dIOfr%2FMdLKBVTA4t3uJ0gqLZ9exk%3D",
+			inputURL:      "https://retina.blob.core.windows.net/container/blob?sas-token",
 			expectedError: nil,
 		},
 		{
@@ -44,7 +82,7 @@ func TestValidateBlobURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateBlobURL(tt.inputURL)
+			err := validateBlobSASURL(tt.inputURL)
 
 			if err != nil && tt.expectedError == nil {
 				t.Errorf("Unexpected error: %v", err)

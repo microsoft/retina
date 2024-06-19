@@ -17,7 +17,7 @@ By default, Retina capture CLI will exit before the jobs are completed. With `--
 
 - do not wait for the long-running capture job to finish
 
-`kubectl retina capture create --host-path /mnt/capture --node-selectors "kubernetes.io/os=linux" --no-wait=true`
+`kubectl retina capture create --name capture-test --host-path /mnt/capture --node-selectors "kubernetes.io/os=linux" --no-wait=true`
 
 ### Namespace(default "default")
 
@@ -27,7 +27,7 @@ Namespace to host capture job and the other k8s resources for a network capture.
 
 - deploy the capture job in namespace `capture`
 
-`kubectl retina capture create --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux"`
+`kubectl retina capture create --name capture-test --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux"`
 
 ### Capture Target(required)
 
@@ -37,15 +37,15 @@ Capture target indicates the target on which the network packets capture will be
 
 - capture network packets on the node selected by node selectors
 
-`kubectl retina capture create --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux"`
+`kubectl retina capture create --name capture-test --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux"`
 
 - capture network packets on the node selected by node names
 
-`kubectl retina capture create --host-path /mnt/capture --namespace capture --node-names "aks-nodepool1-41844487-vmss000000,aks-nodepool1-41844487-vmss000001"`
+`kubectl retina capture create --name capture-test --host-path /mnt/capture --namespace capture --node-names "aks-nodepool1-41844487-vmss000000,aks-nodepool1-41844487-vmss000001"`
 
 - capture network packets on the pod selected by pod-selector and namespace-selector pairs
 
-`kubectl retina capture create --host-path /mnt/capture --namespace capture --pod-selectors="k8s-app=kube-dns" --namespace-selectors="kubernetes.io/metadata.name=kube-system"`
+`kubectl retina capture create --name capture-test --host-path /mnt/capture --namespace capture --pod-selectors="k8s-app=kube-dns" --namespace-selectors="kubernetes.io/metadata.name=kube-system"`
 
 ### Stop Capture(optional with default values)
 
@@ -64,7 +64,7 @@ Duration of capturing packets(default 1m)
 
 - stop the capture in 2 minutes
 
-`kubectl retina capture create --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux" --duration=2m`
+`kubectl retina capture create --name capture-test --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux" --duration=2m`
 
 #### Maximum Capture Size
 
@@ -74,7 +74,7 @@ Limit the capture file to MB in size(default 100MB)
 
 - stop the capture when the capture file size reaches 50MB
 
-`kubectl retina capture create --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux" --max-size=50`
+`kubectl retina capture create --name capture-test --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux" --max-size=50`
 
 #### Packet Size(optional)
 
@@ -85,7 +85,7 @@ This is beneficial when the user wants to reduce the capture file size or hide c
 
 - limit each packet size to 96 bytes
 
-`kubectl retina capture create --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux" --packet-size=96`
+`kubectl retina capture create --name capture-test --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux" --packet-size=96`
 
 ### Capture Configuration(optional)
 
@@ -97,7 +97,7 @@ Packet capture filters represent a range of filters to be included/excluded in t
 
 ##### Example
 
-`kubectl retina capture create --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux" --exclude-filter="10.224.0.26:80,10.224.0.33:8080" --include-filter="10.224.0.42:80,10.224.0.33:8080"`
+`kubectl retina capture create --name capture-test --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux" --exclude-filter="10.224.0.26:80,10.224.0.33:8080" --include-filter="10.224.0.42:80,10.224.0.33:8080"`
 
 #### Tcpdump Filter
 
@@ -109,7 +109,7 @@ NOTE: this includes only tcpdump flags, for expression part, please user [Packet
 
 - filter DNS query
 
-`kubectl retina capture create --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux" --tcpdump-filter="udp port 53"`
+`kubectl retina capture create --name capture-test --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux" --tcpdump-filter="udp port 53"`
 
 #### Include Metadata
 
@@ -119,7 +119,7 @@ If true, collect static network metadata into the capture file(default true)
 
 - disable collecting network metadata
 
-`kubectl retina capture create --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux" --include-metadata=false`
+`kubectl retina capture create --name capture-test --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux" --include-metadata=false`
 
 ### Job Number Limit(optional)
 
@@ -130,7 +130,7 @@ When creating a job requires job number exceeds this limit, it will fail with pr
 
 #### Example
 
-`kubectl retina capture create --job-num-limit=10 --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux"`
+`kubectl retina capture create --name capture-test --job-num-limit=10 --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux"`
 
 ### Output Configuration(required)
 
@@ -142,23 +142,23 @@ Blob-upload requires a Blob Shared Access Signature with the write permission to
 
 - store the capture file in the node host path `/mnt/capture`
 
-`kubectl retina capture create --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux"`
+`kubectl retina capture create --name capture-test --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux"`
 
 - store the capture file to a PVC `mypvc` with access mode ReadWriteMany in namespace `capture`
 
-`kubectl retina capture create --pvc mypvc --namespace capture --node-selectors "kubernetes.io/os=linux"`
+`kubectl retina capture create --name capture-test --pvc mypvc --namespace capture --node-selectors "kubernetes.io/os=linux"`
 
 - store the capture file to a storage account
 
-`kubectl retina capture create --blob-upload <Blob SAS URL with write permission> --node-selectors "kubernetes.io/os=linux"`
+`kubectl retina capture create --name capture-test --blob-upload <Blob SAS URL with write permission> --node-selectors "kubernetes.io/os=linux"`
 
 - store the capture file to AWS S3
 
-`kubectl retina capture create --s3-bucket "your-bucket-name" --s3-region "eu-central-1" --s3-access-key-id "your-access-key-id" --s3-secret-access-key "your-secret-access-key" --node-selectors "kubernetes.io/os=linux"`
+`kubectl retina capture create --name capture-test --s3-bucket "your-bucket-name" --s3-region "eu-central-1" --s3-access-key-id "your-access-key-id" --s3-secret-access-key "your-secret-access-key" --node-selectors "kubernetes.io/os=linux"`
 
 - store the capture file to S3-compatible service (like MinIO)
 
-`kubectl retina capture create --s3-bucket "your-bucket-name" --s3-endpoint "https://play.min.io:9000" --s3-access-key-id "your-access-key-id" --s3-secret-access-key "your-secret-access-key" --node-selectors "kubernetes.io/os=linux"`
+`kubectl retina capture create --name capture-test --s3-bucket "your-bucket-name" --s3-endpoint "https://play.min.io:9000" --s3-access-key-id "your-access-key-id" --s3-secret-access-key "your-secret-access-key" --node-selectors "kubernetes.io/os=linux"`
 
 ### Debug mode
 
@@ -168,11 +168,11 @@ With debug mode, when `--debug` is specified, we can overwrite the capture job P
 
 - use `ghcr.io` image in default debug mode
 
-`kubectl retina capture create --host-path /mnt/test --namespace capture --node-selectors "kubernetes.io/os=linux" --debug`
+`kubectl retina capture create --name capture-test --host-path /mnt/test --namespace capture --node-selectors "kubernetes.io/os=linux" --debug`
 
 - use customized retina-agent image
 
-`RETINA_AGENT_IMAGE=<YOUR RETINA AGENT IMAGE> kubectl retina capture create --host-path /mnt/test --namespace capture --node-selectors "kubernetes.io/os=linux" --debug`
+`RETINA_AGENT_IMAGE=<YOUR RETINA AGENT IMAGE> kubectl retina capture create --name capture-test --host-path /mnt/test --namespace capture --node-selectors "kubernetes.io/os=linux" --debug`
 
 ## Retina capture delete
 
