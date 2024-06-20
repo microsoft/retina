@@ -37,6 +37,8 @@ spec:
           - name: bpf
             mountPath: /sys/fs/bpf
             mountPropagation: Bidirectional
+          args:
+            - --config=/retina/config/config.yaml
       containers:
         - name: {{ include "retina.name" . }} 
           livenessProbe:
