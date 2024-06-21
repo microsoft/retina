@@ -269,7 +269,7 @@ func setupZapLogger(retinaConfig *config.Config, k8sCfg *rest.Config) *log.ZapLo
 		logger.Fatalf("Failed to setup zap logger: %v", err)
 	}
 
-	namedLogger := log.Logger().Named("retina-enterprise")
+	namedLogger := log.Logger().Named("retina-with-hubble")
 	namedLogger.Info("Traces telemetry initialized with zapai", zap.String("version", retinaVersion), zap.String("appInsightsID", applicationInsightsID))
 
 	return namedLogger

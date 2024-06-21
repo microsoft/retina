@@ -16,7 +16,7 @@ os:
 # FIXME: remove unnecessary pieces, etc.
 operator:
   enabled: true
-  repository: acndev.azurecr.io/retina-operator-enterprise
+  repository: acndev.azurecr.io/retina-operator
   pullPolicy: Always
   tag: "latest"
   leaderElection: true
@@ -27,12 +27,12 @@ agent:
   leaderElection: false
   enabled: true
   name: retina-agent
-  repository: acndev.azurecr.io/retina-agent-enterprise
+  repository: acndev.azurecr.io/retina-agent
   tag: "latest"
   init:
     enabled: true
     name: retina-agent-init
-    repository: acndev.azurecr.io/retina-agent-init-enterprise
+    repository: acndev.azurecr.io/retina-agent-init
     tag: "latest"
   pullPolicy: Always
   container:

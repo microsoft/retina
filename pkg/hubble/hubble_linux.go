@@ -62,7 +62,6 @@ func newRetinaHubble(params hubbleParams) *RetinaHubble {
 }
 
 func (rh *RetinaHubble) defaultOptions() {
-	// Set the default values for Retina-enterprise.
 	// Not final, will be updated later.
 	option.Config.HubblePreferIpv6 = false
 	option.Config.EnableHighScaleIPcache = false
