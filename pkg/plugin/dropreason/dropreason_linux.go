@@ -41,6 +41,7 @@ const (
 	intCskAcceptFn       = "inet_csk_accept"
 	nfNatInetFn          = "nf_nat_inet_fn"
 	nfConntrackConfirmFn = "__nf_conntrack_confirm"
+	kfreeSkbReasonFn     = "kfree_skb_reason"
 )
 
 // New creates a new dropreason plugin.
@@ -228,6 +229,17 @@ func (dr *dropReason) Init() error {
 			dr.l.Warn("nf_conntrack_confirm_ret not found, skipping attaching kretprobe to it. This may impact the drop reason metrics.")
 		} else {
 			dr.l.Error("opening kretprobe: %w", zap.Error(err))
+			return err
+		}
+	}
+
+	dr.KKfreeSkbReason, err = link.Kprobe(kfreeSkbReasonFn, objs.KfreeSkbReason, nil)
+	if err != nil {
+		// TODO: remove this check once we get this working on Mariner OS.
+		if errors.Is(err, os.ErrNotExist) {
+			dr.l.Warn("kfree_skb_reason not found, skipping attaching kprobe to it. This may impact the drop reason metrics.")
+		} else {
+			dr.l.Error("opening kprobe: %w", zap.Error(err))
 			return err
 		}
 	}

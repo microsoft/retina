@@ -273,7 +273,8 @@ This function will look PID and the length of SKB it is working on. Then it chec
 the return value of the function and update the metrics map accordingly.
 
 */
-
+// check if we're getting udplicate invocations, will need to get back to remiving in the future
+// if removing any of these lprobes, do not change the PROTO file
 SEC("kretprobe/nf_hook_slow")
 int BPF_KRETPROBE(nf_hook_slow_ret, int retVal)
 {
@@ -295,7 +296,9 @@ int BPF_KRETPROBE(nf_hook_slow_ret, int retVal)
     update_metrics_map(ctx, IPTABLE_RULE_DROP, 0, p);
     return 0;
 }
-
+// lprobe/section/free_reasons
+// []...
+// update_metrics_map(ctx, kernel_derived_reason, 0, p);
 // static __always_inline int
 // exit_tcp_connect(struct pt_regs *ctx, int ret)
 
@@ -429,6 +432,55 @@ int BPF_KRETPROBE(nf_nat_inet_fn_ret, int retVal)
 SEC("kprobe/__nf_conntrack_confirm")
 int BPF_KPROBE(nf_conntrack_confirm, struct sk_buff *skb)
 {
+//     if (!skb)
+//         return 0;
+
+//     __u16 eth_proto;
+
+//     member_read(&eth_proto, skb, protocol);
+//     if (eth_proto != bpf_htons(ETH_P_IP))
+//         return 0;
+
+//     struct packet p;
+//     __builtin_memset(&p, 0, sizeof(p));
+
+//     p.in_filtermap = false;
+//     p.skb_len = 0;
+//     get_packet_from_skb(&p, skb);
+
+//     __u64 pid_tgid = bpf_get_current_pid_tgid();
+//     __u32 pid = pid_tgid >> 32;
+//     bpf_map_update_elem(&natdrop_pids, &pid, &p, BPF_ANY);
+    return 0;
+}
+
+ SEC("kretprobe/__nf_conntrack_confirm")
+ int BPF_KRETPROBE(nf_conntrack_confirm_ret, int retVal)
+ {
+//     __u64 pid_tgid = bpf_get_current_pid_tgid();
+//     __u32 pid = pid_tgid >> 32;
+//     struct packet *p = bpf_map_lookup_elem(&natdrop_pids, &pid);
+//     bpf_map_delete_elem(&natdrop_pids, &pid);
+
+//     if (!p)
+//         return 0;
+
+//     if (retVal != NF_DROP)
+//     {
+//         return 0;
+//     }
+
+//     update_metrics_map(ctx, CONNTRACK_ADD_DROP, retVal, p);
+     return 0;
+ }
+
+SEC("kprobe/kfree_skb_reason")
+int BPF_KPROBE(kfree_skb_reason, struct sk_buff *skb, enum skb_drop_reason reason)
+{
+    if (reason == 0) { // SKB_NOT_DROPPED_YET
+        return 0;
+    }
+
     if (!skb)
         return 0;
 
@@ -444,29 +496,8 @@ int BPF_KPROBE(nf_conntrack_confirm, struct sk_buff *skb)
     p.in_filtermap = false;
     p.skb_len = 0;
     get_packet_from_skb(&p, skb);
+    bpf_printk("hit igor's kprobe, reason %d", reason);
 
-    __u64 pid_tgid = bpf_get_current_pid_tgid();
-    __u32 pid = pid_tgid >> 32;
-    bpf_map_update_elem(&natdrop_pids, &pid, &p, BPF_ANY);
-    return 0;
-}
-
-SEC("kretprobe/__nf_conntrack_confirm")
-int BPF_KRETPROBE(nf_conntrack_confirm_ret, int retVal)
-{
-    __u64 pid_tgid = bpf_get_current_pid_tgid();
-    __u32 pid = pid_tgid >> 32;
-    struct packet *p = bpf_map_lookup_elem(&natdrop_pids, &pid);
-    bpf_map_delete_elem(&natdrop_pids, &pid);
-
-    if (!p)
-        return 0;
-
-    if (retVal != NF_DROP)
-    {
-        return 0;
-    }
-
-    update_metrics_map(ctx, CONNTRACK_ADD_DROP, retVal, p);
+    // update_metrics_map(ctx, TCP_ACCEPT_BASIC, 0, &p);
     return 0;
 }

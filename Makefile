@@ -171,7 +171,7 @@ retina-capture-workload: ## build the Retina capture workload
 
 ##@ Containers
 
-IMAGE_REGISTRY	?= ghcr.io
+IMAGE_REGISTRY	?= acnpublic.azurecr.io
 IMAGE_NAMESPACE ?= $(shell git config --get remote.origin.url | sed -E 's/.*github\.com[\/:]([^\/]+)\/([^\/.]+)(.git)?/\1\/\2/' | tr '[:upper:]' '[:lower:]')
 
 RETINA_BUILDER_IMAGE			= $(IMAGE_NAMESPACE)/retina-builder
@@ -457,7 +457,7 @@ docs-prod:
 .PHONY: quick-build
 quick-build:
 	$(MAKE) retina-image PLATFORM=linux/amd64 BUILDX_ACTION=--push
-	$(MAKE) retina-operator-image PLATFORM=linux/amd64 BUILDX_ACTION=--push
+	# $(MAKE) retina-operator-image PLATFORM=linux/amd64 BUILDX_ACTION=--push
 
 .PHONY: quick-deploy
 quick-deploy:

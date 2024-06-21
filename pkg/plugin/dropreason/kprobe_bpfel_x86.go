@@ -88,6 +88,7 @@ type kprobeSpecs struct {
 type kprobeProgramSpecs struct {
 	InetCskAccept         *ebpf.ProgramSpec `ebpf:"inet_csk_accept"`
 	InetCskAcceptRet      *ebpf.ProgramSpec `ebpf:"inet_csk_accept_ret"`
+	KfreeSkbReason        *ebpf.ProgramSpec `ebpf:"kfree_skb_reason"`
 	NfConntrackConfirm    *ebpf.ProgramSpec `ebpf:"nf_conntrack_confirm"`
 	NfConntrackConfirmRet *ebpf.ProgramSpec `ebpf:"nf_conntrack_confirm_ret"`
 	NfHookSlow            *ebpf.ProgramSpec `ebpf:"nf_hook_slow"`
@@ -153,6 +154,7 @@ func (m *kprobeMaps) Close() error {
 type kprobePrograms struct {
 	InetCskAccept         *ebpf.Program `ebpf:"inet_csk_accept"`
 	InetCskAcceptRet      *ebpf.Program `ebpf:"inet_csk_accept_ret"`
+	KfreeSkbReason        *ebpf.Program `ebpf:"kfree_skb_reason"`
 	NfConntrackConfirm    *ebpf.Program `ebpf:"nf_conntrack_confirm"`
 	NfConntrackConfirmRet *ebpf.Program `ebpf:"nf_conntrack_confirm_ret"`
 	NfHookSlow            *ebpf.Program `ebpf:"nf_hook_slow"`
@@ -166,6 +168,7 @@ func (p *kprobePrograms) Close() error {
 	return _KprobeClose(
 		p.InetCskAccept,
 		p.InetCskAcceptRet,
+		p.KfreeSkbReason,
 		p.NfConntrackConfirm,
 		p.NfConntrackConfirmRet,
 		p.NfHookSlow,
