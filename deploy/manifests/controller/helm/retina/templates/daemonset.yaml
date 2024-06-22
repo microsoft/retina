@@ -62,6 +62,7 @@ spec:
           {{- range $.Values.daemonset.container.retina.args}}
           - {{ . | quote }}
           {{- end}}
+          - --config=/retina/config/config.yaml
           {{- end}}
           ports:
           - name: retina
