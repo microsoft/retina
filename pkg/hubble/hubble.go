@@ -15,13 +15,13 @@ import (
 	"github.com/cilium/cilium/pkg/hubble/peer"
 	"github.com/cilium/cilium/pkg/hubble/peer/serviceoption"
 	"github.com/cilium/cilium/pkg/hubble/server"
-	"github.com/cilium/cilium/pkg/hubble/server/serveroption"
 	"github.com/cilium/cilium/pkg/ipcache"
 	"github.com/cilium/cilium/pkg/logging/logfields"
 	monitoragent "github.com/cilium/cilium/pkg/monitor/agent"
 	"github.com/cilium/cilium/pkg/option"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	rnode "github.com/microsoft/retina/pkg/controllers/daemon/nodereconciler"
+	serveroption "github.com/microsoft/retina/pkg/hubble/internal"
 	"github.com/microsoft/retina/pkg/hubble/parser"
 	"github.com/pkg/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -155,15 +155,17 @@ func (rh *RetinaHubble) start(ctx context.Context) error {
 	peerServiceOptions = append(peerServiceOptions, tlsPeerOpt...)
 
 	peerSvc := peer.NewService(rh.nodeReconciler, peerServiceOptions...)
-	localSrvOpts = append(localSrvOpts,
-		serveroption.WithUnixSocketListener(sockPath),
-		serveroption.WithHealthService(),
-		serveroption.WithObserverService(hubbleObserver),
-		serveroption.WithPeerService(peerSvc),
-		// The local server does not need to be guarded by TLS.
-		// It's only used for local communication.
-		serveroption.WithInsecure(),
-	)
+	/*
+		localSrvOpts = append(localSrvOpts,
+			serveroption.WithUnixSocketListener(sockPath),
+			serveroption.WithHealthService(),
+			serveroption.WithObserverService(hubbleObserver),
+			serveroption.WithPeerService(peerSvc),
+			// The local server does not need to be guarded by TLS.
+			// It's only used for local communication.
+			serveroption.WithInsecure(),
+		)
+	*/
 
 	localSrv, err := server.NewServer(rh.log, localSrvOpts...)
 	if err != nil {

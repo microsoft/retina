@@ -217,7 +217,6 @@ require (
 	google.golang.org/genproto v0.0.0-20240213162025-012b6fc9bca9 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240311132316-a219d84964c2 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240318140521-94a12d6c2237 // indirect
-	google.golang.org/grpc v1.62.1 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	k8s.io/apiserver v0.30.1 // indirect
@@ -305,6 +304,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.27.0
 	go.uber.org/mock v0.4.0
 	golang.org/x/exp v0.0.0-20240318143956-a85f2c67cd81
+	google.golang.org/grpc v1.62.1
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gotest.tools v2.2.0+incompatible
 	gotest.tools/v3 v3.5.1
