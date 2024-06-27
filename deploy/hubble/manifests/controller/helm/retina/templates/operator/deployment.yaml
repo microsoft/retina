@@ -1,0 +1,98 @@
+{{- if .Values.operator.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: retina-operator
+  namespace: kube-system
+  labels:
+    app: retina-operator
+    control-plane: retina-operator
+    app.kubernetes.io/name: deployment
+    app.kubernetes.io/instance: retina-operator
+    app.kubernetes.io/component: retina-operator
+    app.kubernetes.io/created-by: operator
+    app.kubernetes.io/part-of: operator
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  selector:
+    matchLabels:
+      control-plane: retina-operator
+  replicas: 1
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: retina-operator
+      labels:
+        app: retina-operator
+        control-plane: retina-operator
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values:
+                      - amd64
+                  - key: kubernetes.io/os
+                    operator: In
+                    values:
+                      - linux
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - command:
+            - /retina-operator
+          args:
+            - --config-dir=/retina
+          image: {{ .Values.operator.repository }}:{{ .Values.operator.tag }}
+          imagePullPolicy: {{ .Values.operator.pullPolicy }}
+          name: retina-operator
+          env:
+          # this env var is used by retina OSS telemetry and zap
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.name
+          volumeMounts:
+            - name: retina-operator-config
+              mountPath: /retina/
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - "ALL"
+          # livenessProbe:
+          #   httpGet:
+          #     path: /healthz
+          #     port: 8081
+          #   initialDelaySeconds: 15
+          #   periodSeconds: 20
+          # readinessProbe:
+          #   httpGet:
+          #     path: /readyz
+          #     port: 8081
+          #   initialDelaySeconds: 5
+          #   periodSeconds: 10
+          resources:
+            limits:
+              cpu: 500m
+              memory: 500Mi
+            requests:
+              cpu: 10m
+              memory: 64Mi
+      serviceAccountName: retina-operator
+      terminationGracePeriodSeconds: 10
+      volumes:
+        - name: retina-operator-config
+          configMap:
+            name: retina-operator-config
+
+{{- end -}}

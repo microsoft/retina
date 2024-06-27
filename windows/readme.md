@@ -3,7 +3,7 @@
 1. Cordon all windows nodes. Until the below selector is added, needed so helm install isn't blocked.
 2. Install Linux Retina helm chart.
 
-    `helm install retina ./deploy/manifests/controller/helm/retina/ --namespace kube-system`
+    `helm install retina ./deploy/legacy/manifests/controller/helm/retina/ --namespace kube-system`
 
 3. Uncordon the Windows and nodes.
 

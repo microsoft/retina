@@ -3,7 +3,7 @@
 ## Overview
 
 To customize metrics and other options, you can modify Retina's ConfigMap called `retina-config`.
-Defaults are specified for each component in *deploy/manifests/controller/helm/retina/values.yaml*.
+Defaults are specified for each component in *deploy/legacy/manifests/controller/helm/retina/values.yaml*.
 
 ## Agent Config
 

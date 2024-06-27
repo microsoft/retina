@@ -1,0 +1,14 @@
+{{- if .Values.operator.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: retina-operator-config
+  namespace: {{ .Values.namespace }}
+data:
+  enable-telemetry: {{ .Values.enableTelemetry | quote }}
+  log-opt: "{\"level\":\"{{ .Values.logLevel }}\"}"
+  leader-election: {{ .Values.operator.leaderElection | quote }}
+  identity-gc-interval: {{ .Values.operator.identityGCInterval }}
+  cilium-endpoint-gc-interval: {{ .Values.operator.endpointGCInterval }}
+
+{{- end -}}

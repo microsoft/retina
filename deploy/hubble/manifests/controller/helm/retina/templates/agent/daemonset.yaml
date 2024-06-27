@@ -1,0 +1,233 @@
+{{- if .Values.agent.enabled -}}
+{{- if .Values.os.linux -}}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ .Values.agent.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    k8s-app: {{ include "retina.name" . }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "retina.name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "retina.name" . }}
+        k8s-app: {{ include "retina.name" . }}
+      annotations:
+        prometheus.io/port: "{{ .Values.retinaPort }}"
+        prometheus.io/scrape: "true"
+        checksum/config: {{ include (print $.Template.BasePath "/agent/configmap.yaml") . | sha256sum }}
+    spec:
+      hostNetwork: true
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      nodeSelector:
+        kubernetes.io/os: linux
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: retina-agent-init
+          image: {{ .Values.agent.init.repository }}:{{ .Values.agent.init.tag }}
+          imagePullPolicy: {{ .Values.agent.pullPolicy }}
+          terminationMessagePolicy: FallbackToLogsOnError
+          securityContext:
+            privileged: true
+          volumeMounts:
+          - name: bpf
+            mountPath: /sys/fs/bpf
+            mountPropagation: Bidirectional
+          - name: varrun
+            mountPath: /var/run
+            mountPropagation: Bidirectional
+      containers:
+        - name: {{ include "retina.name" . }} 
+          image: {{ .Values.agent.repository }}:{{ .Values.agent.tag }}
+          imagePullPolicy: {{ .Values.agent.pullPolicy }}
+          {{- if .Values.agent.container.retina.command }}
+          command:
+          {{- range .Values.agent.container.retina.command }}
+          - {{ . }}
+          {{- end }}
+          {{- end }}
+          {{- if .Values.agent.container.retina.args}}
+          args:
+          - --health-probe-bind-address={{ .Values.agent.container.retina.healthProbeBindAddress }}
+          - --metrics-bind-address={{ .Values.agent.container.retina.metricsBindAddress }}
+          {{- range $.Values.agent.container.retina.args}}
+          - {{ . | quote }}
+          {{- end}}
+          {{- end}}
+          ports:
+          - containerPort: {{ .Values.agent.container.retina.ports.containerPort }}
+          resources:
+            limits:
+              memory: {{ .Values.resources.limits.memory | quote }}
+              cpu: {{ .Values.resources.limits.cpu | quote }}
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: {{ .Values.agent.container.retina.ports.containerPort }}
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.name
+          - name: NODE_NAME
+            valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+          - name: NODE_IP
+            valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.hostIP
+          securityContext:
+            capabilities:
+              add:
+              {{- range .Values.securityContext.capabilities.add }}
+              - {{ . }}
+              {{- end }}
+            privileged: {{ .Values.securityContext.privileged }}
+        {{- if .Values.volumeMounts }}
+          volumeMounts:
+          {{- range $name, $mountPath := .Values.volumeMounts }}
+            - name: {{ $name }}
+              mountPath: {{ $mountPath }}
+          {{- end }}
+          {{- if .Values.hubble.tls.enabled }}
+            - name: tls
+              mountPath: /var/lib/cilium/tls/hubble
+              readOnly: true
+          {{- end }}
+        {{- end }}
+      terminationGracePeriodSeconds: 90 # Allow for retina to cleanup plugin resources.
+      volumes:
+      {{- range $name, $hostPath := .Values.volumeMounts}}
+      - name: {{ $name }}
+      {{ if eq $name "config" }}
+        configMap:
+          name: {{ $.Values.nameOverride }}-config
+      {{ else if eq $name "tmp"}}
+        emptyDir: {}
+      {{ else }}
+        hostPath:
+          path: {{ $hostPath }}
+      {{ end }}
+      {{- end }}
+      {{- if .Values.hubble.tls.enabled }}
+      - name: tls
+        projected:
+          defaultMode: 0400
+          sources:
+            - secret:
+                name: hubble-server-certs
+                items:
+                  - key: tls.crt
+                    path: server.crt
+                  - key: tls.key
+                    path: server.key
+                  - key: ca.crt
+                    path: client-ca.crt
+      {{- end }}
+      nodeSelector:
+        kubernetes.io/os: linux
+{{- end }}
+---
+{{- if .Values.os.windows}}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    k8s-app: {{ include "retina.name" . }}
+  name: {{ .Values.agent_win.name }}
+  namespace: {{ .Values.namespace }}
+  annotations:
+    prometheus.io/port: "{{ .Values.retinaPort }}"
+    prometheus.io/scrape: "true"
+    checksum/config: {{ include (print $.Template.BasePath "/agent/configmap.yaml") . | sha256sum }}
+spec:
+  selector:
+    matchLabels:
+      k8s-app: {{ include "retina.name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "retina.name" . }}
+        k8s-app: {{ include "retina.name" . }}
+      name: {{ include "retina.name" . }}
+      namespace: {{ .Values.namespace }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}      
+      securityContext:
+        windowsOptions:
+          hostProcess: true
+          runAsUserName: {{ .Values.securityContext.windowsOptions.runAsUserName}}
+        runAsNonRoot: false
+      hostNetwork: true
+      containers:
+        - name: retinawin
+          image: {{ .Values.agent.repository }}:{{ .Values.agent.tag }}
+          ports:
+            - containerPort: {{ .Values.agent.container.retina.ports.containerPort }}
+          command:
+            - powershell.exe
+            - -command
+            - .\setkubeconfigpath.ps1; ./controller.exe --config ./retina/config.yaml --kubeconfig ./kubeconfig
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: {{ .Values.agent.container.retina.ports.containerPort }}
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.name
+          - name: NODE_NAME
+            valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+          - name: NODE_IP
+            valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.hostIP
+          securityContext:
+            capabilities:
+              add:
+              {{- range .Values.securityContext.capabilities.add }}
+              - {{ . }}
+              {{- end }}
+            privileged: {{ .Values.securityContext.privileged }}
+        {{- if .Values.volumeMounts_win }}
+          volumeMounts:
+          {{- range $name, $mountPath := .Values.volumeMounts_win }}
+            - name: {{ $name }}
+              mountPath: {{ $mountPath }}
+          {{- end }}
+        {{- end }}
+      nodeSelector:
+        kubernetes.io/os: windows
+      volumes:
+      {{- range $name, $mountPath := .Values.volumeMounts_win }}
+        - name: {{ $name }}
+          configMap:
+            name: {{ $name }}
+      {{- end }}
+{{- end }}
+{{- end }}
