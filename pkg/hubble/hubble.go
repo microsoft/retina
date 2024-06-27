@@ -21,7 +21,7 @@ import (
 	"github.com/cilium/cilium/pkg/option"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	rnode "github.com/microsoft/retina/pkg/controllers/daemon/nodereconciler"
-	"github.com/microsoft/retina/pkg/hubble/internal/serveroption"
+	serveroption "github.com/microsoft/retina/pkg/hubble/internal"
 	"github.com/microsoft/retina/pkg/hubble/parser"
 	"github.com/pkg/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"

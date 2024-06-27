@@ -3,7 +3,7 @@
 
 // Copyright Authors of Cilium
 
-package serveroption
+package internal
 
 import (
 	"crypto/tls"
