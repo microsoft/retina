@@ -155,15 +155,17 @@ func (rh *RetinaHubble) start(ctx context.Context) error {
 	peerServiceOptions = append(peerServiceOptions, tlsPeerOpt...)
 
 	peerSvc := peer.NewService(rh.nodeReconciler, peerServiceOptions...)
-	localSrvOpts = append(localSrvOpts,
-		serveroption.WithUnixSocketListener(sockPath),
-		serveroption.WithHealthService(),
-		serveroption.WithObserverService(hubbleObserver),
-		serveroption.WithPeerService(peerSvc),
-		// The local server does not need to be guarded by TLS.
-		// It's only used for local communication.
-		serveroption.WithInsecure(),
-	)
+	/*
+		localSrvOpts = append(localSrvOpts,
+			serveroption.WithUnixSocketListener(sockPath),
+			serveroption.WithHealthService(),
+			serveroption.WithObserverService(hubbleObserver),
+			serveroption.WithPeerService(peerSvc),
+			// The local server does not need to be guarded by TLS.
+			// It's only used for local communication.
+			serveroption.WithInsecure(),
+		)
+	*/
 
 	localSrv, err := server.NewServer(rh.log, localSrvOpts...)
 	if err != nil {
