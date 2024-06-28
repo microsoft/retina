@@ -500,6 +500,6 @@ int BPF_KPROBE(kfree_skb_reason, struct sk_buff *skb, enum skb_drop_reason reaso
     get_packet_from_skb(&p, skb);
     bpf_printk("hit igor's kprobe, reason %d", reason);
 
-    update_metrics_map(ctx, UNKNOWN_DROP, 0, &p);
+    update_metrics_map(ctx, reason, 0, &p);
     return 0;
 }
