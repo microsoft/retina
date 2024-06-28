@@ -5,6 +5,7 @@ package main
 
 import (
 	"github.com/microsoft/retina/pkg/bpf"
+	"github.com/microsoft/retina/pkg/ciliumfs"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/telemetry"
 	"go.uber.org/zap"
@@ -40,4 +41,7 @@ func main() {
 
 	// Setup BPF
 	bpf.Setup(l)
+
+	// Setup CiliumFS.
+	ciliumfs.Setup(l)
 }

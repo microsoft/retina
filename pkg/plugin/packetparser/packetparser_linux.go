@@ -579,8 +579,6 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 			// Add metadata to the flow.
 			utils.AddRetinaMetadata(fl, meta)
 
-			p.l.Debug("Received packet", zap.Any("flow", fl))
-
 			// Write the event to the enricher.
 			ev := &v1.Event{
 				Event:     fl,
@@ -639,11 +637,9 @@ func (p *packetParser) readData() {
 
 	select {
 	case p.recordsChannel <- record:
-		p.l.Debug("Sent record to channel", zap.Any("record", record))
 	default:
 		// Channel is full, drop the record.
 		// We shouldn't slow down the perf array reader.
-		// p.l.Warn("Channel is full, dropping record", zap.Any("lost samples", record))
 		metrics.LostEventsCounter.WithLabelValues(utils.BufferedChannel, string(Name)).Inc()
 	}
 }
