@@ -143,7 +143,8 @@ func (dr *dropReason) Init() error {
 	if err := spec.LoadAndAssign(objs, &ebpf.CollectionOptions{
 		Programs: ebpf.ProgramOptions{
 			LogLevel: 2,
-			LogSize:  85 * 1024,
+			// Need larger buffer than default to load the eBPF program, or verifier fails with -ENOSPC
+			LogSize: 85 * 1024,
 		},
 		Maps: ebpf.MapOptions{
 			PinPath: plugincommon.FilterMapPath,

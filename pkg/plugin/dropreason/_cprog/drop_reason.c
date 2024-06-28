@@ -275,8 +275,6 @@ This function will look PID and the length of SKB it is working on. Then it chec
 the return value of the function and update the metrics map accordingly.
 
 */
-// check if we're getting udplicate invocations, will need to get back to remiving in the future
-// if removing any of these lprobes, do not change the PROTO file
 SEC("kretprobe/nf_hook_slow")
 int BPF_KRETPROBE(nf_hook_slow_ret, int retVal)
 {
@@ -298,11 +296,6 @@ int BPF_KRETPROBE(nf_hook_slow_ret, int retVal)
     update_metrics_map(ctx, IPTABLE_RULE_DROP, 0, p);
     return 0;
 }
-// lprobe/section/free_reasons
-// []...
-// update_metrics_map(ctx, kernel_derived_reason, 0, p);
-// static __always_inline int
-// exit_tcp_connect(struct pt_regs *ctx, int ret)
 
 /*
 This function checks the return value of tcp_v4_connect and
@@ -456,9 +449,9 @@ int BPF_KPROBE(nf_conntrack_confirm, struct sk_buff *skb)
     return 0;
 }
 
- SEC("kretprobe/__nf_conntrack_confirm")
- int BPF_KRETPROBE(nf_conntrack_confirm_ret, int retVal)
- {
+SEC("kretprobe/__nf_conntrack_confirm")
+int BPF_KRETPROBE(nf_conntrack_confirm_ret, int retVal)
+{
     __u64 pid_tgid = bpf_get_current_pid_tgid();
     __u32 pid = pid_tgid >> 32;
     struct packet *p = bpf_map_lookup_elem(&natdrop_pids, &pid);

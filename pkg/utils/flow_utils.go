@@ -267,9 +267,6 @@ func AddDropReason(f *flow.Flow, meta *RetinaMetadata, dropReason uint32) {
 
 	f.Verdict = flow.Verdict_DROPPED
 
-	// keep as is, optionally find mapping from linux to Flow type - otherwise,
-	// should work, since this is extracted from METADATA field by control plane
-
 	// Set the drop reason.
 	// Retina drop reasons are different from the drop reasons available in flow library.
 	// We map the ones available in flow library to the ones available in Retina.
