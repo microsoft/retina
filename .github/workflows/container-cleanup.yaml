@@ -1,0 +1,33 @@
+name: Container Registry Cleanup
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # every day at midnight
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  container-cleanup:
+    name: delete-images
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image:
+          - "retina/charts/retina"
+          - "retina/kubectl-retina"
+          - "retina/retina-agent"
+          - "retina/retina-init"
+          - "retina/retina-operator"
+    steps:
+      # This is a fork of the official actions/delete-package-versions which adds GHCR image tag support
+      # https://github.com/actions/delete-package-versions/pull/104
+      - uses: port-of-rotterdam-dtis/delete-package-versions@bf25fb8df311fdcbeac67ba2e5153495d76415a8
+        with:
+          package-name: ${{ matrix.image }}
+          package-type: "container"
+          min-versions-to-keep: 0
+          ignore-versions: "^v(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(\\.*)$"
+          ignore-versions-include-tags: true
