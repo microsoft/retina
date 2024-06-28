@@ -109,37 +109,25 @@ func (p *packetParser) Compile(ctx context.Context) error {
 }
 
 func (p *packetParser) Init() error {
-	var err error
 	if !p.cfg.EnablePodLevel {
 		p.l.Warn("packet parser and latency plugin will not init because pod level is disabled")
 		return nil
 	}
 
-	if err := rlimit.RemoveMemlock(); err != nil {
-		p.l.Error("RemoveMemLock failed:%w", zap.Error(err))
-		return err
-	}
-
-	// Get the absolute path to this file during runtime.
-	dir, err := absPath()
+	err := rlimit.RemoveMemlock()
 	if err != nil {
+		p.l.Error("remove memlock failed", zap.Error(err))
 		return err
 	}
-
-	bpfOutputFile := fmt.Sprintf("%s/%s", dir, bpfObjectFileName)
 
 	objs := &packetparserObjects{}
-	spec, err := ebpf.LoadCollectionSpec(bpfOutputFile)
-	if err != nil {
-		return err
-	}
-	//nolint:typecheck
-	if err := spec.LoadAndAssign(objs, &ebpf.CollectionOptions{ //nolint:typecheck
+
+	if err = loadPacketparserObjects(objs, &ebpf.CollectionOptions{
 		Maps: ebpf.MapOptions{
 			PinPath: plugincommon.FilterMapPath,
 		},
-	}); err != nil { //nolint:typecheck
-		p.l.Error("Error loading objects: %w", zap.Error(err))
+	}); err != nil {
+		p.l.Error("failed to load packetparser objects", zap.Error(err))
 		return err
 	}
 	p.objs = objs
