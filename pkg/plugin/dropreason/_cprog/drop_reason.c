@@ -60,6 +60,8 @@ struct packet
 struct
 {
     __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+    __uint(key_size, sizeof(u32));
+    __uint(value_size, sizeof(u32));
     __uint(max_entries, 16384);
 } dropreason_events SEC(".maps");
 
@@ -432,45 +434,45 @@ int BPF_KRETPROBE(nf_nat_inet_fn_ret, int retVal)
 SEC("kprobe/__nf_conntrack_confirm")
 int BPF_KPROBE(nf_conntrack_confirm, struct sk_buff *skb)
 {
-//     if (!skb)
-//         return 0;
+    if (!skb)
+        return 0;
 
-//     __u16 eth_proto;
+    __u16 eth_proto;
 
-//     member_read(&eth_proto, skb, protocol);
-//     if (eth_proto != bpf_htons(ETH_P_IP))
-//         return 0;
+    member_read(&eth_proto, skb, protocol);
+    if (eth_proto != bpf_htons(ETH_P_IP))
+        return 0;
 
-//     struct packet p;
-//     __builtin_memset(&p, 0, sizeof(p));
+    struct packet p;
+    __builtin_memset(&p, 0, sizeof(p));
 
-//     p.in_filtermap = false;
-//     p.skb_len = 0;
-//     get_packet_from_skb(&p, skb);
+    p.in_filtermap = false;
+    p.skb_len = 0;
+    get_packet_from_skb(&p, skb);
 
-//     __u64 pid_tgid = bpf_get_current_pid_tgid();
-//     __u32 pid = pid_tgid >> 32;
-//     bpf_map_update_elem(&natdrop_pids, &pid, &p, BPF_ANY);
+    __u64 pid_tgid = bpf_get_current_pid_tgid();
+    __u32 pid = pid_tgid >> 32;
+    bpf_map_update_elem(&natdrop_pids, &pid, &p, BPF_ANY);
     return 0;
 }
 
  SEC("kretprobe/__nf_conntrack_confirm")
  int BPF_KRETPROBE(nf_conntrack_confirm_ret, int retVal)
  {
-//     __u64 pid_tgid = bpf_get_current_pid_tgid();
-//     __u32 pid = pid_tgid >> 32;
-//     struct packet *p = bpf_map_lookup_elem(&natdrop_pids, &pid);
-//     bpf_map_delete_elem(&natdrop_pids, &pid);
+    __u64 pid_tgid = bpf_get_current_pid_tgid();
+    __u32 pid = pid_tgid >> 32;
+    struct packet *p = bpf_map_lookup_elem(&natdrop_pids, &pid);
+    bpf_map_delete_elem(&natdrop_pids, &pid);
 
-//     if (!p)
-//         return 0;
+    if (!p)
+        return 0;
 
-//     if (retVal != NF_DROP)
-//     {
-//         return 0;
-//     }
+    if (retVal != NF_DROP)
+    {
+        return 0;
+    }
 
-//     update_metrics_map(ctx, CONNTRACK_ADD_DROP, retVal, p);
+    update_metrics_map(ctx, CONNTRACK_ADD_DROP, retVal, p);
      return 0;
  }
 
@@ -498,6 +500,6 @@ int BPF_KPROBE(kfree_skb_reason, struct sk_buff *skb, enum skb_drop_reason reaso
     get_packet_from_skb(&p, skb);
     bpf_printk("hit igor's kprobe, reason %d", reason);
 
-    // update_metrics_map(ctx, TCP_ACCEPT_BASIC, 0, &p);
+    update_metrics_map(ctx, UNKNOWN_DROP, 0, &p);
     return 0;
 }
