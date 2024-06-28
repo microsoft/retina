@@ -386,7 +386,7 @@ helm-install: manifests
 		--set logLevel=info \
 		--set os.windows=true \
 		--set operator.enabled=false \
-		--set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\]"
+		--set enabledPlugin_linux="\[conntrack\]"
 
 helm-install-with-operator: manifests
 	helm upgrade --install retina ./deploy/manifests/controller/helm/retina/ \
