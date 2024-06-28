@@ -66,6 +66,7 @@ jobs:
       matrix:
         platform: ["windows"]
         arch: ["amd64"]
+        year: ["2019", "2022"]
 
     steps:
       - name: Checkout code
@@ -93,6 +94,7 @@ jobs:
           make retina-image-win \
             IMAGE_NAMESPACE=${{ github.repository }} \
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
+            WINDOWS_YEARS=${{ matrix.year }} \
             BUILDX_ACTION=--push
 
       - name: Sign container image
