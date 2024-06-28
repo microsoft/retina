@@ -27,7 +27,7 @@ const (
 
 type ForwardMetrics struct {
 	baseMetricObject
-	forwardMetric metricsinit.IGaugeVec
+	forwardMetric metricsinit.ICounterVec
 	// bytesMetric metricsinit.IGaugeVec
 	metricName string
 }
@@ -47,13 +47,13 @@ func NewForwardCountMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLo
 func (f *ForwardMetrics) Init(metricName string) {
 	switch metricName {
 	case utils.ForwardCountTotalName:
-		f.forwardMetric = exporter.CreatePrometheusGaugeVecForMetric(
+		f.forwardMetric = exporter.CreatePrometheusCounterVecForMetric(
 			exporter.AdvancedRegistry,
 			TotalCountName,
 			TotalCountDesc,
 			f.getLabels()...)
 	case utils.ForwardBytesTotalName:
-		f.forwardMetric = exporter.CreatePrometheusGaugeVecForMetric(
+		f.forwardMetric = exporter.CreatePrometheusCounterVecForMetric(
 			exporter.AdvancedRegistry,
 			TotalBytesName,
 			TotalBytesDesc,
