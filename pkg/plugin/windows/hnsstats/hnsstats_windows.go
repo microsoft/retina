@@ -159,9 +159,6 @@ func notifyHnsStats(h *hnsstats, stats *HnsStatsData) {
 	metrics.ForwardBytesCounter.WithLabelValues(ingressLabel).Set(float64(stats.hnscounters.BytesReceived))
 	h.l.Debug("emitting bytes received count metric", zap.Uint64(BytesReceived, stats.hnscounters.BytesReceived))
 
-	metrics.WindowsCounter.WithLabelValues(PacketsReceived).Set(float64(stats.hnscounters.PacketsReceived))
-	metrics.WindowsCounter.WithLabelValues(PacketsSent).Set(float64(stats.hnscounters.PacketsSent))
-
 	metrics.DropCounter.WithLabelValues(utils.Endpoint, egressLabel).Set(float64(stats.hnscounters.DroppedPacketsOutgoing))
 	metrics.DropCounter.WithLabelValues(utils.Endpoint, ingressLabel).Set(float64(stats.hnscounters.DroppedPacketsIncoming))
 
