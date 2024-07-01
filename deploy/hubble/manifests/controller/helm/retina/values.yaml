@@ -13,26 +13,33 @@ os:
   linux: true
   windows: false
 
-# FIXME: remove unnecessary pieces, etc.
 operator:
   enabled: true
-  repository: acndev.azurecr.io/retina-operator
+  repository: ghcr.io/microsoft/retina/retina-operator
   pullPolicy: Always
   tag: "latest"
   leaderElection: true
   identityGCInterval: 15m # cilium default
   endpointGCInterval: 5m  # cilium default
+  container:
+    command:
+      - "/retina-operator"
+    args:
+      - "v2"
+      - "--config-dir"
+      - "/retina"
 
 agent:
   leaderElection: false
   enabled: true
   name: retina-agent
-  repository: acndev.azurecr.io/retina-agent
+  repository: ghcr.io/microsoft/retina/retina-agent
   tag: "latest"
   init:
     enabled: true
     name: retina-agent-init
-    repository: acndev.azurecr.io/retina-agent-init
+    repository: ghcr.io/microsoft/retina/retina-init
+
     tag: "latest"
   pullPolicy: Always
   container:

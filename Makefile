@@ -473,7 +473,7 @@ helm-install-hubble:
 
 helm-install-without-tls: clean-certs
 	$(MAKE) helm-install-hubble ENABLE_TLS=false
-
+  
 helm-uninstall:
 	helm uninstall retina -n kube-system
 
@@ -528,4 +528,3 @@ quick-deploy-hubble:
 .PHONY: simplify-dashboards
 simplify-dashboards:
 	cd deploy/legacy/graphana/dashboards && go test . -tags=dashboard,simplifydashboard -v && cd $(REPO_ROOT)
-
