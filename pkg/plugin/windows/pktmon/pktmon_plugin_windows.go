@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 
+	"github.com/cilium/cilium/api/v1/flow"
 	observerv1 "github.com/cilium/cilium/api/v1/observer"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	kcfg "github.com/microsoft/retina/pkg/config"
@@ -17,11 +19,12 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapio"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 var (
-	ErrNilEnricher    error = errors.New("enricher is nil")
-	ErrUnexpectedExit error = errors.New("unexpected exit")
+	ErrNilEnricher    = errors.New("enricher is nil")
+	ErrUnexpectedExit = errors.New("unexpected exit")
 
 	socket = "/tmp/retina-pktmon.sock"
 )
@@ -31,7 +34,7 @@ const (
 	connectionRetryAttempts = 3
 )
 
-type PktMonPlugin struct {
+type Plugin struct {
 	enricher        enricher.EnricherInterface
 	externalChannel chan *v1.Event
 	l               *log.ZapLogger
@@ -40,11 +43,11 @@ type PktMonPlugin struct {
 	errWriter       *zapio.Writer
 }
 
-func (p *PktMonPlugin) Init() error {
+func (p *Plugin) Init() error {
 	return nil
 }
 
-func (p *PktMonPlugin) Name() string {
+func (p *Plugin) Name() string {
 	return "pktmon"
 }
 
@@ -66,7 +69,7 @@ func NewClient() (*pktMonClient, error) {
 		}]
 	}`
 
-	conn, err := grpc.Dial(fmt.Sprintf("%s:%s", "unix", socket), grpc.WithInsecure(), grpc.WithDefaultServiceConfig(retryPolicy))
+	conn, err := grpc.Dial(fmt.Sprintf("%s:%s", "unix", socket), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultServiceConfig(retryPolicy))
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial pktmon server: %w", err)
 	}
@@ -74,12 +77,13 @@ func NewClient() (*pktMonClient, error) {
 	return &pktMonClient{observerv1.NewObserverClient(conn)}, nil
 }
 
-func (p *PktMonPlugin) RunPktMonServer() error {
+func (p *Plugin) RunPktMonServer() error {
 	p.stdWriter = &zapio.Writer{Log: p.l.Logger, Level: zap.InfoLevel}
 	p.errWriter = &zapio.Writer{Log: p.l.Logger, Level: zap.ErrorLevel}
 	defer p.stdWriter.Close()
 	p.pktmonCmd = exec.Command("controller-pktmon.exe")
 	p.pktmonCmd.Args = append(p.pktmonCmd.Args, "--socketpath", socket)
+	p.pktmonCmd.Env = os.Environ()
 	p.pktmonCmd.Stdout = p.stdWriter
 	p.pktmonCmd.Stderr = p.errWriter
 
@@ -101,7 +105,7 @@ func (p *PktMonPlugin) RunPktMonServer() error {
 	return fmt.Errorf("pktmon server exited unexpectedly: %w", ErrUnexpectedExit)
 }
 
-func (p *PktMonPlugin) Start(ctx context.Context) error {
+func (p *Plugin) Start(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	go func() {
 		err := p.RunPktMonServer()
@@ -153,10 +157,23 @@ func (p *PktMonPlugin) Start(ctx context.Context) error {
 				Timestamp: event.GetFlow().GetTime(),
 			}
 
+			if fl.GetType() == flow.FlowType_L7 {
+				dns := fl.GetL7().GetDns()
+				if dns != nil {
+					query := dns.GetQuery()
+					ans := dns.GetIps()
+					if dns.GetQtypes()[0] == "Q" {
+						p.l.Sugar().Debugf("query from %s to %s: request %s\n", fl.GetIP().GetSource(), fl.GetIP().GetDestination(), query)
+					} else {
+						p.l.Sugar().Debugf("answer from %s to %s: result: %+v\n", fl.GetIP().GetSource(), fl.GetIP().GetDestination(), ans)
+					}
+				}
+			}
+
 			if p.enricher != nil {
 				p.enricher.Write(ev)
 			} else {
-				fmt.Printf("enricher is nil when writing\n  ")
+				p.l.Error("enricher is nil when writing event")
 			}
 
 			// Write the event to the external channel.
@@ -173,27 +190,27 @@ func (p *PktMonPlugin) Start(ctx context.Context) error {
 	}
 }
 
-func (p *PktMonPlugin) SetupChannel(ch chan *v1.Event) error {
+func (p *Plugin) SetupChannel(ch chan *v1.Event) error {
 	p.externalChannel = ch
 	return nil
 }
 
 func New(cfg *kcfg.Config) api.Plugin {
-	return &PktMonPlugin{
+	return &Plugin{
 		l: log.Logger().Named(Name),
 	}
 }
 
-func (p *PktMonPlugin) Stop() error {
+func (p *Plugin) Stop() error {
 	// p.pktmonCmd.Wait()
 	// p.stdWriter.Close()
 	return nil
 }
 
-func (p *PktMonPlugin) Compile(ctx context.Context) error {
+func (p *Plugin) Compile(ctx context.Context) error {
 	return nil
 }
 
-func (p *PktMonPlugin) Generate(ctx context.Context) error {
+func (p *Plugin) Generate(ctx context.Context) error {
 	return nil
 }
