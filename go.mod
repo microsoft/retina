@@ -284,7 +284,6 @@ require (
 	github.com/cilium/workerpool v1.2.0
 	github.com/florianl/go-tc v0.4.3
 	github.com/go-logr/zapr v1.3.0
-	github.com/golang/mock v1.1.1
 	github.com/google/gopacket v1.1.19
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/inspektor-gadget/inspektor-gadget v0.27.0
