@@ -99,12 +99,10 @@ jobs:
 
       - name: Sign container image
         run: |
-          for year in 2019 2022; do
-            for image in retina-agent ; do
-              IMAGE_PATH="ghcr.io/${{ github.repository }}/$image:$TAG-windows-ltsc$year-${{ matrix.arch }}"
-              DIGEST=$(jq -r '.["containerimage.digest"]' image-metadata-$image-$TAG-windows-ltsc$year-${{ matrix.arch }}.json) 
-              cosign sign --yes ${IMAGE_PATH}@${DIGEST} 
-            done
+          for image in retina-agent ; do
+            IMAGE_PATH="ghcr.io/${{ github.repository }}/$image:$TAG-windows-ltsc${{ matrix.year }}-${{ matrix.arch }}"
+            DIGEST=$(jq -r '.["containerimage.digest"]' image-metadata-$image-$TAG-windows-ltsc${{ matrix.year }}-${{ matrix.arch }}.json) 
+            cosign sign --yes ${IMAGE_PATH}@${DIGEST}
           done
 
   operator-images:
