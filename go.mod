@@ -6,7 +6,7 @@ require (
 	github.com/go-chi/chi/v5 v5.0.11
 	github.com/google/uuid v1.6.0
 	github.com/prometheus/client_golang v1.19.1
-	github.com/spf13/cobra v1.8.0
+	github.com/spf13/cobra v1.8.1
 	go.uber.org/zap v1.27.0
 	k8s.io/client-go v0.30.1
 )
@@ -284,7 +284,6 @@ require (
 	github.com/cilium/workerpool v1.2.0
 	github.com/florianl/go-tc v0.4.3
 	github.com/go-logr/zapr v1.3.0
-	github.com/golang/mock v1.1.1
 	github.com/google/gopacket v1.1.19
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/inspektor-gadget/inspektor-gadget v0.27.0
