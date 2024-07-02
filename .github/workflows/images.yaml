@@ -102,7 +102,7 @@ jobs:
               IMAGE_NAMESPACE=${{ github.repository }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
-              YEAR=${{ matrix.year }} \
+              WINDOWS_YEARS=${{ matrix.year }} \
               BUILDX_ACTION=--push
           else
             make retina-image-win \

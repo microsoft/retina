@@ -51,11 +51,11 @@ func (p *Plugin) Name() string {
 	return "pktmon"
 }
 
-type pktMonClient struct {
+type Client struct {
 	observerv1.ObserverClient
 }
 
-func NewClient() (*pktMonClient, error) {
+func NewClient() (*Client, error) {
 	retryPolicy := `{
 		"methodConfig": [{
 			"waitForReady": true,
@@ -74,7 +74,7 @@ func NewClient() (*pktMonClient, error) {
 		return nil, fmt.Errorf("failed to dial pktmon server: %w", err)
 	}
 
-	return &pktMonClient{observerv1.NewObserverClient(conn)}, nil
+	return &Client{observerv1.NewObserverClient(conn)}, nil
 }
 
 func (p *Plugin) RunPktMonServer() error {
@@ -195,22 +195,20 @@ func (p *Plugin) SetupChannel(ch chan *v1.Event) error {
 	return nil
 }
 
-func New(cfg *kcfg.Config) api.Plugin {
+func New(_ *kcfg.Config) api.Plugin {
 	return &Plugin{
 		l: log.Logger().Named(Name),
 	}
 }
 
 func (p *Plugin) Stop() error {
-	// p.pktmonCmd.Wait()
-	// p.stdWriter.Close()
 	return nil
 }
 
-func (p *Plugin) Compile(ctx context.Context) error {
+func (p *Plugin) Compile(_ context.Context) error {
 	return nil
 }
 
-func (p *Plugin) Generate(ctx context.Context) error {
+func (p *Plugin) Generate(_ context.Context) error {
 	return nil
 }
