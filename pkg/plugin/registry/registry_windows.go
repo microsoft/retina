@@ -7,6 +7,7 @@ import (
 
 	"github.com/microsoft/retina/pkg/plugin/api"
 	"github.com/microsoft/retina/pkg/plugin/windows/hnsstats"
+	"github.com/microsoft/retina/pkg/plugin/windows/pktmon"
 )
 
 type NewPluginFn func(*kcfg.Config) api.Plugin
@@ -16,4 +17,5 @@ var PluginHandler map[api.PluginName]NewPluginFn
 func RegisterPlugins() {
 	PluginHandler = make(map[api.PluginName]NewPluginFn, 500)
 	PluginHandler[hnsstats.Name] = hnsstats.New
+	PluginHandler[pktmon.Name] = pktmon.New
 }
