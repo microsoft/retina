@@ -53,6 +53,8 @@ func (d DropReasonType) String() string {
 		return "TCP_CLOSE_BASIC"
 	case CONNTRACK_ADD_DROP:
 		return "CONNTRACK_ADD_DROP"
+	case UNKNOWN_DROP:
+		return "UNKNOWN_DROP"
 	default:
 		return "UNKNOWN_DROP"
 	}

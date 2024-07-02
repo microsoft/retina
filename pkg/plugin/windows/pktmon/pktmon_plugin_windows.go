@@ -202,8 +202,6 @@ func New(cfg *kcfg.Config) api.Plugin {
 }
 
 func (p *Plugin) Stop() error {
-	// p.pktmonCmd.Wait()
-	// p.stdWriter.Close()
 	return nil
 }
 
