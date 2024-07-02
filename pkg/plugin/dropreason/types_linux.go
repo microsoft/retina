@@ -42,6 +42,7 @@ type dropReason struct {
 	KRetNfNatInet          link.Link
 	KNfConntrackConfirm    link.Link
 	KRetNfConntrackConfirm link.Link
+	KKfreeSkbReason        link.Link
 	metricsMapData         IMap
 	isRunning              bool
 	reader                 IPerfReader

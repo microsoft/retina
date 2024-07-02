@@ -60,6 +60,8 @@ struct packet
 struct
 {
     __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+    __uint(key_size, sizeof(u32));
+    __uint(value_size, sizeof(u32));
     __uint(max_entries, 16384);
 } dropreason_events SEC(".maps");
 
@@ -273,7 +275,6 @@ This function will look PID and the length of SKB it is working on. Then it chec
 the return value of the function and update the metrics map accordingly.
 
 */
-
 SEC("kretprobe/nf_hook_slow")
 int BPF_KRETPROBE(nf_hook_slow_ret, int retVal)
 {
@@ -295,9 +296,6 @@ int BPF_KRETPROBE(nf_hook_slow_ret, int retVal)
     update_metrics_map(ctx, IPTABLE_RULE_DROP, 0, p);
     return 0;
 }
-
-// static __always_inline int
-// exit_tcp_connect(struct pt_regs *ctx, int ret)
 
 /*
 This function checks the return value of tcp_v4_connect and
@@ -468,5 +466,33 @@ int BPF_KRETPROBE(nf_conntrack_confirm_ret, int retVal)
     }
 
     update_metrics_map(ctx, CONNTRACK_ADD_DROP, retVal, p);
+     return 0;
+ }
+
+SEC("kprobe/kfree_skb_reason")
+int BPF_KPROBE(kfree_skb_reason, struct sk_buff *skb, enum skb_drop_reason reason)
+{
+    if (reason == 0) { // SKB_NOT_DROPPED_YET
+        return 0;
+    }
+
+    if (!skb)
+        return 0;
+
+    __u16 eth_proto;
+
+    member_read(&eth_proto, skb, protocol);
+    if (eth_proto != bpf_htons(ETH_P_IP))
+        return 0;
+
+    struct packet p;
+    __builtin_memset(&p, 0, sizeof(p));
+
+    p.in_filtermap = false;
+    p.skb_len = 0;
+    get_packet_from_skb(&p, skb);
+    bpf_printk("hit igor's kprobe, reason %d", reason);
+
+    update_metrics_map(ctx, reason, 0, &p);
     return 0;
 }
