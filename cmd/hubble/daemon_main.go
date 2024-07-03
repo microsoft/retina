@@ -24,9 +24,10 @@ import (
 	"github.com/cilium/cilium/pkg/ipcache"
 	"github.com/cilium/cilium/pkg/k8s"
 	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
-	"github.com/cilium/cilium/pkg/k8s/watchers"
+
+	//"github.com/cilium/cilium/pkg/k8s/watchers"
 	"github.com/cilium/cilium/pkg/metrics"
-	monitorAgent "github.com/cilium/cilium/pkg/monitor/agent"
+	// monitorAgent "github.com/cilium/cilium/pkg/monitor/agent"
 	monitorAPI "github.com/cilium/cilium/pkg/monitor/api"
 	"github.com/cilium/cilium/pkg/node"
 	"github.com/cilium/cilium/pkg/option"
@@ -175,20 +176,20 @@ func InitGlobalFlags(cmd *cobra.Command, vp *viper.Viper) {
 type daemonParams struct {
 	cell.In
 
-	Lifecycle     cell.Lifecycle
-	Clientset     k8sClient.Clientset
-	MonitorAgent  monitorAgent.Agent
+	Lifecycle cell.Lifecycle
+	Clientset k8sClient.Clientset
+	// MonitorAgent  monitorAgent.Agent
 	PluginManager *pluginmanager.PluginManager
 	HTTPServer    *servermanager.HTTPServer
 	Log           logrus.FieldLogger
 	Client        client.Client
 	EventChan     chan *v1.Event
-	K8sWatcher    *watchers.K8sWatcher
-	Lnds          *node.LocalNodeStore
-	IPC           *ipcache.IPCache
-	SvcCache      *k8s.ServiceCache
-	Telemetry     telemetry.Telemetry
-	Config        config.Config
+	// K8sWatcher    *watchers.K8sWatcher
+	Lnds      *node.LocalNodeStore
+	IPC       *ipcache.IPCache
+	SvcCache  *k8s.ServiceCache
+	Telemetry telemetry.Telemetry
+	Config    config.Config
 }
 
 func newDaemonPromise(params daemonParams) promise.Promise[*Daemon] {

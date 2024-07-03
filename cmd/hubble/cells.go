@@ -14,9 +14,10 @@ import (
 	"github.com/microsoft/retina/pkg/config"
 	rnode "github.com/microsoft/retina/pkg/controllers/daemon/nodereconciler"
 	hubbleserver "github.com/microsoft/retina/pkg/hubble"
-	retinak8s "github.com/microsoft/retina/pkg/k8s"
+
+	// retinak8s "github.com/microsoft/retina/pkg/k8s"
 	"github.com/microsoft/retina/pkg/managers/pluginmanager"
-	"github.com/microsoft/retina/pkg/monitoragent"
+	// "github.com/microsoft/retina/pkg/monitoragent"
 	"github.com/microsoft/retina/pkg/servermanager"
 	"github.com/microsoft/retina/pkg/shared/telemetry"
 	"k8s.io/client-go/rest"
@@ -74,7 +75,7 @@ var (
 		"Control Plane",
 
 		// monitorAgent.Cell,
-		monitoragent.Cell,
+		// monitoragent.Cell,
 
 		daemonCell,
 
@@ -86,7 +87,7 @@ var (
 
 		pluginmanager.Cell,
 
-		retinak8s.Cell,
+		// retinak8s.Cell,
 
 		servermanager.Cell,
 
