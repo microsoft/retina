@@ -17,6 +17,6 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: retina-operator
-  namespace: kube-system
+  namespace: {{ .Values.namespace }}
 
 {{- end -}}

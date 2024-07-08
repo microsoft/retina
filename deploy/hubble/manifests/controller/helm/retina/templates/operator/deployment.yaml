@@ -3,7 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: retina-operator
-  namespace: kube-system
+  namespace: {{ .Values.namespace }}
   labels:
     app: retina-operator
     control-plane: retina-operator
