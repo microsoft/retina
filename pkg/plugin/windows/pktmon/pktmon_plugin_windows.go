@@ -148,7 +148,7 @@ func (p *Plugin) Start(ctx context.Context) error {
 
 			fl := event.GetFlow()
 			if fl == nil {
-				p.l.Error("received nil flow")
+				p.l.Error("received nil flow, flow proto mismatch from client/server?")
 				continue
 			}
 

@@ -50,7 +50,6 @@ func Retry(f func() error, retry int) (err error) {
 			return nil
 		}
 		t := int64(math.Pow(2, float64(i)))
-		fmt.Printf("failed with %v, retrying in %d seconds...\n", err, t)
 		time.Sleep(time.Duration(t) * time.Second)
 	}
 	return err
