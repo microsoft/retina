@@ -23,6 +23,12 @@ operator:
     requests:
       cpu: 10m
       memory: 128Mi
+  container:
+    command:
+      - "/retina-operator"
+    args:
+      - "--config"
+      - "/retina/operator-config.yaml"
 
 image:
   repository: ghcr.io/microsoft/retina/retina-agent

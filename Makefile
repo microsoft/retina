@@ -49,6 +49,10 @@ ALL_ARCH.windows = amd64
 ENABLE_TLS ?= true
 CERT_DIR := $(REPO_ROOT)/.certs
 
+CERT_FILES := tls.crt:tls-client-cert-file \
+              tls.key:tls-client-key-file \
+              ca.crt:tls-ca-cert-files
+
 # TAG is OS and platform agonstic, which can be used for binary version and image manifest tag,
 # while RETINA_PLATFORM_TAG is platform specific, which can be used for image built for specific platforms.
 RETINA_PLATFORM_TAG        ?= $(TAG)-$(subst /,-,$(PLATFORM))
@@ -525,7 +529,8 @@ quick-deploy-hubble:
 	$(MAKE) helm-uninstall || true
 	$(MAKE) helm-install-without-tls HELM_IMAGE_TAG=$(TAG)-linux-amd64
 
+
 .PHONY: simplify-dashboards
 simplify-dashboards:
-	cd deploy/legacy/graphana/dashboards && go test . -tags=dashboard,simplifydashboard -v && cd $(REPO_ROOT)
+	cd deploy/legacy/grafana/dashboards && go test . -tags=dashboard,simplifydashboard -v && cd $(REPO_ROOT)
 
