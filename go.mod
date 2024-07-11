@@ -312,7 +312,7 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gotest.tools v2.2.0+incompatible
 	gotest.tools/v3 v3.5.1
-	helm.sh/helm/v3 v3.15.2
+	helm.sh/helm/v3 v3.15.3
 	k8s.io/apiextensions-apiserver v0.30.1
 	k8s.io/cli-runtime v0.30.1
 	k8s.io/kubectl v0.30.1
