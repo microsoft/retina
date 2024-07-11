@@ -11,11 +11,13 @@ import (
 	"github.com/cilium/cilium/pkg/hubble/metrics"
 	"github.com/cilium/cilium/pkg/hubble/observer"
 	"github.com/cilium/cilium/pkg/hubble/observer/observeroption"
+	"github.com/cilium/cilium/pkg/hubble/peer/serviceoption"
 	"github.com/cilium/cilium/pkg/ipcache"
 	"github.com/cilium/cilium/pkg/logging/logfields"
 	"github.com/cilium/cilium/pkg/option"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	rnode "github.com/microsoft/retina/pkg/controllers/daemon/nodereconciler"
+	serveroption "github.com/microsoft/retina/pkg/hubble/internal"
 	"github.com/microsoft/retina/pkg/hubble/parser"
 	"github.com/pkg/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -74,8 +76,8 @@ func (rh *RetinaHubble) getHubbleEventBufferCapacity() (container.Capacity, erro
 
 func (rh *RetinaHubble) start(ctx context.Context) error {
 	var (
-		// localSrvOpts []serveroption.Option
-		// remoteOpts   []serveroption.Option
+		localSrvOpts []serveroption.Option
+		remoteOpts   []serveroption.Option
 		observerOpts []observeroption.Option
 		// parserOpts   []parserOptions.Option
 	)
@@ -131,67 +133,65 @@ func (rh *RetinaHubble) start(ctx context.Context) error {
 
 	// ---------------------------------------------------------------------------------------------------------------------------------------------------- //
 	// Start the local server.
-	// sockPath := "unix://" + option.Config.HubbleSocketPath
-	// var peerServiceOptions []serviceoption.Option
-	// var tlsCfg *certloader.WatchedServerConfig
+	// sockPath := "unix:" + option.Config.HubbleSocketPath
+	var peerServiceOptions []serviceoption.Option
+	var tlsCfg *certloader.WatchedServerConfig
 
-	// tlsPeerOpt := []serviceoption.Option{serviceoption.WithoutTLSInfo()}
-	// // tlsSrvOpt := serveroption.WithInsecure()
-	// if !option.Config.HubbleTLSDisabled {
-	// 	// tlsCfg, err = rh.fetchTLSConfig(ctx)
-	// 	if err != nil {
-	// 		return errors.Wrap(err, "fetching TLS config")
-	// 	}
+	tlsPeerOpt := []serviceoption.Option{serviceoption.WithoutTLSInfo()}
+	tlsSrvOpt := serveroption.WithInsecure()
+	if !option.Config.HubbleTLSDisabled {
+		tlsCfg, err = rh.fetchTLSConfig(ctx)
+		if err != nil {
+			return errors.Wrap(err, "fetching TLS config")
+		}
 
-	// 	tlsPeerOpt = []serviceoption.Option{}
-	// 	// tlsSrvOpt = serveroption.WithServerTLS(tlsCfg)
-	// }
-	// peerServiceOptions = append(peerServiceOptions, tlsPeerOpt...)
-
-	// peerSvc := peer.NewService(rh.nodeReconciler, peerServiceOptions...)
-	/*
-		localSrvOpts = append(localSrvOpts,
-			serveroption.WithUnixSocketListener(sockPath),
-			serveroption.WithHealthService(),
-			serveroption.WithObserverService(hubbleObserver),
-			serveroption.WithPeerService(peerSvc),
-			// The local server does not need to be guarded by TLS.
-			// It's only used for local communication.
-			serveroption.WithInsecure(),
-		)
-	*/
-
-	// localSrv, err := server.NewServer(rh.log)
-	if err != nil {
-		rh.log.Error("Failed to initialize local Hubble server", zap.Error(err))
-		return fmt.Errorf("starting peer service: %w", err)
+		tlsPeerOpt = []serviceoption.Option{}
+		tlsSrvOpt = serveroption.WithServerTLS(tlsCfg)
 	}
+	peerServiceOptions = append(peerServiceOptions, tlsPeerOpt...)
+
+	peerSvc := serveroption.NewService(rh.nodeReconciler, peerServiceOptions...)
+	localSrvOpts = append(localSrvOpts,
+		// serveroption.WithUnixSocketListener(sockPath),
+		serveroption.WithHealthService(),
+		serveroption.WithObserverService(hubbleObserver),
+		serveroption.WithPeerService(peerSvc),
+		// The local server does not need to be guarded by TLS.
+		// It's only used for local communication.
+		serveroption.WithInsecure(),
+	)
+
+	//localSrv, err := server.NewServer(rh.log)
+	//if err != nil {
+	//rh.log.Error("Failed to initialize local Hubble server", zap.Error(err))
+	//return fmt.Errorf("starting peer service: %w", err)
+	//}
 	// rh.log.Info("Started local Hubble server", zap.String("address", sockPath))
 
 	go func() {
 		//nolint:govet // shadowing the err is intentional here
-		// if err := localSrv.Serve(); err != nil {
-		// 	rh.log.Error("Error while serving from local Hubble server", zap.Error(err))
-		// }
+		//if err := localSrv.Serve(); err != nil {
+		//rh.log.Error("Error while serving from local Hubble server", zap.Error(err))
+		//}
 	}()
 	// Cleanup the local socket on exit.
 	go func() {
 		<-ctx.Done()
 		// localSrv.Stop()
-		//peerSvc.Close()
+		peerSvc.Close()
 		rh.log.Info("Stopped local Hubble server")
 	}()
 
 	// ---------------------------------------------------------------------------------------------------------------------------------------------------- //
 	// Start remote server.
 	address := option.Config.HubbleListenAddress
-	// remoteOpts = append(remoteOpts,
-	// 	serveroption.WithTCPListener(address),
-	// 	serveroption.WithHealthService(),
-	// 	serveroption.WithPeerService(peerSvc),
-	// 	serveroption.WithObserverService(hubbleObserver),
-	// 	tlsSrvOpt,
-	// )
+	remoteOpts = append(remoteOpts,
+		serveroption.WithTCPListener(address),
+		serveroption.WithHealthService(),
+		serveroption.WithPeerService(peerSvc),
+		serveroption.WithObserverService(hubbleObserver),
+		tlsSrvOpt,
+	)
 
 	// srv, err := server.NewServer(rh.log)
 	if err != nil {
