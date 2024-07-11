@@ -161,23 +161,23 @@ func (rh *RetinaHubble) start(ctx context.Context) error {
 		serveroption.WithInsecure(),
 	)
 
-	//localSrv, err := server.NewServer(rh.log)
-	//if err != nil {
-	//rh.log.Error("Failed to initialize local Hubble server", zap.Error(err))
-	//return fmt.Errorf("starting peer service: %w", err)
-	//}
+	localSrv, err := serveroption.NewServer(rh.log)
+	if err != nil {
+		rh.log.Error("Failed to initialize local Hubble server", zap.Error(err))
+		return fmt.Errorf("starting peer service: %w", err)
+	}
 	// rh.log.Info("Started local Hubble server", zap.String("address", sockPath))
 
 	go func() {
 		//nolint:govet // shadowing the err is intentional here
-		//if err := localSrv.Serve(); err != nil {
-		//rh.log.Error("Error while serving from local Hubble server", zap.Error(err))
-		//}
+		if err := localSrv.Serve(); err != nil {
+			rh.log.Error("Error while serving from local Hubble server", zap.Error(err))
+		}
 	}()
 	// Cleanup the local socket on exit.
 	go func() {
 		<-ctx.Done()
-		// localSrv.Stop()
+		localSrv.Stop()
 		peerSvc.Close()
 		rh.log.Info("Stopped local Hubble server")
 	}()
