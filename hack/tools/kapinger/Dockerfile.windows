@@ -1,16 +1,16 @@
-FROM --platform=linux/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.21 AS builder
+FROM --platform=linux/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.22 AS builder
 
-WORKDIR /app
-COPY ./hack/tools .
+WORKDIR /build
+COPY . .
 ENV GOOS=windows
 ENV GOARCH=amd64 
 
 RUN echo "building kapinger for OS: $GOOS, ARCH: $GOARCH"
 RUN go mod download
+RUN ls
+RUN CGO_ENABLED=0 go build -o kapinger.exe .
 
-RUN CGO_ENABLED=0 go build -o kapinger.exe ./kapinger
-
-FROM  mcr.microsoft.com/windows/nanoserver:ltsc2022
-WORKDIR /app
-COPY --from=builder /app/kapinger.exe .
+FROM --platform=windows/amd64 mcr.microsoft.com/windows/nanoserver:ltsc2022
+WORKDIR /build
+COPY --from=builder /build/kapinger.exe .
 CMD ["kapinger.exe"]
