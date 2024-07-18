@@ -454,6 +454,7 @@ helm-install-advanced-local-context: manifests
 helm-install-hubble:
 	helm upgrade --install retina ./deploy/hubble/manifests/controller/helm/retina/ \
 		--namespace kube-system \
+		--set os.windows=true \
 		--set operator.enabled=true \
 		--set operator.repository=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE) \
 		--set operator.tag=$(HELM_IMAGE_TAG) \
@@ -528,4 +529,3 @@ quick-deploy-hubble:
 .PHONY: simplify-dashboards
 simplify-dashboards:
 	cd deploy/legacy/graphana/dashboards && go test . -tags=dashboard,simplifydashboard -v && cd $(REPO_ROOT)
-
