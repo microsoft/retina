@@ -54,6 +54,18 @@ spec:
           image: {{ .Values.operator.repository }}:{{ .Values.operator.tag }}
           imagePullPolicy: {{ .Values.operator.pullPolicy }}
           name: retina-operator
+          {{- if .Values.operator.container.command }}
+          command:
+          {{- range .Values.operator.container.command }}
+          - {{ . }}
+          {{- end }}
+          {{- end }}
+          {{- if .Values.operator.container.args}}
+          args:
+          {{- range $.Values.operator.container.args}}
+          - {{ . | quote }}
+          {{- end}}
+          {{- end}}
           env:
           # this env var is used by retina OSS telemetry and zap
           - name: POD_NAME

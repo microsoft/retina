@@ -50,10 +50,20 @@ spec:
       securityContext:
         runAsNonRoot: true
       containers:
-        - command:
-            - /retina-operator
-          image: {{ .Values.operator.repository }}:{{ .Values.operator.tag }}
+        - image: {{ .Values.operator.repository }}:{{ .Values.operator.tag }}
           name: retina-operator
+          {{- if .Values.operator.container.command }}
+          command:
+          {{- range .Values.operator.container.command }}
+          - {{ . }}
+          {{- end }}
+          {{- end }}
+          {{- if .Values.operator.container.args}}
+          args:
+          {{- range $.Values.operator.container.args}}
+          - {{ . | quote }}
+          {{- end}}
+          {{- end}}
           volumeMounts:
             - name: retina-operator-config
               mountPath: /retina/

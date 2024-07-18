@@ -62,7 +62,7 @@ func NewClient() (*Client, error) {
 			{
 				"waitForReady": true,
 				"retryPolicy": map[string]any{
-					"MaxAttempts":          4,
+					"MaxAttempts":          connectionRetryAttempts,
 					"InitialBackoff":       ".01s",
 					"MaxBackoff":           ".01s",
 					"BackoffMultiplier":    1.0,

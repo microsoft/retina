@@ -1,6 +1,8 @@
 package retina
 
 import (
+	"crypto/rand"
+	"math/big"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -14,6 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var locations = []string{"eastus2", "centralus", "southcentralus", "uksouth", "centralindia", "westus2"}
+
 // TestE2ERetina tests all e2e scenarios for retina
 func TestE2ERetina(t *testing.T) {
 	curuser, err := user.Current()
@@ -26,7 +30,12 @@ func TestE2ERetina(t *testing.T) {
 
 	location := os.Getenv("AZURE_LOCATION")
 	if location == "" {
-		location = "eastus"
+		var nBig *big.Int
+		nBig, err = rand.Int(rand.Reader, big.NewInt(int64(len(locations))))
+		if err != nil {
+			t.Fatalf("Failed to generate a secure random index: %v", err)
+		}
+		location = locations[nBig.Int64()]
 	}
 
 	cwd, err := os.Getwd()
