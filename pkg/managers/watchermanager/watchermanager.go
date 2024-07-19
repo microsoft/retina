@@ -10,7 +10,7 @@ import (
 
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/watchers/apiserver"
-	"github.com/microsoft/retina/pkg/watchers/endpoint"
+	"github.com/microsoft/retina/pkg/watchers/veth"
 	"go.uber.org/zap"
 )
 
@@ -22,7 +22,6 @@ const (
 func NewWatcherManager() *WatcherManager {
 	return &WatcherManager{
 		Watchers: []IWatcher{
-			endpoint.Watcher(),
 			apiserver.Watcher(),
 		},
 		l:           log.Logger().Named("watcher-manager"),
@@ -33,6 +32,9 @@ func NewWatcherManager() *WatcherManager {
 func (wm *WatcherManager) Start(ctx context.Context) error {
 	newCtx, cancelCtx := context.WithCancel(ctx)
 	wm.cancel = cancelCtx
+
+	vethWatcher := veth.NewWatcher()
+	go vethWatcher.Start(newCtx)
 
 	for _, w := range wm.Watchers {
 		if err := w.Init(ctx); err != nil {
