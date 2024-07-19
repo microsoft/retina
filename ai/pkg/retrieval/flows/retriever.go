@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/microsoft/retina/ai/pkg/retrieval/flows/client"
+	"github.com/microsoft/retina/ai/pkg/util"
 
 	flowpb "github.com/cilium/cilium/api/v1/flow"
 	observerpb "github.com/cilium/cilium/api/v1/observer"
@@ -88,7 +89,7 @@ func (r *Retriever) Observe(ctx context.Context, maxFlows int) ([]*flowpb.Flow, 
 
 func flowsRequest() *observerpb.GetFlowsRequest {
 	return &observerpb.GetFlowsRequest{
-		Number:    200,
+		Number:    util.MaxFlowsFromHubbleRelay,
 		Follow:    false,
 		Whitelist: []*flowpb.FlowFilter{},
 		Blacklist: nil,

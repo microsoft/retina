@@ -8,6 +8,7 @@ import (
 	flowanalysis "github.com/microsoft/retina/ai/pkg/analysis/flows"
 	"github.com/microsoft/retina/ai/pkg/lm"
 	flowretrieval "github.com/microsoft/retina/ai/pkg/retrieval/flows"
+	"github.com/microsoft/retina/ai/pkg/util"
 
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
@@ -58,7 +59,7 @@ func (h *Handler) Handle(ctx context.Context, question string, chat lm.ChatHisto
 		return "", fmt.Errorf("error initializing flow retriever: %w", err)
 	}
 
-	flows, err := h.r.Observe(ctx, 50)
+	flows, err := h.r.Observe(ctx, util.MaxFlowsToAnalyze)
 	if err != nil {
 		return "", fmt.Errorf("error observing flows: %w", err)
 	}
