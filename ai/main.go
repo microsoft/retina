@@ -12,7 +12,9 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-const kubeconfigPath = "C:\\Users\\hgregory\\.kube\\config" // "/home/hunter/.kube/config"
+const kubeconfigPath = "/home/hunter/.kube/config"
+
+// const kubeconfigPath = "C:\\Users\\hgregory\\.kube\\config"
 
 func main() {
 	log := logrus.New()

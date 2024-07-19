@@ -28,19 +28,22 @@ type AzureOpenAI struct {
 	client          *azopenai.Client
 }
 
-// $env:AOAI_COMPLETIONS_ENDPOINT = Read-Host 'Enter AOAI_COMPLETIONS_ENDPOINT'
-// $env:AOAI_DEPLOYMENT_NAME = Read-Host 'Enter AOAI_DEPLOYMENT_NAME'
-
 func NewAzureOpenAI() (*AzureOpenAI, error) {
 	aoai := &AzureOpenAI{}
 
 	// Ex: "https://<your-azure-openai-host>.openai.azure.com"
 	azureOpenAIEndpoint := os.Getenv("AOAI_COMPLETIONS_ENDPOINT")
+	if azureOpenAIEndpoint == "" {
+		return nil, fmt.Errorf("set endpoint with environment variable AOAI_COMPLETIONS_ENDPOINT")
+	}
 	if !endpointRegex.MatchString(azureOpenAIEndpoint) {
 		return nil, fmt.Errorf("invalid Azure OpenAI endpoint. must follow pattern: %s", endpointPattern)
 	}
 
 	modelDeployment := os.Getenv("AOAI_DEPLOYMENT_NAME")
+	if modelDeployment == "" {
+		return nil, fmt.Errorf("set model deployment name with environment variable AOAI_DEPLOYMENT_NAME")
+	}
 	if !deploymentRegex.MatchString(modelDeployment) {
 		return nil, fmt.Errorf("invalid Azure OpenAI deployment name. must follow pattern: %s", deploymentPattern)
 	}
