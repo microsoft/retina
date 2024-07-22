@@ -15,16 +15,17 @@ type Server struct {
 }
 
 type Config struct {
-	ApiServer                Server        `yaml:"apiServer"`
-	LogLevel                 string        `yaml:"logLevel"`
-	EnabledPlugin            []string      `yaml:"enabledPlugin"`
-	MetricsInterval          time.Duration `yaml:"metricsInterval"`
-	EnableTelemetry          bool          `yaml:"enableTelemetry"`
-	EnableRetinaEndpoint     bool          `yaml:"enableRetinaEndpoint"`
-	EnablePodLevel           bool          `yaml:"enablePodLevel"`
-	RemoteContext            bool          `yaml:"remoteContext"`
-	EnableAnnotations        bool          `yaml:"enableAnnotations"`
-	BypassLookupIPOfInterest bool          `yaml:"bypassLookupIPOfInterest"`
+	APIServer                          Server        `yaml:"apiServer"`
+	LogLevel                           string        `yaml:"logLevel"`
+	EnabledPlugin                      []string      `yaml:"enabledPlugin"`
+	MetricsInterval                    time.Duration `yaml:"metricsInterval"`
+	EnableTelemetry                    bool          `yaml:"enableTelemetry"`
+	EnableRetinaEndpoint               bool          `yaml:"enableRetinaEndpoint"`
+	EnablePodLevel                     bool          `yaml:"enablePodLevel"`
+	RemoteContext                      bool          `yaml:"remoteContext"`
+	EnableAnnotations                  bool          `yaml:"enableAnnotations"`
+	BypassLookupIPOfInterest           bool          `yaml:"bypassLookupIPOfInterest"`
+	AttachBPFProgramToDefaultInterface bool          `yaml:"attachBPFProgramToDefaultInterface"`
 }
 
 func GetConfig(cfgFilename string) (*Config, error) {

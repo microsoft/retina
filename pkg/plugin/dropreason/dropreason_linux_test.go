@@ -27,9 +27,10 @@ import (
 
 var (
 	cfgPodLevelEnabled = &kcfg.Config{
-		MetricsInterval:          1 * time.Second,
-		EnablePodLevel:           true,
-		BypassLookupIPOfInterest: true,
+		MetricsInterval:                    1 * time.Second,
+		EnablePodLevel:                     true,
+		BypassLookupIPOfInterest:           true,
+		AttachBPFProgramToDefaultInterface: false,
 	}
 	cfgPodLevelDisabled = &kcfg.Config{
 		MetricsInterval: 1 * time.Second,

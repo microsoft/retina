@@ -13,8 +13,8 @@ func TestGetConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected no error, instead got %+v", err)
 	}
-	if c.ApiServer.Host != "0.0.0.0" ||
-		c.ApiServer.Port != 10093 ||
+	if c.APIServer.Host != "0.0.0.0" ||
+		c.APIServer.Port != 10093 ||
 		c.LogLevel != "info" ||
 		c.MetricsInterval != 10*time.Second ||
 		len(c.EnabledPlugin) != 3 ||

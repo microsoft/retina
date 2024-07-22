@@ -34,8 +34,9 @@ import (
 
 var (
 	cfgPodLevelEnabled = &kcfg.Config{
-		EnablePodLevel:           true,
-		BypassLookupIPOfInterest: true,
+		EnablePodLevel:                     true,
+		BypassLookupIPOfInterest:           true,
+		AttachBPFProgramToDefaultInterface: false,
 	}
 	cfgPodLevelDisabled = &kcfg.Config{
 		EnablePodLevel: false,
