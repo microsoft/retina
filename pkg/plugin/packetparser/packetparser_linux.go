@@ -209,7 +209,7 @@ func (p *packetParser) Start(ctx context.Context) error {
 	}
 
 	if p.cfg.AttachBPFProgramToDefaultInterface {
-		p.l.Info("Attaching Packetparser to default interface")
+		p.l.Info("Attaching bpf program to default interface")
 		outgoingLinks, err := utils.GetDefaultOutgoingLinks()
 		if err != nil {
 			return errors.Wrap(err, "could not get default outgoing links")
@@ -226,6 +226,8 @@ func (p *packetParser) Start(ctx context.Context) error {
 			zap.Stringer("outgoingLink.HardwareAddr", outgoingLinkAttributes.HardwareAddr),
 		)
 		p.createQdiscAndAttach(*outgoingLink.Attrs(), Device)
+	} else {
+		p.l.Info("Skipping attaching bpf program to default interface")
 	}
 
 	// Create the channel.
