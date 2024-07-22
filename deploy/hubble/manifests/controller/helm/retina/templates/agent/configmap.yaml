@@ -131,7 +131,6 @@ data:
     enablePodLevel: {{ .Values.enablePodLevel }}
     remoteContext: {{ .Values.remoteContext }}
     bypassLookupIPOfInterest: {{ .Values.bypassLookupIPOfInterest }}
-    attachBPFProgramToDefaultInterface: {{ .Values.attachBPFProgramToDefaultInterface }}
 {{- end}}
 
 {{- end}}

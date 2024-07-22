@@ -20,6 +20,8 @@ data:
     enablePodLevel: {{ .Values.enablePodLevel }}
     remoteContext: {{ .Values.remoteContext }}
     enableAnnotations: {{ .Values.enableAnnotations }}
+    bypassLookupIPOfInterest: {{ .Values.bypassLookupIPOfInterest }}
+    attachBPFProgramToDefaultInterface: {{ .Values.attachBPFProgramToDefaultInterface }}
 {{- end}}
 ---
 {{- if .Values.os.windows}}

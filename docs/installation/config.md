@@ -13,6 +13,7 @@ Defaults are specified for each component in *deploy/legacy/manifests/controller
 * `enabledPlugin_linux`: Array of enabled plugins for linux.
 * `enabledPlugin_win`: Array of enabled plugins for windows.
 * `metricsInterval`: the interval for which metrics will be gathered.
+* `attachBPFProgramToDefaultInterface`: When this toggle is set to true, Retina will attach the packetparser's eBPF program to the default interface of the node it is running on. This is only applicable when running with `enablePodLevel` set to true.
 
 ## Operator Config
 
