@@ -208,7 +208,7 @@ func (p *packetParser) Start(ctx context.Context) error {
 		p.callbackID = ps.Subscribe(common.PubSubEndpoints, &fn)
 	}
 
-	if p.cfg.AttachBPFProgramToDefaultInterface {
+	if p.cfg.DataAggregationLevel == kcfg.Low {
 		p.l.Info("Attaching bpf program to default interface")
 		outgoingLinks, err := utils.GetDefaultOutgoingLinks()
 		if err != nil {

@@ -110,7 +110,7 @@ data:
     remoteContext: {{ .Values.remoteContext }}
     enableAnnotations: {{ .Values.enableAnnotations }}
     bypassLookupIPOfInterest: {{ .Values.bypassLookupIPOfInterest }}
-    attachBPFProgramToDefaultInterface: {{ .Values.attachBPFProgramToDefaultInterface }}
+    dataAggregationLevel: {{ .Values.dataAggregationLevel }}
 {{- end}}
 ---
 {{- if .Values.os.windows}}

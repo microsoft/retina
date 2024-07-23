@@ -45,12 +45,12 @@ var (
 	}
 
 	DefaultRetinaConfig = &Config{
-		EnableTelemetry:                    false,
-		EnabledPlugin:                      []string{"packetforward", "dropreason", "linuxutil", "dns"},
-		EnablePodLevel:                     true,
-		LogLevel:                           "info",
-		BypassLookupIPOfInterest:           true,
-		AttachBPFProgramToDefaultInterface: false,
+		EnableTelemetry:          false,
+		EnabledPlugin:            []string{"packetforward", "dropreason", "linuxutil", "dns"},
+		EnablePodLevel:           true,
+		LogLevel:                 "info",
+		BypassLookupIPOfInterest: true,
+		DataAggregationLevel:     Low,
 	}
 
 	Cell = cell.Module(

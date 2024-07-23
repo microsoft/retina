@@ -60,7 +60,7 @@ enablePodLevel: true
 remoteContext: false
 enableAnnotations: false
 bypassLookupIPOfInterest: true
-attachBPFProgramToDefaultInterface: false
+dataAggregationLevel: 0
 
 imagePullSecrets: []
 nameOverride: "retina"

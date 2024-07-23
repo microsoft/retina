@@ -9,23 +9,31 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Level defines the level of monitor aggregation.
+type Level int
+
+const (
+	Low Level = iota
+	High
+)
+
 type Server struct {
 	Host string `yaml:"host"`
 	Port int    `yaml:"port"`
 }
 
 type Config struct {
-	APIServer                          Server        `yaml:"apiServer"`
-	LogLevel                           string        `yaml:"logLevel"`
-	EnabledPlugin                      []string      `yaml:"enabledPlugin"`
-	MetricsInterval                    time.Duration `yaml:"metricsInterval"`
-	EnableTelemetry                    bool          `yaml:"enableTelemetry"`
-	EnableRetinaEndpoint               bool          `yaml:"enableRetinaEndpoint"`
-	EnablePodLevel                     bool          `yaml:"enablePodLevel"`
-	RemoteContext                      bool          `yaml:"remoteContext"`
-	EnableAnnotations                  bool          `yaml:"enableAnnotations"`
-	BypassLookupIPOfInterest           bool          `yaml:"bypassLookupIPOfInterest"`
-	AttachBPFProgramToDefaultInterface bool          `yaml:"attachBPFProgramToDefaultInterface"`
+	APIServer                Server        `yaml:"apiServer"`
+	LogLevel                 string        `yaml:"logLevel"`
+	EnabledPlugin            []string      `yaml:"enabledPlugin"`
+	MetricsInterval          time.Duration `yaml:"metricsInterval"`
+	EnableTelemetry          bool          `yaml:"enableTelemetry"`
+	EnableRetinaEndpoint     bool          `yaml:"enableRetinaEndpoint"`
+	EnablePodLevel           bool          `yaml:"enablePodLevel"`
+	RemoteContext            bool          `yaml:"remoteContext"`
+	EnableAnnotations        bool          `yaml:"enableAnnotations"`
+	BypassLookupIPOfInterest bool          `yaml:"bypassLookupIPOfInterest"`
+	DataAggregationLevel     Level         `yaml:"dataAggregationLevel"`
 }
 
 func GetConfig(cfgFilename string) (*Config, error) {
