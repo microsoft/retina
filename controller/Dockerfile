@@ -21,7 +21,7 @@ FROM --platform=$TARGETPLATFORM mcr.microsoft.com/windows/servercore@sha256:4595
 # build stages
 
 # intermediate go generate stage
-FROM golang AS bins
+FROM golang AS intermediate 
 ARG APP_INSIGHTS_ID # set to enable AI telemetry
 ARG GOARCH=amd64 # default to amd64
 ARG GOOS=linux # default to linux
@@ -31,21 +31,51 @@ ENV GOOS=${GOOS}
 RUN if [ "$GOOS" = "linux" ] ; then \
       tdnf install -y clang16 lld16 bpftool libbpf-devel; \
     fi
-COPY ./pkg/plugin/ /go/src/github.com/microsoft/retina/plugin
+COPY ./pkg/plugin /go/src/github.com/microsoft/retina/pkg/plugin
 WORKDIR /go/src/github.com/microsoft/retina
 RUN if [ "$GOOS" = "linux" ] ; then \
       go mod init github.com/microsoft/retina; \
       go generate -x /go/src/github.com/microsoft/retina/pkg/plugin/...; \
       rm go.mod; \
     fi
-
 COPY ./go.mod ./go.sum ./
 RUN go mod download
-
 COPY . .
-RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/retina/controller -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID="$APP_INSIGHTS_ID"" controller/main.go 
-RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/retina/initretina -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID="$APP_INSIGHTS_ID"" init/retina/main_linux.go
+
+# capture binary
+FROM intermediate AS capture-bin
+ARG APP_INSIGHTS_ID # set to enable AI telemetry
+ARG GOARCH=amd64 # default to amd64
+ARG GOOS=linux # default to linux
+ARG VERSION
+ENV CGO_ENABLED=0
+ENV GOARCH=${GOARCH}
+ENV GOOS=${GOOS}
 RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/retina/captureworkload -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID="$APP_INSIGHTS_ID"" captureworkload/main.go
+
+
+# controller binary
+FROM intermediate AS controller-bin
+ARG APP_INSIGHTS_ID # set to enable AI telemetry
+ARG GOARCH=amd64 # default to amd64
+ARG GOOS=linux # default to linux
+ARG VERSION
+ENV CGO_ENABLED=0
+ENV GOARCH=${GOARCH}
+ENV GOOS=${GOOS}
+RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/retina/controller -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID="$APP_INSIGHTS_ID"" controller/main.go 
+
+
+# init binary
+FROM intermediate AS init-bin
+ARG APP_INSIGHTS_ID # set to enable AI telemetry
+ARG GOARCH=amd64 # default to amd64
+ARG GOOS=linux # default to linux
+ARG VERSION
+ENV CGO_ENABLED=0
+ENV GOARCH=${GOARCH}
+ENV GOOS=${GOOS}
+RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/retina/initretina -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID="$APP_INSIGHTS_ID"" init/retina/main_linux.go
 
 
 # tools image
@@ -92,9 +122,10 @@ FROM mariner-distroless AS agent
 COPY --from=tools /lib/ /lib
 COPY --from=tools /usr/lib/ /usr/lib
 COPY --from=tools /tmp/bin/ /bin
-COPY --from=bins /go/bin/retina/controller /retina/controller
-COPY --from=bins /go/src/github.com/microsoft/retina/pkg/plugin /go/src/github.com/microsoft/retina/pkg/plugin
-COPY --from=bins /go/bin/retina/captureworkload /retina/captureworkload
+COPY --from=controller-bin /go/bin/retina/controller /retina/controller
+COPY --from=controller-bin /go/src/github.com/microsoft/retina/pkg/plugin /go/src/github.com/microsoft/retina/pkg/plugin
+COPY --from=capture-bin /go/bin/retina/captureworkload /retina/captureworkload
+# Copy Hubble.
 COPY --from=tools /usr/local/hubble /bin/hubble
 # Set Hubble server.
 ENV HUBBLE_SERVER=unix:///var/run/cilium/hubble.sock
@@ -103,9 +134,9 @@ ENTRYPOINT ["./retina/controller"]
 
 # agent final image for windows 
 FROM ${OS_VERSION} AS agent-win
-COPY --from=bins /go/src/github.com/microsoft/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
-COPY --from=bins /go/src/github.com/microsoft/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
-COPY --from=bins /go/bin/retina/controller controller.exe
-COPY --from=bins /go/bin/retina/captureworkload captureworkload.exe
+COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
+COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
+COPY --from=controller-bin /go/bin/retina/controller controller.exe
+COPY --from=capture-bin /go/bin/retina/captureworkload captureworkload.exe
 ADD https://github.com/microsoft/etl2pcapng/releases/download/v1.10.0/etl2pcapng.exe /etl2pcapng.exe
 CMD ["controller.exe", "start", "--kubeconfig=.\\kubeconfig"]
