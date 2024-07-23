@@ -208,7 +208,9 @@ func (p *packetParser) Start(ctx context.Context) error {
 		p.callbackID = ps.Subscribe(common.PubSubEndpoints, &fn)
 	}
 
-	if p.cfg.DataAggregationLevel == kcfg.Low {
+	if p.cfg.DataAggregationLevel == kcfg.High {
+		p.l.Info("Skipping attaching bpf program to default interface")
+	} else {
 		p.l.Info("Attaching bpf program to default interface")
 		outgoingLinks, err := utils.GetDefaultOutgoingLinks()
 		if err != nil {
@@ -226,8 +228,7 @@ func (p *packetParser) Start(ctx context.Context) error {
 			zap.Stringer("outgoingLink.HardwareAddr", outgoingLinkAttributes.HardwareAddr),
 		)
 		p.createQdiscAndAttach(*outgoingLink.Attrs(), Device)
-	} else {
-		p.l.Info("Skipping attaching bpf program to default interface")
+
 	}
 
 	// Create the channel.
