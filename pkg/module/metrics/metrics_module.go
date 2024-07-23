@@ -31,6 +31,7 @@ const (
 	tcp           string = "tcp"
 	nodeApiserver string = "node_apiserver"
 	dns           string = "dns"
+	pktmon        string = "pktmon"
 
 	metricModuleReq filtermanager.Requestor = "metricModule"
 	interval        time.Duration           = 1 * time.Second
@@ -237,7 +238,7 @@ func (m *Module) updateMetricsContexts(spec *api.MetricsSpec) {
 			if lm != nil {
 				m.registry[nodeApiserver] = lm
 			}
-		case strings.Contains(ctxOption.MetricName, dns):
+		case strings.Contains(ctxOption.MetricName, dns) || strings.Contains(ctxOption.MetricName, pktmon):
 			dm := NewDNSMetrics(&ctxOption, m.l, ctxType)
 			if dm != nil {
 				m.registry[ctxOption.MetricName] = dm
