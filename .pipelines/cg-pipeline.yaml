@@ -189,7 +189,7 @@ stages:
               targetType: "inline"
               script: |
                 Import-Module -Name "$(Build.SourcesDirectory)\windows\docker\DockerBuildModule.psm1" -Force
-                Build-RetinaAgentImage -fullBuilderImageName $(WINDOWS_BUILDER_IMAGE) -registry $(BUILD_REGISTRY)
+                Build-RetinaAgentImage -fullBuilderImageName $(WINDOWS_BUILDER_IMAGE) -registry $(BUILD_REGISTRY) -appInsightsID $(PROD_AI)
                 Save-Image -imageName retina-agent -registry $(BUILD_REGISTRY)
 
           - task: PublishBuildArtifacts@1
