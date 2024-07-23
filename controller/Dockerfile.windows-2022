@@ -1,6 +1,4 @@
 FROM --platform=linux/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.21 as builder
-
-# Build args
 ARG VERSION
 ARG APP_INSIGHTS_ID
 
@@ -15,7 +13,7 @@ RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /usr/bin/co
 RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /usr/bin/captureworkload.exe ./captureworkload/
 
 # Copy into final image
-FROM  mcr.microsoft.com/windows/servercore:ltsc2022 as final
+FROM  --platform=windows/amd64 mcr.microsoft.com/windows/servercore:ltsc2022 as final
 COPY --from=builder /usr/src/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
 COPY --from=builder /usr/src/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
 COPY --from=builder /usr/bin/controller.exe controller.exe

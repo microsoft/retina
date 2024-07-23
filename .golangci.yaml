@@ -2,6 +2,18 @@ issues:
   max-same-issues: 0
   max-issues-per-linter: 0
   new-from-rev: origin/main
+  exclude-rules:
+    # some type names are caps/underscore to map OS primitive types
+    - path: pkg/metrics/types_windows.go
+      linters:
+        - revive
+        - gomnd
+        - var-naming
+    - path: pkg/metrics/types_linux.go
+      linters:
+        - revive
+        - gomnd
+        - var-naming
 linters:
   presets: 
   - bugs
