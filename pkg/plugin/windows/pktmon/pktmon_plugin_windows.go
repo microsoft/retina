@@ -21,6 +21,7 @@ import (
 	"go.uber.org/zap/zapio"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 var (
@@ -130,6 +131,44 @@ func (p *Plugin) Start(ctx context.Context) error {
 	}()
 
 	var str observerv1.Observer_GetFlowsClient
+	str, err := p.GetFlowsClient(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get flow client from observer: %w", err)
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("pktmon context cancelled: %w", ctx.Err())
+		default:
+			err := p.GetFlow(str)
+			if err != nil {
+				p.l.Error("failed to get flow from observer", zap.Error(err))
+				// seeing status errors, recreate client
+				// experiencing sporadic cases of this
+
+				// and then client gets stuck in loop, where crashing and recreating is immediate mitigation.
+				// Instead, we will try to recreate the client and stream
+				if _, ok := status.FromError(err); ok {
+					var clientErr error
+					clientErr = str.CloseSend()
+					if clientErr != nil {
+						return fmt.Errorf("failed to close observer after after failure: %w, parent: %w", clientErr, err)
+					}
+					str, clientErr = p.GetFlowsClient(ctx)
+					if clientErr != nil {
+						return fmt.Errorf("failed to get flow client from observer after failure: %w, parent: %w", clientErr, err)
+					}
+				} else {
+					return fmt.Errorf("failed to get flow from observer: %w", err)
+				}
+			}
+		}
+	}
+}
+
+func (p *Plugin) GetFlowsClient(ctx context.Context) (observerv1.Observer_GetFlowsClient, error) {
+	var str observerv1.Observer_GetFlowsClient
 	fn := func() error {
 		p.l.Info("creating pktmon client")
 		client, err := NewClient()
@@ -145,20 +184,9 @@ func (p *Plugin) Start(ctx context.Context) error {
 	}
 	err := utils.Retry(fn, connectionRetryAttempts)
 	if err != nil {
-		return fmt.Errorf("failed to create pktmon client: %w", err)
+		return str, fmt.Errorf("failed to create pktmon client: %w", err)
 	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("pktmon context cancelled: %w", ctx.Err())
-		default:
-			err := p.GetFlow(str)
-			if err != nil {
-				return fmt.Errorf("failed to get flow from observer: %w", err)
-			}
-		}
-	}
+	return str, nil
 }
 
 func (p *Plugin) GetFlow(str observerv1.Observer_GetFlowsClient) error {
