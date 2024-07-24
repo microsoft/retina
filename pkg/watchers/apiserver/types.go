@@ -39,12 +39,11 @@ var w *Watcher
 func NewWatcher() *Watcher {
 	if w == nil {
 		w = &Watcher{
-			l:             log.Logger().Named(watcherName),
-			current:       make(cache),
-			apiServerURL:  getHostURL(),
-			hostResolver:  net.DefaultResolver,
-			filtermanager: getFilterManager(),
-			refreshRate:   defaultRefreshRate,
+			l:            log.Logger().Named(watcherName),
+			current:      make(cache),
+			apiServerURL: getHostURL(),
+			hostResolver: net.DefaultResolver,
+			refreshRate:  defaultRefreshRate,
 		}
 	}
 	return w

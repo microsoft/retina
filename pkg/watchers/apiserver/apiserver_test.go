@@ -17,7 +17,6 @@ import (
 	"github.com/microsoft/retina/pkg/watchers/apiserver/mocks"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
-	"golang.org/x/sync/errgroup"
 )
 
 func TestGetWatcher(t *testing.T) {
@@ -133,12 +132,7 @@ func TestResolveIPEmpty(t *testing.T) {
 
 	mockedResolver.EXPECT().LookupHost(gomock.Any(), gomock.Any()).Return([]string{}, nil).AnyTimes()
 
-	var err error
-	g, ctx := errgroup.WithContext(ctx)
-	g.Go(func() error {
-		err = w.Start(ctx)
-		return err
-	})
+	err := w.Start(ctx)
 	assert.Error(t, err, "Expected error when refreshing the cache")
 }
 
