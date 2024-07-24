@@ -151,7 +151,6 @@ func (p *Plugin) Start(ctx context.Context) error {
 				// Instead, we will try to recreate the client and stream
 				if _, ok := status.FromError(err); ok {
 					var clientErr error
-					clientErr = str.CloseSend()
 					if clientErr != nil {
 						return fmt.Errorf("failed to close observer after after failure: %w, parent: %w", clientErr, err)
 					}
