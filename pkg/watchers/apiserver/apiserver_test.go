@@ -19,17 +19,6 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-func TestGetWatcher(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
-
-	w1 := NewWatcher()
-	assert.NotNil(t, w1)
-
-	w2 := NewWatcher()
-	assert.NotNil(t, w2)
-	assert.Equal(t, w1, w2, "Expected the same veth watcher instance")
-}
-
 func TestStart(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	ctrl := gomock.NewController(t)

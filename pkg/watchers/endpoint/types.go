@@ -25,19 +25,14 @@ type Watcher struct {
 	refreshRate time.Duration
 }
 
-var w *Watcher
-
 // NewEndpointWatcher creates a new endpoint watcher.
 func NewWatcher() *Watcher {
-	if w == nil {
-		w = &Watcher{
-			l:           log.Logger().Named(watcherName),
-			p:           pubsub.New(),
-			current:     make(cache),
-			refreshRate: defaultRefreshRate,
-		}
+	w := &Watcher{
+		l:           log.Logger().Named(watcherName),
+		p:           pubsub.New(),
+		current:     make(cache),
+		refreshRate: defaultRefreshRate,
 	}
-
 	return w
 }
 

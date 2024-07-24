@@ -18,17 +18,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func TestGetWatcher(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
-
-	w1 := NewWatcher()
-	assert.NotNil(t, w1)
-
-	w2 := NewWatcher()
-	assert.NotNil(t, w2)
-	assert.Equal(t, w1, w2, "Expected the same veth watcher instance")
-}
-
 func TestRun(t *testing.T) {
 	showLink = func() ([]netlink.Link, error) {
 		return []netlink.Link{

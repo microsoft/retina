@@ -33,19 +33,16 @@ type Watcher struct {
 	refreshRate   time.Duration
 }
 
-var w *Watcher
-
 // NewWatcher creates a new apiserver watcher.
 func NewWatcher() *Watcher {
-	if w == nil {
-		w = &Watcher{
-			l:            log.Logger().Named(watcherName),
-			current:      make(cache),
-			apiServerURL: getHostURL(),
-			hostResolver: net.DefaultResolver,
-			refreshRate:  defaultRefreshRate,
-		}
+	w := &Watcher{
+		l:            log.Logger().Named(watcherName),
+		current:      make(cache),
+		apiServerURL: getHostURL(),
+		hostResolver: net.DefaultResolver,
+		refreshRate:  defaultRefreshRate,
 	}
+	w.filtermanager = w.getFilterManager()
 	return w
 }
 

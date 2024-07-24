@@ -14,15 +14,12 @@ type Watcher struct {
 	p pubsub.PubSubInterface
 }
 
-var watcher *Watcher
-
 // NewWatcher creates a new veth watcher.
 func NewWatcher() *Watcher {
-	if watcher == nil {
-		watcher = &Watcher{
-			l: log.Logger().Named(watcherName),
-			p: pubsub.New(),
-		}
+	w := &Watcher{
+		l: log.Logger().Named(watcherName),
+		p: pubsub.New(),
 	}
-	return watcher
+
+	return w
 }

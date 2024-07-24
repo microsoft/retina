@@ -26,9 +26,6 @@ func (w *Watcher) Name() string {
 
 // Start the apiserver watcher.
 func (w *Watcher) Start(ctx context.Context) error {
-	if w.filtermanager == nil {
-		w.filtermanager = getFilterManager()
-	}
 	ticker := time.NewTicker(w.refreshRate)
 	for {
 		select {
@@ -202,7 +199,7 @@ func getHostURL() string {
 }
 
 // Get FilterManager
-func getFilterManager() *fm.FilterManager {
+func (w *Watcher) getFilterManager() *fm.FilterManager {
 	f, err := fm.Init(filterManagerRetries)
 	if err != nil {
 		w.l.Error("failed to init filter manager", zap.Error(err))
