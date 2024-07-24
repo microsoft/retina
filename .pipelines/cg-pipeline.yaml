@@ -197,12 +197,12 @@ stages:
             inputs:
               targetType: "inline"
               script: |
-                df -h
+                Get-PSDrive
                 Import-Module -Name "$(Build.SourcesDirectory)\windows\docker\DockerBuildModule.psm1" -Force
                 Build-RetinaAgentImage -fullBuilderImageName $(WINDOWS_BUILDER_IMAGE) -registry $(BUILD_REGISTRY) -appInsightsID $(PROD_AI)
                 Save-Image -imageName retina-agent -registry $(BUILD_REGISTRY)
                 echo "----"
-                df -h
+                Get-PSDrive
           - task: PublishBuildArtifacts@1
             inputs:
               artifactName: output
