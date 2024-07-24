@@ -32,7 +32,12 @@ func (wm *WatcherManager) Start(ctx context.Context) error {
 		w := w
 		g.Go(func() error {
 			wm.l.Info("starting watcher", zap.String("name", w.Name()))
-			return w.Start(ctx)
+			err := w.Start(ctx)
+			if err != nil {
+				wm.l.Error("watcher exited with error", zap.Error(err), zap.String("name", w.Name()))
+				return errors.Wrap(err, "watcher exited with error")
+			}
+			return nil
 		})
 	}
 	err := g.Wait()

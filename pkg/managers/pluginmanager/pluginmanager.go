@@ -152,7 +152,7 @@ func (p *PluginManager) Start(ctx context.Context) error {
 		g.Go(func() error {
 			err = p.watcherManager.Start(ctx)
 			if err != nil {
-				return errors.Wrap(err, "failed to start watcher manager")
+				return errors.Wrap(err, "watcher manager exited with error")
 			}
 			return nil
 		})

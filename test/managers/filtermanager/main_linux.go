@@ -19,6 +19,7 @@ import (
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/watchers/apiserver"
 	"github.com/microsoft/retina/pkg/watchers/endpoint"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
@@ -45,7 +46,12 @@ func main() {
 	g, ctx := errgroup.WithContext(ctx)
 	// Start watcher manager
 	g.Go(func() error {
-		return wm.Start(ctx)
+		err := wm.Start(ctx)
+		if err != nil {
+			l.Error("watcher manager exited with error", zap.Error(err))
+			return errors.Wrap(err, "watcher manager exited with error")
+		}
+		return nil
 	})
 	defer func() {
 		if err := wm.Stop(ctx); err != nil {

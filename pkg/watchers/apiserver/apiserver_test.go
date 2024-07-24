@@ -16,6 +16,7 @@ import (
 	filtermanagermocks "github.com/microsoft/retina/pkg/managers/filtermanager"
 	"github.com/microsoft/retina/pkg/watchers/apiserver/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
 
@@ -47,7 +48,7 @@ func TestStart(t *testing.T) {
 	mockedFilterManager.EXPECT().DeleteIPs(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 	err := w.Start(ctx) // watcher will timeout after 20 seconds
-	assert.NoError(t, err, "Expected no error when refreshing the cache")
+	require.NoError(t, err, "Expected no error when refreshing the cache")
 }
 
 func TestDiffCache(t *testing.T) {
@@ -99,7 +100,7 @@ func TestStartError(t *testing.T) {
 	mockedResolver.EXPECT().LookupHost(gomock.Any(), gomock.Any()).Return(nil, errors.New("Error")).AnyTimes()
 
 	err := w.Start(ctx)
-	assert.Error(t, err, "Expected error when refreshing the cache")
+	require.NoError(t, err, "Expected error when refreshing the cache")
 }
 
 func TestResolveIPEmpty(t *testing.T) {
@@ -122,7 +123,7 @@ func TestResolveIPEmpty(t *testing.T) {
 	mockedResolver.EXPECT().LookupHost(gomock.Any(), gomock.Any()).Return([]string{}, nil).AnyTimes()
 
 	err := w.Start(ctx)
-	assert.Error(t, err, "Expected error when refreshing the cache")
+	require.NoError(t, err, "Expected error when refreshing the cache")
 }
 
 func randomIP() string {

@@ -32,10 +32,10 @@ func (w *Watcher) Start(ctx context.Context) error {
 	}
 
 	// Create a channel to receive netlink events.
-	netlinkEv := make(chan netlink.LinkUpdate)
+	netlinkEvCh := make(chan netlink.LinkUpdate)
 	done := make(chan struct{})
 	// Subscribe to link (network interface) updates.
-	if err := netlink.LinkSubscribe(netlinkEv, done); err != nil {
+	if err := netlink.LinkSubscribe(netlinkEvCh, done); err != nil {
 		return errors.Wrap(err, "failed to subscribe to link updates")
 	}
 	defer close(done)
@@ -45,9 +45,9 @@ func (w *Watcher) Start(ctx context.Context) error {
 		case <-ctx.Done():
 			w.l.Info("stopping veth watcher")
 			return nil
-		case ev := <-netlinkEv:
+		case ev := <-netlinkEvCh:
 			// Filter for veth devices.
-			w.l.Info("received netlink event", zap.Any("device", ev.Link.Attrs()))
+			w.l.Info("received netlink event", zap.Any("device", linkAttrsToMap(ev.Link.Attrs())))
 			if ev.Link.Attrs().EncapType == "ether" && ev.Link.Type() == "veth" {
 				switch ev.Header.Type {
 				case syscall.RTM_NEWLINK:
@@ -65,4 +65,41 @@ func (w *Watcher) Start(ctx context.Context) error {
 func (w *Watcher) Stop(_ context.Context) error {
 	w.l.Info("stopping veth watcher")
 	return nil
+}
+
+func linkAttrsToMap(attrs *netlink.LinkAttrs) map[string]any {
+	return map[string]any{
+		"Name":           attrs.Name,
+		"HardwareAddr":   attrs.HardwareAddr.String(),
+		"MTU":            attrs.MTU,
+		"Flags":          attrs.Flags.String(),
+		"RawFlags":       attrs.RawFlags,
+		"ParentIndex":    attrs.ParentIndex,
+		"MasterIndex":    attrs.MasterIndex,
+		"Namespace":      attrs.Namespace,
+		"Alias":          attrs.Alias,
+		"AltNames":       attrs.AltNames,
+		"Statistics":     attrs.Statistics,
+		"Promisc":        attrs.Promisc,
+		"Allmulti":       attrs.Allmulti,
+		"Multi":          attrs.Multi,
+		"Xdp":            attrs.Xdp,
+		"EncapType":      attrs.EncapType,
+		"Protinfo":       attrs.Protinfo,
+		"OperState":      attrs.OperState.String(),
+		"PhysSwitchID":   attrs.PhysSwitchID,
+		"NetNsID":        attrs.NetNsID,
+		"NumTxQueues":    attrs.NumTxQueues,
+		"NumRxQueues":    attrs.NumRxQueues,
+		"TSOMaxSegs":     attrs.TSOMaxSegs,
+		"TSOMaxSize":     attrs.TSOMaxSize,
+		"GSOMaxSegs":     attrs.GSOMaxSegs,
+		"GSOMaxSize":     attrs.GSOMaxSize,
+		"GROMaxSize":     attrs.GROMaxSize,
+		"GSOIPv4MaxSize": attrs.GSOIPv4MaxSize,
+		"GROIPv4MaxSize": attrs.GROIPv4MaxSize,
+		"Vfs":            attrs.Vfs,
+		"Group":          attrs.Group,
+		"PermHWAddr":     attrs.PermHWAddr.String(),
+	}
 }

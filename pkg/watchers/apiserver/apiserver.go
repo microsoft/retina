@@ -139,14 +139,14 @@ func (w *Watcher) getApiServerIPs(ctx context.Context) ([]string, error) {
 // parse url to extract hostname
 func (w *Watcher) retrieveAPIServerHostname() (string, error) {
 	// Parse the URL
-	url, err := url.Parse(w.apiServerURL)
+	parsedURL, err := url.Parse(w.apiServerURL)
 	if err != nil {
 		fmt.Println("Failed to parse URL:", err)
 		return "", err
 	}
 
 	// Remove the scheme (http:// or https://) and port from the host
-	host := strings.TrimPrefix(url.Host, "www.")
+	host := strings.TrimPrefix(parsedURL.Host, "www.")
 	colonIndex := strings.IndexByte(host, ':')
 	if colonIndex != -1 {
 		host = host[:colonIndex]
