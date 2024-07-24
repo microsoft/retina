@@ -19,6 +19,7 @@ stages:
           - checkout: self
             fetchTags: true
           - script: |
+              df -h
               BUILD_NUMBER=$(Build.BuildNumber)
               if [ "$(Build.Reason)" = "Schedule" ]
               then
@@ -43,97 +44,97 @@ stages:
             displayName: "Set environmental variables"
             condition: always()
 
-      - job: retinaagentimages
-        displayName: Build Retina Agent Images
-        pool:
-          name: "$(BUILD_POOL_NAME_DEFAULT)"
-        strategy:
-          matrix:
-            agent-linux-arm:
-              platform: "linux"
-              arch: "arm64"
-              target: "agent"
+      # - job: retinaagentimages
+      #   displayName: Build Retina Agent Images
+      #   pool:
+      #     name: "$(BUILD_POOL_NAME_DEFAULT)"
+      #   strategy:
+      #     matrix:
+      #       agent-linux-arm:
+      #         platform: "linux"
+      #         arch: "arm64"
+      #         target: "agent"
 
-            agent-linux-amd64:
-              platform: "linux"
-              arch: "amd64"
-              target: "agent"
+      #       agent-linux-amd64:
+      #         platform: "linux"
+      #         arch: "amd64"
+      #         target: "agent"
 
-            init-linux-arm:
-              platform: "linux"
-              arch: "arm64"
-              target: "init"
+      #       init-linux-arm:
+      #         platform: "linux"
+      #         arch: "arm64"
+      #         target: "init"
 
-            init-linux-amd64:
-              platform: "linux"
-              arch: "amd64"
-              target: "init"
+      #       init-linux-amd64:
+      #         platform: "linux"
+      #         arch: "amd64"
+      #         target: "init"
 
-        steps:
-          - checkout: self
-            fetchTags: true
-          - script: |
-              set -euo pipefail
-              echo "VERSION=$(make version)"
-              export VERSION=$(make version)
-              mkdir -p ./output/images/$(platform)/$(arch)/$(year)
-              make retina-image \
-                AGENT_TARGETS=$(target) \
-                TAG=$(make version) \
-                IMAGE_NAMESPACE=retina \
-                PLATFORM=$(platform)/$(arch) \
-                IMAGE_REGISTRY=ghcr.io/microsoft  \
-                BUILDX_ACTION="-o type=docker,dest=./output/images/$(platform)/$(arch)/retina-$(target)-$VERSION-$(platform)-$(arch).tar"
-            # make manifest-skopeo-archive IMAGE_ARCHIVE_DIR=$(Build.ArtifactStagingDirectory)/images
-            displayName: "Build Retina Linux Images"
+      #   steps:
+      #     - checkout: self
+      #       fetchTags: true
+      #     - script: |
+      #         set -euo pipefail
+      #         echo "VERSION=$(make version)"
+      #         export VERSION=$(make version)
+      #         mkdir -p ./output/images/$(platform)/$(arch)/$(year)
+      #         make retina-image \
+      #           AGENT_TARGETS=$(target) \
+      #           TAG=$(make version) \
+      #           IMAGE_NAMESPACE=retina \
+      #           PLATFORM=$(platform)/$(arch) \
+      #           IMAGE_REGISTRY=ghcr.io/microsoft  \
+      #           BUILDX_ACTION="-o type=docker,dest=./output/images/$(platform)/$(arch)/retina-$(target)-$VERSION-$(platform)-$(arch).tar"
+      #       # make manifest-skopeo-archive IMAGE_ARCHIVE_DIR=$(Build.ArtifactStagingDirectory)/images
+      #       displayName: "Build Retina Linux Images"
 
-          - bash: |
-              mkdir -p $(Build.ArtifactStagingDirectory)
-              cp -r output/* $(Build.ArtifactStagingDirectory)
-            displayName: "Copy binaries to the binaries artifact folder"
+      #     - bash: |
+      #         mkdir -p $(Build.ArtifactStagingDirectory)
+      #         cp -r output/* $(Build.ArtifactStagingDirectory)
+      #       displayName: "Copy binaries to the binaries artifact folder"
 
-          - task: PublishBuildArtifacts@1
-            inputs:
-              artifactName: output
-              pathtoPublish: "$(Build.ArtifactStagingDirectory)"
-            condition: succeeded()
+      #     - task: PublishBuildArtifacts@1
+      #       inputs:
+      #         artifactName: output
+      #         pathtoPublish: "$(Build.ArtifactStagingDirectory)"
+      #       condition: succeeded()
 
-      - job: retinaoperatorimages
-        displayName: Build Retina Operator Images
-        pool:
-          name: "$(BUILD_POOL_NAME_DEFAULT)"
-        strategy:
-          matrix:
-            operator-linux-amd64:
-              platform: "linux"
-              arch: "amd64"
+      # - job: retinaoperatorimages
+      #   displayName: Build Retina Operator Images
+      #   pool:
+      #     name: "$(BUILD_POOL_NAME_DEFAULT)"
+      #   strategy:
+      #     matrix:
+      #       operator-linux-amd64:
+      #         platform: "linux"
+      #         arch: "amd64"
 
-        steps:
-          - checkout: self
-            fetchTags: true
-          - script: |
-              set -euo pipefail
-              echo "VERSION=$(make version)"
-              export VERSION=$(make version)
-              mkdir -p ./output/images/$(platform)/$(arch)/$(year)
-              make retina-operator-image \
-                TAG=$(make version) \
-                IMAGE_NAMESPACE=retina \
-                PLATFORM=$(platform)/$(arch) \
-                IMAGE_REGISTRY=ghcr.io/microsoft  \
-                BUILDX_ACTION="-o type=docker,dest=./output/images/$(platform)/$(arch)/retina-operator-$VERSION-$(platform)-$(arch).tar"
-            displayName: "Build Retina Operator Linux Images"
+      #   steps:
+      #     - checkout: self
+      #       fetchTags: true
+      #     - script: |
+      #         set -euo pipefail
+      #         echo "VERSION=$(make version)"
+      #         export VERSION=$(make version)
+      #         mkdir -p ./output/images/$(platform)/$(arch)/$(year)
+      #         make retina-operator-image \
+      #           TAG=$(make version) \
+      #           IMAGE_NAMESPACE=retina \
+      #           PLATFORM=$(platform)/$(arch) \
+      #           IMAGE_REGISTRY=ghcr.io/microsoft  \
+      #           BUILDX_ACTION="-o type=docker,dest=./output/images/$(platform)/$(arch)/retina-operator-$VERSION-$(platform)-$(arch).tar"
+      #       displayName: "Build Retina Operator Linux Images"
 
-          - bash: |
-              mkdir -p $(Build.ArtifactStagingDirectory)
-              cp -r output/* $(Build.ArtifactStagingDirectory)
-            displayName: "Copy binaries to the binaries artifact folder"
+      #     - bash: |
+      #         mkdir -p $(Build.ArtifactStagingDirectory)
+      #         cp -r output/* $(Build.ArtifactStagingDirectory)
+      #       displayName: "Copy binaries to the binaries artifact folder"
 
-          - task: PublishBuildArtifacts@1
-            inputs:
-              artifactName: output
-              pathtoPublish: "$(Build.ArtifactStagingDirectory)"
-            condition: succeeded()
+      #     - task: PublishBuildArtifacts@1
+      #       inputs:
+      #         artifactName: output
+      #         pathtoPublish: "$(Build.ArtifactStagingDirectory)"
+      #       condition: succeeded()
 
       # windows 2019 only in buildx, windows server 2022 requires native windows container build because of cgo
       - job: retinaagentimageswin2019
@@ -152,6 +153,7 @@ stages:
             fetchTags: true
           - script: |
               set -euo pipefail
+              df -h
               echo "VERSION=$(make version)"
               export VERSION=$(make version)
               mkdir -p ./output/images/$(platform)/$(arch)/$(year)
@@ -168,32 +170,32 @@ stages:
               pathtoPublish: ./output
             condition: succeeded()
 
-      - job: windowsnative
-        displayName: Build Retina Windows Images (native)
-        pool:
-          name: "$(BUILD_POOL_NAME_WINDOWS_DEFAULT)"
-        steps:
-          - checkout: self
-            fetchTags: true
+      # - job: windowsnative
+      #   displayName: Build Retina Windows Images (native)
+      #   pool:
+      #     name: "$(BUILD_POOL_NAME_WINDOWS_DEFAULT)"
+      #   steps:
+      #     - checkout: self
+      #       fetchTags: true
 
-          - task: Docker@2
-            displayName: Docker Login
-            inputs:
-              containerRegistry: $(WINDOWS_BUILDER_REGISTRY)
-              command: "login"
-              addPipelineData: false
+      #     - task: Docker@2
+      #       displayName: Docker Login
+      #       inputs:
+      #         containerRegistry: $(WINDOWS_BUILDER_REGISTRY)
+      #         command: "login"
+      #         addPipelineData: false
 
-          - task: PowerShell@2
-            displayName: "Build Retina Windows Image (LTSC2022)"
-            inputs:
-              targetType: "inline"
-              script: |
-                Import-Module -Name "$(Build.SourcesDirectory)\windows\docker\DockerBuildModule.psm1" -Force
-                Build-RetinaAgentImage -fullBuilderImageName $(WINDOWS_BUILDER_IMAGE) -registry $(BUILD_REGISTRY) -appInsightsID $(PROD_AI)
-                Save-Image -imageName retina-agent -registry $(BUILD_REGISTRY)
+      #     - task: PowerShell@2
+      #       displayName: "Build Retina Windows Image (LTSC2022)"
+      #       inputs:
+      #         targetType: "inline"
+      #         script: |
+      #           Import-Module -Name "$(Build.SourcesDirectory)\windows\docker\DockerBuildModule.psm1" -Force
+      #           Build-RetinaAgentImage -fullBuilderImageName $(WINDOWS_BUILDER_IMAGE) -registry $(BUILD_REGISTRY) -appInsightsID $(PROD_AI)
+      #           Save-Image -imageName retina-agent -registry $(BUILD_REGISTRY)
 
-          - task: PublishBuildArtifacts@1
-            inputs:
-              artifactName: output
-              pathtoPublish: ./output
-            condition: succeeded()
+      #     - task: PublishBuildArtifacts@1
+      #       inputs:
+      #         artifactName: output
+      #         pathtoPublish: ./output
+      #       condition: succeeded()
