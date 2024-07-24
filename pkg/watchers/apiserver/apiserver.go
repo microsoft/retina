@@ -26,6 +26,9 @@ func (w *Watcher) Name() string {
 
 // Start the apiserver watcher.
 func (w *Watcher) Start(ctx context.Context) error {
+	if w.filtermanager == nil {
+		w.filtermanager = getFilterManager()
+	}
 	ticker := time.NewTicker(w.refreshRate)
 	for {
 		select {
