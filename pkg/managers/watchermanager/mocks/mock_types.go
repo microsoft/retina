@@ -16,96 +16,45 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockIWatcher is a mock of IWatcher interface.
-type MockIWatcher struct {
+// MockWatcher is a mock of Watcher interface.
+type MockWatcher struct {
 	ctrl     *gomock.Controller
-	recorder *MockIWatcherMockRecorder
+	recorder *MockWatcherMockRecorder
 }
 
-// MockIWatcherMockRecorder is the mock recorder for MockIWatcher.
-type MockIWatcherMockRecorder struct {
-	mock *MockIWatcher
+// MockWatcherMockRecorder is the mock recorder for MockWatcher.
+type MockWatcherMockRecorder struct {
+	mock *MockWatcher
 }
 
-// NewMockIWatcher creates a new mock instance.
-func NewMockIWatcher(ctrl *gomock.Controller) *MockIWatcher {
-	mock := &MockIWatcher{ctrl: ctrl}
-	mock.recorder = &MockIWatcherMockRecorder{mock}
+// NewMockWatcher creates a new mock instance.
+func NewMockWatcher(ctrl *gomock.Controller) *MockWatcher {
+	mock := &MockWatcher{ctrl: ctrl}
+	mock.recorder = &MockWatcherMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockIWatcher) EXPECT() *MockIWatcherMockRecorder {
+func (m *MockWatcher) EXPECT() *MockWatcherMockRecorder {
 	return m.recorder
 }
 
-// Init mocks base method.
-func (m *MockIWatcher) Init(ctx context.Context) error {
+// Name mocks base method.
+func (m *MockWatcher) Name() string {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Init", ctx)
-	ret0, _ := ret[0].(error)
+	ret := m.ctrl.Call(m, "Name")
+	ret0, _ := ret[0].(string)
 	return ret0
 }
 
-// Init indicates an expected call of Init.
-func (mr *MockIWatcherMockRecorder) Init(ctx any) *gomock.Call {
+// Name indicates an expected call of Name.
+func (mr *MockWatcherMockRecorder) Name() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Init", reflect.TypeOf((*MockIWatcher)(nil).Init), ctx)
-}
-
-// Refresh mocks base method.
-func (m *MockIWatcher) Refresh(ctx context.Context) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Refresh", ctx)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Refresh indicates an expected call of Refresh.
-func (mr *MockIWatcherMockRecorder) Refresh(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Refresh", reflect.TypeOf((*MockIWatcher)(nil).Refresh), ctx)
-}
-
-// Stop mocks base method.
-func (m *MockIWatcher) Stop(ctx context.Context) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Stop", ctx)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Stop indicates an expected call of Stop.
-func (mr *MockIWatcherMockRecorder) Stop(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockIWatcher)(nil).Stop), ctx)
-}
-
-// MockIWatcherManager is a mock of IWatcherManager interface.
-type MockIWatcherManager struct {
-	ctrl     *gomock.Controller
-	recorder *MockIWatcherManagerMockRecorder
-}
-
-// MockIWatcherManagerMockRecorder is the mock recorder for MockIWatcherManager.
-type MockIWatcherManagerMockRecorder struct {
-	mock *MockIWatcherManager
-}
-
-// NewMockIWatcherManager creates a new mock instance.
-func NewMockIWatcherManager(ctrl *gomock.Controller) *MockIWatcherManager {
-	mock := &MockIWatcherManager{ctrl: ctrl}
-	mock.recorder = &MockIWatcherManagerMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockIWatcherManager) EXPECT() *MockIWatcherManagerMockRecorder {
-	return m.recorder
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Name", reflect.TypeOf((*MockWatcher)(nil).Name))
 }
 
 // Start mocks base method.
-func (m *MockIWatcherManager) Start(ctx context.Context) error {
+func (m *MockWatcher) Start(ctx context.Context) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Start", ctx)
 	ret0, _ := ret[0].(error)
@@ -113,13 +62,13 @@ func (m *MockIWatcherManager) Start(ctx context.Context) error {
 }
 
 // Start indicates an expected call of Start.
-func (mr *MockIWatcherManagerMockRecorder) Start(ctx any) *gomock.Call {
+func (mr *MockWatcherMockRecorder) Start(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockIWatcherManager)(nil).Start), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockWatcher)(nil).Start), ctx)
 }
 
 // Stop mocks base method.
-func (m *MockIWatcherManager) Stop(ctx context.Context) error {
+func (m *MockWatcher) Stop(ctx context.Context) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Stop", ctx)
 	ret0, _ := ret[0].(error)
@@ -127,7 +76,58 @@ func (m *MockIWatcherManager) Stop(ctx context.Context) error {
 }
 
 // Stop indicates an expected call of Stop.
-func (mr *MockIWatcherManagerMockRecorder) Stop(ctx any) *gomock.Call {
+func (mr *MockWatcherMockRecorder) Stop(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockIWatcherManager)(nil).Stop), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockWatcher)(nil).Stop), ctx)
+}
+
+// MockManager is a mock of Manager interface.
+type MockManager struct {
+	ctrl     *gomock.Controller
+	recorder *MockManagerMockRecorder
+}
+
+// MockManagerMockRecorder is the mock recorder for MockManager.
+type MockManagerMockRecorder struct {
+	mock *MockManager
+}
+
+// NewMockManager creates a new mock instance.
+func NewMockManager(ctrl *gomock.Controller) *MockManager {
+	mock := &MockManager{ctrl: ctrl}
+	mock.recorder = &MockManagerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockManager) EXPECT() *MockManagerMockRecorder {
+	return m.recorder
+}
+
+// Start mocks base method.
+func (m *MockManager) Start(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Start", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Start indicates an expected call of Start.
+func (mr *MockManagerMockRecorder) Start(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockManager)(nil).Start), ctx)
+}
+
+// Stop mocks base method.
+func (m *MockManager) Stop(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Stop", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Stop indicates an expected call of Stop.
+func (mr *MockManagerMockRecorder) Stop(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockManager)(nil).Stop), ctx)
 }

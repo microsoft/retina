@@ -5,29 +5,14 @@ import (
 	"syscall"
 
 	"github.com/microsoft/retina/pkg/common"
-	"github.com/microsoft/retina/pkg/log"
-	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/microsoft/retina/pkg/watchers/endpoint"
 	"github.com/pkg/errors"
 	"github.com/vishvananda/netlink"
 	"go.uber.org/zap"
 )
 
-type Watcher struct {
-	l *log.ZapLogger
-	p pubsub.PubSubInterface
-}
-
-var watcher *Watcher
-
-func NewWatcher() *Watcher {
-	if watcher == nil {
-		watcher = &Watcher{
-			l: log.Logger().Named("veth-watcher"),
-			p: pubsub.New(),
-		}
-	}
-	return watcher
+func (w *Watcher) Name() string {
+	return watcherName
 }
 
 func (w *Watcher) Start(ctx context.Context) error {
@@ -75,4 +60,9 @@ func (w *Watcher) Start(ctx context.Context) error {
 			}
 		}
 	}
+}
+
+func (w *Watcher) Stop(_ context.Context) error {
+	w.l.Info("stopping veth watcher")
+	return nil
 }

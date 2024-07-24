@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/retina/pkg/managers/watchermanager"
 	"github.com/microsoft/retina/pkg/watchers/apiserver"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
 func main() {
@@ -21,7 +22,8 @@ func main() {
 	log.SetupZapLogger(opts)
 	l := log.Logger().Named("test-apiserver")
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// Filtermanager.
 	f, err := filtermanager.Init(5)
@@ -36,14 +38,14 @@ func main() {
 	}()
 	// watcher manager
 	wm := watchermanager.NewWatcherManager()
-	wm.Watchers = []watchermanager.IWatcher{apiserver.Watcher()}
+	wm.Watchers = []watchermanager.Watcher{apiserver.NewWatcher()}
 
 	// apiserver watcher.
-	err = wm.Start(ctx)
-	if err != nil {
-		l.Error("Failed to start watcher manager", zap.Error(err))
-		panic(err)
-	}
+	g, ctx := errgroup.WithContext(ctx)
+	// Start watcher manager
+	g.Go(func() error {
+		return wm.Start(ctx)
+	})
 
 	// Sleep 1 minute.
 	time.Sleep(60 * time.Second)

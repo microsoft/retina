@@ -12,29 +12,32 @@ import (
 	"github.com/microsoft/retina/pkg/managers/watchermanager"
 	"github.com/microsoft/retina/pkg/watchers/endpoint"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
 func main() {
 	opts := log.GetDefaultLogOpts()
 	opts.Level = "debug"
 	log.SetupZapLogger(opts)
-	l := log.Logger().Named("test-veth")
+	l := log.Logger().Named("test-endpoint-watcher")
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// watcher manager
 	wm := watchermanager.NewWatcherManager()
-	wm.Watchers = []watchermanager.IWatcher{endpoint.Watcher()}
+	wm.Watchers = []watchermanager.Watcher{endpoint.NewWatcher()}
 
-	err := wm.Start(ctx)
-	if err != nil {
-		panic(err)
-	}
+	g, ctx := errgroup.WithContext(ctx)
+	// Start watcher manager
+	g.Go(func() error {
+		return wm.Start(ctx)
+	})
 
 	// Sleep 1 minute.
-	time.Sleep(60 * time.Second)
+	time.Sleep(60 * time.Second) // nolint:gomnd // Sleep is used for testing purposes.
 
-	err = wm.Stop(ctx)
+	err := wm.Stop(ctx)
 	if err != nil {
 		l.Error("Failed to start watcher manager", zap.Error(err))
 		panic(err)

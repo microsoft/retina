@@ -37,8 +37,8 @@ var (
 	}
 )
 
-func setupWatcherManagerMock(ctl *gomock.Controller) (m *watchermock.MockIWatcherManager) {
-	m = watchermock.NewMockIWatcherManager(ctl)
+func setupWatcherManagerMock(ctl *gomock.Controller) (m *watchermock.MockManager) {
+	m = watchermock.NewMockManager(ctl)
 	m.EXPECT().Start(gomock.Any()).Return(nil).AnyTimes()
 	m.EXPECT().Stop(gomock.Any()).Return(nil).AnyTimes()
 	return
@@ -438,7 +438,7 @@ func TestWatcherManagerFailure(t *testing.T) {
 	defer ctl.Finish()
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 
-	m := watchermock.NewMockIWatcherManager(ctl)
+	m := watchermock.NewMockManager(ctl)
 	m.EXPECT().Start(gomock.Any()).Return(errors.New("error")).AnyTimes()
 
 	mgr := &PluginManager{

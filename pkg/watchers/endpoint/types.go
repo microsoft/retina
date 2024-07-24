@@ -3,10 +3,43 @@
 
 package endpoint
 
-const (
-	endpointCreated string = "endpoint_created"
-	endpointDeleted string = "endpoint_deleted"
+import (
+	"time"
+
+	"github.com/microsoft/retina/pkg/log"
+	"github.com/microsoft/retina/pkg/pubsub"
 )
+
+const (
+	watcherName        string = "endpoint-watcher"
+	endpointCreated    string = "endpoint_created"
+	endpointDeleted    string = "endpoint_deleted"
+	defaultRefreshRate        = 30 * time.Second
+)
+
+type Watcher struct {
+	l           *log.ZapLogger
+	current     cache
+	new         cache
+	p           pubsub.PubSubInterface
+	refreshRate time.Duration
+}
+
+var w *Watcher
+
+// NewEndpointWatcher creates a new endpoint watcher.
+func NewWatcher() *Watcher {
+	if w == nil {
+		w = &Watcher{
+			l:           log.Logger().Named(watcherName),
+			p:           pubsub.New(),
+			current:     make(cache),
+			refreshRate: defaultRefreshRate,
+		}
+	}
+
+	return w
+}
 
 type key struct {
 	name         string

@@ -9,77 +9,24 @@ import (
 	"errors"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/stretchr/testify/assert"
 	"github.com/vishvananda/netlink"
+	"golang.org/x/sync/errgroup"
 )
 
 func TestGetWatcher(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 
-	v := Watcher()
-	assert.NotNil(t, v)
+	w1 := NewWatcher()
+	assert.NotNil(t, w1)
 
-	v_again := Watcher()
-	assert.Equal(t, v, v_again, "Expected the same veth watcher instance")
-}
-
-func TestEndpointWatcherStart(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
-	c := context.Background()
-
-	// When veth is already running.
-	v := &EndpointWatcher{
-		isRunning: true,
-		l:         log.Logger().Named("veth-watcher"),
-	}
-	err := v.Init(c)
-	assert.NoError(t, err, "Expected no error when starting a running veth watcher")
-	assert.Equal(t, true, v.isRunning, "Expected veth watcher to be running")
-
-	// When veth is not running.
-	v.isRunning = false
-	err = v.Init(c)
-	assert.NoError(t, err, "Expected no error when starting a stopped veth watcher")
-	assert.Equal(t, true, v.isRunning, "Expected veth watcher to be running")
-
-	// Stop the watcher.
-	err = v.Stop(c)
-	assert.NoError(t, err, "Expected no error when stopping a running veth watcher")
-
-	// Restart the watcher.
-	err = v.Init(c)
-	assert.NoError(t, err, "Expected no error when starting a stopped veth watcher")
-	assert.Equal(t, true, v.isRunning, "Expected veth watcher to be running")
-
-	// Stop the watcher.
-	err = v.Stop(c)
-	assert.NoError(t, err, "Expected no error when stopping a running veth watcher")
-}
-
-func TestEndpointWatcherStop(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
-	c := context.Background()
-
-	// When veth is already stopped.
-	v := &EndpointWatcher{
-		isRunning: false,
-		l:         log.Logger().Named("veth-watcher"),
-	}
-	err := v.Stop(c)
-	assert.NoError(t, err, "Expected no error when stopping a stopped veth watcher")
-	assert.Equal(t, false, v.isRunning, "Expected veth watcher to be stopped")
-
-	// Start the watcher.
-	err = v.Init(c)
-	assert.NoError(t, err, "Expected no error when starting a stopped veth watcher")
-
-	// Stop the watcher.
-	err = v.Stop(c)
-	assert.NoError(t, err, "Expected no error when stopping a running veth watcher")
-	assert.Equal(t, false, v.isRunning, "Expected veth watcher to be stopped")
+	w2 := NewWatcher()
+	assert.NotNil(t, w2)
+	assert.Equal(t, w1, w2, "Expected the same veth watcher instance")
 }
 
 func TestRun(t *testing.T) {
@@ -123,7 +70,7 @@ func TestDiffCache(t *testing.T) {
 			Name: "veth1",
 		},
 	}
-	e := &EndpointWatcher{current: old, new: new}
+	e := &Watcher{current: old, new: new, refreshRate: 5 * time.Second}
 	c, d := e.diffCache()
 	assert.Equal(t, 1, len(c), "Expected to find 1 created veth")
 	assert.Equal(t, 1, len(d), "Expected to find 1 deleted veth")
@@ -131,9 +78,10 @@ func TestDiffCache(t *testing.T) {
 	assert.Equal(t, "veth0", d[0].(netlink.LinkAttrs).Name, "Expected to find veth0")
 }
 
-func TestRefreshAndCallback(t *testing.T) {
+func TestStartAndCallback(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
-	c := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
 
 	showLink = func() ([]netlink.Link, error) {
 		return []netlink.Link{
@@ -171,48 +119,56 @@ func TestRefreshAndCallback(t *testing.T) {
 		},
 	}
 
-	v := &EndpointWatcher{
-		isRunning: true,
-		current:   cache,
-		l:         log.Logger().Named("veth-watcher"),
-		p:         pubsub.New(),
+	w := &Watcher{
+		current:     cache,
+		l:           log.Logger().Named(watcherName),
+		p:           pubsub.New(),
+		refreshRate: 5 * time.Second,
 	}
 
-	// When cache is empty.
-	assert.Equal(t, 1, len(v.current), "Expected to find 0 veths")
+	// When cache only has 1 veth.
+	assert.Len(t, w.current, 1, "Expected to find 1 veths")
 
-	// Post refresh.
-	err := v.Refresh(c)
+	// Start watcher manager
+	var err error
+	g, ctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		err = w.Start(ctx)
+		return err
+	})
+	// Sleep 10 seconds for the watcher to refresh the cache.
+	time.Sleep(10 * time.Second)
 	assert.NoError(t, err, "Expected no error when refreshing veth cache")
-	assert.Equal(t, 2, len(v.current), "Expected to find 2 veths")
-	assert.Equal(t, "veth0", v.current[key{
+	assert.Len(t, w.current, 2, "Expected to find 2 veths")
+	assert.Equal(t, "veth0", w.current[key{
 		name:         "veth0",
 		hardwareAddr: "00:00:00:00:00:00",
 		netNsID:      0,
 	}].(netlink.LinkAttrs).Name, "Expected to find veth0")
-	assert.Equal(t, "veth1", v.current[key{
+	assert.Equal(t, "veth1", w.current[key{
 		name:         "veth1",
 		hardwareAddr: "00:00:00:00:00:01",
 		netNsID:      1,
 	}].(netlink.LinkAttrs).Name, "Expected to find veth1")
 }
 
-func TestRefreshError(t *testing.T) {
+func TestStartError(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
-	c := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
 
 	showLink = func() ([]netlink.Link, error) {
 		return nil, errors.New("error")
 	}
 
-	v := &EndpointWatcher{
-		isRunning: true,
-		current:   make(cache),
-		l:         log.Logger().Named("veth-watcher"),
-		p:         pubsub.New(),
+	w := &Watcher{
+		current:     make(cache),
+		l:           log.Logger().Named(watcherName),
+		p:           pubsub.New(),
+		refreshRate: 5 * time.Second,
 	}
 
-	err := v.Refresh(c)
+	err := w.Start(ctx)
 	assert.Error(t, err, "Expected an error when refreshing veth cache")
 }
 

@@ -21,6 +21,3 @@ spec:
         image: mcr.microsoft.com/mirror/docker/library/nginx:1.23
         ports:
         - containerPort: 80
-      nodeSelector:
-        # kubernetes.io/hostname: aks-nodepool1-29238948-vmss000000
-        # kubernetes.io/hostname: aks-arm64-36093013-vmss000000

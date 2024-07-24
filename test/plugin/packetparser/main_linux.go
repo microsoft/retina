@@ -10,6 +10,7 @@ import (
 	"time"
 
 	kcfg "github.com/microsoft/retina/pkg/config"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/managers/filtermanager"
@@ -54,12 +55,13 @@ func main() {
 
 	// watcher manager
 	wm := watchermanager.NewWatcherManager()
-	wm.Watchers = []watchermanager.IWatcher{endpoint.Watcher()}
+	wm.Watchers = []watchermanager.Watcher{endpoint.NewWatcher()}
 
-	err := wm.Start(ctxTimeout)
-	if err != nil {
-		panic(err)
-	}
+	g, ctx := errgroup.WithContext(ctxTimeout)
+	// Start watcher manager
+	g.Go(func() error {
+		return wm.Start(ctx)
+	})
 
 	defer func() {
 		if err := wm.Stop(ctxTimeout); err != nil {

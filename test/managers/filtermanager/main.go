@@ -20,6 +20,7 @@ import (
 	"github.com/microsoft/retina/pkg/watchers/apiserver"
 	"github.com/microsoft/retina/pkg/watchers/endpoint"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
 func main() {
@@ -34,17 +35,18 @@ func main() {
 
 	metrics.InitializeMetrics()
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// watcher manager
 	wm := watchermanager.NewWatcherManager()
-	wm.Watchers = []watchermanager.IWatcher{endpoint.Watcher(), apiserver.Watcher()}
+	wm.Watchers = []watchermanager.Watcher{endpoint.NewWatcher(), apiserver.NewWatcher()}
 
-	err := wm.Start(ctx)
-	if err != nil {
-		l.Error("Failed to start endpoint watcher", zap.Error(err))
-		panic(err)
-	}
+	g, ctx := errgroup.WithContext(ctx)
+	// Start watcher manager
+	g.Go(func() error {
+		return wm.Start(ctx)
+	})
 	defer func() {
 		if err := wm.Stop(ctx); err != nil {
 			l.Error("Failed to stop endpoint watcher", zap.Error(err))

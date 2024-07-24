@@ -9,7 +9,7 @@ import (
 	"github.com/Microsoft/hcsshim/hcn"
 )
 
-func (e *EndpointWatcher) initNewCache() error {
+func (w *Watcher) initNewCache() error {
 	return nil
 }
 
