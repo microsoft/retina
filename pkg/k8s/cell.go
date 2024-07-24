@@ -16,7 +16,6 @@ import (
 	slim_networkingv1 "github.com/cilium/cilium/pkg/k8s/slim/k8s/api/networking/v1"
 	"github.com/cilium/cilium/pkg/k8s/synced"
 	"github.com/cilium/cilium/pkg/k8s/types"
-	"github.com/cilium/cilium/pkg/k8s/watchers"
 	"github.com/cilium/cilium/pkg/node"
 	"github.com/cilium/cilium/pkg/option"
 	"github.com/microsoft/retina/pkg/common"
@@ -69,9 +68,9 @@ var Cell = cell.Module(
 		func() daemonk8s.EndpointsNonHeadless {
 			return &fakeresource[*ciliumk8s.Endpoints]{}
 		},
-		func() watchers.WatcherConfiguration {
-			return &watcherconfig{}
-		},
+		// func() watchers.WatcherConfiguration {
+		// 	return &watcherconfig{}
+		// },
 	),
 
 	cell.Provide(func(lc cell.Lifecycle, cs client.Clientset) (resource.Resource[*ciliumk8s.Endpoints], error) {
@@ -124,7 +123,7 @@ var Cell = cell.Module(
 
 	synced.Cell,
 
-	cell.Provide(NewWatcher),
+	// cell.Provide(NewWatcher),
 
 	cell.Provide(newAPIServerEventHandler),
 	cell.Invoke(func(a *APIServerEventHandler) {

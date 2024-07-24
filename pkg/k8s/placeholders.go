@@ -8,7 +8,7 @@ import (
 	"time"
 
 	datapathtypes "github.com/cilium/cilium/pkg/datapath/types"
-	"github.com/cilium/cilium/pkg/endpoint"
+	// "github.com/cilium/cilium/pkg/endpoint"
 	"github.com/cilium/cilium/pkg/identity"
 	"github.com/cilium/cilium/pkg/identity/cache"
 	"github.com/cilium/cilium/pkg/ipcache"
@@ -51,25 +51,25 @@ func (w *internalconfigs) K8sGatewayAPIEnabled() bool {
 
 type epmgr struct{}
 
-func (e *epmgr) LookupCEPName(string) *endpoint.Endpoint {
-	return nil
-}
+// func (e *epmgr) LookupCEPName(string) *endpoint.Endpoint {
+// 	return nil
+// }
 
-func (e *epmgr) GetEndpoints() []*endpoint.Endpoint {
-	return nil
-}
+// func (e *epmgr) GetEndpoints() []*endpoint.Endpoint {
+// 	return nil
+// }
 
-func (e *epmgr) GetHostEndpoint() *endpoint.Endpoint {
-	return nil
-}
+// func (e *epmgr) GetHostEndpoint() *endpoint.Endpoint {
+// 	return nil
+// }
 
-func (e *epmgr) GetEndpointsByPodName(string) []*endpoint.Endpoint {
-	return nil
-}
+// func (e *epmgr) GetEndpointsByPodName(string) []*endpoint.Endpoint {
+// 	return nil
+// }
 
-func (e *epmgr) WaitForEndpointsAtPolicyRev(context.Context, uint64) error {
-	return nil
-}
+// func (e *epmgr) WaitForEndpointsAtPolicyRev(context.Context, uint64) error {
+// 	return nil
+// }
 
 func (e *epmgr) UpdatePolicyMaps(context.Context, *sync.WaitGroup) *sync.WaitGroup {
 	return nil

@@ -15,15 +15,16 @@ import (
 	"github.com/microsoft/retina/pkg/managers/pluginmanager"
 	"github.com/microsoft/retina/pkg/managers/servermanager"
 
-	retinak8s "github.com/microsoft/retina/pkg/k8s"
+	// retinak8s "github.com/microsoft/retina/pkg/k8s"
 
 	"github.com/cilium/cilium/pkg/hive/cell"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/cilium/pkg/ipcache"
 	"github.com/cilium/cilium/pkg/k8s"
+
+	// "github.com/cilium/cilium/pkg/k8s"
 	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
-	"github.com/cilium/cilium/pkg/k8s/watchers"
-	monitoragent "github.com/cilium/cilium/pkg/monitor/agent"
+	// monitoragent "github.com/cilium/cilium/pkg/monitor/agent"
 	"github.com/cilium/cilium/pkg/node"
 	"github.com/cilium/workerpool"
 
@@ -98,13 +99,13 @@ var (
 type Daemon struct {
 	clientset k8sClient.Clientset
 
-	log            logrus.FieldLogger
-	monitorAgent   monitoragent.Agent
-	pluginManager  *pluginmanager.PluginManager
-	HTTPServer     *servermanager.HTTPServer
-	client         client.Client
-	eventChan      chan *v1.Event
-	k8swatcher     *watchers.K8sWatcher
+	log logrus.FieldLogger
+	// monitorAgent  monitoragent.Agent
+	pluginManager *pluginmanager.PluginManager
+	HTTPServer    *servermanager.HTTPServer
+	client        client.Client
+	eventChan     chan *v1.Event
+	// k8swatcher     *watchers.K8sWatcher
 	localNodeStore *node.LocalNodeStore
 	ipc            *ipcache.IPCache
 	svcCache       *k8s.ServiceCache
@@ -112,14 +113,14 @@ type Daemon struct {
 
 func newDaemon(params *daemonParams) *Daemon {
 	return &Daemon{
-		monitorAgent:   params.MonitorAgent,
-		pluginManager:  params.PluginManager,
-		HTTPServer:     params.HTTPServer,
-		clientset:      params.Clientset,
-		log:            params.Log,
-		client:         params.Client,
-		eventChan:      params.EventChan,
-		k8swatcher:     params.K8sWatcher,
+		// monitorAgent:  nil,
+		pluginManager: params.PluginManager,
+		HTTPServer:    params.HTTPServer,
+		clientset:     params.Clientset,
+		log:           params.Log,
+		client:        params.Client,
+		eventChan:     params.EventChan,
+		// k8swatcher:     params.K8sWatcher,
 		localNodeStore: params.Lnds,
 		ipc:            params.IPC,
 		svcCache:       params.SvcCache,
@@ -132,7 +133,7 @@ func (d *Daemon) Run(ctx context.Context) error {
 
 	// Start K8s watcher. Will block till sync is complete or timeout.
 	// If sync doesn't complete within timeout (3 minutes), causes fatal error.
-	retinak8s.Start(ctx, d.k8swatcher)
+	// retinak8s.Start(ctx, nil)
 
 	go d.generateEvents(ctx)
 	return nil
@@ -145,10 +146,10 @@ func (d *Daemon) generateEvents(ctx context.Context) {
 			return
 		case event := <-d.eventChan:
 			d.log.WithField("event", event).Debug("Sending event to monitor agent")
-			err := d.monitorAgent.SendEvent(0, event)
-			if err != nil {
-				d.log.WithError(err).Error("Unable to send event to monitor agent")
-			}
+			// err := d.monitorAgent.SendEvent(0, event)
+			// if err != nil {
+			// 	d.log.WithError(err).Error("Unable to send event to monitor agent")
+			// }
 		}
 	}
 }

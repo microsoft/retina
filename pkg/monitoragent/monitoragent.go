@@ -6,11 +6,11 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"reflect"
 
 	"github.com/cilium/cilium/api/v1/models"
 	"github.com/cilium/cilium/pkg/lock"
 	"github.com/cilium/cilium/pkg/monitor/agent/consumer"
-	"github.com/cilium/cilium/pkg/monitor/agent/listener"
 	"github.com/cilium/cilium/pkg/monitor/api"
 	"github.com/cilium/cilium/pkg/monitor/payload"
 	"github.com/sirupsen/logrus"
@@ -20,6 +20,27 @@ var (
 	errMonitorAgentNotSetup = fmt.Errorf("monitor agent is not set up")
 	errUnexpectedEvent      = errors.New("unexpected event type for MessageTypeAgent")
 )
+
+type EnqueuerCloser interface {
+	Enqueue(pl *payload.Payload)
+	Close()
+}
+
+// the original version of MonitorListener has an enum type to represent
+// "Version" with an underlying Kind of string. We cannot import
+// "github.com/cilium/cilium/pkg/monitor/agent/listener" because it breaks
+// windows compatibility (it depends on "golang.org/x/sys/unix"). To avoid this
+// problematic Version method, we use reflection to dig the string out of it
+// and use EnqueuerCloser to use the other methods we care about as per usual.
+func extractVersion(ec EnqueuerCloser) string {
+	val := reflect.ValueOf(ec)
+	method := val.MethodByName("Version")
+	if method.IsValid() {
+		versionValue := method.Call(nil)[0]
+		return versionValue.String()
+	}
+	return "unsupported"
+}
 
 // isCtxDone is a utility function that returns true when the context's Done()
 // channel is closed. It is intended to simplify goroutines that need to check
@@ -42,7 +63,7 @@ type monitorAgent struct {
 
 	// listeners are external cilium monitor clients which receive raw
 	// gob-encoded payloads
-	listeners map[listener.MonitorListener]struct{}
+	listeners map[EnqueuerCloser]struct{}
 	// consumers are internal clients which receive decoded messages
 	consumers map[consumer.MonitorConsumer]struct{}
 }
@@ -98,7 +119,7 @@ func (a *monitorAgent) SendEvent(typ int, event interface{}) error {
 	return nil
 }
 
-func (a *monitorAgent) RegisterNewListener(newListener listener.MonitorListener) {
+func (a *monitorAgent) RegisterNewListener(newListener EnqueuerCloser) {
 	if a == nil || newListener == nil {
 		return
 	}
@@ -112,9 +133,9 @@ func (a *monitorAgent) RegisterNewListener(newListener listener.MonitorListener)
 		return
 	}
 
-	version := newListener.Version()
-	switch newListener.Version() { //nolint:exhaustive // the only other case is unsupported which is covered by default
-	case listener.Version1_2:
+	version := extractVersion(newListener)
+	switch version { //nolint:exhaustive // the only other case is unsupported which is covered by default
+	case "1.2":
 		a.listeners[newListener] = struct{}{}
 	default:
 		newListener.Close()
@@ -127,7 +148,7 @@ func (a *monitorAgent) RegisterNewListener(newListener listener.MonitorListener)
 	}).Debug("New listener connected")
 }
 
-func (a *monitorAgent) RemoveListener(ml listener.MonitorListener) {
+func (a *monitorAgent) RemoveListener(ml EnqueuerCloser) {
 	if a == nil || ml == nil {
 		return
 	}
@@ -139,7 +160,7 @@ func (a *monitorAgent) RemoveListener(ml listener.MonitorListener) {
 	delete(a.listeners, ml)
 	log.WithFields(logrus.Fields{
 		"count.listener": len(a.listeners),
-		"version":        ml.Version(),
+		"version":        extractVersion(ml),
 	}).Debug("Removed listener")
 	ml.Close()
 }
