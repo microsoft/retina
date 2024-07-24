@@ -7,9 +7,8 @@ FROM  --platform=windows/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.22-wi
 WORKDIR C:\\retina
 COPY go.mod .
 COPY go.sum .
-ENV CGO_ENABLED=1
+ENV CGO_ENABLED=0
 RUN go mod download
-RUN go mod verify
 ADD . .
 ARG VERSION
 ARG APP_INSIGHTS_ID

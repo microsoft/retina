@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 
-	"github.com/cilium/cilium/api/v1/flow"
 	observerv1 "github.com/cilium/cilium/api/v1/observer"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	kcfg "github.com/microsoft/retina/pkg/config"
@@ -28,6 +28,10 @@ var (
 	ErrUnexpectedExit = errors.New("unexpected exit")
 
 	socket = "/temp/retina-pktmon.sock"
+
+	truncationSize   = 128
+	bufferSize       = 9000
+	bufferMultiplier = 10
 )
 
 const (
@@ -79,7 +83,14 @@ func NewClient() (*Client, error) {
 
 	retryPolicyStr := string(bytes)
 
-	conn, err := grpc.Dial(fmt.Sprintf("%s:%s", "unix", socket), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultServiceConfig(retryPolicyStr))
+	maxRequestBodySize := 40
+	var opts []grpc.CallOption
+	opts = append(opts, grpc.MaxCallRecvMsgSize(maxRequestBodySize*1024*1024))
+
+	conn, err := grpc.Dial(fmt.Sprintf("%s:%s", "unix", socket),
+		grpc.WithDefaultCallOptions(opts...),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultServiceConfig(retryPolicyStr))
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial pktmon server: %w", err)
 	}
@@ -94,6 +105,9 @@ func (p *Plugin) RunPktMonServer() error {
 	defer p.errWriter.Close()
 	p.pktmonCmd = exec.Command("controller-pktmon.exe")
 	p.pktmonCmd.Args = append(p.pktmonCmd.Args, "--socketpath", socket)
+	p.pktmonCmd.Args = append(p.pktmonCmd.Args, "--buffer-multiplier", strconv.Itoa(bufferMultiplier))
+	p.pktmonCmd.Args = append(p.pktmonCmd.Args, "--truncation-size", strconv.Itoa(truncationSize))
+	p.pktmonCmd.Args = append(p.pktmonCmd.Args, "--buffer-size", strconv.Itoa(bufferSize))
 	p.pktmonCmd.Env = os.Environ()
 	p.pktmonCmd.Stdout = p.stdWriter
 	p.pktmonCmd.Stderr = p.errWriter
@@ -176,19 +190,6 @@ func (p *Plugin) GetFlow(str observerv1.Observer_GetFlowsClient) error {
 	ev := &v1.Event{
 		Event:     fl,
 		Timestamp: fl.GetTime(),
-	}
-
-	if fl.GetType() == flow.FlowType_L7 {
-		dns := fl.GetL7().GetDns()
-		if dns != nil {
-			query := dns.GetQuery()
-			ans := dns.GetIps()
-			if dns.GetQtypes()[0] == "Q" {
-				p.l.Sugar().Debugf("query from %s to %s: request %s\n", fl.GetIP().GetSource(), fl.GetIP().GetDestination(), query)
-			} else {
-				p.l.Sugar().Debugf("answer from %s to %s: result: %+v\n", fl.GetIP().GetSource(), fl.GetIP().GetDestination(), ans)
-			}
-		}
 	}
 
 	if p.enricher != nil {
