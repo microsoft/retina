@@ -26,7 +26,7 @@ func (w *Watcher) Start(ctx context.Context) error {
 	}
 	for _, link := range links {
 		if link.Type() == "veth" {
-			w.l.Info("veth device found", zap.String("device", link.Attrs().Name))
+			w.l.Info("exisiting veth device found", zap.String("device", link.Attrs().Name))
 			w.p.Publish(common.PubSubEndpoints, endpoint.NewEndpointEvent(endpoint.EndpointCreated, *link.Attrs()))
 		}
 	}
@@ -47,15 +47,21 @@ func (w *Watcher) Start(ctx context.Context) error {
 			return nil
 		case ev := <-netlinkEvCh:
 			// Filter for veth devices.
-			w.l.Info("received netlink event", zap.Any("device", linkAttrsToMap(ev.Link.Attrs())))
-			if ev.Link.Attrs().EncapType == "ether" && ev.Link.Type() == "veth" {
+			if ev.Link.Type() == "veth" {
+				veth := ev.Link.(*netlink.Veth)
 				switch ev.Header.Type {
 				case syscall.RTM_NEWLINK:
-					w.l.Info("veth device added", zap.String("device", ev.Link.Attrs().Name))
-					w.p.Publish(common.PubSubEndpoints, endpoint.NewEndpointEvent(endpoint.EndpointCreated, *ev.Link.Attrs()))
+					// Check if the veth device is up.
+					if veth.Attrs().OperState == netlink.OperUp {
+						w.l.Info("new veth device added", zap.String("device", veth.Name), zap.String("peer", veth.PeerName), zap.String("mac", veth.HardwareAddr.String()))
+						w.p.Publish(common.PubSubEndpoints, endpoint.NewEndpointEvent(endpoint.EndpointCreated, *veth.Attrs()))
+					}
 				case syscall.RTM_DELLINK:
-					w.l.Info("veth device deleted", zap.String("device", ev.Link.Attrs().Name))
-					w.p.Publish(common.PubSubEndpoints, endpoint.NewEndpointEvent(endpoint.EndpointDeleted, *ev.Link.Attrs()))
+					// Check if the veth device is down.
+					if veth.Attrs().OperState == netlink.OperDown {
+						w.l.Info("veth device deleted", zap.String("device", veth.Name), zap.String("peer", veth.PeerName), zap.String("mac", veth.HardwareAddr.String()))
+						w.p.Publish(common.PubSubEndpoints, endpoint.NewEndpointEvent(endpoint.EndpointDeleted, *veth.Attrs()))
+					}
 				}
 			}
 		}
@@ -65,41 +71,4 @@ func (w *Watcher) Start(ctx context.Context) error {
 func (w *Watcher) Stop(_ context.Context) error {
 	w.l.Info("stopping veth watcher")
 	return nil
-}
-
-func linkAttrsToMap(attrs *netlink.LinkAttrs) map[string]any {
-	return map[string]any{
-		"Name":           attrs.Name,
-		"HardwareAddr":   attrs.HardwareAddr.String(),
-		"MTU":            attrs.MTU,
-		"Flags":          attrs.Flags.String(),
-		"RawFlags":       attrs.RawFlags,
-		"ParentIndex":    attrs.ParentIndex,
-		"MasterIndex":    attrs.MasterIndex,
-		"Namespace":      attrs.Namespace,
-		"Alias":          attrs.Alias,
-		"AltNames":       attrs.AltNames,
-		"Statistics":     attrs.Statistics,
-		"Promisc":        attrs.Promisc,
-		"Allmulti":       attrs.Allmulti,
-		"Multi":          attrs.Multi,
-		"Xdp":            attrs.Xdp,
-		"EncapType":      attrs.EncapType,
-		"Protinfo":       attrs.Protinfo,
-		"OperState":      attrs.OperState.String(),
-		"PhysSwitchID":   attrs.PhysSwitchID,
-		"NetNsID":        attrs.NetNsID,
-		"NumTxQueues":    attrs.NumTxQueues,
-		"NumRxQueues":    attrs.NumRxQueues,
-		"TSOMaxSegs":     attrs.TSOMaxSegs,
-		"TSOMaxSize":     attrs.TSOMaxSize,
-		"GSOMaxSegs":     attrs.GSOMaxSegs,
-		"GSOMaxSize":     attrs.GSOMaxSize,
-		"GROMaxSize":     attrs.GROMaxSize,
-		"GSOIPv4MaxSize": attrs.GSOIPv4MaxSize,
-		"GROIPv4MaxSize": attrs.GROIPv4MaxSize,
-		"Vfs":            attrs.Vfs,
-		"Group":          attrs.Group,
-		"PermHWAddr":     attrs.PermHWAddr.String(),
-	}
 }
