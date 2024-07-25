@@ -7,7 +7,7 @@ const (
 	// second parameter is the user's network flow logs
 	messagePromptTemplate = `%s
 
-	"summary of network flow logs":
+"summary of network flow logs":
 %s
 `
 )

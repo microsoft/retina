@@ -86,5 +86,5 @@ func endpointName(ep *flowpb.Endpoint) (string, error) {
 	// reserved:world
 	// reserved:host
 	// reserved:kube-apiserver
-	return ep.GetLabels()[0], nil
+	return lbls[0], nil
 }
