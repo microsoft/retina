@@ -66,6 +66,7 @@ jobs:
       matrix:
         platform: ["windows"]
         arch: ["amd64"]
+        year: ["2019", "2022"]
 
     steps:
       - name: Checkout code
@@ -93,16 +94,15 @@ jobs:
           make retina-image-win \
             IMAGE_NAMESPACE=${{ github.repository }} \
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
+            WINDOWS_YEARS=${{ matrix.year }} \
             BUILDX_ACTION=--push
 
       - name: Sign container image
         run: |
-          for year in 2019 2022; do
-            for image in retina-agent ; do
-              IMAGE_PATH="ghcr.io/${{ github.repository }}/$image:$TAG-windows-ltsc$year-${{ matrix.arch }}"
-              DIGEST=$(jq -r '.["containerimage.digest"]' image-metadata-$image-$TAG-windows-ltsc$year-${{ matrix.arch }}.json) 
-              cosign sign --yes ${IMAGE_PATH}@${DIGEST} 
-            done
+          for image in retina-agent ; do
+            IMAGE_PATH="ghcr.io/${{ github.repository }}/$image:$TAG-windows-ltsc${{ matrix.year }}-${{ matrix.arch }}"
+            DIGEST=$(jq -r '.["containerimage.digest"]' image-metadata-$image-$TAG-windows-ltsc${{ matrix.year }}-${{ matrix.arch }}.json) 
+            cosign sign --yes ${IMAGE_PATH}@${DIGEST}
           done
 
   operator-images:

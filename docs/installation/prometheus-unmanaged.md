@@ -15,7 +15,7 @@
   helm repo update
   ```
 
-2. Save **[these Prometheus values](https://github.com/microsoft/retina/blob/main/deploy/prometheus/values.yaml)** below to `deploy/prometheus/values.yaml`
+2. Save **[these Prometheus values](https://github.com/microsoft/retina/blob/main/deploy/legacy/prometheus/values.yaml)** below to `deploy/legacy/prometheus/values.yaml`
 
 3. Install the Prometheus chart
 

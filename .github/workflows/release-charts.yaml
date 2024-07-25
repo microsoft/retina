@@ -16,7 +16,7 @@ jobs:
   push-retina-charts:
     name: Publish Retina Helm Charts
     runs-on: ubuntu-latest
-
+    if: github.ref_type == 'tag'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -40,7 +40,7 @@ jobs:
         run: |
           set -euo pipefail
           export TAG=$(make version)
-          helm package ./deploy/manifests/controller/helm/retina --version $TAG
+          helm package ./deploy/legacy/manifests/controller/helm/retina --version $TAG
           # Get Helm chart's SHA digest from helm push cmd output
           helm push retina-$TAG.tgz oci://ghcr.io/${{ github.repository }}/charts >> helm_push_result.txt 2>&1
           cat helm_push_result.txt

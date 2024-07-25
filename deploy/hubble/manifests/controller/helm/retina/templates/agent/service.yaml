@@ -1,0 +1,16 @@
+{{- if .Values.agent.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "retina.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ include "retina.name" . }}
+spec:
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.retinaPort }}
+  selector:
+    app: {{ include "retina.name" . }}
+
+{{- end}}

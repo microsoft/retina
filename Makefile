@@ -34,12 +34,24 @@ PLATFORM		?= $(OS)/$(ARCH)
 PLATFORMS		?= linux/amd64 linux/arm64 windows/amd64
 OS_VERSION		?= ltsc2019
 
+HUBBLE_VERSION ?= v0.13.0
+
 CONTAINER_BUILDER ?= docker
 CONTAINER_RUNTIME ?= docker
 YEAR 			  ?= 2022
 
 ALL_ARCH.linux = amd64 arm64
 ALL_ARCH.windows = amd64
+
+#######
+# TLS #
+#######
+ENABLE_TLS ?= true
+CERT_DIR := $(REPO_ROOT)/.certs
+
+CERT_FILES := tls.crt:tls-client-cert-file \
+              tls.key:tls-client-key-file \
+              ca.crt:tls-ca-cert-files
 
 # TAG is OS and platform agonstic, which can be used for binary version and image manifest tag,
 # while RETINA_PLATFORM_TAG is platform specific, which can be used for image built for specific platforms.
@@ -236,6 +248,7 @@ container-docker: buildx # util target to build container images using docker bu
 		--build-arg GOARCH=$$arch \
 		--build-arg GOOS=$$os \
 		--build-arg OS_VERSION=$(OS_VERSION) \
+		--build-arg HUBBLE_VERSION=$(HUBBLE_VERSION) \
 		--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
 		--target=$(TARGET) \
 		-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
@@ -376,7 +389,7 @@ HELM_IMAGE_TAG ?= v0.0.2
 
 # basic/node-level mode
 helm-install: manifests
-	helm upgrade --install retina ./deploy/manifests/controller/helm/retina/ \
+	helm upgrade --install retina ./deploy/legacy/manifests/controller/helm/retina/ \
 		--namespace kube-system \
 		--set image.repository=$(IMAGE_REGISTRY)/$(RETINA_IMAGE) \
 		--set image.initRepository=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE) \
@@ -389,7 +402,7 @@ helm-install: manifests
 		--set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\]"
 
 helm-install-with-operator: manifests
-	helm upgrade --install retina ./deploy/manifests/controller/helm/retina/ \
+	helm upgrade --install retina ./deploy/legacy/manifests/controller/helm/retina/ \
 		--namespace kube-system \
 		--set image.repository=$(IMAGE_REGISTRY)/$(RETINA_IMAGE) \
 		--set image.initRepository=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE) \
@@ -406,7 +419,7 @@ helm-install-with-operator: manifests
 
 # advanced/pod-level mode with scale limitations, where metrics are aggregated by source and destination Pod
 helm-install-advanced-remote-context: manifests
-	helm upgrade --install retina ./deploy/manifests/controller/helm/retina/ \
+	helm upgrade --install retina ./deploy/legacy/manifests/controller/helm/retina/ \
 		--namespace kube-system \
 		--set image.repository=$(IMAGE_REGISTRY)/$(RETINA_IMAGE) \
 		--set image.initRepository=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE) \
@@ -425,7 +438,7 @@ helm-install-advanced-remote-context: manifests
 
 # advanced/pod-level mode designed for scale, where metrics are aggregated by "local" Pod (source for outgoing traffic, destination for incoming traffic)
 helm-install-advanced-local-context: manifests
-	helm upgrade --install retina ./deploy/manifests/controller/helm/retina/ \
+	helm upgrade --install retina ./deploy/legacy/manifests/controller/helm/retina/ \
 		--namespace kube-system \
 		--set image.repository=$(IMAGE_REGISTRY)/$(RETINA_IMAGE) \
 		--set image.initRepository=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE) \
@@ -442,8 +455,57 @@ helm-install-advanced-local-context: manifests
 		--set enablePodLevel=true \
 		--set enableAnnotations=true
 
+helm-install-hubble:
+	helm upgrade --install retina ./deploy/hubble/manifests/controller/helm/retina/ \
+		--namespace kube-system \
+		--set os.windows=true \
+		--set operator.enabled=true \
+		--set operator.repository=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE) \
+		--set operator.tag=$(HELM_IMAGE_TAG) \
+		--set agent.enabled=true \
+		--set agent.repository=$(IMAGE_REGISTRY)/$(RETINA_IMAGE) \
+		--set agent.tag=$(HELM_IMAGE_TAG) \
+		--set agent.init.enabled=true \
+		--set agent.init.repository=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE) \
+		--set agent.init.tag=$(HELM_IMAGE_TAG) \
+		--set logLevel=info \
+		--set hubble.tls.enabled=$(ENABLE_TLS) \
+		--set hubble.relay.tls.server.enabled=$(ENABLE_TLS) \
+		--set hubble.tls.auto.enabled=$(ENABLE_TLS) \
+		--set hubble.tls.auto.method=cronJob \
+		--set hubble.tls.auto.certValidityDuration=1 \
+		--set hubble.tls.auto.schedule="*/10 * * * *"	
+
+helm-install-without-tls: clean-certs
+	$(MAKE) helm-install-hubble ENABLE_TLS=false
+
 helm-uninstall:
 	helm uninstall retina -n kube-system
+
+.PHONY: get-certs
+get-certs:
+	mkdir -p $(CERT_DIR)
+	$(foreach kv,$(CERT_FILES),\
+			$(eval FILE=$(word 1,$(subst :, ,$(kv)))) \
+			$(eval CONFIG_KEY=$(word 2,$(subst :, ,$(kv)))) \
+			kubectl get secret $(TLS_SECRET_NAME) \
+				-n kube-system \
+				-o jsonpath="{.data['$(call escape_dot,$(FILE))']}" \
+			| base64 -d > $(CERT_DIR)/$(FILE);\
+			hubble config set $(CONFIG_KEY) $(CERT_DIR)/$(FILE);\
+		)
+	hubble config set tls true
+	hubble config set tls-server-name instance.hubble-relay.cilium.io
+
+.PHONY: clean-certs
+clean-certs:
+	rm -rf $(CERT_DIR)
+	$(foreach kv,$(CERT_FILES),\
+		$(eval CONFIG_KEY=$(word 2,$(subst :, ,$(kv)))) \
+		hubble config reset $(CONFIG_KEY);\
+	)
+	hubble config set tls false
+	hubble config reset tls-server-name
 
 .PHONY: docs
 docs: 
@@ -463,6 +525,12 @@ quick-build:
 quick-deploy:
 	$(MAKE) helm-install-advanced-local-context HELM_IMAGE_TAG=$(TAG)-linux-amd64
 
+.PHONY: quick-deploy-hubble
+quick-deploy-hubble:
+	$(MAKE) helm-uninstall || true
+	$(MAKE) helm-install-without-tls HELM_IMAGE_TAG=$(TAG)-linux-amd64
+
+
 .PHONY: simplify-dashboards
 simplify-dashboards:
-	cd deploy/grafana/dashboards/ && go test . -tags=dashboard,simplifydashboard -v
+	cd deploy/legacy/grafana/dashboards && go test . -tags=dashboard,simplifydashboard -v && cd $(REPO_ROOT)
