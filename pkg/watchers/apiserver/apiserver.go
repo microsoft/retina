@@ -90,7 +90,7 @@ func (w *Watcher) Stop(_ context.Context) error {
 }
 
 func (w *Watcher) initNewCache(ctx context.Context) error {
-	ips, err := w.getApiServerIPs(ctx)
+	ips, err := w.getAPIServerIPs(ctx)
 	if err != nil {
 		return err
 	}
@@ -120,7 +120,7 @@ func (w *Watcher) diffCache() (created, deleted []interface{}) {
 	return
 }
 
-func (w *Watcher) getApiServerIPs(ctx context.Context) ([]string, error) {
+func (w *Watcher) getAPIServerIPs(ctx context.Context) ([]string, error) {
 	// Parse the URL
 	host, err := w.retrieveAPIServerHostname()
 	if err != nil {

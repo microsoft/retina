@@ -19,7 +19,10 @@ import (
 func main() {
 	opts := log.GetDefaultLogOpts()
 	opts.Level = "debug"
-	log.SetupZapLogger(opts)
+	_, err := log.SetupZapLogger(opts)
+	if err != nil {
+		panic(err)
+	}
 	l := log.Logger().Named("test-endpoint-watcher")
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -32,7 +35,7 @@ func main() {
 	g, ctx := errgroup.WithContext(ctx)
 	// Start watcher manager
 	g.Go(func() error {
-		err := wm.Start(ctx)
+		err = wm.Start(ctx)
 		if err != nil {
 			l.Error("watcher manager exited with error", zap.Error(err))
 			return errors.Wrap(err, "watcher manager exited with error")
@@ -43,7 +46,7 @@ func main() {
 	// Sleep 1 minute.
 	time.Sleep(60 * time.Second) // nolint:gomnd // Sleep is used for testing purposes.
 
-	err := wm.Stop(ctx)
+	err = wm.Stop(ctx)
 	if err != nil {
 		l.Error("Failed to start watcher manager", zap.Error(err))
 		panic(err)

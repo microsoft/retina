@@ -36,7 +36,7 @@ func TestStart(t *testing.T) {
 		apiServerURL:  "https://kubernetes.default.svc.cluster.local:443",
 		hostResolver:  mockedResolver,
 		filtermanager: mockedFilterManager,
-		refreshRate:   5 * time.Second,
+		refreshRate:   1 * time.Second,
 	}
 
 	// Return 2 random IPs for the host everytime LookupHost is called.
@@ -66,16 +66,16 @@ func TestDiffCache(t *testing.T) {
 	new["192.168.1.2"] = struct{}{}
 	new["192.168.1.3"] = struct{}{}
 
-	a := &Watcher{
+	w := &Watcher{
 		l:            log.Logger().Named(watcherName),
 		apiServerURL: "https://kubernetes.default.svc.cluster.local:443",
 		hostResolver: mockedResolver,
 		current:      old,
 		new:          new,
-		refreshRate:  5 * time.Second,
+		refreshRate:  1 * time.Second,
 	}
 
-	created, deleted := a.diffCache()
+	created, deleted := w.diffCache()
 	assert.Equal(t, 1, len(created), "Expected 1 created host")
 	assert.Equal(t, 1, len(deleted), "Expected 1 deleted host")
 }
@@ -89,18 +89,20 @@ func TestStartError(t *testing.T) {
 	defer cancel()
 
 	mockedResolver := mocks.NewMockIHostResolver(ctrl)
+	mockedFilterManager := filtermanagermocks.NewMockIFilterManager(ctrl)
 
 	w := &Watcher{
-		l:            log.Logger().Named(watcherName),
-		apiServerURL: "https://kubernetes.default.svc.cluster.local:443",
-		hostResolver: mockedResolver,
-		refreshRate:  5 * time.Second,
+		l:             log.Logger().Named(watcherName),
+		apiServerURL:  "https://kubernetes.default.svc.cluster.local:443",
+		hostResolver:  mockedResolver,
+		filtermanager: mockedFilterManager,
+		refreshRate:   1 * time.Second,
 	}
 
 	mockedResolver.EXPECT().LookupHost(gomock.Any(), gomock.Any()).Return(nil, errors.New("Error")).AnyTimes()
 
 	err := w.Start(ctx)
-	require.NoError(t, err, "Expected error when refreshing the cache")
+	require.Error(t, err, "Expected error when refreshing the cache")
 }
 
 func TestResolveIPEmpty(t *testing.T) {
@@ -117,13 +119,13 @@ func TestResolveIPEmpty(t *testing.T) {
 		l:            log.Logger().Named(watcherName),
 		apiServerURL: "https://kubernetes.default.svc.cluster.local:443",
 		hostResolver: mockedResolver,
-		refreshRate:  5 * time.Second,
+		refreshRate:  1 * time.Second,
 	}
 
 	mockedResolver.EXPECT().LookupHost(gomock.Any(), gomock.Any()).Return([]string{}, nil).AnyTimes()
 
 	err := w.Start(ctx)
-	require.NoError(t, err, "Expected error when refreshing the cache")
+	require.Error(t, err, "Expected error when resolving the IP")
 }
 
 func randomIP() string {

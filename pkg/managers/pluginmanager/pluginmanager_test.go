@@ -451,5 +451,5 @@ func TestWatcherManagerFailure(t *testing.T) {
 
 	err := mgr.Start(context.Background())
 	require.NotNil(t, err, "Expected Start err but got nil")
-	require.ErrorContains(t, err, "failed to start watcher manager", "Expected watcher manager , but got:%w", err)
+	require.ErrorContains(t, err, "watcher manager exited with error", "Expected watcher manager , but got:%w", err)
 }

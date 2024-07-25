@@ -112,7 +112,7 @@ func TestStartAndCallback(t *testing.T) {
 		current:     cache,
 		l:           log.Logger().Named(watcherName),
 		p:           pubsub.New(),
-		refreshRate: 5 * time.Second,
+		refreshRate: 1 * time.Second,
 	}
 
 	// When cache only has 1 veth.
@@ -154,7 +154,7 @@ func TestStartError(t *testing.T) {
 		current:     make(cache),
 		l:           log.Logger().Named(watcherName),
 		p:           pubsub.New(),
-		refreshRate: 5 * time.Second,
+		refreshRate: 1 * time.Second,
 	}
 
 	err := w.Start(ctx)
