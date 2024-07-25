@@ -2,12 +2,13 @@ package flows
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"time"
 
 	"github.com/microsoft/retina/ai/pkg/retrieval/flows/client"
-	"github.com/microsoft/retina/ai/pkg/util"
 
 	flowpb "github.com/cilium/cilium/api/v1/flow"
 	observerpb "github.com/cilium/cilium/api/v1/observer"
@@ -20,12 +21,13 @@ import (
 )
 
 type Retriever struct {
-	log         logrus.FieldLogger
-	config      *rest.Config
-	clientset   *kubernetes.Clientset
-	initialized bool
-	client      *client.Client
-	flows       []*flowpb.Flow
+	log          logrus.FieldLogger
+	config       *rest.Config
+	clientset    *kubernetes.Clientset
+	initialized  bool
+	client       *client.Client
+	readFromFile bool
+	flows        []*flowpb.Flow
 }
 
 func NewRetriever(log logrus.FieldLogger, config *rest.Config, clientset *kubernetes.Clientset) *Retriever {
@@ -36,7 +38,16 @@ func NewRetriever(log logrus.FieldLogger, config *rest.Config, clientset *kubern
 	}
 }
 
+func (r *Retriever) UseFile() {
+	r.readFromFile = true
+}
+
 func (r *Retriever) Init() error {
+	if r.readFromFile {
+		r.log.Info("using flows from file")
+		return nil
+	}
+
 	client, err := client.New()
 	if err != nil {
 		return fmt.Errorf("failed to create grpc client. %v", err)
@@ -49,16 +60,21 @@ func (r *Retriever) Init() error {
 	return nil
 }
 
-func (r *Retriever) Observe(ctx context.Context, maxFlows int) ([]*flowpb.Flow, error) {
+func (r *Retriever) Observe(ctx context.Context, req *observerpb.GetFlowsRequest) ([]*flowpb.Flow, error) {
+	if r.readFromFile {
+		flows, err := readFlowsFromFile("flows.json")
+		if err != nil {
+			return nil, fmt.Errorf("failed to read flows from file. %v", err)
+		}
+
+		return flows, nil
+	}
+
 	if !r.initialized {
 		if err := r.Init(); err != nil {
 			return nil, fmt.Errorf("failed to initialize. %v", err)
 		}
 	}
-
-	// translate parameters to flow request
-	// TODO: use parameters
-	req := flowsRequest()
 
 	// port-forward to hubble-relay
 	portForwardCtx, portForwardCancel := context.WithCancel(ctx)
@@ -73,7 +89,10 @@ func (r *Retriever) Observe(ctx context.Context, maxFlows int) ([]*flowpb.Flow, 
 	// observe flows
 	observeCtx, observeCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer observeCancel()
-	flows, err := r.observeFlowsGRPC(observeCtx, req, maxFlows)
+
+	// FIXME don't use maxFlows anymore? check for EOF? then remove this constant: MaxFlowsToAnalyze
+	maxFlows := req.Number
+	flows, err := r.observeFlowsGRPC(observeCtx, req, int(maxFlows))
 	if err != nil {
 		return nil, fmt.Errorf("failed to observe flows over grpc. %v", err)
 	}
@@ -84,19 +103,13 @@ func (r *Retriever) Observe(ctx context.Context, maxFlows int) ([]*flowpb.Flow, 
 	_ = cmd.Wait()
 	r.log.Info("stopped port-forward")
 
-	return flows, nil
-}
-
-func flowsRequest() *observerpb.GetFlowsRequest {
-	return &observerpb.GetFlowsRequest{
-		Number:    util.MaxFlowsFromHubbleRelay,
-		Follow:    false,
-		Whitelist: []*flowpb.FlowFilter{},
-		Blacklist: nil,
-		Since:     nil,
-		Until:     nil,
-		First:     false,
+	r.log.Info("saving flows to JSON")
+	if err := saveFlowsToJSON(flows, "flows.json"); err != nil {
+		r.log.WithError(err).Error("failed to save flows to JSON")
+		return nil, err
 	}
+
+	return flows, nil
 }
 
 func (r *Retriever) observeFlowsGRPC(ctx context.Context, req *observerpb.GetFlowsRequest, maxFlows int) ([]*flowpb.Flow, error) {
@@ -163,4 +176,42 @@ func (r *Retriever) handleFlow(f *flowpb.Flow) {
 	}
 
 	r.flows = append(r.flows, f)
+}
+
+func saveFlowsToJSON(flows []*flowpb.Flow, filename string) error {
+	for _, f := range flows {
+		// to avoid getting an error:
+		// failed to encode JSON: json: error calling MarshalJSON for type *flow.Flow: proto:\u00a0google.protobuf.Any: unable to resolve \"type.googleapis.com/utils.RetinaMetadata\": not found
+		f.Extensions = nil
+	}
+
+	file, err := os.Create(filename)
+	if err != nil {
+		return fmt.Errorf("failed to create file: %w", err)
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ") // optional: to make the JSON output pretty
+	if err := encoder.Encode(flows); err != nil {
+		return fmt.Errorf("failed to encode JSON: %w", err)
+	}
+
+	return nil
+}
+
+func readFlowsFromFile(filename string) ([]*flowpb.Flow, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	var flows []*flowpb.Flow
+	decoder := json.NewDecoder(file)
+	if err := decoder.Decode(&flows); err != nil {
+		return nil, fmt.Errorf("failed to decode JSON: %w", err)
+	}
+
+	return flows, nil
 }

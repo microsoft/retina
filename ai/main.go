@@ -18,7 +18,7 @@ const kubeconfigPath = "/home/hunter/.kube/config"
 
 func main() {
 	log := logrus.New()
-	log.SetLevel(logrus.DebugLevel)
+	// log.SetLevel(logrus.DebugLevel)
 
 	log.Info("starting app...")
 
@@ -36,6 +36,7 @@ func main() {
 
 	// configure LM (language model)
 	// model := lm.NewEchoModel()
+	// log.Info("initialized echo model")
 	model, err := lm.NewAzureOpenAI()
 	if err != nil {
 		log.WithError(err).Fatal("failed to create Azure OpenAI model")
@@ -52,9 +53,9 @@ func handleChat(log logrus.FieldLogger, config *rest.Config, clientset *kubernet
 
 	h := flowscenario.NewHandler(log, config, clientset, model)
 	params := &flowscenario.ScenarioParams{
-		Scenario:   flowscenario.AnyScenario,
-		Namespace1: "frontend",
-		Namespace2: "backend",
+		Scenario:   flowscenario.DropScenario,
+		Namespace1: "default",
+		Namespace2: "default",
 	}
 
 	ctx := context.TODO()
