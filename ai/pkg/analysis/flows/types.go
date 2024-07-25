@@ -44,7 +44,29 @@ func (fs FlowSummary) connStrings(verdict flowpb.Verdict) string {
 			continue
 		}
 
-		connString := fmt.Sprintf("Connection: %s -> %s, Number of Flows: %d", conn.Pod1, conn.Pod2, len(conn.Flows))
+		connString := ""
+		if verdict == flowpb.Verdict_FORWARDED && conn.Flows[0].L4.GetTCP() != nil {
+			successful := false
+			rst := false
+			for _, f := range conn.Flows {
+				if f.GetVerdict() == flowpb.Verdict_FORWARDED && f.L4.GetTCP().GetFlags().GetSYN() && f.L4.GetTCP().GetFlags().GetACK() {
+					successful = true
+					continue
+				}
+
+				if f.GetVerdict() == flowpb.Verdict_FORWARDED && f.L4.GetTCP().GetFlags().GetRST() {
+					rst = true
+					continue
+				}
+			}
+			_ = successful
+			connString = fmt.Sprintf("Connection: %s -> %s, Number of Flows: %d. Was Reset: %v", conn.Pod1, conn.Pod2, len(conn.Flows), rst)
+
+		} else {
+
+			connString = fmt.Sprintf("Connection: %s -> %s, Number of Flows: %d", conn.Pod1, conn.Pod2, len(conn.Flows))
+		}
+
 		connStrings = append(connStrings, connString)
 	}
 
