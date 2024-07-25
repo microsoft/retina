@@ -285,7 +285,7 @@ require (
 	github.com/cilium/ebpf v0.16.0
 	github.com/cilium/proxy v0.0.0-20231031145409-f19708f3d018
 	github.com/cilium/workerpool v1.2.0
-	github.com/florianl/go-tc v0.4.3
+	github.com/florianl/go-tc v0.4.4
 	github.com/go-logr/zapr v1.3.0
 	github.com/google/gopacket v1.1.19
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
