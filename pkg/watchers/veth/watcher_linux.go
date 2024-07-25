@@ -26,7 +26,7 @@ func (w *Watcher) Start(ctx context.Context) error {
 	}
 	for _, link := range links {
 		if link.Type() == "veth" {
-			w.l.Info("exisiting veth device found", zap.String("device", link.Attrs().Name))
+			w.l.Info("exisiting veth device found", zap.String("name", link.Attrs().Name))
 			w.p.Publish(common.PubSubEndpoints, endpoint.NewEndpointEvent(endpoint.EndpointCreated, *link.Attrs()))
 		}
 	}
@@ -34,7 +34,7 @@ func (w *Watcher) Start(ctx context.Context) error {
 	// Create a channel to receive netlink events.
 	netlinkEvCh := make(chan netlink.LinkUpdate)
 	done := make(chan struct{})
-	// Subscribe to link (network interface) updates.
+	// Subscribe to link updates.
 	if err := netlink.LinkSubscribe(netlinkEvCh, done); err != nil {
 		return errors.Wrap(err, "failed to subscribe to link updates")
 	}
@@ -53,13 +53,13 @@ func (w *Watcher) Start(ctx context.Context) error {
 				case syscall.RTM_NEWLINK:
 					// Check if the veth device is up.
 					if veth.Attrs().OperState == netlink.OperUp {
-						w.l.Info("new veth device added", zap.String("device", veth.Name), zap.String("peer", veth.PeerName), zap.String("mac", veth.HardwareAddr.String()))
+						w.l.Info("new veth device added", zap.String("name", veth.Name), zap.String("peer", veth.PeerName), zap.String("mac", veth.HardwareAddr.String()))
 						w.p.Publish(common.PubSubEndpoints, endpoint.NewEndpointEvent(endpoint.EndpointCreated, *veth.Attrs()))
 					}
 				case syscall.RTM_DELLINK:
 					// Check if the veth device is down.
 					if veth.Attrs().OperState == netlink.OperDown {
-						w.l.Info("veth device deleted", zap.String("device", veth.Name), zap.String("peer", veth.PeerName), zap.String("mac", veth.HardwareAddr.String()))
+						w.l.Info("veth device deleted", zap.String("name", veth.Name), zap.String("peer", veth.PeerName), zap.String("mac", veth.HardwareAddr.String()))
 						w.p.Publish(common.PubSubEndpoints, endpoint.NewEndpointEvent(endpoint.EndpointDeleted, *veth.Attrs()))
 					}
 				}
