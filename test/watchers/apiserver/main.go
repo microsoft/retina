@@ -45,7 +45,7 @@ func main() {
 	g, ctx := errgroup.WithContext(ctx)
 	// Start watcher manager
 	g.Go(func() error {
-		err := wm.Start(ctx)
+		err = wm.Start(ctx)
 		if err != nil {
 			l.Error("watcher manager exited with error", zap.Error(err))
 			return errors.Wrap(err, "watcher manager exited with error")
