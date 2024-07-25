@@ -53,13 +53,11 @@ func (w *Watcher) Start(ctx context.Context) error {
 				case syscall.RTM_NEWLINK:
 					// Check if the veth device is up.
 					if veth.Attrs().OperState == netlink.OperUp {
-						w.l.Info("new veth device added", zap.String("name", veth.Name), zap.String("peer", veth.PeerName), zap.String("mac", veth.HardwareAddr.String()))
 						w.p.Publish(common.PubSubEndpoints, endpoint.NewEndpointEvent(endpoint.EndpointCreated, *veth.Attrs()))
 					}
 				case syscall.RTM_DELLINK:
 					// Check if the veth device is down.
 					if veth.Attrs().OperState == netlink.OperDown {
-						w.l.Info("veth device deleted", zap.String("name", veth.Name), zap.String("peer", veth.PeerName), zap.String("mac", veth.HardwareAddr.String()))
 						w.p.Publish(common.PubSubEndpoints, endpoint.NewEndpointEvent(endpoint.EndpointDeleted, *veth.Attrs()))
 					}
 				}

@@ -337,6 +337,11 @@ func (p *packetParser) endpointWatcherCallbackFn(obj interface{}) {
 
 	switch event.Type {
 	case endpoint.EndpointCreated:
+		// Only create qdisc and attach if the interface is not already in the map.
+		if _, ok := p.tcMap.Load(ifaceKey); ok {
+			p.l.Debug("Endpoint already exists", zap.String("name", iface.Name))
+			return
+		}
 		p.l.Debug("Endpoint created", zap.String("name", iface.Name))
 		p.createQdiscAndAttach(iface, Veth)
 	case endpoint.EndpointDeleted:
