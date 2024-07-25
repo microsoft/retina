@@ -111,8 +111,8 @@ func (p *Plugin) RunPktMonServer() error {
 	return fmt.Errorf("pktmon server exited unexpectedly: %w", ErrUnexpectedExit)
 }
 
-func (p *Plugin) Start(ctx context.Context) error {
-	ctx, cancel := context.WithCancel(ctx)
+func (p *Plugin) Start(parentCtx context.Context) error {
+	streamCtx, cancel := context.WithCancel(parentCtx)
 	defer cancel()
 
 	p.enricher = enricher.Instance()
@@ -131,15 +131,15 @@ func (p *Plugin) Start(ctx context.Context) error {
 	}()
 
 	var str observerv1.Observer_GetFlowsClient
-	str, err := p.GetFlowsClient(ctx)
+	str, err := p.GetFlowsClient(streamCtx)
 	if err != nil {
 		return fmt.Errorf("failed to get flow client from observer: %w", err)
 	}
 
 	for {
 		select {
-		case <-ctx.Done():
-			return fmt.Errorf("pktmon context cancelled: %w", ctx.Err())
+		case <-parentCtx.Done():
+			return fmt.Errorf("pktmon context cancelled: %w", streamCtx.Err())
 		default:
 			err := p.GetFlow(str)
 			if err != nil {
@@ -154,7 +154,14 @@ func (p *Plugin) Start(ctx context.Context) error {
 					if clientErr != nil {
 						return fmt.Errorf("failed to close observer after after failure: %w, parent: %w", clientErr, err)
 					}
-					str, clientErr = p.GetFlowsClient(ctx)
+					// cancel old stream
+					cancel()
+
+					// create new streaming context
+					streamCtx, cancel = context.WithCancel(parentCtx)
+					defer cancel()
+
+					str, clientErr = p.GetFlowsClient(streamCtx)
 					if clientErr != nil {
 						return fmt.Errorf("failed to get flow client from observer after failure: %w, parent: %w", clientErr, err)
 					}
@@ -175,6 +182,7 @@ func (p *Plugin) GetFlowsClient(ctx context.Context) (observerv1.Observer_GetFlo
 			return fmt.Errorf("failed to create pktmon client before getting flows: %w", err)
 		}
 
+	
 		str, err = client.GetFlows(ctx, &observerv1.GetFlowsRequest{})
 		if err != nil {
 			return fmt.Errorf("failed to open pktmon stream: %w", err)
