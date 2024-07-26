@@ -118,6 +118,7 @@ func (d *Daemon) Start() error {
 		zap.String("version", version),
 		zap.String("apiserver", cfg.Host),
 		zap.String("plugins", strings.Join(daemonConfig.EnabledPlugin, `,`)),
+		zap.String("data aggregation level", daemonConfig.DataAggregationLevel.String()),
 	)
 	if err != nil {
 		panic(err)
@@ -126,6 +127,8 @@ func (d *Daemon) Start() error {
 	mainLogger := zl.Named("main").Sugar()
 
 	metrics.InitializeMetrics()
+
+	mainLogger.Info(zap.String("data aggregation level", daemonConfig.DataAggregationLevel.String()))
 
 	var tel telemetry.Telemetry
 	if daemonConfig.EnableTelemetry && applicationInsightsID != "" {

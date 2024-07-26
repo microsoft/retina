@@ -21,7 +21,8 @@ func TestGetConfig(t *testing.T) {
 		c.EnablePodLevel ||
 		!c.EnableRetinaEndpoint ||
 		c.RemoteContext ||
-		c.EnableAnnotations {
+		c.EnableAnnotations ||
+		c.DataAggregationLevel != High {
 		t.Fatalf("Expeted config should be same as ./testwith/config.yaml; instead got %+v", c)
 	}
 }

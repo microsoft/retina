@@ -8,3 +8,4 @@ enabledPlugin: ["dropreason", "packetforward", "linuxutil"]
 metricsInterval: 10
 # used to export telemetry to AppInsights
 telemetryEnabled: true
+dataAggregationLevel: "high"
