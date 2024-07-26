@@ -30,7 +30,7 @@ var deleteCapture = &cobra.Command{
 	Short:   "Delete a Retina capture",
 	Example: deleteExample,
 	RunE: func(*cobra.Command, []string) error {
-		kubeConfig, err := configFlags.ToRESTConfig()
+		kubeConfig, err := opts.ToRESTConfig()
 		if err != nil {
 			return errors.Wrap(err, "")
 		}
@@ -42,7 +42,7 @@ var deleteCapture = &cobra.Command{
 
 		captureJobSelector := &metav1.LabelSelector{
 			MatchLabels: map[string]string{
-				label.CaptureNameLabel: name,
+				label.CaptureNameLabel: *opts.Name,
 				label.AppLabel:         captureConstants.CaptureAppname,
 			},
 		}
@@ -51,12 +51,12 @@ var deleteCapture = &cobra.Command{
 			LabelSelector: labelSelector.String(),
 		}
 
-		jobList, err := kubeClient.BatchV1().Jobs(namespace).List(context.TODO(), jobListOpt)
+		jobList, err := kubeClient.BatchV1().Jobs(*opts.Namespace).List(context.TODO(), jobListOpt)
 		if err != nil {
 			return errors.Wrap(err, "failed to list capture jobs")
 		}
 		if len(jobList.Items) == 0 {
-			return errors.Errorf("capture %s in namespace %s was not found", name, namespace)
+			return errors.Errorf("capture %s in namespace %s was not found", *opts.Name, *opts.Namespace)
 		}
 
 		for _, job := range jobList.Items {
@@ -70,13 +70,13 @@ var deleteCapture = &cobra.Command{
 
 		for _, volume := range jobList.Items[0].Spec.Template.Spec.Volumes {
 			if volume.Secret != nil {
-				if err := kubeClient.CoreV1().Secrets(namespace).Delete(context.TODO(), volume.Secret.SecretName, metav1.DeleteOptions{}); err != nil {
+				if err := kubeClient.CoreV1().Secrets(*opts.Namespace).Delete(context.TODO(), volume.Secret.SecretName, metav1.DeleteOptions{}); err != nil {
 					return errors.Wrap(err, "failed to delete capture secret")
 				}
 				break
 			}
 		}
-		retinacmd.Logger.Info(fmt.Sprintf("Retina Capture %q delete", name))
+		retinacmd.Logger.Info(fmt.Sprintf("Retina Capture %q delete", *opts.Name))
 
 		return nil
 	},
