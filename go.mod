@@ -295,7 +295,7 @@ require (
 	github.com/jsternberg/zap-logfmt v1.3.0
 	github.com/microsoft/ApplicationInsights-Go v0.4.4
 	github.com/onsi/ginkgo/v2 v2.19.0
-	github.com/onsi/gomega v1.33.1
+	github.com/onsi/gomega v1.34.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_model v0.6.1
 	github.com/prometheus/common v0.55.0
