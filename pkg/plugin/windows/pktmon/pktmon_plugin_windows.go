@@ -33,7 +33,7 @@ var (
 
 const (
 	Name                    = "pktmon"
-	connectionRetryAttempts = 3
+	connectionRetryAttempts = 5
 )
 
 type Plugin struct {
@@ -53,11 +53,11 @@ func (p *Plugin) Name() string {
 	return "pktmon"
 }
 
-type Client struct {
+type GRPCClient struct {
 	observerv1.ObserverClient
 }
 
-func NewClient() (*Client, error) {
+func newGRPCClient() (*GRPCClient, error) {
 	retryPolicy := map[string]any{
 		"methodConfig": []map[string]any{
 			{
@@ -85,7 +85,25 @@ func NewClient() (*Client, error) {
 		return nil, fmt.Errorf("failed to dial pktmon server: %w", err)
 	}
 
-	return &Client{observerv1.NewObserverClient(conn)}, nil
+	return &GRPCClient{observerv1.NewObserverClient(conn)}, nil
+}
+
+func (c *GRPCClient) StartStreamingRPC(ctx context.Context) (observerv1.Observer_GetFlowsClient, error) {
+	var str observerv1.Observer_GetFlowsClient
+	var err error
+	fn := func() error {
+		str, err = c.GetFlows(ctx, &observerv1.GetFlowsRequest{})
+		if err != nil {
+			return fmt.Errorf("failed to open pktmon stream: %w", err)
+		}
+		return nil
+	}
+	err = utils.Retry(fn, connectionRetryAttempts)
+	if err != nil {
+		return str, fmt.Errorf("failed to create pktmon client: %w", err)
+	}
+
+	return str, nil
 }
 
 func (p *Plugin) RunPktMonServer() error {
@@ -123,15 +141,17 @@ func (p *Plugin) Start(parentCtx context.Context) error {
 	go func() {
 		err := p.RunPktMonServer()
 		if err != nil {
-			p.l.Error("failed to run pktmon server", zap.Error(err))
+			p.l.Error("pktmon server exited", zap.Error(err))
 		}
-
-		// if the pktmon server process exits, cancel the context, we need to crash
-		cancel()
 	}()
 
+	grpcClient, err := p.GetGRPCClient()
+	if err != nil {
+		return fmt.Errorf("failed to create pktmon grpc client: %w", err)
+	}
+
 	var str observerv1.Observer_GetFlowsClient
-	str, err := p.GetFlowsClient(streamCtx)
+	str, err = grpcClient.StartStreamingRPC(streamCtx)
 	if err != nil {
 		return fmt.Errorf("failed to get flow client from observer: %w", err)
 	}
@@ -139,6 +159,7 @@ func (p *Plugin) Start(parentCtx context.Context) error {
 	for {
 		select {
 		case <-parentCtx.Done():
+			cancel()
 			return fmt.Errorf("pktmon context cancelled: %w", streamCtx.Err())
 		default:
 			err := p.GetFlow(str)
@@ -150,22 +171,23 @@ func (p *Plugin) Start(parentCtx context.Context) error {
 				// and then client gets stuck in loop, where crashing and recreating is immediate mitigation.
 				// Instead, we will try to recreate the client and stream
 				if _, ok := status.FromError(err); ok {
-					var clientErr error
-					if clientErr != nil {
-						return fmt.Errorf("failed to close observer after after failure: %w, parent: %w", clientErr, err)
-					}
-					// cancel old stream
+					var rpcErr error
+					// cancel old streaming context
+					p.l.Logger.Info("cancelling old stream")
 					cancel()
 
+					p.l.Logger.Info("creating new stream")
 					// create new streaming context
 					streamCtx, cancel = context.WithCancel(parentCtx)
-					defer cancel()
 
-					str, clientErr = p.GetFlowsClient(streamCtx)
-					if clientErr != nil {
-						return fmt.Errorf("failed to get flow client from observer after failure: %w, parent: %w", clientErr, err)
+					// start new streaming RPC
+					str, rpcErr = grpcClient.StartStreamingRPC(streamCtx)
+					if rpcErr != nil {
+						cancel()
+						return fmt.Errorf("failed to get flow client from observer after failure: %w, parent: %w", rpcErr, err)
 					}
 				} else {
+					cancel()
 					return fmt.Errorf("failed to get flow from observer: %w", err)
 				}
 			}
@@ -173,27 +195,24 @@ func (p *Plugin) Start(parentCtx context.Context) error {
 	}
 }
 
-func (p *Plugin) GetFlowsClient(ctx context.Context) (observerv1.Observer_GetFlowsClient, error) {
-	var str observerv1.Observer_GetFlowsClient
+func (p *Plugin) GetGRPCClient() (*GRPCClient, error) {
+	var client *GRPCClient
+	var err error
 	fn := func() error {
 		p.l.Info("creating pktmon client")
-		client, err := NewClient()
+		client, err = newGRPCClient()
 		if err != nil {
 			return fmt.Errorf("failed to create pktmon client before getting flows: %w", err)
 		}
 
-	
-		str, err = client.GetFlows(ctx, &observerv1.GetFlowsRequest{})
-		if err != nil {
-			return fmt.Errorf("failed to open pktmon stream: %w", err)
-		}
 		return nil
 	}
-	err := utils.Retry(fn, connectionRetryAttempts)
+	err = utils.Retry(fn, connectionRetryAttempts)
 	if err != nil {
-		return str, fmt.Errorf("failed to create pktmon client: %w", err)
+		return client, fmt.Errorf("failed to create pktmon client: %w", err)
 	}
-	return str, nil
+
+	return client, nil
 }
 
 func (p *Plugin) GetFlow(str observerv1.Observer_GetFlowsClient) error {
