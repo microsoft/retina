@@ -4,8 +4,12 @@
 package config
 
 import (
+	"reflect"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetConfig(t *testing.T) {
@@ -24,5 +28,28 @@ func TestGetConfig(t *testing.T) {
 		c.EnableAnnotations ||
 		c.DataAggregationLevel != High {
 		t.Fatalf("Expeted config should be same as ./testwith/config.yaml; instead got %+v", c)
+	}
+}
+
+func TestDecodeLevelHook(t *testing.T) {
+	tests := []struct {
+		input    interface{}
+		expected interface{}
+		hasError bool
+	}{
+		{"low", Low, false},
+		{"high", High, false},
+		{"invalid", Low, false}, // Unimplemented or invalid input should default to Low
+		{123, 123, false},       // Non-string input should be returned as is
+	}
+
+	for _, test := range tests {
+		result, err := decodeLevelHook(reflect.TypeOf(test.input), reflect.TypeOf(Level(0)), test.input)
+		if test.hasError {
+			assert.Error(t, err)
+		} else {
+			require.NoError(t, err)
+			assert.Equal(t, test.expected, result)
+		}
 	}
 }

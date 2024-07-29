@@ -28,6 +28,7 @@ func (l *Level) UnmarshalText(text []byte) error {
 	case "high":
 		*l = High
 	default:
+		// Default to Low if the text is not recognized.
 		*l = Low
 	}
 	return nil
@@ -40,7 +41,7 @@ func (l *Level) String() string {
 	case High:
 		return "high"
 	default:
-		return "unknown"
+		return ""
 	}
 }
 
@@ -84,22 +85,9 @@ func GetConfig(cfgFilename string) (*Config, error) {
 	var config Config
 	decoderConfigOption := func(dc *mapstructure.DecoderConfig) {
 		dc.DecodeHook = mapstructure.ComposeDecodeHookFunc(
-			mapstructure.StringToTimeDurationHookFunc(),
-			mapstructure.StringToSliceHookFunc(","),
-			func(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
-				if f.Kind() != reflect.String {
-					return data, nil
-				}
-				if t != reflect.TypeOf(Level(0)) {
-					return data, nil
-				}
-				var level Level
-				err = level.UnmarshalText([]byte(data.(string)))
-				if err != nil {
-					return nil, err
-				}
-				return level, nil
-			},
+			mapstructure.StringToTimeDurationHookFunc(), // default hook.
+			mapstructure.StringToSliceHookFunc(","),     // default hook.
+			decodeLevelHook,
 		)
 	}
 	err = viper.Unmarshal(&config, decoderConfigOption)
@@ -110,4 +98,21 @@ func GetConfig(cfgFilename string) (*Config, error) {
 	config.MetricsInterval = config.MetricsInterval * time.Second
 
 	return &config, nil
+}
+
+func decodeLevelHook(field, target reflect.Type, data interface{}) (interface{}, error) {
+	// Check if the field we are decoding is a string.
+	if field.Kind() != reflect.String {
+		return data, nil
+	}
+	// Check if the type we are decoding to is a Level.
+	if target != reflect.TypeOf(Level(0)) {
+		return data, nil
+	}
+	var level Level
+	err := level.UnmarshalText([]byte(data.(string)))
+	if err != nil {
+		return nil, err
+	}
+	return level, nil
 }
