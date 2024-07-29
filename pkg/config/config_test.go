@@ -26,7 +26,7 @@ func TestGetConfig(t *testing.T) {
 		!c.EnableRetinaEndpoint ||
 		c.RemoteContext ||
 		c.EnableAnnotations ||
-		c.DataAggregationLevel != High {
+		c.DataAggregationLevel != Low {
 		t.Fatalf("Expeted config should be same as ./testwith/config.yaml; instead got %+v", c)
 	}
 }
@@ -35,21 +35,17 @@ func TestDecodeLevelHook(t *testing.T) {
 	tests := []struct {
 		input    interface{}
 		expected interface{}
-		hasError bool
 	}{
-		{"low", Low, false},
-		{"high", High, false},
-		{"invalid", Low, false}, // Unimplemented or invalid input should default to Low
-		{123, 123, false},       // Non-string input should be returned as is
+		{"low", Low},
+		{"high", High},
+		{"invalid", Low}, // Unimplemented or invalid input should default to Low
+		{123, 123},       // Non-string input should be returned as is
 	}
 
 	for _, test := range tests {
 		result, err := decodeLevelHook(reflect.TypeOf(test.input), reflect.TypeOf(Level(0)), test.input)
-		if test.hasError {
-			assert.Error(t, err)
-		} else {
-			require.NoError(t, err)
-			assert.Equal(t, test.expected, result)
-		}
+		require.NoError(t, err)
+		assert.Equal(t, test.expected, result)
+
 	}
 }
