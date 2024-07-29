@@ -54,7 +54,7 @@ func Init() (*FilterMap, error) {
 	obj := &filterObjects{}                                //nolint:typecheck
 	err := loadFilterObjects(obj, &ebpf.CollectionOptions{ //nolint:typecheck
 		Maps: ebpf.MapOptions{
-			PinPath: plugincommon.FilterMapPath,
+			PinPath: plugincommon.MapPath,
 		},
 	})
 	if err != nil {
