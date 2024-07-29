@@ -209,7 +209,7 @@ func (p *packetParser) Start(ctx context.Context) error {
 	}
 
 	if p.cfg.DataAggregationLevel == kcfg.Low {
-		p.l.Info("Attaching bpf program to default interface")
+		p.l.Info("Attaching bpf program to default interface of k8s Node in node namespace")
 		outgoingLinks, err := utils.GetDefaultOutgoingLinks()
 		if err != nil {
 			return errors.Wrap(err, "could not get default outgoing links")
@@ -227,7 +227,7 @@ func (p *packetParser) Start(ctx context.Context) error {
 		)
 		p.createQdiscAndAttach(*outgoingLink.Attrs(), Device)
 	} else {
-		p.l.Info("Skipping attaching bpf program to default interface")
+		p.l.Info("Skipping attaching bpf program to default interface of k8s Node in node namespace")
 	}
 
 	// Create the channel.

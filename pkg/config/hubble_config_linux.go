@@ -50,7 +50,7 @@ var (
 		EnablePodLevel:           true,
 		LogLevel:                 "info",
 		BypassLookupIPOfInterest: true,
-		DataAggregationLevel:     Low,
+		DataAggregationLevel:     High,
 	}
 
 	Cell = cell.Module(
