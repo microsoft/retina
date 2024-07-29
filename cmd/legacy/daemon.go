@@ -5,7 +5,9 @@ package legacy
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"go.uber.org/zap"
@@ -277,6 +279,15 @@ func (d *Daemon) Start() error {
 	if err != nil {
 		mainLogger.Fatal("Failed to create controller manager", zap.Error(err))
 	}
+	// Create a channel to listen for OS signals.
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		sig := <-sigChan
+		mainLogger.Info("Received signal, stopping controller manager", zap.String("signal", sig.String()))
+		controllerMgr.Stop(ctx)
+	}()
+
 	if err := controllerMgr.Init(ctx); err != nil {
 		mainLogger.Fatal("Failed to initialize controller manager", zap.Error(err))
 	}
