@@ -18,7 +18,7 @@ import (
 	"go.uber.org/zap"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cc clang-14 -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type ct_key conntrack ./_cprog/conntrack.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type ct_key conntrack ./_cprog/conntrack.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src
 
 var (
 	ct   *Conntrack
@@ -85,6 +85,7 @@ func (ct *Conntrack) gc(timeout time.Duration) {
 
 	iter := ct.ctmap.Iterate()
 	for iter.Next(&key, &value) {
+		noOfCtEntries++
 		ct.l.Debug("ct_key", zap.Uint32("src_ip", key.SrcIp), zap.Uint32("dst_ip", key.DstIp), zap.Uint16("src_port", key.SrcPort), zap.Uint16("dst_port", key.DstPort), zap.Uint8("proto", key.Protocol))
 		ct.l.Debug("ct_value", zap.Uint64("timestamp", value.Timestamp), zap.Uint8("is_closed", value.IsClosed))
 

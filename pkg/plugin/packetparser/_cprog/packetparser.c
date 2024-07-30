@@ -6,6 +6,7 @@
 #include "bpf_endian.h"
 #include "packetparser.h"
 #include "retina_filter.c"
+#include "conntrack.c"
 #include "dynamic.h"
 
 char __license[] SEC("license") = "Dual MIT/GPL";
@@ -182,6 +183,17 @@ static void parse(struct __sk_buff *skb, direction d)
 		}
 	#endif
 	#endif
+
+	// Create ct_key from packet
+    struct ct_key key;
+    __builtin_memset(&key, 0, sizeof(key));
+    key.src_ip = p.src_ip;
+    key.dst_ip = p.dst_ip;
+    key.src_port = 0;
+    key.dst_port = 0;
+    key.protocol = p.proto;
+
+    __u8 flags = 0;
 	// Get source and destination ports.
 	if (ip->protocol == IPPROTO_TCP)
 	{
@@ -191,6 +203,13 @@ static void parse(struct __sk_buff *skb, direction d)
 
 		p.src_port = tcp->source;
 		p.dst_port = tcp->dest;
+
+		key.src_port = tcp->source;
+        key.dst_port = tcp->dest;
+
+        // Get TCP flags
+        flags = tcp->fin | (tcp->syn << 1) | (tcp->rst << 2) | (tcp->psh << 3) | (tcp->ack << 4) | (tcp->urg << 5);
+
 
 		// Get TCP metadata.
 		struct tcpmetadata tcp_metadata;
@@ -221,13 +240,20 @@ static void parse(struct __sk_buff *skb, direction d)
 
 		p.src_port = udp->source;
 		p.dst_port = udp->dest;
+
+		key.src_port = udp->source;
+        key.dst_port = udp->dest;
 	}
 	else
 	{
 		return;
 	}
-
-	bpf_perf_event_output(skb, &packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
+	// Process the packet with ct_process_packet
+    if (ct_process_packet(&key, flags))
+    {
+        // If the packet is TCP and the flags have not been seen before, send it to the perf buffer.
+        bpf_perf_event_output(skb, &packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
+    }
 }
 
 SEC("classifier_endpoint_ingress")
