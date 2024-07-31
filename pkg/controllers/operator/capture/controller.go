@@ -62,21 +62,21 @@ type CaptureReconciler struct {
 	managedStorageAccountManager *managedOutputLocation.StorageAccountManager
 }
 
-func NewCaptureReconciler(client client.Client, scheme *runtime.Scheme, kubeClient kubernetes.Interface, config config.CaptureConfig) (*CaptureReconciler, error) {
+func NewCaptureReconciler(c client.Client, scheme *runtime.Scheme, kubeClient kubernetes.Interface, captureConfig config.CaptureConfig) (*CaptureReconciler, error) {
 	cr := &CaptureReconciler{
-		Client: client,
+		Client: c,
 		scheme: scheme,
 		logger: log.Logger().Named("Capture"),
 	}
 
-	cr.captureToPodTranslator = pkgcapture.NewCaptureToPodTranslator(kubeClient, cr.logger, config)
+	cr.captureToPodTranslator = pkgcapture.NewCaptureToPodTranslator(kubeClient, cr.logger, captureConfig)
 
-	if config.EnableManagedStorageAccount {
+	if captureConfig.EnableManagedStorageAccount {
 		cr.logger.Info("Managed storage account is enabled")
 		managedStorageAccountManager := managedOutputLocation.NewStorageAccountManager()
 		cr.managedStorageAccountManager = managedStorageAccountManager
-		if err := cr.managedStorageAccountManager.Init(config.AzureCredentialConfig); err != nil {
-			return nil, err
+		if err := cr.managedStorageAccountManager.Init(captureConfig.AzureCredentialConfig); err != nil {
+			return nil, fmt.Errorf("failed to initialize managed storage account manager, %w", err)
 		}
 	}
 
@@ -319,7 +319,8 @@ func (cr *CaptureReconciler) handleUpdate(ctx context.Context, capture *retinav1
 			}
 
 			secret := getSecretFromCapture(capture, sasURL)
-			if opRet, err := controllerutil.CreateOrUpdate(ctx, cr.Client, &secret, func() error {
+			var opRet controllerutil.OperationResult
+			if opRet, err = controllerutil.CreateOrUpdate(ctx, cr.Client, &secret, func() error {
 				return nil
 			}); err != nil {
 				cr.logger.Error("Failed to create secret", zap.Error(err), zap.String("Capture", captureRef.String()), zap.String("operation result", string(opRet)))
@@ -338,9 +339,9 @@ func (cr *CaptureReconciler) handleUpdate(ctx context.Context, capture *retinav1
 			// set secret in the blob upload configuration
 			// TODO(mainred): update Capture with container/blob info to simply the following blob download
 			capture.Spec.OutputConfiguration.BlobUpload = to.Ptr(secret.Name)
-			if err := cr.Client.Update(ctx, capture); err != nil {
+			if err = cr.Client.Update(ctx, capture); err != nil {
 				cr.logger.Error("Failed to update capture with managed secret", zap.Error(err), zap.String("secret", secret.Name), zap.String("Capture", captureRef.String()))
-				return ctrl.Result{}, err
+				return ctrl.Result{}, fmt.Errorf("failed to update capture with managed secret, %w", err)
 			}
 			cr.logger.Info("Use the existing secret", zap.Error(err), zap.String("Capture", captureRef.String()), zap.String("secret", *capture.Spec.OutputConfiguration.BlobUpload))
 		}
@@ -380,7 +381,7 @@ func (cr *CaptureReconciler) handleDelete(ctx context.Context, capture *retinav1
 		},
 	); err != nil {
 		cr.logger.Error("Failed to delete Capture jobs", zap.Error(err), zap.String("Capture", captureRef.String()))
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to delete Capture jobs, %w", err)
 	}
 	cr.logger.Info("Capture jobs are removed", zap.String("Capture", captureRef.String()))
 
@@ -389,11 +390,11 @@ func (cr *CaptureReconciler) handleDelete(ctx context.Context, capture *retinav1
 
 		if err := apiretry.Do(
 			func() error {
-				return cr.Client.Delete(ctx, &secret)
+				return cr.Client.Delete(ctx, &secret) //nolint:wrapcheck // no wrapped, detailed explanation is required for the internal error
 			},
 		); err != nil {
 			cr.logger.Error("Failed to delete secret", zap.Error(err), zap.String("Capture", captureRef.String()))
-			return ctrl.Result{}, err
+			return ctrl.Result{}, fmt.Errorf("failed to delete secret, %w", err)
 		}
 		cr.logger.Info("Capture secret is removed", zap.String("Capture", captureRef.String()))
 	}
@@ -401,7 +402,7 @@ func (cr *CaptureReconciler) handleDelete(ctx context.Context, capture *retinav1
 	controllerutil.RemoveFinalizer(capture, captureFinalizer)
 	if err := cr.Client.Update(ctx, capture); err != nil {
 		cr.logger.Error("Failed to remove Capture finalizer", zap.Error(err), zap.String("Capture", captureRef.String()))
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to remove Capture finalizer, %w", err)
 	}
 	return ctrl.Result{}, nil
 }
@@ -441,7 +442,7 @@ func (cr *CaptureReconciler) updateStatus(ctx context.Context, capture *retinav1
 	latestCapture := &retinav1alpha1.Capture{}
 	if err := cr.Client.Get(ctx, captureRef, latestCapture); err != nil {
 		cr.logger.Error("Failed to get Capture", zap.Error(err), zap.String("Capture", captureRef.String()))
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to get Capture, %w", err)
 	}
 	if reflect.DeepEqual(capture.Status, latestCapture.Status) {
 		return ctrl.Result{}, nil
@@ -450,7 +451,7 @@ func (cr *CaptureReconciler) updateStatus(ctx context.Context, capture *retinav1
 	capture = latestCapture
 	if err := cr.Client.Status().Update(ctx, latestCapture); err != nil {
 		cr.logger.Error("Failed to update status of Capture", zap.Error(err), zap.String("Capture", captureRef.String()))
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to update status of Capture, %w", err)
 	}
 	return ctrl.Result{}, nil
 }

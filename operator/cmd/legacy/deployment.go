@@ -201,7 +201,7 @@ func (o *Operator) Start() {
 		mainLogger.Error("Unable to create capture reconciler", zap.Error(err))
 		os.Exit(1)
 	}
-	if err := captureReconciler.SetupWithManager(mgr); err != nil {
+	if err = captureReconciler.SetupWithManager(mgr); err != nil {
 		mainLogger.Error("Unable to setup retina capture controller with manager", zap.Error(err))
 		os.Exit(1)
 	}

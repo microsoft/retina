@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader"
 )
 
-type AZClientsImpl struct {
+type Impl struct {
 	azureConfig *AzureConfig
 
 	storageAccountsClient    *armstorage.AccountsClient
@@ -23,38 +23,38 @@ type AZClientsImpl struct {
 	blobServiceClient        *storageservice.Client
 }
 
-func (azclients *AZClientsImpl) getTokenCredential() (azcore.TokenCredential, error) {
+func (azclients *Impl) getTokenCredential() (azcore.TokenCredential, error) {
 	// Create token credential out of cloud credential config.
 	authProvider, err := azclient.NewAuthProvider(&azclients.azureConfig.ARMClientConfig, &azclients.azureConfig.AzureAuthConfig)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create AuthProvider, %w", err)
 	}
 	cred := authProvider.GetAzIdentity()
 	return cred, nil
 }
 
 func NewAZClients(configFile string) (AZClients, error) {
-	azclients := AZClientsImpl{}
+	azclients := Impl{}
 	// Load auth config file from cloud credential file.
 	config, err := configloader.Load[AzureConfig](context.Background(),
 		nil,
 		&configloader.FileLoaderConfig{FilePath: configFile},
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load azure credential config, %w", err)
 	}
 	azclients.azureConfig = config
 
 	cred, err := azclients.getTokenCredential()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get TokenCredential, %w", err)
 	}
 
 	// Create default necessary az clients.
 
 	storageClientFactory, err := armstorage.NewClientFactory(config.SubscriptionID, cred, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create ClientFactory, %w", err)
 	}
 	azclients.storageAccountsClient = storageClientFactory.NewAccountsClient()
 	azclients.blobContainersClient = storageClientFactory.NewBlobContainersClient()
@@ -63,35 +63,35 @@ func NewAZClients(configFile string) (AZClients, error) {
 	return &azclients, nil
 }
 
-func (azclients *AZClientsImpl) GetStorageAccountsClient() *armstorage.AccountsClient {
+func (azclients *Impl) GetStorageAccountsClient() *armstorage.AccountsClient {
 	return azclients.storageAccountsClient
 }
 
-func (azclients *AZClientsImpl) GetBlobContainersClient() *armstorage.BlobContainersClient {
+func (azclients *Impl) GetBlobContainersClient() *armstorage.BlobContainersClient {
 	return azclients.blobContainersClient
 }
 
-func (azclients *AZClientsImpl) GetManagementPoliciesClient() *armstorage.ManagementPoliciesClient {
+func (azclients *Impl) GetManagementPoliciesClient() *armstorage.ManagementPoliciesClient {
 	return azclients.managementPoliciesClient
 }
 
-func (azclients *AZClientsImpl) CreateBlobServiceClient(storageAccountName string) (*storageservice.Client, error) {
+func (azclients *Impl) CreateBlobServiceClient(storageAccountName string) (*storageservice.Client, error) {
 	cred, err := azclients.getTokenCredential()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get TokenCredential, %w", err)
 	}
 	azclients.blobServiceClient, err = storageservice.NewClient(fmt.Sprintf("https://%s.blob.core.windows.net/", storageAccountName), cred, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create blob service client, %w", err)
 	}
 
 	return azclients.blobServiceClient, nil
 }
 
-func (azclients *AZClientsImpl) GetBlobServiceClient() *storageservice.Client {
+func (azclients *Impl) GetBlobServiceClient() *storageservice.Client {
 	return azclients.blobServiceClient
 }
 
-func (azclients *AZClientsImpl) GetClientConfig() *AzureConfig {
+func (azclients *Impl) GetClientConfig() *AzureConfig {
 	return azclients.azureConfig
 }
