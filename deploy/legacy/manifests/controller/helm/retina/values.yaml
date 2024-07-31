@@ -14,8 +14,9 @@ operator:
   installCRDs: true
   enableRetinaEndpoint: false
   capture:
-    debug: "true"
+    debug: true
     jobNumLimit: 0
+    enableManagedStorageAccount: false
   resources:
     limits:
       cpu: 500m

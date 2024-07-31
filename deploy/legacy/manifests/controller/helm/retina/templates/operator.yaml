@@ -67,6 +67,13 @@ spec:
           volumeMounts:
             - name: retina-operator-config
               mountPath: /retina/
+{{- if .Values.operator.capture.enableManagedStorageAccount }}
+            - name: etc-kubernetes
+              mountPath: /etc/kubernetes
+            - name: cloud-config
+              mountPath: /etc/kubernetes/cloud-config
+              readOnly: true
+{{- end }}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -92,7 +99,14 @@ spec:
         - name: retina-operator-config
           configMap:
             name: retina-operator-config
-
+{{- if .Values.operator.capture.enableManagedStorageAccount }}
+        - name: etc-kubernetes
+          hostPath:
+            path: /etc/kubernetes
+        - name: cloud-config
+          secret:
+            secretName: azure-cloud-config
+{{- end }}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -195,10 +209,21 @@ rules:
     - namespaces
     - pods
     - nodes
-    - secrets
     verbs:
     - get
     - list
+  - apiGroups:
+      - ""
+    resources:
+    - secrets
+    verbs:
+    - create
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch
   - apiGroups:
       - batch
     resources:
@@ -278,4 +303,31 @@ data:
     remoteContext: {{ .Values.remoteContext }}
     captureDebug: {{ .Values.operator.capture.debug }}
     captureJobNumLimit: {{ .Values.operator.capture.jobNumLimit }}
+    enableManagedStorageAccount: {{ .Values.operator.capture.enableManagedStorageAccount }}
+{{- if .Values.operator.capture.enableManagedStorageAccount }}
+    azureCredentialConfig: /etc/kubernetes/cloud-config/azure.json
+{{- end }}
+---
+{{- if .Values.operator.capture.enableManagedStorageAccount }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: azure-cloud-config
+  namespace: kube-system
+type: Opaque
+stringData:
+  azure.json: |-
+    {
+      "cloud": "AzurePublicCloud",
+      "tenantId": "<tenant-id>",
+      "subscriptionId": "<subscription-id>",
+      "aadClientId": "<client-id>",
+      "aadClientSecret": "<client-secret>",
+      "resourceGroup": "<resource-group-name>",
+      "location": "<location>",
+      "useManagedIdentityExtension": false,
+      "userAssignedIdentityID": "",
+      "useInstanceMetadata": true,
+    }
+{{- end }}
 {{- end }}
