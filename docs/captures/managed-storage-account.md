@@ -16,7 +16,7 @@ To simply customers' work to decide where to store the packets and then download
 
 To enable the managed storage account, you need to specify the following configuration in the helm command,
 
-```
+```bash
 --set operator.enabled=true \
 --set operator.capture.enableManagedStorageAccount=true
 ```
@@ -25,11 +25,11 @@ Internally, `enableManagedStorageAccount` will change the following retina-opera
 
 ### Retina-Operator Configuration
 
-#### enabledManagedStorageAccount Configuration
+#### enableManagedStorageAccount Configuration
 
-`enabledManagedStorageAccount` configuration controls whether to use managed storage account or not.
+`enableManagedStorageAccount` configuration controls whether to use managed storage account or not.
 
-```
+```yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -37,7 +37,7 @@ metadata:
   namespace: kube-system
 data:
   ... ...
-  enabledManagedStorageAccount: true/false
+  enableManagedStorageAccount: true/false
   azureCredentialConfig: /etc/kubernetes/cloud-config/azure.json
 ```
 
@@ -53,7 +53,7 @@ metadata:
   namespace: kube-system
 data:
   .. ...
-  enabledManagedStorageAccount: true/false
+  enableManagedStorageAccount: true/false
   azureCredentialConfig: /etc/kubernetes/cloud-config/azure.json
 ```
 
@@ -74,6 +74,7 @@ The volume defined in retina-operator deployment mount the secret containing the
           secret:
             secretName: azure-cloud-config
 ```
+
 When default storage account is enabled, a managed storage account will be created under the resource group of the sub both specified in the credential file.
 In the case of AKS, the resource group will be MC, or node, resource group, and subscription will be the overlay subscription.
 
@@ -85,7 +86,7 @@ The service principal or managed identity should have `Storage Blob Data Contrib
 
 - Managed Identity
 
-```
+```json
 {
     "cloud": "AzurePublicCloud",
     "tenantId": "<tenant-id>",
@@ -101,7 +102,7 @@ The service principal or managed identity should have `Storage Blob Data Contrib
 
 - Service Principal
 
-```
+```json
 {
     "cloud": "AzurePublicCloud",
     "tenantId": "<tenant-id>",
