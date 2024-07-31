@@ -2,8 +2,8 @@ ARG OS_VERSION
 
 # pinned base images
 
-# mcr.microsoft.com/oss/go/microsoft/golang:1.22.3-1-cbl-mariner2.0
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:8253def0216b87b2994b7ad689aeec7440f6eb67f981e438071d8d67e36ff69f as golang
+# mcr.microsoft.com/oss/go/microsoft/golang:1.22.5-1-cbl-mariner2.0
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:d3aa879f8a636fc0c7ac0108bb9f0738a7782e02a0e183dda80a974cd110efbd as golang
 
 # mcr.microsoft.com/cbl-mariner/base/core:2.0
 FROM --platform=$TARGETPLATFORM mcr.microsoft.com/cbl-mariner/base/core@sha256:77651116f2e83cf50fddd8a0316945499f8ce6521ff8e94e67539180d1e5975a as mariner-core
