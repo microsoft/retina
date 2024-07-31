@@ -133,38 +133,9 @@ func (p *Plugin) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to setup initial pktmon stream: %w", err)
 	}
 
-	eventCh := make(chan *v1.Event, eventChannelSize)
-
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				p.l.Info("pktmon plugin context done")
-				return
-			case ev := <-eventCh:
-				if p.enricher != nil {
-					p.enricher.Write(ev)
-				} else {
-					p.l.Error("enricher is nil when writing event")
-				}
-
-				// Write the event to the external channel.
-				if p.externalChannel != nil {
-					select {
-					case p.externalChannel <- ev:
-					default:
-						// Channel is full, drop the event.
-						// We shouldn't slow down the reader.
-						metrics.LostEventsCounter.WithLabelValues(utils.ExternalChannel, string(Name)).Inc()
-					}
-				}
-			}
-		}
-	}()
-
 	// run the getflows loop
 	for {
-		err := p.GetFlow(ctx, eventCh)
+		err := p.GetFlow(ctx)
 		if _, ok := status.FromError(err); ok {
 			p.l.Error("failed to get flow, retriable:", zap.Error(err))
 			continue
@@ -213,7 +184,7 @@ func (p *Plugin) StartStream(ctx context.Context) error {
 	return nil
 }
 
-func (p *Plugin) GetFlow(ctx context.Context, eventCh chan<- *v1.Event) error {
+func (p *Plugin) GetFlow(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -242,7 +213,23 @@ func (p *Plugin) GetFlow(ctx context.Context, eventCh chan<- *v1.Event) error {
 				Event:     fl,
 				Timestamp: fl.GetTime(),
 			}
-			eventCh <- ev
+
+			if p.enricher != nil {
+				p.enricher.Write(ev)
+			} else {
+				p.l.Error("enricher is nil when writing event")
+			}
+
+			// Write the event to the external channel.
+			if p.externalChannel != nil {
+				select {
+				case p.externalChannel <- ev:
+				default:
+					// Channel is full, drop the event.
+					// We shouldn't slow down the reader.
+					metrics.LostEventsCounter.WithLabelValues(utils.ExternalChannel, string(Name)).Inc()
+				}
+			}
 		}
 	}
 }
