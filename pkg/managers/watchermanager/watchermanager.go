@@ -73,7 +73,7 @@ func (wm *WatcherManager) runWatcher(ctx context.Context, w IWatcher) error {
 		case <-ticker.C:
 			err := w.Refresh(ctx)
 			if err != nil {
-				wm.l.Error("refresh failed", zap.Error(err))
+				wm.l.Warn("refresh failed", zap.Error(err))
 				continue
 			}
 		}
