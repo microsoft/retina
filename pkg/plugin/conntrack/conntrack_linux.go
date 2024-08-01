@@ -19,7 +19,7 @@ import (
 	"go.uber.org/zap"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type ct_key conntrack ./_cprog/conntrack.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type ct_v4_key conntrack ./_cprog/conntrack.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src
 
 var (
 	ct   *Conntrack
@@ -69,6 +69,19 @@ func decodeFlags(flags uint8) string {
 		return "None"
 	}
 	return strings.Join(flagDescriptions, ", ")
+}
+
+func decodeProto(proto uint8) string {
+	switch proto {
+	case 1:
+		return "ICMP"
+	case 6:
+		return "TCP"
+	case 17:
+		return "UDP"
+	default:
+		return "Unknown"
+	}
 }
 
 type Conntrack struct {
@@ -122,7 +135,7 @@ func (ct *Conntrack) Close() {
 
 // Run starts the Conntrack garbage collection loop.
 func (ct *Conntrack) Run(ctx context.Context) error {
-	ticker := time.NewTicker(10 * time.Second) //nolint:gomnd // 10 seconds
+	ticker := time.NewTicker(15 * time.Second) //nolint:gomnd // 10 seconds
 	defer ticker.Stop()
 
 	ct.l.Info("Starting Conntrack GC loop")
@@ -133,12 +146,12 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			ct.Close()
 			return nil
 		case <-ticker.C:
-			var key conntrackCtKey
+			var key conntrackCtV4Key
 			var value conntrackCtValue
 
 			var noOfCtEntries, entriesDeleted int
 			// List of keys to be deleted
-			var keysToDelete []conntrackCtKey
+			var keysToDelete []conntrackCtV4Key
 			iter := ct.ctmap.Iterate()
 			for iter.Next(&key, &value) {
 				noOfCtEntries++
@@ -154,7 +167,7 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 					zap.Uint32("srcPort", sourcePortShort),
 					zap.String("dstIP", dstIP.String()),
 					zap.Uint32("dstPort", destinationPortShort),
-					zap.Uint8("proto", key.Proto),
+					zap.String("proto", decodeProto(key.Proto)),
 					zap.Uint32("lifetime", value.Lifetime),
 					zap.Uint16("isClosing", value.IsClosing),
 					zap.String("flags_seen", decodeFlags(value.FlagsSeen)),

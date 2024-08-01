@@ -184,15 +184,6 @@ static void parse(struct __sk_buff *skb, direction d)
 	#endif
 	#endif
 
-	// Create ct_key from packet
-    struct ct_key key;
-    __builtin_memset(&key, 0, sizeof(struct ct_key));
-    key.src_ip = p.src_ip;
-    key.dst_ip = p.dst_ip;
-    key.src_port = 0;
-    key.dst_port = 0;
-    key.proto = p.proto;
-
     __u8 flags = 0;
 	// Get source and destination ports.
 	if (ip->protocol == IPPROTO_TCP)
@@ -203,9 +194,6 @@ static void parse(struct __sk_buff *skb, direction d)
 
 		p.src_port = tcp->source;
 		p.dst_port = tcp->dest;
-
-		key.src_port = tcp->source;
-        key.dst_port = tcp->dest;
 
         // Get all TCP flags.
 		flags = (tcp->fin << 0) | (tcp->syn << 1) | (tcp->rst << 2) | (tcp->psh << 3) | (tcp->ack << 4) | (tcp->urg << 5) | (tcp->ece << 6) | (tcp->cwr << 7);
@@ -240,14 +228,19 @@ static void parse(struct __sk_buff *skb, direction d)
 
 		p.src_port = udp->source;
 		p.dst_port = udp->dest;
-
-		key.src_port = udp->source;
-        key.dst_port = udp->dest;
 	}
 	else
 	{
 		return;
 	}
+	// Create a new conntrack key.
+	struct ct_v4_key key;
+	__builtin_memset(&key, 0, sizeof(struct ct_v4_key));
+	key.src_ip = p.src_ip;
+	key.dst_ip = p.dst_ip;
+	key.src_port = p.src_port;
+	key.dst_port = p.dst_port;
+	key.proto = p.proto;
 	// Process the packet with ct_process_packet if the packet is from a TCP connection.
 	if (ip->protocol == IPPROTO_TCP) {
 		if (ct_process_packet(&key, flags)) {
