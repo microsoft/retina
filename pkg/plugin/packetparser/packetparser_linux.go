@@ -525,13 +525,6 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 			p.l.Info("Context is done, stopping Worker", zap.Int("worker_id", id))
 			return
 		case record := <-p.recordsChannel:
-			p.l.Debug("Received record",
-				zap.Int("cpu", record.CPU),
-				zap.Uint64("lost_samples", record.LostSamples),
-				zap.Int("bytes_remaining", record.Remaining),
-				zap.Int("worker_id", id),
-			)
-
 			var bpfEvent packetparserPacket
 			err := binary.Read(bytes.NewReader(record.RawSample), binary.LittleEndian, &bpfEvent)
 			if err != nil {
@@ -578,6 +571,9 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 
 			// Add metadata to the flow.
 			utils.AddRetinaMetadata(fl, meta)
+
+			// Log the flow.
+			p.l.Debug("Flow", zap.Any("flow", fl))
 
 			// Write the event to the enricher.
 			ev := &v1.Event{

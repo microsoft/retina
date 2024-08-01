@@ -186,12 +186,12 @@ static void parse(struct __sk_buff *skb, direction d)
 
 	// Create ct_key from packet
     struct ct_key key;
-    __builtin_memset(&key, 0, sizeof(key));
+    __builtin_memset(&key, 0, sizeof(struct ct_key));
     key.src_ip = p.src_ip;
     key.dst_ip = p.dst_ip;
     key.src_port = 0;
     key.dst_port = 0;
-    key.protocol = p.proto;
+    key.proto = p.proto;
 
     __u8 flags = 0;
 	// Get source and destination ports.
@@ -207,8 +207,8 @@ static void parse(struct __sk_buff *skb, direction d)
 		key.src_port = tcp->source;
         key.dst_port = tcp->dest;
 
-        // Get TCP flags
-        flags = tcp->fin | (tcp->syn << 1) | (tcp->rst << 2) | (tcp->psh << 3) | (tcp->ack << 4) | (tcp->urg << 5);
+        // Get all TCP flags.
+		flags = (tcp->fin << 0) | (tcp->syn << 1) | (tcp->rst << 2) | (tcp->psh << 3) | (tcp->ack << 4) | (tcp->urg << 5) | (tcp->ece << 6) | (tcp->cwr << 7);
 
 
 		// Get TCP metadata.
@@ -248,15 +248,23 @@ static void parse(struct __sk_buff *skb, direction d)
 	{
 		return;
 	}
-	// Process the packet with ct_process_packet
-    if (ct_process_packet(&key, flags))
-    {
-        // If the packet is TCP and the flags have not been seen before, send it to the perf buffer.
-        bpf_perf_event_output(skb, &packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
-    }
+	// Process the packet with ct_process_packet if the packet is from a TCP connection.
+	if (ip->protocol == IPPROTO_TCP) {
+		if (ct_process_packet(&key, flags)) {
+			// Send the packet to the perf buffer.
+			bpf_perf_event_output(skb, &packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
+			return;
+		}
+	} else if (ip->protocol == IPPROTO_UDP) {
+		// Send the packet to the perf buffer.
+		bpf_perf_event_output(skb, &packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
+		return;
+	} else {
+		return;
+	}
 }
 
-SEC("classifier_endpoint_ingress")
+SEC("tc/ingress")
 int endpoint_ingress_filter(struct __sk_buff *skb)
 {
 	// This is attached to the interface on the host side.
@@ -266,7 +274,7 @@ int endpoint_ingress_filter(struct __sk_buff *skb)
 	return TC_ACT_UNSPEC;
 }
 
-SEC("classifier_endpoint_egress")
+SEC("tc/egress")
 int endpoint_egress_filter(struct __sk_buff *skb)
 {
 	// This is attached to the interface on the host side.
@@ -276,7 +284,7 @@ int endpoint_egress_filter(struct __sk_buff *skb)
 	return TC_ACT_UNSPEC;
 }
 
-SEC("classifier_host_ingress")
+SEC("tc/ingress")
 int host_ingress_filter(struct __sk_buff *skb)
 {
 	parse(skb, FROM_NETWORK);
@@ -284,7 +292,7 @@ int host_ingress_filter(struct __sk_buff *skb)
 	return TC_ACT_UNSPEC;
 }
 
-SEC("classifier_host_egress")
+SEC("tc/egress")
 int host_egress_filter(struct __sk_buff *skb)
 {
 	parse(skb, TO_NETWORK);

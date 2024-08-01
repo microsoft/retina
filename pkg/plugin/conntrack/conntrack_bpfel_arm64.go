@@ -13,19 +13,21 @@ import (
 )
 
 type conntrackCtKey struct {
-	SrcIp    uint32
-	DstIp    uint32
-	SrcPort  uint16
-	DstPort  uint16
-	Protocol uint8
-	_        [3]byte
+	SrcIp   uint32
+	DstIp   uint32
+	SrcPort uint16
+	DstPort uint16
+	Proto   uint8
+	_       [3]byte
 }
 
 type conntrackCtValue struct {
-	Timestamp uint64
-	Flags     uint32
-	IsClosed  uint8
-	_         [3]byte
+	Lifetime   uint32
+	FlagsSeen  uint8
+	_          [3]byte
+	LastReport uint32
+	IsClosing  uint16
+	_          [2]byte
 }
 
 // loadConntrack returns the embedded CollectionSpec for conntrack.

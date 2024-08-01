@@ -6,14 +6,15 @@ package conntrack
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/rlimit"
-	"github.com/microsoft/retina/internal/ktime"
 	"github.com/microsoft/retina/pkg/log"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
+	"github.com/microsoft/retina/pkg/utils"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
@@ -24,6 +25,51 @@ var (
 	ct   *Conntrack
 	once sync.Once
 )
+
+// Define TCP flag constants
+const (
+	TCP_FIN = 0x01
+	TCP_SYN = 0x02
+	TCP_RST = 0x04
+	TCP_PSH = 0x08
+	TCP_ACK = 0x10
+	TCP_URG = 0x20
+	TCP_ECE = 0x40
+	TCP_CWR = 0x80
+)
+
+// decodeFlags decodes the TCP flags into a human-readable string
+func decodeFlags(flags uint8) string {
+	var flagDescriptions []string
+	if flags&TCP_FIN != 0 {
+		flagDescriptions = append(flagDescriptions, "FIN")
+	}
+	if flags&TCP_SYN != 0 {
+		flagDescriptions = append(flagDescriptions, "SYN")
+	}
+	if flags&TCP_RST != 0 {
+		flagDescriptions = append(flagDescriptions, "RST")
+	}
+	if flags&TCP_PSH != 0 {
+		flagDescriptions = append(flagDescriptions, "PSH")
+	}
+	if flags&TCP_ACK != 0 {
+		flagDescriptions = append(flagDescriptions, "ACK")
+	}
+	if flags&TCP_URG != 0 {
+		flagDescriptions = append(flagDescriptions, "URG")
+	}
+	if flags&TCP_ECE != 0 {
+		flagDescriptions = append(flagDescriptions, "ECE")
+	}
+	if flags&TCP_CWR != 0 {
+		flagDescriptions = append(flagDescriptions, "CWR")
+	}
+	if len(flagDescriptions) == 0 {
+		return "None"
+	}
+	return strings.Join(flagDescriptions, ", ")
+}
 
 type Conntrack struct {
 	l     *log.ZapLogger
@@ -62,7 +108,7 @@ func Init() (*Conntrack, error) {
 	ct.objs = objs
 
 	// Get the conntrack map from the objects
-	ct.ctmap = objs.conntrackMaps.RetinaConntrackMap
+	ct.ctmap = objs.RetinaConntrackMap
 
 	return ct, nil
 }
@@ -74,63 +120,9 @@ func (ct *Conntrack) Close() {
 	}
 }
 
-// gc loops through the conntrack map and deletes entries older than the specified timeout.
-func (ct *Conntrack) gc(timeout time.Duration) {
-	ct.l.Debug("Running Conntrack GC loop")
-
-	var key conntrackCtKey
-	var value conntrackCtValue
-
-	var noOfCtEntries, noOfCtEntriesDeleted int
-
-	iter := ct.ctmap.Iterate()
-	for iter.Next(&key, &value) {
-		noOfCtEntries++
-		ct.l.Debug("ct_key", zap.Uint32("src_ip", key.SrcIp), zap.Uint32("dst_ip", key.DstIp), zap.Uint16("src_port", key.SrcPort), zap.Uint16("dst_port", key.DstPort), zap.Uint8("proto", key.Protocol))
-		ct.l.Debug("ct_value", zap.Uint64("timestamp", value.Timestamp), zap.Uint8("is_closed", value.IsClosed))
-
-		// If the entry is marked as isClosed, delete the key and continue
-		if value.IsClosed == 1 {
-			ct.l.Debug("deleting conntrack entry since it is marked as closed",
-				zap.Uint32("src_ip", key.SrcIp),
-				zap.Uint32("dst_ip", key.DstIp),
-				zap.Uint16("src_port", key.SrcPort),
-				zap.Uint16("dst_port", key.DstPort),
-				zap.Uint8("proto", key.Protocol),
-			)
-			err := ct.ctmap.Delete(&key)
-			if err != nil {
-				ct.l.Error("failed to delete conntrack entry", zap.Error(err))
-			}
-			noOfCtEntriesDeleted++
-			continue
-		}
-
-		// If the last seen time is older than the timeout, delete the key
-		// Convert the timestamp from nanoseconds to a time.Time value
-		lastSeen := ktime.MonotonicOffset.Nanoseconds() + int64(value.Timestamp)
-
-		if time.Since(time.Unix(lastSeen, 0)) > timeout {
-			ct.l.Debug("deleting conntrack entry since it is older than the timeout",
-				zap.Uint32("src_ip", key.SrcIp), zap.Uint32("dst_ip", key.DstIp),
-				zap.Uint16("src_port", key.SrcPort),
-				zap.Uint16("dst_port", key.DstPort),
-				zap.Uint8("proto", key.Protocol),
-			)
-			err := ct.ctmap.Delete(&key)
-			if err != nil {
-				ct.l.Error("failed to delete conntrack entry", zap.Error(err))
-			}
-			noOfCtEntriesDeleted++
-		}
-	}
-	// Log the number of entries and the number of entries deleted
-	ct.l.Info("Conntrack GC loop completed", zap.Int("no_of_ct_entries", noOfCtEntries), zap.Int("no_of_ct_entries_deleted", noOfCtEntriesDeleted))
-}
-
-// Start starts the Conntrack GC loop. It runs every 30 seconds and deletes entries older than 5 minutes.
+// Run starts the Conntrack garbage collection loop.
 func (ct *Conntrack) Run(ctx context.Context) error {
-	ticker := time.NewTicker(30 * time.Second) //nolint:gomnd // 30 seconds
+	ticker := time.NewTicker(10 * time.Second) //nolint:gomnd // 10 seconds
 	defer ticker.Stop()
 
 	ct.l.Info("Starting Conntrack GC loop")
@@ -141,7 +133,46 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			ct.Close()
 			return nil
 		case <-ticker.C:
-			ct.gc(5 * time.Minute) //nolint:gomnd // 5 minutes
+			var key conntrackCtKey
+			var value conntrackCtValue
+
+			var noOfCtEntries, entriesDeleted int
+			// List of keys to be deleted
+			var keysToDelete []conntrackCtKey
+			iter := ct.ctmap.Iterate()
+			for iter.Next(&key, &value) {
+				noOfCtEntries++
+				if value.IsClosing == 1 {
+					keysToDelete = append(keysToDelete, key)
+				}
+				// Log the conntrack entry
+				srcIP := utils.Int2ip(key.SrcIp).To4()
+				dstIP := utils.Int2ip(key.DstIp).To4()
+				sourcePortShort := uint32(utils.HostToNetShort(key.SrcPort))
+				destinationPortShort := uint32(utils.HostToNetShort(key.DstPort))
+				ct.l.Info("Conntrack entry", zap.String("srcIP", srcIP.String()),
+					zap.Uint32("srcPort", sourcePortShort),
+					zap.String("dstIP", dstIP.String()),
+					zap.Uint32("dstPort", destinationPortShort),
+					zap.Uint8("proto", key.Proto),
+					zap.Uint32("lifetime", value.Lifetime),
+					zap.Uint16("isClosing", value.IsClosing),
+					zap.String("flags_seen", decodeFlags(value.FlagsSeen)),
+					zap.Uint32("last_reported", value.LastReport),
+				)
+			}
+			if err := iter.Err(); err != nil {
+				ct.l.Error("Iterate failed", zap.Error(err))
+			}
+			// Delete the conntrack entries
+			for _, key := range keysToDelete {
+				if err := ct.ctmap.Delete(key); err != nil {
+					ct.l.Error("Delete failed", zap.Error(err))
+				} else {
+					entriesDeleted++
+				}
+			}
+			ct.l.Info("Number of conntrack entries", zap.Int("noOfCtEntries", noOfCtEntries), zap.Int("entriesDeleted", entriesDeleted))
 		}
 	}
 }

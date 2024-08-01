@@ -40,7 +40,7 @@ image:
 enablePodLevel: false
 remoteContext: false
 enableAnnotations: false
-bypassLookupIPOfInterest: false
+bypassLookupIPOfInterest: true
 
 imagePullSecrets: []
 nameOverride: "retina"
