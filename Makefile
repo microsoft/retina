@@ -176,7 +176,7 @@ retina: ## builds retina binary
 retina-binary: ## build the Retina binary
 	export CGO_ENABLED=0 && \
 	go generate ./... && \
-	go build -v -o $(RETINA_BUILD_DIR)/retina$(EXE_EXT) -gcflags="-dwarflocationlists=true" -ldflags "-X main.version=$(TAG) -X main.applicationInsightsID=$(APP_INSIGHTS_ID)" $(RETINA_DIR)/main.go
+	go build -v -o $(RETINA_BUILD_DIR)/retina$(EXE_EXT) -gcflags="-dwarflocationlists=true" -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version=$(TAG) -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=$(APP_INSIGHTS_ID)" $(RETINA_DIR)/main.go
 
 retina-capture-workload: ## build the Retina capture workload
 	cd $(CAPTURE_WORKLOAD_DIR) && CGO_ENABLED=0 go build -v -o $(RETINA_BUILD_DIR)/captureworkload$(EXE_EXT) -gcflags="-dwarflocationlists=true"  -ldflags "-X main.version=$(TAG)"

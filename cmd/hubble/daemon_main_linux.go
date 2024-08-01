@@ -32,6 +32,7 @@ import (
 	"github.com/cilium/cilium/pkg/promise"
 	"github.com/cilium/cilium/pkg/time"
 	"github.com/cilium/proxy/pkg/logging"
+	"github.com/microsoft/retina/internal/buildinfo"
 	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/managers/pluginmanager"
@@ -49,14 +50,6 @@ import (
 const (
 	configFileName string = "config.yaml"
 	logFileName    string = "retina.log"
-)
-
-var (
-	// Below two fields are set while building the binary
-	// they are passed in as ldflags
-	// see dockerfile
-	applicationInsightsID string
-	retinaVersion         string
 )
 
 func InitGlobalFlags(cmd *cobra.Command, vp *viper.Viper) {
@@ -203,7 +196,7 @@ func newDaemonPromise(params daemonParams) promise.Promise[*Daemon] {
 			daemon = d
 			daemonResolver.Resolve(daemon)
 
-			d.log.Info("starting Retina Enterprise version: ", retinaVersion)
+			d.log.Info("starting Retina Enterprise version: ", buildinfo.Version)
 			err := d.Run(daemonCtx)
 			if err != nil {
 				return fmt.Errorf("daemon run failed: %w", err)
@@ -253,12 +246,12 @@ func setupZapLogger(retinaConfig *config.Config, k8sCfg *rest.Config) *log.ZapLo
 		MaxFileSizeMB:         100, //nolint:gomnd // this is obvious from usage
 		MaxBackups:            3,   //nolint:gomnd // this is obvious from usage
 		MaxAgeDays:            30,  //nolint:gomnd // this is obvious from usage
-		ApplicationInsightsID: applicationInsightsID,
+		ApplicationInsightsID: buildinfo.ApplicationInsightsID,
 		EnableTelemetry:       retinaConfig.EnableTelemetry,
 	}
 
 	persistentFields := []zap.Field{
-		zap.String("version", retinaVersion),
+		zap.String("version", buildinfo.Version),
 		zap.String("apiserver", k8sCfg.Host),
 		zap.Strings("plugins", retinaConfig.EnabledPlugin),
 	}
@@ -269,7 +262,7 @@ func setupZapLogger(retinaConfig *config.Config, k8sCfg *rest.Config) *log.ZapLo
 	}
 
 	namedLogger := log.Logger().Named("retina-with-hubble")
-	namedLogger.Info("Traces telemetry initialized with zapai", zap.String("version", retinaVersion), zap.String("appInsightsID", applicationInsightsID))
+	namedLogger.Info("Traces telemetry initialized with zapai", zap.String("version", buildinfo.Version), zap.String("appInsightsID", buildinfo.ApplicationInsightsID))
 
 	return namedLogger
 }

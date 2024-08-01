@@ -25,6 +25,7 @@ import (
 
 	"github.com/go-logr/zapr"
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
+	"github.com/microsoft/retina/internal/buildinfo"
 	"github.com/microsoft/retina/pkg/config"
 	controllercache "github.com/microsoft/retina/pkg/controllers/cache"
 	mcc "github.com/microsoft/retina/pkg/controllers/daemon/metricsconfiguration"
@@ -53,15 +54,7 @@ const (
 	nodeIPEnvKey   = "NODE_IP"
 )
 
-var (
-	scheme = k8sruntime.NewScheme()
-
-	// applicationInsightsID is the instrumentation key for Azure Application Insights
-	// It is set during the build process using the -ldflags flag
-	// If it is set, the application will send telemetry to the corresponding Application Insights resource.
-	applicationInsightsID string
-	version               string
-)
+var scheme = k8sruntime.NewScheme()
 
 func init() {
 	//+kubebuilder:scaffold:scheme
@@ -86,10 +79,10 @@ func NewDaemon(metricsAddr, probeAddr, configFile string, enableLeaderElection b
 }
 
 func (d *Daemon) Start() error {
-	fmt.Printf("starting Retina daemon with legacy control plane %v\n", version)
+	fmt.Printf("starting Retina daemon with legacy control plane %v\n", buildinfo.Version)
 
-	if applicationInsightsID != "" {
-		telemetry.InitAppInsights(applicationInsightsID, version)
+	if buildinfo.ApplicationInsightsID != "" {
+		telemetry.InitAppInsights(buildinfo.ApplicationInsightsID, buildinfo.Version)
 		defer telemetry.ShutdownAppInsights()
 		defer telemetry.TrackPanic()
 	}
@@ -113,10 +106,10 @@ func (d *Daemon) Start() error {
 		MaxFileSizeMB:         100, //nolint:gomnd // defaults
 		MaxBackups:            3,   //nolint:gomnd // defaults
 		MaxAgeDays:            30,  //nolint:gomnd // defaults
-		ApplicationInsightsID: applicationInsightsID,
+		ApplicationInsightsID: buildinfo.ApplicationInsightsID,
 		EnableTelemetry:       daemonConfig.EnableTelemetry,
 	},
-		zap.String("version", version),
+		zap.String("version", buildinfo.Version),
 		zap.String("apiserver", cfg.Host),
 		zap.String("plugins", strings.Join(daemonConfig.EnabledPlugin, `,`)),
 	)
@@ -129,10 +122,10 @@ func (d *Daemon) Start() error {
 	metrics.InitializeMetrics()
 
 	var tel telemetry.Telemetry
-	if daemonConfig.EnableTelemetry && applicationInsightsID != "" {
-		mainLogger.Info("telemetry enabled", zap.String("applicationInsightsID", applicationInsightsID))
+	if daemonConfig.EnableTelemetry && buildinfo.ApplicationInsightsID != "" {
+		mainLogger.Info("telemetry enabled", zap.String("applicationInsightsID", buildinfo.ApplicationInsightsID))
 		tel = telemetry.NewAppInsightsTelemetryClient("retina-agent", map[string]string{
-			"version":   version,
+			"version":   buildinfo.Version,
 			"apiserver": cfg.Host,
 			"plugins":   strings.Join(daemonConfig.EnabledPlugin, `,`),
 		})
