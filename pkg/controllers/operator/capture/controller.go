@@ -298,7 +298,7 @@ func (cr *CaptureReconciler) handleUpdate(ctx context.Context, capture *retinav1
 		},
 	); err != nil {
 		cr.logger.Error("Failed to list Capture jobs", zap.Error(err), zap.String("Capture", captureRef.String()))
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to list Capture jobs, %w", err)
 	}
 
 	// Once the jobs are created, we'll update the status of the Capture according to the status of the jobs.
@@ -315,7 +315,7 @@ func (cr *CaptureReconciler) handleUpdate(ctx context.Context, capture *retinav1
 			sasURL, err := cr.managedStorageAccountManager.CreateContainerSASURL(ctx, capture.Namespace, capture.Spec.CaptureConfiguration.CaptureOption.Duration.Duration)
 			if err != nil {
 				cr.logger.Error("Failed to create Capture SAS URL", zap.Error(err), zap.String("Capture", captureRef.String()))
-				return ctrl.Result{}, err
+				return ctrl.Result{}, fmt.Errorf("failed to create Capture SAS URL, %w", err)
 			}
 
 			secret := getSecretFromCapture(capture, sasURL)
