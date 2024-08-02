@@ -6,27 +6,23 @@
 #include "vmlinux.h"
 #include "bpf_helpers.h"
 
-
+// Helper functions to get the current time
+// Ref: https://github.com/cilium/cilium/blob/6186d579ed60f334c7a4daaf81060797b02cc6bd/bpf/lib/time.h
 #define NSEC_PER_SEC	(1000ULL * 1000ULL * 1000UL)
-#define NSEC_PER_MSEC	(1000ULL * 1000ULL)
-#define NSEC_PER_USEC	(1000UL)
-
-/* Monotonic clock, scalar format. */
 #define bpf_ktime_get_sec()	\
-	({ __u64 __x = bpf_ktime_get_ns() / NSEC_PER_SEC; __x; })
-#define bpf_ktime_get_msec()	\
-	({ __u64 __x = bpf_ktime_get_ns() / NSEC_PER_MSEC; __x; })
-#define bpf_ktime_get_usec()	\
-	({ __u64 __x = bpf_ktime_get_ns() / NSEC_PER_USEC; __x; })
-#define bpf_ktime_get_nsec()	\
-	({ __u64 __x = bpf_ktime_get_ns(); __x; })
-
+	({ __u64 __x = bpf_ktime_get_boot_ns() / NSEC_PER_SEC; __x; })
 # define bpf_mono_now()		bpf_ktime_get_sec()
 
-#define CT_CONNECTION_LIFETIME_TCP  360 // 6 minutes
-#define CT_CONNECTION_LIFETIME_NONTCP	60 // 1 minute
-#define CT_SYN_TIMEOUT                  60 // 1 minute
-#define CT_REPORT_INTERVAL              5 // 5 seconds
+// These units are in seconds
+
+// Define how long a TCP connection should be kept in the table
+#define CT_CONNECTION_LIFETIME_TCP 360 
+// Define how long a non-TCP connection should be kept in the table
+#define CT_CONNECTION_LIFETIME_NONTCP 60
+// Define how long a TCP connection should be kept alive after receiving the first SYN
+#define CT_SYN_TIMEOUT 60
+// Define the interval at which a packet should be sent to the userspace
+#define CT_REPORT_INTERVAL 15
 
 enum tcp_flags {
     TCP_FIN = 0x01,

@@ -451,8 +451,7 @@ helm-install-advanced-local-context: manifests
 		--set operator.enableRetinaEndpoint=true \
 		--set operator.repository=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE) \
 		--skip-crds \
-		--set enabledPlugin_linux="\[packetparser\]" \
-		--set bypassLookupIPOfInterest=true \
+		--set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\,packetparser\]" \
 		--set enablePodLevel=true \
 		--set enableAnnotations=true
 

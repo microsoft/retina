@@ -257,7 +257,7 @@ static void parse(struct __sk_buff *skb, direction d)
 	}
 }
 
-SEC("tc/ingress")
+SEC("classifier_endpoint_ingress")
 int endpoint_ingress_filter(struct __sk_buff *skb)
 {
 	// This is attached to the interface on the host side.
@@ -267,7 +267,7 @@ int endpoint_ingress_filter(struct __sk_buff *skb)
 	return TC_ACT_UNSPEC;
 }
 
-SEC("tc/egress")
+SEC("classifier_endpoint_egress")
 int endpoint_egress_filter(struct __sk_buff *skb)
 {
 	// This is attached to the interface on the host side.
@@ -277,7 +277,7 @@ int endpoint_egress_filter(struct __sk_buff *skb)
 	return TC_ACT_UNSPEC;
 }
 
-SEC("tc/ingress")
+SEC("classifier_host_ingress")
 int host_ingress_filter(struct __sk_buff *skb)
 {
 	parse(skb, FROM_NETWORK);
@@ -285,7 +285,7 @@ int host_ingress_filter(struct __sk_buff *skb)
 	return TC_ACT_UNSPEC;
 }
 
-SEC("tc/egress")
+SEC("classifier_host_egress")
 int host_egress_filter(struct __sk_buff *skb)
 {
 	parse(skb, TO_NETWORK);

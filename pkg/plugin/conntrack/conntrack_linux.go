@@ -6,14 +6,17 @@ package conntrack
 
 import (
 	"context"
-	"strings"
-	"sync"
 	"time"
 
+	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/rlimit"
+	"github.com/microsoft/retina/internal/ktime"
+	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
+	"github.com/microsoft/retina/pkg/plugin/api"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
+	_ "github.com/microsoft/retina/pkg/plugin/conntrack/_cprog" // nolint // This is needed so cprog is included when vendoring
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -21,90 +24,30 @@ import (
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type ct_v4_key conntrack ./_cprog/conntrack.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src
 
-var (
-	ct   *Conntrack
-	once sync.Once
-)
-
-// Define TCP flag constants
-const (
-	TCP_FIN = 0x01
-	TCP_SYN = 0x02
-	TCP_RST = 0x04
-	TCP_PSH = 0x08
-	TCP_ACK = 0x10
-	TCP_URG = 0x20
-	TCP_ECE = 0x40
-	TCP_CWR = 0x80
-)
-
-// decodeFlags decodes the TCP flags into a human-readable string
-func decodeFlags(flags uint8) string {
-	var flagDescriptions []string
-	if flags&TCP_FIN != 0 {
-		flagDescriptions = append(flagDescriptions, "FIN")
-	}
-	if flags&TCP_SYN != 0 {
-		flagDescriptions = append(flagDescriptions, "SYN")
-	}
-	if flags&TCP_RST != 0 {
-		flagDescriptions = append(flagDescriptions, "RST")
-	}
-	if flags&TCP_PSH != 0 {
-		flagDescriptions = append(flagDescriptions, "PSH")
-	}
-	if flags&TCP_ACK != 0 {
-		flagDescriptions = append(flagDescriptions, "ACK")
-	}
-	if flags&TCP_URG != 0 {
-		flagDescriptions = append(flagDescriptions, "URG")
-	}
-	if flags&TCP_ECE != 0 {
-		flagDescriptions = append(flagDescriptions, "ECE")
-	}
-	if flags&TCP_CWR != 0 {
-		flagDescriptions = append(flagDescriptions, "CWR")
-	}
-	if len(flagDescriptions) == 0 {
-		return "None"
-	}
-	return strings.Join(flagDescriptions, ", ")
-}
-
-func decodeProto(proto uint8) string {
-	switch proto {
-	case 1:
-		return "ICMP"
-	case 6:
-		return "TCP"
-	case 17:
-		return "UDP"
-	default:
-		return "Unknown"
+// New creates a packetparser plugin.
+func New(_ *config.Config) api.Plugin {
+	return &conntrack{
+		l: log.Logger().Named(string(Name)),
 	}
 }
 
-type Conntrack struct {
-	l     *log.ZapLogger
-	objs  *conntrackObjects
-	ctmap *ebpf.Map
+func (ct *conntrack) Name() string {
+	return Name
 }
 
-func Init() (*Conntrack, error) {
-	once.Do(func() {
-		ct = &Conntrack{}
-	})
-	if ct.l == nil {
-		ct.l = log.Logger().Named("conntrack")
-	}
-	if ct.objs != nil {
-		return ct, nil
-	}
+func (ct *conntrack) Generate(_ context.Context) error {
+	return nil
+}
 
+func (ct *conntrack) Compile(_ context.Context) error {
+	return nil
+}
+
+func (ct *conntrack) Init() error {
 	// Allow the current process to lock memory for eBPF resources.
 	if err := rlimit.RemoveMemlock(); err != nil {
 		ct.l.Error("RemoveMemlock failed", zap.Error(err))
-		return ct, errors.Wrapf(err, "failed to remove memlock limit")
+		return errors.Wrapf(err, "failed to remove memlock limit")
 	}
 
 	objs := &conntrackObjects{}
@@ -115,7 +58,7 @@ func Init() (*Conntrack, error) {
 	})
 	if err != nil {
 		ct.l.Error("loadConntrackObjects failed", zap.Error(err))
-		return ct, err
+		return errors.Wrap(err, "failed to load conntrack objects")
 	}
 
 	ct.objs = objs
@@ -123,19 +66,12 @@ func Init() (*Conntrack, error) {
 	// Get the conntrack map from the objects
 	ct.ctmap = objs.RetinaConntrackMap
 
-	return ct, nil
-}
-
-// Close cleans up the Conntrack plugin.
-func (ct *Conntrack) Close() {
-	if ct.objs != nil {
-		ct.objs.Close()
-	}
+	return nil
 }
 
 // Run starts the Conntrack garbage collection loop.
-func (ct *Conntrack) Run(ctx context.Context) error {
-	ticker := time.NewTicker(15 * time.Second) //nolint:gomnd // 10 seconds
+func (ct *conntrack) Start(ctx context.Context) error {
+	ticker := time.NewTicker(defaultGCFrequency)
 	defer ticker.Stop()
 
 	ct.l.Info("Starting Conntrack GC loop")
@@ -143,7 +79,6 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			ct.Close()
 			return nil
 		case <-ticker.C:
 			var key conntrackCtV4Key
@@ -155,15 +90,18 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			iter := ct.ctmap.Iterate()
 			for iter.Next(&key, &value) {
 				noOfCtEntries++
-				if value.IsClosing == 1 {
-					keysToDelete = append(keysToDelete, key)
+				if value.IsClosing == 1 || ktime.MonotonicOffset.Seconds()+float64(value.Lifetime) < float64((time.Now().Unix())) {
+					// Iterating a hash map from which keys are being deleted is not safe.
+					// So, we store the keys to be deleted in a list and delete them after the iteration.
+					keyCopy := key // Copy the key to avoid using the same key in the next iteration
+					keysToDelete = append(keysToDelete, keyCopy)
 				}
 				// Log the conntrack entry
 				srcIP := utils.Int2ip(key.SrcIp).To4()
 				dstIP := utils.Int2ip(key.DstIp).To4()
 				sourcePortShort := uint32(utils.HostToNetShort(key.SrcPort))
 				destinationPortShort := uint32(utils.HostToNetShort(key.DstPort))
-				ct.l.Info("Conntrack entry", zap.String("srcIP", srcIP.String()),
+				ct.l.Debug("Conntrack entry", zap.String("srcIP", srcIP.String()),
 					zap.Uint32("srcPort", sourcePortShort),
 					zap.String("dstIP", dstIP.String()),
 					zap.Uint32("dstPort", destinationPortShort),
@@ -185,7 +123,24 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 					entriesDeleted++
 				}
 			}
-			ct.l.Info("Number of conntrack entries", zap.Int("noOfCtEntries", noOfCtEntries), zap.Int("entriesDeleted", entriesDeleted))
+			ct.l.Debug("Conntrack GC completed", zap.Int("number_of_entries", noOfCtEntries), zap.Int("entries_deleted", entriesDeleted))
 		}
 	}
+}
+
+// Close cleans up the Conntrack plugin.
+func (ct *conntrack) Stop() error {
+	ct.l.Info("Stopping Conntrack plugin")
+	if ct.objs != nil {
+		err := ct.objs.Close()
+		if err != nil {
+			ct.l.Error("objs.Close failed", zap.Error(err))
+			return errors.Wrap(err, "failed to close conntrack objects")
+		}
+	}
+	return nil
+}
+
+func (ct *conntrack) SetupChannel(_ chan *v1.Event) error {
+	return nil
 }

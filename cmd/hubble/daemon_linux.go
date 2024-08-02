@@ -14,7 +14,6 @@ import (
 	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/managers/pluginmanager"
 	"github.com/microsoft/retina/pkg/managers/servermanager"
-	"github.com/microsoft/retina/pkg/plugin/conntrack"
 
 	retinak8s "github.com/microsoft/retina/pkg/k8s"
 
@@ -134,17 +133,6 @@ func (d *Daemon) Run(ctx context.Context) error {
 	// Start K8s watcher. Will block till sync is complete or timeout.
 	// If sync doesn't complete within timeout (3 minutes), causes fatal error.
 	retinak8s.Start(ctx, d.k8swatcher)
-
-	ct, err := conntrack.Init()
-	if err != nil {
-		return errors.Wrap(err, "failed to initialize conntrack")
-	}
-	go func() {
-		err := ct.Run(ctx)
-		if err != nil {
-			d.log.WithError(err).Error("Conntrack garbage collection loop failed")
-		}
-	}()
 
 	go d.generateEvents(ctx)
 	return nil

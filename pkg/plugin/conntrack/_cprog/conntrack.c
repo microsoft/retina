@@ -21,7 +21,7 @@ struct ct_v4_key {
  **/
 struct ct_value {
     /* 
-        * lifetime represents the time when the connection will be closed.
+        * lifetime represents the time when the connection should be timed out.
     */
     __u32 lifetime;
     /*
@@ -145,7 +145,7 @@ static __always_inline void replicate_ct_v4_key(struct ct_v4_key *new_key, const
     * @arg flags The flags of the packet.
     * Returns true if the packet should be report to userspace. False otherwise.
 **/
-static __always_inline bool ct_process_packet(struct ct_v4_key *key, __u8 flags) {
+static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_v4_key *key, __u8 flags) {
     if (!key) {
         return false;
     }

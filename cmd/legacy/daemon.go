@@ -34,7 +34,6 @@ import (
 	pc "github.com/microsoft/retina/pkg/controllers/daemon/pod"
 	kec "github.com/microsoft/retina/pkg/controllers/daemon/retinaendpoint"
 	sc "github.com/microsoft/retina/pkg/controllers/daemon/service"
-	"github.com/microsoft/retina/pkg/plugin/conntrack"
 
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
@@ -220,16 +219,6 @@ func (d *Daemon) Start() error {
 		}
 		defer fm.Stop() //nolint:errcheck // best effort
 		enrich.Run()
-		ct, err := conntrack.Init()
-		if err != nil {
-			mainLogger.Fatal("unable to create conntrack", zap.Error(err))
-		}
-		go func() {
-			err := ct.Run(ctx)
-			if err != nil {
-				mainLogger.Error("conntrack run failed", zap.Error(err))
-			}
-		}()
 		metricsModule := mm.InitModule(ctx, daemonConfig, pubSub, enrich, fm, controllerCache)
 
 		if !daemonConfig.RemoteContext {

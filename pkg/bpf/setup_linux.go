@@ -85,7 +85,8 @@ func Setup(l *zap.Logger) {
 
 	// Initialize the conntrack map.
 	// This will create the conntrack map in kernel and pin it to /sys/fs/bpf.
-	_, err = conntrack.Init()
+	ct := conntrack.New(nil)
+	err = ct.Init()
 	if err != nil {
 		l.Panic("Failed to initialize conntrack map", zap.Error(err))
 	}
