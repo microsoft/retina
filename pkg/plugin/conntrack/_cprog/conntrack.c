@@ -74,18 +74,21 @@ static __always_inline bool _should_report_tcp_packet(__u8 flags, struct ct_valu
 
     __u32 now = bpf_mono_now();
     __u32 lifetime = value->lifetime;
-    // Check if the connection timed out or closed.
-    if (now >= lifetime || flags & (TCP_FIN | TCP_RST)) {
-        // The connection is closing or closed. Mark the connection as closing.
-        value->is_closing = 1;
-        return true; // Report the last packet received.
-    }
-    // Update the lifetime of the connection.
-    value->lifetime = now + CT_CONNECTION_LIFETIME_TCP;
     __u8 seen_flags = value->flags_seen;
     __u32 last_report = value->last_report;
     // OR the seen flags with the new flags.
     flags |= seen_flags;
+
+    // Check if the connection timed out or closed.
+    if (now >= lifetime || flags & (TCP_FIN | TCP_RST)) {
+        // The connection is closing or closed. Mark the connection as closing. Update the flags seen and last report time.
+        value->is_closing = 1;
+        value->flags_seen = flags;
+        value->last_report = now;
+        return true; // Report the last packet received.
+    }
+    // Update the lifetime of the connection.
+    value->lifetime = now + CT_CONNECTION_LIFETIME_TCP;
     // We will only report this packet iff a new flag is seen or the report interval has passed.
     if (flags != seen_flags || now - last_report >= CT_REPORT_INTERVAL) {
         value->flags_seen = flags;
