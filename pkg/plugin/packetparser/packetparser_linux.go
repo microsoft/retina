@@ -14,6 +14,7 @@ import (
 	"path"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/cilium/cilium/api/v1/flow"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
@@ -41,6 +42,7 @@ import (
 	"github.com/vishvananda/netlink"
 	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type packet packetparser ./_cprog/packetparser.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../filter/_cprog/ -I../conntrack/_cprog/
@@ -227,6 +229,8 @@ func (p *packetParser) Start(ctx context.Context) error {
 	// Create the channel.
 	p.recordsChannel = make(chan perf.Record, buffer)
 	p.l.Debug("Created records channel")
+
+	cacheInit()
 
 	return p.run(ctx)
 }
@@ -537,40 +541,61 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 			sourcePortShort := uint32(utils.HostToNetShort(bpfEvent.SrcPort))
 			destinationPortShort := uint32(utils.HostToNetShort(bpfEvent.DstPort))
 
-			fl := utils.ToFlow(
-				ktime.MonotonicOffset.Nanoseconds()+int64(bpfEvent.Ts),
-				utils.Int2ip(bpfEvent.SrcIp).To4(), // Precautionary To4() call.
-				utils.Int2ip(bpfEvent.DstIp).To4(), // Precautionary To4() call.
-				sourcePortShort,
-				destinationPortShort,
-				bpfEvent.Proto,
-				bpfEvent.Dir,
-				flow.Verdict_FORWARDED,
-			)
-			if fl == nil {
-				p.l.Warn("Could not convert bpfEvent to flow", zap.Any("bpfEvent", bpfEvent))
-				continue
+			// Check cache first.
+			ck := cacheKey{
+				srcIP:   bpfEvent.SrcIp,
+				dstIP:   bpfEvent.DstIp,
+				srcPort: sourcePortShort,
+				dstPort: destinationPortShort,
+				proto:   bpfEvent.Proto,
+				dir:     bpfEvent.Dir,
 			}
 
-			meta := &utils.RetinaMetadata{}
+			var fl *flow.Flow
+			fl, ok := c.Get(ck)
+			if !ok {
+				fl = utils.ToFlow(
+					ktime.MonotonicOffset.Nanoseconds()+int64(bpfEvent.Ts),
+					utils.Int2ip(bpfEvent.SrcIp).To4(), // Precautionary To4() call.
+					utils.Int2ip(bpfEvent.DstIp).To4(), // Precautionary To4() call.
+					sourcePortShort,
+					destinationPortShort,
+					bpfEvent.Proto,
+					bpfEvent.Dir,
+					flow.Verdict_FORWARDED,
+				)
+				if fl == nil {
+					p.l.Warn("Could not convert bpfEvent to flow", zap.Any("bpfEvent", bpfEvent))
+					continue
+				}
+				c.Add(ck, fl)
 
-			// Add packet size to the flow's metadata.
-			utils.AddPacketSize(meta, bpfEvent.Bytes)
+				// meta := &utils.RetinaMetadata{}
 
-			// Add the TCP metadata to the flow.
-			tcpMetadata := bpfEvent.TcpMetadata
-			utils.AddTCPFlags(fl, tcpMetadata.Syn, tcpMetadata.Ack, tcpMetadata.Fin, tcpMetadata.Rst, tcpMetadata.Psh, tcpMetadata.Urg)
+				// // Add packet size to the flow's metadata.
+				// utils.AddPacketSize(meta, bpfEvent.Bytes)
 
-			// For packets originating from node, we use tsval as the tcpID.
-			// Packets coming back has the tsval echoed in tsecr.
-			if fl.TraceObservationPoint == flow.TraceObservationPoint_TO_NETWORK {
-				utils.AddTCPID(meta, uint64(tcpMetadata.Tsval))
-			} else if fl.TraceObservationPoint == flow.TraceObservationPoint_FROM_NETWORK {
-				utils.AddTCPID(meta, uint64(tcpMetadata.Tsecr))
+				// // Add the TCP metadata to the flow.
+				// tcpMetadata := bpfEvent.TcpMetadata
+				// utils.AddTCPFlags(fl, tcpMetadata.Syn, tcpMetadata.Ack, tcpMetadata.Fin, tcpMetadata.Rst, tcpMetadata.Psh, tcpMetadata.Urg)
+
+				// // For packets originating from node, we use tsval as the tcpID.
+				// // Packets coming back has the tsval echoed in tsecr.
+				// if fl.TraceObservationPoint == flow.TraceObservationPoint_TO_NETWORK {
+				// 	utils.AddTCPID(meta, uint64(tcpMetadata.Tsval))
+				// } else if fl.TraceObservationPoint == flow.TraceObservationPoint_FROM_NETWORK {
+				// 	utils.AddTCPID(meta, uint64(tcpMetadata.Tsecr))
+				// }
+
+				// // Add metadata to the flow.
+				// utils.AddRetinaMetadata(fl, meta)
+			} else {
+				if t, err := decodeTime(ktime.MonotonicOffset.Nanoseconds() + int64(bpfEvent.Ts)); err == nil {
+					fl.Time = t
+				} else {
+					p.l.Warn("Failed to get current time", zap.Error(err))
+				}
 			}
-
-			// Add metadata to the flow.
-			utils.AddRetinaMetadata(fl, meta)
 
 			// Log the flow.
 			p.l.Debug("Flow", zap.Any("flow", fl))
@@ -650,4 +675,16 @@ func absPath() (string, error) {
 	}
 	dir := path.Dir(filename)
 	return dir, nil
+}
+
+func decodeTime(nanoseconds int64) (pbTime *timestamppb.Timestamp, err error) {
+	goTime, err := time.Parse(time.RFC3339Nano, time.Unix(0, nanoseconds).Format(time.RFC3339Nano))
+	if err != nil {
+		return nil, err
+	}
+	pbTime = timestamppb.New(goTime)
+	if err = pbTime.CheckValid(); err != nil {
+		return nil, err
+	}
+	return pbTime, nil
 }
