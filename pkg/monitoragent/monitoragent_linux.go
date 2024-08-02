@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/cilium/cilium/api/v1/models"
-	observerTypes "github.com/cilium/cilium/pkg/hubble/observer/types"
 	"github.com/cilium/cilium/pkg/lock"
 	"github.com/cilium/cilium/pkg/monitor/agent/consumer"
 	"github.com/cilium/cilium/pkg/monitor/agent/listener"
@@ -65,19 +64,7 @@ func (a *monitorAgent) SendEvent(typ int, event interface{}) error {
 	// While we want to avoid marshalling events if there are no active
 	// listeners, there's no need to check for active consumers ahead of time.
 
-	log.Info("SendEvent called")
-	// perfEvents are bpf datapath events (reserved for 0-128), where 0 = unspecified
-	if typ > 0 && typ <= 128 {
-		log.Info("SendEvent called with PERF event")
-		event, ok := event.(observerTypes.PerfEvent)
-		if !ok {
-			return fmt.Errorf("unexpected event type for perf event")
-		}
-		a.sendPerfEvent(event)
-	} else {
-		log.Info("SendEvent called with AGENT event")
-		a.notifyAgentEvent(typ, event)
-	}
+	a.notifyAgentEvent(typ, event)
 
 	// do not marshal notifications if there are no active listeners
 	if !a.hasListeners() {
@@ -109,20 +96,6 @@ func (a *monitorAgent) SendEvent(typ int, event interface{}) error {
 	a.sendToListeners(&p)
 
 	return nil
-}
-
-func (a *monitorAgent) sendPerfEvent(event observerTypes.PerfEvent) {
-	a.Lock()
-	defer a.Unlock()
-	a.notifyPerfEventLocked(event.Data, event.CPU)
-}
-
-// notifyPerfEventLocked notifies all consumers about a perf event.
-// The caller must hold the monitor lock.
-func (a *monitorAgent) notifyPerfEventLocked(data []byte, cpu int) {
-	for mc := range a.consumers {
-		mc.NotifyPerfEvent(data, cpu)
-	}
 }
 
 func (a *monitorAgent) RegisterNewListener(newListener listener.MonitorListener) {

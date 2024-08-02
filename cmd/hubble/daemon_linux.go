@@ -19,14 +19,11 @@ import (
 
 	"github.com/cilium/cilium/pkg/hive/cell"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
-	observerTypes "github.com/cilium/cilium/pkg/hubble/observer/types"
 	"github.com/cilium/cilium/pkg/ipcache"
 	"github.com/cilium/cilium/pkg/k8s"
 	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
 	"github.com/cilium/cilium/pkg/k8s/watchers"
-	"github.com/cilium/cilium/pkg/monitor"
 	monitoragent "github.com/cilium/cilium/pkg/monitor/agent"
-	monitorAPI "github.com/cilium/cilium/pkg/monitor/api"
 	"github.com/cilium/cilium/pkg/node"
 	"github.com/cilium/workerpool"
 
@@ -148,18 +145,7 @@ func (d *Daemon) generateEvents(ctx context.Context) {
 			return
 		case event := <-d.eventChan:
 			d.log.WithField("event", event).Debug("Sending event to monitor agent")
-			var err error
-			switch event.Event.(type) {
-			case monitor.LogRecordNotify:
-				err = d.monitorAgent.SendEvent(monitorAPI.MessageTypeAccessLog, event.Event)
-			case monitorAPI.AgentNotifyMessage:
-				err = d.monitorAgent.SendEvent(monitorAPI.MessageTypeAgent, event.Event)
-			case observerTypes.PerfEvent:
-				// send 1 here to signal bpf event
-				err = d.monitorAgent.SendEvent(1, event.Event)
-			default:
-				err = d.monitorAgent.SendEvent(0, event.Event)
-			}
+			err := d.monitorAgent.SendEvent(0, event)
 			if err != nil {
 				d.log.WithError(err).Error("Unable to send event to monitor agent")
 			}
