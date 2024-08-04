@@ -12,7 +12,7 @@ import (
 	"github.com/cilium/ebpf"
 )
 
-type conntrackCtKey struct {
+type conntrackCtV4Key struct {
 	SrcIp   uint32
 	DstIp   uint32
 	SrcPort uint16

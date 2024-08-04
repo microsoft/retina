@@ -130,7 +130,7 @@ static __always_inline bool _should_report_udp_packet(struct ct_value *value) {
     * @arg new_key The new key to be replicated to.
     * @arg key The key to be replicated.
 **/
-static __always_inline void replicate_ct_v4_key(struct ct_v4_key *new_key, const struct ct_v4_key *key) {
+static __always_inline void _replicate_ct_v4_key(struct ct_v4_key *new_key, const struct ct_v4_key *key) {
     __builtin_memset(new_key, 0, sizeof(struct ct_v4_key));
     new_key->src_ip = key->src_ip;
     new_key->dst_ip = key->dst_ip;
@@ -152,7 +152,7 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_
     // Checking whether the key is null is not enough for the eBPF verifier.
     // We need to recreate the key to avoid the verifier error.
     struct ct_v4_key new_key;
-    replicate_ct_v4_key(&new_key, key);
+    _replicate_ct_v4_key(&new_key, key);
     
     // Lookup the connection in the map.
     struct ct_value *value = bpf_map_lookup_elem(&retina_conntrack_map, &new_key);
@@ -249,4 +249,25 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_
             }
     }
     return false;
+}
+
+/**
+ * Check if a packet is a reply packet to a connection.
+ * @arg key The key to be used to check if the packet is a reply packet.
+ */
+static __always_inline __attribute__((unused)) bool is_reply_packet(struct ct_v4_key *key) {
+    if (!key) {
+        return false;
+    }
+    struct ct_v4_key new_key;
+    _replicate_ct_v4_key(&new_key, key);
+    
+    // Lookup the connection in the map.
+    struct ct_value *value = bpf_map_lookup_elem(&retina_conntrack_map, &new_key);
+    if (value) {
+        return false;
+    } else {
+        return true;
+    }
+
 }

@@ -37,6 +37,7 @@ struct packet
 	__u8 proto;
 	struct tcpmetadata tcp_metadata; // TCP metadata
 	direction dir; // 0 -> INGRESS, 1 -> EGRESS
+	bool is_reply; // 0 -> FALSE, 1 -> TRUE
 	__u64 ts; // timestamp in nanoseconds
 	__u64 bytes; // packet size in bytes
 };
@@ -241,20 +242,15 @@ static void parse(struct __sk_buff *skb, direction d)
 	key.src_port = p.src_port;
 	key.dst_port = p.dst_port;
 	key.proto = p.proto;
-	// Process the packet with ct_process_packet if the packet is from a TCP connection.
-	if (ip->protocol == IPPROTO_TCP) {
-		if (ct_process_packet(&key, flags)) {
-			// Send the packet to the perf buffer.
-			bpf_perf_event_output(skb, &packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
-			return;
-		}
-	} else if (ip->protocol == IPPROTO_UDP) {
+
+	if (ct_process_packet(&key, flags)) {
+		// Check if this packet is a reply packet.
+		p.is_reply = is_reply_packet(&key);
+
 		// Send the packet to the perf buffer.
 		bpf_perf_event_output(skb, &packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
-		return;
-	} else {
-		return;
 	}
+	return;
 }
 
 SEC("classifier_endpoint_ingress")

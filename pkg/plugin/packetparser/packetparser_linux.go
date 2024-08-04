@@ -43,6 +43,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type packet packetparser ./_cprog/packetparser.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../filter/_cprog/ -I../conntrack/_cprog/
@@ -596,6 +597,8 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 					p.l.Warn("Failed to get current time", zap.Error(err))
 				}
 			}
+
+			fl.IsReply = &wrapperspb.BoolValue{Value: bpfEvent.IsReply}
 
 			// Log the flow.
 			p.l.Debug("Flow", zap.Any("flow", fl))

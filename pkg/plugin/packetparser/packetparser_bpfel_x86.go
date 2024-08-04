@@ -54,9 +54,11 @@ type packetparserPacket struct {
 		Tsval  uint32
 		Tsecr  uint32
 	}
-	Dir   uint32
-	Ts    uint64
-	Bytes uint64
+	Dir     uint32
+	IsReply bool
+	_       [7]byte
+	Ts      uint64
+	Bytes   uint64
 }
 
 // loadPacketparser returns the embedded CollectionSpec for packetparser.
