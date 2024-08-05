@@ -117,14 +117,9 @@ func (c *cilium) monitorLoop(ctx context.Context) error {
 				c.l.Error("Failed to decode payload", zap.Error(err))
 				return err
 			}
-			fl, err := c.p.Decode(&pl)
+			ev, err := c.p.Decode(&pl)
 			if err == nil {
-				c.l.Debug("Decoded flow", zap.Any("flow", fl))
-				event := &v1.Event{
-					Event:     fl,
-					Timestamp: fl.GetTime(),
-				}
-				c.externalChannel <- event
+				c.externalChannel <- ev
 			} else {
 				c.l.Warn("Failed to decode to flow", zap.Error(err))
 			}
