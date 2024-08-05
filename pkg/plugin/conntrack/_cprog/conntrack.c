@@ -7,7 +7,7 @@
 
 
 /**
-    * The structure representing an ipv4 connection tracking key in the connection tracking map.
+    * The structure representing an ipv4 5-tuple key in the connection tracking map.
  **/
 struct ct_v4_key {
     __u32 src_ip;
@@ -124,38 +124,15 @@ static __always_inline bool _should_report_udp_packet(struct ct_value *value) {
     return false;
 }
 
-
-/** 
-    * Replicate the content of a ct_v4_key.
-    * @arg new_key The new key to be replicated to.
-    * @arg key The key to be replicated.
-**/
-static __always_inline void _replicate_ct_v4_key(struct ct_v4_key *new_key, const struct ct_v4_key *key) {
-    __builtin_memset(new_key, 0, sizeof(struct ct_v4_key));
-    new_key->src_ip = key->src_ip;
-    new_key->dst_ip = key->dst_ip;
-    new_key->src_port = key->src_port;
-    new_key->dst_port = key->dst_port;
-    new_key->proto = key->proto;
-}
-
 /**
     * Process a packet and update the connection tracking map.
     * @arg key The key to be used to lookup the connection in the map.
     * @arg flags The flags of the packet.
     * Returns true if the packet should be report to userspace. False otherwise.
 **/
-static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_v4_key *key, __u8 flags) {
-    if (!key) {
-        return false;
-    }
-    // Checking whether the key is null is not enough for the eBPF verifier.
-    // We need to recreate the key to avoid the verifier error.
-    struct ct_v4_key new_key;
-    _replicate_ct_v4_key(&new_key, key);
-    
+static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_v4_key key, __u8 flags) {    
     // Lookup the connection in the map.
-    struct ct_value *value = bpf_map_lookup_elem(&retina_conntrack_map, &new_key);
+    struct ct_value *value = bpf_map_lookup_elem(&retina_conntrack_map, &key);
 
     // If the connection is not found based on given packet, there are a few possibilities:
     // 1. The connection is new. This connection is either originated from the endpoint or destined to the endpoint.
@@ -164,17 +141,17 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_
         // Create a new key for the reverse direction.
         struct ct_v4_key reverse_key;
         __builtin_memset(&reverse_key, 0, sizeof(struct ct_v4_key));
-        reverse_key.src_ip = new_key.dst_ip;
-        reverse_key.dst_ip = new_key.src_ip;
-        reverse_key.src_port = new_key.dst_port;
-        reverse_key.dst_port = new_key.src_port;
-        reverse_key.proto = new_key.proto;
+        reverse_key.src_ip = key.dst_ip;
+        reverse_key.dst_ip = key.src_ip;
+        reverse_key.src_port = key.dst_port;
+        reverse_key.dst_port = key.src_port;
+        reverse_key.proto = key.proto;
         // Lookup the connection in the map based on the reverse key.
         value = bpf_map_lookup_elem(&retina_conntrack_map, &reverse_key);
         // If the connection is still not found, the connection is new.
         if (!value) {
             // Check what kind of protocol the packet is.
-            switch(new_key.proto) {
+            switch(key.proto) {
                 case IPPROTO_TCP: {
                     // Check if the packet is a SYN packet.
                     if (flags & TCP_SYN) {
@@ -187,7 +164,7 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_
                         new_value.flags_seen = flags;
                         new_value.last_report = now;
                         new_value.is_closing = 0;
-                        bpf_map_update_elem(&retina_conntrack_map, &new_key, &new_value, BPF_ANY);
+                        bpf_map_update_elem(&retina_conntrack_map, &key, &new_value, BPF_ANY);
                         return true;
                     } else {
                         // The packet is not a SYN packet and the connection corresponding to this packet is not found.
@@ -206,7 +183,7 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_
                     new_value.flags_seen = flags;
                     new_value.last_report = now;
                     new_value.is_closing = 0;
-                    bpf_map_update_elem(&retina_conntrack_map, &new_key, &new_value, BPF_ANY);
+                    bpf_map_update_elem(&retina_conntrack_map, &key, &new_value, BPF_ANY);
                     return true;
                 }
                 default:
@@ -231,16 +208,16 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_
             }
         }
     } else { // The connection is found in the forward direction. Update the connection.
-        switch(new_key.proto) {
+        switch(key.proto) {
                 case IPPROTO_TCP:
                     if (_should_report_tcp_packet(flags, value)) {
-                        _update_conntrack_map(&new_key, value);
+                        _update_conntrack_map(&key, value);
                         return true;
                     }
                     return false;
                 case IPPROTO_UDP:
                     if (_should_report_udp_packet(value)) {
-                        _update_conntrack_map(&new_key, value);
+                        _update_conntrack_map(&key, value);
                         return true;
                     }
                     return false;
@@ -255,16 +232,12 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_
  * Check if a packet is a reply packet to a connection.
  * @arg key The key to be used to check if the packet is a reply packet.
  */
-static __always_inline __attribute__((unused)) bool is_reply_packet(struct ct_v4_key *key) {
-    if (!key) {
-        return false;
-    }
-    struct ct_v4_key new_key;
-    _replicate_ct_v4_key(&new_key, key);
-    
+static __always_inline __attribute__((unused)) bool is_reply_packet(struct ct_v4_key key) {    
     // Lookup the connection in the map.
-    struct ct_value *value = bpf_map_lookup_elem(&retina_conntrack_map, &new_key);
+    struct ct_value *value = bpf_map_lookup_elem(&retina_conntrack_map, &key);
     if (value) {
+        // We return false here because we found the connection in the forward direction
+        // meaning that the packet is coming from the initiator of the connection and therefore not a reply packet.
         return false;
     } else {
         return true;

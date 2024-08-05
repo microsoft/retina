@@ -243,9 +243,9 @@ static void parse(struct __sk_buff *skb, direction d)
 	key.dst_port = p.dst_port;
 	key.proto = p.proto;
 
-	if (ct_process_packet(&key, flags)) {
+	if (ct_process_packet(key, flags)) {
 		// Check if this packet is a reply packet.
-		p.is_reply = is_reply_packet(&key);
+		p.is_reply = is_reply_packet(key);
 
 		// Send the packet to the perf buffer.
 		bpf_perf_event_output(skb, &packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));

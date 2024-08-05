@@ -22,7 +22,7 @@
 // Define how long a TCP connection should be kept alive after receiving the first SYN
 #define CT_SYN_TIMEOUT 60
 // Define the interval at which a packet should be sent to the userspace
-#define CT_REPORT_INTERVAL 15
+#define CT_REPORT_INTERVAL 30
 
 enum tcp_flags {
     TCP_FIN = 0x01,
