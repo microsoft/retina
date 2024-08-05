@@ -9,19 +9,19 @@ import (
 )
 
 type Parser struct {
-	log     logrus.FieldLogger
-	summary FlowSummary
+	log         logrus.FieldLogger
+	connections Connections
 }
 
 func NewParser(log logrus.FieldLogger) *Parser {
 	return &Parser{
-		log:     log.WithField("component", "flow-parser"),
-		summary: make(map[string]*Connection),
+		log:         log.WithField("component", "flow-parser"),
+		connections: make(map[string]*Connection),
 	}
 }
 
-func (p *Parser) Summary() FlowSummary {
-	return p.summary
+func (p *Parser) Connections() Connections {
+	return p.connections
 }
 
 func (p *Parser) Parse(flows []*flowpb.Flow) {
@@ -57,7 +57,7 @@ func (p *Parser) addFlow(f *flowpb.Flow) error {
 	pod1, pod2 := pods[0], pods[1]
 	key := pod1 + "#" + pod2
 
-	conn, exists := p.summary[key]
+	conn, exists := p.connections[key]
 	if !exists {
 		conn = &Connection{
 			Pod1:  pod1,
@@ -65,7 +65,7 @@ func (p *Parser) addFlow(f *flowpb.Flow) error {
 			Key:   key,
 			Flows: []*flowpb.Flow{},
 		}
-		p.summary[key] = conn
+		p.connections[key] = conn
 	}
 
 	conn.Flows = append(conn.Flows, f)

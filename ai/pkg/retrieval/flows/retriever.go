@@ -20,6 +20,8 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+const MaxFlowsFromHubbleRelay = 30000
+
 type Retriever struct {
 	log          logrus.FieldLogger
 	config       *rest.Config
@@ -90,7 +92,6 @@ func (r *Retriever) Observe(ctx context.Context, req *observerpb.GetFlowsRequest
 	observeCtx, observeCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer observeCancel()
 
-	// FIXME don't use maxFlows anymore? check for EOF? then remove this constant: MaxFlowsToAnalyze
 	maxFlows := req.Number
 	flows, err := r.observeFlowsGRPC(observeCtx, req, int(maxFlows))
 	if err != nil {

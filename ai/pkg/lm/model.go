@@ -10,5 +10,5 @@ type MessagePair struct {
 type ChatHistory []MessagePair
 
 type Model interface {
-	Generate(ctx context.Context, systemPrompt string, chat ChatHistory, message string) (string, error)
+	Generate(ctx context.Context, systemPrompt string, history ChatHistory, message string) (string, error)
 }

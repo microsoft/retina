@@ -65,11 +65,11 @@ func NewAzureOpenAI() (*AzureOpenAI, error) {
 	return aoai, nil
 }
 
-func (m *AzureOpenAI) Generate(ctx context.Context, systemPrompt string, chat ChatHistory, message string) (string, error) {
+func (m *AzureOpenAI) Generate(ctx context.Context, systemPrompt string, history ChatHistory, message string) (string, error) {
 	messages := []azopenai.ChatRequestMessageClassification{
 		&azopenai.ChatRequestSystemMessage{Content: to.Ptr(systemPrompt)},
 	}
-	for _, pair := range chat {
+	for _, pair := range history {
 		messages = append(messages, &azopenai.ChatRequestUserMessage{Content: azopenai.NewChatRequestUserMessageContent(pair.User)})
 		messages = append(messages, &azopenai.ChatRequestAssistantMessage{Content: to.Ptr(pair.Assistant)})
 	}

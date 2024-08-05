@@ -15,7 +15,3 @@
       - `$env:AOAI_COMPLETIONS_ENDPOINT = Read-Host 'Enter AOAI_COMPLETIONS_ENDPOINT'`
       - `$env:AOAI_DEPLOYMENT_NAME = Read-Host 'Enter AOAI_DEPLOYMENT_NAME'`
 - `go run main.go`
-
-## Development
-
-Modify prompts in the folders within *pkg/analysis/* (e.g. *pkg/analysis/flows/prompt.go* or *analyzer.go*)

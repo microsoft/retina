@@ -13,9 +13,9 @@ func NewEchoModel() *EchoModel {
 	return &EchoModel{}
 }
 
-func (m *EchoModel) Generate(ctx context.Context, systemPrompt string, chat ChatHistory, message string) (string, error) {
-	chatStrings := make([]string, 0, len(chat))
-	for _, pair := range chat {
+func (m *EchoModel) Generate(ctx context.Context, systemPrompt string, history ChatHistory, message string) (string, error) {
+	chatStrings := make([]string, 0, len(history))
+	for _, pair := range history {
 		chatStrings = append(chatStrings, fmt.Sprintf("USER: %s\nASSISTANT: %s\n", pair.User, pair.Assistant))
 	}
 	resp := fmt.Sprintf("systemPrompt: %s\nhistory: %s\nmessage: %s", systemPrompt, strings.Join(chatStrings, "\n"), message)
