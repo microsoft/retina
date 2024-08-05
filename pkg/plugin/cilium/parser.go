@@ -41,6 +41,8 @@ func (p *parser) Init() {
 }
 
 // Reconstruct monitorEvents and then decode flow events to our hubble instance.
+// Additionally, We require the corresponding parser in pkg/hubble/parser for
+// hubble metrics to be enriched and updated properly
 // Agent Events
 //   - MessageTypeAccessLog:		accesslog.LogRecord
 //   - MessageTypeAgent:			api.AgentNotify
@@ -73,6 +75,7 @@ func (p *parser) Decode(pl *payload.Payload) (*v1.Event, error) {
 			// AccessLogs can also reflect kafka related metrics
 			monEvent.Payload = &observerTypes.AgentEvent{}
 			return nil, fmt.Errorf(ErrNotImplemented, monitorAPI.MessageTypeNameAgent)
+		// MessageTypeTraceSock and MessageTypeDebug are also perf events but have their own dedicated decoders in cilium.
 		case monitorAPI.MessageTypeDrop, monitorAPI.MessageTypeTrace, monitorAPI.MessageTypePolicyVerdict, monitorAPI.MessageTypeCapture:
 			perfEvent := &observerTypes.PerfEvent{}
 			perfEvent.Data = data
