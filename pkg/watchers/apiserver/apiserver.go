@@ -5,7 +5,7 @@ package apiserver
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"net"
 	"net/url"
 	"strings"
@@ -28,21 +28,21 @@ type ApiServerWatcher struct {
 	l             *log.ZapLogger
 	current       cache
 	new           cache
-	apiServerUrl  string
+	apiServerURL  string
 	hostResolver  IHostResolver
-	filtermanager fm.IFilterManager
+	filterManager fm.IFilterManager
 }
 
 var a *ApiServerWatcher
 
-// Watcher creates a new apiserver watcher.
+// Watcher creates a new ApiServerWatcher instance.
 func Watcher() *ApiServerWatcher {
 	if a == nil {
 		a = &ApiServerWatcher{
 			isRunning:    false,
 			l:            log.Logger().Named("apiserver-watcher"),
 			current:      make(cache),
-			apiServerUrl: getHostURL(),
+			apiServerURL: getHostURL(),
 			hostResolver: net.DefaultResolver,
 		}
 	}
@@ -56,12 +56,15 @@ func (a *ApiServerWatcher) Init(ctx context.Context) error {
 		return nil
 	}
 
-	a.filtermanager = getFilterManager()
+	a.filterManager = a.getFilterManager()
+	if a.filterManager == nil {
+		return errors.New("failed to initialize filter manager")
+	}
 	a.isRunning = true
 	return nil
 }
 
-// Stop the apiserver watcher.
+// Stop stops the ApiServerWatcher.
 func (a *ApiServerWatcher) Stop(ctx context.Context) error {
 	if !a.isRunning {
 		a.l.Info("apiserver watcher is not running")
@@ -76,46 +79,40 @@ func (a *ApiServerWatcher) Refresh(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// Compare the new ips with the old ones.
+	// Compare the new IPs with the old ones.
 	created, deleted := a.diffCache()
 
-	// Publish the new ips.
-	createdIps := []net.IP{}
-	deletedIps := []net.IP{}
+	createdIPs := []net.IP{}
+	deletedIPs := []net.IP{}
 
 	for _, v := range created {
-		a.l.Info("New Apiserver ips:", zap.Any("ip", v))
+		a.l.Info("New Apiserver IPs:", zap.Any("ip", v))
 		ip := net.ParseIP(v.(string)).To4()
-		createdIps = append(createdIps, ip)
+		createdIPs = append(createdIPs, ip)
 	}
 
 	for _, v := range deleted {
-		a.l.Info("Deleted Apiserver ips:", zap.Any("ip", v))
+		a.l.Info("Deleted Apiserver IPs:", zap.Any("ip", v))
 		ip := net.ParseIP(v.(string)).To4()
-		deletedIps = append(deletedIps, ip)
+		deletedIPs = append(deletedIPs, ip)
 	}
 
-	if len(createdIps) > 0 {
-		// Publish the new ips.
-		a.publish(createdIps, cc.EventTypeAddAPIServerIPs)
-		// Add ips to filter manager if any.
-		err := a.filtermanager.AddIPs(createdIps, "apiserver-watcher", fm.RequestMetadata{RuleID: "apiserver-watcher"})
+	if len(createdIPs) > 0 {
+		a.publish(createdIPs, cc.EventTypeAddAPIServerIPs)
+		err := a.filterManager.AddIPs(createdIPs, "apiserver-watcher", fm.RequestMetadata{RuleID: "apiserver-watcher"})
 		if err != nil {
-			a.l.Error("Failed to add ips to filter manager", zap.Error(err))
+			a.l.Error("Failed to add IPs to filter manager", zap.Error(err))
 		}
 	}
 
-	if len(deletedIps) > 0 {
-		// Publish the deleted ips.
-		a.publish(deletedIps, cc.EventTypeDeleteAPIServerIPs)
-		// Delete ips from filter manager if any.
-		err := a.filtermanager.DeleteIPs(deletedIps, "apiserver-watcher", fm.RequestMetadata{RuleID: "apiserver-watcher"})
+	if len(deletedIPs) > 0 {
+		a.publish(deletedIPs, cc.EventTypeDeleteAPIServerIPs)
+		err := a.filterManager.DeleteIPs(deletedIPs, "apiserver-watcher", fm.RequestMetadata{RuleID: "apiserver-watcher"})
 		if err != nil {
-			a.l.Error("Failed to delete ips from filter manager", zap.Error(err))
+			a.l.Error("Failed to delete IPs from filter manager", zap.Error(err))
 		}
 	}
 
-	// update the current cache and reset the new cache
 	a.current = a.new.deepcopy()
 	a.new = nil
 
@@ -123,12 +120,7 @@ func (a *ApiServerWatcher) Refresh(ctx context.Context) error {
 }
 
 func (a *ApiServerWatcher) initNewCache(ctx context.Context) error {
-	ips, err := a.getApiServerIPs(ctx)
-	if err != nil {
-		return err
-	}
-
-	// Reset the new cache.
+	ips := a.getApiServerIPs(ctx)
 	a.new = make(cache)
 	for _, ip := range ips {
 		a.new[ip] = struct{}{}
@@ -137,14 +129,14 @@ func (a *ApiServerWatcher) initNewCache(ctx context.Context) error {
 }
 
 func (a *ApiServerWatcher) diffCache() (created, deleted []interface{}) {
-	// check if there are new ips
+	// Check if there are any new IPs.
 	for k := range a.new {
 		if _, ok := a.current[k]; !ok {
 			created = append(created, k)
 		}
 	}
 
-	// check if there are deleted ips
+	// Check if there are any deleted IPs.
 	for k := range a.current {
 		if _, ok := a.new[k]; !ok {
 			deleted = append(deleted, k)
@@ -153,53 +145,39 @@ func (a *ApiServerWatcher) diffCache() (created, deleted []interface{}) {
 	return
 }
 
-func (a *ApiServerWatcher) getApiServerIPs(ctx context.Context) ([]string, error) {
-	// Parse the URL
-	host, err := a.retrieveApiServerHostname()
-	if err != nil {
-		return nil, err
-	}
-
-	// Get the ips for the host
-	ips, err := a.resolveIPs(ctx, host)
-	if err != nil {
-		return nil, err
-	}
-
-	return ips, nil
+func (a *ApiServerWatcher) getApiServerIPs(ctx context.Context) []string {
+	host := a.retrieveApiServerHostname()
+	ips := a.resolveIPs(ctx, host)
+	return ips
 }
 
-// parse url to extract hostname
-func (a *ApiServerWatcher) retrieveApiServerHostname() (string, error) {
-	// Parse the URL
-	url, err := url.Parse(a.apiServerUrl)
+func (a *ApiServerWatcher) retrieveApiServerHostname() string {
+	parsedURL, err := url.Parse(a.apiServerURL)
 	if err != nil {
-		fmt.Println("Failed to parse URL:", err)
-		return "", err
+		a.l.Warn("failed to parse URL", zap.String("url", a.apiServerURL), zap.Error(err))
+		return ""
 	}
 
-	// Remove the scheme (http:// or https://) and port from the host
-	host := strings.TrimPrefix(url.Host, "www.")
-	colonIndex := strings.IndexByte(host, ':')
-	if colonIndex != -1 {
+	host := strings.TrimPrefix(parsedURL.Host, "www.")
+	if colonIndex := strings.IndexByte(host, ':'); colonIndex != -1 {
 		host = host[:colonIndex]
 	}
-	return host, nil
+	return host
 }
 
-// Resolve the list of ips for the given host
-func (a *ApiServerWatcher) resolveIPs(ctx context.Context, host string) ([]string, error) {
-	hostIps, err := a.hostResolver.LookupHost(ctx, host)
+func (a *ApiServerWatcher) resolveIPs(ctx context.Context, host string) []string {
+	hostIPs, err := a.hostResolver.LookupHost(ctx, host)
 	if err != nil {
-		return nil, err
+		a.l.Warn("failed to resolve IPs for host", zap.String("host", host), zap.Error(err))
+		return nil
 	}
 
-	if len(hostIps) == 0 {
-		a.l.Error("no ips found for host", zap.String("host", host))
-		return nil, fmt.Errorf("no ips found for host %s", host)
+	if len(hostIPs) == 0 {
+		a.l.Warn("no IPs found for host", zap.String("host", host))
+		return nil
 	}
 
-	return hostIps, nil
+	return hostIPs
 }
 
 func (a *ApiServerWatcher) publish(netIPs []net.IP, eventType cc.EventType) {
@@ -212,16 +190,10 @@ func (a *ApiServerWatcher) publish(netIPs []net.IP, eventType cc.EventType) {
 		ipsToPublish = append(ipsToPublish, ip.String())
 	}
 	ps := pubsub.New()
-	ps.Publish(common.PubSubAPIServer,
-		cc.NewCacheEvent(
-			eventType,
-			common.NewAPIServerObject(ipsToPublish),
-		),
-	)
+	ps.Publish(common.PubSubAPIServer, cc.NewCacheEvent(eventType, common.NewAPIServerObject(ipsToPublish)))
 	a.l.Debug("Published event", zap.Any("eventType", eventType), zap.Any("netIPs", ipsToPublish))
 }
 
-// getHostURL returns the host url from the config.
 func getHostURL() string {
 	config, err := kcfg.GetConfig()
 	if err != nil {
@@ -231,8 +203,7 @@ func getHostURL() string {
 	return config.Host
 }
 
-// Get FilterManager
-func getFilterManager() *fm.FilterManager {
+func (a *ApiServerWatcher) getFilterManager() *fm.FilterManager {
 	f, err := fm.Init(filterManagerRetries)
 	if err != nil {
 		a.l.Error("failed to init filter manager", zap.Error(err))
