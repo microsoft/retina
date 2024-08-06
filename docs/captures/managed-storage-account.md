@@ -4,7 +4,7 @@
 
 Retina Capture helps customers capture network packets on Kuberentes cluster to debug network issues. Before Retina Capture can debug the packets, Retina Capture can store the network packets and the customers need to download the packets from Retina Capture supported locations with tools like Wireshark.
 
-To simply customers' work to decide where to store the packets and then download the packets to local environment, we propose a managed account solution for customer to help customer manage the lifecycle, security when to the storage account and garbage collection of the storage account. Customers can use managed storage account by default, or specify their own storage account ID and Storage Blob Data Owner or higher privilege should be granted to [AKS managed identity or service principal](https://learn.microsoft.com/en-us/azure/aks/use-managed-identity).
+To simplify customers' work to decide where to store the packets and then download the packets to local environment, we propose a managed account solution for customer to help customer manage the lifecycle, security when to the storage account and garbage collection of the storage account. Customers can use managed storage account by default, or specify their own storage account ID and Storage Blob Data Owner or higher privilege should be granted to [AKS managed identity or service principal](https://learn.microsoft.com/en-us/azure/aks/use-managed-identity).
 
 ## Detailed Design
 

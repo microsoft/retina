@@ -2,8 +2,7 @@ FROM mcr.microsoft.com/oss/go/microsoft/golang:1.22 AS builder
 
 ARG VERSION
 ARG APP_INSIGHTS_ID
-RUN apt-get update && apt-get install -y ca-certificates
-RUN update-ca-certificates
+RUN apt-get update && apt-get install -y ca-certificates && update-ca-certificates
 
 WORKDIR /workspace
 COPY . .

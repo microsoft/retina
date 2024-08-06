@@ -17,7 +17,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/microsoft/retina/pkg/log"
-	"github.com/microsoft/retina/pkg/provider/azure/azclients"
+	azclients "github.com/microsoft/retina/pkg/provider/azure/clients"
 )
 
 const (
@@ -68,7 +68,7 @@ type StorageAccountManager struct {
 	// creation function.
 	containerCreated map[string]struct{}
 
-	azClients azclients.AZClients
+	azClients *azclients.AZClients
 
 	logger *log.ZapLogger
 }
@@ -84,24 +84,24 @@ func NewStorageAccountManager() *StorageAccountManager {
 func (sam *StorageAccountManager) Init(configFile string) error {
 	azClients, err := azclients.NewAZClients(configFile)
 	if err != nil {
-		return fmt.Errorf("failed to create Azure clients, %w", err)
+		return fmt.Errorf("failed to create Azure clients: %w", err)
 	}
 	sam.azClients = azClients
 
-	if err := sam.ValidateAuthConfig(); err != nil {
+	if err := sam.validateAuthConfig(); err != nil {
 		sam.logger.Error("No all configurations are set, please refer to TODO(add a link)", zap.Error(err))
-		return fmt.Errorf("failed to validate auth config, %w", err)
+		return fmt.Errorf("failed to validate auth config: %w", err)
 	}
 
 	// All setup steps should be idempotent to withstand storage account manager restart.
 	ctx := context.Background()
 	if err := sam.SetupStorageAccount(ctx); err != nil {
-		return fmt.Errorf("failed to setup storage account, %w", err)
+		return fmt.Errorf("failed to setup storage account: %w", err)
 	}
 
 	if !sam.uniqueContainerPerNamespace {
 		if err := sam.CreateBlobContainer(ctx, defaultConainerName); err != nil {
-			return fmt.Errorf("failed to create blob container, %w", err)
+			return fmt.Errorf("failed to create blob container: %w", err)
 		}
 	}
 
@@ -118,11 +118,14 @@ func (err ConfigEmptyError) Error() string {
 	return fmt.Sprintf("Configuration %s is empty", err.ConfigName)
 }
 
-func (sam *StorageAccountManager) ValidateAuthConfig() error {
-	if strings.TrimSpace(sam.azClients.GetClientConfig().ResourceGroup) == "" {
+// ValidateAuthConfig validates the necessary configuration for storage account.
+// Consider moving this function to under azclients.AzureConfig as a common validation
+// when these configurations are required commonly.
+func (sam *StorageAccountManager) validateAuthConfig() error {
+	if strings.TrimSpace(sam.azClients.AzureConfig.ResourceGroup) == "" {
 		return ConfigEmptyError{ConfigName: "resourcegroup"}
 	}
-	if strings.TrimSpace(sam.azClients.GetClientConfig().Location) == "" {
+	if strings.TrimSpace(sam.azClients.AzureConfig.Location) == "" {
 		return ConfigEmptyError{ConfigName: "location"}
 	}
 	return nil
@@ -131,14 +134,14 @@ func (sam *StorageAccountManager) ValidateAuthConfig() error {
 func (sam *StorageAccountManager) SetupStorageAccount(ctx context.Context) error {
 	sam.logger.Info("Begin to setup managed storage account")
 
-	resourceGroupName := sam.azClients.GetClientConfig().ResourceGroup
-	location := sam.azClients.GetClientConfig().Location
+	resourceGroupName := sam.azClients.AzureConfig.ResourceGroup
+	location := sam.azClients.AzureConfig.Location
 
 	// Once the storage account is created by the storage account manager, it will be give an unique name
 	// and bound to this manager through tags. We'll continue to use the existing one if found.
 	existingStorageAccountName, err := sam.checkStorageAccountCreated(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to check existing storage account, %w", err)
+		return fmt.Errorf("failed to check existing storage account: %w", err)
 	}
 	if existingStorageAccountName != "" {
 		sam.storageAccountName = existingStorageAccountName
@@ -146,10 +149,6 @@ func (sam *StorageAccountManager) SetupStorageAccount(ctx context.Context) error
 	} else {
 		sam.storageAccountName = getStorageAccountName()
 		sam.logger.Info("Pick a new random storage account name", zap.String("storage account name", sam.storageAccountName))
-	}
-
-	if _, err = sam.azClients.CreateBlobServiceClient(sam.storageAccountName); err != nil {
-		return fmt.Errorf("failed to create blob service client, %w", err)
 	}
 
 	sam.logger.Info("Creating the storage account", zap.String("storage account name", sam.storageAccountName))
@@ -173,14 +172,14 @@ func (sam *StorageAccountManager) SetupStorageAccount(ctx context.Context) error
 			},
 		},
 	}
-	pollerAccountCreateResp, err := sam.azClients.GetStorageAccountsClient().BeginCreate(ctx, resourceGroupName, sam.storageAccountName, *resource, nil)
+	pollerAccountCreateResp, err := sam.azClients.StorageAccountsClient.BeginCreate(ctx, resourceGroupName, sam.storageAccountName, *resource, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create storage account resp poller, %w", err)
+		return fmt.Errorf("failed to create storage account resp poller: %w", err)
 	}
 	accountCreateResp, err := pollerAccountCreateResp.PollUntilDone(ctx, nil)
 	if err != nil {
 		sam.logger.Error("Failed to create storage account", zap.String("storage account name", sam.storageAccountName), zap.Error(err))
-		return fmt.Errorf("failed to create storage account, %w", err)
+		return fmt.Errorf("failed to create storage account: %w", err)
 	}
 	sam.logger.Info("Created storage account", zap.String("storage account name", *accountCreateResp.Account.Name), zap.String("storage account ID", *accountCreateResp.Account.ID))
 
@@ -214,10 +213,10 @@ func (sam *StorageAccountManager) SetupStorageAccount(ctx context.Context) error
 			},
 		},
 	}
-	managementPolicyResp, err := sam.azClients.GetManagementPoliciesClient().CreateOrUpdate(ctx, resourceGroupName, sam.storageAccountName, armstorage.ManagementPolicyNameDefault, policy, nil)
+	managementPolicyResp, err := sam.azClients.ManagementPoliciesClient.CreateOrUpdate(ctx, resourceGroupName, sam.storageAccountName, armstorage.ManagementPolicyNameDefault, policy, nil)
 	if err != nil {
 		sam.logger.Error("Failed to create management policy", zap.Error(err))
-		return fmt.Errorf("failed to create management policy, %w", err)
+		return fmt.Errorf("failed to create management policy: %w", err)
 	}
 	sam.logger.Info(
 		"Created storage account management policy",
@@ -237,16 +236,16 @@ func (sam *StorageAccountManager) CreateBlobContainer(ctx context.Context, conta
 	sam.logger.Info("Begin to create blob container", zap.String("container name", containerName))
 
 	sam.logger.Info("Creating blob container", zap.String("container name", containerName))
-	resourceGroupName := sam.azClients.GetClientConfig().ResourceGroup
-	blobConainerCreateResp, err := sam.azClients.GetBlobContainersClient().Create(ctx, resourceGroupName, sam.storageAccountName, containerName, armstorage.BlobContainer{}, nil)
+	resourceGroupName := sam.azClients.AzureConfig.ResourceGroup
+	blobConainerCreateResp, err := sam.azClients.BlobContainersClient.Create(ctx, resourceGroupName, sam.storageAccountName, containerName, armstorage.BlobContainer{}, nil)
 	if err != nil {
 		sam.logger.Error("Failed to create container", zap.String("container name", containerName), zap.Error(err))
-		return fmt.Errorf("failed to create blob container, %w", err)
+		return fmt.Errorf("failed to create blob container: %w", err)
 	}
 	sam.logger.Info("Created blob container", zap.String("blob container name", *blobConainerCreateResp.BlobContainer.Name), zap.String("blo container ID", *blobConainerCreateResp.BlobContainer.ID))
 
 	sam.logger.Info("Creating container immutability policy", zap.String("container name", containerName))
-	resp, err := sam.azClients.GetBlobContainersClient().CreateOrUpdateImmutabilityPolicy(
+	resp, err := sam.azClients.BlobContainersClient.CreateOrUpdateImmutabilityPolicy(
 		ctx,
 		resourceGroupName,
 		sam.storageAccountName,
@@ -260,7 +259,7 @@ func (sam *StorageAccountManager) CreateBlobContainer(ctx context.Context, conta
 			},
 		})
 	if err != nil {
-		return fmt.Errorf("failed to create container immutability policy, %w", err)
+		return fmt.Errorf("failed to create container immutability policy: %w", err)
 	}
 	sam.logger.Info("Created container immutability policy", zap.String("container name", containerName), zap.String("immutability policy ID", *resp.ImmutabilityPolicy.ID))
 
@@ -281,12 +280,12 @@ func (sam *StorageAccountManager) cacheContainerCreated(containerName string) {
 
 func (sam *StorageAccountManager) checkStorageAccountCreated(ctx context.Context) (string, error) {
 	retinaAccountTags := getStorageAccountTag()
-	resourceGroupName := sam.azClients.GetClientConfig().ResourceGroup
-	storageAccountItemsPager := sam.azClients.GetStorageAccountsClient().NewListByResourceGroupPager(resourceGroupName, nil)
+	resourceGroupName := sam.azClients.AzureConfig.ResourceGroup
+	storageAccountItemsPager := sam.azClients.StorageAccountsClient.NewListByResourceGroupPager(resourceGroupName, nil)
 	for storageAccountItemsPager.More() {
 		pageResp, err := storageAccountItemsPager.NextPage(ctx)
 		if err != nil {
-			return "", fmt.Errorf("failed to list storage accounts, %w", err)
+			return "", fmt.Errorf("failed to list storage accounts: %w", err)
 		}
 
 		for _, account := range pageResp.AccountListResult.Value {
@@ -317,10 +316,13 @@ func (sam *StorageAccountManager) CreateContainerSASURL(ctx context.Context, nam
 	// create container if not exist
 	containerName := sam.ConainerNameByNamespace(namespace)
 	if err := sam.CreateBlobContainer(ctx, containerName); err != nil {
-		return "", fmt.Errorf("failed to create blob container, %w", err)
+		return "", fmt.Errorf("failed to create blob container: %w", err)
 	}
 
-	svcClient := sam.azClients.GetBlobServiceClient()
+	svcClient, err := sam.azClients.GetBlobServiceClient(sam.storageAccountName)
+	if err != nil {
+		return "", fmt.Errorf("failed to get blob service client: %w", err)
+	}
 
 	// Set current and past time and create key
 	now := time.Now().UTC().Add(-10 * time.Second)
@@ -338,7 +340,7 @@ func (sam *StorageAccountManager) CreateContainerSASURL(ctx context.Context, nam
 
 	udc, err := svcClient.GetUserDelegationCredential(ctx, info, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to get user delegation credential, %w", err)
+		return "", fmt.Errorf("failed to get user delegation credential: %w", err)
 	}
 
 	// Create Blob Signature Values with desired permissions and sign with user delegation credential
@@ -351,7 +353,7 @@ func (sam *StorageAccountManager) CreateContainerSASURL(ctx context.Context, nam
 		ContainerName: containerName,
 	}.SignWithUserDelegation(udc)
 	if err != nil {
-		return "", fmt.Errorf("failed to sign with user delegation, %w", err)
+		return "", fmt.Errorf("failed to sign with user delegation: %w", err)
 	}
 	containerSASURL := svcClient.URL() + containerName + "?" + sasQueryParams.Encode()
 	sam.logger.Info("Succeeded to create container SAS URL")
