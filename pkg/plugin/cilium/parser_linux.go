@@ -2,7 +2,6 @@ package cilium
 
 import (
 	"errors"
-	"fmt"
 	"time"
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
@@ -17,11 +16,9 @@ import (
 	"go.uber.org/zap"
 )
 
-const ErrNotImplemented = "Error, not implemented for type: %s"
+const ErrNotImplemented = "Error, not implemented"
 
-var (
-	ErrEmptyData = errors.New("empty data")
-)
+var ErrEmptyData = errors.New("empty data")
 
 func (p *parser) Init() {
 	parser, err := hp.New(logrus.WithField("cilium", "parser"),
@@ -74,7 +71,7 @@ func (p *parser) Decode(pl *payload.Payload) (*v1.Event, error) {
 			// Log Records can be DNS traces for CNP related pods
 			// AccessLogs can also reflect kafka related metrics
 			monEvent.Payload = &observerTypes.AgentEvent{}
-			return nil, fmt.Errorf(ErrNotImplemented, monitorAPI.MessageTypeNameAgent)
+			return nil, errors.New(ErrNotImplemented) //nolint:goerr113 //no specific handling expected
 		// MessageTypeTraceSock and MessageTypeDebug are also perf events but have their own dedicated decoders in cilium.
 		case monitorAPI.MessageTypeDrop, monitorAPI.MessageTypeTrace, monitorAPI.MessageTypePolicyVerdict, monitorAPI.MessageTypeCapture:
 			perfEvent := &observerTypes.PerfEvent{}
@@ -83,7 +80,7 @@ func (p *parser) Decode(pl *payload.Payload) (*v1.Event, error) {
 			monEvent.Payload = perfEvent
 			event, err := p.hparser.Decode(monEvent)
 			if err != nil {
-				return nil, err
+				return nil, err //nolint:wrapcheck // dont wrap error since it would not provide more context
 			}
 			return event, nil
 		default:
@@ -91,7 +88,7 @@ func (p *parser) Decode(pl *payload.Payload) (*v1.Event, error) {
 		}
 	case payload.RecordLost:
 		p.l.Warn("Record lost for cilium event", zap.Uint64("lost", pl.Lost))
-		return nil, fmt.Errorf("Record lost for cilium event: %d", pl.Lost)
+		return nil, errors.New("Record lost for cilium event") //nolint:goerr113 //no specific handling expected
 	default:
 		p.l.Warn("Unknown event type", zap.Int("type", pl.Type))
 		return nil, parserErrors.ErrUnknownEventType
