@@ -24,6 +24,9 @@ type cilium struct {
 	externalChannel chan *v1.Event
 	connection      net.Conn
 	p               *parser
+	maxAttempts     int
+	retryDelay      int
+	sockPath        string
 }
 
 type parser struct {

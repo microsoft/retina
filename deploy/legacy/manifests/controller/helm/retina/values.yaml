@@ -97,7 +97,6 @@ volumeMounts:
   cgroup: /sys/fs/cgroup
   tmp: /tmp
   config: /retina/config
-  varrun: /var/run
 
 #volume mounts for windows
 volumeMounts_win:

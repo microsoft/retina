@@ -23,13 +23,17 @@ import (
 
 const (
 	MonitorSockPath1_2 = "/var/run/cilium/monitor1_2.sock"
-	connectionTimeout  = 12
+	defaultRetryDelay  = 12
+	defaultAttempts    = 10
 )
 
 func New(cfg *kcfg.Config) api.Plugin {
 	return &cilium{
-		cfg: cfg,
-		l:   log.Logger().Named(string(Name)),
+		cfg:         cfg,
+		l:           log.Logger().Named(string(Name)),
+		retryDelay:  defaultRetryDelay,
+		maxAttempts: defaultAttempts,
+		sockPath:    MonitorSockPath1_2,
 	}
 }
 
@@ -37,11 +41,11 @@ func (c *cilium) Name() string {
 	return string(Name)
 }
 
-func (c *cilium) Generate(ctx context.Context) error {
+func (c *cilium) Generate(_ context.Context) error {
 	return nil
 }
 
-func (c *cilium) Compile(ctx context.Context) error {
+func (c *cilium) Compile(_ context.Context) error {
 	return nil
 }
 
@@ -63,15 +67,21 @@ func (c *cilium) Start(ctx context.Context) error {
 		}
 	}
 
-	// Start the cilium monitor
-	go c.monitor(ctx)
+	// Connect and monitor loop
+	err := c.connect(ctx)
+	if err != nil {
+		c.l.Error("Error while connecting and decoding cilium events", zap.Error(err))
+		return err
+	}
+	go func() {
+		c.monitorLoop(ctx)
+	}()
 
 	<-ctx.Done()
 	return nil
 }
 
 func (c *cilium) Stop() error {
-
 	c.l.Info("Stopped cilium plugin")
 	return nil
 }
@@ -82,46 +92,52 @@ func (c *cilium) SetupChannel(ch chan *v1.Event) error {
 }
 
 // Create a connection to the cilium unix socket to monitor events
-func (c *cilium) monitor(ctx context.Context) {
+func (c *cilium) connect(ctx context.Context) error {
 	// Start the cilium monitor
-	for ; ; time.Sleep(12) {
-		conn, err := net.Dial("unix", MonitorSockPath1_2)
-		if err != nil {
-			c.l.Error("Failed to connect to cilium monitor", zap.Error(err))
-			continue
-		}
-		c.l.Info("Connected to cilium monitor")
-		c.connection = conn
-		err = c.monitorLoop(ctx)
-		if err != nil {
-			c.l.Error("Monitor loop exited with error", zap.Error(err))
-		} else if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-			c.l.Warn("Connection was closed")
+	for attempt := 0; attempt < c.maxAttempts; attempt++ {
+		select {
+		case <-ctx.Done(): // Cancelled or done
+			//nolint:wrapcheck // dont wrap error since it would not provide more context
+			return ctx.Err()
+		default:
+			conn, err := net.Dial("unix", c.sockPath)
+			if err != nil {
+				c.l.Error("Failed to connect to cilium monitor", zap.Error(err))
+				time.Sleep(time.Duration(c.retryDelay) * time.Second)
+				continue
+			}
+			c.l.Info("Connected to cilium monitor")
+			c.connection = conn
+			return nil
 		}
 	}
+	return nil
 }
 
 // monitor events from uds connection
-func (c *cilium) monitorLoop(ctx context.Context) error {
+func (c *cilium) monitorLoop(ctx context.Context) {
 	defer c.connection.Close()
 	decoder := gob.NewDecoder(c.connection)
 	var pl payload.Payload
-
 	for {
 		select {
-		case <-ctx.Done():
+		case <-ctx.Done(): // cancelled or done
 			c.l.Info("Context done, exiting monitor loop")
-			return nil
+			return
 		default:
 			if err := pl.DecodeBinary(decoder); err != nil {
-				c.l.Error("Failed to decode payload", zap.Error(err))
-				return err
+				c.l.Warn("Failed to decode payload from cilium", zap.Error(err))
+				continue
 			}
 			ev, err := c.p.Decode(&pl)
 			if err == nil {
 				c.externalChannel <- ev
 			} else {
-				c.l.Warn("Failed to decode to flow", zap.Error(err))
+				c.l.Warn("Failed to decode cilium payload to flow", zap.Error(err))
+				if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+					c.l.Warn("Connection was closed", zap.Error(err))
+					return
+				}
 			}
 		}
 	}
