@@ -57,23 +57,7 @@ data:
   azureCredentialConfig: /etc/kubernetes/cloud-config/azure.json
 ```
 
-The volume defined in retina-operator deployment mount the secret containing the authentication information to the container.
-
-```yaml
-          volumeMounts:
-            - name: etc-kubernetes
-              mountPath: /etc/kubernetes
-            - name: cloud-config
-              mountPath: /etc/kubernetes/cloud-config
-              readOnly: true
-      volumes:
-        - name: etc-kubernetes
-          hostPath:
-            path: /etc/kubernetes
-        - name: cloud-config
-          secret:
-            secretName: azure-cloud-config
-```
+In the above configuration, when `enableManagedStorageAccount` is true, retina-operator will pick azure credential configuration from `/etc/kubernetes/cloud-config/azure.json`. [retina-operator helm template](https://github.com/microsoft/retina/blob/main/deploy/legacy/manifests/controller/helm/retina/templates/operator.yaml) mounts the secret containing azure credentials to `/etc/kubernetes/cloud-config/azure.json`.
 
 When default storage account is enabled, a managed storage account will be created under the resource group of the sub both specified in the credential file.
 In the case of AKS, the resource group will be MC, or node, resource group, and subscription will be the overlay subscription.
@@ -126,5 +110,5 @@ A container, `capture`, will be created to store the network artifacts after the
 
 ## Create a Retina Capture
 
-Retina-operator will create a container blob SAS URL with expiry time determined from Capture Duration to make sure blob SAS URL is invaid soon after the Capture is completed.
+Retina-operator will create a container blob SAS URL with expiry time determined from Capture Duration to make sure blob SAS URL is invalid soon after the Capture is completed.
 And Retina-operator will update Capture CR with the blob SAL URL to allow the customer read the URL.
