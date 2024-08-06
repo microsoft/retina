@@ -242,5 +242,4 @@ static __always_inline __attribute__((unused)) bool is_reply_packet(struct ct_v4
     } else {
         return true;
     }
-
 }
