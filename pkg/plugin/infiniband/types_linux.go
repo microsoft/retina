@@ -3,6 +3,8 @@
 package infiniband
 
 import (
+	"sync"
+
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/plugin/api"
@@ -17,6 +19,7 @@ type infiniband struct {
 	cfg       *kcfg.Config
 	l         *log.ZapLogger
 	isRunning bool
+	startLock sync.Mutex
 }
 
 type CounterStat struct {
