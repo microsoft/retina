@@ -30,6 +30,7 @@ import (
 
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
 	deploy "github.com/microsoft/retina/deploy/legacy"
+	"github.com/microsoft/retina/internal/buildinfo"
 	"github.com/microsoft/retina/operator/cache"
 	config "github.com/microsoft/retina/operator/config"
 	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
@@ -56,13 +57,6 @@ var (
 	MaxAgeDays    = 30
 
 	HeartbeatFrequency = 5 * time.Minute
-
-	version = "undefined"
-
-	// applicationInsightsID is the instrumentation key for Azure Application Insights
-	// It is set during the build process using the -ldflags flag
-	// If it is set, the application will send telemetry to the corresponding Application Insights resource.
-	applicationInsightsID string
 )
 
 func init() {
@@ -106,7 +100,7 @@ func (o *Operator) Start() {
 	mainLogger.Sugar().Infof("Operator configuration", zap.Any("configuration", oconfig))
 
 	// Set Capture config
-	oconfig.CaptureConfig.CaptureImageVersion = version
+	oconfig.CaptureConfig.CaptureImageVersion = buildinfo.Version
 	oconfig.CaptureConfig.CaptureImageVersionSource = captureUtils.VersionSourceOperatorImageVersion
 
 	if err != nil {
@@ -114,7 +108,7 @@ func (o *Operator) Start() {
 		os.Exit(1)
 	}
 
-	err = initLogging(oconfig, applicationInsightsID)
+	err = initLogging(oconfig, buildinfo.ApplicationInsightsID)
 	if err != nil {
 		fmt.Printf("failed to initialize logging with err %s", err.Error())
 		os.Exit(1)
@@ -176,10 +170,10 @@ func (o *Operator) Start() {
 	}
 
 	var tel telemetry.Telemetry
-	if oconfig.EnableTelemetry && applicationInsightsID != "" {
-		mainLogger.Info("telemetry enabled", zap.String("applicationInsightsID", applicationInsightsID))
+	if oconfig.EnableTelemetry && buildinfo.ApplicationInsightsID != "" {
+		mainLogger.Info("telemetry enabled", zap.String("applicationInsightsID", buildinfo.ApplicationInsightsID))
 		properties := map[string]string{
-			"version":                   version,
+			"version":                   buildinfo.Version,
 			telemetry.PropertyApiserver: apiserverURL,
 		}
 		tel = telemetry.NewAppInsightsTelemetryClient("retina-operator", properties)

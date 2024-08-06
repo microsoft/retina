@@ -25,6 +25,7 @@ import (
 	"github.com/cilium/cilium/pkg/logging/logfields"
 	"github.com/cilium/cilium/pkg/metrics"
 	"github.com/cilium/cilium/pkg/option"
+	"github.com/microsoft/retina/internal/buildinfo"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -33,10 +34,6 @@ import (
 )
 
 var (
-	// set at build time in Dockerfile
-	applicationInsightsID string
-	retinaVersion         string
-
 	// set logger field: subsys=retina-operator
 	binaryName       = filepath.Base(os.Args[0])
 	logger           = logging.DefaultLogger.WithField(logfields.LogSubsys, binaryName)
@@ -92,7 +89,7 @@ func initEnv(vp *viper.Viper) {
 	}
 
 	option.LogRegisteredOptions(vp, logger)
-	logger.Infof("retina operator version: %s", retinaVersion)
+	logger.Infof("retina operator version: %s", buildinfo.Version)
 }
 
 func doCleanup() {

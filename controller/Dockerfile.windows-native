@@ -7,9 +7,8 @@ FROM  --platform=windows/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.22-wi
 WORKDIR C:\\retina
 COPY go.mod .
 COPY go.sum .
-ENV CGO_ENABLED=1
+ENV CGO_ENABLED=0
 RUN go mod download
-RUN go mod verify
 ADD . .
 ARG VERSION
 ARG APP_INSIGHTS_ID
@@ -17,8 +16,8 @@ SHELL ["cmd", "/S", "/C"]
 ENV VERSION=$VERSION
 
 ENV APP_INSIGHTS_ID=$APP_INSIGHTS_ID
-RUN go build -v -o controller.exe -ldflags="-X main.version=%VERSION% -X main.applicationInsightsID=%APP_INSIGHTS_ID%" .\controller
-RUN go build -v -o captureworkload.exe -ldflags="-X main.version=%VERSION% -X main.applicationInsightsID=%APP_INSIGHTS_ID%" .\captureworkload
+RUN go build -v -o controller.exe -ldflags="-X github.com/microsoft/retina/internal/buildinfo.Version=%VERSION% -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=%APP_INSIGHTS_ID%" .\controller
+RUN go build -v -o captureworkload.exe -ldflags="-X github.com/microsoft/retina/internal/buildinfo.Version=%VERSION% -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=%APP_INSIGHTS_ID%" .\captureworkload
 
 FROM --platform=windows/amd64 ${BUILDER_IMAGE} as pktmon-builder
 WORKDIR C:\\retina
