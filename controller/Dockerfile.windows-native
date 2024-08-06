@@ -3,7 +3,7 @@
 # buildx targets, and this one requires legacy build.
 # Maybe one day: https://github.com/moby/buildkit/issues/616
 ARG BUILDER_IMAGE
-FROM  --platform=windows/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.22-windowsservercore-ltsc2022 as builder
+FROM  --platform=windows/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.22-windowsservercore-ltsc2022 AS builder
 WORKDIR C:\\retina
 COPY go.mod .
 COPY go.sum .
@@ -22,7 +22,7 @@ RUN go build -v -o captureworkload.exe -ldflags="-X github.com/microsoft/retina/
 FROM --platform=windows/amd64 ${BUILDER_IMAGE} as pktmon-builder
 WORKDIR C:\\retina
 
-FROM --platform=windows/amd64 mcr.microsoft.com/windows/nanoserver:ltsc2022 as final
+FROM --platform=windows/amd64 mcr.microsoft.com/windows/nanoserver:ltsc2022 AS final
 ADD https://github.com/microsoft/etl2pcapng/releases/download/v1.10.0/etl2pcapng.exe /etl2pcapng.exe
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'Continue';"]
 COPY --from=builder C:\\retina\\controller.exe controller.exe

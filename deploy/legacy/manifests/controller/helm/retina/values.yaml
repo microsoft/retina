@@ -41,6 +41,7 @@ enablePodLevel: false
 remoteContext: false
 enableAnnotations: false
 bypassLookupIPOfInterest: true
+dataAggregationLevel: "low"
 
 imagePullSecrets: []
 nameOverride: "retina"

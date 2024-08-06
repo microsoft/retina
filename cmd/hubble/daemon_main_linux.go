@@ -254,6 +254,7 @@ func setupZapLogger(retinaConfig *config.Config, k8sCfg *rest.Config) *log.ZapLo
 		zap.String("version", buildinfo.Version),
 		zap.String("apiserver", k8sCfg.Host),
 		zap.Strings("plugins", retinaConfig.EnabledPlugin),
+		zap.String("data aggregation level", retinaConfig.DataAggregationLevel.String()),
 	}
 
 	_, err := log.SetupZapLogger(logOpts, persistentFields...)

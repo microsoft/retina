@@ -8,13 +8,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"os"
 	"path"
 	"runtime"
 	"sync"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/cilium/cilium/api/v1/flow"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
@@ -210,22 +211,27 @@ func (p *packetParser) Start(ctx context.Context) error {
 		p.callbackID = ps.Subscribe(common.PubSubEndpoints, &fn)
 	}
 
-	outgoingLinks, err := utils.GetDefaultOutgoingLinks()
-	if err != nil {
-		return err
-	}
-	if len(outgoingLinks) == 0 {
-		return errNoOutgoingLinks
-	}
-	outgoingLink := outgoingLinks[0] // Take first link until multi-link support is implemented
+	if p.cfg.DataAggregationLevel == kcfg.Low {
+		p.l.Info("Attaching bpf program to default interface of k8s Node in node namespace")
+		outgoingLinks, err := utils.GetDefaultOutgoingLinks()
+		if err != nil {
+			return errors.Wrap(err, "could not get default outgoing links")
+		}
+		if len(outgoingLinks) == 0 {
+			return errNoOutgoingLinks
+		}
+		outgoingLink := outgoingLinks[0] // Take first link until multi-link support is implemented
 
-	outgoingLinkAttributes := outgoingLink.Attrs()
-	p.l.Info("Attaching Packetparser",
-		zap.Int("outgoingLink.Index", outgoingLinkAttributes.Index),
-		zap.String("outgoingLink.Name", outgoingLinkAttributes.Name),
-		zap.Stringer("outgoingLink.HardwareAddr", outgoingLinkAttributes.HardwareAddr),
-	)
-	p.createQdiscAndAttach(*outgoingLink.Attrs(), Device)
+		outgoingLinkAttributes := outgoingLink.Attrs()
+		p.l.Info("Attaching Packetparser",
+			zap.Int("outgoingLink.Index", outgoingLinkAttributes.Index),
+			zap.String("outgoingLink.Name", outgoingLinkAttributes.Name),
+			zap.Stringer("outgoingLink.HardwareAddr", outgoingLinkAttributes.HardwareAddr),
+		)
+		p.createQdiscAndAttach(*outgoingLink.Attrs(), Device)
+	} else {
+		p.l.Info("Skipping attaching bpf program to default interface of k8s Node in node namespace")
+	}
 
 	// Create the channel.
 	p.recordsChannel = make(chan perf.Record, buffer)

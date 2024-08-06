@@ -60,6 +60,7 @@ enablePodLevel: true
 remoteContext: false
 enableAnnotations: false
 bypassLookupIPOfInterest: true
+dataAggregationLevel: "high"
 
 imagePullSecrets: []
 nameOverride: "retina"
@@ -178,7 +179,7 @@ hubble:
   # Possible values are:
   #   1, 3, 7, 15, 31, 63, 127, 255, 511, 1023,
   #   2047, 4095, 8191, 16383, 32767, 65535
-  # eventBufferCapacity: "4095"
+  eventBufferCapacity: "4095"
 
   # -- Hubble metrics configuration.
   # See https://docs.cilium.io/en/stable/observability/metrics/#hubble-metrics
