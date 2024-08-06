@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
-package azclients
+package clients
 
 import (
 	"sigs.k8s.io/cloud-provider-azure/pkg/azclient"
