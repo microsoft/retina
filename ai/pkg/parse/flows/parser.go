@@ -34,6 +34,10 @@ func (p *Parser) Parse(flows []*flowpb.Flow) {
 }
 
 func (p *Parser) addFlow(f *flowpb.Flow) error {
+	if f == nil {
+		return nil
+	}
+
 	src := f.GetSource()
 	dst := f.GetDestination()
 	if src == nil || dst == nil {

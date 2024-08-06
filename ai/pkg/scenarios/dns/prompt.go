@@ -1,16 +1,21 @@
-package drops
+package dns
 
 // TODO implement below analysis logic in code and/or LM prompt
 
 /*
-	DROPS ANALYSIS LOGIC
+	DNS ANALYSIS LOGIC
 
 	Primary questions:
-	- Is there dropped traffic? What are the source, destination, protocol, and port?
-	- Are there TCP SYNs missing SYN-ACKs? What are the source, destination, and port?
-	- Same for TCP resets.
-	- Which connections are successful? Compare this to above.
-	- Are Nodes experiencing NIC issues?
+	- Do any queries have failing responses? Which?
+	- Do any queries have no responses? Which?
+	- Which Pods are impacted by above? Which are not?
+	- Which core-dns Pods are impacted by above? Which are not?
+	- Is "reserved:world" responding with errors or responding at all?
+
+	More questions:
+	- What kind of queries do we see (qualitatively)?
+	- Do we see any issue by DNS record type?
+	- Does number of IPs matter??
 */
 
 const (

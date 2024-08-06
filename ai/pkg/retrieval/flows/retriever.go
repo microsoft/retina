@@ -83,13 +83,13 @@ func (r *Retriever) Observe(ctx context.Context, req *observerpb.GetFlowsRequest
 	defer portForwardCancel()
 
 	// FIXME make ports part of a config
-	cmd := exec.CommandContext(portForwardCtx, "kubectl", "port-forward", "-n", "kube-system", "svc/hubble-relay", "5555:80")
+	cmd := exec.CommandContext(portForwardCtx, "kubectl", "port-forward", "-n", "kube-system", "svc/hubble-relay", "5557:80")
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start port-forward. %v", err)
 	}
 
 	// observe flows
-	observeCtx, observeCancel := context.WithTimeout(ctx, 30*time.Second)
+	observeCtx, observeCancel := context.WithTimeout(ctx, 15*time.Second)
 	defer observeCancel()
 
 	maxFlows := req.Number
@@ -120,18 +120,25 @@ func (r *Retriever) observeFlowsGRPC(ctx context.Context, req *observerpb.GetFlo
 	}
 
 	r.flows = make([]*flowpb.Flow, 0)
+	var errReceiving error
 	for {
 		select {
 		case <-ctx.Done():
 			r.log.Info("context cancelled")
 			return r.flows, nil
 		default:
+			if errReceiving != nil {
+				// error receiving and context not done
+				// TODO handle error instead of returning error
+				return nil, fmt.Errorf("failed to receive flow. %v", err)
+			}
+
 			r.log.WithField("flowCount", len(r.flows)).Debug("processing flow")
 
 			getFlowResponse, err := stream.Recv()
 			if err != nil {
-				// TODO handle error instead of returning error
-				return nil, fmt.Errorf("failed to receive flow. %v", err)
+				errReceiving = err
+				continue
 			}
 
 			f := getFlowResponse.GetFlow()
@@ -150,7 +157,7 @@ func (r *Retriever) observeFlowsGRPC(ctx context.Context, req *observerpb.GetFlo
 // handleFlow logic is inspired by a snippet from Hubble UI
 // https://github.com/cilium/hubble-ui/blob/a06e19ba65299c63a58034a360aeedde9266ec01/backend/internal/flow_stream/flow_stream.go#L360-L395
 func (r *Retriever) handleFlow(f *flowpb.Flow) {
-	if f.GetL4() == nil || f.GetSource() == nil || f.GetDestination() == nil {
+	if (f.GetL7() == nil && f.GetL4() == nil) || f.GetSource() == nil || f.GetDestination() == nil {
 		return
 	}
 

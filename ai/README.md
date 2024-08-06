@@ -4,7 +4,7 @@
 
 - Change into this *ai/* folder.
 - `go mod tidy ; go mod vendor`
-- Set your `kubeconfigPath` in *main.go*.
+- Modify the `defaultConfig` values in *main.go*
 - If using Azure OpenAI:
   - Make sure you're logged into your account/subscription in your terminal.
   - Specify environment variables for Deployment name and Endpoint URL. Get deployment from e.g. [https://oai.azure.com/portal/deployment](https://oai.azure.com/portal/deployment) and Endpoint from e.g. Deployment > Playground > Code.

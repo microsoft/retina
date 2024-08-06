@@ -31,7 +31,7 @@ func New() (*Client, error) {
 	tlsDialOption := grpc.WithTransportCredentials(insecure.NewCredentials())
 
 	// FIXME make address part of a config
-	addr := ":5555"
+	addr := ":5557"
 	connection, err := grpc.NewClient(addr, tlsDialOption, connectDialOption)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial %s: %w", addr, err)

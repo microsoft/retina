@@ -27,7 +27,7 @@ var (
 		Name:        "namespace2",
 		DataType:    "string",
 		Description: "Namespace 2",
-		Optional:    false,
+		Optional:    true,
 		Regex:       k8sNameRegex,
 	}
 

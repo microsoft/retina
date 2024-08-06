@@ -7,41 +7,67 @@ import (
 	"github.com/microsoft/retina/ai/pkg/lm"
 	flowretrieval "github.com/microsoft/retina/ai/pkg/retrieval/flows"
 	"github.com/microsoft/retina/ai/pkg/scenarios"
-	"github.com/microsoft/retina/ai/pkg/scenarios/dns"
-	"github.com/microsoft/retina/ai/pkg/scenarios/drops"
 
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
 
-var (
-	definitions = []*scenarios.Definition{
-		drops.Definition,
-		dns.Definition,
-	}
-)
-
 type Bot struct {
-	log       logrus.FieldLogger
-	config    *rest.Config
-	clientset *kubernetes.Clientset
-	model     lm.Model
+	log           logrus.FieldLogger
+	config        *rest.Config
+	clientset     *kubernetes.Clientset
+	model         lm.Model
+	flowRetriever *flowretrieval.Retriever
 }
 
 // input log, config, clientset, model
-func NewBot(log logrus.FieldLogger, config *rest.Config, clientset *kubernetes.Clientset, model lm.Model) *Bot {
-	return &Bot{
-		log:       log.WithField("component", "chat"),
-		config:    config,
-		clientset: clientset,
-		model:     model,
+func NewBot(log logrus.FieldLogger, config *rest.Config, clientset *kubernetes.Clientset, model lm.Model, useFlowsFromFile bool) *Bot {
+	b := &Bot{
+		log:           log.WithField("component", "chat"),
+		config:        config,
+		clientset:     clientset,
+		model:         model,
+		flowRetriever: flowretrieval.NewRetriever(log, config, clientset),
 	}
+
+	if useFlowsFromFile {
+		b.flowRetriever.UseFile()
+	}
+
+	return b
 }
 
+func (b *Bot) HandleScenario(question string, history lm.ChatHistory, definition *scenarios.Definition, parameters map[string]string) (lm.ChatHistory, error) {
+	if definition == nil {
+		return history, fmt.Errorf("no scenario selected")
+	}
+
+	cfg := &scenarios.Config{
+		Log:           b.log,
+		Config:        b.config,
+		Clientset:     b.clientset,
+		Model:         b.model,
+		FlowRetriever: b.flowRetriever,
+	}
+
+	ctx := context.TODO()
+	response, err := definition.Handle(ctx, cfg, parameters, question, history)
+	if err != nil {
+		return history, fmt.Errorf("error handling scenario: %w", err)
+	}
+
+	history = append(history, lm.MessagePair{
+		User:      question,
+		Assistant: response,
+	})
+
+	return history, nil
+}
+
+// FIXME get user input and implement scenario selection
 func (b *Bot) Loop() error {
 	var history lm.ChatHistory
-	flowRetriever := flowretrieval.NewRetriever(b.log, b.config, b.clientset)
 
 	for {
 		// TODO get user input
@@ -53,39 +79,26 @@ func (b *Bot) Loop() error {
 			return fmt.Errorf("error selecting scenario: %w", err)
 		}
 
-		// cfg.FlowRetriever.UseFile()
-
-		cfg := &scenarios.Config{
-			Log:           b.log,
-			Config:        b.config,
-			Clientset:     b.clientset,
-			Model:         b.model,
-			FlowRetriever: flowRetriever,
-		}
-
-		ctx := context.TODO()
-		response, err := definition.Handle(ctx, cfg, params, question, history)
+		newHistory, err := b.HandleScenario(question, history, definition, params)
 		if err != nil {
 			return fmt.Errorf("error handling scenario: %w", err)
 		}
 
-		fmt.Println(response)
+		fmt.Println(newHistory[len(newHistory)-1].Assistant)
 
-		// TODO keep chat loop going
-		break
+		history = newHistory
 	}
-
-	return nil
 }
 
+// FIXME fix prompts
 func (b *Bot) selectScenario(question string, history lm.ChatHistory) (*scenarios.Definition, map[string]string, error) {
-	// TODO use chat interface
-	// FIXME hard-coding the scenario and params for now
-	d := definitions[0]
-	params := map[string]string{
-		scenarios.Namespace1.Name: "default",
-		scenarios.Namespace2.Name: "default",
+	ctx := context.TODO()
+	response, err := b.model.Generate(ctx, selectionSystemPrompt, nil, selectionPrompt(question, history))
+	if err != nil {
+		return nil, nil, fmt.Errorf("error generating response: %w", err)
 	}
 
-	return d, params, nil
+	// TODO parse response and return scenario definition and parameters
+	_ = response
+	return nil, nil, nil
 }

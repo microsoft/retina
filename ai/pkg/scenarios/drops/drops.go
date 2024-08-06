@@ -177,17 +177,6 @@ func flowsRequest(params *params) *observerpb.GetFlowsRequest {
 		// filterPod1ToIP,
 	}
 
-	req.Whitelist = nil
-
-	req.Blacklist = []*flowpb.FlowFilter{
-		{
-			SourcePod: []string{"kube-system/"},
-		},
-		{
-			DestinationPod: []string{"kube-system/"},
-		},
-	}
-
 	return req
 }
 
