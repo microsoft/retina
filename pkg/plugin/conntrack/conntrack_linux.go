@@ -27,7 +27,8 @@ import (
 // New creates a packetparser plugin.
 func New(_ *config.Config) api.Plugin {
 	return &conntrack{
-		l: log.Logger().Named(string(Name)),
+		l:           log.Logger().Named(string(Name)),
+		gcFrequency: defaultGCFrequency,
 	}
 }
 
@@ -64,14 +65,14 @@ func (ct *conntrack) Init() error {
 	ct.objs = objs
 
 	// Get the conntrack map from the objects
-	ct.ctmap = objs.RetinaConntrackMap
+	ct.ctMap = objs.RetinaConntrackMap
 
 	return nil
 }
 
 // Run starts the Conntrack garbage collection loop.
 func (ct *conntrack) Start(ctx context.Context) error {
-	ticker := time.NewTicker(defaultGCFrequency)
+	ticker := time.NewTicker(ct.gcFrequency)
 	defer ticker.Stop()
 
 	ct.l.Info("Starting Conntrack GC loop")
@@ -87,7 +88,7 @@ func (ct *conntrack) Start(ctx context.Context) error {
 			var noOfCtEntries, entriesDeleted int
 			// List of keys to be deleted
 			var keysToDelete []conntrackCtV4Key
-			iter := ct.ctmap.Iterate()
+			iter := ct.ctMap.Iterate()
 			for iter.Next(&key, &value) {
 				noOfCtEntries++
 				if value.IsClosing == 1 || ktime.MonotonicOffset.Seconds()+float64(value.Lifetime) < float64((time.Now().Unix())) {
@@ -117,7 +118,7 @@ func (ct *conntrack) Start(ctx context.Context) error {
 			}
 			// Delete the conntrack entries
 			for _, key := range keysToDelete {
-				if err := ct.ctmap.Delete(key); err != nil {
+				if err := ct.ctMap.Delete(key); err != nil {
 					ct.l.Error("Delete failed", zap.Error(err))
 				} else {
 					entriesDeleted++
