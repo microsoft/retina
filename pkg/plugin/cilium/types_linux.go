@@ -4,6 +4,7 @@ package cilium
 
 import (
 	"net"
+	"time"
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	hp "github.com/cilium/cilium/pkg/hubble/parser"
@@ -25,7 +26,7 @@ type cilium struct {
 	connection      net.Conn
 	p               *parser
 	maxAttempts     int
-	retryDelay      int
+	retryDelay      time.Duration
 	sockPath        string
 }
 

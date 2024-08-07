@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
-// Package dns contains the Retina DNS plugin. It uses the Inspektor Gadget DNS tracer to capture DNS events.
+// Package cilium contains the Retina Cilium plugin. It uses unix socket to get events from cilium and decode them to flow objects.
 package cilium
 
 import (
@@ -23,8 +23,8 @@ import (
 
 const (
 	MonitorSockPath1_2 = "/var/run/cilium/monitor1_2.sock"
-	defaultRetryDelay  = 12
 	defaultAttempts    = 10
+	defaultRetryDelay  = 12 * time.Second
 )
 
 func New(cfg *kcfg.Config) api.Plugin {
@@ -53,7 +53,11 @@ func (c *cilium) Init() error {
 	c.p = &parser{
 		l: c.l,
 	}
-	c.p.Init()
+	err := c.p.Init()
+	if err != nil {
+		c.l.Error("Failed to initialize cilium parser", zap.Error(err))
+		return err
+	}
 	c.l.Info("Initialized cilium plugin")
 	return nil
 }
@@ -102,8 +106,9 @@ func (c *cilium) connect(ctx context.Context) error {
 		default:
 			conn, err := net.Dial("unix", c.sockPath)
 			if err != nil {
+				c.connection = nil
 				c.l.Error("Failed to connect to cilium monitor", zap.Error(err))
-				time.Sleep(time.Duration(c.retryDelay) * time.Second)
+				time.Sleep(c.retryDelay)
 				continue
 			}
 			c.l.Info("Connected to cilium monitor")
@@ -118,14 +123,22 @@ func (c *cilium) connect(ctx context.Context) error {
 func (c *cilium) monitorLoop(ctx context.Context) {
 	defer c.connection.Close()
 	decoder := gob.NewDecoder(c.connection)
-	var pl payload.Payload
 	for {
+		var pl payload.Payload
 		select {
 		case <-ctx.Done(): // cancelled or done
 			c.l.Info("Context done, exiting monitor loop")
 			return
 		default:
 			if err := pl.DecodeBinary(decoder); err != nil {
+				if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+					c.l.Warn("Connection was closed, retrying connection", zap.Error(err))
+					if err = c.connect(ctx); err != nil {
+						c.l.Error("Failed to reconnect to cilium monitor", zap.Error(err))
+						return
+					}
+					continue
+				}
 				c.l.Warn("Failed to decode payload from cilium", zap.Error(err))
 				continue
 			}
@@ -134,10 +147,6 @@ func (c *cilium) monitorLoop(ctx context.Context) {
 				c.externalChannel <- ev
 			} else {
 				c.l.Warn("Failed to decode cilium payload to flow", zap.Error(err))
-				if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-					c.l.Warn("Connection was closed", zap.Error(err))
-					return
-				}
 			}
 		}
 	}

@@ -20,7 +20,7 @@ import (
 )
 
 func TestStart(t *testing.T) {
-	ctxTimeout, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
+	ctxTimeout, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
 	_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
@@ -51,31 +51,52 @@ func TestMonitorLoop(t *testing.T) {
 	cil := New(cfg)
 	_ = cil.Init()
 
+	cil.(*cilium).retryDelay = 1 * time.Millisecond
+	cil.(*cilium).maxAttempts = 1
+
 	// Test monitorLoop
 	reader, writer := net.Pipe()
+	defer reader.Close()
+	defer writer.Close()
 	// overwrite the connection
 	cil.(*cilium).connection = reader
 	go cil.(*cilium).monitorLoop(ctxWithCancel)
 
-	go func() {
-		defer writer.Close()
-		dn := monitor.DropNotify{
-			Type:    byte(monitorAPI.MessageTypeDrop),
-			SubType: uint8(130),
-		}
+	dn := monitor.DropNotify{
+		Type:    byte(monitorAPI.MessageTypeDrop),
+		SubType: uint8(130),
+	}
 
-		data, _ := testutils.CreateL3L4Payload(dn)
-		pl := payload.Payload{
-			Data: data,
-			CPU:  0,
-			Lost: 0,
-			Type: 9,
-		}
-		msg, _ := pl.Encode()
-		_, err := writer.Write(msg)
-		assert.NilError(t, err)
-	}()
+	data, _ := testutils.CreateL3L4Payload(dn)
+	pl := payload.Payload{
+		Data: data,
+		CPU:  0,
+		Lost: 0,
+		Type: 9,
+	}
+	msg, _ := pl.Encode()
+	_, err := writer.Write(msg)
+	assert.NilError(t, err)
+	cancel()
+}
 
+func TestMonitorLoopWithRetry(t *testing.T) {
+	ctxWithCancel, cancel := context.WithCancel(context.Background())
+	_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
+	cfg := &config.Config{
+		EnablePodLevel: true,
+	}
+	cil := New(cfg)
+	_ = cil.Init()
+	cil.(*cilium).retryDelay = 1 * time.Millisecond
+	cil.(*cilium).maxAttempts = 2
+	// Test monitorLoop
+	reader, writer := net.Pipe()
+	cil.(*cilium).connection = reader
+	go cil.(*cilium).monitorLoop(ctxWithCancel)
+	err := writer.Close()
+	assert.NilError(t, err)
 	time.Sleep(5 * time.Second)
+	assert.Assert(t, cil.(*cilium).connection == nil, "connection should be nil")
 	cancel()
 }
