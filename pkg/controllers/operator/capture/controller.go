@@ -1,7 +1,6 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
-// package capture features the retina capture controller.
 package capture
 
 import (
@@ -23,8 +22,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
 	pkgcapture "github.com/microsoft/retina/pkg/capture"
+	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
+	managedOutputLocation "github.com/microsoft/retina/pkg/capture/outputlocation/managed"
 	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	"github.com/microsoft/retina/pkg/common/apiretry"
 	"github.com/microsoft/retina/pkg/config"
@@ -34,11 +36,12 @@ import (
 const (
 	captureFinalizer = "kappio.io/capture-cleanup"
 
-	captureErrorReasonExceedJobNumLimit = "ExceedJobNumLimit"
-	captureErrorReasonFindSecretFailed  = "FindSecretFailed"
-	captureErrorReasonOthers            = "OtherError"
-	captureErrorReasonCreateJobFailed   = "CreateSecretFailed"
-	captureErrorReasonRunJobFailed      = "RunJobFailed"
+	captureErrorReasonExceedJobNumLimit  = "ExceedJobNumLimit"
+	captureErrorReasonFindSecretFailed   = "FindSecretFailed"
+	captureErrorReasonOthers             = "OtherError"
+	captureErrorReasonCreateJobFailed    = "CreateJobFailed"
+	captureErrorReasonCreateSecretFailed = "CreateSecretFailed"
+	captureErrorReasonRunJobFailed       = "RunJobFailed"
 
 	captureInPogressReason        = "JobsInProgress"
 	captureCompleteReason         = "JobsCompleted"
@@ -55,18 +58,29 @@ type CaptureReconciler struct {
 	logger *log.ZapLogger
 
 	captureToPodTranslator *pkgcapture.CaptureToPodTranslator
+
+	managedStorageAccountManager *managedOutputLocation.StorageAccountManager
 }
 
-func NewCaptureReconciler(client client.Client, scheme *runtime.Scheme, kubeClient kubernetes.Interface, config config.CaptureConfig) *CaptureReconciler {
+func NewCaptureReconciler(c client.Client, scheme *runtime.Scheme, kubeClient kubernetes.Interface, captureConfig config.CaptureConfig) (*CaptureReconciler, error) {
 	cr := &CaptureReconciler{
-		Client: client,
+		Client: c,
 		scheme: scheme,
 		logger: log.Logger().Named("Capture"),
 	}
 
-	cr.captureToPodTranslator = pkgcapture.NewCaptureToPodTranslator(kubeClient, cr.logger, config)
+	cr.captureToPodTranslator = pkgcapture.NewCaptureToPodTranslator(kubeClient, cr.logger, captureConfig)
 
-	return cr
+	if captureConfig.EnableManagedStorageAccount {
+		cr.logger.Info("Managed storage account is enabled")
+		managedStorageAccountManager := managedOutputLocation.NewStorageAccountManager()
+		cr.managedStorageAccountManager = managedStorageAccountManager
+		if err := cr.managedStorageAccountManager.Init(captureConfig.AzureCredentialConfig); err != nil {
+			return nil, fmt.Errorf("failed to initialize managed storage account manager: %w", err)
+		}
+	}
+
+	return cr, nil
 }
 
 //+kubebuilder:rbac:groups=retina.sh,resources=captures,verbs=get;list;watch;create;update;patch;delete
@@ -74,7 +88,7 @@ func NewCaptureReconciler(client client.Client, scheme *runtime.Scheme, kubeClie
 //+kubebuilder:rbac:groups=retina.sh,resources=captures/finalizers,verbs=update
 //+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete;deletecollection
 //+kubebuilder:rbac:groups=batch,resources=jobs/status,verbs=get
-//+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list
+//+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=nodes,verbs=get;list
 //+kubebuilder:rbac:groups="",resources=pods,verbs=get;list
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list
@@ -284,7 +298,7 @@ func (cr *CaptureReconciler) handleUpdate(ctx context.Context, capture *retinav1
 		},
 	); err != nil {
 		cr.logger.Error("Failed to list Capture jobs", zap.Error(err), zap.String("Capture", captureRef.String()))
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to list Capture jobs: %w", err)
 	}
 
 	// Once the jobs are created, we'll update the status of the Capture according to the status of the jobs.
@@ -292,7 +306,52 @@ func (cr *CaptureReconciler) handleUpdate(ctx context.Context, capture *retinav1
 		return cr.updateCaptureStatusFromJobs(ctx, capture, captureJobList.Items)
 	}
 
+	// create SAS URL and then secret for the Capture if managed storage account is enabled.
+	// Don't repeat the process if the secret already exists.
+	if cr.managedStorageAccountEnabled() {
+		if capture.Spec.OutputConfiguration.BlobUpload == nil {
+			cr.logger.Info("Creating a secret from managed storage account", zap.String("Capture", captureRef.String()))
+
+			sasURL, err := cr.managedStorageAccountManager.CreateContainerSASURL(ctx, capture.Namespace, capture.Spec.CaptureConfiguration.CaptureOption.Duration.Duration)
+			if err != nil {
+				cr.logger.Error("Failed to create Capture SAS URL", zap.Error(err), zap.String("Capture", captureRef.String()))
+				return ctrl.Result{}, fmt.Errorf("failed to create Capture SAS URL: %w", err)
+			}
+
+			secret := getSecretFromCapture(capture, sasURL)
+			var opRet controllerutil.OperationResult
+			if opRet, err = controllerutil.CreateOrUpdate(ctx, cr.Client, &secret, func() error {
+				return nil
+			}); err != nil {
+				cr.logger.Error("Failed to create secret", zap.Error(err), zap.String("Capture", captureRef.String()), zap.String("operation result", string(opRet)))
+				// Update status of Capture to error
+				meta.SetStatusCondition(&capture.Status.Conditions, metav1.Condition{
+					Type:    string(retinav1alpha1.CaptureError),
+					Status:  metav1.ConditionTrue,
+					Reason:  captureErrorReasonCreateSecretFailed,
+					Message: fmt.Sprintf("Failed to create secret %s/%s", secret.Name, secret.Namespace),
+				})
+
+				return cr.updateStatus(ctx, capture)
+			}
+			cr.logger.Info("Secret is created", zap.String("secret name", secret.Name), zap.String("secret namespace", secret.Namespace), zap.String("Capture", captureRef.String()))
+
+			// set secret in the blob upload configuration
+			// TODO(mainred): update Capture with container/blob info to simply the following blob download
+			capture.Spec.OutputConfiguration.BlobUpload = to.Ptr(secret.Name)
+			if err = cr.Client.Update(ctx, capture); err != nil {
+				cr.logger.Error("Failed to update capture with managed secret", zap.Error(err), zap.String("secret", secret.Name), zap.String("Capture", captureRef.String()))
+				return ctrl.Result{}, fmt.Errorf("failed to update capture with managed secret: %w", err)
+			}
+			cr.logger.Info("Use the existing secret", zap.Error(err), zap.String("Capture", captureRef.String()), zap.String("secret", *capture.Spec.OutputConfiguration.BlobUpload))
+		}
+	}
+
 	return cr.createJobsFromCapture(ctx, capture)
+}
+
+func (cr *CaptureReconciler) managedStorageAccountEnabled() bool {
+	return cr.managedStorageAccountManager != nil
 }
 
 func (cr *CaptureReconciler) handleDelete(ctx context.Context, capture *retinav1alpha1.Capture) (ctrl.Result, error) {
@@ -322,15 +381,46 @@ func (cr *CaptureReconciler) handleDelete(ctx context.Context, capture *retinav1
 		},
 	); err != nil {
 		cr.logger.Error("Failed to delete Capture jobs", zap.Error(err), zap.String("Capture", captureRef.String()))
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to delete Capture jobs: %w", err)
+	}
+	cr.logger.Info("Capture jobs are removed", zap.String("Capture", captureRef.String()))
+
+	if cr.managedStorageAccountEnabled() {
+		secret := getSecretFromCapture(capture, "")
+
+		if err := apiretry.Do(
+			func() error {
+				return cr.Client.Delete(ctx, &secret) //nolint:wrapcheck // no wrapped, detailed explanation is required for the internal error
+			},
+		); err != nil {
+			cr.logger.Error("Failed to delete secret", zap.Error(err), zap.String("Capture", captureRef.String()))
+			return ctrl.Result{}, fmt.Errorf("failed to delete secret: %w", err)
+		}
+		cr.logger.Info("Capture secret is removed", zap.String("Capture", captureRef.String()))
 	}
 
 	controllerutil.RemoveFinalizer(capture, captureFinalizer)
 	if err := cr.Client.Update(ctx, capture); err != nil {
 		cr.logger.Error("Failed to remove Capture finalizer", zap.Error(err), zap.String("Capture", captureRef.String()))
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to remove Capture finalizer: %w", err)
 	}
 	return ctrl.Result{}, nil
+}
+
+func getSecretFromCapture(capture *retinav1alpha1.Capture, sasURL string) corev1.Secret {
+	secretName := managedSecretName(capture.Name)
+	secret := corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: capture.Namespace,
+			Labels:    captureUtils.GetSerectLabelsFromCaptureName(capture.Name),
+		},
+		Data: map[string][]byte{
+			captureConstants.CaptureOutputLocationBlobUploadSecretKey: []byte(sasURL),
+		},
+		Type: corev1.SecretTypeOpaque,
+	}
+	return secret
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -352,7 +442,7 @@ func (cr *CaptureReconciler) updateStatus(ctx context.Context, capture *retinav1
 	latestCapture := &retinav1alpha1.Capture{}
 	if err := cr.Client.Get(ctx, captureRef, latestCapture); err != nil {
 		cr.logger.Error("Failed to get Capture", zap.Error(err), zap.String("Capture", captureRef.String()))
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to get Capture: %w", err)
 	}
 	if reflect.DeepEqual(capture.Status, latestCapture.Status) {
 		return ctrl.Result{}, nil
@@ -361,7 +451,11 @@ func (cr *CaptureReconciler) updateStatus(ctx context.Context, capture *retinav1
 	capture = latestCapture
 	if err := cr.Client.Status().Update(ctx, latestCapture); err != nil {
 		cr.logger.Error("Failed to update status of Capture", zap.Error(err), zap.String("Capture", captureRef.String()))
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to update status of Capture: %w", err)
 	}
 	return ctrl.Result{}, nil
+}
+
+func managedSecretName(captureName string) string {
+	return fmt.Sprintf("managed-%s", captureName)
 }
