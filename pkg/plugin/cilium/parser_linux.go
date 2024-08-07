@@ -16,11 +16,12 @@ import (
 	"go.uber.org/zap"
 )
 
-const ErrNotImplemented = "Error, not implemented"
+var (
+	ErrNotImplemented = errors.New("Error, not implemented")
+	ErrEmptyData      = errors.New("empty data")
+)
 
-var ErrEmptyData = errors.New("empty data")
-
-func (p *parser) Init() {
+func (p *parser) Init() error {
 	parser, err := hp.New(logrus.WithField("cilium", "parser"),
 		// We use noOp getters here since we will use our own custom parser in hubble
 		&hptestutils.NoopEndpointGetter,
@@ -33,8 +34,10 @@ func (p *parser) Init() {
 	)
 	if err != nil {
 		p.l.Fatal("Failed to create parser", zap.Error(err))
+		return err //nolint:wrapcheck // dont wrap error since it would not provide more context
 	}
 	p.hparser = parser
+	return nil
 }
 
 // Reconstruct monitorEvents and then decode flow events to our hubble instance.
@@ -71,7 +74,7 @@ func (p *parser) Decode(pl *payload.Payload) (*v1.Event, error) {
 			// Log Records can be DNS traces for CNP related pods
 			// AccessLogs can also reflect kafka related metrics
 			monEvent.Payload = &observerTypes.AgentEvent{}
-			return nil, errors.New(ErrNotImplemented) //nolint:goerr113 //no specific handling expected
+			return nil, ErrNotImplemented //nolint:goerr113 //no specific handling expected
 		// MessageTypeTraceSock and MessageTypeDebug are also perf events but have their own dedicated decoders in cilium.
 		case monitorAPI.MessageTypeDrop, monitorAPI.MessageTypeTrace, monitorAPI.MessageTypePolicyVerdict, monitorAPI.MessageTypeCapture:
 			perfEvent := &observerTypes.PerfEvent{}

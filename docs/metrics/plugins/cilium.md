@@ -8,6 +8,15 @@ The metrics will be dependent on our custom parsers. For now, we have L34 parser
 We currently do not support Agent or Access Log events from cilium itself.
 This [metrics reference](https://docs.cilium.io/en/stable/observability/metrics/#metrics-reference) from cilium can give an idea of what metrics can be added.
 
+At the moment, we can see metrics such as:
+|        Name             | Description              | Extra Labels  |
+| ----------------------- | -----------------------  | ------------- |
+| `hubble_drop_total` | Number of drops | destination, protocol, reason, source |
+| `hubble_tcp_flags_total` | TCP flag occurrences | destination, family, flag, source |
+| `hubble_metrics_http_handler_request_duration_seconds` | A histogram of latencies of Hubble metrics handler. | code, le |
+| `hubble_flows_processed_total` | Total number of flows processed | destination, protocol, subtype, type, verdict |
+| `hubble_metrics_http_handler_requests_total` | A counter for requests to Hubble metrics handler. | code |
+
 ## Architecture
 
 Cilium collects events and sends these events through the cilium monitor1_2 socket. These events can be categorized as Event Sample or Lost Record. Event samples can be broken down into different categories: Agent events or Perf Events.
