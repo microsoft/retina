@@ -21,14 +21,13 @@ import (
 var (
 	client  appinsights.TelemetryClient
 	version string
-	btoMb   uint64 = 1024
+	mbShift uint64 = 20
 
 	// property keys
-	kernelversion     = "kernelversion"
-	allocatedmem      = "allocmem"
-	totalallocatedmem = "totalallocmem"
-	sysmem            = "sysmem"
-	goroutines        = "goroutines"
+	kernelversion = "kernelversion"
+	allocatedmem  = "allocmem"
+	sysmem        = "sysmem"
+	goroutines    = "goroutines"
 )
 
 type Telemetry interface {
@@ -155,18 +154,17 @@ func (t *TelemetryClient) heartbeat(ctx context.Context) {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 	props := map[string]string{
-		kernelversion:     kernelVersion,
-		allocatedmem:      strconv.FormatUint(bToMb(m.Alloc), 10),
-		totalallocatedmem: strconv.FormatUint(bToMb(m.TotalAlloc), 10),
-		sysmem:            strconv.FormatUint(bToMb(m.Sys), 10),
-		goroutines:        strconv.Itoa(runtime.NumGoroutine()),
+		kernelversion: kernelVersion,
+		allocatedmem:  strconv.FormatUint(bToMb(m.Alloc), 10),
+		sysmem:        strconv.FormatUint(bToMb(m.Sys), 10),
+		goroutines:    strconv.Itoa(runtime.NumGoroutine()),
 	}
 
 	t.TrackEvent("heartbeat", props)
 }
 
 func bToMb(b uint64) uint64 {
-	return b / btoMb / btoMb
+	return b >> mbShift
 }
 
 func (t *TelemetryClient) TrackEvent(name string, properties map[string]string) {
