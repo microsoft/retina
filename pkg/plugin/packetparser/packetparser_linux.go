@@ -13,7 +13,6 @@ import (
 	"path"
 	"runtime"
 	"sync"
-	"time"
 
 	"github.com/pkg/errors"
 
@@ -43,7 +42,6 @@ import (
 	"github.com/vishvananda/netlink"
 	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
@@ -236,8 +234,6 @@ func (p *packetParser) Start(ctx context.Context) error {
 	// Create the channel.
 	p.recordsChannel = make(chan perf.Record, buffer)
 	p.l.Debug("Created records channel")
-
-	cacheInit()
 
 	return p.run(ctx)
 }
@@ -548,40 +544,19 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 			sourcePortShort := uint32(utils.HostToNetShort(bpfEvent.SrcPort))
 			destinationPortShort := uint32(utils.HostToNetShort(bpfEvent.DstPort))
 
-			// Check cache first.
-			ck := cacheKey{
-				srcIP:   bpfEvent.SrcIp,
-				dstIP:   bpfEvent.DstIp,
-				srcPort: sourcePortShort,
-				dstPort: destinationPortShort,
-				proto:   bpfEvent.Proto,
-				dir:     bpfEvent.Dir,
-			}
-
-			var fl *flow.Flow
-			fl, ok := c.Get(ck)
-			if !ok {
-				fl = utils.ToFlow(
-					ktime.MonotonicOffset.Nanoseconds()+int64(bpfEvent.Ts),
-					utils.Int2ip(bpfEvent.SrcIp).To4(), // Precautionary To4() call.
-					utils.Int2ip(bpfEvent.DstIp).To4(), // Precautionary To4() call.
-					sourcePortShort,
-					destinationPortShort,
-					bpfEvent.Proto,
-					bpfEvent.Dir,
-					flow.Verdict_FORWARDED,
-				)
-				if fl == nil {
-					p.l.Warn("Could not convert bpfEvent to flow", zap.Any("bpfEvent", bpfEvent))
-					continue
-				}
-				c.Add(ck, fl)
-			} else {
-				if t, err := decodeTime(ktime.MonotonicOffset.Nanoseconds() + int64(bpfEvent.Ts)); err == nil {
-					fl.Time = t
-				} else {
-					p.l.Warn("Failed to get current time", zap.Error(err))
-				}
+			fl := utils.ToFlow(
+				ktime.MonotonicOffset.Nanoseconds()+int64(bpfEvent.Ts),
+				utils.Int2ip(bpfEvent.SrcIp).To4(), // Precautionary To4() call.
+				utils.Int2ip(bpfEvent.DstIp).To4(), // Precautionary To4() call.
+				sourcePortShort,
+				destinationPortShort,
+				bpfEvent.Proto,
+				bpfEvent.Dir,
+				flow.Verdict_FORWARDED,
+			)
+			if fl == nil {
+				p.l.Warn("Could not convert bpfEvent to flow", zap.Any("bpfEvent", bpfEvent))
+				continue
 			}
 
 			meta := &utils.RetinaMetadata{}
@@ -684,16 +659,4 @@ func absPath() (string, error) {
 	}
 	dir := path.Dir(filename)
 	return dir, nil
-}
-
-func decodeTime(nanoseconds int64) (pbTime *timestamppb.Timestamp, err error) {
-	goTime, err := time.Parse(time.RFC3339Nano, time.Unix(0, nanoseconds).Format(time.RFC3339Nano))
-	if err != nil {
-		return nil, err
-	}
-	pbTime = timestamppb.New(goTime)
-	if err = pbTime.CheckValid(); err != nil {
-		return nil, err
-	}
-	return pbTime, nil
 }
