@@ -576,26 +576,6 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 					continue
 				}
 				c.Add(ck, fl)
-
-				// meta := &utils.RetinaMetadata{}
-
-				// // Add packet size to the flow's metadata.
-				// utils.AddPacketSize(meta, bpfEvent.Bytes)
-
-				// // Add the TCP metadata to the flow.
-				// tcpMetadata := bpfEvent.TcpMetadata
-				// utils.AddTCPFlags(fl, tcpMetadata.Syn, tcpMetadata.Ack, tcpMetadata.Fin, tcpMetadata.Rst, tcpMetadata.Psh, tcpMetadata.Urg)
-
-				// // For packets originating from node, we use tsval as the tcpID.
-				// // Packets coming back has the tsval echoed in tsecr.
-				// if fl.TraceObservationPoint == flow.TraceObservationPoint_TO_NETWORK {
-				// 	utils.AddTCPID(meta, uint64(tcpMetadata.Tsval))
-				// } else if fl.TraceObservationPoint == flow.TraceObservationPoint_FROM_NETWORK {
-				// 	utils.AddTCPID(meta, uint64(tcpMetadata.Tsecr))
-				// }
-
-				// // Add metadata to the flow.
-				// utils.AddRetinaMetadata(fl, meta)
 			} else {
 				if t, err := decodeTime(ktime.MonotonicOffset.Nanoseconds() + int64(bpfEvent.Ts)); err == nil {
 					fl.Time = t
@@ -603,6 +583,26 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 					p.l.Warn("Failed to get current time", zap.Error(err))
 				}
 			}
+
+			meta := &utils.RetinaMetadata{}
+
+			// Add packet size to the flow's metadata.
+			utils.AddPacketSize(meta, bpfEvent.Bytes)
+
+			// Add the TCP metadata to the flow.
+			tcpMetadata := bpfEvent.TcpMetadata
+			utils.AddTCPFlags(fl, tcpMetadata.Syn, tcpMetadata.Ack, tcpMetadata.Fin, tcpMetadata.Rst, tcpMetadata.Psh, tcpMetadata.Urg)
+
+			// For packets originating from node, we use tsval as the tcpID.
+			// Packets coming back has the tsval echoed in tsecr.
+			if fl.GetTraceObservationPoint() == flow.TraceObservationPoint_TO_NETWORK {
+				utils.AddTCPID(meta, uint64(tcpMetadata.Tsval))
+			} else if fl.GetTraceObservationPoint() == flow.TraceObservationPoint_FROM_NETWORK {
+				utils.AddTCPID(meta, uint64(tcpMetadata.Tsecr))
+			}
+
+			// Add metadata to the flow.
+			utils.AddRetinaMetadata(fl, meta)
 
 			fl.IsReply = &wrapperspb.BoolValue{Value: bpfEvent.IsReply}
 
