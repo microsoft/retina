@@ -62,8 +62,8 @@ func NewControllerManager(conf *kcfg.Config, kubeclient kubernetes.Interface, te
 
 	// create HTTP server for API server
 	httpServer := sm.NewHTTPServer(
-		conf.ApiServer.Host,
-		conf.ApiServer.Port,
+		conf.APIServer.Host,
+		conf.APIServer.Port,
 	)
 
 	return &Controller{

@@ -11,6 +11,7 @@ import (
 	"github.com/cilium/cilium/pkg/hive/cell"
 	"github.com/cilium/cilium/pkg/logging"
 	"github.com/cilium/cilium/pkg/option"
+	"github.com/microsoft/retina/internal/buildinfo"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/zap"
@@ -52,12 +53,12 @@ func setupZapHook(p params) {
 		MaxFileSizeMB:         MaxFileSizeMB,
 		MaxBackups:            MaxBackups,
 		MaxAgeDays:            MaxAgeDays,
-		ApplicationInsightsID: applicationInsightsID,
+		ApplicationInsightsID: buildinfo.ApplicationInsightsID,
 		EnableTelemetry:       p.OperatorCfg.EnableTelemetry,
 	}
 
 	persistentFields := []zap.Field{
-		zap.String("version", retinaVersion),
+		zap.String("version", buildinfo.Version),
 		zap.String("apiserver", p.K8sCfg.Host),
 	}
 
@@ -67,7 +68,7 @@ func setupZapHook(p params) {
 	}
 
 	namedLogger := log.Logger().Named("retina-operator-v2")
-	namedLogger.Info("Traces telemetry initialized with zapai", zap.String("version", retinaVersion), zap.String("appInsightsID", lOpts.ApplicationInsightsID))
+	namedLogger.Info("Traces telemetry initialized with zapai", zap.String("version", buildinfo.Version), zap.String("appInsightsID", lOpts.ApplicationInsightsID))
 
 	var hook *zaphook.ZapHook
 	hook, err = zaphook.NewZapHook(namedLogger.Logger)

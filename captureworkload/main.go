@@ -7,6 +7,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/microsoft/retina/internal/buildinfo"
 	"github.com/microsoft/retina/pkg/capture"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
 
@@ -14,33 +15,25 @@ import (
 	"github.com/microsoft/retina/pkg/telemetry"
 )
 
-var (
-	// applicationInsightsID is the instrumentation key for Azure Application Insights
-	// It is set during the build process using the -ldflags flag
-	// If it is set, the application will send telemetry to the corresponding Application Insights resource.
-	applicationInsightsID string //nolint
-	version               string //nolint
-)
-
 func main() {
 	lOpts := log.GetDefaultLogOpts()
 	// Set Azure application insights ID if it is provided
-	if applicationInsightsID != "" {
-		lOpts.ApplicationInsightsID = applicationInsightsID
+	if buildinfo.ApplicationInsightsID != "" {
+		lOpts.ApplicationInsightsID = buildinfo.ApplicationInsightsID
 	}
 
 	log.SetupZapLogger(lOpts)
 	l := log.Logger().Named("captureworkload")
 	l.Info("Start to capture network traffic")
-	l.Info("Version: ", zap.String("version", version))
+	l.Info("Version: ", zap.String("version", buildinfo.Version))
 
 	var tel telemetry.Telemetry
-	if applicationInsightsID != "" {
-		l.Info("telemetry enabled", zap.String("applicationInsightsID", applicationInsightsID))
-		telemetry.InitAppInsights(applicationInsightsID, version)
+	if buildinfo.ApplicationInsightsID != "" {
+		l.Info("telemetry enabled", zap.String("applicationInsightsID", buildinfo.ApplicationInsightsID))
+		telemetry.InitAppInsights(buildinfo.ApplicationInsightsID, buildinfo.Version)
 		defer telemetry.ShutdownAppInsights()
 		tel = telemetry.NewAppInsightsTelemetryClient("retina-capture", map[string]string{
-			"version":                   version,
+			"version":                   buildinfo.Version,
 			telemetry.PropertyApiserver: os.Getenv(captureConstants.ApiserverEnvKey),
 		})
 	} else {
