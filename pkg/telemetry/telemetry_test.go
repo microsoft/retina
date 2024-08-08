@@ -130,3 +130,7 @@ func TestTelemetryClient_StopPerf(t *testing.T) {
 		})
 	}
 }
+
+func TestBtoMB(t *testing.T) {
+	require.Equal(t, uint64(1), bToMb(1048576))
+}

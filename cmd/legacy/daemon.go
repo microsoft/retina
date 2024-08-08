@@ -47,7 +47,7 @@ import (
 
 const (
 	logFileName       = "retina.log"
-	heartbeatInterval = 5 * time.Minute
+	heartbeatInterval = 10 * time.Minute
 
 	nodeNameEnvKey = "NODE_NAME"
 	nodeIPEnvKey   = "NODE_IP"
