@@ -40,6 +40,14 @@ var (
 	cfgPodLevelDisabled = &kcfg.Config{
 		EnablePodLevel: false,
 	}
+	cfgDataAggregationLevelLow = &kcfg.Config{
+		EnablePodLevel:       true,
+		DataAggregationLevel: kcfg.Low,
+	}
+	cfgDataAggregationLevelHigh = &kcfg.Config{
+		EnablePodLevel:       true,
+		DataAggregationLevel: kcfg.High,
+	}
 )
 
 func TestCleanAll(t *testing.T) {
@@ -354,6 +362,132 @@ func TestStartPodLevelDisabled(t *testing.T) {
 		l:   log.Logger().Named("test"),
 	}
 	ctx := context.Background()
+	err := p.Start(ctx)
+	require.NoError(t, err)
+}
+
+func TestStartWithDataAggregationLevelLow(t *testing.T) {
+	log.SetupZapLogger(log.GetDefaultLogOpts()) // nolint:errcheck // ignore
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockFilter := mocks.NewMockIFilter(ctrl)
+	mQdisc := mocks.NewMockIQdisc(ctrl)
+
+	// We are expecting two calls to Add since we are invoking createQdiscAndAttach for eth0
+	mockFilter.EXPECT().Add(gomock.Any()).Return(nil).Times(2)
+	mQdisc.EXPECT().Add(gomock.Any()).Return(nil).Times(2)
+
+	mockTC := mocks.NewMockITc(ctrl)
+
+	mockReader := mocks.NewMockIPerf(ctrl)
+	mockReader.EXPECT().Read().Return(perf.Record{}, nil).AnyTimes()
+
+	getQdisc = func(_ ITc) IQdisc {
+		return mQdisc
+	}
+
+	getFilter = func(_ ITc) IFilter {
+		return mockFilter
+	}
+
+	tcOpen = func(_ *tc.Config) (ITc, error) {
+		return mockTC, nil
+	}
+
+	getFD = func(_ *ebpf.Program) int {
+		return 1
+	}
+
+	pObj := &packetparserObjects{}
+	pObj.EndpointIngressFilter = &ebpf.Program{}
+	pObj.EndpointEgressFilter = &ebpf.Program{}
+
+	p := &packetParser{
+		cfg:              cfgDataAggregationLevelLow,
+		l:                log.Logger().Named("test"),
+		objs:             pObj,
+		reader:           mockReader,
+		interfaceLockMap: &sync.Map{},
+		endpointIngressInfo: &ebpf.ProgramInfo{
+			Name: "ingress",
+		},
+		endpointEgressInfo: &ebpf.ProgramInfo{
+			Name: "egress",
+		},
+		hostIngressInfo: &ebpf.ProgramInfo{
+			Name: "ingress",
+		},
+		hostEgressInfo: &ebpf.ProgramInfo{
+			Name: "egress",
+		},
+		tcMap: &sync.Map{},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	err := p.Start(ctx)
+	require.NoError(t, err)
+}
+
+func TestStartWithDataAggregationLevelHigh(t *testing.T) {
+	log.SetupZapLogger(log.GetDefaultLogOpts()) // nolint:errcheck // ignore
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockFilter := mocks.NewMockIFilter(ctrl)
+	mQdisc := mocks.NewMockIQdisc(ctrl)
+
+	// We are not expecting any calls to Add since we are not invoking createQdiscAndAttach for eth0
+	mockFilter.EXPECT().Add(gomock.Any()).Return(nil).Times(0)
+	mQdisc.EXPECT().Add(gomock.Any()).Return(nil).Times(0)
+
+	mockTC := mocks.NewMockITc(ctrl)
+
+	mockReader := mocks.NewMockIPerf(ctrl)
+	mockReader.EXPECT().Read().Return(perf.Record{}, nil).AnyTimes()
+
+	getQdisc = func(_ ITc) IQdisc {
+		return mQdisc
+	}
+
+	getFilter = func(_ ITc) IFilter {
+		return mockFilter
+	}
+
+	tcOpen = func(_ *tc.Config) (ITc, error) {
+		return mockTC, nil
+	}
+
+	getFD = func(_ *ebpf.Program) int {
+		return 1
+	}
+
+	pObj := &packetparserObjects{}
+	pObj.EndpointIngressFilter = &ebpf.Program{}
+	pObj.EndpointEgressFilter = &ebpf.Program{}
+
+	p := &packetParser{
+		cfg:              cfgDataAggregationLevelHigh,
+		l:                log.Logger().Named("test"),
+		objs:             pObj,
+		reader:           mockReader,
+		interfaceLockMap: &sync.Map{},
+		endpointIngressInfo: &ebpf.ProgramInfo{
+			Name: "ingress",
+		},
+		endpointEgressInfo: &ebpf.ProgramInfo{
+			Name: "egress",
+		},
+		hostIngressInfo: &ebpf.ProgramInfo{
+			Name: "ingress",
+		},
+		hostEgressInfo: &ebpf.ProgramInfo{
+			Name: "egress",
+		},
+		tcMap: &sync.Map{},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
 	err := p.Start(ctx)
 	require.NoError(t, err)
 }
