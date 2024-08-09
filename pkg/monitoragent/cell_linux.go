@@ -2,7 +2,6 @@ package monitoragent
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cilium/cilium/pkg/common"
 	"github.com/cilium/cilium/pkg/defaults"
@@ -72,12 +71,6 @@ func newMonitorAgent(params agentParams) ciliumagent.Agent {
 					if queueSize > defaults.MonitorQueueSizePerCPUMaximum {
 						queueSize = defaults.MonitorQueueSizePerCPUMaximum
 					}
-				}
-
-				monitorErr := ciliumagent.ServeMonitorAPI(ctx, agent, queueSize)
-				if monitorErr != nil {
-					log.WithError(monitorErr).Error("encountered error serving monitor agent API")
-					return fmt.Errorf("encountered error serving monitor agent API: %w", monitorErr)
 				}
 			}
 			return err
