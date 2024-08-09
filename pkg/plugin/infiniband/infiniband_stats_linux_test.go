@@ -73,7 +73,11 @@ func TestReadCounterStats(t *testing.T) {
 			MockGaugeVec.EXPECT().WithLabelValues(gomock.Any()).Return(testmetric).AnyTimes()
 
 			assert.NotNil(t, nr)
-			err := nr.readCounterStats(embeddedFs, tt.filePath)
+			ibFS, err := testFS.Sub(tt.filePath)
+			if err != nil {
+				t.Fatalf("Error reading fs: %v", err)
+			}
+			err = nr.readCounterStats(ibFS)
 			if tt.wantErr {
 				assert.NotNil(t, err, "Expected error but got nil")
 			} else {
@@ -82,7 +86,7 @@ func TestReadCounterStats(t *testing.T) {
 				for _, val := range nr.counterStats {
 					assert.Equal(t, val, uint64(1))
 				}
-				assert.Equal(t, 4, len(nr.counterStats), "Read values are not equal to expected")
+				assert.Equal(t, 6, len(nr.counterStats), "Read values are not equal to expected")
 				nr.updateMetrics()
 			}
 		})
@@ -127,7 +131,11 @@ func TestReadStatusParamStats(t *testing.T) {
 
 			MockGaugeVec.EXPECT().WithLabelValues(gomock.Any()).Return(testmetric).AnyTimes()
 
-			err := nr.readStatusParamStats(embeddedFs, tt.filePath)
+			netFS, err := testFS.Sub(tt.filePath)
+			if err != nil {
+				t.Fatalf("Error reading fs: %v", err)
+			}
+			err = nr.readStatusParamStats(netFS)
 			if tt.wantErr {
 				assert.NotNil(t, err, "Expected error but got nil") // nolint std. fmt.
 			} else {
