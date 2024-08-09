@@ -7,6 +7,7 @@ import (
 	"github.com/cilium/cilium/api/v1/flow"
 	"github.com/cilium/cilium/pkg/ipcache"
 	"github.com/microsoft/retina/pkg/hubble/common"
+	"github.com/microsoft/retina/pkg/networkpolicy/netpolagent"
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/zap"
@@ -14,14 +15,16 @@ import (
 )
 
 type Parser struct {
-	l  *logrus.Entry
-	ep common.EpDecoder
+	l           *logrus.Entry
+	ep          common.EpDecoder
+	netpolAgent *netpolagent.NetPolAgent
 }
 
-func New(l *logrus.Entry, c *ipcache.IPCache) *Parser {
+func New(l *logrus.Entry, c *ipcache.IPCache, netpolAgent *netpolagent.NetPolAgent) *Parser {
 	p := &Parser{
-		l:  l.WithField("subsys", "layer34"),
-		ep: common.NewEpDecoder(c),
+		l:           l.WithField("subsys", "layer34"),
+		ep:          common.NewEpDecoder(c),
+		netpolAgent: netpolAgent,
 	}
 	// Log the localHostIP for debugging purposes.
 	return p
@@ -59,6 +62,8 @@ func (p *Parser) Decode(f *flow.Flow) *flow.Flow {
 
 	// Add TrafficDirection to flow.
 	p.decodeTrafficDirection(f)
+
+	p.decodePoliciesDroppingTraffic(f)
 
 	return f
 }
@@ -132,4 +137,29 @@ func (p *Parser) decodeTrafficDirection(f *flow.Flow) {
 
 	// Default to ingress.
 	f.TrafficDirection = flow.TrafficDirection_INGRESS
+}
+
+func (p *Parser) decodePoliciesDroppingTraffic(f *flow.Flow) {
+	if f.GetVerdict() != flow.Verdict_DROPPED {
+		return
+	}
+
+	ingressPolicies, egressPolicies := p.netpolAgent.PoliciesDroppingTraffic(f.Source, f.Destination)
+
+	// repurposing EgressAllowedBy and IngressAllowedBy to store policies DROPPING traffic.
+	for _, metadata := range ingressPolicies {
+		fp := &flow.Policy{
+			Name:      metadata.Name,
+			Namespace: metadata.Namespace,
+		}
+		f.IngressAllowedBy = append(f.IngressAllowedBy, fp)
+	}
+
+	for _, metadata := range egressPolicies {
+		fp := &flow.Policy{
+			Name:      metadata.Name,
+			Namespace: metadata.Namespace,
+		}
+		f.EgressAllowedBy = append(f.EgressAllowedBy, fp)
+	}
 }

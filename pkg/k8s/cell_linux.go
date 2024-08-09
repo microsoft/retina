@@ -20,6 +20,7 @@ import (
 	"github.com/cilium/cilium/pkg/node"
 	"github.com/cilium/cilium/pkg/option"
 	"github.com/microsoft/retina/pkg/common"
+	"github.com/microsoft/retina/pkg/networkpolicy"
 	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,9 +42,6 @@ var Cell = cell.Module(
 		},
 		func() daemonk8s.LocalCiliumNodeResource {
 			return &fakeresource[*cilium_api_v2.CiliumNode]{}
-		},
-		func() resource.Resource[*slim_networkingv1.NetworkPolicy] {
-			return &fakeresource[*slim_networkingv1.NetworkPolicy]{}
 		},
 		func() resource.Resource[*cilium_api_v2.CiliumNetworkPolicy] {
 			return &fakeresource[*cilium_api_v2.CiliumNetworkPolicy]{}
@@ -73,6 +71,14 @@ var Cell = cell.Module(
 			return &watcherconfig{}
 		},
 	),
+
+	cell.Provide(func(lc cell.Lifecycle, cs client.Clientset, cfg *networkpolicy.Config) (resource.Resource[*slim_networkingv1.NetworkPolicy], error) {
+		if cfg.EnableNetworkPolicyEnrichment {
+			return ciliumk8s.NetworkPolicyResource(lc, cs)
+		}
+
+		return &fakeresource[*slim_networkingv1.NetworkPolicy]{}, nil
+	}),
 
 	cell.Provide(func(lc cell.Lifecycle, cs client.Clientset) (resource.Resource[*ciliumk8s.Endpoints], error) {
 		//nolint:wrapcheck // a wrapped error here is of dubious value

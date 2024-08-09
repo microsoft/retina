@@ -9,6 +9,7 @@ import (
 	ipc "github.com/cilium/cilium/pkg/ipcache"
 	"github.com/microsoft/retina/pkg/hubble/parser/layer34"
 	"github.com/microsoft/retina/pkg/hubble/parser/seven"
+	"github.com/microsoft/retina/pkg/networkpolicy/netpolagent"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -29,12 +30,12 @@ type Parser struct {
 	l7  *seven.Parser
 }
 
-func New(l *logrus.Entry, c *ipc.IPCache) *Parser {
+func New(l *logrus.Entry, c *ipc.IPCache, netpolAgent *netpolagent.NetPolAgent) *Parser {
 	return &Parser{
 		l:       l,
 		ipcache: c,
 
-		l34: layer34.New(l, c),
+		l34: layer34.New(l, c, netpolAgent),
 		l7:  seven.New(l, c),
 	}
 }

@@ -23,6 +23,7 @@ import (
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	rnode "github.com/microsoft/retina/pkg/controllers/daemon/nodereconciler"
 	"github.com/microsoft/retina/pkg/hubble/parser"
+	"github.com/microsoft/retina/pkg/networkpolicy/netpolagent"
 	"github.com/pkg/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -36,6 +37,7 @@ type RetinaHubble struct {
 	monitorAgent   monitoragent.Agent
 	ipc            *ipcache.IPCache
 	nodeReconciler *rnode.NodeReconciler
+	netpolAgent    *netpolagent.NetPolAgent
 }
 
 type hubbleParams struct {
@@ -45,6 +47,7 @@ type hubbleParams struct {
 	MonitorAgent   monitoragent.Agent
 	IPCache        *ipcache.IPCache
 	NodeReconciler *rnode.NodeReconciler
+	NetPolAgent    *netpolagent.NetPolAgent
 	Log            logrus.FieldLogger
 }
 
@@ -55,6 +58,7 @@ func newRetinaHubble(params hubbleParams) *RetinaHubble {
 		monitorAgent:   params.MonitorAgent,
 		ipc:            params.IPCache,
 		nodeReconciler: params.NodeReconciler,
+		netpolAgent:    params.NetPolAgent,
 	}
 	rh.log.Logger.SetLevel(logrus.InfoLevel)
 
@@ -115,7 +119,7 @@ func (rh *RetinaHubble) start(ctx context.Context) error {
 	)
 
 	// TODO: Replace with our custom parser.
-	payloadParser := parser.New(rh.log, rh.ipc)
+	payloadParser := parser.New(rh.log, rh.ipc, rh.netpolAgent)
 
 	namespaceManager := observer.NewNamespaceManager()
 	go namespaceManager.Run(ctx)
