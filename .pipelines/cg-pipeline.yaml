@@ -47,6 +47,9 @@ stages:
         displayName: Build Retina Agent Images
         pool:
           name: "$(BUILD_POOL_NAME_DEFAULT)"
+        dependsOn: env
+        variables:
+          ApplicationInsightsID: $[ dependencies.env.outputs['EnvironmentalVariables.ApplicationInsightsID'] ]
         strategy:
           matrix:
             agent-linux-arm:
@@ -76,6 +79,8 @@ stages:
               set -euo pipefail
               echo "VERSION=$(make version)"
               export VERSION=$(make version)
+              echo $(ApplicationInsightsID)
+              export APP_INSIGHTS_ID=$(ApplicationInsightsID)
               mkdir -p ./output/images/$(platform)/$(arch)/$(year)
               make retina-image \
                 AGENT_TARGETS=$(target) \
@@ -100,6 +105,8 @@ stages:
 
       - job: retinaoperatorimages
         displayName: Build Retina Operator Images
+        variables:
+          ApplicationInsightsID: $[ dependencies.env.outputs['EnvironmentalVariables.ApplicationInsightsID'] ]
         pool:
           name: "$(BUILD_POOL_NAME_DEFAULT)"
         strategy:
@@ -115,6 +122,8 @@ stages:
               set -euo pipefail
               echo "VERSION=$(make version)"
               export VERSION=$(make version)
+              echo $(ApplicationInsightsID)
+              export APP_INSIGHTS_ID=$(ApplicationInsightsID)
               mkdir -p ./output/images/$(platform)/$(arch)/$(year)
               make retina-operator-image \
                 TAG=$(make version) \
@@ -137,22 +146,22 @@ stages:
 
       - job: windowsnative
         displayName: Build Retina Windows Images (native)
+        variables:
+          ApplicationInsightsID: $[ dependencies.env.outputs['EnvironmentalVariables.ApplicationInsightsID'] ]
         pool:
           name: "$(BUILD_POOL_NAME_WINDOWS_DEFAULT)"
         steps:
           - checkout: self
             fetchTags: true
 
-      
-
           - task: DownloadPipelineArtifact@2
             inputs:
-              buildType: 'specific'
+              buildType: "specific"
               project: $(BUILDER_ADO_PROECT)
               definition: $(BUILDER_ADO_DEFINITION_ID) # Replace with your build definition ID
               buildId: $(BUILDER_ADO_BUILD_ID)
               artifactName: $(BUILDER_ADO_ARTIFACTE_NAME) # Replace with your artifact name
-              itemPattern:  '**/*builder*.tar'
+              itemPattern: "**/*builder*.tar"
               downloadPath: '$(Pipeline.Workspace)\artifacts'
 
           - task: PowerShell@2
@@ -173,7 +182,7 @@ stages:
               targetType: "inline"
               script: |
                 Import-Module -Name "$(Build.SourcesDirectory)\windows\docker\DockerBuildModule.psm1" -Force
-                Build-RetinaAgentImage -fullBuilderImageName $(WINDOWS_BUILDER_IMAGE) -registry $(BUILD_REGISTRY) -appInsightsID $(PROD_AI)
+                Build-RetinaAgentImage -fullBuilderImageName $(WINDOWS_BUILDER_IMAGE) -registry $(BUILD_REGISTRY) -appInsightsID $(ApplicationInsightsID)
                 Save-Image -imageName retina-agent -registry $(BUILD_REGISTRY)
 
           - task: PublishBuildArtifacts@1
