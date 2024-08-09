@@ -107,6 +107,7 @@ stages:
         displayName: Build Retina Operator Images
         variables:
           ApplicationInsightsID: $[ dependencies.env.outputs['EnvironmentalVariables.ApplicationInsightsID'] ]
+        dependsOn: env
         pool:
           name: "$(BUILD_POOL_NAME_DEFAULT)"
         strategy:
@@ -148,6 +149,7 @@ stages:
         displayName: Build Retina Windows Images (native)
         variables:
           ApplicationInsightsID: $[ dependencies.env.outputs['EnvironmentalVariables.ApplicationInsightsID'] ]
+        dependsOn: env
         pool:
           name: "$(BUILD_POOL_NAME_WINDOWS_DEFAULT)"
         steps:
