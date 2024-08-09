@@ -9,7 +9,7 @@ import (
 
 var showLink = netlink.LinkList
 
-func (e *EndpointWatcher) initNewCache() error {
+func (e *Watcher) initNewCache() error {
 	veths, err := listVeths()
 	if err != nil {
 		return err
