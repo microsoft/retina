@@ -42,10 +42,10 @@ import (
 	"github.com/vishvananda/netlink"
 	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type packet packetparser ./_cprog/packetparser.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../filter/_cprog/
-
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type packet packetparser ./_cprog/packetparser.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../filter/_cprog/ -I../conntrack/_cprog/
 var errNoOutgoingLinks = errors.New("could not determine any outgoing links")
 
 // New creates a packetparser plugin.
@@ -95,13 +95,14 @@ func (p *packetParser) Compile(ctx context.Context) error {
 	arch := runtime.GOARCH
 	includeDir := fmt.Sprintf("-I%s/../lib/_%s", dir, arch)
 	filterDir := fmt.Sprintf("-I%s/../filter/_cprog/", dir)
+	conntrackDir := fmt.Sprintf("-I%s/../conntrack/_cprog/", dir)
 	libbpfDir := fmt.Sprintf("-I%s/../lib/common/libbpf/_src", dir)
 	targetArch := "-D__TARGET_ARCH_x86"
 	if arch == "arm64" {
 		targetArch = "-D__TARGET_ARCH_arm64"
 	}
 	// Keep target as bpf, otherwise clang compilation yields bpf object that elf reader cannot load.
-	err = loader.CompileEbpf(ctx, "-target", "bpf", "-Wall", targetArch, "-g", "-O2", "-c", bpfSourceFile, "-o", bpfOutputFile, includeDir, libbpfDir, filterDir)
+	err = loader.CompileEbpf(ctx, "-target", "bpf", "-Wall", targetArch, "-g", "-O2", "-c", bpfSourceFile, "-o", bpfOutputFile, includeDir, libbpfDir, filterDir, conntrackDir)
 	if err != nil {
 		return err
 	}
@@ -137,7 +138,7 @@ func (p *packetParser) Init() error {
 	//nolint:typecheck
 	if err := spec.LoadAndAssign(objs, &ebpf.CollectionOptions{ //nolint:typecheck
 		Maps: ebpf.MapOptions{
-			PinPath: plugincommon.FilterMapPath,
+			PinPath: plugincommon.MapPath,
 		},
 	}); err != nil { //nolint:typecheck
 		p.l.Error("Error loading objects: %w", zap.Error(err))
@@ -531,13 +532,6 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 			p.l.Info("Context is done, stopping Worker", zap.Int("worker_id", id))
 			return
 		case record := <-p.recordsChannel:
-			p.l.Debug("Received record",
-				zap.Int("cpu", record.CPU),
-				zap.Uint64("lost_samples", record.LostSamples),
-				zap.Int("bytes_remaining", record.Remaining),
-				zap.Int("worker_id", id),
-			)
-
 			var bpfEvent packetparserPacket
 			err := binary.Read(bytes.NewReader(record.RawSample), binary.LittleEndian, &bpfEvent)
 			if err != nil {
@@ -576,14 +570,19 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 
 			// For packets originating from node, we use tsval as the tcpID.
 			// Packets coming back has the tsval echoed in tsecr.
-			if fl.TraceObservationPoint == flow.TraceObservationPoint_TO_NETWORK {
+			if fl.GetTraceObservationPoint() == flow.TraceObservationPoint_TO_NETWORK {
 				utils.AddTCPID(meta, uint64(tcpMetadata.Tsval))
-			} else if fl.TraceObservationPoint == flow.TraceObservationPoint_FROM_NETWORK {
+			} else if fl.GetTraceObservationPoint() == flow.TraceObservationPoint_FROM_NETWORK {
 				utils.AddTCPID(meta, uint64(tcpMetadata.Tsecr))
 			}
 
 			// Add metadata to the flow.
 			utils.AddRetinaMetadata(fl, meta)
+
+			fl.IsReply = &wrapperspb.BoolValue{Value: bpfEvent.IsReply}
+
+			// Log the flow.
+			p.l.Debug("Flow", zap.Any("flow", fl))
 
 			// Write the event to the enricher.
 			ev := &v1.Event{

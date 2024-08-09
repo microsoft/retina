@@ -4,43 +4,43 @@
 package bpf
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/cilium/cilium/pkg/mountinfo"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
 	"github.com/microsoft/retina/pkg/plugin/filter"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
 )
 
-func __mount() error {
+func mount() error {
 	// Check if the path exists.
-	_, err := os.Stat(plugincommon.FilterMapPath)
+	_, err := os.Stat(plugincommon.MapPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			// Path does not exist. Create it.
-			err = os.MkdirAll(plugincommon.FilterMapPath, 0o755)
+			err = os.MkdirAll(plugincommon.MapPath, 0o755) //nolint:gomnd // 0o755 is the permission.
 			if err != nil {
-				return err
+				return errors.Wrap(err, "failed to create bpf filesystem path")
 			}
 		} else {
 			// Some other error. Return.
-			return err
+			return errors.Wrap(err, "failed to stat bpf filesystem path")
 		}
 	}
-	err = unix.Mount(plugincommon.FilterMapPath, plugincommon.FilterMapPath, "bpf", 0, "")
-	return err
+	err = unix.Mount(plugincommon.MapPath, plugincommon.MapPath, "bpf", 0, "")
+	return errors.Wrap(err, "failed to mount bpf filesystem")
 }
 
 func mountBpfFs() error {
 	// Check if /sys/fs/bpf is already mounted.
-	mounted, bpfMount, err := mountinfo.IsMountFS(mountinfo.FilesystemTypeBPFFS, plugincommon.FilterMapPath)
+	mounted, bpfMount, err := mountinfo.IsMountFS(mountinfo.FilesystemTypeBPFFS, plugincommon.MapPath)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to check if bpf filesystem is mounted")
 	}
 	if !mounted {
-		if err := __mount(); err != nil {
+		if err := mount(); err != nil {
 			return err
 		}
 		return nil
@@ -48,7 +48,7 @@ func mountBpfFs() error {
 	// Else mounted. Check the type of mount.
 	if !bpfMount {
 		// Custom mount of /sys/fs/bpf. Unknown setup. Exit.
-		return fmt.Errorf("%+s is already mounted but not as bpf. Not supported", plugincommon.FilterMapPath)
+		return errors.New("bpf filesystem is mounted but not as bpf type")
 	}
 	return nil
 }
@@ -58,14 +58,14 @@ func Setup(l *zap.Logger) {
 	if err != nil {
 		l.Panic("Failed to mount bpf filesystem", zap.Error(err))
 	}
-	l.Info("BPF filesystem mounted successfully", zap.String("path", plugincommon.FilterMapPath))
+	l.Info("BPF filesystem mounted successfully", zap.String("path", plugincommon.MapPath))
 
 	// Delete existing filter map file.
-	err = os.Remove(plugincommon.FilterMapPath + "/" + plugincommon.FilterMapName)
+	err = os.Remove(plugincommon.MapPath + "/" + plugincommon.FilterMapName)
 	if err != nil && !os.IsNotExist(err) {
 		l.Panic("Failed to delete existing filter map file", zap.Error(err))
 	}
-	l.Info("Deleted existing filter map file", zap.String("path", plugincommon.FilterMapPath), zap.String("Map name", plugincommon.FilterMapName))
+	l.Info("Deleted existing filter map file", zap.String("path", plugincommon.MapPath), zap.String("Map name", plugincommon.FilterMapName))
 
 	// Initialize the filter map.
 	// This will create the filter map in kernel and pin it to /sys/fs/bpf.
@@ -73,5 +73,5 @@ func Setup(l *zap.Logger) {
 	if err != nil {
 		l.Panic("Failed to initialize filter map", zap.Error(err))
 	}
-	l.Info("Filter map initialized successfully", zap.String("path", plugincommon.FilterMapPath), zap.String("Map name", plugincommon.FilterMapName))
+	l.Info("Filter map initialized successfully", zap.String("path", plugincommon.MapPath), zap.String("Map name", plugincommon.FilterMapName))
 }

@@ -144,7 +144,7 @@ func (dr *dropReason) Init() error {
 			LogLevel: 2,
 		},
 		Maps: ebpf.MapOptions{
-			PinPath: plugincommon.FilterMapPath,
+			PinPath: plugincommon.MapPath,
 		},
 	}); err != nil {
 		dr.l.Error("Error loading objects: %w", zap.Error(err))

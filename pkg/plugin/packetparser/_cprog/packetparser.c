@@ -6,6 +6,7 @@
 #include "bpf_endian.h"
 #include "packetparser.h"
 #include "retina_filter.c"
+#include "conntrack.c"
 #include "dynamic.h"
 
 char __license[] SEC("license") = "Dual MIT/GPL";
@@ -36,6 +37,7 @@ struct packet
 	__u8 proto;
 	struct tcpmetadata tcp_metadata; // TCP metadata
 	direction dir; // 0 -> INGRESS, 1 -> EGRESS
+	bool is_reply; // 0 -> FALSE, 1 -> TRUE
 	__u64 ts; // timestamp in nanoseconds
 	__u64 bytes; // packet size in bytes
 };
@@ -98,45 +100,44 @@ static int parse_tcp_ts(struct tcphdr *tcph, void *data_end, __u32 *tsval, __u32
 		if (tcp_options_cur_ptr + 1 > (__u8 *)tcp_opt_end_ptr || tcp_options_cur_ptr + 1 > (__u8 *)data_end) {
 			return -1;
 		}
-	        // Dereference the pointer to get the option kind.
-	        opt_kind = *tcp_options_cur_ptr;
-	        // switch case to check the option kind.
-	        switch (opt_kind) {
-	            case 0:
-	                // End of options list.
-	                return -1;
-	            case 1:
-	                // No operation.
-			tcp_options_cur_ptr++;
-	                continue;
-	            default:
-			// Some kind of option.
-			// Since each option is at least 2 bytes long, we need to check that adding 2 to the pointer will not go past the end of the packet.
-	                if (tcp_options_cur_ptr + 2 > tcp_opt_end_ptr || tcp_options_cur_ptr + 2 > (__u8 *)data_end) {
-	                    return -1;
-	                }
-	                // Get the length of the option.
-	                opt_len = *(tcp_options_cur_ptr + 1);
-			// Check that the option length is valid. It should be at least 2 bytes long.
-			if (opt_len < 2) {
+		// Dereference the pointer to get the option kind.
+		opt_kind = *tcp_options_cur_ptr;
+		// switch case to check the option kind.
+		switch (opt_kind) {
+			case 0:
+				// End of options list.
 				return -1;
-			}
-			// Check if the option is the timestamp option. The timestamp option has a kind of 8 and a length of 10 bytes.
-	                if (opt_kind == 8 && opt_len == 10) {
-				// Verify that adding the option's length to the pointer will not go past the end of the packet.
-				if (tcp_options_cur_ptr + 10 > tcp_opt_end_ptr || tcp_options_cur_ptr + 10 > (__u8 *)data_end) {
+			case 1:
+				// No operation.
+				tcp_options_cur_ptr++;
+				continue;
+			default:
+				// Some kind of option.
+				// Since each option is at least 2 bytes long, we need to check that adding 2 to the pointer will not go past the end of the packet.
+				if (tcp_options_cur_ptr + 2 > tcp_opt_end_ptr || tcp_options_cur_ptr + 2 > (__u8 *)data_end) {
 					return -1;
 				}
-				// Found the TSval and TSecr values. Store them in the tsval and tsecr pointers.
-				*tsval = bpf_ntohl(*(__u32 *)(tcp_options_cur_ptr + 2));
-				*tsecr = bpf_ntohl(*(__u32 *)(tcp_options_cur_ptr + 6));
-	
-				return 0;
-			}
-			// Move the pointer to the next option.
-			tcp_options_cur_ptr += opt_len;
-	        }
-    	}
+				// Get the length of the option.
+				opt_len = *(tcp_options_cur_ptr + 1);
+				// Check that the option length is valid. It should be at least 2 bytes long.
+				if (opt_len < 2) {
+					return -1;
+				}
+				// Check if the option is the timestamp option. The timestamp option has a kind of 8 and a length of 10 bytes.
+				if (opt_kind == 8 && opt_len == 10) {
+					// Verify that adding the option's length to the pointer will not go past the end of the packet.
+					if (tcp_options_cur_ptr + 10 > tcp_opt_end_ptr || tcp_options_cur_ptr + 10 > (__u8 *)data_end) {
+						return -1;
+					}
+					// Found the TSval and TSecr values. Store them in the tsval and tsecr pointers.
+					*tsval = bpf_ntohl(*(__u32 *)(tcp_options_cur_ptr + 2));
+					*tsecr = bpf_ntohl(*(__u32 *)(tcp_options_cur_ptr + 6));
+					return 0;
+				}
+				// Move the pointer to the next option.
+				tcp_options_cur_ptr += opt_len;
+		}
+	}
 	return -1;
 }
 
@@ -182,6 +183,8 @@ static void parse(struct __sk_buff *skb, direction d)
 		}
 	#endif
 	#endif
+
+    __u8 flags = 0;
 	// Get source and destination ports.
 	if (ip->protocol == IPPROTO_TCP)
 	{
@@ -191,6 +194,10 @@ static void parse(struct __sk_buff *skb, direction d)
 
 		p.src_port = tcp->source;
 		p.dst_port = tcp->dest;
+
+        // Get all TCP flags.
+		flags = (tcp->fin << 0) | (tcp->syn << 1) | (tcp->rst << 2) | (tcp->psh << 3) | (tcp->ack << 4) | (tcp->urg << 5) | (tcp->ece << 6) | (tcp->cwr << 7);
+
 
 		// Get TCP metadata.
 		struct tcpmetadata tcp_metadata;
@@ -226,8 +233,23 @@ static void parse(struct __sk_buff *skb, direction d)
 	{
 		return;
 	}
+	// Create a new conntrack key.
+	struct ct_v4_key key;
+	__builtin_memset(&key, 0, sizeof(struct ct_v4_key));
+	key.src_ip = p.src_ip;
+	key.dst_ip = p.dst_ip;
+	key.src_port = p.src_port;
+	key.dst_port = p.dst_port;
+	key.proto = p.proto;
 
-	bpf_perf_event_output(skb, &packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
+	if (ct_process_packet(key, flags)) {
+		// Check if this packet is a reply packet.
+		p.is_reply = is_reply_packet(key);
+
+		// Send the packet to the perf buffer.
+		bpf_perf_event_output(skb, &packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
+	}
+	return;
 }
 
 SEC("classifier_endpoint_ingress")

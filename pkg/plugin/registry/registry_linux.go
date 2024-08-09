@@ -8,6 +8,7 @@ import (
 	kcfg "github.com/microsoft/retina/pkg/config"
 
 	"github.com/microsoft/retina/pkg/plugin/api"
+	"github.com/microsoft/retina/pkg/plugin/conntrack"
 	"github.com/microsoft/retina/pkg/plugin/dns"
 	"github.com/microsoft/retina/pkg/plugin/dropreason"
 	"github.com/microsoft/retina/pkg/plugin/infiniband"
@@ -31,5 +32,6 @@ func RegisterPlugins() {
 	PluginHandler[packetparser.Name] = packetparser.New
 	PluginHandler[dns.Name] = dns.New
 	PluginHandler[tcpretrans.Name] = tcpretrans.New
+	PluginHandler[conntrack.Name] = conntrack.New
 	PluginHandler[mockplugin.Name] = mockplugin.New
 }
