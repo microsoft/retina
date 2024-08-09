@@ -2,7 +2,7 @@ package infiniband
 
 import "testing/fstest"
 
-var embeddedFs = fstest.MapFS{ // nolint unused
+var testFS = fstest.MapFS{ // nolint unused
 	"infiniband/mlx5_ib0/ports/1/counters/excessive_buffer_overrun_errors": &fstest.MapFile{
 		Data: []byte("1"),
 	},
