@@ -9,7 +9,10 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
-var name string
+var opts = struct {
+	genericclioptions.ConfigFlags
+	Name *string
+}{}
 
 var capture = &cobra.Command{
 	Use:   "capture",
@@ -18,8 +21,8 @@ var capture = &cobra.Command{
 
 func init() {
 	cmd.Retina.AddCommand(capture)
-	configFlags = genericclioptions.NewConfigFlags(true)
-	configFlags.AddFlags(capture.PersistentFlags())
-	capture.PersistentFlags().StringVar(&name, "name", "", "The name of the Retina Capture")
+	opts.ConfigFlags = *genericclioptions.NewConfigFlags(true)
+	opts.AddFlags(capture.PersistentFlags())
+	capture.PersistentFlags().StringVar(opts.Name, "name", "", "The name of the Retina Capture")
 	_ = capture.MarkPersistentFlagRequired("name")
 }
