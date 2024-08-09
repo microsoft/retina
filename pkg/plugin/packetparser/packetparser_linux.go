@@ -13,8 +13,11 @@ import (
 	"path"
 	"runtime"
 	"sync"
+	"time"
 
+	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/pkg/errors"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/cilium/cilium/api/v1/flow"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
@@ -177,6 +180,9 @@ func (p *packetParser) Init() error {
 
 	p.tcMap = &sync.Map{}
 	p.interfaceLockMap = &sync.Map{}
+
+	// Initialize flow cache.
+	p.flowCache = expirable.NewLRU[flowCacheKey, *flow.Flow](flowCacheSize, nil, flowCacheTTL)
 
 	return nil
 }
@@ -531,13 +537,6 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 			p.l.Info("Context is done, stopping Worker", zap.Int("worker_id", id))
 			return
 		case record := <-p.recordsChannel:
-			p.l.Debug("Received record",
-				zap.Int("cpu", record.CPU),
-				zap.Uint64("lost_samples", record.LostSamples),
-				zap.Int("bytes_remaining", record.Remaining),
-				zap.Int("worker_id", id),
-			)
-
 			var bpfEvent packetparserPacket
 			err := binary.Read(bytes.NewReader(record.RawSample), binary.LittleEndian, &bpfEvent)
 			if err != nil {
@@ -550,19 +549,42 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 			sourcePortShort := uint32(utils.HostToNetShort(bpfEvent.SrcPort))
 			destinationPortShort := uint32(utils.HostToNetShort(bpfEvent.DstPort))
 
-			fl := utils.ToFlow(
-				ktime.MonotonicOffset.Nanoseconds()+int64(bpfEvent.Ts),
-				utils.Int2ip(bpfEvent.SrcIp).To4(), // Precautionary To4() call.
-				utils.Int2ip(bpfEvent.DstIp).To4(), // Precautionary To4() call.
-				sourcePortShort,
-				destinationPortShort,
-				bpfEvent.Proto,
-				bpfEvent.Dir,
-				flow.Verdict_FORWARDED,
-			)
-			if fl == nil {
-				p.l.Warn("Could not convert bpfEvent to flow", zap.Any("bpfEvent", bpfEvent))
-				continue
+			// Check if the flow exists in the cache.
+			key := flowCacheKey{
+				srcIP:   bpfEvent.SrcIp,
+				dstIP:   bpfEvent.DstIp,
+				srcPort: sourcePortShort,
+				dstPort: destinationPortShort,
+				proto:   bpfEvent.Proto,
+				dir:     bpfEvent.Dir,
+			}
+
+			var fl *flow.Flow
+			fl, ok := p.flowCache.Get(key)
+			if !ok {
+				fl = utils.ToFlow(
+					ktime.MonotonicOffset.Nanoseconds()+int64(bpfEvent.Ts),
+					utils.Int2ip(bpfEvent.SrcIp).To4(), // Precautionary To4() call.
+					utils.Int2ip(bpfEvent.DstIp).To4(), // Precautionary To4() call.
+					sourcePortShort,
+					destinationPortShort,
+					bpfEvent.Proto,
+					bpfEvent.Dir,
+					flow.Verdict_FORWARDED,
+				)
+				if fl == nil {
+					p.l.Warn("Could not convert bpfEvent to flow", zap.Any("bpfEvent", bpfEvent))
+					continue
+				}
+				// Add the flow to the cache.
+				p.flowCache.Add(key, fl)
+			} else {
+				// Update the flow's time.
+				if t, err := decodeTime(ktime.MonotonicOffset.Nanoseconds() + int64(bpfEvent.Ts)); err == nil {
+					fl.Time = t
+				} else {
+					p.l.Warn("Failed to get current time", zap.Error(err))
+				}
 			}
 
 			meta := &utils.RetinaMetadata{}
@@ -576,9 +598,9 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 
 			// For packets originating from node, we use tsval as the tcpID.
 			// Packets coming back has the tsval echoed in tsecr.
-			if fl.TraceObservationPoint == flow.TraceObservationPoint_TO_NETWORK {
+			if fl.GetTraceObservationPoint() == flow.TraceObservationPoint_TO_NETWORK {
 				utils.AddTCPID(meta, uint64(tcpMetadata.Tsval))
-			} else if fl.TraceObservationPoint == flow.TraceObservationPoint_FROM_NETWORK {
+			} else if fl.GetTraceObservationPoint() == flow.TraceObservationPoint_FROM_NETWORK {
 				utils.AddTCPID(meta, uint64(tcpMetadata.Tsecr))
 			}
 
@@ -660,4 +682,17 @@ func absPath() (string, error) {
 	}
 	dir := path.Dir(filename)
 	return dir, nil
+}
+
+// decodeTime converts nanoseconds to a protobuf timestamp.
+func decodeTime(nanoseconds int64) (pbTime *timestamppb.Timestamp, err error) {
+	goTime, err := time.Parse(time.RFC3339Nano, time.Unix(0, nanoseconds).Format(time.RFC3339Nano))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse time")
+	}
+	pbTime = timestamppb.New(goTime)
+	if err = pbTime.CheckValid(); err != nil {
+		return nil, errors.Wrap(err, "invalid timestamp")
+	}
+	return pbTime, nil
 }

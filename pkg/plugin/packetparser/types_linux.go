@@ -5,18 +5,20 @@ package packetparser
 
 import (
 	"sync"
+	"time"
 
 	kcfg "github.com/microsoft/retina/pkg/config"
 
+	"github.com/cilium/cilium/api/v1/flow"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/perf"
 	"github.com/florianl/go-tc"
-	"github.com/vishvananda/netlink"
-
+	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/plugin/api"
+	"github.com/vishvananda/netlink"
 )
 
 const (
@@ -27,6 +29,8 @@ const (
 	Device                string         = "device"
 	workers               int            = 2
 	buffer                int            = 10000
+	flowCacheSize         int            = 1000
+	flowCacheTTL          time.Duration  = 6 * time.Minute
 	bpfSourceDir          string         = "_cprog"
 	bpfSourceFileName     string         = "packetparser.c"
 	bpfObjectFileName     string         = "packetparser_bpf.o"
@@ -55,6 +59,15 @@ type key struct {
 	name         string
 	hardwareAddr string
 	netNs        int
+}
+
+type flowCacheKey struct {
+	srcIP   uint32
+	dstIP   uint32
+	srcPort uint32
+	dstPort uint32
+	proto   uint8
+	dir     uint32
 }
 
 //go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=types_linux.go -destination=mocks/mock_types.go -package=mocks
@@ -90,6 +103,7 @@ type packetParser struct {
 	cfg        *kcfg.Config
 	l          *log.ZapLogger
 	callbackID string
+	flowCache  *expirable.LRU[flowCacheKey, *flow.Flow]
 	objs       *packetparserObjects //nolint:typecheck
 	// tcMap is a map of key to *val.
 	tcMap    *sync.Map
