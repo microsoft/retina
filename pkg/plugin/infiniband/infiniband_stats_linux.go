@@ -11,7 +11,9 @@ import (
 
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -20,7 +22,7 @@ const (
 )
 
 const (
-	InfinibandDevicePrefix = "mlx5_ib"
+	InfinibandDevicePrefix = "mlx"
 	InfinibandIfacePrefix  = "ib"
 )
 
@@ -39,34 +41,27 @@ type InfinibandReader struct { // nolint // clearer naming
 }
 
 func (ir *InfinibandReader) readAndUpdate() error {
+	g := errgroup.Group{}
 	ibFS := os.DirFS(pathInfiniband)
-	counterStatsErr := ir.readCounterStats(ibFS, pathInfiniband)
+	g.Go(func() error { return ir.readCounterStats(ibFS) })
 
 	netFS := os.DirFS(pathDebugStatusParameters)
-	statusParamStatsErr := ir.readStatusParamStats(netFS, pathDebugStatusParameters)
+	g.Go(func() error { return ir.readStatusParamStats(netFS) })
 
+	err := g.Wait()
 	ir.updateMetrics()
 	ir.l.Debug("Done reading and updating stats")
-
-	if counterStatsErr != nil {
-		return counterStatsErr
-	} else if statusParamStatsErr != nil {
-		return statusParamStatsErr
-	}
-	return nil
+	return errors.Wrap(err, "error reading and updating stats")
 }
 
-func (ir *InfinibandReader) readCounterStats(fsys fs.FS, path string) error {
-	devices, err := fs.ReadDir(fsys, path)
+func (ir *InfinibandReader) readCounterStats(fsys fs.FS) error {
+	devices, err := fs.ReadDir(fsys, ".")
 	if err != nil {
 		ir.l.Error("error reading dir:", zap.Error(err))
 		return err // nolint std. fmt.
 	}
 	for _, device := range devices {
-		if !strings.HasPrefix(device.Name(), InfinibandDevicePrefix) {
-			continue
-		}
-		portsPath := filepath.Join(path, device.Name(), "ports")
+		portsPath := filepath.Join(".", device.Name(), "ports")
 		ports, err := fs.ReadDir(fsys, portsPath) // does the real filesystem c
 		if err != nil {
 			ir.l.Error("error reading dir:", zap.Error(err))
@@ -99,8 +94,8 @@ func (ir *InfinibandReader) readCounterStats(fsys fs.FS, path string) error {
 	return nil
 }
 
-func (ir *InfinibandReader) readStatusParamStats(fsys fs.FS, path string) error {
-	ifaces, err := fs.ReadDir(fsys, path)
+func (ir *InfinibandReader) readStatusParamStats(fsys fs.FS) error {
+	ifaces, err := fs.ReadDir(fsys, ".")
 	if err != nil {
 		ir.l.Error("error reading dir:", zap.Error(err))
 		return err // nolint std. fmt.
@@ -110,7 +105,7 @@ func (ir *InfinibandReader) readStatusParamStats(fsys fs.FS, path string) error 
 		if !strings.HasPrefix(iface.Name(), InfinibandIfacePrefix) {
 			continue
 		}
-		statusParamsPath := filepath.Join(path, iface.Name(), "debug")
+		statusParamsPath := filepath.Join(".", iface.Name(), "debug")
 		statusParams, err := fs.ReadDir(fsys, statusParamsPath)
 		if err != nil {
 			ir.l.Error("error parsing string:", zap.Error(err))
