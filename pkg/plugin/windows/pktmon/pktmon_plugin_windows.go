@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/cilium/cilium/api/v1/flow"
 	observerv1 "github.com/cilium/cilium/api/v1/observer"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	kcfg "github.com/microsoft/retina/pkg/config"
@@ -21,18 +20,21 @@ import (
 	"go.uber.org/zap/zapio"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 var (
 	ErrNilEnricher    = errors.New("enricher is nil")
 	ErrUnexpectedExit = errors.New("unexpected exit")
+	ErrNilGrpcClient  = errors.New("grpc client is nil")
 
 	socket = "/temp/retina-pktmon.sock"
 )
 
 const (
 	Name                    = "pktmon"
-	connectionRetryAttempts = 3
+	connectionRetryAttempts = 5
+	eventChannelSize        = 1000
 )
 
 type Plugin struct {
@@ -42,6 +44,9 @@ type Plugin struct {
 	pktmonCmd       *exec.Cmd
 	stdWriter       *zapio.Writer
 	errWriter       *zapio.Writer
+
+	grpcClient *GRPCClient
+	stream     observerv1.Observer_GetFlowsClient
 }
 
 func (p *Plugin) Init() error {
@@ -52,11 +57,11 @@ func (p *Plugin) Name() string {
 	return "pktmon"
 }
 
-type Client struct {
+type GRPCClient struct {
 	observerv1.ObserverClient
 }
 
-func NewClient() (*Client, error) {
+func newGRPCClient() (*GRPCClient, error) {
 	retryPolicy := map[string]any{
 		"methodConfig": []map[string]any{
 			{
@@ -84,15 +89,15 @@ func NewClient() (*Client, error) {
 		return nil, fmt.Errorf("failed to dial pktmon server: %w", err)
 	}
 
-	return &Client{observerv1.NewObserverClient(conn)}, nil
+	return &GRPCClient{observerv1.NewObserverClient(conn)}, nil
 }
 
-func (p *Plugin) RunPktMonServer() error {
+func (p *Plugin) RunPktMonServer(ctx context.Context) error {
 	p.stdWriter = &zapio.Writer{Log: p.l.Logger, Level: zap.InfoLevel}
 	defer p.stdWriter.Close()
 	p.errWriter = &zapio.Writer{Log: p.l.Logger, Level: zap.ErrorLevel}
 	defer p.errWriter.Close()
-	p.pktmonCmd = exec.Command("controller-pktmon.exe")
+	p.pktmonCmd = exec.CommandContext(ctx, "controller-pktmon.exe")
 	p.pktmonCmd.Args = append(p.pktmonCmd.Args, "--socketpath", socket)
 	p.pktmonCmd.Env = os.Environ()
 	p.pktmonCmd.Stdout = p.stdWriter
@@ -111,103 +116,122 @@ func (p *Plugin) RunPktMonServer() error {
 }
 
 func (p *Plugin) Start(ctx context.Context) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	p.enricher = enricher.Instance()
 	if p.enricher == nil {
 		return ErrNilEnricher
 	}
 
 	go func() {
-		err := p.RunPktMonServer()
+		err := p.RunPktMonServer(ctx)
 		if err != nil {
-			p.l.Error("failed to run pktmon server", zap.Error(err))
+			p.l.Error("pktmon server exited", zap.Error(err))
 		}
-
-		// if the pktmon server process exits, cancel the context, we need to crash
-		cancel()
 	}()
 
-	var str observerv1.Observer_GetFlowsClient
+	err := p.SetupStream()
+	if err != nil {
+		return fmt.Errorf("failed to setup initial pktmon stream: %w", err)
+	}
+
+	// run the getflows loop
+	for {
+		err := p.GetFlow(ctx)
+		if _, ok := status.FromError(err); ok {
+			p.l.Error("failed to get flow, retriable:", zap.Error(err))
+			continue
+		}
+		return fmt.Errorf("failed to get flow, unrecoverable: %w", err)
+	}
+}
+
+func (p *Plugin) SetupStream() error {
+	var err error
 	fn := func() error {
 		p.l.Info("creating pktmon client")
-		client, err := NewClient()
+		p.grpcClient, err = newGRPCClient()
 		if err != nil {
 			return fmt.Errorf("failed to create pktmon client before getting flows: %w", err)
 		}
 
-		str, err = client.GetFlows(ctx, &observerv1.GetFlowsRequest{})
+		return nil
+	}
+	err = utils.Retry(fn, connectionRetryAttempts)
+	if err != nil {
+		return fmt.Errorf("failed to create pktmon client: %w", err)
+	}
+
+	return nil
+}
+
+func (p *Plugin) StartStream(ctx context.Context) error {
+	if p.grpcClient == nil {
+		return fmt.Errorf("unable to start stream: %w", ErrNilGrpcClient)
+	}
+
+	var err error
+	fn := func() error {
+		p.stream, err = p.grpcClient.GetFlows(ctx, &observerv1.GetFlowsRequest{})
 		if err != nil {
 			return fmt.Errorf("failed to open pktmon stream: %w", err)
 		}
 		return nil
 	}
-	err := utils.Retry(fn, connectionRetryAttempts)
+	err = utils.Retry(fn, connectionRetryAttempts)
 	if err != nil {
 		return fmt.Errorf("failed to create pktmon client: %w", err)
+	}
+
+	return nil
+}
+
+func (p *Plugin) GetFlow(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	err := p.StartStream(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to setup pktmon stream: %w", err)
 	}
 
 	for {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("pktmon context cancelled: %w", ctx.Err())
+			return fmt.Errorf("pktmon plugin context done: %w", ctx.Err())
 		default:
-			err := p.GetFlow(str)
+			event, err := p.stream.Recv()
 			if err != nil {
-				return fmt.Errorf("failed to get flow from observer: %w", err)
+				return fmt.Errorf("failed to receive pktmon event: %w", err)
 			}
-		}
-	}
-}
 
-func (p *Plugin) GetFlow(str observerv1.Observer_GetFlowsClient) error {
-	event, err := str.Recv()
-	if err != nil {
-		return fmt.Errorf("failed to receive pktmon event: %w", err)
-	}
+			fl := event.GetFlow()
+			if fl == nil {
+				p.l.Error("received nil flow, flow proto mismatch from client/server?")
+				return nil
+			}
 
-	fl := event.GetFlow()
-	if fl == nil {
-		p.l.Error("received nil flow, flow proto mismatch from client/server?")
-		return nil
-	}
+			ev := &v1.Event{
+				Event:     fl,
+				Timestamp: fl.GetTime(),
+			}
 
-	ev := &v1.Event{
-		Event:     fl,
-		Timestamp: fl.GetTime(),
-	}
-
-	if fl.GetType() == flow.FlowType_L7 {
-		dns := fl.GetL7().GetDns()
-		if dns != nil {
-			query := dns.GetQuery()
-			ans := dns.GetIps()
-			if dns.GetQtypes()[0] == "Q" {
-				p.l.Sugar().Debugf("query from %s to %s: request %s\n", fl.GetIP().GetSource(), fl.GetIP().GetDestination(), query)
+			if p.enricher != nil {
+				p.enricher.Write(ev)
 			} else {
-				p.l.Sugar().Debugf("answer from %s to %s: result: %+v\n", fl.GetIP().GetSource(), fl.GetIP().GetDestination(), ans)
+				p.l.Error("enricher is nil when writing event")
+			}
+
+			// Write the event to the external channel.
+			if p.externalChannel != nil {
+				select {
+				case p.externalChannel <- ev:
+				default:
+					// Channel is full, drop the event.
+					// We shouldn't slow down the reader.
+					metrics.LostEventsCounter.WithLabelValues(utils.ExternalChannel, string(Name)).Inc()
+				}
 			}
 		}
 	}
-
-	if p.enricher != nil {
-		p.enricher.Write(ev)
-	} else {
-		p.l.Error("enricher is nil when writing event")
-	}
-
-	// Write the event to the external channel.
-	if p.externalChannel != nil {
-		select {
-		case p.externalChannel <- ev:
-		default:
-			// Channel is full, drop the event.
-			// We shouldn't slow down the reader.
-			metrics.LostEventsCounter.WithLabelValues(utils.ExternalChannel, string(Name)).Inc()
-		}
-	}
-	return nil
 }
 
 func (p *Plugin) SetupChannel(ch chan *v1.Event) error {

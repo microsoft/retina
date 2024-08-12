@@ -13,6 +13,7 @@ import (
 	"github.com/cilium/cilium/pkg/pprof"
 	"github.com/cilium/proxy/pkg/logging"
 	"github.com/cilium/proxy/pkg/logging/logfields"
+	"github.com/microsoft/retina/internal/buildinfo"
 	"github.com/microsoft/retina/pkg/config"
 	rnode "github.com/microsoft/retina/pkg/controllers/daemon/nodereconciler"
 	hubbleserver "github.com/microsoft/retina/pkg/hubble"
@@ -59,8 +60,8 @@ var (
 			return telemetry.Config{
 				Component:             "retina-agent",
 				EnableTelemetry:       cfg.EnableTelemetry,
-				ApplicationInsightsID: applicationInsightsID,
-				RetinaVersion:         retinaVersion,
+				ApplicationInsightsID: buildinfo.ApplicationInsightsID,
+				RetinaVersion:         buildinfo.Version,
 				EnabledPlugins:        cfg.EnabledPlugin,
 			}
 		}),
