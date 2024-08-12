@@ -26,19 +26,6 @@ stages:
               else
                 echo "##vso[task.setvariable variable=Tag;isOutput=true]$(make version)"
               fi
-
-              if [[ -z $(git status -s) ]]; then
-                  if [[ -n $(git describe --exact-match --tags HEAD 2>/dev/null) ]]; then
-                      echo "the current folder is clean and has a tag."
-                      echo "##vso[task.setvariable variable=ApplicationInsightsID;isOutput=true]$(PROD_AI)"
-                  else
-                      echo "the current folder is clean but does not have a tag."
-                      echo "##vso[task.setvariable variable=ApplicationInsightsID;isOutput=true]$(TEST_AI)"
-                  fi
-              else
-                  echo "the current folder is not clean."
-                  echo "##vso[task.setvariable variable=ApplicationInsightsID;isOutput=true]$(TEST_AI)"
-              fi
             name: "EnvironmentalVariables"
             displayName: "Set environmental variables"
             condition: always()
@@ -76,10 +63,12 @@ stages:
               set -euo pipefail
               echo "VERSION=$(make version)"
               export VERSION=$(make version)
+              export APP_INSIGHTS_ID=$(APP_INSIGHTS_ID)
               mkdir -p ./output/images/$(platform)/$(arch)/$(year)
               make retina-image \
                 AGENT_TARGETS=$(target) \
                 TAG=$(make version) \
+                APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
                 IMAGE_NAMESPACE=retina \
                 PLATFORM=$(platform)/$(arch) \
                 IMAGE_REGISTRY=ghcr.io/microsoft  \
@@ -118,6 +107,7 @@ stages:
               mkdir -p ./output/images/$(platform)/$(arch)/$(year)
               make retina-operator-image \
                 TAG=$(make version) \
+                APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
                 IMAGE_NAMESPACE=retina \
                 PLATFORM=$(platform)/$(arch) \
                 IMAGE_REGISTRY=ghcr.io/microsoft  \
@@ -143,16 +133,14 @@ stages:
           - checkout: self
             fetchTags: true
 
-      
-
           - task: DownloadPipelineArtifact@2
             inputs:
-              buildType: 'specific'
+              buildType: "specific"
               project: $(BUILDER_ADO_PROECT)
               definition: $(BUILDER_ADO_DEFINITION_ID) # Replace with your build definition ID
               buildId: $(BUILDER_ADO_BUILD_ID)
               artifactName: $(BUILDER_ADO_ARTIFACTE_NAME) # Replace with your artifact name
-              itemPattern:  '**/*builder*.tar'
+              itemPattern: "**/*builder*.tar"
               downloadPath: '$(Pipeline.Workspace)\artifacts'
 
           - task: PowerShell@2
@@ -173,7 +161,7 @@ stages:
               targetType: "inline"
               script: |
                 Import-Module -Name "$(Build.SourcesDirectory)\windows\docker\DockerBuildModule.psm1" -Force
-                Build-RetinaAgentImage -fullBuilderImageName $(WINDOWS_BUILDER_IMAGE) -registry $(BUILD_REGISTRY) -appInsightsID $(PROD_AI)
+                Build-RetinaAgentImage -fullBuilderImageName $(WINDOWS_BUILDER_IMAGE) -registry $(BUILD_REGISTRY) -appInsightsID $(APP_INSIGHTS_ID)
                 Save-Image -imageName retina-agent -registry $(BUILD_REGISTRY)
 
           - task: PublishBuildArtifacts@1
