@@ -35,3 +35,8 @@ enum tcp_flags {
     TCP_CWR = 0x80,
     TCP_NS  = 0x100
 };
+
+enum ct_dir {
+    CT_FORWARD = 0,
+    CT_REPLY,
+};

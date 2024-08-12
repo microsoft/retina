@@ -25,10 +25,11 @@ import (
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type ct_v4_key conntrack ./_cprog/conntrack.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src
 
 // New creates a packetparser plugin.
-func New(_ *config.Config) api.Plugin {
+func New(cfg *config.Config) api.Plugin {
 	return &conntrack{
 		l:           log.Logger().Named(string(Name)),
 		gcFrequency: defaultGCFrequency,
+		cfg:         cfg,
 	}
 }
 
@@ -45,6 +46,10 @@ func (ct *conntrack) Compile(_ context.Context) error {
 }
 
 func (ct *conntrack) Init() error {
+	if ct.cfg.DataAggregationLevel == config.Low {
+		ct.l.Info("conntrack is disabled in low data aggregation level")
+		return nil
+	}
 	// Allow the current process to lock memory for eBPF resources.
 	if err := rlimit.RemoveMemlock(); err != nil {
 		ct.l.Error("RemoveMemlock failed", zap.Error(err))
@@ -72,6 +77,10 @@ func (ct *conntrack) Init() error {
 
 // Run starts the Conntrack garbage collection loop.
 func (ct *conntrack) Start(ctx context.Context) error {
+	if ct.cfg.DataAggregationLevel == config.Low {
+		ct.l.Info("conntrack is disabled in low data aggregation level")
+		return nil
+	}
 	ticker := time.NewTicker(ct.gcFrequency)
 	defer ticker.Stop()
 
@@ -102,14 +111,16 @@ func (ct *conntrack) Start(ctx context.Context) error {
 				dstIP := utils.Int2ip(key.DstIp).To4()
 				sourcePortShort := uint32(utils.HostToNetShort(key.SrcPort))
 				destinationPortShort := uint32(utils.HostToNetShort(key.DstPort))
-				ct.l.Debug("Conntrack entry", zap.String("srcIP", srcIP.String()),
-					zap.Uint32("srcPort", sourcePortShort),
-					zap.String("dstIP", dstIP.String()),
-					zap.Uint32("dstPort", destinationPortShort),
+				ct.l.Debug("conntrack entry",
+					zap.String("src_ip", srcIP.String()),
+					zap.Uint32("src_port", sourcePortShort),
+					zap.String("dst_ip", dstIP.String()),
+					zap.Uint32("dst_port", destinationPortShort),
 					zap.String("proto", decodeProto(key.Proto)),
 					zap.Uint32("lifetime", value.Lifetime),
-					zap.Uint16("isClosing", value.IsClosing),
-					zap.String("flags_seen", decodeFlags(value.FlagsSeen)),
+					zap.Uint16("is_closing", value.IsClosing),
+					zap.String("flags_seen_forward_dir", decodeFlags(value.FlagsSeenForwardDir)),
+					zap.String("flags_seen_reply_dir", decodeFlags(value.FlagsSeenReplyDir)),
 					zap.Uint32("last_reported", value.LastReport),
 				)
 			}

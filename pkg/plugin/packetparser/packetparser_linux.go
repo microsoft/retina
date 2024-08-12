@@ -68,17 +68,22 @@ func (p *packetParser) Generate(ctx context.Context) error {
 	}
 	dir := path.Dir(filename)
 	dynamicHeaderPath := fmt.Sprintf("%s/%s/%s", dir, bpfSourceDir, dynamicHeaderFileName)
-	i := 0
+
+	// Check if packetparser will bypassing lookup IP of interest.
+	bypassLookupIPOfInterest := 0
 	if p.cfg.BypassLookupIPOfInterest {
-		p.l.Logger.Info("Bypassing lookup IP of interest")
-		i = 1
+		p.l.Info("bypassing lookup IP of interest")
+		bypassLookupIPOfInterest = 1
 	}
-	st := fmt.Sprintf("#define BYPASS_LOOKUP_IP_OF_INTEREST %d \n", i)
+
+	p.l.Info("data aggregation level", zap.String("level", p.cfg.DataAggregationLevel.String()))
+
+	st := fmt.Sprintf("#define BYPASS_LOOKUP_IP_OF_INTEREST %d\n#define DATA_AGGREGATION_LEVEL %d\n", bypassLookupIPOfInterest, p.cfg.DataAggregationLevel)
 	err := loader.WriteFile(ctx, dynamicHeaderPath, st)
 	if err != nil {
-		p.l.Error("Error writing dynamic header", zap.Error(err))
-		return err
+		return errors.Wrap(err, "error writing dynamic header")
 	}
+
 	p.l.Info("PacketParser header generated at", zap.String("path", dynamicHeaderPath))
 	return nil
 }

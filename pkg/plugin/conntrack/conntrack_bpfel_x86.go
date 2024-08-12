@@ -22,12 +22,13 @@ type conntrackCtV4Key struct {
 }
 
 type conntrackCtValue struct {
-	Lifetime   uint32
-	FlagsSeen  uint8
-	_          [3]byte
-	LastReport uint32
-	IsClosing  uint16
-	_          [2]byte
+	Lifetime            uint32
+	FlagsSeenForwardDir uint8
+	FlagsSeenReplyDir   uint8
+	_                   [2]byte
+	LastReport          uint32
+	IsClosing           uint16
+	_                   [2]byte
 }
 
 // loadConntrack returns the embedded CollectionSpec for conntrack.
