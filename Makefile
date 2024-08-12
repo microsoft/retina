@@ -385,7 +385,10 @@ coverage: # Code coverage.
 manifests: 
 	cd crd && make manifests && make generate
 
-HELM_IMAGE_TAG ?= v0.0.2
+# Fetch the latest tag from the GitHub
+LATEST_TAG := $(shell curl -s https://api.github.com/repos/microsoft/retina/tags | jq -r '.[0].name')
+
+HELM_IMAGE_TAG ?= $(LATEST_TAG)
 
 # basic/node-level mode
 helm-install: manifests
