@@ -1,6 +1,6 @@
-# `cilium` (Linux)
+# `ciliumEventObserver` (Linux)
 
-Collect agent and perf events from cilium via monitor1_2 socket and process flows in our hubble observer.
+Collect agent and perf events from cilium via monitor1_2 socket. This allows us to serve additional metrics and flows alongside Cilium events.
 
 ## Metrics
 
@@ -27,4 +27,4 @@ The cilium plugin will listen on this socket for these events, decode the payloa
 
 ### Code locations
 
-- Plugin and eBPF code: *pkg/plugin/cilium/*
+- Plugin and eBPF code: *pkg/plugin/ciliumeventobserver/*

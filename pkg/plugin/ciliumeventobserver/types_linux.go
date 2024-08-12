@@ -1,6 +1,6 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
-package cilium
+package ciliumeventobserver
 
 import (
 	"net"
@@ -15,10 +15,10 @@ import (
 )
 
 const (
-	Name api.PluginName = "cilium"
+	Name api.PluginName = "ciliumeventobserver"
 )
 
-type cilium struct {
+type ciliumeventobserver struct {
 	cfg             *kcfg.Config
 	l               *log.ZapLogger
 	enricher        enricher.EnricherInterface

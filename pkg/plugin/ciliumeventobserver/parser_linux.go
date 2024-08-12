@@ -1,4 +1,4 @@
-package cilium
+package ciliumeventobserver
 
 import (
 	"errors"

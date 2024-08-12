@@ -1,4 +1,4 @@
-package cilium
+package ciliumeventobserver
 
 //nolint:typecheck // do not need for test
 import (
@@ -51,16 +51,16 @@ func TestMonitorLoop(t *testing.T) {
 	cil := New(cfg)
 	_ = cil.Init()
 
-	cil.(*cilium).retryDelay = 1 * time.Millisecond
-	cil.(*cilium).maxAttempts = 1
+	cil.(*ciliumeventobserver).retryDelay = 1 * time.Millisecond
+	cil.(*ciliumeventobserver).maxAttempts = 1
 
 	// Test monitorLoop
 	reader, writer := net.Pipe()
 	defer reader.Close()
 	defer writer.Close()
 	// overwrite the connection
-	cil.(*cilium).connection = reader
-	go cil.(*cilium).monitorLoop(ctxWithCancel)
+	cil.(*ciliumeventobserver).connection = reader
+	go cil.(*ciliumeventobserver).monitorLoop(ctxWithCancel)
 
 	dn := monitor.DropNotify{
 		Type:    byte(monitorAPI.MessageTypeDrop),
@@ -88,15 +88,15 @@ func TestMonitorLoopWithRetry(t *testing.T) {
 	}
 	cil := New(cfg)
 	_ = cil.Init()
-	cil.(*cilium).retryDelay = 1 * time.Millisecond
-	cil.(*cilium).maxAttempts = 2
+	cil.(*ciliumeventobserver).retryDelay = 1 * time.Millisecond
+	cil.(*ciliumeventobserver).maxAttempts = 2
 	// Test monitorLoop
 	reader, writer := net.Pipe()
-	cil.(*cilium).connection = reader
-	go cil.(*cilium).monitorLoop(ctxWithCancel)
+	cil.(*ciliumeventobserver).connection = reader
+	go cil.(*ciliumeventobserver).monitorLoop(ctxWithCancel)
 	err := writer.Close()
 	assert.NilError(t, err)
 	time.Sleep(5 * time.Second)
-	assert.Assert(t, cil.(*cilium).connection == nil, "connection should be nil")
+	assert.Assert(t, cil.(*ciliumeventobserver).connection == nil, "connection should be nil")
 	cancel()
 }
