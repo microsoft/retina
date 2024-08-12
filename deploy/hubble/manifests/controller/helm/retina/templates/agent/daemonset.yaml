@@ -33,6 +33,9 @@ spec:
         - name: retina-agent-init
           image: {{ .Values.agent.init.repository }}:{{ .Values.agent.init.tag }}
           imagePullPolicy: {{ .Values.agent.pullPolicy }}
+          args:
+            - --config
+            - "/retina/config/config.yaml"
           terminationMessagePolicy: FallbackToLogsOnError
           securityContext:
             privileged: true
@@ -40,6 +43,8 @@ spec:
           - name: bpf
             mountPath: /sys/fs/bpf
             mountPropagation: Bidirectional
+          - name": config
+            mountPath: /retina/config
           - name: varrun
             mountPath: /var/run
             mountPropagation: Bidirectional

@@ -24,6 +24,8 @@
 // Define the interval at which a packet should be sent to the userspace
 #define CT_REPORT_INTERVAL 30
 
+#define CT_MAP_SIZE 262144
+
 enum tcp_flags {
     TCP_FIN = 0x01,
     TCP_SYN = 0x02,

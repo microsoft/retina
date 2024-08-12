@@ -44,8 +44,7 @@ struct {
     __uint(type, BPF_MAP_TYPE_LRU_HASH);
     __type(key, struct ct_v4_key);
     __type(value, struct ct_value);
-    __uint(max_entries, 262144);
-    __uint(pinning, LIBBPF_PIN_BY_NAME); // Pinned to /sys/fs/bpf.
+    __uint(max_entries, CT_MAP_SIZE);
 } retina_conntrack_map SEC(".maps");
 
 /**
