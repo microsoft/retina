@@ -386,7 +386,7 @@ manifests:
 	cd crd && make manifests && make generate
 
 # Fetch the latest tag from the GitHub
-LATEST_TAG := $(shell curl -s https://api.github.com/repos/microsoft/retina/tags | jq -r '.[0].name')
+LATEST_TAG := $(shell curl -s https://api.github.com/repos/microsoft/retina/releases | jq -r '.[0].name')
 
 HELM_IMAGE_TAG ?= $(LATEST_TAG)
 
