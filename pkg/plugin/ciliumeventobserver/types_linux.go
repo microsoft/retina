@@ -41,10 +41,6 @@ type dialer interface {
 
 type DefaultDialer struct{}
 
-func (d *DefaultDialer) Dial(network, address string) (net.Conn, error) {
-	return net.Dial(network, address)
-}
-
 type parser struct {
 	l       *log.ZapLogger
 	hparser *hp.Parser

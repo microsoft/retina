@@ -54,13 +54,13 @@ func TestStart(t *testing.T) {
 	}
 	cil := New(cfg)
 	exChan := make(chan *v1.Event)
-	cil.SetupChannel(exChan)
+	_ = cil.SetupChannel(exChan)
 	_ = cil.Init()
 	md := NewMockDialer(false)
 	cil.(*ciliumeventobserver).d = md
 	cil.(*ciliumeventobserver).connection = md.reader
 
-	go cil.Start(ctxWithCancel)
+	go cil.Start(ctxWithCancel) //nolint:errcheck // do not need for test
 	pl := getPayload()
 	msg, _ := pl.Encode()
 	_, _ = md.writer.Write(msg)
@@ -83,7 +83,7 @@ func TestMonitorLoop(t *testing.T) {
 	md := NewMockDialer(false)
 	cil.(*ciliumeventobserver).d = md
 	cil.(*ciliumeventobserver).connection = md.reader
-	go cil.(*ciliumeventobserver).monitorLoop(ctxWithCancel)
+	go cil.(*ciliumeventobserver).monitorLoop(ctxWithCancel) //nolint:errcheck // do not need for test
 
 	pl := getPayload()
 	msg, _ := pl.Encode()
@@ -105,14 +105,14 @@ func TestParse(t *testing.T) {
 	cil := New(cfg)
 	_ = cil.Init()
 	exChannel := make(chan *v1.Event)
-	cil.SetupChannel(exChannel)
+	_ = cil.SetupChannel(exChannel)
 	cil.(*ciliumeventobserver).retryDelay = 1 * time.Millisecond
 	cil.(*ciliumeventobserver).maxAttempts = 1
 
 	md := NewMockDialer(false)
 	cil.(*ciliumeventobserver).d = md
 	cil.(*ciliumeventobserver).connection = md.reader
-	go cil.(*ciliumeventobserver).monitorLoop(ctxWithCancel)
+	go cil.(*ciliumeventobserver).monitorLoop(ctxWithCancel) //nolint:errcheck // do not need for test
 
 	pl := getPayload()
 	msg, _ := pl.Encode()
@@ -157,10 +157,9 @@ func NewMockDialer(re bool) *MockDialer {
 	return me
 }
 
-func (d *MockDialer) Dial(network, address string) (net.Conn, error) {
+func (d *MockDialer) Dial(_, _ string) (net.Conn, error) {
 	if d.returnsError {
-		return nil, errors.New("error")
-	} else {
-		return d.reader, nil
+		return nil, errors.New("error") //nolint:goerr113 // do not need for test
 	}
+	return d.reader, nil
 }

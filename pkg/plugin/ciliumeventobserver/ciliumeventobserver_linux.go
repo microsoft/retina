@@ -9,6 +9,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"io"
+	"net"
 	"time"
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
@@ -24,6 +25,11 @@ const (
 	defaultAttempts   = 5
 	defaultRetryDelay = 12 * time.Second
 	workers           = 2
+)
+
+var (
+	errFailedConnection = errors.New("Failed to connect to cilium monitor after max attempts")
+	errFailedToDial     = errors.New("Failed to dial cilium monitor socket")
 )
 
 func New(cfg *kcfg.Config) api.Plugin {
@@ -104,20 +110,29 @@ func (c *ciliumeventobserver) SetupChannel(ch chan *v1.Event) error {
 	return nil
 }
 
+// Wrapper on net.Dial to mock in tests
+func (d *DefaultDialer) Dial(network, address string) (net.Conn, error) {
+	conn, err := net.Dial(network, address)
+	if err != nil {
+		return nil, errFailedToDial
+	}
+	return conn, nil
+}
+
 // Create a connection to the ciliumeventobserver unix socket to monitor events
 func (c *ciliumeventobserver) connect(ctx context.Context) error {
 	ticker := time.NewTicker(c.retryDelay)
 	curAttempt := 1
 	select {
 	case <-ctx.Done():
-		return ctx.Err()
+		return ctx.Err() //nolint:wrapcheck // no additional context needed
 	case <-ticker.C:
 		conn, err := c.d.Dial("unix", c.sockPath)
 		if err != nil {
 			c.l.Error("Connection attempt failed", zap.Error(err))
 			if curAttempt > c.maxAttempts {
 				c.connection = nil
-				return err
+				return errFailedConnection
 			}
 		} else {
 			c.l.Info("Connected to cilium monitor")
@@ -140,7 +155,7 @@ func (c *ciliumeventobserver) monitorLoop(ctx context.Context) error {
 		default:
 			if err := pl.DecodeBinary(decoder); err != nil {
 				if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-					return err
+					return err //nolint:wrapcheck // Error is handled by the caller
 				}
 				c.l.Warn("Failed to decode payload from cilium", zap.Error(err))
 				continue
