@@ -43,7 +43,7 @@ spec:
           - name: bpf
             mountPath: /sys/fs/bpf
             mountPropagation: Bidirectional
-          - name": config
+          - name: config
             mountPath: /retina/config
           - name: varrun
             mountPath: /var/run
