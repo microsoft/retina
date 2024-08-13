@@ -63,6 +63,12 @@ func (p *Parser) Decode(f *flow.Flow) *flow.Flow {
 	// Add TrafficDirection to flow.
 	p.decodeTrafficDirection(f)
 
+	p.l.WithFields(logrus.Fields{
+		"verdict": f.GetVerdict(),
+		"src":     f.GetSource().GetPodName(),
+		"dst":     f.GetDestination().GetPodName(),
+	}).Info("DEBUGME: Decode bottom")
+
 	p.decodePoliciesDroppingTraffic(f)
 
 	return f
@@ -144,7 +150,7 @@ func (p *Parser) decodePoliciesDroppingTraffic(f *flow.Flow) {
 		return
 	}
 
-	ingressPolicies, egressPolicies := p.netpolAgent.PoliciesDroppingTraffic(f.Source, f.Destination)
+	ingressPolicies, egressPolicies := p.netpolAgent.PoliciesDroppingTraffic(f)
 
 	// repurposing EgressAllowedBy and IngressAllowedBy to store policies DROPPING traffic.
 	for _, metadata := range ingressPolicies {
@@ -153,6 +159,8 @@ func (p *Parser) decodePoliciesDroppingTraffic(f *flow.Flow) {
 			Namespace: metadata.Namespace,
 		}
 		f.IngressAllowedBy = append(f.IngressAllowedBy, fp)
+
+		p.l.WithField("key", fmt.Sprintf("%s/%s", fp.Namespace, fp.Name)).Info("ingress policy dropping traffic")
 	}
 
 	for _, metadata := range egressPolicies {
@@ -161,5 +169,7 @@ func (p *Parser) decodePoliciesDroppingTraffic(f *flow.Flow) {
 			Namespace: metadata.Namespace,
 		}
 		f.EgressAllowedBy = append(f.EgressAllowedBy, fp)
+
+		p.l.WithField("key", fmt.Sprintf("%s/%s", fp.Namespace, fp.Name)).Info("egress policy dropping traffic")
 	}
 }

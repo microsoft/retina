@@ -2,10 +2,12 @@ package netpolagent
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/microsoft/retina/pkg/networkpolicy"
 
+	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/network-policy-api/cmd/policy-assistant/pkg/matcher"
 
 	"github.com/cilium/cilium/api/v1/flow"
@@ -36,7 +38,7 @@ type agentParams struct {
 	Lifecycle cell.Lifecycle
 	Log       logrus.FieldLogger
 	Config    networkpolicy.Config
-	npv1      resource.Resource[*slim_networkingv1.NetworkPolicy]
+	NPV1      resource.Resource[*slim_networkingv1.NetworkPolicy]
 }
 
 type NetPolAgent struct {
@@ -62,7 +64,7 @@ func newNetPolAgent(p agentParams) *NetPolAgent {
 	n := &NetPolAgent{
 		l:       l,
 		enabled: true,
-		npv1:    p.npv1,
+		npv1:    p.NPV1,
 		store:   newStore(l),
 		wp:      workerpool.New(maxWorkers),
 	}
@@ -91,7 +93,11 @@ func (n *NetPolAgent) Stop(_ cell.HookContext) error {
 // PoliciesDroppingTraffic returns the policies that are causing traffic to be dropped.
 // The first list is policies impacting ingress, the second list is policies impacting egress.
 // Only NetworkPolicyV1 is supported currently.
-func (n *NetPolAgent) PoliciesDroppingTraffic(src, dst *flow.Endpoint) ([]*PolicyMetadata, []*PolicyMetadata) {
+func (n *NetPolAgent) PoliciesDroppingTraffic(f *flow.Flow) ([]*PolicyMetadata, []*PolicyMetadata) {
+	n.l.Info("DEBUGME PoliciesDroppingTraffic")
+
+	src, dst := f.GetSource(), f.GetDestination()
+
 	if !n.enabled || src == nil || dst == nil {
 		return nil, nil
 	}
@@ -99,6 +105,21 @@ func (n *NetPolAgent) PoliciesDroppingTraffic(src, dst *flow.Endpoint) ([]*Polic
 	traffic := &matcher.Traffic{
 		Source:      endpointToTraffic(src),
 		Destination: endpointToTraffic(dst),
+		// FIXME handle port names
+	}
+
+	if tcp := f.GetL4().GetTCP(); tcp != nil {
+		traffic.Protocol = v1.ProtocolTCP
+		traffic.ResolvedPort = int(tcp.GetDestinationPort())
+	} else if udp := f.GetL4().GetUDP(); udp != nil {
+		traffic.Protocol = v1.ProtocolUDP
+		traffic.ResolvedPort = int(udp.GetDestinationPort())
+	} else if sctp := f.GetL4().GetSCTP(); sctp != nil {
+		traffic.Protocol = v1.ProtocolSCTP
+		traffic.ResolvedPort = int(sctp.GetDestinationPort())
+	} else {
+		n.l.Debug("unsupported protocol")
+		return nil, nil
 	}
 
 	ingress := n.policiesDroppingTraffic(traffic, true)
@@ -106,8 +127,45 @@ func (n *NetPolAgent) PoliciesDroppingTraffic(src, dst *flow.Endpoint) ([]*Polic
 	return ingress, egress
 }
 
+func prettyStringTraffic(t *matcher.Traffic) string {
+	if t == nil {
+		return "nil"
+	}
+	src := prettyStringInternalPeer(t.Source.Internal)
+	dst := prettyStringInternalPeer(t.Destination.Internal)
+	return fmt.Sprintf("Traffic{Source: %v, Destination: %v, Protocol: %v, ResolvedPort: %v, ResolvedPortName: %v}", src, dst, t.Protocol, t.ResolvedPort, t.ResolvedPortName)
+}
+
+func prettyStringInternalPeer(p *matcher.InternalPeer) string {
+	if p == nil {
+		return "nil"
+	}
+	return fmt.Sprintf("InternalPeer{PodLabels: %v, NamespaceLabels: %v, Namespace: %v}", p.PodLabels, p.NamespaceLabels, p.Namespace)
+}
+
+func prettyStringPolicy(p *matcher.Policy) string {
+	if p == nil {
+		return "nil"
+	}
+	return fmt.Sprintf("Policy{Ingress: %v, Egress: %v}", prettyStringTargets(p.Ingress), prettyStringTargets(p.Egress))
+}
+
+func prettyStringTargets(t map[string]*matcher.Target) string {
+	if t == nil {
+		return "nil"
+	}
+	var res []string
+	for k, v := range t {
+		prettyTarget := fmt.Sprintf("Target{Peer count: %d, SourceRules: %v}", len(v.Peers), v.SourceRules)
+		res = append(res, fmt.Sprintf("%v: %v", k, prettyTarget))
+	}
+	return strings.Join(res, ", ")
+}
+
 func (n *NetPolAgent) policiesDroppingTraffic(traffic *matcher.Traffic, isIngress bool) []*PolicyMetadata {
 	// NOTE: copied/modified from matcher.Policy.IsIngressOrEgressAllowed()
+
+	n.l.WithField("traffic", prettyStringTraffic(traffic)).Info("DEBUGME traffic")
 
 	var subject *matcher.TrafficPeer
 	var peer *matcher.TrafficPeer
@@ -127,6 +185,7 @@ func (n *NetPolAgent) policiesDroppingTraffic(traffic *matcher.Traffic, isIngres
 
 	n.store.Lock()
 	matchingTargets := n.store.allPolicies.TargetsApplyingToPod(isIngress, subject.Internal)
+	n.l.WithField("policy", prettyStringPolicy(n.store.allPolicies)).Info("DEBUGME traffic")
 	n.store.Unlock()
 
 	// 2. No targets match => automatic allow
@@ -178,7 +237,6 @@ func (n *NetPolAgent) runNPV1Controller(ctx context.Context) error {
 				return nil
 			}
 
-			var err error
 			switch ev.Kind {
 			case resource.Sync:
 				// ignore
@@ -187,11 +245,7 @@ func (n *NetPolAgent) runNPV1Controller(ctx context.Context) error {
 			case resource.Delete:
 				n.store.DeleteNPV1(ev.Key)
 			}
-
-			if err != nil {
-				n.l.WithError(err).WithField("namespaceKey", ev.Key.String()).Error("error creating cilium endpoint. requeuing namespace")
-			}
-			ev.Done(err)
+			ev.Done(nil)
 		case <-ctx.Done():
 			n.l.Info("stop reconciling npv1")
 			return nil
@@ -228,10 +282,16 @@ func endpointToTraffic(ep *flow.Endpoint) *matcher.TrafficPeer {
 			continue
 		}
 
+		shouldIgnore := false
 		for _, prefix := range labelPrefixesToIgnore {
 			if strings.HasPrefix(lbl.Key, prefix) {
-				continue
+				shouldIgnore = true
+				break
 			}
+		}
+
+		if shouldIgnore {
+			continue
 		}
 
 		podLabels[lbl.Key] = lbl.Value

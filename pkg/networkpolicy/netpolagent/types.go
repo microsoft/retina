@@ -49,7 +49,7 @@ func (s *store) UpsertNPV1(key resource.Key, slim *slim_networkingv1.NetworkPoli
 }
 
 func (s *store) updateNPV1(key resource.Key, slim *slim_networkingv1.NetworkPolicy) {
-	s.l.WithField("key", fmt.Sprintf("%s/%s", key.Namespace, key.Name)).Debug("updating existing network policy")
+	s.l.WithField("key", fmt.Sprintf("%s/%s", key.Namespace, key.Name)).Info("updating existing network policy")
 
 	// have to recalculate all policies
 	s.NetworkPolicies[key] = slim
@@ -57,7 +57,7 @@ func (s *store) updateNPV1(key resource.Key, slim *slim_networkingv1.NetworkPoli
 }
 
 func (s *store) addNPV1(key resource.Key, slim *slim_networkingv1.NetworkPolicy) {
-	s.l.WithField("key", fmt.Sprintf("%s/%s", key.Namespace, key.Name)).Debug("adding new network policy")
+	s.l.WithField("key", fmt.Sprintf("%s/%s", key.Namespace, key.Name)).Info("adding new network policy")
 
 	s.NetworkPolicies[key] = slim
 	npv1 := slimToNPV1(slim)[0]
@@ -74,7 +74,7 @@ func (s *store) DeleteNPV1(key resource.Key) {
 		return
 	}
 
-	s.l.WithField("key", fmt.Sprintf("%s/%s", key.Namespace, key.Name)).Debug("deleting network policy")
+	s.l.WithField("key", fmt.Sprintf("%s/%s", key.Namespace, key.Name)).Info("deleting network policy")
 	delete(s.NetworkPolicies, key)
 
 	// have to recalculate all policies

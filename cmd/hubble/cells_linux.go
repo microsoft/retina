@@ -20,6 +20,8 @@ import (
 	retinak8s "github.com/microsoft/retina/pkg/k8s"
 	"github.com/microsoft/retina/pkg/managers/pluginmanager"
 	"github.com/microsoft/retina/pkg/monitoragent"
+	"github.com/microsoft/retina/pkg/networkpolicy"
+	"github.com/microsoft/retina/pkg/networkpolicy/netpolagent"
 	"github.com/microsoft/retina/pkg/servermanager"
 	"github.com/microsoft/retina/pkg/shared/telemetry"
 	"k8s.io/client-go/rest"
@@ -53,6 +55,8 @@ var (
 		// Parse Retina specific configuration
 		config.Cell,
 
+		networkpolicy.Cell,
+
 		// Kubernetes client
 		k8sClient.Cell,
 
@@ -78,6 +82,8 @@ var (
 
 		// monitorAgent.Cell,
 		monitoragent.Cell,
+
+		netpolagent.Cell,
 
 		daemonCell,
 

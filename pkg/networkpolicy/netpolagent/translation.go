@@ -143,17 +143,6 @@ func convertSlimIPBlock(slim *slim_networkingv1.IPBlock) *networkingv1.IPBlock {
 	}
 }
 
-func convertIntOrString(slim *intstr.IntOrString) *intstr.IntOrString {
-	if slim == nil {
-		return nil
-	}
-	return &intstr.IntOrString{
-		Type:   slim.Type,
-		IntVal: slim.IntVal,
-		StrVal: slim.StrVal,
-	}
-}
-
 func convertSlimPolicyTypes(slim []slim_networkingv1.PolicyType) []networkingv1.PolicyType {
 	if slim == nil {
 		return nil

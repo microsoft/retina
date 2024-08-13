@@ -72,7 +72,7 @@ var Cell = cell.Module(
 		},
 	),
 
-	cell.Provide(func(lc cell.Lifecycle, cs client.Clientset, cfg *networkpolicy.Config) (resource.Resource[*slim_networkingv1.NetworkPolicy], error) {
+	cell.Provide(func(lc cell.Lifecycle, cs client.Clientset, cfg networkpolicy.Config) (resource.Resource[*slim_networkingv1.NetworkPolicy], error) {
 		if cfg.EnableNetworkPolicyEnrichment {
 			return ciliumk8s.NetworkPolicyResource(lc, cs)
 		}
