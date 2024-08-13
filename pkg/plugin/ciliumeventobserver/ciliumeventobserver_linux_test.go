@@ -3,10 +3,12 @@ package ciliumeventobserver
 //nolint:typecheck // do not need for test
 import (
 	"context"
+	"errors"
 	"net"
 	"testing"
 	"time"
 
+	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/cilium/pkg/hubble/testutils"
 	"github.com/cilium/cilium/pkg/monitor"
 	monitorAPI "github.com/cilium/cilium/pkg/monitor/api"
@@ -19,7 +21,7 @@ import (
 	"gotest.tools/assert"
 )
 
-func TestStart(t *testing.T) {
+func TestStartError(t *testing.T) {
 	ctxTimeout, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
@@ -35,33 +37,95 @@ func TestStart(t *testing.T) {
 	}
 	cil := New(cfg)
 	_ = cil.Init()
+	md := NewMockDialer(true)
+	cil.(*ciliumeventobserver).d = md
 
 	err := cil.Start(ctxTimeout)
 	assert.Assert(t, err != nil, "Error should not be nil")
 }
 
-func TestMonitorLoop(t *testing.T) {
+func TestStart(t *testing.T) {
 	ctxWithCancel, cancel := context.WithCancel(context.Background())
-
+	defer cancel()
 	_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
 
 	cfg := &config.Config{
 		EnablePodLevel: true,
 	}
 	cil := New(cfg)
+	exChan := make(chan *v1.Event)
+	cil.SetupChannel(exChan)
 	_ = cil.Init()
+	md := NewMockDialer(false)
+	cil.(*ciliumeventobserver).d = md
+	cil.(*ciliumeventobserver).connection = md.reader
 
+	go cil.Start(ctxWithCancel)
+	pl := getPayload()
+	msg, _ := pl.Encode()
+	_, _ = md.writer.Write(msg)
+	event := <-exChan
+	assert.Assert(t, event != nil)
+}
+
+func TestMonitorLoop(t *testing.T) {
+	ctxWithCancel, cancel := context.WithCancel(context.Background())
+	_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
+	cfg := &config.Config{
+		EnablePodLevel: true,
+	}
+	cil := New(cfg)
+	_ = cil.Init()
 	cil.(*ciliumeventobserver).retryDelay = 1 * time.Millisecond
 	cil.(*ciliumeventobserver).maxAttempts = 1
 
 	// Test monitorLoop
-	reader, writer := net.Pipe()
-	defer reader.Close()
-	defer writer.Close()
-	// overwrite the connection
-	cil.(*ciliumeventobserver).connection = reader
+	md := NewMockDialer(false)
+	cil.(*ciliumeventobserver).d = md
+	cil.(*ciliumeventobserver).connection = md.reader
 	go cil.(*ciliumeventobserver).monitorLoop(ctxWithCancel)
 
+	pl := getPayload()
+	msg, _ := pl.Encode()
+	_, err := md.writer.Write(msg)
+	assert.NilError(t, err)
+	time.Sleep(2 * time.Second)
+	plEvent := <-cil.(*ciliumeventobserver).payloadEvents
+	assert.Assert(t, plEvent != nil)
+	cancel()
+}
+
+func TestParse(t *testing.T) {
+	ctxWithCancel, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
+	cfg := &config.Config{
+		EnablePodLevel: true,
+	}
+	cil := New(cfg)
+	_ = cil.Init()
+	exChannel := make(chan *v1.Event)
+	cil.SetupChannel(exChannel)
+	cil.(*ciliumeventobserver).retryDelay = 1 * time.Millisecond
+	cil.(*ciliumeventobserver).maxAttempts = 1
+
+	md := NewMockDialer(false)
+	cil.(*ciliumeventobserver).d = md
+	cil.(*ciliumeventobserver).connection = md.reader
+	go cil.(*ciliumeventobserver).monitorLoop(ctxWithCancel)
+
+	pl := getPayload()
+	msg, _ := pl.Encode()
+	_, err := md.writer.Write(msg)
+	assert.NilError(t, err)
+	go cil.(*ciliumeventobserver).parserLoop(ctxWithCancel)
+	time.Sleep(2 * time.Second)
+	assert.Assert(t, len(cil.(*ciliumeventobserver).payloadEvents) == 0)
+	event := <-exChannel
+	assert.Assert(t, event != nil)
+}
+
+func getPayload() payload.Payload {
 	dn := monitor.DropNotify{
 		Type:    byte(monitorAPI.MessageTypeDrop),
 		SubType: uint8(130),
@@ -74,29 +138,29 @@ func TestMonitorLoop(t *testing.T) {
 		Lost: 0,
 		Type: 9,
 	}
-	msg, _ := pl.Encode()
-	_, err := writer.Write(msg)
-	assert.NilError(t, err)
-	cancel()
+	return pl
 }
 
-func TestMonitorLoopWithRetry(t *testing.T) {
-	ctxWithCancel, cancel := context.WithCancel(context.Background())
-	_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
-	cfg := &config.Config{
-		EnablePodLevel: true,
+type MockDialer struct {
+	returnsError bool
+	reader       net.Conn
+	writer       net.Conn
+}
+
+func NewMockDialer(re bool) *MockDialer {
+	me := &MockDialer{returnsError: re}
+	if !re {
+		r, w := net.Pipe()
+		me.reader = r
+		me.writer = w
 	}
-	cil := New(cfg)
-	_ = cil.Init()
-	cil.(*ciliumeventobserver).retryDelay = 1 * time.Millisecond
-	cil.(*ciliumeventobserver).maxAttempts = 2
-	// Test monitorLoop
-	reader, writer := net.Pipe()
-	cil.(*ciliumeventobserver).connection = reader
-	go cil.(*ciliumeventobserver).monitorLoop(ctxWithCancel)
-	err := writer.Close()
-	assert.NilError(t, err)
-	time.Sleep(5 * time.Second)
-	assert.Assert(t, cil.(*ciliumeventobserver).connection == nil, "connection should be nil")
-	cancel()
+	return me
+}
+
+func (d *MockDialer) Dial(network, address string) (net.Conn, error) {
+	if d.returnsError {
+		return nil, errors.New("error")
+	} else {
+		return d.reader, nil
+	}
 }

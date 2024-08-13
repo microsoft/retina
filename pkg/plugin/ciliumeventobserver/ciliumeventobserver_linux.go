@@ -9,7 +9,6 @@ import (
 	"encoding/gob"
 	"errors"
 	"io"
-	"net"
 	"time"
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
@@ -22,17 +21,20 @@ import (
 )
 
 const (
-	defaultAttempts   = 10
+	defaultAttempts   = 5
 	defaultRetryDelay = 12 * time.Second
+	workers           = 2
 )
 
 func New(cfg *kcfg.Config) api.Plugin {
 	return &ciliumeventobserver{
-		cfg:         cfg,
-		l:           log.Logger().Named(string(Name)),
-		retryDelay:  defaultRetryDelay,
-		maxAttempts: defaultAttempts,
-		sockPath:    cfg.MonitorSockPath,
+		cfg:           cfg,
+		l:             log.Logger().Named(string(Name)),
+		retryDelay:    defaultRetryDelay,
+		maxAttempts:   defaultAttempts,
+		sockPath:      cfg.MonitorSockPath,
+		payloadEvents: make(chan *payload.Payload),
+		d:             &DefaultDialer{},
 	}
 }
 
@@ -70,13 +72,23 @@ func (c *ciliumeventobserver) Start(ctx context.Context) error {
 		}
 	}
 
-	// Connect and monitor loop
-	err := c.connect(ctx)
-	if err != nil {
-		c.l.Error("Error while attempting to connect to monitor socket", zap.Error(err))
-		return err
+	for i := 0; i < workers; i++ {
+		c.wg.Add(1)
+		go c.parserLoop(ctx)
 	}
-	return c.monitorLoop(ctx)
+
+	for {
+		err := c.connect(ctx)
+		if err != nil {
+			c.l.Error("Error while attempting to connect to monitor socket", zap.Error(err))
+			return err
+		}
+		// only error returned should be EOF here.
+		err = c.monitorLoop(ctx)
+		if err != nil {
+			c.l.Error("Error while monitoring cilium events", zap.Error(err))
+		}
+	}
 }
 
 func (c *ciliumeventobserver) Stop() error {
@@ -100,10 +112,11 @@ func (c *ciliumeventobserver) connect(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-ticker.C:
-		conn, err := net.Dial("unix", c.sockPath)
+		conn, err := c.d.Dial("unix", c.sockPath)
 		if err != nil {
 			c.l.Error("Connection attempt failed", zap.Error(err))
 			if curAttempt > c.maxAttempts {
+				c.connection = nil
 				return err
 			}
 		} else {
@@ -114,10 +127,6 @@ func (c *ciliumeventobserver) connect(ctx context.Context) error {
 	}
 	return nil
 }
-
-// reader reports connetion error
-// controller to rety connection and start reader again
-// if connection manager reports error, controller reports back to plugin manager
 
 // monitor events from uds connection
 func (c *ciliumeventobserver) monitorLoop(ctx context.Context) error {
@@ -131,15 +140,24 @@ func (c *ciliumeventobserver) monitorLoop(ctx context.Context) error {
 		default:
 			if err := pl.DecodeBinary(decoder); err != nil {
 				if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-					if err = c.connect(ctx); err != nil {
-						return err
-					}
-					continue
+					return err
 				}
 				c.l.Warn("Failed to decode payload from cilium", zap.Error(err))
 				continue
 			}
-			ev, err := c.p.Decode(&pl)
+			c.payloadEvents <- &pl
+		}
+	}
+}
+
+func (c *ciliumeventobserver) parserLoop(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			c.l.Info("Context done, exiting parser loop")
+			return
+		case pl := <-c.payloadEvents:
+			ev, err := c.p.Decode(pl)
 			if err == nil {
 				c.externalChannel <- ev
 			} else {
