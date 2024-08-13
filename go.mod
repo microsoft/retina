@@ -316,7 +316,7 @@ require (
 	k8s.io/apiextensions-apiserver v0.30.1
 	k8s.io/cli-runtime v0.30.1
 	k8s.io/kubectl v0.30.1
-	sigs.k8s.io/controller-runtime v0.18.4
+	sigs.k8s.io/controller-runtime v0.18.5
 )
 
 replace github.com/vishvananda/netns => github.com/inspektor-gadget/netns v0.0.5-0.20230524185006-155d84c555d6
