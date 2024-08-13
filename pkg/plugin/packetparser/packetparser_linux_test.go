@@ -532,7 +532,7 @@ func TestPacketParseGenerate(t *testing.T) {
 		t.Fatalf("dynamic header file does not exist: %v", err)
 	}
 
-	expectedContents := "#define BYPASS_LOOKUP_IP_OF_INTEREST 1 \n"
+	expectedContents := "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n"
 	actualContents, err := os.ReadFile(dynamicHeaderPath)
 	if err != nil {
 		t.Fatalf("failed to read dynamic header file: %v", err)
