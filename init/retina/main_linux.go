@@ -41,7 +41,7 @@ func main() {
 	}
 
 	// Setup BPF
-	bpf.Setup(l, cfg)
+	bpf.Setup(l)
 
 	// Setup CiliumFS.
 	ciliumfs.Setup(l)

@@ -7,9 +7,7 @@ import (
 	"os"
 
 	"github.com/cilium/cilium/pkg/mountinfo"
-	"github.com/microsoft/retina/pkg/config"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
-	"github.com/microsoft/retina/pkg/plugin/conntrack"
 	"github.com/microsoft/retina/pkg/plugin/filter"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -55,7 +53,7 @@ func mountBpfFs() error {
 	return nil
 }
 
-func Setup(l *zap.Logger, cfg *config.Config) {
+func Setup(l *zap.Logger) {
 	err := mountBpfFs()
 	if err != nil {
 		l.Panic("Failed to mount bpf filesystem", zap.Error(err))
@@ -83,14 +81,4 @@ func Setup(l *zap.Logger, cfg *config.Config) {
 		l.Panic("Failed to initialize filter map", zap.Error(err))
 	}
 	l.Info("Filter map initialized successfully", zap.String("path", plugincommon.MapPath), zap.String("Map name", plugincommon.FilterMapName))
-
-	if cfg.DataAggregationLevel == config.High {
-		// Initialize the conntrack map.
-		ct := conntrack.New(config.DefaultRetinaConfig)
-		err = ct.Init()
-		if err != nil {
-			l.Panic("Failed to initialize conntrack", zap.Error(err))
-		}
-		l.Info("Conntrack initialized successfully", zap.String("path", plugincommon.MapPath), zap.String("Map name", plugincommon.ConntrackMapName))
-	}
 }

@@ -198,6 +198,10 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_
                             new_value.flags_seen_forward_dir = flags;
                             bpf_map_update_elem(&retina_conntrack_map, &key, &new_value, BPF_ANY);
                         }
+                        // Check for FIN and RST flags. If the connection is closing, mark the connection as closing.
+                        if (flags & (TCP_FIN | TCP_RST)) {
+                            new_value.is_closing = 1;
+                        }
                         return true;
                     }
                 }

@@ -34,6 +34,7 @@ import (
 	pc "github.com/microsoft/retina/pkg/controllers/daemon/pod"
 	kec "github.com/microsoft/retina/pkg/controllers/daemon/retinaendpoint"
 	sc "github.com/microsoft/retina/pkg/controllers/daemon/service"
+	"github.com/microsoft/retina/pkg/plugin/conntrack"
 
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
@@ -270,6 +271,16 @@ func (d *Daemon) Start() error {
 				mainLogger.Fatal("unable to create metricsConfigController", zap.Error(err))
 			}
 		}
+
+		if daemonConfig.DataAggregationLevel == config.High {
+			ct := conntrack.New(daemonConfig)
+			go func() {
+				if err := ct.Run(ctx); err != nil {
+					mainLogger.Error("failed to run conntrack", zap.Error(err))
+				}
+			}()
+		}
+
 	}
 
 	controllerMgr, err := cm.NewControllerManager(daemonConfig, cl, tel)

@@ -8,13 +8,11 @@ import (
 	"context"
 	"time"
 
-	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/rlimit"
 	"github.com/microsoft/retina/internal/ktime"
 	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
-	"github.com/microsoft/retina/pkg/plugin/api"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
 	_ "github.com/microsoft/retina/pkg/plugin/conntrack/_cprog" // nolint // This is needed so cprog is included when vendoring
 	"github.com/microsoft/retina/pkg/utils"
@@ -25,27 +23,16 @@ import (
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type ct_v4_key conntrack ./_cprog/conntrack.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src
 
 // New creates a packetparser plugin.
-func New(cfg *config.Config) api.Plugin {
-	return &conntrack{
-		l:           log.Logger().Named(string(Name)),
+func New(cfg *config.Config) *Conntrack {
+	return &Conntrack{
+		l:           log.Logger().Named("conntrack"),
 		gcFrequency: defaultGCFrequency,
 		cfg:         cfg,
 	}
 }
 
-func (ct *conntrack) Name() string {
-	return Name
-}
-
-func (ct *conntrack) Generate(_ context.Context) error {
-	return nil
-}
-
-func (ct *conntrack) Compile(_ context.Context) error {
-	return nil
-}
-
-func (ct *conntrack) Init() error {
+// Run starts the Conntrack garbage collection loop.
+func (ct *Conntrack) Run(ctx context.Context) error {
 	if ct.cfg.DataAggregationLevel == config.Low {
 		ct.l.Info("conntrack is disabled in low data aggregation level")
 		return nil
@@ -72,23 +59,22 @@ func (ct *conntrack) Init() error {
 	// Get the conntrack map from the objects
 	ct.ctMap = objs.RetinaConntrackMap
 
-	return nil
-}
-
-// Run starts the Conntrack garbage collection loop.
-func (ct *conntrack) Start(ctx context.Context) error {
-	if ct.cfg.DataAggregationLevel == config.Low {
-		ct.l.Info("conntrack is disabled in low data aggregation level")
-		return nil
-	}
 	ticker := time.NewTicker(ct.gcFrequency)
 	defer ticker.Stop()
 
-	ct.l.Info("Starting Conntrack GC loop")
+	ct.l.Info("starting Conntrack GC loop")
 
 	for {
 		select {
 		case <-ctx.Done():
+			ct.l.Info("stopping conntrack GC loop")
+			if ct.objs != nil {
+				err := ct.objs.Close()
+				if err != nil {
+					ct.l.Error("objs.Close failed", zap.Error(err))
+					return errors.Wrap(err, "failed to close conntrack objects")
+				}
+			}
 			return nil
 		case <-ticker.C:
 			var key conntrackCtV4Key
@@ -135,24 +121,7 @@ func (ct *conntrack) Start(ctx context.Context) error {
 					entriesDeleted++
 				}
 			}
-			ct.l.Debug("Conntrack GC completed", zap.Int("number_of_entries", noOfCtEntries), zap.Int("entries_deleted", entriesDeleted))
+			ct.l.Debug("conntrack GC completed", zap.Int("number_of_entries", noOfCtEntries), zap.Int("entries_deleted", entriesDeleted))
 		}
 	}
-}
-
-// Close cleans up the Conntrack plugin.
-func (ct *conntrack) Stop() error {
-	ct.l.Info("Stopping Conntrack plugin")
-	if ct.objs != nil {
-		err := ct.objs.Close()
-		if err != nil {
-			ct.l.Error("objs.Close failed", zap.Error(err))
-			return errors.Wrap(err, "failed to close conntrack objects")
-		}
-	}
-	return nil
-}
-
-func (ct *conntrack) SetupChannel(_ chan *v1.Event) error {
-	return nil
 }

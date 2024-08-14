@@ -10,11 +10,10 @@ import (
 )
 
 const (
-	Name               = "conntrack"
 	defaultGCFrequency = 15 * time.Second
 )
 
-type conntrack struct {
+type Conntrack struct {
 	l           *log.ZapLogger
 	objs        *conntrackObjects
 	ctMap       *ebpf.Map

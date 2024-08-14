@@ -80,7 +80,7 @@ apiServer:
 # Supported - debug, info, error, warn, panic, fatal.
 logLevel: info
 
-enabledPlugin_linux: '["linuxutil","packetforward","packetparser","dns", "dropreason", "conntrack"]'
+enabledPlugin_linux: '["linuxutil","packetforward","packetparser","dns", "dropreason"]'
 enabledPlugin_win: '["hnsstats"]'
 
 enableTelemetry: true

@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/managers/pluginmanager"
 	"github.com/microsoft/retina/pkg/managers/servermanager"
+	"github.com/microsoft/retina/pkg/plugin/conntrack"
 
 	retinak8s "github.com/microsoft/retina/pkg/k8s"
 
@@ -90,6 +91,31 @@ var (
 					},
 				},
 			)
+		}),
+		// Start the conntrack if high data aggregation level
+		cell.Invoke(func(l logrus.FieldLogger, lifecycle cell.Lifecycle, cfg config.Config) {
+			if cfg.DataAggregationLevel == config.High {
+				ct := conntrack.New(&cfg)
+				var wp *workerpool.WorkerPool
+				lifecycle.Append(
+					cell.Hook{
+						OnStart: func(cell.HookContext) error {
+							wp = workerpool.New(1)
+							l.Info("starting conntrack")
+							if err := wp.Submit("conntrack", ct.Run); err != nil {
+								return errors.Wrap(err, "failed to submit conntrack to workerpool")
+							}
+							return nil
+						},
+						OnStop: func(cell.HookContext) error {
+							if err := wp.Close(); err != nil {
+								return errors.Wrap(err, "failed to close conntrack workerpool")
+							}
+							return nil
+						},
+					},
+				)
+			}
 		}),
 		cell.Invoke(newDaemonPromise),
 	)
