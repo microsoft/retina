@@ -31,17 +31,16 @@ struct ct_value {
     /*
         * flags_seen_*_dir represents the flags seen in the forward and reply direction.
     */
-	__u8  flags_seen_forward_dir;
+    __u8  flags_seen_forward_dir;
     __u8  flags_seen_reply_dir;
     /*
         * last_report represents the last time when a packet for this connection was reported to userspace.
     */
-	__u32 last_report;
+    __u32 last_report;
     /*
         * is_closing represents whether the connection is closing.
     */
     __u16 is_closing;
-
 };
 
 struct {
