@@ -16,6 +16,7 @@ import (
 	fm "github.com/microsoft/retina/pkg/managers/filtermanager"
 	"github.com/microsoft/retina/pkg/pubsub"
 	"go.uber.org/zap"
+	"k8s.io/client-go/rest"
 	kcfg "sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
@@ -31,6 +32,7 @@ type ApiServerWatcher struct {
 	apiServerHostName string
 	hostResolver      IHostResolver
 	filterManager     fm.IFilterManager
+	restConfig        *rest.Config
 }
 
 var a *ApiServerWatcher
@@ -60,10 +62,20 @@ func (a *ApiServerWatcher) Init(ctx context.Context) error {
 		return errors.New("failed to initialize filter manager")
 	}
 
-	hostName, error := getHostName()
-	if error != nil {
-		a.l.Error("APIServer watcher failed to get host name", zap.Error(error))
-		return error
+	// Get  kubeconfig.
+	if a.restConfig == nil {
+		config, err := kcfg.GetConfig()
+		if err != nil {
+			a.l.Error("failed to get kubeconfig", zap.Error(err))
+			return err
+		}
+		a.restConfig = config
+	}
+
+	hostName, err := a.getHostName()
+	if err != nil {
+		a.l.Error("APIServer watcher failed to get host name", zap.Error(err))
+		return err
 	}
 	a.apiServerHostName = hostName
 
@@ -83,10 +95,10 @@ func (a *ApiServerWatcher) Stop(ctx context.Context) error {
 }
 
 func (a *ApiServerWatcher) Refresh(ctx context.Context) error {
-	error := a.initNewCache(ctx)
-	if error != nil {
-		a.l.Error("failed to initialize new cache", zap.Error(error))
-		return error
+	err := a.initNewCache(ctx)
+	if err != nil {
+		a.l.Error("failed to initialize new cache", zap.Error(err))
+		return err
 	}
 
 	// Compare the new IPs with the old ones.
@@ -130,10 +142,10 @@ func (a *ApiServerWatcher) Refresh(ctx context.Context) error {
 }
 
 func (a *ApiServerWatcher) initNewCache(ctx context.Context) error {
-	ips, error := a.resolveIPs(ctx, a.apiServerHostName)
-	if error != nil {
-		a.l.Error("failed to resolve IPs", zap.Error(error))
-		return error
+	ips, err := a.resolveIPs(ctx, a.apiServerHostName)
+	if err != nil {
+		a.l.Error("failed to resolve IPs", zap.Error(err))
+		return err
 	}
 
 	// Reset new cache.
@@ -196,17 +208,12 @@ func (a *ApiServerWatcher) publish(netIPs []net.IP, eventType cc.EventType) {
 	a.l.Debug("Published event", zap.Any("eventType", eventType), zap.Any("netIPs", ipsToPublish))
 }
 
-func getHostName() (string, error) {
-	// Get the host name from the kubeconfig.
-	config, err := kcfg.GetConfig()
-	if err != nil {
-		log.Logger().Error("failed to get config", zap.Error(err))
-		return "", err
-	}
+func (a *ApiServerWatcher) getHostName() (string, error) {
 	// Parse the host URL.
-	parsedURL, err := url.Parse(config.Host)
+	hostURL := a.restConfig.Host
+	parsedURL, err := url.Parse(hostURL)
 	if err != nil {
-		log.Logger().Error("failed to parse URL", zap.String("url", config.Host), zap.Error(err))
+		log.Logger().Error("failed to parse URL", zap.String("url", hostURL), zap.Error(err))
 		return "", err
 	}
 

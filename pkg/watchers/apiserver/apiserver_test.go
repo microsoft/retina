@@ -17,6 +17,7 @@ import (
 	"github.com/microsoft/retina/pkg/watchers/apiserver/mocks"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+	"k8s.io/client-go/rest"
 )
 
 func TestGetWatcher(t *testing.T) {
@@ -42,7 +43,8 @@ func TestAPIServerWatcherStop(t *testing.T) {
 	a := &ApiServerWatcher{
 		isRunning:     false,
 		l:             log.Logger().Named("apiserver-watcher"),
-		filtermanager: mockedFilterManager,
+		filterManager: mockedFilterManager,
+		restConfig:    getMockConfig(),
 	}
 	err := a.Stop(ctx)
 	assert.NoError(t, err, "Expected no error when stopping a stopped apiserver watcher")
@@ -71,9 +73,8 @@ func TestRefresh(t *testing.T) {
 
 	a := &ApiServerWatcher{
 		l:             log.Logger().Named("apiserver-watcher"),
-		apiServerUrl:  "https://kubernetes.default.svc.cluster.local:443",
 		hostResolver:  mockedResolver,
-		filtermanager: mockedFilterManager,
+		filterManager: mockedFilterManager,
 	}
 
 	// Return 2 random IPs for the host everytime LookupHost is called.
@@ -105,7 +106,6 @@ func TestDiffCache(t *testing.T) {
 
 	a := &ApiServerWatcher{
 		l:            log.Logger().Named("apiserver-watcher"),
-		apiServerUrl: "https://kubernetes.default.svc.cluster.local:443",
 		hostResolver: mockedResolver,
 		current:      old,
 		new:          new,
@@ -128,7 +128,6 @@ func TestRefreshError(t *testing.T) {
 
 	a := &ApiServerWatcher{
 		l:            log.Logger().Named("apiserver-watcher"),
-		apiServerUrl: "https://kubernetes.default.svc.cluster.local:443",
 		hostResolver: mockedResolver,
 	}
 
@@ -150,7 +149,6 @@ func TestResolveIPEmpty(t *testing.T) {
 
 	a := &ApiServerWatcher{
 		l:            log.Logger().Named("apiserver-watcher"),
-		apiServerUrl: "https://kubernetes.default.svc.cluster.local:443",
 		hostResolver: mockedResolver,
 	}
 
@@ -162,4 +160,11 @@ func TestResolveIPEmpty(t *testing.T) {
 
 func randomIP() string {
 	return fmt.Sprintf("%d.%d.%d.%d", rand.Intn(256), rand.Intn(256), rand.Intn(256), rand.Intn(256))
+}
+
+// Mock function to simulate getting a Kubernetes config
+func getMockConfig() (*rest.Config, error) {
+	return &rest.Config{
+		Host: "https://kubernetes.default.svc.cluster.local:443",
+	}, nil
 }
