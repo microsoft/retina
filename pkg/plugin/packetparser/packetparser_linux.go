@@ -137,7 +137,7 @@ func (p *packetParser) Init() error {
 	//nolint:typecheck
 	if err := spec.LoadAndAssign(objs, &ebpf.CollectionOptions{ //nolint:typecheck
 		Maps: ebpf.MapOptions{
-			PinPath: plugincommon.FilterMapPath,
+			PinPath: plugincommon.MapPath,
 		},
 	}); err != nil { //nolint:typecheck
 		p.l.Error("Error loading objects: %w", zap.Error(err))
