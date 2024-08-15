@@ -13,6 +13,7 @@ Defaults are specified for each component in *deploy/legacy/manifests/controller
 * `enabledPlugin_linux`: Array of enabled plugins for linux.
 * `enabledPlugin_win`: Array of enabled plugins for windows.
 * `metricsInterval`: the interval for which metrics will be gathered.
+* `dataAggregationLevel`: This config defines the level of data aggregation for Retina. See [Data Aggregation](../concepts/dataAggregation.md) for more details.
 
 ## Operator Config
 

@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.22 as builder
+FROM --platform=linux/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.22 AS builder
 
 # Build args
 ARG VERSION
@@ -11,7 +11,7 @@ WORKDIR /usr/src/retina
 # Copy the source
 COPY . .
 
-RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -ldflags "-X main.version="$VERSION" -X "main.applicationInsightsID"="$APP_INSIGHTS_ID"" -o -o /usr/bin/retina-operator.exe retina-operator operator/main.go
+RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X "github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID"="$APP_INSIGHTS_ID"" -o -o /usr/bin/retina-operator.exe retina-operator operator/main.go
 
 # Copy into final image
 FROM  mcr.microsoft.com/windows/nanoserver:ltsc2022

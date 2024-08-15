@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
+	"github.com/microsoft/retina/internal/buildinfo"
 	"github.com/microsoft/retina/pkg/shared/telemetry"
 	"github.com/sirupsen/logrus"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -69,8 +70,8 @@ var (
 			return telemetry.Config{
 				Component:             "retina-operator",
 				EnableTelemetry:       cfg.EnableTelemetry,
-				ApplicationInsightsID: applicationInsightsID,
-				RetinaVersion:         retinaVersion,
+				ApplicationInsightsID: buildinfo.ApplicationInsightsID,
+				RetinaVersion:         buildinfo.Version,
 			}
 		}),
 		telemetry.Constructor,
