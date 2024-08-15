@@ -24,13 +24,13 @@ const (
 )
 
 type ApiServerWatcher struct {
-	isRunning     bool
-	l             *log.ZapLogger
-	current       cache
-	new           cache
-	apiServerURL  string
-	hostResolver  IHostResolver
-	filterManager fm.IFilterManager
+	isRunning         bool
+	l                 *log.ZapLogger
+	current           cache
+	new               cache
+	apiServerHostName string
+	hostResolver      IHostResolver
+	filterManager     fm.IFilterManager
 }
 
 var a *ApiServerWatcher
@@ -42,7 +42,6 @@ func Watcher() *ApiServerWatcher {
 			isRunning:    false,
 			l:            log.Logger().Named("apiserver-watcher"),
 			current:      make(cache),
-			apiServerURL: getHostURL(),
 			hostResolver: net.DefaultResolver,
 		}
 	}
@@ -60,7 +59,16 @@ func (a *ApiServerWatcher) Init(ctx context.Context) error {
 	if a.filterManager == nil {
 		return errors.New("failed to initialize filter manager")
 	}
+
+	hostName, error := getHostName()
+	if error != nil {
+		a.l.Error("APIServer watcher failed to get host name", zap.Error(error))
+		return error
+	}
+	a.apiServerHostName = hostName
+
 	a.isRunning = true
+
 	return nil
 }
 
@@ -75,10 +83,12 @@ func (a *ApiServerWatcher) Stop(ctx context.Context) error {
 }
 
 func (a *ApiServerWatcher) Refresh(ctx context.Context) error {
-	err := a.initNewCache(ctx)
-	if err != nil {
-		return err
+	error := a.initNewCache(ctx)
+	if error != nil {
+		a.l.Error("failed to initialize new cache", zap.Error(error))
+		return error
 	}
+
 	// Compare the new IPs with the old ones.
 	created, deleted := a.diffCache()
 
@@ -120,7 +130,13 @@ func (a *ApiServerWatcher) Refresh(ctx context.Context) error {
 }
 
 func (a *ApiServerWatcher) initNewCache(ctx context.Context) error {
-	ips := a.getApiServerIPs(ctx)
+	ips, error := a.resolveIPs(ctx, a.apiServerHostName)
+	if error != nil {
+		a.l.Error("failed to resolve IPs", zap.Error(error))
+		return error
+	}
+
+	// Reset new cache.
 	a.new = make(cache)
 	for _, ip := range ips {
 		a.new[ip] = struct{}{}
@@ -145,39 +161,25 @@ func (a *ApiServerWatcher) diffCache() (created, deleted []interface{}) {
 	return
 }
 
-func (a *ApiServerWatcher) getApiServerIPs(ctx context.Context) []string {
-	host := a.retrieveApiServerHostname()
-	ips := a.resolveIPs(ctx, host)
-	return ips
-}
-
-func (a *ApiServerWatcher) retrieveApiServerHostname() string {
-	parsedURL, err := url.Parse(a.apiServerURL)
-	if err != nil {
-		a.l.Warn("failed to parse URL", zap.String("url", a.apiServerURL), zap.Error(err))
-		return ""
-	}
-
-	host := strings.TrimPrefix(parsedURL.Host, "www.")
-	if colonIndex := strings.IndexByte(host, ':'); colonIndex != -1 {
-		host = host[:colonIndex]
-	}
-	return host
-}
-
-func (a *ApiServerWatcher) resolveIPs(ctx context.Context, host string) []string {
+func (a *ApiServerWatcher) resolveIPs(ctx context.Context, host string) ([]string, error) {
+	// perform a DNS lookup for the host URL using the net.DefaultResolver which uses the local resolver.
+	// Possible errors  here are:
+	// 	- Canceled context: The context was canceled before the lookup completed.
+	// 	-DNS server errors ie NXDOMAIN, SERVFAIL.
+	// 	- Network errors ie timeout, unreachable DNS server.
+	// 	-Other DNS-related errors encapsulated in a DNSError.
 	hostIPs, err := a.hostResolver.LookupHost(ctx, host)
 	if err != nil {
-		a.l.Warn("failed to resolve IPs for host", zap.String("host", host), zap.Error(err))
-		return nil
+		// We chose not to return this error to the caller because we want to rety the DNS lookup in the next refresh.
+		// If there is an error that can't be resolved by retrying, we will single it out and return it to the caller.
+		a.l.Warn("APIServer LookupHost failed", zap.Error(err))
 	}
 
 	if len(hostIPs) == 0 {
-		a.l.Warn("no IPs found for host", zap.String("host", host))
-		return nil
+		a.l.Debug("no IPs found for host", zap.String("host", host))
 	}
 
-	return hostIPs
+	return hostIPs, nil
 }
 
 func (a *ApiServerWatcher) publish(netIPs []net.IP, eventType cc.EventType) {
@@ -194,13 +196,26 @@ func (a *ApiServerWatcher) publish(netIPs []net.IP, eventType cc.EventType) {
 	a.l.Debug("Published event", zap.Any("eventType", eventType), zap.Any("netIPs", ipsToPublish))
 }
 
-func getHostURL() string {
+func getHostName() (string, error) {
+	// Get the host name from the kubeconfig.
 	config, err := kcfg.GetConfig()
 	if err != nil {
 		log.Logger().Error("failed to get config", zap.Error(err))
-		return ""
+		return "", err
 	}
-	return config.Host
+	// Parse the host URL.
+	parsedURL, err := url.Parse(config.Host)
+	if err != nil {
+		log.Logger().Error("failed to parse URL", zap.String("url", config.Host), zap.Error(err))
+		return "", err
+	}
+
+	// Extract the host name from the URL.
+	host := strings.TrimPrefix(parsedURL.Host, "www.")
+	if colonIndex := strings.IndexByte(host, ':'); colonIndex != -1 {
+		host = host[:colonIndex]
+	}
+	return host, nil
 }
 
 func (a *ApiServerWatcher) getFilterManager() *fm.FilterManager {
