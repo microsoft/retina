@@ -6,6 +6,8 @@ import (
 	"github.com/microsoft/retina/pkg/config"
 )
 
+type Conntrack struct{}
+
 // Not implemented for Windows
 func New(_ *config.Config) *Conntrack {
 	return &Conntrack{}
