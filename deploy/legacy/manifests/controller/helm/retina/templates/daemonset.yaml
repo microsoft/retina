@@ -30,6 +30,9 @@ spec:
         - name: init-retina
           image: {{ .Values.image.initRepository }}:{{ .Values.image.tag }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --config
+            - "/retina/config/config.yaml"
           terminationMessagePolicy: FallbackToLogsOnError
           securityContext:
             privileged: true
@@ -37,6 +40,8 @@ spec:
           - name: bpf
             mountPath: /sys/fs/bpf
             mountPropagation: Bidirectional
+          - name: config
+            mountPath: /retina/config
       containers:
         - name: {{ include "retina.name" . }} 
           livenessProbe:
