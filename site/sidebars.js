@@ -76,6 +76,13 @@ const sidebars = {
     },
     {
       type: 'category',
+      label: 'Concepts',
+      items: [
+        'concepts/DataAggregation',
+      ],
+    },
+    {
+      type: 'category',
       label: 'Troubleshooting Guides',
       items: [
         'troubleshooting/capture',
