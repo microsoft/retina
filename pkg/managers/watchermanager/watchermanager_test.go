@@ -20,6 +20,17 @@ func TestStopWatcherManagerGracefully(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	mgr := NewWatcherManager()
 
+	mockApiServerWatcher := mock.NewMockIWatcher(ctl)
+	mockEndpointWatcher := mock.NewMockIWatcher(ctl)
+
+	mgr.Watchers = []IWatcher{
+		mockApiServerWatcher,
+		mockEndpointWatcher,
+	}
+
+	mockApiServerWatcher.EXPECT().Init(gomock.Any()).Return(nil).AnyTimes()
+	mockEndpointWatcher.EXPECT().Init(gomock.Any()).Return(nil).AnyTimes()
+
 	ctx, _ := context.WithCancel(context.Background())
 	g, errctx := errgroup.WithContext(ctx)
 

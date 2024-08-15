@@ -44,7 +44,7 @@ func TestAPIServerWatcherStop(t *testing.T) {
 		isRunning:     false,
 		l:             log.Logger().Named("apiserver-watcher"),
 		filterManager: mockedFilterManager,
-		restConfig:    getMockConfig(),
+		restConfig:    getMockConfig(true),
 	}
 	err := a.Stop(ctx)
 	assert.NoError(t, err, "Expected no error when stopping a stopped apiserver watcher")
@@ -116,7 +116,7 @@ func TestDiffCache(t *testing.T) {
 	assert.Equal(t, 1, len(deleted), "Expected 1 deleted host")
 }
 
-func TestRefreshError(t *testing.T) {
+func TestNoRefreshErrorOnLookupHost(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -134,10 +134,10 @@ func TestRefreshError(t *testing.T) {
 	mockedResolver.EXPECT().LookupHost(gomock.Any(), gomock.Any()).Return(nil, errors.New("Error")).AnyTimes()
 
 	a.Refresh(ctx)
-	assert.Error(t, a.Refresh(context.Background()), "Expected error when refreshing the cache")
+	assert.NoError(t, a.Refresh(context.Background()), "Expected error when refreshing the cache")
 }
 
-func TestResolveIPEmpty(t *testing.T) {
+func TestInitWithIncorrectURL(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -150,12 +150,13 @@ func TestResolveIPEmpty(t *testing.T) {
 	a := &ApiServerWatcher{
 		l:            log.Logger().Named("apiserver-watcher"),
 		hostResolver: mockedResolver,
+		restConfig:   getMockConfig(false),
 	}
 
 	mockedResolver.EXPECT().LookupHost(gomock.Any(), gomock.Any()).Return([]string{}, nil).AnyTimes()
 
-	a.Refresh(ctx)
-	assert.Error(t, a.Refresh(context.Background()), "Expected error when refreshing the cache")
+	a.Init(ctx)
+	assert.Error(t, a.Init(context.Background()), "Expected error during init")
 }
 
 func randomIP() string {
@@ -163,8 +164,13 @@ func randomIP() string {
 }
 
 // Mock function to simulate getting a Kubernetes config
-func getMockConfig() *rest.Config {
+func getMockConfig(isCorrect bool) *rest.Config {
+	if isCorrect {
+		return &rest.Config{
+			Host: "https://kubernetes.default.svc.cluster.local:443",
+		}
+	}
 	return &rest.Config{
-		Host: "https://kubernetes.default.svc.cluster.local:443",
+		Host: "",
 	}
 }
