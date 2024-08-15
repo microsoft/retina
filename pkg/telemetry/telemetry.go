@@ -9,6 +9,7 @@ import (
 	"os"
 	"runtime"
 	"runtime/debug"
+	"strconv"
 	"sync"
 	"time"
 
@@ -20,6 +21,13 @@ import (
 var (
 	client  appinsights.TelemetryClient
 	version string
+	mbShift uint64 = 20
+
+	// property keys
+	kernelversion = "kernelversion"
+	allocatedmem  = "allocmem"
+	sysmem        = "sysmem"
+	goroutines    = "goroutines"
 )
 
 type Telemetry interface {
@@ -143,7 +151,20 @@ func (t *TelemetryClient) heartbeat(ctx context.Context) {
 		t.trackWarning(err, "failed to get kernel version")
 	}
 
-	t.TrackEvent("heartbeat", map[string]string{"kernelversion": kernelVersion})
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	props := map[string]string{
+		kernelversion: kernelVersion,
+		allocatedmem:  strconv.FormatUint(bToMb(m.Alloc), 10),
+		sysmem:        strconv.FormatUint(bToMb(m.Sys), 10),
+		goroutines:    strconv.Itoa(runtime.NumGoroutine()),
+	}
+
+	t.TrackEvent("heartbeat", props)
+}
+
+func bToMb(b uint64) uint64 {
+	return b >> mbShift
 }
 
 func (t *TelemetryClient) TrackEvent(name string, properties map[string]string) {
