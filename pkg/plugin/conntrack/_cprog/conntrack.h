@@ -38,7 +38,21 @@ enum tcp_flags {
     TCP_NS  = 0x100
 };
 
-enum ct_dir {
+enum ct_packet_dir {
     CT_FORWARD = 0,
     CT_REPLY,
 };
+
+enum ct_traffic_dir {
+    TRAFFIC_DIRECTION_UNKNOWN = 0,
+    TRAFFIC_DIRECTION_INGRESS = 1,
+    TRAFFIC_DIRECTION_EGRESS = 2,
+};
+
+enum obs_point{
+    FROM_ENDPOINT = 0,
+    TO_ENDPOINT,
+    FROM_NETWORK,
+    TO_NETWORK,
+};
+

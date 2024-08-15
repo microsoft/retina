@@ -556,7 +556,7 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 				sourcePortShort,
 				destinationPortShort,
 				bpfEvent.Proto,
-				bpfEvent.Dir,
+				bpfEvent.ObservationPoint,
 				flow.Verdict_FORWARDED,
 			)
 			if fl == nil {
@@ -584,7 +584,11 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 			// Add metadata to the flow.
 			utils.AddRetinaMetadata(fl, meta)
 
+			// Add the isReply flag to the flow.
 			fl.IsReply = &wrapperspb.BoolValue{Value: bpfEvent.IsReply}
+
+			// Add the traffic direction to the flow.
+			fl.TrafficDirection = flow.TrafficDirection(bpfEvent.TrafficDirection)
 
 			// Log the flow.
 			p.l.Debug("Flow", zap.Any("flow", fl))

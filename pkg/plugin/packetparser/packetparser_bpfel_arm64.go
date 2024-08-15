@@ -23,6 +23,7 @@ type packetparserCtV4Key struct {
 
 type packetparserCtValue struct {
 	Lifetime            uint32
+	TrafficDirection    uint32
 	FlagsSeenForwardDir uint8
 	FlagsSeenReplyDir   uint8
 	_                   [2]byte
@@ -55,11 +56,12 @@ type packetparserPacket struct {
 		Tsval  uint32
 		Tsecr  uint32
 	}
-	Dir     uint32
-	IsReply bool
-	_       [7]byte
-	Ts      uint64
-	Bytes   uint64
+	ObservationPoint uint32
+	TrafficDirection uint32
+	IsReply          bool
+	_                [3]byte
+	Ts               uint64
+	Bytes            uint64
 }
 
 // loadPacketparser returns the embedded CollectionSpec for packetparser.

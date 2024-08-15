@@ -25,6 +25,10 @@ struct ct_value {
     */
     __u32 lifetime;
     /*
+        * traffic_direction represents the direction of the traffic of a connection in relation to the host
+    */
+    enum ct_traffic_dir traffic_direction;
+    /*
         * flags_seen_*_dir represents the flags seen in the forward and reply direction.
     */
 	__u8  flags_seen_forward_dir;
@@ -67,7 +71,7 @@ static __always_inline void _update_conntrack_map(struct ct_v4_key *key, struct 
      * @arg direction The direction of the packet in relation to the connection.
      * Returns true if the packet should be reported to userspace. False otherwise.
  */
-static __always_inline bool _should_report_tcp_packet(__u8 flags, struct ct_value *value, enum ct_dir direction) {
+static __always_inline bool _should_report_tcp_packet(__u8 flags, struct ct_value *value, enum ct_packet_dir direction) {
     // Check for null parameters.
     if (!value) {
         return false;
@@ -116,22 +120,40 @@ static __always_inline bool _should_report_tcp_packet(__u8 flags, struct ct_valu
      * @arg value The value of the connection.
      * Returns true if the packet should be reported to userspace. False otherwise.
  */
-static __always_inline bool _should_report_udp_packet(struct ct_value *value) {
+static __always_inline bool _should_report_udp_packet(__u8 flags, struct ct_value *value, enum ct_packet_dir direction) {
     // Check for null parameters.
     if (!value) {
         return false;
     }
+
     __u32 now = bpf_mono_now();
     __u32 lifetime = value->lifetime;
-    // Check if the connection timed out.
+    __u8 seen_flags;
+    if (direction == CT_FORWARD) {
+        seen_flags = value->flags_seen_forward_dir;
+    } else {
+        seen_flags = value->flags_seen_reply_dir;
+    }
+    __u32 last_report = value->last_report;
+    // OR the seen flags with the new flags.
+    flags |= seen_flags;
+
+    // Check if the connection timed out or closed.
     if (now >= lifetime) {
-        return true;
+        // The connection is closing or closed. Mark the connection as closing. Update the flags seen and last report time.
+        value->is_closing = 1;
+        value->last_report = now;
+        return true; // Report the last packet received.
     }
     // Update the lifetime of the connection.
     value->lifetime = now + CT_CONNECTION_LIFETIME_NONTCP;
-    __u32 last_report = value->last_report;
-    // We will only report this packet if the report interval has passed.
-    if (now - last_report >= CT_REPORT_INTERVAL) {
+    // We will only report this packet iff a new flag is seen for the given direction or the report interval has passed.
+    if (flags != seen_flags || now - last_report >= CT_REPORT_INTERVAL) {
+        if (direction == CT_FORWARD) {
+            value->flags_seen_forward_dir = flags;
+        } else {
+            value->flags_seen_reply_dir = flags;
+        }
         value->last_report = now;
         return true;
     }
@@ -144,7 +166,7 @@ static __always_inline bool _should_report_udp_packet(struct ct_value *value) {
     * @arg flags The flags of the packet.
     * Returns true if the packet should be report to userspace. False otherwise.
 **/
-static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_v4_key key, __u8 flags) {    
+static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_v4_key key, __u8 flags, enum obs_point observation_point) {    
     // Lookup the connection in the map.
     struct ct_value *value = bpf_map_lookup_elem(&retina_conntrack_map, &key);
 
@@ -178,6 +200,14 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_
                         new_value.flags_seen_forward_dir = flags;
                         new_value.last_report = now;
                         new_value.is_closing = 0;
+                        // Set the traffic direction of the connection depening on the observation point.
+                        if (observation_point == FROM_ENDPOINT) {
+                            new_value.traffic_direction = TRAFFIC_DIRECTION_EGRESS;
+                        } else if (observation_point == TO_ENDPOINT) {
+                            new_value.traffic_direction = TRAFFIC_DIRECTION_INGRESS;
+                        } else {
+                            new_value.traffic_direction = TRAFFIC_DIRECTION_UNKNOWN;
+                        }
                         bpf_map_update_elem(&retina_conntrack_map, &key, &new_value, BPF_ANY);
                         return true;
                     } else {
@@ -190,6 +220,17 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_
                         new_value.lifetime = now + CT_CONNECTION_LIFETIME_TCP;
                         new_value.last_report = now;
                         new_value.is_closing = 0;
+                        // Check for FIN and RST flags. If the connection is closing, mark the connection as closing.
+                        if (flags & (TCP_FIN | TCP_RST)) {
+                            new_value.is_closing = 1;
+                        }
+                        if (observation_point == FROM_ENDPOINT) {
+                            new_value.traffic_direction = TRAFFIC_DIRECTION_EGRESS;
+                        } else if (observation_point == TO_ENDPOINT) {
+                            new_value.traffic_direction = TRAFFIC_DIRECTION_INGRESS;
+                        } else {
+                            new_value.traffic_direction = TRAFFIC_DIRECTION_UNKNOWN;
+                        }
                         // Check for ACK flag. If the ACK flag is set, the packet is considered as a reply packet.
                         if (flags & TCP_ACK) {
                             new_value.flags_seen_reply_dir = flags;
@@ -197,10 +238,6 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_
                         } else {
                             new_value.flags_seen_forward_dir = flags;
                             bpf_map_update_elem(&retina_conntrack_map, &key, &new_value, BPF_ANY);
-                        }
-                        // Check for FIN and RST flags. If the connection is closing, mark the connection as closing.
-                        if (flags & (TCP_FIN | TCP_RST)) {
-                            new_value.is_closing = 1;
                         }
                         return true;
                     }
@@ -215,6 +252,13 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_
                     new_value.flags_seen_forward_dir = flags;
                     new_value.last_report = now;
                     new_value.is_closing = 0;
+                    if (observation_point == FROM_ENDPOINT) {
+                        new_value.traffic_direction = TRAFFIC_DIRECTION_EGRESS;
+                    } else if (observation_point == TO_ENDPOINT) {
+                        new_value.traffic_direction = TRAFFIC_DIRECTION_INGRESS;
+                    } else {
+                        new_value.traffic_direction = TRAFFIC_DIRECTION_UNKNOWN;
+                    }
                     bpf_map_update_elem(&retina_conntrack_map, &key, &new_value, BPF_ANY);
                     return true;
                 }
@@ -230,7 +274,7 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_
                     }
                     return false;
                 case IPPROTO_UDP:
-                    if (_should_report_udp_packet(value)) {
+                    if (_should_report_udp_packet(flags, value, CT_REPLY)) {
                         _update_conntrack_map(&reverse_key, value);
                         return true;
                     }
@@ -248,7 +292,7 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_
                     }
                     return false;
                 case IPPROTO_UDP:
-                    if (_should_report_udp_packet(value)) {
+                    if (_should_report_udp_packet(flags, value, CT_FORWARD)) {
                         _update_conntrack_map(&key, value);
                         return true;
                     }
@@ -264,7 +308,7 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_
  * Check if a packet is a reply packet to a connection.
  * @arg key The key to be used to check if the packet is a reply packet.
  */
-static __always_inline __attribute__((unused)) bool is_reply_packet(struct ct_v4_key key) {    
+static __always_inline __attribute__((unused)) bool ct_is_reply_packet(struct ct_v4_key key) {    
     // Lookup the connection in the map.
     struct ct_value *value = bpf_map_lookup_elem(&retina_conntrack_map, &key);
     if (value) {
@@ -274,4 +318,30 @@ static __always_inline __attribute__((unused)) bool is_reply_packet(struct ct_v4
     } else {
         return true;
     }
+}
+
+/**
+ * Get the traffic direction of a connection.
+ * @arg key The key to be used to get the traffic direction of the connection.
+ */
+static __always_inline __attribute__((unused)) enum ct_traffic_dir ct_get_traffic_direction(struct ct_v4_key key) {
+    // Lookup the connection in the map.
+    struct ct_value *value = bpf_map_lookup_elem(&retina_conntrack_map, &key);
+    if (value) {
+        return value->traffic_direction;
+    }
+    // Construct the reverse key.
+    struct ct_v4_key reverse_key;
+    __builtin_memset(&reverse_key, 0, sizeof(struct ct_v4_key));
+    reverse_key.src_ip = key.dst_ip;
+    reverse_key.dst_ip = key.src_ip;
+    reverse_key.src_port = key.dst_port;
+    reverse_key.dst_port = key.src_port;
+    reverse_key.proto = key.proto;
+    // Lookup the connection in the map based on the reverse key.
+    value = bpf_map_lookup_elem(&retina_conntrack_map, &reverse_key);
+    if (value) {
+        return value->traffic_direction;
+    }
+    return TRAFFIC_DIRECTION_UNKNOWN;
 }

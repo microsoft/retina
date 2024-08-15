@@ -41,7 +41,6 @@ func ToFlow(
 	var (
 		l4           *flow.Layer4
 		checkpoint   flow.TraceObservationPoint
-		direction    flow.TrafficDirection
 		subeventtype int
 	)
 
@@ -74,23 +73,18 @@ func ToFlow(
 	switch observationPoint {
 	case uint32(0):
 		checkpoint = flow.TraceObservationPoint_TO_STACK
-		direction = flow.TrafficDirection_EGRESS
 		subeventtype = int(api.TraceToStack)
 	case uint32(1):
 		checkpoint = flow.TraceObservationPoint_TO_ENDPOINT
-		direction = flow.TrafficDirection_INGRESS
 		subeventtype = int(api.TraceToLxc)
 	case uint32(2):
 		checkpoint = flow.TraceObservationPoint_FROM_NETWORK
-		direction = flow.TrafficDirection_INGRESS
 		subeventtype = int(api.TraceFromNetwork)
 	case uint32(3):
 		checkpoint = flow.TraceObservationPoint_TO_NETWORK
-		direction = flow.TrafficDirection_EGRESS
 		subeventtype = int(api.TraceToNetwork)
 	default:
 		checkpoint = flow.TraceObservationPoint_UNKNOWN_POINT
-		direction = flow.TrafficDirection_TRAFFIC_DIRECTION_UNKNOWN
 	}
 
 	if verdict == 0 {
@@ -113,10 +107,8 @@ func ToFlow(
 		},
 		L4:                    l4,
 		TraceObservationPoint: checkpoint,
-		TrafficDirection:      direction,
 		Verdict:               verdict,
 		Extensions:            ext,
-		IsReply:               &wrapperspb.BoolValue{Value: false}, // Setting false by default as we don't have a better way to determine flow direction.
 	}
 	if t, err := decodeTime(ts); err == nil {
 		f.Time = t

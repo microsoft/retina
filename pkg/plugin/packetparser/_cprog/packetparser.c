@@ -7,6 +7,7 @@
 #include "packetparser.h"
 #include "retina_filter.c"
 #include "conntrack.c"
+#include "conntrack.h"
 #include "dynamic.h"
 
 char __license[] SEC("license") = "Dual MIT/GPL";
@@ -36,7 +37,8 @@ struct packet
 	__u16 dst_port;
 	__u8 proto;
 	struct tcpmetadata tcp_metadata; // TCP metadata
-	direction dir; // 0 -> INGRESS, 1 -> EGRESS
+	enum obs_point observation_point; // 
+	enum ct_traffic_dir traffic_direction; // 
 	bool is_reply; // 0 -> FALSE, 1 -> TRUE
 	__u64 ts; // timestamp in nanoseconds
 	__u64 bytes; // packet size in bytes
@@ -142,7 +144,7 @@ static int parse_tcp_ts(struct tcphdr *tcph, void *data_end, __u32 *tsval, __u32
 }
 
 // Function to parse the packet and send it to the perf buffer.
-static void parse(struct __sk_buff *skb, direction d)
+static void parse(struct __sk_buff *skb, enum obs_point obs)
 {
 	struct packet p;
 	__builtin_memset(&p, 0, sizeof(p));
@@ -150,7 +152,7 @@ static void parse(struct __sk_buff *skb, direction d)
 	// Get current time in nanoseconds.
 	p.ts = bpf_ktime_get_boot_ns();
 	
-	p.dir = d;
+	p.observation_point = obs;
 	p.bytes = skb->len;
 
 	void *data_end = (void *)(unsigned long long)skb->data_end;
@@ -235,6 +237,12 @@ static void parse(struct __sk_buff *skb, direction d)
 
 		p.src_port = udp->source;
 		p.dst_port = udp->dest;
+
+		#ifdef DATA_AGGREGATION_LEVEL
+		#if DATA_AGGREGATION_LEVEL == 1
+			flags = 1;
+		#endif
+		#endif
 	}
 	else
 	{
@@ -255,9 +263,10 @@ static void parse(struct __sk_buff *skb, direction d)
 		key.dst_port = p.dst_port;
 		key.proto = p.proto;
 
-        if (ct_process_packet(key, flags)) {
+        if (ct_process_packet(key, flags, obs)) {
             // Check if this packet is a reply packet.
-            p.is_reply = is_reply_packet(key);
+            p.is_reply = ct_is_reply_packet(key);
+			p.traffic_direction = ct_get_traffic_direction(key);
 
             // Send the packet to the perf buffer.
             bpf_perf_event_output(skb, &packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));

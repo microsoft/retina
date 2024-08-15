@@ -272,6 +272,7 @@ func (d *Daemon) Start() error {
 			}
 		}
 
+		// If data aggregation level is high, run conntrack.
 		if daemonConfig.DataAggregationLevel == config.High {
 			ct := conntrack.New(daemonConfig)
 			go func() {

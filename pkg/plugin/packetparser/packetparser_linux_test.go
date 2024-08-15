@@ -308,12 +308,12 @@ func TestReadDataPodLevelEnabled(t *testing.T) {
 	defer ctrl.Finish()
 
 	bpfEvent := &packetparserPacket{ //nolint:typecheck
-		SrcIp:   uint32(83886272), // 192.0.0.5
-		DstIp:   uint32(16777226), // 10.0.0.1
-		Proto:   uint8(6),         // TCP
-		Dir:     uint32(1),        // TO Endpoint
-		SrcPort: uint16(80),
-		DstPort: uint16(443),
+		SrcIp:            uint32(83886272), // 192.0.0.5
+		DstIp:            uint32(16777226), // 10.0.0.1
+		Proto:            uint8(6),         // TCP
+		ObservationPoint: uint32(1),        // TO Endpoint
+		SrcPort:          uint16(80),
+		DstPort:          uint16(443),
 	}
 	bytes, _ := json.Marshal(bpfEvent)
 	record := perf.Record{

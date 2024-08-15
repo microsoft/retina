@@ -23,6 +23,7 @@ type conntrackCtV4Key struct {
 
 type conntrackCtValue struct {
 	Lifetime            uint32
+	TrafficDirection    uint32
 	FlagsSeenForwardDir uint8
 	FlagsSeenReplyDir   uint8
 	_                   [2]byte

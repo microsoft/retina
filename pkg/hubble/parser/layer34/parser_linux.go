@@ -51,9 +51,6 @@ func (p *Parser) Decode(f *flow.Flow) *flow.Flow {
 	f.Source = p.ep.Decode(sourceIP)
 	f.Destination = p.ep.Decode(destIP)
 
-	// Add IsReply to flow.
-	// p.decodeIsReply(f)
-
 	// Add L34 Summary to flow.
 	p.decodeSummary(f)
 
