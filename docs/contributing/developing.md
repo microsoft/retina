@@ -8,6 +8,12 @@ The easiest way to set up your Development Environment is to use the provided Gi
 
 ## Environment Config
 
+- Download [Helm](https://helm.sh/)
+- Fork the repository
+- If you want to use [ghcr.io](https://github.com/features/packages) as container registry, login following instructions [here](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-with-a-personal-access-token-classic)
+
+### LLVM/Clang Installation
+
 To manually configure your DevEnv:
 
 ```bash
@@ -15,9 +21,19 @@ export LLVM_VERSION=16
 curl -sL https://apt.llvm.org/llvm.sh  | sudo bash -s "$LLVM_VERSION"
 ```
 
-- Download [Helm](https://helm.sh/)
-- Fork the repository
-- If you want to use [ghcr.io](https://github.com/features/packages) as container registry, login following instructions [here](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-with-a-personal-access-token-classic)
+Test that `llvm-strip` and `clang` are in your `PATH`:
+
+```bash
+which llvm-strip
+which clang
+```
+
+If these commands fail (there is no output), then see if you have a binary with the version as a suffix (e.g. `/usr/bin/llvm-strip-16`).
+Then create a symbolic link to the versioned binary like:
+
+```bash
+ln -s /usr/bin/llvm-strip-16 /usr/bin/llvm-strip
+```
 
 ## Building and Testing
 
