@@ -163,8 +163,8 @@ func randomIP() string {
 }
 
 // Mock function to simulate getting a Kubernetes config
-func getMockConfig() (*rest.Config, error) {
+func getMockConfig() *rest.Config {
 	return &rest.Config{
 		Host: "https://kubernetes.default.svc.cluster.local:443",
-	}, nil
+	}
 }
