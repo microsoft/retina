@@ -9,6 +9,7 @@ import (
 
 	"github.com/microsoft/retina/pkg/log"
 	mock "github.com/microsoft/retina/pkg/managers/watchermanager/mocks"
+	"github.com/microsoft/retina/pkg/watchers/endpoint"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"golang.org/x/sync/errgroup"
@@ -21,15 +22,14 @@ func TestStopWatcherManagerGracefully(t *testing.T) {
 	mgr := NewWatcherManager()
 
 	mockApiServerWatcher := mock.NewMockIWatcher(ctl)
-	mockEndpointWatcher := mock.NewMockIWatcher(ctl)
 
 	mgr.Watchers = []IWatcher{
+		endpoint.Watcher(),
 		mockApiServerWatcher,
-		mockEndpointWatcher,
 	}
 
 	mockApiServerWatcher.EXPECT().Init(gomock.Any()).Return(nil).AnyTimes()
-	mockEndpointWatcher.EXPECT().Init(gomock.Any()).Return(nil).AnyTimes()
+	mockApiServerWatcher.EXPECT().Stop(gomock.Any()).Return(nil).AnyTimes()
 
 	ctx, _ := context.WithCancel(context.Background())
 	g, errctx := errgroup.WithContext(ctx)

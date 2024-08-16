@@ -5,7 +5,6 @@ package apiserver
 
 import (
 	"context"
-	"errors"
 	"net"
 	"net/url"
 	"strings"
@@ -57,9 +56,13 @@ func (a *ApiServerWatcher) Init(ctx context.Context) error {
 		return nil
 	}
 
-	a.filterManager = a.getFilterManager()
+	// Get filter manager.
 	if a.filterManager == nil {
-		return errors.New("failed to initialize filter manager")
+		a.filterManager, err := fm.Init(filterManagerRetries)
+		if err != nil {
+			a.l.Error("failed to init filter manager", zap.Error(err))
+			return err
+		}
 	}
 
 	// Get  kubeconfig.
@@ -223,12 +226,4 @@ func (a *ApiServerWatcher) getHostName() (string, error) {
 		host = host[:colonIndex]
 	}
 	return host, nil
-}
-
-func (a *ApiServerWatcher) getFilterManager() *fm.FilterManager {
-	f, err := fm.Init(filterManagerRetries)
-	if err != nil {
-		a.l.Error("failed to init filter manager", zap.Error(err))
-	}
-	return f
 }

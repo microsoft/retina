@@ -146,17 +146,17 @@ func TestInitWithIncorrectURL(t *testing.T) {
 	defer cancel()
 
 	mockedResolver := mocks.NewMockIHostResolver(ctrl)
+	mockedFilterManager := filtermanagermocks.NewMockIFilterManager(ctrl)
 
 	a := &ApiServerWatcher{
-		l:            log.Logger().Named("apiserver-watcher"),
-		hostResolver: mockedResolver,
-		restConfig:   getMockConfig(false),
+		l:             log.Logger().Named("apiserver-watcher"),
+		hostResolver:  mockedResolver,
+		restConfig:    getMockConfig(false),
+		filterManager: mockedFilterManager,
 	}
 
 	mockedResolver.EXPECT().LookupHost(gomock.Any(), gomock.Any()).Return([]string{}, nil).AnyTimes()
-
-	a.Init(ctx)
-	assert.Error(t, a.Init(context.Background()), "Expected error during init")
+	assert.Error(t, a.Init(ctx), "Expected error during init")
 }
 
 func randomIP() string {
