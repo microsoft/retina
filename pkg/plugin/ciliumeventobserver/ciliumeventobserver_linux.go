@@ -28,6 +28,7 @@ const (
 	defaultRetryDelay = 12 * time.Second
 	workers           = 2
 	buffer            = 10000
+	parserMetric      = "parser"
 )
 
 var (
@@ -79,8 +80,9 @@ func (c *ciliumeventobserver) Start(ctx context.Context) error {
 			c.enricher = enricher.Instance()
 		} else {
 			c.l.Warn("retina enricher is not initialized")
-			return errPodLevelDisabled
 		}
+	} else {
+		return errPodLevelDisabled
 	}
 
 	for i := 0; i < workers; i++ {
@@ -134,6 +136,7 @@ func (c *ciliumeventobserver) connect(ctx context.Context) error {
 		conn, err := c.d.Dial("unix", c.sockPath)
 		if err != nil {
 			c.l.Error("Connection attempt failed", zap.Error(err))
+			curAttempt++
 			if curAttempt > c.maxAttempts {
 				c.connection = nil
 				return errFailedConnection
@@ -162,9 +165,14 @@ func (c *ciliumeventobserver) monitorLoop(ctx context.Context) error {
 					return err //nolint:wrapcheck // Error is handled by the caller
 				}
 				c.l.Warn("Failed to decode payload from cilium", zap.Error(err))
+				metrics.LostEventsCounter.WithLabelValues(parserMetric, string(Name)).Inc()
 				continue
 			}
-			c.payloadEvents <- &pl
+			select {
+			case c.payloadEvents <- &pl:
+			default:
+				metrics.LostEventsCounter.WithLabelValues(utils.BufferedChannel, string(Name)).Inc()
+			}
 		}
 	}
 }
