@@ -6,6 +6,7 @@ package infiniband
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	hubblev1 "github.com/cilium/cilium/pkg/hubble/api/v1"
@@ -14,6 +15,8 @@ import (
 	"github.com/microsoft/retina/pkg/plugin/api"
 	"go.uber.org/zap"
 )
+
+var ErrAlreadyRunning = errors.New("infiniband plugin is already running")
 
 // New creates a infiniband plugin.
 func New(cfg *kcfg.Config) api.Plugin {
@@ -36,12 +39,17 @@ func (ib *infiniband) Compile(ctx context.Context) error { //nolint // implement
 }
 
 func (ib *infiniband) Init() error {
-	ib.l.Info("Initializing infiniband plugin...")
 	return nil
 }
 
 func (ib *infiniband) Start(ctx context.Context) error {
+	ib.l.Info("Starting infiniband plugin")
+	ib.startLock.Lock()
+	if ib.isRunning {
+		return ErrAlreadyRunning
+	}
 	ib.isRunning = true
+	ib.startLock.Unlock()
 	return ib.run(ctx)
 }
 
