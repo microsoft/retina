@@ -28,6 +28,18 @@ jobs:
         if: env.IS_NOT_MERGE_GROUP
         with:
           go-version-file: go.mod
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: install dependencies and generate
+        if: env.IS_NOT_MERGE_GROUP && matrix.goos == 'linux'
+        run: |
+          export GOARCH=${{ matrix.goarch }}
+          sudo apt-get update
+          sudo apt-get install -y curl lsb-release wget software-properties-common gnupg make git clang-14 lldb-14 lld-14 clangd-14 man-db
+          export LLVM_VERSION=14
+          curl -sL https://apt.llvm.org/llvm.sh  | sudo bash -s "$LLVM_VERSION"
+          export PATH=$PATH:/usr/lib/llvm-$LLVM_VERSION/bin
+          CGO_ENABLED=0 GOARCH=${{ matrix.goarch }} go generate ./pkg/plugin/...;
       - name: golangci-lint
         if: env.IS_NOT_MERGE_GROUP
         uses: golangci/golangci-lint-action@v6
