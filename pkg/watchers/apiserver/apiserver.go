@@ -58,7 +58,8 @@ func (a *ApiServerWatcher) Init(ctx context.Context) error {
 
 	// Get filter manager.
 	if a.filterManager == nil {
-		a.filterManager, err := fm.Init(filterManagerRetries)
+		var err error
+		a.filterManager, err = fm.Init(filterManagerRetries)
 		if err != nil {
 			a.l.Error("failed to init filter manager", zap.Error(err))
 			return err
@@ -214,7 +215,7 @@ func (a *ApiServerWatcher) publish(netIPs []net.IP, eventType cc.EventType) {
 func (a *ApiServerWatcher) getHostName() (string, error) {
 	// Parse the host URL.
 	hostURL := a.restConfig.Host
-	parsedURL, err := url.Parse(hostURL)
+	parsedURL, err := url.ParseRequestURI(hostURL)
 	if err != nil {
 		log.Logger().Error("failed to parse URL", zap.String("url", hostURL), zap.Error(err))
 		return "", err

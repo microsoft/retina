@@ -120,6 +120,7 @@ func TestNewManagerStart(t *testing.T) {
 
 	for _, tt := range tests {
 		mgr, err := NewPluginManager(tt.cfg, tel, api.PluginName(tt.pluginName))
+		mgr.watcherManager = setupWatcherManagerMock(gomock.NewController(t))
 		require.Nil(t, err, "Expected nil but got error:%w", err)
 		require.NotNil(t, mgr, "Expected mgr to be intialized but found nil")
 		require.Condition(t, assert.Comparison(func() bool {
