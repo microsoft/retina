@@ -5,6 +5,7 @@ package apiserver
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/url"
 	"strings"
@@ -62,7 +63,7 @@ func (a *ApiServerWatcher) Init(ctx context.Context) error {
 		a.filterManager, err = fm.Init(filterManagerRetries)
 		if err != nil {
 			a.l.Error("failed to init filter manager", zap.Error(err))
-			return err
+			return fmt.Errorf("failed to init filter manager: %w", err)
 		}
 	}
 
@@ -71,15 +72,15 @@ func (a *ApiServerWatcher) Init(ctx context.Context) error {
 		config, err := kcfg.GetConfig()
 		if err != nil {
 			a.l.Error("failed to get kubeconfig", zap.Error(err))
-			return err
+			return fmt.Errorf("failed to get kubeconfig: %w", err)
 		}
 		a.restConfig = config
 	}
 
 	hostName, err := a.getHostName()
 	if err != nil {
-		a.l.Error("APIServer watcher failed to get host name", zap.Error(err))
-		return err
+		a.l.Error("failed to get host name", zap.Error(err))
+		return fmt.Errorf("failed to get host name: %w", err)
 	}
 	a.apiServerHostName = hostName
 
@@ -218,7 +219,7 @@ func (a *ApiServerWatcher) getHostName() (string, error) {
 	parsedURL, err := url.ParseRequestURI(hostURL)
 	if err != nil {
 		log.Logger().Error("failed to parse URL", zap.String("url", hostURL), zap.Error(err))
-		return "", err
+		return "", fmt.Errorf("failed to parse URL: %w", err)
 	}
 
 	// Extract the host name from the URL.

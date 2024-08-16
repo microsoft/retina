@@ -16,6 +16,7 @@ import (
 	filtermanagermocks "github.com/microsoft/retina/pkg/managers/filtermanager"
 	"github.com/microsoft/retina/pkg/watchers/apiserver/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"k8s.io/client-go/rest"
 )
@@ -134,7 +135,7 @@ func TestNoRefreshErrorOnLookupHost(t *testing.T) {
 	mockedResolver.EXPECT().LookupHost(gomock.Any(), gomock.Any()).Return(nil, errors.New("Error")).AnyTimes()
 
 	a.Refresh(ctx)
-	assert.NoError(t, a.Refresh(context.Background()), "Expected error when refreshing the cache")
+	require.NoError(t, a.Refresh(context.Background()), "Expected error when refreshing the cache")
 }
 
 func TestInitWithIncorrectURL(t *testing.T) {
@@ -156,7 +157,7 @@ func TestInitWithIncorrectURL(t *testing.T) {
 	}
 
 	mockedResolver.EXPECT().LookupHost(gomock.Any(), gomock.Any()).Return([]string{}, nil).AnyTimes()
-	assert.Error(t, a.Init(ctx), "Expected error during init")
+	require.Error(t, a.Init(ctx), "Expected error during init")
 }
 
 func randomIP() string {
