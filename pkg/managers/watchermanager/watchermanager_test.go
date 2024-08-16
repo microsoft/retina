@@ -14,9 +14,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var (
-	errInitFailed = errors.New("init failed")
-)
+var errInitFailed = errors.New("init failed")
 
 func TestStopWatcherManagerGracefully(t *testing.T) {
 	ctl := gomock.NewController(t)
