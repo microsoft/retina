@@ -4,7 +4,6 @@ package ciliumeventobserver
 
 import (
 	"net"
-	"sync"
 	"time"
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
@@ -26,7 +25,6 @@ type ciliumeventobserver struct {
 	enricher        enricher.EnricherInterface
 	externalChannel chan *v1.Event
 	payloadEvents   chan *payload.Payload
-	wg              sync.WaitGroup
 	connection      net.Conn
 	p               *parser
 	maxAttempts     int

@@ -17,7 +17,9 @@ import (
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
+	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/api"
+	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
 )
 
@@ -25,11 +27,13 @@ const (
 	defaultAttempts   = 5
 	defaultRetryDelay = 12 * time.Second
 	workers           = 2
+	buffer            = 10000
 )
 
 var (
-	errFailedConnection = errors.New("Failed to connect to cilium monitor after max attempts")
-	errFailedToDial     = errors.New("Failed to dial cilium monitor socket")
+	errFailedConnection = errors.New("failed to connect to cilium monitor after max attempts")
+	errFailedToDial     = errors.New("failed to dial cilium monitor socket")
+	errPodLevelDisabled = errors.New("pod level enricher is not initialized")
 )
 
 func New(cfg *kcfg.Config) api.Plugin {
@@ -39,7 +43,7 @@ func New(cfg *kcfg.Config) api.Plugin {
 		retryDelay:    defaultRetryDelay,
 		maxAttempts:   defaultAttempts,
 		sockPath:      cfg.MonitorSockPath,
-		payloadEvents: make(chan *payload.Payload),
+		payloadEvents: make(chan *payload.Payload, buffer),
 		d:             &DefaultDialer{},
 	}
 }
@@ -75,11 +79,11 @@ func (c *ciliumeventobserver) Start(ctx context.Context) error {
 			c.enricher = enricher.Instance()
 		} else {
 			c.l.Warn("retina enricher is not initialized")
+			return errPodLevelDisabled
 		}
 	}
 
 	for i := 0; i < workers; i++ {
-		c.wg.Add(1)
 		go c.parserLoop(ctx)
 	}
 
@@ -173,10 +177,14 @@ func (c *ciliumeventobserver) parserLoop(ctx context.Context) {
 			return
 		case pl := <-c.payloadEvents:
 			ev, err := c.p.Decode(pl)
-			if err == nil {
-				c.externalChannel <- ev
-			} else {
+			if err != nil {
 				c.l.Warn("Failed to decode cilium payload to flow", zap.Error(err))
+				continue
+			}
+			select {
+			case c.externalChannel <- ev:
+			default:
+				metrics.LostEventsCounter.WithLabelValues(utils.BufferedChannel, string(Name)).Inc()
 			}
 		}
 	}
