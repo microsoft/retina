@@ -128,8 +128,9 @@ func TestNoRefreshErrorOnLookupHost(t *testing.T) {
 	mockedResolver := mocks.NewMockIHostResolver(ctrl)
 
 	a := &ApiServerWatcher{
-		l:            log.Logger().Named("apiserver-watcher"),
-		hostResolver: mockedResolver,
+		l:                log.Logger().Named("apiserver-watcher"),
+		hostResolver:     mockedResolver,
+		remainingRetries: 3,
 	}
 
 	mockedResolver.EXPECT().LookupHost(gomock.Any(), gomock.Any()).Return(nil, errors.New("Error")).AnyTimes()
@@ -174,4 +175,39 @@ func getMockConfig(isCorrect bool) *rest.Config {
 	return &rest.Config{
 		Host: "",
 	}
+}
+
+func TestRefreshFailsOnlyOnFourthAttempt(t *testing.T) {
+	log.SetupZapLogger(log.GetDefaultLogOpts())
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	mockedResolver := mocks.NewMockIHostResolver(ctrl)
+	mockedFilterManager := filtermanagermocks.NewMockIFilterManager(ctrl)
+
+	a := &ApiServerWatcher{
+		l:                log.Logger().Named("apiserver-watcher"),
+		hostResolver:     mockedResolver,
+		filterManager:    mockedFilterManager,
+		remainingRetries: 3, // Set the initial retry count to 3
+	}
+
+	// Simulate LookupHost failing for all attempts.
+	mockedResolver.EXPECT().LookupHost(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("simulated DNS error")).AnyTimes()
+
+	mockedFilterManager.EXPECT().AddIPs(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mockedFilterManager.EXPECT().DeleteIPs(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+
+	// Call Refresh three times and expect it to succeed (no error)
+	for i := 0; i < 3; i++ {
+		err := a.Refresh(ctx)
+		require.NoError(t, err, "Expected no error on attempt %d", i+1)
+	}
+
+	// Call Refresh the fourth time and expect it to fail
+	err := a.Refresh(ctx)
+	require.Error(t, err, "Expected error on the fourth attempt")
 }

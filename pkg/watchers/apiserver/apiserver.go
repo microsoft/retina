@@ -22,6 +22,7 @@ import (
 
 const (
 	filterManagerRetries = 3
+	hostLookupRetries    = 3
 )
 
 type ApiServerWatcher struct {
@@ -33,6 +34,7 @@ type ApiServerWatcher struct {
 	hostResolver      IHostResolver
 	filterManager     fm.IFilterManager
 	restConfig        *rest.Config
+	remainingRetries  int
 }
 
 var a *ApiServerWatcher
@@ -41,10 +43,11 @@ var a *ApiServerWatcher
 func Watcher() *ApiServerWatcher {
 	if a == nil {
 		a = &ApiServerWatcher{
-			isRunning:    false,
-			l:            log.Logger().Named("apiserver-watcher"),
-			current:      make(cache),
-			hostResolver: net.DefaultResolver,
+			isRunning:        false,
+			l:                log.Logger().Named("apiserver-watcher"),
+			current:          make(cache),
+			hostResolver:     net.DefaultResolver,
+			remainingRetries: hostLookupRetries,
 		}
 	}
 
@@ -187,14 +190,25 @@ func (a *ApiServerWatcher) resolveIPs(ctx context.Context, host string) ([]strin
 	// 	-Other DNS-related errors encapsulated in a DNSError.
 	hostIPs, err := a.hostResolver.LookupHost(ctx, host)
 	if err != nil {
-		// We chose not to return this error to the caller because we want to rety the DNS lookup in the next refresh.
-		// If there is an error that can't be resolved by retrying, we will single it out and return it to the caller.
-		a.l.Warn("APIServer LookupHost failed", zap.Error(err))
+		// Decrement the remaining retries counter.
+		a.remainingRetries--
+		a.l.Debug("APIServer LookupHost failed", zap.Error(err), zap.Int("remainingRetries", a.remainingRetries))
+
+		// If the remaining retries counter is zero, return an error.
+		if a.remainingRetries < 0 {
+			return nil, fmt.Errorf("failed to lookup host: %w", err)
+		}
+
+		// do not return an error, instead return nil IPs so that on the next refresh, the lookup is retried.
+		return nil, nil
 	}
 
 	if len(hostIPs) == 0 {
 		a.l.Debug("no IPs found for host", zap.String("host", host))
 	}
+
+	// Reset the retry counter.
+	a.remainingRetries = hostLookupRetries
 
 	return hostIPs, nil
 }
