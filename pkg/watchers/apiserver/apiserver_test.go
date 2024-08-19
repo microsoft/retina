@@ -21,6 +21,8 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+var errDNS = errors.New("DNS error")
+
 func TestGetWatcher(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 
@@ -140,8 +142,7 @@ func TestNoRefreshErrorOnLookupHost(t *testing.T) {
 }
 
 func TestInitWithIncorrectURL(t *testing.T) {
-	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
-	require.NoError(t, err, "Expected no error during logger setup")
+	log.SetupZapLogger(log.GetDefaultLogOpts())
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -179,14 +180,13 @@ func getMockConfig(isCorrect bool) *rest.Config {
 }
 
 func TestRefreshFailsOnlyOnFourthAttempt(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	require.NoError(t, err)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-
-	simulatedDNSError := errors.New("simulated DNS error")
 
 	mockedResolver := mocks.NewMockIHostResolver(ctrl)
 	mockedFilterManager := filtermanagermocks.NewMockIFilterManager(ctrl)
@@ -199,7 +199,7 @@ func TestRefreshFailsOnlyOnFourthAttempt(t *testing.T) {
 	}
 
 	// Simulate LookupHost failing for all attempts.
-	mockedResolver.EXPECT().LookupHost(gomock.Any(), gomock.Any()).Return(nil, simulatedDNSError).AnyTimes()
+	mockedResolver.EXPECT().LookupHost(gomock.Any(), gomock.Any()).Return(nil, errDNS).AnyTimes()
 
 	mockedFilterManager.EXPECT().AddIPs(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	mockedFilterManager.EXPECT().DeleteIPs(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
