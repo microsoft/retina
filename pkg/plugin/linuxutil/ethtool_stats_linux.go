@@ -12,6 +12,8 @@ import (
 	"go.uber.org/zap"
 )
 
+const limitValue = 2000
+
 type EthtoolReader struct {
 	l           *log.ZapLogger
 	opts        *EthtoolOpts
@@ -36,7 +38,7 @@ func NewEthtoolReader(opts *EthtoolOpts, ethHandle EthtoolInterface) *EthtoolRea
 		data:        &EthtoolStats{},
 		ethHandle:   ethHandle,
 		unsupported: make(map[string]bool),
-		limit:       2000,
+		limit:       limitValue,
 	}
 }
 
@@ -72,7 +74,6 @@ func (er *EthtoolReader) readInterfaceStats() error {
 			continue
 		}
 
-		//check if the interface is in cache
 		if er.unsupported[i.Name] {
 			er.l.Info("Skip Unsupported interface", zap.String("ifacename", i.Name))
 			continue
@@ -85,11 +86,10 @@ func (er *EthtoolReader) readInterfaceStats() error {
 
 			if len(er.unsupported) < er.limit {
 				er.unsupported[i.Name] = true
-				continue
 			} else {
 				er.l.Warn("Reached limit of unsupported interfaces")
-				continue
 			}
+			continue
 		}
 
 		er.data.stats[i.Name] = make(map[string]uint64)
