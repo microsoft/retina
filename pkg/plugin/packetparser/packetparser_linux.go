@@ -98,16 +98,28 @@ func (p *packetParser) Compile(ctx context.Context) error {
 	bpfSourceFile := fmt.Sprintf("%s/%s/%s", dir, bpfSourceDir, bpfSourceFileName)
 	bpfOutputFile := fmt.Sprintf("%s/%s", dir, bpfObjectFileName)
 	arch := runtime.GOARCH
-	includeDir := fmt.Sprintf("-I%s/../lib/_%s", dir, arch)
+	archLibDir := fmt.Sprintf("-I%s/../lib/_%s", dir, arch)
 	filterDir := fmt.Sprintf("-I%s/../filter/_cprog/", dir)
 	conntrackDir := fmt.Sprintf("-I%s/../conntrack/_cprog/", dir)
-	libbpfDir := fmt.Sprintf("-I%s/../lib/common/libbpf/_src", dir)
+	libbpfSrcDir := fmt.Sprintf("-I%s/../lib/common/libbpf/_src", dir)
+	libbpfIncludeLinuxDir := fmt.Sprintf("-I%s/../lib/common/libbpf/_include/linux", dir)
+	libbpfIncludeUapiLinuxDir := fmt.Sprintf("-I%s/../lib/common/libbpf/_include/uapi/linux", dir)
+	libbpfIncludeAsmDir := fmt.Sprintf("-I%s/../lib/common/libbpf/_include/asm", dir)
+
 	targetArch := "-D__TARGET_ARCH_x86"
 	if arch == "arm64" {
 		targetArch = "-D__TARGET_ARCH_arm64"
 	}
 	// Keep target as bpf, otherwise clang compilation yields bpf object that elf reader cannot load.
-	err = loader.CompileEbpf(ctx, "-target", "bpf", "-Wall", targetArch, "-g", "-O2", "-c", bpfSourceFile, "-o", bpfOutputFile, includeDir, libbpfDir, filterDir, conntrackDir)
+	err = loader.CompileEbpf(ctx, "-target", "bpf", "-Wall", targetArch, "-g", "-O2", "-c", bpfSourceFile, "-o", bpfOutputFile,
+		archLibDir,
+		libbpfSrcDir,
+		libbpfIncludeAsmDir,
+		libbpfIncludeLinuxDir,
+		libbpfIncludeUapiLinuxDir,
+		filterDir,
+		conntrackDir,
+	)
 	if err != nil {
 		return err
 	}
