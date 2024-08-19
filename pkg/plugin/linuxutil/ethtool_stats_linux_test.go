@@ -109,11 +109,8 @@ func TestReadInterfaceStats(t *testing.T) {
 
 		ethReader.unsupported = globalUnsupportedCache
 
-		ethReader.unsupported = globalUnsupportedCache
-
 		assert.NotNil(t, ethReader)
 
-		ethHandle.EXPECT().Stats(gomock.Any()).Return(tt.statsReturn, tt.statErr).AnyTimes()
 		ethHandle.EXPECT().Stats(gomock.Any()).Return(tt.statsReturn, tt.statErr).AnyTimes()
 		ethHandle.EXPECT().Close().Times(1)
 		InitalizeMetricsForTesting(ctrl)
@@ -123,14 +120,7 @@ func TestReadInterfaceStats(t *testing.T) {
 				Name: "testmetric",
 				Help: "testmetric",
 			})
-			if tt.statErr == nil {
-				testmetric := prometheus.NewGauge(prometheus.GaugeOpts{
-					Name: "testmetric",
-					Help: "testmetric",
-				})
 
-				MockGaugeVec.EXPECT().WithLabelValues(gomock.Any()).Return(testmetric).AnyTimes()
-			}
 			MockGaugeVec.EXPECT().WithLabelValues(gomock.Any()).Return(testmetric).AnyTimes()
 		}
 
@@ -141,16 +131,15 @@ func TestReadInterfaceStats(t *testing.T) {
 			ethReader.updateMetrics()
 		}
 
-		if tt.statErr != nil && tt.statErr == errInterfaceNotSupported {
+		if tt.statErr != nil && errors.Is(tt.statErr, errInterfaceNotSupported) {
 			assert.NotEqual(t, nil, ethReader.unsupported, "unsupported map should not be nil")
-			assert.Greater(t, len(ethReader.unsupported), 0, "unsupported map should contain interfaces")
+			assert.NotEmpty(t, ethReader.unsupported, "unsupported map should contain interfaces")
 		}
 
 		globalUnsupportedCache = ethReader.unsupported
 		fmt.Println("Current unsupported cache: ", ethReader.unsupported, "Global unsupported cache: ", globalUnsupportedCache)
 
 	}
-
 }
 
 func InitalizeMetricsForTesting(ctrl *gomock.Controller) {
