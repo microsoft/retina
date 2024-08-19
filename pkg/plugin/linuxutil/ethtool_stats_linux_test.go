@@ -1,6 +1,8 @@
 package linuxutil
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/microsoft/retina/pkg/log"
@@ -42,6 +44,8 @@ func TestNewEthtoolWithNil(t *testing.T) {
 	assert.NotNil(t, ethReader)
 }
 
+var globalUnsupportedCache = make(map[string]bool)
+
 func TestReadInterfaceStats(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	l := log.Logger().Named("ethtool test").Sugar()
@@ -69,33 +73,73 @@ func TestReadInterfaceStats(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "test unsported interface",
+			opts: &EthtoolOpts{
+				errOrDropKeysOnly: false,
+				addZeroVal:        false,
+			},
+			statsReturn: nil,
+			statErr:     errors.New("interface not supported"),
+			result:      nil,
+			wantErr:     false,
+		},
+		{
+			name: "test skipped interface",
+			opts: &EthtoolOpts{
+				errOrDropKeysOnly: false,
+				addZeroVal:        false,
+			},
+			statsReturn: nil,
+			statErr:     errors.New("interface not supported"),
+			result:      nil,
+			wantErr:     false,
+		},
 	}
 
 	for _, tt := range tests {
 		l.Infof("Running TestReadInterfaceStats %s", tt.name)
+
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
 		ethHandle := NewMockEthtoolInterface(ctrl)
 		ethReader := NewEthtoolReader(tt.opts, ethHandle)
+
+		ethReader.unsupported = globalUnsupportedCache
+
 		assert.NotNil(t, ethReader)
 
-		ethHandle.EXPECT().Stats(gomock.Any()).Return(tt.statsReturn, nil).AnyTimes()
+		ethHandle.EXPECT().Stats(gomock.Any()).Return(tt.statsReturn, tt.statErr).AnyTimes()
 		ethHandle.EXPECT().Close().Times(1)
 		InitalizeMetricsForTesting(ctrl)
 
-		testmetric := prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "testmetric",
-			Help: "testmetric",
-		})
+		if tt.statErr == nil {
+			testmetric := prometheus.NewGauge(prometheus.GaugeOpts{
+				Name: "testmetric",
+				Help: "testmetric",
+			})
 
-		MockGaugeVec.EXPECT().WithLabelValues(gomock.Any()).Return(testmetric).AnyTimes()
+			MockGaugeVec.EXPECT().WithLabelValues(gomock.Any()).Return(testmetric).AnyTimes()
+		}
 
 		err := ethReader.readInterfaceStats()
 		assert.Nil(t, err)
 
-		ethReader.updateMetrics()
+		if tt.statErr == nil {
+			ethReader.updateMetrics()
+		}
+
+		if tt.statErr != nil && tt.statErr.Error() == "interface not supported" {
+			assert.True(t, ethReader.unsupported != nil, "unsupported map should not be nil")
+			assert.True(t, len(ethReader.unsupported) > 0, "unsupported map should contain interfaces")
+		}
+
+		globalUnsupportedCache = ethReader.unsupported
+		fmt.Println("Current unsupported cache: ", ethReader.unsupported, "Global unsupported cache: ", globalUnsupportedCache)
+
 	}
+
 }
 
 func InitalizeMetricsForTesting(ctrl *gomock.Controller) {

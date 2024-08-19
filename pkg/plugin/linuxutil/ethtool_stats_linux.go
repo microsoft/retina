@@ -13,10 +13,12 @@ import (
 )
 
 type EthtoolReader struct {
-	l         *log.ZapLogger
-	opts      *EthtoolOpts
-	data      *EthtoolStats
-	ethHandle EthtoolInterface
+	l           *log.ZapLogger
+	opts        *EthtoolOpts
+	data        *EthtoolStats
+	ethHandle   EthtoolInterface
+	unsupported map[string]bool
+	limit       int
 }
 
 func NewEthtoolReader(opts *EthtoolOpts, ethHandle EthtoolInterface) *EthtoolReader {
@@ -29,10 +31,12 @@ func NewEthtoolReader(opts *EthtoolOpts, ethHandle EthtoolInterface) *EthtoolRea
 		}
 	}
 	return &EthtoolReader{
-		l:         log.Logger().Named(string("EthtoolReader")),
-		opts:      opts,
-		data:      &EthtoolStats{},
-		ethHandle: ethHandle,
+		l:           log.Logger().Named(string("EthtoolReader")),
+		opts:        opts,
+		data:        &EthtoolStats{},
+		ethHandle:   ethHandle,
+		unsupported: make(map[string]bool),
+		limit:       2000,
 	}
 }
 
@@ -67,11 +71,25 @@ func (er *EthtoolReader) readInterfaceStats() error {
 		if strings.Contains(i.Name, "lo") || strings.Contains(i.Name, "cbr0") {
 			continue
 		}
+
+		//check if the interface is in cache
+		if er.unsupported[i.Name] {
+			er.l.Info("Skip Unsupported interface", zap.String("ifacename", i.Name))
+			continue
+		}
+
 		// Retrieve tx from eth0
 		ifaceStats, err := er.ethHandle.Stats(i.Name)
 		if err != nil {
 			er.l.Error("Error while getting ethtool:", zap.String("ifacename", i.Name), zap.Error(err))
-			continue
+
+			if len(er.unsupported) < er.limit {
+				er.unsupported[i.Name] = true
+				continue
+			} else {
+				er.l.Warn("Reached limit of unsupported interfaces")
+				continue
+			}
 		}
 
 		er.data.stats[i.Name] = make(map[string]uint64)
