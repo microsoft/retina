@@ -41,6 +41,11 @@ const (
 	infinibandCounterStatsDescription         = "InfiniBand Counter Statistics"
 	infinibandStatusParamsDescription         = "InfiniBand Status Parameters"
 
+	flowPacketForwardDescription = "Number of forward packets per flow"
+	flowPacketReplyDescription   = "Number of reply packets per flow"
+	flowBytesForwardDescription  = "Number of forward bytes per flow"
+	flowBytesReplyDescription    = "Number of reply bytes per flow"
+
 	// Control plane metrics
 	pluginManagerFailedToReconcileCounterDescription = "Number of times the plugin manager failed to reconcile the plugins"
 	lostEventsCounterDescription                     = "Number of events lost in control plane"
@@ -91,6 +96,11 @@ var (
 
 	InfinibandCounterStats IGaugeVec
 	InfinibandStatusParams IGaugeVec
+
+	FlowPacketsForward IGaugeVec
+	FlowPacketsReply   IGaugeVec
+	FlowBytesForward   IGaugeVec
+	FlowBytesReply     IGaugeVec
 )
 
 func ToPrometheusType(metric interface{}) prometheus.Collector {

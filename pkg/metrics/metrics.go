@@ -165,6 +165,34 @@ func InitializeMetrics() {
 		utils.InterfaceName,
 	)
 
+	FlowPacketsForward = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.DefaultRegistry,
+		utils.FlowPacketsForwardGaugeName,
+		flowPacketForwardDescription,
+		utils.FlowsGaugeLabels...,
+	)
+
+	FlowPacketsReply = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.DefaultRegistry,
+		utils.FlowPacketsReplyGaugeName,
+		flowPacketReplyDescription,
+		utils.FlowsGaugeLabels...,
+	)
+
+	FlowBytesForward = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.DefaultRegistry,
+		utils.FlowBytesForwardGaugeName,
+		flowBytesForwardDescription,
+		utils.FlowsGaugeLabels...,
+	)
+
+	FlowBytesReply = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.DefaultRegistry,
+		utils.FlowBytesReplyGaugeName,
+		flowBytesReplyDescription,
+		utils.FlowsGaugeLabels...,
+	)
+
 	isInitialized = true
 	metricsLogger.Info("Metrics initialized")
 }

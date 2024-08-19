@@ -105,7 +105,7 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 					zap.String("proto", decodeProto(key.Proto)),
 					zap.Uint32("lifetime", value.Lifetime),
 					zap.Uint32("traffic_direction", value.TrafficDirection),
-					zap.Uint16("is_closing", value.IsClosing),
+					zap.Uint8("is_closing", value.IsClosing),
 					zap.String("flags_seen_forward_dir", decodeFlags(value.FlagsSeenForwardDir)),
 					zap.String("flags_seen_reply_dir", decodeFlags(value.FlagsSeenReplyDir)),
 					zap.Uint32("last_reported_forward_dir", value.LastReportForwardDir),

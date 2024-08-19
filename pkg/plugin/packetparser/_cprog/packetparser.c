@@ -222,6 +222,9 @@ static void parse(struct __sk_buff *skb, enum obs_point obs)
         bpf_perf_event_output(skb, &packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
         return;
     #elif DATA_AGGREGATION_LEVEL == 1
+		struct flowmetadata flow_metadata;
+		__builtin_memset(&flow_metadata, 0, sizeof(flow_metadata));
+		p.flow_metadata = flow_metadata;
         if (ct_process_packet(&p, flags, obs)) {
             // Send the packet to the perf buffer.
             bpf_perf_event_output(skb, &packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));

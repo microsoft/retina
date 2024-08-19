@@ -29,8 +29,13 @@ type packetparserCtValue struct {
 	_                    [2]byte
 	LastReportForwardDir uint32
 	LastReportReplyDir   uint32
-	IsClosing            uint16
-	_                    [2]byte
+	_                    [4]byte
+	BytesForwardCount    uint64
+	BytesReplyCount      uint64
+	PacketsForwardCount  uint64
+	PacketsReplyCount    uint64
+	IsClosing            uint8
+	_                    [7]byte
 }
 
 type packetparserMapKey struct {
@@ -58,11 +63,20 @@ type packetparserPacket struct {
 		Tsecr  uint32
 	}
 	ObservationPoint uint32
-	TrafficDirection uint32
 	IsReply          bool
-	_                [3]byte
-	Ts               uint64
-	Bytes            uint64
+	_                [7]byte
+	FlowMetadata     struct {
+		TrafficDirection    uint32
+		_                   [4]byte
+		BytesForwardCount   uint64
+		BytesReplyCount     uint64
+		PacketsForwardCount uint64
+		PacketsReplyCount   uint64
+		IsClosing           uint8
+		_                   [7]byte
+	}
+	Ts    uint64
+	Bytes uint64
 }
 
 // loadPacketparser returns the embedded CollectionSpec for packetparser.

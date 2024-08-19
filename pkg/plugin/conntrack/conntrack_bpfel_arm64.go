@@ -29,8 +29,13 @@ type conntrackCtValue struct {
 	_                    [2]byte
 	LastReportForwardDir uint32
 	LastReportReplyDir   uint32
-	IsClosing            uint16
-	_                    [2]byte
+	_                    [4]byte
+	BytesForwardCount    uint64
+	BytesReplyCount      uint64
+	PacketsForwardCount  uint64
+	PacketsReplyCount    uint64
+	IsClosing            uint8
+	_                    [7]byte
 }
 
 // loadConntrack returns the embedded CollectionSpec for conntrack.

@@ -32,6 +32,11 @@ const (
 	InfinibandCounterStatsName           = "infiniband_counter_stats"
 	InfinibandStatusParamsName           = "infiniband_status_params"
 
+	FlowPacketsForwardGaugeName = "flow_packets_forward"
+	FlowPacketsReplyGaugeName   = "flow_packets_reply"
+	FlowBytesForwardGaugeName   = "flow_bytes_forward"
+	FlowBytesReplyGaugeName     = "flow_bytes_reply"
+
 	// Common Gauges across os distributions
 	NodeConnectivityStatusName         = "node_connectivity_status"
 	NodeConnectivityLatencySecondsName = "node_connectivity_latency_seconds"

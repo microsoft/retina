@@ -102,8 +102,10 @@ func main() {
 
 	// Start packetparser plugin.
 	cfg := &kcfg.Config{
-		MetricsInterval: 1 * time.Second,
-		EnablePodLevel:  true,
+		MetricsInterval:          1 * time.Second,
+		EnablePodLevel:           true,
+		BypassLookupIPOfInterest: true,
+		DataAggregationLevel:     kcfg.High,
 	}
 	tt = packetparser.New(cfg)
 	if err = tt.Stop(); err != nil {

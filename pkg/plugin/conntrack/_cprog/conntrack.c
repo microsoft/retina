@@ -21,6 +21,29 @@ struct tcpmetadata {
 	__u32 tsecr; // TCP timestamp echo reply
 };
 
+/*
+    flow metadata holds the metadata of the flow/connection related to the packet.
+*/
+struct flowmetadata {
+    /*
+        traffic_direction indicates the direction of the packet's co in relation to the host.
+    */
+	enum ct_traffic_dir traffic_direction;
+    /*
+        bytes_*_count indicates the number of bytes sent and received in the forward and reply direction.
+        These will be reset to 0 every time an event is reported.
+    */
+    __u64 bytes_forward_count;
+    __u64 bytes_reply_count;
+    /*
+        packets_*_count indicates the number of packets sent and received in the forward and reply direction.
+        These will be reset to 0 every time an event is reported.
+    */
+    __u64 packets_forward_count;
+    __u64 packets_reply_count;
+    __u8 is_closing;
+};
+
 struct packet
 {
 	// 5 tuple.
@@ -30,9 +53,15 @@ struct packet
 	__u16 dst_port;
 	__u8 proto;
 	struct tcpmetadata tcp_metadata; // TCP metadata
-	enum obs_point observation_point; // 
-	enum ct_traffic_dir traffic_direction; // 
-	bool is_reply; // 0 -> FALSE, 1 -> TRUE
+    /*
+        observation_point indicates where in the network stack the packet is observed.
+    */
+	enum obs_point observation_point;
+    /*
+        is_reply indicates whether the packet is a reply packet.
+    */
+    bool is_reply;
+    struct flowmetadata flow_metadata;
 	__u64 ts; // timestamp in nanoseconds
 	__u64 bytes; // packet size in bytes
 };
@@ -71,9 +100,21 @@ struct ct_value {
     __u32 last_report_forward_dir;
     __u32 last_report_reply_dir;
     /*
+        bytes_*_count indicates the number of bytes sent and received in the forward and reply direction.
+        These will be reset to 0 every time an event is reported.
+    */
+    __u64 bytes_forward_count;
+    __u64 bytes_reply_count;
+    /*
+        packets_*_count indicates the number of packets sent and received in the forward and reply direction.
+        These will be reset to 0 every time an event is reported.
+    */
+    __u64 packets_forward_count;
+    __u64 packets_reply_count;
+    /*
         * is_closing represents whether the connection is closing.
     */
-    __u16 is_closing;
+    __u8 is_closing;
 };
 
 struct {
@@ -134,6 +175,11 @@ static __always_inline bool _should_report_tcp_packet(__u8 flags, struct ct_valu
             WRITE_ONCE(value->flags_seen_reply_dir, flags);
             WRITE_ONCE(value->last_report_reply_dir, now);
         }
+        // Reset bytes and packets count.
+        WRITE_ONCE(value->bytes_forward_count, 0);
+        WRITE_ONCE(value->bytes_reply_count, 0);
+        WRITE_ONCE(value->packets_forward_count, 0);
+        WRITE_ONCE(value->packets_reply_count, 0);
         return true;
     }
     return false;
@@ -185,6 +231,11 @@ static __always_inline bool _should_report_udp_packet(__u8 flags, struct ct_valu
             WRITE_ONCE(value->flags_seen_reply_dir, flags);
             WRITE_ONCE(value->last_report_reply_dir, now);
         }
+        // Reset bytes and packets count.
+        WRITE_ONCE(value->bytes_forward_count, 0);
+        WRITE_ONCE(value->bytes_reply_count, 0);
+        WRITE_ONCE(value->packets_forward_count, 0);
+        WRITE_ONCE(value->packets_reply_count, 0);
         return true;
     }
     return false;
@@ -240,8 +291,13 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
                         __u64 now = bpf_mono_now();
                         new_value.lifetime = now + CT_SYN_TIMEOUT;
                         new_value.flags_seen_forward_dir = flags;
+                        new_value.flags_seen_reply_dir = 0;
                         new_value.last_report_forward_dir = now;
                         new_value.last_report_reply_dir = 0;
+                        new_value.packets_forward_count = 1;
+                        new_value.packets_reply_count = 0;
+                        new_value.bytes_forward_count = p->bytes;
+                        new_value.bytes_reply_count = 0;
                         new_value.is_closing = 0;
                         // Set the traffic direction of the connection depening on the observation point.
                         if (observation_point == FROM_ENDPOINT) {
@@ -254,7 +310,12 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
                         bpf_map_update_elem(&retina_conntrack_map, &key, &new_value, BPF_ANY);
                         // Update the packet.
                         p->is_reply = false;
-                        p->traffic_direction = new_value.traffic_direction;
+                        p->flow_metadata.traffic_direction = new_value.traffic_direction;
+                        p->flow_metadata.bytes_forward_count = new_value.bytes_forward_count;
+                        p->flow_metadata.bytes_reply_count = new_value.bytes_reply_count;
+                        p->flow_metadata.packets_forward_count = new_value.packets_forward_count;
+                        p->flow_metadata.packets_reply_count = new_value.packets_reply_count;
+                        p->flow_metadata.is_closing = new_value.is_closing;
                         return true;
                     } else {
                         // The packet is not a SYN packet and the connection corresponding to this packet is not found.
@@ -278,19 +339,34 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
                         }
                         // Check for ACK flag. If the ACK flag is set, the packet is considered as a reply packet.
                         if (flags & TCP_ACK) {
+                            new_value.flags_seen_forward_dir = 0;
                             new_value.flags_seen_reply_dir = flags;
                             new_value.last_report_forward_dir = 0;
                             new_value.last_report_reply_dir = now;
+                            new_value.bytes_forward_count = 0;
+                            new_value.bytes_reply_count = p->bytes;
+                            new_value.packets_forward_count = 0;
+                            new_value.packets_reply_count = 1;
                             bpf_map_update_elem(&retina_conntrack_map, &reverse_key, &new_value, BPF_ANY);
                             p->is_reply = true;
                         } else {
                             new_value.flags_seen_forward_dir = flags;
+                            new_value.flags_seen_reply_dir = 0;
                             new_value.last_report_forward_dir = now;
                             new_value.last_report_reply_dir = 0;
+                            new_value.bytes_forward_count = p->bytes;
+                            new_value.bytes_reply_count = 0;
+                            new_value.packets_forward_count = 1;
+                            new_value.packets_reply_count = 0;
                             bpf_map_update_elem(&retina_conntrack_map, &key, &new_value, BPF_ANY);
                             p->is_reply = false;
                         }
-                        p->traffic_direction = new_value.traffic_direction;
+                        p->flow_metadata.traffic_direction = new_value.traffic_direction;
+                        p->flow_metadata.bytes_forward_count = new_value.bytes_forward_count;
+                        p->flow_metadata.bytes_reply_count = new_value.bytes_reply_count;
+                        p->flow_metadata.packets_forward_count = new_value.packets_forward_count;
+                        p->flow_metadata.packets_reply_count = new_value.packets_reply_count;
+                        p->flow_metadata.is_closing = new_value.is_closing;
                         return true;
                     }
                 }
@@ -302,8 +378,13 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
                     __u64 now = bpf_mono_now();
                     new_value.lifetime = now + CT_CONNECTION_LIFETIME_NONTCP;
                     new_value.flags_seen_forward_dir = flags;
+                    new_value.flags_seen_reply_dir = 0;
                     new_value.last_report_forward_dir = now;
                     new_value.last_report_reply_dir = 0;
+                    new_value.packets_forward_count = 1;
+                    new_value.packets_reply_count = 0;
+                    new_value.bytes_forward_count = p->bytes;
+                    new_value.bytes_reply_count = 0;
                     new_value.is_closing = 0;
                     if (observation_point == FROM_ENDPOINT) {
                         new_value.traffic_direction = TRAFFIC_DIRECTION_EGRESS;
@@ -313,56 +394,81 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
                         new_value.traffic_direction = TRAFFIC_DIRECTION_UNKNOWN;
                     }
                     bpf_map_update_elem(&retina_conntrack_map, &key, &new_value, BPF_ANY);
+                    // Update the packet.
                     p->is_reply = false;
-                    p->traffic_direction = new_value.traffic_direction;
+                    p->flow_metadata.traffic_direction = new_value.traffic_direction;
+                    p->flow_metadata.bytes_forward_count = new_value.bytes_forward_count;
+                    p->flow_metadata.bytes_reply_count = new_value.bytes_reply_count;
+                    p->flow_metadata.packets_forward_count = new_value.packets_forward_count;
+                    p->flow_metadata.packets_reply_count = new_value.packets_reply_count;
+                    p->flow_metadata.is_closing = new_value.is_closing;
                     return true;
                 }
                 default:
                     return false; // We are not interested in other protocols.
             }
         } else { // The connection is found based on the reverse key, meaning that the packet is a reply packet to an existing connection.
-             switch(reverse_key.proto) {
+            // Update packet count and bytes count.
+            WRITE_ONCE(value->packets_reply_count, READ_ONCE(value->packets_reply_count) + 1);
+            WRITE_ONCE(value->bytes_reply_count, READ_ONCE(value->bytes_reply_count) + p->bytes);
+            // is_reply is true here because we found the connection in the reverse direction
+            // meaning that the packet is coming from the responder of the connection and therefore a reply packet.
+            p->is_reply = true;
+            p->flow_metadata.traffic_direction = value->traffic_direction;
+            p->flow_metadata.bytes_forward_count = value->bytes_forward_count;
+            p->flow_metadata.bytes_reply_count = value->bytes_reply_count;
+            p->flow_metadata.packets_forward_count = value->packets_forward_count;
+            p->flow_metadata.packets_reply_count = value->packets_reply_count;
+            p->flow_metadata.is_closing = value->is_closing;
+            switch(reverse_key.proto) {
                 case IPPROTO_TCP:
                     if (_should_report_tcp_packet(flags, value, CT_REPLY)) {
-                        // is_reply is true here because we found the connection in the reverse direction
-                        // meaning that the packet is coming from the responder of the connection and therefore a reply packet.
-                        p->is_reply = true;
-                        p->traffic_direction = value->traffic_direction;
+                        // Reupdate the packet is_closing flag in case the connection is closing.
+                        p->flow_metadata.is_closing = value->is_closing;
                         return true;
+                    } else {
+                        return false;
                     }
-                    return false;
                 case IPPROTO_UDP:
                     if (_should_report_udp_packet(flags, value, CT_REPLY)) {
-                        p->is_reply = true;
-                        p->traffic_direction = value->traffic_direction;
+                        p->flow_metadata.is_closing = value->is_closing;
                         return true;
+                    } else {
+                        return false;
                     }
-                    return false;
                 default:
                     return false; // We are not interested in other protocols.
             }
         }
     } else { // The connection is found in the forward direction. Update the connection.
+        // Update packet count and bytes count.
+        WRITE_ONCE(value->packets_forward_count, READ_ONCE(value->packets_forward_count) + 1);
+        WRITE_ONCE(value->bytes_forward_count, READ_ONCE(value->bytes_forward_count) + p->bytes);
+        p->is_reply = false;
+        p->flow_metadata.traffic_direction = value->traffic_direction;
+        p->flow_metadata.bytes_forward_count = value->bytes_forward_count;
+        p->flow_metadata.bytes_reply_count = value->bytes_reply_count;
+        p->flow_metadata.packets_forward_count = value->packets_forward_count;
+        p->flow_metadata.packets_reply_count = value->packets_reply_count;
+        p->flow_metadata.is_closing = value->is_closing;
         switch(key.proto) {
-                case IPPROTO_TCP:
-                    if (_should_report_tcp_packet(flags, value, CT_FORWARD)) {
-                        // is_reply is false here because we found the connection in the forward direction
-                        // meaning that the packet is coming from the initiator of the connection and therefore not a reply packet.
-                        p->is_reply = false;
-                        p->traffic_direction = value->traffic_direction;
-                        return true;
-                    }
+            case IPPROTO_TCP:
+                if (_should_report_tcp_packet(flags, value, CT_FORWARD)) {
+                    p->flow_metadata.is_closing = value->is_closing;
+                    return true;
+                } else {
                     return false;
-                case IPPROTO_UDP:
-                    if (_should_report_udp_packet(flags, value, CT_FORWARD)) {
-                        p->is_reply = false;
-                        p->traffic_direction = value->traffic_direction;
-                        return true;
-                    }
+                }
+            case IPPROTO_UDP:
+                if (_should_report_udp_packet(flags, value, CT_FORWARD)) {
+                    p->flow_metadata.is_closing = value->is_closing;
+                    return true;
+                } else {
                     return false;
-                default:
-                    return false; // We are not interested in other protocols.
-            }
+                }
+            default:
+                return false;
+        }
     }
     return false;
 }

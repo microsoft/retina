@@ -12,6 +12,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strconv"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -600,7 +601,7 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 			fl.IsReply = &wrapperspb.BoolValue{Value: bpfEvent.IsReply}
 
 			// Add the traffic direction to the flow.
-			fl.TrafficDirection = flow.TrafficDirection(bpfEvent.TrafficDirection)
+			fl.TrafficDirection = flow.TrafficDirection(bpfEvent.FlowMetadata.TrafficDirection)
 
 			// Log the flow.
 			p.l.Debug("Flow", zap.Any("flow", fl))
@@ -612,6 +613,104 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 			}
 			if p.enricher != nil {
 				p.enricher.Write(ev)
+			}
+
+			srcIP := fl.GetIP().GetSource()
+			dstIP := fl.GetIP().GetDestination()
+			var srcPort, dstPort uint32
+			if fl.GetL4().GetTCP() != nil {
+				srcPort = uint32(fl.GetL4().GetTCP().GetSourcePort())
+				dstPort = uint32(fl.GetL4().GetTCP().GetDestinationPort())
+			} else if fl.GetL4().GetUDP() != nil {
+				srcPort = uint32(fl.GetL4().GetUDP().GetSourcePort())
+				dstPort = uint32(fl.GetL4().GetUDP().GetDestinationPort())
+			}
+			var proto string
+			if bpfEvent.Proto == 6 { // nolint:gomnd // 6 is TCP
+				proto = "tcp"
+			} else if bpfEvent.Proto == 17 { // nolint:gomnd // 17 is UDP
+				proto = "udp"
+			}
+
+			// if the flow is a reply, swap the src and dst
+			if fl.GetIsReply() != nil && fl.GetIsReply().GetValue() {
+				srcIP, dstIP = dstIP, srcIP
+				srcPort, dstPort = dstPort, srcPort
+			}
+
+			metrics.FlowPacketsForward.WithLabelValues(
+				srcIP,
+				strconv.Itoa(int(srcPort)),
+				dstIP,
+				strconv.Itoa(int(dstPort)),
+				proto,
+				fl.GetTrafficDirection().String(),
+			).Set(float64(bpfEvent.FlowMetadata.PacketsForwardCount))
+
+			metrics.FlowBytesForward.WithLabelValues(
+				srcIP,
+				strconv.Itoa(int(srcPort)),
+				dstIP,
+				strconv.Itoa(int(dstPort)),
+				proto,
+				fl.GetTrafficDirection().String(),
+			).Set(float64(bpfEvent.FlowMetadata.BytesForwardCount))
+
+			metrics.FlowPacketsReply.WithLabelValues(
+				srcIP,
+				strconv.Itoa(int(srcPort)),
+				dstIP,
+				strconv.Itoa(int(dstPort)),
+				proto,
+				fl.GetTrafficDirection().String(),
+			).Set(float64(bpfEvent.FlowMetadata.PacketsReplyCount))
+
+			metrics.FlowBytesReply.WithLabelValues(
+				srcIP,
+				strconv.Itoa(int(srcPort)),
+				dstIP,
+				strconv.Itoa(int(dstPort)),
+				proto,
+				fl.GetTrafficDirection().String(),
+			).Set(float64(bpfEvent.FlowMetadata.BytesReplyCount))
+
+			// Check if the flow is closing
+			if bpfEvent.FlowMetadata.IsClosing == 1 {
+				metrics.FlowPacketsForward.WithLabelValues(
+					srcIP,
+					strconv.Itoa(int(srcPort)),
+					dstIP,
+					strconv.Itoa(int(dstPort)),
+					proto,
+					fl.GetTrafficDirection().String(),
+				).Set(0)
+
+				metrics.FlowBytesForward.WithLabelValues(
+					srcIP,
+					strconv.Itoa(int(srcPort)),
+					dstIP,
+					strconv.Itoa(int(dstPort)),
+					proto,
+					fl.GetTrafficDirection().String(),
+				).Set(0)
+
+				metrics.FlowPacketsReply.WithLabelValues(
+					srcIP,
+					strconv.Itoa(int(srcPort)),
+					dstIP,
+					strconv.Itoa(int(dstPort)),
+					proto,
+					fl.GetTrafficDirection().String(),
+				).Set(0)
+
+				metrics.FlowBytesReply.WithLabelValues(
+					srcIP,
+					strconv.Itoa(int(srcPort)),
+					dstIP,
+					strconv.Itoa(int(dstPort)),
+					proto,
+					fl.GetTrafficDirection().String(),
+				).Set(0)
 			}
 
 			// Write the event to the external channel.
