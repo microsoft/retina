@@ -211,6 +211,6 @@ func TestRefreshFailsOnlyOnFourthAttempt(t *testing.T) {
 	}
 
 	// Call Refresh the fourth time and expect it to fail
-	err := a.Refresh(ctx)
+	err = a.Refresh(ctx)
 	require.Error(t, err, "Expected error on the fourth attempt")
 }
