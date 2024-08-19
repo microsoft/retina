@@ -206,7 +206,7 @@ func TestRefreshFailsOnlyOnFourthAttempt(t *testing.T) {
 
 	// Call Refresh three times and expect it to succeed (no error)
 	for i := 0; i < 3; i++ {
-		err := a.Refresh(ctx)
+		err = a.Refresh(ctx)
 		require.NoError(t, err, "Expected no error on attempt %d", i+1)
 	}
 
