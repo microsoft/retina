@@ -140,7 +140,7 @@ func TestNoRefreshErrorOnLookupHost(t *testing.T) {
 }
 
 func TestInitWithIncorrectURL(t *testing.T) {
-	err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
 	require.NoError(t, err, "Expected no error during logger setup")
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -186,7 +186,7 @@ func TestRefreshFailsOnlyOnFourthAttempt(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	var simulatedDNSError = errors.New("simulated DNS error")
+	simulatedDNSError := errors.New("simulated DNS error")
 
 	mockedResolver := mocks.NewMockIHostResolver(ctrl)
 	mockedFilterManager := filtermanagermocks.NewMockIFilterManager(ctrl)
