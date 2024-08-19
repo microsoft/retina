@@ -22,8 +22,6 @@ linters:
   - performance
   - unused
   disable:
-  - maligned
-  - scopelint
   - gci
   enable:
   - exportloopref
@@ -39,6 +37,7 @@ linters:
   - nakedret
   - promlinter
   - revive
+  - predeclared
 linters-settings:
   gocritic:
     enabled-tags:
@@ -47,7 +46,5 @@ linters-settings:
     - "performance"
     disabled-checks:
     - "hugeParam"
-  govet:
-    check-shadowing: true
   lll:
     line-length: 200

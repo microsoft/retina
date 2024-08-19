@@ -106,8 +106,8 @@ $(GOFUMPT): $(TOOLS_DIR)/go.mod
 
 gofumpt: $(GOFUMPT) ## Build gofumpt
 
-$(GOLANGCI_LINT): ## Get the golangci-lint binary to match gh workflow version instead of building for consistency
-	cd $(TOOLS_DIR); curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(TOOLS_BIN_DIR) v1.55.2
+$(GOLANGCI_LINT): $(TOOLS_DIR)/go.mod
+	cd $(TOOLS_DIR); go mod download; go build -tags=tools -o bin/golangci-lint github.com/golangci/golangci-lint/cmd/golangci-lint
 
 golangci-lint: $(GOLANGCI_LINT) ## Build golangci-lint
 
@@ -160,7 +160,7 @@ fmt: $(GOFUMPT) ## run gofumpt on $FMT_PKG (default "retina").
 	$(GOFUMPT) -w $(FMT_PKG)
 
 lint: $(GOLANGCI_LINT) ## Fast lint vs default branch showing only new issues.
-	$(GOLANGCI_LINT) run --new-from-rev main --timeout 10m -v $(LINT_PKG)/...
+	CGO_ENABLED=0 $(GOLANGCI_LINT) run --new-from-rev main --timeout 10m -v $(LINT_PKG)/...
 
 lint-existing: $(GOLANGCI_LINT) ## Lint the current branch in entirety.
 	$(GOLANGCI_LINT) run -v $(LINT_PKG)/...
