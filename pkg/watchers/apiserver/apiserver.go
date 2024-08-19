@@ -15,6 +15,7 @@ import (
 	"github.com/microsoft/retina/pkg/log"
 	fm "github.com/microsoft/retina/pkg/managers/filtermanager"
 	"github.com/microsoft/retina/pkg/pubsub"
+	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
 	"k8s.io/client-go/rest"
 	kcfg "sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -22,7 +23,7 @@ import (
 
 const (
 	filterManagerRetries = 3
-	hostLookupRetries    = 3
+	hostLookupRetries    = 6 // 6 retries for a total of 63 seconds.
 )
 
 type ApiServerWatcher struct {
@@ -34,7 +35,6 @@ type ApiServerWatcher struct {
 	hostResolver      IHostResolver
 	filterManager     fm.IFilterManager
 	restConfig        *rest.Config
-	remainingRetries  int
 }
 
 var a *ApiServerWatcher
@@ -43,11 +43,10 @@ var a *ApiServerWatcher
 func Watcher() *ApiServerWatcher {
 	if a == nil {
 		a = &ApiServerWatcher{
-			isRunning:        false,
-			l:                log.Logger().Named("apiserver-watcher"),
-			current:          make(cache),
-			hostResolver:     net.DefaultResolver,
-			remainingRetries: hostLookupRetries,
+			isRunning:    false,
+			l:            log.Logger().Named("apiserver-watcher"),
+			current:      make(cache),
+			hostResolver: net.DefaultResolver,
 		}
 	}
 
@@ -188,27 +187,28 @@ func (a *ApiServerWatcher) resolveIPs(ctx context.Context, host string) ([]strin
 	// 	-DNS server errors ie NXDOMAIN, SERVFAIL.
 	// 	- Network errors ie timeout, unreachable DNS server.
 	// 	-Other DNS-related errors encapsulated in a DNSError.
-	hostIPs, err := a.hostResolver.LookupHost(ctx, host)
-	if err != nil {
-		// Decrement the remaining retries counter.
-		a.remainingRetries--
-		a.l.Debug("APIServer LookupHost failed", zap.Error(err), zap.Int("remainingRetries", a.remainingRetries))
+	var hostIPs []string
+	var err error
 
-		// If the remaining retries counter is zero, return an error.
-		if a.remainingRetries < 0 {
-			return nil, fmt.Errorf("failed to lookup host: %w", err)
+	retryFunc := func() error {
+		hostIPs, err = a.hostResolver.LookupHost(ctx, host)
+		if err != nil {
+			a.l.Debug("APIServer LookupHost failed", zap.Error(err))
+			return err
 		}
+		return nil
+	}
 
-		// do not return an error, instead return nil IPs so that on the next refresh, the lookup is retried.
-		return nil, nil
+	// Retry the lookup for hostIPs in case of failure.
+	err = utils.Retry(retryFunc, hostLookupRetries)
+	if err != nil {
+		a.l.Error("failed to resolve IPs", zap.Error(err))
+		return nil, err
 	}
 
 	if len(hostIPs) == 0 {
 		a.l.Debug("no IPs found for host", zap.String("host", host))
 	}
-
-	// Reset the retry counter.
-	a.remainingRetries = hostLookupRetries
 
 	return hostIPs, nil
 }
