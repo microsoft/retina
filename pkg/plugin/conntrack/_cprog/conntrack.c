@@ -6,6 +6,37 @@
 #include "conntrack.h"
 
 
+struct tcpmetadata {
+	__u32 seq; // TCP sequence number
+	__u32 ack_num; // TCP ack number
+	// TCP flags.
+	__u16 syn;
+	__u16 ack;
+	__u16 fin;
+	__u16 rst;
+	__u16 psh;
+	__u16 urg;
+	__u32 tsval; // TCP timestamp value
+	__u32 tsecr; // TCP timestamp echo reply
+};
+
+struct packet
+{
+	// 5 tuple.
+	__u32 src_ip;
+	__u32 dst_ip;
+	__u16 src_port;
+	__u16 dst_port;
+	__u8 proto;
+	struct tcpmetadata tcp_metadata; // TCP metadata
+	enum obs_point observation_point; // 
+	enum ct_traffic_dir traffic_direction; // 
+	bool is_reply; // 0 -> FALSE, 1 -> TRUE
+	__u64 ts; // timestamp in nanoseconds
+	__u64 bytes; // packet size in bytes
+};
+
+
 /**
     * The structure representing an ipv4 5-tuple key in the connection tracking map.
  **/
@@ -51,19 +82,6 @@ struct {
 } retina_conntrack_map SEC(".maps");
 
 /**
-    * Update the connection tracking map.
-    * @arg key The key to be used to update the connection in the map.
-    * @arg value The value to be updated in the map.
- **/
-static __always_inline void _update_conntrack_map(struct ct_v4_key *key, struct ct_value *value) {
-    // Check for null parameters.
-    if (!key || !value) {
-        return;
-    }
-    bpf_map_update_elem(&retina_conntrack_map, key, value, BPF_ANY);
-}
-
-/**
      * Check if a TCP packet should be reported to userspace.
      * @arg flags The flags of the packet.
      * @arg value The value of the connection.
@@ -77,39 +95,39 @@ static __always_inline bool _should_report_tcp_packet(__u8 flags, struct ct_valu
     }
 
     __u32 now = bpf_mono_now();
-    __u32 lifetime = value->lifetime;
+    __u32 lifetime = READ_ONCE(value->lifetime);
     __u8 seen_flags;
     if (direction == CT_FORWARD) {
-        seen_flags = value->flags_seen_forward_dir;
+        seen_flags = READ_ONCE(value->flags_seen_forward_dir);
     } else {
-        seen_flags = value->flags_seen_reply_dir;
+        seen_flags = READ_ONCE(value->flags_seen_reply_dir);
     }
-    __u32 last_report = value->last_report;
+    __u32 last_report = READ_ONCE(value->last_report);
     // OR the seen flags with the new flags.
     flags |= seen_flags;
 
     // Check if the connection timed out or closed.
     if (now >= lifetime || flags & (TCP_FIN | TCP_RST)) {
         // The connection is closing or closed. Mark the connection as closing. Update the flags seen and last report time.
-        value->is_closing = 1;
+        WRITE_ONCE(value->is_closing, 1);
         if (direction == CT_FORWARD) {
-            value->flags_seen_forward_dir = flags;
+            WRITE_ONCE(value->flags_seen_forward_dir, flags);
         } else {
-            value->flags_seen_reply_dir = flags;
+            WRITE_ONCE(value->flags_seen_reply_dir, flags);
         }
-        value->last_report = now;
+        WRITE_ONCE(value->last_report, now);
         return true; // Report the last packet received.
     }
     // Update the lifetime of the connection.
-    value->lifetime = now + CT_CONNECTION_LIFETIME_TCP;
+    WRITE_ONCE(value->lifetime, now + CT_CONNECTION_LIFETIME_TCP);
     // We will only report this packet iff a new flag is seen for the given direction or the report interval has passed.
     if (flags != seen_flags || now - last_report >= CT_REPORT_INTERVAL) {
         if (direction == CT_FORWARD) {
-            value->flags_seen_forward_dir = flags;
+            WRITE_ONCE(value->flags_seen_forward_dir, flags);
         } else {
-            value->flags_seen_reply_dir = flags;
+            WRITE_ONCE(value->flags_seen_reply_dir, flags);
         }
-        value->last_report = now;
+        WRITE_ONCE(value->last_report, now);
         return true;
     }
     return false;
@@ -126,46 +144,58 @@ static __always_inline bool _should_report_udp_packet(__u8 flags, struct ct_valu
     }
 
     __u32 now = bpf_mono_now();
-    __u32 lifetime = value->lifetime;
+    __u32 lifetime = READ_ONCE(value->lifetime);
     __u8 seen_flags;
     if (direction == CT_FORWARD) {
-        seen_flags = value->flags_seen_forward_dir;
+        seen_flags = READ_ONCE(value->flags_seen_forward_dir);
     } else {
-        seen_flags = value->flags_seen_reply_dir;
+        seen_flags = READ_ONCE(value->flags_seen_reply_dir);
     }
-    __u32 last_report = value->last_report;
+    __u32 last_report = READ_ONCE(value->last_report);
     // OR the seen flags with the new flags.
     flags |= seen_flags;
 
     // Check if the connection timed out or closed.
     if (now >= lifetime) {
         // The connection is closing or closed. Mark the connection as closing. Update the flags seen and last report time.
-        value->is_closing = 1;
-        value->last_report = now;
+        WRITE_ONCE(value->is_closing, 1);
+        WRITE_ONCE(value->last_report, now);
         return true; // Report the last packet received.
     }
     // Update the lifetime of the connection.
-    value->lifetime = now + CT_CONNECTION_LIFETIME_NONTCP;
+    WRITE_ONCE(value->lifetime, now + CT_CONNECTION_LIFETIME_NONTCP);
     // We will only report this packet iff a new flag is seen for the given direction or the report interval has passed.
     if (flags != seen_flags || now - last_report >= CT_REPORT_INTERVAL) {
         if (direction == CT_FORWARD) {
-            value->flags_seen_forward_dir = flags;
+            WRITE_ONCE(value->flags_seen_forward_dir, flags);
         } else {
-            value->flags_seen_reply_dir = flags;
+            WRITE_ONCE(value->flags_seen_reply_dir, flags);
         }
-        value->last_report = now;
+        WRITE_ONCE(value->last_report, now);
         return true;
     }
     return false;
 }
 
 /**
-    * Process a packet and update the connection tracking map.
-    * @arg key The key to be used to lookup the connection in the map.
-    * @arg flags The flags of the packet.
+    * Process a packet with the connection tracking logic.
+    * @arg *p Pointer to the packet being processed.
+    * @arg flags Flags seen on the packet.
+    * @arg observation_point The point in the networking stack where the packet is observed.
     * Returns true if the packet should be report to userspace. False otherwise.
 **/
-static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_v4_key key, __u8 flags, enum obs_point observation_point) {    
+static __always_inline __attribute__((unused)) bool ct_process_packet(struct packet *p, __u8 flags, enum obs_point observation_point) {
+    if (!p) {
+        return false;
+    }
+    // Create a new key for the forward direction.
+    struct ct_v4_key key;
+    __builtin_memset(&key, 0, sizeof(struct ct_v4_key));
+    key.src_ip = p->src_ip;
+    key.dst_ip = p->dst_ip;
+    key.src_port = p->src_port;
+    key.dst_port = p->dst_port;
+    key.proto = p->proto;
     // Lookup the connection in the map.
     struct ct_value *value = bpf_map_lookup_elem(&retina_conntrack_map, &key);
 
@@ -208,6 +238,9 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_
                             new_value.traffic_direction = TRAFFIC_DIRECTION_UNKNOWN;
                         }
                         bpf_map_update_elem(&retina_conntrack_map, &key, &new_value, BPF_ANY);
+                        // Update the packet.
+                        p->is_reply = false;
+                        p->traffic_direction = new_value.traffic_direction;
                         return true;
                     } else {
                         // The packet is not a SYN packet and the connection corresponding to this packet is not found.
@@ -234,10 +267,13 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_
                         if (flags & TCP_ACK) {
                             new_value.flags_seen_reply_dir = flags;
                             bpf_map_update_elem(&retina_conntrack_map, &reverse_key, &new_value, BPF_ANY);
+                            p->is_reply = true;
                         } else {
                             new_value.flags_seen_forward_dir = flags;
                             bpf_map_update_elem(&retina_conntrack_map, &key, &new_value, BPF_ANY);
+                            p->is_reply = false;
                         }
+                        p->traffic_direction = new_value.traffic_direction;
                         return true;
                     }
                 }
@@ -259,6 +295,8 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_
                         new_value.traffic_direction = TRAFFIC_DIRECTION_UNKNOWN;
                     }
                     bpf_map_update_elem(&retina_conntrack_map, &key, &new_value, BPF_ANY);
+                    p->is_reply = false;
+                    p->traffic_direction = new_value.traffic_direction;
                     return true;
                 }
                 default:
@@ -268,13 +306,17 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_
              switch(reverse_key.proto) {
                 case IPPROTO_TCP:
                     if (_should_report_tcp_packet(flags, value, CT_REPLY)) {
-                        _update_conntrack_map(&reverse_key, value);
+                        // is_reply is true here because we found the connection in the reverse direction
+                        // meaning that the packet is coming from the responder of the connection and therefore a reply packet.
+                        p->is_reply = true;
+                        p->traffic_direction = value->traffic_direction;
                         return true;
                     }
                     return false;
                 case IPPROTO_UDP:
                     if (_should_report_udp_packet(flags, value, CT_REPLY)) {
-                        _update_conntrack_map(&reverse_key, value);
+                        p->is_reply = true;
+                        p->traffic_direction = value->traffic_direction;
                         return true;
                     }
                     return false;
@@ -286,13 +328,17 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_
         switch(key.proto) {
                 case IPPROTO_TCP:
                     if (_should_report_tcp_packet(flags, value, CT_FORWARD)) {
-                        _update_conntrack_map(&key, value);
+                        // is_reply is false here because we found the connection in the forward direction
+                        // meaning that the packet is coming from the initiator of the connection and therefore not a reply packet.
+                        p->is_reply = false;
+                        p->traffic_direction = value->traffic_direction;
                         return true;
                     }
                     return false;
                 case IPPROTO_UDP:
                     if (_should_report_udp_packet(flags, value, CT_FORWARD)) {
-                        _update_conntrack_map(&key, value);
+                        p->is_reply = false;
+                        p->traffic_direction = value->traffic_direction;
                         return true;
                     }
                     return false;
@@ -301,46 +347,4 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_
             }
     }
     return false;
-}
-
-/**
- * Check if a packet is a reply packet to a connection.
- * @arg key The key to be used to check if the packet is a reply packet.
- */
-static __always_inline __attribute__((unused)) bool ct_is_reply_packet(struct ct_v4_key key) {    
-    // Lookup the connection in the map.
-    struct ct_value *value = bpf_map_lookup_elem(&retina_conntrack_map, &key);
-    if (value) {
-        // We return false here because we found the connection in the forward direction
-        // meaning that the packet is coming from the initiator of the connection and therefore not a reply packet.
-        return false;
-    } else {
-        return true;
-    }
-}
-
-/**
- * Get the traffic direction of a connection.
- * @arg key The key to be used to get the traffic direction of the connection.
- */
-static __always_inline __attribute__((unused)) enum ct_traffic_dir ct_get_traffic_direction(struct ct_v4_key key) {
-    // Lookup the connection in the map.
-    struct ct_value *value = bpf_map_lookup_elem(&retina_conntrack_map, &key);
-    if (value) {
-        return value->traffic_direction;
-    }
-    // Construct the reverse key.
-    struct ct_v4_key reverse_key;
-    __builtin_memset(&reverse_key, 0, sizeof(struct ct_v4_key));
-    reverse_key.src_ip = key.dst_ip;
-    reverse_key.dst_ip = key.src_ip;
-    reverse_key.src_port = key.dst_port;
-    reverse_key.dst_port = key.src_port;
-    reverse_key.proto = key.proto;
-    // Lookup the connection in the map based on the reverse key.
-    value = bpf_map_lookup_elem(&retina_conntrack_map, &reverse_key);
-    if (value) {
-        return value->traffic_direction;
-    }
-    return TRAFFIC_DIRECTION_UNKNOWN;
 }

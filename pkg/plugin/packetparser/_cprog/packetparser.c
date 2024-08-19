@@ -12,38 +12,6 @@
 
 char __license[] SEC("license") = "Dual MIT/GPL";
 
-
-
-struct tcpmetadata {
-	__u32 seq; // TCP sequence number
-	__u32 ack_num; // TCP ack number
-	// TCP flags.
-	__u16 syn;
-	__u16 ack;
-	__u16 fin;
-	__u16 rst;
-	__u16 psh;
-	__u16 urg;
-	__u32 tsval; // TCP timestamp value
-	__u32 tsecr; // TCP timestamp echo reply
-};
-
-struct packet
-{
-	// 5 tuple.
-	__u32 src_ip;
-	__u32 dst_ip;
-	__u16 src_port;
-	__u16 dst_port;
-	__u8 proto;
-	struct tcpmetadata tcp_metadata; // TCP metadata
-	enum obs_point observation_point; // 
-	enum ct_traffic_dir traffic_direction; // 
-	bool is_reply; // 0 -> FALSE, 1 -> TRUE
-	__u64 ts; // timestamp in nanoseconds
-	__u64 bytes; // packet size in bytes
-};
-
 struct
 {
 	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
@@ -254,20 +222,7 @@ static void parse(struct __sk_buff *skb, enum obs_point obs)
         bpf_perf_event_output(skb, &packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
         return;
     #elif DATA_AGGREGATION_LEVEL == 1
-		// Create a new conntrack key.
-		struct ct_v4_key key;
-		__builtin_memset(&key, 0, sizeof(struct ct_v4_key));
-		key.src_ip = p.src_ip;
-		key.dst_ip = p.dst_ip;
-		key.src_port = p.src_port;
-		key.dst_port = p.dst_port;
-		key.proto = p.proto;
-
-        if (ct_process_packet(key, flags, obs)) {
-            // Check if this packet is a reply packet.
-            p.is_reply = ct_is_reply_packet(key);
-			p.traffic_direction = ct_get_traffic_direction(key);
-
+        if (ct_process_packet(&p, flags, obs)) {
             // Send the packet to the perf buffer.
             bpf_perf_event_output(skb, &packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
         }
