@@ -151,8 +151,7 @@ func (a *ApiServerWatcher) Refresh(ctx context.Context) error {
 func (a *ApiServerWatcher) initNewCache(ctx context.Context) error {
 	ips, err := a.resolveIPs(ctx, a.apiServerHostName)
 	if err != nil {
-		a.l.Error("failed to resolve IPs", zap.Error(err))
-		return err
+		return fmt.Errorf("failed to resolve IPs: %w", err)
 	}
 
 	// Reset new cache.
@@ -193,8 +192,7 @@ func (a *ApiServerWatcher) resolveIPs(ctx context.Context, host string) ([]strin
 	retryFunc := func() error {
 		hostIPs, err = a.hostResolver.LookupHost(ctx, host)
 		if err != nil {
-			a.l.Debug("APIServer LookupHost failed", zap.Error(err))
-			return err
+			return fmt.Errorf("APIServer LookupHost failed: %w", err)
 		}
 		return nil
 	}
@@ -202,7 +200,6 @@ func (a *ApiServerWatcher) resolveIPs(ctx context.Context, host string) ([]strin
 	// Retry the lookup for hostIPs in case of failure.
 	err = utils.Retry(retryFunc, hostLookupRetries)
 	if err != nil {
-		a.l.Error("failed to resolve IPs", zap.Error(err))
 		return nil, err
 	}
 

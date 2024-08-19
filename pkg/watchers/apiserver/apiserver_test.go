@@ -119,7 +119,7 @@ func TestDiffCache(t *testing.T) {
 	assert.Equal(t, 1, len(deleted), "Expected 1 deleted host")
 }
 
-func TesRefreshLookUpAlwaysFail(t *testing.T) {
+func TestRefreshLookUpAlwaysFail(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
