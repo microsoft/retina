@@ -22,14 +22,15 @@ type packetparserCtV4Key struct {
 }
 
 type packetparserCtValue struct {
-	Lifetime            uint32
-	TrafficDirection    uint32
-	FlagsSeenForwardDir uint8
-	FlagsSeenReplyDir   uint8
-	_                   [2]byte
-	LastReport          uint32
-	IsClosing           uint16
-	_                   [2]byte
+	Lifetime             uint32
+	TrafficDirection     uint32
+	FlagsSeenForwardDir  uint8
+	FlagsSeenReplyDir    uint8
+	_                    [2]byte
+	LastReportForwardDir uint32
+	LastReportReplyDir   uint32
+	IsClosing            uint16
+	_                    [2]byte
 }
 
 type packetparserMapKey struct {

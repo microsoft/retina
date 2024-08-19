@@ -66,9 +66,10 @@ struct ct_value {
     __u8  flags_seen_forward_dir;
     __u8  flags_seen_reply_dir;
     /*
-        * last_report represents the last time when a packet for this connection was reported to userspace.
+        * last_report_*_dir represents the last time a packet event was reported in the forward and reply direction.
     */
-    __u32 last_report;
+    __u32 last_report_forward_dir;
+    __u32 last_report_reply_dir;
     /*
         * is_closing represents whether the connection is closing.
     */
@@ -98,12 +99,14 @@ static __always_inline bool _should_report_tcp_packet(__u8 flags, struct ct_valu
     __u32 now = bpf_mono_now();
     __u32 lifetime = READ_ONCE(value->lifetime);
     __u8 seen_flags;
+    __u32 last_report;
     if (direction == CT_FORWARD) {
         seen_flags = READ_ONCE(value->flags_seen_forward_dir);
+        last_report = READ_ONCE(value->last_report_forward_dir);
     } else {
         seen_flags = READ_ONCE(value->flags_seen_reply_dir);
+        last_report = READ_ONCE(value->last_report_reply_dir);
     }
-    __u32 last_report = READ_ONCE(value->last_report);
     // OR the seen flags with the new flags.
     flags |= seen_flags;
 
@@ -113,10 +116,11 @@ static __always_inline bool _should_report_tcp_packet(__u8 flags, struct ct_valu
         WRITE_ONCE(value->is_closing, 1);
         if (direction == CT_FORWARD) {
             WRITE_ONCE(value->flags_seen_forward_dir, flags);
+            WRITE_ONCE(value->last_report_forward_dir, now);
         } else {
             WRITE_ONCE(value->flags_seen_reply_dir, flags);
+            WRITE_ONCE(value->last_report_reply_dir, now);
         }
-        WRITE_ONCE(value->last_report, now);
         return true; // Report the last packet received.
     }
     // Update the lifetime of the connection.
@@ -125,10 +129,11 @@ static __always_inline bool _should_report_tcp_packet(__u8 flags, struct ct_valu
     if (flags != seen_flags || now - last_report >= CT_REPORT_INTERVAL) {
         if (direction == CT_FORWARD) {
             WRITE_ONCE(value->flags_seen_forward_dir, flags);
+            WRITE_ONCE(value->last_report_forward_dir, now);
         } else {
             WRITE_ONCE(value->flags_seen_reply_dir, flags);
+            WRITE_ONCE(value->last_report_reply_dir, now);
         }
-        WRITE_ONCE(value->last_report, now);
         return true;
     }
     return false;
@@ -147,12 +152,14 @@ static __always_inline bool _should_report_udp_packet(__u8 flags, struct ct_valu
     __u32 now = bpf_mono_now();
     __u32 lifetime = READ_ONCE(value->lifetime);
     __u8 seen_flags;
+    __u32 last_report;
     if (direction == CT_FORWARD) {
         seen_flags = READ_ONCE(value->flags_seen_forward_dir);
+        last_report = READ_ONCE(value->last_report_forward_dir);
     } else {
         seen_flags = READ_ONCE(value->flags_seen_reply_dir);
+        last_report = READ_ONCE(value->last_report_reply_dir);
     }
-    __u32 last_report = READ_ONCE(value->last_report);
     // OR the seen flags with the new flags.
     flags |= seen_flags;
 
@@ -160,7 +167,11 @@ static __always_inline bool _should_report_udp_packet(__u8 flags, struct ct_valu
     if (now >= lifetime) {
         // The connection is closing or closed. Mark the connection as closing. Update the flags seen and last report time.
         WRITE_ONCE(value->is_closing, 1);
-        WRITE_ONCE(value->last_report, now);
+        if (direction == CT_FORWARD) {
+            WRITE_ONCE(value->last_report_forward_dir, now);
+        } else {
+            WRITE_ONCE(value->last_report_reply_dir, now);
+        }
         return true; // Report the last packet received.
     }
     // Update the lifetime of the connection.
@@ -169,10 +180,11 @@ static __always_inline bool _should_report_udp_packet(__u8 flags, struct ct_valu
     if (flags != seen_flags || now - last_report >= CT_REPORT_INTERVAL) {
         if (direction == CT_FORWARD) {
             WRITE_ONCE(value->flags_seen_forward_dir, flags);
+            WRITE_ONCE(value->last_report_forward_dir, now);
         } else {
             WRITE_ONCE(value->flags_seen_reply_dir, flags);
+            WRITE_ONCE(value->last_report_reply_dir, now);
         }
-        WRITE_ONCE(value->last_report, now);
         return true;
     }
     return false;
@@ -228,7 +240,8 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
                         __u64 now = bpf_mono_now();
                         new_value.lifetime = now + CT_SYN_TIMEOUT;
                         new_value.flags_seen_forward_dir = flags;
-                        new_value.last_report = now;
+                        new_value.last_report_forward_dir = now;
+                        new_value.last_report_reply_dir = 0;
                         new_value.is_closing = 0;
                         // Set the traffic direction of the connection depening on the observation point.
                         if (observation_point == FROM_ENDPOINT) {
@@ -251,7 +264,6 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
                         __builtin_memset(&new_value, 0, sizeof(struct ct_value));
                         __u64 now = bpf_mono_now();
                         new_value.lifetime = now + CT_CONNECTION_LIFETIME_TCP;
-                        new_value.last_report = now;
                         new_value.is_closing = 0;
                         // Check for FIN and RST flags. If the connection is closing, mark the connection as closing.
                         if (flags & (TCP_FIN | TCP_RST)) {
@@ -267,10 +279,14 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
                         // Check for ACK flag. If the ACK flag is set, the packet is considered as a reply packet.
                         if (flags & TCP_ACK) {
                             new_value.flags_seen_reply_dir = flags;
+                            new_value.last_report_forward_dir = 0;
+                            new_value.last_report_reply_dir = now;
                             bpf_map_update_elem(&retina_conntrack_map, &reverse_key, &new_value, BPF_ANY);
                             p->is_reply = true;
                         } else {
                             new_value.flags_seen_forward_dir = flags;
+                            new_value.last_report_forward_dir = now;
+                            new_value.last_report_reply_dir = 0;
                             bpf_map_update_elem(&retina_conntrack_map, &key, &new_value, BPF_ANY);
                             p->is_reply = false;
                         }
@@ -286,7 +302,8 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
                     __u64 now = bpf_mono_now();
                     new_value.lifetime = now + CT_CONNECTION_LIFETIME_NONTCP;
                     new_value.flags_seen_forward_dir = flags;
-                    new_value.last_report = now;
+                    new_value.last_report_forward_dir = now;
+                    new_value.last_report_reply_dir = 0;
                     new_value.is_closing = 0;
                     if (observation_point == FROM_ENDPOINT) {
                         new_value.traffic_direction = TRAFFIC_DIRECTION_EGRESS;

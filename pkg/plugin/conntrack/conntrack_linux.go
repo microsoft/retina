@@ -108,7 +108,8 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 					zap.Uint16("is_closing", value.IsClosing),
 					zap.String("flags_seen_forward_dir", decodeFlags(value.FlagsSeenForwardDir)),
 					zap.String("flags_seen_reply_dir", decodeFlags(value.FlagsSeenReplyDir)),
-					zap.Uint32("last_reported", value.LastReport),
+					zap.Uint32("last_reported_forward_dir", value.LastReportForwardDir),
+					zap.Uint32("last_reported_reply_dir", value.LastReportReplyDir),
 				)
 			}
 			if err := iter.Err(); err != nil {
