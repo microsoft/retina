@@ -3,6 +3,7 @@
 
 #include "vmlinux.h"
 #include "bpf_helpers.h"
+#include "compiler.h"
 #include "conntrack.h"
 
 
