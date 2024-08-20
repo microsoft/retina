@@ -20,9 +20,9 @@ import (
 	"go.uber.org/zap"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type ct_v4_key conntrack ./_cprog/conntrack.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src
-
 // New creates a packetparser plugin.
+//
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type ct_v4_key conntrack ./_cprog/conntrack.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../lib/common/libbpf/_include/linux -I../lib/common/libbpf/_include/uapi/linux -I../lib/common/libbpf/_include/asm
 func New(cfg *config.Config) *Conntrack {
 	return &Conntrack{
 		l:           log.Logger().Named("conntrack"),
@@ -78,7 +78,7 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			return nil
 		case <-ticker.C:
 			var key conntrackCtV4Key
-			var value conntrackCtValue
+			var value conntrackCtEntry
 
 			var noOfCtEntries, entriesDeleted int
 			// List of keys to be deleted
@@ -105,10 +105,11 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 					zap.String("proto", decodeProto(key.Proto)),
 					zap.Uint32("lifetime", value.Lifetime),
 					zap.Uint32("traffic_direction", value.TrafficDirection),
-					zap.Uint16("is_closing", value.IsClosing),
+					zap.Uint8("is_closing", value.IsClosing),
 					zap.String("flags_seen_forward_dir", decodeFlags(value.FlagsSeenForwardDir)),
 					zap.String("flags_seen_reply_dir", decodeFlags(value.FlagsSeenReplyDir)),
-					zap.Uint32("last_reported", value.LastReport),
+					zap.Uint32("last_reported_forward_dir", value.LastReportForwardDir),
+					zap.Uint32("last_reported_reply_dir", value.LastReportReplyDir),
 				)
 			}
 			if err := iter.Err(); err != nil {

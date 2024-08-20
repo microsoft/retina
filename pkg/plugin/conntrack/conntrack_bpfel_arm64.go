@@ -12,6 +12,18 @@ import (
 	"github.com/cilium/ebpf"
 )
 
+type conntrackCtEntry struct {
+	Lifetime             uint32
+	TrafficDirection     uint32
+	FlagsSeenForwardDir  uint8
+	FlagsSeenReplyDir    uint8
+	_                    [2]byte
+	LastReportForwardDir uint32
+	LastReportReplyDir   uint32
+	IsClosing            uint8
+	_                    [3]byte
+}
+
 type conntrackCtV4Key struct {
 	SrcIp   uint32
 	DstIp   uint32
@@ -19,17 +31,6 @@ type conntrackCtV4Key struct {
 	DstPort uint16
 	Proto   uint8
 	_       [3]byte
-}
-
-type conntrackCtValue struct {
-	Lifetime            uint32
-	TrafficDirection    uint32
-	FlagsSeenForwardDir uint8
-	FlagsSeenReplyDir   uint8
-	_                   [2]byte
-	LastReport          uint32
-	IsClosing           uint16
-	_                   [2]byte
 }
 
 // loadConntrack returns the embedded CollectionSpec for conntrack.
