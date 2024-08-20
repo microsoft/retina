@@ -15,6 +15,7 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"github.com/cilium/cilium/api/v1/flow"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
@@ -44,8 +45,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type packet packetparser ./_cprog/packetparser.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../filter/_cprog/
-
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type packet packetparser ./_cprog/packetparser.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../lib/common/libbpf/_include/linux -I../lib/common/libbpf/_include/uapi/linux -I../lib/common/libbpf/_include/asm -I../filter/_cprog/ -I../conntrack/_cprog/
 var errNoOutgoingLinks = errors.New("could not determine any outgoing links")
 
 // New creates a packetparser plugin.
@@ -68,16 +68,17 @@ func (p *packetParser) Generate(ctx context.Context) error {
 	}
 	dir := path.Dir(filename)
 	dynamicHeaderPath := fmt.Sprintf("%s/%s/%s", dir, bpfSourceDir, dynamicHeaderFileName)
-	i := 0
+	// Check if packetparser will bypassing lookup IP of interest.
+	bypassLookupIPOfInterest := 0
 	if p.cfg.BypassLookupIPOfInterest {
-		p.l.Logger.Info("Bypassing lookup IP of interest")
-		i = 1
+		p.l.Info("bypassing lookup IP of interest")
+		bypassLookupIPOfInterest = 1
 	}
-	st := fmt.Sprintf("#define BYPASS_LOOKUP_IP_OF_INTEREST %d \n", i)
+	p.l.Info("data aggregation level", zap.String("level", p.cfg.DataAggregationLevel.String()))
+	st := fmt.Sprintf("#define BYPASS_LOOKUP_IP_OF_INTEREST %d\n#define DATA_AGGREGATION_LEVEL %d\n", bypassLookupIPOfInterest, p.cfg.DataAggregationLevel)
 	err := loader.WriteFile(ctx, dynamicHeaderPath, st)
 	if err != nil {
-		p.l.Error("Error writing dynamic header", zap.Error(err))
-		return err
+		return errors.Wrap(err, "failed to write dynamic header")
 	}
 	p.l.Info("PacketParser header generated at", zap.String("path", dynamicHeaderPath))
 	return nil
@@ -93,15 +94,27 @@ func (p *packetParser) Compile(ctx context.Context) error {
 	bpfSourceFile := fmt.Sprintf("%s/%s/%s", dir, bpfSourceDir, bpfSourceFileName)
 	bpfOutputFile := fmt.Sprintf("%s/%s", dir, bpfObjectFileName)
 	arch := runtime.GOARCH
-	includeDir := fmt.Sprintf("-I%s/../lib/_%s", dir, arch)
+	archLibDir := fmt.Sprintf("-I%s/../lib/_%s", dir, arch)
 	filterDir := fmt.Sprintf("-I%s/../filter/_cprog/", dir)
-	libbpfDir := fmt.Sprintf("-I%s/../lib/common/libbpf/_src", dir)
+	conntrackDir := fmt.Sprintf("-I%s/../conntrack/_cprog/", dir)
+	libbpfSrcDir := fmt.Sprintf("-I%s/../lib/common/libbpf/_src", dir)
+	libbpfIncludeLinuxDir := fmt.Sprintf("-I%s/../lib/common/libbpf/_include/linux", dir)
+	libbpfIncludeUapiLinuxDir := fmt.Sprintf("-I%s/../lib/common/libbpf/_include/uapi/linux", dir)
+	libbpfIncludeAsmDir := fmt.Sprintf("-I%s/../lib/common/libbpf/_include/asm", dir)
 	targetArch := "-D__TARGET_ARCH_x86"
 	if arch == "arm64" {
 		targetArch = "-D__TARGET_ARCH_arm64"
 	}
 	// Keep target as bpf, otherwise clang compilation yields bpf object that elf reader cannot load.
-	err = loader.CompileEbpf(ctx, "-target", "bpf", "-Wall", targetArch, "-g", "-O2", "-c", bpfSourceFile, "-o", bpfOutputFile, includeDir, libbpfDir, filterDir)
+	err = loader.CompileEbpf(ctx, "-target", "bpf", "-Wall", targetArch, "-g", "-O2", "-c", bpfSourceFile, "-o", bpfOutputFile,
+		archLibDir,
+		libbpfSrcDir,
+		libbpfIncludeAsmDir,
+		libbpfIncludeLinuxDir,
+		libbpfIncludeUapiLinuxDir,
+		filterDir,
+		conntrackDir,
+	)
 	if err != nil {
 		return err
 	}
@@ -557,7 +570,7 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 				sourcePortShort,
 				destinationPortShort,
 				bpfEvent.Proto,
-				bpfEvent.Dir,
+				bpfEvent.ObservationPoint,
 				flow.Verdict_FORWARDED,
 			)
 			if fl == nil {
@@ -576,14 +589,20 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 
 			// For packets originating from node, we use tsval as the tcpID.
 			// Packets coming back has the tsval echoed in tsecr.
-			if fl.TraceObservationPoint == flow.TraceObservationPoint_TO_NETWORK {
+			if fl.GetTraceObservationPoint() == flow.TraceObservationPoint_TO_NETWORK {
 				utils.AddTCPID(meta, uint64(tcpMetadata.Tsval))
-			} else if fl.TraceObservationPoint == flow.TraceObservationPoint_FROM_NETWORK {
+			} else if fl.GetTraceObservationPoint() == flow.TraceObservationPoint_FROM_NETWORK {
 				utils.AddTCPID(meta, uint64(tcpMetadata.Tsecr))
 			}
 
 			// Add metadata to the flow.
 			utils.AddRetinaMetadata(fl, meta)
+
+			// Add the isReply flag to the flow.
+			fl.IsReply = &wrapperspb.BoolValue{Value: bpfEvent.IsReply}
+
+			// Add the traffic direction to the flow.
+			fl.TrafficDirection = flow.TrafficDirection(bpfEvent.TrafficDirection)
 
 			// Write the event to the enricher.
 			ev := &v1.Event{

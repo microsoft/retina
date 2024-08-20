@@ -20,9 +20,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// New creates a packetparser plugin.
-//
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type ct_v4_key conntrack ./_cprog/conntrack.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../lib/common/libbpf/_include/linux -I../lib/common/libbpf/_include/uapi/linux -I../lib/common/libbpf/_include/asm
+
 func New(cfg *config.Config) *Conntrack {
 	return &Conntrack{
 		l:           log.Logger().Named("conntrack"),

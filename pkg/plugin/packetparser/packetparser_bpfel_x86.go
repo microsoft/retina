@@ -12,6 +12,27 @@ import (
 	"github.com/cilium/ebpf"
 )
 
+type packetparserCtEntry struct {
+	Lifetime             uint32
+	TrafficDirection     uint32
+	FlagsSeenForwardDir  uint8
+	FlagsSeenReplyDir    uint8
+	_                    [2]byte
+	LastReportForwardDir uint32
+	LastReportReplyDir   uint32
+	IsClosing            uint8
+	_                    [3]byte
+}
+
+type packetparserCtV4Key struct {
+	SrcIp   uint32
+	DstIp   uint32
+	SrcPort uint16
+	DstPort uint16
+	Proto   uint8
+	_       [3]byte
+}
+
 type packetparserMapKey struct {
 	Prefixlen uint32
 	Data      uint32
@@ -36,9 +57,12 @@ type packetparserPacket struct {
 		Tsval  uint32
 		Tsecr  uint32
 	}
-	Dir   uint32
-	Ts    uint64
-	Bytes uint64
+	ObservationPoint uint32
+	TrafficDirection uint32
+	IsReply          bool
+	_                [3]byte
+	Ts               uint64
+	Bytes            uint64
 }
 
 // loadPacketparser returns the embedded CollectionSpec for packetparser.
@@ -93,6 +117,7 @@ type packetparserProgramSpecs struct {
 // It can be passed ebpf.CollectionSpec.Assign.
 type packetparserMapSpecs struct {
 	PacketparserEvents *ebpf.MapSpec `ebpf:"packetparser_events"`
+	RetinaConntrackMap *ebpf.MapSpec `ebpf:"retina_conntrack_map"`
 	RetinaFilterMap    *ebpf.MapSpec `ebpf:"retina_filter_map"`
 }
 
@@ -116,12 +141,14 @@ func (o *packetparserObjects) Close() error {
 // It can be passed to loadPacketparserObjects or ebpf.CollectionSpec.LoadAndAssign.
 type packetparserMaps struct {
 	PacketparserEvents *ebpf.Map `ebpf:"packetparser_events"`
+	RetinaConntrackMap *ebpf.Map `ebpf:"retina_conntrack_map"`
 	RetinaFilterMap    *ebpf.Map `ebpf:"retina_filter_map"`
 }
 
 func (m *packetparserMaps) Close() error {
 	return _PacketparserClose(
 		m.PacketparserEvents,
+		m.RetinaConntrackMap,
 		m.RetinaFilterMap,
 	)
 }

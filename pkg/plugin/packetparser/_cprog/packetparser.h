@@ -9,8 +9,6 @@
 
 typedef enum
 {
-    FROM_ENDPOINT = 0,
-    TO_ENDPOINT,
-    FROM_NETWORK,
-    TO_NETWORK,
-} direction;
+    DATA_AGGREGATION_LEVEL_LOW = 0,
+    DATA_AGGREGATION_LEVEL_HIGH,
+} data_aggregation_level;
