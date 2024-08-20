@@ -37,8 +37,8 @@ var (
 	}
 )
 
-func setupWatcherManagerMock(ctl *gomock.Controller) (m *watchermock.MockIWatcherManager) {
-	m = watchermock.NewMockIWatcherManager(ctl)
+func setupWatcherManagerMock(ctl *gomock.Controller) (m *watchermock.MockManager) {
+	m = watchermock.NewMockManager(ctl)
 	m.EXPECT().Start(gomock.Any()).Return(nil).AnyTimes()
 	m.EXPECT().Stop(gomock.Any()).Return(nil).AnyTimes()
 	return
@@ -438,7 +438,7 @@ func TestWatcherManagerFailure(t *testing.T) {
 	defer ctl.Finish()
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 
-	m := watchermock.NewMockIWatcherManager(ctl)
+	m := watchermock.NewMockManager(ctl)
 	m.EXPECT().Start(gomock.Any()).Return(errors.New("error")).AnyTimes()
 
 	mgr := &PluginManager{
@@ -451,5 +451,5 @@ func TestWatcherManagerFailure(t *testing.T) {
 
 	err := mgr.Start(context.Background())
 	require.NotNil(t, err, "Expected Start err but got nil")
-	require.ErrorContains(t, err, "failed to start watcher manager", "Expected watcher manager , but got:%w", err)
+	require.ErrorContains(t, err, "watcher manager exited with error", "Expected watcher manager , but got:%w", err)
 }

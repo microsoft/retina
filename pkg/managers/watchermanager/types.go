@@ -5,29 +5,24 @@ package watchermanager
 
 import (
 	"context"
-	"sync"
-	"time"
 
 	"github.com/microsoft/retina/pkg/log"
 )
 
 //go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=types.go -destination=mocks/mock_types.go -package=mocks .
-type IWatcher interface {
-	// Init, Stop, and Refresh should only be called by watchermanager.
-	Init(ctx context.Context) error
+type Watcher interface {
+	// Start and Stop should only be called by watchermanager.
+	Start(ctx context.Context) error
 	Stop(ctx context.Context) error
-	Refresh(ctx context.Context) error
+	Name() string
 }
 
-type IWatcherManager interface {
+type Manager interface {
 	Start(ctx context.Context) error
 	Stop(ctx context.Context) error
 }
 
 type WatcherManager struct {
-	Watchers    []IWatcher
-	l           *log.ZapLogger
-	refreshRate time.Duration
-	cancel      context.CancelFunc
-	wg          sync.WaitGroup
+	Watchers []Watcher
+	l        *log.ZapLogger
 }

@@ -9,9 +9,8 @@ import (
 	"time"
 
 	"github.com/microsoft/retina/pkg/log"
-	"github.com/microsoft/retina/pkg/managers/filtermanager"
 	"github.com/microsoft/retina/pkg/managers/watchermanager"
-	"github.com/microsoft/retina/pkg/watchers/apiserver"
+	"github.com/microsoft/retina/pkg/watchers/endpoint"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -20,28 +19,19 @@ import (
 func main() {
 	opts := log.GetDefaultLogOpts()
 	opts.Level = "debug"
-	log.SetupZapLogger(opts)
-	l := log.Logger().Named("test-apiserver")
+	_, err := log.SetupZapLogger(opts)
+	if err != nil {
+		panic(err)
+	}
+	l := log.Logger().Named("test-endpoint-watcher")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Filtermanager.
-	f, err := filtermanager.Init(5)
-	if err != nil {
-		l.Error("Failed to start Filtermanager", zap.Error(err))
-		panic(err)
-	}
-	defer func() {
-		if err := f.Stop(); err != nil {
-			l.Error("Failed to stop Filtermanager", zap.Error(err))
-		}
-	}()
 	// watcher manager
 	wm := watchermanager.NewWatcherManager()
-	wm.Watchers = []watchermanager.Watcher{apiserver.NewWatcher()}
+	wm.Watchers = []watchermanager.Watcher{endpoint.NewWatcher()}
 
-	// apiserver watcher.
 	g, ctx := errgroup.WithContext(ctx)
 	// Start watcher manager
 	g.Go(func() error {
@@ -54,10 +44,11 @@ func main() {
 	})
 
 	// Sleep 1 minute.
-	time.Sleep(60 * time.Second)
+	time.Sleep(60 * time.Second) // nolint:gomnd // Sleep is used for testing purposes.
 
 	err = wm.Stop(ctx)
 	if err != nil {
+		l.Error("Failed to start watcher manager", zap.Error(err))
 		panic(err)
 	}
 }
