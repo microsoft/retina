@@ -6,10 +6,10 @@ package telemetry
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"runtime"
 	"runtime/debug"
-	"strconv"
 	"sync"
 	"time"
 
@@ -77,6 +77,7 @@ type TelemetryClient struct {
 	sync.RWMutex
 	processName string
 	properties  map[string]string
+	profile     *PerfProfile
 }
 
 func NewAppInsightsTelemetryClient(processName string, additionalproperties map[string]string) *TelemetryClient {
@@ -90,9 +91,15 @@ func NewAppInsightsTelemetryClient(processName string, additionalproperties map[
 		properties[k] = v
 	}
 
+	perfProfile, err := NewPerfProfile()
+	if err != nil {
+		panic(fmt.Errorf("failed to get perf profile in AppInsights: %w", err))
+	}
+
 	return &TelemetryClient{
 		processName: processName,
 		properties:  properties,
+		profile:     perfProfile,
 	}
 }
 
@@ -151,15 +158,16 @@ func (t *TelemetryClient) heartbeat(ctx context.Context) {
 		t.trackWarning(err, "failed to get kernel version")
 	}
 
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
 	props := map[string]string{
 		kernelversion: kernelVersion,
-		allocatedmem:  strconv.FormatUint(bToMb(m.Alloc), 10),
-		sysmem:        strconv.FormatUint(bToMb(m.Sys), 10),
-		goroutines:    strconv.Itoa(runtime.NumGoroutine()),
 	}
 
+	cpuProps, err := t.profile.GetCPUUsage()
+	if err != nil {
+		t.trackWarning(err, "failed to get cpu usage")
+	}
+	maps.Copy(props, cpuProps)
+	maps.Copy(props, t.profile.GetMemoryUsage())
 	t.TrackEvent("heartbeat", props)
 }
 
