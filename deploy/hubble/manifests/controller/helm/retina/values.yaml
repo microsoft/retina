@@ -61,6 +61,7 @@ remoteContext: false
 enableAnnotations: false
 bypassLookupIPOfInterest: true
 dataAggregationLevel: "high"
+monitorSockPath: "/var/run/cilium/monitor1_2.sock"
 
 imagePullSecrets: []
 nameOverride: "retina"
