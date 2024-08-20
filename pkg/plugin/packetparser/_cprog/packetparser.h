@@ -7,8 +7,5 @@
 // tc-bpf return code to execute the next tc-bpf program.
 #define TC_ACT_UNSPEC   (-1)
 
-typedef enum
-{
-    DATA_AGGREGATION_LEVEL_LOW = 0,
-    DATA_AGGREGATION_LEVEL_HIGH,
-} data_aggregation_level;
+#define DATA_AGGREGATION_LEVEL_LOW 0
+#define DATA_AGGREGATION_LEVEL_HIGH 1
