@@ -23,8 +23,8 @@ RUN --mount=type=cache,target="/root/.cache/go-build" \
 	-a -o retina-operator operator/main.go
 
 ##################### controller #######################
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/mirror/gcr/distroless/cc-debian11:latest@sha256:b53fbf5f81f4a120a489fedff2092e6fcbeacf7863fce3e45d99cc58dc230ccc AS controller
-
+# mcr.microsoft.com/cbl-mariner/distroless/minimal:2.0
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/cbl-mariner/distroless/minimal@sha256:63a0a70ceaa1320bc6eb98b81106667d43e46b674731ea8d28e4de1b87e0747f
 WORKDIR /
 COPY --from=builder /workspace/retina-operator .
 USER 65532:65532
