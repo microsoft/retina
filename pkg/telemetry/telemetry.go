@@ -77,7 +77,7 @@ type TelemetryClient struct {
 	sync.RWMutex
 	processName string
 	properties  map[string]string
-	profile     *PerfProfile
+	profile     Perf
 }
 
 func NewAppInsightsTelemetryClient(processName string, additionalproperties map[string]string) (*TelemetryClient, error) {
@@ -149,7 +149,7 @@ func GetEnvironmentProperties() map[string]string {
 }
 
 func (t *TelemetryClient) trackWarning(err error, msg string) {
-	t.TrackTrace(err.Error(), contracts.Warning, GetEnvironmentProperties())
+	t.TrackTrace(msg+": "+err.Error(), contracts.Warning, GetEnvironmentProperties())
 }
 
 func (t *TelemetryClient) heartbeat(ctx context.Context) {
