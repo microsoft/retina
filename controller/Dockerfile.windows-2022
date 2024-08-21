@@ -1,4 +1,6 @@
-FROM --platform=linux/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.21 AS builder
+# mcr.microsoft.com/oss/go/microsoft/golang:1.22.3-1-cbl-mariner2.0
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:8253def0216b87b2994b7ad689aeec7440f6eb67f981e438071d8d67e36ff69f AS builder
+
 
 # Build args
 ARG VERSION
