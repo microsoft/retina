@@ -176,7 +176,11 @@ func (o *Operator) Start() {
 			"version":                   buildinfo.Version,
 			telemetry.PropertyApiserver: apiserverURL,
 		}
-		tel = telemetry.NewAppInsightsTelemetryClient("retina-operator", properties)
+		tel, err = telemetry.NewAppInsightsTelemetryClient("retina-operator", properties)
+		if err != nil {
+			mainLogger.Error("failed to create telemetry client", zap.Error(err))
+			os.Exit(1)
+		}
 	} else {
 		mainLogger.Info("telemetry disabled", zap.String("apiserver", apiserverURL))
 		tel = telemetry.NewNoopTelemetry()

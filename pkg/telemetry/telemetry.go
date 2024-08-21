@@ -80,7 +80,7 @@ type TelemetryClient struct {
 	profile     *PerfProfile
 }
 
-func NewAppInsightsTelemetryClient(processName string, additionalproperties map[string]string) *TelemetryClient {
+func NewAppInsightsTelemetryClient(processName string, additionalproperties map[string]string) (*TelemetryClient, error) {
 	if client == nil {
 		fmt.Println("appinsights client not initialized")
 	}
@@ -93,14 +93,14 @@ func NewAppInsightsTelemetryClient(processName string, additionalproperties map[
 
 	perfProfile, err := NewPerfProfile()
 	if err != nil {
-		panic(fmt.Errorf("failed to get perf profile in AppInsights: %w", err))
+		return nil, err
 	}
 
 	return &TelemetryClient{
 		processName: processName,
 		properties:  properties,
 		profile:     perfProfile,
-	}
+	}, nil
 }
 
 // TrackPanic function sends the stacktrace and flushes logs only in a goroutine where its call is deferred.

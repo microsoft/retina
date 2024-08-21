@@ -129,11 +129,15 @@ func (d *Daemon) Start() error {
 			panic("telemetry enabled, but ApplicationInsightsID is empty")
 		}
 		mainLogger.Info("telemetry enabled", zap.String("applicationInsightsID", buildinfo.ApplicationInsightsID))
-		tel = telemetry.NewAppInsightsTelemetryClient("retina-agent", map[string]string{
+		tel, err = telemetry.NewAppInsightsTelemetryClient("retina-agent", map[string]string{
 			"version":   buildinfo.Version,
 			"apiserver": cfg.Host,
 			"plugins":   strings.Join(daemonConfig.EnabledPlugin, `,`),
 		})
+		if err != nil {
+			mainLogger.Error("failed to create telemetry client", zap.Error(err))
+			return fmt.Errorf("error when creating telemetry client: %w", err)
+		}
 	} else {
 		mainLogger.Info("telemetry disabled")
 		tel = telemetry.NewNoopTelemetry()

@@ -1,6 +1,7 @@
 package telemetry
 
 import (
+	"errors"
 	"fmt"
 	"runtime"
 	"strconv"
@@ -10,7 +11,7 @@ import (
 
 var (
 	microsecondBitShift = 20
-	ErrorNotInitialized = fmt.Errorf("perf profile not initialized")
+	ErrNotInitialized   = errors.New("perf profile not initialized")
 )
 
 const (
@@ -38,7 +39,7 @@ func NewPerfProfile() (*PerfProfile, error) {
 func (p *PerfProfile) GetCPUUsage() (map[string]string, error) { //nolint unnamed results are fine
 	props := make(map[string]string)
 	if p.usage == nil {
-		return props, ErrorNotInitialized
+		return props, ErrNotInitialized
 	}
 
 	p.perflock.Lock()
@@ -57,8 +58,8 @@ func (p *PerfProfile) GetCPUUsage() (map[string]string, error) { //nolint unname
 
 	p.usage = &currentUsage
 
-	props[userCPUSeconds] = fmt.Sprintf("%d", userTime)
-	props[sysCPUSeconds] = fmt.Sprintf("%d", sysTime)
+	props[userCPUSeconds] = strconv.FormatInt(userTime, 10)
+	props[sysCPUSeconds] = strconv.FormatInt(sysTime, 10)
 
 	return props, nil
 }

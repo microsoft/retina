@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -58,7 +59,10 @@ var (
 					properties["plugins"] = strings.Join(p.Config.EnabledPlugins, `,`)
 				}
 
-				tel := telemetry.NewAppInsightsTelemetryClient(p.Config.Component, properties)
+				tel, err := telemetry.NewAppInsightsTelemetryClient(p.Config.Component, properties)
+				if err != nil {
+					return nil, fmt.Errorf("failed to create telemetry client: %w", err)
+				}
 				return tel, nil
 			}
 
