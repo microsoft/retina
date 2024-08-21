@@ -62,6 +62,7 @@ type Config struct {
 	EnableAnnotations        bool          `yaml:"enableAnnotations"`
 	BypassLookupIPOfInterest bool          `yaml:"bypassLookupIPOfInterest"`
 	DataAggregationLevel     Level         `yaml:"dataAggregationLevel"`
+	MonitorSockPath          string        `yaml:"monitorSockPath"`
 }
 
 func GetConfig(cfgFilename string) (*Config, error) {
