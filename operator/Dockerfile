@@ -1,4 +1,6 @@
-FROM mcr.microsoft.com/oss/go/microsoft/golang:1.22 AS builder
+# mcr.microsoft.com/oss/go/microsoft/golang:1.22.4-1-cbl-mariner2.0
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:62b5953c2bee60b39d2b0505fb073b1f06ec3aaec34e44e9807cb8af85f53622 AS builder
+
 
 ARG VERSION
 ARG APP_INSIGHTS_ID
