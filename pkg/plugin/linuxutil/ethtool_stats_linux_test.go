@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"testing"
 
+	lru "github.com/hashicorp/golang-lru/v2"
+
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/prometheus/client_golang/prometheus"
@@ -24,11 +26,13 @@ func TestNewEthtool(t *testing.T) {
 	opts := &EthtoolOpts{
 		errOrDropKeysOnly: false,
 		addZeroVal:        false,
+		limit:             10,
 	}
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	ethHandle := NewMockEthtoolInterface(ctrl)
+	// cachedEthHandle := NewCachedEthtool(ethHandle, opts)
 	ethReader := NewEthtoolReader(opts, ethHandle)
 	assert.NotNil(t, ethReader)
 }
@@ -39,15 +43,19 @@ func TestNewEthtoolWithNil(t *testing.T) {
 	opts := &EthtoolOpts{
 		errOrDropKeysOnly: false,
 		addZeroVal:        false,
+		limit:             10,
 	}
 
 	ethReader := NewEthtoolReader(opts, nil)
 	assert.NotNil(t, ethReader)
 }
 
-var globalUnsupportedCache = make(map[string]bool)
+// var globalCache *lru.Cache[string, struct{}]
 
 func TestReadInterfaceStats(t *testing.T) {
+
+	globalCache, _ := lru.New[string, any](10)
+
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	l := log.Logger().Named("ethtool test").Sugar()
 
@@ -64,6 +72,7 @@ func TestReadInterfaceStats(t *testing.T) {
 			opts: &EthtoolOpts{
 				errOrDropKeysOnly: false,
 				addZeroVal:        false,
+				limit:             10,
 			},
 			statsReturn: map[string]uint64{
 				"rx_packets": 1,
@@ -79,17 +88,20 @@ func TestReadInterfaceStats(t *testing.T) {
 			opts: &EthtoolOpts{
 				errOrDropKeysOnly: false,
 				addZeroVal:        false,
+				limit:             10,
 			},
 			statsReturn: nil,
 			statErr:     errInterfaceNotSupported,
-			result:      nil,
-			wantErr:     false,
+
+			result:  nil,
+			wantErr: false,
 		},
 		{
 			name: "test skipped interface",
 			opts: &EthtoolOpts{
 				errOrDropKeysOnly: false,
 				addZeroVal:        false,
+				limit:             10,
 			},
 			statsReturn: nil,
 			statErr:     errInterfaceNotSupported,
@@ -105,9 +117,14 @@ func TestReadInterfaceStats(t *testing.T) {
 		defer ctrl.Finish()
 
 		ethHandle := NewMockEthtoolInterface(ctrl)
-		ethReader := NewEthtoolReader(tt.opts, ethHandle)
+		//add
+		cachedEthHandle := NewCachedEthtool(ethHandle, tt.opts)
+		// 在每次测试开始时，将全局缓存传递给临时缓存对象
+		cachedEthHandle.unsupported = globalCache
+		//done
+		ethReader := NewEthtoolReader(tt.opts, cachedEthHandle)
 
-		ethReader.unsupported = globalUnsupportedCache
+		// ethReader.unsupported = globalUnsupportedCache
 
 		assert.NotNil(t, ethReader)
 
@@ -131,13 +148,32 @@ func TestReadInterfaceStats(t *testing.T) {
 			ethReader.updateMetrics()
 		}
 
-		if tt.statErr != nil && errors.Is(tt.statErr, errInterfaceNotSupported) {
-			assert.NotEqual(t, nil, ethReader.unsupported, "unsupported map should not be nil")
-			assert.NotEmpty(t, ethReader.unsupported, "unsupported map should contain interfaces")
-		}
+		// if tt.statErr != nil && errors.Is(tt.statErr, errInterfaceNotSupported) {
+		// 	assert.NotEqual(t, nil, ethReader.unsupported, "unsupported map should not be nil")
+		// 	assert.NotEmpty(t, ethReader.unsupported, "unsupported map should contain interfaces")
+		// }
 
-		globalUnsupportedCache = ethReader.unsupported
-		fmt.Println("Current unsupported cache: ", ethReader.unsupported, "Global unsupported cache: ", globalUnsupportedCache)
+		// globalUnsupportedCache = ethReader.unsupported
+		// fmt.Println("Current unsupported cache: ", ethReader.unsupported, "Global unsupported cache: ", globalUnsupportedCache)
+
+		// 检查缓存是否正确处理不支持的接口
+		fmt.Println("aa---------------------", cachedEthHandle.unsupported.Len())
+		for _, key := range cachedEthHandle.unsupported.Keys() {
+			fmt.Println("key: ", key)
+		}
+		if tt.statErr != nil && errors.Is(tt.statErr, errInterfaceNotSupported) {
+			assert.NotNil(t, cachedEthHandle.unsupported, "cache should not be nil")
+			assert.NotEqual(t, 0, cachedEthHandle.unsupported.Len(), "cache should contain interface")
+			// l.Infof("Current unsupported cache: ", cachedEthHandle.unsupported, "Global unsupported cache: ", globalCache)
+			// cachedIntf, found := cachedEthHandle.unsupported.Get(tt.name)
+			// assert.True(t, found, "interface should be in unsupported cache")
+			// assert.Equal(t, struct{}{}, cachedIntf, "interface should be marked as unsupported")
+			// for key := range cachedEthHandle.unsupported.Keys() {
+			// 	l.Infof("key: ", key)
+			// }
+		}
+		globalCache = cachedEthHandle.unsupported
+		l.Infof("Current unsupported cache: ", cachedEthHandle.unsupported, "Global unsupported cache: ", globalCache)
 
 	}
 }

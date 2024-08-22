@@ -3,6 +3,7 @@
 package linuxutil
 
 import (
+	"errors"
 	"net"
 	"strings"
 
@@ -12,15 +13,12 @@ import (
 	"go.uber.org/zap"
 )
 
-const limitValue = 2000
-
 type EthtoolReader struct {
-	l           *log.ZapLogger
-	opts        *EthtoolOpts
-	data        *EthtoolStats
-	ethHandle   EthtoolInterface
-	unsupported map[string]bool
-	limit       int
+	l         *log.ZapLogger
+	opts      *EthtoolOpts
+	data      *EthtoolStats
+	ethHandle EthtoolInterface
+	// unsupported map[string]struct{}
 }
 
 func NewEthtoolReader(opts *EthtoolOpts, ethHandle EthtoolInterface) *EthtoolReader {
@@ -32,13 +30,15 @@ func NewEthtoolReader(opts *EthtoolOpts, ethHandle EthtoolInterface) *EthtoolRea
 			return nil
 		}
 	}
+	// Construct a cached ethtool handle
+	CachedEthHandle := NewCachedEthtool(ethHandle, opts)
 	return &EthtoolReader{
-		l:           log.Logger().Named(string("EthtoolReader")),
-		opts:        opts,
-		data:        &EthtoolStats{},
-		ethHandle:   ethHandle,
-		unsupported: make(map[string]bool),
-		limit:       limitValue,
+		l:    log.Logger().Named(string("EthtoolReader")),
+		opts: opts,
+		data: &EthtoolStats{},
+		// ethHandle:   ethHandle,
+		ethHandle: CachedEthHandle,
+		// unsupported: make(map[string]struct{}),
 	}
 }
 
@@ -74,29 +74,31 @@ func (er *EthtoolReader) readInterfaceStats() error {
 			continue
 		}
 
-		if er.unsupported[i.Name] {
-			er.l.Info("Skip Unsupported interface", zap.String("ifacename", i.Name))
-			continue
-		}
-
 		// Retrieve tx from eth0
 		ifaceStats, err := er.ethHandle.Stats(i.Name)
-		if err != nil {
-			er.l.Error("Error while getting ethtool:", zap.String("ifacename", i.Name), zap.Error(err))
 
-			if len(er.unsupported) < er.limit {
-				er.unsupported[i.Name] = true
+		if err != nil {
+			if errors.Is(err, errskip) {
+				er.l.Info("Skipping unsupported interface", zap.String("ifacename", i.Name))
 			} else {
-				er.l.Warn("Reached limit of unsupported interfaces")
+				er.l.Error("Error while getting ethtool:", zap.String("ifacename", i.Name), zap.Error(err))
 			}
 			continue
 		}
+
+		// switch {
+		// case errors.Is(err, errskip):
+		// 	er.l.Debug("Skipping unsupported interface", zap.String("ifacename", i.Name))
+		// case err != nil:
+		// 	er.l.Error("Error while getting ethtool stats", zap.String("ifacename", i.Name), zap.Error(err))
+		// case ifaceStats != nil:
 
 		er.data.stats[i.Name] = make(map[string]uint64)
 		tempMap := er.processStats(ifaceStats)
 		er.data.stats[i.Name] = tempMap
 
 		er.l.Debug("Processed ethtool Stats ", zap.String("ifacename", i.Name))
+
 	}
 
 	return nil
