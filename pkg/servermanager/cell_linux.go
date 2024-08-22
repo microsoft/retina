@@ -29,7 +29,7 @@ func newServerManager(params serverParams) (*sm.HTTPServer, error) {
 	logger := params.Log.WithField("module", "servermanager")
 
 	serverCtx, cancelCtx := context.WithCancel(context.Background())
-	serverManager := sm.NewHTTPServer(params.Config.ApiServer.Host, params.Config.ApiServer.Port)
+	serverManager := sm.NewHTTPServer(params.Config.APIServer.Host, params.Config.APIServer.Port)
 	if err := serverManager.Init(); err != nil {
 		logger.WithError(err).Error("Unable to initialize Http server")
 		cancelCtx()

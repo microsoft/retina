@@ -110,6 +110,8 @@ data:
     remoteContext: {{ .Values.remoteContext }}
     enableAnnotations: {{ .Values.enableAnnotations }}
     bypassLookupIPOfInterest: {{ .Values.bypassLookupIPOfInterest }}
+    dataAggregationLevel: {{ .Values.dataAggregationLevel }}
+    monitorSockPath: {{ .Values.monitorSockPath }}
 {{- end}}
 ---
 {{- if .Values.os.windows}}

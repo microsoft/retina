@@ -7,8 +7,8 @@ import (
 
 	"github.com/cilium/cilium/pkg/hive"
 	"github.com/microsoft/retina/cmd/hubble"
+	"github.com/microsoft/retina/internal/buildinfo"
 	"github.com/spf13/cobra"
-	"go.etcd.io/etcd/version"
 )
 
 var (
@@ -19,7 +19,7 @@ var (
 		Short: "Start Hubble control plane",
 		Run: func(cobraCmd *cobra.Command, _ []string) {
 			if v, _ := cobraCmd.Flags().GetBool("version"); v {
-				fmt.Printf("%s %s\n", cobraCmd.Name(), version.Version)
+				fmt.Printf("%s %s\n", cobraCmd.Name(), buildinfo.Version)
 			}
 			hubble.Execute(cobraCmd, h)
 		},

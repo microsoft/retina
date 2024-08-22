@@ -34,7 +34,7 @@ PLATFORM		?= $(OS)/$(ARCH)
 PLATFORMS		?= linux/amd64 linux/arm64 windows/amd64
 OS_VERSION		?= ltsc2019
 
-HUBBLE_VERSION ?= v0.13.0
+HUBBLE_VERSION ?= v0.13.6
 
 CONTAINER_BUILDER ?= docker
 CONTAINER_RUNTIME ?= docker
@@ -176,7 +176,7 @@ retina: ## builds retina binary
 retina-binary: ## build the Retina binary
 	export CGO_ENABLED=0 && \
 	go generate ./... && \
-	go build -v -o $(RETINA_BUILD_DIR)/retina$(EXE_EXT) -gcflags="-dwarflocationlists=true" -ldflags "-X main.version=$(TAG) -X main.applicationInsightsID=$(APP_INSIGHTS_ID)" $(RETINA_DIR)/main.go
+	go build -v -o $(RETINA_BUILD_DIR)/retina$(EXE_EXT) -gcflags="-dwarflocationlists=true" -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version=$(TAG) -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=$(APP_INSIGHTS_ID)" $(RETINA_DIR)/main.go
 
 retina-capture-workload: ## build the Retina capture workload
 	cd $(CAPTURE_WORKLOAD_DIR) && CGO_ENABLED=0 go build -v -o $(RETINA_BUILD_DIR)/captureworkload$(EXE_EXT) -gcflags="-dwarflocationlists=true"  -ldflags "-X main.version=$(TAG)"
@@ -385,7 +385,10 @@ coverage: # Code coverage.
 manifests: 
 	cd crd && make manifests && make generate
 
-HELM_IMAGE_TAG ?= v0.0.2
+# Fetch the latest tag from the GitHub
+LATEST_TAG := $(shell curl -s https://api.github.com/repos/microsoft/retina/releases | jq -r '.[0].name')
+
+HELM_IMAGE_TAG ?= $(LATEST_TAG)
 
 # basic/node-level mode
 helm-install: manifests
