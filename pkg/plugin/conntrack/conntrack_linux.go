@@ -11,7 +11,6 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/rlimit"
 	"github.com/microsoft/retina/internal/ktime"
-	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
 	_ "github.com/microsoft/retina/pkg/plugin/conntrack/_cprog" // nolint // This is needed so cprog is included when vendoring
@@ -22,20 +21,15 @@ import (
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type ct_v4_key conntrack ./_cprog/conntrack.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../lib/common/libbpf/_include/linux -I../lib/common/libbpf/_include/uapi/linux -I../lib/common/libbpf/_include/asm
 
-func New(cfg *config.Config) *Conntrack {
+func New() *Conntrack {
 	return &Conntrack{
 		l:           log.Logger().Named("conntrack"),
 		gcFrequency: defaultGCFrequency,
-		cfg:         cfg,
 	}
 }
 
 // Run starts the Conntrack garbage collection loop.
 func (ct *Conntrack) Run(ctx context.Context) error {
-	if ct.cfg.DataAggregationLevel == config.Low {
-		ct.l.Info("conntrack is disabled in low data aggregation level")
-		return nil
-	}
 	// Allow the current process to lock memory for eBPF resources.
 	if err := rlimit.RemoveMemlock(); err != nil {
 		ct.l.Error("RemoveMemlock failed", zap.Error(err))

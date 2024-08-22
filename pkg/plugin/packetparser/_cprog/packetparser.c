@@ -187,11 +187,7 @@ static void parse(struct __sk_buff *skb, enum obs_point obs)
 	#endif
 	#endif
 
-	#ifdef DATA_AGGREGATION_LEVEL
-	#if DATA_AGGREGATION_LEVEL == DATA_AGGREGATION_LEVEL_HIGH
-    	__u8 flags = 0;
-	#endif
-	#endif
+	__u8 flags = 0;
 	// Get source and destination ports.
 	if (ip->protocol == IPPROTO_TCP)
 	{
@@ -202,12 +198,8 @@ static void parse(struct __sk_buff *skb, enum obs_point obs)
 		p.src_port = tcp->source;
 		p.dst_port = tcp->dest;
 
-		#ifdef DATA_AGGREGATION_LEVEL
-		#if DATA_AGGREGATION_LEVEL == DATA_AGGREGATION_LEVEL_HIGH
-			// Get all TCP flags.
-			flags = (tcp->fin << 0) | (tcp->syn << 1) | (tcp->rst << 2) | (tcp->psh << 3) | (tcp->ack << 4) | (tcp->urg << 5) | (tcp->ece << 6) | (tcp->cwr << 7);
-		#endif
-		#endif
+		// Get all TCP flags.
+		flags = (tcp->fin << 0) | (tcp->syn << 1) | (tcp->rst << 2) | (tcp->psh << 3) | (tcp->ack << 4) | (tcp->urg << 5) | (tcp->ece << 6) | (tcp->cwr << 7);
 
 		// Get TCP metadata.
 		struct tcpmetadata tcp_metadata;
@@ -239,40 +231,34 @@ static void parse(struct __sk_buff *skb, enum obs_point obs)
 		p.src_port = udp->source;
 		p.dst_port = udp->dest;
 
-		#ifdef DATA_AGGREGATION_LEVEL
-		#if DATA_AGGREGATION_LEVEL == DATA_AGGREGATION_LEVEL_HIGH
-			flags = 1;
-		#endif
-		#endif
+		flags = 1;
 	}
 	else
 	{
 		return;
 	}
 
+	// Create a new conntrack key.
+	struct ct_v4_key key;
+	__builtin_memset(&key, 0, sizeof(struct ct_v4_key));
+	key.src_ip = p.src_ip;
+	key.dst_ip = p.dst_ip;
+	key.src_port = p.src_port;
+	key.dst_port = p.dst_port;
+	key.proto = p.proto;
+
+	// Process the packet in ct
+	bool report = ct_process_packet(key, flags, obs);
+	p.is_reply = ct_is_reply_packet(key);
+	p.traffic_direction = ct_get_traffic_direction(key);
 	#ifdef DATA_AGGREGATION_LEVEL
-    #if DATA_AGGREGATION_LEVEL == DATA_AGGREGATION_LEVEL_LOW
+	// Check if we need to report this packet. Only report if the aggregation level is low or ct_process_packet() returns true.
+    #if (DATA_AGGREGATION_LEVEL == DATA_AGGREGATION_LEVEL_LOW || report)
         bpf_perf_event_output(skb, &packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
-        return;
-    #elif DATA_AGGREGATION_LEVEL == DATA_AGGREGATION_LEVEL_HIGH
-		// Create a new conntrack key.
-		struct ct_v4_key key;
-		__builtin_memset(&key, 0, sizeof(struct ct_v4_key));
-		key.src_ip = p.src_ip;
-		key.dst_ip = p.dst_ip;
-		key.src_port = p.src_port;
-		key.dst_port = p.dst_port;
-		key.proto = p.proto;
-		if (ct_process_packet(key, flags, obs)) {
-            // Check if this packet is a reply packet.
-            p.is_reply = ct_is_reply_packet(key);
-			p.traffic_direction = ct_get_traffic_direction(key);
-            // Send the packet to the perf buffer.
-            bpf_perf_event_output(skb, &packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
-        }
         return;
     #endif
 	#endif
+	return;
 }
 
 SEC("classifier_endpoint_ingress")

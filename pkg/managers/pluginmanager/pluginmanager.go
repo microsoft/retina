@@ -156,15 +156,15 @@ func (p *PluginManager) Start(ctx context.Context) error {
 		}
 	}
 
-	// start all plugins
 	g, ctx := errgroup.WithContext(ctx)
-	if p.cfg.DataAggregationLevel == kcfg.High {
-		// enable conntrack GC
-		ct := conntrack.New(p.cfg)
-		g.Go(func() error {
-			return errors.Wrapf(ct.Run(ctx), "failed to run conntrack GC")
-		})
-	}
+
+	// run conntrack GC
+	ct := conntrack.New()
+	g.Go(func() error {
+		return errors.Wrapf(ct.Run(ctx), "failed to run conntrack GC")
+	})
+
+	// start all plugins
 	for _, plugin := range p.plugins {
 		plug := plugin
 
