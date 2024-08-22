@@ -19,6 +19,7 @@ var (
 	probeAddr            string
 	enableLeaderElection bool
 	cfgFile              string
+	kubeConfigFileName   = ""
 
 	rootCmd = &cobra.Command{
 		Use:   "retina-agent",
@@ -41,6 +42,7 @@ func init() {
 	rootCmd.Flags().StringVar(&probeAddr, "health-probe-bind-address", ":18081", "The address the probe endpoint binds to.")
 	rootCmd.Flags().BoolVar(&enableLeaderElection, "leader-elect", false, "Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
 	rootCmd.Flags().StringVar(&cfgFile, "config", configFileName, "config file")
+	rootCmd.Flags().StringVar(&kubeConfigFileName, "kubeconfig", kubeConfigFileName, "kubeconfig file") // this is read during GetConfigOrDie, not explicitly passed to any of our logic
 }
 
 func Execute() {
