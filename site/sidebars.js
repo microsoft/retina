@@ -45,6 +45,7 @@ const sidebars = {
           type: 'category',
           label: 'Plugins',
           items: [
+            'metrics/plugins/readme',
             'metrics/plugins/packetforward',
             'metrics/plugins/dropreason',
             'metrics/plugins/linuxutil',
@@ -53,6 +54,7 @@ const sidebars = {
             'metrics/plugins/hnsstats',
             'metrics/plugins/packetparser',
             'metrics/plugins/tcpretrans',
+            `metrics/plugins/ciliumeventobserver`,
           ],
         },
       ],
@@ -63,6 +65,7 @@ const sidebars = {
       items: [
         'captures/readme',
         'captures/cli',
+        'captures/managed-storage-account',
       ],
     },
     {
@@ -72,6 +75,13 @@ const sidebars = {
         'CRDs/Capture',
         'CRDs/RetinaEndpoint',
         'CRDs/MetricsConfiguration',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Concepts',
+      items: [
+        'concepts/dataAggregation',
       ],
     },
     {
