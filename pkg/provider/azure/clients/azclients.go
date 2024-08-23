@@ -68,7 +68,7 @@ func (azclients *AZClients) GetBlobServiceClient(storageAccountName string) (*st
 	// special characters to perform a path traversal attack or DDOS.
 	validName := regexp.MustCompile(`^[a-z0-9]{3,24}$`)
 	if match := validName.MatchString(storageAccountName); !match {
-		return nil, fmt.Errorf("invalid storage account name: %s", storageAccountName)
+		return nil, fmt.Errorf("invalid storage account name: %s", storageAccountName) //nolint:goerr113 //no specific handling expected
 	}
 
 	cred, err := azclients.getTokenCredential()
