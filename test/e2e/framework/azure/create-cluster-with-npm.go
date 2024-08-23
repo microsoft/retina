@@ -96,6 +96,10 @@ func (c *CreateNPMCluster) Run() error {
 		MaxPods:            to.Ptr(int32(MaxPodsPerNode)),
 	})
 
+	npmCluster.Properties.AutoUpgradeProfile = &armcontainerservice.ManagedClusterAutoUpgradeProfile{
+		NodeOSUpgradeChannel: to.Ptr(armcontainerservice.NodeOSUpgradeChannelNodeImage),
+	}
+
 	// Deploy cluster
 	cred, err := azidentity.NewAzureCLICredential(nil)
 	if err != nil {
