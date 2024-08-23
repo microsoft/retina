@@ -66,7 +66,7 @@ In the case of AKS, the resource group will be MC, or node, resource group, and 
 
 Detailed explanation of the auth configuration can be found [here](https://github.com/kubernetes-sigs/cloud-provider-azure/blob/0556803/pkg/azclient/auth_conf.go).
 
-The service principal or managed identity should have `Storage Blob Data Contributor` role to create user delegation SAS, and at least `Storage Account Contributor` role to manage storage account, container and polices in Azure.
+Under the resource group, the service principal or managed identity should have `Storage Blob Data Contributor` role to create user delegation SAS, AND at least `Storage Account Contributor` role to manage storage account, container and polices in Azure.
 
 - Managed Identity
 
@@ -81,6 +81,7 @@ The service principal or managed identity should have `Storage Blob Data Contrib
     "location": "<location>", // the location where the cluster is deployed in
     "useManagedIdentityExtension": true,
     "userAssignedIdentityID": "<managed-identity-client-id>",
+    "useInstanceMetadata": true
 }
 ```
 
@@ -97,6 +98,7 @@ The service principal or managed identity should have `Storage Blob Data Contrib
     "location": "<location>", // the location where the cluster is deployed in
     "useManagedIdentityExtension": false,
     "userAssignedIdentityID": "",
+    "useInstanceMetadata": true
 }
 ```
 
