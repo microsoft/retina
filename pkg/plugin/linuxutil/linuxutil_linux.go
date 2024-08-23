@@ -18,6 +18,8 @@ import (
 	"go.uber.org/zap"
 )
 
+const defaultLimit = 2000
+
 // New creates a linuxutil plugin.
 func New(cfg *kcfg.Config) api.Plugin {
 	return &linuxUtil{
@@ -87,7 +89,7 @@ func (lu *linuxUtil) run(ctx context.Context) error {
 			ethtoolOpts := &EthtoolOpts{
 				errOrDropKeysOnly: false,
 				addZeroVal:        false,
-				limit:             2000,
+				limit:             defaultLimit,
 			}
 
 			ethHandle, err := ethtool.NewEthtool()

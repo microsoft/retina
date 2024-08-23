@@ -31,7 +31,6 @@ func TestNewEthtool(t *testing.T) {
 	defer ctrl.Finish()
 
 	ethHandle := NewMockEthtoolInterface(ctrl)
-	// cachedEthHandle := NewCachedEthtool(ethHandle, opts)
 	ethReader := NewEthtoolReader(opts, ethHandle)
 	assert.NotNil(t, ethReader)
 }

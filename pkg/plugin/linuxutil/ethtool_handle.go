@@ -1,7 +1,7 @@
 package linuxutil
 
 import (
-	"errors"
+	"github.com/pkg/errors"
 
 	lru "github.com/hashicorp/golang-lru/v2"
 
@@ -39,7 +39,7 @@ func (ce *CachedEthtool) Stats(intf string) (map[string]uint64, error) {
 	ifaceStats, err := ce.ethHandle.Stats(intf)
 	if err != nil {
 		ce.unsupported.Add(intf, struct{}{})
-		return nil, err
+		return nil, errors.Wrap(err, "error getting interface stats")
 	}
 	return ifaceStats, nil
 }
