@@ -18,6 +18,7 @@ import (
 	"github.com/microsoft/retina/pkg/managers/filtermanager"
 	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
 )
@@ -40,6 +41,7 @@ func TestAppendIncludeList(t *testing.T) {
 	c := cache.NewMockCacheInterface(ctrl)          //nolint:typecheck
 	c.EXPECT().GetIPsByNamespace(gomock.Any()).Return([]net.IP{}).AnyTimes()
 	fm.EXPECT().AddIPs(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	fm.EXPECT().DeleteIPs(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 	me := InitModule(
 		context.Background(),
@@ -52,6 +54,81 @@ func TestAppendIncludeList(t *testing.T) {
 	assert.NotNil(t, me)
 
 	me.appendIncludeList([]string{"test"})
+}
+
+func TestUpdateNamespaceLists(t *testing.T) {
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	require.NoError(t, err)
+	cfg, err := kcfg.GetConfig(testCfgFile)
+	assert.NotNil(t, cfg)
+	require.NoError(t, err)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	p := pubsub.NewMockPubSubInterface(ctrl)
+	e := enricher.NewMockEnricherInterface(ctrl)
+	fm := filtermanager.NewMockIFilterManager(ctrl)
+	c := cache.NewMockCacheInterface(ctrl)
+	c.EXPECT().GetIPsByNamespace(gomock.Any()).Return([]net.IP{}).AnyTimes()
+	fm.EXPECT().AddIPs(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	fm.EXPECT().DeleteIPs(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+
+	me := InitModule(
+		context.Background(),
+		cfg,
+		p,
+		e,
+		fm,
+		c,
+	)
+
+	assert.NotNil(t, me)
+
+	testcases := []struct {
+		description            string
+		namespaces             []string
+		wantIncludedNamespaces map[string]struct{}
+	}{
+		{
+			"input 0 namespaces",
+			[]string{},
+			map[string]struct{}{},
+		},
+		{
+			"input 1 namespace (add)",
+			[]string{"ns1"},
+			map[string]struct{}{"ns1": {}},
+		},
+		{
+			"input 1 namespace different than previous (add 1 & remove 1)",
+			[]string{"ns2"},
+			map[string]struct{}{"ns2": {}},
+		},
+		{
+			"input 2 namespaces (add 1)",
+			[]string{"ns1", "ns2"},
+			map[string]struct{}{"ns1": {}, "ns2": {}},
+		},
+		{
+			"input 2 namespaces different than previous 2 (add 2 & remove 2)",
+			[]string{"ns3", "ns4"},
+			map[string]struct{}{"ns3": {}, "ns4": {}},
+		},
+		{
+			"input 0 namespaces (remove 2)",
+			[]string{},
+			map[string]struct{}{},
+		},
+	}
+
+	for _, test := range testcases {
+		t.Run(test.description, func(t *testing.T) {
+			spec := (&api.MetricsSpec{}).
+				WithIncludedNamespaces(test.namespaces)
+			me.updateNamespaceLists(spec)
+			assert.Equal(t, test.wantIncludedNamespaces, me.includedNamespaces)
+		})
+	}
 }
 
 func TestPodCallBack(t *testing.T) {

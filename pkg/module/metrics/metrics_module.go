@@ -179,6 +179,16 @@ func (m *Module) updateNamespaceLists(spec *api.MetricsSpec) {
 		m.l.Error("Both included and excluded namespaces are specified. Cannot reconcile.")
 	}
 
+	if len(spec.Namespaces.Include) == 0 {
+		m.appendIncludeList([]string{})
+		m.appendExcludeList([]string{})
+	}
+
+	if len(spec.Namespaces.Exclude) == 0 {
+		m.appendIncludeList([]string{})
+		m.appendExcludeList([]string{})
+	}
+
 	if len(spec.Namespaces.Include) > 0 {
 		m.l.Info("Including namespaces", zap.Strings("namespaces", spec.Namespaces.Include))
 		m.appendIncludeList(spec.Namespaces.Include)
