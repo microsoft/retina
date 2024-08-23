@@ -15,8 +15,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	ctrl "sigs.k8s.io/controller-runtime"
 	crcache "sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -71,13 +69,12 @@ type Daemon struct {
 	kubeConfigFile       string
 }
 
-func NewDaemon(metricsAddr, probeAddr, configFile, kubeConfigFile string, enableLeaderElection bool) *Daemon {
+func NewDaemon(metricsAddr, probeAddr, configFile string, enableLeaderElection bool) *Daemon {
 	return &Daemon{
 		metricsAddr:          metricsAddr,
 		probeAddr:            probeAddr,
 		enableLeaderElection: enableLeaderElection,
 		configFile:           configFile,
-		kubeConfigFile:       kubeConfigFile,
 	}
 }
 
@@ -203,18 +200,7 @@ func (d *Daemon) Start() error {
 		mainLogger.Fatal("Unable to set up ready check", zap.Error(addReadyCheckErr))
 	}
 
-	var cl *kubernetes.Clientset
-	if d.kubeConfigFile != "" {
-		var restConfig *rest.Config
-		restConfig, err = clientcmd.BuildConfigFromFlags("", d.kubeConfigFile)
-		if err != nil {
-			mainLogger.Fatal("failed to build kubeconfig", zap.Error(err))
-		}
-		cl = kubernetes.NewForConfigOrDie(restConfig)
-	} else {
-		// k8s Client used for informers
-		cl = kubernetes.NewForConfigOrDie(mgr.GetConfig())
-	}
+	cl := kubernetes.NewForConfigOrDie(mgr.GetConfig())
 
 	serverVersion, err := cl.Discovery().ServerVersion()
 	if err != nil {
