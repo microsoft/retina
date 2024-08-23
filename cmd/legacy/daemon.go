@@ -98,20 +98,10 @@ func (d *Daemon) Start() error {
 	var cfg *rest.Config
 	cfg, err = kcfg.GetConfig()
 	if err != nil {
-		env := "KUBECONFIG"
-		fmt.Println("failed to load kubeconfig via controller runtime: ", err)
-		fmt.Println("checking with env: ", env)
-		kubeconfig := os.Getenv("KUBECONFIG")
-		if kubeconfig == "" {
-			hardcode := "./kubeconfig"
-			fmt.Println("kubeconfig not found in env, using hardcoded path", hardcode)
-			kubeconfig = hardcode
-		}
-		cfg, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
-		if err != nil {
-			panic(err)
-		}
+		panic(err)
 	}
+
+	fmt.Println("api server: ", cfg.Host)
 
 	fmt.Println("init logger")
 	zl, err := log.SetupZapLogger(&log.LogOpts{
@@ -202,8 +192,25 @@ func (d *Daemon) Start() error {
 
 	mgr, err := crmgr.New(cfg, mgrOption)
 	if err != nil {
-		mainLogger.Error("Unable to start manager", zap.Error(err))
-		return fmt.Errorf("creating controller-runtime manager: %w", err)
+		env := "KUBECONFIG"
+		fmt.Println("failed to load kubeconfig via controller runtime: ", err)
+		fmt.Println("checking with env: ", env)
+		kubeconfig := os.Getenv("KUBECONFIG")
+		if kubeconfig == "" {
+			hardcode := "./kubeconfig"
+			fmt.Println("kubeconfig not found in env, using hardcoded path", hardcode)
+			kubeconfig = hardcode
+		}
+		cfg, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+		if err != nil {
+			mainLogger.Error("Unable build kubeconfig", zap.Error(err))
+			return fmt.Errorf("creating controller-runtime manager: %w", err)
+		}
+		mgr, err = crmgr.New(cfg, mgrOption)
+		if err != nil {
+			mainLogger.Error("Unable to start manager", zap.Error(err))
+			return fmt.Errorf("creating controller-runtime manager: %w", err)
+		}
 	}
 
 	//+kubebuilder:scaffold:builder
