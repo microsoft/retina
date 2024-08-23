@@ -4,7 +4,6 @@ FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:
 
 ARG VERSION
 ARG APP_INSIGHTS_ID
-RUN apt-get update && apt-get install -y ca-certificates && update-ca-certificates
 
 WORKDIR /workspace
 COPY . .
@@ -27,7 +26,6 @@ RUN --mount=type=cache,target="/root/.cache/go-build" \
 # mcr.microsoft.com/cbl-mariner/distroless/minimal:2.0
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/cbl-mariner/distroless/minimal@sha256:63a0a70ceaa1320bc6eb98b81106667d43e46b674731ea8d28e4de1b87e0747f
 WORKDIR /
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /workspace/retina-operator .
 USER 65532:65532
 
