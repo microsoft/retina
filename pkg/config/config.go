@@ -4,10 +4,46 @@ package config
 
 import (
 	"fmt"
+	"reflect"
+	"strings"
 	"time"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
 )
+
+// Level defines the level of monitor aggregation.
+type Level int
+
+const (
+	Low Level = iota
+	High
+)
+
+func (l *Level) UnmarshalText(text []byte) error {
+	s := strings.ToLower(string(text))
+	switch s {
+	case "low":
+		*l = Low
+	case "high":
+		*l = High
+	default:
+		// Default to Low if the text is not recognized.
+		*l = Low
+	}
+	return nil
+}
+
+func (l *Level) String() string {
+	switch *l {
+	case Low:
+		return "low"
+	case High:
+		return "high"
+	default:
+		return ""
+	}
+}
 
 type Server struct {
 	Host string `yaml:"host"`
@@ -15,7 +51,7 @@ type Server struct {
 }
 
 type Config struct {
-	ApiServer                Server        `yaml:"apiServer"`
+	APIServer                Server        `yaml:"apiServer"`
 	LogLevel                 string        `yaml:"logLevel"`
 	EnabledPlugin            []string      `yaml:"enabledPlugin"`
 	MetricsInterval          time.Duration `yaml:"metricsInterval"`
@@ -25,6 +61,8 @@ type Config struct {
 	RemoteContext            bool          `yaml:"remoteContext"`
 	EnableAnnotations        bool          `yaml:"enableAnnotations"`
 	BypassLookupIPOfInterest bool          `yaml:"bypassLookupIPOfInterest"`
+	DataAggregationLevel     Level         `yaml:"dataAggregationLevel"`
+	MonitorSockPath          string        `yaml:"monitorSockPath"`
 }
 
 func GetConfig(cfgFilename string) (*Config, error) {
@@ -46,7 +84,14 @@ func GetConfig(cfgFilename string) (*Config, error) {
 		return nil, fmt.Errorf("fatal error config file: %s", err)
 	}
 	var config Config
-	err = viper.Unmarshal(&config)
+	decoderConfigOption := func(dc *mapstructure.DecoderConfig) {
+		dc.DecodeHook = mapstructure.ComposeDecodeHookFunc(
+			mapstructure.StringToTimeDurationHookFunc(), // default hook.
+			mapstructure.StringToSliceHookFunc(","),     // default hook.
+			decodeLevelHook,
+		)
+	}
+	err = viper.Unmarshal(&config, decoderConfigOption)
 	if err != nil {
 		return nil, fmt.Errorf("fatal error config file: %s", err)
 	}
@@ -54,4 +99,21 @@ func GetConfig(cfgFilename string) (*Config, error) {
 	config.MetricsInterval = config.MetricsInterval * time.Second
 
 	return &config, nil
+}
+
+func decodeLevelHook(field, target reflect.Type, data interface{}) (interface{}, error) {
+	// Check if the field we are decoding is a string.
+	if field.Kind() != reflect.String {
+		return data, nil
+	}
+	// Check if the type we are decoding to is a Level.
+	if target != reflect.TypeOf(Level(0)) {
+		return data, nil
+	}
+	var level Level
+	err := level.UnmarshalText([]byte(data.(string)))
+	if err != nil {
+		return nil, err
+	}
+	return level, nil
 }

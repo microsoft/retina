@@ -14,11 +14,27 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+var errInitFailed = errors.New("init failed")
+
 func TestStopWatcherManagerGracefully(t *testing.T) {
 	ctl := gomock.NewController(t)
 	defer ctl.Finish()
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	mgr := NewWatcherManager()
+
+	mockAPIServerWatcher := mock.NewMockIWatcher(ctl)
+	mockEndpointWatcher := mock.NewMockIWatcher(ctl)
+
+	mgr.Watchers = []IWatcher{
+		mockEndpointWatcher,
+		mockAPIServerWatcher,
+	}
+
+	mockAPIServerWatcher.EXPECT().Init(gomock.Any()).Return(nil).AnyTimes()
+	mockEndpointWatcher.EXPECT().Init(gomock.Any()).Return(nil).AnyTimes()
+
+	mockEndpointWatcher.EXPECT().Stop(gomock.Any()).Return(nil).AnyTimes()
+	mockAPIServerWatcher.EXPECT().Stop(gomock.Any()).Return(nil).AnyTimes()
 
 	ctx, _ := context.WithCancel(context.Background())
 	g, errctx := errgroup.WithContext(ctx)
@@ -37,17 +53,17 @@ func TestWatcherInitFailsGracefully(t *testing.T) {
 	defer ctl.Finish()
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 
-	mockApiServerWatcher := mock.NewMockIWatcher(ctl)
+	mockAPIServerWatcher := mock.NewMockIWatcher(ctl)
 	mockEndpointWatcher := mock.NewMockIWatcher(ctl)
 
 	mgr := NewWatcherManager()
 	mgr.Watchers = []IWatcher{
-		mockApiServerWatcher,
+		mockAPIServerWatcher,
 		mockEndpointWatcher,
 	}
 
-	mockApiServerWatcher.EXPECT().Init(gomock.Any()).Return(errors.New("error")).AnyTimes()
-	mockEndpointWatcher.EXPECT().Init(gomock.Any()).Return(errors.New("error")).AnyTimes()
+	mockAPIServerWatcher.EXPECT().Init(gomock.Any()).Return(errInitFailed).AnyTimes()
+	mockEndpointWatcher.EXPECT().Init(gomock.Any()).Return(errInitFailed).AnyTimes()
 
 	err := mgr.Start(context.Background())
 	require.NotNil(t, err, "Expected error when starting watcher manager")

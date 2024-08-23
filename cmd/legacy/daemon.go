@@ -47,7 +47,7 @@ import (
 
 const (
 	logFileName       = "retina.log"
-	heartbeatInterval = 5 * time.Minute
+	heartbeatInterval = 10 * time.Minute
 
 	nodeNameEnvKey = "NODE_NAME"
 	nodeIPEnvKey   = "NODE_IP"
@@ -111,6 +111,7 @@ func (d *Daemon) Start() error {
 		zap.String("version", buildinfo.Version),
 		zap.String("apiserver", cfg.Host),
 		zap.String("plugins", strings.Join(daemonConfig.EnabledPlugin, `,`)),
+		zap.String("data aggregation level", daemonConfig.DataAggregationLevel.String()),
 	)
 	if err != nil {
 		panic(err)
@@ -120,8 +121,13 @@ func (d *Daemon) Start() error {
 
 	metrics.InitializeMetrics()
 
+	mainLogger.Info(zap.String("data aggregation level", daemonConfig.DataAggregationLevel.String()))
+
 	var tel telemetry.Telemetry
-	if daemonConfig.EnableTelemetry && buildinfo.ApplicationInsightsID != "" {
+	if daemonConfig.EnableTelemetry {
+		if buildinfo.ApplicationInsightsID == "" {
+			panic("telemetry enabled, but ApplicationInsightsID is empty")
+		}
 		mainLogger.Info("telemetry enabled", zap.String("applicationInsightsID", buildinfo.ApplicationInsightsID))
 		tel = telemetry.NewAppInsightsTelemetryClient("retina-agent", map[string]string{
 			"version":   buildinfo.Version,

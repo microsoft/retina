@@ -34,7 +34,7 @@ PLATFORM		?= $(OS)/$(ARCH)
 PLATFORMS		?= linux/amd64 linux/arm64 windows/amd64
 OS_VERSION		?= ltsc2019
 
-HUBBLE_VERSION ?= v0.13.0
+HUBBLE_VERSION ?= v0.13.6
 
 CONTAINER_BUILDER ?= docker
 CONTAINER_RUNTIME ?= docker
@@ -385,7 +385,10 @@ coverage: # Code coverage.
 manifests: 
 	cd crd && make manifests && make generate
 
-HELM_IMAGE_TAG ?= v0.0.2
+# Fetch the latest tag from the GitHub
+LATEST_TAG := $(shell curl -s https://api.github.com/repos/microsoft/retina/releases | jq -r '.[0].name')
+
+HELM_IMAGE_TAG ?= $(LATEST_TAG)
 
 # basic/node-level mode
 helm-install: manifests

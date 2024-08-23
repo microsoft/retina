@@ -1,4 +1,5 @@
-FROM  --platform=windows/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.22.2-windowsservercore-ltsc2022 as cgo
+# mcr.microsoft.com/oss/go/microsoft/golang:1.22.4-windowsservercore-ltsc2022
+FROM --platform=windows/amd64 mcr.microsoft.com/oss/go/microsoft/golang@sha256:c2548f33fe6e8d0663660cfb5279706288aa7a9f65df0029abb690e575126a25 AS cgo
 
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
