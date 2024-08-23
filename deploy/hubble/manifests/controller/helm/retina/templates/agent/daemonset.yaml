@@ -137,8 +137,6 @@ spec:
                   - key: ca.crt
                     path: client-ca.crt
       {{- end }}
-      nodeSelector:
-        kubernetes.io/os: linux
 {{- end }}
 ---
 {{- if .Values.os.windows}}
