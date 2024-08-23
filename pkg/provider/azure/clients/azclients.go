@@ -3,6 +3,7 @@ package clients
 import (
 	"context"
 	"fmt"
+	"regexp"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
@@ -62,6 +63,14 @@ func NewAZClients(configFile string) (*AZClients, error) {
 
 // GetBlobServiceClient gives a blob service client for a given storage account.
 func (azclients *AZClients) GetBlobServiceClient(storageAccountName string) (*storageservice.Client, error) {
+	// validate the storage account to eliminate potential security risks.
+	// For example, a malicious user could use a storage account name that contains
+	// special characters to perform a path traversal attack or DDOS.
+	validName := regexp.MustCompile(`^[a-z0-9]{3,24}$`)
+	if match := validName.MatchString(storageAccountName); !match {
+		return nil, fmt.Errorf("invalid storage account name: %s", storageAccountName)
+	}
+
 	cred, err := azclients.getTokenCredential()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get TokenCredential: %w", err)
