@@ -51,7 +51,6 @@ func (er *EthtoolReader) readAndUpdate() error {
 }
 
 func (er *EthtoolReader) readInterfaceStats() error {
-
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		er.l.Error("Error while getting all interfaces: %v\n", zap.Error(err))
@@ -72,7 +71,6 @@ func (er *EthtoolReader) readInterfaceStats() error {
 
 		// Retrieve tx from eth0
 		ifaceStats, err := er.ethHandle.Stats(i.Name)
-
 		if err != nil {
 			if errors.Is(err, errskip) {
 				er.l.Debug("Skipping unsupported interface", zap.String("ifacename", i.Name))

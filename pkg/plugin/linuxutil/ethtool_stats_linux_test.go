@@ -50,7 +50,6 @@ func TestNewEthtoolWithNil(t *testing.T) {
 }
 
 func TestReadInterfaceStats(t *testing.T) {
-
 	globalCache, _ := lru.New[string, struct{}](10)
 
 	log.SetupZapLogger(log.GetDefaultLogOpts())
