@@ -39,7 +39,7 @@ func (ce *CachedEthtool) Stats(intf string) (map[string]uint64, error) {
 	ifaceStats, err := ce.ethHandle.Stats(intf)
 	if err != nil {
 		ce.unsupported.Add(intf, struct{}{})
-		return nil, errors.Wrap(err, "error getting interface stats")
+		return nil, errors.Wrap(err, "error while getting interface stats")
 	}
 	return ifaceStats, nil
 }
