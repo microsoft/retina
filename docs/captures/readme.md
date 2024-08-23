@@ -43,6 +43,10 @@ Available after after [installing Retina](../installation/setup.md) with capture
 
 See [Capture CRD](../CRDs/Capture.md) for more details.
 
+#### Managed Storage Account
+
+To simply the user experience, a managed storage account is configurable when setting up Retina, which can manage the storage account, container and Kubernetes secreting container the blob SAS on behalf the user. Check [managed-storage-account.md] for more details.
+
 #### Example
 
 This example creates a Capture and stores the Capture artifacts into a storage account specified by Blob SAS URL.

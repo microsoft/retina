@@ -19,7 +19,7 @@ RUN make manifests
 RUN --mount=type=cache,target="/root/.cache/go-build" \
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
 	-ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" \
-    -X "github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID"="$APP_INSIGHTS_ID"" \
+	-X "github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID"="$APP_INSIGHTS_ID"" \
 	-a -o retina-operator operator/main.go
 
 ##################### controller #######################
