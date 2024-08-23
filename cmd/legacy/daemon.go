@@ -15,6 +15,8 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	ctrl "sigs.k8s.io/controller-runtime"
 	crcache "sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -66,7 +68,6 @@ type Daemon struct {
 	probeAddr            string
 	enableLeaderElection bool
 	configFile           string
-	kubeConfigFile       string
 }
 
 func NewDaemon(metricsAddr, probeAddr, configFile string, enableLeaderElection bool) *Daemon {
@@ -93,9 +94,23 @@ func (d *Daemon) Start() error {
 	}
 
 	fmt.Println("init client-go")
-	cfg, err := kcfg.GetConfig()
+
+	var cfg *rest.Config
+	cfg, err = kcfg.GetConfig()
 	if err != nil {
-		panic(err)
+		env := "KUBECONFIG"
+		fmt.Println("failed to load kubeconfig via controller runtime: ", err)
+		fmt.Println("checking with env: ", env)
+		kubeconfig := os.Getenv("KUBECONFIG")
+		if kubeconfig == "" {
+			hardcode := "./kubeconfig"
+			fmt.Println("kubeconfig not found in env, using hardcoded path", hardcode)
+			kubeconfig = hardcode
+		}
+		cfg, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	fmt.Println("init logger")
