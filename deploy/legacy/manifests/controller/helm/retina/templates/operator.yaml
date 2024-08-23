@@ -68,10 +68,8 @@ spec:
             - name: retina-operator-config
               mountPath: /retina/
 {{- if .Values.operator.capture.enableManagedStorageAccount }}
-            - name: etc-kubernetes
-              mountPath: /etc/kubernetes
             - name: cloud-config
-              mountPath: /etc/kubernetes/cloud-config
+              mountPath: /etc/cloud-config
               readOnly: true
 {{- end }}
           securityContext:
@@ -100,9 +98,6 @@ spec:
           configMap:
             name: retina-operator-config
 {{- if .Values.operator.capture.enableManagedStorageAccount }}
-        - name: etc-kubernetes
-          hostPath:
-            path: /etc/kubernetes
         - name: cloud-config
           secret:
             secretName: azure-cloud-config
@@ -305,7 +300,7 @@ data:
     captureJobNumLimit: {{ .Values.operator.capture.jobNumLimit }}
     enableManagedStorageAccount: {{ .Values.operator.capture.enableManagedStorageAccount }}
 {{- if .Values.operator.capture.enableManagedStorageAccount }}
-    azureCredentialConfig: /etc/kubernetes/cloud-config/azure.json
+    azureCredentialConfig: /etc/cloud-config/azure.json
 {{- end }}
 ---
 {{- if .Values.operator.capture.enableManagedStorageAccount }}
@@ -318,16 +313,23 @@ type: Opaque
 stringData:
   azure.json: |-
     {
-      "cloud": "AzurePublicCloud",
-      "tenantId": "<tenant-id>",
-      "subscriptionId": "<subscription-id>",
-      "aadClientId": "<client-id>",
-      "aadClientSecret": "<client-secret>",
-      "resourceGroup": "<resource-group-name>",
-      "location": "<location>",
+{{- if .Values.operator.capture.managedIdentityClientId }}
+      "useManagedIdentityExtension": true,
+      "aadClientId": "msi",
+      "aadClientSecret": "msi",
+      "userAssignedIdentityID": "{{ .Values.operator.capture.managedIdentityClientId }}",
+{{- else }}
       "useManagedIdentityExtension": false,
+      "aadClientId": "{{ .Values.operator.capture.aadClientId }}",
+      "aadClientSecret": "{{ .Values.operator.capture.aadClientSecret }}",
       "userAssignedIdentityID": "",
+{{- end }}
       "useInstanceMetadata": true,
+      "cloud": "AzurePublicCloud",
+      "tenantId": "{{ .Values.operator.capture.tenantId }}",
+      "subscriptionId": "{{ .Values.operator.capture.subscriptionId }}",
+      "resourceGroup": "{{ .Values.operator.capture.resourceGroup }}",
+      "location": "{{ .Values.operator.capture.location }}"
     }
 {{- end }}
 {{- end }}

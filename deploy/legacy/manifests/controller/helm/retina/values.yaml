@@ -17,6 +17,13 @@ operator:
     debug: true
     jobNumLimit: 0
     enableManagedStorageAccount: false
+    tenantId: ""
+    subscriptionId: ""
+    aadClientId: ""
+    aadClientSecret: ""
+    resourceGroup: ""
+    location: ""
+    managedIdentityClientId: ""
   resources:
     limits:
       cpu: 500m
