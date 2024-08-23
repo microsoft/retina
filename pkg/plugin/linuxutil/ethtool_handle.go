@@ -11,16 +11,16 @@ import (
 
 type CachedEthtool struct {
 	ethHandle   EthtoolInterface
-	unsupported *lru.Cache[string, any]
+	unsupported *lru.Cache[string, struct{}]
 	l           *log.ZapLogger
 }
 
 func NewCachedEthtool(ethHandle EthtoolInterface, opts *EthtoolOpts) *CachedEthtool {
-	cache, err := lru.New[string, any](int(opts.limit))
+	cache, err := lru.New[string, struct{}](int(opts.limit))
 	if err != nil {
 		log.Logger().Error("failed to create LRU cache: ", zap.Error(err))
 	}
-	//not sure if I should do the same way to process the handle
+
 	return &CachedEthtool{
 		ethHandle:   ethHandle,
 		unsupported: cache,
@@ -39,7 +39,7 @@ func (ce *CachedEthtool) Stats(intf string) (map[string]uint64, error) {
 	ifaceStats, err := ce.ethHandle.Stats(intf)
 
 	if err != nil {
-		ce.unsupported.Add(intf, nil)
+		ce.unsupported.Add(intf, struct{}{})
 		return nil, err
 	}
 	return ifaceStats, nil

@@ -18,7 +18,6 @@ type EthtoolReader struct {
 	opts      *EthtoolOpts
 	data      *EthtoolStats
 	ethHandle EthtoolInterface
-	// unsupported map[string]struct{}
 }
 
 func NewEthtoolReader(opts *EthtoolOpts, ethHandle EthtoolInterface) *EthtoolReader {
@@ -33,12 +32,10 @@ func NewEthtoolReader(opts *EthtoolOpts, ethHandle EthtoolInterface) *EthtoolRea
 	// Construct a cached ethtool handle
 	CachedEthHandle := NewCachedEthtool(ethHandle, opts)
 	return &EthtoolReader{
-		l:    log.Logger().Named(string("EthtoolReader")),
-		opts: opts,
-		data: &EthtoolStats{},
-		// ethHandle:   ethHandle,
+		l:         log.Logger().Named(string("EthtoolReader")),
+		opts:      opts,
+		data:      &EthtoolStats{},
 		ethHandle: CachedEthHandle,
-		// unsupported: make(map[string]struct{}),
 	}
 }
 
@@ -54,7 +51,6 @@ func (er *EthtoolReader) readAndUpdate() error {
 }
 
 func (er *EthtoolReader) readInterfaceStats() error {
-	// ethtool section
 
 	ifaces, err := net.Interfaces()
 	if err != nil {
@@ -79,19 +75,12 @@ func (er *EthtoolReader) readInterfaceStats() error {
 
 		if err != nil {
 			if errors.Is(err, errskip) {
-				er.l.Info("Skipping unsupported interface", zap.String("ifacename", i.Name))
+				er.l.Debug("Skipping unsupported interface", zap.String("ifacename", i.Name))
 			} else {
 				er.l.Error("Error while getting ethtool:", zap.String("ifacename", i.Name), zap.Error(err))
 			}
 			continue
 		}
-
-		// switch {
-		// case errors.Is(err, errskip):
-		// 	er.l.Debug("Skipping unsupported interface", zap.String("ifacename", i.Name))
-		// case err != nil:
-		// 	er.l.Error("Error while getting ethtool stats", zap.String("ifacename", i.Name), zap.Error(err))
-		// case ifaceStats != nil:
 
 		er.data.stats[i.Name] = make(map[string]uint64)
 		tempMap := er.processStats(ifaceStats)
