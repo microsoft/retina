@@ -8,9 +8,9 @@ Basic metrics is covered by the [Metrics](../metrics/basic.md) section of the Re
 
 If you are not seeing metrics in Grafana, it is likely that the metrics are not being generated. To troubleshoot this issue, you can check the following:
 
-### Check Retina Pods are running
+### Check Retina pods are running
 
-Check that all Retina Pods are running. You can do this by running the following command:
+Check that all Retina pods are running. You can do this by running the following command:
 
 ```shell
 kubectl get pods -n kube-system -l k8s-app=retina
@@ -24,7 +24,7 @@ kubectl describe pod -n kube-system <retina pod name>
 
 ### Check Retina Pod Logs
 
-If retina Pods are running, you can check the logs for the Pod to see what the issue is. You can do this by running the following command:
+If retina pods are running, you can check the logs for the Pod to see what the issue is. You can do this by running the following command:
 
 ```shell
 kubectl logs -n kube-system <retina pod name>
@@ -130,37 +130,36 @@ If you are not seeing metrics like the above, then the plugin is not running cor
 
 If you are using managed Prometheus, you can check if it is scraping the retina metrics by following below steps.
 
-1. Check if AMA-Metrics Pods are running
+1. Check if AMA metrics pods are running
 
     ```shell
     kubectl get pods -n kube-system -l dsName=ama-metrics-node
     ```
 
-2. If they are running, then port forward one of the AMA metrics Pods to see if it can identify retina Pods
+2. If the AMA metrics pods are running, port forward one of them to check if it can identify the Retina agent pod on the same node.
 
     ```shell
     kubectl port-forward -n kube-system <ama-metrics-pod-name> 9090:9090
     ```
 
-3. Open the following URL in your browser to see if retina Pods are being discovered
+3. Open the URL below in your browser to check if the AMA pod is targeting the Retina agent pod.
 
     ```shell
     http://localhost:9090/targets
     ```
 
-    ![alt text](imgs/prometheus-retina-targets1.png)
-    ![alt text](imgs/prometheus-retina-targets2.png)
+    ![alt text](imgs/prometheus-retina-targets.png)
 
-    a. check if service discovery is recognizing retina Pods
+4. Verify if service discovery is detecting the Retina agent pod.
 
     ```shell
-    http://localhost:9090/service-discovery#retina-pods
+    http://localhost:9090/service-discovery
     ```
 
     ![alt text](imgs/prom-retina-service-discovery1.png)
     ![alt text](imgs/prom-retina-service-discovery2.png)
 
-4. If Retina Pods are not discovered then please check prometheus configuration and make sure the Retina Pod's job is added to the scrape config.
+5. If the Retina agent pod is not discovered, check the Prometheus configuration and ensure the Retina pod's scrape job is included in the scrape config.
 
     ```shell
     http://localhost:9090/config
@@ -168,7 +167,7 @@ If you are using managed Prometheus, you can check if it is scraping the retina 
 
     ![alt text](imgs/prom-retina-config.png)
 
-5. If the Retina Pod's scrape job is not present in prom config, please check ama-metrics-node config map for the presence of this job or the setting called
+6. If the Retina pod's scrape job is missing in the Prometheus config, check the ama-metrics-node config map for the presence of this job or the relevant setting.
 
     ```shell
     kubectl get configmap ama-metrics-prometheus-config-node -n kube-system -oyaml

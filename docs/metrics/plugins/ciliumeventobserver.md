@@ -23,7 +23,7 @@ Cilium collects events and sends these events through the cilium monitor1_2 sock
 Access Log events are events such as DNS resolutions matching a cilium node policy while Agent Events can be any cilium agent events.
 Perf Events are bpf related events such as drop, trace, policy verdict, or capture events.
 
-The cilium plugin will listen on this socket for these events, decode the payload and reconstruct either an Agent Event or a Perf Event. These events are then decoded using a lightweight cilium parser. Once these events are decoded into a flow object, it is then passed to the external channel. The retina daemon listens for these events and send it to our monitor agent. Our hubble observer will consume these events and process the flows using our own custom [parsers](pkg/hubble/parser).
+The cilium plugin will listen on this socket for these events, decode the payload and reconstruct either an Agent Event or a Perf Event. These events are then decoded using a lightweight cilium parser. Once these events are decoded into a flow object, it is then passed to the external channel. The retina daemon listens for these events and send it to our monitor agent. Our hubble observer will consume these events and process the flows using our own custom [parsers](https://github.com/microsoft/retina/tree/main/pkg/hubble/parser).
 
 ### Code locations
 

@@ -67,6 +67,11 @@ spec:
           volumeMounts:
             - name: retina-operator-config
               mountPath: /retina/
+{{- if .Values.capture.enableManagedStorageAccount }}
+            - name: cloud-config
+              mountPath: /etc/cloud-config
+              readOnly: true
+{{- end }}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -92,7 +97,11 @@ spec:
         - name: retina-operator-config
           configMap:
             name: retina-operator-config
-
+{{- if .Values.capture.enableManagedStorageAccount }}
+        - name: cloud-config
+          secret:
+            secretName: azure-cloud-config
+{{- end }}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -195,10 +204,21 @@ rules:
     - namespaces
     - pods
     - nodes
-    - secrets
     verbs:
     - get
     - list
+  - apiGroups:
+      - ""
+    resources:
+    - secrets
+    verbs:
+    - create
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch
   - apiGroups:
       - batch
     resources:
@@ -276,6 +296,40 @@ data:
     installCRDs: {{ .Values.operator.installCRDs }}
     enableTelemetry: {{ .Values.enableTelemetry }}
     remoteContext: {{ .Values.remoteContext }}
-    captureDebug: {{ .Values.operator.capture.debug }}
-    captureJobNumLimit: {{ .Values.operator.capture.jobNumLimit }}
+    captureDebug: {{ .Values.capture.debug }}
+    captureJobNumLimit: {{ .Values.capture.jobNumLimit }}
+    enableManagedStorageAccount: {{ .Values.capture.enableManagedStorageAccount }}
+{{- if .Values.capture.enableManagedStorageAccount }}
+    azureCredentialConfig: /etc/cloud-config/azure.json
+{{- end }}
+---
+{{- if .Values.capture.enableManagedStorageAccount }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: azure-cloud-config
+  namespace: kube-system
+type: Opaque
+stringData:
+  azure.json: |-
+    {
+{{- if .Values.capture.managedIdentityClientId }}
+      "useManagedIdentityExtension": true,
+      "aadClientId": "msi",
+      "aadClientSecret": "msi",
+      "userAssignedIdentityID": "{{ .Values.capture.managedIdentityClientId }}",
+{{- else }}
+      "useManagedIdentityExtension": false,
+      "aadClientId": "{{ .Values.capture.aadClientId }}",
+      "aadClientSecret": "{{ .Values.capture.aadClientSecret }}",
+      "userAssignedIdentityID": "",
+{{- end }}
+      "useInstanceMetadata": true,
+      "cloud": "AzurePublicCloud",
+      "tenantId": "{{ .Values.capture.tenantId }}",
+      "subscriptionId": "{{ .Values.capture.subscriptionId }}",
+      "resourceGroup": "{{ .Values.capture.resourceGroup }}",
+      "location": "{{ .Values.capture.location }}"
+    }
+{{- end }}
 {{- end }}
