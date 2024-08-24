@@ -11,8 +11,8 @@ import (
 	tcp "github.com/microsoft/retina/test/e2e/scenarios/tcp"
 )
 
-func CreateTestInfra(subID, clusterName, location, kubeConfigFilePath string) *types.Job {
-	job := types.NewJob("Create e2e test infrastructure")
+func CreateTestInfraAZ(subID, clusterName, location, kubeConfigFilePath string) *types.Job {
+	job := types.NewJob("Create e2e test infrastructure AZ")
 
 	job.AddStep(&azure.CreateResourceGroup{
 		SubscriptionID:    subID,
@@ -50,14 +50,26 @@ func CreateTestInfra(subID, clusterName, location, kubeConfigFilePath string) *t
 	return job
 }
 
-func DeleteTestInfra(subID, clusterName, location string) *types.Job {
-	job := types.NewJob("Delete e2e test infrastructure")
+func DeleteTestInfraAZ(subID, clusterName, location string) *types.Job {
+	job := types.NewJob("Delete e2e test infrastructure AZ")
 
 	job.AddStep(&azure.DeleteResourceGroup{
 		SubscriptionID:    subID,
 		ResourceGroupName: clusterName,
 		Location:          location,
 	}, nil)
+
+	return job
+}
+
+func CreateTestInfraAWS(accID, clusterName, region, kubeConfigFilePath string) *types.Job {
+	job := types.NewJob("Create e2e test infrastructure AWS")
+
+	return job
+}
+
+func DeleteTestInfraAWS(accID, clusterName, region string) *types.Job {
+	job := types.NewJob("Delete e2e test infrastructure AWS")
 
 	return job
 }
