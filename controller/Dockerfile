@@ -42,7 +42,9 @@ RUN if [ "$GOOS" = "linux" ] ; then \
 COPY ./go.mod ./go.sum ./
 RUN go mod download
 COPY . .
-RUN rm -rf ./pkg/plugin && tar xvf /gen.tar.gz ./pkg/plugin
+RUN if [ "$GOOS" = "linux" ] ; then \
+      rm -rf ./pkg/plugin && tar xvf /gen.tar.gz ./pkg/plugin; \
+    fi
 
 # capture binary
 FROM intermediate AS capture-bin
