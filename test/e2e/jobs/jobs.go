@@ -1,6 +1,7 @@
 package retina
 
 import (
+	"github.com/microsoft/retina/test/e2e/framework/aws"
 	"github.com/microsoft/retina/test/e2e/framework/azure"
 	"github.com/microsoft/retina/test/e2e/framework/generic"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
@@ -64,6 +65,12 @@ func DeleteTestInfraAZ(subID, clusterName, location string) *types.Job {
 
 func CreateTestInfraAWS(accID, clusterName, region, kubeConfigFilePath string) *types.Job {
 	job := types.NewJob("Create e2e test infrastructure AWS")
+
+	job.AddStep(&aws.CreateCluster{
+		AccountID:   accID,
+		ClusterName: clusterName,
+		Region:      region,
+	}, nil)
 
 	return job
 }
