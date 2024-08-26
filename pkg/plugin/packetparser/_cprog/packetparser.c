@@ -253,7 +253,7 @@ static void parse(struct __sk_buff *skb, enum obs_point obs)
 	p.traffic_direction = ct_get_traffic_direction(key);
 	#ifdef DATA_AGGREGATION_LEVEL
 	// Check if we need to report this packet. Only report if the aggregation level is low or ct_process_packet() returns true.
-    #if (DATA_AGGREGATION_LEVEL == DATA_AGGREGATION_LEVEL_LOW || report)
+    #if (DATA_AGGREGATION_LEVEL == 0 || report)
         bpf_perf_event_output(skb, &packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
         return;
     #endif

@@ -54,8 +54,10 @@ struct {
 static __always_inline __u8 _ct_get_traffic_direction(enum obs_point observation_point) {
     switch (observation_point) {
         case FROM_ENDPOINT:
+        case TO_NETWORK:
             return TRAFFIC_DIRECTION_EGRESS;
         case TO_ENDPOINT:
+        case FROM_NETWORK:
             return TRAFFIC_DIRECTION_INGRESS;
         default:
             return TRAFFIC_DIRECTION_UNKNOWN;
