@@ -36,11 +36,13 @@ WORKDIR /go/src/github.com/microsoft/retina
 RUN if [ "$GOOS" = "linux" ] ; then \
       go mod init github.com/microsoft/retina; \
       go generate -x /go/src/github.com/microsoft/retina/pkg/plugin/...; \
+      tar czf /gen.tar.gz ./pkg/plugin; \
       rm go.mod; \
     fi
 COPY ./go.mod ./go.sum ./
 RUN go mod download
 COPY . .
+RUN rm -rf ./pkg/plugin && tar xvf /gen.tar.gz ./pkg/plugin
 
 # capture binary
 FROM intermediate AS capture-bin
