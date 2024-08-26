@@ -14,14 +14,13 @@ import (
 
 type packetparserCtEntry struct {
 	Lifetime             uint32
+	LastReportForwardDir uint32
+	LastReportReplyDir   uint32
 	TrafficDirection     uint32
 	FlagsSeenForwardDir  uint8
 	FlagsSeenReplyDir    uint8
-	_                    [2]byte
-	LastReportForwardDir uint32
-	LastReportReplyDir   uint32
-	IsClosing            uint8
-	_                    [3]byte
+	IsClosing            bool
+	_                    [1]byte
 }
 
 type packetparserCtV4Key struct {
@@ -39,30 +38,29 @@ type packetparserMapKey struct {
 }
 
 type packetparserPacket struct {
+	Ts          uint64
+	Bytes       uint64
 	SrcIp       uint32
 	DstIp       uint32
 	SrcPort     uint16
 	DstPort     uint16
-	Proto       uint8
-	_           [3]byte
 	TcpMetadata struct {
 		Seq    uint32
 		AckNum uint32
+		Tsval  uint32
+		Tsecr  uint32
 		Syn    uint16
 		Ack    uint16
 		Fin    uint16
 		Rst    uint16
 		Psh    uint16
 		Urg    uint16
-		Tsval  uint32
-		Tsecr  uint32
 	}
 	ObservationPoint uint32
 	TrafficDirection uint32
+	Proto            uint8
 	IsReply          bool
-	_                [3]byte
-	Ts               uint64
-	Bytes            uint64
+	_                [6]byte
 }
 
 // loadPacketparser returns the embedded CollectionSpec for packetparser.

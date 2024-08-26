@@ -12,11 +12,11 @@
 
 char __license[] SEC("license") = "Dual MIT/GPL";
 
-
-
 struct tcpmetadata {
 	__u32 seq; // TCP sequence number
 	__u32 ack_num; // TCP ack number
+	__u32 tsval; // TCP timestamp value
+	__u32 tsecr; // TCP timestamp echo reply
 	// TCP flags.
 	__u16 syn;
 	__u16 ack;
@@ -24,24 +24,22 @@ struct tcpmetadata {
 	__u16 rst;
 	__u16 psh;
 	__u16 urg;
-	__u32 tsval; // TCP timestamp value
-	__u32 tsecr; // TCP timestamp echo reply
 };
 
 struct packet
 {
+	__u64 ts; // timestamp in nanoseconds
+	__u64 bytes; // packet size in bytes
 	// 5 tuple.
 	__u32 src_ip;
 	__u32 dst_ip;
 	__u16 src_port;
 	__u16 dst_port;
-	__u8 proto;
 	struct tcpmetadata tcp_metadata; // TCP metadata
 	enum obs_point observation_point;
 	enum ct_traffic_dir traffic_direction;
+	__u8 proto;
 	bool is_reply;
-	__u64 ts; // timestamp in nanoseconds
-	__u64 bytes; // packet size in bytes
 };
 
 struct
@@ -248,15 +246,21 @@ static void parse(struct __sk_buff *skb, enum obs_point obs)
 	key.proto = p.proto;
 
 	// Process the packet in ct
-	bool report = ct_process_packet(key, flags, obs);
+	bool report __attribute__((unused));
+	report = ct_process_packet(key, flags, obs);
 	p.is_reply = ct_is_reply_packet(key);
 	p.traffic_direction = ct_get_traffic_direction(key);
 	#ifdef DATA_AGGREGATION_LEVEL
-	// Check if we need to report this packet. Only report if the aggregation level is low or ct_process_packet() returns true.
-    #if (DATA_AGGREGATION_LEVEL == 0 || report)
-        bpf_perf_event_output(skb, &packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
+	// If the data aggregation level is low, always send the packet to the perf buffer.
+    #if DATA_AGGREGATION_LEVEL == DATA_AGGREGATION_LEVEL_LOW
+		bpf_perf_event_output(skb, &packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
         return;
-    #endif
+	// If the data aggregation level is high, only send the packet to the perf buffer if it needs to be reported.
+    #elif DATA_AGGREGATION_LEVEL == DATA_AGGREGATION_LEVEL_HIGH
+		if (report) {
+			bpf_perf_event_output(skb, &packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
+		}
+	#endif
 	#endif
 	return;
 }

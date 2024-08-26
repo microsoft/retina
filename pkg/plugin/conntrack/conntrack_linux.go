@@ -79,7 +79,7 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			iter := ct.ctMap.Iterate()
 			for iter.Next(&key, &value) {
 				noOfCtEntries++
-				if value.IsClosing == 1 || ktime.MonotonicOffset.Seconds()+float64(value.Lifetime) < float64((time.Now().Unix())) {
+				if value.IsClosing || ktime.MonotonicOffset.Seconds()+float64(value.Lifetime) < float64((time.Now().Unix())) {
 					// Iterating a hash map from which keys are being deleted is not safe.
 					// So, we store the keys to be deleted in a list and delete them after the iteration.
 					keyCopy := key // Copy the key to avoid using the same key in the next iteration
@@ -98,7 +98,7 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 					zap.String("proto", decodeProto(key.Proto)),
 					zap.Uint32("lifetime", value.Lifetime),
 					zap.Uint32("traffic_direction", value.TrafficDirection),
-					zap.Uint8("is_closing", value.IsClosing),
+					zap.Bool("is_closing", value.IsClosing),
 					zap.String("flags_seen_forward_dir", decodeFlags(value.FlagsSeenForwardDir)),
 					zap.String("flags_seen_reply_dir", decodeFlags(value.FlagsSeenReplyDir)),
 					zap.Uint32("last_reported_forward_dir", value.LastReportForwardDir),
