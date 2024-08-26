@@ -365,6 +365,10 @@ test: $(ENVTEST) # Run unit tests.
 	go build -o test-summary ./test/utsummary/main.go
 	CGO_ENABLED=0 KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit,dashboard -skip=TestE2E* -coverprofile=coverage.out -v -json ./... | ./test-summary --progress --verbose
 
+E2E_TEST_PATH ?= ./test/e2e/*.go
+test-e2e: $(ENVTEST) # Run e2e tests.
+	CGO_ENABLED=0 go test -v $(E2E_TEST_PATH) -timeout 30m -tags=e2e -count=1 -args -image-tag=$(IMAGE_TAG) -image-registry=acnpublic.azurecr.io -image-namespace=microsoft/retina
+
 coverage: # Code coverage.
 #	go generate ./... && go test -tags=unit -coverprofile=coverage.out.tmp ./...
 	cat coverage.out | grep -v "_bpf.go\|_bpfel_x86.go\|_bpfel_arm64.go|_generated.go|mock_" | grep -v mock > coveragenew.out

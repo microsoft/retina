@@ -227,12 +227,7 @@ func InstallAndTestRetinaCiliumMetrics(kubeConfigFilePath, chartPath, valuesFile
 
 	// Upgade to ciliumeventobserver plugin
 	job.AddStep(&kubernetes.UpgradeRetinaHelmChart{
-		Namespace:          "kube-system",
-		ReleaseName:        "retina",
-		KubeConfigFilePath: kubeConfigFilePath,
-		ChartPath:          chartPath,
-		TagEnv:             generic.DefaultTagEnv,
-		ValuesFile:         valuesFilePath,
+		ValuesFile: valuesFilePath,
 	}, nil)
 
 	job.AddScenario(ciliumeventobserver.ValidateCiliumEventObserverDropMetric())

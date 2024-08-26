@@ -16,12 +16,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var retinaCiliumLocations = []string{"eastus2", "centralus", "southcentralus", "uksouth", "centralindia", "westus2"}
+
 // TestE2ERetinaCilium tests all e2e scenarios for retina on cilium clusters
 func TestE2ERetinaCilium(t *testing.T) {
 	curuser, err := user.Current()
 	require.NoError(t, err)
-
-	clusterName := curuser.Username + common.NetObsRGtag + "cilium-" + strconv.FormatInt(time.Now().Unix(), 10)
+	clusterName := curuser.Username + common.NetObsRGtag + "cil-" + strconv.FormatInt(time.Now().Unix(), 10)
 
 	subID := os.Getenv("AZURE_SUBSCRIPTION_ID")
 	require.NotEmpty(t, subID)
@@ -29,11 +30,11 @@ func TestE2ERetinaCilium(t *testing.T) {
 	location := os.Getenv("AZURE_LOCATION")
 	if location == "" {
 		var nBig *big.Int
-		nBig, err = rand.Int(rand.Reader, big.NewInt(int64(len(locations))))
+		nBig, err = rand.Int(rand.Reader, big.NewInt(int64(len(retinaCiliumLocations))))
 		if err != nil {
 			t.Fatalf("Failed to generate a secure random index: %v", err)
 		}
-		location = locations[nBig.Int64()]
+		location = retinaCiliumLocations[nBig.Int64()]
 	}
 
 	cwd, err := os.Getwd()
