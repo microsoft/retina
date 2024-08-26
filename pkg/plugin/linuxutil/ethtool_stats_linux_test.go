@@ -49,7 +49,10 @@ func TestNewEthtoolWithNil(t *testing.T) {
 }
 
 func TestReadInterfaceStats(t *testing.T) {
-	globalCache, _ := lru.New[string, struct{}](10)
+	globalCache, err := lru.New[string, struct{}](10)
+	if err != nil {
+		t.Fatal("failed to create LRU cache: ", err)
+	}
 
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	l := log.Logger().Named("ethtool test").Sugar()

@@ -10,7 +10,7 @@ import (
 )
 
 type CachedEthtool struct {
-	ethHandle   EthtoolInterface
+	EthtoolInterface
 	unsupported *lru.Cache[string, struct{}]
 	l           *log.ZapLogger
 }
@@ -22,9 +22,9 @@ func NewCachedEthtool(ethHandle EthtoolInterface, opts *EthtoolOpts) *CachedEtht
 	}
 
 	return &CachedEthtool{
-		ethHandle:   ethHandle,
-		unsupported: cache,
-		l:           log.Logger().Named(string("EthtoolReader")),
+		EthtoolInterface: ethHandle,
+		unsupported:      cache,
+		l:                log.Logger().Named(string("EthtoolReader")),
 	}
 }
 
@@ -36,14 +36,10 @@ func (ce *CachedEthtool) Stats(intf string) (map[string]uint64, error) {
 		return nil, errskip
 	}
 
-	ifaceStats, err := ce.ethHandle.Stats(intf)
+	ifaceStats, err := ce.EthtoolInterface.Stats(intf)
 	if err != nil {
 		ce.unsupported.Add(intf, struct{}{})
 		return nil, errors.Wrap(err, "error while getting interface stats")
 	}
 	return ifaceStats, nil
-}
-
-func (ce *CachedEthtool) Close() {
-	ce.ethHandle.Close()
 }
