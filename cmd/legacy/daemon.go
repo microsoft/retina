@@ -94,11 +94,18 @@ func (d *Daemon) Start() error {
 	}
 
 	fmt.Println("init client-go")
-
 	var cfg *rest.Config
-	cfg, err = kcfg.GetConfig()
-	if err != nil {
-		panic(err)
+	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
+		fmt.Println("KUBECONFIG set, using kubeconfig: ", kubeconfig)
+		cfg, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+		if err != nil {
+			return fmt.Errorf("creating controller-runtime manager: %w", err)
+		}
+	} else {
+		cfg, err = kcfg.GetConfig()
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	fmt.Println("api server: ", cfg.Host)
@@ -192,25 +199,8 @@ func (d *Daemon) Start() error {
 
 	mgr, err := crmgr.New(cfg, mgrOption)
 	if err != nil {
-		env := "KUBECONFIG"
-		fmt.Println("failed to load kubeconfig via controller runtime: ", err)
-		fmt.Println("checking with env: ", env)
-		kubeconfig := os.Getenv("KUBECONFIG")
-		if kubeconfig == "" {
-			hardcode := "./kubeconfig"
-			fmt.Println("kubeconfig not found in env, using hardcoded path", hardcode)
-			kubeconfig = hardcode
-		}
-		cfg, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
-		if err != nil {
-			mainLogger.Error("Unable build kubeconfig", zap.Error(err))
-			return fmt.Errorf("creating controller-runtime manager: %w", err)
-		}
-		mgr, err = crmgr.New(cfg, mgrOption)
-		if err != nil {
-			mainLogger.Error("Unable to start manager", zap.Error(err))
-			return fmt.Errorf("creating controller-runtime manager: %w", err)
-		}
+		mainLogger.Error("Unable to start manager", zap.Error(err))
+		return fmt.Errorf("creating controller-runtime manager: %w", err)
 	}
 
 	//+kubebuilder:scaffold:builder
@@ -222,6 +212,7 @@ func (d *Daemon) Start() error {
 		mainLogger.Fatal("Unable to set up ready check", zap.Error(addReadyCheckErr))
 	}
 
+	// k8s Client used for informers
 	cl := kubernetes.NewForConfigOrDie(mgr.GetConfig())
 
 	serverVersion, err := cl.Discovery().ServerVersion()

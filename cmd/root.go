@@ -42,7 +42,9 @@ func init() {
 	rootCmd.Flags().StringVar(&probeAddr, "health-probe-bind-address", ":18081", "The address the probe endpoint binds to.")
 	rootCmd.Flags().BoolVar(&enableLeaderElection, "leader-elect", false, "Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
 	rootCmd.Flags().StringVar(&cfgFile, "config", configFileName, "config file")
-	rootCmd.Flags().StringVar(&kubeConfigFileName, "kubeconfig", kubeConfigFileName, "noop we just need cobra to not check since controller runtime can use this flag") // this is read during GetConfigOrDie, not explicitly passed to any of our logic
+
+	// this is read during GetConfigOrDie, not explicitly passed to any of our logic
+	rootCmd.Flags().StringVar(&kubeConfigFileName, "kubeconfig", kubeConfigFileName, "noop we just need cobra to not check since controller runtime can use this flag")
 }
 
 func Execute() {
