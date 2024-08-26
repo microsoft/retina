@@ -5,6 +5,7 @@ import (
 	"github.com/microsoft/retina/test/e2e/framework/generic"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/types"
+	"github.com/microsoft/retina/test/e2e/scenarios/ciliumeventobserver"
 	"github.com/microsoft/retina/test/e2e/scenarios/dns"
 	"github.com/microsoft/retina/test/e2e/scenarios/drop"
 	"github.com/microsoft/retina/test/e2e/scenarios/latency"
@@ -35,6 +36,32 @@ func CreateTestInfra(subID, clusterName, location, kubeConfigFilePath string) *t
 		PodCidr:      "10.128.0.0/9",
 		DNSServiceIP: "192.168.0.10",
 		ServiceCidr:  "192.168.0.0/28",
+	}, nil)
+
+	job.AddStep(&azure.GetAKSKubeConfig{
+		KubeConfigFilePath: kubeConfigFilePath,
+	}, nil)
+
+	job.AddStep(&generic.LoadFlags{
+		TagEnv:            generic.DefaultTagEnv,
+		ImageNamespaceEnv: generic.DefaultImageNamespace,
+		ImageRegistryEnv:  generic.DefaultImageRegistry,
+	}, nil)
+
+	return job
+}
+
+func CreateTestInfraCilium(subID, clusterName, location, kubeConfigFilePath string) *types.Job {
+	job := types.NewJob("Create e2e test infrastructure on cilium dataplane")
+
+	job.AddStep(&azure.CreateResourceGroup{
+		SubscriptionID:    subID,
+		ResourceGroupName: clusterName,
+		Location:          location,
+	}, nil)
+
+	job.AddStep(&azure.CreateCiliumCluster{
+		ClusterName: clusterName,
 	}, nil)
 
 	job.AddStep(&azure.GetAKSKubeConfig{
@@ -183,6 +210,33 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 	}
 
 	job.AddScenario(latency.ValidateLatencyMetric())
+
+	return job
+}
+
+func InstallAndTestRetinaCiliumMetrics(kubeConfigFilePath, chartPath, valuesFilePath string) *types.Job {
+	job := types.NewJob("Install and test Retina with Cilium metrics")
+
+	job.AddStep(&kubernetes.InstallHelmChart{
+		Namespace:          "kube-system",
+		ReleaseName:        "retina",
+		KubeConfigFilePath: kubeConfigFilePath,
+		ChartPath:          chartPath,
+		TagEnv:             generic.DefaultTagEnv,
+	}, nil)
+
+	// Upgade to ciliumeventobserver plugin
+	job.AddStep(&kubernetes.UpgradeRetinaHelmChart{
+		Namespace:          "kube-system",
+		ReleaseName:        "retina",
+		KubeConfigFilePath: kubeConfigFilePath,
+		ChartPath:          chartPath,
+		TagEnv:             generic.DefaultTagEnv,
+		ValuesFile:         valuesFilePath,
+	}, nil)
+
+	job.AddScenario(ciliumeventobserver.ValidateCiliumEventObserverDropMetric())
+	job.AddScenario(ciliumeventobserver.ValidateCiliumEventObserverFlowsAndTCPMetrics())
 
 	return job
 }
