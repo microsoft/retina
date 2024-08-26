@@ -33,6 +33,9 @@ spec:
         - name: retina-agent-init
           image: {{ .Values.agent.init.repository }}:{{ .Values.agent.init.tag }}
           imagePullPolicy: {{ .Values.agent.pullPolicy }}
+          args:
+            - --config
+            - "/retina/config/config.yaml"
           terminationMessagePolicy: FallbackToLogsOnError
           securityContext:
             privileged: true
@@ -43,6 +46,8 @@ spec:
           - name: varrun
             mountPath: /var/run
             mountPropagation: Bidirectional
+          - name: config
+            mountPath: /retina/config
       containers:
         - name: {{ include "retina.name" . }} 
           image: {{ .Values.agent.repository }}:{{ .Values.agent.tag }}
@@ -137,8 +142,6 @@ spec:
                   - key: ca.crt
                     path: client-ca.crt
       {{- end }}
-      nodeSelector:
-        kubernetes.io/os: linux
 {{- end }}
 ---
 {{- if .Values.os.windows}}
