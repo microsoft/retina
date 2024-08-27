@@ -59,7 +59,7 @@ Retina provides both:
 - **Basic metrics** (default, Node-Level metrics) and
 - **Advanced/Pod-Level metrics** (if enabled).
 
-For more info and a list of metrics, see [Metrics](03-Metrics/modes.md).
+For more info and a list of metrics, see [Metrics](03-Metrics/modes/modes.md).
 
 ### Captures
 
