@@ -11,6 +11,7 @@ const (
 	sleepDelay = 5 * time.Second
 	TCP        = "TCP"
 	UDP        = "UDP"
+	ICMPv6     = "ICMPv6"
 	HubblePort = "9965"
 
 	PolicyDenied = "POLICY_DENIED"
@@ -79,6 +80,19 @@ func ValidateCiliumEventObserverDropMetric() *types.Scenario {
 				Reason:                  PolicyDenied,
 				Direction:               "unknown",
 				Protocol:                UDP,
+			},
+			Opts: &types.StepOptions{
+				SkipSavingParamatersToJob: true,
+			},
+		},
+		{
+			// Drop for IPv6
+			Step: &CEODropMetric{
+				PortForwardedHubblePort: HubblePort,
+				Source:                  "agnhost-a",
+				Reason:                  PolicyDenied,
+				Direction:               "unknown",
+				Protocol:                ICMPv6,
 			},
 		},
 		{
@@ -161,7 +175,8 @@ func ValidateCiliumEventObserverFlowsAndTCPMetrics() *types.Scenario {
 			},
 		},
 		{
-			Step: &CEOFlowsAndTCPMetrics{
+			// Check IPv4
+			Step: &CEOFlowsMetric{
 				PortForwardedHubblePort: HubblePort,
 				// Source and Destination are empty for now due to hubble enrichment bug
 				// Source:      "",
@@ -169,7 +184,47 @@ func ValidateCiliumEventObserverFlowsAndTCPMetrics() *types.Scenario {
 				Protocol: TCP,
 				Verdict:  Forwarded,
 				Type:     "Trace",
-				Flag:     "FIN",
+			},
+			Opts: &types.StepOptions{
+				SkipSavingParamatersToJob: true,
+			},
+		},
+		{
+			// Check IPv6
+			Step: &CEOFlowsMetric{
+				PortForwardedHubblePort: HubblePort,
+				// Source and Destination are empty for now due to hubble enrichment bug
+				// Source:      "",
+				// Destination: "",
+				Protocol: ICMPv6,
+				Verdict:  Forwarded,
+				Type:     "Trace",
+			},
+			Opts: &types.StepOptions{
+				SkipSavingParamatersToJob: true,
+			},
+		},
+		{
+			// check IPv4
+			Step: &CEOTCPMetric{
+				PortForwardedHubblePort: HubblePort,
+				// Source: "agnhost-a",
+				// Destination: "",
+				Flag:   "FIN",
+				Family: "IPv4",
+			},
+			Opts: &types.StepOptions{
+				SkipSavingParamatersToJob: true,
+			},
+		},
+		{
+			// check IPv6
+			Step: &CEOTCPMetric{
+				PortForwardedHubblePort: HubblePort,
+				// Source: "agnhost-a",
+				// Destination: "",
+				Flag:   "FIN",
+				Family: "IPv6",
 			},
 		},
 		{
