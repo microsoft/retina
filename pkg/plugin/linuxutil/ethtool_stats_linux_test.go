@@ -17,7 +17,7 @@ var (
 	MockGaugeVec   *metrics.MockIGaugeVec
 	MockCounterVec *metrics.MockICounterVec
 )
-var errInterfaceNotSupported = errors.New("interface not supported")
+var errInterfaceNotSupported = errors.New("operation not supported")
 
 func TestNewEthtool(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
@@ -80,6 +80,18 @@ func TestReadInterfaceStats(t *testing.T) {
 				"rx_packets": 1,
 			},
 			wantErr: false,
+		},
+		{
+			name: "test other error not added to cache",
+			opts: &EthtoolOpts{
+				errOrDropKeysOnly: false,
+				addZeroVal:        false,
+				limit:             10,
+			},
+			statsReturn: nil,
+			statErr:     errors.New("other error"),
+			result:      nil,
+			wantErr:     true,
 		},
 		{
 			name: "test unsported interface",
@@ -146,6 +158,8 @@ func TestReadInterfaceStats(t *testing.T) {
 		if tt.statErr != nil && errors.Is(tt.statErr, errInterfaceNotSupported) {
 			assert.NotNil(t, cachedEthHandle.unsupported, "cache should not be nil")
 			assert.NotEqual(t, 0, cachedEthHandle.unsupported.Len(), "cache should contain interface")
+		} else if tt.statErr != nil && !errors.Is(tt.statErr, errInterfaceNotSupported) {
+			assert.Equal(t, 0, cachedEthHandle.unsupported.Len(), "cache should not add interface for other errors")
 		}
 
 		globalCache = cachedEthHandle.unsupported
