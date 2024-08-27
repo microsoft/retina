@@ -28,14 +28,18 @@ func main() {
 	l.Info("Version: ", zap.String("version", buildinfo.Version))
 
 	var tel telemetry.Telemetry
+	var err error
 	if buildinfo.ApplicationInsightsID != "" {
 		l.Info("telemetry enabled", zap.String("applicationInsightsID", buildinfo.ApplicationInsightsID))
 		telemetry.InitAppInsights(buildinfo.ApplicationInsightsID, buildinfo.Version)
 		defer telemetry.ShutdownAppInsights()
-		tel = telemetry.NewAppInsightsTelemetryClient("retina-capture", map[string]string{
+		tel, err = telemetry.NewAppInsightsTelemetryClient("retina-capture", map[string]string{
 			"version":                   buildinfo.Version,
 			telemetry.PropertyApiserver: os.Getenv(captureConstants.ApiserverEnvKey),
 		})
+		if err != nil {
+			log.Logger().Panic("failed to create telemetry client", zap.Error(err))
+		}
 	} else {
 		tel = telemetry.NewNoopTelemetry()
 	}
