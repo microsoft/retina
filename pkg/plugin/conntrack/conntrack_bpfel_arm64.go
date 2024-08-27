@@ -14,14 +14,13 @@ import (
 
 type conntrackCtEntry struct {
 	Lifetime             uint32
+	LastReportForwardDir uint32
+	LastReportReplyDir   uint32
 	TrafficDirection     uint32
 	FlagsSeenForwardDir  uint8
 	FlagsSeenReplyDir    uint8
-	_                    [2]byte
-	LastReportForwardDir uint32
-	LastReportReplyDir   uint32
-	IsClosing            uint8
-	_                    [3]byte
+	IsClosing            bool
+	_                    [1]byte
 }
 
 type conntrackCtV4Key struct {

@@ -23,7 +23,7 @@
 #define CT_SYN_TIMEOUT 60
 // Define the interval at which a packet should be sent to the userspace
 #define CT_REPORT_INTERVAL 30
-
+// Define the maximum number of connections that can be stored in the conntrack table
 #define CT_MAP_SIZE 262144
 
 enum tcp_flags {
