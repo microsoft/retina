@@ -11,8 +11,10 @@ const (
 	sleepDelay = 5 * time.Second
 	TCP        = "TCP"
 	UDP        = "UDP"
+	HubblePort = "9965"
 
 	PolicyDenied = "POLICY_DENIED"
+	Forwarded    = "FORWARDED"
 )
 
 func ValidateCiliumEventObserverDropMetric() *types.Scenario {
@@ -61,8 +63,8 @@ func ValidateCiliumEventObserverDropMetric() *types.Scenario {
 			Step: &kubernetes.PortForward{
 				Namespace:             "kube-system",
 				LabelSelector:         "k8s-app=retina",
-				LocalPort:             "9965",
-				RemotePort:            "9965",
+				LocalPort:             HubblePort,
+				RemotePort:            HubblePort,
 				Endpoint:              "metrics",
 				OptionalLabelAffinity: "app=agnhost-a", // port forward to a pod on a node that also has this pod with this label, assuming same namespace
 			},
@@ -72,7 +74,7 @@ func ValidateCiliumEventObserverDropMetric() *types.Scenario {
 		},
 		{
 			Step: &CEODropMetric{
-				PortForwardedHubblePort: "9965",
+				PortForwardedHubblePort: HubblePort,
 				Source:                  "agnhost-a",
 				Reason:                  PolicyDenied,
 				Direction:               "unknown",
@@ -149,8 +151,8 @@ func ValidateCiliumEventObserverFlowsAndTCPMetrics() *types.Scenario {
 			Step: &kubernetes.PortForward{
 				Namespace:             "kube-system",
 				LabelSelector:         "k8s-app=retina",
-				LocalPort:             "9965",
-				RemotePort:            "9965",
+				LocalPort:             HubblePort,
+				RemotePort:            HubblePort,
 				Endpoint:              "metrics",
 				OptionalLabelAffinity: "app=agnhost-a", // port forward to a pod on a node that also has this pod with this label, assuming same namespace
 			},
@@ -160,8 +162,14 @@ func ValidateCiliumEventObserverFlowsAndTCPMetrics() *types.Scenario {
 		},
 		{
 			Step: &CEOFlowsAndTCPMetrics{
-				PortForwardedHubblePort: "9965",
-				Source:                  "agnhost-a",
+				PortForwardedHubblePort: HubblePort,
+				// Source and Destination are empty for now due to hubble enrichment bug
+				// Source:      "",
+				// Destination: "",
+				Protocol: TCP,
+				Verdict:  Forwarded,
+				Type:     "Trace",
+				Flag:     "FIN",
 			},
 		},
 		{

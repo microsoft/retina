@@ -11,6 +11,8 @@
 # Test binary, built with `go test -c`
 *.test
 
+*.pem
+
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
@@ -35,6 +37,8 @@ output
 
 dist/
 bin/
+.certs/
+site/build/
 
 image-metadata-*.json
 *packetmonitorsupport*/

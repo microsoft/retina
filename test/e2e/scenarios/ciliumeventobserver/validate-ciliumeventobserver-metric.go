@@ -29,16 +29,11 @@ type CEODropMetric struct {
 	Direction               string
 }
 
-type CEOFlowsAndTCPMetrics struct {
-	PortForwardedHubblePort string
-	Source                  string
-}
-
 func (v *CEODropMetric) Run() error {
 	promAddress := fmt.Sprintf("http://localhost:%s/metrics", v.PortForwardedHubblePort)
 
 	metric := map[string]string{
-		directionKey: v.Direction, reasonKey: PolicyDenied,
+		directionKey: v.Direction, reasonKey: v.Reason,
 	}
 
 	err := prom.CheckMetric(promAddress, dropCountMetricName, metric)
@@ -58,11 +53,29 @@ func (v *CEODropMetric) Stop() error {
 	return nil
 }
 
+type CEOFlowsAndTCPMetrics struct {
+	PortForwardedHubblePort string
+	// Source                  string
+	// Destination             string
+	Protocol string
+	Verdict  string
+	Type     string
+	Flag     string
+}
+
 // Flows
 func (v *CEOFlowsAndTCPMetrics) Run() error {
 	promAddress := fmt.Sprintf("http://localhost:%s/metrics", v.PortForwardedHubblePort)
 
-	metric := map[string]string{}
+	// Source and Destination are empty for now due to hubble enrichment bug
+	// This should be updated in both maps once the bug is fixed
+	metric := map[string]string{
+		// "destination": v.Destination,
+		// "source":      v.Source,
+		"protocol": v.Protocol, // TCP
+		"verdict":  v.Verdict,  // FORWARDED
+		"type":     v.Type,     // trace
+	}
 
 	err := prom.CheckMetric(promAddress, flowsMetricName, metric)
 	if err != nil {
@@ -70,7 +83,11 @@ func (v *CEOFlowsAndTCPMetrics) Run() error {
 	}
 	log.Printf("found metrics matching %+v\n", metric)
 
-	metric = map[string]string{}
+	metric = map[string]string{
+		// "destination": v.Destination,
+		// "source":      v.Source,
+		"flag": v.Flag, // FIN, RST, SYN, SYN-ACK
+	}
 	err = prom.CheckMetric(promAddress, tcpFlagsMetricName, metric)
 	if err != nil {
 		return fmt.Errorf("failed to verify prometheus metrics %s: %w", tcpFlagsMetricName, err)
