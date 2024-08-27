@@ -4,7 +4,6 @@
 package bpf
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/cilium/cilium/pkg/mountinfo"
@@ -21,7 +20,7 @@ func __mount() error {
 	if err != nil {
 		if os.IsNotExist(err) {
 			// Path does not exist. Create it.
-			err = os.MkdirAll(plugincommon.MapPath, 0o755)
+			err = os.MkdirAll(plugincommon.MapPath, 0o755) //nolint:gomnd // 0o755 is the permission for the directory.
 			if err != nil {
 				return err
 			}
@@ -49,7 +48,7 @@ func mountBpfFs() error {
 	// Else mounted. Check the type of mount.
 	if !bpfMount {
 		// Custom mount of /sys/fs/bpf. Unknown setup. Exit.
-		return fmt.Errorf("%+s is already mounted but not as bpf. Not supported", plugincommon.MapPath)
+		return errors.New(plugincommon.MapPath + " is already mounted but not as bpf. Not supported")
 	}
 	return nil
 }
