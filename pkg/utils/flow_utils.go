@@ -71,16 +71,16 @@ func ToFlow(
 	// So for HOST -> CONTAINER, egress of host veth is ingress of container.
 	// Hence, we need to swap the direction.
 	switch observationPoint {
-	case uint8(0):
+	case uint8(0): //nolint:gomnd // flow.TraceObservationPoint_TO_STACK
 		checkpoint = flow.TraceObservationPoint_TO_STACK
 		subeventtype = int(api.TraceToStack)
-	case uint8(1):
+	case uint8(1): //nolint:gomnd // flow.TraceObservationPoint_TO_ENDPOINT
 		checkpoint = flow.TraceObservationPoint_TO_ENDPOINT
 		subeventtype = int(api.TraceToLxc)
-	case uint8(2):
+	case uint8(2): //nolint:gomnd // flow.TraceObservationPoint_FROM_NETWORK
 		checkpoint = flow.TraceObservationPoint_FROM_NETWORK
 		subeventtype = int(api.TraceFromNetwork)
-	case uint8(3):
+	case uint8(3): //nolint:gomnd // flow.TraceObservationPoint_TO_NETWORK
 		checkpoint = flow.TraceObservationPoint_TO_NETWORK
 		subeventtype = int(api.TraceToNetwork)
 	default:

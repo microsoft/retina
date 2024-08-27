@@ -119,7 +119,7 @@ func (d *dns) eventHandler(event *types.Event) {
 		return
 	}
 
-	var dir uint32
+	var dir uint8
 	if event.PktType == "HOST" {
 		// Ingress.
 		dir = 2
