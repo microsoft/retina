@@ -45,7 +45,7 @@ func run(args ...string) error {
 	// Get config
 	cfg, err := config.GetConfig(*configPath)
 	if err != nil {
-		l.Fatal("failed to get config", zap.Error(err))
+		return errors.Wrap(err, "failed to get config")
 	}
 
 	// Enable telemetry if applicationInsightsID is provided and telemetry is enabled in config.
@@ -59,10 +59,16 @@ func run(args ...string) error {
 	}
 
 	// Setup BPF
-	bpf.Setup(l)
+	err = bpf.Setup(l)
+	if err != nil {
+		return errors.Wrap(err, "failed to setup Retina bpf filesystem")
+	}
 
 	// Setup CiliumFS.
-	ciliumfs.Setup(l)
+	err = ciliumfs.Setup(l)
+	if err != nil {
+		return errors.Wrap(err, "failed to setup CiliumFS")
+	}
 
 	return nil
 }
