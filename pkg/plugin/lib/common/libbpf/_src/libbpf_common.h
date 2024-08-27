@@ -30,20 +30,10 @@
 /* Add checks for other versions below when planning deprecation of API symbols
  * with the LIBBPF_DEPRECATED_SINCE macro.
  */
-#if __LIBBPF_CURRENT_VERSION_GEQ(0, 6)
-#define __LIBBPF_MARK_DEPRECATED_0_6(X) X
+#if __LIBBPF_CURRENT_VERSION_GEQ(1, 0)
+#define __LIBBPF_MARK_DEPRECATED_1_0(X) X
 #else
-#define __LIBBPF_MARK_DEPRECATED_0_6(X)
-#endif
-#if __LIBBPF_CURRENT_VERSION_GEQ(0, 7)
-#define __LIBBPF_MARK_DEPRECATED_0_7(X) X
-#else
-#define __LIBBPF_MARK_DEPRECATED_0_7(X)
-#endif
-#if __LIBBPF_CURRENT_VERSION_GEQ(0, 8)
-#define __LIBBPF_MARK_DEPRECATED_0_8(X) X
-#else
-#define __LIBBPF_MARK_DEPRECATED_0_8(X)
+#define __LIBBPF_MARK_DEPRECATED_1_0(X)
 #endif
 
 /* This set of internal macros allows to do "function overloading" based on
@@ -79,5 +69,24 @@
 			__VA_ARGS__					    \
 		};							    \
 	})
+
+/* Helper macro to clear and optionally reinitialize libbpf options struct
+ *
+ * Small helper macro to reset all fields and to reinitialize the common
+ * structure size member. Values provided by users in struct initializer-
+ * syntax as varargs can be provided as well to reinitialize options struct
+ * specific members.
+ */
+#define LIBBPF_OPTS_RESET(NAME, ...)					    \
+	do {								    \
+		typeof(NAME) ___##NAME = ({ 				    \
+			memset(&___##NAME, 0, sizeof(NAME));		    \
+			(typeof(NAME)) {				    \
+				.sz = sizeof(NAME),			    \
+				__VA_ARGS__				    \
+			};						    \
+		});							    \
+		memcpy(&NAME, &___##NAME, sizeof(NAME));		    \
+	} while (0)
 
 #endif /* __LIBBPF_LIBBPF_COMMON_H */
