@@ -15,6 +15,8 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	ctrl "sigs.k8s.io/controller-runtime"
 	crcache "sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -92,10 +94,21 @@ func (d *Daemon) Start() error {
 	}
 
 	fmt.Println("init client-go")
-	cfg, err := kcfg.GetConfig()
-	if err != nil {
-		panic(err)
+	var cfg *rest.Config
+	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
+		fmt.Println("KUBECONFIG set, using kubeconfig: ", kubeconfig)
+		cfg, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+		if err != nil {
+			return fmt.Errorf("creating controller-runtime manager: %w", err)
+		}
+	} else {
+		cfg, err = kcfg.GetConfig()
+		if err != nil {
+			panic(err)
+		}
 	}
+
+	fmt.Println("api server: ", cfg.Host)
 
 	fmt.Println("init logger")
 	zl, err := log.SetupZapLogger(&log.LogOpts{
