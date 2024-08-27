@@ -28,15 +28,26 @@ ARG GOOS=linux # default to linux
 ENV CGO_ENABLED=0
 ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
-COPY . /go/src/github.com/microsoft/retina
+RUN if [ "$GOOS" = "linux" ] ; then \
+      tdnf install -y clang16 lld16 bpftool libbpf-devel; \
+    fi
+COPY ./pkg/plugin /go/src/github.com/microsoft/retina/pkg/plugin
 WORKDIR /go/src/github.com/microsoft/retina
 RUN if [ "$GOOS" = "linux" ] ; then \
-    tdnf install -y clang16 lld16 bpftool libbpf-devel; \
-    go generate -x /go/src/github.com/microsoft/retina/pkg/plugin/...; \
+      go mod init github.com/microsoft/retina; \
+      go generate -x /go/src/github.com/microsoft/retina/pkg/plugin/...; \
+      tar czf /gen.tar.gz ./pkg/plugin; \
+      rm go.mod; \
+    fi
+COPY ./go.mod ./go.sum ./
+RUN go mod download
+COPY . .
+RUN if [ "$GOOS" = "linux" ] ; then \
+      rm -rf ./pkg/plugin && tar xvf /gen.tar.gz ./pkg/plugin; \
     fi
 
 # capture binary
-FROM golang AS capture-bin
+FROM intermediate AS capture-bin
 ARG APP_INSIGHTS_ID # set to enable AI telemetry
 ARG GOARCH=amd64 # default to amd64
 ARG GOOS=linux # default to linux
@@ -44,8 +55,6 @@ ARG VERSION
 ENV CGO_ENABLED=0
 ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
-COPY . /go/src/github.com/microsoft/retina 
-WORKDIR /go/src/github.com/microsoft/retina
 RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/retina/captureworkload -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID="$APP_INSIGHTS_ID"" captureworkload/main.go
 
 
