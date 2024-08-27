@@ -11,10 +11,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        goos: ["linux", "windows"]
-        goarch: ["amd64", "arm64"]
+        include:
+          - goos: "linux"
+            goarch: "amd64"
+            runs-on: "ubuntu-latest"
+          - goos: "linux"
+            goarch: "arm64"
+            runs-on: "ubuntu-latest"
+          - goos: "windows"
+            goarch: "amd64"
+            runs-on: "windows-latest"
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runs-on }}
     env:
       IS_NOT_MERGE_GROUP: ${{ github.event_name != 'merge_group' }}
       GOOS: ${{ matrix.goos }}
@@ -44,8 +52,8 @@ jobs:
       - name: Set up tools/dependencies and generate - Windows
         if: env.GOOS == 'windows' && env.IS_NOT_MERGE_GROUP
         run: |
-          # As of now, we there are only mockgen files. other generated files (ebpf) are not supported for windows yet
-          GOOS=linux make all
+          go build -v ./controller
+          go build -v ./captureworkload
       - name: golangci-lint
         if: env.IS_NOT_MERGE_GROUP
         uses: golangci/golangci-lint-action@v6

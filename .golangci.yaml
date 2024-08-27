@@ -24,7 +24,7 @@ linters:
   disable:
   - gci
   enable:
-  - exportloopref
+  - copyloopvar
   - goconst
   - gocritic
   - gocyclo
