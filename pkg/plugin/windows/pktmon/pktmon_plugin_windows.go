@@ -97,7 +97,16 @@ func (p *Plugin) RunPktMonServer(ctx context.Context) error {
 	defer p.stdWriter.Close()
 	p.errWriter = &zapio.Writer{Log: p.l.Logger, Level: zap.ErrorLevel}
 	defer p.errWriter.Close()
-	p.pktmonCmd = exec.CommandContext(ctx, "controller-pktmon.exe")
+
+	pwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current working directory for pktmon: %w", err)
+	}
+
+	cmd := pwd + "\\" + "controller-pktmon.exe"
+
+	p.pktmonCmd = exec.CommandContext(ctx, cmd)
+	p.pktmonCmd.Dir = pwd
 	p.pktmonCmd.Args = append(p.pktmonCmd.Args, "--socketpath", socket)
 	p.pktmonCmd.Env = os.Environ()
 	p.pktmonCmd.Stdout = p.stdWriter
@@ -106,7 +115,7 @@ func (p *Plugin) RunPktMonServer(ctx context.Context) error {
 	p.l.Info("calling start on pktmon stream server", zap.String("cmd", p.pktmonCmd.String()))
 
 	// block this thread, and should it ever return, it's a problem
-	err := p.pktmonCmd.Run()
+	err = p.pktmonCmd.Run()
 	if err != nil {
 		return fmt.Errorf("pktmon server exited when it should not have: %w", err)
 	}

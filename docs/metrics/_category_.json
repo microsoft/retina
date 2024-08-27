@@ -1,8 +1,0 @@
-{
-  "label": "Metrics",
-  "position": 2,
-  "link": {
-    "type": "generated-index",
-    "description": "Currently supported Retina plugins."
-  }
-}
