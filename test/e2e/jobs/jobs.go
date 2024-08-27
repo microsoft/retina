@@ -67,9 +67,10 @@ func CreateTestInfraAWS(accID, clusterName, region, kubeConfigFilePath string) *
 	job := types.NewJob("Create e2e test infrastructure AWS")
 
 	job.AddStep(&aws.CreateCluster{
-		AccountID:   accID,
-		ClusterName: clusterName,
-		Region:      region,
+		AccountID:          accID,
+		ClusterName:        clusterName,
+		Region:             region,
+		KubeConfigFilePath: kubeConfigFilePath,
 	}, nil)
 
 	return job
@@ -77,6 +78,12 @@ func CreateTestInfraAWS(accID, clusterName, region, kubeConfigFilePath string) *
 
 func DeleteTestInfraAWS(accID, clusterName, region string) *types.Job {
 	job := types.NewJob("Delete e2e test infrastructure AWS")
+
+	job.AddStep(&aws.DeleteCluster{
+		AccountID:   accID,
+		ClusterName: clusterName,
+		Region:      region,
+	}, nil)
 
 	return job
 }
