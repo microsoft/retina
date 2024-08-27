@@ -11,18 +11,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - goos: "linux"
-            goarch: "amd64"
-            runs-on: "ubuntu-latest"
-          - goos: "linux"
-            goarch: "arm64"
-            runs-on: "ubuntu-latest"
-          - goos: "windows"
-            goarch: "amd64"
-            runs-on: "windows-latest"
+        goos: [linux, windows]
+        goarch: [amd64, arm64]
     name: Lint
-    runs-on: ${{ matrix.runs-on }}
+    runs-on: ubuntu-latest
     env:
       IS_NOT_MERGE_GROUP: ${{ github.event_name != 'merge_group' }}
       GOOS: ${{ matrix.goos }}
