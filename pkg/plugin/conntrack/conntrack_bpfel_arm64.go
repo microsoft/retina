@@ -16,11 +16,10 @@ type conntrackCtEntry struct {
 	Lifetime             uint32
 	LastReportForwardDir uint32
 	LastReportReplyDir   uint32
-	TrafficDirection     uint32
+	TrafficDirection     uint8
 	FlagsSeenForwardDir  uint8
 	FlagsSeenReplyDir    uint8
 	IsClosing            bool
-	_                    [1]byte
 }
 
 type conntrackCtV4Key struct {

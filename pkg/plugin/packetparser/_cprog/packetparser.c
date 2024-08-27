@@ -30,14 +30,13 @@ struct packet
 {
 	__u64 ts; // timestamp in nanoseconds
 	__u64 bytes; // packet size in bytes
-	// 5 tuple.
 	__u32 src_ip;
 	__u32 dst_ip;
 	__u16 src_port;
 	__u16 dst_port;
 	struct tcpmetadata tcp_metadata; // TCP metadata
-	enum obs_point observation_point;
-	enum ct_traffic_dir traffic_direction;
+	__u8 observation_point;
+	__u8 traffic_direction;
 	__u8 proto;
 	bool is_reply;
 };
@@ -143,7 +142,7 @@ static int parse_tcp_ts(struct tcphdr *tcph, void *data_end, __u32 *tsval, __u32
 }
 
 // Function to parse the packet and send it to the perf buffer.
-static void parse(struct __sk_buff *skb, enum obs_point obs)
+static void parse(struct __sk_buff *skb, __u8 obs)
 {
 	struct packet p;
 	__builtin_memset(&p, 0, sizeof(p));
@@ -270,7 +269,7 @@ int endpoint_ingress_filter(struct __sk_buff *skb)
 {
 	// This is attached to the interface on the host side.
 	// So ingress on host is egress on endpoint and vice versa.
-	parse(skb, FROM_ENDPOINT);
+	parse(skb, OBSERVAION_POINT_FROM_ENDPOINT);
 	// Always return TC_ACT_UNSPEC to allow packet to pass to the next BPF program.
 	return TC_ACT_UNSPEC;
 }
@@ -280,7 +279,7 @@ int endpoint_egress_filter(struct __sk_buff *skb)
 {
 	// This is attached to the interface on the host side.
 	// So egress on host is ingress on endpoint and vice versa.
-	parse(skb, TO_ENDPOINT);
+	parse(skb, OBSERVAION_POINT_TO_ENDPOINT);
 	// Always return TC_ACT_UNSPEC to allow packet to pass to the next BPF program.
 	return TC_ACT_UNSPEC;
 }
@@ -288,7 +287,7 @@ int endpoint_egress_filter(struct __sk_buff *skb)
 SEC("classifier_host_ingress")
 int host_ingress_filter(struct __sk_buff *skb)
 {
-	parse(skb, FROM_NETWORK);
+	parse(skb, OBSERVAION_POINT_FROM_NETWORK);
 	// Always return TC_ACT_UNSPEC to allow packet to pass to the next BPF program.
 	return TC_ACT_UNSPEC;
 }
@@ -296,7 +295,7 @@ int host_ingress_filter(struct __sk_buff *skb)
 SEC("classifier_host_egress")
 int host_egress_filter(struct __sk_buff *skb)
 {
-	parse(skb, TO_NETWORK);
+	parse(skb, OBSERVAION_POINT_TO_NETWORK);
 	// Always return TC_ACT_UNSPEC to allow packet to pass to the next BPF program.
 	return TC_ACT_UNSPEC;
 }

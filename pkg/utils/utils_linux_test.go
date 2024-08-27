@@ -22,7 +22,7 @@ func TestToFlow(t *testing.T) {
 	ts := int64(1649748687588860)
 	f := ToFlow(ts, net.ParseIP("1.1.1.1").To4(),
 		net.ParseIP("2.2.2.2").To4(),
-		443, 80, 6, uint32(1), flow.Verdict_FORWARDED)
+		443, 80, 6, uint8(1), flow.Verdict_FORWARDED)
 	/*
 		expected  ---> flow.Flow{
 			IP: &flow.IP{
@@ -66,7 +66,7 @@ func TestToFlow(t *testing.T) {
 	for idx, val := range []uint32{0, 1, 2, 3, 4} {
 		f = ToFlow(ts, net.ParseIP("1.1.1.1").To4(),
 			net.ParseIP("2.2.2.2").To4(),
-			443, 80, 6, uint32(val), flow.Verdict_FORWARDED)
+			443, 80, 6, uint8(val), flow.Verdict_FORWARDED)
 		assert.EqualValues(t, f.TraceObservationPoint, expectedObsPoint[idx])
 		assert.EqualValues(t, f.GetEventType().GetSubType(), expectedSubtype[idx])
 	}
@@ -83,7 +83,7 @@ func TestAddPacketSize(t *testing.T) {
 		443,
 		80,
 		6,
-		uint32(1),
+		uint8(1),
 		flow.Verdict_FORWARDED,
 	)
 	meta := &RetinaMetadata{}
@@ -105,7 +105,7 @@ func TestTcpID(t *testing.T) {
 		443,
 		80,
 		6,
-		uint32(1),
+		uint8(1),
 		flow.Verdict_FORWARDED,
 	)
 

@@ -3,12 +3,13 @@ package ciliumfs
 import (
 	"os"
 
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
 const ciliumDir = "/var/run/cilium"
 
-func Setup(l *zap.Logger) {
+func Setup(l *zap.Logger) error {
 	// Create /var/run/cilium directory.
 	fp, err := os.Stat(ciliumDir)
 	if err != nil {
@@ -18,13 +19,13 @@ func Setup(l *zap.Logger) {
 			// Path does not exist. Create it.
 			err = os.MkdirAll("/var/run/cilium", 0o755) //nolint:gomnd // 0o755 is the permission mode.
 			if err != nil {
-				l.Error("Failed to create directory", zap.String("dir path", ciliumDir), zap.Error(err))
-				l.Panic("Failed to create directory", zap.String("dir path", ciliumDir), zap.Error(err))
+				return errors.Wrap(err, "failed to create Cilium directory")
 			}
 		} else {
 			// Some other error. Return.
-			l.Panic("Failed to stat directory", zap.String("dir path", ciliumDir), zap.Error(err))
+			return errors.Wrap(err, "failed to stat Cilium directory")
 		}
 	}
 	l.Info("Created directory", zap.String("dir path", ciliumDir), zap.Any("file", fp))
+	return nil
 }

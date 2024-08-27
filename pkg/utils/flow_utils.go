@@ -35,7 +35,7 @@ func ToFlow(
 	sourceIP, destIP net.IP,
 	sourcePort, destPort uint32,
 	proto uint8,
-	observationPoint uint32,
+	observationPoint uint8,
 	verdict flow.Verdict,
 ) *flow.Flow { //nolint:typecheck
 	var (
@@ -71,16 +71,16 @@ func ToFlow(
 	// So for HOST -> CONTAINER, egress of host veth is ingress of container.
 	// Hence, we need to swap the direction.
 	switch observationPoint {
-	case uint32(0):
+	case uint8(0):
 		checkpoint = flow.TraceObservationPoint_TO_STACK
 		subeventtype = int(api.TraceToStack)
-	case uint32(1):
+	case uint8(1):
 		checkpoint = flow.TraceObservationPoint_TO_ENDPOINT
 		subeventtype = int(api.TraceToLxc)
-	case uint32(2):
+	case uint8(2):
 		checkpoint = flow.TraceObservationPoint_FROM_NETWORK
 		subeventtype = int(api.TraceFromNetwork)
-	case uint32(3):
+	case uint8(3):
 		checkpoint = flow.TraceObservationPoint_TO_NETWORK
 		subeventtype = int(api.TraceToNetwork)
 	default:

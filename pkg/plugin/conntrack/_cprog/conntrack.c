@@ -31,7 +31,7 @@ struct ct_entry {
      * traffic_direction indicates the direction of the connection in relation to the host. 
      * If the connection is initiated from within the host, the traffic_direction is egress. Otherwise, the traffic_direction is ingress.
      */
-    enum ct_traffic_dir traffic_direction;
+    __u8 traffic_direction;
     /**
      * flags_seen_*_dir stores the flags seen in the forward and reply direction.
      */
@@ -51,13 +51,13 @@ struct {
  * Returns the traffic direction based on the observation point.
  * @arg observation_point The point in the network stack where the packet is observed.
  */
-static __always_inline __u8 _ct_get_traffic_direction(enum obs_point observation_point) {
+static __always_inline __u8 _ct_get_traffic_direction(__u8 observation_point) {
     switch (observation_point) {
-        case FROM_ENDPOINT:
-        case TO_NETWORK:
+        case OBSERVAION_POINT_FROM_ENDPOINT:
+        case OBSERVAION_POINT_TO_NETWORK:
             return TRAFFIC_DIRECTION_EGRESS;
-        case TO_ENDPOINT:
-        case FROM_NETWORK:
+        case OBSERVAION_POINT_TO_ENDPOINT:
+        case OBSERVAION_POINT_FROM_NETWORK:
             return TRAFFIC_DIRECTION_INGRESS;
         default:
             return TRAFFIC_DIRECTION_UNKNOWN;
@@ -71,7 +71,7 @@ static __always_inline __u8 _ct_get_traffic_direction(enum obs_point observation
  * @arg observation_point The point in the network stack where the packet is observed.
  * @arg timeout The timeout for the connection.
  */
-static __always_inline bool _ct_create_new_tcp_connection(struct ct_v4_key key, __u8 flags, enum obs_point observation_point, __u64 timeout) {
+static __always_inline bool _ct_create_new_tcp_connection(struct ct_v4_key key, __u8 flags, __u8 observation_point, __u64 timeout) {
     struct ct_entry new_value;
     __builtin_memset(&new_value, 0, sizeof(struct ct_entry));
     __u64 now = bpf_mono_now();
@@ -88,7 +88,7 @@ static __always_inline bool _ct_create_new_tcp_connection(struct ct_v4_key key, 
  * @arg flags The flags of the packet.
  * @arg observation_point The point in the network stack where the packet is observed.
  */
-static __always_inline bool _ct_handle_udp_connection(struct ct_v4_key key, __u8 flags, enum obs_point observation_point) {
+static __always_inline bool _ct_handle_udp_connection(struct ct_v4_key key, __u8 flags, __u8 observation_point) {
     struct ct_entry new_value;
     __builtin_memset(&new_value, 0, sizeof(struct ct_entry));
     __u64 now = bpf_mono_now();
@@ -107,7 +107,7 @@ static __always_inline bool _ct_handle_udp_connection(struct ct_v4_key key, __u8
  * @arg flags The flags of the packet.
  * @arg observation_point The point in the network stack where the packet is observed.
  */
-static __always_inline bool _ct_handle_tcp_connection(struct ct_v4_key key, struct ct_v4_key reverse_key, __u8 flags, enum obs_point observation_point) {
+static __always_inline bool _ct_handle_tcp_connection(struct ct_v4_key key, struct ct_v4_key reverse_key, __u8 flags, __u8 observation_point) {
     // Check if the packet is a SYN packet.
     if (flags & TCP_SYN) {
         // Create a new connection with a timeout of CT_SYN_TIMEOUT.
@@ -144,7 +144,7 @@ static __always_inline bool _ct_handle_tcp_connection(struct ct_v4_key key, stru
  * @arg flags The flags of the packet.
  * @arg observation_point The point in the network stack where the packet is observed.
  */
-static __always_inline bool _ct_handle_new_connection(struct ct_v4_key key, struct ct_v4_key reverse_key, __u8 flags, enum obs_point observation_point) {
+static __always_inline bool _ct_handle_new_connection(struct ct_v4_key key, struct ct_v4_key reverse_key, __u8 flags, __u8 observation_point) {
     // Check what kind of protocol the packet is.
     switch (key.proto) {
         case IPPROTO_TCP:
@@ -224,7 +224,7 @@ static __always_inline bool _ct_should_report_packet(__u8 flags, struct ct_entry
  * @arg observation_point The point in the network stack where the packet is observed.
  * Returns true if the packet should be report to userspace. False otherwise.
  */
-static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_v4_key key, __u8 flags, enum obs_point observation_point) {    
+static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_v4_key key, __u8 flags, __u8 observation_point) {    
     // Lookup the connection in the map.
     struct ct_entry *entry = bpf_map_lookup_elem(&retina_conntrack_map, &key);
 
@@ -274,7 +274,7 @@ static __always_inline __attribute__((unused)) bool ct_is_reply_packet(struct ct
  * Get the traffic direction of a connection.
  * @arg key The key to be used to get the traffic direction of the connection.
  */
-static __always_inline __attribute__((unused)) enum ct_traffic_dir ct_get_traffic_direction(struct ct_v4_key key) {
+static __always_inline __attribute__((unused)) __u8 ct_get_traffic_direction(struct ct_v4_key key) {
     // Lookup the connection in the map.
     struct ct_entry *entry = bpf_map_lookup_elem(&retina_conntrack_map, &key);
     if (entry) {

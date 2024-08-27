@@ -311,7 +311,7 @@ func TestReadDataPodLevelEnabled(t *testing.T) {
 		SrcIp:            uint32(83886272), // 192.0.0.5
 		DstIp:            uint32(16777226), // 10.0.0.1
 		Proto:            uint8(6),         // TCP
-		ObservationPoint: uint32(1),        // TO Endpoint
+		ObservationPoint: uint8(1),         // TO Endpoint
 		SrcPort:          uint16(80),
 		DstPort:          uint16(443),
 	}
