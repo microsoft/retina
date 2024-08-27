@@ -300,7 +300,7 @@ require (
 	github.com/google/gopacket v1.1.19
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/inspektor-gadget/inspektor-gadget v0.27.0
-	github.com/jellydator/ttlcache/v3 v3.2.1
+	github.com/jellydator/ttlcache/v3 v3.3.0
 	github.com/jsternberg/zap-logfmt v1.3.0
 	github.com/microsoft/ApplicationInsights-Go v0.4.4
 	github.com/mitchellh/mapstructure v1.5.0
