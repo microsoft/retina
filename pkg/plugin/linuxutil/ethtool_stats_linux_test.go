@@ -17,7 +17,11 @@ var (
 	MockGaugeVec   *metrics.MockIGaugeVec
 	MockCounterVec *metrics.MockICounterVec
 )
-var errInterfaceNotSupported = errors.New("operation not supported")
+
+var (
+	errInterfaceNotSupported = errors.New("operation not supported")
+	errOther                 = errors.New("other error")
+)
 
 func TestNewEthtool(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
@@ -89,7 +93,7 @@ func TestReadInterfaceStats(t *testing.T) {
 				limit:             10,
 			},
 			statsReturn: nil,
-			statErr:     errors.New("other error"),
+			statErr:     errOther,
 			result:      nil,
 			wantErr:     true,
 		},
