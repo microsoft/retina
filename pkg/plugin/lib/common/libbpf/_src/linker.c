@@ -697,11 +697,6 @@ static int linker_load_obj_file(struct bpf_linker *linker, const char *filename,
 	return err;
 }
 
-static bool is_pow_of_2(size_t x)
-{
-	return x && (x & (x - 1)) == 0;
-}
-
 static int linker_sanity_check_elf(struct src_obj *obj)
 {
 	struct src_sec *sec;
@@ -724,13 +719,28 @@ static int linker_sanity_check_elf(struct src_obj *obj)
 			return -EINVAL;
 		}
 
-		if (sec->shdr->sh_addralign && !is_pow_of_2(sec->shdr->sh_addralign))
-			return -EINVAL;
-		if (sec->shdr->sh_addralign != sec->data->d_align)
-			return -EINVAL;
+		if (is_dwarf_sec_name(sec->sec_name))
+			continue;
 
-		if (sec->shdr->sh_size != sec->data->d_size)
+		if (sec->shdr->sh_addralign && !is_pow_of_2(sec->shdr->sh_addralign)) {
+			pr_warn("ELF section #%zu alignment %llu is non pow-of-2 alignment in %s\n",
+				sec->sec_idx, (long long unsigned)sec->shdr->sh_addralign,
+				obj->filename);
 			return -EINVAL;
+		}
+		if (sec->shdr->sh_addralign != sec->data->d_align) {
+			pr_warn("ELF section #%zu has inconsistent alignment addr=%llu != d=%llu in %s\n",
+				sec->sec_idx, (long long unsigned)sec->shdr->sh_addralign,
+				(long long unsigned)sec->data->d_align, obj->filename);
+			return -EINVAL;
+		}
+
+		if (sec->shdr->sh_size != sec->data->d_size) {
+			pr_warn("ELF section #%zu has inconsistent section size sh=%llu != d=%llu in %s\n",
+				sec->sec_idx, (long long unsigned)sec->shdr->sh_size,
+				(long long unsigned)sec->data->d_size, obj->filename);
+			return -EINVAL;
+		}
 
 		switch (sec->shdr->sh_type) {
 		case SHT_SYMTAB:
@@ -742,8 +752,12 @@ static int linker_sanity_check_elf(struct src_obj *obj)
 			break;
 		case SHT_PROGBITS:
 			if (sec->shdr->sh_flags & SHF_EXECINSTR) {
-				if (sec->shdr->sh_size % sizeof(struct bpf_insn) != 0)
+				if (sec->shdr->sh_size % sizeof(struct bpf_insn) != 0) {
+					pr_warn("ELF section #%zu has unexpected size alignment %llu in %s\n",
+						sec->sec_idx, (long long unsigned)sec->shdr->sh_size,
+						obj->filename);
 					return -EINVAL;
+				}
 			}
 			break;
 		case SHT_NOBITS:
@@ -943,19 +957,33 @@ static int check_btf_str_off(__u32 *str_off, void *ctx)
 static int linker_sanity_check_btf(struct src_obj *obj)
 {
 	struct btf_type *t;
-	int i, n, err = 0;
+	int i, n, err;
 
 	if (!obj->btf)
 		return 0;
 
 	n = btf__type_cnt(obj->btf);
 	for (i = 1; i < n; i++) {
+		struct btf_field_iter it;
+		__u32 *type_id, *str_off;
+
 		t = btf_type_by_id(obj->btf, i);
 
-		err = err ?: btf_type_visit_type_ids(t, check_btf_type_id, obj->btf);
-		err = err ?: btf_type_visit_str_offs(t, check_btf_str_off, obj->btf);
+		err = btf_field_iter_init(&it, t, BTF_FIELD_ITER_IDS);
 		if (err)
 			return err;
+		while ((type_id = btf_field_iter_next(&it))) {
+			if (*type_id >= n)
+				return -EINVAL;
+		}
+
+		err = btf_field_iter_init(&it, t, BTF_FIELD_ITER_STRS);
+		if (err)
+			return err;
+		while ((str_off = btf_field_iter_next(&it))) {
+			if (!btf__str_by_offset(obj->btf, *str_off))
+				return -EINVAL;
+		}
 	}
 
 	return 0;
@@ -1120,7 +1148,19 @@ static int extend_sec(struct bpf_linker *linker, struct dst_sec *dst, struct src
 
 	if (src->shdr->sh_type != SHT_NOBITS) {
 		tmp = realloc(dst->raw_data, dst_final_sz);
-		if (!tmp)
+		/* If dst_align_sz == 0, realloc() behaves in a special way:
+		 * 1. When dst->raw_data is NULL it returns:
+		 *    "either NULL or a pointer suitable to be passed to free()" [1].
+		 * 2. When dst->raw_data is not-NULL it frees dst->raw_data and returns NULL,
+		 *    thus invalidating any "pointer suitable to be passed to free()" obtained
+		 *    at step (1).
+		 *
+		 * The dst_align_sz > 0 check avoids error exit after (2), otherwise
+		 * dst->raw_data would be freed again in bpf_linker__free().
+		 *
+		 * [1] man 3 realloc
+		 */
+		if (!tmp && dst_align_sz > 0)
 			return -ENOMEM;
 		dst->raw_data = tmp;
 
@@ -1340,6 +1380,7 @@ recur:
 	case BTF_KIND_STRUCT:
 	case BTF_KIND_UNION:
 	case BTF_KIND_ENUM:
+	case BTF_KIND_ENUM64:
 	case BTF_KIND_FWD:
 	case BTF_KIND_FUNC:
 	case BTF_KIND_VAR:
@@ -1362,6 +1403,7 @@ recur:
 	case BTF_KIND_INT:
 	case BTF_KIND_FLOAT:
 	case BTF_KIND_ENUM:
+	case BTF_KIND_ENUM64:
 		/* ignore encoding for int and enum values for enum */
 		if (t1->size != t2->size) {
 			pr_warn("global '%s': incompatible %s '%s' size %u and %u\n",
@@ -2000,7 +2042,6 @@ add_sym:
 static int linker_append_elf_relos(struct bpf_linker *linker, struct src_obj *obj)
 {
 	struct src_sec *src_symtab = &obj->secs[obj->symtab_sec_idx];
-	struct dst_sec *dst_symtab;
 	int i, err;
 
 	for (i = 1; i < obj->sec_cnt; i++) {
@@ -2033,9 +2074,6 @@ static int linker_append_elf_relos(struct bpf_linker *linker, struct src_obj *ob
 			return -1;
 		}
 
-		/* add_dst_sec() above could have invalidated linker->secs */
-		dst_symtab = &linker->secs[linker->symtab_sec_idx];
-
 		/* shdr->sh_link points to SYMTAB */
 		dst_sec->shdr->sh_link = linker->symtab_sec_idx;
 
@@ -2052,16 +2090,13 @@ static int linker_append_elf_relos(struct bpf_linker *linker, struct src_obj *ob
 		dst_rel = dst_sec->raw_data + src_sec->dst_off;
 		n = src_sec->shdr->sh_size / src_sec->shdr->sh_entsize;
 		for (j = 0; j < n; j++, src_rel++, dst_rel++) {
-			size_t src_sym_idx = ELF64_R_SYM(src_rel->r_info);
-			size_t sym_type = ELF64_R_TYPE(src_rel->r_info);
-			Elf64_Sym *src_sym, *dst_sym;
-			size_t dst_sym_idx;
+			size_t src_sym_idx, dst_sym_idx, sym_type;
+			Elf64_Sym *src_sym;
 
 			src_sym_idx = ELF64_R_SYM(src_rel->r_info);
 			src_sym = src_symtab->data->d_buf + sizeof(*src_sym) * src_sym_idx;
 
 			dst_sym_idx = obj->sym_map[src_sym_idx];
-			dst_sym = dst_symtab->raw_data + sizeof(*dst_sym) * dst_sym_idx;
 			dst_rel->r_offset += src_linked_sec->dst_off;
 			sym_type = ELF64_R_TYPE(src_rel->r_info);
 			dst_rel->r_info = ELF64_R_INFO(dst_sym_idx, sym_type);
@@ -2192,9 +2227,16 @@ static int linker_fixup_btf(struct src_obj *obj)
 		vi = btf_var_secinfos(t);
 		for (j = 0, m = btf_vlen(t); j < m; j++, vi++) {
 			const struct btf_type *vt = btf__type_by_id(obj->btf, vi->type);
-			const char *var_name = btf__str_by_offset(obj->btf, vt->name_off);
-			int var_linkage = btf_var(vt)->linkage;
+			const char *var_name;
+			int var_linkage;
 			Elf64_Sym *sym;
+
+			/* could be a variable or function */
+			if (!btf_is_var(vt))
+				continue;
+
+			var_name = btf__str_by_offset(obj->btf, vt->name_off);
+			var_linkage = btf_var(vt)->linkage;
 
 			/* no need to patch up static or extern vars */
 			if (var_linkage != BTF_VAR_GLOBAL_ALLOCATED)
@@ -2213,26 +2255,10 @@ static int linker_fixup_btf(struct src_obj *obj)
 	return 0;
 }
 
-static int remap_type_id(__u32 *type_id, void *ctx)
-{
-	int *id_map = ctx;
-	int new_id = id_map[*type_id];
-
-	/* Error out if the type wasn't remapped. Ignore VOID which stays VOID. */
-	if (new_id == 0 && *type_id != 0) {
-		pr_warn("failed to find new ID mapping for original BTF type ID %u\n", *type_id);
-		return -EINVAL;
-	}
-
-	*type_id = id_map[*type_id];
-
-	return 0;
-}
-
 static int linker_append_btf(struct bpf_linker *linker, struct src_obj *obj)
 {
 	const struct btf_type *t;
-	int i, j, n, start_id, id;
+	int i, j, n, start_id, id, err;
 	const char *name;
 
 	if (!obj->btf)
@@ -2303,9 +2329,25 @@ static int linker_append_btf(struct bpf_linker *linker, struct src_obj *obj)
 	n = btf__type_cnt(linker->btf);
 	for (i = start_id; i < n; i++) {
 		struct btf_type *dst_t = btf_type_by_id(linker->btf, i);
+		struct btf_field_iter it;
+		__u32 *type_id;
 
-		if (btf_type_visit_type_ids(dst_t, remap_type_id, obj->btf_type_map))
-			return -EINVAL;
+		err = btf_field_iter_init(&it, dst_t, BTF_FIELD_ITER_IDS);
+		if (err)
+			return err;
+
+		while ((type_id = btf_field_iter_next(&it))) {
+			int new_id = obj->btf_type_map[*type_id];
+
+			/* Error out if the type wasn't remapped. Ignore VOID which stays VOID. */
+			if (new_id == 0 && *type_id != 0) {
+				pr_warn("failed to find new ID mapping for original BTF type ID %u\n",
+					*type_id);
+				return -EINVAL;
+			}
+
+			*type_id = obj->btf_type_map[*type_id];
+		}
 	}
 
 	/* Rewrite VAR/FUNC underlying types (i.e., FUNC's FUNC_PROTO and VAR's
@@ -2711,7 +2753,7 @@ static int finalize_btf(struct bpf_linker *linker)
 
 	/* Emit .BTF.ext section */
 	if (linker->btf_ext) {
-		raw_data = btf_ext__get_raw_data(linker->btf_ext, &raw_sz);
+		raw_data = btf_ext__raw_data(linker->btf_ext, &raw_sz);
 		if (!raw_data)
 			return -ENOMEM;
 
