@@ -26,6 +26,6 @@ func Setup(l *zap.Logger) error {
 			return errors.Wrap(err, "failed to stat Cilium directory")
 		}
 	}
-	l.Info("Created directory", zap.String("dir path", ciliumDir), zap.Any("file", fp))
+	l.Info("Created directory", zap.String("dir path", ciliumDir))
 	return nil
 }
