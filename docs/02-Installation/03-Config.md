@@ -12,7 +12,8 @@ Defaults are specified for each component in *deploy/legacy/manifests/controller
 * `enableAnnotations`: When this toggle is set to true, retina will gather metrics for the annotated resources. Namespaces or Pods can be annotated with `retina.sh/v1alpha=observe`. The operator and enableRetinaEndpoint for the operator should be enabled.
 * `enabledPlugin_linux`: Array of enabled plugins for linux.
 * `enabledPlugin_win`: Array of enabled plugins for windows.
-* `metricsInterval`: the interval for which metrics will be gathered.
+* `metricsInterval`: the interval for which metrics will be gathered (in seconds). (@deprecated, use metricsIntervalDuration instead)
+* `metricsIntervalDuration`: the interval for which metrics will be gathered (in duration)
 * `dataAggregationLevel`: This config defines the level of data aggregation for Retina. See [Data Aggregation](../05-Concepts/data-aggregation.md) for more details.
 
 ## Operator Config
