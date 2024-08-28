@@ -86,7 +86,7 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			iter := ct.ctMap.Iterate()
 			for iter.Next(&key, &value) {
 				noOfCtEntries++
-				if value.IsClosing || ktime.MonotonicOffset.Seconds()+float64(value.Lifetime) < float64((time.Now().Unix())) {
+				if value.IsClosing || ktime.MonotonicOffset.Seconds()+float64(value.EvictionTime) < float64((time.Now().Unix())) {
 					// Iterating a hash map from which keys are being deleted is not safe.
 					// So, we store the keys to be deleted in a list and delete them after the iteration.
 					keyCopy := key // Copy the key to avoid using the same key in the next iteration

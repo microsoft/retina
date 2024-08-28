@@ -13,7 +13,9 @@
 	({ __u64 __x = bpf_ktime_get_boot_ns() / NSEC_PER_SEC; __x; })
 # define bpf_mono_now()		bpf_ktime_get_sec()
 
-// These units are in seconds
+#define UINT64_MAX 18446744073709551615ULL
+
+// Time units in seconds
 
 // Define how long a TCP connection should be kept in the table
 #define CT_CONNECTION_LIFETIME_TCP 360 
@@ -45,7 +47,7 @@ enum tcp_flags {
 #define TRAFFIC_DIRECTION_INGRESS 0x01
 #define TRAFFIC_DIRECTION_EGRESS 0x02
 
-#define OBSERVAION_POINT_FROM_ENDPOINT 0x00
-#define OBSERVAION_POINT_TO_ENDPOINT 0x01
-#define OBSERVAION_POINT_FROM_NETWORK 0x02
-#define OBSERVAION_POINT_TO_NETWORK 0x03
+#define OBSERVATION_POINT_FROM_ENDPOINT 0x00
+#define OBSERVATION_POINT_TO_ENDPOINT 0x01
+#define OBSERVATION_POINT_FROM_NETWORK 0x02
+#define OBSERVATION_POINT_TO_NETWORK 0x03
