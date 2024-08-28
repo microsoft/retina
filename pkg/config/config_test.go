@@ -13,7 +13,7 @@ import (
 )
 
 func TestGetConfig(t *testing.T) {
-	c, err := GetConfig("./testwith/config.yaml")
+	c, err := GetConfig("./testdata/config.yaml")
 	if err != nil {
 		t.Fatalf("Expected no error, instead got %+v", err)
 	}
@@ -27,7 +27,7 @@ func TestGetConfig(t *testing.T) {
 		c.RemoteContext ||
 		c.EnableAnnotations ||
 		c.DataAggregationLevel != Low {
-		t.Fatalf("Expeted config should be same as ./testwith/config.yaml; instead got %+v", c)
+		t.Fatalf("Expeted config should be same as ./testdata/config.yaml; instead got %+v", c)
 	}
 }
 
