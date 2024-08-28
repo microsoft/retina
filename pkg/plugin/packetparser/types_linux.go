@@ -57,7 +57,7 @@ type key struct {
 	netNs        int
 }
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=types_linux.go -destination=mocks/mock_types.go -package=mocks
+//go:generate go run go.uber.org/mock/mockgen -source=types_linux.go -destination=mocks/mock_types.go -package=mocks
 
 // Define the interfaces.
 type IQdisc interface {

@@ -48,7 +48,7 @@ jobs:
         if: env.IS_NOT_MERGE_GROUP
         uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.60.1
+          version: v1.60.3
           args: --concurrency 4 --verbose --config=.golangci.yaml --timeout=25m
           only-new-issues: true
           skip-cache: true
