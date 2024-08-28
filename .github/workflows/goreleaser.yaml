@@ -21,6 +21,10 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - name: Go Generate
+        if: env.IS_NOT_MERGE_GROUP
+        run: |
+          make go-gen
       - name: Run GoReleaser build
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -40,6 +44,10 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - name: Go Generate
+        if: env.IS_NOT_MERGE_GROUP
+        run: |
+          make go-gen
       - name: Run GoReleaser release
         uses: goreleaser/goreleaser-action@v6
         with:
