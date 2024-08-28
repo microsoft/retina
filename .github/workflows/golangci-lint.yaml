@@ -11,8 +11,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        goos: [linux, windows]
-        goarch: [amd64, arm64]
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: windows # We do not support windows arm64 yet
+            goarch: amd64
     name: Lint
     runs-on: ubuntu-latest
     env:
@@ -35,7 +40,7 @@ jobs:
       - name: Go Generate
         if: env.IS_NOT_MERGE_GROUP
         run: |
-          make go-gen
+          GOOS=linux make go-gen
       - name: golangci-lint
         if: env.IS_NOT_MERGE_GROUP
         uses: golangci/golangci-lint-action@v6

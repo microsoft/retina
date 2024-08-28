@@ -19,7 +19,7 @@ import (
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
-	"github.com/microsoft/retina/pkg/plugin/common/mocks"
+	mocks "github.com/microsoft/retina/pkg/plugin/common"
 	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"

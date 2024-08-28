@@ -23,7 +23,6 @@ import (
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
-	"github.com/microsoft/retina/pkg/plugin/packetparser/mocks"
 	"github.com/microsoft/retina/pkg/watchers/endpoint"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
@@ -66,10 +65,10 @@ func TestCleanAll(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mtcnl := mocks.NewMockITc(ctrl)
+	mtcnl := NewMockITc(ctrl)
 	mtcnl.EXPECT().Close().Return(nil).AnyTimes()
 
-	mq := mocks.NewMockIQdisc(ctrl)
+	mq := NewMockIQdisc(ctrl)
 	mq.EXPECT().Delete(gomock.Any()).Return(nil).AnyTimes()
 
 	getQdisc = func(tcnl ITc) IQdisc {
@@ -120,10 +119,10 @@ func TestClean(t *testing.T) {
 	p.clean(nil, nil, nil) // Should not panic.
 
 	// Test tcnl calls.
-	mq := mocks.NewMockIQdisc(ctrl)
+	mq := NewMockIQdisc(ctrl)
 	mq.EXPECT().Delete(gomock.Any()).Return(nil).Times(2)
 
-	mtcnl := mocks.NewMockITc(ctrl)
+	mtcnl := NewMockITc(ctrl)
 	mtcnl.EXPECT().Qdisc().Return(nil).Times(2)
 	mtcnl.EXPECT().Close().Return(nil).Times(1)
 
@@ -148,10 +147,10 @@ func TestCleanWithErrors(t *testing.T) {
 	}
 
 	// Test we try delete qdiscs even if we get errors.
-	mq := mocks.NewMockIQdisc(ctrl)
+	mq := NewMockIQdisc(ctrl)
 	mq.EXPECT().Delete(gomock.Any()).Return(errors.New("error")).Times(2)
 
-	mtcnl := mocks.NewMockITc(ctrl)
+	mtcnl := NewMockITc(ctrl)
 	mtcnl.EXPECT().Qdisc().Return(nil).AnyTimes()
 	mtcnl.EXPECT().Close().Return(nil).Times(1)
 
@@ -202,13 +201,13 @@ func TestCreateQdiscAndAttach(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mfilter := mocks.NewMockIFilter(ctrl)
+	mfilter := NewMockIFilter(ctrl)
 	mfilter.EXPECT().Add(gomock.Any()).Return(nil).AnyTimes()
 
-	mq := mocks.NewMockIQdisc(ctrl)
+	mq := NewMockIQdisc(ctrl)
 	mq.EXPECT().Add(gomock.Any()).Return(nil).AnyTimes()
 
-	mtcnl := mocks.NewMockITc(ctrl)
+	mtcnl := NewMockITc(ctrl)
 	mtcnl.EXPECT().Qdisc().Return(nil).AnyTimes()
 
 	getQdisc = func(tcnl ITc) IQdisc {
@@ -282,7 +281,7 @@ func TestReadData_Error(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mperf := mocks.NewMockIPerf(ctrl)
+	mperf := NewMockIPerf(ctrl)
 	mperf.EXPECT().Read().Return(perf.Record{}, errors.New("error")).AnyTimes()
 
 	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
@@ -321,7 +320,7 @@ func TestReadDataPodLevelEnabled(t *testing.T) {
 		RawSample:   bytes,
 	}
 
-	mperf := mocks.NewMockIPerf(ctrl)
+	mperf := NewMockIPerf(ctrl)
 	mperf.EXPECT().Read().Return(record, nil).MinTimes(1)
 
 	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
@@ -371,16 +370,16 @@ func TestStartWithDataAggregationLevelLow(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockFilter := mocks.NewMockIFilter(ctrl)
-	mQdisc := mocks.NewMockIQdisc(ctrl)
+	mockFilter := NewMockIFilter(ctrl)
+	mQdisc := NewMockIQdisc(ctrl)
 
 	// We are expecting two calls to Add since we are invoking createQdiscAndAttach for eth0
 	mockFilter.EXPECT().Add(gomock.Any()).Return(nil).Times(2)
 	mQdisc.EXPECT().Add(gomock.Any()).Return(nil).Times(2)
 
-	mockTC := mocks.NewMockITc(ctrl)
+	mockTC := NewMockITc(ctrl)
 
-	mockReader := mocks.NewMockIPerf(ctrl)
+	mockReader := NewMockIPerf(ctrl)
 	mockReader.EXPECT().Read().Return(perf.Record{}, nil).AnyTimes()
 
 	getQdisc = func(_ ITc) IQdisc {
@@ -434,16 +433,16 @@ func TestStartWithDataAggregationLevelHigh(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockFilter := mocks.NewMockIFilter(ctrl)
-	mQdisc := mocks.NewMockIQdisc(ctrl)
+	mockFilter := NewMockIFilter(ctrl)
+	mQdisc := NewMockIQdisc(ctrl)
 
 	// We are not expecting any calls to Add since we are not invoking createQdiscAndAttach for eth0
 	mockFilter.EXPECT().Add(gomock.Any()).Return(nil).Times(0)
 	mQdisc.EXPECT().Add(gomock.Any()).Return(nil).Times(0)
 
-	mockTC := mocks.NewMockITc(ctrl)
+	mockTC := NewMockITc(ctrl)
 
-	mockReader := mocks.NewMockIPerf(ctrl)
+	mockReader := NewMockIPerf(ctrl)
 	mockReader.EXPECT().Read().Return(perf.Record{}, nil).AnyTimes()
 
 	getQdisc = func(_ ITc) IQdisc {

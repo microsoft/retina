@@ -10,7 +10,7 @@ import (
 	"github.com/cilium/cilium/pkg/labels"
 )
 
-//go:generate go run go.uber.org/mock/mockgen -source decoder.go -destination=mocks/mock_types.go -package=mocks
+//go:generate go run go.uber.org/mock/mockgen -source decoder.go -destination=mock_types.go -package=common
 
 type EpDecoder interface {
 	Decode(ip netip.Addr) *flow.Endpoint

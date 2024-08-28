@@ -10,10 +10,9 @@ import (
 
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
-	watchermock "github.com/microsoft/retina/pkg/managers/watchermanager/mocks"
+	watchermock "github.com/microsoft/retina/pkg/managers/watchermanager"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/api"
-	pluginmock "github.com/microsoft/retina/pkg/plugin/api/mock"
 	"github.com/microsoft/retina/pkg/telemetry"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
@@ -155,7 +154,7 @@ func TestNewManagerWithPluginStartFailure(t *testing.T) {
 		watcherManager: setupWatcherManagerMock(ctl),
 	}
 
-	mockPlugin := pluginmock.NewMockPlugin(ctl)
+	mockPlugin := api.NewMockPlugin(ctl)
 	mockPlugin.EXPECT().Generate(gomock.Any()).Return(nil).AnyTimes()
 	mockPlugin.EXPECT().Compile(gomock.Any()).Return(nil).AnyTimes()
 	mockPlugin.EXPECT().Stop().Return(nil).AnyTimes()
@@ -193,7 +192,7 @@ func TestNewManagerWithPluginReconcileFailure(t *testing.T) {
 		watcherManager: setupWatcherManagerMock(ctl),
 	}
 
-	mockPlugin := pluginmock.NewMockPlugin(ctl)
+	mockPlugin := api.NewMockPlugin(ctl)
 	mockPlugin.EXPECT().Generate(gomock.Any()).Return(nil).AnyTimes()
 	mockPlugin.EXPECT().Compile(gomock.Any()).Return(nil).AnyTimes()
 	mockPlugin.EXPECT().Stop().Return(errors.New("Plugin failed to stop")).AnyTimes()
@@ -411,7 +410,7 @@ func TestStopPluginManagerGracefully(t *testing.T) {
 		watcherManager: setupWatcherManagerMock(ctl),
 	}
 
-	mockPlugin := pluginmock.NewMockPlugin(ctl)
+	mockPlugin := api.NewMockPlugin(ctl)
 	mockPlugin.EXPECT().Generate(gomock.Any()).Return(nil).AnyTimes()
 	mockPlugin.EXPECT().Compile(gomock.Any()).Return(nil).AnyTimes()
 	mockPlugin.EXPECT().Stop().Return(nil).AnyTimes()

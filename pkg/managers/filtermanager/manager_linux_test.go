@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/retina/pkg/log"
-	"github.com/microsoft/retina/pkg/plugin/filter/mocks"
+	mocks "github.com/microsoft/retina/pkg/plugin/filter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"

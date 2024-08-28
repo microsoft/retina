@@ -11,7 +11,7 @@ import (
 	"github.com/microsoft/retina/pkg/log"
 )
 
-//go:generate go run go.uber.org/mock/mockgen -source=types.go -destination=mocks/mock_types.go -package=mocks .
+//go:generate go run go.uber.org/mock/mockgen -source=types.go -destination=mock_types.go -package=watchermanager .
 type IWatcher interface {
 	// Init, Stop, and Refresh should only be called by watchermanager.
 	Init(ctx context.Context) error

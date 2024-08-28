@@ -5,7 +5,7 @@ package apiserver
 
 import "context"
 
-//go:generate go run go.uber.org/mock/mockgen -source=types.go -destination=mocks/mock_types.go -package=mocks .
+//go:generate go run go.uber.org/mock/mockgen -source=types.go -destination=mock_types.go -package=apiserver .
 type IHostResolver interface {
 	LookupHost(context context.Context, host string) ([]string, error)
 }
