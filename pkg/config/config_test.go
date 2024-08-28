@@ -31,6 +31,17 @@ func TestGetConfig(t *testing.T) {
 	}
 }
 
+func TestGetConfigOverlay(t *testing.T) {
+	c, err := GetConfig("./testdata/config.yaml", "./testdata/overlay.yaml")
+	if err != nil {
+		t.Fatal("err getting config: err:", err)
+	}
+
+	if c.LogLevel != "debug" {
+		t.Error("expected LogLevel to be overridden to debug, but found:", c.LogLevel)
+	}
+}
+
 func TestDecodeLevelHook(t *testing.T) {
 	tests := []struct {
 		input    interface{}

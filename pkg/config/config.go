@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mitchellh/mapstructure"
+	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 )
 
@@ -51,6 +52,7 @@ type Server struct {
 	Port int    `yaml:"port"`
 }
 
+// Config describes the complete configuration for a Retina process.
 type Config struct {
 	APIServer       Server        `yaml:"apiServer"`
 	LogLevel        string        `yaml:"logLevel"`
@@ -68,12 +70,22 @@ type Config struct {
 	MonitorSockPath          string        `yaml:"monitorSockPath"`
 }
 
-func GetConfig(cfgFilename string) (*Config, error) {
-	if cfgFilename != "" {
-		viper.SetConfigFile(cfgFilename)
+func GetConfig(files ...string) (*Config, error) {
+	if len(files) == 1 {
+		cfgFilename := files[0]
+		if cfgFilename != "" {
+			viper.SetConfigFile(cfgFilename)
+		} else {
+			viper.SetConfigName("config")
+			viper.AddConfigPath("/retina/config")
+		}
 	} else {
-		viper.SetConfigName("config")
-		viper.AddConfigPath("/retina/config")
+		for _, file := range files {
+			viper.SetConfigFile(file)
+			if err := viper.MergeInConfig(); err != nil {
+				return nil, errors.Wrapf(err, "loading config file %q", file)
+			}
+		}
 	}
 
 	viper.SetEnvPrefix("retina")
