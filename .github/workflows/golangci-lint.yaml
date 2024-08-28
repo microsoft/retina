@@ -32,20 +32,18 @@ jobs:
       - name: Set up QEMU
         if: env.GOOS == 'linux' && env.IS_NOT_MERGE_GROUP
         uses: docker/setup-qemu-action@v3
-      - name: Set up tools/dependencies and generate - Linux
+      - name: Set Up Tools and Dependencies
         if: env.GOOS == 'linux' && env.IS_NOT_MERGE_GROUP
         run: |
           sudo apt-get update
           sudo apt-get install -y curl lsb-release wget software-properties-common gnupg make git clang-14 lldb-14 lld-14 clangd-14 man-db
           export LLVM_VERSION=14
           curl -sL https://apt.llvm.org/llvm.sh  | sudo bash -s "$LLVM_VERSION"
-          export PATH=$PATH:/usr/lib/llvm-$LLVM_VERSION/bin
-          make all
-      - name: Set up tools/dependencies and generate - Windows
-        if: env.GOOS == 'windows' && env.IS_NOT_MERGE_GROUP
+          echo "/usr/lib/llvm-$LLVM_VERSION/bin" >> $GITHUB_PATH
+      - name: Build and Generate
+        if: env.IS_NOT_MERGE_GROUP
         run: |
-          go build -v ./controller
-          go build -v ./captureworkload
+          CGO_ENABLED=0 go generate ./...
       - name: golangci-lint
         if: env.IS_NOT_MERGE_GROUP
         uses: golangci/golangci-lint-action@v6
