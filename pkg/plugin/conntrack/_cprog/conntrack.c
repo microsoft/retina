@@ -47,6 +47,23 @@ struct {
     __uint(max_entries, CT_MAP_SIZE);
 } retina_conntrack_map SEC(".maps");
 
+
+/**
+ * Helper function to reverse a key.
+ * @arg reverse_key The key to store the reversed key.
+ * @arg key The key to be reversed.
+ */
+static inline void _ct_reverse_key(struct ct_v4_key *reverse_key, const struct ct_v4_key *key) {
+    if (!reverse_key || !key) {
+        return;
+    }
+    reverse_key->src_ip = key->dst_ip;
+    reverse_key->dst_ip = key->src_ip;
+    reverse_key->src_port = key->dst_port;
+    reverse_key->dst_port = key->src_port;
+    reverse_key->proto = key->proto;
+}
+
 /**
  * Returns the traffic direction based on the observation point.
  * @arg observation_point The point in the network stack where the packet is observed.
@@ -121,7 +138,7 @@ static __always_inline bool _ct_handle_tcp_connection(struct ct_v4_key key, stru
     __builtin_memset(&new_value, 0, sizeof(struct ct_entry));
     __u64 now = bpf_mono_now();
     new_value.lifetime = now + CT_CONNECTION_LIFETIME_TCP;
-    new_value.is_closing = (flags & (TCP_FIN | TCP_RST)) ? true : false;
+    new_value.is_closing = (flags & (TCP_FIN | TCP_RST)) != 0x0;
     new_value.traffic_direction = _ct_get_traffic_direction(observation_point);
 
     // Check for ACK flag. If the ACK flag is set, the packet is considered as a reply packet.
@@ -164,7 +181,7 @@ static __always_inline bool _ct_handle_new_connection(struct ct_v4_key key, stru
  * @arg protocol The protocol of the packet (TCP or UDP).
  * Returns true if the packet should be reported to userspace. False otherwise.
  */
-static __always_inline bool _ct_should_report_packet(__u8 flags, struct ct_entry *entry, enum ct_packet_dir direction, __u8 protocol) {
+static __always_inline bool _ct_should_report_packet(struct ct_entry *entry, __u8 flags, __u8 direction, __u8 protocol) {
     // Check for null parameters.
     if (!entry) {
         return false;
@@ -174,7 +191,7 @@ static __always_inline bool _ct_should_report_packet(__u8 flags, struct ct_entry
     __u32 lifetime = READ_ONCE(entry->lifetime);
     __u8 seen_flags;
     __u32 last_report;
-    if (direction == CT_FORWARD) {
+    if (direction == CT_PACKET_DIR_FORWARD) {
         seen_flags = READ_ONCE(entry->flags_seen_forward_dir);
         last_report = READ_ONCE(entry->last_report_forward_dir);
     } else {
@@ -188,7 +205,7 @@ static __always_inline bool _ct_should_report_packet(__u8 flags, struct ct_entry
     if (now >= lifetime || (protocol == IPPROTO_TCP && flags & (TCP_FIN | TCP_RST))) {
         // The connection is closing or closed. Mark the connection as closing. Update the flags seen and last report time.
         WRITE_ONCE(entry->is_closing, true);
-        if (direction == CT_FORWARD) {
+        if (direction == CT_PACKET_DIR_FORWARD) {
             WRITE_ONCE(entry->flags_seen_forward_dir, flags);
             WRITE_ONCE(entry->last_report_forward_dir, now);
         } else {
@@ -205,7 +222,7 @@ static __always_inline bool _ct_should_report_packet(__u8 flags, struct ct_entry
     }
     // We will only report this packet iff a new flag is seen for the given direction or the report interval has passed.
     if (flags != seen_flags || now - last_report >= CT_REPORT_INTERVAL) {
-        if (direction == CT_FORWARD) {
+        if (direction == CT_PACKET_DIR_FORWARD) {
             WRITE_ONCE(entry->flags_seen_forward_dir, flags);
             WRITE_ONCE(entry->last_report_forward_dir, now);
         } else {
@@ -230,24 +247,20 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_
 
     // If the connection is found in the forward direction, update the connection.
     if (entry) {
-        return _ct_should_report_packet(flags, entry, CT_FORWARD, key.proto);
+        return _ct_should_report_packet(entry, flags, CT_PACKET_DIR_FORWARD, key.proto);
     }
     
-    // The connection is not found in the forward direction. Check the reply direction.
+    // The connection is not found in the forward direction. Check the reply direction by reversing the key.
     struct ct_v4_key reverse_key;
     __builtin_memset(&reverse_key, 0, sizeof(struct ct_v4_key));
-    reverse_key.src_ip = key.dst_ip;
-    reverse_key.dst_ip = key.src_ip;
-    reverse_key.src_port = key.dst_port;
-    reverse_key.dst_port = key.src_port;
-    reverse_key.proto = key.proto;
+    _ct_reverse_key(&reverse_key, &key);
 
     // Lookup the connection in the map based on the reverse key.
     entry = bpf_map_lookup_elem(&retina_conntrack_map, &reverse_key);
 
     // If the connection is found based on the reverse key, meaning that the packet is a reply packet to an existing connection.
     if (entry) {
-        return _ct_should_report_packet(flags, entry, CT_REPLY, key.proto);
+        return _ct_should_report_packet(entry, flags, CT_PACKET_DIR_REPLY, key.proto);
     }
 
     // If the connection is still not found, the connection is new.
@@ -261,13 +274,9 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_
 static __always_inline __attribute__((unused)) bool ct_is_reply_packet(struct ct_v4_key key) {    
     // Lookup the connection in the map.
     struct ct_entry *entry = bpf_map_lookup_elem(&retina_conntrack_map, &key);
-    if (entry) {
-        // We return false here because we found the connection in the forward direction
-        // meaning that the packet is coming from the initiator of the connection and therefore not a reply packet.
-        return false;
-    } else {
-        return true;
-    }
+    // We return false here because we found the connection in the forward direction
+    // meaning that the packet is coming from the initiator of the connection and therefore not a reply packet.
+    return entry != NULL;
 }
 
 /**
@@ -283,11 +292,7 @@ static __always_inline __attribute__((unused)) __u8 ct_get_traffic_direction(str
     // Construct the reverse key.
     struct ct_v4_key reverse_key;
     __builtin_memset(&reverse_key, 0, sizeof(struct ct_v4_key));
-    reverse_key.src_ip = key.dst_ip;
-    reverse_key.dst_ip = key.src_ip;
-    reverse_key.src_port = key.dst_port;
-    reverse_key.dst_port = key.src_port;
-    reverse_key.proto = key.proto;
+    _ct_reverse_key(&reverse_key, &key);
     // Lookup the connection in the map based on the reverse key.
     entry = bpf_map_lookup_elem(&retina_conntrack_map, &reverse_key);
     if (entry) {

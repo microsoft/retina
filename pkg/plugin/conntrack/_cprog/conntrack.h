@@ -38,10 +38,8 @@ enum tcp_flags {
     TCP_NS  = 0x100
 };
 
-enum ct_packet_dir {
-    CT_FORWARD = 0,
-    CT_REPLY,
-};
+#define CT_PACKET_DIR_FORWARD 0
+#define CT_PACKET_DIR_REPLY 1
 
 #define TRAFFIC_DIRECTION_UNKNOWN 0x00
 #define TRAFFIC_DIRECTION_INGRESS 0x01

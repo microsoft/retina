@@ -33,10 +33,13 @@ import (
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/api"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
-	_ "github.com/microsoft/retina/pkg/plugin/lib/_amd64"             // nolint
-	_ "github.com/microsoft/retina/pkg/plugin/lib/_arm64"             // nolint
-	_ "github.com/microsoft/retina/pkg/plugin/lib/common/libbpf/_src" // nolint
-	_ "github.com/microsoft/retina/pkg/plugin/packetparser/_cprog"    // nolint
+	_ "github.com/microsoft/retina/pkg/plugin/lib/_amd64"                            // nolint
+	_ "github.com/microsoft/retina/pkg/plugin/lib/_arm64"                            // nolint
+	_ "github.com/microsoft/retina/pkg/plugin/lib/common/libbpf/_include/asm"        // nolint
+	_ "github.com/microsoft/retina/pkg/plugin/lib/common/libbpf/_include/linux"      // nolint
+	_ "github.com/microsoft/retina/pkg/plugin/lib/common/libbpf/_include/uapi/linux" // nolint
+	_ "github.com/microsoft/retina/pkg/plugin/lib/common/libbpf/_src"                // nolint
+	_ "github.com/microsoft/retina/pkg/plugin/packetparser/_cprog"                   // nolint
 	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/microsoft/retina/pkg/watchers/endpoint"
