@@ -276,7 +276,7 @@ static __always_inline __attribute__((unused)) bool ct_is_reply_packet(struct ct
     struct ct_entry *entry = bpf_map_lookup_elem(&retina_conntrack_map, &key);
     // We return false here because we found the connection in the forward direction
     // meaning that the packet is coming from the initiator of the connection and therefore not a reply packet.
-    return entry != NULL;
+    return entry == NULL;
 }
 
 /**
