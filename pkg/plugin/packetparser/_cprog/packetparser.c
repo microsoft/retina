@@ -269,7 +269,7 @@ int endpoint_ingress_filter(struct __sk_buff *skb)
 {
 	// This is attached to the interface on the host side.
 	// So ingress on host is egress on endpoint and vice versa.
-	parse(skb, OBSERVAION_POINT_FROM_ENDPOINT);
+	parse(skb, OBSERVATION_POINT_FROM_ENDPOINT);
 	// Always return TC_ACT_UNSPEC to allow packet to pass to the next BPF program.
 	return TC_ACT_UNSPEC;
 }
@@ -279,7 +279,7 @@ int endpoint_egress_filter(struct __sk_buff *skb)
 {
 	// This is attached to the interface on the host side.
 	// So egress on host is ingress on endpoint and vice versa.
-	parse(skb, OBSERVAION_POINT_TO_ENDPOINT);
+	parse(skb, OBSERVATION_POINT_TO_ENDPOINT);
 	// Always return TC_ACT_UNSPEC to allow packet to pass to the next BPF program.
 	return TC_ACT_UNSPEC;
 }
@@ -287,7 +287,7 @@ int endpoint_egress_filter(struct __sk_buff *skb)
 SEC("classifier_host_ingress")
 int host_ingress_filter(struct __sk_buff *skb)
 {
-	parse(skb, OBSERVAION_POINT_FROM_NETWORK);
+	parse(skb, OBSERVATION_POINT_FROM_NETWORK);
 	// Always return TC_ACT_UNSPEC to allow packet to pass to the next BPF program.
 	return TC_ACT_UNSPEC;
 }
@@ -295,7 +295,7 @@ int host_ingress_filter(struct __sk_buff *skb)
 SEC("classifier_host_egress")
 int host_egress_filter(struct __sk_buff *skb)
 {
-	parse(skb, OBSERVAION_POINT_TO_NETWORK);
+	parse(skb, OBSERVATION_POINT_TO_NETWORK);
 	// Always return TC_ACT_UNSPEC to allow packet to pass to the next BPF program.
 	return TC_ACT_UNSPEC;
 }
