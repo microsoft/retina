@@ -21,7 +21,7 @@ struct ct_v4_key {
  * The structure representing a connection in the connection tracking map.
  */
 struct ct_entry {
-    __u32 lifetime; // lifetime stores the time when the connection should be removed from the map.
+    __u32 eviction_time; // eviction_time stores the time when the connection should be evicted from the map.
     /**
      * last_report_*_dir stores the time when the last packet event was reported in the forward and reply direction respectively.
      */
@@ -70,11 +70,11 @@ static inline void _ct_reverse_key(struct ct_v4_key *reverse_key, const struct c
  */
 static __always_inline __u8 _ct_get_traffic_direction(__u8 observation_point) {
     switch (observation_point) {
-        case OBSERVAION_POINT_FROM_ENDPOINT:
-        case OBSERVAION_POINT_TO_NETWORK:
+        case OBSERVATION_POINT_FROM_ENDPOINT:
+        case OBSERVATION_POINT_TO_NETWORK:
             return TRAFFIC_DIRECTION_EGRESS;
-        case OBSERVAION_POINT_TO_ENDPOINT:
-        case OBSERVAION_POINT_FROM_NETWORK:
+        case OBSERVATION_POINT_TO_ENDPOINT:
+        case OBSERVATION_POINT_FROM_NETWORK:
             return TRAFFIC_DIRECTION_INGRESS;
         default:
             return TRAFFIC_DIRECTION_UNKNOWN;
@@ -92,7 +92,11 @@ static __always_inline bool _ct_create_new_tcp_connection(struct ct_v4_key key, 
     struct ct_entry new_value;
     __builtin_memset(&new_value, 0, sizeof(struct ct_entry));
     __u64 now = bpf_mono_now();
-    new_value.lifetime = now + timeout;
+    // Check for overflow
+    if (timeout > UINT64_MAX - now) {
+        return false;
+    }
+    new_value.eviction_time = now + timeout;
     new_value.flags_seen_forward_dir = flags;
     new_value.traffic_direction = _ct_get_traffic_direction(observation_point);
     bpf_map_update_elem(&retina_conntrack_map, &key, &new_value, BPF_ANY);
@@ -109,7 +113,11 @@ static __always_inline bool _ct_handle_udp_connection(struct ct_v4_key key, __u8
     struct ct_entry new_value;
     __builtin_memset(&new_value, 0, sizeof(struct ct_entry));
     __u64 now = bpf_mono_now();
-    new_value.lifetime = now + CT_CONNECTION_LIFETIME_NONTCP;
+    // Check for overflow
+    if (CT_CONNECTION_LIFETIME_NONTCP > UINT64_MAX - now) {
+        return false;
+    }
+    new_value.eviction_time = now + CT_CONNECTION_LIFETIME_NONTCP;
     new_value.flags_seen_forward_dir = flags;
     new_value.last_report_forward_dir = now;
     new_value.traffic_direction = _ct_get_traffic_direction(observation_point);
@@ -137,7 +145,11 @@ static __always_inline bool _ct_handle_tcp_connection(struct ct_v4_key key, stru
     struct ct_entry new_value;
     __builtin_memset(&new_value, 0, sizeof(struct ct_entry));
     __u64 now = bpf_mono_now();
-    new_value.lifetime = now + CT_CONNECTION_LIFETIME_TCP;
+    // Check for overflow
+    if (CT_CONNECTION_LIFETIME_TCP > UINT64_MAX - now) {
+        return false;
+    }
+    new_value.eviction_time = now + CT_CONNECTION_LIFETIME_TCP;
     new_value.is_closing = (flags & (TCP_FIN | TCP_RST)) != 0x0;
     new_value.traffic_direction = _ct_get_traffic_direction(observation_point);
 
@@ -187,8 +199,8 @@ static __always_inline bool _ct_should_report_packet(struct ct_entry *entry, __u
         return false;
     }
 
-    __u32 now = bpf_mono_now();
-    __u32 lifetime = READ_ONCE(entry->lifetime);
+    __u64 now = bpf_mono_now();
+    __u32 eviction_time = READ_ONCE(entry->eviction_time);
     __u8 seen_flags;
     __u32 last_report;
     if (direction == CT_PACKET_DIR_FORWARD) {
@@ -202,7 +214,7 @@ static __always_inline bool _ct_should_report_packet(struct ct_entry *entry, __u
     flags |= seen_flags;
 
     // Check if the connection timed out of if it is a TCP connection and FIN or RST flags are set.
-    if (now >= lifetime || (protocol == IPPROTO_TCP && flags & (TCP_FIN | TCP_RST))) {
+    if (now >= eviction_time || (protocol == IPPROTO_TCP && flags & (TCP_FIN | TCP_RST))) {
         // The connection is closing or closed. Mark the connection as closing. Update the flags seen and last report time.
         WRITE_ONCE(entry->is_closing, true);
         if (direction == CT_PACKET_DIR_FORWARD) {
@@ -214,11 +226,18 @@ static __always_inline bool _ct_should_report_packet(struct ct_entry *entry, __u
         }
         return true; // Report the last packet received.
     }
-    // Update the lifetime of the connection.
+    // Update the eviction time of the connection.
     if (protocol == IPPROTO_TCP) {
-        WRITE_ONCE(entry->lifetime, now + CT_CONNECTION_LIFETIME_TCP);
+        // Check for overflow, only update the eviction time if there is no overflow.
+        if (CT_CONNECTION_LIFETIME_TCP > UINT64_MAX - now) {
+            return false;
+        }
+        WRITE_ONCE(entry->eviction_time, now + CT_CONNECTION_LIFETIME_TCP);
     } else {
-        WRITE_ONCE(entry->lifetime, now + CT_CONNECTION_LIFETIME_NONTCP);
+        if (CT_CONNECTION_LIFETIME_NONTCP > UINT64_MAX - now) {
+            return false;
+        }
+        WRITE_ONCE(entry->eviction_time, now + CT_CONNECTION_LIFETIME_NONTCP);
     }
     // We will only report this packet iff a new flag is seen for the given direction or the report interval has passed.
     if (flags != seen_flags || now - last_report >= CT_REPORT_INTERVAL) {

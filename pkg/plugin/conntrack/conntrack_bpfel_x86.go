@@ -13,7 +13,7 @@ import (
 )
 
 type conntrackCtEntry struct {
-	Lifetime             uint32
+	EvictionTime         uint32
 	LastReportForwardDir uint32
 	LastReportReplyDir   uint32
 	TrafficDirection     uint8
