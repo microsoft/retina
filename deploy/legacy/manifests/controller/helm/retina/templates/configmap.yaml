@@ -16,6 +16,7 @@ data:
     logLevel: {{ .Values.logLevel }}
     enabledPlugin: {{ .Values.enabledPlugin_linux }}
     metricsInterval: {{ .Values.metricsInterval }}
+    metricsIntervalDuration: {{ .Values.metricsIntervalDuration }}
     enableTelemetry: {{ .Values.enableTelemetry }}
     enablePodLevel: {{ .Values.enablePodLevel }}
     remoteContext: {{ .Values.remoteContext }}
@@ -42,6 +43,7 @@ data:
     logLevel: {{ .Values.logLevel }}
     enabledPlugin: {{ .Values.enabledPlugin_win }}
     metricsInterval: {{ .Values.metricsInterval }}
+    metricsIntervalDuration: {{ .Values.metricsIntervalDuration }}
     enableTelemetry: {{ .Values.enableTelemetry }}
     enablePodLevel: {{ .Values.enablePodLevel }}
     remoteContext: {{ .Values.remoteContext }}

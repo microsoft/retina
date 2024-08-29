@@ -67,4 +67,4 @@ data:
       port: 10093
     logLevel: info
     enabledPlugin: ["hnsstats"] 
-    metricsInterval: 10
+    metricsIntervalDuration: "10s"
