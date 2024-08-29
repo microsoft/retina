@@ -23,20 +23,20 @@ struct ct_v4_key {
 struct ct_entry {
     __u32 eviction_time; // eviction_time stores the time when the connection should be evicted from the map.
     /**
-     * last_report_*_dir stores the time when the last packet event was reported in the forward and reply direction respectively.
+     * last_report_*_dir stores the time when the last packet event was reported in the send and reply direction respectively.
      */
-    __u32 last_report_forward_dir;
-    __u32 last_report_reply_dir;
+    __u32 last_report_tx_dir;
+    __u32 last_report_rx_dir;
     /**
      * traffic_direction indicates the direction of the connection in relation to the host. 
      * If the connection is initiated from within the host, the traffic_direction is egress. Otherwise, the traffic_direction is ingress.
      */
     __u8 traffic_direction;
     /**
-     * flags_seen_*_dir stores the flags seen in the forward and reply direction.
+     * flags_seen_*_dir stores the flags seen in the send and reply direction respectively.
      */
-    __u8  flags_seen_forward_dir;
-    __u8  flags_seen_reply_dir;
+    __u8  flags_seen_tx_dir;
+    __u8  flags_seen_rx_dir;
     bool is_closing; // is_closing indicates if the connection is closing.
 };
 
@@ -95,7 +95,7 @@ static __always_inline bool _ct_create_new_tcp_connection(struct ct_v4_key key, 
         return false;
     }
     new_value.eviction_time = now + timeout;
-    new_value.flags_seen_forward_dir = flags;
+    new_value.flags_seen_tx_dir = flags;
     new_value.traffic_direction = _ct_get_traffic_direction(observation_point);
     bpf_map_update_elem(&retina_conntrack_map, &key, &new_value, BPF_ANY);
     return true;
@@ -116,8 +116,8 @@ static __always_inline bool _ct_handle_udp_connection(struct ct_v4_key key, __u8
         return false;
     }
     new_value.eviction_time = now + CT_CONNECTION_LIFETIME_NONTCP;
-    new_value.flags_seen_forward_dir = flags;
-    new_value.last_report_forward_dir = now;
+    new_value.flags_seen_tx_dir = flags;
+    new_value.last_report_tx_dir = now;
     new_value.traffic_direction = _ct_get_traffic_direction(observation_point);
     bpf_map_update_elem(&retina_conntrack_map, &key, &new_value, BPF_ANY);
     return true;
@@ -151,14 +151,14 @@ static __always_inline bool _ct_handle_tcp_connection(struct ct_v4_key key, stru
     new_value.is_closing = (flags & (TCP_FIN | TCP_RST)) != 0x0;
     new_value.traffic_direction = _ct_get_traffic_direction(observation_point);
 
-    // Check for ACK flag. If the ACK flag is set, the packet is considered as a reply packet.
+    // Check for ACK flag. If the ACK flag is set, the packet is considered as a packet in the reply direction of the connection.
     if (flags & TCP_ACK) {
-        new_value.flags_seen_reply_dir = flags;
-        new_value.last_report_reply_dir = now;
+        new_value.flags_seen_rx_dir = flags;
+        new_value.last_report_rx_dir = now;
         bpf_map_update_elem(&retina_conntrack_map, &reverse_key, &new_value, BPF_ANY);
-    } else { // Otherwise, the packet is considered as a forward packet.
-        new_value.flags_seen_forward_dir = flags;
-        new_value.last_report_forward_dir = now;
+    } else { // Otherwise, the packet is considered as a packet in the send direction.
+        new_value.flags_seen_tx_dir = flags;
+        new_value.last_report_tx_dir = now;
         bpf_map_update_elem(&retina_conntrack_map, &key, &new_value, BPF_ANY);
     }
     return true;
@@ -199,12 +199,12 @@ static __always_inline bool _ct_should_report_packet(struct ct_entry *entry, __u
     __u32 eviction_time = READ_ONCE(entry->eviction_time);
     __u8 seen_flags;
     __u32 last_report;
-    if (direction == CT_PACKET_DIR_FORWARD) {
-        seen_flags = READ_ONCE(entry->flags_seen_forward_dir);
-        last_report = READ_ONCE(entry->last_report_forward_dir);
+    if (direction == CT_PACKET_DIR_TX) {
+        seen_flags = READ_ONCE(entry->flags_seen_tx_dir);
+        last_report = READ_ONCE(entry->last_report_tx_dir);
     } else {
-        seen_flags = READ_ONCE(entry->flags_seen_reply_dir);
-        last_report = READ_ONCE(entry->last_report_reply_dir);
+        seen_flags = READ_ONCE(entry->flags_seen_rx_dir);
+        last_report = READ_ONCE(entry->last_report_rx_dir);
     }
     // OR the seen flags with the new flags.
     flags |= seen_flags;
@@ -213,12 +213,12 @@ static __always_inline bool _ct_should_report_packet(struct ct_entry *entry, __u
     if (now >= eviction_time || (protocol == IPPROTO_TCP && flags & (TCP_FIN | TCP_RST))) {
         // The connection is closing or closed. Mark the connection as closing. Update the flags seen and last report time.
         WRITE_ONCE(entry->is_closing, true);
-        if (direction == CT_PACKET_DIR_FORWARD) {
-            WRITE_ONCE(entry->flags_seen_forward_dir, flags);
-            WRITE_ONCE(entry->last_report_forward_dir, now);
+        if (direction == CT_PACKET_DIR_TX) {
+            WRITE_ONCE(entry->flags_seen_tx_dir, flags);
+            WRITE_ONCE(entry->last_report_tx_dir, now);
         } else {
-            WRITE_ONCE(entry->flags_seen_reply_dir, flags);
-            WRITE_ONCE(entry->last_report_reply_dir, now);
+            WRITE_ONCE(entry->flags_seen_rx_dir, flags);
+            WRITE_ONCE(entry->last_report_rx_dir, now);
         }
         return true; // Report the last packet received.
     }
@@ -237,12 +237,12 @@ static __always_inline bool _ct_should_report_packet(struct ct_entry *entry, __u
     }
     // We will only report this packet iff a new flag is seen for the given direction or the report interval has passed.
     if (flags != seen_flags || now - last_report >= CT_REPORT_INTERVAL) {
-        if (direction == CT_PACKET_DIR_FORWARD) {
-            WRITE_ONCE(entry->flags_seen_forward_dir, flags);
-            WRITE_ONCE(entry->last_report_forward_dir, now);
+        if (direction == CT_PACKET_DIR_TX) {
+            WRITE_ONCE(entry->flags_seen_tx_dir, flags);
+            WRITE_ONCE(entry->last_report_tx_dir, now);
         } else {
-            WRITE_ONCE(entry->flags_seen_reply_dir, flags);
-            WRITE_ONCE(entry->last_report_reply_dir, now);
+            WRITE_ONCE(entry->flags_seen_rx_dir, flags);
+            WRITE_ONCE(entry->last_report_rx_dir, now);
         }
         return true;
     }
@@ -260,12 +260,12 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_
     // Lookup the connection in the map.
     struct ct_entry *entry = bpf_map_lookup_elem(&retina_conntrack_map, &key);
 
-    // If the connection is found in the forward direction, update the connection.
+    // If the connection is found in the send direction, update the connection.
     if (entry) {
-        return _ct_should_report_packet(entry, flags, CT_PACKET_DIR_FORWARD, key.proto);
+        return _ct_should_report_packet(entry, flags, CT_PACKET_DIR_TX, key.proto);
     }
     
-    // The connection is not found in the forward direction. Check the reply direction by reversing the key.
+    // The connection is not found in the send direction. Check the reply direction by reversing the key.
     struct ct_v4_key reverse_key;
     __builtin_memset(&reverse_key, 0, sizeof(struct ct_v4_key));
     _ct_reverse_key(&reverse_key, &key);
@@ -275,7 +275,7 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_
 
     // If the connection is found based on the reverse key, meaning that the packet is a reply packet to an existing connection.
     if (entry) {
-        return _ct_should_report_packet(entry, flags, CT_PACKET_DIR_REPLY, key.proto);
+        return _ct_should_report_packet(entry, flags, CT_PACKET_DIR_RX, key.proto);
     }
 
     // If the connection is still not found, the connection is new.
@@ -289,7 +289,7 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct ct_
 static __always_inline __attribute__((unused)) bool ct_is_reply_packet(struct ct_v4_key key) {    
     // Lookup the connection in the map.
     struct ct_entry *entry = bpf_map_lookup_elem(&retina_conntrack_map, &key);
-    // We return false here because we found the connection in the forward direction
+    // We return false here because we found the connection in the send direction
     // meaning that the packet is coming from the initiator of the connection and therefore not a reply packet.
     return entry == NULL;
 }
