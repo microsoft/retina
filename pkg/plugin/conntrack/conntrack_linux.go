@@ -21,18 +21,12 @@ import (
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type ct_v4_key conntrack ./_cprog/conntrack.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../lib/common/libbpf/_include/linux -I../lib/common/libbpf/_include/uapi/linux -I../lib/common/libbpf/_include/asm
 
-func New() *Conntrack {
-	return &Conntrack{
-		l:           log.Logger().Named("conntrack"),
-		gcFrequency: defaultGCFrequency,
-	}
-}
-
-// Run starts the Conntrack garbage collection loop.
-func (ct *Conntrack) Run(ctx context.Context) error {
+// Init initializes the conntrack eBPF map in the kernel for the first time.
+// This function should be called in the init container since
+// it requires securityContext.privileged to be true.
+func Init() error {
 	// Allow the current process to lock memory for eBPF resources.
 	if err := rlimit.RemoveMemlock(); err != nil {
-		ct.l.Error("RemoveMemlock failed", zap.Error(err))
 		return errors.Wrapf(err, "failed to remove memlock limit")
 	}
 
@@ -43,24 +37,52 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 		},
 	})
 	if err != nil {
-		ct.l.Error("loadConntrackObjects failed", zap.Error(err))
 		return errors.Wrap(err, "failed to load conntrack objects")
+	}
+	return nil
+}
+
+// New returns a new Conntrack instance.
+func New() (*Conntrack, error) {
+	ct := &Conntrack{
+		l:           log.Logger().Named("conntrack"),
+		gcFrequency: defaultGCFrequency,
+	}
+
+	// Allow the current process to lock memory for eBPF resources.
+	if err := rlimit.RemoveMemlock(); err != nil {
+		ct.l.Error("RemoveMemlock failed", zap.Error(err))
+		return nil, errors.Wrapf(err, "failed to remove memlock limit")
+	}
+
+	objs := &conntrackObjects{}
+	err := loadConntrackObjects(objs, &ebpf.CollectionOptions{
+		Maps: ebpf.MapOptions{
+			PinPath: plugincommon.MapPath,
+		},
+	})
+	if err != nil {
+		ct.l.Error("loadConntrackObjects failed", zap.Error(err))
+		return nil, errors.Wrap(err, "failed to load conntrack objects")
 	}
 
 	ct.objs = objs
-
 	// Get the conntrack map from the objects
 	ct.ctMap = objs.RetinaConntrackMap
+	return ct, nil
+}
 
+// Run starts the Conntrack garbage collection loop.
+func (ct *Conntrack) Run(ctx context.Context) error {
 	ticker := time.NewTicker(ct.gcFrequency)
 	defer ticker.Stop()
 
-	ct.l.Info("starting Conntrack GC loop")
+	ct.l.Info("Starting Conntrack GC loop")
 
 	for {
 		select {
 		case <-ctx.Done():
-			ct.l.Info("stopping conntrack GC loop")
+			ct.l.Info("Stopping conntrack GC loop")
 			if ct.objs != nil {
 				err := ct.objs.Close()
 				if err != nil {

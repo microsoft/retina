@@ -251,11 +251,11 @@ static void parse(struct __sk_buff *skb, __u8 obs)
 	p.traffic_direction = ct_get_traffic_direction(key);
 	#ifdef DATA_AGGREGATION_LEVEL
 	// If the data aggregation level is low, always send the packet to the perf buffer.
-    #if DATA_AGGREGATION_LEVEL == DATA_AGGREGATION_LEVEL_LOW
+	#if DATA_AGGREGATION_LEVEL == DATA_AGGREGATION_LEVEL_LOW
 		bpf_perf_event_output(skb, &packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
-        return;
+		return;
 	// If the data aggregation level is high, only send the packet to the perf buffer if it needs to be reported.
-    #elif DATA_AGGREGATION_LEVEL == DATA_AGGREGATION_LEVEL_HIGH
+	#elif DATA_AGGREGATION_LEVEL == DATA_AGGREGATION_LEVEL_HIGH
 		if (report) {
 			bpf_perf_event_output(skb, &packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
 		}

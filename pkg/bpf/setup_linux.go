@@ -9,6 +9,7 @@ import (
 
 	"github.com/cilium/cilium/pkg/mountinfo"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
+	"github.com/microsoft/retina/pkg/plugin/conntrack"
 	"github.com/microsoft/retina/pkg/plugin/filter"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -75,5 +76,18 @@ func Setup(l *zap.Logger) error {
 		return errors.Wrap(err, "failed to initialize filter map")
 	}
 	l.Info("Filter map initialized successfully", zap.String("path", plugincommon.MapPath), zap.String("Map name", plugincommon.FilterMapName))
+
+	// Delete existing conntrack map file.
+	err = os.Remove(plugincommon.MapPath + "/" + plugincommon.ConntrackMapName)
+	if err != nil && !os.IsNotExist(err) {
+		return errors.Wrap(err, "failed to delete existing conntrack map file")
+	}
+	l.Info("Deleted existing conntrack map file", zap.String("path", plugincommon.MapPath), zap.String("Map name", plugincommon.ConntrackMapName))
+	// Initialize the conntrack map.
+	// This will create the conntrack map in kernel and pin it to /sys/fs/bpf.
+	err = conntrack.Init()
+	if err != nil {
+		return errors.Wrap(err, "failed to initialize conntrack map")
+	}
 	return nil
 }

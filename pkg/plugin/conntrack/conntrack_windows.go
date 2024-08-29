@@ -7,8 +7,8 @@ import (
 type Conntrack struct{}
 
 // Not implemented for Windows
-func New() *Conntrack {
-	return &Conntrack{}
+func New() (*Conntrack, error) {
+	return &Conntrack{}, nil
 }
 
 // Not implemented for Windows
