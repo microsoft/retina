@@ -71,20 +71,22 @@ type Config struct {
 }
 
 func GetConfig(files ...string) (*Config, error) {
-	if len(files) == 1 {
-		cfgFilename := files[0]
-		if cfgFilename != "" {
-			viper.SetConfigFile(cfgFilename)
-		} else {
-			viper.SetConfigName("config")
-			viper.AddConfigPath("/retina/config")
-		}
+	if len(files) == 0 {
+		viper.SetConfigName("config")
+		viper.AddConfigPath("/retina/config")
+	}
+
+	cfgFilename := files[0]
+	if cfgFilename != "" {
+		viper.SetConfigFile(cfgFilename)
 	} else {
-		for _, file := range files {
-			viper.SetConfigFile(file)
-			if err := viper.MergeInConfig(); err != nil {
-				return nil, errors.Wrapf(err, "loading config file %q", file)
-			}
+		viper.SetConfigName("config")
+		viper.AddConfigPath("/retina/config")
+	}
+	for _, file := range files[1:] {
+		viper.SetConfigFile(file)
+		if err := viper.MergeInConfig(); err != nil {
+			return nil, errors.Wrapf(err, "loading config file %q", file)
 		}
 	}
 
