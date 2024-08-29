@@ -4,6 +4,7 @@
 package bpf
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/cilium/cilium/pkg/mountinfo"
