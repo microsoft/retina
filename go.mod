@@ -9,7 +9,7 @@ require (
 	github.com/spf13/cobra v1.8.1
 	go.uber.org/zap v1.27.0
 	k8s.io/client-go v0.30.3
-	sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.0.44
+	sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.0.46
 	sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader v0.0.20
 )
 
@@ -304,7 +304,7 @@ require (
 	github.com/jsternberg/zap-logfmt v1.3.0
 	github.com/microsoft/ApplicationInsights-Go v0.4.4
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/onsi/ginkgo/v2 v2.20.1
+	github.com/onsi/ginkgo/v2 v2.20.2
 	github.com/onsi/gomega v1.34.2
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_model v0.6.1
