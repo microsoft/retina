@@ -123,9 +123,11 @@ spec:
       {{- end }}
       {{- if fromYamlArray .Values.enabledPlugin_linux | has "infiniband" }}
       - name: sysclassnet
-        hostPath: /sys/class/net
+        hostPath: 
+          path: /sys/class/net
       - name: sysclassinfiniband
-        hostPath: /sys/class/infiniband
+        hostPath: 
+          path: /sys/class/infiniband
       {{- end }}
       nodeSelector:
         kubernetes.io/os: linux
