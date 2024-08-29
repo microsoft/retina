@@ -106,10 +106,10 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 					zap.Uint32("eviction_time", value.EvictionTime),
 					zap.Uint8("traffic_direction", value.TrafficDirection),
 					zap.Bool("is_closing", value.IsClosing),
-					zap.String("flags_seen_forward_dir", decodeFlags(value.FlagsSeenForwardDir)),
-					zap.String("flags_seen_reply_dir", decodeFlags(value.FlagsSeenReplyDir)),
-					zap.Uint32("last_reported_forward_dir", value.LastReportForwardDir),
-					zap.Uint32("last_reported_reply_dir", value.LastReportReplyDir),
+					zap.String("flags_seen_tx_dir", decodeFlags(value.FlagsSeenTxDir)),
+					zap.String("flags_seen_rx_dir", decodeFlags(value.FlagsSeenRxDir)),
+					zap.Uint32("last_reported_tx_dir", value.LastReportTxDir),
+					zap.Uint32("last_reported_rx_dir", value.LastReportRxDir),
 				)
 			}
 			if err := iter.Err(); err != nil {
