@@ -45,6 +45,7 @@ struct {
     __type(key, struct ct_v4_key);
     __type(value, struct ct_entry);
     __uint(max_entries, CT_MAP_SIZE);
+    __uint(pinning, LIBBPF_PIN_BY_NAME); // needs pinning so this can be access from other processes .i.e debug cli
 } retina_conntrack_map SEC(".maps");
 
 
@@ -69,15 +70,12 @@ static inline void _ct_reverse_key(struct ct_v4_key *reverse_key, const struct c
  * @arg observation_point The point in the network stack where the packet is observed.
  */
 static __always_inline __u8 _ct_get_traffic_direction(__u8 observation_point) {
-    switch (observation_point) {
-        case OBSERVATION_POINT_FROM_ENDPOINT:
-        case OBSERVATION_POINT_TO_NETWORK:
-            return TRAFFIC_DIRECTION_EGRESS;
-        case OBSERVATION_POINT_TO_ENDPOINT:
-        case OBSERVATION_POINT_FROM_NETWORK:
-            return TRAFFIC_DIRECTION_INGRESS;
-        default:
-            return TRAFFIC_DIRECTION_UNKNOWN;
+    if (observation_point & (OBSERVATION_POINT_FROM_ENDPOINT | OBSERVATION_POINT_TO_NETWORK)) {
+        return TRAFFIC_DIRECTION_EGRESS;
+    } else if (observation_point & (OBSERVATION_POINT_TO_ENDPOINT | OBSERVATION_POINT_FROM_NETWORK)) {
+        return TRAFFIC_DIRECTION_INGRESS;
+    } else {
+        return TRAFFIC_DIRECTION_UNKNOWN;
     }
 }
 
@@ -174,14 +172,12 @@ static __always_inline bool _ct_handle_tcp_connection(struct ct_v4_key key, stru
  * @arg observation_point The point in the network stack where the packet is observed.
  */
 static __always_inline bool _ct_handle_new_connection(struct ct_v4_key key, struct ct_v4_key reverse_key, __u8 flags, __u8 observation_point) {
-    // Check what kind of protocol the packet is.
-    switch (key.proto) {
-        case IPPROTO_TCP:
-            return _ct_handle_tcp_connection(key, reverse_key, flags, observation_point);
-        case IPPROTO_UDP:
-            return _ct_handle_udp_connection(key, flags, observation_point);
-        default:
-            return false; // We are not interested in other protocols.
+    if (key.proto & IPPROTO_TCP) {
+        return _ct_handle_tcp_connection(key, reverse_key, flags, observation_point);
+    } else if (key.proto & IPPROTO_UDP) {
+        return _ct_handle_udp_connection(key, flags, observation_point);
+    } else {
+        return false; // We are not interested in other protocols.
     }
 }
 
@@ -213,7 +209,7 @@ static __always_inline bool _ct_should_report_packet(struct ct_entry *entry, __u
     // OR the seen flags with the new flags.
     flags |= seen_flags;
 
-    // Check if the connection timed out of if it is a TCP connection and FIN or RST flags are set.
+    // Check if the connection timed out or if it is a TCP connection and FIN or RST flags are set.
     if (now >= eviction_time || (protocol == IPPROTO_TCP && flags & (TCP_FIN | TCP_RST))) {
         // The connection is closing or closed. Mark the connection as closing. Update the flags seen and last report time.
         WRITE_ONCE(entry->is_closing, true);
