@@ -20,7 +20,7 @@ func __mount() error {
 	if err != nil {
 		if os.IsNotExist(err) {
 			// Path does not exist. Create it.
-			err = os.MkdirAll(plugincommon.MapPath, 0o755) //nolint:gomnd // 0o755 is the permission for the directory.
+			err = os.MkdirAll(plugincommon.MapPath, 0o755) // nolint:gomnd // directory permissions
 			if err != nil {
 				return err
 			}
@@ -48,7 +48,7 @@ func mountBpfFs() error {
 	// Else mounted. Check the type of mount.
 	if !bpfMount {
 		// Custom mount of /sys/fs/bpf. Unknown setup. Exit.
-		return errors.New(plugincommon.MapPath + " is already mounted but not as bpf. Not supported")
+		return fmt.Errorf("%+s is already mounted but not as bpf. Not supported", plugincommon.MapPath) // nolint:goerr113 // don't have to define a new error for this
 	}
 	return nil
 }
