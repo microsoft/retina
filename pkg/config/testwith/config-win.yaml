@@ -5,6 +5,6 @@ apiServer:
 logLevel: info
 enabledPlugin: ["hnsstats"]
 # Interval, in seconds, to scrape/publish metrics.
-metricsInterval: 10
+metricsIntervalDuration: "10s"
 # used to export telemetry to AppInsights
 telemetryEnabled: true

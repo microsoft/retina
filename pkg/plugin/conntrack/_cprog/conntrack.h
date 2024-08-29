@@ -28,20 +28,17 @@
 // Define the maximum number of connections that can be stored in the conntrack table
 #define CT_MAP_SIZE 262144
 
-enum tcp_flags {
-    TCP_FIN = 0x01,
-    TCP_SYN = 0x02,
-    TCP_RST = 0x04,
-    TCP_PSH = 0x08,
-    TCP_ACK = 0x10,
-    TCP_URG = 0x20,
-    TCP_ECE = 0x40,
-    TCP_CWR = 0x80,
-    TCP_NS  = 0x100
-};
+#define TCP_FIN 0x01
+#define TCP_SYN 0x02
+#define TCP_RST 0x04
+#define TCP_PSH 0x08
+#define TCP_ACK 0x10
+#define TCP_URG 0x20
+#define TCP_ECE 0x40
+#define TCP_CWR 0x80
 
-#define CT_PACKET_DIR_FORWARD 0x00
-#define CT_PACKET_DIR_REPLY 0x01
+#define CT_PACKET_DIR_TX 0x00
+#define CT_PACKET_DIR_RX 0x01
 
 #define TRAFFIC_DIRECTION_UNKNOWN 0x00
 #define TRAFFIC_DIRECTION_INGRESS 0x01

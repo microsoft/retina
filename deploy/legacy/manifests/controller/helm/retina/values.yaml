@@ -66,8 +66,8 @@ enabledPlugin_win: '["hnsstats"]'
 
 enableTelemetry: false
 
-# Interval, in seconds, to scrape/publish metrics.
-metricsInterval: 10
+# Interval, in duration, to scrape/publish metrics.
+metricsIntervalDuration: "10s"
 
 azure:
   appinsights:
@@ -191,3 +191,4 @@ metrics:
     ## @param metrics.podMonitor.relabelings [array] Prometheus relabeling rules
     ##
     relabelings: []
+

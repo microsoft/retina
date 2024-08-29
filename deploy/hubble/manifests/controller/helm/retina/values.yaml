@@ -86,8 +86,8 @@ enabledPlugin_win: '["hnsstats"]'
 
 enableTelemetry: true
 
-# Interval, in seconds, to scrape/publish metrics.
-metricsInterval: 10
+# Interval, in duration, to scrape/publish metrics.
+metricsIntervalDuration: "10s"
 
 azure:
   appinsights:
