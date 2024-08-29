@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/microsoft/retina/hack/tools/kapinger/clients"
+	"github.com/microsoft/retina/hack/tools/kapinger/servers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -23,13 +24,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	httpPort, err := strconv.Atoi(os.Getenv(envHTTPPort))
+	httpPort, err := strconv.Atoi(os.Getenv(servers.EnvHTTPPort))
 	if err != nil {
-		httpPort = httpport
-		log.Printf("HTTP_PORT not set, defaulting to port %d\n", httpport)
+		httpPort = servers.HTTPPort
+		log.Printf("HTTP_PORT not set, defaulting to port %d\n", servers.HTTPPort)
 	}
 
-	go StartServers()
+	go servers.StartAll()
 
 	// Create an HTTP client with the custom Transport
 	client, err := clients.NewKapingerHTTPClient(clientset, "app=kapinger", httpPort)
