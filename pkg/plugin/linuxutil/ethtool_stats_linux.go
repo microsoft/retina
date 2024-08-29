@@ -3,6 +3,7 @@
 package linuxutil
 
 import (
+	"errors"
 	"net"
 	"strings"
 
@@ -28,11 +29,13 @@ func NewEthtoolReader(opts *EthtoolOpts, ethHandle EthtoolInterface) *EthtoolRea
 			return nil
 		}
 	}
+	// Construct a cached ethtool handle
+	CachedEthHandle := NewCachedEthtool(ethHandle, opts)
 	return &EthtoolReader{
 		l:         log.Logger().Named(string("EthtoolReader")),
 		opts:      opts,
 		data:      &EthtoolStats{},
-		ethHandle: ethHandle,
+		ethHandle: CachedEthHandle,
 	}
 }
 
@@ -48,8 +51,6 @@ func (er *EthtoolReader) readAndUpdate() error {
 }
 
 func (er *EthtoolReader) readInterfaceStats() error {
-	// ethtool section
-
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		er.l.Error("Error while getting all interfaces: %v\n", zap.Error(err))
@@ -67,10 +68,15 @@ func (er *EthtoolReader) readInterfaceStats() error {
 		if strings.Contains(i.Name, "lo") || strings.Contains(i.Name, "cbr0") {
 			continue
 		}
+
 		// Retrieve tx from eth0
 		ifaceStats, err := er.ethHandle.Stats(i.Name)
 		if err != nil {
-			er.l.Error("Error while getting ethtool:", zap.String("ifacename", i.Name), zap.Error(err))
+			if errors.Is(err, errskip) {
+				er.l.Debug("Skipping unsupported interface", zap.String("ifacename", i.Name))
+			} else {
+				er.l.Error("Error while getting ethtool:", zap.String("ifacename", i.Name), zap.Error(err))
+			}
 			continue
 		}
 
@@ -79,6 +85,7 @@ func (er *EthtoolReader) readInterfaceStats() error {
 		er.data.stats[i.Name] = tempMap
 
 		er.l.Debug("Processed ethtool Stats ", zap.String("ifacename", i.Name))
+
 	}
 
 	return nil
