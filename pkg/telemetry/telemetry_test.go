@@ -90,6 +90,7 @@ func TestHeartbeat(t *testing.T) {
 			tr := &TelemetryClient{
 				RWMutex:    sync.RWMutex{},
 				properties: tt.fields.properties,
+				profile:    NewNoopPerfProfile(),
 			}
 			tr.heartbeat(tt.args.ctx)
 		})
@@ -125,8 +126,13 @@ func TestTelemetryClient_StopPerf(t *testing.T) {
 			tr := &TelemetryClient{
 				RWMutex:    sync.RWMutex{},
 				properties: tt.fields.properties,
+				profile:    NewNoopPerfProfile(),
 			}
 			tr.StopPerf(tt.args.counter)
 		})
 	}
+}
+
+func TestBtoMB(t *testing.T) {
+	require.Equal(t, uint64(1), bToMb(1048576))
 }

@@ -44,15 +44,15 @@ Retina can be installed using the Helm chart from GHCR:
 VERSION=$( curl -sL https://api.github.com/repos/microsoft/retina/releases/latest | jq -r .name)
 helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
     --version $VERSION \
-		--set image.tag=$VERSION \
-		--set operator.tag=$VERSION \
-		--set logLevel=info \
-		--set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\]"
+    --set image.tag=$VERSION \
+    --set operator.tag=$VERSION \
+    --set logLevel=info \
+    --set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\]"
 ```
 
 Set the `version` and image `tag` arguments to the desired version, if different.
 
-After Helm install, follow steps in [Using Prometheus and Grafana](https://retina.sh/docs/installation/prometheus-unmanaged) to set up metrics collection and visualization.
+After Helm install, follow steps in [Using Prometheus and Grafana](https://retina.sh/docs/installation/grafana/prometheus-unmanaged) to set up metrics collection and visualization.
 
 ### Captures Quick Start Guide
 

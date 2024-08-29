@@ -36,7 +36,7 @@ func (wm *WatcherManager) Start(ctx context.Context) error {
 
 	for _, w := range wm.Watchers {
 		if err := w.Init(ctx); err != nil {
-			wm.l.Error("init failed", zap.String("watcher_type", fmt.Sprintf("%T", w)))
+			wm.l.Error("init failed", zap.String("watcher_type", fmt.Sprintf("%T", w)), zap.Error(err))
 			return err
 		}
 		wm.wg.Add(1)

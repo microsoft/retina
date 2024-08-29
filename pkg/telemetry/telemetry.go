@@ -6,6 +6,7 @@ package telemetry
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"runtime"
 	"runtime/debug"
@@ -20,6 +21,13 @@ import (
 var (
 	client  appinsights.TelemetryClient
 	version string
+	mbShift uint64 = 20
+
+	// property keys
+	kernelversion = "kernelversion"
+	allocatedmem  = "allocmem"
+	sysmem        = "sysmem"
+	goroutines    = "goroutines"
 )
 
 type Telemetry interface {
@@ -69,9 +77,10 @@ type TelemetryClient struct {
 	sync.RWMutex
 	processName string
 	properties  map[string]string
+	profile     Perf
 }
 
-func NewAppInsightsTelemetryClient(processName string, additionalproperties map[string]string) *TelemetryClient {
+func NewAppInsightsTelemetryClient(processName string, additionalproperties map[string]string) (*TelemetryClient, error) {
 	if client == nil {
 		fmt.Println("appinsights client not initialized")
 	}
@@ -82,10 +91,16 @@ func NewAppInsightsTelemetryClient(processName string, additionalproperties map[
 		properties[k] = v
 	}
 
+	perfProfile, err := NewPerfProfile()
+	if err != nil {
+		return nil, err
+	}
+
 	return &TelemetryClient{
 		processName: processName,
 		properties:  properties,
-	}
+		profile:     perfProfile,
+	}, nil
 }
 
 // TrackPanic function sends the stacktrace and flushes logs only in a goroutine where its call is deferred.
@@ -134,7 +149,7 @@ func GetEnvironmentProperties() map[string]string {
 }
 
 func (t *TelemetryClient) trackWarning(err error, msg string) {
-	t.TrackTrace(err.Error(), contracts.Warning, GetEnvironmentProperties())
+	t.TrackTrace(msg+": "+err.Error(), contracts.Warning, GetEnvironmentProperties())
 }
 
 func (t *TelemetryClient) heartbeat(ctx context.Context) {
@@ -143,7 +158,21 @@ func (t *TelemetryClient) heartbeat(ctx context.Context) {
 		t.trackWarning(err, "failed to get kernel version")
 	}
 
-	t.TrackEvent("heartbeat", map[string]string{"kernelversion": kernelVersion})
+	props := map[string]string{
+		kernelversion: kernelVersion,
+	}
+
+	cpuProps, err := t.profile.GetCPUUsage()
+	if err != nil {
+		t.trackWarning(err, "failed to get cpu usage")
+	}
+	maps.Copy(props, cpuProps)
+	maps.Copy(props, t.profile.GetMemoryUsage())
+	t.TrackEvent("heartbeat", props)
+}
+
+func bToMb(b uint64) uint64 {
+	return b >> mbShift
 }
 
 func (t *TelemetryClient) TrackEvent(name string, properties map[string]string) {

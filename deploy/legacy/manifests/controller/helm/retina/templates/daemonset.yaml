@@ -30,6 +30,9 @@ spec:
         - name: init-retina
           image: {{ .Values.image.initRepository }}:{{ .Values.image.tag }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --config
+            - "/retina/config/config.yaml"
           terminationMessagePolicy: FallbackToLogsOnError
           securityContext:
             privileged: true
@@ -37,6 +40,8 @@ spec:
           - name: bpf
             mountPath: /sys/fs/bpf
             mountPropagation: Bidirectional
+          - name: config
+            mountPath: /retina/config
       containers:
         - name: {{ include "retina.name" . }} 
           livenessProbe:
@@ -89,26 +94,40 @@ spec:
               - {{ . }}
               {{- end }}
             privileged: {{ .Values.securityContext.privileged }}
-        {{- if .Values.volumeMounts }}
           volumeMounts:
+          {{- if .Values.volumeMounts }}
           {{- range $name, $mountPath := .Values.volumeMounts }}
-            - name: {{ $name }}
-              mountPath: {{ $mountPath }}
+          - name: {{ $name }}
+            mountPath: {{ $mountPath }}
           {{- end }}
-        {{- end }}
+          {{- end }}
+          {{- if fromYamlArray .Values.enabledPlugin_linux | has "infiniband" }}
+          - name: sysclassnet
+            mountPath: /sys/class/net
+          - name: sysclassinfiniband
+            mountPath: /sys/class/infiniband
+          {{- end }}
       terminationGracePeriodSeconds: 90 # Allow for retina to cleanup plugin resources.
       volumes:
       {{- range $name, $hostPath := .Values.volumeMounts}}
       - name: {{ $name }}
-      {{ if eq $name "config" }}
+      {{- if eq $name "config" }}
         configMap:
           name: {{ $.Values.nameOverride }}-config
-      {{ else if eq $name "tmp"}}
+      {{- else if eq $name "tmp"}}
         emptyDir: {}
-      {{ else }}
+      {{- else }}
         hostPath:
           path: {{ $hostPath }}
-      {{ end }}
+      {{- end }}
+      {{- end }}
+      {{- if fromYamlArray .Values.enabledPlugin_linux | has "infiniband" }}
+      - name: sysclassnet
+        hostPath: 
+          path: /sys/class/net
+      - name: sysclassinfiniband
+        hostPath: 
+          path: /sys/class/infiniband
       {{- end }}
       nodeSelector:
         kubernetes.io/os: linux

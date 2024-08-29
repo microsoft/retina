@@ -13,9 +13,6 @@ operator:
   tag: "v0.0.2"
   installCRDs: true
   enableRetinaEndpoint: false
-  capture:
-    debug: "true"
-    jobNumLimit: 0
   resources:
     limits:
       cpu: 500m
@@ -69,8 +66,8 @@ enabledPlugin_win: '["hnsstats"]'
 
 enableTelemetry: false
 
-# Interval, in seconds, to scrape/publish metrics.
-metricsInterval: 10
+# Interval, in duration, to scrape/publish metrics.
+metricsIntervalDuration: "10s"
 
 azure:
   appinsights:
@@ -131,6 +128,24 @@ resources:
     memory: "300Mi"
     cpu: "500m"
 
+# Retina Capture Configuration
+capture:
+  # debug toggles the debug mode for the Capture. Must be true in production.
+  debug: true
+  # jobNumLimit indicates the maximum number of jobs that can be created for each Capture.
+  jobNumLimit: 0
+  # enableManagedStorageAccount toggles the use of managed storage account for storing artifacts.
+  # If set to true, the following fields related to Azure credentials must be set.
+  # Ref: docs/captures/managed-storage-account.md
+  enableManagedStorageAccount: false
+  tenantId: ""
+  subscriptionId: ""
+  aadClientId: ""
+  aadClientSecret: ""
+  resourceGroup: ""
+  location: ""
+  managedIdentityClientId: ""
+
 ## @param nodeSelector [object] Node labels for pod assignment
 ## Ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
 ##
@@ -176,3 +191,4 @@ metrics:
     ## @param metrics.podMonitor.relabelings [array] Prometheus relabeling rules
     ##
     relabelings: []
+

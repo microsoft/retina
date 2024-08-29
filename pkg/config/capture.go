@@ -22,4 +22,9 @@ type CaptureConfig struct {
 
 	// JobNumLimit indicates the maximum number of jobs that can be created for each Capture.
 	CaptureJobNumLimit int `yaml:"captureJobNumLimit"`
+
+	// EnableManagedStorageAccount indicates whether a managed storage account will be created to store the captured network artifacts.
+	EnableManagedStorageAccount bool `yaml:"enableManagedStorageAccount"`
+	// AzureCredentialConfig indicates the path of Azure credential configuration file.
+	AzureCredentialConfig string `yaml:"azureCredentialConfig"`
 }

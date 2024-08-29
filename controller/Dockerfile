@@ -2,8 +2,8 @@ ARG OS_VERSION
 
 # pinned base images
 
-# mcr.microsoft.com/oss/go/microsoft/golang:1.22.3-1-cbl-mariner2.0
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:8253def0216b87b2994b7ad689aeec7440f6eb67f981e438071d8d67e36ff69f AS golang
+# mcr.microsoft.com/oss/go/microsoft/golang:1.22.4-1-cbl-mariner2.0
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:62b5953c2bee60b39d2b0505fb073b1f06ec3aaec34e44e9807cb8af85f53622 AS golang
 
 # mcr.microsoft.com/cbl-mariner/base/core:2.0
 FROM --platform=$TARGETPLATFORM mcr.microsoft.com/cbl-mariner/base/core@sha256:77651116f2e83cf50fddd8a0316945499f8ce6521ff8e94e67539180d1e5975a AS mariner-core
@@ -28,15 +28,26 @@ ARG GOOS=linux # default to linux
 ENV CGO_ENABLED=0
 ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
-COPY . /go/src/github.com/microsoft/retina
+RUN if [ "$GOOS" = "linux" ] ; then \
+      tdnf install -y clang16 lld16 bpftool libbpf-devel; \
+    fi
+COPY ./pkg/plugin /go/src/github.com/microsoft/retina/pkg/plugin
 WORKDIR /go/src/github.com/microsoft/retina
 RUN if [ "$GOOS" = "linux" ] ; then \
-    tdnf install -y clang16 lld16 bpftool libbpf-devel; \
-    go generate -x /go/src/github.com/microsoft/retina/pkg/plugin/...; \
+      go mod init github.com/microsoft/retina; \
+      go generate -x /go/src/github.com/microsoft/retina/pkg/plugin/...; \
+      tar czf /gen.tar.gz ./pkg/plugin; \
+      rm go.mod; \
+    fi
+COPY ./go.mod ./go.sum ./
+RUN go mod download
+COPY . .
+RUN if [ "$GOOS" = "linux" ] ; then \
+      rm -rf ./pkg/plugin && tar xvf /gen.tar.gz ./pkg/plugin; \
     fi
 
 # capture binary
-FROM golang AS capture-bin
+FROM intermediate AS capture-bin
 ARG APP_INSIGHTS_ID # set to enable AI telemetry
 ARG GOARCH=amd64 # default to amd64
 ARG GOOS=linux # default to linux
@@ -44,8 +55,6 @@ ARG VERSION
 ENV CGO_ENABLED=0
 ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
-COPY . /go/src/github.com/microsoft/retina 
-WORKDIR /go/src/github.com/microsoft/retina
 RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/retina/captureworkload -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID="$APP_INSIGHTS_ID"" captureworkload/main.go
 
 
@@ -93,7 +102,7 @@ RUN arr="clang tcpdump ip ss iptables-legacy iptables-legacy-save iptables-nft i
 # Download Hubble
 ARG GOARCH=amd64
 ENV HUBBLE_ARCH=${GOARCH}
-ARG HUBBLE_VERSION=v0.13.0
+ARG HUBBLE_VERSION=v0.13.6
 ENV HUBBLE_VERSION=${HUBBLE_VERSION}
 RUN echo "Hubble version: $HUBBLE_VERSION" && \
     wget --no-check-certificate https://github.com/cilium/hubble/releases/download/$HUBBLE_VERSION/hubble-linux-${HUBBLE_ARCH}.tar.gz && \
