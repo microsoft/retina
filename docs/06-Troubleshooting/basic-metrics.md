@@ -56,7 +56,7 @@ data:
       port: 10093
     logLevel: info
     enabledPlugin: ["dropreason","packetforward","linuxutil"]
-    metricsInterval: 10
+    metricsIntervalDuration: "10s"
     enableTelemetry: false
 kind: ConfigMap
 metadata:

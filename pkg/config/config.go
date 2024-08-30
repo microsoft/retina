@@ -4,6 +4,7 @@ package config
 
 import (
 	"fmt"
+	"log"
 	"reflect"
 	"strings"
 	"time"
@@ -51,10 +52,12 @@ type Server struct {
 }
 
 type Config struct {
-	APIServer                Server        `yaml:"apiServer"`
-	LogLevel                 string        `yaml:"logLevel"`
-	EnabledPlugin            []string      `yaml:"enabledPlugin"`
-	MetricsInterval          time.Duration `yaml:"metricsInterval"`
+	APIServer       Server        `yaml:"apiServer"`
+	LogLevel        string        `yaml:"logLevel"`
+	EnabledPlugin   []string      `yaml:"enabledPlugin"`
+	MetricsInterval time.Duration `yaml:"metricsInterval"`
+	// Deprecated: Use only MetricsInterval instead in the go code.
+	MetricsIntervalDuration  time.Duration `yaml:"metricsIntervalDuration"`
 	EnableTelemetry          bool          `yaml:"enableTelemetry"`
 	EnableRetinaEndpoint     bool          `yaml:"enableRetinaEndpoint"`
 	EnablePodLevel           bool          `yaml:"enablePodLevel"`
@@ -95,8 +98,13 @@ func GetConfig(cfgFilename string) (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("fatal error config file: %s", err)
 	}
-	// Convert to second.
-	config.MetricsInterval = config.MetricsInterval * time.Second
+
+	if config.MetricsIntervalDuration != 0 {
+		config.MetricsInterval = config.MetricsIntervalDuration
+	} else if config.MetricsInterval != 0 {
+		config.MetricsInterval *= time.Second
+		log.Print("metricsInterval is deprecated, please use metricsIntervalDuration instead")
+	}
 
 	return &config, nil
 }

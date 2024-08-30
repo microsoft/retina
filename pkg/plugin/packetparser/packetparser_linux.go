@@ -140,7 +140,7 @@ func (p *packetParser) Init() error {
 	//nolint:typecheck
 	if err := spec.LoadAndAssign(objs, &ebpf.CollectionOptions{ //nolint:typecheck
 		Maps: ebpf.MapOptions{
-			PinPath: plugincommon.FilterMapPath,
+			PinPath: plugincommon.MapPath,
 		},
 	}); err != nil { //nolint:typecheck
 		p.l.Error("Error loading objects: %w", zap.Error(err))
@@ -318,10 +318,10 @@ func (p *packetParser) clean(tcnl ITc, tcIngressObj *tc.Object, tcEgressObj *tc.
 	// Warning, not error. Clean is best effort.
 	if tcnl != nil {
 		if err := getQdisc(tcnl).Delete(tcEgressObj); err != nil && !errors.Is(err, tc.ErrNoArg) {
-			p.l.Warn("could not delete egress qdisc", zap.Error(err))
+			p.l.Debug("could not delete egress qdisc", zap.Error(err))
 		}
 		if err := getQdisc(tcnl).Delete(tcIngressObj); err != nil && !errors.Is(err, tc.ErrNoArg) {
-			p.l.Warn("could not delete ingress qdisc", zap.Error(err))
+			p.l.Debug("could not delete ingress qdisc", zap.Error(err))
 		}
 		if err := tcnl.Close(); err != nil {
 			p.l.Warn("could not close rtnetlink socket", zap.Error(err))
