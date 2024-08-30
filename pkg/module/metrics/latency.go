@@ -293,7 +293,7 @@ func (lm *LatencyMetrics) calculateLatency(f *flow.Flow) {
 			// Determine if this is the first reply packet, and if so, log handshake latency.
 			prevFlowflags := item.Value().flags
 			curFlowflags := f.L4.GetTCP().Flags
-			if lm.nodeAPIServerHandshakeLatency != nil && prevFlowflags != nil && prevFlowflags.SYN && curFlowflags != nil && curFlowflags.SYN && curFlowflags.ACK {
+			if lm.nodeAPIServerHandshakeLatency != nil && prevFlowflags != nil && prevFlowflags.GetSYN() && curFlowflags != nil && curFlowflags.GetSYN() && curFlowflags.GetACK() {
 				// This is the first reply packet.
 				lm.nodeAPIServerHandshakeLatency.Observe(latency)
 			}
