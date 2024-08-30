@@ -22,7 +22,6 @@ const (
 	TcpRetransCount                      = "tcp_retransmission_count"
 	IpConnectionStatsName                = "ip_connection_stats"
 	UdpConnectionStatsName               = "udp_connection_stats"
-	UdpActiveSocketsCounterName          = "udp_active_sockets"
 	InterfaceStatsName                   = "interface_stats"
 	DNSRequestCounterName                = "dns_request_count"
 	DNSResponseCounterName               = "dns_response_count"
@@ -54,7 +53,6 @@ func IsAdvancedMetric(name string) bool {
 		TcpRetransCount,
 		IpConnectionStatsName,
 		UdpConnectionStatsName,
-		UdpActiveSocketsCounterName,
 		DNSRequestCounterName,
 		DNSResponseCounterName,
 		NodeApiServerLatencyName,
