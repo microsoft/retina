@@ -20,24 +20,24 @@ func InitializeMetrics() {
 	}
 	DropPacketsGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
-		utils.DropCountTotalName,
+		utils.DroppedPacketsGaugeName,
 		dropCountTotalDescription,
 		utils.Reason,
 		utils.Direction)
 	DropBytesGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
-		utils.DropBytesTotalName,
+		utils.DropBytesGaugeName,
 		dropBytesTotalDescription,
 		utils.Reason,
 		utils.Direction)
 	ForwardPacketsGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
-		utils.ForwardCountTotalName,
+		utils.ForwardPacketsGaugeName,
 		forwardCountTotalDescription,
 		utils.Direction)
 	ForwardBytesGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
-		utils.ForwardBytesTotalName,
+		utils.ForwardBytesGaugeName,
 		forwardBytesTotalDescription,
 		utils.Direction)
 	WindowsGauge = exporter.CreatePrometheusGaugeVecForMetric(
@@ -49,49 +49,57 @@ func InitializeMetrics() {
 	NodeConnectivityStatusGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
 		utils.NodeConnectivityStatusName,
-		nodeConnectivityStatusDescription,
+		nodeConnectivityStatusGaugeDescription,
 		utils.SourceNodeName,
 		utils.TargetNodeName)
 	NodeConnectivityLatencyGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
 		utils.NodeConnectivityLatencySecondsName,
-		nodeConnectivityLatencySecondsDescription,
+		nodeConnectivityLatencySecondsGaugeDescription,
 		utils.SourceNodeName,
 		utils.TargetNodeName)
 
 	TCPStateGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
-		utils.TcpStateGaugeName,
+		utils.TCPStateGaugeName,
 		tcpStateGaugeDescription,
 		utils.State,
 	)
 	TCPConnectionRemoteGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
-		utils.TcpConnectionRemoteGaugeName,
+		utils.TCPConnectionRemoteGaugeName,
 		tcpConnectionRemoteGaugeDescription,
 		utils.Address,
 		utils.Port,
 	)
 	TCPConnectionStatsGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
-		utils.TcpConnectionStatsName,
-		tcpConnectionStatsDescription,
+		utils.TCPConnectionStatsName,
+		tcpConnectionStatsGaugeDescription,
 		utils.StatName,
+	)
+
+	TCPFlagGauge = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.DefaultRegistry,
+		utils.TCPFlagGauge,
+		tcpFlagGaugeDescription,
+		utils.Direction,
+		utils.Flag,
 	)
 
 	// IP States
 	IPConnectionStatsGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
-		utils.IpConnectionStatsName,
-		ipConnectionStatsDescription,
+		utils.IPConnectionStatsName,
+		ipConnectionStatsGaugeDescription,
 		utils.StatName,
 	)
 
 	// UDP Stats
 	UDPConnectionStatsGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
-		utils.UdpConnectionStatsName,
-		udpConnectionStatsDescription,
+		utils.UDPConnectionStatsName,
+		udpConnectionStatsGaugeDescription,
 		utils.StatName,
 	)
 
@@ -99,7 +107,7 @@ func InitializeMetrics() {
 	InterfaceStatsGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
 		utils.InterfaceStatsName,
-		interfaceStatsDescription,
+		interfaceStatsGaugeDescription,
 		utils.InterfaceName,
 		utils.StatName,
 	)
@@ -139,7 +147,7 @@ func InitializeMetrics() {
 	InfinibandStatsGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
 		utils.InfinibandCounterStatsName,
-		infinibandCounterStatsDescription,
+		infinibandStatsGaugeDescription,
 		utils.StatName,
 		utils.Device,
 		utils.Port,
@@ -148,7 +156,7 @@ func InitializeMetrics() {
 	InfinibandStatusParamsGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
 		utils.InfinibandStatusParamsName,
-		infinibandStatusParamsDescription,
+		infinibandStatusParamsGaugeDescription,
 		utils.StatName,
 		utils.InterfaceName,
 	)

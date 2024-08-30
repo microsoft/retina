@@ -46,13 +46,13 @@ func NewForwardCountMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLo
 
 func (f *ForwardMetrics) Init(metricName string) {
 	switch metricName {
-	case utils.ForwardCountTotalName:
+	case utils.ForwardPacketsGaugeName:
 		f.forwardMetric = exporter.CreatePrometheusGaugeVecForMetric(
 			exporter.AdvancedRegistry,
 			TotalCountName,
 			TotalCountDesc,
 			f.getLabels()...)
-	case utils.ForwardBytesTotalName:
+	case utils.ForwardBytesGaugeName:
 		f.forwardMetric = exporter.CreatePrometheusGaugeVecForMetric(
 			exporter.AdvancedRegistry,
 			TotalBytesName,
@@ -163,9 +163,9 @@ func (f *ForwardMetrics) processLocalCtxFlow(flow *v1.Flow) {
 
 func (f *ForwardMetrics) update(fl *v1.Flow, labels []string) {
 	switch f.metricName {
-	case utils.ForwardCountTotalName:
+	case utils.ForwardPacketsGaugeName:
 		f.forwardMetric.WithLabelValues(labels...).Inc()
-	case utils.ForwardBytesTotalName:
+	case utils.ForwardBytesGaugeName:
 		f.forwardMetric.WithLabelValues(labels...).Add(float64(utils.PacketSize(fl)))
 	}
 }

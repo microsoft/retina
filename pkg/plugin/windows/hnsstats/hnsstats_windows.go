@@ -147,50 +147,50 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 
 func notifyHnsStats(h *hnsstats, stats *HnsStatsData) {
 	// hns signals
-	metrics.ForwardCounter.WithLabelValues(ingressLabel).Set(float64(stats.hnscounters.PacketsReceived))
+	metrics.ForwardPacketsGauge.WithLabelValues(ingressLabel).Set(float64(stats.hnscounters.PacketsReceived))
 	h.l.Debug("emitting packets received count metric", zap.Uint64(PacketsReceived, stats.hnscounters.PacketsReceived))
 
-	metrics.ForwardCounter.WithLabelValues(egressLabel).Set(float64(stats.hnscounters.PacketsSent))
+	metrics.ForwardPacketsGauge.WithLabelValues(egressLabel).Set(float64(stats.hnscounters.PacketsSent))
 	h.l.Debug("emitting packets sent count metric", zap.Uint64(PacketsSent, stats.hnscounters.PacketsSent))
 
-	metrics.ForwardBytesCounter.WithLabelValues(egressLabel).Set(float64(stats.hnscounters.BytesSent))
+	metrics.ForwardBytesGauge.WithLabelValues(egressLabel).Set(float64(stats.hnscounters.BytesSent))
 	h.l.Debug("emitting bytes sent count metric", zap.Uint64(BytesSent, stats.hnscounters.BytesSent))
 
-	metrics.ForwardBytesCounter.WithLabelValues(ingressLabel).Set(float64(stats.hnscounters.BytesReceived))
+	metrics.ForwardBytesGauge.WithLabelValues(ingressLabel).Set(float64(stats.hnscounters.BytesReceived))
 	h.l.Debug("emitting bytes received count metric", zap.Uint64(BytesReceived, stats.hnscounters.BytesReceived))
 
-	metrics.WindowsCounter.WithLabelValues(PacketsReceived).Set(float64(stats.hnscounters.PacketsReceived))
-	metrics.WindowsCounter.WithLabelValues(PacketsSent).Set(float64(stats.hnscounters.PacketsSent))
+	metrics.WindowsGauge.WithLabelValues(PacketsReceived).Set(float64(stats.hnscounters.PacketsReceived))
+	metrics.WindowsGauge.WithLabelValues(PacketsSent).Set(float64(stats.hnscounters.PacketsSent))
 
-	metrics.DropCounter.WithLabelValues(utils.Endpoint, egressLabel).Set(float64(stats.hnscounters.DroppedPacketsOutgoing))
-	metrics.DropCounter.WithLabelValues(utils.Endpoint, ingressLabel).Set(float64(stats.hnscounters.DroppedPacketsIncoming))
+	metrics.DropPacketsGauge.WithLabelValues(utils.Endpoint, egressLabel).Set(float64(stats.hnscounters.DroppedPacketsOutgoing))
+	metrics.DropPacketsGauge.WithLabelValues(utils.Endpoint, ingressLabel).Set(float64(stats.hnscounters.DroppedPacketsIncoming))
 
 	if stats.vfpCounters == nil {
 		h.l.Warn("will not record some metrics since VFP port counters failed to be set")
 		return
 	}
 
-	metrics.DropCounter.WithLabelValues(utils.AclRule, ingressLabel).Set(float64(stats.vfpCounters.In.DropCounters.AclDropPacketCount))
-	metrics.DropCounter.WithLabelValues(utils.AclRule, egressLabel).Set(float64(stats.vfpCounters.Out.DropCounters.AclDropPacketCount))
+	metrics.DropPacketsGauge.WithLabelValues(utils.AclRule, ingressLabel).Set(float64(stats.vfpCounters.In.DropCounters.AclDropPacketCount))
+	metrics.DropPacketsGauge.WithLabelValues(utils.AclRule, egressLabel).Set(float64(stats.vfpCounters.Out.DropCounters.AclDropPacketCount))
 
-	metrics.TCPConnectionStats.WithLabelValues(utils.ResetCount).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.ResetCount))
-	metrics.TCPConnectionStats.WithLabelValues(utils.ClosedFin).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.ClosedFinCount))
-	metrics.TCPConnectionStats.WithLabelValues(utils.ResetSyn).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.ResetSynCount))
-	metrics.TCPConnectionStats.WithLabelValues(utils.TcpHalfOpenTimeouts).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.TcpHalfOpenTimeoutsCount))
-	metrics.TCPConnectionStats.WithLabelValues(utils.Verified).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.VerifiedCount))
-	metrics.TCPConnectionStats.WithLabelValues(utils.TimedOutCount).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.TimedOutCount))
-	metrics.TCPConnectionStats.WithLabelValues(utils.TimeWaitExpiredCount).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.TimeWaitExpiredCount))
+	metrics.TCPConnectionStatsGauge.WithLabelValues(utils.ResetCount).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.ResetCount))
+	metrics.TCPConnectionStatsGauge.WithLabelValues(utils.ClosedFin).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.ClosedFinCount))
+	metrics.TCPConnectionStatsGauge.WithLabelValues(utils.ResetSyn).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.ResetSynCount))
+	metrics.TCPConnectionStatsGauge.WithLabelValues(utils.TcpHalfOpenTimeouts).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.TcpHalfOpenTimeoutsCount))
+	metrics.TCPConnectionStatsGauge.WithLabelValues(utils.Verified).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.VerifiedCount))
+	metrics.TCPConnectionStatsGauge.WithLabelValues(utils.TimedOutCount).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.TimedOutCount))
+	metrics.TCPConnectionStatsGauge.WithLabelValues(utils.TimeWaitExpiredCount).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.TimeWaitExpiredCount))
 
 	// TCP Flag counters
-	metrics.TCPFlagCounters.WithLabelValues(ingressLabel, utils.SYN).Set(float64(stats.vfpCounters.In.TcpCounters.PacketCounters.SynPacketCount))
-	metrics.TCPFlagCounters.WithLabelValues(ingressLabel, utils.SYNACK).Set(float64(stats.vfpCounters.In.TcpCounters.PacketCounters.SynAckPacketCount))
-	metrics.TCPFlagCounters.WithLabelValues(ingressLabel, utils.FIN).Set(float64(stats.vfpCounters.In.TcpCounters.PacketCounters.FinPacketCount))
-	metrics.TCPFlagCounters.WithLabelValues(ingressLabel, utils.RST).Set(float64(stats.vfpCounters.In.TcpCounters.PacketCounters.RstPacketCount))
+	metrics.TCPFlagGauge.WithLabelValues(ingressLabel, utils.SYN).Set(float64(stats.vfpCounters.In.TcpCounters.PacketCounters.SynPacketCount))
+	metrics.TCPFlagGauge.WithLabelValues(ingressLabel, utils.SYNACK).Set(float64(stats.vfpCounters.In.TcpCounters.PacketCounters.SynAckPacketCount))
+	metrics.TCPFlagGauge.WithLabelValues(ingressLabel, utils.FIN).Set(float64(stats.vfpCounters.In.TcpCounters.PacketCounters.FinPacketCount))
+	metrics.TCPFlagGauge.WithLabelValues(ingressLabel, utils.RST).Set(float64(stats.vfpCounters.In.TcpCounters.PacketCounters.RstPacketCount))
 
-	metrics.TCPFlagCounters.WithLabelValues(egressLabel, utils.SYN).Set(float64(stats.vfpCounters.Out.TcpCounters.PacketCounters.SynPacketCount))
-	metrics.TCPFlagCounters.WithLabelValues(egressLabel, utils.SYNACK).Set(float64(stats.vfpCounters.Out.TcpCounters.PacketCounters.SynAckPacketCount))
-	metrics.TCPFlagCounters.WithLabelValues(egressLabel, utils.FIN).Set(float64(stats.vfpCounters.Out.TcpCounters.PacketCounters.FinPacketCount))
-	metrics.TCPFlagCounters.WithLabelValues(egressLabel, utils.RST).Set(float64(stats.vfpCounters.Out.TcpCounters.PacketCounters.RstPacketCount))
+	metrics.TCPFlagGauge.WithLabelValues(egressLabel, utils.SYN).Set(float64(stats.vfpCounters.Out.TcpCounters.PacketCounters.SynPacketCount))
+	metrics.TCPFlagGauge.WithLabelValues(egressLabel, utils.SYNACK).Set(float64(stats.vfpCounters.Out.TcpCounters.PacketCounters.SynAckPacketCount))
+	metrics.TCPFlagGauge.WithLabelValues(egressLabel, utils.FIN).Set(float64(stats.vfpCounters.Out.TcpCounters.PacketCounters.FinPacketCount))
+	metrics.TCPFlagGauge.WithLabelValues(egressLabel, utils.RST).Set(float64(stats.vfpCounters.Out.TcpCounters.PacketCounters.RstPacketCount))
 }
 
 func (h *hnsstats) Start(ctx context.Context) error {

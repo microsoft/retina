@@ -11,17 +11,17 @@ package utils
 const (
 	// Common Counters across os distributions (should these be asynch or synch)
 	// make sure IsMetric is updated if you add a new metric here
-	DropCountTotalName                   = "drop_count"
-	DropBytesTotalName                   = "drop_bytes"
-	ForwardCountTotalName                = "forward_count"
-	ForwardBytesTotalName                = "forward_bytes"
-	TcpStateGaugeName                    = "tcp_state"
-	TcpConnectionRemoteGaugeName         = "tcp_connection_remote"
-	TcpConnectionStatsName               = "tcp_connection_stats"
-	TcpFlagCounters                      = "tcp_flag_counters"
-	TcpRetransCount                      = "tcp_retransmission_count"
-	IpConnectionStatsName                = "ip_connection_stats"
-	UdpConnectionStatsName               = "udp_connection_stats"
+	DroppedPacketsGaugeName              = "drop_count"
+	DropBytesGaugeName                   = "drop_bytes"
+	ForwardPacketsGaugeName              = "forward_count"
+	ForwardBytesGaugeName                = "forward_bytes"
+	TCPStateGaugeName                    = "tcp_state"
+	TCPConnectionRemoteGaugeName         = "tcp_connection_remote"
+	TCPConnectionStatsName               = "tcp_connection_stats"
+	TCPFlagGauge                         = "tcp_flag_gauges"
+	TCPRetransCount                      = "tcp_retransmission_count"
+	IPConnectionStatsName                = "ip_connection_stats"
+	UDPConnectionStatsName               = "udp_connection_stats"
 	InterfaceStatsName                   = "interface_stats"
 	DNSRequestCounterName                = "dns_request_count"
 	DNSResponseCounterName               = "dns_response_count"
@@ -40,19 +40,19 @@ const (
 func IsAdvancedMetric(name string) bool {
 	switch name {
 	case
-		DropCountTotalName,
-		DropBytesTotalName,
-		ForwardCountTotalName,
-		ForwardBytesTotalName,
+		DroppedPacketsGaugeName,
+		DropBytesGaugeName,
+		ForwardPacketsGaugeName,
+		ForwardBytesGaugeName,
 		NodeConnectivityStatusName,
 		NodeConnectivityLatencySecondsName,
-		TcpStateGaugeName,
-		TcpConnectionRemoteGaugeName,
-		TcpConnectionStatsName,
-		TcpFlagCounters,
-		TcpRetransCount,
-		IpConnectionStatsName,
-		UdpConnectionStatsName,
+		TCPStateGaugeName,
+		TCPConnectionRemoteGaugeName,
+		TCPConnectionStatsName,
+		TCPFlagGauge,
+		TCPRetransCount,
+		IPConnectionStatsName,
+		UDPConnectionStatsName,
 		DNSRequestCounterName,
 		DNSResponseCounterName,
 		NodeApiServerLatencyName,
