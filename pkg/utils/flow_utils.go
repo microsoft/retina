@@ -31,6 +31,7 @@ const (
 // 2 is from host to network and 3 is from network to host.
 // ts is the timestamp in nanoseconds.
 func ToFlow(
+	l *log.ZapLogger,
 	ts int64,
 	sourceIP, destIP net.IP,
 	sourcePort, destPort uint32,
@@ -38,14 +39,7 @@ func ToFlow(
 	observationPoint uint8,
 	verdict flow.Verdict,
 ) *flow.Flow { //nolint:typecheck
-	var (
-		l4           *flow.Layer4
-		checkpoint   flow.TraceObservationPoint
-		subeventtype int
-	)
-
-	l := log.Logger().Named("ToFlow")
-
+	var l4 *flow.Layer4
 	switch proto {
 	case 6:
 		l4 = &flow.Layer4{
@@ -67,6 +61,10 @@ func ToFlow(
 		}
 	}
 
+	var (
+		checkpoint   flow.TraceObservationPoint
+		subeventtype int
+	)
 	// We are attaching the filters to the veth interface on the host side.
 	// So for HOST -> CONTAINER, egress of host veth is ingress of container.
 	// Hence, we need to swap the direction.

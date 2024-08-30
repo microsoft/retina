@@ -121,7 +121,7 @@ func TestProcessFlow(t *testing.T) {
 	 * Test case 1: TCP handshake.
 	 */
 	// Node -> Api server.
-	f1 := utils.ToFlow(t1, apiSeverIp, nodeIp, 80, 443, 6, 3, 0)
+	f1 := utils.ToFlow(l, t1, apiSeverIp, nodeIp, 80, 443, 6, 3, 0)
 	metaf1 := &utils.RetinaMetadata{}
 	utils.AddTCPID(metaf1, 1234)
 	utils.AddTCPFlags(f1, 1, 0, 0, 0, 0, 0)
@@ -131,7 +131,7 @@ func TestProcessFlow(t *testing.T) {
 	}
 
 	// Api server -> Node.
-	f2 := utils.ToFlow(t2, nodeIp, apiSeverIp, 443, 80, 6, 2, 0)
+	f2 := utils.ToFlow(l, t2, nodeIp, apiSeverIp, 443, 80, 6, 2, 0)
 	metaf2 := &utils.RetinaMetadata{}
 	utils.AddTCPID(metaf2, 1234)
 	utils.AddTCPFlags(f2, 1, 1, 0, 0, 0, 0)

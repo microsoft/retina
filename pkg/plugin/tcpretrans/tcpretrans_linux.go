@@ -118,6 +118,7 @@ func (t *tcpretrans) eventHandler(event *types.Event) {
 
 	// TODO add metric here or add a enriched value
 	fl := utils.ToFlow(
+		t.l,
 		int64(event.Timestamp),
 		net.ParseIP(event.SrcEndpoint.L3Endpoint.Addr).To4(), // Precautionary To4() call.
 		net.ParseIP(event.DstEndpoint.L3Endpoint.Addr).To4(), // Precautionary To4() call.

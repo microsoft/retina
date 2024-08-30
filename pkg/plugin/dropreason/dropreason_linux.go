@@ -353,6 +353,7 @@ func (dr *dropReason) processRecord(ctx context.Context, id int) {
 			dropKey := (dropMetricKey)(bpfEvent.Key)
 
 			fl := utils.ToFlow(
+				dr.l,
 				ktime.MonotonicOffset.Nanoseconds()+int64(bpfEvent.Ts),
 				utils.Int2ip(bpfEvent.SrcIp).To4(), // Precautionary To4() call.
 				utils.Int2ip(bpfEvent.DstIp).To4(), // Precautionary To4() call.

@@ -17,10 +17,10 @@ import (
 )
 
 func TestToFlow(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	l, _ := log.SetupZapLogger(log.GetDefaultLogOpts())
 
 	ts := int64(1649748687588860)
-	f := ToFlow(ts, net.ParseIP("1.1.1.1").To4(),
+	f := ToFlow(l, ts, net.ParseIP("1.1.1.1").To4(),
 		net.ParseIP("2.2.2.2").To4(),
 		443, 80, 6, uint8(1), flow.Verdict_FORWARDED)
 	/*
@@ -64,7 +64,7 @@ func TestToFlow(t *testing.T) {
 	}
 	expectedSubtype := []int32{3, 0, 10, 11, 0}
 	for idx, val := range []uint32{0, 1, 2, 3, 4} {
-		f = ToFlow(ts, net.ParseIP("1.1.1.1").To4(),
+		f = ToFlow(l, ts, net.ParseIP("1.1.1.1").To4(),
 			net.ParseIP("2.2.2.2").To4(),
 			443, 80, 6, uint8(val), flow.Verdict_FORWARDED)
 		assert.EqualValues(t, f.TraceObservationPoint, expectedObsPoint[idx])
@@ -73,10 +73,11 @@ func TestToFlow(t *testing.T) {
 }
 
 func TestAddPacketSize(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	l, _ := log.SetupZapLogger(log.GetDefaultLogOpts())
 
 	ts := int64(1649748687588864)
 	fl := ToFlow(
+		l,
 		ts,
 		net.ParseIP("1.1.1.1").To4(),
 		net.ParseIP("2.2.2.2").To4(),
@@ -95,10 +96,11 @@ func TestAddPacketSize(t *testing.T) {
 }
 
 func TestTcpID(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	l, _ := log.SetupZapLogger(log.GetDefaultLogOpts())
 
 	ts := int64(1649748687588864)
 	fl := ToFlow(
+		l,
 		ts,
 		net.ParseIP("1.1.1.1").To4(),
 		net.ParseIP("2.2.2.2").To4(),

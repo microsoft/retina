@@ -560,6 +560,7 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 			destinationPortShort := uint32(utils.HostToNetShort(bpfEvent.DstPort))
 
 			fl := utils.ToFlow(
+				p.l,
 				ktime.MonotonicOffset.Nanoseconds()+int64(bpfEvent.T_nsec),
 				utils.Int2ip(bpfEvent.SrcIp).To4(), // Precautionary To4() call.
 				utils.Int2ip(bpfEvent.DstIp).To4(), // Precautionary To4() call.
@@ -573,6 +574,12 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 				p.l.Warn("Could not convert bpfEvent to flow", zap.Any("bpfEvent", bpfEvent))
 				continue
 			}
+
+			// Add the isReply flag to the flow.
+			fl.IsReply = &wrapperspb.BoolValue{Value: bpfEvent.IsReply}
+
+			// Add the traffic direction to the flow.
+			fl.TrafficDirection = flow.TrafficDirection(bpfEvent.TrafficDirection)
 
 			meta := &utils.RetinaMetadata{}
 
@@ -593,12 +600,6 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 
 			// Add metadata to the flow.
 			utils.AddRetinaMetadata(fl, meta)
-
-			// Add the isReply flag to the flow.
-			fl.IsReply = &wrapperspb.BoolValue{Value: bpfEvent.IsReply}
-
-			// Add the traffic direction to the flow.
-			fl.TrafficDirection = flow.TrafficDirection(bpfEvent.TrafficDirection)
 
 			// Write the event to the enricher.
 			ev := &v1.Event{

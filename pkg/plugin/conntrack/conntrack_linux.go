@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/rlimit"
 	"github.com/microsoft/retina/internal/ktime"
 	"github.com/microsoft/retina/pkg/log"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
@@ -47,7 +48,7 @@ func New() (*Conntrack, error) {
 		l:           log.Logger().Named("conntrack"),
 		gcFrequency: defaultGCFrequency,
 	}
-  
+
 	objs := &conntrackObjects{}
 	err := loadConntrackObjects(objs, &ebpf.CollectionOptions{
 		Maps: ebpf.MapOptions{
