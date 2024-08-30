@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/rlimit"
 	"github.com/microsoft/retina/internal/ktime"
 	"github.com/microsoft/retina/pkg/log"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
@@ -48,13 +47,7 @@ func New() (*Conntrack, error) {
 		l:           log.Logger().Named("conntrack"),
 		gcFrequency: defaultGCFrequency,
 	}
-
-	// Allow the current process to lock memory for eBPF resources.
-	if err := rlimit.RemoveMemlock(); err != nil {
-		ct.l.Error("RemoveMemlock failed", zap.Error(err))
-		return nil, errors.Wrapf(err, "failed to remove memlock limit")
-	}
-
+  
 	objs := &conntrackObjects{}
 	err := loadConntrackObjects(objs, &ebpf.CollectionOptions{
 		Maps: ebpf.MapOptions{

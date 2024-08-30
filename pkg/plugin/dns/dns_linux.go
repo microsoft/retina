@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
-	"github.com/cilium/ebpf/rlimit"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/gadgets/trace/dns/tracer"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/gadgets/trace/dns/types"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/utils/host"
@@ -46,11 +45,6 @@ func (d *dns) Compile(ctx context.Context) error {
 }
 
 func (d *dns) Init() error {
-	if err := rlimit.RemoveMemlock(); err != nil {
-		d.l.Error("RemoveMemLock failed:%w", zap.Error(err))
-		return err
-	}
-
 	// Create tracer. In this case no parameters are passed.
 	err := host.Init(host.Config{})
 	tracer, err := tracer.NewTracer()
