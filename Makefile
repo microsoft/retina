@@ -536,4 +536,4 @@ quick-deploy-hubble:
 
 .PHONY: simplify-dashboards
 simplify-dashboards:
-	cd deploy/legacy/grafana/dashboards && go test . -tags=dashboard,simplifydashboard -v && cd $(REPO_ROOT)
+	cd deploy/testutils && go test ./... -tags=dashboard,simplifydashboard -v && cd $(REPO_ROOT)

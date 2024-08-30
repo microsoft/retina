@@ -10,7 +10,7 @@ require (
 	go.uber.org/mock v0.4.0
 	mvdan.cc/gofumpt v0.7.0
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20211110210527-619e6b92dab9
-	sigs.k8s.io/controller-tools v0.16.1
+	sigs.k8s.io/controller-tools v0.16.2
 )
 
 require (
