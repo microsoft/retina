@@ -12,35 +12,6 @@
 
 char __license[] SEC("license") = "Dual MIT/GPL";
 
-struct tcpmetadata {
-	__u32 seq; // TCP sequence number
-	__u32 ack_num; // TCP ack number
-	__u32 tsval; // TCP timestamp value
-	__u32 tsecr; // TCP timestamp echo reply
-	// TCP flags.
-	__u16 syn;
-	__u16 ack;
-	__u16 fin;
-	__u16 rst;
-	__u16 psh;
-	__u16 urg;
-};
-
-struct packet
-{
-	__u64 ts; // timestamp in nanoseconds
-	__u64 bytes; // packet size in bytes
-	__u32 src_ip;
-	__u32 dst_ip;
-	__u16 src_port;
-	__u16 dst_port;
-	struct tcpmetadata tcp_metadata; // TCP metadata
-	__u8 observation_point;
-	__u8 traffic_direction;
-	__u8 proto;
-	bool is_reply;
-};
-
 struct
 {
 	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
@@ -148,7 +119,7 @@ static void parse(struct __sk_buff *skb, __u8 obs)
 	__builtin_memset(&p, 0, sizeof(p));
 
 	// Get current time in nanoseconds.
-	p.ts = bpf_ktime_get_boot_ns();
+	p.t_nsec = bpf_ktime_get_boot_ns();
 	
 	p.observation_point = obs;
 	p.bytes = skb->len;
@@ -235,20 +206,10 @@ static void parse(struct __sk_buff *skb, __u8 obs)
 		return;
 	}
 
-	// Create a new conntrack key.
-	struct ct_v4_key key;
-	__builtin_memset(&key, 0, sizeof(struct ct_v4_key));
-	key.src_ip = p.src_ip;
-	key.dst_ip = p.dst_ip;
-	key.src_port = p.src_port;
-	key.dst_port = p.dst_port;
-	key.proto = p.proto;
 
 	// Process the packet in ct
 	bool report __attribute__((unused));
-	report = ct_process_packet(key, flags, obs);
-	p.is_reply = ct_is_reply_packet(key);
-	p.traffic_direction = ct_get_traffic_direction(key);
+	report = ct_process_packet(&p, flags, obs);
 	#ifdef DATA_AGGREGATION_LEVEL
 	// If the data aggregation level is low, always send the packet to the perf buffer.
 	#if DATA_AGGREGATION_LEVEL == DATA_AGGREGATION_LEVEL_LOW

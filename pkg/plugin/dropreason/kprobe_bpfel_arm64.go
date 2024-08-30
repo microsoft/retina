@@ -36,10 +36,9 @@ type kprobePacket struct {
 	DstPort     uint16
 	Proto       uint8
 	_           [3]byte
-	SkbLen      uint64
+	SkbLen      uint32
 	Direction   uint32
 	Key         kprobeMetricsMapKey
-	_           [4]byte
 	Ts          uint64
 	InFiltermap bool
 	_           [7]byte

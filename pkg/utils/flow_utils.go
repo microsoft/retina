@@ -251,14 +251,14 @@ func DNSRcodeToString(f *flow.Flow) string {
 }
 
 // AddPacketSize adds the packet size to the flow's metadata.
-func AddPacketSize(meta *RetinaMetadata, packetSize uint64) {
+func AddPacketSize(meta *RetinaMetadata, packetSize uint32) {
 	if meta == nil {
 		return
 	}
 	meta.Bytes = packetSize
 }
 
-func PacketSize(f *flow.Flow) uint64 {
+func PacketSize(f *flow.Flow) uint32 {
 	if f.Extensions == nil {
 		return 0
 	}

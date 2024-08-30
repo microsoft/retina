@@ -37,8 +37,8 @@ type packetparserMapKey struct {
 }
 
 type packetparserPacket struct {
-	Ts          uint64
-	Bytes       uint64
+	T_nsec      uint64
+	Bytes       uint32
 	SrcIp       uint32
 	DstIp       uint32
 	SrcPort     uint16
@@ -59,7 +59,6 @@ type packetparserPacket struct {
 	TrafficDirection uint8
 	Proto            uint8
 	IsReply          bool
-	_                [4]byte
 }
 
 // loadPacketparser returns the embedded CollectionSpec for packetparser.

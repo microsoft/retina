@@ -13,7 +13,7 @@
 	({ __u64 __x = bpf_ktime_get_boot_ns() / NSEC_PER_SEC; __x; })
 # define bpf_mono_now()		bpf_ktime_get_sec()
 
-#define UINT64_MAX 18446744073709551615ULL
+#define UINT32_MAX 4294967295U
 
 // Time units in seconds
 

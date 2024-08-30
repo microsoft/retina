@@ -4,7 +4,7 @@ package utils;
 option go_package = "github.com/microsoft/retina/pkg/utils";
 
 message RetinaMetadata {
-    uint64 bytes = 1;
+    uint32 bytes = 1;
 
     // DNS metadata.
     DNSType dns_type = 2;

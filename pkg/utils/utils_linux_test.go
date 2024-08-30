@@ -87,7 +87,7 @@ func TestAddPacketSize(t *testing.T) {
 		flow.Verdict_FORWARDED,
 	)
 	meta := &RetinaMetadata{}
-	AddPacketSize(meta, uint64(100))
+	AddPacketSize(meta, uint32(100))
 	AddRetinaMetadata(fl, meta)
 
 	res := PacketSize(fl)

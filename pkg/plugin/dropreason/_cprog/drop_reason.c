@@ -48,7 +48,7 @@ struct packet
     __u16 src_port;
     __u16 dst_port;
     __u8 proto;
-    __u64 skb_len;
+    __u32 skb_len;
     direction_type direction;
     struct metrics_map_key key;
     __u64 ts; // timestamp in nanoseconds

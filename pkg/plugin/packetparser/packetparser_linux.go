@@ -567,7 +567,7 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 			destinationPortShort := uint32(utils.HostToNetShort(bpfEvent.DstPort))
 
 			fl := utils.ToFlow(
-				ktime.MonotonicOffset.Nanoseconds()+int64(bpfEvent.Ts),
+				ktime.MonotonicOffset.Nanoseconds()+int64(bpfEvent.T_nsec),
 				utils.Int2ip(bpfEvent.SrcIp).To4(), // Precautionary To4() call.
 				utils.Int2ip(bpfEvent.DstIp).To4(), // Precautionary To4() call.
 				sourcePortShort,
