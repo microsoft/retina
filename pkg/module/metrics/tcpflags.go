@@ -25,7 +25,7 @@ const (
 
 type TCPMetrics struct {
 	baseMetricObject
-	tcpFlagsMetrics metricsinit.IGaugeVec
+	tcpFlagsMetrics metricsinit.GaugeVec
 }
 
 func NewTCPMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext) *TCPMetrics {

@@ -51,46 +51,44 @@ var (
 	// Prevent re-initialization
 	isInitialized bool
 
-	// Common counters across os distributions
-	DropCounter         IGaugeVec
-	DropBytesCounter    IGaugeVec
-	ForwardCounter      IGaugeVec
-	ForwardBytesCounter IGaugeVec
+	// Common gauges across os distributions
+	DropPacketsGauge    GaugeVec
+	DropBytesGauge      GaugeVec
+	ForwardPacketsGauge GaugeVec
+	ForwardBytesGauge   GaugeVec
 
-	WindowsCounter IGaugeVec
+	WindowsGauge GaugeVec
 
 	// Common gauges across os distributions
-	NodeConnectivityStatusGauge  IGaugeVec
-	NodeConnectivityLatencyGauge IGaugeVec
+	NodeConnectivityStatusGauge  GaugeVec
+	NodeConnectivityLatencyGauge GaugeVec
 
 	// TCP Stats
-	TCPStateGauge            IGaugeVec
-	TCPConnectionRemoteGauge IGaugeVec
-	TCPConnectionStats       IGaugeVec
-	TCPFlagCounters          IGaugeVec
+	TCPStateGauge            GaugeVec
+	TCPConnectionRemoteGauge GaugeVec
+	TCPConnectionStatsGauge  GaugeVec
 
 	// IP States
-	IPConnectionStats IGaugeVec
+	IPConnectionStatsGauge GaugeVec
 
 	// UDP Stats
-	UDPConnectionStats      IGaugeVec
-	UDPActiveSocketsCounter IGaugeVec
+	UDPConnectionStatsGauge GaugeVec
 
 	// Interface Stats
-	InterfaceStats IGaugeVec
+	InterfaceStatsGauge GaugeVec
 
 	metricsLogger *log.ZapLogger
 
 	// Control Plane Metrics
-	PluginManagerFailedToReconcileCounter ICounterVec
-	LostEventsCounter                     ICounterVec
+	PluginManagerFailedToReconcileCounter CounterVec
+	LostEventsCounter                     CounterVec
 
 	// DNS Metrics.
-	DNSRequestCounter  ICounterVec
-	DNSResponseCounter ICounterVec
+	DNSRequestCounter  CounterVec
+	DNSResponseCounter CounterVec
 
-	InfinibandCounterStats IGaugeVec
-	InfinibandStatusParams IGaugeVec
+	InfinibandStatsGauge        GaugeVec
+	InfinibandStatusParamsGauge GaugeVec
 )
 
 func ToPrometheusType(metric interface{}) prometheus.Collector {
@@ -98,12 +96,10 @@ func ToPrometheusType(metric interface{}) prometheus.Collector {
 		return nil
 	}
 	switch m := metric.(type) {
-	case IGaugeVec:
+	case GaugeVec:
 		return m.(*prometheus.GaugeVec)
-	case ICounterVec:
+	case CounterVec:
 		return m.(*prometheus.CounterVec)
-	case IHistogramVec:
-		return m.(prometheus.Histogram)
 	default:
 		metricsLogger.Error("error converting unknown metric type", zap.Any("metric", m))
 		return nil

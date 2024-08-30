@@ -81,12 +81,12 @@ func processMapValue(m IMap, key uint32) (uint64, uint64, error) {
 
 func updateMetrics(data *PacketForwardData) {
 	// Add the packet count metrics.
-	metrics.ForwardCounter.WithLabelValues(ingressLabel).Set(float64(data.ingressCountTotal))
-	metrics.ForwardCounter.WithLabelValues(egressLabel).Set(float64(data.egressCountTotal))
+	metrics.ForwardPacketsGauge.WithLabelValues(ingressLabel).Set(float64(data.ingressCountTotal))
+	metrics.ForwardPacketsGauge.WithLabelValues(egressLabel).Set(float64(data.egressCountTotal))
 
 	// Add the packet bytes metrics.
-	metrics.ForwardBytesCounter.WithLabelValues(ingressLabel).Set(float64(data.ingressBytesTotal))
-	metrics.ForwardBytesCounter.WithLabelValues(egressLabel).Set(float64(data.egressBytesTotal))
+	metrics.ForwardBytesGauge.WithLabelValues(ingressLabel).Set(float64(data.ingressBytesTotal))
+	metrics.ForwardBytesGauge.WithLabelValues(egressLabel).Set(float64(data.egressBytesTotal))
 }
 
 // Plugin API implementation for packet forward.

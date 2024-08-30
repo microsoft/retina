@@ -27,7 +27,7 @@ const (
 
 type ForwardMetrics struct {
 	baseMetricObject
-	forwardMetric metricsinit.IGaugeVec
+	forwardMetric metricsinit.GaugeVec
 	// bytesMetric metricsinit.IGaugeVec
 	metricName string
 }

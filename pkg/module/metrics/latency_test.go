@@ -99,18 +99,18 @@ func TestProcessFlow(t *testing.T) {
 	lm.apiServerIps[apiSeverIp.String()] = struct{}{}
 
 	// Set mock nodeApiServerLatency.
-	mHist := metrics.NewMockIHistogramVec(ctrl)
+	mHist := metrics.NewMockHistogram(ctrl)
 	mHist.EXPECT().Observe(float64(1)).Return().Times(2)
 	lm.nodeApiServerLatency = mHist
 
 	// Set mock nodeApiServerHandshakeLatency.
-	mHist2 := metrics.NewMockIHistogramVec(ctrl)
+	mHist2 := metrics.NewMockHistogram(ctrl)
 	mHist2.EXPECT().Observe(float64(1)).Return().Times(1)
 	lm.nodeApiServerHandshakeLatency = mHist2
 
 	// Test No response metric.
 	c := prometheus.NewCounter(prometheus.CounterOpts{})
-	mNoResponse := metrics.NewMockICounterVec(ctrl)
+	mNoResponse := metrics.NewMockCounterVec(ctrl)
 	mNoResponse.EXPECT().WithLabelValues("no_response").Return(c).Times(1)
 	lm.noResponseMetric = mNoResponse
 

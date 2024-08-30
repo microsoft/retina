@@ -134,11 +134,11 @@ func TestProcessMapValue(t *testing.T) {
 	direction := testMetricKey.getDirection()
 
 	dropCount := &dto.Metric{}
-	err := metrics.DropCounter.WithLabelValues(reason, direction).Write(dropCount)
+	err := metrics.DropPacketsGauge.WithLabelValues(reason, direction).Write(dropCount)
 	require.Nil(t, err, "Expected no error but got: %w", err)
 
 	dropBytes := &dto.Metric{}
-	err = metrics.DropBytesCounter.WithLabelValues(reason, direction).Write(dropBytes)
+	err = metrics.DropBytesGauge.WithLabelValues(reason, direction).Write(dropBytes)
 	require.Nil(t, err, "Expected no error but got: %w", err)
 
 	dropCountValue := *dropCount.Gauge.Value

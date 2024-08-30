@@ -277,7 +277,7 @@ func TestNewDrop(t *testing.T) {
 			} else {
 				assert.NotNil(t, f, "drp[] metrics should not be nil Test Name: %s", tc.name)
 			}
-			dropMock := metricsinit.NewMockIGaugeVec(ctrl) //nolint:typecheck
+			dropMock := metricsinit.NewMockGaugeVec(ctrl) //nolint:typecheck
 
 			f.dropMetric = dropMock
 

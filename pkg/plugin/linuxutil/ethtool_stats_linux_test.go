@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	MockGaugeVec   *metrics.MockIGaugeVec
-	MockCounterVec *metrics.MockICounterVec
+	MockGaugeVec   *metrics.MockGaugeVec
+	MockCounterVec *metrics.MockCounterVec
 )
 
 var (
@@ -174,22 +174,20 @@ func InitalizeMetricsForTesting(ctrl *gomock.Controller) {
 	metricsLogger := log.Logger().Named("metrics")
 	metricsLogger.Info("Initializing metrics for testing")
 
-	MockCounterVec = metrics.NewMockICounterVec(ctrl)
-	MockGaugeVec = metrics.NewMockIGaugeVec(ctrl) //nolint:typecheck
+	MockCounterVec = metrics.NewMockCounterVec(ctrl)
+	MockGaugeVec = metrics.NewMockGaugeVec(ctrl) //nolint:typecheck
 
-	metrics.DropCounter = MockGaugeVec
-	metrics.DropBytesCounter = MockGaugeVec
-	metrics.ForwardBytesCounter = MockGaugeVec
-	metrics.ForwardCounter = MockGaugeVec
+	metrics.DropPacketsGauge = MockGaugeVec
+	metrics.DropBytesGauge = MockGaugeVec
+	metrics.ForwardBytesGauge = MockGaugeVec
+	metrics.ForwardPacketsGauge = MockGaugeVec
 	metrics.NodeConnectivityStatusGauge = MockGaugeVec
 	metrics.NodeConnectivityLatencyGauge = MockGaugeVec
 	metrics.TCPStateGauge = MockGaugeVec
 	metrics.TCPConnectionRemoteGauge = MockGaugeVec
-	metrics.TCPConnectionStats = MockGaugeVec
-	metrics.TCPFlagCounters = MockGaugeVec
-	metrics.IPConnectionStats = MockGaugeVec
-	metrics.UDPConnectionStats = MockGaugeVec
-	metrics.UDPActiveSocketsCounter = MockGaugeVec
-	metrics.InterfaceStats = MockGaugeVec
+	metrics.TCPConnectionStatsGauge = MockGaugeVec
+	metrics.IPConnectionStatsGauge = MockGaugeVec
+	metrics.UDPConnectionStatsGauge = MockGaugeVec
+	metrics.InterfaceStatsGauge = MockGaugeVec
 	metrics.PluginManagerFailedToReconcileCounter = MockCounterVec
 }

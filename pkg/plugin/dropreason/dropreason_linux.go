@@ -495,8 +495,8 @@ func (dr *dropReason) Stop() error {
 }
 
 func (dr *dropReason) dropMetricAdd(reason string, direction string, count float64, bytes float64) {
-	metrics.DropCounter.WithLabelValues(reason, direction).Set(float64(count))
-	metrics.DropBytesCounter.WithLabelValues(reason, direction).Set(float64(bytes))
+	metrics.DropPacketsGauge.WithLabelValues(reason, direction).Set(float64(count))
+	metrics.DropBytesGauge.WithLabelValues(reason, direction).Set(float64(bytes))
 }
 
 // Helper functions.

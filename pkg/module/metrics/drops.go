@@ -25,7 +25,7 @@ const (
 
 type DropCountMetrics struct {
 	baseMetricObject
-	dropMetric metrics.IGaugeVec
+	dropMetric metrics.GaugeVec
 	metricName string
 }
 

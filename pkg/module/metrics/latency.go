@@ -63,9 +63,9 @@ type LatencyMetrics struct {
 	l                             *log.ZapLogger
 	apiServerIps                  map[string]struct{}
 	cache                         *ttlcache.Cache[key, *val]
-	nodeApiServerLatency          metricsinit.IHistogramVec
-	nodeApiServerHandshakeLatency metricsinit.IHistogramVec
-	noResponseMetric              metricsinit.ICounterVec
+	nodeApiServerLatency          metricsinit.Histogram
+	nodeApiServerHandshakeLatency metricsinit.Histogram
+	noResponseMetric              metricsinit.CounterVec
 	callbackId                    string
 	mu                            sync.RWMutex
 }
