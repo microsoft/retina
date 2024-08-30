@@ -21,10 +21,10 @@ const (
 	nodeApiServerHandshakeLatencyHistName = "node_apiserver_handshake_latency_ms"
 
 	// Metric Descriptions
-	dropCountTotalDescription                      = "Total dropped packets"
-	dropBytesTotalDescription                      = "Total dropped bytes"
-	forwardCountTotalDescription                   = "Total forwarded packets"
-	forwardBytesTotalDescription                   = "Total forwarded bytes"
+	dropPacketsGaugeDescription                    = "Total dropped packets"
+	dropBytesGaugeDescription                      = "Total dropped bytes"
+	forwardPacketsGaugeDescription                 = "Total forwarded packets"
+	forwardBytesGaugeDescription                   = "Total forwarded bytes"
 	nodeConnectivityStatusGaugeDescription         = "The last observed status of both ICMP and HTTP connectivity between the current Cilium agent and other Cilium nodes"
 	nodeConnectivityLatencySecondsGaugeDescription = "The last observed latency between the current Cilium agent and other Cilium nodes in seconds"
 	tcpStateGaugeDescription                       = "Number of active TCP connections by state"

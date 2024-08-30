@@ -21,24 +21,24 @@ func InitializeMetrics() {
 	DropPacketsGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
 		utils.DroppedPacketsGaugeName,
-		dropCountTotalDescription,
+		dropPacketsGaugeDescription,
 		utils.Reason,
 		utils.Direction)
 	DropBytesGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
 		utils.DropBytesGaugeName,
-		dropBytesTotalDescription,
+		dropBytesGaugeDescription,
 		utils.Reason,
 		utils.Direction)
 	ForwardPacketsGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
 		utils.ForwardPacketsGaugeName,
-		forwardCountTotalDescription,
+		forwardPacketsGaugeDescription,
 		utils.Direction)
 	ForwardBytesGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
 		utils.ForwardBytesGaugeName,
-		forwardBytesTotalDescription,
+		forwardBytesGaugeDescription,
 		utils.Direction)
 	WindowsGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
