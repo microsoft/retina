@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/rlimit"
 	"github.com/microsoft/retina/internal/ktime"
 	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
@@ -36,11 +35,6 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 	if ct.cfg.DataAggregationLevel == config.Low {
 		ct.l.Info("conntrack is disabled in low data aggregation level")
 		return nil
-	}
-	// Allow the current process to lock memory for eBPF resources.
-	if err := rlimit.RemoveMemlock(); err != nil {
-		ct.l.Error("RemoveMemlock failed", zap.Error(err))
-		return errors.Wrapf(err, "failed to remove memlock limit")
 	}
 
 	objs := &conntrackObjects{}

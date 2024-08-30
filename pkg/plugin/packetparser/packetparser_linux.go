@@ -20,7 +20,6 @@ import (
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/perf"
-	"github.com/cilium/ebpf/rlimit"
 	"github.com/florianl/go-tc"
 	helper "github.com/florianl/go-tc/core"
 	"github.com/microsoft/retina/internal/ktime"
@@ -118,12 +117,6 @@ func (p *packetParser) Init() error {
 		p.l.Warn("packet parser and latency plugin will not init because pod level is disabled")
 		return nil
 	}
-
-	if err := rlimit.RemoveMemlock(); err != nil {
-		p.l.Error("RemoveMemLock failed:%w", zap.Error(err))
-		return err
-	}
-
 	// Get the absolute path to this file during runtime.
 	dir, err := absPath()
 	if err != nil {

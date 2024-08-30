@@ -25,6 +25,7 @@ import (
 	crmgr "sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+	"github.com/cilium/ebpf/rlimit"
 	"github.com/go-logr/zapr"
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/internal/buildinfo"
@@ -131,6 +132,11 @@ func (d *Daemon) Start() error {
 	}
 	defer zl.Close()
 	mainLogger := zl.Named("main").Sugar()
+
+	// Allow the current process to lock memory for eBPF resources.
+	if err = rlimit.RemoveMemlock(); err != nil {
+		mainLogger.Fatal("failed to remove memlock", zap.Error(err))
+	}
 
 	metrics.InitializeMetrics()
 
