@@ -25,9 +25,9 @@ const (
 	InterfaceStatsName                   = "interface_stats"
 	DNSRequestCounterName                = "dns_request_count"
 	DNSResponseCounterName               = "dns_response_count"
-	NodeApiServerLatencyName             = "node_apiserver_latency"
-	NodeApiServerTcpHandshakeLatencyName = "node_apiserver_handshake_latency"
-	NoResponseFromApiServerName          = "node_apiserver_no_response"
+	NodeAPIServerLatencyName             = "node_apiserver_latency"
+	NodeAPIServerTCPHandshakeLatencyName = "node_apiserver_handshake_latency"
+	NoResponseFromAPIServerName          = "node_apiserver_no_response"
 	InfinibandCounterStatsName           = "infiniband_counter_stats"
 	InfinibandStatusParamsName           = "infiniband_status_params"
 
@@ -55,9 +55,9 @@ func IsAdvancedMetric(name string) bool {
 		UDPConnectionStatsName,
 		DNSRequestCounterName,
 		DNSResponseCounterName,
-		NodeApiServerLatencyName,
-		NodeApiServerTcpHandshakeLatencyName,
-		NoResponseFromApiServerName:
+		NodeAPIServerLatencyName,
+		NodeAPIServerTCPHandshakeLatencyName,
+		NoResponseFromAPIServerName:
 		return true
 	default:
 		return false

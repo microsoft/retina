@@ -175,7 +175,7 @@ func InitalizeMetricsForTesting(ctrl *gomock.Controller) {
 	metricsLogger.Info("Initializing metrics for testing")
 
 	MockCounterVec = metrics.NewMockCounterVec(ctrl)
-	MockGaugeVec = metrics.NewMockGaugeVec(ctrl) //nolint:typecheck
+	MockGaugeVec = metrics.NewMockGaugeVec(ctrl)
 
 	metrics.DropPacketsGauge = MockGaugeVec
 	metrics.DropBytesGauge = MockGaugeVec

@@ -346,9 +346,9 @@ func DefaultMetrics() []string {
 		// tcp retransmissions
 		utils.TCPRetransCount,
 		// latency
-		utils.NodeApiServerLatencyName,
-		utils.NodeApiServerTcpHandshakeLatencyName,
-		utils.NoResponseFromApiServerName,
+		utils.NodeAPIServerLatencyName,
+		utils.NodeAPIServerTCPHandshakeLatencyName,
+		utils.NoResponseFromAPIServerName,
 		// dns
 		utils.DNSRequestCounterName,
 		utils.DNSResponseCounterName,
