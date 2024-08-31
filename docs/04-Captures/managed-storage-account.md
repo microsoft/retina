@@ -17,15 +17,19 @@ To simplify customers' work to decide where to store the packets and then downlo
 To enable the managed storage account, you need to specify the following configuration in the helm command,
 
 ```bash
+TENANT_ID=""
+SUBSCRIPTION_ID=""
+RESOURCE_GROUP_NAME=""
+REGION=""
+MSI_CLIENT_ID=""
 helm upgrade --install retina ./deploy/legacy/manifests/controller/helm/retina/ \
   --set operator.enabled=true \
-  --set operator.capture.enableManagedStorageAccount=true \
   --set capture.enableManagedStorageAccount=true \
-  --set capture.tenantId=72f988bf-86f1-41af-91ab-2d7cd011db47 \
-  --set capture.subscriptionId=26ad903f-2330-429d-8389-864ac35c4350 \
-  --set capture.resourceGroup=MC_qinhao_calico_eastasia \
-  --set capture.location=eastasia \
-  --set capture.managedIdentityClientId=42903c00-f445-40c9-a358-5ffaff13a87e
+  --set capture.tenantId=$TENANT_ID \
+  --set capture.subscriptionId=$SUBSCRIPTION_ID \
+  --set capture.resourceGroup=$RESOURCE_GROUP_NAME \
+  --set capture.location=$REGION \
+  --set capture.managedIdentityClientId=$MSI_CLIENT_ID
 ```
 
 Internally, `enableManagedStorageAccount` will change the following retina-operator configuration and azure credential config as explained in the following two sections.

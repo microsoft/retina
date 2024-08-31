@@ -390,12 +390,14 @@ func (cr *CaptureReconciler) handleDelete(ctx context.Context, capture *retinav1
 	if cr.managedStorageAccountEnabled() {
 		managedSecret := getSecretFromCapture(capture, "")
 		// Delete the secret only when the secret is created by the operator.
-		if *capture.Spec.OutputConfiguration.BlobUpload == managedSecret.Name {
-			if err := apiretry.Do(
+		if capture.Spec.OutputConfiguration.BlobUpload != nil && *capture.Spec.OutputConfiguration.BlobUpload == managedSecret.Name {
+			err := apiretry.Do(
 				func() error {
 					return cr.Client.Delete(ctx, &managedSecret) //nolint:wrapcheck // no wrapped, detailed explanation is required for the internal error
 				},
-			); err != nil && !apierrors.IsNotFound(err) {
+			)
+			// Ignore the error if the secret is not found.
+			if err != nil && !apierrors.IsNotFound(err) {
 				cr.logger.Error("Failed to delete secret", zap.Error(err), zap.String("Capture", captureRef.String()))
 				return ctrl.Result{}, fmt.Errorf("failed to delete secret: %w", err)
 			}
