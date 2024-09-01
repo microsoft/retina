@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
-	"github.com/cilium/ebpf/rlimit"
 	gadgetcontext "github.com/inspektor-gadget/inspektor-gadget/pkg/gadget-context"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/gadgets/trace/tcpretrans/tracer"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/gadgets/trace/tcpretrans/types"
@@ -50,12 +49,6 @@ func (t *tcpretrans) Init() error {
 		t.l.Warn("tcpretrans will not init because pod level is disabled")
 		return nil
 	}
-
-	if err := rlimit.RemoveMemlock(); err != nil {
-		t.l.Error("RemoveMemLock failed", zap.Error(err))
-		return err
-	}
-
 	// Create tracer. In this case no parameters are passed.
 	if err := host.Init(host.Config{}); err != nil {
 		t.l.Error("failed to init host", zap.Error(err))

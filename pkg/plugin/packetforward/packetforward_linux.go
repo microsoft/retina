@@ -18,7 +18,6 @@ import (
 
 	hubblev1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/rlimit"
 	"github.com/microsoft/retina/pkg/loader"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
@@ -132,11 +131,6 @@ func (p *packetForward) Compile(ctx context.Context) error {
 }
 
 func (p *packetForward) Init() error {
-	if err := rlimit.RemoveMemlock(); err != nil {
-		p.l.Error("RemoveMemLock failed:%w", zap.Error(err))
-		return err
-	}
-
 	// Get the absolute path to this file during runtime.
 	dir, err := absPath()
 	if err != nil {

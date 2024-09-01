@@ -31,6 +31,7 @@ import (
 	"github.com/cilium/cilium/pkg/option"
 	"github.com/cilium/cilium/pkg/promise"
 	"github.com/cilium/cilium/pkg/time"
+	"github.com/cilium/ebpf/rlimit"
 	"github.com/cilium/proxy/pkg/logging"
 	"github.com/microsoft/retina/internal/buildinfo"
 	"github.com/microsoft/retina/pkg/config"
@@ -299,6 +300,11 @@ func Execute(cobraCmd *cobra.Command, h *hive.Hive) {
 	fn()
 	initDaemonConfig(h.Viper())
 	initLogging()
+
+	// Allow the current process to lock memory for eBPF resources.
+	if err := rlimit.RemoveMemlock(); err != nil {
+		logger.Fatal("failed to remove memlock", zap.Error(err))
+	}
 
 	//nolint:gocritic // without granular commits this commented-out code may be lost
 	// initEnv(h.Viper())

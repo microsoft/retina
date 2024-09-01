@@ -13,6 +13,7 @@
 #define __uint(name, val) int (*name)[val]
 #define __type(name, val) typeof(val) *name
 #define __array(name, val) typeof(val) *name[]
+#define __ulong(name, val) enum { ___bpf_concat(__unique_value, __COUNTER__) = val } name
 
 /*
  * Helper macro to place programs, maps, license in
@@ -22,11 +23,24 @@
  * To allow use of SEC() with externs (e.g., for extern .maps declarations),
  * make sure __attribute__((unused)) doesn't trigger compilation warning.
  */
+#if __GNUC__ && !__clang__
+
+/*
+ * Pragma macros are broken on GCC
+ * https://gcc.gnu.org/bugzilla/show_bug.cgi?id=55578
+ * https://gcc.gnu.org/bugzilla/show_bug.cgi?id=90400
+ */
+#define SEC(name) __attribute__((section(name), used))
+
+#else
+
 #define SEC(name) \
 	_Pragma("GCC diagnostic push")					    \
 	_Pragma("GCC diagnostic ignored \"-Wignored-attributes\"")	    \
 	__attribute__((section(name), used))				    \
 	_Pragma("GCC diagnostic pop")					    \
+
+#endif
 
 /* Avoid 'linux/stddef.h' definition of '__always_inline'. */
 #undef __always_inline
@@ -64,15 +78,44 @@
 /*
  * Helper macros to manipulate data structures
  */
-#ifndef offsetof
-#define offsetof(TYPE, MEMBER)	((unsigned long)&((TYPE *)0)->MEMBER)
-#endif
-#ifndef container_of
+
+/* offsetof() definition that uses __builtin_offset() might not preserve field
+ * offset CO-RE relocation properly, so force-redefine offsetof() using
+ * old-school approach which works with CO-RE correctly
+ */
+#undef offsetof
+#define offsetof(type, member)	((unsigned long)&((type *)0)->member)
+
+/* redefined container_of() to ensure we use the above offsetof() macro */
+#undef container_of
 #define container_of(ptr, type, member)				\
 	({							\
 		void *__mptr = (void *)(ptr);			\
 		((type *)(__mptr - offsetof(type, member)));	\
 	})
+
+/*
+ * Compiler (optimization) barrier.
+ */
+#ifndef barrier
+#define barrier() asm volatile("" ::: "memory")
+#endif
+
+/* Variable-specific compiler (optimization) barrier. It's a no-op which makes
+ * compiler believe that there is some black box modification of a given
+ * variable and thus prevents compiler from making extra assumption about its
+ * value and potential simplifications and optimizations on this variable.
+ *
+ * E.g., compiler might often delay or even omit 32-bit to 64-bit casting of
+ * a variable, making some code patterns unverifiable. Putting barrier_var()
+ * in place will ensure that cast is performed before the barrier_var()
+ * invocation, because compiler has to pessimistically assume that embedded
+ * asm section might perform some extra operations on that variable.
+ *
+ * This is a variable-specific variant of more global barrier().
+ */
+#ifndef barrier_var
+#define barrier_var(var) asm volatile("" : "+r"(var))
 #endif
 
 /*
@@ -94,7 +137,8 @@
 /*
  * Helper function to perform a tail call with a constant/immediate map slot.
  */
-#if __clang_major__ >= 8 && defined(__bpf__)
+#if (defined(__clang__) && __clang_major__ >= 8) || (!defined(__clang__) && __GNUC__ > 12)
+#if defined(__bpf__)
 static __always_inline void
 bpf_tail_call_static(void *ctx, const void *map, const __u32 slot)
 {
@@ -122,18 +166,7 @@ bpf_tail_call_static(void *ctx, const void *map, const __u32 slot)
 		     : "r0", "r1", "r2", "r3", "r4", "r5");
 }
 #endif
-
-/*
- * Helper structure used by eBPF C program
- * to describe BPF map attributes to libbpf loader
- */
-struct bpf_map_def {
-	unsigned int type;
-	unsigned int key_size;
-	unsigned int value_size;
-	unsigned int max_entries;
-	unsigned int map_flags;
-} __attribute__((deprecated("use BTF-defined maps in .maps section")));
+#endif
 
 enum libbpf_pin_type {
 	LIBBPF_PIN_NONE,
@@ -149,13 +182,31 @@ enum libbpf_tristate {
 
 #define __kconfig __attribute__((section(".kconfig")))
 #define __ksym __attribute__((section(".ksyms")))
-#if __has_attribute(btf_type_tag)
+#define __kptr_untrusted __attribute__((btf_type_tag("kptr_untrusted")))
 #define __kptr __attribute__((btf_type_tag("kptr")))
-#define __kptr_ref __attribute__((btf_type_tag("kptr_ref")))
+#define __percpu_kptr __attribute__((btf_type_tag("percpu_kptr")))
+
+#if defined (__clang__)
+#define bpf_ksym_exists(sym) ({						\
+	_Static_assert(!__builtin_constant_p(!!sym),			\
+		       #sym " should be marked as __weak");		\
+	!!sym;								\
+})
+#elif __GNUC__ > 8
+#define bpf_ksym_exists(sym) ({						\
+	_Static_assert(__builtin_has_attribute (*sym, __weak__),	\
+		       #sym " should be marked as __weak");		\
+	!!sym;								\
+})
 #else
-#define __kptr
-#define __kptr_ref
+#define bpf_ksym_exists(sym) !!sym
 #endif
+
+#define __arg_ctx __attribute__((btf_decl_tag("arg:ctx")))
+#define __arg_nonnull __attribute((btf_decl_tag("arg:nonnull")))
+#define __arg_nullable __attribute((btf_decl_tag("arg:nullable")))
+#define __arg_trusted __attribute((btf_decl_tag("arg:trusted")))
+#define __arg_arena __attribute((btf_decl_tag("arg:arena")))
 
 #ifndef ___bpf_concat
 #define ___bpf_concat(a, b) a ## b
@@ -265,5 +316,108 @@ enum libbpf_tristate {
 
 /* Helper macro to print out debug messages */
 #define bpf_printk(fmt, args...) ___bpf_pick_printk(args)(fmt, ##args)
+
+struct bpf_iter_num;
+
+extern int bpf_iter_num_new(struct bpf_iter_num *it, int start, int end) __weak __ksym;
+extern int *bpf_iter_num_next(struct bpf_iter_num *it) __weak __ksym;
+extern void bpf_iter_num_destroy(struct bpf_iter_num *it) __weak __ksym;
+
+#ifndef bpf_for_each
+/* bpf_for_each(iter_type, cur_elem, args...) provides generic construct for
+ * using BPF open-coded iterators without having to write mundane explicit
+ * low-level loop logic. Instead, it provides for()-like generic construct
+ * that can be used pretty naturally. E.g., for some hypothetical cgroup
+ * iterator, you'd write:
+ *
+ * struct cgroup *cg, *parent_cg = <...>;
+ *
+ * bpf_for_each(cgroup, cg, parent_cg, CG_ITER_CHILDREN) {
+ *     bpf_printk("Child cgroup id = %d", cg->cgroup_id);
+ *     if (cg->cgroup_id == 123)
+ *         break;
+ * }
+ *
+ * I.e., it looks almost like high-level for each loop in other languages,
+ * supports continue/break, and is verifiable by BPF verifier.
+ *
+ * For iterating integers, the difference betwen bpf_for_each(num, i, N, M)
+ * and bpf_for(i, N, M) is in that bpf_for() provides additional proof to
+ * verifier that i is in [N, M) range, and in bpf_for_each() case i is `int
+ * *`, not just `int`. So for integers bpf_for() is more convenient.
+ *
+ * Note: this macro relies on C99 feature of allowing to declare variables
+ * inside for() loop, bound to for() loop lifetime. It also utilizes GCC
+ * extension: __attribute__((cleanup(<func>))), supported by both GCC and
+ * Clang.
+ */
+#define bpf_for_each(type, cur, args...) for (							\
+	/* initialize and define destructor */							\
+	struct bpf_iter_##type ___it __attribute__((aligned(8), /* enforce, just in case */,	\
+						    cleanup(bpf_iter_##type##_destroy))),	\
+	/* ___p pointer is just to call bpf_iter_##type##_new() *once* to init ___it */		\
+			       *___p __attribute__((unused)) = (				\
+					bpf_iter_##type##_new(&___it, ##args),			\
+	/* this is a workaround for Clang bug: it currently doesn't emit BTF */			\
+	/* for bpf_iter_##type##_destroy() when used from cleanup() attribute */		\
+					(void)bpf_iter_##type##_destroy, (void *)0);		\
+	/* iteration and termination check */							\
+	(((cur) = bpf_iter_##type##_next(&___it)));						\
+)
+#endif /* bpf_for_each */
+
+#ifndef bpf_for
+/* bpf_for(i, start, end) implements a for()-like looping construct that sets
+ * provided integer variable *i* to values starting from *start* through,
+ * but not including, *end*. It also proves to BPF verifier that *i* belongs
+ * to range [start, end), so this can be used for accessing arrays without
+ * extra checks.
+ *
+ * Note: *start* and *end* are assumed to be expressions with no side effects
+ * and whose values do not change throughout bpf_for() loop execution. They do
+ * not have to be statically known or constant, though.
+ *
+ * Note: similarly to bpf_for_each(), it relies on C99 feature of declaring for()
+ * loop bound variables and cleanup attribute, supported by GCC and Clang.
+ */
+#define bpf_for(i, start, end) for (								\
+	/* initialize and define destructor */							\
+	struct bpf_iter_num ___it __attribute__((aligned(8), /* enforce, just in case */	\
+						 cleanup(bpf_iter_num_destroy))),		\
+	/* ___p pointer is necessary to call bpf_iter_num_new() *once* to init ___it */		\
+			    *___p __attribute__((unused)) = (					\
+				bpf_iter_num_new(&___it, (start), (end)),			\
+	/* this is a workaround for Clang bug: it currently doesn't emit BTF */			\
+	/* for bpf_iter_num_destroy() when used from cleanup() attribute */			\
+				(void)bpf_iter_num_destroy, (void *)0);				\
+	({											\
+		/* iteration step */								\
+		int *___t = bpf_iter_num_next(&___it);						\
+		/* termination and bounds check */						\
+		(___t && ((i) = *___t, (i) >= (start) && (i) < (end)));				\
+	});											\
+)
+#endif /* bpf_for */
+
+#ifndef bpf_repeat
+/* bpf_repeat(N) performs N iterations without exposing iteration number
+ *
+ * Note: similarly to bpf_for_each(), it relies on C99 feature of declaring for()
+ * loop bound variables and cleanup attribute, supported by GCC and Clang.
+ */
+#define bpf_repeat(N) for (									\
+	/* initialize and define destructor */							\
+	struct bpf_iter_num ___it __attribute__((aligned(8), /* enforce, just in case */	\
+						 cleanup(bpf_iter_num_destroy))),		\
+	/* ___p pointer is necessary to call bpf_iter_num_new() *once* to init ___it */		\
+			    *___p __attribute__((unused)) = (					\
+				bpf_iter_num_new(&___it, 0, (N)),				\
+	/* this is a workaround for Clang bug: it currently doesn't emit BTF */			\
+	/* for bpf_iter_num_destroy() when used from cleanup() attribute */			\
+				(void)bpf_iter_num_destroy, (void *)0);				\
+	bpf_iter_num_next(&___it);								\
+	/* nothing here  */									\
+)
+#endif /* bpf_repeat */
 
 #endif

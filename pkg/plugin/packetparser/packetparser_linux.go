@@ -20,7 +20,6 @@ import (
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/perf"
-	"github.com/cilium/ebpf/rlimit"
 	"github.com/florianl/go-tc"
 	helper "github.com/florianl/go-tc/core"
 	"github.com/microsoft/retina/internal/ktime"
@@ -32,10 +31,13 @@ import (
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/api"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
-	_ "github.com/microsoft/retina/pkg/plugin/lib/_amd64"             // nolint
-	_ "github.com/microsoft/retina/pkg/plugin/lib/_arm64"             // nolint
-	_ "github.com/microsoft/retina/pkg/plugin/lib/common/libbpf/_src" // nolint
-	_ "github.com/microsoft/retina/pkg/plugin/packetparser/_cprog"    // nolint
+	_ "github.com/microsoft/retina/pkg/plugin/lib/_amd64"                            // nolint
+	_ "github.com/microsoft/retina/pkg/plugin/lib/_arm64"                            // nolint
+	_ "github.com/microsoft/retina/pkg/plugin/lib/common/libbpf/_include/asm"        // nolint
+	_ "github.com/microsoft/retina/pkg/plugin/lib/common/libbpf/_include/linux"      // nolint
+	_ "github.com/microsoft/retina/pkg/plugin/lib/common/libbpf/_include/uapi/linux" // nolint
+	_ "github.com/microsoft/retina/pkg/plugin/lib/common/libbpf/_src"                // nolint
+	_ "github.com/microsoft/retina/pkg/plugin/packetparser/_cprog"                   // nolint
 	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/microsoft/retina/pkg/watchers/endpoint"
@@ -115,12 +117,6 @@ func (p *packetParser) Init() error {
 		p.l.Warn("packet parser and latency plugin will not init because pod level is disabled")
 		return nil
 	}
-
-	if err := rlimit.RemoveMemlock(); err != nil {
-		p.l.Error("RemoveMemLock failed:%w", zap.Error(err))
-		return err
-	}
-
 	// Get the absolute path to this file during runtime.
 	dir, err := absPath()
 	if err != nil {
@@ -137,7 +133,7 @@ func (p *packetParser) Init() error {
 	//nolint:typecheck
 	if err := spec.LoadAndAssign(objs, &ebpf.CollectionOptions{ //nolint:typecheck
 		Maps: ebpf.MapOptions{
-			PinPath: plugincommon.FilterMapPath,
+			PinPath: plugincommon.MapPath,
 		},
 	}); err != nil { //nolint:typecheck
 		p.l.Error("Error loading objects: %w", zap.Error(err))
@@ -315,10 +311,10 @@ func (p *packetParser) clean(tcnl ITc, tcIngressObj *tc.Object, tcEgressObj *tc.
 	// Warning, not error. Clean is best effort.
 	if tcnl != nil {
 		if err := getQdisc(tcnl).Delete(tcEgressObj); err != nil && !errors.Is(err, tc.ErrNoArg) {
-			p.l.Warn("could not delete egress qdisc", zap.Error(err))
+			p.l.Debug("could not delete egress qdisc", zap.Error(err))
 		}
 		if err := getQdisc(tcnl).Delete(tcIngressObj); err != nil && !errors.Is(err, tc.ErrNoArg) {
-			p.l.Warn("could not delete ingress qdisc", zap.Error(err))
+			p.l.Debug("could not delete ingress qdisc", zap.Error(err))
 		}
 		if err := tcnl.Close(); err != nil {
 			p.l.Warn("could not close rtnetlink socket", zap.Error(err))

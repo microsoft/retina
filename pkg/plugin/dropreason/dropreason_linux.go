@@ -20,7 +20,6 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
-	"github.com/cilium/ebpf/rlimit"
 	"github.com/microsoft/retina/internal/ktime"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
@@ -118,12 +117,6 @@ func (dr *dropReason) Compile(ctx context.Context) error {
 
 func (dr *dropReason) Init() error {
 	var err error
-
-	if err = rlimit.RemoveMemlock(); err != nil {
-		dr.l.Error("RemoveMemLock failed:%w", zap.Error(err))
-		return err
-	}
-
 	// Get the absolute path to this file during runtime.
 	dir, err := absPath()
 	if err != nil {
@@ -144,7 +137,7 @@ func (dr *dropReason) Init() error {
 			LogLevel: 2,
 		},
 		Maps: ebpf.MapOptions{
-			PinPath: plugincommon.FilterMapPath,
+			PinPath: plugincommon.MapPath,
 		},
 	}); err != nil {
 		dr.l.Error("Error loading objects: %w", zap.Error(err))
