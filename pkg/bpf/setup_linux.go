@@ -89,5 +89,6 @@ func Setup(l *zap.Logger) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize conntrack map")
 	}
+	l.Info("Conntrack map initialized successfully", zap.String("path", plugincommon.MapPath), zap.String("Map name", plugincommon.ConntrackMapName))
 	return nil
 }
