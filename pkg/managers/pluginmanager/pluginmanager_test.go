@@ -138,7 +138,7 @@ func TestNewManagerStart(t *testing.T) {
 				if strings.Contains(err.Error(), "failed to get conntrack instance") || strings.Contains(err.Error(), "failed to run conntrack GC") {
 					t.Logf("Ignoring error: %v", err)
 				} else {
-					assert.NoError(t, err, "Expected nil but got error:%v", err)
+					assert.NoError(t, err, "Expected nil but got error:%v", err) //nolint:testifylint // no reason not to use assert here
 				}
 			}
 		}()
