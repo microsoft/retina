@@ -154,6 +154,37 @@ nodeSelector: {}
 ## Ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
 ##
 tolerations: []
+## @param affinity [object] Affinity rules for pod assignment
+## Ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#affinity-and-anti-affinity
+##
+affinity: []
+
+## @param readinessProbe.initialDelaySeconds [array] Initial delay seconds for readinessProbe
+## @param readinessProbe.periodSeconds [array] Period seconds for readinessProbe
+## @param readinessProbe.timeoutSeconds [array] Timeout seconds for readinessProbe
+## @param readinessProbe.failureThreshold [array] Failure threshold for readinessProbe
+## @param readinessProbe.successThreshold [array] Success threshold for readinessProbe
+## Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#configure-probes
+##
+readinessProbe: {}
+  # initialDelaySeconds: 30
+  # periodSeconds: 10
+  # timeoutSeconds: 15
+  # failureThreshold: 5
+  # successThreshold: 1
+## @param livenessProbe.initialDelaySeconds [array] Initial delay seconds for livenessProbe
+## @param livenessProbe.periodSeconds [array] Period seconds for livenessProbe
+## @param livenessProbe.timeoutSeconds [array] Timeout seconds for livenessProbe
+## @param livenessProbe.failureThreshold [array] Failure threshold for livenessProbe
+## @param livenessProbe.successThreshold [array] Success threshold for livenessProbe
+## Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#configure-probes
+##
+livenessProbe: {}
+  # initialDelaySeconds: 30
+  # periodSeconds: 10
+  # timeoutSeconds: 15
+  # failureThreshold: 5
+  # successThreshold: 1
 
 metrics:
   ## Prometheus Service Monitor
