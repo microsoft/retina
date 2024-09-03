@@ -8,7 +8,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func NewFilteredYAML(source io.Reader, allowedFields []string) (*FilteredYAML, error) {
+func NewFilteredYAML(source io.ReadCloser, allowedFields []string) (*FilteredYAML, error) {
 	f := &FilteredYAML{
 		YAML:          source,
 		AllowedFields: allowedFields,
@@ -26,12 +26,13 @@ func NewFilteredYAML(source io.Reader, allowedFields []string) (*FilteredYAML, e
 // fields. Any additional fields found will be removed, such that the resulting
 // configuration is the subset of fields found in the allowlist.
 type FilteredYAML struct {
-	YAML          io.Reader // the input YAML
-	AllowedFields []string  // the set of allowed fields in the resulting YAML
+	YAML          io.ReadCloser // the input YAML
+	AllowedFields []string      // the set of allowed fields in the resulting YAML
 	buf           *bytes.Buffer
 }
 
 func (f *FilteredYAML) filter() error {
+	defer f.YAML.Close()
 	f.buf = bytes.NewBufferString("")
 
 	decoded := make(map[string]any)

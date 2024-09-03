@@ -32,7 +32,12 @@ func TestGetConfig(t *testing.T) {
 }
 
 func TestGetConfigOverlay(t *testing.T) {
-	c, err := GetConfig("./testdata/config.yaml", "./testdata/overlay.yaml")
+	c, err := GetConfig("./testdata/config.yaml", FilteredConfig{
+		Filename: "./testdata/overlay.yaml",
+		AllowedFields: []string{
+			"logLevel",
+		},
+	})
 	if err != nil {
 		t.Fatal("err getting config: err:", err)
 	}

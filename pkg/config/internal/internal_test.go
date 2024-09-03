@@ -42,7 +42,7 @@ func TestFilteredYAML(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			fy, err := internal.NewFilteredYAML(strings.NewReader(test.in), test.allowed)
+			fy, err := internal.NewFilteredYAML(io.NopCloser(strings.NewReader(test.in)), test.allowed)
 			if err != nil {
 				t.Fatal("unexpected error creating filtered yaml: err:", err)
 			}

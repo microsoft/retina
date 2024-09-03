@@ -5,10 +5,12 @@ package config
 import (
 	"fmt"
 	"log"
+	"os"
 	"reflect"
 	"strings"
 	"time"
 
+	"github.com/microsoft/retina/pkg/config/internal"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -70,26 +72,37 @@ type Config struct {
 	MonitorSockPath          string        `yaml:"monitorSockPath"`
 }
 
-func GetConfig(files ...string) (*Config, error) {
-	if len(files) == 0 {
-		viper.SetConfigName("config")
-		viper.AddConfigPath("/retina/config")
+type FilteredConfig struct {
+	Filename      string
+	AllowedFields []string
+}
+
+func mergeConfig(file FilteredConfig) error {
+	f, err := os.Open(file.Filename)
+	if err != nil {
+		return errors.Wrapf(err, "opening config file %q", file)
+	}
+	defer f.Close()
+
+	fy, err := internal.NewFilteredYAML(f, file.AllowedFields)
+	if err != nil {
+		return errors.Wrap(err, "creating FilteredYAML")
 	}
 
-	cfgFilename := files[0]
-	if cfgFilename != "" {
-		viper.SetConfigFile(cfgFilename)
+	err = viper.MergeConfig(fy)
+	if err != nil {
+		return errors.Wrap(err, "merging config with viper")
+	}
+	return nil
+}
+
+func GetConfig(primaryCfg string, overlays ...FilteredConfig) (*Config, error) {
+	if primaryCfg != "" {
+		viper.SetConfigFile(primaryCfg)
 	} else {
 		viper.SetConfigName("config")
 		viper.AddConfigPath("/retina/config")
 	}
-	for _, file := range files[1:] {
-		viper.SetConfigFile(file)
-		if err := viper.MergeInConfig(); err != nil {
-			return nil, errors.Wrapf(err, "loading config file %q", file)
-		}
-	}
-
 	viper.SetEnvPrefix("retina")
 	viper.AutomaticEnv()
 	// NOTE(mainred): RetinaEndpoint is currently the only supported solution to cache Pod, and before an alternative is implemented,
@@ -100,6 +113,15 @@ func GetConfig(files ...string) (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("fatal error config file: %s", err)
 	}
+
+	// apply overlay configs
+	for _, file := range overlays {
+		err := mergeConfig(file)
+		if err != nil {
+			return nil, errors.Wrapf(err, "merging config for %q", file)
+		}
+	}
+
 	var config Config
 	decoderConfigOption := func(dc *mapstructure.DecoderConfig) {
 		dc.DecodeHook = mapstructure.ComposeDecodeHookFunc(
