@@ -67,6 +67,7 @@ func (c *CreateCluster) Run() error {
 		c.ClusterName,
 		"--region",
 		c.Region,
+		"--with-oidc",
 		"--managed",
 	}
 
