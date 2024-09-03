@@ -12,6 +12,9 @@ import (
 	"github.com/kris-nova/logger"
 	lol "github.com/kris-nova/lolgopher"
 	"github.com/spf13/cobra"
+	"github.com/weaveworks/eksctl/pkg/ctl/cmdutils"
+	"github.com/weaveworks/eksctl/pkg/ctl/create"
+	"github.com/weaveworks/eksctl/pkg/ctl/delete"
 )
 
 func initLogger(level int, colorValue string, logBuffer *bytes.Buffer, dumpLogsValue bool) {
@@ -118,4 +121,38 @@ func checkCommand(rootCmd *cobra.Command) {
 			return e
 		}
 	}
+}
+
+func CreateEKSCtlCmd() *cobra.Command {
+	// Create the ekctl root cmd to execute
+	rootCmd := &cobra.Command{
+		Use:   "eksctl [command]",
+		Short: "The official CLI for Amazon EKS",
+		Run: func(c *cobra.Command, _ []string) {
+			if err := c.Help(); err != nil {
+				logger.Debug("ignoring cobra error %q", err.Error())
+			}
+		},
+		SilenceUsage: true,
+	}
+
+	loggerLevel := rootCmd.PersistentFlags().IntP("verbose", "v", 3, "set log level, use 0 to silence, 4 for debugging and 5 for debugging with AWS debug logging")
+	colorValue := rootCmd.PersistentFlags().StringP("color", "C", "true", "toggle colorized logs (valid options: true, false, fabulous)")
+	dumpLogsValue := rootCmd.PersistentFlags().BoolP("dumpLogs", "d", false, "dump logs to disk on failure if set to true")
+
+	logBuffer := new(bytes.Buffer)
+
+	cobra.OnInitialize(func() {
+		initLogger(*loggerLevel, *colorValue, logBuffer, *dumpLogsValue)
+	})
+
+	flagGrouping := cmdutils.NewGrouping()
+	createCmd := create.Command(flagGrouping)
+	deleteCmd := delete.Command(flagGrouping)
+	rootCmd.AddCommand(createCmd)
+	rootCmd.AddCommand(deleteCmd)
+
+	checkCommand(rootCmd)
+
+	return rootCmd
 }
