@@ -48,17 +48,13 @@ type packetparserPacket struct {
 		AckNum uint32
 		Tsval  uint32
 		Tsecr  uint32
-		Syn    uint16
-		Ack    uint16
-		Fin    uint16
-		Rst    uint16
-		Psh    uint16
-		Urg    uint16
 	}
 	ObservationPoint uint8
 	TrafficDirection uint8
 	Proto            uint8
+	Flags            uint8
 	IsReply          bool
+	_                [3]byte
 }
 
 // loadPacketparser returns the embedded CollectionSpec for packetparser.

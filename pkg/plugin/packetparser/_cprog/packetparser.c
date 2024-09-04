@@ -155,7 +155,6 @@ static void parse(struct __sk_buff *skb, __u8 obs)
 	#endif
 	#endif
 
-	__u8 flags = 0;
 	// Get source and destination ports.
 	if (ip->protocol == IPPROTO_TCP)
 	{
@@ -166,22 +165,16 @@ static void parse(struct __sk_buff *skb, __u8 obs)
 		p.src_port = tcp->source;
 		p.dst_port = tcp->dest;
 
-		// Get all TCP flags.
-		flags = (tcp->fin << 0) | (tcp->syn << 1) | (tcp->rst << 2) | (tcp->psh << 3) | (tcp->ack << 4) | (tcp->urg << 5) | (tcp->ece << 6) | (tcp->cwr << 7);
 
 		// Get TCP metadata.
 		struct tcpmetadata tcp_metadata;
 		__builtin_memset(&tcp_metadata, 0, sizeof(tcp_metadata));
 
+		// Get all TCP flags.
+		p.flags = (tcp->fin << 0) | (tcp->syn << 1) | (tcp->rst << 2) | (tcp->psh << 3) | (tcp->ack << 4) | (tcp->urg << 5) | (tcp->ece << 6) | (tcp->cwr << 7);
+
 		tcp_metadata.seq = tcp->seq;
 		tcp_metadata.ack_num = tcp->ack_seq;
-		tcp_metadata.syn = tcp->syn;
-		tcp_metadata.ack = tcp->ack;
-		tcp_metadata.fin = tcp->fin;
-		tcp_metadata.rst = tcp->rst;
-		tcp_metadata.psh = tcp->psh;
-		tcp_metadata.urg = tcp->urg;
-
 		p.tcp_metadata = tcp_metadata;
 
 		// Get TSval/TSecr from TCP header.
@@ -199,7 +192,7 @@ static void parse(struct __sk_buff *skb, __u8 obs)
 		p.src_port = udp->source;
 		p.dst_port = udp->dest;
 
-		flags = 1;
+		p.flags = 1;
 	}
 	else
 	{
@@ -209,7 +202,7 @@ static void parse(struct __sk_buff *skb, __u8 obs)
 
 	// Process the packet in ct
 	bool report __attribute__((unused));
-	report = ct_process_packet(&p, flags, obs);
+	report = ct_process_packet(&p, obs);
 	#ifdef DATA_AGGREGATION_LEVEL
 	// If the data aggregation level is low, always send the packet to the perf buffer.
 	#if DATA_AGGREGATION_LEVEL == DATA_AGGREGATION_LEVEL_LOW

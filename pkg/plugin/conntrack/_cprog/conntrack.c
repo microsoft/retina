@@ -11,13 +11,6 @@ struct tcpmetadata {
 	__u32 ack_num; // TCP ack number
 	__u32 tsval; // TCP timestamp value
 	__u32 tsecr; // TCP timestamp echo reply
-	// TCP flags.
-	__u16 syn;
-	__u16 ack;
-	__u16 fin;
-	__u16 rst;
-	__u16 psh;
-	__u16 urg;
 };
 
 
@@ -33,6 +26,7 @@ struct packet
 	__u8 observation_point;
 	__u8 traffic_direction;
 	__u8 proto;
+	__u8 flags; // For TCP packets, this is the TCP flags. For UDP packets, this is will always be 1 for conntrack purposes.
 	bool is_reply;
 };
 
@@ -132,11 +126,11 @@ static __always_inline bool _ct_create_new_tcp_connection(struct ct_v4_key key, 
 
 /**
  * Create a new UDP connection.
+ * @arg *p pointer to the packet to be processed.
  * @arg key The key to be used to create the new connection.
- * @arg flags The flags of the packet.
  * @arg observation_point The point in the network stack where the packet is observed.
  */
-static __always_inline bool _ct_handle_udp_connection(struct packet *p, struct ct_v4_key key, __u8 flags, __u8 observation_point) {
+static __always_inline bool _ct_handle_udp_connection(struct packet *p, struct ct_v4_key key, __u8 observation_point) {
     struct ct_entry new_value;
     __builtin_memset(&new_value, 0, sizeof(struct ct_entry));
     __u64 now = bpf_mono_now();
@@ -145,10 +139,11 @@ static __always_inline bool _ct_handle_udp_connection(struct packet *p, struct c
         return false;
     }
     new_value.eviction_time = now + CT_CONNECTION_LIFETIME_NONTCP;
-    new_value.flags_seen_tx_dir = flags;
+    new_value.flags_seen_tx_dir = p->flags;
     new_value.last_report_tx_dir = now;
     new_value.traffic_direction = _ct_get_traffic_direction(observation_point);
     bpf_map_update_elem(&retina_conntrack_map, &key, &new_value, BPF_ANY);
+    // Update packet
     p->is_reply = false;
     p->traffic_direction = new_value.traffic_direction;
     return true;
@@ -156,18 +151,19 @@ static __always_inline bool _ct_handle_udp_connection(struct packet *p, struct c
 
 /**
  * Handle a TCP connection.
+ * @arg *p pointer to the packet to be processed.
  * @arg key The key to be used to handle the connection.
  * @arg reverse_key The reverse key to be used to handle the connection.
- * @arg flags The flags of the packet.
  * @arg observation_point The point in the network stack where the packet is observed.
  */
-static __always_inline bool _ct_handle_tcp_connection(struct packet *p, struct ct_v4_key key, struct ct_v4_key reverse_key, __u8 flags, __u8 observation_point) {
+static __always_inline bool _ct_handle_tcp_connection(struct packet *p, struct ct_v4_key key, struct ct_v4_key reverse_key, __u8 observation_point) {
     // Check if the packet is a SYN packet.
-    if (flags & TCP_SYN) {
+    if (p->flags & TCP_SYN) {
+        // Update packet accordingly.
         p->is_reply = false;
         p->traffic_direction = _ct_get_traffic_direction(observation_point);
         // Create a new connection with a timeout of CT_SYN_TIMEOUT.
-        return _ct_create_new_tcp_connection(key, flags, observation_point);
+        return _ct_create_new_tcp_connection(key, p->flags, observation_point);
     }
 
     // The packet is not a SYN packet and the connection corresponding to this packet is not found.
@@ -181,19 +177,19 @@ static __always_inline bool _ct_handle_tcp_connection(struct packet *p, struct c
         return false;
     }
     new_value.eviction_time = now + CT_CONNECTION_LIFETIME_TCP;
-    new_value.is_closing = (flags & (TCP_FIN | TCP_RST)) != 0x0;
+    new_value.is_closing = (p->flags & (TCP_FIN | TCP_RST)) != 0x0;
     new_value.traffic_direction = _ct_get_traffic_direction(observation_point);
     p->traffic_direction = new_value.traffic_direction;
 
     // Check for ACK flag. If the ACK flag is set, the packet is considered as a packet in the reply direction of the connection.
-    if (flags & TCP_ACK) {
+    if (p->flags & TCP_ACK) {
         p->is_reply = true;
-        new_value.flags_seen_rx_dir = flags;
+        new_value.flags_seen_rx_dir = p->flags;
         new_value.last_report_rx_dir = now;
         bpf_map_update_elem(&retina_conntrack_map, &reverse_key, &new_value, BPF_ANY);
     } else { // Otherwise, the packet is considered as a packet in the send direction.
         p->is_reply = false;
-        new_value.flags_seen_tx_dir = flags;
+        new_value.flags_seen_tx_dir = p->flags;
         new_value.last_report_tx_dir = now;
         bpf_map_update_elem(&retina_conntrack_map, &key, &new_value, BPF_ANY);
     }
@@ -202,16 +198,16 @@ static __always_inline bool _ct_handle_tcp_connection(struct packet *p, struct c
 
 /**
  * Handle a new connection.
+ * @arg *p pointer to the packet to be processed.
  * @arg key The key to be used to handle the connection.
  * @arg reverse_key The reverse key to be used to handle the connection.
- * @arg flags The flags of the packet.
  * @arg observation_point The point in the network stack where the packet is observed.
  */
-static __always_inline bool _ct_handle_new_connection(struct packet *p, struct ct_v4_key key, struct ct_v4_key reverse_key, __u8 flags, __u8 observation_point) {
+static __always_inline bool _ct_handle_new_connection(struct packet *p, struct ct_v4_key key, struct ct_v4_key reverse_key, __u8 observation_point) {
     if (key.proto & IPPROTO_TCP) {
-        return _ct_handle_tcp_connection(p, key, reverse_key, flags, observation_point);
+        return _ct_handle_tcp_connection(p, key, reverse_key, observation_point);
     } else if (key.proto & IPPROTO_UDP) {
-        return _ct_handle_udp_connection(p, key, flags, observation_point);
+        return _ct_handle_udp_connection(p, key, observation_point);
     } else {
         return false; // We are not interested in other protocols.
     }
@@ -288,11 +284,10 @@ static __always_inline bool _ct_should_report_packet(struct ct_entry *entry, __u
 /**
  * Process a packet and update the connection tracking map.
  * @arg *p pointer to the packet to be processed.
- * @arg flags The flags of the packet.
  * @arg observation_point The point in the network stack where the packet is observed.
  * Returns true if the packet should be report to userspace. False otherwise.
  */
-static __always_inline __attribute__((unused)) bool ct_process_packet(struct packet *p, __u8 flags, __u8 observation_point) {    
+static __always_inline __attribute__((unused)) bool ct_process_packet(struct packet *p, __u8 observation_point) {    
     if (!p) {
         return false;
     }
@@ -309,9 +304,10 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
 
     // If the connection is found in the send direction, update the connection.
     if (entry) {
+        // Update the packet accordingly.
         p->is_reply = false;
         p->traffic_direction = entry->traffic_direction;
-        return _ct_should_report_packet(entry, flags, CT_PACKET_DIR_TX, key.proto);
+        return _ct_should_report_packet(entry, p->flags, CT_PACKET_DIR_TX, key.proto);
     }
     
     // The connection is not found in the send direction. Check the reply direction by reversing the key.
@@ -324,11 +320,12 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
 
     // If the connection is found based on the reverse key, meaning that the packet is a reply packet to an existing connection.
     if (entry) {
+        // Update the packet accordingly.
         p->is_reply = true;
         p->traffic_direction = entry->traffic_direction;
-        return _ct_should_report_packet(entry, flags, CT_PACKET_DIR_RX, key.proto);
+        return _ct_should_report_packet(entry, p->flags, CT_PACKET_DIR_RX, key.proto);
     }
 
     // If the connection is still not found, the connection is new.
-    return _ct_handle_new_connection(p, key, reverse_key, flags, observation_point);
+    return _ct_handle_new_connection(p, key, reverse_key, observation_point);
 }
