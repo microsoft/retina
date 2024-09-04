@@ -12,7 +12,6 @@ import (
 	"github.com/microsoft/retina/pkg/log"
 	pm "github.com/microsoft/retina/pkg/managers/pluginmanager"
 	"github.com/microsoft/retina/pkg/plugin/api"
-	"github.com/microsoft/retina/pkg/plugin/api/mock"
 	"github.com/microsoft/retina/pkg/telemetry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -90,7 +89,7 @@ func TestControllerPluginManagerStartFail(t *testing.T) {
 	mgr, err := pm.NewPluginManager(cfg, telemetry.NewNoopTelemetry(), api.PluginName(pluginName))
 	require.NoError(t, err, "Expected no error, instead got %+v", err)
 
-	mockPlugin := mock.NewMockPlugin(ctl)
+	mockPlugin := api.NewMockPlugin(ctl)
 	mockPlugin.EXPECT().Generate(gomock.Any()).Return(nil).AnyTimes()
 	mockPlugin.EXPECT().Compile(gomock.Any()).Return(nil).AnyTimes()
 	mockPlugin.EXPECT().Stop().Return(nil).AnyTimes()

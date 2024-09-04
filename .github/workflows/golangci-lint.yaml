@@ -11,14 +11,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        goos: ["linux", "windows"]
-        goarch: ["amd64", "arm64"]
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: windows # We do not support windows arm64 yet
+            goarch: amd64
     name: Lint
     runs-on: ubuntu-latest
     env:
       IS_NOT_MERGE_GROUP: ${{ github.event_name != 'merge_group' }}
       GOOS: ${{ matrix.goos }}
       GOARCH: ${{ matrix.goarch }}
+      CGO_ENABLED: 0
     steps:
       - uses: actions/checkout@v4
         if: env.IS_NOT_MERGE_GROUP
@@ -28,11 +34,18 @@ jobs:
         if: env.IS_NOT_MERGE_GROUP
         with:
           go-version-file: go.mod
+      - name: Set up QEMU
+        if: env.GOOS == 'linux' && env.IS_NOT_MERGE_GROUP
+        uses: docker/setup-qemu-action@v3
+      - name: Go Generate
+        if: env.IS_NOT_MERGE_GROUP
+        run: |
+          GOOS=linux make go-gen
       - name: golangci-lint
         if: env.IS_NOT_MERGE_GROUP
         uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.55
+          version: v1.60.3
           args: --concurrency 4 --verbose --config=.golangci.yaml --timeout=25m
           only-new-issues: true
           skip-cache: true

@@ -23,6 +23,12 @@ go.work
 # Object files
 *.o
 
+# Generated mock files
+*_mock_generated.go
+*_bpfel_*.go
+mock_types.go
+mock_*.go
+
 # docusaurus
 site/yarn.lock
 site/.docusaurus/
@@ -32,6 +38,8 @@ hack/tools/bin
 output
 #vscode 
 .vscode/
+
+.certs/
 
 dist/
 bin/

@@ -7,12 +7,12 @@ issues:
     - path: pkg/metrics/types_windows.go
       linters:
         - revive
-        - gomnd
+        - mnd
         - var-naming
     - path: pkg/metrics/types_linux.go
       linters:
         - revive
-        - gomnd
+        - mnd
         - var-naming
 linters:
   presets: 
@@ -22,16 +22,14 @@ linters:
   - performance
   - unused
   disable:
-  - maligned
-  - scopelint
   - gci
   enable:
-  - exportloopref
+  - copyloopvar
   - goconst
   - gocritic
   - gocyclo
   - gofmt
-  - gomnd
+  - mnd
   - goprintffuncname
   - gosimple
   - lll
@@ -39,6 +37,7 @@ linters:
   - nakedret
   - promlinter
   - revive
+  - predeclared
 linters-settings:
   gocritic:
     enabled-tags:
@@ -47,7 +46,5 @@ linters-settings:
     - "performance"
     disabled-checks:
     - "hugeParam"
-  govet:
-    check-shadowing: true
   lll:
     line-length: 200

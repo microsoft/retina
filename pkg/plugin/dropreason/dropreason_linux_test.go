@@ -18,7 +18,6 @@ import (
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
-	mocks "github.com/microsoft/retina/pkg/plugin/dropreason/mocks"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -153,8 +152,8 @@ func TestDropReasonRun_Error(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockedMap := mocks.NewMockIMap(ctrl)
-	mockedMapIterator := mocks.NewMockIMapIterator(ctrl)
+	mockedMap := NewMockIMap(ctrl)
+	mockedMapIterator := NewMockIMapIterator(ctrl)
 
 	// reasign helper function so that it returns the mockedMapIterator
 	iMapIterator = func(x IMap) IMapIterator {
@@ -195,9 +194,9 @@ func TestDropReasonRun(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockedMap := mocks.NewMockIMap(ctrl)
-	mockedMapIterator := mocks.NewMockIMapIterator(ctrl)
-	mockedPerfReader := mocks.NewMockIPerfReader(ctrl)
+	mockedMap := NewMockIMap(ctrl)
+	mockedMapIterator := NewMockIMapIterator(ctrl)
+	mockedPerfReader := NewMockIPerfReader(ctrl)
 	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
 
 	// reasign helper function so that it returns the mockedMapIterator
@@ -257,8 +256,8 @@ func TestDropReasonReadDataPodLevelEnabled(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockedMap := mocks.NewMockIMap(ctrl)
-	mockedPerfReader := mocks.NewMockIPerfReader(ctrl)
+	mockedMap := NewMockIMap(ctrl)
+	mockedPerfReader := NewMockIPerfReader(ctrl)
 	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
 
 	// create a rawSample slice and fill it with 56 bytes of data. 56 is the size of the rawSample in perf.Record (kprobePacket)
@@ -310,8 +309,8 @@ func TestDropReasonReadData_WithEmptyPerfArray(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockedMap := mocks.NewMockIMap(ctrl)
-	mockedPerfReader := mocks.NewMockIPerfReader(ctrl)
+	mockedMap := NewMockIMap(ctrl)
+	mockedPerfReader := NewMockIPerfReader(ctrl)
 
 	// mock perf reader record
 	mockedPerfRecord := perf.Record{
@@ -347,8 +346,8 @@ func TestDropReasonReadData_WithPerfArrayLostSamples(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockedMap := mocks.NewMockIMap(ctrl)
-	mockedPerfReader := mocks.NewMockIPerfReader(ctrl)
+	mockedMap := NewMockIMap(ctrl)
+	mockedPerfReader := NewMockIPerfReader(ctrl)
 
 	// create a rawSample slice and fill it with 56 bytes of data. 56 is the size of the rawSample in perf.Record (kprobePacket)
 	rawSample := make([]byte, 56)
@@ -389,8 +388,8 @@ func TestDropReasonReadData_WithUnknownError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockedMap := mocks.NewMockIMap(ctrl)
-	mockedPerfReader := mocks.NewMockIPerfReader(ctrl)
+	mockedMap := NewMockIMap(ctrl)
+	mockedPerfReader := NewMockIPerfReader(ctrl)
 
 	// create a rawSample slice and fill it with 56 bytes of data. 56 is the size of the rawSample in perf.Record (kprobePacket)
 	rawSample := make([]byte, 56)

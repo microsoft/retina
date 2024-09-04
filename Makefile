@@ -160,7 +160,7 @@ fmt: $(GOFUMPT) ## run gofumpt on $FMT_PKG (default "retina").
 	$(GOFUMPT) -w $(FMT_PKG)
 
 lint: $(GOLANGCI_LINT) ## Fast lint vs default branch showing only new issues.
-	$(GOLANGCI_LINT) run --new-from-rev main --timeout 10m -v $(LINT_PKG)/...
+	CGO_ENABLED=0 $(GOLANGCI_LINT) run --new-from-rev main --timeout 10m -v $(LINT_PKG)/...
 
 lint-existing: $(GOLANGCI_LINT) ## Lint the current branch in entirety.
 	$(GOLANGCI_LINT) run -v $(LINT_PKG)/...
@@ -477,7 +477,7 @@ helm-install-hubble:
 		--set hubble.tls.auto.enabled=$(ENABLE_TLS) \
 		--set hubble.tls.auto.method=cronJob \
 		--set hubble.tls.auto.certValidityDuration=1 \
-		--set hubble.tls.auto.schedule="*/10 * * * *"	
+		--set hubble.tls.auto.schedule="*/10 * * * *" 
 
 helm-install-without-tls: clean-certs
 	$(MAKE) helm-install-hubble ENABLE_TLS=false
@@ -523,6 +523,24 @@ docs-prod:
 quick-build:
 	$(MAKE) retina-image PLATFORM=linux/amd64 BUILDX_ACTION=--push
 	$(MAKE) retina-operator-image PLATFORM=linux/amd64 BUILDX_ACTION=--push
+
+.PHONY: quick-build-devcontainer
+quick-build-devcontainer: # buildx push doesnt work for some reason in kind
+	$(MAKE) retina-image PLATFORM=linux/amd64 BUILDX_ACTION=--load RETINA_IMAGE=retina-agent RETINA_INIT_IMAGE=retina-init RETINA_OPERATOR_IMAGE=retina-operator IMAGE_REGISTRY=localhost:5000
+	$(MAKE) retina-operator-image PLATFORM=linux/amd64 BUILDX_ACTION=--load RETINA_IMAGE=retina-agent RETINA_INIT_IMAGE=retina-init RETINA_OPERATOR_IMAGE=retina-operator IMAGE_REGISTRY=localhost:5000
+
+quick-push-devcontainer:
+	IMAGES="retina-agent retina-init retina-operator"; \
+	for image in $$IMAGES; do \
+		docker push localhost:5000/$$image:$(RETINA_PLATFORM_TAG); \
+		docker rmi localhost:5000/$$image:$(RETINA_PLATFORM_TAG); \
+	done
+
+.PHONY: quick-deploy-hubble-devcontainer
+quick-deploy-hubble-devcontainer:
+	REGISTRY_IP=$(shell ip addr show docker0 | grep 'inet ' | awk '{print $$2}' | cut -d'/' -f1 | head -n 1):5000; \
+	$(MAKE) helm-uninstall || true; \
+	$(MAKE) helm-install-hubble IMAGE_REGISTRY=$$REGISTRY_IP RETINA_IMAGE=retina-agent RETINA_INIT_IMAGE=retina-init RETINA_OPERATOR_IMAGE=retina-operator HELM_IMAGE_TAG=$(RETINA_PLATFORM_TAG)
 
 .PHONY: quick-deploy
 quick-deploy:

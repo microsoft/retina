@@ -18,7 +18,6 @@ import (
 
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
-	mocks "github.com/microsoft/retina/pkg/plugin/packetforward/mocks"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"golang.org/x/sync/errgroup"
@@ -39,7 +38,7 @@ func TestProcessMapValue_NoErr(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	m := mocks.NewMockIMap(ctrl)
+	m := NewMockIMap(ctrl)
 	m.EXPECT().Lookup(uint32(0), gomock.Any()).Return(nil)
 	_, _, err := processMapValue(m, 0)
 	if err != nil {
@@ -51,7 +50,7 @@ func TestProcessMapValue_ReturnErr(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	m := mocks.NewMockIMap(ctrl)
+	m := NewMockIMap(ctrl)
 	m.EXPECT().Lookup(uint32(0), gomock.Any()).Return(errors.New("Error"))
 	_, _, err := processMapValue(m, 0)
 	if err == nil {
@@ -63,7 +62,7 @@ func TestProcessMapValue_ReturnData(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	m := mocks.NewMockIMap(ctrl)
+	m := NewMockIMap(ctrl)
 
 	v2 := []packetforwardMetric{
 		{Count: 3, Bytes: 10},
@@ -109,7 +108,7 @@ func TestStop_NonNilMap(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockedMap := mocks.NewMockIMap(ctrl)
+	mockedMap := NewMockIMap(ctrl)
 	mockedMap.EXPECT().Close().Return(errors.New("Error")).MinTimes(1)
 	p := &packetForward{
 		l:           log.Logger().Named(string(Name)),
@@ -185,7 +184,7 @@ func TestRun(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockedMap := mocks.NewMockIMap(ctrl)
+	mockedMap := NewMockIMap(ctrl)
 	mockedMap.EXPECT().Lookup(gomock.Any(), gomock.Any()).Return(nil).MinTimes(1)
 
 	p := &packetForward{
@@ -218,7 +217,7 @@ func TestRun_ReturnError_Ingress(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockedMap := mocks.NewMockIMap(ctrl)
+	mockedMap := NewMockIMap(ctrl)
 	mockedMap.EXPECT().Lookup(uint32(0), gomock.Any()).Return(errors.New("Error")).MinTimes(1)
 
 	p := &packetForward{
@@ -251,7 +250,7 @@ func TestRun_ReturnError_Egress(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockedMap := mocks.NewMockIMap(ctrl)
+	mockedMap := NewMockIMap(ctrl)
 	mockedMap.EXPECT().Lookup(uint32(0), gomock.Any()).Return(nil).MinTimes(1)
 	mockedMap.EXPECT().Lookup(uint32(1), gomock.Any()).Return(errors.New("Error")).MinTimes(1)
 

@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/microsoft/retina/pkg/log"
-	"github.com/microsoft/retina/pkg/plugin/filter/mocks"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )
@@ -77,7 +76,7 @@ func TestFilterMap_Add(t *testing.T) {
 	}
 	expectedValues := []uint8{1, 1}
 
-	mockKfm := mocks.NewMockIEbpfMap(ctrl)
+	mockKfm := NewMockIEbpfMap(ctrl)
 	mockKfm.EXPECT().BatchUpdate(expectedKeys, expectedValues, gomock.Any()).Return(2, nil)
 
 	f := &FilterMap{
@@ -111,7 +110,7 @@ func TestFilterMap_Delete(t *testing.T) {
 		},
 	}
 
-	mockKfm := mocks.NewMockIEbpfMap(ctrl)
+	mockKfm := NewMockIEbpfMap(ctrl)
 	mockKfm.EXPECT().BatchDelete(expectedKeys, gomock.Any()).Return(2, nil)
 
 	f := &FilterMap{
@@ -146,7 +145,7 @@ func TestFilterMap_Add_No_BatchApi(t *testing.T) {
 	}
 	expectedValues := []uint8{1, 1}
 
-	mockKfm := mocks.NewMockIEbpfMap(ctrl)
+	mockKfm := NewMockIEbpfMap(ctrl)
 	// Test error case.
 	mockKfm.EXPECT().BatchUpdate(expectedKeys, expectedValues, gomock.Any()).Return(0, errors.New("map batch api not supported (requires >= v5.6)"))
 	mockKfm.EXPECT().Put(gomock.Any(), gomock.Any()).Return(nil).Times(2)
@@ -182,7 +181,7 @@ func TestFilterMap_Delete_No_BatchApi(t *testing.T) {
 		},
 	}
 
-	mockKfm := mocks.NewMockIEbpfMap(ctrl)
+	mockKfm := NewMockIEbpfMap(ctrl)
 	mockKfm.EXPECT().BatchDelete(expectedKeys, gomock.Any()).Return(0, errors.New("map batch api not supported (requires >= v5.6)"))
 	mockKfm.EXPECT().Delete(gomock.Any()).Return(nil).Times(2)
 

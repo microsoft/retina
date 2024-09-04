@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/microsoft/retina/pkg/log"
-	mock "github.com/microsoft/retina/pkg/managers/watchermanager/mocks"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"golang.org/x/sync/errgroup"
@@ -22,8 +21,8 @@ func TestStopWatcherManagerGracefully(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	mgr := NewWatcherManager()
 
-	mockAPIServerWatcher := mock.NewMockIWatcher(ctl)
-	mockEndpointWatcher := mock.NewMockIWatcher(ctl)
+	mockAPIServerWatcher := NewMockIWatcher(ctl)
+	mockEndpointWatcher := NewMockIWatcher(ctl)
 
 	mgr.Watchers = []IWatcher{
 		mockEndpointWatcher,
@@ -53,8 +52,8 @@ func TestWatcherInitFailsGracefully(t *testing.T) {
 	defer ctl.Finish()
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 
-	mockAPIServerWatcher := mock.NewMockIWatcher(ctl)
-	mockEndpointWatcher := mock.NewMockIWatcher(ctl)
+	mockAPIServerWatcher := NewMockIWatcher(ctl)
+	mockEndpointWatcher := NewMockIWatcher(ctl)
 
 	mgr := NewWatcherManager()
 	mgr.Watchers = []IWatcher{

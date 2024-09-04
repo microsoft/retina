@@ -14,7 +14,6 @@ import (
 
 	"github.com/microsoft/retina/pkg/log"
 	filtermanagermocks "github.com/microsoft/retina/pkg/managers/filtermanager"
-	"github.com/microsoft/retina/pkg/watchers/apiserver/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -71,7 +70,7 @@ func TestRefresh(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	mockedResolver := mocks.NewMockIHostResolver(ctrl)
+	mockedResolver := NewMockIHostResolver(ctrl)
 	mockedFilterManager := filtermanagermocks.NewMockIFilterManager(ctrl)
 
 	a := &ApiServerWatcher{
@@ -97,7 +96,7 @@ func TestDiffCache(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockedResolver := mocks.NewMockIHostResolver(ctrl)
+	mockedResolver := NewMockIHostResolver(ctrl)
 
 	old := make(map[string]struct{})
 	new := make(map[string]struct{})
@@ -127,7 +126,7 @@ func TestRefreshLookUpAlwaysFail(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	mockedResolver := mocks.NewMockIHostResolver(ctrl)
+	mockedResolver := NewMockIHostResolver(ctrl)
 
 	a := &ApiServerWatcher{
 		l:            log.Logger().Named("apiserver-watcher"),
@@ -148,7 +147,7 @@ func TestInitWithIncorrectURL(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	mockedResolver := mocks.NewMockIHostResolver(ctrl)
+	mockedResolver := NewMockIHostResolver(ctrl)
 	mockedFilterManager := filtermanagermocks.NewMockIFilterManager(ctrl)
 
 	a := &ApiServerWatcher{
@@ -187,7 +186,7 @@ func TestRefreshFailsFirstFourAttemptsSucceedsOnFifth(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	mockedResolver := mocks.NewMockIHostResolver(ctrl)
+	mockedResolver := NewMockIHostResolver(ctrl)
 	mockedFilterManager := filtermanagermocks.NewMockIFilterManager(ctrl)
 
 	a := &ApiServerWatcher{
