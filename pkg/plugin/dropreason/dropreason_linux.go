@@ -357,7 +357,6 @@ func (dr *dropReason) processRecord(ctx context.Context, id int) {
 			}
 			sourcePortShort := uint32(utils.HostToNetShort(bpfEvent.SrcPort))
 			destinationPortShort := uint32(utils.HostToNetShort(bpfEvent.DstPort))
-			dropKey := (dropMetricKey)(bpfEvent.Key)
 
 			fl := utils.ToFlow(
 				ktime.MonotonicOffset.Nanoseconds()+int64(bpfEvent.Ts),
@@ -377,7 +376,7 @@ func (dr *dropReason) processRecord(ctx context.Context, id int) {
 			meta := &utils.RetinaMetadata{}
 
 			// Add drop reason to the flow's metadata.
-			utils.AddDropReason(fl, meta, dropKey.DropType)
+			utils.AddDropReason(fl, meta, bpfEvent.DropType)
 
 			// Add packet size to the flow's metadata.
 			utils.AddPacketSize(meta, bpfEvent.SkbLen)
@@ -387,7 +386,7 @@ func (dr *dropReason) processRecord(ctx context.Context, id int) {
 
 			// This is only for development purposes.
 			// Removing this makes logs way too chatter-y.
-			dr.l.Debug("DropReason Packet Received", zap.Any("flow", fl), zap.Any("Raw Bpf Event", bpfEvent), zap.Uint32("drop type", dropKey.DropType))
+			dr.l.Debug("DropReason Packet Received", zap.Any("flow", fl), zap.Any("Raw Bpf Event", bpfEvent), zap.Uint16("drop type", bpfEvent.DropType))
 
 			// Write the event to the enricher.
 			ev := &hubblev1.Event{

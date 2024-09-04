@@ -87,11 +87,11 @@ func TestAddPacketSize(t *testing.T) {
 		flow.Verdict_FORWARDED,
 	)
 	meta := &RetinaMetadata{}
-	AddPacketSize(meta, uint64(100))
+	AddPacketSize(meta, uint32(100))
 	AddRetinaMetadata(fl, meta)
 
 	res := PacketSize(fl)
-	assert.EqualValues(t, res, uint64(100))
+	assert.EqualValues(t, res, uint32(100))
 }
 
 func TestTcpID(t *testing.T) {

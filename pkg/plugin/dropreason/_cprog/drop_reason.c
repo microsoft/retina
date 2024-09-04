@@ -23,16 +23,9 @@ char __license[] SEC("license") = "Dual MIT/GPL";
 #define PACKET_HOST 0     // Incomming packets
 #define PACKET_OUTGOING 4 // Outgoing packets
 
-typedef enum
-{
-    UNKNOWN_DIRECTION = 0,
-    INGRESS_KEY,
-    EGRESS_KEY,
-} direction_type;
-
 struct metrics_map_key
 {
-    __u32 drop_type;
+    __u16 drop_type;
     __u32 return_val;
 };
 struct metrics_map_value
@@ -47,15 +40,15 @@ struct packet
     __u32 dst_ip;
     __u16 src_port;
     __u16 dst_port;
+    __u32 skb_len;
+    __u32 return_val;
+    __u16 drop_type;
     __u8 proto;
-    __u64 skb_len;
-    direction_type direction;
-    struct metrics_map_key key;
-    __u64 ts; // timestamp in nanoseconds
     // in_filtermap defines if a given packet is of interest to us
     // and added to the filtermap. is this is set then dropreason
     // will send a perf event along with the usual aggregation in metricsmap
     bool in_filtermap;
+    __u64 ts; // timestamp in nanoseconds
 };
 struct
 {
@@ -137,10 +130,8 @@ void update_metrics_map(void *ctx, drop_reason_t drop_type, int ret_val, struct 
 #if ADVANCED_METRICS == 1
     if (p->in_filtermap)
     {
-        struct metrics_map_key key2 = {
-            .drop_type = drop_type,
-            .return_val = ret_val};
-        p->key = key2;
+        p->drop_type = drop_type;
+        p->return_val = ret_val;
         bpf_perf_event_output(ctx, &dropreason_events, BPF_F_CURRENT_CPU, p, sizeof(struct packet));
     };
 #endif
