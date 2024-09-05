@@ -38,7 +38,8 @@ type packetparserPacket struct {
 	}
 	Dir   uint32
 	Ts    uint64
-	Bytes uint64
+	Bytes uint32
+	_     [4]byte
 }
 
 // loadPacketparser returns the embedded CollectionSpec for packetparser.

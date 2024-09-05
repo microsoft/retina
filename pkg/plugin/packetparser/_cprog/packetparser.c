@@ -37,7 +37,7 @@ struct packet
 	struct tcpmetadata tcp_metadata; // TCP metadata
 	direction dir; // 0 -> INGRESS, 1 -> EGRESS
 	__u64 ts; // timestamp in nanoseconds
-	__u64 bytes; // packet size in bytes
+	__u32 bytes; // packet size in bytes
 };
 
 struct
