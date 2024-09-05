@@ -58,5 +58,5 @@ func (f *FilteredYAML) filter() error {
 // Read extracts the subset of YAML matching AllowedFields and writes it to the
 // supplied buffer.
 func (f *FilteredYAML) Read(out []byte) (int, error) {
-	return f.buf.Read(out)
+	return f.buf.Read(out) //nolint:wrapcheck // there's no value in wrapping this
 }

@@ -115,7 +115,7 @@ func GetConfig(primaryCfg string, overlays ...FilteredConfig) (*Config, error) {
 
 	// apply overlay configs
 	for _, file := range overlays {
-		err := mergeConfig(file)
+		err := mergeConfig(file) //nolint:govet // shadowing is fine here
 		if err != nil {
 			return nil, errors.Wrapf(err, "merging config for %q", file)
 		}
