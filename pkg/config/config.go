@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/microsoft/retina/pkg/config/internal"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -84,7 +83,7 @@ func mergeConfig(file FilteredConfig) error {
 	}
 	defer f.Close()
 
-	fy, err := internal.NewFilteredYAML(f, file.AllowedFields)
+	fy, err := NewFilteredYAML(f, file.AllowedFields)
 	if err != nil {
 		return errors.Wrap(err, "creating FilteredYAML")
 	}

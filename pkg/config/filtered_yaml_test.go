@@ -1,4 +1,4 @@
-package internal_test
+package config_test
 
 import (
 	"io"
@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/microsoft/retina/pkg/config/internal"
+	"github.com/microsoft/retina/pkg/config"
 )
 
 func TestFilteredYAML(t *testing.T) {
@@ -42,7 +42,7 @@ func TestFilteredYAML(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			fy, err := internal.NewFilteredYAML(io.NopCloser(strings.NewReader(test.in)), test.allowed)
+			fy, err := config.NewFilteredYAML(io.NopCloser(strings.NewReader(test.in)), test.allowed)
 			if err != nil {
 				t.Fatal("unexpected error creating filtered yaml: err:", err)
 			}
