@@ -109,9 +109,10 @@ struct
 void update_metrics_map(void *ctx, drop_reason_t drop_type, int ret_val, struct packet *p)
 {
     struct metrics_map_value *entry, new_entry = {};
-    struct metrics_map_key key = {
-        .drop_type = drop_type,
-        .return_val = ret_val};
+    struct metrics_map_key key;
+    __builtin_memset(&key, 0, sizeof(p));
+    key.drop_type = drop_type;
+    key.return_val = ret_val;
 
     entry = bpf_map_lookup_elem(&metrics_map, &key);
     if (entry)
