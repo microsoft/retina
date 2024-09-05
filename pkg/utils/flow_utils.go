@@ -266,7 +266,7 @@ func PacketSize(f *flow.Flow) uint32 {
 }
 
 // AddDropReason adds the drop reason to the flow's metadata.
-func AddDropReason(f *flow.Flow, meta *RetinaMetadata, dropReason uint32) {
+func AddDropReason(f *flow.Flow, meta *RetinaMetadata, dropReason uint16) {
 	if f == nil || meta == nil {
 		return
 	}

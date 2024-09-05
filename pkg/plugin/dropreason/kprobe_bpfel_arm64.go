@@ -20,7 +20,8 @@ type kprobeMapKey struct {
 }
 
 type kprobeMetricsMapKey struct {
-	DropType  uint32
+	DropType  uint16
+	_         [2]byte
 	ReturnVal uint32
 }
 
@@ -34,14 +35,12 @@ type kprobePacket struct {
 	DstIp       uint32
 	SrcPort     uint16
 	DstPort     uint16
-	Proto       uint8
-	_           [3]byte
 	SkbLen      uint32
-	Direction   uint32
-	Key         kprobeMetricsMapKey
-	Ts          uint64
+	ReturnVal   uint32
+	DropType    uint16
+	Proto       uint8
 	InFiltermap bool
-	_           [7]byte
+	Ts          uint64
 }
 
 // loadKprobe returns the embedded CollectionSpec for kprobe.

@@ -92,7 +92,7 @@ func TestAddPacketSize(t *testing.T) {
 	AddRetinaMetadata(fl, meta)
 
 	res := PacketSize(fl)
-	assert.EqualValues(t, res, uint64(100))
+	assert.EqualValues(t, res, uint32(100))
 }
 
 func TestTcpID(t *testing.T) {
@@ -120,7 +120,7 @@ func TestTcpID(t *testing.T) {
 func TestAddDropReason(t *testing.T) {
 	testCases := []struct {
 		name                 string
-		dropReason           uint32
+		dropReason           uint16
 		expectedDesc         flow.DropReason
 		expectedReason       uint32
 		expectedRetinaReason string
