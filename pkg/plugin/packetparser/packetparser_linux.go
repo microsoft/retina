@@ -590,12 +590,12 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 			tcpMetadata := bpfEvent.TcpMetadata
 			utils.AddTCPFlags(
 				fl,
-				uint16(bpfEvent.Flags&TCPFlagSYN),
-				uint16(bpfEvent.Flags&TCPFlagACK),
-				uint16(bpfEvent.Flags&TCPFlagFIN),
-				uint16(bpfEvent.Flags&TCPFlagRST),
-				uint16(bpfEvent.Flags&TCPFlagPSH),
-				uint16(bpfEvent.Flags&TCPFlagURG),
+				uint16((bpfEvent.Flags&TCPFlagSYN)>>1),
+				uint16((bpfEvent.Flags&TCPFlagACK)>>4), // nolint:gomnd // 4 is the offset for ACK.
+				uint16((bpfEvent.Flags&TCPFlagFIN)>>0),
+				uint16((bpfEvent.Flags&TCPFlagRST)>>2), // nolint:gomnd // 2 is the offset for RST.
+				uint16((bpfEvent.Flags&TCPFlagPSH)>>3), // nolint:gomnd // 3 is the offset for PSH.
+				uint16((bpfEvent.Flags&TCPFlagURG)>>5), // nolint:gomnd // 5 is the offset for URG.
 			)
 
 			// For packets originating from node, we use tsval as the tcpID.
