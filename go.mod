@@ -308,7 +308,7 @@ require (
 	github.com/onsi/gomega v1.34.2
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_model v0.6.1
-	github.com/prometheus/common v0.58.0
+	github.com/prometheus/common v0.59.0
 	github.com/safchain/ethtool v0.4.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.19.0
