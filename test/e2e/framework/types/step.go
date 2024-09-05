@@ -7,7 +7,7 @@ var DefaultOpts = StepOptions{
 	// when wanting to avoid saving the parameters to the job,
 	// such as a repetetive task where step is used multiple times sequentially,
 	// but parameters are different each time
-	SkipSavingParamatersToJob: false,
+	SkipSavingParametersToJob: false,
 }
 
 type Step interface {
@@ -32,7 +32,7 @@ type StepOptions struct {
 	// a step, but you don't want to save the parameters
 	// ex: Sleep for 15 seconds, then Sleep for 10 seconds,
 	// you don't want to save the parameters
-	SkipSavingParamatersToJob bool
+	SkipSavingParametersToJob bool
 
 	// Will save this step to the job's steps
 	// and then later on when Stop is called with job name,

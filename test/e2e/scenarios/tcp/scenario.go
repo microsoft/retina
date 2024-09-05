@@ -36,7 +36,7 @@ func ValidateTCPMetrics() *types.Scenario {
 				PodNamespace: "kube-system",
 				Command:      "curl -s -m 5 bing.com",
 			}, Opts: &types.StepOptions{
-				SkipSavingParamatersToJob: true,
+				SkipSavingParametersToJob: true,
 			},
 		},
 		{
@@ -50,7 +50,7 @@ func ValidateTCPMetrics() *types.Scenario {
 				PodNamespace: "kube-system",
 				Command:      "curl -s -m 5 bing.com",
 			}, Opts: &types.StepOptions{
-				SkipSavingParamatersToJob: true,
+				SkipSavingParametersToJob: true,
 			},
 		},
 		{
@@ -63,7 +63,7 @@ func ValidateTCPMetrics() *types.Scenario {
 				OptionalLabelAffinity: "app=agnhost-a", // port forward to a pod on a node that also has this pod with this label, assuming same namespace
 			},
 			Opts: &types.StepOptions{
-				SkipSavingParamatersToJob: true,
+				SkipSavingParametersToJob: true,
 				RunInBackgroundWithID:     "drop-flow-forward",
 			},
 		},
@@ -71,14 +71,14 @@ func ValidateTCPMetrics() *types.Scenario {
 			Step: &ValidateRetinaTCPStateMetric{
 				PortForwardedRetinaPort: "10093",
 			}, Opts: &types.StepOptions{
-				SkipSavingParamatersToJob: true,
+				SkipSavingParametersToJob: true,
 			},
 		},
 		{
 			Step: &ValidateRetinaTCPConnectionRemoteMetric{
 				PortForwardedRetinaPort: "10093",
 			}, Opts: &types.StepOptions{
-				SkipSavingParamatersToJob: true,
+				SkipSavingParametersToJob: true,
 			},
 		},
 		{
@@ -92,7 +92,7 @@ func ValidateTCPMetrics() *types.Scenario {
 				ResourceName:      "agnhost-a",
 				ResourceNamespace: "kube-system",
 			}, Opts: &types.StepOptions{
-				SkipSavingParamatersToJob: true,
+				SkipSavingParametersToJob: true,
 			},
 		},
 	}
