@@ -38,7 +38,7 @@ func ValidateDropMetric() *types.Scenario {
 			},
 			Opts: &types.StepOptions{
 				ExpectError:               true,
-				SkipSavingParamatersToJob: true,
+				SkipSavingParametersToJob: true,
 			},
 		},
 		{
@@ -54,7 +54,7 @@ func ValidateDropMetric() *types.Scenario {
 			},
 			Opts: &types.StepOptions{
 				ExpectError:               true,
-				SkipSavingParamatersToJob: true,
+				SkipSavingParametersToJob: true,
 			},
 		},
 		{
@@ -91,7 +91,7 @@ func ValidateDropMetric() *types.Scenario {
 				ResourceName:      "deny-all",
 				ResourceNamespace: "kube-system",
 			}, Opts: &types.StepOptions{
-				SkipSavingParamatersToJob: true,
+				SkipSavingParametersToJob: true,
 			},
 		},
 		{
@@ -100,7 +100,7 @@ func ValidateDropMetric() *types.Scenario {
 				ResourceName:      "agnhost-a",
 				ResourceNamespace: "kube-system",
 			}, Opts: &types.StepOptions{
-				SkipSavingParamatersToJob: true,
+				SkipSavingParametersToJob: true,
 			},
 		},
 	}
