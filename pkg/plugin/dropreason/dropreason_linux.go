@@ -367,6 +367,9 @@ func (dr *dropReason) processRecord(ctx context.Context, id int) {
 				continue
 			}
 
+			// IsReply is not applicable for DROPPED verdicts.
+			fl.IsReply = nil
+
 			meta := &utils.RetinaMetadata{}
 
 			// Add drop reason to the flow's metadata.
