@@ -12,34 +12,49 @@ import (
 	"github.com/cilium/ebpf"
 )
 
+type packetparserCtEntry struct {
+	EvictionTime     uint32
+	LastReportTxDir  uint32
+	LastReportRxDir  uint32
+	TrafficDirection uint8
+	FlagsSeenTxDir   uint8
+	FlagsSeenRxDir   uint8
+	IsClosing        bool
+}
+
+type packetparserCtV4Key struct {
+	SrcIp   uint32
+	DstIp   uint32
+	SrcPort uint16
+	DstPort uint16
+	Proto   uint8
+	_       [3]byte
+}
+
 type packetparserMapKey struct {
 	Prefixlen uint32
 	Data      uint32
 }
 
 type packetparserPacket struct {
+	T_nsec      uint64
+	Bytes       uint32
 	SrcIp       uint32
 	DstIp       uint32
 	SrcPort     uint16
 	DstPort     uint16
-	Proto       uint8
-	_           [3]byte
 	TcpMetadata struct {
 		Seq    uint32
 		AckNum uint32
-		Syn    uint16
-		Ack    uint16
-		Fin    uint16
-		Rst    uint16
-		Psh    uint16
-		Urg    uint16
 		Tsval  uint32
 		Tsecr  uint32
 	}
-	Dir   uint32
-	Ts    uint64
-	Bytes uint32
-	_     [4]byte
+	ObservationPoint uint8
+	TrafficDirection uint8
+	Proto            uint8
+	Flags            uint8
+	IsReply          bool
+	_                [3]byte
 }
 
 // loadPacketparser returns the embedded CollectionSpec for packetparser.
@@ -94,6 +109,7 @@ type packetparserProgramSpecs struct {
 // It can be passed ebpf.CollectionSpec.Assign.
 type packetparserMapSpecs struct {
 	PacketparserEvents *ebpf.MapSpec `ebpf:"packetparser_events"`
+	RetinaConntrackMap *ebpf.MapSpec `ebpf:"retina_conntrack_map"`
 	RetinaFilterMap    *ebpf.MapSpec `ebpf:"retina_filter_map"`
 }
 
@@ -117,12 +133,14 @@ func (o *packetparserObjects) Close() error {
 // It can be passed to loadPacketparserObjects or ebpf.CollectionSpec.LoadAndAssign.
 type packetparserMaps struct {
 	PacketparserEvents *ebpf.Map `ebpf:"packetparser_events"`
+	RetinaConntrackMap *ebpf.Map `ebpf:"retina_conntrack_map"`
 	RetinaFilterMap    *ebpf.Map `ebpf:"retina_filter_map"`
 }
 
 func (m *packetparserMaps) Close() error {
 	return _PacketparserClose(
 		m.PacketparserEvents,
+		m.RetinaConntrackMap,
 		m.RetinaFilterMap,
 	)
 }

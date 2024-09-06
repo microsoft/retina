@@ -31,22 +31,15 @@ const (
 // 2 is from host to network and 3 is from network to host.
 // ts is the timestamp in nanoseconds.
 func ToFlow(
+	l *log.ZapLogger,
 	ts int64,
 	sourceIP, destIP net.IP,
 	sourcePort, destPort uint32,
 	proto uint8,
-	observationPoint uint32,
+	observationPoint uint8,
 	verdict flow.Verdict,
 ) *flow.Flow { //nolint:typecheck
-	var (
-		l4           *flow.Layer4
-		checkpoint   flow.TraceObservationPoint
-		direction    flow.TrafficDirection
-		subeventtype int
-	)
-
-	l := log.Logger().Named("ToFlow")
-
+	var l4 *flow.Layer4
 	switch proto {
 	case 6:
 		l4 = &flow.Layer4{
@@ -68,23 +61,28 @@ func ToFlow(
 		}
 	}
 
+	var (
+		checkpoint   flow.TraceObservationPoint
+		subeventtype int
+		direction    flow.TrafficDirection
+	)
 	// We are attaching the filters to the veth interface on the host side.
 	// So for HOST -> CONTAINER, egress of host veth is ingress of container.
 	// Hence, we need to swap the direction.
 	switch observationPoint {
-	case uint32(0):
+	case uint8(0): //nolint:gomnd // flow.TraceObservationPoint_TO_STACK
 		checkpoint = flow.TraceObservationPoint_TO_STACK
 		direction = flow.TrafficDirection_EGRESS
 		subeventtype = int(api.TraceToStack)
-	case uint32(1):
+	case uint8(1): //nolint:gomnd // flow.TraceObservationPoint_TO_ENDPOINT
 		checkpoint = flow.TraceObservationPoint_TO_ENDPOINT
 		direction = flow.TrafficDirection_INGRESS
 		subeventtype = int(api.TraceToLxc)
-	case uint32(2):
+	case uint8(2): //nolint:gomnd // flow.TraceObservationPoint_FROM_NETWORK
 		checkpoint = flow.TraceObservationPoint_FROM_NETWORK
 		direction = flow.TrafficDirection_INGRESS
 		subeventtype = int(api.TraceFromNetwork)
-	case uint32(3):
+	case uint8(3): //nolint:gomnd // flow.TraceObservationPoint_TO_NETWORK
 		checkpoint = flow.TraceObservationPoint_TO_NETWORK
 		direction = flow.TrafficDirection_EGRESS
 		subeventtype = int(api.TraceToNetwork)
@@ -113,10 +111,13 @@ func ToFlow(
 		},
 		L4:                    l4,
 		TraceObservationPoint: checkpoint,
-		TrafficDirection:      direction,
-		Verdict:               verdict,
-		Extensions:            ext,
-		IsReply:               &wrapperspb.BoolValue{Value: false}, // Setting false by default as we don't have a better way to determine flow direction.
+		// Packetparser running with conntrack can determine the traffic direction correctly and will override this value.
+		TrafficDirection: direction,
+		Verdict:          verdict,
+		Extensions:       ext,
+		// Setting IsReply to false by default.
+		// Packetparser running with conntrack can determine the direction of the flow, and will override this value.
+		IsReply: &wrapperspb.BoolValue{Value: false},
 	}
 	if t, err := decodeTime(ts); err == nil {
 		f.Time = t

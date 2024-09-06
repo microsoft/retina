@@ -20,9 +20,9 @@ type kprobeMapKey struct {
 }
 
 type kprobeMetricsMapKey struct {
-	ReturnVal uint32
 	DropType  uint16
 	_         [2]byte
+	ReturnVal uint32
 }
 
 type kprobeMetricsMapValue struct {

@@ -7,10 +7,5 @@
 // tc-bpf return code to execute the next tc-bpf program.
 #define TC_ACT_UNSPEC   (-1)
 
-typedef enum
-{
-    FROM_ENDPOINT = 0,
-    TO_ENDPOINT,
-    FROM_NETWORK,
-    TO_NETWORK,
-} direction;
+#define DATA_AGGREGATION_LEVEL_LOW 0
+#define DATA_AGGREGATION_LEVEL_HIGH 1

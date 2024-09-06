@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/rlimit"
 	"github.com/microsoft/retina/internal/ktime"
-	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
 	_ "github.com/microsoft/retina/pkg/plugin/conntrack/_cprog" // nolint // This is needed so cprog is included when vendoring
@@ -19,22 +19,34 @@ import (
 	"go.uber.org/zap"
 )
 
-// New creates a packetparser plugin.
-//
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type ct_v4_key conntrack ./_cprog/conntrack.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../lib/common/libbpf/_include/linux -I../lib/common/libbpf/_include/uapi/linux -I../lib/common/libbpf/_include/asm
-func New(cfg *config.Config) *Conntrack {
-	return &Conntrack{
-		l:           log.Logger().Named("conntrack"),
-		gcFrequency: defaultGCFrequency,
-		cfg:         cfg,
+
+// Init initializes the conntrack eBPF map in the kernel for the first time.
+// This function should be called in the init container since
+// it requires securityContext.privileged to be true.
+func Init() error {
+	// Allow the current process to lock memory for eBPF resources.
+	if err := rlimit.RemoveMemlock(); err != nil {
+		return errors.Wrapf(err, "failed to remove memlock limit")
 	}
+
+	objs := &conntrackObjects{}
+	err := loadConntrackObjects(objs, &ebpf.CollectionOptions{
+		Maps: ebpf.MapOptions{
+			PinPath: plugincommon.MapPath,
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to load conntrack objects")
+	}
+	return nil
 }
 
-// Run starts the Conntrack garbage collection loop.
-func (ct *Conntrack) Run(ctx context.Context) error {
-	if ct.cfg.DataAggregationLevel == config.Low {
-		ct.l.Info("conntrack is disabled in low data aggregation level")
-		return nil
+// New returns a new Conntrack instance.
+func New() (*Conntrack, error) {
+	ct := &Conntrack{
+		l:           log.Logger().Named("conntrack"),
+		gcFrequency: defaultGCFrequency,
 	}
 
 	objs := &conntrackObjects{}
@@ -45,23 +57,26 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 	})
 	if err != nil {
 		ct.l.Error("loadConntrackObjects failed", zap.Error(err))
-		return errors.Wrap(err, "failed to load conntrack objects")
+		return nil, errors.Wrap(err, "failed to load conntrack objects")
 	}
 
 	ct.objs = objs
-
 	// Get the conntrack map from the objects
 	ct.ctMap = objs.RetinaConntrackMap
+	return ct, nil
+}
 
+// Run starts the Conntrack garbage collection loop.
+func (ct *Conntrack) Run(ctx context.Context) error {
 	ticker := time.NewTicker(ct.gcFrequency)
 	defer ticker.Stop()
 
-	ct.l.Info("starting Conntrack GC loop")
+	ct.l.Info("Starting Conntrack GC loop")
 
 	for {
 		select {
 		case <-ctx.Done():
-			ct.l.Info("stopping conntrack GC loop")
+			ct.l.Info("Stopping conntrack GC loop")
 			if ct.objs != nil {
 				err := ct.objs.Close()
 				if err != nil {
@@ -80,6 +95,7 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			iter := ct.ctMap.Iterate()
 			for iter.Next(&key, &value) {
 				noOfCtEntries++
+				// Check if the connection is closing or has expired
 				if value.IsClosing || ktime.MonotonicOffset.Seconds()+float64(value.EvictionTime) < float64((time.Now().Unix())) {
 					// Iterating a hash map from which keys are being deleted is not safe.
 					// So, we store the keys to be deleted in a list and delete them after the iteration.

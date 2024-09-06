@@ -20,6 +20,17 @@ import (
 )
 
 const (
+	TCPFlagFIN = 1 << iota
+	TCPFlagSYN
+	TCPFlagRST
+	TCPFlagPSH
+	TCPFlagACK
+	TCPFlagURG
+	TCPFlagECE
+	TCPFlagCWR
+)
+
+const (
 	Name                  api.PluginName = "packetparser"
 	toEndpoint            string         = "toEndpoint"
 	fromEndpoint          string         = "fromEndpoint"

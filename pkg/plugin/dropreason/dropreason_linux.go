@@ -352,6 +352,7 @@ func (dr *dropReason) processRecord(ctx context.Context, id int) {
 			destinationPortShort := uint32(utils.HostToNetShort(bpfEvent.DstPort))
 
 			fl := utils.ToFlow(
+				dr.l,
 				ktime.MonotonicOffset.Nanoseconds()+int64(bpfEvent.Ts),
 				utils.Int2ip(bpfEvent.SrcIp).To4(), // Precautionary To4() call.
 				utils.Int2ip(bpfEvent.DstIp).To4(), // Precautionary To4() call.
@@ -365,6 +366,9 @@ func (dr *dropReason) processRecord(ctx context.Context, id int) {
 				dr.l.Warn("Could not convert bpfEvent to flow", zap.Any("bpfEvent", bpfEvent))
 				continue
 			}
+
+			// IsReply is not applicable for DROPPED verdicts.
+			fl.IsReply = nil
 
 			meta := &utils.RetinaMetadata{}
 
