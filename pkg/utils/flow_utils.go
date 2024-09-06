@@ -64,6 +64,7 @@ func ToFlow(
 	var (
 		checkpoint   flow.TraceObservationPoint
 		subeventtype int
+		direction    flow.TrafficDirection
 	)
 	// We are attaching the filters to the veth interface on the host side.
 	// So for HOST -> CONTAINER, egress of host veth is ingress of container.
@@ -71,18 +72,23 @@ func ToFlow(
 	switch observationPoint {
 	case uint8(0): //nolint:gomnd // flow.TraceObservationPoint_TO_STACK
 		checkpoint = flow.TraceObservationPoint_TO_STACK
+		direction = flow.TrafficDirection_EGRESS
 		subeventtype = int(api.TraceToStack)
 	case uint8(1): //nolint:gomnd // flow.TraceObservationPoint_TO_ENDPOINT
 		checkpoint = flow.TraceObservationPoint_TO_ENDPOINT
+		direction = flow.TrafficDirection_INGRESS
 		subeventtype = int(api.TraceToLxc)
 	case uint8(2): //nolint:gomnd // flow.TraceObservationPoint_FROM_NETWORK
 		checkpoint = flow.TraceObservationPoint_FROM_NETWORK
+		direction = flow.TrafficDirection_INGRESS
 		subeventtype = int(api.TraceFromNetwork)
 	case uint8(3): //nolint:gomnd // flow.TraceObservationPoint_TO_NETWORK
 		checkpoint = flow.TraceObservationPoint_TO_NETWORK
+		direction = flow.TrafficDirection_EGRESS
 		subeventtype = int(api.TraceToNetwork)
 	default:
 		checkpoint = flow.TraceObservationPoint_UNKNOWN_POINT
+		direction = flow.TrafficDirection_TRAFFIC_DIRECTION_UNKNOWN
 	}
 
 	if verdict == 0 {
@@ -105,10 +111,12 @@ func ToFlow(
 		},
 		L4:                    l4,
 		TraceObservationPoint: checkpoint,
-		Verdict:               verdict,
-		Extensions:            ext,
-		// Setting IsReply to false by default as we don't have a better way to determine flow direction by default.
-		// Packetparser running with conntrack can determine the direction of the flow.
+		// Packetparser running with conntrack can determine the traffic direction correctly and will override this value.
+		TrafficDirection: direction,
+		Verdict:          verdict,
+		Extensions:       ext,
+		// Setting IsReply to false by default.
+		// Packetparser running with conntrack can determine the direction of the flow, and will override this value.
 		IsReply: &wrapperspb.BoolValue{Value: false},
 	}
 	if t, err := decodeTime(ts); err == nil {
