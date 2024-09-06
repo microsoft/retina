@@ -56,7 +56,7 @@ func ValidateBasicDNSMetrics(scenarioName string, req *RequestValidationParams, 
 			},
 			Opts: &types.StepOptions{
 				ExpectError:               req.ExpectError,
-				SkipSavingParamatersToJob: true,
+				SkipSavingParametersToJob: true,
 			},
 		},
 		{
@@ -73,7 +73,7 @@ func ValidateBasicDNSMetrics(scenarioName string, req *RequestValidationParams, 
 			},
 			Opts: &types.StepOptions{
 				ExpectError:               req.ExpectError,
-				SkipSavingParamatersToJob: true,
+				SkipSavingParametersToJob: true,
 			},
 		},
 		{
@@ -91,7 +91,7 @@ func ValidateBasicDNSMetrics(scenarioName string, req *RequestValidationParams, 
 				OptionalLabelAffinity: "app=" + agnhostName, // port forward to a pod on a node that also has this pod with this label, assuming same namespace
 			},
 			Opts: &types.StepOptions{
-				SkipSavingParamatersToJob: true,
+				SkipSavingParametersToJob: true,
 				RunInBackgroundWithID:     id,
 			},
 		},
@@ -101,7 +101,7 @@ func ValidateBasicDNSMetrics(scenarioName string, req *RequestValidationParams, 
 				QueryType: req.QueryType,
 			},
 			Opts: &types.StepOptions{
-				SkipSavingParamatersToJob: true,
+				SkipSavingParametersToJob: true,
 			},
 		},
 		{
@@ -113,7 +113,7 @@ func ValidateBasicDNSMetrics(scenarioName string, req *RequestValidationParams, 
 				Response:    resp.Response,
 			},
 			Opts: &types.StepOptions{
-				SkipSavingParamatersToJob: true,
+				SkipSavingParametersToJob: true,
 			},
 		},
 		{
@@ -127,7 +127,7 @@ func ValidateBasicDNSMetrics(scenarioName string, req *RequestValidationParams, 
 				ResourceName:      agnhostName,
 				ResourceNamespace: "kube-system",
 			}, Opts: &types.StepOptions{
-				SkipSavingParamatersToJob: true,
+				SkipSavingParametersToJob: true,
 			},
 		},
 		{
@@ -160,7 +160,7 @@ func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParam
 			},
 			Opts: &types.StepOptions{
 				ExpectError:               req.ExpectError,
-				SkipSavingParamatersToJob: true,
+				SkipSavingParametersToJob: true,
 			},
 		},
 		{
@@ -177,7 +177,7 @@ func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParam
 			},
 			Opts: &types.StepOptions{
 				ExpectError:               req.ExpectError,
-				SkipSavingParamatersToJob: true,
+				SkipSavingParametersToJob: true,
 			},
 		},
 		{
@@ -195,7 +195,7 @@ func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParam
 				OptionalLabelAffinity: "app=" + agnhostName, // port forward to a pod on a node that also has this pod with this label, assuming same namespace
 			},
 			Opts: &types.StepOptions{
-				SkipSavingParamatersToJob: true,
+				SkipSavingParametersToJob: true,
 				RunInBackgroundWithID:     id,
 			},
 		},
@@ -210,7 +210,7 @@ func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParam
 				KubeConfigFilePath: kubeConfigFilePath,
 			},
 			Opts: &types.StepOptions{
-				SkipSavingParamatersToJob: true,
+				SkipSavingParametersToJob: true,
 			},
 		},
 		{
@@ -227,7 +227,7 @@ func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParam
 				KubeConfigFilePath: kubeConfigFilePath,
 			},
 			Opts: &types.StepOptions{
-				SkipSavingParamatersToJob: true,
+				SkipSavingParametersToJob: true,
 			},
 		},
 		{
@@ -241,7 +241,7 @@ func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParam
 				ResourceName:      agnhostName,
 				ResourceNamespace: "kube-system",
 			}, Opts: &types.StepOptions{
-				SkipSavingParamatersToJob: true,
+				SkipSavingParametersToJob: true,
 			},
 		},
 		{

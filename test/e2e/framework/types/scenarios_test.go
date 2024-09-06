@@ -39,7 +39,7 @@ func TestScenarioValuesWithSkip(t *testing.T) {
 		Parameter1: "Top Level Step 1",
 		Parameter2: "Top Level Step 2",
 	}, &StepOptions{
-		SkipSavingParamatersToJob: true,
+		SkipSavingParametersToJob: true,
 	})
 
 	// top level step skips saving parameters, so we should error here
@@ -100,7 +100,7 @@ func NewDummyScenarioWithSkipSave() *Scenario {
 				Parameter1: "",
 				Parameter2: "",
 			}, Opts: &StepOptions{
-				SkipSavingParamatersToJob: true,
+				SkipSavingParametersToJob: true,
 			},
 		},
 	)

@@ -286,7 +286,7 @@ func (j *Job) validateStep(step *StepWrapper) error {
 
 				var err error
 				var value string
-				if step.Opts.SkipSavingParamatersToJob {
+				if step.Opts.SkipSavingParametersToJob {
 					retrievedvalue := j.GetValues(step, parameter)
 
 					// if the value is already set, and it's not the same as the one we're trying to set, error

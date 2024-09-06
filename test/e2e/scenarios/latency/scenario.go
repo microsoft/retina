@@ -27,14 +27,14 @@ func ValidateLatencyMetric() *types.Scenario {
 				OptionalLabelAffinity: "k8s-app=retina",
 			},
 			Opts: &types.StepOptions{
-				SkipSavingParamatersToJob: true,
+				SkipSavingParametersToJob: true,
 				RunInBackgroundWithID:     "latency-port-forward",
 			},
 		},
 		{
 			Step: &ValidateAPIServerLatencyMetric{},
 			Opts: &types.StepOptions{
-				SkipSavingParamatersToJob: true,
+				SkipSavingParametersToJob: true,
 			},
 		},
 		{
