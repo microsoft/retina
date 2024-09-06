@@ -17,31 +17,31 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockICounterVec is a mock of ICounterVec interface.
-type MockICounterVec struct {
+// MockCounterVec is a mock of CounterVec interface.
+type MockCounterVec struct {
 	ctrl     *gomock.Controller
-	recorder *MockICounterVecMockRecorder
+	recorder *MockCounterVecMockRecorder
 }
 
-// MockICounterVecMockRecorder is the mock recorder for MockICounterVec.
-type MockICounterVecMockRecorder struct {
-	mock *MockICounterVec
+// MockCounterVecMockRecorder is the mock recorder for MockCounterVec.
+type MockCounterVecMockRecorder struct {
+	mock *MockCounterVec
 }
 
-// NewMockICounterVec creates a new mock instance.
-func NewMockICounterVec(ctrl *gomock.Controller) *MockICounterVec {
-	mock := &MockICounterVec{ctrl: ctrl}
-	mock.recorder = &MockICounterVecMockRecorder{mock}
+// NewMockCounterVec creates a new mock instance.
+func NewMockCounterVec(ctrl *gomock.Controller) *MockCounterVec {
+	mock := &MockCounterVec{ctrl: ctrl}
+	mock.recorder = &MockCounterVecMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockICounterVec) EXPECT() *MockICounterVecMockRecorder {
+func (m *MockCounterVec) EXPECT() *MockCounterVecMockRecorder {
 	return m.recorder
 }
 
 // GetMetricWithLabelValues mocks base method.
-func (m *MockICounterVec) GetMetricWithLabelValues(lvs ...string) (prometheus.Counter, error) {
+func (m *MockCounterVec) GetMetricWithLabelValues(lvs ...string) (prometheus.Counter, error) {
 	m.ctrl.T.Helper()
 	varargs := []any{}
 	for _, a := range lvs {
@@ -54,13 +54,13 @@ func (m *MockICounterVec) GetMetricWithLabelValues(lvs ...string) (prometheus.Co
 }
 
 // GetMetricWithLabelValues indicates an expected call of GetMetricWithLabelValues.
-func (mr *MockICounterVecMockRecorder) GetMetricWithLabelValues(lvs ...any) *gomock.Call {
+func (mr *MockCounterVecMockRecorder) GetMetricWithLabelValues(lvs ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetricWithLabelValues", reflect.TypeOf((*MockICounterVec)(nil).GetMetricWithLabelValues), lvs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetricWithLabelValues", reflect.TypeOf((*MockCounterVec)(nil).GetMetricWithLabelValues), lvs...)
 }
 
 // WithLabelValues mocks base method.
-func (m *MockICounterVec) WithLabelValues(lvs ...string) prometheus.Counter {
+func (m *MockCounterVec) WithLabelValues(lvs ...string) prometheus.Counter {
 	m.ctrl.T.Helper()
 	varargs := []any{}
 	for _, a := range lvs {
@@ -72,36 +72,36 @@ func (m *MockICounterVec) WithLabelValues(lvs ...string) prometheus.Counter {
 }
 
 // WithLabelValues indicates an expected call of WithLabelValues.
-func (mr *MockICounterVecMockRecorder) WithLabelValues(lvs ...any) *gomock.Call {
+func (mr *MockCounterVecMockRecorder) WithLabelValues(lvs ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithLabelValues", reflect.TypeOf((*MockICounterVec)(nil).WithLabelValues), lvs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithLabelValues", reflect.TypeOf((*MockCounterVec)(nil).WithLabelValues), lvs...)
 }
 
-// MockIGaugeVec is a mock of IGaugeVec interface.
-type MockIGaugeVec struct {
+// MockGaugeVec is a mock of GaugeVec interface.
+type MockGaugeVec struct {
 	ctrl     *gomock.Controller
-	recorder *MockIGaugeVecMockRecorder
+	recorder *MockGaugeVecMockRecorder
 }
 
-// MockIGaugeVecMockRecorder is the mock recorder for MockIGaugeVec.
-type MockIGaugeVecMockRecorder struct {
-	mock *MockIGaugeVec
+// MockGaugeVecMockRecorder is the mock recorder for MockGaugeVec.
+type MockGaugeVecMockRecorder struct {
+	mock *MockGaugeVec
 }
 
-// NewMockIGaugeVec creates a new mock instance.
-func NewMockIGaugeVec(ctrl *gomock.Controller) *MockIGaugeVec {
-	mock := &MockIGaugeVec{ctrl: ctrl}
-	mock.recorder = &MockIGaugeVecMockRecorder{mock}
+// NewMockGaugeVec creates a new mock instance.
+func NewMockGaugeVec(ctrl *gomock.Controller) *MockGaugeVec {
+	mock := &MockGaugeVec{ctrl: ctrl}
+	mock.recorder = &MockGaugeVecMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockIGaugeVec) EXPECT() *MockIGaugeVecMockRecorder {
+func (m *MockGaugeVec) EXPECT() *MockGaugeVecMockRecorder {
 	return m.recorder
 }
 
 // GetMetricWithLabelValues mocks base method.
-func (m *MockIGaugeVec) GetMetricWithLabelValues(lvs ...string) (prometheus.Gauge, error) {
+func (m *MockGaugeVec) GetMetricWithLabelValues(lvs ...string) (prometheus.Gauge, error) {
 	m.ctrl.T.Helper()
 	varargs := []any{}
 	for _, a := range lvs {
@@ -114,13 +114,13 @@ func (m *MockIGaugeVec) GetMetricWithLabelValues(lvs ...string) (prometheus.Gaug
 }
 
 // GetMetricWithLabelValues indicates an expected call of GetMetricWithLabelValues.
-func (mr *MockIGaugeVecMockRecorder) GetMetricWithLabelValues(lvs ...any) *gomock.Call {
+func (mr *MockGaugeVecMockRecorder) GetMetricWithLabelValues(lvs ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetricWithLabelValues", reflect.TypeOf((*MockIGaugeVec)(nil).GetMetricWithLabelValues), lvs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetricWithLabelValues", reflect.TypeOf((*MockGaugeVec)(nil).GetMetricWithLabelValues), lvs...)
 }
 
 // WithLabelValues mocks base method.
-func (m *MockIGaugeVec) WithLabelValues(lvs ...string) prometheus.Gauge {
+func (m *MockGaugeVec) WithLabelValues(lvs ...string) prometheus.Gauge {
 	m.ctrl.T.Helper()
 	varargs := []any{}
 	for _, a := range lvs {
@@ -132,48 +132,48 @@ func (m *MockIGaugeVec) WithLabelValues(lvs ...string) prometheus.Gauge {
 }
 
 // WithLabelValues indicates an expected call of WithLabelValues.
-func (mr *MockIGaugeVecMockRecorder) WithLabelValues(lvs ...any) *gomock.Call {
+func (mr *MockGaugeVecMockRecorder) WithLabelValues(lvs ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithLabelValues", reflect.TypeOf((*MockIGaugeVec)(nil).WithLabelValues), lvs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithLabelValues", reflect.TypeOf((*MockGaugeVec)(nil).WithLabelValues), lvs...)
 }
 
-// MockIHistogramVec is a mock of IHistogramVec interface.
-type MockIHistogramVec struct {
+// MockHistogram is a mock of Histogram interface.
+type MockHistogram struct {
 	ctrl     *gomock.Controller
-	recorder *MockIHistogramVecMockRecorder
+	recorder *MockHistogramMockRecorder
 }
 
-// MockIHistogramVecMockRecorder is the mock recorder for MockIHistogramVec.
-type MockIHistogramVecMockRecorder struct {
-	mock *MockIHistogramVec
+// MockHistogramMockRecorder is the mock recorder for MockHistogram.
+type MockHistogramMockRecorder struct {
+	mock *MockHistogram
 }
 
-// NewMockIHistogramVec creates a new mock instance.
-func NewMockIHistogramVec(ctrl *gomock.Controller) *MockIHistogramVec {
-	mock := &MockIHistogramVec{ctrl: ctrl}
-	mock.recorder = &MockIHistogramVecMockRecorder{mock}
+// NewMockHistogram creates a new mock instance.
+func NewMockHistogram(ctrl *gomock.Controller) *MockHistogram {
+	mock := &MockHistogram{ctrl: ctrl}
+	mock.recorder = &MockHistogramMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockIHistogramVec) EXPECT() *MockIHistogramVecMockRecorder {
+func (m *MockHistogram) EXPECT() *MockHistogramMockRecorder {
 	return m.recorder
 }
 
 // Observe mocks base method.
-func (m *MockIHistogramVec) Observe(arg0 float64) {
+func (m *MockHistogram) Observe(arg0 float64) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Observe", arg0)
 }
 
 // Observe indicates an expected call of Observe.
-func (mr *MockIHistogramVecMockRecorder) Observe(arg0 any) *gomock.Call {
+func (mr *MockHistogramMockRecorder) Observe(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Observe", reflect.TypeOf((*MockIHistogramVec)(nil).Observe), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Observe", reflect.TypeOf((*MockHistogram)(nil).Observe), arg0)
 }
 
 // Write mocks base method.
-func (m *MockIHistogramVec) Write(arg0 *io_prometheus_client.Metric) error {
+func (m *MockHistogram) Write(arg0 *io_prometheus_client.Metric) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Write", arg0)
 	ret0, _ := ret[0].(error)
@@ -181,7 +181,7 @@ func (m *MockIHistogramVec) Write(arg0 *io_prometheus_client.Metric) error {
 }
 
 // Write indicates an expected call of Write.
-func (mr *MockIHistogramVecMockRecorder) Write(arg0 any) *gomock.Call {
+func (mr *MockHistogramMockRecorder) Write(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Write", reflect.TypeOf((*MockIHistogramVec)(nil).Write), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Write", reflect.TypeOf((*MockHistogram)(nil).Write), arg0)
 }

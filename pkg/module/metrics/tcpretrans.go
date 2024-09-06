@@ -25,7 +25,7 @@ const (
 
 type TCPRetransMetrics struct {
 	baseMetricObject
-	tcpRetransMetrics metricsinit.IGaugeVec
+	tcpRetransMetrics metricsinit.GaugeVec
 }
 
 func NewTCPRetransMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext) *TCPRetransMetrics {

@@ -233,17 +233,17 @@ func (nr *NetstatReader) updateMetrics() {
 	}
 	// Adding TCP Connection Stats
 	for statName, val := range nr.connStats.TcpExt {
-		metrics.TCPConnectionStats.WithLabelValues(statName).Set(float64(val))
+		metrics.TCPConnectionStatsGauge.WithLabelValues(statName).Set(float64(val))
 	}
 
 	// Adding IP Stats
 	for statName, val := range nr.connStats.IpExt {
-		metrics.IPConnectionStats.WithLabelValues(statName).Set(float64(val))
+		metrics.IPConnectionStatsGauge.WithLabelValues(statName).Set(float64(val))
 	}
 
 	// Adding MPTCP Stats
 	for statName, val := range nr.connStats.MPTcpExt {
-		metrics.TCPConnectionStats.WithLabelValues(statName).Set(float64(val))
+		metrics.TCPConnectionStatsGauge.WithLabelValues(statName).Set(float64(val))
 	}
 
 	// TCP COnnection State and remote addr metrics
@@ -267,7 +267,7 @@ func (nr *NetstatReader) updateMetrics() {
 	}
 
 	// UDP COnnection State metrics
-	metrics.UDPConnectionStats.WithLabelValues(utils.Active).Set(float64(nr.connStats.UdpSockets.totalActiveSockets))
+	metrics.UDPConnectionStatsGauge.WithLabelValues(utils.Active).Set(float64(nr.connStats.UdpSockets.totalActiveSockets))
 }
 
 func validateRemoteAddr(addr string) bool {

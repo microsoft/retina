@@ -336,19 +336,19 @@ func DefaultCtxOptions() []string {
 func DefaultMetrics() []string {
 	return []string{
 		// forward
-		utils.ForwardCountTotalName,
-		utils.ForwardBytesTotalName,
+		utils.ForwardPacketsGaugeName,
+		utils.ForwardBytesGaugeName,
 		// drop
-		utils.DropCountTotalName,
-		utils.DropBytesTotalName,
+		utils.DroppedPacketsGaugeName,
+		utils.DropBytesGaugeName,
 		// tcp flags
-		utils.TcpFlagCounters,
+		utils.TCPFlagGauge,
 		// tcp retransmissions
-		utils.TcpRetransCount,
+		utils.TCPRetransCount,
 		// latency
-		utils.NodeApiServerLatencyName,
-		utils.NodeApiServerTcpHandshakeLatencyName,
-		utils.NoResponseFromApiServerName,
+		utils.NodeAPIServerLatencyName,
+		utils.NodeAPIServerTCPHandshakeLatencyName,
+		utils.NoResponseFromAPIServerName,
 		// dns
 		utils.DNSRequestCounterName,
 		utils.DNSResponseCounterName,

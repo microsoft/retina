@@ -479,7 +479,7 @@ func TestNewTCPMetrics(t *testing.T) {
 			assert.NotNil(t, tcp, "forward metrics should not be nil Test Name: %s", tc.name)
 		}
 
-		tcpFlagMockMetrics := metricsinit.NewMockIGaugeVec(ctrl) //nolint:staticcheck
+		tcpFlagMockMetrics := metricsinit.NewMockGaugeVec(ctrl) //nolint:staticcheck
 		tcp.tcpFlagsMetrics = tcpFlagMockMetrics
 
 		testmetric := prometheus.NewGauge(prometheus.GaugeOpts{

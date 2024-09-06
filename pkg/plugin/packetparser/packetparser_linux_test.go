@@ -335,7 +335,7 @@ func TestReadDataPodLevelEnabled(t *testing.T) {
 		recordsChannel: make(chan perf.Record, buffer),
 	}
 
-	mICounterVec := metrics.NewMockICounterVec(ctrl)
+	mICounterVec := metrics.NewMockCounterVec(ctrl)
 	mICounterVec.EXPECT().WithLabelValues(gomock.Any()).Return(prometheus.NewCounter(prometheus.CounterOpts{})).AnyTimes()
 
 	metrics.LostEventsCounter = mICounterVec

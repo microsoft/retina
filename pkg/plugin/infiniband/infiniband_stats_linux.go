@@ -133,11 +133,11 @@ func (ir *InfinibandReader) readStatusParamStats(fsys fs.FS) error {
 func (ir *InfinibandReader) updateMetrics() {
 	// Adding counter stats
 	for counter, val := range ir.counterStats {
-		metrics.InfinibandCounterStats.WithLabelValues(counter.Name, counter.Device, counter.Port).Set(float64(val))
+		metrics.InfinibandStatsGauge.WithLabelValues(counter.Name, counter.Device, counter.Port).Set(float64(val))
 	}
 
 	// Adding status params
 	for statusParam, val := range ir.statusParamStats {
-		metrics.InfinibandStatusParams.WithLabelValues(statusParam.Name, statusParam.Iface).Set(float64(val))
+		metrics.InfinibandStatusParamsGauge.WithLabelValues(statusParam.Name, statusParam.Iface).Set(float64(val))
 	}
 }
