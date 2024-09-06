@@ -49,13 +49,13 @@ func TestNewLatencyMetrics(t *testing.T) {
 	for _, option := range options[2:] {
 		lm = NewLatencyMetrics(option, l, "")
 	}
-	if lm.nodeApiServerLatency == nil {
+	if lm.nodeAPIServerLatency == nil {
 		t.Errorf("LatencyMetrics.nodeApiServerLatency should be initialized")
 	}
 	if lm.noResponseMetric == nil {
 		t.Errorf("LatencyMetrics.noResponseMetric should be initialized")
 	}
-	if lm.nodeApiServerHandshakeLatency == nil {
+	if lm.nodeAPIServerHandshakeLatency == nil {
 		t.Errorf("LatencyMetrics.nodeApiServerHandshakeLatency should be initialized")
 	}
 
@@ -99,18 +99,18 @@ func TestProcessFlow(t *testing.T) {
 	lm.apiServerIps[apiSeverIp.String()] = struct{}{}
 
 	// Set mock nodeApiServerLatency.
-	mHist := metrics.NewMockIHistogramVec(ctrl)
+	mHist := metrics.NewMockHistogram(ctrl)
 	mHist.EXPECT().Observe(float64(1)).Return().Times(2)
-	lm.nodeApiServerLatency = mHist
+	lm.nodeAPIServerLatency = mHist
 
 	// Set mock nodeApiServerHandshakeLatency.
-	mHist2 := metrics.NewMockIHistogramVec(ctrl)
+	mHist2 := metrics.NewMockHistogram(ctrl)
 	mHist2.EXPECT().Observe(float64(1)).Return().Times(1)
-	lm.nodeApiServerHandshakeLatency = mHist2
+	lm.nodeAPIServerHandshakeLatency = mHist2
 
 	// Test No response metric.
 	c := prometheus.NewCounter(prometheus.CounterOpts{})
-	mNoResponse := metrics.NewMockICounterVec(ctrl)
+	mNoResponse := metrics.NewMockCounterVec(ctrl)
 	mNoResponse.EXPECT().WithLabelValues("no_response").Return(c).Times(1)
 	lm.noResponseMetric = mNoResponse
 
