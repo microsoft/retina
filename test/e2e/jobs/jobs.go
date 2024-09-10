@@ -62,6 +62,20 @@ func DeleteTestInfra(subID, clusterName, location string) *types.Job {
 	return job
 }
 
+func InstallRetina(kubeConfigFilePath, chartPath string) *types.Job {
+	job := types.NewJob("Install and test Retina with basic metrics")
+
+	job.AddStep(&kubernetes.InstallHelmChart{
+		Namespace:          "kube-system",
+		ReleaseName:        "retina",
+		KubeConfigFilePath: kubeConfigFilePath,
+		ChartPath:          chartPath,
+		TagEnv:             generic.DefaultTagEnv,
+	}, nil)
+
+	return job
+}
+
 func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string) *types.Job {
 	job := types.NewJob("Install and test Retina with basic metrics")
 

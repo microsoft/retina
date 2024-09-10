@@ -17,10 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var locations = []string{"eastus2", "centralus", "southcentralus", "uksouth", "centralindia", "westus2"}
-
-// TestE2ERetina tests all e2e scenarios for retina
-func TestE2ERetina(t *testing.T) {
+func TestE2ERetina_Scale(t *testing.T) {
 	ctx, cancel := helpers.Context(t)
 	defer cancel()
 
@@ -41,7 +38,6 @@ func TestE2ERetina(t *testing.T) {
 		}
 		location = locations[nBig.Int64()]
 	}
-
 	cwd, err := os.Getwd()
 	require.NoError(t, err)
 
@@ -49,7 +45,6 @@ func TestE2ERetina(t *testing.T) {
 	rootDir := filepath.Dir(filepath.Dir(cwd))
 
 	chartPath := filepath.Join(rootDir, "deploy", "legacy", "manifests", "controller", "helm", "retina")
-	profilePath := filepath.Join(rootDir, "test", "profiles", "advanced", "values.yaml")
 	kubeConfigFilePath := filepath.Join(rootDir, "test", "e2e", "test.pem")
 
 	// CreateTestInfra
@@ -60,11 +55,11 @@ func TestE2ERetina(t *testing.T) {
 		_ = jobs.DeleteTestInfra(subID, clusterName, location).Run()
 	})
 
-	// Install and test Retina basic metrics
-	basicMetricsE2E := types.NewRunner(t, jobs.InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath))
-	basicMetricsE2E.Run(ctx)
+	// Install Retina
+	installRetina := types.NewRunner(t, jobs.InstallRetina(kubeConfigFilePath, chartPath))
+	installRetina.Run(ctx)
 
-	// Upgrade and test Retina with advanced metrics
-	advanceMetricsE2E := types.NewRunner(t, jobs.UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, profilePath))
-	advanceMetricsE2E.Run(ctx)
+	// TODO: Scale Cluster
+
+	// TODO: equivalent of github.com/Azure/azure-container-networking/test/scale/test-scale.sh
 }
