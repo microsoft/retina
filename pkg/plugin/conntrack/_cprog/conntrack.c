@@ -94,9 +94,9 @@ static inline void _ct_reverse_key(struct ct_v4_key *reverse_key, const struct c
  * @arg observation_point The point in the network stack where the packet is observed.
  */
 static __always_inline __u8 _ct_get_traffic_direction(__u8 observation_point) {
-    if (observation_point & (OBSERVATION_POINT_FROM_ENDPOINT | OBSERVATION_POINT_TO_NETWORK)) {
+    if (observation_point == OBSERVATION_POINT_FROM_ENDPOINT || observation_point == OBSERVATION_POINT_TO_NETWORK) {
         return TRAFFIC_DIRECTION_EGRESS;
-    } else if (observation_point & (OBSERVATION_POINT_TO_ENDPOINT | OBSERVATION_POINT_FROM_NETWORK)) {
+    } else if (observation_point == OBSERVATION_POINT_TO_ENDPOINT || observation_point == OBSERVATION_POINT_FROM_NETWORK) {
         return TRAFFIC_DIRECTION_INGRESS;
     } else {
         return TRAFFIC_DIRECTION_UNKNOWN;
