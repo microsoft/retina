@@ -6,12 +6,17 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/microsoft/retina/test/e2e/framework/helpers"
 )
 
 func TestFramework(t *testing.T) {
+	ctx, cancel := helpers.Context(t)
+	defer cancel()
+
 	job := NewJob("Validate that drop metrics are present in the prometheus endpoint")
 	runner := NewRunner(t, job)
-	defer runner.Run()
+	defer runner.Run(ctx)
 
 	job.AddStep(&TestBackground{
 		CounterName: "Example Counter",
