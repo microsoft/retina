@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/microsoft/retina/test/e2e/common"
+	"github.com/microsoft/retina/test/e2e/framework/helpers"
 	"github.com/microsoft/retina/test/e2e/framework/types"
 	jobs "github.com/microsoft/retina/test/e2e/jobs"
 	"github.com/stretchr/testify/require"
@@ -25,6 +26,9 @@ var (
 
 // TestE2ERetina tests all e2e scenarios for retina
 func TestE2ERetina(t *testing.T) {
+	ctx, cancel := helpers.Context(t)
+	defer cancel()
+
 	curuser, err := user.Current()
 	require.NoError(t, err)
 	flag.Parse()
@@ -72,23 +76,19 @@ func TestE2ERetina(t *testing.T) {
 
 	// CreateTestInfra
 	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath, *createInfra))
-	createTestInfra.Run()
+	createTestInfra.Run(ctx)
 
-	// Hacky way to ensure that the test infra is deleted even if the test panics
-	defer func() {
-		if r := recover(); r != nil {
-			t.Logf("Recovered in TestE2ERetina, %v", r)
-		}
+	t.Cleanup(func() {
 		if *deleteInfra {
 			_ = jobs.DeleteTestInfra(subID, rg, clusterName, location).Run()
 		}
-	}()
+	})
 
 	// Install and test Retina basic metrics
 	basicMetricsE2E := types.NewRunner(t, jobs.InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath, common.TestPodNamespace))
-	basicMetricsE2E.Run()
+	basicMetricsE2E.Run(ctx)
 
 	// Upgrade and test Retina with advanced metrics
 	advanceMetricsE2E := types.NewRunner(t, jobs.UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, profilePath, common.TestPodNamespace))
-	advanceMetricsE2E.Run()
+	advanceMetricsE2E.Run(ctx)
 }
