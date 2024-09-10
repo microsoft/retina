@@ -1,7 +1,6 @@
 module github.com/microsoft/retina
 
 go 1.22.4
-
 require (
 	github.com/go-chi/chi/v5 v5.1.0
 	github.com/google/uuid v1.6.0
@@ -9,7 +8,7 @@ require (
 	github.com/spf13/cobra v1.8.1
 	go.uber.org/zap v1.27.0
 	k8s.io/client-go v0.30.3
-	sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.0.49
+	sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.0.51
 	sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader v0.0.20
 )
 
