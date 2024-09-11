@@ -71,6 +71,7 @@ type Config struct {
 	BypassLookupIPOfInterest bool          `yaml:"bypassLookupIPOfInterest"`
 	DataAggregationLevel     Level         `yaml:"dataAggregationLevel"`
 	MonitorSockPath          string        `yaml:"monitorSockPath"`
+	TLSManagement            string        `yaml:"tlsManagement"`
 }
 
 func (c *Config) WriteYAML(w io.Writer) error {
