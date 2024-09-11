@@ -4,6 +4,7 @@ package config
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"reflect"
@@ -13,6 +14,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v2"
 )
 
 // Level defines the level of monitor aggregation.
@@ -69,6 +71,10 @@ type Config struct {
 	BypassLookupIPOfInterest bool          `yaml:"bypassLookupIPOfInterest"`
 	DataAggregationLevel     Level         `yaml:"dataAggregationLevel"`
 	MonitorSockPath          string        `yaml:"monitorSockPath"`
+}
+
+func (c *Config) WriteYAML(w io.Writer) error {
+	return yaml.NewEncoder(w).Encode(c)
 }
 
 type FilteredConfig struct {
