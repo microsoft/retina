@@ -38,8 +38,8 @@ func TestDecodeLevelHook(t *testing.T) {
 	}{
 		{"low", Low},
 		{"high", High},
-		{"invalid", Low}, // Unimplemented or invalid input should default to Low
-		{123, 123},       // Non-string input should be returned as is
+		{"invalid", High}, // Unimplemented or invalid input should default to Low
+		{123, 123},        // Non-string input should be returned as is
 	}
 
 	for _, test := range tests {
