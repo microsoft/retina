@@ -29,8 +29,8 @@ func (l *Level) UnmarshalText(text []byte) error {
 	case "high":
 		*l = High
 	default:
-		// Default to Low if the text is not recognized.
-		*l = Low
+		// Default to High if the text is not recognized.
+		*l = High
 	}
 	return nil
 }
@@ -52,11 +52,11 @@ type Server struct {
 }
 
 type Config struct {
-	APIServer       Server        `yaml:"apiServer"`
-	LogLevel        string        `yaml:"logLevel"`
-	EnabledPlugin   []string      `yaml:"enabledPlugin"`
-	MetricsInterval time.Duration `yaml:"metricsInterval"`
+	APIServer     Server   `yaml:"apiServer"`
+	LogLevel      string   `yaml:"logLevel"`
+	EnabledPlugin []string `yaml:"enabledPlugin"`
 	// Deprecated: Use only MetricsInterval instead in the go code.
+	MetricsInterval          time.Duration `yaml:"metricsInterval"`
 	MetricsIntervalDuration  time.Duration `yaml:"metricsIntervalDuration"`
 	EnableTelemetry          bool          `yaml:"enableTelemetry"`
 	EnableRetinaEndpoint     bool          `yaml:"enableRetinaEndpoint"`
