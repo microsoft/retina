@@ -1,6 +1,7 @@
 package debug
 
 import (
+	"github.com/microsoft/retina/cli/cmd/debug/bpf"
 	"github.com/microsoft/retina/cli/cmd/debug/conntrack"
 	"github.com/spf13/cobra"
 )
@@ -12,4 +13,5 @@ var Cmd = &cobra.Command{
 
 func init() {
 	Cmd.AddCommand(conntrack.Cmd)
+	Cmd.AddCommand(bpf.Cmd)
 }
