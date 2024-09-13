@@ -114,7 +114,7 @@ func (er *EthtoolReader) updateMetrics() {
 	// retrive interfacename and statname from ethStats
 	for ifName, stats := range er.data.stats {
 		for statName, statVal := range stats {
-			metrics.InterfaceStats.WithLabelValues(ifName, statName).Set(float64(statVal))
+			metrics.InterfaceStatsGauge.WithLabelValues(ifName, statName).Set(float64(statVal))
 		}
 	}
 }

@@ -63,9 +63,9 @@ type LatencyMetrics struct {
 	l                             *log.ZapLogger
 	apiServerIps                  map[string]struct{}
 	cache                         *ttlcache.Cache[key, *val]
-	nodeApiServerLatency          metricsinit.IHistogramVec
-	nodeApiServerHandshakeLatency metricsinit.IHistogramVec
-	noResponseMetric              metricsinit.ICounterVec
+	nodeAPIServerLatency          metricsinit.Histogram
+	nodeAPIServerHandshakeLatency metricsinit.Histogram
+	noResponseMetric              metricsinit.CounterVec
 	callbackId                    string
 	mu                            sync.RWMutex
 }
@@ -83,8 +83,8 @@ func NewLatencyMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger,
 	}
 
 	switch ctxOptions.MetricName {
-	case utils.NodeApiServerLatencyName:
-		lm.nodeApiServerLatency = exporter.CreatePrometheusHistogramWithLinearBucketsForMetric(
+	case utils.NodeAPIServerLatencyName:
+		lm.nodeAPIServerLatency = exporter.CreatePrometheusHistogramWithLinearBucketsForMetric(
 			exporter.AdvancedRegistry,
 			apiserverLatencyName,
 			apiserverLatencyDesc,
@@ -92,8 +92,8 @@ func NewLatencyMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger,
 			width,
 			count,
 		)
-	case utils.NodeApiServerTcpHandshakeLatencyName:
-		lm.nodeApiServerHandshakeLatency = exporter.CreatePrometheusHistogramWithLinearBucketsForMetric(
+	case utils.NodeAPIServerTCPHandshakeLatencyName:
+		lm.nodeAPIServerHandshakeLatency = exporter.CreatePrometheusHistogramWithLinearBucketsForMetric(
 			exporter.AdvancedRegistry,
 			apiServerHandshakeLatencyName,
 			apiServerHandshakeLatencyDesc,
@@ -101,11 +101,12 @@ func NewLatencyMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger,
 			width,
 			count,
 		)
-	case utils.NoResponseFromApiServerName:
+	case utils.NoResponseFromAPIServerName:
 		lm.noResponseMetric = exporter.CreatePrometheusCounterVecForMetric(
 			exporter.AdvancedRegistry,
 			noResponseFromNodeAPIServerName,
 			noResponseFromNodeAPIServerDesc,
+			"no_response",
 		)
 	}
 
@@ -149,11 +150,11 @@ func (lm *LatencyMetrics) Init(metricName string) {
 }
 
 func (lm *LatencyMetrics) Clean() {
-	if lm.nodeApiServerLatency != nil {
-		exporter.UnregisterMetric(exporter.AdvancedRegistry, metricsinit.ToPrometheusType(lm.nodeApiServerLatency))
+	if lm.nodeAPIServerLatency != nil {
+		exporter.UnregisterMetric(exporter.AdvancedRegistry, metricsinit.ToPrometheusType(lm.nodeAPIServerLatency))
 	}
-	if lm.nodeApiServerLatency != nil {
-		exporter.UnregisterMetric(exporter.AdvancedRegistry, metricsinit.ToPrometheusType(lm.nodeApiServerHandshakeLatency))
+	if lm.nodeAPIServerLatency != nil {
+		exporter.UnregisterMetric(exporter.AdvancedRegistry, metricsinit.ToPrometheusType(lm.nodeAPIServerHandshakeLatency))
 	}
 	if lm.noResponseMetric != nil {
 		exporter.UnregisterMetric(exporter.AdvancedRegistry, metricsinit.ToPrometheusType(lm.noResponseMetric))
@@ -286,16 +287,16 @@ func (lm *LatencyMetrics) calculateLatency(f *flow.Flow) {
 			latency := math.Round(float64(f.Time.Nanos-item.Value().t) / float64(1000000))
 
 			// Log continuous latency.
-			if lm.nodeApiServerLatency != nil {
-				lm.nodeApiServerLatency.Observe(latency)
+			if lm.nodeAPIServerLatency != nil {
+				lm.nodeAPIServerLatency.Observe(latency)
 			}
 
 			// Determine if this is the first reply packet, and if so, log handshake latency.
 			prevFlowflags := item.Value().flags
 			curFlowflags := f.L4.GetTCP().Flags
-			if lm.nodeApiServerHandshakeLatency != nil && prevFlowflags != nil && prevFlowflags.SYN && curFlowflags != nil && curFlowflags.SYN && curFlowflags.ACK {
+			if lm.nodeAPIServerHandshakeLatency != nil && prevFlowflags != nil && prevFlowflags.GetSYN() && curFlowflags != nil && curFlowflags.GetSYN() && curFlowflags.GetACK() {
 				// This is the first reply packet.
-				lm.nodeApiServerHandshakeLatency.Observe(latency)
+				lm.nodeAPIServerHandshakeLatency.Observe(latency)
 			}
 			// Delete the entry from cache. Calculate latency for the first reply packet only.
 			lm.cache.Delete(k)

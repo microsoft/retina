@@ -302,7 +302,7 @@ func TestProcessLocalCtx(t *testing.T) {
 			m := NewMockContextOptionsInterface(ctrl) //nolint:typecheck
 			m.EXPECT().getLocalCtxValues(tt.input).Return(tt.output).Times(1)
 
-			mockCV := metrics.NewMockICounterVec(ctrl)
+			mockCV := metrics.NewMockCounterVec(ctrl)
 			if tt.metricsUpdate {
 				mockCV.EXPECT().WithLabelValues(tt.expectedLabels).Return(c).Times(1)
 			}

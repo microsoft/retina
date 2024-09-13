@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/retina/pkg/managers/watchermanager"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/api"
+	"github.com/microsoft/retina/pkg/plugin/conntrack"
 	"github.com/microsoft/retina/pkg/plugin/registry"
 	"github.com/microsoft/retina/pkg/telemetry"
 	"github.com/pkg/errors"
@@ -155,8 +156,18 @@ func (p *PluginManager) Start(ctx context.Context) error {
 		}
 	}
 
-	// start all plugins
 	g, ctx := errgroup.WithContext(ctx)
+
+	// run conntrack GC
+	ct, err := conntrack.New()
+	if err != nil {
+		return errors.Wrap(err, "failed to get conntrack instance")
+	}
+	g.Go(func() error {
+		return errors.Wrapf(ct.Run(ctx), "failed to run conntrack GC")
+	})
+
+	// start all plugins
 	for _, plugin := range p.plugins {
 		plug := plugin
 

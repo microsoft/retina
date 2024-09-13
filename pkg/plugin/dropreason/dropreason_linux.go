@@ -350,9 +350,9 @@ func (dr *dropReason) processRecord(ctx context.Context, id int) {
 			}
 			sourcePortShort := uint32(utils.HostToNetShort(bpfEvent.SrcPort))
 			destinationPortShort := uint32(utils.HostToNetShort(bpfEvent.DstPort))
-			dropKey := (dropMetricKey)(bpfEvent.Key)
 
 			fl := utils.ToFlow(
+				dr.l,
 				ktime.MonotonicOffset.Nanoseconds()+int64(bpfEvent.Ts),
 				utils.Int2ip(bpfEvent.SrcIp).To4(), // Precautionary To4() call.
 				utils.Int2ip(bpfEvent.DstIp).To4(), // Precautionary To4() call.
@@ -367,10 +367,13 @@ func (dr *dropReason) processRecord(ctx context.Context, id int) {
 				continue
 			}
 
+			// IsReply is not applicable for DROPPED verdicts.
+			fl.IsReply = nil
+
 			meta := &utils.RetinaMetadata{}
 
 			// Add drop reason to the flow's metadata.
-			utils.AddDropReason(fl, meta, dropKey.DropType)
+			utils.AddDropReason(fl, meta, bpfEvent.DropType)
 
 			// Add packet size to the flow's metadata.
 			utils.AddPacketSize(meta, bpfEvent.SkbLen)
@@ -380,7 +383,7 @@ func (dr *dropReason) processRecord(ctx context.Context, id int) {
 
 			// This is only for development purposes.
 			// Removing this makes logs way too chatter-y.
-			dr.l.Debug("DropReason Packet Received", zap.Any("flow", fl), zap.Any("Raw Bpf Event", bpfEvent), zap.Uint32("drop type", dropKey.DropType))
+			dr.l.Debug("DropReason Packet Received", zap.Any("flow", fl), zap.Any("Raw Bpf Event", bpfEvent), zap.Uint16("drop type", bpfEvent.DropType))
 
 			// Write the event to the enricher.
 			ev := &hubblev1.Event{
@@ -488,8 +491,8 @@ func (dr *dropReason) Stop() error {
 }
 
 func (dr *dropReason) dropMetricAdd(reason string, direction string, count float64, bytes float64) {
-	metrics.DropCounter.WithLabelValues(reason, direction).Set(float64(count))
-	metrics.DropBytesCounter.WithLabelValues(reason, direction).Set(float64(bytes))
+	metrics.DropPacketsGauge.WithLabelValues(reason, direction).Set(float64(count))
+	metrics.DropBytesGauge.WithLabelValues(reason, direction).Set(float64(bytes))
 }
 
 // Helper functions.

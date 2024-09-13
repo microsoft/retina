@@ -31,7 +31,7 @@ var (
 
 type DNSMetrics struct {
 	baseMetricObject
-	dnsMetrics metricsinit.ICounterVec
+	dnsMetrics metricsinit.CounterVec
 	metricName string
 }
 

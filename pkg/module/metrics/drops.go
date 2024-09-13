@@ -25,7 +25,7 @@ const (
 
 type DropCountMetrics struct {
 	baseMetricObject
-	dropMetric metrics.IGaugeVec
+	dropMetric metrics.GaugeVec
 	metricName string
 }
 
@@ -43,13 +43,13 @@ func NewDropCountMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogge
 
 func (d *DropCountMetrics) Init(metricName string) {
 	switch metricName {
-	case utils.DropCountTotalName:
+	case utils.DroppedPacketsGaugeName:
 		d.dropMetric = exporter.CreatePrometheusGaugeVecForMetric(
 			exporter.AdvancedRegistry,
 			TotalDropCountName,
 			TotalDropCountDesc,
 			d.getLabels()...)
-	case utils.DropBytesTotalName:
+	case utils.DropBytesGaugeName:
 		d.dropMetric = exporter.CreatePrometheusGaugeVecForMetric(
 			exporter.AdvancedRegistry,
 			TotalDropBytesName,
@@ -163,9 +163,9 @@ func (d *DropCountMetrics) processLocalCtxFlow(flow *v1.Flow) {
 
 func (d *DropCountMetrics) update(fl *v1.Flow, labels []string) {
 	switch d.metricName {
-	case utils.DropCountTotalName:
+	case utils.DroppedPacketsGaugeName:
 		d.dropMetric.WithLabelValues(labels...).Inc()
-	case utils.DropBytesTotalName:
+	case utils.DropBytesGaugeName:
 		d.dropMetric.WithLabelValues(labels...).Add(float64(utils.PacketSize(fl)))
 	}
 }

@@ -16,7 +16,7 @@ const (
 	Name api.PluginName = "dns"
 )
 
-var m metrics.ICounterVec
+var m metrics.CounterVec
 
 type dns struct {
 	cfg             *kcfg.Config

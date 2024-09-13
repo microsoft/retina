@@ -21,25 +21,24 @@ const (
 	nodeApiServerHandshakeLatencyHistName = "node_apiserver_handshake_latency_ms"
 
 	// Metric Descriptions
-	dropCountTotalDescription                 = "Total dropped packets"
-	dropBytesTotalDescription                 = "Total dropped bytes"
-	forwardCountTotalDescription              = "Total forwarded packets"
-	forwardBytesTotalDescription              = "Total forwarded bytes"
-	nodeConnectivityStatusDescription         = "The last observed status of both ICMP and HTTP connectivity between the current Cilium agent and other Cilium nodes"
-	nodeConnectivityLatencySecondsDescription = "The last observed latency between the current Cilium agent and other Cilium nodes in seconds"
-	tcpStateGaugeDescription                  = "number of active TCP connections by state"
-	tcpConnectionRemoteGaugeDescription       = "number of active TCP connections by remote address"
-	tcpConnectionStatsDescription             = "TCP connections Statistics"
-	tcpFlagCountersDescription                = "TCP counters by flag"
-	ipConnectionStatsDescription              = "IP connections Statistics"
-	udpConnectionStatsDescription             = "UDP connections Statistics"
-	udpActiveSocketsCounterDescription        = "number of active UDP sockets"
-	interfaceStatsDescription                 = "Interface Statistics"
-	nodeApiServerHandshakeLatencyDesc         = "Histogram depicting latency of the TCP handshake between nodes and Kubernetes API server measured in milliseconds"
-	dnsRequestCounterDescription              = "DNS requests by statistics"
-	dnsResponseCounterDescription             = "DNS responses by statistics"
-	infinibandCounterStatsDescription         = "InfiniBand Counter Statistics"
-	infinibandStatusParamsDescription         = "InfiniBand Status Parameters"
+	dropPacketsGaugeDescription                    = "Total dropped packets"
+	dropBytesGaugeDescription                      = "Total dropped bytes"
+	forwardPacketsGaugeDescription                 = "Total forwarded packets"
+	forwardBytesGaugeDescription                   = "Total forwarded bytes"
+	nodeConnectivityStatusGaugeDescription         = "The last observed status of both ICMP and HTTP connectivity between the current Cilium agent and other Cilium nodes"
+	nodeConnectivityLatencySecondsGaugeDescription = "The last observed latency between the current Cilium agent and other Cilium nodes in seconds"
+	tcpStateGaugeDescription                       = "Number of active TCP connections by state"
+	tcpConnectionRemoteGaugeDescription            = "Number of active TCP connections by remote address"
+	tcpConnectionStatsGaugeDescription             = "TCP connections statistics"
+	tcpFlagGaugeDescription                        = "TCP gauges by flag"
+	ipConnectionStatsGaugeDescription              = "IP connections statistics"
+	udpConnectionStatsGaugeDescription             = "UDP connections statistics"
+	interfaceStatsGaugeDescription                 = "Interface statistics"
+	nodeAPIServerHandshakeLatencyDesc              = "Histogram depicting latency of the TCP handshake between nodes and Kubernetes API server measured in milliseconds"
+	dnsRequestCounterDescription                   = "DNS requests by statistics"
+	dnsResponseCounterDescription                  = "DNS responses by statistics"
+	infinibandStatsGaugeDescription                = "InfiniBand statistics gauge"
+	infinibandStatusParamsGaugeDescription         = "InfiniBand Status Parameters gauge"
 
 	// Control plane metrics
 	pluginManagerFailedToReconcileCounterDescription = "Number of times the plugin manager failed to reconcile the plugins"
@@ -51,46 +50,45 @@ var (
 	// Prevent re-initialization
 	isInitialized bool
 
-	// Common counters across os distributions
-	DropCounter         IGaugeVec
-	DropBytesCounter    IGaugeVec
-	ForwardCounter      IGaugeVec
-	ForwardBytesCounter IGaugeVec
+	// Common gauges across os distributions
+	DropPacketsGauge    GaugeVec
+	DropBytesGauge      GaugeVec
+	ForwardPacketsGauge GaugeVec
+	ForwardBytesGauge   GaugeVec
 
-	WindowsCounter IGaugeVec
+	WindowsGauge GaugeVec
 
 	// Common gauges across os distributions
-	NodeConnectivityStatusGauge  IGaugeVec
-	NodeConnectivityLatencyGauge IGaugeVec
+	NodeConnectivityStatusGauge  GaugeVec
+	NodeConnectivityLatencyGauge GaugeVec
 
 	// TCP Stats
-	TCPStateGauge            IGaugeVec
-	TCPConnectionRemoteGauge IGaugeVec
-	TCPConnectionStats       IGaugeVec
-	TCPFlagCounters          IGaugeVec
+	TCPStateGauge            GaugeVec
+	TCPConnectionRemoteGauge GaugeVec
+	TCPConnectionStatsGauge  GaugeVec
+	TCPFlagGauge             GaugeVec
 
 	// IP States
-	IPConnectionStats IGaugeVec
+	IPConnectionStatsGauge GaugeVec
 
 	// UDP Stats
-	UDPConnectionStats      IGaugeVec
-	UDPActiveSocketsCounter IGaugeVec
+	UDPConnectionStatsGauge GaugeVec
 
 	// Interface Stats
-	InterfaceStats IGaugeVec
+	InterfaceStatsGauge GaugeVec
 
 	metricsLogger *log.ZapLogger
 
 	// Control Plane Metrics
-	PluginManagerFailedToReconcileCounter ICounterVec
-	LostEventsCounter                     ICounterVec
+	PluginManagerFailedToReconcileCounter CounterVec
+	LostEventsCounter                     CounterVec
 
 	// DNS Metrics.
-	DNSRequestCounter  ICounterVec
-	DNSResponseCounter ICounterVec
+	DNSRequestCounter  CounterVec
+	DNSResponseCounter CounterVec
 
-	InfinibandCounterStats IGaugeVec
-	InfinibandStatusParams IGaugeVec
+	InfinibandStatsGauge        GaugeVec
+	InfinibandStatusParamsGauge GaugeVec
 )
 
 func ToPrometheusType(metric interface{}) prometheus.Collector {
@@ -98,12 +96,10 @@ func ToPrometheusType(metric interface{}) prometheus.Collector {
 		return nil
 	}
 	switch m := metric.(type) {
-	case IGaugeVec:
+	case GaugeVec:
 		return m.(*prometheus.GaugeVec)
-	case ICounterVec:
+	case CounterVec:
 		return m.(*prometheus.CounterVec)
-	case IHistogramVec:
-		return m.(prometheus.Histogram)
 	default:
 		metricsLogger.Error("error converting unknown metric type", zap.Any("metric", m))
 		return nil

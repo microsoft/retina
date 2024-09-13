@@ -308,12 +308,12 @@ func TestReadDataPodLevelEnabled(t *testing.T) {
 	defer ctrl.Finish()
 
 	bpfEvent := &packetparserPacket{ //nolint:typecheck
-		SrcIp:   uint32(83886272), // 192.0.0.5
-		DstIp:   uint32(16777226), // 10.0.0.1
-		Proto:   uint8(6),         // TCP
-		Dir:     uint32(1),        // TO Endpoint
-		SrcPort: uint16(80),
-		DstPort: uint16(443),
+		SrcIp:            uint32(83886272), // 192.0.0.5
+		DstIp:            uint32(16777226), // 10.0.0.1
+		Proto:            uint8(6),         // TCP
+		ObservationPoint: uint8(1),         // TO Endpoint
+		SrcPort:          uint16(80),
+		DstPort:          uint16(443),
 	}
 	bytes, _ := json.Marshal(bpfEvent)
 	record := perf.Record{
@@ -335,7 +335,7 @@ func TestReadDataPodLevelEnabled(t *testing.T) {
 		recordsChannel: make(chan perf.Record, buffer),
 	}
 
-	mICounterVec := metrics.NewMockICounterVec(ctrl)
+	mICounterVec := metrics.NewMockCounterVec(ctrl)
 	mICounterVec.EXPECT().WithLabelValues(gomock.Any()).Return(prometheus.NewCounter(prometheus.CounterOpts{})).AnyTimes()
 
 	metrics.LostEventsCounter = mICounterVec
@@ -532,7 +532,7 @@ func TestPacketParseGenerate(t *testing.T) {
 		t.Fatalf("dynamic header file does not exist: %v", err)
 	}
 
-	expectedContents := "#define BYPASS_LOOKUP_IP_OF_INTEREST 1 \n"
+	expectedContents := "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n#define DATA_AGGREGATION_LEVEL 0\n"
 	actualContents, err := os.ReadFile(dynamicHeaderPath)
 	if err != nil {
 		t.Fatalf("failed to read dynamic header file: %v", err)

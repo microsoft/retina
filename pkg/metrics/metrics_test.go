@@ -15,7 +15,7 @@ func TestInitialization_FirstInit(t *testing.T) {
 	InitializeMetrics()
 
 	//  All metrics should be initialized.
-	objs := []interface{}{DropCounter, DropBytesCounter, ForwardBytesCounter, ForwardCounter, NodeConnectivityStatusGauge, NodeConnectivityLatencyGauge, PluginManagerFailedToReconcileCounter}
+	objs := []interface{}{DropPacketsGauge, DropBytesGauge, ForwardBytesGauge, ForwardPacketsGauge, NodeConnectivityStatusGauge, NodeConnectivityLatencyGauge, PluginManagerFailedToReconcileCounter}
 	for _, obj := range objs {
 		if obj == nil {
 			t.Fatalf("Expected all metrics to be initialized")

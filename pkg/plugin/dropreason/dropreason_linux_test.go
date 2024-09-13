@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"testing"
 	"time"
+	"unsafe"
 
 	"github.com/cilium/ebpf/perf"
 	kcfg "github.com/microsoft/retina/pkg/config"
@@ -134,11 +135,11 @@ func TestProcessMapValue(t *testing.T) {
 	direction := testMetricKey.getDirection()
 
 	dropCount := &dto.Metric{}
-	err := metrics.DropCounter.WithLabelValues(reason, direction).Write(dropCount)
+	err := metrics.DropPacketsGauge.WithLabelValues(reason, direction).Write(dropCount)
 	require.Nil(t, err, "Expected no error but got: %w", err)
 
 	dropBytes := &dto.Metric{}
-	err = metrics.DropBytesCounter.WithLabelValues(reason, direction).Write(dropBytes)
+	err = metrics.DropBytesGauge.WithLabelValues(reason, direction).Write(dropBytes)
 	require.Nil(t, err, "Expected no error but got: %w", err)
 
 	dropCountValue := *dropCount.Gauge.Value
@@ -207,8 +208,8 @@ func TestDropReasonRun(t *testing.T) {
 	mockedMapIterator.EXPECT().Err().Return(nil).MinTimes(1)
 	mockedMapIterator.EXPECT().Next(gomock.Any(), gomock.Any()).Return(false).MinTimes(1)
 
-	// create a rawSample slice and fill it with 56 bytes of data. 56 is the size of the rawSample in perf.Record (kprobePacket)
-	rawSample := make([]byte, 56)
+	// create a rawSample slice and fill it with `unsafe.Sizeof(kprobePacket{})`
+	rawSample := make([]byte, unsafe.Sizeof(kprobePacket{}))
 	for i := range rawSample {
 		rawSample[i] = byte(i)
 	}
@@ -261,8 +262,8 @@ func TestDropReasonReadDataPodLevelEnabled(t *testing.T) {
 	mockedPerfReader := mocks.NewMockIPerfReader(ctrl)
 	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
 
-	// create a rawSample slice and fill it with 56 bytes of data. 56 is the size of the rawSample in perf.Record (kprobePacket)
-	rawSample := make([]byte, 56)
+	// create a rawSample slice and fill it with `unsafe.Sizeof(kprobePacket{})`
+	rawSample := make([]byte, unsafe.Sizeof(kprobePacket{}))
 	for i := range rawSample {
 		rawSample[i] = byte(i)
 	}
@@ -350,8 +351,8 @@ func TestDropReasonReadData_WithPerfArrayLostSamples(t *testing.T) {
 	mockedMap := mocks.NewMockIMap(ctrl)
 	mockedPerfReader := mocks.NewMockIPerfReader(ctrl)
 
-	// create a rawSample slice and fill it with 56 bytes of data. 56 is the size of the rawSample in perf.Record (kprobePacket)
-	rawSample := make([]byte, 56)
+	// create a rawSample slice and fill it with `unsafe.Sizeof(kprobePacket{})`
+	rawSample := make([]byte, unsafe.Sizeof(kprobePacket{}))
 	for i := range rawSample {
 		rawSample[i] = byte(i)
 	}
@@ -392,8 +393,8 @@ func TestDropReasonReadData_WithUnknownError(t *testing.T) {
 	mockedMap := mocks.NewMockIMap(ctrl)
 	mockedPerfReader := mocks.NewMockIPerfReader(ctrl)
 
-	// create a rawSample slice and fill it with 56 bytes of data. 56 is the size of the rawSample in perf.Record (kprobePacket)
-	rawSample := make([]byte, 56)
+	// create a rawSample slice and fill it with `unsafe.Sizeof(kprobePacket{})`
+	rawSample := make([]byte, unsafe.Sizeof(kprobePacket{}))
 	for i := range rawSample {
 		rawSample[i] = byte(i)
 	}

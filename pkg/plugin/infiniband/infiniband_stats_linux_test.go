@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	MockGaugeVec   *metrics.MockIGaugeVec
-	MockCounterVec *metrics.MockICounterVec
+	MockGaugeVec   *metrics.MockGaugeVec
+	MockCounterVec *metrics.MockCounterVec
 )
 
 func TestNewInfinibandReader(t *testing.T) {
@@ -30,9 +30,9 @@ func InitalizeMetricsForTesting(ctrl *gomock.Controller) {
 	metricsLogger := log.Logger().Named("metrics")
 	metricsLogger.Info("Initializing metrics for testing")
 
-	MockGaugeVec = metrics.NewMockIGaugeVec(ctrl)
-	metrics.InfinibandCounterStats = MockGaugeVec //nolint:typecheck // no type check
-	metrics.InfinibandStatusParams = MockGaugeVec
+	MockGaugeVec = metrics.NewMockGaugeVec(ctrl)
+	metrics.InfinibandStatsGauge = MockGaugeVec //nolint:typecheck // no type check
+	metrics.InfinibandStatusParamsGauge = MockGaugeVec
 }
 
 //nolint:testifylint // not making linter changes to preserve exact behavior

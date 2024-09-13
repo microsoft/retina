@@ -9,17 +9,17 @@ import (
 
 //go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=interfaces.go -destination=mock_types.go -package=metrics
 
-type ICounterVec interface {
+type CounterVec interface {
 	WithLabelValues(lvs ...string) prometheus.Counter
 	GetMetricWithLabelValues(lvs ...string) (prometheus.Counter, error)
 }
 
-type IGaugeVec interface {
+type GaugeVec interface {
 	WithLabelValues(lvs ...string) prometheus.Gauge
 	GetMetricWithLabelValues(lvs ...string) (prometheus.Gauge, error)
 }
 
-type IHistogramVec interface {
+type Histogram interface {
 	Observe(float64)
 	// Keep the Write method for testing purposes.
 	Write(*dto.Metric) error

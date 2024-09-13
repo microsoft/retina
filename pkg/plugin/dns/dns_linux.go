@@ -113,7 +113,7 @@ func (d *dns) eventHandler(event *types.Event) {
 		return
 	}
 
-	var dir uint32
+	var dir uint8
 	if event.PktType == "HOST" {
 		// Ingress.
 		dir = 2
@@ -126,6 +126,7 @@ func (d *dns) eventHandler(event *types.Event) {
 
 	// Update advanced metrics.
 	fl := utils.ToFlow(
+		d.l,
 		int64(event.Timestamp),
 		net.ParseIP(event.SrcIP),
 		net.ParseIP(event.DstIP),
