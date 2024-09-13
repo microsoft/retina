@@ -249,9 +249,6 @@ int BPF_KPROBE(nf_hook_slow, struct sk_buff *skb, struct nf_hook_state *state)
 
     struct packet p;
     __builtin_memset(&p, 0, sizeof(p));
-
-    p.in_filtermap = false;
-    p.skb_len = 0;
     get_packet_from_skb(&p, skb);
 
     __u64 pid_tgid = bpf_get_current_pid_tgid();
@@ -271,25 +268,24 @@ int BPF_KRETPROBE(nf_hook_slow_ret, int retVal)
 {
     __u64 pid_tgid = bpf_get_current_pid_tgid();
     __u32 pid = pid_tgid >> 32;
-    struct packet *p = bpf_map_lookup_elem(&drop_pids, &pid);
-    bpf_map_delete_elem(&drop_pids, &pid);
 
+    if (retVal >= 0)
+    {
+        bpf_map_delete_elem(&drop_pids, &pid);
+        return 0;
+    }
+
+    struct packet *p = bpf_map_lookup_elem(&drop_pids, &pid);
     if (!p)
     {
         return 0;
     }
 
-    if (retVal >= 0)
-    {
-        return 0;
-    }
+    bpf_map_delete_elem(&drop_pids, &pid);
 
     update_metrics_map(ctx, IPTABLE_RULE_DROP, 0, p);
     return 0;
 }
-
-// static __always_inline int
-// exit_tcp_connect(struct pt_regs *ctx, int ret)
 
 /*
 This function checks the return value of tcp_v4_connect and
@@ -308,9 +304,6 @@ int BPF_KRETPROBE(tcp_v4_connect_ret, int retVal)
 
     struct packet p;
     __builtin_memset(&p, 0, sizeof(p));
-
-    p.in_filtermap = false;
-    p.skb_len = 0;
 
     update_metrics_map(ctx, TCP_CONNECT_BASIC, retVal, &p);
     return 0;
@@ -387,9 +380,6 @@ int BPF_KPROBE(nf_nat_inet_fn, void *priv, struct sk_buff *skb, const struct nf_
 
     struct packet p;
     __builtin_memset(&p, 0, sizeof(p));
-
-    p.in_filtermap = false;
-    p.skb_len = 0;
     get_packet_from_skb(&p, skb);
 
     __u64 pid_tgid = bpf_get_current_pid_tgid();
@@ -403,16 +393,20 @@ int BPF_KRETPROBE(nf_nat_inet_fn_ret, int retVal)
 {
     __u64 pid_tgid = bpf_get_current_pid_tgid();
     __u32 pid = pid_tgid >> 32;
-    struct packet *p = bpf_map_lookup_elem(&natdrop_pids, &pid);
-    bpf_map_delete_elem(&natdrop_pids, &pid);
-
-    if (!p)
-        return 0;
 
     if (retVal != NF_DROP)
     {
+        bpf_map_delete_elem(&natdrop_pids, &pid);
         return 0;
     }
+
+    struct packet *p = bpf_map_lookup_elem(&natdrop_pids, &pid);
+    if (!p)
+    {
+        return 0;
+    }
+
+    bpf_map_delete_elem(&natdrop_pids, &pid);
 
     update_metrics_map(ctx, IPTABLE_NAT_DROP, 0, p);
     return 0;
@@ -432,9 +426,6 @@ int BPF_KPROBE(nf_conntrack_confirm, struct sk_buff *skb)
 
     struct packet p;
     __builtin_memset(&p, 0, sizeof(p));
-
-    p.in_filtermap = false;
-    p.skb_len = 0;
     get_packet_from_skb(&p, skb);
 
     __u64 pid_tgid = bpf_get_current_pid_tgid();
@@ -448,16 +439,20 @@ int BPF_KRETPROBE(nf_conntrack_confirm_ret, int retVal)
 {
     __u64 pid_tgid = bpf_get_current_pid_tgid();
     __u32 pid = pid_tgid >> 32;
-    struct packet *p = bpf_map_lookup_elem(&natdrop_pids, &pid);
-    bpf_map_delete_elem(&natdrop_pids, &pid);
-
-    if (!p)
-        return 0;
-
+    
     if (retVal != NF_DROP)
+    {
+        bpf_map_delete_elem(&natdrop_pids, &pid);
+        return 0;
+    }
+    
+    struct packet *p = bpf_map_lookup_elem(&natdrop_pids, &pid);
+    if (!p)
     {
         return 0;
     }
+
+    bpf_map_delete_elem(&natdrop_pids, &pid);
 
     update_metrics_map(ctx, CONNTRACK_ADD_DROP, retVal, p);
     return 0;
