@@ -88,8 +88,10 @@ func DeleteTestInfraAWS(accID, clusterName, region string) *types.Job {
 	return job
 }
 
-func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string) *types.Job {
+func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath, cloudProvider string) *types.Job {
 	job := types.NewJob("Install and test Retina with basic metrics")
+
+	apiEndpoint := getCloudApiIP(cloudProvider)
 
 	job.AddStep(&kubernetes.InstallHelmChart{
 		Namespace:          "kube-system",
@@ -99,7 +101,9 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string) *typ
 		TagEnv:             generic.DefaultTagEnv,
 	}, nil)
 
-	job.AddScenario(drop.ValidateDropMetric())
+	if cloudProvider == "azure" {
+		job.AddScenario(drop.ValidateDropMetric())
+	}
 
 	job.AddScenario(tcp.ValidateTCPMetrics())
 
@@ -122,7 +126,7 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string) *typ
 				Query:       "kubernetes.default.svc.cluster.local.",
 				QueryType:   "A",
 				ReturnCode:  "No Error",
-				Response:    "10.0.0.1",
+				Response:    apiEndpoint,
 			},
 		},
 		{
@@ -151,7 +155,7 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string) *typ
 	return job
 }
 
-func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFilePath string) *types.Job {
+func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFilePath, cloudProvider string) *types.Job {
 	job := types.NewJob("Upgrade and test Retina with advanced metrics")
 	// enable advanced metrics
 	job.AddStep(&kubernetes.UpgradeRetinaHelmChart{
@@ -162,6 +166,8 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 		TagEnv:             generic.DefaultTagEnv,
 		ValuesFile:         valuesFilePath,
 	}, nil)
+
+	apiEndpoint := getCloudApiIP(cloudProvider)
 
 	dnsScenarios := []struct {
 		name string
@@ -182,7 +188,7 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 				Query:       "kubernetes.default.svc.cluster.local.",
 				QueryType:   "A",
 				ReturnCode:  "NOERROR",
-				Response:    "10.0.0.1",
+				Response:    apiEndpoint,
 			},
 		},
 		{
