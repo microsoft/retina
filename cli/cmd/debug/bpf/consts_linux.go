@@ -1,6 +1,11 @@
 package bpf
 
-import "github.com/cilium/ebpf"
+import (
+	"fmt"
+
+	"github.com/cilium/ebpf"
+	"github.com/pkg/errors"
+)
 
 var (
 	eBPFMapList = []ebpf.MapType{
@@ -36,7 +41,6 @@ var (
 	}
 
 	eBPFProgramList = []ebpf.ProgramType{
-		ebpf.UnspecifiedProgram,
 		ebpf.SocketFilter,
 		ebpf.Kprobe,
 		ebpf.SchedCLS,
@@ -71,3 +75,14 @@ var (
 		ebpf.Netfilter,
 	}
 )
+
+func isSupported(err error) string {
+	if errors.Is(err, ebpf.ErrNotSupported) {
+		return "not supported"
+	}
+	return "supported"
+}
+
+func getLinuxKernelVersion(versionCode uint32) string {
+	return fmt.Sprintf("%d.%d.%d", versionCode>>16, (versionCode>>8)&0xff, versionCode&0xff) //nolint:gomnd // bit shifting
+}

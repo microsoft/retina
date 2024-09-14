@@ -17,7 +17,7 @@ var featuresCmd = &cobra.Command{
 		if err != nil {
 			return errors.Wrap(err, "failed to get Linux version code")
 		}
-		fmt.Printf("Linux version code: %d\n", linuxVersion)
+		fmt.Printf("Linux kernel version: %s\n", getLinuxKernelVersion(linuxVersion))
 
 		fmt.Println("--------------------------------------------------")
 
@@ -57,11 +57,4 @@ var featuresCmd = &cobra.Command{
 
 		return nil
 	},
-}
-
-func isSupported(err error) string {
-	if errors.Is(err, ebpf.ErrNotSupported) {
-		return "not supported"
-	}
-	return "supported"
 }
