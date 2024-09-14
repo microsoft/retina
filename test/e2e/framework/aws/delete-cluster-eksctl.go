@@ -27,10 +27,9 @@ func (d *DeleteCluster) Run() error {
 	deleteArgs := []string{
 		"delete",
 		"cluster",
-		"-n",
-		d.ClusterName,
-		"--region",
-		d.Region,
+		"-f",
+		"cluster-config.yaml",
+		"--wait",
 	}
 
 	rootCmd := CreateEKSCtlCmd()

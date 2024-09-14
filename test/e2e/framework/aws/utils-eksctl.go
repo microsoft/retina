@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/fatih/color"
@@ -121,6 +122,29 @@ func checkCommand(rootCmd *cobra.Command) {
 			return e
 		}
 	}
+}
+
+func templateCluster(templateFile, outputFile string, c *CreateCluster) error {
+	// Read the template file
+	tmpl, err := template.ParseFiles(templateFile)
+	if err != nil {
+		return err
+	}
+
+	// Create the output file
+	outFile, err := os.Create(outputFile)
+	if err != nil {
+		return err
+	}
+	defer outFile.Close()
+
+	// Execute the template with the data
+	err = tmpl.Execute(outFile, c)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func CreateEKSCtlCmd() *cobra.Command {

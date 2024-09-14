@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"path"
+	"runtime"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 )
@@ -25,17 +27,29 @@ func (c *CreateCluster) Run() error {
 		return fmt.Errorf("unable to load SDK config, %v", err)
 	}
 
+	// Get the directory of the current test file.
+	_, filename, _, ok := runtime.Caller(0)
+
+	if !ok {
+		return fmt.Errorf("failed to determine test file path")
+	}
+
+	currDir := path.Dir(filename)
+	templateName := path.Join(currDir, "cluster-config.tpl")
+
+	err = templateCluster(templateName, "cluster-config.yaml", c)
+
+	if err != nil {
+		return fmt.Errorf("unable to template cluster config, %v", err)
+	}
+
 	createArgs := []string{
 		"create",
 		"cluster",
 		"--kubeconfig",
 		c.KubeConfigFilePath,
-		"-n",
-		c.ClusterName,
-		"--region",
-		c.Region,
-		"--with-oidc",
-		"--managed",
+		"-f",
+		"cluster-config.yaml",
 	}
 
 	rootCmd := CreateEKSCtlCmd()
