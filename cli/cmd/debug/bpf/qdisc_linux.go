@@ -5,7 +5,7 @@ import (
 	"net"
 	"os"
 
-	"github.com/florianl/go-tc"
+	tc "github.com/florianl/go-tc"
 	"github.com/mdlayher/netlink"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
