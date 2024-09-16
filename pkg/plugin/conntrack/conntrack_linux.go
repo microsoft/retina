@@ -156,21 +156,16 @@ func Dump() error {
 	var v conntrackCtEntry
 	iter := ct.Iterate()
 	for iter.Next(&k, &v) {
-		fmt.Printf("proto=%s src_ip=%s src_port=%d dst_ip=%s dst_port=%d eviction_time=%f "+
-			"traffic_direction=%s is_closing=%t flags_seen_tx_dir=%s flags_seen_rx_dir=%s "+
-			"last_reported_tx_dir=%f last_reported_rx_dir=%f\n",
+		fmt.Printf("proto=%s is_closing=%t src_ip=%s src_port=%d dst_ip=%s dst_port=%d traffic_direction=%s flags_seen_tx_dir=%s flags_seen_rx_dir=%s\n",
 			decodeProto(k.Proto),
+			v.IsClosing,
 			utils.Int2ip(k.SrcIp).To4().String(),
 			utils.HostToNetShort(k.SrcPort),
 			utils.Int2ip(k.DstIp).To4().String(),
 			utils.HostToNetShort(k.DstPort),
-			ktime.MonotonicOffset.Seconds()+float64(v.EvictionTime),
 			flow.TrafficDirection(v.TrafficDirection).String(),
-			v.IsClosing,
 			decodeFlags(v.FlagsSeenTxDir),
 			decodeFlags(v.FlagsSeenRxDir),
-			ktime.MonotonicOffset.Seconds()+float64(v.LastReportTxDir),
-			ktime.MonotonicOffset.Seconds()+float64(v.LastReportRxDir),
 		)
 	}
 
