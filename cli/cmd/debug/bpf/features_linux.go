@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// featuresCmd outputs available BPF features on the host
 var featuresCmd = &cobra.Command{
 	Use:   "features",
 	Short: "Output available BPF features on the host",

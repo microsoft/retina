@@ -9,4 +9,5 @@ var Cmd = &cobra.Command{
 
 func init() {
 	Cmd.AddCommand(featuresCmd)
+	Cmd.AddCommand(qdiscCmd)
 }
