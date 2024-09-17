@@ -6,14 +6,24 @@ import (
 	"os"
 
 	tc "github.com/florianl/go-tc"
+	"github.com/florianl/go-tc/core"
 	"github.com/mdlayher/netlink"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"golang.org/x/sys/unix"
 )
 
+// val is a struct to hold qdiscs and filters for an interface
+type val struct {
+	qdiscs         []tc.Object
+	egressfilters  []tc.Object
+	ingressfilters []tc.Object
+}
+
 var (
-	ifaceName string
-	qdiscCmd  = &cobra.Command{
+	ifaceName                  string
+	ifaceToQdiscsAndFiltersMap = make(map[string]*val)
+	qdiscCmd                   = &cobra.Command{
 		Use:   "tc",
 		Short: "Output all qdiscs and attached bpf programs on each interface on the host",
 		RunE: func(*cobra.Command, []string) error {
@@ -41,33 +51,78 @@ var (
 			for _, qdisc := range qdiscs {
 				iface, err := net.InterfaceByIndex(int(qdisc.Ifindex))
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "could not get interface for index %d: %v\n", qdisc.Ifindex, err)
-					continue
+					return errors.Wrap(err, "could not get interface by index")
 				}
-				if ifaceName != "" {
-					// Output only qdiscs and attached bpf programs for the specified interface
-					if iface.Name == ifaceName {
-						qdiscKind := qdisc.Kind
-						fmt.Printf("Interface: %s\n", iface.Name)
-						fmt.Printf("|->Qdisc: %s\n", qdiscKind)
-						if qdisc.BPF != nil {
-							fmt.Printf("   |->Attached bpf programs:\n")
-							fmt.Printf("	  |->Name: %s\n", *qdisc.BPF.Name)
-						}
-					} else {
-						continue
+				if _, ok := ifaceToQdiscsAndFiltersMap[iface.Name]; !ok {
+					ifaceToQdiscsAndFiltersMap[iface.Name] = &val{}
+				}
+				ifaceToQdiscsAndFiltersMap[iface.Name].qdiscs = append(ifaceToQdiscsAndFiltersMap[iface.Name].qdiscs, qdisc)
+
+				ingressFilters, err := rtnl.Filter().Get(&tc.Msg{
+					Family:  unix.AF_UNSPEC,
+					Ifindex: uint32(iface.Index),
+					Handle:  0,
+					Parent:  core.BuildHandle(tc.HandleRoot, tc.HandleMinIngress),
+					Info:    0x10300, // nolint:gomnd // info
+				})
+				if err != nil {
+					return errors.Wrap(err, "could not get ingress filters for interface")
+				}
+				ifaceToQdiscsAndFiltersMap[iface.Name].ingressfilters = append(ifaceToQdiscsAndFiltersMap[iface.Name].ingressfilters, ingressFilters...)
+
+				egressFilters, err := rtnl.Filter().Get(&tc.Msg{
+					Family:  unix.AF_UNSPEC,
+					Ifindex: uint32(iface.Index),
+					Handle:  1,
+					Parent:  core.BuildHandle(tc.HandleRoot, tc.HandleMinEgress),
+					Info:    0x10300, // nolint:gomnd // info
+				})
+				if err != nil {
+					return errors.Wrap(err, "could not get egress filters for interface")
+				}
+				ifaceToQdiscsAndFiltersMap[iface.Name].egressfilters = append(ifaceToQdiscsAndFiltersMap[iface.Name].egressfilters, egressFilters...)
+			}
+
+			if ifaceName != "" {
+				if val, ok := ifaceToQdiscsAndFiltersMap[ifaceName]; ok {
+					fmt.Printf("Interface: %s\n", ifaceName)
+					fmt.Printf("Qdiscs:\n")
+					for _, qdisc := range val.qdiscs {
+						fmt.Printf("  %s\n", qdisc.Kind)
+					}
+					fmt.Printf("Ingress filters:\n")
+					for _, ingressFilter := range val.ingressfilters {
+						fmt.Printf("  %s\n", ingressFilter.Kind)
+						fmt.Printf("  %s\n", *ingressFilter.BPF.Name)
+					}
+					fmt.Printf("Egress filters:\n")
+					for _, egressFilter := range val.egressfilters {
+						fmt.Printf("  %s\n", egressFilter.Kind)
+						fmt.Printf("  %s\n", *egressFilter.BPF.Name)
 					}
 				} else {
-					// Output all qdiscs and attached bpf programs
-					qdiscKind := qdisc.Kind
-					fmt.Printf("Interface: %s\n", iface.Name)
-					fmt.Printf("|->Qdisc: %s\n", qdiscKind)
-					if qdisc.BPF != nil {
-						fmt.Printf("   |->Attached bpf programs:\n")
-						fmt.Printf("	  |->Name: %s\n", *qdisc.BPF.Name)
+					fmt.Printf("Interface %s not found\n", ifaceName)
+				}
+			} else {
+				for iface, val := range ifaceToQdiscsAndFiltersMap {
+					fmt.Printf("Interface: %s\n", iface)
+					fmt.Printf("Qdiscs:\n")
+					for _, qdisc := range val.qdiscs {
+						fmt.Printf("  %s\n", qdisc.Kind)
+					}
+					fmt.Printf("Ingress filters:\n")
+					for _, ingressFilter := range val.ingressfilters {
+						fmt.Printf("  %s\n", ingressFilter.Kind)
+						fmt.Printf("  %s\n", *ingressFilter.BPF.Name)
+					}
+					fmt.Printf("Egress filters:\n")
+					for _, egressFilter := range val.egressfilters {
+						fmt.Printf("  %s\n", egressFilter.Kind)
+						fmt.Printf("  %s\n", *egressFilter.BPF.Name)
 					}
 				}
 			}
+
 			return nil
 		},
 	}
