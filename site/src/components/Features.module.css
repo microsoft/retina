@@ -1,0 +1,53 @@
+.section {
+    color: var(--brand-color-accent);
+    font-family: "Urbanist", sans-serif;
+    padding: 8rem 0;
+    text-align: center;
+  }
+  
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 1rem;
+  }
+  
+  .section h2 {
+    color: var(--brand-color-accent);
+    font-size: 42px;
+  }
+  
+  .section h3 {
+    color: var(--brand-color-accent);
+    font-size: 26px;
+    margin: 0;
+    line-height: 42px;
+  }
+  
+  .description {
+    font-size: 23px;
+  }
+  
+  .featureDescription {
+    font-size: 20px;
+    font-weight: 400;
+  }
+  
+  .features {
+    max-width: 1100px;
+    margin-top: 4rem;
+    display: flex;
+    gap: 4rem;
+    justify-content: center;
+  }
+  
+  .feature {
+    max-width: 300px;
+  }
+  
+  @media (max-width: 800px) {
+    .features {
+      align-items: center;
+      flex-direction: column;
+    }
+  }
+  

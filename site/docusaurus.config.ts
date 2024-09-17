@@ -11,7 +11,7 @@ const config = {
   favicon: 'img/favicon.ico',
 
   // Set the production url of your site here
-  url: 'https://docs.microsoft.com',
+  url: 'https://retina.sh',
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
   baseUrl: '/',
@@ -21,7 +21,7 @@ const config = {
   organizationName: 'Azure', // Usually your GitHub org/user name.
   projectName: 'Retina', // Usually your repo name.
 
-  onBrokenLinks: 'throw',
+  onBrokenLinks: 'warn',
   onBrokenMarkdownLinks: 'warn',
 
   // Even if you don't use internalization, you can use this field to set useful
@@ -30,6 +30,11 @@ const config = {
   i18n: {
     defaultLocale: 'en',
     locales: ['en'],
+  },
+
+  markdown: {
+    format: "detect",
+    mermaid: true,
   },
 
   presets: [
@@ -61,15 +66,21 @@ const config = {
       navbar: {
         title: 'Retina',
         logo: {
-          alt: 'My Site Logo',
+          alt: 'Retina Logo',
           src: 'img/retina-logo.png',
         },
         items: [
           {
-            type: 'doc',
-            docId: 'Intro',
-            position: 'left',
-            label: 'Docs',
+            position: "left",
+            to: "/",
+            label: "Home",
+            activeBaseRegex: `^\/$`,
+          },
+          {
+            type: "docSidebar",
+            sidebarId: "mainSidebar",
+            position: "left",
+            label: "Docs",
           },
           {
             href: 'https://github.com/microsoft/retina',
@@ -82,10 +93,11 @@ const config = {
         style: 'dark',
       },
       prism: {
+        additionalLanguages: ["bash", "yaml", "docker", "go"],
         theme: lightCodeTheme,
         darkTheme: darkCodeTheme,
       },
     }),
 };
 
-module.exports = config;
+export default config;

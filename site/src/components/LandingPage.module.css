@@ -1,0 +1,76 @@
+/**
+ * CSS files with the .module.css suffix will be treated as CSS modules
+ * and scoped locally.
+ */
+
+ .title {
+    font-size: 3rem;
+    color: var(--ifm-color-primary);
+  }
+  
+  @media (max-width: 576px) {
+    .title {
+      font-size: 2.5rem;
+    }
+  }
+  
+  .heroBanner {
+    display: flex;
+    color: var(--ifm-hero-text-color);
+    font-family: "Urbanist", sans-serif;
+    padding: 4rem 0;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    background: url(./square1.svg) no-repeat 10% 80px,
+      url(./square2.svg) no-repeat 90% 130px;
+  }
+  
+  @media (max-width: 1190px) {
+    .heroBanner {
+      background: none;
+    }
+  }
+  
+  div.heroContainer {
+    max-width: 850px;
+  }
+  
+  .about {
+    width: 100%;
+    display: flex;
+    margin: 0 auto;
+    align-items: center;
+    flex-direction: column;
+    text-align: center;
+    padding: 40px 1rem;
+  }
+  
+  .aboutTitle {
+    font-size: 2.5rem;
+  }
+  
+  .clusterLink {
+    padding: 1rem 0;
+  }
+  
+  .layoutWrapper::before {
+    z-index: -1;
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at 10% 10%, #2e35f71c, transparent 20%),
+    radial-gradient(circle at 90% 400px, #2e3ff71c, transparent 30%);
+    pointer-events: none;
+  }
+  
+  .video {
+    max-width: 900px;
+    width: 100%;
+    border-radius: var(--ifm-card-border-radius);
+    border: 3px solid #ffd500;
+  }
+  
