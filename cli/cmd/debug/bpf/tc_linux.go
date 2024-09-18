@@ -92,13 +92,11 @@ var (
 					}
 					fmt.Printf("Ingress filters:\n")
 					for _, ingressFilter := range val.ingressfilters {
-						fmt.Printf("  %s\n", ingressFilter.Kind)
-						fmt.Printf("  %s\n", *ingressFilter.BPF.Name)
+						fmt.Printf("  %+v\n", ingressFilter)
 					}
 					fmt.Printf("Egress filters:\n")
 					for _, egressFilter := range val.egressfilters {
-						fmt.Printf("  %s\n", egressFilter.Kind)
-						fmt.Printf("  %s\n", *egressFilter.BPF.Name)
+						fmt.Printf("  %+v\n", egressFilter)
 					}
 				} else {
 					fmt.Printf("Interface %s not found\n", ifaceName)
@@ -112,13 +110,11 @@ var (
 					}
 					fmt.Printf("Ingress filters:\n")
 					for _, ingressFilter := range val.ingressfilters {
-						fmt.Printf("  %s\n", ingressFilter.Kind)
-						fmt.Printf("  %s\n", *ingressFilter.BPF.Name)
+						fmt.Printf("  %+v\n", ingressFilter)
 					}
 					fmt.Printf("Egress filters:\n")
 					for _, egressFilter := range val.egressfilters {
-						fmt.Printf("  %s\n", egressFilter.Kind)
-						fmt.Printf("  %s\n", *egressFilter.BPF.Name)
+						fmt.Printf("  %+v\n", egressFilter)
 					}
 				}
 			}
