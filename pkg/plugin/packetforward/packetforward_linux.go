@@ -199,7 +199,7 @@ func (p *packetForward) Stop() error {
 }
 
 func (p *packetForward) SetupChannel(ch chan *hubblev1.Event) error {
-	p.l.Warn("SetupChannel is not supported by plugin", zap.String("plugin", string(Name)))
+	p.l.Debug("SetupChannel is not supported by plugin", zap.String("plugin", string(Name)))
 	return nil
 }
 
