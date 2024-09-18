@@ -1,13 +1,14 @@
 // @ts-check
 // Note: type annotations allow type checking and IDEs autocompletion
 
-const lightCodeTheme = require('prism-react-renderer').themes.github;
-const darkCodeTheme = require('prism-react-renderer').themes.dracula;
+import { themes as prismThemes } from "prism-react-renderer";
+import type { Config } from "@docusaurus/types";
+import type * as Preset from "@docusaurus/preset-classic";
+import { githubA11yLight } from "./src/prismColorTheme";
 
-/** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'Retina',
-  tagline: 'Kubernetes Network Observability',
+  tagline: 'kubernetes network observability platform',
   favicon: 'img/favicon.ico',
 
   // Set the production url of your site here
@@ -37,6 +38,10 @@ const config = {
     mermaid: true,
   },
 
+  // plugins: [
+  //   "docusaurus-lunr-search",
+  // ],
+
   presets: [
     [
       'classic',
@@ -44,10 +49,7 @@ const config = {
       ({
         docs: {
           sidebarPath: require.resolve('./sidebars.js'),
-          // Please change this to your repo.
-          // Remove this to remove the "edit this page" links.
           path: '../docs',
-          //routeBasePath: '../docs',
           editUrl:
             'https://github.com/microsoft/retina/blob/main/docs',
         },
@@ -58,10 +60,34 @@ const config = {
     ],
   ],
 
+  headTags: [
+    {
+      tagName: "link",
+      attributes: {
+        rel: "preconnect",
+        href: "https://fonts.googleapis.com",
+      },
+    },
+    {
+      tagName: "link",
+      attributes: {
+        rel: "preconnect",
+        href: "https://fonts.gstatic.com",
+        crossorigin: "true",
+      },
+    },
+    {
+      tagName: "link",
+      attributes: {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Overpass+Mono:wght@300..700&family=Overpass:ital,wght@0,100..900;1,100..900&family=Urbanist:ital,wght@0,100..900;1,100..900&display=swap",
+      },
+    },
+  ],
+
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
-      // Replace with your project's social card
       image: 'img/docusaurus-social-card.jpg',
       navbar: {
         title: 'Retina',
@@ -90,12 +116,34 @@ const config = {
         ],
       },
       footer: {
-        style: 'dark',
+        style: "light",
+        logo: {
+          alt: "IG logo",
+          src: "img/retina-logo.png",
+          width: "155",
+          height: "32",
+        },
+        links: [
+          {
+            title: "Community",
+            items: [
+              // {
+              //   label: "Contribute",
+              //   href: "https://www.inspektor-gadget.io/docs/latest/devel/contributing/",
+              // },
+              {
+                label: "Github",
+                href: "https://github.com/microsoft/retina",
+              },
+            ],
+          },
+        ],
+        copyright: `Copyright ${new Date().getFullYear()} Retina Contributors`,
       },
       prism: {
         additionalLanguages: ["bash", "yaml", "docker", "go"],
-        theme: lightCodeTheme,
-        darkTheme: darkCodeTheme,
+        theme: githubA11yLight,
+        darkTheme: prismThemes.oceanicNext,
       },
     }),
 };

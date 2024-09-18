@@ -5,7 +5,6 @@ import clsx from "clsx";
 
 import styles from "./LandingPage.module.css";
 import { Features } from "./Features";
-import { FeatureHighlight } from "./FeatureHighlight";
 import React from "react";
 
 function HomepageHeader() {
@@ -30,7 +29,6 @@ export default function LandingPage(): JSX.Element {
       <main>
         <HomepageHeader />
         <Features />
-        <FeatureHighlight />
       </main>
     </Layout>
   );

@@ -28,7 +28,7 @@
   }
   
   .featureDescription {
-    font-size: 20px;
+    font-size: 16px;
     font-weight: 400;
   }
   
@@ -36,7 +36,7 @@
     max-width: 1100px;
     margin-top: 4rem;
     display: flex;
-    gap: 4rem;
+    gap: 5rem;
     justify-content: center;
   }
   

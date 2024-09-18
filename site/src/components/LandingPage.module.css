@@ -17,8 +17,8 @@
   .heroBanner {
     display: flex;
     color: var(--ifm-hero-text-color);
-    font-family: "Urbanist", sans-serif;
-    padding: 4rem 0;
+    font-family: "Fira Code", sans-serif;
+    padding: 4rem 0 0 0;
     text-align: center;
     position: relative;
     overflow: hidden;
