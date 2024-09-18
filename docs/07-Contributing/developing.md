@@ -8,13 +8,24 @@ The easiest way to set up your Development Environment is to use the provided Gi
 
 ## Environment Config
 
-- Download [Helm](https://helm.sh/)
+- [Go](https://go.dev/doc/install)
+- Docker
+- [Helm](https://helm.sh/docs/intro/install)
+- jq: `sudo apt install jq`
 - Fork the repository
 - If you want to use [ghcr.io](https://github.com/features/packages) as container registry, login following instructions [here](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-with-a-personal-access-token-classic)
 
 ### LLVM/Clang Installation
 
-To manually configure your DevEnv:
+To manually configure your DevEnv you will need `llvm-strip` and `clang`.
+
+To install `clang`:
+
+```bash
+sudo apt install clang-16
+```
+
+To install `llvm-strip`:
 
 ```bash
 export LLVM_VERSION=16
@@ -24,15 +35,16 @@ curl -sL https://apt.llvm.org/llvm.sh  | sudo bash -s "$LLVM_VERSION"
 Test that `llvm-strip` and `clang` are in your `PATH`:
 
 ```bash
-which llvm-strip
 which clang
+which llvm-strip
 ```
 
-If these commands fail (there is no output), then see if you have a binary with the version as a suffix (e.g. `/usr/bin/llvm-strip-16`).
+If these commands fail (there is no output), then see if you have a binary with the version as a suffix (e.g. `/usr/bin/clang-16` and `/usr/bin/llvm-strip-16`).
 Then create a symbolic link to the versioned binary like:
 
 ```bash
-ln -s /usr/bin/llvm-strip-16 /usr/bin/llvm-strip
+sudo ln -s /usr/bin/clang-16 /usr/bin/clang
+sudo ln -s /usr/bin/llvm-strip-16 /usr/bin/llvm-strip
 ```
 
 ## Building and Testing
