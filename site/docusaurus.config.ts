@@ -38,9 +38,31 @@ const config = {
     mermaid: true,
   },
 
-  // plugins: [
-  //   "docusaurus-lunr-search",
-  // ],
+  plugins: [
+    "docusaurus-lunr-search",
+    [
+      "@docusaurus/plugin-ideal-image",
+      {
+        quality: 70,
+        max: 1030, // max resized image's size.
+        min: 640, // min resized image's size. if original is lower, use that size.
+        steps: 2, // the max number of images generated between min and max (inclusive)
+        disableInDev: false,
+      },
+    ],
+    function (context, options) {
+      return {
+        name: "webpack-configuration-plugin",
+        configureWebpack(config, isServer, utils) {
+          return {
+            resolve: {
+              symlinks: false,
+            },
+          };
+        },
+      };
+    },
+  ],
 
   presets: [
     [
@@ -130,10 +152,10 @@ const config = {
           {
             title: "Community",
             items: [
-              // {
-              //   label: "Contribute",
-              //   href: "https://www.inspektor-gadget.io/docs/latest/devel/contributing/",
-              // },
+              {
+                label: "Contribute",
+                href: "https://github.com/microsoft/retina/tree/main/docs/07-Contributing",
+              },
               {
                 label: "Github",
                 href: "https://github.com/microsoft/retina",
