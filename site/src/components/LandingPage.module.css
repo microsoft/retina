@@ -64,7 +64,7 @@
     height: 100%;
     background: radial-gradient(circle at 10% 10%, #2e35f71c, transparent 20%),
     radial-gradient(circle at 90% 200px, #2e3ff71c, transparent 30%),
-    url(./hex.svg) no-repeat 60% 130px;
+    url(./hex.svg) no-repeat 50% 120px;
     pointer-events: none;
   }
   
