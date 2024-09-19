@@ -21,7 +21,7 @@ import (
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/perf"
-	"github.com/florianl/go-tc"
+	tc "github.com/florianl/go-tc"
 	helper "github.com/florianl/go-tc/core"
 	nl "github.com/mdlayher/netlink"
 	"github.com/microsoft/retina/internal/ktime"

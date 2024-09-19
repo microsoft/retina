@@ -11,7 +11,7 @@ import (
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/perf"
-	"github.com/florianl/go-tc"
+	tc "github.com/florianl/go-tc"
 	nl "github.com/mdlayher/netlink"
 	"github.com/vishvananda/netlink"
 
