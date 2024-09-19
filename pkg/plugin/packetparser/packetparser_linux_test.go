@@ -19,6 +19,7 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/perf"
 	tc "github.com/florianl/go-tc"
+	nl "github.com/mdlayher/netlink"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
@@ -188,6 +189,7 @@ func TestCreateQdiscAndAttach(t *testing.T) {
 
 	mrtnl := mocks.NewMocknltc(ctrl)
 	mrtnl.EXPECT().Qdisc().Return(nil).AnyTimes()
+	mrtnl.EXPECT().SetOption(nl.ExtendedAcknowledge, true).Return(nil).AnyTimes()
 
 	getQdisc = func(nltc) qdisc {
 		return mq
@@ -357,6 +359,7 @@ func TestStartWithDataAggregationLevelLow(t *testing.T) {
 	mQdisc.EXPECT().Add(gomock.Any()).Return(nil).Times(1)
 
 	mockRtnl := mocks.NewMocknltc(ctrl)
+	mockRtnl.EXPECT().SetOption(nl.ExtendedAcknowledge, true).Return(nil).Times(1)
 
 	bpfEvent := &packetparserPacket{
 		SrcIp:            uint32(83886272), // 192.0.0.5
