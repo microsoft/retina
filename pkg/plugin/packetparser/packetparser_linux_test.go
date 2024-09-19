@@ -69,6 +69,7 @@ func TestCleanAll(t *testing.T) {
 
 	mrtnl := mocks.NewMocknltc(ctrl)
 	mrtnl.EXPECT().Close().Return(nil).AnyTimes()
+	mrtnl.EXPECT().SetOption(nl.ExtendedAcknowledge, true).Return(nil).AnyTimes()
 
 	mq := mocks.NewMockqdisc(ctrl)
 	mq.EXPECT().Delete(gomock.Any()).Return(nil).AnyTimes()
@@ -110,6 +111,7 @@ func TestClean(t *testing.T) {
 
 	mrtnl := mocks.NewMocknltc(ctrl)
 	mrtnl.EXPECT().Qdisc().Return(nil).Times(1)
+	mrtnl.EXPECT().SetOption(nl.ExtendedAcknowledge, true).Return(nil).AnyTimes()
 
 	getQdisc = func(tcnl nltc) qdisc {
 		// Add this verify tcnl.Qdisc() is called twice
