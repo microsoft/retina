@@ -321,11 +321,14 @@ func (p *packetParser) cleanAll() error {
 	return nil
 }
 
-func (p *packetParser) clean(tcnl nltc, qdisc *tc.Object) {
+func (p *packetParser) clean(rtnl nltc, qdisc *tc.Object) {
 	// Warning, not error. Clean is best effort.
-	if tcnl != nil {
-		if err := getQdisc(tcnl).Delete(qdisc); err != nil && !errors.Is(err, tc.ErrNoArg) {
+	if rtnl != nil {
+		if err := getQdisc(rtnl).Delete(qdisc); err != nil && !errors.Is(err, tc.ErrNoArg) {
 			p.l.Debug("could not delete egress qdisc", zap.Error(err))
+		}
+		if err := rtnl.Close(); err != nil {
+			p.l.Warn("could not close rtnetlink socket", zap.Error(err))
 		}
 	}
 }
