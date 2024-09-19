@@ -90,10 +90,12 @@ const config = {
     ({
       image: 'img/docusaurus-social-card.jpg',
       navbar: {
-        title: 'Retina',
         logo: {
           alt: 'Retina Logo',
-          src: 'img/retina-logo.png',
+          src: 'img/retina-logo.svg',
+          srcDark : "img/retina-logo-dark.svg",
+          width: "103",
+          height: "32",
         },
         items: [
           {
@@ -118,8 +120,9 @@ const config = {
       footer: {
         style: "light",
         logo: {
-          alt: "IG logo",
-          src: "img/retina-logo.png",
+          alt: "Retina logo",
+          src: "img/retina-logo.svg",
+          srcDark : "img/retina-logo-dark.svg",
           width: "155",
           height: "32",
         },
