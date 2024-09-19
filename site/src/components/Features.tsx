@@ -38,7 +38,7 @@ export function Features() {
         <div className={clsx(style.features)}>
           <div className={style.feature}>
             <Prometheus />
-            <h3>Metrics</h3>
+            <h3>Actionable Metrics</h3>
             <p className={style.featureDescription}>
               Provides industry standard Prometheus metrics
             </p>
