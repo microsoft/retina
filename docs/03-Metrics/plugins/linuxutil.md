@@ -2,10 +2,6 @@
 
 Gathers TCP/UDP statistics and network interface statistics from the `netstats` and `ethtool` Node utilities (respectively).
 
-## Metrics
-
-See metrics for [Basic Mode](../modes/basic.md#plugin-linuxutil-linux) (Advanced modes have identical metrics).
-
 ## Architecture
 
 The plugin uses the following utilities as data sources:
@@ -20,6 +16,10 @@ The plugin uses the following utilities as data sources:
 ### Code Locations
 
 - Plugin code interfacing with the Node utilities: *pkg/plugin/linuxutil/*
+
+## Metrics
+
+See metrics for [Basic Mode](../modes/basic.md#plugin-linuxutil-linux) (Advanced modes have identical metrics).
 
 ### Configuration (in Code)
 

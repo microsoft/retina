@@ -1,7 +1,7 @@
 <h1 align="center">
   <picture>
     <source media="(prefers-color-scheme: light)" srcset="site/static/img/retina-logo.svg">
-    <img src="site/static/img/retina-logo.svg" alt="Retina Logo" width="80%">
+    <img src="site/static/img/retina-logo.svg" alt="Retina Logo" width="30%">
   </picture>
 </h1>
 

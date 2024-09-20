@@ -2,10 +2,6 @@
 
 Measures retransmitted TCP packets.
 
-## Metrics
-
-See metrics for [Advanced Mode](../modes/advanced.md#plugin-tcpretrans-linux).
-
 ## Architecture
 
 The plugin utilizes eBPF to gather data.
@@ -16,3 +12,7 @@ In Advanced mode (see [Metric Modes](../modes/modes.md)), the plugin turns an eB
 
 - Plugin and eBPF code: *pkg/plugin/tcpretrans/*
 - Module for extra Advanced metrics: *pkg/module/metrics/tcpretrans.go*
+
+## Metrics
+
+See metrics for [Advanced Mode](../modes/advanced.md#plugin-tcpretrans-linux).

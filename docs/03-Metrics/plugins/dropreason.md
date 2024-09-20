@@ -2,10 +2,6 @@
 
 Counts number of packets/bytes dropped on a Node, along with the direction and reason for drop.
 
-## Metrics
-
-See metrics for [Basic Mode](../modes/basic.md#plugin-dropreason-linux) or [Advanced Mode](../modes/advanced.md#plugin-dropreason-linux).
-
 ## Architecture
 
 The plugin utilizes eBPF to gather data.
@@ -16,6 +12,10 @@ In Advanced mode (see [Metric Modes](../modes/modes.md)), the plugin turns this 
 
 - Plugin and eBPF code: *pkg/plugin/dropreason/*
 - Module for extra Advanced metrics: *pkg/module/metrics/drops.go*
+
+## Metrics
+
+See metrics for [Basic Mode](../modes/basic.md#plugin-dropreason-linux) or [Advanced Mode](../modes/advanced.md#plugin-dropreason-linux).
 
 ### Data sources
 

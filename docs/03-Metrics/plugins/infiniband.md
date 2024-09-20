@@ -2,12 +2,6 @@
 
 Gathers Nvidia Infiniband port counters and debug status parameters from /sys/class/infiniband and /sys/class/net (respectively).
 
-## Metrics
-
-Infiniband Port Counter Statistics
-
-Infiniband Status Parameter Statistics
-
 ## Architecture
 
 The plugin uses the following data sources:
@@ -18,6 +12,12 @@ The plugin uses the following data sources:
 ### Code Locations
 
 - Plugin code interfacing with the Infiniband driver: *pkg/plugin/infiniband/*
+
+## Metrics
+
+- Infiniband Port Counter Statistics
+
+- Infiniband Status Parameter Statistics
 
 ## Label Values for Infiniband Port Counters
 

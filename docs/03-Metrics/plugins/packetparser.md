@@ -1,21 +1,21 @@
 # `packetparser` (Linux)
 
-Measures TCP packets passing through `eth0`, providing the ability to calculate TCP-handshake latencies, etc.
+Captures TCP and UDP packets traveling to and from pods and nodes.
+
+## Architecture
+
+`packetparser` attached a [`qdisc` (Queuing Discipline)](https://www.man7.org/linux/man-pages/man8/tc.8.html) of type `clsact` to each pod's virtual interface (`veth`) and the host's default interface (`device`). This setup enabled the attachment of eBPF filter programs for both ingress and egress directions, allowing `packetparser` to capture individual packets traveling to and from the interfaces.
+
+`packetparser` does not produce Basic metrics. In Advanced mode (refer to [Metric Modes](../modes/modes.md)), the plugin transforms an eBPF result into an enriched `Flow` by adding Pod information based on IP. It then sends the `Flow` to an external channel, enabling *several modules* to generate Pod-Level metrics.
+
+### Code locations
+
+- Plugin and eBPF code: *pkg/plugin/packetparser/*
+- Modules for extra Advanced metrics: see section below.
 
 ## Metrics
 
 See metrics for [Advanced Mode](../modes/advanced.md#plugin-packetparser-linux). For module information, see [below](#modules).
-
-## Architecture
-
-The plugin utilizes eBPF to gather data.
-The plugin does not generate Basic metrics.
-In Advanced mode (see [Metric Modes](../modes/modes.md)), the plugin turns an eBPF result into an enriched `Flow` (adding Pod information based on IP), then sends the `Flow` to an external channel so that *several modules* can create Pod-Level metrics.
-
-### Code locations
-
-- Plugin and eBPF code: *pkg/plugin/tcpretrans/*
-- Modules for extra Advanced metrics: see section below.
 
 ### Modules
 
