@@ -526,6 +526,7 @@ quick-build:
 
 .PHONY: quick-deploy
 quick-deploy:
+	$(MAKE) helm-uninstall || true
 	$(MAKE) helm-install-advanced-local-context HELM_IMAGE_TAG=$(TAG)-linux-amd64
 
 .PHONY: quick-deploy-hubble

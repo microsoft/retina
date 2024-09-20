@@ -81,6 +81,16 @@ ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
 RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/retina/initretina -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID="$APP_INSIGHTS_ID"" init/retina/main_linux.go
 
+# debug binary
+FROM intermediate AS debug-bin
+ARG APP_INSIGHTS_ID # set to enable AI telemetry
+ARG GOARCH=amd64 # default to amd64
+ARG GOOS=linux # default to linux
+ARG VERSION
+ENV CGO_ENABLED=0
+ENV GOARCH=${GOARCH}
+ENV GOOS=${GOOS}
+RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/retina/debug -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID="$APP_INSIGHTS_ID"" debug/main.go
 
 # tools image
 FROM mariner-core AS tools
@@ -93,9 +103,10 @@ RUN tdnf install -y \
     wget \
     gnupg2 \
     ca-certificates \
-    tar
+    tar \
+    bpftool lld16 libbpf-devel
 RUN mkdir -p /tmp/bin
-RUN arr="clang tcpdump ip ss iptables-legacy iptables-legacy-save iptables-nft iptables-nft-save cp uname" ;\
+RUN arr="clang tcpdump ip ss iptables-legacy iptables-legacy-save iptables-nft iptables-nft-save cp uname bpftool" ;\
     for i in $arr; do    \
     cp $(which $i) /tmp/bin;   \
     done
@@ -129,6 +140,7 @@ COPY --from=tools /tmp/bin/ /bin
 COPY --from=controller-bin /go/bin/retina/controller /retina/controller
 COPY --from=controller-bin /go/src/github.com/microsoft/retina/pkg/plugin /go/src/github.com/microsoft/retina/pkg/plugin
 COPY --from=capture-bin /go/bin/retina/captureworkload /retina/captureworkload
+COPY --from=debug-bin /go/bin/retina/debug /retina/debug
 # Copy Hubble.
 COPY --from=tools /usr/local/hubble /bin/hubble
 # Set Hubble server.
