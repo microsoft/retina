@@ -1,4 +1,4 @@
-# `dropreason` (Linux)
+# `dropreason`
 
 Counts number of packets/bytes dropped on a Node, along with the direction and reason for drop.
 
@@ -6,7 +6,7 @@ Counts number of packets/bytes dropped on a Node, along with the direction and r
 
 The plugin utilizes eBPF to gather data.
 The plugin generates Basic metrics from an eBPF result.
-In Advanced mode (see [Metric Modes](../modes/modes.md)), the plugin turns this eBPF result into an enriched `Flow` (adding Pod information based on IP), then sends the `Flow` to an external channel so that a drops module can create extra Pod-Level metrics.
+In Advanced mode (see [Metric Modes](../../modes/modes.md)), the plugin turns this eBPF result into an enriched `Flow` (adding Pod information based on IP), then sends the `Flow` to an external channel so that a drops module can create extra Pod-Level metrics.
 
 ### Code locations
 
@@ -15,7 +15,7 @@ In Advanced mode (see [Metric Modes](../modes/modes.md)), the plugin turns this 
 
 ## Metrics
 
-See metrics for [Basic Mode](../modes/basic.md#plugin-dropreason-linux) or [Advanced Mode](../modes/advanced.md#plugin-dropreason-linux).
+See metrics for [Basic Mode](../../modes/basic.md#plugin-dropreason-linux) or [Advanced Mode](../../modes/advanced.md#plugin-dropreason-linux).
 
 ### Data sources
 

@@ -1,4 +1,4 @@
-# `ciliumEventObserver` (Linux)
+# `ciliumEventObserver`
 
 Collect agent and perf events from cilium via monitor1_2 socket. This allows us to serve additional metrics and flows alongside Cilium events.
 
@@ -22,6 +22,7 @@ We currently do not support Agent or Access Log events from cilium itself.
 This [metrics reference](https://docs.cilium.io/en/stable/observability/metrics/#metrics-reference) from cilium can give an idea of what metrics can be added.
 
 At the moment, we can see metrics such as:
+
 |        Name             | Description              | Extra Labels  |
 | ----------------------- | -----------------------  | ------------- |
 | `hubble_drop_total` | Number of drops | destination, protocol, reason, source |

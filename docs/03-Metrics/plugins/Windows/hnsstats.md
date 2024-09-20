@@ -1,4 +1,4 @@
-# `hnsstats` (Windows)
+# `hnsstats`
 
 Gathers TCP statistics and counts number of packets/bytes forwarded or dropped in HNS and VFP.
 
@@ -12,4 +12,4 @@ Interfaces with a Windows Node's HNS (Host Networking System) and VFP (Virtual F
 
 ## Metrics
 
-See metrics for [Basic Mode](../modes/basic.md#plugin-hnsstats-windows) (Advanced modes have identical metrics).
+See metrics for [Basic Mode](../../modes/basic.md#plugin-hnsstats-windows) (Advanced modes have identical metrics).

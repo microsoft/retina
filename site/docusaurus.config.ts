@@ -20,7 +20,7 @@ const config = {
   organizationName: 'Azure', // Usually your GitHub org/user name.
   projectName: 'Retina', // Usually your repo name.
 
-  onBrokenLinks: 'warn',
+  onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
 
   // Even if you don't use internalization, you can use this field to set useful

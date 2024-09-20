@@ -1,4 +1,4 @@
-# `packetparser` (Linux)
+# `packetparser`
 
 Captures TCP and UDP packets traveling to and from pods and nodes.
 
@@ -6,7 +6,7 @@ Captures TCP and UDP packets traveling to and from pods and nodes.
 
 `packetparser` attached a [`qdisc` (Queuing Discipline)](https://www.man7.org/linux/man-pages/man8/tc.8.html) of type `clsact` to each pod's virtual interface (`veth`) and the host's default interface (`device`). This setup enabled the attachment of eBPF filter programs for both ingress and egress directions, allowing `packetparser` to capture individual packets traveling to and from the interfaces.
 
-`packetparser` does not produce Basic metrics. In Advanced mode (refer to [Metric Modes](../modes/modes.md)), the plugin transforms an eBPF result into an enriched `Flow` by adding Pod information based on IP. It then sends the `Flow` to an external channel, enabling *several modules* to generate Pod-Level metrics.
+`packetparser` does not produce Basic metrics. In Advanced mode (refer to [Metric Modes](../../modes/modes.md)), the plugin transforms an eBPF result into an enriched `Flow` by adding Pod information based on IP. It then sends the `Flow` to an external channel, enabling *several modules* to generate Pod-Level metrics.
 
 ### Code locations
 
@@ -15,7 +15,7 @@ Captures TCP and UDP packets traveling to and from pods and nodes.
 
 ## Metrics
 
-See metrics for [Advanced Mode](../modes/advanced.md#plugin-packetparser-linux). For module information, see [below](#modules).
+See metrics for [Advanced Mode](../../modes/advanced.md#plugin-packetparser-linux). For module information, see [below](#modules).
 
 ### Modules
 

@@ -1,4 +1,4 @@
-# `dns` (Linux)
+# `dns`
 
 Tracks incoming and outgoing DNS traffic, providing various metrics and details about the DNS queries and responses.
 
@@ -15,4 +15,4 @@ In [Advanced mode](https://retina.sh/docs/metrics/modes), the plugin further pro
 
 ## Metrics
 
-See metrics for [Basic Mode](../modes/basic.md#plugin-dns-linux) or [Advanced Mode](../modes/advanced.md#plugin-dns-linux).
+See metrics for [Basic Mode](../../modes/basic.md#plugin-dns-linux) or [Advanced Mode](../../modes/advanced.md#plugin-dns-linux).

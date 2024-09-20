@@ -1,4 +1,4 @@
-# `infiniband` (Linux)
+# `infiniband`
 
 Gathers Nvidia Infiniband port counters and debug status parameters from /sys/class/infiniband and /sys/class/net (respectively).
 

@@ -1,4 +1,4 @@
-# `packetforward` (Linux)
+# `packetforward`
 
 Counts number of packets/bytes passing through the `eth0` interface of a Node, along with the direction of the packets.
 
@@ -12,7 +12,7 @@ Counts number of packets/bytes passing through the `eth0` interface of a Node, a
 
 ## Metrics
 
-See metrics for [Basic Mode](../modes/basic.md#plugin-packetforward-linux) (Advanced modes have identical metrics).
+See metrics for [Basic Mode](../../modes/basic.md#plugin-packetforward-linux) (Advanced modes have identical metrics).
 
 :::note
 
