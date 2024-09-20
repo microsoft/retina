@@ -111,6 +111,7 @@ func TestClean(t *testing.T) {
 
 	mrtnl := mocks.NewMocknltc(ctrl)
 	mrtnl.EXPECT().Qdisc().Return(nil).Times(1)
+	mrtnl.EXPECT().Close().Return(nil).AnyTimes()
 	mrtnl.EXPECT().SetOption(nl.ExtendedAcknowledge, true).Return(nil).AnyTimes()
 
 	getQdisc = func(tcnl nltc) qdisc {
@@ -138,6 +139,8 @@ func TestCleanWithErrors(t *testing.T) {
 	mq.EXPECT().Delete(gomock.Any()).Return(errors.New("error")).Times(1) //nolint:err113 // ignore
 
 	mrtnl := mocks.NewMocknltc(ctrl)
+	mrtnl.EXPECT().Close().Return(nil).AnyTimes()
+	mrtnl.EXPECT().SetOption(nl.ExtendedAcknowledge, true).Return(nil).AnyTimes()
 	mrtnl.EXPECT().Qdisc().Return(nil).AnyTimes()
 
 	getQdisc = func(nltc) qdisc {
