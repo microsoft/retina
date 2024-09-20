@@ -6,8 +6,10 @@ package conntrack
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"github.com/cilium/cilium/api/v1/flow"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/rlimit"
 	"github.com/microsoft/retina/internal/ktime"
@@ -136,4 +138,66 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			ct.l.Debug("conntrack GC completed", zap.Int("number_of_entries", noOfCtEntries), zap.Int("entries_deleted", entriesDeleted))
 		}
 	}
+}
+
+// Dump dumps all conntrack entries.
+func Dump() error {
+	objs := &conntrackObjects{}
+	err := loadConntrackObjects(objs, &ebpf.CollectionOptions{
+		Maps: ebpf.MapOptions{
+			PinPath: plugincommon.MapPath,
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to load conntrack objects")
+	}
+	ct := objs.RetinaConntrackMap
+	var k conntrackCtV4Key
+	var v conntrackCtEntry
+	iter := ct.Iterate()
+	for iter.Next(&k, &v) {
+		fmt.Printf("proto=%s is_closing=%t src_ip=%s src_port=%d dst_ip=%s dst_port=%d traffic_direction=%s flags_seen_tx_dir=%s flags_seen_rx_dir=%s\n",
+			decodeProto(k.Proto),
+			v.IsClosing,
+			utils.Int2ip(k.SrcIp).To4().String(),
+			utils.HostToNetShort(k.SrcPort),
+			utils.Int2ip(k.DstIp).To4().String(),
+			utils.HostToNetShort(k.DstPort),
+			flow.TrafficDirection(v.TrafficDirection).String(),
+			decodeFlags(v.FlagsSeenTxDir),
+			decodeFlags(v.FlagsSeenRxDir),
+		)
+	}
+
+	return nil
+}
+
+func Stats() error {
+	objs := &conntrackObjects{}
+	err := loadConntrackObjects(objs, &ebpf.CollectionOptions{
+		Maps: ebpf.MapOptions{
+			PinPath: plugincommon.MapPath,
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to load conntrack objects")
+	}
+	ct := objs.RetinaConntrackMap
+	var k conntrackCtV4Key
+	var v conntrackCtEntry
+	iter := ct.Iterate()
+	var noOfCtEntries int
+	var noOfTCPEntries int
+	var noOfUDPEntries int
+	for iter.Next(&k, &v) {
+		noOfCtEntries++
+		if k.Proto == 6 { //nolint:gomnd // TCP
+			noOfTCPEntries++
+		} else if k.Proto == 17 { //nolint:gomnd // UDP
+			noOfUDPEntries++
+		}
+	}
+	fmt.Printf("no_of_ct_entries=%d no_of_tcp_entries=%d no_of_udp_entries=%d\n", noOfCtEntries, noOfTCPEntries, noOfUDPEntries)
+
+	return nil
 }

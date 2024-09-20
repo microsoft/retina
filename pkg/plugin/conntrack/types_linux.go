@@ -67,9 +67,9 @@ func decodeFlags(flags uint8) string {
 func decodeProto(proto uint8) string {
 	switch proto {
 	case 6: // nolint:gomnd // TCP
-		return "TCP"
+		return "tcp"
 	case 17: // nolint:gomnd // UDP
-		return "UDP"
+		return "udp"
 	default:
 		return "Not supported"
 	}
