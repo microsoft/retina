@@ -14,7 +14,6 @@ The cilium plugin will listen on this socket for these events, decode the payloa
 
 - Plugin and eBPF code: *pkg/plugin/ciliumeventobserver/*
 
-
 ## Metrics
 
 The metrics will be dependent on our custom parsers. For now, we have L34 parser and L7 parser for dns and http.
