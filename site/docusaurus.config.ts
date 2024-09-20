@@ -2,14 +2,12 @@
 // Note: type annotations allow type checking and IDEs autocompletion
 
 import { themes as prismThemes } from "prism-react-renderer";
-import type { Config } from "@docusaurus/types";
-import type * as Preset from "@docusaurus/preset-classic";
 import { githubA11yLight } from "./src/prismColorTheme";
 
 const config = {
   title: 'Retina',
   tagline: 'kubernetes network observability platform',
-  favicon: 'img/favicon.ico',
+  favicon: 'img/favicon.svg',
 
   // Set the production url of your site here
   url: 'https://retina.sh',
@@ -110,7 +108,13 @@ const config = {
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
-      image: 'img/docusaurus-social-card.jpg',
+      image: "img/retina-social-card.png",
+      metadata: [
+        { name: "og:url", content: "/" },
+        { name: "og:site_name", content: "Retina" },
+        { name: "og:image:width", content: "1200" },
+        { name: "og:image:height", content: "600" },
+      ],
       navbar: {
         logo: {
           alt: 'Retina Logo',
