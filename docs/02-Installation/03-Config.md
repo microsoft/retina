@@ -10,11 +10,11 @@ Defaults are specified for each component in *deploy/legacy/manifests/controller
 * `enablePodLevel`: When this toggle is set to true, Retina will gather Advanced/Pod-Level metrics. Advanced metrics can attach Pod metadata to Retina's metrics.
 * `remoteContext`: When this toggle is set to true, retina will watch Pods on the cluster.
 * `enableAnnotations`: When this toggle is set to true, retina will gather metrics for the annotated resources. Namespaces or Pods can be annotated with `retina.sh=observe`. The operator and enableRetinaEndpoint for the operator should be enabled.
-* `enabledPlugin_linux`: Array of enabled plugins for linux.
-* `enabledPlugin_win`: Array of enabled plugins for windows.
-* `metricsInterval`: the interval for which metrics will be gathered (in seconds). (@deprecated, use metricsIntervalDuration instead)
-* `metricsIntervalDuration`: the interval for which metrics will be gathered (in duration)
-* `dataAggregationLevel`: This config defines the level of data aggregation for Retina. See [Data Aggregation](../05-Concepts/data-aggregation.md) for more details.
+* `enabledPlugin_linux`: List of enabled plugins for linux.
+* `enabledPlugin_win`: List of enabled plugins for windows.
+* `metricsInterval`: The interval for which metrics will be gathered (in seconds). (@deprecated, use metricsIntervalDuration instead)
+* `metricsIntervalDuration`: The interval for which metrics will be gathered (in duration)
+* `dataAggregationLevel`: Defines the level of data aggregation for Retina. This is set to `high` by default. See [Data Aggregation](../05-Concepts/data-aggregation.md) for more details.
 
 ## Operator Config
 
