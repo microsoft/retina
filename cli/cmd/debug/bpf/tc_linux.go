@@ -8,29 +8,31 @@ import (
 	tc "github.com/florianl/go-tc"
 	"github.com/florianl/go-tc/core"
 	"github.com/mdlayher/netlink"
-	"github.com/pkg/errors"
+	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"golang.org/x/sys/unix"
 )
 
 // val is a struct to hold qdiscs and filters for an interface
 type val struct {
-	qdiscs         []tc.Object
-	egressfilters  []tc.Object
-	ingressfilters []tc.Object
+	qdisc              []tc.Object
+	egressFilterExist  bool
+	ingressFilterExist bool
 }
 
 var (
 	ifaceName                  string
-	ifaceToQdiscsAndFiltersMap = make(map[string]*val)
+	ifaceToQdiscsAndFiltersMap = make(map[string]any)
 	qdiscCmd                   = &cobra.Command{
 		Use:   "tc",
 		Short: "Output all qdiscs and attached bpf programs on each interface on the host",
-		RunE: func(*cobra.Command, []string) error {
+		Run: func(*cobra.Command, []string) {
+			logger := pterm.DefaultLogger.WithLevel(pterm.LogLevelTrace)
 			// open a rtnetlink socket
 			rtnl, err := tc.Open(&tc.Config{})
 			if err != nil {
-				return errors.Wrap(err, "could not open rtnetlink socket")
+				logger.Error("could not open rtnetlink socket", logger.Args(err))
+				return
 			}
 			defer func() {
 				if err = rtnl.Close(); err != nil {
@@ -38,25 +40,31 @@ var (
 				}
 			}()
 
+			// set NETLINK_EXT_ACK option for detailed error messages
 			err = rtnl.SetOption(netlink.ExtendedAcknowledge, true)
 			if err != nil {
-				return errors.Wrap(err, "could not set NETLINK_EXT_ACK option")
+				logger.Warn("could not set NETLINK_EXT_ACK option", logger.Args(err))
 			}
 
+			// get all qdiscs
 			qdiscs, err := rtnl.Qdisc().Get()
 			if err != nil {
-				return errors.Wrap(err, "could not get qdiscs")
+				logger.Error("could not get qdiscs", logger.Args(err))
+				return
 			}
 
+			// populate ifaceToQdiscsAndFiltersMap
 			for _, qdisc := range qdiscs {
 				iface, err := net.InterfaceByIndex(int(qdisc.Ifindex))
 				if err != nil {
-					return errors.Wrap(err, "could not get interface by index")
+					logger.Error("could not get interface by index", logger.Args(err, qdisc.Ifindex))
+					continue
 				}
 				if _, ok := ifaceToQdiscsAndFiltersMap[iface.Name]; !ok {
 					ifaceToQdiscsAndFiltersMap[iface.Name] = &val{}
 				}
-				ifaceToQdiscsAndFiltersMap[iface.Name].qdiscs = append(ifaceToQdiscsAndFiltersMap[iface.Name].qdiscs, qdisc)
+				v := ifaceToQdiscsAndFiltersMap[iface.Name].(*val)
+				v.qdisc = append(v.qdisc, qdisc)
 
 				ingressFilters, err := rtnl.Filter().Get(&tc.Msg{
 					Family:  unix.AF_UNSPEC,
@@ -66,9 +74,10 @@ var (
 					Info:    0x10300, // nolint:gomnd // info
 				})
 				if err != nil {
-					return errors.Wrap(err, "could not get ingress filters for interface")
+					logger.Error("could not get ingress filters for interface", logger.Args(err))
+					continue
 				}
-				ifaceToQdiscsAndFiltersMap[iface.Name].ingressfilters = append(ifaceToQdiscsAndFiltersMap[iface.Name].ingressfilters, ingressFilters...)
+				v.ingressFilterExist = len(ingressFilters) > 0
 
 				egressFilters, err := rtnl.Filter().Get(&tc.Msg{
 					Family:  unix.AF_UNSPEC,
@@ -78,48 +87,28 @@ var (
 					Info:    0x10300, // nolint:gomnd // info
 				})
 				if err != nil {
-					return errors.Wrap(err, "could not get egress filters for interface")
+					logger.Error("could not get egress filters for interface", logger.Args(err))
+					continue
 				}
-				ifaceToQdiscsAndFiltersMap[iface.Name].egressfilters = append(ifaceToQdiscsAndFiltersMap[iface.Name].egressfilters, egressFilters...)
+				v.egressFilterExist = len(egressFilters) > 0
 			}
 
 			if ifaceName != "" {
-				if val, ok := ifaceToQdiscsAndFiltersMap[ifaceName]; ok {
-					fmt.Printf("Interface: %s\n", ifaceName)
-					fmt.Printf("Qdiscs:\n")
-					for _, qdisc := range val.qdiscs {
-						fmt.Printf("  %s\n", qdisc.Kind)
-					}
-					fmt.Printf("Ingress filters:\n")
-					for _, ingressFilter := range val.ingressfilters {
-						fmt.Printf("  %+v\n", ingressFilter)
-					}
-					fmt.Printf("Egress filters:\n")
-					for _, egressFilter := range val.egressfilters {
-						fmt.Printf("  %+v\n", egressFilter)
-					}
+				if value, ok := ifaceToQdiscsAndFiltersMap[ifaceName]; ok {
+					v := value.(*val)
+					outputMap := make(map[string]any)
+					outputMap["name"] = ifaceName
+					outputMap["qdiscs"] = v.qdisc
+					outputMap["ingressFilterExist"] = v.ingressFilterExist
+					outputMap["egressFilterExist"] = v.egressFilterExist
+					logger.Info("Interface", logger.ArgsFromMap(outputMap))
 				} else {
-					fmt.Printf("Interface %s not found\n", ifaceName)
+					logger.Error("Interface not found", logger.Args(ifaceName))
+					return
 				}
 			} else {
-				for iface, val := range ifaceToQdiscsAndFiltersMap {
-					fmt.Printf("Interface: %s\n", iface)
-					fmt.Printf("Qdiscs:\n")
-					for _, qdisc := range val.qdiscs {
-						fmt.Printf("  %s\n", qdisc.Kind)
-					}
-					fmt.Printf("Ingress filters:\n")
-					for _, ingressFilter := range val.ingressfilters {
-						fmt.Printf("  %+v\n", ingressFilter)
-					}
-					fmt.Printf("Egress filters:\n")
-					for _, egressFilter := range val.egressfilters {
-						fmt.Printf("  %+v\n", egressFilter)
-					}
-				}
+				logger.Info("Interfaces", logger.ArgsFromMap(ifaceToQdiscsAndFiltersMap))
 			}
-
-			return nil
 		},
 	}
 )
