@@ -6,11 +6,12 @@ Note: captures can also be performed with a [Capture CRD](../05-Concepts/CRDs/Ca
 
 ## Retina capture create
 
-`retina capture create` creates a Capture with underlying Kubernetes jobs.
+`kubectl retina capture create` creates a Capture with underlying Kubernetes jobs.
 
 ### No wait(default true)
 
 Do not wait for the long-running capture job to finish.
+
 By default, Retina capture CLI will exit before the jobs are completed. With `--no-wait=false`, the CLI will wait until the jobs are completed and clean up the Kubernetes resources created.
 
 #### Example
@@ -89,7 +90,7 @@ This is beneficial when the user wants to reduce the capture file size or hide c
 
 ### Capture Configuration(optional)
 
-capture configuration indicates the configurations of the network capture.
+Capture configuration indicates the configurations of the network capture.
 
 #### Packet capture filters
 
@@ -176,7 +177,7 @@ With debug mode, when `--debug` is specified, we can overwrite the capture job P
 
 ## Retina capture delete
 
-`retina capture delete` deletes a Kubernetes Jobs with the specified Capture name.
+`kubectl retina capture delete` deletes a Kubernetes Jobs with the specified Capture name.
 
 ### Examples
 
@@ -184,7 +185,7 @@ With debug mode, when `--debug` is specified, we can overwrite the capture job P
 
 ## Retina capture list
 
-`retina capture list` lists Captures in a namespace or all namespaces.
+`kubectl retina capture list` lists Captures in a namespace or all namespaces.
 
 ### Examples
 

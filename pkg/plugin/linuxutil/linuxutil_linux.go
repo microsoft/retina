@@ -51,7 +51,7 @@ func (lu *linuxUtil) Start(ctx context.Context) error {
 }
 
 func (lu *linuxUtil) SetupChannel(ch chan *hubblev1.Event) error {
-	lu.l.Warn("Plugin does not support SetupChannel", zap.String("plugin", string(Name)))
+	lu.l.Debug("Plugin does not support SetupChannel", zap.String("plugin", string(Name)))
 	return nil
 }
 
