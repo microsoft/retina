@@ -1,6 +1,9 @@
 package retina
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/microsoft/retina/test/e2e/framework/azure"
 	"github.com/microsoft/retina/test/e2e/framework/generic"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
@@ -8,6 +11,7 @@ import (
 	"github.com/microsoft/retina/test/e2e/scenarios/dns"
 	"github.com/microsoft/retina/test/e2e/scenarios/drop"
 	"github.com/microsoft/retina/test/e2e/scenarios/latency"
+	"github.com/microsoft/retina/test/e2e/scenarios/perf"
 	tcp "github.com/microsoft/retina/test/e2e/scenarios/tcp"
 )
 
@@ -38,6 +42,26 @@ func CreateTestInfra(subID, clusterName, location, kubeConfigFilePath string) *t
 	}, nil)
 
 	job.AddStep(&azure.GetAKSKubeConfig{
+		KubeConfigFilePath: kubeConfigFilePath,
+	}, nil)
+
+	job.AddStep(&generic.LoadFlags{
+		TagEnv:            generic.DefaultTagEnv,
+		ImageNamespaceEnv: generic.DefaultImageNamespace,
+		ImageRegistryEnv:  generic.DefaultImageRegistry,
+	}, nil)
+
+	return job
+}
+
+func RegisterExistingInfra(subID, clusterName, resGroupName, location, kubeConfigFilePath string) *types.Job {
+	job := types.NewJob("Register existing e2e test infrastructure")
+
+	job.AddStep(&azure.GetAKSKubeConfig{
+		SubscriptionID:     subID,
+		ResourceGroupName:  resGroupName,
+		ClusterName:        clusterName,
+		Location:           location,
 		KubeConfigFilePath: kubeConfigFilePath,
 	}, nil)
 
@@ -183,6 +207,46 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 	}
 
 	job.AddScenario(latency.ValidateLatencyMetric())
+
+	return job
+}
+
+func RunPerfTest(kubeConfigFilePath string, chartPath string) *types.Job {
+	job := types.NewJob("Run performance tests")
+
+	benchmarkFile := fmt.Sprintf("netperf-benchmark-%s.json", time.Now().Format("20060102150405"))
+	resultFile := fmt.Sprintf("netperf-result-%s.json", time.Now().Format("20060102150405"))
+
+	job.AddStep(&perf.GetNetworkPerformanceMeasures{
+		KubeConfigFilePath: kubeConfigFilePath,
+		ResultTag:          "no-retina",
+		JsonOutputFile:     benchmarkFile,
+	}, &types.StepOptions{
+		SkipSavingParametersToJob: true,
+	})
+
+	job.AddStep(&kubernetes.InstallHelmChart{
+		Namespace:          "kube-system",
+		ReleaseName:        "retina",
+		KubeConfigFilePath: kubeConfigFilePath,
+		ChartPath:          chartPath,
+		TagEnv:             generic.DefaultTagEnv,
+	}, nil)
+
+	job.AddStep(&perf.GetNetworkPerformanceMeasures{
+		KubeConfigFilePath: kubeConfigFilePath,
+		ResultTag:          "retina",
+		JsonOutputFile:     resultFile,
+	}, &types.StepOptions{
+		SkipSavingParametersToJob: true,
+	})
+
+	job.AddStep(&perf.GetNetworkRegressionResults{
+		BaseResultsFile: benchmarkFile,
+		NewResultsFile:  resultFile,
+	}, &types.StepOptions{
+		SkipSavingParametersToJob: true,
+	})
 
 	return job
 }

@@ -38,3 +38,5 @@ bin/
 
 image-metadata-*.json
 *packetmonitorsupport*/
+*.pem
+*results*.json
