@@ -1,6 +1,7 @@
 package retina
 
 import (
+	"github.com/microsoft/retina/test/e2e/framework/aws"
 	"github.com/microsoft/retina/test/e2e/framework/azure"
 	"github.com/microsoft/retina/test/e2e/framework/generic"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
@@ -11,8 +12,8 @@ import (
 	tcp "github.com/microsoft/retina/test/e2e/scenarios/tcp"
 )
 
-func CreateTestInfra(subID, clusterName, location, kubeConfigFilePath string) *types.Job {
-	job := types.NewJob("Create e2e test infrastructure")
+func CreateTestInfraAZ(subID, clusterName, location, kubeConfigFilePath string) *types.Job {
+	job := types.NewJob("Create e2e test infrastructure AZ")
 
 	job.AddStep(&azure.CreateResourceGroup{
 		SubscriptionID:    subID,
@@ -50,8 +51,8 @@ func CreateTestInfra(subID, clusterName, location, kubeConfigFilePath string) *t
 	return job
 }
 
-func DeleteTestInfra(subID, clusterName, location string) *types.Job {
-	job := types.NewJob("Delete e2e test infrastructure")
+func DeleteTestInfraAZ(subID, clusterName, location string) *types.Job {
+	job := types.NewJob("Delete e2e test infrastructure AZ")
 
 	job.AddStep(&azure.DeleteResourceGroup{
 		SubscriptionID:    subID,
@@ -62,8 +63,35 @@ func DeleteTestInfra(subID, clusterName, location string) *types.Job {
 	return job
 }
 
-func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string) *types.Job {
+func CreateTestInfraAWS(accID, clusterName, region, kubeConfigFilePath string) *types.Job {
+	job := types.NewJob("Create e2e test infrastructure AWS")
+
+	job.AddStep(&aws.CreateCluster{
+		AccountID:          accID,
+		ClusterName:        clusterName,
+		Region:             region,
+		KubeConfigFilePath: kubeConfigFilePath,
+	}, nil)
+
+	return job
+}
+
+func DeleteTestInfraAWS(accID, clusterName, region string) *types.Job {
+	job := types.NewJob("Delete e2e test infrastructure AWS")
+
+	job.AddStep(&aws.DeleteCluster{
+		AccountID:   accID,
+		ClusterName: clusterName,
+		Region:      region,
+	}, nil)
+
+	return job
+}
+
+func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath, cloudProvider string) *types.Job {
 	job := types.NewJob("Install and test Retina with basic metrics")
+
+	apiEndpoint := getCloudApiIP(cloudProvider)
 
 	job.AddStep(&kubernetes.InstallHelmChart{
 		Namespace:          "kube-system",
@@ -73,7 +101,9 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string) *typ
 		TagEnv:             generic.DefaultTagEnv,
 	}, nil)
 
-	job.AddScenario(drop.ValidateDropMetric())
+	if cloudProvider == "azure" {
+		job.AddScenario(drop.ValidateDropMetric())
+	}
 
 	job.AddScenario(tcp.ValidateTCPMetrics())
 
@@ -96,7 +126,7 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string) *typ
 				Query:       "kubernetes.default.svc.cluster.local.",
 				QueryType:   "A",
 				ReturnCode:  "No Error",
-				Response:    "10.0.0.1",
+				Response:    apiEndpoint,
 			},
 		},
 		{
@@ -125,7 +155,7 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string) *typ
 	return job
 }
 
-func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFilePath string) *types.Job {
+func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFilePath, cloudProvider string) *types.Job {
 	job := types.NewJob("Upgrade and test Retina with advanced metrics")
 	// enable advanced metrics
 	job.AddStep(&kubernetes.UpgradeRetinaHelmChart{
@@ -136,6 +166,8 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 		TagEnv:             generic.DefaultTagEnv,
 		ValuesFile:         valuesFilePath,
 	}, nil)
+
+	apiEndpoint := getCloudApiIP(cloudProvider)
 
 	dnsScenarios := []struct {
 		name string
@@ -156,7 +188,7 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 				Query:       "kubernetes.default.svc.cluster.local.",
 				QueryType:   "A",
 				ReturnCode:  "NOERROR",
-				Response:    "10.0.0.1",
+				Response:    apiEndpoint,
 			},
 		},
 		{
