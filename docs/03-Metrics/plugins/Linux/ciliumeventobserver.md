@@ -1,21 +1,6 @@
-# `ciliumEventObserver` (Linux)
+# `ciliumEventObserver`
 
 Collect agent and perf events from cilium via monitor1_2 socket. This allows us to serve additional metrics and flows alongside Cilium events.
-
-## Metrics
-
-The metrics will be dependent on our custom parsers. For now, we have L34 parser and L7 parser for dns and http.
-We currently do not support Agent or Access Log events from cilium itself.
-This [metrics reference](https://docs.cilium.io/en/stable/observability/metrics/#metrics-reference) from cilium can give an idea of what metrics can be added.
-
-At the moment, we can see metrics such as:
-|        Name             | Description              | Extra Labels  |
-| ----------------------- | -----------------------  | ------------- |
-| `hubble_drop_total` | Number of drops | destination, protocol, reason, source |
-| `hubble_tcp_flags_total` | TCP flag occurrences | destination, family, flag, source |
-| `hubble_metrics_http_handler_request_duration_seconds` | A histogram of latencies of Hubble metrics handler. | code, le |
-| `hubble_flows_processed_total` | Total number of flows processed | destination, protocol, subtype, type, verdict |
-| `hubble_metrics_http_handler_requests_total` | A counter for requests to Hubble metrics handler. | code |
 
 ## Architecture
 
@@ -28,3 +13,19 @@ The cilium plugin will listen on this socket for these events, decode the payloa
 ### Code locations
 
 - Plugin and eBPF code: *pkg/plugin/ciliumeventobserver/*
+
+## Metrics
+
+The metrics will be dependent on our custom parsers. For now, we have L34 parser and L7 parser for dns and http.
+We currently do not support Agent or Access Log events from cilium itself.
+This [metrics reference](https://docs.cilium.io/en/stable/observability/metrics/#metrics-reference) from cilium can give an idea of what metrics can be added.
+
+At the moment, we can see metrics such as:
+
+|        Name             | Description              | Extra Labels  |
+| ----------------------- | -----------------------  | ------------- |
+| `hubble_drop_total` | Number of drops | destination, protocol, reason, source |
+| `hubble_tcp_flags_total` | TCP flag occurrences | destination, family, flag, source |
+| `hubble_metrics_http_handler_request_duration_seconds` | A histogram of latencies of Hubble metrics handler. | code, le |
+| `hubble_flows_processed_total` | Total number of flows processed | destination, protocol, subtype, type, verdict |
+| `hubble_metrics_http_handler_requests_total` | A counter for requests to Hubble metrics handler. | code |

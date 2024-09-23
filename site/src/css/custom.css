@@ -28,3 +28,69 @@
   --ifm-color-primary-lightest: #00a8f8;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
 }
+
+.navbar__items {
+  gap: 0.25rem;
+}
+
+.navbar__link {
+  border-radius: 0.25rem;
+}
+
+.navbar__link--active {
+  background-color: var(--ifm-menu-color-background-active);
+}
+
+.navbar__link:hover {
+  background-color: var(--ifm-menu-color-background-hover);
+}
+
+/* Make logo smaller on mobile so it fits with the search */
+@media screen and (max-width: 380px) {
+  .navbar__logo > img {
+    width: 120px;
+  }
+}
+@media screen and (max-width: 340px) {
+  .navbar__logo > img {
+    width: 100px;
+  }
+}
+
+.pagination-nav {
+  margin-bottom: 3rem;
+}
+
+.button--primary {
+  background-color: var(--brand-core-yellow);
+  border: none;
+  color: #111;
+  transition: box-shadow;
+  transition-duration: 0.1s;
+}
+.button--primary:hover {
+  color: #111;
+  box-shadow: 0px 1px 2px 0px rgba(0, 0, 0, 0.2),
+    0px 1px 3px 1px rgba(0, 0, 0, 0.1);
+}
+.button--primary:active {
+  background-color: #d0c71f;
+  box-shadow: none;
+}
+
+.hero {
+  background: transparent;
+}
+
+/* Utility classes */
+.fit-content {
+  max-width: fit-content;
+}
+
+.search-icon {
+  display: none;
+}
+
+.markdown img {
+  background: #fff;
+}
