@@ -95,7 +95,7 @@ Possible values for `statistic_name` (for metric `tcp_connection_stats`):
 - `TCPTimeouts`
 - `TCPTSReorder`
 - `ResetCount`
-- and many others (full list [here](../plugins/linuxutil.md#label-values-for-tcp_connection_stats))
+- and many others (full list [here](../plugins/Linux/linuxutil.md#label-values-for-tcp_connection_stats))
 
 Possible values for `statistic_name` (for metric `ip_connection_stats`):
 

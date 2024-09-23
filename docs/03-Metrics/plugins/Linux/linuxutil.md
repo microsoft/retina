@@ -1,10 +1,6 @@
-# `linuxutil` (Linux)
+# `linuxutil`
 
 Gathers TCP/UDP statistics and network interface statistics from the `netstats` and `ethtool` Node utilities (respectively).
-
-## Metrics
-
-See metrics for [Basic Mode](../modes/basic.md#plugin-linuxutil-linux) (Advanced modes have identical metrics).
 
 ## Architecture
 
@@ -21,30 +17,34 @@ The plugin uses the following utilities as data sources:
 
 - Plugin code interfacing with the Node utilities: *pkg/plugin/linuxutil/*
 
+## Metrics
+
+See metrics for [Basic Mode](../../modes/basic.md#plugin-linuxutil-linux) (Advanced modes have identical metrics).
+
 ### Configuration (in Code)
 
 Both `ethtool` and `netstat` data can be curated to remove unwanted data. Below options in a struct in *linuxutil.go* can be used to configure the same.
 
 ```go
 type EthtoolOpts struct {
-	// when true will only include keys with err or drop in its name
-	errOrDropKeysOnly bool
+ // when true will only include keys with err or drop in its name
+ errOrDropKeysOnly bool
 
-	// when true will include all keys with value 0
-	addZeroVal bool
+ // when true will include all keys with value 0
+ addZeroVal bool
 }
 ```
 
 ```go
 type NetstatOpts struct {
-	// when true only includes curated list of keys
-	CuratedKeys bool
+ // when true only includes curated list of keys
+ CuratedKeys bool
 
-	// when true will include all keys with value 0
-	AddZeroVal bool
+ // when true will include all keys with value 0
+ AddZeroVal bool
 
-	// get only listening sockets
-	ListenSock bool
+ // get only listening sockets
+ ListenSock bool
 }
 ```
 

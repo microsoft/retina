@@ -1,4 +1,9 @@
-# Retina
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="site/static/img/retina-logo.svg">
+    <img src="site/static/img/retina-logo.svg" alt="Retina Logo" width="30%">
+  </picture>
+</h1>
 
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=746962176)
 
