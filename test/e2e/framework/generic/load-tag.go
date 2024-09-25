@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+
+	"github.com/microsoft/retina/test/e2e/framework/types"
 )
 
 const (
@@ -31,7 +33,7 @@ type LoadFlags struct {
 	ImageRegistryEnv  string
 }
 
-func (s *LoadFlags) Run() error {
+func (s *LoadFlags) Run(_ *types.RuntimeObjects) error {
 	tag := os.Getenv(s.TagEnv)
 	imageNamespace := os.Getenv(s.ImageNamespaceEnv)
 	imageRegistry := os.Getenv(s.ImageRegistryEnv)
@@ -39,7 +41,7 @@ func (s *LoadFlags) Run() error {
 	return nil
 }
 
-func (s *LoadFlags) Prevalidate() error {
+func (s *LoadFlags) PreRun() error {
 	if err := s.validateEnvAndFlag(s.TagEnv, imageTagArg, *imageTag, ErrTagNotSet); err != nil {
 		return err
 	}

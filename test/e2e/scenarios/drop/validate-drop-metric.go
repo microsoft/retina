@@ -5,6 +5,7 @@ import (
 	"log"
 
 	prom "github.com/microsoft/retina/test/e2e/framework/prometheus"
+	"github.com/microsoft/retina/test/e2e/framework/types"
 )
 
 var (
@@ -28,7 +29,7 @@ type ValidateRetinaDropMetric struct {
 	Direction               string
 }
 
-func (v *ValidateRetinaDropMetric) Run() error {
+func (v *ValidateRetinaDropMetric) Run(_ *types.RuntimeObjects) error {
 	promAddress := fmt.Sprintf("http://localhost:%s/metrics", v.PortForwardedRetinaPort)
 
 	metric := map[string]string{
@@ -49,7 +50,7 @@ func (v *ValidateRetinaDropMetric) Run() error {
 	return nil
 }
 
-func (v *ValidateRetinaDropMetric) Prevalidate() error {
+func (v *ValidateRetinaDropMetric) PreRun() error {
 	return nil
 }
 

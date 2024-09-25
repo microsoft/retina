@@ -34,7 +34,7 @@ type TestBackground struct {
 	c           *counter
 }
 
-func (t *TestBackground) Run() error {
+func (t *TestBackground) Run(_ *RuntimeObjects) error {
 	t.c = newCounter()
 	err := t.c.Start()
 	if err != nil {
@@ -54,7 +54,7 @@ func (t *TestBackground) Stop() error {
 	return nil
 }
 
-func (t *TestBackground) Prevalidate() error {
+func (t *TestBackground) PreRun() error {
 	return nil
 }
 

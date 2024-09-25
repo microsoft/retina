@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/microsoft/retina/test/e2e/framework/types"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -22,7 +23,7 @@ type CreateDenyAllNetworkPolicy struct {
 	DenyAllLabelSelector   string
 }
 
-func (c *CreateDenyAllNetworkPolicy) Run() error {
+func (c *CreateDenyAllNetworkPolicy) Run(_ *types.RuntimeObjects) error {
 	config, err := clientcmd.BuildConfigFromFlags("", c.KubeConfigFilePath)
 	if err != nil {
 		return fmt.Errorf("error building kubeconfig: %w", err)
@@ -68,7 +69,7 @@ func getNetworkPolicy(namespace, labelSelector string) *networkingv1.NetworkPoli
 	}
 }
 
-func (c *CreateDenyAllNetworkPolicy) Prevalidate() error {
+func (c *CreateDenyAllNetworkPolicy) PreRun() error {
 	return nil
 }
 
@@ -82,7 +83,7 @@ type DeleteDenyAllNetworkPolicy struct {
 	DenyAllLabelSelector   string
 }
 
-func (d *DeleteDenyAllNetworkPolicy) Run() error {
+func (d *DeleteDenyAllNetworkPolicy) Run(_ *types.RuntimeObjects) error {
 	config, err := clientcmd.BuildConfigFromFlags("", d.KubeConfigFilePath)
 	if err != nil {
 		return fmt.Errorf("error building kubeconfig: %w", err)
@@ -105,6 +106,6 @@ func (d *DeleteDenyAllNetworkPolicy) Run() error {
 	return nil
 }
 
-func (d *DeleteDenyAllNetworkPolicy) Prevalidate() error {
+func (d *DeleteDenyAllNetworkPolicy) PreRun() error {
 	return nil
 }

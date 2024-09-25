@@ -23,6 +23,7 @@ var (
 // A Job is a logical grouping of steps, options and values
 type Job struct {
 	values          *JobValues
+	runtimeObjects  *RuntimeObjects
 	Description     string
 	Steps           []*StepWrapper
 	BackgroundSteps map[string]*StepWrapper
@@ -84,6 +85,9 @@ func NewJob(description string) *Job {
 	return &Job{
 		values: &JobValues{
 			kv: make(map[string]string),
+		},
+		runtimeObjects: &RuntimeObjects{
+			kv: make(map[string]interface{}),
 		},
 		BackgroundSteps: make(map[string]*StepWrapper),
 		Scenarios:       make(map[*StepWrapper]*Scenario),
@@ -168,7 +172,7 @@ func (j *Job) Run() error {
 	}
 
 	for _, wrapper := range j.Steps {
-		err := wrapper.Step.Prevalidate()
+		err := wrapper.Step.PreRun()
 		if err != nil {
 			return err //nolint:wrapcheck // don't wrap error, wouldn't provide any more context than the error itself
 		}
@@ -176,7 +180,7 @@ func (j *Job) Run() error {
 
 	for _, wrapper := range j.Steps {
 		j.responseDivider(wrapper)
-		err := wrapper.Step.Run()
+		err := wrapper.Step.Run(j.runtimeObjects)
 		if wrapper.Opts.ExpectError && err == nil {
 			return fmt.Errorf("expected error from step %s but got nil: %w", reflect.TypeOf(wrapper.Step).Elem().Name(), ErrNilError)
 		} else if !wrapper.Opts.ExpectError && err != nil {

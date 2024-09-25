@@ -8,6 +8,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	armcontainerservice "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v4"
+	"github.com/microsoft/retina/test/e2e/framework/types"
 )
 
 const (
@@ -25,7 +26,7 @@ type CreateCluster struct {
 	ClusterName       string
 }
 
-func (c *CreateCluster) Run() error {
+func (c *CreateCluster) Run(ro *types.RuntimeObjects) error {
 	cred, err := azidentity.NewAzureCLICredential(nil)
 	if err != nil {
 		return fmt.Errorf("failed to obtain a credential: %w", err)
@@ -106,7 +107,7 @@ func GetStarterClusterTemplate(location string) armcontainerservice.ManagedClust
 	}
 }
 
-func (c *CreateCluster) Prevalidate() error {
+func (c *CreateCluster) PreRun() error {
 	return nil
 }
 

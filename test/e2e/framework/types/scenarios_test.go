@@ -111,7 +111,7 @@ type DummyStep struct {
 	Parameter2 string
 }
 
-func (d *DummyStep) Run() error {
+func (d *DummyStep) Run(_ *RuntimeObjects) error {
 	fmt.Printf("Running DummyStep with parameter 1 as: %s\n", d.Parameter1)
 	fmt.Printf("Running DummyStep with parameter 2 as: %s\n", d.Parameter2)
 	return nil
@@ -121,6 +121,6 @@ func (d *DummyStep) Stop() error {
 	return nil
 }
 
-func (d *DummyStep) Prevalidate() error {
+func (d *DummyStep) PreRun() error {
 	return nil
 }

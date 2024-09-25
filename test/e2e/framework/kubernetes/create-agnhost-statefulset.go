@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/microsoft/retina/test/e2e/framework/types"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -27,7 +28,7 @@ type CreateAgnhostStatefulSet struct {
 	KubeConfigFilePath string
 }
 
-func (c *CreateAgnhostStatefulSet) Run() error {
+func (c *CreateAgnhostStatefulSet) Run(_ *types.RuntimeObjects) error {
 	config, err := clientcmd.BuildConfigFromFlags("", c.KubeConfigFilePath)
 	if err != nil {
 		return fmt.Errorf("error building kubeconfig: %w", err)
@@ -62,7 +63,7 @@ func (c *CreateAgnhostStatefulSet) Run() error {
 	return nil
 }
 
-func (c *CreateAgnhostStatefulSet) Prevalidate() error {
+func (c *CreateAgnhostStatefulSet) PreRun() error {
 	return nil
 }
 

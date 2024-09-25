@@ -1,40 +1,32 @@
 package types
 
 import (
-	"fmt"
+	"errors"
 	"sync"
 )
 
-var (
-	ErrValueAlreadySet = fmt.Errorf("value already set")
-	ErrEmptyValue      = fmt.Errorf("empty parameter not found in values")
-)
+var ErrEmptyRuntimeObject = errors.New("empty value for runtime object key")
 
-type JobValues struct {
+type RuntimeObjects struct {
 	RWLock sync.RWMutex
-	kv     map[string]string
+	kv     map[string]interface{}
 }
 
-func (j *JobValues) New() *JobValues {
-	return &JobValues{
-		kv: make(map[string]string),
-	}
-}
-
-func (j *JobValues) Contains(key string) bool {
+func (j *RuntimeObjects) Contains(key string) bool {
 	j.RWLock.RLock()
 	defer j.RWLock.RUnlock()
 	_, ok := j.kv[key]
 	return ok
 }
 
-func (j *JobValues) Get(key string) string {
+func (j *RuntimeObjects) Get(key string) (interface{}, bool) {
 	j.RWLock.RLock()
 	defer j.RWLock.RUnlock()
-	return j.kv[key]
+	val, ok := j.kv[key]
+	return val, ok
 }
 
-func (j *JobValues) SetGet(key, value string) (string, error) {
+func (j *RuntimeObjects) SetGet(key string, value interface{}) (interface{}, error) {
 	j.RWLock.Lock()
 	defer j.RWLock.Unlock()
 

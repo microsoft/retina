@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/retina/test/e2e/common"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	prom "github.com/microsoft/retina/test/e2e/framework/prometheus"
+	"github.com/microsoft/retina/test/e2e/framework/types"
 	"github.com/pkg/errors"
 )
 
@@ -28,7 +29,7 @@ type ValidateAdvancedDNSRequestMetrics struct {
 	KubeConfigFilePath string
 }
 
-func (v *ValidateAdvancedDNSRequestMetrics) Run() error {
+func (v *ValidateAdvancedDNSRequestMetrics) Run(_ *types.RuntimeObjects) error {
 	metricsEndpoint := fmt.Sprintf("http://localhost:%d/metrics", common.RetinaPort)
 	// Get Pod IP address
 	podIP, err := kubernetes.GetPodIP(v.KubeConfigFilePath, v.Namespace, v.PodName)
@@ -55,7 +56,7 @@ func (v *ValidateAdvancedDNSRequestMetrics) Run() error {
 	return nil
 }
 
-func (v *ValidateAdvancedDNSRequestMetrics) Prevalidate() error {
+func (v *ValidateAdvancedDNSRequestMetrics) PreRun() error {
 	return nil
 }
 
@@ -77,7 +78,7 @@ type ValidateAdvanceDNSResponseMetrics struct {
 	KubeConfigFilePath string
 }
 
-func (v *ValidateAdvanceDNSResponseMetrics) Run() error {
+func (v *ValidateAdvanceDNSResponseMetrics) Run(_ *types.RuntimeObjects) error {
 	metricsEndpoint := fmt.Sprintf("http://localhost:%d/metrics", common.RetinaPort)
 	// Get Pod IP address
 	podIP, err := kubernetes.GetPodIP(v.KubeConfigFilePath, v.Namespace, v.PodName)
@@ -111,7 +112,7 @@ func (v *ValidateAdvanceDNSResponseMetrics) Run() error {
 	return nil
 }
 
-func (v *ValidateAdvanceDNSResponseMetrics) Prevalidate() error {
+func (v *ValidateAdvanceDNSResponseMetrics) PreRun() error {
 	return nil
 }
 

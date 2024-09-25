@@ -7,6 +7,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	armcontainerservice "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v4"
+	"github.com/microsoft/retina/test/e2e/framework/types"
 )
 
 type DeleteCluster struct {
@@ -16,7 +17,7 @@ type DeleteCluster struct {
 	Location          string
 }
 
-func (d *DeleteCluster) Run() error {
+func (d *DeleteCluster) Run(_ *types.RuntimeObjects) error {
 	cred, err := azidentity.NewAzureCLICredential(nil)
 	if err != nil {
 		return fmt.Errorf("failed to obtain a credential: %w", err)
@@ -39,7 +40,7 @@ func (d *DeleteCluster) Run() error {
 	return nil
 }
 
-func (d *DeleteCluster) Prevalidate() error {
+func (d *DeleteCluster) PreRun() error {
 	return nil
 }
 

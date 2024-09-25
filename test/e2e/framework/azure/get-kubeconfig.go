@@ -8,6 +8,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	armcontainerservice "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v4"
+	"github.com/microsoft/retina/test/e2e/framework/types"
 )
 
 const KubeConfigPerms = 0o600
@@ -20,7 +21,7 @@ type GetAKSKubeConfig struct {
 	KubeConfigFilePath string
 }
 
-func (c *GetAKSKubeConfig) Run() error {
+func (c *GetAKSKubeConfig) Run(_ *types.RuntimeObjects) error {
 	cred, err := azidentity.NewAzureCLICredential(nil)
 	if err != nil {
 		return fmt.Errorf("failed to obtain a credential: %w", err)
@@ -44,7 +45,7 @@ func (c *GetAKSKubeConfig) Run() error {
 	return nil
 }
 
-func (c *GetAKSKubeConfig) Prevalidate() error {
+func (c *GetAKSKubeConfig) PreRun() error {
 	return nil
 }
 

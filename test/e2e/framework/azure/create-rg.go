@@ -8,6 +8,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
+	"github.com/microsoft/retina/test/e2e/framework/types"
 )
 
 type CreateResourceGroup struct {
@@ -16,7 +17,7 @@ type CreateResourceGroup struct {
 	Location          string
 }
 
-func (c *CreateResourceGroup) Run() error {
+func (c *CreateResourceGroup) Run(_ *types.RuntimeObjects) error {
 	cred, err := azidentity.NewAzureCLICredential(nil)
 	if err != nil {
 		return fmt.Errorf("failed to obtain a credential: %w", err)
@@ -39,7 +40,7 @@ func (c *CreateResourceGroup) Run() error {
 	return nil
 }
 
-func (c *CreateResourceGroup) Prevalidate() error {
+func (c *CreateResourceGroup) PreRun() error {
 	return nil
 }
 

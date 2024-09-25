@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/microsoft/retina/test/e2e/framework/types"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/cli"
 	helmValues "helm.sh/helm/v3/pkg/cli/values"
@@ -25,7 +26,7 @@ type UpgradeRetinaHelmChart struct {
 	ValuesFile         string
 }
 
-func (u *UpgradeRetinaHelmChart) Run() error {
+func (u *UpgradeRetinaHelmChart) Run(_ *types.RuntimeObjects) error {
 	settings := cli.New()
 	settings.KubeConfig = u.KubeConfigFilePath
 	actionConfig := new(action.Configuration)
@@ -76,7 +77,7 @@ func (u *UpgradeRetinaHelmChart) Run() error {
 	return nil
 }
 
-func (u *UpgradeRetinaHelmChart) Prevalidate() error {
+func (u *UpgradeRetinaHelmChart) PreRun() error {
 	return nil
 }
 
