@@ -10,10 +10,17 @@ The Retina capture command allows users to capture network traffic and metadata 
 
 ## Flags
 
-<!-- TODO:
-1. remove unnecessary flags from the capture targets
-3. is name a required flag
--->
+### [required] Name
+
+- Syntax: `--name <string>`
+
+A name for the Retina Capture.
+
+**Example:**
+
+`kubectl retina capture create --name capture-test --host-path /mnt/capture --node-selectors "kubernetes.io/os=linux"`
+
+---
 
 ### [required] Capture Target
 
@@ -21,27 +28,34 @@ The capture target indicates where the packet capture will be performed. There a
 
 #### Node Selectors
 
-Capture network captures on nodes filtered by the provided by node selectors.
+- Syntax: `--node-selectors "<string>"`
+
+Capture network captures on nodes filtered by the provided by node selectors. Comma-separated.
 
 **Example:**
 
-`kubectl retina capture create --name capture-test --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux"`
+`kubectl retina capture create --name capture-test --host-path /mnt/capture --node-selectors "kubernetes.io/os=linux"`
 
 #### Node Names
 
-Capture network captures on nodes filtered by the provided node names.
+- Syntax: `--node-names "<string>"`
+
+Capture network captures on nodes filtered by the provided node names. Comma-separated.
 
 **Example:**
 
-`kubectl retina capture create --name capture-test --host-path /mnt/capture --namespace capture --node-names "aks-nodepool1-41844487-vmss000000,aks-nodepool1-41844487-vmss000001"`
+`kubectl retina capture create --name capture-test --host-path /mnt/capture --node-names "aks-nodepool1-41844487-vmss000000,aks-nodepool1-41844487-vmss000001"`
 
 #### Pod Selectors & Namespace Selectors (Pairs)
 
-Capture network captures on pods filtered by the provided pod-selector and namespace-selector **pairs**.
+- Syntax (Pod Selectors): `--pod-selectors="<string>"`
+- Syntax (Namespace Selectors): `--namespace-selectors="<string>"`
+
+Capture network captures on pods filtered by the provided pod-selector and namespace-selector **pairs**. Comma-separated.
 
 **Example:**
 
-`kubectl retina capture create --name capture-test --host-path /mnt/capture --namespace capture --pod-selectors="k8s-app=kube-dns" --namespace-selectors="kubernetes.io/metadata.name=kube-system"`
+`kubectl retina capture create --name capture-test --host-path /mnt/capture --pod-selectors="k8s-app=kube-dns" --namespace-selectors="kubernetes.io/metadata.name=kube-system"`
 
 ---
 
@@ -57,7 +71,7 @@ Store the capture file in the node's specified host path. In the below example t
 
 **Example:**
 
-`kubectl retina capture create --name capture-test --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux"`
+`kubectl retina capture create --name capture-test --host-path /mnt/capture --node-selectors "kubernetes.io/os=linux"`
 
 #### PVC
 
@@ -65,7 +79,7 @@ Store the capture file to a PVC, in the example below `mypvc` with access mode R
 
 **Example:**
 
-`kubectl retina capture create --name capture-test --pvc mypvc --namespace capture --node-selectors "kubernetes.io/os=linux"`
+`kubectl retina capture create --name capture-test --pvc mypvc --node-selectors "kubernetes.io/os=linux"`
 
 #### Storage Account
 
@@ -128,7 +142,9 @@ Sets the namespace which hosts the capture job and the other Kubernetes resource
 - Default value: `""`
 - Optional
 
-Represent a range of IP/port filters to be included or excluded from the capture. This is **not** available on Windows.
+A comma-separated list of IP:Port pairs that are included or excluded from capturing network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:*
+
+Only works on Linux.
 
 **Example:**
 
@@ -190,6 +206,8 @@ When creating a job requires job number exceeds this limit, it will fail with pr
 
 Limit the packet size in bytes. Packets longer than the defined maximum size will be truncated. The default value 0 indicates no limit. This is beneficial when the user wants to reduce the capture file size or hide customer data due to security concerns.
 
+Only works on Linux.
+
 **Example:**
 
 `kubectl retina capture create --name capture-test --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux" --packet-size=96`
@@ -208,10 +226,10 @@ The network traffic will be uploaded to the specified output location.
 ### Capture Duration
 
 - Syntax: `--duration=<string>`
-- Default value: `1m`
+- Default value: `1m0s`
 - Optional
 
-Maximum duration of the packet capture - in minutes.
+Maximum duration of the packet capture - in minutes / seconds.
 
 **Example:**
 
@@ -225,13 +243,15 @@ Maximum duration of the packet capture - in minutes.
 
 Maximum size of the capture file - in MB.
 
+Only works on Linux.
+
 **Example:**
 
 `kubectl retina capture create --name capture-test --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux" --max-size=50`
 
 ### Capture Delete
 
-Deleting the capture job before either of the terminating conditions have been met will stop the capture. 
+Deleting the capture job before either of the terminating conditions have been met will stop the capture.
 
 `kubectl retina capture delete --name <string>` deletes a Kubernetes Jobs with the specified Capture name.
 
@@ -351,7 +371,7 @@ Use `ghcr.io` image in default debug mode.
 
 **Example:**
 
-Use custom retina-agent image by specifying it before the command.
+Use custom retina-agent image by specifying it in the `RETINA_AGENT_IMAGE` environment variable.
 
 `RETINA_AGENT_IMAGE=<YOUR RETINA AGENT IMAGE> kubectl retina capture create --name capture-test --host-path /mnt/test --namespace capture --node-selectors "kubernetes.io/os=linux" --debug`
 
