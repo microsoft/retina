@@ -537,3 +537,6 @@ quick-deploy-hubble:
 .PHONY: simplify-dashboards
 simplify-dashboards:
 	cd deploy/testutils && go test ./... -tags=dashboard,simplifydashboard -v && cd $(REPO_ROOT)
+
+run-perf-test:
+	go test -v ./test/e2e/retina_perf_test.go -timeout 2h -tags=e2e -count=1  -args -image-tag=${TAG} -image-registry=${IMAGE_REGISTRY} -image-namespace=${IMAGE_NAMESPACE}

@@ -9,3 +9,5 @@ const (
 	// netObsRGtag is used to tag resources created by this test suite
 	NetObsRGtag = "-e2e-netobs-"
 )
+
+var AzureLocations = []string{"eastus2", "centralus", "southcentralus", "uksouth", "centralindia", "westus2"}

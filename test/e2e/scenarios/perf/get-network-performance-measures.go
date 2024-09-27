@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/ritwikranjan/perf-tests/network/benchmarks/netperf/lib"
+	"k8s.io/perf-tests/network/benchmarks/netperf/lib"
 )
 
 type GetNetworkPerformanceMeasures struct {
@@ -33,12 +33,10 @@ func (v *GetNetworkPerformanceMeasures) Run() error {
 		return fmt.Errorf("failed to get network performance measures: %v", err)
 	}
 	sourceJsonOutputFile := results[0].JsonResultFile
-	err = copyFile(sourceJsonOutputFile, v.JsonOutputFile)
+	err = moveFile(sourceJsonOutputFile, v.JsonOutputFile)
 	if err != nil {
 		return fmt.Errorf("failed to copy json output file: %v", err)
 	}
-	defer deleteFile(sourceJsonOutputFile)
-	defer deleteFile(results[0].CsvResultFile)
 	return nil
 }
 
@@ -46,8 +44,21 @@ func (v *GetNetworkPerformanceMeasures) Stop() error {
 	return nil
 }
 
+func moveFile(src, dst string) error {
+	err := copyFile(src, dst)
+	if err != nil {
+		return fmt.Errorf("failed to move file: %v", err)
+	}
+
+	err = os.Remove(src)
+	if err != nil {
+		fmt.Printf("warning: failed to delete source file %s: %v\n", src, err)
+	}
+
+	return nil
+}
+
 func copyFile(src, dst string) error {
-	// Open the source file
 	sourceFile, err := os.Open(src)
 	if err != nil {
 		return fmt.Errorf("failed to open source file: %v", err)
@@ -74,11 +85,4 @@ func copyFile(src, dst string) error {
 	}
 
 	return nil
-}
-
-func deleteFile(filePath string) {
-	err := os.Remove(filePath)
-	if err != nil {
-		fmt.Println("Failed to delete file: ", err)
-	}
 }

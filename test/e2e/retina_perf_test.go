@@ -29,11 +29,11 @@ func TestPerfRetina(t *testing.T) {
 	location := os.Getenv("AZURE_LOCATION")
 	if location == "" {
 		var nBig *big.Int
-		nBig, err = rand.Int(rand.Reader, big.NewInt(int64(len(locations))))
+		nBig, err = rand.Int(rand.Reader, big.NewInt(int64(len(common.AzureLocations))))
 		if err != nil {
 			t.Fatalf("Failed to generate a secure random index: %v", err)
 		}
-		location = locations[nBig.Int64()]
+		location = common.AzureLocations[nBig.Int64()]
 	}
 
 	cwd, err := os.Getwd()
@@ -45,34 +45,18 @@ func TestPerfRetina(t *testing.T) {
 	chartPath := filepath.Join(rootDir, "deploy", "legacy", "manifests", "controller", "helm", "retina")
 	kubeConfigFilePath := filepath.Join(rootDir, "test", "e2e", "test.pem")
 
-	useExistingInfra, err := strconv.ParseBool(os.Getenv("USE_EXISTING_INFRA"))
-	if err != nil {
-		useExistingInfra = false
-	}
-	if useExistingInfra {
-		clusterName = os.Getenv("CLUSTER_NAME")
-		require.NotEmpty(t, clusterName)
-		resGroupName := os.Getenv("RESOURCE_GROUP_NAME")
-		require.NotEmpty(t, resGroupName)
-		// RegisterExistingInfra
-		registerExistingInfra := types.NewRunner(t, jobs.RegisterExistingInfra(subID, clusterName, resGroupName, location, kubeConfigFilePath))
-		registerExistingInfra.Run()
-	} else {
-		// CreateTestInfra
-		createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, clusterName, location, kubeConfigFilePath))
-		createTestInfra.Run()
-	}
-
-	// sleep for 2 minutes to ensure that the cluster is up and running
-	time.Sleep(2 * time.Minute)
+	// CreateTestInfra
+	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, clusterName, location, kubeConfigFilePath))
+	createTestInfra.Run()
 
 	// Hacky way to ensure that the test infra is deleted even if the test panics
 	defer func() {
 		if r := recover(); r != nil {
 			t.Logf("Recovered in TestE2ERetina, %v", r)
 		}
-		if !useExistingInfra {
-			_ = jobs.DeleteTestInfra(subID, clusterName, location).Run()
+		err := jobs.DeleteTestInfra(subID, clusterName, location).Run()
+		if err != nil {
+			t.Logf("Failed to delete test infrastructure: %v", err)
 		}
 	}()
 

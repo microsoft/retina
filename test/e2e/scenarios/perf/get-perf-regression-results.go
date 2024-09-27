@@ -8,41 +8,42 @@ import (
 	"time"
 )
 
+type TestInfo struct {
+	Protocol string `json:"protocol"`
+	Streams  int    `json:"streams"`
+	Blksize  int    `json:"blksize"`
+	Duration int    `json:"duration"`
+}
+
 type CPUUtilization struct {
-	Host   float64 `json:"host"`
-	Remote float64 `json:"remote"`
+	HostTotal   float64 `json:"host_total"`
+	RemoteTotal float64 `json:"remote_total"`
+}
+
+type Result struct {
+	TestInfo        TestInfo       `json:"test_info"`
+	TotalThroughput float64        `json:"total_throughput"`
+	MeanRTT         float64        `json:"mean_rtt"`
+	MinRTT          float64        `json:"min_rtt"`
+	MaxRTT          float64        `json:"max_rtt"`
+	Retransmits     int            `json:"retransmits"`
+	CPUUtilization  CPUUtilization `json:"cpu_utilization"`
+	JitterMs        float64        `json:"jitter_ms"`
+	LostPackets     int            `json:"lost_packets"`
+	LostPercent     float64        `json:"lost_percent"`
+	OutofOrder      int            `json:"out_of_order"`
 }
 
 type TestResult struct {
-	TotalThroughput float64        `json:"total_throughput"`
-	MeanRTT         int            `json:"mean_rtt,omitempty"`
-	MinRTT          int            `json:"min_rtt,omitempty"`
-	MaxRTT          int            `json:"max_rtt,omitempty"`
-	Retransmits     int            `json:"retransmits,omitempty"`
-	JitterMs        float64        `json:"jitter_ms,omitempty"`
-	LostPackets     int            `json:"lost_packets,omitempty"`
-	TotalPackets    int            `json:"total_packets,omitempty"`
-	LostPercent     float64        `json:"lost_percent,omitempty"`
-	CPUUtilization  CPUUtilization `json:"cpu_utilization"`
-}
-
-type TestCase struct {
-	Label  string     `json:"label"`
-	Result TestResult `json:"result"`
+	Label  string `json:"label"`
+	Result Result `json:"result"`
 }
 
 type RegressionResult struct {
-	Label      string  `json:"label"`
-	Metric     string  `json:"metric"`
-	BaseValue  float64 `json:"base_value"`
-	NewValue   float64 `json:"new_value"`
-	Regression float64 `json:"regression"`
-}
-
-type AggregatedResult struct {
 	Label       string             `json:"label"`
-	BaseMetrics map[string]float64 `json:"base_metrics"`
-	Metrics     map[string]float64 `json:"metrics"`
+	TestInfo    TestInfo           `json:"test_info"`
+	Benchmark   map[string]float64 `json:"benchmark"`
+	Result      map[string]float64 `json:"result"`
 	Regressions map[string]float64 `json:"regressions"`
 }
 
@@ -56,63 +57,69 @@ func (v *GetNetworkRegressionResults) Prevalidate() error {
 }
 
 func (v *GetNetworkRegressionResults) Run() error {
-	testCases1, err := readJSONFile(v.BaseResultsFile)
+	benchmarkResults, err := readJSONFile(v.BaseResultsFile)
 	if err != nil {
-		return fmt.Errorf("error reading file %s: %v", v.BaseResultsFile, err)
+		return fmt.Errorf("failed to read benchmark results file: %v", err)
 	}
 
-	testCases2, err := readJSONFile(v.NewResultsFile)
+	newResults, err := readJSONFile(v.NewResultsFile)
 	if err != nil {
-		return fmt.Errorf("error reading file %s: %v", v.NewResultsFile, err)
+		return fmt.Errorf("failed to read new results file: %v", err)
 	}
 
-	if len(testCases1) != len(testCases2) {
-		return fmt.Errorf("number of test cases in the two files do not match")
+	if len(benchmarkResults) != len(newResults) {
+		return fmt.Errorf("number of tests in benchmark results and new results do not match")
 	}
 
-	aggregatedResults := make(map[string]*AggregatedResult)
+	regressionResults := make(map[string]*RegressionResult)
 
-	for i := range testCases1 {
-		tc1 := testCases1[i]
-		tc2 := testCases2[i]
+	for i := range benchmarkResults {
+		benchmarkResult := benchmarkResults[i]
+		newResult := newResults[i]
 
-		if _, exists := aggregatedResults[tc1.Label]; !exists {
-			aggregatedResults[tc1.Label] = &AggregatedResult{
-				Label:       tc1.Label,
-				BaseMetrics: make(map[string]float64),
-				Metrics:     make(map[string]float64),
+		if benchmarkResult.Label != newResult.Label {
+			return fmt.Errorf("test labels do not match")
+		}
+
+		if _, exists := regressionResults[benchmarkResults[i].Label]; !exists {
+			regressionResults[benchmarkResults[i].Label] = &RegressionResult{
+				Label:       benchmarkResults[i].Label,
+				TestInfo:    benchmarkResults[i].Result.TestInfo,
+				Benchmark:   make(map[string]float64),
+				Result:      make(map[string]float64),
 				Regressions: make(map[string]float64),
 			}
 		}
 
 		metrics := []struct {
-			name   string
-			oldVal float64
-			newVal float64
+			name      string
+			benchmark float64
+			result    float64
 		}{
-			{"Total Throughput", tc1.Result.TotalThroughput, tc2.Result.TotalThroughput},
-			{"Mean RTT", float64(tc1.Result.MeanRTT), float64(tc2.Result.MeanRTT)},
-			{"Min RTT", float64(tc1.Result.MinRTT), float64(tc2.Result.MinRTT)},
-			{"Max RTT", float64(tc1.Result.MaxRTT), float64(tc2.Result.MaxRTT)},
-			{"Retransmits", float64(tc1.Result.Retransmits), float64(tc2.Result.Retransmits)},
-			{"Jitter (ms)", tc1.Result.JitterMs, tc2.Result.JitterMs},
-			{"Lost Packets", float64(tc1.Result.LostPackets), float64(tc2.Result.LostPackets)},
-			{"Lost Percent", tc1.Result.LostPercent, tc2.Result.LostPercent},
-			{"CPU Utilization Host", tc1.Result.CPUUtilization.Host, tc2.Result.CPUUtilization.Host},
-			{"CPU Utilization Remote", tc1.Result.CPUUtilization.Remote, tc2.Result.CPUUtilization.Remote},
+			{"total_throughput", benchmarkResult.Result.TotalThroughput, newResult.Result.TotalThroughput},
+			{"mean_rtt", benchmarkResult.Result.MeanRTT, newResult.Result.MeanRTT},
+			{"min_rtt", benchmarkResult.Result.MinRTT, newResult.Result.MinRTT},
+			{"max_rtt", benchmarkResult.Result.MaxRTT, newResult.Result.MaxRTT},
+			{"retransmits", float64(benchmarkResult.Result.Retransmits), float64(newResult.Result.Retransmits)},
+			{"jitter_ms", benchmarkResult.Result.JitterMs, newResult.Result.JitterMs},
+			{"lost_packets", float64(benchmarkResult.Result.LostPackets), float64(newResult.Result.LostPackets)},
+			{"lost_percent", benchmarkResult.Result.LostPercent, newResult.Result.LostPercent},
+			{"out_of_order", float64(benchmarkResult.Result.OutofOrder), float64(newResult.Result.OutofOrder)},
+			{"host_total_cpu", benchmarkResult.Result.CPUUtilization.HostTotal, newResult.Result.CPUUtilization.HostTotal},
+			{"remote_total_cpu", benchmarkResult.Result.CPUUtilization.RemoteTotal, newResult.Result.CPUUtilization.RemoteTotal},
 		}
 
 		for _, metric := range metrics {
-			if metric.oldVal != 0 || metric.newVal != 0 {
-				aggregatedResults[tc1.Label].BaseMetrics[metric.name] = metric.oldVal
-				aggregatedResults[tc1.Label].Metrics[metric.name] = metric.newVal
-				aggregatedResults[tc1.Label].Regressions[metric.name] = calculateRegression(metric.oldVal, metric.newVal)
+			if metric.benchmark != 0 && metric.result != 0 {
+				regressionResults[benchmarkResult.Label].Benchmark[metric.name] = metric.benchmark
+				regressionResults[benchmarkResult.Label].Result[metric.name] = metric.result
+				regressionResults[benchmarkResult.Label].Regressions[metric.name] = calculateRegression(metric.benchmark, metric.result)
 			}
 		}
 	}
 
-	var results []AggregatedResult
-	for _, result := range aggregatedResults {
+	var results []RegressionResult
+	for _, result := range regressionResults {
 		results = append(results, *result)
 	}
 
@@ -125,12 +132,11 @@ func (v *GetNetworkRegressionResults) Run() error {
 
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(results); err != nil {
-		return fmt.Errorf("error encoding results to JSON: %v", err)
-	}
 
-	defer deleteFile(v.BaseResultsFile)
-	defer deleteFile(v.NewResultsFile)
+	err = encoder.Encode(results)
+	if err != nil {
+		return fmt.Errorf("error encoding regression results: %v", err)
+	}
 
 	return nil
 }
@@ -139,7 +145,7 @@ func (v *GetNetworkRegressionResults) Stop() error {
 	return nil
 }
 
-func readJSONFile(filename string) ([]TestCase, error) {
+func readJSONFile(filename string) ([]TestResult, error) {
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, err
@@ -151,7 +157,7 @@ func readJSONFile(filename string) ([]TestCase, error) {
 		return nil, err
 	}
 
-	var testCases []TestCase
+	var testCases []TestResult
 	err = json.Unmarshal(byteValue, &testCases)
 	if err != nil {
 		return nil, err
