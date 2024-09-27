@@ -1,12 +1,12 @@
 # Capture with Retina CLI
 
-The Retina capture command allows users to capture network traffic and metadata for the capture target, and send the data to the location defined by output configuration.
+The capture command in Retina allows users to capture network traffic and metadata for the capture target, and send the data to the location defined by output configuration.
 
-> Note: captures can also be performed with a [Capture CRD](../05-Concepts/CRDs/Capture.md) after [installing Retina](../02-Installation/01-Setup.md) **with capture support**.
+> NOTE: captures can also be performed with a [Capture CRD](../05-Concepts/CRDs/Capture.md) after [installing Retina](../02-Installation/01-Setup.md) **with capture support**.
 
 ## Starting a Capture
 
-`kubectl retina capture create [--flags]` creates a Capture with underlying Kubernetes jobs.
+`kubectl retina capture create <required-flags> [optional-flags]` creates a Capture with underlying Kubernetes jobs.
 
 ## Flags
 
@@ -22,13 +22,13 @@ A name for the Retina Capture.
 
 ---
 
-### [required] Capture Target
+### [required] Target
 
-The capture target indicates where the packet capture will be performed. There are three choices here, each of which is its own flag. They are described below.
+The target indicates where the packet capture will be performed. There are three choices here, each of which is its own flag. They are described below.
 
 #### Node Selectors
 
-- Syntax: `--node-selectors "<string>"`
+- Syntax: `--node-selectors <string>`
 
 Capture network captures on nodes filtered by the provided by node selectors. Comma-separated.
 
@@ -38,7 +38,7 @@ Capture network captures on nodes filtered by the provided by node selectors. Co
 
 #### Node Names
 
-- Syntax: `--node-names "<string>"`
+- Syntax: `--node-names <string>`
 
 Capture network captures on nodes filtered by the provided node names. Comma-separated.
 
@@ -48,8 +48,8 @@ Capture network captures on nodes filtered by the provided node names. Comma-sep
 
 #### Pod Selectors & Namespace Selectors (Pairs)
 
-- Syntax (Pod Selectors): `--pod-selectors="<string>"`
-- Syntax (Namespace Selectors): `--namespace-selectors="<string>"`
+- Syntax (Pod Selectors): `--pod-selectors <string>`
+- Syntax (Namespace Selectors): `--namespace-selectors <string>`
 
 Capture network captures on pods filtered by the provided pod-selector and namespace-selector **pairs**. Comma-separated.
 
@@ -160,7 +160,7 @@ Only works on Linux.
 
 Raw tcpdump flags which only work on Linux. Available tcpdump filters can be found in the [TCPDUMP MAN PAGE](https://www.tcpdump.org/manpages/tcpdump.1.html).
 
-NOTE: this includes only tcpdump flags, for boolean expressions, please use [Packet include/exclude filters](#include--exclude-filters).
+> NOTE: this includes only tcpdump flags, for boolean expressions, please use [Packet include/exclude filters](#include--exclude-filters).
 
 **Example:**
 

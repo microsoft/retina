@@ -19,7 +19,7 @@ There are two methods for triggering a Capture:
 
 The command syntax is `kubectl retina capture create [--flags]`.
 
-Check out the [Capture Command](../04-Captures/cli.md) documentation for more details.
+Refer to the [Capture Command](../04-Captures/cli.md) documentation for more details.
 
 #### Example
 
@@ -43,7 +43,7 @@ A random hashed name is assigned to each Retina Capture to uniquely label it.
 
 > Prerequisite: [Install Retina](../02-Installation/01-Setup.md) **with capture support**.
 
-Check out the [Capture CRD](../05-Concepts/CRDs/Capture.md) documentation for more details.
+Refer to the [Capture CRD](../05-Concepts/CRDs/Capture.md) documentation for more details.
 
 #### Managed Storage Account
 
