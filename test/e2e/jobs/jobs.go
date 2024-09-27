@@ -122,6 +122,11 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string) *typ
 		job.AddScenario(dns.ValidateBasicDNSMetrics(scenario.name, scenario.req, scenario.resp))
 	}
 
+	job.AddStep(&kubernetes.NoCrashes{
+		PodNamespace:  "kube-system",
+		LabelSelector: "k8s-app=retina",
+	}, nil)
+
 	return job
 }
 
@@ -183,6 +188,11 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 	}
 
 	job.AddScenario(latency.ValidateLatencyMetric())
+
+	job.AddStep(&kubernetes.NoCrashes{
+		PodNamespace:  "kube-system",
+		LabelSelector: "k8s-app=retina",
+	}, nil)
 
 	return job
 }
