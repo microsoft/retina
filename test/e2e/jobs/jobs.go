@@ -11,35 +11,46 @@ import (
 	tcp "github.com/microsoft/retina/test/e2e/scenarios/tcp"
 )
 
-func CreateTestInfra(subID, clusterName, location, kubeConfigFilePath string) *types.Job {
+func CreateTestInfra(subID, clusterName, location, kubeConfigFilePath string, createInfra bool) *types.Job {
 	job := types.NewJob("Create e2e test infrastructure")
 
-	job.AddStep(&azure.CreateResourceGroup{
-		SubscriptionID:    subID,
-		ResourceGroupName: clusterName,
-		Location:          location,
-	}, nil)
+	if createInfra {
+		job.AddStep(&azure.CreateResourceGroup{
+			SubscriptionID:    subID,
+			ResourceGroupName: clusterName,
+			Location:          location,
+		}, nil)
 
-	job.AddStep(&azure.CreateVNet{
-		VnetName:         "testvnet",
-		VnetAddressSpace: "10.0.0.0/9",
-	}, nil)
+		job.AddStep(&azure.CreateVNet{
+			VnetName:         "testvnet",
+			VnetAddressSpace: "10.0.0.0/9",
+		}, nil)
 
-	job.AddStep(&azure.CreateSubnet{
-		SubnetName:         "testsubnet",
-		SubnetAddressSpace: "10.0.0.0/12",
-	}, nil)
+		job.AddStep(&azure.CreateSubnet{
+			SubnetName:         "testsubnet",
+			SubnetAddressSpace: "10.0.0.0/12",
+		}, nil)
 
-	job.AddStep(&azure.CreateNPMCluster{
-		ClusterName:  clusterName,
-		PodCidr:      "10.128.0.0/9",
-		DNSServiceIP: "192.168.0.10",
-		ServiceCidr:  "192.168.0.0/28",
-	}, nil)
+		job.AddStep(&azure.CreateNPMCluster{
+			ClusterName:  clusterName,
+			PodCidr:      "10.128.0.0/9",
+			DNSServiceIP: "192.168.0.10",
+			ServiceCidr:  "192.168.0.0/28",
+		}, nil)
 
-	job.AddStep(&azure.GetAKSKubeConfig{
-		KubeConfigFilePath: kubeConfigFilePath,
-	}, nil)
+		job.AddStep(&azure.GetAKSKubeConfig{
+			KubeConfigFilePath: kubeConfigFilePath,
+		}, nil)
+
+	} else {
+		job.AddStep(&azure.GetAKSKubeConfig{
+			KubeConfigFilePath: "./test.pem",
+			ClusterName:        clusterName,
+			SubscriptionID:     subID,
+			ResourceGroupName:  clusterName,
+			Location:           location,
+		}, nil)
+	}
 
 	job.AddStep(&generic.LoadFlags{
 		TagEnv:            generic.DefaultTagEnv,
@@ -122,7 +133,7 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string) *typ
 		job.AddScenario(dns.ValidateBasicDNSMetrics(scenario.name, scenario.req, scenario.resp))
 	}
 
-	job.AddStep(&kubernetes.NoCrashes{
+	job.AddStep(&kubernetes.EnsureStableCluster{
 		PodNamespace:  "kube-system",
 		LabelSelector: "k8s-app=retina",
 	}, nil)
@@ -189,7 +200,7 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 
 	job.AddScenario(latency.ValidateLatencyMetric())
 
-	job.AddStep(&kubernetes.NoCrashes{
+	job.AddStep(&kubernetes.EnsureStableCluster{
 		PodNamespace:  "kube-system",
 		LabelSelector: "k8s-app=retina",
 	}, nil)

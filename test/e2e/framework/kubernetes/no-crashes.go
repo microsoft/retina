@@ -4,19 +4,19 @@ import (
 	"context"
 	"fmt"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-type NoCrashes struct {
+var ErrPodCrashed = fmt.Errorf("pod has crashes")
+
+type EnsureStableCluster struct {
 	LabelSelector      string
 	PodNamespace       string
 	KubeConfigFilePath string
 }
 
-func (n *NoCrashes) Run() error {
+func (n *EnsureStableCluster) Run() error {
 	config, err := clientcmd.BuildConfigFromFlags("", n.KubeConfigFilePath)
 	if err != nil {
 		return fmt.Errorf("error building kubeconfig: %w", err)
@@ -27,32 +27,17 @@ func (n *NoCrashes) Run() error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	fieldSelector := fields.Everything()
-
-	pods, err := clientset.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{
-		LabelSelector: n.LabelSelector,
-		FieldSelector: fieldSelector.String(),
-	})
+	err = WaitForPodReady(context.TODO(), clientset, n.PodNamespace, n.LabelSelector)
 	if err != nil {
-		return fmt.Errorf("error listing pods: %w", err)
+		return fmt.Errorf("error waiting for retina pods to be ready: %w", err)
 	}
-
-	for _, pod := range pods.Items {
-		for _, status := range pod.Status.ContainerStatuses {
-			if status.RestartCount > 0 {
-				PrintPodLogs(n.KubeConfigFilePath, pod.Namespace, pod.Name)
-				return fmt.Errorf("Pod %s has %d restarts", pod.Name, status)
-			}
-		}
-	}
-
 	return nil
 }
 
-func (n *NoCrashes) Prevalidate() error {
+func (n *EnsureStableCluster) Prevalidate() error {
 	return nil
 }
 
-func (n *NoCrashes) Stop() error {
+func (n *EnsureStableCluster) Stop() error {
 	return nil
 }
