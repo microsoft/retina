@@ -68,5 +68,6 @@ func PrintPodLogs(ctx context.Context, clientset *kubernetes.Clientset, namespac
 
 		// Print the logs
 		log.Println(string(buf))
+		fmt.Printf("#######################################################\n")
 	}
 }
