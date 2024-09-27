@@ -44,12 +44,24 @@ spec:
             mountPath: /retina/config
       containers:
         - name: {{ include "retina.name" . }} 
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: {{ .Values.retinaPort }}
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds | default "30" }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds | default "30" }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds | default "1" }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold | default "3" }}
+            successThreshold: {{ .Values.readinessProbe.successThreshold | default "1" }}
           livenessProbe:
             httpGet:
               path: /metrics
               port: {{ .Values.retinaPort }}
-            initialDelaySeconds: 30
-            periodSeconds: 30
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds | default "30" }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds | default "30" }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds | default "1" }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold | default "3" }}
+            successThreshold: {{ .Values.livenessProbe.successThreshold | default "1" }}
           image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- if .Values.daemonset.container.retina.command }}
@@ -128,6 +140,9 @@ spec:
       - name: sysclassinfiniband
         hostPath: 
           path: /sys/class/infiniband
+      {{- end }}
+      {{- if .Values.affinity }}
+      affinity: {{- toYaml .Values.affinity | nindent 8 }}
       {{- end }}
       nodeSelector:
         kubernetes.io/os: linux
@@ -213,6 +228,9 @@ spec:
               mountPath: {{ $mountPath }}
           {{- end }}
         {{- end }}
+      {{- if .Values.affinity }}
+      affinity: {{- toYaml .Values.affinity | nindent 8 }}
+      {{- end }}
       nodeSelector:
         kubernetes.io/os: windows
         {{- if .Values.nodeSelector }}

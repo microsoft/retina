@@ -14,6 +14,7 @@ import (
 	errors "k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	retinaCommon "github.com/microsoft/retina/pkg/common"
 	"github.com/microsoft/retina/pkg/controllers/cache"
@@ -76,7 +77,6 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	ips := retinaCommon.IPAddresses{}
 	ips.IPv4 = net.ParseIP(service.Spec.ClusterIP)
-	net.ParseIP(service.Spec.ClusterIP)
 	var lbIP net.IP
 	if service.Status.LoadBalancer.Ingress != nil && len(service.Status.LoadBalancer.Ingress) > 0 {
 		lbIP = net.ParseIP(service.Status.LoadBalancer.Ingress[0].IP)
@@ -93,7 +93,16 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 // SetupWithManager sets up the controller with the Manager.
 func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.l.Info("Setting up Service controller")
+	// Define a predicate to filter out Services with ClusterIP == "None"
+	pred := predicate.NewPredicateFuncs(func(object client.Object) bool {
+		service, ok := object.(*corev1.Service)
+		if !ok {
+			return false
+		}
+		return service.Spec.ClusterIP != "None"
+	})
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Service{}).
+		WithEventFilter(pred).
 		Complete(r)
 }
