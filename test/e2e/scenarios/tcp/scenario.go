@@ -15,25 +15,25 @@ const (
 	IPTableRuleDrop = "IPTABLE_RULE_DROP"
 )
 
-func ValidateTCPMetrics() *types.Scenario {
+func ValidateTCPMetrics(namespace string) *types.Scenario {
 	Name := "Flow Metrics"
 	Steps := []*types.StepWrapper{
 		{
 			Step: &kubernetes.CreateKapingerDeployment{
-				KapingerNamespace: "kube-system",
+				KapingerNamespace: namespace,
 				KapingerReplicas:  "1",
 			},
 		},
 		{
 			Step: &kubernetes.CreateAgnhostStatefulSet{
 				AgnhostName:      "agnhost-a",
-				AgnhostNamespace: "kube-system",
+				AgnhostNamespace: namespace,
 			},
 		},
 		{
 			Step: &kubernetes.ExecInPod{
 				PodName:      "agnhost-a-0",
-				PodNamespace: "kube-system",
+				PodNamespace: namespace,
 				Command:      "curl -s -m 5 bing.com",
 			}, Opts: &types.StepOptions{
 				SkipSavingParametersToJob: true,
@@ -47,7 +47,7 @@ func ValidateTCPMetrics() *types.Scenario {
 		{
 			Step: &kubernetes.ExecInPod{
 				PodName:      "agnhost-a-0",
-				PodNamespace: "kube-system",
+				PodNamespace: namespace,
 				Command:      "curl -s -m 5 bing.com",
 			}, Opts: &types.StepOptions{
 				SkipSavingParametersToJob: true,
@@ -56,7 +56,7 @@ func ValidateTCPMetrics() *types.Scenario {
 		{
 			Step: &kubernetes.PortForward{
 				LabelSelector:         "k8s-app=retina",
-				Namespace:             "kube-system",
+				Namespace:             namespace,
 				LocalPort:             "10093",
 				RemotePort:            "10093",
 				Endpoint:              "metrics",
@@ -90,7 +90,7 @@ func ValidateTCPMetrics() *types.Scenario {
 			Step: &kubernetes.DeleteKubernetesResource{
 				ResourceType:      kubernetes.TypeString(kubernetes.StatefulSet),
 				ResourceName:      "agnhost-a",
-				ResourceNamespace: "kube-system",
+				ResourceNamespace: namespace,
 			}, Opts: &types.StepOptions{
 				SkipSavingParametersToJob: true,
 			},

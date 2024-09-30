@@ -62,20 +62,20 @@ func DeleteTestInfra(subID, clusterName, location string) *types.Job {
 	return job
 }
 
-func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string) *types.Job {
+func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, testNamespace string) *types.Job {
 	job := types.NewJob("Install and test Retina with basic metrics")
 
 	job.AddStep(&kubernetes.InstallHelmChart{
-		Namespace:          "kube-system",
+		Namespace:          testNamespace,
 		ReleaseName:        "retina",
 		KubeConfigFilePath: kubeConfigFilePath,
 		ChartPath:          chartPath,
 		TagEnv:             generic.DefaultTagEnv,
 	}, nil)
 
-	job.AddScenario(drop.ValidateDropMetric())
+	job.AddScenario(drop.ValidateDropMetric(testNamespace))
 
-	job.AddScenario(tcp.ValidateTCPMetrics())
+	job.AddScenario(tcp.ValidateTCPMetrics(testNamespace))
 
 	dnsScenarios := []struct {
 		name string
@@ -119,17 +119,17 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string) *typ
 	}
 
 	for _, scenario := range dnsScenarios {
-		job.AddScenario(dns.ValidateBasicDNSMetrics(scenario.name, scenario.req, scenario.resp))
+		job.AddScenario(dns.ValidateBasicDNSMetrics(scenario.name, scenario.req, scenario.resp, testNamespace))
 	}
 
 	return job
 }
 
-func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFilePath string) *types.Job {
+func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFilePath string, testNamespace string) *types.Job {
 	job := types.NewJob("Upgrade and test Retina with advanced metrics")
 	// enable advanced metrics
 	job.AddStep(&kubernetes.UpgradeRetinaHelmChart{
-		Namespace:          "kube-system",
+		Namespace:          testNamespace,
 		ReleaseName:        "retina",
 		KubeConfigFilePath: kubeConfigFilePath,
 		ChartPath:          chartPath,
@@ -179,10 +179,10 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 	}
 
 	for _, scenario := range dnsScenarios {
-		job.AddScenario(dns.ValidateAdvancedDNSMetrics(scenario.name, scenario.req, scenario.resp, kubeConfigFilePath))
+		job.AddScenario(dns.ValidateAdvancedDNSMetrics(scenario.name, scenario.req, scenario.resp, kubeConfigFilePath, testNamespace))
 	}
 
-	job.AddScenario(latency.ValidateLatencyMetric())
+	job.AddScenario(latency.ValidateLatencyMetric(testNamespace))
 
 	return job
 }

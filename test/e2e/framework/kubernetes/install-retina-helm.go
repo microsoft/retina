@@ -61,6 +61,8 @@ func (i *InstallHelmChart) Run() error {
 		return fmt.Errorf("failed to load chart from path %s: %w", i.ChartPath, err)
 	}
 
+	// update namespace with test value
+	chart.Values["namespace"] = i.Namespace
 	chart.Values["imagePullSecrets"] = []map[string]interface{}{
 		{
 			"name": "acr-credentials",
@@ -95,6 +97,7 @@ func (i *InstallHelmChart) Run() error {
 	client.Timeout = createTimeout
 	client.Wait = true
 	client.WaitForJobs = true
+	client.CreateNamespace = true
 
 	// install the chart here
 	rel, err := client.Run(chart, chart.Values)

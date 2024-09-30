@@ -7,5 +7,6 @@ package common
 const (
 	RetinaPort int = 10093
 	// netObsRGtag is used to tag resources created by this test suite
-	NetObsRGtag = "-e2e-netobs-"
+	NetObsRGtag   = "-e2e-netobs-"
+	TestNamespace = "kube-system-test"
 )
