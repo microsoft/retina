@@ -9,7 +9,7 @@ import (
 
 const sleepDelay = 5 * time.Second
 
-func ValidateLatencyMetric() *types.Scenario {
+func ValidateLatencyMetric(namespace string) *types.Scenario {
 	name := "Latency Metrics"
 	steps := []*types.StepWrapper{
 		{
@@ -19,7 +19,7 @@ func ValidateLatencyMetric() *types.Scenario {
 		},
 		{
 			Step: &kubernetes.PortForward{
-				Namespace:             "kube-system",
+				Namespace:             namespace,
 				LabelSelector:         "k8s-app=retina",
 				LocalPort:             "10093",
 				RemotePort:            "10093",
