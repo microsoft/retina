@@ -5,7 +5,7 @@ metadata:
     app: agnhost
     agnhost: a
   name: agnhost-a
-  namespace: kube-system
+  namespace: {{ .Values.namespace }}
 spec:
   nodeName: aks-nodepool1-12809644-vmss000000
   containers:
@@ -21,7 +21,7 @@ metadata:
     app: agnhost
     agnhost: b
   name: agnhost-b
-  namespace: kube-system
+  namespace: {{ .Values.namespace }}
 spec:
   nodeName: aks-nodepool1-12809644-vmss000001
   containers:
@@ -37,7 +37,7 @@ metadata:
     app: agnhost
     agnhost: c
   name: agnhost-c
-  namespace: kube-system
+  namespace: {{ .Values.namespace }}
 spec:
   nodeName: aks-nodepool1-12809644-vmss000002
   containers:

@@ -49,4 +49,4 @@ data:
     enabled = false
 metadata:
   name: ama-metrics-settings-configmap
-  namespace: kube-system
+  namespace: {{ .Values.namespace }}

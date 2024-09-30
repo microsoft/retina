@@ -3,7 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: retina-operator
-  namespace: kube-system
+  namespace: {{ .Values.namespace }}
   labels:
     app: retina-operator
     control-plane: retina-operator
@@ -114,7 +114,7 @@ metadata:
     app.kubernetes.io/part-of: operator
     app.kubernetes.io/managed-by: kustomize
   name: retina-operator
-  namespace: kube-system
+  namespace: {{ .Values.namespace }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -284,7 +284,7 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: retina-operator
-  namespace: kube-system
+  namespace: {{ .Values.namespace }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -308,7 +308,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: azure-cloud-config
-  namespace: kube-system
+  namespace: {{ .Values.namespace }}
 type: Opaque
 stringData:
   azure.json: |-
