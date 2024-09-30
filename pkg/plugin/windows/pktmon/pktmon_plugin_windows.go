@@ -18,6 +18,7 @@ import (
 	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapio"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
@@ -130,12 +131,15 @@ func (p *Plugin) Start(ctx context.Context) error {
 		return ErrNilEnricher
 	}
 
-	go func() {
+	g, ctx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
 		err := p.RunPktMonServer(ctx)
 		if err != nil {
-			p.l.Error("pktmon server exited", zap.Error(err))
+			return fmt.Errorf("pktmon server exited: %w", err)
 		}
-	}()
+		return nil
+	})
 
 	err := p.SetupStream()
 	if err != nil {
@@ -143,14 +147,18 @@ func (p *Plugin) Start(ctx context.Context) error {
 	}
 
 	// run the getflows loop
-	for {
-		err := p.GetFlow(ctx)
-		if _, ok := status.FromError(err); ok {
-			p.l.Error("failed to get flow, retriable:", zap.Error(err))
-			continue
+	g.Go(func() error {
+		for {
+			err := p.GetFlow(ctx)
+			if _, ok := status.FromError(err); ok {
+				p.l.Error("failed to get flow, retriable:", zap.Error(err))
+				continue
+			}
+			return fmt.Errorf("failed to get flow, unrecoverable: %w", err)
 		}
-		return fmt.Errorf("failed to get flow, unrecoverable: %w", err)
-	}
+	})
+
+	return g.Wait()
 }
 
 func (p *Plugin) SetupStream() error {
