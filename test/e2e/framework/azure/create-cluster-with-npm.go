@@ -98,6 +98,7 @@ func (c *CreateNPMCluster) Run() error {
 
 	npmCluster.Properties.AutoUpgradeProfile = &armcontainerservice.ManagedClusterAutoUpgradeProfile{
 		NodeOSUpgradeChannel: to.Ptr(armcontainerservice.NodeOSUpgradeChannelNodeImage),
+		UpgradeChannel:       to.Ptr(armcontainerservice.UpgradeChannelPatch),
 	}
 
 	// Deploy cluster

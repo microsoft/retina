@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/retina/test/e2e/scenarios/drop"
 	"github.com/microsoft/retina/test/e2e/scenarios/latency"
 	tcp "github.com/microsoft/retina/test/e2e/scenarios/tcp"
+	"github.com/microsoft/retina/test/e2e/scenarios/windows"
 )
 
 func CreateTestInfra(subID, clusterName, location, kubeConfigFilePath string, createInfra bool) *types.Job {
@@ -83,6 +84,8 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string) *typ
 		ChartPath:          chartPath,
 		TagEnv:             generic.DefaultTagEnv,
 	}, nil)
+
+	job.AddScenario(windows.ValidateWindowsBasicMetric())
 
 	job.AddScenario(drop.ValidateDropMetric())
 
