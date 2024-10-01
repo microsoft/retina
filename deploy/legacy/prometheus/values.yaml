@@ -52,7 +52,7 @@ prometheus:
         relabel_configs:
           - source_labels: [__meta_kubernetes_pod_container_name]
             action: keep
-            regex: retina(.*)
+            regex: retina
           - source_labels:
               [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
             separator: ":"
