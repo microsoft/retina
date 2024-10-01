@@ -12,6 +12,7 @@ import (
 	armcontainerservice "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v4"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/dashboard/armdashboard"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor"
+	"github.com/microsoft/retina/test/e2e/framework/types"
 )
 
 const fileperms = 0o600
@@ -23,7 +24,7 @@ type CreateAzureMonitor struct {
 	ClusterName       string
 }
 
-func (c *CreateAzureMonitor) Run() error {
+func (c *CreateAzureMonitor) Run(_ *types.RuntimeObjects) error {
 	log.Printf(`this will deploy azure monitor workspace and grafana, but as of 1/9/2024, the api docs don't show how to do 
 az aks update --enable-azure-monitor-metrics \
 -n $NAME \
@@ -108,7 +109,7 @@ az aks update --enable-azure-monitor-metrics \
 	return nil
 }
 
-func (c *CreateAzureMonitor) Prevalidate() error {
+func (c *CreateAzureMonitor) PreRun() error {
 	return nil
 }
 

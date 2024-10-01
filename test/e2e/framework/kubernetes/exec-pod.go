@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/microsoft/retina/test/e2e/framework/types"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -23,7 +24,7 @@ type ExecInPod struct {
 	Command            string
 }
 
-func (e *ExecInPod) Run() error {
+func (e *ExecInPod) Run(_ *types.RuntimeObjects) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -35,7 +36,7 @@ func (e *ExecInPod) Run() error {
 	return nil
 }
 
-func (e *ExecInPod) Prevalidate() error {
+func (e *ExecInPod) PreRun() error {
 	return nil
 }
 

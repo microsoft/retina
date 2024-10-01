@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/microsoft/retina/test/e2e/framework/types"
 	retry "github.com/microsoft/retina/test/retry"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -42,7 +43,7 @@ type PortForward struct {
 	pf *PortForwarder
 }
 
-func (p *PortForward) Run() error {
+func (p *PortForward) Run(_ *types.RuntimeObjects) error {
 	lport, _ := strconv.Atoi(p.LocalPort)
 	rport, _ := strconv.Atoi(p.RemotePort)
 
@@ -153,7 +154,7 @@ func (p *PortForward) findPodsWithAffinity(ctx context.Context, clientset *kuber
 	return "", fmt.Errorf("could not find a pod with label \"%s\", on a node that also has a pod with label \"%s\": %w", p.LabelSelector, p.OptionalLabelAffinity, ErrNoPodWithLabelFound)
 }
 
-func (p *PortForward) Prevalidate() error {
+func (p *PortForward) PreRun() error {
 	return nil
 }
 

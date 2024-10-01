@@ -8,6 +8,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	armnetwork "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v5"
+	"github.com/microsoft/retina/test/e2e/framework/types"
 )
 
 const FlowTimeoutInMinutes = 10
@@ -20,7 +21,7 @@ type CreateVNet struct {
 	VnetAddressSpace  string
 }
 
-func (c *CreateVNet) Run() error {
+func (c *CreateVNet) Run(_ *types.RuntimeObjects) error {
 	cred, err := azidentity.NewAzureCLICredential(nil)
 	if err != nil {
 		return fmt.Errorf("failed to obtain a credential: %w", err)
@@ -55,7 +56,7 @@ func (c *CreateVNet) Run() error {
 	return nil
 }
 
-func (c *CreateVNet) Prevalidate() error {
+func (c *CreateVNet) PreRun() error {
 	return nil
 }
 
@@ -72,7 +73,7 @@ type CreateSubnet struct {
 	SubnetAddressSpace string
 }
 
-func (c *CreateSubnet) Run() error {
+func (c *CreateSubnet) Run(_ *types.RuntimeObjects) error {
 	cred, err := azidentity.NewAzureCLICredential(nil)
 	if err != nil {
 		return fmt.Errorf("failed to obtain a credential: %w", err)
@@ -101,7 +102,7 @@ func (c *CreateSubnet) Run() error {
 	return nil
 }
 
-func (c *CreateSubnet) Prevalidate() error {
+func (c *CreateSubnet) PreRun() error {
 	return nil
 }
 

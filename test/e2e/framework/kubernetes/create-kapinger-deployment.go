@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/microsoft/retina/test/e2e/framework/types"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -29,7 +30,7 @@ type CreateKapingerDeployment struct {
 	KubeConfigFilePath string
 }
 
-func (c *CreateKapingerDeployment) Run() error {
+func (c *CreateKapingerDeployment) Run(_ *types.RuntimeObjects) error {
 	_, err := strconv.Atoi(c.KapingerReplicas)
 	if err != nil {
 		return fmt.Errorf("error converting replicas to int for Kapinger replicas: %w", err)
@@ -66,7 +67,7 @@ func (c *CreateKapingerDeployment) Run() error {
 	return nil
 }
 
-func (c *CreateKapingerDeployment) Prevalidate() error {
+func (c *CreateKapingerDeployment) PreRun() error {
 	return nil
 }
 

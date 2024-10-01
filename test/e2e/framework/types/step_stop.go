@@ -11,7 +11,7 @@ type Stop struct {
 	Step         Step
 }
 
-func (c *Stop) Run() error {
+func (c *Stop) Run(ro *RuntimeObjects) error {
 	stepName := reflect.TypeOf(c.Step).Elem().Name()
 	log.Println("stopping step:", stepName)
 	err := c.Step.Stop()
@@ -25,6 +25,6 @@ func (c *Stop) Stop() error {
 	return nil
 }
 
-func (c *Stop) Prevalidate() error {
+func (c *Stop) PreRun() error {
 	return nil
 }

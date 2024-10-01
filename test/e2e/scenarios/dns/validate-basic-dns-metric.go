@@ -8,6 +8,7 @@ import (
 
 	"github.com/microsoft/retina/test/e2e/common"
 	prom "github.com/microsoft/retina/test/e2e/framework/prometheus"
+	"github.com/microsoft/retina/test/e2e/framework/types"
 	"github.com/pkg/errors"
 )
 
@@ -21,7 +22,7 @@ type validateBasicDNSRequestMetrics struct {
 	QueryType string
 }
 
-func (v *validateBasicDNSRequestMetrics) Run() error {
+func (v *validateBasicDNSRequestMetrics) Run(_ *types.RuntimeObjects) error {
 	metricsEndpoint := fmt.Sprintf("http://localhost:%d/metrics", common.RetinaPort)
 
 	validBasicDNSRequestMetricLabels := map[string]string{
@@ -38,7 +39,7 @@ func (v *validateBasicDNSRequestMetrics) Run() error {
 	return nil
 }
 
-func (v *validateBasicDNSRequestMetrics) Prevalidate() error {
+func (v *validateBasicDNSRequestMetrics) PreRun() error {
 	return nil
 }
 
@@ -54,7 +55,7 @@ type validateBasicDNSResponseMetrics struct {
 	Response    string
 }
 
-func (v *validateBasicDNSResponseMetrics) Run() error {
+func (v *validateBasicDNSResponseMetrics) Run(_ *types.RuntimeObjects) error {
 	metricsEndpoint := fmt.Sprintf("http://localhost:%d/metrics", common.RetinaPort)
 
 	if v.Response == EmptyResponse {
@@ -78,7 +79,7 @@ func (v *validateBasicDNSResponseMetrics) Run() error {
 	return nil
 }
 
-func (v *validateBasicDNSResponseMetrics) Prevalidate() error {
+func (v *validateBasicDNSResponseMetrics) PreRun() error {
 	return nil
 }
 

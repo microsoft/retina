@@ -15,11 +15,11 @@ type Step interface {
 	// if a parameter length is known to be required less than 80 characters,
 	// do this here so we don't find out later on when we run the step
 	// when possible, try to avoid making external calls, this should be fast and simple
-	Prevalidate() error
+	PreRun() error
 
 	// Primary step where test logic is executed
 	// Returning an error will cause the test to fail
-	Run() error
+	Run(ro *RuntimeObjects) error
 
 	// Require for background steps
 	Stop() error
@@ -38,4 +38,7 @@ type StepOptions struct {
 	// and then later on when Stop is called with job name,
 	// it will call Stop() on the step
 	RunInBackgroundWithID string
+
+	//
+	RuntimeObjectKeys map[string]interface{}
 }

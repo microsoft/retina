@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/microsoft/retina/test/e2e/framework/types"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -68,7 +69,7 @@ type DeleteKubernetesResource struct {
 	KubeConfigFilePath string
 }
 
-func (d *DeleteKubernetesResource) Run() error {
+func (d *DeleteKubernetesResource) Run(_ *types.RuntimeObjects) error {
 	config, err := clientcmd.BuildConfigFromFlags("", d.KubeConfigFilePath)
 	if err != nil {
 		return fmt.Errorf("error building kubeconfig: %w", err)
@@ -187,7 +188,7 @@ func (d *DeleteKubernetesResource) Stop() error {
 	return nil
 }
 
-func (d *DeleteKubernetesResource) Prevalidate() error {
+func (d *DeleteKubernetesResource) PreRun() error {
 	restype := ResourceType(d.ResourceType)
 	if restype == Unknown {
 		return ErrUnknownResourceType

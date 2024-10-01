@@ -10,6 +10,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	armcontainerservice "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v4"
+	"github.com/microsoft/retina/test/e2e/framework/types"
 )
 
 var (
@@ -37,7 +38,7 @@ type CreateNPMCluster struct {
 	ServiceCidr       string
 }
 
-func (c *CreateNPMCluster) Prevalidate() error {
+func (c *CreateNPMCluster) PreRun() error {
 	return nil
 }
 
@@ -45,7 +46,7 @@ func (c *CreateNPMCluster) Stop() error {
 	return nil
 }
 
-func (c *CreateNPMCluster) Run() error {
+func (c *CreateNPMCluster) Run(_ *types.RuntimeObjects) error {
 	// Start with default cluster template
 	npmCluster := GetStarterClusterTemplate(c.Location)
 

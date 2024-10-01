@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/retina/test/e2e/common"
 	prom "github.com/microsoft/retina/test/e2e/framework/prometheus"
+	"github.com/microsoft/retina/test/e2e/framework/types"
 	"github.com/pkg/errors"
 )
 
@@ -13,11 +14,11 @@ var latencyBucketMetricName = "networkobservability_adv_node_apiserver_tcp_hands
 
 type ValidateAPIServerLatencyMetric struct{}
 
-func (v *ValidateAPIServerLatencyMetric) Prevalidate() error {
+func (v *ValidateAPIServerLatencyMetric) PreRun() error {
 	return nil
 }
 
-func (v *ValidateAPIServerLatencyMetric) Run() error {
+func (v *ValidateAPIServerLatencyMetric) Run(_ *types.RuntimeObjects) error {
 	promAddress := fmt.Sprintf("http://localhost:%d/metrics", common.RetinaPort)
 
 	metric := map[string]string{}

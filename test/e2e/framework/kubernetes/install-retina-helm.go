@@ -8,6 +8,7 @@ import (
 	"time"
 
 	generic "github.com/microsoft/retina/test/e2e/framework/generic"
+	"github.com/microsoft/retina/test/e2e/framework/types"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/cli"
@@ -31,7 +32,7 @@ type InstallHelmChart struct {
 	TagEnv             string
 }
 
-func (i *InstallHelmChart) Run() error {
+func (i *InstallHelmChart) Run(_ *types.RuntimeObjects) error {
 	settings := cli.New()
 	settings.KubeConfig = i.KubeConfigFilePath
 	actionConfig := new(action.Configuration)
@@ -109,7 +110,7 @@ func (i *InstallHelmChart) Run() error {
 	return nil
 }
 
-func (i *InstallHelmChart) Prevalidate() error {
+func (i *InstallHelmChart) PreRun() error {
 	_, err := os.Stat(i.ChartPath)
 
 	if os.IsNotExist(err) {

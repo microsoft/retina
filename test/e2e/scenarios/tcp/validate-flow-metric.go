@@ -5,6 +5,7 @@ import (
 	"log"
 
 	prom "github.com/microsoft/retina/test/e2e/framework/prometheus"
+	"github.com/microsoft/retina/test/e2e/framework/types"
 )
 
 var tcpStateMetricName = "networkobservability_tcp_state"
@@ -21,7 +22,7 @@ type ValidateRetinaTCPStateMetric struct {
 	PortForwardedRetinaPort string
 }
 
-func (v *ValidateRetinaTCPStateMetric) Run() error {
+func (v *ValidateRetinaTCPStateMetric) Run(_ *types.RuntimeObjects) error {
 	promAddress := fmt.Sprintf("http://localhost:%s/metrics", v.PortForwardedRetinaPort)
 
 	validMetrics := []map[string]string{
@@ -41,7 +42,7 @@ func (v *ValidateRetinaTCPStateMetric) Run() error {
 	return nil
 }
 
-func (v *ValidateRetinaTCPStateMetric) Prevalidate() error {
+func (v *ValidateRetinaTCPStateMetric) PreRun() error {
 	return nil
 }
 

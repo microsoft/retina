@@ -8,6 +8,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
+	"github.com/microsoft/retina/test/e2e/framework/types"
 )
 
 type DeleteResourceGroup struct {
@@ -16,7 +17,7 @@ type DeleteResourceGroup struct {
 	Location          string
 }
 
-func (d *DeleteResourceGroup) Run() error {
+func (d *DeleteResourceGroup) Run(_ *types.RuntimeObjects) error {
 	log.Printf("deleting resource group \"%s\"...", d.ResourceGroupName)
 	cred, err := azidentity.NewAzureCLICredential(nil)
 	if err != nil {
@@ -37,7 +38,7 @@ func (d *DeleteResourceGroup) Run() error {
 	return nil
 }
 
-func (d *DeleteResourceGroup) Prevalidate() error {
+func (d *DeleteResourceGroup) PreRun() error {
 	return nil
 }
 
