@@ -9,8 +9,9 @@ func ValidateWindowsBasicMetric() *types.Scenario {
 	steps := []*types.StepWrapper{
 		{
 			Step: &ValidateHNSMetric{
-				KubeConfigFilePath: "./test.pem",
-				RetinaPodNamespace: "kube-system",
+				KubeConfigFilePath:       "./test.pem",
+				RetinaDaemonSetNamespace: "kube-system",
+				RetinaDaemonSetName:      "retina-agent-win",
 			},
 		},
 	}

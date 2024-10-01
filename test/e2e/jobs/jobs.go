@@ -45,7 +45,7 @@ func CreateTestInfra(subID, clusterName, location, kubeConfigFilePath string, cr
 
 	} else {
 		job.AddStep(&azure.GetAKSKubeConfig{
-			KubeConfigFilePath: "./test.pem",
+			KubeConfigFilePath: kubeConfigFilePath,
 			ClusterName:        clusterName,
 			SubscriptionID:     subID,
 			ResourceGroupName:  clusterName,
@@ -84,8 +84,6 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string) *typ
 		ChartPath:          chartPath,
 		TagEnv:             generic.DefaultTagEnv,
 	}, nil)
-
-	job.AddScenario(windows.ValidateWindowsBasicMetric())
 
 	job.AddScenario(drop.ValidateDropMetric())
 
@@ -202,6 +200,8 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 	}
 
 	job.AddScenario(latency.ValidateLatencyMetric())
+
+	job.AddScenario(windows.ValidateWindowsBasicMetric())
 
 	job.AddStep(&kubernetes.EnsureStableCluster{
 		PodNamespace:  "kube-system",
