@@ -89,6 +89,8 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string) *typ
 
 	job.AddScenario(tcp.ValidateTCPMetrics())
 
+	job.AddScenario(windows.ValidateWindowsBasicMetric())
+
 	dnsScenarios := []struct {
 		name string
 		req  *dns.RequestValidationParams
@@ -200,8 +202,6 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 	}
 
 	job.AddScenario(latency.ValidateLatencyMetric())
-
-	job.AddScenario(windows.ValidateWindowsBasicMetric())
 
 	job.AddStep(&kubernetes.EnsureStableCluster{
 		PodNamespace:  "kube-system",

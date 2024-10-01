@@ -58,8 +58,8 @@ func CheckMetric(promAddress, metricName string, validMetric map[string]string) 
 	return nil
 }
 
-func CheckMetricFromBuffer(promethusMetricData []byte, metricName string, validMetric map[string]string) error {
-	metrics, err := getAllPrometheusMetricsFromBuffer(promethusMetricData)
+func CheckMetricFromBuffer(prometheusMetricData []byte, metricName string, validMetric map[string]string) error {
+	metrics, err := getAllPrometheusMetricsFromBuffer(prometheusMetricData)
 	if err != nil {
 		return fmt.Errorf("failed to parse prometheus metrics: %w", err)
 	}

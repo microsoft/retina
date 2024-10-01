@@ -15,6 +15,8 @@ import (
 const (
 	RetryTimeoutPodsReady  = 5 * time.Minute
 	RetryIntervalPodsReady = 5 * time.Second
+
+	printInterval = 5 // print to stdout every 5 iterations
 )
 
 func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, namespace, labelSelector string) error {
@@ -53,7 +55,7 @@ func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, names
 
 			// Check the Pod phase
 			if pod.Status.Phase != corev1.PodRunning {
-				if printIterator%5 == 0 {
+				if printIterator%printInterval == 0 {
 					log.Printf("pod \"%s\" is not in Running state yet. Waiting...\n", pod.Name)
 				}
 				return false, nil
