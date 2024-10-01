@@ -5,12 +5,20 @@ metadata:
   creationTimestamp: null
   name: retina-operator-role
 rules:
-  - apiGroups: 
+  - apiGroups:
       - "apiextensions.k8s.io"
-    resources: 
+    resources:
       - "customresourcedefinitions"
-    verbs: 
+    verbs:
       - "create"
+  - apiGroups:
+      - "apiextensions.k8s.io"
+    resources:
+      - "customresourcedefinitions"
+    resourceNames:
+      - ciliumidentities.cilium.io
+      - ciliumendpoints.cilium.io
+    verbs:
       - "get"
       - "update"
       - "delete"
