@@ -15,12 +15,18 @@ import (
 const (
 	RetryTimeoutPodsReady  = 5 * time.Minute
 	RetryIntervalPodsReady = 5 * time.Second
+
+	printInterval = 5 // print to stdout every 5 iterations
 )
 
 func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, namespace, labelSelector string) error {
 	podReadyMap := make(map[string]bool)
 
+	printIterator := 0
 	conditionFunc := wait.ConditionWithContextFunc(func(context.Context) (bool, error) {
+		defer func() {
+			printIterator++
+		}()
 		var podList *corev1.PodList
 		podList, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 		if err != nil {
@@ -40,11 +46,21 @@ func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, names
 				return false, fmt.Errorf("error getting Pod: %w", err)
 			}
 
+			for istatus := range pod.Status.ContainerStatuses {
+				status := &pod.Status.ContainerStatuses[istatus]
+				if status.RestartCount > 0 {
+					return false, fmt.Errorf("pod %s has %d restarts: status: %+v: %w", pod.Name, status.RestartCount, status, ErrPodCrashed)
+				}
+			}
+
 			// Check the Pod phase
 			if pod.Status.Phase != corev1.PodRunning {
-				log.Printf("pod \"%s\" is not in Running state yet. Waiting...\n", pod.Name)
+				if printIterator%printInterval == 0 {
+					log.Printf("pod \"%s\" is not in Running state yet. Waiting...\n", pod.Name)
+				}
 				return false, nil
 			}
+
 			if !podReadyMap[pod.Name] {
 				log.Printf("pod \"%s\" is in Running state\n", pod.Name)
 				podReadyMap[pod.Name] = true
@@ -56,6 +72,7 @@ func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, names
 
 	err := wait.PollUntilContextCancel(ctx, RetryIntervalPodsReady, true, conditionFunc)
 	if err != nil {
+		PrintPodLogs(ctx, clientset, namespace, labelSelector)
 		return fmt.Errorf("error waiting for pods in namespace \"%s\" with label \"%s\" to be in Running state: %w", namespace, labelSelector, err)
 	}
 	return nil
