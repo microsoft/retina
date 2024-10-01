@@ -16,7 +16,7 @@ struct
 {
 	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
 	__uint(max_entries, 16384);
-} packetparser_events SEC(".maps");
+} retina_packetparser_events SEC(".maps");
 
 // Define const variables to avoid warnings.
 const struct packet *unused __attribute__((unused));
@@ -206,12 +206,12 @@ static void parse(struct __sk_buff *skb, __u8 obs)
 	#ifdef DATA_AGGREGATION_LEVEL
 	// If the data aggregation level is low, always send the packet to the perf buffer.
 	#if DATA_AGGREGATION_LEVEL == DATA_AGGREGATION_LEVEL_LOW
-		bpf_perf_event_output(skb, &packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
+		bpf_perf_event_output(skb, &retina_packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
 		return;
 	// If the data aggregation level is high, only send the packet to the perf buffer if it needs to be reported.
 	#elif DATA_AGGREGATION_LEVEL == DATA_AGGREGATION_LEVEL_HIGH
 		if (report) {
-			bpf_perf_event_output(skb, &packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
+			bpf_perf_event_output(skb, &retina_packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
 		}
 	#endif
 	#endif

@@ -31,7 +31,7 @@ struct
     __uint(max_entries, 512);
     __type(key, struct metrics_map_key);
     __type(value, struct metrics_map_value);
-} metrics_map SEC(".maps");
+} retina_dropreason_metrics SEC(".maps");
 
 struct metrics_map_key
 {

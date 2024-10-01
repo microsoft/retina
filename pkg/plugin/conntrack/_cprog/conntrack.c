@@ -70,7 +70,7 @@ struct {
     __type(value, struct ct_entry);
     __uint(max_entries, CT_MAP_SIZE);
     __uint(pinning, LIBBPF_PIN_BY_NAME); // needs pinning so this can be access from other processes .i.e debug cli
-} retina_conntrack_map SEC(".maps");
+} retina_conntrack SEC(".maps");
 
 
 /**
@@ -120,7 +120,7 @@ static __always_inline bool _ct_create_new_tcp_connection(struct ct_v4_key key, 
     new_value.eviction_time = now + CT_SYN_TIMEOUT;
     new_value.flags_seen_tx_dir = flags;
     new_value.traffic_direction = _ct_get_traffic_direction(observation_point);
-    bpf_map_update_elem(&retina_conntrack_map, &key, &new_value, BPF_ANY);
+    bpf_map_update_elem(&retina_conntrack, &key, &new_value, BPF_ANY);
     return true;
 }
 
@@ -142,7 +142,7 @@ static __always_inline bool _ct_handle_udp_connection(struct packet *p, struct c
     new_value.flags_seen_tx_dir = p->flags;
     new_value.last_report_tx_dir = now;
     new_value.traffic_direction = _ct_get_traffic_direction(observation_point);
-    bpf_map_update_elem(&retina_conntrack_map, &key, &new_value, BPF_ANY);
+    bpf_map_update_elem(&retina_conntrack, &key, &new_value, BPF_ANY);
     // Update packet
     p->is_reply = false;
     p->traffic_direction = new_value.traffic_direction;
@@ -186,12 +186,12 @@ static __always_inline bool _ct_handle_tcp_connection(struct packet *p, struct c
         p->is_reply = true;
         new_value.flags_seen_rx_dir = p->flags;
         new_value.last_report_rx_dir = now;
-        bpf_map_update_elem(&retina_conntrack_map, &reverse_key, &new_value, BPF_ANY);
+        bpf_map_update_elem(&retina_conntrack, &reverse_key, &new_value, BPF_ANY);
     } else { // Otherwise, the packet is considered as a packet in the send direction.
         p->is_reply = false;
         new_value.flags_seen_tx_dir = p->flags;
         new_value.last_report_tx_dir = now;
-        bpf_map_update_elem(&retina_conntrack_map, &key, &new_value, BPF_ANY);
+        bpf_map_update_elem(&retina_conntrack, &key, &new_value, BPF_ANY);
     }
     return true;
 }
@@ -300,7 +300,7 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
     key.dst_port = p->dst_port;
     key.proto = p->proto;
     // Lookup the connection in the map.
-    struct ct_entry *entry = bpf_map_lookup_elem(&retina_conntrack_map, &key);
+    struct ct_entry *entry = bpf_map_lookup_elem(&retina_conntrack, &key);
 
     // If the connection is found in the send direction, update the connection.
     if (entry) {
@@ -316,7 +316,7 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
     _ct_reverse_key(&reverse_key, &key);
 
     // Lookup the connection in the map based on the reverse key.
-    entry = bpf_map_lookup_elem(&retina_conntrack_map, &reverse_key);
+    entry = bpf_map_lookup_elem(&retina_conntrack, &reverse_key);
 
     // If the connection is found based on the reverse key, meaning that the packet is a reply packet to an existing connection.
     if (entry) {

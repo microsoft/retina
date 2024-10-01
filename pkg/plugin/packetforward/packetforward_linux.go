@@ -151,7 +151,7 @@ func (p *packetForward) Init() error {
 		return err
 	}
 
-	p.hashmapData = objs.Packets
+	p.hashmapData = objs.RetinaPacketforwardMetrics
 
 	// The steps to attach ebpf to socket is documented in cilium/ebpf
 	// https://github.com/cilium/ebpf/blob/master/example_sock_elf_test.go#L85.
