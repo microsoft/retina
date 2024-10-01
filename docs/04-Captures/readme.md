@@ -2,29 +2,31 @@
 
 ## Overview
 
-Retina Capture allows users to capture network traffic/metadata for the specified Nodes/Pods.
+Retina Capture allows users to capture network traffic/metadata for specified Nodes/Pods.
 
-Captures are on-demand and can be output to the host filesystem, a storage blob, etc.
+Captures are on-demand and can be output to persistent storage such as the host filesystem, a storage blob, etc.
 
 ## Usage
 
 There are two methods for triggering a Capture:
 
-- [CLI command](#option-1-retina-cli) or
-- [CRD/YAML configuration](#option-2-capture-crd-custom-resource-definition).
+- [CLI command](#option-1-retina-cli)
+- [CRD/YAML configuration](#option-2-capture-crd-custom-resource-definition)
 
 ### Option 1: Retina CLI
 
-Available after [Installing Retina CLI](../02-Installation/02-CLI.md).
+> Prerequisite: [Install Retina CLI](../02-Installation/02-CLI.md)
 
-See [Capture Command](](../04-Captures/02-CLI.md) for more details.
+The command syntax is `kubectl retina capture create [--flags]`.
+
+Refer to the [Capture Command](../04-Captures/cli.md) documentation for more details.
 
 #### Example
 
 This example captures network traffic for all Linux Nodes, storing the output in the folder */mnt/capture* on each Node.
 
 ```shell
-kubectl-retina capture create --name capture-test --host-path /mnt/capture --node-selectors "kubernetes.io/os=linux"
+kubectl retina capture create --name capture-test --host-path /mnt/capture --node-selectors "kubernetes.io/os=linux"
 ```
 
 #### Architecture
@@ -39,27 +41,25 @@ A random hashed name is assigned to each Retina Capture to uniquely label it.
 
 ### Option 2: Capture CRD (Custom Resource Definition)
 
-Available after after [installing Retina](../02-Installation/01-Setup.md) with capture support.
+> Prerequisite: [Install Retina](../02-Installation/01-Setup.md) **with capture support**.
 
-See [Capture CRD](../05-Concepts/CRDs/Capture.md) for more details.
+Refer to the [Capture CRD](../05-Concepts/CRDs/Capture.md) documentation for more details.
 
 #### Managed Storage Account
 
-To simply the user experience, a managed storage account is configurable when setting up Retina, which can manage the storage account, container and Kubernetes secreting container the blob SAS on behalf the user. Check [managed-storage-account.md] for more details.
+To simplify the user experience, a managed storage account can be configured when setting up Retina. Instructions for this are provided [here](../04-Captures/managed-storage-account.md#setup).
 
 #### Example
 
 This example creates a Capture and stores the Capture artifacts into a storage account specified by Blob SAS URL.
 
-Create a secret to store blob SAS URL:
+Create a secret to store blob SAS URL (and store it in blob-upload-url.txt):
 
 ```bash
 kubectl create secret generic blob-sas-url --from-file=blob-upload-url=./blob-upload-url.txt
 ```
 
-in which blob-upload-url.txt stores the Blob SAS URL
-
-Create a Capture specifying the secret created as blobUpload, this example will also store the artifact on the node host path
+Create a Capture specifying the secret created as blobUpload, this example will also store the artifact on the node host path.
 
 ```yaml
 apiVersion: retina.sh/v1alpha1
@@ -79,7 +79,7 @@ spec:
     blobUpload: blob-sas-url
 ```
 
-More Retina Capture samples can be found [here](https://github.com/microsoft/retina/tree/main/samples/capture)
+More Retina Capture samples can be found [here](https://github.com/microsoft/retina/tree/main/samples/capture).
 
 #### Architecture
 
