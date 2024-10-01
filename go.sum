@@ -760,8 +760,8 @@ github.com/prometheus/procfs v0.0.3/go.mod h1:4A/X28fw3Fc593LaREMrKMqOKvUAntwMDa
 github.com/prometheus/procfs v0.0.8/go.mod h1:7Qr8sr6344vo1JqZ6HhLceV9o3AJ1Ff+GxbHq6oeK9A=
 github.com/prometheus/procfs v0.15.1 h1:YagwOFzUgYfKKHX6Dr+sHT7km/hxC76UB0learggepc=
 github.com/prometheus/procfs v0.15.1/go.mod h1:fB45yRUv8NstnjriLhBQLuOUt+WW4BsoGhij/e3PBqk=
-github.com/ritwikranjan/perf-tests/network/benchmarks/netperf v0.0.0-20240926175158-d0a61c755609 h1:YTQYpu9p6MjFIRJNZpCV3EQ2DTyQboKNQWV3WOQYLYU=
-github.com/ritwikranjan/perf-tests/network/benchmarks/netperf v0.0.0-20240926175158-d0a61c755609/go.mod h1:PUa9msVr70tIWPb+i5a68SNFbyiEBEcoQbgFHaTEEL0=
+github.com/ritwikranjan/perf-tests/network/benchmarks/netperf v0.0.0-20241001103703-41323364781f h1:fbcRfs8KpPJdjYBU2xuP53K90rVisQgWqsfUnmSuhcg=
+github.com/ritwikranjan/perf-tests/network/benchmarks/netperf v0.0.0-20241001103703-41323364781f/go.mod h1:uNVSmziO8eBGgZ9UKBt3Yv9Uvw97T/1nh08FjgWN/fM=
 github.com/rogpeppe/fastuuid v1.2.0/go.mod h1:jVj6XXZzXRy/MSR5jhDC/2q6DgLz+nrA6LYCDYWNEvQ=
 github.com/rogpeppe/go-internal v1.6.1/go.mod h1:xXDCJY+GAPziupqXw64V24skbSoqbTEfhy4qGm1nDQc=
 github.com/rogpeppe/go-internal v1.9.0/go.mod h1:WtVeX8xhTBvf0smdhujwtBcq4Qrzq/fJaraNFVN+nFs=
