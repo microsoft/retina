@@ -3,6 +3,7 @@ package latency
 import (
 	"time"
 
+	"github.com/microsoft/retina/test/e2e/common"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/types"
 )
@@ -19,7 +20,8 @@ func ValidateLatencyMetric(namespace string) *types.Scenario {
 		},
 		{
 			Step: &kubernetes.PortForward{
-				Namespace:             namespace,
+				Namespace:             common.Namespace,
+				PodNamespace:          namespace,
 				LabelSelector:         "k8s-app=retina",
 				LocalPort:             "10093",
 				RemotePort:            "10093",

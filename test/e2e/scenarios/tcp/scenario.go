@@ -3,6 +3,7 @@ package flow
 import (
 	"time"
 
+	"github.com/microsoft/retina/test/e2e/common"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/types"
 )
@@ -55,8 +56,9 @@ func ValidateTCPMetrics(namespace string) *types.Scenario {
 		},
 		{
 			Step: &kubernetes.PortForward{
+				Namespace:             common.Namespace,
+				PodNamespace:          namespace,
 				LabelSelector:         "k8s-app=retina",
-				Namespace:             namespace,
 				LocalPort:             "10093",
 				RemotePort:            "10093",
 				Endpoint:              "metrics",

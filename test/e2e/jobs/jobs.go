@@ -1,6 +1,7 @@
 package retina
 
 import (
+	"github.com/microsoft/retina/test/e2e/common"
 	"github.com/microsoft/retina/test/e2e/framework/azure"
 	"github.com/microsoft/retina/test/e2e/framework/generic"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
@@ -62,20 +63,20 @@ func DeleteTestInfra(subID, clusterName, location string) *types.Job {
 	return job
 }
 
-func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, testNamespace string) *types.Job {
+func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, testPodNamespace string) *types.Job {
 	job := types.NewJob("Install and test Retina with basic metrics")
 
 	job.AddStep(&kubernetes.InstallHelmChart{
-		Namespace:          testNamespace,
+		Namespace:          common.Namespace,
 		ReleaseName:        "retina",
 		KubeConfigFilePath: kubeConfigFilePath,
 		ChartPath:          chartPath,
 		TagEnv:             generic.DefaultTagEnv,
 	}, nil)
 
-	job.AddScenario(drop.ValidateDropMetric(testNamespace))
+	job.AddScenario(drop.ValidateDropMetric(testPodNamespace))
 
-	job.AddScenario(tcp.ValidateTCPMetrics(testNamespace))
+	job.AddScenario(tcp.ValidateTCPMetrics(testPodNamespace))
 
 	dnsScenarios := []struct {
 		name string
@@ -119,17 +120,17 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, test
 	}
 
 	for _, scenario := range dnsScenarios {
-		job.AddScenario(dns.ValidateBasicDNSMetrics(scenario.name, scenario.req, scenario.resp, testNamespace))
+		job.AddScenario(dns.ValidateBasicDNSMetrics(scenario.name, scenario.req, scenario.resp, testPodNamespace))
 	}
 
 	return job
 }
 
-func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFilePath string, testNamespace string) *types.Job {
+func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFilePath string, testPodNamespace string) *types.Job {
 	job := types.NewJob("Upgrade and test Retina with advanced metrics")
 	// enable advanced metrics
 	job.AddStep(&kubernetes.UpgradeRetinaHelmChart{
-		Namespace:          testNamespace,
+		Namespace:          common.Namespace,
 		ReleaseName:        "retina",
 		KubeConfigFilePath: kubeConfigFilePath,
 		ChartPath:          chartPath,
@@ -179,10 +180,10 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 	}
 
 	for _, scenario := range dnsScenarios {
-		job.AddScenario(dns.ValidateAdvancedDNSMetrics(scenario.name, scenario.req, scenario.resp, kubeConfigFilePath, testNamespace))
+		job.AddScenario(dns.ValidateAdvancedDNSMetrics(scenario.name, scenario.req, scenario.resp, kubeConfigFilePath, testPodNamespace))
 	}
 
-	job.AddScenario(latency.ValidateLatencyMetric(testNamespace))
+	job.AddScenario(latency.ValidateLatencyMetric(testPodNamespace))
 
 	return job
 }
