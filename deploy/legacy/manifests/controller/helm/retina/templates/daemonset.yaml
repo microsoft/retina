@@ -214,6 +214,15 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: status.hostIP
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: {{ .Values.retinaPort }}
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds | default "30" }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds | default "30" }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds | default "1" }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold | default "3" }}
+            successThreshold: {{ .Values.livenessProbe.successThreshold | default "1" }}
           securityContext:
             capabilities:
               add:
