@@ -16,8 +16,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestE2ERetina tests all e2e scenarios for retina
-func TestPerfRetina(t *testing.T) {
+// This test creates a new k8s cluster runs some network performance tests
+// saves the data as benchmark information and then installs retina and runs the performance tests
+// to compare the results and publishes a json with regression information.
+func TestE2EPerfRetina(t *testing.T) {
 	curuser, err := user.Current()
 	require.NoError(t, err)
 
@@ -49,16 +51,12 @@ func TestPerfRetina(t *testing.T) {
 	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, clusterName, location, kubeConfigFilePath))
 	createTestInfra.Run()
 
-	// Hacky way to ensure that the test infra is deleted even if the test panics
-	defer func() {
-		if r := recover(); r != nil {
-			t.Logf("Recovered in TestE2ERetina, %v", r)
-		}
+	t.Cleanup(func() {
 		err := jobs.DeleteTestInfra(subID, clusterName, location).Run()
 		if err != nil {
 			t.Logf("Failed to delete test infrastructure: %v", err)
 		}
-	}()
+	})
 
 	// Gather benchmark results then install retina and run the performance tests
 	runner := types.NewRunner(t, jobs.RunPerfTest(kubeConfigFilePath, chartPath))
