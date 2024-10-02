@@ -139,7 +139,6 @@ func (p *PortForward) findPodsWithAffinity(ctx context.Context, clientset *kuber
 	}
 
 	// get all pods with optional label affinity
-	affinityPods, errAffinity := clientset.CoreV1().Pods(p.Namespace).List(ctx, metav1.ListOptions{
 	affinityPods, errAffinity := clientset.CoreV1().Pods(p.PodNamespace).List(ctx, metav1.ListOptions{
 		LabelSelector: p.OptionalLabelAffinity,
 		FieldSelector: "status.phase=Running",
