@@ -17,3 +17,19 @@ For reference, see the `test-all` recipe in the root [Makefile](../../Makefile).
 
 For sample test, please check out:
 [the Retina E2E.](./scenarios/retina/drop/scenario.go)
+
+## Sample VSCode `settings.json` for running with existing cluster
+
+```json
+"go.testFlags": [
+    "-v",
+    "-timeout=40m",
+    "-tags=e2e",
+    "-args",
+    "-create-infra=false",
+    "-delete-infra=false",
+    "-image-namespace=retistrynamespace",
+    "-image-registry=yourregistry",
+    "-image-tag=yourtesttag",
+],
+```

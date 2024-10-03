@@ -16,7 +16,7 @@ struct {
         __uint(map_flags, BPF_F_NO_PREALLOC);
         __uint(max_entries, 255);
 	__uint(pinning, LIBBPF_PIN_BY_NAME); // Pinned to /sys/fs/bpf.
-} retina_filter_map SEC(".maps");
+} retina_filter SEC(".maps");
 
 // Returns 1 if the IP address is in the map, 0 otherwise.
 bool lookup(__u32 ipaddr)
@@ -26,7 +26,7 @@ bool lookup(__u32 ipaddr)
                 .data = ipaddr
         };
 
-        if (bpf_map_lookup_elem(&retina_filter_map, &key))
+        if (bpf_map_lookup_elem(&retina_filter, &key))
                 return true;
         return false;
 }

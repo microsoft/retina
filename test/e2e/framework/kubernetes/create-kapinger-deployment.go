@@ -107,6 +107,9 @@ func (c *CreateKapingerDeployment) GetKapingerDeployment() *appsv1.Deployment {
 				},
 
 				Spec: v1.PodSpec{
+					NodeSelector: map[string]string{
+						"kubernetes.io/os": "linux",
+					},
 					Affinity: &v1.Affinity{
 						PodAntiAffinity: &v1.PodAntiAffinity{
 							// prefer an even spread across the cluster to avoid scheduling on the same node

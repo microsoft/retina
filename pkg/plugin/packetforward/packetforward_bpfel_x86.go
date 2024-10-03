@@ -67,7 +67,7 @@ type packetforwardProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type packetforwardMapSpecs struct {
-	Packets *ebpf.MapSpec `ebpf:"packets"`
+	RetinaPacketforwardMetrics *ebpf.MapSpec `ebpf:"retina_packetforward_metrics"`
 }
 
 // packetforwardObjects contains all objects after they have been loaded into the kernel.
@@ -89,12 +89,12 @@ func (o *packetforwardObjects) Close() error {
 //
 // It can be passed to loadPacketforwardObjects or ebpf.CollectionSpec.LoadAndAssign.
 type packetforwardMaps struct {
-	Packets *ebpf.Map `ebpf:"packets"`
+	RetinaPacketforwardMetrics *ebpf.Map `ebpf:"retina_packetforward_metrics"`
 }
 
 func (m *packetforwardMaps) Close() error {
 	return _PacketforwardClose(
-		m.Packets,
+		m.RetinaPacketforwardMetrics,
 	)
 }
 
