@@ -16,13 +16,13 @@ If you followed the steps to install and configure [Prometheus](./04-prometheus.
    kubectl get secret -n kube-system prometheus-grafana -o jsonpath="{.data.admin-user}" | base64 --decode ; echo
    ```
 
-2. Get Grafana password 
+2. Get Grafana password
 
    ```shell
    kubectl get secret -n kube-system prometheus-grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
    ```
 
-3. Use port forwarding to access Grafana UI at [localhost:8080](http://localhost:8080) and enter you login credentials 
+3. Use port forwarding to access Grafana UI at [localhost:8080](http://localhost:8080) and enter you login credentials
 
    ```shell
    kubectl port-forward --namespace kube-system  svc/prometheus-grafana 8080:80

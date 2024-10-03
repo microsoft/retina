@@ -16,7 +16,7 @@ Prometheus is an open-source system monitoring and alerting toolkit originally b
   helm repo update
   ```
 
-2. Install the Prometheus chart
+1. Install the Prometheus chart
 
   ```shell
   helm install prometheus -n kube-system -f deploy/legacy/prometheus/values.yaml prometheus-community/kube-prometheus-stack
@@ -38,11 +38,10 @@ Prometheus is an open-source system monitoring and alerting toolkit originally b
   kubectl port-forward --namespace kube-system svc/prometheus-operated 9090
   ```
 
-2. Go to [localhost:9090/targets](http://localhost:9090/targets) to see the Retina Pods being discovered and scraped by Prometheus
+1. Go to [localhost:9090/targets](http://localhost:9090/targets) to see the Retina Pods being discovered and scraped by Prometheus
 
 ![Prometheus Retina Targets](./img/prometheus-retina-targets.png)
 
 ## Next steps
 
 Follow [Configuring Grafana](./05-grafana.md) to visualise metrics in dashboards.
-
