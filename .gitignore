@@ -43,3 +43,5 @@ image-metadata-*.json
 *packetmonitorsupport*/
 *.pem
 *results*.json
+netperf-*.json
+netperf-*.csv

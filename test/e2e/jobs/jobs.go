@@ -66,26 +66,6 @@ func CreateTestInfra(subID, clusterName, location, kubeConfigFilePath string, cr
 	return job
 }
 
-func RegisterExistingInfra(subID, clusterName, resGroupName, location, kubeConfigFilePath string) *types.Job {
-	job := types.NewJob("Register existing e2e test infrastructure")
-
-	job.AddStep(&azure.GetAKSKubeConfig{
-		SubscriptionID:     subID,
-		ResourceGroupName:  resGroupName,
-		ClusterName:        clusterName,
-		Location:           location,
-		KubeConfigFilePath: kubeConfigFilePath,
-	}, nil)
-
-	job.AddStep(&generic.LoadFlags{
-		TagEnv:            generic.DefaultTagEnv,
-		ImageNamespaceEnv: generic.DefaultImageNamespace,
-		ImageRegistryEnv:  generic.DefaultImageRegistry,
-	}, nil)
-
-	return job
-}
-
 func DeleteTestInfra(subID, clusterName, location string) *types.Job {
 	job := types.NewJob("Delete e2e test infrastructure")
 
