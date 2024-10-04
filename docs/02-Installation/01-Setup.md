@@ -86,5 +86,5 @@ helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
 
 ## Next Steps: Configuring Prometheus and Grafana
 
-- [Prometheus](./prometheus.md)
-- [Grafana](./grafana.md)
+- [Prometheus](./04-prometheus.md)
+- [Grafana](./05-grafana.md)
