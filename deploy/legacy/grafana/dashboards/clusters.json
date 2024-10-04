@@ -171,7 +171,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (cluster) (rate(networkobservability_forward_bytes[$__rate_interval]))",
+          "expr": "sum by (cluster) (rate(networkobservability_forward_bytes{instance=~\"$Nodes\"}[$__rate_interval]))",
           "format": "table",
           "instant": true,
           "legendFormat": "__auto",
@@ -279,7 +279,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (cluster) (rate(networkobservability_forward_bytes[$__rate_interval]))",
+          "expr": "sum by (cluster) (rate(networkobservability_forward_bytes{instance=~\"$Nodes\"}[$__rate_interval]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -355,7 +355,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (cluster) (rate(networkobservability_drop_bytes[$__rate_interval]))",
+          "expr": "sum by (cluster) (rate(networkobservability_drop_bytes{instance=~\"$Nodes\"}[$__rate_interval]))",
           "format": "table",
           "instant": true,
           "legendFormat": "__auto",
@@ -463,7 +463,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (cluster) (rate(networkobservability_drop_bytes[$__rate_interval]))",
+          "expr": "sum by (cluster) (rate(networkobservability_drop_bytes{instance=~\"$Nodes\"}[$__rate_interval]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -3713,23 +3713,19 @@
         "type": "query"
       },
       {
-        "allValue": "(.*)",
         "current": {},
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(kube_node_info{cluster=\"$cluster\"},node)",
+        "definition": "label_values(kube_node_info{cluster=\"$cluster\"}, node)",
         "hide": 0,
         "includeAll": true,
         "label": "Nodes",
         "multi": true,
         "name": "Nodes",
         "options": [],
-        "query": {
-          "query": "label_values(kube_node_info{cluster=\"$cluster\"},node)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
+        "query": "label_values(kube_node_info{cluster=\"$cluster\"}, node)",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
