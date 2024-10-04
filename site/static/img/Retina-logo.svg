@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" viewBox="0 0 500 500">
+  <defs>
+    <style>
+      .cls-1 {
+        mask: url(#mask);
+      }
+
+      .cls-2 {
+        filter: url(#luminosity-invert);
+      }
+
+      .cls-3 {
+        filter: url(#drop-shadow-1);
+      }
+
+      .cls-4 {
+        filter: url(#drop-shadow-2);
+      }
+
+      .cls-5 {
+        filter: url(#luminosity-invert-2);
+      }
+
+      .cls-6 {
+        filter: url(#luminosity-invert-4);
+      }
+
+      .cls-7 {
+        filter: url(#luminosity-invert-3);
+      }
+
+      .cls-8 {
+        fill: url(#linear-gradient-5);
+      }
+
+      .cls-9 {
+        fill: url(#linear-gradient-6);
+      }
+
+      .cls-10 {
+        fill: url(#linear-gradient-4);
+      }
+
+      .cls-11 {
+        fill: url(#linear-gradient-3);
+      }
+
+      .cls-12 {
+        fill: url(#linear-gradient-2);
+      }
+
+      .cls-13 {
+        fill: url(#radial-gradient-4);
+      }
+
+      .cls-13, .cls-14, .cls-15, .cls-16 {
+        mix-blend-mode: soft-light;
+      }
+
+      .cls-14 {
+        fill: url(#radial-gradient-3);
+      }
+
+      .cls-15 {
+        fill: url(#radial-gradient-2);
+      }
+
+      .cls-17 {
+        fill: url(#linear-gradient);
+      }
+
+      .cls-18 {
+        fill: #0078d4;
+      }
+
+      .cls-19 {
+        isolation: isolate;
+      }
+
+      .cls-20 {
+        mask: url(#mask-2);
+      }
+
+      .cls-21 {
+        mask: url(#mask-3);
+      }
+
+      .cls-22 {
+        mask: url(#mask-4);
+      }
+
+      .cls-23 {
+        mask: url(#mask-5);
+      }
+
+      .cls-24 {
+        mask: url(#mask-7);
+      }
+
+      .cls-25 {
+        mask: url(#mask-6);
+      }
+
+      .cls-26 {
+        mask: url(#mask-1);
+      }
+
+      .cls-27 {
+        fill-rule: evenodd;
+      }
+
+      .cls-28 {
+        fill: #fff;
+      }
+
+      .cls-16 {
+        fill: url(#radial-gradient);
+      }
+
+      .cls-29 {
+        mix-blend-mode: screen;
+        opacity: .8;
+      }
+    </style>
+    <linearGradient id="linear-gradient" x1="533.9" y1="600.3" x2="79" y2="604.9" gradientTransform="translate(-56 854) scale(1 -1)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffc326"/>
+      <stop offset=".2" stop-color="#f65567"/>
+      <stop offset=".7" stop-color="#8937f2"/>
+      <stop offset="1" stop-color="#d54f7a"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="534" y1="603.1" x2="79.1" y2="607.7" xlink:href="#linear-gradient"/>
+    <radialGradient id="radial-gradient" cx="408.4" cy="256.1" fx="408.4" fy="256.1" r="114.3" gradientTransform="translate(12.2 12.2) scale(1)" gradientUnits="userSpaceOnUse">
+      <stop offset=".7" stop-color="#fff" stop-opacity="0"/>
+      <stop offset=".9" stop-color="#fff"/>
+    </radialGradient>
+    <mask id="mask" x="306" y="156.3" width="172.1" height="187.5" maskUnits="userSpaceOnUse">
+      <path class="cls-16" d="M458.8,189l-47.1-27.4c-12.1-7.1-27.1-7.1-39.2,0l-47.1,27.4c-3,1.8-5.7,3.9-8.1,6.3.8-.5,1.6-1.1,2.4-1.5l47.1-27.4c12.1-7,27.1-7,39.2,0l47.1,27.4c12,7,19.3,19.8,19.3,33.6v54.8c0,10.4-4.1,20.2-11.2,27.4,10.6-7.2,17-19.2,17-32.1v-54.8c0-13.9-7.4-26.7-19.3-33.6Z"/>
+    </mask>
+    <linearGradient id="linear-gradient-3" x1="535.1" y1="603.1" x2="80.2" y2="607.7" xlink:href="#linear-gradient"/>
+    <filter id="luminosity-invert" x="303.8" y="154.1" width="176.4" height="191.8" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feColorMatrix result="cm" values="-1 0 0 0 1 0 -1 0 0 1 0 0 -1 0 1 0 0 0 1 0"/>
+    </filter>
+    <mask id="mask-1" x="303.8" y="154.1" width="176.4" height="191.8" maskUnits="userSpaceOnUse">
+      <g class="cls-2">
+        <image width="735" height="799" transform="translate(303.8 154.1) scale(.2)" xlink:href="Retina-logo copy-1.png"/>
+      </g>
+    </mask>
+    <radialGradient id="radial-gradient-2" cx="112.1" fx="112.1" xlink:href="#radial-gradient"/>
+    <mask id="mask-2" x="24.2" y="156.3" width="172.1" height="187.5" maskUnits="userSpaceOnUse">
+      <path class="cls-15" d="M177,189l-47.1-27.4c-12.1-7.1-27.1-7.1-39.2,0l-47.1,27.4c-3,1.8-5.7,3.9-8.1,6.3.8-.5,1.6-1.1,2.4-1.5l47.1-27.4c12.1-7,27.1-7,39.2,0l47.1,27.4c12,7,19.3,19.8,19.3,33.6v54.8c0,10.4-4.1,20.2-11.2,27.4,10.6-7.2,17-19.2,17-32.1v-54.8c0-13.9-7.4-26.7-19.3-33.6Z"/>
+    </mask>
+    <linearGradient id="linear-gradient-4" x1="535.1" x2="80.2" xlink:href="#linear-gradient"/>
+    <filter id="luminosity-invert-2" x="22.1" y="154.1" width="176.4" height="191.8" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feColorMatrix result="cm" values="-1 0 0 0 1 0 -1 0 0 1 0 0 -1 0 1 0 0 0 1 0"/>
+    </filter>
+    <mask id="mask-3" x="22.1" y="154.1" width="176.4" height="191.8" maskUnits="userSpaceOnUse">
+      <g class="cls-5">
+        <image width="735" height="799" transform="translate(22.1 154.1) scale(.2)" xlink:href="Retina-logo copy-2.png"/>
+      </g>
+    </mask>
+    <linearGradient id="linear-gradient-5" x1="226" y1="501.7" x2="389.4" y2="707.7" gradientTransform="translate(-56 854) scale(1 -1)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#016fc4"/>
+      <stop offset="1" stop-color="#50e6ff"/>
+    </linearGradient>
+    <radialGradient id="radial-gradient-3" cx="263.2" cy="222.9" fx="263.2" fy="222.9" r="118.7" xlink:href="#radial-gradient"/>
+    <mask id="mask-4" x="119.8" y="118.7" width="262.7" height="262.6" maskUnits="userSpaceOnUse">
+      <path class="cls-14" d="M247,124.4c72.5,0,131.3,58.8,131.3,131.3s-8.4,53-22.9,74.1c16.9-22.1,27-49.8,27-79.8,0-72.5-58.8-131.3-131.3-131.3s-84.8,22.7-108.5,57.2c24-31.3,61.8-51.5,104.3-51.5Z"/>
+    </mask>
+    <filter id="luminosity-invert-3" x="117.6" y="116.6" width="267.1" height="266.9" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feColorMatrix result="cm" values="-1 0 0 0 1 0 -1 0 0 1 0 0 -1 0 1 0 0 0 1 0"/>
+    </filter>
+    <mask id="mask-5" x="117.6" y="116.6" width="267.1" height="266.9" maskUnits="userSpaceOnUse">
+      <g class="cls-7">
+        <image width="1113" height="1112" transform="translate(117.6 116.6) scale(.2)" xlink:href="Retina-logo copy-3.png"/>
+      </g>
+    </mask>
+    <linearGradient id="linear-gradient-6" x1="231.5" y1="519.2" x2="377.1" y2="682.5" gradientTransform="translate(-56 854) scale(1 -1)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8937f2"/>
+      <stop offset=".5" stop-color="#50e6ff"/>
+      <stop offset="1" stop-color="#ff6d4d"/>
+    </linearGradient>
+    <radialGradient id="radial-gradient-4" cx="263.3" cy="232.8" fx="263.3" fy="232.8" r="94.2" xlink:href="#radial-gradient"/>
+    <mask id="mask-6" x="147.6" y="146.5" width="207.2" height="207.1" maskUnits="userSpaceOnUse">
+      <path class="cls-13" d="M246.3,152c57.2,0,103.6,46.4,103.6,103.5s-8.7,47.4-23.1,65.2c17.4-18.5,28-43.4,28-70.8,0-57.2-46.4-103.5-103.6-103.5s-61.5,15-80.5,38.4c18.9-20.2,45.8-32.8,75.6-32.8Z"/>
+    </mask>
+    <filter id="luminosity-invert-4" x="145.4" y="144.2" width="211.4" height="211.4" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feColorMatrix result="cm" values="-1 0 0 0 1 0 -1 0 0 1 0 0 -1 0 1 0 0 0 1 0"/>
+    </filter>
+    <mask id="mask-7" x="145.4" y="144.2" width="211.4" height="211.4" maskUnits="userSpaceOnUse">
+      <g class="cls-6">
+        <image width="881" height="881" transform="translate(145.4 144.2) scale(.2)" xlink:href="Retina-logo copy-4.png"/>
+      </g>
+    </mask>
+    <filter id="drop-shadow-1" x="161.8" y="162.6" width="178.8" height="178.8" filterUnits="userSpaceOnUse">
+      <feOffset dx="0" dy="1.9"/>
+      <feGaussianBlur result="blur" stdDeviation="2.9"/>
+      <feFlood flood-color="#000" flood-opacity=".5"/>
+      <feComposite in2="blur" operator="in"/>
+      <feComposite in="SourceGraphic"/>
+    </filter>
+    <filter id="drop-shadow-2" x="193.8" y="194.7" width="114.7" height="114.5" filterUnits="userSpaceOnUse">
+      <feOffset dx="0" dy="1.9"/>
+      <feGaussianBlur result="blur-2" stdDeviation="2.9"/>
+      <feFlood flood-color="#000" flood-opacity=".5"/>
+      <feComposite in2="blur-2" operator="in"/>
+      <feComposite in="SourceGraphic"/>
+    </filter>
+  </defs>
+  <!-- Generator: Adobe Illustrator 28.7.1, SVG Export Plug-In . SVG Version: 1.2.0 Build 142)  -->
+  <g class="cls-19">
+    <g id="Retina">
+      <g>
+        <path id="Black_Back_Outline" class="cls-27" d="M251.5,392c42.9,0,81.3-19,107.3-49l7.3,4.2c15.4,8.9,34.3,8.9,49.7,0l47.1-27.4c12.1-7,20.4-18.7,23.4-32,.5-2.5.9-5,1.1-7.5,0-1.1.1-2.2.1-3.3v-54.8c0-15.4-7.2-29.8-19.1-39.1-1.7-1.3-3.5-2.6-5.4-3.7l-47.1-27.4c-15.4-9-34.4-9-49.7,0l-7.6,4.4c-26-29.8-64.3-48.6-107-48.6s-.4,0-.5,0c-.2,0-.3,0-.5,0-43,0-81.6,19.1-107.6,49.3l-8.9-5.2c-15.4-9-34.4-9-49.7,0l-47.1,27.4c-6.7,3.9-12.2,9.2-16.3,15.4-.3.4-.6.9-.9,1.3-4.8,7.7-7.4,16.7-7.4,26.1v54.8c0,17.6,9.4,33.9,24.6,42.8l47.2,27.4c15.4,8.9,34.3,8.9,49.7,0l8.8-5.1c15.8,18.4,36.3,32.8,59.6,41.1,15.3,5.6,31.8,8.7,49.1,8.7Z"/>
+        <g id="Gradient_Cubes">
+          <g>
+            <path class="cls-17" d="M128.7,161.6c-12.1-7.1-27.1-7.1-39.2,0l-47.1,27.4c-12,7-19.4,19.8-19.4,33.7v54.8c0,13.9,7.4,26.7,19.4,33.7l47.2,27.4c12.1,7,27,7,39.1,0l47.1-27.4c12-7,19.4-19.8,19.4-33.7v-54.8c0-13.9-7.4-26.7-19.3-33.6l-47.1-27.4Z"/>
+            <path class="cls-12" d="M410.5,161.6c-12.1-7.1-27.1-7.1-39.2,0l-47.1,27.4c-12,7-19.4,19.8-19.4,33.7v54.8c0,13.9,7.4,26.7,19.4,33.7l47.2,27.4c12.1,7,27,7,39.1,0l47.1-27.4c12-7,19.4-19.8,19.4-33.7v-54.8c0-13.9-7.4-26.7-19.3-33.6l-47.1-27.4Z"/>
+          </g>
+          <g>
+            <g class="cls-1">
+              <g>
+                <path class="cls-11" d="M411.7,161.6c-12.1-7.1-27.1-7.1-39.2,0l-47.1,27.4c-12,7-19.4,19.8-19.4,33.7v54.8c0,13.9,7.4,26.7,19.4,33.7l47.2,27.4c12.1,7,27,7,39.1,0l47.1-27.4c12-7,19.4-19.8,19.4-33.7v-54.8c0-13.9-7.4-26.7-19.3-33.6l-47.1-27.4Z"/>
+                <g class="cls-26">
+                  <g class="cls-29">
+                    <path class="cls-28" d="M411.7,161.6c-12.1-7.1-27.1-7.1-39.2,0l-47.1,27.4c-12,7-19.4,19.8-19.4,33.7v54.8c0,13.9,7.4,26.7,19.4,33.7l47.2,27.4c12.1,7,27,7,39.1,0l47.1-27.4c12-7,19.4-19.8,19.4-33.7v-54.8c0-13.9-7.4-26.7-19.3-33.6l-47.1-27.4Z"/>
+                  </g>
+                </g>
+              </g>
+            </g>
+            <g class="cls-20">
+              <g>
+                <path class="cls-10" d="M129.9,161.6c-12.1-7.1-27.1-7.1-39.2,0l-47.1,27.4c-12,7-19.4,19.8-19.4,33.7v54.8c0,13.9,7.4,26.7,19.4,33.7l47.2,27.4c12.1,7,27,7,39.1,0l47.1-27.4c12-7,19.4-19.8,19.4-33.7v-54.8c0-13.9-7.4-26.7-19.3-33.6l-47.1-27.4Z"/>
+                <g class="cls-21">
+                  <g class="cls-29">
+                    <path class="cls-28" d="M129.9,161.6c-12.1-7.1-27.1-7.1-39.2,0l-47.1,27.4c-12,7-19.4,19.8-19.4,33.7v54.8c0,13.9,7.4,26.7,19.4,33.7l47.2,27.4c12.1,7,27,7,39.1,0l47.1-27.4c12-7,19.4-19.8,19.4-33.7v-54.8c0-13.9-7.4-26.7-19.3-33.6l-47.1-27.4Z"/>
+                  </g>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+        <g id="Black_Circle_Outline">
+          <path class="cls-27" d="M393.2,250c0,78.4-63.6,142-142,142s-142-63.6-142-142,63.6-142,142-142,142,63.6,142,142Z"/>
+        </g>
+        <g id="Blue_Circle">
+          <g id="Blue_Circle-2" data-name="Blue_Circle">
+            <path class="cls-8" d="M251.1,381.3c72.5,0,131.3-58.8,131.3-131.3s-58.8-131.3-131.3-131.3-131.3,58.8-131.3,131.3,58.8,131.3,131.3,131.3Z"/>
+          </g>
+          <g class="cls-22">
+            <g>
+              <path class="cls-8" d="M251.1,381.3c72.5,0,131.3-58.8,131.3-131.3s-58.8-131.3-131.3-131.3-131.3,58.8-131.3,131.3,58.8,131.3,131.3,131.3Z"/>
+              <g class="cls-23">
+                <g class="cls-29">
+                  <path class="cls-28" d="M251.1,381.3c72.5,0,131.3-58.8,131.3-131.3s-58.8-131.3-131.3-131.3-131.3,58.8-131.3,131.3,58.8,131.3,131.3,131.3Z"/>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+        <g id="Gradient_Circle">
+          <g id="Gradient_Circle-2" data-name="Gradient_Circle">
+            <path class="cls-9" d="M251.1,353.5c57.2,0,103.6-46.4,103.6-103.5s-46.4-103.5-103.6-103.5-103.6,46.4-103.6,103.5,46.4,103.5,103.6,103.5Z"/>
+          </g>
+          <g class="cls-25">
+            <g>
+              <path class="cls-9" d="M251.1,353.5c57.2,0,103.6-46.4,103.6-103.5s-46.4-103.5-103.6-103.5-103.6,46.4-103.6,103.5,46.4,103.5,103.6,103.5Z"/>
+              <g class="cls-24">
+                <g class="cls-29">
+                  <path class="cls-28" d="M251.1,353.5c57.2,0,103.6-46.4,103.6-103.5s-46.4-103.5-103.6-103.5-103.6,46.4-103.6,103.5,46.4,103.5,103.6,103.5Z"/>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+        <g id="White_Circle" class="cls-3">
+          <path class="cls-28" d="M251.1,330.6c44.6,0,80.7-36.1,80.7-80.6s-36.1-80.6-80.7-80.6-80.7,36.1-80.7,80.6,36.1,80.6,80.7,80.6Z"/>
+        </g>
+        <g id="Iris" class="cls-4">
+          <path class="cls-18" d="M291.3,222.7c0,.8.2,1.6.2,2.4,0,10.5-8.6,19.1-19.1,19.1s-19.1-8.6-19.1-19.1,8.2-18.6,18.4-19c-6.2-2.9-13.2-4.6-20.5-4.6-26.8,0-48.6,21.7-48.6,48.6s21.7,48.6,48.6,48.6,48.6-21.7,48.6-48.6-3.1-19.5-8.4-27.3h0ZM251.5,257.6c-4.7,0-8.5-3.8-8.5-8.5s3.8-8.5,8.5-8.5,8.5,3.8,8.5,8.5-3.8,8.5-8.5,8.5Z"/>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>

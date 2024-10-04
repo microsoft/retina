@@ -6,7 +6,7 @@ import { githubA11yLight } from "./src/prismColorTheme";
 const config = {
   title: 'Retina',
   tagline: 'kubernetes network observability platform',
-  favicon: 'img/favicon.svg',
+  favicon: 'img/Retina-logo-white.png',
   url: 'https://retina.sh',
   baseUrl: '/',
   organizationName: 'Azure',
@@ -92,7 +92,7 @@ const config = {
   ],
 
   themeConfig: {
-    image: "img/retina-social-card.png",
+    image: "img/Retina-logo-horizontal-white.png",
     metadata: [
       { name: "og:url", content: "/" },
       { name: "og:site_name", content: "Retina" },
@@ -102,10 +102,10 @@ const config = {
     navbar: {
       logo: {
         alt: 'Retina Logo',
-        src: 'img/retina-logo.svg',
-        srcDark: "img/retina-logo-dark.svg",
+        src: 'img/Retina-logo-horizontal.svg',
+        srcDark: "img/Retina-logo-horizontal-white.svg",
         width: "103",
-        height: "32",
+        height: "68",
       },
       items: [
         {
@@ -131,10 +131,10 @@ const config = {
       style: "light",
       logo: {
         alt: "Retina logo",
-        src: "img/retina-logo.svg",
-        srcDark: "img/retina-logo-dark.svg",
-        width: "155",
-        height: "32",
+        src: 'img/Retina-logo-horizontal.svg',
+        srcDark: "img/Retina-logo-horizontal-white.svg",
+        width: "250",
+        height: "150",
       },
       links: [
         {
