@@ -84,6 +84,7 @@ helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
     --set enableAnnotations=true
 ```
 
-## Next Steps: Configuring Prometheus/Grafana
+## Next Steps: Configuring Prometheus and Grafana
 
-- [Unmanaged Prometheus/Grafana](./04-Grafana/prometheus-unmanaged.md)
+- [Prometheus](./04-prometheus.md)
+- [Grafana](./05-grafana.md)

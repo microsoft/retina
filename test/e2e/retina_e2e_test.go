@@ -2,6 +2,7 @@ package retina
 
 import (
 	"crypto/rand"
+	"flag"
 	"math/big"
 	"os"
 	"os/user"
@@ -16,14 +17,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var locations = []string{"eastus2", "centralus", "southcentralus", "uksouth", "centralindia", "westus2"}
+var (
+	locations   = []string{"eastus2", "centralus", "southcentralus", "uksouth", "centralindia", "westus2"}
+	createInfra = flag.Bool("create-infra", true, "create a Resource group, vNET and AKS cluster for testing")
+	deleteInfra = flag.Bool("delete-infra", true, "delete a Resource group, vNET and AKS cluster for testing")
+)
 
 // TestE2ERetina tests all e2e scenarios for retina
 func TestE2ERetina(t *testing.T) {
 	curuser, err := user.Current()
 	require.NoError(t, err)
+	flag.Parse()
 
-	clusterName := curuser.Username + common.NetObsRGtag + strconv.FormatInt(time.Now().Unix(), 10)
+	clusterName := os.Getenv("CLUSTER_NAME")
+	if clusterName == "" {
+		clusterName = curuser.Username + common.NetObsRGtag + strconv.FormatInt(time.Now().Unix(), 10)
+		t.Logf("CLUSTER_NAME is not set, generating a random cluster name: %s", clusterName)
+	}
 
 	subID := os.Getenv("AZURE_SUBSCRIPTION_ID")
 	require.NotEmpty(t, subID)
@@ -49,7 +59,7 @@ func TestE2ERetina(t *testing.T) {
 	kubeConfigFilePath := filepath.Join(rootDir, "test", "e2e", "test.pem")
 
 	// CreateTestInfra
-	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, clusterName, location, kubeConfigFilePath))
+	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, clusterName, location, kubeConfigFilePath, *createInfra))
 	createTestInfra.Run()
 
 	// Hacky way to ensure that the test infra is deleted even if the test panics
@@ -57,7 +67,9 @@ func TestE2ERetina(t *testing.T) {
 		if r := recover(); r != nil {
 			t.Logf("Recovered in TestE2ERetina, %v", r)
 		}
-		_ = jobs.DeleteTestInfra(subID, clusterName, location).Run()
+		if *deleteInfra {
+			_ = jobs.DeleteTestInfra(subID, clusterName, location).Run()
+		}
 	}()
 
 	// Install and test Retina basic metrics

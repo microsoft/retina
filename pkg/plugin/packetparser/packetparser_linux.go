@@ -179,7 +179,7 @@ func (p *packetParser) Init() error {
 		return err
 	}
 
-	p.reader, err = plugincommon.NewPerfReader(p.l, objs.PacketparserEvents, perCPUBuffer, 1)
+	p.reader, err = plugincommon.NewPerfReader(p.l, objs.RetinaPacketparserEvents, perCPUBuffer, 1)
 	if err != nil {
 		p.l.Error("Error NewReader", zap.Error(err))
 		return err
