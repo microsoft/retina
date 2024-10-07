@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"time"
 )
 
 type TestInfo struct {
@@ -48,8 +47,9 @@ type RegressionResult struct {
 }
 
 type GetNetworkRegressionResults struct {
-	BaseResultsFile string
-	NewResultsFile  string
+	BaseResultsFile       string
+	NewResultsFile        string
+	RegressionResultsFile string
 }
 
 func (v *GetNetworkRegressionResults) Prevalidate() error {
@@ -123,10 +123,9 @@ func (v *GetNetworkRegressionResults) Run() error {
 		results = append(results, *result)
 	}
 
-	outputFile := fmt.Sprintf("network-regression-results-%s.json", time.Now().Format("20060102150405"))
-	file, err := os.Create(outputFile)
+	file, err := os.Create(v.RegressionResultsFile)
 	if err != nil {
-		return fmt.Errorf("error creating file %s: %v", outputFile, err)
+		return fmt.Errorf("error creating file %s: %v", v.RegressionResultsFile, err)
 	}
 	defer file.Close()
 

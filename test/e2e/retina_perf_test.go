@@ -26,7 +26,7 @@ func TestE2EPerfRetina(t *testing.T) {
 	clusterName := curuser.Username + common.NetObsRGtag + strconv.FormatInt(time.Now().Unix(), 10)
 
 	subID := os.Getenv("AZURE_SUBSCRIPTION_ID")
-	require.NotEmpty(t, subID)
+	require.NotEmpty(t, subID, "AZURE_SUBSCRIPTION_ID environment variable must be set")
 
 	location := os.Getenv("AZURE_LOCATION")
 	if location == "" {
@@ -40,6 +40,9 @@ func TestE2EPerfRetina(t *testing.T) {
 
 	cwd, err := os.Getwd()
 	require.NoError(t, err)
+
+	appInsightsKey := os.Getenv("APP_INSIGHTS_KEY")
+	require.NotEmpty(t, appInsightsKey, "APP_INSIGHTS_KEY environment variable must be set")
 
 	// Get to root of the repo by going up two directories
 	rootDir := filepath.Dir(filepath.Dir(cwd))

@@ -220,6 +220,7 @@ func RunPerfTest(kubeConfigFilePath string, chartPath string) *types.Job {
 
 	benchmarkFile := fmt.Sprintf("netperf-benchmark-%s.json", time.Now().Format("20060102150405"))
 	resultFile := fmt.Sprintf("netperf-result-%s.json", time.Now().Format("20060102150405"))
+	regressionFile := fmt.Sprintf("netperf-regression-%s.json", time.Now().Format("20060102150405"))
 
 	job.AddStep(&perf.GetNetworkPerformanceMeasures{
 		KubeConfigFilePath: kubeConfigFilePath,
@@ -246,8 +247,15 @@ func RunPerfTest(kubeConfigFilePath string, chartPath string) *types.Job {
 	})
 
 	job.AddStep(&perf.GetNetworkRegressionResults{
-		BaseResultsFile: benchmarkFile,
-		NewResultsFile:  resultFile,
+		BaseResultsFile:       benchmarkFile,
+		NewResultsFile:        resultFile,
+		RegressionResultsFile: regressionFile,
+	}, &types.StepOptions{
+		SkipSavingParametersToJob: true,
+	})
+
+	job.AddStep(&perf.PublishPerfResults{
+		ResultsFile: regressionFile,
 	}, &types.StepOptions{
 		SkipSavingParametersToJob: true,
 	})

@@ -10,4 +10,4 @@ const (
 	NetObsRGtag = "-e2e-netobs-"
 )
 
-var AzureLocations = []string{"eastus2", "centralus", "northeurope", "uksouth", "centralindia", "westus2"}
+var AzureLocations = []string{"eastus2", "northeurope", "uksouth", "centralindia", "westus2"}
