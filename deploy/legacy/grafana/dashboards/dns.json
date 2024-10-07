@@ -856,6 +856,7 @@
         "type": "datasource"
       },
       {
+        "allValue": "(.*)",
         "current": {},
         "datasource": {
           "type": "prometheus",
@@ -863,7 +864,7 @@
         },
         "definition": "label_values(kube_node_info, cluster)",
         "hide": 0,
-        "includeAll": true,
+        "includeAll": false,
         "label": "Cluster",
         "multi": false,
         "name": "cluster",
@@ -884,17 +885,14 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(kube_node_info, node)",
+        "definition": "label_values(kube_node_info{cluster=\"$cluster\"}, node)",
         "hide": 0,
         "includeAll": true,
         "label": "Nodes",
         "multi": true,
         "name": "Nodes",
         "options": [],
-        "query": {
-          "query": "label_values(kube_node_info, node)",
-          "refId": "StandardVariableQuery"
-        },
+        "query": "label_values(kube_node_info{cluster=\"$cluster\"}, node)",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,

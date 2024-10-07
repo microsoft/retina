@@ -143,7 +143,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "builder",
-          "expr": "sum(irate(retina_adv_forward_count{source_podname=~\"$pod\"}[1m]))",
+          "expr": "sum(irate(networkobservability_adv_forward_count{source_podname=~\"$pod\"}[1m]))",
           "legendFormat": "Total PPS",
           "range": true,
           "refId": "A"
@@ -236,7 +236,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "builder",
-          "expr": "sum(irate(retina_adv_forward_count{destination_podname=~\"$pod\"}[1m]))",
+          "expr": "sum(irate(networkobservability_adv_forward_count{destination_podname=~\"$pod\"}[1m]))",
           "legendFormat": "Total PPS",
           "range": true,
           "refId": "A"
@@ -331,7 +331,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "builder",
-          "expr": "sum by(source_podname) (irate(retina_adv_forward_count{destination_podname!=\"unknown\", source_podname!=\"unknown\"}[1m]))",
+          "expr": "sum by(source_podname) (irate(networkobservability_adv_forward_count{destination_podname!=\"unknown\", source_podname!=\"unknown\"}[1m]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -423,7 +423,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "builder",
-          "expr": "sum by(destination_podname) (irate(retina_adv_forward_count{destination_podname!=\"unknown\", source_podname!=\"unknown\"}[1m]))",
+          "expr": "sum by(destination_podname) (irate(networkobservability_adv_forward_count{destination_podname!=\"unknown\", source_podname!=\"unknown\"}[1m]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -518,7 +518,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(source_podname) (irate(retina_adv_drop_count{destination_podname!=\"unknown\", source_podname!=\"unknown\"}[1m]))",
+          "expr": "sum by(source_podname) (irate(networkobservability_adv_drop_count{destination_podname!=\"unknown\", source_podname!=\"unknown\"}[1m]))",
           "hide": false,
           "legendFormat": "__auto",
           "range": true,
@@ -611,7 +611,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(destination_podname) (irate(retina_adv_forward_count{destination_podname!=\"unknown\", source_podname!=\"unknown\"}[1m]))",
+          "expr": "sum by(destination_podname) (irate(networkobservability_adv_forward_count{destination_podname!=\"unknown\", source_podname!=\"unknown\"}[1m]))",
           "hide": false,
           "legendFormat": "__auto",
           "range": true,
@@ -707,7 +707,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "builder",
-          "expr": "sum by(source_ip) (irate(retina_adv_forward_count{source_podname=\"unknown\"}[1m]))",
+          "expr": "sum by(source_ip) (irate(networkobservability_adv_forward_count{source_podname=\"unknown\"}[1m]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -799,7 +799,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "builder",
-          "expr": "sum by(destination_ip) (irate(retina_adv_forward_count{destination_podname=\"unknown\"}[1m]))",
+          "expr": "sum by(destination_ip) (irate(networkobservability_adv_forward_count{destination_podname=\"unknown\"}[1m]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -875,7 +875,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "builder",
-          "expr": "topk(10, sum by(source_podname) (irate(retina_adv_forward_count{source_podname!=\"unknown\"}[5m])))",
+          "expr": "topk(10, sum by(source_podname) (irate(networkobservability_adv_forward_count{source_podname!=\"unknown\"}[5m])))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -951,7 +951,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "builder",
-          "expr": "topk(10, sum by(destination_podname) (irate(retina_adv_forward_count{destination_podname!=\"unknown\"}[5m])))",
+          "expr": "topk(10, sum by(destination_podname) (irate(networkobservability_adv_forward_count{destination_podname!=\"unknown\"}[5m])))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1043,7 +1043,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "builder",
-          "expr": "avg by(instance) (sum by(le, instance) (rate(retina_node_apiserver_handshake_latency_ms_bucket[1m])))",
+          "expr": "avg by(instance) (sum by(le, instance) (rate(networkobservability_node_apiserver_handshake_latency_ms_bucket[1m])))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1064,23 +1064,38 @@
     "list": [
       {
         "current": {},
+        "hide": 0,
+        "includeAll": false,
+        "label": "Data Source",
+        "multi": false,
+        "name": "datasource",
+        "options": [],
+        "query": "prometheus",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "current": {},
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "query_result(retina_adv_forward_count)",
+        "definition": "query_result(networkobservability_adv_forward_count)",
         "hide": 1,
         "includeAll": true,
-        "label": "Pod Name ",
+        "label": "Pod Name",
         "multi": false,
         "name": "pod",
         "options": [],
         "query": {
-          "query": "query_result(retina_adv_forward_count)",
+          "query": "query_result(networkobservability_adv_forward_count)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
-        "regex": "/.*_podname=\"([^\"]*).*/",
+        "regex": "/.*podname=\"([^\"]*).*/",
         "skipUrlSync": false,
         "sort": 0,
         "type": "query"
