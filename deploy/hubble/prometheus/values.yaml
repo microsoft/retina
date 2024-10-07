@@ -87,5 +87,5 @@ prometheus:
             action: replace
         metric_relabel_configs:
           - source_labels: [__name__]
-            regex: '|hubble_dns_queries_total|hubble_dns_responses_total|hubble_drop_total|hubble_tcp_flags_total' # if desired, add |hubble_flows_processed_total
+            regex: '|hubble_dns_queries_total|hubble_dns_responses_total|hubble_drop_total|hubble_tcp_flags_total|hubble_flows_processed_total'
             action: keep
