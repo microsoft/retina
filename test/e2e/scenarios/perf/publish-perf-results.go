@@ -36,14 +36,14 @@ func (v *PublishPerfResults) Run() error {
 		return fmt.Errorf("failed to unmarshal results: %v", err)
 	}
 
-	appInsightsKey := os.Getenv("APP_INSIGHTS_KEY")
+	appInsightsKey := os.Getenv("AZURE_APP_INSIGHTS_KEY")
 	retinaVersion := os.Getenv(generic.DefaultTagEnv)
 
 	// We have checks for them in early steps of the perf test
 	// so we can safely assume they are set
 	// However, this test will ensure they set if run from a different scope
 	if appInsightsKey == "" || retinaVersion == "" {
-		return fmt.Errorf("APP_INSIGHTS_KEY and %s environment variables must be set", generic.DefaultTagEnv)
+		return fmt.Errorf("AZURE_APP_INSIGHTS_KEY and %s environment variables must be set", generic.DefaultTagEnv)
 	}
 
 	telemetry.InitAppInsights(appInsightsKey, retinaVersion)

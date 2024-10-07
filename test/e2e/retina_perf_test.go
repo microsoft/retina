@@ -41,8 +41,8 @@ func TestE2EPerfRetina(t *testing.T) {
 	cwd, err := os.Getwd()
 	require.NoError(t, err)
 
-	appInsightsKey := os.Getenv("APP_INSIGHTS_KEY")
-	require.NotEmpty(t, appInsightsKey, "APP_INSIGHTS_KEY environment variable must be set")
+	appInsightsKey := os.Getenv("AZURE_APP_INSIGHTS_KEY")
+	require.NotEmpty(t, appInsightsKey, "AZURE_APP_INSIGHTS_KEY environment variable must be set")
 
 	// Get to root of the repo by going up two directories
 	rootDir := filepath.Dir(filepath.Dir(cwd))

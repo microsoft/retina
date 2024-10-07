@@ -1,8 +1,10 @@
-name: E2E
+name: Network Performance Measurement
 
 on:
   schedule:
+    # It runs on 17th minute of every 2 hours
     - cron: '17 */2 * * *'
+  workflow_dispatch: 
 
 permissions:
   contents: read
