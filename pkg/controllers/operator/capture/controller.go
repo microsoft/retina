@@ -9,9 +9,11 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"go.uber.org/zap"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -22,7 +24,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
 	pkgcapture "github.com/microsoft/retina/pkg/capture"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
@@ -385,18 +386,23 @@ func (cr *CaptureReconciler) handleDelete(ctx context.Context, capture *retinav1
 	}
 	cr.logger.Info("Capture jobs are removed", zap.String("Capture", captureRef.String()))
 
+	// Remove the secret if the secret is created by the operator when the managed storage account is enabled.
 	if cr.managedStorageAccountEnabled() {
-		secret := getSecretFromCapture(capture, "")
-
-		if err := apiretry.Do(
-			func() error {
-				return cr.Client.Delete(ctx, &secret) //nolint:wrapcheck // no wrapped, detailed explanation is required for the internal error
-			},
-		); err != nil {
-			cr.logger.Error("Failed to delete secret", zap.Error(err), zap.String("Capture", captureRef.String()))
-			return ctrl.Result{}, fmt.Errorf("failed to delete secret: %w", err)
+		managedSecret := getSecretFromCapture(capture, "")
+		// Delete the secret only when the secret is created by the operator.
+		if capture.Spec.OutputConfiguration.BlobUpload != nil && *capture.Spec.OutputConfiguration.BlobUpload == managedSecret.Name {
+			err := apiretry.Do(
+				func() error {
+					return cr.Client.Delete(ctx, &managedSecret) //nolint:wrapcheck // no wrapped, detailed explanation is required for the internal error
+				},
+			)
+			// Ignore the error if the secret is not found.
+			if err != nil && !apierrors.IsNotFound(err) {
+				cr.logger.Error("Failed to delete secret", zap.Error(err), zap.String("Capture", captureRef.String()))
+				return ctrl.Result{}, fmt.Errorf("failed to delete secret: %w", err)
+			}
+			cr.logger.Info("Capture secret is removed", zap.String("Capture", captureRef.String()), zap.String("Secret", managedSecret.Name))
 		}
-		cr.logger.Info("Capture secret is removed", zap.String("Capture", captureRef.String()))
 	}
 
 	controllerutil.RemoveFinalizer(capture, captureFinalizer)
