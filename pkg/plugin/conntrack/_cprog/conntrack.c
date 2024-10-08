@@ -73,6 +73,21 @@ struct {
 } retina_conntrack SEC(".maps");
 
 
+static __always_inline void _ct_cleanup_conn(struct ct_v4_key *key) {
+    __u64 now = bpf_mono_now();
+    struct ct_entry *entry = bpf_map_lookup_elem(&retina_conntrack, key);
+
+    if (entry) {
+        __u32 eviction_time = READ_ONCE(entry->eviction_time);
+        bool is_closing = READ_ONCE(entry->is_closing);
+
+        // Check if the connection is closing and has exceeded its lifetime.
+        if (is_closing && now >= eviction_time) {
+            bpf_map_delete_elem(&retina_conntrack, key);
+        }
+    }
+}
+
 /**
  * Helper function to reverse a key.
  * @arg reverse_key The key to store the reversed key.
@@ -287,7 +302,8 @@ static __always_inline bool _ct_should_report_packet(struct ct_entry *entry, __u
  * @arg observation_point The point in the network stack where the packet is observed.
  * Returns true if the packet should be report to userspace. False otherwise.
  */
-static __always_inline __attribute__((unused)) bool ct_process_packet(struct packet *p, __u8 observation_point) {    
+static __always_inline __attribute__((unused)) bool ct_process_packet(struct packet *p, __u8 observation_point) {
+
     if (!p) {
         return false;
     }
@@ -299,6 +315,7 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
     key.src_port = p->src_port;
     key.dst_port = p->dst_port;
     key.proto = p->proto;
+    _ct_cleanup_conn(&key);
     // Lookup the connection in the map.
     struct ct_entry *entry = bpf_map_lookup_elem(&retina_conntrack, &key);
 
@@ -314,7 +331,7 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
     struct ct_v4_key reverse_key;
     __builtin_memset(&reverse_key, 0, sizeof(struct ct_v4_key));
     _ct_reverse_key(&reverse_key, &key);
-
+    _ct_cleanup_conn(&reverse_key);
     // Lookup the connection in the map based on the reverse key.
     entry = bpf_map_lookup_elem(&retina_conntrack, &reverse_key);
 

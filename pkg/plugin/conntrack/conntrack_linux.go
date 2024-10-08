@@ -10,7 +10,6 @@ import (
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/rlimit"
-	"github.com/microsoft/retina/internal/ktime"
 	"github.com/microsoft/retina/pkg/log"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
 	_ "github.com/microsoft/retina/pkg/plugin/conntrack/_cprog" // nolint // This is needed so cprog is included when vendoring
@@ -89,19 +88,11 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			var key conntrackCtV4Key
 			var value conntrackCtEntry
 
-			var noOfCtEntries, entriesDeleted int
-			// List of keys to be deleted
-			var keysToDelete []conntrackCtV4Key
+			var noOfCtEntries int
+
 			iter := ct.ctMap.Iterate()
 			for iter.Next(&key, &value) {
 				noOfCtEntries++
-				// Check if the connection is closing or has expired
-				if value.IsClosing || ktime.MonotonicOffset.Seconds()+float64(value.EvictionTime) < float64((time.Now().Unix())) {
-					// Iterating a hash map from which keys are being deleted is not safe.
-					// So, we store the keys to be deleted in a list and delete them after the iteration.
-					keyCopy := key // Copy the key to avoid using the same key in the next iteration
-					keysToDelete = append(keysToDelete, keyCopy)
-				}
 				// Log the conntrack entry
 				srcIP := utils.Int2ip(key.SrcIp).To4()
 				dstIP := utils.Int2ip(key.DstIp).To4()
@@ -125,15 +116,8 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			if err := iter.Err(); err != nil {
 				ct.l.Error("Iterate failed", zap.Error(err))
 			}
-			// Delete the conntrack entries
-			for _, key := range keysToDelete {
-				if err := ct.ctMap.Delete(key); err != nil {
-					ct.l.Error("Delete failed", zap.Error(err))
-				} else {
-					entriesDeleted++
-				}
-			}
-			ct.l.Debug("conntrack GC completed", zap.Int("number_of_entries", noOfCtEntries), zap.Int("entries_deleted", entriesDeleted))
+
+			ct.l.Debug("conntrack GC completed", zap.Int("number_of_entries", noOfCtEntries))
 		}
 	}
 }
