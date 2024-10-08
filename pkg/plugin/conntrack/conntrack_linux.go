@@ -10,6 +10,7 @@ import (
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/rlimit"
+	"github.com/microsoft/retina/internal/ktime"
 	"github.com/microsoft/retina/pkg/log"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
 	_ "github.com/microsoft/retina/pkg/plugin/conntrack/_cprog" // nolint // This is needed so cprog is included when vendoring
@@ -88,11 +89,20 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			var key conntrackCtV4Key
 			var value conntrackCtEntry
 
-			var noOfCtEntries int
+			var noOfCtEntries, entriesDeleted int
+			// List of keys to be deleted
+			var keysToDelete []conntrackCtV4Key
 
 			iter := ct.ctMap.Iterate()
 			for iter.Next(&key, &value) {
 				noOfCtEntries++
+				// Check if the connection is closing or has expired
+				if ktime.MonotonicOffset.Seconds()+float64(value.EvictionTime) < float64((time.Now().Unix())) {
+					// Iterating a hash map from which keys are being deleted is not safe.
+					// So, we store the keys to be deleted in a list and delete them after the iteration.
+					keyCopy := key // Copy the key to avoid using the same key in the next iteration
+					keysToDelete = append(keysToDelete, keyCopy)
+				}
 				// Log the conntrack entry
 				srcIP := utils.Int2ip(key.SrcIp).To4()
 				dstIP := utils.Int2ip(key.DstIp).To4()
@@ -106,7 +116,6 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 					zap.String("proto", decodeProto(key.Proto)),
 					zap.Uint32("eviction_time", value.EvictionTime),
 					zap.Uint8("traffic_direction", value.TrafficDirection),
-					zap.Bool("is_closing", value.IsClosing),
 					zap.String("flags_seen_tx_dir", decodeFlags(value.FlagsSeenTxDir)),
 					zap.String("flags_seen_rx_dir", decodeFlags(value.FlagsSeenRxDir)),
 					zap.Uint32("last_reported_tx_dir", value.LastReportTxDir),
@@ -116,8 +125,15 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			if err := iter.Err(); err != nil {
 				ct.l.Error("Iterate failed", zap.Error(err))
 			}
-
-			ct.l.Debug("conntrack GC completed", zap.Int("number_of_entries", noOfCtEntries))
+			// Delete the conntrack entries
+			for _, key := range keysToDelete {
+				if err := ct.ctMap.Delete(key); err != nil {
+					ct.l.Error("Delete failed", zap.Error(err))
+				} else {
+					entriesDeleted++
+				}
+			}
+			ct.l.Debug("conntrack GC completed", zap.Int("number_of_entries", noOfCtEntries), zap.Int("entries_deleted", entriesDeleted))
 		}
 	}
 }

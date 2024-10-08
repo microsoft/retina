@@ -61,7 +61,6 @@ struct ct_entry {
      */
     __u8  flags_seen_tx_dir;
     __u8  flags_seen_rx_dir;
-    bool is_closing; // is_closing indicates if the connection is closing.
 };
 
 struct {
@@ -71,22 +70,6 @@ struct {
     __uint(max_entries, CT_MAP_SIZE);
     __uint(pinning, LIBBPF_PIN_BY_NAME); // needs pinning so this can be access from other processes .i.e debug cli
 } retina_conntrack SEC(".maps");
-
-
-static __always_inline void _ct_cleanup_conn(struct ct_v4_key *key) {
-    __u64 now = bpf_mono_now();
-    struct ct_entry *entry = bpf_map_lookup_elem(&retina_conntrack, key);
-
-    if (entry) {
-        __u32 eviction_time = READ_ONCE(entry->eviction_time);
-        bool is_closing = READ_ONCE(entry->is_closing);
-
-        // Check if the connection is closing and has exceeded its lifetime.
-        if (is_closing && now >= eviction_time) {
-            bpf_map_delete_elem(&retina_conntrack, key);
-        }
-    }
-}
 
 /**
  * Helper function to reverse a key.
@@ -192,7 +175,11 @@ static __always_inline bool _ct_handle_tcp_connection(struct packet *p, struct c
         return false;
     }
     new_value.eviction_time = now + CT_CONNECTION_LIFETIME_TCP;
-    new_value.is_closing = (p->flags & (TCP_FIN | TCP_RST)) != 0x0;
+    if (p->flags & (TCP_FIN | TCP_RST)){
+        // The packet is a FIN or RST packet. The connection is closing or closed.
+        // Delete the connection from the map.
+        bpf_map_delete_elem(&retina_conntrack, &key);
+    }
     new_value.traffic_direction = _ct_get_traffic_direction(observation_point);
     p->traffic_direction = new_value.traffic_direction;
 
@@ -236,12 +223,13 @@ static __always_inline bool _ct_handle_new_connection(struct packet *p, struct c
  * @arg protocol The protocol of the packet (TCP or UDP).
  * Returns true if the packet should be reported to userspace. False otherwise.
  */
-static __always_inline bool _ct_should_report_packet(struct ct_entry *entry, __u8 flags, __u8 direction, __u8 protocol) {
+static __always_inline bool _ct_should_report_packet(struct ct_entry *entry, __u8 flags, __u8 direction, struct ct_v4_key *key) {
     // Check for null parameters.
     if (!entry) {
         return false;
     }
 
+    __u8 protocol = key->proto;
     __u64 now = bpf_mono_now();
     __u32 eviction_time = READ_ONCE(entry->eviction_time);
     __u8 seen_flags;
@@ -258,8 +246,10 @@ static __always_inline bool _ct_should_report_packet(struct ct_entry *entry, __u
 
     // Check if the connection timed out or if it is a TCP connection and FIN or RST flags are set.
     if (now >= eviction_time || (protocol == IPPROTO_TCP && flags & (TCP_FIN | TCP_RST))) {
-        // The connection is closing or closed. Mark the connection as closing. Update the flags seen and last report time.
-        WRITE_ONCE(entry->is_closing, true);
+        // The connection is closing or closed. Delete the connection from the map
+        bpf_map_delete_elem(&retina_conntrack, key);
+
+        // Update the flags seen and last report time.
         if (direction == CT_PACKET_DIR_TX) {
             WRITE_ONCE(entry->flags_seen_tx_dir, flags);
             WRITE_ONCE(entry->last_report_tx_dir, now);
@@ -315,7 +305,6 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
     key.src_port = p->src_port;
     key.dst_port = p->dst_port;
     key.proto = p->proto;
-    _ct_cleanup_conn(&key);
     // Lookup the connection in the map.
     struct ct_entry *entry = bpf_map_lookup_elem(&retina_conntrack, &key);
 
@@ -324,14 +313,13 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
         // Update the packet accordingly.
         p->is_reply = false;
         p->traffic_direction = entry->traffic_direction;
-        return _ct_should_report_packet(entry, p->flags, CT_PACKET_DIR_TX, key.proto);
+        return _ct_should_report_packet(entry, p->flags, CT_PACKET_DIR_TX, &key);
     }
     
     // The connection is not found in the send direction. Check the reply direction by reversing the key.
     struct ct_v4_key reverse_key;
     __builtin_memset(&reverse_key, 0, sizeof(struct ct_v4_key));
     _ct_reverse_key(&reverse_key, &key);
-    _ct_cleanup_conn(&reverse_key);
     // Lookup the connection in the map based on the reverse key.
     entry = bpf_map_lookup_elem(&retina_conntrack, &reverse_key);
 
@@ -340,7 +328,7 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
         // Update the packet accordingly.
         p->is_reply = true;
         p->traffic_direction = entry->traffic_direction;
-        return _ct_should_report_packet(entry, p->flags, CT_PACKET_DIR_RX, key.proto);
+        return _ct_should_report_packet(entry, p->flags, CT_PACKET_DIR_RX, &key);
     }
 
     // If the connection is still not found, the connection is new.
