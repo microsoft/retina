@@ -3,10 +3,11 @@ package pktmon
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+
+	"github.com/pkg/errors"
 
 	observerv1 "github.com/cilium/cilium/api/v1/observer"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
@@ -80,14 +81,14 @@ func newGRPCClient() (*GRPCClient, error) {
 
 	bytes, err := json.Marshal(retryPolicy)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal retry policy: %w", err)
+		return nil, errors.Wrapf(err, "failed to marshal retry policy")
 	}
 
 	retryPolicyStr := string(bytes)
 
 	conn, err := grpc.Dial(fmt.Sprintf("%s:%s", "unix", socket), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultServiceConfig(retryPolicyStr))
 	if err != nil {
-		return nil, fmt.Errorf("failed to dial pktmon server: %w", err)
+		return nil, errors.Wrapf(err, "failed to dial pktmon server:")
 	}
 
 	return &GRPCClient{observerv1.NewObserverClient(conn)}, nil
@@ -101,7 +102,7 @@ func (p *Plugin) RunPktMonServer(ctx context.Context) error {
 
 	pwd, err := os.Getwd()
 	if err != nil {
-		return fmt.Errorf("failed to get current working directory for pktmon: %w", err)
+		return errors.Wrapf(err, "failed to get current working directory for pktmon")
 	}
 
 	cmd := pwd + "\\" + "controller-pktmon.exe"
@@ -118,11 +119,11 @@ func (p *Plugin) RunPktMonServer(ctx context.Context) error {
 	// block this thread, and should it ever return, it's a problem
 	err = p.pktmonCmd.Run()
 	if err != nil {
-		return fmt.Errorf("pktmon server exited when it should not have: %w", err)
+		return errors.Wrapf(err, "pktmon server exited when it should not have")
 	}
 
 	// we never want to return happy from this
-	return fmt.Errorf("pktmon server exited unexpectedly: %w", ErrUnexpectedExit)
+	return errors.Wrapf(ErrUnexpectedExit, "pktmon server exited unexpectedly")
 }
 
 func (p *Plugin) Start(ctx context.Context) error {
@@ -136,14 +137,14 @@ func (p *Plugin) Start(ctx context.Context) error {
 	g.Go(func() error {
 		err := p.RunPktMonServer(ctx)
 		if err != nil {
-			return fmt.Errorf("pktmon server exited: %w", err)
+			return errors.Wrapf(err, "pktmon server exited")
 		}
 		return nil
 	})
 
 	err := p.SetupStream()
 	if err != nil {
-		return fmt.Errorf("failed to setup initial pktmon stream: %w", err)
+		return errors.Wrapf(err, "failed to setup initial pktmon stream")
 	}
 
 	// run the getflows loop
@@ -154,7 +155,7 @@ func (p *Plugin) Start(ctx context.Context) error {
 				p.l.Error("failed to get flow, retriable:", zap.Error(err))
 				continue
 			}
-			return fmt.Errorf("failed to get flow, unrecoverable: %w", err)
+			return errors.Wrapf(err, "failed to get flow, unrecoverable")
 		}
 	})
 
@@ -167,14 +168,14 @@ func (p *Plugin) SetupStream() error {
 		p.l.Info("creating pktmon client")
 		p.grpcClient, err = newGRPCClient()
 		if err != nil {
-			return fmt.Errorf("failed to create pktmon client before getting flows: %w", err)
+			return errors.Wrapf(err, "failed to create pktmon client before getting flows")
 		}
 
 		return nil
 	}
 	err = utils.Retry(fn, connectionRetryAttempts)
 	if err != nil {
-		return fmt.Errorf("failed to create pktmon client: %w", err)
+		return errors.Wrapf(err, "failed to create pktmon client")
 	}
 
 	return nil
@@ -182,20 +183,20 @@ func (p *Plugin) SetupStream() error {
 
 func (p *Plugin) StartStream(ctx context.Context) error {
 	if p.grpcClient == nil {
-		return fmt.Errorf("unable to start stream: %w", ErrNilGrpcClient)
+		return errors.Wrapf(ErrNilGrpcClient, "unable to start stream")
 	}
 
 	var err error
 	fn := func() error {
 		p.stream, err = p.grpcClient.GetFlows(ctx, &observerv1.GetFlowsRequest{})
 		if err != nil {
-			return fmt.Errorf("failed to open pktmon stream: %w", err)
+			return errors.Wrapf(err, "failed to open pktmon stream")
 		}
 		return nil
 	}
 	err = utils.Retry(fn, connectionRetryAttempts)
 	if err != nil {
-		return fmt.Errorf("failed to create pktmon client: %w", err)
+		return errors.Wrapf(err, "failed to create pktmon client")
 	}
 
 	return nil
@@ -207,17 +208,17 @@ func (p *Plugin) GetFlow(ctx context.Context) error {
 
 	err := p.StartStream(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to setup pktmon stream: %w", err)
+		return errors.Wrapf(err, "failed to setup pktmon stream")
 	}
 
 	for {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("pktmon plugin context done: %w", ctx.Err())
+			return errors.Wrapf(ctx.Err(), "pktmon plugin context done")
 		default:
 			event, err := p.stream.Recv()
 			if err != nil {
-				return fmt.Errorf("failed to receive pktmon event: %w", err)
+				return errors.Wrapf(err, "failed to receive pktmon event")
 			}
 
 			fl := event.GetFlow()
@@ -266,7 +267,7 @@ func (p *Plugin) Stop() error {
 	if p.pktmonCmd != nil {
 		err := p.pktmonCmd.Process.Kill()
 		if err != nil {
-			return fmt.Errorf("failed to kill pktmon server during stop: %w", err)
+			return errors.Wrapf(err, "failed to kill pktmon server during stop")
 		}
 	}
 
