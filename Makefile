@@ -513,7 +513,7 @@ clean-certs:
 .PHONY: docs
 docs: 
 	echo $(PWD)
-	docker run -it -p 3000:3000 -v $(PWD):/retina -w /retina/ node:20-alpine ./site/start-dev.sh
+	docker run -it -p 3000:3000 -v $(PWD):/retina -w /retina/ node:20-alpine sh ./site/start-dev.sh
 
 .PHONY: docs-pod
 docs-prod:
