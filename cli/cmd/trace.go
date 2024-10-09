@@ -9,7 +9,7 @@ import (
 
 var trace = &cobra.Command{
 	Use:   "trace",
-	Short: "retrieve status or results from Retina",
+	Short: "Retrieve status or results from Retina",
 }
 
 var getTrace = &cobra.Command{

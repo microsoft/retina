@@ -4,252 +4,117 @@ The capture command in Retina allows users to capture network traffic and metada
 
 > NOTE: captures can also be performed with a [Capture CRD](../05-Concepts/CRDs/Capture.md) after [installing Retina](../02-Installation/01-Setup.md) **with capture support**.
 
-## Starting a Capture
+## Capture Create
 
-`kubectl retina capture create <required-flags> [optional-flags]` creates a Capture with underlying Kubernetes jobs.
+`kubectl retina capture create [--flags]` creates a Capture with underlying Kubernetes jobs.
 
-## Flags
+### Selecting a Target
 
-### [required] Name
+The target indicates where the packet capture will be performed. There are three choices available. These are the `--node-selectors`, `--node-names` and `pod-selectors` & `namespace-selectors` pairs.
 
-- Syntax: `--name <string>`
+Note that Node Selectors are not compatible with Pod Selectors & Namespace Selectors pairs and the capture will not go through if all are populated.
 
-A name for the Retina Capture.
+If nothing is set, `kubectl retina capture create` will use `--node-selectors` with the default value shown below in [Flags](#flags).
 
-**Example:**
+You can find [target selection examples](#target-selection) below.
 
-`kubectl retina capture create --name capture-test --host-path /mnt/capture --node-selectors "kubernetes.io/os=linux"`
-
----
-
-### [required] Target
-
-The target indicates where the packet capture will be performed. There are three choices here, each of which is its own flag. They are described below.
-
-#### Node Selectors
-
-- Syntax: `--node-selectors <string>`
-
-Capture network captures on nodes filtered by the provided by node selectors. Comma-separated.
-
-**Example:**
-
-`kubectl retina capture create --name capture-test --host-path /mnt/capture --node-selectors "kubernetes.io/os=linux"`
-
-#### Node Names
-
-- Syntax: `--node-names <string>`
-
-Capture network captures on nodes filtered by the provided node names. Comma-separated.
-
-**Example:**
-
-`kubectl retina capture create --name capture-test --host-path /mnt/capture --node-names "aks-nodepool1-41844487-vmss000000,aks-nodepool1-41844487-vmss000001"`
-
-#### Pod Selectors & Namespace Selectors (Pairs)
-
-- Syntax (Pod Selectors): `--pod-selectors <string>`
-- Syntax (Namespace Selectors): `--namespace-selectors <string>`
-
-Capture network captures on pods filtered by the provided pod-selector and namespace-selector **pairs**. Comma-separated.
-
-**Example:**
-
-`kubectl retina capture create --name capture-test --host-path /mnt/capture --pod-selectors="k8s-app=kube-dns" --namespace-selectors="kubernetes.io/metadata.name=kube-system"`
-
----
-
-### [required] Output Configuration
+### Configuring the Output Location
 
 The output configuration indicates the location where the capture will be stored. At least one location needs to be specified. This can either be the host path on the node, or a remote storage option.
 
 Blob-upload requires a Blob Shared Access Signature (SAS) with the write permission to the storage account container, to create SAS tokens in the Azure portal, please read: [Create SAS Tokens in the Azure Portal](https://learn.microsoft.com/en-us/azure/cognitive-services/translator/document-translation/how-to-guides/create-sas-tokens?tabs=Containers#create-sas-tokens-in-the-azure-portal).
 
-#### Host Path
+You can find [output configuration examples](#output-configuration) below.
 
-Store the capture file in the node's specified host path. In the below example this is `/mnt/capture`.
-
-**Example:**
-
-`kubectl retina capture create --name capture-test --host-path /mnt/capture --node-selectors "kubernetes.io/os=linux"`
-
-#### PVC
-
-Store the capture file to a PVC, in the example below `mypvc` with access mode ReadWriteMany in namespace `capture`.
-
-**Example:**
-
-`kubectl retina capture create --name capture-test --pvc mypvc --node-selectors "kubernetes.io/os=linux"`
-
-#### Storage Account
-
-Store the capture file to a storage account (blob) through the use of a SAS.
-
-**Example:**
-
-`kubectl retina capture create --name capture-test --blob-upload <Blob SAS URL with write permission> --node-selectors "kubernetes.io/os=linux"`
-
-#### AWS S3
-
-Store the capture file to AWS S3.
-
-**Example:**
-
-`kubectl retina capture create --name capture-test --s3-bucket "your-bucket-name" --s3-region "eu-central-1" --s3-access-key-id "your-access-key-id" --s3-secret-access-key "your-secret-access-key" --node-selectors "kubernetes.io/os=linux"`
-
-#### S3-compatible service
-
-Store the capture file to S3-compatible service (such as MinIO).
-
-**Example:**
-
-`kubectl retina capture create --name capture-test --s3-bucket "your-bucket-name" --s3-endpoint "https://play.min.io:9000" --s3-access-key-id "your-access-key-id" --s3-secret-access-key "your-secret-access-key" --node-selectors "kubernetes.io/os=linux"`
-
----
-
-### No Wait
-
-- Syntax: `--no-wait=<bool>`
-- Default value: `true`
-- Optional
-
-By default, Retina capture CLI will exit before the jobs are completed. With `--no-wait=false`, the CLI will wait until the jobs are completed and clean up the Kubernetes resources created.
-
-**Example:**
-
-`kubectl retina capture create --name capture-test --host-path /mnt/capture --node-selectors "kubernetes.io/os=linux" --no-wait=true`
-
----
-
-### Namespace
-
-- Syntax: `--namespace <string>`
-- Default value: `default`
-- Optional
-
-Sets the namespace which hosts the capture job and the other Kubernetes resources for a network capture. **Ensure the namespace exists**.
-
-**Example:**
-
-`kubectl retina capture create --name capture-test --host-path /mnt/capture --node-selectors "kubernetes.io/os=linux" --namespace capture`
-
----
-
-### Include / Exclude Filters
-
-- Syntax (Include): `--include-filter="<string>"`
-- Syntax (Exclude): `--exclude-filter="<string>"`
-- Default value: `""`
-- Optional
-
-A comma-separated list of IP:Port pairs that are included or excluded from capturing network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:*
-
-Only works on Linux.
-
-**Example:**
-
-`kubectl retina capture create --name capture-test --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux" --include-filter="10.224.0.42:80,10.224.0.33:8080" --exclude-filter="10.224.0.26:80,10.224.0.34:8080"`
-
----
-
-### Tcpdump Filters
-
-- Syntax: `--tcpdump-filter="<string>"`
-- Default value: `""`
-- Optional
-
-Raw tcpdump flags which only work on Linux. Available tcpdump filters can be found in the [TCPDUMP MAN PAGE](https://www.tcpdump.org/manpages/tcpdump.1.html).
-
-> NOTE: this includes only tcpdump flags, for boolean expressions, please use [Packet include/exclude filters](#include--exclude-filters).
-
-**Example:**
-
-`kubectl retina capture create --name capture-test --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux" --tcpdump-filter="udp port 53"`
-
----
-
-### Include Metadata
-
-- Syntax: `--include-metadata=<bool>`
-- Default value: `true`
-- Optional
-
-Collect static network metadata into the capture file if true.
-
-**Example:**
-
-`kubectl retina capture create --name capture-test --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux" --include-metadata=false`
-
----
-
-### Job Number Limit
-
-- Syntax: `--job-num-limit=<int>`
-- Default value: `0`
-- Optional
-
-The maximum number of jobs which can be created for each capture. The default value 0 indicates no limit. This can be configured by CLI flags for each CLI command, or by a config map consumed by the retina-operator.
-
-When creating a job requires job number exceeds this limit, it will fail with prompt like `Error: the number of capture jobs 3 exceeds the limit 2`.
-
-**Example:**
-
-`kubectl retina capture create --name capture-test --job-num-limit=10 --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux"`
-
----
-
-### Packet Size Limit
-
-- Syntax: `--packet-size=<int>`
-- Default value: `0`
-- Optional
-
-Limit the packet size in bytes. Packets longer than the defined maximum size will be truncated. The default value 0 indicates no limit. This is beneficial when the user wants to reduce the capture file size or hide customer data due to security concerns.
-
-Only works on Linux.
-
-**Example:**
-
-`kubectl retina capture create --name capture-test --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux" --packet-size=96`
-
----
-
-## Stopping a Capture
+### Stopping a Capture
 
 The Capture can be stopped in a number of ways:
 
-- In a given time, by the `duration` flag, or when the file reaches the maximum allowed file size defined by the `max-size` flag. When both are specified, the capture will stop whenever either condition is first met.
-- On demand by deleting the capture before the specified conditions meets.
+- In a given time, by the `duration` flag, or when the file reaches the maximum allowed file size defined by the `max-size` flag. When both are specified, the capture will stop whenever **either condition is first met**.
+- On demand by [deleting the capture](#capture-delete) before the specified conditions meets.
 
 The network traffic will be uploaded to the specified output location.
 
-### Capture Duration
+### Flags
 
-- Syntax: `--duration=<string>`
-- Default value: `1m0s`
-- Optional
+| Flag                  | Type       | Default  | Description                                                                 | Notes |
+|-----------------------|------------|----------|-----------------------------------------------------------------------------|-------|
+| `blob-upload`         | string     | ""       | Blob SAS URL with write permission to upload capture files.                  |       |
+| `debug`               | bool       | false    | When debug is true, a customized retina-agent image, determined by the environment variable RETINA_AGENT_IMAGE, is set. |       |
+| `duration`            | string     | 1m0s     | Maximum duration of the packet capture - in minutes / seconds.              |       |
+| `exclude-filter`      | string     | ""       | A comma-separated list of IP:Port pairs that are excluded from capturing network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:* | Only works on Linux.     |
+| `help`                |            |          | Help for create command.                                                     |       |
+| `host-path`           | string     | /mnt/retina/captures | Store the capture file in the node's specified host path.                   |       |
+| `include-filter`      | string     | ""       | A comma-separated list of IP:Port pairs that are included from capturing network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:* | Only works on Linux.      |
+| `include-metadata`    | bool       | true     | Collect static network metadata into the capture file if true.              |       |
+| `job-num-limit`       | int        | 0        | The maximum number of jobs which can be created for each capture. The default value 0 indicates no limit. This can be configured by CLI flags for each CLI command, or by a config map consumed by the retina-operator. When creating a job requires job number exceeds this limit, it will fail with prompt like `Error: the number of capture jobs 3 exceeds the limit 2`. |       |
+| `max-size`            | int        | 100      | Maximum size of the capture file - in MB               | Only works on Linux.      |
+| `name`                | string     | retina-capture | A name for the Retina Capture.                                              |       |
+| `namespace`           | string     | default  | Sets the namespace which hosts the capture job and the other Kubernetes resources for a network capture. | Ensure the namespace exists.      |
+| `namespace-selectors` | string     | ""       | Capture network captures on pods filtered by the provided namespace selectors. | Pair with `pod-selectors`.      |
+| `node-names`          | string     | ""       | A comma-separated list of node names to select nodes on which the network capture will be performed. |       |
+| `node-selectors`      | string     | kubernetes.io/os=linux | A comma-separated list of node labels to select nodes on which the network capture will be performed. |       |
+| `no-wait`             | bool       | true     | By default, Retina capture CLI will exit before the jobs are completed. If false, the CLI will wait until the jobs are completed and clean up the Kubernetes resources created. |       |
+| `packet-size`         | int        | 0        | Limit the packet size in bytes. Packets longer than the defined maximum size will be truncated. The default value 0 indicates no limit. This is beneficial when the user wants to reduce the capture file size or hide customer data due to security concerns. | Only works on Linux.      |
+| `pod-selectors`       | string     | ""       | A comma-separated list of pod labels to select pods on which the network capture will be performed. | Pair with `namespace-selectors`.      |
+| `pvc`                 | string     | ""       | PersistentVolumeClaim under the specified or default namespace to store capture files. |       |
+| `s3-access-key-id`    | string     | ""       | S3 access key id to upload capture files.                                   |       |
+| `s3-bucket`           | string     | ""       | Bucket in which to store capture files.                                      |       |
+| `s3-endpoint`         | string     | ""       | Endpoint for an S3 compatible storage service. Use this if you are using a custom or private S3 service that requires a specific endpoint. |       |
+| `s3-path`             | string     | retina/captures | Prefix path within the S3 bucket where captures will be stored.              |       |
+| `s3-region`           | string     | ""       | Region where the S3 compatible bucket is located.                            |       |
+| `s3-secret-access-key`| string     | ""       | S3 access secret key to upload capture files.                                |       |
+| `tcpdump-filter`      | string     | ""       | Raw tcpdump flags. Available tcpdump filters can be found in the [TCPDUMP MAN PAGE](https://www.tcpdump.org/manpages/tcpdump.1.html).  | Only works on Linux. Includes only tcpdump flags, for boolean expressions, please use include/exclude filters.     |
 
-Maximum duration of the packet capture - in minutes / seconds.
+### Examples
 
-**Example:**
+#### Target Selection
 
-`kubectl retina capture create --name capture-test --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux" --duration=2m`
+Node Selectors
 
-### Capture Size
+`kubectl retina capture create --name example-node-selectors --node-selectors "kubernetes.io/os=linux"`
 
-- Syntax: `--max-size=<int>`
-- Default value: `100`
-- Optional
+Node Names
 
-Maximum size of the capture file - in MB.
+`kubectl retina capture create --name example-node-names --node-names "aks-agentpool-26113504-vmss000000,aks-agentpool-26113504-vmss000001"`
 
-Only works on Linux.
+Pod Selectors & Namespace Selectors (Pairs)
 
-**Example:**
+`kubectl retina capture create --name example-pod-namespace-selectors --pod-selectors="k8s-app=kube-dns" --namespace-selectors="kubernetes.io/metadata.name=kube-system"`
 
-`kubectl retina capture create --name capture-test --host-path /mnt/capture --namespace capture --node-selectors "kubernetes.io/os=linux" --max-size=50`
+#### Output Configuration
 
-### Capture Delete
+Host Path
+
+`kubectl retina capture create --name example-host-path --host-path /mnt/retina/example/captures`
+
+PVC
+
+`kubectl retina capture create --name example-pvc --pvc mypvc`
+
+Storage Account
+
+`kubectl retina capture create --name example-blob --blob-upload <Blob SAS URL with write permission>`
+
+AWS S3
+
+`kubectl retina capture create --name example-s3 --s3-bucket "your-bucket-name" --s3-region "eu-central-1" --s3-access-key-id "your-access-key-id" --s3-secret-access-key "your-secret-access-key"`
+
+S3 Compatible Service (MinIO)
+
+`kubectl retina capture create --name example-minio --s3-bucket "your-bucket-name" --s3-endpoint "https://play.min.io:9000" --s3-access-key-id "your-access-key-id" --s3-secret-access-key "your-secret-access-key"`
+
+#### Capture Filters
+
+Include / Exclude Filters
+
+`kubectl retina capture create --name example-include-exclude-filters --include-filter="10.224.0.42:80,10.224.0.33:8080" --exclude-filter="10.224.0.26:80,10.224.0.34:8080"`
+
+Tcpdump Filters
+
+`kubectl retina capture create --name example-tcpdump-filters --tcpdump-filter="udp port 53"`
+
+## Capture Delete
 
 Deleting the capture job before either of the terminating conditions have been met will stop the capture.
 
@@ -259,7 +124,7 @@ Deleting the capture job before either of the terminating conditions have been m
 
 `kubectl retina capture delete --name retina-capture-zlx5v`
 
-#### Get Capture List
+## Capture List
 
 To get a list of the captures you can run `kubectl retina capture list` to get the captures in a specific namespace or in all namespaces.
 
@@ -270,8 +135,6 @@ To get a list of the captures you can run `kubectl retina capture list` to get t
 **Example (all namespaces):**
 
 `kubectl retina capture list --all-namespaces`
-
----
 
 ## Obtaining the output
 
