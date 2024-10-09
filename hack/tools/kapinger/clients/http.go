@@ -60,8 +60,27 @@ func NewKapingerHTTPClient(clientset *kubernetes.Clientset, labelselector string
 
 	return &k, nil
 }
+func (k *KapingerHTTPClient) MakeRequests(ctx context.Context, volume int, interval time.Duration) error {
+	ticker := time.NewTicker(interval)
+	for {
+		select {
+		case <-ctx.Done():
+			log.Printf("HTTP client context done")
+			return nil
+		case <-ticker.C:
+			go func() {
+				for i := 0; i < volume; i++ {
+					err := k.makeRequest()
+					if err != nil {
+						log.Printf("error making request: %v", err)
+					}
+				}
+			}()
+		}
+	}
+}
 
-func (k *KapingerHTTPClient) MakeRequest() error {
+func (k *KapingerHTTPClient) makeRequest() error {
 	for _, ip := range k.ips {
 		url := fmt.Sprintf("http://%s:%d", ip, k.port)
 		req, err := http.NewRequest("GET", url, nil)
