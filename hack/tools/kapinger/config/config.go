@@ -53,10 +53,12 @@ func LoadConfigFromEnv() *KapingerConfig {
 		log.Printf("%s not set, defaulting to port %d\n", EnvHTTPPort, defaultHTTPPort)
 	}
 
-	k.BurstVolume, err = strconv.Atoi(os.Getenv(EnvHTTPPort))
+	k.BurstVolume, err = strconv.Atoi(os.Getenv(EnvBurstVolume))
 	if err != nil {
 		k.BurstVolume = defaultBurstVolume
 		log.Printf("%s not set, defaulting to %d\n", EnvBurstVolume, defaultBurstVolume)
+	} else {
+		log.Printf("%s set to: %d\n", EnvBurstVolume, k.BurstVolume)
 	}
 
 	burstInterval, err := strconv.Atoi(os.Getenv(EnvBurstInterval))
@@ -65,6 +67,7 @@ func LoadConfigFromEnv() *KapingerConfig {
 		log.Printf("%s not set, defaulting to %d\n", EnvBurstInterval, defaultBurstInterval)
 	} else {
 		k.BurstInterval = time.Duration(burstInterval) * time.Millisecond
+		log.Printf("%s set to: %s\n", EnvBurstInterval, k.BurstInterval)
 	}
 
 	return k
