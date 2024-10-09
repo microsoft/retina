@@ -1,5 +1,6 @@
 global:
   scrape_interval: 10s
+  
 scrape_configs:
   - job_name: "networkobservability-retina-test"
     kubernetes_sd_configs:
@@ -29,3 +30,7 @@ scrape_configs:
       - source_labels: [__address__]
         replacement: "$NODE_NAME"
         target_label: instance
+
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: "pod"
