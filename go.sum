@@ -75,8 +75,8 @@ github.com/Azure/go-autorest/logger v0.2.1 h1:IG7i4p/mDa2Ce4TRyAO8IHnVhAVF3RFU+Z
 github.com/Azure/go-autorest/logger v0.2.1/go.mod h1:T9E3cAhj2VqvPOtCYAvby9aBXkZmbF5NWuPV8+WeEW8=
 github.com/Azure/go-autorest/tracing v0.6.0 h1:TYi4+3m5t6K48TGI9AUdb+IzbnSxvnvUMfuitfgcfuo=
 github.com/Azure/go-autorest/tracing v0.6.0/go.mod h1:+vhtPC754Xsa23ID7GlGsrdKBpUA79WCAKPPZVC2DeU=
-github.com/Azure/perf-tests/network/benchmarks/netperf v0.0.0-20241002134946-01238fe018fc h1:XpAgbFWmvKlNTuk2ogOc3eV1/0I02JzBGeC68/2dOtk=
-github.com/Azure/perf-tests/network/benchmarks/netperf v0.0.0-20241002134946-01238fe018fc/go.mod h1:jeV6A8q9uDVDwffTt5KBk+5g7bXfpEImYW6qLKn0E+I=
+github.com/Azure/perf-tests/network/benchmarks/netperf v0.0.0-20241008140716-395a79947d2c h1:TMXh4Z1Z98o4Ob7JYhiNHocITQXHqJSsrB5ts4uwKl8=
+github.com/Azure/perf-tests/network/benchmarks/netperf v0.0.0-20241008140716-395a79947d2c/go.mod h1:jeV6A8q9uDVDwffTt5KBk+5g7bXfpEImYW6qLKn0E+I=
 github.com/AzureAD/microsoft-authentication-library-for-go v1.2.2 h1:XHOnouVk1mxXfQidrMEnLlPk9UMeRtyBTnEFtxkV0kU=
 github.com/AzureAD/microsoft-authentication-library-for-go v1.2.2/go.mod h1:wP83P5OoQ5p6ip3ScPr0BAq0BvuPAvacpEuSzyouqAI=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
