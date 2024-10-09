@@ -175,11 +175,6 @@ static __always_inline bool _ct_handle_tcp_connection(struct packet *p, struct c
         return false;
     }
     new_value.eviction_time = now + CT_CONNECTION_LIFETIME_TCP;
-    if (p->flags & (TCP_FIN | TCP_RST)){
-        // The packet is a FIN or RST packet. The connection is closing or closed.
-        // Delete the connection from the map.
-        bpf_map_delete_elem(&retina_conntrack, &key);
-    }
     new_value.traffic_direction = _ct_get_traffic_direction(observation_point);
     p->traffic_direction = new_value.traffic_direction;
 
@@ -249,14 +244,6 @@ static __always_inline bool _ct_should_report_packet(struct ct_entry *entry, __u
         // The connection is closing or closed. Delete the connection from the map
         bpf_map_delete_elem(&retina_conntrack, key);
 
-        // Update the flags seen and last report time.
-        if (direction == CT_PACKET_DIR_TX) {
-            WRITE_ONCE(entry->flags_seen_tx_dir, flags);
-            WRITE_ONCE(entry->last_report_tx_dir, now);
-        } else {
-            WRITE_ONCE(entry->flags_seen_rx_dir, flags);
-            WRITE_ONCE(entry->last_report_rx_dir, now);
-        }
         return true; // Report the last packet received.
     }
     // Update the eviction time of the connection.
