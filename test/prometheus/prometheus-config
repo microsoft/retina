@@ -1,0 +1,31 @@
+global:
+  scrape_interval: 10s
+scrape_configs:
+  - job_name: "networkobservability-retina-test"
+    kubernetes_sd_configs:
+      - role: service
+    scheme: http
+    relabel_configs:
+      - source_labels:
+          [
+            __meta_kubernetes_namespace,
+            __meta_kubernetes_service_name,
+            __meta_kubernetes_service_port_name,
+          ]
+        action: keep
+        regex: kube-system;networkobservability-test;retina
+
+      - source_labels: [__address__]
+        target_label: __address__
+        replacement: $NODE_IP
+        action: replace
+
+      - source_labels: [__address__, __meta_kubernetes_service_port_number]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+
+      - source_labels: [__address__]
+        replacement: "$NODE_NAME"
+        target_label: instance
