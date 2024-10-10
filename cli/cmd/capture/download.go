@@ -45,14 +45,14 @@ var downloadCapture = &cobra.Command{
 		splitPath := strings.SplitN(containerPath, "/", 2) //nolint:gomnd // TODO string splitting probably isn't the right way to parse this URL?
 		containerName := splitPath[0]
 
-		params := storage.ListBlobsParameters{Prefix: name}
+		params := storage.ListBlobsParameters{Prefix: *opts.Name}
 		blobList, err := blobService.GetContainerReference(containerName).ListBlobs(params)
 		if err != nil {
 			return errors.Wrap(err, "failed to list blobstore ")
 		}
 
 		if len(blobList.Blobs) == 0 {
-			return errors.Errorf("no blobs found with prefix: %s", name)
+			return errors.Errorf("no blobs found with prefix: %s", *opts.Name)
 		}
 
 		for _, v := range blobList.Blobs {
