@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/microsoft/retina/test/e2e/common"
 	generic "github.com/microsoft/retina/test/e2e/framework/generic"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
@@ -44,6 +45,12 @@ func (i *InstallHelmChart) Run() error {
 	err := actionConfig.Init(settings.RESTClientGetter(), i.Namespace, os.Getenv("HELM_DRIVER"), log.Printf)
 	if err != nil {
 		return fmt.Errorf("failed to initialize helm action config: %w", err)
+	}
+
+	// Creating extra namespace to deploy test pods
+	err = CreateNamespace(i.KubeConfigFilePath, common.TestPodNamespace)
+	if err != nil {
+		return fmt.Errorf("failed to create namespace %s: %w", i.Namespace, err)
 	}
 
 	tag := os.Getenv(generic.DefaultTagEnv)
