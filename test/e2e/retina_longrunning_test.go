@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestE2ERetina tests all e2e scenarios for retina
+// Scrape PProf over a long running datapath tests
 func TestLongRunningRetina(t *testing.T) {
 	settings, err := LoadInfraSettings()
 	require.NoError(t, err)

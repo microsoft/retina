@@ -75,7 +75,7 @@ func (p *PullPProf) Run() error {
 	}()
 
 	scrape := func() error {
-		log.Printf("-- scraping pprof profiles --\n")
+		log.Printf("-- starting scrape pprof profiles --\n")
 		folder := "./pprof/" + time.Now().Format("2006.01.02-15:04:05") + "/"
 		err = os.MkdirAll(folder, os.ModePerm)
 		if err != nil {
@@ -102,7 +102,8 @@ func (p *PullPProf) Run() error {
 			}
 		}
 
-		log.Printf("-- scraped profiles saved to to %s --\n", folder)
+		log.Printf("-- finished scraping profiles, saved to to %s --\n", folder)
+		log.Printf("waiting %s seconds for next scrape\n", p.ScrapeIntervalSeconds)
 		return err
 	}
 
