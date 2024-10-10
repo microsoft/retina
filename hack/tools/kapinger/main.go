@@ -1,20 +1,16 @@
 package main
 
 import (
+	"context"
 	"log"
 	"math/rand"
-	"os"
-	"strconv"
 	"time"
 
 	"github.com/microsoft/retina/hack/tools/kapinger/clients"
+	"github.com/microsoft/retina/hack/tools/kapinger/config"
 	"github.com/microsoft/retina/hack/tools/kapinger/servers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-)
-
-const (
-	delay = 500 * time.Millisecond
 )
 
 func main() {
@@ -24,16 +20,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	httpPort, err := strconv.Atoi(os.Getenv(servers.EnvHTTPPort))
-	if err != nil {
-		httpPort = servers.HTTPPort
-		log.Printf("HTTP_PORT not set, defaulting to port %d\n", servers.HTTPPort)
-	}
+	config := config.LoadConfigFromEnv()
 
-	go servers.StartAll()
+	ctx := context.Background()
+	go servers.StartAll(ctx, config)
 
-	// Create an HTTP client with the custom Transport
-	client, err := clients.NewKapingerHTTPClient(clientset, "app=kapinger", httpPort)
+	// Create an HTTP httpclient with the custom Transport
+	httpclient, err := clients.NewKapingerHTTPClient(clientset, "app=kapinger", config.HTTPPort)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -45,12 +38,9 @@ func main() {
 	jitter := rand.Intn(100) + 1
 	time.Sleep(time.Duration(jitter) * time.Millisecond)
 
-	for {
-		err := client.MakeRequest()
-		if err != nil {
-			log.Printf("error making request: %v", err)
-		}
-		time.Sleep(delay)
+	err = httpclient.MakeRequests(ctx, config.BurstVolume, config.BurstInterval)
+	if err != nil {
+		log.Printf("error making request: %v", err)
 	}
 }
 
