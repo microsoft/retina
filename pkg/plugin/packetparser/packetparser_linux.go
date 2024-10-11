@@ -44,6 +44,7 @@ import (
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/microsoft/retina/pkg/watchers/endpoint"
 	"github.com/vishvananda/netlink"
+	vnl "github.com/vishvananda/netlink/nl"
 	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
 )
@@ -436,9 +437,9 @@ func (p *packetParser) createQdiscAndAttach(iface netlink.LinkAttrs, ifaceType i
 		Msg: tc.Msg{
 			Family:  unix.AF_UNSPEC,
 			Ifindex: uint32(iface.Index),
-			Handle:  0,                                               // arbitrary handle to distinguish between ingress and egress filters
-			Parent:  helper.BuildHandle(0xFFFF, tc.HandleMinIngress), // nolint:gomnd // same major component (0xffff) as clsact
-			Info:    0x10300,                                         // nolint:gomnd // ignore, have not been able to find the exact meaning of this value
+			Handle:  0,                                                                // arbitrary handle to distinguish between ingress and egress filters
+			Parent:  helper.BuildHandle(0xFFFF, tc.HandleMinIngress),                  // nolint:gomnd // same major component (0xffff) as clsact
+			Info:    netlink.MakeHandle(tcFilterPriority, vnl.Swap16(unix.ETH_P_ALL)), // set the filter priority and protocol to ETH_P_ALL
 		},
 		Attribute: tc.Attribute{
 			Kind: "bpf",
@@ -459,8 +460,8 @@ func (p *packetParser) createQdiscAndAttach(iface netlink.LinkAttrs, ifaceType i
 			Family:  unix.AF_UNSPEC,
 			Ifindex: uint32(iface.Index),
 			Handle:  1,
-			Parent:  helper.BuildHandle(0xFFFF, tc.HandleMinEgress), // nolint:gomnd // ignore
-			Info:    0x10300,                                        // nolint:gomnd // ignore
+			Parent:  helper.BuildHandle(0xFFFF, tc.HandleMinEgress),                   // nolint:gomnd // ignore
+			Info:    netlink.MakeHandle(tcFilterPriority, vnl.Swap16(unix.ETH_P_ALL)), // nolint:gomnd // ignore
 		},
 		Attribute: tc.Attribute{
 			Kind: "bpf",

@@ -41,6 +41,7 @@ const (
 	bpfSourceFileName     string         = "packetparser.c"
 	bpfObjectFileName     string         = "packetparser_bpf.o"
 	dynamicHeaderFileName string         = "dynamic.h"
+	tcFilterPriority      uint16         = 0x1
 )
 
 type interfaceType string
@@ -131,13 +132,4 @@ func ifaceToKey(iface netlink.LinkAttrs) tcKey {
 		hardwareAddr: iface.HardwareAddr.String(),
 		netNs:        iface.NetNsID,
 	}
-}
-
-const (
-	handleMajMask uint32 = 0xFFFF0000
-	handleMinMask uint32 = 0x0000FFFF
-)
-
-func TC_H_MAKE(maj, min uint32) uint32 {
-	return (((maj) & handleMajMask) | (min & handleMinMask))
 }
