@@ -146,7 +146,7 @@ func (c *CreateKapingerDeployment) GetKapingerDeployment() *appsv1.Deployment {
 					Containers: []v1.Container{
 						{
 							Name:  "kapinger",
-							Image: "acnpublic.azurecr.io/kapinger:20241011.2",
+							Image: "acnpublic.azurecr.io/kapinger:20241011.3",
 							Resources: v1.ResourceRequirements{
 								Requests: v1.ResourceList{
 									"memory": resource.MustParse("20Mi"),
@@ -174,6 +174,14 @@ func (c *CreateKapingerDeployment) GetKapingerDeployment() *appsv1.Deployment {
 									ValueFrom: &v1.EnvVarSource{
 										FieldRef: &v1.ObjectFieldSelector{
 											FieldPath: "status.podIP",
+										},
+									},
+								},
+								{
+									Name: "GOMEMLIMIT",
+									ValueFrom: &v1.EnvVarSource{
+										ResourceFieldRef: &v1.ResourceFieldSelector{
+											Resource: "limits.memory",
 										},
 									},
 								},
