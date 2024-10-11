@@ -2,29 +2,31 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: retina-operator
+  name: {{ .Values.operator.name }}
   namespace: kube-system
   labels:
-    app: retina-operator
-    control-plane: retina-operator
+    app: {{ .Values.operator.name }}
+    control-plane: {{ .Values.operator.name }}
     app.kubernetes.io/name: deployment
-    app.kubernetes.io/instance: retina-operator
-    app.kubernetes.io/component: retina-operator
+    app.kubernetes.io/instance: {{ .Values.operator.name }}
+    app.kubernetes.io/component: {{ .Values.operator.name }}
     app.kubernetes.io/created-by: operator
     app.kubernetes.io/part-of: operator
     app.kubernetes.io/managed-by: kustomize
 spec:
   selector:
     matchLabels:
-      control-plane: retina-operator
+      control-plane: {{ .Values.operator.name }}
   replicas: 1
   template:
     metadata:
       annotations:
-        kubectl.kubernetes.io/default-container: retina-operator
+        kubectl.kubernetes.io/default-container: {{ .Values.operator.name }}
+        prometheus.io/port: "{{ .Values.operatorService.port }}"
+        prometheus.io/scrape: "true"
       labels:
-        app: retina-operator
-        control-plane: retina-operator
+        app: {{ .Values.operator.name }}
+        control-plane: {{ .Values.operator.name }}
     spec:
       # TODO(user): Uncomment the following code to configure the nodeAffinity expression
       # according to the platforms which are supported by your solution.
@@ -51,7 +53,7 @@ spec:
         runAsNonRoot: true
       containers:
         - image: {{ .Values.operator.repository }}:{{ .Values.operator.tag }}
-          name: retina-operator
+          name: {{ .Values.operator.name }}
           {{- if .Values.operator.container.command }}
           command:
           {{- range .Values.operator.container.command }}
@@ -59,13 +61,16 @@ spec:
           {{- end }}
           {{- end }}
           {{- if .Values.operator.container.args}}
+          ports:
+          - containerPort: {{ .Values.operatorService.port }}
+            name: {{ .Values.operatorService.name }}
           args:
           {{- range $.Values.operator.container.args}}
           - {{ . | quote }}
           {{- end}}
           {{- end}}
           volumeMounts:
-            - name: retina-operator-config
+            - name: "{{ .Values.operator.name }}-config"
               mountPath: /retina/
 {{- if .Values.capture.enableManagedStorageAccount }}
             - name: cloud-config
@@ -91,12 +96,12 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.operator.resources | nindent 12 }}
-      serviceAccountName: retina-operator
+      serviceAccountName: {{ .Values.operator.name }}
       terminationGracePeriodSeconds: 10
       volumes:
-        - name: retina-operator-config
+        - name: "{{ .Values.operator.name }}-config"
           configMap:
-            name: retina-operator-config
+            name: "{{ .Values.operator.name }}-config"
 {{- if .Values.capture.enableManagedStorageAccount }}
         - name: cloud-config
           secret:
@@ -108,19 +113,19 @@ kind: ServiceAccount
 metadata:
   labels:
     app.kubernetes.io/name: serviceaccount
-    app.kubernetes.io/instance: retina-operator
+    app.kubernetes.io/instance: {{ .Values.operator.name }}
     app.kubernetes.io/component: rbac
     app.kubernetes.io/created-by: operator
     app.kubernetes.io/part-of: operator
     app.kubernetes.io/managed-by: kustomize
-  name: retina-operator
+  name: {{ .Values.operator.name }}
   namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: retina-operator-role
+  name: "{{ .Values.operator.name }}-role"
 rules:
   - apiGroups: 
       - "apiextensions.k8s.io"
@@ -271,25 +276,25 @@ kind: ClusterRoleBinding
 metadata:
   labels:
     app.kubernetes.io/name: clusterrolebinding
-    app.kubernetes.io/instance: retina-operator-rolebinding
+    app.kubernetes.io/instance: "{{ .Values.operator.name }}-rolebinding"
     app.kubernetes.io/component: rbac
     app.kubernetes.io/created-by: operator
     app.kubernetes.io/part-of: operator
     app.kubernetes.io/managed-by: kustomize
-  name: retina-operator-rolebinding
+  name: "{{ .Values.operator.name }}-rolebinding"
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: retina-operator-role
+  name: "{{ .Values.operator.name }}-role"
 subjects:
 - kind: ServiceAccount
-  name: retina-operator
+  name: {{ .Values.operator.name }}
   namespace: kube-system
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: retina-operator-config
+  name: "{{ .Values.operator.name }}-config"
   namespace: {{ .Values.namespace }}
 data:
   operator-config.yaml: |-
@@ -333,3 +338,60 @@ stringData:
     }
 {{- end }}
 {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.operator.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Values.operator.name }}
+spec:
+  ports:
+  - name: {{ .Values.operatorService.name }}
+    port: {{ .Values.operatorService.port }}
+    protocol: TCP
+    targetPort: {{ .Values.operatorService.targetPort }}
+  selector:
+      app: {{ .Values.operator.name }}
+      control-plane: {{ .Values.operator.name }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: "{{ .Values.operator.name }}-servicemonitor"
+  namespace: {{ ternary .Values.metrics.serviceMonitor.namespace .Values.namespace (not (empty .Values.metrics.serviceMonitor.namespace)) }}
+  labels:
+    {{- if .Values.metrics.serviceMonitor.additionalLabels }}
+    {{- toYaml .Values.metrics.serviceMonitor.additionalLabels | nindent 4 }}
+    {{- end }}
+spec:
+  endpoints:
+    - targetPort: retina-operator
+      path: /metrics
+      {{- if .Values.metrics.serviceMonitor.interval }}
+      interval: {{ .Values.metrics.serviceMonitor.interval }}
+      {{- end }}
+      {{- if .Values.metrics.serviceMonitor.scrapeTimeout }}
+      scrapeTimeout: {{ .Values.metrics.serviceMonitor.scrapeTimeout }}
+      {{- end }}
+      {{- if .Values.metrics.serviceMonitor.scheme }}
+      scheme: {{ .Values.metrics.serviceMonitor.scheme }}
+      {{- end }}
+      {{- if .Values.metrics.serviceMonitor.tlsConfig }}
+      tlsConfig: {{- .Values.metrics.serviceMonitor.tlsConfig | nindent 8 }}
+      {{- end }}
+      {{- if .Values.metrics.serviceMonitor.relabelings }}
+      relabelings: 
+      {{- toYaml .Values.metrics.serviceMonitor.relabelings | nindent 8 }}
+      {{- end }}
+      {{- if .Values.metrics.serviceMonitor.metricRelabelings }}
+      metricRelabelings: 
+      {{- toYaml .Values.metrics.serviceMonitor.metricRelabelings | nindent 8 }}
+      {{- end }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Values.namespace }}
+  selector:
+    matchLabels:
+      app: {{ .Values.operator.name }}

@@ -9,8 +9,10 @@ metadata:
     app.kubernetes.io/component: networking
 spec:
   ports:
-    - port: {{ .Values.service.port }}
-      targetPort: {{ .Values.service.targetPort }}
+  - name: {{ .Values.service.name }}
+    port: {{ .Values.service.port }}
+    protocol: TCP
+    targetPort: {{ .Values.service.targetPort }}
   selector:
     {{- include "retina.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: workload
