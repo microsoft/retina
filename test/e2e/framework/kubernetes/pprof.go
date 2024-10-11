@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -22,9 +23,11 @@ var (
 
 	// key:profile name, value: pprof endpoint
 	simpleProfiles = map[string]string{
-		"heap":  "/heap",
-		"block": "/block",
-		"mutex": "/mutex",
+		"heap":    "/heap",
+		"block":   "/block",
+		"mutex":   "/mutex",
+		"cmdline": "/cmdline",
+		"symbol":  "/symbol",
 	}
 
 	durationProfiles = map[string]string{
@@ -59,20 +62,21 @@ func (p *PullPProf) Run() error {
 		return fmt.Errorf("error converting pprof interval to int: %w", err)
 	}
 
+	log.Printf("starting pprof scraping for %s seconds at %s second intervals\n", p.DurationSeconds, p.ScrapeIntervalSeconds)
+
 	ticker := time.NewTicker(time.Duration(interval) * time.Second)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(duration)*time.Second)
 	defer cancel()
 
-	defer func() {
-		if err != nil {
-			log.Printf("--pprof viewing commands:--\n")
-			log.Printf("heap: \tgo tool pprof -http=:8081 %s\n", "heap.out")
-			log.Printf("cpu: \tgo tool pprof -http=:8082 %s\n", "cpu.out")
-			log.Printf("block: \tgo tool pprof -http=:8083 %s\n", "block.out")
-			log.Printf("mutex: \tgo tool pprof -http=:8084 %s\n", "mutex.out")
-			log.Printf("trace: \tgo tool trace -http=:8085 %s\n", "trace.out")
-		}
-	}()
+	log.Printf("--pprof viewing commands:--\n")
+	log.Printf("profile: \tgo tool pprof -http=:8081 %s\n", "profile.out")
+	log.Printf("heap: \tgo tool pprof -http=:8081 %s\n", "heap.out")
+	log.Printf("cpu: \tgo tool pprof -http=:8082 %s\n", "cpu.out")
+	log.Printf("block: \tgo tool pprof -http=:8083 %s\n", "block.out")
+	log.Printf("mutex: \tgo tool pprof -http=:8084 %s\n", "mutex.out")
+	log.Printf("cmdline: \tgo tool pprof -http=:8085 %s\n", "cmdline.out")
+	log.Printf("symbol: \tgo tool pprof -http=:8086 %s\n", "symbol.out")
+	log.Printf("trace: \tgo tool trace -http=:8087 %s\n", "trace.out")
 
 	scrape := func() error {
 		log.Printf("-- starting scrape pprof profiles --\n")
@@ -92,15 +96,22 @@ func (p *PullPProf) Run() error {
 			}
 		}
 
+		var wg sync.WaitGroup
+
 		for name, path := range durationProfiles {
-			file := folder + name + ".out"
-			err = p.scraper.GetProfileWithDuration(name, path, file, defaultSpanTime)
-			if err != nil {
-				// don't return here because some data is better than no data,
-				// and other profiles might be functional
-				log.Printf("error getting %s profile: %v\n", name, err)
-			}
+			wg.Add(1)
+			go func(name, path string) {
+				file := folder + name + ".out"
+				err = p.scraper.GetProfileWithDuration(name, path, file, defaultSpanTime)
+				if err != nil {
+					// don't return here because some data is better than no data,
+					// and other profiles might be functional
+					log.Printf("error getting %s profile: %v\n", name, err)
+				}
+				wg.Done()
+			}(name, path)
 		}
+		wg.Wait()
 
 		log.Printf("-- finished scraping profiles, saved to to %s --\n", folder)
 		log.Printf("waiting %s seconds for next scrape\n", p.ScrapeIntervalSeconds)

@@ -1,6 +1,9 @@
 package longrunning
 
 import (
+	"strconv"
+	"time"
+
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/types"
 )
@@ -10,9 +13,11 @@ func PullPProf(kubeConfigFilePath string) *types.Scenario {
 	Steps := []*types.StepWrapper{
 		{
 			Step: &kubernetes.CreateKapingerDeployment{
-				KapingerNamespace:  "kube-system",
-				KapingerReplicas:   "5",
+				KapingerNamespace:  "default",
+				KapingerReplicas:   "500",
 				KubeConfigFilePath: kubeConfigFilePath,
+				BurstIntervalMs:    "10000", // 10 seconds
+				BurstVolume:        "10",    // 500 requests every 10 seconds
 			},
 		},
 		{
@@ -30,8 +35,8 @@ func PullPProf(kubeConfigFilePath string) *types.Scenario {
 		},
 		{
 			Step: &kubernetes.PullPProf{
-				DurationSeconds:       "28800", // 8 hours
-				ScrapeIntervalSeconds: "60",
+				DurationSeconds:       strconv.Itoa(int((8 * time.Hour).Seconds())), //nolint part of the test
+				ScrapeIntervalSeconds: strconv.Itoa(int((1 * time.Hour).Seconds())), //nolint part of the test
 			},
 		},
 		{

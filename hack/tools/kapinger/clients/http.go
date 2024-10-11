@@ -21,7 +21,8 @@ const (
 	Service TargetType = "service"
 	Pod     TargetType = "pod"
 
-	envTargetType = "TARGET_TYPE"
+	envTargetType            = "TARGET_TYPE"
+	defaultHTTPClientTimeout = 30 * time.Second
 )
 
 type KapingerHTTPClient struct {
@@ -39,7 +40,7 @@ func NewKapingerHTTPClient(clientset *kubernetes.Clientset, labelselector string
 			Transport: &http.Transport{
 				DisableKeepAlives: true,
 			},
-			Timeout: 3 * time.Second,
+			Timeout: defaultHTTPClientTimeout,
 		},
 		labelselector: labelselector,
 		clientset:     clientset,
@@ -72,7 +73,7 @@ func (k *KapingerHTTPClient) MakeRequests(ctx context.Context, volume int, inter
 				for i := 0; i < volume; i++ {
 					err := k.makeRequest()
 					if err != nil {
-						log.Printf("error making request: %v", err)
+						log.Printf("http client: error making request: %v", err)
 					}
 				}
 			}()
@@ -103,7 +104,7 @@ func (k *KapingerHTTPClient) makeRequest() error {
 			log.Fatalf("Error reading response body from %s: %v", url, err)
 			return err
 		}
-		log.Printf("Response from %s: %s\n", url, string(body))
+		log.Printf("Response from %s: %s", url, string(body))
 	}
 	return nil
 }
