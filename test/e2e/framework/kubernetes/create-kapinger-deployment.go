@@ -178,6 +178,14 @@ func (c *CreateKapingerDeployment) GetKapingerDeployment() *appsv1.Deployment {
 									},
 								},
 								{
+									Name: "GOMEMLIMIT",
+									ValueFrom: &v1.EnvVarSource{
+										ResourceFieldRef: &v1.ResourceFieldSelector{
+											Resource: "limits.memory",
+										},
+									},
+								},
+								{
 									Name:  "TARGET_TYPE",
 									Value: "service",
 								},
