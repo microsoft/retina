@@ -22,7 +22,7 @@ func (k *KapingerHTTPServer) Start(ctx context.Context) error {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, err := w.Write(getResponse(r.RemoteAddr, "http"))
 		if err != nil {
-			fmt.Println(err)
+			fmt.Printf("http server: error writing response: %v\n", err)
 		}
 	})
 

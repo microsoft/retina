@@ -90,7 +90,6 @@ func (c *CreateAgnhostStatefulSet) getAgnhostDeployment() *appsv1.StatefulSet {
 				},
 			},
 		}
-
 	} else {
 		affinity = &v1.Affinity{
 			PodAntiAffinity: &v1.PodAntiAffinity{

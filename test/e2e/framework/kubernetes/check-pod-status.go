@@ -37,7 +37,6 @@ func (w *WaitPodsReady) Prevalidate() error {
 // Primary step where test logic is executed
 // Returning an error will cause the test to fail
 func (w *WaitPodsReady) Run() error {
-
 	config, err := clientcmd.BuildConfigFromFlags("", w.KubeConfigFilePath)
 	if err != nil {
 		return fmt.Errorf("error building kubeconfig: %w", err)
@@ -60,8 +59,6 @@ func (w *WaitPodsReady) Stop() error {
 }
 
 func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, namespace, labelSelector string) error {
-	podReadyMap := make(map[string]bool)
-
 	printIterator := 0
 	conditionFunc := wait.ConditionWithContextFunc(func(context.Context) (bool, error) {
 		defer func() {
@@ -80,10 +77,12 @@ func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, names
 
 		// check each indviidual pod to see if it's in Running state
 		for i := range podList.Items {
-			var pod *corev1.Pod
-			pod, err = clientset.CoreV1().Pods(namespace).Get(ctx, podList.Items[i].Name, metav1.GetOptions{})
-			if err != nil {
-				return false, fmt.Errorf("error getting Pod: %w", err)
+			pod := &podList.Items[i]
+			for istatus := range pod.Status.ContainerStatuses {
+				status := &pod.Status.ContainerStatuses[istatus]
+				if status.RestartCount > 0 {
+					return false, fmt.Errorf("pod %s has %d restarts: status: %+v: %w", pod.Name, status.RestartCount, status, ErrPodCrashed)
+				}
 			}
 
 			// Check the Pod phase
@@ -94,18 +93,6 @@ func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, names
 				return false, nil
 			}
 
-			// Check all container status.
-			for _, containerStatus := range pod.Status.ContainerStatuses {
-				if !containerStatus.Ready {
-					log.Printf("container \"%s\" in pod \"%s\" is not ready yet. Waiting...\n", containerStatus.Name, pod.Name)
-					return false, nil
-				}
-			}
-
-			if !podReadyMap[pod.Name] {
-				log.Printf("pod \"%s\" is in Running state\n", pod.Name)
-				podReadyMap[pod.Name] = true
-			}
 		}
 		log.Printf("all pods in namespace \"%s\" with label \"%s\" are in Running state\n", namespace, labelSelector)
 		return true, nil

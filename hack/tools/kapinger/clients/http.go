@@ -21,7 +21,8 @@ const (
 	Service TargetType = "service"
 	Pod     TargetType = "pod"
 
-	envTargetType = "TARGET_TYPE"
+	envTargetType            = "TARGET_TYPE"
+	defaultHTTPClientTimeout = 30 * time.Second
 )
 
 type KapingerHTTPClient struct {
@@ -41,7 +42,7 @@ func NewKapingerHTTPClient(clientset *kubernetes.Clientset, labelselector string
 			Transport: &http.Transport{
 				DisableKeepAlives: true,
 			},
-			Timeout: 3 * time.Second,
+			Timeout: defaultHTTPClientTimeout,
 		},
 		labelselector: labelselector,
 		clientset:     clientset,

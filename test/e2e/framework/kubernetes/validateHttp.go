@@ -21,7 +21,7 @@ func (v *ValidateHTTPResponse) Run() error {
 	ctx, cancel := context.WithTimeout(context.Background(), RequestTimeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, v.URL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, v.URL, http.NoBody)
 	if err != nil {
 		return fmt.Errorf("error creating HTTP request: %w", err)
 	}
