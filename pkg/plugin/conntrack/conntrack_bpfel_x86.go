@@ -20,6 +20,7 @@ type conntrackCtEntry struct {
 	FlagsSeenTxDir   uint8
 	FlagsSeenRxDir   uint8
 	_                [1]byte
+	LastSeq          uint32
 }
 
 type conntrackCtV4Key struct {

@@ -61,6 +61,11 @@ struct ct_entry {
      */
     __u8  flags_seen_tx_dir;
     __u8  flags_seen_rx_dir;
+
+    /**
+     * last_seq stores the last sequence number seen in the connection.
+     */
+    __u32 last_seq;
 };
 
 struct {
@@ -70,6 +75,13 @@ struct {
     __uint(max_entries, CT_MAP_SIZE);
     __uint(pinning, LIBBPF_PIN_BY_NAME); // needs pinning so this can be access from other processes .i.e debug cli
 } retina_conntrack SEC(".maps");
+
+/**
+ * Helper function to check if a packet sequence number is increasing.
+ */
+static inline bool is_seq_increasing(__u32 seq1, __u32 seq2) {
+    return (__s32)(seq1 - seq2) > 0;
+}
 
 /**
  * Helper function to reverse a key.
@@ -155,40 +167,58 @@ static __always_inline bool _ct_handle_udp_connection(struct packet *p, struct c
  * @arg observation_point The point in the network stack where the packet is observed.
  */
 static __always_inline bool _ct_handle_tcp_connection(struct packet *p, struct ct_v4_key key, struct ct_v4_key reverse_key, __u8 observation_point) {
-    // Check if the packet is a SYN packet.
-    if (p->flags & TCP_SYN) {
-        // Update packet accordingly.
-        p->is_reply = false;
-        p->traffic_direction = _ct_get_traffic_direction(observation_point);
-        // Create a new connection with a timeout of CT_SYN_TIMEOUT.
-        return _ct_create_new_tcp_connection(key, p->flags, observation_point);
-    }
+    struct ct_entry *entry = bpf_map_lookup_elem(&retina_conntrack, &key);
+    struct ct_entry *reverse_entry = bpf_map_lookup_elem(&retina_conntrack, &reverse_key);
+    if (entry && reverse_entry) {
+        // Compare sequence numbers to determine direction
+        if (is_seq_increasing(p->tcp_metadata.seq, entry->last_seq)) {
+            p->is_reply = false;
+            entry->last_seq = p->tcp_metadata.seq;
+            bpf_map_update_elem(&retina_conntrack, &key, entry, BPF_ANY);
+        } else {
+            p->is_reply = true;
+            reverse_entry->last_seq = p->tcp_metadata.seq;
+            bpf_map_update_elem(&retina_conntrack, &reverse_key, reverse_entry, BPF_ANY);
+        }
+    } else {
+        // Check if the packet is a SYN packet.
+        if (p->flags & TCP_SYN) {
+            // Update packet accordingly.
+            p->is_reply = false;
+            p->traffic_direction = _ct_get_traffic_direction(observation_point);
+            // Create a new connection with a timeout of CT_SYN_TIMEOUT.
+            return _ct_create_new_tcp_connection(key, p->flags, observation_point);
+        }
 
-    // The packet is not a SYN packet and the connection corresponding to this packet is not found.
-    // This might be because of an ongoing connection that started before Retina started tracking connections.
-    // Therefore we would have missed the SYN packet. A conntrack entry will be created with best effort.
-    struct ct_entry new_value;
-    __builtin_memset(&new_value, 0, sizeof(struct ct_entry));
-    __u64 now = bpf_mono_now();
-    // Check for overflow
-    if (CT_CONNECTION_LIFETIME_TCP > UINT32_MAX - now) {
-        return false;
-    }
-    new_value.eviction_time = now + CT_CONNECTION_LIFETIME_TCP;
-    new_value.traffic_direction = _ct_get_traffic_direction(observation_point);
-    p->traffic_direction = new_value.traffic_direction;
+        // The packet is not a SYN packet and the connection corresponding to this packet is not found.
+        // This might be because of an ongoing connection that started before Retina started tracking connections.
+        // Therefore we would have missed the SYN packet. A conntrack entry will be created with best effort.
+        struct ct_entry new_value;
+        __builtin_memset(&new_value, 0, sizeof(struct ct_entry));
+        __u64 now = bpf_mono_now();
+        // Check for overflow
+        if (CT_CONNECTION_LIFETIME_TCP > UINT32_MAX - now) {
+            return false;
+        }
+        new_value.eviction_time = now + CT_CONNECTION_LIFETIME_TCP;
+        new_value.traffic_direction = _ct_get_traffic_direction(observation_point);
+        p->traffic_direction = new_value.traffic_direction;
 
-    // Check for ACK flag. If the ACK flag is set, the packet is considered as a packet in the reply direction of the connection.
-    if (p->flags & TCP_ACK) {
-        p->is_reply = true;
-        new_value.flags_seen_rx_dir = p->flags;
-        new_value.last_report_rx_dir = now;
-        bpf_map_update_elem(&retina_conntrack, &reverse_key, &new_value, BPF_ANY);
-    } else { // Otherwise, the packet is considered as a packet in the send direction.
-        p->is_reply = false;
-        new_value.flags_seen_tx_dir = p->flags;
-        new_value.last_report_tx_dir = now;
-        bpf_map_update_elem(&retina_conntrack, &key, &new_value, BPF_ANY);
+        // Debug print
+        // bpf_trace_printk("Create ct entry for pre-existing conn: src_ip=%u, src_port=%u, dst_ip=%u, dst_port=%u, flags=%u\\n", key.src_ip, key.src_port, key.dst_ip, key.dst_port, p->flags);
+
+        // Check for ACK flag. If the ACK flag is set, the packet is considered as a packet in the reply direction of the connection.
+        if (p->flags & TCP_ACK) {
+            p->is_reply = true;
+            new_value.flags_seen_rx_dir = p->flags;
+            new_value.last_report_rx_dir = now;
+            bpf_map_update_elem(&retina_conntrack, &reverse_key, &new_value, BPF_ANY);
+        } else { // Otherwise, the packet is considered as a packet in the send direction.
+            p->is_reply = false;
+            new_value.flags_seen_tx_dir = p->flags;
+            new_value.last_report_tx_dir = now;
+            bpf_map_update_elem(&retina_conntrack, &key, &new_value, BPF_ANY);
+        }
     }
     return true;
 }
