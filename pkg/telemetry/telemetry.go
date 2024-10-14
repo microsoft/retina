@@ -27,10 +27,11 @@ var (
 	kernelversion = "kernelversion"
 	allocatedmem  = "allocmem"
 	sysmem        = "sysmem"
-	othersysmem   = "othersysmem"
-	heapallocmem  = "heapallocmem"
+	heapallocmem  = "heapalloc"
 	heapobjects   = "heapobjects"
-	nextgc        = "nextgc"
+	heapsys       = "heapsys"
+	stackinuse    = "stackinuse"
+	stacksys      = "stacksys"
 	goroutines    = "goroutines"
 )
 
