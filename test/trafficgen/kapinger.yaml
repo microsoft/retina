@@ -47,7 +47,7 @@ spec:
       serviceAccountName: kapinger-sa
       containers:
         - name: kapinger
-          image: ghcr.io/microsoft/retina/kapinger:latest
+          image: acnpublic.azurecr.io/kapinger:20241009.5
           resources:
             limits:
               memory: 20Mi
@@ -70,6 +70,10 @@ spec:
               value: "8085"
             - name: UDP_PORT
               value: "8086"
+            - name: BURST_INTERVAL_MS
+              value: "500"
+            - name: BURST_VOLUME
+              value: "1"
           ports:
             - containerPort: 8080
 ---
