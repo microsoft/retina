@@ -44,10 +44,11 @@ func (p *PerfProfile) GetMemoryUsage() map[string]string {
 	props := map[string]string{
 		allocatedmem: strconv.FormatUint(bToMb(m.Alloc), 10),
 		sysmem:       strconv.FormatUint(bToMb(m.Sys), 10),
-		othersysmem:  strconv.FormatUint(bToMb(m.OtherSys), 10),
 		heapallocmem: strconv.FormatUint(bToMb(m.HeapAlloc), 10),
 		heapobjects:  strconv.FormatUint(m.HeapObjects, 10),
-		nextgc:       strconv.FormatUint(m.NextGC, 10),
+		heapsys:      strconv.FormatUint(bToMb(m.HeapSys), 10),
+		stackinuse:   strconv.FormatUint(m.StackInuse, 10),
+		stacksys:     strconv.FormatUint(bToMb(m.StackSys), 10),
 		goroutines:   strconv.Itoa(runtime.NumGoroutine()),
 	}
 	return props
