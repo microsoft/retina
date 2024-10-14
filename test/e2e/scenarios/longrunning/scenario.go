@@ -17,7 +17,7 @@ func PullPProf(kubeConfigFilePath string) *types.Scenario {
 				KapingerReplicas:   "500",
 				KubeConfigFilePath: kubeConfigFilePath,
 				BurstIntervalMs:    "10000", // 10 seconds
-				BurstVolume:        "10",    // 500 requests every 10 seconds
+				BurstVolume:        "200",   // 500 requests every 10 seconds
 			},
 		},
 		{

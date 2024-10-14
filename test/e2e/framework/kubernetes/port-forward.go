@@ -110,6 +110,8 @@ func (p *PortForward) Run() error {
 
 		log.Printf("port forward validation HTTP request to \"%s\" succeeded, response: %s\n", p.pf.Address(), resp.Status)
 
+		log.Printf("starting keepalive for port forward...\n")
+		go p.pf.KeepAlive(pctx)
 		return nil
 	}
 
@@ -117,6 +119,8 @@ func (p *PortForward) Run() error {
 		return fmt.Errorf("could not start port forward within %ds: %w", defaultTimeoutSeconds, err)
 	}
 	log.Printf("successfully port forwarded to \"%s\"\n", p.pf.Address())
+	log.Printf("starting port forward keepalive...\n")
+	go p.pf.KeepAlive(pctx)
 	return nil
 }
 

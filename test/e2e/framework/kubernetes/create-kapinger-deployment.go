@@ -210,17 +210,6 @@ func (c *CreateKapingerDeployment) GetKapingerDeployment() *appsv1.Deployment {
 									Value: c.BurstVolume,
 								},
 							},
-							LivenessProbe: &v1.Probe{
-								ProbeHandler: v1.ProbeHandler{
-									HTTPGet: &v1.HTTPGetAction{
-										Path: "/",
-										Port: intstr.FromInt(KapingerHTTPPort),
-									},
-								},
-								TimeoutSeconds:      10, //nolint
-								PeriodSeconds:       10, //nolint
-								InitialDelaySeconds: 3,  //nolint
-							},
 						},
 					},
 				},

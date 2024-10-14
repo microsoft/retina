@@ -9,12 +9,11 @@ import (
 	"net/url"
 	"os"
 	"strconv"
-	"sync"
 	"time"
 )
 
 const (
-	defaultTimeout    = 30 * time.Second
+	defaultTimeout    = 3200 * time.Second
 	defaultRetinaPort = 10093
 	defaultSpanTime   = 10 * time.Second
 )
@@ -96,22 +95,15 @@ func (p *PullPProf) Run() error {
 			}
 		}
 
-		var wg sync.WaitGroup
-
 		for name, path := range durationProfiles {
-			wg.Add(1)
-			go func(name, path string) {
-				file := folder + name + ".out"
-				err = p.scraper.GetProfileWithDuration(name, path, file, defaultSpanTime)
-				if err != nil {
-					// don't return here because some data is better than no data,
-					// and other profiles might be functional
-					log.Printf("error getting %s profile: %v\n", name, err)
-				}
-				wg.Done()
-			}(name, path)
+			file := folder + name + ".out"
+			err = p.scraper.GetProfileWithDuration(name, path, file, defaultSpanTime)
+			if err != nil {
+				// don't return here because some data is better than no data,
+				// and other profiles might be functional
+				log.Printf("error getting %s profile: %v\n", name, err)
+			}
 		}
-		wg.Wait()
 
 		log.Printf("-- finished scraping profiles, saved to to %s --\n", folder)
 		log.Printf("waiting %s seconds for next scrape\n", p.ScrapeIntervalSeconds)
@@ -166,12 +158,12 @@ func (p *PprofScraper) GetProfileWithDuration(name, path, outfile string, durati
 	log.Printf("getting %s profile for %d seconds...\n", name, seconds)
 	profileURL := p.formatURLWithSeconds(seconds)
 	profileURL.Path += path
-	return p.scrape(profileURL.String(), defaultTimeout+duration, outfile)
+	return p.scrape(profileURL.String(), outfile)
 }
 
 func (p *PprofScraper) GetProfile(name, path, outfile string) error {
 	log.Printf("getting %s profile...\n", name)
-	return p.scrape(p.baseURL.String()+path, defaultTimeout, outfile)
+	return p.scrape(p.baseURL.String()+path, outfile)
 }
 
 func (p *PprofScraper) formatURLWithSeconds(seconds int) url.URL {
@@ -183,10 +175,8 @@ func (p *PprofScraper) formatURLWithSeconds(seconds int) url.URL {
 	return queryURL
 }
 
-func (p *PprofScraper) scrape(scrapingURL string, timeout time.Duration, outfile string) error {
-	client := http.Client{
-		Timeout: timeout,
-	}
+func (p *PprofScraper) scrape(scrapingURL, outfile string) error {
+	client := http.Client{}
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, scrapingURL, http.NoBody)
 	if err != nil {
