@@ -3,30 +3,29 @@ package pktmon
 import (
 	"context"
 
-
 	"github.com/pkg/errors"
 
-
+	"github.com/cilium/cilium/api/v1/flow"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
+	"github.com/google/gopacket"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/api"
+	"github.com/microsoft/retina/pkg/plugin/windows/pktmon/stream"
 	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
-	"github.com/google/gopacket"
-	"github.com/cilium/cilium/api/v1/flow"
 )
 
 var (
-	ErrNilEnricher    = errors.New("enricher is nil")
-	ErrNotSupported   = errors.New("not supported")
+	ErrNilEnricher  = errors.New("enricher is nil")
+	ErrNotSupported = errors.New("not supported")
 )
 
 const (
-	Name                    = "pktmon"
-	eventChannelSize        = 1000
+	Name             = "pktmon"
+	eventChannelSize = 1000
 )
 
 type PktMonConn interface {
@@ -41,7 +40,7 @@ type Plugin struct {
 	enricher        enricher.EnricherInterface
 	externalChannel chan *v1.Event
 	l               *log.ZapLogger
-	pkt			 PktMonConn
+	pkt             PktMonConn
 }
 
 func (p *Plugin) Init() error {
@@ -57,6 +56,9 @@ func (p *Plugin) Start(ctx context.Context) error {
 	if p.enricher == nil {
 		return ErrNilEnricher
 	}
+
+	p.pkt = stream.NewWinPktMonStreamer(p.l, 0, 0, 0)
+
 	for {
 		select {
 		case <-ctx.Done():
