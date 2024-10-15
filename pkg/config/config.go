@@ -4,13 +4,17 @@ package config
 
 import (
 	"fmt"
+	"io"
 	"log"
+	"os"
 	"reflect"
 	"strings"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
+	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v2"
 )
 
 // Level defines the level of monitor aggregation.
@@ -51,6 +55,7 @@ type Server struct {
 	Port int    `yaml:"port"`
 }
 
+// Config describes the complete configuration for a Retina process.
 type Config struct {
 	APIServer       Server        `yaml:"apiServer"`
 	LogLevel        string        `yaml:"logLevel"`
@@ -66,16 +71,44 @@ type Config struct {
 	BypassLookupIPOfInterest bool          `yaml:"bypassLookupIPOfInterest"`
 	DataAggregationLevel     Level         `yaml:"dataAggregationLevel"`
 	MonitorSockPath          string        `yaml:"monitorSockPath"`
+	TLSManagement            string        `yaml:"tlsManagement"`
 }
 
-func GetConfig(cfgFilename string) (*Config, error) {
-	if cfgFilename != "" {
-		viper.SetConfigFile(cfgFilename)
+func (c *Config) WriteYAML(w io.Writer) error {
+	return yaml.NewEncoder(w).Encode(c)
+}
+
+type FilteredConfig struct {
+	Filename      string
+	AllowedFields []string
+}
+
+func mergeConfig(file FilteredConfig) error {
+	f, err := os.Open(file.Filename)
+	if err != nil {
+		return errors.Wrapf(err, "opening config file %q", file)
+	}
+	defer f.Close()
+
+	fy, err := NewFilteredYAML(f, file.AllowedFields)
+	if err != nil {
+		return errors.Wrap(err, "creating FilteredYAML")
+	}
+
+	err = viper.MergeConfig(fy)
+	if err != nil {
+		return errors.Wrap(err, "merging config with viper")
+	}
+	return nil
+}
+
+func GetConfig(primaryCfg string, overlays ...FilteredConfig) (*Config, error) {
+	if primaryCfg != "" {
+		viper.SetConfigFile(primaryCfg)
 	} else {
 		viper.SetConfigName("config")
 		viper.AddConfigPath("/retina/config")
 	}
-
 	viper.SetEnvPrefix("retina")
 	viper.AutomaticEnv()
 	// NOTE(mainred): RetinaEndpoint is currently the only supported solution to cache Pod, and before an alternative is implemented,
@@ -86,6 +119,15 @@ func GetConfig(cfgFilename string) (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("fatal error config file: %s", err)
 	}
+
+	// apply overlay configs
+	for _, file := range overlays {
+		err := mergeConfig(file) //nolint:govet // shadowing is fine here
+		if err != nil {
+			return nil, errors.Wrapf(err, "merging config for %q", file)
+		}
+	}
+
 	var config Config
 	decoderConfigOption := func(dc *mapstructure.DecoderConfig) {
 		dc.DecodeHook = mapstructure.ComposeDecodeHookFunc(
