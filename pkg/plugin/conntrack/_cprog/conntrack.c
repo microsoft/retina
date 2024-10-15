@@ -204,9 +204,6 @@ static __always_inline bool _ct_handle_tcp_connection(struct packet *p, struct c
         new_value.traffic_direction = _ct_get_traffic_direction(observation_point);
         p->traffic_direction = new_value.traffic_direction;
 
-        // Debug print
-        // bpf_trace_printk("Create ct entry for pre-existing conn: src_ip=%u, src_port=%u, dst_ip=%u, dst_port=%u, flags=%u\\n", key.src_ip, key.src_port, key.dst_ip, key.dst_port, p->flags);
-
         // Check for ACK flag. If the ACK flag is set, the packet is considered as a packet in the reply direction of the connection.
         if (p->flags & TCP_ACK) {
             p->is_reply = true;
