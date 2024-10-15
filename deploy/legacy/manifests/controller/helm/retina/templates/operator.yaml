@@ -3,7 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Values.operator.name }}
-  namespace: kube-system
+  namespace: {{ .Values.namespace }}
   labels:
     app: {{ .Values.operator.name }}
     control-plane: {{ .Values.operator.name }}
@@ -119,7 +119,7 @@ metadata:
     app.kubernetes.io/part-of: operator
     app.kubernetes.io/managed-by: kustomize
   name: {{ .Values.operator.name }}
-  namespace: kube-system
+  namespace: {{ .Values.namespace }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -289,7 +289,7 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: {{ .Values.operator.name }}
-  namespace: kube-system
+  namespace: {{ .Values.namespace }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -313,7 +313,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: azure-cloud-config
-  namespace: kube-system
+  namespace: {{ .Values.namespace }}
 type: Opaque
 stringData:
   azure.json: |-
@@ -356,12 +356,14 @@ spec:
       app: {{ .Values.operator.name }}
       control-plane: {{ .Values.operator.name }}
 ---
+{{- if .Values.metrics.serviceMonitor.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: "{{ .Values.operator.name }}-servicemonitor"
   namespace: {{ ternary .Values.metrics.serviceMonitor.namespace .Values.namespace (not (empty .Values.metrics.serviceMonitor.namespace)) }}
   labels:
+    app: {{ .Values.operator.name }}
     {{- if .Values.metrics.serviceMonitor.additionalLabels }}
     {{- toYaml .Values.metrics.serviceMonitor.additionalLabels | nindent 4 }}
     {{- end }}
@@ -395,3 +397,4 @@ spec:
   selector:
     matchLabels:
       app: {{ .Values.operator.name }}
+{{- end }}
