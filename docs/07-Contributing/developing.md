@@ -190,8 +190,25 @@ In order to certify the provenance of commits and defend against impersonation, 
 Documentation for setting up Git and Github to sign your commits can be found [here](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits).
 Additional information about Git's use of GPG can be found [here](https://git-scm.com/book/en/v2/Git-Tools-Signing-Your-Work)
 
+This can be accomplished by providing a `-S` flag to `git commit` as documented [here](https://git-scm.com/docs/git-commit#Documentation/git-commit.txt--Sltkeyidgt)
+
 ### Developers Certificate of Origin (DCO)
 
 Contributions to Retina must contain a Developers Certificate of Origin within their constituent commits.
 This can be accomplished by providing a `-s` flag to `git commit` as documented [here](https://git-scm.com/docs/git-commit#Documentation/git-commit.txt--s).
 This will add a `Signed-off-by` trailer to your Git commit, affirming your acceptance of the Contributor License Agreement.
+
+### Example commit
+
+Here is an example development flow to add a change made to file `docs/07-Contributing/developing.md`
+
+```sh
+git checkout -b feat-branch-1
+git add docs/07-Contributing/developing.md
+git commit -m "fix(doc): update contributing docs" -sS
+git push origin feat-branch-1 -u
+```
+
+After committing your change, when accessing [retina project's repo](https://github.com/microsoft/retina) you will get a prompt to create a PR from your fork.
+
+> Note: the DCO is not mandatory (i.e. the `-s` flag) - however, the cryptographically signing of commit is mandatory for all contributors. Hence, please make sure to always include the `-S` flag to your `git commit` instructions. 
