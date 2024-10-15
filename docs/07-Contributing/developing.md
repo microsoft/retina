@@ -211,4 +211,4 @@ git push origin feat-branch-1 -u
 
 After committing your change, when accessing [retina project's repo](https://github.com/microsoft/retina) you will get a prompt to create a PR from your fork.
 
-> Note: the DCO is not mandatory (i.e. the `-s` flag) - however, the cryptographically signing of commit is mandatory for all contributors. Hence, please make sure to always include the `-S` flag to your `git commit` instructions. 
+> Note: the DCO is not mandatory (i.e. the `-s` flag) - however, the cryptographically signing of commit is mandatory for all contributors. Hence, please make sure to always include the `-S` flag to your `git commit` instructions.
