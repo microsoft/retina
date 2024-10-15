@@ -8,6 +8,7 @@ os:
   windows: true
 
 operator:
+  name: retina-operator
   enabled: false
   repository: ghcr.io/microsoft/retina/retina-operator
   tag: "v0.0.2"
@@ -115,6 +116,12 @@ service:
   port: 10093
   targetPort: 10093
   name: retina
+
+operatorService:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+  name: retina-operator
 
 serviceAccount:
   annotations: {}
@@ -237,8 +244,11 @@ metrics:
     scrapeTimeout: 30s
     ## @param metrics.serviceMonitor.additionalLabels [object] Additional labels that can be used so serviceMonitor will be discovered by Prometheus
     ## ref: https://github.com/coreos/prometheus-operator/blob/master/Documentation/api.md#prometheusspec
+    ## 'release: prometheus' label is needed for prometheus to discover ServiceMoniotrs
     ##
-    additionalLabels: {}
+    additionalLabels:
+      release: prometheus
+      app.kubernetes.io/component: metrics
     ## @param metrics.serviceMonitor.scheme Scheme to use for scraping
     ##
     scheme: http
@@ -253,7 +263,20 @@ metrics:
     tlsConfig: {}
     ## @param metrics.serviceMonitor.relabelings [array] Prometheus relabeling rules to apply to samples before scraping
     ##
-    relabelings: []
+    relabelings: 
+      - sourceLabels:
+          [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        separator: ":"
+        regex: ([^:]+)(?::\d+)?
+        targetLabel: __address__
+        replacement: ${1}:${2}
+        action: replace
+      - sourceLabels: [__meta_kubernetes_pod_node_name]
+        action: replace
+        targetLabel: instance
     ## @param metrics.serviceMonitor.metricRelabelings [array] Prometheus relabeling rules to apply to samples before ingestion
     ##
-    metricRelabelings: []
+    metricRelabelings:
+      - sourceLabels: [__name__]
+        action: keep
+        regex: (.*)
