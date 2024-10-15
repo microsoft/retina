@@ -19,7 +19,7 @@ type conntrackCtEntry struct {
 	TrafficDirection uint8
 	FlagsSeenTxDir   uint8
 	FlagsSeenRxDir   uint8
-	IsClosing        bool
+	_                [1]byte
 }
 
 type conntrackCtV4Key struct {

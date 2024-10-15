@@ -1,0 +1,8 @@
+kind: ConfigMap
+apiVersion: v1
+data:
+  pod-annotation-based-scraping: |-
+    podannotationnamespaceregex = ""
+metadata:
+  name: ama-metrics-settings-configmap
+  namespace: kube-system
