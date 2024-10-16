@@ -84,6 +84,18 @@ func ScaleTest(opt *scaletest.Options) *types.Job {
 		DryRun:                opt.DryRun,
 	}, nil)
 
+	// Apply network policies (applied and unapplied)
+	job.AddStep(&scaletest.CreateNetworkPolicies{
+		NumNetworkPolicies:    opt.NumNetworkPolicies,
+		NumSharedLabelsPerPod: opt.NumSharedLabelsPerPod,
+		DryRun:                opt.DryRun,
+	}, nil)
+
+	job.AddStep(&kubernetes.WaitPodsReady{
+		LabelSelector: "is-real=true",
+		DryRun:        opt.DryRun,
+	}, nil)
+
 	job.AddStep(&scaletest.DeleteAndReAddLabels{
 		DryRun:                opt.DryRun,
 		DeleteLabels:          opt.DeleteLabels,
@@ -91,6 +103,14 @@ func ScaleTest(opt *scaletest.Options) *types.Job {
 		DeleteLabelsTimes:     opt.DeleteLabelsTimes,
 		NumSharedLabelsPerPod: opt.NumSharedLabelsPerPod,
 	}, nil)
+
+	// TODO: Add steps to get the state of the cluster
+
+	// job.AddStep(&kubernetes.GetDeployment{})
+
+	// job.AddStep(&kubernetes.GetDaemonSet{})
+
+	// job.AddStep(&kubernetes.DescribePods{})
 
 	return job
 }
