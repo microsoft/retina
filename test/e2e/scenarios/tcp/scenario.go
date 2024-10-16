@@ -56,7 +56,7 @@ func ValidateTCPMetrics(namespace string) *types.Scenario {
 		},
 		{
 			Step: &kubernetes.PortForward{
-				Namespace:             common.Namespace,
+				Namespace:             common.KubeSystemNamespace,
 				LabelSelector:         "k8s-app=retina",
 				LocalPort:             "10093",
 				RemotePort:            "10093",

@@ -79,7 +79,7 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, test
 	job := types.NewJob("Install and test Retina with basic metrics")
 
 	job.AddStep(&kubernetes.InstallHelmChart{
-		Namespace:          common.Namespace,
+		Namespace:          common.KubeSystemNamespace,
 		ReleaseName:        "retina",
 		KubeConfigFilePath: kubeConfigFilePath,
 		ChartPath:          chartPath,
@@ -138,7 +138,7 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, test
 	}
 
 	job.AddStep(&kubernetes.EnsureStableCluster{
-		PodNamespace:  common.Namespace,
+		PodNamespace:  common.KubeSystemNamespace,
 		LabelSelector: "k8s-app=retina",
 	}, nil)
 
@@ -149,7 +149,7 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 	job := types.NewJob("Upgrade and test Retina with advanced metrics")
 	// enable advanced metrics
 	job.AddStep(&kubernetes.UpgradeRetinaHelmChart{
-		Namespace:          common.Namespace,
+		Namespace:          common.KubeSystemNamespace,
 		ReleaseName:        "retina",
 		KubeConfigFilePath: kubeConfigFilePath,
 		ChartPath:          chartPath,
@@ -205,7 +205,7 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 	job.AddScenario(latency.ValidateLatencyMetric(testPodNamespace))
 
 	job.AddStep(&kubernetes.EnsureStableCluster{
-		PodNamespace:  common.Namespace,
+		PodNamespace:  common.KubeSystemNamespace,
 		LabelSelector: "k8s-app=retina",
 	}, nil)
 
