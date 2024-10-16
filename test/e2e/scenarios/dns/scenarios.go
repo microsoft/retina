@@ -84,7 +84,6 @@ func ValidateBasicDNSMetrics(scenarioName string, req *RequestValidationParams, 
 		{
 			Step: &kubernetes.PortForward{
 				Namespace:             common.Namespace,
-				PodNamespace:          namespace,
 				LabelSelector:         "k8s-app=retina",
 				LocalPort:             strconv.Itoa(common.RetinaPort),
 				RemotePort:            strconv.Itoa(common.RetinaPort),
@@ -189,7 +188,6 @@ func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParam
 		{
 			Step: &kubernetes.PortForward{
 				Namespace:             common.Namespace,
-				PodNamespace:          namespace,
 				LabelSelector:         "k8s-app=retina",
 				LocalPort:             strconv.Itoa(common.RetinaPort),
 				RemotePort:            strconv.Itoa(common.RetinaPort),
@@ -203,7 +201,7 @@ func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParam
 		},
 		{
 			Step: &ValidateAdvancedDNSRequestMetrics{
-				Namespace:          common.Namespace,
+				PodNamespace:       namespace,
 				PodName:            podName,
 				Query:              req.Query,
 				QueryType:          req.QueryType,
@@ -217,7 +215,7 @@ func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParam
 		},
 		{
 			Step: &ValidateAdvanceDNSResponseMetrics{
-				Namespace:          common.Namespace,
+				PodNamespace:       namespace,
 				NumResponse:        resp.NumResponse,
 				PodName:            podName,
 				Query:              resp.Query,

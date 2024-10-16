@@ -1,6 +1,7 @@
 package windows
 
 import (
+	"github.com/microsoft/retina/test/e2e/common"
 	"github.com/microsoft/retina/test/e2e/framework/types"
 )
 
@@ -10,7 +11,7 @@ func ValidateWindowsBasicMetric() *types.Scenario {
 		{
 			Step: &ValidateHNSMetric{
 				KubeConfigFilePath:       "./test.pem",
-				RetinaDaemonSetNamespace: "kube-system",
+				RetinaDaemonSetNamespace: common.Namespace,
 				RetinaDaemonSetName:      "retina-agent-win",
 			},
 		},

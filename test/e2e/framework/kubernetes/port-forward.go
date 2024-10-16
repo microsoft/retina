@@ -32,7 +32,6 @@ var (
 
 type PortForward struct {
 	Namespace             string
-	PodNamespace          string
 	LabelSelector         string
 	LocalPort             string
 	RemotePort            string
@@ -139,12 +138,12 @@ func (p *PortForward) findPodsWithAffinity(ctx context.Context, clientset *kuber
 	}
 
 	// get all pods with optional label affinity
-	affinityPods, errAffinity := clientset.CoreV1().Pods(p.PodNamespace).List(ctx, metav1.ListOptions{
+	affinityPods, errAffinity := clientset.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{
 		LabelSelector: p.OptionalLabelAffinity,
 		FieldSelector: "status.phase=Running",
 	})
 	if errAffinity != nil {
-		return "", fmt.Errorf("could not list affinity pods in %q with label %q: %w", p.PodNamespace, p.OptionalLabelAffinity, errAffinity)
+		return "", fmt.Errorf("could not list affinity pods across all namespaces with label %q: %w", p.OptionalLabelAffinity, errAffinity)
 	}
 
 	// keep track of where the affinity pods are scheduled
