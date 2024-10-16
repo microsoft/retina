@@ -83,19 +83,6 @@ static inline bool is_seq_increasing(__u32 seq1, __u32 seq2) {
 }
 
 /**
- * Helper function to check if a packet sequence number is decreasing.
- */
-static __always_inline void _ct_update_packet(struct packet *p, struct ct_entry *entry, struct ct_v4_key *key, bool is_reply) {
-    p->is_reply = is_reply;
-    p->traffic_direction = entry->traffic_direction;
-
-    if (is_seq_increasing(p->tcp_metadata.seq, entry->last_seq)) {
-        entry->last_seq = p->tcp_metadata.seq;
-        bpf_map_update_elem(&retina_conntrack, key, entry, BPF_ANY);
-    }
-}
-
-/**
  * Helper function to reverse a key.
  * @arg reverse_key The key to store the reversed key.
  * @arg key The key to be reversed.
@@ -321,7 +308,9 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
 
     // If the connection is found in the send direction, update the connection.
     if (entry) {
-        _ct_update_packet(p, entry, &key, false);
+        p->is_reply = false;
+        p->traffic_direction = entry->traffic_direction;
+        entry->last_seq = p->tcp_metadata.seq;
         return _ct_should_report_packet(entry, p->flags, CT_PACKET_DIR_TX, &key);
     }
     
@@ -334,7 +323,18 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
 
     // If the connection is found based on the reverse key, meaning that the packet is a reply packet to an existing connection.
     if (entry) {
-        _ct_update_packet(p, entry, &reverse_key, true);
+        if (is_seq_increasing(p->tcp_metadata.seq, entry->last_seq)) {
+            entry->last_seq = p->tcp_metadata.seq;
+            entry->traffic_direction = _ct_get_traffic_direction(observation_point);
+            bpf_map_update_elem(&retina_conntrack, &key, entry, BPF_ANY);
+            bpf_map_delete_elem(&retina_conntrack, &reverse_key);
+            p->is_reply = false;
+            p->traffic_direction = entry->traffic_direction;
+            return _ct_should_report_packet(entry, p->flags, CT_PACKET_DIR_TX, &key);
+        } else {
+            p->is_reply = true;
+            p->traffic_direction = entry->traffic_direction;
+        }
         return _ct_should_report_packet(entry, p->flags, CT_PACKET_DIR_RX, &key);
     }
 
