@@ -1,4 +1,4 @@
-name: commit-message
+name: commit-verifier
 on:
   merge_group:
   pull_request:
@@ -9,10 +9,13 @@ on:
       - edited
       - reopened
 jobs:
-  commit-message:
+  commit-verifier:
     if: ${{ github.event_name != 'merge_group' }}
     runs-on: ubuntu-20.04
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
       - name: verify_commit_message
         env:
           TITLE: ${{ github.event.pull_request.title }}
@@ -36,3 +39,12 @@ jobs:
             echo "For more details, see .github/workflows/commit-message.yaml"
             exit 1
           }
+
+      - name: Verify GPG Signature
+        run: |
+            LAST_COMMIT=$(git rev-parse HEAD)
+            SIGNATURE=$(git log --show-signature -1 $LAST_COMMIT)
+            echo "$SIGNATURE" | grep 'gpg: Signature made' || {
+            echo "ERROR: The last commit is not GPG signed. Please sign your commit."
+            exit 1
+            }
