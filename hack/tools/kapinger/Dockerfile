@@ -14,16 +14,16 @@ RUN CGO_ENABLED=0 GOOS=windows go build -o kapinger.exe .
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o kapinger-arm64 .
 
 FROM --platform=linux/amd64 scratch AS linux-amd64
-WORKDIR /build
+WORKDIR /app
 COPY --from=builder /build/kapinger .
 CMD ["./kapinger"]
 
-FROM --platform=windows/amd64 mcr.microsoft.com/windows/nanoserver:ltsc2022 AS windows-amd64
-WORKDIR /build
-COPY --from=builder /build/kapinger.exe .
-CMD ["./kapinger.exe"]
+FROM --platform=windows/amd64 mcr.microsoft.com/windows/servercore:ltsc2022 AS windows-amd64
+WORKDIR /app
+ENTRYPOINT [ "cmd.exe" ]
+CMD [ "/c", "kapinger.exe" ]
 
 FROM --platform=linux/arm64 scratch AS linux-arm64
-WORKDIR /build
+WORKDIR /app
 COPY --from=builder /build/kapinger-arm64 .
 CMD ["./kapinger-arm64"]
