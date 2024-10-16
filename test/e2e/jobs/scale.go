@@ -63,5 +63,16 @@ func ScaleTest(opt *scaletest.Options) *types.Job {
 		DryRun: opt.DryRun,
 	}, nil)
 
+	job.AddStep(&scaletest.CreateResources{
+		NumKwokDeployments:           opt.NumKwokDeployments,
+		NumKwokReplicas:              opt.NumKwokReplicas,
+		RealPodType:                  opt.RealPodType,
+		NumRealDeployments:           opt.NumRealDeployments,
+		NumRealReplicas:              opt.NumRealReplicas,
+		NumRealServices:              opt.NumRealServices,
+		NumUniqueLabelsPerDeployment: opt.NumUniqueLabelsPerDeployment,
+		DryRun:                       opt.DryRun,
+	}, nil)
+
 	return job
 }
