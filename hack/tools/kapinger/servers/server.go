@@ -7,8 +7,6 @@ import (
 	"github.com/microsoft/retina/hack/tools/kapinger/config"
 )
 
-const ()
-
 type Server interface {
 	Start(ctx context.Context) error
 }

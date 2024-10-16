@@ -132,7 +132,7 @@ func (c *CreateKapingerDeployment) GetKapingerDeployment() *appsv1.Deployment {
 					Containers: []v1.Container{
 						{
 							Name:  "kapinger",
-							Image: "acnpublic.azurecr.io/kapinger:be57650",
+							Image: "acnpublic.azurecr.io/kapinger:20241014.7",
 							Resources: v1.ResourceRequirements{
 								Requests: v1.ResourceList{
 									"memory": resource.MustParse("20Mi"),
@@ -147,6 +147,10 @@ func (c *CreateKapingerDeployment) GetKapingerDeployment() *appsv1.Deployment {
 								},
 							},
 							Env: []v1.EnvVar{
+								{
+									Name:  "GODEBUG",
+									Value: "netdns=go",
+								},
 								{
 									Name:  "TARGET_TYPE",
 									Value: "service",
