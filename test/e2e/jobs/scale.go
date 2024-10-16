@@ -60,5 +60,15 @@ func ScaleTest(opt *scaletest.Options) *types.Job {
 
 	job.AddStep(&kubernetes.CreateNamespace{}, nil)
 
+	job.AddStep(&scaletest.CreateResources{
+		NumKwokDeployments:           opt.NumKwokDeployments,
+		NumKwokReplicas:              opt.NumKwokReplicas,
+		RealPodType:                  opt.RealPodType,
+		NumRealDeployments:           opt.NumRealDeployments,
+		NumRealReplicas:              opt.NumRealReplicas,
+		NumRealServices:              opt.NumRealServices,
+		NumUniqueLabelsPerDeployment: opt.NumUniqueLabelsPerDeployment,
+	}, nil)
+
 	return job
 }
