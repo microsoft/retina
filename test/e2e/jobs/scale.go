@@ -70,5 +70,20 @@ func ScaleTest(opt *scaletest.Options) *types.Job {
 		NumUniqueLabelsPerDeployment: opt.NumUniqueLabelsPerDeployment,
 	}, nil)
 
+	job.AddStep(&scaletest.AddSharedLabelsToAllPods{
+		NumSharedLabelsPerPod: opt.NumSharedLabelsPerPod,
+	}, nil)
+
+	job.AddStep(&scaletest.AddUniqueLabelsToAllPods{
+		NumUniqueLabelsPerPod: opt.NumUniqueLabelsPerPod,
+	}, nil)
+
+	job.AddStep(&scaletest.DeleteAndReAddLabels{
+		DeleteLabels:          opt.DeleteLabels,
+		DeleteLabelsInterval:  opt.DeleteLabelsInterval,
+		DeleteLabelsTimes:     opt.DeleteLabelsTimes,
+		NumSharedLabelsPerPod: opt.NumSharedLabelsPerPod,
+	}, nil)
+
 	return job
 }
