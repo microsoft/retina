@@ -20,6 +20,7 @@ CMD ["./kapinger"]
 
 FROM --platform=windows/amd64 mcr.microsoft.com/windows/servercore:ltsc2022 AS windows-amd64
 WORKDIR /app
+COPY --from=builder /build/kapinger.exe .
 ENTRYPOINT [ "cmd.exe" ]
 CMD [ "/c", "kapinger.exe" ]
 
