@@ -3,6 +3,7 @@ package retina
 import (
 	"time"
 
+	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/scaletest"
 	"github.com/microsoft/retina/test/e2e/framework/types"
 )
@@ -45,6 +46,19 @@ func ScaleTest(opt *scaletest.Options) *types.Job {
 	job.AddStep(&scaletest.ValidateAndPrintOptions{
 		Options: opt,
 	}, nil)
+
+	job.AddStep(&scaletest.ValidateNumOfNodes{
+		KubeConfigFilePath: opt.KubeconfigPath,
+		Label:              map[string]string{"scale-test": "true"},
+		NumNodesRequired: (opt.NumRealDeployments*opt.NumRealReplicas +
+			opt.MaxRealPodsPerNode - 1) / opt.MaxRealPodsPerNode,
+	}, nil)
+
+	job.AddStep(&kubernetes.DeleteNamespace{
+		Namespace: opt.Namespace,
+	}, nil)
+
+	job.AddStep(&kubernetes.CreateNamespace{}, nil)
 
 	return job
 }
