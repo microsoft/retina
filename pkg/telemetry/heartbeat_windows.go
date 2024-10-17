@@ -12,7 +12,7 @@ import (
 )
 
 func KernelVersion(ctx context.Context) (string, error) {
-	cmd := exec.CommandContext(ctx, ".\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", "$([Environment]::OSVersion).VersionString")
+	cmd := exec.CommandContext(ctx, "powershell", "-command", "$([Environment]::OSVersion).VersionString")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to get windows kernel version: %s", string(output))
