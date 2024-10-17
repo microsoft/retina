@@ -6,6 +6,3 @@ sudo apt-get update && sudo apt-get install -y lsb-release wget software-propert
 # Install LLVM 14
 export LLVM_VERSION=14
 curl -sL https://apt.llvm.org/llvm.sh | sudo bash -s "$LLVM_VERSION"
-
-# Configure Git client to sign commits by default
-git config commit.gpgsign true
