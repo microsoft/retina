@@ -19,7 +19,7 @@ import (
 
 const (
 	defaultTimeoutSeconds    = 300
-	defaultRetryDelay        = 5 * time.Second
+	defaultRetryDelay        = 500 * time.Millisecond
 	defaultRetryAttempts     = 60
 	defaultHTTPClientTimeout = 2 * time.Second
 )
@@ -27,7 +27,7 @@ const (
 var (
 	ErrNoPodWithLabelFound = fmt.Errorf("no pod with label found with matching pod affinity")
 
-	defaultRetrier = retry.Retrier{Attempts: defaultRetryAttempts, Delay: defaultRetryDelay}
+	defaultRetrier = retry.Retrier{Attempts: defaultRetryAttempts, Delay: defaultRetryDelay, ExpBackoff: true}
 )
 
 type PortForward struct {
