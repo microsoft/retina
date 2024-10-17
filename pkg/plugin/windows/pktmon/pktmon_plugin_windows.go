@@ -26,6 +26,10 @@ var (
 const (
 	Name             = "pktmon"
 	eventChannelSize = 1000
+
+	defaultBufferMultiplier = 10
+	defaultTruncationSize   = 256
+	defaultBufferSize       = 9000
 )
 
 type PktMonConn interface {
@@ -57,7 +61,12 @@ func (p *Plugin) Start(ctx context.Context) error {
 		return ErrNilEnricher
 	}
 
-	p.pkt = stream.NewWinPktMonStreamer(p.l, 0, 0, 0)
+	p.pkt = stream.NewWinPktMonStreamer(p.l, defaultTruncationSize, defaultBufferSize, defaultBufferMultiplier)
+
+	err := p.pkt.Initialize()
+	if err != nil {
+		return errors.Wrapf(err, "Failed to initialize pktmon")
+	}
 
 	for {
 		select {
