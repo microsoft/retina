@@ -2,7 +2,6 @@ package retina
 
 import (
 	"crypto/rand"
-	"flag"
 	"math/big"
 	"os"
 	"os/user"
@@ -18,26 +17,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	locations   = []string{"eastus2", "centralus", "southcentralus", "uksouth", "centralindia", "westus2"}
-	createInfra = flag.Bool("create-infra", true, "create a Resource group, vNET and AKS cluster for testing")
-	deleteInfra = flag.Bool("delete-infra", true, "delete a Resource group, vNET and AKS cluster for testing")
-)
-
-// TestE2ERetina tests all e2e scenarios for retina
-func TestE2ERetina(t *testing.T) {
+func TestE2ERetina_Scale(t *testing.T) {
 	ctx, cancel := helpers.Context(t)
 	defer cancel()
 
 	curuser, err := user.Current()
 	require.NoError(t, err)
-	flag.Parse()
 
-	clusterName := os.Getenv("CLUSTER_NAME")
-	if clusterName == "" {
-		clusterName = curuser.Username + common.NetObsRGtag + strconv.FormatInt(time.Now().Unix(), 10)
-		t.Logf("CLUSTER_NAME is not set, generating a random cluster name: %s", clusterName)
-	}
+	clusterName := curuser.Username + common.NetObsRGtag + strconv.FormatInt(time.Now().Unix(), 10)
 
 	subID := os.Getenv("AZURE_SUBSCRIPTION_ID")
 	require.NotEmpty(t, subID)
@@ -51,7 +38,6 @@ func TestE2ERetina(t *testing.T) {
 		}
 		location = locations[nBig.Int64()]
 	}
-
 	cwd, err := os.Getwd()
 	require.NoError(t, err)
 
@@ -59,7 +45,6 @@ func TestE2ERetina(t *testing.T) {
 	rootDir := filepath.Dir(filepath.Dir(cwd))
 
 	chartPath := filepath.Join(rootDir, "deploy", "legacy", "manifests", "controller", "helm", "retina")
-	profilePath := filepath.Join(rootDir, "test", "profiles", "advanced", "values.yaml")
 	kubeConfigFilePath := filepath.Join(rootDir, "test", "e2e", "test.pem")
 
 	// CreateTestInfra
@@ -72,11 +57,16 @@ func TestE2ERetina(t *testing.T) {
 		}
 	})
 
-	// Install and test Retina basic metrics
-	basicMetricsE2E := types.NewRunner(t, jobs.InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath))
-	basicMetricsE2E.Run(ctx)
+	// Install Retina
+	installRetina := types.NewRunner(t, jobs.InstallRetina(kubeConfigFilePath, chartPath))
+	installRetina.Run(ctx)
 
-	// Upgrade and test Retina with advanced metrics
-	advanceMetricsE2E := types.NewRunner(t, jobs.UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, profilePath))
-	advanceMetricsE2E.Run(ctx)
+	// Scale test
+	opt := jobs.DefaultScaleTestOptions()
+	opt.KubeconfigPath = kubeConfigFilePath
+	opt.RealPodType = "kapinger"
+	opt.DeleteLabels = true
+
+	scale := types.NewRunner(t, jobs.ScaleTest(&opt))
+	scale.Run(ctx)
 }
