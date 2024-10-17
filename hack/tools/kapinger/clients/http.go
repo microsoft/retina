@@ -9,6 +9,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/microsoft/retina/test/retry"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -21,7 +22,11 @@ const (
 	Service TargetType = "service"
 	Pod     TargetType = "pod"
 
-	envTargetType = "TARGET_TYPE"
+	envTargetType            = "TARGET_TYPE"
+	defaultHTTPClientTimeout = 30 * time.Second
+
+	defaultRetryAttempts = 10
+	defaultRetryDelay    = 5 * time.Second
 )
 
 type KapingerHTTPClient struct {
@@ -39,7 +44,7 @@ func NewKapingerHTTPClient(clientset *kubernetes.Clientset, labelselector string
 			Transport: &http.Transport{
 				DisableKeepAlives: true,
 			},
-			Timeout: 3 * time.Second,
+			Timeout: defaultHTTPClientTimeout,
 		},
 		labelselector: labelselector,
 		clientset:     clientset,
@@ -53,9 +58,17 @@ func NewKapingerHTTPClient(clientset *kubernetes.Clientset, labelselector string
 		k.targettype = Service
 	}
 
-	err := k.getIPS()
+	retrier := retry.Retrier{Attempts: defaultRetryAttempts, Delay: defaultRetryDelay}
+
+	err := retrier.Do(context.TODO(), func() error {
+		err := k.getIPS()
+		if err != nil {
+			return fmt.Errorf("error getting IPs: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("error getting IPs: %w", err)
+		return nil, err
 	}
 
 	return &k, nil
@@ -72,7 +85,7 @@ func (k *KapingerHTTPClient) MakeRequests(ctx context.Context, volume int, inter
 				for i := 0; i < volume; i++ {
 					err := k.makeRequest()
 					if err != nil {
-						log.Printf("error making request: %v", err)
+						log.Printf("http client: error making request: %v", err)
 					}
 				}
 			}()
@@ -100,10 +113,10 @@ func (k *KapingerHTTPClient) makeRequest() error {
 
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			log.Fatalf("Error reading response body from %s: %v", url, err)
+			log.Fatalf("http client: error reading response body from %s: %v", url, err)
 			return err
 		}
-		log.Printf("Response from %s: %s\n", url, string(body))
+		log.Printf("http client: response from %s: %s", url, string(body))
 	}
 	return nil
 }
@@ -117,7 +130,7 @@ func (k *KapingerHTTPClient) getIPS() error {
 			LabelSelector: k.labelselector,
 		})
 		if err != nil {
-			return fmt.Errorf("error getting services: %w", err)
+			return fmt.Errorf("http client: error getting services: %w", err)
 		}
 
 		// Extract the Service cluster IP addresses
@@ -125,12 +138,12 @@ func (k *KapingerHTTPClient) getIPS() error {
 		for _, svc := range services.Items {
 			ips = append(ips, svc.Spec.ClusterIP)
 		}
-		log.Println("using service IPs:", ips)
+		log.Println("http client: using service IPs:", ips)
 
 	case Pod:
 		err := waitForPodsRunning(k.clientset, k.labelselector)
 		if err != nil {
-			return fmt.Errorf("error waiting for pods to be in Running state: %w", err)
+			return fmt.Errorf("http client: error waiting for pods to be in Running state: %w", err)
 		}
 
 		// Get all pods in the cluster with label app=agnhost
@@ -138,7 +151,7 @@ func (k *KapingerHTTPClient) getIPS() error {
 			LabelSelector: k.labelselector,
 		})
 		if err != nil {
-			return fmt.Errorf("error getting pods: %w", err)
+			return fmt.Errorf("http client: error getting pods: %w", err)
 		}
 
 		for _, pod := range pods.Items {

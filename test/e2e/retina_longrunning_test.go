@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestE2ERetina tests all e2e scenarios for retina
-func TestE2ERetina(t *testing.T) {
+// Scrape PProf over a long running datapath tests
+func TestLongRunningRetina(t *testing.T) {
 	settings, err := LoadInfraSettings()
 	require.NoError(t, err)
 
@@ -22,11 +22,6 @@ func TestE2ERetina(t *testing.T) {
 		}
 	})
 
-	// Install and test Retina basic metrics
-	basicMetricsE2E := types.NewRunner(t, jobs.InstallAndTestRetinaBasicMetrics(settings.KubeConfigFilePath, settings.ChartPath))
-	basicMetricsE2E.Run()
-
-	// Upgrade and test Retina with advanced metrics
-	advanceMetricsE2E := types.NewRunner(t, jobs.UpgradeAndTestRetinaAdvancedMetrics(settings.KubeConfigFilePath, settings.ChartPath, settings.ProfilePath))
-	advanceMetricsE2E.Run()
+	longrunning := types.NewRunner(t, jobs.CreateLongRunningTest(subID, clusterName, location, settings.KubeConfigFilePath, settings.CreateInfra))
+	longrunning.Run()
 }

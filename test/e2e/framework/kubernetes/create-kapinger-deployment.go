@@ -27,6 +27,8 @@ type CreateKapingerDeployment struct {
 	KapingerNamespace  string
 	KapingerReplicas   string
 	KubeConfigFilePath string
+	BurstIntervalMs    string
+	BurstVolume        string
 }
 
 func (c *CreateKapingerDeployment) Run() error {
@@ -63,6 +65,11 @@ func (c *CreateKapingerDeployment) Run() error {
 		}
 	}
 
+	err = WaitForPodReady(ctx, clientset, c.KapingerNamespace, "app=kapinger")
+	if err != nil {
+		return fmt.Errorf("error waiting for agnhost pod to be ready: %w", err)
+	}
+
 	return nil
 }
 
@@ -92,6 +99,13 @@ func (c *CreateKapingerDeployment) GetKapingerDeployment() *appsv1.Deployment {
 			Namespace: c.KapingerNamespace,
 		},
 		Spec: appsv1.DeploymentSpec{
+			Strategy: appsv1.DeploymentStrategy{
+				Type: appsv1.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &appsv1.RollingUpdateDeployment{
+					MaxUnavailable: &intstr.IntOrString{IntVal: 20},
+					MaxSurge:       &intstr.IntOrString{IntVal: 20},
+				},
+			},
 			Replicas: &reps,
 			Selector: &metaV1.LabelSelector{
 				MatchLabels: map[string]string{
@@ -132,7 +146,7 @@ func (c *CreateKapingerDeployment) GetKapingerDeployment() *appsv1.Deployment {
 					Containers: []v1.Container{
 						{
 							Name:  "kapinger",
-							Image: "acnpublic.azurecr.io/kapinger:be57650",
+							Image: "acnpublic.azurecr.io/kapinger:20241011.4",
 							Resources: v1.ResourceRequirements{
 								Requests: v1.ResourceList{
 									"memory": resource.MustParse("20Mi"),
@@ -148,6 +162,30 @@ func (c *CreateKapingerDeployment) GetKapingerDeployment() *appsv1.Deployment {
 							},
 							Env: []v1.EnvVar{
 								{
+									Name: "POD_NAME",
+									ValueFrom: &v1.EnvVarSource{
+										FieldRef: &v1.ObjectFieldSelector{
+											FieldPath: "metadata.name",
+										},
+									},
+								},
+								{
+									Name: "POD_IP",
+									ValueFrom: &v1.EnvVarSource{
+										FieldRef: &v1.ObjectFieldSelector{
+											FieldPath: "status.podIP",
+										},
+									},
+								},
+								{
+									Name: "GOMEMLIMIT",
+									ValueFrom: &v1.EnvVarSource{
+										ResourceFieldRef: &v1.ResourceFieldSelector{
+											Resource: "limits.memory",
+										},
+									},
+								},
+								{
 									Name:  "TARGET_TYPE",
 									Value: "service",
 								},
@@ -162,6 +200,14 @@ func (c *CreateKapingerDeployment) GetKapingerDeployment() *appsv1.Deployment {
 								{
 									Name:  "UDP_PORT",
 									Value: strconv.Itoa(KapingerUDPPort),
+								},
+								{
+									Name:  "BURST_INTERVAL_MS",
+									Value: c.BurstIntervalMs,
+								},
+								{
+									Name:  "BURST_VOLUME",
+									Value: c.BurstVolume,
 								},
 							},
 						},

@@ -54,6 +54,10 @@ spec:
             requests:
               memory: 20Mi
           env:
+            - name: GOMEMLIMIT
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory
             - name: TARGET_TYPE
               value: "service"
             - name: POD_IP
