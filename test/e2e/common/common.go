@@ -11,3 +11,5 @@ const (
 	KubeSystemNamespace = "kube-system"
 	TestPodNamespace    = "kube-system-test"
 )
+
+var AzureLocations = []string{"eastus2", "northeurope", "uksouth", "centralindia", "westus2"}

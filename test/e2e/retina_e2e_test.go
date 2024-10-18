@@ -18,7 +18,6 @@ import (
 )
 
 var (
-	locations   = []string{"eastus2", "centralus", "southcentralus", "uksouth", "centralindia", "westus2"}
 	createInfra = flag.Bool("create-infra", true, "create a Resource group, vNET and AKS cluster for testing")
 	deleteInfra = flag.Bool("delete-infra", true, "delete a Resource group, vNET and AKS cluster for testing")
 )
@@ -41,11 +40,11 @@ func TestE2ERetina(t *testing.T) {
 	location := os.Getenv("AZURE_LOCATION")
 	if location == "" {
 		var nBig *big.Int
-		nBig, err = rand.Int(rand.Reader, big.NewInt(int64(len(locations))))
+		nBig, err = rand.Int(rand.Reader, big.NewInt(int64(len(common.AzureLocations))))
 		if err != nil {
 			t.Fatalf("Failed to generate a secure random index: %v", err)
 		}
-		location = locations[nBig.Int64()]
+		location = common.AzureLocations[nBig.Int64()]
 	}
 
 	cwd, err := os.Getwd()
