@@ -19,7 +19,7 @@ import (
 
 const (
 	defaultTimeoutSeconds    = 300
-	defaultRetryDelay        = 5 * time.Second
+	defaultRetryDelay        = 500 * time.Millisecond
 	defaultRetryAttempts     = 60
 	defaultHTTPClientTimeout = 2 * time.Second
 )
@@ -27,7 +27,7 @@ const (
 var (
 	ErrNoPodWithLabelFound = fmt.Errorf("no pod with label found with matching pod affinity")
 
-	defaultRetrier = retry.Retrier{Attempts: defaultRetryAttempts, Delay: defaultRetryDelay}
+	defaultRetrier = retry.Retrier{Attempts: defaultRetryAttempts, Delay: defaultRetryDelay, ExpBackoff: true}
 )
 
 type PortForward struct {
@@ -138,12 +138,12 @@ func (p *PortForward) findPodsWithAffinity(ctx context.Context, clientset *kuber
 	}
 
 	// get all pods with optional label affinity
-	affinityPods, errAffinity := clientset.CoreV1().Pods(p.Namespace).List(ctx, metav1.ListOptions{
+	affinityPods, errAffinity := clientset.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{
 		LabelSelector: p.OptionalLabelAffinity,
 		FieldSelector: "status.phase=Running",
 	})
 	if errAffinity != nil {
-		return "", fmt.Errorf("could not list affinity pods in %q with label %q: %w", p.Namespace, p.OptionalLabelAffinity, errAffinity)
+		return "", fmt.Errorf("could not list affinity pods across all namespaces with label %q: %w", p.OptionalLabelAffinity, errAffinity)
 	}
 
 	// keep track of where the affinity pods are scheduled
