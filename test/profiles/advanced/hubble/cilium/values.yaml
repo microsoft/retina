@@ -1,0 +1,3 @@
+enabledPlugin_linux: '["dns", "ciliumeventobserver"]'
+operator:
+  enabled: false
