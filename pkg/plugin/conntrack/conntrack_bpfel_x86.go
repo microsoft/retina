@@ -16,6 +16,7 @@ type conntrackCtEntry struct {
 	EvictionTime     uint32
 	LastReportTxDir  uint32
 	LastReportRxDir  uint32
+	LastSeq          uint32
 	TrafficDirection uint8
 	FlagsSeenTxDir   uint8
 	FlagsSeenRxDir   uint8
