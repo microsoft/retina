@@ -49,7 +49,9 @@ func (v *PublishPerfResults) Run() error {
 	telemetry.InitAppInsights(appInsightsKey, retinaVersion)
 	defer telemetry.ShutdownAppInsights()
 
-	telemetryClient, err := telemetry.NewAppInsightsTelemetryClient("retina-perf-test", map[string]string{})
+	telemetryClient, err := telemetry.NewAppInsightsTelemetryClient("retina-perf-test", map[string]string{
+		"retinaVersion": retinaVersion,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to create telemetry client: %v", err)
 	}
