@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubectl/pkg/scheme"
 )
 
@@ -39,9 +40,18 @@ func (e *ExecInPod) Run() error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	_, err = ExecPod(ctx, clientset, config, e.PodNamespace, e.PodName, e.Command)
+	err = retry.OnError(retry.DefaultRetry, func(err error) bool {
+		// Retry on every error
+		return true
+	}, func() error {
+		_, execErr := ExecPod(ctx, clientset, config, e.PodNamespace, e.PodName, e.Command)
+		if execErr != nil {
+			log.Printf("error executing command, retrying [%s]: %v", e.Command, execErr)
+		}
+		return execErr
+	})
 	if err != nil {
-		return fmt.Errorf("error executing command [%s]: %w", e.Command, err)
+		return fmt.Errorf("error executing command, all retries exhausted [%s]: %w", e.Command, err)
 	}
 
 	return nil
