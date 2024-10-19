@@ -196,6 +196,9 @@ func (nr *NetstatReader) readSockStats() error {
 				}
 				addr := addrPort.Addr().String()
 				port := strconv.Itoa(int(addrPort.Port()))
+				if !validateRemoteAddr(addr) {
+					continue
+				}
 				// Check if the remote address is in the new sockStats map
 				if _, ok := sockStats.socketByRemoteAddr[remoteAddr]; !ok {
 					nr.l.Debug("Removing remote address from metrics", zap.String("remoteAddr", remoteAddr))
@@ -271,12 +274,13 @@ func (nr *NetstatReader) updateMetrics() {
 }
 
 func validateRemoteAddr(addr string) bool {
+	nodeIP := os.Getenv("NODE_IP")
 	if addr == "" {
 		return false
 	}
 
 	// ignore localhost addresses.
-	if strings.Contains(addr, "127.0.0") {
+	if strings.Contains(addr, "127.0.0") || addr == nodeIP {
 		return false
 	}
 
