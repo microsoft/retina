@@ -97,13 +97,12 @@ func (d *dns) eventHandler(event *types.Event) {
 	// Update basic metrics
 	if event.Qr == types.DNSPktTypeQuery {
 		m = metrics.DNSRequestCounter
-		m.WithLabelValues().Inc()
 	} else if event.Qr == types.DNSPktTypeResponse {
 		m = metrics.DNSResponseCounter
-		m.WithLabelValues().Inc()
 	} else {
 		return
 	}
+	m.WithLabelValues().Inc()
 
 	if !d.cfg.EnablePodLevel {
 		return

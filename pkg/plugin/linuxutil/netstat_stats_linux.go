@@ -22,6 +22,10 @@ const (
 	pathNetSnmp    = "/proc/net/snmp"
 )
 
+var (
+	nodeIP = os.Getenv("NODE_IP")
+)
+
 type NetstatReader struct {
 	l          *log.ZapLogger
 	connStats  *ConnectionStats
@@ -274,13 +278,12 @@ func (nr *NetstatReader) updateMetrics() {
 }
 
 func validateRemoteAddr(addr string) bool {
-	nodeIP := os.Getenv("NODE_IP")
 	if addr == "" {
 		return false
 	}
 
-	// ignore localhost addresses.
-	if strings.Contains(addr, "127.0.0") || addr == nodeIP {
+	// ignore localhost addresses and the node's own IP
+	if strings.Contains(addr, "127.0.0") || addr == nodeIP || addr == "0.0.0.0" {
 		return false
 	}
 
