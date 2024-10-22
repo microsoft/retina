@@ -283,7 +283,7 @@ func validateRemoteAddr(addr string) bool {
 	}
 
 	// ignore localhost addresses and the node's own IP
-	if strings.Contains(addr, "127.0.0") || addr == nodeIP || addr == "0.0.0.0" {
+	if strings.HasPrefix(addr, "127.0.0") || addr == nodeIP || addr == "0.0.0.0" {
 		return false
 	}
 
