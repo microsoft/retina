@@ -18,7 +18,7 @@ var (
 )
 
 type ValidateAdvancedDNSRequestMetrics struct {
-	Namespace    string
+	PodNamespace string
 	PodName      string
 	Query        string
 	QueryType    string
@@ -31,14 +31,14 @@ type ValidateAdvancedDNSRequestMetrics struct {
 func (v *ValidateAdvancedDNSRequestMetrics) Run() error {
 	metricsEndpoint := fmt.Sprintf("http://localhost:%d/metrics", common.RetinaPort)
 	// Get Pod IP address
-	podIP, err := kubernetes.GetPodIP(v.KubeConfigFilePath, v.Namespace, v.PodName)
+	podIP, err := kubernetes.GetPodIP(v.KubeConfigFilePath, v.PodNamespace, v.PodName)
 	if err != nil {
 		return errors.Wrapf(err, "failed to get pod IP address")
 	}
 
 	validateAdvancedDNSRequestMetrics := map[string]string{
 		"ip":            podIP,
-		"namespace":     v.Namespace,
+		"namespace":     v.PodNamespace,
 		"podname":       v.PodName,
 		"query":         v.Query,
 		"query_type":    v.QueryType,
@@ -64,7 +64,7 @@ func (v *ValidateAdvancedDNSRequestMetrics) Stop() error {
 }
 
 type ValidateAdvanceDNSResponseMetrics struct {
-	Namespace    string
+	PodNamespace string
 	NumResponse  string
 	PodName      string
 	Query        string
@@ -80,7 +80,7 @@ type ValidateAdvanceDNSResponseMetrics struct {
 func (v *ValidateAdvanceDNSResponseMetrics) Run() error {
 	metricsEndpoint := fmt.Sprintf("http://localhost:%d/metrics", common.RetinaPort)
 	// Get Pod IP address
-	podIP, err := kubernetes.GetPodIP(v.KubeConfigFilePath, v.Namespace, v.PodName)
+	podIP, err := kubernetes.GetPodIP(v.KubeConfigFilePath, v.PodNamespace, v.PodName)
 	if err != nil {
 		return errors.Wrapf(err, "failed to get pod IP address")
 	}
@@ -91,7 +91,7 @@ func (v *ValidateAdvanceDNSResponseMetrics) Run() error {
 
 	validateAdvanceDNSResponseMetrics := map[string]string{
 		"ip":            podIP,
-		"namespace":     v.Namespace,
+		"namespace":     v.PodNamespace,
 		"num_response":  v.NumResponse,
 		"podname":       v.PodName,
 		"query":         v.Query,

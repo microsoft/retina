@@ -7,7 +7,7 @@ toolchain go1.23.1
 require (
 	github.com/go-chi/chi/v5 v5.1.0
 	github.com/google/uuid v1.6.0
-	github.com/prometheus/client_golang v1.20.4
+	github.com/prometheus/client_golang v1.20.5
 	github.com/spf13/cobra v1.8.1
 	go.uber.org/zap v1.27.0
 	k8s.io/client-go v0.30.3
@@ -276,7 +276,7 @@ require (
 require (
 	github.com/Azure/azure-container-networking/zapai v0.0.3
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible
-	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.14.0
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.16.0
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.8.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v4 v4.8.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/dashboard/armdashboard v1.2.0
@@ -288,9 +288,9 @@ require (
 	github.com/Microsoft/hcsshim v0.12.0-rc.3
 	github.com/Sytten/logrus-zap-hook v0.1.0
 	github.com/aws/aws-sdk-go-v2 v1.32.2
-	github.com/aws/aws-sdk-go-v2/config v1.27.43
+	github.com/aws/aws-sdk-go-v2/config v1.28.0
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.41
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.65.2
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.66.0
 	github.com/cakturk/go-netstat v0.0.0-20200220111822-e5b49efee7a5
 	github.com/cilium/cilium v1.16.0-pre.1.0.20240403152809-b9853ecbcaeb
 	github.com/cilium/ebpf v0.16.0
@@ -316,10 +316,10 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.19.0
 	github.com/vishvananda/netlink v1.2.1-beta.2.0.20240524165444-4d4ba1473f21
-	go.opentelemetry.io/otel v1.30.0
-	go.opentelemetry.io/otel/metric v1.30.0
-	go.opentelemetry.io/otel/trace v1.30.0
-	go.uber.org/mock v0.4.0
+	go.opentelemetry.io/otel v1.31.0
+	go.opentelemetry.io/otel/metric v1.31.0
+	go.opentelemetry.io/otel/trace v1.31.0
+	go.uber.org/mock v0.5.0
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
 	google.golang.org/grpc v1.67.1
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1

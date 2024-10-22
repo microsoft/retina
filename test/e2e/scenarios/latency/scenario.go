@@ -3,13 +3,14 @@ package latency
 import (
 	"time"
 
+	"github.com/microsoft/retina/test/e2e/common"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/types"
 )
 
 const sleepDelay = 5 * time.Second
 
-func ValidateLatencyMetric() *types.Scenario {
+func ValidateLatencyMetric(namespace string) *types.Scenario {
 	name := "Latency Metrics"
 	steps := []*types.StepWrapper{
 		{
@@ -19,7 +20,7 @@ func ValidateLatencyMetric() *types.Scenario {
 		},
 		{
 			Step: &kubernetes.PortForward{
-				Namespace:             "kube-system",
+				Namespace:             common.KubeSystemNamespace,
 				LabelSelector:         "k8s-app=retina",
 				LocalPort:             "10093",
 				RemotePort:            "10093",

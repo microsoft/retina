@@ -32,32 +32,45 @@ import (
 var (
 	configFlags *genericclioptions.ConfigFlags
 
-	duration           time.Duration
-	maxSize            int
-	packetSize         int
-	nodeSelectors      string
-	podSelectors       string
-	namespaceSelectors string
-	nodeNames          string
-	hostPath           string
-	pvc                string
 	blobUpload         string
-	s3Region           string
-	s3Endpoint         string
-	s3Bucket           string
-	s3Path             string
-	s3AccessKeyID      string
-	s3SecretAccessKey  string
-	tcpdumpFilter      string
+	debug              bool
+	duration           time.Duration
 	excludeFilter      string
+	hostPath           string
 	includeFilter      string
 	includeMetadata    bool
-	namespace          string
 	jobNumLimit        int
+	maxSize            int
+	namespace          string
+	namespaceSelectors string
+	nodeNames          string
+	nodeSelectors      string
+	nowait             bool
+	packetSize         int
+	podSelectors       string
+	pvc                string
+	s3AccessKeyID      string
+	s3Bucket           string
+	s3Endpoint         string
+	s3Path             string
+	s3Region           string
+	s3SecretAccessKey  string
+	tcpdumpFilter      string
+)
 
-	nowait bool
-
-	debug bool
+const (
+	DefaultDebug           bool          = false
+	DefaultDuration        time.Duration = 1 * time.Minute
+	DefaultHostPath        string        = "/mnt/retina/captures"
+	DefaultIncludeMetadata bool          = true
+	DefaultJobNumLimit     int           = 0
+	DefaultMaxSize         int           = 100
+	DefaultNodeSelectors   string        = "kubernetes.io/os=linux"
+	DefaultNowait          bool          = true
+	DefaultPacketSize      int           = 0
+	DefaultS3Path          string        = "retina/captures"
+	DefaultWaitPeriod      time.Duration = 1 * time.Minute
+	DefaultWaitTimeout     time.Duration = 5 * time.Minute
 )
 
 var createExample = templates.Examples(i18n.T(`
@@ -91,14 +104,9 @@ var createExample = templates.Examples(i18n.T(`
 			--s3-secret-access-key "your-secret-access-key"
 		`))
 
-const (
-	defaultWaitTimeout time.Duration = 5 * time.Minute
-	defaultWaitPeriod  time.Duration = 1 * time.Minute
-)
-
 var createCapture = &cobra.Command{
 	Use:     "create",
-	Short:   "create a Retina Capture",
+	Short:   "Create a Retina Capture",
 	Example: createExample,
 	RunE: func(*cobra.Command, []string) error {
 		kubeConfig, err := configFlags.ToRESTConfig()
@@ -244,6 +252,14 @@ func createCaptureF(kubeClient kubernetes.Interface) (*retinav1alpha1.Capture, e
 		capture.Spec.CaptureConfiguration.CaptureOption.Duration = &metav1.Duration{Duration: duration}
 	}
 
+	if namespaceSelectors != "" || podSelectors != "" {
+		// if node selector is using the default value (aka hasn't been set by user), set it to nil to prevent clash with namespace and pod selector
+		if nodeSelectors == DefaultNodeSelectors {
+			retinacmd.Logger.Info("Overriding default node selectors value and setting it to nil. Using namespace and pod selectors. To use node selector, please remove namespace and pod selectors.")
+			nodeSelectors = ""
+		}
+	}
+
 	nodeSelectorLabelsMap, err := labels.ConvertSelectorToLabelsMap(nodeSelectors)
 	if err != nil {
 		return nil, err
@@ -375,12 +391,12 @@ func waitUntilJobsComplete(kubeClient kubernetes.Interface, jobs []batchv1.Job) 
 	allJobsCompleted := false
 
 	// TODO: let's make the timeout and period to wait for all job to finish configurable.
-	var deadline time.Duration = defaultWaitTimeout
+	var deadline time.Duration = DefaultWaitTimeout
 	if duration != 0 {
 		deadline = duration * 2
 	}
 
-	var period time.Duration = defaultWaitPeriod
+	var period time.Duration = DefaultWaitPeriod
 	// To print less noisy messages, we rely on duration to decide the wait period.
 	if period < duration/10 {
 		period = duration / 10
@@ -443,23 +459,23 @@ func deleteJobs(kubeClient kubernetes.Interface, jobs []batchv1.Job) []string {
 
 func init() {
 	capture.AddCommand(createCapture)
-	createCapture.Flags().DurationVar(&duration, "duration", time.Minute, "Duration of capturing packets")
-	createCapture.Flags().IntVar(&maxSize, "max-size", 100, "Limit the capture file to MB in size which works only for Linux") //nolint:gomnd // default
-	createCapture.Flags().IntVar(&packetSize, "packet-size", 0, "Limits the each packet to bytes in size which works only for Linux")
+	createCapture.Flags().DurationVar(&duration, "duration", DefaultDuration, "Duration of capturing packets")
+	createCapture.Flags().IntVar(&maxSize, "max-size", DefaultMaxSize, "Limit the capture file to MB in size which works only for Linux") //nolint:gomnd // default
+	createCapture.Flags().IntVar(&packetSize, "packet-size", DefaultPacketSize, "Limits the each packet to bytes in size which works only for Linux")
 	createCapture.Flags().StringVar(&nodeNames, "node-names", "", "A comma-separated list of node names to select nodes on which the network capture will be performed")
-	createCapture.Flags().StringVar(&nodeSelectors, "node-selectors", "", "A comma-separated list of node labels to select nodes on which the network capture will be performed")
+	createCapture.Flags().StringVar(&nodeSelectors, "node-selectors", DefaultNodeSelectors, "A comma-separated list of node labels to select nodes on which the network capture will be performed")
 	createCapture.Flags().StringVar(&podSelectors, "pod-selectors", "",
 		"A comma-separated list of pod labels to select pods on which the network capture will be performed")
 	createCapture.Flags().StringVar(&namespaceSelectors, "namespace-selectors", "",
 		"A comma-separated list of namespace labels in which to apply the pod-selectors. By default, the pod namespace is specified by the flag namespace")
-	createCapture.Flags().StringVar(&hostPath, "host-path", "", "HostPath of the node to store the capture files")
+	createCapture.Flags().StringVar(&hostPath, "host-path", DefaultHostPath, "HostPath of the node to store the capture files")
 	createCapture.Flags().StringVar(&pvc, "pvc", "", "PersistentVolumeClaim under the specified or default namespace to store capture files")
 	createCapture.Flags().StringVar(&blobUpload, "blob-upload", "", "Blob SAS URL with write permission to upload capture files")
 	createCapture.Flags().StringVar(&s3Region, "s3-region", "", "Region where the S3 compatible bucket is located")
 	createCapture.Flags().StringVar(&s3Endpoint, "s3-endpoint", "",
 		"Endpoint for an S3 compatible storage service. Use this if you are using a custom or private S3 service that requires a specific endpoint")
 	createCapture.Flags().StringVar(&s3Bucket, "s3-bucket", "", "Bucket in which to store capture files")
-	createCapture.Flags().StringVar(&s3Path, "s3-path", "retina/captures", "Prefix path within the S3 bucket where captures will be stored")
+	createCapture.Flags().StringVar(&s3Path, "s3-path", DefaultS3Path, "Prefix path within the S3 bucket where captures will be stored")
 	createCapture.Flags().StringVar(&s3AccessKeyID, "s3-access-key-id", "", "S3 access key id to upload capture files")
 	createCapture.Flags().StringVar(&s3SecretAccessKey, "s3-secret-access-key", "", "S3 access secret key to upload capture files")
 	createCapture.Flags().StringVar(&tcpdumpFilter, "tcpdump-filter", "", "Raw tcpdump flags which works only for Linux")
@@ -467,8 +483,8 @@ func init() {
 		"excluded from capturing network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:*")
 	createCapture.Flags().StringVar(&includeFilter, "include-filter", "", "A comma-separated list of IP:Port pairs that are "+
 		"used to filter capture network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:*")
-	createCapture.Flags().BoolVar(&includeMetadata, "include-metadata", true, "If true, collect static network metadata into capture file")
-	createCapture.Flags().IntVar(&jobNumLimit, "job-num-limit", 0, "The maximum number of jobs can be created for each capture. 0 means no limit")
-	createCapture.Flags().BoolVar(&nowait, "no-wait", true, "Do not wait for the long-running capture job to finish")
-	createCapture.Flags().BoolVar(&debug, "debug", false, "When debug is true, a customized retina-agent image, determined by the environment variable RETINA_AGENT_IMAGE, is set")
+	createCapture.Flags().BoolVar(&includeMetadata, "include-metadata", DefaultIncludeMetadata, "If true, collect static network metadata into capture file")
+	createCapture.Flags().IntVar(&jobNumLimit, "job-num-limit", DefaultJobNumLimit, "The maximum number of jobs can be created for each capture. 0 means no limit")
+	createCapture.Flags().BoolVar(&nowait, "no-wait", DefaultNowait, "Do not wait for the long-running capture job to finish")
+	createCapture.Flags().BoolVar(&debug, "debug", DefaultDebug, "When debug is true, a customized retina-agent image, determined by the environment variable RETINA_AGENT_IMAGE, is set")
 }

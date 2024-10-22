@@ -7,7 +7,6 @@ metadata:
   labels:
     k8s-app: {{ include "retina.name" . }}
     {{- include "retina.labels" . | nindent 4 }}
-    app.kubernetes.io/component: metrics
     {{- if .Values.metrics.serviceMonitor.additionalLabels }}
     {{- toYaml .Values.metrics.serviceMonitor.additionalLabels | nindent 4 }}
     {{- end }}

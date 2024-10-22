@@ -3,6 +3,7 @@ package drop
 import (
 	"time"
 
+	"github.com/microsoft/retina/test/e2e/common"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/types"
 )
@@ -15,25 +16,25 @@ const (
 	IPTableRuleDrop = "IPTABLE_RULE_DROP"
 )
 
-func ValidateDropMetric() *types.Scenario {
+func ValidateDropMetric(namespace string) *types.Scenario {
 	name := "Drop Metrics"
 	steps := []*types.StepWrapper{
 		{
 			Step: &kubernetes.CreateDenyAllNetworkPolicy{
-				NetworkPolicyNamespace: "kube-system",
+				NetworkPolicyNamespace: namespace,
 				DenyAllLabelSelector:   "app=agnhost-a",
 			},
 		},
 		{
 			Step: &kubernetes.CreateAgnhostStatefulSet{
 				AgnhostName:      "agnhost-a",
-				AgnhostNamespace: "kube-system",
+				AgnhostNamespace: namespace,
 			},
 		},
 		{
 			Step: &kubernetes.ExecInPod{
 				PodName:      "agnhost-a-0",
-				PodNamespace: "kube-system",
+				PodNamespace: namespace,
 				Command:      "curl -s -m 5 bing.com",
 			},
 			Opts: &types.StepOptions{
@@ -49,7 +50,7 @@ func ValidateDropMetric() *types.Scenario {
 		{
 			Step: &kubernetes.ExecInPod{
 				PodName:      "agnhost-a-0",
-				PodNamespace: "kube-system",
+				PodNamespace: namespace,
 				Command:      "curl -s -m 5 bing.com",
 			},
 			Opts: &types.StepOptions{
@@ -59,7 +60,7 @@ func ValidateDropMetric() *types.Scenario {
 		},
 		{
 			Step: &kubernetes.PortForward{
-				Namespace:             "kube-system",
+				Namespace:             common.KubeSystemNamespace,
 				LabelSelector:         "k8s-app=retina",
 				LocalPort:             "10093",
 				RemotePort:            "10093",
@@ -89,7 +90,7 @@ func ValidateDropMetric() *types.Scenario {
 			Step: &kubernetes.DeleteKubernetesResource{
 				ResourceType:      kubernetes.TypeString(kubernetes.NetworkPolicy),
 				ResourceName:      "deny-all",
-				ResourceNamespace: "kube-system",
+				ResourceNamespace: namespace,
 			}, Opts: &types.StepOptions{
 				SkipSavingParametersToJob: true,
 			},
@@ -98,7 +99,7 @@ func ValidateDropMetric() *types.Scenario {
 			Step: &kubernetes.DeleteKubernetesResource{
 				ResourceType:      kubernetes.TypeString(kubernetes.StatefulSet),
 				ResourceName:      "agnhost-a",
-				ResourceNamespace: "kube-system",
+				ResourceNamespace: namespace,
 			}, Opts: &types.StepOptions{
 				SkipSavingParametersToJob: true,
 			},
