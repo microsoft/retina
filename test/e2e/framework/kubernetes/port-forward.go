@@ -11,6 +11,7 @@ import (
 	"time"
 
 	retry "github.com/microsoft/retina/test/retry"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -18,7 +19,7 @@ import (
 
 const (
 	defaultTimeoutSeconds    = 300
-	defaultRetryDelay        = 5 * time.Second
+	defaultRetryDelay        = 500 * time.Millisecond
 	defaultRetryAttempts     = 60
 	defaultHTTPClientTimeout = 2 * time.Second
 )
@@ -26,7 +27,7 @@ const (
 var (
 	ErrNoPodWithLabelFound = fmt.Errorf("no pod with label found with matching pod affinity")
 
-	defaultRetrier = retry.Retrier{Attempts: defaultRetryAttempts, Delay: defaultRetryDelay}
+	defaultRetrier = retry.Retrier{Attempts: defaultRetryAttempts, Delay: defaultRetryDelay, ExpBackoff: true}
 )
 
 type PortForward struct {
@@ -120,7 +121,7 @@ func (p *PortForward) Run() error {
 }
 
 func (p *PortForward) findPodsWithAffinity(ctx context.Context, clientset *kubernetes.Clientset) (string, error) {
-	targetPods, errAffinity := clientset.CoreV1().Pods(p.Namespace).List(ctx, metav1.ListOptions{
+	targetPodsAll, errAffinity := clientset.CoreV1().Pods(p.Namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: p.LabelSelector,
 		FieldSelector: "status.phase=Running",
 	})
@@ -128,12 +129,21 @@ func (p *PortForward) findPodsWithAffinity(ctx context.Context, clientset *kuber
 		return "", fmt.Errorf("could not list pods in %q with label %q: %w", p.Namespace, p.LabelSelector, errAffinity)
 	}
 
-	affinityPods, errAffinity := clientset.CoreV1().Pods(p.Namespace).List(ctx, metav1.ListOptions{
+	// omit windows pods because we can't port-forward to them
+	targetPodsLinux := make([]v1.Pod, 0)
+	for i := range targetPodsAll.Items {
+		if targetPodsAll.Items[i].Spec.NodeSelector["kubernetes.io/os"] != "windows" {
+			targetPodsLinux = append(targetPodsLinux, targetPodsAll.Items[i])
+		}
+	}
+
+	// get all pods with optional label affinity
+	affinityPods, errAffinity := clientset.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{
 		LabelSelector: p.OptionalLabelAffinity,
 		FieldSelector: "status.phase=Running",
 	})
 	if errAffinity != nil {
-		return "", fmt.Errorf("could not list affinity pods in %q with label %q: %w", p.Namespace, p.OptionalLabelAffinity, errAffinity)
+		return "", fmt.Errorf("could not list affinity pods across all namespaces with label %q: %w", p.OptionalLabelAffinity, errAffinity)
 	}
 
 	// keep track of where the affinity pods are scheduled
@@ -143,10 +153,10 @@ func (p *PortForward) findPodsWithAffinity(ctx context.Context, clientset *kuber
 	}
 
 	// if a pod is found on the same node as an affinity pod, use it
-	for i := range targetPods.Items {
-		if affinityNodes[targetPods.Items[i].Spec.NodeName] {
+	for i := range targetPodsLinux {
+		if affinityNodes[targetPodsLinux[i].Spec.NodeName] {
 			// found a pod with the specified label, on a node with the optional label affinity
-			return targetPods.Items[i].Name, nil
+			return targetPodsLinux[i].Name, nil
 		}
 	}
 

@@ -8,6 +8,9 @@
 *.so
 *.dylib
 
+# Avoid checking in keys
+*.pem
+
 # Test binary, built with `go test -c`
 *.test
 

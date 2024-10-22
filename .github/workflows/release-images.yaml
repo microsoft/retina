@@ -32,7 +32,7 @@ jobs:
       - run: go version
 
       - name: Install Cosign
-        uses: sigstore/cosign-installer@v3.6.0
+        uses: sigstore/cosign-installer@v3.7.0
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -78,7 +78,7 @@ jobs:
       - run: go version
 
       - name: Install Cosign
-        uses: sigstore/cosign-installer@v3.6.0
+        uses: sigstore/cosign-installer@v3.7.0
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -124,7 +124,7 @@ jobs:
       - run: go version
 
       - name: Install Cosign
-        uses: sigstore/cosign-installer@v3.6.0
+        uses: sigstore/cosign-installer@v3.7.0
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -167,7 +167,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
 
       - name: Install Cosign
-        uses: sigstore/cosign-installer@v3.6.0
+        uses: sigstore/cosign-installer@v3.7.0
 
       - name: Log in to registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin

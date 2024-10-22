@@ -519,9 +519,11 @@ func (translator *CaptureToPodTranslator) validateTargetSelector(captureTarget r
 	if captureTarget.NodeSelector == nil && captureTarget.PodSelector == nil {
 		return fmt.Errorf("Neither NodeSelector nor NamespaceSelector&PodSelector is set.")
 	}
+
 	if captureTarget.NodeSelector != nil && (captureTarget.NamespaceSelector != nil || captureTarget.PodSelector != nil) {
-		return fmt.Errorf("NodeSelector is not compatible with NamespaceSelector&PodSelector.")
+		return fmt.Errorf("NodeSelector is not compatible with NamespaceSelector&PodSelector. Please use one or the other.")
 	}
+
 	return nil
 }
 

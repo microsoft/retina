@@ -22,7 +22,7 @@ struct {
     __uint(max_entries, 2);
     __type(key, key_type);
     __type(value, struct metric);
-} packets SEC(".maps");
+} retina_packetforward_metrics SEC(".maps");
 
 SEC("socket1")
 int socket_filter(struct __sk_buff *skb) {
@@ -40,13 +40,13 @@ int socket_filter(struct __sk_buff *skb) {
     // Get the packet size (in bytes) including headers.
     u64 packetSize = skb->len;
 
-    struct metric *curMetric = bpf_map_lookup_elem(&packets, &mapKey);
+    struct metric *curMetric = bpf_map_lookup_elem(&retina_packetforward_metrics, &mapKey);
 	if (!curMetric) {
         // Per CPU hashmap, hence no race condition here.
         struct metric initMetric;
         initMetric.count = 1;
         initMetric.bytes = packetSize;
-        bpf_map_update_elem(&packets, &mapKey, &initMetric, BPF_ANY);
+        bpf_map_update_elem(&retina_packetforward_metrics, &mapKey, &initMetric, BPF_ANY);
     } else {
         // Atomic operation.
         curMetric->count++;
