@@ -18,19 +18,22 @@ func downloadExternalCRDs(chartPath string) error {
 
 	for _, crdUrl := range crdUrls {
 		crd, err := fetchYAML(crdUrl)
-		if err == nil && crd != nil {
+		if err != nil {
+			return err
+		}
+		if crd != nil {
 			crdName, err := extractFileName(crdUrl)
-			if err == nil && crdName != "" {
+			if err != nil {
+				return err
+			}
+			if crdName != "" {
 				log.Printf("CRD exists %s", crdName)
 				log.Printf("File path to be written to %s", filepath.Join(chartPath, "/crds/"+crdName))
 				err = saveToFile(filepath.Join(chartPath, "/crds/"+crdName), crd)
 				if err != nil {
-					return fmt.Errorf("failed to save crd.yaml /crds dir: %w", err)
+					return err
 				}
 			}
-		}
-		if err != nil {
-			return fmt.Errorf("failed to fetch crd from %s: %w", crdUrl, err)
 		}
 	}
 	return nil
@@ -39,7 +42,7 @@ func downloadExternalCRDs(chartPath string) error {
 func fetchYAML(url string) ([]byte, error) {
 	resp, err := http.Get(url)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get crd source code: %w", err)
+		return nil, fmt.Errorf("failed to get crd source code from %s: %w", url, err)
 	}
 	defer resp.Body.Close()
 	return io.ReadAll(resp.Body)
@@ -56,7 +59,7 @@ func extractFileName(rawURL string) (string, error) {
 func saveToFile(filename string, data []byte) error {
 	err := os.WriteFile(filename, data, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to write crd file: %w", err)
+		return fmt.Errorf("failed to write crd.yaml to /crds dir : %w", err)
 	}
 	return nil
 }
