@@ -21,19 +21,17 @@ func downloadExternalCRDs(chartPath string) error {
 		if err != nil {
 			return err
 		}
-		if crd != nil {
-			crdName, err := extractFileName(crdUrl)
-			if err != nil {
-				return err
-			}
-			if crdName != "" {
-				log.Printf("CRD exists %s", crdName)
-				log.Printf("File path to be written to %s", filepath.Join(chartPath, "/crds/"+crdName))
-				err = saveToFile(filepath.Join(chartPath, "/crds/"+crdName), crd)
-				if err != nil {
-					return err
-				}
-			}
+
+		crdName, err := extractFileName(crdUrl)
+		if err != nil {
+			return err
+		}
+
+		log.Printf("CRD exists %s", crdName)
+		log.Printf("File path to be written to %s", filepath.Join(chartPath, "/crds/"+crdName))
+		err = saveToFile(filepath.Join(chartPath, "/crds/"+crdName), crd)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
