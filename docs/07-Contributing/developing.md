@@ -190,6 +190,10 @@ In order to certify the provenance of commits and defend against impersonation, 
 Documentation for setting up Git and Github to sign your commits can be found [here](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits).
 Additional information about Git's use of GPG can be found [here](https://git-scm.com/book/en/v2/Git-Tools-Signing-Your-Work)
 
+> To configure your Git client to sign commits by default for a local repository, run `git config --add commit.gpgsign true`.
+
+For **GitHub Codespaces** users, please follow [this doc](https://docs.github.com/en/codespaces/managing-your-codespaces/managing-gpg-verification-for-github-codespaces) to configure GitHub to automatically use GPG to sign commits you make in your Codespaces.
+
 ### Developers Certificate of Origin (DCO)
 
 Contributions to Retina must contain a Developers Certificate of Origin within their constituent commits.
