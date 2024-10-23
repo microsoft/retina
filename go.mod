@@ -277,7 +277,7 @@ require (
 require (
 	github.com/Azure/azure-container-networking/zapai v0.0.3
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible
-	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.15.0
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.16.0
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.8.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v4 v4.8.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/dashboard/armdashboard v1.2.0
@@ -319,7 +319,7 @@ require (
 	go.opentelemetry.io/otel v1.31.0
 	go.opentelemetry.io/otel/metric v1.31.0
 	go.opentelemetry.io/otel/trace v1.31.0
-	go.uber.org/mock v0.4.0
+	go.uber.org/mock v0.5.0
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
 	google.golang.org/grpc v1.67.1
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
