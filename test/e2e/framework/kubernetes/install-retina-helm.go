@@ -67,6 +67,12 @@ func (i *InstallHelmChart) Run() error {
 		return fmt.Errorf("image namespace is not set: %w", errEmpty)
 	}
 
+	//Download necessary CRD's
+	err = downloadExternalCRDs(i.ChartPath)
+	if err != nil {
+		return fmt.Errorf("failed to load external crd's: %w", err)
+	}
+
 	// load chart from the path
 	chart, err := loader.Load(i.ChartPath)
 	if err != nil {
