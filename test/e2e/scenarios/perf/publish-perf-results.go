@@ -58,18 +58,9 @@ func (v *PublishPerfResults) Run() error {
 
 	fmt.Printf("Sending telemetry data to app insights\n")
 	for _, result := range results {
-		err = publishResultMetrics(telemetryClient, result.Label, "benchmark", result.Benchmark)
-		if err != nil {
-			return fmt.Errorf("failed to publish benchmark metrics: %v", err)
-		}
-		err = publishResultMetrics(telemetryClient, result.Label, "result", result.Result)
-		if err != nil {
-			return fmt.Errorf("failed to publish result metrics: %v", err)
-		}
-		err = publishResultMetrics(telemetryClient, result.Label, "regression", result.Regressions)
-		if err != nil {
-			return fmt.Errorf("failed to publish regression metrics: %v", err)
-		}
+		publishResultEvent(telemetryClient, result.Label, "benchmark", result.Benchmark)
+		publishResultEvent(telemetryClient, result.Label, "result", result.Result)
+		publishResultEvent(telemetryClient, result.Label, "regression", result.Regressions)
 	}
 	return nil
 }
@@ -78,9 +69,12 @@ func (v *PublishPerfResults) Stop() error {
 	return nil
 }
 
-func publishResultMetrics(telemetryClient telemetry.Telemetry, testCase, resultType string, metricMap map[string]float64) error {
-	for name, value := range metricMap {
-		telemetryClient.TrackMetric(name, value, map[string]string{"resultType": resultType, "testCase": testCase})
+func publishResultEvent(telemetryClient telemetry.Telemetry, testCase, resultType string, metricMap map[string]float64) {
+	event := make(map[string]string)
+	for k, v := range metricMap {
+		event[k] = fmt.Sprintf("%f", v)
 	}
-	return nil
+	event["testCase"] = testCase
+	event["resultType"] = resultType
+	telemetryClient.TrackEvent("retina-perf", event)
 }
