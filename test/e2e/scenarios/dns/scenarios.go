@@ -48,6 +48,15 @@ func ValidateBasicDNSMetrics(scenarioName string, req *RequestValidationParams, 
 				AgnhostNamespace: namespace,
 			},
 		},
+		// Need this delay to guarantee that the pods will have bpf program attached
+		{
+			Step: &types.Sleep{
+				Duration: 30 * time.Second,
+			},
+			Opts: &types.StepOptions{
+				SkipSavingParametersToJob: true,
+			},
+		},
 		{
 			Step: &kubernetes.ExecInPod{
 				PodName:      podName,
@@ -150,6 +159,15 @@ func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParam
 			Step: &kubernetes.CreateAgnhostStatefulSet{
 				AgnhostName:      agnhostName,
 				AgnhostNamespace: namespace,
+			},
+		},
+		// Need this delay to guarantee that the pods will have bpf program attached
+		{
+			Step: &types.Sleep{
+				Duration: 30 * time.Second,
+			},
+			Opts: &types.StepOptions{
+				SkipSavingParametersToJob: true,
 			},
 		},
 		{
