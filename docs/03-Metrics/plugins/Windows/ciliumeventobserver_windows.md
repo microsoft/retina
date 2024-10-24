@@ -41,7 +41,6 @@ The cilium events map on windows is a ring buffer map.
 so we will add a small golang library to connect to the ebpf-for-windows ring buffer.
 
 #### GoLang Shim for Windows eBPF ring buffer
- 
 - This will be a custom Golang library for consuming the eBPF ring buffer implementation on Windows.
 - It will provide sufficient functionality to instantiate and consume events from a specified ring buffer in eBPF.
 - The ciliumEventObserverWindows module willuse this shim to read the events in the ring buffer and perform further processing.
