@@ -16,21 +16,40 @@ but currently only include the cilium event details (not the raw packet data).
 To connect to these events you can use the `ciliumeventobserver_windows` retina plugin.
 The Windows cilium plugin will attach to the `cilium_events` ring buffer and read the
 the events, then decode and parse the events and wrap them in a flow object.
-The flow object will
-
-The raw event parsing will be done using the existing [cilium/cilium/pkg/monitor](https://github.com/cilium/cilium/tree/main/pkg/monitor), since cilium on windows has the same binary event format.
-The retina daemon listens for the flow objects the plugin emits and sends them to our monitor agent.
-Our hubble observer will consume these events and process the flows using our own custom
-[parsers](https://github.com/microsoft/retina/tree/main/pkg/hubble/parser).
+The flow object will then be sent to the external channel for processing.
 
 ### Processing Pipeline
 
 1. Cilium bpf program writes events to ring buffer
 2. Windows cilium retina agent plugin will:
-   1. consume the ring buffer events
+   1. collect the ring buffer events
    2. Decode and parse the events into Hubble-compatible flow objects
    3. Write the flow objects to the external channel
 3. From the external channel retina will process the events into metrics.
+
+### Cilium generated events
+
+The Windows version of cilium writes observability and debugging events to an eBPF ring buffer map.
+The event structures used in the Windows cilium eBPF programs have the same definitions as on linux,
+so can use the same decoding logic. The main difference in the Windows eBPF program is the runtime [Event filtering](#event-filter-configuration), where instead of conditionally compiling in the observability reporting
+The cilium programs check an observability configuration array map at runtime to decide whether to emit events.
+
+
+### Collecting cilium events
+
+The cilium events map on windows is a ring buffer map.
+[cilium/ebpf-go](https://github.com/cilium/ebpf) does not yet run on Windows,
+so we will add a small golang library to connect to the ebpf-for-windows ring buffer.
+
+### Event Parsing
+
+The raw event parsing will be done using the existing [cilium/cilium/pkg/monitor](https://github.com/cilium/cilium/tree/main/pkg/monitor), since cilium on windows has the same binary event format.
+
+### Event Processing
+
+The retina daemon listens for the flow objects the plugin emits and sends them to our monitor agent.
+Our hubble observer will consume these events and process the flows using our own custom
+[parsers](https://github.com/microsoft/retina/tree/main/pkg/hubble/parser).
 
 ## Event filter configuration
 
