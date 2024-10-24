@@ -34,7 +34,6 @@ The event structures used in the Windows cilium eBPF programs have the same defi
 so can use the same decoding logic. The main difference in the Windows eBPF program is the runtime [Event filtering](#event-filter-configuration), where instead of conditionally compiling in the observability reporting
 The cilium programs check an observability configuration array map at runtime to decide whether to emit events.
 
-
 ### Collecting cilium events
 
 The cilium events map on windows is a ring buffer map.
@@ -62,8 +61,7 @@ To configure the event filter in retina, modify the appropriate values in the `r
 [ConfigMap](../02-Installation/03-Config.md).
 When retina reloads the configuration it will write the corresponding values to the event configuration map.
 
-_(DRAFT)_
-```
+```yaml
 cilium_windows:
   # NOTE: currently DROP events are always enabled
   enabled_events:
@@ -91,7 +89,7 @@ The monitor aggregation value has the same meaning as the linux cilium monitor a
 
 ## Code locations
 
-- Plugin and eBPF code: *pkg/plugin/ciliumeventobserver_windows/*
+- Plugin and eBPF code: _pkg/plugin/ciliumeventobserver_windows/_
 
 ## Metrics
 
