@@ -2,6 +2,12 @@
 
 Captures TCP and UDP packets traveling to and from pods and nodes.
 
+## Capabilities
+
+The `packetparser` plugin requires the `CAP_NET_ADMIN` and `CAP_SYS_ADMIN` capabilities.
+- `CAP_SYS_ADMIN` is used to load maps and programs into the kernel and assign them to user-defined structs - `LoadAndAssign()` method at `packetparser_linux.go:147`
+- `CAP_NET_ADMIN` is used for the queuing discipline kernel mechanism - `getQdisc()` method at `packetparser_linux.go:430`
+
 ## Architecture
 
 `packetparser` attached a [`qdisc` (Queuing Discipline)](https://www.man7.org/linux/man-pages/man8/tc.8.html) of type `clsact` to each pod's virtual interface (`veth`) and the host's default interface (`device`). This setup enabled the attachment of eBPF filter programs for both ingress and egress directions, allowing `packetparser` to capture individual packets traveling to and from the interfaces.
