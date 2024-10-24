@@ -22,19 +22,28 @@ func ValidateDropMetric(namespace string) *types.Scenario {
 		{
 			Step: &kubernetes.CreateDenyAllNetworkPolicy{
 				NetworkPolicyNamespace: namespace,
-				DenyAllLabelSelector:   "app=agnhost-a",
+				DenyAllLabelSelector:   "app=agnhost-drop",
 			},
 		},
 		{
 			Step: &kubernetes.CreateAgnhostStatefulSet{
-				AgnhostName:      "agnhost-a",
 				AgnhostNamespace: namespace,
+				AgnhostName:      "agnhost-drop",
+			},
+		},
+		// Need this delay to guarantee that the pods will have bpf program attached
+		{
+			Step: &types.Sleep{
+				Duration: 30 * time.Second,
+			},
+			Opts: &types.StepOptions{
+				SkipSavingParametersToJob: true,
 			},
 		},
 		{
 			Step: &kubernetes.ExecInPod{
-				PodName:      "agnhost-a-0",
 				PodNamespace: namespace,
+				PodName:      "agnhost-drop-0",
 				Command:      "curl -s -m 5 bing.com",
 			},
 			Opts: &types.StepOptions{
@@ -49,8 +58,8 @@ func ValidateDropMetric(namespace string) *types.Scenario {
 		},
 		{
 			Step: &kubernetes.ExecInPod{
-				PodName:      "agnhost-a-0",
 				PodNamespace: namespace,
+				PodName:      "agnhost-drop-0",
 				Command:      "curl -s -m 5 bing.com",
 			},
 			Opts: &types.StepOptions{
@@ -65,7 +74,7 @@ func ValidateDropMetric(namespace string) *types.Scenario {
 				LocalPort:             "10093",
 				RemotePort:            "10093",
 				Endpoint:              "metrics",
-				OptionalLabelAffinity: "app=agnhost-a", // port forward to a pod on a node that also has this pod with this label, assuming same namespace
+				OptionalLabelAffinity: "app=agnhost-drop", // port forward to a pod on a node that also has this pod with this label, assuming same namespace
 			},
 			Opts: &types.StepOptions{
 				RunInBackgroundWithID: "drop-port-forward",
@@ -74,7 +83,7 @@ func ValidateDropMetric(namespace string) *types.Scenario {
 		{
 			Step: &ValidateRetinaDropMetric{
 				PortForwardedRetinaPort: "10093",
-				Source:                  "agnhost-a",
+				Source:                  "agnhost-drop",
 				Reason:                  IPTableRuleDrop,
 				Direction:               "unknown",
 				Protocol:                UDP,
@@ -98,8 +107,8 @@ func ValidateDropMetric(namespace string) *types.Scenario {
 		{
 			Step: &kubernetes.DeleteKubernetesResource{
 				ResourceType:      kubernetes.TypeString(kubernetes.StatefulSet),
-				ResourceName:      "agnhost-a",
 				ResourceNamespace: namespace,
+				ResourceName:      "agnhost-drop",
 			}, Opts: &types.StepOptions{
 				SkipSavingParametersToJob: true,
 			},

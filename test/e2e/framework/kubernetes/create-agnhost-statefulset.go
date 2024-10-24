@@ -9,7 +9,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -24,6 +24,7 @@ const (
 type CreateAgnhostStatefulSet struct {
 	AgnhostName        string
 	AgnhostNamespace   string
+	ScheduleOnSameNode bool
 	KubeConfigFilePath string
 }
 
@@ -73,25 +74,64 @@ func (c *CreateAgnhostStatefulSet) Stop() error {
 func (c *CreateAgnhostStatefulSet) getAgnhostDeployment() *appsv1.StatefulSet {
 	reps := int32(AgnhostReplicas)
 
+	var affinity *v1.Affinity
+	if c.ScheduleOnSameNode {
+		affinity = &v1.Affinity{
+			PodAffinity: &v1.PodAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+					{
+						TopologyKey: "kubernetes.io/hostname",
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"k8s-app": "agnhost",
+							},
+						},
+					},
+				},
+			},
+		}
+
+	} else {
+		affinity = &v1.Affinity{
+			PodAntiAffinity: &v1.PodAntiAffinity{
+				// prefer an even spread across the cluster to avoid scheduling on the same node
+				PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
+					{
+						Weight: MaxAffinityWeight,
+						PodAffinityTerm: v1.PodAffinityTerm{
+							TopologyKey: "kubernetes.io/hostname",
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"k8s-app": "agnhost",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+
 	return &appsv1.StatefulSet{
-		TypeMeta: metaV1.TypeMeta{
-			Kind:       "Deployment",
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "StatefulSet",
 			APIVersion: "apps/v1",
 		},
-		ObjectMeta: metaV1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.AgnhostName,
 			Namespace: c.AgnhostNamespace,
 		},
 		Spec: appsv1.StatefulSetSpec{
-			Replicas: &reps,
-			Selector: &metaV1.LabelSelector{
+			ServiceName: c.AgnhostName,
+			Replicas:    &reps,
+			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app":     c.AgnhostName,
 					"k8s-app": "agnhost",
 				},
 			},
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: metaV1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"app":     c.AgnhostName,
 						"k8s-app": "agnhost",
@@ -99,24 +139,7 @@ func (c *CreateAgnhostStatefulSet) getAgnhostDeployment() *appsv1.StatefulSet {
 				},
 
 				Spec: v1.PodSpec{
-					Affinity: &v1.Affinity{
-						PodAntiAffinity: &v1.PodAntiAffinity{
-							// prefer an even spread across the cluster to avoid scheduling on the same node
-							PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
-								{
-									Weight: MaxAffinityWeight,
-									PodAffinityTerm: v1.PodAffinityTerm{
-										TopologyKey: "kubernetes.io/hostname",
-										LabelSelector: &metaV1.LabelSelector{
-											MatchLabels: map[string]string{
-												"k8s-app": "agnhost",
-											},
-										},
-									},
-								},
-							},
-						},
-					},
+					Affinity: affinity,
 					NodeSelector: map[string]string{
 						"kubernetes.io/os": "linux",
 					},
