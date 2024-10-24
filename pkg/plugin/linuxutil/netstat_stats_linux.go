@@ -22,6 +22,10 @@ const (
 	pathNetSnmp    = "/proc/net/snmp"
 )
 
+var (
+	nodeIP = os.Getenv("NODE_IP")
+)
+
 type NetstatReader struct {
 	l          *log.ZapLogger
 	connStats  *ConnectionStats
@@ -196,6 +200,9 @@ func (nr *NetstatReader) readSockStats() error {
 				}
 				addr := addrPort.Addr().String()
 				port := strconv.Itoa(int(addrPort.Port()))
+				if !validateRemoteAddr(addr) {
+					continue
+				}
 				// Check if the remote address is in the new sockStats map
 				if _, ok := sockStats.socketByRemoteAddr[remoteAddr]; !ok {
 					nr.l.Debug("Removing remote address from metrics", zap.String("remoteAddr", remoteAddr))
@@ -275,8 +282,8 @@ func validateRemoteAddr(addr string) bool {
 		return false
 	}
 
-	// ignore localhost addresses.
-	if strings.Contains(addr, "127.0.0") {
+	// ignore localhost addresses and the node's own IP
+	if strings.HasPrefix(addr, "127.0.0") || addr == nodeIP || addr == "0.0.0.0" {
 		return false
 	}
 

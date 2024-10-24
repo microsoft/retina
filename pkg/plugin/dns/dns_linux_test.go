@@ -141,7 +141,7 @@ func TestRequestEventHandler(t *testing.T) {
 
 	// Basic metrics.
 	mockCV := metrics.NewMockCounterVec(ctrl)
-	mockCV.EXPECT().WithLabelValues(event.QType, event.DNSName).Return(c).Times(1)
+	mockCV.EXPECT().WithLabelValues().Return(c).Times(1)
 	before := value(c)
 	metrics.DNSRequestCounter = mockCV
 
@@ -191,7 +191,7 @@ func TestResponseEventHandler(t *testing.T) {
 	// Basic metrics.
 	c := prometheus.NewCounter(prometheus.CounterOpts{})
 	mockCV := metrics.NewMockCounterVec(ctrl)
-	mockCV.EXPECT().WithLabelValues(event.Rcode, event.QType, event.DNSName, "1.1.1.1,2.2.2.2", "2").Return(c).Times(1)
+	mockCV.EXPECT().WithLabelValues().Return(c).Times(1)
 	before := value(c)
 	metrics.DNSResponseCounter = mockCV
 
