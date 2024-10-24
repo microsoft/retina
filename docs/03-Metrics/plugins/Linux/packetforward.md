@@ -5,6 +5,7 @@ Counts number of packets/bytes passing through the `eth0` interface of a Node, a
 ## Capabilities
 
 The `packetforward` plugin requires the `CAP_BPF` and `CAP_NET_RAW` capabilities.
+
 - `CAP_NET_RAW` is used to open raw sockets on the `eth0` network interface - `OpenRawSocket()` method at `packetforward_linux.go:159`
 
 ## Architecture

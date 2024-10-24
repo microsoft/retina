@@ -5,8 +5,9 @@ Tracks incoming and outgoing DNS traffic, providing various metrics and details 
 ## Capabilities
 
 The `dns` plugin requires the `CAP_SYS_ADMIN` and `CAP_NET_RAW` capabilities.
+
 - `CAP_SYS_ADMIN` is used to create a network tracer which invokes a tail call for updating the `ProgramArray` map - `NewTracer()` method at `dns_linux:50`
-- `CAP_NET_RAW` is used to open a raw socket - `Attach()` method at `dns_linux:70` 
+- `CAP_NET_RAW` is used to open a raw socket - `Attach()` method at `dns_linux:70`
 
 ## Architecture
 

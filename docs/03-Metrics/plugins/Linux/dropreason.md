@@ -5,6 +5,7 @@ Counts number of packets/bytes dropped on a Node, along with the direction and r
 ## Capabilities
 
 The `dropreason` plugin requires the `CAP_SYS_ADMIN` and the `CAP_DAC_OVERRIDE` capabilities.
+
 - `CAP_DAC_OVERRIDE` is used to override discretionary access control (DAC) restrictions, enabling the process to read, write, or execute files it would not normally have permissions to access - `LoadAndAssign()` method at `dropreason_linux.go:135`
 - `CAP_SYS_ADMIN` is used to increase the memory lock limits, enabling the allocation of additional memory for eBPF programs and maps - `LoadAndAssign()` method at `dropreason_linux.go:135`
 

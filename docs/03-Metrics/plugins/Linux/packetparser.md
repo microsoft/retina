@@ -5,6 +5,7 @@ Captures TCP and UDP packets traveling to and from pods and nodes.
 ## Capabilities
 
 The `packetparser` plugin requires the `CAP_NET_ADMIN` and `CAP_SYS_ADMIN` capabilities.
+
 - `CAP_SYS_ADMIN` is used to load maps and programs into the kernel and assign them to user-defined structs - `LoadAndAssign()` method at `packetparser_linux.go:147`
 - `CAP_NET_ADMIN` is used for the queuing discipline kernel mechanism - `getQdisc()` method at `packetparser_linux.go:430`
 
