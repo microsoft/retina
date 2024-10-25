@@ -19,6 +19,7 @@ import (
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
 	captureOutput "github.com/microsoft/retina/pkg/capture/outputlocation"
 	captureProvider "github.com/microsoft/retina/pkg/capture/provider"
+	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/telemetry"
 )
@@ -40,7 +41,12 @@ func NewCaptureManager(logger *log.ZapLogger, tel telemetry.Telemetry) *CaptureM
 }
 
 func (cm *CaptureManager) CaptureNetwork(sigChan <-chan os.Signal) (string, error) {
-	tmpLocation, err := cm.networkCaptureProvider.Setup(cm.captureName(), cm.captureNodeHostName())
+	startTimestamp, err := cm.captureStartTimestamp()
+	if err != nil {
+		return "", err
+	}
+
+	tmpLocation, err := cm.networkCaptureProvider.Setup(cm.captureName(), cm.captureNodeHostName(), startTimestamp)
 	if err != nil {
 		return "", err
 	}
@@ -94,6 +100,17 @@ func (cm *CaptureManager) captureName() string {
 
 func (cm *CaptureManager) captureNodeHostName() string {
 	return os.Getenv(captureConstants.NodeHostNameEnvKey)
+}
+
+func (cm *CaptureManager) captureStartTimestamp() (time.Time, error) {
+	tmp := os.Getenv(captureConstants.CaptureStartTimestampEnvKey)
+
+	timestamp, err := captureUtils.ConvertStringToTimestamp(tmp)
+	if err != nil {
+		cm.l.Error("Failed to parse the timestamp into the right format", zap.Error(err))
+		return time.Time{}, err
+	}
+	return timestamp, nil
 }
 
 func (cm *CaptureManager) captureFilter() string {

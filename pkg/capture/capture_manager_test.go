@@ -8,10 +8,12 @@ import (
 	"os"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
 	"github.com/microsoft/retina/pkg/capture/provider"
+	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/telemetry"
 	"go.uber.org/mock/gomock"
@@ -27,6 +29,7 @@ func TestCaptureNetwork(t *testing.T) {
 		tel:                    telemetry.NewNoopTelemetry(),
 	}
 
+	timestamp := time.Now().UTC()
 	captureName := "capture-name"
 	nodeHostName := "node-host-name"
 	filter := "-i any"
@@ -34,6 +37,7 @@ func TestCaptureNetwork(t *testing.T) {
 	maxSize := 100
 	os.Setenv(captureConstants.CaptureNameEnvKey, captureName)
 	os.Setenv(captureConstants.NodeHostNameEnvKey, nodeHostName)
+	os.Setenv(captureConstants.CaptureStartTimestampEnvKey, captureUtils.ConvertTimestampToString(timestamp))
 	os.Setenv(captureConstants.TcpdumpFilterEnvKey, filter)
 	os.Setenv(captureConstants.CaptureDurationEnvKey, "10s")
 	os.Setenv(captureConstants.CaptureMaxSizeEnvKey, strconv.Itoa(maxSize))
@@ -41,6 +45,7 @@ func TestCaptureNetwork(t *testing.T) {
 	defer func() {
 		os.Unsetenv(captureConstants.CaptureNameEnvKey)
 		os.Unsetenv(captureConstants.NodeHostNameEnvKey)
+		os.Unsetenv(captureConstants.CaptureStartTimestampEnvKey)
 		os.Unsetenv(captureConstants.TcpdumpFilterEnvKey)
 		os.Unsetenv(captureConstants.CaptureDurationEnvKey)
 		os.Unsetenv(captureConstants.CaptureMaxSizeEnvKey)
@@ -48,7 +53,7 @@ func TestCaptureNetwork(t *testing.T) {
 
 	sigChanel := make(chan os.Signal, 1)
 
-	networkCaptureProvider.EXPECT().Setup(captureName, nodeHostName).Return(fmt.Sprintf("%s-%s", captureName, nodeHostName), nil).Times(1)
+	networkCaptureProvider.EXPECT().Setup(captureName, nodeHostName, timestamp).Return(fmt.Sprintf("%s-%s-%s", captureName, nodeHostName, captureUtils.ConvertTimestampToString(timestamp)), nil).Times(1)
 	networkCaptureProvider.EXPECT().CaptureNetworkPacket(filter, duration, maxSize, sigChanel).Return(nil).Times(1)
 
 	_, err := cm.CaptureNetwork(sigChanel)

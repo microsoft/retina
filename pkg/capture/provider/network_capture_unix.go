@@ -17,14 +17,16 @@ import (
 	"go.uber.org/zap"
 
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
+	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	"github.com/microsoft/retina/pkg/log"
 )
 
 type NetworkCaptureProvider struct {
 	NetworkCaptureProviderCommon
-	TmpCaptureDir string
-	CaptureName   string
-	NodeHostName  string
+	TmpCaptureDir  string
+	CaptureName    string
+	NodeHostName   string
+	StartTimestamp time.Time
 
 	l *log.ZapLogger
 }
@@ -38,8 +40,8 @@ func NewNetworkCaptureProvider(logger *log.ZapLogger) NetworkCaptureProviderInte
 	}
 }
 
-func (ncp *NetworkCaptureProvider) Setup(captureName, nodeHostname string) (string, error) {
-	captureFolderDir, err := ncp.NetworkCaptureProviderCommon.Setup(captureName, nodeHostname)
+func (ncp *NetworkCaptureProvider) Setup(captureName, nodeHostname string, startTimestamp time.Time) (string, error) {
+	captureFolderDir, err := ncp.NetworkCaptureProviderCommon.Setup(captureName, nodeHostname, startTimestamp)
 	if err != nil {
 		return "", err
 	}
@@ -52,7 +54,7 @@ func (ncp *NetworkCaptureProvider) Setup(captureName, nodeHostname string) (stri
 }
 
 func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(filter string, duration, maxSizeMB int, sigChan <-chan os.Signal) error {
-	captureFileName := ncp.NetworkCaptureProviderCommon.CaptureNodetimestampName(ncp.CaptureName, ncp.NodeHostName)
+	captureFileName := captureUtils.GenerateCaptureFileName(ncp.CaptureName, ncp.NodeHostName, ncp.StartTimestamp)
 	captureFileName = fmt.Sprintf("%s.pcap", captureFileName)
 	captureFilePath := filepath.Join(ncp.TmpCaptureDir, captureFileName)
 
