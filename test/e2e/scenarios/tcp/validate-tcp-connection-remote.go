@@ -30,7 +30,7 @@ func (v *ValidateRetinaTCPConnectionRemoteMetric) Run() error {
 		}
 	}
 
-	log.Printf("found metrics matching %+v\n", validMetrics)
+	log.Printf("found metrics matching %+v\n", tcpConnectionRemoteMetricName)
 	return nil
 }
 
