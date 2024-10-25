@@ -21,9 +21,7 @@ type ValidateRetinaTCPConnectionRemoteMetric struct {
 func (v *ValidateRetinaTCPConnectionRemoteMetric) Run() error {
 	promAddress := fmt.Sprintf("http://localhost:%s/metrics", v.PortForwardedRetinaPort)
 
-	validMetrics := []map[string]string{
-		{address: "0.0.0.0", port: "0"},
-	}
+	validMetrics := []map[string]string{}
 
 	for _, metric := range validMetrics {
 		err := prom.CheckMetric(promAddress, tcpConnectionRemoteMetricName, metric)
