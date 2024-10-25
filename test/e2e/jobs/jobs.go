@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/retina/test/e2e/framework/generic"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/types"
+	"github.com/microsoft/retina/test/e2e/hubble"
 	"github.com/microsoft/retina/test/e2e/scenarios/dns"
 	"github.com/microsoft/retina/test/e2e/scenarios/drop"
 	"github.com/microsoft/retina/test/e2e/scenarios/latency"
@@ -206,6 +207,78 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 
 	job.AddStep(&kubernetes.EnsureStableCluster{
 		PodNamespace:  common.KubeSystemNamespace,
+		LabelSelector: "k8s-app=retina",
+	}, nil)
+
+	return job
+}
+
+func ValidateHubble(kubeConfigFilePath, chartPath string, testPodNamespace string) *types.Job {
+	job := types.NewJob("Validate Hubble")
+
+	job.AddStep(&kubernetes.ValidateHubbleStep{
+		Namespace:          "kube-system",
+		ReleaseName:        "retina",
+		KubeConfigFilePath: kubeConfigFilePath,
+		ChartPath:          chartPath,
+		TagEnv:             generic.DefaultTagEnv,
+	}, nil)
+
+	job.AddScenario(hubble.ValidateHubbleRelayService())
+
+	job.AddScenario(hubble.ValidateHubbleUIService(kubeConfigFilePath))
+
+	job.AddScenario(drop.ValidateDropMetric(testPodNamespace))
+
+	job.AddScenario(tcp.ValidateTCPMetrics(testPodNamespace))
+
+	dnsScenarios := []struct {
+		name string
+		req  *dns.RequestValidationParams
+		resp *dns.ResponseValidationParams
+	}{
+		{
+			name: "Validate basic DNS request and response metrics for a valid domain",
+			req: &dns.RequestValidationParams{
+				NumResponse: "0",
+				Query:       "kubernetes.default.svc.cluster.local.",
+				QueryType:   "A",
+				Command:     "nslookup kubernetes.default",
+				ExpectError: false,
+			},
+			resp: &dns.ResponseValidationParams{
+				NumResponse: "1",
+				Query:       "kubernetes.default.svc.cluster.local.",
+				QueryType:   "A",
+				ReturnCode:  "No Error",
+				Response:    "10.0.0.1",
+			},
+		},
+		{
+			name: "Validate basic DNS request and response metrics for a non-existent domain",
+			req: &dns.RequestValidationParams{
+				NumResponse: "0",
+				Query:       "some.non.existent.domain.",
+				QueryType:   "A",
+				Command:     "nslookup some.non.existent.domain",
+				ExpectError: true,
+			},
+			resp: &dns.ResponseValidationParams{
+				NumResponse: "0",
+				Query:       "some.non.existent.domain.",
+				QueryType:   "A",
+				Response:    dns.EmptyResponse, // hacky way to bypass the framework for now
+				ReturnCode:  "Non-Existent Domain",
+			},
+		},
+	}
+
+	for _, scenario := range dnsScenarios {
+		job.AddScenario(dns.ValidateBasicDNSMetrics(scenario.name, scenario.req, scenario.resp, testPodNamespace))
+	}
+
+	job.AddStep(&kubernetes.EnsureStableCluster{
+		PodNamespace:  "kube-system",
 		LabelSelector: "k8s-app=retina",
 	}, nil)
 
