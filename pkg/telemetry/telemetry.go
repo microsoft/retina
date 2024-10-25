@@ -25,15 +25,16 @@ var (
 
 	// property keys
 	kernelversion = "kernelversion"
-	allocatedmem  = "allocmem"
 	sysmem        = "sysmem"
-	heapallocmem  = "heapalloc"
+	heapalloc     = "heapalloc"
 	heapobjects   = "heapobjects"
 	heapidle      = "heapidle"
 	heapinuse     = "heapinuse"
 	heapsys       = "heapsys"
+	nextgc        = "nextgc"
 	stackinuse    = "stackinuse"
 	stacksys      = "stacksys"
+	othersysmem   = "othersysmem"
 	goroutines    = "goroutines"
 )
 
