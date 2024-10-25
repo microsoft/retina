@@ -47,7 +47,7 @@ func (p *PerfProfile) GetMemoryUsage() map[string]string {
 		heapallocmem: strconv.FormatUint(bToMb(m.HeapAlloc), 10),
 		heapobjects:  strconv.FormatUint(m.HeapObjects, 10),
 		heapsys:      strconv.FormatUint(bToMb(m.HeapSys), 10),
-		stackinuse:   strconv.FormatUint(m.StackInuse, 10),
+		stackinuse:   strconv.FormatUint(bToMb(m.StackInuse), 10),
 		stacksys:     strconv.FormatUint(bToMb(m.StackSys), 10),
 		goroutines:   strconv.Itoa(runtime.NumGoroutine()),
 	}
