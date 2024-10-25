@@ -23,7 +23,12 @@ const (
 )
 
 var (
-	nodeIP = os.Getenv("NODE_IP")
+	nodeIP   = os.Getenv("NODE_IP")
+	denyList = []string{
+		"0.0.0.0",
+		"127.0.0",
+		nodeIP,
+	}
 )
 
 type NetstatReader struct {
@@ -282,9 +287,11 @@ func validateRemoteAddr(addr string) bool {
 		return false
 	}
 
-	// ignore localhost addresses and the node's own IP
-	if strings.HasPrefix(addr, "127.0.0") || addr == nodeIP || addr == "0.0.0.0" {
-		return false
+	// check if the remote address is in the deny list
+	for _, addressToDeny := range denyList {
+		if strings.HasPrefix(addr, addressToDeny) {
+			return false
+		}
 	}
 
 	return true
