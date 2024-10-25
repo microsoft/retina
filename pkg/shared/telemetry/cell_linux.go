@@ -12,7 +12,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-const heartbeatInterval = 5 * time.Minute
+const heartbeatInterval = 15 * time.Minute
 
 type Config struct {
 	Component             string
