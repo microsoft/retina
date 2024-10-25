@@ -85,10 +85,8 @@ func verifyValidMetricPresent(metricName string, data map[string]*promclient.Met
 				}
 
 				// if valid metric is empty, then we just need to make sure the metric and value is present
-				if len(validMetric) == 0 {
-					if len(metricLabels) > 0 {
-						return nil
-					}
+				if len(validMetric) == 0 && len(metricLabels) > 0 {
+					return nil
 				}
 
 				if reflect.DeepEqual(metricLabels, validMetric) {
