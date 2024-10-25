@@ -29,6 +29,8 @@ var (
 	sysmem        = "sysmem"
 	heapallocmem  = "heapalloc"
 	heapobjects   = "heapobjects"
+	heapidle      = "heapidle"
+	heapinuse     = "heapinuse"
 	heapsys       = "heapsys"
 	stackinuse    = "stackinuse"
 	stacksys      = "stacksys"
