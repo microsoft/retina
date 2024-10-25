@@ -23,13 +23,19 @@ const (
 )
 
 var (
-	nodeIP   = os.Getenv("NODE_IP")
-	denyList = []string{
+	nodeIP     = os.Getenv("NODE_IP")
+	ignoreList = []string{
 		"0.0.0.0",
-		"127.0.0",
-		nodeIP,
+		"127.0.0.",
 	}
 )
+
+func init() {
+	// Add node IP to the ignore list
+	if nodeIP != "" {
+		ignoreList = append(ignoreList, nodeIP)
+	}
+}
 
 type NetstatReader struct {
 	l          *log.ZapLogger
@@ -287,9 +293,9 @@ func validateRemoteAddr(addr string) bool {
 		return false
 	}
 
-	// check if the remote address is in the deny list
-	for _, addressToDeny := range denyList {
-		if strings.HasPrefix(addr, addressToDeny) {
+	// check if the address is in the ignore list
+	for _, addressToIgnore := range ignoreList {
+		if strings.HasPrefix(addr, addressToIgnore) {
 			return false
 		}
 	}
