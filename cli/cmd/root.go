@@ -25,7 +25,8 @@ type Config struct {
 
 var Retina = &cobra.Command{
 	Use: "kubectl-retina",
-	Short: "Retina is the eBPF distributed networking observability tool for Kubernetes",
+	Short: "A kubectl plugin for Retina",
+	Long: "A kubectl plugin for Retina\nRetina is an eBPF distributed networking observability tool for Kubernetes.",
 	PersistentPreRun: func(*cobra.Command, []string) {
 		var config Config
 		file, _ := os.ReadFile(ClientConfigPath)
