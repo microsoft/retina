@@ -11,9 +11,9 @@ func (p *PerfProfile) GetMemoryUsage() map[string]string {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 	props := map[string]string{
-		allocatedmem: strconv.FormatUint(bToMb(m.Alloc), 10),
-		sysmem:       strconv.FormatUint(bToMb(m.Sys), 10),
-		goroutines:   strconv.Itoa(runtime.NumGoroutine()),
+		heapalloc:  strconv.FormatUint(bToMb(m.HeapAlloc), 10),
+		sysmem:     strconv.FormatUint(bToMb(m.Sys), 10),
+		goroutines: strconv.Itoa(runtime.NumGoroutine()),
 	}
 	return props
 }
