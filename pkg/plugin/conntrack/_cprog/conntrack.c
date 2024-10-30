@@ -259,6 +259,14 @@ static __always_inline bool _ct_should_report_packet(struct ct_entry *entry, __u
         }
         WRITE_ONCE(entry->eviction_time, now + CT_CONNECTION_LIFETIME_NONTCP);
     }
+
+    // Check for important/special flags that we will always report regardless of the report interval.
+    // Note: SYN can still be present at this stage due to SYN-ACK packets.
+    // We will not update the last report time for these flags as we still want to sample other flags based on the report interval.
+    if (protocol == IPPROTO_TCP && flags & (TCP_SYN | TCP_URG | TCP_ECE | TCP_CWR)) {
+        return true;
+    }
+
     // We will only report this packet iff a new flag is seen for the given direction or the report interval has passed.
     if (flags != seen_flags || now - last_report >= CT_REPORT_INTERVAL) {
         if (direction == CT_PACKET_DIR_TX) {
@@ -315,7 +323,7 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
         // Update the packet accordingly.
         p->is_reply = true;
         p->traffic_direction = entry->traffic_direction;
-        return _ct_should_report_packet(entry, p->flags, CT_PACKET_DIR_RX, &key);
+        return _ct_should_report_packet(entry, p->flags, CT_PACKET_DIR_RX, &reverse_key);
     }
 
     // If the connection is still not found, the connection is new.
