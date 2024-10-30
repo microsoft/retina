@@ -105,9 +105,9 @@ securityContext:
   capabilities:
     add:
       - SYS_ADMIN
-      - SYS_RESOURCE
+      - DAC_OVERRIDE # for dropreason plugin
       - NET_ADMIN # for packetparser plugin
-      - IPC_LOCK # for mmap() calls made by NewReader(), ref: https://man7.org/linux/man-pages/man2/mmap.2.html
+      - NET_RAW # for dns plugin
   windowsOptions:
     runAsUserName: "NT AUTHORITY\\SYSTEM"
 

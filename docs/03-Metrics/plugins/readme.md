@@ -15,3 +15,64 @@ To run Retina without any plugins, the `CAP_BPF` capability (since Linux 5.8) is
 | `hnstats` (Windows)     | Gathers TCP statistics and counts number of packets/bytes forwarded or dropped in HNS and VFP.                               | [Basic Mode](../modes/basic.md#plugin-hnsstats-windows)      | Same metrics as Basic mode                                | [Dev Guide](./Windows/hnsstats.md)      |
 | `packetparser` (Linux)  | Captures TCP and UDP packets traveling to and from pods and nodes.                | No basic metrics                                       | [Advanced Mode](../modes/advanced.md#plugin-packetparser-linux) | [Dev Guide](./Linux/packetparser.md)  |
 | `cilium` (Linux) | Collect agent and perf events from cilium via monitor1_2 socket and process flows in our hubble observer | [Metrics](./Linux/ciliumeventobserver.md#metrics) | Same metrics as Basic mode | [Dev Guide](./Linux/ciliumeventobserver.md) |
+
+### Procedure to identify which Linux capabilities are required by each plugin
+
+Generate the eBPF wrappers for the plugins:
+
+```bash
+$ make all
+```
+
+Generate the Retina binary:
+
+```bash
+$ make retina
+```
+
+Create the required config file used by the Retina controller config-map:
+
+```bash
+# Step 1 - Create config file
+$ sudo vi /retina/config/config.yaml
+
+# Step 2 - Fill the contents with the below (adjust parameters when required) and save it
+apiServer:
+  host: 0.0.0.0
+  port: 10093
+logLevel: info
+enabledPlugin: []
+metricsInterval:
+metricsIntervalDuration: 10s
+enableTelemetry: false
+enablePodLevel: false
+remoteContext: false
+enableAnnotations: true
+bypassLookupIPOfInterest: false
+dataAggregationLevel: low
+```
+
+Mount the BPF filesystem:
+
+```bash
+$ sudo mount -t bpf bpf /sys/fs/bpf/
+```
+
+Add the relevant capabilities to the binary:
+
+```bash
+$ sudo setcap cap_bpf,cap_net_raw=ep output/linux_amd64/retina/retina
+```
+
+Confirm that the assigned capabilities were added:
+
+```bash
+$ getcap output/linux_amd64/retina/retina
+output/linux_amd64/retina/retina cap_bpf,cap_net_raw=ep
+```
+
+Run the binary to verify that Retina is operating successfully with the specified plugins:
+
+```bash
+$ output/linux_amd64/retina/retina
+```
