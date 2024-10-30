@@ -2,6 +2,10 @@
 
 Gathers TCP/UDP statistics and network interface statistics from the `netstats` and `ethtool` Node utilities (respectively).
 
+## Capabilities
+
+The `linuxutil` plugin requires the `CAP_BPF` capability.
+
 ## Architecture
 
 The plugin uses the following utilities as data sources:
