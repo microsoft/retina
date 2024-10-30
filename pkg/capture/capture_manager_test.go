@@ -12,8 +12,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
+	"github.com/microsoft/retina/pkg/capture/file"
 	"github.com/microsoft/retina/pkg/capture/provider"
-	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/telemetry"
 	"go.uber.org/mock/gomock"
@@ -29,7 +29,7 @@ func TestCaptureNetwork(t *testing.T) {
 		tel:                    telemetry.NewNoopTelemetry(),
 	}
 
-	timestamp := time.Now().UTC()
+	timestamp := file.Timestamp{Time: time.Now().UTC()}
 	captureName := "capture-name"
 	nodeHostName := "node-host-name"
 	filter := "-i any"
@@ -37,7 +37,7 @@ func TestCaptureNetwork(t *testing.T) {
 	maxSize := 100
 	os.Setenv(captureConstants.CaptureNameEnvKey, captureName)
 	os.Setenv(captureConstants.NodeHostNameEnvKey, nodeHostName)
-	os.Setenv(captureConstants.CaptureStartTimestampEnvKey, captureUtils.ConvertTimestampToString(timestamp))
+	os.Setenv(captureConstants.CaptureStartTimestampEnvKey, timestamp.TimestampToString())
 	os.Setenv(captureConstants.TcpdumpFilterEnvKey, filter)
 	os.Setenv(captureConstants.CaptureDurationEnvKey, "10s")
 	os.Setenv(captureConstants.CaptureMaxSizeEnvKey, strconv.Itoa(maxSize))
@@ -53,7 +53,8 @@ func TestCaptureNetwork(t *testing.T) {
 
 	sigChanel := make(chan os.Signal, 1)
 
-	networkCaptureProvider.EXPECT().Setup(captureName, nodeHostName, timestamp).Return(fmt.Sprintf("%s-%s-%s", captureName, nodeHostName, captureUtils.ConvertTimestampToString(timestamp)), nil).Times(1)
+	tmpFilename := file.CaptureFilename{CaptureName: captureName, NodeHostname: nodeHostName, StartTimestamp: &timestamp}
+	networkCaptureProvider.EXPECT().Setup(tmpFilename).Return(fmt.Sprintf("%s-%s-%s", captureName, nodeHostName, timestamp.TimestampToString()), nil).Times(1)
 	networkCaptureProvider.EXPECT().CaptureNetworkPacket(filter, duration, maxSize, sigChanel).Return(nil).Times(1)
 
 	_, err := cm.CaptureNetwork(sigChanel)

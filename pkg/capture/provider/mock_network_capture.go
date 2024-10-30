@@ -12,8 +12,8 @@ package provider
 import (
 	os "os"
 	reflect "reflect"
-	time "time"
 
+	file "github.com/microsoft/retina/pkg/capture/file"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -83,16 +83,16 @@ func (mr *MockNetworkCaptureProviderInterfaceMockRecorder) CollectMetadata() *go
 }
 
 // Setup mocks base method.
-func (m *MockNetworkCaptureProviderInterface) Setup(captureJobName, nodeHostname string, startTimestamp time.Time) (string, error) {
+func (m *MockNetworkCaptureProviderInterface) Setup(filename file.CaptureFilename) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Setup", captureJobName, nodeHostname, startTimestamp)
+	ret := m.ctrl.Call(m, "Setup", filename)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Setup indicates an expected call of Setup.
-func (mr *MockNetworkCaptureProviderInterfaceMockRecorder) Setup(captureJobName, nodeHostname, startTimestamp interface{}) *gomock.Call {
+func (mr *MockNetworkCaptureProviderInterfaceMockRecorder) Setup(filename any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Setup", reflect.TypeOf((*MockNetworkCaptureProviderInterface)(nil).Setup), captureJobName, nodeHostname, startTimestamp)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Setup", reflect.TypeOf((*MockNetworkCaptureProviderInterface)(nil).Setup), filename)
 }

@@ -22,6 +22,7 @@ import (
 
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
+	"github.com/microsoft/retina/pkg/capture/file"
 	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/label"
@@ -384,9 +385,9 @@ func (translator *CaptureToPodTranslator) renderJob(captureTargetOnNode *Capture
 		return nil, fmt.Errorf("no nodes are selected")
 	}
 
-	captureStartTimestamp := time.Now().UTC()
+	captureStartTimestamp := file.Timestamp{Time: time.Now().UTC()}
 
-	printOutputFileNames(captureTargetOnNode, envCommon, captureStartTimestamp)
+	printOutputFileNames(captureTargetOnNode, envCommon, &captureStartTimestamp)
 
 	jobs := make([]*batchv1.Job, 0, len(*captureTargetOnNode))
 	for nodeName, target := range *captureTargetOnNode {
@@ -454,7 +455,7 @@ func (translator *CaptureToPodTranslator) renderJob(captureTargetOnNode *Capture
 			job.Spec.Template.Spec.Containers[0].Env = append(job.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{Name: k, Value: v})
 		}
 		job.Spec.Template.Spec.Containers[0].Env = append(job.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{Name: captureConstants.NodeHostNameEnvKey, Value: nodeName})
-		job.Spec.Template.Spec.Containers[0].Env = append(job.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{Name: captureConstants.CaptureStartTimestampEnvKey, Value: captureUtils.ConvertTimestampToString(captureStartTimestamp)})
+		job.Spec.Template.Spec.Containers[0].Env = append(job.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{Name: captureConstants.CaptureStartTimestampEnvKey, Value: captureStartTimestamp.TimestampToString()})
 
 		jobs = append(jobs, job)
 	}
@@ -462,10 +463,11 @@ func (translator *CaptureToPodTranslator) renderJob(captureTargetOnNode *Capture
 	return jobs, nil
 }
 
-func printOutputFileNames(captureTargetOnNode *CaptureTargetsOnNode, envCommon map[string]string, timestamp time.Time) {
+func printOutputFileNames(captureTargetOnNode *CaptureTargetsOnNode, envCommon map[string]string, timestamp *file.Timestamp) {
 	captureFileNames := []string{}
 	for k := range *captureTargetOnNode {
-		captureFileNames = append(captureFileNames, captureUtils.GenerateCaptureFileName(envCommon[captureConstants.CaptureNameEnvKey], k, timestamp))
+		capture := file.CaptureFilename{CaptureName: envCommon[captureConstants.CaptureNameEnvKey], NodeHostname: k, StartTimestamp: timestamp}
+		captureFileNames = append(captureFileNames, capture.GenerateCaptureFileName())
 	}
 	fmt.Println("#########################")
 	fmt.Println("Expected Capture Files")

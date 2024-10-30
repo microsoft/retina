@@ -8,9 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"time"
 
-	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
+	"github.com/microsoft/retina/pkg/capture/file"
 	"github.com/microsoft/retina/pkg/log"
 	"go.uber.org/zap"
 )
@@ -20,9 +19,8 @@ type NetworkCaptureProviderCommon struct {
 	l             *log.ZapLogger
 }
 
-func (ncpc *NetworkCaptureProviderCommon) Setup(captureName, nodeHostname string, startTimestamp time.Time) (string, error) {
-	captureFolderName := captureUtils.GenerateCaptureFileName(captureName, nodeHostname, startTimestamp)
-	captureFolderDir := filepath.Join(os.TempDir(), captureFolderName)
+func (ncpc *NetworkCaptureProviderCommon) Setup(filename file.CaptureFilename) (string, error) {
+	captureFolderDir := filepath.Join(os.TempDir(), filename.GenerateCaptureFileName())
 	err := os.MkdirAll(captureFolderDir, 0o750)
 	if err != nil {
 		return "", err
