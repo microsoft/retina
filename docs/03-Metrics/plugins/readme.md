@@ -24,7 +24,7 @@ Generate the eBPF wrappers for the plugins:
 make all
 ```
 
-Generate the Retina binary:
+Build the Retina binary:
 
 ```bash
 make retina
