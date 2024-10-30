@@ -197,7 +197,7 @@ type command struct {
 func (ncp *NetworkCaptureProvider) CollectMetadata() error {
 	ncp.l.Info("Start to collect network metadata")
 
-	iptablesMode := obtainIptablesMode()
+	iptablesMode := obtainIptablesMode(ncp.l)
 	ncp.l.Info(fmt.Sprintf("Iptables mode %s is used", iptablesMode))
 	iptablesSaveCmdName := fmt.Sprintf("iptables-%s-save", iptablesMode)
 	iptablesCmdName := fmt.Sprintf("iptables-%s", iptablesMode)
@@ -371,27 +371,29 @@ const (
 	nftIptablesMode    iptablesMode = "nft"
 )
 
-func obtainIptablesMode() iptablesMode {
+func obtainIptablesMode(logger *log.ZapLogger) iptablesMode {
 	// Since iptables v1.8, nf_tables are introduced as an improvement of legacy iptables, but provides the same user
 	// interface as legacy iptables through iptables-nft command.
 	// based on: https://github.com/kubernetes-sigs/iptables-wrappers/blob/97b01f43a8e8db07840fc4b95e833a37c0d36b12/iptables-wrapper-installer.sh
 
-	// when both iptables modes available, we choose the one with more rules.
+	// When both iptables modes available, we choose the one with more rules, because the other one normally outputs empty rules.
 	nftIptablesModeAvaiable := true
 	legacyIptablesModeAvaiable := true
 	legacySaveOut, err := exec.Command("iptables-legacy-save").CombinedOutput()
-	if err != nil && strings.Contains(err.Error(), "command not found") {
-		legacyIptablesModeAvaiable = false
-	}
-
-	legacySaveLineNum := len(strings.Split(string(legacySaveOut), "\n"))
-	nftSaveOut, err := exec.Command("iptables-nft-save").CombinedOutput()
-	if err != nil && strings.Contains(err.Error(), "command not found") {
+	if err != nil {
 		nftIptablesModeAvaiable = false
+		logger.Error("Failed to run iptables-legacy-save", zap.Error(err))
 	}
+	legacySaveLineNum := len(strings.Split(string(legacySaveOut), "\n"))
+
+	nftSaveOut, err := exec.Command("iptables-nft-save").CombinedOutput()
+	if err != nil {
+		nftIptablesModeAvaiable = false
+		logger.Error("Failed to run iptables-nft-save", zap.Error(err))
+	}
+	nftSaveLineNum := len(strings.Split(string(nftSaveOut), "\n"))
 
 	if nftIptablesModeAvaiable && legacyIptablesModeAvaiable {
-		nftSaveLineNum := len(strings.Split(string(nftSaveOut), "\n"))
 		if legacySaveLineNum > nftSaveLineNum {
 			return legacyIptablesMode
 		}
