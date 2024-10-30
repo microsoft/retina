@@ -197,7 +197,7 @@ type command struct {
 func (ncp *NetworkCaptureProvider) CollectMetadata() error {
 	ncp.l.Info("Start to collect network metadata")
 
-	iptablesMode := obtainIptablesMode(ncp.l)
+	iptablesMode := obtainIptablesMode()
 	ncp.l.Info(fmt.Sprintf("Iptables mode %s is used", iptablesMode))
 	iptablesSaveCmdName := fmt.Sprintf("iptables-%s-save", iptablesMode)
 	iptablesCmdName := fmt.Sprintf("iptables-%s", iptablesMode)
@@ -371,7 +371,7 @@ const (
 	nftIptablesMode    iptablesMode = "nft"
 )
 
-func obtainIptablesMode(l *log.ZapLogger) iptablesMode {
+func obtainIptablesMode() iptablesMode {
 	// Since iptables v1.8, nf_tables are introduced as an improvement of legacy iptables, but provides the same user
 	// interface as legacy iptables through iptables-nft command.
 	// based on: https://github.com/kubernetes-sigs/iptables-wrappers/blob/97b01f43a8e8db07840fc4b95e833a37c0d36b12/iptables-wrapper-installer.sh
@@ -395,7 +395,7 @@ func obtainIptablesMode(l *log.ZapLogger) iptablesMode {
 		if legacySaveLineNum > nftSaveLineNum {
 			return legacyIptablesMode
 		}
-		return "nft"
+		return nftIptablesMode
 	}
 
 	// when only one iptables mode available, we choose the available one when the other one is not available.
