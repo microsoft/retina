@@ -13,7 +13,7 @@ type Timestamp struct {
 const captureFileNameTimestampFormat string = "2006#01#02#15#04#05UTC"
 
 func (timestamp *Timestamp) TimestampToString() string {
-	return timestamp.Format(captureFileNameTimestampFormat)
+	return timestamp.Time.Format(captureFileNameTimestampFormat)
 }
 
 func NewTimestamp(timestamp string) (*Timestamp, error) {
