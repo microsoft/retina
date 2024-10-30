@@ -128,7 +128,8 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			// Delete the conntrack entries
 			for _, key := range keysToDelete {
 				if err := ct.ctMap.Delete(key); err != nil {
-					ct.l.Error("Delete failed", zap.Error(err))
+					// Should only happen in a high connection churn scenario
+					ct.l.Debug("Delete failed", zap.Error(err))
 				} else {
 					entriesDeleted++
 				}
