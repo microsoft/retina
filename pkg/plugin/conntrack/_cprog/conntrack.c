@@ -315,7 +315,7 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
         // Update the packet accordingly.
         p->is_reply = true;
         p->traffic_direction = entry->traffic_direction;
-        return _ct_should_report_packet(entry, p->flags, CT_PACKET_DIR_RX, &key);
+        return _ct_should_report_packet(entry, p->flags, CT_PACKET_DIR_RX, &reverse_key);
     }
 
     // If the connection is still not found, the connection is new.

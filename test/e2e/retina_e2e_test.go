@@ -31,7 +31,13 @@ func TestE2ERetina(t *testing.T) {
 
 	clusterName := os.Getenv("CLUSTER_NAME")
 	if clusterName == "" {
-		clusterName = curuser.Username + common.NetObsRGtag + strconv.FormatInt(time.Now().Unix(), 10)
+		username := curuser.Username
+		// Truncate the username to 8 characters
+		if len(username) > 8 {
+			username = username[:8]
+			t.Logf("Username is too long, truncating to 8 characters: %s", username)
+		}
+		clusterName = username + common.NetObsRGtag + strconv.FormatInt(time.Now().Unix(), 10)
 		t.Logf("CLUSTER_NAME is not set, generating a random cluster name: %s", clusterName)
 	}
 
