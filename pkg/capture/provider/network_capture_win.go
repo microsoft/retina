@@ -19,14 +19,17 @@ import (
 	"go.uber.org/zap"
 
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
+	"github.com/microsoft/retina/pkg/capture/file"
 	"github.com/microsoft/retina/pkg/log"
 )
 
 type NetworkCaptureProvider struct {
 	NetworkCaptureProviderCommon
-	TmpCaptureDir string
-	CaptureName   string
-	NodeHostName  string
+	TmpCaptureDir  string
+	CaptureName    string
+	NodeHostName   string
+	StartTimestamp *file.Timestamp
+	Filename       file.CaptureFilename
 
 	l *log.ZapLogger
 }
@@ -40,16 +43,19 @@ func NewNetworkCaptureProvider(logger *log.ZapLogger) NetworkCaptureProviderInte
 	}
 }
 
-func (ncp *NetworkCaptureProvider) Setup(captureName, nodeHostname string) (string, error) {
-	captureFolderDir, err := ncp.NetworkCaptureProviderCommon.Setup(captureName, nodeHostname)
+func (ncp *NetworkCaptureProvider) Setup(filename file.CaptureFilename) (string, error) {
+	captureFolderDir, err := ncp.NetworkCaptureProviderCommon.Setup(filename)
 	if err != nil {
 		return "", err
 	}
 	ncp.l.Info("Created temporary folder for network capture", zap.String("capture temporary folder", captureFolderDir))
 
 	ncp.TmpCaptureDir = captureFolderDir
-	ncp.CaptureName = captureName
-	ncp.NodeHostName = nodeHostname
+	ncp.CaptureName = filename.CaptureName
+	ncp.NodeHostName = filename.NodeHostname
+	ncp.StartTimestamp = filename.StartTimestamp
+	ncp.Filename = file.CaptureFilename{CaptureName: ncp.CaptureName, NodeHostname: ncp.NodeHostName, StartTimestamp: ncp.StartTimestamp}
+
 	return ncp.TmpCaptureDir, nil
 }
 
@@ -63,7 +69,7 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(filter string, duration,
 		_ = ncp.stopNetworkCapture()
 	}
 
-	captureFileName := ncp.NetworkCaptureProviderCommon.CaptureNodetimestampName(ncp.CaptureName, ncp.NodeHostName)
+	captureFileName := ncp.Filename.GenerateCaptureFileName()
 	captureFileName = captureFileName + ".etl"
 	captureFilePath := filepath.Join(ncp.TmpCaptureDir, captureFileName)
 
@@ -157,7 +163,7 @@ func (ncp *NetworkCaptureProvider) needToStopTraceSession() (bool, error) {
 		return false, err
 	}
 
-	if strings.Contains(string(output), captureLabelFolderName) {
+	if strings.Contains(string(output), ncp.Filename.GenerateCaptureFileName()) {
 		ncp.l.Info("There is a running trace session created by Retina capture")
 		return true, nil
 	}
