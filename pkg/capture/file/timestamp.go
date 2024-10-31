@@ -10,16 +10,20 @@ type Timestamp struct {
 	time.Time
 }
 
-const captureFileNameTimestampFormat string = "2006#01#02#15#04#05UTC"
+const captureFileNameTimestampFormat string = "20060102150405UTC"
 
-func (timestamp *Timestamp) TimestampToString() string {
+func Now() Timestamp {
+	return Timestamp{Time: time.Now().UTC().Truncate(time.Second)}
+}
+
+func (timestamp *Timestamp) String() string {
 	return timestamp.Time.Format(captureFileNameTimestampFormat)
 }
 
-func NewTimestamp(timestamp string) (*Timestamp, error) {
-	timestampStr, err := time.Parse(captureFileNameTimestampFormat, timestamp)
+func StringToTimestamp(timestamp string) (*Timestamp, error) {
+	parsedTime, err := time.Parse(captureFileNameTimestampFormat, timestamp)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create new timestamp")
+		return nil, errors.Wrap(err, "failed to create timestamp from string")
 	}
-	return &Timestamp{timestampStr}, nil
+	return &Timestamp{parsedTime}, nil
 }

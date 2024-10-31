@@ -105,7 +105,7 @@ func (cm *CaptureManager) captureNodeHostName() string {
 }
 
 func (cm *CaptureManager) captureStartTimestamp() (*file.Timestamp, error) {
-	timestamp, err := file.NewTimestamp((os.Getenv(captureConstants.CaptureStartTimestampEnvKey)))
+	timestamp, err := file.StringToTimestamp((os.Getenv(captureConstants.CaptureStartTimestampEnvKey)))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse timestamp")
 	}

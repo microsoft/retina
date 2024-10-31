@@ -2,7 +2,6 @@ package file
 
 import (
 	"fmt"
-	"strings"
 )
 
 type CaptureFilename struct {
@@ -12,7 +11,6 @@ type CaptureFilename struct {
 }
 
 func (cf *CaptureFilename) GenerateCaptureFileName() string {
-	formattedTime := strings.Replace(cf.StartTimestamp.TimestampToString(), "#", "", -1)
-	uniqueName := fmt.Sprintf("%s-%s-%s", cf.CaptureName, cf.NodeHostname, formattedTime)
+	uniqueName := fmt.Sprintf("%s-%s-%s", cf.CaptureName, cf.NodeHostname, cf.StartTimestamp)
 	return uniqueName
 }
