@@ -466,7 +466,7 @@ func printOutputFileNames(captureTargetOnNode *CaptureTargetsOnNode, envCommon m
 	captureFileNames := []string{}
 	for k := range *captureTargetOnNode {
 		capture := file.CaptureFilename{CaptureName: envCommon[captureConstants.CaptureNameEnvKey], NodeHostname: k, StartTimestamp: timestamp}
-		captureFileNames = append(captureFileNames, capture.GenerateCaptureFileName())
+		captureFileNames = append(captureFileNames, capture.String())
 	}
 	fmt.Println("#########################")
 	fmt.Println("Expected Capture Files")

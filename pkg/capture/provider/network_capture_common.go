@@ -20,7 +20,7 @@ type NetworkCaptureProviderCommon struct {
 }
 
 func (ncpc *NetworkCaptureProviderCommon) Setup(filename file.CaptureFilename) (string, error) {
-	captureFolderDir := filepath.Join(os.TempDir(), filename.GenerateCaptureFileName())
+	captureFolderDir := filepath.Join(os.TempDir(), filename.String())
 	err := os.MkdirAll(captureFolderDir, 0o750)
 	if err != nil {
 		return "", err

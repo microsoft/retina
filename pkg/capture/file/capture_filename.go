@@ -10,7 +10,7 @@ type CaptureFilename struct {
 	StartTimestamp *Timestamp
 }
 
-func (cf *CaptureFilename) GenerateCaptureFileName() string {
+func (cf *CaptureFilename) String() string {
 	uniqueName := fmt.Sprintf("%s-%s-%s", cf.CaptureName, cf.NodeHostname, cf.StartTimestamp)
 	return uniqueName
 }

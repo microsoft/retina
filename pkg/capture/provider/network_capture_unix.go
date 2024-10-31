@@ -55,9 +55,8 @@ func (ncp *NetworkCaptureProvider) Setup(filename file.CaptureFilename) (string,
 }
 
 func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(filter string, duration, maxSizeMB int, sigChan <-chan os.Signal) error {
-	tmp := file.CaptureFilename{CaptureName: ncp.CaptureName, NodeHostname: ncp.NodeHostName, StartTimestamp: ncp.StartTimestamp}
-	captureFileName := tmp.GenerateCaptureFileName()
-	captureFileName = fmt.Sprintf("%s.pcap", captureFileName)
+	filename := file.CaptureFilename{CaptureName: ncp.CaptureName, NodeHostname: ncp.NodeHostName, StartTimestamp: ncp.StartTimestamp}
+	captureFileName := fmt.Sprintf("%s.pcap", filename)
 	captureFilePath := filepath.Join(ncp.TmpCaptureDir, captureFileName)
 
 	// Remove the folder in case it already exists to mislead the file size check.

@@ -69,8 +69,7 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(filter string, duration,
 		_ = ncp.stopNetworkCapture()
 	}
 
-	captureFileName := ncp.Filename.GenerateCaptureFileName()
-	captureFileName = captureFileName + ".etl"
+	captureFileName := ncp.Filename.String() + ".etl"
 	captureFilePath := filepath.Join(ncp.TmpCaptureDir, captureFileName)
 
 	captureStartCmd := exec.Command(
@@ -163,7 +162,7 @@ func (ncp *NetworkCaptureProvider) needToStopTraceSession() (bool, error) {
 		return false, err
 	}
 
-	if strings.Contains(string(output), ncp.Filename.GenerateCaptureFileName()) {
+	if strings.Contains(string(output), ncp.Filename.String()) {
 		ncp.l.Info("There is a running trace session created by Retina capture")
 		return true, nil
 	}
