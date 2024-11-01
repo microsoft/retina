@@ -2,6 +2,10 @@
 
 Counts number of packets/bytes passing through the `eth0` interface of a Node, along with the direction of the packets.
 
+## Capabilities
+
+The `packetforward` plugin requires the `CAP_BPF` capability.
+
 ## Architecture
 
 `packetforward` uses an eBPF socket filter program on the host's primary interface to capture packets and generate basic metrics from the captured data.
