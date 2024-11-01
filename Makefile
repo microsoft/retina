@@ -316,6 +316,9 @@ kapinger-image:
 		$(IMAGE_REGISTRY)/$(KAPINGER_IMAGE):$(TAG)-linux-amd64 \
 		$(IMAGE_REGISTRY)/$(KAPINGER_IMAGE):$(TAG)-linux-arm64
 
+toolbox: 
+	docker buildx build --builder retina --platform linux/amd64  -t $(IMAGE_REGISTRY)/toolbox:$(TAG)   -f ./hack/tools/toolbox/Dockerfile ./hack/tools/ --push
+
 proto-gen: ## generate protobuf code
 	docker build --platform=linux/amd64 \
 		-t $(IMAGE_REGISTRY)/$(RETINA_PROTO_IMAGE):$(RETINA_PLATFORM_TAG) \
