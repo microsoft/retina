@@ -61,6 +61,11 @@ struct ct_entry {
      */
     __u8  flags_seen_tx_dir;
     __u8  flags_seen_rx_dir;
+    /**
+     * is_direction_unknown is set to true if the direction of the connection is unknown. This can happen if the connection is created
+     * before retina deployment and the SYN packet was not captured.
+     */
+    bool is_direction_unknown;
 };
 
 struct {
@@ -174,6 +179,8 @@ static __always_inline bool _ct_handle_tcp_connection(struct packet *p, struct c
     if (CT_CONNECTION_LIFETIME_TCP > UINT32_MAX - now) {
         return false;
     }
+    // Set the connection as unknown direction since we did not capture the SYN packet.
+    new_value.is_direction_unknown = true;
     new_value.eviction_time = now + CT_CONNECTION_LIFETIME_TCP;
     new_value.traffic_direction = _ct_get_traffic_direction(observation_point);
     p->traffic_direction = new_value.traffic_direction;
@@ -267,7 +274,7 @@ static __always_inline bool _ct_should_report_packet(struct ct_entry *entry, __u
         return true;
     }
 
-    // We will only report this packet iff a new flag is seen for the given direction or the report interval has passed.
+    // We will only report this packet if a new flag is seen for the given direction or the report interval has passed.
     if (flags != seen_flags || now - last_report >= CT_REPORT_INTERVAL) {
         if (direction == CT_PACKET_DIR_TX) {
             WRITE_ONCE(entry->flags_seen_tx_dir, flags);
