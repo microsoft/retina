@@ -1,4 +1,3 @@
-// migrate from enterprise
 package kubernetes
 
 import (
