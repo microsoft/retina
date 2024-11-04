@@ -53,6 +53,12 @@ func TestE2ERetina(t *testing.T) {
 		location = common.AzureLocations[nBig.Int64()]
 	}
 
+	rg := os.Getenv("AZURE_RESOURCE_GROUP")
+	if rg == "" {
+		// Use the cluster name as the resource group name by default.
+		rg = clusterName
+	}
+
 	cwd, err := os.Getwd()
 	require.NoError(t, err)
 
@@ -64,7 +70,7 @@ func TestE2ERetina(t *testing.T) {
 	kubeConfigFilePath := filepath.Join(rootDir, "test", "e2e", "test.pem")
 
 	// CreateTestInfra
-	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, clusterName, location, kubeConfigFilePath, *createInfra))
+	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath, *createInfra))
 	createTestInfra.Run()
 
 	// Hacky way to ensure that the test infra is deleted even if the test panics
@@ -73,7 +79,7 @@ func TestE2ERetina(t *testing.T) {
 			t.Logf("Recovered in TestE2ERetina, %v", r)
 		}
 		if *deleteInfra {
-			_ = jobs.DeleteTestInfra(subID, clusterName, location).Run()
+			_ = jobs.DeleteTestInfra(subID, rg, clusterName, location).Run()
 		}
 	}()
 

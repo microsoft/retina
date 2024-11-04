@@ -61,6 +61,14 @@ func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, names
 				return false, nil
 			}
 
+			// Check all container status.
+			for _, containerStatus := range pod.Status.ContainerStatuses {
+				if !containerStatus.Ready {
+					log.Printf("container \"%s\" in pod \"%s\" is not ready yet. Waiting...\n", containerStatus.Name, pod.Name)
+					return false, nil
+				}
+			}
+
 			if !podReadyMap[pod.Name] {
 				log.Printf("pod \"%s\" is in Running state\n", pod.Name)
 				podReadyMap[pod.Name] = true
