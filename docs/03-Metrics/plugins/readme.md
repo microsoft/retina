@@ -4,6 +4,8 @@ Each metric is associated with a Plugin.
 Associated metrics are linked below.
 See [Metrics Configuration](../configuration.md) for info on configuration.
 
+To run Retina without any plugins, the `CAP_BPF` capability (since Linux 5.8) is required for memory locking and for loading/using BPF programs. This capability is mandatory. If you're using any plugins, ensure that the necessary capabilities for those plugins are also added. If a plugin requires `CAP_SYS_ADMIN`, you can substitute it for `CAP_BPF`.
+
 | Name                    | Description                                                                                                                  | Metrics in Basic Mode                                  | Metrics in Advanced Mode                                  | Development Guide               |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------------------- | ------------------------------- |
 | `packetforward` (Linux) | Counts number of packets/bytes passing through the `eth0` interface of a Node, along with the direction of the packets.      | [Basic Mode](../modes/basic.md#plugin-packetforward-linux)   | Same metrics as Basic mode                                | [Dev Guide](./Linux/packetforward.md) |

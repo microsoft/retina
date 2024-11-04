@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"math/rand"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/microsoft/retina/hack/tools/kapinger/clients"
 	"github.com/microsoft/retina/hack/tools/kapinger/config"
 	"github.com/microsoft/retina/hack/tools/kapinger/servers"
+	"golang.org/x/sync/errgroup"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -20,16 +22,23 @@ func main() {
 		log.Fatal(err)
 	}
 
-	config := config.LoadConfigFromEnv()
+	cfg := config.LoadConfigFromEnv()
 
 	ctx := context.Background()
-	go servers.StartAll(ctx, config)
+	go servers.StartAll(ctx, cfg)
+
+	var kapingerClients []clients.Client
 
 	// Create an HTTP httpclient with the custom Transport
-	httpclient, err := clients.NewKapingerHTTPClient(clientset, "app=kapinger", config.HTTPPort)
+	httpclient, err := clients.NewKapingerHTTPClient(clientset, "app=kapinger", cfg.BurstVolume, cfg.BurstInterval, cfg.HTTPPort)
 	if err != nil {
 		log.Fatal(err)
 	}
+	kapingerClients = append(kapingerClients, httpclient)
+
+	// create and append a DNS client
+	dnsclient := clients.NewKapingerDNSClient(cfg.BurstVolume, cfg.BurstInterval)
+	kapingerClients = append(kapingerClients, dnsclient)
 
 	// Initialize the random number generator with a seed based on the current time
 	rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -38,9 +47,21 @@ func main() {
 	jitter := rand.Intn(100) + 1
 	time.Sleep(time.Duration(jitter) * time.Millisecond)
 
-	err = httpclient.MakeRequests(ctx, config.BurstVolume, config.BurstInterval)
+	g, gCtx := errgroup.WithContext(ctx)
+
+	for _, client := range kapingerClients {
+		client := client
+		g.Go(func() error {
+			err = client.MakeRequests(gCtx)
+			if err != nil {
+				return fmt.Errorf("error making request: %w", err)
+			}
+			return nil
+		})
+	}
+	err = g.Wait()
 	if err != nil {
-		log.Printf("error making request: %v", err)
+		log.Fatalf("error making request: %v", err)
 	}
 }
 
