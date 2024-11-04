@@ -25,7 +25,6 @@ import (
 	crmgr "sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	"github.com/cilium/ebpf/rlimit"
 	"github.com/go-logr/zapr"
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/internal/buildinfo"
@@ -50,7 +49,7 @@ import (
 
 const (
 	logFileName       = "retina.log"
-	heartbeatInterval = 10 * time.Minute
+	heartbeatInterval = 15 * time.Minute
 
 	nodeNameEnvKey = "NODE_NAME"
 	nodeIPEnvKey   = "NODE_IP"
@@ -134,7 +133,9 @@ func (d *Daemon) Start() error {
 	mainLogger := zl.Named("main").Sugar()
 
 	// Allow the current process to lock memory for eBPF resources.
-	if err = rlimit.RemoveMemlock(); err != nil {
+	// OS specific implementation.
+	// This is a no-op on Windows.
+	if err = d.RemoveMemlock(); err != nil {
 		mainLogger.Fatal("failed to remove memlock", zap.Error(err))
 	}
 

@@ -3,18 +3,8 @@ package servers
 import (
 	"context"
 	"log"
-	"os"
-	"strconv"
-)
 
-const (
-	HTTPPort = 8080
-	TCPPort  = 8085
-	UDPPort  = 8086
-
-	EnvHTTPPort = "HTTP_PORT"
-	EnvTCPPort  = "TCP_PORT"
-	EnvUDPPort  = "UDP_PORT"
+	"github.com/microsoft/retina/hack/tools/kapinger/config"
 )
 
 type Server interface {
@@ -37,34 +27,15 @@ func (k *Kapinger) Start(ctx context.Context) {
 	<-ctx.Done()
 }
 
-func StartAll() {
-	tcpPort, err := strconv.Atoi(os.Getenv(EnvTCPPort))
-	if err != nil {
-		tcpPort = TCPPort
-		log.Printf("TCP_PORT not set, defaulting to port %d\n", TCPPort)
-	}
-
-	udpPort, err := strconv.Atoi(os.Getenv(EnvUDPPort))
-	if err != nil {
-		udpPort = UDPPort
-		log.Printf("UDP_PORT not set, defaulting to port %d\n", UDPPort)
-	}
-
-	httpPort, err := strconv.Atoi(os.Getenv(EnvHTTPPort))
-	if err != nil {
-		httpPort = HTTPPort
-		log.Printf("HTTP_PORT not set, defaulting to port %d\n", HTTPPort)
-	}
-
+func StartAll(ctx context.Context, config *config.KapingerConfig) {
 	k := &Kapinger{
 		servers: []Server{
-			NewKapingerTCPServer(tcpPort),
-			NewKapingerUDPServer(udpPort),
-			NewKapingerHTTPServer(httpPort),
+			NewKapingerTCPServer(config.TCPPort),
+			NewKapingerUDPServer(config.UDPPort),
+			NewKapingerHTTPServer(config.HTTPPort),
 		},
 	}
 
 	// cancel
-	ctx := context.Background()
 	k.Start(ctx)
 }

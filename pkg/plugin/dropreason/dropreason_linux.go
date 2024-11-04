@@ -145,7 +145,7 @@ func (dr *dropReason) Init() error {
 	}
 
 	// read perf map
-	dr.reader, err = plugincommon.NewPerfReader(dr.l, objs.DropreasonEvents, perCPUBuffer, 1)
+	dr.reader, err = plugincommon.NewPerfReader(dr.l, objs.RetinaDropreasonEvents, perCPUBuffer, 1)
 	if err != nil {
 		dr.l.Error("Error NewReader: %w", zap.Error(err))
 		return err
@@ -225,7 +225,7 @@ func (dr *dropReason) Init() error {
 		}
 	}
 
-	dr.metricsMapData = objs.MetricsMap
+	dr.metricsMapData = objs.RetinaDropreasonMetrics
 	return nil
 }
 

@@ -194,7 +194,7 @@ RETINA_OPERATOR_IMAGE			= $(IMAGE_NAMESPACE)/retina-operator
 RETINA_INTEGRATION_TEST_IMAGE	= $(IMAGE_NAMESPACE)/retina-integration-test
 RETINA_PROTO_IMAGE				= $(IMAGE_NAMESPACE)/retina-proto-gen
 RETINA_GO_GEN_IMAGE				= $(IMAGE_NAMESPACE)/retina-go-gen
-KAPINGER_IMAGE 					= $(IMAGE_NAMESPACE)/kapinger
+KAPINGER_IMAGE 					= kapinger
 
 skopeo-export: # util target to copy a container from containers-storage to the docker daemon.
 	skopeo copy \
@@ -306,6 +306,15 @@ retina-operator-image:  ## build the retina linux operator image.
 			TAG=$(RETINA_PLATFORM_TAG) \
 			APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
 			CONTEXT_DIR=$(REPO_ROOT)
+
+kapinger-image: 
+	docker buildx build --builder retina --platform windows/amd64 --target windows-amd64 -t $(IMAGE_REGISTRY)/$(KAPINGER_IMAGE):$(TAG)-windows-amd64  ./hack/tools/kapinger/ --push
+	docker buildx build --builder retina --platform linux/amd64 --target linux-amd64 -t $(IMAGE_REGISTRY)/$(KAPINGER_IMAGE):$(TAG)-linux-amd64  ./hack/tools/kapinger/ --push
+	docker buildx build --builder retina --platform linux/arm64 --target linux-arm64 -t $(IMAGE_REGISTRY)/$(KAPINGER_IMAGE):$(TAG)-linux-arm64  ./hack/tools/kapinger/ --push
+	docker buildx imagetools create -t $(IMAGE_REGISTRY)/$(KAPINGER_IMAGE):$(TAG) \
+		$(IMAGE_REGISTRY)/$(KAPINGER_IMAGE):$(TAG)-windows-amd64 \
+		$(IMAGE_REGISTRY)/$(KAPINGER_IMAGE):$(TAG)-linux-amd64 \
+		$(IMAGE_REGISTRY)/$(KAPINGER_IMAGE):$(TAG)-linux-arm64
 
 proto-gen: ## generate protobuf code
 	docker build --platform=linux/amd64 \
@@ -513,7 +522,7 @@ clean-certs:
 .PHONY: docs
 docs: 
 	echo $(PWD)
-	docker run -it -p 3000:3000 -v $(PWD):/retina -w /retina/ node:20-alpine ./site/start-dev.sh
+	docker run -it -p 3000:3000 -v $(PWD):/retina -w /retina/ node:20-alpine sh ./site/start-dev.sh
 
 .PHONY: docs-pod
 docs-prod:

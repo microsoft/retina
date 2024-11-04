@@ -33,7 +33,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: hack/tools/kapinger
-          file: hack/tools/kapinger/Dockerfile.windows
+          file: hack/tools/kapinger/Dockerfile
           platforms: windows/amd64
           push: false
           provenance: false

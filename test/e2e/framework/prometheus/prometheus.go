@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/microsoft/retina/test/retry"
@@ -34,7 +35,7 @@ func CheckMetric(promAddress, metricName string, validMetric map[string]string) 
 		var err error
 
 		// obtain a full dump of all metrics on the endpoint
-		metrics, err = getAllPrometheusMetrics(promAddress)
+		metrics, err = getAllPrometheusMetricsFromURL(promAddress)
 		if err != nil {
 			return fmt.Errorf("could not start port forward within %ds: %w	", defaultTimeout, err)
 		}
@@ -57,6 +58,21 @@ func CheckMetric(promAddress, metricName string, validMetric map[string]string) 
 	return nil
 }
 
+func CheckMetricFromBuffer(prometheusMetricData []byte, metricName string, validMetric map[string]string) error {
+	metrics, err := getAllPrometheusMetricsFromBuffer(prometheusMetricData)
+	if err != nil {
+		return fmt.Errorf("failed to parse prometheus metrics: %w", err)
+	}
+
+	err = verifyValidMetricPresent(metricName, metrics, validMetric)
+	if err != nil {
+		log.Printf("failed to find metric matching %s: %+v\n", metricName, validMetric)
+		return ErrNoMetricFound
+	}
+
+	return nil
+}
+
 func verifyValidMetricPresent(metricName string, data map[string]*promclient.MetricFamily, validMetric map[string]string) error {
 	for _, metric := range data {
 		if metric.GetName() == metricName {
@@ -67,6 +83,12 @@ func verifyValidMetricPresent(metricName string, data map[string]*promclient.Met
 				for _, label := range metric.GetLabel() {
 					metricLabels[label.GetName()] = label.GetValue()
 				}
+
+				// if valid metric is empty, then we just need to make sure the metric and value is present
+				if len(validMetric) == 0 && len(metricLabels) > 0 {
+					return nil
+				}
+
 				if reflect.DeepEqual(metricLabels, validMetric) {
 					return nil
 				}
@@ -77,7 +99,7 @@ func verifyValidMetricPresent(metricName string, data map[string]*promclient.Met
 	return fmt.Errorf("failed to find metric matching: %+v: %w", validMetric, ErrNoMetricFound)
 }
 
-func getAllPrometheusMetrics(url string) (map[string]*promclient.MetricFamily, error) {
+func getAllPrometheusMetricsFromURL(url string) (map[string]*promclient.MetricFamily, error) {
 	client := http.Client{}
 	resp, err := client.Get(url) //nolint
 	if err != nil {
@@ -89,7 +111,7 @@ func getAllPrometheusMetrics(url string) (map[string]*promclient.MetricFamily, e
 		return nil, fmt.Errorf("HTTP request failed with status: %v", resp.Status) //nolint:goerr113,gocritic
 	}
 
-	metrics, err := parseReaderPrometheusMetrics(resp.Body)
+	metrics, err := ParseReaderPrometheusMetrics(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +119,25 @@ func getAllPrometheusMetrics(url string) (map[string]*promclient.MetricFamily, e
 	return metrics, nil
 }
 
-func parseReaderPrometheusMetrics(input io.Reader) (map[string]*promclient.MetricFamily, error) {
+func getAllPrometheusMetricsFromBuffer(buf []byte) (map[string]*promclient.MetricFamily, error) {
+	var parser expfmt.TextParser
+	reader := strings.NewReader(string(buf))
+	return parser.TextToMetricFamilies(reader) //nolint
+}
+
+func ParseReaderPrometheusMetrics(input io.Reader) (map[string]*promclient.MetricFamily, error) {
 	var parser expfmt.TextParser
 	return parser.TextToMetricFamilies(input) //nolint
+}
+
+// When capturing promethus output via curl and exect, there's a lot
+// of garbage at the front
+func stripExecGarbage(s string) string {
+	index := strings.Index(s, "#")
+	if index == -1 {
+		// If there's no `#`, return the original string
+		return s
+	}
+	// Slice the string up to the character before the first `#`
+	return s[:index]
 }

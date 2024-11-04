@@ -1,20 +1,24 @@
 package kubernetes
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/microsoft/retina/test/e2e/common"
 	generic "github.com/microsoft/retina/test/e2e/framework/generic"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/cli"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 const (
-	createTimeout = 240 * time.Second // windpws is slow
+	createTimeout = 20 * time.Minute // windows is slow
 	deleteTimeout = 60 * time.Second
 )
 
@@ -32,6 +36,8 @@ type InstallHelmChart struct {
 }
 
 func (i *InstallHelmChart) Run() error {
+	ctx, cancel := context.WithTimeout(context.Background(), createTimeout)
+	defer cancel()
 	settings := cli.New()
 	settings.KubeConfig = i.KubeConfigFilePath
 	actionConfig := new(action.Configuration)
@@ -39,6 +45,12 @@ func (i *InstallHelmChart) Run() error {
 	err := actionConfig.Init(settings.RESTClientGetter(), i.Namespace, os.Getenv("HELM_DRIVER"), log.Printf)
 	if err != nil {
 		return fmt.Errorf("failed to initialize helm action config: %w", err)
+	}
+
+	// Creating extra namespace to deploy test pods
+	err = CreateNamespace(i.KubeConfigFilePath, common.TestPodNamespace)
+	if err != nil {
+		return fmt.Errorf("failed to create namespace %s: %w", i.Namespace, err)
 	}
 
 	tag := os.Getenv(generic.DefaultTagEnv)
@@ -53,6 +65,12 @@ func (i *InstallHelmChart) Run() error {
 	imageNamespace := os.Getenv(generic.DefaultImageNamespace)
 	if imageNamespace == "" {
 		return fmt.Errorf("image namespace is not set: %w", errEmpty)
+	}
+
+	//Download necessary CRD's
+	err = downloadExternalCRDs(i.ChartPath)
+	if err != nil {
+		return fmt.Errorf("failed to load external crd's: %w", err)
 	}
 
 	// load chart from the path
@@ -97,7 +115,7 @@ func (i *InstallHelmChart) Run() error {
 	client.WaitForJobs = true
 
 	// install the chart here
-	rel, err := client.Run(chart, chart.Values)
+	rel, err := client.RunWithContext(ctx, chart, chart.Values)
 	if err != nil {
 		return fmt.Errorf("failed to install chart: %w", err)
 	}
@@ -105,6 +123,23 @@ func (i *InstallHelmChart) Run() error {
 	log.Printf("installed chart from path: %s in namespace: %s\n", rel.Name, rel.Namespace)
 	// this will confirm the values set during installation
 	log.Printf("chart values: %v\n", rel.Config)
+
+	// ensure all pods are running, since helm doesn't care about windows
+	config, err := clientcmd.BuildConfigFromFlags("", i.KubeConfigFilePath)
+	if err != nil {
+		return fmt.Errorf("error building kubeconfig: %w", err)
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("error creating Kubernetes client: %w", err)
+	}
+
+	labelSelector := "k8s-app=retina"
+	err = WaitForPodReady(ctx, clientset, "kube-system", labelSelector)
+	if err != nil {
+		return fmt.Errorf("error waiting for retina pods to be ready: %w", err)
+	}
 
 	return nil
 }

@@ -40,7 +40,8 @@ func CaptureWorkloadImage(logger *log.ZapLogger, imageVersion string, debug bool
 
 	// For testing.
 	if debug {
-		if captureWorkloadImageFromEnv := os.Getenv(captureWorkloadImageEnvKey); len(captureWorkloadImageFromEnv) != 0 {
+		captureWorkloadImageFromEnv := os.Getenv(captureWorkloadImageEnvKey)
+		if captureWorkloadImageFromEnv != "" {
 			logger.Info("Debug mode: obtained capture workload image from environment variable", zap.String("environment variable key", captureWorkloadImageEnvKey), zap.String("image", captureWorkloadImageFromEnv))
 			return captureWorkloadImageFromEnv
 		}

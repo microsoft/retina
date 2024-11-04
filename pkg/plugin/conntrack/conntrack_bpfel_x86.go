@@ -19,7 +19,7 @@ type conntrackCtEntry struct {
 	TrafficDirection uint8
 	FlagsSeenTxDir   uint8
 	FlagsSeenRxDir   uint8
-	IsClosing        bool
+	_                [1]byte
 }
 
 type conntrackCtV4Key struct {
@@ -78,7 +78,7 @@ type conntrackProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type conntrackMapSpecs struct {
-	RetinaConntrackMap *ebpf.MapSpec `ebpf:"retina_conntrack_map"`
+	RetinaConntrack *ebpf.MapSpec `ebpf:"retina_conntrack"`
 }
 
 // conntrackObjects contains all objects after they have been loaded into the kernel.
@@ -100,12 +100,12 @@ func (o *conntrackObjects) Close() error {
 //
 // It can be passed to loadConntrackObjects or ebpf.CollectionSpec.LoadAndAssign.
 type conntrackMaps struct {
-	RetinaConntrackMap *ebpf.Map `ebpf:"retina_conntrack_map"`
+	RetinaConntrack *ebpf.Map `ebpf:"retina_conntrack"`
 }
 
 func (m *conntrackMaps) Close() error {
 	return _ConntrackClose(
-		m.RetinaConntrackMap,
+		m.RetinaConntrack,
 	)
 }
 

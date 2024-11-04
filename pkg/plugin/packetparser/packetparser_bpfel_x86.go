@@ -19,7 +19,7 @@ type packetparserCtEntry struct {
 	TrafficDirection uint8
 	FlagsSeenTxDir   uint8
 	FlagsSeenRxDir   uint8
-	IsClosing        bool
+	_                [1]byte
 }
 
 type packetparserCtV4Key struct {
@@ -108,9 +108,9 @@ type packetparserProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type packetparserMapSpecs struct {
-	PacketparserEvents *ebpf.MapSpec `ebpf:"packetparser_events"`
-	RetinaConntrackMap *ebpf.MapSpec `ebpf:"retina_conntrack_map"`
-	RetinaFilterMap    *ebpf.MapSpec `ebpf:"retina_filter_map"`
+	RetinaConntrack          *ebpf.MapSpec `ebpf:"retina_conntrack"`
+	RetinaFilter             *ebpf.MapSpec `ebpf:"retina_filter"`
+	RetinaPacketparserEvents *ebpf.MapSpec `ebpf:"retina_packetparser_events"`
 }
 
 // packetparserObjects contains all objects after they have been loaded into the kernel.
@@ -132,16 +132,16 @@ func (o *packetparserObjects) Close() error {
 //
 // It can be passed to loadPacketparserObjects or ebpf.CollectionSpec.LoadAndAssign.
 type packetparserMaps struct {
-	PacketparserEvents *ebpf.Map `ebpf:"packetparser_events"`
-	RetinaConntrackMap *ebpf.Map `ebpf:"retina_conntrack_map"`
-	RetinaFilterMap    *ebpf.Map `ebpf:"retina_filter_map"`
+	RetinaConntrack          *ebpf.Map `ebpf:"retina_conntrack"`
+	RetinaFilter             *ebpf.Map `ebpf:"retina_filter"`
+	RetinaPacketparserEvents *ebpf.Map `ebpf:"retina_packetparser_events"`
 }
 
 func (m *packetparserMaps) Close() error {
 	return _PacketparserClose(
-		m.PacketparserEvents,
-		m.RetinaConntrackMap,
-		m.RetinaFilterMap,
+		m.RetinaConntrack,
+		m.RetinaFilter,
+		m.RetinaPacketparserEvents,
 	)
 }
 

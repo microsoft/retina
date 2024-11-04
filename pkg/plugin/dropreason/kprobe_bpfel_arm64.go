@@ -99,12 +99,12 @@ type kprobeProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type kprobeMapSpecs struct {
-	AcceptPids       *ebpf.MapSpec `ebpf:"accept_pids"`
-	DropPids         *ebpf.MapSpec `ebpf:"drop_pids"`
-	DropreasonEvents *ebpf.MapSpec `ebpf:"dropreason_events"`
-	MetricsMap       *ebpf.MapSpec `ebpf:"metrics_map"`
-	NatdropPids      *ebpf.MapSpec `ebpf:"natdrop_pids"`
-	RetinaFilterMap  *ebpf.MapSpec `ebpf:"retina_filter_map"`
+	RetinaDropreasonAcceptPids  *ebpf.MapSpec `ebpf:"retina_dropreason_accept_pids"`
+	RetinaDropreasonDropPids    *ebpf.MapSpec `ebpf:"retina_dropreason_drop_pids"`
+	RetinaDropreasonEvents      *ebpf.MapSpec `ebpf:"retina_dropreason_events"`
+	RetinaDropreasonMetrics     *ebpf.MapSpec `ebpf:"retina_dropreason_metrics"`
+	RetinaDropreasonNatdropPids *ebpf.MapSpec `ebpf:"retina_dropreason_natdrop_pids"`
+	RetinaFilter                *ebpf.MapSpec `ebpf:"retina_filter"`
 }
 
 // kprobeObjects contains all objects after they have been loaded into the kernel.
@@ -126,22 +126,22 @@ func (o *kprobeObjects) Close() error {
 //
 // It can be passed to loadKprobeObjects or ebpf.CollectionSpec.LoadAndAssign.
 type kprobeMaps struct {
-	AcceptPids       *ebpf.Map `ebpf:"accept_pids"`
-	DropPids         *ebpf.Map `ebpf:"drop_pids"`
-	DropreasonEvents *ebpf.Map `ebpf:"dropreason_events"`
-	MetricsMap       *ebpf.Map `ebpf:"metrics_map"`
-	NatdropPids      *ebpf.Map `ebpf:"natdrop_pids"`
-	RetinaFilterMap  *ebpf.Map `ebpf:"retina_filter_map"`
+	RetinaDropreasonAcceptPids  *ebpf.Map `ebpf:"retina_dropreason_accept_pids"`
+	RetinaDropreasonDropPids    *ebpf.Map `ebpf:"retina_dropreason_drop_pids"`
+	RetinaDropreasonEvents      *ebpf.Map `ebpf:"retina_dropreason_events"`
+	RetinaDropreasonMetrics     *ebpf.Map `ebpf:"retina_dropreason_metrics"`
+	RetinaDropreasonNatdropPids *ebpf.Map `ebpf:"retina_dropreason_natdrop_pids"`
+	RetinaFilter                *ebpf.Map `ebpf:"retina_filter"`
 }
 
 func (m *kprobeMaps) Close() error {
 	return _KprobeClose(
-		m.AcceptPids,
-		m.DropPids,
-		m.DropreasonEvents,
-		m.MetricsMap,
-		m.NatdropPids,
-		m.RetinaFilterMap,
+		m.RetinaDropreasonAcceptPids,
+		m.RetinaDropreasonDropPids,
+		m.RetinaDropreasonEvents,
+		m.RetinaDropreasonMetrics,
+		m.RetinaDropreasonNatdropPids,
+		m.RetinaFilter,
 	)
 }
 

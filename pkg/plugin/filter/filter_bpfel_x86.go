@@ -64,7 +64,7 @@ type filterProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type filterMapSpecs struct {
-	RetinaFilterMap *ebpf.MapSpec `ebpf:"retina_filter_map"`
+	RetinaFilter *ebpf.MapSpec `ebpf:"retina_filter"`
 }
 
 // filterObjects contains all objects after they have been loaded into the kernel.
@@ -86,12 +86,12 @@ func (o *filterObjects) Close() error {
 //
 // It can be passed to loadFilterObjects or ebpf.CollectionSpec.LoadAndAssign.
 type filterMaps struct {
-	RetinaFilterMap *ebpf.Map `ebpf:"retina_filter_map"`
+	RetinaFilter *ebpf.Map `ebpf:"retina_filter"`
 }
 
 func (m *filterMaps) Close() error {
 	return _FilterClose(
-		m.RetinaFilterMap,
+		m.RetinaFilter,
 	)
 }
 

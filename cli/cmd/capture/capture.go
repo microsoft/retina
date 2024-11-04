@@ -11,15 +11,16 @@ import (
 
 var name string
 
+const defaultName = "retina-capture"
+
 var capture = &cobra.Command{
 	Use:   "capture",
-	Short: "capture network traffic",
+	Short: "Capture network traffic",
 }
 
 func init() {
 	cmd.Retina.AddCommand(capture)
 	configFlags = genericclioptions.NewConfigFlags(true)
 	configFlags.AddFlags(capture.PersistentFlags())
-	capture.PersistentFlags().StringVar(&name, "name", "", "The name of the Retina Capture")
-	_ = capture.MarkPersistentFlagRequired("name")
+	capture.PersistentFlags().StringVar(&name, "name", defaultName, "The name of the Retina Capture")
 }
