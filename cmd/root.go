@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/microsoft/retina/cli/cmd/debug"
 	"github.com/microsoft/retina/cmd/legacy"
 	"github.com/spf13/cobra"
 )
@@ -45,6 +46,9 @@ func init() {
 
 	// this is read during GetConfigOrDie, not explicitly passed to any of our logic
 	rootCmd.Flags().StringVar(&kubeConfigFileName, "kubeconfig", kubeConfigFileName, "noop we just need cobra to not check since controller runtime can use this flag")
+
+	// Add debug commands
+	rootCmd.AddCommand(debug.Cmd)
 }
 
 func Execute() {
