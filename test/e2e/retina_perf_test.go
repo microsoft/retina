@@ -33,9 +33,15 @@ func TestE2EPerfRetina(t *testing.T) {
 		var nBig *big.Int
 		nBig, err = rand.Int(rand.Reader, big.NewInt(int64(len(common.AzureLocations))))
 		if err != nil {
-			t.Fatalf("Failed to generate a secure random index: %v", err)
+			t.Fatal("Failed to generate a secure random index", err)
 		}
 		location = common.AzureLocations[nBig.Int64()]
+	}
+
+	rg := os.Getenv("AZURE_RESOURCE_GROUP")
+	if rg == "" {
+		// Use the cluster name as the resource group name by default.
+		rg = clusterName
 	}
 
 	cwd, err := os.Getwd()
@@ -51,11 +57,11 @@ func TestE2EPerfRetina(t *testing.T) {
 	kubeConfigFilePath := filepath.Join(rootDir, "test", "e2e", "test.pem")
 
 	// CreateTestInfra
-	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, clusterName, location, kubeConfigFilePath, true))
+	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath, true))
 	createTestInfra.Run()
 
 	t.Cleanup(func() {
-		err := jobs.DeleteTestInfra(subID, clusterName, location).Run()
+		err := jobs.DeleteTestInfra(subID, rg, clusterName, location).Run()
 		if err != nil {
 			t.Logf("Failed to delete test infrastructure: %v", err)
 		}

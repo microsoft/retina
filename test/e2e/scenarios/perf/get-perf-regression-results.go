@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/pkg/errors"
 )
 
 type TestInfo struct {
@@ -59,16 +61,16 @@ func (v *GetNetworkRegressionResults) Prevalidate() error {
 func (v *GetNetworkRegressionResults) Run() error {
 	benchmarkResults, err := readJSONFile(v.BaseResultsFile)
 	if err != nil {
-		return fmt.Errorf("failed to read benchmark results file: %v", err)
+		return errors.Wrap(err, "failed to read base results file")
 	}
 
 	newResults, err := readJSONFile(v.NewResultsFile)
 	if err != nil {
-		return fmt.Errorf("failed to read new results file: %v", err)
+		return errors.Wrap(err, "failed to read new results file")
 	}
 
 	if len(benchmarkResults) != len(newResults) {
-		return fmt.Errorf("number of tests in benchmark results and new results do not match")
+		return errors.New("number of test results do not match")
 	}
 
 	regressionResults := make(map[string]*RegressionResult)
@@ -78,7 +80,7 @@ func (v *GetNetworkRegressionResults) Run() error {
 		newResult := newResults[i]
 
 		if benchmarkResult.Label != newResult.Label {
-			return fmt.Errorf("test labels do not match")
+			return errors.New("test labels do not match")
 		}
 
 		if _, exists := regressionResults[benchmarkResults[i].Label]; !exists {
@@ -125,7 +127,7 @@ func (v *GetNetworkRegressionResults) Run() error {
 
 	file, err := os.Create(v.RegressionResultsFile)
 	if err != nil {
-		return fmt.Errorf("error creating file %s: %v", v.RegressionResultsFile, err)
+		return errors.Wrap(err, fmt.Sprintf("failed to create regression results file: %s", v.RegressionResultsFile))
 	}
 	defer file.Close()
 
@@ -134,7 +136,7 @@ func (v *GetNetworkRegressionResults) Run() error {
 
 	err = encoder.Encode(results)
 	if err != nil {
-		return fmt.Errorf("error encoding regression results: %v", err)
+		return errors.Wrap(err, "failed to encode regression results")
 	}
 
 	return nil

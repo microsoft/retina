@@ -1,10 +1,10 @@
 package perf
 
 import (
-	"fmt"
 	"io"
 	"os"
 
+	"github.com/pkg/errors"
 	"k8s.io/perf-tests/network/benchmarks/netperf/lib"
 )
 
@@ -30,12 +30,12 @@ func (v *GetNetworkPerformanceMeasures) Run() error {
 		KubeConfig:    v.KubeConfigFilePath,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to get network performance measures: %v", err)
+		return errors.Wrap(err, "failed to get network performance measures")
 	}
 	sourceJsonOutputFile := results[0].JsonResultFile
 	err = moveFile(sourceJsonOutputFile, v.JsonOutputFile)
 	if err != nil {
-		return fmt.Errorf("failed to copy json output file: %v", err)
+		return errors.Wrap(err, "failed to move json output file")
 	}
 	return nil
 }
@@ -47,12 +47,12 @@ func (v *GetNetworkPerformanceMeasures) Stop() error {
 func moveFile(src, dst string) error {
 	err := copyFile(src, dst)
 	if err != nil {
-		return fmt.Errorf("failed to move file: %v", err)
+		return errors.Wrap(err, "failed to copy file")
 	}
 
 	err = os.Remove(src)
 	if err != nil {
-		fmt.Printf("warning: failed to delete source file %s: %v\n", src, err)
+		return errors.Wrap(err, "failed to remove source file")
 	}
 
 	return nil
@@ -61,27 +61,27 @@ func moveFile(src, dst string) error {
 func copyFile(src, dst string) error {
 	sourceFile, err := os.Open(src)
 	if err != nil {
-		return fmt.Errorf("failed to open source file: %v", err)
+		return errors.Wrap(err, "failed to open source file")
 	}
 	defer sourceFile.Close()
 
 	// Create the destination file
 	destinationFile, err := os.Create(dst)
 	if err != nil {
-		return fmt.Errorf("failed to create destination file: %v", err)
+		return errors.Wrap(err, "failed to create destination file")
 	}
 	defer destinationFile.Close()
 
 	// Copy the contents from source to destination
 	_, err = io.Copy(destinationFile, sourceFile)
 	if err != nil {
-		return fmt.Errorf("failed to copy file: %v", err)
+		return errors.Wrap(err, "failed to copy contents from source to destination")
 	}
 
 	// Flush the destination file to ensure all data is written
 	err = destinationFile.Sync()
 	if err != nil {
-		return fmt.Errorf("failed to sync destination file: %v", err)
+		return errors.Wrap(err, "failed to flush destination file")
 	}
 
 	return nil

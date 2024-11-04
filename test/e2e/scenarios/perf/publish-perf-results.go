@@ -8,6 +8,7 @@ import (
 
 	"github.com/microsoft/retina/pkg/telemetry"
 	"github.com/microsoft/retina/test/e2e/framework/generic"
+	"github.com/pkg/errors"
 )
 
 type PublishPerfResults struct {
@@ -21,19 +22,19 @@ func (v *PublishPerfResults) Prevalidate() error {
 func (v *PublishPerfResults) Run() error {
 	resultsFile, err := os.OpenFile(v.ResultsFile, os.O_RDONLY, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to open results file: %v", err)
+		return errors.Wrap(err, "failed to open results file")
 	}
 	defer resultsFile.Close()
 
 	resultBytes, err := io.ReadAll(resultsFile)
 	if err != nil {
-		return fmt.Errorf("failed to read results file: %v", err)
+		return errors.Wrap(err, "failed to read results file")
 	}
 
 	var results []RegressionResult
 	err = json.Unmarshal(resultBytes, &results)
 	if err != nil {
-		return fmt.Errorf("failed to unmarshal results: %v", err)
+		return errors.Wrap(err, "failed to unmarshal results")
 	}
 
 	appInsightsKey := os.Getenv("AZURE_APP_INSIGHTS_KEY")
@@ -43,7 +44,7 @@ func (v *PublishPerfResults) Run() error {
 	// so we can safely assume they are set
 	// However, this test will ensure they set if run from a different scope
 	if appInsightsKey == "" || retinaVersion == "" {
-		return fmt.Errorf("AZURE_APP_INSIGHTS_KEY and %s environment variables must be set", generic.DefaultTagEnv)
+		return errors.New(fmt.Sprintf("AZURE_APP_INSIGHTS_KEY and %s must be set", generic.DefaultTagEnv))
 	}
 
 	telemetry.InitAppInsights(appInsightsKey, retinaVersion)
@@ -53,7 +54,7 @@ func (v *PublishPerfResults) Run() error {
 		"retinaVersion": retinaVersion,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create telemetry client: %v", err)
+		return errors.Wrap(err, "failed to create telemetry client")
 	}
 
 	fmt.Printf("Sending telemetry data to app insights\n")
