@@ -13,13 +13,13 @@ import (
 	"github.com/microsoft/retina/test/e2e/scenarios/windows"
 )
 
-func CreateTestInfra(subID, clusterName, location, kubeConfigFilePath string, createInfra bool) *types.Job {
+func CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath string, createInfra bool) *types.Job {
 	job := types.NewJob("Create e2e test infrastructure")
 
 	if createInfra {
 		job.AddStep(&azure.CreateResourceGroup{
 			SubscriptionID:    subID,
-			ResourceGroupName: clusterName,
+			ResourceGroupName: rg,
 			Location:          location,
 		}, nil)
 
@@ -49,7 +49,7 @@ func CreateTestInfra(subID, clusterName, location, kubeConfigFilePath string, cr
 			KubeConfigFilePath: kubeConfigFilePath,
 			ClusterName:        clusterName,
 			SubscriptionID:     subID,
-			ResourceGroupName:  clusterName,
+			ResourceGroupName:  rg,
 			Location:           location,
 		}, nil)
 	}
@@ -63,12 +63,12 @@ func CreateTestInfra(subID, clusterName, location, kubeConfigFilePath string, cr
 	return job
 }
 
-func DeleteTestInfra(subID, clusterName, location string) *types.Job {
+func DeleteTestInfra(subID, rg, clusterName, location string) *types.Job {
 	job := types.NewJob("Delete e2e test infrastructure")
 
 	job.AddStep(&azure.DeleteResourceGroup{
 		SubscriptionID:    subID,
-		ResourceGroupName: clusterName,
+		ResourceGroupName: rg,
 		Location:          location,
 	}, nil)
 
