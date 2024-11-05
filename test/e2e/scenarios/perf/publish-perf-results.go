@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 
 	"github.com/microsoft/retina/pkg/telemetry"
@@ -20,6 +21,12 @@ func (v *PublishPerfResults) Prevalidate() error {
 }
 
 func (v *PublishPerfResults) Run() error {
+	appInsightsKey := os.Getenv("AZURE_APP_INSIGHTS_KEY")
+	if appInsightsKey == "" {
+		log.Println("No app insights key provided, skipping publishing results")
+		return nil
+	}
+
 	resultsFile, err := os.OpenFile(v.ResultsFile, os.O_RDONLY, 0644)
 	if err != nil {
 		return errors.Wrap(err, "failed to open results file")
@@ -37,14 +44,13 @@ func (v *PublishPerfResults) Run() error {
 		return errors.Wrap(err, "failed to unmarshal results")
 	}
 
-	appInsightsKey := os.Getenv("AZURE_APP_INSIGHTS_KEY")
 	retinaVersion := os.Getenv(generic.DefaultTagEnv)
 
 	// We have checks for them in early steps of the perf test
 	// so we can safely assume they are set
 	// However, this test will ensure they set if run from a different scope
-	if appInsightsKey == "" || retinaVersion == "" {
-		return errors.New(fmt.Sprintf("AZURE_APP_INSIGHTS_KEY and %s must be set", generic.DefaultTagEnv))
+	if retinaVersion == "" {
+		return errors.New(fmt.Sprintf("%s must be set", generic.DefaultTagEnv))
 	}
 
 	telemetry.InitAppInsights(appInsightsKey, retinaVersion)

@@ -99,9 +99,9 @@ func (v *GetNetworkRegressionResults) Run() error {
 			result    float64
 		}{
 			{"total_throughput", benchmarkResult.Result.TotalThroughput, newResult.Result.TotalThroughput},
-			{"mean_rtt", benchmarkResult.Result.MeanRTT, newResult.Result.MeanRTT},
-			{"min_rtt", benchmarkResult.Result.MinRTT, newResult.Result.MinRTT},
-			{"max_rtt", benchmarkResult.Result.MaxRTT, newResult.Result.MaxRTT},
+			{"mean_rtt_ms", benchmarkResult.Result.MeanRTT, newResult.Result.MeanRTT},
+			{"min_rtt_ms", benchmarkResult.Result.MinRTT, newResult.Result.MinRTT},
+			{"max_rtt_ms", benchmarkResult.Result.MaxRTT, newResult.Result.MaxRTT},
 			{"retransmits", float64(benchmarkResult.Result.Retransmits), float64(newResult.Result.Retransmits)},
 			{"jitter_ms", benchmarkResult.Result.JitterMs, newResult.Result.JitterMs},
 			{"lost_packets", float64(benchmarkResult.Result.LostPackets), float64(newResult.Result.LostPackets)},

@@ -4,7 +4,11 @@ on:
   schedule:
     # It runs on 17th minute of every 2 hours
     - cron: '17 */2 * * *'
-  workflow_dispatch: 
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Image Tag to use for the performance test'
+        required: true
 
 permissions:
   contents: read
@@ -40,4 +44,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          go test -v ./test/e2e/*perf*.go -timeout 2h -tags=e2e -count=1  -args -image-tag=v0.0.16 -image-registry=ghcr.io -image-namespace=microsoft/retina
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            TAG=${{ github.event.inputs.tag }}
+          else
+            TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
+          fi
+          go test -v ./test/e2e/*perf*.go -timeout 2h -tags=e2e -count=1 -args -image-tag=$TAG -image-registry=${{ vars.ACR_NAME }} -image-namespace=${{ github.repository }}
