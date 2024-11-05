@@ -93,7 +93,7 @@ func TestE2ERetina(t *testing.T) {
 	advanceMetricsE2E := types.NewRunner(t, jobs.UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, profilePath, common.TestPodNamespace))
 	advanceMetricsE2E.Run()
 
-	// Install and test Retina basic metrics
+	// Install and test Hubble basic metrics
 	validatehubble := types.NewRunner(t, jobs.ValidateHubble(kubeConfigFilePath, hubblechartPath, common.TestPodNamespace))
 	validatehubble.Run()
 }
