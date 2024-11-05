@@ -49,7 +49,7 @@ func TestE2EPerfRetina(t *testing.T) {
 
 	appInsightsKey := os.Getenv("AZURE_APP_INSIGHTS_KEY")
 	if appInsightsKey == "" {
-		t.Log("No app insights key provided, results will be saved locally")
+		t.Log("No app insights key provided, results will be saved locally at ./ as `netperf-benchmark-*`, `netperf-result-*`, and `netperf-regression-*`")
 	}
 
 	// Get to root of the repo by going up two directories

@@ -98,7 +98,7 @@ func (v *GetNetworkRegressionResults) Run() error {
 			benchmark float64
 			result    float64
 		}{
-			{"total_throughput", benchmarkResult.Result.TotalThroughput, newResult.Result.TotalThroughput},
+			{"total_throughput_gbits_sec", benchmarkResult.Result.TotalThroughput, newResult.Result.TotalThroughput},
 			{"mean_rtt_ms", benchmarkResult.Result.MeanRTT, newResult.Result.MeanRTT},
 			{"min_rtt_ms", benchmarkResult.Result.MinRTT, newResult.Result.MinRTT},
 			{"max_rtt_ms", benchmarkResult.Result.MaxRTT, newResult.Result.MaxRTT},
