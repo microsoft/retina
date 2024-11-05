@@ -14,6 +14,7 @@ type EnsureStableCluster struct {
 	LabelSelector      string
 	PodNamespace       string
 	KubeConfigFilePath string
+	IgnoreRestart      bool
 }
 
 func (n *EnsureStableCluster) Run() error {
@@ -30,6 +31,13 @@ func (n *EnsureStableCluster) Run() error {
 	err = WaitForPodReady(context.TODO(), clientset, n.PodNamespace, n.LabelSelector)
 	if err != nil {
 		return fmt.Errorf("error waiting for retina pods to be ready: %w", err)
+	}
+
+	if !n.IgnoreRestart {
+		err = CheckPodRestarts(context.TODO(), clientset, n.PodNamespace, n.LabelSelector)
+		if err != nil {
+			return fmt.Errorf("error checking pod restarts: %w", err)
+		}
 	}
 	return nil
 }

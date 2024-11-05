@@ -46,13 +46,6 @@ func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, names
 				return false, fmt.Errorf("error getting Pod: %w", err)
 			}
 
-			for istatus := range pod.Status.ContainerStatuses {
-				status := &pod.Status.ContainerStatuses[istatus]
-				if status.RestartCount > 0 {
-					return false, fmt.Errorf("pod %s has %d restarts: status: %+v: %w", pod.Name, status.RestartCount, status, ErrPodCrashed)
-				}
-			}
-
 			// Check the Pod phase
 			if pod.Status.Phase != corev1.PodRunning {
 				if printIterator%printInterval == 0 {
@@ -83,5 +76,24 @@ func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, names
 		PrintPodLogs(ctx, clientset, namespace, labelSelector)
 		return fmt.Errorf("error waiting for pods in namespace \"%s\" with label \"%s\" to be in Running state: %w", namespace, labelSelector, err)
 	}
+	return nil
+}
+
+func CheckPodRestarts(ctx context.Context, clientset *kubernetes.Clientset, namespace, labelSelector string) error {
+	var podList *corev1.PodList
+	podList, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+	if err != nil {
+		return fmt.Errorf("error listing Pods: %w", err)
+	}
+
+	for _, pod := range podList.Items {
+		for istatus := range pod.Status.ContainerStatuses {
+			status := &pod.Status.ContainerStatuses[istatus]
+			if status.RestartCount > 0 {
+				return fmt.Errorf("pod %s has %d restarts: status: %+v: %w", pod.Name, status.RestartCount, status, ErrPodCrashed)
+			}
+		}
+	}
+	log.Printf("no restarts detected for pods in namespace \"%s\" with label \"%s\"\n", namespace, labelSelector)
 	return nil
 }

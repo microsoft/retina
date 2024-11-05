@@ -140,6 +140,7 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, test
 	job.AddStep(&kubernetes.EnsureStableCluster{
 		PodNamespace:  common.KubeSystemNamespace,
 		LabelSelector: "k8s-app=retina",
+		IgnoreRestart: false,
 	}, nil)
 
 	return job
@@ -207,6 +208,7 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 	job.AddStep(&kubernetes.EnsureStableCluster{
 		PodNamespace:  common.KubeSystemNamespace,
 		LabelSelector: "k8s-app=retina",
+		IgnoreRestart: false,
 	}, nil)
 
 	return job
