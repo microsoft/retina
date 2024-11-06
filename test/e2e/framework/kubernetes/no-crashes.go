@@ -10,7 +10,7 @@ import (
 
 var ErrPodCrashed = fmt.Errorf("pod has crashes")
 
-type EnsureStableCluster struct {
+type EnsureStableComponent struct {
 	LabelSelector      string
 	PodNamespace       string
 	KubeConfigFilePath string
@@ -21,7 +21,7 @@ type EnsureStableCluster struct {
 	IgnoreContainerRestart bool
 }
 
-func (n *EnsureStableCluster) Run() error {
+func (n *EnsureStableComponent) Run() error {
 	config, err := clientcmd.BuildConfigFromFlags("", n.KubeConfigFilePath)
 	if err != nil {
 		return fmt.Errorf("error building kubeconfig: %w", err)
@@ -46,10 +46,10 @@ func (n *EnsureStableCluster) Run() error {
 	return nil
 }
 
-func (n *EnsureStableCluster) Prevalidate() error {
+func (n *EnsureStableComponent) Prevalidate() error {
 	return nil
 }
 
-func (n *EnsureStableCluster) Stop() error {
+func (n *EnsureStableComponent) Stop() error {
 	return nil
 }
