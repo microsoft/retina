@@ -94,6 +94,5 @@ func CheckPodRestarts(ctx context.Context, clientset *kubernetes.Clientset, name
 			}
 		}
 	}
-	log.Printf("no restarts detected for pods in namespace \"%s\" with label \"%s\"\n", namespace, labelSelector)
 	return nil
 }
