@@ -16,7 +16,7 @@ kubectl krew install retina
 
 Download the `kubectl-retina` package for your platform from the latest [Retina release](https://github.com/microsoft/retina/releases/latest).
 
-## Option 2: Build from source
+## Option 3: Build from source
 
 Building the CLI requires go1.21 or greater.
 
