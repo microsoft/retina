@@ -1,9 +1,13 @@
 name: Network Performance Measurement
 
 on:
+  workflow_run:
+    workflows: [Build Images]
+    types:
+      - completed
   schedule:
-    # It runs on 17th minute of every 2 hours
-    - cron: '17 */2 * * *'
+    # It runs on 17th minute of every 12 hours
+    - cron: '17 */12 * * *'
   workflow_dispatch:
     inputs:
       tag:
@@ -16,6 +20,7 @@ permissions:
 
 jobs:
   perf_test:
+    if: ${{ github.event_name == 'merge_group' }}
     name: Retina Performance Test
     runs-on: ubuntu-latest
 
@@ -46,7 +51,9 @@ jobs:
           set -euo pipefail
           if [ -n "${{ github.event.inputs.tag }}" ]; then
             TAG=${{ github.event.inputs.tag }}
-          else
+          elif [ "${{ github.event_name }}" == "merge_group" ]; then
             TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
+          else
+            TAG="default-version"
           fi
           go test -v ./test/e2e/*perf*.go -timeout 2h -tags=e2e -count=1 -args -image-tag=$TAG -image-registry=${{ vars.ACR_NAME }} -image-namespace=${{ github.repository }}
