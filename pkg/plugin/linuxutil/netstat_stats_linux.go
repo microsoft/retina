@@ -18,8 +18,9 @@ import (
 )
 
 const (
-	pathNetNetstat = "/proc/net/netstat"
-	pathNetSnmp    = "/proc/net/snmp"
+	pathNetNetstat       = "/proc/net/netstat"
+	pathNetSnmp          = "/proc/net/snmp"
+	addrDefaultTCPRemote = "AllIPs"
 )
 
 type NetstatReader struct {
@@ -31,6 +32,7 @@ type NetstatReader struct {
 }
 
 func NewNetstatReader(opts *NetstatOpts, ns NetstatInterface) *NetstatReader {
+	metrics.TCPConnectionRemoteGauge.WithLabelValues(addrDefaultTCPRemote).Set(0)
 	return &NetstatReader{
 		l:          log.Logger().Named(string("NetstatReader")),
 		opts:       opts,
@@ -190,17 +192,9 @@ func (nr *NetstatReader) readSockStats() error {
 		// Log the socketByRemoteAddr map
 		if nr.opts.PrevTCPSockStats != nil {
 			for remoteAddr := range nr.opts.PrevTCPSockStats.socketByRemoteAddr {
-				addrPort, err := netip.ParseAddrPort(remoteAddr)
+				_, err := netip.ParseAddrPort(remoteAddr)
 				if err != nil {
-					return errors.Wrapf(err, "failed to parse remote address %s", remoteAddr)
-				}
-				addr := addrPort.Addr().String()
-				port := strconv.Itoa(int(addrPort.Port()))
-				// Check if the remote address is in the new sockStats map
-				if _, ok := sockStats.socketByRemoteAddr[remoteAddr]; !ok {
-					nr.l.Debug("Removing remote address from metrics", zap.String("remoteAddr", remoteAddr))
-					// If not, set the value to 0
-					metrics.TCPConnectionRemoteGauge.WithLabelValues(addr, port).Set(0)
+					return errors.Wrapf(err, "failed to parse remote address %s, %s", remoteAddr)
 				}
 			}
 		}
@@ -251,20 +245,11 @@ func (nr *NetstatReader) updateMetrics() {
 		metrics.TCPStateGauge.WithLabelValues(state).Set(float64(v))
 	}
 
-	for remoteAddr, v := range nr.connStats.TcpSockets.socketByRemoteAddr {
-		addrPort, err := netip.ParseAddrPort(remoteAddr)
-		if err != nil {
-			nr.l.Error("Failed to parse remote address", zap.Error(err))
-			continue
-		}
-		addr := addrPort.Addr().String()
-		port := strconv.Itoa(int(addrPort.Port()))
-		if !validateRemoteAddr(addr) {
-			continue
-		}
-
-		metrics.TCPConnectionRemoteGauge.WithLabelValues(addr, port).Set(float64(v))
+	totalCount := 0
+	for _, v := range nr.connStats.TcpSockets.socketByRemoteAddr {
+		totalCount += v
 	}
+	metrics.TCPConnectionRemoteGauge.WithLabelValues(addrDefaultTCPRemote).Set(float64(totalCount))
 
 	// UDP COnnection State metrics
 	metrics.UDPConnectionStatsGauge.WithLabelValues(utils.Active).Set(float64(nr.connStats.UdpSockets.totalActiveSockets))
