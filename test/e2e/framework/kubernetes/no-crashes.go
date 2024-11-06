@@ -14,7 +14,11 @@ type EnsureStableCluster struct {
 	LabelSelector      string
 	PodNamespace       string
 	KubeConfigFilePath string
-	IgnoreRestart      bool
+
+	// Container restarts can occur for various reason, they do not necessarily mean the entire cluster
+	// is unstable or needs to be recreated. In some cases, container restarts are expected and acceptable.
+	// This flag should be set to true only in those cases and provide additional why restart restarts are acceptable.
+	IgnoreContainerRestart bool
 }
 
 func (n *EnsureStableCluster) Run() error {
@@ -33,8 +37,8 @@ func (n *EnsureStableCluster) Run() error {
 		return fmt.Errorf("error waiting for retina pods to be ready: %w", err)
 	}
 
-	if !n.IgnoreRestart {
-		err = CheckPodRestarts(context.TODO(), clientset, n.PodNamespace, n.LabelSelector)
+	if !n.IgnoreContainerRestart {
+		err = CheckContainerRestart(context.TODO(), clientset, n.PodNamespace, n.LabelSelector)
 		if err != nil {
 			return fmt.Errorf("error checking pod restarts: %w", err)
 		}

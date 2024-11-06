@@ -79,7 +79,7 @@ func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, names
 	return nil
 }
 
-func CheckPodRestarts(ctx context.Context, clientset *kubernetes.Clientset, namespace, labelSelector string) error {
+func CheckContainerRestart(ctx context.Context, clientset *kubernetes.Clientset, namespace, labelSelector string) error {
 	var podList *corev1.PodList
 	podList, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 	if err != nil {
@@ -90,7 +90,7 @@ func CheckPodRestarts(ctx context.Context, clientset *kubernetes.Clientset, name
 		for istatus := range pod.Status.ContainerStatuses {
 			status := &pod.Status.ContainerStatuses[istatus]
 			if status.RestartCount > 0 {
-				return fmt.Errorf("pod %s has %d restarts: status: %+v: %w", pod.Name, status.RestartCount, status, ErrPodCrashed)
+				return fmt.Errorf("pod %s has %d container restarts: status: %+v: %w", pod.Name, status.RestartCount, status, ErrPodCrashed)
 			}
 		}
 	}
