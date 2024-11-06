@@ -7,7 +7,6 @@ package packetforward
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"path"
 	"runtime"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	kcfg "github.com/microsoft/retina/pkg/config"
+	"github.com/pkg/errors"
 
 	hubblev1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
@@ -124,7 +124,7 @@ func (p *packetForward) Compile(ctx context.Context) error {
 	// Keep target as bpf, otherwise clang compilation yields bpf object that elf reader cannot load.
 	err = loader.CompileEbpf(ctx, "-target", "bpf", "-Wall", targetArch, "-g", "-O2", "-c", bpfSourceFile, "-o", bpfOutputFile, includeDir, libbpfDir)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error compiling ebpf code")
 	}
 	p.l.Info("Packet forwarding metric compiled")
 	return nil
