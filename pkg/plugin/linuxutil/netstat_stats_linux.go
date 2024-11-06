@@ -209,7 +209,7 @@ func (nr *NetstatReader) readSockStats() error {
 			for remoteAddr := range nr.opts.PrevTCPSockStats.socketByRemoteAddr {
 				_, err := netip.ParseAddrPort(remoteAddr)
 				if err != nil {
-					return errors.Wrapf(err, "failed to parse remote address %s, %s", remoteAddr)
+					return errors.Wrapf(err, "failed to parse remote address %s", remoteAddr)
 				}
 			}
 		}
