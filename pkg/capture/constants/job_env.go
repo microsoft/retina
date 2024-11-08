@@ -16,8 +16,9 @@ const (
 	CaptureOutputLocationEnvKeyS3Bucket              CaptureOutputLocationEnvKey = "S3_BUCKET"
 	CaptureOutputLocationEnvKeyS3Path                CaptureOutputLocationEnvKey = "S3_PATH"
 
-	CaptureNameEnvKey  string = "CAPTURE_NAME"
-	NodeHostNameEnvKey string = "NODE_HOST_NAME"
+	CaptureNameEnvKey           string = "CAPTURE_NAME"
+	NodeHostNameEnvKey          string = "NODE_HOST_NAME"
+	CaptureStartTimestampEnvKey string = "CAPTURE_START_TIMESTAMP"
 
 	CaptureFilterEnvKey   string = "CAPTURE_FILTER"
 	CaptureDurationEnvKey string = "CAPTURE_DURATION"

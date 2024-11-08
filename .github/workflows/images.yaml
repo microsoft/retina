@@ -47,7 +47,7 @@ jobs:
           set -euo pipefail
           echo "TAG=$(make version)" >> $GITHUB_ENV
           if [ "$IS_MERGE_GROUP" == "true" ]; then
-            az acr login -n ${{ vars.ACR_NAME }} 
+            az acr login -n ${{ vars.ACR_NAME }}
             make retina-image \
               IMAGE_NAMESPACE=${{ github.repository }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
@@ -148,7 +148,7 @@ jobs:
           set -euo pipefail
           echo "TAG=$(make version)" >> $GITHUB_ENV
           if [ "$IS_MERGE_GROUP" == "true" ]; then
-            az acr login -n ${{ vars.ACR_NAME }} 
+            az acr login -n ${{ vars.ACR_NAME }}
             make retina-operator-image \
               IMAGE_NAMESPACE=${{ github.repository }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
@@ -162,15 +162,64 @@ jobs:
         env:
           IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
 
-  manifests:
-    if: ${{ github.event_name == 'merge_group' && success('retina-images') && success('retina-win-images') && success('operator-images')}} 
-    name: Generate Manifests
+  retina-shell-images:
+    name: Build Retina Shell Images
     runs-on: ubuntu-latest
-    needs: [retina-images, retina-win-images, operator-images]
 
     strategy:
       matrix:
-        components: ["retina", "operator"]
+        platform: ["linux"]
+        arch: ["amd64", "arm64"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go version
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Az CLI login
+        uses: azure/login@v2
+        if: ${{ github.event_name == 'merge_group' }}
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION }}
+
+      - name: Build Images
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "TAG=$(make version)" >> $GITHUB_ENV
+          if [ "$IS_MERGE_GROUP" == "true" ]; then
+            az acr login -n ${{ vars.ACR_NAME }}
+            make retina-shell-image \
+              IMAGE_NAMESPACE=${{ github.repository }} \
+              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
+              IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
+              BUILDX_ACTION=--push
+          else
+            make retina-shell-image \
+              IMAGE_NAMESPACE=${{ github.repository }} \
+              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
+          fi
+        env:
+          IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
+
+  manifests:
+    if: ${{ github.event_name == 'merge_group' && success('retina-images') && success('retina-win-images') && success('operator-images') && success('retina-shell-images')}}
+    name: Generate Manifests
+    runs-on: ubuntu-latest
+    needs: [retina-images, retina-win-images, operator-images, retina-shell-images]
+
+    strategy:
+      matrix:
+        components: ["retina", "operator", "shell"]
 
     steps:
       - name: Checkout code

@@ -24,6 +24,7 @@ import (
 
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
+	"github.com/microsoft/retina/pkg/capture/file"
 	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/label"
@@ -822,6 +823,7 @@ func Test_CaptureToPodTranslator_ValidateCapture(t *testing.T) {
 func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 	captureName := "capture-test"
 	hostPath := "/tmp/capture"
+	timestamp := file.Now()
 	pvc := "capture-pvc"
 	backoffLimit := int32(0)
 	rootUser := int64(0)
@@ -987,6 +989,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 				{Name: captureConstants.CaptureDurationEnvKey, Value: "1m0s"},
 				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: hostPath},
 				{Name: captureConstants.CaptureNameEnvKey, Value: captureName},
+				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: timestamp.String()},
 				{Name: captureConstants.IncludeMetadataEnvKey, Value: "false"},
 				{Name: captureConstants.NodeHostNameEnvKey, Value: "node1"},
 				{
@@ -1115,6 +1118,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			podEnv: []v1.EnvVar{
 				{Name: captureConstants.CaptureDurationEnvKey, Value: "1m0s"},
 				{Name: captureConstants.CaptureNameEnvKey, Value: captureName},
+				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: timestamp.String()},
 				{Name: captureConstants.IncludeMetadataEnvKey, Value: "false"},
 				{Name: string(captureConstants.CaptureOutputLocationEnvKeyPersistentVolumeClaim), Value: pvc},
 				{Name: captureConstants.NodeHostNameEnvKey, Value: "node1"},
@@ -1186,6 +1190,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			podEnv: []v1.EnvVar{
 				{Name: captureConstants.CaptureDurationEnvKey, Value: "1m0s"},
 				{Name: captureConstants.CaptureNameEnvKey, Value: captureName},
+				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: timestamp.String()},
 				{Name: captureConstants.IncludeMetadataEnvKey, Value: "false"},
 				{Name: string(captureConstants.CaptureOutputLocationEnvKeyPersistentVolumeClaim), Value: pvc},
 				{Name: captureConstants.NodeHostNameEnvKey, Value: "node1"},
@@ -1271,6 +1276,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 				{Name: captureConstants.CaptureDurationEnvKey, Value: "1m0s"},
 				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: hostPath},
 				{Name: captureConstants.CaptureNameEnvKey, Value: captureName},
+				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: timestamp.String()},
 				{Name: captureConstants.IncludeMetadataEnvKey, Value: "false"},
 				{Name: string(captureConstants.CaptureOutputLocationEnvKeyPersistentVolumeClaim), Value: pvc},
 				{Name: captureConstants.NodeHostNameEnvKey, Value: "node1"},
@@ -1352,6 +1358,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 				{Name: captureConstants.CaptureDurationEnvKey, Value: "1m0s"},
 				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: hostPath},
 				{Name: captureConstants.CaptureNameEnvKey, Value: captureName},
+				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: timestamp.String()},
 				{Name: captureConstants.IncludeMetadataEnvKey, Value: "false"},
 				{Name: captureConstants.NodeHostNameEnvKey, Value: "node1"},
 				{Name: captureConstants.TcpdumpRawFilterEnvKey, Value: "-i eth0"},
@@ -1428,6 +1435,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 				{Name: captureConstants.CaptureDurationEnvKey, Value: "1m0s"},
 				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: hostPath},
 				{Name: captureConstants.CaptureNameEnvKey, Value: captureName},
+				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: timestamp.String()},
 				{Name: captureConstants.IncludeMetadataEnvKey, Value: "false"},
 				{Name: captureConstants.NodeHostNameEnvKey, Value: "node1"},
 				{Name: captureConstants.TcpdumpFilterEnvKey, Value: "(host 10.225.0.4)"},
@@ -1506,6 +1514,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 				{Name: captureConstants.CaptureDurationEnvKey, Value: "1m0s"},
 				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: hostPath},
 				{Name: captureConstants.CaptureNameEnvKey, Value: captureName},
+				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: timestamp.String()},
 				{Name: captureConstants.IncludeMetadataEnvKey, Value: "false"},
 				{Name: captureConstants.NodeHostNameEnvKey, Value: "node1"},
 				{Name: captureConstants.TcpdumpFilterEnvKey, Value: "(host 10.225.0.4 or host fd5c:d9f1:79c5:fd83::21e)"},
@@ -1584,6 +1593,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 				{Name: captureConstants.CaptureDurationEnvKey, Value: "1m0s"},
 				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: hostPath},
 				{Name: captureConstants.CaptureNameEnvKey, Value: captureName},
+				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: timestamp.String()},
 				{Name: captureConstants.IncludeMetadataEnvKey, Value: "false"},
 				{Name: captureConstants.NodeHostNameEnvKey, Value: "node1"},
 				{Name: captureConstants.NetshFilterEnvKey, Value: "IPv4.Address=(10.225.0.4) IPv6.Address=(fd5c:d9f1:79c5:fd83::21e)"},
@@ -1661,6 +1671,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 				{Name: captureConstants.CaptureDurationEnvKey, Value: "1m0s"},
 				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: hostPath},
 				{Name: captureConstants.CaptureNameEnvKey, Value: captureName},
+				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: timestamp.String()},
 				{Name: captureConstants.IncludeMetadataEnvKey, Value: "false"},
 				{Name: captureConstants.NodeHostNameEnvKey, Value: "node1"},
 				{Name: captureConstants.TcpdumpRawFilterEnvKey, Value: "-i eth0"},

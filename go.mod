@@ -7,7 +7,7 @@ toolchain go1.23.1
 require (
 	github.com/go-chi/chi/v5 v5.1.0
 	github.com/google/uuid v1.6.0
-	github.com/prometheus/client_golang v1.20.4
+	github.com/prometheus/client_golang v1.20.5
 	github.com/spf13/cobra v1.8.1
 	go.uber.org/zap v1.27.0
 	k8s.io/client-go v0.30.3
@@ -47,18 +47,18 @@ require (
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.6 // indirect
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.18 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.22 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.22 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.19 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.23 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.23 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.1 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/v4a v1.3.22 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.3.23 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.12.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.4.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.12.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.18.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.24.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.28.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.32.3 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.4.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.12.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.18.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.24.5 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.28.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.32.4 // indirect
 	github.com/aws/smithy-go v1.22.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
@@ -116,7 +116,7 @@ require (
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gofrs/uuid v4.2.0+incompatible // indirect
-	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
+	github.com/golang-jwt/jwt/v4 v4.5.1 // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/btree v1.1.2 // indirect
@@ -256,9 +256,9 @@ require (
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/net v0.30.0 // indirect
-	golang.org/x/oauth2 v0.22.0 // indirect
-	golang.org/x/sync v0.8.0
-	golang.org/x/sys v0.26.0
+	golang.org/x/oauth2 v0.23.0 // indirect
+	golang.org/x/sync v0.9.0
+	golang.org/x/sys v0.27.0
 	golang.org/x/term v0.25.0 // indirect
 	google.golang.org/protobuf v1.35.1
 	gopkg.in/yaml.v2 v2.4.0 // indirect
@@ -287,10 +287,10 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.4.1
 	github.com/Microsoft/hcsshim v0.12.0-rc.3
 	github.com/Sytten/logrus-zap-hook v0.1.0
-	github.com/aws/aws-sdk-go-v2 v1.32.3
-	github.com/aws/aws-sdk-go-v2/config v1.27.35
-	github.com/aws/aws-sdk-go-v2/credentials v1.17.42
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.66.2
+	github.com/aws/aws-sdk-go-v2 v1.32.4
+	github.com/aws/aws-sdk-go-v2/config v1.28.3
+	github.com/aws/aws-sdk-go-v2/credentials v1.17.44
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.66.3
 	github.com/cakturk/go-netstat v0.0.0-20200220111822-e5b49efee7a5
 	github.com/cilium/cilium v1.16.0-pre.1.0.20240403152809-b9853ecbcaeb
 	github.com/cilium/ebpf v0.16.0
@@ -311,7 +311,7 @@ require (
 	github.com/onsi/gomega v1.35.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_model v0.6.1
-	github.com/prometheus/common v0.59.1
+	github.com/prometheus/common v0.60.1
 	github.com/safchain/ethtool v0.4.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.19.0
