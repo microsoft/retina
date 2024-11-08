@@ -8,8 +8,6 @@ FROM mcr.microsoft.com/azurelinux/base/core@sha256:7ec490b605aac8a44aed0b0695b0e
 #    This will be fixed by https://github.com/microsoft/SymCrypt-OpenSSL/pull/92
 RUN tdnf install -y \
 	bind-utils \
-	bpftool \
-	bpftrace \
 	conntrack \
 	curl \
 	ebtables-legacy \
@@ -18,10 +16,12 @@ RUN tdnf install -y \
 	ipset \
 	iptables \
 	iputils \
+	jq \
 	ldns-utils \
 	net-tools \
 	nftables \
 	nmap \
+	nmap-ncat \
 	openssh \
 	socat \
 	tcpdump \
