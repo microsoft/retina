@@ -7,7 +7,7 @@ import (
 	"net"
 )
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=types.go -destination=mock_types.go -package=filtermanager
+//go:generate mockgen -source=types.go -destination=mock_types.go -package=filtermanager
 type ICache interface {
 	ips() []net.IP
 	reset()

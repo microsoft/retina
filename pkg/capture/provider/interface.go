@@ -9,7 +9,7 @@ import (
 	"github.com/microsoft/retina/pkg/capture/file"
 )
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=interface.go -destination=mock_network_capture.go -package=provider Interface
+//go:generate mockgen -source=interface.go -destination=mock_network_capture.go -package=provider Interface
 type NetworkCaptureProviderInterface interface {
 	// Setup prepares the provider with folder to store network capture for temporary.
 	Setup(filename file.CaptureFilename) (string, error)

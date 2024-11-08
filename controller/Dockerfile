@@ -30,6 +30,8 @@ ENV GOOS=${GOOS}
 RUN if [ "$GOOS" = "linux" ] ; then \
       tdnf install -y clang16 lld16 bpftool libbpf-devel; \
     fi
+RUN go install github.com/cilium/ebpf/cmd/bpf2go@v0.16.0; \
+    go install go.uber.org/mock/mockgen@v0.5.0
 COPY ./pkg/plugin /go/src/github.com/microsoft/retina/pkg/plugin
 WORKDIR /go/src/github.com/microsoft/retina
 RUN if [ "$GOOS" = "linux" ] ; then \

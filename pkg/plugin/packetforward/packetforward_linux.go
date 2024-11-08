@@ -28,7 +28,7 @@ import (
 	_ "github.com/microsoft/retina/pkg/plugin/packetforward/_cprog" // nolint
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type metric packetforward ./_cprog/packetforward.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src
+//go:generate bpf2go -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type metric packetforward ./_cprog/packetforward.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src
 
 // New creates a new packetforward plugin.
 func New(cfg *kcfg.Config) api.Plugin {

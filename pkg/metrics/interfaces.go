@@ -7,7 +7,7 @@ import (
 	dto "github.com/prometheus/client_model/go"
 )
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=interfaces.go -destination=mock_types.go -package=metrics
+//go:generate mockgen -source=interfaces.go -destination=mock_types.go -package=metrics
 
 type CounterVec interface {
 	WithLabelValues(lvs ...string) prometheus.Counter
