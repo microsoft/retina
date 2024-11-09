@@ -47,7 +47,6 @@ type NetstatReader struct {
 }
 
 func NewNetstatReader(opts *NetstatOpts, ns NetstatInterface) *NetstatReader {
-	metrics.TCPConnectionRemoteGauge.WithLabelValues(addrDefaultTCPRemote).Set(0)
 	return &NetstatReader{
 		l:          log.Logger().Named(string("NetstatReader")),
 		opts:       opts,
@@ -58,6 +57,7 @@ func NewNetstatReader(opts *NetstatOpts, ns NetstatInterface) *NetstatReader {
 }
 
 func (nr *NetstatReader) readAndUpdate() (*SocketStats, error) {
+	metrics.TCPConnectionRemoteGauge.WithLabelValues(addrDefaultTCPRemote).Set(0)
 	if err := nr.readConnectionStats(pathNetNetstat); err != nil {
 		return nil, err
 	}
