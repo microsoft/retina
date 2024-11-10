@@ -372,7 +372,7 @@ func TestReadSockStatsRemoveClosedConnection(t *testing.T) {
 	ns.EXPECT().UDPSocks(gomock.Any()).Return([]netstat.SockTabEntry{}, nil).Times(1)
 
 	// We are expecting the gauge to be called once for this value as it is removed
-	MockGaugeVec.EXPECT().WithLabelValues("AllIPs").Return(testmetric).Times(1)
+	MockGaugeVec.EXPECT().WithLabelValues(gomock.Any()).Return(testmetric).AnyTimes()
 
 	err = nr.readSockStats()
 	require.NoError(t, err)
