@@ -5,7 +5,6 @@ package linuxutil
 import (
 	"fmt"
 	"net"
-	"os"
 	"testing"
 
 	"github.com/cakturk/go-netstat/netstat"
@@ -340,9 +339,6 @@ func TestReadSockStats(t *testing.T) {
 
 // Test IP that belongs to a closed connection being removed from the metrics
 func TestReadSockStatsRemoveClosedConnection(t *testing.T) {
-	// Set os env variable to enable debug logs
-	os.Setenv("NODE_IP", "10.224.0.6")
-
 	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
 	require.NoError(t, err)
 	opts := &NetstatOpts{
@@ -376,11 +372,7 @@ func TestReadSockStatsRemoveClosedConnection(t *testing.T) {
 	ns.EXPECT().UDPSocks(gomock.Any()).Return([]netstat.SockTabEntry{}, nil).Times(1)
 
 	// We are expecting the gauge to be called once for this value as it is removed
-	MockGaugeVec.EXPECT().WithLabelValues("192.168.1.100", "80").Return(testmetric).Times(1)
-
-	// We are not expecting the gauge to be called for localhost or node IP
-	MockGaugeVec.EXPECT().WithLabelValues("127.0.0.1", "80").Return(testmetric).Times(0)
-	MockGaugeVec.EXPECT().WithLabelValues("10.224.0.6", "80").Return(testmetric).Times(0)
+	MockGaugeVec.EXPECT().WithLabelValues("AllIPs").Return(testmetric).Times(1)
 
 	err = nr.readSockStats()
 	require.NoError(t, err)

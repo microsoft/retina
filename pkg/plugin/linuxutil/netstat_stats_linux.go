@@ -23,21 +23,6 @@ const (
 	addrDefaultTCPRemote = "AllIPs"
 )
 
-var (
-	nodeIP     = os.Getenv("NODE_IP")
-	ignoreList = []string{
-		"0.0.0.0",
-		"127.0.0.",
-	}
-)
-
-func init() {
-	// Add node IP to the ignore list
-	if nodeIP != "" {
-		ignoreList = append(ignoreList, nodeIP)
-	}
-}
-
 type NetstatReader struct {
 	l          *log.ZapLogger
 	connStats  *ConnectionStats
@@ -268,19 +253,4 @@ func (nr *NetstatReader) updateMetrics() {
 
 	// UDP COnnection State metrics
 	metrics.UDPConnectionStatsGauge.WithLabelValues(utils.Active).Set(float64(nr.connStats.UdpSockets.totalActiveSockets))
-}
-
-func validateRemoteAddr(addr string) bool {
-	if addr == "" {
-		return false
-	}
-
-	// check if the address is in the ignore list
-	for _, addressToIgnore := range ignoreList {
-		if strings.HasPrefix(addr, addressToIgnore) {
-			return false
-		}
-	}
-
-	return true
 }
