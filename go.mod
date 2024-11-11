@@ -316,9 +316,9 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.19.0
 	github.com/vishvananda/netlink v1.2.1-beta.2.0.20240524165444-4d4ba1473f21
-	go.opentelemetry.io/otel v1.31.0
-	go.opentelemetry.io/otel/metric v1.31.0
-	go.opentelemetry.io/otel/trace v1.31.0
+	go.opentelemetry.io/otel v1.32.0
+	go.opentelemetry.io/otel/metric v1.32.0
+	go.opentelemetry.io/otel/trace v1.32.0
 	go.uber.org/mock v0.5.0
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
 	google.golang.org/grpc v1.66.2
