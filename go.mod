@@ -292,7 +292,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.44
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.66.3
 	github.com/cakturk/go-netstat v0.0.0-20200220111822-e5b49efee7a5
-	github.com/cilium/cilium v1.16.0-pre.1.0.20240403152809-b9853ecbcaeb
+	github.com/cilium/cilium v1.16.0-pre.1.0.20241108214337-9b22db2738e4
 	github.com/cilium/ebpf v0.16.0
 	github.com/cilium/proxy v0.0.0-20231031145409-f19708f3d018
 	github.com/cilium/workerpool v1.2.0
@@ -333,3 +333,5 @@ require (
 )
 
 replace github.com/vishvananda/netns => github.com/inspektor-gadget/netns v0.0.5-0.20230524185006-155d84c555d6
+
+replace github.com/cilium/cilium => github.com/anubhabMajumdar/cilium v0.0.0-20241108214337-9b22db2738e4

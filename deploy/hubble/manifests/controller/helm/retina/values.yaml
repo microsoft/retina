@@ -130,7 +130,7 @@ serviceAccount:
 
 resources:
   limits:
-    memory: "500Mi"
+    memory: "750Mi"
     cpu: "500m"
 
 # -- Define serviceAccount names for components.

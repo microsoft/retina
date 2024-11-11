@@ -111,6 +111,8 @@ github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751/go.mod h1:LOuy
 github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
 github.com/alecthomas/units v0.0.0-20190717042225-c3de453c63f4/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
+github.com/anubhabMajumdar/cilium v0.0.0-20241108214337-9b22db2738e4 h1:cw44EEIryTipctuKSio1DbBHftE80pIEK+BF7LFs2VQ=
+github.com/anubhabMajumdar/cilium v0.0.0-20241108214337-9b22db2738e4/go.mod h1:ks3XSifKcx50E7JwdyKssalQ10xvwC+/sHmpBvDezmM=
 github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e/go.mod h1:3U/XgcO3hCbHZ8TKRvWD2dDTCfh9M9ya+I9JpbB7O8o=
 github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da/go.mod h1:Q73ZrmVTwzkszR9V5SSuryQ31EELlFMUz1kKyl939pY=
 github.com/armon/go-metrics v0.4.1 h1:hR91U9KYmb6bLBYLQjyM+3j+rcd/UhE+G78SFnF8gJA=
@@ -189,8 +191,6 @@ github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e/go.mod h1:nSuG5e5P
 github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1/go.mod h1:Q3SI9o4m/ZMnBNeIyt5eFwwo7qiLfzFZmjNmxjkiQlU=
 github.com/cilium/checkmate v1.0.3 h1:CQC5eOmlAZeEjPrVZY3ZwEBH64lHlx9mXYdUehEwI5w=
 github.com/cilium/checkmate v1.0.3/go.mod h1:KiBTasf39/F2hf2yAmHw21YFl3hcEyP4Yk6filxc12A=
-github.com/cilium/cilium v1.16.0-pre.1.0.20240403152809-b9853ecbcaeb h1:77M/pRhFWIImKh9KNCbx+afVN9E8zBmySuoKnw9wkWQ=
-github.com/cilium/cilium v1.16.0-pre.1.0.20240403152809-b9853ecbcaeb/go.mod h1:ks3XSifKcx50E7JwdyKssalQ10xvwC+/sHmpBvDezmM=
 github.com/cilium/dns v1.1.51-0.20231120140355-729345173dc3 h1:3PErIjIq4DlOwNsQNPcILFzbGnxPuKuqJsHEFpiwstM=
 github.com/cilium/dns v1.1.51-0.20231120140355-729345173dc3/go.mod h1:/7LC2GOgyXJ7maupZlaVIumYQiGPIgllSf6mA9sg6RU=
 github.com/cilium/ebpf v0.5.0/go.mod h1:4tRaxcgiL706VnOzHOdBlY8IEAIdxINsQBcU4xJJXRs=
