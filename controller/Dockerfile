@@ -35,7 +35,7 @@ COPY ./pkg/plugin /go/src/github.com/microsoft/retina/pkg/plugin
 WORKDIR /go/src/github.com/microsoft/retina
 RUN if [ "$GOOS" = "linux" ] ; then \
       go mod init github.com/microsoft/retina; \
-      go generate -x /go/src/github.com/microsoft/retina/pkg/plugin/...; \
+      go generate -skip "mockgen" -x /go/src/github.com/microsoft/retina/pkg/plugin/...; \
       tar czf /gen.tar.gz ./pkg/plugin; \
       rm go.mod; \
     fi
