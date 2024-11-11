@@ -7,7 +7,7 @@ toolchain go1.23.1
 require (
 	github.com/go-chi/chi/v5 v5.1.0
 	github.com/google/uuid v1.6.0
-	github.com/prometheus/client_golang v1.20.4
+	github.com/prometheus/client_golang v1.20.5
 	github.com/spf13/cobra v1.8.1
 	go.uber.org/zap v1.27.0
 	k8s.io/client-go v0.30.3
@@ -257,8 +257,8 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/net v0.30.0 // indirect
 	golang.org/x/oauth2 v0.23.0 // indirect
-	golang.org/x/sync v0.8.0
-	golang.org/x/sys v0.26.0
+	golang.org/x/sync v0.9.0
+	golang.org/x/sys v0.27.0
 	golang.org/x/term v0.25.0 // indirect
 	google.golang.org/protobuf v1.35.1
 	gopkg.in/yaml.v2 v2.4.0 // indirect
