@@ -9,6 +9,7 @@ import (
 
 	"github.com/cakturk/go-netstat/netstat"
 	"github.com/microsoft/retina/pkg/log"
+	"github.com/microsoft/retina/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -371,9 +372,11 @@ func TestReadSockStatsRemoveClosedConnection(t *testing.T) {
 	ns.EXPECT().TCPSocks(gomock.Any()).Return([]netstat.SockTabEntry{}, nil).Times(1)
 	ns.EXPECT().UDPSocks(gomock.Any()).Return([]netstat.SockTabEntry{}, nil).Times(1)
 
-	// We are expecting the gauge to be called once for this value as it is removed
-	MockGaugeVec.EXPECT().WithLabelValues(gomock.Any()).Return(testmetric).AnyTimes()
+	// We are expecting the gauges to be called once.
+	MockGaugeVec.EXPECT().WithLabelValues(addrDefaultTCPRemote).Return(testmetric).Times(1)
+	MockGaugeVec.EXPECT().WithLabelValues(utils.Active).Return(testmetric).Times(1)
 
 	err = nr.readSockStats()
+	nr.updateMetrics()
 	require.NoError(t, err)
 }
