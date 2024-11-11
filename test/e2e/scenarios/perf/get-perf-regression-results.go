@@ -112,7 +112,7 @@ func (v *GetNetworkRegressionResults) Run() error {
 		}
 
 		for _, metric := range metrics {
-			if metric.benchmark != 0 && metric.result != 0 {
+			if metric.benchmark != 0 || metric.result != 0 {
 				regressionResults[benchmarkResult.Label].Benchmark[metric.name] = metric.benchmark
 				regressionResults[benchmarkResult.Label].Result[metric.name] = metric.result
 				regressionResults[benchmarkResult.Label].Regressions[metric.name] = calculateRegression(metric.benchmark, metric.result)
@@ -169,7 +169,7 @@ func readJSONFile(filename string) ([]TestResult, error) {
 
 func calculateRegression(old, new float64) float64 {
 	if old == 0 {
-		return 0
+		return 100
 	}
 	return ((new - old) / old) * 100
 }
