@@ -228,7 +228,7 @@ buildx:
 		echo "Buildx instance retina already exists."; \
 	else \
 		echo "Creating buildx instance retina..."; \
-		docker buildx create --name retina --use --platform $$(echo "$(PLATFORMS)" | tr ' ' ','); \
+		docker buildx create --name retina --use --driver-opt image=mcr.microsoft.com/oss/v2/moby/buildkit:v0.16.0-2 --platform $$(echo "$(PLATFORMS)" | tr ' ' ','); \
 		docker buildx use retina; \
 		echo "Buildx instance retina created."; \
 	fi;
