@@ -9,12 +9,6 @@ import (
 	"strings"
 	"time"
 
-	retinacmd "github.com/microsoft/retina/cli/cmd"
-	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
-	pkgcapture "github.com/microsoft/retina/pkg/capture"
-	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
-	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
-	"github.com/microsoft/retina/pkg/config"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -27,6 +21,14 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
+
+	retinacmd "github.com/microsoft/retina/cli/cmd"
+	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
+	"github.com/microsoft/retina/internal/buildinfo"
+	pkgcapture "github.com/microsoft/retina/pkg/capture"
+	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
+	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
+	"github.com/microsoft/retina/pkg/config"
 )
 
 var (
@@ -361,7 +363,7 @@ func createCaptureF(kubeClient kubernetes.Interface) (*retinav1alpha1.Capture, e
 
 func getCLICaptureConfig() config.CaptureConfig {
 	return config.CaptureConfig{
-		CaptureImageVersion:       retinacmd.Version,
+		CaptureImageVersion:       buildinfo.Version,
 		CaptureDebug:              debug,
 		CaptureImageVersionSource: captureUtils.VersionSourceCLIVersion,
 		CaptureJobNumLimit:        jobNumLimit,
