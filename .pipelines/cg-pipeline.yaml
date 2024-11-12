@@ -174,6 +174,13 @@ stages:
           - checkout: self
             fetchTags: true
 
+          - task: Docker@2
+            displayName: Docker Login
+            inputs:
+              containerRegistry: $(WINDOWS_BUILDER_REGISTRY)
+              command: "login"
+              addPipelineData: false
+
           - task: DownloadPipelineArtifact@2
             inputs:
               buildType: "specific"
