@@ -192,6 +192,7 @@ RETINA_IMAGE 					= $(IMAGE_NAMESPACE)/retina-agent
 RETINA_INIT_IMAGE				= $(IMAGE_NAMESPACE)/retina-init
 RETINA_OPERATOR_IMAGE			= $(IMAGE_NAMESPACE)/retina-operator
 RETINA_SHELL_IMAGE				= $(IMAGE_NAMESPACE)/retina-shell
+KUBECTL_RETINA_IMAGE			= $(IMAGE_NAMESPACE)/kubectl-retina
 RETINA_INTEGRATION_TEST_IMAGE	= $(IMAGE_NAMESPACE)/retina-integration-test
 RETINA_PROTO_IMAGE				= $(IMAGE_NAMESPACE)/retina-proto-gen
 RETINA_GO_GEN_IMAGE				= $(IMAGE_NAMESPACE)/retina-go-gen
@@ -320,6 +321,18 @@ retina-shell-image:
 			TAG=$(RETINA_PLATFORM_TAG) \
 			CONTEXT_DIR=$(REPO_ROOT)
 
+kubectl-retina-image:
+	echo "Building for $(PLATFORM)"
+	set -e ; \
+	$(MAKE) container-$(CONTAINER_BUILDER) \
+			PLATFORM=$(PLATFORM) \
+			DOCKERFILE=cli/Dockerfile \
+			REGISTRY=$(IMAGE_REGISTRY) \
+			IMAGE=$(KUBECTL_RETINA_IMAGE) \
+			VERSION=$(TAG) \
+			TAG=$(RETINA_PLATFORM_TAG) \
+			CONTEXT_DIR=$(REPO_ROOT)
+
 kapinger-image: 
 	docker buildx build --builder retina --platform windows/amd64 --target windows-amd64 -t $(IMAGE_REGISTRY)/$(KAPINGER_IMAGE):$(TAG)-windows-amd64  ./hack/tools/kapinger/ --push
 	docker buildx build --builder retina --platform linux/amd64 --target linux-amd64 -t $(IMAGE_REGISTRY)/$(KAPINGER_IMAGE):$(TAG)-linux-amd64  ./hack/tools/kapinger/ --push
@@ -364,6 +377,10 @@ manifest-shell-image:
 	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_SHELL_IMAGE):$(TAG))
 	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
 
+manifest-kubectl-retina-image:
+	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(KUBECTL_RETINA_IMAGE):$(TAG))
+	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+
 manifest:
 	echo "Building for $(COMPONENT)"
 	if [ "$(COMPONENT)" = "retina" ]; then \
@@ -372,6 +389,8 @@ manifest:
 		$(MAKE) manifest-operator-image; \
 	elif [ "$(COMPONENT)" = "shell" ]; then \
 		$(MAKE) manifest-shell-image; \
+	elif [ "$(COMPONENT)" = "kubectl-retina" ]; then \
+		$(MAKE) manifest-kubectl-retina-image; \
 	fi
 
 ##@ Tests
