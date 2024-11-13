@@ -26,6 +26,8 @@ RUN --mount=type=cache,target="/root/.cache/go-build" \
 # mcr.microsoft.com/cbl-mariner/distroless/minimal:2.0
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/cbl-mariner/distroless/minimal@sha256:db87903c5d4d9d6760e86a274914efd6a3bb5914c0b5a6c6b35350ec297fea4f
 WORKDIR /
+COPY --from=builder /lib /lib
+COPY --from=builder /usr/lib/ /usr/lib
 COPY --from=builder /workspace/retina-operator .
 USER 65532:65532
 
