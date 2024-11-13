@@ -9,7 +9,6 @@ import (
 
 	"github.com/cakturk/go-netstat/netstat"
 	"github.com/microsoft/retina/pkg/log"
-	"github.com/microsoft/retina/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	gomock "go.uber.org/mock/gomock"
@@ -309,9 +308,6 @@ func TestReadSockStats(t *testing.T) {
 		},
 	}, nil).Times(1)
 
-	// We are expecting the gauges to be called once.
-	MockGaugeVec.EXPECT().WithLabelValues(addrDefaultTCPRemote).Return(testmetric).Times(1)
-	MockGaugeVec.EXPECT().WithLabelValues(utils.Active).Return(testmetric).Times(1)
 	ns.EXPECT().TCPSocks(gomock.Any()).Return([]netstat.SockTabEntry{
 		{
 			LocalAddr: &netstat.SockAddr{
