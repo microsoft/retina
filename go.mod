@@ -15,6 +15,10 @@ require (
 	sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader v0.0.20
 )
 
+retract (
+	v0.10.0 // published accidentally
+)
+
 require (
 	cel.dev/expr v0.15.0 // indirect
 	code.cloudfoundry.org/clock v1.0.0 // indirect

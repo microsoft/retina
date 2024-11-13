@@ -1,6 +1,7 @@
 package types
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -20,9 +21,20 @@ func NewRunner(t *testing.T, job *Job) *Runner {
 	}
 }
 
-func (r *Runner) Run() {
+func (r *Runner) Run(ctx context.Context) {
 	if r.t.Failed() {
 		return
 	}
-	require.NoError(r.t, r.Job.Run())
+	runComplete := make(chan error)
+
+	go func() {
+		runComplete <- r.Job.Run()
+		close(runComplete)
+	}()
+	select {
+	case <-ctx.Done():
+		r.t.Fatal("Test deadline exceeded. If more time is needed, set -timeout flag to a higher value")
+	case err := <-runComplete:
+		require.NoError(r.t, err)
+	}
 }

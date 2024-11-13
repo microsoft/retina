@@ -34,7 +34,7 @@ PLATFORM		?= $(OS)/$(ARCH)
 PLATFORMS		?= linux/amd64 linux/arm64 windows/amd64
 OS_VERSION		?= ltsc2019
 
-HUBBLE_VERSION ?= v1.16.1
+HUBBLE_VERSION ?= v1.16.3
 
 CONTAINER_BUILDER ?= docker
 CONTAINER_RUNTIME ?= docker
@@ -228,7 +228,7 @@ buildx:
 		echo "Buildx instance retina already exists."; \
 	else \
 		echo "Creating buildx instance retina..."; \
-		docker buildx create --name retina --use --platform $$(echo "$(PLATFORMS)" | tr ' ' ','); \
+		docker buildx create --name retina --use --driver-opt image=mcr.microsoft.com/oss/v2/moby/buildkit:v0.16.0-2 --platform $$(echo "$(PLATFORMS)" | tr ' ' ','); \
 		docker buildx use retina; \
 		echo "Buildx instance retina created."; \
 	fi;

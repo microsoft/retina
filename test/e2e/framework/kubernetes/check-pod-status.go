@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 const (
@@ -18,6 +19,45 @@ const (
 
 	printInterval = 5 // print to stdout every 5 iterations
 )
+
+type WaitPodsReady struct {
+	KubeConfigFilePath string
+	Namespace          string
+	LabelSelector      string
+}
+
+// Useful when wanting to do parameter checking, for example
+// if a parameter length is known to be required less than 80 characters,
+// do this here so we don't find out later on when we run the step
+// when possible, try to avoid making external calls, this should be fast and simple
+func (w *WaitPodsReady) Prevalidate() error {
+	return nil
+}
+
+// Primary step where test logic is executed
+// Returning an error will cause the test to fail
+func (w *WaitPodsReady) Run() error {
+
+	config, err := clientcmd.BuildConfigFromFlags("", w.KubeConfigFilePath)
+	if err != nil {
+		return fmt.Errorf("error building kubeconfig: %w", err)
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("error creating Kubernetes client: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeoutSeconds*time.Second)
+	defer cancel()
+
+	return WaitForPodReady(ctx, clientset, w.Namespace, w.LabelSelector)
+}
+
+// Require for background steps
+func (w *WaitPodsReady) Stop() error {
+	return nil
+}
 
 func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, namespace, labelSelector string) error {
 	podReadyMap := make(map[string]bool)

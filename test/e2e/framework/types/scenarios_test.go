@@ -3,15 +3,20 @@ package types
 import (
 	"fmt"
 	"testing"
+
+	"github.com/microsoft/retina/test/e2e/framework/helpers"
 )
 
 // Test against a BYO cluster with Cilium and Hubble enabled,
 // create a pod with a deny all network policy and validate
 // that the drop metrics are present in the prometheus endpoint
 func TestScenarioValues(t *testing.T) {
+	ctx, cancel := helpers.Context(t)
+	defer cancel()
+
 	job := NewJob("Validate that drop metrics are present in the prometheus endpoint")
 	runner := NewRunner(t, job)
-	defer runner.Run()
+	defer runner.Run(ctx)
 
 	// Add top level step
 	job.AddStep(&DummyStep{
@@ -30,9 +35,12 @@ func TestScenarioValues(t *testing.T) {
 // create a pod with a deny all network policy and validate
 // that the drop metrics are present in the prometheus endpoint
 func TestScenarioValuesWithSkip(t *testing.T) {
+	ctx, cancel := helpers.Context(t)
+	defer cancel()
+
 	job := NewJob("Validate that drop metrics are present in the prometheus endpoint")
 	runner := NewRunner(t, job)
-	defer runner.Run()
+	defer runner.Run(ctx)
 
 	// Add top level step
 	job.AddStep(&DummyStep{
@@ -53,9 +61,12 @@ func TestScenarioValuesWithSkip(t *testing.T) {
 }
 
 func TestScenarioValuesWithScenarioSkip(t *testing.T) {
+	ctx, cancel := helpers.Context(t)
+	defer cancel()
+
 	job := NewJob("Validate that drop metrics are present in the prometheus endpoint")
 	runner := NewRunner(t, job)
-	defer runner.Run()
+	defer runner.Run(ctx)
 
 	// Add top level step
 	job.AddStep(&DummyStep{
