@@ -122,6 +122,7 @@ static __always_inline bool _ct_create_new_tcp_connection(struct ct_v4_key key, 
     }
     new_value.eviction_time = now + CT_SYN_TIMEOUT;
     new_value.flags_seen_tx_dir = flags;
+    new_value.is_direction_unknown = false;
     new_value.traffic_direction = _ct_get_traffic_direction(observation_point);
     bpf_map_update_elem(&retina_conntrack, &key, &new_value, BPF_ANY);
     return true;
