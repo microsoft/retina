@@ -12,7 +12,6 @@ import (
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -310,6 +309,9 @@ func TestReadSockStats(t *testing.T) {
 		},
 	}, nil).Times(1)
 
+	// We are expecting the gauges to be called once.
+	MockGaugeVec.EXPECT().WithLabelValues(addrDefaultTCPRemote).Return(testmetric).Times(1)
+	MockGaugeVec.EXPECT().WithLabelValues(utils.Active).Return(testmetric).Times(1)
 	ns.EXPECT().TCPSocks(gomock.Any()).Return([]netstat.SockTabEntry{
 		{
 			LocalAddr: &netstat.SockAddr{
@@ -336,47 +338,4 @@ func TestReadSockStats(t *testing.T) {
 	assert.Equal(t, nr.connStats.TcpSockets.socketByState["ESTABLISHED"], 1, "Read values are not equal to expected tetsname")
 
 	nr.updateMetrics()
-}
-
-// Test IP that belongs to a closed connection being removed from the metrics
-func TestReadSockStatsRemoveClosedConnection(t *testing.T) {
-	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
-	require.NoError(t, err)
-	opts := &NetstatOpts{
-		CuratedKeys: false,
-		AddZeroVal:  false,
-		ListenSock:  false,
-	}
-
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	ns := NewMockNetstatInterface(ctrl)
-	nr := NewNetstatReader(opts, ns)
-	assert.NotNil(t, nr)
-	InitalizeMetricsForTesting(ctrl)
-
-	testmetric := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "testmetric",
-		Help: "testmetric",
-	})
-
-	// Initial value
-	nr.opts.PrevTCPSockStats = &SocketStats{
-		socketByRemoteAddr: map[string]int{
-			"192.168.1.100:80": 1,
-		},
-	}
-
-	// Latest read would not contain the IP in PrevTCPSockStats
-	ns.EXPECT().TCPSocks(gomock.Any()).Return([]netstat.SockTabEntry{}, nil).Times(1)
-	ns.EXPECT().UDPSocks(gomock.Any()).Return([]netstat.SockTabEntry{}, nil).Times(1)
-
-	// We are expecting the gauges to be called once.
-	MockGaugeVec.EXPECT().WithLabelValues(addrDefaultTCPRemote).Return(testmetric).Times(1)
-	MockGaugeVec.EXPECT().WithLabelValues(utils.Active).Return(testmetric).Times(1)
-
-	err = nr.readSockStats()
-	nr.updateMetrics()
-	require.NoError(t, err)
 }

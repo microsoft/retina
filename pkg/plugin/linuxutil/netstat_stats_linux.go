@@ -13,7 +13,6 @@ import (
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/utils"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
@@ -188,17 +187,6 @@ func (nr *NetstatReader) readSockStats() error {
 		return err
 	} else {
 		sockStats := processSocks(socks)
-		// Compare existing tcp socket connections with updated ones, remove the ones that are not seen in the new sockStats map
-		// Log the socketByRemoteAddr map
-		if nr.opts.PrevTCPSockStats != nil {
-			for remoteAddr := range nr.opts.PrevTCPSockStats.socketByRemoteAddr {
-				_, err := netip.ParseAddrPort(remoteAddr)
-				if err != nil {
-					return errors.Wrapf(err, "failed to parse remote address %s", remoteAddr)
-				}
-			}
-		}
-
 		nr.connStats.TcpSockets = *sockStats
 	}
 
@@ -246,7 +234,12 @@ func (nr *NetstatReader) updateMetrics() {
 	}
 
 	totalCount := 0
-	for _, v := range nr.connStats.TcpSockets.socketByRemoteAddr {
+	for remoteAddr, v := range nr.connStats.TcpSockets.socketByRemoteAddr {
+		// only count valid remote addresses
+		if _, err := netip.ParseAddrPort(remoteAddr); err != nil {
+			nr.l.Error("failed to parse remote address", zap.String("remoteAddr", remoteAddr), zap.Error(err))
+			continue
+		}
 		totalCount += v
 	}
 	metrics.TCPConnectionRemoteGauge.WithLabelValues(addrDefaultTCPRemote).Set(float64(totalCount))
