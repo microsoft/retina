@@ -87,7 +87,7 @@ func (lu *linuxUtil) run(ctx context.Context) error {
 			}()
 
 			ethtoolOpts := &EthtoolOpts{
-				errOrDropKeysOnly: false,
+				errOrDropKeysOnly: true,
 				addZeroVal:        false,
 				limit:             defaultLimit,
 			}
