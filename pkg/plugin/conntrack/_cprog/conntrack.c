@@ -275,7 +275,7 @@ static __always_inline bool _ct_should_report_packet(struct ct_entry *entry, __u
         return true;
     }
 
-    // We will only report this packet if a new flag is seen for the given direction or the report interval has passed.
+    // We will only report this packet iff a new flag is seen for the given direction or the report interval has passed.
     if (flags != seen_flags || now - last_report >= CT_REPORT_INTERVAL) {
         if (direction == CT_PACKET_DIR_TX) {
             WRITE_ONCE(entry->flags_seen_tx_dir, flags);
