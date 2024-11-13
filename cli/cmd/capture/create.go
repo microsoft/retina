@@ -76,29 +76,29 @@ const (
 )
 
 var createExample = templates.Examples(i18n.T(`
-		# Capture network packets on the node selected by node names and copy the artifacts to the node host path /mnt/capture
-		kubectl retina capture create --host-path /mnt/capture --namespace capture --node-names "aks-nodepool1-41844487-vmss000000,aks-nodepool1-41844487-vmss000001"
+		# Select nodes by node name and copy the artifacts to the node host path
+		kubectl retina capture create --host-path /mnt/retina/testcapture --node-names "<nodename1>,<nodename2>"
 
-		# Capture network packets on the coredns pods determined by pod-selectors and namespace-selectors
-		kubectl retina capture create --host-path /mnt/capture --namespace capture --pod-selectors="k8s-app=kube-dns" --namespace-selectors="kubernetes.io/metadata.name=kube-system"
+		# Select pods determined by pod-selectors and namespace-selectors
+		kubectl retina capture create --namespace capture --pod-selectors="k8s-app=kube-dns" --namespace-selectors="kubernetes.io/metadata.name=kube-system"
 
-		# Capture network packets on nodes with label "agentpool=agentpool" and "version:v20"
-		kubectl retina capture create --host-path /mnt/capture --node-selectors="agentpool=agentpool,version:v20"
+		# Select nodes with label "agentpool=agentpool" and "version:v20"
+		kubectl retina capture create --node-selectors="agentpool=agentpool,version:v20"
 
-		# Capture network packets on nodes using node-selector with duration 10s
-		kubectl retina capture create --host-path=/mnt/capture --node-selectors="agentpool=agentpool" --duration=10s
+		# Select nodes using node-selector and set duration to 10s
+		kubectl retina capture create --node-selectors="agentpool=agentpool" --duration=10s
 
-		# Capture network packets on nodes using node-selector and upload the artifacts to blob storage with SAS URL https://testaccount.blob.core.windows.net/<token>
+		# Select nodes using node-selector and upload the artifacts to blob storage with SAS URL https://testaccount.blob.core.windows.net/<token>
 		kubectl retina capture create --node-selectors="agentpool=agentpool" --blob-upload=https://testaccount.blob.core.windows.net/<token>
 
-		# Capture network packets on nodes using node-selector and upload the artifacts to AWS S3
+		# Select nodes using node-selector and upload the artifacts to AWS S3
 		kubectl retina capture create --node-selectors="agentpool=agentpool" \
 			--s3-bucket "your-bucket-name" \
 			--s3-region "eu-central-1"\
 			--s3-access-key-id "your-access-key-id" \
 			--s3-secret-access-key "your-secret-access-key"
 
-		# Capture network packets on nodes using node-selector and upload the artifacts to S3-compatible service (like MinIO)
+		# Select nodes using node-selector and upload the artifacts to S3-compatible service (like MinIO)
 		kubectl retina capture create --node-selectors="agentpool=agentpool" \
 			--s3-bucket "your-bucket-name" \
 			--s3-endpoint "https://play.min.io:9000" \
