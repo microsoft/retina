@@ -15,18 +15,14 @@ ENV GOOS=${GOOS}
 ARG GOARCH=amd64
 ENV GOARCH=${GOARCH}
 
-RUN make manifests
 RUN --mount=type=cache,target="/root/.cache/go-build" \
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
-	-ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" \
-	-X "github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID"="$APP_INSIGHTS_ID"" \
-	-a -o retina-operator operator/main.go
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" \
+    -X "github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID"="$APP_INSIGHTS_ID"" \
+    -a -o kubectl-retina cli/main.go
 
-##################### controller #######################
 # mcr.microsoft.com/cbl-mariner/distroless/minimal:2.0
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/cbl-mariner/distroless/minimal@sha256:db87903c5d4d9d6760e86a274914efd6a3bb5914c0b5a6c6b35350ec297fea4f
 WORKDIR /
-COPY --from=builder /workspace/retina-operator .
-USER 65532:65532
+COPY --from=builder /workspace/kubectl-retina .
 
-ENTRYPOINT ["/retina-operator"]

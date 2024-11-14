@@ -70,7 +70,6 @@ func InitializeMetrics() {
 		utils.TCPConnectionRemoteGaugeName,
 		tcpConnectionRemoteGaugeDescription,
 		utils.Address,
-		utils.Port,
 	)
 	TCPConnectionStatsGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
