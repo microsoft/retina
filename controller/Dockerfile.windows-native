@@ -8,7 +8,6 @@ FROM --platform=windows/amd64 mcr.microsoft.com/oss/go/microsoft/golang@sha256:e
 WORKDIR C:\\retina
 COPY go.mod .
 COPY go.sum .
-ENV CGO_ENABLED=0
 RUN go mod download
 ADD . .
 ARG VERSION

@@ -139,14 +139,14 @@ setup-envtest: $(ENVTEST)
 all: generate
 
 generate: generate-bpf-go
-	CGO_ENABLED=0 go generate ./...
+	go generate ./...
 	for dir in $(GENERATE_TARGET_DIRS); do \
 			make -C $$dir $@; \
 	done
 
 generate-bpf-go: ## generate ebpf wrappers for plugins for all archs
 	for arch in $(ALL_ARCH.linux); do \
-        CGO_ENABLED=0 GOARCH=$$arch go generate ./pkg/plugin/...; \
+        GOARCH=$$arch go generate ./pkg/plugin/...; \
     done
 	
 .PHONY: all generate generate-bpf-go
@@ -174,12 +174,11 @@ retina: ## builds retina binary
 	$(MAKE) retina-binary 
 
 retina-binary: ## build the Retina binary
-	export CGO_ENABLED=0 && \
 	go generate ./... && \
 	go build -v -o $(RETINA_BUILD_DIR)/retina$(EXE_EXT) -gcflags="-dwarflocationlists=true" -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version=$(TAG) -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=$(APP_INSIGHTS_ID)" $(RETINA_DIR)/main.go
 
 retina-capture-workload: ## build the Retina capture workload
-	cd $(CAPTURE_WORKLOAD_DIR) && CGO_ENABLED=0 go build -v -o $(RETINA_BUILD_DIR)/captureworkload$(EXE_EXT) -gcflags="-dwarflocationlists=true"  -ldflags "-X main.version=$(TAG)"
+	cd $(CAPTURE_WORKLOAD_DIR) && go build -v -o $(RETINA_BUILD_DIR)/captureworkload$(EXE_EXT) -gcflags="-dwarflocationlists=true"  -ldflags "-X main.version=$(TAG)"
 
 ##@ Containers
 
@@ -410,7 +409,7 @@ COVER_PKG ?= .
 
 test: $(ENVTEST) # Run unit tests.
 	go build -o test-summary ./test/utsummary/main.go
-	CGO_ENABLED=0 KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit,dashboard -skip=TestE2E* -coverprofile=coverage.out -v -json ./... | ./test-summary --progress --verbose
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit,dashboard -skip=TestE2E* -coverprofile=coverage.out -v -json ./... | ./test-summary --progress --verbose
 
 coverage: # Code coverage.
 #	go generate ./... && go test -tags=unit -coverprofile=coverage.out.tmp ./...
