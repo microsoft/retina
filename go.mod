@@ -15,7 +15,10 @@ require (
 	sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader v0.0.20
 )
 
-retract v0.10.0 // published accidentally
+retract (
+	v0.10.0 // Published accidentally.
+	v0.10.1 // Contains retractions only.
+)
 
 require (
 	cel.dev/expr v0.15.0 // indirect
