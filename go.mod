@@ -17,7 +17,7 @@ require (
 
 retract (
 	v0.10.0 // Published accidentally.
-    v0.10.1 // Contains retractions only.
+	v0.10.1 // Contains retractions only.
 )
 
 require (
