@@ -275,7 +275,7 @@ jobs:
 
     strategy:
       matrix:
-        components: ["retina", "operator", "shell"]
+        components: ["retina", "operator", "shell", "kubectl-retina"]
 
     steps:
       - name: Checkout code
