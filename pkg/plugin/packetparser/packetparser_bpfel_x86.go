@@ -13,13 +13,13 @@ import (
 )
 
 type packetparserCtEntry struct {
-	EvictionTime     uint32
-	LastReportTxDir  uint32
-	LastReportRxDir  uint32
-	TrafficDirection uint8
-	FlagsSeenTxDir   uint8
-	FlagsSeenRxDir   uint8
-	_                [1]byte
+	EvictionTime       uint32
+	LastReportTxDir    uint32
+	LastReportRxDir    uint32
+	TrafficDirection   uint8
+	FlagsSeenTxDir     uint8
+	FlagsSeenRxDir     uint8
+	IsDirectionUnknown bool
 }
 
 type packetparserCtV4Key struct {
