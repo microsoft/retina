@@ -57,12 +57,12 @@ func TestE2ERetina_Scale(t *testing.T) {
 	kubeConfigFilePath := filepath.Join(rootDir, "test", "e2e", "test.pem")
 
 	// CreateTestInfra
-	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath, *createInfra))
+	createTestInfra := types.NewRunner(t, jobs.CreateTestInfraAZ(subID, rg, clusterName, location, kubeConfigFilePath, *createInfra))
 	createTestInfra.Run(ctx)
 
 	t.Cleanup(func() {
 		if *deleteInfra {
-			_ = jobs.DeleteTestInfra(subID, rg, clusterName, location).Run()
+			_ = jobs.DeleteTestInfraAZ(subID, rg, clusterName, location).Run()
 		}
 	})
 

@@ -25,7 +25,7 @@ var (
 )
 
 // TestE2ERetina tests all e2e scenarios for retina
-func TestE2ERetina(t *testing.T) {
+func TestE2ERetinaAZ(t *testing.T) {
 	ctx, cancel := helpers.Context(t)
 	defer cancel()
 
@@ -75,20 +75,63 @@ func TestE2ERetina(t *testing.T) {
 	kubeConfigFilePath := filepath.Join(rootDir, "test", "e2e", "test.pem")
 
 	// CreateTestInfra
-	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath, *createInfra))
+	createTestInfra := types.NewRunner(t, jobs.CreateTestInfraAZ(subID, rg, clusterName, location, kubeConfigFilePath, *createInfra))
 	createTestInfra.Run(ctx)
 
 	t.Cleanup(func() {
 		if *deleteInfra {
-			_ = jobs.DeleteTestInfra(subID, rg, clusterName, location).Run()
+			_ = jobs.DeleteTestInfraAZ(subID, rg, clusterName, location).Run()
 		}
 	})
 
 	// Install and test Retina basic metrics
-	basicMetricsE2E := types.NewRunner(t, jobs.InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath, common.TestPodNamespace))
+	basicMetricsE2E := types.NewRunner(t, jobs.InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath, "azure", common.TestPodNamespace))
 	basicMetricsE2E.Run(ctx)
 
 	// Upgrade and test Retina with advanced metrics
-	advanceMetricsE2E := types.NewRunner(t, jobs.UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, profilePath, common.TestPodNamespace))
+	advanceMetricsE2E := types.NewRunner(t, jobs.UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, profilePath, "azure", common.TestPodNamespace))
+	advanceMetricsE2E.Run(ctx)
+}
+
+func TestE2ERetinaAWS(t *testing.T) {
+	ctx, cancel := helpers.Context(t)
+	defer cancel()
+
+	curuser, err := user.Current()
+	require.NoError(t, err)
+
+	clusterName := curuser.Username + common.NetObsRGtag + strconv.FormatInt(time.Now().Unix(), 10)
+
+	accID := os.Getenv("AWS_ACCOUNT_ID")
+	require.NotEmpty(t, accID)
+
+	region := os.Getenv("AWS_REGION")
+
+	cwd, err := os.Getwd()
+	require.NoError(t, err)
+
+	// Get to root of the repo by going up two directories
+	rootDir := filepath.Dir(filepath.Dir(cwd))
+
+	chartPath := filepath.Join(rootDir, "deploy", "legacy", "manifests", "controller", "helm", "retina")
+	profilePath := filepath.Join(rootDir, "test", "profiles", "advanced", "values.yaml")
+	kubeConfigFilePath := filepath.Join(rootDir, "test", "e2e", "test.pem")
+
+	// CreateTestInfra
+	createTestInfra := types.NewRunner(t, jobs.CreateTestInfraAWS(accID, clusterName, region, kubeConfigFilePath))
+	createTestInfra.Run(ctx)
+
+	t.Cleanup(func() {
+		if *deleteInfra {
+			_ = jobs.DeleteTestInfraAWS(accID, clusterName, region).Run()
+		}
+	})
+
+	// Install and test Retina basic metrics
+	basicMetricsE2E := types.NewRunner(t, jobs.InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath, "aws", common.TestPodNamespace))
+	basicMetricsE2E.Run(ctx)
+
+	// Upgrade and test Retina with advanced metrics
+	advanceMetricsE2E := types.NewRunner(t, jobs.UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, profilePath, "aws", common.TestPodNamespace))
 	advanceMetricsE2E.Run(ctx)
 }

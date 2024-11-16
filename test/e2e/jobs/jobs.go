@@ -2,6 +2,7 @@ package retina
 
 import (
 	"github.com/microsoft/retina/test/e2e/common"
+	"github.com/microsoft/retina/test/e2e/framework/aws"
 	"github.com/microsoft/retina/test/e2e/framework/azure"
 	"github.com/microsoft/retina/test/e2e/framework/generic"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
@@ -13,8 +14,8 @@ import (
 	"github.com/microsoft/retina/test/e2e/scenarios/windows"
 )
 
-func CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath string, createInfra bool) *types.Job {
-	job := types.NewJob("Create e2e test infrastructure")
+func CreateTestInfraAZ(subID, rg, clusterName, location, kubeConfigFilePath string, createInfra bool) *types.Job {
+	job := types.NewJob("Create e2e test infrastructure AZ")
 
 	if createInfra {
 		job.AddStep(&azure.CreateResourceGroup{
@@ -63,8 +64,8 @@ func CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath string
 	return job
 }
 
-func DeleteTestInfra(subID, rg, clusterName, location string) *types.Job {
-	job := types.NewJob("Delete e2e test infrastructure")
+func DeleteTestInfraAZ(subID, rg, clusterName, location string) *types.Job {
+	job := types.NewJob("Delete e2e test infrastructure AZ")
 
 	job.AddStep(&azure.DeleteResourceGroup{
 		SubscriptionID:    subID,
@@ -75,8 +76,33 @@ func DeleteTestInfra(subID, rg, clusterName, location string) *types.Job {
 	return job
 }
 
+func CreateTestInfraAWS(accID, clusterName, region, kubeConfigFilePath string) *types.Job {
+	job := types.NewJob("Create e2e test infrastructure AWS")
+
+	job.AddStep(&aws.CreateCluster{
+		AccountID:          accID,
+		ClusterName:        clusterName,
+		Region:             region,
+		KubeConfigFilePath: kubeConfigFilePath,
+	}, nil)
+
+	return job
+}
+
+func DeleteTestInfraAWS(accID, clusterName, region string) *types.Job {
+	job := types.NewJob("Delete e2e test infrastructure AWS")
+
+	job.AddStep(&aws.DeleteCluster{
+		AccountID:   accID,
+		ClusterName: clusterName,
+		Region:      region,
+	}, nil)
+
+	return job
+}
+
 func InstallRetina(kubeConfigFilePath, chartPath string) *types.Job {
-	job := types.NewJob("Install and test Retina with basic metrics")
+	job := types.NewJob("Install Retina")
 
 	job.AddStep(&kubernetes.InstallHelmChart{
 		Namespace:          common.KubeSystemNamespace,
@@ -89,7 +115,7 @@ func InstallRetina(kubeConfigFilePath, chartPath string) *types.Job {
 	return job
 }
 
-func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, testPodNamespace string) *types.Job {
+func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath, cloudProvider, testPodNamespace string) *types.Job {
 	job := types.NewJob("Install and test Retina with basic metrics")
 
 	job.AddStep(&kubernetes.InstallHelmChart{
@@ -100,7 +126,11 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, test
 		TagEnv:             generic.DefaultTagEnv,
 	}, nil)
 
-	job.AddScenario(drop.ValidateDropMetric(testPodNamespace))
+	apiEndpoint := getCloudApiIP(cloudProvider)
+
+	if cloudProvider == "azure" {
+		job.AddScenario(drop.ValidateDropMetric(testPodNamespace))
+	}
 
 	job.AddScenario(tcp.ValidateTCPMetrics(testPodNamespace))
 
@@ -125,7 +155,7 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, test
 				Query:       "kubernetes.default.svc.cluster.local.",
 				QueryType:   "A",
 				ReturnCode:  "No Error",
-				Response:    "10.0.0.1",
+				Response:    apiEndpoint,
 			},
 		},
 		{
@@ -160,7 +190,7 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, test
 	return job
 }
 
-func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFilePath string, testPodNamespace string) *types.Job {
+func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFilePath, cloudProvider, testPodNamespace string) *types.Job {
 	job := types.NewJob("Upgrade and test Retina with advanced metrics")
 	// enable advanced metrics
 	job.AddStep(&kubernetes.UpgradeRetinaHelmChart{
@@ -171,6 +201,8 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 		TagEnv:             generic.DefaultTagEnv,
 		ValuesFile:         valuesFilePath,
 	}, nil)
+
+	apiEndpoint := getCloudApiIP(cloudProvider)
 
 	dnsScenarios := []struct {
 		name string
@@ -191,7 +223,7 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 				Query:       "kubernetes.default.svc.cluster.local.",
 				QueryType:   "A",
 				ReturnCode:  "NOERROR",
-				Response:    "10.0.0.1",
+				Response:    apiEndpoint,
 			},
 		},
 		{
