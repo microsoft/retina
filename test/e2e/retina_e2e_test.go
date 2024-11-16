@@ -2,6 +2,7 @@ package retina
 
 import (
 	"crypto/rand"
+	"flag"
 	"math/big"
 	"os"
 	"os/user"
@@ -11,19 +12,38 @@ import (
 	"time"
 
 	"github.com/microsoft/retina/test/e2e/common"
+	"github.com/microsoft/retina/test/e2e/framework/helpers"
 	"github.com/microsoft/retina/test/e2e/framework/types"
 	jobs "github.com/microsoft/retina/test/e2e/jobs"
 	"github.com/stretchr/testify/require"
 )
 
-var locations = []string{"eastus2", "centralus", "southcentralus", "uksouth", "centralindia", "westus2"}
+var (
+	locations   = []string{"eastus2", "centralus", "southcentralus", "uksouth", "centralindia", "westus2"}
+	createInfra = flag.Bool("create-infra", true, "create a Resource group, vNET and AKS cluster for testing")
+	deleteInfra = flag.Bool("delete-infra", true, "delete a Resource group, vNET and AKS cluster for testing")
+)
 
 // TestE2ERetina tests all e2e scenarios for retina
 func TestE2ERetinaAZ(t *testing.T) {
+	ctx, cancel := helpers.Context(t)
+	defer cancel()
+
 	curuser, err := user.Current()
 	require.NoError(t, err)
+	flag.Parse()
 
-	clusterName := curuser.Username + common.NetObsRGtag + strconv.FormatInt(time.Now().Unix(), 10)
+	clusterName := os.Getenv("CLUSTER_NAME")
+	if clusterName == "" {
+		username := curuser.Username
+		// Truncate the username to 8 characters
+		if len(username) > 8 {
+			username = username[:8]
+			t.Logf("Username is too long, truncating to 8 characters: %s", username)
+		}
+		clusterName = username + common.NetObsRGtag + strconv.FormatInt(time.Now().Unix(), 10)
+		t.Logf("CLUSTER_NAME is not set, generating a random cluster name: %s", clusterName)
+	}
 
 	subID := os.Getenv("AZURE_SUBSCRIPTION_ID")
 	require.NotEmpty(t, subID)
@@ -38,6 +58,12 @@ func TestE2ERetinaAZ(t *testing.T) {
 		location = locations[nBig.Int64()]
 	}
 
+	rg := os.Getenv("AZURE_RESOURCE_GROUP")
+	if rg == "" {
+		// Use the cluster name as the resource group name by default.
+		rg = clusterName
+	}
+
 	cwd, err := os.Getwd()
 	require.NoError(t, err)
 
@@ -49,27 +75,28 @@ func TestE2ERetinaAZ(t *testing.T) {
 	kubeConfigFilePath := filepath.Join(rootDir, "test", "e2e", "test.pem")
 
 	// CreateTestInfra
-	createTestInfra := types.NewRunner(t, jobs.CreateTestInfraAZ(subID, clusterName, location, kubeConfigFilePath))
-	createTestInfra.Run()
+	createTestInfra := types.NewRunner(t, jobs.CreateTestInfraAZ(subID, rg, clusterName, location, kubeConfigFilePath, *createInfra))
+	createTestInfra.Run(ctx)
 
-	// Hacky way to ensure that the test infra is deleted even if the test panics
-	defer func() {
-		if r := recover(); r != nil {
-			t.Logf("Recovered in TestE2ERetina, %v", r)
+	t.Cleanup(func() {
+		if *deleteInfra {
+			_ = jobs.DeleteTestInfraAZ(subID, rg, clusterName, location).Run()
 		}
-		_ = jobs.DeleteTestInfraAZ(subID, clusterName, location).Run()
-	}()
+	})
 
 	// Install and test Retina basic metrics
-	basicMetricsE2E := types.NewRunner(t, jobs.InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath, "azure"))
-	basicMetricsE2E.Run()
+	basicMetricsE2E := types.NewRunner(t, jobs.InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath, "azure", common.TestPodNamespace))
+	basicMetricsE2E.Run(ctx)
 
 	// Upgrade and test Retina with advanced metrics
-	advanceMetricsE2E := types.NewRunner(t, jobs.UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, profilePath, "azure"))
-	advanceMetricsE2E.Run()
+	advanceMetricsE2E := types.NewRunner(t, jobs.UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, profilePath, "azure", common.TestPodNamespace))
+	advanceMetricsE2E.Run(ctx)
 }
 
 func TestE2ERetinaAWS(t *testing.T) {
+	ctx, cancel := helpers.Context(t)
+	defer cancel()
+
 	curuser, err := user.Current()
 	require.NoError(t, err)
 
@@ -92,21 +119,19 @@ func TestE2ERetinaAWS(t *testing.T) {
 
 	// CreateTestInfra
 	createTestInfra := types.NewRunner(t, jobs.CreateTestInfraAWS(accID, clusterName, region, kubeConfigFilePath))
-	createTestInfra.Run()
+	createTestInfra.Run(ctx)
 
-	// Finalizer to clean up test infra
-	defer func() {
-		if r := recover(); r != nil {
-			t.Logf("Recovered in TestE2ERetina, %v", r)
+	t.Cleanup(func() {
+		if *deleteInfra {
+			_ = jobs.DeleteTestInfraAWS(accID, clusterName, region).Run()
 		}
-		_ = jobs.DeleteTestInfraAWS(accID, clusterName, region).Run()
-	}()
+	})
 
 	// Install and test Retina basic metrics
-	basicMetricsE2E := types.NewRunner(t, jobs.InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath, "aws"))
-	basicMetricsE2E.Run()
+	basicMetricsE2E := types.NewRunner(t, jobs.InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath, "aws", common.TestPodNamespace))
+	basicMetricsE2E.Run(ctx)
 
 	// Upgrade and test Retina with advanced metrics
-	advanceMetricsE2E := types.NewRunner(t, jobs.UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, profilePath, "aws"))
-	advanceMetricsE2E.Run()
+	advanceMetricsE2E := types.NewRunner(t, jobs.UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, profilePath, "aws", common.TestPodNamespace))
+	advanceMetricsE2E.Run(ctx)
 }

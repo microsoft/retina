@@ -62,7 +62,7 @@ func Init() (*FilterMap, error) {
 		return f, err
 	}
 	f.obj = obj
-	f.kfm = obj.RetinaFilterMap
+	f.kfm = obj.RetinaFilter
 	return f, nil
 }
 

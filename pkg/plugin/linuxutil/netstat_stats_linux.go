@@ -13,13 +13,13 @@ import (
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/utils"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
 const (
-	pathNetNetstat = "/proc/net/netstat"
-	pathNetSnmp    = "/proc/net/snmp"
+	pathNetNetstat       = "/proc/net/netstat"
+	pathNetSnmp          = "/proc/net/snmp"
+	addrDefaultTCPRemote = "AllIPs"
 )
 
 type NetstatReader struct {
@@ -41,6 +41,7 @@ func NewNetstatReader(opts *NetstatOpts, ns NetstatInterface) *NetstatReader {
 }
 
 func (nr *NetstatReader) readAndUpdate() (*SocketStats, error) {
+	metrics.TCPConnectionRemoteGauge.WithLabelValues(addrDefaultTCPRemote).Set(0)
 	if err := nr.readConnectionStats(pathNetNetstat); err != nil {
 		return nil, err
 	}
@@ -186,25 +187,6 @@ func (nr *NetstatReader) readSockStats() error {
 		return err
 	} else {
 		sockStats := processSocks(socks)
-		// Compare existing tcp socket connections with updated ones, remove the ones that are not seen in the new sockStats map
-		// Log the socketByRemoteAddr map
-		if nr.opts.PrevTCPSockStats != nil {
-			for remoteAddr := range nr.opts.PrevTCPSockStats.socketByRemoteAddr {
-				addrPort, err := netip.ParseAddrPort(remoteAddr)
-				if err != nil {
-					return errors.Wrapf(err, "failed to parse remote address %s", remoteAddr)
-				}
-				addr := addrPort.Addr().String()
-				port := strconv.Itoa(int(addrPort.Port()))
-				// Check if the remote address is in the new sockStats map
-				if _, ok := sockStats.socketByRemoteAddr[remoteAddr]; !ok {
-					nr.l.Debug("Removing remote address from metrics", zap.String("remoteAddr", remoteAddr))
-					// If not, set the value to 0
-					metrics.TCPConnectionRemoteGauge.WithLabelValues(addr, port).Set(0)
-				}
-			}
-		}
-
 		nr.connStats.TcpSockets = *sockStats
 	}
 
@@ -251,34 +233,17 @@ func (nr *NetstatReader) updateMetrics() {
 		metrics.TCPStateGauge.WithLabelValues(state).Set(float64(v))
 	}
 
+	totalCount := 0
 	for remoteAddr, v := range nr.connStats.TcpSockets.socketByRemoteAddr {
-		addrPort, err := netip.ParseAddrPort(remoteAddr)
-		if err != nil {
-			nr.l.Error("Failed to parse remote address", zap.Error(err))
+		// only count valid remote addresses
+		if _, err := netip.ParseAddrPort(remoteAddr); err != nil {
+			nr.l.Error("failed to parse remote address", zap.String("remoteAddr", remoteAddr), zap.Error(err))
 			continue
 		}
-		addr := addrPort.Addr().String()
-		port := strconv.Itoa(int(addrPort.Port()))
-		if !validateRemoteAddr(addr) {
-			continue
-		}
-
-		metrics.TCPConnectionRemoteGauge.WithLabelValues(addr, port).Set(float64(v))
+		totalCount += v
 	}
+	metrics.TCPConnectionRemoteGauge.WithLabelValues(addrDefaultTCPRemote).Set(float64(totalCount))
 
 	// UDP COnnection State metrics
 	metrics.UDPConnectionStatsGauge.WithLabelValues(utils.Active).Set(float64(nr.connStats.UdpSockets.totalActiveSockets))
-}
-
-func validateRemoteAddr(addr string) bool {
-	if addr == "" {
-		return false
-	}
-
-	// ignore localhost addresses.
-	if strings.Contains(addr, "127.0.0") {
-		return false
-	}
-
-	return true
 }

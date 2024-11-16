@@ -18,7 +18,7 @@ var (
 )
 
 const (
-	clusterTimeout      = 10 * time.Minute
+	clusterTimeout      = 15 * time.Minute
 	clusterCreateTicker = 30 * time.Second
 	pollFrequency       = 5 * time.Second
 	AgentARMSKU         = "Standard_D4pls_v5"

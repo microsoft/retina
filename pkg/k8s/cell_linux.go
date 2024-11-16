@@ -57,14 +57,8 @@ var Cell = cell.Module(
 		func() resource.Resource[*cilium_api_v2alpha1.CiliumEndpointSlice] {
 			return &fakeresource[*cilium_api_v2alpha1.CiliumEndpointSlice]{}
 		},
-		func() resource.Resource[*types.CiliumEndpoint] {
-			return &fakeresource[*types.CiliumEndpoint]{}
-		},
 		func() resource.Resource[*cilium_api_v2.CiliumNode] {
 			return &fakeresource[*cilium_api_v2.CiliumNode]{}
-		},
-		func() daemonk8s.ServiceNonHeadless {
-			return &fakeresource[*slim_corev1.Service]{}
 		},
 		func() daemonk8s.EndpointsNonHeadless {
 			return &fakeresource[*ciliumk8s.Endpoints]{}
@@ -73,6 +67,12 @@ var Cell = cell.Module(
 			return &watcherconfig{}
 		},
 	),
+
+	// Provide the resources needed by the watchers.
+
+	cell.Provide(func(lc cell.Lifecycle, cs client.Clientset) (resource.Resource[*types.CiliumEndpoint], error) {
+		return ciliumk8s.CiliumSlimEndpointResource(lc, cs, nil)
+	}),
 
 	cell.Provide(func(lc cell.Lifecycle, cs client.Clientset) (resource.Resource[*ciliumk8s.Endpoints], error) {
 		//nolint:wrapcheck // a wrapped error here is of dubious value
@@ -88,7 +88,18 @@ var Cell = cell.Module(
 			lc,
 			ciliumk8s.Config{
 				EnableK8sEndpointSlice: false,
-				K8sServiceProxyName:    "",
+			},
+			cs,
+			func(*metav1.ListOptions) {},
+		)
+	}),
+
+	cell.Provide(func(lc cell.Lifecycle, cs client.Clientset) (daemonk8s.ServiceNonHeadless, error) {
+		//nolint:wrapcheck // a wrapped error here is of dubious value
+		return ciliumk8s.ServiceResource(
+			lc,
+			ciliumk8s.Config{
+				EnableK8sEndpointSlice: false,
 			},
 			cs,
 			func(*metav1.ListOptions) {},

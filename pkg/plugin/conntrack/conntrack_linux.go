@@ -62,7 +62,7 @@ func New() (*Conntrack, error) {
 
 	ct.objs = objs
 	// Get the conntrack map from the objects
-	ct.ctMap = objs.RetinaConntrackMap
+	ct.ctMap = objs.RetinaConntrack
 	return ct, nil
 }
 
@@ -92,11 +92,12 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			var noOfCtEntries, entriesDeleted int
 			// List of keys to be deleted
 			var keysToDelete []conntrackCtV4Key
+
 			iter := ct.ctMap.Iterate()
 			for iter.Next(&key, &value) {
 				noOfCtEntries++
 				// Check if the connection is closing or has expired
-				if value.IsClosing || ktime.MonotonicOffset.Seconds()+float64(value.EvictionTime) < float64((time.Now().Unix())) {
+				if ktime.MonotonicOffset.Seconds()+float64(value.EvictionTime) < float64((time.Now().Unix())) {
 					// Iterating a hash map from which keys are being deleted is not safe.
 					// So, we store the keys to be deleted in a list and delete them after the iteration.
 					keyCopy := key // Copy the key to avoid using the same key in the next iteration
@@ -115,11 +116,11 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 					zap.String("proto", decodeProto(key.Proto)),
 					zap.Uint32("eviction_time", value.EvictionTime),
 					zap.Uint8("traffic_direction", value.TrafficDirection),
-					zap.Bool("is_closing", value.IsClosing),
 					zap.String("flags_seen_tx_dir", decodeFlags(value.FlagsSeenTxDir)),
 					zap.String("flags_seen_rx_dir", decodeFlags(value.FlagsSeenRxDir)),
 					zap.Uint32("last_reported_tx_dir", value.LastReportTxDir),
 					zap.Uint32("last_reported_rx_dir", value.LastReportRxDir),
+					zap.Bool("is_direction_unknown", value.IsDirectionUnknown),
 				)
 			}
 			if err := iter.Err(); err != nil {
@@ -128,7 +129,8 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			// Delete the conntrack entries
 			for _, key := range keysToDelete {
 				if err := ct.ctMap.Delete(key); err != nil {
-					ct.l.Error("Delete failed", zap.Error(err))
+					// Should only happen in a high connection churn scenario
+					ct.l.Debug("Delete failed", zap.Error(err))
 				} else {
 					entriesDeleted++
 				}

@@ -29,10 +29,6 @@ const (
 	MAX_RECONCILE_TIME = 10 * time.Second
 )
 
-const (
-	MAX_STARTUP_TIME = 10 * time.Second
-)
-
 var (
 	ErrNilCfg       = errors.New("pluginmanager requires a non-nil config")
 	ErrZeroInterval = errors.New("pluginmanager requires a positive MetricsInterval in its config")
@@ -106,18 +102,18 @@ func (p *PluginManager) Reconcile(ctx context.Context, plugin api.Plugin) error 
 	// Regenerate eBPF code and bpf object.
 	// This maybe no-op for plugins that don't use eBPF.
 	if err := plugin.Generate(ctx); err != nil {
-		return err
+		return errors.Wrap(err, "failed to generate plugin")
 	}
 	if err := plugin.Compile(ctx); err != nil {
-		return err
+		return errors.Wrap(err, "failed to compile plugin")
 	}
 
 	// Re-start plugin.
 	if err := plugin.Stop(); err != nil {
-		return err
+		return errors.Wrap(err, "failed to stop plugin")
 	}
 	if err := plugin.Init(); err != nil {
-		return err
+		return errors.Wrap(err, "failed to init plugin")
 	}
 
 	p.l.Info("Reconciled plugin", zap.String("name", plugin.Name()))
@@ -128,14 +124,6 @@ func (p *PluginManager) Reconcile(ctx context.Context, plugin api.Plugin) error 
 // Note: This will block as long as main thread is running.
 func (p *PluginManager) Start(ctx context.Context) error {
 	counter := p.tel.StartPerf("start-plugin-manager")
-	// start plugins evenly throughout the interval,
-	// if 2 plugins enabled, and 10 second interval
-	// 10 / 2 = 5, then after every start sleep 5s
-	// plugin 1 = 0s
-	// plugin 2 = 5s
-	// then the plugins won't awake at the same time and they'll have even execution time
-
-	delay := float32(MAX_STARTUP_TIME) / float32(len(p.plugins))
 	p.l.Info("Starting plugin manager ...")
 	var err error
 
@@ -184,8 +172,6 @@ func (p *PluginManager) Start(ctx context.Context) error {
 			p.l.Info(fmt.Sprintf("starting plugin %s", plug.Name()))
 			return errors.Wrapf(plug.Start(ctx), "failed to start plugin %s", plug.Name())
 		})
-
-		time.Sleep(time.Duration(delay))
 	}
 
 	p.tel.StopPerf(counter)

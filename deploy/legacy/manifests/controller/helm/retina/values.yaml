@@ -8,6 +8,7 @@ os:
   windows: true
 
 operator:
+  name: retina-operator
   enabled: false
   repository: ghcr.io/microsoft/retina/retina-operator
   tag: "v0.0.2"
@@ -104,7 +105,6 @@ securityContext:
   capabilities:
     add:
       - SYS_ADMIN
-      - SYS_RESOURCE
       - NET_ADMIN # for packetparser plugin
       - IPC_LOCK # for mmap() calls made by NewReader(), ref: https://man7.org/linux/man-pages/man2/mmap.2.html
   windowsOptions:
@@ -115,6 +115,12 @@ service:
   port: 10093
   targetPort: 10093
   name: retina
+
+operatorService:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+  name: retina-operator
 
 serviceAccount:
   annotations: {}
@@ -154,6 +160,37 @@ nodeSelector: {}
 ## Ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
 ##
 tolerations: []
+## @param affinity [object] Affinity rules for pod assignment
+## Ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#affinity-and-anti-affinity
+##
+affinity: []
+
+## @param readinessProbe.initialDelaySeconds [array] Initial delay seconds for readinessProbe
+## @param readinessProbe.periodSeconds [array] Period seconds for readinessProbe
+## @param readinessProbe.timeoutSeconds [array] Timeout seconds for readinessProbe
+## @param readinessProbe.failureThreshold [array] Failure threshold for readinessProbe
+## @param readinessProbe.successThreshold [array] Success threshold for readinessProbe
+## Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#configure-probes
+##
+readinessProbe: {}
+  # initialDelaySeconds: 30
+  # periodSeconds: 10
+  # timeoutSeconds: 15
+  # failureThreshold: 5
+  # successThreshold: 1
+## @param livenessProbe.initialDelaySeconds [array] Initial delay seconds for livenessProbe
+## @param livenessProbe.periodSeconds [array] Period seconds for livenessProbe
+## @param livenessProbe.timeoutSeconds [array] Timeout seconds for livenessProbe
+## @param livenessProbe.failureThreshold [array] Failure threshold for livenessProbe
+## @param livenessProbe.successThreshold [array] Success threshold for livenessProbe
+## Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#configure-probes
+##
+livenessProbe: {}
+  # initialDelaySeconds: 30
+  # periodSeconds: 10
+  # timeoutSeconds: 15
+  # failureThreshold: 5
+  # successThreshold: 1
 
 metrics:
   ## Prometheus Service Monitor
@@ -206,8 +243,11 @@ metrics:
     scrapeTimeout: 30s
     ## @param metrics.serviceMonitor.additionalLabels [object] Additional labels that can be used so serviceMonitor will be discovered by Prometheus
     ## ref: https://github.com/coreos/prometheus-operator/blob/master/Documentation/api.md#prometheusspec
+    ## 'release: prometheus' label is needed for prometheus to discover ServiceMoniotrs
     ##
-    additionalLabels: {}
+    additionalLabels:
+      release: prometheus
+      app.kubernetes.io/component: metrics
     ## @param metrics.serviceMonitor.scheme Scheme to use for scraping
     ##
     scheme: http
@@ -222,7 +262,20 @@ metrics:
     tlsConfig: {}
     ## @param metrics.serviceMonitor.relabelings [array] Prometheus relabeling rules to apply to samples before scraping
     ##
-    relabelings: []
+    relabelings: 
+      - sourceLabels:
+          [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        separator: ":"
+        regex: ([^:]+)(?::\d+)?
+        targetLabel: __address__
+        replacement: ${1}:${2}
+        action: replace
+      - sourceLabels: [__meta_kubernetes_pod_node_name]
+        action: replace
+        targetLabel: instance
     ## @param metrics.serviceMonitor.metricRelabelings [array] Prometheus relabeling rules to apply to samples before ingestion
     ##
-    metricRelabelings: []
+    metricRelabelings:
+      - sourceLabels: [__name__]
+        action: keep
+        regex: (.*)

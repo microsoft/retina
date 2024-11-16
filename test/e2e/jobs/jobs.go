@@ -1,6 +1,7 @@
 package retina
 
 import (
+	"github.com/microsoft/retina/test/e2e/common"
 	"github.com/microsoft/retina/test/e2e/framework/aws"
 	"github.com/microsoft/retina/test/e2e/framework/azure"
 	"github.com/microsoft/retina/test/e2e/framework/generic"
@@ -10,37 +11,49 @@ import (
 	"github.com/microsoft/retina/test/e2e/scenarios/drop"
 	"github.com/microsoft/retina/test/e2e/scenarios/latency"
 	tcp "github.com/microsoft/retina/test/e2e/scenarios/tcp"
+	"github.com/microsoft/retina/test/e2e/scenarios/windows"
 )
 
-func CreateTestInfraAZ(subID, clusterName, location, kubeConfigFilePath string) *types.Job {
+func CreateTestInfraAZ(subID, rg, clusterName, location, kubeConfigFilePath string, createInfra bool) *types.Job {
 	job := types.NewJob("Create e2e test infrastructure AZ")
 
-	job.AddStep(&azure.CreateResourceGroup{
-		SubscriptionID:    subID,
-		ResourceGroupName: clusterName,
-		Location:          location,
-	}, nil)
+	if createInfra {
+		job.AddStep(&azure.CreateResourceGroup{
+			SubscriptionID:    subID,
+			ResourceGroupName: rg,
+			Location:          location,
+		}, nil)
 
-	job.AddStep(&azure.CreateVNet{
-		VnetName:         "testvnet",
-		VnetAddressSpace: "10.0.0.0/9",
-	}, nil)
+		job.AddStep(&azure.CreateVNet{
+			VnetName:         "testvnet",
+			VnetAddressSpace: "10.0.0.0/9",
+		}, nil)
 
-	job.AddStep(&azure.CreateSubnet{
-		SubnetName:         "testsubnet",
-		SubnetAddressSpace: "10.0.0.0/12",
-	}, nil)
+		job.AddStep(&azure.CreateSubnet{
+			SubnetName:         "testsubnet",
+			SubnetAddressSpace: "10.0.0.0/12",
+		}, nil)
 
-	job.AddStep(&azure.CreateNPMCluster{
-		ClusterName:  clusterName,
-		PodCidr:      "10.128.0.0/9",
-		DNSServiceIP: "192.168.0.10",
-		ServiceCidr:  "192.168.0.0/28",
-	}, nil)
+		job.AddStep(&azure.CreateNPMCluster{
+			ClusterName:  clusterName,
+			PodCidr:      "10.128.0.0/9",
+			DNSServiceIP: "192.168.0.10",
+			ServiceCidr:  "192.168.0.0/28",
+		}, nil)
 
-	job.AddStep(&azure.GetAKSKubeConfig{
-		KubeConfigFilePath: kubeConfigFilePath,
-	}, nil)
+		job.AddStep(&azure.GetAKSKubeConfig{
+			KubeConfigFilePath: kubeConfigFilePath,
+		}, nil)
+
+	} else {
+		job.AddStep(&azure.GetAKSKubeConfig{
+			KubeConfigFilePath: kubeConfigFilePath,
+			ClusterName:        clusterName,
+			SubscriptionID:     subID,
+			ResourceGroupName:  rg,
+			Location:           location,
+		}, nil)
+	}
 
 	job.AddStep(&generic.LoadFlags{
 		TagEnv:            generic.DefaultTagEnv,
@@ -51,12 +64,12 @@ func CreateTestInfraAZ(subID, clusterName, location, kubeConfigFilePath string) 
 	return job
 }
 
-func DeleteTestInfraAZ(subID, clusterName, location string) *types.Job {
+func DeleteTestInfraAZ(subID, rg, clusterName, location string) *types.Job {
 	job := types.NewJob("Delete e2e test infrastructure AZ")
 
 	job.AddStep(&azure.DeleteResourceGroup{
 		SubscriptionID:    subID,
-		ResourceGroupName: clusterName,
+		ResourceGroupName: rg,
 		Location:          location,
 	}, nil)
 
@@ -88,24 +101,40 @@ func DeleteTestInfraAWS(accID, clusterName, region string) *types.Job {
 	return job
 }
 
-func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath, cloudProvider string) *types.Job {
-	job := types.NewJob("Install and test Retina with basic metrics")
-
-	apiEndpoint := getCloudApiIP(cloudProvider)
+func InstallRetina(kubeConfigFilePath, chartPath string) *types.Job {
+	job := types.NewJob("Install Retina")
 
 	job.AddStep(&kubernetes.InstallHelmChart{
-		Namespace:          "kube-system",
+		Namespace:          common.KubeSystemNamespace,
 		ReleaseName:        "retina",
 		KubeConfigFilePath: kubeConfigFilePath,
 		ChartPath:          chartPath,
 		TagEnv:             generic.DefaultTagEnv,
 	}, nil)
 
+	return job
+}
+
+func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath, cloudProvider, testPodNamespace string) *types.Job {
+	job := types.NewJob("Install and test Retina with basic metrics")
+
+	job.AddStep(&kubernetes.InstallHelmChart{
+		Namespace:          common.KubeSystemNamespace,
+		ReleaseName:        "retina",
+		KubeConfigFilePath: kubeConfigFilePath,
+		ChartPath:          chartPath,
+		TagEnv:             generic.DefaultTagEnv,
+	}, nil)
+
+	apiEndpoint := getCloudApiIP(cloudProvider)
+
 	if cloudProvider == "azure" {
-		job.AddScenario(drop.ValidateDropMetric())
+		job.AddScenario(drop.ValidateDropMetric(testPodNamespace))
 	}
 
-	job.AddScenario(tcp.ValidateTCPMetrics())
+	job.AddScenario(tcp.ValidateTCPMetrics(testPodNamespace))
+
+	job.AddScenario(windows.ValidateWindowsBasicMetric())
 
 	dnsScenarios := []struct {
 		name string
@@ -149,17 +178,23 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath, cloudProvid
 	}
 
 	for _, scenario := range dnsScenarios {
-		job.AddScenario(dns.ValidateBasicDNSMetrics(scenario.name, scenario.req, scenario.resp))
+		job.AddScenario(dns.ValidateBasicDNSMetrics(scenario.name, scenario.req, scenario.resp, testPodNamespace))
 	}
+
+	job.AddStep(&kubernetes.EnsureStableComponent{
+		PodNamespace:           common.KubeSystemNamespace,
+		LabelSelector:          "k8s-app=retina",
+		IgnoreContainerRestart: false,
+	}, nil)
 
 	return job
 }
 
-func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFilePath, cloudProvider string) *types.Job {
+func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFilePath, cloudProvider, testPodNamespace string) *types.Job {
 	job := types.NewJob("Upgrade and test Retina with advanced metrics")
 	// enable advanced metrics
 	job.AddStep(&kubernetes.UpgradeRetinaHelmChart{
-		Namespace:          "kube-system",
+		Namespace:          common.KubeSystemNamespace,
 		ReleaseName:        "retina",
 		KubeConfigFilePath: kubeConfigFilePath,
 		ChartPath:          chartPath,
@@ -211,10 +246,16 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 	}
 
 	for _, scenario := range dnsScenarios {
-		job.AddScenario(dns.ValidateAdvancedDNSMetrics(scenario.name, scenario.req, scenario.resp, kubeConfigFilePath))
+		job.AddScenario(dns.ValidateAdvancedDNSMetrics(scenario.name, scenario.req, scenario.resp, kubeConfigFilePath, testPodNamespace))
 	}
 
-	job.AddScenario(latency.ValidateLatencyMetric())
+	job.AddScenario(latency.ValidateLatencyMetric(testPodNamespace))
+
+	job.AddStep(&kubernetes.EnsureStableComponent{
+		PodNamespace:           common.KubeSystemNamespace,
+		LabelSelector:          "k8s-app=retina",
+		IgnoreContainerRestart: false,
+	}, nil)
 
 	return job
 }

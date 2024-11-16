@@ -36,7 +36,7 @@ type ResponseValidationParams struct {
 }
 
 // ValidateBasicDNSMetrics validates basic DNS metrics present in the metrics endpoint
-func ValidateBasicDNSMetrics(scenarioName string, req *RequestValidationParams, resp *ResponseValidationParams) *types.Scenario {
+func ValidateBasicDNSMetrics(scenarioName string, req *RequestValidationParams, resp *ResponseValidationParams, namespace string) *types.Scenario {
 	// generate a random ID using rand
 	id := fmt.Sprintf("basic-dns-port-forward-%d", rand.Int()) // nolint:gosec // fine to use math/rand here
 	agnhostName := "agnhost-" + id
@@ -45,13 +45,22 @@ func ValidateBasicDNSMetrics(scenarioName string, req *RequestValidationParams, 
 		{
 			Step: &kubernetes.CreateAgnhostStatefulSet{
 				AgnhostName:      agnhostName,
-				AgnhostNamespace: "kube-system",
+				AgnhostNamespace: namespace,
+			},
+		},
+		// Need this delay to guarantee that the pods will have bpf program attached
+		{
+			Step: &types.Sleep{
+				Duration: 30 * time.Second,
+			},
+			Opts: &types.StepOptions{
+				SkipSavingParametersToJob: true,
 			},
 		},
 		{
 			Step: &kubernetes.ExecInPod{
 				PodName:      podName,
-				PodNamespace: "kube-system",
+				PodNamespace: namespace,
 				Command:      req.Command,
 			},
 			Opts: &types.StepOptions{
@@ -68,7 +77,7 @@ func ValidateBasicDNSMetrics(scenarioName string, req *RequestValidationParams, 
 		{
 			Step: &kubernetes.ExecInPod{
 				PodName:      podName,
-				PodNamespace: "kube-system",
+				PodNamespace: namespace,
 				Command:      req.Command,
 			},
 			Opts: &types.StepOptions{
@@ -83,7 +92,7 @@ func ValidateBasicDNSMetrics(scenarioName string, req *RequestValidationParams, 
 		},
 		{
 			Step: &kubernetes.PortForward{
-				Namespace:             "kube-system",
+				Namespace:             common.KubeSystemNamespace,
 				LabelSelector:         "k8s-app=retina",
 				LocalPort:             strconv.Itoa(common.RetinaPort),
 				RemotePort:            strconv.Itoa(common.RetinaPort),
@@ -125,7 +134,7 @@ func ValidateBasicDNSMetrics(scenarioName string, req *RequestValidationParams, 
 			Step: &kubernetes.DeleteKubernetesResource{
 				ResourceType:      kubernetes.TypeString(kubernetes.StatefulSet),
 				ResourceName:      agnhostName,
-				ResourceNamespace: "kube-system",
+				ResourceNamespace: namespace,
 			}, Opts: &types.StepOptions{
 				SkipSavingParametersToJob: true,
 			},
@@ -140,7 +149,7 @@ func ValidateBasicDNSMetrics(scenarioName string, req *RequestValidationParams, 
 }
 
 // ValidateAdvancedDNSMetrics validates the advanced DNS metrics present in the metrics endpoint
-func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParams, resp *ResponseValidationParams, kubeConfigFilePath string) *types.Scenario {
+func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParams, resp *ResponseValidationParams, kubeConfigFilePath string, namespace string) *types.Scenario {
 	// random ID
 	id := fmt.Sprintf("adv-dns-port-forward-%d", rand.Int()) // nolint:gosec // fine to use math/rand here
 	agnhostName := "agnhost-" + id
@@ -149,13 +158,22 @@ func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParam
 		{
 			Step: &kubernetes.CreateAgnhostStatefulSet{
 				AgnhostName:      agnhostName,
-				AgnhostNamespace: "kube-system",
+				AgnhostNamespace: namespace,
+			},
+		},
+		// Need this delay to guarantee that the pods will have bpf program attached
+		{
+			Step: &types.Sleep{
+				Duration: 30 * time.Second,
+			},
+			Opts: &types.StepOptions{
+				SkipSavingParametersToJob: true,
 			},
 		},
 		{
 			Step: &kubernetes.ExecInPod{
 				PodName:      podName,
-				PodNamespace: "kube-system",
+				PodNamespace: namespace,
 				Command:      req.Command,
 			},
 			Opts: &types.StepOptions{
@@ -172,7 +190,7 @@ func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParam
 		{
 			Step: &kubernetes.ExecInPod{
 				PodName:      podName,
-				PodNamespace: "kube-system",
+				PodNamespace: namespace,
 				Command:      req.Command,
 			},
 			Opts: &types.StepOptions{
@@ -187,7 +205,7 @@ func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParam
 		},
 		{
 			Step: &kubernetes.PortForward{
-				Namespace:             "kube-system",
+				Namespace:             common.KubeSystemNamespace,
 				LabelSelector:         "k8s-app=retina",
 				LocalPort:             strconv.Itoa(common.RetinaPort),
 				RemotePort:            strconv.Itoa(common.RetinaPort),
@@ -201,7 +219,7 @@ func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParam
 		},
 		{
 			Step: &ValidateAdvancedDNSRequestMetrics{
-				Namespace:          "kube-system",
+				PodNamespace:       namespace,
 				PodName:            podName,
 				Query:              req.Query,
 				QueryType:          req.QueryType,
@@ -215,7 +233,7 @@ func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParam
 		},
 		{
 			Step: &ValidateAdvanceDNSResponseMetrics{
-				Namespace:          "kube-system",
+				PodNamespace:       namespace,
 				NumResponse:        resp.NumResponse,
 				PodName:            podName,
 				Query:              resp.Query,
@@ -239,7 +257,7 @@ func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParam
 			Step: &kubernetes.DeleteKubernetesResource{
 				ResourceType:      kubernetes.TypeString(kubernetes.StatefulSet),
 				ResourceName:      agnhostName,
-				ResourceNamespace: "kube-system",
+				ResourceNamespace: namespace,
 			}, Opts: &types.StepOptions{
 				SkipSavingParametersToJob: true,
 			},

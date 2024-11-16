@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -30,6 +29,7 @@ import (
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
 	_ "github.com/microsoft/retina/pkg/plugin/dropreason/_cprog" // nolint
 	"github.com/microsoft/retina/pkg/utils"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
@@ -109,7 +109,7 @@ func (dr *dropReason) Compile(ctx context.Context) error {
 	// Keep target as bpf, otherwise clang compilation yields bpf object that elf reader cannot load.
 	err = loader.CompileEbpf(ctx, "-target", "bpf", "-Wall", targetArch, "-g", "-O2", "-c", bpfSourceFile, "-o", bpfOutputFile, includeDir, libbpfDir, filterDir)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "unable to compile eBPF code")
 	}
 	dr.l.Info("DropReason metric compiled")
 	return nil
@@ -145,7 +145,7 @@ func (dr *dropReason) Init() error {
 	}
 
 	// read perf map
-	dr.reader, err = plugincommon.NewPerfReader(dr.l, objs.DropreasonEvents, perCPUBuffer, 1)
+	dr.reader, err = plugincommon.NewPerfReader(dr.l, objs.RetinaDropreasonEvents, perCPUBuffer, 1)
 	if err != nil {
 		dr.l.Error("Error NewReader: %w", zap.Error(err))
 		return err
@@ -225,7 +225,7 @@ func (dr *dropReason) Init() error {
 		}
 	}
 
-	dr.metricsMapData = objs.MetricsMap
+	dr.metricsMapData = objs.RetinaDropreasonMetrics
 	return nil
 }
 

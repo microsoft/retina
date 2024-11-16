@@ -6,7 +6,7 @@ const (
 	// MapPath is the path to pinned BPF maps
 	MapPath = "/sys/fs/bpf"
 	// FilterMapName is the name of the BPF filter map
-	FilterMapName = "retina_filter_map"
+	FilterMapName = "retina_filter"
 	// ConntrackMapName is the name of the BPF conntrack map
-	ConntrackMapName = "retina_conntrack_map"
+	ConntrackMapName = "retina_conntrack"
 )
