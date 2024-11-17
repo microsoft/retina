@@ -130,11 +130,10 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath, cloudProvid
 
 	if cloudProvider == "azure" {
 		job.AddScenario(drop.ValidateDropMetric(testPodNamespace))
+		job.AddScenario(windows.ValidateWindowsBasicMetric())
 	}
 
 	job.AddScenario(tcp.ValidateTCPMetrics(testPodNamespace))
-
-	job.AddScenario(windows.ValidateWindowsBasicMetric())
 
 	dnsScenarios := []struct {
 		name string
