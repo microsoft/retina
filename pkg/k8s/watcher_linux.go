@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/runtime"
+
 	agentK8s "github.com/cilium/cilium/daemon/k8s"
 	"github.com/cilium/cilium/pkg/hive/cell"
 	"github.com/cilium/cilium/pkg/ipcache"
@@ -16,6 +18,13 @@ import (
 	"github.com/cilium/cilium/pkg/logging/logfields"
 	"github.com/cilium/cilium/pkg/option"
 )
+
+func init() {
+	// Register custom error handler for the watcher
+	runtime.ErrorHandlers = []func(error){
+		RetinaK8sErrorHandler,
+	}
+}
 
 const (
 	K8sAPIGroupCiliumEndpointV2 = "cilium/v2::CiliumEndpoint"
