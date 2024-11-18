@@ -48,7 +48,7 @@ func (i *InstallHelmChart) Run() error {
 	}
 
 	// Creating extra namespace to deploy test pods
-	err = CreateNamespace(i.KubeConfigFilePath, common.TestPodNamespace)
+	err = CreateNamespaceFn(i.KubeConfigFilePath, common.TestPodNamespace)
 	if err != nil {
 		return fmt.Errorf("failed to create namespace %s: %w", i.Namespace, err)
 	}

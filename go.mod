@@ -15,6 +15,11 @@ require (
 	sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader v0.0.20
 )
 
+retract (
+	v0.10.1 // Contains retractions only.
+	v0.10.0 // Published accidentally.
+)
+
 require (
 	cel.dev/expr v0.15.0 // indirect
 	code.cloudfoundry.org/clock v1.0.0 // indirect
@@ -58,7 +63,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.18.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.24.5 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.28.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.32.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.33.0 // indirect
 	github.com/aws/smithy-go v1.22.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
@@ -260,7 +265,7 @@ require (
 	golang.org/x/sync v0.9.0
 	golang.org/x/sys v0.27.0
 	golang.org/x/term v0.25.0 // indirect
-	google.golang.org/protobuf v1.35.1
+	google.golang.org/protobuf v1.35.2
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/api v0.30.3
@@ -284,13 +289,13 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v5 v5.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage v1.6.0
-	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.4.1
+	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.5.0
 	github.com/Microsoft/hcsshim v0.12.0-rc.3
 	github.com/Sytten/logrus-zap-hook v0.1.0
 	github.com/aws/aws-sdk-go-v2 v1.32.4
-	github.com/aws/aws-sdk-go-v2/config v1.28.3
-	github.com/aws/aws-sdk-go-v2/credentials v1.17.44
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.66.3
+	github.com/aws/aws-sdk-go-v2/config v1.28.4
+	github.com/aws/aws-sdk-go-v2/credentials v1.17.45
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.67.0
 	github.com/cakturk/go-netstat v0.0.0-20200220111822-e5b49efee7a5
 	github.com/cilium/cilium v1.16.0-pre.1.0.20240403152809-b9853ecbcaeb
 	github.com/cilium/ebpf v0.16.0

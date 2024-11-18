@@ -64,8 +64,11 @@ func (er *EthtoolReader) readInterfaceStats() error {
 	}
 
 	for _, i := range ifaces {
-		// exclude loopback interface and bridge network interface
-		if strings.Contains(i.Name, "lo") || strings.Contains(i.Name, "cbr0") {
+		// exclude lo (loopback interface), cbr0 (bridge network interface), lxc (Linux containers interface), and azv (virtual interface)
+		if strings.Contains(i.Name, "lo") ||
+			strings.Contains(i.Name, "cbr0") ||
+			strings.Contains(i.Name, "lxc") ||
+			strings.Contains(i.Name, "azv") {
 			continue
 		}
 

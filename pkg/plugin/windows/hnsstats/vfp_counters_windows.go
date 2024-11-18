@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 // IN/OUT Direction of vSwitch VFP port
@@ -151,13 +153,14 @@ func getVfpPortCountersRaw(portGUID string) (string, error) {
 	cmd := exec.Command("cmd", "/c", vfpCmd)
 	out, err := cmd.Output()
 
-	return string(out), err
+	return string(out), errors.Wrap(err, "errored while running vfpctrl /get-port-counter")
 }
 
 // TODO: Remove this once Resources.Allocators.EndpointPortGuid gets added to hcsshim Endpoint struct
 // Lists all vSwitch ports
 func listvPorts() ([]byte, error) {
-	return exec.Command("cmd", "/c", "vfpctrl /list-vmswitch-port").CombinedOutput()
+	out, err := exec.Command("cmd", "/c", "vfpctrl /list-vmswitch-port").CombinedOutput()
+	return out, errors.Wrap(err, "errored while running vfpctrl /list-vmswitch-port")
 }
 
 // TODO: Remove this once Resources.Allocators.EndpointPortGuid gets added to hcsshim Endpoint struct
