@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/microsoft/retina/test/e2e/common"
+	"github.com/microsoft/retina/test/e2e/framework/helpers"
 	"github.com/microsoft/retina/test/e2e/framework/types"
 	jobs "github.com/microsoft/retina/test/e2e/jobs"
 	"github.com/stretchr/testify/require"
@@ -20,6 +21,9 @@ import (
 // saves the data as benchmark information and then installs retina and runs the performance tests
 // to compare the results and publishes a json with regression information.
 func TestE2EPerfRetina(t *testing.T) {
+	ctx, cancel := helpers.Context(t)
+	defer cancel()
+
 	curuser, err := user.Current()
 	require.NoError(t, err)
 
@@ -60,7 +64,7 @@ func TestE2EPerfRetina(t *testing.T) {
 
 	// CreateTestInfra
 	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath, true))
-	createTestInfra.Run()
+	createTestInfra.Run(ctx)
 
 	t.Cleanup(func() {
 		err := jobs.DeleteTestInfra(subID, rg, clusterName, location).Run()
@@ -71,5 +75,5 @@ func TestE2EPerfRetina(t *testing.T) {
 
 	// Gather benchmark results then install retina and run the performance tests
 	runner := types.NewRunner(t, jobs.RunPerfTest(kubeConfigFilePath, chartPath))
-	runner.Run()
+	runner.Run(ctx)
 }
