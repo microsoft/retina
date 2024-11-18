@@ -293,9 +293,10 @@ func ValidateHubble(kubeConfigFilePath, chartPath string, testPodNamespace strin
 		job.AddScenario(dns.ValidateBasicDNSMetrics(scenario.name, scenario.req, scenario.resp, testPodNamespace))
 	}
 
-	job.AddStep(&kubernetes.EnsureStableCluster{
-		PodNamespace:  "kube-system",
-		LabelSelector: "k8s-app=retina",
+	job.AddStep(&kubernetes.EnsureStableComponent{
+		PodNamespace:           common.KubeSystemNamespace,
+		LabelSelector:          "k8s-app=retina",
+		IgnoreContainerRestart: false,
 	}, nil)
 
 	return job
