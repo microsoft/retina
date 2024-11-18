@@ -4,11 +4,8 @@ import (
 	"crypto/rand"
 	"math/big"
 	"os"
-	"os/user"
 	"path/filepath"
-	"strconv"
 	"testing"
-	"time"
 
 	"github.com/microsoft/retina/test/e2e/common"
 	"github.com/microsoft/retina/test/e2e/framework/helpers"
@@ -24,18 +21,14 @@ func TestE2EPerfRetina(t *testing.T) {
 	ctx, cancel := helpers.Context(t)
 	defer cancel()
 
-	curuser, err := user.Current()
-	require.NoError(t, err)
-
-	clusterName := curuser.Username + common.NetObsRGtag + strconv.FormatInt(time.Now().Unix(), 10)
+	clusterName := common.ClusterNameForE2ETest(t)
 
 	subID := os.Getenv("AZURE_SUBSCRIPTION_ID")
 	require.NotEmpty(t, subID, "AZURE_SUBSCRIPTION_ID environment variable must be set")
 
 	location := os.Getenv("AZURE_LOCATION")
 	if location == "" {
-		var nBig *big.Int
-		nBig, err = rand.Int(rand.Reader, big.NewInt(int64(len(common.AzureLocations))))
+		nBig, err := rand.Int(rand.Reader, big.NewInt(int64(len(common.AzureLocations))))
 		if err != nil {
 			t.Fatal("Failed to generate a secure random index", err)
 		}
