@@ -11,6 +11,7 @@ RUN tdnf install -y \
 	conntrack \
 	curl \
 	ebtables-legacy \
+	ethtool \
 	iperf3 \
 	iproute \
 	ipset \
