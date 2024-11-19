@@ -2,6 +2,10 @@
 
 Measures retransmitted TCP packets.
 
+## Capabilities
+
+The `tcpretrans` plugin requires the `CAP_SYS_ADMIN` capability.
+
 ## Architecture
 
 The plugin utilizes eBPF to gather data.

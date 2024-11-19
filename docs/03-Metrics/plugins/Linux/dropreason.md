@@ -2,6 +2,12 @@
 
 Counts number of packets/bytes dropped on a Node, along with the direction and reason for drop.
 
+## Capabilities
+
+The `dropreason` plugin requires the `CAP_SYS_ADMIN` capability.
+
+- `CAP_SYS_ADMIN` is used to increase the memory lock limits, enabling the allocation of additional memory for eBPF programs and maps - `LoadAndAssign()` method at `dropreason_linux.go:135`
+
 ## Architecture
 
 The plugin utilizes eBPF to gather data.

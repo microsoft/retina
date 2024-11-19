@@ -67,7 +67,7 @@ func (lu *linuxUtil) run(ctx context.Context) error {
 			return nil
 		case <-ticker.C:
 			opts := &NetstatOpts{
-				CuratedKeys:      false,
+				CuratedKeys:      true,
 				AddZeroVal:       false,
 				ListenSock:       false,
 				PrevTCPSockStats: lu.prevTCPSockStats,
@@ -87,7 +87,7 @@ func (lu *linuxUtil) run(ctx context.Context) error {
 			}()
 
 			ethtoolOpts := &EthtoolOpts{
-				errOrDropKeysOnly: false,
+				errOrDropKeysOnly: true,
 				addZeroVal:        false,
 				limit:             defaultLimit,
 			}

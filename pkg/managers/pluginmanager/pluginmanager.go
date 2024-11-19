@@ -102,18 +102,18 @@ func (p *PluginManager) Reconcile(ctx context.Context, plugin api.Plugin) error 
 	// Regenerate eBPF code and bpf object.
 	// This maybe no-op for plugins that don't use eBPF.
 	if err := plugin.Generate(ctx); err != nil {
-		return err
+		return errors.Wrap(err, "failed to generate plugin")
 	}
 	if err := plugin.Compile(ctx); err != nil {
-		return err
+		return errors.Wrap(err, "failed to compile plugin")
 	}
 
 	// Re-start plugin.
 	if err := plugin.Stop(); err != nil {
-		return err
+		return errors.Wrap(err, "failed to stop plugin")
 	}
 	if err := plugin.Init(); err != nil {
-		return err
+		return errors.Wrap(err, "failed to init plugin")
 	}
 
 	p.l.Info("Reconciled plugin", zap.String("name", plugin.Name()))

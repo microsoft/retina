@@ -100,8 +100,8 @@ spec:
               cpu: 500m
               memory: 500Mi
             requests:
-              cpu: 10m
-              memory: 64Mi
+              cpu: 250m
+              memory: 250Mi
       serviceAccountName: retina-operator
       terminationGracePeriodSeconds: 10
       volumes:

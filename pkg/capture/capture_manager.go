@@ -17,10 +17,12 @@ import (
 	"go.uber.org/zap"
 
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
+	"github.com/microsoft/retina/pkg/capture/file"
 	captureOutput "github.com/microsoft/retina/pkg/capture/outputlocation"
 	captureProvider "github.com/microsoft/retina/pkg/capture/provider"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/telemetry"
+	"github.com/pkg/errors"
 )
 
 // CaptureManager captures network packets and metadata into tar ball, then send the tar ball to the location(s)
@@ -40,7 +42,13 @@ func NewCaptureManager(logger *log.ZapLogger, tel telemetry.Telemetry) *CaptureM
 }
 
 func (cm *CaptureManager) CaptureNetwork(sigChan <-chan os.Signal) (string, error) {
-	tmpLocation, err := cm.networkCaptureProvider.Setup(cm.captureName(), cm.captureNodeHostName())
+	startTimestamp, err := cm.captureStartTimestamp()
+	if err != nil {
+		return "", err
+	}
+
+	filename := file.CaptureFilename{CaptureName: cm.captureName(), NodeHostname: cm.captureNodeHostName(), StartTimestamp: startTimestamp}
+	tmpLocation, err := cm.networkCaptureProvider.Setup(filename)
 	if err != nil {
 		return "", err
 	}
@@ -94,6 +102,14 @@ func (cm *CaptureManager) captureName() string {
 
 func (cm *CaptureManager) captureNodeHostName() string {
 	return os.Getenv(captureConstants.NodeHostNameEnvKey)
+}
+
+func (cm *CaptureManager) captureStartTimestamp() (*file.Timestamp, error) {
+	timestamp, err := file.StringToTimestamp((os.Getenv(captureConstants.CaptureStartTimestampEnvKey)))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse timestamp")
+	}
+	return timestamp, nil
 }
 
 func (cm *CaptureManager) captureFilter() string {

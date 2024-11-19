@@ -105,7 +105,6 @@ securityContext:
   capabilities:
     add:
       - SYS_ADMIN
-      - SYS_RESOURCE
       - NET_ADMIN # for packetparser plugin
       - IPC_LOCK # for mmap() calls made by NewReader(), ref: https://man7.org/linux/man-pages/man2/mmap.2.html
   windowsOptions:

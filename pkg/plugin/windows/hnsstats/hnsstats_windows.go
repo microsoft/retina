@@ -124,7 +124,11 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 					// h.l.Info(hnsStatsData.String())
 
 					// Get VFP port counters for matching port (MAC address of endpoint as the key)
-					portguid := kv[mac]
+					portguid, ok := kv[mac]
+					if !ok || len(portguid) == 0 {
+						h.l.Error("port is either empty of not found", zap.String(zapMACField, mac))
+						continue
+					}
 					if countersRaw, err := getVfpPortCountersRaw(portguid); len(portguid) > 0 && err == nil {
 						if vfpcounters, err := parseVfpPortCounters(countersRaw); err == nil {
 							// Attach VFP port counters
@@ -135,7 +139,7 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 							h.l.Error("Unable to parse VFP port counters", zap.String(zapPortField, portguid), zap.Error(err))
 						}
 					} else {
-						h.l.Error("Unable to find VFP port counters", zap.String(zapMACField, mac), zap.Error(err))
+						h.l.Error("Unable to find VFP port counters", zap.String(zapMACField, mac), zap.String(zapPortField, portguid), zap.Error(err))
 					}
 
 					notifyHnsStats(h, hnsStatsData)

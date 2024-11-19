@@ -125,6 +125,88 @@ stages:
               pathtoPublish: "$(Build.ArtifactStagingDirectory)"
             condition: succeeded()
 
+      - job: retinashellimages
+        displayName: Build Retina Shell Images
+        pool:
+          name: "$(BUILD_POOL_NAME_DEFAULT)"
+        strategy:
+          matrix:
+            shell-linux-arm:
+              platform: "linux"
+              arch: "arm64"
+
+            shell-linux-amd64:
+              platform: "linux"
+              arch: "amd64"
+
+        steps:
+          - checkout: self
+            fetchTags: true
+          - script: |
+              set -euo pipefail
+              echo "VERSION=$(make version)"
+              export VERSION=$(make version)
+              mkdir -p ./output/images/$(platform)/$(arch)/$(year)
+              make retina-shell-image \
+                TAG=$(make version) \
+                IMAGE_NAMESPACE=retina \
+                PLATFORM=$(platform)/$(arch) \
+                IMAGE_REGISTRY=ghcr.io/microsoft  \
+                BUILDX_ACTION="-o type=docker,dest=./output/images/$(platform)/$(arch)/retina-shell-$VERSION-$(platform)-$(arch).tar"
+            displayName: "Build Retina Shell Linux Images"
+
+          - bash: |
+              mkdir -p $(Build.ArtifactStagingDirectory)
+              cp -r output/* $(Build.ArtifactStagingDirectory)
+            displayName: "Copy binaries to the binaries artifact folder"
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              artifactName: output
+              pathtoPublish: "$(Build.ArtifactStagingDirectory)"
+            condition: succeeded()
+
+      - job: kubectlretinaimages
+        displayName: Build Kubectl Retina Images
+        pool:
+          name: "$(BUILD_POOL_NAME_DEFAULT)"
+        strategy:
+          matrix:
+            kubectl-linux-arm:
+              platform: "linux"
+              arch: "arm64"
+
+            kubectl-linux-amd64:
+              platform: "linux"
+              arch: "amd64"
+
+        steps:
+          - checkout: self
+            fetchTags: true
+          - script: |
+              set -euo pipefail
+              echo "VERSION=$(make version)"
+              export VERSION=$(make version)
+              mkdir -p ./output/images/$(platform)/$(arch)/$(year)
+              make kubectl-retina-image \
+                TAG=$(make version) \
+                IMAGE_NAMESPACE=retina \
+                PLATFORM=$(platform)/$(arch) \
+                IMAGE_REGISTRY=ghcr.io/microsoft  \
+                BUILDX_ACTION="-o type=docker,dest=./output/images/$(platform)/$(arch)/kubectl-retina-$VERSION-$(platform)-$(arch).tar"
+            displayName: "Build Kubectl Retina Linux Images"
+
+          - bash: |
+              mkdir -p $(Build.ArtifactStagingDirectory)
+              cp -r output/* $(Build.ArtifactStagingDirectory)
+            displayName: "Copy binaries to the binaries artifact folder"
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              artifactName: output
+              pathtoPublish: "$(Build.ArtifactStagingDirectory)"
+            condition: succeeded()
+
       - job: windowsnative
         displayName: Build Retina Windows Images (native)
         pool:

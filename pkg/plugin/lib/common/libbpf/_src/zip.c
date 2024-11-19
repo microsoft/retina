@@ -1,3 +1,5 @@
+//go:build ignore
+
 // SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
 /*
  * Routines for dealing with .zip archives.

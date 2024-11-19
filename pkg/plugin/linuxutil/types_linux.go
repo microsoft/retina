@@ -35,6 +35,9 @@ var netstatCuratedKeys = map[string]struct{}{
 	"DataCsumErr":        {},
 	"AddAddrDrop":        {},
 	"RmAddrDrop":         {},
+	"TCPTimeouts": 	      {},
+	"TCPLossProbes":      {},
+	"TCPLostRetransmit":  {},
 }
 
 type ConnectionStats struct {

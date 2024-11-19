@@ -42,4 +42,4 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          go test -v ./test/e2e/*.go -timeout 30m -tags=e2e -count=1  -args -image-tag=$(make version) -image-registry=${{vars.ACR_NAME}} -image-namespace=${{github.repository}}
+          go test -v ./test/e2e/. -timeout 60m -tags=e2e -count=1  -args -image-tag=$(make version) -image-registry=${{vars.ACR_NAME}} -image-namespace=${{github.repository}}

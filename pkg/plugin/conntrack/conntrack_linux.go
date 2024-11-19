@@ -120,6 +120,7 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 					zap.String("flags_seen_rx_dir", decodeFlags(value.FlagsSeenRxDir)),
 					zap.Uint32("last_reported_tx_dir", value.LastReportTxDir),
 					zap.Uint32("last_reported_rx_dir", value.LastReportRxDir),
+					zap.Bool("is_direction_unknown", value.IsDirectionUnknown),
 				)
 			}
 			if err := iter.Err(); err != nil {
@@ -128,7 +129,8 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			// Delete the conntrack entries
 			for _, key := range keysToDelete {
 				if err := ct.ctMap.Delete(key); err != nil {
-					ct.l.Error("Delete failed", zap.Error(err))
+					// Should only happen in a high connection churn scenario
+					ct.l.Debug("Delete failed", zap.Error(err))
 				} else {
 					entriesDeleted++
 				}

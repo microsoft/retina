@@ -17,14 +17,16 @@ import (
 	"go.uber.org/zap"
 
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
+	"github.com/microsoft/retina/pkg/capture/file"
 	"github.com/microsoft/retina/pkg/log"
 )
 
 type NetworkCaptureProvider struct {
 	NetworkCaptureProviderCommon
-	TmpCaptureDir string
-	CaptureName   string
-	NodeHostName  string
+	TmpCaptureDir  string
+	CaptureName    string
+	NodeHostName   string
+	StartTimestamp *file.Timestamp
 
 	l *log.ZapLogger
 }
@@ -38,22 +40,23 @@ func NewNetworkCaptureProvider(logger *log.ZapLogger) NetworkCaptureProviderInte
 	}
 }
 
-func (ncp *NetworkCaptureProvider) Setup(captureName, nodeHostname string) (string, error) {
-	captureFolderDir, err := ncp.NetworkCaptureProviderCommon.Setup(captureName, nodeHostname)
+func (ncp *NetworkCaptureProvider) Setup(filename file.CaptureFilename) (string, error) {
+	captureFolderDir, err := ncp.NetworkCaptureProviderCommon.Setup(filename)
 	if err != nil {
 		return "", err
 	}
 	ncp.l.Info("Created temporary folder for network capture", zap.String("capture temporary folder", captureFolderDir))
 
 	ncp.TmpCaptureDir = captureFolderDir
-	ncp.CaptureName = captureName
-	ncp.NodeHostName = nodeHostname
+	ncp.CaptureName = filename.CaptureName
+	ncp.NodeHostName = filename.NodeHostname
+	ncp.StartTimestamp = filename.StartTimestamp
 	return ncp.TmpCaptureDir, nil
 }
 
 func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(filter string, duration, maxSizeMB int, sigChan <-chan os.Signal) error {
-	captureFileName := ncp.NetworkCaptureProviderCommon.CaptureNodetimestampName(ncp.CaptureName, ncp.NodeHostName)
-	captureFileName = fmt.Sprintf("%s.pcap", captureFileName)
+	filename := file.CaptureFilename{CaptureName: ncp.CaptureName, NodeHostname: ncp.NodeHostName, StartTimestamp: ncp.StartTimestamp}
+	captureFileName := fmt.Sprintf("%s.pcap", filename)
 	captureFilePath := filepath.Join(ncp.TmpCaptureDir, captureFileName)
 
 	// Remove the folder in case it already exists to mislead the file size check.

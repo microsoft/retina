@@ -2,6 +2,10 @@
 
 Gathers Nvidia Infiniband port counters and debug status parameters from /sys/class/infiniband and /sys/class/net (respectively).
 
+## Capabilities
+
+The `infiniband` plugin requires the `CAP_BPF` capability.
+
 ## Architecture
 
 The plugin uses the following data sources:

@@ -21,6 +21,7 @@ import (
 
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
+	"github.com/microsoft/retina/pkg/capture/file"
 	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/label"
@@ -383,6 +384,10 @@ func (translator *CaptureToPodTranslator) renderJob(captureTargetOnNode *Capture
 		return nil, fmt.Errorf("no nodes are selected")
 	}
 
+	captureStartTimestamp := file.Now()
+
+	printOutputFileNames(captureTargetOnNode, envCommon, &captureStartTimestamp)
+
 	jobs := make([]*batchv1.Job, 0, len(*captureTargetOnNode))
 	for nodeName, target := range *captureTargetOnNode {
 		jobEnv := make(map[string]string, len(envCommon))
@@ -449,11 +454,30 @@ func (translator *CaptureToPodTranslator) renderJob(captureTargetOnNode *Capture
 			job.Spec.Template.Spec.Containers[0].Env = append(job.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{Name: k, Value: v})
 		}
 		job.Spec.Template.Spec.Containers[0].Env = append(job.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{Name: captureConstants.NodeHostNameEnvKey, Value: nodeName})
+		job.Spec.Template.Spec.Containers[0].Env = append(job.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{Name: captureConstants.CaptureStartTimestampEnvKey, Value: captureStartTimestamp.String()})
 
 		jobs = append(jobs, job)
 	}
 
 	return jobs, nil
+}
+
+func printOutputFileNames(captureTargetOnNode *CaptureTargetsOnNode, envCommon map[string]string, timestamp *file.Timestamp) {
+	captureFileNames := []string{}
+	for k := range *captureTargetOnNode {
+		capture := file.CaptureFilename{CaptureName: envCommon[captureConstants.CaptureNameEnvKey], NodeHostname: k, StartTimestamp: timestamp}
+		captureFileNames = append(captureFileNames, capture.String())
+	}
+	fmt.Println("#########################")
+	fmt.Println("Expected Capture Files")
+	fmt.Println("#########################")
+
+	for _, v := range captureFileNames {
+		fmt.Printf("%s.tar.gz\n", v)
+	}
+
+	fmt.Println("\nNote: The file(s) may not be created if the capture job(s) fail prematurely.")
+	fmt.Println("#########################")
 }
 
 func updateTcpdumpFilterWithPodIPAddress(podIPAddresses []string, tcpdumpFilter string) string {

@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
+	"github.com/microsoft/retina/pkg/capture/file"
 	"github.com/microsoft/retina/pkg/capture/provider"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/telemetry"
@@ -27,6 +28,7 @@ func TestCaptureNetwork(t *testing.T) {
 		tel:                    telemetry.NewNoopTelemetry(),
 	}
 
+	timestamp := file.Now()
 	captureName := "capture-name"
 	nodeHostName := "node-host-name"
 	filter := "-i any"
@@ -34,6 +36,7 @@ func TestCaptureNetwork(t *testing.T) {
 	maxSize := 100
 	os.Setenv(captureConstants.CaptureNameEnvKey, captureName)
 	os.Setenv(captureConstants.NodeHostNameEnvKey, nodeHostName)
+	os.Setenv(captureConstants.CaptureStartTimestampEnvKey, timestamp.String())
 	os.Setenv(captureConstants.TcpdumpFilterEnvKey, filter)
 	os.Setenv(captureConstants.CaptureDurationEnvKey, "10s")
 	os.Setenv(captureConstants.CaptureMaxSizeEnvKey, strconv.Itoa(maxSize))
@@ -41,6 +44,7 @@ func TestCaptureNetwork(t *testing.T) {
 	defer func() {
 		os.Unsetenv(captureConstants.CaptureNameEnvKey)
 		os.Unsetenv(captureConstants.NodeHostNameEnvKey)
+		os.Unsetenv(captureConstants.CaptureStartTimestampEnvKey)
 		os.Unsetenv(captureConstants.TcpdumpFilterEnvKey)
 		os.Unsetenv(captureConstants.CaptureDurationEnvKey)
 		os.Unsetenv(captureConstants.CaptureMaxSizeEnvKey)
@@ -48,7 +52,8 @@ func TestCaptureNetwork(t *testing.T) {
 
 	sigChanel := make(chan os.Signal, 1)
 
-	networkCaptureProvider.EXPECT().Setup(captureName, nodeHostName).Return(fmt.Sprintf("%s-%s", captureName, nodeHostName), nil).Times(1)
+	tmpFilename := file.CaptureFilename{CaptureName: captureName, NodeHostname: nodeHostName, StartTimestamp: &timestamp}
+	networkCaptureProvider.EXPECT().Setup(tmpFilename).Return(fmt.Sprintf("%s-%s-%s", captureName, nodeHostName, &timestamp), nil).Times(1)
 	networkCaptureProvider.EXPECT().CaptureNetworkPacket(filter, duration, maxSize, sigChanel).Return(nil).Times(1)
 
 	_, err := cm.CaptureNetwork(sigChanel)
