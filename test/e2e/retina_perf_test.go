@@ -1,4 +1,4 @@
-//go:build scale
+//go:build perf
 
 package retina
 
@@ -16,14 +16,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestE2ERetina_Scale(t *testing.T) {
+// This test creates a new k8s cluster runs some network performance tests
+// saves the data as benchmark information and then installs retina and runs the performance tests
+// to compare the results and publishes a json with regression information.
+func TestE2EPerfRetina(t *testing.T) {
 	ctx, cancel := helpers.Context(t)
 	defer cancel()
 
 	clusterName := common.ClusterNameForE2ETest(t)
 
 	subID := os.Getenv("AZURE_SUBSCRIPTION_ID")
-	require.NotEmpty(t, subID)
+	require.NotEmpty(t, subID, "AZURE_SUBSCRIPTION_ID environment variable must be set")
 
 	location := os.Getenv("AZURE_LOCATION")
 	if location == "" {
@@ -43,6 +46,11 @@ func TestE2ERetina_Scale(t *testing.T) {
 	cwd, err := os.Getwd()
 	require.NoError(t, err)
 
+	appInsightsKey := os.Getenv("AZURE_APP_INSIGHTS_KEY")
+	if appInsightsKey == "" {
+		t.Log("No app insights key provided, results will be saved locally at ./ as `netperf-benchmark-*`, `netperf-result-*`, and `netperf-regression-*`")
+	}
+
 	// Get to root of the repo by going up two directories
 	rootDir := filepath.Dir(filepath.Dir(cwd))
 
@@ -50,25 +58,17 @@ func TestE2ERetina_Scale(t *testing.T) {
 	kubeConfigFilePath := filepath.Join(rootDir, "test", "e2e", "test.pem")
 
 	// CreateTestInfra
-	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath, *createInfra))
+	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath, true))
 	createTestInfra.Run(ctx)
 
 	t.Cleanup(func() {
-		if *deleteInfra {
-			_ = jobs.DeleteTestInfra(subID, rg, clusterName, location).Run()
+		err := jobs.DeleteTestInfra(subID, rg, clusterName, location).Run()
+		if err != nil {
+			t.Logf("Failed to delete test infrastructure: %v", err)
 		}
 	})
 
-	// Install Retina
-	installRetina := types.NewRunner(t, jobs.InstallRetina(kubeConfigFilePath, chartPath))
-	installRetina.Run(ctx)
-
-	// Scale test
-	opt := jobs.DefaultScaleTestOptions()
-	opt.KubeconfigPath = kubeConfigFilePath
-	opt.RealPodType = "kapinger"
-	opt.DeleteLabels = true
-
-	scale := types.NewRunner(t, jobs.ScaleTest(&opt))
-	scale.Run(ctx)
+	// Gather benchmark results then install retina and run the performance tests
+	runner := types.NewRunner(t, jobs.RunPerfTest(kubeConfigFilePath, chartPath))
+	runner.Run(ctx)
 }

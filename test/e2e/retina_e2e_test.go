@@ -1,3 +1,5 @@
+//go:build e2e
+
 package retina
 
 import (
@@ -5,11 +7,8 @@ import (
 	"flag"
 	"math/big"
 	"os"
-	"os/user"
 	"path/filepath"
-	"strconv"
 	"testing"
-	"time"
 
 	"github.com/microsoft/retina/test/e2e/common"
 	"github.com/microsoft/retina/test/e2e/framework/helpers"
@@ -19,7 +18,6 @@ import (
 )
 
 var (
-	locations   = []string{"eastus2", "centralus", "southcentralus", "uksouth", "centralindia", "westus2"}
 	createInfra = flag.Bool("create-infra", true, "create a Resource group, vNET and AKS cluster for testing")
 	deleteInfra = flag.Bool("delete-infra", true, "delete a Resource group, vNET and AKS cluster for testing")
 )
@@ -29,33 +27,21 @@ func TestE2ERetina(t *testing.T) {
 	ctx, cancel := helpers.Context(t)
 	defer cancel()
 
-	curuser, err := user.Current()
-	require.NoError(t, err)
 	flag.Parse()
 
-	clusterName := os.Getenv("CLUSTER_NAME")
-	if clusterName == "" {
-		username := curuser.Username
-		// Truncate the username to 8 characters
-		if len(username) > 8 {
-			username = username[:8]
-			t.Logf("Username is too long, truncating to 8 characters: %s", username)
-		}
-		clusterName = username + common.NetObsRGtag + strconv.FormatInt(time.Now().Unix(), 10)
-		t.Logf("CLUSTER_NAME is not set, generating a random cluster name: %s", clusterName)
-	}
+	// Truncate the username to 8 characters
+	clusterName := common.ClusterNameForE2ETest(t)
 
 	subID := os.Getenv("AZURE_SUBSCRIPTION_ID")
 	require.NotEmpty(t, subID)
 
 	location := os.Getenv("AZURE_LOCATION")
 	if location == "" {
-		var nBig *big.Int
-		nBig, err = rand.Int(rand.Reader, big.NewInt(int64(len(locations))))
+		nBig, err := rand.Int(rand.Reader, big.NewInt(int64(len(common.AzureLocations))))
 		if err != nil {
 			t.Fatalf("Failed to generate a secure random index: %v", err)
 		}
-		location = locations[nBig.Int64()]
+		location = common.AzureLocations[nBig.Int64()]
 	}
 
 	rg := os.Getenv("AZURE_RESOURCE_GROUP")
