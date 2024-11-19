@@ -1,10 +1,9 @@
-//go:build e2e
+//go:build perf
 
 package retina
 
 import (
 	"crypto/rand"
-	"flag"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -17,29 +16,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	createInfra = flag.Bool("create-infra", true, "create a Resource group, vNET and AKS cluster for testing")
-	deleteInfra = flag.Bool("delete-infra", true, "delete a Resource group, vNET and AKS cluster for testing")
-)
-
-// TestE2ERetina tests all e2e scenarios for retina
-func TestE2ERetina(t *testing.T) {
+// This test creates a new k8s cluster runs some network performance tests
+// saves the data as benchmark information and then installs retina and runs the performance tests
+// to compare the results and publishes a json with regression information.
+func TestE2EPerfRetina(t *testing.T) {
 	ctx, cancel := helpers.Context(t)
 	defer cancel()
 
-	flag.Parse()
-
-	// Truncate the username to 8 characters
 	clusterName := common.ClusterNameForE2ETest(t)
 
 	subID := os.Getenv("AZURE_SUBSCRIPTION_ID")
-	require.NotEmpty(t, subID)
+	require.NotEmpty(t, subID, "AZURE_SUBSCRIPTION_ID environment variable must be set")
 
 	location := os.Getenv("AZURE_LOCATION")
 	if location == "" {
 		nBig, err := rand.Int(rand.Reader, big.NewInt(int64(len(common.AzureLocations))))
 		if err != nil {
-			t.Fatalf("Failed to generate a secure random index: %v", err)
+			t.Fatal("Failed to generate a secure random index", err)
 		}
 		location = common.AzureLocations[nBig.Int64()]
 	}
@@ -53,28 +46,29 @@ func TestE2ERetina(t *testing.T) {
 	cwd, err := os.Getwd()
 	require.NoError(t, err)
 
+	appInsightsKey := os.Getenv("AZURE_APP_INSIGHTS_KEY")
+	if appInsightsKey == "" {
+		t.Log("No app insights key provided, results will be saved locally at ./ as `netperf-benchmark-*`, `netperf-result-*`, and `netperf-regression-*`")
+	}
+
 	// Get to root of the repo by going up two directories
 	rootDir := filepath.Dir(filepath.Dir(cwd))
 
 	chartPath := filepath.Join(rootDir, "deploy", "legacy", "manifests", "controller", "helm", "retina")
-	profilePath := filepath.Join(rootDir, "test", "profiles", "advanced", "values.yaml")
 	kubeConfigFilePath := filepath.Join(rootDir, "test", "e2e", "test.pem")
 
 	// CreateTestInfra
-	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath, *createInfra))
+	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath, true))
 	createTestInfra.Run(ctx)
 
 	t.Cleanup(func() {
-		if *deleteInfra {
-			_ = jobs.DeleteTestInfra(subID, rg, clusterName, location).Run()
+		err := jobs.DeleteTestInfra(subID, rg, clusterName, location).Run()
+		if err != nil {
+			t.Logf("Failed to delete test infrastructure: %v", err)
 		}
 	})
 
-	// Install and test Retina basic metrics
-	basicMetricsE2E := types.NewRunner(t, jobs.InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath, common.TestPodNamespace))
-	basicMetricsE2E.Run(ctx)
-
-	// Upgrade and test Retina with advanced metrics
-	advanceMetricsE2E := types.NewRunner(t, jobs.UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, profilePath, common.TestPodNamespace))
-	advanceMetricsE2E.Run(ctx)
+	// Gather benchmark results then install retina and run the performance tests
+	runner := types.NewRunner(t, jobs.RunPerfTest(kubeConfigFilePath, chartPath))
+	runner.Run(ctx)
 }
