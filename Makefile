@@ -53,6 +53,11 @@ CERT_FILES := tls.crt:tls-client-cert-file \
               tls.key:tls-client-key-file \
               ca.crt:tls-ca-cert-files
 
+##################
+# Dynamic Export #
+##################
+ENABLE_DYNAMIC_EXPORT ?= false
+
 # TAG is OS and platform agonstic, which can be used for binary version and image manifest tag,
 # while RETINA_PLATFORM_TAG is platform specific, which can be used for image built for specific platforms.
 RETINA_PLATFORM_TAG        ?= $(TAG)-$(subst /,-,$(PLATFORM))
@@ -518,6 +523,7 @@ helm-install-hubble:
 		--set agent.init.repository=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE) \
 		--set agent.init.tag=$(HELM_IMAGE_TAG) \
 		--set logLevel=info \
+		--set hubble.export.dynamic.enabled=$(ENABLE_DYNAMIC_EXPORT) \
 		--set hubble.tls.enabled=$(ENABLE_TLS) \
 		--set hubble.relay.tls.server.enabled=$(ENABLE_TLS) \
 		--set hubble.tls.auto.enabled=$(ENABLE_TLS) \
@@ -578,6 +584,7 @@ quick-deploy:
 quick-deploy-hubble:
 	$(MAKE) helm-uninstall || true
 	$(MAKE) helm-install-without-tls HELM_IMAGE_TAG=$(TAG)-linux-amd64
+# $(MAKE) helm-install-without-tls HELM_IMAGE_TAG=$(TAG)-linux-amd64 ENABLE_DYNAMIC_EXPORT=true
 
 
 .PHONY: simplify-dashboards

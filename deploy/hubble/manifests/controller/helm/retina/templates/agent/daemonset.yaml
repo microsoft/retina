@@ -112,6 +112,11 @@ spec:
               mountPath: /var/lib/cilium/tls/hubble
               readOnly: true
           {{- end }}
+          {{- if .Values.hubble.export.dynamic.enabled }}
+            - name: hubble-flowlog-config
+              mountPath: /flowlog-config
+              readOnly: true
+          {{- end }}
         {{- end }}
       terminationGracePeriodSeconds: 90 # Allow for retina to cleanup plugin resources.
       volumes:
@@ -141,6 +146,12 @@ spec:
                     path: server.key
                   - key: ca.crt
                     path: client-ca.crt
+      {{- end }}
+      {{- if .Values.hubble.export.dynamic.enabled }}
+      - name: hubble-flowlog-config
+        configMap:
+          name: {{ .Values.hubble.export.dynamic.config.configMapName }}
+          optional: true
       {{- end }}
 {{- end }}
 ---

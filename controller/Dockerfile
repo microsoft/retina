@@ -116,8 +116,8 @@ ENTRYPOINT ["./retina/initretina"]
 
 
 # agent final image
-# mcr.microsoft.com/cbl-mariner/distroless/minimal:2.0
-# mcr.microsoft.com/cbl-mariner/distroless/minimal@sha256:63a0a70ceaa1320bc6eb98b81106667d43e46b674731ea8d28e4de1b87e0747f
+# For debug: mcr.microsoft.com/cbl-mariner/distroless/debug:2.0
+# k exec -it ds/retina-agent -- busybox tail -f /var/run/retina/hubble/events.log
 FROM mariner-distroless AS agent
 COPY --from=tools /lib/ /lib
 COPY --from=tools /usr/lib/ /usr/lib

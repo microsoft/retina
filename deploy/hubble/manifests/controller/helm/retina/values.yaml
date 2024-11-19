@@ -821,10 +821,10 @@ hubble:
     # --- Dynamic exporters configuration.
     # Dynamic exporters may be reconfigured without a need of agent restarts.
     dynamic:
-      enabled: false
+      enabled: true
       config:
         # ---- Name of configmap with configuration that may be altered to reconfigure exporters within a running agents.
-        configMapName: cilium-flowlog-config
+        configMapName: retina-flowlog-config
         # ---- True if helm installer should create config map.
         # Switch to false if you want to self maintain the file content.
         createConfigMap: true
@@ -834,7 +834,7 @@ hubble:
             fieldMask: []
             includeFilters: []
             excludeFilters: []
-            filePath: "/var/run/cilium/hubble/events.log"
+            filePath: "/var/run/retina/hubble/events.log"
         #- name: "test002"
         #  filePath: "/var/log/network/flow-log/pa/test002.log"
         #  fieldMask: ["source.namespace", "source.pod_name", "destination.namespace", "destination.pod_name", "verdict"]

@@ -26,6 +26,7 @@ import (
 	"github.com/pkg/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/cilium/cilium/pkg/hubble/exporter"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/zap"
 )
@@ -113,6 +114,18 @@ func (rh *RetinaHubble) start(ctx context.Context) error {
 			return false, nil
 		}),
 	)
+
+	// Start the dynamic exporter if the config file path is provided.
+	if option.Config.HubbleFlowlogsConfigFilePath != "" {
+		dynamicHubbleExporter := exporter.NewDynamicExporter(
+			rh.log,
+			option.Config.HubbleFlowlogsConfigFilePath,
+			option.Config.HubbleExportFileMaxSizeMB,
+			option.Config.HubbleExportFileMaxBackups)
+		opt := observeroption.WithOnDecodedEvent(dynamicHubbleExporter)
+		observerOpts = append(observerOpts, opt)
+		rh.log.Info("Started dynamic exporter", zap.String("configFilePath", option.Config.HubbleFlowlogsConfigFilePath))
+	}
 
 	// TODO: Replace with our custom parser.
 	payloadParser := parser.New(rh.log, rh.ipc)
