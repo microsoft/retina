@@ -90,11 +90,11 @@ func TestE2ERetina_Scale(t *testing.T) {
 	opt.LabelsToGetMetrics = map[string]string{"k8s-app": "retina"}
 
 	// CreateTestInfra
-	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath, *createInfra))
+	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath, *common.CreateInfra))
 	createTestInfra.Run(ctx)
 
 	t.Cleanup(func() {
-		if *deleteInfra {
+		if *common.DeleteInfra {
 			_ = jobs.DeleteTestInfra(subID, rg, clusterName, location).Run()
 		}
 	})

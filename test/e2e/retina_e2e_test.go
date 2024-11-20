@@ -4,7 +4,6 @@ package retina
 
 import (
 	"crypto/rand"
-	"flag"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -21,8 +20,6 @@ import (
 func TestE2ERetina(t *testing.T) {
 	ctx, cancel := helpers.Context(t)
 	defer cancel()
-
-	flag.Parse()
 
 	// Truncate the username to 8 characters
 	clusterName := common.ClusterNameForE2ETest(t)
@@ -57,11 +54,11 @@ func TestE2ERetina(t *testing.T) {
 	kubeConfigFilePath := filepath.Join(rootDir, "test", "e2e", "test.pem")
 
 	// CreateTestInfra
-	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath, *createInfra))
+	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath, *common.CreateInfra))
 	createTestInfra.Run(ctx)
 
 	t.Cleanup(func() {
-		if *deleteInfra {
+		if *common.DeleteInfra {
 			_ = jobs.DeleteTestInfra(subID, rg, clusterName, location).Run()
 		}
 	})

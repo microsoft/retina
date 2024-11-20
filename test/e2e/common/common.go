@@ -5,6 +5,7 @@
 package common
 
 import (
+	"flag"
 	"os"
 	"os/user"
 	"strconv"
@@ -22,7 +23,11 @@ const (
 	TestPodNamespace    = "kube-system-test"
 )
 
-var AzureLocations = []string{"eastus2", "northeurope", "uksouth", "centralindia", "westus2"}
+var (
+	AzureLocations = []string{"eastus2", "northeurope", "uksouth", "centralindia", "westus2"}
+	CreateInfra    = flag.Bool("create-infra", true, "create a Resource group, vNET and AKS cluster for testing")
+	DeleteInfra    = flag.Bool("delete-infra", true, "delete a Resource group, vNET and AKS cluster for testing")
+)
 
 func ClusterNameForE2ETest(t *testing.T) string {
 	clusterName := os.Getenv("CLUSTER_NAME")
