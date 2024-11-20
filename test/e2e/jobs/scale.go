@@ -1,6 +1,7 @@
 package retina
 
 import (
+	"os"
 	"time"
 
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
@@ -37,6 +38,8 @@ func DefaultScaleTestOptions() scaletest.Options {
 		DeleteNetworkPolicies:         false,
 		DeleteNetworkPoliciesInterval: 60 * time.Second,
 		DeleteNetworkPoliciesTimes:    1,
+		LabelsToGetMetrics:            map[string]string{},
+		AdditionalTelemetryProperty:   map[string]string{},
 	}
 }
 
@@ -59,6 +62,15 @@ func ScaleTest(opt *scaletest.Options) *types.Job {
 	}, nil)
 
 	job.AddStep(&kubernetes.CreateNamespace{}, nil)
+
+	job.AddStep(&scaletest.GetAndPublishMetrics{
+		Labels:                      opt.LabelsToGetMetrics,
+		AdditionalTelemetryProperty: opt.AdditionalTelemetryProperty,
+		OutputFilePath:                  os.Getenv("OUTPUT_FILEPATH"),
+	}, &types.StepOptions{
+		SkipSavingParametersToJob: true,
+		RunInBackgroundWithID:     "get-metrics",
+	})
 
 	job.AddStep(&scaletest.CreateResources{
 		NumKwokDeployments:           opt.NumKwokDeployments,
@@ -95,15 +107,11 @@ func ScaleTest(opt *scaletest.Options) *types.Job {
 		NumSharedLabelsPerPod: opt.NumSharedLabelsPerPod,
 	}, nil)
 
-	// job.AddStep(&kubernetes.DeleteNamespace{}, nil)
+	job.AddStep(&types.Stop{
+		BackgroundID: "get-metrics",
+	}, nil)
 
-	// TODO: Add steps to get the state of the cluster
-
-	// job.AddStep(&kubernetes.GetDeployment{})
-
-	// job.AddStep(&kubernetes.GetDaemonSet{})
-
-	// job.AddStep(&kubernetes.DescribePods{})
+	job.AddStep(&kubernetes.DeleteNamespace{}, nil)
 
 	return job
 }

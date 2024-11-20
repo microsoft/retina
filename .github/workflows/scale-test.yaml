@@ -99,7 +99,7 @@ jobs:
           IMAGE_REGISTRY: ${{  inputs.image_namespace == '' && vars.ACR_NAME || inputs.image_namespace }}
           IMAGE_NAMESPACE: ${{ github.repository }}
           TAG: ${{ inputs.image_tag }}
-          APP_INSIGHTS_KEY: ${{ secrets.APP_INSIGHTS_KEY }}
+          AZURE_APP_INSIGHTS_KEY: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
         shell: bash
         run: |
           set -euo pipefail
