@@ -17,6 +17,7 @@ RUN tdnf install -y \
 	ipset \
 	iptables \
 	iputils \
+	perftest \
 	jq \
 	ldns-utils \
 	net-tools \
