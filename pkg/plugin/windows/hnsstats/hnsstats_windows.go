@@ -13,11 +13,18 @@ import (
 	"github.com/Microsoft/hcsshim/hcn"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	kcfg "github.com/microsoft/retina/pkg/config"
+	"github.com/microsoft/retina/pkg/enricher"
+	"github.com/microsoft/retina/pkg/exporter"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/api"
 	"github.com/microsoft/retina/pkg/utils"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
+)
+
+var (
+	AdvWindowsGauge *prometheus.GaugeVec
 )
 
 const (
@@ -73,6 +80,11 @@ func (h *hnsstats) Init() error {
 		return err
 	}
 	h.endpointQuery.Filter = string(filter)
+
+	if h.cfg.EnablePodLevel {
+		h.l.Info("Creating advanced HNS stats metrics")
+		initializeAdvMetrics()
+	}
 
 	h.l.Info("Exiting hnsstats Init...")
 	return nil
@@ -133,6 +145,7 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 						if vfpcounters, err := parseVfpPortCounters(countersRaw); err == nil {
 							// Attach VFP port counters
 							hnsStatsData.vfpCounters = vfpcounters
+							hnsStatsData.Port = portguid
 							h.l.Debug("Attached VFP port counters", zap.String(zapPortField, portguid))
 							// h.l.Info(vfpcounters.String())
 						} else {
@@ -143,6 +156,7 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 					}
 
 					notifyHnsStats(h, hnsStatsData)
+					getAdvancedMetricLabels(h, hnsStatsData)
 				}
 			}
 		}
@@ -197,6 +211,21 @@ func notifyHnsStats(h *hnsstats, stats *HnsStatsData) {
 	metrics.TCPFlagGauge.WithLabelValues(egressLabel, utils.RST).Set(float64(stats.vfpCounters.Out.TcpCounters.PacketCounters.RstPacketCount))
 }
 
+func getAdvancedMetricLabels(h *hnsstats, stats *HnsStatsData) {
+	if AdvWindowsGauge == nil {
+		h.l.Warn("Advanced windows metric is not initialized")
+		return
+	}
+	// if port is populated, vfp data exists
+	labels := enricher.Instance().GetWindowLabels(stats.IPAddress)
+
+	if labels != nil {
+		AdvWindowsGauge.WithLabelValues(PacketsReceived, stats.IPAddress, stats.Port, labels.Namespace, labels.PodName, labels.Workloads.Kind, labels.Workloads.Name).Set(float64(stats.hnscounters.PacketsReceived))
+		AdvWindowsGauge.WithLabelValues(PacketsSent, stats.IPAddress, stats.Port, labels.Namespace, labels.PodName, labels.Workloads.Kind, labels.Workloads.Name).Set(float64(stats.hnscounters.PacketsSent))
+		h.l.Info("updating advanced HNS stats metric", zap.String(PodName, labels.PodName), zap.String(Namespace, labels.Namespace))
+	}
+}
+
 func (h *hnsstats) Start(ctx context.Context) error {
 	h.l.Info("Start hnsstats plugin...")
 	h.state = start
@@ -222,4 +251,26 @@ func New(cfg *kcfg.Config) api.Plugin {
 		cfg: cfg,
 		l:   log.Logger().Named(string(Name)),
 	}
+}
+
+func cleanAdvMetrics() {
+	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(AdvWindowsGauge))
+}
+
+func initializeAdvMetrics() {
+	if AdvWindowsGauge != nil {
+		cleanAdvMetrics()
+	}
+	AdvWindowsGauge = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.AdvancedRegistry,
+		AdvHNSStatsName,
+		AdvHNSStatsDescription,
+		utils.Direction,
+		Ip,
+		Port,
+		Namespace,
+		PodName,
+		WorkloadKind,
+		WorkloadName,
+	)
 }
