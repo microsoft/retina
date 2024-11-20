@@ -15,14 +15,14 @@ func DefaultScaleTestOptions() scaletest.Options {
 		NumKwokDeployments:            0,
 		NumKwokReplicas:               0,
 		MaxRealPodsPerNode:            100,
-		NumRealDeployments:            3,
-		RealPodType:                   "agnhost",
-		NumRealReplicas:               2,
-		NumRealServices:               1,
+		NumRealDeployments:            1000,
+		RealPodType:                   "kapinger",
+		NumRealReplicas:               40,
+		NumRealServices:               1000,
 		NumNetworkPolicies:            10,
 		NumUnapliedNetworkPolicies:    10,
-		NumUniqueLabelsPerPod:         2,
-		NumUniqueLabelsPerDeployment:  2,
+		NumUniqueLabelsPerPod:         0,
+		NumUniqueLabelsPerDeployment:  1,
 		NumSharedLabelsPerPod:         3,
 		KubeconfigPath:                "",
 		RestartNpmPods:                false,
@@ -94,6 +94,8 @@ func ScaleTest(opt *scaletest.Options) *types.Job {
 		DeleteLabelsTimes:     opt.DeleteLabelsTimes,
 		NumSharedLabelsPerPod: opt.NumSharedLabelsPerPod,
 	}, nil)
+
+	// job.AddStep(&kubernetes.DeleteNamespace{}, nil)
 
 	// TODO: Add steps to get the state of the cluster
 

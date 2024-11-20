@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/microsoft/retina/test/e2e/common"
@@ -63,11 +64,36 @@ func TestE2ERetina_Scale(t *testing.T) {
 	installRetina := types.NewRunner(t, jobs.InstallRetina(kubeConfigFilePath, chartPath))
 	installRetina.Run(ctx)
 
+	t.Cleanup(func() {
+		_ = jobs.UninstallRetina(kubeConfigFilePath, chartPath).Run()
+	})
+
 	// Scale test
 	opt := jobs.DefaultScaleTestOptions()
 	opt.KubeconfigPath = kubeConfigFilePath
-	opt.RealPodType = "kapinger"
-	opt.DeleteLabels = true
+
+	NumDeployments := os.Getenv("NUM_DEPLOYMENTS")
+	NumReplicas := os.Getenv("NUM_REPLICAS")
+	NumNetworkPolicies := os.Getenv("NUM_NET_POL")
+	CleanUp := os.Getenv("CLEANUP")
+
+	if NumDeployments != "" {
+		opt.NumRealDeployments, err = strconv.Atoi(NumDeployments)
+		opt.NumRealServices = opt.NumRealDeployments
+		require.NoError(t, err)
+	}
+	if NumReplicas != "" {
+		opt.NumRealReplicas, err = strconv.Atoi(NumReplicas)
+		require.NoError(t, err)
+	}
+	if NumNetworkPolicies != "" {
+		opt.NumNetworkPolicies, err = strconv.Atoi(NumNetworkPolicies)
+		require.NoError(t, err)
+	}
+	if CleanUp != "" {
+		opt.DeleteLabels, err = strconv.ParseBool(CleanUp)
+		require.NoError(t, err)
+	}
 
 	scale := types.NewRunner(t, jobs.ScaleTest(&opt))
 	scale.Run(ctx)

@@ -8,13 +8,15 @@ on:
         required: true
         type: string
       cluster_name:
-        description: "AKS Cluster Name"
+        description: "AKS Cluster Name (nodes to receive traffic pods should be labeled with scale-test=true)"
         required: true
         type: string
-      location:
-        description: "Azure Location"
+      image_namespace:
+        description: "Image Namespace (if not set, default namespace will be used)"
         type: string
-        default: ${{ vars.AZURE_LOCATION }}
+      image_tag:
+        description: "Image Tag (if not set, default for this commit will be used)"
+        type: string
       num_deployments:
         description: "Number of Traffic Deployments"
         default: 1000
@@ -27,20 +29,8 @@ on:
         description: "Number of Network Policies"
         default: 1000
         type: number
-      num_unique_labels_per_pod: 
-        description: "Number of Unique Labels per Pod"
-        default: 2
-        type: number
-      num_unique_labels_per_deployment:
-        description: "Number of Unique Labels per Deployment"
-        default: 2
-        type: number
-      num_shared_labels_per_pod:
-        description: "Number of Shared Labels per Pod"
-        default: 3
-        type: number
-      delete_labels: 
-        description: "Delete Labels"
+      cleanup: 
+        description: "Clean up environment after test"
         default: true
         type: boolean
 
@@ -54,10 +44,6 @@ on:
         description: "AKS Cluster Name"
         required: true
         type: string
-      location:
-        description: "Azure Location"
-        type: string
-        default: ${{ vars.AZURE_LOCATION }}
       num_deployments:
         description: "Number of Traffic Deployments"
         default: 1000
@@ -70,20 +56,8 @@ on:
         description: "Number of Network Policies"
         default: 1000
         type: number
-      num_unique_labels_per_pod: 
-        description: "Number of Unique Labels per Pod"
-        default: 2
-        type: number
-      num_unique_labels_per_deployment:
-        description: "Number of Unique Labels per Deployment"
-        default: 2
-        type: number
-      num_shared_labels_per_pod:
-        description: "Number of Shared Labels per Pod"
-        default: 3
-        type: number
-      delete_labels: 
-        description: "Delete Labels"
+      cleanup: 
+        description: "Clean up environment after test"
         default: true
         type: boolean
 
@@ -116,17 +90,17 @@ jobs:
       - name: Run Scale Test
         env:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION }}
-          AZURE_LOCATION: ${{ input.location }}
           AZURE_RESOURCE_GROUP: ${{ inputs.resource_group }}
           CLUSTER_NAME: ${{ inputs.cluster_name }}
           NUM_DEPLOYMENTS: ${{ inputs.num_deployments }}
           NUM_REPLICAS: ${{ inputs.num_replicas }}
           NUM_NETPOLS: ${{ inputs.num_netpol }}
-          NUM_UNIQUE_LABELS_PER_POD: ${{ inputs.num_unique_labels_per_pod }}
-          NUM_SHARED_LABELS_PER_POD: ${{ inputs.num_shared_labels_per_pod }}
-          NUM_UNIQUE_LABELS_PER_DEPLOYMENT: ${{ inputs.num_unique_labels_per_deployment }}
-          DELETE_LABELS: ${{ inputs.delete_labels }}
+          CLEANUP: ${{ inputs.cleanup }}
+          IMAGE_REGISTRY: ${{  inputs.image_namespace == '' && vars.ACR_NAME || inputs.image_namespace }}
+          IMAGE_NAMESPACE: ${{ github.repository }}
+          TAG: ${{ inputs.image_tag }}
+          APP_INSIGHTS_KEY: ${{ secrets.APP_INSIGHTS_KEY }}
         shell: bash
         run: |
           set -euo pipefail
-          go test -v ./test/e2e/. -timeout 300m -tags=scale -count=1  -args -image-tag=$(make version) -image-registry=${{vars.ACR_NAME}} -image-namespace=${{github.repository}}
+          go test -v ./test/e2e/. -timeout 300m -tags=scale -count=1  -args -image-tag=$( [[ $TAG == "" ]] && make version || echo $TAG ) -create-infra=false -delete-infra=false 

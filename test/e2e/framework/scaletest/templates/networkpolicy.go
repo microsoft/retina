@@ -19,6 +19,9 @@ var (
 				"Ingress",
 				"Egress",
 			},
+			PodSelector: metav1.LabelSelector{
+				MatchLabels: map[string]string{},
+			},
 		},
 	}
 )

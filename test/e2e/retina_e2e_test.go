@@ -17,11 +17,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	createInfra = flag.Bool("create-infra", true, "create a Resource group, vNET and AKS cluster for testing")
-	deleteInfra = flag.Bool("delete-infra", true, "delete a Resource group, vNET and AKS cluster for testing")
-)
-
 // TestE2ERetina tests all e2e scenarios for retina
 func TestE2ERetina(t *testing.T) {
 	ctx, cancel := helpers.Context(t)
