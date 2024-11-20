@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: ["retina-agent", "retina-init", "retina-operator"]
+        image: ["retina-agent", "retina-init", "retina-operator", "kubectl-retina", "retina-shell"]
     runs-on: ubuntu-latest # trivy only supports running on Linux
     steps:
       - name: Checkout code
