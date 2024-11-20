@@ -1,0 +1,59 @@
+name: Network Performance Measurement
+
+on:
+  workflow_run:
+    workflows: [Build Images]
+    types:
+      - completed
+  schedule:
+    # It runs on 17th minute of every 12 hours
+    - cron: '17 */12 * * *'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Image Tag to use for the performance test'
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  perf_test:
+    if: ${{ github.event_name == 'merge_group' }}
+    name: Retina Performance Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go version
+
+      - name: Az CLI login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION }}
+
+      - name: Run performance measurement for Retina
+        env:
+          AZURE_APP_INSIGHTS_KEY: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION }}
+          AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            TAG=${{ github.event.inputs.tag }}
+          elif [ "${{ github.event_name }}" == "merge_group" ]; then
+            TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
+          else
+            TAG="default-version"
+          fi
+          go test -v ./test/e2e/. -timeout 2h -tags=perf -count=1 -args -image-tag=$TAG -image-registry=${{ vars.ACR_NAME }} -image-namespace=${{ github.repository }}
