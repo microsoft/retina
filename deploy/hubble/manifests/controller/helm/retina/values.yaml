@@ -118,6 +118,11 @@ securityContext:
   windowsOptions:
     runAsUserName: "NT AUTHORITY\\SYSTEM"
 
+## @param priorityClassName [string] Indicates the pod's priority
+## Ref: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
+##
+priorityClassName: ""
+
 service:
   type: ClusterIP
   port: 10093

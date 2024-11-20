@@ -26,6 +26,9 @@ spec:
     spec:
       hostNetwork: true
       serviceAccountName: {{ .Values.serviceAccount.name }}
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}
       initContainers:
         - name: init-retina
           image: {{ .Values.image.initRepository }}:{{ .Values.image.tag }}
@@ -183,6 +186,9 @@ spec:
       namespace: {{ .Values.namespace }}
     spec:
       serviceAccountName: {{ .Values.serviceAccount.name }}
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}
       securityContext:
         windowsOptions:
           hostProcess: true
