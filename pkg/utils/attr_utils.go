@@ -87,7 +87,7 @@ var (
 type LabelsInfo struct {
 	Namespace string
 	PodName   string
-	Workloads *flow.Workload
+	Workload  *flow.Workload
 }
 
 func GetPluginEventAttributes(attrs []attribute.KeyValue, pluginName, eventName, timestamp string) []attribute.KeyValue {

@@ -202,7 +202,7 @@ func (e *Enricher) GetWindowLabels(ip string) *utils.LabelsInfo {
 		return &utils.LabelsInfo{
 			Namespace: o.Namespace(),
 			PodName:   o.Name(),
-			Workloads: workload,
+			Workload:  workload,
 		}
 
 	default:

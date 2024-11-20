@@ -7,6 +7,7 @@ package hnsstats
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/Microsoft/hcsshim"
@@ -232,9 +233,11 @@ func getAdvancedMetricLabels(h *hnsstats, stats *HnsStatsData) {
 	labels := enricher.Instance().GetWindowLabels(stats.IPAddress)
 
 	if labels != nil {
-		AdvWindowsGauge.WithLabelValues(PacketsReceived, stats.IPAddress, stats.Port, labels.Namespace, labels.PodName, labels.Workloads.Kind, labels.Workloads.Name).Set(float64(stats.hnscounters.PacketsReceived))
-		AdvWindowsGauge.WithLabelValues(PacketsSent, stats.IPAddress, stats.Port, labels.Namespace, labels.PodName, labels.Workloads.Kind, labels.Workloads.Name).Set(float64(stats.hnscounters.PacketsSent))
+		AdvWindowsGauge.WithLabelValues(PacketsReceived, stats.IPAddress, stats.Port, labels.Namespace, labels.PodName, labels.Workload.Kind, labels.Workload.Name).Set(float64(stats.hnscounters.PacketsReceived))
+		AdvWindowsGauge.WithLabelValues(PacketsSent, stats.IPAddress, stats.Port, labels.Namespace, labels.PodName, labels.Workload.Kind, labels.Workload.Name).Set(float64(stats.hnscounters.PacketsSent))
 		h.l.Info("updating advanced HNS stats metric", zap.String(PodName, labels.PodName), zap.String(Namespace, labels.Namespace))
+		fmt.Printf("\n%+v", labels.Workload.Kind)
+		fmt.Printf("\n%+v", labels.Workload.Name)
 	}
 }
 
