@@ -73,10 +73,18 @@ spec:
               memory: {{ .Values.resources.limits.memory | quote }}
               cpu: {{ .Values.resources.limits.cpu | quote }}
           readinessProbe:
-            httpGet:
-              path: /metrics
-              port: {{ .Values.agent.container.retina.ports.containerPort }}
-            initialDelaySeconds: 10
+            exec:
+              command:
+              - hubble
+              - status
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+              - hubble
+              - status
+            initialDelaySeconds: 30
             periodSeconds: 30
           env:
           - name: POD_NAME
@@ -189,11 +197,19 @@ spec:
             - -command
             - .\setkubeconfigpath.ps1; ./controller.exe --config ./retina/config.yaml --kubeconfig ./kubeconfig
           readinessProbe:
-            httpGet:
-              path: /metrics
-              port: {{ .Values.agent.container.retina.ports.containerPort }}
+            exec:
+              command:
+              - hubble
+              - status
             initialDelaySeconds: 15
             periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+              - hubble
+              - status
+            initialDelaySeconds: 30
+            periodSeconds: 30
           env:
           - name: POD_NAME
             valueFrom:
