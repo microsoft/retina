@@ -5,6 +5,7 @@ package enricher
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sync"
 
@@ -194,6 +195,7 @@ func (e *Enricher) GetWindowLabels(ip string) *utils.LabelsInfo {
 	case *common.RetinaEndpoint:
 		var workload *flow.Workload
 		if workloads := e.getWorkloads(o.OwnerRefs()); len(workloads) > 0 {
+			fmt.Printf("Workloads Check: \n%+v", workloads)
 			workload = workloads[0]
 		} else {
 			workload = &flow.Workload{Name: "", Kind: ""}
