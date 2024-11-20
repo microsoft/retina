@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/retina/test/e2e/common"
+	"github.com/microsoft/retina/test/e2e/framework/azure"
 	"github.com/microsoft/retina/test/e2e/framework/generic"
 	"github.com/microsoft/retina/test/e2e/framework/helpers"
 	"github.com/microsoft/retina/test/e2e/framework/types"
@@ -97,6 +98,10 @@ func TestE2ERetina_Scale(t *testing.T) {
 			_ = jobs.DeleteTestInfra(subID, rg, clusterName, location).Run()
 		}
 	})
+
+	fqdn, err := azure.GetFqdnFn(subID, rg, clusterName)
+	require.NoError(t, err)
+	opt.AdditionalTelemetryProperty["clusterFqdn"] = fqdn
 
 	// Install Retina
 	installRetina := types.NewRunner(t, jobs.InstallRetina(kubeConfigFilePath, chartPath))
