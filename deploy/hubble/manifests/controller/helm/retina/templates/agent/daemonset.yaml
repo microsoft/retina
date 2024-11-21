@@ -197,19 +197,9 @@ spec:
             - -command
             - .\setkubeconfigpath.ps1; ./controller.exe --config ./retina/config.yaml --kubeconfig ./kubeconfig
           readinessProbe:
-            exec:
-              command:
-              - hubble
-              - status
-            initialDelaySeconds: 15
-            periodSeconds: 10
-          livenessProbe:
-            exec:
-              command:
-              - hubble
-              - status
-            initialDelaySeconds: 30
-            periodSeconds: 30
+            httpGet:
+              path: /metrics
+              port: {{ .Values.agent.container.retina.ports.containerPort }}
           env:
           - name: POD_NAME
             valueFrom:
