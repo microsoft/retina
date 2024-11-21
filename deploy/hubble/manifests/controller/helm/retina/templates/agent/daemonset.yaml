@@ -200,6 +200,8 @@ spec:
             httpGet:
               path: /metrics
               port: {{ .Values.agent.container.retina.ports.containerPort }}
+            initialDelaySeconds: 15
+            periodSeconds: 10
           env:
           - name: POD_NAME
             valueFrom:
