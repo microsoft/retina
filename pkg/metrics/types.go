@@ -16,6 +16,8 @@ const (
 	// Windows
 	hnsStats            = "windows_hns_stats"
 	hnsStatsDescription = "Include many different metrics from packets sent/received to closed connections"
+	vfpStats            = "windows_vfp_stats"
+	vfpStatsDescription = "Include many different metrics from packets sent/received to closed connections"
 
 	// Linux only metrics (for now).
 	nodeApiServerHandshakeLatencyHistName = "node_apiserver_handshake_latency_ms"
@@ -56,7 +58,9 @@ var (
 	ForwardPacketsGauge GaugeVec
 	ForwardBytesGauge   GaugeVec
 
-	WindowsGauge GaugeVec
+	// Windows
+	HNSStatsGauge GaugeVec
+	VFPStatsGauge GaugeVec
 
 	// Common gauges across os distributions
 	NodeConnectivityStatusGauge  GaugeVec

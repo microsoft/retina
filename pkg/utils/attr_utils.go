@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	unknown = "__uknown__"
+	unknown = "__unknown__"
 )
 
 var (
@@ -49,6 +49,7 @@ var (
 	AclRule        = "aclrule"
 	Active         = "ACTIVE"
 	Device         = "device"
+	Uninitialized  = "uninitialized"
 
 	// TCP Connection Statistic Names
 	ResetCount           = "ResetCount"
