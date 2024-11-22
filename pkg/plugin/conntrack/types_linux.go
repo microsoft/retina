@@ -13,10 +13,11 @@ const (
 )
 
 type Conntrack struct {
-	l           *log.ZapLogger
-	objs        *conntrackObjects
-	ctMap       *ebpf.Map
-	gcFrequency time.Duration
+	l            *log.ZapLogger
+	objs         *conntrackObjects
+	ctMap        *ebpf.Map
+	ctMetricsMap *ebpf.Map
+	gcFrequency  time.Duration
 }
 
 // Define TCP flag constants
@@ -70,6 +71,34 @@ func decodeProto(proto uint8) string {
 		return "TCP"
 	case 17: // nolint:gomnd // UDP
 		return "UDP"
+	default:
+		return "Not supported"
+	}
+}
+
+func decodeDirection(trafficDirection uint8) string {
+	switch trafficDirection {
+	case 0: // nolint:gomnd // TRAFFIC_DIRECTION_UNKNOWN
+		return "TRAFFIC_DIRECTION_UNKNOWN"
+	case 1: // nolint:gomnd // TRAFFIC_DIRECTION_INGRESS
+		return "TRAFFIC_DIRECTION_INGRESS"
+	case 2: // nolint:gomnd // TRAFFIC_DIRECTION_EGRESS
+		return "TRAFFIC_DIRECTION_EGRESS"
+	default:
+		return "Not supported"
+	}
+}
+
+func decodeObservationPoint(trafficDirection uint8) string {
+	switch trafficDirection {
+	case 0: // nolint:gomnd // OBSERVATION_POINT_FROM_ENDPOINT
+		return "OBSERVATION_POINT_FROM_ENDPOINT"
+	case 1: // nolint:gomnd // OBSERVATION_POINT_TO_ENDPOINT
+		return "OBSERVATION_POINT_TO_ENDPOINT"
+	case 2: // nolint:gomnd // OBSERVATION_POINT_FROM_NETWORK
+		return "OBSERVATION_POINT_FROM_NETWORK"
+	case 3: // nolint:gomnd // OBSERVATION_POINT_TO_NETWORK
+		return "OBSERVATION_POINT_TO_NETWORK"
 	default:
 		return "Not supported"
 	}

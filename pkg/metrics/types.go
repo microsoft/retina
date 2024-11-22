@@ -39,6 +39,9 @@ const (
 	dnsResponseCounterDescription                  = "DNS responses by statistics"
 	infinibandStatsGaugeDescription                = "InfiniBand statistics gauge"
 	infinibandStatusParamsGaugeDescription         = "InfiniBand Status Parameters gauge"
+	conntrackPacketsCountDescription               = "Number of packets per connection"
+	conntrackPacketsBytesCountDescription          = "Number of bytes per connection"
+	conntrackConnectionsCountDescription           = "Number of connections"
 
 	// Control plane metrics
 	pluginManagerFailedToReconcileCounterDescription = "Number of times the plugin manager failed to reconcile the plugins"
@@ -89,6 +92,11 @@ var (
 
 	InfinibandStatsGauge        GaugeVec
 	InfinibandStatusParamsGauge GaugeVec
+
+	// Conntrack metrics
+	ConntrackPacketsCounter      GaugeVec
+	ConntrackPacketsBytesCounter GaugeVec
+	ConntrackConnectionsCounter  CounterVec
 )
 
 func ToPrometheusType(metric interface{}) prometheus.Collector {

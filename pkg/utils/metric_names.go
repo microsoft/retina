@@ -30,6 +30,9 @@ const (
 	NoResponseFromAPIServerName          = "node_apiserver_no_response"
 	InfinibandCounterStatsName           = "infiniband_counter_stats"
 	InfinibandStatusParamsName           = "infiniband_status_params"
+	ConntrackPacketsCounterName          = "packets_count_per_connection"
+	ConntrackBytesCounterName            = "bytes_count_per_connection"
+	ConntrackConnectionsCounterName      = "connections_count"
 
 	// Common Gauges across os distributions
 	NodeConnectivityStatusName         = "node_connectivity_status"
@@ -57,7 +60,10 @@ func IsAdvancedMetric(name string) bool {
 		DNSResponseCounterName,
 		NodeAPIServerLatencyName,
 		NodeAPIServerTCPHandshakeLatencyName,
-		NoResponseFromAPIServerName:
+		NoResponseFromAPIServerName,
+		ConntrackPacketsCounterName,
+		ConntrackBytesCounterName,
+		ConntrackConnectionsCounterName:
 		return true
 	default:
 		return false

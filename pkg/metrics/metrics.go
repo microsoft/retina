@@ -140,6 +140,26 @@ func InitializeMetrics() {
 		dnsResponseCounterDescription,
 	)
 
+	// Conntrack Metrics
+	ConntrackPacketsCounter = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.DefaultRegistry,
+		utils.ConntrackPacketsCounterName,
+		conntrackPacketsCountDescription,
+		utils.ConntrackLabels...,
+	)
+	ConntrackPacketsBytesCounter = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.DefaultRegistry,
+		utils.ConntrackBytesCounterName,
+		conntrackPacketsBytesCountDescription,
+		utils.ConntrackLabels...,
+	)
+	ConntrackConnectionsCounter = exporter.CreatePrometheusCounterVecForMetric(
+		exporter.DefaultRegistry,
+		utils.ConntrackConnectionsCounterName,
+		conntrackConnectionsCountDescription,
+		utils.ConntrackLabels...,
+	)
+
 	// InfiniBand Metrics
 	InfinibandStatsGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,

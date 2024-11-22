@@ -17,6 +17,8 @@ import (
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+
+	"github.com/microsoft/retina/pkg/metrics"
 )
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type ct_v4_key conntrack ./_cprog/conntrack.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../lib/common/libbpf/_include/linux -I../lib/common/libbpf/_include/uapi/linux -I../lib/common/libbpf/_include/asm
@@ -63,7 +65,23 @@ func New() (*Conntrack, error) {
 	ct.objs = objs
 	// Get the conntrack map from the objects
 	ct.ctMap = objs.RetinaConntrack
+	ct.ctMetricsMap = objs.RetinaConntrackMetrics
 	return ct, nil
+}
+
+func (ct *Conntrack) updateConntrackMetrics() {
+	var key conntrackCtV4Key
+	var value conntrackConntrackMetricEntry
+	iter := ct.ctMetricsMap.Iterate()
+	info, err := ct.ctMetricsMap.Info()
+	if err != nil {
+		ct.l.Error("Failed to get conntrack metrics map info", zap.Error(err))
+		return
+	}
+	ct.l.Debug("Iterating over conntrack metrics" + info.Name)
+	for iter.Next(&key, &value) {
+		ct.conntrackMetricAdd(key, float64(value.PacketCount), float64(value.ByteCount), uint8(value.ObservationPoint), uint8(value.TrafficDirection))
+	}
 }
 
 // Run starts the Conntrack garbage collection loop.
@@ -93,8 +111,13 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			// List of keys to be deleted
 			var keysToDelete []conntrackCtV4Key
 
+			ct.updateConntrackMetrics()
+
 			iter := ct.ctMap.Iterate()
 			for iter.Next(&key, &value) {
+
+				// TODO: remove this once the metrics are updated
+				// ct.conntrackMetricAdd(key, 2, 4)
 				noOfCtEntries++
 				// Check if the connection is closing or has expired
 				if ktime.MonotonicOffset.Seconds()+float64(value.EvictionTime) < float64((time.Now().Unix())) {
@@ -138,4 +161,21 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			ct.l.Debug("conntrack GC completed", zap.Int("number_of_entries", noOfCtEntries), zap.Int("entries_deleted", entriesDeleted))
 		}
 	}
+}
+
+func (ct *Conntrack) conntrackMetricAdd(key conntrackCtV4Key, count float64, bytes float64, observationPoint uint8, direction uint8) {
+
+	srcIP := utils.Int2ip(key.SrcIp).To4()
+	dstIP := utils.Int2ip(key.DstIp).To4()
+
+	labels := []string{
+		srcIP.String(),
+		dstIP.String(),
+		decodeProto(key.Proto),
+		decodeObservationPoint(observationPoint),
+		decodeDirection(direction),
+	}
+	metrics.ConntrackPacketsCounter.WithLabelValues(labels...).Set(float64(count))
+	metrics.ConntrackPacketsBytesCounter.WithLabelValues(labels...).Set(float64(bytes))
+	// TODO metrics.ConntrackConnectionsCounter.WithLabelValues(labels...).Inc()
 }
