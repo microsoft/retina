@@ -87,7 +87,7 @@ var (
 	DNSResponseLabels = []string{"return_code", "query_type", "query", "response", "num_response"}
 
 	// Conntrack labels.
-	ConntrackLabels = []string{"src_ip", "dst_ip", "proto", "observation_point", "direction"}
+	ConntrackLabels = []string{"src_ip", "dst_ip", "proto", "direction"}
 )
 
 func GetPluginEventAttributes(attrs []attribute.KeyValue, pluginName, eventName, timestamp string) []attribute.KeyValue {

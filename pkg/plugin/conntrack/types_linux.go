@@ -13,11 +13,10 @@ const (
 )
 
 type Conntrack struct {
-	l            *log.ZapLogger
-	objs         *conntrackObjects
-	ctMap        *ebpf.Map
-	ctMetricsMap *ebpf.Map
-	gcFrequency  time.Duration
+	l           *log.ZapLogger
+	objs        *conntrackObjects
+	ctMap       *ebpf.Map
+	gcFrequency time.Duration
 }
 
 // Define TCP flag constants

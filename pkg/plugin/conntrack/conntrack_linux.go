@@ -65,23 +65,7 @@ func New() (*Conntrack, error) {
 	ct.objs = objs
 	// Get the conntrack map from the objects
 	ct.ctMap = objs.RetinaConntrack
-	ct.ctMetricsMap = objs.RetinaConntrackMetrics
 	return ct, nil
-}
-
-func (ct *Conntrack) updateConntrackMetrics() {
-	var key conntrackCtV4Key
-	var value conntrackConntrackMetricEntry
-	iter := ct.ctMetricsMap.Iterate()
-	info, err := ct.ctMetricsMap.Info()
-	if err != nil {
-		ct.l.Error("Failed to get conntrack metrics map info", zap.Error(err))
-		return
-	}
-	ct.l.Debug("Iterating over conntrack metrics" + info.Name)
-	for iter.Next(&key, &value) {
-		ct.conntrackMetricAdd(key, float64(value.PacketCount), float64(value.ByteCount), uint8(value.ObservationPoint), uint8(value.TrafficDirection))
-	}
 }
 
 // Run starts the Conntrack garbage collection loop.
@@ -111,10 +95,10 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			// List of keys to be deleted
 			var keysToDelete []conntrackCtV4Key
 
-			ct.updateConntrackMetrics()
-
 			iter := ct.ctMap.Iterate()
 			for iter.Next(&key, &value) {
+				// Add the conntrack metrics
+				ct.conntrackMetricAdd(key, float64(value.PacketCount), float64(value.ByteCount), uint8(value.TrafficDirection))
 
 				// TODO: remove this once the metrics are updated
 				// ct.conntrackMetricAdd(key, 2, 4)
@@ -163,7 +147,7 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 	}
 }
 
-func (ct *Conntrack) conntrackMetricAdd(key conntrackCtV4Key, count float64, bytes float64, observationPoint uint8, direction uint8) {
+func (ct *Conntrack) conntrackMetricAdd(key conntrackCtV4Key, count float64, bytes float64, direction uint8) {
 
 	srcIP := utils.Int2ip(key.SrcIp).To4()
 	dstIP := utils.Int2ip(key.DstIp).To4()
@@ -172,7 +156,6 @@ func (ct *Conntrack) conntrackMetricAdd(key conntrackCtV4Key, count float64, byt
 		srcIP.String(),
 		dstIP.String(),
 		decodeProto(key.Proto),
-		decodeObservationPoint(observationPoint),
 		decodeDirection(direction),
 	}
 	metrics.ConntrackPacketsCounter.WithLabelValues(labels...).Set(float64(count))

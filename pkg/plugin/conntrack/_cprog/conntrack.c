@@ -68,6 +68,11 @@ struct ct_entry {
      * before retina deployment and the SYN packet was not captured.
      */
     bool is_direction_unknown;
+    /**
+     * conntrack metrics
+     */
+    __u64 packet_count;
+    __u64 byte_count;
 };
 
 struct {
@@ -78,23 +83,6 @@ struct {
     __uint(pinning, LIBBPF_PIN_BY_NAME); // needs pinning so this can be access from other processes .i.e debug cli
 } retina_conntrack SEC(".maps");
 
-/* 
-* Metric to store the number of packets and bytes for a connection.
-*/
-struct conntrack_metric_entry {
-    __u64 packet_count;
-    __u64 byte_count;
-    __u8 observation_point;
-	__u8 traffic_direction;
-};
-
-struct {
-    __uint(type, BPF_MAP_TYPE_LRU_HASH);
-    __uint(max_entries, 512);
-    __type(key, struct ct_v4_key);
-    __type(value, struct conntrack_metric_entry);
-    __uint(pinning, LIBBPF_PIN_BY_NAME); // needs pinning so this can be access from other processes .i.e debug cli
-} retina_conntrack_metrics SEC(".maps");
 
 
 /**
@@ -113,28 +101,13 @@ static inline void _ct_reverse_key(struct ct_v4_key *reverse_key, const struct c
     reverse_key->proto = key->proto;
 }
 
-static __always_inline void  _ct_update_counter_metrics(struct ct_v4_key *key, struct packet *p) {
-    // lookup if the key exists in packet metrics map
-    struct conntrack_metric_entry *ct_metric_entry = bpf_map_lookup_elem(&retina_conntrack_metrics, key);
+static __always_inline void  _ct_update_metrics(struct ct_entry *entry, struct packet *p) {
+    // Update packet and byte counters
+    entry->packet_count += 1;
+    entry->byte_count += p->bytes;
+    // Used for metric labels
+    entry->traffic_direction = p->traffic_direction;
 
-    if (!ct_metric_entry) {
-        // create a new entry
-        struct conntrack_metric_entry new_ct_metric_entry;
-        __builtin_memset(&new_ct_metric_entry, 0, sizeof(struct conntrack_metric_entry));
-        // initialize the new entry
-        new_ct_metric_entry.packet_count = 1;
-        new_ct_metric_entry.byte_count = p->bytes;
-        new_ct_metric_entry.observation_point = p->observation_point;
-        new_ct_metric_entry.traffic_direction = p->traffic_direction;
-        // update bpf map for packet metrics
-        bpf_map_update_elem(&retina_conntrack_metrics, key, &new_ct_metric_entry, BPF_ANY);
-    } else {
-        // Update packet and byte counters
-        ct_metric_entry->packet_count += 1;
-        ct_metric_entry->byte_count += p->bytes;
-        ct_metric_entry->observation_point = p->observation_point;
-        ct_metric_entry->traffic_direction = p->traffic_direction;
-    }
 }
 
 /**
@@ -211,8 +184,6 @@ static __always_inline bool _ct_handle_tcp_connection(struct packet *p, struct c
         // Update packet accordingly.
         p->is_reply = false;
         p->traffic_direction = _ct_get_traffic_direction(observation_point);
-        // Update metrics this initializes the key if it does not exist
-        _ct_update_counter_metrics(&key, p);
         // Create a new connection with a timeout of CT_SYN_TIMEOUT.
         return _ct_create_new_tcp_connection(key, p->flags, observation_point);
     }
@@ -355,9 +326,6 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
     key.dst_port = p->dst_port;
     key.proto = p->proto;
 
-    // Update metrics this initializes the key if it does not exist
-    _ct_update_counter_metrics(&key, p);
-
     // Lookup the connection in the map.
     struct ct_entry *entry = bpf_map_lookup_elem(&retina_conntrack, &key);
 
@@ -366,6 +334,7 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
         // Update the packet accordingly.
         p->is_reply = false;
         p->traffic_direction = entry->traffic_direction;
+        _ct_update_metrics(entry,p);
         return _ct_should_report_packet(entry, p->flags, CT_PACKET_DIR_TX, &key);
     }
     
@@ -381,6 +350,7 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
         // Update the packet accordingly.
         p->is_reply = true;
         p->traffic_direction = entry->traffic_direction;
+        _ct_update_metrics(entry,p);
         return _ct_should_report_packet(entry, p->flags, CT_PACKET_DIR_RX, &reverse_key);
     }
 
