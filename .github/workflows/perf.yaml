@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   perf_test:
-    if: ${{ github.event != 'workflow_run' || github.event_name == 'merge_group' }}
+    if: ${{ github.event_name != 'workflow_run' || github.event_name == 'merge_group' }}
     name: Retina Performance Test
     runs-on: ubuntu-latest
 
@@ -40,6 +40,9 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION }}
+        
+      - id: fetch-latest-github-release
+        uses: cityoflosangeles/fetch-latest-github-release@v2.0.4
 
       - name: Run performance measurement for Retina
         env:
@@ -49,11 +52,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ "${{ github.event }}" == "workflow_dispatch" ]; then
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             TAG=${{ github.event.inputs.tag }}
           elif [ "${{ github.event_name }}" == "merge_group" ]; then
             TAG=$(make version)
           else
-            TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
+            TAG=${{ steps.fetch-latest-github-release.outputs.tag_name }}
           fi
           go test -v ./test/e2e/. -timeout 2h -tags=perf -count=1 -args -image-tag=$TAG -image-registry=${{ vars.ACR_NAME }} -image-namespace=${{ github.repository }}
