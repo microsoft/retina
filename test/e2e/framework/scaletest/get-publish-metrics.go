@@ -80,10 +80,10 @@ func (g *GetAndPublishMetrics) Stop() error {
 }
 
 func (g *GetAndPublishMetrics) Prevalidate() error {
-	if os.Getenv("AZURE_APP_INSIGHTS_KEY") == "" {
-		log.Println("env APP_INSIGHTS_KEY not provided")
+	if os.Getenv(common.AzureAppInsightsKeyEnv) == "" {
+		log.Println("env ", common.AzureAppInsightsKeyEnv, " not provided")
 	}
-	g.appInsightsKey = os.Getenv("AZURE_APP_INSIGHTS_KEY")
+	g.appInsightsKey = os.Getenv(common.AzureAppInsightsKeyEnv)
 
 	if _, ok := g.AdditionalTelemetryProperty["retinaVersion"]; !ok {
 		return fmt.Errorf("retinaVersion is required in AdditionalTelemetryProperty")

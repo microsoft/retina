@@ -85,7 +85,7 @@ func TestE2ERetina_Scale(t *testing.T) {
 	opt.AdditionalTelemetryProperty["clusterName"] = clusterName
 
 	// AppInsightsKey is required for telemetry
-	require.NotEmpty(t, os.Getenv("AZURE_APP_INSIGHTS_KEY"))
+	require.NotEmpty(t, os.Getenv(common.AzureAppInsightsKeyEnv))
 
 	opt.LabelsToGetMetrics = map[string]string{"k8s-app": "retina"}
 
