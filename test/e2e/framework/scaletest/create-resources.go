@@ -85,7 +85,9 @@ func (c *CreateResources) getResources() []runtime.Object {
 
 	kapingerClusterRoleBinding := kapinger.GetKapingerClusterRoleBinding()
 
-	objs = append(objs, kapingerClusterRole, kapingerClusterRoleBinding)
+	kapingerSA := kapinger.GetKapingerServiceAccount()
+
+	objs = append(objs, kapingerClusterRole, kapingerClusterRoleBinding, kapingerSA)
 	// c.generateKwokNodes()
 	log.Println("Finished generating YAMLs")
 	return objs
@@ -101,6 +103,9 @@ func (c *CreateResources) generateDeployments() []runtime.Object {
 	}
 	template := kapinger.GetKapingerDeployment()
 
+	if template.Labels == nil {
+		template.Labels = make(map[string]string)
+	}
 	template.Labels["is-real"] = "true"
 	template.Spec.Template.Labels["is-real"] = "true"
 	template.Spec.Template.Spec.NodeSelector["scale-test"] = "true"

@@ -5,6 +5,7 @@
 package common
 
 import (
+	"flag"
 	"os"
 	"os/user"
 	"strconv"
@@ -17,12 +18,17 @@ import (
 const (
 	RetinaPort int = 10093
 	// netObsRGtag is used to tag resources created by this test suite
-	NetObsRGtag         = "-e2e-netobs-"
-	KubeSystemNamespace = "kube-system"
-	TestPodNamespace    = "kube-system-test"
+	NetObsRGtag            = "-e2e-netobs-"
+	KubeSystemNamespace    = "kube-system"
+	TestPodNamespace       = "kube-system-test"
+	AzureAppInsightsKeyEnv = "AZURE_APP_INSIGHTS_KEY"
 )
 
-var AzureLocations = []string{"eastus2", "northeurope", "uksouth", "centralindia", "westus2"}
+var (
+	AzureLocations = []string{"eastus2", "northeurope", "uksouth", "centralindia", "westus2"}
+	CreateInfra    = flag.Bool("create-infra", true, "create a Resource group, vNET and AKS cluster for testing")
+	DeleteInfra    = flag.Bool("delete-infra", true, "delete a Resource group, vNET and AKS cluster for testing")
+)
 
 func ClusterNameForE2ETest(t *testing.T) string {
 	clusterName := os.Getenv("CLUSTER_NAME")

@@ -35,4 +35,6 @@ type Options struct {
 	DeleteNetworkPoliciesTimes    int
 	numKwokPods                   int
 	numRealPods                   int
+	LabelsToGetMetrics            map[string]string
+	AdditionalTelemetryProperty   map[string]string
 }

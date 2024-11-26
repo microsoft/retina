@@ -19,7 +19,7 @@ import (
 
 const (
 	createTimeout = 20 * time.Minute // windows is slow
-	deleteTimeout = 60 * time.Second
+	deleteTimeout = 5 * time.Minute
 )
 
 var (
