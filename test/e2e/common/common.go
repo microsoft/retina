@@ -8,6 +8,7 @@ import (
 	"flag"
 	"os"
 	"os/user"
+	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
@@ -45,4 +46,20 @@ func ClusterNameForE2ETest(t *testing.T) string {
 		t.Logf("CLUSTER_NAME is not set, generating a random cluster name: %s", clusterName)
 	}
 	return clusterName
+}
+
+func RetinaChartPath(hubbleControlPlane bool) (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	rootDir := filepath.Dir(filepath.Dir(cwd))
+	controlPlane := "legacy"
+
+	if hubbleControlPlane {
+		controlPlane = "hubble"
+	}
+
+	return filepath.Join(rootDir, "deploy", controlPlane, "manifests", "controller", "helm", "retina"), nil
 }

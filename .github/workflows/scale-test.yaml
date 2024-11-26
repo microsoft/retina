@@ -17,6 +17,13 @@ on:
       image_tag:
         description: "Image Tag (if not set, default for this commit will be used)"
         type: string
+      control_plane:
+        description: "Control Plane"
+        type: choice
+        required: true
+        options:
+          - "legacy"
+          - "hubble"
       num_deployments:
         description: "Number of Traffic Deployments"
         default: 1000
@@ -100,6 +107,7 @@ jobs:
           IMAGE_NAMESPACE: ${{ github.repository }}
           TAG: ${{ inputs.image_tag }}
           AZURE_APP_INSIGHTS_KEY: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
+          HUBBLE_CONTROL_PLANE: ${{ inputs.control_plane == 'hubble' }}
         shell: bash
         run: |
           set -euo pipefail

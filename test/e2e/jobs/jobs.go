@@ -80,8 +80,23 @@ func DeleteTestInfra(subID, rg, clusterName, location string) *types.Job {
 	return job
 }
 
-func InstallRetina(kubeConfigFilePath, chartPath string) *types.Job {
-	job := types.NewJob("Install and test Retina with basic metrics")
+func InstallRetina(kubeConfigFilePath, chartPath string, hubbleControlPlane bool) *types.Job {
+	if hubbleControlPlane {
+		job := types.NewJob("Install Retina with Hubble Control Plane")
+
+		// Install Retina with Hubble Control Plane
+		job.AddStep(&kubernetes.ValidateHubbleStep{
+			Namespace:          common.KubeSystemNamespace,
+			ReleaseName:        "retina",
+			KubeConfigFilePath: kubeConfigFilePath,
+			ChartPath:          chartPath,
+			TagEnv:             generic.DefaultTagEnv,
+		}, nil)
+
+		return job
+	}
+
+	job := types.NewJob("Install Retina with Legacy Control Plane")
 
 	job.AddStep(&kubernetes.InstallHelmChart{
 		Namespace:          common.KubeSystemNamespace,
@@ -365,4 +380,3 @@ func RunPerfTest(kubeConfigFilePath string, chartPath string) *types.Job {
 
 	return job
 }
-
