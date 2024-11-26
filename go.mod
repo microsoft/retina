@@ -257,7 +257,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/net v0.30.0 // indirect
 	golang.org/x/oauth2 v0.23.0 // indirect
@@ -333,6 +333,7 @@ require (
 	k8s.io/apiextensions-apiserver v0.30.3
 	k8s.io/cli-runtime v0.30.3
 	k8s.io/kubectl v0.30.3
+	k8s.io/metrics v0.30.3
 	k8s.io/perf-tests/network/benchmarks/netperf v0.0.0-00010101000000-000000000000
 	sigs.k8s.io/controller-runtime v0.18.5
 )
