@@ -94,6 +94,18 @@ func InstallRetina(kubeConfigFilePath, chartPath string) *types.Job {
 	return job
 }
 
+func UninstallRetina(kubeConfigFilePath, chartPath string) *types.Job {
+	job := types.NewJob("Uninstall Retina")
+
+	job.AddStep(&kubernetes.UninstallHelmChart{
+		Namespace:          common.KubeSystemNamespace,
+		ReleaseName:        "retina",
+		KubeConfigFilePath: kubeConfigFilePath,
+	}, nil)
+
+	return job
+}
+
 func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, testPodNamespace string) *types.Job {
 	job := types.NewJob("Install and test Retina with basic metrics")
 

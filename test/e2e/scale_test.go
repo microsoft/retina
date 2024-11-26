@@ -7,9 +7,12 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/microsoft/retina/test/e2e/common"
+	"github.com/microsoft/retina/test/e2e/framework/azure"
+	"github.com/microsoft/retina/test/e2e/framework/generic"
 	"github.com/microsoft/retina/test/e2e/framework/helpers"
 	"github.com/microsoft/retina/test/e2e/framework/types"
 	jobs "github.com/microsoft/retina/test/e2e/jobs"
@@ -49,25 +52,64 @@ func TestE2ERetina_Scale(t *testing.T) {
 	chartPath := filepath.Join(rootDir, "deploy", "legacy", "manifests", "controller", "helm", "retina")
 	kubeConfigFilePath := filepath.Join(rootDir, "test", "e2e", "test.pem")
 
+	// Scale test parameters
+	opt := jobs.DefaultScaleTestOptions()
+	opt.KubeconfigPath = kubeConfigFilePath
+
+	NumDeployments := os.Getenv("NUM_DEPLOYMENTS")
+	NumReplicas := os.Getenv("NUM_REPLICAS")
+	NumNetworkPolicies := os.Getenv("NUM_NET_POL")
+	CleanUp := os.Getenv("CLEANUP")
+
+	if NumDeployments != "" {
+		opt.NumRealDeployments, err = strconv.Atoi(NumDeployments)
+		opt.NumRealServices = opt.NumRealDeployments
+		require.NoError(t, err)
+	}
+	if NumReplicas != "" {
+		opt.NumRealReplicas, err = strconv.Atoi(NumReplicas)
+		require.NoError(t, err)
+	}
+	if NumNetworkPolicies != "" {
+		opt.NumNetworkPolicies, err = strconv.Atoi(NumNetworkPolicies)
+		require.NoError(t, err)
+	}
+	if CleanUp != "" {
+		opt.DeleteLabels, err = strconv.ParseBool(CleanUp)
+		require.NoError(t, err)
+	}
+
+	RetinaVersion := os.Getenv(generic.DefaultTagEnv)
+	require.NotEmpty(t, RetinaVersion)
+	opt.AdditionalTelemetryProperty["retinaVersion"] = RetinaVersion
+	opt.AdditionalTelemetryProperty["clusterName"] = clusterName
+
+	// AppInsightsKey is required for telemetry
+	require.NotEmpty(t, os.Getenv(common.AzureAppInsightsKeyEnv))
+
+	opt.LabelsToGetMetrics = map[string]string{"k8s-app": "retina"}
+
 	// CreateTestInfra
-	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath, *createInfra))
+	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath, *common.CreateInfra))
 	createTestInfra.Run(ctx)
 
 	t.Cleanup(func() {
-		if *deleteInfra {
+		if *common.DeleteInfra {
 			_ = jobs.DeleteTestInfra(subID, rg, clusterName, location).Run()
 		}
 	})
+
+	fqdn, err := azure.GetFqdnFn(subID, rg, clusterName)
+	require.NoError(t, err)
+	opt.AdditionalTelemetryProperty["clusterFqdn"] = fqdn
 
 	// Install Retina
 	installRetina := types.NewRunner(t, jobs.InstallRetina(kubeConfigFilePath, chartPath))
 	installRetina.Run(ctx)
 
-	// Scale test
-	opt := jobs.DefaultScaleTestOptions()
-	opt.KubeconfigPath = kubeConfigFilePath
-	opt.RealPodType = "kapinger"
-	opt.DeleteLabels = true
+	t.Cleanup(func() {
+		_ = jobs.UninstallRetina(kubeConfigFilePath, chartPath).Run()
+	})
 
 	scale := types.NewRunner(t, jobs.ScaleTest(&opt))
 	scale.Run(ctx)
