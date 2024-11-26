@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/microsoft/retina/pkg/telemetry"
+	"github.com/microsoft/retina/test/e2e/common"
 	"github.com/microsoft/retina/test/e2e/framework/generic"
 	"github.com/pkg/errors"
 )
@@ -21,7 +22,7 @@ func (v *PublishPerfResults) Prevalidate() error {
 }
 
 func (v *PublishPerfResults) Run() error {
-	appInsightsKey := os.Getenv("AZURE_APP_INSIGHTS_KEY")
+	appInsightsKey := os.Getenv(common.AzureAppInsightsKeyEnv)
 	if appInsightsKey == "" {
 		log.Println("No app insights key provided, skipping publishing results")
 		return nil

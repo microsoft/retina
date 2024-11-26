@@ -46,7 +46,7 @@ func TestE2EPerfRetina(t *testing.T) {
 	cwd, err := os.Getwd()
 	require.NoError(t, err)
 
-	appInsightsKey := os.Getenv("AZURE_APP_INSIGHTS_KEY")
+	appInsightsKey := os.Getenv(common.AzureAppInsightsKeyEnv)
 	if appInsightsKey == "" {
 		t.Log("No app insights key provided, results will be saved locally at ./ as `netperf-benchmark-*`, `netperf-result-*`, and `netperf-regression-*`")
 	}

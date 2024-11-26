@@ -26,7 +26,7 @@ var listCaptures = &cobra.Command{
 	Short:   "List Retina Captures",
 	Example: listExample,
 	RunE: func(*cobra.Command, []string) error {
-		kubeConfig, err := configFlags.ToRESTConfig()
+		kubeConfig, err := opts.ToRESTConfig()
 		if err != nil {
 			return errors.Wrap(err, "failed to compose k8s rest config")
 		}
@@ -36,7 +36,7 @@ var listCaptures = &cobra.Command{
 			return errors.Wrap(err, "failed to initialize kubernetes client")
 		}
 
-		captureNamespace := namespace
+		captureNamespace := *opts.Namespace
 		if allNamespaces {
 			captureNamespace = ""
 		}
@@ -46,7 +46,6 @@ var listCaptures = &cobra.Command{
 
 func init() {
 	capture.AddCommand(listCaptures)
-	listCaptures.Flags().StringVarP(&namespace, "namespace", "n", "default", "Namespace to host capture job")
 	listCaptures.Flags().BoolVarP(&allNamespaces, "all-namespaces", "A", allNamespaces,
 		"If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 }

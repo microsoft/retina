@@ -103,6 +103,9 @@ spec:
               cpu: 250m
               memory: 250Mi
       serviceAccountName: retina-operator
+      {{- if .Values.operator.priorityClassName }}
+      priorityClassName: {{ .Values.operator.priorityClassName }}
+      {{- end }}
       terminationGracePeriodSeconds: 10
       volumes:
         - name: retina-operator-config
