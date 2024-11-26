@@ -40,9 +40,6 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION }}
-        
-      - id: fetch-latest-github-release
-        uses: cityoflosangeles/fetch-latest-github-release@v2.0.4
 
       - name: Run performance measurement for Retina
         env:
@@ -57,6 +54,6 @@ jobs:
           elif [ "${{ github.event_name }}" == "merge_group" ]; then
             TAG=$(make version)
           else
-            TAG=${{ steps.fetch-latest-github-release.outputs.tag_name }}
+            TAG=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r .tag_name)
           fi
           go test -v ./test/e2e/. -timeout 2h -tags=perf -count=1 -args -image-tag=$TAG -image-registry=${{ vars.ACR_NAME }} -image-namespace=${{ github.repository }}
