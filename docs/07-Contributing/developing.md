@@ -9,7 +9,7 @@ The easiest way to set up your Development Environment is to use the provided Gi
 ## Environment Config
 
 - [Go](https://go.dev/doc/install)
-- Docker
+- [Docker](https://docs.docker.com/engine/install/)
 - [Helm](https://helm.sh/docs/intro/install)
 - jq: `sudo apt install jq`
 - Fork the repository
