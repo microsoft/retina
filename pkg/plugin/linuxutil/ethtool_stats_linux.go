@@ -9,6 +9,7 @@ import (
 
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
+	"github.com/microsoft/retina/pkg/utils"
 	"github.com/safchain/ethtool"
 	"go.uber.org/zap"
 )
@@ -60,7 +61,7 @@ func (er *EthtoolReader) readInterfaceStats() error {
 	defer er.ethHandle.Close()
 
 	er.data = &EthtoolStats{
-		stats: make(map[string]map[string]uint64),
+		stats: make(map[string]uint64),
 	}
 
 	for _, i := range ifaces {
@@ -83,12 +84,12 @@ func (er *EthtoolReader) readInterfaceStats() error {
 			continue
 		}
 
-		er.data.stats[i.Name] = make(map[string]uint64)
 		tempMap := er.processStats(ifaceStats)
-		er.data.stats[i.Name] = tempMap
+		for key, value := range tempMap {
+			er.data.stats[key] += value
+		}
 
 		er.l.Debug("Processed ethtool Stats ", zap.String("ifacename", i.Name))
-
 	}
 
 	return nil
@@ -114,10 +115,8 @@ func (er *EthtoolReader) processStats(ifaceStats map[string]uint64) map[string]u
 
 func (er *EthtoolReader) updateMetrics() {
 	// update metrics section
-	// retrive interfacename and statname from ethStats
-	for ifName, stats := range er.data.stats {
-		for statName, statVal := range stats {
-			metrics.InterfaceStatsGauge.WithLabelValues(ifName, statName).Set(float64(statVal))
-		}
+	// retrive statname from ethStats
+	for statName, statVal := range er.data.stats {
+		metrics.InterfaceStatsGauge.WithLabelValues(utils.InterfaceNameConstant, statName).Set(float64(statVal))
 	}
 }
