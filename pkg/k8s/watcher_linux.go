@@ -23,7 +23,7 @@ import (
 func init() {
 	// Register custom error handler for the watcher
 	runtime.ErrorHandlers = []func(error){
-		retinaK8sErrorHandler,
+		k8sWatcherErrorHandler,
 	}
 }
 
@@ -105,18 +105,14 @@ func Start(ctx context.Context, k *watchers.K8sWatcher) {
 
 // retinaK8sErrorHandler is a custom error handler for the watcher
 // that logs the error and tags the error to easily identify
-func retinaK8sErrorHandler(e error) {
+func k8sWatcherErrorHandler(e error) {
 	errStr := e.Error()
 	switch {
 	case strings.Contains(errStr, "Failed to watch *v1.Node"):
-		logger.WithField("actualError", errStr).Error("Potentially Network Error coming from K8s API Server failing to watch Nodes")
 	case strings.Contains(errStr, "Failed to watch *v2.CiliumEndpoint"):
-		logger.WithField("actualError", errStr).Error("Potentially Network Error coming from K8s API Server failing to watch CiliumEndpoints")
 	case strings.Contains(errStr, "Failed to watch *v1.Service"):
-		logger.WithField("actualError", errStr).Error("Potentially Network Error coming from K8s API Server failing to watch Services")
 	case strings.Contains(errStr, "Failed to watch *v2.CiliumNode"):
-		logger.WithField("actualError", errStr).Error("Potentially Network Error coming from K8s API Server failing to watch CiliumNodes")
-
+		logger.WithField("underlyingError", errStr).Error("Error watching k8s resource")
 	default:
 		k8s.K8sErrorHandler(e)
 	}
