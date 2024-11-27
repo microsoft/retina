@@ -97,6 +97,9 @@ spec:
           resources:
             {{- toYaml .Values.operator.resources | nindent 12 }}
       serviceAccountName: {{ .Values.operator.name }}
+      {{- if .Values.operator.priorityClassName }}
+      priorityClassName: {{ .Values.operator.priorityClassName }}
+      {{- end }}
       terminationGracePeriodSeconds: 10
       volumes:
         - name: "{{ .Values.operator.name }}-config"

@@ -23,6 +23,9 @@ spec:
     spec:
       hostNetwork: true
       serviceAccountName: {{ .Values.serviceAccount.name }}
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}
       nodeSelector:
         kubernetes.io/os: linux
       {{- with .Values.imagePullSecrets }}
@@ -170,6 +173,9 @@ spec:
     spec:
       serviceAccountName: {{ .Values.serviceAccount.name }}
       {{- with .Values.imagePullSecrets }}
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}      

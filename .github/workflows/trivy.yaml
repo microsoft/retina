@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: ["retina-agent", "retina-init", "retina-operator"]
+        image: ["retina-agent", "retina-init", "retina-operator", "kubectl-retina", "retina-shell"]
     runs-on: ubuntu-latest # trivy only supports running on Linux
     steps:
       - name: Checkout code
@@ -30,7 +30,7 @@ jobs:
           echo "TAG=$(make version)" >> $GITHUB_ENV
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2
+        uses: aquasecurity/trivy-action@18f2510ee396bbf400402947b394f2dd8c87dbb0
         with:
           image-ref: "ghcr.io/${{ github.repository }}/${{ matrix.image }}:${{ env.TAG }}"
           format: "template"
