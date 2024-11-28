@@ -40,7 +40,8 @@ type PluginManager struct {
 	plugins map[api.PluginName]api.Plugin
 	tel     telemetry.Telemetry
 
-	watcherManager watchermanager.IWatcherManager
+	watcherManager  watchermanager.IWatcherManager
+	externalChannel chan *v1.Event
 }
 
 func init() {
@@ -154,6 +155,8 @@ func (p *PluginManager) Start(ctx context.Context) error {
 	g.Go(func() error {
 		return errors.Wrapf(ct.Run(ctx), "failed to run conntrack GC")
 	})
+	// set up hubble channel for conntrack
+	ct.SetupChannel(p.externalChannel)
 
 	// start all plugins
 	for _, plugin := range p.plugins {

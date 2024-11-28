@@ -22,6 +22,22 @@ const (
 	TypeUrl                string       = "retina.sh"
 )
 
+type ConntrackMetricsMetadataValues struct {
+	PacketsCount uint64
+	BytesCount   uint64
+}
+
+type ConntrackMetricsMetadata struct {
+	Logger           *log.ZapLogger
+	SrcIP            string
+	DstIP            string
+	SrcPort          uint32
+	DstPort          uint32
+	Proto            uint8
+	Timestamp        int64
+	TrafficDirection uint8
+}
+
 // ToFlow returns a flow.Flow object.
 // This sets up a L3/L4 flow object.
 // sourceIP, destIP are IPv4 addresses.
@@ -314,4 +330,66 @@ func decodeTime(nanoseconds int64) (pbTime *timestamppb.Timestamp, err error) {
 		return nil, err
 	}
 	return pbTime, nil
+}
+
+// Add Conntack information to the retina's metadata.
+func AddConntrackMetadata(meta *RetinaMetadata, conntrackMeta *ConntrackMetricsMetadataValues) {
+	if meta == nil || conntrackMeta == nil {
+		return
+	}
+	meta.CtPacketsCount = uint64(conntrackMeta.PacketsCount)
+	meta.CtBytesCount = uint64(conntrackMeta.BytesCount)
+}
+
+func toFlowL4(proto uint8, srcPort, dstPort uint32) *flow.Layer4 {
+	if proto == 6 {
+		return &flow.Layer4{
+			Protocol: &flow.Layer4_TCP{
+				TCP: &flow.TCP{
+					SourcePort:      srcPort,
+					DestinationPort: dstPort,
+				},
+			},
+		}
+	}
+	if proto == 17 {
+		return &flow.Layer4{
+			Protocol: &flow.Layer4_UDP{
+				UDP: &flow.UDP{
+					SourcePort:      srcPort,
+					DestinationPort: dstPort,
+				},
+			},
+		}
+	}
+	return nil
+}
+
+func toFlowTrafficDirection(direction uint8) flow.TrafficDirection {
+	switch direction {
+	case 1:
+		return flow.TrafficDirection_INGRESS
+	case 2:
+		return flow.TrafficDirection_EGRESS
+	default:
+		return flow.TrafficDirection_TRAFFIC_DIRECTION_UNKNOWN
+	}
+}
+
+func ToConntrackFLow(ctm *ConntrackMetricsMetadata) *flow.Flow {
+	t, err := decodeTime(ctm.Timestamp)
+	if err != nil {
+		ctm.Logger.Warn("Failed to get current time", zap.Error(err))
+	}
+	return &flow.Flow{
+		IP: &flow.IP{
+			Source:      ctm.SrcIP,
+			Destination: ctm.DstIP,
+			IpVersion:   flow.IPVersion_IPv4,
+		},
+		L4:               toFlowL4(ctm.Proto, ctm.SrcPort, ctm.DstPort),
+		Time:             t,
+		Verdict:          flow.Verdict_FORWARDED,
+		TrafficDirection: toFlowTrafficDirection(ctm.TrafficDirection),
+	}
 }

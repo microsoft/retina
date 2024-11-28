@@ -4,7 +4,9 @@ import (
 	"strings"
 	"time"
 
+	hubblev1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
+	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 )
 
@@ -13,10 +15,12 @@ const (
 )
 
 type Conntrack struct {
-	l           *log.ZapLogger
-	objs        *conntrackObjects
-	ctMap       *ebpf.Map
-	gcFrequency time.Duration
+	l               *log.ZapLogger
+	objs            *conntrackObjects
+	ctMap           *ebpf.Map
+	gcFrequency     time.Duration
+	enricher        enricher.EnricherInterface
+	externalChannel chan *hubblev1.Event
 }
 
 // Define TCP flag constants

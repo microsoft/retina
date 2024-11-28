@@ -8,6 +8,7 @@ import (
 	"context"
 	"time"
 
+	hubblev1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/rlimit"
 	"github.com/microsoft/retina/internal/ktime"
@@ -20,6 +21,8 @@ import (
 
 	"github.com/microsoft/retina/pkg/metrics"
 )
+
+const name = "conntrack"
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type ct_v4_key conntrack ./_cprog/conntrack.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../lib/common/libbpf/_include/linux -I../lib/common/libbpf/_include/uapi/linux -I../lib/common/libbpf/_include/asm
 
@@ -98,10 +101,8 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			iter := ct.ctMap.Iterate()
 			for iter.Next(&key, &value) {
 				// Add the conntrack metrics
-				ct.conntrackMetricAdd(key, float64(value.PacketCount), float64(value.ByteCount), uint8(value.TrafficDirection))
+				ct.conntrackMetricAdd(key, value)
 
-				// TODO: remove this once the metrics are updated
-				// ct.conntrackMetricAdd(key, 2, 4)
 				noOfCtEntries++
 				// Check if the connection is closing or has expired
 				if ktime.MonotonicOffset.Seconds()+float64(value.EvictionTime) < float64((time.Now().Unix())) {
@@ -147,10 +148,19 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 	}
 }
 
-func (ct *Conntrack) conntrackMetricAdd(key conntrackCtV4Key, count float64, bytes float64, direction uint8) {
+func (ct *Conntrack) SetupChannel(ch chan *hubblev1.Event) error {
+	ct.externalChannel = ch
+	return nil
+}
 
+func (ct *Conntrack) conntrackMetricAdd(key conntrackCtV4Key, value conntrackCtEntry) {
+	count := float64(value.PacketCount)
+	bytes := float64(value.ByteCount)
+	direction := uint8(value.TrafficDirection)
 	srcIP := utils.Int2ip(key.SrcIp).To4()
 	dstIP := utils.Int2ip(key.DstIp).To4()
+	srcPort := uint32(utils.HostToNetShort(key.SrcPort))
+	dstPort := uint32(utils.HostToNetShort(key.DstPort))
 
 	labels := []string{
 		srcIP.String(),
@@ -158,7 +168,51 @@ func (ct *Conntrack) conntrackMetricAdd(key conntrackCtV4Key, count float64, byt
 		decodeProto(key.Proto),
 		decodeDirection(direction),
 	}
-	metrics.ConntrackPacketsCounter.WithLabelValues(labels...).Set(float64(count))
-	metrics.ConntrackPacketsBytesCounter.WithLabelValues(labels...).Set(float64(bytes))
+
+	// Update basic metrics
+	metrics.ConntrackPacketsCounter.WithLabelValues(labels...).Set(count)
+	metrics.ConntrackPacketsBytesCounter.WithLabelValues(labels...).Set(bytes)
 	// TODO metrics.ConntrackConnectionsCounter.WithLabelValues(labels...).Inc()
+
+	// Update advanced metrics
+	ctMetricsMeta := &utils.ConntrackMetricsMetadata{
+		Logger:           ct.l,
+		SrcIP:            srcIP.String(),
+		DstIP:            dstIP.String(),
+		SrcPort:          srcPort,
+		DstPort:          dstPort,
+		Proto:            key.Proto,
+		Timestamp:        time.Now().UnixNano(),
+		TrafficDirection: value.TrafficDirection,
+	}
+	fl := utils.ToConntrackFLow(ctMetricsMeta)
+
+	meta := &utils.RetinaMetadata{}
+	ctMeta := &utils.ConntrackMetricsMetadataValues{
+		PacketsCount: uint64(count),
+		BytesCount:   uint64(bytes),
+	}
+
+	// Add conntrack metadata to retina metadata
+	utils.AddConntrackMetadata(meta, ctMeta)
+	// Add retina metadata to the flow object
+	utils.AddRetinaMetadata(fl, meta)
+
+	// Write the event to enricher.
+	ev := (&hubblev1.Event{
+		Event:     fl,
+		Timestamp: fl.GetTime(),
+	})
+	if ct.enricher != nil {
+		ct.enricher.Write(ev)
+	}
+
+	// Send event to external channel.
+	if ct.externalChannel != nil {
+		select {
+		case ct.externalChannel <- ev:
+		default:
+			metrics.LostEventsCounter.WithLabelValues(utils.ExternalChannel, string(name)).Inc()
+		}
+	}
 }

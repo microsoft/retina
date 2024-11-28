@@ -54,8 +54,10 @@ func newPluginManager(params pluginManagerParams) (*PluginManager, error) {
 	}
 
 	pmCtx, cancelCtx := context.WithCancel(context.Background())
-	// Setup the event channel to be used by hubble
+	// Setup the event channel to be used by hubble to receive events from plugins
 	pluginMgr.SetupChannel(params.EventChan)
+	// Pass channel reference to pluginmanager
+	pluginMgr.externalChannel = params.EventChan
 
 	var wg sync.WaitGroup
 	params.Lifecycle.Append(cell.Hook{
