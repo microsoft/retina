@@ -35,7 +35,7 @@ var netstatCuratedKeys = map[string]struct{}{
 	"DataCsumErr":        {},
 	"AddAddrDrop":        {},
 	"RmAddrDrop":         {},
-	"TCPTimeouts": 	      {},
+	"TCPTimeouts":        {},
 	"TCPLossProbes":      {},
 	"TCPLostRetransmit":  {},
 }
@@ -95,8 +95,8 @@ type NetstatOpts struct {
 }
 
 type EthtoolStats struct {
-	// Stats by interface name and stat name
-	stats map[string]map[string]uint64
+	// Stats by name
+	stats map[string]uint64
 }
 
 type EthtoolOpts struct {
