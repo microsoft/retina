@@ -4,12 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+)
+
+const (
+	timeoutToLabelAllPodsMinutes = 120
 )
 
 type patchStringValue struct {
@@ -50,32 +55,21 @@ func (a *AddSharedLabelsToAllPods) Run() error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeoutSeconds*time.Second)
+	ctx, cancel := contextToLabelAllPods()
 	defer cancel()
 
 	resources, err := clientset.CoreV1().Pods(a.Namespace).List(ctx, metav1.ListOptions{})
 
-	patch := []patchStringValue{}
-
-	for i := 0; i < a.NumSharedLabelsPerPod; i++ {
-		patch = append(patch, patchStringValue{
-			Op:    "add",
-			Path:  "/metadata/labels/shared-lab-" + fmt.Sprintf("%05d", i),
-			Value: "val",
-		})
-	}
-
-	patchBytes, err := json.Marshal(patch)
+	patchBytes, err := getSharedLabelsPatch(a.NumSharedLabelsPerPod)
 	if err != nil {
 		return fmt.Errorf("error marshalling patch: %w", err)
 	}
 
 	for _, resource := range resources.Items {
-		clientset.CoreV1().Pods(a.Namespace).Patch(ctx, resource.Name,
-			types.JSONPatchType,
-			patchBytes,
-			metav1.PatchOptions{},
-		)
+		err = patchLabel(ctx, clientset, a.Namespace, resource.Name, patchBytes)
+		if err != nil {
+			log.Printf("Error adding shared labels to pod %s: %s\n", resource.Name, err)
+		}
 	}
 
 	return nil
@@ -84,4 +78,30 @@ func (a *AddSharedLabelsToAllPods) Run() error {
 // Require for background steps
 func (a *AddSharedLabelsToAllPods) Stop() error {
 	return nil
+}
+
+func patchLabel(ctx context.Context, clientset *kubernetes.Clientset, namespace, podName string, patchBytes []byte) error {
+	log.Println("Labeling Pod", podName)
+	_, err := clientset.CoreV1().Pods(namespace).Patch(ctx, podName,
+		types.JSONPatchType,
+		patchBytes,
+		metav1.PatchOptions{},
+	)
+	return err
+}
+
+func getSharedLabelsPatch(numLabels int) ([]byte, error) {
+	patch := []patchStringValue{}
+	for i := 0; i < numLabels; i++ {
+		patch = append(patch, patchStringValue{
+			Op:    "add",
+			Path:  "/metadata/labels/shared-lab-" + fmt.Sprintf("%05d", i),
+			Value: "val",
+		})
+	}
+	return json.Marshal(patch)
+}
+
+func contextToLabelAllPods() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), timeoutToLabelAllPodsMinutes*time.Minute)
 }

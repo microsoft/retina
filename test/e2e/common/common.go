@@ -22,6 +22,7 @@ const (
 	KubeSystemNamespace    = "kube-system"
 	TestPodNamespace       = "kube-system-test"
 	AzureAppInsightsKeyEnv = "AZURE_APP_INSIGHTS_KEY"
+	OutputFilePathEnv      = "OUTPUT_FILEPATH"
 )
 
 var (

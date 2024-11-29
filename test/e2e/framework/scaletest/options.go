@@ -37,4 +37,5 @@ type Options struct {
 	numRealPods                   int
 	LabelsToGetMetrics            map[string]string
 	AdditionalTelemetryProperty   map[string]string
+	CleanUp                       bool
 }
