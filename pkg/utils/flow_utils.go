@@ -339,8 +339,6 @@ func AddConntrackMetadata(meta *RetinaMetadata, conntrackMeta *ConntrackMetricsM
 	if meta == nil || conntrackMeta == nil {
 		return
 	}
-	meta.CtPacketsCount = uint64(conntrackMeta.PacketsCount)
-	meta.CtBytesCount = uint64(conntrackMeta.BytesCount)
 }
 
 func toFlowL4(proto uint8, srcPort, dstPort uint32) *flow.Layer4 {

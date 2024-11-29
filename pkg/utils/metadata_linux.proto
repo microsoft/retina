@@ -15,12 +15,6 @@ message RetinaMetadata {
 
     // Drop reason in Retina.
     DropReason drop_reason = 5;
-
-    // Conntrack bytes count
-    uint64 ct_bytes_count = 6;
-
-    // Conntrack packets count;
-    uint64 ct_packets_count = 7;
 }
 
 enum DNSType {

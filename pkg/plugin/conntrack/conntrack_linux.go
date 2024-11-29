@@ -13,13 +13,12 @@ import (
 	"github.com/cilium/ebpf/rlimit"
 	"github.com/microsoft/retina/internal/ktime"
 	"github.com/microsoft/retina/pkg/log"
+	"github.com/microsoft/retina/pkg/metrics"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
 	_ "github.com/microsoft/retina/pkg/plugin/conntrack/_cprog" // nolint // This is needed so cprog is included when vendoring
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
-
-	"github.com/microsoft/retina/pkg/metrics"
 )
 
 const name = "conntrack"
@@ -169,12 +168,12 @@ func (ct *Conntrack) conntrackMetricAdd(key conntrackCtV4Key, value conntrackCtE
 		decodeDirection(direction),
 	}
 
-	// Update basic metrics
+	// Update advanced/pod-level metrics
+
 	metrics.ConntrackPacketsCounter.WithLabelValues(labels...).Set(count)
 	metrics.ConntrackPacketsBytesCounter.WithLabelValues(labels...).Set(bytes)
 	// TODO metrics.ConntrackConnectionsCounter.WithLabelValues(labels...).Inc()
 
-	// Update advanced metrics
 	ctMeta := &utils.ConntrackMetricsMetadataValues{
 		PacketsCount: uint64(count),
 		BytesCount:   uint64(bytes),
@@ -191,13 +190,6 @@ func (ct *Conntrack) conntrackMetricAdd(key conntrackCtV4Key, value conntrackCtE
 		Metrics:          ctMeta,
 	}
 	fl := utils.ToConntrackFLow(ctMetricsMeta)
-
-	meta := &utils.RetinaMetadata{}
-
-	// Add conntrack metadata to retina metadata
-	utils.AddConntrackMetadata(meta, ctMeta)
-	// Add retina metadata to the flow object
-	utils.AddRetinaMetadata(fl, meta)
 
 	// Write the event to enricher.
 	ev := (&hubblev1.Event{

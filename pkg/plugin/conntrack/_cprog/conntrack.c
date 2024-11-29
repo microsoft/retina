@@ -107,7 +107,6 @@ static __always_inline void  _ct_update_metrics(struct ct_entry *entry, struct p
     entry->byte_count += p->bytes;
     // Used for metric labels
     entry->traffic_direction = p->traffic_direction;
-
 }
 
 /**
@@ -314,6 +313,7 @@ static __always_inline bool _ct_should_report_packet(struct ct_entry *entry, __u
  * Returns true if the packet should be report to userspace. False otherwise.
  */
 static __always_inline __attribute__((unused)) bool ct_process_packet(struct packet *p, __u8 observation_point) {
+
     if (!p) {
         return false;
     }
@@ -325,7 +325,6 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
     key.src_port = p->src_port;
     key.dst_port = p->dst_port;
     key.proto = p->proto;
-
     // Lookup the connection in the map.
     struct ct_entry *entry = bpf_map_lookup_elem(&retina_conntrack, &key);
 
