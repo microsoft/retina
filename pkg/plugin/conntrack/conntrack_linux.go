@@ -175,6 +175,10 @@ func (ct *Conntrack) conntrackMetricAdd(key conntrackCtV4Key, value conntrackCtE
 	// TODO metrics.ConntrackConnectionsCounter.WithLabelValues(labels...).Inc()
 
 	// Update advanced metrics
+	ctMeta := &utils.ConntrackMetricsMetadataValues{
+		PacketsCount: uint64(count),
+		BytesCount:   uint64(bytes),
+	}
 	ctMetricsMeta := &utils.ConntrackMetricsMetadata{
 		Logger:           ct.l,
 		SrcIP:            srcIP.String(),
@@ -184,14 +188,11 @@ func (ct *Conntrack) conntrackMetricAdd(key conntrackCtV4Key, value conntrackCtE
 		Proto:            key.Proto,
 		Timestamp:        time.Now().UnixNano(),
 		TrafficDirection: value.TrafficDirection,
+		Metrics:          ctMeta,
 	}
 	fl := utils.ToConntrackFLow(ctMetricsMeta)
 
 	meta := &utils.RetinaMetadata{}
-	ctMeta := &utils.ConntrackMetricsMetadataValues{
-		PacketsCount: uint64(count),
-		BytesCount:   uint64(bytes),
-	}
 
 	// Add conntrack metadata to retina metadata
 	utils.AddConntrackMetadata(meta, ctMeta)

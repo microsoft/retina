@@ -3,6 +3,7 @@
 package utils
 
 import (
+	"fmt"
 	"net"
 	"time"
 
@@ -36,6 +37,7 @@ type ConntrackMetricsMetadata struct {
 	Proto            uint8
 	Timestamp        int64
 	TrafficDirection uint8
+	Metrics          *ConntrackMetricsMetadataValues
 }
 
 // ToFlow returns a flow.Flow object.
@@ -381,7 +383,9 @@ func ToConntrackFLow(ctm *ConntrackMetricsMetadata) *flow.Flow {
 	if err != nil {
 		ctm.Logger.Warn("Failed to get current time", zap.Error(err))
 	}
+	summary := fmt.Sprintf("[Conntrack] Packets: %d, Bytes: %d", ctm.Metrics.PacketsCount, ctm.Metrics.BytesCount)
 	return &flow.Flow{
+		Type: flow.FlowType_L3_L4,
 		IP: &flow.IP{
 			Source:      ctm.SrcIP,
 			Destination: ctm.DstIP,
@@ -391,5 +395,6 @@ func ToConntrackFLow(ctm *ConntrackMetricsMetadata) *flow.Flow {
 		Time:             t,
 		Verdict:          flow.Verdict_FORWARDED,
 		TrafficDirection: toFlowTrafficDirection(ctm.TrafficDirection),
+		Summary:          summary,
 	}
 }
