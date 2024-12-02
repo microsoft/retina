@@ -208,8 +208,8 @@ spec:
             - .\setkubeconfigpath.ps1; ./controller.exe --config ./retina/config.yaml --kubeconfig ./kubeconfig
           readinessProbe:
             httpGet:
-              path: /metrics
-              port: {{ .Values.agent.container.retina.ports.containerPort }}
+              path: /healthz
+              port: {{ .Values.agent.container.retina.ports.healthPort }}
             initialDelaySeconds: 15
             periodSeconds: 10
           env:
