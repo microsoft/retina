@@ -4,6 +4,7 @@ package legacy
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -53,6 +54,10 @@ const (
 
 	nodeNameEnvKey = "NODE_NAME"
 	nodeIPEnvKey   = "NODE_IP"
+)
+
+var (
+	healthzChecker healthz.Checker
 )
 
 var scheme = k8sruntime.NewScheme()
@@ -215,14 +220,6 @@ func (d *Daemon) Start() error {
 	}
 
 	//+kubebuilder:scaffold:builder
-
-	if healthCheckErr := mgr.AddHealthzCheck("healthz", healthz.Ping); healthCheckErr != nil {
-		mainLogger.Fatal("Unable to set up health check", zap.Error(healthCheckErr))
-	}
-	if addReadyCheckErr := mgr.AddReadyzCheck("readyz", healthz.Ping); addReadyCheckErr != nil {
-		mainLogger.Fatal("Unable to set up ready check", zap.Error(addReadyCheckErr))
-	}
-
 	// k8s Client used for informers
 	cl := kubernetes.NewForConfigOrDie(mgr.GetConfig())
 
@@ -294,6 +291,21 @@ func (d *Daemon) Start() error {
 				mainLogger.Fatal("unable to create metricsConfigController", zap.Error(err))
 			}
 		}
+
+		// Define a custom health check for advanced metrics
+		healthzChecker = healthz.CheckHandler{
+			Checker: healthz.Checker(func(req *http.Request) error {
+				_, err := metricsModule.Status()
+				if err != nil {
+					mainLogger.Error("failed to get metrics module status fr advanced metrics", zap.Error(err))
+					return err
+				}
+				return nil
+			}),
+		}.Checker
+	} else {
+		// Advanced Metric not enabled, Ping healthcheck
+		healthzChecker = healthz.Ping
 	}
 
 	controllerMgr, err := cm.NewControllerManager(daemonConfig, cl, tel)
@@ -314,6 +326,17 @@ func (d *Daemon) Start() error {
 	// Start controller manager, which will start http server and plugin manager.
 	go controllerMgr.Start(ctx)
 	mainLogger.Info("Started controller manager")
+
+	//Set health checks according to retina confiuration
+	if err := mgr.AddHealthzCheck("healthz", healthzChecker); err != nil {
+		mainLogger.Error("unable to set up custom health check", zap.Error(err))
+		os.Exit(1)
+	}
+
+	if err := mgr.AddReadyzCheck("readyz", healthzChecker); err != nil {
+		mainLogger.Error("unable to set up custom ready check", zap.Error(err))
+		os.Exit(1)
+	}
 
 	// Start all registered controllers. This will block until container receives SIGTERM.
 	if err := mgr.Start(ctx); err != nil {

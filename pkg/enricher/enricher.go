@@ -5,8 +5,12 @@ package enricher
 
 import (
 	"context"
+	"errors"
+	"io"
 	"reflect"
 	"sync"
+
+	"time"
 
 	"github.com/cilium/cilium/api/v1/flow"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
@@ -188,4 +192,55 @@ func (e *Enricher) Write(ev *v1.Event) {
 
 func (e *Enricher) ExportReader() *container.RingReader {
 	return container.NewRingReader(e.outputRing, e.outputRing.OldestWrite())
+}
+
+func (e *Enricher) Status() (float64, error) {
+	rate, err := e.getFlowRate(e.outputRing, time.Now())
+	if err != nil {
+		e.l.Error("failed to get flow rate %w", zap.Error(err))
+		return 0, err
+	}
+	return rate, nil
+}
+
+// ref: "getFlowRate" "github.com/cilium/cilium/pkg/hubble/observer/local_observer.go"
+func (en *Enricher) getFlowRate(ring *container.Ring, at time.Time) (float64, error) {
+	reader := container.NewRingReader(ring, ring.LastWriteParallel())
+	count := 0
+	since := at.Add(-1 * time.Minute)
+	var lastSeenEvent *v1.Event
+	for {
+		e, err := reader.Previous()
+		lost := e.GetLostEvent()
+		if lost != nil {
+			// a lost event means we read the complete ring buffer
+			// if we read at least one flow, update `since` to calculate the rate over the available time range
+			if lastSeenEvent != nil {
+				since = lastSeenEvent.Timestamp.AsTime()
+			}
+			break
+		} else if errors.Is(err, io.EOF) {
+			// an EOF error means the ring buffer is empty, ignore error and continue
+			break
+		} else if err != nil {
+			// unexpected error
+			return 0, err
+		}
+		if _, isFlowEvent := e.Event.(*flow.Flow); !isFlowEvent {
+			// ignore non flow events
+			continue
+		}
+		if err := e.Timestamp.CheckValid(); err != nil {
+			return 0, err
+		}
+		ts := e.Timestamp.AsTime()
+		if ts.Before(since) {
+			// scanned the last minute, exit loop
+			break
+		}
+		lastSeenEvent = e
+		count++
+	}
+	fl := float64(count) / at.Sub(since).Seconds()
+	return fl, nil
 }

@@ -13,4 +13,5 @@ type EnricherInterface interface {
 	Run()
 	Write(ev *v1.Event)
 	ExportReader() *container.RingReader
+	Status() (float64, error)
 }

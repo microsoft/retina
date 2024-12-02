@@ -139,6 +139,10 @@ func InitModule(ctx context.Context,
 	return m
 }
 
+func (m *Module) Status() (float64, error) {
+	return m.enricher.Status()
+}
+
 func (m *Module) Reconcile(spec *api.MetricsSpec) error {
 	// If the new spec has not changed, then do nothing.
 	if m.currentSpec != nil && m.currentSpec.Equals(spec) {
