@@ -29,7 +29,6 @@ func (a *AddUniqueLabelsToAllPods) Prevalidate() error {
 // Primary step where test logic is executed
 // Returning an error will cause the test to fail
 func (a *AddUniqueLabelsToAllPods) Run() error {
-
 	if a.NumUniqueLabelsPerPod < 1 {
 		return nil
 	}

@@ -21,11 +21,7 @@ const (
 	Service TargetType = "service"
 	Pod     TargetType = "pod"
 
-	envTargetType            = "TARGET_TYPE"
-	defaultHTTPClientTimeout = 30 * time.Second
-
-	defaultRetryAttempts = 10
-	defaultRetryDelay    = 5 * time.Second
+	envTargetType = "TARGET_TYPE"
 )
 
 type KapingerHTTPClient struct {
@@ -45,7 +41,7 @@ func NewKapingerHTTPClient(clientset *kubernetes.Clientset, labelselector string
 			Transport: &http.Transport{
 				DisableKeepAlives: true,
 			},
-			Timeout: defaultHTTPClientTimeout,
+			Timeout: 3 * time.Second,
 		},
 		labelselector: labelselector,
 		clientset:     clientset,
@@ -76,7 +72,7 @@ func NewKapingerHTTPClient(clientset *kubernetes.Clientset, labelselector string
 		return nil, fmt.Errorf("env TARGET_TYPE must be \"service\" or \"pod\"")
 	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error getting IPs: %w", err)
 	}
 
 	return &k, nil
@@ -106,30 +102,10 @@ func (k *KapingerHTTPClient) MakeRequests(ctx context.Context) error {
 	}
 }
 
-func (k *KapingerHTTPClient) makeRequest() error {
-	for _, ip := range k.ips {
-		url := fmt.Sprintf("http://%s:%d", ip, k.port)
-		req, err := http.NewRequest("GET", url, nil)
-		if err != nil {
-			return err
-		}
-
-		// Set the "Connection" header to "close"
-		req.Header.Set("Connection", "close")
-
-		// Send the request
-		resp, err := k.client.Do(req)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			log.Fatalf("http client: error reading response body from %s: %v", url, err)
-			return err
-		}
-		log.Printf("http client: response from %s: %s", url, string(body))
+func (k *KapingerHTTPClient) makeRequest(ctx context.Context, url string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, http.NoBody)
+	if err != nil {
+		return nil, err
 	}
 
 	// Set the "Connection" header to "close"
@@ -151,46 +127,13 @@ func (k *KapingerHTTPClient) makeRequest() error {
 	return body, nil
 }
 
-func (k *KapingerHTTPClient) getIPS() error {
-	ips := []string{}
-
-	switch k.targettype {
-	case Service:
-		services, err := k.clientset.CoreV1().Services(corev1.NamespaceAll).List(context.Background(), metav1.ListOptions{
-			LabelSelector: k.labelselector,
-		})
-		if err != nil {
-			return fmt.Errorf("http client: error getting services: %w", err)
-		}
-
-		// Extract the Service cluster IP addresses
-
-		for _, svc := range services.Items {
-			ips = append(ips, svc.Spec.ClusterIP)
-		}
-		log.Println("http client: using service IPs:", ips)
-
-	case Pod:
-		err := waitForPodsRunning(k.clientset, k.labelselector)
-		if err != nil {
-			return fmt.Errorf("http client: error waiting for pods to be in Running state: %w", err)
-		}
-
-		// Get all pods in the cluster with label app=agnhost
-		pods, err := k.clientset.CoreV1().Pods(corev1.NamespaceAll).List(context.Background(), metav1.ListOptions{
-			LabelSelector: k.labelselector,
-		})
-		if err != nil {
-			return fmt.Errorf("http client: error getting pods: %w", err)
-		}
-
-		for _, pod := range pods.Items {
-			ips = append(ips, pod.Status.PodIP)
-		}
-
-		log.Printf("using pod IPs: %v", ips)
-	default:
-		return fmt.Errorf("env TARGET_TYPE must be \"service\" or \"pod\"")
+func (k *KapingerHTTPClient) getServiceURLs() ([]string, error) {
+	urls := []string{}
+	services, err := k.clientset.CoreV1().Services(corev1.NamespaceAll).List(context.Background(), metav1.ListOptions{
+		LabelSelector: k.labelselector,
+	})
+	if err != nil {
+		return urls, fmt.Errorf("error getting services: %w", err)
 	}
 
 	// Extract the Service cluster IP addresses

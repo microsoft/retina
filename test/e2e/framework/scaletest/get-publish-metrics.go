@@ -47,7 +47,6 @@ func (g *GetAndPublishMetrics) Run() error {
 	g.wg.Add(1)
 
 	go func() {
-
 		t := time.NewTicker(5 * time.Minute)
 
 		for {
@@ -66,7 +65,6 @@ func (g *GetAndPublishMetrics) Run() error {
 
 			}
 		}
-
 	}()
 
 	return nil
@@ -92,7 +90,6 @@ func (g *GetAndPublishMetrics) Prevalidate() error {
 }
 
 func (g *GetAndPublishMetrics) getAndPublishMetrics() error {
-
 	config, err := clientcmd.BuildConfigFromFlags("", g.KubeConfigFilePath)
 	if err != nil {
 		return fmt.Errorf("error building kubeconfig: %w", err)
@@ -121,14 +118,13 @@ func (g *GetAndPublishMetrics) getAndPublishMetrics() error {
 		log.Println("Publishing metrics to AppInsights")
 		for _, metric := range metrics {
 			g.telemetryClient.TrackEvent("scale-test", metric)
-
 		}
 	}
 
 	// Write metrics to file
 	if g.OutputFilePath != "" {
 		log.Println("Writing metrics to file ", g.OutputFilePath)
-		file, err := os.OpenFile(g.OutputFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		file, err := os.OpenFile(g.OutputFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 		if err != nil {
 			return fmt.Errorf("error writing to csv file: %w", err)
 		}
@@ -151,7 +147,6 @@ func (g *GetAndPublishMetrics) getAndPublishMetrics() error {
 type metric map[string]string
 
 func (g *GetAndPublishMetrics) getMetrics(ctx context.Context, k8sClient *kubernetes.Clientset, metricsClient *metrics.Clientset) ([]metric, error) {
-
 	labelSelector := labels.Set(g.Labels).String()
 
 	pods, err := k8sClient.CoreV1().Pods(common.KubeSystemNamespace).List(ctx, metav1.ListOptions{LabelSelector: labelSelector})

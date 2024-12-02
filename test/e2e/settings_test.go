@@ -2,6 +2,7 @@ package retina
 
 import (
 	"crypto/rand"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -16,9 +17,12 @@ import (
 )
 
 var (
-	clusterName = os.Getenv("CLUSTER_NAME")
-	subID       = os.Getenv("AZURE_SUBSCRIPTION_ID")
-	location    = os.Getenv("AZURE_LOCATION")
+	clusterName   = os.Getenv("CLUSTER_NAME")
+	subID         = os.Getenv("AZURE_SUBSCRIPTION_ID")
+	location      = os.Getenv("AZURE_LOCATION")
+	resourceGroup = os.Getenv("AZURE_RESOURCE_GROUP")
+
+	errAzureSubscriptionIDNotSet = errors.New("AZURE_SUBSCRIPTION_ID is not set")
 )
 
 var (
@@ -38,7 +42,7 @@ type TestInfraSettings struct {
 func LoadInfraSettings() (*TestInfraSettings, error) {
 	curuser, err := user.Current()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Failed to get current user: %w", err)
 	}
 
 	flag.Parse()
@@ -49,21 +53,26 @@ func LoadInfraSettings() (*TestInfraSettings, error) {
 	}
 
 	if subID == "" {
-		return nil, fmt.Errorf("AZURE_SUBSCRIPTION_ID is not set")
+		return nil, errAzureSubscriptionIDNotSet
 	}
 
 	if location == "" {
 		var nBig *big.Int
 		nBig, err = rand.Int(rand.Reader, big.NewInt(int64(len(locations))))
 		if err != nil {
-			return nil, fmt.Errorf("Failed to generate a secure random index: %v", err)
+			return nil, fmt.Errorf("Failed to generate a secure random index: %w", err)
 		}
 		location = locations[nBig.Int64()]
 	}
 
+	if resourceGroup == "" {
+		log.Printf("AZURE_RESOURCE_GROUP is not set, using the cluster name as the resource group name by default")
+		resourceGroup = clusterName
+	}
+
 	cwd, err := os.Getwd()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Failed to get current working directory: %w", err)
 	}
 
 	// Get to root of the repo by going up two directories

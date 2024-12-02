@@ -34,7 +34,7 @@ func (v *ValidateHTTPResponse) Run() error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != v.ExpectedStatus {
-		return fmt.Errorf("unexpected status code: got %d, want %d", resp.StatusCode, v.ExpectedStatus)
+		return fmt.Errorf("unexpected status code: got %d, want %d", resp.StatusCode, v.ExpectedStatus) //nolint:goerr113 no formatting needed
 	}
 	log.Printf("HTTP validation succeeded for URL: %s with status code %d\n", v.URL, resp.StatusCode)
 

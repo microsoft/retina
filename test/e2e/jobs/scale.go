@@ -66,7 +66,7 @@ func ScaleTest(opt *scaletest.Options) *types.Job {
 	job.AddStep(&scaletest.GetAndPublishMetrics{
 		Labels:                      opt.LabelsToGetMetrics,
 		AdditionalTelemetryProperty: opt.AdditionalTelemetryProperty,
-		OutputFilePath:                  os.Getenv("OUTPUT_FILEPATH"),
+		OutputFilePath:              os.Getenv("OUTPUT_FILEPATH"),
 	}, &types.StepOptions{
 		SkipSavingParametersToJob: true,
 		RunInBackgroundWithID:     "get-metrics",

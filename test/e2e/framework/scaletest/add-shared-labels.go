@@ -35,7 +35,6 @@ func (a *AddSharedLabelsToAllPods) Prevalidate() error {
 // Primary step where test logic is executed
 // Returning an error will cause the test to fail
 func (a *AddSharedLabelsToAllPods) Run() error {
-
 	if a.NumSharedLabelsPerPod < 1 {
 		return nil
 	}

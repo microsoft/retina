@@ -365,4 +365,3 @@ func RunPerfTest(kubeConfigFilePath string, chartPath string) *types.Job {
 
 	return job
 }
-

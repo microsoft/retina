@@ -28,7 +28,7 @@ func (v *PublishPerfResults) Run() error {
 		return nil
 	}
 
-	resultsFile, err := os.OpenFile(v.ResultsFile, os.O_RDONLY, 0644)
+	resultsFile, err := os.OpenFile(v.ResultsFile, os.O_RDONLY, 0o644)
 	if err != nil {
 		return errors.Wrap(err, "failed to open results file")
 	}
