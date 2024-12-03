@@ -7,7 +7,7 @@ import (
 	"github.com/cilium/cilium/pkg/hubble/container"
 )
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4.0 -destination=mock_enricherinterface.go  -copyright_file=../lib/ignore_headers.txt -package=enricher github.com/microsoft/retina/pkg/enricher EnricherInterface
+//go:generate mockgen -destination=mock_enricherinterface.go  -copyright_file=../lib/ignore_headers.txt -package=enricher github.com/microsoft/retina/pkg/enricher EnricherInterface
 
 type EnricherInterface interface {
 	Run()

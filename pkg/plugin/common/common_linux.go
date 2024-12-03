@@ -17,7 +17,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4.0 -destination=mocks/mock_types.go -package=mocks . ITracer
+//go:generate mockgen -destination=mocks/mock_types.go -package=mocks . ITracer
 
 // Interface for IG tracers.
 // Ref: https://pkg.go.dev/github.com/inspektor-gadget/inspektor-gadget@v0.18.1/pkg/gadgets/trace/dns/tracer#Tracer

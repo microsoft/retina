@@ -13,7 +13,7 @@ const (
 	Name api.PluginName = "linuxutil"
 )
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=types_linux.go -destination=linuxutil_mock_generated.go -package=linuxutil
+//go:generate mockgen -source=types_linux.go -destination=linuxutil_mock_generated.go -package=linuxutil
 type linuxUtil struct {
 	cfg              *kcfg.Config
 	l                *log.ZapLogger

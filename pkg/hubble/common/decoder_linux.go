@@ -10,7 +10,7 @@ import (
 	"github.com/cilium/cilium/pkg/labels"
 )
 
-//go:generate go run github.com/golang/mock/mockgen@v1.6.0 -source decoder.go -destination=mocks/mock_types.go -package=mocks
+//go:generate mockgen -source decoder.go -destination=mocks/mock_types.go -package=mocks
 
 type EpDecoder interface {
 	Decode(ip netip.Addr) *flow.Endpoint

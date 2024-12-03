@@ -10,7 +10,7 @@ import (
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 )
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4.0 -destination=mock/mock_plugin.go -copyright_file=../../lib/ignore_headers.txt -package=mock github.com/microsoft/retina/pkg/plugin/api Plugin
+//go:generate mockgen -destination=mock/mock_plugin.go -copyright_file=../../lib/ignore_headers.txt -package=mock github.com/microsoft/retina/pkg/plugin/api Plugin
 
 const (
 	Meter       string = "retina-meter"

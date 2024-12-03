@@ -4,7 +4,7 @@ package pubsub
 
 type CallBackFunc func(interface{})
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4.0 -destination=mock_pubsubinterface.go  -copyright_file=../lib/ignore_headers.txt -package=pubsub github.com/microsoft/retina/pkg/pubsub PubSubInterface
+//go:generate mockgen -destination=mock_pubsubinterface.go  -copyright_file=../lib/ignore_headers.txt -package=pubsub github.com/microsoft/retina/pkg/pubsub PubSubInterface
 
 // this file defines the interface a simple pubsub implementation should implement
 type PubSubInterface interface {

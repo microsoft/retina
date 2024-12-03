@@ -20,7 +20,7 @@ import (
 	_ "github.com/microsoft/retina/pkg/plugin/filter/_cprog" // nolint
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type mapKey filter ./_cprog/retina_filter.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src
+//go:generate bpf2go -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type mapKey filter ./_cprog/retina_filter.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src
 
 var (
 	f    *FilterMap

@@ -9,7 +9,7 @@ import (
 	"github.com/cilium/ebpf"
 )
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=types.go -destination=mocks/mock_types.go -package=mocks
+//go:generate mockgen -source=types.go -destination=mocks/mock_types.go -package=mocks
 
 /*
 A thin wrapper around the eBPF map that allows adding and deleting IPv4 addresses.

@@ -59,7 +59,7 @@ const (
 	egress = "egress"
 )
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=types.go -destination=mock_types.go -package=metrics
+//go:generate mockgen -source=types.go -destination=mock_types.go -package=metrics
 type IModule interface {
 	Reconcile(spec *api.MetricsSpec) error
 }
