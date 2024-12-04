@@ -4,6 +4,7 @@ package legacy
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -21,7 +22,6 @@ import (
 	crcache "sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	kcfg "sigs.k8s.io/controller-runtime/pkg/client/config"
-	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	crmgr "sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
@@ -308,14 +308,12 @@ func (d *Daemon) Start() error {
 	mainLogger.Info("Started controller manager")
 
 	// Set health checks
-	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		mainLogger.Error("unable to set up health check", zap.Error(err))
-		os.Exit(1)
+	if err := mgr.AddHealthzCheck("healthz", func(_ *http.Request) error { return nil }); err != nil {
+		mainLogger.Error("unable to set up agent health check", zap.Error(err))
 	}
 
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		mainLogger.Error("unable to set up ready check", zap.Error(err))
-		os.Exit(1)
+	if err := mgr.AddReadyzCheck("readyz", func(_ *http.Request) error { return nil }); err != nil {
+		mainLogger.Error("unable to set up agent ready check", zap.Error(err))
 	}
 
 	// Start all registered controllers. This will block until container receives SIGTERM.

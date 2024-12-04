@@ -7,7 +7,7 @@ package hubble
 import (
 	"context"
 	"fmt"
-	"os"
+	"net/http"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -33,7 +33,6 @@ import (
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	zapf "sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -68,14 +67,12 @@ var (
 				return nil, nil, fmt.Errorf("creating new controller-runtime manager: %w", err)
 			}
 
-			if err := ctrlManager.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-				logger.Error("unable to set up healthz check", err)
-				os.Exit(1)
+			if err := ctrlManager.AddHealthzCheck("healthz", func(_ *http.Request) error { return nil }); err != nil {
+				logger.Error("unable to set up agent healthz check", err)
 			}
 
-			if err := ctrlManager.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-				logger.Error("unable to set up readyz check", err)
-				os.Exit(1)
+			if err := ctrlManager.AddReadyzCheck("readyz", func(_ *http.Request) error { return nil }); err != nil {
+				logger.Error("unable to set up agent readyz check", err)
 			}
 
 			return ctrlManager, ctrlManager.GetClient(), nil
