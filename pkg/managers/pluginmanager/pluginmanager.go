@@ -13,9 +13,8 @@ import (
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/managers/watchermanager"
 	"github.com/microsoft/retina/pkg/metrics"
-	"github.com/microsoft/retina/pkg/plugin/api"
+	"github.com/microsoft/retina/pkg/plugin"
 	"github.com/microsoft/retina/pkg/plugin/conntrack"
-	"github.com/microsoft/retina/pkg/plugin/registry"
 	"github.com/microsoft/retina/pkg/telemetry"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -37,27 +36,19 @@ var (
 type PluginManager struct {
 	cfg     *kcfg.Config
 	l       *log.ZapLogger
-	plugins map[api.PluginName]api.Plugin
+	plugins map[string]plugin.Plugin
 	tel     telemetry.Telemetry
 
 	watcherManager watchermanager.IWatcherManager
 }
 
-func init() {
-	registry.RegisterPlugins()
-}
-
-func NewPluginManager(
-	cfg *kcfg.Config,
-	tel telemetry.Telemetry,
-	pluginNames ...api.PluginName,
-) (*PluginManager, error) {
+func NewPluginManager(cfg *kcfg.Config, tel telemetry.Telemetry) (*PluginManager, error) {
 	logger := log.Logger().Named("plugin-manager")
 	mgr := &PluginManager{
 		cfg:     cfg,
 		l:       logger,
 		tel:     tel,
-		plugins: map[api.PluginName]api.Plugin{},
+		plugins: map[string]plugin.Plugin{},
 	}
 
 	if mgr.cfg.EnablePodLevel {
@@ -67,8 +58,8 @@ func NewPluginManager(
 		mgr.l.Info("plugin manager has pod level disabled")
 	}
 
-	for _, name := range pluginNames {
-		newPluginFn, ok := registry.PluginHandler[name]
+	for _, name := range cfg.EnabledPlugin {
+		newPluginFn, ok := plugin.Registry[name]
 		if !ok {
 			return nil, fmt.Errorf("plugin %s not found in registry", name)
 		}
@@ -80,9 +71,9 @@ func NewPluginManager(
 
 func (p *PluginManager) Stop() {
 	var wg sync.WaitGroup
-	for _, plugin := range p.plugins {
+	for _, pl := range p.plugins {
 		wg.Add(1)
-		go func(plugin api.Plugin) {
+		go func(plugin plugin.Plugin) {
 			defer wg.Done()
 			if err := plugin.Stop(); err != nil {
 				p.l.Error("failed to stop plugin", zap.Error(err))
@@ -91,32 +82,32 @@ func (p *PluginManager) Stop() {
 				// even if some plugins fail to stop.
 			}
 			p.l.Info("Cleaned up resource for plugin", zap.String("name", plugin.Name()))
-		}(plugin)
+		}(pl)
 	}
 	wg.Wait()
 }
 
 // Reconcile reconciles a particular plugin.
-func (p *PluginManager) Reconcile(ctx context.Context, plugin api.Plugin) error {
-	defer p.tel.StopPerf(p.tel.StartPerf(fmt.Sprintf("reconcile-%s", plugin.Name())))
+func (p *PluginManager) Reconcile(ctx context.Context, pl plugin.Plugin) error {
+	defer p.tel.StopPerf(p.tel.StartPerf("reconcile-" + pl.Name()))
 	// Regenerate eBPF code and bpf object.
 	// This maybe no-op for plugins that don't use eBPF.
-	if err := plugin.Generate(ctx); err != nil {
+	if err := pl.Generate(ctx); err != nil {
 		return errors.Wrap(err, "failed to generate plugin")
 	}
-	if err := plugin.Compile(ctx); err != nil {
+	if err := pl.Compile(ctx); err != nil {
 		return errors.Wrap(err, "failed to compile plugin")
 	}
 
 	// Re-start plugin.
-	if err := plugin.Stop(); err != nil {
+	if err := pl.Stop(); err != nil {
 		return errors.Wrap(err, "failed to stop plugin")
 	}
-	if err := plugin.Init(); err != nil {
+	if err := pl.Init(); err != nil {
 		return errors.Wrap(err, "failed to init plugin")
 	}
 
-	p.l.Info("Reconciled plugin", zap.String("name", plugin.Name()))
+	p.l.Info("Reconciled plugin", zap.String("name", pl.Name()))
 	return nil
 }
 
@@ -196,22 +187,22 @@ func (p *PluginManager) Start(ctx context.Context) error {
 	return nil
 }
 
-func (p *PluginManager) SetPlugin(name api.PluginName, plugin api.Plugin) {
+func (p *PluginManager) SetPlugin(name string, pl plugin.Plugin) {
 	if p == nil {
 		return
 	}
 
 	if p.plugins == nil {
-		p.plugins = map[api.PluginName]api.Plugin{}
+		p.plugins = map[string]plugin.Plugin{}
 	}
-	p.plugins[name] = plugin
+	p.plugins[name] = pl
 }
 
 func (p *PluginManager) SetupChannel(c chan *v1.Event) {
 	for name, plugin := range p.plugins {
 		err := plugin.SetupChannel(c)
 		if err != nil {
-			p.l.Error("failed to setup channel for plugin", zap.String("plugin name", string(name)), zap.Error(err))
+			p.l.Error("failed to setup channel for plugin", zap.String("plugin name", name), zap.Error(err))
 		}
 	}
 }

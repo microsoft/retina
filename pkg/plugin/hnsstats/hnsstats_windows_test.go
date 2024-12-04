@@ -20,7 +20,7 @@ func TestShutdown(t *testing.T) {
 			MetricsInterval: 100 * time.Second,
 			EnablePodLevel:  true,
 		},
-		l: log.Logger().Named(string(Name)),
+		l: log.Logger().Named(name),
 	}
 	p.Init()
 	ctx, cancel := context.WithCancel(context.Background())

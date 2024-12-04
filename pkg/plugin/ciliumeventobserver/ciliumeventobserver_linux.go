@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-
 // Package ciliumeventobserver contains the Retina CiliumEventObserver plugin. It uses unix socket to get events from cilium and decode them to flow objects.
 package ciliumeventobserver
 
@@ -18,7 +15,7 @@ import (
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
-	"github.com/microsoft/retina/pkg/plugin/api"
+	"github.com/microsoft/retina/pkg/plugin/registry"
 	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
 )
@@ -37,10 +34,14 @@ var (
 	errPodLevelDisabled = errors.New("pod level enricher is not initialized")
 )
 
-func New(cfg *kcfg.Config) api.Plugin {
+func init() {
+	registry.Plugins[name] = New
+}
+
+func New(cfg *kcfg.Config) registry.Plugin {
 	return &ciliumeventobserver{
 		cfg:           cfg,
-		l:             log.Logger().Named(string(Name)),
+		l:             log.Logger().Named(name),
 		retryDelay:    defaultRetryDelay,
 		maxAttempts:   defaultAttempts,
 		sockPath:      cfg.MonitorSockPath,
@@ -50,7 +51,7 @@ func New(cfg *kcfg.Config) api.Plugin {
 }
 
 func (c *ciliumeventobserver) Name() string {
-	return string(Name)
+	return name
 }
 
 func (c *ciliumeventobserver) Generate(_ context.Context) error {
@@ -165,13 +166,13 @@ func (c *ciliumeventobserver) monitorLoop(ctx context.Context) error {
 					return err //nolint:wrapcheck // Error is handled by the caller
 				}
 				c.l.Warn("Failed to decode payload from cilium", zap.Error(err))
-				metrics.LostEventsCounter.WithLabelValues(parserMetric, string(Name)).Inc()
+				metrics.LostEventsCounter.WithLabelValues(parserMetric, name).Inc()
 				continue
 			}
 			select {
 			case c.payloadEvents <- &pl:
 			default:
-				metrics.LostEventsCounter.WithLabelValues(utils.BufferedChannel, string(Name)).Inc()
+				metrics.LostEventsCounter.WithLabelValues(utils.BufferedChannel, name).Inc()
 			}
 		}
 	}
@@ -192,7 +193,7 @@ func (c *ciliumeventobserver) parserLoop(ctx context.Context) {
 			select {
 			case c.externalChannel <- ev:
 			default:
-				metrics.LostEventsCounter.WithLabelValues(utils.BufferedChannel, string(Name)).Inc()
+				metrics.LostEventsCounter.WithLabelValues(utils.BufferedChannel, name).Inc()
 			}
 		}
 	}

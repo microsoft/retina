@@ -17,7 +17,6 @@ import (
 
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
-	"github.com/microsoft/retina/pkg/plugin/api"
 )
 
 const (
@@ -32,16 +31,16 @@ const (
 )
 
 const (
-	Name                  api.PluginName = "packetparser"
-	toEndpoint            string         = "toEndpoint"
-	fromEndpoint          string         = "fromEndpoint"
-	workers               int            = 2
-	buffer                int            = 10000
-	bpfSourceDir          string         = "_cprog"
-	bpfSourceFileName     string         = "packetparser.c"
-	bpfObjectFileName     string         = "packetparser_bpf.o"
-	dynamicHeaderFileName string         = "dynamic.h"
-	tcFilterPriority      uint16         = 0x1
+	name                  string = "packetparser"
+	toEndpoint            string = "toEndpoint"
+	fromEndpoint          string = "fromEndpoint"
+	workers               int    = 2
+	buffer                int    = 10000
+	bpfSourceDir          string = "_cprog"
+	bpfSourceFileName     string = "packetparser.c"
+	bpfObjectFileName     string = "packetparser_bpf.o"
+	dynamicHeaderFileName string = "dynamic.h"
+	tcFilterPriority      uint16 = 0x1
 )
 
 type interfaceType string

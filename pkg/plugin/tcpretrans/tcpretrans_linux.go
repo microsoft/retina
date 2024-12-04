@@ -19,21 +19,25 @@ import (
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
-	"github.com/microsoft/retina/pkg/plugin/api"
+	"github.com/microsoft/retina/pkg/plugin/registry"
 	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
 )
 
-func New(cfg *kcfg.Config) api.Plugin {
+func init() {
+	registry.Plugins[name] = New
+}
+
+func New(cfg *kcfg.Config) registry.Plugin {
 	return &tcpretrans{
 		cfg: cfg,
-		l:   log.Logger().Named(string(Name)),
+		l:   log.Logger().Named(name),
 	}
 }
 
 func (t *tcpretrans) Name() string {
-	return string(Name)
+	return name
 }
 
 func (t *tcpretrans) Generate(ctx context.Context) error {
@@ -103,7 +107,7 @@ func (t *tcpretrans) Stop() error {
 }
 
 func (t *tcpretrans) SetupChannel(ch chan *v1.Event) error {
-	t.l.Warn("SetupChannel is not supported by plugin", zap.String("plugin", string(Name)))
+	t.l.Warn("SetupChannel is not supported by plugin", zap.String("plugin", name))
 	return nil
 }
 

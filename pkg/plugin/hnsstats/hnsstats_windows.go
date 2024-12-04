@@ -15,7 +15,7 @@ import (
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
-	"github.com/microsoft/retina/pkg/plugin/api"
+	"github.com/microsoft/retina/pkg/plugin/registry"
 	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
 )
@@ -43,15 +43,26 @@ const (
 	zapPortField       = "port"
 )
 
-func (h *hnsstats) Name() string {
-	return string(Name)
+func init() {
+	registry.Plugins[name] = New
 }
 
-func (h *hnsstats) Generate(ctx context.Context) error {
+func New(cfg *kcfg.Config) registry.Plugin {
+	return &hnsstats{
+		cfg: cfg,
+		l:   log.Logger().Named(name),
+	}
+}
+
+func (h *hnsstats) Name() string {
+	return name
+}
+
+func (h *hnsstats) Generate(context.Context) error {
 	return nil
 }
 
-func (h *hnsstats) Compile(ctx context.Context) error {
+func (h *hnsstats) Compile(context.Context) error {
 	return nil
 }
 
@@ -78,8 +89,8 @@ func (h *hnsstats) Init() error {
 	return nil
 }
 
-func (h *hnsstats) SetupChannel(ch chan *v1.Event) error {
-	h.l.Warn("Plugin does not support SetupChannel", zap.String(zapPluginField, string(Name)))
+func (h *hnsstats) SetupChannel(chan *v1.Event) error {
+	h.l.Warn("Plugin does not support SetupChannel", zap.String(zapPluginField, name))
 	return nil
 }
 
@@ -213,13 +224,4 @@ func (d *hnsstats) Stop() error {
 	d.state = stop
 	d.l.Info("Exiting hnsstats Stop...")
 	return nil
-}
-
-// New creates an hnsstats plugin.
-func New(cfg *kcfg.Config) api.Plugin {
-	// Init logger
-	return &hnsstats{
-		cfg: cfg,
-		l:   log.Logger().Named(string(Name)),
-	}
 }

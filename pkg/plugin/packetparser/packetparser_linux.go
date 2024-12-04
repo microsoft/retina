@@ -31,7 +31,6 @@ import (
 	"github.com/microsoft/retina/pkg/loader"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
-	"github.com/microsoft/retina/pkg/plugin/api"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
 	_ "github.com/microsoft/retina/pkg/plugin/lib/_amd64"                            // nolint
 	_ "github.com/microsoft/retina/pkg/plugin/lib/_arm64"                            // nolint
@@ -40,6 +39,7 @@ import (
 	_ "github.com/microsoft/retina/pkg/plugin/lib/common/libbpf/_include/uapi/linux" // nolint
 	_ "github.com/microsoft/retina/pkg/plugin/lib/common/libbpf/_src"                // nolint
 	_ "github.com/microsoft/retina/pkg/plugin/packetparser/_cprog"                   // nolint
+	"github.com/microsoft/retina/pkg/plugin/registry"
 	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/microsoft/retina/pkg/watchers/endpoint"
@@ -52,16 +52,20 @@ import (
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type packet packetparser ./_cprog/packetparser.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../lib/common/libbpf/_include/linux -I../lib/common/libbpf/_include/uapi/linux -I../lib/common/libbpf/_include/asm -I../filter/_cprog/ -I../conntrack/_cprog/
 var errNoOutgoingLinks = errors.New("could not determine any outgoing links")
 
+func init() {
+	registry.Plugins[name] = New
+}
+
 // New creates a packetparser plugin.
-func New(cfg *kcfg.Config) api.Plugin {
+func New(cfg *kcfg.Config) registry.Plugin {
 	return &packetParser{
 		cfg: cfg,
-		l:   log.Logger().Named(string(Name)),
+		l:   log.Logger().Named(name),
 	}
 }
 
 func (p *packetParser) Name() string {
-	return string(Name)
+	return name
 }
 
 func (p *packetParser) Generate(ctx context.Context) error {
@@ -606,7 +610,7 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 				default:
 					// Channel is full, drop the event.
 					// We shouldn't slow down the reader.
-					metrics.LostEventsCounter.WithLabelValues(utils.ExternalChannel, string(Name)).Inc()
+					metrics.LostEventsCounter.WithLabelValues(utils.ExternalChannel, name).Inc()
 				}
 			}
 		}
@@ -642,7 +646,7 @@ func (p *packetParser) readData() {
 
 	if record.LostSamples > 0 {
 		// p.l.Warn("Lostsamples", zap.Uint64("lost samples", record.LostSamples))
-		metrics.LostEventsCounter.WithLabelValues(utils.Kernel, string(Name)).Add(float64(record.LostSamples))
+		metrics.LostEventsCounter.WithLabelValues(utils.Kernel, name).Add(float64(record.LostSamples))
 		return
 	}
 
@@ -651,7 +655,7 @@ func (p *packetParser) readData() {
 	default:
 		// Channel is full, drop the record.
 		// We shouldn't slow down the perf array reader.
-		metrics.LostEventsCounter.WithLabelValues(utils.BufferedChannel, string(Name)).Inc()
+		metrics.LostEventsCounter.WithLabelValues(utils.BufferedChannel, name).Inc()
 	}
 }
 

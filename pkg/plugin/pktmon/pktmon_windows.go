@@ -15,7 +15,7 @@ import (
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
-	"github.com/microsoft/retina/pkg/plugin/api"
+	"github.com/microsoft/retina/pkg/plugin/registry"
 	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapio"
@@ -34,7 +34,7 @@ var (
 )
 
 const (
-	Name                    = "pktmon"
+	name                    = "pktmon"
 	connectionRetryAttempts = 5
 	eventChannelSize        = 1000
 )
@@ -49,6 +49,16 @@ type Plugin struct {
 
 	grpcClient *GRPCClient
 	stream     observerv1.Observer_GetFlowsClient
+}
+
+func init() {
+	registry.Plugins[name] = New
+}
+
+func New(*kcfg.Config) registry.Plugin {
+	return &Plugin{
+		l: log.Logger().Named(name),
+	}
 }
 
 func (p *Plugin) Init() error {
@@ -245,7 +255,7 @@ func (p *Plugin) GetFlow(ctx context.Context) error {
 				default:
 					// Channel is full, drop the event.
 					// We shouldn't slow down the reader.
-					metrics.LostEventsCounter.WithLabelValues(utils.ExternalChannel, string(Name)).Inc()
+					metrics.LostEventsCounter.WithLabelValues(utils.ExternalChannel, name).Inc()
 				}
 			}
 		}
@@ -255,12 +265,6 @@ func (p *Plugin) GetFlow(ctx context.Context) error {
 func (p *Plugin) SetupChannel(ch chan *v1.Event) error {
 	p.externalChannel = ch
 	return nil
-}
-
-func New(_ *kcfg.Config) api.Plugin {
-	return &Plugin{
-		l: log.Logger().Named(Name),
-	}
 }
 
 func (p *Plugin) Stop() error {
@@ -274,10 +278,10 @@ func (p *Plugin) Stop() error {
 	return nil
 }
 
-func (p *Plugin) Compile(_ context.Context) error {
+func (p *Plugin) Compile(context.Context) error {
 	return nil
 }
 
-func (p *Plugin) Generate(_ context.Context) error {
+func (p *Plugin) Generate(context.Context) error {
 	return nil
 }
