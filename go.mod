@@ -10,7 +10,7 @@ require (
 	github.com/prometheus/client_golang v1.20.5
 	github.com/spf13/cobra v1.8.1
 	go.uber.org/zap v1.27.0
-	k8s.io/client-go v0.30.3
+	k8s.io/client-go v0.31.3
 	sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.0.49
 	sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader v0.0.20
 )
@@ -269,8 +269,8 @@ require (
 	google.golang.org/protobuf v1.35.2
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/api v0.30.3
-	k8s.io/apimachinery v0.30.3
+	k8s.io/api v0.31.3
+	k8s.io/apimachinery v0.31.3
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20240903163716-9e1beecbcb38 // indirect
 	k8s.io/utils v0.0.0-20240921022957-49e7df575cb6
@@ -335,12 +335,17 @@ require (
 	k8s.io/apiextensions-apiserver v0.30.3
 	k8s.io/cli-runtime v0.30.3
 	k8s.io/kubectl v0.30.3
-	k8s.io/metrics v0.30.3
+	k8s.io/metrics v0.31.3
 	k8s.io/perf-tests/network/benchmarks/netperf v0.0.0-00010101000000-000000000000
 	sigs.k8s.io/controller-runtime v0.18.5
 )
 
-require github.com/rogpeppe/go-internal v1.12.0 // indirect
+require (
+	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
+	github.com/rogpeppe/go-internal v1.12.0 // indirect
+	github.com/x448/float16 v0.8.4 // indirect
+	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
+)
 
 replace github.com/vishvananda/netns => github.com/inspektor-gadget/netns v0.0.5-0.20230524185006-155d84c555d6
 
