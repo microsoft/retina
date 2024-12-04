@@ -3,24 +3,47 @@
 # buildx targets, and this one requires legacy build.
 # Maybe one day: https://github.com/moby/buildkit/issues/616
 ARG BUILDER_IMAGE
+
+FROM --platform=windows/amd64 ${BUILDER_IMAGE} as pktmon-builder
+WORKDIR C:\\retina
+
 # mcr.microsoft.com/oss/go/microsoft/golang:1.23.1-windowsservercore-ltsc2022
 FROM --platform=windows/amd64 mcr.microsoft.com/oss/go/microsoft/golang@sha256:e2d55093522b5f4a311494255d0598145b1f13da5ae2354a09c7f7c1355f3ad9 AS builder
 WORKDIR C:\\retina
 COPY go.mod .
 COPY go.sum .
 RUN go mod download
+
+
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+
+RUN [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+    Invoke-WebRequest -UseBasicParsing -uri "https://github.com/msys2/msys2-installer/releases/download/2024-05-07/msys2-base-x86_64-20240507.sfx.exe" -OutFile msys2.exe; \
+    .\msys2.exe -y -oC:\; \
+    Remove-Item msys2.exe ; \
+    function msys() { C:\msys64\usr\bin\bash.exe @('-lc') + @Args; } \
+    msys ' '; \
+    msys 'pacman --noconfirm -Syuu'; \
+    msys 'pacman --noconfirm -S mingw-w64-x86_64-gcc'; \
+    msys 'pacman --noconfirm -Scc'; 
+
+# pure magic: https://github.com/MicrosoftDocs/Virtualization-Documentation/blob/3f7c7ed7ef8d582c74ec740414c54f25bf5850c0/windows-container-samples/golang/Dockerfile#L15C1-L15C179
+RUN setx path "C:\msys64\mingw64\bin"
+
 ADD . .
+RUN powershell -Command "Remove-Item -Recurse -Force C:\retina\pkg\plugin\windows\pktmon\stream"
+COPY --from=pktmon-builder C:\\pktmon\\stream  C:\\retina\\pkg\\plugin\\windows\\pktmon\\stream
+
 ARG VERSION
 ARG APP_INSIGHTS_ID
 SHELL ["cmd", "/S", "/C"]
 ENV VERSION=$VERSION
 
 ENV APP_INSIGHTS_ID=$APP_INSIGHTS_ID
+ENV CGO_ENABLED=1
 RUN go build -v -o controller.exe -ldflags="-X github.com/microsoft/retina/internal/buildinfo.Version=%VERSION% -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=%APP_INSIGHTS_ID%" .\controller
 RUN go build -v -o captureworkload.exe -ldflags="-X github.com/microsoft/retina/internal/buildinfo.Version=%VERSION% -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=%APP_INSIGHTS_ID%" .\captureworkload
 
-FROM --platform=windows/amd64 ${BUILDER_IMAGE} as pktmon-builder
-WORKDIR C:\\retina
 
 FROM --platform=windows/amd64 mcr.microsoft.com/windows/nanoserver:ltsc2022 AS final
 ADD https://github.com/microsoft/etl2pcapng/releases/download/v1.10.0/etl2pcapng.exe /etl2pcapng.exe
