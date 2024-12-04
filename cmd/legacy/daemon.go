@@ -307,7 +307,7 @@ func (d *Daemon) Start() error {
 	go controllerMgr.Start(ctx)
 	mainLogger.Info("Started controller manager")
 
-	//Set health checks
+	// Set health checks
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		mainLogger.Error("unable to set up health check", zap.Error(err))
 		os.Exit(1)
