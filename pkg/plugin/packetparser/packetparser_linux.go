@@ -53,7 +53,7 @@ import (
 var errNoOutgoingLinks = errors.New("could not determine any outgoing links")
 
 func init() {
-	registry.Plugins[name] = New
+	registry.Add(name, New)
 }
 
 // New creates a packetparser plugin.

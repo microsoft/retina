@@ -36,9 +36,17 @@ type Plugin interface {
 // PluginFunc is the Constructor func that all PLugins must provide to Register.
 type PluginFunc func(*kcfg.Config) Plugin
 
-// Plugins is the centralized list of Retina plugins their New functions to create them.
-var Plugins = map[string]PluginFunc{}
+// plugins is the centralized list of Retina plugins their New functions to create them.
+var plugins = map[string]PluginFunc{}
 
-func Register(name string, f PluginFunc) {
-	Plugins[name] = f
+func Add(name string, f PluginFunc) {
+	if _, ok := plugins[name]; ok {
+		panic("duplicate plugin registration for " + name)
+	}
+	plugins[name] = f
+}
+
+func Get(name string) (PluginFunc, bool) {
+	f, ok := plugins[name]
+	return f, ok
 }

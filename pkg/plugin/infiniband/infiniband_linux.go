@@ -19,7 +19,7 @@ import (
 var ErrAlreadyRunning = errors.New("infiniband plugin is already running")
 
 func init() {
-	registry.Plugins[name] = New
+	registry.Add(name, New)
 }
 
 // New creates a infiniband plugin.

@@ -21,7 +21,7 @@ import (
 const defaultLimit = 2000
 
 func init() {
-	registry.Plugins[name] = New
+	registry.Add(name, New)
 }
 
 // New creates a linuxutil plugin.

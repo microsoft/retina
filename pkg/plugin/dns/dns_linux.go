@@ -24,7 +24,7 @@ import (
 )
 
 func init() {
-	registry.Plugins[name] = New
+	registry.Add(name, New)
 }
 
 func New(cfg *kcfg.Config) registry.Plugin {

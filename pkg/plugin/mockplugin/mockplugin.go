@@ -27,7 +27,7 @@ type MockPlugin struct {
 }
 
 func init() {
-	registry.Plugins[name] = New
+	registry.Add(name, New)
 }
 
 // New creates a mock plugin.

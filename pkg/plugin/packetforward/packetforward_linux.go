@@ -30,7 +30,7 @@ import (
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type metric packetforward ./_cprog/packetforward.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src
 
 func init() {
-	registry.Plugins[name] = New
+	registry.Add(name, New)
 }
 
 // New creates a new packetforward plugin.

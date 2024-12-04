@@ -43,7 +43,7 @@ const (
 )
 
 func init() {
-	registry.Plugins[name] = New
+	registry.Add(name, New)
 }
 
 // New creates a new dropreason plugin.

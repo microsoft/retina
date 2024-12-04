@@ -59,7 +59,7 @@ func NewPluginManager(cfg *kcfg.Config, tel telemetry.Telemetry) (*PluginManager
 	}
 
 	for _, name := range cfg.EnabledPlugin {
-		newPluginFn, ok := plugin.Registry[name]
+		newPluginFn, ok := plugin.Get(name)
 		if !ok {
 			return nil, fmt.Errorf("plugin %s not found in registry", name)
 		}

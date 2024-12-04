@@ -52,7 +52,7 @@ type Plugin struct {
 }
 
 func init() {
-	registry.Plugins[name] = New
+	registry.Add(name, New)
 }
 
 func New(*kcfg.Config) registry.Plugin {
