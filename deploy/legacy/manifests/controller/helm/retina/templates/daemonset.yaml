@@ -220,6 +220,15 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: status.hostIP
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: {{ .Values.daemonset.container.retina.ports.healthPort }}
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds | default "30" }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds | default "30" }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds | default "1" }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold | default "3" }}
+            successThreshold: {{ .Values.readinessProbe.successThreshold | default "1" }}
           livenessProbe:
             httpGet:
               path: /healthz
