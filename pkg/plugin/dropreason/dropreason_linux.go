@@ -25,9 +25,9 @@ import (
 	"github.com/microsoft/retina/pkg/loader"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
-	"github.com/microsoft/retina/pkg/plugin/api"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
 	_ "github.com/microsoft/retina/pkg/plugin/dropreason/_cprog" // nolint
+	"github.com/microsoft/retina/pkg/plugin/registry"
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -42,20 +42,24 @@ const (
 	nfConntrackConfirmFn = "__nf_conntrack_confirm"
 )
 
+func init() {
+	registry.Add(name, New)
+}
+
 // New creates a new dropreason plugin.
 // When opts.EnablePodLevel=false, the enricher will not be used.
-func New(cfg *kcfg.Config) api.Plugin {
+func New(cfg *kcfg.Config) registry.Plugin {
 	return &dropReason{
 		cfg: cfg,
-		l:   log.Logger().Named(string(Name)),
+		l:   log.Logger().Named(name),
 	}
 }
 
 // Plugin API implementation for packet forward.
-// Ref: github.com/microsoft/retina/pkg/plugin/api
+// Ref: github.com/microsoft/retina/pkg/plugin
 
 func (dr *dropReason) Name() string {
-	return string(Name)
+	return name
 }
 
 func (dr *dropReason) Generate(ctx context.Context) error {
@@ -399,7 +403,7 @@ func (dr *dropReason) processRecord(ctx context.Context, id int) {
 				select {
 				case dr.externalChannel <- ev:
 				default:
-					metrics.LostEventsCounter.WithLabelValues(utils.ExternalChannel, string(Name)).Inc()
+					metrics.LostEventsCounter.WithLabelValues(utils.ExternalChannel, name).Inc()
 				}
 			}
 		}
@@ -421,7 +425,7 @@ func (dr *dropReason) readEventArrayData() error {
 
 	if record.LostSamples > 0 {
 		// dr.l.Warn("Lost samples in drop reason plugin", zap.Uint64("lost samples", record.LostSamples))
-		metrics.LostEventsCounter.WithLabelValues(utils.Kernel, string(Name)).Add(float64(record.LostSamples))
+		metrics.LostEventsCounter.WithLabelValues(utils.Kernel, name).Add(float64(record.LostSamples))
 		return nil
 	}
 
@@ -430,7 +434,7 @@ func (dr *dropReason) readEventArrayData() error {
 		dr.l.Debug("Record sent to channel", zap.Any("record", record))
 	default:
 		// dr.l.Warn("Channel is full, dropping record", zap.Any("record", record))
-		metrics.LostEventsCounter.WithLabelValues(utils.BufferedChannel, string(Name)).Inc()
+		metrics.LostEventsCounter.WithLabelValues(utils.BufferedChannel, name).Inc()
 	}
 
 	return nil

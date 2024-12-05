@@ -12,7 +12,6 @@ import (
 	"github.com/microsoft/retina/pkg/log"
 	pm "github.com/microsoft/retina/pkg/managers/pluginmanager"
 	sm "github.com/microsoft/retina/pkg/managers/servermanager"
-	"github.com/microsoft/retina/pkg/plugin/api"
 	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/microsoft/retina/pkg/telemetry"
 	"go.uber.org/zap"
@@ -46,15 +45,9 @@ func NewControllerManager(conf *kcfg.Config, kubeclient kubernetes.Interface, te
 		factory.WaitForCacheSync(wait.NeverStop)
 	}
 
-	// enabledPlugins := {api.PluginName(conf.EnabledPlugin[])}
-	enabledPlugins := []api.PluginName{}
-	for _, pluginName := range conf.EnabledPlugin {
-		enabledPlugins = append(enabledPlugins, api.PluginName(pluginName))
-	}
 	pMgr, err := pm.NewPluginManager(
 		conf,
 		tel,
-		enabledPlugins...,
 	)
 	if err != nil {
 		return nil, err

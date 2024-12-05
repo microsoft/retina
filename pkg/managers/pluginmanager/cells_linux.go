@@ -8,7 +8,6 @@ import (
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/metrics"
-	"github.com/microsoft/retina/pkg/plugin/api"
 	"github.com/microsoft/retina/pkg/telemetry"
 	"github.com/sirupsen/logrus"
 )
@@ -44,11 +43,7 @@ func newPluginManager(params pluginManagerParams) (*PluginManager, error) {
 	// Enable Metrics in retina
 	metrics.InitializeMetrics()
 
-	enabledPlugins := []api.PluginName{}
-	for _, pluginName := range params.Config.EnabledPlugin {
-		enabledPlugins = append(enabledPlugins, api.PluginName(pluginName))
-	}
-	pluginMgr, err := NewPluginManager(&params.Config, params.Telemetry, enabledPlugins...)
+	pluginMgr, err := NewPluginManager(&params.Config, params.Telemetry)
 	if err != nil {
 		return &PluginManager{}, err
 	}

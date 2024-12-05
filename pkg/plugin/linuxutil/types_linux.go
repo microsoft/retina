@@ -6,12 +6,9 @@ import (
 	"github.com/cakturk/go-netstat/netstat"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
-	"github.com/microsoft/retina/pkg/plugin/api"
 )
 
-const (
-	Name api.PluginName = "linuxutil"
-)
+const name = "linuxutil"
 
 //go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=types_linux.go -destination=linuxutil_mock_generated_linux.go -package=linuxutil
 type linuxUtil struct {
