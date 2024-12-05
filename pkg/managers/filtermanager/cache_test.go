@@ -6,6 +6,7 @@ package filtermanager
 import (
 	"fmt"
 	"net"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,7 +14,7 @@ import (
 )
 
 func Test_newCache(t *testing.T) {
-	f := newCache()
+	f := getCache()
 	assert.NotNil(t, f)
 
 	f.data["1.1.1.1"] = requests{
@@ -22,12 +23,12 @@ func Test_newCache(t *testing.T) {
 		},
 	}
 
-	f2 := newCache()
+	f2 := getCache()
 	assert.Equal(t, f, f2)
 }
 
 func Test_IPs(t *testing.T) {
-	f := newCache()
+	f := getCache()
 	f.reset()
 
 	ips := f.ips()
@@ -45,7 +46,7 @@ func Test_IPs(t *testing.T) {
 }
 
 func Test_reset(t *testing.T) {
-	f := newCache()
+	f := getCache()
 	assert.NotNil(t, f)
 
 	f.data["1.1.1.1"] = requests{}
@@ -54,30 +55,45 @@ func Test_reset(t *testing.T) {
 }
 
 func Test_hasKey(t *testing.T) {
-	f := newCache()
+	f := getCache()
 	f.data["1.1.1.1"] = requests{}
 	assert.True(t, f.hasKey(net.ParseIP("1.1.1.1")))
 	assert.False(t, f.hasKey(net.ParseIP("2.2.2.2")))
 }
 
 func addIPsHelper() {
-	f := newCache()
+	f := getCache()
 	ip1 := net.ParseIP("1.1.1.1")
 	ip2 := net.ParseIP("2.2.2.2")
 
-	go f.addIP(ip1, "trace1", RequestMetadata{RuleID: "task1"})
-	go f.addIP(ip1, "trace1", RequestMetadata{RuleID: "task2"})
-	go f.addIP(ip1, "trace2", RequestMetadata{RuleID: "task3"})
-	go f.addIP(ip2, "trace1", RequestMetadata{RuleID: "task1"})
+	wg := sync.WaitGroup{}
+	wg.Add(4)
+
+	go func() {
+		f.addIP(ip1, "trace1", RequestMetadata{RuleID: "task1"})
+		wg.Done()
+	}()
+	go func() {
+		f.addIP(ip1, "trace1", RequestMetadata{RuleID: "task2"})
+		wg.Done()
+	}()
+	go func() {
+		f.addIP(ip1, "trace2", RequestMetadata{RuleID: "task3"})
+		wg.Done()
+	}()
+	go func() {
+		f.addIP(ip2, "trace1", RequestMetadata{RuleID: "task1"})
+		wg.Done()
+	}()
 
 	// Wait for goroutines to finish.
-	time.Sleep(1 * time.Second)
+	wg.Wait()
 }
 
 func Test_addIP(t *testing.T) {
 	addIPsHelper()
 
-	f := newCache()
+	f := getCache()
 	assert.Equal(t, 2, len(f.data))
 
 	expectedData := map[string]requests{
@@ -106,7 +122,7 @@ func Test_addIP(t *testing.T) {
 func Test_deleteIP(t *testing.T) {
 	addIPsHelper()
 
-	f := newCache()
+	f := getCache()
 	assert.Equal(t, 2, len(f.data))
 
 	ip1 := net.ParseIP("1.1.1.1")
@@ -202,13 +218,18 @@ func Test_deleteIP(t *testing.T) {
 }
 
 func Test_multiOp(t *testing.T) {
-	f := newCache()
+	f := getCache()
 
+	wg := sync.WaitGroup{}
+	wg.Add(100)
 	for i := 0; i < 100; i++ {
 		ip := net.ParseIP(fmt.Sprintf("%d.%d.%d.%d", i, i, i, i))
-		go f.addIP(ip, Requestor(fmt.Sprintf("trace-%d", i)), RequestMetadata{RuleID: "task1"})
+		go func() {
+			f.addIP(ip, Requestor(fmt.Sprintf("trace-%d", i)), RequestMetadata{RuleID: "task1"})
+			wg.Done()
+		}()
 	}
-	time.Sleep(1 * time.Second)
+	wg.Wait()
 	assert.Equal(t, 100, len(f.data))
 
 	fn := func(i int) {
@@ -216,9 +237,14 @@ func Test_multiOp(t *testing.T) {
 		res := f.deleteIP(ip, Requestor(fmt.Sprintf("trace-%d", i)), RequestMetadata{RuleID: "task1"})
 		assert.True(t, res)
 	}
+	wg.Add(100)
 	for i := 0; i < 100; i++ {
-		go fn(i)
+		go func() {
+			i := i
+			fn(i)
+			wg.Done()
+		}()
 	}
-	time.Sleep(1 * time.Second)
+	wg.Wait()
 	assert.Equal(t, 0, len(f.data))
 }
