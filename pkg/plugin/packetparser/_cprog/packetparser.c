@@ -201,6 +201,10 @@ static void parse(struct __sk_buff *skb, __u8 obs)
 		return;
 	}
 
+	// Initialize the conntrack metadata.
+	struct conntrackmetadata conntrack_metadata;
+	__builtin_memset(&conntrack_metadata, 0, sizeof(conntrack_metadata));
+	p.conntrack_metadata = conntrack_metadata;
 
 	// Process the packet in ct
 	bool report __attribute__((unused));
