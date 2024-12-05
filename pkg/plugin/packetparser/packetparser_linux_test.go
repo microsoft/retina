@@ -536,7 +536,7 @@ func TestPacketParseGenerate(t *testing.T) {
 	// Instantiate the packetParser struct with a mocked logger and context.
 	p := &packetParser{
 		cfg: cfgPodLevelEnabled,
-		l:   log.Logger().Named(string(Name)),
+		l:   log.Logger().Named(name),
 	}
 	ctx := context.Background()
 
@@ -567,7 +567,7 @@ func TestCompile(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	p := &packetParser{
 		cfg: cfgPodLevelEnabled,
-		l:   log.Logger().Named(string(Name)),
+		l:   log.Logger().Named(name),
 	}
 	dir, _ := absPath()
 	expectedOutputFile := fmt.Sprintf("%s/%s", dir, bpfObjectFileName)

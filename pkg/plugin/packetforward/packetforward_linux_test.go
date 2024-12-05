@@ -84,7 +84,7 @@ func TestStop(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	p := &packetForward{
 		cfg: cfgPodLevelEnabled,
-		l:   log.Logger().Named(string(Name)),
+		l:   log.Logger().Named(name),
 	}
 	err := p.Stop()
 	if err != nil {
@@ -112,7 +112,7 @@ func TestStop_NonNilMap(t *testing.T) {
 	mockedMap := mocks.NewMockIMap(ctrl)
 	mockedMap.EXPECT().Close().Return(errors.New("Error")).MinTimes(1)
 	p := &packetForward{
-		l:           log.Logger().Named(string(Name)),
+		l:           log.Logger().Named(name),
 		hashmapData: mockedMap,
 	}
 	err := p.Stop()
@@ -136,7 +136,7 @@ func TestStop_NonNilMap(t *testing.T) {
 func TestCompile(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	p := &packetForward{
-		l: log.Logger().Named(string(Name)),
+		l: log.Logger().Named(name),
 	}
 	dir, _ := absPath()
 	expectedOutputFile := fmt.Sprintf("%s/%s", dir, bpfObjectFileName)
@@ -163,7 +163,7 @@ func TestShutdown(t *testing.T) {
 			MetricsInterval: 100 * time.Second,
 			EnablePodLevel:  true,
 		},
-		l: log.Logger().Named(string(Name)),
+		l: log.Logger().Named(name),
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -190,7 +190,7 @@ func TestRun(t *testing.T) {
 
 	p := &packetForward{
 		cfg:         cfgPodLevelEnabled,
-		l:           log.Logger().Named(string(Name)),
+		l:           log.Logger().Named(name),
 		hashmapData: mockedMap,
 	}
 
@@ -223,7 +223,7 @@ func TestRun_ReturnError_Ingress(t *testing.T) {
 
 	p := &packetForward{
 		cfg:         cfgPodLevelEnabled,
-		l:           log.Logger().Named(string(Name)),
+		l:           log.Logger().Named(name),
 		hashmapData: mockedMap,
 	}
 
@@ -257,7 +257,7 @@ func TestRun_ReturnError_Egress(t *testing.T) {
 
 	p := &packetForward{
 		cfg:         cfgPodLevelEnabled,
-		l:           log.Logger().Named(string(Name)),
+		l:           log.Logger().Named(name),
 		hashmapData: mockedMap,
 	}
 
