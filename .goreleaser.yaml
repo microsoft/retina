@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 # vim: set ts=2 sw=2 tw=0 fo=cnqoj
 
-version: 1
+version: 2
 
 before:
   hooks:
@@ -22,7 +22,7 @@ builds:
       - windows
       - darwin
     ldflags:
-      - -X github.com/microsoft/retina/cli/cmd.Version=v{{.Version}}
+      - -X github.com/microsoft/retina/internal/buildinfo.Version=v{{.Version}}
     main: cli/main.go
 
 archives:
