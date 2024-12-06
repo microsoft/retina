@@ -22,6 +22,7 @@ import (
 
 func init() {
 	// Register custom error handler for the watcher
+	// nolint:reassign
 	runtime.ErrorHandlers = []func(error){
 		k8sWatcherErrorHandler,
 	}
