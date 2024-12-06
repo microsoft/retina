@@ -17,21 +17,25 @@ import (
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
-	"github.com/microsoft/retina/pkg/plugin/api"
 	"github.com/microsoft/retina/pkg/plugin/common"
+	"github.com/microsoft/retina/pkg/plugin/registry"
 	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
 )
 
-func New(cfg *kcfg.Config) api.Plugin {
+func init() {
+	registry.Add(name, New)
+}
+
+func New(cfg *kcfg.Config) registry.Plugin {
 	return &dns{
 		cfg: cfg,
-		l:   log.Logger().Named(string(Name)),
+		l:   log.Logger().Named(name),
 	}
 }
 
 func (d *dns) Name() string {
-	return string(Name)
+	return name
 }
 
 func (d *dns) Generate(ctx context.Context) error {
@@ -152,7 +156,7 @@ func (d *dns) eventHandler(event *types.Event) {
 		select {
 		case d.externalChannel <- ev:
 		default:
-			metrics.LostEventsCounter.WithLabelValues(utils.ExternalChannel, string(Name)).Inc()
+			metrics.LostEventsCounter.WithLabelValues(utils.ExternalChannel, name).Inc()
 		}
 	}
 }
