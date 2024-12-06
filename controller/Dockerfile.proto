@@ -3,15 +3,14 @@ FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:
 
 LABEL Name=retina-builder Version=0.0.1
 
-RUN apt-get update &&\
-    apt-get -y install lsb-release wget software-properties-common gnupg file git make unzip
+RUN tdnf install -y unzip
 
 WORKDIR /tmp
 
-RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.31.0
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.2
 RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v24.2/protoc-24.2-linux-x86_64.zip
 RUN unzip protoc-24.2-linux-x86_64.zip -d protoc
 RUN mv protoc/bin/protoc /usr/bin/protoc
 
 WORKDIR /app
-ENTRYPOINT protoc -I=. --go_out=paths=source_relative:. ./pkg/utils/metadata.proto
+ENTRYPOINT protoc -I=. --go_out=paths=source_relative:. ./pkg/utils/metadata_linux.proto
