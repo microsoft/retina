@@ -13,17 +13,21 @@ import (
 )
 
 type conntrackCtEntry struct {
-	EvictionTime        uint32
-	LastReportTxDir     uint32
-	LastReportRxDir     uint32
-	TrafficDirection    uint8
-	FlagsSeenTxDir      uint8
-	FlagsSeenRxDir      uint8
-	IsDirectionUnknown  bool
-	BytesForwardCount   uint64
-	BytesReplyCount     uint64
-	PacketsForwardCount uint64
-	PacketsReplyCount   uint64
+	EvictionTime       uint32
+	LastReportTxDir    uint32
+	LastReportRxDir    uint32
+	TrafficDirection   uint8
+	FlagsSeenTxDir     uint8
+	FlagsSeenRxDir     uint8
+	IsDirectionUnknown bool
+	ConntrackMetadata  struct {
+		BytesForwardCount   uint64
+		BytesReplyCount     uint64
+		PacketsForwardCount uint64
+		PacketsReplyCount   uint64
+		TrafficDirection    uint8
+		_                   [7]byte
+	}
 }
 
 type conntrackCtV4Key struct {
