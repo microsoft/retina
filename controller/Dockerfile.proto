@@ -3,8 +3,7 @@ FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:
 
 LABEL Name=retina-builder Version=0.0.1
 
-RUN yum update -y &&\
-    yum install -y unzip
+RUN tdnf install -y unzip
 
 WORKDIR /tmp
 
