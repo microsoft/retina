@@ -1,7 +1,6 @@
 package retina
 
 import (
-	"os"
 	"time"
 
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
@@ -32,7 +31,7 @@ func DefaultScaleTestOptions() scaletest.Options {
 		DeletePodsInterval:            60 * time.Second,
 		DeleteRealPods:                false,
 		DeletePodsTimes:               1,
-		DeleteLabels:                  false,
+		DeleteLabels:                  true,
 		DeleteLabelsInterval:          60 * time.Second,
 		DeleteLabelsTimes:             1,
 		DeleteNetworkPolicies:         false,
@@ -40,6 +39,7 @@ func DefaultScaleTestOptions() scaletest.Options {
 		DeleteNetworkPoliciesTimes:    1,
 		LabelsToGetMetrics:            map[string]string{},
 		AdditionalTelemetryProperty:   map[string]string{},
+		CleanUp:                       true,
 	}
 }
 
@@ -66,7 +66,6 @@ func ScaleTest(opt *scaletest.Options) *types.Job {
 	job.AddStep(&scaletest.GetAndPublishMetrics{
 		Labels:                      opt.LabelsToGetMetrics,
 		AdditionalTelemetryProperty: opt.AdditionalTelemetryProperty,
-		OutputFilePath:                  os.Getenv("OUTPUT_FILEPATH"),
 	}, &types.StepOptions{
 		SkipSavingParametersToJob: true,
 		RunInBackgroundWithID:     "get-metrics",
@@ -111,7 +110,9 @@ func ScaleTest(opt *scaletest.Options) *types.Job {
 		BackgroundID: "get-metrics",
 	}, nil)
 
-	job.AddStep(&kubernetes.DeleteNamespace{}, nil)
+	if opt.CleanUp {
+		job.AddStep(&kubernetes.DeleteNamespace{}, nil)
+	}
 
 	return job
 }
