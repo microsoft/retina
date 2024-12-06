@@ -20,6 +20,14 @@ type packetparserCtEntry struct {
 	FlagsSeenTxDir     uint8
 	FlagsSeenRxDir     uint8
 	IsDirectionUnknown bool
+	ConntrackMetadata  struct {
+		BytesForwardCount   uint64
+		BytesReplyCount     uint64
+		PacketsForwardCount uint64
+		PacketsReplyCount   uint64
+		TrafficDirection    uint8
+		_                   [7]byte
+	}
 }
 
 type packetparserCtV4Key struct {
@@ -49,12 +57,20 @@ type packetparserPacket struct {
 		Tsval  uint32
 		Tsecr  uint32
 	}
-	ObservationPoint uint8
-	TrafficDirection uint8
-	Proto            uint8
-	Flags            uint8
-	IsReply          bool
-	_                [3]byte
+	ObservationPoint  uint8
+	TrafficDirection  uint8
+	Proto             uint8
+	Flags             uint8
+	IsReply           bool
+	_                 [3]byte
+	ConntrackMetadata struct {
+		BytesForwardCount   uint64
+		BytesReplyCount     uint64
+		PacketsForwardCount uint64
+		PacketsReplyCount   uint64
+		TrafficDirection    uint8
+		_                   [7]byte
+	}
 }
 
 // loadPacketparser returns the embedded CollectionSpec for packetparser.
