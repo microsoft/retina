@@ -32,6 +32,7 @@ import (
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
+	"github.com/microsoft/retina/pkg/plugin/conntrack"
 	_ "github.com/microsoft/retina/pkg/plugin/lib/_amd64"                            // nolint
 	_ "github.com/microsoft/retina/pkg/plugin/lib/_arm64"                            // nolint
 	_ "github.com/microsoft/retina/pkg/plugin/lib/common/libbpf/_include/asm"        // nolint
@@ -82,8 +83,20 @@ func (p *packetParser) Generate(ctx context.Context) error {
 		p.l.Info("bypassing lookup IP of interest")
 		bypassLookupIPOfInterest = 1
 	}
+	conntrackMetrics := 0
+	// Check if packetparser has Conntrack metrics enabled.
+	if p.cfg.EnableConntrackMetrics {
+		p.l.Info("conntrack metrics enabled")
+		conntrackMetrics = 1
+		// Generate dynamic header for conntrack.
+		err := conntrack.GenerateDynamic(ctx, conntrackMetrics)
+		if err != nil {
+			return errors.Wrap(err, "failed to generate dynamic header for conntrack")
+		}
+		p.l.Info("Conntrack header generated")
+	}
 	p.l.Info("data aggregation level", zap.String("level", p.cfg.DataAggregationLevel.String()))
-	st := fmt.Sprintf("#define BYPASS_LOOKUP_IP_OF_INTEREST %d\n#define DATA_AGGREGATION_LEVEL %d\n", bypassLookupIPOfInterest, p.cfg.DataAggregationLevel)
+	st := fmt.Sprintf("#define BYPASS_LOOKUP_IP_OF_INTEREST %d\n#define DATA_AGGREGATION_LEVEL %d\n#define CONNTRACK_METRICS %d\n", bypassLookupIPOfInterest, p.cfg.DataAggregationLevel, conntrackMetrics)
 	err := loader.WriteFile(ctx, dynamicHeaderPath, st)
 	if err != nil {
 		return errors.Wrap(err, "failed to write dynamic header")

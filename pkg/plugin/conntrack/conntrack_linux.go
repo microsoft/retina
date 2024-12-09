@@ -6,11 +6,15 @@ package conntrack
 
 import (
 	"context"
+	"fmt"
+	"path"
+	"runtime"
 	"time"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/rlimit"
 	"github.com/microsoft/retina/internal/ktime"
+	"github.com/microsoft/retina/pkg/loader"
 	"github.com/microsoft/retina/pkg/log"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
 	_ "github.com/microsoft/retina/pkg/plugin/conntrack/_cprog" // nolint // This is needed so cprog is included when vendoring
@@ -64,6 +68,23 @@ func New() (*Conntrack, error) {
 	// Get the conntrack map from the objects
 	ct.ctMap = objs.RetinaConntrack
 	return ct, nil
+}
+
+// Generate dynamic header file for conntrack eBPF program.
+func GenerateDynamic(ctx context.Context, conntrackMetrics int) error {
+	// Get absolute path to this file during runtime.
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		return errors.New("unable to get absolute path for conntrack file")
+	}
+	dir := path.Dir(filename)
+	dynamicHeaderPath := fmt.Sprintf("%s/%s/%s", dir, bpfSourceDir, dynamicHeaderFileName)
+	st := fmt.Sprintf("#define CONNTRACK_METRICS %d\n", conntrackMetrics)
+	err := loader.WriteFile(ctx, dynamicHeaderPath, st)
+	if err != nil {
+		return errors.Wrap(err, "failed to write conntrack dynamic header")
+	}
+	return nil
 }
 
 // Run starts the Conntrack garbage collection loop.
