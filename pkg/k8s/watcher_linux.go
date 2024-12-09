@@ -109,10 +109,10 @@ func Start(ctx context.Context, k *watchers.K8sWatcher) {
 // that logs the error and tags the error to easily identify
 func k8sWatcherErrorHandler(e error) {
 	errStr := e.Error()
-	logError := func(msg, res string) {
+	logError := func(er, r string) {
 		logger.WithFields(logrus.Fields{
-			"underlyingError": errStr,
-			"resource":        res,
+			"underlyingError": er,
+			"resource":        r,
 		}).Error("Error watching k8s resource")
 	}
 
