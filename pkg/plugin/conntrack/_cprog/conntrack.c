@@ -7,7 +7,6 @@
 #include "compiler.h"
 #include "bpf_helpers.h"
 #include "conntrack.h"
-#include "string.h"
 
 struct tcpmetadata {
 	__u32 seq; // TCP sequence number
@@ -159,7 +158,7 @@ static __always_inline bool _ct_create_new_tcp_connection(struct packet *p, stru
     p->is_reply = false;
     p->traffic_direction = new_value.traffic_direction;
     // Update initial conntrack metadata for the connection.
-    memcpy(&p->conntrack_metadata, &new_value.conntrack_metadata, sizeof(struct conntrackmetadata));
+    __builtin_memcpy(&p->conntrack_metadata, &new_value.conntrack_metadata, sizeof(struct conntrackmetadata));
     return true;
 }
 
@@ -188,7 +187,7 @@ static __always_inline bool _ct_handle_udp_connection(struct packet *p, struct c
     p->is_reply = false;
     p->traffic_direction = new_value.traffic_direction;
     // Update packet's conntrack metadata.
-    memcpy(&p->conntrack_metadata, &new_value.conntrack_metadata, sizeof(struct conntrackmetadata));;
+    __builtin_memcpy(&p->conntrack_metadata, &new_value.conntrack_metadata, sizeof(struct conntrackmetadata));;
     return true;
 }
 
@@ -239,7 +238,7 @@ static __always_inline bool _ct_handle_tcp_connection(struct packet *p, struct c
         bpf_map_update_elem(&retina_conntrack, &key, &new_value, BPF_ANY);
     }
     // Update packet's conntrack metadata.
-    memcpy(&p->conntrack_metadata, &new_value.conntrack_metadata, sizeof(struct conntrackmetadata));
+    __builtin_memcpy(&p->conntrack_metadata, &new_value.conntrack_metadata, sizeof(struct conntrackmetadata));
     return true;
 }
 
@@ -362,7 +361,7 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
         WRITE_ONCE(entry->conntrack_metadata.packets_forward_count, READ_ONCE(entry->conntrack_metadata.packets_forward_count) + 1);
         WRITE_ONCE(entry->conntrack_metadata.bytes_forward_count, READ_ONCE(entry->conntrack_metadata.bytes_forward_count) + p->bytes);
         // Update packet's conntract metadata.
-        memcpy(&p->conntrack_metadata, &entry->conntrack_metadata, sizeof(struct conntrackmetadata));
+        __builtin_memcpy(&p->conntrack_metadata, &entry->conntrack_metadata, sizeof(struct conntrackmetadata));
         return _ct_should_report_packet(entry, p->flags, CT_PACKET_DIR_TX, &key);
     }
     
@@ -382,7 +381,7 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
         WRITE_ONCE(entry->conntrack_metadata.packets_reply_count, READ_ONCE(entry->conntrack_metadata.packets_reply_count) + 1);
         WRITE_ONCE(entry->conntrack_metadata.bytes_reply_count, READ_ONCE(entry->conntrack_metadata.bytes_reply_count) + p->bytes);
         // Update packet's conntract metadata.
-        memcpy(&p->conntrack_metadata, &entry->conntrack_metadata, sizeof(struct conntrackmetadata));
+        __builtin_memcpy(&p->conntrack_metadata, &entry->conntrack_metadata, sizeof(struct conntrackmetadata));
         return _ct_should_report_packet(entry, p->flags, CT_PACKET_DIR_RX, &reverse_key);
     }
 
