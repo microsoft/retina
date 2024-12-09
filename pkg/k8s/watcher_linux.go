@@ -18,6 +18,7 @@ import (
 	"github.com/cilium/cilium/pkg/logging"
 	"github.com/cilium/cilium/pkg/logging/logfields"
 	"github.com/cilium/cilium/pkg/option"
+	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -108,12 +109,22 @@ func Start(ctx context.Context, k *watchers.K8sWatcher) {
 // that logs the error and tags the error to easily identify
 func k8sWatcherErrorHandler(e error) {
 	errStr := e.Error()
+	logError := func(msg, res string) {
+		logger.WithFields(logrus.Fields{
+			"underlyingError": errStr,
+			"resource":        res,
+		}).Error("Error watching k8s resource")
+	}
+
 	switch {
 	case strings.Contains(errStr, "Failed to watch *v1.Node"):
+		logError(errStr, "v1.Node")
 	case strings.Contains(errStr, "Failed to watch *v2.CiliumEndpoint"):
+		logError(errStr, "v2.CiliumEndpoint")
 	case strings.Contains(errStr, "Failed to watch *v1.Service"):
+		logError(errStr, "v1.Service")
 	case strings.Contains(errStr, "Failed to watch *v2.CiliumNode"):
-		logger.WithField("underlyingError", errStr).Error("Error watching k8s resource")
+		logError(errStr, "v2.CiliumNode")
 	default:
 		k8s.K8sErrorHandler(e)
 	}
