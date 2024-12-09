@@ -19,10 +19,10 @@ import (
 )
 
 var (
-	client  appinsights.TelemetryClient
-	version string
-	mbShift uint64 = 20
-
+	client            appinsights.TelemetryClient
+	version           string
+	mbShift           uint64 = 20
+	kernelVersionFunc        = KernelVersion
 	// property keys
 	kernelversion = "kernelversion"
 	sysmem        = "sysmem"
@@ -161,7 +161,7 @@ func (t *TelemetryClient) trackWarning(err error, msg string) {
 }
 
 func (t *TelemetryClient) heartbeat(ctx context.Context) {
-	kernelVersion, err := KernelVersion(ctx)
+	kernelVersion, err := kernelVersionFunc(ctx)
 	if err != nil {
 		t.trackWarning(err, "failed to get kernel version")
 	}
@@ -224,6 +224,20 @@ func (t *TelemetryClient) TrackMetric(metricname string, value float64, properti
 
 func (t *TelemetryClient) TrackTrace(name string, severity contracts.SeverityLevel, properties map[string]string) {
 	trace := appinsights.NewTraceTelemetry(name, severity)
+
+	kernelVersion, err := kernelVersionFunc(context.Background())
+	if err != nil {
+		if client != nil {
+			errtrace := appinsights.NewTraceTelemetry(fmt.Sprintf("failed to get kernel version for trace: %v", err), contracts.Error)
+			for k, v := range t.properties {
+				errtrace.Properties[k] = v
+			}
+			client.Track(errtrace)
+		}
+	} else {
+		properties[kernelversion] = kernelVersion
+	}
+
 	if t.properties != nil {
 		t.RLock()
 		for k, v := range t.properties {
