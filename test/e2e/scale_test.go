@@ -75,7 +75,7 @@ func TestE2ERetina_Scale(t *testing.T) {
 		require.NoError(t, err)
 	}
 	if CleanUp != "" {
-		opt.DeleteLabels, err = strconv.ParseBool(CleanUp)
+		opt.CleanUp, err = strconv.ParseBool(CleanUp)
 		require.NoError(t, err)
 	}
 
