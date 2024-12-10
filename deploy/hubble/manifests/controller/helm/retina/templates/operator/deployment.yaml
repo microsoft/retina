@@ -43,6 +43,9 @@ spec:
                     operator: In
                     values:
                       - linux
+      {{- if .Values.operator.tolerations }}
+      tolerations: {{- toYaml .Values.operator.tolerations | nindent 8 }}
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
