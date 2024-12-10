@@ -29,11 +29,6 @@ struct conntrackmetadata {
     */
     __u64 packets_forward_count;
     __u64 packets_reply_count;
-    /*
-        This is the inital direction of the connection.
-        It is set to egress if the connection is initiated from the host and ingress otherwise.
-    */
-    __u8 traffic_direction;
 };
 
 struct packet
@@ -153,10 +148,6 @@ static __always_inline bool _ct_create_new_tcp_connection(struct packet *p, stru
     #if CONNTRACK_METRICS == 1
         new_value.conntrack_metadata.packets_forward_count = 1;
         new_value.conntrack_metadata.bytes_forward_count = p->bytes;
-        // The initial SYN is captured. Set the traffic direction of the connection.
-        // This is important for the case where the SYN packet is not captured
-        // and the connection is created with unknown direction.
-        new_value.conntrack_metadata.traffic_direction = new_value.traffic_direction;
         // Update initial conntrack metadata for the connection.
         __builtin_memcpy(&p->conntrack_metadata, &new_value.conntrack_metadata, sizeof(struct conntrackmetadata));
     #endif
