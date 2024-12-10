@@ -152,15 +152,21 @@ func getVfpPortCountersRaw(portGUID string) (string, error) {
 
 	cmd := exec.Command("cmd", "/c", vfpCmd)
 	out, err := cmd.Output()
+	if err != nil {
+		return "", errors.Wrap(err, "errored while running vfpctrl /get-port-counter")
+	}
+	return string(out), nil
 
-	return string(out), errors.Wrap(err, "errored while running vfpctrl /get-port-counter")
 }
 
 // TODO: Remove this once Resources.Allocators.EndpointPortGuid gets added to hcsshim Endpoint struct
 // Lists all vSwitch ports
 func listvPorts() ([]byte, error) {
 	out, err := exec.Command("cmd", "/c", "vfpctrl /list-vmswitch-port").CombinedOutput()
-	return out, errors.Wrap(err, "errored while running vfpctrl /list-vmswitch-port")
+	if err != nil {
+		return nil, errors.Wrap(err, "errored while running vfpctrl /list-vmswitch-port")
+	}
+	return out, nil
 }
 
 // TODO: Remove this once Resources.Allocators.EndpointPortGuid gets added to hcsshim Endpoint struct
