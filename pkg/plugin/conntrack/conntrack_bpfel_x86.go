@@ -20,6 +20,12 @@ type conntrackCtEntry struct {
 	FlagsSeenTxDir     uint8
 	FlagsSeenRxDir     uint8
 	IsDirectionUnknown bool
+	ConntrackMetadata  struct {
+		BytesForwardCount   uint64
+		BytesReplyCount     uint64
+		PacketsForwardCount uint64
+		PacketsReplyCount   uint64
+	}
 }
 
 type conntrackCtV4Key struct {
