@@ -41,8 +41,7 @@ spec:
           command:
             - powershell.exe
             - -command
-            - .\setkubeconfigpath.ps1; ./controller.exe --config ./retina/config.yaml --kubeconfig ./kubeconfig
-            # .\setkubeconfigpath.ps1; Start-Sleep -s 1000
+            - $env:CONTAINER_SANDBOX_MOUNT_POINT/controller.exe --config ./retina/config.yaml
           securityContext:
             privileged: true
           volumeMounts:
