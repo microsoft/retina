@@ -31,7 +31,7 @@ import (
 func TestStop(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	d := &dns{
-		l:   log.Logger().Named(string(Name)),
+		l:   log.Logger().Named(name),
 		pid: 1234,
 	}
 	// Check nil tracer.
@@ -59,7 +59,7 @@ func TestStart(t *testing.T) {
 	defer e.Reader.Close()
 
 	d := &dns{
-		l:   log.Logger().Named(string(Name)),
+		l:   log.Logger().Named(name),
 		pid: 1234,
 		cfg: &config.Config{
 			EnablePodLevel: true,
@@ -90,7 +90,7 @@ func TestStart(t *testing.T) {
 func TestMalformedEventHandler(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	d := &dns{
-		l: log.Logger().Named(string(Name)),
+		l: log.Logger().Named(name),
 	}
 
 	// Test nil event.
@@ -112,7 +112,7 @@ func TestRequestEventHandler(t *testing.T) {
 	metrics.InitializeMetrics()
 
 	d := &dns{
-		l: log.Logger().Named(string(Name)),
+		l: log.Logger().Named(name),
 		cfg: &config.Config{
 			EnablePodLevel: true,
 		},
@@ -162,7 +162,7 @@ func TestResponseEventHandler(t *testing.T) {
 	metrics.InitializeMetrics()
 
 	d := &dns{
-		l: log.Logger().Named(string(Name)),
+		l: log.Logger().Named(name),
 		cfg: &config.Config{
 			EnablePodLevel: true,
 		},

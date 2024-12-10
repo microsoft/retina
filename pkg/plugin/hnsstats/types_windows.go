@@ -11,7 +11,6 @@ import (
 	"github.com/Microsoft/hcsshim/hcn"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
-	"github.com/microsoft/retina/pkg/plugin/api"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 
@@ -19,8 +18,8 @@ import (
 )
 
 const (
-	Name          api.PluginName = "hnsstats"
-	HnsStatsEvent string         = "hnsstatscount"
+	name          string = "hnsstats"
+	HnsStatsEvent string = "hnsstatscount"
 	// From HNSStats API
 	PacketsReceived        string = "win_packets_recv_count"
 	PacketsSent            string = "win_packets_sent_count"

@@ -10,12 +10,9 @@ import (
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
-	"github.com/microsoft/retina/pkg/plugin/api"
 )
 
-const (
-	Name api.PluginName = "tcpretrans"
-)
+const name = "tcpretrans"
 
 type tcpretrans struct {
 	cfg       *kcfg.Config
