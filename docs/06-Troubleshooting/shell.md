@@ -82,7 +82,7 @@ table ip filter {
 
 **If you see the error "Operation not permitted (you must be root)", check that your `kubectl retina shell` command sets `--capabilities NET_RAW,NET_ADMIN`.**
 
-`iptables` in the shell image uses `iptables-legacy`, which may or may not match the configuration on the node. For example, Ubuntu maps `iptables` to `iptables-nft`. To use the exact same `iptables` binary as installed on the node, you will need to `chroot` into the host filesystem (see below).
+`iptables` in the shell image uses `iptables-nft`, which may or may not match the configuration on the node. For example, Azure Linux 2 maps `iptables` to `iptables-legacy`. To use the exact same `iptables` binary as installed on the node, you will need to `chroot` into the host filesystem (see below).
 
 ## Accessing the host filesystem
 
