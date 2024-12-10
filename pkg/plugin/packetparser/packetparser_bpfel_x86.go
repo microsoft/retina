@@ -25,8 +25,6 @@ type packetparserCtEntry struct {
 		BytesReplyCount     uint64
 		PacketsForwardCount uint64
 		PacketsReplyCount   uint64
-		TrafficDirection    uint8
-		_                   [7]byte
 	}
 }
 
@@ -68,8 +66,6 @@ type packetparserPacket struct {
 		BytesReplyCount     uint64
 		PacketsForwardCount uint64
 		PacketsReplyCount   uint64
-		TrafficDirection    uint8
-		_                   [7]byte
 	}
 }
 
