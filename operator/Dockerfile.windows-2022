@@ -17,8 +17,6 @@ RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -ldflags "-X g
 
 # Copy into final image
 FROM  mcr.microsoft.com/windows/nanoserver:ltsc2022
-COPY --from=builder /usr/src/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
-COPY --from=builder /usr/src/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
 
 COPY --from=builder /usr/bin/retina-operator.exe retina-operator.exe
 
