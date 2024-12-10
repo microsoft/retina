@@ -1,5 +1,5 @@
-# mcr.microsoft.com/azurelinux/base/core:3.0.20241101
-FROM mcr.microsoft.com/azurelinux/base/core@sha256:87f833180f7ff6987231c1946995cce01d19ffbc7f815b6444b714cec63c8310
+# mcr.microsoft.com/azurelinux/base/core:3.0.20241203
+FROM mcr.microsoft.com/azurelinux/base/core@sha256:07540f424a12aa58f0de61aab38e9670c82f16b35a2ba3e449309596d422109b
 
 # There are a two known issues with Azure Linux 3.0.20241005 that affect this image:
 # 1. `iptables-nft` binary is not yet installed, but will be fixed by https://github.com/microsoft/azurelinux/pull/10786
