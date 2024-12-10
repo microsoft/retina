@@ -2,8 +2,11 @@ package k8s
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/runtime"
 
 	agentK8s "github.com/cilium/cilium/daemon/k8s"
 	"github.com/cilium/cilium/pkg/hive/cell"
@@ -15,7 +18,16 @@ import (
 	"github.com/cilium/cilium/pkg/logging"
 	"github.com/cilium/cilium/pkg/logging/logfields"
 	"github.com/cilium/cilium/pkg/option"
+	"github.com/sirupsen/logrus"
 )
+
+func init() {
+	// Register custom error handler for the watcher
+	// nolint:reassign // this is the only way to set the error handler
+	runtime.ErrorHandlers = []func(error){
+		k8sWatcherErrorHandler,
+	}
+}
 
 const (
 	K8sAPIGroupCiliumEndpointV2 = "cilium/v2::CiliumEndpoint"
@@ -91,4 +103,29 @@ func Start(ctx context.Context, k *watchers.K8sWatcher) {
 	// Wait for K8s watcher to sync. If doesn't complete in 3 minutes, causes fatal error.
 	<-syncdCache
 	logger.Info("Kubernetes watcher synced")
+}
+
+// retinaK8sErrorHandler is a custom error handler for the watcher
+// that logs the error and tags the error to easily identify
+func k8sWatcherErrorHandler(e error) {
+	errStr := e.Error()
+	logError := func(er, r string) {
+		logger.WithFields(logrus.Fields{
+			"underlyingError": er,
+			"resource":        r,
+		}).Error("Error watching k8s resource")
+	}
+
+	switch {
+	case strings.Contains(errStr, "Failed to watch *v1.Node"):
+		logError(errStr, "v1.Node")
+	case strings.Contains(errStr, "Failed to watch *v2.CiliumEndpoint"):
+		logError(errStr, "v2.CiliumEndpoint")
+	case strings.Contains(errStr, "Failed to watch *v1.Service"):
+		logError(errStr, "v1.Service")
+	case strings.Contains(errStr, "Failed to watch *v2.CiliumNode"):
+		logError(errStr, "v2.CiliumNode")
+	default:
+		k8s.K8sErrorHandler(e)
+	}
 }
