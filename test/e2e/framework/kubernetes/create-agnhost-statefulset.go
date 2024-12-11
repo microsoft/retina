@@ -50,14 +50,14 @@ func (c *CreateAgnhostStatefulSet) Run() error {
 		c.AgnhostArch = AgnhostArchAmd64
 	}
 
-	agnhostStatefulest := c.getAgnhostDeployment(c.AgnhostArch)
+	agnhostStatefulSet := c.getAgnhostDeployment(c.AgnhostArch)
 
-	err = CreateResource(ctx, agnhostStatefulest, clientset)
+	err = CreateResource(ctx, agnhostStatefulSet, clientset)
 	if err != nil {
 		return fmt.Errorf("error agnhost component: %w", err)
 	}
 
-	selector, exists := agnhostStatefulest.Spec.Selector.MatchLabels["app"]
+	selector, exists := agnhostStatefulSet.Spec.Selector.MatchLabels["app"]
 	if !exists {
 		return fmt.Errorf("missing label \"app=%s\" from agnhost statefulset: %w", c.AgnhostName, ErrLabelMissingFromPod)
 	}
@@ -98,7 +98,6 @@ func (c *CreateAgnhostStatefulSet) getAgnhostDeployment(arch string) *appsv1.Sta
 				},
 			},
 		}
-
 	} else {
 		affinity = &v1.Affinity{
 			PodAntiAffinity: &v1.PodAntiAffinity{
