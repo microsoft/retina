@@ -23,8 +23,8 @@ type packetparserCtEntry struct {
 	ConntrackMetadata  struct {
 		BytesForwardCount   uint64
 		BytesReplyCount     uint64
-		PacketsForwardCount uint64
-		PacketsReplyCount   uint64
+		PacketsForwardCount uint32
+		PacketsReplyCount   uint32
 	}
 }
 
@@ -64,8 +64,8 @@ type packetparserPacket struct {
 	ConntrackMetadata struct {
 		BytesForwardCount   uint64
 		BytesReplyCount     uint64
-		PacketsForwardCount uint64
-		PacketsReplyCount   uint64
+		PacketsForwardCount uint32
+		PacketsReplyCount   uint32
 	}
 }
 

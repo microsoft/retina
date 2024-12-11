@@ -27,8 +27,8 @@ struct conntrackmetadata {
         packets_*_count indicates the number of packets sent and received in the forward and reply direction.
         These values will be based on the conntrack entry.
     */
-    __u64 packets_forward_count;
-    __u64 packets_reply_count;
+    __u32 packets_forward_count;
+    __u32 packets_reply_count;
 };
 
 struct packet
