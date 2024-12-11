@@ -117,12 +117,6 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, test
 		TagEnv:             generic.DefaultTagEnv,
 	}, nil)
 
-	job.AddScenario(drop.ValidateDropMetric(testPodNamespace))
-
-	job.AddScenario(tcp.ValidateTCPMetrics(testPodNamespace))
-
-	job.AddScenario(windows.ValidateWindowsBasicMetric())
-
 	dnsScenarios := []struct {
 		name string
 		req  *dns.RequestValidationParams
@@ -164,8 +158,16 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, test
 		},
 	}
 
-	for _, scenario := range dnsScenarios {
-		job.AddScenario(dns.ValidateBasicDNSMetrics(scenario.name, scenario.req, scenario.resp, testPodNamespace))
+	for _, arch := range common.Architectures {
+		job.AddScenario(drop.ValidateDropMetric(testPodNamespace, arch))
+		job.AddScenario(tcp.ValidateTCPMetrics(testPodNamespace, arch))
+
+		for _, scenario := range dnsScenarios {
+			name := scenario.name + " - Arch: " + arch
+			job.AddScenario(dns.ValidateBasicDNSMetrics(name, scenario.req, scenario.resp, testPodNamespace, arch))
+		}
+
+		job.AddScenario(windows.ValidateWindowsBasicMetric())
 	}
 
 	job.AddStep(&kubernetes.EnsureStableComponent{
@@ -230,8 +232,11 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 		},
 	}
 
-	for _, scenario := range dnsScenarios {
-		job.AddScenario(dns.ValidateAdvancedDNSMetrics(scenario.name, scenario.req, scenario.resp, kubeConfigFilePath, testPodNamespace))
+	for _, arch := range common.Architectures {
+		for _, scenario := range dnsScenarios {
+			name := scenario.name + " - Arch: " + arch
+			job.AddScenario(dns.ValidateAdvancedDNSMetrics(name, scenario.req, scenario.resp, kubeConfigFilePath, testPodNamespace, arch))
+		}
 	}
 
 	job.AddScenario(latency.ValidateLatencyMetric(testPodNamespace))
@@ -259,61 +264,6 @@ func ValidateHubble(kubeConfigFilePath, chartPath string, testPodNamespace strin
 	job.AddScenario(hubble.ValidateHubbleRelayService())
 
 	job.AddScenario(hubble.ValidateHubbleUIService(kubeConfigFilePath))
-
-	job.AddScenario(drop.ValidateDropMetric(testPodNamespace))
-
-	job.AddScenario(tcp.ValidateTCPMetrics(testPodNamespace))
-
-	dnsScenarios := []struct {
-		name string
-		req  *dns.RequestValidationParams
-		resp *dns.ResponseValidationParams
-	}{
-		{
-			name: "Validate basic DNS request and response metrics for a valid domain",
-			req: &dns.RequestValidationParams{
-				NumResponse: "0",
-				Query:       "kubernetes.default.svc.cluster.local.",
-				QueryType:   "A",
-				Command:     "nslookup kubernetes.default",
-				ExpectError: false,
-			},
-			resp: &dns.ResponseValidationParams{
-				NumResponse: "1",
-				Query:       "kubernetes.default.svc.cluster.local.",
-				QueryType:   "A",
-				ReturnCode:  "No Error",
-				Response:    "10.0.0.1",
-			},
-		},
-		{
-			name: "Validate basic DNS request and response metrics for a non-existent domain",
-			req: &dns.RequestValidationParams{
-				NumResponse: "0",
-				Query:       "some.non.existent.domain.",
-				QueryType:   "A",
-				Command:     "nslookup some.non.existent.domain",
-				ExpectError: true,
-			},
-			resp: &dns.ResponseValidationParams{
-				NumResponse: "0",
-				Query:       "some.non.existent.domain.",
-				QueryType:   "A",
-				Response:    dns.EmptyResponse, // hacky way to bypass the framework for now
-				ReturnCode:  "Non-Existent Domain",
-			},
-		},
-	}
-
-	for _, scenario := range dnsScenarios {
-		job.AddScenario(dns.ValidateBasicDNSMetrics(scenario.name, scenario.req, scenario.resp, testPodNamespace))
-	}
-
-	job.AddStep(&kubernetes.EnsureStableComponent{
-		PodNamespace:           common.KubeSystemNamespace,
-		LabelSelector:          "k8s-app=retina",
-		IgnoreContainerRestart: false,
-	}, nil)
 
 	return job
 }
@@ -365,4 +315,3 @@ func RunPerfTest(kubeConfigFilePath string, chartPath string) *types.Job {
 
 	return job
 }
-
