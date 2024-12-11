@@ -50,7 +50,7 @@ func (c *CreateAgnhostStatefulSet) Run() error {
 		c.AgnhostArch = AgnhostArchAmd64
 	}
 
-	agnhostStatefulest := c.getAgnhostDeployment(c.AgnhostArch)
+	agnhostStatefulSet := c.getAgnhostDeployment(c.AgnhostArch)
 
 	err = CreateResource(ctx, agnhostStatefulSet, clientset)
 	if err != nil {
