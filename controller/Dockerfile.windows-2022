@@ -18,6 +18,8 @@ RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /usr/bin/ca
 
 # Copy into final image
 FROM  --platform=windows/amd64 mcr.microsoft.com/windows/servercore:ltsc2022 as final
+COPY --from=builder /usr/src/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
+COPY --from=builder /usr/src/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
 COPY --from=builder /usr/bin/controller.exe controller.exe
 COPY --from=builder /usr/bin/captureworkload.exe captureworkload.exe
 

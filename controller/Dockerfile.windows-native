@@ -25,6 +25,8 @@ WORKDIR C:\\retina
 FROM --platform=windows/amd64 mcr.microsoft.com/windows/nanoserver:ltsc2022 AS final
 ADD https://github.com/microsoft/etl2pcapng/releases/download/v1.10.0/etl2pcapng.exe /etl2pcapng.exe
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'Continue';"]
+COPY --from=builder C:\\retina\\windows\\kubeconfigtemplate.yaml kubeconfigtemplate.yaml
+COPY --from=builder C:\\retina\\windows\\setkubeconfigpath.ps1 setkubeconfigpath.ps1
 COPY --from=builder C:\\retina\\controller.exe controller.exe
 COPY --from=pktmon-builder C:\\pktmon\\controller-pktmon.exe controller-pktmon.exe
 COPY --from=builder C:\\retina\\captureworkload.exe captureworkload.exe

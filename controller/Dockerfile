@@ -134,6 +134,8 @@ ENTRYPOINT ["./retina/controller"]
 
 # agent final image for windows 
 FROM ${OS_VERSION} AS agent-win
+COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
+COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
 COPY --from=controller-bin /go/bin/retina/controller controller.exe
 COPY --from=capture-bin /go/bin/retina/captureworkload captureworkload.exe
 ADD https://github.com/microsoft/etl2pcapng/releases/download/v1.10.0/etl2pcapng.exe /etl2pcapng.exe
