@@ -265,6 +265,12 @@ func ValidateHubble(kubeConfigFilePath, chartPath string, testPodNamespace strin
 
 	job.AddScenario(hubble.ValidateHubbleUIService(kubeConfigFilePath))
 
+	job.AddStep(&kubernetes.EnsureStableComponent{
+		PodNamespace:           common.KubeSystemNamespace,
+		LabelSelector:          "k8s-app=retina",
+		IgnoreContainerRestart: false,
+	}, nil)
+
 	return job
 }
 
