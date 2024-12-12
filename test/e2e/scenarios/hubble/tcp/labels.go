@@ -17,7 +17,7 @@ var (
 		constants.HubbleSourceLabel:      "",
 		constants.HubbleDestinationLabel: common.TestPodNamespace + "/" + podName,
 		constants.HubbleFamilyLabel:      constants.IPV4,
-		constants.HubbleFlagLabel:        constants.SYN_ACK,
+		constants.HubbleFlagLabel:        constants.SYNACK,
 	}
 	validHubbleTCPFINFlag = map[string]string{
 		constants.HubbleSourceLabel:      "",
@@ -28,7 +28,7 @@ var (
 
 	validHubbleTCPMetricsLabels = []map[string]string{
 		validHubbleTCPSYNFlag,
-		//validHubbleTCPSYNACKFlag,
+		// validHubbleTCPSYNACKFlag, TODO: Needs to further investigate why these labels are not being generated
 		validHubbleTCPFINFlag,
 	}
 )
