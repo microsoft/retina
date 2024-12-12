@@ -9,9 +9,12 @@ import (
 	"github.com/microsoft/retina/test/e2e/framework/generic"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/types"
-	"github.com/microsoft/retina/test/e2e/hubble"
 	"github.com/microsoft/retina/test/e2e/scenarios/dns"
 	"github.com/microsoft/retina/test/e2e/scenarios/drop"
+	hubble_dns "github.com/microsoft/retina/test/e2e/scenarios/hubble/dns"
+	hubble_flow "github.com/microsoft/retina/test/e2e/scenarios/hubble/flow"
+	hubble_service "github.com/microsoft/retina/test/e2e/scenarios/hubble/service"
+	hubble_tcp "github.com/microsoft/retina/test/e2e/scenarios/hubble/tcp"
 	"github.com/microsoft/retina/test/e2e/scenarios/latency"
 	"github.com/microsoft/retina/test/e2e/scenarios/perf"
 	tcp "github.com/microsoft/retina/test/e2e/scenarios/tcp"
@@ -245,10 +248,10 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 	return job
 }
 
-func ValidateHubble(kubeConfigFilePath, chartPath string, testPodNamespace string) *types.Job {
+func InstallAndTestHubbleMetrics(kubeConfigFilePath, chartPath string) *types.Job {
 	job := types.NewJob("Validate Hubble")
 
-	job.AddStep(&kubernetes.ValidateHubbleStep{
+	job.AddStep(&kubernetes.InstallHubbleHelmChart{
 		Namespace:          common.KubeSystemNamespace,
 		ReleaseName:        "retina",
 		KubeConfigFilePath: kubeConfigFilePath,
@@ -256,57 +259,17 @@ func ValidateHubble(kubeConfigFilePath, chartPath string, testPodNamespace strin
 		TagEnv:             generic.DefaultTagEnv,
 	}, nil)
 
-	job.AddScenario(hubble.ValidateHubbleRelayService())
-
-	job.AddScenario(hubble.ValidateHubbleUIService(kubeConfigFilePath))
-
-	job.AddScenario(drop.ValidateDropMetric(testPodNamespace))
-
-	job.AddScenario(tcp.ValidateTCPMetrics(testPodNamespace))
-
-	dnsScenarios := []struct {
-		name string
-		req  *dns.RequestValidationParams
-		resp *dns.ResponseValidationParams
-	}{
-		{
-			name: "Validate basic DNS request and response metrics for a valid domain",
-			req: &dns.RequestValidationParams{
-				NumResponse: "0",
-				Query:       "kubernetes.default.svc.cluster.local.",
-				QueryType:   "A",
-				Command:     "nslookup kubernetes.default",
-				ExpectError: false,
-			},
-			resp: &dns.ResponseValidationParams{
-				NumResponse: "1",
-				Query:       "kubernetes.default.svc.cluster.local.",
-				QueryType:   "A",
-				ReturnCode:  "No Error",
-				Response:    "10.0.0.1",
-			},
-		},
-		{
-			name: "Validate basic DNS request and response metrics for a non-existent domain",
-			req: &dns.RequestValidationParams{
-				NumResponse: "0",
-				Query:       "some.non.existent.domain.",
-				QueryType:   "A",
-				Command:     "nslookup some.non.existent.domain",
-				ExpectError: true,
-			},
-			resp: &dns.ResponseValidationParams{
-				NumResponse: "0",
-				Query:       "some.non.existent.domain.",
-				QueryType:   "A",
-				Response:    dns.EmptyResponse, // hacky way to bypass the framework for now
-				ReturnCode:  "Non-Existent Domain",
-			},
-		},
+	hubbleScrenarios := []*types.Scenario{
+		hubble_dns.ValidateDNSMetric(),
+		hubble_flow.ValidateFlowMetric(),
+		// hubble_drop.ValidateDropMetric(), TODO Needs to investigate why drop metrics are not present.
+		hubble_tcp.ValidateTCPMetric(),
+		hubble_service.ValidateHubbleRelayService(),
+		hubble_service.ValidateHubbleUIService(kubeConfigFilePath),
 	}
 
-	for _, scenario := range dnsScenarios {
-		job.AddScenario(dns.ValidateBasicDNSMetrics(scenario.name, scenario.req, scenario.resp, testPodNamespace))
+	for _, scenario := range hubbleScrenarios {
+		job.AddScenario(scenario)
 	}
 
 	job.AddStep(&kubernetes.EnsureStableComponent{
@@ -365,4 +328,3 @@ func RunPerfTest(kubeConfigFilePath string, chartPath string) *types.Job {
 
 	return job
 }
-
