@@ -8,6 +8,10 @@ import (
 	prom "github.com/microsoft/retina/test/e2e/framework/prometheus"
 )
 
+var (
+	ErrMetricFound = errors.New("unexpected metric found")
+)
+
 type ValidateMetric struct {
 	ForwardedPort string
 	MetricName    string
@@ -31,7 +35,7 @@ func (v *ValidateMetric) Run() error {
 
 		// if we expect the metric not to be found, return an error if it is found
 		if !v.ExpectMetric {
-			return fmt.Errorf("did not expect to find metric %s matching %+v", v.MetricName, validMetric)
+			return fmt.Errorf("did not expect to find metric %s matching %+v: %w", v.MetricName, validMetric, ErrMetricFound)
 		}
 
 		log.Printf("found metric %s matching %+v\n", v.MetricName, validMetric)

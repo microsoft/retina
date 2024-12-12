@@ -255,7 +255,7 @@ func InstallAndTestHubbleMetrics(kubeConfigFilePath, chartPath string, testPodNa
 	hubbleScrenarios := []*types.Scenario{
 		hubble_dns.ValidateDNSMetric(),
 		hubble_flow.ValidateFlowMetric(),
-		//hubble_drop.ValidateDropMetric(),
+		// hubble_drop.ValidateDropMetric(), TODO Needs to investigate why drop metrics are not present.
 		hubble_tcp.ValidateTCPMetric(),
 		hubble_service.ValidateHubbleRelayService(),
 		hubble_service.ValidateHubbleUIService(kubeConfigFilePath),
