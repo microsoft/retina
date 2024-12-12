@@ -241,7 +241,7 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 	return job
 }
 
-func InstallAndTestHubbleMetrics(kubeConfigFilePath, chartPath, testPodNamespace string) *types.Job {
+func InstallAndTestHubbleMetrics(kubeConfigFilePath, chartPath string) *types.Job {
 	job := types.NewJob("Validate Hubble")
 
 	job.AddStep(&kubernetes.InstallHubbleHelmChart{
