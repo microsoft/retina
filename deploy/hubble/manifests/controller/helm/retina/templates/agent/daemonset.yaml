@@ -196,7 +196,11 @@ spec:
           command:
             - powershell.exe
             - -command
+            {{- if semverCompare ">=1.28" .Capabilities.KubeVersion.GitVersion }}
+            - $env:CONTAINER_SANDBOX_MOUNT_POINT/controller.exe --config ./retina/config.yaml
+            {{- else }}
             - .\setkubeconfigpath.ps1; ./controller.exe --config ./retina/config.yaml --kubeconfig ./kubeconfig
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /metrics
