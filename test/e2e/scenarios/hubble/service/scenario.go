@@ -1,4 +1,4 @@
-package hubble
+package services
 
 import (
 	"net/http"
