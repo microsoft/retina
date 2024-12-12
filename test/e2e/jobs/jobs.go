@@ -9,9 +9,12 @@ import (
 	"github.com/microsoft/retina/test/e2e/framework/generic"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/types"
-	"github.com/microsoft/retina/test/e2e/hubble"
 	"github.com/microsoft/retina/test/e2e/scenarios/dns"
 	"github.com/microsoft/retina/test/e2e/scenarios/drop"
+	hubble_dns "github.com/microsoft/retina/test/e2e/scenarios/hubble/dns"
+	hubble_flow "github.com/microsoft/retina/test/e2e/scenarios/hubble/flow"
+	hubble_service "github.com/microsoft/retina/test/e2e/scenarios/hubble/service"
+	hubble_tcp "github.com/microsoft/retina/test/e2e/scenarios/hubble/tcp"
 	"github.com/microsoft/retina/test/e2e/scenarios/latency"
 	"github.com/microsoft/retina/test/e2e/scenarios/perf"
 	tcp "github.com/microsoft/retina/test/e2e/scenarios/tcp"
@@ -117,6 +120,12 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, test
 		TagEnv:             generic.DefaultTagEnv,
 	}, nil)
 
+	job.AddScenario(drop.ValidateDropMetric(testPodNamespace))
+
+	job.AddScenario(tcp.ValidateTCPMetrics(testPodNamespace))
+
+	job.AddScenario(windows.ValidateWindowsBasicMetric())
+
 	dnsScenarios := []struct {
 		name string
 		req  *dns.RequestValidationParams
@@ -158,16 +167,8 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, test
 		},
 	}
 
-	for _, arch := range common.Architectures {
-		job.AddScenario(drop.ValidateDropMetric(testPodNamespace, arch))
-		job.AddScenario(tcp.ValidateTCPMetrics(testPodNamespace, arch))
-
-		for _, scenario := range dnsScenarios {
-			name := scenario.name + " - Arch: " + arch
-			job.AddScenario(dns.ValidateBasicDNSMetrics(name, scenario.req, scenario.resp, testPodNamespace, arch))
-		}
-
-		job.AddScenario(windows.ValidateWindowsBasicMetric())
+	for _, scenario := range dnsScenarios {
+		job.AddScenario(dns.ValidateBasicDNSMetrics(scenario.name, scenario.req, scenario.resp, testPodNamespace))
 	}
 
 	job.AddStep(&kubernetes.EnsureStableComponent{
@@ -232,11 +233,8 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 		},
 	}
 
-	for _, arch := range common.Architectures {
-		for _, scenario := range dnsScenarios {
-			name := scenario.name + " - Arch: " + arch
-			job.AddScenario(dns.ValidateAdvancedDNSMetrics(name, scenario.req, scenario.resp, kubeConfigFilePath, testPodNamespace, arch))
-		}
+	for _, scenario := range dnsScenarios {
+		job.AddScenario(dns.ValidateAdvancedDNSMetrics(scenario.name, scenario.req, scenario.resp, kubeConfigFilePath, testPodNamespace))
 	}
 
 	job.AddScenario(latency.ValidateLatencyMetric(testPodNamespace))
@@ -250,10 +248,10 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 	return job
 }
 
-func ValidateHubble(kubeConfigFilePath, chartPath string, testPodNamespace string) *types.Job {
+func InstallAndTestHubbleMetrics(kubeConfigFilePath, chartPath string, testPodNamespace string) *types.Job {
 	job := types.NewJob("Validate Hubble")
 
-	job.AddStep(&kubernetes.ValidateHubbleStep{
+	job.AddStep(&kubernetes.InstallHubbleHelmChart{
 		Namespace:          common.KubeSystemNamespace,
 		ReleaseName:        "retina",
 		KubeConfigFilePath: kubeConfigFilePath,
@@ -261,9 +259,18 @@ func ValidateHubble(kubeConfigFilePath, chartPath string, testPodNamespace strin
 		TagEnv:             generic.DefaultTagEnv,
 	}, nil)
 
-	job.AddScenario(hubble.ValidateHubbleRelayService())
+	hubbleScrenarios := []*types.Scenario{
+		hubble_dns.ValidateDNSMetric(),
+		hubble_flow.ValidateFlowMetric(),
+		//hubble_drop.ValidateDropMetric(),
+		hubble_tcp.ValidateTCPMetric(),
+		hubble_service.ValidateHubbleRelayService(),
+		hubble_service.ValidateHubbleUIService(kubeConfigFilePath),
+	}
 
-	job.AddScenario(hubble.ValidateHubbleUIService(kubeConfigFilePath))
+	for _, scenario := range hubbleScrenarios {
+		job.AddScenario(scenario)
+	}
 
 	job.AddStep(&kubernetes.EnsureStableComponent{
 		PodNamespace:           common.KubeSystemNamespace,
