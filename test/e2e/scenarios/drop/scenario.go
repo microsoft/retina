@@ -16,11 +16,8 @@ const (
 	IPTableRuleDrop = "IPTABLE_RULE_DROP"
 )
 
-func ValidateDropMetric(namespace, arch string) *types.Scenario {
-	id := "drop-port-forward-" + arch
-	agnhostName := "agnhost-drop"
-	podName := agnhostName + "-0"
-	name := "Drop Metrics - Arch: " + arch
+func ValidateDropMetric(namespace string) *types.Scenario {
+	name := "Drop Metrics"
 	steps := []*types.StepWrapper{
 		{
 			Step: &kubernetes.CreateDenyAllNetworkPolicy{
@@ -31,8 +28,7 @@ func ValidateDropMetric(namespace, arch string) *types.Scenario {
 		{
 			Step: &kubernetes.CreateAgnhostStatefulSet{
 				AgnhostNamespace: namespace,
-				AgnhostName:      agnhostName,
-				AgnhostArch:      arch,
+				AgnhostName:      "agnhost-drop",
 			},
 		},
 		// Need this delay to guarantee that the pods will have bpf program attached
@@ -47,7 +43,7 @@ func ValidateDropMetric(namespace, arch string) *types.Scenario {
 		{
 			Step: &kubernetes.ExecInPod{
 				PodNamespace: namespace,
-				PodName:      podName,
+				PodName:      "agnhost-drop-0",
 				Command:      "curl -s -m 5 bing.com",
 			},
 			Opts: &types.StepOptions{
@@ -63,7 +59,7 @@ func ValidateDropMetric(namespace, arch string) *types.Scenario {
 		{
 			Step: &kubernetes.ExecInPod{
 				PodNamespace: namespace,
-				PodName:      podName,
+				PodName:      "agnhost-drop-0",
 				Command:      "curl -s -m 5 bing.com",
 			},
 			Opts: &types.StepOptions{
@@ -78,16 +74,16 @@ func ValidateDropMetric(namespace, arch string) *types.Scenario {
 				LocalPort:             "10093",
 				RemotePort:            "10093",
 				Endpoint:              "metrics",
-				OptionalLabelAffinity: "app=" + agnhostName, // port forward to a pod on a node that also has this pod with this label, assuming same namespace
+				OptionalLabelAffinity: "app=agnhost-drop", // port forward to a pod on a node that also has this pod with this label, assuming same namespace
 			},
 			Opts: &types.StepOptions{
-				RunInBackgroundWithID: id,
+				RunInBackgroundWithID: "drop-port-forward",
 			},
 		},
 		{
 			Step: &ValidateRetinaDropMetric{
 				PortForwardedRetinaPort: "10093",
-				Source:                  agnhostName,
+				Source:                  "agnhost-drop",
 				Reason:                  IPTableRuleDrop,
 				Direction:               "unknown",
 				Protocol:                UDP,
@@ -95,7 +91,7 @@ func ValidateDropMetric(namespace, arch string) *types.Scenario {
 		},
 		{
 			Step: &types.Stop{
-				BackgroundID: id,
+				BackgroundID: "drop-port-forward",
 			},
 		},
 
@@ -112,7 +108,7 @@ func ValidateDropMetric(namespace, arch string) *types.Scenario {
 			Step: &kubernetes.DeleteKubernetesResource{
 				ResourceType:      kubernetes.TypeString(kubernetes.StatefulSet),
 				ResourceNamespace: namespace,
-				ResourceName:      agnhostName,
+				ResourceName:      "agnhost-drop",
 			}, Opts: &types.StepOptions{
 				SkipSavingParametersToJob: true,
 			},

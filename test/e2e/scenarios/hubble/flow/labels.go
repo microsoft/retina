@@ -42,7 +42,6 @@ var (
 
 	validHubbleFlowMetricsLabels = []map[string]string{
 		validHubbleFlowLabelsToStack,
-		// TODO: Needs to further investigate why these labels are not being generated
 		// validHubbleFlowLabelsToNetwork,
 		// validHubbleFlowLabelsFromNetwork,
 		validHubbleFlowLabelsToEndpoint,

@@ -36,7 +36,7 @@ type ResponseValidationParams struct {
 }
 
 // ValidateBasicDNSMetrics validates basic DNS metrics present in the metrics endpoint
-func ValidateBasicDNSMetrics(scenarioName string, req *RequestValidationParams, resp *ResponseValidationParams, namespace, arch string) *types.Scenario {
+func ValidateBasicDNSMetrics(scenarioName string, req *RequestValidationParams, resp *ResponseValidationParams, namespace string) *types.Scenario {
 	// generate a random ID using rand
 	id := fmt.Sprintf("basic-dns-port-forward-%d", rand.Int()) // nolint:gosec // fine to use math/rand here
 	agnhostName := "agnhost-" + id
@@ -46,7 +46,6 @@ func ValidateBasicDNSMetrics(scenarioName string, req *RequestValidationParams, 
 			Step: &kubernetes.CreateAgnhostStatefulSet{
 				AgnhostName:      agnhostName,
 				AgnhostNamespace: namespace,
-				AgnhostArch:      arch,
 			},
 		},
 		// Need this delay to guarantee that the pods will have bpf program attached
@@ -150,7 +149,7 @@ func ValidateBasicDNSMetrics(scenarioName string, req *RequestValidationParams, 
 }
 
 // ValidateAdvancedDNSMetrics validates the advanced DNS metrics present in the metrics endpoint
-func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParams, resp *ResponseValidationParams, kubeConfigFilePath, namespace, arch string) *types.Scenario {
+func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParams, resp *ResponseValidationParams, kubeConfigFilePath string, namespace string) *types.Scenario {
 	// random ID
 	id := fmt.Sprintf("adv-dns-port-forward-%d", rand.Int()) // nolint:gosec // fine to use math/rand here
 	agnhostName := "agnhost-" + id
@@ -160,7 +159,6 @@ func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParam
 			Step: &kubernetes.CreateAgnhostStatefulSet{
 				AgnhostName:      agnhostName,
 				AgnhostNamespace: namespace,
-				AgnhostArch:      arch,
 			},
 		},
 		// Need this delay to guarantee that the pods will have bpf program attached
