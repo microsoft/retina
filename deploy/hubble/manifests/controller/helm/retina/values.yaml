@@ -29,6 +29,9 @@ operator:
       - "manage-cilium-crds"
       - "--config-dir"
       - "/retina"
+  # -- Node tolerations for pod assignment on nodes with taints
+  # ref: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
+  tolerations: []
 
 agent:
   leaderElection: false
@@ -55,6 +58,9 @@ agent:
       metricsBindAddress: ":18080"
       ports:
         containerPort: 10093
+  # -- Node tolerations for pod assignment on nodes with taints
+  # ref: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
+  tolerations: []
 
 enablePodLevel: true
 remoteContext: false
