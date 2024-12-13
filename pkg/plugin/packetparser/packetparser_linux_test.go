@@ -553,7 +553,7 @@ func TestPacketParseGenerate(t *testing.T) {
 		{
 			name:             "ConntrackMetricsEnabled",
 			cfg:              cfgConntrackMetricsEnabled,
-			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n#define CONNTRACK_METRICS 1\n#define DATA_AGGREGATION_LEVEL 1\n",
+			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n#define ENABLE_CONNTRACK_METRICS 1\n#define DATA_AGGREGATION_LEVEL 1\n",
 		},
 		{
 			name:             "DataAggregationLevelLow",

@@ -144,12 +144,12 @@ static __always_inline bool _ct_create_new_tcp_connection(struct packet *p, stru
     new_value.is_direction_unknown = false;
     new_value.traffic_direction = _ct_get_traffic_direction(observation_point);
 
-    #ifdef CONNTRACK_METRICS
+    #ifdef ENABLE_CONNTRACK_METRICS
         new_value.conntrack_metadata.packets_forward_count = 1;
         new_value.conntrack_metadata.bytes_forward_count = p->bytes;
         // Update initial conntrack metadata for the connection.
         __builtin_memcpy(&p->conntrack_metadata, &new_value.conntrack_metadata, sizeof(struct conntrackmetadata));
-    #endif // CONNTRACK_METRICS
+    #endif // ENABLE_CONNTRACK_METRICS
 
     // Update packet
     p->is_reply = false;
@@ -176,12 +176,12 @@ static __always_inline bool _ct_handle_udp_connection(struct packet *p, struct c
     new_value.flags_seen_tx_dir = p->flags;
     new_value.last_report_tx_dir = now;
     new_value.traffic_direction = _ct_get_traffic_direction(observation_point);
-    #ifdef CONNTRACK_METRICS
+    #ifdef ENABLE_CONNTRACK_METRICS
         new_value.conntrack_metadata.packets_forward_count = 1;
         new_value.conntrack_metadata.bytes_forward_count = p->bytes;
         // Update packet's conntrack metadata.
         __builtin_memcpy(&p->conntrack_metadata, &new_value.conntrack_metadata, sizeof(struct conntrackmetadata));;
-    #endif // CONNTRACK_METRICS    
+    #endif // ENABLE_CONNTRACK_METRICS    
 
     // Update packet
     p->is_reply = false;
@@ -225,25 +225,25 @@ static __always_inline bool _ct_handle_tcp_connection(struct packet *p, struct c
         p->is_reply = true;
         new_value.flags_seen_rx_dir = p->flags;
         new_value.last_report_rx_dir = now;
-        #ifdef CONNTRACK_METRICS
+        #ifdef ENABLE_CONNTRACK_METRICS
             new_value.conntrack_metadata.bytes_reply_count = p->bytes;
             new_value.conntrack_metadata.packets_reply_count = 1;
-        #endif // CONNTRACK_METRICS
+        #endif // ENABLE_CONNTRACK_METRICS
         bpf_map_update_elem(&retina_conntrack, &reverse_key, &new_value, BPF_ANY);
     } else { // Otherwise, the packet is considered as a packet in the send direction.
         p->is_reply = false;
         new_value.flags_seen_tx_dir = p->flags;
         new_value.last_report_tx_dir = now;
-        #ifdef CONNTRACK_METRICS
+        #ifdef ENABLE_CONNTRACK_METRICS
             new_value.conntrack_metadata.bytes_forward_count = p->bytes;
             new_value.conntrack_metadata.packets_forward_count = 1;
-        #endif // CONNTRACK_METRICS
+        #endif // ENABLE_CONNTRACK_METRICS
         bpf_map_update_elem(&retina_conntrack, &key, &new_value, BPF_ANY);
     }
-    #ifdef CONNTRACK_METRICS
+    #ifdef ENABLE_CONNTRACK_METRICS
         // Update packet's conntrack metadata.
         __builtin_memcpy(&p->conntrack_metadata, &new_value.conntrack_metadata, sizeof(struct conntrackmetadata));
-    #endif // CONNTRACK_METRICS
+    #endif // ENABLE_CONNTRACK_METRICS
     return true;
 }
 
@@ -362,13 +362,13 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
         // Update the packet accordingly.
         p->is_reply = false;
         p->traffic_direction = entry->traffic_direction;
-        #ifdef CONNTRACK_METRICS
+        #ifdef ENABLE_CONNTRACK_METRICS
             // Update packet count and bytes count on conntrack entry.
             WRITE_ONCE(entry->conntrack_metadata.packets_forward_count, READ_ONCE(entry->conntrack_metadata.packets_forward_count) + 1);
             WRITE_ONCE(entry->conntrack_metadata.bytes_forward_count, READ_ONCE(entry->conntrack_metadata.bytes_forward_count) + p->bytes);
             // Update packet's conntract metadata.
             __builtin_memcpy(&p->conntrack_metadata, &entry->conntrack_metadata, sizeof(struct conntrackmetadata));
-        #endif // CONNTRACK_METRICS
+        #endif // ENABLE_CONNTRACK_METRICS
         return _ct_should_report_packet(entry, p->flags, CT_PACKET_DIR_TX, &key);
     }
     
@@ -384,13 +384,13 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
         // Update the packet accordingly.
         p->is_reply = true;
         p->traffic_direction = entry->traffic_direction;
-        #ifdef CONNTRACK_METRICS
+        #ifdef ENABLE_CONNTRACK_METRICS
             // Update packet count and bytes count on conntrack entry.
             WRITE_ONCE(entry->conntrack_metadata.packets_reply_count, READ_ONCE(entry->conntrack_metadata.packets_reply_count) + 1);
             WRITE_ONCE(entry->conntrack_metadata.bytes_reply_count, READ_ONCE(entry->conntrack_metadata.bytes_reply_count) + p->bytes);
             // Update packet's conntract metadata.
             __builtin_memcpy(&p->conntrack_metadata, &entry->conntrack_metadata, sizeof(struct conntrackmetadata));
-        #endif // CONNTRACK_METRICS
+        #endif // ENABLE_CONNTRACK_METRICS
         return _ct_should_report_packet(entry, p->flags, CT_PACKET_DIR_RX, &reverse_key);
     }
 

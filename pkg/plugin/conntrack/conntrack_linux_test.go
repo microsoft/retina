@@ -39,12 +39,12 @@ func TestGenerateDynamic(t *testing.T) {
 		{
 			name:             "ConntrackMetricsEnabled",
 			conntrackMetrics: 1,
-			expectedContents: "#define CONNTRACK_METRICS 1\n",
+			expectedContents: "#define ENABLE_CONNTRACK_METRICS 1\n",
 		},
 		{
 			name:             "ConntrackMetricsDisabled",
 			conntrackMetrics: 0,
-			expectedContents: "#define CONNTRACK_METRICS 0\n",
+			expectedContents: "#define ENABLE_CONNTRACK_METRICS 0\n",
 		},
 	}
 

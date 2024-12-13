@@ -111,7 +111,7 @@ func (p *packetParser) Generate(ctx context.Context) error {
 		}
 
 		// Process packetparser dynamic.h conntrack metrics definition.
-		st += fmt.Sprintf("#define CONNTRACK_METRICS %d\n", conntrackMetrics)
+		st += fmt.Sprintf("#define ENABLE_CONNTRACK_METRICS %d\n", conntrackMetrics)
 	}
 
 	// Process packetparser data aggregation level.

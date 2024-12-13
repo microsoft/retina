@@ -84,7 +84,7 @@ func BuildDynamicHeaderPath() string {
 // Generate dynamic header file for conntrack eBPF program.
 func GenerateDynamic(ctx context.Context, dynamicHeaderPath string, conntrackMetrics int) error {
 
-	st := fmt.Sprintf("#define CONNTRACK_METRICS %d\n", conntrackMetrics)
+	st := fmt.Sprintf("#define ENABLE_CONNTRACK_METRICS %d\n", conntrackMetrics)
 	err := loader.WriteFile(ctx, dynamicHeaderPath, st)
 	if err != nil {
 		return errors.Wrap(err, "failed to write conntrack dynamic header")
