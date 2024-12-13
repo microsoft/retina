@@ -32,6 +32,7 @@ import (
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
+	"github.com/microsoft/retina/pkg/plugin/conntrack"
 	_ "github.com/microsoft/retina/pkg/plugin/lib/_amd64"                            // nolint
 	_ "github.com/microsoft/retina/pkg/plugin/lib/_arm64"                            // nolint
 	_ "github.com/microsoft/retina/pkg/plugin/lib/common/libbpf/_include/asm"        // nolint
@@ -68,23 +69,56 @@ func (p *packetParser) Name() string {
 	return name
 }
 
-func (p *packetParser) Generate(ctx context.Context) error {
+func generateDynamicHeaderPath() (string, error) {
 	// Get absolute path to this file during runtime.
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
-		return errors.New("unable to get absolute path to this file")
+		return "", errors.New("unable to get absolute path to this file")
 	}
 	dir := path.Dir(filename)
-	dynamicHeaderPath := fmt.Sprintf("%s/%s/%s", dir, bpfSourceDir, dynamicHeaderFileName)
+	return fmt.Sprintf("%s/%s/%s", dir, bpfSourceDir, dynamicHeaderFileName), nil
+}
+
+func (p *packetParser) Generate(ctx context.Context) error {
+	// Variable to store content of dynamic header.
+	var st string
+
+	dynamicHeaderPath, err := generateDynamicHeaderPath()
+	if err != nil {
+		return err
+	}
+
 	// Check if packetparser will bypassing lookup IP of interest.
 	bypassLookupIPOfInterest := 0
 	if p.cfg.BypassLookupIPOfInterest {
 		p.l.Info("bypassing lookup IP of interest")
 		bypassLookupIPOfInterest = 1
+		st = fmt.Sprintf("#define BYPASS_LOOKUP_IP_OF_INTEREST %d\n", bypassLookupIPOfInterest)
 	}
+
+	conntrackMetrics := 0
+	// Check if packetparser has Conntrack metrics enabled.
+	if p.cfg.EnableConntrackMetrics {
+		p.l.Info("conntrack metrics enabled")
+		conntrackMetrics = 1
+
+		// Generate dynamic header for conntrack.
+		ctDynamicHeaderPath := conntrack.BuildDynamicHeaderPath()
+		err = conntrack.GenerateDynamic(ctx, ctDynamicHeaderPath, conntrackMetrics)
+		if err != nil {
+			return errors.Wrap(err, "failed to generate dynamic header for conntrack")
+		}
+
+		// Process packetparser dynamic.h conntrack metrics definition.
+		st += fmt.Sprintf("#define ENABLE_CONNTRACK_METRICS %d\n", conntrackMetrics)
+	}
+
+	// Process packetparser data aggregation level.
 	p.l.Info("data aggregation level", zap.String("level", p.cfg.DataAggregationLevel.String()))
-	st := fmt.Sprintf("#define BYPASS_LOOKUP_IP_OF_INTEREST %d\n#define DATA_AGGREGATION_LEVEL %d\n", bypassLookupIPOfInterest, p.cfg.DataAggregationLevel)
-	err := loader.WriteFile(ctx, dynamicHeaderPath, st)
+	st += fmt.Sprintf("#define DATA_AGGREGATION_LEVEL %d\n", p.cfg.DataAggregationLevel)
+
+	// Generate dynamic header for packetparser.
+	err = loader.WriteFile(ctx, dynamicHeaderPath, st)
 	if err != nil {
 		return errors.Wrap(err, "failed to write dynamic header")
 	}
