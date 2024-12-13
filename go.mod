@@ -320,9 +320,9 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.19.0
 	github.com/vishvananda/netlink v1.2.1-beta.2.0.20240524165444-4d4ba1473f21
-	go.opentelemetry.io/otel v1.32.0
-	go.opentelemetry.io/otel/metric v1.32.0
-	go.opentelemetry.io/otel/trace v1.32.0
+	go.opentelemetry.io/otel v1.33.0
+	go.opentelemetry.io/otel/metric v1.33.0
+	go.opentelemetry.io/otel/trace v1.33.0
 	go.uber.org/mock v0.5.0
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
 	google.golang.org/grpc v1.66.2
@@ -338,7 +338,10 @@ require (
 	sigs.k8s.io/controller-runtime v0.18.5
 )
 
-require github.com/rogpeppe/go-internal v1.12.0 // indirect
+require (
+	github.com/rogpeppe/go-internal v1.13.1 // indirect
+	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
+)
 
 replace github.com/vishvananda/netns => github.com/inspektor-gadget/netns v0.0.5-0.20230524185006-155d84c555d6
 
