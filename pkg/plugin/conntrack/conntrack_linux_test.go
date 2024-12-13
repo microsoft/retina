@@ -63,12 +63,12 @@ func TestGenerateDynamic(t *testing.T) {
 
 			// Call the GenerateDynamic function and check if it returns an error.
 			ctx := context.Background()
-			if err := GenerateDynamic(ctx, dynamicHeaderPath, tt.conntrackMetrics); err != nil {
+			if err = GenerateDynamic(ctx, dynamicHeaderPath, tt.conntrackMetrics); err != nil {
 				t.Fatalf("failed to generate dynamic header: %v", err)
 			}
 
 			// Verify that the dynamic header file was created in the expected location and contains the expected contents.
-			if _, err := os.Stat(dynamicHeaderPath); os.IsNotExist(err) {
+			if _, err = os.Stat(dynamicHeaderPath); os.IsNotExist(err) {
 				t.Fatalf("dynamic header file does not exist: %v", err)
 			}
 

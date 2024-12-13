@@ -70,7 +70,6 @@ func (p *packetParser) Name() string {
 }
 
 func generateDynamicHeaderPath() (string, error) {
-
 	// Get absolute path to this file during runtime.
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
@@ -104,8 +103,8 @@ func (p *packetParser) Generate(ctx context.Context) error {
 		conntrackMetrics = 1
 
 		// Generate dynamic header for conntrack.
-		dynamicHeaderPath := conntrack.BuildDynamicHeaderPath()
-		err := conntrack.GenerateDynamic(ctx, dynamicHeaderPath, conntrackMetrics)
+		ctDynamicHeaderPath := conntrack.BuildDynamicHeaderPath()
+		err = conntrack.GenerateDynamic(ctx, ctDynamicHeaderPath, conntrackMetrics)
 		if err != nil {
 			return errors.Wrap(err, "failed to generate dynamic header for conntrack")
 		}
