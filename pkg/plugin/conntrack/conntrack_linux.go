@@ -70,15 +70,20 @@ func New() (*Conntrack, error) {
 	return ct, nil
 }
 
-// Generate dynamic header file for conntrack eBPF program.
-func GenerateDynamic(ctx context.Context, conntrackMetrics int) error {
+// Build dynamic header path
+func BuildDynamicHeaderPath() string {
 	// Get absolute path to this file during runtime.
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
-		return errors.New("unable to get absolute path for conntrack file")
+		return ""
 	}
-	dir := path.Dir(filename)
-	dynamicHeaderPath := fmt.Sprintf("%s/%s/%s", dir, bpfSourceDir, dynamicHeaderFileName)
+	currDir := path.Dir(filename)
+	return fmt.Sprintf("%s/%s/%s", currDir, bpfSourceDir, dynamicHeaderFileName)
+}
+
+// Generate dynamic header file for conntrack eBPF program.
+func GenerateDynamic(ctx context.Context, dynamicHeaderPath string, conntrackMetrics int) error {
+
 	st := fmt.Sprintf("#define CONNTRACK_METRICS %d\n", conntrackMetrics)
 	err := loader.WriteFile(ctx, dynamicHeaderPath, st)
 	if err != nil {

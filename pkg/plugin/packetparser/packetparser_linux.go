@@ -89,7 +89,8 @@ func (p *packetParser) Generate(ctx context.Context) error {
 		p.l.Info("conntrack metrics enabled")
 		conntrackMetrics = 1
 		// Generate dynamic header for conntrack.
-		err := conntrack.GenerateDynamic(ctx, conntrackMetrics)
+		dynamicHeaderPath := conntrack.BuildDynamicHeaderPath()
+		err := conntrack.GenerateDynamic(ctx, dynamicHeaderPath, conntrackMetrics)
 		if err != nil {
 			return errors.Wrap(err, "failed to generate dynamic header for conntrack")
 		}
