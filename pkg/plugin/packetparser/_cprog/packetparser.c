@@ -202,12 +202,10 @@ static void parse(struct __sk_buff *skb, __u8 obs)
 	}
 
 	#ifdef CONNTRACK_METRICS
-	#if CONNTRACK_METRICS == 1
 		// Initialize conntrack metadata in packet struct.
 		struct conntrackmetadata conntrack_metadata;
 		__builtin_memset(&conntrack_metadata, 0, sizeof(conntrack_metadata));
 		p.conntrack_metadata = conntrack_metadata;
-	#endif
 	#endif // CONNTRACK_METRICS
 
 	// Process the packet in ct

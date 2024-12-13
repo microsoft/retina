@@ -37,6 +37,7 @@ var (
 	cfgPodLevelEnabled = &kcfg.Config{
 		EnablePodLevel:           true,
 		BypassLookupIPOfInterest: true,
+		EnableConntrackMetrics:   false,
 	}
 	cfgPodLevelDisabled = &kcfg.Config{
 		EnablePodLevel: false,
@@ -50,7 +51,10 @@ var (
 		DataAggregationLevel: kcfg.High,
 	}
 	cfgConntrackMetricsEnabled = &kcfg.Config{
-		EnableConntrackMetrics: true,
+		EnablePodLevel:           true,
+		DataAggregationLevel:     kcfg.High,
+		BypassLookupIPOfInterest: true,
+		EnableConntrackMetrics:   true,
 	}
 )
 
@@ -544,12 +548,22 @@ func TestPacketParseGenerate(t *testing.T) {
 		{
 			name:             "PodLevelEnabled",
 			cfg:              cfgPodLevelEnabled,
-			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n#define DATA_AGGREGATION_LEVEL 0\n#define CONNTRACK_METRICS 0\n",
+			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n#define DATA_AGGREGATION_LEVEL 0\n",
 		},
 		{
 			name:             "ConntrackMetricsEnabled",
 			cfg:              cfgConntrackMetricsEnabled,
-			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 0\n#define DATA_AGGREGATION_LEVEL 0\n#define CONNTRACK_METRICS 1\n",
+			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n#define CONNTRACK_METRICS 1\n#define DATA_AGGREGATION_LEVEL 1\n",
+		},
+		{
+			name:             "DataAggregationLevelLow",
+			cfg:              cfgDataAggregationLevelLow,
+			expectedContents: "#define DATA_AGGREGATION_LEVEL 0\n",
+		},
+		{
+			name:             "DataAggregationLevelHigh",
+			cfg:              cfgDataAggregationLevelHigh,
+			expectedContents: "#define DATA_AGGREGATION_LEVEL 1\n",
 		},
 	}
 
