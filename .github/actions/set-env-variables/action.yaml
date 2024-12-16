@@ -1,0 +1,15 @@
+name: Set environment variables
+description: Set environment variables
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        RUN_ID: ${{ github.run_id }}
+        RUN_ATTEMPT: ${{ github.run_attempt }}
+      run: |
+        echo "RESOURCE_GROUP=retina-e2e-tests" >> $GITHUB_ENV
+        echo "LOCATION=westus2" >> $GITHUB_ENV
+        echo "RUN_SUFFIX=${RUN_ID}-${RUN_ATTEMPT}" >> $GITHUB_ENV
+        echo "CLUSTER_NAME=retina-e2e-tests-${RUN_SUFFIX}" >> $GITHUB_ENV
+        echo "VM_SIZE=Standard_D4_v3" >> $GITHUB_ENV
