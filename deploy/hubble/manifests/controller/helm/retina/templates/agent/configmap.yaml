@@ -131,7 +131,7 @@ data:
     enabledPlugin: {{ .Values.enabledPlugin_win }}
     metricsInterval: {{ .Values.metricsInterval }}
     metricsIntervalDuration: {{ .Values.metricsIntervalDuration }}
-    enableTelemetry: {{ .Values.enableTelemetry }}
+    enableTelemetry: false
     enablePodLevel: false
     remoteContext: {{ .Values.remoteContext }}
     bypassLookupIPOfInterest: {{ .Values.bypassLookupIPOfInterest }}
