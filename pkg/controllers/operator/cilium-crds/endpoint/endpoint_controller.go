@@ -533,7 +533,7 @@ func (r *endpointReconciler) handlePodUpsert(ctx context.Context, newPEP *PodEnd
 		// May end up getting another endpoint ID below if we try to create the CEP below.
 		// No downside to this.
 
-		if !k8serrors.IsNotFound(err) && err != nil {
+		if !k8serrors.IsNotFound(err) {
 			r.l.WithError(err).WithFields(logrus.Fields{
 				"podKey": newPEP.key.String(),
 				"pep":    newPEP,
