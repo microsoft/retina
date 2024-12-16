@@ -34,7 +34,6 @@ func (c *CreateNetworkPolicies) Prevalidate() error {
 // Primary step where test logic is executed
 // Returning an error will cause the test to fail
 func (c *CreateNetworkPolicies) Run() error {
-
 	config, err := clientcmd.BuildConfigFromFlags("", c.KubeConfigFilePath)
 	if err != nil {
 		return fmt.Errorf("error building kubeconfig: %w", err)

@@ -171,6 +171,9 @@ func (p *PortForwarder) KeepAlive(ctx context.Context) {
 		case <-ctx.Done():
 			p.logger.Logf("port forwarder: keep alive cancelled: %v", ctx.Err())
 			return
+		case <-p.stopChan:
+			p.logger.Logf("port forwarder: keep alive stopped via stop channel")
+			return
 		case pfErr := <-p.errChan:
 			// as of client-go v0.26.1, if the connection is successful at first but then fails,
 			// an error is logged but only a nil error is sent to this channel. this will be fixed

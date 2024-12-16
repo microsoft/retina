@@ -26,6 +26,8 @@ func ValidateTCPMetrics(namespace, arch string) *types.Scenario {
 			Step: &kubernetes.CreateKapingerDeployment{
 				KapingerNamespace: namespace,
 				KapingerReplicas:  "1",
+				BurstIntervalMs:   "10000", // 10 seconds
+				BurstVolume:       "10",    // 500 requests every 10 seconds
 			},
 		},
 		{

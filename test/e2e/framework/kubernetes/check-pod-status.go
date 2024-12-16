@@ -37,7 +37,6 @@ func (w *WaitPodsReady) Prevalidate() error {
 // Primary step where test logic is executed
 // Returning an error will cause the test to fail
 func (w *WaitPodsReady) Run() error {
-
 	config, err := clientcmd.BuildConfigFromFlags("", w.KubeConfigFilePath)
 	if err != nil {
 		return fmt.Errorf("error building kubeconfig: %w", err)
@@ -95,7 +94,8 @@ func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, names
 			}
 
 			// Check all container status.
-			for _, containerStatus := range pod.Status.ContainerStatuses {
+			for i := range pod.Status.ContainerStatuses {
+				containerStatus := &pod.Status.ContainerStatuses[i]
 				if !containerStatus.Ready {
 					log.Printf("container \"%s\" in pod \"%s\" is not ready yet. Waiting...\n", containerStatus.Name, pod.Name)
 					return false, nil

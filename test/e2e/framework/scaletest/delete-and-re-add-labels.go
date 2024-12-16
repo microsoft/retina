@@ -33,7 +33,6 @@ func (d *DeleteAndReAddLabels) Prevalidate() error {
 // Primary step where test logic is executed
 // Returning an error will cause the test to fail
 func (d *DeleteAndReAddLabels) Run() error {
-
 	if d.NumSharedLabelsPerPod <= 2 || !d.DeleteLabels {
 		return nil
 	}
@@ -89,7 +88,6 @@ func (d *DeleteAndReAddLabels) Run() error {
 }
 
 func (d *DeleteAndReAddLabels) addLabels(ctx context.Context, clientset *kubernetes.Clientset, pods *corev1.PodList, patch string) error {
-
 	for _, pod := range pods.Items {
 		_, err := clientset.CoreV1().Pods(d.Namespace).Patch(ctx, pod.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
 		if err != nil {
@@ -101,7 +99,6 @@ func (d *DeleteAndReAddLabels) addLabels(ctx context.Context, clientset *kuberne
 }
 
 func (d *DeleteAndReAddLabels) deleteLabels(ctx context.Context, clientset *kubernetes.Clientset, pods *corev1.PodList, patch string) error {
-
 	for _, pod := range pods.Items {
 		_, err := clientset.CoreV1().Pods(d.Namespace).Patch(ctx, pod.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
 		if err != nil {
