@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
 	"net"
 	"time"
 )
@@ -30,7 +31,7 @@ func (k *KapingerDNSClient) MakeRequests(ctx context.Context) error {
 		case <-ticker.C:
 			go func() {
 				for i := 0; i < k.volume; i++ {
-					domain := "retina.sh"
+					domain := randomString(20) + ".test"
 
 					ips, err := net.LookupIP(domain)
 					if err != nil {
@@ -42,4 +43,17 @@ func (k *KapingerDNSClient) MakeRequests(ctx context.Context) error {
 			}()
 		}
 	}
+}
+
+func randomString(n int) string {
+	var letters = []rune("abcdefghijklmnopqrstuvwxyz")
+	b := make([]rune, n)
+
+	rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+
+	return string(b)
 }
