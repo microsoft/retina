@@ -3,6 +3,7 @@ package ebpfwindows
 import (
 	"context"
 	"time"
+	"unsafe"
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	kcfg "github.com/microsoft/retina/pkg/config"
@@ -43,7 +44,7 @@ func (p *Plugin) Name() string {
 func (p *Plugin) Start(ctx context.Context) error {
 
 	p.l.Info("Start ebpfWindows plugin...")
-	p.pullCiliumMetrics(ctx)
+	p.pullCiliumMetricsAndEvents(ctx)
 	return nil
 }
 
@@ -54,8 +55,25 @@ func (p *Plugin) metricsMapIterateCallback(key *MetricsKey, value *MetricsValues
 	p.l.Info("Value", zap.String("Value", value.String()))
 }
 
+// eventsMapCallback is the callback function that is called for each value  in the events map.
+func (p *Plugin) eventsMapCallback(data unsafe.Pointer, size uint32) int {
+	p.l.Info("EventsMapCallback")
+	p.l.Info("Size", zap.Uint32("Size", size))
+	return 0
+}
+
 // pullCiliumeBPFMetrics is the function that is called periodically by the timer.
-func (p *Plugin) pullCiliumMetrics(ctx context.Context) {
+func (p *Plugin) pullCiliumMetricsAndEvents(ctx context.Context) {
+
+	eventsMap := NewEventsMap()
+	metricsMap := NewMetricsMap()
+
+	err := eventsMap.RegisterForCallback(p.eventsMapCallback)
+
+	if err != nil {
+		p.l.Error("Error registering for events map callback", zap.Error(err))
+		return
+	}
 
 	ticker := time.NewTicker(p.cfg.MetricsInterval)
 	defer ticker.Stop()
@@ -63,13 +81,13 @@ func (p *Plugin) pullCiliumMetrics(ctx context.Context) {
 	for {
 		select {
 		case <-ticker.C:
-			metricsMap := NewMetricsMap()
 			err := metricsMap.IterateWithCallback(p.metricsMapIterateCallback)
 			if err != nil {
 				p.l.Error("Error iterating metrics map", zap.Error(err))
 			}
 		case <-ctx.Done():
 			p.l.Error("ebpfwindows plugin canceling", zap.Error(ctx.Err()))
+			eventsMap.UnregisterForCallback()
 			return
 		}
 	}

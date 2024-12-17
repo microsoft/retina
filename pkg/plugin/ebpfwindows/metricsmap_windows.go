@@ -68,13 +68,13 @@ var (
 )
 
 // ringBufferEventCallback type definition in Go
-type enumMetricsCallback = func(key unsafe.Pointer, value unsafe.Pointer) int
+type enumMetricsCallback = func(key, value unsafe.Pointer) int
 
 // Callbacks in Go can only be passed as functions with specific signatures and often need to be wrapped in a syscall-compatible function.
 var enumCallBack enumMetricsCallback = nil
 
 // This function will be passed to the Windows API
-func enumMetricsSysCallCallback(key unsafe.Pointer, value unsafe.Pointer) uintptr {
+func enumMetricsSysCallCallback(key, value unsafe.Pointer) uintptr {
 
 	if enumCallBack != nil {
 		return uintptr(enumCallBack(key, value))
