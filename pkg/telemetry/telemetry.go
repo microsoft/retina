@@ -19,10 +19,9 @@ import (
 )
 
 var (
-	client            appinsights.TelemetryClient
-	version           string
-	mbShift           uint64 = 20
-	kernelVersionFunc        = KernelVersion
+	client  appinsights.TelemetryClient
+	version string
+	mbShift uint64 = 20
 	// property keys
 	kernelversion = "kernelversion"
 	sysmem        = "sysmem"
@@ -86,6 +85,10 @@ type TelemetryClient struct {
 	processName string
 	properties  map[string]string
 	profile     Perf
+
+	kernelInfoClient interface {
+		KernelVersion(context.Context) (string, error)
+	}
 }
 
 func NewAppInsightsTelemetryClient(processName string, additionalproperties map[string]string) (*TelemetryClient, error) {
@@ -105,9 +108,10 @@ func NewAppInsightsTelemetryClient(processName string, additionalproperties map[
 	}
 
 	return &TelemetryClient{
-		processName: processName,
-		properties:  properties,
-		profile:     perfProfile,
+		processName:      processName,
+		kernelInfoClient: &HostInfoClient{},
+		properties:       properties,
+		profile:          perfProfile,
 	}, nil
 }
 
@@ -161,7 +165,7 @@ func (t *TelemetryClient) trackWarning(err error, msg string) {
 }
 
 func (t *TelemetryClient) heartbeat(ctx context.Context) {
-	kernelVersion, err := kernelVersionFunc(ctx)
+	kernelVersion, err := t.kernelInfoClient.KernelVersion(ctx)
 	if err != nil {
 		t.trackWarning(err, "failed to get kernel version")
 	}
@@ -225,7 +229,7 @@ func (t *TelemetryClient) TrackMetric(metricname string, value float64, properti
 func (t *TelemetryClient) TrackTrace(name string, severity contracts.SeverityLevel, properties map[string]string) {
 	trace := appinsights.NewTraceTelemetry(name, severity)
 
-	kernelVersion, err := kernelVersionFunc(context.Background())
+	kernelVersion, err := t.kernelInfoClient.KernelVersion(context.Background())
 	if err != nil {
 		if client != nil {
 			errtrace := appinsights.NewTraceTelemetry(fmt.Sprintf("failed to get kernel version for trace: %v", err), contracts.Error)

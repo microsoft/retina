@@ -14,7 +14,8 @@ func TestWindowsGetKernelVersion(t *testing.T) {
 	InitAppInsights("", "")
 	ctx := context.TODO()
 
-	str, err := KernelVersion(ctx)
+	client := &HostInfoClient{}
+	str, err := client.KernelVersion(ctx)
 	require.NoError(t, err)
 	require.NotEmpty(t, str)
 }
