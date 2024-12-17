@@ -53,7 +53,7 @@ func Init(retry int) (*FilterManager, error) {
 		f.l = log.Logger().Named("filter-manager")
 	}
 	if f.c == nil {
-		f.c = newCache()
+		f.c = getCache()
 	}
 	f.fm, err = filter.Init()
 	return f, errors.Wrapf(err, "failed to initialize filter map")

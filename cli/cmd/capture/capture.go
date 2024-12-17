@@ -12,7 +12,9 @@ import (
 var opts = struct {
 	genericclioptions.ConfigFlags
 	Name *string
-}{}
+}{
+	Name: new(string),
+}
 
 const defaultName = "retina-capture"
 

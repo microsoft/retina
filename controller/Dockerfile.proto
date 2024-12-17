@@ -1,17 +1,16 @@
-# mcr.microsoft.com/oss/go/microsoft/golang:1.23.1-cbl-mariner2.0
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:dcd95cadab21a855894c599c9e26bfb2179aa08e7d7f99c0e8546167712ba6ef
+# mcr.microsoft.com/oss/go/microsoft/golang:1.23.4-cbl-mariner2.0
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:88225e171f29fe5f1f6ffca8eb659535b19b253354e43e1f4fc8a9bc67615ca1
 
 LABEL Name=retina-builder Version=0.0.1
 
-RUN apt-get update &&\
-    apt-get -y install lsb-release wget software-properties-common gnupg file git make unzip
+RUN tdnf install -y unzip
 
 WORKDIR /tmp
 
-RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.31.0
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.2
 RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v24.2/protoc-24.2-linux-x86_64.zip
 RUN unzip protoc-24.2-linux-x86_64.zip -d protoc
 RUN mv protoc/bin/protoc /usr/bin/protoc
 
 WORKDIR /app
-ENTRYPOINT protoc -I=. --go_out=paths=source_relative:. ./pkg/utils/metadata.proto
+ENTRYPOINT protoc -I=. --go_out=paths=source_relative:. ./pkg/utils/metadata_linux.proto

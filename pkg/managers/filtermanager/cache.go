@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-var fc *filterCache
+var fc = &filterCache{data: make(map[string]requests)}
 
 // requests maps a requestor to a list of request metadata.
 // Nested maps
@@ -24,10 +24,7 @@ type filterCache struct {
 	data map[string]requests
 }
 
-func newCache() *filterCache {
-	if fc == nil {
-		fc = &filterCache{data: make(map[string]requests)}
-	}
+func getCache() *filterCache {
 	return fc
 }
 

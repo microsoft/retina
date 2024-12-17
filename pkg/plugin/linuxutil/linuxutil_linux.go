@@ -13,30 +13,34 @@ import (
 	hubblev1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
-	"github.com/microsoft/retina/pkg/plugin/api"
+	"github.com/microsoft/retina/pkg/plugin/registry"
 	"github.com/safchain/ethtool"
 	"go.uber.org/zap"
 )
 
 const defaultLimit = 2000
 
+func init() {
+	registry.Add(name, New)
+}
+
 // New creates a linuxutil plugin.
-func New(cfg *kcfg.Config) api.Plugin {
+func New(cfg *kcfg.Config) registry.Plugin {
 	return &linuxUtil{
 		cfg: cfg,
-		l:   log.Logger().Named(string(Name)),
+		l:   log.Logger().Named(name),
 	}
 }
 
 func (lu *linuxUtil) Name() string {
-	return string(Name)
+	return name
 }
 
-func (lu *linuxUtil) Generate(ctx context.Context) error {
+func (lu *linuxUtil) Generate(context.Context) error {
 	return nil
 }
 
-func (lu *linuxUtil) Compile(ctx context.Context) error {
+func (lu *linuxUtil) Compile(context.Context) error {
 	return nil
 }
 
@@ -50,8 +54,8 @@ func (lu *linuxUtil) Start(ctx context.Context) error {
 	return lu.run(ctx)
 }
 
-func (lu *linuxUtil) SetupChannel(ch chan *hubblev1.Event) error {
-	lu.l.Debug("Plugin does not support SetupChannel", zap.String("plugin", string(Name)))
+func (lu *linuxUtil) SetupChannel(chan *hubblev1.Event) error {
+	lu.l.Debug("Plugin does not support SetupChannel", zap.String("plugin", name))
 	return nil
 }
 
