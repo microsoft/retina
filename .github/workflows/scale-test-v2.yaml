@@ -68,6 +68,14 @@ permissions:
   contents: read
   id-token: write
 
+env:
+  RESOURCE_GROUP: ${{ inputs.resource_group }}
+  CLUSTER_NAME: ${{ inputs.cluster_name }}
+  TAG: RetinaVersion
+  VM_SIZE: Standard_D4_v3
+  LOCATION: westus2
+  OUTPUT_FILEPATH: ./output.log
+
 jobs:
   setup-cluster:
     if: ${{ github.event.inputs.create_cluster == 'true' }}
@@ -135,14 +143,6 @@ jobs:
         shell: bash
         run: az aks get-credentials --name $CLUSTER_NAME --resource-group $RESOURCE_GROUP --overwrite-existing
 
-      - name: Run Scale Test
-        shell: bash
-        run: |
-          set -euo pipefail
-          # Placeholder for test
-          sleep 300 &
-          echo "TEST_PID=$!" >> $GITHUB_ENV
-
       - name: Clone ClusterLoader2
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -163,18 +163,29 @@ jobs:
           mkdir test
           cp ../../.github/actions/cl2/* ./test -r
           go build ./cmd/clusterloader.go
-          ls -l
 
-      - name: Run CL2
+      - name: Run Scale Test
         shell: bash
+        env:
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION }}
+          AZURE_APP_INSIGHTS_KEY: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
         run: |
           set -euo pipefail
-          cd perf-tests/clusterloader2
-          ./clusterloader --testconfig=./test/config.yaml --provider=aks --kubeconfig=$HOME/.kube/config --v=2 --report-dir=./report
+          # Placeholder for test
+          go test ./test/e2e/. -v -tags=scale -timeout 300s -args -image-tag=$(make version) -create-infra=false -delete-infra=false
 
-      - name: Stop test
-        shell: bash
-        run: kill $TEST_PID
+      # - name: Run CL2
+      #   shell: bash
+      #   run: |
+      #     set -euo pipefail
+      #     cd perf-tests/clusterloader2
+      #     ./clusterloader --testconfig=./test/config.yaml --provider=aks --kubeconfig=$HOME/.kube/config --v=2 --report-dir=./report
+
+      # - name: Stop test
+      #   shell: bash
+      #   run: |
+      #     PID=$(ps aux | grep "go test" | awk '{print $2}')
+      #     kill -s 15 $PID
 
   cleanup:
     name: Cleanup
