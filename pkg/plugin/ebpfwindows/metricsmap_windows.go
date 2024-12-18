@@ -2,6 +2,7 @@ package ebpfwindows
 
 import (
 	"fmt"
+	"reflect"
 	"syscall"
 	"unsafe"
 
@@ -68,16 +69,16 @@ var (
 )
 
 // ringBufferEventCallback type definition in Go
-type enumMetricsCallback = func(key, value unsafe.Pointer) int
+type enumMetricsCallback = func(key, value unsafe.Pointer, valueSize int) int
 
 // Callbacks in Go can only be passed as functions with specific signatures and often need to be wrapped in a syscall-compatible function.
 var enumCallBack enumMetricsCallback = nil
 
 // This function will be passed to the Windows API
-func enumMetricsSysCallCallback(key, value unsafe.Pointer) uintptr {
+func enumMetricsSysCallCallback(key, value unsafe.Pointer, valueSize int) uintptr {
 
 	if enumCallBack != nil {
-		return uintptr(enumCallBack(key, value))
+		return uintptr(enumCallBack(key, value, valueSize))
 	}
 
 	return 0
@@ -93,10 +94,16 @@ func NewMetricsMap() MetricsMap {
 func (m metricsMap) IterateWithCallback(cb IterateCallback) error {
 
 	// Define the callback function in Go
-	enumCallBack = func(key unsafe.Pointer, value unsafe.Pointer) int {
+	enumCallBack = func(key unsafe.Pointer, value unsafe.Pointer, valueSize int) int {
+
+		var metricsValues MetricsValues
+		sh := (*reflect.SliceHeader)(unsafe.Pointer(&metricsValues))
+		sh.Data = uintptr(value)
+		sh.Len = valueSize
+		sh.Cap = valueSize
+
 		metricsKey := (*MetricsKey)(key)
-		metricsValues := (*MetricsValues)(value)
-		cb(metricsKey, metricsValues)
+		cb(metricsKey, &metricsValues)
 		return 0
 	}
 

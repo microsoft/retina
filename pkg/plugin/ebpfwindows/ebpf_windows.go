@@ -2,6 +2,7 @@ package ebpfwindows
 
 import (
 	"context"
+	"errors"
 	"time"
 	"unsafe"
 
@@ -15,6 +16,10 @@ import (
 const (
 	// name of the ebpfwindows plugin
 	name = "windowseBPF"
+)
+
+var (
+	ErrInvalidEventData = errors.New("The Cilium Event Data is invalid")
 )
 
 // Plugin is the ebpfwindows plugin
@@ -56,9 +61,16 @@ func (p *Plugin) metricsMapIterateCallback(key *MetricsKey, value *MetricsValues
 }
 
 // eventsMapCallback is the callback function that is called for each value  in the events map.
-func (p *Plugin) eventsMapCallback(data unsafe.Pointer, size uint32) int {
+func (p *Plugin) eventsMapCallback(data unsafe.Pointer, size uint64) int {
 	p.l.Info("EventsMapCallback")
-	p.l.Info("Size", zap.Uint32("Size", size))
+	p.l.Info("Size", zap.Uint64("Size", size))
+	err := p.handleTraceEvent(data, size)
+
+	if err != nil {
+		p.l.Error("Error handling trace event", zap.Error(err))
+		return -1
+	}
+
 	return 0
 }
 
@@ -112,5 +124,62 @@ func (p *Plugin) Compile(context.Context) error {
 
 // Generate is a no-op for the ebpfwindows plugin
 func (p *Plugin) Generate(context.Context) error {
+	return nil
+}
+
+func (p *Plugin) handleDropNotify(dropNotify *DropNotify) {
+	p.l.Info("DropNotify", zap.String("DropNotify", dropNotify.String()))
+}
+
+func (p *Plugin) handleTraceNotify(traceNotify *TraceNotify) {
+	p.l.Info("TraceNotify", zap.String("TraceNotify", traceNotify.String()))
+}
+
+func (p *Plugin) handleTraceSockNotify(traceSockNotify *TraceSockNotify) {
+	p.l.Info("TraceSockNotify", zap.String("TraceSockNotify", traceSockNotify.String()))
+}
+
+func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint64) error {
+
+	if uintptr(size) < unsafe.Sizeof(uint8(0)) {
+		return ErrInvalidEventData
+	}
+
+	eventType := *(*uint8)(data)
+
+	switch eventType {
+	case CILIUM_NOTIFY_DROP:
+
+		if uintptr(size) < unsafe.Sizeof(DropNotify{}) {
+			p.l.Error("Invalid DropNotify data size", zap.Uint64("size", size))
+			return ErrInvalidEventData
+		}
+
+		dropNotify := (*DropNotify)(data)
+		p.handleDropNotify(dropNotify)
+
+	case CILIUM_NOTIFY_TRACE:
+
+		if uintptr(size) < unsafe.Sizeof(TraceNotify{}) {
+			p.l.Error("Invalid TraceNotify data size", zap.Uint64("size", size))
+			return ErrInvalidEventData
+		}
+
+		traceNotify := (*TraceNotify)(data)
+		p.handleTraceNotify(traceNotify)
+
+	case CILIUM_NOTIFY_TRACE_SOCK:
+		if uintptr(size) < unsafe.Sizeof(TraceSockNotify{}) {
+			p.l.Error("Invalid TraceSockNotify data size", zap.Uint64("size", size))
+			return ErrInvalidEventData
+		}
+
+		traceSockNotify := (*TraceSockNotify)(data)
+		p.handleTraceSockNotify(traceSockNotify)
+
+	default:
+		p.l.Error("Unsupported event type", zap.Uint8("eventType", eventType))
+	}
+
 	return nil
 }

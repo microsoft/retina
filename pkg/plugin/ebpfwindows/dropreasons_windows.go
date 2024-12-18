@@ -11,7 +11,7 @@ var DropMin uint8 = 130
 var DropInvalid uint8 = 2
 
 // These values are shared with bpf/lib/common.h and api/v1/flow/flow.proto.
-var errors = map[uint8]string{
+var dropErrors = map[uint8]string{
 	0:  "Success",
 	2:  "Invalid packet",
 	3:  "Plain Text",
@@ -68,7 +68,7 @@ func extendedReason(extError int8) string {
 }
 
 func DropReasonExt(reason uint8, extError int8) string {
-	if err, ok := errors[reason]; ok {
+	if err, ok := dropErrors[reason]; ok {
 		if ext := extendedReason(extError); ext == "" {
 			return err
 		} else {
