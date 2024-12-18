@@ -139,8 +139,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "Run Scale Test"
-          kubectl get ns
+          # Placeholder for test
+          sleep 300 &
+          echo "TEST_PID=$!" >> $GITHUB_ENV
 
       - name: Clone ClusterLoader2
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -159,14 +160,21 @@ jobs:
       - name: Setup CL2
         run: |
           cd perf-tests/clusterloader2
+          mkdir test
+          cp ../../.github/actions/cl2/* ./test -r
           go build ./cmd/clusterloader.go
+          ls -l
 
       - name: Run CL2
         shell: bash
         run: |
           set -euo pipefail
-          echo "Run CL2"
-          # ./clusterloader --kubeconfig $KUBECONFIG --num-deployments $NUM_DEPLOYMENTS --num-replicas $NUM_REPLICAS --num-netpol $NUM_NETPOL
+          cd perf-tests/clusterloader2
+          ./clusterloader --testconfig=./test/config.yaml --provider=aks --kubeconfig=$HOME/.kube/config --v=2 --report-dir=./report
+
+      - name: Stop test
+        shell: bash
+        run: kill $TEST_PID
 
   cleanup:
     name: Cleanup
