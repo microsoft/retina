@@ -11,6 +11,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/microsoft/ApplicationInsights-Go/appinsights"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,6 +21,40 @@ func init() {
 
 func TestNewAppInsightsTelemetryClient(t *testing.T) {
 	require.NotPanics(t, func() { NewAppInsightsTelemetryClient("test", map[string]string{}) })
+}
+
+type MockKernelVersionClient struct {
+	KernelVersionF func(context.Context) (string, error)
+}
+
+func (m *MockKernelVersionClient) KernelVersion(ctx context.Context) (string, error) {
+	return m.KernelVersionF(ctx)
+}
+
+func TestTrackTraceIncludesKernelVersion(t *testing.T) {
+	mockKernelVersion := "5.15.0-101-generic"
+	called := false
+	mockClient := &MockKernelVersionClient{
+		KernelVersionF: func(_ context.Context) (string, error) {
+			called = true
+			return mockKernelVersion, nil
+		},
+	}
+
+	client := &TelemetryClient{
+		kernelInfoClient: mockClient,
+		properties: map[string]string{
+			"test_key": "test_value",
+		},
+	}
+
+	traceProperties := map[string]string{}
+
+	client.TrackTrace("test_trace_event", appinsights.Information, traceProperties)
+
+	require.Equal(t, mockKernelVersion, traceProperties[kernelversion], "kernelVersion should be included in trace properties")
+
+	require.True(t, called, "expected KernelVersion to be called but wasn't")
 }
 
 func TestGetEnvironmentProerties(t *testing.T) {
