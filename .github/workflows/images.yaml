@@ -356,8 +356,9 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION }}
 
-      - name: Run E2E Tests
+      - name: Run Perf Tests
         env:
+          AZURE_APP_INSIGHTS_KEY: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION }}
           AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
         shell: bash
