@@ -1,13 +1,18 @@
 package ebpfwindows
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"net"
 )
 
 // IP represents an IPv4 or IPv4 or IPv6 address
 type IP struct {
-	Address [16]byte
+	Address uint32
+	Pad1    uint32
+	Pad2    uint32
+	Pad3    uint32
 }
 
 // TraceSockNotify is the notification for a socket trace
@@ -20,7 +25,6 @@ type TraceSockNotify struct {
 	CgroupID   uint64
 	L4Proto    uint8
 	IPv6       bool
-	Pad        uint8
 }
 
 // NotifyCommonHdr is the common header for all notifications
@@ -59,22 +63,43 @@ type TraceNotify struct {
 	DstID    uint16
 	Reason   uint8
 	IPv6     bool
-	Pad      uint8
 	Ifindex  uint32
 	OrigIP   IP
 }
 
 // Notification types
 const (
-	CILIUM_NOTIFY_UNSPEC         = 0
-	CILIUM_NOTIFY_DROP           = 1
-	CILIUM_NOTIFY_DBG_MSG        = 2
-	CILIUM_NOTIFY_DBG_CAPTURE    = 3
-	CILIUM_NOTIFY_TRACE          = 4
-	CILIUM_NOTIFY_POLICY_VERDICT = 5
-	CILIUM_NOTIFY_CAPTURE        = 6
-	CILIUM_NOTIFY_TRACE_SOCK     = 7
+	CiliumNotifyUnspec        = 0
+	CiliumNotifyDrop          = 1
+	CiliumNotifyDebugMessage  = 2
+	CiliumNotifyDebugCapture  = 3
+	CiliumNotifyTrace         = 4
+	CiliumNotifyPolicyVerdict = 5
+	CiliumNotifyCapture       = 6
+	CiliumNotifyTraceSock     = 7
 )
+
+func (ip *IP) ConvertToString(IPv6 bool) string {
+	var ipAddress string
+	var buf bytes.Buffer
+
+	err := binary.Write(&buf, binary.BigEndian, *ip)
+
+	if err != nil {
+		return ""
+	}
+
+	byteArray := buf.Bytes()
+
+	if IPv6 {
+		ipAddress = net.IP(byteArray[:16]).String()
+	} else {
+		ipAddress = net.IP(byteArray[:4]).String()
+	}
+
+	return ipAddress
+
+}
 
 // String returns a string representation of the DropNotify
 func (k *DropNotify) String() string {
@@ -84,27 +109,12 @@ func (k *DropNotify) String() string {
 
 // String returns a string representation of the TraceNotify
 func (k *TraceNotify) String() string {
-	var ipAddress string = ""
-
-	if k.IPv6 {
-		ipAddress = net.IP(k.OrigIP.Address[:]).String()
-	} else {
-		ipAddress = net.IP(k.OrigIP.Address[:3]).String()
-	}
-
+	ipAddress := k.OrigIP.ConvertToString(k.IPv6)
 	return fmt.Sprintf("Ifindex: %d, SrcLabel:%d, DstLabel:%d, IpV6:%t, OrigIP:%s", k.Ifindex, k.SrcLabel, k.DstLabel, k.IPv6, ipAddress)
 }
 
 // String returns a string representation of the TraceSockNotify
 func (k *TraceSockNotify) String() string {
-
-	var ipAddress string = ""
-
-	if k.IPv6 {
-		ipAddress = net.IP(k.DstIP.Address[:]).String()
-	} else {
-		ipAddress = net.IP(k.DstIP.Address[:3]).String()
-	}
-
+	ipAddress := k.DstIP.ConvertToString(k.IPv6)
 	return fmt.Sprintf("DstIP:%s, DstPort:%d, SockCookie:%d, CgroupID:%d, L4Proto:%d, IPv6:%t", ipAddress, k.DstPort, k.SockCookie, k.CgroupID, k.L4Proto, k.IPv6)
 }
