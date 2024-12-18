@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/retina/test/e2e/common"
@@ -49,7 +50,6 @@ func TestE2ERetina_Scale(t *testing.T) {
 	// Get to root of the repo by going up two directories
 	rootDir := filepath.Dir(filepath.Dir(cwd))
 
-	chartPath := filepath.Join(rootDir, "deploy", "legacy", "manifests", "controller", "helm", "retina")
 	kubeConfigFilePath := filepath.Join(rootDir, "test", "e2e", "test.pem")
 
 	// Scale test parameters
@@ -103,8 +103,16 @@ func TestE2ERetina_Scale(t *testing.T) {
 	require.NoError(t, err)
 	opt.AdditionalTelemetryProperty["clusterFqdn"] = fqdn
 
+	var hubbleControlPlane bool
+	if strings.ToLower(os.Getenv("HUBBLE_CONTROL_PLANE")) == "true" {
+		hubbleControlPlane = true
+	}
+
+	chartPath, err := common.RetinaChartPath(hubbleControlPlane)
+	require.NoError(t, err)
+
 	// Install Retina
-	installRetina := types.NewRunner(t, jobs.InstallRetina(kubeConfigFilePath, chartPath))
+	installRetina := types.NewRunner(t, jobs.InstallRetina(kubeConfigFilePath, chartPath, hubbleControlPlane))
 	installRetina.Run(ctx)
 
 	t.Cleanup(func() {
