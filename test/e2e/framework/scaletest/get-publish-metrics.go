@@ -44,6 +44,7 @@ func (g *GetAndPublishMetrics) Run() error {
 	}
 
 	g.stop = make(chan struct{})
+
 	g.wg.Add(1)
 
 	go func() {
@@ -66,7 +67,6 @@ func (g *GetAndPublishMetrics) Run() error {
 
 			}
 		}
-
 	}()
 
 	return nil
