@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{.Name}}
+  labels:
+    is-real: "true"
+spec:
+  replicas: {{.Replicas}}
+  selector:
+    matchLabels:
+      app: kapinger
+  template:
+    metadata:
+      labels:
+        app: kapinger
+        is-real: "true"
+        unique-dep-label: "{{.Index}}"
+    spec:
+      nodeSelector:
+        kubernetes.io/os: linux
+        scale-test: "true"
+        kubernetes.io/arch: amd64
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app: kapinger
+      serviceAccountName: kapinger-sa-0
+      containers:
+        - image: acnpublic.azurecr.io/kapinger:20241014.7
+          name: kapinger
+          resources:
+            limits:
+              memory: 80Mi
+            requests:
+              memory: 20Mi
+          ports:
+            - containerPort: 8080
+          env:
+          - name: GODEBUG
+            value: "netdns=go"
+          - name: TARGET_TYPE
+            value: "service"
+          - name: HTTP_PORT
+            value: "8080"
+          - name: TCP_PORT
+            value: "8085"
+          - name: UDP_PORT
+            value: "8086"
+
