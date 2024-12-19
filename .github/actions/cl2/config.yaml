@@ -1,0 +1,35 @@
+name: test
+namespace:
+  number: 1
+  prefix: traffic
+tuningSets:
+  - name: Uniform1qps
+    qpsLoad:
+      qps: 1
+  - name: Uniform500qps
+    qpsLoad:
+      qps: 500
+steps:
+  - name: Start measurements
+    measurements:
+      - Identifier: WaitForControlledPodsRunning
+        Method: WaitForControlledPodsRunning
+        Params:
+          action: start
+          apiVersion: apps/v1
+          kind: Deployment
+          labelSelector: is-real = true
+          operationTimeout: 120s
+  - module:
+      path: /traffic/kapinger.yaml
+      params:
+        namespace: traffic-1
+        tuningSet: Uniform500qps
+        deployments: 10
+        podReplicas: 5
+  - name: Wait for pods to be running
+    measurements:
+      - Identifier: WaitForControlledPodsRunning
+        Method: WaitForControlledPodsRunning
+        Params:
+          action: gather
