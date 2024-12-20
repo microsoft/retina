@@ -1,0 +1,74 @@
+on:
+  schedule:
+    - cron: '0 0 * * *' # Runs daily at midnight
+  workflow_dispatch:
+
+jobs:
+  bump-version:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get latest Hubble version
+        id: get_version
+        run: |
+          latest_version=$(curl -s https://api.github.com/repos/cilium/hubble/releases/latest | jq -r .tag_name)
+          echo "Latest Hubble version: $latest_version"
+          echo "::set-output name=version::$latest_version"
+
+      - name: Get current Hubble version from Dockerfile
+        id: get_current_version
+        run: |
+          current_version=$(grep -oP '(?<=ARG HUBBLE_VERSION=).*' controller/Dockerfile)
+          echo "Current Hubble version: $current_version"
+          echo "::set-output name=version::$current_version"
+
+      - name: Check if update is needed
+        id: check_update
+        run: |
+          if [ "${{ steps.get_version.outputs.version }}" == "${{ steps.get_current_version.outputs.version }}" ]; then
+            echo "Hubble version is up to date. No update needed."
+            echo "::set-output name=update_needed::false"
+          else
+            echo "Hubble version needs to be updated."
+            echo "::set-output name=update_needed::true"
+          fi
+
+      - name: Update Dockerfile and Makefile with latest Hubble version
+        if: steps.check_update.outputs.update_needed == 'true'
+        run: |
+          latest_version=${{ steps.get_version.outputs.version }}
+          sed -i "s/^ARG HUBBLE_VERSION=.*/ARG HUBBLE_VERSION=${latest_version}/" controller/Dockerfile
+          sed -i "s/^ENV HUBBLE_VERSION=.*/ENV HUBBLE_VERSION=${latest_version}/" controller/Dockerfile
+          sed -i "s/^HUBBLE_VERSION=.*/HUBBLE_VERSION=${latest_version}/" Makefile
+
+      - name: Create new branch
+        if: steps.check_update.outputs.update_needed == 'true'
+        run: |
+          git checkout -b bump-hubble-version-${{ steps.get_version.outputs.version }}
+
+      - name: Commit and push changes
+        if: steps.check_update.outputs.update_needed == 'true'
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add controller/Dockerfile Makefile
+          git commit -m "Bump Hubble version to ${{ steps.get_version.outputs.version }}"
+          git push --set-upstream origin bump-hubble-version-${{ steps.get_version.outputs.version }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create pull request
+        if: steps.check_update.outputs.update_needed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: bump-hubble-version-${{ steps.get_version.outputs.version }}
+          title: "deps: bump Hubble version to ${{ steps.get_version.outputs.version }}"
+          body: "This PR bumps the Hubble version to ${{ steps.get_version.outputs.version }}."
+          labels: "area/dependencies"
+          sign-commits: true
+          signoff: true
+  
