@@ -1,0 +1,12 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kapinger-rolebinding
+subjects:
+- kind: ServiceAccount
+  name: kapinger-sa-0
+  namespace: {{.subjectNamespace}}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kapinger-role-0

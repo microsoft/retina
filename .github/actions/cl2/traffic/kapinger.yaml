@@ -1,0 +1,61 @@
+## Kapinger module creates kapinger components
+
+# Namespaces where kapinger will be deployed to
+{{$namespace := DefaultParam .namespace "traffic-1"}}
+# Tuning set
+{{$tuningSet := DefaultParam .tuningSet "Uniform500qps"}}
+# Number of deployments
+{{$deployments := DefaultParam .deployments 1000}}
+# Number of pods per deploymen
+{{$podReplicas := DefaultParam .podReplicas 20}}
+
+steps:
+  - name: Create service accounts
+    phases:
+      - namespaceList:
+        - {{$namespace}}
+        replicasPerNamespace: 1
+        tuningSet: {{$tuningSet}}
+        objectBundle:
+          - basename: kapinger-sa
+            objectTemplatePath: "traffic/kapinger/sa.yaml"
+  - name: Create cluster role
+    phases:
+      - namespaceList:
+        - ""
+        replicasPerNamespace: 1
+        tuningSet: {{$tuningSet}}
+        objectBundle:
+          - basename: kapinger-role
+            objectTemplatePath: "traffic/kapinger/role.yaml"
+  - name: Create cluster role binding
+    phases:
+      - namespaceList:
+        - ""
+        replicasPerNamespace: 1
+        tuningSet: {{$tuningSet}}
+        objectBundle:
+          - basename: kapinger-rolebinding
+            objectTemplatePath: "traffic/kapinger/rolebinding.yaml"
+            templateFillMap:
+              subjectNamespace: {{$namespace}}
+  - name: Create deployments
+    phases:
+      - namespaceList:
+        - {{$namespace}}
+        replicasPerNamespace: {{$deployments}}
+        tuningSet: {{$tuningSet}}
+        objectBundle:
+          - basename: kapinger
+            objectTemplatePath: "traffic/kapinger/deployment.yaml"
+            templateFillMap:
+              Replicas: {{$podReplicas}}
+  - name: Create services
+    phases:
+      - namespaceList:
+        - {{$namespace}}
+        replicasPerNamespace: {{$deployments}}
+        tuningSet: {{$tuningSet}}
+        objectBundle:
+          - basename: kapinger
+            objectTemplatePath: "traffic/kapinger/svc.yaml"
