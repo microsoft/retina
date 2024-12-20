@@ -5,6 +5,10 @@ on:
     - cron: '0 0 * * *' # Runs daily at midnight
   workflow_dispatch:
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   update-hubble:
     name: Update Hubble to latest version
