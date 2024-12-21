@@ -3,13 +3,20 @@ package ebpfwindows
 import (
     "context"
     "errors"
+    "net"
     "time"
     "unsafe"
 
+    "github.com/cilium/cilium/api/v1/flow"
     v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
+    hp "github.com/cilium/cilium/pkg/hubble/parser"
     kcfg "github.com/microsoft/retina/pkg/config"
+    "github.com/microsoft/retina/pkg/enricher"
     "github.com/microsoft/retina/pkg/log"
+    "github.com/microsoft/retina/pkg/metrics"
     "github.com/microsoft/retina/pkg/plugin/registry"
+    "github.com/microsoft/retina/pkg/utils"
+    "github.com/sirupsen/logrus"
     "go.uber.org/zap"
 )
 
@@ -20,12 +27,20 @@ const (
 
 var (
     ErrInvalidEventData = errors.New("The Cilium Event Data is invalid")
+    ErrNilEnricher      = errors.New("enricher is nil")
 )
 
 // Plugin is the ebpfwindows plugin
 type Plugin struct {
-    l   *log.ZapLogger
-    cfg *kcfg.Config
+    l               *log.ZapLogger
+    cfg             *kcfg.Config
+    enricher        enricher.EnricherInterface
+    externalChannel chan *v1.Event
+    parser          *hp.Parser
+}
+
+func init() {
+    registry.Add(name, New)
 }
 
 func New(cfg *kcfg.Config) registry.Plugin {
@@ -37,6 +52,23 @@ func New(cfg *kcfg.Config) registry.Plugin {
 
 // Init is a no-op for the ebpfwindows plugin
 func (p *Plugin) Init() error {
+
+    parser, err := hp.New(logrus.WithField("cilium", "parser"),
+        nil,
+        nil,
+        nil,
+        nil,
+        nil,
+        nil,
+        nil,
+    )
+
+    if err != nil {
+        p.l.Fatal("Failed to create parser", zap.Error(err))
+        return err
+    }
+
+    p.parser = parser
     return nil
 }
 
@@ -49,6 +81,12 @@ func (p *Plugin) Name() string {
 func (p *Plugin) Start(ctx context.Context) error {
 
     p.l.Info("Start ebpfWindows plugin...")
+    p.enricher = enricher.Instance()
+
+    if p.enricher == nil {
+        return ErrNilEnricher
+    }
+
     p.pullCiliumMetricsAndEvents(ctx)
     return nil
 }
@@ -105,8 +143,9 @@ func (p *Plugin) pullCiliumMetricsAndEvents(ctx context.Context) {
     }
 }
 
-// SetupChannel is a no-op for the ebpfwindows plugin
+// SetupChannel saves the external channel to which the plugin will send events.
 func (p *Plugin) SetupChannel(ch chan *v1.Event) error {
+    p.externalChannel = ch
     return nil
 }
 
@@ -179,6 +218,52 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint64) error {
 
     default:
         p.l.Error("Unsupported event type", zap.Uint8("eventType", eventType))
+    }
+
+    t1 := time.Now().UnixNano()
+
+    // Hardcoded values for flow object. These values will be replaced by the actual values from the event.
+    fl := utils.ToFlow(
+        p.l,
+        t1,
+        net.ParseIP("192.168.0.1").To4(), // Src IP
+        net.ParseIP("192.168.0.2").To4(), // Dst IP
+        80,                               // Src Port
+        1024,                             // Dst Port
+        6,                                // Protocol
+        2,
+        flow.Verdict_DROPPED,
+    )
+
+    if fl == nil {
+        p.l.Warn("Could not convert event to flow", zap.Any("handleTraceEvent", data))
+        return ErrInvalidEventData
+    }
+
+    if fl != nil {
+
+        ev := &v1.Event{
+            Event:     fl,
+            Timestamp: fl.GetTime(),
+        }
+
+        if p.enricher != nil {
+            p.enricher.Write(ev)
+        } else {
+            p.l.Error("enricher is nil when writing event")
+        }
+
+        // Write the event to the external channel.
+        if p.externalChannel != nil {
+            select {
+            case p.externalChannel <- ev:
+            default:
+                // Channel is full, drop the event.
+                // We shouldn't slow down the reader.
+                metrics.LostEventsCounter.WithLabelValues(utils.ExternalChannel, name).Inc()
+            }
+        }
+
     }
 
     return nil
