@@ -11,8 +11,7 @@ import (
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
 	pm "github.com/microsoft/retina/pkg/managers/pluginmanager"
-	"github.com/microsoft/retina/pkg/plugin/api"
-	"github.com/microsoft/retina/pkg/plugin/api/mock"
+	plugin "github.com/microsoft/retina/pkg/plugin/mock"
 	"github.com/microsoft/retina/pkg/telemetry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -82,15 +81,15 @@ func TestControllerPluginManagerStartFail(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 
 	pluginName := "mockplugin"
-
 	cfg := &kcfg.Config{
 		MetricsInterval: timeInter,
 		EnablePodLevel:  true,
+		EnabledPlugin:   []string{pluginName},
 	}
-	mgr, err := pm.NewPluginManager(cfg, telemetry.NewNoopTelemetry(), api.PluginName(pluginName))
+	mgr, err := pm.NewPluginManager(cfg, telemetry.NewNoopTelemetry())
 	require.NoError(t, err, "Expected no error, instead got %+v", err)
 
-	mockPlugin := mock.NewMockPlugin(ctl)
+	mockPlugin := plugin.NewMockPlugin(ctl)
 	mockPlugin.EXPECT().Generate(gomock.Any()).Return(nil).AnyTimes()
 	mockPlugin.EXPECT().Compile(gomock.Any()).Return(nil).AnyTimes()
 	mockPlugin.EXPECT().Stop().Return(nil).AnyTimes()
@@ -98,7 +97,7 @@ func TestControllerPluginManagerStartFail(t *testing.T) {
 	mockPlugin.EXPECT().Name().Return(pluginName).AnyTimes()
 	mockPlugin.EXPECT().Start(gomock.Any()).Return(errors.New("test error")).AnyTimes()
 
-	mgr.SetPlugin(api.PluginName(pluginName), mockPlugin)
+	mgr.SetPlugin(pluginName, mockPlugin)
 	cm.pluginManager = mgr
 
 	err = cm.Init(context.Background())

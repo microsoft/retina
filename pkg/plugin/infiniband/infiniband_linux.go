@@ -12,29 +12,33 @@ import (
 	hubblev1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
-	"github.com/microsoft/retina/pkg/plugin/api"
+	"github.com/microsoft/retina/pkg/plugin/registry"
 	"go.uber.org/zap"
 )
 
 var ErrAlreadyRunning = errors.New("infiniband plugin is already running")
 
+func init() {
+	registry.Add(name, New)
+}
+
 // New creates a infiniband plugin.
-func New(cfg *kcfg.Config) api.Plugin {
+func New(cfg *kcfg.Config) registry.Plugin {
 	return &infiniband{
 		cfg: cfg,
-		l:   log.Logger().Named(string(Name)),
+		l:   log.Logger().Named(name),
 	}
 }
 
 func (ib *infiniband) Name() string {
-	return string(Name)
+	return name
 }
 
-func (ib *infiniband) Generate(ctx context.Context) error { //nolint //implementing iface
+func (ib *infiniband) Generate(context.Context) error {
 	return nil
 }
 
-func (ib *infiniband) Compile(ctx context.Context) error { //nolint // implementing iface
+func (ib *infiniband) Compile(context.Context) error {
 	return nil
 }
 
@@ -53,8 +57,8 @@ func (ib *infiniband) Start(ctx context.Context) error {
 	return ib.run(ctx)
 }
 
-func (ib *infiniband) SetupChannel(ch chan *hubblev1.Event) error { // nolint // impl. iface
-	ib.l.Warn("Plugin does not support SetupChannel", zap.String("plugin", string(Name)))
+func (ib *infiniband) SetupChannel(chan *hubblev1.Event) error {
+	ib.l.Warn("Plugin does not support SetupChannel", zap.String("plugin", name))
 	return nil
 }
 

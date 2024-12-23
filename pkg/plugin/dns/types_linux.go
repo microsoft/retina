@@ -8,13 +8,10 @@ import (
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
-	"github.com/microsoft/retina/pkg/plugin/api"
 	"github.com/microsoft/retina/pkg/plugin/common"
 )
 
-const (
-	Name api.PluginName = "dns"
-)
+const name = "dns"
 
 var m metrics.CounterVec
 

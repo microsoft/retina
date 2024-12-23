@@ -12,18 +12,17 @@ import (
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
-	"github.com/microsoft/retina/pkg/plugin/api"
 	"github.com/microsoft/retina/pkg/utils"
 )
 
 const (
-	Name                  api.PluginName = "dropreason"
-	bpfSourceDir          string         = "_cprog"
-	bpfSourceFileName     string         = "drop_reason.c"
-	bpfObjectFileName     string         = "kprobe_bpf.o"
-	dynamicHeaderFileName string         = "dynamic.h"
-	buffer                int            = 10000
-	workers               int            = 2
+	name                  string = "dropreason"
+	bpfSourceDir          string = "_cprog"
+	bpfSourceFileName     string = "drop_reason.c"
+	bpfObjectFileName     string = "kprobe_bpf.o"
+	dynamicHeaderFileName string = "dynamic.h"
+	buffer                int    = 10000
+	workers               int    = 2
 )
 
 // Determined via testing on a large cluster.

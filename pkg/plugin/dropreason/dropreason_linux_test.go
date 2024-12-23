@@ -43,7 +43,7 @@ func TestStop(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	p := &dropReason{
 		cfg: cfgPodLevelEnabled,
-		l:   log.Logger().Named(string(Name)),
+		l:   log.Logger().Named(name),
 	}
 	err := p.Stop()
 	if err != nil {
@@ -70,7 +70,7 @@ func TestShutdown(t *testing.T) {
 			MetricsInterval: 100 * time.Second,
 			EnablePodLevel:  false,
 		},
-		l: log.Logger().Named(string(Name)),
+		l: log.Logger().Named(name),
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -93,7 +93,7 @@ func TestCompile(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	p := &dropReason{
 		cfg: cfgPodLevelEnabled,
-		l:   log.Logger().Named(string(Name)),
+		l:   log.Logger().Named(name),
 	}
 	dir, _ := absPath()
 	expectedOutputFile := fmt.Sprintf("%s/%s", dir, bpfObjectFileName)
@@ -122,7 +122,7 @@ func TestProcessMapValue(t *testing.T) {
 	metrics.InitializeMetrics()
 	dr := &dropReason{
 		cfg: cfgPodLevelEnabled,
-		l:   log.Logger().Named(string(Name)),
+		l:   log.Logger().Named(name),
 	}
 
 	testMetricKey := dropMetricKey{DropType: 1, ReturnVal: 2}
@@ -167,7 +167,7 @@ func TestDropReasonRun_Error(t *testing.T) {
 	// Create drop reason instance
 	dr := &dropReason{
 		cfg:            cfgPodLevelDisabled,
-		l:              log.Logger().Named(string(Name)),
+		l:              log.Logger().Named(name),
 		metricsMapData: mockedMap,
 	}
 
@@ -225,7 +225,7 @@ func TestDropReasonRun(t *testing.T) {
 	// Create drop reason instance
 	dr := &dropReason{
 		cfg:            cfgPodLevelEnabled,
-		l:              log.Logger().Named(string(Name)),
+		l:              log.Logger().Named(name),
 		metricsMapData: mockedMap,
 		reader:         mockedPerfReader,
 		enricher:       menricher,
@@ -280,7 +280,7 @@ func TestDropReasonReadDataPodLevelEnabled(t *testing.T) {
 	// Create drop reason instance
 	dr := &dropReason{
 		cfg:            cfgPodLevelEnabled,
-		l:              log.Logger().Named(string(Name)),
+		l:              log.Logger().Named(name),
 		metricsMapData: mockedMap,
 		reader:         mockedPerfReader,
 		enricher:       menricher,
@@ -325,7 +325,7 @@ func TestDropReasonReadData_WithEmptyPerfArray(t *testing.T) {
 	// Create drop reason instance
 	dr := &dropReason{
 		cfg:            cfgPodLevelEnabled,
-		l:              log.Logger().Named(string(Name)),
+		l:              log.Logger().Named(name),
 		metricsMapData: mockedMap,
 		reader:         mockedPerfReader,
 	}
@@ -367,7 +367,7 @@ func TestDropReasonReadData_WithPerfArrayLostSamples(t *testing.T) {
 	// Create drop reason instance
 	dr := &dropReason{
 		cfg:            cfgPodLevelEnabled,
-		l:              log.Logger().Named(string(Name)),
+		l:              log.Logger().Named(name),
 		metricsMapData: mockedMap,
 		reader:         mockedPerfReader,
 	}
@@ -409,7 +409,7 @@ func TestDropReasonReadData_WithUnknownError(t *testing.T) {
 	// Create drop reason instance
 	dr := &dropReason{
 		cfg:            cfgPodLevelEnabled,
-		l:              log.Logger().Named(string(Name)),
+		l:              log.Logger().Named(name),
 		metricsMapData: mockedMap,
 		reader:         mockedPerfReader,
 	}
@@ -443,7 +443,7 @@ func TestDropReasonGenerate(t *testing.T) {
 	// Instantiate the dropReason struct with a mocked logger and context.
 	dr := &dropReason{
 		cfg: cfgPodLevelEnabled,
-		l:   log.Logger().Named(string(Name)),
+		l:   log.Logger().Named(name),
 	}
 	ctx := context.Background()
 

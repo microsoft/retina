@@ -9,12 +9,10 @@ import (
 	hubblev1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
-	"github.com/microsoft/retina/pkg/plugin/api"
+	"github.com/microsoft/retina/pkg/plugin/registry"
 )
 
-const (
-	Name api.PluginName = "mockplugin"
-)
+const name = "mockplugin"
 
 const (
 	initialize = iota + 1
@@ -28,8 +26,12 @@ type MockPlugin struct {
 	l     *log.ZapLogger
 }
 
+func init() {
+	registry.Add(name, New)
+}
+
 // New creates a mock plugin.
-func New(cfg *kcfg.Config) api.Plugin {
+func New(cfg *kcfg.Config) registry.Plugin {
 	return &MockPlugin{
 		cfg: cfg,
 	}
@@ -39,11 +41,11 @@ func (mp *MockPlugin) Name() string {
 	return "mockplugin"
 }
 
-func (mp *MockPlugin) Generate(ctx context.Context) error {
+func (mp *MockPlugin) Generate(context.Context) error {
 	return nil
 }
 
-func (mp *MockPlugin) Compile(ctx context.Context) error {
+func (mp *MockPlugin) Compile(context.Context) error {
 	return nil
 }
 
@@ -52,7 +54,7 @@ func (mp *MockPlugin) Init() error {
 	return nil
 }
 
-func (mp *MockPlugin) Start(ctx context.Context) error {
+func (mp *MockPlugin) Start(context.Context) error {
 	if mp.state != initialize {
 		return fmt.Errorf("plugin not initialized")
 	}
@@ -68,10 +70,6 @@ func (mp *MockPlugin) Stop() error {
 	return nil
 }
 
-func (mp *MockPlugin) SetupChannel(ch chan *hubblev1.Event) error {
+func (mp *MockPlugin) SetupChannel(chan *hubblev1.Event) error {
 	return nil
-}
-
-func NewPluginFn(l *log.ZapLogger) api.Plugin {
-	return &MockPlugin{l: l}
 }

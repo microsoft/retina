@@ -34,6 +34,7 @@ var (
 	remoteNodeKey      = attribute.Key("remote_node")
 
 	// todo move to attributes pkg?
+<<<<<<< HEAD
 	Type           = "type"
 	Reason         = "reason"
 	Direction      = "direction"
@@ -50,6 +51,24 @@ var (
 	Active         = "ACTIVE"
 	Device         = "device"
 	Uninitialized  = "uninitialized"
+=======
+	Type                  = "type"
+	Reason                = "reason"
+	Direction             = "direction"
+	SourceNodeName        = "source_node_name"
+	TargetNodeName        = "target_node_name"
+	State                 = "state"
+	Address               = "address"
+	Port                  = "port"
+	StatName              = "statistic_name"
+	InterfaceName         = "interface_name"
+	InterfaceNameConstant = "all_interfaces"
+	Flag                  = "flag"
+	Endpoint              = "endpoint"
+	AclRule               = "aclrule"
+	Active                = "ACTIVE"
+	Device                = "device"
+>>>>>>> main
 
 	// TCP Connection Statistic Names
 	ResetCount           = "ResetCount"

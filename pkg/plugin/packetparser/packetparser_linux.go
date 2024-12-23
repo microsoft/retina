@@ -31,8 +31,8 @@ import (
 	"github.com/microsoft/retina/pkg/loader"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
-	"github.com/microsoft/retina/pkg/plugin/api"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
+	"github.com/microsoft/retina/pkg/plugin/conntrack"
 	_ "github.com/microsoft/retina/pkg/plugin/lib/_amd64"                            // nolint
 	_ "github.com/microsoft/retina/pkg/plugin/lib/_arm64"                            // nolint
 	_ "github.com/microsoft/retina/pkg/plugin/lib/common/libbpf/_include/asm"        // nolint
@@ -40,6 +40,7 @@ import (
 	_ "github.com/microsoft/retina/pkg/plugin/lib/common/libbpf/_include/uapi/linux" // nolint
 	_ "github.com/microsoft/retina/pkg/plugin/lib/common/libbpf/_src"                // nolint
 	_ "github.com/microsoft/retina/pkg/plugin/packetparser/_cprog"                   // nolint
+	"github.com/microsoft/retina/pkg/plugin/registry"
 	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/microsoft/retina/pkg/watchers/endpoint"
@@ -52,35 +53,72 @@ import (
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type packet packetparser ./_cprog/packetparser.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../lib/common/libbpf/_include/linux -I../lib/common/libbpf/_include/uapi/linux -I../lib/common/libbpf/_include/asm -I../filter/_cprog/ -I../conntrack/_cprog/
 var errNoOutgoingLinks = errors.New("could not determine any outgoing links")
 
+func init() {
+	registry.Add(name, New)
+}
+
 // New creates a packetparser plugin.
-func New(cfg *kcfg.Config) api.Plugin {
+func New(cfg *kcfg.Config) registry.Plugin {
 	return &packetParser{
 		cfg: cfg,
-		l:   log.Logger().Named(string(Name)),
+		l:   log.Logger().Named(name),
 	}
 }
 
 func (p *packetParser) Name() string {
-	return string(Name)
+	return name
 }
 
-func (p *packetParser) Generate(ctx context.Context) error {
+func generateDynamicHeaderPath() (string, error) {
 	// Get absolute path to this file during runtime.
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
-		return errors.New("unable to get absolute path to this file")
+		return "", errors.New("unable to get absolute path to this file")
 	}
 	dir := path.Dir(filename)
-	dynamicHeaderPath := fmt.Sprintf("%s/%s/%s", dir, bpfSourceDir, dynamicHeaderFileName)
+	return fmt.Sprintf("%s/%s/%s", dir, bpfSourceDir, dynamicHeaderFileName), nil
+}
+
+func (p *packetParser) Generate(ctx context.Context) error {
+	// Variable to store content of dynamic header.
+	var st string
+
+	dynamicHeaderPath, err := generateDynamicHeaderPath()
+	if err != nil {
+		return err
+	}
+
 	// Check if packetparser will bypassing lookup IP of interest.
 	bypassLookupIPOfInterest := 0
 	if p.cfg.BypassLookupIPOfInterest {
 		p.l.Info("bypassing lookup IP of interest")
 		bypassLookupIPOfInterest = 1
+		st = fmt.Sprintf("#define BYPASS_LOOKUP_IP_OF_INTEREST %d\n", bypassLookupIPOfInterest)
 	}
+
+	conntrackMetrics := 0
+	// Check if packetparser has Conntrack metrics enabled.
+	if p.cfg.EnableConntrackMetrics {
+		p.l.Info("conntrack metrics enabled")
+		conntrackMetrics = 1
+
+		// Generate dynamic header for conntrack.
+		ctDynamicHeaderPath := conntrack.BuildDynamicHeaderPath()
+		err = conntrack.GenerateDynamic(ctx, ctDynamicHeaderPath, conntrackMetrics)
+		if err != nil {
+			return errors.Wrap(err, "failed to generate dynamic header for conntrack")
+		}
+
+		// Process packetparser dynamic.h conntrack metrics definition.
+		st += fmt.Sprintf("#define ENABLE_CONNTRACK_METRICS %d\n", conntrackMetrics)
+	}
+
+	// Process packetparser data aggregation level.
 	p.l.Info("data aggregation level", zap.String("level", p.cfg.DataAggregationLevel.String()))
-	st := fmt.Sprintf("#define BYPASS_LOOKUP_IP_OF_INTEREST %d\n#define DATA_AGGREGATION_LEVEL %d\n", bypassLookupIPOfInterest, p.cfg.DataAggregationLevel)
-	err := loader.WriteFile(ctx, dynamicHeaderPath, st)
+	st += fmt.Sprintf("#define DATA_AGGREGATION_LEVEL %d\n", p.cfg.DataAggregationLevel)
+
+	// Generate dynamic header for packetparser.
+	err = loader.WriteFile(ctx, dynamicHeaderPath, st)
 	if err != nil {
 		return errors.Wrap(err, "failed to write dynamic header")
 	}
@@ -606,7 +644,7 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 				default:
 					// Channel is full, drop the event.
 					// We shouldn't slow down the reader.
-					metrics.LostEventsCounter.WithLabelValues(utils.ExternalChannel, string(Name)).Inc()
+					metrics.LostEventsCounter.WithLabelValues(utils.ExternalChannel, name).Inc()
 				}
 			}
 		}
@@ -642,7 +680,7 @@ func (p *packetParser) readData() {
 
 	if record.LostSamples > 0 {
 		// p.l.Warn("Lostsamples", zap.Uint64("lost samples", record.LostSamples))
-		metrics.LostEventsCounter.WithLabelValues(utils.Kernel, string(Name)).Add(float64(record.LostSamples))
+		metrics.LostEventsCounter.WithLabelValues(utils.Kernel, name).Add(float64(record.LostSamples))
 		return
 	}
 
@@ -651,7 +689,7 @@ func (p *packetParser) readData() {
 	default:
 		// Channel is full, drop the record.
 		// We shouldn't slow down the perf array reader.
-		metrics.LostEventsCounter.WithLabelValues(utils.BufferedChannel, string(Name)).Inc()
+		metrics.LostEventsCounter.WithLabelValues(utils.BufferedChannel, name).Inc()
 	}
 }
 
