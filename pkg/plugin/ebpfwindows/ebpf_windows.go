@@ -34,7 +34,7 @@ var (
 type Plugin struct {
     l               *log.ZapLogger
     cfg             *kcfg.Config
-    enricher        enricher.EnricherInterface
+    enricher        *enricher.Enricher
     externalChannel chan *v1.Event
     parser          *hp.Parser
 }
@@ -240,30 +240,26 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint64) error {
         return ErrInvalidEventData
     }
 
-    if fl != nil {
+    ev := &v1.Event{
+        Event:     fl,
+        Timestamp: fl.GetTime(),
+    }
 
-        ev := &v1.Event{
-            Event:     fl,
-            Timestamp: fl.GetTime(),
+    if p.enricher != nil {
+        p.enricher.Write(ev)
+    } else {
+        p.l.Error("enricher is nil when writing event")
+    }
+
+    // Write the event to the external channel.
+    if p.externalChannel != nil {
+        select {
+        case p.externalChannel <- ev:
+        default:
+            // Channel is full, drop the event.
+            // We shouldn't slow down the reader.
+            metrics.LostEventsCounter.WithLabelValues(utils.ExternalChannel, name).Inc()
         }
-
-        if p.enricher != nil {
-            p.enricher.Write(ev)
-        } else {
-            p.l.Error("enricher is nil when writing event")
-        }
-
-        // Write the event to the external channel.
-        if p.externalChannel != nil {
-            select {
-            case p.externalChannel <- ev:
-            default:
-                // Channel is full, drop the event.
-                // We shouldn't slow down the reader.
-                metrics.LostEventsCounter.WithLabelValues(utils.ExternalChannel, name).Inc()
-            }
-        }
-
     }
 
     return nil

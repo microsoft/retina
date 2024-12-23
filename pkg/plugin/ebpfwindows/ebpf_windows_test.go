@@ -10,7 +10,10 @@ import (
     "time"
 
     kcfg "github.com/microsoft/retina/pkg/config"
+    "github.com/microsoft/retina/pkg/controllers/cache"
+    "github.com/microsoft/retina/pkg/enricher"
     "github.com/microsoft/retina/pkg/log"
+    "github.com/microsoft/retina/pkg/pubsub"
     "go.uber.org/zap"
 )
 
@@ -24,6 +27,11 @@ func TestPlugin(t *testing.T) {
         MetricsInterval: 1 * time.Second,
         EnablePodLevel:  true,
     }
+
+    c := cache.New(pubsub.New())
+    e := enricher.New(ctx, c)
+    e.Run()
+    defer e.Reader.Close()
 
     tt := New(cfg)
 
