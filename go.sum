@@ -1220,8 +1220,8 @@ k8s.io/utils v0.0.0-20240921022957-49e7df575cb6 h1:MDF6h2H/h4tbzmtIKTuctcwZmY0tY
 k8s.io/utils v0.0.0-20240921022957-49e7df575cb6/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
 oras.land/oras-go v1.2.5 h1:XpYuAwAb0DfQsunIyMfeET92emK8km3W4yEzZvUbsTo=
 oras.land/oras-go v1.2.5/go.mod h1:PuAwRShRZCsZb7g8Ar3jKKQR/2A/qN+pkYxIOd/FAoo=
-sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.3.1 h1:VC7sQVtKlX7RrYyVdxzgaoqLO8ZokYzMbTvfmND9ciY=
-sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.3.1/go.mod h1:IgwGixJhv7hSS0iINNGCqSD6GhkUjeWKWqQjy87ZkRM=
+sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.4.1 h1:Gq0ED8eSgBQm51q0hjwfGkadutJ66uM06DdZmz8RaFQ=
+sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.4.1/go.mod h1:SoTek2pL6V7adQX6kaJFE86IKDQNzwlNf9cXKgTGMT8=
 sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader v0.0.20 h1:jeEFfNxq9uJqkkxhd6WaWNsKNjKhJBcVuWTSgJoXXHM=
 sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader v0.0.20/go.mod h1:5evhIg+6KdZLaezvJPN1rMcn/EY+GypQh/7gNZHD97Y=
 sigs.k8s.io/controller-runtime v0.18.5 h1:nTHio/W+Q4aBlQMgbnC5hZb4IjIidyrizMai9P6n4Rk=
