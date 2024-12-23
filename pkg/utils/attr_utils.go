@@ -6,10 +6,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
-const (
-	unknown = "__unknown__"
-)
-
 var (
 	pluginKey    = attribute.Key("plugin")
 	eventTypeKey = attribute.Key("event_type")
