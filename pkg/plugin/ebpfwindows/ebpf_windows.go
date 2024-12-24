@@ -22,7 +22,17 @@ import (
 
 const (
     // name of the ebpfwindows plugin
-    name = "windowseBPF"
+    name string = "windowseBPF"
+    // name of the metrics
+    packetsReceived        string = "win_packets_recv_count"
+    packetsSent            string = "win_packets_sent_count"
+    bytesSent              string = "win_bytes_sent_count"
+    bytesReceived          string = "win_bytes_recv_count"
+    droppedPacketsIncoming string = "win_packets_recv_drop_count"
+    droppedPacketsOutgoing string = "win_packets_sent_drop_count"
+    // metrics direction
+    ingressLabel = "ingress"
+    egressLabel  = "egress"
 )
 
 var (
@@ -96,6 +106,28 @@ func (p *Plugin) metricsMapIterateCallback(key *MetricsKey, value *MetricsValues
     p.l.Info("MetricsMapIterateCallback")
     p.l.Info("Key", zap.String("Key", key.String()))
     p.l.Info("Value", zap.String("Value", value.String()))
+
+    if key.IsDrop() {
+        if key.IsEgress() {
+            metrics.DropPacketsGauge.WithLabelValues(egressLabel).Set(float64(value.Count()))
+        } else if key.IsIngress() {
+            metrics.DropPacketsGauge.WithLabelValues(ingressLabel).Set(float64(value.Count()))
+        }
+
+    } else {
+
+        if key.IsEgress() {
+            metrics.ForwardBytesGauge.WithLabelValues(egressLabel).Set(float64(value.Bytes()))
+            p.l.Debug("emitting bytes sent count metric", zap.Uint64(bytesSent, value.Bytes()))
+            metrics.WindowsGauge.WithLabelValues(packetsSent).Set(float64(value.Count()))
+            p.l.Debug("emitting packets sent count metric", zap.Uint64(packetsSent, value.Count()))
+        } else if key.IsIngress() {
+            metrics.ForwardPacketsGauge.WithLabelValues(ingressLabel).Set(float64(value.Count()))
+            p.l.Debug("emitting packets received count metric", zap.Uint64(packetsReceived, value.Count()))
+            metrics.ForwardBytesGauge.WithLabelValues(ingressLabel).Set(float64(value.Bytes()))
+            p.l.Debug("emitting bytes received count metric", zap.Uint64(bytesReceived, value.Bytes()))
+        }
+    }
 }
 
 // eventsMapCallback is the callback function that is called for each value  in the events map.

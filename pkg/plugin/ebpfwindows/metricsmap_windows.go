@@ -1,19 +1,19 @@
 package ebpfwindows
 
 import (
-    "fmt"
-    "reflect"
-    "syscall"
-    "unsafe"
+	"fmt"
+	"reflect"
+	"syscall"
+	"unsafe"
 
-    "golang.org/x/sys/windows"
+	"golang.org/x/sys/windows"
 )
 
 const (
-    dirUnknown = 0
-    dirIngress = 1
-    dirEgress  = 2
-    dirService = 3
+	dirUnknown = 0
+	dirIngress = 1
+	dirEgress  = 2
+	dirService = 3
 )
 
 // direction is the metrics direction i.e ingress (to an endpoint),
@@ -21,27 +21,27 @@ const (
 // outside or a ClusterIP service being accessed from inside the cluster).
 // If it's none of the above, we return UNKNOWN direction.
 var direction = map[uint8]string{
-    dirUnknown: "UNKNOWN",
-    dirIngress: "INGRESS",
-    dirEgress:  "EGRESS",
-    dirService: "SERVICE",
+	dirUnknown: "UNKNOWN",
+	dirIngress: "INGRESS",
+	dirEgress:  "EGRESS",
+	dirService: "SERVICE",
 }
 
 // Value must be in sync with struct metrics_key in <bpf/lib/common.h>
 type MetricsKey struct {
-    Reason uint8 `align:"reason"`
-    Dir    uint8 `align:"dir"`
-    // Line contains the line number of the metrics statement.
-    Line uint16 `align:"line"`
-    // File is the number of the source file containing the metrics statement.
-    File     uint8    `align:"file"`
-    Reserved [3]uint8 `align:"reserved"`
+	Reason uint8 `align:"reason"`
+	Dir    uint8 `align:"dir"`
+	// Line contains the line number of the metrics statement.
+	Line uint16 `align:"line"`
+	// File is the number of the source file containing the metrics statement.
+	File     uint8    `align:"file"`
+	Reserved [3]uint8 `align:"reserved"`
 }
 
 // Value must be in sync with struct metrics_value in <bpf/lib/common.h>
 type MetricsValue struct {
-    Count uint64 `align:"count"`
-    Bytes uint64 `align:"bytes"`
+	Count uint64 `align:"count"`
+	Bytes uint64 `align:"bytes"`
 }
 
 // MetricsMapValues is a slice of MetricsMapValue
@@ -55,17 +55,17 @@ type IterateCallback func(*MetricsKey, *MetricsValues)
 // MetricsMap interface represents a metrics map, and can be reused to implement
 // mock maps for unit tests.
 type MetricsMap interface {
-    IterateWithCallback(IterateCallback) error
+	IterateWithCallback(IterateCallback) error
 }
 
 type metricsMap struct {
 }
 
 var (
-    // Load the retinaebpfapi.dll
-    retinaEbpfApi = windows.NewLazyDLL("retinaebpfapi.dll")
-    // Load the enumerate_cilium_metricsmap function
-    enumMetricsMap = retinaEbpfApi.NewProc("enumerate_cilium_metricsmap")
+	// Load the retinaebpfapi.dll
+	retinaEbpfApi = windows.NewLazyDLL("retinaebpfapi.dll")
+	// Load the enumerate_cilium_metricsmap function
+	enumMetricsMap = retinaEbpfApi.NewProc("enumerate_cilium_metricsmap")
 )
 
 // ringBufferEventCallback type definition in Go
@@ -77,104 +77,114 @@ var enumCallBack enumMetricsCallback = nil
 // This function will be passed to the Windows API
 func enumMetricsSysCallCallback(key, value unsafe.Pointer, valueSize int) uintptr {
 
-    if enumCallBack != nil {
-        return uintptr(enumCallBack(key, value, valueSize))
-    }
+	if enumCallBack != nil {
+		return uintptr(enumCallBack(key, value, valueSize))
+	}
 
-    return 0
+	return 0
 }
 
 // NewMetricsMap creates a new metrics map
 func NewMetricsMap() MetricsMap {
-    return &metricsMap{}
+	return &metricsMap{}
 }
 
 // IterateWithCallback iterates through all the keys/values of a metrics map,
 // passing each key/value pair to the cb callback
 func (m metricsMap) IterateWithCallback(cb IterateCallback) error {
 
-    // Define the callback function in Go
-    enumCallBack = func(key unsafe.Pointer, value unsafe.Pointer, valueSize int) int {
+	// Define the callback function in Go
+	enumCallBack = func(key unsafe.Pointer, value unsafe.Pointer, valueSize int) int {
 
-        var metricsValues MetricsValues
-        sh := (*reflect.SliceHeader)(unsafe.Pointer(&metricsValues))
-        sh.Data = uintptr(value)
-        sh.Len = valueSize
-        sh.Cap = valueSize
+		var metricsValues MetricsValues
+		sh := (*reflect.SliceHeader)(unsafe.Pointer(&metricsValues))
+		sh.Data = uintptr(value)
+		sh.Len = valueSize
+		sh.Cap = valueSize
 
-        metricsKey := (*MetricsKey)(key)
-        cb(metricsKey, &metricsValues)
-        return 0
-    }
+		metricsKey := (*MetricsKey)(key)
+		cb(metricsKey, &metricsValues)
+		return 0
+	}
 
-    // Convert the Go function into a syscall-compatible function
-    callback := syscall.NewCallback(enumMetricsSysCallCallback)
+	// Convert the Go function into a syscall-compatible function
+	callback := syscall.NewCallback(enumMetricsSysCallCallback)
 
-    // Call the API
-    ret, _, err := enumMetricsMap.Call(
-        uintptr(callback),
-    )
+	// Call the API
+	ret, _, err := enumMetricsMap.Call(
+		uintptr(callback),
+	)
 
-    if ret != 0 {
-        return err
-    }
+	if ret != 0 {
+		return err
+	}
 
-    return nil
+	return nil
 }
 
 // MetricDirection gets the direction in human readable string format
 func MetricDirection(dir uint8) string {
-    if desc, ok := direction[dir]; ok {
-        return desc
-    }
-    return direction[dirUnknown]
+	if desc, ok := direction[dir]; ok {
+		return desc
+	}
+	return direction[dirUnknown]
 }
 
 // Direction gets the direction in human readable string format
 func (k *MetricsKey) Direction() string {
-    return MetricDirection(k.Dir)
+	return MetricDirection(k.Dir)
 }
 
 // String returns the key in human readable string format
 func (k *MetricsKey) String() string {
-    return fmt.Sprintf("Direction: %s, Reason: %s, File: %s, Line: %d", k.Direction(), DropReason(k.Reason), BPFFileName(k.File), k.Line)
+	return fmt.Sprintf("Direction: %s, Reason: %s, File: %s, Line: %d", k.Direction(), DropReason(k.Reason), BPFFileName(k.File), k.Line)
 }
 
 // DropForwardReason gets the forwarded/dropped reason in human readable string format
 func (k *MetricsKey) DropForwardReason() string {
-    return DropReason(k.Reason)
+	return DropReason(k.Reason)
 }
 
 // FileName returns the filename where the event occurred, in string format.
 func (k *MetricsKey) FileName() string {
-    return BPFFileName(k.File)
+	return BPFFileName(k.File)
 }
 
 // IsDrop checks if the reason is drop or not.
 func (k *MetricsKey) IsDrop() bool {
-    return k.Reason == DropInvalid || k.Reason >= DropMin
+	return k.Reason == DropInvalid || k.Reason >= DropMin
+}
+
+// IsIngress checks if the direction is ingress or not.
+func (k *MetricsKey) IsIngress() bool {
+	return k.Dir == dirIngress
+}
+
+// IsEgress checks if the direction is egress or not.
+func (k *MetricsKey) IsEgress() bool {
+	return k.Dir == dirEgress
 }
 
 // Count returns the sum of all the per-CPU count values
 func (vs MetricsValues) Count() uint64 {
-    c := uint64(0)
-    for _, v := range vs {
-        c += v.Count
-    }
+	c := uint64(0)
+	for _, v := range vs {
+		c += v.Count
+	}
 
-    return c
+	return c
 }
 
 // Bytes returns the sum of all the per-CPU bytes values
 func (vs MetricsValues) Bytes() uint64 {
-    b := uint64(0)
-    for _, v := range vs {
-        b += v.Bytes
-    }
+	b := uint64(0)
+	for _, v := range vs {
+		b += v.Bytes
+	}
 
-    return b
+	return b
 }
 
 func (vs MetricsValues) String() string {
-    return fmt.Sprintf("Count: %d, Bytes: %d", vs.Count(), vs.Bytes())
+	return fmt.Sprintf("Count: %d, Bytes: %d", vs.Count(), vs.Bytes())
 }
