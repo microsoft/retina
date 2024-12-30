@@ -1,0 +1,64 @@
+name: Update Hubble
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Runs daily at midnight
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-hubble:
+    name: Update Hubble to latest version
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get latest Hubble version
+        id: get_version
+        run: |
+          latest_version=$(curl -s https://api.github.com/repos/cilium/hubble/releases/latest | jq -r .tag_name)
+          echo "Latest Hubble version: $latest_version"
+          echo "version=$latest_version" >> $GITHUB_ENV
+
+      - name: Get current Hubble version from Dockerfile
+        id: get_current_version
+        run: |
+          current_version=$(grep -oP '(?<=ARG HUBBLE_VERSION=).*' controller/Dockerfile)
+          echo "Current Hubble version: $current_version"
+          echo "current_version=$current_version" >> $GITHUB_ENV
+
+      - name: Check if update is needed
+        id: check_update
+        run: |
+          if [ "${{ env.version }}" == "${{ env.current_version }}" ]; then
+            echo "Hubble version is up to date. No update needed."
+            echo "update_needed=false" >> $GITHUB_ENV
+          else
+            echo "Hubble version needs to be updated."
+            echo "update_needed=true" >> $GITHUB_ENV
+          fi
+
+      - name: Update Dockerfile and Makefile with latest Hubble version
+        if: env.update_needed == 'true'
+        run: |
+          sed -i "s/^ARG HUBBLE_VERSION=.*/ARG HUBBLE_VERSION=${{ env.version }}/" controller/Dockerfile
+          sed -i "s/^HUBBLE_VERSION ?=.*/HUBBLE_VERSION ?= ${{ env.version }}/" Makefile
+
+      - name: Create pull request
+        if: env.update_needed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: deps/update-hubble-to-${{ env.version }}
+          title: "deps: bump Hubble version from ${{ env.current_version }} to ${{ env.version }}"
+          body: "This PR bumps the Hubble version from ${{ env.current_version }} to ${{ env.version }}."
+          commit-message: "deps: bump Hubble version from ${{ env.current_version }} to ${{ env.version }}"
+          labels: "area/dependencies"
+          sign-commits: true
+          signoff: true
+          delete-branch: true
