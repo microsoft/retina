@@ -1,3 +1,4 @@
+# DisableKubernetesDeploymentDetector: "This deployment is not used as part of the Retina OSS CG Pipeline."
 apiVersion: v1
 kind: ServiceAccount
 metadata:
