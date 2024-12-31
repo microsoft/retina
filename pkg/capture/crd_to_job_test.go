@@ -1723,6 +1723,15 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			job.Spec.Template.Spec.Containers[0].VolumeMounts = tt.volumeMounts
 			job.Spec.Template.Spec.Volumes = tt.volumes
 
+			for _, env := range tt.podEnv {
+				if env.Name == captureConstants.CaptureStartTimestampEnvKey {
+					_, err := file.StringToTimestamp(env.Value)
+					if err != nil {
+						t.Errorf("TranslateCaptureToJobs() error with capture timestamp: %v", err)
+					}
+				}
+			}
+
 			if tt.isWindows {
 				containerAdministrator := "NT AUTHORITY\\SYSTEM"
 				useHostProcess := true
