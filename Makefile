@@ -564,7 +564,7 @@ docs:
 	echo $(PWD)
 	docker run -it -p 3000:3000 -v $(PWD):/retina -w /retina/ node:20-alpine sh ./site/start-dev.sh
 
-.PHONY: docs-pod
+.PHONY: docs-prod
 docs-prod:
 	docker run -i -p 3000:3000 -v $(PWD):/retina -w /retina/ node:20-alpine npm install --prefix site && npm run build --prefix site
 
