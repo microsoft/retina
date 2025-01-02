@@ -53,7 +53,8 @@ func (e *epDecoder) Decode(ip netip.Addr) *flow.Endpoint {
 	case identity.ReservedIdentityWorld:
 		ep.Labels = labels.LabelWorld.GetModel()
 	default:
-		ep.Labels = e.ipcache.GetMetadataLabelsByIP(ip).GetModel()
+		// https://github.com/cilium/cilium/commit/ba2eb6cc1da6b894c7bea23b31ed6a33292ba951#diff-bb1165de1a65911d59ac7f9a002aa9f1e25c30e073547adec11b174a174fdca6L192
+		// ep.Labels = e.ipcache.GetMetadataLabelsByIP(ip).GetModel()
 	}
 
 	return ep
