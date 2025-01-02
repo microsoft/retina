@@ -5,7 +5,7 @@ package config
 import (
 	"path/filepath"
 
-	"github.com/cilium/cilium/pkg/hive/cell"
+	"github.com/cilium/hive/cell"
 	"github.com/cilium/cilium/pkg/option"
 	sharedconfig "github.com/microsoft/retina/pkg/shared/config"
 	"github.com/sirupsen/logrus"

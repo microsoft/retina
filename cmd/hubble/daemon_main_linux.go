@@ -9,14 +9,15 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"math"
+	"os"
 	"path/filepath"
 	"strings"
 
 	zaphook "github.com/Sytten/logrus-zap-hook"
 	"github.com/cilium/cilium/pkg/defaults"
 	"github.com/cilium/cilium/pkg/hive"
-	"github.com/cilium/cilium/pkg/hive/cell"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/cilium/pkg/hubble/exporter/exporteroption"
 	"github.com/cilium/cilium/pkg/hubble/observer/observeroption"
@@ -32,6 +33,7 @@ import (
 	"github.com/cilium/cilium/pkg/promise"
 	"github.com/cilium/cilium/pkg/time"
 	"github.com/cilium/ebpf/rlimit"
+	"github.com/cilium/hive/cell"
 	"github.com/cilium/proxy/pkg/logging"
 	"github.com/microsoft/retina/internal/buildinfo"
 	"github.com/microsoft/retina/pkg/config"
@@ -301,6 +303,8 @@ func Execute(cobraCmd *cobra.Command, h *hive.Hive) {
 	initDaemonConfig(h.Viper())
 	initLogging()
 
+	hiveLogger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
 	// Allow the current process to lock memory for eBPF resources.
 	if err := rlimit.RemoveMemlock(); err != nil {
 		logger.Fatal("failed to remove memlock", zap.Error(err))
@@ -309,7 +313,7 @@ func Execute(cobraCmd *cobra.Command, h *hive.Hive) {
 	//nolint:gocritic // without granular commits this commented-out code may be lost
 	// initEnv(h.Viper())
 
-	if err := h.Run(); err != nil {
+	if err := h.Run(hiveLogger); err != nil {
 		logger.Fatal(err)
 	}
 }

@@ -34,7 +34,7 @@ type IdentityManager struct {
 type owner struct{}
 
 // UpdateIdentities is a callback when identities are updated
-func (o *owner) UpdateIdentities(_, _ icache.IdentityCache) {
+func (o *owner) UpdateIdentities(_, _ identity.IdentityMap) {
 	// no-op
 }
 

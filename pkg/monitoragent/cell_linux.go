@@ -3,14 +3,14 @@ package monitoragent
 import (
 	"context"
 
-	"github.com/cilium/cilium/pkg/common"
 	"github.com/cilium/cilium/pkg/defaults"
-	"github.com/cilium/cilium/pkg/hive/cell"
 	"github.com/cilium/cilium/pkg/logging"
 	"github.com/cilium/cilium/pkg/logging/logfields"
 	ciliumagent "github.com/cilium/cilium/pkg/monitor/agent"
 	"github.com/cilium/cilium/pkg/monitor/agent/consumer"
 	"github.com/cilium/cilium/pkg/monitor/agent/listener"
+	"github.com/cilium/ebpf"
+	"github.com/cilium/hive/cell"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 )
@@ -67,7 +67,7 @@ func newMonitorAgent(params agentParams) ciliumagent.Agent {
 			if params.Config.EnableMonitor {
 				queueSize := params.Config.MonitorQueueSize
 				if queueSize == 0 {
-					queueSize = common.GetNumPossibleCPUs(log) * defaults.MonitorQueueSizePerCPU
+					queueSize = ebpf.MustPossibleCPU() * defaults.MonitorQueueSizePerCPU
 					if queueSize > defaults.MonitorQueueSizePerCPUMaximum {
 						queueSize = defaults.MonitorQueueSizePerCPUMaximum
 					}

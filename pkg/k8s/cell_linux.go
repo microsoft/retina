@@ -4,7 +4,6 @@ import (
 	"context"
 
 	daemonk8s "github.com/cilium/cilium/daemon/k8s"
-	"github.com/cilium/cilium/pkg/hive/cell"
 	"github.com/cilium/cilium/pkg/identity/cache"
 	"github.com/cilium/cilium/pkg/ipcache"
 	ciliumk8s "github.com/cilium/cilium/pkg/k8s"
@@ -18,7 +17,7 @@ import (
 	"github.com/cilium/cilium/pkg/k8s/types"
 	"github.com/cilium/cilium/pkg/k8s/watchers"
 	"github.com/cilium/cilium/pkg/node"
-	"github.com/cilium/cilium/pkg/option"
+	"github.com/cilium/hive/cell"
 	"github.com/microsoft/retina/pkg/common"
 	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/sirupsen/logrus"
@@ -71,7 +70,10 @@ var Cell = cell.Module(
 	// Provide the resources needed by the watchers.
 
 	cell.Provide(func(lc cell.Lifecycle, cs client.Clientset) (resource.Resource[*types.CiliumEndpoint], error) {
-		return ciliumk8s.CiliumSlimEndpointResource(lc, cs, nil)
+		return ciliumk8s.CiliumSlimEndpointResource(ciliumk8s.CiliumResourceParams{
+			Lifecycle: lc,
+			ClientSet: cs,
+		}, nil, func(*metav1.ListOptions) {})
 	}),
 
 	cell.Provide(func(lc cell.Lifecycle, cs client.Clientset) (resource.Resource[*ciliumk8s.Endpoints], error) {
@@ -121,21 +123,17 @@ var Cell = cell.Module(
 		})
 	}),
 
-	cell.Provide(func() *ciliumk8s.ServiceCache {
-		option.Config.K8sServiceCacheSize = 1000
-		return ciliumk8s.NewServiceCache(&nodeaddressing{})
-	}),
-
 	cell.Provide(func() node.LocalNodeSynchronizer {
 		return &nodeSynchronizer{
 			l: logrus.WithField("module", "node-synchronizer"),
 		}
 	}),
+
 	node.LocalNodeStoreCell,
 
-	synced.Cell,
+	watchers.Cell,
 
-	cell.Provide(NewWatcher),
+	synced.Cell,
 
 	cell.Provide(newAPIServerEventHandler),
 	cell.Invoke(func(a *APIServerEventHandler) {

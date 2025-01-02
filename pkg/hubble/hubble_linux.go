@@ -6,7 +6,6 @@ import (
 
 	"github.com/cilium/cilium/api/v1/flow"
 	"github.com/cilium/cilium/pkg/crypto/certloader"
-	"github.com/cilium/cilium/pkg/hive/cell"
 	"github.com/cilium/cilium/pkg/hubble/container"
 	"github.com/cilium/cilium/pkg/hubble/metrics"
 	"github.com/cilium/cilium/pkg/hubble/monitor"
@@ -20,6 +19,7 @@ import (
 	"github.com/cilium/cilium/pkg/logging/logfields"
 	monitoragent "github.com/cilium/cilium/pkg/monitor/agent"
 	"github.com/cilium/cilium/pkg/option"
+	"github.com/cilium/hive/cell"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	rnode "github.com/microsoft/retina/pkg/controllers/daemon/nodereconciler"
 	"github.com/microsoft/retina/pkg/hubble/parser"
@@ -89,7 +89,7 @@ func (rh *RetinaHubble) start(ctx context.Context) error {
 	// ---------------------------------------------------------------------------------------------------------------------------------------------------- //
 	// Setup metrics.
 	grpcMetrics := grpc_prometheus.NewServerMetrics()
-	if err := metrics.EnableMetrics(rh.log, option.Config.HubbleMetricsServer, option.Config.HubbleMetrics, grpcMetrics, option.Config.EnableHubbleOpenMetrics); err != nil {
+	if err := metrics.EnableMetrics(rh.log.Logger, option.Config.HubbleMetricsServer, nil, option.Config.HubbleMetrics, grpcMetrics, option.Config.EnableHubbleOpenMetrics); err != nil {
 		rh.log.Error("Failed to enable metrics", zap.Error(err))
 		return fmt.Errorf("enabling metrics: %w", err)
 	}

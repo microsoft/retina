@@ -107,7 +107,7 @@ func (n *nodeaddressing) IPv4() datapathtypes.NodeAddressingFamily {
 
 type identityAllocatorOwner struct{}
 
-func (i *identityAllocatorOwner) UpdateIdentities(cache.IdentityCache, cache.IdentityCache) {}
+func (i *identityAllocatorOwner) UpdateIdentities(identity.IdentityMap, identity.IdentityMap) {}
 
 func (i *identityAllocatorOwner) GetNodeSuffix() string {
 	return ""
@@ -127,7 +127,8 @@ func (c cachingIdentityAllocator) ReleaseCIDRIdentitiesByID(context.Context, []i
 
 type policyhandler struct{}
 
-func (p *policyhandler) UpdateIdentities(cache.IdentityCache, cache.IdentityCache, *sync.WaitGroup) {}
+func (p *policyhandler) UpdateIdentities(identity.IdentityMap, identity.IdentityMap, *sync.WaitGroup) {
+}
 
 type datapathhandler struct{}
 

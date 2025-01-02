@@ -8,7 +8,7 @@ import (
 	"io"
 
 	zaphook "github.com/Sytten/logrus-zap-hook"
-	"github.com/cilium/cilium/pkg/hive/cell"
+	"github.com/cilium/hive/cell"
 	"github.com/cilium/cilium/pkg/logging"
 	"github.com/cilium/cilium/pkg/option"
 	"github.com/microsoft/retina/internal/buildinfo"

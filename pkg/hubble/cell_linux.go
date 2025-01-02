@@ -1,7 +1,7 @@
 package hubble
 
 import (
-	"github.com/cilium/cilium/pkg/hive/cell"
+	"github.com/cilium/hive/cell"
 	"github.com/cilium/workerpool"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
