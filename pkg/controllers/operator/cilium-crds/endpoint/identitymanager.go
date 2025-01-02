@@ -7,7 +7,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/cilium/cilium/pkg/identity"
-	icache "github.com/cilium/cilium/pkg/identity/cache"
+	"github.com/cilium/cilium/pkg/identity/cache"
 	"github.com/cilium/cilium/pkg/k8s/client/clientset/versioned"
 	"github.com/cilium/cilium/pkg/labels"
 	"github.com/cilium/cilium/pkg/option"
@@ -25,7 +25,7 @@ type IdentityManager struct {
 	// The struct performs a bit more than is needed including:
 	// - logic for local identities (e.g. node-local CIDR identity), which we do not use
 	// - a go routine for notifications on identity changes
-	alloc *icache.CachingIdentityAllocator
+	alloc *cache.CachingIdentityAllocator
 	// labelIdentities maps sorted labels (via labels.Labels.String()) to allocated identity
 	labelIdentities map[string]identity.NumericIdentity
 }
@@ -46,7 +46,7 @@ func (o *owner) GetNodeSuffix() string {
 func NewIdentityManager(l logrus.FieldLogger, client versioned.Interface) (*IdentityManager, error) {
 	im := &IdentityManager{
 		l:               l.WithField("component", "identitymanager"),
-		alloc:           icache.NewCachingIdentityAllocator(&owner{}),
+		alloc:           cache.NewCachingIdentityAllocator(&owner{}),
 		labelIdentities: make(map[string]identity.NumericIdentity),
 	}
 
