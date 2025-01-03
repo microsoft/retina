@@ -90,7 +90,7 @@ logLevel: info
 enabledPlugin_linux: '["linuxutil","packetforward","packetparser","dns", "dropreason"]'
 enabledPlugin_win: '["hnsstats"]'
 
-enableTelemetry: true
+enableTelemetry: false
 
 # Interval, in duration, to scrape/publish metrics.
 metricsIntervalDuration: "10s"
