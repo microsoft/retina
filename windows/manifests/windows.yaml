@@ -4,7 +4,7 @@ metadata:
   labels:
     app: retina
   name: retina-win
-  namespace: {{ .Values.namespace }}
+  namespace: kube-system
   annotations:
     prometheus.io/port: "10093"
     prometheus.io/scrape: "true"
@@ -62,7 +62,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: retina-config-win
-  namespace: {{ .Values.namespace }}
+  namespace: kube-system
 data:
   config.yaml: |-
     apiServer:
