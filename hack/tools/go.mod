@@ -4,7 +4,7 @@ go 1.22.1
 toolchain go1.23.4
 
 require (
-	github.com/golangci/golangci-lint v1.63.3
+	github.com/golangci/golangci-lint v1.63.4
 	github.com/goreleaser/goreleaser v1.26.2
 	github.com/onsi/ginkgo v1.16.5
 	go.uber.org/mock v0.5.0
