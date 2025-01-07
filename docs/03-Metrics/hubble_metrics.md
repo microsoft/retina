@@ -3,6 +3,7 @@ sidebar_position: 1
 ---
 
 # Hubble Metrics
+
 When Retina is deployed with Hubble control plane, the metrics include Node-level and Pod-level. Metrics are stored in Prometheus format, and can be viewed in Grafana.
 
 ## Metrics
