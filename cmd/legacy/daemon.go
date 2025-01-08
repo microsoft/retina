@@ -304,7 +304,6 @@ func (d *Daemon) Start() error {
 					mainLogger.Fatal("unable to create metricsConfigController", zap.Error(err))
 				}
 			}
-
 		}
 	}
 
@@ -328,8 +327,10 @@ func (d *Daemon) Start() error {
 	mainLogger.Info("Started controller manager")
 
 	// Start all registered controllers. This will block until container receives SIGTERM.
-	if err := mgr.Start(ctx); err != nil {
-		mainLogger.Fatal("unable to start manager", zap.Error(err))
+	if mgr != nil {
+		if err := mgr.Start(ctx); err != nil {
+			mainLogger.Fatal("unable to start manager", zap.Error(err))
+		}
 	}
 
 	mainLogger.Info("Network observability exiting. Till next time!")
