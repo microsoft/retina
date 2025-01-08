@@ -327,11 +327,12 @@ func (d *Daemon) Start() error {
 	mainLogger.Info("Started controller manager")
 
 	// Start all registered controllers. This will block until container receives SIGTERM.
-	if mgr != nil {
-		if err := mgr.Start(ctx); err != nil {
-			mainLogger.Fatal("unable to start manager", zap.Error(err))
-		}
+	if err := mgr.Start(ctx); err != nil {
+		mainLogger.Fatal("unable to start manager", zap.Error(err))
 	}
+
+	// Block the main thread until the context is canceled (e.g., SIGTERM).
+	<-ctx.Done()
 
 	mainLogger.Info("Network observability exiting. Till next time!")
 	return nil
