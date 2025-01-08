@@ -104,11 +104,12 @@ func (d *Daemon) Start() error {
 	} else {
 		cfg, err = kcfg.GetConfig()
 		if err != nil {
-			panic(err)
+			fmt.Println("Falling back to standalone mode")
+			cfg = nil
 		}
 	}
 
-	fmt.Println("api server: ", cfg.Host)
+	fmt.Println("api server: ", getHost(cfg))
 
 	fmt.Println("init logger")
 	zl, err := log.SetupZapLogger(&log.LogOpts{
@@ -122,7 +123,7 @@ func (d *Daemon) Start() error {
 		EnableTelemetry:       daemonConfig.EnableTelemetry,
 	},
 		zap.String("version", buildinfo.Version),
-		zap.String("apiserver", cfg.Host),
+		zap.String("apiserver", getHost(cfg)),
 		zap.String("plugins", strings.Join(daemonConfig.EnabledPlugin, `,`)),
 		zap.String("data aggregation level", daemonConfig.DataAggregationLevel.String()),
 	)
@@ -151,7 +152,7 @@ func (d *Daemon) Start() error {
 		mainLogger.Info("telemetry enabled", zap.String("applicationInsightsID", buildinfo.ApplicationInsightsID))
 		tel, err = telemetry.NewAppInsightsTelemetryClient("retina-agent", map[string]string{
 			"version":   buildinfo.Version,
-			"apiserver": cfg.Host,
+			"apiserver": getHost(cfg),
 			"plugins":   strings.Join(daemonConfig.EnabledPlugin, `,`),
 		})
 		if err != nil {
@@ -322,4 +323,11 @@ func (d *Daemon) Start() error {
 
 	mainLogger.Info("Network observability exiting. Till next time!")
 	return nil
+}
+
+func getHost(cfg *rest.Config) string {
+	if cfg != nil {
+		return cfg.Host
+	}
+	return "running in standalone mode"
 }
