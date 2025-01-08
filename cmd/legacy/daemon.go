@@ -104,7 +104,7 @@ func (d *Daemon) Start() error {
 	} else {
 		cfg, err = kcfg.GetConfig()
 		if err != nil {
-			fmt.Println("Falling back to standalone mode")
+			fmt.Println("KUBECONFIG not set. Falling back to standalone mode")
 			cfg = nil
 		}
 	}
@@ -209,35 +209,43 @@ func (d *Daemon) Start() error {
 		}
 	}
 
-	mgr, err := crmgr.New(cfg, mgrOption)
-	if err != nil {
-		mainLogger.Error("Unable to start manager", zap.Error(err))
-		return fmt.Errorf("creating controller-runtime manager: %w", err)
-	}
-
-	//+kubebuilder:scaffold:builder
-
-	if healthCheckErr := mgr.AddHealthzCheck("healthz", healthz.Ping); healthCheckErr != nil {
-		mainLogger.Fatal("Unable to set up health check", zap.Error(healthCheckErr))
-	}
-	if addReadyCheckErr := mgr.AddReadyzCheck("readyz", healthz.Ping); addReadyCheckErr != nil {
-		mainLogger.Fatal("Unable to set up ready check", zap.Error(addReadyCheckErr))
-	}
-
-	// k8s Client used for informers
-	cl := kubernetes.NewForConfigOrDie(mgr.GetConfig())
-
-	serverVersion, err := cl.Discovery().ServerVersion()
-	if err != nil {
-		mainLogger.Error("failed to get Kubernetes server version: ", zap.Error(err))
-	} else {
-		mainLogger.Infof("Kubernetes server version: %v", serverVersion)
-	}
-
 	// Setup RetinaEndpoint controller.
 	// TODO(mainred): This is to temporarily create a cache and pubsub for RetinaEndpoint, need to refactor this.
 	ctx := ctrl.SetupSignalHandler()
 	ctrl.SetLogger(zapr.NewLogger(zl.Logger.Named("controller-runtime")))
+
+	var cl *kubernetes.Clientset
+	var mgr crmgr.Manager
+	if cfg != nil {
+		mgr, err := crmgr.New(cfg, mgrOption)
+		if err != nil {
+			mainLogger.Error("Unable to start manager", zap.Error(err))
+			return fmt.Errorf("creating controller-runtime manager: %w", err)
+		}
+
+		//+kubebuilder:scaffold:builder
+
+		if healthCheckErr := mgr.AddHealthzCheck("healthz", healthz.Ping); healthCheckErr != nil {
+			mainLogger.Fatal("Unable to set up health check", zap.Error(healthCheckErr))
+		}
+		if addReadyCheckErr := mgr.AddReadyzCheck("readyz", healthz.Ping); addReadyCheckErr != nil {
+			mainLogger.Fatal("Unable to set up ready check", zap.Error(addReadyCheckErr))
+		}
+
+		// k8s Client used for informers
+		cl := kubernetes.NewForConfigOrDie(mgr.GetConfig())
+
+		serverVersion, err := cl.Discovery().ServerVersion()
+		if err != nil {
+			mainLogger.Error("failed to get Kubernetes server version: ", zap.Error(err))
+		} else {
+			mainLogger.Infof("Kubernetes server version: %v", serverVersion)
+		}
+	} else {
+		cl = nil
+		mgr = nil
+		mainLogger.Info("Running in standalone mode. Kubernetes components will be disabled.")
+	}
 
 	if daemonConfig.EnablePodLevel {
 		pubSub := pubsub.New()
@@ -252,48 +260,51 @@ func (d *Daemon) Start() error {
 		enrich.Run()
 		metricsModule := mm.InitModule(ctx, daemonConfig, pubSub, enrich, fm, controllerCache)
 
-		if !daemonConfig.RemoteContext {
-			mainLogger.Info("Initializing Pod controller")
+		if cfg != nil {
+			if !daemonConfig.RemoteContext {
+				mainLogger.Info("Initializing Pod controller")
 
-			podController := pc.New(mgr.GetClient(), controllerCache)
-			if err := podController.SetupWithManager(mgr); err != nil {
-				mainLogger.Fatal("unable to create PodController", zap.Error(err))
+				podController := pc.New(mgr.GetClient(), controllerCache)
+				if err := podController.SetupWithManager(mgr); err != nil {
+					mainLogger.Fatal("unable to create PodController", zap.Error(err))
+				}
+			} else if daemonConfig.EnableRetinaEndpoint {
+				mainLogger.Info("RetinaEndpoint is enabled")
+				mainLogger.Info("Initializing RetinaEndpoint controller")
+
+				retinaEndpointController := kec.New(mgr.GetClient(), controllerCache)
+				if err := retinaEndpointController.SetupWithManager(mgr); err != nil {
+					mainLogger.Fatal("unable to create retinaEndpointController", zap.Error(err))
+				}
 			}
-		} else if daemonConfig.EnableRetinaEndpoint {
-			mainLogger.Info("RetinaEndpoint is enabled")
-			mainLogger.Info("Initializing RetinaEndpoint controller")
 
-			retinaEndpointController := kec.New(mgr.GetClient(), controllerCache)
-			if err := retinaEndpointController.SetupWithManager(mgr); err != nil {
-				mainLogger.Fatal("unable to create retinaEndpointController", zap.Error(err))
+			mainLogger.Info("Initializing Node controller")
+			nodeController := nc.New(mgr.GetClient(), controllerCache)
+			if err := nodeController.SetupWithManager(mgr); err != nil {
+				mainLogger.Fatal("unable to create nodeController", zap.Error(err))
 			}
-		}
 
-		mainLogger.Info("Initializing Node controller")
-		nodeController := nc.New(mgr.GetClient(), controllerCache)
-		if err := nodeController.SetupWithManager(mgr); err != nil {
-			mainLogger.Fatal("unable to create nodeController", zap.Error(err))
-		}
-
-		mainLogger.Info("Initializing Service controller")
-		svcController := sc.New(mgr.GetClient(), controllerCache)
-		if err := svcController.SetupWithManager(mgr); err != nil {
-			mainLogger.Fatal("unable to create svcController", zap.Error(err))
-		}
-
-		if daemonConfig.EnableAnnotations {
-			mainLogger.Info("Initializing MetricsConfig namespaceController")
-			namespaceController := namespacecontroller.New(mgr.GetClient(), controllerCache, metricsModule)
-			if err := namespaceController.SetupWithManager(mgr); err != nil {
-				mainLogger.Fatal("unable to create namespaceController", zap.Error(err))
+			mainLogger.Info("Initializing Service controller")
+			svcController := sc.New(mgr.GetClient(), controllerCache)
+			if err := svcController.SetupWithManager(mgr); err != nil {
+				mainLogger.Fatal("unable to create svcController", zap.Error(err))
 			}
-			go namespaceController.Start(ctx)
-		} else {
-			mainLogger.Info("Initializing MetricsConfig controller")
-			metricsConfigController := mcc.New(mgr.GetClient(), mgr.GetScheme(), metricsModule)
-			if err := metricsConfigController.SetupWithManager(mgr); err != nil {
-				mainLogger.Fatal("unable to create metricsConfigController", zap.Error(err))
+
+			if daemonConfig.EnableAnnotations {
+				mainLogger.Info("Initializing MetricsConfig namespaceController")
+				namespaceController := namespacecontroller.New(mgr.GetClient(), controllerCache, metricsModule)
+				if err := namespaceController.SetupWithManager(mgr); err != nil {
+					mainLogger.Fatal("unable to create namespaceController", zap.Error(err))
+				}
+				go namespaceController.Start(ctx)
+			} else {
+				mainLogger.Info("Initializing MetricsConfig controller")
+				metricsConfigController := mcc.New(mgr.GetClient(), mgr.GetScheme(), metricsModule)
+				if err := metricsConfigController.SetupWithManager(mgr); err != nil {
+					mainLogger.Fatal("unable to create metricsConfigController", zap.Error(err))
+				}
 			}
+
 		}
 	}
 
