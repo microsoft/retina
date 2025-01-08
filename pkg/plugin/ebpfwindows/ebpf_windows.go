@@ -246,7 +246,7 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint64) error {
         dstIP := e.GetFlow().IP.Destination
         srcP :=  e.GetFlow().GetL4().GetTCP().GetSourcePort()
         dstP :=  e.GetFlow().GetL4().GetTCP().GetDestinationPort()
-        p.l.Info("PHY TUPLE", zap.String("srcIP", srcIP), zap.String("dstIP", dstIP), zap.Uint32("srcP", srcP), zap.Uint32("dstP", dstP))
+        p.l.Info("5 TUPLE", zap.String("srcIP", srcIP), zap.String("dstIP", dstIP), zap.Uint32("srcP", srcP), zap.Uint32("dstP", dstP))
 
     case CiliumNotifyTrace:
 
