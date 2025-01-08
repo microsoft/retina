@@ -42,7 +42,8 @@ The following metrics are aggregated per pod (node information is preserved). Al
 
 * `cluster`
 * `instance` (Node name)
-* `source` or `destination`
+* `source`
+* `destination`
 
 For *outgoing traffic*, there will be a `source` label with source pod namespace/name.
 For *incoming traffic*, there will be a `destination` label with destination pod namespace/name.
