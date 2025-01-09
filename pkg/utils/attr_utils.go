@@ -87,6 +87,11 @@ var (
 	DNSResponseLabels = []string{"return_code", "query_type", "query", "response", "num_response"}
 )
 
+type LabelsInfo struct {
+	Namespace string
+	PodName   string
+}
+
 func GetPluginEventAttributes(attrs []attribute.KeyValue, pluginName, eventName, timestamp string) []attribute.KeyValue {
 	return append(attrs,
 		pluginKey.String(pluginName),

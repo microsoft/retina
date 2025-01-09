@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/retina/pkg/common"
 	"github.com/microsoft/retina/pkg/controllers/cache"
 	"github.com/microsoft/retina/pkg/log"
+	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
 )
 
@@ -184,6 +185,26 @@ func (e *Enricher) getWorkloads(ownerRefs []*common.OwnerReference) []*flow.Work
 
 func (e *Enricher) Write(ev *v1.Event) {
 	e.inputRing.Write(ev)
+}
+
+func (e *Enricher) GetWindowLabels(ip string) *utils.LabelsInfo {
+	obj := e.cache.GetObjByIP(ip)
+	if obj == nil {
+		e.l.Debug("No object found for IP", zap.String("ip", ip))
+		return nil
+	}
+
+	switch o := obj.(type) {
+	case *common.RetinaEndpoint:
+		return &utils.LabelsInfo{
+			Namespace: o.Namespace(),
+			PodName:   o.Name(),
+		}
+
+	default:
+		e.l.Debug("received unknown type from cache", zap.Any("obj", obj), zap.Any("type", reflect.TypeOf(obj)))
+		return nil
+	}
 }
 
 func (e *Enricher) ExportReader() *container.RingReader {
