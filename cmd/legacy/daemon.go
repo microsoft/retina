@@ -95,7 +95,8 @@ func (d *Daemon) Start() error {
 
 	fmt.Println("init client-go")
 	var cfg *rest.Config
-	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
+	var kubeconfig = os.Getenv("KUBECONFIG")
+	if kubeconfig != "" {
 		fmt.Println("KUBECONFIG set, using kubeconfig: ", kubeconfig)
 		cfg, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 		if err != nil {
@@ -152,7 +153,7 @@ func (d *Daemon) Start() error {
 		mainLogger.Info("telemetry enabled", zap.String("applicationInsightsID", buildinfo.ApplicationInsightsID))
 		tel, err = telemetry.NewAppInsightsTelemetryClient("retina-agent", map[string]string{
 			"version":   buildinfo.Version,
-			"apiserver": getHost(cfg),
+			"apiserver": cfg.Host,
 			"plugins":   strings.Join(daemonConfig.EnabledPlugin, `,`),
 		})
 		if err != nil {
@@ -214,37 +215,31 @@ func (d *Daemon) Start() error {
 	ctx := ctrl.SetupSignalHandler()
 	ctrl.SetLogger(zapr.NewLogger(zl.Logger.Named("controller-runtime")))
 
-	var cl *kubernetes.Clientset
-	var mgr crmgr.Manager
-	if cfg != nil {
-		mgr, err := crmgr.New(cfg, mgrOption)
-		if err != nil {
-			mainLogger.Error("Unable to start manager", zap.Error(err))
-			return fmt.Errorf("creating controller-runtime manager: %w", err)
-		}
+	mgr, err := crmgr.New(cfg, mgrOption)
+	if err != nil {
+		mainLogger.Error("Unable to start manager", zap.Error(err))
+		return fmt.Errorf("creating controller-runtime manager: %w", err)
+	}
 
-		//+kubebuilder:scaffold:builder
+	//+kubebuilder:scaffold:builder
 
-		if healthCheckErr := mgr.AddHealthzCheck("healthz", healthz.Ping); healthCheckErr != nil {
-			mainLogger.Fatal("Unable to set up health check", zap.Error(healthCheckErr))
-		}
-		if addReadyCheckErr := mgr.AddReadyzCheck("readyz", healthz.Ping); addReadyCheckErr != nil {
-			mainLogger.Fatal("Unable to set up ready check", zap.Error(addReadyCheckErr))
-		}
+	if healthCheckErr := mgr.AddHealthzCheck("healthz", healthz.Ping); healthCheckErr != nil {
+		mainLogger.Fatal("Unable to set up health check", zap.Error(healthCheckErr))
+	}
+	if addReadyCheckErr := mgr.AddReadyzCheck("readyz", healthz.Ping); addReadyCheckErr != nil {
+		mainLogger.Fatal("Unable to set up ready check", zap.Error(addReadyCheckErr))
+	}
 
-		// k8s Client used for informers
-		cl := kubernetes.NewForConfigOrDie(mgr.GetConfig())
+	// k8s Client used for informers
+	cl := kubernetes.NewForConfigOrDie(mgr.GetConfig())
 
+	if kubeconfig != "" {
 		serverVersion, err := cl.Discovery().ServerVersion()
 		if err != nil {
 			mainLogger.Error("failed to get Kubernetes server version: ", zap.Error(err))
 		} else {
 			mainLogger.Infof("Kubernetes server version: %v", serverVersion)
 		}
-	} else {
-		cl = nil
-		mgr = nil
-		mainLogger.Info("Running in standalone mode. Kubernetes components will be disabled.")
 	}
 
 	if daemonConfig.EnablePodLevel {
@@ -331,9 +326,6 @@ func (d *Daemon) Start() error {
 		mainLogger.Fatal("unable to start manager", zap.Error(err))
 	}
 
-	// Block the main thread until the context is canceled (e.g., SIGTERM).
-	<-ctx.Done()
-
 	mainLogger.Info("Network observability exiting. Till next time!")
 	return nil
 }
@@ -347,11 +339,4 @@ func loadStandaloneConfig() *rest.Config {
 			NegotiatedSerializer: nil,
 		},
 	}
-}
-
-func getHost(cfg *rest.Config) string {
-	if cfg != nil {
-		return cfg.Host
-	}
-	return "running in standalone mode"
 }
