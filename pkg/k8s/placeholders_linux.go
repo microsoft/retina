@@ -152,30 +152,26 @@ func (f *fakeBandwidthManager) UpdateBandwidthLimit(uint16, uint64) {}
 
 func (f *fakeBandwidthManager) DeleteBandwidthLimit(uint16) {}
 
-type fakeDatapath struct{}
-
-func (f *fakeDatapath) GetEndpointNetnsCookieByIP(netip.Addr) (uint64, error) {
-	return 0, nil
-}
-
 type fakeIpsetMgr struct{}
 
 func (f *fakeIpsetMgr) NewInitializer() ipset.Initializer {
 	return nil
 }
 
-func (f *fakeIpsetMgr) AddToIPSet(name string, family ipset.Family, addrs ...netip.Addr) {}
+func (f *fakeIpsetMgr) AddToIPSet(string, ipset.Family, ...netip.Addr) {}
 
-func (f *fakeIpsetMgr) RemoveFromIPSet(name string, addrs ...netip.Addr) {}
+func (f *fakeIpsetMgr) RemoveFromIPSet(string, ...netip.Addr) {}
 
 type fakeMetalLBBgpSpeaker struct{}
 
-func (f *fakeMetalLBBgpSpeaker) OnUpdateEndpoints(eps *k8s.Endpoints) error {
+func (f *fakeMetalLBBgpSpeaker) OnUpdateEndpoints(*k8s.Endpoints) error {
 	return nil
 }
-func (f *fakeMetalLBBgpSpeaker) OnUpdateService(svc *slim_corev1.Service) error {
+
+func (f *fakeMetalLBBgpSpeaker) OnUpdateService(*slim_corev1.Service) error {
 	return nil
 }
-func (f *fakeMetalLBBgpSpeaker) OnDeleteService(svc *slim_corev1.Service) error {
+
+func (f *fakeMetalLBBgpSpeaker) OnDeleteService(*slim_corev1.Service) error {
 	return nil
 }

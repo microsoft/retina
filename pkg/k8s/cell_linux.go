@@ -12,7 +12,6 @@ import (
 	"github.com/cilium/cilium/pkg/endpointmanager"
 	"github.com/cilium/cilium/pkg/identity/cache"
 	"github.com/cilium/cilium/pkg/ipcache"
-	"github.com/cilium/cilium/pkg/k8s"
 	ciliumk8s "github.com/cilium/cilium/pkg/k8s"
 	cilium_api_v2 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2"
 	cilium_api_v2alpha1 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2alpha1"
@@ -47,9 +46,12 @@ var Cell = cell.Module(
 		},
 	),
 	cell.Invoke(func(db *statedb.DB, t statedb.Table[tables.NodeAddress]) {
-		db.RegisterTable(t)
+		err := db.RegisterTable(t)
+		if err != nil {
+			logrus.WithError(err).Fatal("Failed to register table")
+		}
 	}),
-	cell.Provide(k8s.NewServiceCache),
+	cell.Provide(ciliumk8s.NewServiceCache),
 
 	cell.Provide(
 		func(cell.Lifecycle, client.Clientset) (daemonk8s.LocalPodResource, error) {
