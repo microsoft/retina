@@ -67,3 +67,15 @@ prometheus:
           - source_labels: [__name__]
             action: keep
             regex: (.*)
+    resources:
+      limits:
+        memory: 10Gi
+    enableAdminAPI: true
+    storageSpec: 
+     volumeClaimTemplate:
+       spec:
+         # storageClassName: gp2
+         accessModes: ["ReadWriteOnce"]
+         resources:
+           requests:
+             storage: 50Gi

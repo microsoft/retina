@@ -16,12 +16,14 @@ import (
 )
 
 const (
-	RetinaPort int = 10093
+	RetinaPort     int = 10093
+	PrometheusPort int = 9090
 	// netObsRGtag is used to tag resources created by this test suite
 	NetObsRGtag            = "-e2e-netobs-"
 	KubeSystemNamespace    = "kube-system"
 	TestPodNamespace       = "kube-system-test"
 	AzureAppInsightsKeyEnv = "AZURE_APP_INSIGHTS_KEY"
+	OutputFilePathEnv      = "OUTPUT_FILEPATH"
 )
 
 var (
