@@ -337,7 +337,7 @@ require (
 
 require (
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
-	github.com/cilium/statedb v0.2.4 // indirect
+	github.com/cilium/statedb v0.2.4
 	github.com/containerd/containerd/api v1.7.19 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/containerd/platforms v0.2.1 // indirect
