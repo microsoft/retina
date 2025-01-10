@@ -9,5 +9,4 @@ There are two control planes used in the Retina project: Hubble and the legacy c
 1. [Hubble metrics](./hubble_metrics.md)
 2. [Legacy metrics](./modes/modes.md)
 
-
 > Note: Hubble offers additional features and metrics that the legacy control plane does not support. The plan is to deprecate the legacy control plane in favor of Hubble. For further documentation on Hubble, check [Cilium/Hubble repository](https://github.com/cilium/hubble/?tab=readme-ov-file#features) and official [Hubble metrics documentation](https://docs.cilium.io/en/stable/observability/metrics/#hubble-metrics)
