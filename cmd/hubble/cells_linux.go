@@ -89,9 +89,9 @@ var (
 
 		pluginmanager.Cell,
 
-		retinak8s.Cell,
-
 		servermanager.Cell,
+
+		retinak8s.Cell,
 
 		telemetry.Heartbeat,
 	)

@@ -4,8 +4,15 @@ import (
 	"context"
 
 	daemonk8s "github.com/cilium/cilium/daemon/k8s"
+	"github.com/cilium/cilium/pkg/bgp/speaker"
+	cgmngr "github.com/cilium/cilium/pkg/cgroups/manager"
+	"github.com/cilium/cilium/pkg/datapath/iptables/ipset"
+	"github.com/cilium/cilium/pkg/datapath/tables"
+	"github.com/cilium/cilium/pkg/datapath/types"
+	"github.com/cilium/cilium/pkg/endpointmanager"
 	"github.com/cilium/cilium/pkg/identity/cache"
 	"github.com/cilium/cilium/pkg/ipcache"
+	"github.com/cilium/cilium/pkg/k8s"
 	ciliumk8s "github.com/cilium/cilium/pkg/k8s"
 	cilium_api_v2 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2"
 	cilium_api_v2alpha1 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2alpha1"
@@ -14,10 +21,16 @@ import (
 	slim_corev1 "github.com/cilium/cilium/pkg/k8s/slim/k8s/api/core/v1"
 	slim_networkingv1 "github.com/cilium/cilium/pkg/k8s/slim/k8s/api/networking/v1"
 	"github.com/cilium/cilium/pkg/k8s/synced"
-	"github.com/cilium/cilium/pkg/k8s/types"
+	k8sTypes "github.com/cilium/cilium/pkg/k8s/types"
 	"github.com/cilium/cilium/pkg/k8s/watchers"
+	"github.com/cilium/cilium/pkg/metrics"
 	"github.com/cilium/cilium/pkg/node"
+	"github.com/cilium/cilium/pkg/node/manager"
+	"github.com/cilium/cilium/pkg/policy"
+	"github.com/cilium/cilium/pkg/redirectpolicy"
+	"github.com/cilium/cilium/pkg/service"
 	"github.com/cilium/hive/cell"
+	"github.com/cilium/statedb"
 	"github.com/microsoft/retina/pkg/common"
 	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/sirupsen/logrus"
@@ -27,6 +40,16 @@ import (
 var Cell = cell.Module(
 	"k8s-watcher",
 	"Kubernetes watchers needed by the agent",
+
+	cell.Provide(
+		func() (statedb.Table[tables.NodeAddress], error) {
+			return statedb.NewTable(tables.NodeAddressTableName, tables.NodeAddressIndex)
+		},
+	),
+	cell.Invoke(func(db *statedb.DB, t statedb.Table[tables.NodeAddress]) {
+		db.RegisterTable(t)
+	}),
+	cell.Provide(k8s.NewServiceCache),
 
 	cell.Provide(
 		func(cell.Lifecycle, client.Clientset) (daemonk8s.LocalPodResource, error) {
@@ -59,17 +82,36 @@ var Cell = cell.Module(
 		func() resource.Resource[*cilium_api_v2.CiliumNode] {
 			return &fakeresource[*cilium_api_v2.CiliumNode]{}
 		},
-		func() daemonk8s.EndpointsNonHeadless {
-			return &fakeresource[*ciliumk8s.Endpoints]{}
-		},
 		func() watchers.WatcherConfiguration {
 			return &watcherconfig{}
 		},
 	),
 
+	metrics.Cell,
+
+	endpointmanager.Cell,
+
+	cell.Provide(func() *policy.Updater {
+		return &policy.Updater{}
+	}),
+
+	cell.Provide(func() *redirectpolicy.Manager {
+		return &redirectpolicy.Manager{}
+	}),
+
+	cell.Provide(func() types.BandwidthManager {
+		return &fakeBandwidthManager{}
+	}),
+
+	cell.Provide(func() service.ServiceManager {
+		return &service.Service{}
+	}),
+
+	cgmngr.Cell,
+
 	// Provide the resources needed by the watchers.
 
-	cell.Provide(func(lc cell.Lifecycle, cs client.Clientset) (resource.Resource[*types.CiliumEndpoint], error) {
+	cell.Provide(func(lc cell.Lifecycle, cs client.Clientset) (resource.Resource[*k8sTypes.CiliumEndpoint], error) {
 		return ciliumk8s.CiliumSlimEndpointResource(ciliumk8s.CiliumResourceParams{
 			Lifecycle: lc,
 			ClientSet: cs,
@@ -85,18 +127,6 @@ var Cell = cell.Module(
 	}),
 
 	cell.Provide(func(lc cell.Lifecycle, cs client.Clientset) (resource.Resource[*slim_corev1.Service], error) {
-		//nolint:wrapcheck // a wrapped error here is of dubious value
-		return ciliumk8s.ServiceResource(
-			lc,
-			ciliumk8s.Config{
-				EnableK8sEndpointSlice: false,
-			},
-			cs,
-			func(*metav1.ListOptions) {},
-		)
-	}),
-
-	cell.Provide(func(lc cell.Lifecycle, cs client.Clientset) (daemonk8s.ServiceNonHeadless, error) {
 		//nolint:wrapcheck // a wrapped error here is of dubious value
 		return ciliumk8s.ServiceResource(
 			lc,
@@ -129,13 +159,23 @@ var Cell = cell.Module(
 		}
 	}),
 
+	cell.Provide(func() ipset.Manager {
+		return &fakeIpsetMgr{}
+	}),
+
+	cell.Provide(func() speaker.MetalLBBgpSpeaker {
+		return &fakeMetalLBBgpSpeaker{}
+	}),
+
+	manager.Cell,
+
 	node.LocalNodeStoreCell,
+
+	synced.Cell,
+	cell.Provide(newAPIServerEventHandler),
 
 	watchers.Cell,
 
-	synced.Cell,
-
-	cell.Provide(newAPIServerEventHandler),
 	cell.Invoke(func(a *APIServerEventHandler) {
 		ps := pubsub.New()
 		fn := pubsub.CallBackFunc(a.handleAPIServerEvent)

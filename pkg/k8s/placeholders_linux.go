@@ -7,11 +7,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cilium/cilium/pkg/datapath/iptables/ipset"
 	datapathtypes "github.com/cilium/cilium/pkg/datapath/types"
 	"github.com/cilium/cilium/pkg/endpoint"
 	"github.com/cilium/cilium/pkg/identity"
 	"github.com/cilium/cilium/pkg/identity/cache"
 	"github.com/cilium/cilium/pkg/ipcache"
+	"github.com/cilium/cilium/pkg/k8s"
 	"github.com/cilium/cilium/pkg/k8s/resource"
 	slim_corev1 "github.com/cilium/cilium/pkg/k8s/slim/k8s/api/core/v1"
 	nodetypes "github.com/cilium/cilium/pkg/node/types"
@@ -134,4 +136,46 @@ type datapathhandler struct{}
 
 func (d *datapathhandler) UpdatePolicyMaps(context.Context, *sync.WaitGroup) *sync.WaitGroup {
 	return &sync.WaitGroup{}
+}
+
+type fakeBandwidthManager struct{}
+
+func (f *fakeBandwidthManager) BBREnabled() bool {
+	return false
+}
+
+func (f *fakeBandwidthManager) Enabled() bool {
+	return false
+}
+
+func (f *fakeBandwidthManager) UpdateBandwidthLimit(uint16, uint64) {}
+
+func (f *fakeBandwidthManager) DeleteBandwidthLimit(uint16) {}
+
+type fakeDatapath struct{}
+
+func (f *fakeDatapath) GetEndpointNetnsCookieByIP(netip.Addr) (uint64, error) {
+	return 0, nil
+}
+
+type fakeIpsetMgr struct{}
+
+func (f *fakeIpsetMgr) NewInitializer() ipset.Initializer {
+	return nil
+}
+
+func (f *fakeIpsetMgr) AddToIPSet(name string, family ipset.Family, addrs ...netip.Addr) {}
+
+func (f *fakeIpsetMgr) RemoveFromIPSet(name string, addrs ...netip.Addr) {}
+
+type fakeMetalLBBgpSpeaker struct{}
+
+func (f *fakeMetalLBBgpSpeaker) OnUpdateEndpoints(eps *k8s.Endpoints) error {
+	return nil
+}
+func (f *fakeMetalLBBgpSpeaker) OnUpdateService(svc *slim_corev1.Service) error {
+	return nil
+}
+func (f *fakeMetalLBBgpSpeaker) OnDeleteService(svc *slim_corev1.Service) error {
+	return nil
 }

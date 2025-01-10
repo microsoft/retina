@@ -19,7 +19,7 @@ retract (
 )
 
 require (
-	cel.dev/expr v0.16.0 // indirect
+	cel.dev/expr v0.16.1 // indirect
 	code.cloudfoundry.org/clock v1.0.0 // indirect
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230811130428-ced1acdcaa24 // indirect
 	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20230306123547-8075edf89bb0 // indirect
@@ -68,7 +68,7 @@ require (
 	github.com/cilium/dns v1.1.51-0.20240603182237-af788769786a // indirect
 	github.com/cilium/lumberjack/v2 v2.3.0 // indirect
 	github.com/cilium/stream v0.0.0-20240226091623-f979d32855f8 // indirect
-	github.com/cncf/xds/go v0.0.0-20240723142845-024c85f92f20 // indirect
+	github.com/cncf/xds/go v0.0.0-20240905190251-b4127c9b8d78 // indirect
 	github.com/containerd/cgroups/v3 v3.0.3 // indirect
 	github.com/containerd/containerd v1.7.23 // indirect
 	github.com/containerd/continuity v0.4.2 // indirect
@@ -185,7 +185,7 @@ require (
 	github.com/opentracing/opentracing-go v1.2.1-0.20220228012449-10b1cf09e00b // indirect
 	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
 	github.com/peterbourgon/diskv v2.0.2-0.20180312054125-0646ccaebea1+incompatible // indirect
-	github.com/petermattis/goid v0.0.0-20180202154549-b0b1615b78e5 // indirect
+	github.com/petermattis/goid v0.0.0-20240813172612-4fcff4a6cae7 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
@@ -194,7 +194,7 @@ require (
 	github.com/s3rj1k/go-fanotify/fanotify v0.0.0-20210917134616-9c00a300bb7a // indirect
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
-	github.com/sasha-s/go-deadlock v0.3.1 // indirect
+	github.com/sasha-s/go-deadlock v0.3.5 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.11.0 // indirect
@@ -229,8 +229,8 @@ require (
 	golang.org/x/tools v0.28.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/genproto v0.0.0-20240213162025-012b6fc9bca9 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20240814211410-ddb44dafa142 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240903143218-8af14fe29dc1 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20241206012308-a4fef0638583 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20241206012308-a4fef0638583 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	k8s.io/apiserver v0.30.3 // indirect
@@ -292,10 +292,10 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.48
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.72.0
 	github.com/cakturk/go-netstat v0.0.0-20200220111822-e5b49efee7a5
-	github.com/cilium/cilium v1.16.4
+	github.com/cilium/cilium v1.16.5
 	github.com/cilium/ebpf v0.16.0
 	github.com/cilium/hive v0.0.0-20240529072208-d997f86e4219
-	github.com/cilium/proxy v0.0.0-20240418093727-2c7164c53e26
+	github.com/cilium/proxy v0.0.0-20241210133824-eaae5aca0fb9
 	github.com/cilium/workerpool v1.2.0
 	github.com/florianl/go-tc v0.4.4
 	github.com/go-logr/zapr v1.3.0
@@ -322,7 +322,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.33.0
 	go.uber.org/mock v0.5.0
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
-	google.golang.org/grpc v1.67.0
+	google.golang.org/grpc v1.68.1
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gotest.tools v2.2.0+incompatible
 	gotest.tools/v3 v3.5.1
