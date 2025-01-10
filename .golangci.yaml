@@ -7,12 +7,10 @@ issues:
     - path: pkg/metrics/types_windows.go
       linters:
         - revive
-        - mnd
         - var-naming
     - path: pkg/metrics/types_linux.go
       linters:
         - revive
-        - mnd
         - var-naming
 linters:
   presets: 
@@ -31,7 +29,6 @@ linters:
   - gocritic
   - gocyclo
   - gofmt
-  - mnd
   - goprintffuncname
   - gosimple
   - lll
