@@ -9,7 +9,7 @@ require (
 	github.com/spf13/cobra v1.8.1
 	go.uber.org/zap v1.27.0
 	k8s.io/client-go v0.30.3
-	sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.4.7
+	sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.4.9
 	sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader v0.0.20
 )
 
