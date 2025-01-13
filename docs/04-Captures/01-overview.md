@@ -1,6 +1,4 @@
-# Captures
-
-## Overview
+# Overview
 
 Retina Capture allows users to capture network traffic/metadata for specified Nodes/Pods.
 
