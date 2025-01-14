@@ -230,7 +230,10 @@ func getAdvancedMetricLabels(h *hnsstats, stats *HnsStatsData) {
 	}
 	// if port is populated, vfp data exists
 	// labels := enricher.Instance().GetWindowLabels(stats.IPAddress)
+	h.l.Info("New standalone feature")
+
 	labels, err := getStandaloneLabels(stats.IPAddress)
+	h.l.Info("Reading fields from CNI state file", zap.String(Ip, stats.IPAddress), zap.String(PodName, labels.PodName), zap.String(Namespace, labels.Namespace))
 
 	if err != nil {
 		AdvWindowsGauge.WithLabelValues(PacketsReceived, stats.IPAddress, stats.Port, labels.Namespace, labels.PodName).Set(float64(stats.hnscounters.PacketsReceived))
@@ -262,8 +265,6 @@ func initializeAdvMetrics() {
 		Port,
 		Namespace,
 		PodName,
-		WorkloadKind,
-		WorkloadName,
 	)
 }
 
@@ -300,7 +301,6 @@ func getStandaloneLabels(ip string) (*utils.LabelsInfo, error) {
 	}
 	defer file.Close()
 
-	// Decode JSON
 	var network Network
 	if err := json.NewDecoder(file).Decode(&network); err != nil {
 		return &utils.LabelsInfo{
