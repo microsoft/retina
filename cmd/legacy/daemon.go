@@ -89,6 +89,8 @@ func (d *Daemon) Start() error {
 	}
 
 	daemonConfig, err := config.GetConfig(d.configFile)
+	fmt.Printf("config %+v\n", daemonConfig)
+
 	if err != nil {
 		panic(err)
 	}
