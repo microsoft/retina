@@ -1,7 +1,7 @@
 ---
-sidebar_position: 1
+sidebar_position: 2
 ---
-# Metric Modes
+# Legacy Metric Modes
 
 Retina provides **three modes** with their own metrics and scale capabilities.
 Each mode is **fully customizable** (only create the metrics/labels you need).
