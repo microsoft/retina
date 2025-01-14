@@ -371,3 +371,5 @@ replace github.com/vishvananda/netns => github.com/inspektor-gadget/netns v0.0.5
 replace k8s.io/perf-tests/network/benchmarks/netperf => github.com/Azure/perf-tests/network/benchmarks/netperf v0.0.0-20241008140716-395a79947d2c
 
 replace go.universe.tf/metallb => github.com/cilium/metallb v0.1.1-0.20220829170633-5d7dfb1129f7
+
+replace github.com/cilium/cilium => github.com/ritwikranjan/cilium v0.0.0-20250114123205-3b4fd6e1c18d

@@ -1,13 +1,14 @@
 package common
 
 import (
+	"net"
 	"net/netip"
 	"os"
 
 	"github.com/cilium/cilium/api/v1/flow"
 	"github.com/cilium/cilium/pkg/identity"
 	ipc "github.com/cilium/cilium/pkg/ipcache"
-	"github.com/cilium/cilium/pkg/labels"
+	"github.com/cilium/cilium/pkg/k8s"
 )
 
 //go:generate go run github.com/golang/mock/mockgen@v1.6.0 -source decoder.go -destination=mocks/mock_types.go -package=mocks
@@ -43,19 +44,19 @@ func (e *epDecoder) Decode(ip netip.Addr) *flow.Endpoint {
 	ep.ID = id.ID.Uint32()
 	ep.Identity = id.ID.Uint32()
 
-	switch id.ID { //nolint:exhaustive // We don't need all the cases.
-	case identity.ReservedIdentityHost:
-		ep.Labels = labels.LabelHost.GetModel()
-	case identity.ReservedIdentityKubeAPIServer:
-		ep.Labels = labels.LabelKubeAPIServer.GetModel()
-	case identity.ReservedIdentityRemoteNode:
-		ep.Labels = labels.LabelRemoteNode.GetModel()
-	case identity.ReservedIdentityWorld:
-		ep.Labels = labels.LabelWorld.GetModel()
-	default:
-		// https://github.com/cilium/cilium/commit/ba2eb6cc1da6b894c7bea23b31ed6a33292ba951#diff-bb1165de1a65911d59ac7f9a002aa9f1e25c30e073547adec11b174a174fdca6L192
-		// ep.Labels = e.ipcache.GetMetadataLabelsByIP(ip).GetModel()
-	}
+	// switch id.ID { //nolint:exhaustive // We don't need all the cases.
+	// case identity.ReservedIdentityHost:
+	// 	ep.Labels = labels.LabelHost.GetModel()
+	// case identity.ReservedIdentityKubeAPIServer:
+	// 	ep.Labels = labels.LabelKubeAPIServer.GetModel()
+	// case identity.ReservedIdentityRemoteNode:
+	// 	ep.Labels = labels.LabelRemoteNode.GetModel()
+	// case identity.ReservedIdentityWorld:
+	// 	ep.Labels = labels.LabelWorld.GetModel()
+	// default:
+	// 	// https://github.com/cilium/cilium/commit/ba2eb6cc1da6b894c7bea23b31ed6a33292ba951#diff-bb1165de1a65911d59ac7f9a002aa9f1e25c30e073547adec11b174a174fdca6L192
+	// 	// ep.Labels = e.ipcache.GetMetadataLabelsByIP(ip).GetModel()
+	// }
 
 	return ep
 }
@@ -69,26 +70,26 @@ func (e *epDecoder) IsEndpointOnLocalHost(ip string) bool {
 	return e.localHostIP == e.endpointHostIP(ip)
 }
 
-// type SvcDecoder interface {
-// 	Decode(ip netip.Addr) *flow.Service
-// }
-//
-// type svcDecoder struct {
-// 	svccache *k8s.ServiceCache
-// }
-//
-// func NewSvcDecoder(sc *k8s.ServiceCache) *svcDecoder {
-// 	return &svcDecoder{
-// 		svccache: sc,
-// 	}
-// }
-//
-// func (s *svcDecoder) Decode(ip netip.Addr) *flow.Service {
-// 	svc := &flow.Service{}
-//
-// 	if svcID, ok := s.svccache.GetServiceIDFromFrontendIP(ip.String()); ok {
-// 		svc.Name = svcID.Name
-// 		svc.Namespace = svcID.Namespace
-// 	}
-// 	return svc
-// }
+type SvcDecoder interface {
+	Decode(ip netip.Addr) *flow.Service
+}
+
+type svcDecoder struct {
+	svccache *k8s.ServiceCache
+}
+
+func NewSvcDecoder(sc *k8s.ServiceCache) *svcDecoder {
+	return &svcDecoder{
+		svccache: sc,
+	}
+}
+
+func (s *svcDecoder) Decode(ip netip.Addr) *flow.Service {
+	svc := &flow.Service{}
+
+	if svcID, ok := s.svccache.GetServiceIDByIP(net.IP(ip.String())); ok {
+		svc.Name = svcID.Name
+		svc.Namespace = svcID.Namespace
+	}
+	return svc
+}
