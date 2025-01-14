@@ -6,9 +6,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	hp "github.com/cilium/cilium/pkg/hubble/parser"
-
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
+	hp "github.com/cilium/cilium/pkg/hubble/parser"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
@@ -16,7 +15,6 @@ import (
 	"github.com/microsoft/retina/pkg/plugin/registry"
 	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapio"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -24,16 +22,12 @@ const (
 	name = "windowsebpf"
 )
 
-var (
-	ErrNilEnricher = errors.New("nil enricher")
-)
+var ErrNilEnricher = errors.New("enricher is nil")
 
 type Plugin struct {
 	enricher        enricher.EnricherInterface
 	externalChannel chan *v1.Event
 	l               *log.ZapLogger
-	stdWriter       *zapio.Writer
-	errWriter       *zapio.Writer
 
 	parser *hp.Parser
 }
@@ -62,17 +56,17 @@ func (p *Plugin) Start(ctx context.Context) error {
 		return ErrNilEnricher
 	}
 
-	g, ctx := errgroup.WithContext(ctx)
+	_, ctx = errgroup.WithContext(ctx)
 
 	parser, err := hp.New(logrus.WithField("cilium", "parser"),
-		// We use noOp getters here since we will use our own custom parser in hubble
-		nil, // todo: implement NoopEndpointGetter
-		nil, // todo: implement NoopIdentityGetter
-		nil, // todo: implement NoopDNSGetter
-		nil, // todo: implement NoopIPGetter
-		nil, // todo: implement NoopServiceGetter
-		nil, // todo: implement NoopLinkGetter
-		nil, // todo: implement NoopPodMetadataGetter
+		// We use noop getters here since we will use our own custom parser in hubble
+		&NoopEndpointGetter,
+		&NoopIdentityGetter,
+		&NoopDNSGetter,
+		&NoopIPGetter,
+		&NoopServiceGetter,
+		&NoopLinkGetter,
+		&NoopPodMetadataGetter,
 	)
 	if err != nil {
 		p.l.Fatal("Failed to create parser", zap.Error(err))
@@ -85,7 +79,7 @@ func (p *Plugin) Start(ctx context.Context) error {
 		case <-ctx.Done():
 			return errors.Wrapf(ctx.Err(), "windowsebpf plugin context done")
 		default:
-			event, err := p.windowsebpf.Recv() //todo: implement windowsebpf.Recv() or
+			event, err := p.recv() // todo: implement windowsebpf.Recv() or
 			if err != nil {
 				return errors.Wrapf(err, "failed to receive windowsebpf event")
 			}
@@ -119,6 +113,11 @@ func (p *Plugin) Start(ctx context.Context) error {
 			}
 		}
 	}
+}
+
+func (p *Plugin) recv() (*v1.Event, error) {
+	// example
+	return nil, nil
 }
 
 func (p *Plugin) SetupChannel(ch chan *v1.Event) error {
