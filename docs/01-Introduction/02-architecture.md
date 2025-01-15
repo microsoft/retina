@@ -17,8 +17,10 @@ The plugins are responsible for installing the eBPF programs into the host kerne
 Some examlpes of existing Retina plugins:
 
 - Drop Reason - measures the number of packets/bytes dropped and the reason and the direction of the drop.
-- DNS - uses the Inspektor Gadget DNS tracer to capture DNS events.
+- DNS - counts DNS requests/responses by query, including error codes, response IPs, and other metadata.
 - Packet Forward - measures packets and bytes passing through the eth0 interface of each node, along with the direction of the packets.
+
+You can check out the rest on the [Plugins](../03-Metrics/plugins/readme.md) page.
 
 !["Retina Data Plane"](./img/data-plane.png "Retina Data Plane")
 
@@ -42,6 +44,14 @@ Retina currently has two options for the Control Plane:
 - [Legacy* Control Plane](#legacy-control-plane)
 
 (* The "Legacy" naming will soon be replaced to a more accurate description - [GitHub Issue #1115](https://github.com/microsoft/retina/issues/1115))
+
+| Platform | Default Control Plane  |
+|----------|------------------------|
+| Windows  | Legacy                 |
+| Linux    | Legacy                 |
+| Linux - [Advanced Container Networking Services](https://aka.ms/acns)   | Hubble         |
+
+Please refer to the [Installation](../02-Installation/01-Setup.md) page for further setup instructions.
 
 ### Hubble Control Plane
 
