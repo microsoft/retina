@@ -80,7 +80,6 @@ helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
     --set enableAnnotations=true
 ```
 
-
 ### Hubble control plane
 
 ```shell
