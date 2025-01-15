@@ -59,6 +59,8 @@ func (p *Parser) Decode(f *flow.Flow) *flow.Flow {
 	// Add L34 Summary to flow.
 	p.decodeSummary(f)
 
+	p.decodeTrafficDirection(f)
+
 	return f
 }
 
@@ -87,4 +89,25 @@ func (p *Parser) decodeSummary(f *flow.Flow) {
 			f.Summary = "UDP" // nolint:staticcheck // We need summary for now.
 		}
 	}
+}
+
+// decodeTrafficDirection decodes the traffic direction of the flow.
+// It is only required for DROPPED verdicts because dropreason bpf program
+// cannot determine the traffic direction. We determine using the source endpoint's
+// node IP.
+// Note: If the source and destination are on the same node, then the traffic is outbound.
+func (p *Parser) decodeTrafficDirection(f *flow.Flow) {
+	// Only required for DROPPED verdicts.
+	if f.GetVerdict() != flow.Verdict_DROPPED {
+		return
+	}
+
+	// If the source EP's node is the same as the current node, then the traffic is outbound.
+	if p.ep.IsEndpointOnLocalHost(f.IP.Source) {
+		f.TrafficDirection = flow.TrafficDirection_EGRESS
+		return
+	}
+
+	// Default to ingress.
+	f.TrafficDirection = flow.TrafficDirection_INGRESS
 }
