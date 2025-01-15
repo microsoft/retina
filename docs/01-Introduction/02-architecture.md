@@ -51,11 +51,25 @@ Retina currently has two options for the Control Plane:
 | Linux    | Legacy                 |
 | Linux - [Advanced Container Networking Services](https://aka.ms/acns)   | Hubble         |
 
+Both Control Planes integrate with the same Data Plane, and have the same contract which is the `flow` data structure. (The flow data structure is [defined by Cilium](https://github.com/cilium/cilium/tree/main/api/v1/flow).) Both Control Planes also generate metrics and traces, albeit different metrics are supported by each. See our [Metrics page](../03-Metrics/01-metrics-intro.md) for more information.
+
 Please refer to the [Installation](../02-Installation/01-Setup.md) page for further setup instructions.
 
 ### Hubble Control Plane
 
-Describe the control plane.
+When the Hubble Control Plane is being used, the data from the plugins is written to an `external channel`. A component called the Monitor Agent monitors this channel, and keeps track of a list of listeners and consumers. One of such consumers is the Hubble Observer. This means that when the Monitor Agent detects an update in the channel it will forward the data to the Hubble Observer.
+
+The Hubble Observer is initialized with a Packet Parser. The parser has an understanding of the data that it receives from the Monitor Agent and it converts this data into basic `flow` structs.
+
+This basic flow struct is then enriched with Kubernetes specific context through the use of Cilium libraries (red blocks in the diagram). This includes mapping IP addressses to Kubernetes objects such as Nodes, Pods, Namespaces or Labels. This data comes from the Kubernetes watchers.
+
+Once the data is in consistent flow objects, and enriched with Kubernetes context, it gets sent to Hubble. Hubble reads this data from its buffer and converts it to metrics and flow logs, which are then served as follows:
+
+- Server 9965 - Hubble metrics (Prometheus)
+- Local Server 4244 - Hubble Relay aggregates the data across all nodes in the cluster
+- Local Unix Socket - serves node specific data
+
+!["Hubble Control Plane"](./img/hubble-control-plane.png "Hubble Control Plane")
 
 ### Legacy Control Plane
 
