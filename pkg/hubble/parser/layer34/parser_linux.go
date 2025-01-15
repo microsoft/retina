@@ -103,7 +103,7 @@ func (p *Parser) decodeTrafficDirection(f *flow.Flow) {
 	}
 
 	// If the source EP's node is the same as the current node, then the traffic is outbound.
-	if p.ep.IsEndpointOnLocalHost(f.IP.Source) {
+	if p.ep.IsEndpointOnLocalHost(f.GetIP().GetSource()) {
 		f.TrafficDirection = flow.TrafficDirection_EGRESS
 		return
 	}

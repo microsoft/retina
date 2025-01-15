@@ -24,7 +24,7 @@ type epDecoder struct {
 	ipcache     *ipc.IPCache
 }
 
-func NewEpDecoder(c *ipc.IPCache) *epDecoder { //nolint:revive // This is a factory function.
+func NewEpDecoder(c *ipc.IPCache) EpDecoder {
 	return &epDecoder{
 		localHostIP: os.Getenv("NODE_IP"),
 		ipcache:     c,
@@ -79,7 +79,7 @@ type svcDecoder struct {
 	svccache *k8s.ServiceCache
 }
 
-func NewSvcDecoder(sc *k8s.ServiceCache) *svcDecoder {
+func NewSvcDecoder(sc *k8s.ServiceCache) SvcDecoder {
 	return &svcDecoder{
 		svccache: sc,
 	}
