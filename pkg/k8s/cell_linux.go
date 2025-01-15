@@ -148,10 +148,11 @@ var Cell = cell.Module(
 			nil,
 		}
 		return ipcache.NewIPCache(&ipcache.Configuration{
-			Context:           context.Background(),
-			IdentityAllocator: idAlloc,
-			PolicyHandler:     &policyhandler{},
-			DatapathHandler:   &datapathhandler{},
+			Context:               context.Background(),
+			IdentityAllocator:     idAlloc,
+			PolicyHandler:         &policyhandler{},
+			DatapathHandler:       &datapathhandler{},
+			DisableLabelInjection: true,
 		})
 	}),
 

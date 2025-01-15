@@ -9,6 +9,7 @@ import (
 	"github.com/cilium/cilium/pkg/identity"
 	ipc "github.com/cilium/cilium/pkg/ipcache"
 	"github.com/cilium/cilium/pkg/k8s"
+	"github.com/cilium/cilium/pkg/labels"
 )
 
 //go:generate go run github.com/golang/mock/mockgen@v1.6.0 -source decoder.go -destination=mocks/mock_types.go -package=mocks
@@ -44,19 +45,19 @@ func (e *epDecoder) Decode(ip netip.Addr) *flow.Endpoint {
 	ep.ID = id.ID.Uint32()
 	ep.Identity = id.ID.Uint32()
 
-	// switch id.ID { //nolint:exhaustive // We don't need all the cases.
-	// case identity.ReservedIdentityHost:
-	// 	ep.Labels = labels.LabelHost.GetModel()
-	// case identity.ReservedIdentityKubeAPIServer:
-	// 	ep.Labels = labels.LabelKubeAPIServer.GetModel()
-	// case identity.ReservedIdentityRemoteNode:
-	// 	ep.Labels = labels.LabelRemoteNode.GetModel()
-	// case identity.ReservedIdentityWorld:
-	// 	ep.Labels = labels.LabelWorld.GetModel()
-	// default:
-	// 	// https://github.com/cilium/cilium/commit/ba2eb6cc1da6b894c7bea23b31ed6a33292ba951#diff-bb1165de1a65911d59ac7f9a002aa9f1e25c30e073547adec11b174a174fdca6L192
-	// 	// ep.Labels = e.ipcache.GetMetadataLabelsByIP(ip).GetModel()
-	// }
+	switch id.ID { //nolint:exhaustive // We don't need all the cases.
+	case identity.ReservedIdentityHost:
+		ep.Labels = labels.LabelHost.GetModel()
+	case identity.ReservedIdentityKubeAPIServer:
+		ep.Labels = labels.LabelKubeAPIServer.GetModel()
+	case identity.ReservedIdentityRemoteNode:
+		ep.Labels = labels.LabelRemoteNode.GetModel()
+	case identity.ReservedIdentityWorld:
+		ep.Labels = labels.LabelWorld.GetModel()
+	default:
+		prefix := netip.PrefixFrom(ip, ip.BitLen())
+		ep.Labels = e.ipcache.GetMetadataLabelsByPrefix(prefix).GetModel()
+	}
 
 	return ep
 }
