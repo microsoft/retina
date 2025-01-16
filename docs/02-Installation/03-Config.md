@@ -2,9 +2,10 @@
 
 ## Overview
 
-To customize metrics and other options, upgrade Retina defining the specific parameter and attribute as part of the `helm upgrade` command. 
+To customize metrics and other options, upgrade Retina defining the specific parameter and attribute as part of the `helm upgrade` command.
 
 ### Example
+
 The example below enables gathering of advance pod-level metrics.
 
 ```shell
@@ -18,9 +19,11 @@ helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
     --set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\]"
     --set enablePodLevel=true
 ```
+
 Default settings for each component are specified in [Values file](../../deploy/legacy/manifests/controller/helm/retina/values.yaml).
 
 ## General Configuration
+
 Apply to both Agent and Operator.
 
 * `enableTelemetry`: Enables telemetry for the agent for managed AKS clusters. Requires `buildinfo.ApplicationInsightsID` to be set if enabled.
