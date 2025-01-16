@@ -549,6 +549,9 @@ get-certs:
 	hubble config set tls true
 	hubble config set tls-server-name instance.hubble-relay.cilium.io
 
+# Replaces every '.' in $(1) with '\.'
+escape_dot = $(subst .,\.,$(1))
+
 .PHONY: clean-certs
 clean-certs:
 	rm -rf $(CERT_DIR)
