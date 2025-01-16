@@ -2,9 +2,22 @@
 
 ## Overview
 
-To customize metrics and other options, upgrade Retina defining the specific parameter and attribute as part of the `helm upgrade` command.
+### Default Configuration
 
-### Example
+Default settings for each component are specified in [Values file](../../deploy/legacy/manifests/controller/helm/retina/values.yaml).
+
+### Deployed Configuration
+
+Configuration of an active Retina deployment can be seen in `retina-config` and `retina-operator-config` configmaps.
+
+```shell
+kubectl get configmap retina-config -n kube-system -o yaml
+kubectl get configmap retina-operator-config -n kube-system -o yaml
+```
+
+### Updating Configuration
+
+If the Retina installation was done via Helm, configuration updates should be done via `helm upgrade` defining the specific attribute name and value as part of the command.
 
 The example below enables gathering of advance pod-level metrics.
 
@@ -19,8 +32,6 @@ helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
     --set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\]"
     --set enablePodLevel=true
 ```
-
-Default settings for each component are specified in [Values file](../../deploy/legacy/manifests/controller/helm/retina/values.yaml).
 
 ## General Configuration
 
