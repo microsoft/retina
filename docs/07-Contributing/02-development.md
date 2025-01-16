@@ -43,7 +43,7 @@ If these commands fail (there is no output), then see if you have a binary with 
 Then create a symbolic link to the versioned binary like:
 
 ```bash
-sudo ln -s /usr/bin/clang-16 /usr/bin/clan
+sudo ln -s /usr/bin/clang-16 /usr/bin/clang
 sudo ln -s /usr/bin/llvm-strip-16 /usr/bin/llvm-strip
 ```
 
