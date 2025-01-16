@@ -16,7 +16,7 @@ helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
     --set operator.tag=$VERSION \
     --set logLevel=info \
     --set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\]"
-    **--set enablePodLevel=true**
+    --set enablePodLevel=true
 ```
 Default settings for each component are specified in [Values file](../../deploy/legacy/manifests/controller/helm/retina/values.yaml).
 
