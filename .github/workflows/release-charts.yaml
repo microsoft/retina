@@ -34,7 +34,7 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u $ --password-stdin
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
       
-      - name: Build, Push and Sign legacy chart
+      - name: Build, Push and Sign chart
         id: build_chart
         shell: bash
         run: |

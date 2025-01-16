@@ -6,7 +6,7 @@ Note: you can also run captures with just the [CLI](./02-CLI.md).
 
 ## Installation
 
-Requires Helm version >= v3.8.0. The installation of Retina depends control plane and mode. The choice of control plane is between "legacy", which is the original implementation of Retina control plane and Hubble. The metrics dimensions available depend on the mode selection, see [Legacy Metric Modes](../03-Metrics/modes/modes.md) for an explaination of available mode. Modes are available for "legacy" control plane only. For Hubble control plane metrics, see [Hubble metrics](../03-Metrics/02-hubble_metrics.md) documentation.
+Requires Helm version >= v3.8.0. The installation of Retina can be configured using different control planes and modes. You can choose between the "legacy" control plane, which is the original implementation of Retina, and Hubble. The available metric dimensions depend on the selected mode. For an explanation of the available modes, see [Legacy Metric Modes](../03-Metrics/modes/modes.md). Modes are available only for the "legacy" control plane. For metrics related to the Hubble control plane, refer to the [Hubble metrics](../03-Metrics/02-hubble_metrics.md) documentation.
 
 ### Basic Mode
 
