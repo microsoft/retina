@@ -36,7 +36,7 @@ With Retina, you can **automate this process** with a **single CLI command** or 
 - Run captures on all Nodes hosting the Pods of interest.
 - Upload each Node's results to a storage blob.
 
-To begin using the CLI, see [Quick Start Installation](./02-Installation/02-CLI.md).
+To begin using the CLI, see [Quick Start Installation](../02-Installation/02-CLI.md).
 
 ### Use Case - Monitoring Network Health
 
@@ -67,7 +67,7 @@ Retina provides both:
 - **Basic metrics** - Node-Level (default)
 - **Advanced metrics** - Pod-Level (if enabled)
 
-For more info and a list of metrics, see [Metrics](03-Metrics/modes/modes.md).
+For more info and a list of metrics, see [Metrics](../03-Metrics/modes/modes.md).
 
 The same set of metrics are generated regardless of the underlying OS or CNI.
 
@@ -75,7 +75,7 @@ The same set of metrics are generated regardless of the underlying OS or CNI.
 
 A Retina capture **logs network traffic** and metadata **for the specified Nodes/Pods**.
 
-Captures are **on-demand** and can be output to multiple destinations. For more info, see [Captures](04-Captures/readme.md).
+Captures are **on-demand** and can be output to multiple destinations. For more info, see [Captures](../04-Captures/01-overview.md).
 
 ## What is Hubble?
 
