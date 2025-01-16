@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/pprof"
-	"os"
 	"time"
 
 	"go.uber.org/zap/zapcore"
@@ -81,7 +80,7 @@ func NewOperator(metricsAddr, probeAddr, configFile string, enableLeaderElection
 	}
 }
 
-func (o *Operator) Start() {
+func (o *Operator) Start() error {
 	mainLogger = log.Logger().Named("main")
 
 	mainLogger.Sugar().Infof("Starting legacy operator")
@@ -94,7 +93,7 @@ func (o *Operator) Start() {
 	oconfig, err = config.GetConfig(o.configFile)
 	if err != nil {
 		fmt.Printf("failed to load config with err %s", err.Error())
-		os.Exit(1)
+		return err
 	}
 
 	mainLogger.Sugar().Infof("Operator configuration", zap.Any("configuration", oconfig))
@@ -105,13 +104,13 @@ func (o *Operator) Start() {
 
 	if err != nil {
 		fmt.Printf("failed to load config with err %s", err.Error())
-		os.Exit(1)
+		return err
 	}
 
 	err = initLogging(oconfig, buildinfo.ApplicationInsightsID)
 	if err != nil {
 		fmt.Printf("failed to initialize logging with err %s", err.Error())
-		os.Exit(1)
+		return err
 	}
 
 	ctrl.SetLogger(crzap.New(crzap.UseFlagOptions(opts), crzap.Encoder(zapcore.NewConsoleEncoder(log.EncoderConfig()))))
@@ -139,14 +138,14 @@ func (o *Operator) Start() {
 	})
 	if err != nil {
 		mainLogger.Error("Unable to start manager", zap.Error(err))
-		os.Exit(1)
+		return err
 	}
 
 	ctx := context.Background()
 	clientset, err := apiextv1.NewForConfig(mgr.GetConfig())
 	if err != nil {
 		mainLogger.Error("Failed to get apiextension clientset", zap.Error(err))
-		os.Exit(1)
+		return err
 	}
 
 	if oconfig.InstallCRDs {
@@ -156,7 +155,7 @@ func (o *Operator) Start() {
 		crds, err = deploy.InstallOrUpdateCRDs(ctx, oconfig.EnableRetinaEndpoint, clientset)
 		if err != nil {
 			mainLogger.Error("unable to register CRDs", zap.Error(err))
-			os.Exit(1)
+			return err
 		}
 		for name := range crds {
 			mainLogger.Info("CRD registered", zap.String("name", name))
@@ -166,7 +165,7 @@ func (o *Operator) Start() {
 	apiserverURL, err := telemetry.GetK8SApiserverURLFromKubeConfig()
 	if err != nil {
 		mainLogger.Error("Apiserver URL is cannot be found", zap.Error(err))
-		os.Exit(1)
+		return err
 	}
 
 	var tel telemetry.Telemetry
@@ -176,10 +175,15 @@ func (o *Operator) Start() {
 			"version":                   buildinfo.Version,
 			telemetry.PropertyApiserver: apiserverURL,
 		}
+
+		telemetry.InitAppInsights(buildinfo.ApplicationInsightsID, buildinfo.Version)
+		defer telemetry.ShutdownAppInsights()
+		defer telemetry.TrackPanic()
+
 		tel, err = telemetry.NewAppInsightsTelemetryClient("retina-operator", properties)
 		if err != nil {
 			mainLogger.Error("failed to create telemetry client", zap.Error(err))
-			os.Exit(1)
+			return err
 		}
 	} else {
 		mainLogger.Info("telemetry disabled", zap.String("apiserver", apiserverURL))
@@ -189,7 +193,7 @@ func (o *Operator) Start() {
 	kubeClient, err := kubernetes.NewForConfig(mgr.GetConfig())
 	if err != nil {
 		mainLogger.Error("Failed to get clientset", zap.Error(err))
-		os.Exit(1)
+		return err
 	}
 
 	captureReconciler, err := captureController.NewCaptureReconciler(
@@ -197,11 +201,11 @@ func (o *Operator) Start() {
 	)
 	if err != nil {
 		mainLogger.Error("Unable to create capture reconciler", zap.Error(err))
-		os.Exit(1)
+		return err
 	}
 	if err = captureReconciler.SetupWithManager(mgr); err != nil {
 		mainLogger.Error("Unable to setup retina capture controller with manager", zap.Error(err))
-		os.Exit(1)
+		return err
 	}
 
 	ctrlCtx := ctrl.SetupSignalHandler()
@@ -226,7 +230,7 @@ func (o *Operator) Start() {
 			pc := podcontroller.New(mgr.GetClient(), mgr.GetScheme(), retinaendpointchannel)
 			if err = (pc).SetupWithManager(mgr); err != nil {
 				mainLogger.Error("Unable to create controller", zap.String("controller", "podcontroller"), zap.Error(err))
-				os.Exit(1)
+				return err
 			}
 		}
 	}
@@ -234,28 +238,30 @@ func (o *Operator) Start() {
 	mc := metricsconfiguration.New(mgr.GetClient(), mgr.GetScheme())
 	if err = (mc).SetupWithManager(mgr); err != nil {
 		mainLogger.Error("Unable to create controller", zap.String("controller", "metricsconfiguration"), zap.Error(err))
-		os.Exit(1)
+		return err
 	}
 
 	//+kubebuilder:scaffold:builder
 
-	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+	if err = mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		mainLogger.Error("Unable to set up health check", zap.Error(err))
-		os.Exit(1)
+		return err
 	}
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+	if err = mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
 		mainLogger.Error("Unable to set up ready check", zap.Error(err))
-		os.Exit(1)
+		return err
 	}
 
 	mainLogger.Info("Starting manager")
-	if err := mgr.Start(ctrlCtx); err != nil {
+	if err = mgr.Start(ctrlCtx); err != nil {
 		mainLogger.Error("Problem running manager", zap.Error(err))
-		os.Exit(1)
+		return err
 	}
 
 	// start heartbeat goroutine for application insights
 	go tel.Heartbeat(ctx, HeartbeatFrequency)
+
+	return nil
 }
 
 func EnablePProf() {
