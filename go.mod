@@ -295,7 +295,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.73.0
 	github.com/cakturk/go-netstat v0.0.0-20200220111822-e5b49efee7a5
 	github.com/cilium/cilium v1.16.0-pre.1.0.20240403152809-b9853ecbcaeb
-	github.com/cilium/ebpf v0.16.0
+	github.com/cilium/ebpf v0.17.1
 	github.com/cilium/proxy v0.0.0-20231031145409-f19708f3d018
 	github.com/cilium/workerpool v1.2.0
 	github.com/florianl/go-tc v0.4.4
