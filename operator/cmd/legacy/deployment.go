@@ -243,17 +243,17 @@ func (o *Operator) Start() error {
 
 	//+kubebuilder:scaffold:builder
 
-	if err = mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		mainLogger.Error("Unable to set up health check", zap.Error(err))
 		return err
 	}
-	if err = mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
 		mainLogger.Error("Unable to set up ready check", zap.Error(err))
 		return err
 	}
 
 	mainLogger.Info("Starting manager")
-	if err = mgr.Start(ctrlCtx); err != nil {
+	if err := mgr.Start(ctrlCtx); err != nil {
 		mainLogger.Error("Problem running manager", zap.Error(err))
 		return err
 	}
