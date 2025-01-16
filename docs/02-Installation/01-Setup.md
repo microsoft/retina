@@ -6,7 +6,10 @@ Note: you can also run captures with just the [CLI](./02-CLI.md).
 
 ## Installation
 
-Requires Helm version >= v3.8.0.
+### Requirements
+
+Helm version >= v3.8.0.
+Docker and Helm login to GitHub Container Registry. [Authenticating to GHCR](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-to-the-container-registry)
 
 ### Basic Mode
 
