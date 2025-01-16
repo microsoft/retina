@@ -93,10 +93,10 @@ func (h *hnsstats) Init() error {
 	}
 	h.endpointQuery.Filter = string(filter)
 
-	if h.cfg.EnablePodLevel {
-		h.l.Info("Creating advanced HNS stats metrics")
-		initializeAdvMetrics()
-	}
+	// if h.cfg.EnablePodLevel {
+	h.l.Info("Creating advanced HNS stats metrics")
+	initializeAdvMetrics()
+	// }
 
 	h.l.Info("Exiting hnsstats Init...")
 	return nil
