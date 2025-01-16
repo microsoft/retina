@@ -382,23 +382,26 @@ func (p *packetParser) endpointWatcherCallbackFn(obj interface{}) {
 	iface := event.Obj.(netlink.LinkAttrs)
 
 	ifaceKey := ifaceToKey(iface)
-	lockMapVal, _ := p.interfaceLockMap.LoadOrStore(ifaceKey, &sync.Mutex{})
-	mu := lockMapVal.(*sync.Mutex)
-	mu.Lock()
-	defer mu.Unlock()
+	_, ifaceExist := p.interfaceLockMap.LoadOrStore(ifaceKey, struct{}{})
 
 	switch event.Type {
 	case endpoint.EndpointCreated:
-		p.l.Debug("Endpoint created", zap.String("name", iface.Name))
-		p.createQdiscAndAttach(iface, Veth)
+		if !ifaceExist {
+			p.l.Debug("Endpoint created", zap.String("name", iface.Name))
+			p.createQdiscAndAttach(iface, Veth)
+		}
 	case endpoint.EndpointDeleted:
-		p.l.Debug("Endpoint deleted", zap.String("name", iface.Name))
-		// Clean.
-		if value, ok := p.tcMap.Load(ifaceKey); ok {
-			v := value.(*tcValue)
-			p.clean(v.tc, v.qdisc)
-			// Delete from map.
-			p.tcMap.Delete(ifaceKey)
+		if ifaceExist {
+			p.l.Debug("Endpoint deleted", zap.String("name", iface.Name))
+			// Clean.
+			if value, ok := p.tcMap.Load(ifaceKey); ok {
+				v := value.(*tcValue)
+				p.clean(v.tc, v.qdisc)
+				// Delete from map.
+				p.tcMap.Delete(ifaceKey)
+			}
+			// Delete from interfaceLockMap.
+			p.interfaceLockMap.Delete(ifaceKey)
 		}
 	default:
 		// Unknown.

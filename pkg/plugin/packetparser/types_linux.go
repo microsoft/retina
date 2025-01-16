@@ -114,7 +114,7 @@ type packetParser struct {
 	tcMap    *sync.Map
 	reader   perfReader
 	enricher enricher.EnricherInterface
-	// interfaceLockMap is a map of key to *sync.Mutex.
+	// interfaceLockMap is a map of exisiting interfaces
 	interfaceLockMap    *sync.Map
 	endpointIngressInfo *ebpf.ProgramInfo
 	endpointEgressInfo  *ebpf.ProgramInfo

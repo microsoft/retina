@@ -36,7 +36,7 @@ func main() {
 	}()
 	// watcher manager
 	wm := watchermanager.NewWatcherManager()
-	wm.Watchers = []watchermanager.IWatcher{apiserver.Watcher()}
+	wm.Watchers = []watchermanager.Watcher{apiserver.NewWatcher()}
 
 	// apiserver watcher.
 	err = wm.Start(ctx)

@@ -39,7 +39,7 @@ type PluginManager struct {
 	plugins map[string]plugin.Plugin
 	tel     telemetry.Telemetry
 
-	watcherManager watchermanager.IWatcherManager
+	watcherManager watchermanager.Manager
 }
 
 func NewPluginManager(cfg *kcfg.Config, tel telemetry.Telemetry) (*PluginManager, error) {
@@ -126,16 +126,19 @@ func (p *PluginManager) Start(ctx context.Context) error {
 		return ErrZeroInterval
 	}
 
-	if p.cfg.EnablePodLevel {
-		p.l.Info("starting watchers")
-
-		// Start watcher manager
-		if err := p.watcherManager.Start(ctx); err != nil {
-			return errors.Wrap(err, "failed to start watcher manager")
-		}
-	}
-
 	g, ctx := errgroup.WithContext(ctx)
+
+	if p.cfg.EnablePodLevel {
+		g.Go(func() error {
+			p.l.Info("starting watchers")
+
+			// Start watcher manager
+			if err := p.watcherManager.Start(ctx); err != nil {
+				return errors.Wrap(err, "failed to start watcher manager")
+			}
+			return nil
+		})
+	}
 
 	// run conntrack GC
 	ct, err := conntrack.New()
