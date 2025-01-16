@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/microsoft/retina/operator/cmd/legacy"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -30,8 +31,7 @@ var (
 			d := legacy.NewOperator(metricsAddr, probeAddr, cfgFile, enableLeaderElection)
 
 			if err := d.Start(); err != nil {
-				fmt.Println(err)
-				return err
+				return errors.Wrap(err, "failed to start retina-operator")
 			}
 			return nil
 		},
