@@ -5,6 +5,7 @@ package legacy
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/pprof"
@@ -93,7 +94,8 @@ func (o *Operator) Start() error {
 	oconfig, err = config.GetConfig(o.configFile)
 	if err != nil {
 		fmt.Printf("failed to load config with err %s", err.Error())
-		return err
+
+		return errors.Wrap(err, "")
 	}
 
 	mainLogger.Sugar().Infof("Operator configuration", zap.Any("configuration", oconfig))

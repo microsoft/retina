@@ -25,7 +25,7 @@ var (
 		Use:   "retina-operator",
 		Short: "Retina Operator",
 		Long:  "Start Retina Operator",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			fmt.Println("Starting Retina Operator")
 			d := legacy.NewOperator(metricsAddr, probeAddr, cfgFile, enableLeaderElection)
 
