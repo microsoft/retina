@@ -313,7 +313,7 @@ require (
 	github.com/onsi/gomega v1.36.2
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_model v0.6.1
-	github.com/prometheus/common v0.61.0
+	github.com/prometheus/common v0.62.0
 	github.com/safchain/ethtool v0.5.9
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.19.0
