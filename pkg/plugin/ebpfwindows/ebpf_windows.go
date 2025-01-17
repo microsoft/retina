@@ -64,13 +64,14 @@ func New(cfg *kcfg.Config) registry.Plugin {
 func (p *Plugin) Init() error {
 
     parser, err := hp.New(logrus.WithField("cilium", "parser"),
-        nil,
-        nil,
-        nil,
-        nil,
-        nil,
-        nil,
-        nil,
+        // We use noop getters here since we will use our own custom parser in hubble
+        &NoopEndpointGetter,
+        &NoopIdentityGetter,
+        &NoopDNSGetter,
+        &NoopIPGetter,
+        &NoopServiceGetter,
+        &NoopLinkGetter,
+        &NoopPodMetadataGetter,
     )
 
     if err != nil {
