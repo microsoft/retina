@@ -131,9 +131,8 @@ func (p *PluginManager) Start(ctx context.Context) error {
 	if p.cfg.EnablePodLevel {
 		g.Go(func() error {
 			p.l.Info("starting watchers")
-
 			// Start watcher manager
-			if err := p.watcherManager.Start(ctx); err != nil {
+			if err = p.watcherManager.Start(ctx); err != nil {
 				return errors.Wrap(err, "failed to start watcher manager")
 			}
 			return nil

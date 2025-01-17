@@ -16,6 +16,7 @@ import (
 	"github.com/microsoft/retina/pkg/log"
 	fm "github.com/microsoft/retina/pkg/managers/filtermanager"
 	"github.com/microsoft/retina/pkg/pubsub"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	kcfg "sigs.k8s.io/controller-runtime/pkg/client/config"
 )
@@ -141,8 +142,8 @@ func (w *Watcher) retrieveAPIServerHostname() (string, error) {
 	// Parse the URL
 	parsedURL, err := url.Parse(w.apiServerURL)
 	if err != nil {
-		fmt.Println("Failed to parse URL:", err)
-		return "", err
+		w.l.Error("failed to parse url", zap.Error(err))
+		return "", errors.Wrap(err, "failed to parse url")
 	}
 
 	// Remove the scheme (http:// or https://) and port from the host
@@ -163,7 +164,7 @@ func (w *Watcher) resolveIPs(ctx context.Context, host string) ([]string, error)
 
 	if len(hostIps) == 0 {
 		w.l.Error("no ips found for host", zap.String("host", host))
-		return nil, fmt.Errorf("no ips found for host %s", host)
+		return nil, fmt.Errorf("no ips found for host %s", host) //nolint:err113 // static err is not necessary
 	}
 
 	return hostIps, nil

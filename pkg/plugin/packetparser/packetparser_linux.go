@@ -225,7 +225,7 @@ func (p *packetParser) Init() error {
 	}
 
 	p.tcMap = &sync.Map{}
-	p.interfaceLockMap = &sync.Map{}
+	p.interfaceMap = &sync.Map{}
 
 	return nil
 }
@@ -382,7 +382,7 @@ func (p *packetParser) endpointWatcherCallbackFn(obj interface{}) {
 	iface := event.Obj.(netlink.LinkAttrs)
 
 	ifaceKey := ifaceToKey(iface)
-	_, ifaceExist := p.interfaceLockMap.LoadOrStore(ifaceKey, struct{}{})
+	_, ifaceExist := p.interfaceMap.LoadOrStore(ifaceKey, struct{}{})
 
 	switch event.Type {
 	case endpoint.EndpointCreated:
@@ -400,8 +400,8 @@ func (p *packetParser) endpointWatcherCallbackFn(obj interface{}) {
 				// Delete from map.
 				p.tcMap.Delete(ifaceKey)
 			}
-			// Delete from interfaceLockMap.
-			p.interfaceLockMap.Delete(ifaceKey)
+			// Delete from interfaceMap
+			p.interfaceMap.Delete(ifaceKey)
 		}
 	default:
 		// Unknown.
