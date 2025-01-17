@@ -8,6 +8,7 @@ import (
 	"flag"
 	"os"
 	"os/user"
+	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
@@ -29,6 +30,22 @@ var (
 	Architectures  = []string{"amd64", "arm64"}
 	CreateInfra    = flag.Bool("create-infra", true, "create a Resource group, vNET and AKS cluster for testing")
 	DeleteInfra    = flag.Bool("delete-infra", true, "delete a Resource group, vNET and AKS cluster for testing")
+
+	// kubeconfig: path to kubeconfig file, in not provided,
+	// a new k8s cluster will be created
+	KubeConfig = flag.String("kubeConfig", "", "Path to kubeconfig file")
+)
+
+var (
+	RetinaChartPath = func(rootDir string) string {
+		return filepath.Join(rootDir, "deploy", "legacy", "manifests", "controller", "helm", "retina")
+	}
+	RetinaAdvancedProfilePath = func(rootDir string) string {
+		return filepath.Join(rootDir, "test", "profiles", "advanced", "values.yaml")
+	}
+	KubeConfigFilePath = func(rootDir string) string {
+		return filepath.Join(rootDir, "test", "e2e", "test.pem")
+	}
 )
 
 func ClusterNameForE2ETest(t *testing.T) string {
