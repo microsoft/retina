@@ -35,13 +35,8 @@ jobs:
         run: |
           make test-image IMAGE_NAMESPACE=${{ github.repository }} PLATFORM=linux/amd64
 
-      - name: Generate coverage
-        run: |
-          pwd && ls -la
-          make coverage
-
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: coverage-files
-          path: ./coverage*
+          path: ./output/coverage*
