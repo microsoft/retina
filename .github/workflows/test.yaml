@@ -37,6 +37,7 @@ jobs:
 
       - name: Generate coverage
         run: |
+          pwd && ls -la
           make coverage
 
       - name: Upload Artifacts
