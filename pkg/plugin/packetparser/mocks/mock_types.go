@@ -14,34 +14,35 @@ import (
 
 	perf "github.com/cilium/ebpf/perf"
 	tc "github.com/florianl/go-tc"
+	netlink "github.com/mdlayher/netlink"
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockIQdisc is a mock of IQdisc interface.
-type MockIQdisc struct {
+// Mockqdisc is a mock of qdisc interface.
+type Mockqdisc struct {
 	ctrl     *gomock.Controller
-	recorder *MockIQdiscMockRecorder
+	recorder *MockqdiscMockRecorder
 }
 
-// MockIQdiscMockRecorder is the mock recorder for MockIQdisc.
-type MockIQdiscMockRecorder struct {
-	mock *MockIQdisc
+// MockqdiscMockRecorder is the mock recorder for Mockqdisc.
+type MockqdiscMockRecorder struct {
+	mock *Mockqdisc
 }
 
-// NewMockIQdisc creates a new mock instance.
-func NewMockIQdisc(ctrl *gomock.Controller) *MockIQdisc {
-	mock := &MockIQdisc{ctrl: ctrl}
-	mock.recorder = &MockIQdiscMockRecorder{mock}
+// NewMockqdisc creates a new mock instance.
+func NewMockqdisc(ctrl *gomock.Controller) *Mockqdisc {
+	mock := &Mockqdisc{ctrl: ctrl}
+	mock.recorder = &MockqdiscMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockIQdisc) EXPECT() *MockIQdiscMockRecorder {
+func (m *Mockqdisc) EXPECT() *MockqdiscMockRecorder {
 	return m.recorder
 }
 
 // Add mocks base method.
-func (m *MockIQdisc) Add(info *tc.Object) error {
+func (m *Mockqdisc) Add(info *tc.Object) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Add", info)
 	ret0, _ := ret[0].(error)
@@ -49,13 +50,13 @@ func (m *MockIQdisc) Add(info *tc.Object) error {
 }
 
 // Add indicates an expected call of Add.
-func (mr *MockIQdiscMockRecorder) Add(info any) *gomock.Call {
+func (mr *MockqdiscMockRecorder) Add(info any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*MockIQdisc)(nil).Add), info)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*Mockqdisc)(nil).Add), info)
 }
 
 // Delete mocks base method.
-func (m *MockIQdisc) Delete(info *tc.Object) error {
+func (m *Mockqdisc) Delete(info *tc.Object) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Delete", info)
 	ret0, _ := ret[0].(error)
@@ -63,36 +64,36 @@ func (m *MockIQdisc) Delete(info *tc.Object) error {
 }
 
 // Delete indicates an expected call of Delete.
-func (mr *MockIQdiscMockRecorder) Delete(info any) *gomock.Call {
+func (mr *MockqdiscMockRecorder) Delete(info any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockIQdisc)(nil).Delete), info)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*Mockqdisc)(nil).Delete), info)
 }
 
-// MockIFilter is a mock of IFilter interface.
-type MockIFilter struct {
+// Mockfilter is a mock of filter interface.
+type Mockfilter struct {
 	ctrl     *gomock.Controller
-	recorder *MockIFilterMockRecorder
+	recorder *MockfilterMockRecorder
 }
 
-// MockIFilterMockRecorder is the mock recorder for MockIFilter.
-type MockIFilterMockRecorder struct {
-	mock *MockIFilter
+// MockfilterMockRecorder is the mock recorder for Mockfilter.
+type MockfilterMockRecorder struct {
+	mock *Mockfilter
 }
 
-// NewMockIFilter creates a new mock instance.
-func NewMockIFilter(ctrl *gomock.Controller) *MockIFilter {
-	mock := &MockIFilter{ctrl: ctrl}
-	mock.recorder = &MockIFilterMockRecorder{mock}
+// NewMockfilter creates a new mock instance.
+func NewMockfilter(ctrl *gomock.Controller) *Mockfilter {
+	mock := &Mockfilter{ctrl: ctrl}
+	mock.recorder = &MockfilterMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockIFilter) EXPECT() *MockIFilterMockRecorder {
+func (m *Mockfilter) EXPECT() *MockfilterMockRecorder {
 	return m.recorder
 }
 
 // Add mocks base method.
-func (m *MockIFilter) Add(info *tc.Object) error {
+func (m *Mockfilter) Add(info *tc.Object) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Add", info)
 	ret0, _ := ret[0].(error)
@@ -100,36 +101,36 @@ func (m *MockIFilter) Add(info *tc.Object) error {
 }
 
 // Add indicates an expected call of Add.
-func (mr *MockIFilterMockRecorder) Add(info any) *gomock.Call {
+func (mr *MockfilterMockRecorder) Add(info any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*MockIFilter)(nil).Add), info)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*Mockfilter)(nil).Add), info)
 }
 
-// MockITc is a mock of ITc interface.
-type MockITc struct {
+// Mocknltc is a mock of nltc interface.
+type Mocknltc struct {
 	ctrl     *gomock.Controller
-	recorder *MockITcMockRecorder
+	recorder *MocknltcMockRecorder
 }
 
-// MockITcMockRecorder is the mock recorder for MockITc.
-type MockITcMockRecorder struct {
-	mock *MockITc
+// MocknltcMockRecorder is the mock recorder for Mocknltc.
+type MocknltcMockRecorder struct {
+	mock *Mocknltc
 }
 
-// NewMockITc creates a new mock instance.
-func NewMockITc(ctrl *gomock.Controller) *MockITc {
-	mock := &MockITc{ctrl: ctrl}
-	mock.recorder = &MockITcMockRecorder{mock}
+// NewMocknltc creates a new mock instance.
+func NewMocknltc(ctrl *gomock.Controller) *Mocknltc {
+	mock := &Mocknltc{ctrl: ctrl}
+	mock.recorder = &MocknltcMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockITc) EXPECT() *MockITcMockRecorder {
+func (m *Mocknltc) EXPECT() *MocknltcMockRecorder {
 	return m.recorder
 }
 
 // Close mocks base method.
-func (m *MockITc) Close() error {
+func (m *Mocknltc) Close() error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Close")
 	ret0, _ := ret[0].(error)
@@ -137,13 +138,13 @@ func (m *MockITc) Close() error {
 }
 
 // Close indicates an expected call of Close.
-func (mr *MockITcMockRecorder) Close() *gomock.Call {
+func (mr *MocknltcMockRecorder) Close() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockITc)(nil).Close))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*Mocknltc)(nil).Close))
 }
 
 // Filter mocks base method.
-func (m *MockITc) Filter() *tc.Filter {
+func (m *Mocknltc) Filter() *tc.Filter {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Filter")
 	ret0, _ := ret[0].(*tc.Filter)
@@ -151,13 +152,13 @@ func (m *MockITc) Filter() *tc.Filter {
 }
 
 // Filter indicates an expected call of Filter.
-func (mr *MockITcMockRecorder) Filter() *gomock.Call {
+func (mr *MocknltcMockRecorder) Filter() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Filter", reflect.TypeOf((*MockITc)(nil).Filter))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Filter", reflect.TypeOf((*Mocknltc)(nil).Filter))
 }
 
 // Qdisc mocks base method.
-func (m *MockITc) Qdisc() *tc.Qdisc {
+func (m *Mocknltc) Qdisc() *tc.Qdisc {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Qdisc")
 	ret0, _ := ret[0].(*tc.Qdisc)
@@ -165,36 +166,50 @@ func (m *MockITc) Qdisc() *tc.Qdisc {
 }
 
 // Qdisc indicates an expected call of Qdisc.
-func (mr *MockITcMockRecorder) Qdisc() *gomock.Call {
+func (mr *MocknltcMockRecorder) Qdisc() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Qdisc", reflect.TypeOf((*MockITc)(nil).Qdisc))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Qdisc", reflect.TypeOf((*Mocknltc)(nil).Qdisc))
 }
 
-// MockIPerf is a mock of IPerf interface.
-type MockIPerf struct {
+// SetOption mocks base method.
+func (m *Mocknltc) SetOption(arg0 netlink.ConnOption, arg1 bool) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetOption", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetOption indicates an expected call of SetOption.
+func (mr *MocknltcMockRecorder) SetOption(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetOption", reflect.TypeOf((*Mocknltc)(nil).SetOption), arg0, arg1)
+}
+
+// MockperfReader is a mock of perfReader interface.
+type MockperfReader struct {
 	ctrl     *gomock.Controller
-	recorder *MockIPerfMockRecorder
+	recorder *MockperfReaderMockRecorder
 }
 
-// MockIPerfMockRecorder is the mock recorder for MockIPerf.
-type MockIPerfMockRecorder struct {
-	mock *MockIPerf
+// MockperfReaderMockRecorder is the mock recorder for MockperfReader.
+type MockperfReaderMockRecorder struct {
+	mock *MockperfReader
 }
 
-// NewMockIPerf creates a new mock instance.
-func NewMockIPerf(ctrl *gomock.Controller) *MockIPerf {
-	mock := &MockIPerf{ctrl: ctrl}
-	mock.recorder = &MockIPerfMockRecorder{mock}
+// NewMockperfReader creates a new mock instance.
+func NewMockperfReader(ctrl *gomock.Controller) *MockperfReader {
+	mock := &MockperfReader{ctrl: ctrl}
+	mock.recorder = &MockperfReaderMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockIPerf) EXPECT() *MockIPerfMockRecorder {
+func (m *MockperfReader) EXPECT() *MockperfReaderMockRecorder {
 	return m.recorder
 }
 
 // Close mocks base method.
-func (m *MockIPerf) Close() error {
+func (m *MockperfReader) Close() error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Close")
 	ret0, _ := ret[0].(error)
@@ -202,13 +217,13 @@ func (m *MockIPerf) Close() error {
 }
 
 // Close indicates an expected call of Close.
-func (mr *MockIPerfMockRecorder) Close() *gomock.Call {
+func (mr *MockperfReaderMockRecorder) Close() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockIPerf)(nil).Close))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockperfReader)(nil).Close))
 }
 
 // Read mocks base method.
-func (m *MockIPerf) Read() (perf.Record, error) {
+func (m *MockperfReader) Read() (perf.Record, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Read")
 	ret0, _ := ret[0].(perf.Record)
@@ -217,7 +232,7 @@ func (m *MockIPerf) Read() (perf.Record, error) {
 }
 
 // Read indicates an expected call of Read.
-func (mr *MockIPerfMockRecorder) Read() *gomock.Call {
+func (mr *MockperfReaderMockRecorder) Read() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Read", reflect.TypeOf((*MockIPerf)(nil).Read))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Read", reflect.TypeOf((*MockperfReader)(nil).Read))
 }

@@ -7,34 +7,37 @@ package packetforward
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"path"
 	"runtime"
 	"syscall"
 	"time"
 
-	kcfg "github.com/microsoft/retina/pkg/config"
-
 	hubblev1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
+	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/loader"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
-	"github.com/microsoft/retina/pkg/plugin/api"
 	"github.com/microsoft/retina/pkg/utils"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
 	_ "github.com/microsoft/retina/pkg/plugin/packetforward/_cprog" // nolint
+	"github.com/microsoft/retina/pkg/plugin/registry"
 )
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type metric packetforward ./_cprog/packetforward.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src
 
+func init() {
+	registry.Add(name, New)
+}
+
 // New creates a new packetforward plugin.
-func New(cfg *kcfg.Config) api.Plugin {
+func New(cfg *kcfg.Config) registry.Plugin {
 	return &packetForward{
 		cfg: cfg,
-		l:   log.Logger().Named(string(Name)),
+		l:   log.Logger().Named(name),
 	}
 }
 
@@ -89,13 +92,13 @@ func updateMetrics(data *PacketForwardData) {
 }
 
 // Plugin API implementation for packet forward.
-// Ref: github.com/microsoft/retina/pkg/plugin/api
+// Ref: github.com/microsoft/retina/pkg/plugin
 
 func (p *packetForward) Name() string {
-	return string(Name)
+	return name
 }
 
-func (p *packetForward) Generate(ctx context.Context) error {
+func (p *packetForward) Generate(context.Context) error {
 	// Use this function to parse p and generate header files under cprog.
 	// Example: https://github.com/anubhabMajumdar/Retina/blob/c4bc06e7f922124f92536ffb5312bada5c2dfe99/pkg/plugin/custom/packetforward/packetforward.go#L77
 	p.l.Info("Packet forwarding metric header generated")
@@ -124,7 +127,7 @@ func (p *packetForward) Compile(ctx context.Context) error {
 	// Keep target as bpf, otherwise clang compilation yields bpf object that elf reader cannot load.
 	err = loader.CompileEbpf(ctx, "-target", "bpf", "-Wall", targetArch, "-g", "-O2", "-c", bpfSourceFile, "-o", bpfOutputFile, includeDir, libbpfDir)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error compiling ebpf code")
 	}
 	p.l.Info("Packet forwarding metric compiled")
 	return nil
@@ -192,8 +195,8 @@ func (p *packetForward) Stop() error {
 	return nil
 }
 
-func (p *packetForward) SetupChannel(ch chan *hubblev1.Event) error {
-	p.l.Debug("SetupChannel is not supported by plugin", zap.String("plugin", string(Name)))
+func (p *packetForward) SetupChannel(chan *hubblev1.Event) error {
+	p.l.Debug("SetupChannel is not supported by plugin", zap.String("plugin", name))
 	return nil
 }
 

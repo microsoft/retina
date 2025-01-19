@@ -9,7 +9,10 @@ import (
 )
 
 const (
-	defaultGCFrequency = 15 * time.Second
+	defaultGCFrequency    = 15 * time.Second
+	bpfSourceDir          = "_cprog"
+	bpfSourceFileName     = "conntrack.c"
+	dynamicHeaderFileName = "dynamic.h"
 )
 
 type Conntrack struct {

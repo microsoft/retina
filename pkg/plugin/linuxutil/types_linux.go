@@ -6,14 +6,11 @@ import (
 	"github.com/cakturk/go-netstat/netstat"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
-	"github.com/microsoft/retina/pkg/plugin/api"
 )
 
-const (
-	Name api.PluginName = "linuxutil"
-)
+const name = "linuxutil"
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=types_linux.go -destination=linuxutil_mock_generated.go -package=linuxutil
+//go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=types_linux.go -destination=linuxutil_mock_generated_linux.go -package=linuxutil
 type linuxUtil struct {
 	cfg              *kcfg.Config
 	l                *log.ZapLogger
@@ -35,6 +32,9 @@ var netstatCuratedKeys = map[string]struct{}{
 	"DataCsumErr":        {},
 	"AddAddrDrop":        {},
 	"RmAddrDrop":         {},
+	"TCPTimeouts":        {},
+	"TCPLossProbes":      {},
+	"TCPLostRetransmit":  {},
 }
 
 type ConnectionStats struct {
@@ -92,8 +92,8 @@ type NetstatOpts struct {
 }
 
 type EthtoolStats struct {
-	// Stats by interface name and stat name
-	stats map[string]map[string]uint64
+	// Stats by name
+	stats map[string]uint64
 }
 
 type EthtoolOpts struct {

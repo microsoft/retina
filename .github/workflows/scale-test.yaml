@@ -1,0 +1,106 @@
+name: Scale Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      resource_group:
+        description: "Azure Resource Group"
+        required: true
+        type: string
+      cluster_name:
+        description: "AKS Cluster Name (nodes to receive traffic pods should be labeled with scale-test=true)"
+        required: true
+        type: string
+      image_namespace:
+        description: "Image Namespace (if not set, default namespace will be used)"
+        type: string
+      image_tag:
+        description: "Image Tag (if not set, default for this commit will be used)"
+        type: string
+      num_deployments:
+        description: "Number of Traffic Deployments"
+        default: 1000
+        type: number
+      num_replicas:
+        description: "Number of Traffic Replicas per Deployment"
+        default: 40
+        type: number
+      num_netpol: 
+        description: "Number of Network Policies"
+        default: 1000
+        type: number
+      cleanup: 
+        description: "Clean up environment after test"
+        default: true
+        type: boolean
+
+  workflow_call:
+    inputs:
+      resource_group:
+        description: "Azure Resource Group"
+        required: true
+        type: string
+      cluster_name:
+        description: "AKS Cluster Name"
+        required: true
+        type: string
+      num_deployments:
+        description: "Number of Traffic Deployments"
+        default: 1000
+        type: number
+      num_replicas:
+        description: "Number of Traffic Replicas per Deployment"
+        default: 40
+        type: number
+      num_netpol: 
+        description: "Number of Network Policies"
+        default: 1000
+        type: number
+      cleanup: 
+        description: "Clean up environment after test"
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  scale-test:
+    name: Scale Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go version
+
+      - name: Az CLI login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION }}
+
+      - name: Run Scale Test
+        env:
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION }}
+          AZURE_RESOURCE_GROUP: ${{ inputs.resource_group }}
+          CLUSTER_NAME: ${{ inputs.cluster_name }}
+          NUM_DEPLOYMENTS: ${{ inputs.num_deployments }}
+          NUM_REPLICAS: ${{ inputs.num_replicas }}
+          NUM_NETPOLS: ${{ inputs.num_netpol }}
+          CLEANUP: ${{ inputs.cleanup }}
+          IMAGE_REGISTRY: ${{  inputs.image_namespace == '' && vars.ACR_NAME || inputs.image_namespace }}
+          IMAGE_NAMESPACE: ${{ github.repository }}
+          TAG: ${{ inputs.image_tag }}
+          AZURE_APP_INSIGHTS_KEY: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -v ./test/e2e/. -timeout 300m -tags=scale -count=1  -args -image-tag=$( [[ $TAG == "" ]] && make version || echo $TAG ) -create-infra=false -delete-infra=false 

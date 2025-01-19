@@ -23,8 +23,14 @@ spec:
     spec:
       hostNetwork: true
       serviceAccountName: {{ .Values.serviceAccount.name }}
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}
       nodeSelector:
         kubernetes.io/os: linux
+      {{- if .Values.agent.tolerations }}
+      tolerations: {{- toYaml .Values.agent.tolerations | nindent 8 }}
+      {{- end }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -170,6 +176,9 @@ spec:
     spec:
       serviceAccountName: {{ .Values.serviceAccount.name }}
       {{- with .Values.imagePullSecrets }}
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}      
@@ -187,7 +196,11 @@ spec:
           command:
             - powershell.exe
             - -command
+            {{- if semverCompare ">=1.28" .Capabilities.KubeVersion.GitVersion }}
+            - $env:CONTAINER_SANDBOX_MOUNT_POINT/controller.exe --config ./retina/config.yaml
+            {{- else }}
             - .\setkubeconfigpath.ps1; ./controller.exe --config ./retina/config.yaml --kubeconfig ./kubeconfig
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /metrics
@@ -226,6 +239,9 @@ spec:
         {{- end }}
       nodeSelector:
         kubernetes.io/os: windows
+      {{- if .Values.agent.tolerations }}
+      tolerations: {{- toYaml .Values.agent.tolerations | nindent 8 }}
+      {{- end }}
       volumes:
       {{- range $name, $mountPath := .Values.volumeMounts_win }}
         - name: {{ $name }}

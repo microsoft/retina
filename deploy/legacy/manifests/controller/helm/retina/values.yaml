@@ -35,6 +35,7 @@ image:
   # Overrides the image tag whose default is the chart appVersion.
   tag: "v0.0.2"
 
+enableConntrackMetrics: false
 enablePodLevel: false
 remoteContext: false
 enableAnnotations: false
@@ -105,7 +106,6 @@ securityContext:
   capabilities:
     add:
       - SYS_ADMIN
-      - SYS_RESOURCE
       - NET_ADMIN # for packetparser plugin
       - IPC_LOCK # for mmap() calls made by NewReader(), ref: https://man7.org/linux/man-pages/man2/mmap.2.html
   windowsOptions:
@@ -192,6 +192,11 @@ livenessProbe: {}
   # timeoutSeconds: 15
   # failureThreshold: 5
   # successThreshold: 1
+
+## @param priorityClassName [string] Indicates the pod's priority
+## Ref: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
+##
+priorityClassName: ""
 
 metrics:
   ## Prometheus Service Monitor

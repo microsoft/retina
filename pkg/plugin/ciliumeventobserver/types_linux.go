@@ -12,12 +12,9 @@ import (
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
-	"github.com/microsoft/retina/pkg/plugin/api"
 )
 
-const (
-	Name api.PluginName = "ciliumeventobserver"
-)
+const name = "ciliumeventobserver"
 
 type ciliumeventobserver struct {
 	cfg             *kcfg.Config

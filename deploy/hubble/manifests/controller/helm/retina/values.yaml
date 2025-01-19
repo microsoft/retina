@@ -29,6 +29,9 @@ operator:
       - "manage-cilium-crds"
       - "--config-dir"
       - "/retina"
+  # -- Node tolerations for pod assignment on nodes with taints
+  # ref: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
+  tolerations: []
 
 agent:
   leaderElection: false
@@ -55,6 +58,9 @@ agent:
       metricsBindAddress: ":18080"
       ports:
         containerPort: 10093
+  # -- Node tolerations for pod assignment on nodes with taints
+  # ref: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
+  tolerations: []
 
 enablePodLevel: true
 remoteContext: false
@@ -84,7 +90,7 @@ logLevel: info
 enabledPlugin_linux: '["linuxutil","packetforward","packetparser","dns", "dropreason"]'
 enabledPlugin_win: '["hnsstats"]'
 
-enableTelemetry: true
+enableTelemetry: false
 
 # Interval, in duration, to scrape/publish metrics.
 metricsIntervalDuration: "10s"
@@ -117,6 +123,11 @@ securityContext:
       - IPC_LOCK # for mmap() calls made by NewReader(), ref: https://man7.org/linux/man-pages/man2/mmap.2.html
   windowsOptions:
     runAsUserName: "NT AUTHORITY\\SYSTEM"
+
+## @param priorityClassName [string] Indicates the pod's priority
+## Ref: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
+##
+priorityClassName: ""
 
 service:
   type: ClusterIP

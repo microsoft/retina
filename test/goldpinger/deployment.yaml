@@ -73,7 +73,7 @@ spec:
                   fieldPath: status.podIP
             - name: HOSTS_TO_RESOLVE
               value: "1.1.1.1 8.8.8.8 www.bing.com"
-          image: "docker.io/bloomberg/goldpinger:v3.9.0"
+          image: "mcr.microsoft.com/aks/e2e/bloomberg-goldpinger:v3.7.0"
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

@@ -33,7 +33,7 @@ func TestStop(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	p := &infiniband{
 		cfg: cfgPodLevelEnabled,
-		l:   log.Logger().Named(string(Name)),
+		l:   log.Logger().Named(name),
 	}
 	err := p.Stop()
 	if err != nil {
@@ -60,7 +60,7 @@ func TestShutdown(t *testing.T) {
 			MetricsInterval: 100 * time.Second,
 			EnablePodLevel:  true,
 		},
-		l: log.Logger().Named(string(Name)),
+		l: log.Logger().Named(name),
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -69,8 +69,6 @@ func TestShutdown(t *testing.T) {
 	g.Go(func() error {
 		return p.Start(errctx)
 	})
-
-	time.Sleep(1 * time.Second)
 	cancel()
 	err := g.Wait()
 	require.NoError(t, err)

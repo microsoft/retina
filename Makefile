@@ -34,7 +34,7 @@ PLATFORM		?= $(OS)/$(ARCH)
 PLATFORMS		?= linux/amd64 linux/arm64 windows/amd64
 OS_VERSION		?= ltsc2019
 
-HUBBLE_VERSION ?= v1.16.1
+HUBBLE_VERSION ?= v1.16.5 # This may be modified via the update-hubble GitHub Action
 
 CONTAINER_BUILDER ?= docker
 CONTAINER_RUNTIME ?= docker
@@ -139,14 +139,14 @@ setup-envtest: $(ENVTEST)
 all: generate
 
 generate: generate-bpf-go
-	CGO_ENABLED=0 go generate ./...
+	go generate ./...
 	for dir in $(GENERATE_TARGET_DIRS); do \
 			make -C $$dir $@; \
 	done
 
 generate-bpf-go: ## generate ebpf wrappers for plugins for all archs
 	for arch in $(ALL_ARCH.linux); do \
-        CGO_ENABLED=0 GOARCH=$$arch go generate ./pkg/plugin/...; \
+        GOARCH=$$arch go generate ./pkg/plugin/...; \
     done
 	
 .PHONY: all generate generate-bpf-go
@@ -174,12 +174,11 @@ retina: ## builds retina binary
 	$(MAKE) retina-binary 
 
 retina-binary: ## build the Retina binary
-	export CGO_ENABLED=0 && \
 	go generate ./... && \
 	go build -v -o $(RETINA_BUILD_DIR)/retina$(EXE_EXT) -gcflags="-dwarflocationlists=true" -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version=$(TAG) -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=$(APP_INSIGHTS_ID)" $(RETINA_DIR)/main.go
 
 retina-capture-workload: ## build the Retina capture workload
-	cd $(CAPTURE_WORKLOAD_DIR) && CGO_ENABLED=0 go build -v -o $(RETINA_BUILD_DIR)/captureworkload$(EXE_EXT) -gcflags="-dwarflocationlists=true"  -ldflags "-X main.version=$(TAG)"
+	cd $(CAPTURE_WORKLOAD_DIR) && go build -v -o $(RETINA_BUILD_DIR)/captureworkload$(EXE_EXT) -gcflags="-dwarflocationlists=true"  -ldflags "-X main.version=$(TAG)"
 
 ##@ Containers
 
@@ -191,10 +190,12 @@ RETINA_TOOLS_IMAGE				= $(IMAGE_NAMESPACE)/retina-tools
 RETINA_IMAGE 					= $(IMAGE_NAMESPACE)/retina-agent
 RETINA_INIT_IMAGE				= $(IMAGE_NAMESPACE)/retina-init
 RETINA_OPERATOR_IMAGE			= $(IMAGE_NAMESPACE)/retina-operator
+RETINA_SHELL_IMAGE				= $(IMAGE_NAMESPACE)/retina-shell
+KUBECTL_RETINA_IMAGE			= $(IMAGE_NAMESPACE)/kubectl-retina
 RETINA_INTEGRATION_TEST_IMAGE	= $(IMAGE_NAMESPACE)/retina-integration-test
 RETINA_PROTO_IMAGE				= $(IMAGE_NAMESPACE)/retina-proto-gen
 RETINA_GO_GEN_IMAGE				= $(IMAGE_NAMESPACE)/retina-go-gen
-KAPINGER_IMAGE 					= $(IMAGE_NAMESPACE)/kapinger
+KAPINGER_IMAGE 					= kapinger
 
 skopeo-export: # util target to copy a container from containers-storage to the docker daemon.
 	skopeo copy \
@@ -226,7 +227,7 @@ buildx:
 		echo "Buildx instance retina already exists."; \
 	else \
 		echo "Creating buildx instance retina..."; \
-		docker buildx create --name retina --use --platform $$(echo "$(PLATFORMS)" | tr ' ' ','); \
+		docker buildx create --name retina --use --driver-opt image=mcr.microsoft.com/oss/v2/moby/buildkit:v0.16.0-2 --platform $$(echo "$(PLATFORMS)" | tr ' ' ','); \
 		docker buildx use retina; \
 		echo "Buildx instance retina created."; \
 	fi;
@@ -240,6 +241,7 @@ container-docker: buildx # util target to build container images using docker bu
 	image_metadata_filename="image-metadata-$$image_name-$(TAG).json"; \
 	touch $$image_metadata_filename; \
 	echo "Building $$image_name for $$os/$$arch "; \
+	mkdir -p $(OUTPUT_DIR); \
 	docker buildx build \
 		--platform $(PLATFORM) \
 		--metadata-file=$$image_metadata_filename \
@@ -252,6 +254,7 @@ container-docker: buildx # util target to build container images using docker bu
 		--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
 		--target=$(TARGET) \
 		-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
+		--output type=local,dest=$(OUTPUT_DIR) \
 		$(BUILDX_ACTION) \
 		$(CONTEXT_DIR) 
 
@@ -307,6 +310,42 @@ retina-operator-image:  ## build the retina linux operator image.
 			APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
 			CONTEXT_DIR=$(REPO_ROOT)
 
+retina-shell-image:
+	echo "Building for $(PLATFORM)"
+	set -e ; \
+	$(MAKE) container-$(CONTAINER_BUILDER) \
+			PLATFORM=$(PLATFORM) \
+			DOCKERFILE=shell/Dockerfile \
+			REGISTRY=$(IMAGE_REGISTRY) \
+			IMAGE=$(RETINA_SHELL_IMAGE) \
+			VERSION=$(TAG) \
+			TAG=$(RETINA_PLATFORM_TAG) \
+			CONTEXT_DIR=$(REPO_ROOT)
+
+kubectl-retina-image:
+	echo "Building for $(PLATFORM)"
+	set -e ; \
+	$(MAKE) container-$(CONTAINER_BUILDER) \
+			PLATFORM=$(PLATFORM) \
+			DOCKERFILE=cli/Dockerfile \
+			REGISTRY=$(IMAGE_REGISTRY) \
+			IMAGE=$(KUBECTL_RETINA_IMAGE) \
+			VERSION=$(TAG) \
+			TAG=$(RETINA_PLATFORM_TAG) \
+			CONTEXT_DIR=$(REPO_ROOT)
+
+kapinger-image: 
+	docker buildx build --builder retina --platform windows/amd64 --target windows-amd64 -t $(IMAGE_REGISTRY)/$(KAPINGER_IMAGE):$(TAG)-windows-amd64  ./hack/tools/kapinger/ --push
+	docker buildx build --builder retina --platform linux/amd64 --target linux-amd64 -t $(IMAGE_REGISTRY)/$(KAPINGER_IMAGE):$(TAG)-linux-amd64  ./hack/tools/kapinger/ --push
+	docker buildx build --builder retina --platform linux/arm64 --target linux-arm64 -t $(IMAGE_REGISTRY)/$(KAPINGER_IMAGE):$(TAG)-linux-arm64  ./hack/tools/kapinger/ --push
+	docker buildx imagetools create -t $(IMAGE_REGISTRY)/$(KAPINGER_IMAGE):$(TAG) \
+		$(IMAGE_REGISTRY)/$(KAPINGER_IMAGE):$(TAG)-windows-amd64 \
+		$(IMAGE_REGISTRY)/$(KAPINGER_IMAGE):$(TAG)-linux-amd64 \
+		$(IMAGE_REGISTRY)/$(KAPINGER_IMAGE):$(TAG)-linux-arm64
+
+toolbox: 
+	docker buildx build --builder retina --platform linux/amd64  -t $(IMAGE_REGISTRY)/toolbox:$(TAG)   -f ./hack/tools/toolbox/Dockerfile ./hack/tools/ --push
+
 proto-gen: ## generate protobuf code
 	docker build --platform=linux/amd64 \
 		-t $(IMAGE_REGISTRY)/$(RETINA_PROTO_IMAGE):$(RETINA_PLATFORM_TAG) \
@@ -338,12 +377,24 @@ manifest-operator-image: ## create a multiplatform manifest for the operator ima
 	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE):$(TAG))
 	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
 
+manifest-shell-image:
+	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_SHELL_IMAGE):$(TAG))
+	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+
+manifest-kubectl-retina-image:
+	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(KUBECTL_RETINA_IMAGE):$(TAG))
+	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+
 manifest:
 	echo "Building for $(COMPONENT)"
 	if [ "$(COMPONENT)" = "retina" ]; then \
 		$(MAKE) manifest-retina-image; \
 	elif [ "$(COMPONENT)" = "operator" ]; then \
 		$(MAKE) manifest-operator-image; \
+	elif [ "$(COMPONENT)" = "shell" ]; then \
+		$(MAKE) manifest-shell-image; \
+	elif [ "$(COMPONENT)" = "kubectl-retina" ]; then \
+		$(MAKE) manifest-kubectl-retina-image; \
 	fi
 
 ##@ Tests
@@ -363,7 +414,7 @@ COVER_PKG ?= .
 
 test: $(ENVTEST) # Run unit tests.
 	go build -o test-summary ./test/utsummary/main.go
-	CGO_ENABLED=0 KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit,dashboard -skip=TestE2E* -coverprofile=coverage.out -v -json ./... | ./test-summary --progress --verbose
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit,dashboard -skip=TestE2E* -coverprofile=coverage.out -v -json ./... | ./test-summary --progress --verbose
 
 coverage: # Code coverage.
 #	go generate ./... && go test -tags=unit -coverprofile=coverage.out.tmp ./...
@@ -500,6 +551,9 @@ get-certs:
 	hubble config set tls true
 	hubble config set tls-server-name instance.hubble-relay.cilium.io
 
+# Replaces every '.' in $(1) with '\.'
+escape_dot = $(subst .,\.,$(1))
+
 .PHONY: clean-certs
 clean-certs:
 	rm -rf $(CERT_DIR)
@@ -515,7 +569,7 @@ docs:
 	echo $(PWD)
 	docker run -it -p 3000:3000 -v $(PWD):/retina -w /retina/ node:20-alpine sh ./site/start-dev.sh
 
-.PHONY: docs-pod
+.PHONY: docs-prod
 docs-prod:
 	docker run -i -p 3000:3000 -v $(PWD):/retina -w /retina/ node:20-alpine npm install --prefix site && npm run build --prefix site
 
@@ -537,3 +591,6 @@ quick-deploy-hubble:
 .PHONY: simplify-dashboards
 simplify-dashboards:
 	cd deploy/testutils && go test ./... -tags=dashboard,simplifydashboard -v && cd $(REPO_ROOT)
+
+run-perf-test:
+	go test -v ./test/e2e/retina_perf_test.go -timeout 2h -tags=perf -count=1  -args -image-tag=${TAG} -image-registry=${IMAGE_REGISTRY} -image-namespace=${IMAGE_NAMESPACE}

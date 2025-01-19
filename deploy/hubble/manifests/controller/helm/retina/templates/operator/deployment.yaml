@@ -43,6 +43,9 @@ spec:
                     operator: In
                     values:
                       - linux
+      {{- if .Values.operator.tolerations }}
+      tolerations: {{- toYaml .Values.operator.tolerations | nindent 8 }}
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -100,9 +103,12 @@ spec:
               cpu: 500m
               memory: 500Mi
             requests:
-              cpu: 10m
-              memory: 64Mi
+              cpu: 250m
+              memory: 250Mi
       serviceAccountName: retina-operator
+      {{- if .Values.operator.priorityClassName }}
+      priorityClassName: {{ .Values.operator.priorityClassName }}
+      {{- end }}
       terminationGracePeriodSeconds: 10
       volumes:
         - name: retina-operator-config

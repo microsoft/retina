@@ -1,3 +1,5 @@
+//go:build ignore
+
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
@@ -5,6 +7,7 @@
 #include "compiler.h"
 #include "bpf_helpers.h"
 #include "conntrack.h"
+#include "dynamic.h"
 
 struct tcpmetadata {
 	__u32 seq; // TCP sequence number
@@ -13,6 +16,20 @@ struct tcpmetadata {
 	__u32 tsecr; // TCP timestamp echo reply
 };
 
+struct conntrackmetadata {
+    /*
+        bytes_*_count indicates the number of bytes sent and received in the forward and reply direction.
+        These values will be based on the conntrack entry.
+    */
+    __u64 bytes_forward_count;
+    __u64 bytes_reply_count;
+    /*
+        packets_*_count indicates the number of packets sent and received in the forward and reply direction.
+        These values will be based on the conntrack entry.
+    */
+    __u32 packets_forward_count;
+    __u32 packets_reply_count;
+};
 
 struct packet
 {
@@ -28,6 +45,7 @@ struct packet
 	__u8 proto;
 	__u8 flags; // For TCP packets, this is the TCP flags. For UDP packets, this is will always be 1 for conntrack purposes.
 	bool is_reply;
+    struct conntrackmetadata conntrack_metadata;
 };
 
 
@@ -61,6 +79,12 @@ struct ct_entry {
      */
     __u8  flags_seen_tx_dir;
     __u8  flags_seen_rx_dir;
+    /**
+     * is_direction_unknown is set to true if the direction of the connection is unknown. This can happen if the connection is created
+     * before retina deployment and the SYN packet was not captured.
+     */
+    bool is_direction_unknown;
+    struct conntrackmetadata conntrack_metadata;
 };
 
 struct {
@@ -103,11 +127,11 @@ static __always_inline __u8 _ct_get_traffic_direction(__u8 observation_point) {
 
 /**
  * Create a new TCP connection.
+ * @arg *p pointer to the packet to be processed.
  * @arg key The key to be used to create the new connection.
- * @arg flags The flags of the packet.
  * @arg observation_point The point in the network stack where the packet is observed.
  */
-static __always_inline bool _ct_create_new_tcp_connection(struct ct_v4_key key, __u8 flags, __u8 observation_point) {
+static __always_inline bool _ct_create_new_tcp_connection(struct packet *p, struct ct_v4_key key,  __u8 observation_point) {
     struct ct_entry new_value;
     __builtin_memset(&new_value, 0, sizeof(struct ct_entry));
     __u64 now = bpf_mono_now();
@@ -116,8 +140,20 @@ static __always_inline bool _ct_create_new_tcp_connection(struct ct_v4_key key, 
         return false;
     }
     new_value.eviction_time = now + CT_SYN_TIMEOUT;
-    new_value.flags_seen_tx_dir = flags;
+    new_value.flags_seen_tx_dir = p->flags;
+    new_value.is_direction_unknown = false;
     new_value.traffic_direction = _ct_get_traffic_direction(observation_point);
+
+    #ifdef ENABLE_CONNTRACK_METRICS
+        new_value.conntrack_metadata.packets_forward_count = 1;
+        new_value.conntrack_metadata.bytes_forward_count = p->bytes;
+        // Update initial conntrack metadata for the connection.
+        __builtin_memcpy(&p->conntrack_metadata, &new_value.conntrack_metadata, sizeof(struct conntrackmetadata));
+    #endif // ENABLE_CONNTRACK_METRICS
+
+    // Update packet
+    p->is_reply = false;
+    p->traffic_direction = new_value.traffic_direction;
     bpf_map_update_elem(&retina_conntrack, &key, &new_value, BPF_ANY);
     return true;
 }
@@ -140,10 +176,17 @@ static __always_inline bool _ct_handle_udp_connection(struct packet *p, struct c
     new_value.flags_seen_tx_dir = p->flags;
     new_value.last_report_tx_dir = now;
     new_value.traffic_direction = _ct_get_traffic_direction(observation_point);
-    bpf_map_update_elem(&retina_conntrack, &key, &new_value, BPF_ANY);
+    #ifdef ENABLE_CONNTRACK_METRICS
+        new_value.conntrack_metadata.packets_forward_count = 1;
+        new_value.conntrack_metadata.bytes_forward_count = p->bytes;
+        // Update packet's conntrack metadata.
+        __builtin_memcpy(&p->conntrack_metadata, &new_value.conntrack_metadata, sizeof(struct conntrackmetadata));;
+    #endif // ENABLE_CONNTRACK_METRICS    
+
     // Update packet
     p->is_reply = false;
     p->traffic_direction = new_value.traffic_direction;
+    bpf_map_update_elem(&retina_conntrack, &key, &new_value, BPF_ANY);
     return true;
 }
 
@@ -157,11 +200,8 @@ static __always_inline bool _ct_handle_udp_connection(struct packet *p, struct c
 static __always_inline bool _ct_handle_tcp_connection(struct packet *p, struct ct_v4_key key, struct ct_v4_key reverse_key, __u8 observation_point) {
     // Check if the packet is a SYN packet.
     if (p->flags & TCP_SYN) {
-        // Update packet accordingly.
-        p->is_reply = false;
-        p->traffic_direction = _ct_get_traffic_direction(observation_point);
         // Create a new connection with a timeout of CT_SYN_TIMEOUT.
-        return _ct_create_new_tcp_connection(key, p->flags, observation_point);
+        return _ct_create_new_tcp_connection(p, key, observation_point);
     }
 
     // The packet is not a SYN packet and the connection corresponding to this packet is not found.
@@ -174,6 +214,8 @@ static __always_inline bool _ct_handle_tcp_connection(struct packet *p, struct c
     if (CT_CONNECTION_LIFETIME_TCP > UINT32_MAX - now) {
         return false;
     }
+    // Set the connection as unknown direction since we did not capture the SYN packet.
+    new_value.is_direction_unknown = true;
     new_value.eviction_time = now + CT_CONNECTION_LIFETIME_TCP;
     new_value.traffic_direction = _ct_get_traffic_direction(observation_point);
     p->traffic_direction = new_value.traffic_direction;
@@ -183,13 +225,25 @@ static __always_inline bool _ct_handle_tcp_connection(struct packet *p, struct c
         p->is_reply = true;
         new_value.flags_seen_rx_dir = p->flags;
         new_value.last_report_rx_dir = now;
+        #ifdef ENABLE_CONNTRACK_METRICS
+            new_value.conntrack_metadata.bytes_reply_count = p->bytes;
+            new_value.conntrack_metadata.packets_reply_count = 1;
+        #endif // ENABLE_CONNTRACK_METRICS
         bpf_map_update_elem(&retina_conntrack, &reverse_key, &new_value, BPF_ANY);
     } else { // Otherwise, the packet is considered as a packet in the send direction.
         p->is_reply = false;
         new_value.flags_seen_tx_dir = p->flags;
         new_value.last_report_tx_dir = now;
+        #ifdef ENABLE_CONNTRACK_METRICS
+            new_value.conntrack_metadata.bytes_forward_count = p->bytes;
+            new_value.conntrack_metadata.packets_forward_count = 1;
+        #endif // ENABLE_CONNTRACK_METRICS
         bpf_map_update_elem(&retina_conntrack, &key, &new_value, BPF_ANY);
     }
+    #ifdef ENABLE_CONNTRACK_METRICS
+        // Update packet's conntrack metadata.
+        __builtin_memcpy(&p->conntrack_metadata, &new_value.conntrack_metadata, sizeof(struct conntrackmetadata));
+    #endif // ENABLE_CONNTRACK_METRICS
     return true;
 }
 
@@ -259,6 +313,14 @@ static __always_inline bool _ct_should_report_packet(struct ct_entry *entry, __u
         }
         WRITE_ONCE(entry->eviction_time, now + CT_CONNECTION_LIFETIME_NONTCP);
     }
+
+    // Check for important/special flags that we will always report regardless of the report interval.
+    // Note: SYN can still be present at this stage due to SYN-ACK packets.
+    // We will not update the last report time for these flags as we still want to sample other flags based on the report interval.
+    if (protocol == IPPROTO_TCP && flags & (TCP_SYN | TCP_URG | TCP_ECE | TCP_CWR)) {
+        return true;
+    }
+
     // We will only report this packet iff a new flag is seen for the given direction or the report interval has passed.
     if (flags != seen_flags || now - last_report >= CT_REPORT_INTERVAL) {
         if (direction == CT_PACKET_DIR_TX) {
@@ -300,6 +362,13 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
         // Update the packet accordingly.
         p->is_reply = false;
         p->traffic_direction = entry->traffic_direction;
+        #ifdef ENABLE_CONNTRACK_METRICS
+            // Update packet count and bytes count on conntrack entry.
+            WRITE_ONCE(entry->conntrack_metadata.packets_forward_count, READ_ONCE(entry->conntrack_metadata.packets_forward_count) + 1);
+            WRITE_ONCE(entry->conntrack_metadata.bytes_forward_count, READ_ONCE(entry->conntrack_metadata.bytes_forward_count) + p->bytes);
+            // Update packet's conntract metadata.
+            __builtin_memcpy(&p->conntrack_metadata, &entry->conntrack_metadata, sizeof(struct conntrackmetadata));
+        #endif // ENABLE_CONNTRACK_METRICS
         return _ct_should_report_packet(entry, p->flags, CT_PACKET_DIR_TX, &key);
     }
     
@@ -315,6 +384,13 @@ static __always_inline __attribute__((unused)) bool ct_process_packet(struct pac
         // Update the packet accordingly.
         p->is_reply = true;
         p->traffic_direction = entry->traffic_direction;
+        #ifdef ENABLE_CONNTRACK_METRICS
+            // Update packet count and bytes count on conntrack entry.
+            WRITE_ONCE(entry->conntrack_metadata.packets_reply_count, READ_ONCE(entry->conntrack_metadata.packets_reply_count) + 1);
+            WRITE_ONCE(entry->conntrack_metadata.bytes_reply_count, READ_ONCE(entry->conntrack_metadata.bytes_reply_count) + p->bytes);
+            // Update packet's conntract metadata.
+            __builtin_memcpy(&p->conntrack_metadata, &entry->conntrack_metadata, sizeof(struct conntrackmetadata));
+        #endif // ENABLE_CONNTRACK_METRICS
         return _ct_should_report_packet(entry, p->flags, CT_PACKET_DIR_RX, &reverse_key);
     }
 

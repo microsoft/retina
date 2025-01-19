@@ -9,12 +9,6 @@ import (
 	"strings"
 	"time"
 
-	retinacmd "github.com/microsoft/retina/cli/cmd"
-	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
-	pkgcapture "github.com/microsoft/retina/pkg/capture"
-	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
-	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
-	"github.com/microsoft/retina/pkg/config"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -23,15 +17,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
+
+	retinacmd "github.com/microsoft/retina/cli/cmd"
+	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
+	"github.com/microsoft/retina/internal/buildinfo"
+	pkgcapture "github.com/microsoft/retina/pkg/capture"
+	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
+	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
+	"github.com/microsoft/retina/pkg/config"
 )
 
 var (
-	configFlags *genericclioptions.ConfigFlags
-
 	blobUpload         string
 	debug              bool
 	duration           time.Duration
@@ -74,29 +73,29 @@ const (
 )
 
 var createExample = templates.Examples(i18n.T(`
-		# Capture network packets on the node selected by node names and copy the artifacts to the node host path /mnt/capture
-		kubectl retina capture create --host-path /mnt/capture --namespace capture --node-names "aks-nodepool1-41844487-vmss000000,aks-nodepool1-41844487-vmss000001"
+		# Select nodes by node name and copy the artifacts to the node host path
+		kubectl retina capture create --host-path /mnt/retina/testcapture --node-names "<nodename1>,<nodename2>"
 
-		# Capture network packets on the coredns pods determined by pod-selectors and namespace-selectors
-		kubectl retina capture create --host-path /mnt/capture --namespace capture --pod-selectors="k8s-app=kube-dns" --namespace-selectors="kubernetes.io/metadata.name=kube-system"
+		# Select pods determined by pod-selectors and namespace-selectors
+		kubectl retina capture create --namespace capture --pod-selectors="k8s-app=kube-dns" --namespace-selectors="kubernetes.io/metadata.name=kube-system"
 
-		# Capture network packets on nodes with label "agentpool=agentpool" and "version:v20"
-		kubectl retina capture create --host-path /mnt/capture --node-selectors="agentpool=agentpool,version:v20"
+		# Select nodes with label "agentpool=agentpool" and "version:v20"
+		kubectl retina capture create --node-selectors="agentpool=agentpool,version:v20"
 
-		# Capture network packets on nodes using node-selector with duration 10s
-		kubectl retina capture create --host-path=/mnt/capture --node-selectors="agentpool=agentpool" --duration=10s
+		# Select nodes using node-selector and set duration to 10s
+		kubectl retina capture create --node-selectors="agentpool=agentpool" --duration=10s
 
-		# Capture network packets on nodes using node-selector and upload the artifacts to blob storage with SAS URL https://testaccount.blob.core.windows.net/<token>
+		# Select nodes using node-selector and upload the artifacts to blob storage with SAS URL https://testaccount.blob.core.windows.net/<token>
 		kubectl retina capture create --node-selectors="agentpool=agentpool" --blob-upload=https://testaccount.blob.core.windows.net/<token>
 
-		# Capture network packets on nodes using node-selector and upload the artifacts to AWS S3
+		# Select nodes using node-selector and upload the artifacts to AWS S3
 		kubectl retina capture create --node-selectors="agentpool=agentpool" \
 			--s3-bucket "your-bucket-name" \
 			--s3-region "eu-central-1"\
 			--s3-access-key-id "your-access-key-id" \
 			--s3-secret-access-key "your-secret-access-key"
 
-		# Capture network packets on nodes using node-selector and upload the artifacts to S3-compatible service (like MinIO)
+		# Select nodes using node-selector and upload the artifacts to S3-compatible service (like MinIO)
 		kubectl retina capture create --node-selectors="agentpool=agentpool" \
 			--s3-bucket "your-bucket-name" \
 			--s3-endpoint "https://play.min.io:9000" \
@@ -109,7 +108,7 @@ var createCapture = &cobra.Command{
 	Short:   "Create a Retina Capture",
 	Example: createExample,
 	RunE: func(*cobra.Command, []string) error {
-		kubeConfig, err := configFlags.ToRESTConfig()
+		kubeConfig, err := opts.ToRESTConfig()
 		if err != nil {
 			return errors.Wrap(err, "failed to compose k8s rest config")
 		}
@@ -132,10 +131,10 @@ var createCapture = &cobra.Command{
 		if nowait {
 			retinacmd.Logger.Info("Please manually delete all capture jobs")
 			if capture.Spec.OutputConfiguration.BlobUpload != nil {
-				retinacmd.Logger.Info("Please manually delete capture secret", zap.String("namespace", namespace), zap.String("secret name", *capture.Spec.OutputConfiguration.BlobUpload))
+				retinacmd.Logger.Info("Please manually delete capture secret", zap.String("namespace", *opts.Namespace), zap.String("secret name", *capture.Spec.OutputConfiguration.BlobUpload))
 			}
 			if capture.Spec.OutputConfiguration.S3Upload != nil && capture.Spec.OutputConfiguration.S3Upload.SecretName != "" {
-				retinacmd.Logger.Info("Please manually delete capture secret", zap.String("namespace", namespace), zap.String("secret name", capture.Spec.OutputConfiguration.S3Upload.SecretName))
+				retinacmd.Logger.Info("Please manually delete capture secret", zap.String("namespace", *opts.Namespace), zap.String("secret name", capture.Spec.OutputConfiguration.S3Upload.SecretName))
 			}
 			printCaptureResult(jobsCreated)
 			return nil
@@ -152,19 +151,19 @@ var createCapture = &cobra.Command{
 			retinacmd.Logger.Info("Deleting jobs as all jobs are completed")
 			jobsFailedToDelete := deleteJobs(kubeClient, jobsCreated)
 			if len(jobsFailedToDelete) != 0 {
-				retinacmd.Logger.Info("Please manually delete capture jobs failed to delete", zap.String("namespace", namespace), zap.String("job list", strings.Join(jobsFailedToDelete, ",")))
+				retinacmd.Logger.Info("Please manually delete capture jobs failed to delete", zap.String("namespace", *opts.Namespace), zap.String("job list", strings.Join(jobsFailedToDelete, ",")))
 			}
 
 			err = deleteSecret(kubeClient, capture.Spec.OutputConfiguration.BlobUpload)
 			if err != nil {
 				retinacmd.Logger.Error("Failed to delete capture secret, please manually delete it",
-					zap.String("namespace", namespace), zap.String("secret name", *capture.Spec.OutputConfiguration.BlobUpload), zap.Error(err))
+					zap.String("namespace", *opts.Namespace), zap.String("secret name", *capture.Spec.OutputConfiguration.BlobUpload), zap.Error(err))
 			}
 
 			err = deleteSecret(kubeClient, &capture.Spec.OutputConfiguration.S3Upload.SecretName)
 			if err != nil {
 				retinacmd.Logger.Error("Failed to delete capture secret, please manually delete it",
-					zap.String("namespace", namespace),
+					zap.String("namespace", *opts.Namespace),
 					zap.String("secret name", capture.Spec.OutputConfiguration.S3Upload.SecretName),
 					zap.Error(err),
 				)
@@ -178,7 +177,7 @@ var createCapture = &cobra.Command{
 
 		retinacmd.Logger.Info("Not all job are completed in the given time")
 		retinacmd.Logger.Info("Please manually delete the Capture")
-		return getCaptureAndPrintCaptureResult(kubeClient, capture.Name, namespace)
+		return getCaptureAndPrintCaptureResult(kubeClient, capture.Name, *opts.Namespace)
 	},
 }
 
@@ -197,7 +196,7 @@ func createSecretFromBlobUpload(kubeClient kubernetes.Interface, blobUpload, cap
 			captureConstants.CaptureOutputLocationBlobUploadSecretKey: []byte(blobUpload),
 		},
 	}
-	secret, err := kubeClient.CoreV1().Secrets(namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+	secret, err := kubeClient.CoreV1().Secrets(*opts.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -216,7 +215,7 @@ func createSecretFromS3Upload(kubeClient kubernetes.Interface, s3AccessKeyID, s3
 			captureConstants.CaptureOutputLocationS3UploadSecretAccessKey: []byte(s3SecretAccessKey),
 		},
 	}
-	secret, err := kubeClient.CoreV1().Secrets(namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+	secret, err := kubeClient.CoreV1().Secrets(*opts.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
 	if err != nil {
 		return "", fmt.Errorf("failed to create s3 upload secret: %w", err)
 	}
@@ -228,14 +227,14 @@ func deleteSecret(kubeClient kubernetes.Interface, secretName *string) error {
 		return nil
 	}
 
-	return kubeClient.CoreV1().Secrets(namespace).Delete(context.TODO(), *secretName, metav1.DeleteOptions{})
+	return kubeClient.CoreV1().Secrets(*opts.Namespace).Delete(context.TODO(), *secretName, metav1.DeleteOptions{}) //nolint:wrapcheck //internal return
 }
 
 func createCaptureF(kubeClient kubernetes.Interface) (*retinav1alpha1.Capture, error) {
 	capture := &retinav1alpha1.Capture{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name:      *opts.Name,
+			Namespace: *opts.Namespace,
 		},
 		Spec: retinav1alpha1.CaptureSpec{
 			CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
@@ -320,7 +319,7 @@ func createCaptureF(kubeClient kubernetes.Interface) (*retinav1alpha1.Capture, e
 
 	if len(blobUpload) != 0 {
 		// Mount blob url as secret onto the capture pod for security concern if blob url is not empty.
-		secretName, err := createSecretFromBlobUpload(kubeClient, blobUpload, name)
+		secretName, err := createSecretFromBlobUpload(kubeClient, blobUpload, *opts.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -328,7 +327,7 @@ func createCaptureF(kubeClient kubernetes.Interface) (*retinav1alpha1.Capture, e
 	}
 
 	if s3Bucket != "" {
-		secretName, err := createSecretFromS3Upload(kubeClient, s3AccessKeyID, s3SecretAccessKey, name)
+		secretName, err := createSecretFromS3Upload(kubeClient, s3AccessKeyID, s3SecretAccessKey, *opts.Name)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create s3 upload secret: %w", err)
 		}
@@ -361,7 +360,7 @@ func createCaptureF(kubeClient kubernetes.Interface) (*retinav1alpha1.Capture, e
 
 func getCLICaptureConfig() config.CaptureConfig {
 	return config.CaptureConfig{
-		CaptureImageVersion:       retinacmd.Version,
+		CaptureImageVersion:       buildinfo.Version,
 		CaptureDebug:              debug,
 		CaptureImageVersionSource: captureUtils.VersionSourceCLIVersion,
 		CaptureJobNumLimit:        jobNumLimit,
@@ -377,12 +376,12 @@ func createJobs(kubeClient kubernetes.Interface, capture *retinav1alpha1.Capture
 
 	jobsCreated := []batchv1.Job{}
 	for _, job := range jobs {
-		jobCreated, err := kubeClient.BatchV1().Jobs(namespace).Create(context.TODO(), job, metav1.CreateOptions{})
+		jobCreated, err := kubeClient.BatchV1().Jobs(*opts.Namespace).Create(context.TODO(), job, metav1.CreateOptions{})
 		if err != nil {
 			return nil, err
 		}
 		jobsCreated = append(jobsCreated, *jobCreated)
-		retinacmd.Logger.Info("Packet capture job is created", zap.String("namespace", namespace), zap.String("capture job", jobCreated.Name))
+		retinacmd.Logger.Info("Packet capture job is created", zap.String("namespace", *opts.Namespace), zap.String("capture job", jobCreated.Name))
 	}
 	return jobsCreated, nil
 }
@@ -426,7 +425,7 @@ func waitUntilJobsComplete(kubeClient kubernetes.Interface, jobs []batchv1.Job) 
 
 		if len(jobsIncompleted) != 0 {
 			retinacmd.Logger.Info("Not all jobs are completed",
-				zap.String("namespace", namespace),
+				zap.String("namespace", *opts.Namespace),
 				zap.String("Completed jobs", strings.Join(jobsCompleted, ",")),
 				zap.String("Uncompleted packet capture jobs", strings.Join(jobsIncompleted, ",")),
 			)

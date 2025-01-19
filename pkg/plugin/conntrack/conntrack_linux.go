@@ -6,11 +6,15 @@ package conntrack
 
 import (
 	"context"
+	"fmt"
+	"path"
+	"runtime"
 	"time"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/rlimit"
 	"github.com/microsoft/retina/internal/ktime"
+	"github.com/microsoft/retina/pkg/loader"
 	"github.com/microsoft/retina/pkg/log"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
 	_ "github.com/microsoft/retina/pkg/plugin/conntrack/_cprog" // nolint // This is needed so cprog is included when vendoring
@@ -64,6 +68,27 @@ func New() (*Conntrack, error) {
 	// Get the conntrack map from the objects
 	ct.ctMap = objs.RetinaConntrack
 	return ct, nil
+}
+
+// Build dynamic header path
+func BuildDynamicHeaderPath() string {
+	// Get absolute path to this file during runtime.
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		return ""
+	}
+	currDir := path.Dir(filename)
+	return fmt.Sprintf("%s/%s/%s", currDir, bpfSourceDir, dynamicHeaderFileName)
+}
+
+// Generate dynamic header file for conntrack eBPF program.
+func GenerateDynamic(ctx context.Context, dynamicHeaderPath string, conntrackMetrics int) error {
+	st := fmt.Sprintf("#define ENABLE_CONNTRACK_METRICS %d\n", conntrackMetrics)
+	err := loader.WriteFile(ctx, dynamicHeaderPath, st)
+	if err != nil {
+		return errors.Wrap(err, "failed to write conntrack dynamic header")
+	}
+	return nil
 }
 
 // Run starts the Conntrack garbage collection loop.
@@ -120,6 +145,7 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 					zap.String("flags_seen_rx_dir", decodeFlags(value.FlagsSeenRxDir)),
 					zap.Uint32("last_reported_tx_dir", value.LastReportTxDir),
 					zap.Uint32("last_reported_rx_dir", value.LastReportRxDir),
+					zap.Bool("is_direction_unknown", value.IsDirectionUnknown),
 				)
 			}
 			if err := iter.Err(); err != nil {
@@ -128,7 +154,8 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			// Delete the conntrack entries
 			for _, key := range keysToDelete {
 				if err := ct.ctMap.Delete(key); err != nil {
-					ct.l.Error("Delete failed", zap.Error(err))
+					// Should only happen in a high connection churn scenario
+					ct.l.Debug("Delete failed", zap.Error(err))
 				} else {
 					entriesDeleted++
 				}

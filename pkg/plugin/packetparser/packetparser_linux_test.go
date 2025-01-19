@@ -18,7 +18,8 @@ import (
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/perf"
-	"github.com/florianl/go-tc"
+	tc "github.com/florianl/go-tc"
+	nl "github.com/mdlayher/netlink"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
@@ -36,6 +37,7 @@ var (
 	cfgPodLevelEnabled = &kcfg.Config{
 		EnablePodLevel:           true,
 		BypassLookupIPOfInterest: true,
+		EnableConntrackMetrics:   false,
 	}
 	cfgPodLevelDisabled = &kcfg.Config{
 		EnablePodLevel: false,
@@ -47,6 +49,12 @@ var (
 	cfgDataAggregationLevelHigh = &kcfg.Config{
 		EnablePodLevel:       true,
 		DataAggregationLevel: kcfg.High,
+	}
+	cfgConntrackMetricsEnabled = &kcfg.Config{
+		EnablePodLevel:           true,
+		DataAggregationLevel:     kcfg.High,
+		BypassLookupIPOfInterest: true,
+		EnableConntrackMetrics:   true,
 	}
 )
 
@@ -66,34 +74,19 @@ func TestCleanAll(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mtcnl := mocks.NewMockITc(ctrl)
-	mtcnl.EXPECT().Close().Return(nil).AnyTimes()
+	mrtnl := mocks.NewMocknltc(ctrl)
+	mrtnl.EXPECT().Close().Return(nil).AnyTimes()
+	mrtnl.EXPECT().SetOption(nl.ExtendedAcknowledge, true).Return(nil).AnyTimes()
 
-	mq := mocks.NewMockIQdisc(ctrl)
+	mq := mocks.NewMockqdisc(ctrl)
 	mq.EXPECT().Delete(gomock.Any()).Return(nil).AnyTimes()
 
-	getQdisc = func(tcnl ITc) IQdisc {
+	getQdisc = func(nltc) qdisc {
 		return mq
 	}
 
-	p.tcMap.Store(key{
-		name:         "test",
-		hardwareAddr: "test",
-		netNs:        1,
-	}, &val{
-		tcnl:         mtcnl,
-		tcIngressObj: &tc.Object{},
-		tcEgressObj:  &tc.Object{},
-	})
-	p.tcMap.Store(key{
-		name:         "test2",
-		hardwareAddr: "test2",
-		netNs:        2,
-	}, &val{
-		tcnl:         mtcnl,
-		tcIngressObj: &tc.Object{},
-		tcEgressObj:  &tc.Object{},
-	})
+	p.tcMap.Store(tcKey{"test", "test", 1}, &tcValue{mrtnl, &tc.Object{}})
+	p.tcMap.Store(tcKey{"test2", "test2", 2}, &tcValue{mrtnl, &tc.Object{}})
 
 	assert.Nil(t, p.cleanAll())
 
@@ -117,23 +110,24 @@ func TestClean(t *testing.T) {
 		cfg: cfgPodLevelEnabled,
 		l:   log.Logger().Named("test"),
 	}
-	p.clean(nil, nil, nil) // Should not panic.
+	p.clean(nil, nil) // Should not panic.
 
 	// Test tcnl calls.
-	mq := mocks.NewMockIQdisc(ctrl)
-	mq.EXPECT().Delete(gomock.Any()).Return(nil).Times(2)
+	mq := mocks.NewMockqdisc(ctrl)
+	mq.EXPECT().Delete(gomock.Any()).Return(nil).Times(1)
 
-	mtcnl := mocks.NewMockITc(ctrl)
-	mtcnl.EXPECT().Qdisc().Return(nil).Times(2)
-	mtcnl.EXPECT().Close().Return(nil).Times(1)
+	mrtnl := mocks.NewMocknltc(ctrl)
+	mrtnl.EXPECT().Qdisc().Return(nil).Times(1)
+	mrtnl.EXPECT().Close().Return(nil).AnyTimes()
+	mrtnl.EXPECT().SetOption(nl.ExtendedAcknowledge, true).Return(nil).AnyTimes()
 
-	getQdisc = func(tcnl ITc) IQdisc {
+	getQdisc = func(tcnl nltc) qdisc {
 		// Add this verify tcnl.Qdisc() is called twice
 		tcnl.Qdisc()
 		return mq
 	}
 
-	p.clean(mtcnl, &tc.Object{}, &tc.Object{})
+	p.clean(mrtnl, &tc.Object{})
 }
 
 func TestCleanWithErrors(t *testing.T) {
@@ -148,18 +142,19 @@ func TestCleanWithErrors(t *testing.T) {
 	}
 
 	// Test we try delete qdiscs even if we get errors.
-	mq := mocks.NewMockIQdisc(ctrl)
-	mq.EXPECT().Delete(gomock.Any()).Return(errors.New("error")).Times(2)
+	mq := mocks.NewMockqdisc(ctrl)
+	mq.EXPECT().Delete(gomock.Any()).Return(errors.New("error")).Times(1) //nolint:err113 // ignore
 
-	mtcnl := mocks.NewMockITc(ctrl)
-	mtcnl.EXPECT().Qdisc().Return(nil).AnyTimes()
-	mtcnl.EXPECT().Close().Return(nil).Times(1)
+	mrtnl := mocks.NewMocknltc(ctrl)
+	mrtnl.EXPECT().Close().Return(nil).AnyTimes()
+	mrtnl.EXPECT().SetOption(nl.ExtendedAcknowledge, true).Return(nil).AnyTimes()
+	mrtnl.EXPECT().Qdisc().Return(nil).AnyTimes()
 
-	getQdisc = func(tcnl ITc) IQdisc {
+	getQdisc = func(nltc) qdisc {
 		return mq
 	}
 
-	p.clean(mtcnl, &tc.Object{}, &tc.Object{})
+	p.clean(mrtnl, &tc.Object{})
 }
 
 func TestEndpointWatcherCallbackFn_EndpointDeleted(t *testing.T) {
@@ -179,11 +174,7 @@ func TestEndpointWatcherCallbackFn_EndpointDeleted(t *testing.T) {
 		NetNsID:      1,
 	}
 	key := ifaceToKey(linkAttr)
-	p.tcMap.Store(key, &val{
-		tcnl:         nil,
-		tcIngressObj: &tc.Object{},
-		tcEgressObj:  &tc.Object{},
-	})
+	p.tcMap.Store(key, &tcValue{nil, &tc.Object{}})
 
 	// Create EndpointDeleted event.
 	e := &endpoint.EndpointEvent{
@@ -202,25 +193,26 @@ func TestCreateQdiscAndAttach(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mfilter := mocks.NewMockIFilter(ctrl)
+	mfilter := mocks.NewMockfilter(ctrl)
 	mfilter.EXPECT().Add(gomock.Any()).Return(nil).AnyTimes()
 
-	mq := mocks.NewMockIQdisc(ctrl)
+	mq := mocks.NewMockqdisc(ctrl)
 	mq.EXPECT().Add(gomock.Any()).Return(nil).AnyTimes()
 
-	mtcnl := mocks.NewMockITc(ctrl)
-	mtcnl.EXPECT().Qdisc().Return(nil).AnyTimes()
+	mrtnl := mocks.NewMocknltc(ctrl)
+	mrtnl.EXPECT().Qdisc().Return(nil).AnyTimes()
+	mrtnl.EXPECT().SetOption(nl.ExtendedAcknowledge, true).Return(nil).AnyTimes()
 
-	getQdisc = func(tcnl ITc) IQdisc {
+	getQdisc = func(nltc) qdisc {
 		return mq
 	}
 
-	getFilter = func(tcnl ITc) IFilter {
+	getFilter = func(nltc) filter {
 		return mfilter
 	}
 
-	tcOpen = func(c *tc.Config) (ITc, error) {
-		return mtcnl, nil
+	tcOpen = func(*tc.Config) (nltc, error) {
+		return mrtnl, nil
 	}
 
 	getFD = func(e *ebpf.Program) int {
@@ -282,7 +274,7 @@ func TestReadData_Error(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mperf := mocks.NewMockIPerf(ctrl)
+	mperf := mocks.NewMockperfReader(ctrl)
 	mperf.EXPECT().Read().Return(perf.Record{}, errors.New("error")).AnyTimes()
 
 	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
@@ -321,7 +313,7 @@ func TestReadDataPodLevelEnabled(t *testing.T) {
 		RawSample:   bytes,
 	}
 
-	mperf := mocks.NewMockIPerf(ctrl)
+	mperf := mocks.NewMockperfReader(ctrl)
 	mperf.EXPECT().Read().Return(record, nil).MinTimes(1)
 
 	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
@@ -343,7 +335,7 @@ func TestReadDataPodLevelEnabled(t *testing.T) {
 	exCh := make(chan *v1.Event, 10)
 	p.SetupChannel(exCh)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 	p.run(ctx)
 
@@ -371,28 +363,44 @@ func TestStartWithDataAggregationLevelLow(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockFilter := mocks.NewMockIFilter(ctrl)
-	mQdisc := mocks.NewMockIQdisc(ctrl)
+	mockFilter := mocks.NewMockfilter(ctrl)
+	mQdisc := mocks.NewMockqdisc(ctrl)
 
-	// We are expecting two calls to Add since we are invoking createQdiscAndAttach for eth0
+	// We are expecting one call to Add since we are invoking createQdiscAndAttach for eth0
 	mockFilter.EXPECT().Add(gomock.Any()).Return(nil).Times(2)
-	mQdisc.EXPECT().Add(gomock.Any()).Return(nil).Times(2)
+	mQdisc.EXPECT().Add(gomock.Any()).Return(nil).Times(1)
 
-	mockTC := mocks.NewMockITc(ctrl)
+	mockRtnl := mocks.NewMocknltc(ctrl)
+	mockRtnl.EXPECT().SetOption(nl.ExtendedAcknowledge, true).Return(nil).Times(1)
 
-	mockReader := mocks.NewMockIPerf(ctrl)
-	mockReader.EXPECT().Read().Return(perf.Record{}, nil).AnyTimes()
+	bpfEvent := &packetparserPacket{
+		SrcIp:            uint32(83886272), // 192.0.0.5
+		DstIp:            uint32(16777226), // 10.0.0.1
+		Proto:            uint8(6),         // TCP
+		ObservationPoint: uint8(1),         // TO Endpoint
+		SrcPort:          uint16(80),
+		DstPort:          uint16(443),
+	}
+	bytes, err := json.Marshal(bpfEvent) // nolint:musttag // ignore
+	require.NoError(t, err)
+	record := perf.Record{
+		LostSamples: 0,
+		RawSample:   bytes,
+	}
 
-	getQdisc = func(_ ITc) IQdisc {
+	mockReader := mocks.NewMockperfReader(ctrl)
+	mockReader.EXPECT().Read().Return(record, nil).MinTimes(1)
+
+	getQdisc = func(_ nltc) qdisc {
 		return mQdisc
 	}
 
-	getFilter = func(_ ITc) IFilter {
+	getFilter = func(_ nltc) filter {
 		return mockFilter
 	}
 
-	tcOpen = func(_ *tc.Config) (ITc, error) {
-		return mockTC, nil
+	tcOpen = func(_ *tc.Config) (nltc, error) {
+		return mockRtnl, nil
 	}
 
 	getFD = func(_ *ebpf.Program) int {
@@ -408,6 +416,7 @@ func TestStartWithDataAggregationLevelLow(t *testing.T) {
 		l:                log.Logger().Named("test"),
 		objs:             pObj,
 		reader:           mockReader,
+		recordsChannel:   make(chan perf.Record, buffer),
 		interfaceLockMap: &sync.Map{},
 		endpointIngressInfo: &ebpf.ProgramInfo{
 			Name: "ingress",
@@ -425,7 +434,7 @@ func TestStartWithDataAggregationLevelLow(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	err := p.Start(ctx)
+	err = p.Start(ctx)
 	require.NoError(t, err)
 }
 
@@ -434,28 +443,43 @@ func TestStartWithDataAggregationLevelHigh(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockFilter := mocks.NewMockIFilter(ctrl)
-	mQdisc := mocks.NewMockIQdisc(ctrl)
+	mockFilter := mocks.NewMockfilter(ctrl)
+	mQdisc := mocks.NewMockqdisc(ctrl)
 
 	// We are not expecting any calls to Add since we are not invoking createQdiscAndAttach for eth0
 	mockFilter.EXPECT().Add(gomock.Any()).Return(nil).Times(0)
 	mQdisc.EXPECT().Add(gomock.Any()).Return(nil).Times(0)
 
-	mockTC := mocks.NewMockITc(ctrl)
+	mockRtnl := mocks.NewMocknltc(ctrl)
 
-	mockReader := mocks.NewMockIPerf(ctrl)
-	mockReader.EXPECT().Read().Return(perf.Record{}, nil).AnyTimes()
+	bpfEvent := &packetparserPacket{
+		SrcIp:            uint32(83886272), // 192.0.0.5
+		DstIp:            uint32(16777226), // 10.0.0.1
+		Proto:            uint8(6),         // TCP
+		ObservationPoint: uint8(1),         // TO Endpoint
+		SrcPort:          uint16(80),
+		DstPort:          uint16(443),
+	}
+	bytes, err := json.Marshal(bpfEvent) // nolint:musttag // ignore
+	require.NoError(t, err)
+	record := perf.Record{
+		LostSamples: 0,
+		RawSample:   bytes,
+	}
 
-	getQdisc = func(_ ITc) IQdisc {
+	mockReader := mocks.NewMockperfReader(ctrl)
+	mockReader.EXPECT().Read().Return(record, nil).MinTimes(1)
+
+	getQdisc = func(_ nltc) qdisc {
 		return mQdisc
 	}
 
-	getFilter = func(_ ITc) IFilter {
+	getFilter = func(_ nltc) filter {
 		return mockFilter
 	}
 
-	tcOpen = func(_ *tc.Config) (ITc, error) {
-		return mockTC, nil
+	tcOpen = func(_ *tc.Config) (nltc, error) {
+		return mockRtnl, nil
 	}
 
 	getFD = func(_ *ebpf.Program) int {
@@ -471,6 +495,7 @@ func TestStartWithDataAggregationLevelHigh(t *testing.T) {
 		l:                log.Logger().Named("test"),
 		objs:             pObj,
 		reader:           mockReader,
+		recordsChannel:   make(chan perf.Record, buffer),
 		interfaceLockMap: &sync.Map{},
 		endpointIngressInfo: &ebpf.ProgramInfo{
 			Name: "ingress",
@@ -488,7 +513,7 @@ func TestStartWithDataAggregationLevelHigh(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	err := p.Start(ctx)
+	err = p.Start(ctx)
 	require.NoError(t, err)
 }
 
@@ -515,30 +540,60 @@ func TestPacketParseGenerate(t *testing.T) {
 	currDir := path.Dir(filename)
 	dynamicHeaderPath := fmt.Sprintf("%s/%s/%s", currDir, bpfSourceDir, dynamicHeaderFileName)
 
-	// Instantiate the packetParser struct with a mocked logger and context.
-	p := &packetParser{
-		cfg: cfgPodLevelEnabled,
-		l:   log.Logger().Named(string(Name)),
+	tests := []struct {
+		name             string
+		cfg              *kcfg.Config
+		expectedContents string
+	}{
+		{
+			name:             "PodLevelEnabled",
+			cfg:              cfgPodLevelEnabled,
+			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n#define DATA_AGGREGATION_LEVEL 0\n",
+		},
+		{
+			name:             "ConntrackMetricsEnabled",
+			cfg:              cfgConntrackMetricsEnabled,
+			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n#define ENABLE_CONNTRACK_METRICS 1\n#define DATA_AGGREGATION_LEVEL 1\n",
+		},
+		{
+			name:             "DataAggregationLevelLow",
+			cfg:              cfgDataAggregationLevelLow,
+			expectedContents: "#define DATA_AGGREGATION_LEVEL 0\n",
+		},
+		{
+			name:             "DataAggregationLevelHigh",
+			cfg:              cfgDataAggregationLevelHigh,
+			expectedContents: "#define DATA_AGGREGATION_LEVEL 1\n",
+		},
 	}
-	ctx := context.Background()
 
-	// Call the Generate function and check if it returns an error.
-	if err := p.Generate(ctx); err != nil {
-		t.Fatalf("failed to generate PacketParser header: %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Instantiate the packetParser struct with a mocked logger and context.
+			p := &packetParser{
+				cfg: tt.cfg,
+				l:   log.Logger().Named(name),
+			}
+			ctx := context.Background()
 
-	// Verify that the dynamic header file was created in the expected location and contains the expected contents.
-	if _, err := os.Stat(dynamicHeaderPath); os.IsNotExist(err) {
-		t.Fatalf("dynamic header file does not exist: %v", err)
-	}
+			// Call the Generate function and check if it returns an error.
+			if err := p.Generate(ctx); err != nil {
+				t.Fatalf("failed to generate PacketParser header: %v", err)
+			}
 
-	expectedContents := "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n#define DATA_AGGREGATION_LEVEL 0\n"
-	actualContents, err := os.ReadFile(dynamicHeaderPath)
-	if err != nil {
-		t.Fatalf("failed to read dynamic header file: %v", err)
-	}
-	if string(actualContents) != expectedContents {
-		t.Errorf("unexpected dynamic header file contents: got %q, want %q", string(actualContents), expectedContents)
+			// Verify that the dynamic header file was created in the expected location and contains the expected contents.
+			if _, err := os.Stat(dynamicHeaderPath); os.IsNotExist(err) {
+				t.Fatalf("dynamic header file does not exist: %v", err)
+			}
+
+			actualContents, err := os.ReadFile(dynamicHeaderPath)
+			if err != nil {
+				t.Fatalf("failed to read dynamic header file: %v", err)
+			}
+			if string(actualContents) != tt.expectedContents {
+				t.Errorf("unexpected dynamic header file contents: got %q, want %q", string(actualContents), tt.expectedContents)
+			}
+		})
 	}
 }
 
@@ -549,7 +604,7 @@ func TestCompile(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	p := &packetParser{
 		cfg: cfgPodLevelEnabled,
-		l:   log.Logger().Named(string(Name)),
+		l:   log.Logger().Named(name),
 	}
 	dir, _ := absPath()
 	expectedOutputFile := fmt.Sprintf("%s/%s", dir, bpfObjectFileName)
