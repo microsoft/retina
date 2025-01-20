@@ -1,4 +1,4 @@
-//go:build e2e
+// go:build e2e
 
 package retina
 
@@ -28,7 +28,8 @@ func TestE2ERetina(t *testing.T) {
 
 	hubblechartPath := filepath.Join(rootDir, "deploy", "hubble", "manifests", "controller", "helm", "retina")
 
-	jobs.LoadGenericFlags().Run()
+	err = jobs.LoadGenericFlags().Run()
+	require.NoError(t, err, "failed to load generic flags")
 
 	if *common.KubeConfig == "" {
 		*common.KubeConfig = infra.CreateAzureTempK8sInfra(t, rootDir, ctx)

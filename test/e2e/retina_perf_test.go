@@ -47,7 +47,8 @@ func TestE2EPerfRetina(t *testing.T) {
 	// Get to root of the repo by going up two directories
 	rootDir := filepath.Dir(filepath.Dir(cwd))
 
-	jobs.LoadGenericFlags().Run()
+	err = jobs.LoadGenericFlags().Run()
+	require.NoError(t, err, "failed to load generic flags")
 
 	if *common.KubeConfig == "" {
 		*common.KubeConfig = infra.CreateAzureTempK8sInfra(t, rootDir, ctx)

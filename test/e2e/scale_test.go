@@ -1,4 +1,4 @@
-//go:build scale
+// go:build scale
 
 package retina
 
@@ -49,7 +49,8 @@ func TestE2ERetina_Scale(t *testing.T) {
 	// Get to root of the repo by going up two directories
 	rootDir := filepath.Dir(filepath.Dir(cwd))
 
-	jobs.LoadGenericFlags().Run()
+	err = jobs.LoadGenericFlags().Run()
+	require.NoError(t, err, "failed to load generic flags")
 
 	// Scale test parameters
 	opt := jobs.DefaultScaleTestOptions()
