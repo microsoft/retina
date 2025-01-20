@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/microsoft/retina/test/e2e/common"
+	"github.com/microsoft/retina/test/e2e/framework/azure"
+	"github.com/microsoft/retina/test/e2e/framework/generic"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/scaletest"
 	"github.com/microsoft/retina/test/e2e/framework/types"
@@ -43,6 +45,51 @@ func DefaultScaleTestOptions() scaletest.Options {
 		AdditionalTelemetryProperty:   map[string]string{},
 		CleanUp:                       true,
 	}
+}
+
+func GetScaleTestInfra(subID, rg, clusterName, location, kubeConfigFilePath string, nodes int32, createInfra bool) *types.Job {
+	job := types.NewJob("Get scale test infrastructure")
+
+	if createInfra {
+		job.AddStep(&azure.CreateResourceGroup{
+			SubscriptionID:    subID,
+			ResourceGroupName: rg,
+			Location:          location,
+		}, nil)
+
+		job.AddStep((&azure.CreateCluster{
+			ClusterName: clusterName,
+			Nodes: nodes,
+		}).
+			SetPodCidr("100.64.0.0/10").
+			SetVMSize("Standard_D4_v3").
+			SetNetworkPluginMode("overlay"), nil)
+
+		job.AddStep(&azure.GetAKSKubeConfig{
+			KubeConfigFilePath: kubeConfigFilePath,
+		}, nil)
+
+	} else {
+		job.AddStep(&azure.GetAKSKubeConfig{
+			KubeConfigFilePath: kubeConfigFilePath,
+			ClusterName:        clusterName,
+			SubscriptionID:     subID,
+			ResourceGroupName:  rg,
+			Location:           location,
+		}, nil)
+	}
+
+	job.AddStep(&kubernetes.LabelNodes{
+		Labels: map[string]string{"scale-test": "true"},
+	}, nil)
+
+	job.AddStep(&generic.LoadFlags{
+		TagEnv:            generic.DefaultTagEnv,
+		ImageNamespaceEnv: generic.DefaultImageNamespace,
+		ImageRegistryEnv:  generic.DefaultImageRegistry,
+	}, nil)
+
+	return job
 }
 
 func ScaleTest(opt *scaletest.Options) *types.Job {

@@ -49,7 +49,7 @@ func (c *CreateResources) Run() error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1200*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 1800*time.Second)
 	defer cancel()
 
 	retrier := retry.Retrier{Attempts: defaultRetryAttempts, Delay: defaultRetryDelay}

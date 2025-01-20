@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/microsoft/retina/test/retry"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -48,21 +49,34 @@ func (d *DeleteAndReAddLabels) Run() error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	ctx, cancel := contextToLabelAllPods()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	labelsToDelete := `"shared-lab-00000": null, "shared-lab-00001": null, "shared-lab-00002": null`
 	labelsToAdd := `"shared-lab-00000": "val", "shared-lab-00001": "val", "shared-lab-00002": "val"`
 
-	pods, err := clientset.CoreV1().Pods(d.Namespace).List(ctx, metav1.ListOptions{})
+	var pods *corev1.PodList
+
+	retrier := retry.Retrier{Attempts: defaultRetryAttempts, Delay: defaultRetryDelay}
+
+	retrier.Do(ctx, func() error {
+		pods, err = clientset.CoreV1().Pods(d.Namespace).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to list pods: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
-		return fmt.Errorf("error listing pods: %w", err)
+		return fmt.Errorf("retrier failed: %w", err)
 	}
 
 	for i := 0; i < d.DeleteLabelsTimes; i++ {
 		log.Printf("Deleting labels. Round %d/%d", i+1, d.DeleteLabelsTimes)
 
 		patch := fmt.Sprintf(`{"metadata": {"labels": {%s}}}`, labelsToDelete)
+
+		ctx, cancel = contextToLabelAllPods()
+		defer cancel()
 
 		err = d.deleteLabels(ctx, clientset, pods, patch)
 		if err != nil {
@@ -75,6 +89,9 @@ func (d *DeleteAndReAddLabels) Run() error {
 		log.Printf("Re-adding labels. Round %d/%d", i+1, d.DeleteLabelsTimes)
 
 		patch = fmt.Sprintf(`{"metadata": {"labels": {%s}}}`, labelsToAdd)
+
+		ctx, cancel = contextToLabelAllPods()
+		defer cancel()
 
 		err = d.addLabels(ctx, clientset, pods, patch)
 		if err != nil {
@@ -92,9 +109,18 @@ func (d *DeleteAndReAddLabels) addLabels(ctx context.Context, clientset *kuberne
 
 	for _, pod := range pods.Items {
 		log.Println("Labeling Pod", pod.Name)
-		_, err := clientset.CoreV1().Pods(d.Namespace).Patch(ctx, pod.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
+
+		retrier := retry.Retrier{Attempts: defaultRetryAttempts, Delay: defaultRetryDelay}
+		err := retrier.Do(ctx, func() error {
+			_, err := clientset.CoreV1().Pods(d.Namespace).Patch(ctx, pod.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
+			if err != nil {
+				return fmt.Errorf("could not patch pod: %w", err)
+			}
+			return nil
+		})
+
 		if err != nil {
-			return fmt.Errorf("error patching pod: %w", err)
+			return fmt.Errorf("could not patch pod: %w", err)
 		}
 	}
 
@@ -105,9 +131,18 @@ func (d *DeleteAndReAddLabels) deleteLabels(ctx context.Context, clientset *kube
 
 	for _, pod := range pods.Items {
 		log.Println("Deleting label from Pod", pod.Name)
-		_, err := clientset.CoreV1().Pods(d.Namespace).Patch(ctx, pod.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
+
+		retrier := retry.Retrier{Attempts: defaultRetryAttempts, Delay: defaultRetryDelay}
+		err := retrier.Do(ctx, func() error {
+			_, err := clientset.CoreV1().Pods(d.Namespace).Patch(ctx, pod.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
+			if err != nil {
+				return fmt.Errorf("could not patch pod: %w", err)
+			}
+			return nil
+		})
+
 		if err != nil {
-			return fmt.Errorf("error patching pod: %w", err)
+			return fmt.Errorf("could not patch pod: %w", err)
 		}
 	}
 	return nil

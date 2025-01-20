@@ -3,8 +3,6 @@
 package retina
 
 import (
-	"crypto/rand"
-	"math/big"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -14,6 +12,7 @@ import (
 	"github.com/microsoft/retina/test/e2e/framework/azure"
 	"github.com/microsoft/retina/test/e2e/framework/generic"
 	"github.com/microsoft/retina/test/e2e/framework/helpers"
+	"github.com/microsoft/retina/test/e2e/framework/params"
 	"github.com/microsoft/retina/test/e2e/framework/types"
 	jobs "github.com/microsoft/retina/test/e2e/jobs"
 	"github.com/stretchr/testify/require"
@@ -23,25 +22,13 @@ func TestE2ERetina_Scale(t *testing.T) {
 	ctx, cancel := helpers.Context(t)
 	defer cancel()
 
-	clusterName := common.ClusterNameForE2ETest(t)
-
-	subID := os.Getenv("AZURE_SUBSCRIPTION_ID")
+	clusterName := common.ScaleTestInfra.GetClusterName()
+	subID := common.ScaleTestInfra.GetSubscriptionID()
 	require.NotEmpty(t, subID)
-
-	location := os.Getenv("AZURE_LOCATION")
-	if location == "" {
-		nBig, err := rand.Int(rand.Reader, big.NewInt(int64(len(common.AzureLocations))))
-		if err != nil {
-			t.Fatal("Failed to generate a secure random index", err)
-		}
-		location = common.AzureLocations[nBig.Int64()]
-	}
-
-	rg := os.Getenv("AZURE_RESOURCE_GROUP")
-	if rg == "" {
-		// Use the cluster name as the resource group name by default.
-		rg = clusterName
-	}
+	location := common.ScaleTestInfra.GetLocation()
+	rg := common.ScaleTestInfra.GetResourceGroup()
+	nodes, err := strconv.ParseInt(common.ScaleTestInfra.GetNodes(), 10, 32)
+	require.NoError(t, err, "NODES must be an integer within int32 range")
 
 	cwd, err := os.Getwd()
 	require.NoError(t, err)
@@ -56,10 +43,10 @@ func TestE2ERetina_Scale(t *testing.T) {
 	opt := jobs.DefaultScaleTestOptions()
 	opt.KubeconfigPath = common.KubeConfigFilePath(rootDir)
 
-	NumDeployments := os.Getenv("NUM_DEPLOYMENTS")
-	NumReplicas := os.Getenv("NUM_REPLICAS")
-	NumNetworkPolicies := os.Getenv("NUM_NETPOLS")
-	CleanUp := os.Getenv("CLEANUP")
+	NumDeployments := params.NumDeployments
+	NumReplicas := params.NumReplicas
+	NumNetworkPolicies := params.NumNetworkPolicies
+	CleanUp := params.CleanUp
 
 	if NumDeployments != "" {
 		opt.NumRealDeployments, err = strconv.Atoi(NumDeployments)
@@ -90,12 +77,13 @@ func TestE2ERetina_Scale(t *testing.T) {
 	opt.LabelsToGetMetrics = map[string]string{"k8s-app": "retina"}
 
 	// CreateTestInfra
-	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, rg, clusterName, location, common.KubeConfigFilePath(rootDir), *common.CreateInfra))
+	infra := types.NewRunner(t, jobs.GetScaleTestInfra(subID, rg, clusterName, location, common.KubeConfigFilePath(rootDir), int32(nodes), *common.CreateInfra))
+
 	t.Cleanup(func() {
 		_ = jobs.DeleteTestInfra(subID, rg, location, *common.DeleteInfra).Run()
 	})
 
-	createTestInfra.Run(ctx)
+	infra.Run(ctx)
 
 	fqdn, err := azure.GetFqdnFn(subID, rg, clusterName)
 	require.NoError(t, err)
