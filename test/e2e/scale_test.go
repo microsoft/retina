@@ -58,7 +58,7 @@ func TestE2ERetina_Scale(t *testing.T) {
 
 	NumDeployments := os.Getenv("NUM_DEPLOYMENTS")
 	NumReplicas := os.Getenv("NUM_REPLICAS")
-	NumNetworkPolicies := os.Getenv("NUM_NET_POL")
+	NumNetworkPolicies := os.Getenv("NUM_NETPOLS")
 	CleanUp := os.Getenv("CLEANUP")
 
 	if NumDeployments != "" {
@@ -75,7 +75,7 @@ func TestE2ERetina_Scale(t *testing.T) {
 		require.NoError(t, err)
 	}
 	if CleanUp != "" {
-		opt.DeleteLabels, err = strconv.ParseBool(CleanUp)
+		opt.CleanUp, err = strconv.ParseBool(CleanUp)
 		require.NoError(t, err)
 	}
 
