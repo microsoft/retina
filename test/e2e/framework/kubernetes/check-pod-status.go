@@ -90,9 +90,9 @@ func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, names
 			}
 
 			// Check all container status.
-			for i := range podList.Items[i].Status.ContainerStatuses {
-				if !podList.Items[i].Status.ContainerStatuses[i].Ready {
-					log.Printf("container \"%s\" in pod \"%s\" is not ready yet. Waiting...\n", podList.Items[i].Status.ContainerStatuses[i].Name, podList.Items[i].Name)
+			for j := range podList.Items[i].Status.ContainerStatuses {
+				if !podList.Items[i].Status.ContainerStatuses[j].Ready {
+					log.Printf("container \"%s\" in pod \"%s\" is not ready yet. Waiting...\n", podList.Items[i].Status.ContainerStatuses[j].Name, podList.Items[i].Name)
 					return false, nil
 				}
 			}
