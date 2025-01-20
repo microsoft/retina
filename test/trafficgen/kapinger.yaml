@@ -98,7 +98,7 @@ spec:
       serviceAccountName: kapinger-sa
       containers:
         - name: kapinger
-          image: ghcr.io/microsoft/retina/kapinger:latest
+          image: acnpublic.azurecr.io/kapinger:20241009.5
           resources:
             limits:
               memory: 20Mi

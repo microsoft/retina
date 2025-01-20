@@ -34,7 +34,7 @@ PLATFORM		?= $(OS)/$(ARCH)
 PLATFORMS		?= linux/amd64 linux/arm64 windows/amd64
 OS_VERSION		?= ltsc2019
 
-HUBBLE_VERSION ?= v1.16.3 # This may be modified via the update-hubble GitHub Action
+HUBBLE_VERSION ?= v1.16.5 # This may be modified via the update-hubble GitHub Action
 
 CONTAINER_BUILDER ?= docker
 CONTAINER_RUNTIME ?= docker
@@ -241,6 +241,7 @@ container-docker: buildx # util target to build container images using docker bu
 	image_metadata_filename="image-metadata-$$image_name-$(TAG).json"; \
 	touch $$image_metadata_filename; \
 	echo "Building $$image_name for $$os/$$arch "; \
+	mkdir -p $(OUTPUT_DIR); \
 	docker buildx build \
 		--platform $(PLATFORM) \
 		--metadata-file=$$image_metadata_filename \
@@ -253,6 +254,7 @@ container-docker: buildx # util target to build container images using docker bu
 		--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
 		--target=$(TARGET) \
 		-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
+		--output type=local,dest=$(OUTPUT_DIR) \
 		$(BUILDX_ACTION) \
 		$(CONTEXT_DIR) 
 
@@ -549,6 +551,9 @@ get-certs:
 	hubble config set tls true
 	hubble config set tls-server-name instance.hubble-relay.cilium.io
 
+# Replaces every '.' in $(1) with '\.'
+escape_dot = $(subst .,\.,$(1))
+
 .PHONY: clean-certs
 clean-certs:
 	rm -rf $(CERT_DIR)
@@ -564,7 +569,7 @@ docs:
 	echo $(PWD)
 	docker run -it -p 3000:3000 -v $(PWD):/retina -w /retina/ node:20-alpine sh ./site/start-dev.sh
 
-.PHONY: docs-pod
+.PHONY: docs-prod
 docs-prod:
 	docker run -i -p 3000:3000 -v $(PWD):/retina -w /retina/ node:20-alpine npm install --prefix site && npm run build --prefix site
 
