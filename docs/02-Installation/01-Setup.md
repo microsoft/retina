@@ -6,7 +6,9 @@ Note: you can also run captures with just the [CLI](./02-CLI.md).
 
 ## Installation
 
-Requires Helm version >= v3.8.0.
+### Requirements
+
+- Helm version >= v3.8.0.
 
 ### Basic Mode
 
