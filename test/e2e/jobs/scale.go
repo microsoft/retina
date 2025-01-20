@@ -4,6 +4,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/microsoft/retina/test/e2e/common"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/scaletest"
 	"github.com/microsoft/retina/test/e2e/framework/types"
@@ -15,7 +16,7 @@ func DefaultScaleTestOptions() scaletest.Options {
 		MaxKwokPodsPerNode:            0,
 		NumKwokDeployments:            0,
 		NumKwokReplicas:               0,
-		MaxRealPodsPerNode:            100,
+		MaxRealPodsPerNode:            250,
 		NumRealDeployments:            1000,
 		RealPodType:                   "kapinger",
 		NumRealReplicas:               40,
@@ -32,7 +33,7 @@ func DefaultScaleTestOptions() scaletest.Options {
 		DeletePodsInterval:            60 * time.Second,
 		DeleteRealPods:                false,
 		DeletePodsTimes:               1,
-		DeleteLabels:                  false,
+		DeleteLabels:                  true,
 		DeleteLabelsInterval:          60 * time.Second,
 		DeleteLabelsTimes:             1,
 		DeleteNetworkPolicies:         false,
@@ -40,6 +41,7 @@ func DefaultScaleTestOptions() scaletest.Options {
 		DeleteNetworkPoliciesTimes:    1,
 		LabelsToGetMetrics:            map[string]string{},
 		AdditionalTelemetryProperty:   map[string]string{},
+		CleanUp:                       true,
 	}
 }
 
@@ -63,14 +65,18 @@ func ScaleTest(opt *scaletest.Options) *types.Job {
 
 	job.AddStep(&kubernetes.CreateNamespace{}, nil)
 
-	job.AddStep(&scaletest.GetAndPublishMetrics{
+	// There's a known limitation on leaving empty fields in Steps.
+	// Set methods are used to set private fields and keep environment variables accessed within jobs, rather then spread through steps.
+	job.AddStep((&scaletest.GetAndPublishMetrics{
 		Labels:                      opt.LabelsToGetMetrics,
 		AdditionalTelemetryProperty: opt.AdditionalTelemetryProperty,
-		OutputFilePath:                  os.Getenv("OUTPUT_FILEPATH"),
-	}, &types.StepOptions{
-		SkipSavingParametersToJob: true,
-		RunInBackgroundWithID:     "get-metrics",
-	})
+	}).
+		SetOutputFilePath(os.Getenv(common.OutputFilePathEnv)).
+		SetAppInsightsKey(os.Getenv(common.AzureAppInsightsKeyEnv)),
+		&types.StepOptions{
+			SkipSavingParametersToJob: true,
+			RunInBackgroundWithID:     "get-metrics",
+		})
 
 	job.AddStep(&scaletest.CreateResources{
 		NumKwokDeployments:           opt.NumKwokDeployments,
@@ -111,7 +117,9 @@ func ScaleTest(opt *scaletest.Options) *types.Job {
 		BackgroundID: "get-metrics",
 	}, nil)
 
-	job.AddStep(&kubernetes.DeleteNamespace{}, nil)
+	if opt.CleanUp {
+		job.AddStep(&kubernetes.DeleteNamespace{}, nil)
+	}
 
 	return job
 }
