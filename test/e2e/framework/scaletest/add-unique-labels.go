@@ -1,13 +1,10 @@
 package scaletest
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -44,7 +41,7 @@ func (a *AddUniqueLabelsToAllPods) Run() error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeoutSeconds*time.Second)
+	ctx, cancel := contextToLabelAllPods()
 	defer cancel()
 
 	resources, err := clientset.CoreV1().Pods(a.Namespace).List(ctx, metav1.ListOptions{})
@@ -53,7 +50,6 @@ func (a *AddUniqueLabelsToAllPods) Run() error {
 
 	for _, resource := range resources.Items {
 		patch := []patchStringValue{}
-
 		for i := 0; i < a.NumUniqueLabelsPerPod; i++ {
 			patch = append(patch, patchStringValue{
 				Op:    "add",
@@ -65,14 +61,13 @@ func (a *AddUniqueLabelsToAllPods) Run() error {
 
 		patchBytes, err := json.Marshal(patch)
 		if err != nil {
-			return fmt.Errorf("error marshalling patch: %w", err)
+			return fmt.Errorf("failed to marshal patch: %w", err)
 		}
 
-		clientset.CoreV1().Pods(a.Namespace).Patch(ctx, resource.Name,
-			types.JSONPatchType,
-			patchBytes,
-			metav1.PatchOptions{},
-		)
+		err = patchLabel(ctx, clientset, a.Namespace, resource.Name, patchBytes)
+		if err != nil {
+			return fmt.Errorf("error adding unique label to pod: %w", err)
+		}
 	}
 
 	return nil

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	e2ekubernetes "github.com/microsoft/retina/test/e2e/framework/kubernetes"
+	"github.com/microsoft/retina/test/retry"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -48,11 +49,18 @@ func (c *CreateResources) Run() error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeoutSeconds*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 1200*time.Second)
 	defer cancel()
 
+	retrier := retry.Retrier{Attempts: defaultRetryAttempts, Delay: defaultRetryDelay}
+
 	for _, resource := range resources {
-		e2ekubernetes.CreateResource(ctx, resource, clientset)
+		err := retrier.Do(ctx, func() error {
+			return e2ekubernetes.CreateResource(ctx, resource, clientset)
+		})
+		if err != nil {
+			return fmt.Errorf("error creating resource: %w", err)
+		}
 	}
 
 	return nil
@@ -71,12 +79,6 @@ func (c *CreateResources) getResources() []runtime.Object {
 	// kwokDeployments := c.generateDeployments(c.NumKwokDeployments, c.NumKwokReplicas, "kwok")
 	// objs = append(objs, kwokDeployments...)
 
-	realDeployments := c.generateDeployments()
-	objs = append(objs, realDeployments...)
-
-	services := c.generateServices("real")
-	objs = append(objs, services...)
-
 	kapinger := e2ekubernetes.CreateKapingerDeployment{
 		KapingerNamespace:  c.Namespace,
 		KubeConfigFilePath: c.KubeConfigFilePath,
@@ -88,6 +90,13 @@ func (c *CreateResources) getResources() []runtime.Object {
 	kapingerSA := kapinger.GetKapingerServiceAccount()
 
 	objs = append(objs, kapingerClusterRole, kapingerClusterRoleBinding, kapingerSA)
+
+	realDeployments := c.generateDeployments()
+	objs = append(objs, realDeployments...)
+
+	services := c.generateServices()
+	objs = append(objs, services...)
+
 	// c.generateKwokNodes()
 	log.Println("Finished generating YAMLs")
 	return objs
@@ -118,6 +127,8 @@ func (c *CreateResources) generateDeployments() []runtime.Object {
 		labelPrefix := fmt.Sprintf("%s-dep-lab", name)
 
 		deployment.Name = name
+		deployment.Labels["name"] = name
+		deployment.Spec.Template.Labels["name"] = name
 
 		r := int32(c.NumRealReplicas)
 		deployment.Spec.Replicas = &r
@@ -135,7 +146,7 @@ func (c *CreateResources) generateDeployments() []runtime.Object {
 	return objs
 }
 
-func (c *CreateResources) generateServices(svcKind string) []runtime.Object {
+func (c *CreateResources) generateServices() []runtime.Object {
 	objs := []runtime.Object{}
 
 	kapingerSvc := e2ekubernetes.CreateKapingerDeployment{
@@ -146,10 +157,10 @@ func (c *CreateResources) generateServices(svcKind string) []runtime.Object {
 	for i := 0; i < c.NumRealServices; i++ {
 		template := kapingerSvc.GetKapingerService()
 
-		name := fmt.Sprintf("%s-svc-%05d", svcKind, i)
+		name := fmt.Sprintf("%s-svc-%05d", c.RealPodType, i)
 		template.Name = name
 
-		template.Spec.Selector["name"] = fmt.Sprintf("%s-%s-dep-%05d", svcKind, c.RealPodType, i)
+		template.Spec.Selector["name"] = fmt.Sprintf("%s-dep-%05d", c.RealPodType, i)
 
 		objs = append(objs, template)
 	}

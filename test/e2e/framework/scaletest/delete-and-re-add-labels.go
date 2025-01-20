@@ -48,7 +48,7 @@ func (d *DeleteAndReAddLabels) Run() error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeoutSeconds*time.Second)
+	ctx, cancel := contextToLabelAllPods()
 	defer cancel()
 
 	labelsToDelete := `"shared-lab-00000": null, "shared-lab-00001": null, "shared-lab-00002": null`
@@ -91,6 +91,7 @@ func (d *DeleteAndReAddLabels) Run() error {
 func (d *DeleteAndReAddLabels) addLabels(ctx context.Context, clientset *kubernetes.Clientset, pods *corev1.PodList, patch string) error {
 
 	for _, pod := range pods.Items {
+		log.Println("Labeling Pod", pod.Name)
 		_, err := clientset.CoreV1().Pods(d.Namespace).Patch(ctx, pod.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
 		if err != nil {
 			return fmt.Errorf("error patching pod: %w", err)
@@ -103,6 +104,7 @@ func (d *DeleteAndReAddLabels) addLabels(ctx context.Context, clientset *kuberne
 func (d *DeleteAndReAddLabels) deleteLabels(ctx context.Context, clientset *kubernetes.Clientset, pods *corev1.PodList, patch string) error {
 
 	for _, pod := range pods.Items {
+		log.Println("Deleting label from Pod", pod.Name)
 		_, err := clientset.CoreV1().Pods(d.Namespace).Patch(ctx, pod.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
 		if err != nil {
 			return fmt.Errorf("error patching pod: %w", err)
