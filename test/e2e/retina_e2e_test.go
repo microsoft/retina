@@ -1,4 +1,4 @@
-// go:build e2e
+//go:build e2e
 
 package retina
 
@@ -36,14 +36,30 @@ func TestE2ERetina(t *testing.T) {
 	}
 
 	// Install and test Retina basic metrics
-	basicMetricsE2E := types.NewRunner(t, jobs.InstallAndTestRetinaBasicMetrics(common.KubeConfigFilePath(rootDir), common.RetinaChartPath(rootDir), common.TestPodNamespace))
+	basicMetricsE2E := types.NewRunner(t,
+		jobs.InstallAndTestRetinaBasicMetrics(
+			common.KubeConfigFilePath(rootDir),
+			common.RetinaChartPath(rootDir),
+			common.TestPodNamespace),
+	)
 	basicMetricsE2E.Run(ctx)
 
 	// Upgrade and test Retina with advanced metrics
-	advanceMetricsE2E := types.NewRunner(t, jobs.UpgradeAndTestRetinaAdvancedMetrics(common.KubeConfigFilePath(rootDir), common.RetinaChartPath(rootDir), common.RetinaAdvancedProfilePath(rootDir), common.TestPodNamespace))
+	advanceMetricsE2E := types.NewRunner(t,
+		jobs.UpgradeAndTestRetinaAdvancedMetrics(
+			common.KubeConfigFilePath(rootDir),
+			common.RetinaChartPath(rootDir),
+			common.RetinaAdvancedProfilePath(rootDir),
+			common.TestPodNamespace),
+	)
 	advanceMetricsE2E.Run(ctx)
 
 	// Install and test Hubble basic metrics
-	validatehubble := types.NewRunner(t, jobs.ValidateHubble(common.KubeConfigFilePath(rootDir), hubblechartPath, common.TestPodNamespace))
+	validatehubble := types.NewRunner(t,
+		jobs.ValidateHubble(
+			common.KubeConfigFilePath(rootDir),
+			hubblechartPath,
+			common.TestPodNamespace),
+	)
 	validatehubble.Run(ctx)
 }

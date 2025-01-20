@@ -1,4 +1,4 @@
-// go:build scale
+//go:build scale
 
 package retina
 
