@@ -81,9 +81,6 @@ var (
 	// DNS labels.
 	DNSRequestLabels  = []string{"query_type", "query"}
 	DNSResponseLabels = []string{"return_code", "query_type", "query", "response", "num_response"}
-
-	// Flow labels.
-	ConntrackGaugeLabels = []string{"protocol", "traffic_direction"}
 )
 
 func GetPluginEventAttributes(attrs []attribute.KeyValue, pluginName, eventName, timestamp string) []attribute.KeyValue {

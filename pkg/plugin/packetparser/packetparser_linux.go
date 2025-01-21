@@ -639,19 +639,6 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 				p.enricher.Write(ev)
 			}
 
-			// Add conntrack metrics.
-			if p.cfg.EnableConntrackMetrics {
-				labels := []string{
-					protoToString(bpfEvent.Proto),
-					fl.GetTrafficDirection().String(),
-				}
-				// Basic metrics, node-level
-				metrics.ConntrackPacketsForward.WithLabelValues(labels...).Set(float64(bpfEvent.ConntrackMetadata.PacketsForwardCount))
-				metrics.ConntrackBytesForward.WithLabelValues(labels...).Set(float64(bpfEvent.ConntrackMetadata.BytesForwardCount))
-				metrics.ConntrackPacketsReply.WithLabelValues(labels...).Set(float64(bpfEvent.ConntrackMetadata.PacketsReplyCount))
-				metrics.ConntrackBytesReply.WithLabelValues(labels...).Set(float64(bpfEvent.ConntrackMetadata.BytesReplyCount))
-			}
-
 			// Write the event to the external channel.
 			if p.externalChannel != nil {
 				select {
@@ -718,14 +705,4 @@ func absPath() (string, error) {
 	}
 	dir := path.Dir(filename)
 	return dir, nil
-}
-
-func protoToString(bpfEventProto uint8) string {
-	var proto string
-	if bpfEventProto == 6 {
-		proto = "tcp"
-	} else if bpfEventProto == 17 {
-		proto = "udp"
-	}
-	return proto
 }

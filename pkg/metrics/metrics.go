@@ -162,28 +162,24 @@ func InitializeMetrics() {
 		exporter.DefaultRegistry,
 		utils.ConntrackPacketsForwardGaugeName,
 		ConntrackPacketForwardDescription,
-		utils.ConntrackGaugeLabels...,
 	)
 
 	ConntrackPacketsReply = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
 		utils.ConntrackPacketsReplyGaugeName,
 		ConntrackPacketReplyDescription,
-		utils.ConntrackGaugeLabels...,
 	)
 
 	ConntrackBytesForward = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
 		utils.ConntrackBytesForwardGaugeName,
 		ConntrackBytesForwardDescription,
-		utils.ConntrackGaugeLabels...,
 	)
 
 	ConntrackBytesReply = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
 		utils.ConntrackBytesReplyGaugeName,
 		ConntrackBytesReplyDescription,
-		utils.ConntrackGaugeLabels...,
 	)
 
 	isInitialized = true
