@@ -166,7 +166,6 @@ func TestEndpointWatcherCallbackFn_EndpointDeleted(t *testing.T) {
 	p := &packetParser{
 		cfg:              cfgPodLevelEnabled,
 		l:                log.Logger().Named("test"),
-		interfaceLockMap: &sync.Map{},
 		tcMap:            &sync.Map{},
 	}
 
@@ -178,8 +177,7 @@ func TestEndpointWatcherCallbackFn_EndpointDeleted(t *testing.T) {
 	}
 	key := ifaceToKey(linkAttr)
 
-	// Pre-populate both maps to simulate existing interface
-	p.interfaceLockMap.Store(key, &sync.Mutex{})
+	// Pre-populate the map to simulate existing interface
 	p.tcMap.Store(key, &tcValue{nil, &tc.Object{}})
 
 	// Create EndpointDeleted event.
@@ -192,12 +190,10 @@ func TestEndpointWatcherCallbackFn_EndpointDeleted(t *testing.T) {
 	p.endpointWatcherCallbackFn(e)
 
 	// Verify both maps are cleaned up.
-	_, tcMapExists := p.tcMap.Load(key)
-	_, lockMapExists := p.interfaceLockMap.Load(key)
+	_, ok := p.tcMap.Load(key)
 
 	// Assert both maps are cleaned up
-	assert.False(t, tcMapExists, "tcMap entry should be deleted")
-	assert.False(t, lockMapExists, "interfaceLockMap entry should be deleted")
+	assert.False(t, ok, "tcMap entry should be deleted")
 }
 
 func TestCreateQdiscAndAttach(t *testing.T) {
@@ -239,7 +235,6 @@ func TestCreateQdiscAndAttach(t *testing.T) {
 		cfg:              cfgPodLevelEnabled,
 		l:                log.Logger().Named("test"),
 		objs:             pObj,
-		interfaceLockMap: &sync.Map{},
 		endpointIngressInfo: &ebpf.ProgramInfo{
 			Name: "ingress",
 		},
@@ -429,7 +424,6 @@ func TestStartWithDataAggregationLevelLow(t *testing.T) {
 		objs:             pObj,
 		reader:           mockReader,
 		recordsChannel:   make(chan perf.Record, buffer),
-		interfaceLockMap: &sync.Map{},
 		endpointIngressInfo: &ebpf.ProgramInfo{
 			Name: "ingress",
 		},
@@ -508,7 +502,6 @@ func TestStartWithDataAggregationLevelHigh(t *testing.T) {
 		objs:             pObj,
 		reader:           mockReader,
 		recordsChannel:   make(chan perf.Record, buffer),
-		interfaceLockMap: &sync.Map{},
 		endpointIngressInfo: &ebpf.ProgramInfo{
 			Name: "ingress",
 		},
