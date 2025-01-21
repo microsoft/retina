@@ -167,7 +167,7 @@ func TestEndpointWatcherCallbackFn_EndpointDeleted(t *testing.T) {
 		cfg:              cfgPodLevelEnabled,
 		l:                log.Logger().Named("test"),
 		interfaceLockMap: &sync.Map{},
-		tcMap:           &sync.Map{},
+		tcMap:            &sync.Map{},
 	}
 
 	// Create test interface attributes.
