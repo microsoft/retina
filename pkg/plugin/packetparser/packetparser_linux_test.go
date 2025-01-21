@@ -162,18 +162,24 @@ func TestEndpointWatcherCallbackFn_EndpointDeleted(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	// Initialize packetParser with both maps.
 	p := &packetParser{
 		cfg:              cfgPodLevelEnabled,
 		l:                log.Logger().Named("test"),
 		interfaceLockMap: &sync.Map{},
+		tcMap:           &sync.Map{},
 	}
-	p.tcMap = &sync.Map{}
+
+	// Create test interface attributes.
 	linkAttr := netlink.LinkAttrs{
 		Name:         "test",
 		HardwareAddr: []byte("test"),
 		NetNsID:      1,
 	}
 	key := ifaceToKey(linkAttr)
+
+	// Pre-populate both maps to simulate existing interface
+	p.interfaceLockMap.Store(key, &sync.Mutex{})
 	p.tcMap.Store(key, &tcValue{nil, &tc.Object{}})
 
 	// Create EndpointDeleted event.
@@ -182,10 +188,16 @@ func TestEndpointWatcherCallbackFn_EndpointDeleted(t *testing.T) {
 		Obj:  linkAttr,
 	}
 
+	// Execute the callback.
 	p.endpointWatcherCallbackFn(e)
 
-	_, ok := p.tcMap.Load(key)
-	assert.False(t, ok)
+	// Verify both maps are cleaned up.
+	_, tcMapExists := p.tcMap.Load(key)
+	_, lockMapExists := p.interfaceLockMap.Load(key)
+
+	// Assert both maps are cleaned up
+	assert.False(t, tcMapExists, "tcMap entry should be deleted")
+	assert.False(t, lockMapExists, "interfaceLockMap entry should be deleted")
 }
 
 func TestCreateQdiscAndAttach(t *testing.T) {

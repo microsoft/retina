@@ -389,17 +389,34 @@ func (p *packetParser) endpointWatcherCallbackFn(obj interface{}) {
 
 	switch event.Type {
 	case endpoint.EndpointCreated:
+		// Create mutex only when needed
+		lockMapVal, _ := p.interfaceLockMap.LoadOrStore(ifaceKey, &sync.Mutex{})
+		mu := lockMapVal.(*sync.Mutex)
+		mu.Lock()
+		defer mu.Unlock()
+
 		p.l.Debug("Endpoint created", zap.String("name", iface.Name))
 		p.createQdiscAndAttach(iface, Veth)
 	case endpoint.EndpointDeleted:
+		// Get the mutex only if it exists
+		lockMapVal, exists := p.interfaceLockMap.Load(ifaceKey)
+		if !exists {
+			return
+		}
+		mu := lockMapVal.(*sync.Mutex)
+		mu.Lock()
+		defer mu.Unlock()
+
 		p.l.Debug("Endpoint deleted", zap.String("name", iface.Name))
-		// Clean.
+		// Clean tcMap.
 		if value, ok := p.tcMap.Load(ifaceKey); ok {
 			v := value.(*tcValue)
 			p.clean(v.tc, v.qdisc)
-			// Delete from map.
 			p.tcMap.Delete(ifaceKey)
 		}
+
+		// Clean interfaceLockMap.
+		p.interfaceLockMap.Delete(ifaceKey)
 	default:
 		// Unknown.
 		p.l.Debug("Unknown event", zap.String("type", event.Type.String()))
