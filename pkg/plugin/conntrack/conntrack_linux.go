@@ -24,7 +24,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var conntrackMetricsEnabled = false // global variable to enable conntrack metrics
+var conntrackMetricsEnabled = false // conntrack metrics global variable
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type ct_v4_key conntrack ./_cprog/conntrack.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../lib/common/libbpf/_include/linux -I../lib/common/libbpf/_include/uapi/linux -I../lib/common/libbpf/_include/asm
 
@@ -91,7 +91,7 @@ func GenerateDynamic(ctx context.Context, dynamicHeaderPath string, conntrackMet
 	if err != nil {
 		return errors.Wrap(err, "failed to write conntrack dynamic header")
 	}
-	// set a global variable to enable conntrack metrics
+	// set a global variable
 	if conntrackMetrics == 1 {
 		conntrackMetricsEnabled = true
 	}
@@ -126,7 +126,7 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			var keysToDelete []conntrackCtV4Key
 
 			// metrics counters
-			var packetsCountForward, packetsCountReply uint32
+			var packetsCountForward, packetsCountReply, totConnections uint32
 			var bytesCountForward, bytesCountReply uint64
 
 			iter := ct.ctMap.Iterate()
@@ -148,8 +148,8 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 				// Add conntrack metrics.
 				if conntrackMetricsEnabled {
 					// Basic metrics, node-level
-					// for each ct_entry increment counters
 					ctMeta := value.ConntrackMetadata
+					totConnections++
 					packetsCountForward += ctMeta.PacketsForwardCount
 					packetsCountReply += ctMeta.PacketsReplyCount
 					bytesCountForward += ctMeta.BytesForwardCount
@@ -181,6 +181,7 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 				metrics.ConntrackBytesForward.WithLabelValues().Set(float64(bytesCountForward))
 				metrics.ConntrackPacketsReply.WithLabelValues().Set(float64(packetsCountReply))
 				metrics.ConntrackBytesReply.WithLabelValues().Set(float64(bytesCountReply))
+				metrics.ConntrackTotalConnections.WithLabelValues().Set(float64(totConnections))
 			}
 
 			// Delete the conntrack entries

@@ -182,6 +182,12 @@ func InitializeMetrics() {
 		ConntrackBytesReplyDescription,
 	)
 
+	ConntrackTotalConnections = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.DefaultRegistry,
+		utils.ConntrackTotalConnectionsName,
+		ConntrackTotalConnectionsDescription,
+	)
+
 	isInitialized = true
 	metricsLogger.Info("Metrics initialized")
 }

@@ -45,10 +45,11 @@ const (
 	lostEventsCounterDescription                     = "Number of events lost in control plane"
 
 	// Conntrack metrics
-	ConntrackPacketForwardDescription = "Number of forward packets"
-	ConntrackPacketReplyDescription   = "Number of reply packets"
-	ConntrackBytesForwardDescription  = "Number of forward bytes"
-	ConntrackBytesReplyDescription    = "Number of reply bytes"
+	ConntrackPacketForwardDescription    = "Number of forward packets"
+	ConntrackPacketReplyDescription      = "Number of reply packets"
+	ConntrackBytesForwardDescription     = "Number of forward bytes"
+	ConntrackBytesReplyDescription       = "Number of reply bytes"
+	ConntrackTotalConnectionsDescription = "Total number of connections"
 )
 
 // Metric Counters
@@ -98,10 +99,11 @@ var (
 	InfinibandStatusParamsGauge GaugeVec
 
 	// Conntrack
-	ConntrackPacketsForward GaugeVec
-	ConntrackPacketsReply   GaugeVec
-	ConntrackBytesForward   GaugeVec
-	ConntrackBytesReply     GaugeVec
+	ConntrackPacketsForward   GaugeVec
+	ConntrackPacketsReply     GaugeVec
+	ConntrackBytesForward     GaugeVec
+	ConntrackBytesReply       GaugeVec
+	ConntrackTotalConnections GaugeVec
 )
 
 func ToPrometheusType(metric interface{}) prometheus.Collector {
