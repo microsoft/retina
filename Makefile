@@ -11,6 +11,7 @@ ifndef TAG
 	TAG ?= $(shell git describe --tags --always)
 endif
 OUTPUT_DIR = $(REPO_ROOT)/output
+ARTIFACTS_DIR = $(REPO_ROOT)/artifacts
 BUILD_DIR = $(OUTPUT_DIR)/$(GOOS)_$(GOARCH)
 RETINA_BUILD_DIR = $(BUILD_DIR)/retina
 RETINA_DIR = $(REPO_ROOT)/controller
@@ -241,7 +242,7 @@ container-docker: buildx # util target to build container images using docker bu
 	image_metadata_filename="image-metadata-$$image_name-$(TAG).json"; \
 	touch $$image_metadata_filename; \
 	echo "Building $$image_name for $$os/$$arch "; \
-	mkdir -p $(OUTPUT_DIR); \
+	mkdir -p $(ARTIFACTS_DIR); \
 	docker buildx build \
 		--platform $(PLATFORM) \
 		--metadata-file=$$image_metadata_filename \
@@ -254,7 +255,7 @@ container-docker: buildx # util target to build container images using docker bu
 		--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
 		--target=$(TARGET) \
 		-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
-		--output type=local,dest=$(OUTPUT_DIR) \
+		--output type=local,dest=$(ARTIFACTS_DIR) \
 		$(BUILDX_ACTION) \
 		$(CONTEXT_DIR) 
 
