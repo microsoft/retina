@@ -380,12 +380,7 @@ func (p *packetParser) endpointWatcherCallbackFn(obj interface{}) {
 	}
 
 	iface := event.Obj.(netlink.LinkAttrs)
-
 	ifaceKey := ifaceToKey(iface)
-	lockMapVal, _ := p.interfaceLockMap.LoadOrStore(ifaceKey, &sync.Mutex{})
-	mu := lockMapVal.(*sync.Mutex)
-	mu.Lock()
-	defer mu.Unlock()
 
 	switch event.Type {
 	case endpoint.EndpointCreated:
