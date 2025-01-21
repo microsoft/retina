@@ -820,6 +820,10 @@ func Test_CaptureToPodTranslator_ValidateCapture(t *testing.T) {
 	}
 }
 
+func isIgnorableEnvVar(envVar corev1.EnvVar) bool {
+	return envVar.Name == captureConstants.CaptureStartTimestampEnvKey
+}
+
 func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 	captureName := "capture-test"
 	hostPath := "/tmp/capture"
@@ -1719,6 +1723,15 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			job.Spec.Template.Spec.Containers[0].VolumeMounts = tt.volumeMounts
 			job.Spec.Template.Spec.Volumes = tt.volumes
 
+			for _, env := range tt.podEnv {
+				if env.Name == captureConstants.CaptureStartTimestampEnvKey {
+					_, err := file.StringToTimestamp(env.Value)
+					if err != nil {
+						t.Errorf("TranslateCaptureToJobs() error with capture timestamp: %v", err)
+					}
+				}
+			}
+
 			if tt.isWindows {
 				containerAdministrator := "NT AUTHORITY\\SYSTEM"
 				useHostProcess := true
@@ -1736,7 +1749,15 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 				job.Spec.Template.Spec.Containers[0].Command = []string{captureConstants.CaptureContainerEntrypointWin}
 			}
 
-			cmpOption := cmpopts.SortSlices(func(enVar1, enVar2 corev1.EnvVar) bool { return enVar1.Name < enVar2.Name })
+			cmpOption := cmp.Options{
+				cmpopts.SortSlices(func(enVar1, enVar2 corev1.EnvVar) bool { return enVar1.Name < enVar2.Name }),
+				cmp.Comparer(func(x, y corev1.EnvVar) bool {
+					if isIgnorableEnvVar(x) || isIgnorableEnvVar(y) {
+						return true
+					}
+					return x.Name == y.Name && x.Value == y.Value
+				}),
+			}
 
 			if diff := cmp.Diff([]*batchv1.Job{job}, jobs, cmpOption); diff != "" {
 				t.Errorf("TranslateCaptureToJobs() mismatch (-want, +got):\n%s", diff)

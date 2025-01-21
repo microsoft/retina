@@ -16,8 +16,11 @@ const (
 	IPTableRuleDrop = "IPTABLE_RULE_DROP"
 )
 
-func ValidateTCPMetrics(namespace string) *types.Scenario {
-	Name := "Flow Metrics"
+func ValidateTCPMetrics(namespace, arch string) *types.Scenario {
+	id := "flow-port-forward-" + arch
+	agnhostName := "agnhost-tcp"
+	podName := agnhostName + "-0"
+	Name := "Flow Metrics - Arch: " + arch
 	Steps := []*types.StepWrapper{
 		{
 			Step: &kubernetes.CreateKapingerDeployment{
@@ -27,13 +30,14 @@ func ValidateTCPMetrics(namespace string) *types.Scenario {
 		},
 		{
 			Step: &kubernetes.CreateAgnhostStatefulSet{
-				AgnhostName:      "agnhost-a",
+				AgnhostName:      agnhostName,
 				AgnhostNamespace: namespace,
+				AgnhostArch:      arch,
 			},
 		},
 		{
 			Step: &kubernetes.ExecInPod{
-				PodName:      "agnhost-a-0",
+				PodName:      podName,
 				PodNamespace: namespace,
 				Command:      "curl -s -m 5 bing.com",
 			}, Opts: &types.StepOptions{
@@ -47,7 +51,7 @@ func ValidateTCPMetrics(namespace string) *types.Scenario {
 		},
 		{
 			Step: &kubernetes.ExecInPod{
-				PodName:      "agnhost-a-0",
+				PodName:      podName,
 				PodNamespace: namespace,
 				Command:      "curl -s -m 5 bing.com",
 			}, Opts: &types.StepOptions{
@@ -61,11 +65,11 @@ func ValidateTCPMetrics(namespace string) *types.Scenario {
 				LocalPort:             "10093",
 				RemotePort:            "10093",
 				Endpoint:              "metrics",
-				OptionalLabelAffinity: "app=agnhost-a", // port forward to a pod on a node that also has this pod with this label, assuming same namespace
+				OptionalLabelAffinity: "app=" + agnhostName, // port forward to a pod on a node that also has this pod with this label, assuming same namespace
 			},
 			Opts: &types.StepOptions{
 				SkipSavingParametersToJob: true,
-				RunInBackgroundWithID:     "drop-flow-forward",
+				RunInBackgroundWithID:     id,
 			},
 		},
 		{
@@ -84,13 +88,13 @@ func ValidateTCPMetrics(namespace string) *types.Scenario {
 		},
 		{
 			Step: &types.Stop{
-				BackgroundID: "drop-flow-forward",
+				BackgroundID: id,
 			},
 		},
 		{
 			Step: &kubernetes.DeleteKubernetesResource{
 				ResourceType:      kubernetes.TypeString(kubernetes.StatefulSet),
-				ResourceName:      "agnhost-a",
+				ResourceName:      agnhostName,
 				ResourceNamespace: namespace,
 			}, Opts: &types.StepOptions{
 				SkipSavingParametersToJob: true,

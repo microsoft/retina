@@ -108,6 +108,7 @@ data:
     metricsIntervalDuration: {{ .Values.metricsIntervalDuration }}
     enableTelemetry: {{ .Values.enableTelemetry }}
     enablePodLevel: {{ .Values.enablePodLevel }}
+    enableConntrackMetrics: {{ .Values.enableConntrackMetrics }}
     remoteContext: {{ .Values.remoteContext }}
     enableAnnotations: {{ .Values.enableAnnotations }}
     bypassLookupIPOfInterest: {{ .Values.bypassLookupIPOfInterest }}
@@ -131,7 +132,7 @@ data:
     metricsInterval: {{ .Values.metricsInterval }}
     metricsIntervalDuration: {{ .Values.metricsIntervalDuration }}
     enableTelemetry: {{ .Values.enableTelemetry }}
-    enablePodLevel: {{ .Values.enablePodLevel }}
+    enablePodLevel: false
     remoteContext: {{ .Values.remoteContext }}
     bypassLookupIPOfInterest: {{ .Values.bypassLookupIPOfInterest }}
 {{- end}}

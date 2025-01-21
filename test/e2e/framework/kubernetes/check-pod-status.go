@@ -14,8 +14,9 @@ import (
 )
 
 const (
-	RetryTimeoutPodsReady  = 5 * time.Minute
-	RetryIntervalPodsReady = 5 * time.Second
+	RetryTimeoutPodsReady     = 5 * time.Minute
+	RetryIntervalPodsReady    = 5 * time.Second
+	timeoutWaitForPodsSeconds = 1200
 
 	printInterval = 5 // print to stdout every 5 iterations
 )
@@ -48,7 +49,7 @@ func (w *WaitPodsReady) Run() error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeoutSeconds*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), timeoutWaitForPodsSeconds*time.Second)
 	defer cancel()
 
 	return WaitForPodReady(ctx, clientset, w.Namespace, w.LabelSelector)
@@ -60,7 +61,6 @@ func (w *WaitPodsReady) Stop() error {
 }
 
 func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, namespace, labelSelector string) error {
-	podReadyMap := make(map[string]bool)
 
 	printIterator := 0
 	conditionFunc := wait.ConditionWithContextFunc(func(context.Context) (bool, error) {
@@ -78,34 +78,25 @@ func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, names
 			return false, nil
 		}
 
-		// check each indviidual pod to see if it's in Running state
+		// check each individual pod to see if it's in Running state
 		for i := range podList.Items {
-			var pod *corev1.Pod
-			pod, err = clientset.CoreV1().Pods(namespace).Get(ctx, podList.Items[i].Name, metav1.GetOptions{})
-			if err != nil {
-				return false, fmt.Errorf("error getting Pod: %w", err)
-			}
 
 			// Check the Pod phase
-			if pod.Status.Phase != corev1.PodRunning {
+			if podList.Items[i].Status.Phase != corev1.PodRunning {
 				if printIterator%printInterval == 0 {
-					log.Printf("pod \"%s\" is not in Running state yet. Waiting...\n", pod.Name)
+					log.Printf("pod \"%s\" is not in Running state yet. Waiting...\n", podList.Items[i].Name)
 				}
 				return false, nil
 			}
 
 			// Check all container status.
-			for _, containerStatus := range pod.Status.ContainerStatuses {
-				if !containerStatus.Ready {
-					log.Printf("container \"%s\" in pod \"%s\" is not ready yet. Waiting...\n", containerStatus.Name, pod.Name)
+			for j := range podList.Items[i].Status.ContainerStatuses {
+				if !podList.Items[i].Status.ContainerStatuses[j].Ready {
+					log.Printf("container \"%s\" in pod \"%s\" is not ready yet. Waiting...\n", podList.Items[i].Status.ContainerStatuses[j].Name, podList.Items[i].Name)
 					return false, nil
 				}
 			}
 
-			if !podReadyMap[pod.Name] {
-				log.Printf("pod \"%s\" is in Running state\n", pod.Name)
-				podReadyMap[pod.Name] = true
-			}
 		}
 		log.Printf("all pods in namespace \"%s\" with label \"%s\" are in Running state\n", namespace, labelSelector)
 		return true, nil

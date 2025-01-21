@@ -29,6 +29,9 @@ operator:
       - "manage-cilium-crds"
       - "--config-dir"
       - "/retina"
+  # -- Node tolerations for pod assignment on nodes with taints
+  # ref: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
+  tolerations: []
 
 agent:
   leaderElection: false
@@ -39,7 +42,7 @@ agent:
   init:
     enabled: true
     name: retina-agent-init
-    repository: ghcr.io/microsoft/retina/retina-init
+    repository: ghcr.io/microsoft/retina/retina-initS
 
     tag: "latest"
   pullPolicy: Always
@@ -55,7 +58,10 @@ agent:
       metricsBindAddress: ":18080"
       ports:
         containerPort: 10093
-        healthPort: 18081
+        healthPort: 18081    
+  # -- Node tolerations for pod assignment on nodes with taints
+  # ref: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
+  tolerations: []
 
 enablePodLevel: true
 remoteContext: false
@@ -85,7 +91,7 @@ logLevel: info
 enabledPlugin_linux: '["linuxutil","packetforward","packetparser","dns", "dropreason"]'
 enabledPlugin_win: '["hnsstats"]'
 
-enableTelemetry: true
+enableTelemetry: false
 
 # Interval, in duration, to scrape/publish metrics.
 metricsIntervalDuration: "10s"
