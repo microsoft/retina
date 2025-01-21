@@ -24,7 +24,7 @@ type TraceSockNotify struct {
 	SockCookie uint64
 	CgroupID   uint64
 	L4Proto    uint8
-	IPv6       bool
+	Ipv6       bool
 }
 
 // NotifyCommonHdr is the common header for all notifications
@@ -62,7 +62,7 @@ type TraceNotify struct {
 	DstLabel uint32
 	DstID    uint16
 	Reason   uint8
-	IPv6     bool
+	Ipv6     bool
 	Ifindex  uint32
 	OrigIP   IP
 }
@@ -79,7 +79,7 @@ const (
 	CiliumNotifyTraceSock     = 7
 )
 
-func (ip *IP) ConvertToString(IPv6 bool) string {
+func (ip *IP) ConvertToString(Ipv6 bool) string {
 	var ipAddress string
 	var buf bytes.Buffer
 
@@ -91,7 +91,7 @@ func (ip *IP) ConvertToString(IPv6 bool) string {
 
 	byteArray := buf.Bytes()
 
-	if IPv6 {
+	if Ipv6 {
 		ipAddress = net.IP(byteArray[:16]).String()
 	} else {
 		ipAddress = net.IP(byteArray[:4]).String()
@@ -109,12 +109,12 @@ func (k *DropNotify) String() string {
 
 // String returns a string representation of the TraceNotify
 func (k *TraceNotify) String() string {
-	ipAddress := k.OrigIP.ConvertToString(k.IPv6)
-	return fmt.Sprintf("Ifindex: %d, SrcLabel:%d, DstLabel:%d, IpV6:%t, OrigIP:%s", k.Ifindex, k.SrcLabel, k.DstLabel, k.IPv6, ipAddress)
+	ipAddress := k.OrigIP.ConvertToString(k.Ipv6)
+	return fmt.Sprintf("Ifindex: %d, SrcLabel:%d, DstLabel:%d, IpV6:%t, OrigIP:%s", k.Ifindex, k.SrcLabel, k.DstLabel, k.Ipv6, ipAddress)
 }
 
 // String returns a string representation of the TraceSockNotify
 func (k *TraceSockNotify) String() string {
-	ipAddress := k.DstIP.ConvertToString(k.IPv6)
-	return fmt.Sprintf("DstIP:%s, DstPort:%d, SockCookie:%d, CgroupID:%d, L4Proto:%d, IPv6:%t", ipAddress, k.DstPort, k.SockCookie, k.CgroupID, k.L4Proto, k.IPv6)
+	ipAddress := k.DstIP.ConvertToString(k.Ipv6)
+	return fmt.Sprintf("DstIP:%s, DstPort:%d, SockCookie:%d, CgroupID:%d, L4Proto:%d, IPv6:%t", ipAddress, k.DstPort, k.SockCookie, k.CgroupID, k.L4Proto, k.Ipv6)
 }

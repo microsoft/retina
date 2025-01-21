@@ -63,16 +63,16 @@ type metricsMap struct {
 
 var (
 	// Load the retinaebpfapi.dll
-	retinaEbpfApi = windows.NewLazyDLL("retinaebpfapi.dll")
+	retinaEbpfAPI = windows.NewLazyDLL("retinaebpfapi.dll")
 	// Load the enumerate_cilium_metricsmap function
-	enumMetricsMap = retinaEbpfApi.NewProc("enumerate_cilium_metricsmap")
+	enumMetricsMap = retinaEbpfAPI.NewProc("enumerate_cilium_metricsmap")
 )
 
 // ringBufferEventCallback type definition in Go
 type enumMetricsCallback = func(key, value unsafe.Pointer, valueSize int) int
 
 // Callbacks in Go can only be passed as functions with specific signatures and often need to be wrapped in a syscall-compatible function.
-var enumCallBack enumMetricsCallback = nil
+var enumCallBack enumMetricsCallback
 
 // This function will be passed to the Windows API
 func enumMetricsSysCallCallback(key, value unsafe.Pointer, valueSize int) uintptr {
