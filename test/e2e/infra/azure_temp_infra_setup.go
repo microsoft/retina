@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func CreateAzureTempK8sInfra(t *testing.T, rootDir string, ctx context.Context) string {
+func CreateAzureTempK8sInfra(ctx context.Context, t *testing.T, rootDir string) string {
 	kubeConfigFilePath := common.KubeConfigFilePath(rootDir)
 	clusterName := common.ClusterNameForE2ETest(t)
 

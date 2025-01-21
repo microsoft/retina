@@ -51,7 +51,7 @@ func TestE2EPerfRetina(t *testing.T) {
 	require.NoError(t, err, "failed to load generic flags")
 
 	if *common.KubeConfig == "" {
-		*common.KubeConfig = infra.CreateAzureTempK8sInfra(t, rootDir, ctx)
+		*common.KubeConfig = infra.CreateAzureTempK8sInfra(ctx, t, rootDir)
 	}
 
 	appInsightsKey := os.Getenv(common.AzureAppInsightsKeyEnv)
