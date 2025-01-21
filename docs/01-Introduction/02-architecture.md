@@ -47,14 +47,12 @@ This section describes how the collected data from the Data Plane is processed, 
 Retina currently has two options for the Control Plane:
 
 - [Hubble Control Plane](#hubble-control-plane)
-- [Legacy* Control Plane](#legacy-control-plane)
-
-(* The "Legacy" naming will soon be replaced to a more accurate description - [GitHub Issue #1115](https://github.com/microsoft/retina/issues/1115))
+- [Standard Control Plane](#standard-control-plane)
 
 | Platform | Supported Control Plane    |
 |----------|----------------------------|
-| Windows  | Legacy                     |
-| Linux    | Legacy, Hubble             |
+| Windows  | Standard                   |
+| Linux    | Standard, Hubble           |
 
 Both Control Planes integrate with the same Data Plane, and have the same contract which is the `flow` data structure. Both Control Planes also generate metrics and traces, albeit different metrics are supported by each. See our [Metrics page](../03-Metrics/01-metrics-intro.md) for more information.
 
@@ -74,12 +72,12 @@ Hubble uses the enriched flows to generate `hubble_*` metrics and flow logs, whi
 
 !["Hubble Control Plane"](./img/hubble-control-plane.png "Hubble Control Plane")
 
-### Legacy Control Plane
+### Standard Control Plane
 
-When the Legacy Control Plane is being used, the data from the plugins is written to a custom [Enricher](https://github.com/microsoft/retina/tree/main/pkg/enricher) component. This component is not initialized when using the Hubble Control Plane, and so the plugins know where to write the data to.
+When the Standard Control Plane is being used, the data from the plugins is written to a custom [Enricher](https://github.com/microsoft/retina/tree/main/pkg/enricher) component. This component is not initialized when using the Hubble Control Plane, and so the plugins know where to write the data to.
 
 Retina maintains a cache of Kubernetes objects. The Enricher makes use of this cache to enrich the `flow` objects with this information. After enrichment, the `flow` objects are exported to an output ring.
 
 The [Metrics Module](https://github.com/microsoft/retina/blob/main/pkg/module/metrics/metrics_module.go) reads the data exported by the Enricher and constructs metrics out of it, which it then exports itself.
 
-!["Legacy Control Plane"](./img/control-plane.png "Control Plane")
+!["Standard Control Plane"](./img/control-plane.png "Standard Control Plane")
