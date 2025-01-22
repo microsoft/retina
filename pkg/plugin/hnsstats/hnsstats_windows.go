@@ -7,17 +7,25 @@ package hnsstats
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"os"
 	"time"
 
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/hcn"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	kcfg "github.com/microsoft/retina/pkg/config"
+	"github.com/microsoft/retina/pkg/exporter"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/registry"
 	"github.com/microsoft/retina/pkg/utils"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
+)
+
+var (
+	AdvWindowsGauge *prometheus.GaugeVec
 )
 
 const (
@@ -85,6 +93,11 @@ func (h *hnsstats) Init() error {
 	}
 	h.endpointQuery.Filter = string(filter)
 
+	// if h.cfg.EnablePodLevel {
+	h.l.Info("Creating advanced HNS stats metrics")
+	initializeAdvMetrics()
+	// }
+
 	h.l.Info("Exiting hnsstats Init...")
 	return nil
 }
@@ -144,6 +157,7 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 						if vfpcounters, err := parseVfpPortCounters(countersRaw); err == nil {
 							// Attach VFP port counters
 							hnsStatsData.vfpCounters = vfpcounters
+							hnsStatsData.Port = portguid
 							h.l.Debug("Attached VFP port counters", zap.String(zapPortField, portguid))
 							// h.l.Info(vfpcounters.String())
 						} else {
@@ -154,6 +168,7 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 					}
 
 					notifyHnsStats(h, hnsStatsData)
+					getAdvancedMetricLabels(h, hnsStatsData)
 				}
 			}
 		}
@@ -208,10 +223,112 @@ func notifyHnsStats(h *hnsstats, stats *HnsStatsData) {
 	metrics.TCPFlagGauge.WithLabelValues(egressLabel, utils.RST).Set(float64(stats.vfpCounters.Out.TcpCounters.PacketCounters.RstPacketCount))
 }
 
+func getAdvancedMetricLabels(h *hnsstats, stats *HnsStatsData) {
+	if AdvWindowsGauge == nil {
+		h.l.Warn("Advanced windows metric is not initialized")
+		return
+	}
+	// if port is populated, vfp data exists
+	// labels := enricher.Instance().GetWindowLabels(stats.IPAddress)
+	h.l.Info("New standalone feature")
+
+	labels, err := getStandaloneLabels(stats.IPAddress)
+	h.l.Info("Reading fields from CNI state file", zap.String(Ip, stats.IPAddress), zap.String(PodName, labels.PodName), zap.String(Namespace, labels.Namespace))
+
+	if err != nil {
+		AdvWindowsGauge.WithLabelValues(PacketsReceived, stats.IPAddress, stats.Port, labels.Namespace, labels.PodName).Set(float64(stats.hnscounters.PacketsReceived))
+		AdvWindowsGauge.WithLabelValues(PacketsSent, stats.IPAddress, stats.Port, labels.Namespace, labels.PodName).Set(float64(stats.hnscounters.PacketsSent))
+		h.l.Info("updating advanced HNS stats metric", zap.String(PodName, labels.PodName), zap.String(Namespace, labels.Namespace))
+	}
+}
+
 func (h *hnsstats) Start(ctx context.Context) error {
 	h.l.Info("Start hnsstats plugin...")
 	h.state = start
 	return pullHnsStats(ctx, h)
+}
+
+func cleanAdvMetrics() {
+	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(AdvWindowsGauge))
+}
+
+func initializeAdvMetrics() {
+	if AdvWindowsGauge != nil {
+		cleanAdvMetrics()
+	}
+	AdvWindowsGauge = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.AdvancedRegistry,
+		AdvHNSStatsName,
+		AdvHNSStatsDescription,
+		utils.Direction,
+		Ip,
+		Port,
+		Namespace,
+		PodName,
+	)
+}
+
+type Endpoint struct {
+	ID           string   `json:"Id"`
+	IPAddresses  []IPInfo `json:"IPAddresses"`
+	PODName      string   `json:"PODName"`
+	PODNameSpace string   `json:"PODNameSpace"`
+}
+
+type IPInfo struct {
+	IP string `json:"IP"`
+}
+
+type Network struct {
+	ExternalInterfaces map[string]ExternalInterface `json:"ExternalInterfaces"`
+}
+
+type ExternalInterface struct {
+	Networks map[string]NetworkInfo `json:"Networks"`
+}
+
+type NetworkInfo struct {
+	Endpoints map[string]Endpoint `json:"Endpoints"`
+}
+
+func getStandaloneLabels(ip string) (*utils.LabelsInfo, error) {
+	file, err := os.Open("C:/k/azure-vnet.json")
+	if err != nil {
+		return &utils.LabelsInfo{
+			Namespace: "",
+			PodName:   "",
+		}, fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	var network Network
+	if err := json.NewDecoder(file).Decode(&network); err != nil {
+		return &utils.LabelsInfo{
+			Namespace: "",
+			PodName:   "",
+		}, fmt.Errorf("failed to decode JSON: %w", err)
+	}
+
+	// Search for the IP in Endpoints
+	for _, iface := range network.ExternalInterfaces {
+		for _, network := range iface.Networks {
+			for _, endpoint := range network.Endpoints {
+				for _, ipAddr := range endpoint.IPAddresses {
+					if ipAddr.IP == ip {
+						return &utils.LabelsInfo{
+							Namespace: endpoint.PODNameSpace,
+							PodName:   endpoint.PODName,
+						}, nil
+					}
+				}
+			}
+		}
+	}
+
+	return &utils.LabelsInfo{
+		Namespace: "",
+		PodName:   "",
+	}, fmt.Errorf("IP address not found")
 }
 
 func (d *hnsstats) Stop() error {

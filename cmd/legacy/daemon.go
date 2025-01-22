@@ -89,13 +89,16 @@ func (d *Daemon) Start() error {
 	}
 
 	daemonConfig, err := config.GetConfig(d.configFile)
+	fmt.Printf("config %+v\n", daemonConfig)
+
 	if err != nil {
 		panic(err)
 	}
 
 	fmt.Println("init client-go")
 	var cfg *rest.Config
-	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
+	var kubeconfig = os.Getenv("KUBECONFIG")
+	if kubeconfig != "" {
 		fmt.Println("KUBECONFIG set, using kubeconfig: ", kubeconfig)
 		cfg, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 		if err != nil {
@@ -104,7 +107,8 @@ func (d *Daemon) Start() error {
 	} else {
 		cfg, err = kcfg.GetConfig()
 		if err != nil {
-			panic(err)
+			fmt.Println("KUBECONFIG not set. Falling back to standalone mode")
+			cfg = loadStandaloneConfig()
 		}
 	}
 
@@ -208,6 +212,11 @@ func (d *Daemon) Start() error {
 		}
 	}
 
+	// Setup RetinaEndpoint controller.
+	// TODO(mainred): This is to temporarily create a cache and pubsub for RetinaEndpoint, need to refactor this.
+	ctx := ctrl.SetupSignalHandler()
+	ctrl.SetLogger(zapr.NewLogger(zl.Logger.Named("controller-runtime")))
+
 	mgr, err := crmgr.New(cfg, mgrOption)
 	if err != nil {
 		mainLogger.Error("Unable to start manager", zap.Error(err))
@@ -226,17 +235,14 @@ func (d *Daemon) Start() error {
 	// k8s Client used for informers
 	cl := kubernetes.NewForConfigOrDie(mgr.GetConfig())
 
-	serverVersion, err := cl.Discovery().ServerVersion()
-	if err != nil {
-		mainLogger.Error("failed to get Kubernetes server version: ", zap.Error(err))
-	} else {
-		mainLogger.Infof("Kubernetes server version: %v", serverVersion)
+	if kubeconfig != "" {
+		serverVersion, err := cl.Discovery().ServerVersion()
+		if err != nil {
+			mainLogger.Error("failed to get Kubernetes server version: ", zap.Error(err))
+		} else {
+			mainLogger.Infof("Kubernetes server version: %v", serverVersion)
+		}
 	}
-
-	// Setup RetinaEndpoint controller.
-	// TODO(mainred): This is to temporarily create a cache and pubsub for RetinaEndpoint, need to refactor this.
-	ctx := ctrl.SetupSignalHandler()
-	ctrl.SetLogger(zapr.NewLogger(zl.Logger.Named("controller-runtime")))
 
 	if daemonConfig.EnablePodLevel {
 		pubSub := pubsub.New()
@@ -251,47 +257,49 @@ func (d *Daemon) Start() error {
 		enrich.Run()
 		metricsModule := mm.InitModule(ctx, daemonConfig, pubSub, enrich, fm, controllerCache)
 
-		if !daemonConfig.RemoteContext {
-			mainLogger.Info("Initializing Pod controller")
+		if cfg != nil {
+			if !daemonConfig.RemoteContext {
+				mainLogger.Info("Initializing Pod controller")
 
-			podController := pc.New(mgr.GetClient(), controllerCache)
-			if err := podController.SetupWithManager(mgr); err != nil {
-				mainLogger.Fatal("unable to create PodController", zap.Error(err))
+				podController := pc.New(mgr.GetClient(), controllerCache)
+				if err := podController.SetupWithManager(mgr); err != nil {
+					mainLogger.Fatal("unable to create PodController", zap.Error(err))
+				}
+			} else if daemonConfig.EnableRetinaEndpoint {
+				mainLogger.Info("RetinaEndpoint is enabled")
+				mainLogger.Info("Initializing RetinaEndpoint controller")
+
+				retinaEndpointController := kec.New(mgr.GetClient(), controllerCache)
+				if err := retinaEndpointController.SetupWithManager(mgr); err != nil {
+					mainLogger.Fatal("unable to create retinaEndpointController", zap.Error(err))
+				}
 			}
-		} else if daemonConfig.EnableRetinaEndpoint {
-			mainLogger.Info("RetinaEndpoint is enabled")
-			mainLogger.Info("Initializing RetinaEndpoint controller")
 
-			retinaEndpointController := kec.New(mgr.GetClient(), controllerCache)
-			if err := retinaEndpointController.SetupWithManager(mgr); err != nil {
-				mainLogger.Fatal("unable to create retinaEndpointController", zap.Error(err))
+			mainLogger.Info("Initializing Node controller")
+			nodeController := nc.New(mgr.GetClient(), controllerCache)
+			if err := nodeController.SetupWithManager(mgr); err != nil {
+				mainLogger.Fatal("unable to create nodeController", zap.Error(err))
 			}
-		}
 
-		mainLogger.Info("Initializing Node controller")
-		nodeController := nc.New(mgr.GetClient(), controllerCache)
-		if err := nodeController.SetupWithManager(mgr); err != nil {
-			mainLogger.Fatal("unable to create nodeController", zap.Error(err))
-		}
-
-		mainLogger.Info("Initializing Service controller")
-		svcController := sc.New(mgr.GetClient(), controllerCache)
-		if err := svcController.SetupWithManager(mgr); err != nil {
-			mainLogger.Fatal("unable to create svcController", zap.Error(err))
-		}
-
-		if daemonConfig.EnableAnnotations {
-			mainLogger.Info("Initializing MetricsConfig namespaceController")
-			namespaceController := namespacecontroller.New(mgr.GetClient(), controllerCache, metricsModule)
-			if err := namespaceController.SetupWithManager(mgr); err != nil {
-				mainLogger.Fatal("unable to create namespaceController", zap.Error(err))
+			mainLogger.Info("Initializing Service controller")
+			svcController := sc.New(mgr.GetClient(), controllerCache)
+			if err := svcController.SetupWithManager(mgr); err != nil {
+				mainLogger.Fatal("unable to create svcController", zap.Error(err))
 			}
-			go namespaceController.Start(ctx)
-		} else {
-			mainLogger.Info("Initializing MetricsConfig controller")
-			metricsConfigController := mcc.New(mgr.GetClient(), mgr.GetScheme(), metricsModule)
-			if err := metricsConfigController.SetupWithManager(mgr); err != nil {
-				mainLogger.Fatal("unable to create metricsConfigController", zap.Error(err))
+
+			if daemonConfig.EnableAnnotations {
+				mainLogger.Info("Initializing MetricsConfig namespaceController")
+				namespaceController := namespacecontroller.New(mgr.GetClient(), controllerCache, metricsModule)
+				if err := namespaceController.SetupWithManager(mgr); err != nil {
+					mainLogger.Fatal("unable to create namespaceController", zap.Error(err))
+				}
+				go namespaceController.Start(ctx)
+			} else {
+				mainLogger.Info("Initializing MetricsConfig controller")
+				metricsConfigController := mcc.New(mgr.GetClient(), mgr.GetScheme(), metricsModule)
+				if err := metricsConfigController.SetupWithManager(mgr); err != nil {
+					mainLogger.Fatal("unable to create metricsConfigController", zap.Error(err))
+				}
 			}
 		}
 	}
@@ -322,4 +330,15 @@ func (d *Daemon) Start() error {
 
 	mainLogger.Info("Network observability exiting. Till next time!")
 	return nil
+}
+
+func loadStandaloneConfig() *rest.Config {
+	return &rest.Config{
+		Host:    "http://localhost:8080",
+		APIPath: "/api",
+		ContentConfig: rest.ContentConfig{
+			GroupVersion:         nil,
+			NegotiatedSerializer: nil,
+		},
+	}
 }
