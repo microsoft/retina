@@ -125,6 +125,8 @@ static void parse(struct __sk_buff *skb, __u8 obs)
 	
 	p.observation_point = obs;
 	p.bytes = skb->len;
+	p.pid = bpf_get_current_pid_tgid() >> 32;
+    bpf_get_current_comm(&p.comm, sizeof(p.comm));
 
 	void *data_end = (void *)(unsigned long long)skb->data_end;
 	void *data = (void *)(unsigned long long)skb->data;

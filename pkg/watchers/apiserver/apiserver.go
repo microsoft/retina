@@ -74,7 +74,7 @@ func (a *ApiServerWatcher) Init(ctx context.Context) error {
 		config, err := kcfg.GetConfig()
 		if err != nil {
 			a.l.Error("failed to get kubeconfig", zap.Error(err))
-			return fmt.Errorf("failed to get kubeconfig: %w", err)
+			return nil
 		}
 		a.restConfig = config
 	}

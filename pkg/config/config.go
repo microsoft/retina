@@ -67,6 +67,7 @@ type Config struct {
 	BypassLookupIPOfInterest bool          `yaml:"bypassLookupIPOfInterest"`
 	DataAggregationLevel     Level         `yaml:"dataAggregationLevel"`
 	MonitorSockPath          string        `yaml:"monitorSockPath"`
+	Standalone               bool          `yaml:"standalone"`
 }
 
 func GetConfig(cfgFilename string) (*Config, error) {
