@@ -411,6 +411,9 @@ func (p *packetParser) endpointWatcherCallbackFn(obj interface{}) {
 			p.tcMap.Delete(ifaceKey)
 		}
 		p.interfaceLockMap.Delete(ifaceKey)
+	default:
+		// Unknown.
+		p.l.Debug("Unknown event", zap.String("type", event.Type.String()))
 	}
 }
 
