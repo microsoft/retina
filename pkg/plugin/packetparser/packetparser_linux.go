@@ -225,6 +225,7 @@ func (p *packetParser) Init() error {
 	}
 
 	p.tcMap = &sync.Map{}
+	p.interfaceLockMap = &sync.Map{}
 
 	return nil
 }
@@ -372,7 +373,6 @@ func (p *packetParser) clean(rtnl nltc, qdisc *tc.Object) {
 }
 
 func (p *packetParser) endpointWatcherCallbackFn(obj interface{}) {
-	// Contract is that we will receive an endpoint event pointer.
 	event := obj.(*endpoint.EndpointEvent)
 	if event == nil {
 		return
@@ -383,19 +383,34 @@ func (p *packetParser) endpointWatcherCallbackFn(obj interface{}) {
 
 	switch event.Type {
 	case endpoint.EndpointCreated:
-		p.l.Debug("Endpoint created", zap.String("name", iface.Name))
-		p.createQdiscAndAttach(iface, Veth)
+		// Get or create mutex atomically
+		lockMapVal, loaded := p.interfaceLockMap.LoadOrStore(ifaceKey, &sync.Mutex{})
+		mu := lockMapVal.(*sync.Mutex)
+		mu.Lock()
+		defer mu.Unlock()
+
+		// Only proceed with creation if this is a new interface
+		if !loaded {
+			p.l.Debug("Endpoint created", zap.String("name", iface.Name))
+			p.createQdiscAndAttach(iface, Veth)
+		}
+
 	case endpoint.EndpointDeleted:
-		p.l.Debug("Endpoint deleted", zap.String("name", iface.Name))
-		// Clean tcMap.
+		lockMapVal, ok := p.interfaceLockMap.Load(ifaceKey)
+		if !ok {
+			return
+		}
+		mu := lockMapVal.(*sync.Mutex)
+		mu.Lock()
+		defer mu.Unlock()
+
+		// Clean up operations
 		if value, ok := p.tcMap.Load(ifaceKey); ok {
 			v := value.(*tcValue)
 			p.clean(v.tc, v.qdisc)
 			p.tcMap.Delete(ifaceKey)
 		}
-	default:
-		// Unknown.
-		p.l.Debug("Unknown event", zap.String("type", event.Type.String()))
+		p.interfaceLockMap.Delete(ifaceKey)
 	}
 }
 
