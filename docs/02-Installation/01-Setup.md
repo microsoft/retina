@@ -97,6 +97,7 @@ helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
 ```shell
 VERSION=$( curl -sL https://api.github.com/repos/microsoft/retina/releases/latest | jq -r .name)
 helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina-hubble \
+        --version $VERSION \
         --namespace kube-system \
         --set os.windows=true \
         --set operator.enabled=true \
