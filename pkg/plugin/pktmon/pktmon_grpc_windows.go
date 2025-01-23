@@ -18,9 +18,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-var (
-	ErrNilStream = errors.New("stream is nil")
-)
+var ErrNilStream = errors.New("stream is nil")
 
 type GRPCManager interface {
 	SetupStream() error
@@ -31,7 +29,7 @@ type GRPCManager interface {
 	Stop() error
 }
 
-type PktmonGRPCManager struct {
+type WindowsGRPCManager struct {
 	grpcClient *GRPCClient
 	stream     observerv1.Observer_GetFlowsClient
 	l          *log.ZapLogger
@@ -41,7 +39,7 @@ type PktmonGRPCManager struct {
 	errWriter *zapio.Writer
 }
 
-func (p *PktmonGRPCManager) SetupStream() error {
+func (p *WindowsGRPCManager) SetupStream() error {
 	var err error
 	fn := func() error {
 		p.l.Info("creating pktmon client")
@@ -60,7 +58,7 @@ func (p *PktmonGRPCManager) SetupStream() error {
 	return nil
 }
 
-func (p *PktmonGRPCManager) StartStream(ctx context.Context) error {
+func (p *WindowsGRPCManager) StartStream(ctx context.Context) error {
 	if p.grpcClient == nil {
 		return errors.Wrapf(ErrNilGrpcClient, "unable to start stream")
 	}
@@ -81,12 +79,12 @@ func (p *PktmonGRPCManager) StartStream(ctx context.Context) error {
 	return nil
 }
 
-func (p *PktmonGRPCManager) ReceiveFromStream() (*observerv1.GetFlowsResponse, error) {
+func (p *WindowsGRPCManager) ReceiveFromStream() (*observerv1.GetFlowsResponse, error) {
 	if p.stream == nil {
 		return nil, errors.Wrapf(ErrNilStream, "unable to receive from stream")
 	}
 
-	return p.stream.Recv()
+	return p.stream.Recv() //nolint:wrapcheck // wrapcheck is disabled because we want to return the error as is
 }
 
 func newGRPCClient() (*GRPCClient, error) {
@@ -112,15 +110,15 @@ func newGRPCClient() (*GRPCClient, error) {
 
 	retryPolicyStr := string(bytes)
 
-	conn, err := grpc.Dial(fmt.Sprintf("%s:%s", "unix", socket), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultServiceConfig(retryPolicyStr))
+	conn, err := grpc.NewClient(fmt.Sprintf("%s:%s", "unix", socket), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultServiceConfig(retryPolicyStr))
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to dial pktmon server:")
+		return nil, errors.Wrapf(err, "failed to dial pktmon server")
 	}
 
 	return &GRPCClient{observerv1.NewObserverClient(conn)}, nil
 }
 
-func (p *PktmonGRPCManager) RunPktMonServer(ctx context.Context) error {
+func (p *WindowsGRPCManager) RunPktMonServer(ctx context.Context) error {
 	p.stdWriter = &zapio.Writer{Log: p.l.Logger, Level: zap.InfoLevel}
 	defer p.stdWriter.Close()
 	p.errWriter = &zapio.Writer{Log: p.l.Logger, Level: zap.ErrorLevel}
@@ -152,7 +150,7 @@ func (p *PktmonGRPCManager) RunPktMonServer(ctx context.Context) error {
 	return errors.Wrapf(ErrUnexpectedExit, "pktmon server exited unexpectedly")
 }
 
-func (p *PktmonGRPCManager) Stop() error {
+func (p *WindowsGRPCManager) Stop() error {
 	if p.pktmonCmd != nil {
 		err := p.pktmonCmd.Process.Kill()
 		if err != nil {

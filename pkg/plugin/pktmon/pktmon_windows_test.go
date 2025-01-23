@@ -6,6 +6,7 @@ import (
 
 	observerv1 "github.com/cilium/cilium/api/v1/observer"
 	"github.com/microsoft/retina/pkg/log"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -24,7 +25,7 @@ func (p *TestGRPCManager) RunPktMonServer(ctx context.Context) error {
 	return nil
 }
 
-func (p *TestGRPCManager) StartStream(ctx context.Context) error {
+func (p *TestGRPCManager) StartStream(_ context.Context) error {
 	return nil
 }
 
@@ -40,7 +41,9 @@ func (p *TestGRPCManager) Stop() error {
 
 func TestStart(t *testing.T) {
 	opts := log.GetDefaultLogOpts()
-	log.SetupZapLogger(opts)
+	_, err := log.SetupZapLogger(opts)
+	require.NoError(t, err)
+
 	p := &Plugin{
 		l: log.Logger().Named("test"),
 	}
@@ -60,7 +63,7 @@ func TestStart(t *testing.T) {
 	}
 
 	// Start the Plugin.
-	err := p.Start(ctx)
+	err = p.Start(ctx)
 	// Check if the error is nil.
 	if stat, ok := status.FromError(err); ok {
 		if stat.Code() != codes.Canceled {

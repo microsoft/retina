@@ -53,7 +53,7 @@ func New(*kcfg.Config) registry.Plugin {
 }
 
 func (p *Plugin) Init() error {
-	p.grpcManager = &PktmonGRPCManager{
+	p.grpcManager = &WindowsGRPCManager{
 		l: p.l,
 	}
 	return nil
