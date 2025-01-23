@@ -1,4 +1,4 @@
-package legacy
+package standard
 
 import "github.com/cilium/ebpf/rlimit"
 

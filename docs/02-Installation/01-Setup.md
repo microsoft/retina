@@ -14,9 +14,9 @@ Note: you can also run captures with just the [CLI](./02-CLI.md).
 
 The installation of Retina can be configured using different control planes and modes.
 
-You can choose between the "legacy" control plane (the original implementation of Retina) and Hubble.
+You can choose between the "Standard" control plane (the original implementation of Retina) and Hubble.
 
-If the "legacy" control plane is chosen, different modes are available. The available metric dimensions depend on the selected mode. For an explanation of the available modes, see [Legacy Metric Modes](../03-Metrics/modes/modes.md).
+If the "Standard" control plane is chosen, different modes are available. The available metric dimensions depend on the selected mode. For an explanation of the available modes, see [Standard Metric Modes](../03-Metrics/modes/modes.md).
 
 Modes are not applicable to the Hubble control plane. For metrics related to the Hubble control plane, refer to the [Hubble metrics](../03-Metrics/02-hubble_metrics.md) documentation.
 
