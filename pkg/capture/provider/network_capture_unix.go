@@ -6,6 +6,7 @@
 package provider
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -198,11 +199,7 @@ func (ncp *NetworkCaptureProvider) CollectMetadata() error {
 
 	iptablesMode, err := obtainIptablesMode(ncp.l)
 	if err != nil {
-		return fmt.Errorf("failed to determine iptables modes. %s", err.Error())
-	}
-
-	if iptablesMode == "" {
-		return fmt.Errorf("no iptables command is available")
+		return fmt.Errorf("failed to determine iptables modes. %w", err)
 	}
 
 	ncp.l.Info(fmt.Sprintf("Iptables mode %s is used", iptablesMode))
@@ -318,7 +315,7 @@ func (ncp *NetworkCaptureProvider) CollectMetadata() error {
 			// Print headlines for all commands in output file.
 			cmds := []*exec.Cmd{}
 			for _, command := range metadata.commands {
-				cmd := exec.Command(command.name, command.args...) // nolint:gosec,gomnd // no sensitive data
+				cmd := exec.Command(command.name, command.args...) // nolint:gosec // no sensitive data
 				cmds = append(cmds, cmd)
 				commandSummary := fmt.Sprintf("%s(%s)\n", cmd.String(), command.description)
 				if _, err := outfile.WriteString(commandSummary); err != nil {
@@ -332,7 +329,7 @@ func (ncp *NetworkCaptureProvider) CollectMetadata() error {
 
 			// Write command stdout and stderr to output file
 			for _, command := range metadata.commands {
-				cmd := exec.Command(command.name, command.args...)
+				cmd := exec.Command(command.name, command.args...) // nolint:gosec // no sensitive data
 				if _, err := outfile.WriteString(fmt.Sprintf("%s\n\n", cmd.String())); err != nil {
 					ncp.l.Error("Failed to write string to file", zap.String("file", outfile.Name()), zap.Error(err))
 				}
@@ -376,8 +373,7 @@ const (
 	nftIptablesMode    iptablesMode = "nft"
 )
 
-// define a error
-var IptablesUnavilable = fmt.Errorf("no iptables command is available")
+var errIptablesUnavilable = errors.New("no iptables command is available")
 
 // obtainIptablesMode return the available iptables mode, and returns empty when no iptables is available.
 func obtainIptablesMode(logger *log.ZapLogger) (iptablesMode, error) {
@@ -396,7 +392,7 @@ func obtainIptablesMode(logger *log.ZapLogger) (iptablesMode, error) {
 	} else {
 		legacySaveOut, err := exec.Command("iptables-legacy-save").CombinedOutput()
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("failed to run iptables-legacy-save, %s", err.Error()) //nolint:goerr113 //no specific handling expected
 		}
 		legacySaveLineNum = len(strings.Split(string(legacySaveOut), "\n"))
 	}
@@ -407,7 +403,7 @@ func obtainIptablesMode(logger *log.ZapLogger) (iptablesMode, error) {
 	} else {
 		nftSaveOut, err := exec.Command("iptables-nft-save").CombinedOutput()
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("failed to run iptables-nft-save, %s", err.Error()) //nolint:goerr113 //no specific handling expected
 		}
 		legacySaveLineNum = len(strings.Split(string(nftSaveOut), "\n"))
 	}
@@ -427,5 +423,5 @@ func obtainIptablesMode(logger *log.ZapLogger) (iptablesMode, error) {
 		return legacyIptablesMode, nil
 	}
 
-	return "", IptablesUnavilable
+	return "", errIptablesUnavilable
 }
