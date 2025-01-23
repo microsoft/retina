@@ -946,12 +946,12 @@ tls:
 ## @param readinessProbe.successThreshold [array] Success threshold for readinessProbe
 ## Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#configure-probes
 ##
-readinessProbe: {}
-  # initialDelaySeconds: 30
-  # periodSeconds: 10
-  # timeoutSeconds: 15
-  # failureThreshold: 5
-  # successThreshold: 1
+readinessProbe:
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  timeoutSeconds: 15
+  failureThreshold: 3
+  successThreshold: 1
 ## @param livenessProbe.initialDelaySeconds [array] Initial delay seconds for livenessProbe
 ## @param livenessProbe.periodSeconds [array] Period seconds for livenessProbe
 ## @param livenessProbe.timeoutSeconds [array] Timeout seconds for livenessProbe
@@ -959,9 +959,9 @@ readinessProbe: {}
 ## @param livenessProbe.successThreshold [array] Success threshold for livenessProbe
 ## Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#configure-probes
 ##
-livenessProbe: {}
-  # initialDelaySeconds: 30
-  # periodSeconds: 10
-  # timeoutSeconds: 15
-  # failureThreshold: 5
-  # successThreshold: 1
+livenessProbe:
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  timeoutSeconds: 15
+  failureThreshold: 3
+  successThreshold: 1

@@ -82,20 +82,20 @@ spec:
             httpGet:
               path: /health
               port: {{ .Values.agent.container.retina.ports.containerPort }}
-            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds | default "30" }}
-            periodSeconds: {{ .Values.readinessProbe.periodSeconds | default "30" }}
-            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds | default "1" }}
-            failureThreshold: {{ .Values.readinessProbe.failureThreshold | default "3" }}
-            successThreshold: {{ .Values.readinessProbe.successThreshold | default "1" }}
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+            successThreshold: {{ .Values.readinessProbe.successThreshold }}
           livenessProbe:
             httpGet:
               path: /health
               port: {{ .Values.agent.container.retina.ports.containerPort }}
-            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds | default "30" }}
-            periodSeconds: {{ .Values.livenessProbe.periodSeconds | default "30" }}
-            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds | default "1" }}
-            failureThreshold: {{ .Values.livenessProbe.failureThreshold | default "3" }}
-            successThreshold: {{ .Values.livenessProbe.successThreshold | default "1" }}
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+            successThreshold: {{ .Values.livenessProbe.successThreshold }}
           env:
           - name: POD_NAME
             valueFrom:
@@ -216,9 +216,21 @@ spec:
           readinessProbe:
             httpGet:
               path: /health
-              port: {{ .Values.agent.container.retina.ports.containerPort }}
-            initialDelaySeconds: 15
-            periodSeconds: 10
+              port: {{ .Values.retinaPort }}
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+            successThreshold: {{ .Values.readinessProbe.successThreshold }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.retinaPort }}
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+            successThreshold: {{ .Values.livenessProbe.successThreshold }}
           env:
           - name: POD_NAME
             valueFrom:
