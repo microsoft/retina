@@ -46,7 +46,6 @@ func (rt *Server) SetupHandlers() {
 		rt.servePrometheusMetrics()
 	})
 	rt.serveHealth()
-	rt.serveHealth2()
 	rt.mux.HandleFunc("/debug/pprof/", pprof.Index)
 	rt.mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
 	rt.mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
@@ -65,15 +64,7 @@ func (rt *Server) servePrometheusMetrics() {
 }
 
 func (rt *Server) serveHealth() {
-	rt.mux.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		rt.l.Error("serving health writing 20Ok")
-	})
-}
-
-func (rt *Server) serveHealth2() {
-	rt.mux.Get("/health2", healthz.CheckHandler{Checker: healthz.Ping}.ServeHTTP)
-	rt.l.Error("serving health2 with Ping")
+	rt.mux.Get("/health", healthz.CheckHandler{Checker: healthz.Ping}.ServeHTTP)
 }
 
 func (rt *Server) Start(ctx context.Context, addr string) error {
