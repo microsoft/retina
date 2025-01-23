@@ -6,7 +6,7 @@ Prometheus is an open-source system monitoring and alerting toolkit originally b
 
 1. Create a Kubernetes cluster.
 2. Install Retina DaemonSet (see [Quick Installation](./01-Setup.md)).
-3. Clone [Retina Repository](https://github.com/microsoft/retina) or download [Prometheus Values File](../../deploy/legacy/prometheus/values.yaml).
+3. Clone [Retina Repository](https://github.com/microsoft/retina) or download [Prometheus Values File](../../deploy/standard/prometheus/values.yaml).
 
 ## Install Prometheus via Helm
 
@@ -21,7 +21,7 @@ Prometheus is an open-source system monitoring and alerting toolkit originally b
 
   ```shell
   # The value of VALUE_FILE_PATH is relative to the repo root folder. Update this according to the location of your file.
-  VALUE_FILE_PATH=deploy/legacy/prometheus/values.yaml
+  VALUE_FILE_PATH=deploy/standard/prometheus/values.yaml
   helm install prometheus -n kube-system -f $VALUE_FILE_PATH prometheus-community/kube-prometheus-stack
   ```
 
@@ -29,7 +29,7 @@ Prometheus is an open-source system monitoring and alerting toolkit originally b
 
   ```shell
   # The value of VALUE_FILE_PATH is relative to the repo root folder. Update this according to the location of your file.
-  VALUE_FILE_PATH=deploy/legacy/prometheus/values.yaml
+  VALUE_FILE_PATH=deploy/standard/prometheus/values.yaml
   helm upgrade prometheus -n kube-system -f $VALUE_FILE_PATH prometheus-community/kube-prometheus-stack
   ```
 

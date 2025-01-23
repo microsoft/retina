@@ -8,7 +8,7 @@ In large-scale API servers, each Retina Pod needs to learn about cluster state, 
 
 ## CRD Specification
 
-The full specification for the `RetinaEndpoint` CRD can be found in the [RetinaEndpoint CRD]( https://github.com/microsoft/retina/blob/main/deploy/legacy/manifests/controller/helm/retina/crds/retina.sh_retinaendpoints.yaml) file.
+The full specification for the `RetinaEndpoint` CRD can be found in the [RetinaEndpoint CRD]( https://github.com/microsoft/retina/blob/main/deploy/standard/manifests/controller/helm/retina/crds/retina.sh_retinaendpoints.yaml) file.
 
 The `RetinaEndpoint` CRD is defined with the following specifications:
 

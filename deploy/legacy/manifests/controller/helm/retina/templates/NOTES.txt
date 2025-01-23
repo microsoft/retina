@@ -1,3 +1,0 @@
-1. Installing retina service using helm: helm install retina ./deploy/legacy/manifests/controller/helm/retina/ --namespace kube-system --dependency-update
-2. Cleaning up/uninstalling/deleting retina and dependencies related: 
-  helm uninstall retina -n kube-system
