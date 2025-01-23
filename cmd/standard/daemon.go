@@ -1,6 +1,6 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
-package legacy
+package standard
 
 import (
 	"fmt"

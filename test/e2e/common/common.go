@@ -39,7 +39,7 @@ var (
 
 var (
 	RetinaChartPath = func(rootDir string) string {
-		return filepath.Join(rootDir, "deploy", "legacy", "manifests", "controller", "helm", "retina")
+		return filepath.Join(rootDir, "deploy", "standard", "manifests", "controller", "helm", "retina")
 	}
 	RetinaAdvancedProfilePath = func(rootDir string) string {
 		return filepath.Join(rootDir, "test", "profiles", "advanced", "values.yaml")
