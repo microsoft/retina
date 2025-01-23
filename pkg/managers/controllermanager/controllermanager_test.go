@@ -33,7 +33,7 @@ func TestNewControllerManager(t *testing.T) {
 
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	kubeclient := k8sfake.NewSimpleClientset()
-	cm, err := NewControllerManager(c, kubeclient, telemetry.NewNoopTelemetry())
+	cm, err := NewControllerManager(c, false, kubeclient, telemetry.NewNoopTelemetry())
 	assert.NoError(t, err, "Expected no error, instead got %+v", err)
 	assert.NotNil(t, cm)
 }
@@ -45,7 +45,7 @@ func TestNewControllerManagerWin(t *testing.T) {
 
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	kubeclient := k8sfake.NewSimpleClientset()
-	cm, err := NewControllerManager(c, kubeclient, telemetry.NewNoopTelemetry())
+	cm, err := NewControllerManager(c, false, kubeclient, telemetry.NewNoopTelemetry())
 	assert.Error(t, err, "Expected error of not recognising windows plugins in linux, instead got no error")
 	assert.Nil(t, cm)
 }
@@ -57,7 +57,7 @@ func TestNewControllerManagerInit(t *testing.T) {
 
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	kubeclient := k8sfake.NewSimpleClientset()
-	cm, err := NewControllerManager(c, kubeclient, telemetry.NewNoopTelemetry())
+	cm, err := NewControllerManager(c, false, kubeclient, telemetry.NewNoopTelemetry())
 	assert.NoError(t, err, "Expected no error, instead got %+v", err)
 	assert.NotNil(t, cm)
 
@@ -72,7 +72,7 @@ func TestControllerPluginManagerStartFail(t *testing.T) {
 
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	kubeclient := k8sfake.NewSimpleClientset()
-	cm, err := NewControllerManager(c, kubeclient, telemetry.NewNoopTelemetry())
+	cm, err := NewControllerManager(c, false, kubeclient, telemetry.NewNoopTelemetry())
 	assert.NoError(t, err, "Expected no error, instead got %+v", err)
 	assert.NotNil(t, cm)
 

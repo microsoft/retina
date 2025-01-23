@@ -36,10 +36,10 @@ type Controller struct {
 	enricher      *enricher.Enricher
 }
 
-func NewControllerManager(conf *kcfg.Config, kubeclient kubernetes.Interface, tel telemetry.Telemetry) (*Controller, error) {
+func NewControllerManager(conf *kcfg.Config, standalone bool, kubeclient kubernetes.Interface, tel telemetry.Telemetry) (*Controller, error) {
 	cmLogger := log.Logger().Named("controller-manager")
 
-	if conf.EnablePodLevel {
+	if conf.EnablePodLevel && !standalone {
 		// informer factory for pods/services
 		factory := informers.NewSharedInformerFactory(kubeclient, ResyncTime)
 		factory.WaitForCacheSync(wait.NeverStop)

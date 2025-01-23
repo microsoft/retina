@@ -48,3 +48,15 @@
 #define OBSERVATION_POINT_TO_ENDPOINT 0x01
 #define OBSERVATION_POINT_FROM_NETWORK 0x02
 #define OBSERVATION_POINT_TO_NETWORK 0x03
+
+/*
+* below enum is pulled from sched.h 
+* https://elixir.bootlin.com/linux/v6.12/source/include/linux/sched.h#L306
+*/
+/*
+ * Define the task command name length as enum, then it can be visible to
+ * BPF programs.
+ */
+enum {
+	TASK_COMM_LEN = 16,
+};

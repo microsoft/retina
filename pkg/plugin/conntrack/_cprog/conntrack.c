@@ -45,6 +45,8 @@ struct packet
 	__u8 proto;
 	__u8 flags; // For TCP packets, this is the TCP flags. For UDP packets, this is will always be 1 for conntrack purposes.
 	bool is_reply;
+    __u32 pid;
+    char comm[TASK_COMM_LEN];
     struct conntrackmetadata conntrack_metadata;
 };
 

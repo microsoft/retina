@@ -61,6 +61,9 @@ type packetparserPacket struct {
 	Flags             uint8
 	IsReply           bool
 	_                 [3]byte
+	Pid               uint32
+	Comm              [16]int8
+	_                 [4]byte
 	ConntrackMetadata struct {
 		BytesForwardCount   uint64
 		BytesReplyCount     uint64
