@@ -49,16 +49,16 @@ func TestE2ERetina_Scale(t *testing.T) {
 	// Get to root of the repo by going up two directories
 	rootDir := filepath.Dir(filepath.Dir(cwd))
 
-	chartPath := filepath.Join(rootDir, "deploy", "legacy", "manifests", "controller", "helm", "retina")
-	kubeConfigFilePath := filepath.Join(rootDir, "test", "e2e", "test.pem")
+	err = jobs.LoadGenericFlags().Run()
+	require.NoError(t, err, "failed to load generic flags")
 
 	// Scale test parameters
 	opt := jobs.DefaultScaleTestOptions()
-	opt.KubeconfigPath = kubeConfigFilePath
+	opt.KubeconfigPath = common.KubeConfigFilePath(rootDir)
 
 	NumDeployments := os.Getenv("NUM_DEPLOYMENTS")
 	NumReplicas := os.Getenv("NUM_REPLICAS")
-	NumNetworkPolicies := os.Getenv("NUM_NET_POL")
+	NumNetworkPolicies := os.Getenv("NUM_NETPOLS")
 	CleanUp := os.Getenv("CLEANUP")
 
 	if NumDeployments != "" {
@@ -75,7 +75,7 @@ func TestE2ERetina_Scale(t *testing.T) {
 		require.NoError(t, err)
 	}
 	if CleanUp != "" {
-		opt.DeleteLabels, err = strconv.ParseBool(CleanUp)
+		opt.CleanUp, err = strconv.ParseBool(CleanUp)
 		require.NoError(t, err)
 	}
 
@@ -90,13 +90,11 @@ func TestE2ERetina_Scale(t *testing.T) {
 	opt.LabelsToGetMetrics = map[string]string{"k8s-app": "retina"}
 
 	// CreateTestInfra
-	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath, *common.CreateInfra))
+	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, rg, clusterName, location, common.KubeConfigFilePath(rootDir), *common.CreateInfra))
 	createTestInfra.Run(ctx)
 
 	t.Cleanup(func() {
-		if *common.DeleteInfra {
-			_ = jobs.DeleteTestInfra(subID, rg, clusterName, location).Run()
-		}
+		_ = jobs.DeleteTestInfra(subID, rg, location, *common.DeleteInfra).Run()
 	})
 
 	fqdn, err := azure.GetFqdnFn(subID, rg, clusterName)
@@ -104,11 +102,11 @@ func TestE2ERetina_Scale(t *testing.T) {
 	opt.AdditionalTelemetryProperty["clusterFqdn"] = fqdn
 
 	// Install Retina
-	installRetina := types.NewRunner(t, jobs.InstallRetina(kubeConfigFilePath, chartPath))
+	installRetina := types.NewRunner(t, jobs.InstallRetina(common.KubeConfigFilePath(rootDir), common.RetinaChartPath(rootDir)))
 	installRetina.Run(ctx)
 
 	t.Cleanup(func() {
-		_ = jobs.UninstallRetina(kubeConfigFilePath, chartPath).Run()
+		_ = jobs.UninstallRetina(common.KubeConfigFilePath(rootDir), common.RetinaChartPath(rootDir)).Run()
 	})
 
 	scale := types.NewRunner(t, jobs.ScaleTest(&opt))

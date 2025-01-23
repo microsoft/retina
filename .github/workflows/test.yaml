@@ -7,6 +7,7 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+
 permissions:
   actions: read
   contents: read
@@ -15,6 +16,7 @@ permissions:
   pull-requests: write
   security-events: write
   issues: write
+
 jobs:
   test-image:
     runs-on: ubuntu-latest
@@ -32,8 +34,9 @@ jobs:
           PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           make test-image IMAGE_NAMESPACE=${{ github.repository }} PLATFORM=linux/amd64
+
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: coverage-files
-          path: ./coverage*
+          path: ./artifacts/coverage*
