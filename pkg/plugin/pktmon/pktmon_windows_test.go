@@ -4,19 +4,67 @@ import (
 	"context"
 	"testing"
 
-	"github.com/microsoft/retina/pkg/config"
+	observerv1 "github.com/cilium/cilium/api/v1/observer"
+	"github.com/microsoft/retina/pkg/log"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
+type TestGRPCManager struct {
+	streamErrorIndex int
+	streamErrors     []error
+}
+
+func (p *TestGRPCManager) SetupStream() error {
+	return nil
+}
+
+func (p *TestGRPCManager) RunPktMonServer(ctx context.Context) error {
+	<-ctx.Done()
+	return nil
+}
+
+func (p *TestGRPCManager) StartStream(ctx context.Context) error {
+	return nil
+}
+
+func (p *TestGRPCManager) ReceiveFromStream() (*observerv1.GetFlowsResponse, error) {
+	err := p.streamErrors[p.streamErrorIndex]
+	p.streamErrorIndex++
+	return nil, err
+}
+
+func (p *TestGRPCManager) Stop() error {
+	return nil
+}
+
 func TestStart(t *testing.T) {
-	// TestStart tests the Start function.
-	t.Run("TestStart", func(t *testing.T) {
-		// Create a new Plugin.
-		p := New(&config.Config{})
-		// Start the Plugin.
-		err := p.Start(context.Background())
-		// Check if the error is nil.
-		if err != nil {
-			t.Errorf("got %v, want nil", err)
+	opts := log.GetDefaultLogOpts()
+	log.SetupZapLogger(opts)
+	p := &Plugin{
+		l: log.Logger().Named("test"),
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	p.grpcManager = &TestGRPCManager{
+		streamErrors: []error{
+			status.Errorf(codes.Unavailable, "frame too large"),
+			status.Errorf(codes.Internal, "unexpected EOF"),
+			status.Errorf(codes.Internal, "exceeding the limit"),
+			status.Errorf(codes.Internal, "cannot parse invalid wire-format data"),
+			status.Errorf(codes.Internal, "string field contains invalid UTF-8"),
+			status.Errorf(codes.Canceled, "context canceled"),
+		},
+	}
+
+	// Start the Plugin.
+	err := p.Start(ctx)
+	// Check if the error is nil.
+	if stat, ok := status.FromError(err); ok {
+		if stat.Code() != codes.Canceled {
+			t.Errorf("expected %v, got %v", codes.Canceled, stat.Code())
 		}
-	})
+	}
 }
