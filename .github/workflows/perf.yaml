@@ -15,8 +15,8 @@ permissions:
   id-token: write
 
 jobs:
-  perf_test:
-    name: Retina Performance Test
+  perf_test-basic:
+    name: Retina Basic Performance Test
     runs-on: ubuntu-latest
 
     steps:
@@ -49,4 +49,40 @@ jobs:
           else
             TAG=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r .tag_name)
           fi
-          go test -v ./test/e2e/. -timeout 2h -tags=perf -count=1 -args -image-tag=$TAG -image-registry=ghcr.io -image-namespace=${{ github.repository }}
+          go test -v ./test/e2e/. -timeout 2h -tags=perf -count=1 -args -image-tag=$TAG -image-registry=ghcr.io -image-namespace=${{ github.repository }} -retina-mode=basic
+
+  perf_test-advanced:
+    name: Retina Advanced Performance Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go version
+
+      - name: Az CLI login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION }}
+
+      - name: Run performance measurement for Retina
+        env:
+          AZURE_APP_INSIGHTS_KEY: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION }}
+          AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            TAG=${{ github.event.inputs.tag }}
+          else
+            TAG=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r .tag_name)
+          fi
+          go test -v ./test/e2e/. -timeout 2h -tags=perf -count=1 -args -image-tag=$TAG -image-registry=ghcr.io -image-namespace=${{ github.repository }} -retina-mode=advanced
