@@ -49,8 +49,8 @@ spec:
         - name: {{ include "retina.name" . }} 
           readinessProbe:
             httpGet:
-              path: /readyz
-              port: {{ .Values.daemonset.container.retina.ports.healthPort }}
+              path: /health
+              port: {{ .Values.daemonset.container.retina.ports.containerPort }}
             initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds | default "30" }}
             periodSeconds: {{ .Values.readinessProbe.periodSeconds | default "30" }}
             timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds | default "1" }}
@@ -58,8 +58,8 @@ spec:
             successThreshold: {{ .Values.readinessProbe.successThreshold | default "1" }}
           livenessProbe:
             httpGet:
-              path: /healthz
-              port: {{ .Values.daemonset.container.retina.ports.healthPort }}
+              path: /health
+              port: {{ .Values.daemonset.container.retina.ports.containerPort }}
             initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds | default "30" }}
             periodSeconds: {{ .Values.livenessProbe.periodSeconds | default "30" }}
             timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds | default "1" }}
@@ -228,8 +228,8 @@ spec:
                   fieldPath: status.hostIP
           readinessProbe:
             httpGet:
-              path: /readyz
-              port: {{ .Values.daemonset.container.retina.ports.healthPort }}
+              path: /health
+              port: {{ .Values.daemonset.container.retina.ports.containerPort }}
             initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds | default "30" }}
             periodSeconds: {{ .Values.readinessProbe.periodSeconds | default "30" }}
             timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds | default "1" }}
@@ -237,8 +237,8 @@ spec:
             successThreshold: {{ .Values.readinessProbe.successThreshold | default "1" }}
           livenessProbe:
             httpGet:
-              path: /healthz
-              port: {{ .Values.daemonset.container.retina.ports.healthPort }}
+              path: /health
+              port: {{ .Values.daemonset.container.retina.ports.containerPort }}
             initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds | default "30" }}
             periodSeconds: {{ .Values.livenessProbe.periodSeconds | default "30" }}
             timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds | default "1" }}

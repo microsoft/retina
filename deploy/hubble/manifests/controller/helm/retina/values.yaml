@@ -42,7 +42,7 @@ agent:
   init:
     enabled: true
     name: retina-agent-init
-    repository: ghcr.io/microsoft/retina/retina-initS
+    repository: ghcr.io/microsoft/retina/retina-init
 
     tag: "latest"
   pullPolicy: Always
@@ -58,7 +58,6 @@ agent:
       metricsBindAddress: ":18080"
       ports:
         containerPort: 10093
-        healthPort: 18081    
   # -- Node tolerations for pod assignment on nodes with taints
   # ref: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
   tolerations: []

@@ -4,7 +4,6 @@ package legacy
 
 import (
 	"fmt"
-	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -22,6 +21,7 @@ import (
 	crcache "sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	kcfg "sigs.k8s.io/controller-runtime/pkg/client/config"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	crmgr "sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
@@ -215,6 +215,14 @@ func (d *Daemon) Start() error {
 	}
 
 	//+kubebuilder:scaffold:builder
+
+	if healthCheckErr := mgr.AddHealthzCheck("healthz", healthz.Ping); healthCheckErr != nil {
+		mainLogger.Fatal("Unable to set up health check", zap.Error(healthCheckErr))
+	}
+	if addReadyCheckErr := mgr.AddReadyzCheck("readyz", healthz.Ping); addReadyCheckErr != nil {
+		mainLogger.Fatal("Unable to set up ready check", zap.Error(addReadyCheckErr))
+	}
+
 	// k8s Client used for informers
 	cl := kubernetes.NewForConfigOrDie(mgr.GetConfig())
 
@@ -306,15 +314,6 @@ func (d *Daemon) Start() error {
 	// Start controller manager, which will start http server and plugin manager.
 	go controllerMgr.Start(ctx)
 	mainLogger.Info("Started controller manager")
-
-	// Set health checks
-	if err := mgr.AddHealthzCheck("healthz", func(_ *http.Request) error { return nil }); err != nil {
-		mainLogger.Error("unable to set up agent health check", zap.Error(err))
-	}
-
-	if err := mgr.AddReadyzCheck("readyz", func(_ *http.Request) error { return nil }); err != nil {
-		mainLogger.Error("unable to set up agent ready check", zap.Error(err))
-	}
 
 	// Start all registered controllers. This will block until container receives SIGTERM.
 	if err := mgr.Start(ctx); err != nil {

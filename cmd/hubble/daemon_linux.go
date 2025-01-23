@@ -7,7 +7,6 @@ package hubble
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -65,14 +64,6 @@ var (
 			if err != nil {
 				logger.Error("failed to create manager")
 				return nil, nil, fmt.Errorf("creating new controller-runtime manager: %w", err)
-			}
-
-			if err := ctrlManager.AddHealthzCheck("healthz", func(_ *http.Request) error { return nil }); err != nil {
-				logger.Error("unable to set up agent healthz check", err)
-			}
-
-			if err := ctrlManager.AddReadyzCheck("readyz", func(_ *http.Request) error { return nil }); err != nil {
-				logger.Error("unable to set up agent readyz check", err)
 			}
 
 			return ctrlManager, ctrlManager.GetClient(), nil

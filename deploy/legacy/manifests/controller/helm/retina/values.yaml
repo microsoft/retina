@@ -87,7 +87,6 @@ daemonset:
       metricsBindAddress: ":18080"
       ports:
         containerPort: 10093
-        healthPort: 18081
 
 # volume mounts with name and mountPath
 volumeMounts:
