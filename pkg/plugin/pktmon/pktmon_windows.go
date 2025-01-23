@@ -21,6 +21,7 @@ import (
 	"go.uber.org/zap/zapio"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 )
@@ -161,11 +162,15 @@ func (p *Plugin) Start(ctx context.Context) error {
 	g.Go(func() error {
 		for {
 			err := p.GetFlow(ctx)
-			if _, ok := status.FromError(err); ok {
+			if stat, ok := status.FromError(err); ok {
+				if stat.Code() == codes.Internal {
+					p.l.Error("failed to get flow, retriable:", zap.Error(err))
+				}
 				p.l.Error("failed to get flow, retriable:", zap.Error(err))
 				continue
+			} else {
+				return errors.Wrapf(err, "failed to get flow")
 			}
-			return errors.Wrapf(err, "failed to get flow, unrecoverable")
 		}
 	})
 
