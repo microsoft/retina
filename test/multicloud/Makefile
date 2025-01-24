@@ -1,6 +1,8 @@
 PREFIX ?= retina
 STACK_NAME ?= $(PREFIX)-aks
 
+.PHONY: init plan apply quick gke aks kind destroy clean kind-kubeconfig test
+
 plan:
 	cd live/$(STACK_NAME) && \
 		tofu fmt && tofu init && tofu plan
@@ -32,9 +34,9 @@ destroy:
 clean: destroy
 	@cd live/$(STACK_NAME) && \
 		rm -rf .terraform && rm terraform.tfstate && rm terraform.tfstate.backup
-	@if [ $(STACK_NAME) == $(PREFIX)-kind ]; then \
-		rm -rf live/$(STACK_NAME)/mc-kind-config; \
-	fi
 
 kind-kubeconfig:
 	@kubectl config set-context live/$(PREFIX)-kind/mc-kind-config
+
+test:
+	@cd test && go test -v -count=1 -timeout 30m ./...
