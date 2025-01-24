@@ -6,7 +6,7 @@ import { githubA11yLight } from "./src/prismColorTheme";
 const config = {
   title: 'Retina',
   tagline: 'kubernetes network observability platform',
-  favicon: 'img/Retina-logo-white.png',
+  favicon: 'img/Retina-logo.png',
   url: 'https://retina.sh',
   baseUrl: '/',
   organizationName: 'Azure',
