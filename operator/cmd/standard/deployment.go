@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"os"
-	"time"
 
 	"go.uber.org/zap/zapcore"
 
@@ -55,8 +54,6 @@ var (
 	MaxFileSizeMB = 100
 	MaxBackups    = 3
 	MaxAgeDays    = 30
-
-	HeartbeatFrequency = 5 * time.Minute
 )
 
 func init() {
@@ -255,7 +252,7 @@ func (o *Operator) Start() {
 	}
 
 	// start heartbeat goroutine for application insights
-	go tel.Heartbeat(ctx, HeartbeatFrequency)
+	go tel.Heartbeat(ctx, oconfig.TelemetryInterval)
 }
 
 func EnablePProf() {

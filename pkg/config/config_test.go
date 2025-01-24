@@ -4,6 +4,7 @@
 package config
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 	"time"
@@ -26,8 +27,26 @@ func TestGetConfig(t *testing.T) {
 		!c.EnableRetinaEndpoint ||
 		c.RemoteContext ||
 		c.EnableAnnotations ||
+		c.TelemetryInterval != 15*time.Minute ||
 		c.DataAggregationLevel != Low {
-		t.Fatalf("Expeted config should be same as ./testwith/config.yaml; instead got %+v", c)
+		t.Errorf("Expeted config should be same as ./testwith/config.yaml; instead got %+v", c)
+	}
+}
+
+func TestGetConfig_SmallTelemetryInterval(t *testing.T) {
+	_, err := GetConfig("./testwith/config-small-telemetry-interval.yaml")
+	if !errors.Is(err, ErrorTelemetryIntervalTooSmall) {
+		t.Errorf("Expected error %s, instead got %s", ErrorTelemetryIntervalTooSmall, err)
+	}
+}
+
+func TestGetConfig_DefaultTelemetryInterval(t *testing.T) {
+	c, err := GetConfig("./testwith/config-without-telemetry-interval.yaml")
+	if err != nil {
+		t.Errorf("Expected no error, instead got %+v", err)
+	}
+	if c.TelemetryInterval != DefaultTelemetryInterval {
+		t.Errorf("Expected telemetry interval to be %v, instead got %v", DefaultTelemetryInterval, c.TelemetryInterval)
 	}
 }
 
