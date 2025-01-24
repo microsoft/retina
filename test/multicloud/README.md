@@ -11,21 +11,23 @@ This project leverages [OpenTofu](https://opentofu.org/docs/intro/) Infrastructu
 
 ## Prerequisites
 
-AKS:
+* [OpenTofu installation guide](https://opentofu.org/docs/intro/install/)
 
-1. create an Azure account
-2. [Install az](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli)
+* AKS:
 
-GKE:
+    1. create an Azure account
+    2. [Install az](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli)
 
-1. create a gcloud account, project and enable billing
-2. create a service account and service account key
-3. [Enable Kubernetes Engine API](https://console.developers.google.com/apis/api/container.googleapis.com/overview?project=mc-retina)
-4. [Install gcloud](https://cloud.google.com/sdk/docs/install)
+* GKE:
 
-Kind:
+    1. create a gcloud account, project and enable billing
+    2. create a service account and service account key
+    3. [Enable Kubernetes Engine API](https://console.developers.google.com/apis/api/container.googleapis.com/overview?project=mc-retina)
+    4. [Install gcloud](https://cloud.google.com/sdk/docs/install)
 
-1. Docker installed on the host machine
+* Kind:
+
+    1. Docker installed on the host machine
 
 ## Quickstart
 
