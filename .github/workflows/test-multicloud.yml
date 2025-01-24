@@ -10,6 +10,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - uses: opentofu/setup-opentofu@v1
+      with:
+        tofu_version: 1.8.3
+
     - name: Checkout code
       uses: actions/checkout@v2
 
