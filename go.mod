@@ -372,6 +372,6 @@ replace k8s.io/perf-tests/network/benchmarks/netperf => github.com/Azure/perf-te
 
 replace go.universe.tf/metallb => github.com/cilium/metallb v0.1.1-0.20220829170633-5d7dfb1129f7
 
-// replace github.com/cilium/cilium => github.com/ritwikranjan/cilium v0.0.0-20250114123205-3b4fd6e1c18d
+replace github.com/cilium/cilium => github.com/ritwikranjan/cilium v0.0.0-20250124161933-2d6f94502143
 
-replace github.com/cilium/cilium => github.com/anubhabMajumdar/cilium v0.0.0-20250114231451-025e95e1ee63
+// replace github.com/cilium/cilium => github.com/anubhabMajumdar/cilium v0.0.0-20250114231451-025e95e1ee63

@@ -35,7 +35,7 @@ type Enricher struct {
 
 	inputRing *container.Ring
 
-	Reader *container.RingReader
+	Reader container.RingReaderInterface
 
 	outputRing *container.Ring
 }
@@ -186,6 +186,6 @@ func (e *Enricher) Write(ev *v1.Event) {
 	e.inputRing.Write(ev)
 }
 
-func (e *Enricher) ExportReader() *container.RingReader {
+func (e *Enricher) ExportReader() RingReaderInterface {
 	return container.NewRingReader(e.outputRing, e.outputRing.OldestWrite())
 }
