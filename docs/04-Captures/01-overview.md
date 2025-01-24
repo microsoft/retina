@@ -1,6 +1,4 @@
-# Captures
-
-## Overview
+# Overview
 
 Retina Capture allows users to capture network traffic/metadata for specified Nodes/Pods.
 
@@ -19,7 +17,7 @@ There are two methods for triggering a Capture:
 
 The command syntax is `kubectl retina capture create [--flags]`.
 
-Refer to the [Capture Command](../04-Captures/cli.md) documentation for more details.
+Refer to the [Capture Command](../04-Captures/02-cli.md) documentation for more details.
 
 #### Example
 
@@ -47,7 +45,7 @@ Refer to the [Capture CRD](../05-Concepts/CRDs/Capture.md) documentation for mor
 
 #### Managed Storage Account
 
-To simplify the user experience, a managed storage account can be configured when setting up Retina. Instructions for this are provided [here](../04-Captures/managed-storage-account.md#setup).
+To simplify the user experience, a managed storage account can be configured when setting up Retina. Instructions for this are provided [here](../04-Captures/03-managed-storage-account.md#setup).
 
 #### Example
 
