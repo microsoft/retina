@@ -77,6 +77,14 @@ export STACK_NAME=retina-aks
 make clean
 ```
 
+### Test
+
+The test framework is levergaing Go and [Terratest](https://terratest.gruntwork.io/docs/). To run tests:
+
+```sh
+make test
+```
+
 ## Providers references
 
 * [GKE resource documentation](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/container_cluster)
