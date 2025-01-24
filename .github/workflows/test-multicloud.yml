@@ -20,6 +20,8 @@ jobs:
 
     - name: Install dependencies
       run: go mod download
+      working-directory: test/multicloud/
 
     - name: Run tests
       run: make test
+      working-directory: test/multicloud/
