@@ -2,6 +2,5 @@ terraform.tfvars
 .terraform
 terraform.tfstate
 *terraform.tfstate.*
-kubeconfig.yaml
 service-key.json
-kubeconfig.yaml
+mc-kind-config

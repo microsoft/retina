@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.0.0"
+  required_version = "1.8.3"
   required_providers {
     kind = {
       source  = "tehcyx/kind"
@@ -8,10 +8,6 @@ terraform {
     helm = {
       source  = "hashicorp/helm"
       version = "2.17.0"
-    }
-    local = {
-      source  = "hashicorp/local"
-      version = "2.5.2"
     }
   }
 }
