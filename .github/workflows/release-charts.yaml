@@ -40,9 +40,20 @@ jobs:
         run: |
           set -euo pipefail
           export TAG=$(make version)
-          helm package ./deploy/legacy/manifests/controller/helm/retina --version $TAG
+          helm package ./deploy/standard/manifests/controller/helm/retina --version $TAG
           # Get Helm chart's SHA digest from helm push cmd output
           helm push retina-$TAG.tgz oci://ghcr.io/${{ github.repository }}/charts >> helm_push_result.txt 2>&1
           cat helm_push_result.txt
           cosign sign --yes ghcr.io/${{ github.repository }}/charts/retina@$(tail -n 1 helm_push_result.txt | awk '{ print $2 }')
 
+      - name: Build, Push and Sign Hubble chart
+        id: build_hubble_chart
+        shell: bash
+        run: |
+          set -euo pipefail
+          export TAG=$(make version)
+          helm package ./deploy/hubble/manifests/controller/helm/retina --version $TAG
+          # Get Helm chart's SHA digest from helm push cmd output
+          helm push retina-hubble-$TAG.tgz oci://ghcr.io/${{ github.repository }}/charts >> helm_push_hubble.txt 2>&1
+          cat helm_push_hubble.txt
+          cosign sign --yes ghcr.io/${{ github.repository }}/charts/retina-hubble@$(tail -n 1 helm_push_hubble.txt | awk '{ print $2 }')

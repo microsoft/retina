@@ -9,7 +9,7 @@ To use the `Capture` CRD, [install Retina](../../02-Installation/01-Setup.md) wi
 
 ## CRD Specification
 
-The full specification for the `Capture` CRD can be found in the [Capture CRD](https://github.com/microsoft/retina/blob/main/deploy/legacy/manifests/controller/helm/retina/crds/retina.sh_captures.yaml) file.
+The full specification for the `Capture` CRD can be found in the [Capture CRD](https://github.com/microsoft/retina/blob/main/deploy/standard/manifests/controller/helm/retina/crds/retina.sh_captures.yaml) file.
 
 The `Capture` CRD is defined with the following specifications:
 
