@@ -286,7 +286,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v5 v5.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage v1.6.0
-	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.5.0
+	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.0
 	github.com/Microsoft/hcsshim v0.12.0-rc.3
 	github.com/Sytten/logrus-zap-hook v0.1.0
 	github.com/aws/aws-sdk-go-v2 v1.33.0
