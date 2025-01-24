@@ -1,4 +1,5 @@
 # Multi Cloud Retina
+
 This project leverages [OpenTofu](https://opentofu.org/docs/intro/) Infrastructure as Code (IaC) to create Kubernetes infrastructure on multi-cloud and deploy [microsoft/retina](https://github.com/microsoft/retina) via Helm provider.
 
 ## Modules available
@@ -13,7 +14,7 @@ This project leverages [OpenTofu](https://opentofu.org/docs/intro/) Infrastructu
 AKS:
 
 1. create an Azure account
-3. [Install az](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli)
+2. [Install az](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli)
 
 GKE:
 
@@ -25,7 +26,6 @@ GKE:
 Kind:
 
 1. Docker installed on the host machine
-
 
 ## Quickstart
 
@@ -49,14 +49,19 @@ Format code, initialize OpenTofu, plan and apply the stack to create infra and d
 ### Create
 
 * AKS:
+
     ```sh
     make aks
     ```
+
 * GKE:
+
     ```sh
     make gke
     ```
+
 * Kind:
+
     ```sh
     make kind
     ```
