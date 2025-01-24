@@ -22,7 +22,7 @@ SUBSCRIPTION_ID=""
 RESOURCE_GROUP_NAME=""
 REGION=""
 MSI_CLIENT_ID=""
-helm upgrade --install retina ./deploy/legacy/manifests/controller/helm/retina/ \
+helm upgrade --install retina ./deploy/standard/manifests/controller/helm/retina/ \
   --set operator.enabled=true \
   --set capture.enableManagedStorageAccount=true \
   --set capture.tenantId=$TENANT_ID \
@@ -68,7 +68,7 @@ data:
   azureCredentialConfig: /etc/kubernetes/cloud-config/azure.json
 ```
 
-In the above configuration, when `enableManagedStorageAccount` is true, retina-operator will pick azure credential configuration from `/etc/kubernetes/cloud-config/azure.json`. [retina-operator helm template](https://github.com/microsoft/retina/blob/main/deploy/legacy/manifests/controller/helm/retina/templates/operator.yaml) mounts the secret containing azure credentials to `/etc/kubernetes/cloud-config/azure.json`.
+In the above configuration, when `enableManagedStorageAccount` is true, retina-operator will pick azure credential configuration from `/etc/kubernetes/cloud-config/azure.json`. [retina-operator helm template](https://github.com/microsoft/retina/blob/main/deploy/standard/manifests/controller/helm/retina/templates/operator.yaml) mounts the secret containing azure credentials to `/etc/kubernetes/cloud-config/azure.json`.
 
 When default storage account is enabled, a managed storage account will be created under the resource group of the sub both specified in the credential file.
 In the case of AKS, the resource group will be MC, or node, resource group, and subscription will be the overlay subscription.

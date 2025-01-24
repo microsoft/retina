@@ -71,7 +71,7 @@ func (a *monitorAgent) SendEvent(typ int, event interface{}) error {
 		return nil
 	}
 
-	// marshal notifications into JSON format for legacy listeners
+	// marshal notifications into JSON format for standard listeners
 	if typ == api.MessageTypeAgent {
 		msg, ok := event.(api.AgentNotifyMessage)
 		if !ok {

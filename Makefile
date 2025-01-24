@@ -11,6 +11,7 @@ ifndef TAG
 	TAG ?= $(shell git describe --tags --always)
 endif
 OUTPUT_DIR = $(REPO_ROOT)/output
+ARTIFACTS_DIR = $(REPO_ROOT)/artifacts
 BUILD_DIR = $(OUTPUT_DIR)/$(GOOS)_$(GOARCH)
 RETINA_BUILD_DIR = $(BUILD_DIR)/retina
 RETINA_DIR = $(REPO_ROOT)/controller
@@ -241,6 +242,7 @@ container-docker: buildx # util target to build container images using docker bu
 	image_metadata_filename="image-metadata-$$image_name-$(TAG).json"; \
 	touch $$image_metadata_filename; \
 	echo "Building $$image_name for $$os/$$arch "; \
+	mkdir -p $(ARTIFACTS_DIR); \
 	docker buildx build \
 		--platform $(PLATFORM) \
 		--metadata-file=$$image_metadata_filename \
@@ -253,6 +255,7 @@ container-docker: buildx # util target to build container images using docker bu
 		--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
 		--target=$(TARGET) \
 		-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
+		--output type=local,dest=$(ARTIFACTS_DIR) \
 		$(BUILDX_ACTION) \
 		$(CONTEXT_DIR) 
 
@@ -441,7 +444,7 @@ HELM_IMAGE_TAG ?= $(LATEST_TAG)
 
 # basic/node-level mode
 helm-install: manifests
-	helm upgrade --install retina ./deploy/legacy/manifests/controller/helm/retina/ \
+	helm upgrade --install retina ./deploy/standard/manifests/controller/helm/retina/ \
 		--namespace kube-system \
 		--set image.repository=$(IMAGE_REGISTRY)/$(RETINA_IMAGE) \
 		--set image.initRepository=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE) \
@@ -454,7 +457,7 @@ helm-install: manifests
 		--set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\]"
 
 helm-install-with-operator: manifests
-	helm upgrade --install retina ./deploy/legacy/manifests/controller/helm/retina/ \
+	helm upgrade --install retina ./deploy/standard/manifests/controller/helm/retina/ \
 		--namespace kube-system \
 		--set image.repository=$(IMAGE_REGISTRY)/$(RETINA_IMAGE) \
 		--set image.initRepository=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE) \
@@ -471,7 +474,7 @@ helm-install-with-operator: manifests
 
 # advanced/pod-level mode with scale limitations, where metrics are aggregated by source and destination Pod
 helm-install-advanced-remote-context: manifests
-	helm upgrade --install retina ./deploy/legacy/manifests/controller/helm/retina/ \
+	helm upgrade --install retina ./deploy/standard/manifests/controller/helm/retina/ \
 		--namespace kube-system \
 		--set image.repository=$(IMAGE_REGISTRY)/$(RETINA_IMAGE) \
 		--set image.initRepository=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE) \
@@ -490,7 +493,7 @@ helm-install-advanced-remote-context: manifests
 
 # advanced/pod-level mode designed for scale, where metrics are aggregated by "local" Pod (source for outgoing traffic, destination for incoming traffic)
 helm-install-advanced-local-context: manifests
-	helm upgrade --install retina ./deploy/legacy/manifests/controller/helm/retina/ \
+	helm upgrade --install retina ./deploy/standard/manifests/controller/helm/retina/ \
 		--namespace kube-system \
 		--set image.repository=$(IMAGE_REGISTRY)/$(RETINA_IMAGE) \
 		--set image.initRepository=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE) \
@@ -548,6 +551,9 @@ get-certs:
 		)
 	hubble config set tls true
 	hubble config set tls-server-name instance.hubble-relay.cilium.io
+
+# Replaces every '.' in $(1) with '\.'
+escape_dot = $(subst .,\.,$(1))
 
 .PHONY: clean-certs
 clean-certs:

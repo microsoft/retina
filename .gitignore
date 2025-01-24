@@ -45,3 +45,5 @@ image-metadata-*.json
 *results*.json
 netperf-*.json
 netperf-*.csv
+
+.certs/

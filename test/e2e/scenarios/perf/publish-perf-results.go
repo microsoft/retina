@@ -14,6 +14,7 @@ import (
 )
 
 type PublishPerfResults struct {
+	RetinaMode  string
 	ResultsFile string
 }
 
@@ -59,6 +60,7 @@ func (v *PublishPerfResults) Run() error {
 
 	telemetryClient, err := telemetry.NewAppInsightsTelemetryClient("retina-perf-test", map[string]string{
 		"retinaVersion": retinaVersion,
+		"retinaMode":    v.RetinaMode,
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to create telemetry client")
