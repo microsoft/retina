@@ -46,7 +46,6 @@ var (
 	AclRule               = "aclrule"
 	Active                = "ACTIVE"
 	Device                = "device"
-	Uninitialized         = "uninitialized"
 
 	// TCP Connection Statistic Names
 	ResetCount           = "ResetCount"

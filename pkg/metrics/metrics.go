@@ -46,12 +46,6 @@ func InitializeMetrics() {
 		hnsStatsDescription,
 		utils.Direction,
 	)
-	VFPStatsGauge = exporter.CreatePrometheusGaugeVecForMetric(
-		exporter.DefaultRegistry,
-		vfpStats,
-		vfpStatsDescription,
-		utils.State,
-	)
 	NodeConnectivityStatusGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
 		utils.NodeConnectivityStatusName,

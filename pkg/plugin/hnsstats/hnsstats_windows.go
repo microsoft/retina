@@ -181,7 +181,6 @@ func notifyHnsStats(h *hnsstats, stats *HnsStatsData) {
 	metrics.DropPacketsGauge.WithLabelValues(utils.Endpoint, ingressLabel).Set(float64(stats.hnscounters.DroppedPacketsIncoming))
 
 	if stats.vfpCounters == nil {
-		metrics.VFPStatsGauge.WithLabelValues(utils.Uninitialized).Inc()
 		h.l.Debug("will not record some metrics since VFP port counters failed to be set")
 		return
 	}
