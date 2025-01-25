@@ -1,5 +1,5 @@
 apiVersion: v2
-name: retina
+name: retina-hubble
 description: A Helm chart for Retina Network Observability in Kubernetes with dependencies
 
 # A chart can be either an 'application' or a 'library' chart.

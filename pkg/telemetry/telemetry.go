@@ -10,12 +10,15 @@ import (
 	"os"
 	"runtime"
 	"runtime/debug"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/microsoft/ApplicationInsights-Go/appinsights"
 	"github.com/microsoft/ApplicationInsights-Go/appinsights/contracts"
+	"github.com/microsoft/retina/pkg/exporter"
 	"github.com/microsoft/retina/pkg/log"
+	io_prometheus_client "github.com/prometheus/client_model/go"
 )
 
 var (
@@ -174,9 +177,54 @@ func (t *TelemetryClient) heartbeat(ctx context.Context) {
 	if err != nil {
 		t.trackWarning(err, "failed to get cpu usage")
 	}
+
+	metricscardinality, err := metricsCardinality()
+	if err != nil {
+		t.trackWarning(err, "failed to get metrics cardinality")
+	}
+
+	props["metricscardinality"] = strconv.Itoa(metricscardinality)
+
 	maps.Copy(props, cpuProps)
 	maps.Copy(props, t.profile.GetMemoryUsage())
 	t.TrackEvent("heartbeat", props)
+}
+func metricsCardinality() (int, error) {
+	metricFamilies, err := exporter.CombinedGatherer.Gather()
+	if err != nil {
+		return 0, fmt.Errorf("failed to gather metrics: %w", err)
+	}
+
+	metricscardinality := 0
+
+	for _, mf := range metricFamilies {
+		switch mf.GetType() { //nolint:exhaustive // 'default' satisfies exhaustiveness
+
+		case io_prometheus_client.MetricType_HISTOGRAM:
+			metrics := mf.GetMetric()
+			for _, m := range metrics {
+				metricscardinality += len(m.GetHistogram().GetBucket()) + 3 // +3 for le="+Inf", _sum and _count
+			}
+
+		case io_prometheus_client.MetricType_GAUGE_HISTOGRAM:
+			metrics := mf.GetMetric()
+			for _, m := range metrics {
+				metricscardinality += len(m.GetHistogram().GetBucket()) + 3 // +3 for le="+Inf", _sum and _count
+			}
+
+		case io_prometheus_client.MetricType_SUMMARY:
+			metrics := mf.GetMetric()
+			for _, m := range metrics {
+				metricscardinality += len(m.GetSummary().GetQuantile()) + 2 // +2 for _sum and _count
+			}
+
+		default:
+			metricscardinality += len(mf.GetMetric())
+
+		}
+	}
+
+	return metricscardinality, nil
 }
 
 func bToMb(b uint64) uint64 {
