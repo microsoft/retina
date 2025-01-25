@@ -4,9 +4,11 @@
 package enricher
 
 import (
+	"context"
 	"sync"
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
+	"github.com/microsoft/retina/pkg/controllers/cache"
 )
 
 var (
@@ -17,7 +19,7 @@ var (
 
 type Enricher struct{}
 
-func New() *Enricher {
+func New(_ context.Context, _ cache.CacheInterface) *Enricher {
 	once.Do(func() {
 		e = &Enricher{}
 		initialized = true
