@@ -1,5 +1,3 @@
-// go:build !windows
-
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 package cmd
