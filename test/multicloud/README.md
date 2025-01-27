@@ -2,6 +2,8 @@
 
 This project leverages [OpenTofu](https://opentofu.org/docs/intro/) Infrastructure as Code (IaC) to create Kubernetes infrastructure on multi-cloud and deploy [microsoft/retina](https://github.com/microsoft/retina) via Helm provider.
 
+![Architecture Diagram](./diagrams/diagram.svg)
+
 ## Modules available
 
 * [aks](./modules/aks/)
