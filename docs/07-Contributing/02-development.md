@@ -180,6 +180,12 @@ Uninstall `Retina`:
 make helm-uninstall
 ```
 
+## Updating Documentation
+
+The documentation available on [retina.sh](https://retina.sh) can be found within the [docs](https://github.com/microsoft/retina/tree/main/docs) folder in the repository.
+
+The diagrams used are created with [Excalidraw](https://excalidraw.com/). The source `.excalidraw` files are stored within the repository, alongside their `.png` equivalent.
+
 ## Opening a Pull Request
 
 When you're ready to open a pull request, please ensure that your branch is up-to-date with the `main` branch, updates relevant docs and tests, and passes all tests and lints.
