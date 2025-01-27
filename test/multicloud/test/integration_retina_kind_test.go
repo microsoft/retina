@@ -13,7 +13,7 @@ func TestRetinaKindIntegration(t *testing.T) {
 		TerraformDir: "../examples/integration/retina-kind",
 
 		Vars: map[string]interface{}{
-			"prefix":         "test",
+			"prefix":         "test-integration",
 			"retina_version": "v0.0.24",
 		},
 	}
