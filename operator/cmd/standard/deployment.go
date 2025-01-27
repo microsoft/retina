@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
-package legacy
+package standard
 
 import (
 	"context"
@@ -29,7 +29,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
-	deploy "github.com/microsoft/retina/deploy/legacy"
+	deploy "github.com/microsoft/retina/deploy/standard"
 	"github.com/microsoft/retina/internal/buildinfo"
 	"github.com/microsoft/retina/operator/cache"
 	config "github.com/microsoft/retina/operator/config"
@@ -84,7 +84,7 @@ func NewOperator(metricsAddr, probeAddr, configFile string, enableLeaderElection
 func (o *Operator) Start() {
 	mainLogger = log.Logger().Named("main")
 
-	mainLogger.Sugar().Infof("Starting legacy operator")
+	mainLogger.Sugar().Infof("Starting standard operator")
 
 	opts := &crzap.Options{
 		Development: false,
