@@ -33,11 +33,11 @@ import (
 	operatorOption "github.com/cilium/cilium/operator/option"
 	cmtypes "github.com/cilium/cilium/pkg/clustermesh/types"
 	"github.com/cilium/cilium/pkg/controller"
-	"github.com/cilium/cilium/pkg/hive/cell"
 	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
 	"github.com/cilium/cilium/pkg/kvstore/store"
 	"github.com/cilium/cilium/pkg/option"
 	"github.com/cilium/cilium/pkg/pprof"
+	"github.com/cilium/hive/cell"
 )
 
 const operatorK8sNamespace = "kube-system"
@@ -121,8 +121,8 @@ var (
 		"Operator Control Plane",
 
 		cell.Config(cmtypes.DefaultClusterInfo),
-		cell.Invoke(func(cinfo cmtypes.ClusterInfo) error {
-			err := cinfo.Validate()
+		cell.Invoke(func(cinfo cmtypes.ClusterInfo, l logrus.FieldLogger) error {
+			err := cinfo.Validate(l)
 			if err != nil {
 				return fmt.Errorf("error validating cluster info: %w", err)
 			}

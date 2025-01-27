@@ -7,11 +7,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cilium/cilium/pkg/datapath/iptables/ipset"
 	datapathtypes "github.com/cilium/cilium/pkg/datapath/types"
 	"github.com/cilium/cilium/pkg/endpoint"
 	"github.com/cilium/cilium/pkg/identity"
 	"github.com/cilium/cilium/pkg/identity/cache"
 	"github.com/cilium/cilium/pkg/ipcache"
+	"github.com/cilium/cilium/pkg/k8s"
 	"github.com/cilium/cilium/pkg/k8s/resource"
 	slim_corev1 "github.com/cilium/cilium/pkg/k8s/slim/k8s/api/core/v1"
 	nodetypes "github.com/cilium/cilium/pkg/node/types"
@@ -107,7 +109,7 @@ func (n *nodeaddressing) IPv4() datapathtypes.NodeAddressingFamily {
 
 type identityAllocatorOwner struct{}
 
-func (i *identityAllocatorOwner) UpdateIdentities(cache.IdentityCache, cache.IdentityCache) {}
+func (i *identityAllocatorOwner) UpdateIdentities(identity.IdentityMap, identity.IdentityMap) {}
 
 func (i *identityAllocatorOwner) GetNodeSuffix() string {
 	return ""
@@ -127,10 +129,49 @@ func (c cachingIdentityAllocator) ReleaseCIDRIdentitiesByID(context.Context, []i
 
 type policyhandler struct{}
 
-func (p *policyhandler) UpdateIdentities(cache.IdentityCache, cache.IdentityCache, *sync.WaitGroup) {}
+func (p *policyhandler) UpdateIdentities(identity.IdentityMap, identity.IdentityMap, *sync.WaitGroup) {
+}
 
 type datapathhandler struct{}
 
 func (d *datapathhandler) UpdatePolicyMaps(context.Context, *sync.WaitGroup) *sync.WaitGroup {
 	return &sync.WaitGroup{}
+}
+
+type fakeBandwidthManager struct{}
+
+func (f *fakeBandwidthManager) BBREnabled() bool {
+	return false
+}
+
+func (f *fakeBandwidthManager) Enabled() bool {
+	return false
+}
+
+func (f *fakeBandwidthManager) UpdateBandwidthLimit(uint16, uint64) {}
+
+func (f *fakeBandwidthManager) DeleteBandwidthLimit(uint16) {}
+
+type fakeIpsetMgr struct{}
+
+func (f *fakeIpsetMgr) NewInitializer() ipset.Initializer {
+	return nil
+}
+
+func (f *fakeIpsetMgr) AddToIPSet(string, ipset.Family, ...netip.Addr) {}
+
+func (f *fakeIpsetMgr) RemoveFromIPSet(string, ...netip.Addr) {}
+
+type fakeMetalLBBgpSpeaker struct{}
+
+func (f *fakeMetalLBBgpSpeaker) OnUpdateEndpoints(*k8s.Endpoints) error {
+	return nil
+}
+
+func (f *fakeMetalLBBgpSpeaker) OnUpdateService(*slim_corev1.Service) error {
+	return nil
+}
+
+func (f *fakeMetalLBBgpSpeaker) OnDeleteService(*slim_corev1.Service) error {
+	return nil
 }

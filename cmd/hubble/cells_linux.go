@@ -7,10 +7,10 @@ package hubble
 import (
 	"github.com/cilium/cilium/pkg/defaults"
 	"github.com/cilium/cilium/pkg/gops"
-	"github.com/cilium/cilium/pkg/hive/cell"
 	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
 	"github.com/cilium/cilium/pkg/option"
 	"github.com/cilium/cilium/pkg/pprof"
+	"github.com/cilium/hive/cell"
 	"github.com/cilium/proxy/pkg/logging"
 	"github.com/cilium/proxy/pkg/logging/logfields"
 	"github.com/microsoft/retina/internal/buildinfo"
@@ -89,9 +89,9 @@ var (
 
 		pluginmanager.Cell,
 
-		retinak8s.Cell,
-
 		servermanager.Cell,
+
+		retinak8s.Cell,
 
 		telemetry.Heartbeat,
 	)

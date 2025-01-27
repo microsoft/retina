@@ -3,7 +3,7 @@ package config
 import (
 	"fmt"
 
-	"github.com/cilium/cilium/pkg/hive/cell"
+	"github.com/cilium/hive/cell"
 	"k8s.io/client-go/rest"
 	kcfg "sigs.k8s.io/controller-runtime/pkg/client/config"
 )

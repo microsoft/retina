@@ -17,7 +17,6 @@ import (
 
 	retinak8s "github.com/microsoft/retina/pkg/k8s"
 
-	"github.com/cilium/cilium/pkg/hive/cell"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/cilium/pkg/ipcache"
 	"github.com/cilium/cilium/pkg/k8s"
@@ -25,6 +24,7 @@ import (
 	"github.com/cilium/cilium/pkg/k8s/watchers"
 	monitoragent "github.com/cilium/cilium/pkg/monitor/agent"
 	"github.com/cilium/cilium/pkg/node"
+	"github.com/cilium/hive/cell"
 	"github.com/cilium/workerpool"
 
 	corev1 "k8s.io/api/core/v1"

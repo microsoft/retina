@@ -6,7 +6,6 @@ import (
 
 	"github.com/cilium/cilium/api/v1/flow"
 	"github.com/cilium/cilium/pkg/crypto/certloader"
-	"github.com/cilium/cilium/pkg/hive/cell"
 	"github.com/cilium/cilium/pkg/hubble/container"
 	"github.com/cilium/cilium/pkg/hubble/metrics"
 	"github.com/cilium/cilium/pkg/hubble/monitor"
@@ -17,9 +16,11 @@ import (
 	"github.com/cilium/cilium/pkg/hubble/server"
 	"github.com/cilium/cilium/pkg/hubble/server/serveroption"
 	"github.com/cilium/cilium/pkg/ipcache"
+	"github.com/cilium/cilium/pkg/k8s"
 	"github.com/cilium/cilium/pkg/logging/logfields"
 	monitoragent "github.com/cilium/cilium/pkg/monitor/agent"
 	"github.com/cilium/cilium/pkg/option"
+	"github.com/cilium/hive/cell"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	rnode "github.com/microsoft/retina/pkg/controllers/daemon/nodereconciler"
 	"github.com/microsoft/retina/pkg/hubble/parser"
@@ -34,6 +35,7 @@ type RetinaHubble struct {
 	log            *logrus.Entry
 	client         client.Client
 	monitorAgent   monitoragent.Agent
+	svc            *k8s.ServiceCache
 	ipc            *ipcache.IPCache
 	nodeReconciler *rnode.NodeReconciler
 }
@@ -43,6 +45,7 @@ type hubbleParams struct {
 
 	Client         client.Client
 	MonitorAgent   monitoragent.Agent
+	ServiceCache   *k8s.ServiceCache
 	IPCache        *ipcache.IPCache
 	NodeReconciler *rnode.NodeReconciler
 	Log            logrus.FieldLogger
@@ -53,6 +56,7 @@ func newRetinaHubble(params hubbleParams) *RetinaHubble {
 		log:            params.Log.WithField(logfields.LogSubsys, "retina-hubble"),
 		client:         params.Client,
 		monitorAgent:   params.MonitorAgent,
+		svc:            params.ServiceCache,
 		ipc:            params.IPCache,
 		nodeReconciler: params.NodeReconciler,
 	}
@@ -89,7 +93,7 @@ func (rh *RetinaHubble) start(ctx context.Context) error {
 	// ---------------------------------------------------------------------------------------------------------------------------------------------------- //
 	// Setup metrics.
 	grpcMetrics := grpc_prometheus.NewServerMetrics()
-	if err := metrics.EnableMetrics(rh.log, option.Config.HubbleMetricsServer, option.Config.HubbleMetrics, grpcMetrics, option.Config.EnableHubbleOpenMetrics); err != nil {
+	if err := metrics.EnableMetrics(rh.log.Logger, option.Config.HubbleMetricsServer, nil, option.Config.HubbleMetrics, grpcMetrics, option.Config.EnableHubbleOpenMetrics); err != nil {
 		rh.log.Error("Failed to enable metrics", zap.Error(err))
 		return fmt.Errorf("enabling metrics: %w", err)
 	}
@@ -115,7 +119,7 @@ func (rh *RetinaHubble) start(ctx context.Context) error {
 	)
 
 	// TODO: Replace with our custom parser.
-	payloadParser := parser.New(rh.log, rh.ipc)
+	payloadParser := parser.New(rh.log, rh.svc, rh.ipc)
 
 	namespaceManager := observer.NewNamespaceManager()
 	go namespaceManager.Run(ctx)

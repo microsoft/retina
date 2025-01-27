@@ -1,12 +1,14 @@
 package common
 
 import (
+	"net"
 	"net/netip"
 	"os"
 
 	"github.com/cilium/cilium/api/v1/flow"
 	"github.com/cilium/cilium/pkg/identity"
 	ipc "github.com/cilium/cilium/pkg/ipcache"
+	"github.com/cilium/cilium/pkg/k8s"
 	"github.com/cilium/cilium/pkg/labels"
 )
 
@@ -22,7 +24,7 @@ type epDecoder struct {
 	ipcache     *ipc.IPCache
 }
 
-func NewEpDecoder(c *ipc.IPCache) *epDecoder { //nolint:revive // This is a factory function.
+func NewEpDecoder(c *ipc.IPCache) EpDecoder {
 	return &epDecoder{
 		localHostIP: os.Getenv("NODE_IP"),
 		ipcache:     c,
@@ -53,7 +55,8 @@ func (e *epDecoder) Decode(ip netip.Addr) *flow.Endpoint {
 	case identity.ReservedIdentityWorld:
 		ep.Labels = labels.LabelWorld.GetModel()
 	default:
-		ep.Labels = e.ipcache.GetMetadataLabelsByIP(ip).GetModel()
+		prefix := netip.PrefixFrom(ip, ip.BitLen())
+		ep.Labels = e.ipcache.GetMetadataLabelsByPrefix(prefix).GetModel()
 	}
 
 	return ep
@@ -68,26 +71,26 @@ func (e *epDecoder) IsEndpointOnLocalHost(ip string) bool {
 	return e.localHostIP == e.endpointHostIP(ip)
 }
 
-// type SvcDecoder interface {
-// 	Decode(ip netip.Addr) *flow.Service
-// }
-//
-// type svcDecoder struct {
-// 	svccache *k8s.ServiceCache
-// }
-//
-// func NewSvcDecoder(sc *k8s.ServiceCache) *svcDecoder {
-// 	return &svcDecoder{
-// 		svccache: sc,
-// 	}
-// }
-//
-// func (s *svcDecoder) Decode(ip netip.Addr) *flow.Service {
-// 	svc := &flow.Service{}
-//
-// 	if svcID, ok := s.svccache.GetServiceIDFromFrontendIP(ip.String()); ok {
-// 		svc.Name = svcID.Name
-// 		svc.Namespace = svcID.Namespace
-// 	}
-// 	return svc
-// }
+type SvcDecoder interface {
+	Decode(ip netip.Addr) *flow.Service
+}
+
+type svcDecoder struct {
+	svccache *k8s.ServiceCache
+}
+
+func NewSvcDecoder(sc *k8s.ServiceCache) SvcDecoder {
+	return &svcDecoder{
+		svccache: sc,
+	}
+}
+
+func (s *svcDecoder) Decode(ip netip.Addr) *flow.Service {
+	svc := &flow.Service{}
+
+	if svcID, ok := s.svccache.GetServiceIDByIP(net.IP(ip.String())); ok {
+		svc.Name = svcID.Name
+		svc.Namespace = svcID.Namespace
+	}
+	return svc
+}
