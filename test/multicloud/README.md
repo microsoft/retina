@@ -72,7 +72,9 @@ Format code, initialize OpenTofu, plan and apply the stack to create infra and d
     make kind
     ```
 
-To destroy the cluster
+### Clean up
+
+To destroy the cluster specify the `STACK_NAME` and run `make clean`.
 
 ```sh
 # destroy AKS and cleanup local state files
