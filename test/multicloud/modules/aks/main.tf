@@ -8,33 +8,39 @@ resource "azurerm_kubernetes_cluster" "aks" {
   location            = azurerm_resource_group.aks_rg.location
   resource_group_name = azurerm_resource_group.aks_rg.name
   dns_prefix          = "${var.prefix}-aks-dns"
-  kubernetes_version  = "1.29.8"
+  kubernetes_version  = var.kubernetes_version
 
-  default_node_pool {
-    name            = "agentpool"
-    node_count      = 2
-    vm_size         = "Standard_D4ds_v5"
-    os_disk_size_gb = 128
-    os_disk_type    = "Ephemeral"
-    max_pods        = 110
-    type            = "VirtualMachineScaleSets"
-    node_labels     = var.labels
+  dynamic "default_node_pool" {
+    for_each = [var.default_node_pool]
+    content {
+      name            = default_node_pool.value.name
+      node_count      = default_node_pool.value.node_count
+      vm_size         = default_node_pool.value.vm_size
+      os_disk_size_gb = default_node_pool.value.os_disk_size_gb
+      os_disk_type    = default_node_pool.value.os_disk_type
+      max_pods        = default_node_pool.value.max_pods
+      type            = default_node_pool.value.type
+      node_labels     = default_node_pool.value.node_labels
+    }
   }
 
   identity {
     type = "SystemAssigned"
   }
 
-  network_profile {
-    network_plugin      = "azure"
-    network_plugin_mode = "overlay"
-    load_balancer_profile {
-      managed_outbound_ip_count = 1
+  dynamic "network_profile" {
+    for_each = [var.network_profile]
+    content {
+      network_plugin      = network_profile.value.network_plugin
+      network_plugin_mode = network_profile.value.network_plugin_mode
+      load_balancer_profile {
+        managed_outbound_ip_count = network_profile.value.load_balancer_profile.managed_outbound_ip_count
+      }
+      pod_cidr       = network_profile.value.pod_cidr
+      service_cidr   = network_profile.value.service_cidr
+      dns_service_ip = network_profile.value.dns_service_ip
+      outbound_type  = network_profile.value.outbound_type
     }
-    pod_cidr       = "10.244.0.0/16"
-    service_cidr   = "10.0.0.0/16"
-    dns_service_ip = "10.0.0.10"
-    outbound_type  = "loadBalancer"
   }
 
   tags = var.labels
