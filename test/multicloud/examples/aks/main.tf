@@ -6,6 +6,7 @@ module "aks" {
   labels              = var.labels
 }
 
-output kubeconfig {
-  value       = module.aks.azure_get_kubeconfig
+output "kubeconfig" {
+  value     = module.aks.azure_get_kubeconfig
+  sensitive = true
 }

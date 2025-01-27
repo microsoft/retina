@@ -11,7 +11,7 @@ variable "tenant_id" {
 variable "location" {
   description = "The Azure Cloud location where AKS will be deployed to."
   type        = string
-  default    = "UK South"
+  default     = "UK South"
 }
 
 variable "resource_group_name" {
