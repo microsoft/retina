@@ -20,6 +20,14 @@ This project leverages [OpenTofu](https://opentofu.org/docs/intro/) Infrastructu
     1. create an Azure account
     2. [Install az](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli)
 
+    To deploy an AKS cluster and install retina, create file `live/retina-aks/terraform.tfvars` with the Azure TenantID and SubscriptionID
+
+    ```sh
+    # example values
+    subscription_id     = "d6050d84-e4dd-463d-afc7-a6ab3dc33ab7"
+    tenant_id           = "ac8a4ccd-35f1-4f95-a688-f68e3d89adfc"
+    ```
+
 * GKE:
 
     1. create a gcloud account, project and enable billing
@@ -27,30 +35,24 @@ This project leverages [OpenTofu](https://opentofu.org/docs/intro/) Infrastructu
     3. [Enable Kubernetes Engine API](https://console.developers.google.com/apis/api/container.googleapis.com/overview?project=mc-retina)
     4. [Install gcloud](https://cloud.google.com/sdk/docs/install)
 
+    To deploy a GKE cluster export `GOOGLE_APPLICATION_CREDENTIALS` env variable to point to the path where your [service account key](https://cloud.google.com/iam/docs/keys-create-delete) is located.
+
+    ```sh
+    # example
+    export GOOGLE_APPLICATION_CREDENTIALS=/Users/srodi/src/retina/test/multicloud/live/retina-gke/service-key.json
+    ```
+
 * Kind:
 
     1. Docker installed on the host machine
 
 ## Quickstart
 
-To deploy an AKS cluster and install retina, create file `live/retina-aks/terraform.tfvars` with the Azure TenantID and SubscriptionID
-
-```sh
-# example values
-subscription_id     = "d6050d84-e4dd-463d-afc7-a6ab3dc33ab7"
-tenant_id           = "ac8a4ccd-35f1-4f95-a688-f68e3d89adfc"
-```
-
-To deploy a GKE cluster export `GOOGLE_APPLICATION_CREDENTIALS` env variable to point to the path where your [service account key](https://cloud.google.com/iam/docs/keys-create-delete) is located.
-
-```sh
-# example
-export GOOGLE_APPLICATION_CREDENTIALS=/Users/srodi/src/retina/test/multicloud/live/retina-gke/service-key.json
-```
-
-Format code, initialize OpenTofu, plan and apply the stack to create infra and deploy retina
+The following Make targets can be used to manage each stack lifecycle.
 
 ### Create
+
+Format code, initialize OpenTofu, plan and apply the stack to create infra and deploy retina
 
 * AKS:
 
