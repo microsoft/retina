@@ -3,6 +3,7 @@ package test
 import (
 	"bufio"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"strings"
@@ -14,16 +15,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func buildClientSet(caCert, clientCert, clientKey, host string) (*kubernetes.Clientset, error) {
-	// Create a TLS REST config using the provided certificates
-	config := &rest.Config{
-		Host: host,
-		TLSClientConfig: rest.TLSClientConfig{
-			CAData:   []byte(caCert),
-			CertData: []byte(clientCert),
-			KeyData:  []byte(clientKey),
-		},
-	}
+func buildClientSet(config *rest.Config) (*kubernetes.Clientset, error) {
 	// Create a Kubernetes client
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
@@ -32,22 +24,36 @@ func buildClientSet(caCert, clientCert, clientKey, host string) (*kubernetes.Cli
 	return clientset, nil
 }
 
-func checkClusterAccess(t *testing.T, caCert, clientCert, clientKey, host string) {
-	// Create a TLS config using the provided certificates
-	tlsClientConfig := rest.TLSClientConfig{
-		CAData:   []byte(caCert),
-		CertData: []byte(clientCert),
-		KeyData:  []byte(clientKey),
-	}
-	// Create a Kubernetes client config
+// Create a Bearer token REST config
+func createRESTConfigWithBearer(caCert, bearerToken, host string) *rest.Config {
 	config := &rest.Config{
-		Host:            host,
-		TLSClientConfig: tlsClientConfig,
+		Host:        host,
+		BearerToken: bearerToken,
+		TLSClientConfig: rest.TLSClientConfig{
+			CAData: []byte(caCert),
+		},
 	}
-	// Create a Kubernetes client
-	clientset, err := kubernetes.NewForConfig(config)
+	return config
+}
+
+// Create REST config with client cert and key
+func createRESTConfigWithClientCert(caCert, clientCert, clientKey, host string) *rest.Config {
+	config := &rest.Config{
+		Host: host,
+		TLSClientConfig: rest.TLSClientConfig{
+			CAData:   []byte(caCert),
+			CertData: []byte(clientCert),
+			KeyData:  []byte(clientKey),
+		},
+	}
+	return config
+}
+
+func testClusterAccess(t *testing.T, clientset *kubernetes.Clientset) {
+	// Test the cluster is accessible by listing nodes
+	_, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		t.Fatalf("Failed to create Kubernetes client: %v", err)
+		t.Fatalf("Failed to list nodes: %v", err)
 	}
 	// Test the cluster is accessible by listing namespaces
 	_, err = clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
@@ -100,4 +106,15 @@ func checkRetinaLogs(t *testing.T, clientset *kubernetes.Clientset) {
 		// Close the logs stream
 		logs.Close()
 	}
+}
+
+// function to convert base64 encoded string to plain text
+func decodeBase64(encoded string) (string, error) {
+	// decode the base64 encoded string
+	decoded, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return "", err
+	}
+	// return the decoded string
+	return string(decoded), nil
 }

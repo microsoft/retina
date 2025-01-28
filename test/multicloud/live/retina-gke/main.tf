@@ -10,7 +10,3 @@ module "retina" {
   depends_on = [module.gke]
   source     = "../../modules/retina"
 }
-
-output "kubeconfig_command" {
-  value = module.gke.gcloud_get_kubeconfig
-}

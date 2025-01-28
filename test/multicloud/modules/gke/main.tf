@@ -13,13 +13,6 @@ resource "google_container_cluster" "gke" {
   remove_default_node_pool = true
   initial_node_count       = 1
   deletion_protection      = false
-
-  # Required to configure Kubernetes provider
-  master_auth {
-    client_certificate_config {
-      issue_client_certificate = true
-    }
-  }
 }
 
 resource "google_container_node_pool" "gke_preemptible_nodes" {

@@ -3,4 +3,4 @@ terraform.tfvars
 terraform.tfstate
 *terraform.tfstate.*
 service-key.json
-mc-kind-config
+*-kind-config

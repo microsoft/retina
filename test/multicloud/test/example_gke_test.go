@@ -14,8 +14,8 @@ func TestGKEExample(t *testing.T) {
 
 		Vars: map[string]interface{}{
 			"prefix":       "test",
-			"location":     "eu-central1",
-			"project":      "mc-retina", // TODO: replace with actual project once we get gcloud access
+			"location":     "europe-west2", // London
+			"project":      "mc-retina",    // TODO: replace with actual project once we get gcloud access
 			"machine_type": "e2-standard-4",
 		},
 	}
@@ -28,5 +28,27 @@ func TestGKEExample(t *testing.T) {
 	// TODO: uncomment once we get creds for gcloud
 	// terraform.Apply(t, opts)
 
-	// TODO: add actual tests here
+	// // get outputs
+	// caCert := terraform.Output(t, opts, "cluster_ca_certificate")
+	// host := terraform.Output(t, opts, "host")
+	// token := terraform.Output(t, opts, "access_token")
+
+	// caCertString, err := decodeBase64(caCert)
+	// if err != nil {
+	// 	t.Fatalf("Failed to decode ca cert: %v", err)
+	// }
+
+	// // build the REST config
+	// restConfig := createRESTConfigWithBearer(caCertString, token, host)
+
+	// // create a Kubernetes clientset
+	// clientSet, err := buildClientSet(restConfig)
+	// if err != nil {
+	// 	t.Fatalf("Failed to create Kubernetes clientset: %v", err)
+	// }
+
+	// // test the cluster is accessible
+	// testClusterAccess(t, clientSet)
+
+	// // TODO: add more tests here
 }
