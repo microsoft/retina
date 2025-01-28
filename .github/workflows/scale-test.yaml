@@ -97,7 +97,7 @@ jobs:
           NUM_NETPOLS: ${{ inputs.num_netpol }}
           CLEANUP: ${{ inputs.cleanup }}
           IMAGE_REGISTRY: ${{ vars.ACR_NAME }}
-          IMAGE_NAMESPACE: ${{ github.repository }}
+          IMAGE_NAMESPACE: ${{ inputs.image_namespace == '' && github.repository || inputs.image_namespace }}
           TAG: ${{ inputs.image_tag }}
           AZURE_APP_INSIGHTS_KEY: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
         shell: bash
