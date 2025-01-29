@@ -23,7 +23,8 @@ stages:
         instructions: Confirm to continue. This will timeout in 24 hours and will reject the rest of the pipeline if not approved.
         onTimeout: 'reject'
         # approvers: "[TEAM FOUNDATION]\\Retina"
-        approvers: "yilinwang@microsoft.com"
+        approvers: | 
+          "yilinwang@microsoft.com"
 
 # Prepare Image Artifact
 - stage: build
