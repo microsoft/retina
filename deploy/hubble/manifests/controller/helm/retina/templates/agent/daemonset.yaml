@@ -81,7 +81,7 @@ spec:
           readinessProbe:
             httpGet:
               path: /health
-              port: {{ .Values.agent.container.retina.ports.containerPort }}
+              port: {{ .Values.retinaPort }}
             initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
             periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
             timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
@@ -90,7 +90,7 @@ spec:
           livenessProbe:
             httpGet:
               path: /health
-              port: {{ .Values.agent.container.retina.ports.containerPort }}
+              port: {{ .Values.retinaPort }}
             initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
             periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
             timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
