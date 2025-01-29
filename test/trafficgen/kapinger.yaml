@@ -47,7 +47,7 @@ spec:
       serviceAccountName: kapinger-sa
       containers:
         - name: kapinger
-          image: acnpublic.azurecr.io/kapinger:20241009.5
+          image: acnpublic.azurecr.io/kapinger:v0.0.23-9-g23ef222
           resources:
             limits:
               memory: 40Mi
@@ -101,7 +101,7 @@ spec:
       serviceAccountName: kapinger-sa
       containers:
         - name: kapinger
-          image: acnpublic.azurecr.io/kapinger:20241009.5
+          image: acnpublic.azurecr.io/kapinger:v0.0.23-9-g23ef222
           resources:
             limits:
               memory: 20Mi
