@@ -1,0 +1,42 @@
+{
+    "$schema": "https://ev2schema.azure.net/schemas/2020-04-01/RegionAgnosticServiceModel.json",
+    "contentVersion": "1.0.0.2",
+    "serviceMetadata": {
+        "serviceIdentifier":"dd590928-4e04-48cb-9d3d-ee06c5f0e17f",
+        "serviceGroup": "Microsoft.Azure.Networking.ContainerNetworking",
+        "environment": "prod",
+        "tenantId":"72f988bf-86f1-41af-91ab-2d7cd011db47",
+        "displayName": "Azure Container Networking",
+        "serviceSpecificationPath": "drop_build_restore/EV2Specs/prod.serviceSpecification.json"
+    },
+    "serviceResourceGroupDefinitions": [
+        {
+            "name": "RetinaOSSReleaseProd",
+            "subscriptionKey": "ACN-Prod-Sub",
+            "scopeTags": [{"name": "Global"}, {"name": "ProdEnv"}],
+            "executionConstraint": {
+                "quantifier": "Always",
+                "level": "Cloud"
+            },
+            "serviceResourceDefinitions": [
+                {
+                    "name": "RetinaOSSReleaseDef",
+                    "composedOf": {
+                        "extension": {
+                            "rolloutParametersPath": "drop_build_restore/EV2Specs/imagePush.rolloutParameters.json",
+                            "shell": [
+                                {
+                                    "type": "PushImageShellType",
+                                    "properties": {
+                                        "imageName": "adm-mariner-20-l",
+                                        "imageVersion": "v9"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
+        }
+    ]
+}

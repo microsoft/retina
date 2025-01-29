@@ -1,0 +1,7 @@
+{
+    "name": "Microsoft.Azure.Networking.ContainerNetworking.RetinaOSS",
+    "description": "Azure Container Networking",
+    "ownerGroupObjectId": "29450736-10f6-472c-8380-52860dfab468",
+    "ownerGroupContactEmail": "acn@microsoft.com",
+    "contentVersion": "1.0.0.0"
+  }

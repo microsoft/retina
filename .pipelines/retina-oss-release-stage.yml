@@ -1,0 +1,104 @@
+parameters:
+- name: artifactPipelineName
+  type: string
+  #define in runtime
+- name: pipelineWorkspace
+  type: string
+- name: retinaOSSRepoName
+  type: string
+
+stages:
+- stage: validationStage
+  displayName: 'Pre-deployment approvals'
+  jobs:
+  - job: manualValidation
+    displayName: 'Manual Validation'
+    pool:
+      type: agentless
+    timeoutInMinutes: 1440
+    steps:
+    - task: ManualValidation@1
+      timeoutInMinutes: 1440
+      inputs:
+        instructions: Confirm to continue. This will timeout in 24 hours and will reject the rest of the pipeline if not approved.
+        onTimeout: 'reject'
+        # approvers: "[TEAM FOUNDATION]\\Retina"
+        approvers: "yilinwang@microsoft.com"
+
+# Prepare Image Artifact
+- stage: build
+  displayName: Create Official Release file
+  dependsOn: validationStage
+  condition: succeeded()
+  jobs:
+  - job: restore
+    pool:
+      type: linux
+    variables:
+      ob_outputDirectory: '$(Build.SourcesDirectory)/${{ parameters.retinaOSSRepoName }}/.pipelines'
+      ob_git_fetchDepth: -1
+      ob_git_fetchTags: true
+    steps:
+    - download: ${{ parameters.artifactPipelineName }}
+      displayName: Download Build Artifacts
+    - checkout: ${{ parameters.retinaOSSRepoName }}
+    - task: Bash@3
+      inputs:
+        filePath: $(Build.SourcesDirectory)/${{ parameters.retinaOSSRepoName }}/.pipelines/Shell/Restore.sh
+        workingDirectory: $(Build.SourcesDirectory)/${{ parameters.retinaOSSRepoName }}/.pipelines
+
+# Test Stage
+- stage: 'TEST_Retina_OSS_Release'
+  displayName: 'TEST: Retina OSS Managed SDP Rollout'
+  dependsOn: build
+  condition: succeeded()
+  variables:
+    # ob_release_environment: Production
+    ob_release_environment: TEST
+  jobs:
+  - job: ReleaseJob
+    displayName: 'TEST_EV2_Managed_SDP'
+    pool:
+      type: release # read more about custom job types at https://aka.ms/obpipelines/yaml/jobs   
+    variables:
+      retryCountOnMonitoringTaskFailure: 3
+    steps:
+    - download: current
+    - task: vsrm-ev2.ev2-rollout.ev2-rollout-task.Ev2RARollout@2
+      displayName: 'Ev2 Managed SDP Rollout'
+      inputs:
+        EndpointProviderType: Ev2Endpoint
+        ConnectedServiceName: "acn-ev2-service-connection (Test)"
+        TaskAction: RegisterAndRollout
+        SkipRegistrationIfExists: true
+        ServiceRootPath: '$(Pipeline.Workspace)'
+        RolloutSpecPath: '$(Pipeline.Workspace)/drop_build_restore/EV2Specs/test.rolloutSpec.json'
+        StageMapName: 'Microsoft.Azure.SDP.Standard'
+        Select: regions(*)
+
+# Prod Stage
+# - stage: "Prod_Release"
+#   dependsOn: build
+#   condition: succeeded()
+#   displayName: "Prod: Push Retina OSS images to ACR"
+#   variables:
+#     ob_release_environment: Production
+#   jobs:
+#   - job: ReleaseJob
+#     pool:
+#       type: release
+#     variables:
+#       retryCountOnMonitoringTaskFailure: 3
+#     steps:
+#     - download: current
+#     - task: vsrm-ev2.ev2-rollout.ev2-rollout-task.Ev2RARollout@2
+#       displayName: "Start Ev2 Rollout"
+#       inputs:
+#         EndpointProviderType: ApprovalService
+#         ApprovalServiceEnvironment: Production
+#         TaskAction: RegisterAndRollout
+#         SkipRegistrationIfExists: true
+#         ServiceRootPath: '$(Pipeline.Workspace)'
+#         RolloutSpecPath: '$(Pipeline.Workspace)/drop_build_restore/EV2Specs/prod.rolloutSpec.json'
+#         StageMapName: 'Microsoft.Azure.SDP.Standard'
+#         Select: regions(*)

@@ -7,6 +7,9 @@ ARG APP_INSIGHTS_ID
 WORKDIR /workspace
 COPY . .
 
+# Install jq
+RUN tdnf install -y jq
+
 # Default linux/architecture.
 ARG GOOS=linux
 ENV GOOS=${GOOS}
