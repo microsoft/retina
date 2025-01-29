@@ -333,6 +333,7 @@ kubectl-retina-image:
 			CONTEXT_DIR=$(REPO_ROOT)
 
 kapinger-image: 
+	#docker buildx create --name=retina --append
 	docker buildx build --builder retina --platform windows/amd64 --target windows-amd64 -t $(IMAGE_REGISTRY)/$(KAPINGER_IMAGE):$(TAG)-windows-amd64  ./hack/tools/kapinger/ --push
 	docker buildx build --builder retina --platform linux/amd64 --target linux-amd64 -t $(IMAGE_REGISTRY)/$(KAPINGER_IMAGE):$(TAG)-linux-amd64  ./hack/tools/kapinger/ --push
 	docker buildx build --builder retina --platform linux/arm64 --target linux-arm64 -t $(IMAGE_REGISTRY)/$(KAPINGER_IMAGE):$(TAG)-linux-arm64  ./hack/tools/kapinger/ --push

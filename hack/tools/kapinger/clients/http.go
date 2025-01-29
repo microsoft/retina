@@ -41,7 +41,7 @@ func NewKapingerHTTPClient(clientset *kubernetes.Clientset, labelselector string
 			Transport: &http.Transport{
 				DisableKeepAlives: true,
 			},
-			Timeout: 3 * time.Second,
+			Timeout: 15 * time.Second,
 		},
 		labelselector: labelselector,
 		clientset:     clientset,
@@ -80,22 +80,41 @@ func NewKapingerHTTPClient(clientset *kubernetes.Clientset, labelselector string
 
 func (k *KapingerHTTPClient) MakeRequests(ctx context.Context) error {
 	ticker := time.NewTicker(k.interval)
+	sem := make(chan struct{}, 5) // semaphore to limit the number of active goroutines
+
+	serviceController, err := NewServiceLoggingController(k.clientset, k.labelselector)
+	if err != nil {
+		return fmt.Errorf("error creating service controller: %w", err)
+	}
+
+	go serviceController.Run(ctx)
+
 	for {
 		select {
 		case <-ctx.Done():
 			log.Printf("HTTP client context done")
 			return nil
 		case <-ticker.C:
+			if len(sem) >= cap(sem) {
+				log.Printf("max http clients reached, skipping interval")
+				continue
+			}
 			go func() {
+				sem <- struct{}{}
+				defer func() { <-sem }()
+
 				for i := 0; i < k.volume; i++ {
-					for _, url := range k.urls {
-						body, err := k.makeRequest(ctx, url)
-						if err != nil {
-							log.Printf("error making request: %v", err)
-						} else {
-							log.Printf("response from %s: %s\n", url, string(body))
-						}
+					ip := serviceController.getIP()
+
+					url := fmt.Sprintf("http://%s:%d/", ip, k.port)
+
+					body, err := k.makeRequest(ctx, url)
+					if err != nil {
+						log.Printf("error making request: %v", err)
+					} else {
+						log.Printf("response from %s: %s\n", url, string(body))
 					}
+
 				}
 			}()
 		}

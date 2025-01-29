@@ -7,5 +7,5 @@ import (
 
 func getResponse(addressString, protocol string) []byte {
 	podname := os.Getenv("POD_NAME")
-	return []byte(fmt.Sprintf("connected to: %s via %s, connected from: %v", podname, protocol, addressString))
+	return []byte(fmt.Sprintf("connected to: %s via %s, connected from: %v\n", podname, protocol, addressString))
 }
