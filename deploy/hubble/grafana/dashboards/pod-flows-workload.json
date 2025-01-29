@@ -4004,7 +4004,7 @@
     ]
   },
   "timezone": "",
-  "title": "Kubernetes / Networking / Pod Flows (Workload)",
-  "uid": "NetObsFlowsWorkload6740",
+  "title": "Kubernetes / Networking / Retina (Hubble) / Pod Flows (Workload)",
+  "uid": "RetinaHubblePodFlowsWorkload",
   "version": 1
 }
