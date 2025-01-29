@@ -34,9 +34,13 @@ If you followed the steps to install and configure [Prometheus](./04-prometheus.
 
    ![Grafana datasources](./img/grafana-datasources.png)
 
-5. Import the [kubernetes-networking-observability](https://grafana.com/grafana/dashboards/18814/) dashboard by id `18814` at [localhost:8080/dashboard/import](http://localhost:8080/dashboard/import)
+5. Import the [kubernetes-networking-retina-cluster](https://grafana.com/grafana/dashboards/22771/) dashboard by id `22771` at [localhost:8080/dashboard/import](http://localhost:8080/dashboard/import)
 
    ![Grafana import](./img/grafana-import.png)
+
+   Some other dashboards available are:
+   - [kubernetes-networking-retina-DNS](https://grafana.com/grafana/dashboards/22772/) dashboard (id `22772`)
+   - [kubernetes-networking-retina-PodTraffic](https://grafana.com/grafana/dashboards/22773/) dashboard (id `22773`)
 
 6. Kubernetes cluster metrics shouold be visible
 
@@ -49,3 +53,5 @@ There is a set of Retina dashboards that you can import directly into Grafana as
 Here is an example of the Retina `dns.json` dashboard.
 
 ![Grafana retina DNS dashboard](./img/grafana-retina-dns-dash.png)
+
+These dashboards are also available at the [Grafana Portal Retina Page](https://grafana.com/orgs/retina1/dashboards)
