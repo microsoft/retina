@@ -3,8 +3,11 @@ package clients
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
+
+	"log"
 
 	"golang.org/x/exp/rand"
 	v1 "k8s.io/api/core/v1"
@@ -12,17 +15,36 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2"
 )
 
-type ServiceLoggingController struct {
+type serviceController struct {
 	sync.RWMutex
 	serviceInformer cache.SharedIndexInformer
 
-	ips map[string]string
+	ips []string
 }
 
-func (c *ServiceLoggingController) Run(ctx context.Context) error {
+func newServiceController(clientset kubernetes.Interface, labelselector string) (*serviceController, error) {
+	serviceInformer := informers.NewSharedInformerFactoryWithOptions(clientset, time.Hour*24,
+		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
+			options.LabelSelector = labelselector // Filter by label selector
+		}),
+	).Core().V1().Services().Informer()
+	c := &serviceController{
+		serviceInformer: serviceInformer,
+	}
+	serviceInformer.AddEventHandler(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc:    c.serviceAdd,
+			UpdateFunc: c.serviceUpdate,
+			DeleteFunc: c.serviceDelete,
+		},
+	)
+
+	return c, nil
+}
+
+func (c *serviceController) run(ctx context.Context) error {
 	stopCh := make(chan struct{})
 	go func() {
 		<-ctx.Done()
@@ -35,63 +57,55 @@ func (c *ServiceLoggingController) Run(ctx context.Context) error {
 	return nil
 }
 
-func (c *ServiceLoggingController) serviceAdd(obj interface{}) {
+func (c *serviceController) serviceAdd(obj interface{}) {
 	service := obj.(*v1.Service)
-	klog.Infof("SERVICE CREATED: %s/%s", service.Namespace, service.Name)
-	c.Lock()
-	defer c.Unlock()
-	c.ips[service.Name] = service.Spec.ClusterIP
+	log.Printf("service %s/%s added with ip %s", service.Namespace, service.Name, service.Spec.ClusterIP)
+	c.addIP(service.Spec.ClusterIP)
 }
 
-func (c *ServiceLoggingController) serviceUpdate(old, new interface{}) {
+func (c *serviceController) serviceUpdate(old, new interface{}) {
 	newsvc := new.(*v1.Service)
 	oldsvc := new.(*v1.Service)
-	klog.Infof("SERVICE UPDATED. %s/%s", newsvc.Namespace, newsvc.Name)
-	c.Lock()
-	defer c.Unlock()
-	delete(c.ips, oldsvc.Name)
-	c.ips[newsvc.Name] = newsvc.Spec.ClusterIP
+	log.Printf("service %s/%s updated with new ip %s", newsvc.Namespace, newsvc.Name, newsvc.Spec.ClusterIP)
+	c.removeIP(oldsvc.Spec.ClusterIP)
+	c.addIP(newsvc.Spec.ClusterIP)
 }
 
-func (c *ServiceLoggingController) serviceDelete(obj interface{}) {
+func (c *serviceController) serviceDelete(obj interface{}) {
 	service := obj.(*v1.Service)
-	klog.Infof("SERVICE DELETED: %s/%s", service.Namespace, service.Name)
-	c.Lock()
-	defer c.Unlock()
-	delete(c.ips, service.Name)
+	log.Printf("service %s/%s deleted", service.Namespace, service.Name)
+	c.removeIP(service.Spec.ClusterIP)
 }
 
-func (c *ServiceLoggingController) getIP() string {
+func (c *serviceController) getIP() string {
 	c.RLock()
 	defer c.RUnlock()
-	// select random ip from map
-	randIndex := rand.Intn(len(c.ips))
-	for key := range c.ips {
-		randIndex--
-		if randIndex == 0 {
-			return c.ips[key]
-		}
-	}
-	return ""
+	return c.ips[rand.Intn(len(c.ips))]
 }
 
-func NewServiceLoggingController(clientset kubernetes.Interface, labelselector string) (*ServiceLoggingController, error) {
-	serviceInformer := informers.NewSharedInformerFactoryWithOptions(clientset, time.Hour*24,
-		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
-			options.LabelSelector = labelselector // Filter by label selector
-		}),
-	).Core().V1().Services().Informer()
-	c := &ServiceLoggingController{
-		serviceInformer: serviceInformer,
-	}
-	serviceInformer.AddEventHandler(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    c.serviceAdd,
-			UpdateFunc: c.serviceUpdate,
-			DeleteFunc: c.serviceDelete,
-		},
-	)
+func (c *serviceController) addIP(ip string) {
+	c.Lock()
+	defer c.Unlock()
+	c.ips = append(c.ips, ip)
+}
 
-	c.ips = make(map[string]string)
-	return c, nil
+func (c *serviceController) removeIP(ip string) {
+	c.Lock()
+	defer c.Unlock()
+	
+	// find the index of the ip
+	i := -1
+	for j, cip := range c.ips {
+		if cip == ip {
+			i = j
+			break
+		}
+	}
+	if i == -1 {
+		log.Printf("service with ip %s not found", ip)
+		return
+	}
+
+	c.ips = slices.Delete(c.ips, i, i+1)
+	c.ips = slices.Clip(c.ips)
 }

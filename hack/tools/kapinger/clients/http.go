@@ -82,12 +82,12 @@ func (k *KapingerHTTPClient) MakeRequests(ctx context.Context) error {
 	ticker := time.NewTicker(k.interval)
 	sem := make(chan struct{}, 5) // semaphore to limit the number of active goroutines
 
-	serviceController, err := NewServiceLoggingController(k.clientset, k.labelselector)
+	serviceController, err := newServiceController(k.clientset, k.labelselector)
 	if err != nil {
 		return fmt.Errorf("error creating service controller: %w", err)
 	}
 
-	go serviceController.Run(ctx)
+	go serviceController.run(ctx)
 
 	for {
 		select {

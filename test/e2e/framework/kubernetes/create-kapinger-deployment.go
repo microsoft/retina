@@ -21,6 +21,9 @@ const (
 	KapingerTCPPort   = 8085
 	KapingerUDPPort   = 8086
 	MaxAffinityWeight = 100
+
+	KapingerBurstVolume     = 1
+	KapingerBurstIntervalMs = 500
 )
 
 type CreateKapingerDeployment struct {
@@ -135,7 +138,7 @@ func (c *CreateKapingerDeployment) GetKapingerDeployment() *appsv1.Deployment {
 							Image: "acnpublic.azurecr.io/kapinger:20241014.7",
 							Resources: v1.ResourceRequirements{
 								Requests: v1.ResourceList{
-									"memory": resource.MustParse("20Mi"),
+									"memory": resource.MustParse("40Mi"),
 								},
 								Limits: v1.ResourceList{
 									"memory": resource.MustParse("20Mi"),
@@ -148,12 +151,24 @@ func (c *CreateKapingerDeployment) GetKapingerDeployment() *appsv1.Deployment {
 							},
 							Env: []v1.EnvVar{
 								{
-									Name:  "GODEBUG",
-									Value: "netdns=go",
-								},
-								{
 									Name:  "TARGET_TYPE",
 									Value: "service",
+								},
+								{
+									Name: "POD_NAME",
+									ValueFrom: &v1.EnvVarSource{
+										FieldRef: &v1.ObjectFieldSelector{
+											FieldPath: "metadata.name",
+										},
+									},
+								},
+								{
+									Name: "GOMEMLIMIT",
+									ValueFrom: &v1.EnvVarSource{
+										ResourceFieldRef: &v1.ResourceFieldSelector{
+											Resource: "limits.memory",
+										},
+									},
 								},
 								{
 									Name:  "HTTP_PORT",
@@ -166,6 +181,14 @@ func (c *CreateKapingerDeployment) GetKapingerDeployment() *appsv1.Deployment {
 								{
 									Name:  "UDP_PORT",
 									Value: strconv.Itoa(KapingerUDPPort),
+								},
+								{
+									Name:  "BURST_INTERVAL_MS",
+									Value: strconv.Itoa(KapingerBurstIntervalMs),
+								},
+								{
+									Name:  "BURST_VOLUME",
+									Value: strconv.Itoa(KapingerBurstVolume),
 								},
 							},
 						},
