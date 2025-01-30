@@ -5,7 +5,7 @@ STACK_NAME ?= $(PREFIX)-aks
 
 plan:
 	cd live/$(STACK_NAME) && \
-		tofu fmt && tofu init && tofu plan
+		tofu init && tofu plan
 
 apply:
 	cd live/$(STACK_NAME) && \
@@ -38,5 +38,13 @@ clean: destroy
 kind-kubeconfig:
 	@kubectl config set-context live/$(PREFIX)-kind/mc-kind-config
 
+# For now we only want to run the retina-kind integration
+# since we do not have credentials for the other cloud providers
+# Once we do this targets will be updated to
+# @cd test && go test -v -count=1 -timeout 30m ./...
 test:
-	@cd test && go test -v -count=1 -timeout 30m ./...
+	@cd test && go test -run TestRetinaKindIntegration -count=1 -timeout 10m
+
+fmt:
+	@tofu fmt -recursive
+	@cd test && go fmt ./...

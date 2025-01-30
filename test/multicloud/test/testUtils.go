@@ -8,9 +8,13 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/gruntwork-io/terratest/modules/logger"
+	"github.com/gruntwork-io/terratest/modules/terraform"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -109,12 +113,44 @@ func checkRetinaLogs(t *testing.T, clientset *kubernetes.Clientset) {
 }
 
 // function to convert base64 encoded string to plain text
-func decodeBase64(encoded string) (string, error) {
+func decodeBase64(t *testing.T, encoded string) string {
 	// decode the base64 encoded string
 	decoded, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
-		return "", err
+		t.Fatalf("Failed to decode base64 string %v:", err)
 	}
 	// return the decoded string
-	return string(decoded), nil
+	return string(decoded)
+}
+
+// fetch the sensitive output from OpenTofu
+func fetchSensitiveOutput(t *testing.T, options *terraform.Options, name string) string {
+	defer func() {
+		options.Logger = nil
+	}()
+	options.Logger = logger.Discard
+	return terraform.Output(t, options, name)
+}
+
+func checkRetinaPodsRunning(t *testing.T, clientset *kubernetes.Clientset) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	err := wait.PollUntilContextTimeout(ctx, 3*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
+		pods, err := clientset.CoreV1().Pods("kube-system").List(ctx, metav1.ListOptions{
+			LabelSelector: "k8s-app=retina",
+		})
+		if err != nil {
+			return false, err
+		}
+		for _, pod := range pods.Items {
+			if pod.Status.Phase != v1.PodRunning {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("Retina pods did not start in time: %v\n", err)
+	}
 }
