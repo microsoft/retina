@@ -15,7 +15,7 @@ permissions:
   id-token: write
 
 jobs:
-  perf_test-basic:
+  perf-test-basic:
     name: Retina Basic Performance Test
     runs-on: ubuntu-latest
 
@@ -51,7 +51,7 @@ jobs:
           fi
           go test -v ./test/e2e/. -timeout 2h -tags=perf -count=1 -args -image-tag=$TAG -image-registry=ghcr.io -image-namespace=${{ github.repository }} -retina-mode=basic
 
-  perf_test-advanced:
+  perf-test-advanced:
     name: Retina Advanced Performance Test
     runs-on: ubuntu-latest
 
