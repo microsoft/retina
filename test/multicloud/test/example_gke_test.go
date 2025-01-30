@@ -22,33 +22,25 @@ func TestGKEExample(t *testing.T) {
 
 	// clean up at the end of the test
 	defer terraform.Destroy(t, opts)
+	terraform.InitAndApply(t, opts)
 
-	terraform.Init(t, opts)
+	// get outputs
+	caCert := fetchSensitiveOutput(t, opts, "cluster_ca_certificate")
+	host := fetchSensitiveOutput(t, opts, "host")
+	token := fetchSensitiveOutput(t, opts, "access_token")
 
-	// TODO: uncomment once we get creds for gcloud
-	// terraform.Apply(t, opts)
+	// decode the base64 encoded cert
+	caCertString := decodeBase64(t, caCert)
 
-	// // get outputs
-	// caCert := terraform.Output(t, opts, "cluster_ca_certificate")
-	// host := terraform.Output(t, opts, "host")
-	// token := terraform.Output(t, opts, "access_token")
+	// build the REST config
+	restConfig := createRESTConfigWithBearer(caCertString, token, host)
 
-	// caCertString, err := decodeBase64(caCert)
-	// if err != nil {
-	// 	t.Fatalf("Failed to decode ca cert: %v", err)
-	// }
+	// create a Kubernetes clientset
+	clientSet, err := buildClientSet(restConfig)
+	if err != nil {
+		t.Fatalf("Failed to create Kubernetes clientset: %v", err)
+	}
 
-	// // build the REST config
-	// restConfig := createRESTConfigWithBearer(caCertString, token, host)
-
-	// // create a Kubernetes clientset
-	// clientSet, err := buildClientSet(restConfig)
-	// if err != nil {
-	// 	t.Fatalf("Failed to create Kubernetes clientset: %v", err)
-	// }
-
-	// // test the cluster is accessible
-	// testClusterAccess(t, clientSet)
-
-	// // TODO: add more tests here
+	// test the cluster is accessible
+	testClusterAccess(t, clientSet)
 }

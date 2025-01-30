@@ -20,15 +20,13 @@ func TestRetinaKindIntegration(t *testing.T) {
 
 	// clean up at the end of the test
 	defer terraform.Destroy(t, opts)
-
-	terraform.Init(t, opts)
-	terraform.Apply(t, opts)
+	terraform.InitAndApply(t, opts)
 
 	// get outputs
-	caCert := terraform.Output(t, opts, "cluster_ca_certificate")
-	clientCert := terraform.Output(t, opts, "client_certificate")
-	clientKey := terraform.Output(t, opts, "client_key")
-	host := terraform.Output(t, opts, "host")
+	caCert := fetchSensitiveOutput(t, opts, "cluster_ca_certificate")
+	clientCert := fetchSensitiveOutput(t, opts, "client_certificate")
+	clientKey := fetchSensitiveOutput(t, opts, "client_key")
+	host := fetchSensitiveOutput(t, opts, "host")
 
 	// build the REST config
 	restConfig := createRESTConfigWithClientCert(caCert, clientCert, clientKey, host)
@@ -38,6 +36,9 @@ func TestRetinaKindIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create Kubernetes clientset: %v", err)
 	}
+
+	// check the retina pods are running
+	checkRetinaPodsRunning(t, clientSet)
 
 	// test the cluster is accessible
 	testClusterAccess(t, clientSet)

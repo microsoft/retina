@@ -13,11 +13,9 @@ func TestAKSExample(t *testing.T) {
 		TerraformDir: "../examples/aks",
 
 		Vars: map[string]interface{}{
-			"prefix":              "test",
+			"prefix":              "test-mc",
 			"location":            "uksouth",
-			"subscription_id":     "d6050d84-e4dd-463d-afc7-a6ab3dc33ab7", // TODO: replace with actual project once we get azure "public" access
-			"tenant_id":           "ac8a4ccd-35f1-4f95-a688-f68e3d89adfc",
-			"resource_group_name": "test",
+			"resource_group_name": "test-mc",
 			"labels": map[string]string{
 				"environment": "test",
 				"owner":       "test",
@@ -28,11 +26,28 @@ func TestAKSExample(t *testing.T) {
 
 	// clean up at the end of the test
 	defer terraform.Destroy(t, opts)
+	terraform.InitAndApply(t, opts)
 
-	terraform.Init(t, opts)
+	// get outputs
+	caCert := fetchSensitiveOutput(t, opts, "cluster_ca_certificate")
+	clientCert := fetchSensitiveOutput(t, opts, "client_certificate")
+	clientKey := fetchSensitiveOutput(t, opts, "client_key")
+	host := fetchSensitiveOutput(t, opts, "host")
 
-	// TODO: uncomment once we get creds for azure "public"
-	// terraform.Apply(t, opts)
+	// decode the base64 encoded strings
+	caCertDecoded := decodeBase64(t, caCert)
+	clientCertDecoded := decodeBase64(t, clientCert)
+	clientKeyDecoded := decodeBase64(t, clientKey)
 
-	// TODO: add actual tests here
+	// build the REST config
+	restConfig := createRESTConfigWithClientCert(caCertDecoded, clientCertDecoded, clientKeyDecoded, host)
+
+	// create a Kubernetes clientset
+	clientSet, err := buildClientSet(restConfig)
+	if err != nil {
+		t.Fatalf("Failed to create Kubernetes clientset: %v", err)
+	}
+
+	// test the cluster is accessible
+	testClusterAccess(t, clientSet)
 }
