@@ -24,6 +24,7 @@ stages:
         onTimeout: 'reject'
         # approvers: "[TEAM FOUNDATION]\\Retina"
         approvers: "yilinwang@microsoft.com"
+        allowApproversToApproveTheirOwnRuns: true
 
 # Prepare Image Artifact
 - stage: build
