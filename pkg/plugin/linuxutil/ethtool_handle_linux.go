@@ -1,7 +1,6 @@
 package linuxutil
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -43,9 +42,9 @@ func (ce *CachedEthtool) Stats(intf string) (map[string]uint64, error) {
 	if err != nil {
 		if strings.Contains(err.Error(), "operation not supported") {
 			ce.unsupported.Add(intf, struct{}{})
-			return nil, fmt.Errorf("interface %q not supported while retrieving stats: %w", intf, err)
+			return nil, errors.Wrap(err, "interface not supported while retrieving stats")
 		}
-		return nil, fmt.Errorf("failed to retrieve interface stats for %s: %w", intf, err)
+		return nil, errors.Wrap(err, "failed to retrieve interface stats")
 	}
 	return ifaceStats, nil
 }
