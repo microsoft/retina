@@ -2,6 +2,7 @@ package test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/gruntwork-io/terratest/modules/terraform"
 )
@@ -10,7 +11,7 @@ func TestRetinaKindIntegration(t *testing.T) {
 	t.Parallel()
 
 	opts := &terraform.Options{
-		TerraformDir: "../examples/integration/retina-kind",
+		TerraformDir: examplesPath + "integration/retina-kind",
 
 		Vars: map[string]interface{}{
 			"prefix":         "test-integration",
@@ -40,21 +41,21 @@ func TestRetinaKindIntegration(t *testing.T) {
 	// test the cluster is accessible
 	testClusterAccess(t, clientSet)
 
-	retinaPodSpec := PodSpec{
-		Name:          "retina",
+	retinaPodSelector := PodSelector{
 		Namespace:     "kube-system",
 		LabelSelector: "k8s-app=retina",
 		ContainerName: "retina",
 	}
 
+	timeOut := time.Duration(90) * time.Second
 	// check the retina pods are running
-	result, err := arePodsRunning(clientSet, retinaPodSpec, 90)
+	result, err := arePodsRunning(clientSet, retinaPodSelector, timeOut)
 	if !result {
 		t.Fatalf("Retina pods did not start in time: %v\n", err)
 	}
 
 	// check the retina pods logs for errors
-	checkPodLogs(t, clientSet, retinaPodSpec)
+	checkPodLogs(t, clientSet, retinaPodSelector)
 
 	// TODO: add more tests here
 }

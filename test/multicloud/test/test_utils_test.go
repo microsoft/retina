@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/gruntwork-io/terratest/modules/terraform"
 	v1 "k8s.io/api/core/v1"
@@ -52,6 +53,15 @@ func TestCreateRESTConfigWithClientCert(t *testing.T) {
 
 func TestTestClusterAccess(t *testing.T) {
 	clientset := fake.NewSimpleClientset()
+	testClusterAccess(t, clientset)
+
+	// Simulate a failure scenario
+	clientset = nil
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatalf("Expected panic due to nil clientset, but code did not panic")
+		}
+	}()
 	testClusterAccess(t, clientset)
 }
 
@@ -109,12 +119,12 @@ func TestCheckPodLogs(t *testing.T) {
 			},
 		},
 	})
-	podSpec := PodSpec{
+	podSelector := PodSelector{
 		Namespace:     "default",
 		LabelSelector: "app=test",
 		ContainerName: "test-container",
 	}
-	checkPodLogs(t, clientset, podSpec)
+	checkPodLogs(t, clientset, podSelector)
 }
 
 func TestDecodeBase64(t *testing.T) {
@@ -255,11 +265,11 @@ func TestCheckPodsRunning(t *testing.T) {
 				objects = append(objects, pod.DeepCopyObject())
 			}
 			clientset := fake.NewSimpleClientset(objects...)
-			podSpec := PodSpec{
+			podSelector := PodSelector{
 				Namespace:     "default",
 				LabelSelector: "app=test",
 			}
-			result, err := arePodsRunning(clientset, podSpec, 1)
+			result, err := arePodsRunning(clientset, podSelector, time.Duration(1)*time.Second)
 			if result != tc.expected {
 				t.Fatalf("Expected %v, got %v with error: %v", tc.expected, result, err)
 			}

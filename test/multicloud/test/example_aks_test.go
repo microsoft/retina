@@ -10,7 +10,7 @@ func TestAKSExample(t *testing.T) {
 	t.Parallel()
 
 	opts := &terraform.Options{
-		TerraformDir: "../examples/aks",
+		TerraformDir: examplesPath + "aks",
 
 		Vars: map[string]interface{}{
 			"prefix":              "test-mc",

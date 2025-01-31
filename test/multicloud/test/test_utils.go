@@ -85,10 +85,10 @@ func checkLogsForErrors(logs io.ReadCloser) error {
 	return nil
 }
 
-func checkPodLogs(t *testing.T, clientset kubernetes.Interface, podSpec PodSpec) {
+func checkPodLogs(t *testing.T, clientset kubernetes.Interface, podSelector PodSelector) {
 	// Get the logs for the retina pods
-	pods, err := clientset.CoreV1().Pods(podSpec.Namespace).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: podSpec.LabelSelector,
+	pods, err := clientset.CoreV1().Pods(podSelector.Namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: podSelector.LabelSelector,
 	})
 	if err != nil {
 		t.Fatalf("Failed to list pods: %v", err)
@@ -96,8 +96,8 @@ func checkPodLogs(t *testing.T, clientset kubernetes.Interface, podSpec PodSpec)
 	// Stream the logs for each pod
 	for _, pod := range pods.Items {
 		// Get the logs for the pod
-		req := clientset.CoreV1().Pods(podSpec.Namespace).GetLogs(pod.Name, &v1.PodLogOptions{
-			Container: podSpec.ContainerName,
+		req := clientset.CoreV1().Pods(podSelector.Namespace).GetLogs(pod.Name, &v1.PodLogOptions{
+			Container: podSelector.ContainerName,
 		})
 		// Stream the logs
 		logs, err := req.Stream(context.Background())
@@ -134,15 +134,15 @@ func fetchSensitiveOutput(t *testing.T, options *terraform.Options, name string)
 	return terraform.Output(t, options, name)
 }
 
-func arePodsRunning(clientset kubernetes.Interface, podSpec PodSpec, timeoutSecounds int) (bool, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSecounds)*time.Minute)
+func arePodsRunning(clientset kubernetes.Interface, podSelector PodSelector, timeout time.Duration) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	// Poll until the pods are running
-	err := wait.PollUntilContextTimeout(ctx, 3*time.Second, time.Duration(timeoutSecounds)*time.Second, true, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, 3*time.Second, timeout, true, func(ctx context.Context) (bool, error) {
 		// List the pods with the label selector
-		pods, err := clientset.CoreV1().Pods(podSpec.Namespace).List(ctx, metav1.ListOptions{
-			LabelSelector: podSpec.LabelSelector,
+		pods, err := clientset.CoreV1().Pods(podSelector.Namespace).List(ctx, metav1.ListOptions{
+			LabelSelector: podSelector.LabelSelector,
 		})
 		if err != nil {
 			return false, err
