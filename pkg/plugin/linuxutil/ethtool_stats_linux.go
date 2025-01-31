@@ -58,7 +58,7 @@ func (er *EthtoolReader) readInterfaceStats() error {
 		return err
 	}
 
-	defer er.ethHandle.Close()
+	// defer er.ethHandle.Close()
 
 	er.data = &EthtoolStats{
 		stats: make(map[string]uint64),

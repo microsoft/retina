@@ -61,6 +61,26 @@ func (lu *linuxUtil) SetupChannel(chan *hubblev1.Event) error {
 
 func (lu *linuxUtil) run(ctx context.Context) error {
 	lu.l.Info("Running linuxutil plugin...")
+
+	ethtoolOpts := &EthtoolOpts{
+		errOrDropKeysOnly: true,
+		addZeroVal:        false,
+		limit:             defaultLimit,
+	}
+
+	ethHandle, err := ethtool.NewEthtool()
+	if err != nil {
+		lu.l.Error("Error while creating ethHandle: %v\n", zap.Error(err))
+		return err
+	}
+
+	ethReader := NewEthtoolReader(ethtoolOpts, ethHandle)
+	if ethReader == nil {
+		lu.l.Error("Error while creating ethReader")
+		return fmt.Errorf("error while creating ethReader")
+	}
+	defer ethHandle.Close()
+
 	ticker := time.NewTicker(lu.cfg.MetricsInterval)
 	defer ticker.Stop()
 
@@ -90,23 +110,6 @@ func (lu *linuxUtil) run(ctx context.Context) error {
 				lu.prevTCPSockStats = tcpSocketStats
 			}()
 
-			ethtoolOpts := &EthtoolOpts{
-				errOrDropKeysOnly: true,
-				addZeroVal:        false,
-				limit:             defaultLimit,
-			}
-
-			ethHandle, err := ethtool.NewEthtool()
-			if err != nil {
-				lu.l.Error("Error while creating ethHandle: %v\n", zap.Error(err))
-				return err
-			}
-
-			ethReader := NewEthtoolReader(ethtoolOpts, ethHandle)
-			if ethReader == nil {
-				lu.l.Error("Error while creating ethReader")
-				return fmt.Errorf("error while creating ethReader")
-			}
 			wg.Add(1)
 			go func() {
 				defer wg.Done()

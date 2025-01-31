@@ -98,7 +98,7 @@ func TestReadInterfaceStats(t *testing.T) {
 			wantErr:     true,
 		},
 		{
-			name: "test unsported interface",
+			name: "test unsupported interface",
 			opts: &EthtoolOpts{
 				errOrDropKeysOnly: false,
 				addZeroVal:        false,
@@ -140,7 +140,7 @@ func TestReadInterfaceStats(t *testing.T) {
 		assert.NotNil(t, ethReader)
 
 		ethHandle.EXPECT().Stats(gomock.Any()).Return(tt.statsReturn, tt.statErr).AnyTimes()
-		ethHandle.EXPECT().Close().Times(1)
+		// ethHandle.EXPECT().Close().Times(1)
 		InitalizeMetricsForTesting(ctrl)
 
 		if tt.statErr == nil {
