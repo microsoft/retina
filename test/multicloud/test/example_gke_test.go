@@ -10,7 +10,7 @@ func TestGKEExample(t *testing.T) {
 	t.Parallel()
 
 	opts := &terraform.Options{
-		TerraformDir: "../examples/gke",
+		TerraformDir: examplesPath + "gke",
 
 		Vars: map[string]interface{}{
 			"prefix":       "test",

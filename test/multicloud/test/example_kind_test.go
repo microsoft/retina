@@ -10,7 +10,7 @@ func TestKindExample(t *testing.T) {
 	t.Parallel()
 
 	opts := &terraform.Options{
-		TerraformDir: "../examples/kind",
+		TerraformDir: examplesPath + "kind",
 
 		Vars: map[string]interface{}{
 			"prefix": "test",

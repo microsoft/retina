@@ -7,15 +7,14 @@ import (
 	"github.com/gruntwork-io/terratest/modules/terraform"
 )
 
-func TestRetinaKindIntegration(t *testing.T) {
+func TestPrometheusKindIntegration(t *testing.T) {
 	t.Parallel()
 
 	opts := &terraform.Options{
-		TerraformDir: examplesPath + "integration/retina-kind",
+		TerraformDir: examplesPath + "integration/prometheus-kind",
 
 		Vars: map[string]interface{}{
-			"prefix":         "test-integration",
-			"retina_version": "v0.0.24",
+			"prefix": "test-integration",
 		},
 	}
 
@@ -41,21 +40,21 @@ func TestRetinaKindIntegration(t *testing.T) {
 	// test the cluster is accessible
 	testClusterAccess(t, clientSet)
 
-	retinaPodSelector := PodSelector{
-		Namespace:     "kube-system",
-		LabelSelector: "k8s-app=retina",
-		ContainerName: "retina",
+	podSelector := PodSelector{
+		Namespace:     "default",
+		LabelSelector: "app.kubernetes.io/instance=prometheus-kube-prometheus-prometheus",
+		ContainerName: "prometheus",
 	}
 
-	timeOut := time.Duration(90) * time.Second
-	// check the retina pods are running
-	result, err := arePodsRunning(clientSet, retinaPodSelector, timeOut)
+	timeOut := time.Duration(60) * time.Second
+	// check the prometheus pods are running
+	result, err := arePodsRunning(clientSet, podSelector, timeOut)
 	if !result {
-		t.Fatalf("Retina pods did not start in time: %v\n", err)
+		t.Fatalf("Prometheus pods did not start in time: %v\n", err)
 	}
 
 	// check the retina pods logs for errors
-	checkPodLogs(t, clientSet, retinaPodSelector)
+	checkPodLogs(t, clientSet, podSelector)
 
 	// TODO: add more tests here
 }
