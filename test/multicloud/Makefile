@@ -31,9 +31,11 @@ destroy:
 	cd live/$(STACK_NAME) && \
 		tofu destroy --auto-approve
 
-clean: destroy
-	@cd live/$(STACK_NAME) && \
-		rm -rf .terraform && rm terraform.tfstate && rm terraform.tfstate.backup
+# !! DANGER remove state, backup, kubeconfig files and .terraform directories
+clean:
+	@find . -name '*.tfstate*' -delete
+	@find . -name '*-kind-config*' -delete
+	@find . -name '*.terraform' -type d -exec rm -rf {} +
 
 kind-kubeconfig:
 	@kubectl config set-context live/$(PREFIX)-kind/mc-kind-config
