@@ -38,7 +38,7 @@ If you followed the steps to install and configure [Prometheus](./04-prometheus.
 
    ![Grafana import](./img/grafana-import.png)
 
-   Some other dashboards available are:
+   Some other available dashboards are:
    - [kubernetes-networking-retina-DNS](https://grafana.com/grafana/dashboards/22772/) dashboard (id `22772`)
    - [kubernetes-networking-retina-PodTraffic](https://grafana.com/grafana/dashboards/22773/) dashboard (id `22773`)
 
