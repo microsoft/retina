@@ -5,6 +5,7 @@ package telemetry
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"os"
@@ -18,6 +19,7 @@ import (
 	"github.com/microsoft/ApplicationInsights-Go/appinsights/contracts"
 	"github.com/microsoft/retina/pkg/exporter"
 	"github.com/microsoft/retina/pkg/log"
+	"github.com/prometheus/client_golang/prometheus"
 	io_prometheus_client "github.com/prometheus/client_model/go"
 )
 
@@ -25,6 +27,8 @@ var (
 	client  appinsights.TelemetryClient
 	version string
 	mbShift uint64 = 20
+
+	ErrorNilCombinedGatherer = errors.New("exporter.CombinedGatherer is nil")
 
 	// property keys
 	kernelversion = "kernelversion"
@@ -178,7 +182,7 @@ func (t *TelemetryClient) heartbeat(ctx context.Context) {
 		t.trackWarning(err, "failed to get cpu usage")
 	}
 
-	metricscardinality, err := metricsCardinality()
+	metricscardinality, err := metricsCardinality(exporter.CombinedGatherer)
 	if err != nil {
 		t.trackWarning(err, "failed to get metrics cardinality")
 	}
@@ -189,8 +193,12 @@ func (t *TelemetryClient) heartbeat(ctx context.Context) {
 	maps.Copy(props, t.profile.GetMemoryUsage())
 	t.TrackEvent("heartbeat", props)
 }
-func metricsCardinality() (int, error) {
-	metricFamilies, err := exporter.CombinedGatherer.Gather()
+func metricsCardinality(gatherer prometheus.Gatherer) (int, error) {
+	if gatherer == nil {
+		return 0, fmt.Errorf("failed to get metrics Gatherer: %w", ErrorNilCombinedGatherer)
+	}
+
+	metricFamilies, err := gatherer.Gather()
 	if err != nil {
 		return 0, fmt.Errorf("failed to gather metrics: %w", err)
 	}
@@ -203,23 +211,44 @@ func metricsCardinality() (int, error) {
 		case io_prometheus_client.MetricType_HISTOGRAM:
 			metrics := mf.GetMetric()
 			for _, m := range metrics {
-				metricscardinality += len(m.GetHistogram().GetBucket()) + 3 // +3 for le="+Inf", _sum and _count
+				histogram := m.GetHistogram()
+				if histogram != nil {
+					buckets := histogram.GetBucket()
+					if buckets != nil {
+						metricscardinality += len(buckets) + 3 // +3 for le="+Inf", _sum and _count
+					}
+				}
 			}
 
 		case io_prometheus_client.MetricType_GAUGE_HISTOGRAM:
 			metrics := mf.GetMetric()
 			for _, m := range metrics {
-				metricscardinality += len(m.GetHistogram().GetBucket()) + 3 // +3 for le="+Inf", _sum and _count
+				histogram := m.GetHistogram()
+				if histogram != nil {
+					buckets := histogram.GetBucket()
+					if buckets != nil {
+						metricscardinality += len(buckets) + 3 // +3 for le="+Inf", _sum and _count
+					}
+				}
 			}
 
 		case io_prometheus_client.MetricType_SUMMARY:
 			metrics := mf.GetMetric()
 			for _, m := range metrics {
-				metricscardinality += len(m.GetSummary().GetQuantile()) + 2 // +2 for _sum and _count
+				summary := m.GetSummary()
+				if summary != nil {
+					quantiles := summary.GetQuantile()
+					if quantiles != nil {
+						metricscardinality += len(quantiles) + 2 // +2 for _sum and _count
+					}
+				}
 			}
 
 		default:
-			metricscardinality += len(mf.GetMetric())
+			metrics := mf.GetMetric()
+			if metrics != nil {
+				metricscardinality += len(metrics)
+			}
 
 		}
 	}
