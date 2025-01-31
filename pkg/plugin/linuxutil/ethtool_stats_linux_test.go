@@ -140,7 +140,6 @@ func TestReadInterfaceStats(t *testing.T) {
 		assert.NotNil(t, ethReader)
 
 		ethHandle.EXPECT().Stats(gomock.Any()).Return(tt.statsReturn, tt.statErr).AnyTimes()
-		// ethHandle.EXPECT().Close().Times(1)
 		InitalizeMetricsForTesting(ctrl)
 
 		if tt.statErr == nil {

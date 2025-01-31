@@ -14,6 +14,7 @@ import (
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/plugin/registry"
+	"github.com/pkg/errors"
 	"github.com/safchain/ethtool"
 	"go.uber.org/zap"
 )
@@ -71,15 +72,15 @@ func (lu *linuxUtil) run(ctx context.Context) error {
 	ethHandle, err := ethtool.NewEthtool()
 	if err != nil {
 		lu.l.Error("Error while creating ethHandle: %v\n", zap.Error(err))
-		return err
+		return fmt.Errorf("failed to create ethHandle: %w", err)
 	}
+	defer ethHandle.Close()
 
 	ethReader := NewEthtoolReader(ethtoolOpts, ethHandle)
 	if ethReader == nil {
 		lu.l.Error("Error while creating ethReader")
-		return fmt.Errorf("error while creating ethReader")
+		return errors.New("error while creating ethReader")
 	}
-	defer ethHandle.Close()
 
 	ticker := time.NewTicker(lu.cfg.MetricsInterval)
 	defer ticker.Stop()
