@@ -29,16 +29,6 @@ func NewWatcher() *Watcher {
 	return w
 }
 
-type key struct {
-	name         string
-	hardwareAddr string
-	// Network namespace for linux.
-	// Compartment ID for windows.
-	netNsID int
-}
-
-type cache map[key]interface{}
-
 type EndpointEvent struct {
 	// Type is the type of the event.
 	Type EventType
@@ -69,12 +59,4 @@ func (e EventType) String() string {
 	default:
 		return "unknown"
 	}
-}
-
-func (c cache) deepcopy() cache {
-	copy := make(cache)
-	for k, v := range c {
-		copy[k] = v
-	}
-	return copy
 }

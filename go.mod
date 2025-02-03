@@ -276,6 +276,7 @@ require (
 )
 
 require (
+	bou.ke/monkey v1.0.2
 	github.com/Azure/azure-container-networking/zapai v0.0.3
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.17.0
