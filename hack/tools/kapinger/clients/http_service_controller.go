@@ -3,6 +3,7 @@ package clients
 import (
 	"context"
 	"fmt"
+	"net"
 	"slices"
 	"sync"
 	"time"
@@ -21,7 +22,7 @@ type serviceController struct {
 	sync.RWMutex
 	serviceInformer cache.SharedIndexInformer
 
-	ips []string
+	ips []net.IP
 }
 
 func newServiceController(clientset kubernetes.Interface, labelselector string) (*serviceController, error) {
@@ -60,43 +61,43 @@ func (c *serviceController) run(ctx context.Context) error {
 func (c *serviceController) serviceAdd(obj interface{}) {
 	service := obj.(*v1.Service)
 	log.Printf("service %s/%s added with ip %s", service.Namespace, service.Name, service.Spec.ClusterIP)
-	c.addIP(service.Spec.ClusterIP)
+	c.addIP(net.ParseIP(service.Spec.ClusterIP))
 }
 
 func (c *serviceController) serviceUpdate(old, new interface{}) {
 	newsvc := new.(*v1.Service)
 	oldsvc := new.(*v1.Service)
 	log.Printf("service %s/%s updated with new ip %s", newsvc.Namespace, newsvc.Name, newsvc.Spec.ClusterIP)
-	c.removeIP(oldsvc.Spec.ClusterIP)
-	c.addIP(newsvc.Spec.ClusterIP)
+	c.removeIP(net.ParseIP(oldsvc.Spec.ClusterIP))
+	c.addIP(net.ParseIP(newsvc.Spec.ClusterIP))
 }
 
 func (c *serviceController) serviceDelete(obj interface{}) {
 	service := obj.(*v1.Service)
 	log.Printf("service %s/%s deleted", service.Namespace, service.Name)
-	c.removeIP(service.Spec.ClusterIP)
+	c.removeIP(net.ParseIP(service.Spec.ClusterIP))
 }
 
-func (c *serviceController) getIP() string {
+func (c *serviceController) getIP() net.IP {
 	c.RLock()
 	defer c.RUnlock()
 	return c.ips[rand.Intn(len(c.ips))]
 }
 
-func (c *serviceController) addIP(ip string) {
+func (c *serviceController) addIP(ip net.IP) {
 	c.Lock()
 	defer c.Unlock()
 	c.ips = append(c.ips, ip)
 }
 
-func (c *serviceController) removeIP(ip string) {
+func (c *serviceController) removeIP(ip net.IP) {
 	c.Lock()
 	defer c.Unlock()
-	
+
 	// find the index of the ip
 	i := -1
 	for j, cip := range c.ips {
-		if cip == ip {
+		if cip.Equal(ip) {
 			i = j
 			break
 		}
