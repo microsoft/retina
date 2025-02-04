@@ -1,4 +1,4 @@
-package test
+package utils
 
 import (
 	"bytes"
@@ -19,7 +19,7 @@ import (
 
 func TestBuildClientSet(t *testing.T) {
 	config := &rest.Config{}
-	clientset, err := buildClientSet(config)
+	clientset, err := BuildClientSet(config)
 	if err != nil {
 		t.Fatalf("Failed to build clientset: %v", err)
 	}
@@ -29,14 +29,14 @@ func TestBuildClientSet(t *testing.T) {
 }
 
 func TestCreateRESTConfigWithBearer(t *testing.T) {
-	config := createRESTConfigWithBearer("caCert", "bearerToken", "host")
+	config := CreateRESTConfigWithBearer("caCert", "bearerToken", "host")
 	if config.BearerToken != "bearerToken" {
 		t.Fatalf("Expected BearerToken to be 'bearerToken'")
 	}
 }
 
 func TestCreateRESTConfigWithClientCert(t *testing.T) {
-	config := createRESTConfigWithClientCert("caCert", "clientCert", "clientKey", "host")
+	config := CreateRESTConfigWithClientCert("caCert", "clientCert", "clientKey", "host")
 	if config.TLSClientConfig.CAData == nil || string(config.TLSClientConfig.CAData) != "caCert" {
 		t.Fatalf("Expected CAData to be 'caCert'")
 	}
@@ -53,7 +53,7 @@ func TestCreateRESTConfigWithClientCert(t *testing.T) {
 
 func TestTestClusterAccess(t *testing.T) {
 	clientset := fake.NewSimpleClientset()
-	testClusterAccess(t, clientset)
+	TestClusterAccess(t, clientset)
 
 	// Simulate a failure scenario
 	clientset = nil
@@ -62,7 +62,7 @@ func TestTestClusterAccess(t *testing.T) {
 			t.Fatalf("Expected panic due to nil clientset, but code did not panic")
 		}
 	}()
-	testClusterAccess(t, clientset)
+	TestClusterAccess(t, clientset)
 }
 
 func TestCheckLogsForErrors(t *testing.T) {
@@ -124,12 +124,12 @@ func TestCheckPodLogs(t *testing.T) {
 		LabelSelector: "app=test",
 		ContainerName: "test-container",
 	}
-	checkPodLogs(t, clientset, podSelector)
+	CheckPodLogs(t, clientset, podSelector)
 }
 
 func TestDecodeBase64(t *testing.T) {
 	encoded := base64.StdEncoding.EncodeToString([]byte("test"))
-	decoded := decodeBase64(t, encoded)
+	decoded := DecodeBase64(t, encoded)
 	if decoded != "test" {
 		t.Fatalf("Expected 'test', got '%s'", decoded)
 	}
@@ -169,7 +169,7 @@ func TestFetchSensitiveOutput(t *testing.T) {
 	}
 
 	// Fetch the sensitive output
-	output := fetchSensitiveOutput(t, opts, "test-output")
+	output := FetchSensitiveOutput(t, opts, "test-output")
 	if output != "sensitive-value" {
 		t.Fatalf("Expected 'sensitive-value', got '%s'", output)
 	}
@@ -269,7 +269,7 @@ func TestCheckPodsRunning(t *testing.T) {
 				Namespace:     "default",
 				LabelSelector: "app=test",
 			}
-			result, err := arePodsRunning(clientset, podSelector, time.Duration(1)*time.Second)
+			result, err := ArePodsRunning(clientset, podSelector, time.Duration(1)*time.Second)
 			if result != tc.expected {
 				t.Fatalf("Expected %v, got %v with error: %v", tc.expected, result, err)
 			}

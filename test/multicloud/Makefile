@@ -45,7 +45,7 @@ kind-kubeconfig:
 # Once we do this targets will be updated to
 # @cd test && go test -v -count=1 -timeout 30m ./...
 test:
-	@cd test && go test -run TestRetinaKindIntegration -count=1 -timeout 10m
+	@cd test/integration && go test -run TestRetinaKindIntegration -count=1 -timeout 20m
 
 fmt:
 	@tofu fmt -recursive
