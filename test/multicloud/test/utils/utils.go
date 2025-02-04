@@ -1,4 +1,4 @@
-package test
+package utils
 
 import (
 	"bufio"
@@ -19,7 +19,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func buildClientSet(config *rest.Config) (*kubernetes.Clientset, error) {
+func BuildClientSet(config *rest.Config) (*kubernetes.Clientset, error) {
 	// Create a Kubernetes client
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
@@ -29,7 +29,7 @@ func buildClientSet(config *rest.Config) (*kubernetes.Clientset, error) {
 }
 
 // Create a Bearer token REST config
-func createRESTConfigWithBearer(caCert, bearerToken, host string) *rest.Config {
+func CreateRESTConfigWithBearer(caCert, bearerToken, host string) *rest.Config {
 	config := &rest.Config{
 		Host:        host,
 		BearerToken: bearerToken,
@@ -41,7 +41,7 @@ func createRESTConfigWithBearer(caCert, bearerToken, host string) *rest.Config {
 }
 
 // Create REST config with client cert and key
-func createRESTConfigWithClientCert(caCert, clientCert, clientKey, host string) *rest.Config {
+func CreateRESTConfigWithClientCert(caCert, clientCert, clientKey, host string) *rest.Config {
 	config := &rest.Config{
 		Host: host,
 		TLSClientConfig: rest.TLSClientConfig{
@@ -53,7 +53,7 @@ func createRESTConfigWithClientCert(caCert, clientCert, clientKey, host string) 
 	return config
 }
 
-func testClusterAccess(t *testing.T, clientset kubernetes.Interface) {
+func TestClusterAccess(t *testing.T, clientset kubernetes.Interface) {
 	// Test the cluster is accessible by listing nodes
 	_, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
@@ -85,7 +85,7 @@ func checkLogsForErrors(logs io.ReadCloser) error {
 	return nil
 }
 
-func checkPodLogs(t *testing.T, clientset kubernetes.Interface, podSelector PodSelector) {
+func CheckPodLogs(t *testing.T, clientset kubernetes.Interface, podSelector PodSelector) {
 	// Get the logs for the retina pods
 	pods, err := clientset.CoreV1().Pods(podSelector.Namespace).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: podSelector.LabelSelector,
@@ -115,7 +115,7 @@ func checkPodLogs(t *testing.T, clientset kubernetes.Interface, podSelector PodS
 }
 
 // function to convert base64 encoded string to plain text
-func decodeBase64(t *testing.T, encoded string) string {
+func DecodeBase64(t *testing.T, encoded string) string {
 	// decode the base64 encoded string
 	decoded, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
@@ -126,7 +126,7 @@ func decodeBase64(t *testing.T, encoded string) string {
 }
 
 // fetch the sensitive output from OpenTofu
-func fetchSensitiveOutput(t *testing.T, options *terraform.Options, name string) string {
+func FetchSensitiveOutput(t *testing.T, options *terraform.Options, name string) string {
 	defer func() {
 		options.Logger = nil
 	}()
@@ -134,7 +134,7 @@ func fetchSensitiveOutput(t *testing.T, options *terraform.Options, name string)
 	return terraform.Output(t, options, name)
 }
 
-func arePodsRunning(clientset kubernetes.Interface, podSelector PodSelector, timeout time.Duration) (bool, error) {
+func ArePodsRunning(clientset kubernetes.Interface, podSelector PodSelector, timeout time.Duration) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 

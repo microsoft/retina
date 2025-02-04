@@ -96,3 +96,19 @@ make test
 * [GKE resource documentation](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/container_cluster)
 * [AKS resource documentation](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/kubernetes_cluster)
 * [Kind resource documentation](https://registry.terraform.io/providers/tehcyx/kind/latest/docs/resources/cluster)
+
+
+## Troubleshooting
+
+In case the test fails due to timeout, validate the resource was created by the provider, and if it is, you can import into OpenTofu state.
+
+Here is an example on how to import resources for `modules/gke`
+
+```sh
+# move to the stack directory
+# i.e. examples/gke
+tofu import module.gke.google_container_cluster.gke europe-west2/test-gke-cluster
+tofu import module.gke.google_service_account.default projects/mc-retina/serviceAccounts/test-gke-service-account@mc-retina.iam.gserviceaccount.com
+```
+
+>Note: each resource documentation contains a section on how to import resources into the State. [Example for google_container_cluster resource](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/container_cluster#import)

@@ -1,6 +1,9 @@
-package test
+package utils
 
-const examplesPath = "../examples/"
+const (
+	ExamplesPath  = "../../examples/"
+	RetinaVersion = "v0.0.24"
+)
 
 type PodSelector struct {
 	Namespace     string

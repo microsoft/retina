@@ -4,13 +4,14 @@ import (
 	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/terraform"
+	"github.com/microsoft/retina/test/multicloud/test/utils"
 )
 
 func TestAKSExample(t *testing.T) {
 	t.Parallel()
 
 	opts := &terraform.Options{
-		TerraformDir: examplesPath + "aks",
+		TerraformDir: utils.ExamplesPath + "aks",
 
 		Vars: map[string]interface{}{
 			"prefix":              "test-mc",
@@ -29,25 +30,25 @@ func TestAKSExample(t *testing.T) {
 	terraform.InitAndApply(t, opts)
 
 	// get outputs
-	caCert := fetchSensitiveOutput(t, opts, "cluster_ca_certificate")
-	clientCert := fetchSensitiveOutput(t, opts, "client_certificate")
-	clientKey := fetchSensitiveOutput(t, opts, "client_key")
-	host := fetchSensitiveOutput(t, opts, "host")
+	caCert := utils.FetchSensitiveOutput(t, opts, "cluster_ca_certificate")
+	clientCert := utils.FetchSensitiveOutput(t, opts, "client_certificate")
+	clientKey := utils.FetchSensitiveOutput(t, opts, "client_key")
+	host := utils.FetchSensitiveOutput(t, opts, "host")
 
 	// decode the base64 encoded strings
-	caCertDecoded := decodeBase64(t, caCert)
-	clientCertDecoded := decodeBase64(t, clientCert)
-	clientKeyDecoded := decodeBase64(t, clientKey)
+	caCertDecoded := utils.DecodeBase64(t, caCert)
+	clientCertDecoded := utils.DecodeBase64(t, clientCert)
+	clientKeyDecoded := utils.DecodeBase64(t, clientKey)
 
 	// build the REST config
-	restConfig := createRESTConfigWithClientCert(caCertDecoded, clientCertDecoded, clientKeyDecoded, host)
+	restConfig := utils.CreateRESTConfigWithClientCert(caCertDecoded, clientCertDecoded, clientKeyDecoded, host)
 
 	// create a Kubernetes clientset
-	clientSet, err := buildClientSet(restConfig)
+	clientSet, err := utils.BuildClientSet(restConfig)
 	if err != nil {
 		t.Fatalf("Failed to create Kubernetes clientset: %v", err)
 	}
 
 	// test the cluster is accessible
-	testClusterAccess(t, clientSet)
+	utils.TestClusterAccess(t, clientSet)
 }
