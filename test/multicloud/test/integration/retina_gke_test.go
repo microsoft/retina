@@ -38,7 +38,7 @@ func TestRetinaGKEIntegration(t *testing.T) {
 	}
 
 	// clean up at the end of the test
-	// defer terraform.Destroy(t, opts)
+	defer terraform.Destroy(t, opts)
 	terraform.InitAndApply(t, opts)
 
 	// get outputs
