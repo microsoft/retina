@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
@@ -48,8 +47,7 @@ import (
 )
 
 const (
-	logFileName       = "retina.log"
-	heartbeatInterval = 15 * time.Minute
+	logFileName = "retina.log"
 
 	nodeNameEnvKey = "NODE_NAME"
 	nodeIPEnvKey   = "NODE_IP"
@@ -309,7 +307,7 @@ func (d *Daemon) Start() error {
 	defer controllerMgr.Stop(ctx)
 
 	// start heartbeat goroutine for application insights
-	go tel.Heartbeat(ctx, heartbeatInterval)
+	go tel.Heartbeat(ctx, daemonConfig.TelemetryInterval)
 
 	// Start controller manager, which will start http server and plugin manager.
 	go controllerMgr.Start(ctx)
