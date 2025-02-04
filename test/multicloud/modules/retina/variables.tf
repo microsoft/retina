@@ -1,5 +1,5 @@
 variable "retina_version" {
-  description = "The tag to apply to all resources."
+  description = "The Retina version to install."
   type        = string
   default     = "v0.0.23"
 }

@@ -3,6 +3,7 @@ resource "google_service_account" "default" {
   display_name = "GKE Service Account for ${var.project}"
 }
 
+// https://cloud.google.com/kubernetes-engine/docs/concepts/network-overview
 resource "google_container_cluster" "gke" {
   name     = "${var.prefix}-gke-cluster"
   location = var.location

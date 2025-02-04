@@ -91,11 +91,11 @@ func TestE2ERetina_Scale(t *testing.T) {
 
 	// CreateTestInfra
 	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, rg, clusterName, location, common.KubeConfigFilePath(rootDir), *common.CreateInfra))
-	createTestInfra.Run(ctx)
-
 	t.Cleanup(func() {
 		_ = jobs.DeleteTestInfra(subID, rg, location, *common.DeleteInfra).Run()
 	})
+
+	createTestInfra.Run(ctx)
 
 	fqdn, err := azure.GetFqdnFn(subID, rg, clusterName)
 	require.NoError(t, err)
@@ -104,10 +104,6 @@ func TestE2ERetina_Scale(t *testing.T) {
 	// Install Retina
 	installRetina := types.NewRunner(t, jobs.InstallRetina(common.KubeConfigFilePath(rootDir), common.RetinaChartPath(rootDir)))
 	installRetina.Run(ctx)
-
-	t.Cleanup(func() {
-		_ = jobs.UninstallRetina(common.KubeConfigFilePath(rootDir), common.RetinaChartPath(rootDir)).Run()
-	})
 
 	scale := types.NewRunner(t, jobs.ScaleTest(&opt))
 	scale.Run(ctx)
