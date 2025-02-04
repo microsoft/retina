@@ -97,7 +97,6 @@ make test
 * [AKS resource documentation](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/kubernetes_cluster)
 * [Kind resource documentation](https://registry.terraform.io/providers/tehcyx/kind/latest/docs/resources/cluster)
 
-
 ## Troubleshooting
 
 In case the test fails due to timeout, validate the resource was created by the provider, and if it is, you can import into OpenTofu state.
