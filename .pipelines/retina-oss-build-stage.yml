@@ -1,5 +1,5 @@
 parameters:
-- name: retinaOSSRepoName #not sure if really need but put for now, YEAH NEED BUT pass this variable for githuboss in 'main'
+- name: retinaOSSRepoName
   type: string
 - name: retinaEnterpriseRepoName
   type: string

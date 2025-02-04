@@ -19,9 +19,7 @@ stages:
       inputs:
         instructions: Confirm to continue. This will timeout in 24 hours and will reject the rest of the pipeline if not approved.
         onTimeout: 'reject'
-        # approvers: "[TEAM FOUNDATION]\\Retina"
-        approvers: "yilinwang@microsoft.com"
-        allowApproversToApproveTheirOwnRuns: true
+        approvers: "[TEAM FOUNDATION]\\Chandan's Extended Team"
 
 # Prepare Image Artifact
 - stage: build
@@ -75,28 +73,28 @@ stages:
         Select: regions(*)
 
 # Prod Stage
-# - stage: "Prod_Release"
-#   dependsOn: build
-#   condition: succeeded()
-#   displayName: "Prod: Push Retina OSS images to ACR"
-#   variables:
-#     ob_release_environment: Production
-#   jobs:
-#   - job: ReleaseJob
-#     pool:
-#       type: release
-#     variables:
-#       retryCountOnMonitoringTaskFailure: 3
-#     steps:
-#     - download: current
-#     - task: vsrm-ev2.ev2-rollout.ev2-rollout-task.Ev2RARollout@2
-#       displayName: "Start Ev2 Rollout"
-#       inputs:
-#         EndpointProviderType: ApprovalService
-#         ApprovalServiceEnvironment: Production
-#         TaskAction: RegisterAndRollout
-#         SkipRegistrationIfExists: true
-#         ServiceRootPath: '$(Pipeline.Workspace)'
-#         RolloutSpecPath: '$(Pipeline.Workspace)/drop_build_restore/EV2Specs/prod.rolloutSpec.json'
-#         StageMapName: 'Microsoft.Azure.SDP.Standard'
-#         Select: regions(*)
+- stage: "Prod_Release"
+  dependsOn: build
+  condition: succeeded()
+  displayName: "Prod: Push Retina OSS images to ACR"
+  variables:
+    ob_release_environment: Production
+  jobs:
+  - job: ReleaseJob
+    pool:
+      type: release
+    variables:
+      retryCountOnMonitoringTaskFailure: 3
+    steps:
+    - download: current
+    - task: vsrm-ev2.ev2-rollout.ev2-rollout-task.Ev2RARollout@2
+      displayName: "Start Ev2 Rollout"
+      inputs:
+        EndpointProviderType: ApprovalService
+        ApprovalServiceEnvironment: Production
+        TaskAction: RegisterAndRollout
+        SkipRegistrationIfExists: true
+        ServiceRootPath: '$(Pipeline.Workspace)'
+        RolloutSpecPath: '$(Pipeline.Workspace)/drop_build_restore/EV2Specs/prod.rolloutSpec.json'
+        StageMapName: 'Microsoft.Azure.SDP.Standard'
+        Select: regions(*)

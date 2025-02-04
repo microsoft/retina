@@ -12,7 +12,7 @@
         },
         "notification": {
             "email": {
-                "to": "yilinwang@microsoft.com",
+                "to": "acn@microsoft.com",
                 "options": {
                     "when": [
                         "onError",

@@ -1,6 +1,5 @@
 #!/bin/bash
 # Azure Container Registry URL
-# Prod ACR_URL="acnprod.azurecr.io/public/containernetworking"
 ACR_URL="$PROD_CONTAINER_REGISTRY/$IMAGE_NAMESPACE"
 IMAGE_NAME="multi_arch_image.tar"
 
@@ -55,9 +54,9 @@ extract_image_details() {
     if [[ $name == *"-"* ]]; then
         name="${name%-*}"
     fi
-
+    
+    # Handle the case for Windows image names/tags
     if [[ $name_tag == *"windows"* ]]; then
-        # Handle the case for Windows image names/tags
         name="${name_tag%-*-*-*-*}"
         tag="${name_tag#*-*-}"
     fi
@@ -78,7 +77,6 @@ find . -type f -name "*.tar" | while read -r tarball; do
     
     # Check if a manifest for this image name already exists
     if [[ ! -f "./manifests/$image_name.txt" ]]; then
-        # If not, create a new file for this image name
         touch "./manifests/$image_name.txt"
     fi
     
@@ -92,7 +90,7 @@ find ./manifests -type f -name "*.txt" | while read -r manifest_file; do
     
     # Extract the git SHA tag by removing architecture
     git_sha_tag="${image_details_array[0]#*:}"
-    git_sha_tag="${git_sha_tag%-*-*}"  # Remove the platform suffix (e.g., -linux-amd64)
+    git_sha_tag="${git_sha_tag%-*-*}" 
 
     # Extract the image name from the manifest file name
     image_name=$(basename "$manifest_file" .txt)

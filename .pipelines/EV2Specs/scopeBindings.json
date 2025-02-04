@@ -32,7 +32,7 @@
                 },
                 {
                     "find": "__IMAGE_NAME_SPACE__",
-                    "replaceWith": "xiaozhiche320/retina"
+                    "replaceWith": "public/retina"
                 }
             ]
         },
