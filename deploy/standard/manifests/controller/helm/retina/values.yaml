@@ -27,6 +27,7 @@ operator:
     args:
       - "--config"
       - "/retina/operator-config.yaml"
+  telemetryInterval: "5m"
 
 image:
   repository: ghcr.io/microsoft/retina/retina-agent
@@ -87,6 +88,7 @@ daemonset:
       metricsBindAddress: ":18080"
       ports:
         containerPort: 10093
+  telemetryInterval: "15m"
 
 # volume mounts with name and mountPath
 volumeMounts:
