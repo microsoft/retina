@@ -7,6 +7,8 @@ import (
 	"log"
 	"time"
 
+	retry "github.com/microsoft/retina/test/retry"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -42,9 +44,18 @@ func (l *LabelNodes) Run() error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeoutSeconds*time.Second)
 	defer cancel()
 
-	nodes, err := clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	var nodes *corev1.NodeList
+
+	retrier := retry.Retrier{Attempts: defaultRetryAttempts, Delay: defaultRetryDelay}
+	retrier.Do(ctx, func() error {
+		nodes, err = clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to get nodes: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
-		return fmt.Errorf("failed to get nodes: %w", err)
+		return fmt.Errorf("retrier failed: %w", err)
 	}
 
 	patch := []patchStringValue{}
@@ -62,9 +73,15 @@ func (l *LabelNodes) Run() error {
 
 	for i := range nodes.Items {
 		log.Println("Labeling node", nodes.Items[i].Name)
-		_, err = clientset.CoreV1().Nodes().Patch(ctx, nodes.Items[i].Name, types.JSONPatchType, b, metav1.PatchOptions{})
+		retrier.Do(ctx, func() error {
+			_, err = clientset.CoreV1().Nodes().Patch(ctx, nodes.Items[i].Name, types.JSONPatchType, b, metav1.PatchOptions{})
+			if err != nil {
+				return fmt.Errorf("failed to patch pod: %w", err)
+			}
+			return nil
+		})
 		if err != nil {
-			return fmt.Errorf("failed to patch pod: %w", err)
+			return fmt.Errorf("retrier failed: %w", err)
 		}
 	}
 
