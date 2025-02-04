@@ -26,7 +26,7 @@ import (
 
 const (
 	defaultRetryAttempts = 10
-	defaultRetryDelay    = 500 * time.Millisecond
+	defaultRetryDelay    = 3 * time.Second
 	defaultInterval      = 2 * time.Minute
 )
 
