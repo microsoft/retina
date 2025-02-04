@@ -1,6 +1,4 @@
 parameters:
-- name: pipelineWorkspace
-  type: string
 - name: retinaOSSRepoName #not sure if really need but put for now, YEAH NEED BUT pass this variable for githuboss in 'main'
   type: string
 - name: retinaEnterpriseRepoName

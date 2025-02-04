@@ -1,9 +1,6 @@
 parameters:
 - name: artifactPipelineName
   type: string
-  #define in runtime
-- name: pipelineWorkspace
-  type: string
 - name: retinaOSSRepoName
   type: string
 
