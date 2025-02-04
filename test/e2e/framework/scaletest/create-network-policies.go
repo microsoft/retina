@@ -16,6 +16,7 @@ import (
 )
 
 type CreateNetworkPolicies struct {
+	Ctx                         context.Context
 	KubeConfigFilePath          string
 	Namespace                   string
 	NumNetworkPolicies          int
@@ -45,7 +46,7 @@ func (c *CreateNetworkPolicies) Run() error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeoutSeconds*time.Second)
+	ctx, cancel := context.WithTimeout(c.Ctx, defaultTimeoutSeconds*time.Second)
 	defer cancel()
 
 	networkPolicies := c.generateNetworkPolicies(c.NumNetworkPolicies)

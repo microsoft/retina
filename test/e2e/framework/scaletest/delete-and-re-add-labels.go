@@ -15,6 +15,7 @@ import (
 )
 
 type DeleteAndReAddLabels struct {
+	Ctx                   context.Context
 	KubeConfigFilePath    string
 	NumSharedLabelsPerPod int
 	DeleteLabels          bool
@@ -49,7 +50,7 @@ func (d *DeleteAndReAddLabels) Run() error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(d.Ctx, 10*time.Second)
 	defer cancel()
 
 	labelsToDelete := `"shared-lab-00000": null, "shared-lab-00001": null, "shared-lab-00002": null`
@@ -75,10 +76,7 @@ func (d *DeleteAndReAddLabels) Run() error {
 
 		patch := fmt.Sprintf(`{"metadata": {"labels": {%s}}}`, labelsToDelete)
 
-		ctx, cancel = contextToLabelAllPods()
-		defer cancel()
-
-		err = d.deleteLabels(ctx, clientset, pods, patch)
+		err = d.deleteLabels(d.Ctx, clientset, pods, patch)
 		if err != nil {
 			return fmt.Errorf("error deleting labels: %w", err)
 		}
@@ -90,10 +88,7 @@ func (d *DeleteAndReAddLabels) Run() error {
 
 		patch = fmt.Sprintf(`{"metadata": {"labels": {%s}}}`, labelsToAdd)
 
-		ctx, cancel = contextToLabelAllPods()
-		defer cancel()
-
-		err = d.addLabels(ctx, clientset, pods, patch)
+		err = d.addLabels(d.Ctx, clientset, pods, patch)
 		if err != nil {
 			return fmt.Errorf("error adding labels: %w", err)
 		}

@@ -20,6 +20,7 @@ type patchStringValue struct {
 }
 
 type AddSharedLabelsToAllPods struct {
+	Ctx                   context.Context
 	KubeConfigFilePath    string
 	NumSharedLabelsPerPod int
 	Namespace             string
@@ -51,10 +52,7 @@ func (a *AddSharedLabelsToAllPods) Run() error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	ctx, cancel := contextToLabelAllPods()
-	defer cancel()
-
-	resources, err := clientset.CoreV1().Pods(a.Namespace).List(ctx, metav1.ListOptions{})
+	resources, err := clientset.CoreV1().Pods(a.Namespace).List(a.Ctx, metav1.ListOptions{})
 
 	patchBytes, err := getSharedLabelsPatch(a.NumSharedLabelsPerPod)
 	if err != nil {
@@ -62,7 +60,7 @@ func (a *AddSharedLabelsToAllPods) Run() error {
 	}
 
 	for _, resource := range resources.Items {
-		err = patchLabel(ctx, clientset, a.Namespace, resource.Name, patchBytes)
+		err = patchLabel(a.Ctx, clientset, a.Namespace, resource.Name, patchBytes)
 		if err != nil {
 			log.Printf("Error adding shared labels to pod %s: %s\n", resource.Name, err)
 		}
