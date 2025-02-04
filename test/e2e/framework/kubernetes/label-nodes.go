@@ -41,7 +41,7 @@ func (l *LabelNodes) Run() error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeoutSeconds*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	var nodes *corev1.NodeList
