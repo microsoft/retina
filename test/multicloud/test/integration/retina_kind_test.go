@@ -15,8 +15,8 @@ func TestRetinaKindIntegration(t *testing.T) {
 		TerraformDir: utils.ExamplesPath + "integration/retina-kind",
 
 		Vars: map[string]interface{}{
-			"prefix":         "test-integration",
-			"retina_version": utils.RetinaVersion,
+			"prefix":               "test-integration",
+			"retina_chart_version": utils.RetinaVersion,
 		},
 	}
 
