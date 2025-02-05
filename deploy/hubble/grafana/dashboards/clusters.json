@@ -85,7 +85,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "# Network Observability Metrics\n\nUse this dashboard to visualise metrics from the Network Observability add-on for AKS. Dashboard displays metrics from Linux and Windows Clusters. To hide the irrelevant metrics, simply collapse the unwanted sections. Alternatively, you can edit the dashboard to delete unwanted panels. For any questions or issues, please see [our documentation](https://aka.ms/NetObsAddonDoc).",
+        "content": "# Retina Network Observability\n\nVisualize metrics for any Kubernetes cluster using [Retina](https://retina.sh/) (any cloud provider, any CNI, any OS). Cycle between all dashboards in the dropdown above.",
         "mode": "markdown"
       },
       "type": "text"
