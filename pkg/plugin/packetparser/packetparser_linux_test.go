@@ -163,9 +163,9 @@ func TestEndpointWatcherCallbackFn_EndpointDeleted(t *testing.T) {
 	defer ctrl.Finish()
 
 	p := &packetParser{
-		cfg:              cfgPodLevelEnabled,
-		l:                log.Logger().Named("test"),
-		interfaceLockMap: &sync.Map{},
+		cfg:          cfgPodLevelEnabled,
+		l:            log.Logger().Named("test"),
+		interfaceMap: &sync.Map{},
 	}
 	p.tcMap = &sync.Map{}
 	linkAttr := netlink.LinkAttrs{
@@ -175,6 +175,7 @@ func TestEndpointWatcherCallbackFn_EndpointDeleted(t *testing.T) {
 	}
 	key := ifaceToKey(linkAttr)
 	p.tcMap.Store(key, &tcValue{nil, &tc.Object{}})
+	p.interfaceMap.Store(key, struct{}{})
 
 	// Create EndpointDeleted event.
 	e := &endpoint.EndpointEvent{
@@ -185,6 +186,8 @@ func TestEndpointWatcherCallbackFn_EndpointDeleted(t *testing.T) {
 	p.endpointWatcherCallbackFn(e)
 
 	_, ok := p.tcMap.Load(key)
+	assert.False(t, ok)
+	_, ok = p.interfaceMap.Load(key)
 	assert.False(t, ok)
 }
 
@@ -224,10 +227,10 @@ func TestCreateQdiscAndAttach(t *testing.T) {
 	pObj.EndpointEgressFilter = &ebpf.Program{}
 
 	p := &packetParser{
-		cfg:              cfgPodLevelEnabled,
-		l:                log.Logger().Named("test"),
-		objs:             pObj,
-		interfaceLockMap: &sync.Map{},
+		cfg:          cfgPodLevelEnabled,
+		l:            log.Logger().Named("test"),
+		objs:         pObj,
+		interfaceMap: &sync.Map{},
 		endpointIngressInfo: &ebpf.ProgramInfo{
 			Name: "ingress",
 		},
@@ -412,12 +415,12 @@ func TestStartWithDataAggregationLevelLow(t *testing.T) {
 	pObj.EndpointEgressFilter = &ebpf.Program{}
 
 	p := &packetParser{
-		cfg:              cfgDataAggregationLevelLow,
-		l:                log.Logger().Named("test"),
-		objs:             pObj,
-		reader:           mockReader,
-		recordsChannel:   make(chan perf.Record, buffer),
-		interfaceLockMap: &sync.Map{},
+		cfg:            cfgDataAggregationLevelLow,
+		l:              log.Logger().Named("test"),
+		objs:           pObj,
+		reader:         mockReader,
+		recordsChannel: make(chan perf.Record, buffer),
+		interfaceMap:   &sync.Map{},
 		endpointIngressInfo: &ebpf.ProgramInfo{
 			Name: "ingress",
 		},
@@ -491,12 +494,12 @@ func TestStartWithDataAggregationLevelHigh(t *testing.T) {
 	pObj.EndpointEgressFilter = &ebpf.Program{}
 
 	p := &packetParser{
-		cfg:              cfgDataAggregationLevelHigh,
-		l:                log.Logger().Named("test"),
-		objs:             pObj,
-		reader:           mockReader,
-		recordsChannel:   make(chan perf.Record, buffer),
-		interfaceLockMap: &sync.Map{},
+		cfg:            cfgDataAggregationLevelHigh,
+		l:              log.Logger().Named("test"),
+		objs:           pObj,
+		reader:         mockReader,
+		recordsChannel: make(chan perf.Record, buffer),
+		interfaceMap:   &sync.Map{},
 		endpointIngressInfo: &ebpf.ProgramInfo{
 			Name: "ingress",
 		},

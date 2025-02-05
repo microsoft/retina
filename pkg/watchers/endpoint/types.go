@@ -3,20 +3,31 @@
 
 package endpoint
 
+import (
+	"github.com/microsoft/retina/pkg/log"
+	"github.com/microsoft/retina/pkg/pubsub"
+)
+
 const (
+	watcherName            = "endpoint-watcher"
 	endpointCreated string = "endpoint_created"
 	endpointDeleted string = "endpoint_deleted"
 )
 
-type key struct {
-	name         string
-	hardwareAddr string
-	// Network namespace for linux.
-	// Compartment ID for windows.
-	netNsID int
+type Watcher struct {
+	l *log.ZapLogger
+	p pubsub.PubSubInterface
 }
 
-type cache map[key]interface{}
+// NewWatcher creates a new endpoint watcher.
+func NewWatcher() *Watcher {
+	w := &Watcher{
+		l: log.Logger().Named(watcherName),
+		p: pubsub.New(),
+	}
+
+	return w
+}
 
 type EndpointEvent struct {
 	// Type is the type of the event.
@@ -48,12 +59,4 @@ func (e EventType) String() string {
 	default:
 		return "unknown"
 	}
-}
-
-func (c cache) deepcopy() cache {
-	copy := make(cache)
-	for k, v := range c {
-		copy[k] = v
-	}
-	return copy
 }

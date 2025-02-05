@@ -24,7 +24,7 @@ func main() {
 
 	// watcher manager
 	wm := watchermanager.NewWatcherManager()
-	wm.Watchers = []watchermanager.IWatcher{endpoint.Watcher()}
+	wm.Watchers = []watchermanager.Watcher{endpoint.NewWatcher()}
 
 	err := wm.Start(ctx)
 	if err != nil {
