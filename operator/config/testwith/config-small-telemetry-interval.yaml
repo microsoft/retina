@@ -1,0 +1,9 @@
+apiServer:
+  host: "0.0.0.0"
+  port: 10093
+installCRDs: true
+enableTelemetry: true
+logLevel: info
+enableRetinaEndpoint: true
+remoteContext: true
+telemetryInterval: "10s"

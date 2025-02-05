@@ -15,4 +15,4 @@
 8. Push to container registry:
 `docker push <container-registry-url>/retina:<TAG>`
 9. Installing retina onto the cluster -
-`helm install retina <retina-repository-path>/deploy/legacy/manifests/controller/helm/retina/ --create-namespace --namespace retina --dependency-update`
+`helm install retina <retina-repository-path>/deploy/standard/manifests/controller/helm/retina/ --create-namespace --namespace retina --dependency-update`

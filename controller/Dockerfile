@@ -2,8 +2,8 @@ ARG OS_VERSION
 
 # pinned base images
 
-# mcr.microsoft.com/oss/go/microsoft/golang:1.23.4-cbl-mariner2.0
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:88225e171f29fe5f1f6ffca8eb659535b19b253354e43e1f4fc8a9bc67615ca1 AS golang
+# mcr.microsoft.com/oss/go/microsoft/golang:1.23.5-cbl-mariner2.0
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:ef39e430a97a61bec3395adb673a7c5611d2212f14abe40da21cbfd11a9d6e9d AS golang
 
 # mcr.microsoft.com/cbl-mariner/base/core:2.0
 FROM --platform=$TARGETPLATFORM mcr.microsoft.com/cbl-mariner/base/core@sha256:77651116f2e83cf50fddd8a0316945499f8ce6521ff8e94e67539180d1e5975a AS mariner-core
@@ -99,7 +99,7 @@ RUN arr="clang tcpdump ip ss iptables-legacy iptables-legacy-save iptables-nft i
 ARG GOARCH=amd64
 ENV HUBBLE_ARCH=${GOARCH}
 # ARG HUBBLE_VERSION may be modified via the update-hubble GitHub Action
-ARG HUBBLE_VERSION=v1.16.5
+ARG HUBBLE_VERSION=v1.16.6
 ENV HUBBLE_VERSION=${HUBBLE_VERSION}
 RUN echo "Hubble version: $HUBBLE_VERSION" && \
     wget --no-check-certificate https://github.com/cilium/hubble/releases/download/$HUBBLE_VERSION/hubble-linux-${HUBBLE_ARCH}.tar.gz && \
