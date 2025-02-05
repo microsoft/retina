@@ -130,8 +130,7 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, fil
 	select {
 	case <-doneChan:
 	case <-ctx.Done():
-		err := ctx.Err()
-		ncp.l.Info("Netsh will be stopped - got OS signal, or timeout reached", zap.Error(err))
+		ncp.l.Info("Netsh will be stopped - got OS signal, or timeout reached", zap.Error(ctx.Err()))
 	}
 
 	ncp.l.Info("Stop netsh")
