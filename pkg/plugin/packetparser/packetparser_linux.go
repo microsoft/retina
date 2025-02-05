@@ -391,7 +391,6 @@ func (p *packetParser) endpointWatcherCallbackFn(obj interface{}) {
 	case endpoint.EndpointCreated:
 		p.l.Debug("Endpoint created", zap.String("name", iface.Name))
 		p.createQdiscAndAttach(iface, Veth)
-
 	case endpoint.EndpointDeleted:
 		p.l.Debug("Endpoint deleted", zap.String("name", iface.Name))
 		// Clean.
