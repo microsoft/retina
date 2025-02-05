@@ -4,6 +4,7 @@
 package outputlocation
 
 import (
+	"context"
 	"io"
 	"os"
 	"path/filepath"
@@ -37,7 +38,7 @@ func (hp *HostPath) Enabled() bool {
 	return true
 }
 
-func (hp *HostPath) Output(srcFilePath string) error {
+func (hp *HostPath) Output(_ context.Context, srcFilePath string) error {
 	hostPath := os.Getenv(string(captureConstants.CaptureOutputLocationEnvKeyHostPath))
 	hp.l.Info("Copy file",
 		zap.String("location", hp.Name()),

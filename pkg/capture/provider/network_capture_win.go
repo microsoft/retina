@@ -6,6 +6,7 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -59,7 +60,10 @@ func (ncp *NetworkCaptureProvider) Setup(filename file.CaptureFilename) (string,
 	return ncp.TmpCaptureDir, nil
 }
 
-func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(filter string, duration, maxSizeMB int, sigChan <-chan os.Signal) error {
+func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, filter string, duration, maxSizeMB int) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Second*time.Duration(duration))
+	defer cancel()
+
 	stopTrace, err := ncp.needToStopTraceSession()
 	if err != nil {
 		return err
@@ -125,8 +129,9 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(filter string, duration,
 
 	select {
 	case <-doneChan:
-	case sig := <-sigChan:
-		ncp.l.Info("Got OS signal, netsh will be stopped", zap.String("signal", sig.String()))
+	case <-ctx.Done():
+		err := ctx.Err()
+		ncp.l.Info("Netsh will be stopped - got OS signal, or timeout reached", zap.Error(err))
 	}
 
 	ncp.l.Info("Stop netsh")

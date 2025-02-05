@@ -42,7 +42,7 @@ func (bu *BlobUpload) Enabled() bool {
 	return true
 }
 
-func (bu *BlobUpload) Output(srcFilePath string) error {
+func (bu *BlobUpload) Output(ctx context.Context, srcFilePath string) error {
 	bu.l.Info("Upload capture file to blob.", zap.String("location", bu.Name()))
 	blobURL, err := readBlobSASURL()
 	if err != nil {
@@ -71,7 +71,7 @@ func (bu *BlobUpload) Output(srcFilePath string) error {
 
 	blobName := filepath.Base(srcFilePath)
 	_, err = azClient.UploadFile(
-		context.TODO(),
+		ctx,
 		"",
 		blobName,
 		blobFile,
