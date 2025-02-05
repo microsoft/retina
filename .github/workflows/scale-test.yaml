@@ -46,10 +46,10 @@ on:
         type: number
       num_netpol: 
         description: "Number of Network Policies"
-        default: 100
+        default: 0
         type: number
       num_nodes:
-        description: "Number of nodes per pool"
+        description: "Number of nodes"
         default: 100
         type: number
       cleanup: 
@@ -102,4 +102,4 @@ jobs:
         run: |
           set -euo pipefail
           [[ $TAG == "" ]] && TAG=$(curl -s https://api.github.com/repos/microsoft/retina/commits | jq -r '.[0].sha' | cut -c1-7)
-          go test -v ./test/e2e/. -timeout 300m -tags=scale -count=1  -args -create-infra=$(echo $CREATE_INFRA) -delete-infra=$(echo $CREATE_INFRA)
+          go test -v ./test/e2e/. -timeout 300m -tags=scale -count=1  -args -create-infra=$(echo $CREATE_INFRA) -delete-infra=$(echo $CLEANUP)

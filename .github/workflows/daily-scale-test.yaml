@@ -1,9 +1,6 @@
 name: Daily Scale Test
 
 on:
-  push:
-    branches:
-      - alexcastilio/scale-test-workflow
   schedule:
     - cron: "0 0 * * *"
 
@@ -17,8 +14,7 @@ jobs:
     with: 
       num_deployments: 1000
       num_replicas: 20
-        # TODO: Fix values
       num_netpol: 0
       num_nodes: 1000
-      cleanup: false
+      cleanup: true
     secrets: inherit

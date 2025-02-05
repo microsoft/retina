@@ -39,6 +39,7 @@ func (c *CreateCluster) SetVMSize(vmSize string) *CreateCluster {
 	c.vmSize = vmSize
 	return c
 }
+
 func (c *CreateCluster) SetNetworkPluginMode(networkPluginMode string) *CreateCluster {
 	c.networkPluginMode = networkPluginMode
 	return c

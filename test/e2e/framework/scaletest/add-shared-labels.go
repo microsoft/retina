@@ -53,6 +53,9 @@ func (a *AddSharedLabelsToAllPods) Run() error {
 	}
 
 	resources, err := clientset.CoreV1().Pods(a.Namespace).List(a.Ctx, metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to list pods: %w", err)
+	}
 
 	patchBytes, err := getSharedLabelsPatch(a.NumSharedLabelsPerPod)
 	if err != nil {

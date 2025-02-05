@@ -47,7 +47,7 @@ func (l *LabelNodes) Run() error {
 	var nodes *corev1.NodeList
 
 	retrier := retry.Retrier{Attempts: defaultRetryAttempts, Delay: defaultRetryDelay}
-	retrier.Do(ctx, func() error {
+	err = retrier.Do(ctx, func() error {
 		nodes, err = clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to get nodes: %w", err)
@@ -73,7 +73,7 @@ func (l *LabelNodes) Run() error {
 
 	for i := range nodes.Items {
 		log.Println("Labeling node", nodes.Items[i].Name)
-		retrier.Do(ctx, func() error {
+		err = retrier.Do(ctx, func() error {
 			_, err = clientset.CoreV1().Nodes().Patch(ctx, nodes.Items[i].Name, types.JSONPatchType, b, metav1.PatchOptions{})
 			if err != nil {
 				return fmt.Errorf("failed to patch pod: %w", err)
