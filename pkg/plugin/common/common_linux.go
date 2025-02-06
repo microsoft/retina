@@ -89,3 +89,16 @@ func NewPerfReader(l *log.ZapLogger, m *ebpf.Map, max, min int) (*perf.Reader, e
 	}
 	return nil, errors.New("failed to create perf reader")
 }
+
+// IsPluginEnabled checks if a given plugin is enabled in the config
+func IsPluginEnabled(enabledPlugins []string, pluginName string) bool {
+	if enabledPlugins == nil {
+		return false
+	}
+	for _, plugin := range enabledPlugins {
+		if plugin == pluginName {
+			return true
+		}
+	}
+	return false
+}

@@ -93,6 +93,12 @@ func GenerateDynamic(ctx context.Context, dynamicHeaderPath string, conntrackMet
 
 // Run starts the Conntrack garbage collection loop.
 func (ct *Conntrack) Run(ctx context.Context) error {
+	// Check if packetparser plugin is enabled
+	if !plugincommon.IsPluginEnabled(ct.cfg.EnabledPlugins, "packetparser") {
+		ct.l.Info("Skipping Conntrack GC loop as packetparser plugin is not enabled")
+		return nil
+	}
+
 	ticker := time.NewTicker(ct.gcFrequency)
 	defer ticker.Stop()
 
