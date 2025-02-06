@@ -2,6 +2,8 @@ package helpers
 
 import (
 	"context"
+	"os/signal"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -20,5 +22,8 @@ func Context(t *testing.T) (context.Context, context.CancelFunc) {
 	// Subtract a minute from the deadline to ensure we have time to cleanup
 	deadline = deadline.Add(-time.Minute)
 
-	return context.WithDeadline(context.Background(), deadline)
+	ctx, cancel := context.WithDeadline(context.Background(), deadline)
+	ctx, cancel = signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+
+	return ctx, cancel
 }
