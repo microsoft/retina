@@ -138,7 +138,7 @@ func (c *CreateKapingerDeployment) GetKapingerDeployment() *appsv1.Deployment {
 									"memory": resource.MustParse("20Mi"),
 								},
 								Limits: v1.ResourceList{
-									"memory": resource.MustParse("100Mi"),
+									"memory": resource.MustParse("20Mi"),
 								},
 							},
 							Ports: []v1.ContainerPort{
