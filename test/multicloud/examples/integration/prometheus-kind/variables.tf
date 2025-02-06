@@ -29,19 +29,6 @@ variable "prometheus_chart_name" {
 }
 
 variable "prometheus_values" {
-  description = "Configuration for set blocks, this corresponds to Helm values.yaml"
-  type = list(object({
-    name  = string
-    value = string
-  }))
-  default = [
-    {
-      name  = "global.prometheus.enabled"
-      value = "true"
-    },
-    {
-      name  = "global.grafana.enabled"
-      value = "true"
-    }
-  ]
+  description = "This corresponds to Helm values.yaml"
+  type        = list(string)
 }

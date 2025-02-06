@@ -19,6 +19,6 @@ variable "chart_name" {
 }
 
 variable "values" {
-  description = "Configuration for set blocks, this corresponds to Helm values.yaml"
+  description = "This corresponds to Helm values.yaml"
   type        = list(string)
 }
