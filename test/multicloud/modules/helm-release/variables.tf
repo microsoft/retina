@@ -20,8 +20,5 @@ variable "chart_name" {
 
 variable "values" {
   description = "Configuration for set blocks, this corresponds to Helm values.yaml"
-  type = list(object({
-    name  = string
-    value = string
-  }))
+  type        = list(string)
 }

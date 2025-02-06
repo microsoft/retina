@@ -1,7 +1,6 @@
 variable "location" {
-  description = "The VM location."
+  description = "Location of the AKS cluster."
   type        = string
-  default     = "UK South"
 }
 
 variable "resource_group_name" {
@@ -12,7 +11,6 @@ variable "resource_group_name" {
 variable "prefix" {
   description = "A prefix to add to all resources."
   type        = string
-  default     = "example-vm"
 }
 
 variable "labels" {
@@ -41,8 +39,8 @@ variable "network_profile" {
       managed_outbound_ip_count = 1
     }
     pod_cidr       = "10.244.0.0/16"
-    service_cidr   = "10.0.0.0/16"
-    dns_service_ip = "10.0.0.10"
+    service_cidr   = "10.1.0.0/16"
+    dns_service_ip = "10.1.0.10"
     outbound_type  = "loadBalancer"
   }
 }
@@ -69,6 +67,18 @@ variable "default_node_pool" {
     type            = "VirtualMachineScaleSets"
     node_labels     = {}
   }
+}
+
+variable "vnet_address_space" {
+  description = "The address space for the virtual network."
+  type        = list(string)
+  default     = ["10.0.0.0/16"]
+}
+
+variable "subnet_address_space" {
+  description = "The address space for the subnet."
+  type        = list(string)
+  default     = ["10.0.1.0/24"]
 }
 
 variable "kubernetes_version" {
