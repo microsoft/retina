@@ -102,4 +102,4 @@ jobs:
         run: |
           set -euo pipefail
           [[ $TAG == "" ]] && TAG=$(curl -s https://api.github.com/repos/microsoft/retina/commits | jq -r '.[0].sha' | cut -c1-7)
-          go test -v ./test/e2e/. -timeout 300m -tags=scale -count=1  -args -create-infra=$(echo $CREATE_INFRA) -delete-infra=$(echo $CLEANUP)
+          exec go test -v ./test/e2e/. -timeout 300m -tags=scale -count=1  -args -create-infra=$(echo $CREATE_INFRA) -delete-infra=$(echo $CLEANUP)
