@@ -42,10 +42,10 @@
       "includeVars": true,
       "keepTime": true,
       "tags": [
-        "k8s:network-observability"
+        "k8s:retina-network-observability"
       ],
       "targetBlank": false,
-      "title": "Dashboards: Network Observability",
+      "title": "Dashboards: Retina Network Observability",
       "tooltip": "",
       "type": "dashboards",
       "url": ""
@@ -60,7 +60,7 @@
       "title": "Documentation",
       "tooltip": "Documentation",
       "type": "link",
-      "url": "https://aka.ms/NetObsAddonDoc"
+      "url": "https://retina.sh/docs/Introduction/intro"
     }
   ],
   "liveNow": true,
@@ -3875,7 +3875,7 @@
   "schemaVersion": 38,
   "style": "dark",
   "tags": [
-    "k8s:network-observability"
+    "k8s:retina-network-observability"
   ],
   "templating": {
     "list": [
@@ -4004,7 +4004,7 @@
     ]
   },
   "timezone": "",
-  "title": "Kubernetes / Networking / Retina (Hubble) / Pod Flows (Workload)",
-  "uid": "RetinaHubblePodFlowsWorkload",
+  "title": "Kubernetes / Networking / Retina / Pod Flows (Workload)",
+  "uid": "RetinaPodFlowsWorkload",
   "version": 1
 }
