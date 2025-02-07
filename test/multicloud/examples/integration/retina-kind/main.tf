@@ -10,15 +10,5 @@ module "retina" {
   repository_url = var.retina_repository_url
   chart_version  = var.retina_chart_version
   chart_name     = var.retina_chart_name
-  values = [jsonencode(
-    {
-      image = {
-        tag = "v0.0.24"
-      }
-      logLevel = "info"
-      operator = {
-        tag = "v0.0.24"
-      }
-    }
-  )]
+  values         = var.retina_values
 }

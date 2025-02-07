@@ -7,24 +7,22 @@ locals {
   retina_repository_url = "oci://ghcr.io/microsoft/retina/charts"
   retina_chart_version  = "v0.0.24"
   retina_chart_name     = "retina"
-  retina_values = [jsonencode(
-    {
-      image = {
-        tag = "v0.0.24"
-      }
-      logLevel = "info"
-      operator = {
-        tag = "v0.0.24"
-      }
+  retina_values = {
+    image = {
+      tag = "v0.0.24"
     }
-  )]
+    logLevel = "info"
+    operator = {
+      tag = "v0.0.24"
+    }
+  }
 
   prometheus_release_name   = "prometheus"
   prometheus_repository_url = "https://prometheus-community.github.io/helm-charts"
   prometheus_chart_version  = "68.4.3"
   prometheus_chart_name     = "kube-prometheus-stack"
   prometheus_values = [
-    "${file("../../../../deploy/standard/prometheus/values.yaml")}"
+    file("../../../../deploy/standard/prometheus/values.yaml")
   ]
 
   aks_security_rules = [

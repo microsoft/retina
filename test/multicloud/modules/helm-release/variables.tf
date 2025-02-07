@@ -20,5 +20,5 @@ variable "chart_name" {
 
 variable "values" {
   description = "This corresponds to Helm values.yaml"
-  type        = list(string)
+  type        = any
 }

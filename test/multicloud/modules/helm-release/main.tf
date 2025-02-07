@@ -3,5 +3,5 @@ resource "helm_release" "release" {
   repository = var.repository_url
   chart      = var.chart_name
   version    = var.chart_version
-  values     = var.values
+  values     = [jsonencode(var.values)]
 }
