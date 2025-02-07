@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/cilium/ebpf"
+	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
 )
 
@@ -15,11 +16,14 @@ const (
 	dynamicHeaderFileName = "dynamic.h"
 )
 
+// Conntrack represents the conntrack plugin
 type Conntrack struct {
 	l           *log.ZapLogger
 	objs        *conntrackObjects
 	ctMap       *ebpf.Map
 	gcFrequency time.Duration
+	isRunning   bool
+	cfg         *config.Config
 }
 
 // Define TCP flag constants

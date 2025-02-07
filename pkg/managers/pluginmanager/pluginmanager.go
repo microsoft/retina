@@ -138,7 +138,7 @@ func (p *PluginManager) Start(ctx context.Context) error {
 	g, ctx := errgroup.WithContext(ctx)
 
 	// run conntrack GC
-	ct, err := conntrack.New()
+	ct, err := conntrack.New(p.cfg)
 	if err != nil {
 		return errors.Wrap(err, "failed to get conntrack instance")
 	}
