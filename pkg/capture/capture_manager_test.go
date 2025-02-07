@@ -4,12 +4,9 @@
 package capture
 
 import (
-	"context"
 	"fmt"
 	"os"
-	"os/signal"
 	"strconv"
-	"syscall"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -53,7 +50,7 @@ func TestCaptureNetwork(t *testing.T) {
 		os.Unsetenv(captureConstants.CaptureMaxSizeEnvKey)
 	}()
 
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
+	ctx, cancel := createTestContext(t)
 	defer cancel()
 
 	tmpFilename := file.CaptureFilename{CaptureName: captureName, NodeHostname: nodeHostName, StartTimestamp: &timestamp}
