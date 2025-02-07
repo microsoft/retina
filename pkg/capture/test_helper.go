@@ -7,11 +7,13 @@ import (
 	"testing"
 )
 
-func createTestContext(t *testing.T) (context.Context, func()) {
+func TestContext(t *testing.T) (context.Context, context.CancelFunc) {
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
+
 	deadline, ok := t.Deadline()
-	if !ok {
-		return signal.NotifyContext(context.Background(), syscall.SIGTERM)
-	} else {
-		return context.WithDeadline(context.Background(), deadline)
+	if ok {
+		return context.WithDeadline(ctx, deadline)
 	}
+
+	return ctx, cancel
 }

@@ -50,7 +50,7 @@ func TestCaptureNetwork(t *testing.T) {
 		os.Unsetenv(captureConstants.CaptureMaxSizeEnvKey)
 	}()
 
-	ctx, cancel := createTestContext(t)
+	ctx, cancel := TestContext(t)
 	defer cancel()
 
 	tmpFilename := file.CaptureFilename{CaptureName: captureName, NodeHostname: nodeHostName, StartTimestamp: &timestamp}

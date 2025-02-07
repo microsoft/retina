@@ -135,7 +135,7 @@ func Test_CaptureTargetsOnNode_AddNodeInterface(t *testing.T) {
 }
 
 func Test_CaptureToPodTranslator_GetCaptureTargetsOnNode(t *testing.T) {
-	ctx, cancel := createTestContext(t)
+	ctx, cancel := TestContext(t)
 	defer cancel()
 
 	cases := []struct {
@@ -411,7 +411,7 @@ func Test_CaptureToPodTranslator_GetCaptureTargetsOnNode(t *testing.T) {
 }
 
 func Test_CaptureToPodTranslator_updateCaptureTargetsOSOnNode(t *testing.T) {
-	ctx, cancel := createTestContext(t)
+	ctx, cancel := TestContext(t)
 	defer cancel()
 
 	cases := []struct {
@@ -590,7 +590,7 @@ func Test_CaptureToPodTranslator_ObtainCaptureJobPodEnv(t *testing.T) {
 }
 
 func Test_CaptureToPodTranslator_RenderJob_NodeSelected(t *testing.T) {
-	ctx, cancel := createTestContext(t)
+	ctx, cancel := TestContext(t)
 	defer cancel()
 
 	cases := []struct {
@@ -834,7 +834,7 @@ func isIgnorableEnvVar(envVar corev1.EnvVar) bool {
 }
 
 func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
-	ctx, cancel := createTestContext(t)
+	ctx, cancel := TestContext(t)
 	defer cancel()
 
 	captureName := "capture-test"
@@ -1779,7 +1779,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 }
 
 func Test_CaptureToPodTranslator_TranslateCaptureToJobs_JobNumLimit(t *testing.T) {
-	ctx, cancel := createTestContext(t)
+	ctx, cancel := TestContext(t)
 	defer cancel()
 
 	captureName := "capture-test"
