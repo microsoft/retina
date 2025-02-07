@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	e2ekubernetes "github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/retry"
@@ -13,7 +14,6 @@ import (
 )
 
 type CreateResources struct {
-	Ctx                          context.Context
 	Namespace                    string
 	KubeConfigFilePath           string
 	NumKwokDeployments           int
@@ -49,11 +49,14 @@ func (c *CreateResources) Run() error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 1800*time.Second)
+	defer cancel()
+
 	retrier := retry.Retrier{Attempts: defaultRetryAttempts, Delay: defaultRetryDelay}
 
 	for _, resource := range resources {
-		err := retrier.Do(c.Ctx, func() error {
-			return e2ekubernetes.CreateResource(c.Ctx, resource, clientset)
+		err := retrier.Do(ctx, func() error {
+			return e2ekubernetes.CreateResource(ctx, resource, clientset)
 		})
 		if err != nil {
 			return fmt.Errorf("error creating resource: %w", err)

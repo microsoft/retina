@@ -1,7 +1,6 @@
 package scaletest
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 
@@ -11,7 +10,6 @@ import (
 )
 
 type AddUniqueLabelsToAllPods struct {
-	Ctx                   context.Context
 	KubeConfigFilePath    string
 	NumUniqueLabelsPerPod int
 	Namespace             string
@@ -43,7 +41,10 @@ func (a *AddUniqueLabelsToAllPods) Run() error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	resources, err := clientset.CoreV1().Pods(a.Namespace).List(a.Ctx, metav1.ListOptions{})
+	ctx, cancel := contextToLabelAllPods()
+	defer cancel()
+
+	resources, err := clientset.CoreV1().Pods(a.Namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list pods: %w", err)
 	}
@@ -66,7 +67,7 @@ func (a *AddUniqueLabelsToAllPods) Run() error {
 			return fmt.Errorf("failed to marshal patch: %w", err)
 		}
 
-		err = patchLabel(a.Ctx, clientset, a.Namespace, resource.Name, patchBytes)
+		err = patchLabel(ctx, clientset, a.Namespace, resource.Name, patchBytes)
 		if err != nil {
 			return fmt.Errorf("error adding unique label to pod: %w", err)
 		}

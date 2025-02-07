@@ -14,14 +14,14 @@ import (
 )
 
 const (
-	RetryTimeoutPodsReady  = 5 * time.Minute
-	RetryIntervalPodsReady = 5 * time.Second
+	RetryTimeoutPodsReady     = 5 * time.Minute
+	RetryIntervalPodsReady    = 5 * time.Second
+	timeoutWaitForPodsSeconds = 1200
 
 	printInterval = 5 // print to stdout every 5 iterations
 )
 
 type WaitPodsReady struct {
-	Ctx                context.Context
 	KubeConfigFilePath string
 	Namespace          string
 	LabelSelector      string
@@ -49,7 +49,10 @@ func (w *WaitPodsReady) Run() error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	return WaitForPodReady(w.Ctx, clientset, w.Namespace, w.LabelSelector)
+	ctx, cancel := context.WithTimeout(context.Background(), timeoutWaitForPodsSeconds*time.Second)
+	defer cancel()
+
+	return WaitForPodReady(ctx, clientset, w.Namespace, w.LabelSelector)
 }
 
 // Require for background steps

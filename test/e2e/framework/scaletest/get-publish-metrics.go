@@ -31,7 +31,6 @@ const (
 )
 
 type GetAndPublishMetrics struct {
-	Ctx                         context.Context
 	KubeConfigFilePath          string
 	AdditionalTelemetryProperty map[string]string
 	Labels                      map[string]string
@@ -137,7 +136,7 @@ func (g *GetAndPublishMetrics) Prevalidate() error {
 
 func (g *GetAndPublishMetrics) getAndPublishMetrics() error {
 
-	ctx, cancel := context.WithTimeout(g.Ctx, defaultTimeoutSeconds*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeoutSeconds*time.Second)
 	defer cancel()
 
 	labelSelector := labels.Set(g.Labels).String()

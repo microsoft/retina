@@ -59,7 +59,7 @@ func GetScaleTestInfra(subID, rg, clusterName, location, kubeConfigFilePath stri
 
 		job.AddStep((&azure.CreateCluster{
 			ClusterName: clusterName,
-			Nodes:       nodes,
+			Nodes: nodes,
 		}).
 			SetPodCidr("100.64.0.0/10").
 			SetVMSize("Standard_D4_v3").
@@ -115,7 +115,6 @@ func ScaleTest(opt *scaletest.Options) *types.Job {
 	// There's a known limitation on leaving empty fields in Steps.
 	// Set methods are used to set private fields and keep environment variables accessed within jobs, rather then spread through steps.
 	job.AddStep((&scaletest.GetAndPublishMetrics{
-		Ctx:                         opt.Ctx,
 		Labels:                      opt.LabelsToGetMetrics,
 		AdditionalTelemetryProperty: opt.AdditionalTelemetryProperty,
 	}).
@@ -127,7 +126,6 @@ func ScaleTest(opt *scaletest.Options) *types.Job {
 		})
 
 	job.AddStep(&scaletest.CreateResources{
-		Ctx:                          opt.Ctx,
 		NumKwokDeployments:           opt.NumKwokDeployments,
 		NumKwokReplicas:              opt.NumKwokReplicas,
 		RealPodType:                  opt.RealPodType,
@@ -138,29 +136,24 @@ func ScaleTest(opt *scaletest.Options) *types.Job {
 	}, nil)
 
 	job.AddStep(&scaletest.AddSharedLabelsToAllPods{
-		Ctx:                   opt.Ctx,
 		NumSharedLabelsPerPod: opt.NumSharedLabelsPerPod,
 	}, nil)
 
 	job.AddStep(&scaletest.AddUniqueLabelsToAllPods{
-		Ctx:                   opt.Ctx,
 		NumUniqueLabelsPerPod: opt.NumUniqueLabelsPerPod,
 	}, nil)
 
 	// Apply network policies (applied and unapplied)
 	job.AddStep(&scaletest.CreateNetworkPolicies{
-		Ctx:                   opt.Ctx,
 		NumNetworkPolicies:    opt.NumNetworkPolicies,
 		NumSharedLabelsPerPod: opt.NumSharedLabelsPerPod,
 	}, nil)
 
 	job.AddStep(&kubernetes.WaitPodsReady{
-		Ctx:           opt.Ctx,
 		LabelSelector: "is-real=true",
 	}, nil)
 
 	job.AddStep(&scaletest.DeleteAndReAddLabels{
-		Ctx:                   opt.Ctx,
 		DeleteLabels:          opt.DeleteLabels,
 		DeleteLabelsInterval:  opt.DeleteLabelsInterval,
 		DeleteLabelsTimes:     opt.DeleteLabelsTimes,

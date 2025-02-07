@@ -1,13 +1,9 @@
 package scaletest
 
-import (
-	"context"
-	"time"
-)
+import "time"
 
 // Options holds parameters for the scale test
 type Options struct {
-	Ctx                           context.Context
 	Namespace                     string
 	MaxKwokPodsPerNode            int
 	NumKwokDeployments            int

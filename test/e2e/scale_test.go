@@ -42,7 +42,6 @@ func TestE2ERetina_Scale(t *testing.T) {
 	// Scale test parameters
 	opt := jobs.DefaultScaleTestOptions()
 	opt.KubeconfigPath = common.KubeConfigFilePath(rootDir)
-	opt.Ctx = ctx
 
 	NumDeployments := params.NumDeployments
 	NumReplicas := params.NumReplicas
