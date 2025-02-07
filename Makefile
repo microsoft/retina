@@ -189,6 +189,15 @@ clean: ## Clean build artifacts
 simplify-dashboards: ## Simplify Grafana dashboards
 	cd deploy/testutils && go test ./... -tags=dashboard,simplifydashboard -v && cd $(REPO_ROOT)
 
+.PHONY: pretty
+pretty: ## Run gofumpt, vet and lint
+	@echo "\n### Running go fmt..."
+	$(MAKE) fmt
+	@echo "\n### Running go vet..."
+	- go vet $(REPO_ROOT)/...
+	@echo "\n### Running linters..."
+	- $(MAKE) lint
+
 ##########################################
 ##@ Generate (Host)
 ##########################################
