@@ -48,5 +48,5 @@ variable "retina_chart_name" {
 
 variable "retina_values" {
   description = "This corresponds to Helm values.yaml"
-  type        = list(string)
+  type        = any
 }

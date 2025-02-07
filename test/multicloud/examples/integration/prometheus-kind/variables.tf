@@ -30,5 +30,5 @@ variable "prometheus_chart_name" {
 
 variable "prometheus_values" {
   description = "This corresponds to Helm values.yaml"
-  type        = list(string)
+  type        = any
 }
