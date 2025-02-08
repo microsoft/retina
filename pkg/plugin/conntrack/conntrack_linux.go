@@ -48,7 +48,7 @@ func Init() error {
 }
 
 // New creates a new Conntrack instance
-func New(cfg *config.Config) (*Conntrack, error) {
+func New() (*Conntrack, error) {
 	objs := &conntrackObjects{}
 	err := loadConntrackObjects(objs, &ebpf.CollectionOptions{
 		Maps: ebpf.MapOptions{
@@ -64,9 +64,13 @@ func New(cfg *config.Config) (*Conntrack, error) {
 		gcFrequency: defaultGCFrequency,
 		objs:        objs,
 		ctMap:       objs.RetinaConntrack,
-		cfg:         cfg,
 	}
 	return ct, nil
+}
+
+// SetConfig sets the config after initialization
+func (ct *Conntrack) SetConfig(cfg *config.Config) {
+	ct.cfg = cfg
 }
 
 // Build dynamic header path

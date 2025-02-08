@@ -22,7 +22,6 @@ type Conntrack struct {
 	objs        *conntrackObjects
 	ctMap       *ebpf.Map
 	gcFrequency time.Duration
-	isRunning   bool
 	cfg         *config.Config
 }
 
