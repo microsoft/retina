@@ -38,7 +38,7 @@ See [retina.sh](http://retina.sh) for documentation and examples.
 Retina has two major features:
 
 - [Metrics](https://retina.sh/docs/metrics/modes)
-- [Captures](https://retina.sh/docs/captures)
+- [Captures](https://retina.sh/docs/captures/overview)
 
 ### Metrics Quick Install Guide
 
