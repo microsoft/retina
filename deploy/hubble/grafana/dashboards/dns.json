@@ -950,7 +950,6 @@
         "type": "datasource"
       },
       {
-        "allValue": "(.*)",
         "current": {},
         "datasource": {
           "type": "prometheus",
@@ -958,7 +957,7 @@
         },
         "definition": "label_values(kube_node_info, cluster)",
         "hide": 0,
-        "includeAll": false,
+        "includeAll": true,
         "label": "Cluster",
         "multi": false,
         "name": "cluster",
