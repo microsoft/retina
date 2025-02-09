@@ -6,7 +6,7 @@
       "id": "grafana",
       "name": "Grafana",
       "type": "grafana",
-      "version": "9.5.15"
+      "version": "9.5.16"
     },
     {
       "id": "prometheus",
@@ -72,8 +72,9 @@
   "liveNow": true,
   "panels": [
     {
+      "description": "",
       "gridPos": {
-        "h": 4,
+        "h": 3,
         "w": 24,
         "x": 0,
         "y": 0
@@ -96,7 +97,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 4
+        "y": 3
       },
       "id": 155,
       "panels": [],
@@ -140,7 +141,7 @@
         "h": 7,
         "w": 6,
         "x": 0,
-        "y": 5
+        "y": 4
       },
       "id": 156,
       "options": {
@@ -170,7 +171,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (cluster) (\r\n    rate(networkobservability_forward_bytes[$__rate_interval])\r\n    or\r\n    rate(kappie_forward_bytes[$__rate_interval])\r\n    or\r\n    rate(cilium_forward_bytes_total[$__rate_interval])\r\n)",
+          "expr": "sum by (cluster) (rate(networkobservability_forward_bytes{instance=~\"$Nodes\"}[$__rate_interval]))",
           "format": "table",
           "instant": true,
           "legendFormat": "__auto",
@@ -248,7 +249,7 @@
               }
             ]
           },
-          "unit": "bps"
+          "unit": "Bps"
         },
         "overrides": []
       },
@@ -256,7 +257,7 @@
         "h": 7,
         "w": 18,
         "x": 6,
-        "y": 5
+        "y": 4
       },
       "id": 123,
       "options": {
@@ -278,7 +279,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(cluster) (\r\n    rate(networkobservability_forward_count{instance=~\"$Nodes\"}[$__rate_interval])\r\n    or\r\n    on(cluster)\r\n        rate(kappie_forward_count{instance=~\"$Nodes\"}[$__rate_interval])\r\n    or\r\n    on(cluster)\r\n        rate(cilium_forward_count_total{instance=~\"$Nodes\"}[$__rate_interval])\r\n)",
+          "expr": "sum by (cluster) (rate(networkobservability_forward_bytes{instance=~\"$Nodes\"}[$__rate_interval]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -324,7 +325,7 @@
         "h": 7,
         "w": 6,
         "x": 0,
-        "y": 12
+        "y": 11
       },
       "id": 158,
       "options": {
@@ -354,7 +355,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (cluster) (\r\n    rate(networkobservability_drop_bytes[$__rate_interval])\r\n    or\r\n    rate(kappie_drop_bytes[$__rate_interval])\r\n    or\r\n    rate(cilium_drop_bytes_total[$__rate_interval])\r\n)",
+          "expr": "sum by (cluster) (rate(networkobservability_drop_bytes{instance=~\"$Nodes\"}[$__rate_interval]))",
           "format": "table",
           "instant": true,
           "legendFormat": "__auto",
@@ -440,7 +441,7 @@
         "h": 7,
         "w": 9,
         "x": 6,
-        "y": 12
+        "y": 11
       },
       "id": 129,
       "options": {
@@ -462,7 +463,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(cluster) (rate(networkobservability_drop_bytes[$__rate_interval]))\r\nor\r\nsum by(cluster) (rate(kappie_drop_bytes[$__rate_interval]))\r\nor\r\nsum by(cluster) (rate(cilium_drop_bytes_total[$__rate_interval]))",
+          "expr": "sum by (cluster) (rate(networkobservability_drop_bytes{instance=~\"$Nodes\"}[$__rate_interval]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -529,7 +530,7 @@
         "h": 7,
         "w": 9,
         "x": 15,
-        "y": 12
+        "y": 11
       },
       "id": 130,
       "options": {
@@ -551,7 +552,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(cluster) (rate(networkobservability_drop_count[$__rate_interval]))\r\nor\r\nsum by(cluster) (rate(kappie_drop_count[$__rate_interval]))\r\nor\r\nsum by(cluster) (rate(cilium_drop_count_total[$__rate_interval]))",
+          "expr": "sum by (cluster) (rate(networkobservability_drop_count[$__rate_interval]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -566,7 +567,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 19
+        "y": 18
       },
       "id": 57,
       "panels": [],
@@ -602,7 +603,7 @@
         "h": 4,
         "w": 3,
         "x": 0,
-        "y": 20
+        "y": 19
       },
       "id": 141,
       "options": {
@@ -626,7 +627,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_forward_bytes{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(kappie_forward_bytes{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(cilium_forward_bytes_total{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_forward_bytes{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
           "legendFormat": "Max Egress Bytes",
           "range": true,
           "refId": "A"
@@ -664,7 +665,7 @@
         "h": 4,
         "w": 3,
         "x": 3,
-        "y": 20
+        "y": 19
       },
       "id": 145,
       "options": {
@@ -689,7 +690,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum(rate(networkobservability_forward_bytes{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(kappie_forward_bytes{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(cilium_forward_bytes_total{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_forward_bytes{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
           "format": "time_series",
           "instant": false,
           "legendFormat": "Min Egress Bytes",
@@ -728,7 +729,7 @@
         "h": 4,
         "w": 3,
         "x": 6,
-        "y": 20
+        "y": 19
       },
       "id": 120,
       "options": {
@@ -752,7 +753,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_forward_count{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(kappie_forward_count{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(cilium_forward_count_total{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_forward_count{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
           "legendFormat": "Max Egress Packets",
           "range": true,
           "refId": "A"
@@ -789,7 +790,7 @@
         "h": 4,
         "w": 3,
         "x": 9,
-        "y": 20
+        "y": 19
       },
       "id": 146,
       "options": {
@@ -813,7 +814,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_forward_count{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(kappie_forward_count{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(cilium_forward_count_total{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_forward_count{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
           "legendFormat": "Min Egress Packets",
           "range": true,
           "refId": "A"
@@ -851,7 +852,7 @@
         "h": 4,
         "w": 3,
         "x": 12,
-        "y": 20
+        "y": 19
       },
       "id": 147,
       "options": {
@@ -875,7 +876,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_forward_bytes{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(kappie_forward_bytes{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(cilium_forward_bytes_total{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_forward_bytes{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
           "legendFormat": "Max Ingress Bytes",
           "range": true,
           "refId": "A"
@@ -913,7 +914,7 @@
         "h": 4,
         "w": 3,
         "x": 15,
-        "y": 20
+        "y": 19
       },
       "id": 148,
       "options": {
@@ -937,7 +938,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_forward_bytes{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(kappie_forward_bytes{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(cilium_forward_bytes_total{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_forward_bytes{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
           "legendFormat": "Min Ingress Bytes",
           "range": true,
           "refId": "A"
@@ -974,7 +975,7 @@
         "h": 4,
         "w": 3,
         "x": 18,
-        "y": 20
+        "y": 19
       },
       "id": 149,
       "options": {
@@ -998,7 +999,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_forward_count{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(kappie_forward_count{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(cilium_forward_count_total{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_forward_count{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
           "legendFormat": "Max Ingress Packets",
           "range": true,
           "refId": "A"
@@ -1035,7 +1036,7 @@
         "h": 4,
         "w": 3,
         "x": 21,
-        "y": 20
+        "y": 19
       },
       "id": 150,
       "options": {
@@ -1059,7 +1060,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_forward_count{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(kappie_forward_count{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(cilium_forward_count_total{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_forward_count{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
           "legendFormat": "Min Ingress Packets",
           "range": true,
           "refId": "A"
@@ -1114,7 +1115,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -1126,7 +1128,7 @@
         "h": 6,
         "w": 6,
         "x": 0,
-        "y": 24
+        "y": 23
       },
       "id": 119,
       "options": {
@@ -1148,7 +1150,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_forward_bytes{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(kappie_forward_bytes{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(cilium_forward_bytes_total{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_forward_bytes{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
           "legendFormat": "Egress Bytes",
           "range": true,
           "refId": "A"
@@ -1203,7 +1205,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -1215,7 +1218,7 @@
         "h": 6,
         "w": 6,
         "x": 6,
-        "y": 24
+        "y": 23
       },
       "id": 143,
       "options": {
@@ -1237,7 +1240,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_forward_count{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(kappie_forward_count{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(cilium_forward_count_total{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_forward_count{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
           "legendFormat": "Egress Packets",
           "range": true,
           "refId": "A"
@@ -1292,7 +1295,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -1304,7 +1308,7 @@
         "h": 6,
         "w": 6,
         "x": 12,
-        "y": 24
+        "y": 23
       },
       "id": 142,
       "options": {
@@ -1326,7 +1330,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_forward_bytes{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(kappie_forward_bytes{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(cilium_forward_bytes_total{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_forward_bytes{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
           "legendFormat": "Ingress Bytes",
           "range": true,
           "refId": "A"
@@ -1381,7 +1385,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -1393,7 +1398,7 @@
         "h": 6,
         "w": 6,
         "x": 18,
-        "y": 24
+        "y": 23
       },
       "id": 144,
       "options": {
@@ -1415,7 +1420,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_forward_count{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(kappie_forward_count{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(cilium_forward_count_total{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_forward_count{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
           "legendFormat": "Ingress Packets",
           "range": true,
           "refId": "A"
@@ -1430,7 +1435,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 30
+        "y": 29
       },
       "id": 55,
       "panels": [],
@@ -1483,7 +1488,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -1495,7 +1501,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 31
+        "y": 30
       },
       "id": 124,
       "options": {
@@ -1517,7 +1523,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_drop_count{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(kappie_drop_count{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(cilium_drop_count_total{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_drop_count{direction=\"egress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
           "legendFormat": "Dropped Packets (Egress)",
           "range": true,
           "refId": "A"
@@ -1572,7 +1578,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -1584,7 +1591,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 31
+        "y": 30
       },
       "id": 125,
       "options": {
@@ -1606,7 +1613,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_drop_count{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(kappie_drop_count{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(cilium_drop_count_total{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_drop_count{direction=\"ingress\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
           "legendFormat": "Dropped Packets (Ingress)",
           "range": true,
           "refId": "A"
@@ -1620,7 +1627,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Non-Cilium only",
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1662,7 +1669,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -1674,7 +1682,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 31
+        "y": 30
       },
       "id": 114,
       "options": {
@@ -1696,7 +1704,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_drop_count{direction=\"unknown\", instance=~\"$Nodes\", cluster=\"$cluster\"}[$__rate_interval]))\r\nor\r\nsum(rate(kappie_drop_count{direction=\"unknown\", instance=~\"$Nodes\", cluster=\"$cluster\"}[$__rate_interval]))",
+          "expr": "sum(rate(networkobservability_drop_count{direction=\"unknown\", instance=~\"$Nodes\", cluster=\"$cluster\"}[$__rate_interval]))",
           "legendFormat": "Dropped Packets (Unknown)",
           "range": true,
           "refId": "A"
@@ -1710,7 +1718,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Values:\n- Non-Cilium (Linux):\n  - iptable_rule_drop: packet dropped in iptables, e.g., because of a NetworkPolicy if using --network-policy=azure\n  - iptable_nat_drop: packet dropped in iptables during NAT (Network Address Translation)\n  - tcp_connect_basic: packet dropped by tcp connect\n  - tcp_accept_basic: packet dropped by tcp accept\n  - tcp_close_basic: packet dropped by tcp close\n  - conntrack_add_drop: packet dropped while conntrack (connection tracking) was adding the connection\n- Cilium (Linux):\n  - Many possible values",
+      "description": "Linux only. Values:\n- iptable_rule_drop: packet dropped in iptables, e.g., because of a NetworkPolicy if using --network-policy=azure\n- iptable_nat_drop: packet dropped in iptables during NAT (Network Address Translation)\n- tcp_connect_basic: packet dropped by tcp connect\n- tcp_accept_basic: packet dropped by tcp accept\n- tcp_close_basic: packet dropped by tcp close\n- conntrack_add_drop: packet dropped while conntrack (connection tracking) was adding the connection",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1751,7 +1759,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -1763,7 +1772,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 38
+        "y": 37
       },
       "id": 86,
       "options": {
@@ -1785,7 +1794,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (reason) (rate(networkobservability_drop_bytes{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0\r\nor\r\nsum by (reason) (rate(kappie_drop_bytes{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0\r\nor\r\nsum by (reason) (rate(cilium_drop_bytes_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+          "expr": "sum by (reason) (rate(networkobservability_drop_bytes{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1799,7 +1808,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Values:\n- Non-Cilium (Linux):\n  - iptable_rule_drop: packet dropped in iptables, e.g., because of a NetworkPolicy if using --network-policy=azure\n  - iptable_nat_drop: packet dropped in iptables during NAT (Network Address Translation)\n  - tcp_connect_basic: packet dropped by tcp connect\n  - tcp_accept_basic: packet dropped by tcp accept\n  - tcp_close_basic: packet dropped by tcp close\n  - conntrack_add_drop: packet dropped while conntrack (connection tracking) was adding the connection\n  - rx_dropped: an interface dropped a received packet\n  - tx_dropped: an interface dropped a transmitted packet\n- Non-Cilium (Windows):\n  - aclrule: dropped by an ACL rule in VFP, e.g., because of a NetworkPolicy\n  - endpoint: dropped by an HNS Pod Endpoint \n- Cilium (Linux):\n  - Many possible values",
+      "description": "Values:\n- Linux:\n  - iptable_rule_drop: packet dropped in iptables, e.g., because of a NetworkPolicy if using --network-policy=azure\n  - iptable_nat_drop: packet dropped in iptables during NAT (Network Address Translation)\n  - tcp_connect_basic: packet dropped by tcp connect\n  - tcp_accept_basic: packet dropped by tcp accept\n  - tcp_close_basic: packet dropped by tcp close\n  - conntrack_add_drop: packet dropped while conntrack (connection tracking) was adding the connection\n  - rx_dropped: an interface dropped a received packet\n  - tx_dropped: an interface dropped a transmitted packet\n- Windows:\n  - aclrule: dropped by an ACL rule in VFP, e.g., because of a NetworkPolicy\n  - endpoint: dropped by an HNS Pod Endpoint ",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1840,7 +1849,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -1852,7 +1862,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 38
+        "y": 37
       },
       "id": 88,
       "options": {
@@ -1874,7 +1884,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (reason) (rate(networkobservability_drop_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0\r\nor\r\nsum by (reason) (rate(kappie_drop_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0\r\nor\r\nsum by (reason) (rate(cilium_drop_count_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0\r\nor\r\nsum by (reason) (\r\n  label_replace(\r\n    rate(networkobservability_interface_stats{statistic_name=\"rx_dropped\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]),\r\n    \"reason\",\r\n    \"$1\",\r\n    \"statistic_name\",\r\n    \"(.*)\"\r\n  )\r\n)\r\nor # cannot combine these interface_stats expressions into one using regex, since regex would capture anything with rx_dropped or tx_dropped in it\r\nsum by (reason) (\r\n  label_replace(\r\n    rate(networkobservability_interface_stats{statistic_name=\"tx_dropped\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]),\r\n    \"reason\",\r\n    \"$1\",\r\n    \"statistic_name\",\r\n    \"(.*)\"\r\n  )\r\n)",
+          "expr": "sum by (reason) (rate(networkobservability_drop_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0\r\nor\r\nsum by (reason) (\r\n  label_replace(\r\n    rate(networkobservability_interface_stats{statistic_name=\"rx_dropped\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]),\r\n    \"reason\",\r\n    \"$1\",\r\n    \"statistic_name\",\r\n    \"(.*)\"\r\n  )\r\n)\r\nor # cannot combine these interface_stats expressions into one using regex, since regex would capture anything with rx_dropped or tx_dropped in it\r\nsum by (reason) (\r\n  label_replace(\r\n    rate(networkobservability_interface_stats{statistic_name=\"tx_dropped\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]),\r\n    \"reason\",\r\n    \"$1\",\r\n    \"statistic_name\",\r\n    \"(.*)\"\r\n  )\r\n)",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1929,7 +1939,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1945,7 +1956,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 46
+        "y": 45
       },
       "id": 131,
       "options": {
@@ -1967,7 +1978,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(instance) (rate(networkobservability_drop_bytes{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0\r\nor\r\nsum by(instance) (rate(kappie_drop_bytes{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0\r\nor\r\nsum by(instance) (rate(cilium_drop_bytes_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0",
+          "expr": "sum by(instance) (rate(networkobservability_drop_bytes{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -2021,7 +2032,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2037,7 +2049,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 46
+        "y": 45
       },
       "id": 132,
       "options": {
@@ -2059,7 +2071,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(instance) (rate(networkobservability_drop_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0\r\nor\r\nsum by(instance) (rate(kappie_drop_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0\r\nor\r\nsum by(instance) (rate(cilium_drop_count_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0",
+          "expr": "sum by(instance) (rate(networkobservability_drop_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -2074,7 +2086,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 54
+        "y": 53
       },
       "id": 59,
       "panels": [
@@ -2083,7 +2095,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Non-Cilium only",
+          "description": "",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2124,7 +2136,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   }
                 ]
               }
@@ -2135,7 +2148,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 8
+            "y": 54
           },
           "id": 64,
           "options": {
@@ -2157,7 +2170,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by(state) (networkobservability_tcp_state{cluster=\"$cluster\", instance=~\"$Nodes\"})\r\nor\r\nsum by(state) (kappie_tcp_state{cluster=\"$cluster\", instance=~\"$Nodes\"})",
+              "expr": "sum by(state) (networkobservability_tcp_state{cluster=\"$cluster\", instance=~\"$Nodes\"})",
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
@@ -2171,7 +2184,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Non-Cilium only",
+          "description": "",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2212,7 +2225,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   }
                 ]
               }
@@ -2223,7 +2237,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 8
+            "y": 54
           },
           "id": 68,
           "options": {
@@ -2245,7 +2259,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by(address) (networkobservability_tcp_connection_remote{cluster=\"$cluster\", instance=~\"$Nodes\", address!~\"127.0.0.1|0.0.0.0\"})\r\nor\r\nsum by(address) (kappie_tcp_connection_remote{cluster=\"$cluster\", instance=~\"$Nodes\", address!~\"127.0.0.1|0.0.0.0\"})",
+              "expr": "sum by(address) (networkobservability_tcp_connection_remote{cluster=\"$cluster\", instance=~\"$Nodes\", address!~\"127.0.0.1|0.0.0.0\"})",
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
@@ -2259,7 +2273,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Non-Cilium only",
+          "description": "",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2300,7 +2314,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   }
                 ]
               }
@@ -2311,7 +2326,7 @@
             "h": 8,
             "w": 10,
             "x": 0,
-            "y": 16
+            "y": 62
           },
           "id": 65,
           "options": {
@@ -2333,7 +2348,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(rate(networkobservability_tcp_connection_stats{statistic_name=\"tcptimeouts\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(kappie_tcp_connection_stats{statistic_name=\"tcptimeouts\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+              "expr": "sum(rate(networkobservability_tcp_connection_stats{statistic_name=\"tcptimeouts\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
               "legendFormat": "TCP Timeouts",
               "range": true,
               "refId": "A"
@@ -2347,7 +2362,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Non-Cilium only",
+          "description": "",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2388,7 +2403,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   }
                 ]
               }
@@ -2399,7 +2415,7 @@
             "h": 8,
             "w": 7,
             "x": 10,
-            "y": 16
+            "y": 62
           },
           "id": 66,
           "options": {
@@ -2421,7 +2437,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(rate(networkobservability_tcp_connection_stats{statistic_name=\"resetcount\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(kappie_tcp_connection_stats{statistic_name=\"resetcount\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+              "expr": "sum(rate(networkobservability_tcp_connection_stats{statistic_name=\"resetcount\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
               "legendFormat": "TCP Resets",
               "range": true,
               "refId": "A"
@@ -2435,7 +2451,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Non-Cilium only",
+          "description": "",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2476,7 +2492,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   }
                 ]
               }
@@ -2487,7 +2504,7 @@
             "h": 8,
             "w": 7,
             "x": 17,
-            "y": 16
+            "y": 62
           },
           "id": 69,
           "options": {
@@ -2509,7 +2526,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(rate(networkobservability_tcp_connection_stats{statistic_name=\"tcptsreorder\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(kappie_tcp_connection_stats{statistic_name=\"tcptsreorder\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+              "expr": "sum(rate(networkobservability_tcp_connection_stats{statistic_name=\"tcptsreorder\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
               "legendFormat": "TCP Reorders",
               "range": true,
               "refId": "A"
@@ -2523,7 +2540,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Windows Non-Cilium only",
+          "description": "Windows only",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2564,7 +2581,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   }
                 ]
               },
@@ -2576,7 +2594,7 @@
             "h": 8,
             "w": 8,
             "x": 0,
-            "y": 24
+            "y": 70
           },
           "id": 61,
           "options": {
@@ -2598,7 +2616,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(rate(networkobservability_tcp_flag_counters{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(kappie_tcp_flag_counters{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+              "expr": "sum(rate(networkobservability_tcp_flag_counters{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
               "legendFormat": "TCP packets",
               "range": true,
               "refId": "A"
@@ -2612,7 +2630,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Windows Non-Cilium only",
+          "description": "Windows only",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2653,7 +2671,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   }
                 ]
               },
@@ -2665,7 +2684,7 @@
             "h": 8,
             "w": 8,
             "x": 8,
-            "y": 24
+            "y": 70
           },
           "id": 62,
           "options": {
@@ -2687,7 +2706,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(rate(networkobservability_tcp_flag_counters{flag=\"rst\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(kappie_tcp_flag_counters{flag=\"rst\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+              "expr": "sum(rate(networkobservability_tcp_flag_counters{flag=\"rst\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
               "legendFormat": "TCP Reset Packets",
               "range": true,
               "refId": "A"
@@ -2701,7 +2720,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Windows Non-Cilium only",
+          "description": "Windows only",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2742,7 +2761,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   }
                 ]
               },
@@ -2754,7 +2774,7 @@
             "h": 8,
             "w": 8,
             "x": 16,
-            "y": 24
+            "y": 70
           },
           "id": 70,
           "options": {
@@ -2776,7 +2796,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(rate(networkobservability_tcp_flag_counters{flag=\"synack\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum(rate(kappie_tcp_flag_counters{flag=\"synack\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+              "expr": "sum(rate(networkobservability_tcp_flag_counters{flag=\"synack\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
               "legendFormat": "TCP SYN-ACK packets",
               "range": true,
               "refId": "A"
@@ -2790,7 +2810,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Non-Cilium only",
+          "description": "",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2831,7 +2851,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   }
                 ]
               }
@@ -2842,7 +2863,7 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 32
+            "y": 78
           },
           "id": 72,
           "options": {
@@ -2864,7 +2885,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(networkobservability_udp_connection_stats{statistic_name=\"active\", cluster=\"$cluster\", instance=~\"$Nodes\"})\r\nor\r\nsum(kappie_udp_connection_stats{statistic_name=\"active\", cluster=\"$cluster\", instance=~\"$Nodes\"})",
+              "expr": "sum(networkobservability_udp_connection_stats{statistic_name=\"active\", cluster=\"$cluster\", instance=~\"$Nodes\"})",
               "legendFormat": "Total UDP Connections",
               "range": true,
               "refId": "A"
@@ -2883,7 +2904,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 55
+        "y": 54
       },
       "id": 74,
       "panels": [
@@ -2892,7 +2913,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Non-Cilium only",
+          "description": "Linux only",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2933,7 +2954,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -2949,7 +2971,7 @@
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 33
+            "y": 55
           },
           "id": 76,
           "options": {
@@ -2971,7 +2993,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (interface_name) (rate(networkobservability_interface_stats{statistic_name=\"rx_packets\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum by (interface_name) (rate(kappie_interface_stats{statistic_name=\"rx_packets\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+              "expr": "sum by (interface_name) (rate(networkobservability_interface_stats{statistic_name=\"rx_packets\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
               "legendFormat": "{{interface_name}}",
               "range": true,
               "refId": "A"
@@ -2985,7 +3007,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Non-Cilium only",
+          "description": "Linux only",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3026,7 +3048,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -3042,7 +3065,7 @@
             "h": 8,
             "w": 6,
             "x": 6,
-            "y": 33
+            "y": 55
           },
           "id": 77,
           "options": {
@@ -3064,7 +3087,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (interface_name) (rate(networkobservability_interface_stats{statistic_name=\"tx_packets\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))\r\nor\r\nsum by (interface_name) (rate(kappie_interface_stats{statistic_name=\"tx_packets\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
+              "expr": "sum by (interface_name) (rate(networkobservability_interface_stats{statistic_name=\"tx_packets\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval]))",
               "legendFormat": "{{interface_name}}",
               "range": true,
               "refId": "A"
@@ -3078,7 +3101,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Non-Cilium only",
+          "description": "Linux only",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3119,7 +3142,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -3134,7 +3158,7 @@
             "h": 8,
             "w": 6,
             "x": 12,
-            "y": 33
+            "y": 55
           },
           "id": 94,
           "options": {
@@ -3156,7 +3180,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (instance) (rate(networkobservability_interface_stats{statistic_name=~\"rx[0-9]+_cache_full\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0\r\nor\r\nsum by (instance) (rate(kappie_interface_stats{statistic_name=~\"rx[0-9]+_cache_full\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0",
+              "expr": "sum by (instance) (rate(networkobservability_interface_stats{statistic_name=~\"rx[0-9]+_cache_full\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0",
               "legendFormat": "{{instance}}",
               "range": true,
               "refId": "A"
@@ -3170,7 +3194,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Non-Cilium only",
+          "description": "Linux only",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3211,7 +3235,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -3226,7 +3251,7 @@
             "h": 8,
             "w": 6,
             "x": 18,
-            "y": 33
+            "y": 55
           },
           "id": 93,
           "options": {
@@ -3248,7 +3273,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (instance) (rate(networkobservability_interface_stats{statistic_name=~\"tx[0-9]+_nop\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0\r\nor\r\nsum by (instance) (rate(kappie_interface_stats{statistic_name=~\"tx[0-9]+_nop\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0",
+              "expr": "sum by (instance) (rate(networkobservability_interface_stats{statistic_name=~\"tx[0-9]+_nop\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0",
               "hide": false,
               "legendFormat": "{{instance}}",
               "range": true,
@@ -3263,7 +3288,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Non-Cilium only",
+          "description": "Linux only",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3304,7 +3329,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -3320,7 +3346,7 @@
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 41
+            "y": 63
           },
           "id": 161,
           "options": {
@@ -3356,7 +3382,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Non-Cilium only",
+          "description": "Linux only",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3397,7 +3423,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -3413,7 +3440,7 @@
             "h": 8,
             "w": 6,
             "x": 6,
-            "y": 41
+            "y": 63
           },
           "id": 162,
           "options": {
@@ -3449,7 +3476,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Non-Cilium only",
+          "description": "Linux only",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3490,7 +3517,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -3506,7 +3534,7 @@
             "h": 8,
             "w": 6,
             "x": 12,
-            "y": 41
+            "y": 63
           },
           "id": 160,
           "options": {
@@ -3528,7 +3556,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (instance) (rate(networkobservability_interface_stats{statistic_name=\"rx_comp_full\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0\r\nor\r\nsum by (instance) (rate(kappie_interface_stats{statistic_name=\"rx_comp_full\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0",
+              "expr": "sum by (instance) (rate(networkobservability_interface_stats{statistic_name=\"rx_comp_full\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0",
               "legendFormat": "{{instance}}",
               "range": true,
               "refId": "A"
@@ -3542,7 +3570,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Non-Cilium only",
+          "description": "Linux only",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3583,7 +3611,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -3599,7 +3628,7 @@
             "h": 8,
             "w": 6,
             "x": 18,
-            "y": 41
+            "y": 63
           },
           "id": 159,
           "options": {
@@ -3621,7 +3650,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (instance) (rate(networkobservability_interface_stats{statistic_name=\"tx_send_full\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0\r\nor\r\nsum by (instance) (rate(kappie_interface_stats{statistic_name=\"tx_send_full\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0",
+              "expr": "sum by (instance) (rate(networkobservability_interface_stats{statistic_name=\"tx_send_full\", cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) > 0",
               "legendFormat": "{{instance}}",
               "range": true,
               "refId": "A"
@@ -3666,7 +3695,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(kube_node_info, cluster)",
+        "definition": "label_values(up, cluster)",
         "hide": 0,
         "includeAll": false,
         "label": "Cluster",
@@ -3674,7 +3703,7 @@
         "name": "cluster",
         "options": [],
         "query": {
-          "query": "label_values(kube_node_info, cluster)",
+          "query": "label_values(up, cluster)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,
@@ -3690,17 +3719,14 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(kube_node_info{cluster=\"$cluster\"},node)",
+        "definition": "label_values(up{cluster=\"$cluster\"},instance)",
         "hide": 0,
         "includeAll": true,
         "label": "Nodes",
         "multi": true,
         "name": "Nodes",
         "options": [],
-        "query": {
-          "query": "label_values(kube_node_info{cluster=\"$cluster\"},node)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
+        "query": "label_values(up{cluster=\"$cluster\"},instance)",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
