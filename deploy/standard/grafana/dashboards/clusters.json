@@ -3753,7 +3753,7 @@
     ]
   },
   "timezone": "",
-  "title": "Kubernetes / Networking / Retina (Standard) / Clusters",
-  "uid": "RetinaStandardClusters",
+  "title": "Kubernetes / Networking / Retina / Clusters",
+  "uid": "RetinaClusters",
   "version": 1
 }
