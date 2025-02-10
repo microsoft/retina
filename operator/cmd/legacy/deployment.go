@@ -234,13 +234,13 @@ func (o *Operator) Start() error {
 		return errors.Wrap(err, "unable to set up ready check")
 	}
 
+	// start heartbeat goroutine for application insights
+	go tel.Heartbeat(ctx, HeartbeatFrequency)
+
 	mainLogger.Info("Starting manager")
 	if err := mgr.Start(ctrlCtx); err != nil {
 		return errors.Wrap(err, "problem running manager")
 	}
-
-	// start heartbeat goroutine for application insights
-	go tel.Heartbeat(ctx, HeartbeatFrequency)
 
 	return nil
 }
