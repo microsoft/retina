@@ -155,7 +155,7 @@ func (o *Operator) Start() error {
 
 	apiserverURL, err := telemetry.GetK8SApiserverURLFromKubeConfig()
 	if err != nil {
-		return errors.Wrap(err, "apiserver URL is cannot be found")
+		return errors.Wrap(err, "apiserver URL cannot be found")
 	}
 
 	var tel telemetry.Telemetry
