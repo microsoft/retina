@@ -20,7 +20,7 @@ RETINA_DIR = $(REPO_ROOT)/controller
 OPERATOR_DIR=$(REPO_ROOT)/operator
 CAPTURE_WORKLOAD_DIR = $(REPO_ROOT)/captureworkload
 CLI_DIR = $(REPO_ROOT)/cli
-BIN_DIR = $(REPO_ROOT)/bin
+BIN_DIR = bin
 
 KIND = /usr/local/bin/kind
 KIND_CLUSTER = retina-cluster
