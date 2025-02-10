@@ -14,7 +14,7 @@ The AKS VS Code extension incorporates Retina to enhance cluster observability b
 
 ## How to Use Retina in the AKS VS Code Extension
 
-1. Install the **Azure Kubernetes Service** extension in VS Code.
+1. Install the **[Azure Kubernetes Service](https://marketplace.visualstudio.com/items?itemName=ms-kubernetes-tools.vscode-aks-tools)** extension in VS Code.
 2. Connect to an AKS cluster.
 3. Navigate to the **Retina Capture** feature.
 4. Capture and analyze workloads seamlessly within the VS Code environment.
