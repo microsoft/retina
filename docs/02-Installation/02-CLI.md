@@ -2,7 +2,7 @@
 
 Currently, Retina CLI supports Linux, Windows, and MacOS on x86_64 and ARM64 platforms.
 
-For CLI usage, see [Capture with Retina CLI](../04-Captures/cli.md).
+For CLI usage, see [Capture with Retina CLI](../04-Captures/02-cli.md).
 
 ## Option 1: Install using Krew
 

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/microsoft/retina/operator/cmd/legacy"
+	"github.com/microsoft/retina/operator/cmd/standard"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -28,7 +28,7 @@ var (
 		Long:  "Start Retina Operator",
 		RunE: func(_ *cobra.Command, _ []string) error {
 			fmt.Println("Starting Retina Operator")
-			d := legacy.NewOperator(metricsAddr, probeAddr, cfgFile, enableLeaderElection)
+			d := standard.NewOperator(metricsAddr, probeAddr, cfgFile, enableLeaderElection)
 
 			if err := d.Start(); err != nil {
 				return errors.Wrap(err, "failed to start retina-operator")

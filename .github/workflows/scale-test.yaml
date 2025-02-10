@@ -96,11 +96,12 @@ jobs:
           NUM_REPLICAS: ${{ inputs.num_replicas }}
           NUM_NETPOLS: ${{ inputs.num_netpol }}
           CLEANUP: ${{ inputs.cleanup }}
-          IMAGE_REGISTRY: ${{  inputs.image_namespace == '' && vars.ACR_NAME || inputs.image_namespace }}
-          IMAGE_NAMESPACE: ${{ github.repository }}
+          IMAGE_REGISTRY: ${{ vars.ACR_NAME }}
+          IMAGE_NAMESPACE: ${{ inputs.image_namespace == '' && github.repository || inputs.image_namespace }}
           TAG: ${{ inputs.image_tag }}
           AZURE_APP_INSIGHTS_KEY: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
         shell: bash
         run: |
           set -euo pipefail
-          go test -v ./test/e2e/. -timeout 300m -tags=scale -count=1  -args -image-tag=$( [[ $TAG == "" ]] && make version || echo $TAG ) -create-infra=false -delete-infra=false 
+          [[ $TAG == "" ]] && TAG=$(make version)
+          go test -v ./test/e2e/. -timeout 300m -tags=scale -count=1  -args -create-infra=false -delete-infra=false 
