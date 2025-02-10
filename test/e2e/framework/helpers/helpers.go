@@ -22,7 +22,7 @@ func Context(t *testing.T) (context.Context, context.CancelFunc) {
 	// Subtract a minute from the deadline to ensure we have time to cleanup
 	deadline = deadline.Add(-time.Minute)
 
-	ctx, cancel := context.WithDeadline(context.Background(), deadline) //nolint: ineffassign // cancel is reassigned in next line
+	ctx, cancel := context.WithDeadline(context.Background(), deadline) //nolint:all // cancel is reassigned in next line
 	ctx, cancel = signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 
 	return ctx, cancel
