@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"time"
 
 	retry "github.com/microsoft/retina/test/retry"
 	corev1 "k8s.io/api/core/v1"
@@ -41,8 +40,7 @@ func (l *LabelNodes) Run() error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer cancel()
+	ctx := context.TODO()
 
 	var nodes *corev1.NodeList
 

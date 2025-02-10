@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -51,8 +50,7 @@ func (a *AddSharedLabelsToAllPods) Run() error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	ctx, cancel := contextToLabelAllPods()
-	defer cancel()
+	ctx := context.TODO()
 
 	resources, err := clientset.CoreV1().Pods(a.Namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
@@ -108,8 +106,4 @@ func getSharedLabelsPatch(numLabels int) ([]byte, error) {
 	}
 
 	return b, nil
-}
-
-func contextToLabelAllPods() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), 120*time.Minute)
 }

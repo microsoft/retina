@@ -136,8 +136,7 @@ func (g *GetAndPublishMetrics) Prevalidate() error {
 
 func (g *GetAndPublishMetrics) getAndPublishMetrics() error {
 
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeoutSeconds*time.Second)
-	defer cancel()
+	ctx := context.TODO()
 
 	labelSelector := labels.Set(g.Labels).String()
 

@@ -50,8 +50,7 @@ func (c *CreateCluster) Run() error {
 	if err != nil {
 		return fmt.Errorf("failed to obtain a credential: %w", err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), defaultClusterCreateTimeout)
-	defer cancel()
+	ctx := context.TODO()
 	clientFactory, err := armcontainerservice.NewClientFactory(c.SubscriptionID, cred, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
