@@ -11,6 +11,7 @@ import (
 	"time"
 
 	hubblev1 "github.com/cilium/cilium/pkg/hubble/api/v1"
+	lru "github.com/hashicorp/golang-lru/v2"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/plugin/registry"
@@ -20,6 +21,8 @@ import (
 )
 
 const defaultLimit = 2000
+
+var globalLruCache *lru.Cache[string, struct{}]
 
 func init() {
 	registry.Add(name, New)
@@ -63,23 +66,12 @@ func (lu *linuxUtil) SetupChannel(chan *hubblev1.Event) error {
 func (lu *linuxUtil) run(ctx context.Context) error {
 	lu.l.Info("Running linuxutil plugin...")
 
-	ethtoolOpts := &EthtoolOpts{
-		errOrDropKeysOnly: true,
-		addZeroVal:        false,
-		limit:             defaultLimit,
-	}
-
-	ethHandle, err := ethtool.NewEthtool()
+	// create a global LRU cache
+	var err error
+	globalLruCache, err = lru.New[string, struct{}](int(defaultLimit))
 	if err != nil {
-		lu.l.Error("Error while creating ethHandle: %v\n", zap.Error(err))
-		return fmt.Errorf("failed to create ethHandle: %w", err)
-	}
-	defer ethHandle.Close()
-
-	ethReader := NewEthtoolReader(ethtoolOpts, ethHandle)
-	if ethReader == nil {
-		lu.l.Error("Error while creating ethReader")
-		return errors.New("error while creating ethReader")
+		lu.l.Error("failed to create global LRU cache", zap.Error(err))
+		return err
 	}
 
 	ticker := time.NewTicker(lu.cfg.MetricsInterval)
@@ -111,6 +103,23 @@ func (lu *linuxUtil) run(ctx context.Context) error {
 				lu.prevTCPSockStats = tcpSocketStats
 			}()
 
+			ethtoolOpts := &EthtoolOpts{
+				errOrDropKeysOnly: true,
+				addZeroVal:        false,
+			}
+
+			ethHandle, err := ethtool.NewEthtool()
+			if err != nil {
+				lu.l.Error("Error while creating ethHandle: %v\n", zap.Error(err))
+				return fmt.Errorf("failed to create ethHandle: %w", err)
+			}
+
+			ethReader := NewEthtoolReader(ethtoolOpts, ethHandle)
+			if ethReader == nil {
+				lu.l.Error("Error while creating ethReader")
+				return errors.New("error while creating ethReader")
+			}
+
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -121,6 +130,7 @@ func (lu *linuxUtil) run(ctx context.Context) error {
 			}()
 
 			wg.Wait()
+			ethHandle.Close()
 		}
 	}
 }

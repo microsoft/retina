@@ -8,7 +8,6 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2"
 
 	"github.com/microsoft/retina/pkg/log"
-	"go.uber.org/zap"
 )
 
 type CachedEthtool struct {
@@ -17,15 +16,10 @@ type CachedEthtool struct {
 	l           *log.ZapLogger
 }
 
-func NewCachedEthtool(ethHandle EthtoolInterface, opts *EthtoolOpts) *CachedEthtool {
-	cache, err := lru.New[string, struct{}](int(opts.limit))
-	if err != nil {
-		log.Logger().Error("failed to create LRU cache: ", zap.Error(err))
-	}
-
+func NewCachedEthtool(ethHandle EthtoolInterface) *CachedEthtool {
 	return &CachedEthtool{
 		EthtoolInterface: ethHandle,
-		unsupported:      cache,
+		unsupported:      globalLruCache,
 		l:                log.Logger().Named(string("EthtoolReader")),
 	}
 }

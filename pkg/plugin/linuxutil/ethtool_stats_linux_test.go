@@ -29,7 +29,6 @@ func TestNewEthtool(t *testing.T) {
 	opts := &EthtoolOpts{
 		errOrDropKeysOnly: false,
 		addZeroVal:        false,
-		limit:             10,
 	}
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -45,7 +44,6 @@ func TestNewEthtoolWithNil(t *testing.T) {
 	opts := &EthtoolOpts{
 		errOrDropKeysOnly: false,
 		addZeroVal:        false,
-		limit:             10,
 	}
 
 	ethReader := NewEthtoolReader(opts, nil)
@@ -53,10 +51,11 @@ func TestNewEthtoolWithNil(t *testing.T) {
 }
 
 func TestReadInterfaceStats(t *testing.T) {
-	globalCache, err := lru.New[string, struct{}](10)
+	testCache, err := lru.New[string, struct{}](10)
 	if err != nil {
 		t.Fatal("failed to create LRU cache: ", err)
 	}
+	globalLruCache = testCache
 
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	l := log.Logger().Named("ethtool test").Sugar()
@@ -74,7 +73,6 @@ func TestReadInterfaceStats(t *testing.T) {
 			opts: &EthtoolOpts{
 				errOrDropKeysOnly: false,
 				addZeroVal:        false,
-				limit:             10,
 			},
 			statsReturn: map[string]uint64{
 				"rx_packets": 1,
@@ -90,7 +88,6 @@ func TestReadInterfaceStats(t *testing.T) {
 			opts: &EthtoolOpts{
 				errOrDropKeysOnly: false,
 				addZeroVal:        false,
-				limit:             10,
 			},
 			statsReturn: nil,
 			statErr:     errOther,
@@ -102,20 +99,17 @@ func TestReadInterfaceStats(t *testing.T) {
 			opts: &EthtoolOpts{
 				errOrDropKeysOnly: false,
 				addZeroVal:        false,
-				limit:             10,
 			},
 			statsReturn: nil,
 			statErr:     errInterfaceNotSupported,
-
-			result:  nil,
-			wantErr: false,
+			result:      nil,
+			wantErr:     false,
 		},
 		{
 			name: "test skipped interface",
 			opts: &EthtoolOpts{
 				errOrDropKeysOnly: false,
 				addZeroVal:        false,
-				limit:             10,
 			},
 			statsReturn: nil,
 			statErr:     errInterfaceNotSupported,
@@ -132,8 +126,7 @@ func TestReadInterfaceStats(t *testing.T) {
 
 		ethHandle := NewMockEthtoolInterface(ctrl)
 
-		cachedEthHandle := NewCachedEthtool(ethHandle, tt.opts)
-		cachedEthHandle.unsupported = globalCache
+		cachedEthHandle := NewCachedEthtool(ethHandle)
 
 		ethReader := NewEthtoolReader(tt.opts, cachedEthHandle)
 
@@ -164,8 +157,6 @@ func TestReadInterfaceStats(t *testing.T) {
 		} else if tt.statErr != nil && !errors.Is(tt.statErr, errInterfaceNotSupported) {
 			assert.Equal(t, 0, cachedEthHandle.unsupported.Len(), "cache should not add interface for other errors")
 		}
-
-		globalCache = cachedEthHandle.unsupported
 	}
 }
 

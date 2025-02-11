@@ -102,9 +102,6 @@ type EthtoolOpts struct {
 
 	// when true will include all keys with value 0
 	addZeroVal bool
-
-	// Configurable limit for unsupported interfaces cache
-	limit uint
 }
 
 type EthtoolInterface interface {

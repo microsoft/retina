@@ -31,7 +31,7 @@ func NewEthtoolReader(opts *EthtoolOpts, ethHandle EthtoolInterface) *EthtoolRea
 		}
 	}
 	// Construct a cached ethtool handle
-	CachedEthHandle := NewCachedEthtool(ethHandle, opts)
+	CachedEthHandle := NewCachedEthtool(ethHandle)
 	return &EthtoolReader{
 		l:         log.Logger().Named(string("EthtoolReader")),
 		opts:      opts,
@@ -76,6 +76,8 @@ func (er *EthtoolReader) readInterfaceStats() error {
 		if err != nil {
 			if errors.Is(err, errskip) {
 				er.l.Debug("Skipping unsupported interface", zap.String("ifacename", i.Name))
+			} else if strings.Contains(err.Error(), "interface not supported while retrieving stats") {
+				er.l.Warn("Unsupported interface detected:", zap.String("ifacename", i.Name), zap.Error(err))
 			} else {
 				er.l.Error("Error while getting ethtool:", zap.String("ifacename", i.Name), zap.Error(err))
 			}
