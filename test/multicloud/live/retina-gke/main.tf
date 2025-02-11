@@ -40,8 +40,8 @@ module "gke_firewall" {
   depends_on             = [module.gke]
   source                 = "../../modules/gke-firewall"
   prefix                 = local.prefix
-  inbound_firewall_rule  = local.gke_firwall_rules.inbound
-  outbound_firewall_rule = local.gke_firwall_rules.outbound
+  inbound_firewall_rule  = local.gke_firewall_rules.inbound
+  outbound_firewall_rule = local.gke_firewall_rules.outbound
 }
 
 module "grafana" {

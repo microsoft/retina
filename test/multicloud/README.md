@@ -119,6 +119,7 @@ Resources documentation:
 * [Kind](https://registry.terraform.io/providers/tehcyx/kind/latest/docs/resources/cluster)
 * [Helm Release](https://registry.terraform.io/providers/hashicorp/helm/latest/docs/resources/release)
 * [Kubernetes LB Service](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/service)
+* [Grafana Data Source](https://registry.terraform.io/providers/grafana/grafana/latest/docs/resources/data_source)
 
 ## Troubleshooting
 
@@ -139,4 +140,4 @@ tofu import module.gke.google_service_account.default projects/mc-retina/service
 
 The [live/](./live/) directory contains the multi-cloud / multi-cluster stacks to deploy clusters, install Retina, install Prometheus, expose all Prometheus using load blanaces, and configure a Grafana Cloud instance to consume prometheus data sources to visualize multiple cluster in a single Grafana dashboard.
 
-![Architecture Diagram](./diagrams/mc-diagram.svg)
+![Architecture Diagram](./diagrams/diagram-mc.svg)

@@ -18,7 +18,7 @@ locals {
   prometheus_release_namespace = "kube-system"
   prometheus_values            = yamldecode(file("../../../../deploy/standard/prometheus/values.yaml"))
 
-  gke_firwall_rules = {
+  gke_firewall_rules = {
     inbound = {
       protocol           = "tcp"
       ports              = ["9090"]
