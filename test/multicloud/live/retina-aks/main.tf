@@ -7,8 +7,13 @@ module "aks" {
 }
 
 module "retina" {
-  depends_on = [module.aks]
-  source     = "../../modules/retina"
+  depends_on     = [module.aks]
+  source         = "../../modules/helm-release"
+  release_name   = var.retina_release_name
+  repository_url = var.retina_repository_url
+  chart_version  = var.retina_chart_version
+  chart_name     = var.retina_chart_name
+  values         = var.retina_values
 }
 
 output "kubeconfig_command" {

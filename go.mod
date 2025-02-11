@@ -3,13 +3,13 @@ module github.com/microsoft/retina
 go 1.23.4
 
 require (
-	github.com/go-chi/chi/v5 v5.2.0
+	github.com/go-chi/chi/v5 v5.2.1
 	github.com/google/uuid v1.6.0
 	github.com/prometheus/client_golang v1.20.5
 	github.com/spf13/cobra v1.8.1
 	go.uber.org/zap v1.27.0
 	k8s.io/client-go v0.30.3
-	sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.4.14
+	sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.4.16
 	sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader v0.0.20
 )
 
@@ -48,18 +48,18 @@ require (
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.8 // indirect
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.26 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.30 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.30 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.28 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.32 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.32 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.2 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/v4a v1.3.29 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.3.32 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.12.2 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.5.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.12.11 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.18.10 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.24.13 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.28.12 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.33.11 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.5.6 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.12.13 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.18.13 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.24.15 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.28.14 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.33.14 // indirect
 	github.com/aws/smithy-go v1.22.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
@@ -224,10 +224,10 @@ require (
 	go.starlark.net v0.0.0-20230814145427-12f4cb8177e4 // indirect
 	go.uber.org/dig v1.17.1 // indirect
 	go4.org/netipx v0.0.0-20231129151722-fdeea329fbba // indirect
-	golang.org/x/crypto v0.32.0 // indirect
+	golang.org/x/crypto v0.33.0 // indirect
 	golang.org/x/mod v0.22.0 // indirect
-	golang.org/x/text v0.21.0 // indirect
-	golang.org/x/time v0.9.0 // indirect
+	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/time v0.10.0 // indirect
 	golang.org/x/tools v0.28.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/genproto v0.0.0-20240213162025-012b6fc9bca9 // indirect
@@ -259,10 +259,10 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/net v0.34.0 // indirect
 	golang.org/x/oauth2 v0.24.0 // indirect
-	golang.org/x/sync v0.10.0
-	golang.org/x/sys v0.29.0
-	golang.org/x/term v0.28.0 // indirect
-	google.golang.org/protobuf v1.36.4
+	golang.org/x/sync v0.11.0
+	golang.org/x/sys v0.30.0
+	golang.org/x/term v0.29.0 // indirect
+	google.golang.org/protobuf v1.36.5
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/api v0.30.3
@@ -289,10 +289,10 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.0
 	github.com/Microsoft/hcsshim v0.12.0-rc.3
 	github.com/Sytten/logrus-zap-hook v0.1.0
-	github.com/aws/aws-sdk-go-v2 v1.35.0
-	github.com/aws/aws-sdk-go-v2/config v1.29.3
-	github.com/aws/aws-sdk-go-v2/credentials v1.17.56
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.75.0
+	github.com/aws/aws-sdk-go-v2 v1.36.1
+	github.com/aws/aws-sdk-go-v2/config v1.29.6
+	github.com/aws/aws-sdk-go-v2/credentials v1.17.59
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.76.0
 	github.com/cakturk/go-netstat v0.0.0-20200220111822-e5b49efee7a5
 	github.com/cilium/cilium v1.16.0-pre.1.0.20240403152809-b9853ecbcaeb
 	github.com/cilium/ebpf v0.16.0
@@ -314,7 +314,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_model v0.6.1
 	github.com/prometheus/common v0.62.0
-	github.com/safchain/ethtool v0.5.9
+	github.com/safchain/ethtool v0.5.10
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.19.0
 	github.com/vishvananda/netlink v1.2.1-beta.2.0.20240524165444-4d4ba1473f21
@@ -326,7 +326,7 @@ require (
 	google.golang.org/grpc v1.66.2
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gotest.tools v2.2.0+incompatible
-	gotest.tools/v3 v3.5.1
+	gotest.tools/v3 v3.5.2
 	helm.sh/helm/v3 v3.15.4
 	k8s.io/apiextensions-apiserver v0.30.3
 	k8s.io/cli-runtime v0.30.3

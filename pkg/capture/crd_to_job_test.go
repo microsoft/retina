@@ -135,6 +135,9 @@ func Test_CaptureTargetsOnNode_AddNodeInterface(t *testing.T) {
 }
 
 func Test_CaptureToPodTranslator_GetCaptureTargetsOnNode(t *testing.T) {
+	ctx, cancel := TestContext(t)
+	defer cancel()
+
 	cases := []struct {
 		name                     string
 		captureTarget            retinav1alpha1.CaptureTarget
@@ -393,7 +396,7 @@ func Test_CaptureToPodTranslator_GetCaptureTargetsOnNode(t *testing.T) {
 
 			k8sClient := fakeclientset.NewSimpleClientset(objects...)
 			captureToPodTranslator := NewCaptureToPodTranslatorForTest(k8sClient)
-			gotCaptureTargetsOnNode, err := captureToPodTranslator.getCaptureTargetsOnNode(tt.captureTarget)
+			gotCaptureTargetsOnNode, err := captureToPodTranslator.getCaptureTargetsOnNode(ctx, tt.captureTarget)
 			if tt.wantErr != (err != nil) {
 				t.Errorf("getCaptureTargetsOnNode() want(%t) error, got error %s", tt.wantErr, err)
 			}
@@ -408,6 +411,9 @@ func Test_CaptureToPodTranslator_GetCaptureTargetsOnNode(t *testing.T) {
 }
 
 func Test_CaptureToPodTranslator_updateCaptureTargetsOSOnNode(t *testing.T) {
+	ctx, cancel := TestContext(t)
+	defer cancel()
+
 	cases := []struct {
 		name                     string
 		captureTargetsOnNode     *CaptureTargetsOnNode
@@ -457,7 +463,7 @@ func Test_CaptureToPodTranslator_updateCaptureTargetsOSOnNode(t *testing.T) {
 
 			k8sClient := fakeclientset.NewSimpleClientset(objects...)
 			captureToPodTranslator := NewCaptureToPodTranslatorForTest(k8sClient)
-			err := captureToPodTranslator.updateCaptureTargetsOSOnNode(tt.captureTargetsOnNode)
+			err := captureToPodTranslator.updateCaptureTargetsOSOnNode(ctx, tt.captureTargetsOnNode)
 			if tt.wantErr != (err != nil) {
 				t.Errorf("updateCaptureTargetsOSOnNode() want(%t) error, got error %s", tt.wantErr, err)
 			}
@@ -584,6 +590,9 @@ func Test_CaptureToPodTranslator_ObtainCaptureJobPodEnv(t *testing.T) {
 }
 
 func Test_CaptureToPodTranslator_RenderJob_NodeSelected(t *testing.T) {
+	ctx, cancel := TestContext(t)
+	defer cancel()
+
 	cases := []struct {
 		name                string
 		captureTargetOnNode *CaptureTargetsOnNode
@@ -670,7 +679,7 @@ func Test_CaptureToPodTranslator_RenderJob_NodeSelected(t *testing.T) {
 			k8sClient := fakeclientset.NewSimpleClientset()
 			log.SetupZapLogger(log.GetDefaultLogOpts())
 			captureToPodTranslator := NewCaptureToPodTranslatorForTest(k8sClient)
-			err := captureToPodTranslator.initJobTemplate(&retinav1alpha1.Capture{
+			err := captureToPodTranslator.initJobTemplate(ctx, &retinav1alpha1.Capture{
 				Spec: retinav1alpha1.CaptureSpec{
 					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{},
 					OutputConfiguration:  retinav1alpha1.OutputConfiguration{},
@@ -825,6 +834,9 @@ func isIgnorableEnvVar(envVar corev1.EnvVar) bool {
 }
 
 func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
+	ctx, cancel := TestContext(t)
+	defer cancel()
+
 	captureName := "capture-test"
 	hostPath := "/tmp/capture"
 	timestamp := file.Now()
@@ -1711,7 +1723,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			}
 			k8sClient := fakeclientset.NewSimpleClientset(objects...)
 			captureToPodTranslator := NewCaptureToPodTranslatorForTest(k8sClient)
-			jobs, err := captureToPodTranslator.TranslateCaptureToJobs(&tt.capture)
+			jobs, err := captureToPodTranslator.TranslateCaptureToJobs(ctx, &tt.capture)
 			if tt.wantErr != (err != nil) {
 				t.Errorf("TranslateCaptureToJobs() want(%t) error, got error %s", tt.wantErr, err)
 			}
@@ -1767,6 +1779,9 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 }
 
 func Test_CaptureToPodTranslator_TranslateCaptureToJobs_JobNumLimit(t *testing.T) {
+	ctx, cancel := TestContext(t)
+	defer cancel()
+
 	captureName := "capture-test"
 	hostPath := "/tmp/capture"
 	cases := []struct {
@@ -1858,7 +1873,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs_JobNumLimit(t *testing.T
 			k8sClient := fakeclientset.NewSimpleClientset(objects...)
 			captureToPodTranslator := NewCaptureToPodTranslatorForTest(k8sClient)
 			captureToPodTranslator.config.CaptureJobNumLimit = tt.jobNumLimit
-			_, err := captureToPodTranslator.TranslateCaptureToJobs(&tt.capture)
+			_, err := captureToPodTranslator.TranslateCaptureToJobs(ctx, &tt.capture)
 			if tt.wantErr != (err != nil) {
 				t.Errorf("TranslateCaptureToJobs() want(%t) error, got error %s", tt.wantErr, err)
 			}

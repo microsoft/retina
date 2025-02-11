@@ -52,6 +52,7 @@ jobs:
               IMAGE_NAMESPACE=${{ github.repository }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
+              APP_INSIGHTS_ID=${{ secrets.AZURE_APP_INSIGHTS_ID }} \
               BUILDX_ACTION=--push
           else
             make retina-image \
@@ -102,6 +103,7 @@ jobs:
               IMAGE_NAMESPACE=${{ github.repository }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
+              APP_INSIGHTS_ID=${{ secrets.AZURE_APP_INSIGHTS_ID }} \
               WINDOWS_YEARS=${{ matrix.year }} \
               BUILDX_ACTION=--push
           else
@@ -153,6 +155,7 @@ jobs:
               IMAGE_NAMESPACE=${{ github.repository }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               IMAGE_REGISTRY=${{ vars.ACR_NAME }} \
+              APP_INSIGHTS_ID=${{ secrets.AZURE_APP_INSIGHTS_ID }} \
               BUILDX_ACTION=--push
           else
             make retina-operator-image \

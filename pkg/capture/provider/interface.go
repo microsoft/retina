@@ -4,7 +4,7 @@
 package provider
 
 import (
-	"os"
+	"context"
 
 	"github.com/microsoft/retina/pkg/capture/file"
 )
@@ -14,7 +14,7 @@ type NetworkCaptureProviderInterface interface {
 	// Setup prepares the provider with folder to store network capture for temporary.
 	Setup(filename file.CaptureFilename) (string, error)
 	// CaptureNetworkPacket capture network traffic per user input and store the captured network packets in local directory.
-	CaptureNetworkPacket(filter string, duration, maxSize int, sigChan <-chan os.Signal) error
+	CaptureNetworkPacket(ctx context.Context, filter string, duration, maxSize int) error
 	// CollectMetadata collects network metadata and store network metadata info in local directory.
 	CollectMetadata() error
 	// Cleanup removes created resources.

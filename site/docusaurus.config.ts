@@ -142,7 +142,7 @@ const config = {
           items: [
             {
               label: "Contribute",
-              href: "https://github.com/microsoft/retina/tree/main/docs/07-Contributing",
+              href: "https://github.com/microsoft/retina/tree/main/docs/08-Contributing",
             },
             {
               label: "Github",
