@@ -11,11 +11,23 @@ import (
 func TestPrometheusKindIntegration(t *testing.T) {
 	t.Parallel()
 
+	jsonValues := utils.SerializeYAMLtoJSONstring(t, utils.PrometheusHelmValuesStandard)
+
 	opts := &terraform.Options{
 		TerraformDir: utils.ExamplesPath + "integration/prometheus-kind",
 
 		Vars: map[string]interface{}{
-			"prefix": "test-integration",
+			"prefix":            "test-integration",
+			"prometheus_values": jsonValues,
+			"retina_values": map[string]interface{}{
+				"image": map[string]interface{}{
+					"tag": "v0.0.24",
+				},
+				"operator": map[string]interface{}{
+					"tag": "v0.0.24",
+				},
+				"logLevel": "debug",
+			},
 		},
 	}
 

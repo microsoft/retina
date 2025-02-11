@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -15,6 +17,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -164,4 +167,33 @@ func ArePodsRunning(clientset kubernetes.Interface, podSelector PodSelector, tim
 		return false, fmt.Errorf("Pods did not start in time: %v", err)
 	}
 	return true, nil
+}
+
+// readYAMLFile reads a YAML file from the given filename and unmarshals it into a map[string]interface{}.
+// It returns the unmarshaled map and any error encountered during the process.
+func readYAMLFile(filename string) (map[string]interface{}, error) {
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	var result map[string]interface{}
+	err = yaml.Unmarshal(data, &result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func SerializeYAMLtoJSONstring(t *testing.T, fileName string) string {
+	values, err := readYAMLFile(fileName)
+	if err != nil {
+		t.Fatalf("Failed to read values.yaml: %v", err)
+	}
+
+	jsonValues, err := json.Marshal(values)
+	if err != nil {
+		t.Fatalf("Failed to serialize YAML to JSON: %v", err)
+	}
+	return string(jsonValues)
 }
