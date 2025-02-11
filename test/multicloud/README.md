@@ -121,7 +121,7 @@ Resources documentation:
 
 In case the test fails due to timeout, validate the resource was created by the provider, and if it is, you can import into OpenTofu state.
 
-Here is an example on how to import resources for `modules/gke`
+Here is an example on how to import resources for `modules/gke`:
 
 ```sh
 # move to the stack directory
@@ -130,10 +130,10 @@ tofu import module.gke.google_container_cluster.gke europe-west2/test-gke-cluste
 tofu import module.gke.google_service_account.default projects/mc-retina/serviceAccounts/test-gke-service-account@mc-retina.iam.gserviceaccount.com
 ```
 
->Note: each resource documentation contains a section on how to import resources into the State. [Example for google_container_cluster resource](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/container_cluster#import)
+>Note: each resource documentation contains a section on how to import resources into the State. [Example for google_container_cluster resource](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/container_cluster#import).
 
 ## Multi-Cloud
 
-The [live/](./live/) directory contains the multi-cloud / multi-cluster stacks to deploy clusters, install Retina, install Prometheus, expose all Prometheus using load blanaces, and configure a Grafana Cloud instance to consume prometheus data sources to visualize multiple cluster in a single Grafana dashboard. 
+The [live/](./live/) directory contains the multi-cloud / multi-cluster stacks to deploy clusters, install Retina, install Prometheus, expose all Prometheus using load blanaces, and configure a Grafana Cloud instance to consume prometheus data sources to visualize multiple cluster in a single Grafana dashboard.
 
 ![Architecture Diagram](./diagrams/mc-diagram.svg)
