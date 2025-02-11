@@ -1,0 +1,29 @@
+# hubble control-plane
+operator:
+  enabled: true
+  tag: v0.0.24
+  repository: ghcr.io/microsoft/retina/retina-operator
+
+agent:
+  enabled: true
+  repository: ghcr.io/microsoft/retina/retina-agent
+  tag: v0.0.24
+  init:
+    enabled: true
+    repository: ghcr.io/microsoft/retina/retina-init
+    tag: v0.0.24
+
+hubble:
+  relay:
+    tls:
+      server:
+        enabled: false
+  tls:
+    enabled: false
+    auto:
+      enabled: false
+      method: cronJob
+      certValidityDuration: 1
+      schedule: "*/10 * * * *" # every 10 minutes
+
+enabledPlugin_linux: '["packetparser","dropreason","packetforward","linuxutil","dns"]'

@@ -3,6 +3,12 @@ variable "release_name" {
   type        = string
 }
 
+variable "release_namespace" {
+  description = "The namespace to install the Helm chart."
+  type        = string
+  default     = "default"
+}
+
 variable "repository_url" {
   description = "The URL of the Helm repository."
   type        = string

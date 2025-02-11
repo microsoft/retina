@@ -14,7 +14,7 @@ module "retina" {
 }
 
 module "prometheus" {
-  depends_on     = [
+  depends_on = [
     module.kind,
     module.retina
   ]

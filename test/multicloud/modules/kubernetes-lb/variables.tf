@@ -4,6 +4,12 @@ variable "name" {
   default     = "prometheus"
 }
 
+variable "namespace" {
+  description = "Namespace for the LoadBalancer service"
+  type        = string
+  default     = "kube-system"
+}
+
 variable "label_selector" {
   description = "Label selector for the backend pods"
   type        = map(string)

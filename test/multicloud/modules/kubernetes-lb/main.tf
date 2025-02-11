@@ -1,6 +1,7 @@
 resource "kubernetes_service" "load_balancer_service" {
   metadata {
-    name = var.name
+    name      = var.name
+    namespace = var.namespace
   }
 
   spec {
