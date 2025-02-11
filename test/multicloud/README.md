@@ -4,6 +4,8 @@ This project leverages [OpenTofu](https://opentofu.org/docs/intro/) Infrastructu
 
 ![Architecture Diagram](./diagrams/diagram.svg)
 
+An example Hubble UI visualization on GKE dataplane v1 (no Cilium). [See GKE network overview doc](https://cloud.google.com/kubernetes-engine/docs/concepts/network-overview).
+
 ## Modules available
 
 * [aks](./modules/aks/): Deploy Azure Kubernetes Service cluster.
@@ -53,6 +55,7 @@ This project leverages [OpenTofu](https://opentofu.org/docs/intro/) Infrastructu
     3. Export `GRAFANA_AUTH` environmnet variable containing the service account token.
 
     ```sh
+    # example
     export GRAFANA_AUTH=glsa_s0MeRan0mS7r1ng_1ab2c345
     ```
 

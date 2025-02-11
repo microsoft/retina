@@ -8,6 +8,7 @@ agent:
   enabled: true
   repository: ghcr.io/microsoft/retina/retina-agent
   tag: v0.0.24
+
   init:
     enabled: true
     repository: ghcr.io/microsoft/retina/retina-init
