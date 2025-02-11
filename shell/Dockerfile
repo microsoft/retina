@@ -25,4 +25,4 @@ RUN tdnf install -y \
 	wget \
 	&& tdnf clean all
 
-CMD ["/bin/bash"]
+CMD ["/bin/bash", "-l"]
