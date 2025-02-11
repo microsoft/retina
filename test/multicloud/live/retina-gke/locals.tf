@@ -16,7 +16,7 @@ locals {
   prometheus_chart_version     = "68.4.3"
   prometheus_chart_name        = "kube-prometheus-stack"
   prometheus_release_namespace = "kube-system"
-  prometheus_values            = yamldecode(file("../../../../deploy/standard/prometheus/values.yaml"))
+  prometheus_values            = yamldecode(file("../../../../deploy/hubble/prometheus/values.yaml"))
 
   gke_firewall_rules = {
     inbound = {
