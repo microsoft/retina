@@ -4013,7 +4013,7 @@
     ]
   },
   "timezone": "",
-  "title": "Kubernetes / Networking / Retina / Pod Flows (Workload)",
+  "title": "Kubernetes / Networking / Retina (Hubble) / Pod Flows (Workload)",
   "uid": "RetinaPodFlowsWorkload",
   "version": 1
 }
