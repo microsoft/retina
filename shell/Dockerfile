@@ -14,6 +14,7 @@ RUN tdnf install -y \
 	iputils \
 	jq \
 	ldns-utils \
+	less \
 	net-tools \
 	nftables \
 	nmap \
