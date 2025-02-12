@@ -40,7 +40,7 @@ If you followed the steps to install and configure [Prometheus](./04-prometheus.
 
    Some other available dashboards for Retina Standard are:
    - [kubernetes-networking-retina-standard-DNS](https://grafana.com/grafana/dashboards/22836/) dashboard (id `22836`)
-   - [kubernetes-networking-retina-standard-PodTraffic](https://grafana.com/grafana/dashboards/22836/) dashboard (id `22836`)
+   - [kubernetes-networking-retina-standard-PodTraffic](https://grafana.com/grafana/dashboards/22837/) dashboard (id `22837`)
 
 6. Kubernetes cluster metrics shouold be visible
 
