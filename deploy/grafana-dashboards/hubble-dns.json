@@ -1017,6 +1017,6 @@
   },
   "timezone": "",
   "title": "Kubernetes / Networking / Retina (Hubble) / DNS",
-  "uid": "RetinaDNS",
+  "uid": "RetinaHubbleDNS",
   "version": 1
 }

@@ -4264,6 +4264,6 @@
   },
   "timezone": "",
   "title": "Kubernetes / Networking / Retina (Hubble) / Pod Flows (Namespace)",
-  "uid": "RetinaPodFlowsNamespace",
+  "uid": "RetinaHubblePodFlowsNamespace",
   "version": 1
 }
