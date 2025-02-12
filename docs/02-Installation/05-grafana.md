@@ -48,9 +48,9 @@ If you followed the steps to install and configure [Prometheus](./04-prometheus.
 
 ## Retina Dashboards
 
-There is a set of Retina dashboards that you can import directly into Grafana as json files. The dashboards are found under `deploy/standard/grafana/dashboards/` if you installed retina standard controlplane, and under `deploy/hubble/grafana/dashboards/` if you installed retina hubble controlplane.
+There is a set of Retina dashboards that you can import directly into Grafana as json files. The dashboards are found under `deploy/grafana-dashboards/`.
 
-Here is an example of the Retina `dns.json` dashboard.
+Here is an example of the Retina `standard-dns.json` dashboard.
 
 ![Grafana retina DNS dashboard](./img/grafana-retina-dns-dash.png)
 
