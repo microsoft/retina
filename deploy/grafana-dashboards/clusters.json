@@ -3695,7 +3695,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(kube_node_info, cluster)",
+        "definition": "label_values(up, cluster)",
         "hide": 0,
         "includeAll": false,
         "label": "Cluster",
@@ -3703,7 +3703,7 @@
         "name": "cluster",
         "options": [],
         "query": {
-          "query": "label_values(kube_node_info, cluster)",
+          "query": "label_values(up, cluster)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,
@@ -3713,19 +3713,20 @@
         "type": "query"
       },
       {
+        "allValue": "(.*)",
         "current": {},
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(kube_node_info{cluster=\"$cluster\"}, node)",
+        "definition": "label_values(up{cluster=\"$cluster\"},instance)",
         "hide": 0,
         "includeAll": true,
         "label": "Nodes",
         "multi": true,
         "name": "Nodes",
         "options": [],
-        "query": "label_values(kube_node_info{cluster=\"$cluster\"}, node)",
+        "query": "label_values(up{cluster=\"$cluster\"},instance)",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
