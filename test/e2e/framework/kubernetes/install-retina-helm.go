@@ -33,6 +33,7 @@ type InstallHelmChart struct {
 	KubeConfigFilePath string
 	ChartPath          string
 	TagEnv             string
+	EnableHeartbeat    bool
 }
 
 func (i *InstallHelmChart) Run() error {
@@ -83,6 +84,11 @@ func (i *InstallHelmChart) Run() error {
 		{
 			"name": "acr-credentials",
 		},
+	}
+
+	if i.EnableHeartbeat {
+		chart.Values["enableTelemetry"] = i.EnableHeartbeat
+		chart.Values["logLevel"] = "error"
 	}
 
 	chart.Values["image"].(map[string]interface{})["tag"] = tag
