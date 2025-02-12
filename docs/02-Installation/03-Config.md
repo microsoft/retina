@@ -4,7 +4,7 @@
 
 ### Default Configuration
 
-Default settings for each component are specified in [Values file](../../deploy/legacy/manifests/controller/helm/retina/values.yaml).
+Default settings for each component are specified in [Values file](../../deploy/standard/manifests/controller/helm/retina/values.yaml).
 
 ### Deployed Configuration
 

@@ -3,8 +3,8 @@
 # buildx targets, and this one requires legacy build.
 # Maybe one day: https://github.com/moby/buildkit/issues/616
 ARG BUILDER_IMAGE
-# mcr.microsoft.com/oss/go/microsoft/golang:1.23.4-windowsservercore-ltsc2022
-FROM --platform=windows/amd64 mcr.microsoft.com/oss/go/microsoft/golang@sha256:e423369b45d4144324e61d6d64ce7a6d0e2bdf7f181c74d8ed25346891b8aacd AS builder
+# mcr.microsoft.com/oss/go/microsoft/golang:1.23.5-windowsservercore-ltsc2022
+FROM --platform=windows/amd64 mcr.microsoft.com/oss/go/microsoft/golang@sha256:f88b5ef1afd628c18196e98c3d1c6081617768f4ad316433dd29b19a257a46eb AS builder
 WORKDIR C:\\retina
 COPY go.mod .
 COPY go.sum .

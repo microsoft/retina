@@ -1,0 +1,6 @@
+terraform.tfvars
+.terraform
+terraform.tfstate
+*terraform.tfstate.*
+service-key.json
+*-kind-config

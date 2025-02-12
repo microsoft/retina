@@ -6,6 +6,7 @@
 package provider
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -55,7 +56,10 @@ func (ncp *NetworkCaptureProvider) Setup(filename file.CaptureFilename) (string,
 	return ncp.TmpCaptureDir, nil
 }
 
-func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(filter string, duration, maxSizeMB int, sigChan <-chan os.Signal) error {
+func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, filter string, duration, maxSizeMB int) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(duration)*time.Second)
+	defer cancel()
+
 	filename := file.CaptureFilename{CaptureName: ncp.CaptureName, NodeHostname: ncp.NodeHostName, StartTimestamp: ncp.StartTimestamp}
 	captureFileName := fmt.Sprintf("%s.pcap", filename)
 	captureFilePath := filepath.Join(ncp.TmpCaptureDir, captureFileName)
@@ -164,8 +168,8 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(filter string, duration,
 
 	select {
 	case <-doneChan:
-	case sig := <-sigChan:
-		ncp.l.Info("Got OS signal, tcpdump will be stopped", zap.String("signal", sig.String()))
+	case <-ctx.Done():
+		ncp.l.Info("Tcpdump will be stopped - got OS signal, or timeout reached", zap.Error(ctx.Err()))
 	case err := <-errChan:
 		return err
 	}
@@ -174,7 +178,7 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(filter string, duration,
 	// flushed to the capture file. Instead, we signal terminate and wait until the process to exit.
 	if err := captureStartCmd.Process.Signal(syscall.SIGTERM); err != nil {
 		ncp.l.Error("Failed to signal terminate to process, will kill the process", zap.Error(err))
-		if killErr := captureStartCmd.Process.Kill(); err != nil {
+		if killErr := captureStartCmd.Process.Kill(); killErr != nil {
 			return fmt.Errorf("tcpdump stop failed, error: %s", killErr)
 		}
 		return err
