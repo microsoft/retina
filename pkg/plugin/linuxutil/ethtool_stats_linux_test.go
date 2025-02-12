@@ -33,8 +33,13 @@ func TestNewEthtool(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	unsupportedInterfacesCache, err := lru.New[string, struct{}](10)
+	if err != nil {
+		t.Fatal("failed to create cache:", err)
+	}
+
 	ethHandle := NewMockEthtoolInterface(ctrl)
-	ethReader := NewEthtoolReader(opts, ethHandle)
+	ethReader := NewEthtoolReader(opts, ethHandle, unsupportedInterfacesCache)
 	assert.NotNil(t, ethReader)
 }
 
@@ -46,16 +51,20 @@ func TestNewEthtoolWithNil(t *testing.T) {
 		addZeroVal:        false,
 	}
 
-	ethReader := NewEthtoolReader(opts, nil)
+	unsupportedInterfacesCache, err := lru.New[string, struct{}](10)
+	if err != nil {
+		t.Fatal("failed to create cache:", err)
+	}
+
+	ethReader := NewEthtoolReader(opts, nil, unsupportedInterfacesCache)
 	assert.NotNil(t, ethReader)
 }
 
 func TestReadInterfaceStats(t *testing.T) {
-	testCache, err := lru.New[string, struct{}](10)
+	unsupportedInterfacesCache, err := lru.New[string, struct{}](10)
 	if err != nil {
 		t.Fatal("failed to create LRU cache: ", err)
 	}
-	globalLruCache = testCache
 
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	l := log.Logger().Named("ethtool test").Sugar()
@@ -126,9 +135,7 @@ func TestReadInterfaceStats(t *testing.T) {
 
 		ethHandle := NewMockEthtoolInterface(ctrl)
 
-		cachedEthHandle := NewCachedEthtool(ethHandle)
-
-		ethReader := NewEthtoolReader(tt.opts, cachedEthHandle)
+		ethReader := NewEthtoolReader(tt.opts, ethHandle, unsupportedInterfacesCache)
 
 		assert.NotNil(t, ethReader)
 
@@ -152,10 +159,10 @@ func TestReadInterfaceStats(t *testing.T) {
 		}
 
 		if tt.statErr != nil && errors.Is(tt.statErr, errInterfaceNotSupported) {
-			assert.NotNil(t, cachedEthHandle.unsupported, "cache should not be nil")
-			assert.NotEqual(t, 0, cachedEthHandle.unsupported.Len(), "cache should contain interface")
+			assert.NotNil(t, unsupportedInterfacesCache, "cache should not be nil")
+			assert.NotEqual(t, 0, unsupportedInterfacesCache.Len(), "cache should contain interface")
 		} else if tt.statErr != nil && !errors.Is(tt.statErr, errInterfaceNotSupported) {
-			assert.Equal(t, 0, cachedEthHandle.unsupported.Len(), "cache should not add interface for other errors")
+			assert.Equal(t, 0, unsupportedInterfacesCache.Len(), "cache should not add interface for other errors")
 		}
 	}
 }

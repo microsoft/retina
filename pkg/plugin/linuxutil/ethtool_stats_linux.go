@@ -7,6 +7,7 @@ import (
 	"net"
 	"strings"
 
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/utils"
@@ -21,7 +22,7 @@ type EthtoolReader struct {
 	ethHandle EthtoolInterface
 }
 
-func NewEthtoolReader(opts *EthtoolOpts, ethHandle EthtoolInterface) *EthtoolReader {
+func NewEthtoolReader(opts *EthtoolOpts, ethHandle EthtoolInterface, unsupportedInterfacesCache *lru.Cache[string, struct{}]) *EthtoolReader {
 	if ethHandle == nil {
 		var err error
 		ethHandle, err = ethtool.NewEthtool()
@@ -31,7 +32,7 @@ func NewEthtoolReader(opts *EthtoolOpts, ethHandle EthtoolInterface) *EthtoolRea
 		}
 	}
 	// Construct a cached ethtool handle
-	CachedEthHandle := NewCachedEthtool(ethHandle)
+	CachedEthHandle := NewCachedEthtool(ethHandle, unsupportedInterfacesCache)
 	return &EthtoolReader{
 		l:         log.Logger().Named(string("EthtoolReader")),
 		opts:      opts,
@@ -79,7 +80,7 @@ func (er *EthtoolReader) readInterfaceStats() error {
 			} else if strings.Contains(err.Error(), "interface not supported while retrieving stats") {
 				er.l.Warn("Unsupported interface detected:", zap.String("ifacename", i.Name), zap.Error(err))
 			} else {
-				er.l.Error("Error while getting ethtool:", zap.String("ifacename", i.Name), zap.Error(err))
+				er.l.Error("Error while retrieving stats:", zap.String("ifacename", i.Name), zap.Error(err))
 			}
 			continue
 		}

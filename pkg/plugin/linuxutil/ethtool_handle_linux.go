@@ -16,10 +16,10 @@ type CachedEthtool struct {
 	l           *log.ZapLogger
 }
 
-func NewCachedEthtool(ethHandle EthtoolInterface) *CachedEthtool {
+func NewCachedEthtool(ethHandle EthtoolInterface, unsupportedInterfacesCache *lru.Cache[string, struct{}]) *CachedEthtool {
 	return &CachedEthtool{
 		EthtoolInterface: ethHandle,
-		unsupported:      globalLruCache,
+		unsupported:      unsupportedInterfacesCache,
 		l:                log.Logger().Named(string("EthtoolReader")),
 	}
 }
