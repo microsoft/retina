@@ -12,7 +12,7 @@ The `dns` plugin requires the `CAP_SYS_ADMIN` capability.
 
 This plugin uses [Inspektor Gadget](https://github.com/inspektor-gadget/inspektor-gadget)'s DNS Tracer to track DNS traffic and generate basic metrics derived from the captured events.
 
-In [Advanced mode](https://retina.sh/docs/metrics/modes), the plugin further processes the capture results into an enriched Flow with additional Pod information. Subsequently, the Flow is transmitted to an external channel. This allows a DNS module to generate additional Pod-Level metrics.
+In [Advanced mode](https://retina.sh/docs/Metrics/modes), the plugin further processes the capture results into an enriched Flow with additional Pod information. Subsequently, the Flow is transmitted to an external channel. This allows a DNS module to generate additional Pod-Level metrics.
 
 ### Code locations
 
