@@ -88,7 +88,7 @@ apiServer:
 logLevel: info
 
 enabledPlugin_linux: '["linuxutil","packetforward","packetparser","dns", "dropreason"]'
-enabledPlugin_win: '["hnsstats"]'
+enabledPlugin_win: '["hnsstats","ebpfwindows"]'
 
 enableTelemetry: false
 
