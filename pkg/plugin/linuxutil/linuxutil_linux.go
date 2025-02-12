@@ -20,8 +20,6 @@ import (
 	"go.uber.org/zap"
 )
 
-const defaultLimit = 2000
-
 func init() {
 	registry.Add(name, New)
 }
