@@ -29,13 +29,17 @@ func TestNewEthtool(t *testing.T) {
 	opts := &EthtoolOpts{
 		errOrDropKeysOnly: false,
 		addZeroVal:        false,
-		limit:             10,
 	}
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	unsupportedInterfacesCache, err := lru.New[string, struct{}](10)
+	if err != nil {
+		t.Fatal("failed to create cache:", err)
+	}
+
 	ethHandle := NewMockEthtoolInterface(ctrl)
-	ethReader := NewEthtoolReader(opts, ethHandle)
+	ethReader := NewEthtoolReader(opts, ethHandle, unsupportedInterfacesCache)
 	assert.NotNil(t, ethReader)
 }
 
@@ -45,15 +49,19 @@ func TestNewEthtoolWithNil(t *testing.T) {
 	opts := &EthtoolOpts{
 		errOrDropKeysOnly: false,
 		addZeroVal:        false,
-		limit:             10,
 	}
 
-	ethReader := NewEthtoolReader(opts, nil)
+	unsupportedInterfacesCache, err := lru.New[string, struct{}](10)
+	if err != nil {
+		t.Fatal("failed to create cache:", err)
+	}
+
+	ethReader := NewEthtoolReader(opts, nil, unsupportedInterfacesCache)
 	assert.NotNil(t, ethReader)
 }
 
 func TestReadInterfaceStats(t *testing.T) {
-	globalCache, err := lru.New[string, struct{}](10)
+	unsupportedInterfacesCache, err := lru.New[string, struct{}](10)
 	if err != nil {
 		t.Fatal("failed to create LRU cache: ", err)
 	}
@@ -74,7 +82,6 @@ func TestReadInterfaceStats(t *testing.T) {
 			opts: &EthtoolOpts{
 				errOrDropKeysOnly: false,
 				addZeroVal:        false,
-				limit:             10,
 			},
 			statsReturn: map[string]uint64{
 				"rx_packets": 1,
@@ -90,7 +97,6 @@ func TestReadInterfaceStats(t *testing.T) {
 			opts: &EthtoolOpts{
 				errOrDropKeysOnly: false,
 				addZeroVal:        false,
-				limit:             10,
 			},
 			statsReturn: nil,
 			statErr:     errOther,
@@ -98,24 +104,21 @@ func TestReadInterfaceStats(t *testing.T) {
 			wantErr:     true,
 		},
 		{
-			name: "test unsported interface",
+			name: "test unsupported interface",
 			opts: &EthtoolOpts{
 				errOrDropKeysOnly: false,
 				addZeroVal:        false,
-				limit:             10,
 			},
 			statsReturn: nil,
 			statErr:     errInterfaceNotSupported,
-
-			result:  nil,
-			wantErr: false,
+			result:      nil,
+			wantErr:     false,
 		},
 		{
 			name: "test skipped interface",
 			opts: &EthtoolOpts{
 				errOrDropKeysOnly: false,
 				addZeroVal:        false,
-				limit:             10,
 			},
 			statsReturn: nil,
 			statErr:     errInterfaceNotSupported,
@@ -132,15 +135,11 @@ func TestReadInterfaceStats(t *testing.T) {
 
 		ethHandle := NewMockEthtoolInterface(ctrl)
 
-		cachedEthHandle := NewCachedEthtool(ethHandle, tt.opts)
-		cachedEthHandle.unsupported = globalCache
-
-		ethReader := NewEthtoolReader(tt.opts, cachedEthHandle)
+		ethReader := NewEthtoolReader(tt.opts, ethHandle, unsupportedInterfacesCache)
 
 		assert.NotNil(t, ethReader)
 
 		ethHandle.EXPECT().Stats(gomock.Any()).Return(tt.statsReturn, tt.statErr).AnyTimes()
-		ethHandle.EXPECT().Close().Times(1)
 		InitalizeMetricsForTesting(ctrl)
 
 		if tt.statErr == nil {
@@ -160,13 +159,11 @@ func TestReadInterfaceStats(t *testing.T) {
 		}
 
 		if tt.statErr != nil && errors.Is(tt.statErr, errInterfaceNotSupported) {
-			assert.NotNil(t, cachedEthHandle.unsupported, "cache should not be nil")
-			assert.NotEqual(t, 0, cachedEthHandle.unsupported.Len(), "cache should contain interface")
+			assert.NotNil(t, unsupportedInterfacesCache, "cache should not be nil")
+			assert.NotEqual(t, 0, unsupportedInterfacesCache.Len(), "cache should contain interface")
 		} else if tt.statErr != nil && !errors.Is(tt.statErr, errInterfaceNotSupported) {
-			assert.Equal(t, 0, cachedEthHandle.unsupported.Len(), "cache should not add interface for other errors")
+			assert.Equal(t, 0, unsupportedInterfacesCache.Len(), "cache should not add interface for other errors")
 		}
-
-		globalCache = cachedEthHandle.unsupported
 	}
 }
 
