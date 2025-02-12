@@ -97,7 +97,7 @@ jobs:
           set -euo pipefail
           echo "TAG=$(make version)" >> $GITHUB_ENV
           if [ "$IS_MERGE_GROUP" == "true" ]; then
-            az acr login -n ${{ vars.ACR_NAME }} 
+            az acr login -n ${{ vars.ACR_NAME }}
             make retina-image-win \
               IMAGE_NAMESPACE=${{ github.repository }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
@@ -108,7 +108,7 @@ jobs:
             make retina-image-win \
               IMAGE_NAMESPACE=${{ github.repository }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
-              WINDOWS_YEARS=${{ matrix.year }} 
+              WINDOWS_YEARS=${{ matrix.year }}
           fi
         env:
           IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
@@ -295,12 +295,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          az acr login -n ${{ vars.ACR_NAME }}  
+          az acr login -n ${{ vars.ACR_NAME }}
           make manifest COMPONENT=${{ matrix.components }} \
           IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
 
   e2e:
-    if: ${{ github.event_name == 'merge_group' && success('manifests')}}
     name: Run E2E Tests
     runs-on: ubuntu-latest
     needs: [manifests]
