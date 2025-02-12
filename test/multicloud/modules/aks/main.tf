@@ -3,6 +3,20 @@ resource "azurerm_resource_group" "aks_rg" {
   location = var.location
 }
 
+resource "azurerm_virtual_network" "aks_vnet" {
+  name                = "${var.prefix}-vnet"
+  address_space       = var.vnet_address_space
+  location            = azurerm_resource_group.aks_rg.location
+  resource_group_name = azurerm_resource_group.aks_rg.name
+}
+
+resource "azurerm_subnet" "aks_subnet" {
+  name                 = "${var.prefix}-subnet"
+  resource_group_name  = azurerm_resource_group.aks_rg.name
+  virtual_network_name = azurerm_virtual_network.aks_vnet.name
+  address_prefixes     = var.subnet_address_space
+}
+
 resource "azurerm_kubernetes_cluster" "aks" {
   name                = "${var.prefix}-aks"
   location            = azurerm_resource_group.aks_rg.location
@@ -21,6 +35,7 @@ resource "azurerm_kubernetes_cluster" "aks" {
       max_pods        = default_node_pool.value.max_pods
       type            = default_node_pool.value.type
       node_labels     = default_node_pool.value.node_labels
+      vnet_subnet_id  = azurerm_subnet.aks_subnet.id
     }
   }
 

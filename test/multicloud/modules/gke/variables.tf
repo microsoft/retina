@@ -1,19 +1,25 @@
+variable "prefix" {
+  description = "Prefix for resource names"
+  type        = string
+}
+
 variable "project" {
-  description = "The Google Cloud project where resources will be deployed."
+  description = "Project ID"
   type        = string
 }
 
 variable "location" {
-  description = "The Google Cloud location where GKE will be deployed to."
-  type        = string
-}
-
-variable "prefix" {
-  description = "A prefix to add to all resources."
+  description = "Region for the GKE cluster and subnet"
   type        = string
 }
 
 variable "machine_type" {
-  description = "The machine type to use for the GKE nodes."
+  description = "Machine type for the GKE node pool"
   type        = string
+}
+
+variable "subnet_cidr" {
+  description = "CIDR range for the subnet"
+  type        = string
+  default     = "10.0.0.0/24"
 }

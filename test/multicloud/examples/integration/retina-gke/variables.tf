@@ -47,23 +47,6 @@ variable "retina_chart_name" {
 }
 
 variable "retina_values" {
-  description = "Configuration for set blocks, this corresponds to Helm values.yaml"
-  type = list(object({
-    name  = string
-    value = string
-  }))
-  default = [
-    {
-      name  = "image.tag"
-      value = "v0.0.24"
-    },
-    {
-      name  = "operator.tag"
-      value = "v0.0.24"
-    },
-    {
-      name  = "logLevel"
-      value = "info"
-    }
-  ]
+  description = "This corresponds to Helm values.yaml"
+  type        = any
 }

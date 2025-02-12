@@ -3,6 +3,20 @@ resource "google_service_account" "default" {
   display_name = "GKE Service Account for ${var.project}"
 }
 
+// Create VPC network
+resource "google_compute_network" "vpc_network" {
+  name                    = "${var.prefix}-vpc-network"
+  auto_create_subnetworks = false
+}
+
+// Create subnet within the VPC network
+resource "google_compute_subnetwork" "subnet" {
+  name          = "${var.prefix}-subnet"
+  ip_cidr_range = var.subnet_cidr
+  region        = var.location
+  network       = google_compute_network.vpc_network.id
+}
+
 // https://cloud.google.com/kubernetes-engine/docs/concepts/network-overview
 resource "google_container_cluster" "gke" {
   name     = "${var.prefix}-gke-cluster"
@@ -14,6 +28,9 @@ resource "google_container_cluster" "gke" {
   remove_default_node_pool = true
   initial_node_count       = 1
   deletion_protection      = false
+
+  network    = google_compute_network.vpc_network.id
+  subnetwork = google_compute_subnetwork.subnet.id
 }
 
 resource "google_container_node_pool" "gke_preemptible_nodes" {

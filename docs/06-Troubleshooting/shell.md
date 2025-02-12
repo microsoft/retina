@@ -180,6 +180,6 @@ kubectl retina shell node0001 # this will use the image "example.azurecr.io/reti
 
 * Windows nodes and pods are not yet supported.
 * `bpftool` and `bpftrace` are not supported.
-* The shell image link `iptables` commands to `iptables-legacy`, even if the node itself links to `iptables-nft`.
+* The shell image links `iptables` commands to `iptables-nft`, even if the node itself links to `iptables-legacy`.
 * `nsenter` is not supported.
 * `ip netns` will not work without `chroot` to the host filesystem.
