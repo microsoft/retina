@@ -20,24 +20,16 @@ func TestRetinaGKEIntegration(t *testing.T) {
 			"project":              "mc-retina",    // TODO: replace with actual project once we get gcloud access
 			"machine_type":         "e2-standard-4",
 			"retina_chart_version": utils.RetinaVersion,
-			"retina_values": []map[string]interface{}{
-				{
-					"name":  "logLevel",
-					"value": "info",
-				},
-				{
-					"name":  "operator.tag",
-					"value": utils.RetinaVersion,
-				},
+			"retina_values": map[string]interface{}{
 				// Example using a public image built during testing
-				{
-					"name":  "image.repository",
-					"value": "acnpublic.azurecr.io/xiaozhiche320/retina/retina-agent",
+				"image": map[string]interface{}{
+					"tag":        "c17d5ea-linux-amd64",
+					"repository": "acnpublic.azurecr.io/xiaozhiche320/retina/retina-agent",
 				},
-				{
-					"name":  "image.tag",
-					"value": "c17d5ea-linux-amd64",
+				"operator": map[string]interface{}{
+					"tag": utils.RetinaVersion,
 				},
+				"logLevel": "info",
 			},
 		},
 	}

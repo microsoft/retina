@@ -1,0 +1,17 @@
+# advanced/pod-level mode with scale limitations
+# metrics are aggregated by source and destination Pod
+image:
+  repository: ghcr.io/microsoft/retina/retina-agent
+  initRepository: ghcr.io/microsoft/retina/retina-init
+  tag: v0.0.24
+
+operator:
+  enabled: true
+  enableRetinaEndpoint: true
+  tag: v0.0.24
+  repository: ghcr.io/microsoft/retina/retina-operator
+
+enabledPlugin_linux: '["packetparser","dropreason","packetforward","linuxutil","dns"]'
+enablePodLevel: true
+enableAnnotations: true
+remoteContext: true

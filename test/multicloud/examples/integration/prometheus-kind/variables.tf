@@ -29,19 +29,35 @@ variable "prometheus_chart_name" {
 }
 
 variable "prometheus_values" {
-  description = "Configuration for set blocks, this corresponds to Helm values.yaml"
-  type = list(object({
-    name  = string
-    value = string
-  }))
-  default = [
-    {
-      name  = "global.prometheus.enabled"
-      value = "true"
-    },
-    {
-      name  = "global.grafana.enabled"
-      value = "true"
-    }
-  ]
+  description = "This corresponds to Helm values.yaml"
+  type        = any
+}
+
+variable "retina_release_name" {
+  description = "The name of the Helm release."
+  type        = string
+  default     = "retina"
+}
+
+variable "retina_repository_url" {
+  description = "The URL of the Helm repository."
+  type        = string
+  default     = "oci://ghcr.io/microsoft/retina/charts"
+}
+
+variable "retina_chart_version" {
+  description = "The version of the Helm chart to install."
+  type        = string
+  default     = "v0.0.24"
+}
+
+variable "retina_chart_name" {
+  description = "The name of the Helm chart to install."
+  type        = string
+  default     = "retina"
+}
+
+variable "retina_values" {
+  description = "This corresponds to Helm values.yaml"
+  type        = any
 }

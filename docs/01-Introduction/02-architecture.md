@@ -10,7 +10,7 @@ To collect this data, Retina observes and hooks on to system events within the k
 
 This section discusses how Retina collects its raw data. More specifically, it discusses how the eBPF programs and plugins are used.
 
-The plugins have a very specific scope by design, and Retina is designed to be extendable, meaning it is easy to add in additional plugins if necessary. If there is a plugin missing for your use case, you can create your own! See our [Development page](../07-Contributing/02-development.md) for details on how to get started.
+The plugins have a very specific scope by design, and Retina is designed to be extendable, meaning it is easy to add in additional plugins if necessary. If there is a plugin missing for your use case, you can create your own! See our [Development page](../08-Contributing/02-development.md) for details on how to get started.
 
 The plugins are responsible for installing the eBPF programs into the host kernel during startup. These eBPF programs collect metrics from events in the kernel level, which are then passed to the user space where they are parsed and converted into a `flow` data structure. Depending on the Control Plane being used, the data will either be sent to a Retina Enricher, or written to an external channel which is consumed by a Hubble observer - more on this in the [Control Plane](#control-plane) section below. It is not required for a plugin to use eBPF, it can also use syscalls or other API calls. In either case, the plugins will implement the same [interface](https://github.com/microsoft/retina/blob/main/pkg/plugin/registry/registry.go).
 
