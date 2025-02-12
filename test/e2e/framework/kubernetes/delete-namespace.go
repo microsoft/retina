@@ -30,8 +30,7 @@ func (d *DeleteNamespace) Run() error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1200*time.Second)
-	defer cancel()
+	ctx := context.TODO()
 
 	err = clientset.CoreV1().Namespaces().Delete(ctx, d.Namespace, metaV1.DeleteOptions{})
 	if err != nil {

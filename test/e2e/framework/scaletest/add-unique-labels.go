@@ -1,6 +1,7 @@
 package scaletest
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -41,10 +42,12 @@ func (a *AddUniqueLabelsToAllPods) Run() error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	ctx, cancel := contextToLabelAllPods()
-	defer cancel()
+	ctx := context.TODO()
 
 	resources, err := clientset.CoreV1().Pods(a.Namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to list pods: %w", err)
+	}
 
 	count := 0
 

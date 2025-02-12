@@ -6,7 +6,6 @@ provider "registry.opentofu.org/hashicorp/helm" {
   constraints = "2.17.0"
   hashes = [
     "h1:69PnHoYrrDrm7C8+8PiSvRGPI55taqL14SvQR/FGM+g=",
-    "h1:ShIag7wqd5Rs+zYpVMpjAh+T0ozr4XGYfSTKWqceQBY=",
     "zh:02690815e35131a42cb9851f63a3369c216af30ad093d05b39001d43da04b56b",
     "zh:27a62f12b29926387f4d71aeeee9f7ffa0ccb81a1b6066ee895716ad050d1b7a",
     "zh:2d0a5babfa73604b3fefc9dab9c87f91c77fce756c2e32b294e9f1290aed26c0",
@@ -24,7 +23,6 @@ provider "registry.opentofu.org/tehcyx/kind" {
   version     = "0.7.0"
   constraints = "0.7.0"
   hashes = [
-    "h1:9ci1+3JBxvMRZ0pnzoVNmw7NrBCAfzqOPyhm+I8Rxag=",
     "h1:nFhFHmE5+dCd9S9dEMwnMNWzyxoVipYobkhXYoDbhgA=",
     "zh:171a2fb0137bfbdebd56cd65afd2e0e2167315fe4cb6a07a218db40cb17339c3",
     "zh:3260b078b7997ddfd03845326ffaeed7f678eeaaf7918430356f22e299e36f22",
