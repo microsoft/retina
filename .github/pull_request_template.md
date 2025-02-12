@@ -8,7 +8,7 @@ If this pull request is related to any issue, please mention it here. Additional
 
 ## Checklist
 
-- [ ] I have read the [contributing documentation](https://retina.sh/docs/contributing).
+- [ ] I have read the [contributing documentation](https://retina.sh/docs/Contributing/overview).
 - [ ] I signed and signed-off the commits (`git commit -S -s ...`). See [this documentation](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification) on signing commits.
 - [ ] I have correctly attributed the author(s) of the code.
 - [ ] I have tested the changes locally.
