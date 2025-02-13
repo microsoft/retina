@@ -16,8 +16,8 @@ func TestOverwriteDashboards(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(files) == 0 {
-		t.Fatal("No JSON files found")
+	if len(files) != 6 {
+		t.Fatal("Some JSON files are not found or new files have been addedd")
 	}
 
 	for _, file := range files {
