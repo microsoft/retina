@@ -1,0 +1,33 @@
+name: Test Grafana Dashboards
+on:
+  merge_group:
+    types: [checks_requested]
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  deployments: read
+  packages: none
+  pull-requests: write
+  security-events: write
+  issues: write
+
+jobs:
+  test-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 # v5.3.0
+        with:
+          go-version-file: go.mod
+
+      - name: Make Retina Test image
+        run: |
+          make simplify-dashboards-test

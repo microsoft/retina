@@ -11,10 +11,14 @@ import (
 // TestDashboardsAreSimplified ensures that all dashboards are simplified
 func TestDashboardsAreSimplified(t *testing.T) {
 	// get all json's in this folder
-	files, err := filepath.Glob("../../../*/grafana/dashboards/*.json")
+	files, err := filepath.Glob("../../../grafana-dashboards/*.json")
 
 	if err != nil {
 		t.Fatal(err)
+	}
+	
+	if len(files) == 0 {
+		t.Fatal("No JSON files found")
 	}
 
 	for _, file := range files {
