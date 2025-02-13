@@ -28,6 +28,6 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Make Retina Test image
+      - name: Make Simplify Dashboards Test
         run: |
           make simplify-dashboards-test
