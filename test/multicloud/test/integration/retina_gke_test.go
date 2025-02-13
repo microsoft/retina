@@ -21,10 +21,10 @@ func TestRetinaGKEIntegration(t *testing.T) {
 			"machine_type":         "e2-standard-4",
 			"retina_chart_version": utils.RetinaVersion,
 			"retina_values": map[string]interface{}{
-				// Example using a public image built during testing
+				// Example using a public image
 				"image": map[string]interface{}{
-					"tag":        "c17d5ea-linux-amd64",
-					"repository": "acnpublic.azurecr.io/xiaozhiche320/retina/retina-agent",
+					"tag":        "65b6244-linux-amd64",
+					"repository": "ghcr.io/microsoft/retina/retina-agent",
 				},
 				"operator": map[string]interface{}{
 					"tag": utils.RetinaVersion,
@@ -71,9 +71,8 @@ func TestRetinaGKEIntegration(t *testing.T) {
 		t.Fatalf("Retina pods did not start in time: %v\n", err)
 	}
 
-	// TODO: uncomment once the log level for "iface not supported" is changed to WARN
 	// check the retina pods logs for errors
-	// utils.CheckPodLogs(t, clientSet, retinaPodSelector)
+	utils.CheckPodLogs(t, clientSet, retinaPodSelector)
 
 	// TODO: add more tests here
 }
