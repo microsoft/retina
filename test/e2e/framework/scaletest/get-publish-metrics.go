@@ -27,7 +27,7 @@ import (
 const (
 	defaultRetryAttempts = 10
 	defaultRetryDelay    = 3 * time.Second
-	defaultInterval      = 2 * time.Minute
+	defaultInterval      = 10 * time.Minute
 )
 
 type GetAndPublishMetrics struct {
