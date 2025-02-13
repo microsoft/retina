@@ -10,10 +10,14 @@ import (
 // TestOverwriteDashboards simplifies and overwrites Grafana dashboards in deploy folder variants
 func TestOverwriteDashboards(t *testing.T) {
 	// get all json's in various generation deploly folders
-	files, err := filepath.Glob("../../../*/grafana/dashboards/*.json")
+	files, err := filepath.Glob("../../../grafana-dashboards/*.json")
 
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	if len(files) == 0 {
+		t.Fatal("No JSON files found")
 	}
 
 	for _, file := range files {

@@ -593,5 +593,9 @@ quick-deploy-hubble:
 simplify-dashboards:
 	cd deploy/testutils && go test ./... -tags=dashboard,simplifydashboard -v && cd $(REPO_ROOT)
 
+.PHONY: simplify-dashboards-test
+simplify-dashboards-test:
+	cd deploy/testutils && go test ./... -tags=dashboard -v && cd $(REPO_ROOT)
+
 run-perf-test:
 	go test -v ./test/e2e/retina_perf_test.go -timeout 2h -tags=perf -count=1  -args -image-tag=${TAG} -image-registry=${IMAGE_REGISTRY} -image-namespace=${IMAGE_NAMESPACE}
