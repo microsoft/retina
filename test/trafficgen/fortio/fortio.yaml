@@ -1,0 +1,82 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fortio-load
+  namespace: default
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: fortio
+      role: load
+  template:
+    metadata:
+      labels:
+        app: fortio
+        role: load
+    spec:
+      containers:
+        - name: fortio
+          image: fortio/fortio
+          args:
+            [
+              "load",
+              "-c",
+              "125000",
+              "-qps",
+              "0",
+              "-t",
+              "0",
+              "-loglevel",
+              "info",
+              "http://fortio-service:8080",
+            ]
+          ports:
+            - containerPort: 8078 # tcp echo
+            - containerPort: 8079 # grpc echo
+            - containerPort: 8080 # main serving port
+            - containerPort: 8081 # redirection to https port
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fortio-server
+  namespace: default
+spec:
+  replicas: 10
+  selector:
+    matchLabels:
+      app: fortio
+      role: server
+  template:
+    metadata:
+      labels:
+        app: fortio
+        role: server
+    spec:
+      containers:
+        - name: fortio
+          image: fortio/fortio
+          args: ["server", "-ui-path", '\"\"', "-http-port", "8080"]
+          ports:
+            - containerPort: 8078 # tcp echo
+            - containerPort: 8079 # grpc echo
+            - containerPort: 8080 # main serving port
+            - containerPort: 8081 # redirection to https port
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fortio-service
+  namespace: default
+  labels:
+    app: fortio
+spec:
+  selector:
+    role: server
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
