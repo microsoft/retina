@@ -10,7 +10,7 @@ import (
 var (
 	ErrEmptyDescription    = fmt.Errorf("job description is empty")
 	ErrNonNilError         = fmt.Errorf("expected error to be non-nil")
-	ErrNilError            = fmt.Errorf("expected error to be nil")
+	ErrNilError            = fmt.Errorf("test ")
 	ErrMissingParameter    = fmt.Errorf("missing parameter")
 	ErrParameterAlreadySet = fmt.Errorf("parameter already set")
 	ErrOrphanSteps         = fmt.Errorf("background steps with no corresponding stop")
