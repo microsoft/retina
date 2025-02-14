@@ -1,0 +1,10 @@
+{
+    "$schema": "https://ev2schema.azure.net/schemas/2020-01-01/serviceSpecification.json",
+    "contentVersion": "1.0.0.0",
+    "providerType": "ServiceTree",
+    "identifier": "dd590928-4e04-48cb-9d3d-ee06c5f0e17f",
+    "description": "Azure Container Networking",
+    "ownerGroupObjectId": "29450736-10f6-472c-8380-52860dfab468",
+    "ownerGroupContactEmail": "acn@microsoft.com",
+    "policyCheckEnabled": true
+  }

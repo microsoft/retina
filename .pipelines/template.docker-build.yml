@@ -1,0 +1,74 @@
+parameters:
+- name: os
+  type: string
+- name: arch
+  type: string
+- name: retinaOSSRepoName
+  type: string
+- name: target
+  type: string
+  default: ""
+- name: hubbleVersion
+  type: string
+  default: v1.16.5
+- name: registry
+  type: string
+  default: ghcr.io   #ghcr.io
+
+jobs:
+  - job: ${{ parameters.target }}_${{ parameters.os }}_${{ parameters.arch }}_ImageBuild
+    displayName: ${{ parameters.target }} ${{ parameters.os }} ${{ parameters.arch }} Image Build
+    dependsOn: prepare
+    condition: succeeded()
+    pool:
+      type: docker
+      os: ${{ parameters.os }}
+    variables:
+      TAG_VERSION: $[ dependencies.prepare.outputs['setVariables.TAG_VERSION'] ]
+      APP_INSIGHTS_ID: $[ dependencies.prepare.outputs['setVariables.APP_INSIGHTS_ID'] ]
+      ob_git_checkout: true
+      # Enable QEMU for ARM64 builds. https://eng.ms/docs/products/onebranch/build/containerbasedworkflow/dockerimagesandacr/buildarm64containers
+      ${{  if eq(parameters.arch, 'arm64')  }}:
+        ob_enable_qemu: true
+    steps:
+      - task: DownloadPipelineArtifact@2
+        displayName: 'Download Artifacts'
+        inputs:
+          targetPath: $(Build.SourcesDirectory)/dst/drop_build_prepare
+          artifact: drop_build_prepare
+      - task: onebranch.pipeline.imagebuildinfo@1
+        inputs:
+          buildkit: 1
+          repositoryName: retina-${{ parameters.target }}
+          dockerFileContextPath: drop_build_prepare/${{ parameters.retinaOSSRepoName }}
+          registry: ${{ parameters.registry }}
+          compress: true
+          enable_network: true
+          enable_pull: true
+          enable_service_tree_acr_path: false
+          build_tag: $(TAG_VERSION)-${{ parameters.os }}-${{ parameters.arch }}    
+          ${{ if eq(parameters.target, 'agent') }}:
+            dockerFileRelPath: drop_build_prepare/${{ parameters.retinaOSSRepoName }}/controller/Dockerfile 
+            arguments: "--platform ${{ parameters.os }}/${{ parameters.arch }} --build-arg GOOS=${{ parameters.os }} --build-arg GOARCH=${{ parameters.arch }} --build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) --build-arg VERSION=$(TAG_VERSION) --build-arg OS_VERSION=ltsc2019 --target ${{ parameters.target }}"
+            saveImageToPath: retina-${{ parameters.target }}-$(TAG_VERSION)-${{ parameters.os }}-${{ parameters.arch }}.tar.gz
+            saveMetadataToPath: image-metadata-retina-${{ parameters.target }}-$(TAG_VERSION).json
+          ${{ if eq(parameters.target, 'init') }}:
+            dockerFileRelPath: drop_build_prepare/${{ parameters.retinaOSSRepoName }}/controller/Dockerfile 
+            arguments: "--platform ${{ parameters.os }}/${{ parameters.arch }} --build-arg GOOS=${{ parameters.os }} --build-arg GOARCH=${{ parameters.arch }} --build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) --build-arg VERSION=$(TAG_VERSION) --build-arg OS_VERSION=ltsc2019 --target ${{ parameters.target }}"
+            saveImageToPath: retina-${{ parameters.target }}-$(TAG_VERSION)-${{ parameters.os }}-${{ parameters.arch }}.tar.gz
+            saveMetadataToPath: image-metadata-retina-${{ parameters.target }}-$(TAG_VERSION).json
+          ${{ if eq(parameters.target, 'operator') }}:
+            dockerFileRelPath: drop_build_prepare/${{ parameters.retinaOSSRepoName }}/${{ parameters.target }}/Dockerfile
+            arguments: "--platform ${{ parameters.os }}/${{ parameters.arch }} --build-arg GOOS=${{ parameters.os }} --build-arg GOARCH=${{ parameters.arch }} --build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) --build-arg VERSION=$(TAG_VERSION)"
+            saveImageToPath: retina-${{ parameters.target }}-$(TAG_VERSION)-${{ parameters.os }}-${{ parameters.arch }}.tar.gz
+            saveMetadataToPath: image-metadata-retina-${{ parameters.target }}-$(TAG_VERSION).json
+          ${{ if eq(parameters.target, 'shell') }}:
+            dockerFileRelPath: drop_build_prepare/${{ parameters.retinaOSSRepoName }}/${{ parameters.target }}/Dockerfile
+            arguments: "--platform ${{ parameters.os }}/${{ parameters.arch }} --build-arg GOOS=${{ parameters.os }} --build-arg GOARCH=${{ parameters.arch }} --build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) --build-arg VERSION=$(TAG_VERSION)"
+            saveImageToPath: retina-${{ parameters.target }}-$(TAG_VERSION)-${{ parameters.os }}-${{ parameters.arch }}.tar.gz
+            saveMetadataToPath: image-metadata-retina-${{ parameters.target }}-$(TAG_VERSION).json
+          ${{ if eq(parameters.target, 'kubectl') }}:
+            dockerFileRelPath: drop_build_prepare/${{ parameters.retinaOSSRepoName }}/cli/Dockerfile
+            arguments: "--platform ${{ parameters.os }}/${{ parameters.arch }} --build-arg GOOS=${{ parameters.os }} --build-arg GOARCH=${{ parameters.arch }} --build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) --build-arg VERSION=$(TAG_VERSION)"
+            saveImageToPath: ${{ parameters.target }}-retina-$(TAG_VERSION)-${{ parameters.os }}-${{ parameters.arch }}.tar.gz
+            saveMetadataToPath: image-metadata-${{ parameters.target }}-retina-$(TAG_VERSION).json
