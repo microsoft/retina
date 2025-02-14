@@ -16,6 +16,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 )
 
 type Server struct {
@@ -44,6 +45,7 @@ func (rt *Server) SetupHandlers() {
 	exporter.RegisterMetricsServeCallback(func() {
 		rt.servePrometheusMetrics()
 	})
+	rt.serveHealth()
 	rt.mux.HandleFunc("/debug/pprof/", pprof.Index)
 	rt.mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
 	rt.mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
@@ -59,6 +61,10 @@ func (rt *Server) SetupHandlers() {
 
 func (rt *Server) servePrometheusMetrics() {
 	rt.mux.Get("/metrics", promhttp.HandlerFor(exporter.CombinedGatherer, promhttp.HandlerOpts{}).ServeHTTP)
+}
+
+func (rt *Server) serveHealth() {
+	rt.mux.Get("/health", healthz.CheckHandler{Checker: healthz.Ping}.ServeHTTP)
 }
 
 func (rt *Server) Start(ctx context.Context, addr string) error {
