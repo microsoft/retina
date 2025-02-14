@@ -119,7 +119,7 @@ func (v *GetNetworkDeltaResults) Run() error {
 		}
 	}
 
-	var results = make([]DeltaResult, 0, len(regressionResults)+1)
+	results := make([]DeltaResult, 0, len(regressionResults)+1)
 	for _, result := range regressionResults {
 		results = append(results, *result)
 	}
