@@ -90,7 +90,7 @@ func TestE2ERetina_Scale(t *testing.T) {
 	opt.AdditionalTelemetryProperty["clusterFqdn"] = fqdn
 
 	// Install Retina
-	installRetina := types.NewRunner(t, jobs.InstallRetina(common.KubeConfigFilePath(rootDir), common.RetinaChartPath(rootDir)))
+	installRetina := types.NewRunner(t, jobs.InstallRetina(common.KubeConfigFilePath(rootDir), common.RetinaChartPath(rootDir), true))
 	installRetina.Run(ctx)
 
 	scale := types.NewRunner(t, jobs.ScaleTest(&opt))
