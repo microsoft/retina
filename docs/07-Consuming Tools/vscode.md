@@ -1,4 +1,4 @@
-# Retina Integration in AKS VS Code Extension
+# AKS VS Code Extension
 
 ## Overview
 
