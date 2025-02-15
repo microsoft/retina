@@ -34,6 +34,13 @@ const (
 	// Common Gauges across os distributions
 	NodeConnectivityStatusName         = "node_connectivity_status"
 	NodeConnectivityLatencySecondsName = "node_connectivity_latency_seconds"
+
+	// Conntrack
+	ConntrackPacketsForwardGaugeName = "conntrack_packets_forward"
+	ConntrackPacketsReplyGaugeName   = "conntrack_packets_reply"
+	ConntrackBytesForwardGaugeName   = "conntrack_bytes_forward"
+	ConntrackBytesReplyGaugeName     = "conntrack_bytes_reply"
+	ConntrackTotalConnectionsName    = "conntrack_total_connections"
 )
 
 // IsAdvancedMetric is a helper function to determine if a name is an advanced metric
