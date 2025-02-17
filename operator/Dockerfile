@@ -7,7 +7,7 @@ ARG APP_INSIGHTS_ID
 WORKDIR /workspace
 COPY . .
 
-# Install jq
+# Install jq since the ADO agent doesn't have it.
 RUN tdnf install -y jq
 
 # Default linux/architecture.

@@ -183,7 +183,7 @@ retina-capture-workload: ## build the Retina capture workload
 
 ##@ Containers
 
-IMAGE_REGISTRY	?= ghcr.io
+IMAGE_REGISTRY	?= acnpublic.azurecr.io
 IMAGE_NAMESPACE ?= $(shell git config --get remote.origin.url | sed -E 's/.*github\.com[\/:]([^\/]+)\/([^\/.]+)(.git)?/\1\/\2/' | tr '[:upper:]' '[:lower:]')
 
 RETINA_BUILDER_IMAGE			= $(IMAGE_NAMESPACE)/retina-builder
@@ -461,8 +461,8 @@ helm-install-with-operator: manifests
 		--namespace kube-system \
 		--set image.repository=$(IMAGE_REGISTRY)/$(RETINA_IMAGE) \
 		--set image.initRepository=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE) \
-		--set image.tag=$(HELM_IMAGE_TAG) \
-		--set operator.tag=$(HELM_IMAGE_TAG) \
+		--set image.tag=4670946 \
+		--set operator.tag=4670946 \
 		--set image.pullPolicy=Always \
 		--set logLevel=info \
 		--set os.windows=true \
