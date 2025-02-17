@@ -1,7 +1,6 @@
 module github.com/microsoft/retina/hack/tools
 
 go 1.22.1
-
 toolchain go1.23.4
 
 require (
