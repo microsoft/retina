@@ -44,5 +44,8 @@ linters-settings:
     - "performance"
     disabled-checks:
     - "hugeParam"
+  govet:
+    enable:
+    - shadow
   lll:
     line-length: 200
