@@ -11,14 +11,14 @@ import (
 	"time"
 
 	hubblev1 "github.com/cilium/cilium/pkg/hubble/api/v1"
+	lru "github.com/hashicorp/golang-lru/v2"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/plugin/registry"
+	"github.com/pkg/errors"
 	"github.com/safchain/ethtool"
 	"go.uber.org/zap"
 )
-
-const defaultLimit = 2000
 
 func init() {
 	registry.Add(name, New)
@@ -61,6 +61,14 @@ func (lu *linuxUtil) SetupChannel(chan *hubblev1.Event) error {
 
 func (lu *linuxUtil) run(ctx context.Context) error {
 	lu.l.Info("Running linuxutil plugin...")
+
+	// create a LRU cache to skip unsupported interfaces
+	unsupportedInterfacesCache, err := lru.New[string, struct{}](int(defaultLimit))
+	if err != nil {
+		lu.l.Error("failed to create global LRU cache", zap.Error(err))
+		return err
+	}
+
 	ticker := time.NewTicker(lu.cfg.MetricsInterval)
 	defer ticker.Stop()
 
@@ -93,20 +101,20 @@ func (lu *linuxUtil) run(ctx context.Context) error {
 			ethtoolOpts := &EthtoolOpts{
 				errOrDropKeysOnly: true,
 				addZeroVal:        false,
-				limit:             defaultLimit,
 			}
 
 			ethHandle, err := ethtool.NewEthtool()
 			if err != nil {
 				lu.l.Error("Error while creating ethHandle: %v\n", zap.Error(err))
-				return err
+				return fmt.Errorf("failed to create ethHandle: %w", err)
 			}
 
-			ethReader := NewEthtoolReader(ethtoolOpts, ethHandle)
+			ethReader := NewEthtoolReader(ethtoolOpts, ethHandle, unsupportedInterfacesCache)
 			if ethReader == nil {
 				lu.l.Error("Error while creating ethReader")
-				return fmt.Errorf("error while creating ethReader")
+				return errors.New("error while creating ethReader")
 			}
+
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -117,6 +125,7 @@ func (lu *linuxUtil) run(ctx context.Context) error {
 			}()
 
 			wg.Wait()
+			ethHandle.Close()
 		}
 	}
 }

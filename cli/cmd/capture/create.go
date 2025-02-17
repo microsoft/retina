@@ -6,7 +6,9 @@ package capture
 import (
 	"context"
 	"fmt"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
@@ -118,12 +120,15 @@ var createCapture = &cobra.Command{
 			return errors.Wrap(err, "failed to initialize kubernetes client")
 		}
 
-		capture, err := createCaptureF(kubeClient)
+		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
+		defer cancel()
+
+		capture, err := createCaptureF(ctx, kubeClient)
 		if err != nil {
 			return err
 		}
 
-		jobsCreated, err := createJobs(kubeClient, capture)
+		jobsCreated, err := createJobs(ctx, kubeClient, capture)
 		if err != nil {
 			retinacmd.Logger.Error("Failed to create job", zap.Error(err))
 			return err
@@ -144,23 +149,23 @@ var createCapture = &cobra.Command{
 		// let the customer recycle them.
 		retinacmd.Logger.Info("Waiting for capture jobs to finish")
 
-		allJobsCompleted := waitUntilJobsComplete(kubeClient, jobsCreated)
+		allJobsCompleted := waitUntilJobsComplete(ctx, kubeClient, jobsCreated)
 
 		// Delete all jobs created only if they all completed, otherwise keep the jobs for debugging.
 		if allJobsCompleted {
 			retinacmd.Logger.Info("Deleting jobs as all jobs are completed")
-			jobsFailedToDelete := deleteJobs(kubeClient, jobsCreated)
+			jobsFailedToDelete := deleteJobs(ctx, kubeClient, jobsCreated)
 			if len(jobsFailedToDelete) != 0 {
 				retinacmd.Logger.Info("Please manually delete capture jobs failed to delete", zap.String("namespace", *opts.Namespace), zap.String("job list", strings.Join(jobsFailedToDelete, ",")))
 			}
 
-			err = deleteSecret(kubeClient, capture.Spec.OutputConfiguration.BlobUpload)
+			err = deleteSecret(ctx, kubeClient, capture.Spec.OutputConfiguration.BlobUpload)
 			if err != nil {
 				retinacmd.Logger.Error("Failed to delete capture secret, please manually delete it",
 					zap.String("namespace", *opts.Namespace), zap.String("secret name", *capture.Spec.OutputConfiguration.BlobUpload), zap.Error(err))
 			}
 
-			err = deleteSecret(kubeClient, &capture.Spec.OutputConfiguration.S3Upload.SecretName)
+			err = deleteSecret(ctx, kubeClient, &capture.Spec.OutputConfiguration.S3Upload.SecretName)
 			if err != nil {
 				retinacmd.Logger.Error("Failed to delete capture secret, please manually delete it",
 					zap.String("namespace", *opts.Namespace),
@@ -177,11 +182,11 @@ var createCapture = &cobra.Command{
 
 		retinacmd.Logger.Info("Not all job are completed in the given time")
 		retinacmd.Logger.Info("Please manually delete the Capture")
-		return getCaptureAndPrintCaptureResult(kubeClient, capture.Name, *opts.Namespace)
+		return getCaptureAndPrintCaptureResult(ctx, kubeClient, capture.Name, *opts.Namespace)
 	},
 }
 
-func createSecretFromBlobUpload(kubeClient kubernetes.Interface, blobUpload, captureName string) (string, error) {
+func createSecretFromBlobUpload(ctx context.Context, kubeClient kubernetes.Interface, blobUpload, captureName string) (string, error) {
 	if blobUpload == "" {
 		return "", nil
 	}
@@ -196,14 +201,14 @@ func createSecretFromBlobUpload(kubeClient kubernetes.Interface, blobUpload, cap
 			captureConstants.CaptureOutputLocationBlobUploadSecretKey: []byte(blobUpload),
 		},
 	}
-	secret, err := kubeClient.CoreV1().Secrets(*opts.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+	secret, err := kubeClient.CoreV1().Secrets(*opts.Namespace).Create(ctx, secret, metav1.CreateOptions{})
 	if err != nil {
 		return "", err
 	}
 	return secret.Name, nil
 }
 
-func createSecretFromS3Upload(kubeClient kubernetes.Interface, s3AccessKeyID, s3SecretAccessKey, captureName string) (string, error) {
+func createSecretFromS3Upload(ctx context.Context, kubeClient kubernetes.Interface, s3AccessKeyID, s3SecretAccessKey, captureName string) (string, error) {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: captureConstants.CaptureOutputLocationS3UploadSecretName,
@@ -215,22 +220,22 @@ func createSecretFromS3Upload(kubeClient kubernetes.Interface, s3AccessKeyID, s3
 			captureConstants.CaptureOutputLocationS3UploadSecretAccessKey: []byte(s3SecretAccessKey),
 		},
 	}
-	secret, err := kubeClient.CoreV1().Secrets(*opts.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+	secret, err := kubeClient.CoreV1().Secrets(*opts.Namespace).Create(ctx, secret, metav1.CreateOptions{})
 	if err != nil {
 		return "", fmt.Errorf("failed to create s3 upload secret: %w", err)
 	}
 	return secret.Name, nil
 }
 
-func deleteSecret(kubeClient kubernetes.Interface, secretName *string) error {
+func deleteSecret(ctx context.Context, kubeClient kubernetes.Interface, secretName *string) error {
 	if secretName == nil {
 		return nil
 	}
 
-	return kubeClient.CoreV1().Secrets(*opts.Namespace).Delete(context.TODO(), *secretName, metav1.DeleteOptions{}) //nolint:wrapcheck //internal return
+	return kubeClient.CoreV1().Secrets(*opts.Namespace).Delete(ctx, *secretName, metav1.DeleteOptions{}) //nolint:wrapcheck //internal return
 }
 
-func createCaptureF(kubeClient kubernetes.Interface) (*retinav1alpha1.Capture, error) {
+func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*retinav1alpha1.Capture, error) {
 	capture := &retinav1alpha1.Capture{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      *opts.Name,
@@ -319,7 +324,7 @@ func createCaptureF(kubeClient kubernetes.Interface) (*retinav1alpha1.Capture, e
 
 	if len(blobUpload) != 0 {
 		// Mount blob url as secret onto the capture pod for security concern if blob url is not empty.
-		secretName, err := createSecretFromBlobUpload(kubeClient, blobUpload, *opts.Name)
+		secretName, err := createSecretFromBlobUpload(ctx, kubeClient, blobUpload, *opts.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -327,7 +332,7 @@ func createCaptureF(kubeClient kubernetes.Interface) (*retinav1alpha1.Capture, e
 	}
 
 	if s3Bucket != "" {
-		secretName, err := createSecretFromS3Upload(kubeClient, s3AccessKeyID, s3SecretAccessKey, *opts.Name)
+		secretName, err := createSecretFromS3Upload(ctx, kubeClient, s3AccessKeyID, s3SecretAccessKey, *opts.Name)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create s3 upload secret: %w", err)
 		}
@@ -367,16 +372,16 @@ func getCLICaptureConfig() config.CaptureConfig {
 	}
 }
 
-func createJobs(kubeClient kubernetes.Interface, capture *retinav1alpha1.Capture) ([]batchv1.Job, error) {
+func createJobs(ctx context.Context, kubeClient kubernetes.Interface, capture *retinav1alpha1.Capture) ([]batchv1.Job, error) {
 	translator := pkgcapture.NewCaptureToPodTranslator(kubeClient, retinacmd.Logger, getCLICaptureConfig())
-	jobs, err := translator.TranslateCaptureToJobs(capture)
+	jobs, err := translator.TranslateCaptureToJobs(ctx, capture)
 	if err != nil {
 		return nil, err
 	}
 
 	jobsCreated := []batchv1.Job{}
 	for _, job := range jobs {
-		jobCreated, err := kubeClient.BatchV1().Jobs(*opts.Namespace).Create(context.TODO(), job, metav1.CreateOptions{})
+		jobCreated, err := kubeClient.BatchV1().Jobs(*opts.Namespace).Create(ctx, job, metav1.CreateOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -386,7 +391,7 @@ func createJobs(kubeClient kubernetes.Interface, capture *retinav1alpha1.Capture
 	return jobsCreated, nil
 }
 
-func waitUntilJobsComplete(kubeClient kubernetes.Interface, jobs []batchv1.Job) bool {
+func waitUntilJobsComplete(ctx context.Context, kubeClient kubernetes.Interface, jobs []batchv1.Job) bool {
 	allJobsCompleted := false
 
 	// TODO: let's make the timeout and period to wait for all job to finish configurable.
@@ -402,7 +407,7 @@ func waitUntilJobsComplete(kubeClient kubernetes.Interface, jobs []batchv1.Job) 
 	}
 	retinacmd.Logger.Info(fmt.Sprintf("Waiting timeout is set to %s", deadline))
 
-	ctx, cancel := context.WithTimeout(context.TODO(), deadline)
+	ctx, cancel := context.WithTimeout(ctx, deadline)
 	defer cancel()
 
 	wait.JitterUntil(func() {
@@ -410,7 +415,7 @@ func waitUntilJobsComplete(kubeClient kubernetes.Interface, jobs []batchv1.Job) 
 		jobsIncompleted := []string{}
 
 		for _, job := range jobs {
-			jobRet, err := kubeClient.BatchV1().Jobs(job.Namespace).Get(context.TODO(), job.Name, metav1.GetOptions{})
+			jobRet, err := kubeClient.BatchV1().Jobs(job.Namespace).Get(ctx, job.Name, metav1.GetOptions{})
 			if err != nil {
 				retinacmd.Logger.Error("Failed to get job", zap.String("namespace", job.Namespace), zap.String("job name", job.Name), zap.Error(err))
 				jobsIncompleted = append(jobsIncompleted, job.Name)
@@ -439,13 +444,13 @@ func waitUntilJobsComplete(kubeClient kubernetes.Interface, jobs []batchv1.Job) 
 	return allJobsCompleted
 }
 
-func deleteJobs(kubeClient kubernetes.Interface, jobs []batchv1.Job) []string {
+func deleteJobs(ctx context.Context, kubeClient kubernetes.Interface, jobs []batchv1.Job) []string {
 	jobsFailedtoDelete := []string{}
 	for _, job := range jobs {
 		// Child pods are preserved by default when jobs are deleted, we need to set propagationPolicy=Background to
 		// remove them.
 		deletePropagationBackground := metav1.DeletePropagationBackground
-		err := kubeClient.BatchV1().Jobs(job.Namespace).Delete(context.TODO(), job.Name, metav1.DeleteOptions{
+		err := kubeClient.BatchV1().Jobs(job.Namespace).Delete(ctx, job.Name, metav1.DeleteOptions{
 			PropagationPolicy: &deletePropagationBackground,
 		})
 		if err != nil {

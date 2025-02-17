@@ -26,7 +26,7 @@ import (
 
 const (
 	defaultRetryAttempts = 10
-	defaultRetryDelay    = 500 * time.Millisecond
+	defaultRetryDelay    = 3 * time.Second
 	defaultInterval      = 2 * time.Minute
 )
 
@@ -136,8 +136,7 @@ func (g *GetAndPublishMetrics) Prevalidate() error {
 
 func (g *GetAndPublishMetrics) getAndPublishMetrics() error {
 
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeoutSeconds*time.Second)
-	defer cancel()
+	ctx := context.TODO()
 
 	labelSelector := labels.Set(g.Labels).String()
 

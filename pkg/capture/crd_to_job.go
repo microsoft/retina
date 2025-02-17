@@ -109,7 +109,7 @@ func NewCaptureToPodTranslator(kubeClient kubernetes.Interface, logger *log.ZapL
 	return captureToPodTranslator
 }
 
-func (translator *CaptureToPodTranslator) initJobTemplate(capture *retinav1alpha1.Capture) error {
+func (translator *CaptureToPodTranslator) initJobTemplate(ctx context.Context, capture *retinav1alpha1.Capture) error {
 	backoffLimit := int32(0)
 	// NOTE(mainred): We allow the capture pod to run for at most 30 minutes before being deleted to ensure the output is
 	// uploaded, and this happens when the user want to stop a capture on demand by deleting the capture.
@@ -223,7 +223,7 @@ func (translator *CaptureToPodTranslator) initJobTemplate(capture *retinav1alpha
 
 	if capture.Spec.OutputConfiguration.BlobUpload != nil && *capture.Spec.OutputConfiguration.BlobUpload != "" {
 		translator.l.Info("BlobUpload is not empty")
-		secret, err := translator.kubeClient.CoreV1().Secrets(capture.Namespace).Get(context.Background(), *capture.Spec.OutputConfiguration.BlobUpload, metav1.GetOptions{})
+		secret, err := translator.kubeClient.CoreV1().Secrets(capture.Namespace).Get(ctx, *capture.Spec.OutputConfiguration.BlobUpload, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			err := SecretNotFoundError{SecretName: *capture.Spec.OutputConfiguration.BlobUpload, Namespace: capture.Namespace}
 			translator.l.Error(err.Error())
@@ -255,7 +255,7 @@ func (translator *CaptureToPodTranslator) initJobTemplate(capture *retinav1alpha
 
 	if capture.Spec.OutputConfiguration.S3Upload != nil && capture.Spec.OutputConfiguration.S3Upload.SecretName != "" {
 		translator.l.Info("S3Upload is not empty")
-		secret, err := translator.kubeClient.CoreV1().Secrets(capture.Namespace).Get(context.Background(), capture.Spec.OutputConfiguration.S3Upload.SecretName, metav1.GetOptions{})
+		secret, err := translator.kubeClient.CoreV1().Secrets(capture.Namespace).Get(ctx, capture.Spec.OutputConfiguration.S3Upload.SecretName, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			err := SecretNotFoundError{SecretName: capture.Spec.OutputConfiguration.S3Upload.SecretName, Namespace: capture.Namespace}
 			translator.l.Error(err.Error())
@@ -288,7 +288,7 @@ func (translator *CaptureToPodTranslator) initJobTemplate(capture *retinav1alpha
 	if capture.Spec.OutputConfiguration.PersistentVolumeClaim != nil && *capture.Spec.OutputConfiguration.PersistentVolumeClaim != "" {
 		translator.l.Info("PersistentVolumeClaim is not empty", zap.String("PersistentVolumeClaim", *capture.Spec.OutputConfiguration.PersistentVolumeClaim))
 
-		_, err := translator.kubeClient.CoreV1().PersistentVolumeClaims(capture.Namespace).Get(context.TODO(), *capture.Spec.OutputConfiguration.PersistentVolumeClaim, metav1.GetOptions{})
+		_, err := translator.kubeClient.CoreV1().PersistentVolumeClaims(capture.Namespace).Get(ctx, *capture.Spec.OutputConfiguration.PersistentVolumeClaim, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to get pvc %s/%s", capture.Namespace, *capture.Spec.OutputConfiguration.PersistentVolumeClaim)
 		}
@@ -314,7 +314,7 @@ func (translator *CaptureToPodTranslator) initJobTemplate(capture *retinav1alpha
 
 // validateNoRunningWindowsCapture checks if there's any running capture jobs on the Windows to deploy capture.
 // Windows node allows only one capture job running for only one tracing session is allowed at one time.
-func (translator *CaptureToPodTranslator) validateNoRunningWindowsCapture(captureTargetOnNode *CaptureTargetsOnNode) error {
+func (translator *CaptureToPodTranslator) validateNoRunningWindowsCapture(ctx context.Context, captureTargetOnNode *CaptureTargetsOnNode) error {
 	// map is easy for removing duplication.
 	windowsNodesRunningCapture := map[string]struct{}{}
 	capturePodSelector := &metav1.LabelSelector{
@@ -324,7 +324,7 @@ func (translator *CaptureToPodTranslator) validateNoRunningWindowsCapture(captur
 	podListOpt := metav1.ListOptions{
 		LabelSelector: labelSelector.String(),
 	}
-	podList, err := translator.kubeClient.CoreV1().Pods("").List(context.TODO(), podListOpt)
+	podList, err := translator.kubeClient.CoreV1().Pods("").List(ctx, podListOpt)
 	if err != nil {
 		translator.l.Error("Failed to list capture Pods", zap.String("podSelector", capturePodSelector.String()), zap.Error(err))
 		return err
@@ -349,15 +349,15 @@ func (translator *CaptureToPodTranslator) validateNoRunningWindowsCapture(captur
 	return nil
 }
 
-func (translator *CaptureToPodTranslator) TranslateCaptureToJobs(capture *retinav1alpha1.Capture) ([]*batchv1.Job, error) {
+func (translator *CaptureToPodTranslator) TranslateCaptureToJobs(ctx context.Context, capture *retinav1alpha1.Capture) ([]*batchv1.Job, error) {
 	if err := translator.validateCapture(capture); err != nil {
 		return nil, err
 	}
 
-	if err := translator.initJobTemplate(capture); err != nil {
+	if err := translator.initJobTemplate(ctx, capture); err != nil {
 		return nil, err
 	}
-	captureTargetOnNode, err := translator.CalculateCaptureTargetsOnNode(capture.Spec.CaptureConfiguration.CaptureTarget)
+	captureTargetOnNode, err := translator.CalculateCaptureTargetsOnNode(ctx, capture.Spec.CaptureConfiguration.CaptureTarget)
 	if err != nil {
 		return nil, err
 	}
@@ -570,16 +570,16 @@ func (translator *CaptureToPodTranslator) validateCapture(capture *retinav1alpha
 	return nil
 }
 
-func (translator *CaptureToPodTranslator) getCaptureTargetsOnNode(captureTarget retinav1alpha1.CaptureTarget) (*CaptureTargetsOnNode, error) {
+func (translator *CaptureToPodTranslator) getCaptureTargetsOnNode(ctx context.Context, captureTarget retinav1alpha1.CaptureTarget) (*CaptureTargetsOnNode, error) {
 	var err error
 	captureTargetsOnNode := &CaptureTargetsOnNode{}
 	if captureTarget.NodeSelector != nil {
-		if captureTargetsOnNode, err = translator.calculateCaptureTargetsByNodeSelector(captureTarget); err != nil {
+		if captureTargetsOnNode, err = translator.calculateCaptureTargetsByNodeSelector(ctx, captureTarget); err != nil {
 			return nil, err
 		}
 	}
 	if captureTarget.PodSelector != nil {
-		if captureTargetsOnNode, err = translator.calculateCaptureTargetsByPodSelector(captureTarget); err != nil {
+		if captureTargetsOnNode, err = translator.calculateCaptureTargetsByPodSelector(ctx, captureTarget); err != nil {
 			return nil, err
 		}
 	}
@@ -590,7 +590,7 @@ func (translator *CaptureToPodTranslator) getCaptureTargetsOnNode(captureTarget 
 	return captureTargetsOnNode, nil
 }
 
-func (translator *CaptureToPodTranslator) updateCaptureTargetsOSOnNode(captureTargetsOnNode *CaptureTargetsOnNode) error {
+func (translator *CaptureToPodTranslator) updateCaptureTargetsOSOnNode(ctx context.Context, captureTargetsOnNode *CaptureTargetsOnNode) error {
 	nodeNames := []string{}
 	for nodeName := range *captureTargetsOnNode {
 		nodeNames = append(nodeNames, nodeName)
@@ -607,7 +607,7 @@ func (translator *CaptureToPodTranslator) updateCaptureTargetsOSOnNode(captureTa
 	nodeListOpt := metav1.ListOptions{
 		LabelSelector: labelSelector.String(),
 	}
-	nodeList, err := translator.kubeClient.CoreV1().Nodes().List(context.TODO(), nodeListOpt)
+	nodeList, err := translator.kubeClient.CoreV1().Nodes().List(ctx, nodeListOpt)
 	if err != nil {
 		return err
 	}
@@ -619,27 +619,27 @@ func (translator *CaptureToPodTranslator) updateCaptureTargetsOSOnNode(captureTa
 }
 
 // CalculateCaptureTargetsOnNode returns capture target on each node.
-func (translator *CaptureToPodTranslator) CalculateCaptureTargetsOnNode(captureTarget retinav1alpha1.CaptureTarget) (*CaptureTargetsOnNode, error) {
+func (translator *CaptureToPodTranslator) CalculateCaptureTargetsOnNode(ctx context.Context, captureTarget retinav1alpha1.CaptureTarget) (*CaptureTargetsOnNode, error) {
 	if err := translator.validateTargetSelector(captureTarget); err != nil {
 		return nil, err
 	}
 
-	captureTargetsOnNode, err := translator.getCaptureTargetsOnNode(captureTarget)
+	captureTargetsOnNode, err := translator.getCaptureTargetsOnNode(ctx, captureTarget)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := translator.updateCaptureTargetsOSOnNode(captureTargetsOnNode); err != nil {
+	if err := translator.updateCaptureTargetsOSOnNode(ctx, captureTargetsOnNode); err != nil {
 		return nil, err
 	}
 
-	if err := translator.validateNoRunningWindowsCapture(captureTargetsOnNode); err != nil {
+	if err := translator.validateNoRunningWindowsCapture(ctx, captureTargetsOnNode); err != nil {
 		return nil, err
 	}
 	return captureTargetsOnNode, nil
 }
 
-func (translator *CaptureToPodTranslator) calculateCaptureTargetsByNodeSelector(captureTarget retinav1alpha1.CaptureTarget) (*CaptureTargetsOnNode, error) {
+func (translator *CaptureToPodTranslator) calculateCaptureTargetsByNodeSelector(ctx context.Context, captureTarget retinav1alpha1.CaptureTarget) (*CaptureTargetsOnNode, error) {
 	captureTargetOnNode := &CaptureTargetsOnNode{}
 	labelSelector, err := labels.Parse(metav1.FormatLabelSelector(captureTarget.NodeSelector))
 	if err != nil {
@@ -649,7 +649,7 @@ func (translator *CaptureToPodTranslator) calculateCaptureTargetsByNodeSelector(
 	nodeListOpt := metav1.ListOptions{
 		LabelSelector: labelSelector.String(),
 	}
-	nodeList, err := translator.kubeClient.CoreV1().Nodes().List(context.TODO(), nodeListOpt)
+	nodeList, err := translator.kubeClient.CoreV1().Nodes().List(ctx, nodeListOpt)
 	if err != nil {
 		translator.l.Error("Failed to list node", zap.String("nodeSelector", fmt.Sprint(captureTarget.NodeSelector.String())), zap.Error(err))
 		return nil, err
@@ -660,7 +660,7 @@ func (translator *CaptureToPodTranslator) calculateCaptureTargetsByNodeSelector(
 	return captureTargetOnNode, nil
 }
 
-func (translator *CaptureToPodTranslator) calculateCaptureTargetsByPodSelector(captureTarget retinav1alpha1.CaptureTarget) (*CaptureTargetsOnNode, error) {
+func (translator *CaptureToPodTranslator) calculateCaptureTargetsByPodSelector(ctx context.Context, captureTarget retinav1alpha1.CaptureTarget) (*CaptureTargetsOnNode, error) {
 	captureTargetOnNode := &CaptureTargetsOnNode{}
 	nsList := &corev1.NamespaceList{Items: []corev1.Namespace{
 		{
@@ -680,7 +680,7 @@ func (translator *CaptureToPodTranslator) calculateCaptureTargetsByPodSelector(c
 		nsListOpt := metav1.ListOptions{
 			LabelSelector: labelSelector.String(),
 		}
-		nsList, err = translator.kubeClient.CoreV1().Namespaces().List(context.TODO(), nsListOpt)
+		nsList, err = translator.kubeClient.CoreV1().Namespaces().List(ctx, nsListOpt)
 		if err != nil {
 			translator.l.Error("Failed to list Namespace", zap.String("namespaceSelector", captureTarget.NamespaceSelector.String()), zap.Error(err))
 			return nil, err
@@ -692,7 +692,7 @@ func (translator *CaptureToPodTranslator) calculateCaptureTargetsByPodSelector(c
 		podListOpt := metav1.ListOptions{
 			LabelSelector: labelSelector.String(),
 		}
-		podList, err := translator.kubeClient.CoreV1().Pods(ns.Name).List(context.TODO(), podListOpt)
+		podList, err := translator.kubeClient.CoreV1().Pods(ns.Name).List(ctx, podListOpt)
 		if err != nil {
 			translator.l.Error("Failed to list Pod.", zap.String("podSelector", captureTarget.PodSelector.String()), zap.Error(err))
 			return nil, err

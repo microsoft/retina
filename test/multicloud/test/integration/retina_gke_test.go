@@ -15,24 +15,21 @@ func TestRetinaGKEIntegration(t *testing.T) {
 		TerraformDir: utils.ExamplesPath + "integration/retina-gke",
 
 		Vars: map[string]interface{}{
-			"prefix":         "test",
-			"location":       "europe-west2", // London
-			"project":        "mc-retina",    // TODO: replace with actual project once we get gcloud access
-			"machine_type":   "e2-standard-4",
-			"retina_version": utils.RetinaVersion,
-			"values": []map[string]interface{}{
-				{
-					"name":  "logLevel",
-					"value": "info",
+			"prefix":               "test",
+			"location":             "europe-west2", // London
+			"project":              "mc-retina",    // TODO: replace with actual project once we get gcloud access
+			"machine_type":         "e2-standard-4",
+			"retina_chart_version": utils.RetinaVersion,
+			"retina_values": map[string]interface{}{
+				// Example using a public image
+				"image": map[string]interface{}{
+					"tag":        "65b6244-linux-amd64",
+					"repository": "ghcr.io/microsoft/retina/retina-agent",
 				},
-				{
-					"name":  "operator.tag",
-					"value": utils.RetinaVersion,
+				"operator": map[string]interface{}{
+					"tag": utils.RetinaVersion,
 				},
-				{
-					"name":  "image.tag",
-					"value": utils.RetinaVersion,
-				},
+				"logLevel": "info",
 			},
 		},
 	}
