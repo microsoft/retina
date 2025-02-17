@@ -40,7 +40,7 @@ func (v *PublishPerfResults) Run() error {
 		return errors.Wrap(err, "failed to read results file")
 	}
 
-	var results []RegressionResult
+	var results []DeltaResult
 	err = json.Unmarshal(resultBytes, &results)
 	if err != nil {
 		return errors.Wrap(err, "failed to unmarshal results")
@@ -68,9 +68,9 @@ func (v *PublishPerfResults) Run() error {
 
 	fmt.Printf("Sending telemetry data to app insights\n")
 	for _, result := range results {
-		publishResultEvent(telemetryClient, result.Label, "benchmark", result.Benchmark)
+		publishResultEvent(telemetryClient, result.Label, "baseline", result.Baseline)
 		publishResultEvent(telemetryClient, result.Label, "result", result.Result)
-		publishResultEvent(telemetryClient, result.Label, "regression", result.Regressions)
+		publishResultEvent(telemetryClient, result.Label, "delta", result.Deltas)
 	}
 	return nil
 }
