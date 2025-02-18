@@ -140,8 +140,8 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum (rate(networkobservability_dns_request_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query_type) > 0",
-          "legendFormat": "{{query_type}}",
+          "expr": "sum (rate(hubble_dns_queries_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (qtypes) > 0",
+          "legendFormat": "{{qtypes}}",
           "range": true,
           "refId": "A"
         }
@@ -230,8 +230,8 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum (rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query_type) > 0",
-          "legendFormat": "{{query_type}}",
+          "expr": "sum (rate(hubble_dns_queries_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (qtypes) > 0",
+          "legendFormat": "{{qtypes}}",
           "range": true,
           "refId": "A"
         }
@@ -320,8 +320,8 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "(\r\n    1 - (\r\n        sum (networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\"}) by (query_type) / sum (networkobservability_dns_request_count{cluster=\"$cluster\", instance=~\"$Nodes\"}) by (query_type)\r\n    )\r\n) * 100 * (\r\n    (\r\n        sum (rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query_type)\r\n    ) > bool 0\r\n) > 0",
-          "legendFormat": "{{query_type}}",
+          "expr": "(\r\n    1 - (\r\n        sum (hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\"}) by (qtypes) / sum (hubble_dns_queries_total{cluster=\"$cluster\", instance=~\"$Nodes\"}) by (qtypes)\r\n    )\r\n) * 100 * (\r\n    (\r\n        sum (rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (qtypes)\r\n    ) > bool 0\r\n) > 0",
+          "legendFormat": "{{qtypes}}",
           "range": true,
           "refId": "A"
         }
@@ -414,8 +414,8 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\", return_code=\"NoError\"}[$__rate_interval])) by (num_response) > 0",
-          "legendFormat": "{{num_response}}",
+          "expr": "sum(rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\", rcode=\"No Error\"}[$__rate_interval])) by (ips_returned) > 0",
+          "legendFormat": "{{ips_returned}}",
           "range": true,
           "refId": "A"
         }
@@ -504,8 +504,8 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "label_replace(\r\n    label_replace(\r\n        sum by (return_code, query_type) (\r\n            rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\", return_code!=\"NoError\"}[$__rate_interval])\r\n        ) > 0, \"return_code\", \"non-existent domain\", \"return_code\", \"nxdomain\"\r\n    ), \"return_code\", \"server failure\", \"return_code\", \"servfail\"\r\n)",
-          "legendFormat": "{{return_code}} ({{query_type}})",
+          "expr": "label_replace(\r\n    label_replace(\r\n        sum by (rcode, qtypes) (\r\n            rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\", rcode!=\"NoError\"}[$__rate_interval])\r\n        ) > 0, \"rcode\", \"non-existent domain\", \"rcode\", \"nxdomain\"\r\n    ), \"rcode\", \"server failure\", \"rcode\", \"servfail\"\r\n)",
+          "legendFormat": "{{rcode}} ({{qtypes}})",
           "range": true,
           "refId": "A"
         }
@@ -599,9 +599,9 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "round(topk(10, sum (60*rate(networkobservability_dns_request_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query, query_type)), 1)",
+          "expr": "round(topk(10, sum (60*rate(hubble_dns_queries_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query, qtypes)), 1)",
           "interval": "",
-          "legendFormat": "{{query}} ({{query_type}})",
+          "legendFormat": "{{query}} ({{qtypes}})",
           "range": true,
           "refId": "A"
         }
@@ -694,9 +694,9 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "round(topk(10, sum (60*rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query, query_type)), 1)",
+          "expr": "round(topk(10, sum (60*rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query, qtypes)), 1)",
           "interval": "",
-          "legendFormat": "{{query}} ({{query_type}})",
+          "legendFormat": "{{query}} ({{qtypes}})",
           "range": true,
           "refId": "A"
         }
@@ -775,7 +775,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "label_replace(\r\n  label_replace(\r\n      sum by (query, query_type, response, return_code) (\r\n        60*rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\", num_response!=\"0\", response!=\"\"}[$__rate_interval])\r\n      ), \"return_code\", \"non-existent domain\", \"return_code\", \"nxdomain\"\r\n  ), \"return_code\", \"success\", \"return_code\", \"noerror\"\r\n)",
+          "expr": "label_replace(\r\n  label_replace(\r\n      sum by (query, qtypes, response, rcode) (\r\n        60*rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\", ips_returned!=\"0\"}[$__rate_interval])\r\n      ), \"rcode\", \"non-existent domain\", \"rcode\", \"nxdomain\"\r\n  ), \"rcode\", \"success\", \"rcode\", \"noerror\"\r\n)",
           "instant": true,
           "interval": "",
           "legendFormat": "__auto",
@@ -789,11 +789,11 @@
           "id": "labelsToFields",
           "options": {
             "keepLabels": [
-              "num_response",
+              "ips_returned",
               "query",
-              "query_type",
+              "qtypes",
               "response",
-              "return_code"
+              "rcode"
             ]
           }
         },
@@ -811,19 +811,19 @@
             "indexByName": {
               "Time": 0,
               "Value": 1,
-              "num_response": 5,
+              "ips_returned": 5,
               "query": 2,
-              "query_type": 3,
+              "qtypes": 3,
               "response": 6,
-              "return_code": 4
+              "rcode": 4
             },
             "renameByName": {
               "Value": "Responses/Min",
-              "num_response": "IPs in Response",
+              "ips_returned": "IPs in Response",
               "query": "Query",
-              "query_type": "Type",
+              "qtypes": "Type",
               "response": "Response",
-              "return_code": "Return Code"
+              "rcode": "Return Code"
             }
           }
         }
@@ -914,7 +914,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\", rcode=\"No Error\", destination=~\"/\"}[1m])) by (destination)",
+          "expr": "sum(rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\", rcode!=\"No Error\", destination=~\".*/.*\"}[1m])) by (destination)",
           "interval": "",
           "legendFormat": "{{destination}}",
           "range": true,
@@ -955,7 +955,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(kube_node_info, cluster)",
+        "definition": "label_values(up, cluster)",
         "hide": 0,
         "includeAll": true,
         "label": "Cluster",
@@ -963,7 +963,7 @@
         "name": "cluster",
         "options": [],
         "query": {
-          "query": "label_values(kube_node_info, cluster)",
+          "query": "label_values(up, cluster)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,
@@ -978,7 +978,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(kube_node_info, node)",
+        "definition": "label_values(up{cluster=\"$cluster\"}, instance)",
         "hide": 0,
         "includeAll": true,
         "label": "Nodes",
@@ -986,7 +986,7 @@
         "name": "Nodes",
         "options": [],
         "query": {
-          "query": "label_values(kube_node_info, node)",
+          "query": "label_values(up{cluster=\"$cluster\"}, instance)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,
