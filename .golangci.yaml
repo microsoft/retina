@@ -45,6 +45,7 @@ linters-settings:
     disabled-checks:
     - "hugeParam"
   govet:
-    check-shadowing: true
+    enable:
+    - shadow
   lll:
     line-length: 200
