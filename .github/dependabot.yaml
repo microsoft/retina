@@ -31,7 +31,6 @@ updates:
     labels: ["lang/go", "area/dependencies"]
     ignore:
       - dependency-name: "github.com/inspektor-gadget/inspektor-gadget"
-      - dependency-name: "google.golang.org/grpc"
     open-pull-requests-limit: 10
   - package-ecosystem: "gomod"
     directory: "/hack/tools"
