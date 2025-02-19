@@ -136,9 +136,9 @@ func (p *PluginManager) Start(ctx context.Context) error {
 	}
 
 	g, ctx := errgroup.WithContext(ctx)
-
+	_, isPacketParserEnabled := p.plugins["packetparser"]
 	// run conntrack GC only if packetparser is enabled
-	if p.isPluginEnabled("packetparser") {
+	if isPacketParserEnabled {
 		ct, err := conntrack.New()
 		if err != nil {
 			return errors.Wrap(err, "failed to get conntrack instance")
@@ -209,16 +209,4 @@ func (p *PluginManager) SetupChannel(c chan *v1.Event) {
 			p.l.Error("failed to setup channel for plugin", zap.String("plugin name", name), zap.Error(err))
 		}
 	}
-}
-
-func (pm *PluginManager) isPluginEnabled(name string) bool {
-	if pm.cfg.EnabledPlugin == nil {
-		return false
-	}
-	for _, plugin := range pm.cfg.EnabledPlugin {
-		if plugin == name {
-			return true
-		}
-	}
-	return false
 }
