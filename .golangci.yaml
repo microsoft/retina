@@ -31,6 +31,7 @@ linters:
   - gofmt
   - goprintffuncname
   - gosimple
+  - govet
   - lll
   - misspell
   - nakedret
