@@ -48,5 +48,8 @@ linters-settings:
   govet:
     enable:
     - shadow
+    settings:
+      shadow:
+        strict: true
   lll:
     line-length: 200
