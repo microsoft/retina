@@ -1,9 +1,6 @@
 name: Daily Scale Test
 
 on:
-  push:
-    branches:
-      - alexcastilio/heartbeat-scale-test
   schedule:
     - cron: "0 0 * * *"
 
