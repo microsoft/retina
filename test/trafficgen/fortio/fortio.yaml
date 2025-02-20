@@ -5,7 +5,7 @@ metadata:
   name: fortio-load
   namespace: default
 spec:
-  replicas: 4
+  replicas: 15
   selector:
     matchLabels:
       app: fortio
@@ -16,6 +16,8 @@ spec:
         app: fortio
         role: load
     spec:
+      nodeSelector:
+        pool: load
       containers:
         - name: fortio
           image: fortio/fortio
@@ -23,13 +25,11 @@ spec:
             [
               "load",
               "-c",
-              "125000",
+              "160",
               "-qps",
               "0",
               "-t",
               "0",
-              "-loglevel",
-              "info",
               "http://fortio-service:8080",
             ]
           ports:
@@ -44,7 +44,7 @@ metadata:
   name: fortio-server
   namespace: default
 spec:
-  replicas: 10
+  replicas: 2
   selector:
     matchLabels:
       app: fortio
@@ -55,10 +55,85 @@ spec:
         app: fortio
         role: server
     spec:
+      nodeSelector:
+        pool: server
       containers:
         - name: fortio
           image: fortio/fortio
-          args: ["server", "-ui-path", '\"\"', "-http-port", "8080"]
+          args: ["server", "-http-port", "0.0.0.0:8080"]
+          ports:
+            - containerPort: 8078 # tcp echo
+            - containerPort: 8079 # grpc echo
+            - containerPort: 8080 # main serving port
+            - containerPort: 8081 # redirection to https port
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nf-conntrack-fix
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: nf-conntrack-fix
+  template:
+    metadata:
+      labels:
+        app: nf-conntrack-fix
+    spec:
+      hostNetwork: true
+      hostPID: true
+      nodeSelector:
+        pool: server
+      initContainers:
+        - name: dependency-install
+          command: ["/bin/sh"]
+          args:
+            [
+              "-c",
+              "nsenter --mount=/proc/1/ns/mnt -- sh -c 'sysctl -w net.nf_conntrack_max=500000'",
+            ]
+          image: alpine:latest
+          securityContext:
+            privileged: true
+      containers:
+        - name: list-conntrack
+          command: ["/bin/sh"]
+          args: [
+              "-c",
+              "nsenter --mount=/proc/1/ns/mnt -- bash -c '
+              while true; do
+              echo $(date +%Y-%m-%dT%H:%M:%S) $(hostname) nf_conntrack_count: $(cat /proc/sys/net/netfilter/nf_conntrack_count);
+              sleep 5;
+              done'",
+            ]
+          image: alpine:latest
+          securityContext:
+            privileged: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fortio-admin
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fortio
+      role: admin
+  template:
+    metadata:
+      labels:
+        app: fortio
+        role: admin
+    spec:
+      nodeSelector:
+        pool: server
+      containers:
+        - name: fortio
+          image: fortio/fortio
+          args: ["server", "-http-port", "8080"]
           ports:
             - containerPort: 8078 # tcp echo
             - containerPort: 8079 # grpc echo
