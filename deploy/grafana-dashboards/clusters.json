@@ -48,10 +48,10 @@
       "includeVars": true,
       "keepTime": true,
       "tags": [
-        "k8s:network-observability"
+        "k8s:retina-network-observability"
       ],
       "targetBlank": false,
-      "title": "Dashboards: Network Observability",
+      "title": "Dashboards: Retina Network Observability",
       "tooltip": "",
       "type": "dashboards",
       "url": ""
@@ -66,7 +66,7 @@
       "title": "Documentation",
       "tooltip": "",
       "type": "link",
-      "url": "https://www.retina.sh"
+      "url": "https://retina.sh/docs/Introduction/intro"
     }
   ],
   "liveNow": true,
@@ -3669,7 +3669,7 @@
   "schemaVersion": 38,
   "style": "dark",
   "tags": [
-    "k8s:network-observability"
+    "k8s:retina-network-observability"
   ],
   "templating": {
     "list": [
@@ -3695,7 +3695,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(kube_node_info, cluster)",
+        "definition": "label_values(up, cluster)",
         "hide": 0,
         "includeAll": false,
         "label": "Cluster",
@@ -3703,7 +3703,7 @@
         "name": "cluster",
         "options": [],
         "query": {
-          "query": "label_values(kube_node_info, cluster)",
+          "query": "label_values(up, cluster)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,
@@ -3713,19 +3713,20 @@
         "type": "query"
       },
       {
+        "allValue": "(.*)",
         "current": {},
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(kube_node_info{cluster=\"$cluster\"}, node)",
+        "definition": "label_values(up{cluster=\"$cluster\"},instance)",
         "hide": 0,
         "includeAll": true,
         "label": "Nodes",
         "multi": true,
         "name": "Nodes",
         "options": [],
-        "query": "label_values(kube_node_info{cluster=\"$cluster\"}, node)",
+        "query": "label_values(up{cluster=\"$cluster\"},instance)",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
@@ -3753,7 +3754,7 @@
     ]
   },
   "timezone": "",
-  "title": "Kubernetes / Networking / Clusters",
-  "uid": "Retina11",
-  "version": 1
+  "title": "Kubernetes / Networking / Retina / Clusters",
+  "uid": "RetinaClusters",
+  "version": 2
 }

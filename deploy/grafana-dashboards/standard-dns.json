@@ -36,10 +36,10 @@
       "includeVars": true,
       "keepTime": true,
       "tags": [
-        "k8s:network-observability"
+        "k8s:retina-network-observability"
       ],
       "targetBlank": false,
-      "title": "Dashboards: Network Observability",
+      "title": "Dashboards: Retina Network Observability",
       "tooltip": "",
       "type": "dashboards",
       "url": ""
@@ -54,7 +54,7 @@
       "title": "Documentation",
       "tooltip": "",
       "type": "link",
-      "url": "https://aka.ms/NetObsAddonDoc"
+      "url": "https://retina.sh/docs/Introduction/intro"
     }
   ],
   "liveNow": true,
@@ -64,7 +64,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Non-Cilium only",
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -140,8 +140,8 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum (rate(hubble_dns_queries_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (qtypes) > 0",
-          "legendFormat": "{{qtypes}}",
+          "expr": "sum (rate(networkobservability_dns_request_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query_type) > 0",
+          "legendFormat": "{{query_type}}",
           "range": true,
           "refId": "A"
         }
@@ -154,7 +154,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Non-Cilium only",
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -230,8 +230,8 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum (rate(hubble_dns_queries_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (qtypes) > 0",
-          "legendFormat": "{{qtypes}}",
+          "expr": "sum (rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query_type) > 0",
+          "legendFormat": "{{query_type}}",
           "range": true,
           "refId": "A"
         }
@@ -244,7 +244,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Non-Cilium only",
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -320,8 +320,8 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "(\r\n    1 - (\r\n        sum (hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\"}) by (qtypes) / sum (hubble_dns_queries_total{cluster=\"$cluster\", instance=~\"$Nodes\"}) by (qtypes)\r\n    )\r\n) * 100 * (\r\n    (\r\n        sum (rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (qtypes)\r\n    ) > bool 0\r\n) > 0",
-          "legendFormat": "{{qtypes}}",
+          "expr": "(\r\n    1 - (\r\n        sum (networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\"}) by (query_type) / sum (networkobservability_dns_request_count{cluster=\"$cluster\", instance=~\"$Nodes\"}) by (query_type)\r\n    )\r\n) * 100 * (\r\n    (\r\n        sum (rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query_type)\r\n    ) > bool 0\r\n) > 0",
+          "legendFormat": "{{query_type}}",
           "range": true,
           "refId": "A"
         }
@@ -334,7 +334,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Non-Cilium only",
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -414,8 +414,8 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\", rcode=\"No Error\"}[$__rate_interval])) by (ips_returned) > 0",
-          "legendFormat": "{{ips_returned}}",
+          "expr": "sum(rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\", return_code=\"NoError\"}[$__rate_interval])) by (num_response) > 0",
+          "legendFormat": "{{num_response}}",
           "range": true,
           "refId": "A"
         }
@@ -428,7 +428,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Non-Cilium only",
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -504,8 +504,8 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "label_replace(\r\n    label_replace(\r\n        sum by (rcode, qtypes) (\r\n            rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\", rcode!=\"NoError\"}[$__rate_interval])\r\n        ) > 0, \"rcode\", \"non-existent domain\", \"rcode\", \"nxdomain\"\r\n    ), \"rcode\", \"server failure\", \"rcode\", \"servfail\"\r\n)",
-          "legendFormat": "{{rcode}} ({{qtypes}})",
+          "expr": "label_replace(\r\n    label_replace(\r\n        sum by (return_code, query_type) (\r\n            rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\", return_code!=\"NoError\"}[$__rate_interval])\r\n        ) > 0, \"return_code\", \"non-existent domain\", \"return_code\", \"nxdomain\"\r\n    ), \"return_code\", \"server failure\", \"return_code\", \"servfail\"\r\n)",
+          "legendFormat": "{{return_code}} ({{query_type}})",
           "range": true,
           "refId": "A"
         }
@@ -518,7 +518,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Non-Cilium only",
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -599,9 +599,9 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "round(topk(10, sum (60*rate(hubble_dns_queries_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query, qtypes)), 1)",
+          "expr": "round(topk(10, sum (60*rate(networkobservability_dns_request_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query, query_type)), 1)",
           "interval": "",
-          "legendFormat": "{{query}} ({{qtypes}})",
+          "legendFormat": "{{query}} ({{query_type}})",
           "range": true,
           "refId": "A"
         }
@@ -614,7 +614,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Non-Cilium only",
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -694,9 +694,9 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "round(topk(10, sum (60*rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query, qtypes)), 1)",
+          "expr": "round(topk(10, sum (60*rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query, query_type)), 1)",
           "interval": "",
-          "legendFormat": "{{query}} ({{qtypes}})",
+          "legendFormat": "{{query}} ({{query_type}})",
           "range": true,
           "refId": "A"
         }
@@ -709,7 +709,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Non-Cilium only",
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -775,7 +775,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "label_replace(\r\n  label_replace(\r\n      sum by (query, qtypes, response, rcode) (\r\n        60*rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\", ips_returned!=\"0\"}[$__rate_interval])\r\n      ), \"rcode\", \"non-existent domain\", \"rcode\", \"nxdomain\"\r\n  ), \"rcode\", \"success\", \"rcode\", \"noerror\"\r\n)",
+          "expr": "label_replace(\r\n  label_replace(\r\n      sum by (query, query_type, response, return_code) (\r\n        60*rate(networkobservability_dns_response_count{cluster=\"$cluster\", instance=~\"$Nodes\", num_response!=\"0\", response!=\"\"}[$__rate_interval])\r\n      ), \"return_code\", \"non-existent domain\", \"return_code\", \"nxdomain\"\r\n  ), \"return_code\", \"success\", \"return_code\", \"noerror\"\r\n)",
           "instant": true,
           "interval": "",
           "legendFormat": "__auto",
@@ -789,11 +789,11 @@
           "id": "labelsToFields",
           "options": {
             "keepLabels": [
-              "ips_returned",
+              "num_response",
               "query",
-              "qtypes",
+              "query_type",
               "response",
-              "rcode"
+              "return_code"
             ]
           }
         },
@@ -811,118 +811,24 @@
             "indexByName": {
               "Time": 0,
               "Value": 1,
-              "ips_returned": 5,
+              "num_response": 5,
               "query": 2,
-              "qtypes": 3,
+              "query_type": 3,
               "response": 6,
-              "rcode": 4
+              "return_code": 4
             },
             "renameByName": {
               "Value": "Responses/Min",
-              "ips_returned": "IPs in Response",
+              "num_response": "IPs in Response",
               "query": "Query",
-              "qtypes": "Type",
+              "query_type": "Type",
               "response": "Response",
-              "rcode": "Return Code"
+              "return_code": "Return Code"
             }
           }
         }
       ],
       "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 15,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              }
-            ]
-          },
-          "unit": "req/min"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 36
-      },
-      "id": 141,
-      "options": {
-        "legend": {
-          "calcs": [
-            "max",
-            "last"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true,
-          "sortBy": "Max",
-          "sortDesc": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "editorMode": "code",
-          "expr": "sum(rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\", rcode!=\"No Error\", destination=~\".*/.*\"}[1m])) by (destination)",
-          "interval": "",
-          "legendFormat": "{{destination}}",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Top Pods with DNS Errors",
-      "type": "timeseries"
     }
   ],
   "refresh": "",
@@ -930,7 +836,7 @@
   "schemaVersion": 38,
   "style": "dark",
   "tags": [
-    "k8s:network-observability"
+    "k8s:retina-network-observability"
   ],
   "templating": {
     "list": [
@@ -950,20 +856,21 @@
         "type": "datasource"
       },
       {
+        "allValue": "(.*)",
         "current": {},
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(up, cluster)",
+        "definition": "label_values(kube_node_info, cluster)",
         "hide": 0,
-        "includeAll": true,
+        "includeAll": false,
         "label": "Cluster",
         "multi": false,
         "name": "cluster",
         "options": [],
         "query": {
-          "query": "label_values(up, cluster)",
+          "query": "label_values(kube_node_info, cluster)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,
@@ -978,17 +885,14 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(up{cluster=\"$cluster\"}, instance)",
+        "definition": "label_values(kube_node_info{cluster=\"$cluster\"}, node)",
         "hide": 0,
         "includeAll": true,
         "label": "Nodes",
         "multi": true,
         "name": "Nodes",
         "options": [],
-        "query": {
-          "query": "label_values(up{cluster=\"$cluster\"}, instance)",
-          "refId": "StandardVariableQuery"
-        },
+        "query": "label_values(kube_node_info{cluster=\"$cluster\"}, node)",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
@@ -1016,7 +920,7 @@
     ]
   },
   "timezone": "",
-  "title": "Kubernetes / Networking / DNS",
-  "uid": "NetObsDNS6741",
+  "title": "Kubernetes / Networking / Retina (Standard) / DNS",
+  "uid": "RetinaStandardDNS",
   "version": 1
 }

@@ -6,19 +6,19 @@
       "id": "grafana",
       "name": "Grafana",
       "type": "grafana",
-      "version": "9.5.6"
-    },
-    {
-      "id": "heatmap",
-      "name": "Heatmap",
-      "type": "panel",
-      "version": ""
+      "version": "9.5.15"
     },
     {
       "id": "prometheus",
       "name": "Prometheus",
       "type": "datasource",
       "version": "1.0.0"
+    },
+    {
+      "id": "table",
+      "name": "Table",
+      "type": "panel",
+      "version": ""
     },
     {
       "id": "timeseries",
@@ -36,10 +36,10 @@
       "includeVars": true,
       "keepTime": true,
       "tags": [
-        "k8s:network-observability"
+        "k8s:retina-network-observability"
       ],
       "targetBlank": false,
-      "title": "Dashboards: Network Observability",
+      "title": "Dashboards: Retina Network Observability",
       "tooltip": "",
       "type": "dashboards",
       "url": ""
@@ -54,16 +54,17 @@
       "title": "Documentation",
       "tooltip": "",
       "type": "link",
-      "url": "https://www.retina.sh"
+      "url": "https://retina.sh/docs/Introduction/intro"
     }
   ],
-  "liveNow": false,
+  "liveNow": true,
   "panels": [
     {
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
+      "description": "Non-Cilium only",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -76,7 +77,7 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "drawStyle": "line",
-            "fillOpacity": 0,
+            "fillOpacity": 15,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -89,7 +90,7 @@
             "scaleDistribution": {
               "type": "linear"
             },
-            "showPoints": "auto",
+            "showPoints": "never",
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -106,399 +107,20 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           },
-          "unit": "pps"
+          "unit": "req/s"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
+        "h": 5,
+        "w": 8,
         "x": 0,
         "y": 0
       },
-      "id": 6,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "editorMode": "builder",
-          "expr": "sum(irate(networkobservability_adv_forward_count{source_podname=~\"$pod\"}[1m]))",
-          "legendFormat": "Total PPS",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Outgoing Traffic",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "pps"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 0
-      },
-      "id": 10,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "editorMode": "builder",
-          "expr": "sum(irate(networkobservability_adv_forward_count{destination_podname=~\"$pod\"}[1m]))",
-          "legendFormat": "Total PPS",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Incoming Traffic",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 30,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineStyle": {
-              "fill": "solid"
-            },
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 8
-      },
-      "id": 4,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "editorMode": "builder",
-          "expr": "sum by(source_podname) (irate(networkobservability_adv_forward_count{destination_podname!=\"unknown\", source_podname!=\"unknown\"}[1m]))",
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "All Outgoing pps per pod",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 30,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 8
-      },
-      "id": 11,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "editorMode": "builder",
-          "expr": "sum by(destination_podname) (irate(networkobservability_adv_forward_count{destination_podname!=\"unknown\", source_podname!=\"unknown\"}[1m]))",
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "All Incoming pps per pod",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "smooth",
-            "lineStyle": {
-              "fill": "solid"
-            },
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 16
-      },
-      "id": 18,
+      "id": 135,
       "options": {
         "legend": {
           "calcs": [],
@@ -518,14 +140,13 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(source_podname) (irate(networkobservability_adv_drop_count{destination_podname!=\"unknown\", source_podname!=\"unknown\"}[1m]))",
-          "hide": false,
-          "legendFormat": "__auto",
+          "expr": "sum (rate(hubble_dns_queries_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (qtypes) > 0",
+          "legendFormat": "{{qtypes}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Dropped pps per source pod",
+      "title": "DNS Requests",
       "type": "timeseries"
     },
     {
@@ -533,6 +154,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
+      "description": "Non-Cilium only",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -545,7 +167,7 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "drawStyle": "line",
-            "fillOpacity": 30,
+            "fillOpacity": 15,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -558,7 +180,7 @@
             "scaleDistribution": {
               "type": "linear"
             },
-            "showPoints": "auto",
+            "showPoints": "never",
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -575,23 +197,20 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
-          }
+          },
+          "unit": "resp/s"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 16
+        "h": 5,
+        "w": 8,
+        "x": 8,
+        "y": 0
       },
-      "id": 19,
+      "id": 136,
       "options": {
         "legend": {
           "calcs": [],
@@ -611,14 +230,13 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(destination_podname) (irate(networkobservability_adv_forward_count{destination_podname!=\"unknown\", source_podname!=\"unknown\"}[1m]))",
-          "hide": false,
-          "legendFormat": "__auto",
+          "expr": "sum (rate(hubble_dns_queries_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (qtypes) > 0",
+          "legendFormat": "{{qtypes}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Dropped pps per Destination pod",
+      "title": "DNS Responses",
       "type": "timeseries"
     },
     {
@@ -626,6 +244,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
+      "description": "Non-Cilium only",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -638,23 +257,20 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "drawStyle": "line",
-            "fillOpacity": 38,
-            "gradientMode": "hue",
+            "fillOpacity": 15,
+            "gradientMode": "none",
             "hideFrom": {
               "legend": false,
               "tooltip": false,
               "viz": false
             },
             "lineInterpolation": "linear",
-            "lineStyle": {
-              "fill": "solid"
-            },
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
             },
-            "showPoints": "auto",
+            "showPoints": "never",
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -671,23 +287,20 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
-          }
+          },
+          "unit": "percent"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 24
+        "h": 5,
+        "w": 8,
+        "x": 16,
+        "y": 0
       },
-      "id": 13,
+      "id": 137,
       "options": {
         "legend": {
           "calcs": [],
@@ -706,14 +319,14 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "editorMode": "builder",
-          "expr": "sum by(source_ip) (irate(networkobservability_adv_forward_count{source_podname=\"unknown\"}[1m]))",
-          "legendFormat": "__auto",
+          "editorMode": "code",
+          "expr": "(\r\n    1 - (\r\n        sum (hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\"}) by (qtypes) / sum (hubble_dns_queries_total{cluster=\"$cluster\", instance=~\"$Nodes\"}) by (qtypes)\r\n    )\r\n) * 100 * (\r\n    (\r\n        sum (rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (qtypes)\r\n    ) > bool 0\r\n) > 0",
+          "legendFormat": "{{qtypes}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "All Outgoing pps per pod",
+      "title": "DNS Missing Response",
       "type": "timeseries"
     },
     {
@@ -721,6 +334,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
+      "description": "Non-Cilium only",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -733,7 +347,7 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "drawStyle": "line",
-            "fillOpacity": 30,
+            "fillOpacity": 15,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -746,7 +360,7 @@
             "scaleDistribution": {
               "type": "linear"
             },
-            "showPoints": "auto",
+            "showPoints": "never",
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -769,17 +383,108 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "resp/s"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      },
+      "id": 139,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\", rcode=\"No Error\"}[$__rate_interval])) by (ips_returned) > 0",
+          "legendFormat": "{{ips_returned}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "DNS Response IPs Returned",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Non-Cilium only",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "resp/s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
         "w": 12,
         "x": 12,
-        "y": 24
+        "y": 5
       },
-      "id": 14,
+      "id": 138,
       "options": {
         "legend": {
           "calcs": [],
@@ -798,14 +503,14 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "editorMode": "builder",
-          "expr": "sum by(destination_ip) (irate(networkobservability_adv_forward_count{destination_podname=\"unknown\"}[1m]))",
-          "legendFormat": "__auto",
+          "editorMode": "code",
+          "expr": "label_replace(\r\n    label_replace(\r\n        sum by (rcode, qtypes) (\r\n            rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\", rcode!=\"NoError\"}[$__rate_interval])\r\n        ) > 0, \"rcode\", \"non-existent domain\", \"rcode\", \"nxdomain\"\r\n    ), \"rcode\", \"server failure\", \"rcode\", \"servfail\"\r\n)",
+          "legendFormat": "{{rcode}} ({{qtypes}})",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "All Incoming pps per pod",
+      "title": "DNS Errors",
       "type": "timeseries"
     },
     {
@@ -813,59 +518,78 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
+      "description": "Non-Cilium only",
       "fieldConfig": {
         "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "none",
             "hideFrom": {
               "legend": false,
               "tooltip": false,
               "viz": false
             },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
             }
-          }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "req/min"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 11,
+        "h": 8,
         "w": 24,
         "x": 0,
-        "y": 32
+        "y": 12
       },
-      "id": 12,
+      "id": 140,
       "options": {
-        "calculate": false,
-        "cellGap": 1,
-        "color": {
-          "exponent": 0.5,
-          "fill": "dark-orange",
-          "mode": "scheme",
-          "reverse": false,
-          "scale": "exponential",
-          "scheme": "Oranges",
-          "steps": 64
-        },
-        "exemplars": {
-          "color": "rgba(255,0,255,0.7)"
-        },
-        "filterValues": {
-          "le": 1e-9
-        },
         "legend": {
-          "show": true
-        },
-        "rowsFrame": {
-          "layout": "auto"
+          "calcs": [
+            "max",
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
-          "show": true,
-          "yHistogram": false
-        },
-        "yAxis": {
-          "axisPlacement": "left",
-          "reverse": false
+          "mode": "single",
+          "sort": "none"
         }
       },
       "targets": [
@@ -874,74 +598,93 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "editorMode": "builder",
-          "expr": "topk(10, sum by(source_podname) (irate(networkobservability_adv_forward_count{source_podname!=\"unknown\"}[5m])))",
-          "legendFormat": "__auto",
+          "editorMode": "code",
+          "expr": "round(topk(10, sum (60*rate(hubble_dns_queries_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query, qtypes)), 1)",
+          "interval": "",
+          "legendFormat": "{{query}} ({{qtypes}})",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Top 10 Pods Outgoing traffic",
-      "type": "heatmap"
+      "title": "Top DNS Queries (Requests)",
+      "type": "timeseries"
     },
     {
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
+      "description": "Non-Cilium only",
       "fieldConfig": {
         "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "none",
             "hideFrom": {
               "legend": false,
               "tooltip": false,
               "viz": false
             },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
             }
-          }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          },
+          "unit": "resp/min"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 11,
+        "h": 8,
         "w": 24,
         "x": 0,
-        "y": 43
+        "y": 20
       },
-      "id": 15,
+      "id": 144,
       "options": {
-        "calculate": false,
-        "cellGap": 1,
-        "color": {
-          "exponent": 0.5,
-          "fill": "dark-orange",
-          "mode": "scheme",
-          "reverse": false,
-          "scale": "exponential",
-          "scheme": "Oranges",
-          "steps": 64
-        },
-        "exemplars": {
-          "color": "rgba(255,0,255,0.7)"
-        },
-        "filterValues": {
-          "le": 1e-9
-        },
         "legend": {
-          "show": true
-        },
-        "rowsFrame": {
-          "layout": "auto"
+          "calcs": [
+            "max",
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
-          "show": true,
-          "yHistogram": false
-        },
-        "yAxis": {
-          "axisPlacement": "left",
-          "reverse": false
+          "mode": "single",
+          "sort": "none"
         }
       },
       "targets": [
@@ -950,15 +693,142 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "editorMode": "builder",
-          "expr": "topk(10, sum by(destination_podname) (irate(networkobservability_adv_forward_count{destination_podname!=\"unknown\"}[5m])))",
-          "legendFormat": "__auto",
+          "editorMode": "code",
+          "expr": "round(topk(10, sum (60*rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])) by (query, qtypes)), 1)",
+          "interval": "",
+          "legendFormat": "{{query}} ({{qtypes}})",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Top 10 Pods Incoming traffic",
-      "type": "heatmap"
+      "title": "Top DNS Queries (Responses)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Non-Cilium only",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "id": 143,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "enablePagination": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "frameIndex": 22,
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Query"
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "label_replace(\r\n  label_replace(\r\n      sum by (query, qtypes, response, rcode) (\r\n        60*rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\", ips_returned!=\"0\"}[$__rate_interval])\r\n      ), \"rcode\", \"non-existent domain\", \"rcode\", \"nxdomain\"\r\n  ), \"rcode\", \"success\", \"rcode\", \"noerror\"\r\n)",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "DNS Response Table",
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "keepLabels": [
+              "ips_returned",
+              "query",
+              "qtypes",
+              "response",
+              "rcode"
+            ]
+          }
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value": true
+            },
+            "indexByName": {
+              "Time": 0,
+              "Value": 1,
+              "ips_returned": 5,
+              "query": 2,
+              "qtypes": 3,
+              "response": 6,
+              "rcode": 4
+            },
+            "renameByName": {
+              "Value": "Responses/Min",
+              "ips_returned": "IPs in Response",
+              "query": "Query",
+              "qtypes": "Type",
+              "response": "Response",
+              "rcode": "Return Code"
+            }
+          }
+        }
+      ],
+      "type": "table"
     },
     {
       "datasource": {
@@ -977,7 +847,7 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "drawStyle": "line",
-            "fillOpacity": 10,
+            "fillOpacity": 15,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -990,7 +860,7 @@
             "scaleDistribution": {
               "type": "linear"
             },
-            "showPoints": "auto",
+            "showPoints": "never",
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -1005,31 +875,32 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
+                "color": "green"
               }
             ]
-          }
+          },
+          "unit": "req/min"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 12,
+        "h": 8,
         "w": 24,
         "x": 0,
-        "y": 54
+        "y": 36
       },
-      "id": 17,
+      "id": 141,
       "options": {
         "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
+          "calcs": [
+            "max",
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "single",
@@ -1042,14 +913,15 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "editorMode": "builder",
-          "expr": "avg by(instance) (sum by(le, instance) (rate(networkobservability_node_apiserver_handshake_latency_ms_bucket[1m])))",
-          "legendFormat": "__auto",
+          "editorMode": "code",
+          "expr": "sum(rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\", rcode!=\"No Error\", destination=~\".*/.*\"}[1m])) by (destination)",
+          "interval": "",
+          "legendFormat": "{{destination}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "API server latency",
+      "title": "Top Pods with DNS Errors",
       "type": "timeseries"
     }
   ],
@@ -1058,7 +930,7 @@
   "schemaVersion": 38,
   "style": "dark",
   "tags": [
-    "k8s:network-observability"
+    "k8s:retina-network-observability"
   ],
   "templating": {
     "list": [
@@ -1083,32 +955,68 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "query_result(networkobservability_adv_forward_count)",
-        "hide": 1,
+        "definition": "label_values(up, cluster)",
+        "hide": 0,
         "includeAll": true,
-        "label": "Pod Name",
+        "label": "Cluster",
         "multi": false,
-        "name": "pod",
+        "name": "cluster",
         "options": [],
         "query": {
-          "query": "query_result(networkobservability_adv_forward_count)",
+          "query": "label_values(up, cluster)",
           "refId": "StandardVariableQuery"
         },
-        "refresh": 1,
-        "regex": "/.*podname=\"([^\"]*).*/",
+        "refresh": 2,
+        "regex": "",
         "skipUrlSync": false,
-        "sort": 0,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {},
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(up{cluster=\"$cluster\"}, instance)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Nodes",
+        "multi": true,
+        "name": "Nodes",
+        "options": [],
+        "query": {
+          "query": "label_values(up{cluster=\"$cluster\"}, instance)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
         "type": "query"
       }
     ]
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-30m",
     "to": "now"
   },
-  "timepicker": {},
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ]
+  },
   "timezone": "",
-  "title": "Kubernetes / Networking / Pod Traffic",
-  "uid": "Retina22",
+  "title": "Kubernetes / Networking / Retina (Hubble) / DNS",
+  "uid": "RetinaHubbleDNS",
   "version": 1
 }

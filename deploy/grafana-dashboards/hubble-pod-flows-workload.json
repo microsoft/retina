@@ -3,12 +3,6 @@
   "__inputs": [],
   "__requires": [
     {
-      "id": "bargauge",
-      "name": "Bar gauge",
-      "type": "panel",
-      "version": ""
-    },
-    {
       "id": "grafana",
       "name": "Grafana",
       "type": "grafana",
@@ -48,10 +42,10 @@
       "includeVars": true,
       "keepTime": true,
       "tags": [
-        "k8s:network-observability"
+        "k8s:retina-network-observability"
       ],
       "targetBlank": false,
-      "title": "Dashboards: Network Observability",
+      "title": "Dashboards: Retina Network Observability",
       "tooltip": "",
       "type": "dashboards",
       "url": ""
@@ -66,7 +60,7 @@
       "title": "Documentation",
       "tooltip": "Documentation",
       "type": "link",
-      "url": "https://aka.ms/NetObsAddonDoc"
+      "url": "https://retina.sh/docs/Introduction/intro"
     }
   ],
   "liveNow": true,
@@ -79,300 +73,9 @@
         "x": 0,
         "y": 0
       },
-      "id": 179,
-      "panels": [],
-      "title": "Top Namespaces",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "fixedColor": "blue",
-            "mode": "fixed"
-          },
-          "displayName": "${__field.displayName}",
-          "mappings": [],
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "pps"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 12,
-        "x": 0,
-        "y": 1
-      },
-      "id": 167,
-      "options": {
-        "displayMode": "basic",
-        "minVizHeight": 10,
-        "minVizWidth": 0,
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showUnfilled": true,
-        "valueMode": "color"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "topk(\r\n  10, round(sum by (namespace) (\r\n    label_replace(\r\n      sum by (source) (rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", source=~\".*/.*\"}[$__rate_interval])),\r\n      \"namespace\", \"$1\", \"source\", \"([-a-z0-9]+)/.+\"\r\n    )\r\n  ), 0.01)\r\n) > 0",
-          "hide": false,
-          "instant": true,
-          "legendFormat": "__auto",
-          "range": false,
-          "refId": "A"
-        }
-      ],
-      "title": "Top Source Namespaces (Outgoing Traffic)",
-      "type": "bargauge"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "fixedColor": "blue",
-            "mode": "fixed"
-          },
-          "displayName": "${__field.displayName}",
-          "mappings": [],
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "pps"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 12,
-        "x": 12,
-        "y": 1
-      },
-      "id": 212,
-      "options": {
-        "displayMode": "basic",
-        "minVizHeight": 10,
-        "minVizWidth": 0,
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showUnfilled": true,
-        "valueMode": "color"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "topk(\r\n  10, round(sum by (namespace) (\r\n    label_replace(\r\n      sum by (destination) (rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", destination=~\".*/.*\"}[$__rate_interval])),\r\n      \"namespace\", \"$1\", \"destination\", \"([-a-z0-9]+)/.+\"\r\n    )\r\n  ), 0.01)\r\n) > 0",
-          "hide": false,
-          "instant": true,
-          "legendFormat": "__auto",
-          "range": false,
-          "refId": "A"
-        }
-      ],
-      "title": "Top Destination Namespaces (Incoming Traffic)",
-      "type": "bargauge"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "description": "Drops seen on the VM of the source Pod (a drop will appear for only one of \"incoming\" or \"outgoing\")",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "fixedColor": "red",
-            "mode": "fixed"
-          },
-          "displayName": "${__field.displayName}",
-          "mappings": [],
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "pps"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 12,
-        "x": 0,
-        "y": 5
-      },
-      "id": 214,
-      "options": {
-        "displayMode": "basic",
-        "minVizHeight": 10,
-        "minVizWidth": 0,
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showUnfilled": true,
-        "text": {},
-        "valueMode": "color"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "topk(\r\n  10, round(sum by (namespace) (\r\n    label_replace(\r\n      sum by (source) (rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", source=~\".*/.*\", verdict=\"DROPPED\"}[$__rate_interval])),\r\n      \"namespace\", \"$1\", \"source\", \"([-a-z0-9]+)/.+\"\r\n    )\r\n  ), 0.01)\r\n) > 0",
-          "hide": false,
-          "instant": true,
-          "legendFormat": "__auto",
-          "range": false,
-          "refId": "A"
-        }
-      ],
-      "title": "Top Namespaces with Outgoing Drops",
-      "type": "bargauge"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "description": "Drops seen on the VM of the destination Pod (a drop will appear for only one of \"incoming\" or \"outgoing\")",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "fixedColor": "red",
-            "mode": "fixed"
-          },
-          "displayName": "${__field.displayName}",
-          "mappings": [],
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "pps"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 12,
-        "x": 12,
-        "y": 5
-      },
-      "id": 213,
-      "options": {
-        "displayMode": "basic",
-        "minVizHeight": 10,
-        "minVizWidth": 0,
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showUnfilled": true,
-        "text": {},
-        "valueMode": "color"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "topk(\r\n  10, round(sum by (namespace) (\r\n    label_replace(\r\n      sum by (destination) (rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", destination=~\".*/.*\", verdict=\"DROPPED\"}[$__rate_interval])),\r\n      \"namespace\", \"$1\", \"destination\", \"([-a-z0-9]+)/.+\"\r\n    )\r\n  ), 0.01)\r\n) > 0",
-          "hide": false,
-          "instant": true,
-          "legendFormat": "__auto",
-          "range": false,
-          "refId": "A"
-        }
-      ],
-      "title": "Top Namespaces with Incoming Drops",
-      "type": "bargauge"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 9
-      },
       "id": 216,
       "panels": [],
-      "title": "Namespace Snapshot ($namespace)",
+      "title": "Workload Snapshot ($workload)",
       "type": "row"
     },
     {
@@ -405,7 +108,7 @@
         "h": 3,
         "w": 6,
         "x": 0,
-        "y": 10
+        "y": 1
       },
       "id": 192,
       "options": {
@@ -430,7 +133,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\r\n  sum by (source) (\r\n    rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/.*\", verdict=\"FORWARDED\"}[10m])\r\n  ) >= 0.01\r\n)",
+          "expr": "count(\r\n  sum by (source) (\r\n    rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/$workload\", verdict=\"FORWARDED\"}[10m])\r\n  ) >= 0.01\r\n)",
           "hide": false,
           "instant": true,
           "legendFormat": "Pods with Outgoing Traffic",
@@ -472,7 +175,7 @@
         "h": 3,
         "w": 3,
         "x": 6,
-        "y": 10
+        "y": 1
       },
       "id": 193,
       "options": {
@@ -497,7 +200,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "round(sum (rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/.*\", verdict=\"FORWARDED\"}[$__rate_interval])), 0.01)",
+          "expr": "round(sum (rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/$workload\", verdict=\"FORWARDED\"}[$__rate_interval])), 0.01)",
           "hide": false,
           "instant": false,
           "legendFormat": "Max Outgoing Traffic",
@@ -539,7 +242,7 @@
         "h": 3,
         "w": 3,
         "x": 9,
-        "y": 10
+        "y": 1
       },
       "id": 198,
       "options": {
@@ -564,7 +267,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "round(sum (rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/.*\", verdict=\"FORWARDED\"}[$__rate_interval])), 0.01)",
+          "expr": "round(sum (rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/$workload\", verdict=\"FORWARDED\"}[$__rate_interval])), 0.01)",
           "hide": false,
           "instant": false,
           "legendFormat": "Min Outgoing Traffic",
@@ -606,7 +309,7 @@
         "h": 3,
         "w": 6,
         "x": 12,
-        "y": 10
+        "y": 1
       },
       "id": 200,
       "options": {
@@ -631,7 +334,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\r\n  sum by (destination) (\r\n    rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/.*\", verdict=\"FORWARDED\"}[10m])\r\n  ) >= 0.01\r\n)",
+          "expr": "count(\r\n  sum by (destination) (\r\n    rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/$workload\", verdict=\"FORWARDED\"}[10m])\r\n  ) >= 0.01\r\n)",
           "hide": false,
           "instant": true,
           "legendFormat": "Pods with Incoming Traffic",
@@ -673,7 +376,7 @@
         "h": 3,
         "w": 3,
         "x": 18,
-        "y": 10
+        "y": 1
       },
       "id": 201,
       "options": {
@@ -698,7 +401,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "round(sum (rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/.*\", verdict=\"FORWARDED\"}[$__rate_interval])), 0.01)",
+          "expr": "round(sum (rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/$workload\", verdict=\"FORWARDED\"}[$__rate_interval])), 0.01)",
           "hide": false,
           "instant": false,
           "legendFormat": "Max Incoming Traffic",
@@ -740,7 +443,7 @@
         "h": 3,
         "w": 3,
         "x": 21,
-        "y": 10
+        "y": 1
       },
       "id": 202,
       "options": {
@@ -765,7 +468,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "round(sum (rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/.*\", verdict=\"FORWARDED\"}[$__rate_interval])), 0.01)",
+          "expr": "round(sum (rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/$workload\", verdict=\"FORWARDED\"}[$__rate_interval])), 0.01)",
           "hide": false,
           "instant": false,
           "legendFormat": "Min Incoming Traffic",
@@ -807,7 +510,7 @@
         "h": 3,
         "w": 6,
         "x": 0,
-        "y": 13
+        "y": 4
       },
       "id": 194,
       "options": {
@@ -832,7 +535,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count (\r\n  sum by (source) (\r\n    rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/.*\", verdict=\"DROPPED\"}[10m])\r\n  ) >= 0.01\r\n)",
+          "expr": "count (\r\n  sum by (source) (\r\n    rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/$workload\", verdict=\"DROPPED\"}[10m])\r\n  ) >= 0.01\r\n)",
           "hide": false,
           "instant": true,
           "legendFormat": "Pods with Outgoing Drops",
@@ -874,7 +577,7 @@
         "h": 3,
         "w": 3,
         "x": 6,
-        "y": 13
+        "y": 4
       },
       "id": 204,
       "options": {
@@ -899,7 +602,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "round(sum (rate(hubble_flows_processed_total{verdict=\"DROPPED\", cluster=\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/.*\"}[$__rate_interval])), 0.01)",
+          "expr": "round(sum (rate(hubble_flows_processed_total{verdict=\"DROPPED\", cluster=\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/$workload\"}[$__rate_interval])), 0.01)",
           "hide": false,
           "instant": false,
           "legendFormat": "Max Outgoing Drops",
@@ -941,7 +644,7 @@
         "h": 3,
         "w": 3,
         "x": 9,
-        "y": 13
+        "y": 4
       },
       "id": 205,
       "options": {
@@ -966,7 +669,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "round(sum (rate(hubble_flows_processed_total{verdict=\"DROPPED\", cluster=\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/.*\"}[$__rate_interval])), 0.01)",
+          "expr": "round(sum (rate(hubble_flows_processed_total{verdict=\"DROPPED\", cluster=\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/$workload\"}[$__rate_interval])), 0.01)",
           "hide": false,
           "instant": false,
           "legendFormat": "Min Outgoing Drops",
@@ -1008,7 +711,7 @@
         "h": 3,
         "w": 6,
         "x": 12,
-        "y": 13
+        "y": 4
       },
       "id": 203,
       "options": {
@@ -1033,7 +736,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count (\r\n  sum by (destination) (\r\n    rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/.*\", verdict=\"DROPPED\"}[10m])\r\n  ) >= 0.01\r\n)",
+          "expr": "count (\r\n  sum by (destination) (\r\n    rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/$workload\", verdict=\"DROPPED\"}[10m])\r\n  ) >= 0.01\r\n)",
           "hide": false,
           "instant": true,
           "legendFormat": "Pods with Incoming Drops",
@@ -1075,7 +778,7 @@
         "h": 3,
         "w": 3,
         "x": 18,
-        "y": 13
+        "y": 4
       },
       "id": 195,
       "options": {
@@ -1100,7 +803,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "round(sum (rate(hubble_flows_processed_total{verdict=\"DROPPED\", cluster=\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/.*\"}[$__rate_interval])), 0.01)",
+          "expr": "round(sum (rate(hubble_flows_processed_total{verdict=\"DROPPED\", cluster=\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/$workload\"}[$__rate_interval])), 0.01)",
           "hide": false,
           "instant": false,
           "legendFormat": "Max Incoming Drops",
@@ -1142,7 +845,7 @@
         "h": 3,
         "w": 3,
         "x": 21,
-        "y": 13
+        "y": 4
       },
       "id": 199,
       "options": {
@@ -1167,7 +870,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "round(sum (rate(hubble_flows_processed_total{verdict=\"DROPPED\", cluster=\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/.*\"}[$__rate_interval])), 0.01)",
+          "expr": "round(sum (rate(hubble_flows_processed_total{verdict=\"DROPPED\", cluster=\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/$workload\"}[$__rate_interval])), 0.01)",
           "hide": false,
           "instant": false,
           "legendFormat": "Min Incoming Drops",
@@ -1185,11 +888,11 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 16
+        "y": 7
       },
       "id": 178,
       "panels": [],
-      "title": "Flows (in $namespace)",
+      "title": "Flows (for $workload)",
       "type": "row"
     },
     {
@@ -1252,7 +955,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 17
+        "y": 8
       },
       "id": 174,
       "options": {
@@ -1274,7 +977,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/.*\"}[$__rate_interval])) by (type, subtype)",
+          "expr": "sum(rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/$workload\"}[$__rate_interval])) by (type, subtype)",
           "legendFormat": "{{type}}/{{subtype}}",
           "range": true,
           "refId": "A"
@@ -1288,7 +991,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Values:\n- to-endpoint: traffic reaching Pod\n- from-network/overlay: traffic reaching Node\n",
+      "description": "Values:\n- to-endpoint: traffic reaching Pod\n- from-network/overlay: traffic reaching Node",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1343,7 +1046,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 17
+        "y": 8
       },
       "id": 176,
       "options": {
@@ -1365,7 +1068,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/.*\"}[$__rate_interval])) by (type, subtype)",
+          "expr": "sum(rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/$workload\"}[$__rate_interval])) by (type, subtype)",
           "legendFormat": "{{type}}/{{subtype}}",
           "range": true,
           "refId": "A"
@@ -1433,7 +1136,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 24
+        "y": 15
       },
       "id": 175,
       "options": {
@@ -1455,7 +1158,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/.*\"}[$__rate_interval])) by (verdict)",
+          "expr": "sum(rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/$workload\"}[$__rate_interval])) by (verdict)",
           "legendFormat": "{{verdict}}",
           "range": true,
           "refId": "A"
@@ -1523,7 +1226,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 24
+        "y": 15
       },
       "id": 177,
       "options": {
@@ -1545,7 +1248,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/.*\"}[$__rate_interval])) by (verdict)",
+          "expr": "sum(rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/$workload\"}[$__rate_interval])) by (verdict)",
           "legendFormat": "{{verdict}}",
           "range": true,
           "refId": "A"
@@ -1579,7 +1282,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 31
+        "y": 22
       },
       "id": 224,
       "options": {
@@ -1625,7 +1328,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "topk(10, round(sum by (source) (\r\n  rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/.*\"}[$__rate_interval])\r\n), 0.01)) > 0",
+          "expr": "topk(10, round(sum by (source) (\r\n  rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/$workload\"}[$__rate_interval])\r\n), 0.01)) > 0",
           "hide": false,
           "legendFormat": "{{source}}",
           "range": true,
@@ -1660,7 +1363,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 31
+        "y": 22
       },
       "id": 225,
       "options": {
@@ -1706,7 +1409,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "topk(10, round(sum by (destination) (\r\n  rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/.*\"}[$__rate_interval])\r\n), 0.01)) > 0",
+          "expr": "topk(10, round(sum by (destination) (\r\n  rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/$workload\"}[$__rate_interval])\r\n), 0.01)) > 0",
           "hide": false,
           "legendFormat": "{{destination}}",
           "range": true,
@@ -1779,7 +1482,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 40
+        "y": 31
       },
       "id": 219,
       "options": {
@@ -1807,7 +1510,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "round(sum by (source) (\r\n  rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/.*\"}[$__rate_interval])\r\n), 0.01) > 0",
+          "expr": "round(sum by (source) (\r\n  rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/$workload\"}[$__rate_interval])\r\n), 0.01) > 0",
           "hide": false,
           "legendFormat": "{{source}}",
           "range": true,
@@ -1880,7 +1583,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 40
+        "y": 31
       },
       "id": 206,
       "options": {
@@ -1908,7 +1611,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "round(sum by (destination) (\r\n  rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/.*\"}[$__rate_interval])\r\n), 0.01) > 0",
+          "expr": "round(sum by (destination) (\r\n  rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/$workload\"}[$__rate_interval])\r\n), 0.01) > 0",
           "hide": false,
           "legendFormat": "{{destination}}",
           "range": true,
@@ -1924,7 +1627,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 49
+        "y": 40
       },
       "id": 183,
       "panels": [
@@ -1953,7 +1656,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 50
+            "y": 9
           },
           "id": 228,
           "options": {
@@ -1999,7 +1702,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "topk(10, round(sum by (source) (\r\n  rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/.*\", verdict=\"DROPPED\"}[$__rate_interval])\r\n), 0.01)) > 0",
+              "expr": "topk(10, round(sum by (source) (\r\n  rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/$workload\", verdict=\"DROPPED\"}[$__rate_interval])\r\n), 0.01)) > 0",
               "hide": false,
               "legendFormat": "{{source}}",
               "range": true,
@@ -2034,7 +1737,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 50
+            "y": 9
           },
           "id": 227,
           "options": {
@@ -2080,7 +1783,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "topk(10, round(sum by (destination) (\r\n  rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/.*\", verdict=\"DROPPED\"}[$__rate_interval])\r\n), 0.01)) > 0",
+              "expr": "topk(10, round(sum by (destination) (\r\n  rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/$workload\", verdict=\"DROPPED\"}[$__rate_interval])\r\n), 0.01)) > 0",
               "hide": false,
               "legendFormat": "{{destination}}",
               "range": true,
@@ -2137,7 +1840,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -2153,7 +1857,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 59
+            "y": 18
           },
           "id": 211,
           "options": {
@@ -2181,7 +1885,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "round(\r\n  sum by (source) (\r\n    rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/.*\", verdict=\"DROPPED\"}[$__rate_interval])\r\n  ), 0.01\r\n)",
+              "expr": "round(\r\n  sum by (source) (\r\n    rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/$workload\", verdict=\"DROPPED\"}[$__rate_interval])\r\n  ), 0.01\r\n)",
               "legendFormat": "{{destination}}",
               "range": true,
               "refId": "A"
@@ -2237,7 +1941,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -2253,7 +1958,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 59
+            "y": 18
           },
           "id": 220,
           "options": {
@@ -2281,7 +1986,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "round(\r\n  sum by (destination) (\r\n    rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/.*\", verdict=\"DROPPED\"}[$__rate_interval])\r\n  ), 0.01\r\n)",
+              "expr": "round(\r\n  sum by (destination) (\r\n    rate(hubble_flows_processed_total{cluster=\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/$workload\", verdict=\"DROPPED\"}[$__rate_interval])\r\n  ), 0.01\r\n)",
               "legendFormat": "{{destination}}",
               "range": true,
               "refId": "A"
@@ -2291,7 +1996,7 @@
           "type": "timeseries"
         }
       ],
-      "title": "Drops (in $namespace)",
+      "title": "Drops (for $workload)",
       "type": "row"
     },
     {
@@ -2300,7 +2005,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 50
+        "y": 41
       },
       "id": 182,
       "panels": [
@@ -2319,7 +2024,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "orange"
+                    "color": "orange",
+                    "value": null
                   }
                 ]
               },
@@ -2331,7 +2037,7 @@
             "h": 3,
             "w": 5,
             "x": 0,
-            "y": 51
+            "y": 10
           },
           "id": 221,
           "options": {
@@ -2356,7 +2062,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "count (\r\n    (\r\n        (sum(\r\n            rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/.*\", flag=\"SYN\"}[10m])\r\n        ) by (source) > 0) - sum(\r\n            label_replace(\r\n                sum(\r\n                    rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/.*\", flag=\"SYN-ACK\"}[10m])\r\n                ) by (destination), \"source\", \"$1\", \"destination\", \"(.*)\"\r\n            )\r\n        ) without (destination)\r\n    ) >= 0.01\r\n)",
+              "expr": "count (\r\n    (\r\n        (sum(\r\n            rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/$workload\", flag=\"SYN\"}[10m])\r\n        ) by (source) > 0) - sum(\r\n            label_replace(\r\n                sum(\r\n                    rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/$workload\", flag=\"SYN-ACK\"}[10m])\r\n                ) by (destination), \"source\", \"$1\", \"destination\", \"(.*)\"\r\n            )\r\n        ) without (destination)\r\n    ) >= 0.01\r\n)",
               "instant": true,
               "legendFormat": "Pods Missing SYN-ACKs",
               "range": false,
@@ -2382,7 +2088,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "red"
+                    "color": "red",
+                    "value": null
                   }
                 ]
               },
@@ -2394,7 +2101,7 @@
             "h": 3,
             "w": 4,
             "x": 5,
-            "y": 51
+            "y": 10
           },
           "id": 222,
           "options": {
@@ -2418,7 +2125,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "round(sum (\r\n    sum(\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/.*\", flag=\"SYN\"}[$__rate_interval])\r\n    ) by (source) > 0 - sum(\r\n        label_replace(\r\n            sum(\r\n                rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/.*\", flag=\"SYN-ACK\"}[$__rate_interval])\r\n            ) by (destination), \"source\", \"$1\", \"destination\", \"(.*)\"\r\n        )\r\n    ) without (destination)\r\n), 0.01)",
+              "expr": "round(sum (\r\n    sum(\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/$workload\", flag=\"SYN\"}[$__rate_interval])\r\n    ) by (source) > 0 - sum(\r\n        label_replace(\r\n            sum(\r\n                rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/$workload\", flag=\"SYN-ACK\"}[$__rate_interval])\r\n            ) by (destination), \"source\", \"$1\", \"destination\", \"(.*)\"\r\n        )\r\n    ) without (destination)\r\n), 0.01)",
               "legendFormat": "Max Packets Missing SYN-ACKs",
               "range": true,
               "refId": "A"
@@ -2443,7 +2150,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "super-light-red"
+                    "color": "super-light-red",
+                    "value": null
                   }
                 ]
               },
@@ -2455,7 +2163,7 @@
             "h": 3,
             "w": 4,
             "x": 9,
-            "y": 51
+            "y": 10
           },
           "id": 223,
           "options": {
@@ -2479,7 +2187,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "round(sum (\r\n    sum(\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/.*\", flag=\"SYN\"}[$__rate_interval])\r\n    ) by (source) > 0 - sum(\r\n        label_replace(\r\n            sum(\r\n                rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/.*\", flag=\"SYN-ACK\"}[$__rate_interval])\r\n            ) by (destination), \"source\", \"$1\", \"destination\", \"(.*)\"\r\n        )\r\n    ) without (destination)\r\n), 0.01) > 0",
+              "expr": "round(sum (\r\n    sum(\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/$workload\", flag=\"SYN\"}[$__rate_interval])\r\n    ) by (source) > 0 - sum(\r\n        label_replace(\r\n            sum(\r\n                rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/$workload\", flag=\"SYN-ACK\"}[$__rate_interval])\r\n            ) by (destination), \"source\", \"$1\", \"destination\", \"(.*)\"\r\n        )\r\n    ) without (destination)\r\n), 0.01) > 0",
               "legendFormat": "Min Packets Missing SYN-ACKs",
               "range": true,
               "refId": "A"
@@ -2514,7 +2222,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 54
+            "y": 13
           },
           "id": 232,
           "options": {
@@ -2560,7 +2268,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "topk(10, round(\r\n  sum(\r\n      rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/.*\", flag=\"SYN\"}[$__rate_interval])\r\n  ) by (source) > 0 - sum(\r\n      label_replace(\r\n          sum(\r\n              rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/.*\", flag=\"SYN-ACK\"}[$__rate_interval])\r\n          ) by (destination), \"source\", \"$1\", \"destination\", \"(.*)\"\r\n      )\r\n  ) without (destination), 0.01\r\n)) > 0",
+              "expr": "topk(10, round(\r\n  sum(\r\n      rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/$workload\", flag=\"SYN\"}[$__rate_interval])\r\n  ) by (source) > 0 - sum(\r\n      label_replace(\r\n          sum(\r\n              rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/$workload\", flag=\"SYN-ACK\"}[$__rate_interval])\r\n          ) by (destination), \"source\", \"$1\", \"destination\", \"(.*)\"\r\n      )\r\n  ) without (destination), 0.01\r\n)) > 0",
               "hide": false,
               "legendFormat": "{{source}}",
               "range": true,
@@ -2616,7 +2324,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -2632,7 +2341,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 54
+            "y": 13
           },
           "id": 184,
           "options": {
@@ -2660,7 +2369,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "round(\r\n    sum(\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/.*\", flag=\"SYN\"}[$__rate_interval])\r\n    ) by (source) > 0 - sum(\r\n        label_replace(\r\n            sum(\r\n                rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/.*\", flag=\"SYN-ACK\"}[$__rate_interval])\r\n            ) by (destination), \"source\", \"$1\", \"destination\", \"(.*)\"\r\n        )\r\n    ) without (destination), 0.01\r\n)",
+              "expr": "round(\r\n    sum(\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/$workload\", flag=\"SYN\"}[$__rate_interval])\r\n    ) by (source) > 0 - sum(\r\n        label_replace(\r\n            sum(\r\n                rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/$workload\", flag=\"SYN-ACK\"}[$__rate_interval])\r\n            ) by (destination), \"source\", \"$1\", \"destination\", \"(.*)\"\r\n        )\r\n    ) without (destination), 0.01\r\n)",
               "hide": false,
               "legendFormat": "{{source}}",
               "range": true,
@@ -2685,7 +2394,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "orange"
+                    "color": "orange",
+                    "value": null
                   }
                 ]
               },
@@ -2697,7 +2407,7 @@
             "h": 3,
             "w": 5,
             "x": 0,
-            "y": 63
+            "y": 22
           },
           "id": 238,
           "options": {
@@ -2722,7 +2432,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "count (\r\n    sum by (source) (\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/.*\", flag=\"RST\"}[10m])\r\n    ) >= 0.01\r\n)",
+              "expr": "count (\r\n    sum by (source) (\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/$workload\", flag=\"RST\"}[10m])\r\n    ) >= 0.01\r\n)",
               "instant": true,
               "legendFormat": "Pods with Outgoing RST",
               "range": false,
@@ -2749,7 +2459,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "red"
+                    "color": "red",
+                    "value": null
                   }
                 ]
               },
@@ -2761,7 +2472,7 @@
             "h": 3,
             "w": 4,
             "x": 5,
-            "y": 63
+            "y": 22
           },
           "id": 239,
           "options": {
@@ -2785,7 +2496,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "round(sum (\r\n    sum(\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/.*\", flag=\"RST\"}[$__rate_interval])\r\n    )\r\n), 0.01)",
+              "expr": "round(sum (\r\n    sum(\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/$workload\", flag=\"RST\"}[$__rate_interval])\r\n    )\r\n), 0.01)",
               "legendFormat": "Max Outgoing RST Packets",
               "range": true,
               "refId": "A"
@@ -2811,7 +2522,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "super-light-red"
+                    "color": "super-light-red",
+                    "value": null
                   }
                 ]
               },
@@ -2823,7 +2535,7 @@
             "h": 3,
             "w": 3,
             "x": 9,
-            "y": 63
+            "y": 22
           },
           "id": 240,
           "options": {
@@ -2847,7 +2559,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "round(sum (\r\n    sum(\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/.*\", flag=\"RST\"}[$__rate_interval])\r\n    )\r\n), 0.01)",
+              "expr": "round(sum (\r\n    sum(\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/$workload\", flag=\"RST\"}[$__rate_interval])\r\n    )\r\n), 0.01)",
               "legendFormat": "Min Outgoing RST Packets",
               "range": true,
               "refId": "A"
@@ -2872,7 +2584,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "orange"
+                    "color": "orange",
+                    "value": null
                   }
                 ]
               },
@@ -2884,7 +2597,7 @@
             "h": 3,
             "w": 5,
             "x": 12,
-            "y": 63
+            "y": 22
           },
           "id": 233,
           "options": {
@@ -2909,7 +2622,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "count (\r\n    sum by (destination) (\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/.*\", flag=\"RST\"}[10m])\r\n    ) >= 0.01\r\n)",
+              "expr": "count (\r\n    sum by (destination) (\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/$workload\", flag=\"RST\"}[10m])\r\n    ) >= 0.01\r\n)",
               "instant": true,
               "legendFormat": "Pods with Incoming RST",
               "range": false,
@@ -2936,7 +2649,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "red"
+                    "color": "red",
+                    "value": null
                   }
                 ]
               },
@@ -2948,7 +2662,7 @@
             "h": 3,
             "w": 4,
             "x": 17,
-            "y": 63
+            "y": 22
           },
           "id": 234,
           "options": {
@@ -2972,7 +2686,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "round(sum (\r\n    sum(\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/.*\", flag=\"RST\"}[$__rate_interval])\r\n    )\r\n), 0.01)",
+              "expr": "round(sum (\r\n    sum(\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/$workload\", flag=\"RST\"}[$__rate_interval])\r\n    )\r\n), 0.01)",
               "legendFormat": "Max Incoming RST Packets",
               "range": true,
               "refId": "A"
@@ -2997,7 +2711,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "super-light-red"
+                    "color": "super-light-red",
+                    "value": null
                   }
                 ]
               },
@@ -3009,7 +2724,7 @@
             "h": 3,
             "w": 3,
             "x": 21,
-            "y": 63
+            "y": 22
           },
           "id": 235,
           "options": {
@@ -3033,7 +2748,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "round(sum (\r\n    sum(\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/.*\", flag=\"RST\"}[$__rate_interval])\r\n    )\r\n), 0.01)",
+              "expr": "round(sum (\r\n    sum(\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/$workload\", flag=\"RST\"}[$__rate_interval])\r\n    )\r\n), 0.01)",
               "legendFormat": "Min Incoming RST Packets",
               "range": true,
               "refId": "A"
@@ -3068,7 +2783,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 66
+            "y": 25
           },
           "id": 237,
           "options": {
@@ -3114,7 +2829,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "topk(10, round(sum by (source) (\r\n  rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/.*\", flag=\"RST\"}[$__rate_interval])\r\n), 0.01)) > 0",
+              "expr": "topk(10, round(sum by (source) (\r\n  rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/$workload\", flag=\"RST\"}[$__rate_interval])\r\n), 0.01)) > 0",
               "hide": false,
               "legendFormat": "{{source}}",
               "range": true,
@@ -3149,7 +2864,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 66
+            "y": 25
           },
           "id": 236,
           "options": {
@@ -3195,7 +2910,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "topk(10, round(sum by (destination) (\r\n  rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/.*\", flag=\"RST\"}[$__rate_interval])\r\n), 0.01)) > 0",
+              "expr": "topk(10, round(sum by (destination) (\r\n  rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/$workload\", flag=\"RST\"}[$__rate_interval])\r\n), 0.01)) > 0",
               "hide": false,
               "legendFormat": "{{destination}}",
               "range": true,
@@ -3222,7 +2937,7 @@
                 "axisPlacement": "auto",
                 "barAlignment": 0,
                 "drawStyle": "line",
-                "fillOpacity": 30,
+                "fillOpacity": 3,
                 "gradientMode": "hue",
                 "hideFrom": {
                   "legend": false,
@@ -3251,7 +2966,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -3267,7 +2983,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 75
+            "y": 34
           },
           "id": 241,
           "options": {
@@ -3295,7 +3011,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "round(sum by (source) (\r\n  rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/.*\", flag=\"RST\"}[$__rate_interval])\r\n), 0.01)",
+              "expr": "round(sum by (source) (\r\n  rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/$workload\", flag=\"RST\"}[$__rate_interval])\r\n), 0.01)",
               "hide": false,
               "legendFormat": "{{source}}",
               "range": true,
@@ -3351,7 +3067,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -3367,7 +3084,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 75
+            "y": 34
           },
           "id": 242,
           "options": {
@@ -3395,7 +3112,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "round(sum by (destination) (\r\n  rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/.*\", flag=\"RST\"}[$__rate_interval])\r\n), 0.01)",
+              "expr": "round(sum by (destination) (\r\n  rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/$workload\", flag=\"RST\"}[$__rate_interval])\r\n), 0.01)",
               "hide": false,
               "legendFormat": "{{source}}",
               "range": true,
@@ -3420,7 +3137,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "purple"
+                    "color": "purple",
+                    "value": null
                   }
                 ]
               },
@@ -3432,7 +3150,7 @@
             "h": 3,
             "w": 5,
             "x": 0,
-            "y": 84
+            "y": 43
           },
           "id": 243,
           "options": {
@@ -3457,7 +3175,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "count (\r\n    sum by (source) (\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/.*\", flag=\"FIN\"}[10m])\r\n    ) >= 0.01\r\n)",
+              "expr": "count (\r\n    sum by (source) (\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/$workload\", flag=\"FIN\"}[10m])\r\n    ) >= 0.01\r\n)",
               "instant": true,
               "legendFormat": "Pods with Outgoing FIN",
               "range": false,
@@ -3484,7 +3202,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "blue"
+                    "color": "blue",
+                    "value": null
                   }
                 ]
               },
@@ -3496,7 +3215,7 @@
             "h": 3,
             "w": 4,
             "x": 5,
-            "y": 84
+            "y": 43
           },
           "id": 244,
           "options": {
@@ -3520,7 +3239,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "round(sum (\r\n    sum(\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/.*\", flag=\"FIN\"}[$__rate_interval])\r\n    )\r\n), 0.01)",
+              "expr": "round(sum (\r\n    sum(\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/$workload\", flag=\"FIN\"}[$__rate_interval])\r\n    )\r\n), 0.01)",
               "legendFormat": "Max Outgoing FIN Packets",
               "range": true,
               "refId": "A"
@@ -3546,7 +3265,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "super-light-blue"
+                    "color": "super-light-blue",
+                    "value": null
                   }
                 ]
               },
@@ -3558,7 +3278,7 @@
             "h": 3,
             "w": 3,
             "x": 9,
-            "y": 84
+            "y": 43
           },
           "id": 245,
           "options": {
@@ -3582,7 +3302,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "round(sum (\r\n    sum(\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/.*\", flag=\"FIN\"}[$__rate_interval])\r\n    )\r\n), 0.01)",
+              "expr": "round(sum (\r\n    sum(\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/$workload\", flag=\"FIN\"}[$__rate_interval])\r\n    )\r\n), 0.01)",
               "legendFormat": "Min Outgoing FIN Packets",
               "range": true,
               "refId": "A"
@@ -3607,7 +3327,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "purple"
+                    "color": "purple",
+                    "value": null
                   }
                 ]
               },
@@ -3619,7 +3340,7 @@
             "h": 3,
             "w": 5,
             "x": 12,
-            "y": 84
+            "y": 43
           },
           "id": 246,
           "options": {
@@ -3644,7 +3365,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "count (\r\n    sum by (destination) (\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/.*\", flag=\"FIN\"}[10m])\r\n    ) >= 0.01\r\n)",
+              "expr": "count (\r\n    sum by (destination) (\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/$workload\", flag=\"FIN\"}[10m])\r\n    ) >= 0.01\r\n)",
               "instant": true,
               "legendFormat": "Pods with Incoming FIN",
               "range": false,
@@ -3671,7 +3392,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "blue"
+                    "color": "blue",
+                    "value": null
                   }
                 ]
               },
@@ -3683,7 +3405,7 @@
             "h": 3,
             "w": 4,
             "x": 17,
-            "y": 84
+            "y": 43
           },
           "id": 247,
           "options": {
@@ -3707,7 +3429,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "round(sum (\r\n    sum(\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/.*\", flag=\"FIN\"}[$__rate_interval])\r\n    )\r\n), 0.01)",
+              "expr": "round(sum (\r\n    sum(\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/$workload\", flag=\"FIN\"}[$__rate_interval])\r\n    )\r\n), 0.01)",
               "legendFormat": "Max Incoming FIN Packets",
               "range": true,
               "refId": "A"
@@ -3732,7 +3454,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "super-light-blue"
+                    "color": "super-light-blue",
+                    "value": null
                   }
                 ]
               },
@@ -3744,7 +3467,7 @@
             "h": 3,
             "w": 3,
             "x": 21,
-            "y": 84
+            "y": 43
           },
           "id": 248,
           "options": {
@@ -3768,7 +3491,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "round(sum (\r\n    sum(\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/.*\", flag=\"FIN\"}[$__rate_interval])\r\n    )\r\n), 0.01)",
+              "expr": "round(sum (\r\n    sum(\r\n        rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/$workload\", flag=\"FIN\"}[$__rate_interval])\r\n    )\r\n), 0.01)",
               "legendFormat": "Min Incoming FIN Packets",
               "range": true,
               "refId": "A"
@@ -3803,7 +3526,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 87
+            "y": 46
           },
           "id": 249,
           "options": {
@@ -3849,7 +3572,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "topk(10, round(sum by (source) (\r\n  rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/.*\", flag=\"FIN\"}[$__rate_interval])\r\n), 0.01)) > 0",
+              "expr": "topk(10, round(sum by (source) (\r\n  rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/$workload\", flag=\"FIN\"}[$__rate_interval])\r\n), 0.01)) > 0",
               "hide": false,
               "legendFormat": "{{source}}",
               "range": true,
@@ -3884,7 +3607,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 87
+            "y": 46
           },
           "id": 250,
           "options": {
@@ -3930,7 +3653,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "topk(10, round(sum by (destination) (\r\n  rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/.*\", flag=\"FIN\"}[$__rate_interval])\r\n), 0.01)) > 0",
+              "expr": "topk(10, round(sum by (destination) (\r\n  rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/$workload\", flag=\"FIN\"}[$__rate_interval])\r\n), 0.01)) > 0",
               "hide": false,
               "legendFormat": "{{destination}}",
               "range": true,
@@ -3986,7 +3709,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -4002,7 +3726,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 96
+            "y": 55
           },
           "id": 251,
           "options": {
@@ -4030,7 +3754,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "round(sum by (source) (\r\n  rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/.*\", flag=\"FIN\"}[$__rate_interval])\r\n), 0.01)",
+              "expr": "round(sum by (source) (\r\n  rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", source=~\"^$namespace/$workload\", flag=\"FIN\"}[$__rate_interval])\r\n), 0.01)",
               "hide": false,
               "legendFormat": "{{source}}",
               "range": true,
@@ -4086,7 +3810,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -4102,7 +3827,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 96
+            "y": 55
           },
           "id": 252,
           "options": {
@@ -4130,7 +3855,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "round(sum by (destination) (\r\n  rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/.*\", flag=\"FIN\"}[$__rate_interval])\r\n), 0.01)",
+              "expr": "round(sum by (destination) (\r\n  rate(hubble_tcp_flags_total{cluster=~\"$cluster\", instance=~\"$Nodes\", destination=~\"^$namespace/$workload\", flag=\"FIN\"}[$__rate_interval])\r\n), 0.01)",
               "hide": false,
               "legendFormat": "{{source}}",
               "range": true,
@@ -4141,7 +3866,7 @@
           "type": "timeseries"
         }
       ],
-      "title": "TCP (in $namespace)",
+      "title": "TCP (for $workload)",
       "type": "row"
     }
   ],
@@ -4150,7 +3875,7 @@
   "schemaVersion": 38,
   "style": "dark",
   "tags": [
-    "k8s:network-observability"
+    "k8s:retina-network-observability"
   ],
   "templating": {
     "list": [
@@ -4183,10 +3908,7 @@
         "multi": false,
         "name": "cluster",
         "options": [],
-        "query": {
-          "query": "label_values(up, cluster)",
-          "refId": "StandardVariableQuery"
-        },
+        "query": "label_values(up, cluster)",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
@@ -4200,17 +3922,14 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(up{cluster=\"$cluster\"},instance)",
+        "definition": "label_values(up{cluster=\"$cluster\"}, instance)",
         "hide": 0,
         "includeAll": true,
         "label": "Nodes",
         "multi": true,
         "name": "Nodes",
         "options": [],
-        "query": {
-          "query": "label_values(up{cluster=\"$cluster\"},instance)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
+        "query": "label_values(up{cluster=\"$cluster\"}, instance)",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
@@ -4241,6 +3960,28 @@
         "skipUrlSync": false,
         "sort": 1,
         "type": "query"
+      },
+      {
+        "allValue": "(.*)",
+        "current": {},
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(kube_pod_info{namespace=\"$namespace\"}, pod)",
+        "description": "",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Workload",
+        "multi": false,
+        "name": "workload",
+        "options": [],
+        "query": "label_values(kube_pod_info{namespace=\"$namespace\"}, pod)",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
       }
     ]
   },
@@ -4263,7 +4004,7 @@
     ]
   },
   "timezone": "",
-  "title": "Kubernetes / Networking / Pod Flows (Namespace)",
-  "uid": "NetObsFlowsNamespace6739",
+  "title": "Kubernetes / Networking / Retina (Hubble) / Pod Flows (Workload)",
+  "uid": "RetinaHubblePodFlowsWorkload",
   "version": 1
 }
