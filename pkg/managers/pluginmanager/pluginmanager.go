@@ -139,9 +139,9 @@ func (p *PluginManager) Start(ctx context.Context) error {
 	_, isPacketParserEnabled := p.plugins["packetparser"]
 	// run conntrack GC only if packetparser is enabled
 	if isPacketParserEnabled {
-		ct, err := conntrack.New()
-		if err != nil {
-			return errors.Wrap(err, "failed to get conntrack instance")
+		ct, connErr := conntrack.New()
+		if connErr != nil {
+			return errors.Wrap(connErr, "failed to get conntrack instance")
 		}
 		g.Go(func() error {
 			return errors.Wrapf(ct.Run(ctx), "failed to run conntrack GC")
