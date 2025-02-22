@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/cilium/ebpf"
-	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
 )
 
@@ -22,7 +21,6 @@ type Conntrack struct {
 	objs        *conntrackObjects
 	ctMap       *ebpf.Map
 	gcFrequency time.Duration
-	cfg         *config.Config
 }
 
 // Define TCP flag constants
