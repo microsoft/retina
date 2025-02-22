@@ -146,6 +146,8 @@ func (p *PluginManager) Start(ctx context.Context) error {
 		g.Go(func() error {
 			return errors.Wrapf(ct.Run(ctx), "failed to run conntrack GC")
 		})
+	} else {
+		p.l.Info("Skipping Conntrack GC loop as packetparser plugin is not enabled")
 	}
 
 	// start all plugins
