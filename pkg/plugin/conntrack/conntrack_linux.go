@@ -14,7 +14,6 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/rlimit"
 	"github.com/microsoft/retina/internal/ktime"
-	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/loader"
 	"github.com/microsoft/retina/pkg/log"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
@@ -47,8 +46,13 @@ func Init() error {
 	return nil
 }
 
-// New creates a new Conntrack instance
+// New returns a new Conntrack instance.
 func New() (*Conntrack, error) {
+	ct := &Conntrack{
+		l:           log.Logger().Named("conntrack"),
+		gcFrequency: defaultGCFrequency,
+	}
+
 	objs := &conntrackObjects{}
 	err := loadConntrackObjects(objs, &ebpf.CollectionOptions{
 		Maps: ebpf.MapOptions{
@@ -56,21 +60,14 @@ func New() (*Conntrack, error) {
 		},
 	})
 	if err != nil {
+		ct.l.Error("loadConntrackObjects failed", zap.Error(err))
 		return nil, errors.Wrap(err, "failed to load conntrack objects")
 	}
 
-	ct := &Conntrack{
-		l:           log.Logger().Named("conntrack"),
-		gcFrequency: defaultGCFrequency,
-		objs:        objs,
-		ctMap:       objs.RetinaConntrack,
-	}
+	ct.objs = objs
+	// Get the conntrack map from the objects
+	ct.ctMap = objs.RetinaConntrack
 	return ct, nil
-}
-
-// SetConfig sets the config after initialization
-func (ct *Conntrack) SetConfig(cfg *config.Config) {
-	ct.cfg = cfg
 }
 
 // Build dynamic header path
@@ -96,12 +93,6 @@ func GenerateDynamic(ctx context.Context, dynamicHeaderPath string, conntrackMet
 
 // Run starts the Conntrack garbage collection loop.
 func (ct *Conntrack) Run(ctx context.Context) error {
-	// Check if packetparser plugin is enabled
-	if !plugincommon.IsPluginEnabled(ct.cfg.EnabledPlugin, "packetparser") {
-		ct.l.Info("Skipping Conntrack GC loop as packetparser plugin is not enabled")
-		return nil
-	}
-
 	ticker := time.NewTicker(ct.gcFrequency)
 	defer ticker.Stop()
 
