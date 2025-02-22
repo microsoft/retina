@@ -15,7 +15,6 @@ const (
 	dynamicHeaderFileName = "dynamic.h"
 )
 
-// Conntrack represents the conntrack plugin
 type Conntrack struct {
 	l           *log.ZapLogger
 	objs        *conntrackObjects
