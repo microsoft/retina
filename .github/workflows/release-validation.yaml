@@ -1,0 +1,72 @@
+name: Release Validation
+
+on:
+  workflow_run:
+    workflows:
+      - Release Retina Charts
+      - Release Retina Container Images
+    types:
+      - completed
+
+jobs:
+  release_validation:
+    name: Release Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4.2.2
+
+      - name: Get latest tag
+        id: get_latest_tag
+        run: |
+          TAG=$(curl -s https://api.github.com/repos/microsoft/retina/releases | jq -r '.[0].name')
+          echo "TAG=$TAG" >> $GITHUB_ENV
+
+      - name: Test Docker images pull
+        run: |
+          TAG=${{ env.TAG }}
+          images=(
+             "retina-agent"
+             "retina-init"
+             "retina-operator"
+             "kubectl-retina"
+             "retina-shell"
+          )
+          for image in "${images[@]}"; do
+            echo "Checking image: ghcr.io/microsoft/$image:$TAG"
+            if curl --head --silent --fail "https://ghcr.io/v2/microsoft/$image/manifests/$TAG"; then
+              docker pull "ghcr.io/microsoft/$image:$TAG"
+            else
+              echo "Image ghcr.io/microsoft/$image:$TAG does not exist or you do not have access."
+            fi
+          done
+
+      - name: Test Helm chart pull
+        run: |
+          helm pull oci://ghcr.io/microsoft/retina/charts/retina-hubble --version  ${{ env.TAG }}
+          helm pull oci://ghcr.io/microsoft/retina/charts/retina --version ${{ env.TAG }}
+
+      - name: Setup kind cluster
+        uses: helm/kind-action@v1.12.0
+
+      # krew does not support installing a specific verison
+      # so if this step fails it means there was something wrong
+      # with the krew index update as part of the release
+      - name: Test krew install retina
+        run: |
+          (
+            set -x; cd "$(mktemp -d)" &&
+            OS="$(uname | tr '[:upper:]' '[:lower:]')" &&
+            ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/\(arm\)\(64\)\?.*/\1\2/' -e 's/aarch64$/arm64/')" &&
+            KREW="krew-${OS}_${ARCH}" &&
+            curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/${KREW}.tar.gz" &&
+            tar zxvf "${KREW}.tar.gz" &&
+            ./"${KREW}" install krew
+            echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.bashrc
+            source ~/.bashrc
+            kubectl krew install retina
+          )
+
+      - name: Check Go package version
+        run: |
+          go list -m github.com/microsoft/retina@{{ env.TAG }}
