@@ -946,8 +946,8 @@ golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa/go.mod h1:IxCIyHEi3zRg3s0
 golang.org/x/crypto v0.3.0/go.mod h1:hebNnKkNXi2UzZN1eVRvBB7co0a+JxK6XbPiWVs/3J4=
 golang.org/x/crypto v0.6.0/go.mod h1:OFC/31mSvZgRz0V1QTNCzfAI1aIRzbiufJtkMIlEp58=
 golang.org/x/crypto v0.19.0/go.mod h1:Iy9bg/ha4yyC70EfRS8jz+B6ybOBKMaSxLj6P6oBDfU=
-golang.org/x/crypto v0.33.0 h1:IOBPskki6Lysi0lo9qQvbxiQ+FvsCC/YWOecCHAixus=
-golang.org/x/crypto v0.33.0/go.mod h1:bVdXmD7IV/4GdElGPozy6U7lWdRXA4qyRVGJV57uQ5M=
+golang.org/x/crypto v0.34.0 h1:+/C6tk6rf/+t5DhUketUbD1aNGqiSX3j15Z6xuIDlBA=
+golang.org/x/crypto v0.34.0/go.mod h1:dy7dXNW32cAb/6/PRuTNsix8T+vJAqvuIy5Bli/x0YQ=
 golang.org/x/exp v0.0.0-20190121172915-509febef88a4/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
 golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 h1:2dVuKD2vS7b0QIHQbpyTISPd0LeHDbnYEryqj5Q1ug8=
 golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56/go.mod h1:M4RDyNAINzryxdtnbRXRL/OHtkFuWGRjvuhBJpk2IlY=
@@ -1224,8 +1224,8 @@ k8s.io/utils v0.0.0-20241210054802-24370beab758 h1:sdbE21q2nlQtFh65saZY+rRM6x6aJ
 k8s.io/utils v0.0.0-20241210054802-24370beab758/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
 oras.land/oras-go v1.2.5 h1:XpYuAwAb0DfQsunIyMfeET92emK8km3W4yEzZvUbsTo=
 oras.land/oras-go v1.2.5/go.mod h1:PuAwRShRZCsZb7g8Ar3jKKQR/2A/qN+pkYxIOd/FAoo=
-sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.5.0 h1:OQOL3+xhy8ZXr9CUAre3g22NFTWQ8m6E+GEOvGR9DKY=
-sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.5.0/go.mod h1:hJBb8wrJacIpnViSbKvyA/5C9oAi2pM9bGjkI43+tYE=
+sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.5.2 h1:w/GkZK6zrRVOp2KiCseJGYKLclvBwpnt8alLNnL/6Js=
+sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.5.2/go.mod h1:v+L8fSlY6pMNfQlGLFlzEhnM6LCO1eRTMEq3egT+4eo=
 sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader v0.0.20 h1:jeEFfNxq9uJqkkxhd6WaWNsKNjKhJBcVuWTSgJoXXHM=
 sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader v0.0.20/go.mod h1:5evhIg+6KdZLaezvJPN1rMcn/EY+GypQh/7gNZHD97Y=
 sigs.k8s.io/controller-runtime v0.18.5 h1:nTHio/W+Q4aBlQMgbnC5hZb4IjIidyrizMai9P6n4Rk=
