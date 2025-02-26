@@ -107,7 +107,7 @@ volumeMounts:
   cgroup: /sys/fs/cgroup
   tmp: /tmp
   config: /retina/config
-  varrun: /var/run
+  varrun: /var/run/cilium
 
 #volume mounts for indows
 volumeMounts_win:
