@@ -50,7 +50,7 @@ spec:
             mountPath: /sys/fs/bpf
             mountPropagation: Bidirectional
           - name: varrun
-            mountPath: /var/run
+            mountPath: /var/run/cilium
             mountPropagation: Bidirectional
           - name: config
             mountPath: /retina/config
@@ -128,6 +128,10 @@ spec:
           name: {{ $.Values.nameOverride }}-config
       {{ else if eq $name "tmp"}}
         emptyDir: {}
+      {{ else if eq $name "varrun"}}
+        hostPath:
+          path: {{ $hostPath }}
+          type: DirectoryOrCreate
       {{ else }}
         hostPath:
           path: {{ $hostPath }}
