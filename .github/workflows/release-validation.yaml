@@ -60,4 +60,5 @@ jobs:
 
       - name: Check Go package version
         run: |
-          go list -m github.com/microsoft/retina@{{ env.TAG }}
+          TAG=${{ env.TAG }}
+          go list -m "github.com/microsoft/retina@${TAG}"
