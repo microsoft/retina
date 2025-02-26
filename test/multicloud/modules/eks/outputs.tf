@@ -4,7 +4,7 @@ output "aws_get_kubeconfig" {
 }
 
 output "access_token" {
-  value = data.aws_eks_cluster_auth.eks.token
+  value     = data.aws_eks_cluster_auth.eks.token
   sensitive = true
 }
 
@@ -14,6 +14,6 @@ output "host" {
 }
 
 output "cluster_ca_certificate" {
-  value = data.aws_eks_cluster.eks.certificate_authority[0].data
+  value     = data.aws_eks_cluster.eks.certificate_authority[0].data
   sensitive = true
 }

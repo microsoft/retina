@@ -18,13 +18,13 @@ provider "aws" {
 }
 
 data "aws_eks_cluster_auth" "eks" {
-  name = "${var.prefix}-eks"
-  depends_on = [ module.eks ]
+  name       = "${var.prefix}-eks"
+  depends_on = [module.eks]
 }
 
 data "aws_eks_cluster" "eks" {
-  name = "${var.prefix}-eks"
-  depends_on = [ module.eks ]
+  name       = "${var.prefix}-eks"
+  depends_on = [module.eks]
 }
 
 # Initialize the Helm provider

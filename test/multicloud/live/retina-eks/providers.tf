@@ -26,13 +26,13 @@ provider "aws" {
 }
 
 data "aws_eks_cluster_auth" "eks" {
-  name = "${local.prefix}-eks"
-  depends_on = [ module.eks ]
+  name       = "${local.prefix}-eks"
+  depends_on = [module.eks]
 }
 
 data "aws_eks_cluster" "eks" {
-  name = "${local.prefix}-eks"
-  depends_on = [ module.eks ]
+  name       = "${local.prefix}-eks"
+  depends_on = [module.eks]
 }
 
 # Initialize the Helm provider
@@ -46,9 +46,9 @@ provider "helm" {
 
 # Initialize the Kubernetes provider for GKE
 provider "kubernetes" {
-    token                  = data.aws_eks_cluster_auth.eks.token
-    host                   = data.aws_eks_cluster.eks.endpoint
-    cluster_ca_certificate = base64decode(data.aws_eks_cluster.eks.certificate_authority[0].data)
+  token                  = data.aws_eks_cluster_auth.eks.token
+  host                   = data.aws_eks_cluster.eks.endpoint
+  cluster_ca_certificate = base64decode(data.aws_eks_cluster.eks.certificate_authority[0].data)
 }
 
 # Initialize the Grafana provider

@@ -1,7 +1,7 @@
 module "eks" {
-    source = "../../../modules/eks"
-    prefix = var.prefix
-    region = var.region
+  source = "../../../modules/eks"
+  prefix = var.prefix
+  region = var.region
 }
 
 module "retina" {

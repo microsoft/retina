@@ -4,21 +4,21 @@ resource "aws_vpc" "vpc" {
 
 # Public subnet for NAT Gateway
 resource "aws_subnet" "subnet1_private" {
-  vpc_id     = aws_vpc.vpc.id
-  cidr_block = "10.0.1.0/24"
+  vpc_id            = aws_vpc.vpc.id
+  cidr_block        = "10.0.1.0/24"
   availability_zone = "${var.region}a"
 }
 
 resource "aws_subnet" "subnet2_private" {
-  vpc_id     = aws_vpc.vpc.id
-  cidr_block = "10.0.2.0/24"
+  vpc_id            = aws_vpc.vpc.id
+  cidr_block        = "10.0.2.0/24"
   availability_zone = "${var.region}b"
 }
 
 resource "aws_subnet" "subnet3_public" {
-  vpc_id     = aws_vpc.vpc.id
-  cidr_block = "10.0.3.0/24"
-  availability_zone = "${var.region}c"
+  vpc_id                  = aws_vpc.vpc.id
+  cidr_block              = "10.0.3.0/24"
+  availability_zone       = "${var.region}c"
   map_public_ip_on_launch = true
 }
 
@@ -55,7 +55,7 @@ resource "aws_route_table" "private_route_table" {
 
   # route private traffic to NAT Gateway
   route {
-    cidr_block = "0.0.0.0/0"
+    cidr_block     = "0.0.0.0/0"
     nat_gateway_id = aws_nat_gateway.nat_gateway.id
   }
 }
@@ -110,18 +110,18 @@ resource "aws_security_group" "eks_worker" {
 
   # Allow worker nodes to communicate with the EKS control plane
   egress {
-    description = "allow-outbound"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
+    description     = "allow-outbound"
+    from_port       = 443
+    to_port         = 443
+    protocol        = "tcp"
     security_groups = [aws_security_group.eks.id]
   }
   # Allow EKS control plane to communicate with worker nodes
   ingress {
-    description = "allow-inbound"
-    from_port   = 1025
-    to_port     = 65535
-    protocol    = "tcp"
+    description     = "allow-inbound"
+    from_port       = 1025
+    to_port         = 65535
+    protocol        = "tcp"
     security_groups = [aws_security_group.eks.id]
   }
 }
@@ -130,8 +130,8 @@ resource "aws_eks_cluster" "eks" {
   name = "${var.prefix}-eks"
 
   access_config {
-    authentication_mode = "API"
-    bootstrap_cluster_creator_admin_permissions  = true
+    authentication_mode                         = "API"
+    bootstrap_cluster_creator_admin_permissions = true
   }
 
   role_arn = aws_iam_role.eks_cluster_role.arn
@@ -204,7 +204,7 @@ resource "aws_eks_node_group" "node_group" {
   node_group_name = "${var.prefix}-node-group"
   node_role_arn   = aws_iam_role.eks_node_group_role.arn
   subnet_ids      = aws_eks_cluster.eks.vpc_config[0].subnet_ids
-  
+
   # Ensure that IAM Role permissions are created before and deleted
   scaling_config {
     desired_size = 2
