@@ -50,4 +50,6 @@ module "grafana" {
   prometheus_endpoints = {
     aks = "http://${module.prometheus_lb_aks.ip}:9090"
   }
+  # All dashboards are deployed as part of live/retina-eks
+  dashboards = {}
 }

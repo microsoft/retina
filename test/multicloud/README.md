@@ -10,6 +10,7 @@ An example Hubble UI visualization on GKE dataplane v1 (no Cilium). [See GKE net
 
 * [aks](./modules/aks/): Deploy Azure Kubernetes Service cluster.
 * [gke](./modules/gke/): Deploy Google Kubernetes Engine cluster.
+* [eks](./modules/eks/): Deploy Elastic Kubernetes Service cluster.
 * [kind](./modules/kind/): Deploy KIND cluster.
 * [helm-release](./modules/helm-release/): Deploy a Helm Chart, used to deploy Retina and Prometheus.
 * [kubernetes-lb](./modules/kubernetes-lb/): Create a Kubernetes Service of type Load Balancer, used to expose Prometheus.
@@ -46,6 +47,19 @@ An example Hubble UI visualization on GKE dataplane v1 (no Cilium). [See GKE net
     ```sh
     # example
     export GOOGLE_APPLICATION_CREDENTIALS=/Users/srodi/src/retina/test/multicloud/live/retina-gke/service-key.json
+    ```
+
+* EKS:
+    1. Create an AWS account
+    2. Create a user and assign required policies to create VPC, Subnets, Security Groups, IAM roles, EKS and workers
+    3. [Install AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+    4. Create required `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` for the new user
+
+    To deploy an EKS cluster export `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` as env variables.
+
+    ```sh
+    export AWS_ACCESS_KEY_ID="..."
+    export AWS_SECRET_ACCESS_KEY="..."
     ```
 
 * Grafana
@@ -85,6 +99,12 @@ Format code, initialize OpenTofu, plan and apply the stack to create infra and d
     make gke
     ```
 
+* EKS:
+
+    ```sh
+    make eks
+    ```
+
 * Kind:
 
     ```sh
@@ -93,13 +113,13 @@ Format code, initialize OpenTofu, plan and apply the stack to create infra and d
 
 ### Clean up
 
-To destroy the cluster specify the `STACK_NAME` and run `make clean`.
+To destroy the cluster specify the `STACK_NAME` and run `make destroy`.
 
 ```sh
 # destroy AKS and cleanup local state files
 # set a different stack as needed (i.e. retina-gke, retina-kind)
 export STACK_NAME=retina-aks
-make clean
+make destroy
 ```
 
 ### Test
@@ -116,6 +136,7 @@ Resources documentation:
 
 * [GKE](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/container_cluster)
 * [AKS](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/kubernetes_cluster)
+* [EKS](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/eks_cluster)
 * [Kind](https://registry.terraform.io/providers/tehcyx/kind/latest/docs/resources/cluster)
 * [Helm Release](https://registry.terraform.io/providers/hashicorp/helm/latest/docs/resources/release)
 * [Kubernetes LB Service](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/service)
@@ -132,6 +153,12 @@ Here is an example on how to import resources for `modules/gke`:
 # i.e. examples/gke
 tofu import module.gke.google_container_cluster.gke europe-west2/test-gke-cluster
 tofu import module.gke.google_service_account.default projects/mc-retina/serviceAccounts/test-gke-service-account@mc-retina.iam.gserviceaccount.com
+
+# i.e. examples/eks
+tofu import module.eks.aws_eks_node_group.node_group mc-test-aks:mc-test-node-group
+tofu import module.eks.aws_iam_role.eks_node_group_role mc-test-eks-node-group-role
+tofu import module.eks.aws_iam_role_policy_attachment.eks_node_group_AmazonEKS_CNI_Policy "mc-test-eks-node-group-role/arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+tofu import module.eks.aws_iam_role_policy_attachment.eks_node_group_AmazonEKSWorkerNodePolicy "mc-test-eks-node-group-role/arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
 ```
 
 >Note: each resource documentation contains a section on how to import resources into the State. [Example for google_container_cluster resource](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/container_cluster#import).

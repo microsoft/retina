@@ -23,6 +23,10 @@ aks: export STACK_NAME=$(PREFIX)-aks
 aks:
 	@make quick
 
+eks: export STACK_NAME=$(PREFIX)-eks
+eks:
+	@make quick
+
 kind: export STACK_NAME=$(PREFIX)-kind
 kind:
 	@make quick
