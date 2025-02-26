@@ -7,6 +7,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -72,11 +73,7 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, fil
 	// tcpdump: Couldn't find user 'tcpdump'
 	// To disable this behavior, we use `--relinquish-privileges=root` same as `-Z root`.
 	// ref: https://manpages.debian.org/bullseye/tcpdump/tcpdump.8.en.html#Z
-	captureStartCmd := exec.Command(
-		"tcpdump",
-		"-w", captureFilePath,
-		"--relinquish-privileges=root",
-	)
+	captureStartCmd := exec.Command("tcpdump", "-w", captureFilePath, "--relinquish-privileges=root")
 
 	if packetSize := os.Getenv(captureConstants.PacketSizeEnvKey); len(packetSize) != 0 {
 		captureStartCmd.Args = append(
@@ -195,15 +192,20 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, fil
 }
 
 type command struct {
-	name        string
-	args        []string
-	description string
+	name          string
+	args          []string
+	description   string
+	ignoreFailure bool
 }
 
 func (ncp *NetworkCaptureProvider) CollectMetadata() error {
 	ncp.l.Info("Start to collect network metadata")
 
-	iptablesMode := obtainIptablesMode()
+	iptablesMode, err := obtainIptablesMode(ncp.l)
+	if err != nil {
+		return fmt.Errorf("failed to determine iptables modes. %w", err)
+	}
+
 	ncp.l.Info(fmt.Sprintf("Iptables mode %s is used", iptablesMode))
 	iptablesSaveCmdName := fmt.Sprintf("iptables-%s-save", iptablesMode)
 	iptablesCmdName := fmt.Sprintf("iptables-%s", iptablesMode)
@@ -292,6 +294,9 @@ func (ncp *NetworkCaptureProvider) CollectMetadata() error {
 					name:        "cp",
 					args:        []string{"-r", "/proc/sys/net", filepath.Join(ncp.TmpCaptureDir, "proc-sys-net")},
 					description: "kernel networking configuration",
+					// Errors will occur when copying kernel networking configuration for not all files under /proc/sys/net are
+					// readable, like '/proc/sys/net/ipv4/route/flush', which doesn't implement the read function.
+					ignoreFailure: true,
 				},
 			},
 		},
@@ -314,7 +319,7 @@ func (ncp *NetworkCaptureProvider) CollectMetadata() error {
 			// Print headlines for all commands in output file.
 			cmds := []*exec.Cmd{}
 			for _, command := range metadata.commands {
-				cmd := exec.Command(command.name, command.args...)
+				cmd := exec.Command(command.name, command.args...) // nolint:gosec // no sensitive data
 				cmds = append(cmds, cmd)
 				commandSummary := fmt.Sprintf("%s(%s)\n", cmd.String(), command.description)
 				if _, err := outfile.WriteString(commandSummary); err != nil {
@@ -327,18 +332,17 @@ func (ncp *NetworkCaptureProvider) CollectMetadata() error {
 			}
 
 			// Write command stdout and stderr to output file
-			for _, cmd := range cmds {
+			for _, command := range metadata.commands {
+				cmd := exec.Command(command.name, command.args...) // nolint:gosec // no sensitive data
 				if _, err := outfile.WriteString(fmt.Sprintf("%s\n\n", cmd.String())); err != nil {
 					ncp.l.Error("Failed to write string to file", zap.String("file", outfile.Name()), zap.Error(err))
 				}
 
 				cmd.Stdout = outfile
 				cmd.Stderr = outfile
-				if err := cmd.Run(); err != nil {
+				if err := cmd.Run(); err != nil && !command.ignoreFailure {
 					// Don't return for error to continue capturing following network metadata.
 					ncp.l.Error("Failed to execute command", zap.String("command", cmd.String()), zap.Error(err))
-					// Log the error in output file because this error does not stop capture job pod from finishing,
-					// and the job can be recycled automatically leaving no info to debug.
 					if _, err = outfile.WriteString(fmt.Sprintf("Failed to run %q, error: %s)", cmd.String(), err.Error())); err != nil {
 						ncp.l.Error("Failed to write command run failure", zap.String("command", cmd.String()), zap.Error(err))
 					}
@@ -346,10 +350,8 @@ func (ncp *NetworkCaptureProvider) CollectMetadata() error {
 			}
 		} else {
 			for _, command := range metadata.commands {
-				cmd := exec.Command(command.name, command.args...)
-				// Errors will when copying kernel networking configuration for not all files under /proc/sys/net are
-				// readable, like '/proc/sys/net/ipv4/route/flush', which doesn't implement the read function.
-				if output, err := cmd.CombinedOutput(); err != nil {
+				cmd := exec.Command(command.name, command.args...) // nolint:gosec,gomnd // no sensitive data
+				if output, err := cmd.CombinedOutput(); err != nil && !command.ignoreFailure {
 					// Don't return for error to continue capturing following network metadata.
 					ncp.l.Error("Failed to execute command", zap.String("command", cmd.String()), zap.String("output", string(output)), zap.Error(err))
 				}
@@ -368,16 +370,62 @@ func (ncp *NetworkCaptureProvider) Cleanup() error {
 	return nil
 }
 
-func obtainIptablesMode() string {
+type iptablesMode string
+
+const (
+	legacyIptablesMode iptablesMode = "legacy"
+	nftIptablesMode    iptablesMode = "nft"
+)
+
+var errIptablesUnavilable = errors.New("no iptables command is available")
+
+// obtainIptablesMode return the available iptables mode, and returns empty when no iptables is available.
+func obtainIptablesMode(logger *log.ZapLogger) (iptablesMode, error) {
 	// Since iptables v1.8, nf_tables are introduced as an improvement of legacy iptables, but provides the same user
 	// interface as legacy iptables through iptables-nft command.
 	// based on: https://github.com/kubernetes-sigs/iptables-wrappers/blob/97b01f43a8e8db07840fc4b95e833a37c0d36b12/iptables-wrapper-installer.sh
-	legacySaveOut, _ := exec.Command("iptables-legacy-save").CombinedOutput()
-	legacySaveLineNum := len(strings.Split(string(legacySaveOut), "\n"))
-	nftSaveOut, _ := exec.Command("iptables-nft-save").CombinedOutput()
-	nftSaveLineNum := len(strings.Split(string(nftSaveOut), "\n"))
-	if legacySaveLineNum > nftSaveLineNum {
-		return "legacy"
+
+	// When both iptables modes available, we choose the one with more rules, because the other one normally outputs empty rules.
+	nftIptablesModeAvaiable := true
+	legacyIptablesModeAvaiable := true
+	legacySaveLineNum := 0
+	nftSaveLineNum := 0
+	if _, err := exec.LookPath("iptables-legacy-save"); err != nil {
+		legacyIptablesModeAvaiable = false
+		logger.Info("iptables-legacy-save is not available", zap.Error(err))
+	} else {
+		legacySaveOut, err := exec.Command("iptables-legacy-save").CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("failed to run iptables-legacy-save, %s", err.Error()) //nolint:goerr113 //no specific handling expected
+		}
+		legacySaveLineNum = len(strings.Split(string(legacySaveOut), "\n"))
 	}
-	return "nft"
+
+	if _, err := exec.LookPath("iptables-nft-save"); err != nil {
+		nftIptablesModeAvaiable = false
+		logger.Info("iptables-nft-save is not available", zap.Error(err))
+	} else {
+		nftSaveOut, err := exec.Command("iptables-nft-save").CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("failed to run iptables-nft-save, %s", err.Error()) //nolint:goerr113 //no specific handling expected
+		}
+		legacySaveLineNum = len(strings.Split(string(nftSaveOut), "\n"))
+	}
+
+	if nftIptablesModeAvaiable && legacyIptablesModeAvaiable {
+		if legacySaveLineNum > nftSaveLineNum {
+			return legacyIptablesMode, nil
+		}
+		return nftIptablesMode, nil
+	}
+
+	if nftIptablesModeAvaiable {
+		return nftIptablesMode, nil
+	}
+
+	if legacyIptablesModeAvaiable {
+		return legacyIptablesMode, nil
+	}
+
+	return "", errIptablesUnavilable
 }
