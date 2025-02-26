@@ -1,12 +1,9 @@
 name: Release Validation
 
 on:
-  workflow_run:
-    workflows:
-      - Release Retina Charts
-      - Release Retina Container Images
-    types:
-      - completed
+  push:
+    branches:
+      - test-sr
 
 jobs:
   release_validation:
@@ -33,12 +30,7 @@ jobs:
              "retina-shell"
           )
           for image in "${images[@]}"; do
-            echo "Checking image: ghcr.io/microsoft/$image:$TAG"
-            if curl --head --silent --fail "https://ghcr.io/v2/microsoft/$image/manifests/$TAG"; then
-              docker pull "ghcr.io/microsoft/$image:$TAG"
-            else
-              echo "Image ghcr.io/microsoft/$image:$TAG does not exist or you do not have access."
-            fi
+            docker pull "ghcr.io/microsoft/retina/$image:$TAG"
           done
 
       - name: Test Helm chart pull
@@ -62,8 +54,7 @@ jobs:
             curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/${KREW}.tar.gz" &&
             tar zxvf "${KREW}.tar.gz" &&
             ./"${KREW}" install krew
-            echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> ~/.bashrc
-            source ~/.bashrc
+            export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
             kubectl krew install retina
           )
 
