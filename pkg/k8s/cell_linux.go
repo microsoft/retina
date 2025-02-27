@@ -51,6 +51,7 @@ var Cell = cell.Module(
 			logrus.WithError(err).Fatal("Failed to register table")
 		}
 	}),
+	cell.Provide(ciliumk8s.NewSVCMetricsNoop),
 	cell.Provide(ciliumk8s.NewServiceCache),
 
 	cell.Provide(
