@@ -1,5 +1,21 @@
 {{- if .Values.agent.enabled -}}
 {{- if .Values.os.linux -}}
+
+{{/*
+volumeMounts values.
+*/}}
+{{- $volumeMounts := dict "debug" .Values.volumeMounts.debug | default "/sys/kernel/debug" -}}
+{{- $_ := set $volumeMounts "trace" .Values.volumeMounts.trace | default "/sys/kernel/tracing" -}}
+{{- $_ := set $volumeMounts "bpf" .Values.volumeMounts.bpf | default "/sys/fs/bpf" -}}
+{{- $_ := set $volumeMounts "cgroup" .Values.volumeMounts.cgroup | default "/sys/fs/cgroup" -}}
+{{- $_ := set $volumeMounts "tmp" .Values.volumeMounts.tmp | default "/tmp" -}}
+{{- $_ := set $volumeMounts "config" .Values.volumeMounts.config | default "/retina/config" -}}
+{{ if ne .Values.volumeMounts.cilium nil }}
+{{- $_ := set $volumeMounts "cilium" .Values.volumeMounts.cilium | default "/var/run/cilium" -}}
+{{ else }}
+{{- $_ := set $volumeMounts "cilium" .Values.volumeMounts.varrun | default "/var/run/cilium" -}}
+{{ end }}
+
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -49,9 +65,8 @@ spec:
           - name: bpf
             mountPath: /sys/fs/bpf
             mountPropagation: Bidirectional
-          - name: varrun
-            mountPath: /var/run
-            mountPropagation: Bidirectional
+          - name: cilium
+            mountPath: /var/run/cilium
           - name: config
             mountPath: /retina/config
       containers:
@@ -107,9 +122,8 @@ spec:
               - {{ . }}
               {{- end }}
             privileged: {{ .Values.securityContext.privileged }}
-        {{- if .Values.volumeMounts }}
           volumeMounts:
-          {{- range $name, $mountPath := .Values.volumeMounts }}
+          {{- range $name, $mountPath := $volumeMounts }}
             - name: {{ $name }}
               mountPath: {{ $mountPath }}
           {{- end }}
@@ -118,21 +132,29 @@ spec:
               mountPath: /var/lib/cilium/tls/hubble
               readOnly: true
           {{- end }}
-        {{- end }}
       terminationGracePeriodSeconds: 90 # Allow for retina to cleanup plugin resources.
       volumes:
-      {{- range $name, $hostPath := .Values.volumeMounts}}
-      - name: {{ $name }}
-      {{ if eq $name "config" }}
+      - name: bpf
+        hostPath:
+          path: {{ $volumeMounts.bpf }}
+      - name: cgroup
+        hostPath:
+          path: {{ $volumeMounts.cgroup }}
+      - name: config
         configMap:
           name: {{ $.Values.nameOverride }}-config
-      {{ else if eq $name "tmp"}}
-        emptyDir: {}
-      {{ else }}
+      - name: debug
         hostPath:
-          path: {{ $hostPath }}
-      {{ end }}
-      {{- end }}
+          path: {{ $volumeMounts.debug }}
+      - name: tmp
+        emptyDir: {}
+      - name: trace
+        hostPath:
+          path: {{ $volumeMounts.trace }}
+      - name: cilium
+        hostPath:
+          path: {{ $volumeMounts.cilium }}
+          type: DirectoryOrCreate
       {{- if .Values.hubble.tls.enabled }}
       - name: tls
         projected:

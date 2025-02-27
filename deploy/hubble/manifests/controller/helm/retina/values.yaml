@@ -107,7 +107,8 @@ volumeMounts:
   cgroup: /sys/fs/cgroup
   tmp: /tmp
   config: /retina/config
-  varrun: /var/run
+  # varrun: /var/run/cilium # Deprecated. Use `cilium` instead
+  cilium: /var/run/cilium
 
 #volume mounts for indows
 volumeMounts_win:
