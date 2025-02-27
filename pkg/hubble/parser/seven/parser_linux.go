@@ -6,7 +6,8 @@ import (
 	"strings"
 
 	"github.com/cilium/cilium/api/v1/flow"
-	"github.com/cilium/cilium/pkg/ipcache"
+	ipc "github.com/cilium/cilium/pkg/ipcache"
+	"github.com/cilium/cilium/pkg/k8s"
 	"github.com/google/gopacket/layers"
 	"github.com/microsoft/retina/pkg/hubble/common"
 	"github.com/sirupsen/logrus"
@@ -14,14 +15,16 @@ import (
 )
 
 type Parser struct {
-	l  *logrus.Entry
-	ep common.EpDecoder
+	l   *logrus.Entry
+	svd common.SvcDecoder
+	ep  common.EpDecoder
 }
 
-func New(l *logrus.Entry, c *ipcache.IPCache) *Parser {
+func New(l *logrus.Entry, svc *k8s.ServiceCache, c *ipc.IPCache) *Parser {
 	return &Parser{
-		l:  l.WithField("subsys", "seven"),
-		ep: common.NewEpDecoder(c),
+		l:   l.WithField("subsys", "seven"),
+		svd: common.NewSvcDecoder(svc),
+		ep:  common.NewEpDecoder(c),
 	}
 }
 
@@ -30,7 +33,7 @@ func (p *Parser) Decode(f *flow.Flow) *flow.Flow {
 		return nil
 	}
 
-	// Decode the flow's IP addresses to their respective endpoints.
+	// Decode the flow's IP addresses to their respective service.
 	p.decodeIP(f)
 
 	// Decode the flow's L7 protocol.
@@ -58,7 +61,7 @@ func (p *Parser) decodeIP(f *flow.Flow) {
 		return
 	}
 
-	// Decode the flow's source and destination IPs to their respective endpoints.
+	// Decode the flow's source and destination IPs to their respective service.
 	if f.GetIP() == nil {
 		p.l.Warn("Failed to get IP from flow", zap.Any("flow", f))
 		return
@@ -76,6 +79,8 @@ func (p *Parser) decodeIP(f *flow.Flow) {
 
 	f.Source = p.ep.Decode(sourceIP)
 	f.Destination = p.ep.Decode(destIP)
+	f.SourceService = p.svd.Decode(sourceIP)
+	f.DestinationService = p.svd.Decode(destIP)
 }
 
 func (p *Parser) decodeDNS(f *flow.Flow) *flow.Flow {

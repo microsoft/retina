@@ -119,3 +119,8 @@ func (m *MockCiliumV2Client) CiliumNodes() ciliumv2.CiliumNodeInterface {
 	m.l.Warn("MockCiliumV2Client.CiliumNodes() called but this returns nil because it's not implemented")
 	return nil
 }
+
+func (m *MockCiliumV2Client) CiliumNodeConfigs(_ string) ciliumv2.CiliumNodeConfigInterface {
+	m.l.Warn("MockCiliumV2Client.CiliumNodeConfigs() called but this returns nil because it's not implemented")
+	return nil
+}

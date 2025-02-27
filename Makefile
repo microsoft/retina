@@ -588,6 +588,11 @@ quick-deploy-hubble:
 	$(MAKE) helm-uninstall || true
 	$(MAKE) helm-install-without-tls HELM_IMAGE_TAG=$(TAG)-linux-amd64
 
+.PHONY: quick-test-hubble
+quick-test-hubble:
+	$(MAKE) quick-build
+	$(MAKE) quick-deploy-hubble
+
 
 .PHONY: simplify-dashboards
 simplify-dashboards:
