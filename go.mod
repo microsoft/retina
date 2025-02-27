@@ -9,7 +9,7 @@ require (
 	github.com/spf13/cobra v1.9.1
 	go.uber.org/zap v1.27.0
 	k8s.io/client-go v0.30.3
-	sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.5.2
+	sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.5.3
 	sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader v0.0.20
 )
 
@@ -37,7 +37,7 @@ require (
 	github.com/Azure/go-autorest/autorest/date v0.3.0 // indirect
 	github.com/Azure/go-autorest/logger v0.2.1 // indirect
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
-	github.com/AzureAD/microsoft-authentication-library-for-go v1.3.3 // indirect
+	github.com/AzureAD/microsoft-authentication-library-for-go v1.4.0 // indirect
 	github.com/BurntSushi/toml v1.3.2 // indirect
 	github.com/MakeNowJust/heredoc v1.0.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
@@ -224,7 +224,7 @@ require (
 	go.starlark.net v0.0.0-20230814145427-12f4cb8177e4 // indirect
 	go.uber.org/dig v1.17.1 // indirect
 	go4.org/netipx v0.0.0-20231129151722-fdeea329fbba // indirect
-	golang.org/x/crypto v0.34.0 // indirect
+	golang.org/x/crypto v0.35.0 // indirect
 	golang.org/x/mod v0.22.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
 	golang.org/x/time v0.10.0 // indirect
@@ -338,10 +338,10 @@ require (
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v6 v6.3.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v6 v6.3.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v6 v6.4.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/msi/armmsi v1.2.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v6 v6.2.0 // indirect
-	github.com/Azure/msi-dataplane v0.4.0 // indirect
+	github.com/Azure/msi-dataplane v0.4.1 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
