@@ -4,8 +4,6 @@ This project leverages [OpenTofu](https://opentofu.org/docs/intro/) Infrastructu
 
 ![Architecture Diagram](./diagrams/diagram.svg)
 
-An example Hubble UI visualization on GKE dataplane v1 (no Cilium). [See GKE network overview doc](https://cloud.google.com/kubernetes-engine/docs/concepts/network-overview).
-
 ## Modules available
 
 * [aks](./modules/aks/): Deploy Azure Kubernetes Service cluster.
@@ -18,12 +16,25 @@ An example Hubble UI visualization on GKE dataplane v1 (no Cilium). [See GKE net
 * [aks-nsg](./modules/aks-nsg/): Inboud and outbount rules for AKS Load Balancer.
 * [gke-firewall](./modules/gke-firewall/): Inboud and outbount rules for GKE Load Balancer.
 
+## Network Observability
+
+Retina supports [Hubble](https://github.com/cilium/hubble) as a [control plane](https://retina.sh/docs/Introduction/architecture#hubble-control-plane), which comes with CLI and UI tools to enhance BPF-powerd network observability. Below is an example Hubble UI visualization on GKE dataplane v1 (no Cilium). [See GKE network overview doc](https://cloud.google.com/kubernetes-engine/docs/concepts/network-overview).
+
+![Hubble UI on GKE v1 dataplane (no Cilium)](./diagrams/mc-gke-hubble-ui.png)
+
+Below is another example with Hubble CLI observing traffic on the `default` Kubernetes namespace for a GKE cluster. The instruction used in this example is `hubble observe --follow --namespace default`.
+
+![Hubble CLI on GKE v1 dataplane (no Cilium)](./diagrams/mc-gke-hubble.png)
+
+In addition to Hubble, Retina provides a number of Grafana dashboards which are also deployed as part of this multicloud sub-project. Below is an example of Retina DNS dashboard visualization for an EKS cluster.
+
+![Grafana Retina DNS dashboard for EKS](./diagrams/mc-eks-grafana.jpeg)
+
 ## Prerequisites
 
-* [OpenTofu installation guide](https://opentofu.org/docs/intro/install/)
+* OpenTofu: [installation guide](https://opentofu.org/docs/intro/install/)
 
 * AKS:
-
     1. Create an Azure account.
     2. [Install az](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli).
 
@@ -36,7 +47,6 @@ An example Hubble UI visualization on GKE dataplane v1 (no Cilium). [See GKE net
     ```
 
 * GKE:
-
     1. create a gcloud account, project and enable billing.
     2. create a service account and service account key.
     3. [Enable Kubernetes Engine API](https://console.developers.google.com/apis/api/container.googleapis.com/overview?project=mc-retina).
@@ -62,8 +72,7 @@ An example Hubble UI visualization on GKE dataplane v1 (no Cilium). [See GKE net
     export AWS_SECRET_ACCESS_KEY="..."
     ```
 
-* Grafana
-
+* Grafana:
     1. Set up a [Grafana Cloud free account](https://grafana.com/pricing/) and start an instance.
     2. Create a [Service Account](https://grafana.com/docs/grafana/latest/administration/service-accounts/#create-a-service-account-in-grafana).
     3. Export `GRAFANA_AUTH` environmnet variable containing the service account token.
@@ -74,12 +83,9 @@ An example Hubble UI visualization on GKE dataplane v1 (no Cilium). [See GKE net
     ```
 
 * Kind:
-
     1. Docker installed on the host machine
 
 ## Quickstart
-
-![Hubble on GKE v1 dataplane (no Cilium)](./diagrams/mc-gke-hubble.png)
 
 The following Make targets can be used to manage each stack lifecycle.
 
