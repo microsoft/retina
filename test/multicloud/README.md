@@ -165,6 +165,6 @@ tofu import module.eks.aws_iam_role_policy_attachment.eks_node_group_AmazonEKSWo
 
 ## Multi-Cloud
 
-The [live/](./live/) directory contains the multi-cloud / multi-cluster stacks to deploy clusters, install Retina, install Prometheus, expose all Prometheus using load blanaces, and configure a Grafana Cloud instance to consume prometheus data sources to visualize multiple cluster in a single Grafana dashboard.
+The [live/](./live/) directory contains multi-cloud / multi-cluster stacks to deploy cloud infrastructure, install Retina, install Prometheus, expose Prometheus instance using a load balancer, and configure a Grafana Cloud instance to consume Prometheus data sources to visualize Retina metrics from multiple clusters in a single Grafana dashboard.
 
 ![Architecture Diagram](./diagrams/diagram-mc.svg)

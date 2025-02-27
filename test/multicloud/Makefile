@@ -11,7 +11,15 @@ apply:
 	cd live/$(STACK_NAME) && \
 		tofu apply --auto-approve
 
+check-env-vars:
+	@if [ -z "$(GRAFANA_AUTH)" ]; then echo "GRAFANA_AUTH is not set"; exit 1; fi
+	@if [ -z "$(STACK_NAME)" ]; then echo "STACK_NAME is not set"; exit 1; fi
+	@if [ "$(STACK_NAME)" = "retina-gke" ] && [ -z "$(GOOGLE_APPLICATION_CREDENTIALS)" ]; then echo "GOOGLE_APPLICATION_CREDENTIALS is not set"; exit 1; fi
+	@if [ "$(STACK_NAME)" = "retina-eks" ] && [ -z "$(AWS_SECRET_ACCESS_KEY)" ]; then echo "AWS_SECRET_ACCESS_KEY is not set"; exit 1; fi
+	@if [ "$(STACK_NAME)" = "retina-eks" ] && [ -z "$(AWS_ACCESS_KEY_ID)" ]; then echo "AWS_ACCESS_KEY_ID is not set"; exit 1; fi
+
 quick:
+	@make check-env-vars
 	@make plan
 	@make apply
 
