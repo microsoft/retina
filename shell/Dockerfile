@@ -14,6 +14,7 @@ RUN tdnf install -y \
 	iputils \
 	jq \
 	ldns-utils \
+	less \
 	net-tools \
 	nftables \
 	nmap \
@@ -24,4 +25,4 @@ RUN tdnf install -y \
 	wget \
 	&& tdnf clean all
 
-CMD ["/bin/bash"]
+CMD ["/bin/bash", "-l"]

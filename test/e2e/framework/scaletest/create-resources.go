@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"time"
 
 	e2ekubernetes "github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/retry"
@@ -49,8 +48,7 @@ func (c *CreateResources) Run() error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1200*time.Second)
-	defer cancel()
+	ctx := context.TODO()
 
 	retrier := retry.Retrier{Attempts: defaultRetryAttempts, Delay: defaultRetryDelay}
 
