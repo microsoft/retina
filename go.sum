@@ -814,8 +814,8 @@ github.com/prometheus/procfs v0.15.1 h1:YagwOFzUgYfKKHX6Dr+sHT7km/hxC76UB0leargg
 github.com/prometheus/procfs v0.15.1/go.mod h1:fB45yRUv8NstnjriLhBQLuOUt+WW4BsoGhij/e3PBqk=
 github.com/redis/go-redis/v9 v9.7.0 h1:HhLSs+B6O021gwzl+locl0zEDnyNkxMtf/Z3NNBMa9E=
 github.com/redis/go-redis/v9 v9.7.0/go.mod h1:f6zhXITC7JUJIlPEiBOTXxJgPLdZcA93GewI7inzyWw=
-github.com/ritwikranjan/cilium v0.0.0-20250227153607-383620be1ad8 h1:bvCRnKN3KVSqgxYwQg774BvTzK01EI39fAT/LVfwww0=
-github.com/ritwikranjan/cilium v0.0.0-20250227153607-383620be1ad8/go.mod h1:NnDWQiYmPef24+pX2U/V85uL8eUTJSFUUjMEy41lGPA=
+github.com/ritwikranjan/cilium v0.0.0-20250227153719-3f10fea210cd h1:m0PeajapBySV78VcwECkITkNhGYbAWIQbsUazmHXJSk=
+github.com/ritwikranjan/cilium v0.0.0-20250227153719-3f10fea210cd/go.mod h1:NnDWQiYmPef24+pX2U/V85uL8eUTJSFUUjMEy41lGPA=
 github.com/rogpeppe/fastuuid v1.2.0/go.mod h1:jVj6XXZzXRy/MSR5jhDC/2q6DgLz+nrA6LYCDYWNEvQ=
 github.com/rogpeppe/go-internal v1.6.1/go.mod h1:xXDCJY+GAPziupqXw64V24skbSoqbTEfhy4qGm1nDQc=
 github.com/rogpeppe/go-internal v1.9.0/go.mod h1:WtVeX8xhTBvf0smdhujwtBcq4Qrzq/fJaraNFVN+nFs=
