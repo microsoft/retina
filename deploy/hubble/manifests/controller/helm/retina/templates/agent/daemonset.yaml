@@ -1,5 +1,6 @@
 {{- if .Values.agent.enabled -}}
 {{- if .Values.os.linux -}}
+
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -49,9 +50,8 @@ spec:
           - name: bpf
             mountPath: /sys/fs/bpf
             mountPropagation: Bidirectional
-          - name: varrun
+          - name: cilium
             mountPath: /var/run/cilium
-            mountPropagation: Bidirectional
           - name: config
             mountPath: /retina/config
       containers:
@@ -109,9 +109,9 @@ spec:
             privileged: {{ .Values.securityContext.privileged }}
         {{- if .Values.volumeMounts }}
           volumeMounts:
-          {{- range $name, $mountPath := .Values.volumeMounts }}
+          {{- range $name, $mount := .Values.volumeMounts}}
             - name: {{ $name }}
-              mountPath: {{ $mountPath }}
+              mountPath: {{ $mount.mountPath }}
           {{- end }}
           {{- if .Values.hubble.tls.enabled }}
             - name: tls
@@ -121,21 +121,9 @@ spec:
         {{- end }}
       terminationGracePeriodSeconds: 90 # Allow for retina to cleanup plugin resources.
       volumes:
-      {{- range $name, $hostPath := .Values.volumeMounts}}
+      {{- range $name, $mount := .Values.volumeMounts}}
       - name: {{ $name }}
-      {{ if eq $name "config" }}
-        configMap:
-          name: {{ $.Values.nameOverride }}-config
-      {{ else if eq $name "tmp"}}
-        emptyDir: {}
-      {{ else if eq $name "varrun"}}
-        hostPath:
-          path: {{ $hostPath }}
-          type: DirectoryOrCreate
-      {{ else }}
-        hostPath:
-          path: {{ $hostPath }}
-      {{ end }}
+        {{ $mount.volume | toYaml | nindent 8 }}
       {{- end }}
       {{- if .Values.hubble.tls.enabled }}
       - name: tls
