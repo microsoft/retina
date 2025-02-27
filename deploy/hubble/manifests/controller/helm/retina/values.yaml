@@ -99,16 +99,6 @@ azure:
   appinsights:
     instrumentation_key: "app-insights-instrumentation-key"
 
-# volume mounts with name and mountPath
-volumeMounts:
-  debug: /sys/kernel/debug
-  trace: /sys/kernel/tracing
-  bpf: /sys/fs/bpf
-  cgroup: /sys/fs/cgroup
-  tmp: /tmp
-  config: /retina/config
-  varrun: /var/run/cilium
-
 #volume mounts for indows
 volumeMounts_win:
   retina-config-win: retina
