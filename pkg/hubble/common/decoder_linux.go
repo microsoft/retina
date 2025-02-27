@@ -55,8 +55,8 @@ func (e *epDecoder) Decode(ip netip.Addr) *flow.Endpoint {
 	case identity.ReservedIdentityWorld:
 		ep.Labels = labels.LabelWorld.GetModel()
 	default:
-		prefix := netip.PrefixFrom(ip, ip.BitLen())
-		ep.Labels = e.ipcache.GetMetadataLabelsByPrefix(prefix).GetModel()
+		// prefix := netip.PrefixFrom(ip, ip.BitLen())
+		// ep.Labels = e.ipcache.GetMetadataLabelsByPrefix(prefix).GetModel()
 	}
 
 	return ep

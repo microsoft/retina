@@ -38,7 +38,7 @@ func Start(ctx context.Context, k *watchers.K8sWatcher) {
 
 	option.Config.K8sSyncTimeout = 3 * time.Minute //nolint:gomnd // this duration is self-explanatory
 	syncdCache := make(chan struct{})
-	go k.InitK8sSubsystemWithResources(ctx, syncdCache, k8sResources)
+	go k.InitK8sSubsystem(ctx, syncdCache)
 	logger.WithField("k8s resources", k8sResources).Info("Kubernetes watcher started, will wait for cache sync")
 
 	// Wait for K8s watcher to sync. If doesn't complete in 3 minutes, causes fatal error.

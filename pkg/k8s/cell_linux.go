@@ -148,11 +148,10 @@ var Cell = cell.Module(
 			nil,
 		}
 		return ipcache.NewIPCache(&ipcache.Configuration{
-			Context:               context.Background(),
-			IdentityAllocator:     idAlloc,
-			PolicyHandler:         &policyhandler{},
-			DatapathHandler:       &datapathhandler{},
-			DisableLabelInjection: true,
+			Context:           context.Background(),
+			IdentityAllocator: idAlloc,
+			PolicyHandler:     &policyhandler{},
+			DatapathHandler:   &datapathhandler{},
 		})
 	}),
 
@@ -177,6 +176,8 @@ var Cell = cell.Module(
 	synced.Cell,
 	cell.Provide(newAPIServerEventHandler),
 
+	cell.Provide(func() watchers.ResourceGroupFunc { return resGroups }),
+
 	watchers.Cell,
 
 	cell.Invoke(func(a *APIServerEventHandler) {
@@ -188,3 +189,11 @@ var Cell = cell.Module(
 		}).Info("Subscribed to PubSub APIServer")
 	}),
 )
+
+func resGroups(watchers.WatcherConfiguration) (resourceGroups, waitForCachesOnly []string) {
+	resourceGroups = []string{
+		K8sAPIGroupServiceV1Core,
+		K8sAPIGroupCiliumEndpointV2,
+	}
+	return
+}

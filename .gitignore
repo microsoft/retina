@@ -47,3 +47,5 @@ netperf-*.json
 netperf-*.csv
 
 .certs/
+
+artifacts/

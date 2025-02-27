@@ -35,7 +35,7 @@ type Enricher struct {
 
 	inputRing *container.Ring
 
-	Reader container.RingReaderInterface
+	Reader *container.RingReader
 
 	outputRing *container.Ring
 }
