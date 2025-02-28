@@ -74,16 +74,17 @@ func (b *BootstrapManager) Start() error {
 	defer zl.Close()
 
 	// Check what mode should be activated
+	var cfg *rest.Config
 	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
 		fmt.Println("KUBECONFIG detected, using kubeconfig: ", kubeconfig)
-		cfg, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+		cfg, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 		if err != nil {
 			return fmt.Errorf("creating controller-runtime manager: %w", err)
 		}
 		return b.startDaemon(cfg, daemonConfig, zl)
 	}
 
-	cfg, err := kcfg.GetConfig()
+	cfg, err = kcfg.GetConfig()
 	if err != nil {
 		sm, err := NewStandaloneDaemon(daemonConfig, zl)
 		if err != nil {

@@ -11,7 +11,9 @@ import (
 )
 
 func TestStandaloneCache(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
+		t.Fatalf("Failed to setup logger: %v", err)
+	}
 	cache := NewStandaloneCache()
 
 	ip := "10.0.0.1"
