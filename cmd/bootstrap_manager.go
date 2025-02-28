@@ -95,7 +95,6 @@ func (b *BootstrapManager) Start() error {
 		return nil
 	}
 	return b.startDaemon(cfg, daemonConfig, zl)
-
 }
 
 func (b *BootstrapManager) startDaemon(cfg *rest.Config, daemoncfg *config.Config, zl *log.ZapLogger) error {
