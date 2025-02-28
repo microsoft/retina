@@ -29,20 +29,20 @@ type StandaloneDaemon struct {
 	tel           telemetry.Telemetry
 }
 
-func NewStandaloneDaemon(config *config.Config, zl *log.ZapLogger) (*StandaloneDaemon, error) {
+func NewStandaloneDaemon(cfg *config.Config, zl *log.ZapLogger) (*StandaloneDaemon, error) {
 	fmt.Println("starting Standalone Retina daemon")
 	sdLogger := zl.Named("standalone-daemon")
 
 	var tel telemetry.Telemetry
 	var err error
-	if config.EnableTelemetry {
+	if cfg.EnableTelemetry {
 		if buildinfo.ApplicationInsightsID == "" {
 			panic("telemetry enabled, but ApplicationInsightsID is empty")
 		}
 		sdLogger.Info("telemetry enabled", zap.String("applicationInsightsID", buildinfo.ApplicationInsightsID))
 		tel, err = telemetry.NewAppInsightsTelemetryClient("standalone-retina-agent", map[string]string{
 			"version": buildinfo.Version,
-			"plugins": strings.Join(config.EnabledPlugin, `,`),
+			"plugins": strings.Join(cfg.EnabledPlugin, `,`),
 		})
 		if err != nil {
 			sdLogger.Error("failed to create telemetry client", zap.Error(err))
@@ -54,62 +54,62 @@ func NewStandaloneDaemon(config *config.Config, zl *log.ZapLogger) (*StandaloneD
 	}
 
 	pMgr, err := pm.NewPluginManager(
-		config,
+		cfg,
 		tel,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create plugin manager: %w", err)
 	}
 
 	// create HTTP server for API server
 	httpServer := sm.NewHTTPServer(
-		config.APIServer.Host,
-		config.APIServer.Port,
+		cfg.APIServer.Host,
+		cfg.APIServer.Port,
 	)
 
 	return &StandaloneDaemon{
 		l:             sdLogger,
 		httpServer:    httpServer,
 		pluginManager: pMgr,
-		config:        config,
+		config:        cfg,
 		tel:           tel,
 	}, nil
 }
 
-func (sm *StandaloneDaemon) Start() {
-	sm.l.Info("Starting standalone daemon")
+func (sd *StandaloneDaemon) Start() {
+	sd.l.Info("Starting standalone daemon")
 
 	// Start the HTTP server and initialize the cache
-	if err := sm.httpServer.Init(); err != nil {
-		sm.l.Error("failed to start http server")
+	if err := sd.httpServer.Init(); err != nil {
+		sd.l.Error("failed to start http server")
 	}
-	sm.cache = cache.NewStandaloneCache()
+	sd.cache = cache.NewStandaloneCache()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// start heartbeat goroutine for application insights
-	go sm.tel.Heartbeat(ctx, sm.config.TelemetryInterval)
+	go sd.tel.Heartbeat(ctx, sd.config.TelemetryInterval)
 
 	var g *errgroup.Group
 	g, ctx = errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		return sm.pluginManager.Start(ctx)
+		return sd.pluginManager.Start(ctx)
 	})
 	g.Go(func() error {
-		return sm.httpServer.Start(ctx)
+		return sd.httpServer.Start(ctx)
 	})
 
 	if err := g.Wait(); err != nil {
-		sm.l.Panic("Error running standalone daemon", zap.Error(err))
+		sd.l.Panic("Error running standalone daemon", zap.Error(err))
 	}
 
-	sm.l.Info("Started standalone daemon")
+	sd.l.Info("Started standalone daemon")
 }
 
-func (sm *StandaloneDaemon) Stop() {
+func (sd *StandaloneDaemon) Stop() {
 	// Clean up plugin resources
-	sm.pluginManager.Stop()
-	sm.l.Info("Stopped the standalone daemon")
+	sd.pluginManager.Stop()
+	sd.l.Info("Stopped the standalone daemon")
 }
