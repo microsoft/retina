@@ -5,6 +5,7 @@ package enricher
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sync"
 
@@ -180,6 +181,26 @@ func (e *Enricher) getWorkloads(ownerRefs []*common.OwnerReference) []*flow.Work
 	}
 
 	return workloads
+}
+
+func (e *Enricher) GetPodInfo(ip string) (*cache.PodInfo, error) {
+	obj := e.cache.GetObjByIP(ip)
+	if obj == nil {
+		e.l.Warn("No object found for IP", zap.String("ip", ip))
+		return nil, fmt.Errorf("failed to get pod info")
+	}
+
+	switch o := obj.(type) {
+	case *common.RetinaEndpoint:
+		return &cache.PodInfo{
+			Name:      o.Name(),
+			Namespace: o.Namespace(),
+		}, nil
+
+	default:
+		e.l.Debug("received unknown type from cache", zap.Any("obj", obj), zap.Any("type", reflect.TypeOf(obj)))
+		return nil, fmt.Errorf("received unknown type from cache")
+	}
 }
 
 func (e *Enricher) Write(ev *v1.Event) {

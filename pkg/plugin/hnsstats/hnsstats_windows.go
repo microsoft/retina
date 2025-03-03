@@ -13,6 +13,8 @@ import (
 	"github.com/Microsoft/hcsshim/hcn"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	kcfg "github.com/microsoft/retina/pkg/config"
+	"github.com/microsoft/retina/pkg/controllers/cache"
+	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/registry"
@@ -161,6 +163,9 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 }
 
 func notifyHnsStats(h *hnsstats, stats *HnsStatsData) {
+	// update metrics - need to update registry to use advanced
+	getPodLabels(h, stats)
+
 	// hns signals
 	metrics.ForwardPacketsGauge.WithLabelValues(ingressLabel).Set(float64(stats.hnscounters.PacketsReceived))
 	h.l.Debug("emitting packets received count metric", zap.Uint64(PacketsReceived, stats.hnscounters.PacketsReceived))
@@ -206,6 +211,24 @@ func notifyHnsStats(h *hnsstats, stats *HnsStatsData) {
 	metrics.TCPFlagGauge.WithLabelValues(egressLabel, utils.SYNACK).Set(float64(stats.vfpCounters.Out.TcpCounters.PacketCounters.SynAckPacketCount))
 	metrics.TCPFlagGauge.WithLabelValues(egressLabel, utils.FIN).Set(float64(stats.vfpCounters.Out.TcpCounters.PacketCounters.FinPacketCount))
 	metrics.TCPFlagGauge.WithLabelValues(egressLabel, utils.RST).Set(float64(stats.vfpCounters.Out.TcpCounters.PacketCounters.RstPacketCount))
+}
+
+func getPodLabels(h *hnsstats, stats *HnsStatsData) (*cache.PodInfo, error) {
+	if h.cfg.EnableStandalonMode {
+		labels, err := GetPodInfo(stats.IPAddress, state_file_location)
+		if err != nil {
+			h.l.Error("Failed to get pod info", zap.String("IP", stats.IPAddress), zap.Error(err))
+			return nil, err
+		}
+		return labels, nil
+	}
+
+	labels, err := enricher.Instance().GetPodInfo(stats.IPAddress)
+	if err != nil {
+		h.l.Error("Failed to get pod info", zap.String("IP", stats.IPAddress), zap.Error(err))
+		return nil, err
+	}
+	return labels, nil
 }
 
 func (h *hnsstats) Start(ctx context.Context) error {
