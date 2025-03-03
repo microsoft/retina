@@ -10,22 +10,24 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestHnsStatsHelper(t *testing.T) {
-	filePath := "/home/beegii/src/retina/pkg/plugin/hnsstats/mock_azure_vnet.json"
-	ip := "192.0.0.5"
+const (
+	mockAzureVnetPath = "/home/beegii/src/retina/pkg/plugin/hnsstats/mock_azure_vnet.json"
+	ip                = "192.0.0.5"
+)
 
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+func TestFileRead(t *testing.T) {
+	if _, err := os.Stat(mockAzureVnetPath); os.IsNotExist(err) {
 		t.Fatalf("mock file does not exist: %v", err)
 	}
 
-	// Scenario 1 - Invalid file path
 	podInfo, err := GetPodInfo(ip, "invalid_file_path")
 	if podInfo != nil {
 		t.Fatalf("expected empty pod info for invalid file path, got: %v", podInfo)
 	}
 	assert.Error(t, err, "expected error when using invalid file path")
+}
 
-	// Scenario 2 - Unable to decode JSON
+func TestJsonDecode(t *testing.T) {
 	malformedJSONPath := "/home/beegii/src/retina/pkg/plugin/hnsstats/mock_invalid_azure_vnet.json"
 	invalidJSONContent := `{
 		"Network": {
@@ -48,10 +50,10 @@ func TestHnsStatsHelper(t *testing.T) {
 	`
 
 	// Write malformed JSON into file
-	err = os.WriteFile(malformedJSONPath, []byte(invalidJSONContent), 0644)
+	err := os.WriteFile(malformedJSONPath, []byte(invalidJSONContent), 0644)
 	assert.NoError(t, err, "failed to create invalid JSON file")
 
-	podInfo, err = GetPodInfo(ip, malformedJSONPath)
+	podInfo, err := GetPodInfo(ip, malformedJSONPath)
 	if podInfo != nil {
 		t.Fatalf("expected empty pod info for malformed JSON file, got: %v", podInfo)
 	}
@@ -61,8 +63,14 @@ func TestHnsStatsHelper(t *testing.T) {
 	err = os.Remove(malformedJSONPath)
 	assert.NoError(t, err, "failed to remove malformed JSON file")
 
-	// Scenario 3 - Valid case
-	podInfo, err = GetPodInfo(ip, filePath)
+	podInfo, err = GetPodInfo(ip, mockAzureVnetPath)
+	assert.NoError(t, err)
+	assert.Equal(t, "retina2-pod", podInfo.Name)
+	assert.Equal(t, "retina2-namespace", podInfo.Namespace)
+}
+
+func TestHnsStatsHelper(t *testing.T) {
+	podInfo, err := GetPodInfo(ip, mockAzureVnetPath)
 	assert.NoError(t, err)
 	assert.Equal(t, "retina2-pod", podInfo.Name)
 	assert.Equal(t, "retina2-namespace", podInfo.Namespace)
