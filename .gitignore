@@ -33,6 +33,8 @@ site/node_modules/
 
 hack/tools/bin
 output
+artifacts
+
 #vscode 
 .vscode/
 
