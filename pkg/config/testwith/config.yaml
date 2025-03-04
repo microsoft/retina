@@ -9,3 +9,4 @@ metricsIntervalDuration: "10s"
 # used to export telemetry to AppInsights
 telemetryEnabled: true
 dataAggregationLevel: "low"
+telemetryInterval: "15m"

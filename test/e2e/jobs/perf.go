@@ -13,14 +13,14 @@ import (
 func RunPerfTest(kubeConfigFilePath, chartPath, advancedValuePath, retinaMode string) *types.Job {
 	job := types.NewJob("Run performance tests")
 
-	benchmarkFile := fmt.Sprintf("netperf-benchmark-%s.json", time.Now().Format("20060102150405"))
+	baselineFile := fmt.Sprintf("netperf-baseline-%s.json", time.Now().Format("20060102150405"))
 	resultFile := fmt.Sprintf("netperf-result-%s.json", time.Now().Format("20060102150405"))
-	regressionFile := fmt.Sprintf("netperf-regression-%s.json", time.Now().Format("20060102150405"))
+	deltaFile := fmt.Sprintf("netperf-delta-%s.json", time.Now().Format("20060102150405"))
 
 	job.AddStep(&perf.GetNetworkPerformanceMeasures{
 		KubeConfigFilePath: kubeConfigFilePath,
 		ResultTag:          "no-retina",
-		JsonOutputFile:     benchmarkFile,
+		JsonOutputFile:     baselineFile,
 	}, &types.StepOptions{
 		SkipSavingParametersToJob: true,
 	})
@@ -54,16 +54,16 @@ func RunPerfTest(kubeConfigFilePath, chartPath, advancedValuePath, retinaMode st
 		SkipSavingParametersToJob: true,
 	})
 
-	job.AddStep(&perf.GetNetworkRegressionResults{
-		BaseResultsFile:       benchmarkFile,
-		NewResultsFile:        resultFile,
-		RegressionResultsFile: regressionFile,
+	job.AddStep(&perf.GetNetworkDeltaResults{
+		BaseResultsFile:  baselineFile,
+		NewResultsFile:   resultFile,
+		DeltaResultsFile: deltaFile,
 	}, &types.StepOptions{
 		SkipSavingParametersToJob: true,
 	})
 
 	job.AddStep(&perf.PublishPerfResults{
-		ResultsFile: regressionFile,
+		ResultsFile: deltaFile,
 		RetinaMode:  retinaMode,
 	}, &types.StepOptions{
 		SkipSavingParametersToJob: true,

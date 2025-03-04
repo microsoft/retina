@@ -21,16 +21,16 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func getCaptureAndPrintCaptureResult(kubeClient *kubernetes.Clientset, name, namespace string) error {
-	return listCapturesAndPrintCaptureResults(kubeClient, name, namespace)
+func getCaptureAndPrintCaptureResult(ctx context.Context, kubeClient *kubernetes.Clientset, name, namespace string) error {
+	return listCapturesAndPrintCaptureResults(ctx, kubeClient, name, namespace)
 }
 
-func listCapturesInNamespaceAndPrintCaptureResults(kubeClient *kubernetes.Clientset, namespace string) error {
-	return listCapturesAndPrintCaptureResults(kubeClient, "", namespace)
+func listCapturesInNamespaceAndPrintCaptureResults(ctx context.Context, kubeClient *kubernetes.Clientset, namespace string) error {
+	return listCapturesAndPrintCaptureResults(ctx, kubeClient, "", namespace)
 }
 
 // listCapturesAndPrintCaptureResults list captures and print the running jobs into properly aligned text.
-func listCapturesAndPrintCaptureResults(kubeClient *kubernetes.Clientset, name, namespace string) error {
+func listCapturesAndPrintCaptureResults(ctx context.Context, kubeClient *kubernetes.Clientset, name, namespace string) error {
 	jobListOpt := metav1.ListOptions{}
 	if len(name) != 0 {
 		captureJobSelector := &metav1.LabelSelector{
@@ -45,7 +45,7 @@ func listCapturesAndPrintCaptureResults(kubeClient *kubernetes.Clientset, name, 
 		}
 	}
 
-	jobList, err := kubeClient.BatchV1().Jobs(namespace).List(context.TODO(), jobListOpt)
+	jobList, err := kubeClient.BatchV1().Jobs(namespace).List(ctx, jobListOpt)
 	if err != nil {
 		return err
 	}

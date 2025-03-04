@@ -307,6 +307,7 @@ data:
     captureDebug: {{ .Values.capture.debug }}
     captureJobNumLimit: {{ .Values.capture.jobNumLimit }}
     enableManagedStorageAccount: {{ .Values.capture.enableManagedStorageAccount }}
+    telemetryInterval: {{ .Values.operator.telemetryInterval }}
 {{- if .Values.capture.enableManagedStorageAccount }}
     azureCredentialConfig: /etc/cloud-config/azure.json
 {{- end }}

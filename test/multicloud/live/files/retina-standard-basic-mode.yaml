@@ -1,0 +1,6 @@
+# basic/node-level mode
+image:
+  rag: v0.0.24
+operator:
+  tag: v0.0.24
+enabledPlugin_linux: '["dropreason","packetforward","linuxutil","dns"]'

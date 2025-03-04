@@ -2,7 +2,6 @@ package perf
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
 
@@ -40,26 +39,26 @@ type TestResult struct {
 	Result Result `json:"result"`
 }
 
-type RegressionResult struct {
-	Label       string             `json:"label"`
-	TestInfo    TestInfo           `json:"test_info"`
-	Benchmark   map[string]float64 `json:"benchmark"`
-	Result      map[string]float64 `json:"result"`
-	Regressions map[string]float64 `json:"regressions"`
+type DeltaResult struct {
+	Label    string             `json:"label"`
+	TestInfo TestInfo           `json:"test_info"`
+	Baseline map[string]float64 `json:"baseline"`
+	Result   map[string]float64 `json:"result"`
+	Deltas   map[string]float64 `json:"regressions"`
 }
 
-type GetNetworkRegressionResults struct {
-	BaseResultsFile       string
-	NewResultsFile        string
-	RegressionResultsFile string
+type GetNetworkDeltaResults struct {
+	BaseResultsFile  string
+	NewResultsFile   string
+	DeltaResultsFile string
 }
 
-func (v *GetNetworkRegressionResults) Prevalidate() error {
+func (v *GetNetworkDeltaResults) Prevalidate() error {
 	return nil
 }
 
-func (v *GetNetworkRegressionResults) Run() error {
-	benchmarkResults, err := readJSONFile(v.BaseResultsFile)
+func (v *GetNetworkDeltaResults) Run() error {
+	baselineResults, err := readJSONFile(v.BaseResultsFile)
 	if err != nil {
 		return errors.Wrap(err, "failed to read base results file")
 	}
@@ -69,65 +68,65 @@ func (v *GetNetworkRegressionResults) Run() error {
 		return errors.Wrap(err, "failed to read new results file")
 	}
 
-	if len(benchmarkResults) != len(newResults) {
+	if len(baselineResults) != len(newResults) {
 		return errors.New("number of test results do not match")
 	}
 
-	regressionResults := make(map[string]*RegressionResult)
+	regressionResults := make(map[string]*DeltaResult)
 
-	for i := range benchmarkResults {
-		benchmarkResult := benchmarkResults[i]
+	for i := range baselineResults {
+		baselineResult := baselineResults[i]
 		newResult := newResults[i]
 
-		if benchmarkResult.Label != newResult.Label {
+		if baselineResult.Label != newResult.Label {
 			return errors.New("test labels do not match")
 		}
 
-		if _, exists := regressionResults[benchmarkResults[i].Label]; !exists {
-			regressionResults[benchmarkResults[i].Label] = &RegressionResult{
-				Label:       benchmarkResults[i].Label,
-				TestInfo:    benchmarkResults[i].Result.TestInfo,
-				Benchmark:   make(map[string]float64),
-				Result:      make(map[string]float64),
-				Regressions: make(map[string]float64),
+		if _, exists := regressionResults[baselineResults[i].Label]; !exists {
+			regressionResults[baselineResults[i].Label] = &DeltaResult{
+				Label:    baselineResults[i].Label,
+				TestInfo: baselineResults[i].Result.TestInfo,
+				Baseline: make(map[string]float64),
+				Result:   make(map[string]float64),
+				Deltas:   make(map[string]float64),
 			}
 		}
 
 		metrics := []struct {
-			name      string
-			benchmark float64
-			result    float64
+			name     string
+			baseline float64
+			result   float64
 		}{
-			{"total_throughput_gbits_sec", benchmarkResult.Result.TotalThroughput, newResult.Result.TotalThroughput},
-			{"mean_rtt_ms", benchmarkResult.Result.MeanRTT, newResult.Result.MeanRTT},
-			{"min_rtt_ms", benchmarkResult.Result.MinRTT, newResult.Result.MinRTT},
-			{"max_rtt_ms", benchmarkResult.Result.MaxRTT, newResult.Result.MaxRTT},
-			{"retransmits", float64(benchmarkResult.Result.Retransmits), float64(newResult.Result.Retransmits)},
-			{"jitter_ms", benchmarkResult.Result.JitterMs, newResult.Result.JitterMs},
-			{"lost_packets", float64(benchmarkResult.Result.LostPackets), float64(newResult.Result.LostPackets)},
-			{"lost_percent", benchmarkResult.Result.LostPercent, newResult.Result.LostPercent},
-			{"out_of_order", float64(benchmarkResult.Result.OutofOrder), float64(newResult.Result.OutofOrder)},
-			{"host_total_cpu", benchmarkResult.Result.CPUUtilization.HostTotal, newResult.Result.CPUUtilization.HostTotal},
-			{"remote_total_cpu", benchmarkResult.Result.CPUUtilization.RemoteTotal, newResult.Result.CPUUtilization.RemoteTotal},
+			{"total_throughput_gbits_sec", baselineResult.Result.TotalThroughput, newResult.Result.TotalThroughput},
+			{"mean_rtt_ms", baselineResult.Result.MeanRTT, newResult.Result.MeanRTT},
+			{"min_rtt_ms", baselineResult.Result.MinRTT, newResult.Result.MinRTT},
+			{"max_rtt_ms", baselineResult.Result.MaxRTT, newResult.Result.MaxRTT},
+			{"retransmits", float64(baselineResult.Result.Retransmits), float64(newResult.Result.Retransmits)},
+			{"jitter_ms", baselineResult.Result.JitterMs, newResult.Result.JitterMs},
+			{"lost_packets", float64(baselineResult.Result.LostPackets), float64(newResult.Result.LostPackets)},
+			{"lost_percent", baselineResult.Result.LostPercent, newResult.Result.LostPercent},
+			{"out_of_order", float64(baselineResult.Result.OutofOrder), float64(newResult.Result.OutofOrder)},
+			{"host_total_cpu", baselineResult.Result.CPUUtilization.HostTotal, newResult.Result.CPUUtilization.HostTotal},
+			{"remote_total_cpu", baselineResult.Result.CPUUtilization.RemoteTotal, newResult.Result.CPUUtilization.RemoteTotal},
 		}
 
 		for _, metric := range metrics {
-			if metric.benchmark != 0 || metric.result != 0 {
-				regressionResults[benchmarkResult.Label].Benchmark[metric.name] = metric.benchmark
-				regressionResults[benchmarkResult.Label].Result[metric.name] = metric.result
-				regressionResults[benchmarkResult.Label].Regressions[metric.name] = calculateRegression(metric.benchmark, metric.result)
+			if metric.baseline != 0 || metric.result != 0 {
+				regressionResults[baselineResult.Label].Baseline[metric.name] = metric.baseline
+				regressionResults[baselineResult.Label].Result[metric.name] = metric.result
+				regressionResults[baselineResult.Label].Deltas[metric.name] = calculateDeltaPercent(metric.baseline, metric.result)
 			}
 		}
 	}
 
-	var results []RegressionResult
+	results := make([]DeltaResult, 0, len(regressionResults)+1)
 	for _, result := range regressionResults {
 		results = append(results, *result)
 	}
 
-	file, err := os.Create(v.RegressionResultsFile)
+	file, err := os.Create(v.DeltaResultsFile)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("failed to create regression results file: %s", v.RegressionResultsFile))
+		return errors.Wrap(err, "failed to create delta results file: "+v.DeltaResultsFile)
 	}
 	defer file.Close()
 
@@ -136,13 +135,13 @@ func (v *GetNetworkRegressionResults) Run() error {
 
 	err = encoder.Encode(results)
 	if err != nil {
-		return errors.Wrap(err, "failed to encode regression results")
+		return errors.Wrap(err, "failed to encode delta results")
 	}
 
 	return nil
 }
 
-func (v *GetNetworkRegressionResults) Stop() error {
+func (v *GetNetworkDeltaResults) Stop() error {
 	return nil
 }
 
@@ -167,9 +166,9 @@ func readJSONFile(filename string) ([]TestResult, error) {
 	return testCases, nil
 }
 
-func calculateRegression(old, new float64) float64 {
-	if old == 0 {
+func calculateDeltaPercent(baseline, result float64) float64 {
+	if baseline == 0 {
 		return 100
 	}
-	return ((new - old) / old) * 100
+	return ((result - baseline) / baseline) * 100
 }
