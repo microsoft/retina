@@ -5,7 +5,6 @@ package standard
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
@@ -23,6 +22,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	"github.com/go-logr/zapr"
+	"github.com/microsoft/retina/cmd/telemetry"
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/internal/buildinfo"
 	"github.com/microsoft/retina/pkg/config"
@@ -41,7 +41,6 @@ import (
 	"github.com/microsoft/retina/pkg/metrics"
 	mm "github.com/microsoft/retina/pkg/module/metrics"
 	"github.com/microsoft/retina/pkg/pubsub"
-	"github.com/microsoft/retina/pkg/telemetry"
 )
 
 const (
@@ -93,25 +92,9 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 	metrics.InitializeMetrics()
 	mainLogger.Info(zap.String("data aggregation level", d.config.DataAggregationLevel.String()))
 
-	var tel telemetry.Telemetry
-	var err error
-	if d.config.EnableTelemetry {
-		if buildinfo.ApplicationInsightsID == "" {
-			panic("telemetry enabled, but ApplicationInsightsID is empty")
-		}
-		mainLogger.Info("telemetry enabled", zap.String("applicationInsightsID", buildinfo.ApplicationInsightsID))
-		tel, err = telemetry.NewAppInsightsTelemetryClient("retina-agent", map[string]string{
-			"version":   buildinfo.Version,
-			"apiserver": d.restConfig.Host,
-			"plugins":   strings.Join(d.config.EnabledPlugin, `,`),
-		})
-		if err != nil {
-			mainLogger.Error("failed to create telemetry client", zap.Error(err))
-			return fmt.Errorf("error when creating telemetry client: %w", err)
-		}
-	} else {
-		mainLogger.Info("telemetry disabled")
-		tel = telemetry.NewNoopTelemetry()
+	tel, err := telemetry.InitializeTelemetryClient(d.restConfig, d.config, mainLogger)
+	if err != nil {
+		return fmt.Errorf("failed to initialize telemetry client: %w", err)
 	}
 
 	// Create a manager for controller-runtime

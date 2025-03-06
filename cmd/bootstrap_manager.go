@@ -73,7 +73,14 @@ func (b *BootstrapManager) Start() error {
 	}
 	defer zl.Close()
 
-	// Check what mode should be activated
+	if daemonConfig.EnableStandalone {
+		sm := NewStandaloneDaemon(daemonConfig)
+		if err := sm.Start(zl); err != nil {
+			return fmt.Errorf("starting standalone daemon: %w", err)
+		}
+		return nil
+	}
+
 	var cfg *rest.Config
 	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
 		fmt.Println("KUBECONFIG detected, using kubeconfig: ", kubeconfig)
@@ -82,19 +89,13 @@ func (b *BootstrapManager) Start() error {
 			return fmt.Errorf("creating controller-runtime manager: %w", err)
 		}
 		return b.startDaemon(cfg, daemonConfig, zl)
-	}
-
-	cfg, err = kcfg.GetConfig()
-	if err != nil {
-		sm, err := NewStandaloneDaemon(daemonConfig, zl)
+	} else {
+		cfg, err = kcfg.GetConfig()
 		if err != nil {
-			zl.Fatal("Failed to create standalone daemon")
+			panic(err)
 		}
-		defer sm.Stop()
-		sm.Start()
-		return nil
+		return b.startDaemon(cfg, daemonConfig, zl)
 	}
-	return b.startDaemon(cfg, daemonConfig, zl)
 }
 
 func (b *BootstrapManager) startDaemon(cfg *rest.Config, daemoncfg *config.Config, zl *log.ZapLogger) error {
