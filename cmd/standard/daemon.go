@@ -75,7 +75,7 @@ func NewDaemon(daemoncfg *config.Config, cfg *rest.Config, metricsAddr, probeAdd
 }
 
 func (d *Daemon) Start(zl *log.ZapLogger) error {
-	fmt.Printf("starting Retina daemon with legacy control plane %v\n", buildinfo.Version)
+	fmt.Printf("Starting Retina daemon with legacy control plane %v\n", buildinfo.Version)
 	fmt.Println("api server: ", d.restConfig.Host)
 
 	mainLogger := zl.Named("main").Sugar().With(
