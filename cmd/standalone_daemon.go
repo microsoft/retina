@@ -8,7 +8,9 @@ import (
 	"fmt"
 
 	"github.com/microsoft/retina/cmd/telemetry"
+	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
+	"github.com/microsoft/retina/pkg/metrics"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
@@ -20,7 +22,6 @@ import (
 
 type StandaloneDaemon struct {
 	config        *config.Config
-	cache         *cache.StandaloneCache
 	httpServer    *sm.HTTPServer
 	pluginManager *pm.PluginManager
 }
@@ -32,12 +33,23 @@ func NewStandaloneDaemon(daemonCfg *config.Config) *StandaloneDaemon {
 }
 
 func (sd *StandaloneDaemon) Start(zl *log.ZapLogger) error {
-	fmt.Println("starting standalone Retina daemon")
+	fmt.Println("Starting standalone Retina daemon")
 	mainLogger := zl.Named("standalone-daemon").Sugar()
+
+	metrics.InitializeMetrics()
 
 	tel, err := telemetry.InitializeTelemetryClient(nil, sd.config, mainLogger)
 	if err != nil {
 		return fmt.Errorf("failed to initialize telemetry client: %w", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if sd.config.EnablePodLevel {
+		cache := cache.NewStandaloneCache()
+		enrich := enricher.NewStandaloneEnricher(context.Background(), cache)
+		enrich.Run(ctx)
 	}
 
 	sd.pluginManager, err = pm.NewPluginManager(
@@ -54,12 +66,9 @@ func (sd *StandaloneDaemon) Start(zl *log.ZapLogger) error {
 	)
 
 	if err := sd.httpServer.Init(); err != nil {
-		mainLogger.Fatal("failed to start http server", zap.Error(err))
+		mainLogger.Fatal("Failed to start http server", zap.Error(err))
 	}
 	defer sd.pluginManager.Stop()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	// start heartbeat goroutine for application insights
 	go tel.Heartbeat(ctx, sd.config.TelemetryInterval)
@@ -78,8 +87,6 @@ func (sd *StandaloneDaemon) Start(zl *log.ZapLogger) error {
 		mainLogger.Panic("Error running standalone daemon", zap.Error(err))
 	}
 
-	sd.cache = cache.NewStandaloneCache()
 	mainLogger.Info("Started standalone daemon")
-
 	return nil
 }
