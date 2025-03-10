@@ -99,15 +99,43 @@ azure:
   appinsights:
     instrumentation_key: "app-insights-instrumentation-key"
 
-# volume mounts with name and mountPath
+# volume mounts with name, mountPath and volume details
 volumeMounts:
-  debug: /sys/kernel/debug
-  trace: /sys/kernel/tracing
-  bpf: /sys/fs/bpf
-  cgroup: /sys/fs/cgroup
-  tmp: /tmp
-  config: /retina/config
-  varrun: /var/run
+  bpf:
+    mountPath: /sys/fs/bpf
+    volume:
+      hostPath:
+        path: /sys/fs/bpf
+  cgroup:
+    mountPath: /sys/fs/cgroup
+    volume:
+      hostPath:
+        path: /sys/fs/cgroup
+  config:
+    mountPath: /retina/config
+    volume:
+      configMap:
+        name: retina-config
+  debug:
+    mountPath: /sys/kernel/debug
+    volume:
+      hostPath:
+        path: /sys/kernel/debug
+  tmp:
+    mountPath: /tmp
+    volume:
+      emptyDir: {}
+  trace:
+    mountPath: /sys/kernel/tracing
+    volume:
+      hostPath:
+        path: /sys/kernel/tracing
+  cilium:
+    mountPath: /var/run/cilium
+    volume:
+      hostPath:
+        path: /var/run/cilium
+        type: DirectoryOrCreate
 
 #volume mounts for indows
 volumeMounts_win:
