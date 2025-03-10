@@ -136,15 +136,19 @@ func (p *PluginManager) Start(ctx context.Context) error {
 	}
 
 	g, ctx := errgroup.WithContext(ctx)
-
-	// run conntrack GC
-	ct, err := conntrack.New()
-	if err != nil {
-		return errors.Wrap(err, "failed to get conntrack instance")
+	_, isPacketParserEnabled := p.plugins["packetparser"]
+	// run conntrack GC only if packetparser is enabled
+	if isPacketParserEnabled {
+		ct, connErr := conntrack.New()
+		if connErr != nil {
+			return errors.Wrap(connErr, "failed to get conntrack instance")
+		}
+		g.Go(func() error {
+			return errors.Wrapf(ct.Run(ctx), "failed to run conntrack GC")
+		})
+	} else {
+		p.l.Info("Skipping Conntrack GC loop as packetparser plugin is not enabled")
 	}
-	g.Go(func() error {
-		return errors.Wrapf(ct.Run(ctx), "failed to run conntrack GC")
-	})
 
 	// start all plugins
 	for _, plugin := range p.plugins {
