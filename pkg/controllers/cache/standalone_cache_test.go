@@ -13,9 +13,25 @@ import (
 
 const (
 	ip        = "10.0.0.1"
-	name      = "standalone-pod"
-	namespace = "standalone-namespace"
+	name      = "test-pod"
+	namespace = "test-namespace"
 )
+
+func TestNewStandaloneCache(t *testing.T) {
+	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
+		t.Fatalf("Failed to setup logger: %v", err)
+	}
+	cache := NewStandaloneCache()
+	if cache == nil {
+		t.Fatalf("Expected non-nil cache, got nil")
+	}
+	if cache.ipToPod == nil {
+		t.Fatalf("Expected non-nil ipToPod map, got nil")
+	}
+	if cache.eventChannel == nil {
+		t.Fatalf("Expected non-nil eventChannel, got nil")
+	}
+}
 
 func TestAddPod(t *testing.T) {
 	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
@@ -36,16 +52,6 @@ func TestAddPod(t *testing.T) {
 	}
 	assert.Equal(t, podInfo.Name, name)
 	assert.Equal(t, podInfo.Namespace, namespace)
-
-	select {
-	case event := <-cache.WatchEvents():
-		assert.Equal(t, event.Ip, ip)
-		assert.Equal(t, event.PodInfo.Name, name)
-		assert.Equal(t, event.PodInfo.Namespace, namespace)
-		assert.Equal(t, event.Action, EventAdd)
-	case <-time.After(time.Second):
-		t.Fatalf("Expected an AddPod event, but none received")
-	}
 }
 
 func TestDeletePod(t *testing.T) {
@@ -55,10 +61,9 @@ func TestDeletePod(t *testing.T) {
 	cache := NewStandaloneCache()
 
 	cache.DeletePod(ip)
-	select {
-	case event := <-cache.WatchEvents():
-		t.Fatalf("Expected no events, but got %+v", event)
-	case <-time.After(100 * time.Millisecond):
+	emptyPodInfo := cache.GetPod(ip)
+	if emptyPodInfo != nil {
+		t.Fatalf("Expected nil, got %v", emptyPodInfo)
 	}
 
 	cache.AddPod(ip, name, namespace)
@@ -67,17 +72,28 @@ func TestDeletePod(t *testing.T) {
 	if deletedPodInfo != nil {
 		t.Fatalf("Expected nil, got %v", deletedPodInfo)
 	}
+}
 
-	for {
-		select {
-		case event := <-cache.WatchEvents():
-			if event.Action == EventDelete {
-				assert.Equal(t, event.Ip, ip)
-				assert.Equal(t, event.Action, EventDelete)
-				return
-			}
-		case <-time.After(time.Second):
-			t.Fatalf("Expected a DeletePod event, but none received")
-		}
+func TestPublishEvent(t *testing.T) {
+	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
+		t.Fatalf("Failed to setup logger: %v", err)
 	}
+
+	MaxStandaloneCacheEventSize = 1
+	cache := NewStandaloneCache()
+
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		event := <-cache.WatchEvents()
+		assert.Equal(t, ip, event.Ip)
+		assert.Equal(t, EventAdd, event.Action)
+	}()
+
+	err := cache.PublishEvent(ip, EventAdd)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	err = cache.PublishEvent(ip, EventDelete)
+	assert.Equal(t, err, ErrEventChannelFull)
 }

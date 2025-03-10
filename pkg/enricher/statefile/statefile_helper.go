@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	State_file_location = "C:/k/azure-vnet.json"
+	State_file_location = "/home/beegii/src/retina/pkg/enricher/statefile/mock_statefile.json"
 )
 
 type CniState struct {
