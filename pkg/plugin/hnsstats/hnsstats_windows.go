@@ -13,6 +13,7 @@ import (
 	"github.com/Microsoft/hcsshim/hcn"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	kcfg "github.com/microsoft/retina/pkg/config"
+	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/registry"
@@ -84,6 +85,12 @@ func (h *hnsstats) Init() error {
 		return err
 	}
 	h.endpointQuery.Filter = string(filter)
+
+	if h.cfg.EnableStandalone {
+		h.enricher = enricher.StandaloneInstance()
+	} else {
+		h.l.Warn("Standalone enricher is not initialized")
+	}
 
 	h.l.Info("Exiting hnsstats Init...")
 	return nil

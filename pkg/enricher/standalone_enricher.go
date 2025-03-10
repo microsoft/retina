@@ -13,6 +13,11 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	se        *StandaloneEnricher
+	localOnce sync.Once
+)
+
 type StandaloneEnricher struct {
 	GenericEnricher
 	cache *cache.StandaloneCache
@@ -20,13 +25,20 @@ type StandaloneEnricher struct {
 }
 
 func NewStandaloneEnricher(ctx context.Context, cache *cache.StandaloneCache) *StandaloneEnricher {
-	return &StandaloneEnricher{
-		GenericEnricher: GenericEnricher{
-			ctx: ctx,
-			l:   log.Logger().Named("standalone-enricher"),
-		},
-		cache: cache,
-	}
+	localOnce.Do(func() {
+		se = &StandaloneEnricher{
+			GenericEnricher: GenericEnricher{
+				ctx: ctx,
+				l:   log.Logger().Named("standalone-enricher"),
+			},
+			cache: cache,
+		}
+	})
+	return se
+}
+
+func StandaloneInstance() *StandaloneEnricher {
+	return se
 }
 
 func (e *StandaloneEnricher) Run(ctx context.Context) {
@@ -43,11 +55,11 @@ func (e *StandaloneEnricher) Run(ctx context.Context) {
 			case event := <-eventsCh:
 				switch event.Action {
 				case cache.EventAdd:
-					e.l.Debug("Enriching pod", zap.String("ip", event.Ip), zap.Any("podInfo", event.PodInfo))
-					e.enrichCache(event.Ip)
+					e.l.Debug("Enriching pod", zap.String("ip", event.Ip))
+					e.ProcessEvent(event.Ip, event.Action)
 				case cache.EventDelete:
-					e.l.Debug("Deleting pod", zap.String("ip", event.Ip), zap.Any("podInfo", event.PodInfo))
-					e.DeletePod(event.Ip)
+					e.l.Debug("Deleting pod", zap.String("ip", event.Ip))
+					e.ProcessEvent(event.Ip, event.Action)
 				default:
 					e.l.Error("Unknown standalone cache event", zap.String("action", string(event.Action)))
 				}
@@ -56,18 +68,20 @@ func (e *StandaloneEnricher) Run(ctx context.Context) {
 	}()
 }
 
-func (e *StandaloneEnricher) enrichCache(ip string) {
-	podInfo, err := sf.GetPodInfo(ip, sf.State_file_location)
-	if err != nil {
-		e.l.Error("Failed to get pod info", zap.String("ip", ip), zap.Error(err))
+func (e *StandaloneEnricher) ProcessEvent(ip string, action cache.Action) {
+	if action == cache.EventAdd {
+		podInfo, err := sf.GetPodInfo(ip, sf.State_file_location)
+		if err != nil {
+			e.l.Error("Failed to get pod info", zap.String("ip", ip), zap.Error(err))
+			return
+		}
+		e.l.Debug("Adding pod to cache", zap.String("ip", ip))
+		e.cache.AddPod(ip, podInfo.Name, podInfo.Namespace)
+	} else if action == cache.EventDelete {
+		e.l.Debug("Deleting pod from cache", zap.String("ip", ip))
+		e.cache.DeletePod(ip)
 	}
-
-	e.l.Debug("Adding pod to cache", zap.String("ip", ip), zap.Any("podInfo", podInfo))
-	e.cache.AddPod(ip, podInfo.Name, podInfo.Namespace)
-}
-
-func (e *StandaloneEnricher) DeletePod(ip string) {
-	e.cache.DeletePod(ip)
+	e.cache.PublishEvent(ip, action)
 }
 
 func (e *StandaloneEnricher) Stop() {

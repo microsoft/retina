@@ -9,76 +9,53 @@ import (
 
 	"github.com/microsoft/retina/pkg/controllers/cache"
 	"github.com/microsoft/retina/pkg/log"
-	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/assert"
 )
 
-type MockStandaloneCache struct {
-	mock.Mock
-}
-
-func (m *MockStandaloneCache) WatchEvents() <-chan cache.Event {
-	args := m.Called()
-	return args.Get(0).(<-chan cache.Event)
-}
-
-func (m *MockStandaloneCache) AddPod(ip, name, namespace string) {
-	m.Called(ip, name, namespace)
-}
-
-func (m *MockStandaloneCache) DeletePod(ip string) {
-	m.Called(ip)
-}
-
-func MockGetPodInfo(ip, stateFileLocation string) (enricher.PodInfo, error) {
-	return enricher.PodInfo{
-		Name:      "test-pod",
-		Namespace: "test-namespace",
-	}, nil
-}
+const (
+	ip        = "192.0.0.5"
+	invalidIp = "10.0.0.0"
+	name      = "retina2-pod"
+	namespace = "retina2-namespace"
+)
 
 func TestStandaloneEnricher(t *testing.T) {
 	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
 		t.Fatalf("Failed to setup logger: %v", err)
 	}
-	mockCache := new(MockStandaloneCache)
 
-	ctx := context.Background()
-	enricher := NewStandaloneEnricher(ctx, mockCache)
+	testCache := cache.NewStandaloneCache()
+	enricher := NewStandaloneEnricher(context.Background(), testCache)
 
-	// override GetPodInfo function
-	enricher.GetPodInfo = MockGetPodInfo
+	go enricher.Run(context.Background())
 
-	mockCache.On("AddPod", "10.0.0.1", "test-pod", "test-namespace").Once()
-	mockCache.On("DeletePod", "10.0.0.1").Once()
-	mockCache.On("Unknown", mock.Anything, mock.Anything, mock.Anything).Maybe()
+	// Event add for pod that doesn't exist in statefile
+	enricher.ProcessEvent(invalidIp, cache.EventAdd)
+	podInfo := testCache.GetPod(invalidIp)
+	assert.Nil(t, podInfo)
 
-	eventsCh := make(chan cache.Event, 3)
-	mockCache.On("WatchEvents").Return(eventsCh)
+	// Event add for pod that exists in statefile
+	enricher.ProcessEvent(ip, cache.EventAdd)
 
-	// Start the enricher in a separate goroutine
-	go enricher.Run(ctx)
+	podInfo = testCache.GetPod(ip)
+	assert.NotNil(t, podInfo)
+	assert.Equal(t, name, podInfo.Name)
+	assert.Equal(t, namespace, podInfo.Namespace)
 
-	// Simulate sending EventAdd
-	eventsCh <- cache.Event{
-		Action:  cache.EventAdd,
-		Ip:      "10.0.0.1",
-		PodInfo: enricher.PodInfo{Name: "test-pod", Namespace: "test-namespace"},
-	}
+	// Event delete for pod that doesn't exist in cache
+	enricher.ProcessEvent(invalidIp, cache.EventDelete)
+	podInfo = testCache.GetPod(invalidIp)
+	assert.Nil(t, podInfo)
 
-	// Simulate sending EventDelete
-	eventsCh <- cache.Event{
-		Action:  cache.EventDelete,
-		Ip:      "10.0.0.1",
-		PodInfo: enricher.PodInfo{Name: "pod2", Namespace: "namespace2"},
-	}
+	// Test deleting a pod that exists in the cache
+	enricher.ProcessEvent(ip, cache.EventDelete)
+	podInfo = testCache.GetPod(ip)
+	assert.Nil(t, podInfo) // cache should be empty now
 
-	// Simulate sending an unknown event
-	eventsCh <- cache.Event{
-		Action:  "Unknown",
-		Ip:      "10.0.0.1",
-		PodInfo: nil,
-	}
+	// Test unknown event action
+	unknownAction := cache.Action("unknown")
+	enricher.ProcessEvent("9.9.9.9", unknownAction)
+	assert.Nil(t, testCache.GetPod("9.9.9.9")) // nothing should happen
 
-	mockCache.AssertExpectations(t)
-	close(eventsCh)
+	enricher.Stop()
 }
