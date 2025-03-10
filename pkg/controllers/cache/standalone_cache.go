@@ -4,6 +4,7 @@
 package cache
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/microsoft/retina/pkg/log"
@@ -12,6 +13,7 @@ import (
 
 var (
 	MaxStandaloneCacheEventSize = 250
+	ErrEventChannelFull         = errors.New("event channel is full, event dropped")
 )
 
 type Action string
@@ -27,9 +29,8 @@ type PodInfo struct {
 }
 
 type StandaloneCacheEvent struct {
-	Ip      string
-	PodInfo PodInfo
-	Action  Action
+	Ip     string
+	Action Action
 }
 
 type StandaloneCache struct {
@@ -41,7 +42,7 @@ type StandaloneCache struct {
 
 func NewStandaloneCache() *StandaloneCache {
 	return &StandaloneCache{
-		l:            log.Logger().Named(string("Standalone Cache")),
+		l:            log.Logger().Named(string("standalone-cache")),
 		ipToPod:      make(map[string]PodInfo),
 		eventChannel: make(chan StandaloneCacheEvent, MaxStandaloneCacheEventSize),
 	}
@@ -53,15 +54,6 @@ func (c *StandaloneCache) AddPod(ip, name, namespace string) {
 
 	c.ipToPod[ip] = PodInfo{Name: name, Namespace: namespace}
 	c.l.Info("Added pod", zap.String("ip", ip), zap.String("name", name), zap.String("namespace", namespace))
-
-	c.eventChannel <- StandaloneCacheEvent{
-		Ip: ip,
-		PodInfo: PodInfo{
-			Name:      name,
-			Namespace: namespace,
-		},
-		Action: EventAdd,
-	}
 }
 
 func (c *StandaloneCache) GetPod(ip string) *PodInfo {
@@ -81,15 +73,19 @@ func (c *StandaloneCache) DeletePod(ip string) {
 	if podInfo, exists := c.ipToPod[ip]; exists {
 		delete(c.ipToPod, ip)
 		c.l.Info("Deleted pod", zap.String("ip", ip), zap.String("name", podInfo.Name), zap.String("namespace", podInfo.Namespace))
-
-		c.eventChannel <- StandaloneCacheEvent{
-			Ip:      ip,
-			PodInfo: podInfo,
-			Action:  EventDelete,
-		}
 	}
 }
 
 func (c *StandaloneCache) WatchEvents() <-chan StandaloneCacheEvent {
 	return c.eventChannel
+}
+
+func (c *StandaloneCache) PublishEvent(ip string, action Action) error {
+	select {
+	case c.eventChannel <- StandaloneCacheEvent{Ip: ip, Action: action}:
+		return nil
+	default:
+		c.l.Warn("Event channel full, dropping event", zap.String("ip", ip), zap.String("action", string(action)))
+		return ErrEventChannelFull
+	}
 }
