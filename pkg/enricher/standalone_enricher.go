@@ -5,6 +5,7 @@ package enricher
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/microsoft/retina/pkg/controllers/cache"
@@ -18,10 +19,20 @@ var (
 	localOnce sync.Once
 )
 
+var (
+	MaxStandaloneCacheEventSize = 250
+	ErrEventChannelFull         = errors.New("event channel is full, event dropped")
+)
+
+type StandaloneEvent struct {
+	Ip string
+}
+
 type StandaloneEnricher struct {
 	GenericEnricher
-	cache *cache.StandaloneCache
-	wg    sync.WaitGroup
+	cache        *cache.StandaloneCache
+	eventChannel chan StandaloneEvent
+	wg           sync.WaitGroup
 }
 
 func NewStandaloneEnricher(ctx context.Context, cache *cache.StandaloneCache) *StandaloneEnricher {
@@ -31,7 +42,8 @@ func NewStandaloneEnricher(ctx context.Context, cache *cache.StandaloneCache) *S
 				ctx: ctx,
 				l:   log.Logger().Named("standalone-enricher"),
 			},
-			cache: cache,
+			cache:        cache,
+			eventChannel: make(chan StandaloneEvent, MaxStandaloneCacheEventSize),
 		}
 	})
 	return se
@@ -43,45 +55,45 @@ func StandaloneInstance() *StandaloneEnricher {
 
 func (e *StandaloneEnricher) Run(ctx context.Context) {
 	e.l.Info("Running standalone enricher")
-
-	eventsCh := e.cache.WatchEvents()
+	e.wg.Add(1)
 
 	go func() {
+		defer e.wg.Done()
 		for {
 			select {
 			case <-ctx.Done():
 				e.l.Info("Standalone enricher shutting down...")
 				return
-			case event := <-eventsCh:
-				switch event.Action {
-				case cache.EventAdd:
-					e.l.Debug("Enriching pod", zap.String("ip", event.Ip))
-					e.ProcessEvent(event.Ip, event.Action)
-				case cache.EventDelete:
-					e.l.Debug("Deleting pod", zap.String("ip", event.Ip))
-					e.ProcessEvent(event.Ip, event.Action)
-				default:
-					e.l.Error("Unknown standalone cache event", zap.String("action", string(event.Action)))
-				}
+			case event := <-e.eventChannel:
+				e.processEvent(event.Ip)
+			default:
+				e.l.Error("Unknown standalone cache event")
 			}
 		}
 	}()
 }
 
-func (e *StandaloneEnricher) ProcessEvent(ip string, action cache.Action) {
-	if action == cache.EventAdd {
-		podInfo, err := sf.GetPodInfo(ip, sf.State_file_location)
-		if err != nil {
-			e.l.Error("Failed to get pod info", zap.String("ip", ip), zap.Error(err))
-			return
-		}
-		e.l.Debug("Adding pod to cache", zap.String("ip", ip))
-		e.cache.AddPod(ip, podInfo.Name, podInfo.Namespace)
-	} else if action == cache.EventDelete {
-		e.l.Debug("Deleting pod from cache", zap.String("ip", ip))
-		e.cache.DeletePod(ip)
+func (c *StandaloneEnricher) processEvent(ip string) {
+	podInfo, err := sf.GetPodInfo(ip, sf.State_file_location)
+	if err != nil {
+		c.l.Error("Failed to get pod info", zap.String("ip", ip), zap.Error(err))
+		return
 	}
-	e.cache.PublishEvent(ip, action)
+	c.cache.ProcessPodInfo(ip, podInfo)
+}
+
+func (c *StandaloneEnricher) GetPodInfo(ip string) *cache.PodInfo {
+	return c.cache.GetPod(ip)
+}
+
+func (c *StandaloneEnricher) PublishEvent(ip string) error {
+	select {
+	case c.eventChannel <- StandaloneEvent{Ip: ip}:
+		return nil
+	default:
+		c.l.Warn("Event channel full, dropping event", zap.String("ip", ip))
+		return ErrEventChannelFull
+	}
 }
 
 func (e *StandaloneEnricher) Stop() {
