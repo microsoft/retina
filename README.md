@@ -27,7 +27,7 @@ Retina **collects customizable telemetry**, which can be exported to **multiple 
 
 ## Why Retina?
 
-Retina lets you **investigate network issues on-demand** and **continuously monitor your clusters**. For scenarios where Retina shines, see the intro docs [here](https://retina.sh/docs/intro)
+Retina lets you **investigate network issues on-demand** and **continuously monitor your clusters**. For scenarios where Retina shines, see the intro docs [here](https://retina.sh/docs/Introduction/intro)
 
 ## Documentation
 
@@ -37,8 +37,8 @@ See [retina.sh](http://retina.sh) for documentation and examples.
 
 Retina has two major features:
 
-- [Metrics](https://retina.sh/docs/metrics/modes)
-- [Captures](https://retina.sh/docs/captures)
+- [Metrics](https://retina.sh/docs/Metrics/modes)
+- [Captures](https://retina.sh/docs/Captures/overview)
 
 ### Metrics Quick Install Guide
 
@@ -57,7 +57,7 @@ helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
 
 Set the `version` and image `tag` arguments to the desired version, if different.
 
-After Helm install, follow steps in [Using Prometheus and Grafana](https://retina.sh/docs/installation/grafana/prometheus-unmanaged) to set up metrics collection and visualization.
+After Helm install, follow the steps for setting up [Prometheus](https://retina.sh/docs/Installation/prometheus) and [Grafana](https://retina.sh/docs/Installation/grafana) to configure metrics collection and visualization.
 
 ### Captures Quick Start Guide
 
@@ -69,7 +69,7 @@ The preferred way to install the Retina CLI using [Krew](https://krew.sigs.k8s.i
 kubectl krew install retina
 ```
 
-Other installation options are documented in [CLI Installation](https://retina.sh/docs/installation/cli).
+Other installation options are documented in [CLI Installation](https://retina.sh/docs/Installation/CLI).
 
 Verify installation:
 
@@ -84,7 +84,7 @@ To quickly start creating a capture:
 kubectl retina capture create --name <my-capture> --namespace <my-namespace> --selector <app=my-app>
 ```
 
-For further CLI documentation, see [Capture with Retina CLI](https://retina.sh/docs/captures/cli).
+For further CLI documentation, see [Capture with Retina CLI](https://retina.sh/docs/Captures/cli).
 
 #### Captures via CRD
 
@@ -105,7 +105,7 @@ helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
     --set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\,packetparser\]"
 ```
 
-Then follow steps in [Capture CRD](https://retina.sh/docs/captures/#option-2-capture-crd-custom-resource-definition) for documentation of the CRD and examples for setting up Captures.
+Then follow steps in [Capture CRD](https://retina.sh/docs/Captures/overview/#option-2-capture-crd-custom-resource-definition) for documentation of the CRD and examples for setting up Captures.
 
 ## Contributing
 
@@ -121,7 +121,7 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
 contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
 
-[Read more about how to begin contributing here.](https://retina.sh/docs/contributing)
+[Read more about how to begin contributing here.](https://retina.sh/docs/Contributing/overview)
 
 ### Verify signed images
 
@@ -136,7 +136,7 @@ cosign verify ghcr.io/$REPO/$IMAGE:$TAG --certificate-oidc-issuer https://token.
 
 ### Office Hours and Community Meetings
 
-We host a periodic open community meeting. [Find the details here.](https://retina.sh/docs/contributing/#office-hours-and-community-meetings)
+We host a periodic open community meeting. [Find the details here.](https://retina.sh/docs/Contributing/overview#office-hours-and-community-meetings)
 
 ## Trademarks
 

@@ -3,17 +3,12 @@ package scaletest
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-)
-
-const (
-	defaultTimeoutSeconds = 300
 )
 
 type ValidateNumOfNodes struct {
@@ -43,8 +38,7 @@ func (v *ValidateNumOfNodes) Run() error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeoutSeconds*time.Second)
-	defer cancel()
+	ctx := context.TODO()
 
 	labelSelector := labels.Set(v.Label).String()
 	nodes, err := clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
