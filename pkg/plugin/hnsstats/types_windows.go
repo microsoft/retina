@@ -10,6 +10,7 @@ import (
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/hcn"
 	kcfg "github.com/microsoft/retina/pkg/config"
+	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -73,6 +74,7 @@ type hnsstats struct {
 	state         int
 	l             *log.ZapLogger
 	endpointQuery hcn.HostComputeQuery
+	enricher      *enricher.StandaloneEnricher
 }
 
 type HnsStatsData struct {
