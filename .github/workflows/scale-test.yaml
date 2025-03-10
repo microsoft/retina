@@ -15,7 +15,7 @@ on:
         description: "Image Namespace (if not set, default namespace will be used)"
         type: string
       image_tag:
-        description: "Image Tag (if not set, default for this commit will be used)"
+        description: "Image Tag (if not set, latest commit from 'main' will be used)"
         type: string
       num_deployments:
         description: "Number of Traffic Deployments"
@@ -36,25 +36,21 @@ on:
 
   workflow_call:
     inputs:
-      resource_group:
-        description: "Azure Resource Group"
-        required: true
-        type: string
-      cluster_name:
-        description: "AKS Cluster Name"
-        required: true
-        type: string
       num_deployments:
         description: "Number of Traffic Deployments"
-        default: 1000
+        default: 100
         type: number
       num_replicas:
         description: "Number of Traffic Replicas per Deployment"
-        default: 40
+        default: 10
         type: number
       num_netpol: 
         description: "Number of Network Policies"
-        default: 1000
+        default: 0
+        type: number
+      num_nodes:
+        description: "Number of nodes"
+        default: 100
         type: number
       cleanup: 
         description: "Clean up environment after test"
@@ -72,10 +68,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 # v5.3.0
         with:
           go-version-file: go.mod
       - run: go version
@@ -96,11 +92,14 @@ jobs:
           NUM_REPLICAS: ${{ inputs.num_replicas }}
           NUM_NETPOLS: ${{ inputs.num_netpol }}
           CLEANUP: ${{ inputs.cleanup }}
-          IMAGE_REGISTRY: ${{  inputs.image_namespace == '' && vars.ACR_NAME || inputs.image_namespace }}
-          IMAGE_NAMESPACE: ${{ github.repository }}
+          IMAGE_REGISTRY: ${{ vars.ACR_NAME }}
+          IMAGE_NAMESPACE: ${{ inputs.image_namespace == '' && github.repository || inputs.image_namespace }}
           TAG: ${{ inputs.image_tag }}
           AZURE_APP_INSIGHTS_KEY: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
+          NODES: ${{ inputs.num_nodes }}
+          CREATE_INFRA: ${{ github.event_name != 'workflow_dispatch' }}
         shell: bash
         run: |
           set -euo pipefail
-          go test -v ./test/e2e/. -timeout 300m -tags=scale -count=1  -args -image-tag=$( [[ $TAG == "" ]] && make version || echo $TAG ) -create-infra=false -delete-infra=false 
+          [[ $TAG == "" ]] && TAG=$(curl -s https://api.github.com/repos/microsoft/retina/commits | jq -r '.[0].sha' | cut -c1-7)
+          exec go test -v ./test/e2e/. -timeout 300m -tags=scale -count=1  -args -create-infra=$(echo $CREATE_INFRA) -delete-infra=$(echo $CLEANUP)

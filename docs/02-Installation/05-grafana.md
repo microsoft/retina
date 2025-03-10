@@ -34,9 +34,13 @@ If you followed the steps to install and configure [Prometheus](./04-prometheus.
 
    ![Grafana datasources](./img/grafana-datasources.png)
 
-5. Import the [kubernetes-networking-observability](https://grafana.com/grafana/dashboards/18814/) dashboard by id `18814` at [localhost:8080/dashboard/import](http://localhost:8080/dashboard/import)
+5. Import the [kubernetes-networking-retina-cluster](https://grafana.com/grafana/dashboards/22835/) dashboard by id `22835` at [localhost:8080/dashboard/import](http://localhost:8080/dashboard/import). This dashboard is agnostic to the control plane used in Retina (Standard or Hubble).
 
    ![Grafana import](./img/grafana-import.png)
+
+   Some other available dashboards for Retina Standard are:
+   - [kubernetes-networking-retina-standard-DNS](https://grafana.com/grafana/dashboards/22836/) dashboard (id `22836`)
+   - [kubernetes-networking-retina-standard-PodTraffic](https://grafana.com/grafana/dashboards/22837/) dashboard (id `22837`)
 
 6. Kubernetes cluster metrics shouold be visible
 
@@ -44,8 +48,10 @@ If you followed the steps to install and configure [Prometheus](./04-prometheus.
 
 ## Retina Dashboards
 
-There is a set of Retina dashboards that you can import directly into Grafana as json files. The dashboards are found under `deploy/legacy/grafana/dashboards/` if you installed retina legacy controlplane, and under `deploy/hubble/grafana/dashboards/` if you installed retina hubble controlplane.
+There is a set of Retina dashboards that you can import directly into Grafana as json files. The dashboards are found under `deploy/grafana-dashboards/`.
 
-Here is an example of the Retina `dns.json` dashboard.
+Here is an example of the Retina `standard-dns.json` dashboard.
 
 ![Grafana retina DNS dashboard](./img/grafana-retina-dns-dash.png)
+
+These dashboards are also available at the [Grafana Portal Retina Page](https://grafana.com/orgs/retina1/dashboards)

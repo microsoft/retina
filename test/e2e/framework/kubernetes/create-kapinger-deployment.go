@@ -132,13 +132,13 @@ func (c *CreateKapingerDeployment) GetKapingerDeployment() *appsv1.Deployment {
 					Containers: []v1.Container{
 						{
 							Name:  "kapinger",
-							Image: "acnpublic.azurecr.io/kapinger:20241014.7",
+							Image: "acnpublic.azurecr.io/kapinger:v0.0.23-9-g23ef222",
 							Resources: v1.ResourceRequirements{
 								Requests: v1.ResourceList{
 									"memory": resource.MustParse("20Mi"),
 								},
 								Limits: v1.ResourceList{
-									"memory": resource.MustParse("20Mi"),
+									"memory": resource.MustParse("40Mi"),
 								},
 							},
 							Ports: []v1.ContainerPort{
