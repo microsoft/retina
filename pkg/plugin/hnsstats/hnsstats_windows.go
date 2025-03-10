@@ -13,6 +13,7 @@ import (
 	"github.com/Microsoft/hcsshim/hcn"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	kcfg "github.com/microsoft/retina/pkg/config"
+	"github.com/microsoft/retina/pkg/controllers/cache"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
@@ -168,6 +169,16 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 }
 
 func notifyHnsStats(h *hnsstats, stats *HnsStatsData) {
+
+	if h.cfg.EnablePodLevel {
+		labels := getPodLabels(h, stats)
+		if labels == nil {
+			h.l.Error("Unable to get pod info", zap.String(zapIPField, stats.IPAddress))
+			return
+		}
+		// update advanced metrics!
+	}
+
 	// hns signals
 	metrics.ForwardPacketsGauge.WithLabelValues(ingressLabel).Set(float64(stats.hnscounters.PacketsReceived))
 	h.l.Debug("emitting packets received count metric", zap.Uint64(PacketsReceived, stats.hnscounters.PacketsReceived))
@@ -215,20 +226,28 @@ func notifyHnsStats(h *hnsstats, stats *HnsStatsData) {
 	metrics.TCPFlagGauge.WithLabelValues(egressLabel, utils.RST).Set(float64(stats.vfpCounters.Out.TcpCounters.PacketCounters.RstPacketCount))
 }
 
+func getPodLabels(h *hnsstats, stats *HnsStatsData) *cache.PodInfo {
+	if h.cfg.EnableStandalone {
+		return h.enricher.GetPodInfo(stats.IPAddress)
+	} else {
+		return enricher.Instance().GetPodInfo(stats.IPAddress)
+	}
+}
+
 func (h *hnsstats) Start(ctx context.Context) error {
 	h.l.Info("Start hnsstats plugin...")
 	h.state = start
 	return pullHnsStats(ctx, h)
 }
 
-func (d *hnsstats) Stop() error {
-	d.l.Info("Entered hnsstats Stop...")
-	if d.state != start {
-		d.l.Info("plugin not started")
+func (h *hnsstats) Stop() error {
+	h.l.Info("Entered hnsstats Stop...")
+	if h.state != start {
+		h.l.Info("plugin not started")
 		return nil
 	}
-	d.l.Info("Stopped listening for hnsstats event...")
-	d.state = stop
-	d.l.Info("Exiting hnsstats Stop...")
+	h.l.Info("Stopped listening for hnsstats event...")
+	h.state = stop
+	h.l.Info("Exiting hnsstats Stop...")
 	return nil
 }
