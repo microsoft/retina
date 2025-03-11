@@ -83,8 +83,8 @@ github.com/Azure/go-autorest/logger v0.2.1 h1:IG7i4p/mDa2Ce4TRyAO8IHnVhAVF3RFU+Z
 github.com/Azure/go-autorest/logger v0.2.1/go.mod h1:T9E3cAhj2VqvPOtCYAvby9aBXkZmbF5NWuPV8+WeEW8=
 github.com/Azure/go-autorest/tracing v0.6.0 h1:TYi4+3m5t6K48TGI9AUdb+IzbnSxvnvUMfuitfgcfuo=
 github.com/Azure/go-autorest/tracing v0.6.0/go.mod h1:+vhtPC754Xsa23ID7GlGsrdKBpUA79WCAKPPZVC2DeU=
-github.com/Azure/msi-dataplane v0.4.2 h1:4V44wRZ+sKmKgj64SKN5lMskt1qQBQSUiy6kazWvwKU=
-github.com/Azure/msi-dataplane v0.4.2/go.mod h1:yAfxdJyvcnvSDfSyOFV9qm4fReEQDl+nZLGeH2ZWSmw=
+github.com/Azure/msi-dataplane v0.4.3 h1:dWPWzY4b54tLIR9T1Q014Xxd/1DxOsMIp6EjRFAJlQY=
+github.com/Azure/msi-dataplane v0.4.3/go.mod h1:yAfxdJyvcnvSDfSyOFV9qm4fReEQDl+nZLGeH2ZWSmw=
 github.com/Azure/perf-tests/network/benchmarks/netperf v0.0.0-20241008140716-395a79947d2c h1:TMXh4Z1Z98o4Ob7JYhiNHocITQXHqJSsrB5ts4uwKl8=
 github.com/Azure/perf-tests/network/benchmarks/netperf v0.0.0-20241008140716-395a79947d2c/go.mod h1:jeV6A8q9uDVDwffTt5KBk+5g7bXfpEImYW6qLKn0E+I=
 github.com/AzureAD/microsoft-authentication-extensions-for-go/cache v0.1.1 h1:WJTmL004Abzc5wDB5VtZG2PJk5ndYDgVacGqfirKxjM=
@@ -1225,8 +1225,8 @@ k8s.io/utils v0.0.0-20241210054802-24370beab758 h1:sdbE21q2nlQtFh65saZY+rRM6x6aJ
 k8s.io/utils v0.0.0-20241210054802-24370beab758/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
 oras.land/oras-go v1.2.5 h1:XpYuAwAb0DfQsunIyMfeET92emK8km3W4yEzZvUbsTo=
 oras.land/oras-go v1.2.5/go.mod h1:PuAwRShRZCsZb7g8Ar3jKKQR/2A/qN+pkYxIOd/FAoo=
-sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.5.9 h1:+ngbNuuzAIy4mIA09/ALZxx0c+PfriOdUZkkFwpTSv8=
-sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.5.9/go.mod h1:wlb5KMXferSuS9asjIlqjU7yHnCUEtAGnwjYdDtqdmk=
+sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.5.12 h1:9CnsYC1HVu/QPExszNb7sRLvbjeFsNiby2WsDUugSZs=
+sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.5.12/go.mod h1:qMLI6HgC4GL/2w+KINP8YVDRzKCH/zQaoYHbfu7YOfU=
 sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader v0.0.20 h1:jeEFfNxq9uJqkkxhd6WaWNsKNjKhJBcVuWTSgJoXXHM=
 sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader v0.0.20/go.mod h1:5evhIg+6KdZLaezvJPN1rMcn/EY+GypQh/7gNZHD97Y=
 sigs.k8s.io/controller-runtime v0.18.5 h1:nTHio/W+Q4aBlQMgbnC5hZb4IjIidyrizMai9P6n4Rk=
