@@ -28,7 +28,7 @@ func TestStandaloneEnricher(t *testing.T) {
 	testCache := cache.NewStandaloneCache()
 	enricher := NewStandaloneEnricher(context.Background(), testCache)
 
-	go enricher.Run(context.Background())
+	go enricher.Run()
 
 	// Enrich pod not in statefile
 	err := enricher.PublishEvent(invalidIp)
@@ -71,7 +71,7 @@ func TestPublishEvent(t *testing.T) {
 	testCache := cache.NewStandaloneCache()
 	enricher := NewStandaloneEnricher(context.Background(), testCache)
 
-	go enricher.Run(context.Background())
+	go enricher.Run()
 
 	err1 := enricher.PublishEvent(ip)
 	err2 := enricher.PublishEvent(invalidIp)

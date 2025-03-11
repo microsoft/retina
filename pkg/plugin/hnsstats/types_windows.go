@@ -11,7 +11,10 @@ import (
 	"github.com/Microsoft/hcsshim/hcn"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
+	"github.com/microsoft/retina/pkg/exporter"
 	"github.com/microsoft/retina/pkg/log"
+	"github.com/microsoft/retina/pkg/metrics"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 
@@ -21,6 +24,11 @@ import (
 const (
 	name          string = "hnsstats"
 	HnsStatsEvent string = "hnsstatscount"
+
+	// Advanced metric
+	AdvHNSStatsName        string = "adv_windows_hns_stats"
+	AdvHNSStatsDescription string = "Include many different metrics from packets sent/received to closed connections"
+
 	// From HNSStats API
 	PacketsReceived        string = "win_packets_recv_count"
 	PacketsSent            string = "win_packets_sent_count"
@@ -66,6 +74,10 @@ const (
 	// metrics direction
 	ingressLabel = "ingress"
 	egressLabel  = "egress"
+)
+
+var (
+	AdvWindowsGauge *prometheus.GaugeVec
 )
 
 type hnsstats struct {
@@ -148,4 +160,22 @@ func updateCounter(counterName string, attr *[]attribute.KeyValue, m metric.Mete
 func (h *HnsStatsData) String() string {
 	return fmt.Sprintf("Endpoint ID: %s, Packets received: %d, Packets sent %d, Bytes sent %d, Bytes received %d",
 		h.hnscounters.EndpointID, h.hnscounters.PacketsReceived, h.hnscounters.PacketsSent, h.hnscounters.BytesSent, h.hnscounters.BytesReceived)
+}
+
+func InitializeAdvMetrics() {
+	if AdvWindowsGauge != nil {
+		cleanAdvMetrics()
+	}
+	AdvWindowsGauge = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.AdvancedRegistry,
+		AdvHNSStatsName,
+		AdvHNSStatsDescription,
+		"Ip",
+		"PodName",
+		"Namespace",
+	)
+}
+
+func cleanAdvMetrics() {
+	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(AdvWindowsGauge))
 }
