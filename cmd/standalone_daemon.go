@@ -48,8 +48,8 @@ func (sd *StandaloneDaemon) Start(zl *log.ZapLogger) error {
 
 	if sd.config.EnablePodLevel {
 		cache := cache.NewStandaloneCache()
-		enrich := enricher.NewStandaloneEnricher(context.Background(), cache)
-		enrich.Run(ctx)
+		enrich := enricher.NewStandaloneEnricher(ctx, cache)
+		enrich.Run()
 	}
 
 	sd.pluginManager, err = pm.NewPluginManager(
