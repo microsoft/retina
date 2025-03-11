@@ -68,6 +68,7 @@ type Config struct {
 	EnableTelemetry          bool          `yaml:"enableTelemetry"`
 	EnableRetinaEndpoint     bool          `yaml:"enableRetinaEndpoint"`
 	EnablePodLevel           bool          `yaml:"enablePodLevel"`
+	EnableStandalonMode      bool          `yaml:"enableStandaloneMode"`
 	EnableConntrackMetrics   bool          `yaml:"enableConntrackMetrics"`
 	RemoteContext            bool          `yaml:"remoteContext"`
 	EnableAnnotations        bool          `yaml:"enableAnnotations"`
