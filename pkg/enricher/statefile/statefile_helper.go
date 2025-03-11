@@ -11,7 +11,7 @@ import (
 	"github.com/microsoft/retina/pkg/controllers/cache"
 )
 
-const (
+var (
 	State_file_location = "/home/beegii/src/retina/pkg/enricher/statefile/mock_statefile.json"
 )
 

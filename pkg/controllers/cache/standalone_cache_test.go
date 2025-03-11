@@ -5,7 +5,6 @@ package cache
 
 import (
 	"testing"
-	"time"
 
 	"github.com/microsoft/retina/pkg/log"
 	"gotest.tools/v3/assert"
@@ -17,6 +16,11 @@ const (
 	namespace = "test-namespace"
 )
 
+var podInfo = &PodInfo{
+	Name:      name,
+	Namespace: namespace,
+}
+
 func TestNewStandaloneCache(t *testing.T) {
 	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
 		t.Fatalf("Failed to setup logger: %v", err)
@@ -27,9 +31,6 @@ func TestNewStandaloneCache(t *testing.T) {
 	}
 	if cache.ipToPod == nil {
 		t.Fatalf("Expected non-nil ipToPod map, got nil")
-	}
-	if cache.eventChannel == nil {
-		t.Fatalf("Expected non-nil eventChannel, got nil")
 	}
 }
 
@@ -44,7 +45,7 @@ func TestAddPod(t *testing.T) {
 		t.Fatalf("Expected nil, got %v", emptyPodInfo)
 	}
 
-	cache.AddPod(ip, name, namespace)
+	cache.ProcessPodInfo(ip, podInfo)
 	podInfo := cache.GetPod(ip)
 
 	if podInfo == nil {
@@ -60,40 +61,24 @@ func TestDeletePod(t *testing.T) {
 	}
 	cache := NewStandaloneCache()
 
-	cache.DeletePod(ip)
-	emptyPodInfo := cache.GetPod(ip)
-	if emptyPodInfo != nil {
-		t.Fatalf("Expected nil, got %v", emptyPodInfo)
+	// Add pod
+	cache.ProcessPodInfo(ip, podInfo)
+	podInfo := cache.GetPod(ip)
+	if podInfo == nil {
+		t.Fatalf("Expected pod info, got nil")
 	}
 
-	cache.AddPod(ip, name, namespace)
-	cache.DeletePod(ip)
+	// Attempt to delete pod not in cache
+	cache.ProcessPodInfo("9.9.9.9", nil)
+	podInfo1 := cache.GetPod(ip)
+	if podInfo1 == nil {
+		t.Fatalf("Expected pod info, got nil")
+	}
+
+	// Delete pod
+	cache.ProcessPodInfo(ip, nil)
 	deletedPodInfo := cache.GetPod(ip)
 	if deletedPodInfo != nil {
 		t.Fatalf("Expected nil, got %v", deletedPodInfo)
 	}
-}
-
-func TestPublishEvent(t *testing.T) {
-	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
-		t.Fatalf("Failed to setup logger: %v", err)
-	}
-
-	MaxStandaloneCacheEventSize = 1
-	cache := NewStandaloneCache()
-
-	go func() {
-		time.Sleep(100 * time.Millisecond)
-		event := <-cache.WatchEvents()
-		assert.Equal(t, ip, event.Ip)
-		assert.Equal(t, EventAdd, event.Action)
-	}()
-
-	err := cache.PublishEvent(ip, EventAdd)
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
-
-	err = cache.PublishEvent(ip, EventDelete)
-	assert.Equal(t, err, ErrEventChannelFull)
 }
