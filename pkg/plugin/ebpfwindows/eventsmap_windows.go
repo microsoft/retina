@@ -6,8 +6,8 @@ import (
 )
 
 var (
-	registerEventsMapCallback   = retinaEbpfAPI.NewProc("register_cilium_eventsmap_callback")
-	unregisterEventsMapCallback = retinaEbpfAPI.NewProc("unregister_cilium_eventsmap_callback")
+	registerEventsMapCallback   = retinaEbpfAPI.NewProc("RetinaRegisterEventsMapCallback")
+	unregisterEventsMapCallback = retinaEbpfAPI.NewProc("RetinaUnregisterEventsMapCallback")
 )
 
 type eventsMapCallback func(data unsafe.Pointer, size uint64) int

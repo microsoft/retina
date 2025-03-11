@@ -120,7 +120,7 @@ func (p *Plugin) metricsMapIterateCallback(key *MetricsKey, value *MetricsValues
 		if key.IsEgress() {
 			metrics.ForwardBytesGauge.WithLabelValues(egressLabel).Set(float64(value.Bytes()))
 			p.l.Debug("emitting bytes sent count metric", zap.Uint64(bytesSent, value.Bytes()))
-			metrics.WindowsGauge.WithLabelValues(packetsSent).Set(float64(value.Count()))
+			metrics.ForwardPacketsGauge.WithLabelValues(egressLabel).Set(float64(value.Count()))
 			p.l.Debug("emitting packets sent count metric", zap.Uint64(packetsSent, value.Count()))
 		} else if key.IsIngress() {
 			metrics.ForwardPacketsGauge.WithLabelValues(ingressLabel).Set(float64(value.Count()))

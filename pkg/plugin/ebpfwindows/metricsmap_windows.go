@@ -65,7 +65,7 @@ var (
 	// Load the retinaebpfapi.dll
 	retinaEbpfAPI = windows.NewLazyDLL("retinaebpfapi.dll")
 	// Load the enumerate_cilium_metricsmap function
-	enumMetricsMap = retinaEbpfAPI.NewProc("enumerate_cilium_metricsmap")
+	enumMetricsMap = retinaEbpfAPI.NewProc("RetinaEnumerateMetricsMap")
 )
 
 // ringBufferEventCallback type definition in Go
