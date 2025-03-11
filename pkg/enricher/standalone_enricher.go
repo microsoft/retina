@@ -32,7 +32,6 @@ type StandaloneEnricher struct {
 	GenericEnricher
 	cache        *cache.StandaloneCache
 	eventChannel chan StandaloneEvent
-	wg           sync.WaitGroup
 }
 
 func NewStandaloneEnricher(ctx context.Context, cache *cache.StandaloneCache) *StandaloneEnricher {
@@ -55,49 +54,49 @@ func StandaloneInstance() *StandaloneEnricher {
 
 func (e *StandaloneEnricher) Run(ctx context.Context) {
 	e.l.Info("Running standalone enricher")
-	e.wg.Add(1)
 
 	go func() {
-		defer e.wg.Done()
 		for {
 			select {
 			case <-ctx.Done():
 				e.l.Info("Standalone enricher shutting down...")
 				return
-			case event := <-e.eventChannel:
+			case event, ok := <-e.eventChannel:
+				if !ok {
+					e.l.Info("Event channel closed, stopping event processing")
+					return
+				}
+				e.l.Debug("Processing event", zap.String("ip", event.Ip))
 				e.processEvent(event.Ip)
-			default:
-				e.l.Error("Unknown standalone cache event")
 			}
 		}
 	}()
 }
 
-func (c *StandaloneEnricher) processEvent(ip string) {
+func (e *StandaloneEnricher) processEvent(ip string) {
 	podInfo, err := sf.GetPodInfo(ip, sf.State_file_location)
 	if err != nil {
-		c.l.Error("Failed to get pod info", zap.String("ip", ip), zap.Error(err))
+		e.l.Error("Failed to get pod info", zap.String("ip", ip), zap.Error(err))
 		return
 	}
-	c.cache.ProcessPodInfo(ip, podInfo)
+	e.cache.ProcessPodInfo(ip, podInfo)
 }
 
-func (c *StandaloneEnricher) GetPodInfo(ip string) *cache.PodInfo {
-	return c.cache.GetPod(ip)
+func (e *StandaloneEnricher) GetPodInfo(ip string) *cache.PodInfo {
+	return e.cache.GetPod(ip)
 }
 
-func (c *StandaloneEnricher) PublishEvent(ip string) error {
+func (e *StandaloneEnricher) PublishEvent(ip string) error {
 	select {
-	case c.eventChannel <- StandaloneEvent{Ip: ip}:
+	case e.eventChannel <- StandaloneEvent{Ip: ip}:
 		return nil
 	default:
-		c.l.Warn("Event channel full, dropping event", zap.String("ip", ip))
+		e.l.Warn("Event channel full, dropping event", zap.String("ip", ip))
 		return ErrEventChannelFull
 	}
 }
 
 func (e *StandaloneEnricher) Stop() {
 	e.l.Info("Stopping standalone enricher...")
-	e.wg.Wait()
-	e.l.Info("Standalone enricher stopped")
+	close(e.eventChannel)
 }

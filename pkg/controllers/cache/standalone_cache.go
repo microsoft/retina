@@ -28,7 +28,6 @@ func NewStandaloneCache() *StandaloneCache {
 	}
 }
 
-// ?
 func (c *StandaloneCache) GetPod(ip string) *PodInfo {
 	c.rwMutex.RLock()
 	defer c.rwMutex.RUnlock()
@@ -52,7 +51,7 @@ func (c *StandaloneCache) addPod(ip, name, namespace string) {
 	defer c.rwMutex.Unlock()
 
 	c.ipToPod[ip] = PodInfo{Name: name, Namespace: namespace}
-	c.l.Debug("Added pod to cache", zap.String("ip", ip), zap.String("name", name), zap.String("namespace", namespace))
+	c.l.Info("Added pod to cache", zap.String("ip", ip), zap.String("name", name), zap.String("namespace", namespace))
 }
 
 func (c *StandaloneCache) deletePod(ip string) {

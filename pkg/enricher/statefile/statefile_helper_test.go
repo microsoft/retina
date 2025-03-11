@@ -11,12 +11,11 @@ import (
 )
 
 const (
-	mockAzureVnetPath = "/home/beegii/src/retina/pkg/enricher/statefile/mock_statefile.json"
-	ip                = "192.0.0.5"
+	ip = "192.0.0.5"
 )
 
 func TestFileRead(t *testing.T) {
-	if _, err := os.Stat(mockAzureVnetPath); os.IsNotExist(err) {
+	if _, err := os.Stat(State_file_location); os.IsNotExist(err) {
 		t.Fatalf("mock file does not exist: %v", err)
 	}
 
@@ -63,14 +62,14 @@ func TestJsonDecode(t *testing.T) {
 	err = os.Remove(malformedJSONPath)
 	assert.NoError(t, err, "failed to remove malformed JSON file")
 
-	podInfo, err = GetPodInfo(ip, mockAzureVnetPath)
+	podInfo, err = GetPodInfo(ip, State_file_location)
 	assert.NoError(t, err)
 	assert.Equal(t, "retina2-pod", podInfo.Name)
 	assert.Equal(t, "retina2-namespace", podInfo.Namespace)
 }
 
 func TestHnsStatsHelper(t *testing.T) {
-	podInfo, err := GetPodInfo(ip, mockAzureVnetPath)
+	podInfo, err := GetPodInfo(ip, State_file_location)
 	assert.NoError(t, err)
 	assert.Equal(t, "retina2-pod", podInfo.Name)
 	assert.Equal(t, "retina2-namespace", podInfo.Namespace)
