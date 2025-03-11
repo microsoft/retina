@@ -29,7 +29,8 @@ type StandaloneEvent struct {
 }
 
 type StandaloneEnricher struct {
-	GenericEnricher
+	ctx          context.Context
+	l            *log.ZapLogger
 	cache        *cache.StandaloneCache
 	eventChannel chan StandaloneEvent
 }
@@ -37,10 +38,8 @@ type StandaloneEnricher struct {
 func NewStandaloneEnricher(ctx context.Context, cache *cache.StandaloneCache) *StandaloneEnricher {
 	localOnce.Do(func() {
 		se = &StandaloneEnricher{
-			GenericEnricher: GenericEnricher{
-				ctx: ctx,
-				l:   log.Logger().Named("standalone-enricher"),
-			},
+			ctx:          ctx,
+			l:            log.Logger().Named("standalone-enricher"),
 			cache:        cache,
 			eventChannel: make(chan StandaloneEvent, MaxStandaloneCacheEventSize),
 		}
@@ -52,13 +51,13 @@ func StandaloneInstance() *StandaloneEnricher {
 	return se
 }
 
-func (e *StandaloneEnricher) Run(ctx context.Context) {
+func (e *StandaloneEnricher) Run() {
 	e.l.Info("Running standalone enricher")
 
 	go func() {
 		for {
 			select {
-			case <-ctx.Done():
+			case <-e.ctx.Done():
 				e.l.Info("Standalone enricher shutting down...")
 				return
 			case event, ok := <-e.eventChannel:
