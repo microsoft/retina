@@ -36,7 +36,7 @@ const (
 )
 
 var (
-	ErrInvalidEventData = errors.New("The Cilium Event Data is invalid")
+	ErrInvalidEventData = errors.New("The Event Data is invalid")
 	ErrNilEnricher      = errors.New("enricher is nil")
 )
 
@@ -63,7 +63,7 @@ func New(cfg *kcfg.Config) registry.Plugin {
 // Init is a no-op for the ebpfwindows plugin
 func (p *Plugin) Init() error {
 
-	parser, err := hp.New(logrus.WithField("cilium", "parser"),
+	parser, err := hp.New(logrus.WithField("windowsEbpf", "parser"),
 		// We use noop getters here since we will use our own custom parser in hubble
 		&NoopEndpointGetter,
 		&NoopIdentityGetter,
@@ -98,7 +98,7 @@ func (p *Plugin) Start(ctx context.Context) error {
 		return ErrNilEnricher
 	}
 
-	p.pullCiliumMetricsAndEvents(ctx)
+	p.pullMetricsAndEvents(ctx)
 	return nil
 }
 
@@ -145,8 +145,8 @@ func (p *Plugin) eventsMapCallback(data unsafe.Pointer, size uint64) int {
 	return 0
 }
 
-// pullCiliumeBPFMetrics is the function that is called periodically by the timer.
-func (p *Plugin) pullCiliumMetricsAndEvents(ctx context.Context) {
+// pullMetricsAndEvents is the function that is called periodically by the timer.
+func (p *Plugin) pullMetricsAndEvents(ctx context.Context) {
 
 	eventsMap := NewEventsMap()
 	metricsMap := NewMetricsMap()
@@ -224,7 +224,7 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint64) error {
 	eventType := *(*uint8)(data)
 
 	switch eventType {
-	case CiliumNotifyDrop:
+	case NotifyDrop:
 
 		if uintptr(size) < unsafe.Sizeof(DropNotify{}) {
 			p.l.Error("Invalid DropNotify data size", zap.Uint64("size", size))
@@ -234,7 +234,7 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint64) error {
 		dropNotify := (*DropNotify)(data)
 		p.handleDropNotify(dropNotify)
 
-	case CiliumNotifyTrace:
+	case NotifyTrace:
 
 		if uintptr(size) < unsafe.Sizeof(TraceNotify{}) {
 			p.l.Error("Invalid TraceNotify data size", zap.Uint64("size", size))
@@ -244,7 +244,7 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint64) error {
 		traceNotify := (*TraceNotify)(data)
 		p.handleTraceNotify(traceNotify)
 
-	case CiliumNotifyTraceSock:
+	case NotifyTraceSock:
 		if uintptr(size) < unsafe.Sizeof(TraceSockNotify{}) {
 			p.l.Error("Invalid TraceSockNotify data size", zap.Uint64("size", size))
 			return ErrInvalidEventData

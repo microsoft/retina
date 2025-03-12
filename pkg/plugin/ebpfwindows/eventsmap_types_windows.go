@@ -69,14 +69,14 @@ type TraceNotify struct {
 
 // Notification types
 const (
-	CiliumNotifyUnspec        = 0
-	CiliumNotifyDrop          = 1
-	CiliumNotifyDebugMessage  = 2
-	CiliumNotifyDebugCapture  = 3
-	CiliumNotifyTrace         = 4
-	CiliumNotifyPolicyVerdict = 5
-	CiliumNotifyCapture       = 6
-	CiliumNotifyTraceSock     = 7
+	NotifyUnspec        = 0
+	NotifyDrop          = 1
+	NotifyDebugMessage  = 2
+	NotifyDebugCapture  = 3
+	NotifyTrace         = 4
+	NotifyPolicyVerdict = 5
+	NotifyCapture       = 6
+	NotifyTraceSock     = 7
 )
 
 func (ip *IP) ConvertToString(Ipv6 bool) string {
