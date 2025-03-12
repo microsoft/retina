@@ -1,0 +1,169 @@
+{
+    "Network": {
+        "CnsClient": null,
+        "Version": "v1.6.17",
+        "TimeStamp": "2025-01-09T16:21:18.4352991Z",
+        "ExternalInterfaces": {
+            "Ethernet": {
+                "Name": "Ethernet",
+                "Networks": {
+                    "azure-vlan1-192-0-0-0_24": {
+                        "Id": "azure-vlan1-192-0-0-0_24",
+                        "HnsId": "174e3286-fd9a-48c0-9840-2c6a133b7b61",
+                        "Mode": "tunnel",
+                        "VlanId": 1,
+                        "Subnets": [
+                            {
+                                "Family": 2,
+                                "Prefix": {
+                                    "IP": "192.0.0.0",
+                                    "Mask": "////AA=="
+                                },
+                                "Gateway": "192.0.0.1",
+                                "PrimaryIP": ""
+                            }
+                        ],
+                        "Endpoints": {
+                            "1f20629e-eth0": {
+                                "Id": "1f20629e-eth0",
+                                "HnsId": "41d49f8c-820a-406a-ade6-6b041ff763a6",
+                                "SandboxKey": "1f20629e98eb30e9958ad070354852f452247556f08cb3ff227665ee5125fea8",
+                                "IfName": "eth0",
+                                "HostIfName": "",
+                                "MacAddress": "ABVdtctu",
+                                "InfraVnetIP": {
+                                    "IP": "",
+                                    "Mask": null
+                                },
+                                "LocalIP": "",
+                                "IPAddresses": [
+                                    {
+                                        "IP": "192.0.0.5",
+                                        "Mask": "////AA=="
+                                    }
+                                ],
+                                "Gateways": [
+                                    "192.0.0.1"
+                                ],
+                                "DNS": {
+                                    "Suffix": "retina2-namespace.svc.cluster.local",
+                                    "Servers": [
+                                        "168.63.129.16"
+                                    ],
+                                    "Options": null
+                                },
+                                "Routes": [
+                                    {
+                                        "Dst": {
+                                            "IP": "0.0.0.0",
+                                            "Mask": "AAAAAA=="
+                                        },
+                                        "Src": "",
+                                        "Gw": "192.0.0.1",
+                                        "Protocol": 0,
+                                        "DevName": "",
+                                        "Scope": 0,
+                                        "Priority": 0,
+                                        "Table": 0
+                                    }
+                                ],
+                                "VlanID": 1,
+                                "EnableSnatOnHost": false,
+                                "EnableInfraVnet": false,
+                                "EnableMultitenancy": false,
+                                "AllowInboundFromHostToNC": true,
+                                "AllowInboundFromNCToHost": true,
+                                "NetworkContainerID": "Swift_00000000-0000-0000-0000-000000000002",
+                                "ContainerID": "1f20629e98eb30e9958ad070354852f452247556f08cb3ff227665ee5125fea8",
+                                "PODName": "retina2-pod",
+                                "PODNameSpace": "retina2-namespace",
+                                "NetNs": "3be8896f-442f-40d2-a3c8-3be9ed730aff",
+                                "SecondaryInterfaces": null,
+                                "NICType": "InfraNIC"
+                            },
+                            "ecb287b4-eth0": {
+                                "Id": "ecb287b4-eth0",
+                                "HnsId": "40cdffea-5a95-4f30-aa6a-a7d65355ef65",
+                                "SandboxKey": "ecb287b4bedd9fcf02cc4bd00d05cb2be1a40055880d8de1a57ca727e5b5ef5b",
+                                "IfName": "eth0",
+                                "HostIfName": "",
+                                "MacAddress": "ABVdtcrw",
+                                "InfraVnetIP": {
+                                    "IP": "",
+                                    "Mask": null
+                                },
+                                "LocalIP": "",
+                                "IPAddresses": [
+                                    {
+                                        "IP": "192.0.0.4",
+                                        "Mask": "////AA=="
+                                    }
+                                ],
+                                "Gateways": [
+                                    "192.0.0.1"
+                                ],
+                                "DNS": {
+                                    "Suffix": "retina2-namespace.svc.cluster.local",
+                                    "Servers": [
+                                        "168.63.129.16"
+                                    ],
+                                    "Options": null
+                                },
+                                "Routes": [
+                                    {
+                                        "Dst": {
+                                            "IP": "0.0.0.0",
+                                            "Mask": "AAAAAA=="
+                                        },
+                                        "Src": "",
+                                        "Gw": "192.0.0.1",
+                                        "Protocol": 0,
+                                        "DevName": "",
+                                        "Scope": 0,
+                                        "Priority": 0,
+                                        "Table": 0
+                                    }
+                                ],
+                                "VlanID": 1,
+                                "EnableSnatOnHost": false,
+                                "EnableInfraVnet": false,
+                                "EnableMultitenancy": false,
+                                "AllowInboundFromHostToNC": true,
+                                "AllowInboundFromNCToHost": true,
+                                "NetworkContainerID": "Swift_00000000-0000-0000-0000-000000000001",
+                                "ContainerID": "ecb287b4bedd9fcf02cc4bd00d05cb2be1a40055880d8de1a57ca727e5b5ef5b",
+                                "PODName": "retina2-pod",
+                                "PODNameSpace": "retina2-namespace",
+                                "NetNs": "86cba19c-b544-4a43-ada0-463b3d56899d",
+                                "SecondaryInterfaces": null,
+                                "NICType": "InfraNIC"
+                            }
+                        },
+                        "DNS": {
+                            "Suffix": "",
+                            "Servers": null,
+                            "Options": null
+                        },
+                        "EnableSnatOnHost": false,
+                        "NetNs": "82a70e8e-3e7c-4f50-a211-ff4062f08cac",
+                        "SnatBridgeIP": ""
+                    }
+                },
+                "Subnets": [
+                    "10.0.0.0/24"
+                ],
+                "BridgeName": "",
+                "DNSInfo": {
+                    "Suffix": "",
+                    "Servers": null,
+                    "Options": null
+                },
+                "MacAddress": "AA06PtyI",
+                "IPAddresses": null,
+                "Routes": null,
+                "IPv4Gateway": "0.0.0.0",
+                "IPv6Gateway": "::"
+            }
+        }
+    }
+}

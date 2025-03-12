@@ -182,6 +182,26 @@ func (e *Enricher) getWorkloads(ownerRefs []*common.OwnerReference) []*flow.Work
 	return workloads
 }
 
+func (e *Enricher) GetPodInfo(ip string) *cache.PodInfo {
+	obj := e.cache.GetObjByIP(ip)
+	if obj == nil {
+		e.l.Warn("No object found for IP", zap.String("ip", ip))
+		return nil
+	}
+
+	switch o := obj.(type) {
+	case *common.RetinaEndpoint:
+		return &cache.PodInfo{
+			Name:      o.Name(),
+			Namespace: o.Namespace(),
+		}
+
+	default:
+		e.l.Debug("received unknown type from cache", zap.Any("obj", obj), zap.Any("type", reflect.TypeOf(obj)))
+		return nil
+	}
+}
+
 func (e *Enricher) Write(ev *v1.Event) {
 	e.inputRing.Write(ev)
 }
