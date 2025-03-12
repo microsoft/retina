@@ -8,7 +8,7 @@ WORKDIR /workspace
 COPY . .
 
 # Install jq, not sure why this went missing in the 1.24.1-2-cbl-mariner2.0 base go image.
-RUN apt-get update && apt-get install -y jq && apt-get clean
+RUN tdnf install -y jq
 
 # Default linux/architecture.
 ARG GOOS=linux
