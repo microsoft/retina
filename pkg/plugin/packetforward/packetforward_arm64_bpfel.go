@@ -54,9 +54,10 @@ func loadPacketforwardObjects(obj interface{}, opts *ebpf.CollectionOptions) err
 type packetforwardSpecs struct {
 	packetforwardProgramSpecs
 	packetforwardMapSpecs
+	packetforwardVariableSpecs
 }
 
-// packetforwardSpecs contains programs before they are loaded into the kernel.
+// packetforwardProgramSpecs contains programs before they are loaded into the kernel.
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type packetforwardProgramSpecs struct {
@@ -70,12 +71,19 @@ type packetforwardMapSpecs struct {
 	RetinaPacketforwardMetrics *ebpf.MapSpec `ebpf:"retina_packetforward_metrics"`
 }
 
+// packetforwardVariableSpecs contains global variables before they are loaded into the kernel.
+//
+// It can be passed ebpf.CollectionSpec.Assign.
+type packetforwardVariableSpecs struct {
+}
+
 // packetforwardObjects contains all objects after they have been loaded into the kernel.
 //
 // It can be passed to loadPacketforwardObjects or ebpf.CollectionSpec.LoadAndAssign.
 type packetforwardObjects struct {
 	packetforwardPrograms
 	packetforwardMaps
+	packetforwardVariables
 }
 
 func (o *packetforwardObjects) Close() error {
@@ -96,6 +104,12 @@ func (m *packetforwardMaps) Close() error {
 	return _PacketforwardClose(
 		m.RetinaPacketforwardMetrics,
 	)
+}
+
+// packetforwardVariables contains all global variables after they have been loaded into the kernel.
+//
+// It can be passed to loadPacketforwardObjects or ebpf.CollectionSpec.LoadAndAssign.
+type packetforwardVariables struct {
 }
 
 // packetforwardPrograms contains all programs after they have been loaded into the kernel.
@@ -122,5 +136,5 @@ func _PacketforwardClose(closers ...io.Closer) error {
 
 // Do not access this directly.
 //
-//go:embed packetforward_bpfel_arm64.o
+//go:embed packetforward_arm64_bpfel.o
 var _PacketforwardBytes []byte

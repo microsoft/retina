@@ -21,6 +21,7 @@ import (
 type MockIFilterMap struct {
 	ctrl     *gomock.Controller
 	recorder *MockIFilterMapMockRecorder
+	isgomock struct{}
 }
 
 // MockIFilterMapMockRecorder is the mock recorder for MockIFilterMap.
@@ -84,6 +85,7 @@ func (mr *MockIFilterMapMockRecorder) Delete(arg0 any) *gomock.Call {
 type MockIEbpfMap struct {
 	ctrl     *gomock.Controller
 	recorder *MockIEbpfMapMockRecorder
+	isgomock struct{}
 }
 
 // MockIEbpfMapMockRecorder is the mock recorder for MockIEbpfMap.

@@ -31,7 +31,6 @@ site/yarn.lock
 site/.docusaurus/
 site/node_modules/
 
-hack/tools/bin
 output
 #vscode 
 .vscode/

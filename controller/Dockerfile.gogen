@@ -1,5 +1,5 @@
-# mcr.microsoft.com/oss/go/microsoft/golang:1.23.5-cbl-mariner2.0
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:ef39e430a97a61bec3395adb673a7c5611d2212f14abe40da21cbfd11a9d6e9d
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.1-2-cbl-mariner2.0 --format "{{.Name}}@{{.Digest}}"
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:00e2221efa6ea3f01b4408432e94ad2cddf5a44fad5882adb7ec5cbcf61a0ec8
 
 
 # Default linux/architecture.
