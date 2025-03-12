@@ -137,7 +137,7 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 				mac := ep.MacAddress
 				ip := ep.IpConfigurations[0].IpAddress
 
-				if h.cfg.EnablePodLevel && h.cfg.EnableStandalone {
+				if h.cfg.EnableStandalone {
 					h.enricher.PublishEvent(ip)
 				}
 
