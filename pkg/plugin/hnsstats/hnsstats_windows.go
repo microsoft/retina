@@ -86,7 +86,7 @@ func (h *hnsstats) Init() error {
 	}
 	h.endpointQuery.Filter = string(filter)
 
-	if h.cfg.EnablePodLevel && h.cfg.EnableStandalone {
+	if h.cfg.EnableStandalone {
 		if instance := enricher.StandaloneInstance(); instance != nil {
 			InitializeAdvMetrics()
 			h.l.Info("Standalone enricher is enabled")
@@ -176,8 +176,7 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 }
 
 func notifyHnsStats(h *hnsstats, stats *HnsStatsData) {
-
-	if h.cfg.EnablePodLevel && h.cfg.EnableStandalone {
+	if h.cfg.EnableStandalone {
 		labels := h.enricher.GetPodInfo(stats.IPAddress)
 		if labels != nil {
 			h.l.Info("HNS stats for pod", zap.String(zapIPField, stats.IPAddress), zap.String("pod-name", labels.Name), zap.String("pod-namespace", labels.Namespace))
