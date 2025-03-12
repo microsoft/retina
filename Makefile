@@ -35,7 +35,7 @@ PLATFORM		?= $(OS)/$(ARCH)
 PLATFORMS		?= linux/amd64 linux/arm64 windows/amd64
 OS_VERSION		?= ltsc2019
 
-HUBBLE_VERSION ?= v1.16.6 # This may be modified via the update-hubble GitHub Action
+HUBBLE_VERSION ?= v1.17.1
 
 CONTAINER_BUILDER ?= docker
 CONTAINER_RUNTIME ?= docker
