@@ -40,7 +40,7 @@ func NewBootstrapManager(metricsAddr, probeAddr, configFile string, enableLeader
 }
 
 func (b *BootstrapManager) Start() error {
-	fmt.Printf("Bootstrapping Retina")
+	fmt.Println("Bootstrapping Retina")
 
 	if buildinfo.ApplicationInsightsID != "" {
 		telemetry.InitAppInsights(buildinfo.ApplicationInsightsID, buildinfo.Version)
@@ -99,7 +99,6 @@ func (b *BootstrapManager) Start() error {
 }
 
 func (b *BootstrapManager) startDaemon(cfg *rest.Config, daemoncfg *config.Config, zl *log.ZapLogger) error {
-	fmt.Println("Starting Retina Agent")
 	d := standard.NewDaemon(daemoncfg, cfg, b.metricsAddr, b.probeAddr, b.enableLeaderElection)
 
 	if err := d.Start(zl); err != nil {
