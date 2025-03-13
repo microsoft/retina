@@ -11,10 +11,12 @@ import (
 )
 
 const (
-	ip = "192.0.0.5"
+	ip       = "192.0.0.5"
+	testfile = "/home/beegii/src/retina/pkg/enricher/statefile/mock_statefile.json"
 )
 
 func TestFileRead(t *testing.T) {
+	State_file_location = testfile
 	if _, err := os.Stat(State_file_location); os.IsNotExist(err) {
 		t.Fatalf("mock file does not exist: %v", err)
 	}
@@ -61,14 +63,10 @@ func TestJsonDecode(t *testing.T) {
 	// Remove malformed JSON file
 	err = os.Remove(malformedJSONPath)
 	assert.NoError(t, err, "failed to remove malformed JSON file")
-
-	podInfo, err = GetPodInfo(ip, State_file_location)
-	assert.NoError(t, err)
-	assert.Equal(t, "retina2-pod", podInfo.Name)
-	assert.Equal(t, "retina2-namespace", podInfo.Namespace)
 }
 
 func TestHnsStatsHelper(t *testing.T) {
+	State_file_location = testfile
 	podInfo, err := GetPodInfo(ip, State_file_location)
 	assert.NoError(t, err)
 	assert.Equal(t, "retina2-pod", podInfo.Name)
