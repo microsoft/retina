@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	State_file_location = "/home/beegii/src/retina/pkg/enricher/statefile/mock_statefile.json"
+	State_file_location = "C:/k/azure-vnet.json"
 )
 
 type CniState struct {
