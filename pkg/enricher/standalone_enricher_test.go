@@ -19,12 +19,16 @@ const (
 	invalidIp = "10.0.0.0"
 	name      = "retina2-pod"
 	namespace = "retina2-namespace"
+	testfile  = "/home/beegii/src/retina/pkg/enricher/statefile/mock_statefile.json"
 )
 
 func TestStandaloneEnricher(t *testing.T) {
 	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
 		t.Fatalf("Failed to setup logger: %v", err)
 	}
+	// Set the state file location to a mock file for testing
+	statefile.State_file_location = testfile
+
 	testCache := cache.NewStandaloneCache()
 	enricher := NewStandaloneEnricher(context.Background(), testCache)
 
@@ -67,6 +71,7 @@ func TestPublishEvent(t *testing.T) {
 		t.Fatalf("Failed to setup logger: %v", err)
 	}
 
+	statefile.State_file_location = testfile
 	MaxStandaloneCacheEventSize = 1
 	testCache := cache.NewStandaloneCache()
 	enricher := NewStandaloneEnricher(context.Background(), testCache)

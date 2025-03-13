@@ -26,7 +26,7 @@ var (
 		Long:  "Start Retina Agent",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Do Stuff Here
-			fmt.Println("Starting Retina Agent")
+			fmt.Println("Bootstrapping Retina")
 			b := NewBootstrapManager(metricsAddr, probeAddr, cfgFile, enableLeaderElection)
 			if err := b.Start(); err != nil {
 				return fmt.Errorf("starting daemon: %w", err)

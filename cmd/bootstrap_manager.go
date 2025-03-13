@@ -40,8 +40,6 @@ func NewBootstrapManager(metricsAddr, probeAddr, configFile string, enableLeader
 }
 
 func (b *BootstrapManager) Start() error {
-	fmt.Println("Bootstrapping Retina")
-
 	if buildinfo.ApplicationInsightsID != "" {
 		telemetry.InitAppInsights(buildinfo.ApplicationInsightsID, buildinfo.Version)
 		defer telemetry.ShutdownAppInsights()
