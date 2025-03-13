@@ -35,7 +35,7 @@ PLATFORM		?= $(OS)/$(ARCH)
 PLATFORMS		?= linux/amd64 linux/arm64 windows/amd64
 OS_VERSION		?= ltsc2019
 
-HUBBLE_VERSION ?= v1.16.6 # This may be modified via the update-hubble GitHub Action
+HUBBLE_VERSION ?= v1.17.1 # This may be modified via the update-hubble GitHub Action
 
 CONTAINER_BUILDER ?= docker
 CONTAINER_RUNTIME ?= docker
@@ -88,52 +88,25 @@ help: ## Display this help
 
 ##@ Tools 
 
-TOOLS_DIR		= $(REPO_ROOT)/hack/tools
-TOOLS_BIN_DIR	= $(TOOLS_DIR)/bin
-
-GOFUMPT			= $(TOOLS_BIN_DIR)/gofumpt
-GOLANGCI_LINT	= $(TOOLS_BIN_DIR)/golangci-lint
-GORELEASER		= $(TOOLS_BIN_DIR)/goreleaser
-CONTROLLER_GEN	= $(TOOLS_BIN_DIR)/controller-gen
-GINKGO			= $(TOOLS_BIN_DIR)/ginkgo
-MOCKGEN			= $(TOOLS_BIN_DIR)/mockgen
-ENVTEST			= $(TOOLS_BIN_DIR)/setup-envtest
-
-$(TOOLS_DIR)/go.mod:
-	cd $(TOOLS_DIR); go mod init && go mod tidy
-
-$(GOFUMPT): $(TOOLS_DIR)/go.mod
-	cd $(TOOLS_DIR); go mod download; go build -tags=tools -o bin/gofumpt mvdan.cc/gofumpt
+GOFUMPT			= go tool mvdan.cc/gofumpt
+GOLANGCI_LINT	= go tool github.com/golangci/golangci-lint/cmd/golangci-lint
+GORELEASER		= go tool github.com/goreleaser/goreleaser
+CONTROLLER_GEN	= go tool sigs.k8s.io/controller-tools/cmd/controller-gen
+GINKGO			= go tool github.com/onsi/ginkgo
+MOCKGEN			= go tool go.uber.org/mock/mockgen
+ENVTEST			= go tool sigs.k8s.io/controller-runtime/tools/setup-envtest
 
 gofumpt: $(GOFUMPT) ## Build gofumpt
 
-$(GOLANGCI_LINT): $(TOOLS_DIR)/go.mod
-	cd $(TOOLS_DIR); go mod download; go build -tags=tools -o bin/golangci-lint github.com/golangci/golangci-lint/cmd/golangci-lint
-
 golangci-lint: $(GOLANGCI_LINT) ## Build golangci-lint
-
-$(CONTROLLER_GEN): $(TOOLS_DIR)/go.mod
-	cd $(TOOLS_DIR); go mod download; go build -tags=tools -o bin/controller-gen sigs.k8s.io/controller-tools/cmd/controller-gen
 
 goreleaser: $(GORELEASER) ## Build goreleaser
 
-$(GORELEASER): $(TOOLS_DIR)/go.mod
-	cd $(TOOLS_DIR); go mod download; go build -tags=tools -o bin/goreleaser github.com/goreleaser/goreleaser
-
 controller-gen: $(CONTROLLER_GEN) ## Build controller-gen
-
-$(GINKGO): $(TOOLS_DIR)/go.mod
-	cd $(TOOLS_DIR); go mod download; go build -tags=tools -o bin/ginkgo github.com/onsi/ginkgo/ginkgo
 
 ginkgo: $(GINKGO) ## Build ginkgo
 
-$(MOCKGEN): $(TOOLS_DIR)/go.mod
-	cd $(TOOLS_DIR); go mod download; go build -tags=$(TOOL_TAG) -o bin/mockgen go.uber.org/mock/mockgen
-
 mockgen: $(MOCKGEN) ## Build mockgen
-
-$(ENVTEST): $(TOOLS_DIR)/go.mod
-	cd $(TOOLS_DIR); go mod download; go build -tags=$(TOOL_TAG) -o bin/setup-envtest sigs.k8s.io/controller-runtime/tools/setup-envtest
 
 setup-envtest: $(ENVTEST)
 
@@ -157,13 +130,13 @@ generate-bpf-go: ## generate ebpf wrappers for plugins for all archs
 FMT_PKG  ?= .
 LINT_PKG ?= .
 
-fmt: $(GOFUMPT) ## run gofumpt on $FMT_PKG (default "retina").
+fmt: ## run gofumpt on $FMT_PKG (default "retina").
 	$(GOFUMPT) -w $(FMT_PKG)
 
-lint: $(GOLANGCI_LINT) ## Fast lint vs default branch showing only new issues.
+lint: ## Fast lint vs default branch showing only new issues.
 	$(GOLANGCI_LINT) run --new-from-rev main --timeout 10m -v $(LINT_PKG)/...
 
-lint-existing: $(GOLANGCI_LINT) ## Lint the current branch in entirety.
+lint-existing: ## Lint the current branch in entirety.
 	$(GOLANGCI_LINT) run -v $(LINT_PKG)/...
 
 clean: ## clean build artifacts
@@ -413,7 +386,8 @@ test-image: ## build the retina container image for testing.
 
 COVER_PKG ?= .
 
-test: $(ENVTEST) # Run unit tests.
+.PHONY: test
+test: # Run unit tests.
 	go build -o test-summary ./test/utsummary/main.go
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit,dashboard -skip=TestE2E* -coverprofile=coverage.out -v -json ./... | ./test-summary --progress --verbose
 

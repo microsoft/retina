@@ -20,11 +20,9 @@ linters:
   - performance
   - unused
   disable:
-  - maligned
-  - scopelint
   - gci
   enable:
-  - exportloopref
+  - copyloopvar
   - goconst
   - gocritic
   - gocyclo

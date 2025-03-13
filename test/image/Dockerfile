@@ -1,6 +1,6 @@
 # build stage
-# mcr.microsoft.com/oss/go/microsoft/golang:1.23.5-cbl-mariner2.0
-FROM mcr.microsoft.com/oss/go/microsoft/golang@sha256:ef39e430a97a61bec3395adb673a7c5611d2212f14abe40da21cbfd11a9d6e9d AS builder
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.1-cbl-mariner2.0 --format "{{.Name}}@{{.Digest}}"
+FROM mcr.microsoft.com/oss/go/microsoft/golang@sha256:605d0a6f05734845927f450a62e081bd19c03dbe1fdbf993cfedc8506c9192b4 AS builder
 ENV CGO_ENABLED=0
 COPY . /go/src/github.com/microsoft/retina 
 WORKDIR /go/src/github.com/microsoft/retina
