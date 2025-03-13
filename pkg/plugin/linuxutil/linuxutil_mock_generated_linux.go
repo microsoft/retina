@@ -20,7 +20,6 @@ import (
 type MockEthtoolInterface struct {
 	ctrl     *gomock.Controller
 	recorder *MockEthtoolInterfaceMockRecorder
-	isgomock struct{}
 }
 
 // MockEthtoolInterfaceMockRecorder is the mock recorder for MockEthtoolInterface.
@@ -71,7 +70,6 @@ func (mr *MockEthtoolInterfaceMockRecorder) Stats(intf any) *gomock.Call {
 type MockNetstatInterface struct {
 	ctrl     *gomock.Controller
 	recorder *MockNetstatInterfaceMockRecorder
-	isgomock struct{}
 }
 
 // MockNetstatInterfaceMockRecorder is the mock recorder for MockNetstatInterface.

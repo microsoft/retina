@@ -27,7 +27,7 @@ const (
 // Interface to https://pkg.go.dev/github.com/cilium/ebpf#Map.
 // Added for unit tests.
 //
-//go:generate go tool go.uber.org/mock/mockgen -destination=mocks/mock_types.go -package=mocks . IMap
+//go:generate go run go.uber.org/mock/mockgen@v0.4.0 -destination=mocks/mock_types.go -package=mocks . IMap
 type IMap interface {
 	Lookup(key, valueOut interface{}) error
 	Close() error

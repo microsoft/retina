@@ -122,5 +122,5 @@ func _PacketforwardClose(closers ...io.Closer) error {
 
 // Do not access this directly.
 //
-//go:embed packetforward_arm64_bpfel.o
+//go:embed packetforward_bpfel_arm64.o
 var _PacketforwardBytes []byte

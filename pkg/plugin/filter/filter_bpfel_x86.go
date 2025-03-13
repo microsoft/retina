@@ -116,5 +116,5 @@ func _FilterClose(closers ...io.Closer) error {
 
 // Do not access this directly.
 //
-//go:embed filter_x86_bpfel.o
+//go:embed filter_bpfel_x86.o
 var _FilterBytes []byte

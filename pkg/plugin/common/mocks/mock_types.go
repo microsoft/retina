@@ -19,7 +19,6 @@ import (
 type MockITracer struct {
 	ctrl     *gomock.Controller
 	recorder *MockITracerMockRecorder
-	isgomock struct{}
 }
 
 // MockITracerMockRecorder is the mock recorder for MockITracer.
@@ -40,17 +39,17 @@ func (m *MockITracer) EXPECT() *MockITracerMockRecorder {
 }
 
 // Attach mocks base method.
-func (m *MockITracer) Attach(pid uint32) error {
+func (m *MockITracer) Attach(arg0 uint32) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Attach", pid)
+	ret := m.ctrl.Call(m, "Attach", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Attach indicates an expected call of Attach.
-func (mr *MockITracerMockRecorder) Attach(pid any) *gomock.Call {
+func (mr *MockITracerMockRecorder) Attach(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Attach", reflect.TypeOf((*MockITracer)(nil).Attach), pid)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Attach", reflect.TypeOf((*MockITracer)(nil).Attach), arg0)
 }
 
 // Close mocks base method.
@@ -66,17 +65,17 @@ func (mr *MockITracerMockRecorder) Close() *gomock.Call {
 }
 
 // Detach mocks base method.
-func (m *MockITracer) Detach(pid uint32) error {
+func (m *MockITracer) Detach(arg0 uint32) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Detach", pid)
+	ret := m.ctrl.Call(m, "Detach", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Detach indicates an expected call of Detach.
-func (mr *MockITracerMockRecorder) Detach(pid any) *gomock.Call {
+func (mr *MockITracerMockRecorder) Detach(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Detach", reflect.TypeOf((*MockITracer)(nil).Detach), pid)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Detach", reflect.TypeOf((*MockITracer)(nil).Detach), arg0)
 }
 
 // SetEventHandler mocks base method.

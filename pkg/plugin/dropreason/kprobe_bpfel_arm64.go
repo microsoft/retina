@@ -185,5 +185,5 @@ func _KprobeClose(closers ...io.Closer) error {
 
 // Do not access this directly.
 //
-//go:embed kprobe_arm64_bpfel.o
+//go:embed kprobe_bpfel_arm64.o
 var _KprobeBytes []byte

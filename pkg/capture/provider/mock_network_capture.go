@@ -21,7 +21,6 @@ import (
 type MockNetworkCaptureProviderInterface struct {
 	ctrl     *gomock.Controller
 	recorder *MockNetworkCaptureProviderInterfaceMockRecorder
-	isgomock struct{}
 }
 
 // MockNetworkCaptureProviderInterfaceMockRecorder is the mock recorder for MockNetworkCaptureProviderInterface.

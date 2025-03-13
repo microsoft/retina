@@ -19,7 +19,6 @@ import (
 type MockIMap struct {
 	ctrl     *gomock.Controller
 	recorder *MockIMapMockRecorder
-	isgomock struct{}
 }
 
 // MockIMapMockRecorder is the mock recorder for MockIMap.
@@ -54,15 +53,15 @@ func (mr *MockIMapMockRecorder) Close() *gomock.Call {
 }
 
 // Lookup mocks base method.
-func (m *MockIMap) Lookup(key, valueOut any) error {
+func (m *MockIMap) Lookup(arg0, arg1 any) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Lookup", key, valueOut)
+	ret := m.ctrl.Call(m, "Lookup", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Lookup indicates an expected call of Lookup.
-func (mr *MockIMapMockRecorder) Lookup(key, valueOut any) *gomock.Call {
+func (mr *MockIMapMockRecorder) Lookup(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Lookup", reflect.TypeOf((*MockIMap)(nil).Lookup), key, valueOut)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Lookup", reflect.TypeOf((*MockIMap)(nil).Lookup), arg0, arg1)
 }
