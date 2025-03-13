@@ -11,7 +11,7 @@ import (
 
 const name = "infiniband"
 
-//go:generate go tool go.uber.org/mock/mockgen -source=types_linux.go -destination=infiniband_mock_generated.go -package=infiniband
+//go:generate go tool go.uber.org/mock/mockgen -source=types_linux.go -destination=infiniband_mock_generated_linux.go -package=infiniband
 type infiniband struct {
 	cfg       *kcfg.Config
 	l         *log.ZapLogger

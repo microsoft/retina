@@ -78,10 +78,9 @@ func loadKprobeObjects(obj interface{}, opts *ebpf.CollectionOptions) error {
 type kprobeSpecs struct {
 	kprobeProgramSpecs
 	kprobeMapSpecs
-	kprobeVariableSpecs
 }
 
-// kprobeProgramSpecs contains programs before they are loaded into the kernel.
+// kprobeSpecs contains programs before they are loaded into the kernel.
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type kprobeProgramSpecs struct {
@@ -108,20 +107,12 @@ type kprobeMapSpecs struct {
 	RetinaFilter                *ebpf.MapSpec `ebpf:"retina_filter"`
 }
 
-// kprobeVariableSpecs contains global variables before they are loaded into the kernel.
-//
-// It can be passed ebpf.CollectionSpec.Assign.
-type kprobeVariableSpecs struct {
-	Unused *ebpf.VariableSpec `ebpf:"unused"`
-}
-
 // kprobeObjects contains all objects after they have been loaded into the kernel.
 //
 // It can be passed to loadKprobeObjects or ebpf.CollectionSpec.LoadAndAssign.
 type kprobeObjects struct {
 	kprobePrograms
 	kprobeMaps
-	kprobeVariables
 }
 
 func (o *kprobeObjects) Close() error {
@@ -152,13 +143,6 @@ func (m *kprobeMaps) Close() error {
 		m.RetinaDropreasonNatdropPids,
 		m.RetinaFilter,
 	)
-}
-
-// kprobeVariables contains all global variables after they have been loaded into the kernel.
-//
-// It can be passed to loadKprobeObjects or ebpf.CollectionSpec.LoadAndAssign.
-type kprobeVariables struct {
-	Unused *ebpf.Variable `ebpf:"unused"`
 }
 
 // kprobePrograms contains all programs after they have been loaded into the kernel.

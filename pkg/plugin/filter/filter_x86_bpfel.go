@@ -52,10 +52,9 @@ func loadFilterObjects(obj interface{}, opts *ebpf.CollectionOptions) error {
 type filterSpecs struct {
 	filterProgramSpecs
 	filterMapSpecs
-	filterVariableSpecs
 }
 
-// filterProgramSpecs contains programs before they are loaded into the kernel.
+// filterSpecs contains programs before they are loaded into the kernel.
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type filterProgramSpecs struct {
@@ -68,19 +67,12 @@ type filterMapSpecs struct {
 	RetinaFilter *ebpf.MapSpec `ebpf:"retina_filter"`
 }
 
-// filterVariableSpecs contains global variables before they are loaded into the kernel.
-//
-// It can be passed ebpf.CollectionSpec.Assign.
-type filterVariableSpecs struct {
-}
-
 // filterObjects contains all objects after they have been loaded into the kernel.
 //
 // It can be passed to loadFilterObjects or ebpf.CollectionSpec.LoadAndAssign.
 type filterObjects struct {
 	filterPrograms
 	filterMaps
-	filterVariables
 }
 
 func (o *filterObjects) Close() error {
@@ -101,12 +93,6 @@ func (m *filterMaps) Close() error {
 	return _FilterClose(
 		m.RetinaFilter,
 	)
-}
-
-// filterVariables contains all global variables after they have been loaded into the kernel.
-//
-// It can be passed to loadFilterObjects or ebpf.CollectionSpec.LoadAndAssign.
-type filterVariables struct {
 }
 
 // filterPrograms contains all programs after they have been loaded into the kernel.

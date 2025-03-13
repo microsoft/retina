@@ -57,7 +57,7 @@ type (
 // Interface to https://pkg.go.dev/github.com/cilium/ebpf#Map.
 // Added for unit tests.
 //
-//go:generate go tool go.uber.org/mock/mockgen -source=types_linux.go -destination=mocks/mock_types.go -package=dropreason . IMap IMapIterator IPerfReader
+//go:generate go tool go.uber.org/mock/mockgen -source=types_linux.go -destination=mocks/mock_types_linux.go -package=dropreason . IMap IMapIterator IPerfReader
 type IMapIterator interface {
 	Next(keyOut interface{}, valueOut interface{}) bool
 	Err() error

@@ -72,10 +72,9 @@ func loadConntrackObjects(obj interface{}, opts *ebpf.CollectionOptions) error {
 type conntrackSpecs struct {
 	conntrackProgramSpecs
 	conntrackMapSpecs
-	conntrackVariableSpecs
 }
 
-// conntrackProgramSpecs contains programs before they are loaded into the kernel.
+// conntrackSpecs contains programs before they are loaded into the kernel.
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type conntrackProgramSpecs struct {
@@ -88,19 +87,12 @@ type conntrackMapSpecs struct {
 	RetinaConntrack *ebpf.MapSpec `ebpf:"retina_conntrack"`
 }
 
-// conntrackVariableSpecs contains global variables before they are loaded into the kernel.
-//
-// It can be passed ebpf.CollectionSpec.Assign.
-type conntrackVariableSpecs struct {
-}
-
 // conntrackObjects contains all objects after they have been loaded into the kernel.
 //
 // It can be passed to loadConntrackObjects or ebpf.CollectionSpec.LoadAndAssign.
 type conntrackObjects struct {
 	conntrackPrograms
 	conntrackMaps
-	conntrackVariables
 }
 
 func (o *conntrackObjects) Close() error {
@@ -121,12 +113,6 @@ func (m *conntrackMaps) Close() error {
 	return _ConntrackClose(
 		m.RetinaConntrack,
 	)
-}
-
-// conntrackVariables contains all global variables after they have been loaded into the kernel.
-//
-// It can be passed to loadConntrackObjects or ebpf.CollectionSpec.LoadAndAssign.
-type conntrackVariables struct {
 }
 
 // conntrackPrograms contains all programs after they have been loaded into the kernel.

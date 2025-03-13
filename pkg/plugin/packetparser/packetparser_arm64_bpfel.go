@@ -104,10 +104,9 @@ func loadPacketparserObjects(obj interface{}, opts *ebpf.CollectionOptions) erro
 type packetparserSpecs struct {
 	packetparserProgramSpecs
 	packetparserMapSpecs
-	packetparserVariableSpecs
 }
 
-// packetparserProgramSpecs contains programs before they are loaded into the kernel.
+// packetparserSpecs contains programs before they are loaded into the kernel.
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type packetparserProgramSpecs struct {
@@ -126,20 +125,12 @@ type packetparserMapSpecs struct {
 	RetinaPacketparserEvents *ebpf.MapSpec `ebpf:"retina_packetparser_events"`
 }
 
-// packetparserVariableSpecs contains global variables before they are loaded into the kernel.
-//
-// It can be passed ebpf.CollectionSpec.Assign.
-type packetparserVariableSpecs struct {
-	Unused *ebpf.VariableSpec `ebpf:"unused"`
-}
-
 // packetparserObjects contains all objects after they have been loaded into the kernel.
 //
 // It can be passed to loadPacketparserObjects or ebpf.CollectionSpec.LoadAndAssign.
 type packetparserObjects struct {
 	packetparserPrograms
 	packetparserMaps
-	packetparserVariables
 }
 
 func (o *packetparserObjects) Close() error {
@@ -164,13 +155,6 @@ func (m *packetparserMaps) Close() error {
 		m.RetinaFilter,
 		m.RetinaPacketparserEvents,
 	)
-}
-
-// packetparserVariables contains all global variables after they have been loaded into the kernel.
-//
-// It can be passed to loadPacketparserObjects or ebpf.CollectionSpec.LoadAndAssign.
-type packetparserVariables struct {
-	Unused *ebpf.Variable `ebpf:"unused"`
 }
 
 // packetparserPrograms contains all programs after they have been loaded into the kernel.
