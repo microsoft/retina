@@ -47,15 +47,13 @@ spec:
       serviceAccountName: kapinger-sa
       containers:
         - name: kapinger
-          image: acnpublic.azurecr.io/kapinger:20241009.5
+          image: acnpublic.azurecr.io/kapinger:v0.0.23-9-g23ef222
           resources:
             limits:
-              memory: 20Mi
+              memory: 40Mi
             requests:
               memory: 20Mi
           env:
-            - name: GODEBUG
-              value: netdns=go
             - name: TARGET_TYPE
               value: "service"
             - name: POD_IP
@@ -66,6 +64,11 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            - name: GOMEMLIMIT
+              valueFrom:
+                resourceFieldRef:
+                  divisor: "0"
+                  resource: limits.memory
             - name: HTTP_PORT
               value: "8080"
             - name: TCP_PORT
@@ -98,7 +101,7 @@ spec:
       serviceAccountName: kapinger-sa
       containers:
         - name: kapinger
-          image: acnpublic.azurecr.io/kapinger:20241009.5
+          image: acnpublic.azurecr.io/kapinger:v0.0.23-9-g23ef222
           resources:
             limits:
               memory: 20Mi
@@ -115,12 +118,21 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            - name: GOMEMLIMIT
+              valueFrom:
+                resourceFieldRef:
+                  divisor: "0"
+                  resource: limits.memory
             - name: HTTP_PORT
               value: "8080"
             - name: TCP_PORT
               value: "8085"
             - name: UDP_PORT
               value: "8086"
+            - name: BURST_INTERVAL_MS
+              value: "500"
+            - name: BURST_VOLUME
+              value: "1"
           ports:
             - containerPort: 8080
 ---

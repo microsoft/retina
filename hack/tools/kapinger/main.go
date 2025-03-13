@@ -54,7 +54,7 @@ func main() {
 		g.Go(func() error {
 			err = client.MakeRequests(gCtx)
 			if err != nil {
-				return fmt.Errorf("error making request: %w", err)
+				return fmt.Errorf("error making client request: %w", err)
 			}
 			return nil
 		})
