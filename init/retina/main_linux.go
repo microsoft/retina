@@ -10,7 +10,6 @@ import (
 
 	"github.com/microsoft/retina/internal/buildinfo"
 	"github.com/microsoft/retina/pkg/bpf"
-	"github.com/microsoft/retina/pkg/ciliumfs"
 	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/telemetry"
@@ -62,12 +61,6 @@ func run(args ...string) error {
 	err = bpf.Setup(l)
 	if err != nil {
 		return errors.Wrap(err, "failed to setup Retina bpf filesystem")
-	}
-
-	// Setup CiliumFS.
-	err = ciliumfs.Setup(l)
-	if err != nil {
-		return errors.Wrap(err, "failed to setup CiliumFS")
 	}
 
 	return nil
