@@ -34,6 +34,12 @@ type dropReason struct {
 	l                      *log.ZapLogger
 	KNfHook                link.Link
 	KRetnfhook             link.Link
+	TrFexithook0           link.Link
+	TrFexithook1           link.Link
+	TrFexithook2           link.Link
+	TrFexithook3           link.Link
+	TrFexithook4           link.Link
+	TrFexithook5           link.Link
 	KTCPAccept             link.Link
 	KRetTCPAccept          link.Link
 	KRetTCPConnect         link.Link

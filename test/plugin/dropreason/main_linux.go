@@ -30,7 +30,7 @@ func main() {
 
 	cfg := &kcfg.Config{
 		MetricsInterval: 1 * time.Second,
-		EnablePodLevel:  true,
+		EnablePodLevel:  false,
 	}
 
 	// Filtermanager.
@@ -67,31 +67,31 @@ func main() {
 
 	err = tt.Stop()
 	if err != nil {
-		l.Error("Stop failed:%v", zap.Error(err))
+		l.Error("Stop failed:", zap.Error(err))
 		return
 	}
 
 	err = tt.Generate(ctx)
 	if err != nil {
-		l.Error("Generate failed:%v", zap.Error(err))
+		l.Error("Generate failed:", zap.Error(err))
 		return
 	}
 
 	err = tt.Compile(ctx)
 	if err != nil {
-		l.Error("Compile failed:%v", zap.Error(err))
+		l.Error("Compile failed:", zap.Error(err))
 		return
 	}
 
 	err = tt.Init()
 	if err != nil {
-		l.Error("Init failed:%v", zap.Error(err))
+		l.Error("Init failed:", zap.Error(err))
 		return
 	}
 
 	err = tt.Start(ctx)
 	if err != nil {
-		l.Error("Start failed:%v", zap.Error(err))
+		l.Error("Start failed:", zap.Error(err))
 		return
 	}
 	l.Info("Started dropreason")
