@@ -84,15 +84,19 @@ type kprobeSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type kprobeProgramSpecs struct {
-	InetCskAccept         *ebpf.ProgramSpec `ebpf:"inet_csk_accept"`
-	InetCskAcceptRet      *ebpf.ProgramSpec `ebpf:"inet_csk_accept_ret"`
-	NfConntrackConfirm    *ebpf.ProgramSpec `ebpf:"nf_conntrack_confirm"`
-	NfConntrackConfirmRet *ebpf.ProgramSpec `ebpf:"nf_conntrack_confirm_ret"`
-	NfHookSlow            *ebpf.ProgramSpec `ebpf:"nf_hook_slow"`
-	NfHookSlowRet         *ebpf.ProgramSpec `ebpf:"nf_hook_slow_ret"`
-	NfNatInetFn           *ebpf.ProgramSpec `ebpf:"nf_nat_inet_fn"`
-	NfNatInetFnRet        *ebpf.ProgramSpec `ebpf:"nf_nat_inet_fn_ret"`
-	TcpV4ConnectRet       *ebpf.ProgramSpec `ebpf:"tcp_v4_connect_ret"`
+	InetCskAccept              *ebpf.ProgramSpec `ebpf:"inet_csk_accept"`
+	InetCskAcceptRet           *ebpf.ProgramSpec `ebpf:"inet_csk_accept_ret"`
+	InetCskAcceptRetBasic      *ebpf.ProgramSpec `ebpf:"inet_csk_accept_ret_basic"`
+	NfConntrackConfirm         *ebpf.ProgramSpec `ebpf:"nf_conntrack_confirm"`
+	NfConntrackConfirmRet      *ebpf.ProgramSpec `ebpf:"nf_conntrack_confirm_ret"`
+	NfConntrackConfirmRetBasic *ebpf.ProgramSpec `ebpf:"nf_conntrack_confirm_ret_basic"`
+	NfHookSlow                 *ebpf.ProgramSpec `ebpf:"nf_hook_slow"`
+	NfHookSlowRet              *ebpf.ProgramSpec `ebpf:"nf_hook_slow_ret"`
+	NfHookSlowRetBasic         *ebpf.ProgramSpec `ebpf:"nf_hook_slow_ret_basic"`
+	NfNatInetFn                *ebpf.ProgramSpec `ebpf:"nf_nat_inet_fn"`
+	NfNatInetFnRet             *ebpf.ProgramSpec `ebpf:"nf_nat_inet_fn_ret"`
+	NfNatInetFnRetBasic        *ebpf.ProgramSpec `ebpf:"nf_nat_inet_fn_ret_basic"`
+	TcpV4ConnectRet            *ebpf.ProgramSpec `ebpf:"tcp_v4_connect_ret"`
 }
 
 // kprobeMapSpecs contains maps before they are loaded into the kernel.
@@ -149,27 +153,35 @@ func (m *kprobeMaps) Close() error {
 //
 // It can be passed to loadKprobeObjects or ebpf.CollectionSpec.LoadAndAssign.
 type kprobePrograms struct {
-	InetCskAccept         *ebpf.Program `ebpf:"inet_csk_accept"`
-	InetCskAcceptRet      *ebpf.Program `ebpf:"inet_csk_accept_ret"`
-	NfConntrackConfirm    *ebpf.Program `ebpf:"nf_conntrack_confirm"`
-	NfConntrackConfirmRet *ebpf.Program `ebpf:"nf_conntrack_confirm_ret"`
-	NfHookSlow            *ebpf.Program `ebpf:"nf_hook_slow"`
-	NfHookSlowRet         *ebpf.Program `ebpf:"nf_hook_slow_ret"`
-	NfNatInetFn           *ebpf.Program `ebpf:"nf_nat_inet_fn"`
-	NfNatInetFnRet        *ebpf.Program `ebpf:"nf_nat_inet_fn_ret"`
-	TcpV4ConnectRet       *ebpf.Program `ebpf:"tcp_v4_connect_ret"`
+	InetCskAccept              *ebpf.Program `ebpf:"inet_csk_accept"`
+	InetCskAcceptRet           *ebpf.Program `ebpf:"inet_csk_accept_ret"`
+	InetCskAcceptRetBasic      *ebpf.Program `ebpf:"inet_csk_accept_ret_basic"`
+	NfConntrackConfirm         *ebpf.Program `ebpf:"nf_conntrack_confirm"`
+	NfConntrackConfirmRet      *ebpf.Program `ebpf:"nf_conntrack_confirm_ret"`
+	NfConntrackConfirmRetBasic *ebpf.Program `ebpf:"nf_conntrack_confirm_ret_basic"`
+	NfHookSlow                 *ebpf.Program `ebpf:"nf_hook_slow"`
+	NfHookSlowRet              *ebpf.Program `ebpf:"nf_hook_slow_ret"`
+	NfHookSlowRetBasic         *ebpf.Program `ebpf:"nf_hook_slow_ret_basic"`
+	NfNatInetFn                *ebpf.Program `ebpf:"nf_nat_inet_fn"`
+	NfNatInetFnRet             *ebpf.Program `ebpf:"nf_nat_inet_fn_ret"`
+	NfNatInetFnRetBasic        *ebpf.Program `ebpf:"nf_nat_inet_fn_ret_basic"`
+	TcpV4ConnectRet            *ebpf.Program `ebpf:"tcp_v4_connect_ret"`
 }
 
 func (p *kprobePrograms) Close() error {
 	return _KprobeClose(
 		p.InetCskAccept,
 		p.InetCskAcceptRet,
+		p.InetCskAcceptRetBasic,
 		p.NfConntrackConfirm,
 		p.NfConntrackConfirmRet,
+		p.NfConntrackConfirmRetBasic,
 		p.NfHookSlow,
 		p.NfHookSlowRet,
+		p.NfHookSlowRetBasic,
 		p.NfNatInetFn,
 		p.NfNatInetFnRet,
+		p.NfNatInetFnRetBasic,
 		p.TcpV4ConnectRet,
 	)
 }
