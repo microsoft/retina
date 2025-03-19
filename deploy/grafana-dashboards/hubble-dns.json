@@ -775,7 +775,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "label_replace(\r\n  label_replace(\r\n      sum by (query, qtypes, response, rcode) (\r\n        60*rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\", ips_returned!=\"0\"}[$__rate_interval])\r\n      ), \"rcode\", \"non-existent domain\", \"rcode\", \"nxdomain\"\r\n  ), \"rcode\", \"success\", \"rcode\", \"noerror\"\r\n)",
+          "expr": "label_replace(\r\n  label_replace(\r\n      sum by (query, qtypes, response, rcode) (\r\n        60*rate(hubble_dns_responses_total{cluster=\"$cluster\", instance=~\"$Nodes\"}[$__rate_interval])\r\n      ), \"rcode\", \"non-existent domain\", \"rcode\", \"nxdomain\"\r\n  ), \"rcode\", \"success\", \"rcode\", \"noerror\"\r\n)",
           "instant": true,
           "interval": "",
           "legendFormat": "__auto",
