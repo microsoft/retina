@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tcp-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tcp-server
+      app.kubernetes.io/name: tcp-server
+  template:
+    metadata:
+      labels:
+        app: tcp-server
+        app.kubernetes.io/name: tcp-server
+    spec:
+      containers:
+      - name: tcp-server
+        image: nginx
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+          requests:
+            memory: "64Mi"
+            cpu: "250m"
+        ports:
+        - containerPort: 80
+          protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tcp-server
+  labels:
+    app: tcp-server
+    app.kubernetes.io/name: tcp-server
+spec:
+  selector:
+    app: tcp-server
+    app.kubernetes.io/name: tcp-server
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: tcp-client-0
+  labels:
+    app: tcp-client-0
+    app.kubernetes.io/name: tcp-client-0
+spec:
+  containers:
+  - name: tcp-client-0
+    image: ghcr.io/srodi/test-fail
+    imagePullPolicy: Always
+    command: ["sh", "-c", "echo 'options ndots:1' >> /etc/resolv.conf; sleep 10; while true; do echo 'Hello' | curl tcp-server.default.svc.cluster.local; sleep 10; done"] 
+    securityContext:
+      privileged: true
+    resources:
+      limits:
+        memory: "128Mi"
+        cpu: "500m"
+      requests:
+        memory: "64Mi"
+        cpu: "250m"
+  securityContext: {}
+  restartPolicy: Never

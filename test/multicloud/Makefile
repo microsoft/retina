@@ -62,3 +62,64 @@ test:
 fmt:
 	@tofu fmt -recursive
 	@cd test && go fmt ./...
+
+# -------------------------------------------------------------------
+# Demo Prep: Deploy client and server pods
+# -------------------------------------------------------------------
+
+demo-deploy-pods:
+	@echo "Deploy demo client and server pods"
+	@kubectl apply -f live/files/mc-demo-manifests.yaml
+
+demo-delete-pods:
+	@echo "Delete demo client and  server pods"
+	@kubectl delete -f live/files/mc-demo-manifests.yaml
+
+# -------------------------------------------------------------------
+# Demo Scenario 1: Packets dropped by iptables (AKS)
+# -------------------------------------------------------------------
+
+demo-drop-add:
+	@echo "Add iptables rule to deny traffic from server to client"
+	@kubectl exec -it $(shell kubectl get pods -l app=tcp-client-0 -o jsonpath='{.items[0].metadata.name}') -- iptables -A INPUT -s tcp-server.default.svc.cluster.local -j DROP
+	@kubectl exec -it $(shell kubectl get pods -l app=tcp-client-0 -o jsonpath='{.items[0].metadata.name}') -- iptables -L --line-numbers
+
+demo-drop-rm:
+	@echo "Remove iptables rule to allow traffic from server to client"
+	@kubectl exec -it $(shell kubectl get pods -l app=tcp-client-0 -o jsonpath='{.items[0].metadata.name}') -- iptables -D INPUT -s tcp-server.default.svc.cluster.local -j DROP
+	@kubectl exec -it $(shell kubectl get pods -l app=tcp-client-0 -o jsonpath='{.items[0].metadata.name}') -- iptables -L --line-numbers
+
+demo-drop-test:
+	@echo "Observe client pod"
+	@hubble observe --follow --to-pod default/tcp-client-0
+
+# -------------------------------------------------------------------
+# Demo Scenario 2: DNS resolution failure for specific domain (EKS)
+# -------------------------------------------------------------------
+
+demo-dns-add-failure:
+	@echo "Backup coredns configmap"
+	@kubectl get cm -n kube-system coredns -o yaml > live/files/mc-demo-coredns-original.yaml
+	@echo "Add DNS failure for example.com"
+	@cat live/files/mc-demo-coredns-custom.yaml
+	@echo "k edit cm -n kube-system coredns"
+
+demo-dns-test:
+	@echo "Test DNS resolution for example.com"
+	@POD=$$(kubectl get pods -l app=tcp-client-0 -o jsonpath='{.items[0].metadata.name}'); \
+	for i in $$(seq 1 10); do \
+		echo "Lookup $$i:"; \
+		kubectl exec -it $$POD -- nslookup -type=AAAA example.com; \
+		kubectl exec -it $$POD -- nslookup -type=A empty.com; \
+		kubectl exec -it $$POD -- nslookup -type=AAAA empty.com; \
+		kubectl exec -it $$POD -- nslookup -type=AAAA refused.com; \
+		kubectl exec -it $$POD -- nslookup -type=A refused.com; \
+	done
+
+demo-dns-observe:
+	@echo "Observe client pod"
+	@hubble observe --follow --to-pod default/tcp-client-0
+
+demo-dns-restart-coredns:
+	@echo "Restart coredns pods"
+	@kubectl rollout restart deployment coredns -n kube-system
