@@ -37,7 +37,6 @@ func (po *ValidateAndPrintOptions) Prevalidate() error {
 
 // Returning an error will cause the test to fail
 func (po *ValidateAndPrintOptions) Run() error {
-
 	log.Printf("Starting to scale with folowing options: %+v", po.Options)
 
 	return nil
