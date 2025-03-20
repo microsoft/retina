@@ -50,7 +50,15 @@ func (c *StandaloneCache) addPod(ip, name, namespace string) {
 	c.rwMutex.Lock()
 	defer c.rwMutex.Unlock()
 
-	c.ipToPod[ip] = PodInfo{Name: name, Namespace: namespace}
+	existingPod, exists := c.ipToPod[ip]
+	newPod := PodInfo{Name: name, Namespace: namespace}
+
+	// Skip adding element if identical
+	if exists && existingPod == newPod {
+		return
+	}
+
+	c.ipToPod[ip] = newPod
 	c.l.Info("Added pod to cache", zap.String("ip", ip), zap.String("name", name), zap.String("namespace", namespace))
 }
 
