@@ -49,6 +49,11 @@ func GetPodInfo(ip, filePath string) (*cache.PodInfo, error) {
 		return nil, fmt.Errorf("failed to read CNI state file: %w", err)
 	}
 
+	// Do nothing if the file is empty
+	if len(data) == 0 {
+		return nil, nil
+	}
+
 	var cniState CniState
 	if err := json.Unmarshal(data, &cniState); err != nil {
 		fmt.Println("Error decoding file:", err)
