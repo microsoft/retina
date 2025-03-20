@@ -52,6 +52,7 @@ metadata:
     app: tcp-client-0
     app.kubernetes.io/name: tcp-client-0
 spec:
+  nodeName: $nodeName
   containers:
   - name: tcp-client-0
     image: ghcr.io/srodi/test-fail
@@ -66,5 +67,14 @@ spec:
       requests:
         memory: "64Mi"
         cpu: "250m"
+    volumeMounts:
+    - name: host
+      mountPath: /host
+      readOnly: true
+  volumes:
+  - name: host
+    hostPath:
+      path: /
+      type: Directory
   securityContext: {}
   restartPolicy: Never

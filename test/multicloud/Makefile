@@ -64,16 +64,26 @@ fmt:
 	@cd test && go fmt ./...
 
 # -------------------------------------------------------------------
-# Demo Prep: Deploy client and server pods
+# Demo Prep: Set Kubeconfig, Deploy client and server pods
 # -------------------------------------------------------------------
+
+demo-set-kubeconfig:
+	@make check-env-vars
+	@echo "Get kubeconfig for $(STACK_NAME)"
+	@cd live/$(STACK_NAME) && \
+		tofu output -json | jq -r '.kubeconfig_command.value' | bash
+	@echo "Set kubeconfig context to $(STACK_NAME)"
 
 demo-deploy-pods:
 	@echo "Deploy demo client and server pods"
-	@kubectl apply -f live/files/mc-demo-manifests.yaml
-
+	@NODE_NAME=$$(kubectl get no -o jsonpath='{.items[0].metadata.name}'); \
+		envsubst < live/files/mc-demo-manifests.yaml | kubectl apply -f -; \
+		echo "Client pod deployed on node $$NODE_NAME"
 demo-delete-pods:
 	@echo "Delete demo client and  server pods"
-	@kubectl delete -f live/files/mc-demo-manifests.yaml
+	@NODE_NAME=$$(kubectl get no -o jsonpath='{.items[0].metadata.name}'); \
+		envsubst < live/files/mc-demo-manifests.yaml | kubectl delete -f -; \
+		echo "Client pod deployed on node $$NODE_NAME"
 
 # -------------------------------------------------------------------
 # Demo Scenario 1: Packets dropped by iptables (AKS)
@@ -99,9 +109,9 @@ demo-drop-test:
 
 demo-dns-add-failure:
 	@echo "Backup coredns configmap"
-	@kubectl get cm -n kube-system coredns -o yaml > live/files/mc-demo-coredns-original.yaml
+	@kubectl get cm -n kube-system coredns -o yaml > live/files/mc-demo-eks-coredns-original.yaml
 	@echo "Add DNS failure for example.com"
-	@cat live/files/mc-demo-coredns-custom.yaml
+	@cat live/files/mc-demo-eks-coredns-custom.yaml
 	@echo "k edit cm -n kube-system coredns"
 
 demo-dns-test:
@@ -120,6 +130,25 @@ demo-dns-observe:
 	@echo "Observe client pod"
 	@hubble observe --follow --to-pod default/tcp-client-0
 
+demo-dns-rm-failure:
+	@echo "Restore coredns configmap"
+	@cat live/files/mc-demo-eks-coredns-original.yaml
+	@echo "k edit cm -n kube-system coredns"
+	@echo "Now you can reload DNS pods [make demo-dns-restart-coredns]"
+
 demo-dns-restart-coredns:
 	@echo "Restart coredns pods"
 	@kubectl rollout restart deployment coredns -n kube-system
+
+# -------------------------------------------------------------------
+# Demo Scenario 3: Retina capture (GKE)
+# -------------------------------------------------------------------
+
+demo-capture-run:
+	@echo "Capture packets from client to server"
+	@kubectl retina capture create --host-path /tmp/retina-capture --node-names $(shell kubectl get po tcp-client-0 -o=jsonpath={.spec.nodeName}) -n default
+	
+demo-capture-copy-file:
+	@echo "Copy capture file to local machine"
+	@kubectl cp default/tcp-client-0:/host/tmp/retina-capture ./retina-capture
+	@echo "Untar the file on localmachine and analyze capture file with Wireshark"

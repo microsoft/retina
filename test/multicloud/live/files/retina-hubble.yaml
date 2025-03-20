@@ -3,6 +3,7 @@ operator:
   enabled: true
   tag: v0.0.24
   repository: ghcr.io/microsoft/retina/retina-operator
+  enableRetinaEndpoint: true
 
 agent:
   enabled: true

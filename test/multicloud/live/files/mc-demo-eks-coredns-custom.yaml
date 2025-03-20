@@ -1,22 +1,39 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: coredns-custom
+  name: coredns
   namespace: kube-system
 data:
-  custom.override: |
+  Corefile: |
+    .:53 {
+        errors
+        health {
+            lameduck 5s
+        }
+        ready
+        kubernetes cluster.local in-addr.arpa ip6.arpa {
+            pods insecure
+            fallthrough in-addr.arpa ip6.arpa
+        }
         # Return SERVFAIL for empty.com A record
         template IN A empty.com {
-          rcode NOERROR
-          answer "{{ .Name }} 0 IN A 0.0.0.0"
-          authority ""
-          additional ""
+            rcode NOERROR
+            answer "{{ .Name }} 0 IN A 0.0.0.0"
+            authority ""
+            additional ""
         }
         # Return REFUSED for refused.com ANY records 
         template IN ANY refused.com {
-          rcode REFUSED
+            rcode REFUSED
         }
         # Return NXDOMAIN for example.com AAAA records
         template ANY AAAA example.com {
-          rcode NXDOMAIN
-        }
+            rcode NXDOMAIN
+        }        
+        prometheus :9153
+        forward . /etc/resolv.conf
+        cache 30
+        loop
+        reload
+        loadbalance
+    }
