@@ -28,6 +28,24 @@ func TestFileRead(t *testing.T) {
 	assert.Error(t, err, "expected error when using invalid file path")
 }
 
+func TestFileReadEmpty(t *testing.T) {
+	emptyJSONPath := "/home/beegii/src/retina/pkg/plugin/hnsstats/empty_azure_vnet.json"
+	emptyJSONContent := ``
+
+	err := os.WriteFile(emptyJSONPath, []byte(emptyJSONContent), 0644)
+	assert.NoError(t, err, "failed to create empty JSON file")
+
+	podInfo, err := GetPodInfo(ip, emptyJSONPath)
+	if podInfo != nil {
+		t.Fatalf("expected no pod info for empty JSON file, got: %v", podInfo)
+	}
+	assert.NoError(t, err)
+
+	// Remove empty JSON file
+	err = os.Remove(emptyJSONPath)
+	assert.NoError(t, err, "failed to remove malformed JSON file")
+}
+
 func TestJsonDecode(t *testing.T) {
 	malformedJSONPath := "/home/beegii/src/retina/pkg/plugin/hnsstats/mock_invalid_azure_vnet.json"
 	invalidJSONContent := `{
