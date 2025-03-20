@@ -3,12 +3,14 @@ package ebpfwindows
 import (
 	"context"
 	"errors"
-	"net"
+	"fmt"
+	"os"
 	"time"
+
 	"unsafe"
 
-	"github.com/cilium/cilium/api/v1/flow"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
+	observer "github.com/cilium/cilium/pkg/hubble/observer/types"
 	hp "github.com/cilium/cilium/pkg/hubble/parser"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
@@ -22,7 +24,7 @@ import (
 
 const (
 	// name of the ebpfwindows plugin
-	name string = "windowseBPF"
+	name string = "ebpfwindows"
 	// name of the metrics
 	packetsReceived        string = "win_packets_recv_count"
 	packetsSent            string = "win_packets_sent_count"
@@ -62,7 +64,6 @@ func New(cfg *kcfg.Config) registry.Plugin {
 
 // Init is a no-op for the ebpfwindows plugin
 func (p *Plugin) Init() error {
-
 	parser, err := hp.New(logrus.WithField("windowsEbpf", "parser"),
 		// We use noop getters here since we will use our own custom parser in hubble
 		&NoopEndpointGetter,
@@ -90,37 +91,30 @@ func (p *Plugin) Name() string {
 
 // Start the plugin by starting a periodic timer.
 func (p *Plugin) Start(ctx context.Context) error {
-
 	p.l.Info("Start ebpfWindows plugin...")
-	p.enricher = enricher.Instance()
-
-	if p.enricher == nil {
-		return ErrNilEnricher
-	}
-
 	p.pullMetricsAndEvents(ctx)
+	p.l.Info("Complete ebpfWindows plugin...")
 	return nil
 }
 
 // metricsMapIterateCallback is the callback function that is called for each key-value pair in the metrics map.
 func (p *Plugin) metricsMapIterateCallback(key *MetricsKey, value *MetricsValues) {
-	p.l.Info("MetricsMapIterateCallback")
-	p.l.Info("Key", zap.String("Key", key.String()))
-	p.l.Info("Value", zap.String("Value", value.String()))
-
+	p.l.Debug("MetricsMapIterateCallback")
+	p.l.Debug("Key", zap.String("Key", key.String()))
+	p.l.Debug("Value", zap.String("Value", value.String()))
 	if key.IsDrop() {
 		if key.IsEgress() {
-			metrics.DropPacketsGauge.WithLabelValues(egressLabel).Set(float64(value.Count()))
+			metrics.DropBytesGauge.WithLabelValues(DropReason(key.Reason), egressLabel).Set(float64(value.Bytes()))
+			metrics.DropPacketsGauge.WithLabelValues(DropReason(key.Reason), egressLabel).Set(float64(value.Count()))
 		} else if key.IsIngress() {
-			metrics.DropPacketsGauge.WithLabelValues(ingressLabel).Set(float64(value.Count()))
+			metrics.DropBytesGauge.WithLabelValues(DropReason(key.Reason), ingressLabel).Set(float64(value.Bytes()))
+			metrics.DropPacketsGauge.WithLabelValues(DropReason(key.Reason), ingressLabel).Set(float64(value.Count()))
 		}
-
 	} else {
-
 		if key.IsEgress() {
 			metrics.ForwardBytesGauge.WithLabelValues(egressLabel).Set(float64(value.Bytes()))
 			p.l.Debug("emitting bytes sent count metric", zap.Uint64(bytesSent, value.Bytes()))
-			metrics.ForwardPacketsGauge.WithLabelValues(egressLabel).Set(float64(value.Count()))
+			metrics.ForwardBytesGauge.WithLabelValues(packetsSent).Set(float64(value.Count()))
 			p.l.Debug("emitting packets sent count metric", zap.Uint64(packetsSent, value.Count()))
 		} else if key.IsIngress() {
 			metrics.ForwardPacketsGauge.WithLabelValues(ingressLabel).Set(float64(value.Count()))
@@ -132,35 +126,63 @@ func (p *Plugin) metricsMapIterateCallback(key *MetricsKey, value *MetricsValues
 }
 
 // eventsMapCallback is the callback function that is called for each value  in the events map.
-func (p *Plugin) eventsMapCallback(data unsafe.Pointer, size uint64) int {
+func (p *Plugin) eventsMapCallback(data unsafe.Pointer, size uint32) int {
 	p.l.Info("EventsMapCallback")
-	p.l.Info("Size", zap.Uint64("Size", size))
+	p.l.Info("Size", zap.Uint32("Size", size))
 	err := p.handleTraceEvent(data, size)
-
 	if err != nil {
 		p.l.Error("Error handling trace event", zap.Error(err))
 		return -1
 	}
-
 	return 0
 }
 
-// pullMetricsAndEvents is the function that is called periodically by the timer.
-func (p *Plugin) pullMetricsAndEvents(ctx context.Context) {
+func ensureRetinaEbpfApiDLLPresent() error {
+	src := `C:\hpc\retinaebpfapi.dll`
+	if _, err := os.Stat(src); os.IsNotExist(err) {
+		return fmt.Errorf("Error: retinaebpfapi.dll not found at %s", src)
+	}
 
+	oldPath := os.Getenv("PATH")
+	newPath := oldPath + ";" + "C:\\Program Files\\ebpf-for-windows\\"
+	if err := os.Setenv("PATH", newPath); err != nil {
+		fmt.Println("Error setting PATH environment variable: %v")
+	}
+
+	return nil
+}
+
+// pullCiliumeBPFMetrics is the function that is called periodically by the timer.
+func (p *Plugin) pullMetricsAndEvents(ctx context.Context) {
 	eventsMap := NewEventsMap()
 	metricsMap := NewMetricsMap()
 
-	err := eventsMap.RegisterForCallback(p.eventsMapCallback)
-
+	err := ensureRetinaEbpfApiDLLPresent()
 	if err != nil {
-		p.l.Error("Error registering for events map callback", zap.Error(err))
 		return
+	}
+
+	if enricher.IsInitialized() {
+		p.enricher = enricher.Instance()
+	} else {
+		p.l.Warn("retina enricher is not initialized")
+	}
+
+	if p.enricher != nil {
+		err := eventsMap.RegisterForCallback(p.eventsMapCallback)
+		if err != nil {
+			p.l.Error("Error registering for events map callback", zap.Error(err))
+			return
+		}
+
+		defer func() {
+			p.l.Error("ebpfwindows plugin canceling", zap.Error(ctx.Err()))
+			eventsMap.UnregisterForCallback()
+		}()
 	}
 
 	ticker := time.NewTicker(p.cfg.MetricsInterval)
 	defer ticker.Stop()
-
 	for {
 		select {
 		case <-ticker.C:
@@ -188,7 +210,6 @@ func (p *Plugin) SetupChannel(ch chan *v1.Event) error {
 
 // Stop the plugin by cancelling the periodic timer.
 func (p *Plugin) Stop() error {
-
 	p.l.Info("Stop ebpfWindows plugin...")
 	return nil
 }
@@ -203,101 +224,54 @@ func (p *Plugin) Generate(context.Context) error {
 	return nil
 }
 
-func (p *Plugin) handleDropNotify(dropNotify *DropNotify) {
-	p.l.Info("DropNotify", zap.String("DropNotify", dropNotify.String()))
-}
-
-func (p *Plugin) handleTraceNotify(traceNotify *TraceNotify) {
-	p.l.Info("TraceNotify", zap.String("TraceNotify", traceNotify.String()))
-}
-
-func (p *Plugin) handleTraceSockNotify(traceSockNotify *TraceSockNotify) {
-	p.l.Info("TraceSockNotify", zap.String("TraceSockNotify", traceSockNotify.String()))
-}
-
-func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint64) error {
-
+func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 	if uintptr(size) < unsafe.Sizeof(uint8(0)) {
 		return ErrInvalidEventData
 	}
-
 	eventType := *(*uint8)(data)
-
 	switch eventType {
 	case NotifyDrop:
-
 		if uintptr(size) < unsafe.Sizeof(DropNotify{}) {
-			p.l.Error("Invalid DropNotify data size", zap.Uint64("size", size))
+			p.l.Error("Invalid DropNotify data size", zap.Uint32("size", size))
 			return ErrInvalidEventData
 		}
-
+		e, err := p.parser.Decode(&observer.MonitorEvent{
+			Payload: &observer.PerfEvent{
+				Data: (*[unsafe.Sizeof(DropNotify{})]byte)(data)[:],
+			},
+		})
+		if err != nil {
+			p.l.Error("Could not convert event to flow", zap.Any("handleTraceEvent", data), zap.Error(err))
+			return ErrInvalidEventData
+		}
+		meta := &utils.RetinaMetadata{}
+		// Add packet size to the flow's metadata.
+		utils.AddPacketSize(meta, 128)
+		fl := e.GetFlow()
 		dropNotify := (*DropNotify)(data)
-		p.handleDropNotify(dropNotify)
-
+		meta.DropReason = utils.DropReason(dropNotify.Subtype)
+		utils.AddRetinaMetadata(fl, meta)
+		p.enricher.Write(e)
 	case NotifyTrace:
-
 		if uintptr(size) < unsafe.Sizeof(TraceNotify{}) {
-			p.l.Error("Invalid TraceNotify data size", zap.Uint64("size", size))
+			p.l.Error("Invalid TraceNotify data size", zap.Uint32("size", size))
 			return ErrInvalidEventData
 		}
-
-		traceNotify := (*TraceNotify)(data)
-		p.handleTraceNotify(traceNotify)
-
-	case NotifyTraceSock:
-		if uintptr(size) < unsafe.Sizeof(TraceSockNotify{}) {
-			p.l.Error("Invalid TraceSockNotify data size", zap.Uint64("size", size))
+		e, err := p.parser.Decode(&observer.MonitorEvent{
+			Payload: &observer.PerfEvent{
+				Data: (*[unsafe.Sizeof(TraceNotify{})]byte)(data)[:],
+			},
+		})
+		if err != nil {
+			p.l.Error("Could not convert event to flow", zap.Any("handleTraceEvent", data), zap.Error(err))
 			return ErrInvalidEventData
 		}
-
-		traceSockNotify := (*TraceSockNotify)(data)
-		p.handleTraceSockNotify(traceSockNotify)
-
-	default:
-		p.l.Error("Unsupported event type", zap.Uint8("eventType", eventType))
+		meta := &utils.RetinaMetadata{}
+		// Add packet size to the flow's metadata.
+		utils.AddPacketSize(meta, 128)
+		fl := e.GetFlow()
+		utils.AddRetinaMetadata(fl, meta)
+		p.enricher.Write(e)
 	}
-
-	t1 := time.Now().UnixNano()
-
-	// Hardcoded values for flow object. These values will be replaced by the actual values from the event.
-	fl := utils.ToFlow(
-		p.l,
-		t1,
-		net.ParseIP("192.168.0.1").To4(), // Src IP
-		net.ParseIP("192.168.0.2").To4(), // Dst IP
-		80,                               // Src Port
-		1024,                             // Dst Port
-		6,                                // Protocol
-		2,
-		flow.Verdict_DROPPED,
-	)
-
-	if fl == nil {
-		p.l.Warn("Could not convert event to flow", zap.Any("handleTraceEvent", data))
-		return ErrInvalidEventData
-	}
-
-	ev := &v1.Event{
-		Event:     fl,
-		Timestamp: fl.GetTime(),
-	}
-
-	if p.enricher != nil {
-		p.enricher.Write(ev)
-	} else {
-		p.l.Error("enricher is nil when writing event")
-	}
-
-	// Write the event to the external channel.
-	if p.externalChannel != nil {
-		select {
-		case p.externalChannel <- ev:
-		default:
-			// Channel is full, drop the event.
-			// We shouldn't slow down the reader.
-			metrics.LostEventsCounter.WithLabelValues(utils.ExternalChannel, name).Inc()
-		}
-	}
-
 	return nil
 }

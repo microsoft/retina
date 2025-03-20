@@ -10,13 +10,13 @@ var (
 	unregisterEventsMapCallback = retinaEbpfAPI.NewProc("RetinaUnregisterEventsMapCallback")
 )
 
-type eventsMapCallback func(data unsafe.Pointer, size uint64) int
+type eventsMapCallback func(data unsafe.Pointer, size uint32) int
 
 // Callbacks in Go can only be passed as functions with specific signatures and often need to be wrapped in a syscall-compatible function.
 var eventsCallback eventsMapCallback
 
 // This function will be passed to the Windows API
-func eventsMapSysCallCallback(data unsafe.Pointer, size uint64) uintptr {
+func eventsMapSysCallCallback(data unsafe.Pointer, size uint32) uintptr {
 
 	if eventsCallback != nil {
 		return uintptr(eventsCallback(data, size))

@@ -11,17 +11,24 @@ FROM --platform=$TARGETPLATFORM mcr.microsoft.com/cbl-mariner/base/core@sha256:7
 # mcr.microsoft.com/cbl-mariner/distroless/minimal:2.0
 FROM --platform=$TARGETPLATFORM mcr.microsoft.com/cbl-mariner/distroless/minimal@sha256:db87903c5d4d9d6760e86a274914efd6a3bb5914c0b5a6c6b35350ec297fea4f AS mariner-distroless
 
-# mcr.microsoft.com/windows/servercore:ltsc2019 
+# mcr.microsoft.com/windows/servercore:ltsc2019
 FROM --platform=$TARGETPLATFORM mcr.microsoft.com/windows/servercore@sha256:6fdf140282a2f809dae9b13fe441635867f0a27c33a438771673b8da8f3348a4 AS ltsc2019
 
 # mcr.microsoft.com/windows/servercore:ltsc2022
 FROM --platform=$TARGETPLATFORM mcr.microsoft.com/windows/servercore@sha256:45952938708fbde6ec0b5b94de68bcdec3f8c838be018536b1e9e5bd95e6b943 AS ltsc2022
 
-
 # build stages
 
 # intermediate go generate stage
-FROM golang AS intermediate 
+
+FROM golang AS eBPFRetinaStage
+WORKDIR /tmp
+RUN tdnf install -y unzip && \
+    curl -L -o eBPFRetina.zip https://www.nuget.org/api/v2/package/Microsoft.Wcn.Observability.eBPF.Retina.x64/0.1.0-prerelease.3 && \
+    mkdir eBPFRetina && \
+    unzip -d eBPFRetina eBPFRetina.zip || true
+
+FROM golang AS intermediate
 ARG APP_INSIGHTS_ID # set to enable AI telemetry
 ARG GOARCH=amd64 # default to amd64
 ARG GOOS=linux # default to linux
@@ -37,7 +44,8 @@ RUN if [ "$GOOS" = "linux" ] ; then \
       go generate -skip "mockgen" -x /go/src/github.com/microsoft/retina/pkg/plugin/...; \
       tar czf /gen.tar.gz ./pkg/plugin; \
       rm go.mod; \
-    fi
+      fi
+
 COPY ./go.mod ./go.sum ./
 RUN go mod download
 COPY . .
@@ -64,7 +72,7 @@ ARG GOOS=linux # default to linux
 ARG VERSION
 ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
-RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/retina/controller -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID="$APP_INSIGHTS_ID"" controller/main.go 
+RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/retina/controller -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID="$APP_INSIGHTS_ID"" controller/main.go
 
 
 # init binary
@@ -76,7 +84,6 @@ ARG VERSION
 ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
 RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/retina/initretina -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID="$APP_INSIGHTS_ID"" init/retina/main_linux.go
-
 
 # tools image
 FROM mariner-core AS tools
@@ -115,7 +122,6 @@ COPY --from=tools /lib/ /lib
 COPY --from=tools /usr/lib/ /usr/lib
 ENTRYPOINT ["./retina/initretina"]
 
-
 # agent final image
 # mcr.microsoft.com/cbl-mariner/distroless/minimal:2.0
 # mcr.microsoft.com/cbl-mariner/distroless/minimal@sha256:63a0a70ceaa1320bc6eb98b81106667d43e46b674731ea8d28e4de1b87e0747f
@@ -132,9 +138,9 @@ COPY --from=tools /usr/local/hubble /bin/hubble
 ENV HUBBLE_SERVER=unix:///var/run/cilium/hubble.sock
 ENTRYPOINT ["./retina/controller"]
 
-
-# agent final image for windows 
+# agent final image for windows
 FROM ${OS_VERSION} AS agent-win
+COPY --from=eBPFRetinaStage /tmp/eBPFRetina/build/native/bin/Release/retinaebpfapi.dll /retinaebpfapi.dll
 COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
 COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
 COPY --from=controller-bin /go/bin/retina/controller controller.exe
