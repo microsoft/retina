@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	State_file_location = "C:/k/azure-vnet.json"
+	State_file_location = "C:/Windows/System32/azure-vnet.json"
 )
 
 type CniState struct {
