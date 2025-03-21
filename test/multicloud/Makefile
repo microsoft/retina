@@ -74,7 +74,7 @@ demo-set-kubeconfig:
 		tofu output -json | jq -r '.kubeconfig_command.value' | bash
 	@echo "Set kubeconfig context to $(STACK_NAME)"
 
-demo-deploy-pods:
+demo-create-pods:
 	@echo "Deploy demo client and server pods"
 	@NODE_NAME=$$(kubectl get no -o jsonpath='{.items[0].metadata.name}'); \
 		envsubst < live/files/mc-demo-manifests.yaml | kubectl apply -f -; \
@@ -84,6 +84,10 @@ demo-delete-pods:
 	@NODE_NAME=$$(kubectl get no -o jsonpath='{.items[0].metadata.name}'); \
 		envsubst < live/files/mc-demo-manifests.yaml | kubectl delete -f -; \
 		echo "Client pod deployed on node $$NODE_NAME"
+
+demo-observe-client:
+	@echo "Observe client pod"
+	@hubble observe --follow --to-pod default/tcp-client-0
 
 # -------------------------------------------------------------------
 # Demo Scenario 1: Packets dropped by iptables (AKS)
@@ -98,10 +102,6 @@ demo-drop-rm:
 	@echo "Remove iptables rule to allow traffic from server to client"
 	@kubectl exec -it $(shell kubectl get pods -l app=tcp-client-0 -o jsonpath='{.items[0].metadata.name}') -- iptables -D INPUT -s tcp-server.default.svc.cluster.local -j DROP
 	@kubectl exec -it $(shell kubectl get pods -l app=tcp-client-0 -o jsonpath='{.items[0].metadata.name}') -- iptables -L --line-numbers
-
-demo-drop-test:
-	@echo "Observe client pod"
-	@hubble observe --follow --to-pod default/tcp-client-0
 
 # -------------------------------------------------------------------
 # Demo Scenario 2: DNS resolution failure for specific domain (EKS)
@@ -126,10 +126,6 @@ demo-dns-test:
 		kubectl exec -it $$POD -- nslookup -type=A refused.com; \
 	done
 
-demo-dns-observe:
-	@echo "Observe client pod"
-	@hubble observe --follow --to-pod default/tcp-client-0
-
 demo-dns-rm-failure:
 	@echo "Restore coredns configmap"
 	@cat live/files/mc-demo-eks-coredns-original.yaml
@@ -146,7 +142,10 @@ demo-dns-restart-coredns:
 
 demo-capture-run:
 	@echo "Capture packets from client to server"
-	@kubectl retina capture create --host-path /tmp/retina-capture --node-names $(shell kubectl get po tcp-client-0 -o=jsonpath={.spec.nodeName}) -n default
+	@kubectl retina capture create \
+		--host-path /tmp/retina-capture \
+		--pod-selectors="app=tcp-client-0" \
+		--duration 15s -n default
 	
 demo-capture-copy-file:
 	@echo "Copy capture file to local machine"

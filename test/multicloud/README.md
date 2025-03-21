@@ -49,7 +49,7 @@ In addition to Hubble, Retina provides a number of Grafana dashboards which are 
 * GKE:
     1. create a gcloud account, project and enable billing.
     2. create a service account and service account key.
-    3. [Enable Kubernetes Engine API](https://console.developers.google.com/apis/api/container.googleapis.com/overview?project=mc-retina).
+    3. Enable Kubernetes Engine API and Identity and Access Management (IAM) API.
     4. [Install gcloud](https://cloud.google.com/sdk/docs/install).
 
     To deploy a GKE cluster export `GOOGLE_APPLICATION_CREDENTIALS` env variable to point to the path where your [service account key](https://cloud.google.com/iam/docs/keys-create-delete) is located.
