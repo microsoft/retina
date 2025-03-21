@@ -6,7 +6,7 @@ locals {
 
   retina_release_name      = "retina"
   retina_repository_url    = "oci://ghcr.io/microsoft/retina/charts"
-  retina_chart_version     = "v0.0.24"
+  retina_chart_version     = "v0.0.29"
   retina_release_namespace = "kube-system"
   retina_chart_name        = "retina-hubble"
   retina_values            = yamldecode(file("../files/retina-hubble.yaml"))
@@ -32,4 +32,6 @@ locals {
       destination_ranges = [module.prometheus_lb_gke.ip]
     }
   }
+  # All dashboards are deployed as part of live/retina-aks
+  grafana_dashboards = {}
 }
