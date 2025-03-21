@@ -89,6 +89,21 @@ demo-observe-client:
 	@echo "Observe client pod"
 	@hubble observe --follow --to-pod default/tcp-client-0
 
+demo-restart-coredns:
+	@echo "Restart coredns pods"
+	@kubectl rollout restart deployment coredns -n kube-system
+
+demo-test-dns:
+	@echo "Test DNS resolution for example.com"
+	@POD=$$(kubectl get pods -l app=tcp-client-0 -o jsonpath='{.items[0].metadata.name}'); \
+	for i in $$(seq 1 10); do \
+		echo "Lookup $$i:"; \
+		kubectl exec -it $$POD -- nslookup -type=AAAA example.com; \
+		kubectl exec -it $$POD -- nslookup -type=A empty.com; \
+		kubectl exec -it $$POD -- nslookup -type=AAAA empty.com; \
+		kubectl exec -it $$POD -- nslookup -type=AAAA refused.com; \
+		kubectl exec -it $$POD -- nslookup -type=A refused.com; \
+	done
 # -------------------------------------------------------------------
 # Demo Scenario 1: Packets dropped by iptables (AKS)
 # -------------------------------------------------------------------
@@ -107,34 +122,47 @@ demo-drop-rm:
 # Demo Scenario 2: DNS resolution failure for specific domain (EKS)
 # -------------------------------------------------------------------
 
-demo-dns-add-failure:
+demo-dns-add:
 	@echo "Backup coredns configmap"
 	@kubectl get cm -n kube-system coredns -o yaml > live/files/mc-demo-eks-coredns-original.yaml
-	@echo "Add DNS failure for example.com"
-	@cat live/files/mc-demo-eks-coredns-custom.yaml
-	@echo "k edit cm -n kube-system coredns"
+	@echo "Adding DNS failure for example.com (programmatically)"
+	@kubectl replace -f live/files/mc-demo-eks-coredns-custom.yaml
+	@echo "CoreDNS ConfigMap updated successfully!"
+	@make demo-restart-coredns
+	@make demo-test-dns
 
-demo-dns-test:
-	@echo "Test DNS resolution for example.com"
-	@POD=$$(kubectl get pods -l app=tcp-client-0 -o jsonpath='{.items[0].metadata.name}'); \
-	for i in $$(seq 1 10); do \
-		echo "Lookup $$i:"; \
-		kubectl exec -it $$POD -- nslookup -type=AAAA example.com; \
-		kubectl exec -it $$POD -- nslookup -type=A empty.com; \
-		kubectl exec -it $$POD -- nslookup -type=AAAA empty.com; \
-		kubectl exec -it $$POD -- nslookup -type=AAAA refused.com; \
-		kubectl exec -it $$POD -- nslookup -type=A refused.com; \
-	done
-
-demo-dns-rm-failure:
-	@echo "Restore coredns configmap"
-	@cat live/files/mc-demo-eks-coredns-original.yaml
-	@echo "k edit cm -n kube-system coredns"
-	@echo "Now you can reload DNS pods [make demo-dns-restart-coredns]"
-
-demo-dns-restart-coredns:
-	@echo "Restart coredns pods"
-	@kubectl rollout restart deployment coredns -n kube-system
+demo-dns-rm:
+	@echo "Restoring original coredns configmap"
+	@echo "apiVersion: v1" > /tmp/coredns-reset.yaml && \
+	echo "kind: ConfigMap" >> /tmp/coredns-reset.yaml && \
+	echo "metadata:" >> /tmp/coredns-reset.yaml && \
+	echo "  name: coredns" >> /tmp/coredns-reset.yaml && \
+	echo "  namespace: kube-system" >> /tmp/coredns-reset.yaml && \
+	echo "  labels:" >> /tmp/coredns-reset.yaml && \
+	kubectl get cm -n kube-system coredns -o jsonpath='{.metadata.labels}' | jq -r 'to_entries[] | "    \(.key): \(.value)"' >> /tmp/coredns-reset.yaml && \
+	echo "data:" >> /tmp/coredns-reset.yaml && \
+	echo "  Corefile: |" >> /tmp/coredns-reset.yaml && \
+	echo "    .:53 {" >> /tmp/coredns-reset.yaml && \
+	echo "        errors" >> /tmp/coredns-reset.yaml && \
+	echo "        health {" >> /tmp/coredns-reset.yaml && \
+	echo "            lameduck 5s" >> /tmp/coredns-reset.yaml && \
+	echo "        }" >> /tmp/coredns-reset.yaml && \
+	echo "        ready" >> /tmp/coredns-reset.yaml && \
+	echo "        kubernetes cluster.local in-addr.arpa ip6.arpa {" >> /tmp/coredns-reset.yaml && \
+	echo "            pods insecure" >> /tmp/coredns-reset.yaml && \
+	echo "            fallthrough in-addr.arpa ip6.arpa" >> /tmp/coredns-reset.yaml && \
+	echo "        }" >> /tmp/coredns-reset.yaml && \
+	echo "        prometheus :9153" >> /tmp/coredns-reset.yaml && \
+	echo "        forward . /etc/resolv.conf" >> /tmp/coredns-reset.yaml && \
+	echo "        cache 30" >> /tmp/coredns-reset.yaml && \
+	echo "        loop" >> /tmp/coredns-reset.yaml && \
+	echo "        reload" >> /tmp/coredns-reset.yaml && \
+	echo "        loadbalance" >> /tmp/coredns-reset.yaml && \
+	echo "    }" >> /tmp/coredns-reset.yaml && \
+	kubectl replace -f /tmp/coredns-reset.yaml
+	@echo "CoreDNS ConfigMap restored successfully!"
+	@make demo-restart-coredns
+	@make demo-test-dns
 
 # -------------------------------------------------------------------
 # Demo Scenario 3: Retina capture (GKE)
