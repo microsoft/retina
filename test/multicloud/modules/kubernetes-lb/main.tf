@@ -15,4 +15,9 @@ resource "kubernetes_service" "load_balancer_service" {
 
     selector = var.label_selector
   }
+  lifecycle {
+    ignore_changes = [
+      metadata.0.annotations
+    ]
+  }
 }

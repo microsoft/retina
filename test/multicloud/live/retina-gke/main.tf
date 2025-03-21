@@ -50,6 +50,5 @@ module "grafana" {
   prometheus_endpoints = {
     gke = "http://${module.prometheus_lb_gke.ip}:9090"
   }
-  # All dashboards are deployed as part of live/retina-eks
-  dashboards = {}
+  dashboards = local.grafana_dashboards
 }

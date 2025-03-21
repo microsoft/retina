@@ -4,7 +4,7 @@ locals {
 
   retina_release_name      = "retina"
   retina_repository_url    = "oci://ghcr.io/microsoft/retina/charts"
-  retina_chart_version     = "v0.0.24"
+  retina_chart_version     = "v0.0.29"
   retina_release_namespace = "kube-system"
   retina_chart_name        = "retina-hubble"
   retina_values            = yamldecode(file("../files/retina-hubble.yaml"))
@@ -16,12 +16,6 @@ locals {
   prometheus_release_namespace = "kube-system"
   prometheus_values            = yamldecode(file("../../../../deploy/hubble/prometheus/values.yaml"))
 
-  dashboards = {
-    "clusters"                   = "clusters.json"
-    "hubble-dns"                 = "hubble-dns.json"
-    "hubble-pod-flows-namespace" = "hubble-pod-flows-namespace.json"
-    "hubble-pod-flows-workload"  = "hubble-pod-flows-workload.json"
-    "standard-dns"               = "standard-dns.json"
-    "standard-pod-level"         = "standard-pod-level.json"
-  }
+  # All dashboards are deployed as part of live/retina-aks
+  dashboards = {}
 }
