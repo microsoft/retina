@@ -1,19 +1,19 @@
 # hubble control-plane
 operator:
   enabled: true
-  tag: v0.0.24
+  tag: v0.0.29
   repository: ghcr.io/microsoft/retina/retina-operator
   enableRetinaEndpoint: true
 
 agent:
   enabled: true
   repository: ghcr.io/microsoft/retina/retina-agent
-  tag: v0.0.24
+  tag: v0.0.29
 
   init:
     enabled: true
     repository: ghcr.io/microsoft/retina/retina-init
-    tag: v0.0.24
+    tag: v0.0.29
 
 hubble:
   relay:

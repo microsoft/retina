@@ -48,9 +48,5 @@ module "grafana" {
   prometheus_endpoints = {
     eks = "http://${module.prometheus_lb_eks.hostname}:9090" # Note: EKS uses hostname instead of IP
   }
-  # Make sure dashboards are deployed only once
-  # if any values is passed here, then
-  # live/retina-aks and live/retina-gke shuould 
-  # be set to empty map (default)
   dashboards = local.dashboards
 }

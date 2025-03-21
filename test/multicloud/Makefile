@@ -64,36 +64,36 @@ fmt:
 	@cd test && go fmt ./...
 
 # -------------------------------------------------------------------
-# Demo Prep: Set Kubeconfig, Deploy client and server pods
+# Demo utils: Set Kubeconfig, Deploy/Observe/Reload pods
 # -------------------------------------------------------------------
 
-demo-set-kubeconfig:
+set-kubeconfig:
 	@make check-env-vars
 	@echo "Get kubeconfig for $(STACK_NAME)"
 	@cd live/$(STACK_NAME) && \
 		tofu output -json | jq -r '.kubeconfig_command.value' | bash
 	@echo "Set kubeconfig context to $(STACK_NAME)"
 
-demo-create-pods:
+create-pods:
 	@echo "Deploy demo client and server pods"
 	@NODE_NAME=$$(kubectl get no -o jsonpath='{.items[0].metadata.name}'); \
-		envsubst < live/files/mc-demo-manifests.yaml | kubectl apply -f -; \
+		envsubst < live/files/mc-manifests.yaml | kubectl apply -f -; \
 		echo "Client pod deployed on node $$NODE_NAME"
-demo-delete-pods:
+delete-pods:
 	@echo "Delete demo client and  server pods"
 	@NODE_NAME=$$(kubectl get no -o jsonpath='{.items[0].metadata.name}'); \
 		envsubst < live/files/mc-demo-manifests.yaml | kubectl delete -f -; \
 		echo "Client pod deployed on node $$NODE_NAME"
 
-demo-observe-client:
+observe-client:
 	@echo "Observe client pod"
 	@hubble observe --follow --to-pod default/tcp-client-0
 
-demo-restart-coredns:
+restart-coredns:
 	@echo "Restart coredns pods"
 	@kubectl rollout restart deployment coredns -n kube-system
 
-demo-test-dns:
+test-dns:
 	@echo "Test DNS resolution for example.com"
 	@POD=$$(kubectl get pods -l app=tcp-client-0 -o jsonpath='{.items[0].metadata.name}'); \
 	for i in $$(seq 1 10); do \
@@ -108,12 +108,15 @@ demo-test-dns:
 # Demo Scenario 1: Packets dropped by iptables (AKS)
 # -------------------------------------------------------------------
 
-demo-drop-add:
+drop-init:
+	@STACK_NAME=retina-aks make set-kubeconfig && k9s
+
+drop-add:
 	@echo "Add iptables rule to deny traffic from server to client"
 	@kubectl exec -it $(shell kubectl get pods -l app=tcp-client-0 -o jsonpath='{.items[0].metadata.name}') -- iptables -A INPUT -s tcp-server.default.svc.cluster.local -j DROP
 	@kubectl exec -it $(shell kubectl get pods -l app=tcp-client-0 -o jsonpath='{.items[0].metadata.name}') -- iptables -L --line-numbers
 
-demo-drop-rm:
+drop-rm:
 	@echo "Remove iptables rule to allow traffic from server to client"
 	@kubectl exec -it $(shell kubectl get pods -l app=tcp-client-0 -o jsonpath='{.items[0].metadata.name}') -- iptables -D INPUT -s tcp-server.default.svc.cluster.local -j DROP
 	@kubectl exec -it $(shell kubectl get pods -l app=tcp-client-0 -o jsonpath='{.items[0].metadata.name}') -- iptables -L --line-numbers
@@ -122,16 +125,19 @@ demo-drop-rm:
 # Demo Scenario 2: DNS resolution failure for specific domain (EKS)
 # -------------------------------------------------------------------
 
-demo-dns-add:
+dns-init:
+	@STACK_NAME=retina-eks make set-kubeconfig && k9s
+
+dns-add:
 	@echo "Backup coredns configmap"
 	@kubectl get cm -n kube-system coredns -o yaml > live/files/mc-demo-eks-coredns-original.yaml
 	@echo "Adding DNS failure for example.com (programmatically)"
 	@kubectl replace -f live/files/mc-demo-eks-coredns-custom.yaml
 	@echo "CoreDNS ConfigMap updated successfully!"
-	@make demo-restart-coredns
-	@make demo-test-dns
+	@make restart-coredns
+	@make test-dns
 
-demo-dns-rm:
+dns-rm:
 	@echo "Restoring original coredns configmap"
 	@echo "apiVersion: v1" > /tmp/coredns-reset.yaml && \
 	echo "kind: ConfigMap" >> /tmp/coredns-reset.yaml && \
@@ -161,21 +167,24 @@ demo-dns-rm:
 	echo "    }" >> /tmp/coredns-reset.yaml && \
 	kubectl replace -f /tmp/coredns-reset.yaml
 	@echo "CoreDNS ConfigMap restored successfully!"
-	@make demo-restart-coredns
-	@make demo-test-dns
+	@make restart-coredns
+	@make test-dns
 
 # -------------------------------------------------------------------
 # Demo Scenario 3: Retina capture (GKE)
 # -------------------------------------------------------------------
 
-demo-capture-run:
+capture-init:
+	@STACK_NAME=retina-gke make set-kubeconfig && k9s
+
+capture-run:
 	@echo "Capture packets from client to server"
 	@kubectl retina capture create \
 		--host-path /tmp/retina-capture \
 		--pod-selectors="app=tcp-client-0" \
 		--duration 15s -n default
 	
-demo-capture-copy-file:
+capture-copy-file:
 	@echo "Copy capture file to local machine"
 	@kubectl cp default/tcp-client-0:/host/tmp/retina-capture ./retina-capture
 	@echo "Untar the file on localmachine and analyze capture file with Wireshark"
