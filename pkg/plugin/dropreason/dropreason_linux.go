@@ -33,7 +33,7 @@ import (
 	"go.uber.org/zap"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type metrics_map_value -type drop_reason_t -type packet kprobe ./_cprog/drop_reason.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../filter/_cprog/
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -mcpu=v3 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type metrics_map_value -type drop_reason_t -type packet kprobe ./_cprog/drop_reason.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../filter/_cprog/
 const (
 	nfHookSlowFn         = "nf_hook_slow"
 	tcpConnectFn         = "tcp_v4_connect"
@@ -66,7 +66,7 @@ func (dr *dropReason) Generate(ctx context.Context) error {
 	// Get absolute path to this file during runtime.
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
-		return errors.New("unable to get absolute path to this file")
+		return errors.New("unables to get absolute path to this file")
 	}
 	dir := path.Dir(filename)
 	dynamicHeaderPath := fmt.Sprintf("%s/%s/%s", dir, bpfSourceDir, dynamicHeaderFileName)
@@ -111,7 +111,7 @@ func (dr *dropReason) Compile(ctx context.Context) error {
 		targetArch = "-D__TARGET_ARCH_arm64"
 	}
 	// Keep target as bpf, otherwise clang compilation yields bpf object that elf reader cannot load.
-	err = loader.CompileEbpf(ctx, "-target", "bpf", "-Wall", targetArch, "-g", "-O2", "-c", bpfSourceFile, "-o", bpfOutputFile, includeDir, libbpfDir, filterDir)
+	err = loader.CompileEbpf(ctx, "-target", "bpf", "-Wall", targetArch, "-g", "-O1", "-c", bpfSourceFile, "-o", bpfOutputFile, includeDir, libbpfDir, filterDir)
 	if err != nil {
 		return errors.Wrap(err, "unable to compile eBPF code")
 	}
@@ -130,6 +130,7 @@ func (dr *dropReason) Init() error {
 	bpfOutputFile := fmt.Sprintf("%s/%s", dir, bpfObjectFileName)
 
 	objs := &kprobeObjects{} //nolint:typecheck
+
 	spec, err := ebpf.LoadCollectionSpec(bpfOutputFile)
 	if err != nil {
 		return err
@@ -155,78 +156,123 @@ func (dr *dropReason) Init() error {
 		return err
 	}
 
-	dr.KNfHook, err = link.Kprobe(nfHookSlowFn, objs.NfHookSlow, nil)
-	if err != nil {
-		dr.l.Error("opening kprobe: %w", zap.Error(err))
-		return err
-	}
-
-	dr.KRetnfhook, err = link.Kretprobe(nfHookSlowFn, objs.NfHookSlowRet, nil)
-	if err != nil {
-		dr.l.Error("opening kretprobe: %w", zap.Error(err))
-		return err
-	}
-
-	dr.KRetTCPConnect, err = link.Kretprobe(tcpConnectFn, objs.TcpV4ConnectRet, nil)
-	if err != nil {
-		dr.l.Error("opening kretprobe: %w", zap.Error(err))
-		return err
-	}
-
-	dr.KTCPAccept, err = link.Kretprobe(intCskAcceptFn, objs.InetCskAccept, nil)
-	if err != nil {
-		dr.l.Error("opening kretprobe: %w", zap.Error(err))
-		return err
-	}
-
-	dr.KRetTCPAccept, err = link.Kretprobe(intCskAcceptFn, objs.InetCskAcceptRet, nil)
-	if err != nil {
-		dr.l.Error("opening kretprobe: %w", zap.Error(err))
-		return err
-	}
-
-	dr.KNfNatInet, err = link.Kretprobe(nfNatInetFn, objs.NfNatInetFn, nil)
-	if err != nil {
-		// TODO: remove this check once we get this working on Mariner OS.
-		if errors.Is(err, os.ErrNotExist) {
-			dr.l.Warn("nf_nat_inet_fn not found, skipping attaching kretprobe to it. This may impact the drop reason metrics.")
-		} else {
-			dr.l.Error("opening kretprobe: %w", zap.Error(err))
-			return err
-		}
-	}
-
-	dr.KRetNfNatInet, err = link.Kretprobe(nfNatInetFn, objs.NfNatInetFnRet, nil)
-	if err != nil {
-		// TODO: remove this check once we get this working on Mariner OS.
-		if errors.Is(err, os.ErrNotExist) {
-			dr.l.Warn("nf_nat_inet_fn_ret not found, skipping attaching kretprobe to it. This may impact the drop reason metrics.")
-		} else {
-			dr.l.Error("opening kretprobe: %w", zap.Error(err))
-			return err
-		}
-	}
-
-	dr.KNfConntrackConfirm, err = link.Kprobe(nfConntrackConfirmFn, objs.NfConntrackConfirm, nil)
-	if err != nil {
-		// TODO: remove this check once we get this working on Mariner OS.
-		if errors.Is(err, os.ErrNotExist) {
-			dr.l.Warn("nf_conntrack_confirm not found, skipping attaching kprobe to it. This may impact the drop reason metrics.")
-		} else {
+	if dr.cfg.EnablePodLevel {
+		dr.KNfHook, err = link.Kprobe(nfHookSlowFn, objs.NfHookSlow, nil)
+		if err != nil {
 			dr.l.Error("opening kprobe: %w", zap.Error(err))
 			return err
 		}
-	}
+		dr.l.Info("Attached program nf_hook_slow")
 
-	dr.KRetNfConntrackConfirm, err = link.Kretprobe(nfConntrackConfirmFn, objs.NfConntrackConfirmRet, nil)
-	if err != nil {
-		// TODO: remove this check once we get this working on Mariner OS.
-		if errors.Is(err, os.ErrNotExist) {
-			dr.l.Warn("nf_conntrack_confirm_ret not found, skipping attaching kretprobe to it. This may impact the drop reason metrics.")
-		} else {
+		dr.KRetnfhook, err = link.Kretprobe(nfHookSlowFn, objs.NfHookSlowRet, nil)
+		if err != nil {
 			dr.l.Error("opening kretprobe: %w", zap.Error(err))
 			return err
 		}
+		dr.l.Info("Attached program nf_hook_slow_ret")
+
+		dr.KTCPAccept, err = link.Kprobe(intCskAcceptFn, objs.InetCskAccept, nil)
+		if err != nil {
+			dr.l.Error("opening kretprobe: %w", zap.Error(err))
+			return err
+		}
+		dr.l.Info("Attached program inet_csk_accept")
+
+		dr.KRetTCPAccept, err = link.Kretprobe(intCskAcceptFn, objs.InetCskAcceptRet, nil)
+		if err != nil {
+			dr.l.Error("opening kretprobe: %w", zap.Error(err))
+			return err
+		}
+		dr.l.Info("Attached program inet_csk_accept_ret")
+
+		dr.KNfNatInet, err = link.Kprobe(nfNatInetFn, objs.NfNatInetFn, nil)
+		if err != nil {
+			// TODO: remove this check once we get this working on Mariner OS.
+			if errors.Is(err, os.ErrNotExist) {
+				dr.l.Warn("nf_nat_inet_fn not found, skipping attaching kretprobe to it. This may impact the drop reason metrics.")
+			} else {
+				dr.l.Error("opening kretprobe: %w", zap.Error(err))
+				return err
+			}
+		} else {
+			dr.l.Info("Attached program nf_nat_inet_fn")
+		}
+
+		dr.KRetNfNatInet, err = link.Kretprobe(nfNatInetFn, objs.NfNatInetFnRet, nil)
+		if err != nil {
+			// TODO: remove this check once we get this working on Mariner OS.
+			if errors.Is(err, os.ErrNotExist) {
+				dr.l.Warn("nf_nat_inet_fn_ret not found, skipping attaching kretprobe to it. This may impact the drop reason metrics.")
+			} else {
+				dr.l.Error("opening kretprobe: %w", zap.Error(err))
+				return err
+			}
+		} else {
+			dr.l.Info("Attached program nf_nat_inet_fn_ret")
+		}
+
+		dr.KNfConntrackConfirm, err = link.Kprobe(nfConntrackConfirmFn, objs.NfConntrackConfirm, nil)
+		if err != nil {
+			// TODO: remove this check once we get this working on Mariner OS.
+			if errors.Is(err, os.ErrNotExist) {
+				dr.l.Warn("nf_conntrack_confirm not found, skipping attaching kprobe to it. This may impact the drop reason metrics.")
+			} else {
+				dr.l.Error("opening kprobe: %w", zap.Error(err))
+				return err
+			}
+		} else {
+			dr.l.Info("Attached program nf_conntrack_confirm")
+		}
+
+		dr.KRetNfConntrackConfirm, err = link.Kretprobe(nfConntrackConfirmFn, objs.NfConntrackConfirmRet, nil)
+		if err != nil {
+			// TODO: remove this check once we get this working on Mariner OS.
+			if errors.Is(err, os.ErrNotExist) {
+				dr.l.Warn("nf_conntrack_confirm_ret not found, skipping attaching kretprobe to it. This may impact the drop reason metrics.")
+			} else {
+				dr.l.Error("opening kretprobe: %w", zap.Error(err))
+				return err
+			}
+		} else {
+			dr.l.Info("Attached program nf_conntrack_confirm_ret")
+		}
+	}
+
+	if !dr.cfg.EnablePodLevel {
+		dr.TrFexithook1, err = link.AttachTracing(link.TracingOptions{Program: objs.NfHookSlowFexit})
+		if err != nil {
+			dr.l.Error("Failed to attach: %w", zap.Error(err))
+			return err
+		}
+		dr.l.Info("Attached program nf_hook_slow_fexit")
+
+		dr.TrFexithook2, err = link.AttachTracing(link.TracingOptions{Program: objs.InetCskAcceptFexit})
+		if err != nil {
+			dr.l.Error("Failed to attach: %w", zap.Error(err))
+			return err
+		}
+		dr.l.Info("Attached program inet_csk_accept_fexit")
+
+		dr.TrFexithook3, err = link.AttachTracing(link.TracingOptions{Program: objs.NfConntrackConfirmFexit})
+		if err != nil {
+			dr.l.Error("Failed to attach: %w", zap.Error(err))
+			return err
+		}
+		dr.l.Info("Attached program nf_conntrack_confirm_fexit")
+
+		dr.TrFexithook4, err = link.AttachTracing(link.TracingOptions{Program: objs.NfNatInetFnFexit})
+		if err != nil {
+			dr.l.Error("Failed to attach: %w", zap.Error(err))
+			return err
+		}
+		dr.l.Info("Attached program nf_nat_inet_fn_fexit")
+
+		dr.TrFexithook5, err = link.AttachTracing(link.TracingOptions{Program: objs.TcpV4ConnectFexit})
+		if err != nil {
+			dr.l.Error("Failed to attach: %w", zap.Error(err))
+			return err
+		}
+		dr.l.Info("Attached program tcp_v4_connect_fexit")
 	}
 
 	dr.metricsMapData = objs.RetinaDropreasonMetrics
@@ -467,6 +513,24 @@ func (dr *dropReason) Stop() error {
 	}
 	if dr.KRetTCPAccept != nil {
 		dr.KRetTCPAccept.Close()
+	}
+	if dr.TrFexithook0 != nil {
+		dr.TrFexithook0.Close()
+	}
+	if dr.TrFexithook1 != nil {
+		dr.TrFexithook1.Close()
+	}
+	if dr.TrFexithook2 != nil {
+		dr.TrFexithook2.Close()
+	}
+	if dr.TrFexithook3 != nil {
+		dr.TrFexithook3.Close()
+	}
+	if dr.TrFexithook4 != nil {
+		dr.TrFexithook4.Close()
+	}
+	if dr.TrFexithook5 != nil {
+		dr.TrFexithook5.Close()
 	}
 	if dr.KTCPAccept != nil {
 		dr.KTCPAccept.Close()
