@@ -3,6 +3,11 @@ output "azure_get_kubeconfig" {
   description = "Run this command to fetch the kubeconfig for your AKS cluster"
 }
 
+output "cluster_name" {
+  value = azurerm_kubernetes_cluster.aks.name
+  description = "AKS cluster name"
+}
+
 output "host" {
   value     = azurerm_kubernetes_cluster.aks.kube_config.0.host
   sensitive = true

@@ -3,6 +3,11 @@ output "gcloud_get_kubeconfig" {
   description = "Run this command to fetch the kubeconfig for your GKE cluster"
 }
 
+output "cluster_name" {
+  value = google_container_cluster.gke.name
+  description = "GKE cluster name"
+}
+
 output "host" {
   value     = "https://${google_container_cluster.gke.endpoint}"
   sensitive = true
