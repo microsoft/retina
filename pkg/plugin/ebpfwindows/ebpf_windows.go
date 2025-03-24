@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"unsafe"
@@ -114,7 +115,7 @@ func (p *Plugin) metricsMapIterateCallback(key *MetricsKey, value *MetricsValues
 		if key.IsEgress() {
 			metrics.ForwardBytesGauge.WithLabelValues(egressLabel).Set(float64(value.Bytes()))
 			p.l.Debug("emitting bytes sent count metric", zap.Uint64(bytesSent, value.Bytes()))
-			metrics.ForwardBytesGauge.WithLabelValues(packetsSent).Set(float64(value.Count()))
+			metrics.ForwardBytesGauge.WithLabelValues(egressLabel).Set(float64(value.Count()))
 			p.l.Debug("emitting packets sent count metric", zap.Uint64(packetsSent, value.Count()))
 		} else if key.IsIngress() {
 			metrics.ForwardPacketsGauge.WithLabelValues(ingressLabel).Set(float64(value.Count()))
@@ -137,27 +138,26 @@ func (p *Plugin) eventsMapCallback(data unsafe.Pointer, size uint32) int {
 	return 0
 }
 
-func ensureRetinaEbpfApiDLLPresent() error {
-	src := `C:\hpc\retinaebpfapi.dll`
-	if _, err := os.Stat(src); os.IsNotExist(err) {
-		return fmt.Errorf("Error: retinaebpfapi.dll not found at %s", src)
+func addEbpfToPath() error {
+	currPath := os.Getenv("PATH")
+	if strings.Contains(currPath, "ebpf-for-windows") {
+		return nil
 	}
-
-	oldPath := os.Getenv("PATH")
-	newPath := oldPath + ";" + "C:\\Program Files\\ebpf-for-windows\\"
+	programFiles := os.Getenv("ProgramFiles")
+	ebpfWindowsPath := programFiles + "\\ebpf-for-windows\\"
+	newPath := currPath + ";" + ebpfWindowsPath
 	if err := os.Setenv("PATH", newPath); err != nil {
-		fmt.Println("Error setting PATH environment variable: %v")
+		return fmt.Errorf("error setting PATH environment variable: %v", err)
 	}
 
 	return nil
 }
 
-// pullCiliumeBPFMetrics is the function that is called periodically by the timer.
 func (p *Plugin) pullMetricsAndEvents(ctx context.Context) {
 	eventsMap := NewEventsMap()
 	metricsMap := NewMetricsMap()
 
-	err := ensureRetinaEbpfApiDLLPresent()
+	err := addEbpfToPath()
 	if err != nil {
 		return
 	}
