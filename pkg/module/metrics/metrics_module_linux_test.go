@@ -4,7 +4,6 @@ package metrics
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"sync"
 	"testing"
@@ -671,7 +670,8 @@ func TestPodAnnotated(t *testing.T) {
 }
 
 func TestModule_GenerateAdvMetrics(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	require.NoError(t, err)
 	l := log.Logger().Named("test")
 
 	disabledAnnotations := &kcfg.Config{
@@ -706,11 +706,11 @@ func TestModule_GenerateAdvMetrics(t *testing.T) {
 		}
 	}
 
-	ip1ToIp2 := newFlow(IP1, IP2)
-	ip2ToIp1 := newFlow(IP2, IP1)
-	ip1ToIp3 := newFlow(IP1, IP3)
-	ip1ToIp4 := newFlow(IP1, IP4)
-	ip4ToIp1 := newFlow(IP4, IP1)
+	ip1ToIP2 := newFlow(IP1, IP2)
+	ip2ToIP1 := newFlow(IP2, IP1)
+	ip1ToIP3 := newFlow(IP1, IP3)
+	ip1ToIP4 := newFlow(IP1, IP4)
+	ip4ToIP1 := newFlow(IP4, IP1)
 
 	tests := []struct {
 		name           string
@@ -723,36 +723,36 @@ func TestModule_GenerateAdvMetrics(t *testing.T) {
 			name:           "Disabled Annotations",
 			config:         disabledAnnotations,
 			IPsInCache:     []net.IP{},
-			generatedFlows: []*flow.Flow{ip1ToIp2, ip2ToIp1},
-			processedFlows: []*flow.Flow{ip1ToIp2, ip2ToIp1},
+			generatedFlows: []*flow.Flow{ip1ToIP2, ip2ToIP1},
+			processedFlows: []*flow.Flow{ip1ToIP2, ip2ToIP1},
 		},
 		{
-			name:           fmt.Sprintf("Enabled Annotations - no ip in cache"),
+			name:           "Enabled Annotations - no ip in cache",
 			config:         enabledAnnotations,
 			IPsInCache:     []net.IP{},
-			generatedFlows: []*flow.Flow{ip1ToIp2, ip2ToIp1},
+			generatedFlows: []*flow.Flow{ip1ToIP2, ip2ToIP1},
 			processedFlows: []*flow.Flow{},
 		},
 		{
-			name:           fmt.Sprintf("Enabled Annotations - ip in cache, flow ip not in cache"),
+			name:           "Enabled Annotations - ip in cache, flow ip not in cache",
 			config:         enabledAnnotations,
 			IPsInCache:     []net.IP{net.ParseIP(IP3)},
-			generatedFlows: []*flow.Flow{ip1ToIp2, ip2ToIp1},
+			generatedFlows: []*flow.Flow{ip1ToIP2, ip2ToIP1},
 			processedFlows: []*flow.Flow{},
 		},
 		{
-			name:           fmt.Sprintf("Enabled Annotations - 1 ip in cache, flow ip in cache"),
+			name:           "Enabled Annotations - 1 ip in cache, flow ip in cache",
 			config:         enabledAnnotations,
 			IPsInCache:     []net.IP{net.ParseIP(IP3)},
-			generatedFlows: []*flow.Flow{ip1ToIp3, ip2ToIp1},
-			processedFlows: []*flow.Flow{ip1ToIp3},
+			generatedFlows: []*flow.Flow{ip1ToIP3, ip2ToIP1},
+			processedFlows: []*flow.Flow{ip1ToIP3},
 		},
 		{
-			name:           fmt.Sprintf("Enabled Annotations - 2 ip in cache, flows with and without ip in cache"),
+			name:           "Enabled Annotations - 2 ip in cache, flows with and without ip in cache",
 			config:         enabledAnnotations,
 			IPsInCache:     []net.IP{net.ParseIP(IP2), net.ParseIP(IP3)},
-			generatedFlows: []*flow.Flow{ip1ToIp3, ip2ToIp1, ip1ToIp4, ip4ToIp1},
-			processedFlows: []*flow.Flow{ip2ToIp1, ip1ToIp3},
+			generatedFlows: []*flow.Flow{ip1ToIP3, ip2ToIP1, ip1ToIP4, ip4ToIP1},
+			processedFlows: []*flow.Flow{ip2ToIP1, ip1ToIP3},
 		},
 	}
 
@@ -760,7 +760,7 @@ func TestModule_GenerateAdvMetrics(t *testing.T) {
 
 		ctrl := gomock.NewController(t)
 		mockMetricName := "mock"
-		myMockMetric := NewMockAdvMetricsInterface(ctrl) //nolint:typecheck
+		myMockMetric := NewMockAdvMetricsInterface(ctrl) //nolint:typecheck // gomock
 
 		m := &Module{
 			wg:           sync.WaitGroup{},
@@ -770,7 +770,7 @@ func TestModule_GenerateAdvMetrics(t *testing.T) {
 			daemonConfig: tt.config,
 			l:            l,
 			daemonCache:  cache.NewMockCacheInterface(ctrl),
-			resetRegistry: func(m *Module, mco []api.MetricsContextOptions) {
+			resetRegistry: func(m *Module, _ []api.MetricsContextOptions) {
 				m.registry[mockMetricName] = myMockMetric
 
 				myMockMetric.Init(mockMetricName)
@@ -779,10 +779,10 @@ func TestModule_GenerateAdvMetrics(t *testing.T) {
 
 		log.Logger().Info("***** Running test *****", zap.String("name", tt.name))
 
-		p := pubsub.NewMockPubSubInterface(ctrl)        //nolint:typecheck
-		e := enricher.NewMockEnricherInterface(ctrl)    //nolint:typecheck
-		fm := filtermanager.NewMockIFilterManager(ctrl) //nolint:typecheck
-		c := cache.NewMockCacheInterface(ctrl)          //nolint:typecheck
+		p := pubsub.NewMockPubSubInterface(ctrl)        //nolint:typecheck // gomock
+		e := enricher.NewMockEnricherInterface(ctrl)    //nolint:typecheck // gomock
+		fm := filtermanager.NewMockIFilterManager(ctrl) //nolint:typecheck // gomock
+		c := cache.NewMockCacheInterface(ctrl)          //nolint:typecheck // gomock
 		m.pubsub = p
 		m.enricher = e
 		m.filterManager = fm
