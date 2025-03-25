@@ -54,7 +54,7 @@ func TestStandaloneEnricher(t *testing.T) {
 	assert.Equal(t, namespace, podInfo.Namespace)
 
 	// Delete pod not in statefile
-	statefile.StateFileLocation = "/home/beegii/src/retina/pkg/enricher/statefile/mock_statefile_updated.json"
+	statefile.StateFileLocation = "statefile/mock_statefile_updated.json"
 	err = enricher.PublishEvent(ip)
 	require.NoError(t, err)
 
