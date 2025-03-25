@@ -174,3 +174,98 @@ tofu import module.eks.aws_iam_role_policy_attachment.eks_node_group_AmazonEKSWo
 The [live/](./live/) directory contains multi-cloud / multi-cluster stacks to deploy cloud infrastructure, install Retina, install Prometheus, expose Prometheus instance using a load balancer, and configure a Grafana Cloud instance to consume Prometheus data sources to visualize Retina metrics from multiple clusters in a single Grafana dashboard.
 
 ![Architecture Diagram](./diagrams/diagram-mc.svg)
+
+In the next section we describe a multi-cloud demo aiming to show some of retina capabilities when deployed in managed Kubernetes clusters on different cloud providers.
+
+### Demo Prerequisites
+
+Create all required Kubernetes infrastructure, deploy Prometheus, Load Balancers, Retina and Grafana datasource config for each managed cluster in `Azure`, `Google Cloud` and `Amazon Web services`.
+
+```sh
+make aks
+make gke
+make eks
+```
+
+### Demo Utilities
+
+The Makefile provides several utilities to help with multi-cloud demo preparation and testing:
+
+#### Setting up Environments
+
+```bash
+# Define STACK_NAME
+# One of "retina-aks", "retina-gke" or "retina-eks"
+export STACK_NAME="retina-gke"
+
+# Set the kubeconfig for the current STACK_NAME
+make set-kubeconfig
+
+# Deploy demo client and server pods
+make create-pods
+
+# Delete demo client and server pods
+make delete-pods
+
+# Observe traffic to the client pod using Hubble
+make observe-client
+
+# Restart CoreDNS pods
+make restart-coredns
+
+# Test DNS resolution for various domains
+make test-dns
+```
+
+### Demo Scenarios
+
+The demo aims to show retina capabilities on different cloud:
+
+1. Packets drop on AKS
+2. DNS failures on EKS
+3. Retina captures on GKE
+
+#### Scenario 1: Packets Dropped by iptables (AKS)
+
+Demonstrates packet drop issues in Azure Kubernetes Service. In this scenario we manipulate network traffic in a Kubernetes environment by adding an `iptables` `DROP` rule within the client pod to block incoming communication from server.
+
+```bash
+# Initialize the AKS environment
+make drop-init
+
+# Add iptables rule to deny traffic from server to client
+make drop-add
+
+# Remove the blocking iptables rule
+make drop-rm
+```
+
+#### Scenario 2: DNS Resolution Failure (EKS)
+
+Demonstrates DNS issues in Amazon EKS. In this scenario we intentionally creates DNS resolution failures and how Retina can diagnose different types of DNS resolution failures in a controlled environment. As part of this scenario we apply three custom DNS response templates within the EKS CoreDNS configuration. Each template creates a specific DNS behavior for different domains.
+
+```bash
+# Initialize the EKS environment
+make dns-init
+
+# Configure CoreDNS to fail resolving specific domains
+make dns-add
+
+# Restore the original CoreDNS configuration
+make dns-rm
+```
+
+#### Scenario 3: Packet Capture with Retina (GKE)
+
+Demonstrates Retina's packet capture capabilities in Google Kubernetes Engine. In this scenario we demonstarte `retina capture` to capture network traffic from the client pod for troubleshooting or analysis purposes. The `capture-copy-file` target can be used afterward to extract the capture file for analysis with tools like Wireshark.
+
+```bash
+# Initialize the GKE environment
+make capture-init
+
+# Run a packet capture on the client pod
+make capture-run
+
+# Copy capture files to your local machine for analysis
+make capture-copy-file
+```
