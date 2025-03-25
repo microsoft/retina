@@ -42,9 +42,8 @@ import (
 )
 
 var (
-	scheme     = k8sruntime.NewScheme()
-	mainLogger *log.ZapLogger
-	oconfig    *config.OperatorConfig
+	scheme  = k8sruntime.NewScheme()
+	oconfig *config.OperatorConfig
 
 	MaxPodChannelBuffer                  = 250
 	MaxMetricsConfigurationChannelBuffer = 50
@@ -79,12 +78,12 @@ func NewOperator(metricsAddr, probeAddr, configFile string, enableLeaderElection
 }
 
 func (o *Operator) Start() error {
-	mainLogger = log.Logger().Named("main")
+	fmt.Printf("Starting Retina Operator with standard control plane %v\n", buildinfo.Version)
 
-	mainLogger.Sugar().Infof("Starting standard operator")
-
-	opts := &crzap.Options{
-		Development: false,
+	if buildinfo.ApplicationInsightsID != "" {
+		telemetry.InitAppInsights(buildinfo.ApplicationInsightsID, buildinfo.Version)
+		defer telemetry.ShutdownAppInsights()
+		defer telemetry.TrackPanic()
 	}
 
 	var err error
@@ -93,15 +92,22 @@ func (o *Operator) Start() error {
 		return errors.Wrap(err, "failed to load config")
 	}
 
-	mainLogger.Sugar().Infof("Operator configuration", zap.Any("configuration", oconfig))
+	zl, err := initLogging(oconfig, buildinfo.ApplicationInsightsID)
+	if err != nil {
+		return errors.Wrap(err, "failed to initialize logging")
+	}
+
+	defer zl.Close()
+	mainLogger := zl.Named("main").Sugar()
+
+	mainLogger.Info("Operator configuration", zap.Any("configuration", oconfig))
 
 	// Set Capture config
 	oconfig.CaptureConfig.CaptureImageVersion = buildinfo.Version
 	oconfig.CaptureConfig.CaptureImageVersionSource = captureUtils.VersionSourceOperatorImageVersion
 
-	err = initLogging(oconfig, buildinfo.ApplicationInsightsID)
-	if err != nil {
-		return errors.Wrap(err, "failed to initialize logging")
+	opts := &crzap.Options{
+		Development: false,
 	}
 
 	ctrl.SetLogger(crzap.New(crzap.UseFlagOptions(opts), crzap.Encoder(zapcore.NewConsoleEncoder(log.EncoderConfig()))))
@@ -138,7 +144,7 @@ func (o *Operator) Start() error {
 	}
 
 	if oconfig.InstallCRDs {
-		mainLogger.Sugar().Infof("Installing CRDs")
+		mainLogger.Info("Installing CRDs")
 
 		var crds map[string]*v1.CustomResourceDefinition
 		crds, err = deploy.InstallOrUpdateCRDs(ctx, oconfig.EnableRetinaEndpoint, clientset)
@@ -162,10 +168,6 @@ func (o *Operator) Start() error {
 			"version":                   buildinfo.Version,
 			telemetry.PropertyApiserver: apiserverURL,
 		}
-
-		telemetry.InitAppInsights(buildinfo.ApplicationInsightsID, buildinfo.Version)
-		defer telemetry.ShutdownAppInsights()
-		defer telemetry.TrackPanic()
 
 		tel, err = telemetry.NewAppInsightsTelemetryClient("retina-operator", properties)
 		if err != nil {
@@ -256,7 +258,7 @@ func EnablePProf() {
 	}
 }
 
-func initLogging(cfg *config.OperatorConfig, applicationInsightsID string) error {
+func initLogging(cfg *config.OperatorConfig, applicationInsightsID string) (*log.ZapLogger, error) {
 	logOpts := &log.LogOpts{
 		Level:                 cfg.LogLevel,
 		File:                  false,
@@ -267,11 +269,13 @@ func initLogging(cfg *config.OperatorConfig, applicationInsightsID string) error
 		EnableTelemetry:       cfg.EnableTelemetry,
 	}
 
-	_, err := log.SetupZapLogger(logOpts)
+	logger, err := log.SetupZapLogger(logOpts,
+		zap.String("version", buildinfo.Version),
+	)
 	if err != nil {
-		mainLogger.Error("Failed to setup zap logger", zap.Error(err))
-		return fmt.Errorf("failed to setup zap logger: %w", err)
+		logger.Error("Failed to setup zap logger", zap.Error(err))
+		return nil, fmt.Errorf("failed to setup zap logger: %w", err)
 	}
 
-	return nil
+	return logger, nil
 }
