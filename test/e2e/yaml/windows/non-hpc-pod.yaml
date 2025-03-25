@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: non-hpc-pod
+  labels:
+    app: non-hpc
+spec:
+  nodeSelector:
+    "kubernetes.io/os": windows
+  containers:
+  - name: non-hpc-container
+    image: ghcr.io/microsoft/retina/e2e-test-event-writer:latest
+    command: ["powershell", "-Command", "while ($true) { Start-Sleep -Seconds 3600 }"]
+    securityContext:
+        windowsOptions:
+          runAsUserName: "NT AUTHORITY\\SYSTEM"
