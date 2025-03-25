@@ -18,13 +18,13 @@ type PodInfo struct {
 type StandaloneCache struct {
 	rwMutex sync.RWMutex
 	l       *log.ZapLogger
-	ipToPod map[string]PodInfo
+	ipToPod map[string]*PodInfo
 }
 
 func NewStandaloneCache() *StandaloneCache {
 	return &StandaloneCache{
 		l:       log.Logger().Named(string("standalone-cache")),
-		ipToPod: make(map[string]PodInfo),
+		ipToPod: make(map[string]*PodInfo),
 	}
 }
 
@@ -33,7 +33,7 @@ func (c *StandaloneCache) GetPod(ip string) *PodInfo {
 	defer c.rwMutex.RUnlock()
 
 	if pod, exists := c.ipToPod[ip]; exists {
-		return &pod
+		return pod
 	}
 	return nil
 }
@@ -51,10 +51,10 @@ func (c *StandaloneCache) addPod(ip, name, namespace string) {
 	defer c.rwMutex.Unlock()
 
 	existingPod, exists := c.ipToPod[ip]
-	newPod := PodInfo{Name: name, Namespace: namespace}
+	newPod := &PodInfo{Name: name, Namespace: namespace}
 
 	// Skip adding element if identical
-	if exists && existingPod == newPod {
+	if exists && *existingPod == *newPod {
 		return
 	}
 

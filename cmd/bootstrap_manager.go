@@ -73,7 +73,7 @@ func (b *BootstrapManager) Start() error {
 
 	if daemonConfig.EnableStandalone {
 		sm := NewStandaloneDaemon(daemonConfig)
-		if err := sm.Start(zl); err != nil {
+		if err = sm.Start(zl); err != nil {
 			return fmt.Errorf("starting standalone daemon: %w", err)
 		}
 		return nil
@@ -87,13 +87,14 @@ func (b *BootstrapManager) Start() error {
 			return fmt.Errorf("creating controller-runtime manager: %w", err)
 		}
 		return b.startDaemon(cfg, daemonConfig, zl)
-	} else {
-		cfg, err = kcfg.GetConfig()
-		if err != nil {
-			panic(err)
-		}
-		return b.startDaemon(cfg, daemonConfig, zl)
 	}
+
+	cfg, err = kcfg.GetConfig()
+	if err != nil {
+		panic(err)
+	}
+
+	return b.startDaemon(cfg, daemonConfig, zl)
 }
 
 func (b *BootstrapManager) startDaemon(cfg *rest.Config, daemoncfg *config.Config, zl *log.ZapLogger) error {

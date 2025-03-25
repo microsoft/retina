@@ -76,9 +76,7 @@ const (
 	egressLabel  = "egress"
 )
 
-var (
-	AdvWindowsGauge *prometheus.GaugeVec
-)
+var AdvWindowsGauge *prometheus.GaugeVec
 
 type hnsstats struct {
 	cfg           *kcfg.Config
