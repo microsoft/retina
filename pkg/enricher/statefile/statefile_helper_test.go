@@ -13,7 +13,7 @@ import (
 
 const (
 	ip       = "192.0.0.5"
-	testfile = "/home/beegii/src/retina/pkg/enricher/statefile/mock_statefile.json"
+	testfile = "mock_statefile.json"
 )
 
 func TestFileRead(t *testing.T) {
@@ -48,7 +48,7 @@ func TestFileReadEmpty(t *testing.T) {
 }
 
 func TestJsonDecode(t *testing.T) {
-	malformedJSONPath := "/home/beegii/src/retina/pkg/plugin/hnsstats/mock_invalid_azure_vnet.json"
+	malformedJSONPath := "mock_invalid_azure_vnet.json"
 	invalidJSONContent := `{
 		"Network": {
 			"ExternalInterfaces": {
