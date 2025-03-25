@@ -11,18 +11,23 @@ data:
             pods insecure
             fallthrough in-addr.arpa ip6.arpa
         }
-        # Return SERVFAIL for empty.com A record
+        # Return NOERROR response with a non-routable IP
+        # address (0.0.0.0) for any A record query for empty.com
         template IN A empty.com {
             rcode NOERROR
             answer "{{ .Name }} 0 IN A 0.0.0.0"
             authority ""
             additional ""
         }
-        # Return REFUSED for refused.com ANY records 
+        # Return REFUSED response code for ANY type of DNS query
+        # to refused.com, effectively telling clients that the
+        # server refuses to process these requests
         template IN ANY refused.com {
             rcode REFUSED
         }
-        # Return NXDOMAIN for example.com AAAA records
+        # Return NXDOMAIN for any AAAA (IPv6) record queries
+        # for example.com, signaling that no IPv6 addresses 
+        # exist for this domain
         template ANY AAAA example.com {
             rcode NXDOMAIN
         }        

@@ -71,19 +71,37 @@ set-kubeconfig:
 	@make check-env-vars
 	@echo "Get kubeconfig for $(STACK_NAME)"
 	@cd live/$(STACK_NAME) && \
-		tofu output -json | jq -r '.kubeconfig_command.value' | bash
+		KUBECONFIG_CMD=$$(tofu output -json | jq -r '.kubeconfig_command.value') && \
+		if [ "$$(echo "$$KUBECONFIG_CMD" | grep -c "az aks get-credentials")" -gt 0 ]; then \
+			$$KUBECONFIG_CMD --overwrite-existing; \
+		elif [ "$$(echo "$$KUBECONFIG_CMD" | grep -c "gcloud container clusters")" -gt 0 ]; then \
+			$$KUBECONFIG_CMD; \
+		else \
+			$$KUBECONFIG_CMD; \
+		fi
 	@echo "Set kubeconfig context to $(STACK_NAME)"
 
+# Fix the create-pods target (remove the :0)
 create-pods:
 	@echo "Deploy demo client and server pods"
 	@NODE_NAME=$$(kubectl get no -o jsonpath='{.items[0].metadata.name}'); \
-		envsubst < live/files/mc-manifests.yaml | kubectl apply -f -; \
+		envsubst < live/files/mc-demo-manifests.yaml | kubectl apply -f -; \
 		echo "Client pod deployed on node $$NODE_NAME"
+
 delete-pods:
 	@echo "Delete demo client and  server pods"
 	@NODE_NAME=$$(kubectl get no -o jsonpath='{.items[0].metadata.name}'); \
 		envsubst < live/files/mc-demo-manifests.yaml | kubectl delete -f -; \
 		echo "Client pod deployed on node $$NODE_NAME"
+
+check-pods:
+	@echo "Checking if demo client and server pods exist..."
+	@if kubectl get pods -l app=tcp-client-0 --no-headers 2>/dev/null | grep -q "tcp-client-0" && \
+        kubectl get pods -l app=tcp-server --no-headers 2>/dev/null | grep -q "tcp-server"; then \
+        echo "Demo pods exist"; \
+    else \
+        make create-pods; \
+    fi
 
 observe-client:
 	@echo "Observe client pod"
@@ -109,7 +127,9 @@ test-dns:
 # -------------------------------------------------------------------
 
 drop-init:
-	@STACK_NAME=retina-aks make set-kubeconfig && k9s
+	@STACK_NAME=retina-aks make set-kubeconfig
+	@make check-pods
+	@k9s
 
 drop-add:
 	@echo "Add iptables rule to deny traffic from server to client"
@@ -126,7 +146,9 @@ drop-rm:
 # -------------------------------------------------------------------
 
 dns-init:
-	@STACK_NAME=retina-eks make set-kubeconfig && k9s
+	@STACK_NAME=retina-eks make set-kubeconfig
+	@make check-pods
+	@k9s
 
 dns-add:
 	@echo "Backup coredns configmap"
@@ -175,7 +197,9 @@ dns-rm:
 # -------------------------------------------------------------------
 
 capture-init:
-	@STACK_NAME=retina-gke make set-kubeconfig && k9s
+	@STACK_NAME=retina-gke make set-kubeconfig
+	@make check-pods
+	@k9s
 
 capture-run:
 	@echo "Capture packets from client to server"

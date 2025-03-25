@@ -3,6 +3,10 @@ output "kubeconfig" {
   sensitive = true
 }
 
+output "cluster_name" {
+  value     = kind_cluster.kind.name
+}
+
 output "host" {
   value     = kind_cluster.kind.endpoint
   sensitive = true

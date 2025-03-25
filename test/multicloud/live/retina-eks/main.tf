@@ -34,13 +34,6 @@ module "prometheus_lb_eks" {
   source = "../../modules/kubernetes-lb"
 }
 
-# module "eks_firewall" {
-#   depends_on             = [module.eks]
-#   source                 = "../../modules/eks-firewall"
-#   prefix                 = local.prefix
-#   inbound_firewall_rule  = local.gke_firewall_rules.inbound
-#   outbound_firewall_rule = local.gke_firewall_rules.outbound
-# }
 
 module "grafana" {
   depends_on = [module.prometheus_lb_eks]
