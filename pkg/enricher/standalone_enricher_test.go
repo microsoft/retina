@@ -23,6 +23,25 @@ const (
 	testfile  = "statefile/mock_statefile.json"
 )
 
+func TestPublishEvent(t *testing.T) {
+	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
+		t.Fatalf("Failed to setup logger: %v", err)
+	}
+
+	statefile.StateFileLocation = testfile
+	MaxStandaloneCacheEventSize = 1
+	testCache := cache.NewStandaloneCache()
+	enricher := NewStandaloneEnricher(context.Background(), testCache)
+
+	go enricher.Run()
+	defer enricher.Stop()
+
+	err1 := enricher.PublishEvent(ip)
+	err2 := enricher.PublishEvent(invalidIP)
+	require.NoError(t, err1)
+	assert.Equal(t, err2, ErrEventChannelFull)
+}
+
 func TestStandaloneEnricher(t *testing.T) {
 	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
 		t.Fatalf("Failed to setup logger: %v", err)
@@ -34,6 +53,7 @@ func TestStandaloneEnricher(t *testing.T) {
 	enricher := NewStandaloneEnricher(context.Background(), testCache)
 
 	go enricher.Run()
+	defer enricher.Stop()
 
 	// Enrich pod not in statefile
 	err := enricher.PublishEvent(invalidIP)
@@ -63,26 +83,4 @@ func TestStandaloneEnricher(t *testing.T) {
 		return podInfo == nil
 	}, 100*time.Millisecond, 25*time.Millisecond, "Pod should be deleted from cache")
 	assert.Nil(t, podInfo)
-
-	enricher.Stop()
-}
-
-func TestPublishEvent(t *testing.T) {
-	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
-		t.Fatalf("Failed to setup logger: %v", err)
-	}
-
-	statefile.StateFileLocation = testfile
-	MaxStandaloneCacheEventSize = 1
-	testCache := cache.NewStandaloneCache()
-	enricher := NewStandaloneEnricher(context.Background(), testCache)
-
-	go enricher.Run()
-
-	err1 := enricher.PublishEvent(ip)
-	err2 := enricher.PublishEvent(invalidIP)
-	require.NoError(t, err1)
-	assert.Equal(t, err2, ErrEventChannelFull)
-
-	enricher.Stop()
 }
