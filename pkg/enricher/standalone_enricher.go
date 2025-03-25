@@ -25,7 +25,7 @@ var (
 )
 
 type StandaloneEvent struct {
-	Ip string
+	IP string
 }
 
 type StandaloneEnricher struct {
@@ -65,15 +65,15 @@ func (e *StandaloneEnricher) Run() {
 					e.l.Info("Event channel closed, stopping event processing")
 					return
 				}
-				e.l.Debug("Processing event", zap.String("ip", event.Ip))
-				e.processEvent(event.Ip)
+				e.l.Debug("Processing event", zap.String("ip", event.IP))
+				e.processEvent(event.IP)
 			}
 		}
 	}()
 }
 
 func (e *StandaloneEnricher) processEvent(ip string) {
-	podInfo, err := sf.GetPodInfo(ip, sf.State_file_location)
+	podInfo, err := sf.GetPodInfo(ip, sf.StateFileLocation)
 	if err != nil {
 		e.l.Error("Failed to get pod info", zap.String("ip", ip), zap.Error(err))
 		return
@@ -87,7 +87,7 @@ func (e *StandaloneEnricher) GetPodInfo(ip string) *cache.PodInfo {
 
 func (e *StandaloneEnricher) PublishEvent(ip string) error {
 	select {
-	case e.eventChannel <- StandaloneEvent{Ip: ip}:
+	case e.eventChannel <- StandaloneEvent{IP: ip}:
 		return nil
 	default:
 		e.l.Warn("Event channel full, dropping event", zap.String("ip", ip))

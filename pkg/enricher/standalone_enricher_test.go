@@ -12,11 +12,12 @@ import (
 	"github.com/microsoft/retina/pkg/enricher/statefile"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
 	ip        = "192.0.0.5"
-	invalidIp = "10.0.0.0"
+	invalidIP = "10.0.0.0"
 	name      = "retina2-pod"
 	namespace = "retina2-namespace"
 	testfile  = "/home/beegii/src/retina/pkg/enricher/statefile/mock_statefile.json"
@@ -27,7 +28,7 @@ func TestStandaloneEnricher(t *testing.T) {
 		t.Fatalf("Failed to setup logger: %v", err)
 	}
 	// Set the state file location to a mock file for testing
-	statefile.State_file_location = testfile
+	statefile.StateFileLocation = testfile
 
 	testCache := cache.NewStandaloneCache()
 	enricher := NewStandaloneEnricher(context.Background(), testCache)
@@ -35,15 +36,15 @@ func TestStandaloneEnricher(t *testing.T) {
 	go enricher.Run()
 
 	// Enrich pod not in statefile
-	err := enricher.PublishEvent(invalidIp)
-	assert.NoError(t, err)
+	err := enricher.PublishEvent(invalidIP)
+	require.NoError(t, err)
 
-	podInfo := enricher.GetPodInfo(invalidIp)
+	podInfo := enricher.GetPodInfo(invalidIP)
 	assert.Nil(t, podInfo)
 
 	// Enrich pod in statefile
 	err = enricher.PublishEvent(ip)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Eventually(t, func() bool {
 		podInfo = enricher.GetPodInfo(ip)
@@ -53,9 +54,9 @@ func TestStandaloneEnricher(t *testing.T) {
 	assert.Equal(t, namespace, podInfo.Namespace)
 
 	// Delete pod not in statefile
-	statefile.State_file_location = "/home/beegii/src/retina/pkg/enricher/statefile/mock_statefile_updated.json"
+	statefile.StateFileLocation = "/home/beegii/src/retina/pkg/enricher/statefile/mock_statefile_updated.json"
 	err = enricher.PublishEvent(ip)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Eventually(t, func() bool {
 		podInfo = enricher.GetPodInfo(ip)
@@ -71,7 +72,7 @@ func TestPublishEvent(t *testing.T) {
 		t.Fatalf("Failed to setup logger: %v", err)
 	}
 
-	statefile.State_file_location = testfile
+	statefile.StateFileLocation = testfile
 	MaxStandaloneCacheEventSize = 1
 	testCache := cache.NewStandaloneCache()
 	enricher := NewStandaloneEnricher(context.Background(), testCache)
@@ -79,8 +80,8 @@ func TestPublishEvent(t *testing.T) {
 	go enricher.Run()
 
 	err1 := enricher.PublishEvent(ip)
-	err2 := enricher.PublishEvent(invalidIp)
-	assert.NoError(t, err1)
+	err2 := enricher.PublishEvent(invalidIP)
+	require.NoError(t, err1)
 	assert.Equal(t, err2, ErrEventChannelFull)
 
 	enricher.Stop()

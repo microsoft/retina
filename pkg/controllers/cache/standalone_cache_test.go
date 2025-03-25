@@ -16,7 +16,7 @@ const (
 	namespace = "test-namespace"
 )
 
-var podInfo = &PodInfo{
+var defaultInfo = &PodInfo{
 	Name:      name,
 	Namespace: namespace,
 }
@@ -45,7 +45,7 @@ func TestAddPod(t *testing.T) {
 		t.Fatalf("Expected nil, got %v", emptyPodInfo)
 	}
 
-	cache.ProcessPodInfo(ip, podInfo)
+	cache.ProcessPodInfo(ip, defaultInfo)
 	podInfo := cache.GetPod(ip)
 
 	if podInfo == nil {
@@ -62,7 +62,7 @@ func TestDeletePod(t *testing.T) {
 	cache := NewStandaloneCache()
 
 	// Add pod
-	cache.ProcessPodInfo(ip, podInfo)
+	cache.ProcessPodInfo(ip, defaultInfo)
 	podInfo := cache.GetPod(ip)
 	if podInfo == nil {
 		t.Fatalf("Expected pod info, got nil")
