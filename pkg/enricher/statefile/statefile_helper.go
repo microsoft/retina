@@ -11,9 +11,7 @@ import (
 	"github.com/microsoft/retina/pkg/controllers/cache"
 )
 
-var (
-	State_file_location = "C:/Windows/System32/azure-vnet.json"
-)
+var StateFileLocation = "C:/Windows/System32/azure-vnet.json"
 
 type CniState struct {
 	Network Network `json:"Network"`
@@ -32,14 +30,14 @@ type NetworkInfo struct {
 }
 
 type Endpoint struct {
-	Id           string   `json:"Id"`
-	IpAddresses  []IPInfo `json:"IpAddresses"`
+	ID           string   `json:"Id"`
+	IPAddresses  []IPInfo `json:"IpAddresses"`
 	PodName      string   `json:"PodName"`
 	PodNamespace string   `json:"PodNamespace"`
 }
 
 type IPInfo struct {
-	Ip string `json:"IP"`
+	IP string `json:"IP"`
 }
 
 func GetPodInfo(ip, filePath string) (*cache.PodInfo, error) {
@@ -64,8 +62,8 @@ func GetPodInfo(ip, filePath string) (*cache.PodInfo, error) {
 	for _, iface := range cniState.Network.ExternalInterfaces {
 		for _, networkInfo := range iface.Networks {
 			for _, endpoint := range networkInfo.Endpoints {
-				for _, ipInfo := range endpoint.IpAddresses {
-					if ipInfo.Ip == ip {
+				for _, ipInfo := range endpoint.IPAddresses {
+					if ipInfo.IP == ip {
 						return &cache.PodInfo{
 							Name:      endpoint.PodName,
 							Namespace: endpoint.PodNamespace,

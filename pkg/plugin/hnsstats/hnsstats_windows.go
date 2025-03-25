@@ -138,7 +138,10 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 				ip := ep.IpConfigurations[0].IpAddress
 
 				if h.cfg.EnableStandalone {
-					h.enricher.PublishEvent(ip)
+					if err = h.enricher.PublishEvent(ip); err != nil {
+						h.l.Error("Failed to publish event", zap.String(zapIPField, ip), zap.Error(err))
+						continue
+					}
 				}
 
 				if stats, err := hcsshim.GetHNSEndpointStats(id); err != nil {

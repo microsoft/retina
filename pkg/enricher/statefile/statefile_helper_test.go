@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -16,8 +17,8 @@ const (
 )
 
 func TestFileRead(t *testing.T) {
-	State_file_location = testfile
-	if _, err := os.Stat(State_file_location); os.IsNotExist(err) {
+	StateFileLocation = testfile
+	if _, err := os.Stat(StateFileLocation); os.IsNotExist(err) {
 		t.Fatalf("mock file does not exist: %v", err)
 	}
 
@@ -32,18 +33,18 @@ func TestFileReadEmpty(t *testing.T) {
 	emptyJSONPath := "/home/beegii/src/retina/pkg/plugin/hnsstats/empty_azure_vnet.json"
 	emptyJSONContent := ``
 
-	err := os.WriteFile(emptyJSONPath, []byte(emptyJSONContent), 0644)
-	assert.NoError(t, err, "failed to create empty JSON file")
+	err := os.WriteFile(emptyJSONPath, []byte(emptyJSONContent), 0o600)
+	require.NoError(t, err, "failed to create empty JSON file")
 
 	podInfo, err := GetPodInfo(ip, emptyJSONPath)
 	if podInfo != nil {
 		t.Fatalf("expected no pod info for empty JSON file, got: %v", podInfo)
 	}
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Remove empty JSON file
 	err = os.Remove(emptyJSONPath)
-	assert.NoError(t, err, "failed to remove malformed JSON file")
+	require.NoError(t, err, "failed to remove malformed JSON file")
 }
 
 func TestJsonDecode(t *testing.T) {
@@ -69,24 +70,24 @@ func TestJsonDecode(t *testing.T) {
 	`
 
 	// Write malformed JSON into file
-	err := os.WriteFile(malformedJSONPath, []byte(invalidJSONContent), 0644)
-	assert.NoError(t, err, "failed to create invalid JSON file")
+	err := os.WriteFile(malformedJSONPath, []byte(invalidJSONContent), 0o600)
+	require.NoError(t, err, "failed to create invalid JSON file")
 
 	podInfo, err := GetPodInfo(ip, malformedJSONPath)
 	if podInfo != nil {
 		t.Fatalf("expected empty pod info for malformed JSON file, got: %v", podInfo)
 	}
-	assert.Error(t, err, "expected error when decoding invalid JSON")
+	require.Error(t, err, "expected error when decoding invalid JSON")
 
 	// Remove malformed JSON file
 	err = os.Remove(malformedJSONPath)
-	assert.NoError(t, err, "failed to remove malformed JSON file")
+	require.NoError(t, err, "failed to remove malformed JSON file")
 }
 
 func TestHnsStatsHelper(t *testing.T) {
-	State_file_location = testfile
-	podInfo, err := GetPodInfo(ip, State_file_location)
-	assert.NoError(t, err)
+	StateFileLocation = testfile
+	podInfo, err := GetPodInfo(ip, StateFileLocation)
+	require.NoError(t, err)
 	assert.Equal(t, "retina2-pod", podInfo.Name)
 	assert.Equal(t, "retina2-namespace", podInfo.Namespace)
 }

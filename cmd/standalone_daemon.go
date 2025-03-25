@@ -33,7 +33,7 @@ func NewStandaloneDaemon(daemonCfg *config.Config) *StandaloneDaemon {
 }
 
 func (sd *StandaloneDaemon) Start(zl *log.ZapLogger) error {
-	fmt.Println("Starting standalone Retina daemon")
+	zl.Info("Starting standalone Retina daemon")
 	mainLogger := zl.Named("standalone-daemon").Sugar()
 
 	metrics.InitializeMetrics()

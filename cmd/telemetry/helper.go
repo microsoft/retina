@@ -39,10 +39,10 @@ func InitializeTelemetryClient(restCfg *rest.Config, dcfg *config.Config, ml *za
 			ml.Error("failed to create telemetry client", zap.Error(err))
 			return tel, fmt.Errorf("error when creating telemetry client: %w", err)
 		}
-		return tel, err
-	} else {
-		ml.Info("telemetry disabled")
-		tel := telemetry.NewNoopTelemetry()
 		return tel, nil
 	}
+
+	ml.Info("telemetry disabled")
+	tel := telemetry.NewNoopTelemetry()
+	return tel, nil
 }
