@@ -108,6 +108,9 @@ type Module struct {
 
 	// pubsub subscription uuid
 	pubsubPodSub string
+
+	// resetRegistry is the function to reset the registry
+	resetRegistry func(*Module, []api.MetricsContextOptions)
 }
 
 func InitModule(ctx context.Context,
@@ -133,6 +136,7 @@ func InitModule(ctx context.Context,
 			dirtyPods:     common.NewDirtyCache(),
 			pubsubPodSub:  "",
 			daemonConfig:  conf,
+			resetRegistry: resetRegistry,
 		}
 	})
 
@@ -162,7 +166,7 @@ func (m *Module) Reconcile(spec *api.MetricsSpec) error {
 	m.updateNamespaceLists(spec)
 
 	if m.currentSpec == nil || !validations.MetricsContextOptionsCompare(m.currentSpec.ContextOptions, spec.ContextOptions) {
-		m.updateMetricsContexts(spec)
+		m.updateMetricsContexts(spec, m.resetRegistry)
 	}
 
 	m.currentSpec = spec
@@ -202,15 +206,8 @@ func (m *Module) updateNamespaceLists(spec *api.MetricsSpec) {
 	}
 }
 
-func (m *Module) updateMetricsContexts(spec *api.MetricsSpec) {
-	// clean old metrics from registry (remove prometheus collectors and remove map entry)
-	// reset the advanced metrics registry
-	for key, metricObj := range m.registry {
-		metricObj.Clean()
-		delete(m.registry, key)
-	}
-
-	exporter.ResetAdvancedMetricsRegistry()
+func resetRegistry(m *Module, contextOptions []api.MetricsContextOptions) {
+	m.registry = make(map[string]AdvMetricsInterface)
 
 	ctxType := remoteContext
 	if m.daemonConfig != nil && !m.daemonConfig.RemoteContext {
@@ -220,7 +217,7 @@ func (m *Module) updateMetricsContexts(spec *api.MetricsSpec) {
 		ctxType = localContext
 	}
 
-	for _, ctxOption := range spec.ContextOptions {
+	for _, ctxOption := range contextOptions {
 		switch {
 		case strings.Contains(ctxOption.MetricName, forward):
 			fm := NewForwardCountMetrics(&ctxOption, m.l, ctxType)
@@ -263,6 +260,19 @@ func (m *Module) updateMetricsContexts(spec *api.MetricsSpec) {
 	}
 }
 
+func (m *Module) updateMetricsContexts(spec *api.MetricsSpec, resetRegistry func(*Module, []api.MetricsContextOptions)) {
+	// clean old metrics from registry (remove prometheus collectors and remove map entry)
+	// reset the advanced metrics registry
+	for key, metricObj := range m.registry {
+		metricObj.Clean()
+		delete(m.registry, key)
+	}
+
+	exporter.ResetAdvancedMetricsRegistry()
+
+	resetRegistry(m, spec.ContextOptions)
+}
+
 func (m *Module) run(newCtx context.Context) {
 	if m.isRunning {
 		m.l.Warn("Metric module is already running. Cannot start again.")
@@ -291,10 +301,18 @@ func (m *Module) run(newCtx context.Context) {
 				m.RLock()
 				f := ev.Event.(*flow.Flow)
 				m.l.Debug("converted flow object", zap.Any("flow l4", f.IP))
-				for _, metricObj := range m.registry {
-					metricObj.ProcessFlow(f)
+
+				srcIP := net.ParseIP(f.GetIP().GetSource())
+				dstIP := net.ParseIP(f.GetIP().GetDestination())
+
+				if !m.daemonConfig.EnableAnnotations ||
+					m.daemonConfig.EnableAnnotations && (m.filterManager.HasIP(srcIP) || m.filterManager.HasIP(dstIP)) {
+					for _, metricObj := range m.registry {
+						metricObj.ProcessFlow(f)
+					}
 				}
 				m.RUnlock()
+
 			case *flow.LostEvent:
 				ev := ev.Event.(*flow.LostEvent)
 				// the number of lost events == the size of the ring buffer initialized.
