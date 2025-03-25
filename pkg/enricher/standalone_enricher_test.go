@@ -20,7 +20,7 @@ const (
 	invalidIP = "10.0.0.0"
 	name      = "retina2-pod"
 	namespace = "retina2-namespace"
-	testfile  = "/home/beegii/src/retina/pkg/enricher/statefile/mock_statefile.json"
+	testfile  = "statefile/mock_statefile.json"
 )
 
 func TestStandaloneEnricher(t *testing.T) {

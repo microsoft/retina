@@ -30,7 +30,7 @@ func TestFileRead(t *testing.T) {
 }
 
 func TestFileReadEmpty(t *testing.T) {
-	emptyJSONPath := "/home/beegii/src/retina/pkg/plugin/hnsstats/empty_azure_vnet.json"
+	emptyJSONPath := "empty_azure_vnet.json"
 	emptyJSONContent := ``
 
 	err := os.WriteFile(emptyJSONPath, []byte(emptyJSONContent), 0o600)
