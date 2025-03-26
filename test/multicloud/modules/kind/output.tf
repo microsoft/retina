@@ -4,7 +4,7 @@ output "kubeconfig" {
 }
 
 output "cluster_name" {
-  value     = kind_cluster.kind.name
+  value = kind_cluster.kind.name
 }
 
 output "host" {

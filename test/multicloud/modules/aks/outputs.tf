@@ -4,7 +4,7 @@ output "azure_get_kubeconfig" {
 }
 
 output "cluster_name" {
-  value = azurerm_kubernetes_cluster.aks.name
+  value       = azurerm_kubernetes_cluster.aks.name
   description = "AKS cluster name"
 }
 

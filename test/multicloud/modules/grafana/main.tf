@@ -1,9 +1,14 @@
 resource "grafana_data_source" "prometheus" {
-  for_each = var.prometheus_endpoints
-
-  name = each.key
+  name = var.cluster_reference
   type = "prometheus"
-  url  = each.value
+  url  = "http://prometheus-operated.kube-system.svc.cluster.local:9090"
+  json_data_encoded = jsonencode(
+    {
+      enableSecureSocksProxy   = true
+      httpMethod               = "POST"
+      secureSocksProxyUsername = "e1152ac0-72e6-44bf-b7d5-75927827c175"
+    }
+  )
 }
 
 resource "grafana_dashboard" "dashboard" {
