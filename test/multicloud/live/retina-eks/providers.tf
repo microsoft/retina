@@ -17,10 +17,6 @@ terraform {
       source  = "grafana/grafana"
       version = "3.18.3"
     }
-    dns = {
-      source  = "hashicorp/dns"
-      version = "3.4.2"
-    }
   }
 }
 
@@ -60,5 +56,3 @@ provider "grafana" {
   url = var.grafana_url
 }
 
-# Initialize the DNS provider
-provider "dns" {}
