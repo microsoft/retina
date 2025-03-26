@@ -26,20 +26,16 @@ module "prometheus_eks" {
   chart_name        = local.prometheus_chart_name
 }
 
-module "prometheus_lb_eks" {
-  depends_on = [
-    module.eks,
-    module.prometheus_eks
-  ]
-  source = "../../modules/kubernetes-lb"
+module "grafana_pdc_eks" {
+  depends_on                    = [module.prometheus_eks]
+  source                        = "../../modules/grafana-pdc-agent"
+  grafana_pdc_token             = var.grafana_pdc_token
+  grafana_pdc_hosted_grafana_id = var.grafana_pdc_hosted_grafana_id
+  grafana_pdc_cluster           = var.grafana_pdc_cluster
 }
 
-
 module "grafana" {
-  depends_on = [module.prometheus_lb_eks]
   source     = "../../modules/grafana"
-  prometheus_endpoints = {
-    eks = "http://${module.prometheus_lb_eks.hostname}:9090" # Note: EKS uses hostname instead of IP
-  }
+  cluster_reference = "eks"
   dashboards = local.dashboards
 }

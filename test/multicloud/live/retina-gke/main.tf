@@ -28,27 +28,8 @@ module "prometheus_gke" {
   chart_name        = local.prometheus_chart_name
 }
 
-module "prometheus_lb_gke" {
-  depends_on = [
-    module.gke,
-    module.prometheus_gke
-  ]
-  source = "../../modules/kubernetes-lb"
-}
-
-module "gke_firewall" {
-  depends_on             = [module.gke]
-  source                 = "../../modules/gke-firewall"
-  prefix                 = local.prefix
-  inbound_firewall_rule  = local.gke_firewall_rules.inbound
-  outbound_firewall_rule = local.gke_firewall_rules.outbound
-}
-
 module "grafana" {
-  depends_on = [module.prometheus_lb_gke]
   source     = "../../modules/grafana"
-  prometheus_endpoints = {
-    gke = "http://${module.prometheus_lb_gke.ip}:9090"
-  }
+  cluster_reference = "gke"
   dashboards = local.grafana_dashboards
 }
