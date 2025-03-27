@@ -305,10 +305,30 @@ func (m *Module) run(newCtx context.Context) {
 				srcIP := net.ParseIP(f.GetIP().GetSource())
 				dstIP := net.ParseIP(f.GetIP().GetDestination())
 
-				if !m.daemonConfig.EnableAnnotations ||
-					m.daemonConfig.EnableAnnotations && (m.filterManager.HasIP(srcIP) || m.filterManager.HasIP(dstIP)) {
+				if !m.daemonConfig.EnableAnnotations {
 					for _, metricObj := range m.registry {
 						metricObj.ProcessFlow(f)
+					}
+				} else {
+					if m.filterManager.HasIP(srcIP) && m.filterManager.HasIP(dstIP) {
+						for _, metricObj := range m.registry {
+							metricObj.ProcessFlow(f)
+						}
+					} else {
+						// TODO: This is a temporary fix. Metrics module should not change the flow struct.
+						if !m.filterManager.HasIP(srcIP) && m.filterManager.HasIP(dstIP) {
+							f.IP.Source = ""
+							f.Source = nil
+							for _, metricObj := range m.registry {
+								metricObj.ProcessFlow(f)
+							}
+						} else if m.filterManager.HasIP(srcIP) && !m.filterManager.HasIP(dstIP) {
+							f.IP.Destination = ""
+							f.Destination = nil
+							for _, metricObj := range m.registry {
+								metricObj.ProcessFlow(f)
+							}
+						}
 					}
 				}
 				m.RUnlock()

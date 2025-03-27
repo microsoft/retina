@@ -605,6 +605,7 @@ func TestModule_Reconcile(t *testing.T) {
 		tt.m.enricher = e
 		tt.m.filterManager = fm
 		tt.m.daemonCache = c
+		tt.m.dirtyPods = common.NewDirtyCache()
 		testRing := container.NewRing(container.Capacity1)
 		testRingReader := container.NewRingReader(testRing, 0)
 		p.EXPECT().Subscribe(gomock.Any(), gomock.Any()).Return("test").AnyTimes()
