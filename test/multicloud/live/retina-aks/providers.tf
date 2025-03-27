@@ -51,5 +51,6 @@ provider "kubernetes" {
 
 # Initialize the Grafana provider
 provider "grafana" {
-  url = var.grafana_url
+  url                       = var.grafana_url
+  cloud_access_policy_token = var.grafana_cloud_access_policy_token
 }

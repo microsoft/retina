@@ -5,4 +5,12 @@ resource "helm_release" "release" {
   chart      = var.chart_name
   version    = var.chart_version
   values     = [jsonencode(var.values)]
+
+  dynamic "set" {
+    for_each = var.custom_values
+    content {
+      name  = set.key
+      value = set.value
+    } 
+  }
 }

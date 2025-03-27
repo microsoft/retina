@@ -26,16 +26,18 @@ module "prometheus_eks" {
   chart_name        = local.prometheus_chart_name
 }
 
-module "grafana_pdc_eks" {
-  depends_on                    = [module.prometheus_eks]
-  source                        = "../../modules/grafana-pdc-agent"
-  grafana_pdc_token             = var.grafana_pdc_token
-  grafana_pdc_hosted_grafana_id = var.grafana_pdc_hosted_grafana_id
-  grafana_pdc_cluster           = var.grafana_pdc_cluster
+module "grafana" {
+  source            = "../../modules/grafana"
+  cluster_reference = "eks"
+  dashboards        = local.dashboards
+  hosted_grafana_id = var.grafana_pdc_hosted_grafana_id
+  grafana_region    = var.grafana_pdc_cluster
 }
 
-module "grafana" {
-  source     = "../../modules/grafana"
-  cluster_reference = "eks"
-  dashboards = local.dashboards
+module "grafana_pdc_eks" {
+  depends_on                    = [module.prometheus_eks, module.grafana]
+  source                        = "../../modules/grafana-pdc-agent"
+  grafana_pdc_token             = module.grafana.pdc_network_token
+  grafana_pdc_hosted_grafana_id = var.grafana_pdc_hosted_grafana_id
+  grafana_pdc_cluster           = var.grafana_pdc_cluster
 }

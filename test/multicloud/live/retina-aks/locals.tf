@@ -16,6 +16,7 @@ locals {
   prometheus_chart_version     = "68.4.3"
   prometheus_chart_name        = "kube-prometheus-stack"
   prometheus_values            = yamldecode(file("../../../../deploy/hubble/prometheus/values.yaml"))
+  cluster_name                 = "aks"
 
   default_node_pool = {
     name            = "agentpool"

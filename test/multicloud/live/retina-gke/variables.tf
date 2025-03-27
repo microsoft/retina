@@ -8,8 +8,8 @@ variable "grafana_url" {
   type        = string
 }
 
-variable "grafana_pdc_token" {
-  description = "The token for the Grafana PDC agent."
+variable "grafana_cloud_access_policy_token" {
+  description = "The Cloud Access Policy token required for Grafana Cloud API operations"
   type        = string
   sensitive   = true
 }

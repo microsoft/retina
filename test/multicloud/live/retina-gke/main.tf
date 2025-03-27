@@ -29,7 +29,17 @@ module "prometheus_gke" {
 }
 
 module "grafana" {
-  source     = "../../modules/grafana"
+  source            = "../../modules/grafana"
   cluster_reference = "gke"
-  dashboards = local.grafana_dashboards
+  dashboards        = local.grafana_dashboards
+  hosted_grafana_id = var.grafana_pdc_hosted_grafana_id
+  grafana_region    = var.grafana_pdc_cluster
+}
+
+module "grafana_pdc_gke" {
+  depends_on                    = [module.prometheus_gke, module.grafana]
+  source                        = "../../modules/grafana-pdc-agent"
+  grafana_pdc_token             = module.grafana.pdc_network_token
+  grafana_pdc_hosted_grafana_id = var.grafana_pdc_hosted_grafana_id
+  grafana_pdc_cluster           = var.grafana_pdc_cluster
 }

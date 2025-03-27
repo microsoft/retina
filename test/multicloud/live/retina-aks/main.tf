@@ -28,17 +28,18 @@ module "prometheus_aks" {
   chart_name        = local.prometheus_chart_name
 }
 
-module "grafana_pdc_aks" {
-  depends_on                    = [module.prometheus_aks]
-  source                        = "../../modules/grafana-pdc-agent"
-  grafana_pdc_token             = var.grafana_pdc_token
-  grafana_pdc_hosted_grafana_id = var.grafana_pdc_hosted_grafana_id
-  grafana_pdc_cluster           = var.grafana_pdc_cluster
-}
-
 module "grafana" {
   source            = "../../modules/grafana"
   cluster_reference = "aks"
-  # All dashboards are deployed as part of live/retina-eks
-  dashboards = local.dashboards
+  dashboards        = local.dashboards
+  hosted_grafana_id = var.grafana_pdc_hosted_grafana_id
+  grafana_region    = var.grafana_pdc_cluster
+}
+
+module "grafana_pdc_aks" {
+  depends_on                    = [module.prometheus_aks, module.grafana]
+  source                        = "../../modules/grafana-pdc-agent"
+  grafana_pdc_token             = module.grafana.pdc_network_token
+  grafana_pdc_hosted_grafana_id = var.grafana_pdc_hosted_grafana_id
+  grafana_pdc_cluster           = var.grafana_pdc_cluster
 }
