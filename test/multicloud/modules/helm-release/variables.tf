@@ -28,3 +28,9 @@ variable "values" {
   description = "This corresponds to Helm values.yaml"
   type        = any
 }
+
+variable "custom_values" {
+  description = "The name of the cluster."
+  type        = map(any)
+  default     = {}
+}

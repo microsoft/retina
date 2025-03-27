@@ -11,10 +11,8 @@ This project leverages [OpenTofu](https://opentofu.org/docs/intro/) Infrastructu
 * [eks](./modules/eks/): Deploy Elastic Kubernetes Service cluster.
 * [kind](./modules/kind/): Deploy KIND cluster.
 * [helm-release](./modules/helm-release/): Deploy a Helm Chart, used to deploy Retina and Prometheus.
-* [kubernetes-lb](./modules/kubernetes-lb/): Create a Kubernetes Service of type Load Balancer, used to expose Prometheus.
-* [grafana](./modules/grafana/): Set up multiple Prometheus data sources in Grafana Cloud.
-* [aks-nsg](./modules/aks-nsg/): Inboud and outbount rules for AKS Load Balancer.
-* [gke-firewall](./modules/gke-firewall/): Inboud and outbount rules for GKE Load Balancer.
+* [grafana](./modules/grafana/): Set up multiple Prometheus data sources including PDC networks in Grafana Cloud.
+* [grafana-pdc-agent](./modules/grafana-pdc-agent/): Deploy PDC agent in each cluster.
 
 ## Network Observability
 
@@ -28,7 +26,7 @@ Below is another example with Hubble CLI observing traffic on the `default` Kube
 
 In addition to Hubble, Retina provides a number of Grafana dashboards which are also deployed as part of this multicloud sub-project. Below is an example of Retina DNS dashboard visualization for an EKS cluster.
 
-![Grafana Retina DNS dashboard for EKS](./diagrams/mc-eks-grafana.jpeg)
+![Grafana Retina DNS dashboard for EKS](./diagrams/mc-eks-grafana.png)
 
 ## Prerequisites
 
@@ -145,7 +143,7 @@ Resources documentation:
 * [EKS](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/eks_cluster)
 * [Kind](https://registry.terraform.io/providers/tehcyx/kind/latest/docs/resources/cluster)
 * [Helm Release](https://registry.terraform.io/providers/hashicorp/helm/latest/docs/resources/release)
-* [Kubernetes LB Service](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/service)
+* [Kubernetes Deployment](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/deployment)
 * [Grafana Data Source](https://registry.terraform.io/providers/grafana/grafana/latest/docs/resources/data_source)
 
 ## Troubleshooting
@@ -171,7 +169,7 @@ tofu import module.eks.aws_iam_role_policy_attachment.eks_node_group_AmazonEKSWo
 
 ## Multi-Cloud
 
-The [live/](./live/) directory contains multi-cloud / multi-cluster stacks to deploy cloud infrastructure, install Retina, install Prometheus, expose Prometheus instance using a load balancer, and configure a Grafana Cloud instance to consume Prometheus data sources to visualize Retina metrics from multiple clusters in a single Grafana dashboard.
+The [live/](./live/) directory contains multi-cloud / multi-cluster stacks to deploy cloud infrastructure, install Retina, install Prometheus, deploy Private Datasource Connection agent in each cluster, and configure a Grafana Cloud instance to consume Prometheus data sources to visualize Retina metrics from multiple clusters in a single Grafana dashboard.
 
 ![Architecture Diagram](./diagrams/diagram-mc.svg)
 

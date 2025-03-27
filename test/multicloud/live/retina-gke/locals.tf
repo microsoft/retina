@@ -17,21 +17,8 @@ locals {
   prometheus_chart_name        = "kube-prometheus-stack"
   prometheus_release_namespace = "kube-system"
   prometheus_values            = yamldecode(file("../../../../deploy/hubble/prometheus/values.yaml"))
+  cluster_name                 = "GoogleKubernetesEngine"
 
-  gke_firewall_rules = {
-    inbound = {
-      protocol           = "tcp"
-      ports              = ["9090"]
-      source_ranges      = [module.prometheus_lb_gke.ip]
-      destination_ranges = ["0.0.0.0/0"]
-    }
-    outbound = {
-      protocol           = "tcp"
-      ports              = ["9090"]
-      source_ranges      = ["0.0.0.0/0"]
-      destination_ranges = [module.prometheus_lb_gke.ip]
-    }
-  }
   # All dashboards are deployed as part of live/retina-aks
   grafana_dashboards = {}
 }

@@ -16,36 +16,12 @@ locals {
   prometheus_chart_version     = "68.4.3"
   prometheus_chart_name        = "kube-prometheus-stack"
   prometheus_values            = yamldecode(file("../../../../deploy/hubble/prometheus/values.yaml"))
-
-  aks_security_rules = [
-    {
-      name                       = "Allow_Prometheus_Inbound"
-      priority                   = 100
-      direction                  = "Inbound"
-      access                     = "Allow"
-      protocol                   = "Tcp"
-      source_port_range          = "*"
-      source_address_prefix      = "*"
-      destination_port_range     = "9090"
-      destination_address_prefix = module.prometheus_lb_aks.ip
-    },
-    {
-      name                       = "Allow_Prometheus_Outbound"
-      priority                   = 100
-      direction                  = "Outbound"
-      access                     = "Allow"
-      protocol                   = "Tcp"
-      source_port_range          = "9090"
-      source_address_prefix      = module.prometheus_lb_aks.ip
-      destination_port_range     = "*"
-      destination_address_prefix = "*"
-    },
-  ]
+  cluster_name                 = "AzureKubernetesService"
 
   default_node_pool = {
     name            = "agentpool"
-    node_count      = 3
-    vm_size         = "standard_a2_v2"
+    node_count      = 2
+    vm_size         = "standard_a4_v2"
     os_disk_size_gb = 128
     os_disk_type    = "Managed"
     max_pods        = 110
@@ -59,11 +35,11 @@ locals {
   # cannot have the same values since we are using
   # a single Grafana instance
   dashboards = {
-    "clusters"                   = "clusters.json"
+    # "clusters"                   = "clusters.json"
     "hubble-dns"                 = "hubble-dns.json"
     "hubble-pod-flows-namespace" = "hubble-pod-flows-namespace.json"
     "hubble-pod-flows-workload"  = "hubble-pod-flows-workload.json"
-    "standard-dns"               = "standard-dns.json"
-    "standard-pod-level"         = "standard-pod-level.json"
+    # "standard-dns"               = "standard-dns.json"
+    # "standard-pod-level"         = "standard-pod-level.json"
   }
 }

@@ -4,7 +4,7 @@ output "aws_get_kubeconfig" {
 }
 
 output "cluster_name" {
-  value = aws_eks_cluster.eks.name
+  value       = aws_eks_cluster.eks.name
   description = "EKS cluster name"
 }
 
