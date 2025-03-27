@@ -35,11 +35,11 @@ locals {
   # cannot have the same values since we are using
   # a single Grafana instance
   dashboards = {
-    "clusters"                   = "clusters.json"
+    # "clusters"                   = "clusters.json"
     "hubble-dns"                 = "hubble-dns.json"
     "hubble-pod-flows-namespace" = "hubble-pod-flows-namespace.json"
     "hubble-pod-flows-workload"  = "hubble-pod-flows-workload.json"
-    "standard-dns"               = "standard-dns.json"
-    "standard-pod-level"         = "standard-pod-level.json"
+    # "standard-dns"               = "standard-dns.json"
+    # "standard-pod-level"         = "standard-pod-level.json"
   }
 }

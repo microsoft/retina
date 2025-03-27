@@ -18,11 +18,11 @@ module "retina_gke" {
 }
 
 module "prometheus_gke" {
-  depends_on        = [module.gke]
-  source            = "../../modules/helm-release"
-  chart_version     = local.prometheus_chart_version
-  values            = merge(local.prometheus_values, {
-    prometheus= {
+  depends_on    = [module.gke]
+  source        = "../../modules/helm-release"
+  chart_version = local.prometheus_chart_version
+  values = merge(local.prometheus_values, {
+    prometheus = {
       prometheusSpec = {
         additionalScrapeConfigs = <<-EOT
                                 - job_name: "retina-pods"
