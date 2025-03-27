@@ -4,7 +4,7 @@ output "gcloud_get_kubeconfig" {
 }
 
 output "cluster_name" {
-  value = google_container_cluster.gke.name
+  value       = google_container_cluster.gke.name
   description = "GKE cluster name"
 }
 
