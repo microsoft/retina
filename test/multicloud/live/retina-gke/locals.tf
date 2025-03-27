@@ -17,6 +17,7 @@ locals {
   prometheus_chart_name        = "kube-prometheus-stack"
   prometheus_release_namespace = "kube-system"
   prometheus_values            = yamldecode(file("../../../../deploy/hubble/prometheus/values.yaml"))
+  cluster_name                 = "GoogleKubernetesEngine"
 
   # All dashboards are deployed as part of live/retina-aks
   grafana_dashboards = {}
