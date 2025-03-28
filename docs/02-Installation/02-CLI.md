@@ -1,6 +1,6 @@
 # CLI Setup
 
-Retina CLI allows to run captures which are distributed packet captures leveraging [tcpdump](https://www.tcpdump.org/). Currently, Retina CLI supports Linux, Windows, and MacOS on x86_64 and ARM64 platforms. For CLI usage, see [Capture with Retina CLI](../04-Captures/02-cli.md).
+Retina CLI allows you to run distributed packet captures leveraging [tcpdump](https://www.tcpdump.org/). Currently, Retina CLI supports Linux, Windows, and MacOS on x86_64 and ARM64 platforms. For CLI usage, see [Capture with Retina CLI](../04-Captures/02-cli.md).
 
 ## Option 1: Install using Krew
 

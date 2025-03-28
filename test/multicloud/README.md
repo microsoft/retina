@@ -173,7 +173,7 @@ The [live/](./live/) directory contains multi-cloud / multi-cluster stacks to de
 
 ![Architecture Diagram](./diagrams/diagram-mc.svg)
 
-In the next section we provide a multi-cloud demo to show some of retina capabilities when deployed in managed Kubernetes clusters on different cloud providers.
+In the next section we provide a multi-cloud demo to show some of Retina's capabilities when deployed in managed Kubernetes clusters on different cloud providers.
 
 ### Demo Prerequisites
 
