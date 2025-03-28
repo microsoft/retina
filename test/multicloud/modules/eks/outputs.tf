@@ -3,6 +3,11 @@ output "aws_get_kubeconfig" {
   description = "Run this command to fetch the kubeconfig for your EKS cluster"
 }
 
+output "cluster_name" {
+  value       = aws_eks_cluster.eks.name
+  description = "EKS cluster name"
+}
+
 output "access_token" {
   value     = data.aws_eks_cluster_auth.eks.token
   sensitive = true

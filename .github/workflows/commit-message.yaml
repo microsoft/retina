@@ -11,7 +11,7 @@ on:
 jobs:
   commit-message:
     if: ${{ github.event_name != 'merge_group' }}
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - name: verify_commit_message
         env:

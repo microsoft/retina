@@ -31,15 +31,4 @@ updates:
     labels: ["lang/go", "area/dependencies"]
     ignore:
       - dependency-name: "github.com/inspektor-gadget/inspektor-gadget"
-      - dependency-name: "google.golang.org/grpc"
-    open-pull-requests-limit: 10
-  - package-ecosystem: "gomod"
-    directory: "/hack/tools"
-    schedule:
-      interval: "daily"
-    reviewers:
-      - "microsoft/retina"
-    commit-message:
-      prefix: "deps"
-    labels: ["lang/go", "area/infra", "area/dependencies"]
     open-pull-requests-limit: 10
