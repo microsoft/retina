@@ -1,4 +1,3 @@
-// nolint:unnamedResult (This is a placeholder for the actual implementation)
 package k8s
 
 import (
@@ -159,15 +158,15 @@ func (n *NoOpPolicyRepository) GetSelectorCache() *policy.SelectorCache {
 
 func (n *NoOpPolicyRepository) Iterate(func(*api.Rule)) {}
 
-func (n *NoOpPolicyRepository) ReplaceByResource(api.Rules, ipcachetypes.ResourceID) (*set.Set[identity.NumericIdentity], uint64, int) {
+func (n *NoOpPolicyRepository) ReplaceByResource(api.Rules, ipcachetypes.ResourceID) (affectedIDs *set.Set[identity.NumericIdentity], rev uint64, oldRevCnt int) {
 	return nil, 0, 0
 }
 
-func (n *NoOpPolicyRepository) ReplaceByLabels(api.Rules, []labels.LabelArray) (*set.Set[identity.NumericIdentity], uint64, int) {
+func (n *NoOpPolicyRepository) ReplaceByLabels(api.Rules, []labels.LabelArray) (affectedIDs *set.Set[identity.NumericIdentity], rev uint64, oldRevCnt int) {
 	return nil, 0, 0
 }
 
-func (n *NoOpPolicyRepository) Search(labels.LabelArray) (api.Rules, uint64) {
+func (n *NoOpPolicyRepository) Search(labels.LabelArray) (r api.Rules, i uint64) {
 	return nil, 0
 }
 
