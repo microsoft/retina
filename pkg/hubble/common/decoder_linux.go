@@ -59,7 +59,7 @@ func (e *epDecoder) Decode(ip netip.Addr) *flow.Endpoint {
 	return ep
 }
 
-func (e *epDecoder) IsEndpointOnLocalHost(ip string) bool {
+func (e *epDecoder) IsEndpointOnLocalHost(string) bool {
 	return false
 }
 

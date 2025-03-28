@@ -226,6 +226,6 @@ var k8sResources = []string{K8sAPIGroupCiliumEndpointV2, K8sAPIGroupServiceV1Cor
 
 // resourceGroups are all of the core Kubernetes and Cilium resource groups
 // which the Cilium agent watches to implement CNI functionality.
-func watcherResourceGroups(logger *slog.Logger, cfg watchers.WatcherConfiguration) (resourceGroups, waitForCachesOnly []string) {
-	return k8sResources, waitForCachesOnly
+func watcherResourceGroups(*slog.Logger, watchers.WatcherConfiguration) ([]string, []string) {
+	return k8sResources, []string{}
 }

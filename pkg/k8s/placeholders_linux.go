@@ -110,10 +110,10 @@ func (f *fakeBandwidthManager) UpdateBandwidthLimit(uint16, uint64, uint32) {}
 
 func (f *fakeBandwidthManager) DeleteBandwidthLimit(uint16) {}
 
-func (f *fakeBandwidthManager) UpdateIngressBandwidthLimit(endpointID uint16, bytesPerSecond uint64) {
+func (f *fakeBandwidthManager) UpdateIngressBandwidthLimit(uint16, uint64) {
 }
 
-func (f *fakeBandwidthManager) DeleteIngressBandwidthLimit(endpointID uint16) {}
+func (f *fakeBandwidthManager) DeleteIngressBandwidthLimit(uint16) {}
 
 type fakeIpsetMgr struct{}
 
@@ -156,13 +156,13 @@ func (n *NoOpPolicyRepository) GetSelectorCache() *policy.SelectorCache {
 	return nil
 }
 
-func (n *NoOpPolicyRepository) Iterate(f func(*api.Rule)) {}
+func (n *NoOpPolicyRepository) Iterate(func(*api.Rule)) {}
 
-func (n *NoOpPolicyRepository) ReplaceByResource(api.Rules, ipcachetypes.ResourceID) (affectedIDs *set.Set[identity.NumericIdentity], rev uint64, oldRevCnt int) {
+func (n *NoOpPolicyRepository) ReplaceByResource(api.Rules, ipcachetypes.ResourceID) (*set.Set[identity.NumericIdentity], uint64, int) {
 	return nil, 0, 0
 }
 
-func (n *NoOpPolicyRepository) ReplaceByLabels(api.Rules, []labels.LabelArray) (affectedIDs *set.Set[identity.NumericIdentity], rev uint64, oldRevCnt int) {
+func (n *NoOpPolicyRepository) ReplaceByLabels(api.Rules, []labels.LabelArray) (*set.Set[identity.NumericIdentity], uint64, int) {
 	return nil, 0, 0
 }
 
@@ -170,7 +170,7 @@ func (n *NoOpPolicyRepository) Search(labels.LabelArray) (api.Rules, uint64) {
 	return nil, 0
 }
 
-func (n *NoOpPolicyRepository) SetEnvoyRulesFunc(f func(certificatemanager.SecretManager, *api.L7Rules, string, string) (*cilium.HttpNetworkPolicyRules, bool)) {
+func (n *NoOpPolicyRepository) SetEnvoyRulesFunc(func(certificatemanager.SecretManager, *api.L7Rules, string, string) (*cilium.HttpNetworkPolicyRules, bool)) {
 }
 
 type NoOpOrchestrator struct{}
