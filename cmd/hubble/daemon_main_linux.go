@@ -219,7 +219,7 @@ func initLogging() {
 	k8sCfg, _ := sharedconfig.GetK8sConfig()
 	zapLogger := setupZapLogger(retinaConfig, k8sCfg)
 	setupLoggingHooks(logger, zapLogger)
-	bootstrapLogging(logger)
+	bootstrapLogging(retinaConfig, logger)
 }
 
 func setupDefaultLogger() *logrus.Logger {
@@ -280,10 +280,16 @@ func setupLoggingHooks(logger *logrus.Logger, zapLogger *log.ZapLogger) {
 	}
 }
 
-func bootstrapLogging(logger *logrus.Logger) {
+func bootstrapLogging(retinaConfig *config.Config, logger *logrus.Logger) {
 	if err := logging.SetupLogging(option.Config.LogDriver, logging.LogOptions(option.Config.LogOpt), "retina-agent", option.Config.Debug); err != nil {
 		logger.Fatal(err)
 	}
+
+	logLevel, err := logrus.ParseLevel(retinaConfig.LogLevel)
+	if err != nil {
+		logLevel = logrus.InfoLevel
+	}
+	logger.SetLevel(logLevel)
 }
 
 func initDaemonConfig(vp *viper.Viper) {
