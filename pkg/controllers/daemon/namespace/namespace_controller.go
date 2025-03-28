@@ -71,6 +71,8 @@ func (r *NamespaceReconciler) Start(ctx context.Context) {
 		select {
 		case <-ticker.C:
 			ns := r.cache.GetAnnotatedNamespaces()
+			// Add kube-system namespace to the list of namespaces to be included in metrics
+			ns = append(ns, "kube-system")
 			r.l.Debug("Reconciling metrics module", zap.Any("namespaces", ns))
 			spec := (&api.MetricsSpec{}).
 				WithIncludedNamespaces(ns).
