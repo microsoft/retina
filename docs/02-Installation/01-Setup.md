@@ -1,14 +1,34 @@
 # Setup
 
-Install the helm chart below for your scenario.
-
-Note: you can also run captures with just the [CLI](./02-CLI.md).
+This page provides the instructions on how to install Retina via Helm.
 
 ## Installation
 
+The assumption is that a Kubernetes cluster has already been created and we have credentials to access it.
+
+>NOTE: In case you want to test out Retina quickly and you have no clusters, you can quickly create one with [kind](https://kind.sigs.k8s.io/)
+
+```sh
+$ kind create cluster --name test-retina
+Creating cluster "test-retina" ...
+ ✓ Ensuring node image (kindest/node:v1.31.0) 🖼
+ ✓ Preparing nodes 📦
+ ✓ Writing configuration 📜
+ ✓ Starting control-plane 🕹️
+ ✓ Installing CNI 🔌
+ ✓ Installing StorageClass 💾
+Set kubectl context to "kind-test-retina"
+You can now use your cluster with:
+
+kubectl cluster-info --context kind-test-retina
+
+Not sure what to do next? 😅  Check out https://kind.sigs.k8s.io/docs/user/quick-start/
+```
+
 ### Requirements
 
-- Helm version >= v3.8.0.
+- Helm version >= v3.8.0
+- Access to a Kubernetes cluster via `kubectl`
 
 ### Control Plane and Modes
 
