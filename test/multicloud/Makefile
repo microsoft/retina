@@ -116,11 +116,11 @@ test-dns:
 	@POD=$$(kubectl get pods -l app=tcp-client-0 -o jsonpath='{.items[0].metadata.name}'); \
 	for i in $$(seq 1 10); do \
 		echo "Lookup $$i:"; \
-		kubectl exec -it $$POD -- nslookup -type=AAAA example.com; \
-		kubectl exec -it $$POD -- nslookup -type=A empty.com; \
-		kubectl exec -it $$POD -- nslookup -type=AAAA empty.com; \
-		kubectl exec -it $$POD -- nslookup -type=AAAA refused.com; \
-		kubectl exec -it $$POD -- nslookup -type=A refused.com; \
+		kubectl exec -it $$POD -- nslookup -type=AAAA example.com > /dev/null; \
+		kubectl exec -it $$POD -- nslookup -type=A empty.com > /dev/null; \
+		kubectl exec -it $$POD -- nslookup -type=AAAA empty.com > /dev/null; \
+		kubectl exec -it $$POD -- nslookup -type=AAAA refused.com > /dev/null; \
+		kubectl exec -it $$POD -- nslookup -type=A refused.com > /dev/null; \
 	done
 # -------------------------------------------------------------------
 # Demo Scenario 1: Packets dropped by iptables (AKS)

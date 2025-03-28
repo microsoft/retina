@@ -173,11 +173,11 @@ The [live/](./live/) directory contains multi-cloud / multi-cluster stacks to de
 
 ![Architecture Diagram](./diagrams/diagram-mc.svg)
 
-In the next section we describe a multi-cloud demo aiming to show some of retina capabilities when deployed in managed Kubernetes clusters on different cloud providers.
+In the next section we provide a multi-cloud demo to show some of Retina's capabilities when deployed in managed Kubernetes clusters on different cloud providers.
 
 ### Demo Prerequisites
 
-Create all required Kubernetes infrastructure, deploy Prometheus, Load Balancers, Retina and Grafana datasource config for each managed cluster in `Azure`, `Google Cloud` and `Amazon Web services`.
+Create all required resources in `Azure`, `Google Cloud` and `Amazon Web services`.
 
 ```sh
 make aks
