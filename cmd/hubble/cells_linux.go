@@ -25,7 +25,6 @@ import (
 
 	"github.com/microsoft/retina/internal/buildinfo"
 	"github.com/microsoft/retina/pkg/config"
-	"github.com/microsoft/retina/pkg/controllers/daemon/nodereconciler"
 	rnode "github.com/microsoft/retina/pkg/controllers/daemon/nodereconciler"
 	"github.com/microsoft/retina/pkg/hubble/parser"
 	retinak8s "github.com/microsoft/retina/pkg/k8s"
@@ -107,7 +106,7 @@ var (
 		// Provides the node reconciler as node manager
 		rnode.Cell,
 		cell.Provide(
-			func(nr *nodereconciler.NodeReconciler) manager.NodeManager {
+			func(nr *rnode.NodeReconciler) manager.NodeManager {
 				return nr
 			},
 		),

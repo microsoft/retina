@@ -54,17 +54,10 @@ func (e *epDecoder) Decode(ip netip.Addr) *flow.Endpoint {
 	case identity.ReservedIdentityWorld:
 		ep.Labels = labels.LabelWorld.GetModel()
 	default:
-		// prefix := netip.PrefixFrom(ip, ip.BitLen())
-		// ep.Labels = e.ipcache.GetMetadataLabelsByPrefix(prefix).GetModel()
 	}
 
 	return ep
 }
-
-// func (e *epDecoder) endpointHostIP(ip string) string {
-// 	hostIP, _ := e.ipcache.GetHostIPCache(ip)
-// 	return hostIP.String()
-// }
 
 func (e *epDecoder) IsEndpointOnLocalHost(ip string) bool {
 	return false
@@ -84,12 +77,7 @@ func NewSvcDecoder(sc k8s.ServiceCache) SvcDecoder {
 	}
 }
 
-func (s *svcDecoder) Decode(ip netip.Addr) *flow.Service {
+func (s *svcDecoder) Decode(netip.Addr) *flow.Service {
 	svc := &flow.Service{}
-
-	// if svcID, ok := s.svccache.GetServiceIDByIP(net.IP(ip.String())); ok {
-	// 	svc.Name = svcID.Name
-	// 	svc.Namespace = svcID.Namespace
-	// }
 	return svc
 }

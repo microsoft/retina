@@ -121,7 +121,7 @@ var (
 		"Operator Control Plane",
 
 		cell.Config(cmtypes.DefaultClusterInfo),
-		cell.Invoke(func(cinfo cmtypes.ClusterInfo, l logrus.FieldLogger) error {
+		cell.Invoke(func(cinfo cmtypes.ClusterInfo) error {
 			err := cinfo.Validate()
 			if err != nil {
 				return fmt.Errorf("error validating cluster info: %w", err)

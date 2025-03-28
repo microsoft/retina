@@ -189,9 +189,6 @@ func bootstrapLogging(logger *logrus.Logger) {
 
 func initDaemonConfig(vp *viper.Viper) {
 	option.Config.Populate(vp)
-	// if option.Config.HubbleEventBufferCapacity == 0 {
-	// 	option.Config.HubbleEventBufferCapacity = int(math.Pow(2, 14) - 1) //nolint:gomnd // this is just math
-	// }
 
 	time.MaxInternalTimerDelay = vp.GetDuration(option.MaxInternalTimerDelay)
 }

@@ -8,7 +8,6 @@ import (
 	cgmngr "github.com/cilium/cilium/pkg/cgroups/manager"
 	"github.com/cilium/cilium/pkg/datapath/iptables/ipset"
 	"github.com/cilium/cilium/pkg/datapath/tables"
-	"github.com/cilium/cilium/pkg/datapath/types"
 	datapath "github.com/cilium/cilium/pkg/datapath/types"
 	"github.com/cilium/cilium/pkg/endpointmanager"
 	"github.com/cilium/cilium/pkg/identity/cache"
@@ -102,7 +101,7 @@ var Cell = cell.Module(
 		return &redirectpolicy.Manager{}
 	}),
 
-	cell.Provide(func() types.BandwidthManager {
+	cell.Provide(func() datapath.BandwidthManager {
 		return &fakeBandwidthManager{}
 	}),
 

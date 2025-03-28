@@ -216,7 +216,7 @@ func (r *NodeReconciler) ClusterSizeDependantInterval(time.Duration) time.Durati
 	return time.Second * 5
 }
 
-func (r *NodeReconciler) Enqueue(n *types.Node) {}
+func (r *NodeReconciler) Enqueue(*types.Node) {}
 
 func (r *NodeReconciler) GetNodeIdentities() []types.Identity {
 	return []types.Identity{}
@@ -236,6 +236,6 @@ func (r *NodeReconciler) NodeSync() {}
 
 func (r *NodeReconciler) NodeUpdated(types.Node) {}
 
-func (r *NodeReconciler) StartNeighborRefresh(nh datapath.NodeNeighbors) {}
+func (r *NodeReconciler) StartNeighborRefresh(datapath.NodeNeighbors) {}
 
-func (r *NodeReconciler) StartNodeNeighborLinkUpdater(nh datapath.NodeNeighbors) {}
+func (r *NodeReconciler) StartNodeNeighborLinkUpdater(datapath.NodeNeighbors) {}

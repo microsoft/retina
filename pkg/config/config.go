@@ -96,12 +96,11 @@ func GetConfig(cfgFilename string) (*Config, error) {
 		return nil, fmt.Errorf("fatal error config file: %s", err)
 	}
 	var config Config
-	decoderConfigOption :=
-		viper.DecodeHook(mapstructure.ComposeDecodeHookFunc(
-			mapstructure.StringToTimeDurationHookFunc(), // default hook.
-			mapstructure.StringToSliceHookFunc(","),     // default hook.
-			decodeLevelHook,
-		))
+	decoderConfigOption := viper.DecodeHook(mapstructure.ComposeDecodeHookFunc(
+		mapstructure.StringToTimeDurationHookFunc(), // default hook.
+		mapstructure.StringToSliceHookFunc(","),     // default hook.
+		decodeLevelHook,
+	))
 
 	err = viper.Unmarshal(&config, decoderConfigOption)
 	if err != nil {

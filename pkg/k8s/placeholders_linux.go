@@ -132,11 +132,11 @@ func (n *NoOpPolicyRepository) BumpRevision() uint64 {
 	return 0
 }
 
-func (n *NoOpPolicyRepository) GetAuthTypes(localID identity.NumericIdentity, remoteID identity.NumericIdentity) policy.AuthTypes {
+func (n *NoOpPolicyRepository) GetAuthTypes(identity.NumericIdentity, identity.NumericIdentity) policy.AuthTypes {
 	return policy.AuthTypes{}
 }
 
-func (n *NoOpPolicyRepository) GetEnvoyHTTPRules(l7Rules *api.L7Rules, ns string) (*cilium.HttpNetworkPolicyRules, bool) {
+func (n *NoOpPolicyRepository) GetEnvoyHTTPRules(*api.L7Rules, string) (*cilium.HttpNetworkPolicyRules, bool) {
 	return nil, false
 }
 
@@ -156,17 +156,17 @@ func (n *NoOpPolicyRepository) GetSelectorCache() *policy.SelectorCache {
 	return nil
 }
 
-func (n *NoOpPolicyRepository) Iterate(f func(rule *api.Rule)) {}
+func (n *NoOpPolicyRepository) Iterate(f func(*api.Rule)) {}
 
-func (n *NoOpPolicyRepository) ReplaceByResource(rules api.Rules, resource ipcachetypes.ResourceID) (affectedIDs *set.Set[identity.NumericIdentity], rev uint64, oldRevCnt int) {
+func (n *NoOpPolicyRepository) ReplaceByResource(api.Rules, ipcachetypes.ResourceID) (affectedIDs *set.Set[identity.NumericIdentity], rev uint64, oldRevCnt int) {
 	return nil, 0, 0
 }
 
-func (n *NoOpPolicyRepository) ReplaceByLabels(rules api.Rules, searchLabelsList []labels.LabelArray) (affectedIDs *set.Set[identity.NumericIdentity], rev uint64, oldRevCnt int) {
+func (n *NoOpPolicyRepository) ReplaceByLabels(api.Rules, []labels.LabelArray) (affectedIDs *set.Set[identity.NumericIdentity], rev uint64, oldRevCnt int) {
 	return nil, 0, 0
 }
 
-func (n *NoOpPolicyRepository) Search(lbls labels.LabelArray) (api.Rules, uint64) {
+func (n *NoOpPolicyRepository) Search(labels.LabelArray) (api.Rules, uint64) {
 	return nil, 0
 }
 
@@ -175,24 +175,24 @@ func (n *NoOpPolicyRepository) SetEnvoyRulesFunc(f func(certificatemanager.Secre
 
 type NoOpOrchestrator struct{}
 
-func (n *NoOpOrchestrator) Reinitialize(ctx context.Context) error {
+func (n *NoOpOrchestrator) Reinitialize(context.Context) error {
 	return nil
 }
 
-func (n *NoOpOrchestrator) ReloadDatapath(ctx context.Context, ep datapathtypes.Endpoint, stats *metrics.SpanStat) (string, error) {
+func (n *NoOpOrchestrator) ReloadDatapath(context.Context, datapathtypes.Endpoint, *metrics.SpanStat) (string, error) {
 	return "", nil
 }
 
-func (n *NoOpOrchestrator) ReinitializeXDP(ctx context.Context, extraCArgs []string) error {
+func (n *NoOpOrchestrator) ReinitializeXDP(context.Context, []string) error {
 	return nil
 }
 
-func (n *NoOpOrchestrator) EndpointHash(cfg datapathtypes.EndpointConfiguration) (string, error) {
+func (n *NoOpOrchestrator) EndpointHash(datapathtypes.EndpointConfiguration) (string, error) {
 	return "", nil
 }
 
-func (n *NoOpOrchestrator) WriteEndpointConfig(w io.Writer, cfg datapathtypes.EndpointConfiguration) error {
+func (n *NoOpOrchestrator) WriteEndpointConfig(io.Writer, datapathtypes.EndpointConfiguration) error {
 	return nil
 }
 
-func (n *NoOpOrchestrator) Unload(ep datapathtypes.Endpoint) {}
+func (n *NoOpOrchestrator) Unload(datapathtypes.Endpoint) {}
