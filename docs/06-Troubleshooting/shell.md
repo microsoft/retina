@@ -1,4 +1,4 @@
-# Shell TSG
+# Shell
 
 **EXPERIMENTAL: `retina shell` is an experimental feature, so the flags and behavior may change in future versions.**
 

@@ -1,5 +1,7 @@
 # Retina Config
 
+Retina config allow to define the level of granularity and filtering of Retina metrics, as well as additional options related to retina-agent and retina-operator. We can update Retina config to enable captures, annotaations, and define data aggregation, as a few examples.
+
 ## Overview
 
 ### Default Configuration

@@ -1,4 +1,4 @@
-# MetricsConfiguration CRD
+# MetricsConfiguration
 
 ## Overview
 
