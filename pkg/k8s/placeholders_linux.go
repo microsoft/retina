@@ -1,3 +1,4 @@
+// nolint:unnamedResult (This is a placeholder for the actual implementation)
 package k8s
 
 import (
