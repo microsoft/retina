@@ -33,11 +33,11 @@ import (
 	operatorOption "github.com/cilium/cilium/operator/option"
 	cmtypes "github.com/cilium/cilium/pkg/clustermesh/types"
 	"github.com/cilium/cilium/pkg/controller"
-	"github.com/cilium/cilium/pkg/hive/cell"
 	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
 	"github.com/cilium/cilium/pkg/kvstore/store"
 	"github.com/cilium/cilium/pkg/option"
 	"github.com/cilium/cilium/pkg/pprof"
+	"github.com/cilium/hive/cell"
 )
 
 const operatorK8sNamespace = "kube-system"
@@ -77,12 +77,13 @@ var (
 		telemetry.Constructor,
 
 		// Register the pprof HTTP handlers, to get runtime profiling data.
-		pprof.Cell,
-		cell.Config(pprof.Config{
-			Pprof:        true,
-			PprofAddress: option.PprofAddressAgent,
-			PprofPort:    option.PprofPortAgent,
-		}),
+		pprof.Cell(
+			pprof.Config{
+				Pprof:        true,
+				PprofAddress: option.PprofAddressAgent,
+				PprofPort:    option.PprofPortAgent,
+			},
+		),
 
 		// // Runs the gops agent, a tool to diagnose Go processes.
 		// gops.Cell(defaults.GopsPortOperator),
@@ -101,8 +102,7 @@ var (
 				// to add their metrics when it's set to true. Therefore, we leave the flag as global
 				// instead of declaring it as part of the metrics cell.
 				// This should be changed once the IPAM allocator is modularized.
-				EnableMetrics:    operatorCfg.EnableMetrics,
-				EnableGatewayAPI: operatorCfg.EnableGatewayAPI,
+				EnableMetrics: operatorCfg.EnableMetrics,
 			}
 		}),
 		cell.Provide(func() *k8sruntime.Scheme {

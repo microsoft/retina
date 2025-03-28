@@ -1,7 +1,7 @@
 package config
 
 import (
-	"github.com/cilium/cilium/pkg/hive/cell"
+	"github.com/cilium/hive/cell"
 	"github.com/spf13/pflag"
 
 	sharedconfig "github.com/microsoft/retina/pkg/shared/config"

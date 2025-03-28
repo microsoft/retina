@@ -3,6 +3,7 @@ package endpointcontroller
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"testing"
 	"time"
@@ -670,7 +671,7 @@ func newTestEndpointReconciler(t *testing.T) (*endpointReconciler, *ciliumutil.M
 	l.SetLevel(logrus.DebugLevel)
 	ciliumEndpoints := ciliumutil.NewMockResource[*ciliumv2.CiliumEndpoint](l)
 
-	fakeClientSet, _ := ciliumclient.NewFakeClientset()
+	fakeClientSet, _ := ciliumclient.NewFakeClientset(slog.Default())
 
 	m := ciliumutil.NewMockVersionedClient(l, ciliumEndpoints)
 	r := &endpointReconciler{
