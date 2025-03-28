@@ -3,6 +3,7 @@ package azure
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
@@ -23,6 +24,25 @@ type CreateCluster struct {
 	ResourceGroupName string
 	Location          string
 	ClusterName       string
+	podCidr           string
+	vmSize            string
+	networkPluginMode string
+	Nodes             int32
+}
+
+func (c *CreateCluster) SetPodCidr(podCidr string) *CreateCluster {
+	c.podCidr = podCidr
+	return c
+}
+
+func (c *CreateCluster) SetVMSize(vmSize string) *CreateCluster {
+	c.vmSize = vmSize
+	return c
+}
+
+func (c *CreateCluster) SetNetworkPluginMode(networkPluginMode string) *CreateCluster {
+	c.networkPluginMode = networkPluginMode
+	return c
 }
 
 func (c *CreateCluster) Run() error {
@@ -30,14 +50,35 @@ func (c *CreateCluster) Run() error {
 	if err != nil {
 		return fmt.Errorf("failed to obtain a credential: %w", err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), defaultClusterCreateTimeout)
-	defer cancel()
+	ctx := context.TODO()
 	clientFactory, err := armcontainerservice.NewClientFactory(c.SubscriptionID, cred, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
+	if c.Nodes == 0 {
+		c.Nodes = MaxNumberOfNodes
+	}
 
-	poller, err := clientFactory.NewManagedClustersClient().BeginCreateOrUpdate(ctx, c.ResourceGroupName, c.ClusterName, GetStarterClusterTemplate(c.Location), nil)
+	template := GetStarterClusterTemplate(c.Location)
+
+	if c.Nodes > 0 {
+		template.Properties.AgentPoolProfiles[0].Count = to.Ptr(c.Nodes)
+	}
+
+	if c.podCidr != "" {
+		template.Properties.NetworkProfile.PodCidr = to.Ptr(c.podCidr)
+	}
+
+	if c.vmSize != "" {
+		template.Properties.AgentPoolProfiles[0].VMSize = to.Ptr(c.vmSize)
+	}
+
+	if c.networkPluginMode != "" {
+		template.Properties.NetworkProfile.NetworkPluginMode = to.Ptr(armcontainerservice.NetworkPluginMode(c.networkPluginMode))
+	}
+
+	log.Printf("creating cluster %s in location %s...", c.ClusterName, c.Location)
+	poller, err := clientFactory.NewManagedClustersClient().BeginCreateOrUpdate(ctx, c.ResourceGroupName, c.ClusterName, template, nil)
 	if err != nil {
 		return fmt.Errorf("failed to finish the create cluster request: %w", err)
 	}
@@ -45,6 +86,7 @@ func (c *CreateCluster) Run() error {
 	if err != nil {
 		return fmt.Errorf("failed to pull the create cluster result: %w", err)
 	}
+	log.Printf("cluster created %s in location %s...", c.ClusterName, c.Location)
 
 	return nil
 }

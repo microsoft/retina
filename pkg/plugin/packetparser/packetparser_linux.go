@@ -400,6 +400,8 @@ func (p *packetParser) endpointWatcherCallbackFn(obj interface{}) {
 			// Delete from map.
 			p.tcMap.Delete(ifaceKey)
 		}
+		// Delete from lock map.
+		p.interfaceLockMap.Delete(ifaceKey)
 	default:
 		// Unknown.
 		p.l.Debug("Unknown event", zap.String("type", event.Type.String()))

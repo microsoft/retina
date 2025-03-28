@@ -224,7 +224,7 @@ stages:
               artifactName: $(BUILDER_ADO_ARTIFACTE_NAME) # Replace with your artifact name
               itemPattern: "**/*builder*.tar"
               downloadPath: '$(Pipeline.Workspace)\artifacts'
-
+              
           - task: PowerShell@2
             displayName: "Load Builder Image"
             inputs:

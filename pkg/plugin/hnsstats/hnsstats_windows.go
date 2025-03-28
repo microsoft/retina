@@ -174,14 +174,14 @@ func notifyHnsStats(h *hnsstats, stats *HnsStatsData) {
 	metrics.ForwardBytesGauge.WithLabelValues(ingressLabel).Set(float64(stats.hnscounters.BytesReceived))
 	h.l.Debug("emitting bytes received count metric", zap.Uint64(BytesReceived, stats.hnscounters.BytesReceived))
 
-	metrics.WindowsGauge.WithLabelValues(PacketsReceived).Set(float64(stats.hnscounters.PacketsReceived))
-	metrics.WindowsGauge.WithLabelValues(PacketsSent).Set(float64(stats.hnscounters.PacketsSent))
+	metrics.HNSStatsGauge.WithLabelValues(PacketsReceived).Set(float64(stats.hnscounters.PacketsReceived))
+	metrics.HNSStatsGauge.WithLabelValues(PacketsSent).Set(float64(stats.hnscounters.PacketsSent))
 
 	metrics.DropPacketsGauge.WithLabelValues(utils.Endpoint, egressLabel).Set(float64(stats.hnscounters.DroppedPacketsOutgoing))
 	metrics.DropPacketsGauge.WithLabelValues(utils.Endpoint, ingressLabel).Set(float64(stats.hnscounters.DroppedPacketsIncoming))
 
 	if stats.vfpCounters == nil {
-		h.l.Warn("will not record some metrics since VFP port counters failed to be set")
+		h.l.Debug("will not record some metrics since VFP port counters failed to be set")
 		return
 	}
 

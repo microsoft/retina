@@ -31,4 +31,4 @@ This will add a `Signed-off-by` trailer to your Git commit, affirming your accep
 
 ## More info
 
-Getting started guides, community meetings, and more can be found on the [Retina website](https://retina.sh/docs/contributing).
+Getting started guides, community meetings, and more can be found on the [Retina website](https://retina.sh/docs/Contributing/overview).

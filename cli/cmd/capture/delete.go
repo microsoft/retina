@@ -6,6 +6,8 @@ package capture
 import (
 	"context"
 	"fmt"
+	"os/signal"
+	"syscall"
 
 	retinacmd "github.com/microsoft/retina/cli/cmd"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
@@ -40,6 +42,9 @@ var deleteCapture = &cobra.Command{
 			return errors.Wrap(err, "")
 		}
 
+		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
+		defer cancel()
+
 		captureJobSelector := &metav1.LabelSelector{
 			MatchLabels: map[string]string{
 				label.CaptureNameLabel: *opts.Name,
@@ -51,7 +56,7 @@ var deleteCapture = &cobra.Command{
 			LabelSelector: labelSelector.String(),
 		}
 
-		jobList, err := kubeClient.BatchV1().Jobs(*opts.Namespace).List(context.TODO(), jobListOpt)
+		jobList, err := kubeClient.BatchV1().Jobs(*opts.Namespace).List(ctx, jobListOpt)
 		if err != nil {
 			return errors.Wrap(err, "failed to list capture jobs")
 		}
@@ -61,7 +66,7 @@ var deleteCapture = &cobra.Command{
 
 		for _, job := range jobList.Items {
 			deletePropagationBackground := metav1.DeletePropagationBackground
-			if err := kubeClient.BatchV1().Jobs(job.Namespace).Delete(context.TODO(), job.Name, metav1.DeleteOptions{
+			if err := kubeClient.BatchV1().Jobs(job.Namespace).Delete(ctx, job.Name, metav1.DeleteOptions{
 				PropagationPolicy: &deletePropagationBackground,
 			}); err != nil {
 				retinacmd.Logger.Info("Failed to delete job", zap.String("job name", job.Name), zap.Error(err))
@@ -70,7 +75,7 @@ var deleteCapture = &cobra.Command{
 
 		for _, volume := range jobList.Items[0].Spec.Template.Spec.Volumes {
 			if volume.Secret != nil {
-				if err := kubeClient.CoreV1().Secrets(*opts.Namespace).Delete(context.TODO(), volume.Secret.SecretName, metav1.DeleteOptions{}); err != nil {
+				if err := kubeClient.CoreV1().Secrets(*opts.Namespace).Delete(ctx, volume.Secret.SecretName, metav1.DeleteOptions{}); err != nil {
 					return errors.Wrap(err, "failed to delete capture secret")
 				}
 				break

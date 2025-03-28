@@ -1,0 +1,56 @@
+{{- if .Values.os.linux}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    {{- include "retina.labels" . | nindent 4 }}
+    app.kubernetes.io/component: config
+    k8s-app: {{ include "retina.name" . }}
+  name: {{ include "retina.name" . }}-config
+  namespace: {{ .Values.namespace }}
+data:
+  config.yaml: |-
+    apiServer:
+      host: {{ .Values.apiServer.host }}
+      port: {{ .Values.retinaPort }}
+    logLevel: {{ .Values.logLevel }}
+    enabledPlugin: {{ .Values.enabledPlugin_linux }}
+    metricsInterval: {{ .Values.metricsInterval }}
+    metricsIntervalDuration: {{ .Values.metricsIntervalDuration }}
+    enableTelemetry: {{ .Values.enableTelemetry }}
+    enablePodLevel: {{ .Values.enablePodLevel }}
+    enableConntrackMetrics: {{ .Values.enableConntrackMetrics }}
+    remoteContext: {{ .Values.remoteContext }}
+    enableAnnotations: {{ .Values.enableAnnotations }}
+    bypassLookupIPOfInterest: {{ .Values.bypassLookupIPOfInterest }}
+    dataAggregationLevel: {{ .Values.dataAggregationLevel }}
+    telemetryInterval: {{ .Values.daemonset.telemetryInterval }}
+{{- end}}
+---
+{{- if .Values.os.windows}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    {{- include "retina.labels" . | nindent 4 }}
+    app.kubernetes.io/component: config
+    k8s-app: {{ include "retina.name" . }}
+  name: {{ include "retina.name" . }}-config-win
+  namespace: {{ .Values.namespace }}
+data:
+  config.yaml: |-
+    apiServer:
+      host: {{ .Values.apiServer.host }}
+      port: {{ .Values.retinaPort }}
+    logLevel: {{ .Values.logLevel }}
+    enabledPlugin: {{ .Values.enabledPlugin_win }}
+    metricsInterval: {{ .Values.metricsInterval }}
+    metricsIntervalDuration: {{ .Values.metricsIntervalDuration }}
+    enableTelemetry: {{ .Values.enableTelemetry }}
+    enablePodLevel: {{ .Values.enablePodLevel }}
+    remoteContext: {{ .Values.remoteContext }}
+    telemetryInterval: {{ .Values.daemonset.telemetryInterval }}
+{{- end}}
+
+
+

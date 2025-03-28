@@ -132,7 +132,7 @@ data:
     metricsInterval: {{ .Values.metricsInterval }}
     metricsIntervalDuration: {{ .Values.metricsIntervalDuration }}
     enableTelemetry: {{ .Values.enableTelemetry }}
-    enablePodLevel: {{ .Values.enablePodLevel }}
+    enablePodLevel: false
     remoteContext: {{ .Values.remoteContext }}
     bypassLookupIPOfInterest: {{ .Values.bypassLookupIPOfInterest }}
 {{- end}}

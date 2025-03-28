@@ -90,7 +90,7 @@ logLevel: info
 enabledPlugin_linux: '["linuxutil","packetforward","packetparser","dns", "dropreason"]'
 enabledPlugin_win: '["hnsstats"]'
 
-enableTelemetry: true
+enableTelemetry: false
 
 # Interval, in duration, to scrape/publish metrics.
 metricsIntervalDuration: "10s"
@@ -98,16 +98,6 @@ metricsIntervalDuration: "10s"
 azure:
   appinsights:
     instrumentation_key: "app-insights-instrumentation-key"
-
-# volume mounts with name and mountPath
-volumeMounts:
-  debug: /sys/kernel/debug
-  trace: /sys/kernel/tracing
-  bpf: /sys/fs/bpf
-  cgroup: /sys/fs/cgroup
-  tmp: /tmp
-  config: /retina/config
-  varrun: /var/run
 
 #volume mounts for indows
 volumeMounts_win:

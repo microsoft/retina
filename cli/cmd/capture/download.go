@@ -18,12 +18,13 @@ import (
 
 const BlobURL = "BLOB_URL"
 
-var ErrEmptyBlobURL = errors.New("BLOB_URL must be set/exported")
+var ErrEmptyBlobURL = errors.Errorf("%s environment variable is empty. It must be set/exported", BlobURL)
 
 var downloadCapture = &cobra.Command{
 	Use:   "download",
 	Short: "Download Retina Captures",
 	RunE: func(*cobra.Command, []string) error {
+		viper.AutomaticEnv()
 		blobURL := viper.GetString(BlobURL)
 		if blobURL == "" {
 			return ErrEmptyBlobURL

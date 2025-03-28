@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"syscall"
@@ -44,10 +45,9 @@ func main() {
 		tel = telemetry.NewNoopTelemetry()
 	}
 
-	// Create channel to listen for signals.
-	sigChan := make(chan os.Signal, 1)
-	// Notify sigChan for SIGTERM.
-	signal.Notify(sigChan, syscall.SIGTERM)
+	// Create a context that is canceled when a termination signal is received
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
+	defer cancel()
 
 	cm := capture.NewCaptureManager(l, tel)
 
@@ -56,12 +56,12 @@ func main() {
 			l.Error("Failed to cleanup network capture", zap.Error(err))
 		}
 	}()
-	srcDir, err := cm.CaptureNetwork(sigChan)
+	srcDir, err := cm.CaptureNetwork(ctx)
 	if err != nil {
 		l.Error("Failed to capture network traffic", zap.Error(err))
 		os.Exit(1)
 	}
-	if err := cm.OutputCapture(srcDir); err != nil {
+	if err := cm.OutputCapture(ctx, srcDir); err != nil {
 		l.Error("Failed to output network traffic", zap.Error(err))
 	}
 	l.Info("Done for capturing network traffic")

@@ -50,13 +50,14 @@ func TestCaptureNetwork(t *testing.T) {
 		os.Unsetenv(captureConstants.CaptureMaxSizeEnvKey)
 	}()
 
-	sigChanel := make(chan os.Signal, 1)
+	ctx, cancel := TestContext(t)
+	defer cancel()
 
 	tmpFilename := file.CaptureFilename{CaptureName: captureName, NodeHostname: nodeHostName, StartTimestamp: &timestamp}
 	networkCaptureProvider.EXPECT().Setup(tmpFilename).Return(fmt.Sprintf("%s-%s-%s", captureName, nodeHostName, &timestamp), nil).Times(1)
-	networkCaptureProvider.EXPECT().CaptureNetworkPacket(filter, duration, maxSize, sigChanel).Return(nil).Times(1)
+	networkCaptureProvider.EXPECT().CaptureNetworkPacket(ctx, filter, duration, maxSize).Return(nil).Times(1)
 
-	_, err := cm.CaptureNetwork(sigChanel)
+	_, err := cm.CaptureNetwork(ctx)
 	if err != nil {
 		t.Errorf("CaptureNetwork should have not fail with error %s", err)
 	}

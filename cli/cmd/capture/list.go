@@ -4,6 +4,10 @@
 package capture
 
 import (
+	"context"
+	"os/signal"
+	"syscall"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/client-go/kubernetes"
@@ -36,11 +40,15 @@ var listCaptures = &cobra.Command{
 			return errors.Wrap(err, "failed to initialize kubernetes client")
 		}
 
+		// Create a context that is canceled when a termination signal is received
+		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
+		defer cancel()
+
 		captureNamespace := *opts.Namespace
 		if allNamespaces {
 			captureNamespace = ""
 		}
-		return listCapturesInNamespaceAndPrintCaptureResults(kubeClient, captureNamespace)
+		return listCapturesInNamespaceAndPrintCaptureResults(ctx, kubeClient, captureNamespace)
 	},
 }
 

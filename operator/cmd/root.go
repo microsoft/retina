@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/microsoft/retina/operator/cmd/legacy"
+	"github.com/microsoft/retina/operator/cmd/standard"
 	"github.com/spf13/cobra"
 )
 
@@ -27,7 +27,7 @@ var (
 		Long:  "Start Retina Operator",
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Println("Starting Retina Operator")
-			d := legacy.NewOperator(metricsAddr, probeAddr, cfgFile, enableLeaderElection)
+			d := standard.NewOperator(metricsAddr, probeAddr, cfgFile, enableLeaderElection)
 			d.Start()
 		},
 	}

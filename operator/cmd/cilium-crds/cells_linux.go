@@ -90,7 +90,7 @@ var (
 		// Provides Clientset, API for accessing Kubernetes objects.
 		k8sClient.Cell,
 
-		// Provides the modular metrics registry, metric HTTP server and legacy metrics cell.
+		// Provides the modular metrics registry, metric HTTP server and standard metrics cell.
 		// NOTE: no server/metrics are created when --enable-metrics=false (default)
 		operatorMetrics.Cell,
 		cell.Provide(func(
@@ -175,7 +175,7 @@ var (
 		// 	isLeader.Load,
 		// ),
 
-		// NOTE: might need to uncomment to support metrics? Code might be legacy though?
+		// NOTE: might need to uncomment to support metrics? Code might be standard though?
 		// api.MetricsHandlerCell,
 
 		controller.Cell,

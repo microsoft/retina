@@ -33,7 +33,7 @@ func (r *Runner) Run(ctx context.Context) {
 	}()
 	select {
 	case <-ctx.Done():
-		r.t.Fatal("Test deadline exceeded. If more time is needed, set -timeout flag to a higher value")
+		r.t.Fatal("Failed to complete execution:", ctx.Err())
 	case err := <-runComplete:
 		require.NoError(r.t, err)
 	}
