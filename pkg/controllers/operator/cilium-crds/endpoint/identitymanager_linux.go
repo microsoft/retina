@@ -46,7 +46,7 @@ func (o *owner) GetNodeSuffix() string {
 func NewIdentityManager(l logrus.FieldLogger, client versioned.Interface) (*IdentityManager, error) {
 	im := &IdentityManager{
 		l:               l.WithField("component", "identitymanager"),
-		alloc:           cache.NewCachingIdentityAllocator(&owner{}),
+		alloc:           cache.NewCachingIdentityAllocator(&owner{}, cache.AllocatorConfig{}),
 		labelIdentities: make(map[string]identity.NumericIdentity),
 	}
 

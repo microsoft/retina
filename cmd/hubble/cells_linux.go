@@ -7,22 +7,32 @@ package hubble
 import (
 	"github.com/cilium/cilium/pkg/defaults"
 	"github.com/cilium/cilium/pkg/gops"
+	hubblecell "github.com/cilium/cilium/pkg/hubble/cell"
+	exportercell "github.com/cilium/cilium/pkg/hubble/exporter/cell"
+	hubbleParser "github.com/cilium/cilium/pkg/hubble/parser"
+	"github.com/cilium/cilium/pkg/ipcache"
+	"github.com/cilium/cilium/pkg/k8s"
 	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
+	"github.com/cilium/cilium/pkg/logging"
+	"github.com/cilium/cilium/pkg/logging/logfields"
+	"github.com/cilium/cilium/pkg/node/manager"
 	"github.com/cilium/cilium/pkg/option"
 	"github.com/cilium/cilium/pkg/pprof"
+	"github.com/cilium/cilium/pkg/recorder"
 	"github.com/cilium/hive/cell"
-	"github.com/cilium/proxy/pkg/logging"
-	"github.com/cilium/proxy/pkg/logging/logfields"
+	"github.com/sirupsen/logrus"
+	"k8s.io/client-go/rest"
+
 	"github.com/microsoft/retina/internal/buildinfo"
 	"github.com/microsoft/retina/pkg/config"
+	"github.com/microsoft/retina/pkg/controllers/daemon/nodereconciler"
 	rnode "github.com/microsoft/retina/pkg/controllers/daemon/nodereconciler"
-	hubbleserver "github.com/microsoft/retina/pkg/hubble"
+	"github.com/microsoft/retina/pkg/hubble/parser"
 	retinak8s "github.com/microsoft/retina/pkg/k8s"
 	"github.com/microsoft/retina/pkg/managers/pluginmanager"
 	"github.com/microsoft/retina/pkg/monitoragent"
 	"github.com/microsoft/retina/pkg/servermanager"
 	"github.com/microsoft/retina/pkg/shared/telemetry"
-	"k8s.io/client-go/rest"
 )
 
 var (
@@ -40,15 +50,14 @@ var (
 		"Infrastructure",
 
 		// Register the pprof HTTP handlers, to get runtime profiling data.
-		pprof.Cell,
-		cell.Config(pprof.Config{
+		pprof.Cell(pprof.Config{
 			Pprof:        true,
 			PprofAddress: option.PprofAddressAgent,
 			PprofPort:    option.PprofPortAgent,
 		}),
 
 		// Runs the gops agent, a tool to diagnose Go processes.
-		gops.Cell(defaults.GopsPortAgent),
+		gops.Cell(true, defaults.GopsPortAgent),
 
 		// Parse Retina specific configuration
 		config.Cell,
@@ -81,17 +90,31 @@ var (
 
 		daemonCell,
 
-		// Provides the node reconciler
-		rnode.Cell,
-
-		// Provides the hubble agent
-		hubbleserver.Cell,
-
 		pluginmanager.Cell,
 
 		servermanager.Cell,
 
 		retinak8s.Cell,
+
+		recorder.Cell,
+
+		cell.Provide(
+			func(l logrus.FieldLogger, ipc *ipcache.IPCache, sc *k8s.ServiceCacheImpl) hubbleParser.Decoder {
+				return parser.New(l.WithField("decoder", nil), sc, ipc)
+			},
+		),
+
+		// Provides the node reconciler as node manager
+		rnode.Cell,
+		cell.Provide(
+			func(nr *nodereconciler.NodeReconciler) manager.NodeManager {
+				return nr
+			},
+		),
+
+		exportercell.Cell,
+		// Provides the hubble agent
+		hubblecell.Core,
 
 		telemetry.Heartbeat,
 	)

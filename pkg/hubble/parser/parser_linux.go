@@ -25,13 +25,13 @@ var (
 type Parser struct {
 	l       logrus.FieldLogger
 	ipcache *ipc.IPCache
-	svc     *k8s.ServiceCache
+	svc     k8s.ServiceCache
 
 	l34 *layer34.Parser
 	l7  *seven.Parser
 }
 
-func New(l *logrus.Entry, svc *k8s.ServiceCache, c *ipc.IPCache) *Parser {
+func New(l *logrus.Entry, svc k8s.ServiceCache, c *ipc.IPCache) *Parser {
 	return &Parser{
 		l:       l,
 		ipcache: c,

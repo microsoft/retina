@@ -20,7 +20,7 @@ type Parser struct {
 	ep  common.EpDecoder
 }
 
-func New(l *logrus.Entry, svc *k8s.ServiceCache, c *ipc.IPCache) *Parser {
+func New(l *logrus.Entry, svc k8s.ServiceCache, c *ipc.IPCache) *Parser {
 	return &Parser{
 		l:   l.WithField("subsys", "seven"),
 		svd: common.NewSvcDecoder(svc),

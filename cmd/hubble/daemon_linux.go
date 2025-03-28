@@ -18,6 +18,7 @@ import (
 	retinak8s "github.com/microsoft/retina/pkg/k8s"
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
+	hubblecell "github.com/cilium/cilium/pkg/hubble/cell"
 	"github.com/cilium/cilium/pkg/ipcache"
 	"github.com/cilium/cilium/pkg/k8s"
 	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
@@ -107,7 +108,8 @@ type Daemon struct {
 	k8swatcher     *watchers.K8sWatcher
 	localNodeStore *node.LocalNodeStore
 	ipc            *ipcache.IPCache
-	svcCache       *k8s.ServiceCache
+	svcCache       k8s.ServiceCache
+	hubble         hubblecell.HubbleIntegration
 }
 
 func newDaemon(params *daemonParams) *Daemon {
@@ -123,6 +125,7 @@ func newDaemon(params *daemonParams) *Daemon {
 		localNodeStore: params.Lnds,
 		ipc:            params.IPC,
 		svcCache:       params.SvcCache,
+		hubble:         params.Hubble,
 	}
 }
 

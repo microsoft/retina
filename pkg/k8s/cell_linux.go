@@ -2,15 +2,17 @@ package k8s
 
 import (
 	"context"
+	"log/slog"
 
 	daemonk8s "github.com/cilium/cilium/daemon/k8s"
-	"github.com/cilium/cilium/pkg/bgp/speaker"
 	cgmngr "github.com/cilium/cilium/pkg/cgroups/manager"
 	"github.com/cilium/cilium/pkg/datapath/iptables/ipset"
 	"github.com/cilium/cilium/pkg/datapath/tables"
 	"github.com/cilium/cilium/pkg/datapath/types"
+	datapath "github.com/cilium/cilium/pkg/datapath/types"
 	"github.com/cilium/cilium/pkg/endpointmanager"
 	"github.com/cilium/cilium/pkg/identity/cache"
+	identitycachecell "github.com/cilium/cilium/pkg/identity/cache/cell"
 	"github.com/cilium/cilium/pkg/ipcache"
 	ciliumk8s "github.com/cilium/cilium/pkg/k8s"
 	cilium_api_v2 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2"
@@ -24,7 +26,6 @@ import (
 	"github.com/cilium/cilium/pkg/k8s/watchers"
 	"github.com/cilium/cilium/pkg/metrics"
 	"github.com/cilium/cilium/pkg/node"
-	"github.com/cilium/cilium/pkg/node/manager"
 	"github.com/cilium/cilium/pkg/policy"
 	"github.com/cilium/cilium/pkg/redirectpolicy"
 	"github.com/cilium/cilium/pkg/service"
@@ -40,24 +41,21 @@ var Cell = cell.Module(
 	"k8s-watcher",
 	"Kubernetes watchers needed by the agent",
 
+	daemonk8s.PodTableCell,
+
 	cell.Provide(
-		func() (statedb.Table[tables.NodeAddress], error) {
-			return statedb.NewTable(tables.NodeAddressTableName, tables.NodeAddressIndex)
-		},
+		tables.NewDeviceTable,
+		statedb.RWTable[*tables.Device].ToTable,
 	),
-	cell.Invoke(func(db *statedb.DB, t statedb.Table[tables.NodeAddress]) {
+
+	cell.Invoke(func(db *statedb.DB, t statedb.Table[*tables.Device]) {
 		err := db.RegisterTable(t)
 		if err != nil {
 			logrus.WithError(err).Fatal("Failed to register table")
 		}
 	}),
-	cell.Provide(ciliumk8s.NewSVCMetricsNoop),
-	cell.Provide(ciliumk8s.NewServiceCache),
 
 	cell.Provide(
-		func(cell.Lifecycle, client.Clientset) (daemonk8s.LocalPodResource, error) {
-			return &fakeresource[*slim_corev1.Pod]{}, nil
-		},
 		func() resource.Resource[*slim_corev1.Namespace] {
 			return &fakeresource[*slim_corev1.Namespace]{}
 		},
@@ -90,6 +88,8 @@ var Cell = cell.Module(
 		},
 	),
 
+	svcCacheCell,
+
 	metrics.Cell,
 
 	endpointmanager.Cell,
@@ -121,9 +121,9 @@ var Cell = cell.Module(
 		}, nil, func(*metav1.ListOptions) {})
 	}),
 
-	cell.Provide(func(lc cell.Lifecycle, cs client.Clientset) (resource.Resource[*ciliumk8s.Endpoints], error) {
+	cell.Provide(func(l *slog.Logger, lc cell.Lifecycle, cs client.Clientset) (resource.Resource[*ciliumk8s.Endpoints], error) {
 		//nolint:wrapcheck // a wrapped error here is of dubious value
-		return ciliumk8s.EndpointsResource(lc, ciliumk8s.Config{
+		return ciliumk8s.EndpointsResource(l, lc, ciliumk8s.Config{
 			EnableK8sEndpointSlice: true,
 			K8sServiceProxyName:    "",
 		}, cs)
@@ -141,20 +141,36 @@ var Cell = cell.Module(
 		)
 	}),
 
+	cell.Provide(
+		func() policy.PolicyRepository {
+			return &NoOpPolicyRepository{}
+		},
+		func() datapath.Orchestrator {
+			return &NoOpOrchestrator{}
+		},
+	),
+
+	identitycachecell.Cell,
+
 	// Provide everything needed for the watchers.
-	cell.Provide(func() *ipcache.IPCache {
-		iao := &identityAllocatorOwner{}
-		idAlloc := &cachingIdentityAllocator{
-			cache.NewCachingIdentityAllocator(iao),
-			nil,
-		}
-		return ipcache.NewIPCache(&ipcache.Configuration{
-			Context:           context.Background(),
-			IdentityAllocator: idAlloc,
-			PolicyHandler:     &policyhandler{},
-			DatapathHandler:   &datapathhandler{},
-		})
-	}),
+	cell.Provide(
+		func() *ipcache.IPCache {
+			alloc := cache.NewCachingIdentityAllocator(
+				&identityAllocatorOwner{},
+				cache.AllocatorConfig{},
+			)
+			idAlloc := &cachingIdentityAllocator{
+				alloc,
+				nil,
+			}
+			return ipcache.NewIPCache(&ipcache.Configuration{
+				Context:           context.Background(),
+				IdentityAllocator: idAlloc,
+				PolicyHandler:     &policyhandler{},
+				DatapathHandler:   &datapathhandler{},
+			})
+		},
+	),
 
 	cell.Provide(func() node.LocalNodeSynchronizer {
 		return &nodeSynchronizer{
@@ -166,18 +182,12 @@ var Cell = cell.Module(
 		return &fakeIpsetMgr{}
 	}),
 
-	cell.Provide(func() speaker.MetalLBBgpSpeaker {
-		return &fakeMetalLBBgpSpeaker{}
-	}),
-
-	manager.Cell,
-
 	node.LocalNodeStoreCell,
 
 	synced.Cell,
 	cell.Provide(newAPIServerEventHandler),
 
-	cell.Provide(func() watchers.ResourceGroupFunc { return resGroups }),
+	cell.Provide(func() watchers.ResourceGroupFunc { return watcherResourceGroups }),
 
 	watchers.Cell,
 
@@ -191,10 +201,32 @@ var Cell = cell.Module(
 	}),
 )
 
-func resGroups(watchers.WatcherConfiguration) (resourceGroups, waitForCachesOnly []string) {
-	resourceGroups = []string{
-		K8sAPIGroupServiceV1Core,
-		K8sAPIGroupCiliumEndpointV2,
-	}
-	return
+var svcCacheCell = cell.Group(
+	cell.Provide(func() (statedb.Table[tables.NodeAddress], error) {
+		return statedb.NewTable(tables.NodeAddressTableName, tables.NodeAddressIndex)
+	}),
+	cell.Invoke(func(db *statedb.DB, t statedb.Table[tables.NodeAddress]) {
+		err := db.RegisterTable(t)
+		if err != nil {
+			logrus.WithError(err).Fatal("Failed to register table")
+		}
+	}),
+	cell.Provide(ciliumk8s.NewSVCMetricsNoop),
+	cell.Provide(ciliumk8s.NewServiceCache),
+	cell.Provide(func(svcCache *ciliumk8s.ServiceCacheImpl) ciliumk8s.ServiceCache {
+		return svcCache
+	}),
+)
+
+const (
+	K8sAPIGroupCiliumEndpointV2 = "cilium/v2::CiliumEndpoint"
+	K8sAPIGroupServiceV1Core    = "core/v1::Service"
+)
+
+var k8sResources = []string{K8sAPIGroupCiliumEndpointV2, K8sAPIGroupServiceV1Core}
+
+// resourceGroups are all of the core Kubernetes and Cilium resource groups
+// which the Cilium agent watches to implement CNI functionality.
+func watcherResourceGroups(logger *slog.Logger, cfg watchers.WatcherConfiguration) (resourceGroups, waitForCachesOnly []string) {
+	return k8sResources, waitForCachesOnly
 }

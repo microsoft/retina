@@ -77,12 +77,13 @@ var (
 		telemetry.Constructor,
 
 		// Register the pprof HTTP handlers, to get runtime profiling data.
-		pprof.Cell,
-		cell.Config(pprof.Config{
-			Pprof:        true,
-			PprofAddress: option.PprofAddressAgent,
-			PprofPort:    option.PprofPortAgent,
-		}),
+		pprof.Cell(
+			pprof.Config{
+				Pprof:        true,
+				PprofAddress: option.PprofAddressAgent,
+				PprofPort:    option.PprofPortAgent,
+			},
+		),
 
 		// // Runs the gops agent, a tool to diagnose Go processes.
 		// gops.Cell(defaults.GopsPortOperator),
@@ -101,8 +102,7 @@ var (
 				// to add their metrics when it's set to true. Therefore, we leave the flag as global
 				// instead of declaring it as part of the metrics cell.
 				// This should be changed once the IPAM allocator is modularized.
-				EnableMetrics:    operatorCfg.EnableMetrics,
-				EnableGatewayAPI: operatorCfg.EnableGatewayAPI,
+				EnableMetrics: operatorCfg.EnableMetrics,
 			}
 		}),
 		cell.Provide(func() *k8sruntime.Scheme {
@@ -122,7 +122,7 @@ var (
 
 		cell.Config(cmtypes.DefaultClusterInfo),
 		cell.Invoke(func(cinfo cmtypes.ClusterInfo, l logrus.FieldLogger) error {
-			err := cinfo.Validate(l)
+			err := cinfo.Validate()
 			if err != nil {
 				return fmt.Errorf("error validating cluster info: %w", err)
 			}

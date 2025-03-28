@@ -18,19 +18,13 @@ import (
 func init() {
 	// Register custom error handler for the watcher
 	// nolint:reassign // this is the only way to set the error handler
-	runtime.ErrorHandlers = []func(error){
-		k8sWatcherErrorHandler,
+	runtime.ErrorHandlers = []runtime.ErrorHandler{
+		runtime.ErrorHandler(k8sWatcherErrorHandler),
 	}
 }
 
-const (
-	K8sAPIGroupCiliumEndpointV2 = "cilium/v2::CiliumEndpoint"
-	K8sAPIGroupServiceV1Core    = "core/v1::Service"
-)
-
 var (
-	logger       = logging.DefaultLogger.WithField(logfields.LogSubsys, "k8s-watcher")
-	k8sResources = []string{K8sAPIGroupCiliumEndpointV2, K8sAPIGroupServiceV1Core}
+	logger = logging.DefaultLogger.WithField(logfields.LogSubsys, "k8s-watcher")
 )
 
 func Start(ctx context.Context, k *watchers.K8sWatcher) {
@@ -48,7 +42,7 @@ func Start(ctx context.Context, k *watchers.K8sWatcher) {
 
 // retinaK8sErrorHandler is a custom error handler for the watcher
 // that logs the error and tags the error to easily identify
-func k8sWatcherErrorHandler(e error) {
+func k8sWatcherErrorHandler(c context.Context, e error, s string, i ...interface{}) {
 	errStr := e.Error()
 	logError := func(er, r string) {
 		logger.WithFields(logrus.Fields{
@@ -67,6 +61,6 @@ func k8sWatcherErrorHandler(e error) {
 	case strings.Contains(errStr, "Failed to watch *v2.CiliumNode"):
 		logError(errStr, "v2.CiliumNode")
 	default:
-		k8s.K8sErrorHandler(e)
+		k8s.K8sErrorHandler(c, e, s, i...)
 	}
 }

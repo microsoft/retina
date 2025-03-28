@@ -95,11 +95,6 @@ func (m *MockCiliumV2Client) CiliumEnvoyConfigs(_ string) ciliumv2.CiliumEnvoyCo
 	return nil
 }
 
-func (m *MockCiliumV2Client) CiliumExternalWorkloads() ciliumv2.CiliumExternalWorkloadInterface {
-	m.l.Warn("MockCiliumV2Client.CiliumExternalWorkloads() called but this returns nil because it's not implemented")
-	return nil
-}
-
 func (m *MockCiliumV2Client) CiliumIdentities() ciliumv2.CiliumIdentityInterface {
 	m.l.Info("MockCiliumV2Client.CiliumIdentities() called")
 	return m.identitiyClient
@@ -122,5 +117,30 @@ func (m *MockCiliumV2Client) CiliumNodes() ciliumv2.CiliumNodeInterface {
 
 func (m *MockCiliumV2Client) CiliumNodeConfigs(_ string) ciliumv2.CiliumNodeConfigInterface {
 	m.l.Warn("MockCiliumV2Client.CiliumNodeConfigs() called but this returns nil because it's not implemented")
+	return nil
+}
+
+func (m *MockCiliumV2Client) CiliumBGPAdvertisements() ciliumv2.CiliumBGPAdvertisementInterface {
+	m.l.Warn("MockCiliumV2Client.CiliumNetworkPoliciesForCRD() called but this returns nil because it's not implemented")
+	return nil
+}
+
+func (m *MockCiliumV2Client) CiliumBGPClusterConfigs() ciliumv2.CiliumBGPClusterConfigInterface {
+	m.l.Warn("MockCiliumV2Client.CiliumNetworkPoliciesForCRD() called but this returns nil because it's not implemented")
+	return nil
+}
+
+func (m *MockCiliumV2Client) CiliumBGPNodeConfigOverrides() ciliumv2.CiliumBGPNodeConfigOverrideInterface {
+	m.l.Warn("MockCiliumV2Client.CiliumNetworkPoliciesForCRD() called but this returns nil because it's not implemented")
+	return nil
+}
+
+func (m *MockCiliumV2Client) CiliumBGPNodeConfigs() ciliumv2.CiliumBGPNodeConfigInterface {
+	m.l.Warn("MockCiliumV2Client.CiliumNetworkPoliciesForCRD() called but this returns nil because it's not implemented")
+	return nil
+}
+
+func (m *MockCiliumV2Client) CiliumBGPPeerConfigs() ciliumv2.CiliumBGPPeerConfigInterface {
+	m.l.Warn("MockCiliumV2Client.CiliumNetworkPoliciesForCRD() called but this returns nil because it's not implemented")
 	return nil
 }

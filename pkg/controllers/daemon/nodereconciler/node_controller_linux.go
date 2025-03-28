@@ -24,6 +24,7 @@ import (
 	"github.com/cilium/cilium/pkg/node/addressing"
 	"github.com/cilium/cilium/pkg/node/types"
 	"github.com/cilium/cilium/pkg/source"
+	"github.com/cilium/cilium/pkg/time"
 )
 
 // NodeReconciler reconciles a Node object.
@@ -210,3 +211,31 @@ func (r *NodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	return nil
 }
+
+func (r *NodeReconciler) ClusterSizeDependantInterval(time.Duration) time.Duration {
+	return time.Second * 5
+}
+
+func (r *NodeReconciler) Enqueue(n *types.Node) {}
+
+func (r *NodeReconciler) GetNodeIdentities() []types.Identity {
+	return []types.Identity{}
+}
+
+func (r *NodeReconciler) GetNodes() map[types.Identity]types.Node {
+	return map[types.Identity]types.Node{}
+}
+
+// MeshNodeSync
+func (r *NodeReconciler) MeshNodeSync() {}
+
+// NodeDeleted
+func (r *NodeReconciler) NodeDeleted(types.Node) {}
+
+func (r *NodeReconciler) NodeSync() {}
+
+func (r *NodeReconciler) NodeUpdated(types.Node) {}
+
+func (r *NodeReconciler) StartNeighborRefresh(nh datapath.NodeNeighbors) {}
+
+func (r *NodeReconciler) StartNodeNeighborLinkUpdater(nh datapath.NodeNeighbors) {}

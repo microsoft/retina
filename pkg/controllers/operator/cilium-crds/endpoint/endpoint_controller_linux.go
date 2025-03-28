@@ -6,6 +6,7 @@ package endpointcontroller
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"reflect"
 	"sync"
 	"time"
@@ -665,7 +666,7 @@ func (r *endpointReconciler) ciliumEndpointsLabels(ctx context.Context, pod *sli
 		}
 		r.store.AddNamespace(ns)
 	}
-	_, ciliumLabels, _, err := k8s.GetPodMetadata(ns, pod)
+	_, ciliumLabels := k8s.GetPodMetadata(slog.Default(), ns, pod)
 	if err != nil {
 		r.l.WithError(err).WithFields(logrus.Fields{
 			"podKey": pod.Name,

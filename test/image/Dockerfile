@@ -1,6 +1,6 @@
 # build stage
-# mcr.microsoft.com/oss/go/microsoft/golang:1.23.5-cbl-mariner2.0
-FROM mcr.microsoft.com/oss/go/microsoft/golang@sha256:ef39e430a97a61bec3395adb673a7c5611d2212f14abe40da21cbfd11a9d6e9d AS builder
+# mcr.microsoft.com/oss/go/microsoft/golang:1.24.1-cbl-mariner2.0
+FROM mcr.microsoft.com/oss/go/microsoft/golang@sha256:8af557687320a25572043c9076107a4b122fb94a20959122499401a03a6fffb7 AS builder
 ENV CGO_ENABLED=0
 COPY . /go/src/github.com/microsoft/retina 
 WORKDIR /go/src/github.com/microsoft/retina
