@@ -18,7 +18,9 @@
 // Time units in seconds
 
 // Define how long a TCP connection should be kept in the table
-#define CT_CONNECTION_LIFETIME_TCP 360 
+#define CT_CONNECTION_LIFETIME_TCP 360
+// Define how long a TCP connection should be kept in the TIME_WAIT state
+#define CT_TIME_WAIT_TIMEOUT_TCP 30
 // Define how long a non-TCP connection should be kept in the table
 #define CT_CONNECTION_LIFETIME_NONTCP 60
 // Define how long a TCP connection should be kept alive after receiving the first SYN
