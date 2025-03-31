@@ -17,14 +17,14 @@ import (
 type Parser struct {
 	l   *logrus.Entry
 	svd common.SvcDecoder
-	ep  common.EpDecoder
+	epd common.EpDecoder
 }
 
 func New(l *logrus.Entry, svc k8s.ServiceCache, c *ipc.IPCache) *Parser {
 	p := &Parser{
 		l:   l.WithField("subsys", "layer34"),
 		svd: common.NewSvcDecoder(svc),
-		ep:  common.NewEpDecoder(c),
+		epd: common.NewEpDecoder(c),
 	}
 	// Log the localHostIP for debugging purposes.
 	return p
@@ -51,8 +51,8 @@ func (p *Parser) Decode(f *flow.Flow) *flow.Flow {
 	}
 
 	// Decode the flow's source and destination IPs to their respective endpoints.
-	f.Source = p.ep.Decode(sourceIP)
-	f.Destination = p.ep.Decode(destIP)
+	f.Source = p.epd.Decode(sourceIP)
+	f.Destination = p.epd.Decode(destIP)
 	f.SourceService = p.svd.Decode(sourceIP)
 	f.DestinationService = p.svd.Decode(destIP)
 
@@ -103,7 +103,7 @@ func (p *Parser) decodeTrafficDirection(f *flow.Flow) {
 	}
 
 	// If the source EP's node is the same as the current node, then the traffic is outbound.
-	if p.ep.IsEndpointOnLocalHost(f.GetIP().GetSource()) {
+	if p.epd.IsEndpointOnLocalHost(f.GetIP().GetSource()) {
 		f.TrafficDirection = flow.TrafficDirection_EGRESS
 		return
 	}

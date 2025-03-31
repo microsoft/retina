@@ -47,7 +47,7 @@ func (m *MockEnricherInterface) EXPECT() *MockEnricherInterfaceMockRecorder {
 }
 
 // ExportReader mocks base method.
-func (m *MockEnricherInterface) ExportReader() RingReaderInterface {
+func (m *MockEnricherInterface) ExportReader() *container.RingReader {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ExportReader")
 	ret0, _ := ret[0].(*container.RingReader)

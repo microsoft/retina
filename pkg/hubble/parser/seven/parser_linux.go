@@ -17,14 +17,14 @@ import (
 type Parser struct {
 	l   *logrus.Entry
 	svd common.SvcDecoder
-	ep  common.EpDecoder
+	epd common.EpDecoder
 }
 
 func New(l *logrus.Entry, svc k8s.ServiceCache, c *ipc.IPCache) *Parser {
 	return &Parser{
 		l:   l.WithField("subsys", "seven"),
 		svd: common.NewSvcDecoder(svc),
-		ep:  common.NewEpDecoder(c),
+		epd: common.NewEpDecoder(c),
 	}
 }
 
@@ -77,8 +77,8 @@ func (p *Parser) decodeIP(f *flow.Flow) {
 		return
 	}
 
-	f.Source = p.ep.Decode(sourceIP)
-	f.Destination = p.ep.Decode(destIP)
+	f.Source = p.epd.Decode(sourceIP)
+	f.Destination = p.epd.Decode(destIP)
 	f.SourceService = p.svd.Decode(sourceIP)
 	f.DestinationService = p.svd.Decode(destIP)
 }

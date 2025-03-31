@@ -186,6 +186,6 @@ func (e *Enricher) Write(ev *v1.Event) {
 	e.inputRing.Write(ev)
 }
 
-func (e *Enricher) ExportReader() RingReaderInterface {
+func (e *Enricher) ExportReader() *container.RingReader {
 	return container.NewRingReader(e.outputRing, e.outputRing.OldestWrite())
 }
