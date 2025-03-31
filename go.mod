@@ -1,6 +1,7 @@
 module github.com/microsoft/retina
 
 go 1.24.1
+
 require (
 	github.com/go-chi/chi/v5 v5.2.1
 	github.com/google/uuid v1.6.0
@@ -52,7 +53,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.3 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/v4a v1.3.34 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.12.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.6.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.7.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.12.15 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.18.15 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.25.2 // indirect
@@ -669,7 +670,7 @@ replace k8s.io/perf-tests/network/benchmarks/netperf => github.com/Azure/perf-te
 
 replace go.universe.tf/metallb => github.com/cilium/metallb v0.1.1-0.20220829170633-5d7dfb1129f7
 
-replace github.com/cilium/cilium => github.com/ritwikranjan/cilium v0.0.0-20250325115314-705b6544077b
+replace github.com/cilium/cilium => github.com/ritwikranjan/cilium v0.0.0-20250327074327-6908ee3a6f1b
 
 // replace github.com/cilium/cilium => github.com/anubhabMajumdar/cilium v0.0.0-20250114231451-025e95e1ee63
 
