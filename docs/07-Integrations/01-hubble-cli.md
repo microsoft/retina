@@ -40,7 +40,6 @@ Use "hubble [command] --help" for more information about a command.
 
 >Note the message "Hubble is a utility to observe and inspect recent Cilium routed traffic in a cluster." is not entirely correct, since Hubble is also available without Cilium when using Retina. This means Cilium IS NOT necessarily required to leverage Hubble.
 
-
 ## Example
 
 To access the Hubble CLI you will need to port-forward the hubble-relay service. The default port used by Hubble CLI is 4245.
@@ -62,6 +61,5 @@ Connected Nodes: 1/1
 Observe network flows via Hubble CLI for a test client/server TCP excange.
 
 ![Hubble CLI](./img/hubble-cli.png "Hubble CLI")
-
 
 >Note: for more examples on hubble CLI checkout the official documentation on [cilium/hubble](https://github.com/cilium/hubble?tab=readme-ov-file#flow-visibility)
