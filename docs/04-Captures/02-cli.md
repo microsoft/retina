@@ -10,7 +10,7 @@ The capture command in Retina allows users to capture network traffic and metada
 
 ### Selecting a Target
 
-The target indicates where the packet capture will be performed. There are three choices available. These are the `--node-selectors`, `--node-names` and `--pod-selectors` & `--namespace-selectors` pairs.
+The target indicates where the packet capture will be performed. This can be set via `--node-selectors`, `--node-names`, `--pod-selectors` and `--namespace-selectors` flags. Run `kubectl retina capture -h` for further details based on the Retina CLI version installed on your environment.
 
 Note that Node Selectors are not compatible with Pod Selectors & Namespace Selectors pairs and the capture will not go through if all are populated.
 
