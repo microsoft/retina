@@ -1,4 +1,4 @@
-# Capture TSG
+# Capture
 
 Retina Capture create Kubernetes Jobs and translate the flags into the specification of the Pod. Locating the Pods by the Capture is essential to troubleshooting Retina Capture issues.
 

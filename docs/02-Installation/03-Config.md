@@ -2,6 +2,8 @@
 
 ## Overview
 
+Retina config allows you to define the level of granularity and filtering of Retina metrics, as well as additional options related to retina-agent and retina-operator. For example, we can update Retina config to enable captures, annotations, and define data aggregation.
+
 ### Default Configuration
 
 Default settings for each component are specified in [Values file](../../deploy/standard/manifests/controller/helm/retina/values.yaml).
