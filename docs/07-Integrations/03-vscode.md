@@ -1,6 +1,6 @@
 # Visual Studio Code
 
-Retina is so integrated with VS Code extension for Azure Kubernetes Service (AKS).
+Retina is integrated with VS Code extension for Azure Kubernetes Service (AKS).
 
 ## Overview
 
