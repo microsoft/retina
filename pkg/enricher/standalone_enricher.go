@@ -8,7 +8,9 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/controllers/cache"
+	ctr "github.com/microsoft/retina/pkg/enricher/ctrinfo"
 	sf "github.com/microsoft/retina/pkg/enricher/statefile"
 	"github.com/microsoft/retina/pkg/log"
 	"go.uber.org/zap"
@@ -29,15 +31,17 @@ type StandaloneEvent struct {
 }
 
 type StandaloneEnricher struct {
+	cfg          *config.Config
 	ctx          context.Context
 	l            *log.ZapLogger
 	cache        *cache.StandaloneCache
 	eventChannel chan StandaloneEvent
 }
 
-func NewStandaloneEnricher(ctx context.Context, cache *cache.StandaloneCache) *StandaloneEnricher {
+func NewStandaloneEnricher(ctx context.Context, cache *cache.StandaloneCache, cfg *config.Config) *StandaloneEnricher {
 	localOnce.Do(func() {
 		se = &StandaloneEnricher{
+			cfg:          cfg,
 			ctx:          ctx,
 			l:            log.Logger().Named("standalone-enricher"),
 			cache:        cache,
@@ -73,7 +77,16 @@ func (e *StandaloneEnricher) Run() {
 }
 
 func (e *StandaloneEnricher) processEvent(ip string) {
-	podInfo, err := sf.GetPodInfo(ip, sf.StateFileLocation)
+	var podInfo *cache.PodInfo
+	var err error
+
+	if e.cfg.EnableCriCtl {
+		e.l.Info("Using containerd to discover pod info")
+		podInfo, err = ctr.GetPodInfo(ip)
+	} else {
+		podInfo, err = sf.GetPodInfo(ip, sf.StateFileLocation)
+	}
+
 	if err != nil {
 		e.l.Error("Failed to get pod info", zap.String("ip", ip), zap.Error(err))
 		return
