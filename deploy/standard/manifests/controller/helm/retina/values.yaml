@@ -38,6 +38,7 @@ image:
 
 enableConntrackMetrics: false
 enableStandalone: false
+enableCriCtl: false
 enablePodLevel: false
 remoteContext: false
 enableAnnotations: false

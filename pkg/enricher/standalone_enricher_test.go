@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/controllers/cache"
 	"github.com/microsoft/retina/pkg/enricher/statefile"
 	"github.com/microsoft/retina/pkg/log"
@@ -31,7 +32,11 @@ func TestPublishEvent(t *testing.T) {
 	statefile.StateFileLocation = testfile
 	MaxStandaloneCacheEventSize = 1
 	testCache := cache.NewStandaloneCache()
-	enricher := NewStandaloneEnricher(context.Background(), testCache)
+	config := &config.Config{
+		EnableCriCtl: false,
+	}
+
+	enricher := NewStandaloneEnricher(context.Background(), testCache, config)
 
 	go enricher.Run()
 	defer enricher.Stop()
@@ -50,7 +55,11 @@ func TestStandaloneEnricher(t *testing.T) {
 	statefile.StateFileLocation = testfile
 
 	testCache := cache.NewStandaloneCache()
-	enricher := NewStandaloneEnricher(context.Background(), testCache)
+	config := &config.Config{
+		EnableCriCtl: false,
+	}
+
+	enricher := NewStandaloneEnricher(context.Background(), testCache, config)
 
 	go enricher.Run()
 	defer enricher.Stop()
