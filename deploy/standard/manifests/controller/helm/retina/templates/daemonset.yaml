@@ -46,7 +46,7 @@ spec:
           - name: config
             mountPath: /retina/config
       containers:
-        - name: {{ include "retina.name" . }} 
+        - name: {{ include "retina.name" . }}
           readinessProbe:
             httpGet:
               path: /metrics
@@ -138,10 +138,10 @@ spec:
       {{- end }}
       {{- if fromYamlArray .Values.enabledPlugin_linux | has "infiniband" }}
       - name: sysclassnet
-        hostPath: 
+        hostPath:
           path: /sys/class/net
       - name: sysclassinfiniband
-        hostPath: 
+        hostPath:
           path: /sys/class/infiniband
       {{- end }}
       {{- if .Values.affinity }}
@@ -167,10 +167,6 @@ metadata:
     k8s-app: {{ include "retina.name" . }}
   name: {{ .Values.agent_win.name }}
   namespace: {{ .Values.namespace }}
-  annotations:
-    prometheus.io/port: "{{ .Values.retinaPort }}"
-    prometheus.io/scrape: "true"
-    checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
 spec:
   selector:
     matchLabels:
@@ -184,6 +180,10 @@ spec:
         k8s-app: {{ include "retina.name" . }}
       name: {{ include "retina.name" . }}
       namespace: {{ .Values.namespace }}
+      annotations:
+        prometheus.io/port: "{{ .Values.retinaPort }}"
+        prometheus.io/scrape: "true"
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
       serviceAccountName: {{ .Values.serviceAccount.name }}
       {{- if .Values.priorityClassName }}
