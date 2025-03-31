@@ -18,6 +18,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	cmtypes "github.com/cilium/cilium/pkg/clustermesh/types"
 	datapath "github.com/cilium/cilium/pkg/datapath/types"
 	"github.com/cilium/cilium/pkg/identity"
 	ipc "github.com/cilium/cilium/pkg/ipcache"
@@ -239,3 +240,5 @@ func (r *NodeReconciler) NodeUpdated(types.Node) {}
 func (r *NodeReconciler) StartNeighborRefresh(datapath.NodeNeighbors) {}
 
 func (r *NodeReconciler) StartNodeNeighborLinkUpdater(datapath.NodeNeighbors) {}
+
+func (r *NodeReconciler) SetPrefixClusterMutatorFn(func(*types.Node) []cmtypes.PrefixClusterOpts) {}
