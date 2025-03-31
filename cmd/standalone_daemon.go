@@ -47,7 +47,7 @@ func (sd *StandaloneDaemon) Start(zl *log.ZapLogger) error {
 	defer cancel()
 
 	cache := cache.NewStandaloneCache()
-	enrich := enricher.NewStandaloneEnricher(ctx, cache)
+	enrich := enricher.NewStandaloneEnricher(ctx, cache, sd.config)
 	enrich.Run()
 
 	sd.pluginManager, err = pm.NewPluginManager(
