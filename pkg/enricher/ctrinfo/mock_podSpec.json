@@ -1,0 +1,99 @@
+{
+    "status": {
+        "id": "f3b1405ccf16f0122ef84b756b72ea43b87d851ec374bdd5012d0283784a6cd2",
+        "metadata": {
+            "attempt": 1,
+            "name": "retina-pod",
+            "namespace": "retina-namespace",
+            "uid": ""
+        },
+        "state": "SANDBOX_READY",
+        "createdAt": "2025-03-20T10:02:27.8699572Z",
+        "network": {
+            "additionalIps": [],
+            "ip": "10.0.0.4"
+        },
+        "linux": {
+            "namespaces": {
+                "options": {
+                    "ipc": "POD",
+                    "network": "POD",
+                    "pid": "POD",
+                    "targetId": ""
+                }
+            }
+        },
+        "labels": {
+            "sandbox-platform": "windows/amd64"
+        },
+        "annotations": {},
+        "runtimeHandler": "runhcs-wcow-process"
+    },
+    "info": {
+        "pid": 9324,
+        "processStatus": "running",
+        "netNamespaceClosed": false,
+        "image": "mcr.microsoft.com/windows/nanoserver:ltsc2022",
+        "snapshotKey": "f3b1405ccf16f0122ef84b756b72ea43b87d851ec374bdd5012d0283784a6cd2",
+        "snapshotter": "windows",
+        "runtimeHandler": "runhcs-wcow-process",
+        "runtimeType": "io.containerd.runhcs.v1",
+        "runtimeOptions": {
+            "debug": true,
+            "debug_type": 2,
+            "sandbox_image": "mcr.microsoft.com/windows/nanoserver:ltsc2022",
+            "sandbox_platform": "windows/amd64"
+        },
+        "config": {
+            "metadata": {
+                "name": "retina-pod",
+                "namespace": "retina-namespace",
+                "attempt": 1
+            },
+            "labels": {
+                "sandbox-platform": "windows/amd64"
+            }
+        },
+        "runtimeSpec": {
+            "ociVersion": "1.0.2",
+            "process": {
+                "user": {
+                    "uid": 0,
+                    "gid": 0
+                },
+                "args": [
+                    "c:\\windows\\system32\\cmd.exe"
+                ],
+                "cwd": "C:\\"
+            },
+            "annotations": {
+                "io.kubernetes.cri.container-type": "sandbox",
+                "io.kubernetes.cri.sandbox-id": "f3b1405ccf16f0122ef84b756b72ea43b87d851ec374bdd5012d0283784a6cd2"
+            },
+            "windows": {
+                "layerFolders": null,
+                "network": {
+                    "networkNamespace": "080b5612-189f-4fe3-a388-43fcc31fe687"
+                }
+            }
+        },
+        "cniResult": {
+            "Interfaces": {
+                "eth0": {
+                    "IPConfigs": [
+                        {
+                            "IP": "10.0.0.4",
+                            "Gateway": "10.0.0.1"
+                        }
+                    ],
+                    "Mac": "",
+                    "Sandbox": ""
+                }
+            },
+            "DNS": [
+                {}
+            ],
+            "Routes": null
+        }
+    }
+}
