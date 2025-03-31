@@ -1,8 +1,10 @@
-# AKS VS Code Extension
+# Visual Studio Code
+
+Retina is so integrated with VS Code extension for Azure Kubernetes Service (AKS).
 
 ## Overview
 
-Retina is a powerful feature integrated into the Azure Kubernetes Service (AKS) VS Code extension, enabling users to capture and analyze workloads efficiently. This integration simplifies debugging and troubleshooting by providing deep insights into Kubernetes applications.
+Users of AKS VS Code extension can run Retina captures and analyze workloads efficiently. This integration simplifies debugging and troubleshooting by providing deep insights into Kubernetes applications.
 
 ## Integration Details
 

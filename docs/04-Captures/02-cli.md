@@ -10,7 +10,7 @@ The capture command in Retina allows users to capture network traffic and metada
 
 ### Selecting a Target
 
-The target indicates where the packet capture will be performed. There are three choices available. These are the `--node-selectors`, `--node-names` and `pod-selectors` & `namespace-selectors` pairs.
+The target indicates where the packet capture will be performed. There are three choices available. These are the `--node-selectors`, `--node-names` and `--pod-selectors` & `--namespace-selectors` pairs.
 
 Note that Node Selectors are not compatible with Pod Selectors & Namespace Selectors pairs and the capture will not go through if all are populated.
 
@@ -72,47 +72,95 @@ The network traffic will be uploaded to the specified output location.
 
 Node Selectors
 
-`kubectl retina capture create --name example-node-selectors --node-selectors "kubernetes.io/os=linux"`
+```sh
+kubectl retina capture create \
+  --name example-node-selectors \
+  --node-selectors "kubernetes.io/os=linux"
+```
 
 Node Names
 
-`kubectl retina capture create --name example-node-names --node-names "aks-agentpool-26113504-vmss000000,aks-agentpool-26113504-vmss000001"`
+```sh
+kubectl retina capture create \
+  --name example-node-names \
+  --node-names "aks-agentpool-26113504-vmss000000,aks-agentpool-26113504-vmss000001"
+```
 
 Pod Selectors & Namespace Selectors (Pairs)
 
-`kubectl retina capture create --name example-pod-namespace-selectors --pod-selectors="k8s-app=kube-dns" --namespace-selectors="kubernetes.io/metadata.name=kube-system"`
+```sh
+kubectl retina capture create \
+  --name example-pod-namespace-selectors \
+  --pod-selectors="k8s-app=kube-dns" \
+  --namespace-selectors="kubernetes.io/metadata.name=kube-system"
+```
 
 #### Output Configuration
 
 Host Path
 
-`kubectl retina capture create --name example-host-path --host-path /mnt/retina/example/captures`
+```sh
+kubectl retina capture create \
+  --name example-host-path \
+  --host-path /mnt/retina/example/captures
+```
 
 PVC
 
-`kubectl retina capture create --name example-pvc --pvc mypvc`
+```sh
+kubectl retina capture create \
+  --name example-pvc \
+  --pvc mypvc
+```
 
 Storage Account
 
-`kubectl retina capture create --name example-blob --blob-upload <Blob SAS URL with write permission>`
+```sh
+kubectl retina capture create \
+  --name example-blob \
+  --blob-upload <Blob SAS URL with write permission>
+```
 
 AWS S3
 
-`kubectl retina capture create --name example-s3 --s3-bucket "your-bucket-name" --s3-region "eu-central-1" --s3-access-key-id "your-access-key-id" --s3-secret-access-key "your-secret-access-key"`
+```sh
+kubectl retina capture create \
+  --name example-s3 \
+  --s3-bucket "your-bucket-name" \
+  --s3-region "eu-central-1" \
+  --s3-access-key-id "your-access-key-id" \
+  --s3-secret-access-key "your-secret-access-key"
+```
 
 S3 Compatible Service (MinIO)
 
-`kubectl retina capture create --name example-minio --s3-bucket "your-bucket-name" --s3-endpoint "https://play.min.io:9000" --s3-access-key-id "your-access-key-id" --s3-secret-access-key "your-secret-access-key"`
+```sh
+kubectl retina capture create \
+  --name example-minio \
+  --s3-bucket "your-bucket-name" \
+  --s3-endpoint "https://play.min.io:9000" \
+  --s3-access-key-id "your-access-key-id" \
+  --s3-secret-access-key "your-secret-access-key"
+```
 
 #### Capture Filters
 
 Include / Exclude Filters
 
-`kubectl retina capture create --name example-include-exclude-filters --include-filter="10.224.0.42:80,10.224.0.33:8080" --exclude-filter="10.224.0.26:80,10.224.0.34:8080"`
+```sh
+kubectl retina capture create \
+  --name example-include-exclude-filters \
+  --include-filter="10.224.0.42:80,10.224.0.33:8080" \
+  --exclude-filter="10.224.0.26:80,10.224.0.34:8080"
+```
 
 Tcpdump Filters
 
-`kubectl retina capture create --name example-tcpdump-filters --tcpdump-filter="udp port 53"`
+```sh
+kubectl retina capture create \
+  --name example-tcpdump-filters \
+  --tcpdump-filter="udp port 53"
+```
 
 ## Capture Delete
 
@@ -120,27 +168,33 @@ Deleting the capture job before either of the terminating conditions have been m
 
 `kubectl retina capture delete --name <string>` deletes a Kubernetes Jobs with the specified Capture name.
 
-**Example:**
+Example:
 
-`kubectl retina capture delete --name retina-capture-zlx5v`
+```sh
+kubectl retina capture delete --name retina-capture-zlx5v
+```
 
 ## Capture List
 
 To get a list of the captures you can run `kubectl retina capture list` to get the captures in a specific namespace or in all namespaces.
 
-**Example (namespace):**
+List by namespace:
 
-`kubectl retina capture list --namespace capture`
+```sh
+kubectl retina capture list --namespace capture
+```
 
-**Example (all namespaces):**
+List by all namespaces:
 
-`kubectl retina capture list --all-namespaces`
+```sh
+kubectl retina capture list --all-namespaces
+```
 
 ## Obtaining the output
 
 After downloading or copying the tarball from the location specified, extract the tarball through the `tar` command in either Linux shell or Windows Powershell, for example,
 
-```shell
+```sh
 tar -xvf retina-capture-aks-nodepool1-41844487-vmss000000-20230320013600UTC.tar.gz
 ```
 
@@ -226,17 +280,28 @@ the tarball take such name pattern, `$(capturename)-$(hostname)-$(date +%Y%m%d%H
 
 With debug mode, when `--debug` is specified, you can overwrite the capture job's pod image.
 
-**Example:**
+Use `ghcr.io` image in default debug mode:
 
-Use `ghcr.io` image in default debug mode.
+```sh
+kubectl retina capture create \
+  --name capture-test \
+  --host-path /mnt/test \
+  --namespace capture \
+  --node-selectors "kubernetes.io/os=linux" \
+  --debug
+```
 
-`kubectl retina capture create --name capture-test --host-path /mnt/test --namespace capture --node-selectors "kubernetes.io/os=linux" --debug`
+Use custom retina-agent image by specifying it in the `RETINA_AGENT_IMAGE` environment variable:
 
-**Example:**
-
-Use custom retina-agent image by specifying it in the `RETINA_AGENT_IMAGE` environment variable.
-
-`RETINA_AGENT_IMAGE=<YOUR RETINA AGENT IMAGE> kubectl retina capture create --name capture-test --host-path /mnt/test --namespace capture --node-selectors "kubernetes.io/os=linux" --debug`
+```sh
+RETINA_AGENT_IMAGE=<YOUR RETINA AGENT IMAGE>
+kubectl retina capture create \
+  --name capture-test \
+  --host-path /mnt/test \
+  --namespace capture \
+  --node-selectors "kubernetes.io/os=linux" \
+  --
+```
 
 ## Cleanup
 
