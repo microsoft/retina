@@ -1279,8 +1279,8 @@ github.com/redis/go-redis/extra/redisotel/v9 v9.7.1 h1:LJF39lvUagUpKfL2/gZIp5vHv
 github.com/redis/go-redis/extra/redisotel/v9 v9.7.1/go.mod h1:VAY1vDpD/dLwfw/wU5SsexXNhCO9DjhRoGkmJeFONoE=
 github.com/redis/go-redis/v9 v9.7.1 h1:4LhKRCIduqXqtvCUlaq9c8bdHOkICjDMrr1+Zb3osAc=
 github.com/redis/go-redis/v9 v9.7.1/go.mod h1:f6zhXITC7JUJIlPEiBOTXxJgPLdZcA93GewI7inzyWw=
-github.com/ritwikranjan/cilium v0.0.0-20250327074327-6908ee3a6f1b h1:TUdCxIdoUQz/umWnRROmaR6i5RjaSAFEQWm1kio43KI=
-github.com/ritwikranjan/cilium v0.0.0-20250327074327-6908ee3a6f1b/go.mod h1:ZXBiZ39p7ogRtPcy40GE8Ss+NcukmQDcT4LfAaQ5RB8=
+github.com/ritwikranjan/cilium v0.0.0-20250328223257-fb13c3dccd89 h1:K+5zaMgGsFjwA7QZR+h5yKPcD1BbbQqjCwkomNVH8no=
+github.com/ritwikranjan/cilium v0.0.0-20250328223257-fb13c3dccd89/go.mod h1:ZXBiZ39p7ogRtPcy40GE8Ss+NcukmQDcT4LfAaQ5RB8=
 github.com/rivo/uniseg v0.1.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
 github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
 github.com/rivo/uniseg v0.4.7 h1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=
