@@ -48,12 +48,6 @@ type PodReconciler struct {
 	l          *log.ZapLogger
 }
 
-func init() {
-	log.SetupZapLogger(&log.LogOpts{
-		File: false,
-	})
-}
-
 func New(client client.Client, scheme *k8sruntime.Scheme, podchannel chan<- cache.PodCacheObject) *PodReconciler {
 	return &PodReconciler{
 		l:          log.Logger().Named(string("pod-controller")),
