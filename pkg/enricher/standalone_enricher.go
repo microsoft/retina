@@ -81,7 +81,6 @@ func (e *StandaloneEnricher) processEvent(ip string) {
 	var err error
 
 	if e.cfg.EnableCriCtl {
-		e.l.Info("Using containerd to discover pod info")
 		podInfo, err = ctr.GetPodInfo(ip)
 	} else {
 		podInfo, err = sf.GetPodInfo(ip, sf.StateFileLocation)
