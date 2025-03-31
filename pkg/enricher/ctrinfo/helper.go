@@ -46,6 +46,8 @@ func GetPodInfo(ip string) (*cache.PodInfo, error) {
 			continue
 		}
 
+		fmt.Printf("Inspecting pod ID: %s\n", podID)
+
 		cmd := exec.Command("C:\\ContainerPlat\\crictl.exe", "inspectp", podID)
 		var podSpec bytes.Buffer
 		cmd.Stdout = &podSpec
@@ -61,6 +63,8 @@ func GetPodInfo(ip string) (*cache.PodInfo, error) {
 			fmt.Printf("Error unmarshalling JSON: %v\n", err)
 			continue
 		}
+
+		fmt.Printf("Pod Name: %s, Namespace: %s, IP: %s\n", podStatus.MetaData.Name, podStatus.MetaData.Namespace, podStatus.Network.IP)
 
 		if podStatus.Network.IP == ip {
 			return &cache.PodInfo{
