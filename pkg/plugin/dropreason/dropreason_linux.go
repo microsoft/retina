@@ -14,8 +14,11 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/blang/semver/v4"
 	"github.com/cilium/cilium/api/v1/flow"
 	hubblev1 "github.com/cilium/cilium/pkg/hubble/api/v1"
+	"github.com/cilium/cilium/pkg/version"
+	"github.com/cilium/cilium/pkg/versioncheck"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
@@ -157,133 +160,31 @@ func (dr *dropReason) Init() error {
 	}
 
 	if dr.cfg.EnablePodLevel {
-		dr.KNfHook, err = link.Kprobe(nfHookSlowFn, objs.NfHookSlow, nil)
+		err = dr.attachKprobes(objs)
+	} else {
+		var kv semver.Version
+		kv, err = version.GetKernelVersion()
 		if err != nil {
-			dr.l.Error("opening kprobe", zap.Error(err))
-			return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-		}
-		dr.l.Info("Attached program nf_hook_slow")
+			dr.l.Warn("Failed to get kernel version", zap.Error(err))
 
-		dr.KRetnfhook, err = link.Kretprobe(nfHookSlowFn, objs.NfHookSlowRet, nil)
-		if err != nil {
-			dr.l.Error("opening kretprobe", zap.Error(err))
-			return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-		}
-		dr.l.Info("Attached program nf_hook_slow_ret")
-
-		dr.KRetTCPConnect, err = link.Kretprobe(tcpConnectFn, objs.TcpV4ConnectRet, nil)
-		if err != nil {
-			dr.l.Error("opening kretprobe", zap.Error(err))
-			return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-		}
-		dr.l.Info("Attached program tcp_v4_connect_ret")
-
-		dr.KTCPAccept, err = link.Kprobe(intCskAcceptFn, objs.InetCskAccept, nil)
-		if err != nil {
-			dr.l.Error("opening kretprobe", zap.Error(err))
-			return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-		}
-		dr.l.Info("Attached program inet_csk_accept")
-
-		dr.KRetTCPAccept, err = link.Kretprobe(intCskAcceptFn, objs.InetCskAcceptRet, nil)
-		if err != nil {
-			dr.l.Error("opening kretprobe", zap.Error(err))
-			return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-		}
-		dr.l.Info("Attached program inet_csk_accept_ret")
-
-		dr.KNfNatInet, err = link.Kprobe(nfNatInetFn, objs.NfNatInetFn, nil)
-		if err != nil {
-			// TODO: remove this check once we get this working on Mariner OS.
-			if errors.Is(err, os.ErrNotExist) {
-				dr.l.Warn("nf_nat_inet_fn not found, skipping attaching kretprobe to it. This may impact the drop reason metrics.")
-			} else {
-				dr.l.Error("opening kretprobe", zap.Error(err))
-				return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
+			kv, err = plugincommon.GetKernelVersionMajMin()
+			if err != nil {
+				return fmt.Errorf("Failed to get kernel version: %w", err) //nolint:goerr113 //wrapping error from external module
 			}
+		}
+		dr.l.Info("Detected kernel >= ", zap.String("version", kv.String()))
+
+		// Need kernel >= 5.5 to run our optimized fexit programs.
+		minVersion, _ := versioncheck.Version("5.5")
+		if kv.GTE(minVersion) {
+			err = dr.attachFexitPrograms(objs)
 		} else {
-			dr.l.Info("Attached program nf_nat_inet_fn")
+			err = dr.attachKprobes(objs)
 		}
-
-		dr.KRetNfNatInet, err = link.Kretprobe(nfNatInetFn, objs.NfNatInetFnRet, nil)
-		if err != nil {
-			// TODO: remove this check once we get this working on Mariner OS.
-			if errors.Is(err, os.ErrNotExist) {
-				dr.l.Warn("nf_nat_inet_fn_ret not found, skipping attaching kretprobe to it. This may impact the drop reason metrics.")
-			} else {
-				dr.l.Error("opening kretprobe", zap.Error(err))
-				return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-			}
-		} else {
-			dr.l.Info("Attached program nf_nat_inet_fn_ret")
-		}
-
-		dr.KNfConntrackConfirm, err = link.Kprobe(nfConntrackConfirmFn, objs.NfConntrackConfirm, nil)
-		if err != nil {
-			// TODO: remove this check once we get this working on Mariner OS.
-			if errors.Is(err, os.ErrNotExist) {
-				dr.l.Warn("nf_conntrack_confirm not found, skipping attaching kprobe to it. This may impact the drop reason metrics.")
-			} else {
-				dr.l.Error("opening kprobe", zap.Error(err))
-				return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-			}
-		} else {
-			dr.l.Info("Attached program nf_conntrack_confirm")
-		}
-
-		dr.KRetNfConntrackConfirm, err = link.Kretprobe(nfConntrackConfirmFn, objs.NfConntrackConfirmRet, nil)
-		if err != nil {
-			// TODO: remove this check once we get this working on Mariner OS.
-			if errors.Is(err, os.ErrNotExist) {
-				dr.l.Warn("nf_conntrack_confirm_ret not found, skipping attaching kretprobe to it. This may impact the drop reason metrics.")
-			} else {
-				dr.l.Error("opening kretprobe", zap.Error(err))
-				return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-			}
-		} else {
-			dr.l.Info("Attached program nf_conntrack_confirm_ret")
-		}
-	}
-
-	if !dr.cfg.EnablePodLevel {
-		dr.TrFexithook1, err = link.AttachTracing(link.TracingOptions{Program: objs.NfHookSlowFexit})
-		if err != nil {
-			dr.l.Error("Failed to attach", zap.Error(err))
-			return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-		}
-		dr.l.Info("Attached program nf_hook_slow_fexit")
-
-		dr.TrFexithook2, err = link.AttachTracing(link.TracingOptions{Program: objs.InetCskAcceptFexit})
-		if err != nil {
-			dr.l.Error("Failed to attach", zap.Error(err))
-			return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-		}
-		dr.l.Info("Attached program inet_csk_accept_fexit")
-
-		dr.TrFexithook3, err = link.AttachTracing(link.TracingOptions{Program: objs.NfConntrackConfirmFexit})
-		if err != nil {
-			dr.l.Error("Failed to attach", zap.Error(err))
-			return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-		}
-		dr.l.Info("Attached program nf_conntrack_confirm_fexit")
-
-		dr.TrFexithook4, err = link.AttachTracing(link.TracingOptions{Program: objs.NfNatInetFnFexit})
-		if err != nil {
-			dr.l.Error("Failed to attach", zap.Error(err))
-			return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-		}
-		dr.l.Info("Attached program nf_nat_inet_fn_fexit")
-
-		dr.TrFexithook5, err = link.AttachTracing(link.TracingOptions{Program: objs.TcpV4ConnectFexit})
-		if err != nil {
-			dr.l.Error("Failed to attach", zap.Error(err))
-			return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-		}
-		dr.l.Info("Attached program tcp_v4_connect_fexit")
 	}
 
 	dr.metricsMapData = objs.RetinaDropreasonMetrics
-	return nil
+	return err
 }
 
 func (dr *dropReason) Start(ctx context.Context) error {
@@ -502,6 +403,140 @@ func (dr *dropReason) processMapValue(dataKey dropMetricKey, dataValue dropMetri
 		zap.Int("DropBytes", int(pktBytes)))
 
 	dr.dropMetricAdd(dataKey.getType(), dataKey.getDirection(), pktCount, pktBytes)
+}
+
+func (dr *dropReason) attachKprobes(objs *kprobeObjects) error {
+	var err error
+
+	dr.KNfHook, err = link.Kprobe(nfHookSlowFn, objs.NfHookSlow, nil)
+	if err != nil {
+		dr.l.Error("opening kprobe", zap.Error(err))
+		return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
+	}
+	dr.l.Info("Attached program nf_hook_slow")
+
+	dr.KRetnfhook, err = link.Kretprobe(nfHookSlowFn, objs.NfHookSlowRet, nil)
+	if err != nil {
+		dr.l.Error("opening kretprobe", zap.Error(err))
+		return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
+	}
+	dr.l.Info("Attached program nf_hook_slow_ret")
+
+	dr.KRetTCPConnect, err = link.Kretprobe(tcpConnectFn, objs.TcpV4ConnectRet, nil)
+	if err != nil {
+		dr.l.Error("opening kretprobe", zap.Error(err))
+		return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
+	}
+	dr.l.Info("Attached program tcp_v4_connect_ret")
+
+	dr.KTCPAccept, err = link.Kprobe(intCskAcceptFn, objs.InetCskAccept, nil)
+	if err != nil {
+		dr.l.Error("opening kretprobe", zap.Error(err))
+		return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
+	}
+	dr.l.Info("Attached program inet_csk_accept")
+
+	dr.KRetTCPAccept, err = link.Kretprobe(intCskAcceptFn, objs.InetCskAcceptRet, nil)
+	if err != nil {
+		dr.l.Error("opening kretprobe", zap.Error(err))
+		return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
+	}
+	dr.l.Info("Attached program inet_csk_accept_ret")
+
+	dr.KNfNatInet, err = link.Kprobe(nfNatInetFn, objs.NfNatInetFn, nil)
+	if err != nil {
+		// TODO: remove this check once we get this working on Mariner OS.
+		if errors.Is(err, os.ErrNotExist) {
+			dr.l.Warn("nf_nat_inet_fn not found, skipping attaching kretprobe to it. This may impact the drop reason metrics.")
+		} else {
+			dr.l.Error("opening kretprobe", zap.Error(err))
+			return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
+		}
+	} else {
+		dr.l.Info("Attached program nf_nat_inet_fn")
+	}
+
+	dr.KRetNfNatInet, err = link.Kretprobe(nfNatInetFn, objs.NfNatInetFnRet, nil)
+	if err != nil {
+		// TODO: remove this check once we get this working on Mariner OS.
+		if errors.Is(err, os.ErrNotExist) {
+			dr.l.Warn("nf_nat_inet_fn_ret not found, skipping attaching kretprobe to it. This may impact the drop reason metrics.")
+		} else {
+			dr.l.Error("opening kretprobe", zap.Error(err))
+			return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
+		}
+	} else {
+		dr.l.Info("Attached program nf_nat_inet_fn_ret")
+	}
+
+	dr.KNfConntrackConfirm, err = link.Kprobe(nfConntrackConfirmFn, objs.NfConntrackConfirm, nil)
+	if err != nil {
+		// TODO: remove this check once we get this working on Mariner OS.
+		if errors.Is(err, os.ErrNotExist) {
+			dr.l.Warn("nf_conntrack_confirm not found, skipping attaching kprobe to it. This may impact the drop reason metrics.")
+		} else {
+			dr.l.Error("opening kprobe", zap.Error(err))
+			return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
+		}
+	} else {
+		dr.l.Info("Attached program nf_conntrack_confirm")
+	}
+
+	dr.KRetNfConntrackConfirm, err = link.Kretprobe(nfConntrackConfirmFn, objs.NfConntrackConfirmRet, nil)
+	if err != nil {
+		// TODO: remove this check once we get this working on Mariner OS.
+		if errors.Is(err, os.ErrNotExist) {
+			dr.l.Warn("nf_conntrack_confirm_ret not found, skipping attaching kretprobe to it. This may impact the drop reason metrics.")
+		} else {
+			dr.l.Error("opening kretprobe", zap.Error(err))
+			return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
+		}
+	} else {
+		dr.l.Info("Attached program nf_conntrack_confirm_ret")
+	}
+
+	return nil
+}
+
+func (dr *dropReason) attachFexitPrograms(objs *kprobeObjects) error {
+	var err error
+
+	dr.TrFexithook1, err = link.AttachTracing(link.TracingOptions{Program: objs.NfHookSlowFexit})
+	if err != nil {
+		dr.l.Error("Failed to attach", zap.Error(err))
+		return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
+	}
+	dr.l.Info("Attached program nf_hook_slow_fexit")
+
+	dr.TrFexithook2, err = link.AttachTracing(link.TracingOptions{Program: objs.InetCskAcceptFexit})
+	if err != nil {
+		dr.l.Error("Failed to attach", zap.Error(err))
+		return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
+	}
+	dr.l.Info("Attached program inet_csk_accept_fexit")
+
+	dr.TrFexithook3, err = link.AttachTracing(link.TracingOptions{Program: objs.NfConntrackConfirmFexit})
+	if err != nil {
+		dr.l.Error("Failed to attach", zap.Error(err))
+		return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
+	}
+	dr.l.Info("Attached program nf_conntrack_confirm_fexit")
+
+	dr.TrFexithook4, err = link.AttachTracing(link.TracingOptions{Program: objs.NfNatInetFnFexit})
+	if err != nil {
+		dr.l.Error("Failed to attach", zap.Error(err))
+		return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
+	}
+	dr.l.Info("Attached program nf_nat_inet_fn_fexit")
+
+	dr.TrFexithook5, err = link.AttachTracing(link.TracingOptions{Program: objs.TcpV4ConnectFexit})
+	if err != nil {
+		dr.l.Error("Failed to attach", zap.Error(err))
+		return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
+	}
+	dr.l.Info("Attached program tcp_v4_connect_fexit")
+
+	return nil
 }
 
 func (dr *dropReason) Stop() error {

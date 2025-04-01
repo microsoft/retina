@@ -131,13 +131,17 @@ void update_metrics_map(void *ctx, drop_reason_t drop_type, int ret_val, struct 
         new_entry.bytes = p->skb_len;
         bpf_map_update_elem(&retina_dropreason_metrics, &key, &new_entry, 0);
     }
-
+// parse packet if advanced metrics are enabled
+#ifdef ADVANCED_METRICS
+#if ADVANCED_METRICS == 1
     if (p->in_filtermap)
     {
         p->drop_type = drop_type;
         p->return_val = ret_val;
         bpf_perf_event_output(ctx, &retina_dropreason_events, BPF_F_CURRENT_CPU, p, sizeof(struct packet));
     };
+#endif
+#endif    
 }
 
 // Updates dropped packet count - ONLY use in Retina basic.
@@ -170,12 +174,12 @@ static void get_packet_from_skb(struct packet *p, struct sk_buff *skb)
         return;
     }
     
-#ifdef ADVANCED_METRICS
-#if ADVANCED_METRICS == 1
     // TODO parse direction like in packetforward
     __u64 skb_len = 0;
     member_read(&skb_len, skb, len);
     p->skb_len = skb_len;
+#ifdef ADVANCED_METRICS
+#if ADVANCED_METRICS == 1
     char *head;
     __u16 nw_header, trans_header, eth_proto;
 
@@ -400,7 +404,11 @@ int BPF_KRETPROBE(inet_csk_accept_ret, struct sock *sk)
     p.in_filtermap = false;
     p.skb_len = 0;
 
+#ifdef ADVANCED_METRICS
+#if ADVANCED_METRICS == 1
     get_packet_from_sock(&p, sk);
+#endif
+#endif
 
     update_metrics_map(ctx, TCP_ACCEPT_BASIC, err, &p);
     return 0;
