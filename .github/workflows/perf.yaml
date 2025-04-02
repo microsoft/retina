@@ -6,9 +6,17 @@ on:
     - cron: '17 */12 * * *'
   workflow_dispatch:
     inputs:
+      image-registry:
+        description: 'Image Registry to use for the performance test'
+        required: true
+        default: 'ghcr.io'
       tag:
         description: 'Image Tag to use for the performance test'
         required: true
+      image-namespace:
+        description: 'Image Namespace to use for the performance test'
+        required: false
+
 
 permissions:
   contents: read
@@ -46,10 +54,14 @@ jobs:
           set -euo pipefail
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             TAG=${{ github.event.inputs.tag }}
+            REGISTRY=${{ github.event.inputs.image-registry }}
+            NAMESPACE=${{ github.event.inputs.image-namespace || github.repository }}
           else
             TAG=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r .tag_name)
+            REGISTRY=ghcr.io
+            NAMESPACE=${{ github.repository }}
           fi
-          go test -v ./test/e2e/. -timeout 2h -tags=perf -count=1 -args -image-tag=$TAG -image-registry=ghcr.io -image-namespace=${{ github.repository }} -retina-mode=basic
+          go test -v ./test/e2e/. -timeout 2h -tags=perf -count=1 -args -image-tag=$TAG -image-registry=$REGISTRY -image-namespace=$NAMESPACE -retina-mode=basic
 
   perf-test-advanced:
     name: Retina Advanced Performance Test
@@ -82,7 +94,11 @@ jobs:
           set -euo pipefail
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             TAG=${{ github.event.inputs.tag }}
+            REGISTRY=${{ github.event.inputs.image-registry }}
+            NAMESPACE=${{ github.event.inputs.image-namespace || github.repository }}
           else
             TAG=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r .tag_name)
+            REGISTRY=ghcr.io
+            NAMESPACE=${{ github.repository }}
           fi
-          go test -v ./test/e2e/. -timeout 2h -tags=perf -count=1 -args -image-tag=$TAG -image-registry=ghcr.io -image-namespace=${{ github.repository }} -retina-mode=advanced
+          go test -v ./test/e2e/. -timeout 2h -tags=perf -count=1 -args -image-tag=$TAG -image-registry=$REGISTRY -image-namespace=$NAMESPACE -retina-mode=advanced
