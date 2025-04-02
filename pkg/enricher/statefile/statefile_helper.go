@@ -72,6 +72,6 @@ func GetPodInfo(ip, filePath string) (*cache.PodInfo, error) {
 		}
 	}
 
-	fmt.Printf("IP address %s not found in CNI state file\n", ip)
+	// fmt.Printf("IP address %s not found in CNI state file\n", ip)
 	return nil, nil
 }
