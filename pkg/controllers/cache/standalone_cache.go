@@ -74,6 +74,8 @@ func (c *StandaloneCache) addPod(ip, name, namespace string) {
 	defer c.rwMutex.Unlock()
 
 	existingPod, exists := c.ipToPod[ip]
+	fmt.Printf("exists: %v, existingPod: %+v, name: %s, namespace: %s\n", exists, existingPod, name, namespace)
+
 	newPod := &PodInfo{Name: name, Namespace: namespace, Active: true}
 
 	// Skip adding element if identical
