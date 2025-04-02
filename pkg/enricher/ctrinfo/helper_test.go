@@ -12,6 +12,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestGetPodInfo(t *testing.T) {
+
+}
+
 func TestJSONUnmarshalling(t *testing.T) {
 	data, err := os.ReadFile("mock_podSpec.json")
 	if err != nil {
@@ -24,7 +28,7 @@ func TestJSONUnmarshalling(t *testing.T) {
 		assert.Error(t, err, "expected error when using invalid file path")
 	}
 
-	assert.Equal(t, "retina-pod", spec.Status.MetaData.Name)
-	assert.Equal(t, "retina-namespace", spec.Status.MetaData.Namespace)
+	assert.Equal(t, "retina-pod", spec.Status.Metadata.Name)
+	assert.Equal(t, "retina-namespace", spec.Status.Metadata.Namespace)
 	assert.Equal(t, "10.0.0.4", spec.Status.Network.IP)
 }

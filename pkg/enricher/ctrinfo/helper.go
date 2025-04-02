@@ -18,7 +18,7 @@ type PodSpec struct {
 }
 
 type Status struct {
-	MetaData Metadata `json:"metadata"`
+	Metadata Metadata `json:"metadata"`
 	Network  Network  `json:"network"`
 }
 
@@ -32,33 +32,28 @@ type Network struct {
 }
 
 func GetPodInfo(ip string) (*cache.PodInfo, error) {
-	cmd := exec.Command("C:\\ContainerPlat\\crictl.exe", "pods", "-q")
-	var output bytes.Buffer
+	cmd := exec.Command("C:\\ContainerPlat\\crictl.exe", "pods", "-q") // investigate in ACI
 
+	var output bytes.Buffer
 	cmd.Stdout = &output
 	err := cmd.Run()
 	if err != nil {
-		fmt.Printf("Error running crictl command: %v\n", err)
-		return nil, err
+		return nil, fmt.Errorf("Failed to get running pods: %w", err)
 	}
 
-	// Gather all pod IDs
-	podIDs := strings.Split(strings.TrimSpace(output.String()), "\n")
+	podIDs := strings.SplitSeq(strings.TrimSpace(output.String()), "\n")
 
-	for _, podID := range podIDs {
+	for podID := range podIDs {
 		if podID == "" {
 			continue
 		}
+		cmd := exec.Command("C:\\ContainerPlat\\crictl.exe", "inspectp", podID) // investigate in ACI
 
-		fmt.Printf("Inspecting pod ID: %s\n", podID)
-
-		cmd := exec.Command("C:\\ContainerPlat\\crictl.exe", "inspectp", podID)
 		var podSpec bytes.Buffer
 		cmd.Stdout = &podSpec
 		err := cmd.Run()
 		if err != nil {
-			fmt.Printf("Error running crictl command: %v\n", err)
-			return nil, err
+			return nil, fmt.Errorf("Failed to inspect pod information: %w", err)
 		}
 
 		var spec PodSpec
@@ -68,15 +63,14 @@ func GetPodInfo(ip string) (*cache.PodInfo, error) {
 			continue
 		}
 
-		fmt.Printf("Pod Name: %s, Namespace: %s, IP: %s\n", spec.Status.MetaData.Name, spec.Status.MetaData.Namespace, spec.Status.Network.IP)
-
 		if spec.Status.Network.IP == ip {
 			return &cache.PodInfo{
-				Name:      spec.Status.MetaData.Name,
-				Namespace: spec.Status.MetaData.Namespace,
+				Name:      spec.Status.Metadata.Name,
+				Namespace: spec.Status.Metadata.Namespace,
 			}, nil
 		}
 	}
 
+	fmt.Printf("IP address %s not found in containerd\n", ip)
 	return nil, nil
 }
