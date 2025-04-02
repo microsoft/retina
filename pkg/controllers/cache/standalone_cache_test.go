@@ -45,7 +45,7 @@ func TestAddPod(t *testing.T) {
 		t.Fatalf("Expected nil, got %v", emptyPodInfo)
 	}
 
-	cache.ProcessPodInfo(ip, defaultInfo)
+	cache.Update(ip, defaultInfo)
 	podInfo := cache.GetPod(ip)
 
 	if podInfo == nil {
@@ -62,21 +62,21 @@ func TestDeletePod(t *testing.T) {
 	cache := NewStandaloneCache()
 
 	// Add pod
-	cache.ProcessPodInfo(ip, defaultInfo)
+	cache.Update(ip, defaultInfo)
 	podInfo := cache.GetPod(ip)
 	if podInfo == nil {
 		t.Fatalf("Expected pod info, got nil")
 	}
 
 	// Attempt to delete pod not in cache
-	cache.ProcessPodInfo("9.9.9.9", nil)
+	cache.Update("9.9.9.9", nil)
 	podInfo1 := cache.GetPod(ip)
 	if podInfo1 == nil {
 		t.Fatalf("Expected pod info, got nil")
 	}
 
 	// Delete pod
-	cache.ProcessPodInfo(ip, nil)
+	cache.Update(ip, nil)
 	deletedPodInfo := cache.GetPod(ip)
 	if deletedPodInfo != nil {
 		t.Fatalf("Expected nil, got %v", deletedPodInfo)

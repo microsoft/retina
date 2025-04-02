@@ -5,18 +5,15 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
+	"github.com/microsoft/retina/cmd/standalone"
 	"github.com/microsoft/retina/cmd/standard"
 	"github.com/microsoft/retina/internal/buildinfo"
 	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/telemetry"
 	"go.uber.org/zap"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
-	kcfg "sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 const (
@@ -72,34 +69,14 @@ func (b *BootstrapManager) Start() error {
 	defer zl.Close()
 
 	if daemonConfig.EnableStandalone {
-		sm := NewStandaloneDaemon(daemonConfig)
-		if err = sm.Start(zl); err != nil {
+		sd := standalone.NewDaemon(daemonConfig)
+		if err = sd.Start(zl); err != nil {
 			return fmt.Errorf("starting standalone daemon: %w", err)
 		}
 		return nil
 	}
 
-	var cfg *rest.Config
-	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
-		fmt.Println("KUBECONFIG detected, using kubeconfig: ", kubeconfig)
-		cfg, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
-		if err != nil {
-			return fmt.Errorf("creating controller-runtime manager: %w", err)
-		}
-		return b.startDaemon(cfg, daemonConfig, zl)
-	}
-
-	cfg, err = kcfg.GetConfig()
-	if err != nil {
-		panic(err)
-	}
-
-	return b.startDaemon(cfg, daemonConfig, zl)
-}
-
-func (b *BootstrapManager) startDaemon(cfg *rest.Config, daemoncfg *config.Config, zl *log.ZapLogger) error {
-	d := standard.NewDaemon(daemoncfg, cfg, b.metricsAddr, b.probeAddr, b.enableLeaderElection)
-
+	d := standard.NewDaemon(daemonConfig, b.metricsAddr, b.probeAddr, b.enableLeaderElection)
 	if err := d.Start(zl); err != nil {
 		return fmt.Errorf("starting daemon: %w", err)
 	}

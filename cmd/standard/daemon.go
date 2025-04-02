@@ -14,15 +14,17 @@ import (
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	ctrl "sigs.k8s.io/controller-runtime"
 	crcache "sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	kcfg "sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	crmgr "sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	"github.com/go-logr/zapr"
-	"github.com/microsoft/retina/cmd/telemetry"
+	"github.com/microsoft/retina/cmd/utils"
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/internal/buildinfo"
 	"github.com/microsoft/retina/pkg/config"
@@ -58,16 +60,14 @@ func init() {
 
 type Daemon struct {
 	config               *config.Config
-	restConfig           *rest.Config
 	metricsAddr          string
 	probeAddr            string
 	enableLeaderElection bool
 }
 
-func NewDaemon(daemoncfg *config.Config, cfg *rest.Config, metricsAddr, probeAddr string, enableLeaderElection bool) *Daemon {
+func NewDaemon(daemoncfg *config.Config, metricsAddr, probeAddr string, enableLeaderElection bool) *Daemon {
 	return &Daemon{
 		config:               daemoncfg,
-		restConfig:           cfg,
 		metricsAddr:          metricsAddr,
 		probeAddr:            probeAddr,
 		enableLeaderElection: enableLeaderElection,
@@ -76,10 +76,26 @@ func NewDaemon(daemoncfg *config.Config, cfg *rest.Config, metricsAddr, probeAdd
 
 func (d *Daemon) Start(zl *log.ZapLogger) error {
 	fmt.Printf("Starting Retina daemon with legacy control plane %v\n", buildinfo.Version)
-	fmt.Println("api server: ", d.restConfig.Host)
+	fmt.Println("init client-go")
+
+	var restCfg *rest.Config
+	var err error
+	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
+		fmt.Println("KUBECONFIG detected, using kubeconfig: ", kubeconfig)
+		restCfg, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+		if err != nil {
+			return fmt.Errorf("creating controller-runtime manager: %w", err)
+		}
+	}
+
+	restCfg, err = kcfg.GetConfig()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("api server: ", restCfg.Host)
 
 	mainLogger := zl.Named("main").Sugar().With(
-		"apiserver", d.restConfig.Host,
+		"apiserver", restCfg.Host,
 	)
 
 	// Allow the current process to lock memory for eBPF resources.
@@ -92,7 +108,7 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 	metrics.InitializeMetrics()
 	mainLogger.Info(zap.String("data aggregation level", d.config.DataAggregationLevel.String()))
 
-	tel, err := telemetry.InitializeTelemetryClient(d.restConfig, d.config, mainLogger)
+	tel, err := utils.InitializeTelemetryClient(restCfg, d.config, mainLogger)
 	if err != nil {
 		return fmt.Errorf("failed to initialize telemetry client: %w", err)
 	}
@@ -141,7 +157,7 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 		}
 	}
 
-	mgr, err := crmgr.New(d.restConfig, mgrOption)
+	mgr, err := crmgr.New(restCfg, mgrOption)
 	if err != nil {
 		mainLogger.Error("Unable to start manager", zap.Error(err))
 		return fmt.Errorf("creating controller-runtime manager: %w", err)
