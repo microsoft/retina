@@ -71,6 +71,6 @@ func GetPodInfo(ip string) (*cache.PodInfo, error) {
 		}
 	}
 
-	fmt.Printf("IP address %s not found in containerd\n", ip)
+	// fmt.Printf("IP address %s not found in containerd\n", ip)
 	return nil, nil
 }
