@@ -4,6 +4,7 @@
 package cache
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/microsoft/retina/pkg/log"
@@ -77,12 +78,15 @@ func (c *StandaloneCache) addPod(ip, name, namespace string) {
 
 	// Skip adding element if identical
 	if exists && existingPod.isEqual(newPod) {
+		fmt.Printf("MUDIT")
 		existingPod.Active = true
 		return
 	}
 
 	c.ipToPod[ip] = newPod
-	c.l.Info("Added pod to cache", zap.String("ip", ip), zap.String("name", name), zap.String("namespace", namespace))
+	if !exists {
+		c.l.Info("Added pod to cache", zap.String("ip", ip), zap.String("name", name), zap.String("namespace", namespace))
+	}
 }
 
 func (c *StandaloneCache) deletePod(ip string) {
