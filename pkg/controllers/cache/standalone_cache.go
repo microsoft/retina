@@ -13,6 +13,7 @@ import (
 type PodInfo struct {
 	Name      string
 	Namespace string
+	Active    bool
 }
 
 type StandaloneCache struct {
@@ -46,15 +47,37 @@ func (c *StandaloneCache) ProcessPodInfo(ip string, podInfo *PodInfo) {
 	}
 }
 
+func (c *StandaloneCache) ResetIPStatuses() {
+	c.rwMutex.Lock()
+	defer c.rwMutex.Unlock()
+
+	for _, podInfo := range c.ipToPod {
+		podInfo.Active = false
+	}
+}
+
+func (c *StandaloneCache) RemoveStaleEntries() {
+	c.rwMutex.Lock()
+	defer c.rwMutex.Unlock()
+
+	for ip, podInfo := range c.ipToPod {
+		if !podInfo.Active {
+			delete(c.ipToPod, ip)
+			c.l.Debug("Removed stale pod IP from cache", zap.String("ip", ip), zap.String("name", podInfo.Name), zap.String("namespace", podInfo.Namespace))
+		}
+	}
+}
+
 func (c *StandaloneCache) addPod(ip, name, namespace string) {
 	c.rwMutex.Lock()
 	defer c.rwMutex.Unlock()
 
 	existingPod, exists := c.ipToPod[ip]
-	newPod := &PodInfo{Name: name, Namespace: namespace}
+	newPod := &PodInfo{Name: name, Namespace: namespace, Active: true}
 
 	// Skip adding element if identical
-	if exists && *existingPod == *newPod {
+	if exists && existingPod.isEqual(newPod) {
+		existingPod.Active = true
 		return
 	}
 
@@ -70,4 +93,8 @@ func (c *StandaloneCache) deletePod(ip string) {
 		delete(c.ipToPod, ip)
 		c.l.Info("Deleted pod from cache", zap.String("ip", ip), zap.String("name", podInfo.Name), zap.String("namespace", podInfo.Namespace))
 	}
+}
+
+func (c *PodInfo) isEqual(other *PodInfo) bool {
+	return c.Name == other.Name && c.Namespace == other.Namespace
 }

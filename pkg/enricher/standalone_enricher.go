@@ -107,6 +107,14 @@ func (e *StandaloneEnricher) PublishEvent(ip string) error {
 	}
 }
 
+func (e *StandaloneEnricher) UpdateIPStatuses() {
+	e.cache.ResetIPStatuses()
+}
+
+func (e *StandaloneEnricher) RemoveStaleEntries() {
+	e.cache.RemoveStaleEntries()
+}
+
 func (e *StandaloneEnricher) Stop() {
 	e.l.Info("Stopping standalone enricher...")
 	close(e.eventChannel)
