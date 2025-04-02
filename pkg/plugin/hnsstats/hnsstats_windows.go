@@ -193,6 +193,19 @@ func notifyHnsStats(h *hnsstats, stats *HnsStatsData) {
 			// This is for test - need to discuss about the advanced metrics (registry)
 			h.l.Info("HNS stats for pod", zap.String(zapIPField, stats.IPAddress), zap.String("pod-name", labels.Name), zap.String("pod-namespace", labels.Namespace))
 			AdvWindowsGauge.WithLabelValues(stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.PacketsReceived))
+
+			// Emit metrics for the pod
+			ForwardPacketsGaugeS.WithLabelValues(ingressLabel, stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.PacketsReceived))
+			ForwardPacketsGaugeS.WithLabelValues(egressLabel, stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.PacketsSent))
+
+			ForwardBytesGaugeS.WithLabelValues(egressLabel, stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.BytesSent))
+			ForwardBytesGaugeS.WithLabelValues(ingressLabel, stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.BytesReceived))
+
+			HNSStatsGaugeS.WithLabelValues(PacketsReceived, stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.PacketsReceived))
+			HNSStatsGaugeS.WithLabelValues(PacketsSent, stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.PacketsSent))
+
+			DropPacketsGaugeS.WithLabelValues(utils.Endpoint, egressLabel, stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.DroppedPacketsOutgoing))
+			DropPacketsGaugeS.WithLabelValues(utils.Endpoint, ingressLabel, stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.DroppedPacketsIncoming))
 		}
 	}
 
