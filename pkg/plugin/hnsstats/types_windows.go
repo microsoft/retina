@@ -183,7 +183,7 @@ func InitializeAdvMetrics() {
 	// Remove after presentation
 	ForwardPacketsGaugeS = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.AdvancedRegistry,
-		utils.ForwardBytesGaugeName,
+		"adv_"+utils.ForwardPacketsGaugeName,
 		"Total forwarded packets",
 		utils.Direction,
 		"Ip",
@@ -193,7 +193,7 @@ func InitializeAdvMetrics() {
 
 	ForwardBytesGaugeS = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.AdvancedRegistry,
-		utils.ForwardBytesGaugeName,
+		"adv_"+utils.ForwardBytesGaugeName,
 		"Total forwarded bytes",
 		utils.Direction,
 		"Ip",
@@ -203,7 +203,7 @@ func InitializeAdvMetrics() {
 
 	HNSStatsGaugeS = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.AdvancedRegistry,
-		"windows_hns_stats",
+		"adv_windows_hns_stats",
 		"Include many different metrics from packets sent/received to closed connections",
 		utils.Direction,
 		"Ip",
@@ -213,7 +213,7 @@ func InitializeAdvMetrics() {
 
 	DropPacketsGaugeS = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.AdvancedRegistry,
-		utils.DroppedPacketsGaugeName,
+		"adv_"+utils.DroppedPacketsGaugeName,
 		"Total dropped packets",
 		utils.Reason,
 		utils.Direction,
