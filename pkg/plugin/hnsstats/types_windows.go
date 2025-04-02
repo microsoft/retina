@@ -77,7 +77,7 @@ const (
 	egressLabel  = "egress"
 )
 
-var AdvWindowsGauge *prometheus.GaugeVec
+// var AdvWindowsGauge *prometheus.GaugeVec
 
 var ForwardPacketsGaugeS *prometheus.GaugeVec
 var ForwardBytesGaugeS *prometheus.GaugeVec
@@ -167,18 +167,18 @@ func (h *HnsStatsData) String() string {
 }
 
 func InitializeAdvMetrics() {
-	if AdvWindowsGauge != nil {
-		cleanAdvMetrics()
-	}
+	// if AdvWindowsGauge != nil {
+	// 	cleanAdvMetrics()
+	// }
 
-	AdvWindowsGauge = exporter.CreatePrometheusGaugeVecForMetric(
-		exporter.AdvancedRegistry,
-		AdvHNSStatsName,
-		AdvHNSStatsDescription,
-		"Ip",
-		"PodName",
-		"Namespace",
-	)
+	// AdvWindowsGauge = exporter.CreatePrometheusGaugeVecForMetric(
+	// 	exporter.AdvancedRegistry,
+	// 	AdvHNSStatsName,
+	// 	AdvHNSStatsDescription,
+	// 	"Ip",
+	// 	"PodName",
+	// 	"Namespace",
+	// )
 
 	// Remove after presentation
 	ForwardPacketsGaugeS = exporter.CreatePrometheusGaugeVecForMetric(
@@ -224,7 +224,7 @@ func InitializeAdvMetrics() {
 }
 
 func cleanAdvMetrics() {
-	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(AdvWindowsGauge))
+	// exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(AdvWindowsGauge))
 
 	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(ForwardPacketsGaugeS))
 	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(ForwardBytesGaugeS))
