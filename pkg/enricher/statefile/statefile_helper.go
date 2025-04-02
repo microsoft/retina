@@ -43,7 +43,6 @@ type IPInfo struct {
 func GetPodInfo(ip, filePath string) (*cache.PodInfo, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		fmt.Println("Error reading file:", err)
 		return nil, fmt.Errorf("failed to read CNI state file: %w", err)
 	}
 
@@ -54,7 +53,6 @@ func GetPodInfo(ip, filePath string) (*cache.PodInfo, error) {
 
 	var cniState CniState
 	if err := json.Unmarshal(data, &cniState); err != nil {
-		fmt.Println("Error decoding file:", err)
 		return nil, fmt.Errorf("failed to decode CNI state file: %w", err)
 	}
 
