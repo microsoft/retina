@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/retina/pkg/exporter"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
+	"github.com/microsoft/retina/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -77,6 +78,11 @@ const (
 )
 
 var AdvWindowsGauge *prometheus.GaugeVec
+
+var ForwardPacketsGaugeS *prometheus.GaugeVec
+var ForwardBytesGaugeS *prometheus.GaugeVec
+var HNSStatsGaugeS *prometheus.GaugeVec
+var DropPacketsGaugeS *prometheus.GaugeVec
 
 type hnsstats struct {
 	cfg           *kcfg.Config
@@ -164,6 +170,7 @@ func InitializeAdvMetrics() {
 	if AdvWindowsGauge != nil {
 		cleanAdvMetrics()
 	}
+
 	AdvWindowsGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.AdvancedRegistry,
 		AdvHNSStatsName,
@@ -172,8 +179,55 @@ func InitializeAdvMetrics() {
 		"PodName",
 		"Namespace",
 	)
+
+	// Remove after presentation
+	ForwardPacketsGaugeS = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.AdvancedRegistry,
+		utils.ForwardBytesGaugeName,
+		"Total forwarded packets",
+		utils.Direction,
+		"Ip",
+		"PodName",
+		"Namespace",
+	)
+
+	ForwardBytesGaugeS = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.AdvancedRegistry,
+		utils.ForwardBytesGaugeName,
+		"Total forwarded bytes",
+		utils.Direction,
+		"Ip",
+		"PodName",
+		"Namespace",
+	)
+
+	HNSStatsGaugeS = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.AdvancedRegistry,
+		"windows_hns_stats",
+		"Include many different metrics from packets sent/received to closed connections",
+		utils.Direction,
+		"Ip",
+		"PodName",
+		"Namespace",
+	)
+
+	DropPacketsGaugeS = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.AdvancedRegistry,
+		utils.DroppedPacketsGaugeName,
+		"Total dropped packets",
+		utils.Reason,
+		utils.Direction,
+		"Ip",
+		"PodName",
+		"Namespace",
+	)
 }
 
 func cleanAdvMetrics() {
 	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(AdvWindowsGauge))
+
+	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(ForwardPacketsGaugeS))
+	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(ForwardBytesGaugeS))
+	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(HNSStatsGaugeS))
+	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(DropPacketsGaugeS))
 }
