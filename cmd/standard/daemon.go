@@ -86,12 +86,13 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 		if err != nil {
 			return fmt.Errorf("creating controller-runtime manager: %w", err)
 		}
+	} else {
+		restCfg, err = kcfg.GetConfig()
+		if err != nil {
+			panic(err)
+		}
 	}
 
-	restCfg, err = kcfg.GetConfig()
-	if err != nil {
-		panic(err)
-	}
 	fmt.Println("api server: ", restCfg.Host)
 
 	mainLogger := zl.Named("main").Sugar().With(
@@ -101,7 +102,7 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 	// Allow the current process to lock memory for eBPF resources.
 	// OS specific implementation.
 	// This is a no-op on Windows.
-	if err := d.RemoveMemlock(); err != nil {
+	if err = d.RemoveMemlock(); err != nil {
 		mainLogger.Fatal("failed to remove memlock", zap.Error(err))
 	}
 
