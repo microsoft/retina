@@ -1,13 +1,13 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
-package cmd
+package standalone
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/microsoft/retina/cmd/telemetry"
+	"github.com/microsoft/retina/cmd/utils"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
@@ -26,7 +26,7 @@ type StandaloneDaemon struct {
 	pluginManager *pm.PluginManager
 }
 
-func NewStandaloneDaemon(daemonCfg *config.Config) *StandaloneDaemon {
+func NewDaemon(daemonCfg *config.Config) *StandaloneDaemon {
 	return &StandaloneDaemon{
 		config: daemonCfg,
 	}
@@ -38,7 +38,7 @@ func (sd *StandaloneDaemon) Start(zl *log.ZapLogger) error {
 
 	metrics.InitializeMetrics()
 
-	tel, err := telemetry.InitializeTelemetryClient(nil, sd.config, mainLogger)
+	tel, err := utils.InitializeTelemetryClient(nil, sd.config, mainLogger)
 	if err != nil {
 		return fmt.Errorf("failed to initialize telemetry client: %w", err)
 	}
