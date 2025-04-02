@@ -4,7 +4,6 @@
 package cache
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/microsoft/retina/pkg/log"
@@ -74,21 +73,16 @@ func (c *StandaloneCache) addPod(ip, name, namespace string) {
 	defer c.rwMutex.Unlock()
 
 	existingPod, exists := c.ipToPod[ip]
-	fmt.Printf("exists: %v, existingPod: %+v, name: %s, namespace: %s\n", exists, existingPod, name, namespace)
-
 	newPod := &PodInfo{Name: name, Namespace: namespace, Active: true}
 
 	// Skip adding element if identical
 	if exists && existingPod.isEqual(newPod) {
-		fmt.Printf("MUDIT")
 		existingPod.Active = true
 		return
 	}
 
 	c.ipToPod[ip] = newPod
-	if !exists {
-		c.l.Info("Added pod to cache", zap.String("ip", ip), zap.String("name", name), zap.String("namespace", namespace))
-	}
+	c.l.Info("Added pod to cache", zap.String("ip", ip), zap.String("name", name), zap.String("namespace", namespace))
 }
 
 func (c *StandaloneCache) deletePod(ip string) {
