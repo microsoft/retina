@@ -51,15 +51,17 @@ func TestStandaloneCache(t *testing.T) {
 		{
 			name: "Add pod - Pod info updated if not identical",
 			setup: func() {
-				testCache.Update(ip, &cache.PodInfo{Name: "updated-pod", Namespace: "updated-ns"})
+				testCache.Update(ip, defaultInfo)
+				testCache.ResetIPStatuses()
+				testCache.Update(ip, defaultInfo)
 			},
 			expect: func(t *testing.T) {
 				podInfo := testCache.GetPod(ip)
 				if podInfo == nil {
 					t.Fatalf("Expected pod info, got nil")
 				}
-				assert.Equal(t, podInfo.Name, "updated-pod")
-				assert.Equal(t, podInfo.Namespace, "updated-ns")
+				assert.Equal(t, podInfo.Name, defaultInfo.Name)
+				assert.Equal(t, podInfo.Namespace, defaultInfo.Namespace)
 				assert.Equal(t, podInfo.Active, true)
 			},
 		},
