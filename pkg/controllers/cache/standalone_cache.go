@@ -39,7 +39,7 @@ func (c *StandaloneCache) GetPod(ip string) *PodInfo {
 	return nil
 }
 
-func (c *StandaloneCache) ProcessPodInfo(ip string, podInfo *PodInfo) {
+func (c *StandaloneCache) Update(ip string, podInfo *PodInfo) {
 	if podInfo != nil {
 		c.addPod(ip, podInfo.Name, podInfo.Namespace)
 	} else {

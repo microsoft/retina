@@ -48,7 +48,7 @@ data:
     metricsIntervalDuration: {{ .Values.metricsIntervalDuration }}
     enableTelemetry: {{ .Values.enableTelemetry }}
     enableStandalone: {{ .Values.enableStandalone }}
-    enableCriCtl: {{ .Values.enableCriCtl }}
+    enableCrictl: {{ .Values.enableCrictl }}
     enablePodLevel: {{ .Values.enablePodLevel }}
     remoteContext: {{ .Values.remoteContext }}
     telemetryInterval: {{ .Values.daemonset.telemetryInterval }}

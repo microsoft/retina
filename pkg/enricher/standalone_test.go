@@ -33,7 +33,7 @@ func TestPublishEvent(t *testing.T) {
 	MaxStandaloneCacheEventSize = 1
 	testCache := cache.NewStandaloneCache()
 	config := &config.Config{
-		EnableCriCtl: false,
+		EnableCrictl: false,
 	}
 
 	enricher := NewStandaloneEnricher(context.Background(), testCache, config)
@@ -56,7 +56,7 @@ func TestStandaloneEnricher(t *testing.T) {
 
 	testCache := cache.NewStandaloneCache()
 	config := &config.Config{
-		EnableCriCtl: false,
+		EnableCrictl: false,
 	}
 
 	enricher := NewStandaloneEnricher(context.Background(), testCache, config)

@@ -70,17 +70,17 @@ func (e *StandaloneEnricher) Run() {
 					return
 				}
 				e.l.Debug("Processing event", zap.String("ip", event.IP))
-				e.processEvent(event.IP)
+				e.enrich(event.IP)
 			}
 		}
 	}()
 }
 
-func (e *StandaloneEnricher) processEvent(ip string) {
+func (e *StandaloneEnricher) enrich(ip string) {
 	var podInfo *cache.PodInfo
 	var err error
 
-	if e.cfg.EnableCriCtl {
+	if e.cfg.EnableCrictl {
 		podInfo, err = ctr.GetPodInfo(ip)
 	} else {
 		podInfo, err = sf.GetPodInfo(ip, sf.StateFileLocation)
@@ -90,7 +90,7 @@ func (e *StandaloneEnricher) processEvent(ip string) {
 		e.l.Error("Failed to get pod info", zap.String("ip", ip), zap.Error(err))
 		return
 	}
-	e.cache.ProcessPodInfo(ip, podInfo)
+	e.cache.Update(ip, podInfo)
 }
 
 func (e *StandaloneEnricher) GetPodInfo(ip string) *cache.PodInfo {
