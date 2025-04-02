@@ -21,7 +21,7 @@ func (v *GetNetworkPerformanceMeasures) Prevalidate() error {
 func (v *GetNetworkPerformanceMeasures) Run() error {
 	results, err := lib.PerformTests(lib.TestParams{
 		Iterations:    1,
-		Image:         "ghcr.io/azure/nptest:v20241002",
+		Image:         "ghcr.io/azure/nptest:v20250402",
 		TestNamespace: "netperf",
 		TestFrom:      13,
 		TestTo:        17,
