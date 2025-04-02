@@ -213,6 +213,10 @@ func (r *NodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return nil
 }
 
+// The following methods are stubs for the NodeManager interface.
+// It is done because the hubble requires NodeManager interface as a dependency.
+// However, we don't need to implement all the methods.
+// TODO: make Notifier interface as dependency for the hubble instead of NodeManager on upstream.
 func (r *NodeReconciler) ClusterSizeDependantInterval(time.Duration) time.Duration {
 	return time.Second * 5
 }
@@ -227,10 +231,8 @@ func (r *NodeReconciler) GetNodes() map[types.Identity]types.Node {
 	return map[types.Identity]types.Node{}
 }
 
-// MeshNodeSync
 func (r *NodeReconciler) MeshNodeSync() {}
 
-// NodeDeleted
 func (r *NodeReconciler) NodeDeleted(types.Node) {}
 
 func (r *NodeReconciler) NodeSync() {}
