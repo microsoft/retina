@@ -127,9 +127,9 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 				h.l.Error("Getting Vswitch ports failed", zap.Error(err))
 			}
 
-			if h.cfg.EnableStandalone {
-				h.enricher.UpdateIPStatuses()
-			}
+			// if h.cfg.EnableStandalone {
+			// 	h.enricher.UpdateIPStatuses()
+			// }
 
 			for _, ep := range endpoints {
 				if len(ep.IpConfigurations) < 1 {
@@ -179,9 +179,9 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 				}
 			}
 
-			if h.cfg.EnableStandalone {
-				h.enricher.RemoveStaleEntries()
-			}
+			// if h.cfg.EnableStandalone {
+			// 	h.enricher.RemoveStaleEntries()
+			// }
 		}
 	}
 }
