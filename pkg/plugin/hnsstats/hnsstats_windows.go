@@ -192,7 +192,7 @@ func notifyHnsStats(h *hnsstats, stats *HnsStatsData) {
 		if labels != nil {
 			// This is for test - need to discuss about the advanced metrics (registry)
 			h.l.Info("HNS stats for pod", zap.String(zapIPField, stats.IPAddress), zap.String("pod-name", labels.Name), zap.String("pod-namespace", labels.Namespace))
-			AdvWindowsGauge.WithLabelValues(stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.PacketsReceived))
+			// AdvWindowsGauge.WithLabelValues(stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.PacketsReceived))
 
 			// Emit metrics for the pod
 			ForwardPacketsGaugeS.WithLabelValues(ingressLabel, stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.PacketsReceived))
