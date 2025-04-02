@@ -57,6 +57,11 @@ func StandaloneInstance() *StandaloneEnricher {
 
 func (e *StandaloneEnricher) Run() {
 	e.l.Info("Running standalone enricher")
+	if e.cfg.EnableCrictl {
+		e.l.Info("Using crictl enrichment")
+	} else {
+		e.l.Info("Using statefile enrichment")
+	}
 
 	go func() {
 		for {
