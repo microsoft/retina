@@ -6,6 +6,7 @@ package enricher
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/microsoft/retina/pkg/config"
@@ -84,6 +85,8 @@ func (e *StandaloneEnricher) Run() {
 func (e *StandaloneEnricher) enrich(ip string) {
 	var podInfo *cache.PodInfo
 	var err error
+
+	fmt.Printf("Getting labels for IP: %s\n", ip)
 
 	if e.cfg.EnableCrictl {
 		podInfo, err = ctr.GetPodInfo(ip)
