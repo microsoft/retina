@@ -13,6 +13,7 @@ import (
 	"github.com/Microsoft/hcsshim/hcn"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	kcfg "github.com/microsoft/retina/pkg/config"
+	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/registry"
@@ -85,6 +86,16 @@ func (h *hnsstats) Init() error {
 	}
 	h.endpointQuery.Filter = string(filter)
 
+	if h.cfg.EnableStandalone {
+		if instance := enricher.StandaloneInstance(); instance != nil {
+			InitializeAdvMetrics()
+			h.l.Info("Standalone enricher is enabled")
+			h.enricher = enricher.StandaloneInstance()
+		} else {
+			h.l.Warn("Standalone enricher is not initialized")
+		}
+	}
+
 	h.l.Info("Exiting hnsstats Init...")
 	return nil
 }
@@ -116,6 +127,10 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 				h.l.Error("Getting Vswitch ports failed", zap.Error(err))
 			}
 
+			// if h.cfg.EnableStandalone {
+			// 	h.enricher.UpdateIPStatuses()
+			// }
+
 			for _, ep := range endpoints {
 				if len(ep.IpConfigurations) < 1 {
 					h.l.Info("Skipping endpoint without IPAddress", zap.String(zapEndpointIDField, ep.Id))
@@ -125,6 +140,13 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 				id := ep.Id
 				mac := ep.MacAddress
 				ip := ep.IpConfigurations[0].IpAddress
+
+				if h.cfg.EnableStandalone {
+					if err = h.enricher.PublishEvent(ip); err != nil {
+						h.l.Error("Failed to publish event", zap.String(zapIPField, ip), zap.Error(err))
+						continue
+					}
+				}
 
 				if stats, err := hcsshim.GetHNSEndpointStats(id); err != nil {
 					h.l.Error("Getting endpoint stats failed", zap.String(zapEndpointIDField, id), zap.Error(err))
@@ -156,11 +178,37 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 					notifyHnsStats(h, hnsStatsData)
 				}
 			}
+
+			// if h.cfg.EnableStandalone {
+			// 	h.enricher.RemoveStaleEntries()
+			// }
 		}
 	}
 }
 
 func notifyHnsStats(h *hnsstats, stats *HnsStatsData) {
+	if h.cfg.EnableStandalone {
+		labels := h.enricher.GetPodInfo(stats.IPAddress)
+		if labels != nil {
+			// This is for test - need to discuss about the advanced metrics (registry)
+			h.l.Info("HNS stats for pod", zap.String(zapIPField, stats.IPAddress), zap.String("pod-name", labels.Name), zap.String("pod-namespace", labels.Namespace))
+			// AdvWindowsGauge.WithLabelValues(stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.PacketsReceived))
+
+			// Emit metrics for the pod
+			ForwardPacketsGaugeS.WithLabelValues(ingressLabel, stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.PacketsReceived))
+			ForwardPacketsGaugeS.WithLabelValues(egressLabel, stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.PacketsSent))
+
+			ForwardBytesGaugeS.WithLabelValues(egressLabel, stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.BytesSent))
+			ForwardBytesGaugeS.WithLabelValues(ingressLabel, stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.BytesReceived))
+
+			HNSStatsGaugeS.WithLabelValues(PacketsReceived, stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.PacketsReceived))
+			HNSStatsGaugeS.WithLabelValues(PacketsSent, stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.PacketsSent))
+
+			DropPacketsGaugeS.WithLabelValues(utils.Endpoint, egressLabel, stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.DroppedPacketsOutgoing))
+			DropPacketsGaugeS.WithLabelValues(utils.Endpoint, ingressLabel, stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.DroppedPacketsIncoming))
+		}
+	}
+
 	// hns signals
 	metrics.ForwardPacketsGauge.WithLabelValues(ingressLabel).Set(float64(stats.hnscounters.PacketsReceived))
 	h.l.Debug("emitting packets received count metric", zap.Uint64(PacketsReceived, stats.hnscounters.PacketsReceived))
@@ -214,14 +262,19 @@ func (h *hnsstats) Start(ctx context.Context) error {
 	return pullHnsStats(ctx, h)
 }
 
-func (d *hnsstats) Stop() error {
-	d.l.Info("Entered hnsstats Stop...")
-	if d.state != start {
-		d.l.Info("plugin not started")
+func (h *hnsstats) Stop() error {
+	h.l.Info("Entered hnsstats Stop...")
+	if h.state != start {
+		h.l.Info("plugin not started")
 		return nil
 	}
-	d.l.Info("Stopped listening for hnsstats event...")
-	d.state = stop
-	d.l.Info("Exiting hnsstats Stop...")
+
+	if h.cfg.EnablePodLevel && h.cfg.EnableStandalone {
+		cleanAdvMetrics()
+	}
+
+	h.l.Info("Stopped listening for hnsstats event...")
+	h.state = stop
+	h.l.Info("Exiting hnsstats Stop...")
 	return nil
 }
