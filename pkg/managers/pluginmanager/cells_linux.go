@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/cilium/cilium/pkg/hive/cell"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
+	"github.com/cilium/hive/cell"
 	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/telemetry"

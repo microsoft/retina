@@ -6,6 +6,7 @@ package endpointcontroller
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"reflect"
 	"sync"
 	"time"
@@ -19,7 +20,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/cilium/cilium/pkg/hive/cell"
 	"github.com/cilium/cilium/pkg/k8s"
 	ciliumv2 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2"
 	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
@@ -28,6 +28,7 @@ import (
 	slim_corev1 "github.com/cilium/cilium/pkg/k8s/slim/k8s/api/core/v1"
 	slim_clientset "github.com/cilium/cilium/pkg/k8s/slim/k8s/client/clientset/versioned"
 	"github.com/cilium/cilium/pkg/labels"
+	"github.com/cilium/hive/cell"
 	"github.com/cilium/workerpool"
 )
 
@@ -665,7 +666,7 @@ func (r *endpointReconciler) ciliumEndpointsLabels(ctx context.Context, pod *sli
 		}
 		r.store.AddNamespace(ns)
 	}
-	_, ciliumLabels, _, err := k8s.GetPodMetadata(ns, pod)
+	_, ciliumLabels := k8s.GetPodMetadata(slog.Default(), ns, pod)
 	if err != nil {
 		r.l.WithError(err).WithFields(logrus.Fields{
 			"podKey": pod.Name,

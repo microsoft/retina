@@ -7,6 +7,7 @@ import (
 	"github.com/cilium/cilium/api/v1/flow"
 	"github.com/cilium/cilium/pkg/identity"
 	ipc "github.com/cilium/cilium/pkg/ipcache"
+	"github.com/cilium/cilium/pkg/k8s"
 	"github.com/cilium/cilium/pkg/labels"
 )
 
@@ -22,7 +23,7 @@ type epDecoder struct {
 	ipcache     *ipc.IPCache
 }
 
-func NewEpDecoder(c *ipc.IPCache) *epDecoder { //nolint:revive // This is a factory function.
+func NewEpDecoder(c *ipc.IPCache) EpDecoder {
 	return &epDecoder{
 		localHostIP: os.Getenv("NODE_IP"),
 		ipcache:     c,
@@ -53,41 +54,35 @@ func (e *epDecoder) Decode(ip netip.Addr) *flow.Endpoint {
 	case identity.ReservedIdentityWorld:
 		ep.Labels = labels.LabelWorld.GetModel()
 	default:
-		ep.Labels = e.ipcache.GetMetadataLabelsByIP(ip).GetModel()
+		// TODO: We do not have an api on the ipcache to get the labels from the ip or identity.
 	}
 
 	return ep
 }
 
-func (e *epDecoder) endpointHostIP(ip string) string {
-	hostIP, _ := e.ipcache.GetHostIPCache(ip)
-	return hostIP.String()
+func (e *epDecoder) IsEndpointOnLocalHost(string) bool {
+	// TODO: We need to check if the ip is in the local host network.
+	// We need the ipcache to provide an api for the same.
+	return false
 }
 
-func (e *epDecoder) IsEndpointOnLocalHost(ip string) bool {
-	return e.localHostIP == e.endpointHostIP(ip)
+type SvcDecoder interface {
+	Decode(ip netip.Addr) *flow.Service
 }
 
-// type SvcDecoder interface {
-// 	Decode(ip netip.Addr) *flow.Service
-// }
-//
-// type svcDecoder struct {
-// 	svccache *k8s.ServiceCache
-// }
-//
-// func NewSvcDecoder(sc *k8s.ServiceCache) *svcDecoder {
-// 	return &svcDecoder{
-// 		svccache: sc,
-// 	}
-// }
-//
-// func (s *svcDecoder) Decode(ip netip.Addr) *flow.Service {
-// 	svc := &flow.Service{}
-//
-// 	if svcID, ok := s.svccache.GetServiceIDFromFrontendIP(ip.String()); ok {
-// 		svc.Name = svcID.Name
-// 		svc.Namespace = svcID.Namespace
-// 	}
-// 	return svc
-// }
+type svcDecoder struct {
+	svccache k8s.ServiceCache
+}
+
+func NewSvcDecoder(sc k8s.ServiceCache) SvcDecoder {
+	return &svcDecoder{
+		svccache: sc,
+	}
+}
+
+func (s *svcDecoder) Decode(netip.Addr) *flow.Service {
+	svc := &flow.Service{}
+	// TODO: serviceCache from cilium do not have a way to get the service name
+	// and namespace from the ip. We need to add this to the serviceCache.
+	return svc
+}

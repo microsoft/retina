@@ -18,13 +18,13 @@ import (
 
 	operatorOption "github.com/cilium/cilium/operator/option"
 	"github.com/cilium/cilium/pkg/hive"
-	"github.com/cilium/cilium/pkg/hive/cell"
 	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
 	k8sversion "github.com/cilium/cilium/pkg/k8s/version"
 	"github.com/cilium/cilium/pkg/logging"
 	"github.com/cilium/cilium/pkg/logging/logfields"
 	"github.com/cilium/cilium/pkg/metrics"
 	"github.com/cilium/cilium/pkg/option"
+	"github.com/cilium/hive/cell"
 	"github.com/microsoft/retina/internal/buildinfo"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -43,7 +43,7 @@ var (
 func Execute(h *hive.Hive) {
 	initEnv(h.Viper())
 
-	if err := h.Run(); err != nil {
+	if err := h.Run(logging.DefaultSlogLogger); err != nil {
 		logger.Fatal(err)
 	}
 }
@@ -60,7 +60,7 @@ func registerOperatorHooks(l logrus.FieldLogger, lc cell.Lifecycle, llc *LeaderL
 			return nil
 		},
 		OnStop: func(ctx cell.HookContext) error {
-			if err := llc.Stop(ctx); err != nil {
+			if err := llc.Stop(logging.DefaultSlogLogger, ctx); err != nil {
 				return errors.Wrap(err, "failed to stop operator")
 			}
 			doCleanup()
@@ -114,7 +114,7 @@ func runOperator(l logrus.FieldLogger, lc *LeaderLifecycle, clientset k8sClient.
 	if !k8sversion.Capabilities().LeasesResourceLock {
 		l.Info("Support for coordination.k8s.io/v1 not present, fallback to non HA mode")
 
-		if err := lc.Start(leaderElectionCtx); err != nil {
+		if err := lc.Start(logging.DefaultSlogLogger, leaderElectionCtx); err != nil {
 			l.WithError(err).Fatal("Failed to start leading")
 		}
 		return
@@ -159,7 +159,7 @@ func runOperator(l logrus.FieldLogger, lc *LeaderLifecycle, clientset k8sClient.
 
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {
-				if err := lc.Start(ctx); err != nil {
+				if err := lc.Start(logging.DefaultSlogLogger, ctx); err != nil {
 					l.WithError(err).Error("Failed to start when elected leader, shutting down")
 					shutdowner.Shutdown(hive.ShutdownWithError(err))
 				}

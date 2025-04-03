@@ -7,6 +7,7 @@ import (
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	observer "github.com/cilium/cilium/pkg/hubble/observer/types"
 	ipc "github.com/cilium/cilium/pkg/ipcache"
+	"github.com/cilium/cilium/pkg/k8s"
 	"github.com/microsoft/retina/pkg/hubble/parser/layer34"
 	"github.com/microsoft/retina/pkg/hubble/parser/seven"
 	"github.com/sirupsen/logrus"
@@ -24,18 +25,20 @@ var (
 type Parser struct {
 	l       logrus.FieldLogger
 	ipcache *ipc.IPCache
+	svc     k8s.ServiceCache
 
 	l34 *layer34.Parser
 	l7  *seven.Parser
 }
 
-func New(l *logrus.Entry, c *ipc.IPCache) *Parser {
+func New(l *logrus.Entry, svc k8s.ServiceCache, c *ipc.IPCache) *Parser {
 	return &Parser{
 		l:       l,
 		ipcache: c,
+		svc:     svc,
 
-		l34: layer34.New(l, c),
-		l7:  seven.New(l, c),
+		l34: layer34.New(l, svc, c),
+		l7:  seven.New(l, svc, c),
 	}
 }
 
