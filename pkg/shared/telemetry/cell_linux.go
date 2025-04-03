@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cilium/cilium/pkg/hive/cell"
+	"github.com/cilium/hive/cell"
 	"github.com/microsoft/retina/pkg/telemetry"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/rest"

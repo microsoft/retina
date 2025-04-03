@@ -1,6 +1,6 @@
 package endpointcontroller
 
-import "github.com/cilium/cilium/pkg/hive/cell"
+import "github.com/cilium/hive/cell"
 
 var Cell = cell.Module(
 	"endpointcontroller",

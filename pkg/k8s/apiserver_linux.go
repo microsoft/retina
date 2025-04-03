@@ -1,10 +1,10 @@
 package k8s
 
 import (
-	"github.com/cilium/cilium/pkg/hive/cell"
 	"github.com/cilium/cilium/pkg/identity"
 	"github.com/cilium/cilium/pkg/ipcache"
 	"github.com/cilium/cilium/pkg/source"
+	"github.com/cilium/hive/cell"
 	"github.com/microsoft/retina/pkg/common"
 	cc "github.com/microsoft/retina/pkg/controllers/cache"
 	"github.com/sirupsen/logrus"
