@@ -1,6 +1,7 @@
 module github.com/microsoft/retina
 
 go 1.24.1
+toolchain go1.24.1
 
 require (
 	github.com/go-chi/chi/v5 v5.2.1
@@ -278,7 +279,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.78.2
 	github.com/cakturk/go-netstat v0.0.0-20200220111822-e5b49efee7a5
 	github.com/cilium/cilium v1.18.0-pre.0.0.20250331121417-b4508ebd8be7
-	github.com/cilium/ebpf v0.17.3
+	github.com/cilium/ebpf v0.18.0
 	github.com/cilium/hive v0.0.0-20250328192914-7f3c86c9c25e
 	github.com/cilium/proxy v0.0.0-20250318065604-173988fc0adb
 	github.com/cilium/workerpool v1.3.0
