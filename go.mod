@@ -1,6 +1,7 @@
 module github.com/microsoft/retina
 
 go 1.24.1
+toolchain go1.24.1
 
 require (
 	github.com/go-chi/chi/v5 v5.2.1
@@ -293,7 +294,7 @@ require (
 	github.com/microsoft/ApplicationInsights-Go v0.4.4
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onsi/ginkgo/v2 v2.23.3
-	github.com/onsi/gomega v1.36.2
+	github.com/onsi/gomega v1.37.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_model v0.6.1
 	github.com/prometheus/common v0.63.0
