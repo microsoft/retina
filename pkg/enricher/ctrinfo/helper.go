@@ -32,7 +32,8 @@ type Network struct {
 }
 
 func GetPodInfo(ip string) (*cache.PodInfo, error) {
-	cmd := exec.Command("C:\\ContainerPlat\\crictl.exe", "pods", "-q") // investigate in ACI
+	cmd := exec.Command("crictl.exe", "pods", "-q") // investigate in
+	// cmd := exec.Command("C:\\ContainerPlat\\crictl.exe", "pods", "-q") // investigate in ACI
 
 	var output bytes.Buffer
 	cmd.Stdout = &output
@@ -47,7 +48,8 @@ func GetPodInfo(ip string) (*cache.PodInfo, error) {
 		if podID == "" {
 			continue
 		}
-		cmd := exec.Command("C:\\ContainerPlat\\crictl.exe", "inspectp", podID) // investigate in ACI
+		cmd := exec.Command("crictl.exe", "inspectp", podID) // investigate in ACI
+		// cmd := exec.Command("C:\\ContainerPlat\\crictl.exe", "inspectp", podID) // investigate in ACI
 
 		var podSpec bytes.Buffer
 		cmd.Stdout = &podSpec
