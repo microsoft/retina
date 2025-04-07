@@ -3,6 +3,7 @@ package k8s
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	daemonk8s "github.com/cilium/cilium/daemon/k8s"
 	cgmngr "github.com/cilium/cilium/pkg/cgroups/manager"
@@ -53,6 +54,13 @@ var Cell = cell.Module(
 			logrus.WithError(err).Fatal("Failed to register table")
 		}
 	}),
+
+	cell.Provide(func() endpointmanager.EndpointManagerConfig {
+		return endpointmanager.EndpointManagerConfig{
+			EndpointRegenInterval: time.Duration(0),
+		}
+	},
+	),
 
 	cell.Provide(
 		func() resource.Resource[*slim_corev1.Namespace] {
