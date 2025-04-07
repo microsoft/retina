@@ -111,14 +111,10 @@ func (p *Plugin) metricsMapIterateCallback(key *MetricsKey, value *MetricsValues
 	} else {
 		if key.IsEgress() {
 			metrics.ForwardBytesGauge.WithLabelValues(egressLabel).Set(float64(value.Bytes()))
-			p.l.Debug("emitting bytes sent count metric", zap.Uint64(bytesSent, value.Bytes()))
 			metrics.ForwardBytesGauge.WithLabelValues(egressLabel).Set(float64(value.Count()))
-			p.l.Debug("emitting packets sent count metric", zap.Uint64(packetsSent, value.Count()))
 		} else if key.IsIngress() {
 			metrics.ForwardPacketsGauge.WithLabelValues(ingressLabel).Set(float64(value.Count()))
-			p.l.Debug("emitting packets received count metric", zap.Uint64(packetsReceived, value.Count()))
 			metrics.ForwardBytesGauge.WithLabelValues(ingressLabel).Set(float64(value.Bytes()))
-			p.l.Debug("emitting bytes received count metric", zap.Uint64(bytesReceived, value.Bytes()))
 		}
 	}
 }
@@ -135,7 +131,7 @@ func (p *Plugin) eventsMapCallback(data unsafe.Pointer, size uint32) int {
 	return 0
 }
 
-func addEbpfToPath() error {
+func (p *Plugin) addEbpfToPath() error {
 	currPath := os.Getenv("PATH")
 	if strings.Contains(currPath, "ebpf-for-windows") {
 		return nil
@@ -144,6 +140,7 @@ func addEbpfToPath() error {
 	ebpfWindowsPath := programFiles + "\\ebpf-for-windows\\"
 	newPath := currPath + ";" + ebpfWindowsPath
 	if err := os.Setenv("PATH", newPath); err != nil {
+		p.l.Error("Error setting PATH environment variable", zap.Error(err))
 		return fmt.Errorf("error setting PATH environment variable: %v", err)
 	}
 
@@ -154,7 +151,7 @@ func (p *Plugin) pullMetricsAndEvents(ctx context.Context) {
 	eventsMap := NewEventsMap()
 	metricsMap := NewMetricsMap()
 
-	err := addEbpfToPath()
+	err := p.addEbpfToPath()
 	if err != nil {
 		return
 	}
