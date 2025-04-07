@@ -10,7 +10,7 @@ require (
 	go.uber.org/zap v1.27.0
 	k8s.io/client-go v0.32.3
 	sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.5.20
-	sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader v0.5.0
+	sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader v0.5.1
 )
 
 retract (
