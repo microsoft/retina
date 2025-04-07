@@ -1,25 +1,15 @@
 package ebpfwindows
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
 	"net"
 )
-
-// IP represents an IPv4 or IPv4 or IPv6 address
-type IP struct {
-	Address uint32
-	Pad1    uint32
-	Pad2    uint32
-	Pad3    uint32
-}
 
 // TraceSockNotify is the notification for a socket trace
 type TraceSockNotify struct {
 	Type       uint8
 	XlatePoint uint8
-	DstIP      IP
+	DstIP      net.IP
 	DstPort    uint16
 	SockCookie uint64
 	CgroupID   uint64
@@ -66,7 +56,7 @@ type TraceNotify struct {
 	Reason   uint8
 	Ipv6     bool
 	Ifindex  uint32
-	OrigIP   IP
+	OrigIP   net.IP
 	Data     [128]byte
 }
 
@@ -82,28 +72,6 @@ const (
 	NotifyTraceSock     = 7
 )
 
-func (ip *IP) ConvertToString(Ipv6 bool) string {
-	var ipAddress string
-	var buf bytes.Buffer
-
-	err := binary.Write(&buf, binary.BigEndian, *ip)
-
-	if err != nil {
-		return ""
-	}
-
-	byteArray := buf.Bytes()
-
-	if Ipv6 {
-		ipAddress = net.IP(byteArray[:16]).String()
-	} else {
-		ipAddress = net.IP(byteArray[:4]).String()
-	}
-
-	return ipAddress
-
-}
-
 // String returns a string representation of the DropNotify
 func (k *DropNotify) String() string {
 
@@ -112,12 +80,10 @@ func (k *DropNotify) String() string {
 
 // String returns a string representation of the TraceNotify
 func (k *TraceNotify) String() string {
-	ipAddress := k.OrigIP.ConvertToString(k.Ipv6)
-	return fmt.Sprintf("Ifindex: %d, SrcLabel:%d, DstLabel:%d, IpV6:%t, OrigIP:%s", k.Ifindex, k.SrcLabel, k.DstLabel, k.Ipv6, ipAddress)
+	return fmt.Sprintf("Ifindex: %d, SrcLabel:%d, DstLabel:%d, IpV6:%t, OrigIP:%s", k.Ifindex, k.SrcLabel, k.DstLabel, k.Ipv6, k.OrigIP.String())
 }
 
 // String returns a string representation of the TraceSockNotify
 func (k *TraceSockNotify) String() string {
-	ipAddress := k.DstIP.ConvertToString(k.Ipv6)
-	return fmt.Sprintf("DstIP:%s, DstPort:%d, SockCookie:%d, CgroupID:%d, L4Proto:%d, IPv6:%t", ipAddress, k.DstPort, k.SockCookie, k.CgroupID, k.L4Proto, k.Ipv6)
+	return fmt.Sprintf("DstIP:%s, DstPort:%d, SockCookie:%d, CgroupID:%d, L4Proto:%d, IPv6:%t", k.DstIP.String(), k.DstPort, k.SockCookie, k.CgroupID, k.L4Proto, k.Ipv6)
 }

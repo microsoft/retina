@@ -77,8 +77,8 @@ func (p *Plugin) Init() error {
 	)
 
 	if err != nil {
-		p.l.Fatal("Failed to create parser", zap.Error(err))
-		return err
+		p.l.Error("Failed to create parser", zap.Error(err))
+		return fmt.Errorf("failed to create parser: %w", err)
 	}
 
 	p.parser = parser
@@ -100,9 +100,6 @@ func (p *Plugin) Start(ctx context.Context) error {
 
 // metricsMapIterateCallback is the callback function that is called for each key-value pair in the metrics map.
 func (p *Plugin) metricsMapIterateCallback(key *MetricsKey, value *MetricsValues) {
-	p.l.Debug("MetricsMapIterateCallback")
-	p.l.Debug("Key", zap.String("Key", key.String()))
-	p.l.Debug("Value", zap.String("Value", value.String()))
 	if key.IsDrop() {
 		if key.IsEgress() {
 			metrics.DropBytesGauge.WithLabelValues(DropReason(key.Reason), egressLabel).Set(float64(value.Bytes()))
@@ -226,52 +223,47 @@ func (p *Plugin) Generate(context.Context) error {
 
 func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 	if uintptr(size) < unsafe.Sizeof(uint8(0)) {
-		return ErrInvalidEventData
+		return fmt.Errorf("invalid size %d", size)
 	}
-	eventType := *(*uint8)(data)
+
+	perfData := unsafe.Slice((*byte)(data), size)
+	eventType := perfData[0]
 	switch eventType {
 	case NotifyDrop:
-		if uintptr(size) < unsafe.Sizeof(DropNotify{}) {
-			p.l.Error("Invalid DropNotify data size", zap.Uint32("size", size))
-			return ErrInvalidEventData
+		if uintptr(size) != unsafe.Sizeof(DropNotify{}) {
+			return fmt.Errorf("invalid size for DropNotify %d", size)
 		}
 		e, err := p.parser.Decode(&observer.MonitorEvent{
 			Payload: &observer.PerfEvent{
-				Data: (*[unsafe.Sizeof(DropNotify{})]byte)(data)[:],
+				Data: perfData,
 			},
 		})
 		if err != nil {
-			p.l.Error("Could not convert event to flow", zap.Any("handleTraceEvent", data), zap.Error(err))
-			return ErrInvalidEventData
+			return fmt.Errorf("could not convert event to flow: %w", err)
 		}
+		p.enricher.Write(e)
 		meta := &utils.RetinaMetadata{}
-		// Add packet size to the flow's metadata.
 		utils.AddPacketSize(meta, 128)
 		fl := e.GetFlow()
-		dropNotify := (*DropNotify)(data)
-		meta.DropReason = utils.DropReason(dropNotify.Subtype)
+		meta.DropReason = utils.DropReason(e.GetFlow().EventType.GetSubType())
 		utils.AddRetinaMetadata(fl, meta)
-		p.enricher.Write(e)
 	case NotifyTrace:
-		if uintptr(size) < unsafe.Sizeof(TraceNotify{}) {
-			p.l.Error("Invalid TraceNotify data size", zap.Uint32("size", size))
-			return ErrInvalidEventData
+		if uintptr(size) != unsafe.Sizeof(TraceNotify{}) {
+			return fmt.Errorf("invalid size for TraceNotify %d", size)
 		}
 		e, err := p.parser.Decode(&observer.MonitorEvent{
 			Payload: &observer.PerfEvent{
-				Data: (*[unsafe.Sizeof(TraceNotify{})]byte)(data)[:],
+				Data: perfData,
 			},
 		})
+		p.enricher.Write(e)
 		if err != nil {
-			p.l.Error("Could not convert event to flow", zap.Any("handleTraceEvent", data), zap.Error(err))
-			return ErrInvalidEventData
+			return fmt.Errorf("could not convert tracenotify event to flow: %w", err)
 		}
 		meta := &utils.RetinaMetadata{}
-		// Add packet size to the flow's metadata.
 		utils.AddPacketSize(meta, 128)
 		fl := e.GetFlow()
 		utils.AddRetinaMetadata(fl, meta)
-		p.enricher.Write(e)
 	}
 	return nil
 }
