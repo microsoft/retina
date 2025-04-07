@@ -1,7 +1,6 @@
 package ebpfwindows
 
 import (
-	"fmt"
 	"net"
 )
 
@@ -71,19 +70,3 @@ const (
 	NotifyCapture       = 6
 	NotifyTraceSock     = 7
 )
-
-// String returns a string representation of the DropNotify
-func (k *DropNotify) String() string {
-
-	return fmt.Sprintf("Ifindex: %d, SrcLabel:%d, DstLabel:%d, File: %s, Line: %d", k.Ifindex, k.SrcLabel, k.DstLabel, BPFFileName(k.File), k.Line)
-}
-
-// String returns a string representation of the TraceNotify
-func (k *TraceNotify) String() string {
-	return fmt.Sprintf("Ifindex: %d, SrcLabel:%d, DstLabel:%d, IpV6:%t, OrigIP:%s", k.Ifindex, k.SrcLabel, k.DstLabel, k.Ipv6, k.OrigIP.String())
-}
-
-// String returns a string representation of the TraceSockNotify
-func (k *TraceSockNotify) String() string {
-	return fmt.Sprintf("DstIP:%s, DstPort:%d, SockCookie:%d, CgroupID:%d, L4Proto:%d, IPv6:%t", k.DstIP.String(), k.DstPort, k.SockCookie, k.CgroupID, k.L4Proto, k.Ipv6)
-}
