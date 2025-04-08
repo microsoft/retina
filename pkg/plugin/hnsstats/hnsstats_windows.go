@@ -7,6 +7,7 @@ package hnsstats
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/Microsoft/hcsshim"
@@ -127,6 +128,7 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 				h.l.Error("Getting Vswitch ports failed", zap.Error(err))
 			}
 
+			fmt.Printf("Endpoints: %v\n", endpoints)
 			// if h.cfg.EnableStandalone {
 			// 	h.enricher.UpdateIPStatuses()
 			// }
@@ -154,7 +156,8 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 					hnsStatsData := &HnsStatsData{hnscounters: stats, IPAddress: ip}
 					h.l.Debug("Fetched HNS endpoints stats", zap.String(zapEndpointIDField, id),
 						zap.String(zapIPField, ip), zap.String(zapMACField, mac))
-					// h.l.Info(hnsStatsData.String())
+					// This is commented out - bring back
+					h.l.Info(hnsStatsData.String())
 
 					// Get VFP port counters for matching port (MAC address of endpoint as the key)
 					portguid, ok := kv[mac]
