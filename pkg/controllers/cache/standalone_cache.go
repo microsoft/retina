@@ -5,27 +5,30 @@ package cache
 
 import (
 	"sync"
+	"time"
 
 	"github.com/microsoft/retina/pkg/log"
 	"go.uber.org/zap"
 )
 
 type PodInfo struct {
-	Name      string
-	Namespace string
-	Active    bool
+	Name       string
+	Namespace  string
+	LastUpdate time.Time
 }
 
 type StandaloneCache struct {
 	rwMutex sync.RWMutex
 	l       *log.ZapLogger
 	ipToPod map[string]*PodInfo
+	ttl     time.Duration
 }
 
 func NewStandaloneCache() *StandaloneCache {
 	return &StandaloneCache{
 		l:       log.Logger().Named(string("standalone-cache")),
 		ipToPod: make(map[string]*PodInfo),
+		ttl:     3 * time.Minute,
 	}
 }
 
@@ -47,25 +50,17 @@ func (c *StandaloneCache) Update(ip string, podInfo *PodInfo) {
 	}
 }
 
-func (c *StandaloneCache) ResetIPStatuses() {
-	c.rwMutex.Lock()
-	defer c.rwMutex.Unlock()
+func (c *StandaloneCache) ForEach(f func(ip string, podInfo *PodInfo)) {
+	c.rwMutex.RLock()
+	defer c.rwMutex.RUnlock()
 
-	for _, podInfo := range c.ipToPod {
-		podInfo.Active = false
+	for ip, podInfo := range c.ipToPod {
+		f(ip, podInfo)
 	}
 }
 
-func (c *StandaloneCache) RemoveStaleEntries() {
-	c.rwMutex.Lock()
-	defer c.rwMutex.Unlock()
-
-	for ip, podInfo := range c.ipToPod {
-		if !podInfo.Active {
-			delete(c.ipToPod, ip)
-			c.l.Debug("Removed stale pod IP from cache", zap.String("ip", ip), zap.String("name", podInfo.Name), zap.String("namespace", podInfo.Namespace))
-		}
-	}
+func (c *StandaloneCache) TTL() time.Duration {
+	return c.ttl
 }
 
 func (c *StandaloneCache) addPod(ip, name, namespace string) {
@@ -73,11 +68,11 @@ func (c *StandaloneCache) addPod(ip, name, namespace string) {
 	defer c.rwMutex.Unlock()
 
 	existingPod, exists := c.ipToPod[ip]
-	newPod := &PodInfo{Name: name, Namespace: namespace, Active: true}
+	newPod := &PodInfo{Name: name, Namespace: namespace, LastUpdate: time.Now()}
 
 	// Skip adding element if identical
 	if exists && existingPod.isEqual(newPod) {
-		existingPod.Active = true
+		existingPod.LastUpdate = time.Now()
 		return
 	}
 

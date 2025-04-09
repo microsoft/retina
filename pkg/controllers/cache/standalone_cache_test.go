@@ -45,14 +45,12 @@ func TestStandaloneCache(t *testing.T) {
 				}
 				assert.Equal(t, podInfo.Name, name)
 				assert.Equal(t, podInfo.Namespace, namespace)
-				assert.Equal(t, podInfo.Active, true)
 			},
 		},
 		{
 			name: "Add pod - Pod info updated if not identical",
 			setup: func() {
 				testCache.Update(ip, defaultInfo)
-				testCache.ResetIPStatuses()
 				testCache.Update(ip, defaultInfo)
 			},
 			expect: func(t *testing.T) {
@@ -62,7 +60,6 @@ func TestStandaloneCache(t *testing.T) {
 				}
 				assert.Equal(t, podInfo.Name, defaultInfo.Name)
 				assert.Equal(t, podInfo.Namespace, defaultInfo.Namespace)
-				assert.Equal(t, podInfo.Active, true)
 			},
 		},
 		{
@@ -81,7 +78,6 @@ func TestStandaloneCache(t *testing.T) {
 			name: "Reset IP Statuses - Pods added before should be marked inactive",
 			setup: func() {
 				testCache.Update(ip, defaultInfo)
-				testCache.ResetIPStatuses()
 				testCache.Update("ip-2", &cache.PodInfo{Name: "pod-2", Namespace: "ns-2"})
 			},
 			expect: func(t *testing.T) {
@@ -89,13 +85,11 @@ func TestStandaloneCache(t *testing.T) {
 				if podInfo1 == nil {
 					t.Fatalf("Expected pod info, got nil")
 				}
-				assert.Equal(t, podInfo1.Active, false)
 
 				podInfo2 := testCache.GetPod("ip-2")
 				if podInfo2 == nil {
 					t.Fatalf("Expected pod info, got nil")
 				}
-				assert.Equal(t, podInfo2.Active, true)
 			},
 		},
 		{
@@ -103,9 +97,7 @@ func TestStandaloneCache(t *testing.T) {
 			setup: func() {
 				testCache.Update(ip, defaultInfo)
 				testCache.Update("ip-2", &cache.PodInfo{Name: "pod-2", Namespace: "ns-2"})
-				testCache.ResetIPStatuses()
 				testCache.Update(ip, defaultInfo)
-				testCache.RemoveStaleEntries()
 			},
 			expect: func(t *testing.T) {
 				podInfo := testCache.GetPod(ip)
@@ -114,7 +106,6 @@ func TestStandaloneCache(t *testing.T) {
 				}
 				assert.Equal(t, podInfo.Name, defaultInfo.Name)
 				assert.Equal(t, podInfo.Namespace, defaultInfo.Namespace)
-				assert.Equal(t, podInfo.Active, true)
 
 				removedPod := testCache.GetPod("ip-2")
 				if removedPod != nil {

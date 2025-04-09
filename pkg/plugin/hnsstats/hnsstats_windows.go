@@ -80,7 +80,11 @@ func (h *hnsstats) Init() error {
 		Flags: hcn.HostComputeQueryFlagsNone,
 	}
 	// Filter out any endpoints that are not in "AttachedShared" State. All running Windows pods with networking must be in this state.
-	filterMap := map[string]uint16{"State": HCN_ENDPOINT_STATE_ATTACHED_SHARING}
+	var filterMap map[string]uint16
+	if !h.cfg.EnableStandalone {
+		filterMap = map[string]uint16{"State": HCN_ENDPOINT_STATE_ATTACHED_SHARING}
+	}
+
 	filter, err := json.Marshal(filterMap)
 	if err != nil {
 		return err
@@ -119,6 +123,9 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 			// Pull data from node
 			// Get local endpoints that are healthy
 			endpoints, err := hcn.ListEndpointsQuery(h.endpointQuery)
+			for i := range endpoints {
+				fmt.Printf("Endpoint: %v\n", endpoints[i].Id)
+			}
 			if err != nil {
 				h.l.Error("Getting endpoints failed", zap.Error(err))
 			}
@@ -127,11 +134,6 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 			if err != nil {
 				h.l.Error("Getting Vswitch ports failed", zap.Error(err))
 			}
-
-			fmt.Printf("Endpoints: %v\n", endpoints)
-			// if h.cfg.EnableStandalone {
-			// 	h.enricher.UpdateIPStatuses()
-			// }
 
 			for _, ep := range endpoints {
 				if len(ep.IpConfigurations) < 1 {
@@ -144,7 +146,7 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 				ip := ep.IpConfigurations[0].IpAddress
 
 				if h.cfg.EnableStandalone {
-					if err = h.enricher.PublishEvent(ip); err != nil {
+					if err = h.enricher.PublishEvent(ip, enricher.AddEvent); err != nil {
 						h.l.Error("Failed to publish event", zap.String(zapIPField, ip), zap.Error(err))
 						continue
 					}
@@ -156,7 +158,7 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 					hnsStatsData := &HnsStatsData{hnscounters: stats, IPAddress: ip}
 					h.l.Debug("Fetched HNS endpoints stats", zap.String(zapEndpointIDField, id),
 						zap.String(zapIPField, ip), zap.String(zapMACField, mac))
-					// This is commented out - bring back
+					// Bring back - This is commented out
 					h.l.Info(hnsStatsData.String())
 
 					// Get VFP port counters for matching port (MAC address of endpoint as the key)
@@ -182,9 +184,9 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 				}
 			}
 
-			// if h.cfg.EnableStandalone {
-			// 	h.enricher.RemoveStaleEntries()
-			// }
+			if h.cfg.EnableStandalone {
+				h.enricher.RemoveStaleEntries()
+			}
 		}
 	}
 }
