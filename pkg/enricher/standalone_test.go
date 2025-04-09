@@ -41,8 +41,8 @@ func TestPublishEvent(t *testing.T) {
 	go enricher.Run()
 	defer enricher.Stop()
 
-	err1 := enricher.PublishEvent(ip)
-	err2 := enricher.PublishEvent(invalidIP)
+	err1 := enricher.PublishEvent(ip, AddEvent)
+	err2 := enricher.PublishEvent(invalidIP, AddEvent)
 	require.NoError(t, err1)
 	assert.Equal(t, err2, ErrEventChannelFull)
 }
@@ -65,14 +65,14 @@ func TestStandaloneEnricher(t *testing.T) {
 	defer enricher.Stop()
 
 	// Enrich pod not in statefile
-	err := enricher.PublishEvent(invalidIP)
+	err := enricher.PublishEvent(invalidIP, AddEvent)
 	require.NoError(t, err)
 
 	podInfo := enricher.GetPodInfo(invalidIP)
 	assert.Nil(t, podInfo)
 
 	// Enrich pod in statefile
-	err = enricher.PublishEvent(ip)
+	err = enricher.PublishEvent(ip, AddEvent)
 	require.NoError(t, err)
 
 	assert.Eventually(t, func() bool {
@@ -84,7 +84,7 @@ func TestStandaloneEnricher(t *testing.T) {
 
 	// Delete pod not in statefile
 	statefile.StateFileLocation = "statefile/mock_statefile_updated.json"
-	err = enricher.PublishEvent(ip)
+	err = enricher.PublishEvent(ip, AddEvent)
 	require.NoError(t, err)
 
 	assert.Eventually(t, func() bool {

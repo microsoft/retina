@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/cilium/cilium/pkg/time"
 	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/controllers/cache"
 	ctr "github.com/microsoft/retina/pkg/enricher/ctrinfo"
@@ -27,8 +28,16 @@ var (
 	ErrEventChannelFull         = errors.New("event channel is full, event dropped")
 )
 
+type Action string
+
+const (
+	AddEvent    Action = "add"
+	DeleteEvent Action = "delete"
+)
+
 type StandaloneEvent struct {
-	IP string
+	IP     string
+	Action Action
 }
 
 type StandaloneEnricher struct {
@@ -75,8 +84,16 @@ func (e *StandaloneEnricher) Run() {
 					e.l.Info("Event channel closed, stopping event processing")
 					return
 				}
-				e.l.Debug("Processing event", zap.String("ip", event.IP))
-				e.enrich(event.IP)
+				switch event.Action {
+				case AddEvent:
+					e.l.Debug("Processing add event", zap.String("ip", event.IP))
+					e.enrich(event.IP)
+				case DeleteEvent:
+					e.l.Debug("Processing delete event", zap.String("ip", event.IP))
+					e.cache.Update(event.IP, nil)
+				default:
+					e.l.Warn("Unknown event action", zap.String("action", string(event.Action)))
+				}
 			}
 		}
 	}()
@@ -105,9 +122,9 @@ func (e *StandaloneEnricher) GetPodInfo(ip string) *cache.PodInfo {
 	return e.cache.GetPod(ip)
 }
 
-func (e *StandaloneEnricher) PublishEvent(ip string) error {
+func (e *StandaloneEnricher) PublishEvent(ip string, action Action) error {
 	select {
-	case e.eventChannel <- StandaloneEvent{IP: ip}:
+	case e.eventChannel <- StandaloneEvent{IP: ip, Action: action}:
 		return nil
 	default:
 		e.l.Warn("Event channel full, dropping event", zap.String("ip", ip))
@@ -115,12 +132,16 @@ func (e *StandaloneEnricher) PublishEvent(ip string) error {
 	}
 }
 
-func (e *StandaloneEnricher) UpdateIPStatuses() {
-	e.cache.ResetIPStatuses()
-}
-
 func (e *StandaloneEnricher) RemoveStaleEntries() {
-	e.cache.RemoveStaleEntries()
+	e.cache.ForEach(func(ip string, podInfo *cache.PodInfo) {
+		if time.Since(podInfo.LastUpdate) > e.cache.TTL() {
+			e.l.Info("Removing stale entry from cache", zap.String("ip", ip))
+			err := e.PublishEvent(ip, DeleteEvent)
+			if err != nil {
+				e.l.Error("Failed to publish delete event", zap.String("ip", ip), zap.Error(err))
+			}
+		}
+	})
 }
 
 func (e *StandaloneEnricher) Stop() {
