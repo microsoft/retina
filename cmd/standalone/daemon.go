@@ -9,7 +9,6 @@ import (
 	"github.com/microsoft/retina/cmd/utils"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
-	"github.com/microsoft/retina/pkg/metrics"
 	"go.uber.org/zap"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -36,8 +35,6 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 	zl.Info("Starting standalone Retina daemon")
 	mainLogger := zl.Named("standalone-daemon").Sugar()
 
-	metrics.InitializeMetrics()
-
 	tel, err := utils.InitializeTelemetryClient(nil, d.config, mainLogger)
 	if err != nil {
 		return fmt.Errorf("failed to initialize telemetry client: %w", err)
@@ -48,9 +45,6 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 	cache := cache.NewStandaloneCache()
 	enrich := enricher.NewStandaloneEnricher(ctx, cache, d.config)
 	enrich.Run()
-
-	// metrics module?
-	// next part
 
 	// enable pod level needs to be false!
 	controllerMgr, err := cm.NewControllerManager(d.config, nil, tel)
