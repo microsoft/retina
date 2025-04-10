@@ -7,7 +7,6 @@ package hnsstats
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/Microsoft/hcsshim"
@@ -125,9 +124,6 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 			// Pull data from node
 			// Get local endpoints that are healthy
 			endpoints, err := hcn.ListEndpointsQuery(h.endpointQuery)
-			for i := range endpoints {
-				fmt.Printf("Endpoint: %v\n", endpoints[i].Id)
-			}
 			if err != nil {
 				h.l.Error("Getting endpoints failed", zap.Error(err))
 			}
