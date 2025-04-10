@@ -69,10 +69,9 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 	go func() {
 		<-ctx.Done()
 		wg.Done()
+		mainLogger.Info("Network observability exiting. Till next time!")
 	}()
 
 	wg.Wait()
-
-	mainLogger.Info("Network observability exiting. Till next time!")
 	return nil
 }
