@@ -82,13 +82,12 @@ func (h *hnsstats) Init() error {
 	var filterMap map[string]uint16
 	if !h.cfg.EnableStandalone {
 		filterMap = map[string]uint16{"State": HCN_ENDPOINT_STATE_ATTACHED_SHARING}
+		filter, err := json.Marshal(filterMap)
+		if err != nil {
+			return err
+		}
+		h.endpointQuery.Filter = string(filter)
 	}
-
-	filter, err := json.Marshal(filterMap)
-	if err != nil {
-		return err
-	}
-	h.endpointQuery.Filter = string(filter)
 
 	if h.cfg.EnableStandalone {
 		if instance := enricher.StandaloneInstance(); instance != nil {
