@@ -192,6 +192,11 @@ func notifyHnsStats(h *hnsstats, stats *HnsStatsData) {
 	if h.cfg.EnableStandalone {
 		labels := h.enricher.GetPodInfo(stats.IPAddress)
 
+		if labels == nil {
+			h.l.Debug("No labels found for IP", zap.String(zapIPField, stats.IPAddress))
+			return
+		}
+
 		AdvForwardPacketsGauge.WithLabelValues(GetLabels([]string{ingressLabel}, stats.IPAddress, labels)...).Set(float64(stats.hnscounters.PacketsReceived))
 		h.l.Debug("emitting packets received count metric", zap.Uint64(PacketsReceived, stats.hnscounters.PacketsReceived))
 		AdvForwardPacketsGauge.WithLabelValues(GetLabels([]string{egressLabel}, stats.IPAddress, labels)...).Set(float64(stats.hnscounters.PacketsSent))
