@@ -10,10 +10,12 @@ import (
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/hcn"
 	kcfg "github.com/microsoft/retina/pkg/config"
+	"github.com/microsoft/retina/pkg/controllers/cache"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/exporter"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
+	m "github.com/microsoft/retina/pkg/module/metrics"
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel/attribute"
@@ -23,12 +25,7 @@ import (
 )
 
 const (
-	name          string = "hnsstats"
-	HnsStatsEvent string = "hnsstatscount"
-
-	// Advanced metric
-	AdvHNSStatsName        string = "adv_windows_hns_stats"
-	AdvHNSStatsDescription string = "Include many different metrics from packets sent/received to closed connections"
+	name string = "hnsstats"
 
 	// From HNSStats API
 	PacketsReceived        string = "win_packets_recv_count"
@@ -77,12 +74,14 @@ const (
 	egressLabel  = "egress"
 )
 
-// var AdvWindowsGauge *prometheus.GaugeVec
-
-var ForwardPacketsGaugeS *prometheus.GaugeVec
-var ForwardBytesGaugeS *prometheus.GaugeVec
-var HNSStatsGaugeS *prometheus.GaugeVec
-var DropPacketsGaugeS *prometheus.GaugeVec
+var (
+	AdvForwardPacketsGauge     *prometheus.GaugeVec
+	AdvForwardBytesGauge       *prometheus.GaugeVec
+	AdvHNSStatsGauge           *prometheus.GaugeVec
+	AdvDroppedPacketsGauge     *prometheus.GaugeVec
+	AdvTCPConnectionStatsGauge *prometheus.GaugeVec
+	AdvTCPFlagGauge            *prometheus.GaugeVec
+)
 
 type hnsstats struct {
 	cfg           *kcfg.Config
@@ -166,68 +165,90 @@ func (h *HnsStatsData) String() string {
 		h.hnscounters.EndpointID, h.hnscounters.PacketsReceived, h.hnscounters.PacketsSent, h.hnscounters.BytesSent, h.hnscounters.BytesReceived)
 }
 
-func InitializeAdvMetrics() {
-	// if AdvWindowsGauge != nil {
-	// 	cleanAdvMetrics()
-	// }
+func InitializeAdvancedMetrics() {
+	if exporter.AdvancedRegistry != nil {
+		cleanAdvMetrics()
+		exporter.ResetAdvancedMetricsRegistry()
+	}
 
-	// AdvWindowsGauge = exporter.CreatePrometheusGaugeVecForMetric(
-	// 	exporter.AdvancedRegistry,
-	// 	AdvHNSStatsName,
-	// 	AdvHNSStatsDescription,
-	// 	"Ip",
-	// 	"PodName",
-	// 	"Namespace",
-	// )
-
-	// Remove after presentation
-	ForwardPacketsGaugeS = exporter.CreatePrometheusGaugeVecForMetric(
+	AdvForwardPacketsGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.AdvancedRegistry,
-		"adv_"+utils.ForwardPacketsGaugeName,
-		"Total forwarded packets",
+		m.TotalCountName,
+		m.TotalCountDesc,
 		utils.Direction,
-		"Ip",
-		"PodName",
-		"Namespace",
+		"ip",
+		"pod",
+		"namespace",
 	)
-
-	ForwardBytesGaugeS = exporter.CreatePrometheusGaugeVecForMetric(
+	AdvForwardBytesGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.AdvancedRegistry,
-		"adv_"+utils.ForwardBytesGaugeName,
-		"Total forwarded bytes",
+		m.TotalBytesName,
+		m.TotalBytesDesc,
 		utils.Direction,
-		"Ip",
-		"PodName",
-		"Namespace",
+		"ip",
+		"pod",
+		"namespace",
 	)
-
-	HNSStatsGaugeS = exporter.CreatePrometheusGaugeVecForMetric(
+	AdvHNSStatsGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.AdvancedRegistry,
-		"adv_windows_hns_stats",
-		"Include many different metrics from packets sent/received to closed connections",
+		metrics.HNSStats,
+		metrics.HNSStatsDescription,
 		utils.Direction,
-		"Ip",
-		"PodName",
-		"Namespace",
+		"ip",
+		"pod",
+		"namespace",
 	)
-
-	DropPacketsGaugeS = exporter.CreatePrometheusGaugeVecForMetric(
+	AdvDroppedPacketsGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.AdvancedRegistry,
-		"adv_"+utils.DroppedPacketsGaugeName,
-		"Total dropped packets",
+		m.TotalDropCountName,
+		m.TotalDropCountDesc,
 		utils.Reason,
 		utils.Direction,
-		"Ip",
-		"PodName",
-		"Namespace",
+		"ip",
+		"pod",
+		"namespace",
+	)
+	// Bytes not available in HNS stats
+	AdvTCPConnectionStatsGauge = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.AdvancedRegistry,
+		utils.TCPConnectionStatsName,
+		metrics.TCPConnectionStatsGaugeDescription,
+		utils.StatName,
+		"ip",
+		"pod",
+		"namespace",
+	)
+	AdvTCPFlagGauge = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.AdvancedRegistry,
+		m.TCPFlagsCountName,
+		m.TCPFlagsCountDesc,
+		utils.Direction,
+		utils.Flag,
+		"ip",
+		"pod",
+		"namespace",
 	)
 }
 
 func cleanAdvMetrics() {
-	// exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(AdvWindowsGauge))
+	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(AdvForwardPacketsGauge))
+	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(AdvForwardBytesGauge))
+	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(AdvHNSStatsGauge))
+	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(AdvDroppedPacketsGauge))
+	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(AdvTCPConnectionStatsGauge))
+	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(AdvTCPFlagGauge))
+}
 
-	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(ForwardPacketsGaugeS))
-	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(ForwardBytesGaugeS))
-	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(HNSStatsGaugeS))
-	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(DropPacketsGaugeS))
+func GetLabels(labels []string, ip string, podInfo *cache.PodInfo) []string {
+	var outputLabels []string
+	if podInfo == nil {
+		outputLabels = []string{ip, "", ""}
+	} else {
+		outputLabels = []string{ip, podInfo.Name, podInfo.Namespace}
+	}
+	return append(labels, outputLabels...)
+}
+
+func setGauge(gauge *prometheus.GaugeVec, labels []string, value uint64) {
+	gauge.WithLabelValues(labels...).Set(float64(value))
 }

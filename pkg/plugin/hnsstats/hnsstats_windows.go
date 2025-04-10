@@ -93,9 +93,11 @@ func (h *hnsstats) Init() error {
 
 	if h.cfg.EnableStandalone {
 		if instance := enricher.StandaloneInstance(); instance != nil {
-			InitializeAdvMetrics()
-			h.l.Info("Standalone enricher is enabled")
+			InitializeAdvancedMetrics()
+			h.l.Info("Metrics initialized")
+
 			h.enricher = enricher.StandaloneInstance()
+			h.l.Info("Standalone enricher is enabled")
 		} else {
 			h.l.Warn("Standalone enricher is not initialized")
 		}
@@ -194,24 +196,47 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 func notifyHnsStats(h *hnsstats, stats *HnsStatsData) {
 	if h.cfg.EnableStandalone {
 		labels := h.enricher.GetPodInfo(stats.IPAddress)
-		if labels != nil {
-			// This is for test - need to discuss about the advanced metrics (registry)
-			h.l.Info("HNS stats for pod", zap.String(zapIPField, stats.IPAddress), zap.String("pod-name", labels.Name), zap.String("pod-namespace", labels.Namespace))
-			// AdvWindowsGauge.WithLabelValues(stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.PacketsReceived))
 
-			// Emit metrics for the pod
-			ForwardPacketsGaugeS.WithLabelValues(ingressLabel, stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.PacketsReceived))
-			ForwardPacketsGaugeS.WithLabelValues(egressLabel, stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.PacketsSent))
+		AdvForwardPacketsGauge.WithLabelValues(GetLabels([]string{ingressLabel}, stats.IPAddress, labels)...).Set(float64(stats.hnscounters.PacketsReceived))
+		h.l.Debug("emitting packets received count metric", zap.Uint64(PacketsReceived, stats.hnscounters.PacketsReceived))
+		AdvForwardPacketsGauge.WithLabelValues(GetLabels([]string{egressLabel}, stats.IPAddress, labels)...).Set(float64(stats.hnscounters.PacketsSent))
+		h.l.Debug("emitting packets sent count metric", zap.Uint64(PacketsSent, stats.hnscounters.PacketsSent))
+		AdvForwardBytesGauge.WithLabelValues(GetLabels([]string{ingressLabel}, stats.IPAddress, labels)...).Set(float64(stats.hnscounters.BytesReceived))
+		h.l.Debug("emitting bytes received count metric", zap.Uint64(BytesReceived, stats.hnscounters.BytesReceived))
+		AdvForwardBytesGauge.WithLabelValues(GetLabels([]string{egressLabel}, stats.IPAddress, labels)...).Set(float64(stats.hnscounters.BytesSent))
+		h.l.Debug("emitting bytes sent count metric", zap.Uint64(BytesSent, stats.hnscounters.BytesSent))
 
-			ForwardBytesGaugeS.WithLabelValues(egressLabel, stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.BytesSent))
-			ForwardBytesGaugeS.WithLabelValues(ingressLabel, stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.BytesReceived))
+		AdvHNSStatsGauge.WithLabelValues(GetLabels([]string{PacketsReceived}, stats.IPAddress, labels)...).Set(float64(stats.hnscounters.PacketsReceived))
+		AdvHNSStatsGauge.WithLabelValues(GetLabels([]string{PacketsSent}, stats.IPAddress, labels)...).Set(float64(stats.hnscounters.PacketsSent))
 
-			HNSStatsGaugeS.WithLabelValues(PacketsReceived, stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.PacketsReceived))
-			HNSStatsGaugeS.WithLabelValues(PacketsSent, stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.PacketsSent))
+		AdvDroppedPacketsGauge.WithLabelValues(GetLabels([]string{utils.Endpoint, egressLabel}, stats.IPAddress, labels)...).Set(float64(stats.hnscounters.DroppedPacketsOutgoing))
+		AdvDroppedPacketsGauge.WithLabelValues(GetLabels([]string{utils.Endpoint, ingressLabel}, stats.IPAddress, labels)...).Set(float64(stats.hnscounters.DroppedPacketsIncoming))
 
-			DropPacketsGaugeS.WithLabelValues(utils.Endpoint, egressLabel, stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.DroppedPacketsOutgoing))
-			DropPacketsGaugeS.WithLabelValues(utils.Endpoint, ingressLabel, stats.IPAddress, labels.Name, labels.Namespace).Set(float64(stats.hnscounters.DroppedPacketsIncoming))
+		if stats.vfpCounters == nil {
+			h.l.Debug("will not record some metrics since VFP port counters failed to be set")
+			return
 		}
+
+		AdvDroppedPacketsGauge.WithLabelValues(GetLabels([]string{utils.AclRule, ingressLabel}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.In.DropCounters.AclDropPacketCount))
+		AdvDroppedPacketsGauge.WithLabelValues(GetLabels([]string{utils.AclRule, egressLabel}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.Out.DropCounters.AclDropPacketCount))
+
+		AdvTCPConnectionStatsGauge.WithLabelValues(GetLabels([]string{utils.ResetCount}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.ResetCount))
+		AdvTCPConnectionStatsGauge.WithLabelValues(GetLabels([]string{utils.ClosedFin}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.ClosedFinCount))
+		AdvTCPConnectionStatsGauge.WithLabelValues(GetLabels([]string{utils.ResetSyn}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.ResetSynCount))
+		AdvTCPConnectionStatsGauge.WithLabelValues(GetLabels([]string{utils.TcpHalfOpenTimeouts}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.TcpHalfOpenTimeoutsCount))
+		AdvTCPConnectionStatsGauge.WithLabelValues(GetLabels([]string{utils.Verified}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.VerifiedCount))
+		AdvTCPConnectionStatsGauge.WithLabelValues(GetLabels([]string{utils.TimedOutCount}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.TimedOutCount))
+		AdvTCPConnectionStatsGauge.WithLabelValues(GetLabels([]string{utils.TimeWaitExpiredCount}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.TimeWaitExpiredCount))
+		// TCP Flag counters
+		AdvTCPFlagGauge.WithLabelValues(GetLabels([]string{ingressLabel, utils.SYN}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.In.TcpCounters.PacketCounters.SynPacketCount))
+		AdvTCPFlagGauge.WithLabelValues(GetLabels([]string{ingressLabel, utils.SYNACK}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.In.TcpCounters.PacketCounters.SynAckPacketCount))
+		AdvTCPFlagGauge.WithLabelValues(GetLabels([]string{ingressLabel, utils.FIN}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.In.TcpCounters.PacketCounters.FinPacketCount))
+		AdvTCPFlagGauge.WithLabelValues(GetLabels([]string{ingressLabel, utils.RST}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.In.TcpCounters.PacketCounters.RstPacketCount))
+
+		AdvTCPFlagGauge.WithLabelValues(GetLabels([]string{egressLabel, utils.SYN}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.Out.TcpCounters.PacketCounters.SynPacketCount))
+		AdvTCPFlagGauge.WithLabelValues(GetLabels([]string{egressLabel, utils.SYNACK}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.Out.TcpCounters.PacketCounters.SynAckPacketCount))
+		AdvTCPFlagGauge.WithLabelValues(GetLabels([]string{egressLabel, utils.FIN}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.Out.TcpCounters.PacketCounters.FinPacketCount))
+		AdvTCPFlagGauge.WithLabelValues(GetLabels([]string{egressLabel, utils.RST}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.Out.TcpCounters.PacketCounters.RstPacketCount))
 	}
 
 	// hns signals
@@ -274,7 +299,7 @@ func (h *hnsstats) Stop() error {
 		return nil
 	}
 
-	if h.cfg.EnablePodLevel && h.cfg.EnableStandalone {
+	if h.cfg.EnableStandalone {
 		cleanAdvMetrics()
 	}
 
