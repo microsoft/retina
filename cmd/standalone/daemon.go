@@ -54,7 +54,6 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 	if err := controllerMgr.Init(ctx); err != nil {
 		mainLogger.Fatal("Failed to initialize controller manager", zap.Error(err))
 	}
-	defer controllerMgr.Stop(ctx)
 
 	// start heartbeat goroutine for application insights
 	go tel.Heartbeat(ctx, d.config.TelemetryInterval)
@@ -64,7 +63,7 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 	mainLogger.Info("Started controller manager")
 
 	<-ctx.Done()
-	// controllerMgr.Stop(ctx)
+	controllerMgr.Stop(ctx)
 
 	mainLogger.Info("Network observability exiting. Till next time!")
 	return nil
