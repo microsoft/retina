@@ -232,6 +232,8 @@ func notifyHnsStats(h *hnsstats, stats *HnsStatsData) {
 		AdvTCPFlagGauge.WithLabelValues(GetLabels([]string{egressLabel, utils.SYNACK}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.Out.TcpCounters.PacketCounters.SynAckPacketCount))
 		AdvTCPFlagGauge.WithLabelValues(GetLabels([]string{egressLabel, utils.FIN}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.Out.TcpCounters.PacketCounters.FinPacketCount))
 		AdvTCPFlagGauge.WithLabelValues(GetLabels([]string{egressLabel, utils.RST}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.Out.TcpCounters.PacketCounters.RstPacketCount))
+
+		return
 	}
 
 	// hns signals
