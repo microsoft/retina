@@ -67,8 +67,8 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		defer wg.Done()
 		<-ctx.Done()
+		wg.Done()
 	}()
 
 	wg.Wait()
