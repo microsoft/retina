@@ -5,7 +5,6 @@ package standalone
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/microsoft/retina/cmd/utils"
 	"github.com/microsoft/retina/pkg/enricher"
@@ -55,7 +54,6 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 	if err := controllerMgr.Init(ctx); err != nil {
 		mainLogger.Fatal("Failed to initialize controller manager", zap.Error(err))
 	}
-	defer controllerMgr.Stop(ctx)
 
 	// start heartbeat goroutine for application insights
 	go tel.Heartbeat(ctx, d.config.TelemetryInterval)
@@ -64,14 +62,9 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 	go controllerMgr.Start(ctx)
 	mainLogger.Info("Started controller manager")
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		<-ctx.Done()
-		wg.Done()
-		mainLogger.Info("Network observability exiting. Till next time!")
-	}()
+	<-ctx.Done()
+	controllerMgr.Stop(ctx)
 
-	wg.Wait()
+	mainLogger.Info("Network observability exiting. Till next time!")
 	return nil
 }
