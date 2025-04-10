@@ -5,6 +5,7 @@ package standalone
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/microsoft/retina/cmd/utils"
 	"github.com/microsoft/retina/pkg/enricher"
@@ -63,7 +64,14 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 	go controllerMgr.Start(ctx)
 	mainLogger.Info("Started controller manager")
 
-	<-ctx.Done()
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		<-ctx.Done()
+	}()
+
+	wg.Wait()
 
 	mainLogger.Info("Network observability exiting. Till next time!")
 	return nil
