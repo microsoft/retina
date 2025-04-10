@@ -63,6 +63,8 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 	go controllerMgr.Start(ctx)
 	mainLogger.Info("Started controller manager")
 
+	<-ctx.Done()
+
 	mainLogger.Info("Network observability exiting. Till next time!")
 	return nil
 }
