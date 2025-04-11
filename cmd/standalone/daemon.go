@@ -32,7 +32,7 @@ func NewDaemon(daemonCfg *config.Config) *Daemon {
 }
 
 func (d *Daemon) Start(zl *log.ZapLogger) error {
-	zl.Info("Starting standalone Retina daemon")
+	zl.Info("Starting Standalone Retina daemon")
 	mainLogger := zl.Named("standalone-daemon").Sugar()
 
 	tel, err := utils.InitializeTelemetryClient(nil, d.config, mainLogger)

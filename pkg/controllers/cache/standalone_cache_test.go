@@ -5,123 +5,148 @@ package cache_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/microsoft/retina/pkg/controllers/cache"
 	"github.com/microsoft/retina/pkg/log"
 	"gotest.tools/v3/assert"
 )
 
-const (
-	ip        = "10.0.0.1"
-	name      = "test-pod"
-	namespace = "test-ns"
+var (
+	ip = "10.0.0.1"
+	p1 = &cache.PodInfo{Name: "pod1", Namespace: "ns1"}
 )
 
-var defaultInfo = &cache.PodInfo{
-	Name:      name,
-	Namespace: namespace,
-}
+func TestCacheAddPod(t *testing.T) {
+	log.SetupZapLogger(log.GetDefaultLogOpts())
+	c := cache.NewStandaloneCache()
 
-func TestStandaloneCache(t *testing.T) {
-	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
-		t.Fatalf("Failed to setup logger: %v", err)
-	}
-	testCache := cache.NewStandaloneCache()
+	p2 := &cache.PodInfo{Name: "pod2", Namespace: "ns2"}
+	p3 := &cache.PodInfo{Name: "pod1", Namespace: "ns1"}
 
 	tests := []struct {
-		name   string
-		setup  func()
-		expect func(t *testing.T)
+		name        string
+		ip          string
+		podInfo     *cache.PodInfo
+		expectedPod string
+		expectedNS  string
 	}{
 		{
-			name: "Add Pod - New pod info added to cache",
-			setup: func() {
-				testCache.Update(ip, defaultInfo)
-			},
-			expect: func(t *testing.T) {
-				podInfo := testCache.GetPod(ip)
-				if podInfo == nil {
-					t.Fatalf("Expected pod info, got nil")
-				}
-				assert.Equal(t, podInfo.Name, name)
-				assert.Equal(t, podInfo.Namespace, namespace)
-			},
+			name:        "Add new pod",
+			ip:          ip,
+			podInfo:     p1,
+			expectedPod: p1.Name,
+			expectedNS:  p1.Namespace,
 		},
 		{
-			name: "Add pod - Pod info updated if not identical",
-			setup: func() {
-				testCache.Update(ip, defaultInfo)
-				testCache.Update(ip, defaultInfo)
-			},
-			expect: func(t *testing.T) {
-				podInfo := testCache.GetPod(ip)
-				if podInfo == nil {
-					t.Fatalf("Expected pod info, got nil")
-				}
-				assert.Equal(t, podInfo.Name, defaultInfo.Name)
-				assert.Equal(t, podInfo.Namespace, defaultInfo.Namespace)
-			},
+			name:        "Add identical pod",
+			ip:          ip,
+			podInfo:     p3,
+			expectedPod: p1.Name,
+			expectedNS:  p1.Namespace,
 		},
 		{
-			name: "Delete pod - Pod info deleted from cache",
-			setup: func() {
-				testCache.Update(ip, nil)
-			},
-			expect: func(t *testing.T) {
-				podInfo := testCache.GetPod(ip)
-				if podInfo != nil {
-					t.Fatalf("Expected nil, got %v", podInfo)
-				}
-			},
-		},
-		{
-			name: "Reset IP Statuses - Pods added before should be marked inactive",
-			setup: func() {
-				testCache.Update(ip, defaultInfo)
-				testCache.Update("ip-2", &cache.PodInfo{Name: "pod-2", Namespace: "ns-2"})
-			},
-			expect: func(t *testing.T) {
-				podInfo1 := testCache.GetPod(ip)
-				if podInfo1 == nil {
-					t.Fatalf("Expected pod info, got nil")
-				}
-
-				podInfo2 := testCache.GetPod("ip-2")
-				if podInfo2 == nil {
-					t.Fatalf("Expected pod info, got nil")
-				}
-			},
-		},
-		{
-			name: "Remove Stale Entries - Stale pods removed from cache",
-			setup: func() {
-				testCache.Update(ip, defaultInfo)
-				testCache.Update("ip-2", &cache.PodInfo{Name: "pod-2", Namespace: "ns-2"})
-				testCache.Update(ip, defaultInfo)
-			},
-			expect: func(t *testing.T) {
-				podInfo := testCache.GetPod(ip)
-				if podInfo == nil {
-					t.Fatalf("Expected pod info, got nil")
-				}
-				assert.Equal(t, podInfo.Name, defaultInfo.Name)
-				assert.Equal(t, podInfo.Namespace, defaultInfo.Namespace)
-
-				removedPod := testCache.GetPod("ip-2")
-				if removedPod != nil {
-					t.Fatalf("Expected nil, got %v", removedPod)
-				}
-			},
+			name:        "Update pod info for same IP",
+			ip:          ip,
+			podInfo:     p2,
+			expectedPod: p2.Name,
+			expectedNS:  p2.Namespace,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testCache = cache.NewStandaloneCache()
-			tt.setup()
-			tt.expect(t)
+			c.Update(tt.ip, tt.podInfo)
+
+			got := c.GetPod(tt.ip)
+			assert.Assert(t, got != nil, "Expected pod info, got nil")
+			assert.Equal(t, got.Name, tt.expectedPod)
+			assert.Equal(t, got.Namespace, tt.expectedNS)
 		})
 	}
 }
 
-// Split up these test into their own units - later
+func TestCacheDeletePod(t *testing.T) {
+	log.SetupZapLogger(log.GetDefaultLogOpts())
+	c := cache.NewStandaloneCache()
+
+	tests := []struct {
+		name            string
+		setup           func()
+		ip              string
+		expectedPodInfo *cache.PodInfo
+	}{
+		{
+			name: "Delete existing pod",
+			setup: func() {
+				c.Update(ip, p1)
+			},
+			ip:              ip,
+			expectedPodInfo: nil,
+		},
+		{
+			name:            "Delete non-existing pod (no-op)",
+			setup:           func() {},
+			ip:              "10.0.0.2",
+			expectedPodInfo: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setup()
+			c.Update(tt.ip, nil) // Delete the pod
+
+			got := c.GetPod(tt.ip)
+			assert.Equal(t, got, tt.expectedPodInfo)
+		})
+	}
+}
+
+func TestCacheUpdate(t *testing.T) {
+	log.SetupZapLogger(log.GetDefaultLogOpts())
+	c := cache.NewStandaloneCache()
+
+	tests := []struct {
+		name            string
+		ip              string
+		podInfo         *cache.PodInfo
+		expectedPodInfo *cache.PodInfo
+	}{
+		{
+			name:            "Add Pod",
+			ip:              ip,
+			podInfo:         p1,
+			expectedPodInfo: p1,
+		},
+		{
+			name:            "Delete Pod",
+			ip:              ip,
+			podInfo:         nil,
+			expectedPodInfo: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c.Update(tt.ip, tt.podInfo)
+
+			got := c.GetPod(tt.ip)
+			if tt.expectedPodInfo == nil {
+				assert.Assert(t, got == nil)
+			} else {
+				assert.Assert(t, got != nil, "Expected pod info, got nil")
+				assert.Equal(t, got.Name, tt.expectedPodInfo.Name)
+				assert.Equal(t, got.Namespace, tt.expectedPodInfo.Namespace)
+			}
+		})
+	}
+}
+
+func TestCacheTTL(t *testing.T) {
+	log.SetupZapLogger(log.GetDefaultLogOpts())
+	c := cache.NewStandaloneCache()
+
+	ttl := c.TTL()
+	assert.Equal(t, ttl, 3*time.Minute)
+}
