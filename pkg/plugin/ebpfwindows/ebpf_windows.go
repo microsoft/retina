@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 	"time"
-
 	"unsafe"
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
@@ -102,27 +101,27 @@ func (p *Plugin) Start(ctx context.Context) error {
 func (p *Plugin) metricsMapIterateCallback(key *MetricsKey, value *MetricsValues) {
 	if key.IsDrop() {
 		if key.IsEgress() {
-			metrics.DropBytesGauge.WithLabelValues(DropReason(key.Reason), egressLabel).Set(float64(value.Bytes()))
-			metrics.DropPacketsGauge.WithLabelValues(DropReason(key.Reason), egressLabel).Set(float64(value.Count()))
+			metrics.DropBytesGauge.WithLabelValues(DropReason(key.Reason), egressLabel).Set(float64(value.BytesSum()))
+			metrics.DropPacketsGauge.WithLabelValues(DropReason(key.Reason), egressLabel).Set(float64(value.Sum()))
 		} else if key.IsIngress() {
-			metrics.DropBytesGauge.WithLabelValues(DropReason(key.Reason), ingressLabel).Set(float64(value.Bytes()))
-			metrics.DropPacketsGauge.WithLabelValues(DropReason(key.Reason), ingressLabel).Set(float64(value.Count()))
+			metrics.DropBytesGauge.WithLabelValues(DropReason(key.Reason), ingressLabel).Set(float64(value.BytesSum()))
+			metrics.DropPacketsGauge.WithLabelValues(DropReason(key.Reason), ingressLabel).Set(float64(value.Sum()))
 		}
 	} else {
 		if key.IsEgress() {
-			metrics.ForwardBytesGauge.WithLabelValues(egressLabel).Set(float64(value.Bytes()))
-			metrics.ForwardBytesGauge.WithLabelValues(egressLabel).Set(float64(value.Count()))
+			metrics.ForwardBytesGauge.WithLabelValues(egressLabel).Set(float64(value.BytesSum()))
+			metrics.ForwardBytesGauge.WithLabelValues(egressLabel).Set(float64(value.Sum()))
 		} else if key.IsIngress() {
-			metrics.ForwardPacketsGauge.WithLabelValues(ingressLabel).Set(float64(value.Count()))
-			metrics.ForwardBytesGauge.WithLabelValues(ingressLabel).Set(float64(value.Bytes()))
+			metrics.ForwardPacketsGauge.WithLabelValues(ingressLabel).Set(float64(value.Sum()))
+			metrics.ForwardBytesGauge.WithLabelValues(ingressLabel).Set(float64(value.BytesSum()))
 		}
 	}
 }
 
 // eventsMapCallback is the callback function that is called for each value  in the events map.
 func (p *Plugin) eventsMapCallback(data unsafe.Pointer, size uint32) int {
-	p.l.Info("EventsMapCallback")
-	p.l.Info("Size", zap.Uint32("Size", size))
+	p.l.Debug("EventsMapCallback")
+	p.l.Debug("Size", zap.Uint32("Size", size))
 	err := p.handleTraceEvent(data, size)
 	if err != nil {
 		p.l.Error("Error handling trace event", zap.Error(err))
@@ -156,7 +155,7 @@ func (p *Plugin) pullMetricsAndEvents(ctx context.Context) {
 		return
 	}
 
-	if enricher.IsInitialized() {
+	if enricher.IsInitialized() && p.cfg.EnablePodLevel == true {
 		p.enricher = enricher.Instance()
 	} else {
 		p.l.Warn("retina enricher is not initialized")
@@ -227,7 +226,7 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 	eventType := perfData[0]
 	switch eventType {
 	case NotifyDrop:
-		if uintptr(size) != unsafe.Sizeof(DropNotify{}) {
+		if size <= uint32(unsafe.Sizeof(DropNotify{})) {
 			return fmt.Errorf("invalid size for DropNotify %d", size)
 		}
 		e, err := p.parser.Decode(&observer.MonitorEvent{
@@ -240,12 +239,12 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 		}
 		p.enricher.Write(e)
 		meta := &utils.RetinaMetadata{}
-		utils.AddPacketSize(meta, 128)
+		utils.AddPacketSize(meta, size-uint32(unsafe.Sizeof(DropNotify{})))
 		fl := e.GetFlow()
 		meta.DropReason = utils.DropReason(e.GetFlow().EventType.GetSubType())
 		utils.AddRetinaMetadata(fl, meta)
 	case NotifyTrace:
-		if uintptr(size) != unsafe.Sizeof(TraceNotify{}) {
+		if size <= uint32(unsafe.Sizeof(TraceNotify{})) {
 			return fmt.Errorf("invalid size for TraceNotify %d", size)
 		}
 		e, err := p.parser.Decode(&observer.MonitorEvent{
@@ -258,7 +257,7 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 			return fmt.Errorf("could not convert tracenotify event to flow: %w", err)
 		}
 		meta := &utils.RetinaMetadata{}
-		utils.AddPacketSize(meta, 128)
+		utils.AddPacketSize(meta, size-uint32(unsafe.Sizeof(TraceNotify{})))
 		fl := e.GetFlow()
 		utils.AddRetinaMetadata(fl, meta)
 	}

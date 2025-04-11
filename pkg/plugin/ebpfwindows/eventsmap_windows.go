@@ -32,12 +32,12 @@ type EventsMap interface {
 }
 
 type eventsMap struct {
-	ringBuffer uintptr
+	perfBuffer uintptr
 }
 
 // NewEventsMap creates a new metrics map
 func NewEventsMap() EventsMap {
-	return &eventsMap{ringBuffer: 0}
+	return &eventsMap{perfBuffer: 0}
 }
 
 // RegisterForCallback registers a callback function to be called when a new event is added to the events map
@@ -51,7 +51,7 @@ func (e *eventsMap) RegisterForCallback(cb eventsMapCallback) error {
 	// Call the API
 	ret, _, err := registerEventsMapCallback.Call(
 		uintptr(callback),
-		uintptr(unsafe.Pointer(&e.ringBuffer)),
+		uintptr(unsafe.Pointer(&e.perfBuffer)),
 	)
 
 	if ret != 0 {
@@ -65,7 +65,7 @@ func (e *eventsMap) RegisterForCallback(cb eventsMapCallback) error {
 func (e *eventsMap) UnregisterForCallback() error {
 
 	// Call the API
-	ret, _, err := unregisterEventsMapCallback.Call(e.ringBuffer)
+	ret, _, err := unregisterEventsMapCallback.Call(e.perfBuffer)
 
 	if ret != 0 {
 		return err

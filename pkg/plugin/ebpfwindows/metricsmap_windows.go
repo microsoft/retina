@@ -166,7 +166,7 @@ func (k *MetricsKey) IsEgress() bool {
 }
 
 // Count returns the sum of all the per-CPU count values
-func (vs MetricsValues) Count() uint64 {
+func (vs MetricsValues) Sum() uint64 {
 	c := uint64(0)
 	for _, v := range vs {
 		c += v.Count
@@ -176,7 +176,7 @@ func (vs MetricsValues) Count() uint64 {
 }
 
 // Bytes returns the sum of all the per-CPU bytes values
-func (vs MetricsValues) Bytes() uint64 {
+func (vs MetricsValues) BytesSum() uint64 {
 	b := uint64(0)
 	for _, v := range vs {
 		b += v.Bytes
@@ -186,5 +186,5 @@ func (vs MetricsValues) Bytes() uint64 {
 }
 
 func (vs MetricsValues) String() string {
-	return fmt.Sprintf("Count: %d, Bytes: %d", vs.Count(), vs.Bytes())
+	return fmt.Sprintf("Sum: %d, BytesSum: %d", vs.Sum(), vs.BytesSum())
 }
