@@ -5,6 +5,7 @@ package standalone
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/microsoft/retina/cmd/utils"
 	"github.com/microsoft/retina/pkg/enricher"
@@ -16,6 +17,8 @@ import (
 	"github.com/microsoft/retina/pkg/controllers/cache"
 	cm "github.com/microsoft/retina/pkg/managers/controllermanager"
 )
+
+const TTL = 3 * time.Minute
 
 type Daemon struct {
 	config *config.Config
@@ -38,7 +41,7 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 
 	ctx := ctrl.SetupSignalHandler() // Importing K8s signal handler - ok?
 
-	cache := cache.NewStandaloneCache()
+	cache := cache.NewStandaloneCache(TTL)
 	enrich := enricher.NewStandaloneEnricher(ctx, cache, d.config)
 	enrich.Run()
 

@@ -24,11 +24,11 @@ type StandaloneCache struct {
 	ttl     time.Duration
 }
 
-func NewStandaloneCache() *StandaloneCache {
+func NewStandaloneCache(ttl time.Duration) *StandaloneCache {
 	return &StandaloneCache{
 		l:       log.Logger().Named(string("standalone-cache")),
 		ipToPod: make(map[string]*PodInfo),
-		ttl:     3 * time.Minute,
+		ttl:     ttl,
 	}
 }
 

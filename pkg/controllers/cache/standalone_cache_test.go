@@ -12,13 +12,14 @@ import (
 )
 
 var (
-	ip = "10.0.0.1"
-	p1 = &PodInfo{Name: "pod1", Namespace: "ns1"}
+	ip  = "10.0.0.1"
+	p1  = &PodInfo{Name: "pod1", Namespace: "ns1"}
+	ttl = 3 * time.Minute
 )
 
 func TestCacheAddPod(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
-	c := NewStandaloneCache()
+	c := NewStandaloneCache(ttl)
 
 	p2 := &PodInfo{Name: "pod2", Namespace: "ns2"}
 	p3 := &PodInfo{Name: "pod1", Namespace: "ns1"}
@@ -71,7 +72,7 @@ func TestCacheAddPod(t *testing.T) {
 
 func TestCacheDeletePod(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
-	c := NewStandaloneCache()
+	c := NewStandaloneCache(ttl)
 
 	tests := []struct {
 		name            string
@@ -108,7 +109,7 @@ func TestCacheDeletePod(t *testing.T) {
 
 func TestCacheUpdate(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
-	c := NewStandaloneCache()
+	c := NewStandaloneCache(ttl)
 
 	tests := []struct {
 		name            string
@@ -148,8 +149,8 @@ func TestCacheUpdate(t *testing.T) {
 
 func TestCacheTTL(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
-	c := NewStandaloneCache()
+	c := NewStandaloneCache(ttl)
 
-	ttl := c.TTL()
-	assert.Equal(t, ttl, 3*time.Minute)
+	time := c.TTL()
+	assert.Equal(t, time, ttl)
 }
