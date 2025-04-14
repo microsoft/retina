@@ -39,8 +39,8 @@ func GetPodInfo(ip string) (*cache.PodInfo, error) {
 		return nil, fmt.Errorf("Failed to get running pods: %w", err)
 	}
 
-	podIDs := strings.SplitSeq(strings.TrimSpace(runningPods), "\n")
-	for podID := range podIDs {
+	podIDs := strings.Split(strings.TrimSpace(runningPods), "\n")
+	for _, podID := range podIDs {
 		if podID == "" {
 			continue
 		}

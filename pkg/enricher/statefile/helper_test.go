@@ -13,11 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	ip       = "192.0.0.5"
-	testfile = "mock_statefile.json"
-)
-
 func TestGetPodInfo(t *testing.T) {
 	emptyJSONPath := "empty_azure_vnet.json"
 	emptyJSONContent := ``

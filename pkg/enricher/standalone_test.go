@@ -16,7 +16,9 @@ import (
 )
 
 func TestPublishEvent(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
+		t.Errorf("Error setting up logger: %s", err)
+	}
 	MaxStandaloneCacheEventSize = 1
 	ip := "10.0.0.0"
 
@@ -61,8 +63,9 @@ func TestPublishEvent(t *testing.T) {
 }
 
 func TestRemoveStaleEntries(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
-
+	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
+		t.Errorf("Error setting up logger: %s", err)
+	}
 	testCache := cache.NewStandaloneCache(1 * time.Millisecond)
 	e := NewStandaloneEnricher(context.Background(), testCache, &config.Config{})
 	e.Run()
@@ -81,7 +84,9 @@ func TestRemoveStaleEntries(t *testing.T) {
 }
 
 func TestRun(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
+		t.Errorf("Error setting up logger: %s", err)
+	}
 	existingIP := "192.0.0.5"
 	nonExistingIP := "10.0.0.0"
 	name := "retina-pod"
@@ -98,7 +103,7 @@ func TestRun(t *testing.T) {
 		{
 			name:            "Successful cache update",
 			event:           StandaloneEvent{IP: existingIP, Action: AddEvent},
-			setupCache:      func(c *cache.StandaloneCache) {},
+			setupCache:      func(_ *cache.StandaloneCache) {},
 			expectedPodInfo: &cache.PodInfo{Name: name, Namespace: namespace},
 		},
 		{
@@ -113,19 +118,19 @@ func TestRun(t *testing.T) {
 		{
 			name:            "No update when pod info is empty",
 			event:           StandaloneEvent{IP: nonExistingIP, Action: AddEvent},
-			setupCache:      func(c *cache.StandaloneCache) {},
+			setupCache:      func(_ *cache.StandaloneCache) {},
 			expectedPodInfo: nil,
 		},
 		{
 			name:            "No update for unknown event",
 			event:           StandaloneEvent{IP: existingIP, Action: Action("unknown")},
-			setupCache:      func(c *cache.StandaloneCache) {},
+			setupCache:      func(_ *cache.StandaloneCache) {},
 			expectedPodInfo: nil,
 		},
 		{
 			name:            "No update when event channel is closed",
 			event:           StandaloneEvent{IP: existingIP, Action: AddEvent},
-			setupCache:      func(c *cache.StandaloneCache) {},
+			setupCache:      func(_ *cache.StandaloneCache) {},
 			shutdown:        true,
 			expectedPodInfo: nil,
 		},
@@ -145,7 +150,8 @@ func TestRun(t *testing.T) {
 			if tt.shutdown {
 				e.Stop()
 			} else {
-				e.PublishEvent(tt.event.IP, tt.event.Action)
+				err := e.PublishEvent(tt.event.IP, tt.event.Action)
+				assert.NoError(t, err)
 			}
 
 			time.Sleep(25 * time.Millisecond)
