@@ -31,37 +31,28 @@ type Network struct {
 	IP string `json:"ip"`
 }
 
-func GetPodInfo(ip string) (*cache.PodInfo, error) {
-	cmd := exec.Command("cmd", "/c", "crictl", "pods", "-q")
+var crictlCommand = runCommand
 
-	var output bytes.Buffer
-	cmd.Stdout = &output
-	err := cmd.Run()
+func GetPodInfo(ip string) (*cache.PodInfo, error) {
+	runningPods, err := crictlCommand("cmd", "/c", "crictl", "pods", "-q")
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get running pods: %w", err)
 	}
 
-	podIDs := strings.SplitSeq(strings.TrimSpace(output.String()), "\n")
-
+	podIDs := strings.SplitSeq(strings.TrimSpace(runningPods), "\n")
 	for podID := range podIDs {
 		if podID == "" {
 			continue
 		}
 
-		cmd := exec.Command("cmd", "/c", "crictl", "inspectp", podID)
-
-		var podSpec bytes.Buffer
-		cmd.Stdout = &podSpec
-		err := cmd.Run()
+		podSpec, err := crictlCommand("cmd", "/c", "crictl", "inspectp", podID)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to inspect pod information: %w", err)
 		}
 
 		var spec PodSpec
-		err = json.Unmarshal(podSpec.Bytes(), &spec)
-		if err != nil {
-			fmt.Printf("Error unmarshalling JSON: %v\n", err)
-			continue
+		if err := json.Unmarshal([]byte(podSpec), &spec); err != nil {
+			return nil, fmt.Errorf("Error unmarshalling JSON: %w", err)
 		}
 
 		if spec.Status.Network.IP == ip {
@@ -72,6 +63,16 @@ func GetPodInfo(ip string) (*cache.PodInfo, error) {
 		}
 	}
 
-	// fmt.Printf("IP address %s not found in containerd\n", ip)
 	return nil, nil
+}
+
+func runCommand(command string, args ...string) (string, error) {
+	cmd := exec.Command(command, args...)
+	var output bytes.Buffer
+	cmd.Stdout = &output
+	err := cmd.Run()
+	if err != nil {
+		return "", fmt.Errorf("Failed to run command: %w", err)
+	}
+	return output.String(), nil
 }

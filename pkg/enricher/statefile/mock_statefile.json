@@ -75,8 +75,8 @@
                                 "AllowInboundFromNCToHost": true,
                                 "NetworkContainerID": "Swift_00000000-0000-0000-0000-000000000002",
                                 "ContainerID": "1f20629e98eb30e9958ad070354852f452247556f08cb3ff227665ee5125fea8",
-                                "PODName": "retina2-pod",
-                                "PODNameSpace": "retina2-namespace",
+                                "PODName": "retina-pod",
+                                "PODNameSpace": "retina-namespace",
                                 "NetNs": "3be8896f-442f-40d2-a3c8-3be9ed730aff",
                                 "SecondaryInterfaces": null,
                                 "NICType": "InfraNIC"

@@ -4,31 +4,108 @@
 package ctrinfo
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
+	"github.com/microsoft/retina/pkg/controllers/cache"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestGetPodInfo(t *testing.T) {
+	invalidJSONPath := "invalid_pod_spec.json"
+	invalidJSONContent := `{"status": {"metadata": {"name": "retina-pod", "namespace": "retina-namespace"}`
+	err := os.WriteFile(invalidJSONPath, []byte(invalidJSONContent), 0o600)
+	assert.NoError(t, err, "failed to create invalid JSON file")
+	defer os.Remove(invalidJSONPath)
 
-}
-
-func TestJSONUnmarshalling(t *testing.T) {
-	data, err := os.ReadFile("mock_podSpec.json")
-	if err != nil {
-		t.Fatalf("Failed to open test file: %v", err)
+	tests := []struct {
+		name             string
+		ip               string
+		podCmdOutput     string
+		inspectCmdOutput string
+		cmdErr           error
+		expectedPodInfo  *cache.PodInfo
+		expectedErr      error
+	}{
+		{
+			name:             "IP found in list of running pods",
+			ip:               "10.0.0.4",
+			podCmdOutput:     "pod1\npod2\n",
+			inspectCmdOutput: "mock_podSpec.json",
+			cmdErr:           nil,
+			expectedPodInfo:  &cache.PodInfo{Name: "retina-pod", Namespace: "retina-namespace"},
+			expectedErr:      nil,
+		},
+		{
+			name:             "No IP found in list of running pods",
+			ip:               "10.0.0.0",
+			podCmdOutput:     "pod1\npod2\n",
+			inspectCmdOutput: "mock_podSpec.json",
+			cmdErr:           nil,
+			expectedPodInfo:  nil,
+			expectedErr:      nil,
+		},
+		{
+			name:             "Invalid pod spec JSON",
+			ip:               "10.0.0.0",
+			podCmdOutput:     "pod1\npod2\n",
+			inspectCmdOutput: invalidJSONPath,
+			cmdErr:           nil,
+			expectedPodInfo:  nil,
+			expectedErr:      fmt.Errorf("Error unmarshalling JSON: unexpected end of JSON input"),
+		},
+		{
+			name:            "Inspect pod error",
+			ip:              "10.0.0.0",
+			cmdErr:          fmt.Errorf("test error"),
+			expectedPodInfo: nil,
+			expectedErr:     fmt.Errorf("Failed to get running pods: %w", fmt.Errorf("test error")),
+		},
+		{
+			name:            "Running pods error",
+			ip:              "10.0.0.0",
+			podCmdOutput:    "pod1\npod2\n",
+			cmdErr:          fmt.Errorf("test error"),
+			expectedPodInfo: nil,
+			expectedErr:     fmt.Errorf("Failed to inspect pod information: %w", fmt.Errorf("test error")),
+		},
 	}
 
-	var spec PodSpec
-	if err := json.Unmarshal(data, &spec); err != nil {
-		fmt.Println("Error decoding file:", err)
-		assert.Error(t, err, "expected error when using invalid file path")
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			crictlCommand = func(command string, args ...string) (string, error) {
+				if strings.Contains(args[2], "pods") {
+					if tt.podCmdOutput != "" {
+						return tt.podCmdOutput, nil
+					}
+					return "", tt.cmdErr
+				}
+				if strings.Contains(args[2], "inspectp") {
+					if tt.cmdErr != nil {
+						return "", tt.cmdErr
+					}
+					content, err := os.ReadFile(tt.inspectCmdOutput)
+					if err != nil {
+						return "", err
+					}
+					return string(content), nil
+				}
+				return "", fmt.Errorf("unexpected command: %s %v", command, args)
+			}
 
-	assert.Equal(t, "retina-pod", spec.Status.Metadata.Name)
-	assert.Equal(t, "retina-namespace", spec.Status.Metadata.Namespace)
-	assert.Equal(t, "10.0.0.4", spec.Status.Network.IP)
+			podInfo, err := GetPodInfo(tt.ip)
+			if tt.expectedErr != nil {
+				assert.Error(t, err)
+				assert.Nil(t, podInfo)
+				assert.Contains(t, err.Error(), tt.expectedErr.Error())
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedPodInfo, podInfo)
+			}
+
+			crictlCommand = runCommand
+		})
+	}
 }
