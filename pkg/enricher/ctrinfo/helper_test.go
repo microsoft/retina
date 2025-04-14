@@ -13,6 +13,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var (
+	errInspectPod     = fmt.Errorf("failed to inspect pod information")
+	errGetRunningPods = fmt.Errorf("Failed to get running pods")
+)
+
 func TestGetPodInfo(t *testing.T) {
 	invalidJSONPath := "invalid_pod_spec.json"
 	invalidJSONContent := `{"status": {"metadata": {"name": "retina-pod", "namespace": "retina-namespace"}`
@@ -29,6 +34,7 @@ func TestGetPodInfo(t *testing.T) {
 		cmdErr           error
 		expectedPodInfo  *cache.PodInfo
 		expectedErr      bool
+		expectedErrMsg   string
 	}{
 		{
 			name:             "IP found in list of running pods",
@@ -63,6 +69,7 @@ func TestGetPodInfo(t *testing.T) {
 			cmdErr:          fmt.Errorf("test error"),
 			expectedPodInfo: nil,
 			expectedErr:     true,
+			expectedErrMsg:  errInspectPod.Error(),
 		},
 		{
 			name:            "Running pods error",
@@ -71,6 +78,7 @@ func TestGetPodInfo(t *testing.T) {
 			cmdErr:          fmt.Errorf("test error"),
 			expectedPodInfo: nil,
 			expectedErr:     true,
+			expectedErrMsg:  errGetRunningPods.Error(),
 		},
 	}
 
@@ -78,10 +86,10 @@ func TestGetPodInfo(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			crictlCommand = func(command string, args ...string) (string, error) {
 				if strings.Contains(args[2], "pods") {
-					if tt.podCmdOutput != "" {
-						return tt.podCmdOutput, nil
+					if tt.cmdErr != nil {
+						return "", tt.cmdErr
 					}
-					return "", tt.cmdErr
+					return tt.podCmdOutput, nil
 				}
 				if strings.Contains(args[2], "inspectp") {
 					if tt.cmdErr != nil {
@@ -89,7 +97,7 @@ func TestGetPodInfo(t *testing.T) {
 					}
 					content, err := os.ReadFile(tt.inspectCmdOutput)
 					if err != nil {
-						return "", err
+						return "", fmt.Errorf("failed to read file: %w", err)
 					}
 					return string(content), nil
 				}
@@ -99,7 +107,9 @@ func TestGetPodInfo(t *testing.T) {
 			podInfo, err := GetPodInfo(tt.ip)
 			if tt.expectedErr {
 				require.Error(t, err)
-				require.Contains(t, err.Error(), tt.cmdErr.Error())
+				if tt.expectedErrMsg != "" {
+					require.Contains(t, err.Error(), tt.expectedErrMsg)
+				}
 				require.Nil(t, podInfo)
 			} else {
 				require.NoError(t, err)

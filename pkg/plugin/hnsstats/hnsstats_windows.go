@@ -7,6 +7,7 @@ package hnsstats
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/Microsoft/hcsshim"
@@ -84,7 +85,7 @@ func (h *hnsstats) Init() error {
 		filterMap = map[string]uint16{"State": HCN_ENDPOINT_STATE_ATTACHED_SHARING}
 		filter, err := json.Marshal(filterMap)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to marshal filter map: %w", err)
 		}
 		h.endpointQuery.Filter = string(filter)
 	}
@@ -155,8 +156,7 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 					hnsStatsData := &HnsStatsData{hnscounters: stats, IPAddress: ip}
 					h.l.Debug("Fetched HNS endpoints stats", zap.String(zapEndpointIDField, id),
 						zap.String(zapIPField, ip), zap.String(zapMACField, mac))
-					// Bring back - This is commented out
-					h.l.Info(hnsStatsData.String())
+					// h.l.Info(hnsStatsData.String())
 
 					// Get VFP port counters for matching port (MAC address of endpoint as the key)
 					portguid, ok := kv[mac]
