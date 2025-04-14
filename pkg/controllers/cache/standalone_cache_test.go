@@ -18,7 +18,9 @@ var (
 )
 
 func TestCacheAddPod(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
+		t.Errorf("Error setting up logger: %s", err)
+	}
 	c := NewStandaloneCache(ttl)
 
 	p2 := &PodInfo{Name: "pod2", Namespace: "ns2"}
@@ -71,7 +73,9 @@ func TestCacheAddPod(t *testing.T) {
 }
 
 func TestCacheDeletePod(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
+		t.Errorf("Error setting up logger: %s", err)
+	}
 	c := NewStandaloneCache(ttl)
 
 	tests := []struct {
@@ -108,7 +112,9 @@ func TestCacheDeletePod(t *testing.T) {
 }
 
 func TestCacheUpdate(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
+		t.Errorf("Error setting up logger: %s", err)
+	}
 	c := NewStandaloneCache(ttl)
 
 	tests := []struct {
@@ -148,7 +154,9 @@ func TestCacheUpdate(t *testing.T) {
 }
 
 func TestCacheTTL(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
+		t.Errorf("Error setting up logger: %s", err)
+	}
 	c := NewStandaloneCache(ttl)
 
 	time := c.TTL()
