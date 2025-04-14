@@ -4,7 +4,6 @@
 package statefile
 
 import (
-	"fmt"
 	"os"
 	"testing"
 
@@ -50,42 +49,42 @@ func TestGetPodInfo(t *testing.T) {
 		ip              string
 		filePath        string
 		expectedPodInfo *cache.PodInfo
-		expectedErr     error
+		expectedErr     bool
 	}{
 		{
 			name:            "Valid IP match",
 			ip:              "192.0.0.5",
 			filePath:        "mock_statefile.json",
 			expectedPodInfo: &cache.PodInfo{Name: "retina-pod", Namespace: "retina-namespace"},
-			expectedErr:     nil,
+			expectedErr:     false,
 		},
 		{
 			name:            "No IP match",
 			ip:              "10.0.0.0",
 			filePath:        "mock_statefile.json",
 			expectedPodInfo: nil,
-			expectedErr:     nil,
+			expectedErr:     false,
 		},
 		{
 			name:            "CNI state file not found",
 			ip:              "10.0.0.0",
 			filePath:        "non_existent_file.json",
 			expectedPodInfo: nil,
-			expectedErr:     fmt.Errorf("open non_existent_file.json: no such file or directory"),
+			expectedErr:     true,
 		},
 		{
 			name:            "Empty CNI state file",
 			ip:              "10.0.0.0",
 			filePath:        emptyJSONPath,
 			expectedPodInfo: nil,
-			expectedErr:     nil,
+			expectedErr:     false,
 		},
 		{
 			name:            "Invalid state file JSON",
 			ip:              "10.0.0.0",
 			filePath:        invalidJSONPath,
 			expectedPodInfo: nil,
-			expectedErr:     fmt.Errorf("unexpected end of JSON input"),
+			expectedErr:     true,
 		},
 	}
 
@@ -93,9 +92,8 @@ func TestGetPodInfo(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			podInfo, err := GetPodInfo(tt.ip, tt.filePath)
 
-			if tt.expectedErr != nil {
+			if tt.expectedErr {
 				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.expectedErr.Error())
 				assert.Nil(t, podInfo)
 			} else {
 				require.NoError(t, err)

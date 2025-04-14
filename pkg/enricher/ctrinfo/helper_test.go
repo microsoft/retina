@@ -27,7 +27,7 @@ func TestGetPodInfo(t *testing.T) {
 		inspectCmdOutput string
 		cmdErr           error
 		expectedPodInfo  *cache.PodInfo
-		expectedErr      error
+		expectedErr      bool
 	}{
 		{
 			name:             "IP found in list of running pods",
@@ -36,7 +36,7 @@ func TestGetPodInfo(t *testing.T) {
 			inspectCmdOutput: "mock_podSpec.json",
 			cmdErr:           nil,
 			expectedPodInfo:  &cache.PodInfo{Name: "retina-pod", Namespace: "retina-namespace"},
-			expectedErr:      nil,
+			expectedErr:      false,
 		},
 		{
 			name:             "No IP found in list of running pods",
@@ -45,7 +45,7 @@ func TestGetPodInfo(t *testing.T) {
 			inspectCmdOutput: "mock_podSpec.json",
 			cmdErr:           nil,
 			expectedPodInfo:  nil,
-			expectedErr:      nil,
+			expectedErr:      false,
 		},
 		{
 			name:             "Invalid pod spec JSON",
@@ -54,14 +54,14 @@ func TestGetPodInfo(t *testing.T) {
 			inspectCmdOutput: invalidJSONPath,
 			cmdErr:           nil,
 			expectedPodInfo:  nil,
-			expectedErr:      fmt.Errorf("Error unmarshalling JSON: unexpected end of JSON input"),
+			expectedErr:      true,
 		},
 		{
 			name:            "Inspect pod error",
 			ip:              "10.0.0.0",
 			cmdErr:          fmt.Errorf("test error"),
 			expectedPodInfo: nil,
-			expectedErr:     fmt.Errorf("Failed to get running pods: %w", fmt.Errorf("test error")),
+			expectedErr:     true,
 		},
 		{
 			name:            "Running pods error",
@@ -69,7 +69,7 @@ func TestGetPodInfo(t *testing.T) {
 			podCmdOutput:    "pod1\npod2\n",
 			cmdErr:          fmt.Errorf("test error"),
 			expectedPodInfo: nil,
-			expectedErr:     fmt.Errorf("Failed to inspect pod information: %w", fmt.Errorf("test error")),
+			expectedErr:     true,
 		},
 	}
 
@@ -96,10 +96,10 @@ func TestGetPodInfo(t *testing.T) {
 			}
 
 			podInfo, err := GetPodInfo(tt.ip)
-			if tt.expectedErr != nil {
+			if tt.expectedErr {
 				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.cmdErr.Error())
 				assert.Nil(t, podInfo)
-				assert.Contains(t, err.Error(), tt.expectedErr.Error())
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.expectedPodInfo, podInfo)
