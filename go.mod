@@ -304,7 +304,7 @@ require (
 	go.opentelemetry.io/otel v1.35.0
 	go.opentelemetry.io/otel/metric v1.35.0
 	go.opentelemetry.io/otel/trace v1.35.0
-	go.uber.org/mock v0.5.0
+	go.uber.org/mock v0.5.1
 	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394
 	google.golang.org/grpc v1.71.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
