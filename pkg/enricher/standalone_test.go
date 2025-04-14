@@ -12,15 +12,16 @@ import (
 	"github.com/microsoft/retina/pkg/controllers/cache"
 	sf "github.com/microsoft/retina/pkg/enricher/statefile"
 	"github.com/microsoft/retina/pkg/log"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+const testIP = "10.0.0.0"
 
 func TestPublishEvent(t *testing.T) {
 	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
 		t.Errorf("Error setting up logger: %s", err)
 	}
 	MaxStandaloneCacheEventSize = 1
-	ip := "10.0.0.0"
 
 	tests := []struct {
 		name        string
@@ -31,13 +32,13 @@ func TestPublishEvent(t *testing.T) {
 		{
 			name:        "Event published successfully",
 			fillChannel: false,
-			event:       StandaloneEvent{IP: ip, Action: AddEvent},
+			event:       StandaloneEvent{IP: testIP, Action: AddEvent},
 			expectedErr: nil,
 		},
 		{
 			name:        "Event channel is full",
 			fillChannel: true,
-			event:       StandaloneEvent{IP: ip, Action: AddEvent},
+			event:       StandaloneEvent{IP: testIP, Action: AddEvent},
 			expectedErr: ErrEventChannelFull,
 		},
 	}
@@ -53,10 +54,10 @@ func TestPublishEvent(t *testing.T) {
 
 			err := e.PublishEvent(tt.event.IP, tt.event.Action)
 			if tt.expectedErr != nil {
-				assert.Error(t, err)
-				assert.Equal(t, tt.expectedErr, err)
+				require.Error(t, err)
+				require.Equal(t, tt.expectedErr, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -71,15 +72,14 @@ func TestRemoveStaleEntries(t *testing.T) {
 	e.Run()
 	defer e.Stop()
 
-	ip := "10.0.0.0"
 	podInfo := cache.PodInfo{Name: "retina-pod", Namespace: "retina-namespace", LastUpdate: time.Now()}
 
-	testCache.Update(ip, &podInfo)
+	testCache.Update(testIP, &podInfo)
 	time.Sleep(10 * time.Millisecond)
 	e.RemoveStaleEntries()
 
-	assert.Eventually(t, func() bool {
-		return testCache.GetPod(ip) == nil
+	require.Eventually(t, func() bool {
+		return testCache.GetPod(testIP) == nil
 	}, 100*time.Millisecond, 10*time.Millisecond, "Expected pod info should be nil after TTL expired")
 }
 
@@ -88,7 +88,8 @@ func TestRun(t *testing.T) {
 		t.Errorf("Error setting up logger: %s", err)
 	}
 	existingIP := "192.0.0.5"
-	nonExistingIP := "10.0.0.0"
+	nonExistingIP := testIP
+
 	name := "retina-pod"
 	namespace := "retina-namespace"
 	sf.StateFileLocation = "statefile/mock_statefile.json"
@@ -151,18 +152,18 @@ func TestRun(t *testing.T) {
 				e.Stop()
 			} else {
 				err := e.PublishEvent(tt.event.IP, tt.event.Action)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			time.Sleep(25 * time.Millisecond)
 
 			podInfo := e.GetPodInfo(tt.event.IP)
 			if tt.expectedPodInfo != nil {
-				assert.NotNil(t, podInfo)
-				assert.Equal(t, tt.expectedPodInfo.Name, podInfo.Name)
-				assert.Equal(t, tt.expectedPodInfo.Namespace, podInfo.Namespace)
+				require.NotNil(t, podInfo)
+				require.Equal(t, tt.expectedPodInfo.Name, podInfo.Name)
+				require.Equal(t, tt.expectedPodInfo.Namespace, podInfo.Namespace)
 			} else {
-				assert.Nil(t, podInfo)
+				require.Nil(t, podInfo)
 			}
 		})
 	}

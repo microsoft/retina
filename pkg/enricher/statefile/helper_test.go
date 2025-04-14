@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/microsoft/retina/pkg/controllers/cache"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -93,8 +92,8 @@ func TestGetPodInfo(t *testing.T) {
 			podInfo, err := GetPodInfo(tt.ip, tt.filePath)
 
 			if tt.expectedErr {
-				assert.Error(t, err)
-				assert.Nil(t, podInfo)
+				require.Error(t, err)
+				require.Nil(t, podInfo)
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, tt.expectedPodInfo, podInfo)

@@ -240,15 +240,6 @@ func cleanAdvMetrics() {
 }
 
 func GetLabels(labels []string, ip string, podInfo *cache.PodInfo) []string {
-	var outputLabels []string
-	if podInfo == nil {
-		outputLabels = []string{ip, "", ""}
-	} else {
-		outputLabels = []string{ip, podInfo.Name, podInfo.Namespace}
-	}
+	outputLabels := []string{ip, podInfo.Name, podInfo.Namespace}
 	return append(labels, outputLabels...)
-}
-
-func setGauge(gauge *prometheus.GaugeVec, labels []string, value uint64) {
-	gauge.WithLabelValues(labels...).Set(float64(value))
 }

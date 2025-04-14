@@ -10,14 +10,15 @@ import (
 	"testing"
 
 	"github.com/microsoft/retina/pkg/controllers/cache"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetPodInfo(t *testing.T) {
 	invalidJSONPath := "invalid_pod_spec.json"
 	invalidJSONContent := `{"status": {"metadata": {"name": "retina-pod", "namespace": "retina-namespace"}`
+
 	err := os.WriteFile(invalidJSONPath, []byte(invalidJSONContent), 0o600)
-	assert.NoError(t, err, "failed to create invalid JSON file")
+	require.NoError(t, err, "failed to create invalid JSON file")
 	defer os.Remove(invalidJSONPath)
 
 	tests := []struct {
@@ -97,12 +98,12 @@ func TestGetPodInfo(t *testing.T) {
 
 			podInfo, err := GetPodInfo(tt.ip)
 			if tt.expectedErr {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.cmdErr.Error())
-				assert.Nil(t, podInfo)
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.cmdErr.Error())
+				require.Nil(t, podInfo)
 			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedPodInfo, podInfo)
+				require.NoError(t, err)
+				require.Equal(t, tt.expectedPodInfo, podInfo)
 			}
 
 			crictlCommand = runCommand
