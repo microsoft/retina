@@ -15,14 +15,10 @@ import (
 	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/controllers/cache"
 	cm "github.com/microsoft/retina/pkg/managers/controllermanager"
-	pm "github.com/microsoft/retina/pkg/managers/pluginmanager"
-	sm "github.com/microsoft/retina/pkg/managers/servermanager"
 )
 
 type Daemon struct {
-	config        *config.Config
-	httpServer    *sm.HTTPServer
-	pluginManager *pm.PluginManager
+	config *config.Config
 }
 
 func NewDaemon(daemonCfg *config.Config) *Daemon {
