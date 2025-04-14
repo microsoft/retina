@@ -1584,8 +1584,8 @@ go.uber.org/goleak v1.1.10/go.mod h1:8a7PlsEVH3e/a/GLqe5IIrQx6GzcnRmZEufDUTk4A7A
 go.uber.org/goleak v1.1.11-0.20210813005559-691160354723/go.mod h1:cwTWslyiVhfpKIDGSZEM2HlOvcqm+tG4zioyIeLoqMQ=
 go.uber.org/goleak v1.3.0 h1:2K3zAYmnTNqV73imy9J1T3WC+gmCePx2hEGkimedGto=
 go.uber.org/goleak v1.3.0/go.mod h1:CoHD4mav9JJNrW/WLlf7HGZPjdw8EucARQHekz1X6bE=
-go.uber.org/mock v0.5.0 h1:KAMbZvZPyBPWgD14IrIQ38QCyjwpvVVV6K/bHl1IwQU=
-go.uber.org/mock v0.5.0/go.mod h1:ge71pBPLYDk7QIi1LupWxdAykm7KIEFchiOqd6z7qMM=
+go.uber.org/mock v0.5.1 h1:ASgazW/qBmR+A32MYFDB6E2POoTgOwT509VP0CT/fjs=
+go.uber.org/mock v0.5.1/go.mod h1:ge71pBPLYDk7QIi1LupWxdAykm7KIEFchiOqd6z7qMM=
 go.uber.org/multierr v1.1.0/go.mod h1:wR5kodmAFQ0UK8QlbwjlSNy0Z68gJhDJUG5sjR94q/0=
 go.uber.org/multierr v1.5.0/go.mod h1:FeouvMocqHpRaaGuG9EjoKcStLC43Zu/fmqdUMPcKYU=
 go.uber.org/multierr v1.6.0/go.mod h1:cdWPpRnG4AhwMwsgIHip0KRBQjJy5kYEpYjJxpXp9iU=
@@ -1966,8 +1966,8 @@ mvdan.cc/unparam v0.0.0-20240528143540-8a5130ca722f h1:lMpcwN6GxNbWtbpI1+xzFLSW8
 mvdan.cc/unparam v0.0.0-20240528143540-8a5130ca722f/go.mod h1:RSLa7mKKCNeTTMHBw5Hsy2rfJmd6O2ivt9Dw9ZqCQpQ=
 oras.land/oras-go v1.2.5 h1:XpYuAwAb0DfQsunIyMfeET92emK8km3W4yEzZvUbsTo=
 oras.land/oras-go v1.2.5/go.mod h1:PuAwRShRZCsZb7g8Ar3jKKQR/2A/qN+pkYxIOd/FAoo=
-sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.5.20 h1:aVSc4LFdBVlrhlldIzPo4NrcTQRdnAlqTB31sOcPIrM=
-sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.5.20/go.mod h1:OkkCYstvomfIwV4rvVIegymcgMnt7ZQ3+1Wi9WZmP1s=
+sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.6.0 h1:sqw3u+v70069K5N8BQN70luRUIC0Q43kjhFIvyZmgNQ=
+sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.6.0/go.mod h1:/OBNY0oAFR9GycDYdI9Gw7bByBP6gqLS9B7daFQ4lWE=
 sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader v0.5.2 h1:jjFJF0PmS9IHLokD41mM6RVoqQF3BQtVDmQd6ZMnN6E=
 sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader v0.5.2/go.mod h1:7DdZ9ipIsmPLpBlfT4gueejcUlJBZQKWhdljQE5SKvc=
 sigs.k8s.io/controller-runtime v0.20.4 h1:X3c+Odnxz+iPTRobG4tp092+CvBU9UK0t/bRf+n0DGU=
