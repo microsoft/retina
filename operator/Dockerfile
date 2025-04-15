@@ -19,7 +19,7 @@ ENV GOARCH=${GOARCH}
 
 RUN make manifests
 RUN --mount=type=cache,target="/root/.cache/go-build" \
-	GOOS=linux GOARCH=amd64 go build \
+	GOOS=$GOOS GOARCH=$GOARCH go build \
 	-ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" \
 	-X "github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID"="$APP_INSIGHTS_ID"" \
 	-a -o retina-operator operator/main.go
