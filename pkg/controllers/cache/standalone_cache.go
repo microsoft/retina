@@ -77,7 +77,7 @@ func (c *StandaloneCache) addPod(ip, name, namespace string) {
 	}
 
 	c.ipToPod[ip] = newPod
-	c.l.Info("Added pod to cache", zap.String("ip", ip), zap.String("name", name), zap.String("namespace", namespace))
+	c.l.Info("Added pod to cache", zap.String("ip", ip), zap.String("pod", name), zap.String("namespace", namespace))
 }
 
 func (c *StandaloneCache) deletePod(ip string) {
@@ -86,7 +86,7 @@ func (c *StandaloneCache) deletePod(ip string) {
 
 	if podInfo, exists := c.ipToPod[ip]; exists {
 		delete(c.ipToPod, ip)
-		c.l.Info("Deleted pod from cache", zap.String("ip", ip), zap.String("name", podInfo.Name), zap.String("namespace", podInfo.Namespace))
+		c.l.Info("Deleted pod from cache", zap.String("ip", ip), zap.String("pod", podInfo.Name), zap.String("namespace", podInfo.Namespace))
 	}
 }
 

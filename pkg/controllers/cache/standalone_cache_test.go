@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/microsoft/retina/pkg/log"
-	"gotest.tools/v3/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -62,12 +62,12 @@ func TestCacheAddPod(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c.addPod(tt.ip, tt.name, tt.namespace)
+			c.addPod(tt.ip, tt.pod, tt.namespace)
 
 			got := c.GetPod(tt.ip)
-			assert.Assert(t, got != nil, "Expected pod info, got nil")
-			assert.Equal(t, got.Name, tt.expectedPod)
-			assert.Equal(t, got.Namespace, tt.expectedNS)
+			require.NotNil(t, got, "Expected pod info, got nil")
+			require.Equal(t, got.Name, tt.expectedPod)
+			require.Equal(t, got.Namespace, tt.expectedNS)
 		})
 	}
 }
@@ -106,7 +106,7 @@ func TestCacheDeletePod(t *testing.T) {
 			c.deletePod(tt.ip)
 
 			got := c.GetPod(tt.ip)
-			assert.Equal(t, got, tt.expectedPodInfo)
+			require.Equal(t, got, tt.expectedPodInfo)
 		})
 	}
 }
@@ -143,11 +143,11 @@ func TestCacheUpdate(t *testing.T) {
 
 			got := c.GetPod(tt.ip)
 			if tt.expectedPodInfo == nil {
-				assert.Assert(t, got == nil)
+				require.Nil(t, got, "Expected nil pod info, got %v", got)
 			} else {
-				assert.Assert(t, got != nil, "Expected pod info, got nil")
-				assert.Equal(t, got.Name, tt.expectedPodInfo.Name)
-				assert.Equal(t, got.Namespace, tt.expectedPodInfo.Namespace)
+				require.NotNil(t, got != nil, "Expected pod info, got nil")
+				require.Equal(t, got.Name, tt.expectedPodInfo.Name)
+				require.Equal(t, got.Namespace, tt.expectedPodInfo.Namespace)
 			}
 		})
 	}
@@ -160,5 +160,5 @@ func TestCacheTTL(t *testing.T) {
 	c := NewStandaloneCache(ttl)
 
 	time := c.TTL()
-	assert.Equal(t, time, ttl)
+	require.Equal(t, time, ttl)
 }
