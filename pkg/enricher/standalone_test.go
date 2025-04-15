@@ -95,6 +95,7 @@ func TestRun(t *testing.T) {
 	name := "retina-pod"
 	namespace := "retina-namespace"
 	sf.StateFileLocation = "statefile/mock_statefile.json"
+	MaxStandaloneCacheEventSize = 250
 
 	tests := []struct {
 		name            string
