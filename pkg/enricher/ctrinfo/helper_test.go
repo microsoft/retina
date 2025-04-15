@@ -14,9 +14,9 @@ import (
 )
 
 var (
-	testGetPodsErr    = errors.New("Failed to get running pods")
-	testInspectPodErr = errors.New("Failed to inspect pod information")
-	testReadJSONErr   = errors.New("unexpected end of JSON input")
+	errGetPods    = errors.New("Failed to get running pods")
+	errInspectPod = errors.New("Failed to inspect pod information")
+	errJSONRead   = errors.New("unexpected end of JSON input")
 )
 
 func TestGetPodInfo(t *testing.T) {
@@ -58,22 +58,22 @@ func TestGetPodInfo(t *testing.T) {
 			ip:               "10.0.0.4",
 			podCmdOutput:     "pod1\npod2\n",
 			inspectCmdOutput: invalidJSONPath,
-			expectedErr:      testReadJSONErr,
+			expectedErr:      errJSONRead,
 			expectedPodInfo:  nil,
 		},
 		{
 			name:            "Running pods error",
 			ip:              "10.0.0.0",
-			getPodsErr:      testGetPodsErr,
-			expectedErr:     testGetPodsErr,
+			getPodsErr:      errGetPods,
+			expectedErr:     errGetPods,
 			expectedPodInfo: nil,
 		},
 		{
 			name:            "Inspect pod error",
 			ip:              "10.0.0.4",
 			podCmdOutput:    "pod1\npod2\n",
-			inspectPodErr:   testInspectPodErr,
-			expectedErr:     testInspectPodErr,
+			inspectPodErr:   errInspectPod,
+			expectedErr:     errInspectPod,
 			expectedPodInfo: nil,
 		},
 	}
@@ -93,7 +93,7 @@ func TestGetPodInfo(t *testing.T) {
 					}
 					content, err := os.ReadFile(tt.inspectCmdOutput)
 					if err != nil {
-						return "", testReadJSONErr
+						return "", errJSONRead
 					}
 					return string(content), nil
 				}
