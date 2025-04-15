@@ -80,7 +80,7 @@ func TestGetPodInfo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			crictlCommand = func(command string, args ...string) (string, error) {
+			crictlCommand = func(_ string, args ...string) (string, error) {
 				if strings.Contains(args[2], "pods") {
 					if tt.getPodsErr != nil {
 						return "", tt.getPodsErr
