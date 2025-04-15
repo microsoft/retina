@@ -197,47 +197,46 @@ func notifyHnsStats(h *hnsstats, stats *HnsStatsData) {
 			return
 		}
 
-		AdvForwardPacketsGauge.WithLabelValues(GetLabels([]string{ingressLabel}, stats.IPAddress, labels)...).Set(float64(stats.hnscounters.PacketsReceived))
+		updateMetric(AdvDroppedPacketsGauge, stats.IPAddress, labels, stats.hnscounters.PacketsReceived, ingressLabel)
 		h.l.Debug("emitting packets received count metric", zap.Uint64(PacketsReceived, stats.hnscounters.PacketsReceived))
-		AdvForwardPacketsGauge.WithLabelValues(GetLabels([]string{egressLabel}, stats.IPAddress, labels)...).Set(float64(stats.hnscounters.PacketsSent))
+		updateMetric(AdvDroppedPacketsGauge, stats.IPAddress, labels, stats.hnscounters.PacketsSent, egressLabel)
 		h.l.Debug("emitting packets sent count metric", zap.Uint64(PacketsSent, stats.hnscounters.PacketsSent))
-		AdvForwardBytesGauge.WithLabelValues(GetLabels([]string{ingressLabel}, stats.IPAddress, labels)...).Set(float64(stats.hnscounters.BytesReceived))
+		updateMetric(AdvForwardPacketsGauge, stats.IPAddress, labels, stats.hnscounters.BytesReceived, ingressLabel)
 		h.l.Debug("emitting bytes received count metric", zap.Uint64(BytesReceived, stats.hnscounters.BytesReceived))
-		AdvForwardBytesGauge.WithLabelValues(GetLabels([]string{egressLabel}, stats.IPAddress, labels)...).Set(float64(stats.hnscounters.BytesSent))
+		updateMetric(AdvForwardPacketsGauge, stats.IPAddress, labels, stats.hnscounters.BytesSent, egressLabel)
 		h.l.Debug("emitting bytes sent count metric", zap.Uint64(BytesSent, stats.hnscounters.BytesSent))
 
-		AdvHNSStatsGauge.WithLabelValues(GetLabels([]string{PacketsReceived}, stats.IPAddress, labels)...).Set(float64(stats.hnscounters.PacketsReceived))
-		AdvHNSStatsGauge.WithLabelValues(GetLabels([]string{PacketsSent}, stats.IPAddress, labels)...).Set(float64(stats.hnscounters.PacketsSent))
+		updateMetric(AdvHNSStatsGauge, stats.IPAddress, labels, stats.hnscounters.PacketsReceived, PacketsReceived)
+		updateMetric(AdvHNSStatsGauge, stats.IPAddress, labels, stats.hnscounters.PacketsSent, PacketsSent)
 
-		AdvDroppedPacketsGauge.WithLabelValues(GetLabels([]string{utils.Endpoint, egressLabel}, stats.IPAddress, labels)...).Set(float64(stats.hnscounters.DroppedPacketsOutgoing))
-		AdvDroppedPacketsGauge.WithLabelValues(GetLabels([]string{utils.Endpoint, ingressLabel}, stats.IPAddress, labels)...).Set(float64(stats.hnscounters.DroppedPacketsIncoming))
+		updateMetric(AdvDroppedPacketsGauge, stats.IPAddress, labels, stats.hnscounters.DroppedPacketsOutgoing, utils.Endpoint, egressLabel)
+		updateMetric(AdvDroppedPacketsGauge, stats.IPAddress, labels, stats.hnscounters.DroppedPacketsIncoming, utils.Endpoint, ingressLabel)
 
 		if stats.vfpCounters == nil {
 			h.l.Debug("will not record some metrics since VFP port counters failed to be set")
 			return
 		}
 
-		AdvDroppedPacketsGauge.WithLabelValues(GetLabels([]string{utils.AclRule, ingressLabel}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.In.DropCounters.AclDropPacketCount))
-		AdvDroppedPacketsGauge.WithLabelValues(GetLabels([]string{utils.AclRule, egressLabel}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.Out.DropCounters.AclDropPacketCount))
+		updateMetric(AdvDroppedPacketsGauge, stats.IPAddress, labels, stats.vfpCounters.In.DropCounters.AclDropPacketCount, utils.AclRule, ingressLabel)
+		updateMetric(AdvDroppedPacketsGauge, stats.IPAddress, labels, stats.vfpCounters.Out.DropCounters.AclDropPacketCount, utils.AclRule, egressLabel)
 
-		AdvTCPConnectionStatsGauge.WithLabelValues(GetLabels([]string{utils.ResetCount}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.ResetCount))
-		AdvTCPConnectionStatsGauge.WithLabelValues(GetLabels([]string{utils.ClosedFin}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.ClosedFinCount))
-		AdvTCPConnectionStatsGauge.WithLabelValues(GetLabels([]string{utils.ResetSyn}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.ResetSynCount))
-		AdvTCPConnectionStatsGauge.WithLabelValues(GetLabels([]string{utils.TcpHalfOpenTimeouts}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.TcpHalfOpenTimeoutsCount))
-		AdvTCPConnectionStatsGauge.WithLabelValues(GetLabels([]string{utils.Verified}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.VerifiedCount))
-		AdvTCPConnectionStatsGauge.WithLabelValues(GetLabels([]string{utils.TimedOutCount}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.TimedOutCount))
-		AdvTCPConnectionStatsGauge.WithLabelValues(GetLabels([]string{utils.TimeWaitExpiredCount}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.In.TcpCounters.ConnectionCounters.TimeWaitExpiredCount))
+		updateMetric(AdvTCPConnectionStatsGauge, stats.IPAddress, labels, stats.vfpCounters.In.TcpCounters.ConnectionCounters.ResetCount, utils.ResetCount)
+		updateMetric(AdvTCPConnectionStatsGauge, stats.IPAddress, labels, stats.vfpCounters.In.TcpCounters.ConnectionCounters.ClosedFinCount, utils.ClosedFin)
+		updateMetric(AdvTCPConnectionStatsGauge, stats.IPAddress, labels, stats.vfpCounters.In.TcpCounters.ConnectionCounters.ResetSynCount, utils.ResetSyn)
+		updateMetric(AdvTCPConnectionStatsGauge, stats.IPAddress, labels, stats.vfpCounters.In.TcpCounters.ConnectionCounters.TcpHalfOpenTimeoutsCount, utils.TcpHalfOpenTimeouts)
+		updateMetric(AdvTCPConnectionStatsGauge, stats.IPAddress, labels, stats.vfpCounters.In.TcpCounters.ConnectionCounters.VerifiedCount, utils.Verified)
+		updateMetric(AdvTCPConnectionStatsGauge, stats.IPAddress, labels, stats.vfpCounters.In.TcpCounters.ConnectionCounters.TimedOutCount, utils.TimedOutCount)
+		updateMetric(AdvTCPConnectionStatsGauge, stats.IPAddress, labels, stats.vfpCounters.In.TcpCounters.ConnectionCounters.TimeWaitExpiredCount, utils.TimeWaitExpiredCount)
 		// TCP Flag counters
-		AdvTCPFlagGauge.WithLabelValues(GetLabels([]string{ingressLabel, utils.SYN}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.In.TcpCounters.PacketCounters.SynPacketCount))
-		AdvTCPFlagGauge.WithLabelValues(GetLabels([]string{ingressLabel, utils.SYNACK}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.In.TcpCounters.PacketCounters.SynAckPacketCount))
-		AdvTCPFlagGauge.WithLabelValues(GetLabels([]string{ingressLabel, utils.FIN}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.In.TcpCounters.PacketCounters.FinPacketCount))
-		AdvTCPFlagGauge.WithLabelValues(GetLabels([]string{ingressLabel, utils.RST}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.In.TcpCounters.PacketCounters.RstPacketCount))
+		updateMetric(AdvTCPFlagGauge, stats.IPAddress, labels, stats.vfpCounters.In.TcpCounters.PacketCounters.SynPacketCount, ingressLabel, utils.SYN)
+		updateMetric(AdvTCPFlagGauge, stats.IPAddress, labels, stats.vfpCounters.In.TcpCounters.PacketCounters.SynAckPacketCount, ingressLabel, utils.SYNACK)
+		updateMetric(AdvTCPFlagGauge, stats.IPAddress, labels, stats.vfpCounters.In.TcpCounters.PacketCounters.FinPacketCount, ingressLabel, utils.FIN)
+		updateMetric(AdvTCPFlagGauge, stats.IPAddress, labels, stats.vfpCounters.In.TcpCounters.PacketCounters.RstPacketCount, ingressLabel, utils.RST)
 
-		AdvTCPFlagGauge.WithLabelValues(GetLabels([]string{egressLabel, utils.SYN}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.Out.TcpCounters.PacketCounters.SynPacketCount))
-		AdvTCPFlagGauge.WithLabelValues(GetLabels([]string{egressLabel, utils.SYNACK}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.Out.TcpCounters.PacketCounters.SynAckPacketCount))
-		AdvTCPFlagGauge.WithLabelValues(GetLabels([]string{egressLabel, utils.FIN}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.Out.TcpCounters.PacketCounters.FinPacketCount))
-		AdvTCPFlagGauge.WithLabelValues(GetLabels([]string{egressLabel, utils.RST}, stats.IPAddress, labels)...).Set(float64(stats.vfpCounters.Out.TcpCounters.PacketCounters.RstPacketCount))
-
+		updateMetric(AdvTCPFlagGauge, stats.IPAddress, labels, stats.vfpCounters.Out.TcpCounters.PacketCounters.SynPacketCount, egressLabel, utils.SYN)
+		updateMetric(AdvTCPFlagGauge, stats.IPAddress, labels, stats.vfpCounters.Out.TcpCounters.PacketCounters.SynAckPacketCount, egressLabel, utils.SYNACK)
+		updateMetric(AdvTCPFlagGauge, stats.IPAddress, labels, stats.vfpCounters.Out.TcpCounters.PacketCounters.FinPacketCount, egressLabel, utils.FIN)
+		updateMetric(AdvTCPFlagGauge, stats.IPAddress, labels, stats.vfpCounters.Out.TcpCounters.PacketCounters.RstPacketCount, egressLabel, utils.RST)
 		return
 	}
 

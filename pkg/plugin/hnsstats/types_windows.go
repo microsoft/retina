@@ -239,7 +239,7 @@ func cleanAdvMetrics() {
 	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(AdvTCPFlagGauge))
 }
 
-func GetLabels(labels []string, ip string, podInfo *cache.PodInfo) []string {
-	outputLabels := []string{ip, podInfo.Name, podInfo.Namespace}
-	return append(labels, outputLabels...)
+func updateMetric(gauge *prometheus.GaugeVec, ip string, podInfo *cache.PodInfo, value uint64, labels ...string) {
+	labels = append(labels, ip, podInfo.Name, podInfo.Namespace)
+	gauge.WithLabelValues(labels...).Set(float64(value))
 }
