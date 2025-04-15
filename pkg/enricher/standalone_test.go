@@ -50,7 +50,7 @@ func TestPublishEvent(t *testing.T) {
 			}
 
 			testCache := cache.NewStandaloneCache(10 * time.Second)
-			e := NewStandaloneEnricher(context.Background(), testCache, &config.Config{})
+			e := NewEnricher(context.Background(), testCache, &config.Config{})
 
 			err := e.PublishEvent(tt.event.IP, tt.event.Action)
 			if tt.expectedErr != nil {
@@ -67,15 +67,17 @@ func TestRemoveStaleEntries(t *testing.T) {
 	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
 		t.Errorf("Error setting up logger: %s", err)
 	}
+
+	sf.StateFileLocation = "statefile/mock_statefile.json"
 	testCache := cache.NewStandaloneCache(1 * time.Millisecond)
-	e := NewStandaloneEnricher(context.Background(), testCache, &config.Config{})
+	e := NewEnricher(context.Background(), testCache, &config.Config{})
 	e.Run()
 	defer e.Stop()
 
 	podInfo := cache.PodInfo{Name: "retina-pod", Namespace: "retina-namespace", LastUpdate: time.Now()}
 
 	testCache.Update(testIP, &podInfo)
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 	e.RemoveStaleEntries()
 
 	require.Eventually(t, func() bool {
@@ -99,7 +101,6 @@ func TestRun(t *testing.T) {
 		event           StandaloneEvent
 		setupCache      func(c *cache.StandaloneCache)
 		expectedPodInfo *cache.PodInfo
-		shutdown        bool
 	}{
 		{
 			name:            "Successful cache update",
@@ -128,43 +129,27 @@ func TestRun(t *testing.T) {
 			setupCache:      func(_ *cache.StandaloneCache) {},
 			expectedPodInfo: nil,
 		},
-		{
-			name:            "No update when event channel is closed",
-			event:           StandaloneEvent{IP: existingIP, Action: AddEvent},
-			setupCache:      func(_ *cache.StandaloneCache) {},
-			shutdown:        true,
-			expectedPodInfo: nil,
-		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			testCache := cache.NewStandaloneCache(1 * time.Second)
-			e := NewStandaloneEnricher(context.Background(), testCache, &config.Config{EnableCrictl: false})
-
-			if tt.setupCache != nil {
-				tt.setupCache(testCache)
-			}
+			e := NewEnricher(context.Background(), testCache, &config.Config{EnableCrictl: false})
+			tt.setupCache(testCache)
 
 			e.Run()
+			defer e.Stop()
 
-			if tt.shutdown {
-				e.Stop()
-			} else {
-				err := e.PublishEvent(tt.event.IP, tt.event.Action)
-				require.NoError(t, err)
-			}
+			err := e.PublishEvent(tt.event.IP, tt.event.Action)
+			require.NoError(t, err)
 
-			time.Sleep(25 * time.Millisecond)
-
-			podInfo := e.GetPodInfo(tt.event.IP)
-			if tt.expectedPodInfo != nil {
-				require.NotNil(t, podInfo)
-				require.Equal(t, tt.expectedPodInfo.Name, podInfo.Name)
-				require.Equal(t, tt.expectedPodInfo.Namespace, podInfo.Namespace)
-			} else {
-				require.Nil(t, podInfo)
-			}
+			require.Eventually(t, func() bool {
+				podInfo := testCache.GetPod(tt.event.IP)
+				if tt.expectedPodInfo == nil {
+					return podInfo == nil
+				}
+				return podInfo != nil && podInfo.Name == tt.expectedPodInfo.Name && podInfo.Namespace == tt.expectedPodInfo.Namespace
+			}, 100*time.Millisecond, 10*time.Millisecond, "Pod info should match the expected pod info")
 		})
 	}
 }

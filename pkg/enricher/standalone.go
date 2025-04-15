@@ -48,15 +48,19 @@ type StandaloneEnricher struct {
 	eventChannel chan StandaloneEvent
 }
 
+func NewEnricher(ctx context.Context, cache *cache.StandaloneCache, cfg *config.Config) *StandaloneEnricher {
+	return &StandaloneEnricher{
+		cfg:          cfg,
+		ctx:          ctx,
+		l:            log.Logger().Named("standalone-enricher"),
+		cache:        cache,
+		eventChannel: make(chan StandaloneEvent, MaxStandaloneCacheEventSize),
+	}
+}
+
 func NewStandaloneEnricher(ctx context.Context, cache *cache.StandaloneCache, cfg *config.Config) *StandaloneEnricher {
 	localOnce.Do(func() {
-		se = &StandaloneEnricher{
-			cfg:          cfg,
-			ctx:          ctx,
-			l:            log.Logger().Named("standalone-enricher"),
-			cache:        cache,
-			eventChannel: make(chan StandaloneEvent, MaxStandaloneCacheEventSize),
-		}
+		se = NewEnricher(ctx, cache, cfg)
 	})
 	return se
 }
