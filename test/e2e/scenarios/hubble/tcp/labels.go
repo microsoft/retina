@@ -28,7 +28,7 @@ var (
 
 	validHubbleTCPMetricsLabels = []map[string]string{
 		validHubbleTCPSYNFlag,
-		// validHubbleTCPSYNACKFlag, TODO: Needs to further investigate why these labels are not being generated
+		validHubbleTCPSYNACKFlag, //TODO: Needs to further investigate why these labels are not being generated
 		validHubbleTCPFINFlag,
 	}
 )

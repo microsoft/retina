@@ -13,27 +13,29 @@ const (
 	sleepDelay = 5 * time.Second
 )
 
-func ValidateFlowMetric() *types.Scenario {
-	name := "Flow Metrics"
+func ValidateFlowMetric(namespace, arch string) *types.Scenario {
+	id := "hubble-flow-port-forward-" + arch
+	name := "Hubble Flow Metrics - Arch: " + arch
 	agnhostName := "agnhost-flow"
 	podName := agnhostName + "-0"
 	steps := []*types.StepWrapper{
 		{
 			Step: &kubernetes.CreateKapingerDeployment{
-				KapingerNamespace: common.KubeSystemNamespace,
+				KapingerNamespace: namespace,
 				KapingerReplicas:  "1",
 			},
 		},
 		{
 			Step: &kubernetes.CreateAgnhostStatefulSet{
 				AgnhostName:      agnhostName,
-				AgnhostNamespace: common.TestPodNamespace,
+				AgnhostNamespace: namespace,
+				AgnhostArch:      arch,
 			},
 		},
 		{
 			Step: &kubernetes.ExecInPod{
 				PodName:      podName,
-				PodNamespace: common.TestPodNamespace,
+				PodNamespace: namespace,
 				Command:      "curl -s -m 5 bing.com",
 			},
 			Opts: &types.StepOptions{
@@ -48,7 +50,7 @@ func ValidateFlowMetric() *types.Scenario {
 		{
 			Step: &kubernetes.ExecInPod{
 				PodName:      podName,
-				PodNamespace: common.TestPodNamespace,
+				PodNamespace: namespace,
 				Command:      "curl -s -m 5 bing.com",
 			},
 			Opts: &types.StepOptions{
@@ -65,7 +67,7 @@ func ValidateFlowMetric() *types.Scenario {
 				OptionalLabelAffinity: "app=" + agnhostName, // port forward to a pod on a node that also has this pod with this label, assuming same namespace
 			},
 			Opts: &types.StepOptions{
-				RunInBackgroundWithID:     "hubble-flow-port-forward",
+				RunInBackgroundWithID:     id,
 				SkipSavingParametersToJob: true,
 			},
 		},
@@ -82,7 +84,7 @@ func ValidateFlowMetric() *types.Scenario {
 		},
 		{
 			Step: &types.Stop{
-				BackgroundID: "hubble-flow-port-forward",
+				BackgroundID: id,
 			},
 		},
 	}

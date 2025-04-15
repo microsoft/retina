@@ -15,22 +15,6 @@ var (
 		constants.HubbleTypeLabel:        "Trace",
 		constants.HubbleVerdictLabel:     "FORWARDED",
 	}
-	validHubbleFlowLabelsToNetwork = map[string]string{
-		constants.HubbleSourceLabel:      common.TestPodNamespace + "/" + podName,
-		constants.HubbleDestinationLabel: "",
-		constants.HubbleProtocolLabel:    constants.UDP,
-		constants.HubbleSubtypeLabel:     "to-network",
-		constants.HubbleTypeLabel:        "Trace",
-		constants.HubbleVerdictLabel:     "FORWARDED",
-	}
-	validHubbleFlowLabelsFromNetwork = map[string]string{
-		constants.HubbleSourceLabel:      "",
-		constants.HubbleDestinationLabel: common.TestPodNamespace + "/" + podName,
-		constants.HubbleProtocolLabel:    constants.UDP,
-		constants.HubbleSubtypeLabel:     "from-network",
-		constants.HubbleTypeLabel:        "Trace",
-		constants.HubbleVerdictLabel:     "FORWARDED",
-	}
 	validHubbleFlowLabelsToEndpoint = map[string]string{
 		constants.HubbleSourceLabel:      "",
 		constants.HubbleDestinationLabel: common.TestPodNamespace + "/" + podName,
@@ -47,4 +31,21 @@ var (
 		// validHubbleFlowLabelsFromNetwork,
 		validHubbleFlowLabelsToEndpoint,
 	}
+
+	// validHubbleFlowLabelsToNetwork = map[string]string{
+	// 	constants.HubbleSourceLabel:      common.TestPodNamespace + "/" + podName,
+	// 	constants.HubbleDestinationLabel: "",
+	// 	constants.HubbleProtocolLabel:    constants.UDP,
+	// 	constants.HubbleSubtypeLabel:     "to-network",
+	// 	constants.HubbleTypeLabel:        "Trace",
+	// 	constants.HubbleVerdictLabel:     "FORWARDED",
+	// }
+	// validHubbleFlowLabelsFromNetwork = map[string]string{
+	// 	constants.HubbleSourceLabel:      "",
+	// 	constants.HubbleDestinationLabel: common.TestPodNamespace + "/" + podName,
+	// 	constants.HubbleProtocolLabel:    constants.UDP,
+	// 	constants.HubbleSubtypeLabel:     "from-network",
+	// 	constants.HubbleTypeLabel:        "Trace",
+	// 	constants.HubbleVerdictLabel:     "FORWARDED",
+	// }
 )

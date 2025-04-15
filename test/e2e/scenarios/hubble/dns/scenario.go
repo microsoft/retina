@@ -13,15 +13,17 @@ const (
 	sleepDelay = 5 * time.Second
 )
 
-func ValidateDNSMetric() *types.Scenario {
-	name := "DNS Metrics"
+func ValidateDNSMetric(namespace, arch string) *types.Scenario {
+	id := "hubble-dns-port-forward-" + arch
+	name := "Hubble DNS Metrics - Arch: " + arch
 	agnhostName := "agnhost-dns"
 	podName := agnhostName + "-0"
 	steps := []*types.StepWrapper{
 		{
 			Step: &kubernetes.CreateAgnhostStatefulSet{
 				AgnhostName:      agnhostName,
-				AgnhostNamespace: common.TestPodNamespace,
+				AgnhostNamespace: namespace,
+				AgnhostArch:      arch,
 			},
 		},
 		{
@@ -34,13 +36,13 @@ func ValidateDNSMetric() *types.Scenario {
 				OptionalLabelAffinity: "app=" + agnhostName, // port forward hubble metrics to a pod on a node that also has this pod with this label, assuming same namespace
 			},
 			Opts: &types.StepOptions{
-				RunInBackgroundWithID: "hubble-dns-port-forward",
+				RunInBackgroundWithID: id,
 			},
 		},
 		{
 			Step: &kubernetes.ExecInPod{
 				PodName:      podName,
-				PodNamespace: common.TestPodNamespace,
+				PodNamespace: namespace,
 				Command:      "nslookup -type=a one.one.one.one",
 			},
 			Opts: &types.StepOptions{
@@ -77,7 +79,7 @@ func ValidateDNSMetric() *types.Scenario {
 		},
 		{
 			Step: &types.Stop{
-				BackgroundID: "hubble-dns-port-forward",
+				BackgroundID: id,
 			},
 		},
 	}

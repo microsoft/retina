@@ -150,7 +150,7 @@ func ValidateBasicDNSMetrics(scenarioName string, req *RequestValidationParams, 
 }
 
 // ValidateAdvancedDNSMetrics validates the advanced DNS metrics present in the metrics endpoint
-func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParams, resp *ResponseValidationParams, kubeConfigFilePath string, namespace, arch string) *types.Scenario {
+func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParams, resp *ResponseValidationParams, kubeConfigFilePath, namespace, arch string) *types.Scenario {
 	// random ID
 	id := fmt.Sprintf("adv-dns-port-forward-%d", rand.Int()) // nolint:gosec // fine to use math/rand here
 	agnhostName := "agnhost-" + id

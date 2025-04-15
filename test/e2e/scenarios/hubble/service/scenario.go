@@ -40,8 +40,11 @@ func ValidateHubbleUIService(kubeConfigFilePath string) *types.Scenario {
 				LocalPort:             "8080",
 				RemotePort:            "8081",
 				OptionalLabelAffinity: "k8s-app=hubble-ui",
-				Endpoint:              "?namespace=default", // set as default namespace query since endpoint can't be nil
+				Endpoint:              "/", // / is used to indicate that during validation step we dont have an endpoint to valdiate
 				KubeConfigFilePath:    kubeConfigFilePath,
+			},
+			Opts: &types.StepOptions{
+				SkipSavingParametersToJob: true,
 			},
 		},
 		{
