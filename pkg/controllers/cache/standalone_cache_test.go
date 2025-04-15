@@ -66,8 +66,8 @@ func TestCacheAddPod(t *testing.T) {
 
 			got := c.GetPod(tt.ip)
 			require.NotNil(t, got, "Expected pod info, got nil")
-			require.Equal(t, got.Name, tt.expectedPod)
-			require.Equal(t, got.Namespace, tt.expectedNS)
+			require.Equal(t, tt.expectedPod, got.Name)
+			require.Equal(t, tt.expectedNS, got.Namespace)
 		})
 	}
 }
@@ -106,7 +106,7 @@ func TestCacheDeletePod(t *testing.T) {
 			c.deletePod(tt.ip)
 
 			got := c.GetPod(tt.ip)
-			require.Equal(t, got, tt.expectedPodInfo)
+			require.Equal(t, tt.expectedPodInfo, got)
 		})
 	}
 }
@@ -146,8 +146,8 @@ func TestCacheUpdate(t *testing.T) {
 				require.Nil(t, got, "Expected nil pod info, got %v", got)
 			} else {
 				require.NotNil(t, got != nil, "Expected pod info, got nil")
-				require.Equal(t, got.Name, tt.expectedPodInfo.Name)
-				require.Equal(t, got.Namespace, tt.expectedPodInfo.Namespace)
+				require.Equal(t, tt.expectedPodInfo.Name, got.Name)
+				require.Equal(t, tt.expectedPodInfo.Namespace, got.Namespace)
 			}
 		})
 	}
