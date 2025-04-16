@@ -197,13 +197,13 @@ func notifyHnsStats(h *hnsstats, stats *HnsStatsData) {
 			return
 		}
 
-		updateMetric(AdvDroppedPacketsGauge, stats.IPAddress, labels, stats.hnscounters.PacketsReceived, ingressLabel)
+		updateMetric(AdvForwardPacketsGauge, stats.IPAddress, labels, stats.hnscounters.PacketsReceived, ingressLabel)
 		h.l.Debug("emitting packets received count metric", zap.Uint64(PacketsReceived, stats.hnscounters.PacketsReceived))
-		updateMetric(AdvDroppedPacketsGauge, stats.IPAddress, labels, stats.hnscounters.PacketsSent, egressLabel)
+		updateMetric(AdvForwardPacketsGauge, stats.IPAddress, labels, stats.hnscounters.PacketsSent, egressLabel)
 		h.l.Debug("emitting packets sent count metric", zap.Uint64(PacketsSent, stats.hnscounters.PacketsSent))
-		updateMetric(AdvForwardPacketsGauge, stats.IPAddress, labels, stats.hnscounters.BytesReceived, ingressLabel)
+		updateMetric(AdvForwardBytesGauge, stats.IPAddress, labels, stats.hnscounters.BytesReceived, ingressLabel)
 		h.l.Debug("emitting bytes received count metric", zap.Uint64(BytesReceived, stats.hnscounters.BytesReceived))
-		updateMetric(AdvForwardPacketsGauge, stats.IPAddress, labels, stats.hnscounters.BytesSent, egressLabel)
+		updateMetric(AdvForwardBytesGauge, stats.IPAddress, labels, stats.hnscounters.BytesSent, egressLabel)
 		h.l.Debug("emitting bytes sent count metric", zap.Uint64(BytesSent, stats.hnscounters.BytesSent))
 
 		updateMetric(AdvHNSStatsGauge, stats.IPAddress, labels, stats.hnscounters.PacketsReceived, PacketsReceived)
