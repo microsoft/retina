@@ -191,7 +191,7 @@ func InitializeAdvancedMetrics() {
 	)
 	AdvHNSStatsGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.AdvancedRegistry,
-		metrics.HNSStats,
+		"adv_"+metrics.HNSStats,
 		metrics.HNSStatsDescription,
 		utils.Direction,
 		"ip",
@@ -211,7 +211,7 @@ func InitializeAdvancedMetrics() {
 	// Bytes not available in HNS stats
 	AdvTCPConnectionStatsGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.AdvancedRegistry,
-		utils.TCPConnectionStatsName,
+		"adv_"+utils.TCPConnectionStatsName,
 		metrics.TCPConnectionStatsGaugeDescription,
 		utils.StatName,
 		"ip",
