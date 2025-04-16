@@ -39,13 +39,13 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 		return fmt.Errorf("failed to initialize telemetry client: %w", err)
 	}
 
-	ctx := ctrl.SetupSignalHandler() // Importing K8s signal handler - ok?
+	ctx := ctrl.SetupSignalHandler()
 
 	cache := cache.NewStandaloneCache(TTL)
 	enrich := enricher.NewStandaloneEnricher(ctx, cache, d.config)
 	enrich.Run()
 
-	// enable pod level needs to be false!
+	// pod level needs to be disabled
 	controllerMgr, err := cm.NewControllerManager(d.config, nil, tel)
 	if err != nil {
 		mainLogger.Fatal("Failed to create controller manager", zap.Error(err))
