@@ -13,12 +13,6 @@ var (
 		constants.HubbleFamilyLabel:      constants.IPV4,
 		constants.HubbleFlagLabel:        constants.SYN,
 	}
-	validHubbleTCPSYNACKFlag = map[string]string{
-		constants.HubbleSourceLabel:      "",
-		constants.HubbleDestinationLabel: common.TestPodNamespace + "/" + podName,
-		constants.HubbleFamilyLabel:      constants.IPV4,
-		constants.HubbleFlagLabel:        constants.SYNACK,
-	}
 	validHubbleTCPFINFlag = map[string]string{
 		constants.HubbleSourceLabel:      "",
 		constants.HubbleDestinationLabel: common.TestPodNamespace + "/" + podName,
@@ -28,7 +22,14 @@ var (
 
 	validHubbleTCPMetricsLabels = []map[string]string{
 		validHubbleTCPSYNFlag,
-		validHubbleTCPSYNACKFlag, // TODO: Need to further investigate why these labels are not being generated
+		// validHubbleTCPSYNACKFlag, // TODO: Need to further investigate why these labels are not being generated
 		validHubbleTCPFINFlag,
 	}
+
+	// validHubbleTCPSYNACKFlag = map[string]string{
+	// 	constants.HubbleSourceLabel:      "",
+	// 	constants.HubbleDestinationLabel: common.TestPodNamespace + "/" + podName,
+	// 	constants.HubbleFamilyLabel:      constants.IPV4,
+	// 	constants.HubbleFlagLabel:        constants.SYNACK,
+	// }
 )

@@ -264,7 +264,7 @@ jobs:
           IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
 
   manifests:
-    if: ${{ github.event_name == 'merge_group' && success('retina-images') && success('retina-win-images') && success('operator-images') && success('retina-shell-images')}}
+    if: ${{ success('retina-images') && success('retina-win-images') && success('operator-images') && success('retina-shell-images')}}
     name: Generate Manifests
     runs-on: ubuntu-latest
     needs:
@@ -303,7 +303,7 @@ jobs:
           IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
 
   e2e:
-    if: ${{ github.event_name == 'merge_group' && success('manifests')}}
+    if: ${{ success('manifests')}}
     name: Run E2E Tests
     runs-on: ubuntu-latest
     needs: [manifests]

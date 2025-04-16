@@ -20,38 +20,16 @@ func ValidateFlowMetric(namespace, arch string) *types.Scenario {
 	podName := agnhostName + "-0"
 	steps := []*types.StepWrapper{
 		{
-			Step: &kubernetes.CreateKapingerDeployment{
-				KapingerNamespace: namespace,
-				KapingerReplicas:  "1",
-			},
-		},
-		{
 			Step: &kubernetes.CreateAgnhostStatefulSet{
 				AgnhostName:      agnhostName,
 				AgnhostNamespace: namespace,
 				AgnhostArch:      arch,
 			},
 		},
-		{
-			Step: &kubernetes.ExecInPod{
-				PodName:      podName,
-				PodNamespace: namespace,
-				Command:      "curl -s -m 5 bing.com",
-			},
-			Opts: &types.StepOptions{
-				SkipSavingParametersToJob: true,
-			},
-		},
+		// Need this delay to guarantee that the pods will have bpf program attached
 		{
 			Step: &types.Sleep{
-				Duration: sleepDelay,
-			},
-		},
-		{
-			Step: &kubernetes.ExecInPod{
-				PodName:      podName,
-				PodNamespace: namespace,
-				Command:      "curl -s -m 5 bing.com",
+				Duration: 30 * time.Second,
 			},
 			Opts: &types.StepOptions{
 				SkipSavingParametersToJob: true,
@@ -69,6 +47,21 @@ func ValidateFlowMetric(namespace, arch string) *types.Scenario {
 			Opts: &types.StepOptions{
 				RunInBackgroundWithID:     id,
 				SkipSavingParametersToJob: true,
+			},
+		},
+		{
+			Step: &kubernetes.ExecInPod{
+				PodName:      podName,
+				PodNamespace: namespace,
+				Command:      "curl -s -m 5 bing.com",
+			},
+			Opts: &types.StepOptions{
+				SkipSavingParametersToJob: true,
+			},
+		},
+		{
+			Step: &types.Sleep{
+				Duration: sleepDelay,
 			},
 		},
 		{
@@ -92,15 +85,6 @@ func ValidateFlowMetric(namespace, arch string) *types.Scenario {
 				ResourceType:      kubernetes.TypeString(kubernetes.StatefulSet),
 				ResourceName:      agnhostName,
 				ResourceNamespace: namespace,
-			}, Opts: &types.StepOptions{
-				SkipSavingParametersToJob: true,
-			},
-		},
-		{
-			Step: &kubernetes.DeleteKubernetesResource{
-				ResourceType:      kubernetes.TypeString(kubernetes.Deployment),
-				ResourceNamespace: namespace,
-				ResourceName:      "kapinger",
 			}, Opts: &types.StepOptions{
 				SkipSavingParametersToJob: true,
 			},

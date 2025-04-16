@@ -41,44 +41,22 @@ func ValidateDropMetric(namespace, arch string) *types.Scenario {
 				SkipSavingParametersToJob: true,
 			},
 		},
-		{
-			Step: &kubernetes.ExecInPod{
-				PodNamespace: namespace,
-				PodName:      podName,
-				Command:      "curl -s -m 5 bing.com",
-			},
-			Opts: &types.StepOptions{
-				ExpectError:               true,
-				SkipSavingParametersToJob: true,
-			},
-		},
-		{
-			Step: &kubernetes.ExecInPod{
-				PodNamespace: namespace,
-				PodName:      podName,
-				Command:      "curl -s -m 5 bing.com",
-			},
-			Opts: &types.StepOptions{
-				ExpectError:               true,
-				SkipSavingParametersToJob: true,
-			},
-		},
-		{
-			Step: &types.Sleep{
-				Duration: sleepDelay,
-			},
-		},
-		{
-			Step: &kubernetes.ExecInPod{
-				PodNamespace: namespace,
-				PodName:      podName,
-				Command:      "curl -s -m 5 bing.com",
-			},
-			Opts: &types.StepOptions{
-				ExpectError:               true,
-				SkipSavingParametersToJob: true,
-			},
-		},
+		// {
+		// 	Step: &kubernetes.ExecInPod{
+		// 		PodNamespace: namespace,
+		// 		PodName:      podName,
+		// 		Command:      "curl -s -m 5 bing.com",
+		// 	},
+		// 	Opts: &types.StepOptions{
+		// 		ExpectError:               true,
+		// 		SkipSavingParametersToJob: true,
+		// 	},
+		// },
+		// {
+		// 	Step: &types.Sleep{
+		// 		Duration: sleepDelay,
+		// 	},
+		// },
 		{
 			Step: &kubernetes.PortForward{
 				LabelSelector:         "k8s-app=retina",
@@ -140,9 +118,6 @@ func ValidateDropMetric(namespace, arch string) *types.Scenario {
 				ResourceType:      kubernetes.TypeString(kubernetes.StatefulSet),
 				ResourceNamespace: namespace,
 				ResourceName:      agnhostName,
-			},
-			Opts: &types.StepOptions{
-				SkipSavingParametersToJob: true,
 			},
 		},
 	}
