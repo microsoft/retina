@@ -82,6 +82,15 @@ func ValidateDNSMetric(namespace, arch string) *types.Scenario {
 				BackgroundID: id,
 			},
 		},
+		{
+			Step: &kubernetes.DeleteKubernetesResource{
+				ResourceType:      kubernetes.TypeString(kubernetes.StatefulSet),
+				ResourceNamespace: namespace,
+				ResourceName:      agnhostName,
+			}, Opts: &types.StepOptions{
+				SkipSavingParametersToJob: true,
+			},
+		},
 	}
 	return types.NewScenario(name, steps...)
 }

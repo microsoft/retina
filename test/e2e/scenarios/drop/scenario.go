@@ -98,7 +98,6 @@ func ValidateDropMetric(namespace, arch string) *types.Scenario {
 				BackgroundID: id,
 			},
 		},
-
 		{
 			Step: &kubernetes.DeleteKubernetesResource{
 				ResourceType:      kubernetes.TypeString(kubernetes.NetworkPolicy),

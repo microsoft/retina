@@ -21,7 +21,7 @@ func ValidateTCPMetric(namespace, arch string) *types.Scenario {
 	steps := []*types.StepWrapper{
 		{
 			Step: &kubernetes.CreateKapingerDeployment{
-				KapingerNamespace: namespace,
+				KapingerNamespace: common.KubeSystemNamespace,
 				KapingerReplicas:  "1",
 			},
 		},
@@ -85,6 +85,24 @@ func ValidateTCPMetric(namespace, arch string) *types.Scenario {
 		{
 			Step: &types.Stop{
 				BackgroundID: id,
+			},
+		},
+		{
+			Step: &kubernetes.DeleteKubernetesResource{
+				ResourceType:      kubernetes.TypeString(kubernetes.StatefulSet),
+				ResourceName:      agnhostName,
+				ResourceNamespace: namespace,
+			}, Opts: &types.StepOptions{
+				SkipSavingParametersToJob: true,
+			},
+		},
+		{
+			Step: &kubernetes.DeleteKubernetesResource{
+				ResourceType:      kubernetes.TypeString(kubernetes.Deployment),
+				ResourceNamespace: namespace,
+				ResourceName:      "kapinger",
+			}, Opts: &types.StepOptions{
+				SkipSavingParametersToJob: true,
 			},
 		},
 	}

@@ -8,9 +8,7 @@ import (
 	prom "github.com/microsoft/retina/test/e2e/framework/prometheus"
 )
 
-var (
-	ErrMetricFound = errors.New("unexpected metric found")
-)
+var ErrMetricFound = errors.New("unexpected metric found")
 
 type ValidateMetric struct {
 	ForwardedPort string

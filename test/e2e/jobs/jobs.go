@@ -12,7 +12,6 @@ import (
 	hubble_flow "github.com/microsoft/retina/test/e2e/scenarios/hubble/flow"
 	hubble_service "github.com/microsoft/retina/test/e2e/scenarios/hubble/service"
 
-	//hubble_service "github.com/microsoft/retina/test/e2e/scenarios/hubble/service"
 	"github.com/microsoft/retina/test/e2e/scenarios/dns"
 	"github.com/microsoft/retina/test/e2e/scenarios/drop"
 

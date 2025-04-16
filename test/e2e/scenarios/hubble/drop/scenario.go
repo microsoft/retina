@@ -122,7 +122,6 @@ func ValidateDropMetric(namespace, arch string) *types.Scenario {
 		},
 		{
 			Step: &types.Stop{
-
 				BackgroundID: id,
 			},
 		},

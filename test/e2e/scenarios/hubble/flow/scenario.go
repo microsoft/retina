@@ -87,6 +87,24 @@ func ValidateFlowMetric(namespace, arch string) *types.Scenario {
 				BackgroundID: id,
 			},
 		},
+		{
+			Step: &kubernetes.DeleteKubernetesResource{
+				ResourceType:      kubernetes.TypeString(kubernetes.StatefulSet),
+				ResourceName:      agnhostName,
+				ResourceNamespace: namespace,
+			}, Opts: &types.StepOptions{
+				SkipSavingParametersToJob: true,
+			},
+		},
+		{
+			Step: &kubernetes.DeleteKubernetesResource{
+				ResourceType:      kubernetes.TypeString(kubernetes.Deployment),
+				ResourceNamespace: namespace,
+				ResourceName:      "kapinger",
+			}, Opts: &types.StepOptions{
+				SkipSavingParametersToJob: true,
+			},
+		},
 	}
 
 	return types.NewScenario(name, steps...)
