@@ -54,12 +54,12 @@ func TestE2ERetina(t *testing.T) {
 	)
 	advanceMetricsE2E.Run(ctx)
 
-	// Install and test Hubble basic metrics
-	validatehubble := types.NewRunner(t,
-		jobs.ValidateHubble(
+	// Install and test Hubble metrics
+	hubbleMetricsE2E := types.NewRunner(t,
+		jobs.InstallAndTestHubbleMetrics(
 			common.KubeConfigFilePath(rootDir),
 			hubblechartPath,
 			common.TestPodNamespace),
 	)
-	validatehubble.Run(ctx)
+	hubbleMetricsE2E.Run(ctx)
 }
