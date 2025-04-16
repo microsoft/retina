@@ -19,15 +19,11 @@ The command syntax is `kubectl retina capture create [--flags]`.
 
 Refer to the [Capture Command](../04-Captures/02-cli.md) documentation for more details.
 
-#### Example
-
 This example captures network traffic for all Linux Nodes, storing the output in the folder */mnt/capture* on each Node.
 
 ```shell
 kubectl retina capture create --name capture-test --host-path /mnt/capture --node-selectors "kubernetes.io/os=linux"
 ```
-
-#### Architecture
 
 For each Capture, a Kubernetes Job is created for each relevant Node (the Node could be selected and/or could be hosting a selected Pod).
 The Job's worker Pod runs for the specified duration, captures and wraps the network information into a tarball, and copies the tarball to the specified output location(s).
@@ -46,8 +42,6 @@ Refer to the [Capture CRD](../05-Concepts/CRDs/Capture.md) documentation for mor
 #### Managed Storage Account
 
 To simplify the user experience, a managed storage account can be configured when setting up Retina. Instructions for this are provided [here](../04-Captures/03-managed-storage-account.md#setup).
-
-#### Example
 
 This example creates a Capture and stores the Capture artifacts into a storage account specified by Blob SAS URL.
 
@@ -78,8 +72,6 @@ spec:
 ```
 
 More Retina Capture samples can be found [here](https://github.com/microsoft/retina/tree/main/samples/capture).
-
-#### Architecture
 
 Similarly to Option 1, a Kubernetes Job is created for each relevant Node.
 

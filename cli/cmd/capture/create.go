@@ -159,19 +159,23 @@ var createCapture = &cobra.Command{
 				retinacmd.Logger.Info("Please manually delete capture jobs failed to delete", zap.String("namespace", *opts.Namespace), zap.String("job list", strings.Join(jobsFailedToDelete, ",")))
 			}
 
-			err = deleteSecret(ctx, kubeClient, capture.Spec.OutputConfiguration.BlobUpload)
-			if err != nil {
-				retinacmd.Logger.Error("Failed to delete capture secret, please manually delete it",
-					zap.String("namespace", *opts.Namespace), zap.String("secret name", *capture.Spec.OutputConfiguration.BlobUpload), zap.Error(err))
+			if capture.Spec.OutputConfiguration.BlobUpload != nil {
+				err = deleteSecret(ctx, kubeClient, capture.Spec.OutputConfiguration.BlobUpload)
+				if err != nil {
+					retinacmd.Logger.Error("Failed to delete capture secret, please manually delete it",
+						zap.String("namespace", *opts.Namespace), zap.String("secret name", *capture.Spec.OutputConfiguration.BlobUpload), zap.Error(err))
+				}
 			}
 
-			err = deleteSecret(ctx, kubeClient, &capture.Spec.OutputConfiguration.S3Upload.SecretName)
-			if err != nil {
-				retinacmd.Logger.Error("Failed to delete capture secret, please manually delete it",
-					zap.String("namespace", *opts.Namespace),
-					zap.String("secret name", capture.Spec.OutputConfiguration.S3Upload.SecretName),
-					zap.Error(err),
-				)
+			if capture.Spec.OutputConfiguration.S3Upload != nil && capture.Spec.OutputConfiguration.S3Upload.SecretName != "" {
+				err = deleteSecret(ctx, kubeClient, &capture.Spec.OutputConfiguration.S3Upload.SecretName)
+				if err != nil {
+					retinacmd.Logger.Error("Failed to delete capture secret, please manually delete it",
+						zap.String("namespace", *opts.Namespace),
+						zap.String("secret name", capture.Spec.OutputConfiguration.S3Upload.SecretName),
+						zap.Error(err),
+					)
+				}
 			}
 
 			if len(jobsFailedToDelete) == 0 && err == nil {

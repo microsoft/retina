@@ -18,12 +18,14 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	cmtypes "github.com/cilium/cilium/pkg/clustermesh/types"
 	datapath "github.com/cilium/cilium/pkg/datapath/types"
 	"github.com/cilium/cilium/pkg/identity"
 	ipc "github.com/cilium/cilium/pkg/ipcache"
 	"github.com/cilium/cilium/pkg/node/addressing"
 	"github.com/cilium/cilium/pkg/node/types"
 	"github.com/cilium/cilium/pkg/source"
+	"github.com/cilium/cilium/pkg/time"
 )
 
 // NodeReconciler reconciles a Node object.
@@ -210,3 +212,35 @@ func (r *NodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	return nil
 }
+
+// The following methods are stubs for the NodeManager interface.
+// It is done because the hubble requires NodeManager interface as a dependency.
+// However, we don't need to implement all the methods.
+// TODO: make Notifier interface as dependency for the hubble instead of NodeManager on upstream.
+func (r *NodeReconciler) ClusterSizeDependantInterval(time.Duration) time.Duration {
+	return time.Second * 5
+}
+
+func (r *NodeReconciler) Enqueue(*types.Node) {}
+
+func (r *NodeReconciler) GetNodeIdentities() []types.Identity {
+	return []types.Identity{}
+}
+
+func (r *NodeReconciler) GetNodes() map[types.Identity]types.Node {
+	return map[types.Identity]types.Node{}
+}
+
+func (r *NodeReconciler) MeshNodeSync() {}
+
+func (r *NodeReconciler) NodeDeleted(types.Node) {}
+
+func (r *NodeReconciler) NodeSync() {}
+
+func (r *NodeReconciler) NodeUpdated(types.Node) {}
+
+func (r *NodeReconciler) StartNeighborRefresh(datapath.NodeNeighbors) {}
+
+func (r *NodeReconciler) StartNodeNeighborLinkUpdater(datapath.NodeNeighbors) {}
+
+func (r *NodeReconciler) SetPrefixClusterMutatorFn(func(*types.Node) []cmtypes.PrefixClusterOpts) {}

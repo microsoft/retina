@@ -4,3 +4,4 @@ terraform.tfstate
 *terraform.tfstate.*
 service-key.json
 *-kind-config
+retina-capture/*

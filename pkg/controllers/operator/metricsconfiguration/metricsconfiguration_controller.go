@@ -38,12 +38,6 @@ type MetricsConfigurationReconciler struct {
 	l       *log.ZapLogger
 }
 
-func init() {
-	log.SetupZapLogger(&log.LogOpts{
-		File: false,
-	})
-}
-
 func New(client client.Client, scheme *runtime.Scheme) *MetricsConfigurationReconciler {
 	return &MetricsConfigurationReconciler{
 		Mutex:   &sync.Mutex{},

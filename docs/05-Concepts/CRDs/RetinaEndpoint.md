@@ -1,4 +1,4 @@
-# RetinaEndpoint CRD
+# RetinaEndpoint
 
 ## Overview
 

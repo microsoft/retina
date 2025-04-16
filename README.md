@@ -1,7 +1,7 @@
 <h1 align="center">
   <picture>
-    <source media="(prefers-color-scheme: light)" srcset="site/static/img/Retina-logo-horizontal-white.png">
-    <img src="site/static/img/Retina-logo-horizontal-white.png" alt="Retina Logo" width="30%">
+    <source media="(prefers-color-scheme: light)" srcset="site/static/img/Retina-logo-horizontal.png">
+    <img src="site/static/img/Retina-logo-horizontal.png" alt="Retina Logo" width="30%">
   </picture>
 </h1>
 
@@ -37,7 +37,7 @@ See [retina.sh](http://retina.sh) for documentation and examples.
 
 Retina has two major features:
 
-- [Metrics](https://retina.sh/docs/Metrics/modes)
+- [Metrics](https://retina.sh/docs/Metrics/metrics-intro)
 - [Captures](https://retina.sh/docs/Captures/overview)
 
 ### Metrics Quick Install Guide
@@ -74,14 +74,31 @@ Other installation options are documented in [CLI Installation](https://retina.s
 Verify installation:
 
 ```bash
-$ kubectl retina version
-v0.0.4 # or latest version
+$ kubectl retina
+Retina is an eBPF distributed networking observability tool for Kubernetes.
+
+Usage:
+  kubectl-retina [command]
+
+Available Commands:
+  capture     Capture network traffic
+  completion  Generate the autocompletion script for the specified shell
+  config      Configure retina CLI
+  help        Help about any command
+  shell       [EXPERIMENTAL] Interactively debug a node or pod
+  trace       Retrieve status or results from Retina
+  version     Show version
+
+Flags:
+  -h, --help   help for kubectl-retina
+
+Use "kubectl-retina [command] --help" for more information about a command.
 ```
 
 To quickly start creating a capture:
 
 ```bash
-kubectl retina capture create --name <my-capture> --namespace <my-namespace> --selector <app=my-app>
+kubectl retina capture create --pod-selectors <app=my-app>
 ```
 
 For further CLI documentation, see [Capture with Retina CLI](https://retina.sh/docs/Captures/cli).
@@ -130,8 +147,9 @@ Retina images published to GHCR are cryptographically signed. You can verify the
 ```shell
 REPO=microsoft/retina # or your repo
 IMAGE=retina-operator # or other image to verify
-TAG=v0.0.6 # or other tag to verify OR replace with the image SHA256
-cosign verify ghcr.io/$REPO/$IMAGE:$TAG --certificate-oidc-issuer https://token.actions.githubusercontent.com --certificate-identity-regexp="https://github.com/$REPO" -o text
+# This can be replaced with another tag to verify, or with the image SHA256
+LATEST_TAG=$(curl -s https://api.github.com/repos/microsoft/retina/releases | jq -r '.[0].name')
+cosign verify ghcr.io/$REPO/$IMAGE:$LATEST_TAG --certificate-oidc-issuer https://token.actions.githubusercontent.com --certificate-identity-regexp="https://github.com/$REPO" -o text
 ```
 
 ### Office Hours and Community Meetings

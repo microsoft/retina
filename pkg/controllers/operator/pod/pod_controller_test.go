@@ -35,6 +35,7 @@ import (
 
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/operator/cache"
+	"github.com/microsoft/retina/pkg/log"
 )
 
 var fakescheme = runtime.NewScheme()
@@ -48,6 +49,9 @@ func init() {
 }
 
 func TestPodReconciler_Reconcile(t *testing.T) {
+	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
+		t.Errorf("Error setting up logger: %s", err)
+	}
 	type fields struct {
 		existingObjects []client.Object
 	}

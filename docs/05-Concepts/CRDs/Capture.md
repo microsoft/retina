@@ -1,4 +1,4 @@
-# Capture CRD
+# Capture
 
 ## Overview
 

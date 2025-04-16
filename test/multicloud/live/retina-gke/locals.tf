@@ -6,7 +6,7 @@ locals {
 
   retina_release_name      = "retina"
   retina_repository_url    = "oci://ghcr.io/microsoft/retina/charts"
-  retina_chart_version     = "v0.0.24"
+  retina_chart_version     = "v0.0.29"
   retina_release_namespace = "kube-system"
   retina_chart_name        = "retina-hubble"
   retina_values            = yamldecode(file("../files/retina-hubble.yaml"))
@@ -17,19 +17,8 @@ locals {
   prometheus_chart_name        = "kube-prometheus-stack"
   prometheus_release_namespace = "kube-system"
   prometheus_values            = yamldecode(file("../../../../deploy/hubble/prometheus/values.yaml"))
+  cluster_name                 = "GoogleKubernetesEngine"
 
-  gke_firewall_rules = {
-    inbound = {
-      protocol           = "tcp"
-      ports              = ["9090"]
-      source_ranges      = [module.prometheus_lb_gke.ip]
-      destination_ranges = ["0.0.0.0/0"]
-    }
-    outbound = {
-      protocol           = "tcp"
-      ports              = ["9090"]
-      source_ranges      = ["0.0.0.0/0"]
-      destination_ranges = [module.prometheus_lb_gke.ip]
-    }
-  }
+  # All dashboards are deployed as part of live/retina-aks
+  grafana_dashboards = {}
 }

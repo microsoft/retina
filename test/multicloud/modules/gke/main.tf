@@ -49,4 +49,10 @@ resource "google_container_node_pool" "gke_preemptible_nodes" {
       "https://www.googleapis.com/auth/cloud-platform"
     ]
   }
+
+  lifecycle {
+    ignore_changes = [
+      node_config.0.resource_labels
+    ]
+  }
 }
