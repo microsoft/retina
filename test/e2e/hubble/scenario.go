@@ -3,6 +3,7 @@ package hubble
 import (
 	"net/http"
 
+	"github.com/microsoft/retina/test/e2e/framework/hubble"
 	k8s "github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/types"
 )
@@ -48,6 +49,19 @@ func ValidateHubbleUIService(kubeConfigFilePath string) *types.Scenario {
 			Step: &k8s.ValidateHTTPResponse{
 				URL:            "http://localhost:8080",
 				ExpectedStatus: http.StatusOK,
+			},
+		},
+	}
+
+	return types.NewScenario(name, steps...)
+}
+
+func ValidateHubbleFlowLogs(kubeConfigFilePath string) *types.Scenario {
+	name := "Validate Hubble Flow Logs"
+	steps := []*types.StepWrapper{
+		{
+			Step: &hubble.ValidateHubbleFlowLogs{
+				KubeConfigFilePath: kubeConfigFilePath,
 			},
 		},
 	}

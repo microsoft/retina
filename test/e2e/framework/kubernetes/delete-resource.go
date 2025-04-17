@@ -345,7 +345,28 @@ func DeleteResource(ctx context.Context, obj runtime.Object, clientset *kubernet
 			}
 			return fmt.Errorf("failed to delete Secret \"%s\" in namespace \"%s\": %w", o.Name, o.Namespace, err)
 		}
-
+	case *v1.Pod:
+		log.Printf("Deleting Pod \"%s\" in namespace \"%s\"...\n", o.Name, o.Namespace)
+		client := clientset.CoreV1().Pods(o.Namespace)
+		err := client.Delete(ctx, o.Name, metaV1.DeleteOptions{})
+		if err != nil {
+			if errors.IsNotFound(err) {
+				log.Printf("Pod \"%s\" in namespace \"%s\" does not exist\n", o.Name, o.Namespace)
+				return nil
+			}
+			return fmt.Errorf("failed to delete Pod \"%s\" in namespace \"%s\": %w", o.Name, o.Namespace, err)
+		}
+	case *v1.Namespace:
+		log.Printf("Deleting Namespace \"%s\"...\n", o.Name)
+		client := clientset.CoreV1().Namespaces()
+		err := client.Delete(ctx, o.Name, metaV1.DeleteOptions{})
+		if err != nil {
+			if errors.IsNotFound(err) {
+				log.Printf("Namespace \"%s\" does not exist\n", o.Name)
+				return nil
+			}
+			return fmt.Errorf("failed to delete Namespace \"%s\": %w", o.Name, err)
+		}
 	default:
 		return fmt.Errorf("unknown object type: %T, err: %w", obj, ErrUnknownResourceType)
 	}

@@ -218,6 +218,38 @@ func CreateResource(ctx context.Context, obj runtime.Object, clientset *kubernet
 			return fmt.Errorf("failed to create/update Secret \"%s\" in namespace \"%s\": %w", o.Name, o.Namespace, err)
 		}
 
+	case *v1.Namespace:
+		log.Printf("Creating/Updating Namespace \"%s\"...\n", o.Name)
+		client := clientset.CoreV1().Namespaces()
+		_, err := client.Get(ctx, o.Name, metaV1.GetOptions{})
+		if errors.IsNotFound(err) {
+			_, err = client.Create(ctx, o, metaV1.CreateOptions{})
+			if err != nil {
+				return fmt.Errorf("failed to create Namespace \"%s\": %w", o.Name, err)
+			}
+			return nil
+		}
+		_, err = client.Update(ctx, o, metaV1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to create/update Namespace \"%s\": %w", o.Name, err)
+		}
+
+	case *v1.Pod:
+		log.Printf("Creating/Updating Pod \"%s\" in namespace \"%s\"...\n", o.Name, o.Namespace)
+		client := clientset.CoreV1().Pods(o.Namespace)
+		_, err := client.Get(ctx, o.Name, metaV1.GetOptions{})
+		if errors.IsNotFound(err) {
+			_, err = client.Create(ctx, o, metaV1.CreateOptions{})
+			if err != nil {
+				return fmt.Errorf("failed to create Pod \"%s\" in namespace \"%s\": %w", o.Name, o.Namespace, err)
+			}
+			return nil
+		}
+		_, err = client.Update(ctx, o, metaV1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to create/update Pod \"%s\" in namespace \"%s\": %w", o.Name, o.Namespace, err)
+		}
+
 	default:
 		return fmt.Errorf("unknown object type: %T, err: %w", obj, ErrUnknownResourceType)
 	}

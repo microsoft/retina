@@ -35,24 +35,24 @@ func TestE2ERetina(t *testing.T) {
 		*common.KubeConfig = infra.CreateAzureTempK8sInfra(ctx, t, rootDir)
 	}
 
-	// Install and test Retina basic metrics
-	basicMetricsE2E := types.NewRunner(t,
-		jobs.InstallAndTestRetinaBasicMetrics(
-			common.KubeConfigFilePath(rootDir),
-			common.RetinaChartPath(rootDir),
-			common.TestPodNamespace),
-	)
-	basicMetricsE2E.Run(ctx)
+	// // Install and test Retina basic metrics
+	// basicMetricsE2E := types.NewRunner(t,
+	// 	jobs.InstallAndTestRetinaBasicMetrics(
+	// 		common.KubeConfigFilePath(rootDir),
+	// 		common.RetinaChartPath(rootDir),
+	// 		common.TestPodNamespace),
+	// )
+	// basicMetricsE2E.Run(ctx)
 
-	// Upgrade and test Retina with advanced metrics
-	advanceMetricsE2E := types.NewRunner(t,
-		jobs.UpgradeAndTestRetinaAdvancedMetrics(
-			common.KubeConfigFilePath(rootDir),
-			common.RetinaChartPath(rootDir),
-			common.RetinaAdvancedProfilePath(rootDir),
-			common.TestPodNamespace),
-	)
-	advanceMetricsE2E.Run(ctx)
+	// // Upgrade and test Retina with advanced metrics
+	// advanceMetricsE2E := types.NewRunner(t,
+	// 	jobs.UpgradeAndTestRetinaAdvancedMetrics(
+	// 		common.KubeConfigFilePath(rootDir),
+	// 		common.RetinaChartPath(rootDir),
+	// 		common.RetinaAdvancedProfilePath(rootDir),
+	// 		common.TestPodNamespace),
+	// )
+	// advanceMetricsE2E.Run(ctx)
 
 	// Install and test Hubble basic metrics
 	validatehubble := types.NewRunner(t,

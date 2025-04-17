@@ -258,6 +258,8 @@ func ValidateHubble(kubeConfigFilePath, chartPath string, testPodNamespace strin
 
 	job.AddScenario(hubble.ValidateHubbleUIService(kubeConfigFilePath))
 
+	job.AddScenario(hubble.ValidateHubbleFlowLogs(kubeConfigFilePath))
+
 	job.AddStep(&kubernetes.EnsureStableComponent{
 		PodNamespace:           common.KubeSystemNamespace,
 		LabelSelector:          "k8s-app=retina",
