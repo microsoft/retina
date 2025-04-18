@@ -173,16 +173,24 @@ func (dr *dropReason) Init() error {
 		return err
 	}
 
-	dr.KTCPAccept, err = link.Kretprobe(intCskAcceptFn, objs.InetCskAccept, nil)
+	dr.KTCPAccept, err = link.Kprobe(intCskAcceptFn, objs.InetCskAccept, nil)
 	if err != nil {
-		dr.l.Error("opening kretprobe: %w", zap.Error(err))
-		return err
+		if errors.Is(err, os.ErrNotExist) {
+			dr.l.Warn("inet_csk_accept not found, skipping attaching kprobe to it. This may impact the drop reason metrics.")
+		} else {
+			dr.l.Error("opening kretprobe: %w", zap.Error(err))
+			return err
+		}
 	}
 
 	dr.KRetTCPAccept, err = link.Kretprobe(intCskAcceptFn, objs.InetCskAcceptRet, nil)
 	if err != nil {
-		dr.l.Error("opening kretprobe: %w", zap.Error(err))
-		return err
+		if errors.Is(err, os.ErrNotExist) {
+			dr.l.Warn("inet_csk_accept not found, skipping attaching kretprobe to it. This may impact the drop reason metrics.")
+		} else {
+			dr.l.Error("opening kretprobe: %w", zap.Error(err))
+			return err
+		}
 	}
 
 	dr.KNfNatInet, err = link.Kretprobe(nfNatInetFn, objs.NfNatInetFn, nil)
