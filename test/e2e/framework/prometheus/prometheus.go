@@ -58,6 +58,31 @@ func CheckMetric(promAddress, metricName string, validMetric map[string]string) 
 	return nil
 }
 
+func GetMetricGuageValueFromBuffer(prometheusMetricData []byte, metricName string, expectedLabels map[string]string) (float64, error) {
+	metrics, err := getAllPrometheusMetricsFromBuffer(prometheusMetricData)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse prometheus metrics: %w", err)
+	}
+
+	for _, metric := range metrics {
+		if metric.GetName() == metricName {
+			for _, metric := range metric.GetMetric() {
+				// get all labels and values on the metric
+				metricLabels := map[string]string{}
+				for _, label := range metric.GetLabel() {
+					metricLabels[label.GetName()] = label.GetValue()
+				}
+				if reflect.DeepEqual(metricLabels, expectedLabels) {
+					return *metric.GetGauge().Value, nil
+				}
+
+			}
+		}
+	}
+
+	return 0, fmt.Errorf("metric not found %s", metricName)
+}
+
 func CheckMetricFromBuffer(prometheusMetricData []byte, metricName string, validMetric map[string]string) error {
 	metrics, err := getAllPrometheusMetricsFromBuffer(prometheusMetricData)
 	if err != nil {
@@ -132,12 +157,10 @@ func ParseReaderPrometheusMetrics(input io.Reader) (map[string]*promclient.Metri
 
 // When capturing promethus output via curl and exect, there's a lot
 // of garbage at the front
-func stripExecGarbage(s string) string {
+func StripExecGarbage(s string) string {
 	index := strings.Index(s, "#")
 	if index == -1 {
-		// If there's no `#`, return the original string
 		return s
 	}
-	// Slice the string up to the character before the first `#`
-	return s[:index]
+	return s[index:]
 }
