@@ -4,12 +4,16 @@
 package capture
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -19,6 +23,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -174,10 +179,13 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 
 	retinacmd.Logger.Info(fmt.Sprintf("File written to: %s", outputFile))
 
-	// err = kubeClient.CoreV1().Pods(namespace).Delete(ctx, downloadPod.Name, metav1.DeleteOptions{})
-	// if err != nil {
-	// 	retinacmd.Logger.Warn("Failed to clean up debug pod", zap.String("name", downloadPod.Name), zap.Error(err))
-	// }
+	err = kubeClient.CoreV1().Pods(namespace).Delete(ctx, downloadPod.Name, metav1.DeleteOptions{})
+	if err != nil {
+		retinacmd.Logger.Warn("Failed to clean up debug pod", zap.String("name", downloadPod.Name), zap.Error(err))
+	}
+
+	outputDir := strings.TrimSuffix(outputFile, ".tar.gz") + "/"
+	UntarGz(outputFile, outputDir)
 
 	return nil
 }
@@ -240,6 +248,60 @@ func createDownloadPod(ctx context.Context, kubeClient *kubernetes.Clientset, na
 			return nil, fmt.Errorf("debug pod ended before becoming ready")
 		}
 	}
+}
+
+func UntarGz(srcFile string, destDir string) error {
+	// Open the tar.gz file
+	f, err := os.Open(srcFile)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	// Set up gzip reader
+	gzr, err := gzip.NewReader(f)
+	if err != nil {
+		return err
+	}
+	defer gzr.Close()
+
+	// Set up tar reader
+	tr := tar.NewReader(gzr)
+
+	// Extract files
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break // end of archive
+		}
+		if err != nil {
+			return err
+		}
+
+		target := filepath.Join(destDir, hdr.Name)
+
+		switch hdr.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(target, 0755); err != nil {
+				return err
+			}
+		case tar.TypeReg:
+			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+				return err
+			}
+			outFile, err := os.Create(target)
+			if err != nil {
+				return err
+			}
+			if _, err := io.Copy(outFile, tr); err != nil {
+				outFile.Close()
+				return err
+			}
+			outFile.Close()
+		}
+	}
+
+	return nil
 }
 
 // func downloadFromBlob() error {
