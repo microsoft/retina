@@ -35,6 +35,8 @@ output
 #vscode 
 .vscode/
 
+artifacts/
+
 dist/
 bin/
 

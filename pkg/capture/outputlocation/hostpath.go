@@ -40,7 +40,7 @@ func (hp *HostPath) Enabled() bool {
 
 func (hp *HostPath) Output(_ context.Context, srcFilePath string) error {
 	hostPath := os.Getenv(string(captureConstants.CaptureOutputLocationEnvKeyHostPath))
-	hp.l.Info("Copy file",
+	hp.l.Info("Copying da file",
 		zap.String("location", hp.Name()),
 		zap.String("source file path", srcFilePath),
 		zap.String("destination file path", hostPath),

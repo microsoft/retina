@@ -9,6 +9,7 @@ type (
 
 // Environment variables
 const (
+	CaptureOutputLocationEnvKeyDownload              CaptureOutputLocationEnvKey = "DOWNLOAD"
 	CaptureOutputLocationEnvKeyHostPath              CaptureOutputLocationEnvKey = "HOSTPATH"
 	CaptureOutputLocationEnvKeyPersistentVolumeClaim CaptureOutputLocationEnvKey = "PERSISTENT_VOLUME_CLAIM"
 	CaptureOutputLocationEnvKeyS3Endpoint            CaptureOutputLocationEnvKey = "S3_ENDPOINT"
@@ -19,6 +20,10 @@ const (
 	CaptureNameEnvKey           string = "CAPTURE_NAME"
 	NodeHostNameEnvKey          string = "NODE_HOST_NAME"
 	CaptureStartTimestampEnvKey string = "CAPTURE_START_TIMESTAMP"
+
+	NamespaceEnvKey     string = "NAMESPACE"
+	PodNameEnvKey       string = "POD_NAME"
+	ContainerNameEnvKey string = "CONTAINER_NAME"
 
 	CaptureFilterEnvKey   string = "CAPTURE_FILTER"
 	CaptureDurationEnvKey string = "CAPTURE_DURATION"

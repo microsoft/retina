@@ -198,6 +198,10 @@ func (cm *CaptureManager) enabledOutputLocations() []captureOutput.Location {
 	if s3 := captureOutput.NewS3Upload(cm.l); s3.Enabled() {
 		locations = append(locations, s3)
 	}
+	if download := captureOutput.NewDownload(cm.l); download.Enabled() {
+		locations = append(locations, download)
+	}
+
 	return locations
 }
 
