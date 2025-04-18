@@ -6,9 +6,13 @@ package common
 
 import (
 	"errors"
+	"fmt"
 	"os"
+	"strings"
 	"syscall"
 
+	"github.com/blang/semver/v4"
+	"github.com/cilium/cilium/pkg/versioncheck"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/perf"
 	"github.com/google/gopacket/layers"
@@ -88,4 +92,21 @@ func NewPerfReader(l *log.ZapLogger, m *ebpf.Map, max, min int) (*perf.Reader, e
 		}
 	}
 	return nil, errors.New("failed to create perf reader")
+}
+
+// Function to only extract the X.Y version components, used as fallback for version.GetKernelVersion()
+// Needed for images which don't follow standard Linux version format, e.g.: 5.15.153.1-microsoft-standard-WSL2
+func GetKernelVersionMajMin() (semver.Version, error) {
+	var unameBuf unix.Utsname
+	if err := unix.Uname(&unameBuf); err != nil {
+		return semver.Version{}, err //nolint:wrapcheck // no additional context needed
+	}
+
+	ver := string(unameBuf.Release[:])
+	verStrs := strings.Split(ver, ".")
+
+	if len(verStrs) < 2 {
+		return semver.Version{}, fmt.Errorf("kernel version string is malformatted: %q", ver) //nolint:err113 // ignore
+	}
+	return versioncheck.Version(strings.Join(verStrs[:2], ".")) //nolint:wrapcheck // no additional context needed
 }
