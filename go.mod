@@ -19,7 +19,7 @@ retract (
 )
 
 require (
-	cel.dev/expr v0.19.1 // indirect
+	cel.dev/expr v0.20.0 // indirect
 	code.cloudfoundry.org/clock v1.0.0 // indirect
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6 // indirect
 	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20230306123547-8075edf89bb0 // indirect
@@ -306,7 +306,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.35.0
 	go.uber.org/mock v0.5.1
 	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394
-	google.golang.org/grpc v1.71.1
+	google.golang.org/grpc v1.72.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gotest.tools v2.2.0+incompatible
 	gotest.tools/v3 v3.5.2
@@ -364,7 +364,7 @@ require (
 	github.com/Crocmagnon/fatcontext v0.7.1 // indirect
 	github.com/Djarvur/go-err113 v0.0.0-20210108212216-aea10b59be24 // indirect
 	github.com/GaijinEntertainment/go-exhaustruct/v3 v3.3.1 // indirect
-	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.25.0 // indirect
+	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.26.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.48.1 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.48.1 // indirect
 	github.com/OpenPeeDeeP/depguard/v2 v2.2.1 // indirect
