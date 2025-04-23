@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -17,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/storage"
 	retinacmd "github.com/microsoft/retina/cli/cmd"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
 	"github.com/microsoft/retina/pkg/capture/file"
@@ -33,13 +35,13 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 )
 
-const BlobURL = "BLOB_URL"
 const DownloadPath = "/tmp/retina/capture/"
 const FileExtension = ".tar.gz"
 const MountPath = "/mnt/retina/"
 
-var ErrEmptyBlobURL = errors.Errorf("%s environment variable is empty. It must be set/exported", BlobURL)
+var ErrEmptyBlobURL = errors.Errorf("You must pass a non-empty BlobUrl.")
 var jobName string
+var blobUrl string
 
 var downloadCapture = &cobra.Command{
 	Use:   "download",
@@ -304,63 +306,61 @@ func UntarGz(srcFile string, destDir string) error {
 	return nil
 }
 
-// func downloadFromBlob() error {
-// // BLOB_URL
-// blobURL := viper.GetString(BlobURL)
-// if blobURL == "" {
-// 	return ErrEmptyBlobURL
-// }
+func downloadFromBlob() error {
+	if blobUrl == "" {
+		return ErrEmptyBlobURL
+	}
 
-// u, err := url.Parse(blobURL)
-// if err != nil {
-// 	return errors.Wrapf(err, "failed to parse SAS URL %s", blobURL)
-// }
+	u, err := url.Parse(blobUrl)
+	if err != nil {
+		return errors.Wrapf(err, "failed to parse SAS URL %s", blobUrl)
+	}
 
-// // blobService, err := storage.NewAccountSASClientFromEndpointToken(u.String(), u.Query().Encode()).GetBlobService()
-// b, err := storage.NewAccountSASClientFromEndpointToken(u.String(), u.Query().Encode())
-// if err != nil {
-// 	return errors.Wrap(err, "failed to create storage account client")
-// }
+	b, err := storage.NewAccountSASClientFromEndpointToken(u.String(), u.Query().Encode())
+	if err != nil {
+		return errors.Wrap(err, "failed to create storage account client")
+	}
 
-// blobService := b.GetBlobService()
-// containerPath := strings.TrimLeft(u.Path, "/")
-// splitPath := strings.SplitN(containerPath, "/", 2) //nolint:gomnd // TODO string splitting probably isn't the right way to parse this URL?
-// containerName := splitPath[0]
+	blobService := b.GetBlobService()
+	containerPath := strings.TrimLeft(u.Path, "/")
+	splitPath := strings.SplitN(containerPath, "/", 2) //nolint:gomnd // TODO string splitting probably isn't the right way to parse this URL?
+	containerName := splitPath[0]
 
-// params := storage.ListBlobsParameters{Prefix: *opts.Name}
-// blobList, err := blobService.GetContainerReference(containerName).ListBlobs(params)
-// if err != nil {
-// 	return errors.Wrap(err, "failed to list blobstore ")
-// }
+	params := storage.ListBlobsParameters{Prefix: *opts.Name}
+	blobList, err := blobService.GetContainerReference(containerName).ListBlobs(params)
+	if err != nil {
+		return errors.Wrap(err, "failed to list blobstore ")
+	}
 
-// if len(blobList.Blobs) == 0 {
-// 	return errors.Errorf("no blobs found with prefix: %s", *opts.Name)
-// }
+	if len(blobList.Blobs) == 0 {
+		return errors.Errorf("no blobs found with prefix: %s", *opts.Name)
+	}
 
-// for _, v := range blobList.Blobs {
-// 	blob := blobService.GetContainerReference(containerName).GetBlobReference(v.Name)
-// 	readCloser, err := blob.Get(&storage.GetBlobOptions{})
-// 	if err != nil {
-// 		return errors.Wrap(err, "failed to read from blobstore")
-// 	}
+	for _, v := range blobList.Blobs {
+		blob := blobService.GetContainerReference(containerName).GetBlobReference(v.Name)
+		readCloser, err := blob.Get(&storage.GetBlobOptions{})
+		if err != nil {
+			return errors.Wrap(err, "failed to read from blobstore")
+		}
 
-// 	defer readCloser.Close()
+		defer readCloser.Close()
 
-// 	blobData, err := io.ReadAll(readCloser)
-// 	if err != nil {
-// 		return errors.Wrap(err, "failed to obtain blob from blobstore")
-// 	}
+		blobData, err := io.ReadAll(readCloser)
+		if err != nil {
+			return errors.Wrap(err, "failed to obtain blob from blobstore")
+		}
 
-// 	err = os.WriteFile(v.Name, blobData, 0o644) //nolint:gosec,gomnd // intentionally permissive bitmask
-// 	if err != nil {
-// 		return errors.Wrap(err, "failed to write file")
-// 	}
-// 	fmt.Println("Downloaded blob: ", v.Name)
-// }
-// return nil
-// }
+		err = os.WriteFile(v.Name, blobData, 0o644) //nolint:gosec,gomnd // intentionally permissive bitmask
+		if err != nil {
+			return errors.Wrap(err, "failed to write file")
+		}
+		fmt.Println("Downloaded blob: ", v.Name)
+	}
+	return nil
+}
 
 func init() {
 	capture.AddCommand(downloadCapture)
 	downloadCapture.Flags().StringVar(&jobName, "job", "", "Name of the capture job")
+	downloadCapture.Flags().StringVar(&blobUrl, "blobURl", "", "Blob URL")
 }
