@@ -35,11 +35,10 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 )
 
+const CaptureFileExtension = ".tar.gz"
 const DownloadPath = "/tmp/retina/capture/"
-const FileExtension = ".tar.gz"
 const MountPath = "/mnt/retina/"
 
-var ErrEmptyBlobURL = errors.Errorf("You must pass a non-empty BlobUrl.")
 var jobName string
 var blobUrl string
 
@@ -63,9 +62,20 @@ var downloadCapture = &cobra.Command{
 			captureNamespace = ""
 		}
 
+		if captureNamespace == "" {
+			captureNamespace = "default"
+		}
 		retinacmd.Logger.Info(fmt.Sprintf("Capture Namespace: %s", captureNamespace))
 
-		return downloadFromCluster(ctx, kubeConfig, "default")
+		if jobName != "" {
+			downloadFromCluster(ctx, kubeConfig, captureNamespace)
+		}
+
+		if blobUrl != "" {
+			downloadFromBlob()
+		}
+
+		return err
 	},
 }
 
@@ -125,7 +135,7 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 		NodeHostname:   nodeHostName,
 		StartTimestamp: timestamp,
 	}
-	fileName := captureFile.String() + FileExtension
+	fileName := captureFile.String() + CaptureFileExtension
 
 	srcFilePath := MountPath + fileName
 	retinacmd.Logger.Info(fmt.Sprintf("File src path:  %s", srcFilePath))
@@ -187,7 +197,7 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 	}
 
 	outputDir := strings.TrimSuffix(outputFile, ".tar.gz") + "/"
-	UntarGz(outputFile, outputDir)
+	untarGz(outputFile, outputDir)
 
 	return nil
 }
@@ -252,7 +262,7 @@ func createDownloadPod(ctx context.Context, kubeClient *kubernetes.Clientset, na
 	}
 }
 
-func UntarGz(srcFile string, destDir string) error {
+func untarGz(srcFile string, destDir string) error {
 	// Open the tar.gz file
 	f, err := os.Open(srcFile)
 	if err != nil {
@@ -307,10 +317,6 @@ func UntarGz(srcFile string, destDir string) error {
 }
 
 func downloadFromBlob() error {
-	if blobUrl == "" {
-		return ErrEmptyBlobURL
-	}
-
 	u, err := url.Parse(blobUrl)
 	if err != nil {
 		return errors.Wrapf(err, "failed to parse SAS URL %s", blobUrl)
@@ -362,5 +368,5 @@ func downloadFromBlob() error {
 func init() {
 	capture.AddCommand(downloadCapture)
 	downloadCapture.Flags().StringVar(&jobName, "job", "", "Name of the capture job")
-	downloadCapture.Flags().StringVar(&blobUrl, "blobURl", "", "Blob URL")
+	downloadCapture.Flags().StringVar(&blobUrl, "blobUrl", "", "Blob URL")
 }
