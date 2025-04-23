@@ -1,0 +1,42 @@
+name: Network Performance Measurement Manually
+
+on:
+  workflow_dispatch:
+    inputs:
+      image-registry:
+        description: 'Image Registry to use for the performance test'
+        required: true
+        default: 'ghcr.io'
+        type: string
+      tag:
+        description: 'Image Tag to use for the performance test'
+        required: true
+        type: string
+      image-namespace:
+        description: 'Image Namespace to use for the performance test'
+        required: false
+        type: string
+      retina-mode:
+        description: 'Retina mode (basic or advanced)'
+        required: true
+        type: string
+        default: 'basic'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  perf-test:
+    uses: ./.github/workflows/perf-template.yaml
+    with:
+      image-registry: ${{ inputs.image-registry }}
+      tag: ${{ inputs.tag }}
+      image-namespace: ${{ inputs.image-namespace || github.repository }}
+      retina-mode: ${{ inputs.retina-mode }}
+      azure-location: ${{ vars.AZURE_LOCATION }}
+    secrets:
+      azure-subscription: ${{ secrets.AZURE_SUBSCRIPTION }}
+      azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+      azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+      azure-app-insights-key: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
