@@ -317,13 +317,17 @@ func untarGz(srcFile string, destDir string) error {
 }
 
 func downloadFromBlob() error {
+	retinacmd.Logger.Info(fmt.Sprintf("I am inside download blob url: %s", blobUrl))
+
 	u, err := url.Parse(blobUrl)
 	if err != nil {
+		retinacmd.Logger.Error("err: ", zap.Error(err))
 		return errors.Wrapf(err, "failed to parse SAS URL %s", blobUrl)
 	}
 
 	b, err := storage.NewAccountSASClientFromEndpointToken(u.String(), u.Query().Encode())
 	if err != nil {
+		retinacmd.Logger.Error("err: ", zap.Error(err))
 		return errors.Wrap(err, "failed to create storage account client")
 	}
 
@@ -335,10 +339,12 @@ func downloadFromBlob() error {
 	params := storage.ListBlobsParameters{Prefix: *opts.Name}
 	blobList, err := blobService.GetContainerReference(containerName).ListBlobs(params)
 	if err != nil {
+		retinacmd.Logger.Error("err: ", zap.Error(err))
 		return errors.Wrap(err, "failed to list blobstore ")
 	}
 
 	if len(blobList.Blobs) == 0 {
+		retinacmd.Logger.Error("err: ", zap.Error(err))
 		return errors.Errorf("no blobs found with prefix: %s", *opts.Name)
 	}
 
@@ -346,6 +352,7 @@ func downloadFromBlob() error {
 		blob := blobService.GetContainerReference(containerName).GetBlobReference(v.Name)
 		readCloser, err := blob.Get(&storage.GetBlobOptions{})
 		if err != nil {
+			retinacmd.Logger.Error("err: ", zap.Error(err))
 			return errors.Wrap(err, "failed to read from blobstore")
 		}
 
@@ -353,13 +360,16 @@ func downloadFromBlob() error {
 
 		blobData, err := io.ReadAll(readCloser)
 		if err != nil {
+			retinacmd.Logger.Error("err: ", zap.Error(err))
 			return errors.Wrap(err, "failed to obtain blob from blobstore")
 		}
 
 		err = os.WriteFile(v.Name, blobData, 0o644) //nolint:gosec,gomnd // intentionally permissive bitmask
 		if err != nil {
+			retinacmd.Logger.Error("err: ", zap.Error(err))
 			return errors.Wrap(err, "failed to write file")
 		}
+		retinacmd.Logger.Info("Downloaded from blob %s", zap.String("name:", string(v.Name)))
 		fmt.Println("Downloaded blob: ", v.Name)
 	}
 	return nil
