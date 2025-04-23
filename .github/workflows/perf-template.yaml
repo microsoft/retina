@@ -14,32 +14,29 @@ on:
         type: string
       image-namespace:
         description: 'Image Namespace to use for the performance test'
-        required: false
+        required: true
         type: string
       retina-mode:
         description: 'Retina mode (basic or advanced)'
         required: true
         type: string
-  workflow_dispatch:
-    inputs:
-      image-registry:
-        description: 'Image Registry to use for the performance test'
-        required: true
-        default: 'ghcr.io'
-        type: string
-      tag:
-        description: 'Image Tag to use for the performance test'
+      azure-location:
+        description: 'Azure location for the performance test'
         required: true
         type: string
-      image-namespace:
-        description: 'Image Namespace to use for the performance test'
-        required: false
-        type: string
-      retina-mode:
-        description: 'Retina mode (basic or advanced)'
-        required: true
-        type: string
-        default: 'basic'
+    secrets:
+        azure-subscription:
+          description: 'Azure subscription ID'
+          required: true
+        azure-tenant-id:
+          description: 'Azure tenant ID'
+          required: true
+        azure-client-id:
+          description: 'Azure client ID'
+          required: true
+        azure-app-insights-key:
+          description: 'Azure Application Insights key'
+          required: true
 
 permissions:
   contents: read
@@ -62,22 +59,22 @@ jobs:
       - name: Az CLI login
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION }}
+          client-id: ${{ secrets.azure-client-id }}
+          tenant-id: ${{ secrets.azure-tenant-id }}
+          subscription-id: ${{ secrets.azure-subscription }}
 
       - name: Run performance measurement for Retina
         env:
-          AZURE_APP_INSIGHTS_KEY: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
-          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION }}
-          AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+          AZURE_APP_INSIGHTS_KEY: ${{ secrets.azure-app-insights-key }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.azure-subscription }}
+          AZURE_LOCATION: ${{ inputs.azure-location }}
         shell: bash
         run: |
           set -euo pipefail
           
           TAG="${{ inputs.tag }}"
           REGISTRY="${{ inputs.image-registry }}"
-          NAMESPACE="${{ inputs.image-namespace || github.repository }}"
+          NAMESPACE="${{ inputs.image-namespace }}"
           MODE="${{ inputs.retina-mode }}"
           
           echo "Running in $MODE mode..."

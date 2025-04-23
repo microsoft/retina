@@ -344,6 +344,12 @@ jobs:
       tag: $(make version)
       image-namespace: ${{ github.repository }}
       retina-mode: basic
+      azure-location: ${{ vars.AZURE_LOCATION }}
+    secrets:
+      azure-subscription: ${{ secrets.AZURE_SUBSCRIPTION }}
+      azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+      azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+      azure-app-insights-key: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
   
   perf-test-advanced:
     if: ${{ github.event_name == 'merge_group' && success('manifests')}}
@@ -354,3 +360,9 @@ jobs:
       tag: $(make version)
       image-namespace: ${{ github.repository }}
       retina-mode: advanced
+      azure-location: ${{ vars.AZURE_LOCATION }}
+    secrets:
+      azure-subscription: ${{ secrets.AZURE_SUBSCRIPTION }}
+      azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+      azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+      azure-app-insights-key: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
