@@ -5,6 +5,7 @@
 package common
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"os"
@@ -109,4 +110,31 @@ func GetKernelVersionMajMin() (semver.Version, error) {
 		return semver.Version{}, fmt.Errorf("kernel version string is malformatted: %q", ver) //nolint:err113 // ignore
 	}
 	return versioncheck.Version(strings.Join(verStrs[:2], ".")) //nolint:wrapcheck // no additional context needed
+}
+
+func IsAzureLinux() bool {
+	paths := []string{"/etc/os-release", "/usr/lib/os-release"}
+	for _, path := range paths {
+		if id := readIDField(path); id == "azurelinux" || id == "mariner" {
+			return true
+		}
+	}
+	return false
+}
+
+func readIDField(path string) string {
+	file, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "ID=") {
+			return strings.Trim(strings.TrimPrefix(line, "ID="), `"`)
+		}
+	}
+	return ""
 }

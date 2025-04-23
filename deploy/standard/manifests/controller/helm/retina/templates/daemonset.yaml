@@ -134,6 +134,9 @@ spec:
       {{- else }}
         hostPath:
           path: {{ $hostPath }}
+        {{- if eq $name "host-os-release" }}
+          type: File
+        {{- end }}
       {{- end }}
       {{- end }}
       {{- if fromYamlArray .Values.enabledPlugin_linux | has "infiniband" }}

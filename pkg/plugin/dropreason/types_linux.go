@@ -30,30 +30,32 @@ const (
 var perCPUBuffer = 16
 
 type dropReason struct {
-	cfg                    *kcfg.Config
-	l                      *log.ZapLogger
-	KNfHook                link.Link
-	KRetnfhook             link.Link
-	TrFexithook0           link.Link
-	TrFexithook1           link.Link
-	TrFexithook2           link.Link
-	TrFexithook3           link.Link
-	TrFexithook4           link.Link
-	TrFexithook5           link.Link
-	KTCPAccept             link.Link
-	KRetTCPAccept          link.Link
-	KRetTCPConnect         link.Link
-	KNfNatInet             link.Link
-	KRetNfNatInet          link.Link
-	KNfConntrackConfirm    link.Link
-	KRetNfConntrackConfirm link.Link
-	metricsMapData         IMap
-	isRunning              bool
-	reader                 IPerfReader
-	enricher               enricher.EnricherInterface
-	recordsChannel         chan perf.Record
-	wg                     sync.WaitGroup
-	externalChannel        chan *hubblev1.Event
+	cfg             *kcfg.Config
+	l               *log.ZapLogger
+	hooks           []link.Link
+	metricsMapData  IMap
+	isRunning       bool
+	reader          IPerfReader
+	enricher        enricher.EnricherInterface
+	recordsChannel  chan perf.Record
+	wg              sync.WaitGroup
+	externalChannel chan *hubblev1.Event
+}
+
+type kprobeObjectsMariner struct {
+	kprobeProgramsMariner
+	kprobeMaps
+}
+
+type kprobeProgramsMariner struct {
+	InetCskAccept      *ebpf.Program `ebpf:"inet_csk_accept"`
+	InetCskAcceptRet   *ebpf.Program `ebpf:"inet_csk_accept_ret"`
+	InetCskAcceptFexit *ebpf.Program `ebpf:"inet_csk_accept_fexit"`
+	NfHookSlow         *ebpf.Program `ebpf:"nf_hook_slow"`
+	NfHookSlowRet      *ebpf.Program `ebpf:"nf_hook_slow_ret"`
+	NfHookSlowFexit    *ebpf.Program `ebpf:"nf_hook_slow_fexit"`
+	TcpV4ConnectRet    *ebpf.Program `ebpf:"tcp_v4_connect_ret"`   // nolint:revive // needs to match generated code
+	TcpV4ConnectFexit  *ebpf.Program `ebpf:"tcp_v4_connect_fexit"` // nolint:revive // needs to match generated code
 }
 
 type (

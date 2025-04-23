@@ -9,7 +9,6 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"os"
 	"path"
 	"runtime"
 	"time"
@@ -38,11 +37,20 @@ import (
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type metrics_map_value -type drop_reason_t -type packet kprobe ./_cprog/drop_reason.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../filter/_cprog/
 const (
-	nfHookSlowFn         = "nf_hook_slow"
-	tcpConnectFn         = "tcp_v4_connect"
-	intCskAcceptFn       = "inet_csk_accept"
-	nfNatInetFn          = "nf_nat_inet_fn"
-	nfConntrackConfirmFn = "__nf_conntrack_confirm"
+	nfHookSlowFn              = "nf_hook_slow"
+	nfHookSlowFnRet           = "nf_hook_slow_ret"
+	nfHookSlowFnFexit         = "nf_hook_slow_fexit"
+	tcpConnectFn              = "tcp_v4_connect"
+	tcpV4ConnectFexit         = "tcp_v4_connect_fexit"
+	inetCskAcceptFn           = "inet_csk_accept"
+	inetCskAcceptFnRet        = "inet_csk_accept_ret"
+	inetCskAcceptFnFexit      = "inet_csk_accept_fexit"
+	nfNatInetFn               = "nf_nat_inet_fn"
+	nfNatInetFnRet            = "nf_nat_inet_fn_ret"
+	nfNatInetFnFexit          = "nf_nat_inet_fn_fexit"
+	nfConntrackConfirmFn      = "__nf_conntrack_confirm"
+	nfConntrackConfirmFnRet   = "__nf_conntrack_confirm_ret"
+	nfConntrackConfirmFnFexit = "__nf_conntrack_confirm_fexit"
 )
 
 func init() {
@@ -132,7 +140,17 @@ func (dr *dropReason) Init() error {
 
 	bpfOutputFile := fmt.Sprintf("%s/%s", dir, bpfObjectFileName)
 
-	objs := &kprobeObjects{} //nolint:typecheck
+	var objs interface{}
+	maps := &kprobeMaps{}
+	isMariner := plugincommon.IsAzureLinux()
+
+	if !isMariner {
+		objs = &kprobeObjects{} //nolint:typecheck // this is a generated struct
+		maps = &objs.(*kprobeObjects).kprobeMaps
+	} else {
+		objs = &kprobeObjectsMariner{} //nolint:typecheck // needs to match a generated struct until we fix Mariner
+		maps = &objs.(*kprobeObjectsMariner).kprobeMaps
+	}
 
 	spec, err := ebpf.LoadCollectionSpec(bpfOutputFile)
 	if err != nil {
@@ -153,14 +171,17 @@ func (dr *dropReason) Init() error {
 	}
 
 	// read perf map
-	dr.reader, err = plugincommon.NewPerfReader(dr.l, objs.RetinaDropreasonEvents, perCPUBuffer, 1)
+	dr.reader, err = plugincommon.NewPerfReader(dr.l, maps.RetinaDropreasonEvents, perCPUBuffer, 1)
 	if err != nil {
 		dr.l.Error("Error NewReader", zap.Error(err))
 		return err
 	}
 
+	progsKprobe, progsKprobeRet := buildKprobePrograms(objs)
+	progsFexit := buildFexitPrograms(objs)
+
 	if dr.cfg.EnablePodLevel {
-		err = dr.attachKprobes(objs)
+		err = dr.attachKprobes(progsKprobe, progsKprobeRet)
 	} else {
 		var kv semver.Version
 		kv, err = version.GetKernelVersion()
@@ -177,13 +198,13 @@ func (dr *dropReason) Init() error {
 		minVersionAmd64, _ := versioncheck.Version("5.5")
 		minVersionArm64, _ := versioncheck.Version("6.0")
 		if (runtime.GOARCH == "amd64" && kv.GTE(minVersionAmd64)) || runtime.GOARCH == "arm64" && kv.GTE(minVersionArm64) {
-			err = dr.attachFexitPrograms(objs)
+			err = dr.attachFexitPrograms(progsFexit)
 		} else {
-			err = dr.attachKprobes(objs)
+			err = dr.attachKprobes(progsKprobe, progsKprobeRet)
 		}
 	}
 
-	dr.metricsMapData = objs.RetinaDropreasonMetrics
+	dr.metricsMapData = maps.RetinaDropreasonMetrics
 	return err
 }
 
@@ -405,136 +426,40 @@ func (dr *dropReason) processMapValue(dataKey dropMetricKey, dataValue dropMetri
 	dr.dropMetricAdd(dataKey.getType(), dataKey.getDirection(), pktCount, pktBytes)
 }
 
-func (dr *dropReason) attachKprobes(objs *kprobeObjects) error {
-	var err error
-
-	dr.KNfHook, err = link.Kprobe(nfHookSlowFn, objs.NfHookSlow, nil)
-	if err != nil {
-		dr.l.Error("opening kprobe", zap.Error(err))
-		return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-	}
-	dr.l.Info("Attached program nf_hook_slow")
-
-	dr.KRetnfhook, err = link.Kretprobe(nfHookSlowFn, objs.NfHookSlowRet, nil)
-	if err != nil {
-		dr.l.Error("opening kretprobe", zap.Error(err))
-		return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-	}
-	dr.l.Info("Attached program nf_hook_slow_ret")
-
-	dr.KRetTCPConnect, err = link.Kretprobe(tcpConnectFn, objs.TcpV4ConnectRet, nil)
-	if err != nil {
-		dr.l.Error("opening kretprobe", zap.Error(err))
-		return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-	}
-	dr.l.Info("Attached program tcp_v4_connect_ret")
-
-	dr.KTCPAccept, err = link.Kprobe(intCskAcceptFn, objs.InetCskAccept, nil)
-	if err != nil {
-		dr.l.Error("opening kretprobe", zap.Error(err))
-		return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-	}
-	dr.l.Info("Attached program inet_csk_accept")
-
-	dr.KRetTCPAccept, err = link.Kretprobe(intCskAcceptFn, objs.InetCskAcceptRet, nil)
-	if err != nil {
-		dr.l.Error("opening kretprobe", zap.Error(err))
-		return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-	}
-	dr.l.Info("Attached program inet_csk_accept_ret")
-
-	dr.KNfNatInet, err = link.Kprobe(nfNatInetFn, objs.NfNatInetFn, nil)
-	if err != nil {
-		// TODO: remove this check once we get this working on Mariner OS.
-		if errors.Is(err, os.ErrNotExist) {
-			dr.l.Warn("nf_nat_inet_fn not found, skipping attaching kretprobe to it. This may impact the drop reason metrics.")
-		} else {
-			dr.l.Error("opening kretprobe", zap.Error(err))
+func (dr *dropReason) attachKprobes(kprobes, kprobesRet map[string]*ebpf.Program) error {
+	for name := range kprobes {
+		progLink, err := link.Kprobe(name, kprobes[name], nil)
+		if err != nil {
+			dr.l.Error("Failed to attach kprobe", zap.String("program", name), zap.Error(err))
 			return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
 		}
-	} else {
-		dr.l.Info("Attached program nf_nat_inet_fn")
+		dr.hooks = append(dr.hooks, progLink)
+		dr.l.Info("Attached kprobe", zap.String("program", name))
 	}
 
-	dr.KRetNfNatInet, err = link.Kretprobe(nfNatInetFn, objs.NfNatInetFnRet, nil)
-	if err != nil {
-		// TODO: remove this check once we get this working on Mariner OS.
-		if errors.Is(err, os.ErrNotExist) {
-			dr.l.Warn("nf_nat_inet_fn_ret not found, skipping attaching kretprobe to it. This may impact the drop reason metrics.")
-		} else {
-			dr.l.Error("opening kretprobe", zap.Error(err))
+	for name := range kprobesRet {
+		progLink, err := link.Kretprobe(name, kprobesRet[name], nil)
+		if err != nil {
+			dr.l.Error("Failed to attach kretprobe", zap.String("program", name), zap.Error(err))
 			return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
 		}
-	} else {
-		dr.l.Info("Attached program nf_nat_inet_fn_ret")
-	}
-
-	dr.KNfConntrackConfirm, err = link.Kprobe(nfConntrackConfirmFn, objs.NfConntrackConfirm, nil)
-	if err != nil {
-		// TODO: remove this check once we get this working on Mariner OS.
-		if errors.Is(err, os.ErrNotExist) {
-			dr.l.Warn("nf_conntrack_confirm not found, skipping attaching kprobe to it. This may impact the drop reason metrics.")
-		} else {
-			dr.l.Error("opening kprobe", zap.Error(err))
-			return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-		}
-	} else {
-		dr.l.Info("Attached program nf_conntrack_confirm")
-	}
-
-	dr.KRetNfConntrackConfirm, err = link.Kretprobe(nfConntrackConfirmFn, objs.NfConntrackConfirmRet, nil)
-	if err != nil {
-		// TODO: remove this check once we get this working on Mariner OS.
-		if errors.Is(err, os.ErrNotExist) {
-			dr.l.Warn("nf_conntrack_confirm_ret not found, skipping attaching kretprobe to it. This may impact the drop reason metrics.")
-		} else {
-			dr.l.Error("opening kretprobe", zap.Error(err))
-			return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-		}
-	} else {
-		dr.l.Info("Attached program nf_conntrack_confirm_ret")
+		dr.hooks = append(dr.hooks, progLink)
+		dr.l.Info("Attached kretprobe", zap.String("program", name))
 	}
 
 	return nil
 }
 
-func (dr *dropReason) attachFexitPrograms(objs *kprobeObjects) error {
-	var err error
-
-	dr.TrFexithook1, err = link.AttachTracing(link.TracingOptions{Program: objs.NfHookSlowFexit, AttachType: ebpf.AttachTraceFExit})
-	if err != nil {
-		dr.l.Error("Failed to attach", zap.Error(err))
-		return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
+func (dr *dropReason) attachFexitPrograms(objs map[string]*ebpf.Program) error {
+	for name, prog := range objs {
+		progLink, err := link.AttachTracing(link.TracingOptions{Program: prog, AttachType: ebpf.AttachTraceFExit})
+		if err != nil {
+			dr.l.Error("Failed to attach", zap.String("program", name), zap.Error(err))
+			return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
+		}
+		dr.hooks = append(dr.hooks, progLink)
+		dr.l.Info("Attached program", zap.String("program", name))
 	}
-	dr.l.Info("Attached program nf_hook_slow_fexit")
-
-	dr.TrFexithook2, err = link.AttachTracing(link.TracingOptions{Program: objs.InetCskAcceptFexit, AttachType: ebpf.AttachTraceFExit})
-	if err != nil {
-		dr.l.Error("Failed to attach", zap.Error(err))
-		return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-	}
-	dr.l.Info("Attached program inet_csk_accept_fexit")
-
-	dr.TrFexithook3, err = link.AttachTracing(link.TracingOptions{Program: objs.NfConntrackConfirmFexit, AttachType: ebpf.AttachTraceFExit})
-	if err != nil {
-		dr.l.Error("Failed to attach", zap.Error(err))
-		return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-	}
-	dr.l.Info("Attached program nf_conntrack_confirm_fexit")
-
-	dr.TrFexithook4, err = link.AttachTracing(link.TracingOptions{Program: objs.NfNatInetFnFexit, AttachType: ebpf.AttachTraceFExit})
-	if err != nil {
-		dr.l.Error("Failed to attach", zap.Error(err))
-		return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-	}
-	dr.l.Info("Attached program nf_nat_inet_fn_fexit")
-
-	dr.TrFexithook5, err = link.AttachTracing(link.TracingOptions{Program: objs.TcpV4ConnectFexit, AttachType: ebpf.AttachTraceFExit})
-	if err != nil {
-		dr.l.Error("Failed to attach", zap.Error(err))
-		return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-	}
-	dr.l.Info("Attached program tcp_v4_connect_fexit")
 
 	return nil
 }
@@ -543,40 +468,14 @@ func (dr *dropReason) Stop() error {
 	if !dr.isRunning {
 		return nil
 	}
+
 	dr.l.Info("Closing drop reason probes...")
-	if dr.KNfHook != nil {
-		dr.KNfHook.Close()
+	for _, hook := range dr.hooks {
+		if hook != nil {
+			hook.Close()
+		}
 	}
-	if dr.KRetnfhook != nil {
-		dr.KRetnfhook.Close()
-	}
-	if dr.KRetTCPConnect != nil {
-		dr.KRetTCPConnect.Close()
-	}
-	if dr.KRetTCPAccept != nil {
-		dr.KRetTCPAccept.Close()
-	}
-	if dr.TrFexithook0 != nil {
-		dr.TrFexithook0.Close()
-	}
-	if dr.TrFexithook1 != nil {
-		dr.TrFexithook1.Close()
-	}
-	if dr.TrFexithook2 != nil {
-		dr.TrFexithook2.Close()
-	}
-	if dr.TrFexithook3 != nil {
-		dr.TrFexithook3.Close()
-	}
-	if dr.TrFexithook4 != nil {
-		dr.TrFexithook4.Close()
-	}
-	if dr.TrFexithook5 != nil {
-		dr.TrFexithook5.Close()
-	}
-	if dr.KTCPAccept != nil {
-		dr.KTCPAccept.Close()
-	}
+
 	if dr.metricsMapData != nil {
 		dr.metricsMapData.Close()
 	}
@@ -615,4 +514,53 @@ func absPath() (string, error) {
 	}
 	dir := path.Dir(filename)
 	return dir, nil
+}
+
+func buildKprobePrograms(objs any) (progsKprobe, progsKprobeRet map[string]*ebpf.Program) {
+	progsKprobe = make(map[string]*ebpf.Program)
+	progsKprobeRet = make(map[string]*ebpf.Program)
+
+	switch o := objs.(type) {
+	case *kprobeObjects:
+		progsKprobe[inetCskAcceptFn] = o.InetCskAccept
+		progsKprobe[nfHookSlowFn] = o.NfHookSlow
+		progsKprobe[nfNatInetFn] = o.NfNatInetFn
+		progsKprobe[nfConntrackConfirmFn] = o.NfConntrackConfirm
+
+		progsKprobeRet[nfHookSlowFn] = o.NfHookSlowRet
+		progsKprobeRet[inetCskAcceptFn] = o.InetCskAcceptRet
+		progsKprobeRet[tcpConnectFn] = o.TcpV4ConnectRet
+		progsKprobeRet[nfNatInetFn] = o.NfNatInetFnRet
+		progsKprobeRet[nfConntrackConfirmFn] = o.NfConntrackConfirmRet
+
+	case *kprobeObjectsMariner:
+		progsKprobe[inetCskAcceptFn] = o.InetCskAccept
+		progsKprobe[nfHookSlowFn] = o.NfHookSlow
+
+		progsKprobeRet[nfHookSlowFn] = o.NfHookSlowRet
+		progsKprobeRet[inetCskAcceptFn] = o.InetCskAcceptRet
+		progsKprobeRet[tcpConnectFn] = o.TcpV4ConnectRet
+
+	}
+	return progsKprobe, progsKprobeRet
+}
+
+func buildFexitPrograms(objs any) map[string]*ebpf.Program {
+	progsFexit := make(map[string]*ebpf.Program)
+
+	switch o := objs.(type) {
+	case *kprobeObjects:
+		progsFexit[inetCskAcceptFnFexit] = o.InetCskAcceptFexit
+		progsFexit[nfHookSlowFnFexit] = o.NfHookSlowFexit
+		progsFexit[tcpV4ConnectFexit] = o.TcpV4ConnectFexit
+		progsFexit[nfNatInetFnFexit] = o.NfNatInetFnFexit
+		progsFexit[nfConntrackConfirmFnFexit] = o.NfConntrackConfirmFexit
+
+	case *kprobeObjectsMariner:
+		progsFexit[inetCskAcceptFnFexit] = o.InetCskAcceptFexit
+		progsFexit[nfHookSlowFnFexit] = o.NfHookSlowFexit
+		progsFexit[tcpV4ConnectFexit] = o.TcpV4ConnectFexit
+
+	}
+	return progsFexit
 }
