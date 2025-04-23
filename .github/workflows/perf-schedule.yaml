@@ -1,0 +1,26 @@
+name: Network Performance Measurement on Schedule
+
+on:
+  schedule:
+    # This is a cron expression that runs at 00:17 and 12:17 UTC
+    - cron: '17 */12 * * *'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  perf-test-basic:
+    uses: ./.github/workflows/perf-template.yaml
+    with:
+      image-registry: ghcr.io
+      tag: $(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r .tag_name)
+      image-namespace: ${{ github.repository }}
+      retina-mode: basic
+  perf-test-advanced:
+    uses: ./.github/workflows/perf-template.yaml
+    with:
+      image-registry: ghcr.io
+      tag: $(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r .tag_name)
+      image-namespace: ${{ github.repository }}
+      retina-mode: advanced
