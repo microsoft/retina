@@ -36,11 +36,13 @@ import (
 )
 
 const CaptureFileExtension = ".tar.gz"
-const DownloadPath = "/tmp/retina/capture/"
+
+// const DownloadPath = "/tmp/retina/capture/"
 const MountPath = "/mnt/retina/"
 
-var jobName string
 var blobUrl string
+var jobName string
+var outputPath string
 
 var downloadCapture = &cobra.Command{
 	Use:   "download",
@@ -145,7 +147,7 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 		return err
 	}
 
-	retinacmd.Logger.Info(fmt.Sprintf("Download debugging: Namespace: default / Pod: %s / Container: %s / SrcFile: %s / Download Path: %s / Download Pod: %s", pod.Name, containerName, srcFilePath, DownloadPath, downloadPod.Name))
+	retinacmd.Logger.Info(fmt.Sprintf("Download debugging: Namespace: default / Pod: %s / Container: %s / SrcFile: %s / Download Path: %s / Download Pod: %s", pod.Name, containerName, srcFilePath, outputPath, downloadPod.Name))
 
 	req := kubeClient.CoreV1().RESTClient().Post().
 		Resource("pods").
@@ -177,9 +179,9 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 		return fmt.Errorf("failed to exec tar in container: %w", err)
 	}
 
-	outputFile := filepath.Join(DownloadPath, fileName)
+	outputFile := filepath.Join(outputPath, fileName)
 
-	err = os.MkdirAll(DownloadPath, 0755)
+	err = os.MkdirAll(outputPath, 0755)
 	if err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
@@ -317,8 +319,6 @@ func untarGz(srcFile string, destDir string) error {
 }
 
 func downloadFromBlob() error {
-	retinacmd.Logger.Info(fmt.Sprintf("I am inside download blob url: %s", blobUrl))
-
 	u, err := url.Parse(blobUrl)
 	if err != nil {
 		retinacmd.Logger.Error("err: ", zap.Error(err))
@@ -377,6 +377,8 @@ func downloadFromBlob() error {
 
 func init() {
 	capture.AddCommand(downloadCapture)
-	downloadCapture.Flags().StringVar(&jobName, "job", "", "Name of the capture job")
-	downloadCapture.Flags().StringVar(&blobUrl, "blobUrl", "", "Blob URL")
+	downloadCapture.Flags().StringVar(&blobUrl, "blobUrl", "", "Blob URL from which to download")
+	downloadCapture.Flags().StringVar(&jobName, "job", "", "The name of a capture job")
+	downloadCapture.Flags().StringVarP(&outputPath, "output", "o", "/tmp/retina/capture/", "Path to save the downloaded capture")
+
 }
