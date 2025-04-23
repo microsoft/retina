@@ -174,9 +174,9 @@ func (dr *dropReason) Init() error {
 		}
 		dr.l.Info("Detected kernel >= ", zap.String("version", kv.String()))
 
-		// Need kernel >= 5.5 to run our optimized fexit programs.
-		minVersion, _ := versioncheck.Version("5.5")
-		if kv.GTE(minVersion) {
+		minVersionAmd64, _ := versioncheck.Version("5.5")
+		minVersionArm64, _ := versioncheck.Version("6.0")
+		if (runtime.GOARCH == "amd64" && kv.GTE(minVersionAmd64)) || runtime.GOARCH == "arm64" && kv.GTE(minVersionArm64) {
 			err = dr.attachFexitPrograms(objs)
 		} else {
 			err = dr.attachKprobes(objs)
@@ -501,35 +501,35 @@ func (dr *dropReason) attachKprobes(objs *kprobeObjects) error {
 func (dr *dropReason) attachFexitPrograms(objs *kprobeObjects) error {
 	var err error
 
-	dr.TrFexithook1, err = link.AttachTracing(link.TracingOptions{Program: objs.NfHookSlowFexit})
+	dr.TrFexithook1, err = link.AttachTracing(link.TracingOptions{Program: objs.NfHookSlowFexit, AttachType: ebpf.AttachTraceFExit})
 	if err != nil {
 		dr.l.Error("Failed to attach", zap.Error(err))
 		return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
 	}
 	dr.l.Info("Attached program nf_hook_slow_fexit")
 
-	dr.TrFexithook2, err = link.AttachTracing(link.TracingOptions{Program: objs.InetCskAcceptFexit})
+	dr.TrFexithook2, err = link.AttachTracing(link.TracingOptions{Program: objs.InetCskAcceptFexit, AttachType: ebpf.AttachTraceFExit})
 	if err != nil {
 		dr.l.Error("Failed to attach", zap.Error(err))
 		return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
 	}
 	dr.l.Info("Attached program inet_csk_accept_fexit")
 
-	dr.TrFexithook3, err = link.AttachTracing(link.TracingOptions{Program: objs.NfConntrackConfirmFexit})
+	dr.TrFexithook3, err = link.AttachTracing(link.TracingOptions{Program: objs.NfConntrackConfirmFexit, AttachType: ebpf.AttachTraceFExit})
 	if err != nil {
 		dr.l.Error("Failed to attach", zap.Error(err))
 		return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
 	}
 	dr.l.Info("Attached program nf_conntrack_confirm_fexit")
 
-	dr.TrFexithook4, err = link.AttachTracing(link.TracingOptions{Program: objs.NfNatInetFnFexit})
+	dr.TrFexithook4, err = link.AttachTracing(link.TracingOptions{Program: objs.NfNatInetFnFexit, AttachType: ebpf.AttachTraceFExit})
 	if err != nil {
 		dr.l.Error("Failed to attach", zap.Error(err))
 		return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
 	}
 	dr.l.Info("Attached program nf_nat_inet_fn_fexit")
 
-	dr.TrFexithook5, err = link.AttachTracing(link.TracingOptions{Program: objs.TcpV4ConnectFexit})
+	dr.TrFexithook5, err = link.AttachTracing(link.TracingOptions{Program: objs.TcpV4ConnectFexit, AttachType: ebpf.AttachTraceFExit})
 	if err != nil {
 		dr.l.Error("Failed to attach", zap.Error(err))
 		return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
