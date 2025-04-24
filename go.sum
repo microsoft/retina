@@ -373,8 +373,8 @@ github.com/chavacava/garif v0.1.0 h1:2JHa3hbYf5D9dsgseMKAmc/MZ109otzgNFk5s87H9Pc
 github.com/chavacava/garif v0.1.0/go.mod h1:XMyYCkEL58DF0oyW4qDjjnPWONs2HBqYKI+UIPD+Gww=
 github.com/chrismellard/docker-credential-acr-env v0.0.0-20230304212654-82a0ddb27589 h1:krfRl01rzPzxSxyLyrChD+U+MzsBXbm0OwYYB67uF+4=
 github.com/chrismellard/docker-credential-acr-env v0.0.0-20230304212654-82a0ddb27589/go.mod h1:OuDyvmLnMCwa2ep4Jkm6nyA0ocJuZlGyk2gGseVzERM=
-github.com/cilium/cilium v1.18.0-pre.0.0.20250331121417-b4508ebd8be7 h1:GhDwF7QtQFuawiKHqJIr4v0B3hWSVgtU7f9dKiNm1wQ=
-github.com/cilium/cilium v1.18.0-pre.0.0.20250331121417-b4508ebd8be7/go.mod h1:xNfreZ/3t6IxynTSSqJRr8hZd2dhX0dns+ae/WDYwWk=
+github.com/cilium/cilium v1.18.0-pre.1 h1:ZE+fNsr6QAVcKsvnO1WmMQF4Jo/aztYF1IGy77kb6i0=
+github.com/cilium/cilium v1.18.0-pre.1/go.mod h1:xNfreZ/3t6IxynTSSqJRr8hZd2dhX0dns+ae/WDYwWk=
 github.com/cilium/dns v1.1.51-0.20240603182237-af788769786a h1:PRGN7B+72mj3OtLL2DM3F/9jp+ItgqgNS7mecgCmwsQ=
 github.com/cilium/dns v1.1.51-0.20240603182237-af788769786a/go.mod h1:/7LC2GOgyXJ7maupZlaVIumYQiGPIgllSf6mA9sg6RU=
 github.com/cilium/ebpf v0.5.0/go.mod h1:4tRaxcgiL706VnOzHOdBlY8IEAIdxINsQBcU4xJJXRs=
