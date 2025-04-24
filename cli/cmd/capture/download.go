@@ -333,7 +333,7 @@ func downloadFromBlob() error {
 
 	blobService := b.GetBlobService()
 	containerPath := strings.TrimLeft(u.Path, "/")
-	splitPath := strings.SplitN(containerPath, "/", 2) //nolint:gomnd // TODO string splitting probably isn't the right way to parse this URL?
+	splitPath := strings.SplitN(containerPath, "/", 2)
 	containerName := splitPath[0]
 
 	params := storage.ListBlobsParameters{Prefix: *opts.Name}
@@ -348,6 +348,11 @@ func downloadFromBlob() error {
 		return errors.Errorf("no blobs found with prefix: %s", *opts.Name)
 	}
 
+	err = os.MkdirAll(outputPath, 0755)
+	if err != nil {
+		return fmt.Errorf("failed to create output directory: %w", err)
+	}
+
 	for _, v := range blobList.Blobs {
 		blob := blobService.GetContainerReference(containerName).GetBlobReference(v.Name)
 		readCloser, err := blob.Get(&storage.GetBlobOptions{})
@@ -355,7 +360,6 @@ func downloadFromBlob() error {
 			retinacmd.Logger.Error("err: ", zap.Error(err))
 			return errors.Wrap(err, "failed to read from blobstore")
 		}
-
 		defer readCloser.Close()
 
 		blobData, err := io.ReadAll(readCloser)
@@ -364,13 +368,15 @@ func downloadFromBlob() error {
 			return errors.Wrap(err, "failed to obtain blob from blobstore")
 		}
 
-		err = os.WriteFile(v.Name, blobData, 0o644) //nolint:gosec,gomnd // intentionally permissive bitmask
+		outputFile := filepath.Join(outputPath, v.Name)
+		err = os.WriteFile(outputFile, blobData, 0o644)
 		if err != nil {
 			retinacmd.Logger.Error("err: ", zap.Error(err))
 			return errors.Wrap(err, "failed to write file")
 		}
-		retinacmd.Logger.Info("Downloaded from blob %s", zap.String("name:", string(v.Name)))
-		fmt.Println("Downloaded blob: ", v.Name)
+
+		retinacmd.Logger.Info("Downloaded from blob", zap.String("name", v.Name))
+		fmt.Println("Downloaded blob:", outputFile)
 	}
 	return nil
 }
@@ -380,5 +386,4 @@ func init() {
 	downloadCapture.Flags().StringVar(&blobUrl, "blobUrl", "", "Blob URL from which to download")
 	downloadCapture.Flags().StringVar(&jobName, "job", "", "The name of a capture job")
 	downloadCapture.Flags().StringVarP(&outputPath, "output", "o", "/tmp/retina/capture/", "Path to save the downloaded capture")
-
 }
