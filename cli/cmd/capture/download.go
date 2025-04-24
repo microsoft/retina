@@ -37,6 +37,7 @@ import (
 
 const CaptureFileExtension = ".tar.gz"
 const MountPath = "/mnt/retina/"
+const DefaultOutputPath = "/tmp/retina/capture/"
 
 var blobUrl string
 var jobName string
@@ -59,13 +60,14 @@ var downloadCapture = &cobra.Command{
 
 		captureNamespace := *opts.Namespace
 		if allNamespaces {
+			fmt.Println("I'm inside allnamespaces...")
 			captureNamespace = ""
 		}
 
+		// this should go
 		if captureNamespace == "" {
 			captureNamespace = "default"
 		}
-		retinacmd.Logger.Info(fmt.Sprintf("Capture Namespace: %s", captureNamespace))
 
 		if jobName != "" {
 			downloadFromCluster(ctx, kubeConfig, captureNamespace)
@@ -124,8 +126,6 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 	nodeHostName := envVars[string(captureConstants.NodeHostNameEnvKey)]
 	captureStart := envVars[string(captureConstants.CaptureStartTimestampEnvKey)]
 
-	retinacmd.Logger.Info(fmt.Sprintf("Host path %s", hostPath))
-
 	timestamp, err := file.StringToTimestamp(captureStart)
 	if err != nil {
 		return err
@@ -138,14 +138,12 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 	fileName := captureFile.String() + CaptureFileExtension
 
 	srcFilePath := MountPath + fileName
-	retinacmd.Logger.Info(fmt.Sprintf("File src path:  %s", srcFilePath))
+	fmt.Println("File to be downloaded: ", srcFilePath)
 
 	downloadPod, err := createDownloadPod(ctx, kubeClient, namespace, nodeHostName, hostPath, jobName)
 	if err != nil {
 		return err
 	}
-
-	retinacmd.Logger.Info(fmt.Sprintf("Download debugging: Namespace: default / Pod: %s / Container: %s / SrcFile: %s / Download Path: %s / Download Pod: %s", pod.Name, containerName, srcFilePath, outputPath, downloadPod.Name))
 
 	req := kubeClient.CoreV1().RESTClient().Post().
 		Resource("pods").
@@ -159,8 +157,6 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 			Stderr:    true,
 		}, scheme.ParameterCodec)
 
-	retinacmd.Logger.Info(fmt.Sprintf("Request: %s", req.URL().String()))
-
 	exec, err := remotecommand.NewSPDYExecutor(config, "POST", req.URL())
 	if err != nil {
 		return fmt.Errorf("failed to create executor: %w", err)
@@ -173,7 +169,6 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 	}
 
 	if err := exec.StreamWithContext(ctx, streamOpts); err != nil {
-		retinacmd.Logger.Error(fmt.Sprintf("exec stream failed: stderr: %s / error: %w", buf.String(), err))
 		return fmt.Errorf("failed to exec tar in container: %w", err)
 	}
 
@@ -189,7 +184,7 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 		return fmt.Errorf("failed to write file to host: %w", err)
 	}
 
-	retinacmd.Logger.Info(fmt.Sprintf("File written to: %s", outputFile))
+	fmt.Println("File written to: ", outputFile)
 
 	err = kubeClient.CoreV1().Pods(namespace).Delete(ctx, downloadPod.Name, metav1.DeleteOptions{})
 	if err != nil {
@@ -247,10 +242,10 @@ func createDownloadPod(ctx context.Context, kubeClient *kubernetes.Clientset, na
 		return nil, fmt.Errorf("failed to create debug pod: %w", err)
 	}
 
+	fmt.Println("Creating download pod to retrieve the files...")
 	// Wait until pod is running
 	for {
 		time.Sleep(1 * time.Second)
-		retinacmd.Logger.Info("Waiting for Download Pod to spin up...")
 		pod, err := kubeClient.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
@@ -272,7 +267,14 @@ func extractFiles(srcFile, dest string) error {
 	defer file.Close()
 
 	tarReader := tar.NewReader(file)
-	return extractTar(tarReader, dest)
+	err = extractTar(tarReader, dest)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Extracted files within: ", dest)
+
+	return nil
 }
 
 func extractTar(tarReader *tar.Reader, dest string) error {
@@ -399,5 +401,5 @@ func init() {
 	capture.AddCommand(downloadCapture)
 	downloadCapture.Flags().StringVar(&blobUrl, "blobUrl", "", "Blob URL from which to download")
 	downloadCapture.Flags().StringVar(&jobName, "job", "", "The name of a capture job")
-	downloadCapture.Flags().StringVarP(&outputPath, "output", "o", "/tmp/retina/capture/", "Path to save the downloaded capture")
+	downloadCapture.Flags().StringVarP(&outputPath, "output", "o", DefaultOutputPath, "Path to save the downloaded capture")
 }
