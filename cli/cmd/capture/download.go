@@ -36,8 +36,6 @@ import (
 )
 
 const CaptureFileExtension = ".tar.gz"
-
-// const DownloadPath = "/tmp/retina/capture/"
 const MountPath = "/mnt/retina/"
 
 var blobUrl string
@@ -198,8 +196,10 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 		retinacmd.Logger.Warn("Failed to clean up debug pod", zap.String("name", downloadPod.Name), zap.Error(err))
 	}
 
-	outputDir := strings.TrimSuffix(outputFile, ".tar.gz") + "/"
-	untarGz(outputFile, outputDir)
+	err = extractFiles(outputFile, outputPath)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -264,57 +264,71 @@ func createDownloadPod(ctx context.Context, kubeClient *kubernetes.Clientset, na
 	}
 }
 
-func untarGz(srcFile string, destDir string) error {
-	// Open the tar.gz file
-	f, err := os.Open(srcFile)
+func extractFiles(srcFile, dest string) error {
+	file, err := os.Open(srcFile)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer file.Close()
 
-	// Set up gzip reader
-	gzr, err := gzip.NewReader(f)
-	if err != nil {
-		return err
-	}
-	defer gzr.Close()
+	tarReader := tar.NewReader(file)
+	return extractTar(tarReader, dest)
+}
 
-	// Set up tar reader
-	tr := tar.NewReader(gzr)
-
-	// Extract files
+func extractTar(tarReader *tar.Reader, dest string) error {
 	for {
-		hdr, err := tr.Next()
+		header, err := tarReader.Next()
 		if err == io.EOF {
-			break // end of archive
+			break
 		}
 		if err != nil {
 			return err
 		}
 
-		target := filepath.Join(destDir, hdr.Name)
+		targetPath := filepath.Join(dest, header.Name)
 
-		switch hdr.Typeflag {
-		case tar.TypeDir:
-			if err := os.MkdirAll(target, 0755); err != nil {
+		switch header.Typeflag {
+		case tar.TypeDir: // directory
+			if err := os.MkdirAll(targetPath, 0755); err != nil { // make directory
 				return err
 			}
-		case tar.TypeReg:
-			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+
+		case tar.TypeReg: // regular file
+			if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil { // create file directory first
 				return err
 			}
-			outFile, err := os.Create(target)
+
+			data, err := io.ReadAll(tarReader)
 			if err != nil {
 				return err
 			}
-			if _, err := io.Copy(outFile, tr); err != nil {
+
+			// Determine if gzipped by checking magic number
+			isGzip := len(data) > 2 && data[0] == 0x1f && data[1] == 0x8b
+
+			if isGzip {
+				reader := bytes.NewReader(data)
+				nestedDst := filepath.Join(dest, strings.TrimSuffix(header.Name, filepath.Ext(header.Name)))
+				os.MkdirAll(nestedDst, 0755)
+
+				if gzr, err := gzip.NewReader(reader); err == nil {
+					defer gzr.Close()
+					_ = extractTar(tar.NewReader(gzr), nestedDst)
+				}
+
+			} else {
+				outFile, err := os.Create(targetPath)
+				if err != nil {
+					return err
+				}
+				_, err = io.Copy(outFile, tarReader)
 				outFile.Close()
-				return err
+				if err != nil {
+					return err
+				}
 			}
-			outFile.Close()
 		}
 	}
-
 	return nil
 }
 
