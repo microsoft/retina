@@ -326,7 +326,7 @@ func createDownloadExec(kubeClient *kubernetes.Clientset, config *rest.Config, p
 		SubResource("exec").
 		VersionedParams(&corev1.PodExecOptions{
 			Container: "download",
-			Command:   []string{"tar", "cf", "-", "-C", filepath.Dir(srcFilePath), filepath.Base(srcFilePath)},
+			Command:   []string{"tar", "czf", "-", "-C", filepath.Dir(srcFilePath), filepath.Base(srcFilePath)},
 			Stdout:    true,
 			Stderr:    true,
 		}, scheme.ParameterCodec)
