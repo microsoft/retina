@@ -24,10 +24,11 @@ var (
 )
 
 var (
-	locations     = []string{"eastus2", "centralus", "southcentralus", "uksouth", "centralindia", "westus2"}
-	architectures = []string{"amd64", "arm64"}
-	createInfra   = flag.Bool("create-infra", true, "create a Resource group, vNET and AKS cluster for testing")
-	deleteInfra   = flag.Bool("delete-infra", true, "delete a Resource group, vNET and AKS cluster for testing")
+	AzureLocations = []string{"eastus2", "centralus", "southcentralus", "uksouth", "centralindia", "westus2"}
+	Architectures  = []string{"amd64", "arm64"}
+
+	createInfra = flag.Bool("create-infra", true, "create a Resource group, vNET and AKS cluster for testing")
+	deleteInfra = flag.Bool("delete-infra", true, "delete a Resource group, vNET and AKS cluster for testing")
 )
 
 type TestInfraSettings struct {
@@ -42,9 +43,6 @@ type TestInfraSettings struct {
 	SubID         string
 	Location      string
 	ResourceGroup string
-
-	AzureLocations []string
-	Architectures  []string
 }
 
 func LoadInfraSettings() (*TestInfraSettings, error) {
@@ -66,11 +64,11 @@ func LoadInfraSettings() (*TestInfraSettings, error) {
 
 	if location == "" {
 		var nBig *big.Int
-		nBig, err = rand.Int(rand.Reader, big.NewInt(int64(len(locations))))
+		nBig, err = rand.Int(rand.Reader, big.NewInt(int64(len(AzureLocations))))
 		if err != nil {
 			return nil, fmt.Errorf("Failed to generate a secure random index: %w", err)
 		}
-		location = locations[nBig.Int64()]
+		location = AzureLocations[nBig.Int64()]
 	}
 
 	if resourceGroup == "" {
@@ -102,7 +100,5 @@ func LoadInfraSettings() (*TestInfraSettings, error) {
 		SubID:               subID,
 		Location:            location,
 		ResourceGroup:       resourceGroup,
-		AzureLocations:      locations,
-		Architectures:       architectures,
 	}, nil
 }

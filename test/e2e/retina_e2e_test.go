@@ -36,6 +36,13 @@ func TestE2ERetina(t *testing.T) {
 	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(settings.SubID, settings.ResourceGroup, settings.ClusterName, settings.Location, settings.KubeConfigFilePath, settings.CreateInfra))
 	createTestInfra.Run(ctx)
 
+	t.Cleanup(func() {
+		err := jobs.DeleteTestInfra(settings.SubID, settings.ResourceGroup, settings.Location).Run()
+		if err != nil {
+			t.Logf("Failed to delete test infrastructure: %v", err)
+		}
+	})
+
 	// Install and test Retina basic metrics
 	basicMetricsE2E := types.NewRunner(t,
 		jobs.InstallAndTestRetinaBasicMetrics(
