@@ -12,7 +12,6 @@ import (
 	"github.com/microsoft/retina/test/e2e/common"
 	"github.com/microsoft/retina/test/e2e/framework/helpers"
 	"github.com/microsoft/retina/test/e2e/framework/types"
-	"github.com/microsoft/retina/test/e2e/infra"
 	jobs "github.com/microsoft/retina/test/e2e/jobs"
 	"github.com/stretchr/testify/require"
 )
@@ -50,9 +49,16 @@ func TestE2EPerfRetina(t *testing.T) {
 	err = jobs.LoadGenericFlags().Run()
 	require.NoError(t, err, "failed to load generic flags")
 
-	if *common.KubeConfig == "" {
-		*common.KubeConfig = infra.CreateAzureTempK8sInfra(ctx, t, rootDir)
-	}
+	settings, err := LoadInfraSettings()
+	require.NoError(t, err)
+
+	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, resourceGroup, clusterName, location, settings.KubeConfigFilePath, settings.CreateInfra))
+	createTestInfra.Run(ctx)
+	t.Cleanup(func() {
+		if settings.DeleteInfra {
+			_ = jobs.DeleteTestInfra(subID, resourceGroup, location).Run()
+		}
+	})
 
 	appInsightsKey := os.Getenv(common.AzureAppInsightsKeyEnv)
 	if appInsightsKey == "" {

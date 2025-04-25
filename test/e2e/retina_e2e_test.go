@@ -10,7 +10,6 @@ import (
 	"github.com/microsoft/retina/test/e2e/common"
 	"github.com/microsoft/retina/test/e2e/framework/helpers"
 	"github.com/microsoft/retina/test/e2e/framework/types"
-	"github.com/microsoft/retina/test/e2e/infra"
 	jobs "github.com/microsoft/retina/test/e2e/jobs"
 	"github.com/stretchr/testify/require"
 )
@@ -31,15 +30,17 @@ func TestE2ERetina(t *testing.T) {
 	err = jobs.LoadGenericFlags().Run()
 	require.NoError(t, err, "failed to load generic flags")
 
-	if *common.KubeConfig == "" {
-		*common.KubeConfig = infra.CreateAzureTempK8sInfra(ctx, t, rootDir)
-	}
+	settings, err := common.LoadInfraSettings()
+	require.NoError(t, err)
+
+	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(settings.SubID, settings.ResourceGroup, settings.ClusterName, settings.Location, settings.KubeConfigFilePath, settings.CreateInfra))
+	createTestInfra.Run(ctx)
 
 	// Install and test Retina basic metrics
 	basicMetricsE2E := types.NewRunner(t,
 		jobs.InstallAndTestRetinaBasicMetrics(
-			common.KubeConfigFilePath(rootDir),
-			common.RetinaChartPath(rootDir),
+			settings.KubeConfigFilePath,
+			settings.ChartPath,
 			common.TestPodNamespace),
 	)
 	basicMetricsE2E.Run(ctx)
@@ -47,9 +48,9 @@ func TestE2ERetina(t *testing.T) {
 	// Upgrade and test Retina with advanced metrics
 	advanceMetricsE2E := types.NewRunner(t,
 		jobs.UpgradeAndTestRetinaAdvancedMetrics(
-			common.KubeConfigFilePath(rootDir),
-			common.RetinaChartPath(rootDir),
-			common.RetinaAdvancedProfilePath(rootDir),
+			settings.KubeConfigFilePath,
+			settings.ChartPath,
+			settings.AdvancedProfilePath,
 			common.TestPodNamespace),
 	)
 	advanceMetricsE2E.Run(ctx)
@@ -57,7 +58,7 @@ func TestE2ERetina(t *testing.T) {
 	// Install and test Hubble basic metrics
 	validatehubble := types.NewRunner(t,
 		jobs.ValidateHubble(
-			common.KubeConfigFilePath(rootDir),
+			settings.KubeConfigFilePath,
 			hubblechartPath,
 			common.TestPodNamespace),
 	)
