@@ -37,20 +37,26 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
-type Env struct {
+// Type ContainerEnvVars contains the required values to rebuild the name and location of a capture file on the host.
+type ContainerEnvVars struct {
 	hostPath         string
 	nodeHostName     string
 	captureName      string
 	captureStartTime string
 }
 
-const MountPath = "/mnt/retina/"
+const MountPath = "/host/mnt/retina/"
 const DefaultOutputPath = "/tmp/retina/capture/"
 
 var blobURL string
 var extract bool
 var jobName string
 var outputPath string
+
+var ErrNoPodFound = errors.New("no pod found for job")
+var ErrManyPodsFound = errors.New("more than one pod found for job; expected exactly one")
+var ErrCaptureContainerNotFound = errors.New("capture container not found in pod")
+var ErrDownloadPodFailed = errors.New("download pod failed to spin up successfully")
 
 var downloadExample = templates.Examples(i18n.T(`
 		# List Retina capture jobs
@@ -66,7 +72,7 @@ var downloadExample = templates.Examples(i18n.T(`
 		kubectl retina capture download --job <job-name> -o <output-location>
 
 		# Download capture files from Blob Storage via Blob URL (Blob URl requires Read/List permissions)
-		kubectl retina capture download --blobUrl "<blob-url>"
+		kubectl retina capture download --blob-url "<blob-url>"
 `))
 
 var downloadCapture = &cobra.Command{
@@ -175,11 +181,11 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 	}
 
 	outputFile := filepath.Join(outputPath, fileName)
-	err = os.MkdirAll(outputPath, 0755)
+	err = os.MkdirAll(outputPath, 0o775)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create directory: %w", err)
 	}
-	err = os.WriteFile(outputFile, buf.Bytes(), 0o600)
+	err = os.WriteFile(outputFile, buf.Bytes(), 0o644)
 	if err != nil {
 		return nil, fmt.Errorf("failed to write file to host: %w", err)
 	}
@@ -201,11 +207,11 @@ func getCapturePod(ctx context.Context, kubeClient *kubernetes.Clientset, jobNam
 		return corev1.Pod{}, err
 	}
 	if len(pods.Items) == 0 {
-		return corev1.Pod{}, fmt.Errorf("no pod found for job %s", jobName)
+		return corev1.Pod{}, errors.Wrap(ErrNoPodFound, jobName)
 	}
 	// The assumption is that the capture job only runs on one pod.
 	if len(pods.Items) > 1 {
-		return corev1.Pod{}, fmt.Errorf("multiple pods found for job %s; expected exactly one", jobName)
+		return corev1.Pod{}, errors.Wrap(ErrManyPodsFound, jobName)
 	}
 
 	return pods.Items[0], nil
@@ -221,13 +227,13 @@ func getCaptureContainer(pod corev1.Pod) (*corev1.Container, error) {
 		}
 	}
 	if targetContainer == nil {
-		return nil, fmt.Errorf("container %s not found in pod %s", containerName, pod.Name)
+		return nil, errors.Wrap(ErrCaptureContainerNotFound, pod.Name)
 	}
 	return targetContainer, nil
 }
 
-func getCaptureEnvironment(container *corev1.Container) Env {
-	var captureEnv = Env{}
+func getCaptureEnvironment(container *corev1.Container) ContainerEnvVars {
+	var captureEnv = ContainerEnvVars{}
 
 	for _, env := range container.Env {
 		switch env.Name {
@@ -245,7 +251,7 @@ func getCaptureEnvironment(container *corev1.Container) Env {
 	return captureEnv
 }
 
-func getCaptureFileName(env Env) (string, error) {
+func getCaptureFileName(env ContainerEnvVars) (string, error) {
 	timestamp, err := file.StringToTimestamp(env.captureStartTime)
 	if err != nil {
 		return "", err
@@ -313,8 +319,8 @@ func createDownloadPod(ctx context.Context, kubeClient *kubernetes.Clientset, na
 		if pod.Status.Phase == corev1.PodRunning {
 			return pod, nil
 		}
-		if pod.Status.Phase == corev1.PodFailed || pod.Status.Phase == corev1.PodSucceeded {
-			return nil, fmt.Errorf("debug pod ended before becoming ready")
+		if pod.Status.Phase == corev1.PodFailed {
+			return nil, ErrDownloadPodFailed
 		}
 	}
 }
@@ -369,7 +375,7 @@ func downloadFromBlob() ([]string, error) {
 		return nil, errors.Errorf("no blobs found with prefix: %s", *opts.Name)
 	}
 
-	err = os.MkdirAll(outputPath, 0755)
+	err = os.MkdirAll(outputPath, 0o775)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create output directory: %w", err)
 	}
@@ -391,7 +397,7 @@ func downloadFromBlob() ([]string, error) {
 		}
 
 		outputFile := filepath.Join(outputPath, v.Name)
-		err = os.WriteFile(outputFile, blobData, 0o600)
+		err = os.WriteFile(outputFile, blobData, 0o644)
 		if err != nil {
 			retinacmd.Logger.Error("err: ", zap.Error(err))
 			return nil, errors.Wrap(err, "failed to write file")
@@ -406,7 +412,7 @@ func downloadFromBlob() ([]string, error) {
 func extractFiles(srcFile, outputDir string) error {
 	output := strings.TrimSuffix(filepath.Base(srcFile), ".tar.gz")
 	dest := filepath.Join(outputDir, output)
-	if err := os.MkdirAll(dest, 0755); err != nil {
+	if err := os.MkdirAll(dest, 0o775); err != nil {
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
 
@@ -440,12 +446,12 @@ func processTarGz(r io.Reader, destDir string) error {
 
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err := os.MkdirAll(targetPath, 0755); err != nil {
+			if err := os.MkdirAll(targetPath, 0o775); err != nil {
 				return err
 			}
 
 		case tar.TypeReg:
-			if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+			if err := os.MkdirAll(filepath.Dir(targetPath), 0o775); err != nil {
 				return err
 			}
 
@@ -487,7 +493,7 @@ func saveFile(path string, data []byte) error {
 
 func init() {
 	capture.AddCommand(downloadCapture)
-	downloadCapture.Flags().StringVar(&blobURL, "blobUrl", "", "Blob URL from which to download")
+	downloadCapture.Flags().StringVar(&blobURL, "blob-url", "", "Blob URL from which to download")
 	downloadCapture.Flags().BoolVarP(&extract, "extract", "e", false, "Extract the tarball upon download")
 	downloadCapture.Flags().StringVar(&jobName, "job", "", "The name of a capture job")
 	downloadCapture.Flags().StringVarP(&outputPath, "output", "o", DefaultOutputPath, "Path to save the downloaded capture")
