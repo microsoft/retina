@@ -116,6 +116,7 @@ var downloadCapture = &cobra.Command{
 					return err
 				}
 			}
+			fmt.Println("Extracted within: ", outputPath)
 		}
 
 		return err
