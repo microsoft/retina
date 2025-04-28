@@ -32,7 +32,6 @@ site/.docusaurus/
 site/node_modules/
 
 output
-
 #vscode 
 .vscode/
 

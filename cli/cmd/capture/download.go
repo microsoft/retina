@@ -210,7 +210,7 @@ func getCapturePod(ctx context.Context, kubeClient *kubernetes.Clientset, jobNam
 		LabelSelector: "job-name=" + jobName,
 	})
 	if err != nil {
-		return corev1.Pod{}, err
+		return corev1.Pod{}, fmt.Errorf("failed to obtain list of pods: %w", err)
 	}
 	if len(pods.Items) == 0 {
 		return corev1.Pod{}, errors.Wrap(ErrNoPodFound, jobName)
@@ -226,8 +226,8 @@ func getCapturePod(ctx context.Context, kubeClient *kubernetes.Clientset, jobNam
 func getCaptureContainer(pod corev1.Pod) (*corev1.Container, error) {
 	containerName := captureConstants.CaptureContainername
 	var targetContainer *corev1.Container
-	for i, c := range pod.Spec.Containers {
-		if c.Name == containerName {
+	for i := range pod.Spec.Containers {
+		if pod.Spec.Containers[i].Name == containerName {
 			targetContainer = &pod.Spec.Containers[i]
 			break
 		}
@@ -260,7 +260,7 @@ func getCaptureEnvironment(container *corev1.Container) ContainerEnvVars {
 func getCaptureFileName(env ContainerEnvVars) (string, error) {
 	timestamp, err := file.StringToTimestamp(env.captureStartTime)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to get the timestamp for the capture file name: %w", err)
 	}
 
 	captureFile := file.CaptureFilename{
@@ -310,17 +310,17 @@ func createDownloadPod(ctx context.Context, kubeClient *kubernetes.Clientset, na
 		},
 	}
 
+	fmt.Println("Creating download pod to retrieve the files...")
 	_, err := kubeClient.CoreV1().Pods(namespace).Create(ctx, podSpec, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create debug pod: %w", err)
+		return nil, fmt.Errorf("failed to create download pod: %w", err)
 	}
 
-	fmt.Println("Creating download pod to retrieve the files...")
 	for {
 		time.Sleep(1 * time.Second)
 		pod, err := kubeClient.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to get download pod: %w", err)
 		}
 		if pod.Status.Phase == corev1.PodRunning {
 			return pod, nil
@@ -387,22 +387,23 @@ func downloadFromBlob() ([]string, error) {
 	}
 
 	files := []string{}
-	for _, v := range blobList.Blobs {
-		blob := blobService.GetContainerReference(containerName).GetBlobReference(v.Name)
-		readCloser, err := blob.Get(&storage.GetBlobOptions{})
+	for i := range blobList.Blobs {
+		blob := blobList.Blobs[i]
+		blobRef := blobService.GetContainerReference(containerName).GetBlobReference(blob.Name)
+		readCloser, err := blobRef.Get(&storage.GetBlobOptions{})
 		if err != nil {
 			retinacmd.Logger.Error("err: ", zap.Error(err))
 			return nil, errors.Wrap(err, "failed to read from blobstore")
 		}
-		defer readCloser.Close()
 
 		blobData, err := io.ReadAll(readCloser)
+		readCloser.Close()
 		if err != nil {
 			retinacmd.Logger.Error("err: ", zap.Error(err))
 			return nil, errors.Wrap(err, "failed to obtain blob from blobstore")
 		}
 
-		outputFile := filepath.Join(outputPath, v.Name)
+		outputFile := filepath.Join(outputPath, blob.Name)
 		err = os.WriteFile(outputFile, blobData, 0o600)
 		if err != nil {
 			retinacmd.Logger.Error("err: ", zap.Error(err))
@@ -424,7 +425,7 @@ func extractFiles(srcFile, outputDir string) error {
 
 	file, err := os.Open(srcFile)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open file %s: %w", srcFile, err)
 	}
 	defer file.Close()
 
@@ -434,7 +435,7 @@ func extractFiles(srcFile, outputDir string) error {
 func processTarGz(r io.Reader, destDir string) error {
 	gzReader, err := gzip.NewReader(r)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create gzip reader: %w", err)
 	}
 	defer gzReader.Close()
 	tarReader := tar.NewReader(gzReader)
@@ -445,7 +446,7 @@ func processTarGz(r io.Reader, destDir string) error {
 			break
 		}
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create tar reader: %w", err)
 		}
 
 		targetPath := filepath.Join(destDir, header.Name)
@@ -453,17 +454,17 @@ func processTarGz(r io.Reader, destDir string) error {
 		switch header.Typeflag {
 		case tar.TypeDir:
 			if err := os.MkdirAll(targetPath, 0o775); err != nil {
-				return err
+				return fmt.Errorf("failed to make directory %s: %w", targetPath, err)
 			}
 
 		case tar.TypeReg:
 			if err := os.MkdirAll(filepath.Dir(targetPath), 0o775); err != nil {
-				return err
+				return fmt.Errorf("failed to make directory %s: %w", targetPath, err)
 			}
 
 			data, err := io.ReadAll(tarReader)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to read data with tar reader: %w", err)
 			}
 
 			// Check if this is a nested tar.gz file by checking the header for the "gzip magic number"
@@ -489,12 +490,15 @@ func processTarGz(r io.Reader, destDir string) error {
 func saveFile(path string, data []byte) error {
 	outFile, err := os.Create(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create file %s: %w", path, err)
 	}
 	defer outFile.Close()
 
 	_, err = outFile.Write(data)
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to write data to file %s: %w", path, err)
+	}
+	return nil
 }
 
 func init() {

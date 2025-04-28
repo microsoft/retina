@@ -76,7 +76,8 @@ func printCaptureResult(captureJobs []batchv1.Job) {
 	w.Init(os.Stdout, 0, 8, 3, ' ', 0)
 	fmt.Fprintln(w, "NAMESPACE\tCAPTURE NAME\tJOB\tCOMPLETIONS\tAGE")
 
-	for captureRef, jobs := range captureToJobs {
+	for captureRef := range captureToJobs {
+		jobs := captureToJobs[captureRef]
 		captureParts := strings.Split(captureRef, "/")
 		captureNamespace, captureName := captureParts[0], captureParts[1]
 
@@ -84,7 +85,8 @@ func printCaptureResult(captureJobs []batchv1.Job) {
 			return jobs[i].Name < jobs[j].Name
 		})
 
-		for _, job := range jobs {
+		for i := range jobs {
+			job := &jobs[i]
 			completions := fmt.Sprintf("%d/%d", job.Status.Succeeded, *job.Spec.Completions)
 			age := durationUtil.HumanDuration(time.Since(job.CreationTimestamp.Time))
 			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", captureNamespace, captureName, job.Name, completions, age)
