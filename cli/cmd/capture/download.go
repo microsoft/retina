@@ -45,18 +45,24 @@ type ContainerEnvVars struct {
 	captureStartTime string
 }
 
-const MountPath = "/host/mnt/retina/"
-const DefaultOutputPath = "/tmp/retina/capture/"
+const (
+	MountPath         = "/host/mnt/retina/"
+	DefaultOutputPath = "/tmp/retina/capture/"
+)
 
-var blobURL string
-var extract bool
-var jobName string
-var outputPath string
+var (
+	blobURL    string
+	extract    bool
+	jobName    string
+	outputPath string
+)
 
-var ErrNoPodFound = errors.New("no pod found for job")
-var ErrManyPodsFound = errors.New("more than one pod found for job; expected exactly one")
-var ErrCaptureContainerNotFound = errors.New("capture container not found in pod")
-var ErrDownloadPodFailed = errors.New("download pod failed to spin up successfully")
+var (
+	ErrNoPodFound               = errors.New("no pod found for job")
+	ErrManyPodsFound            = errors.New("more than one pod found for job; expected exactly one")
+	ErrCaptureContainerNotFound = errors.New("capture container not found in pod")
+	ErrDownloadPodFailed        = errors.New("download pod failed to spin up successfully")
+)
 
 var downloadExample = templates.Examples(i18n.T(`
 		# List Retina capture jobs
@@ -176,7 +182,7 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 		Stdout: &buf,
 		Stderr: &buf,
 	}
-	if err := exec.StreamWithContext(ctx, streamOpts); err != nil {
+	if err = exec.StreamWithContext(ctx, streamOpts); err != nil {
 		return nil, fmt.Errorf("failed to exec tar in container: %w", err)
 	}
 
@@ -185,7 +191,7 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 	if err != nil {
 		return nil, fmt.Errorf("failed to create directory: %w", err)
 	}
-	err = os.WriteFile(outputFile, buf.Bytes(), 0o644)
+	err = os.WriteFile(outputFile, buf.Bytes(), 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("failed to write file to host: %w", err)
 	}
@@ -201,7 +207,7 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 
 func getCapturePod(ctx context.Context, kubeClient *kubernetes.Clientset, jobName, namespace string) (corev1.Pod, error) {
 	pods, err := kubeClient.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("job-name=%s", jobName),
+		LabelSelector: "job-name=" + jobName,
 	})
 	if err != nil {
 		return corev1.Pod{}, err
@@ -233,7 +239,7 @@ func getCaptureContainer(pod corev1.Pod) (*corev1.Container, error) {
 }
 
 func getCaptureEnvironment(container *corev1.Container) ContainerEnvVars {
-	var captureEnv = ContainerEnvVars{}
+	captureEnv := ContainerEnvVars{}
 
 	for _, env := range container.Env {
 		switch env.Name {
@@ -397,7 +403,7 @@ func downloadFromBlob() ([]string, error) {
 		}
 
 		outputFile := filepath.Join(outputPath, v.Name)
-		err = os.WriteFile(outputFile, blobData, 0o644)
+		err = os.WriteFile(outputFile, blobData, 0o600)
 		if err != nil {
 			retinacmd.Logger.Error("err: ", zap.Error(err))
 			return nil, errors.Wrap(err, "failed to write file")
