@@ -463,18 +463,22 @@ func processTarGz(r io.Reader, destDir string) error {
 					return err
 				}
 			} else {
-				outFile, err := os.Create(targetPath)
-				if err != nil {
-					return err
-				}
-				defer outFile.Close()
-
-				_, err = outFile.Write(data)
-				return err
+				saveFile(targetPath, data)
 			}
 		}
 	}
 	return nil
+}
+
+func saveFile(path string, data []byte) error {
+	outFile, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer outFile.Close()
+
+	_, err = outFile.Write(data)
+	return err
 }
 
 func init() {
