@@ -9,7 +9,6 @@ type (
 
 // Environment variables
 const (
-	CaptureOutputLocationEnvKeyDownload              CaptureOutputLocationEnvKey = "DOWNLOAD"
 	CaptureOutputLocationEnvKeyHostPath              CaptureOutputLocationEnvKey = "HOSTPATH"
 	CaptureOutputLocationEnvKeyPersistentVolumeClaim CaptureOutputLocationEnvKey = "PERSISTENT_VOLUME_CLAIM"
 	CaptureOutputLocationEnvKeyS3Endpoint            CaptureOutputLocationEnvKey = "S3_ENDPOINT"

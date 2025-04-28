@@ -32,10 +32,9 @@ site/.docusaurus/
 site/node_modules/
 
 output
+
 #vscode 
 .vscode/
-
-artifacts/
 
 dist/
 bin/
