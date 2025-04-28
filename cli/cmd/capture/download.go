@@ -402,24 +402,30 @@ func downloadFromBlob() ([]string, error) {
 	return files, nil
 }
 
-func extractFiles(srcFile, dest string) error {
+func extractFiles(srcFile, outputDir string) error {
+	output := strings.TrimSuffix(filepath.Base(srcFile), ".tar.gz")
+	dest := filepath.Join(outputDir, output)
+	if err := os.MkdirAll(dest, 0755); err != nil {
+		return fmt.Errorf("failed to create destination directory: %w", err)
+	}
+
 	file, err := os.Open(srcFile)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	tarReader := tar.NewReader(file)
-	err = extractTar(tarReader, dest)
+	return processTarGz(file, dest)
+}
+
+func processTarGz(r io.Reader, destDir string) error {
+	gzReader, err := gzip.NewReader(r)
 	if err != nil {
 		return err
 	}
+	defer gzReader.Close()
+	tarReader := tar.NewReader(gzReader)
 
-	fmt.Println("Extracted files within: ", dest)
-	return nil
-}
-
-func extractTar(tarReader *tar.Reader, dest string) error {
 	for {
 		header, err := tarReader.Next()
 		if err == io.EOF {
@@ -429,16 +435,16 @@ func extractTar(tarReader *tar.Reader, dest string) error {
 			return err
 		}
 
-		targetPath := filepath.Join(dest, header.Name)
+		targetPath := filepath.Join(destDir, header.Name)
 
 		switch header.Typeflag {
-		case tar.TypeDir: // directory
-			if err := os.MkdirAll(targetPath, 0755); err != nil { // make directory
+		case tar.TypeDir:
+			if err := os.MkdirAll(targetPath, 0755); err != nil {
 				return err
 			}
 
-		case tar.TypeReg: // regular file
-			if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil { // create file directory first
+		case tar.TypeReg:
+			if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
 				return err
 			}
 
@@ -447,29 +453,24 @@ func extractTar(tarReader *tar.Reader, dest string) error {
 				return err
 			}
 
-			// Determine if gzipped by checking magic number
+			// Check if this is a nested tar.gz file by checking the header for the "gzip magic number"
 			isGzip := len(data) > 2 && data[0] == 0x1f && data[1] == 0x8b
 
 			if isGzip {
 				reader := bytes.NewReader(data)
-				nestedDst := filepath.Join(dest, strings.TrimSuffix(header.Name, filepath.Ext(header.Name)))
-				os.MkdirAll(nestedDst, 0755)
-
-				if gzr, err := gzip.NewReader(reader); err == nil {
-					defer gzr.Close()
-					_ = extractTar(tar.NewReader(gzr), nestedDst)
+				err = processTarGz(reader, destDir)
+				if err != nil {
+					return err
 				}
-
 			} else {
 				outFile, err := os.Create(targetPath)
 				if err != nil {
 					return err
 				}
-				_, err = io.Copy(outFile, tarReader)
-				outFile.Close()
-				if err != nil {
-					return err
-				}
+				defer outFile.Close()
+
+				_, err = outFile.Write(data)
+				return err
 			}
 		}
 	}
