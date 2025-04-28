@@ -37,7 +37,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
-type CaptureEnv struct {
+type Env struct {
 	hostPath         string
 	nodeHostName     string
 	captureName      string
@@ -47,7 +47,7 @@ type CaptureEnv struct {
 const MountPath = "/mnt/retina/"
 const DefaultOutputPath = "/tmp/retina/capture/"
 
-var blobUrl string
+var blobURL string
 var extract bool
 var jobName string
 var outputPath string
@@ -100,7 +100,7 @@ var downloadCapture = &cobra.Command{
 			downloadedFiles = append(downloadedFiles, files...)
 		}
 
-		if blobUrl != "" {
+		if blobURL != "" {
 			var files []string
 			files, err = downloadFromBlob()
 			if err != nil {
@@ -179,7 +179,7 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 	if err != nil {
 		return nil, fmt.Errorf("failed to create directory: %w", err)
 	}
-	err = os.WriteFile(outputFile, buf.Bytes(), 0644)
+	err = os.WriteFile(outputFile, buf.Bytes(), 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("failed to write file to host: %w", err)
 	}
@@ -226,8 +226,8 @@ func getCaptureContainer(pod corev1.Pod) (*corev1.Container, error) {
 	return targetContainer, nil
 }
 
-func getCaptureEnvironment(container *corev1.Container) CaptureEnv {
-	var captureEnv = CaptureEnv{}
+func getCaptureEnvironment(container *corev1.Container) Env {
+	var captureEnv = Env{}
 
 	for _, env := range container.Env {
 		switch env.Name {
@@ -245,7 +245,7 @@ func getCaptureEnvironment(container *corev1.Container) CaptureEnv {
 	return captureEnv
 }
 
-func getCaptureFileName(env CaptureEnv) (string, error) {
+func getCaptureFileName(env Env) (string, error) {
 	timestamp, err := file.StringToTimestamp(env.captureStartTime)
 	if err != nil {
 		return "", err
@@ -340,10 +340,10 @@ func createDownloadExec(kubeClient *kubernetes.Clientset, config *rest.Config, p
 }
 
 func downloadFromBlob() ([]string, error) {
-	u, err := url.Parse(blobUrl)
+	u, err := url.Parse(blobURL)
 	if err != nil {
 		retinacmd.Logger.Error("err: ", zap.Error(err))
-		return nil, errors.Wrapf(err, "failed to parse SAS URL %s", blobUrl)
+		return nil, errors.Wrapf(err, "failed to parse SAS URL %s", blobURL)
 	}
 
 	b, err := storage.NewAccountSASClientFromEndpointToken(u.String(), u.Query().Encode())
@@ -391,7 +391,7 @@ func downloadFromBlob() ([]string, error) {
 		}
 
 		outputFile := filepath.Join(outputPath, v.Name)
-		err = os.WriteFile(outputFile, blobData, 0o644)
+		err = os.WriteFile(outputFile, blobData, 0o600)
 		if err != nil {
 			retinacmd.Logger.Error("err: ", zap.Error(err))
 			return nil, errors.Wrap(err, "failed to write file")
@@ -464,7 +464,10 @@ func processTarGz(r io.Reader, destDir string) error {
 					return err
 				}
 			} else {
-				saveFile(targetPath, data)
+				err = saveFile(targetPath, data)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -484,7 +487,7 @@ func saveFile(path string, data []byte) error {
 
 func init() {
 	capture.AddCommand(downloadCapture)
-	downloadCapture.Flags().StringVar(&blobUrl, "blobUrl", "", "Blob URL from which to download")
+	downloadCapture.Flags().StringVar(&blobURL, "blobUrl", "", "Blob URL from which to download")
 	downloadCapture.Flags().BoolVarP(&extract, "extract", "e", false, "Extract the tarball upon download")
 	downloadCapture.Flags().StringVar(&jobName, "job", "", "The name of a capture job")
 	downloadCapture.Flags().StringVarP(&outputPath, "output", "o", DefaultOutputPath, "Path to save the downloaded capture")
