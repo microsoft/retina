@@ -150,6 +150,7 @@ func (dr *dropReason) Init() error {
 	} else {
 		objs = &kprobeObjectsMariner{} //nolint:typecheck // needs to match a generated struct until we fix Mariner
 		maps = &objs.(*kprobeObjectsMariner).kprobeMaps
+		dr.l.Info("Detected Mariner distro")
 	}
 
 	spec, err := ebpf.LoadCollectionSpec(bpfOutputFile)

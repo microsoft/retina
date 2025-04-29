@@ -135,7 +135,7 @@ spec:
         hostPath:
           path: {{ $hostPath }}
         {{- if eq $name "host-os-release" }}
-          type: File
+          type: FileOrCreate
         {{- end }}
       {{- end }}
       {{- end }}
