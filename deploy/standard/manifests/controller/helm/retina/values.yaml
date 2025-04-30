@@ -98,6 +98,7 @@ volumeMounts:
   cgroup: /sys/fs/cgroup
   tmp: /tmp
   config: /retina/config
+  host-os-release: /etc/os-release
 
 #volume mounts for windows
 volumeMounts_win:
