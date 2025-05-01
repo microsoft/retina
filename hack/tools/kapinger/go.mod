@@ -1,6 +1,6 @@
 module github.com/microsoft/retina/hack/tools/kapinger
 
-go 1.24.1
+go 1.24.2
 
 require (
 	golang.org/x/sync v0.12.0
