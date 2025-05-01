@@ -28,6 +28,20 @@ operator:
       - "--config"
       - "/retina/operator-config.yaml"
   telemetryInterval: "5m"
+  affinity:
+    # TODO(user): Override the following values to configure the nodeAffinity expression
+    # according to the platforms which are supported by your solution.
+    # It is considered best practice to support multiple architectures. You can
+    # build your manager image using the makefile target docker-buildx.
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: kubernetes.io/os
+                operator: In
+                values:
+                  - linux
+                  #- windows
 
 image:
   repository: ghcr.io/microsoft/retina/retina-agent
