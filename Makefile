@@ -35,7 +35,7 @@ PLATFORM		?= $(OS)/$(ARCH)
 PLATFORMS		?= linux/amd64 linux/arm64 windows/amd64
 OS_VERSION		?= ltsc2019
 
-HUBBLE_VERSION ?= v1.17.2
+HUBBLE_VERSION ?= v1.17.3
 
 CONTAINER_BUILDER ?= docker
 CONTAINER_RUNTIME ?= docker
