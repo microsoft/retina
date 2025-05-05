@@ -11,7 +11,7 @@ FROM mcr.microsoft.com/cbl-mariner/base/core@sha256:8deab931d4af66264253cce66471
 # skopeo inspect docker://mcr.microsoft.com/cbl-mariner/distroless/minimal:2.0 --format "{{.Name}}@{{.Digest}}"
 FROM mcr.microsoft.com/cbl-mariner/distroless/minimal@sha256:0b09ee9e988e338f86432484c980c9c334d2b35b3bec6ce14298b754ecb6460b AS mariner-distroless
 
-# mcr.microsoft.com/windows/servercore:ltsc2019 
+# mcr.microsoft.com/windows/servercore:ltsc2019
 FROM mcr.microsoft.com/windows/servercore@sha256:6fdf140282a2f809dae9b13fe441635867f0a27c33a438771673b8da8f3348a4 AS ltsc2019
 
 # mcr.microsoft.com/windows/servercore:ltsc2022
@@ -21,7 +21,7 @@ FROM mcr.microsoft.com/windows/servercore@sha256:45952938708fbde6ec0b5b94de68bcd
 # build stages
 
 # intermediate go generate stage
-FROM golang AS intermediate 
+FROM golang AS intermediate
 ARG APP_INSIGHTS_ID # set to enable AI telemetry
 ARG GOARCH=amd64 # default to amd64
 ARG GOOS=linux # default to linux
@@ -45,6 +45,13 @@ RUN if [ "$GOOS" = "linux" ] ; then \
       rm -rf ./pkg/plugin && tar xvf /gen.tar.gz ./pkg/plugin; \
     fi
 
+FROM golang AS eBPFRetinaStage
+WORKDIR /tmp
+RUN tdnf install -y unzip && \
+    curl -L -o eBPFRetina.zip https://www.nuget.org/api/v2/package/Microsoft.Wcn.Observability.eBPF.Retina.x64/0.1.0-prerelease.3 && \
+    unzip -d eBPFRetina eBPFRetina.zip || exit 0 && \
+    if [ ! -d "eBPFRetina" ]; then echo "eBPFRetina directory not found after unzip!" && exit 1; fi
+
 # capture binary
 FROM intermediate AS capture-bin
 ARG APP_INSIGHTS_ID # set to enable AI telemetry
@@ -64,7 +71,7 @@ ARG GOOS=linux # default to linux
 ARG VERSION
 ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
-RUN --mount=type=cache,target="/root/.cache/go-build" go build -x -v -o /go/bin/retina/controller -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID="$APP_INSIGHTS_ID"" controller/main.go 
+RUN --mount=type=cache,target="/root/.cache/go-build" go build -x -v -o /go/bin/retina/controller -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID="$APP_INSIGHTS_ID"" controller/main.go
 
 
 # init binary
@@ -133,8 +140,9 @@ ENV HUBBLE_SERVER=unix:///var/run/cilium/hubble.sock
 ENTRYPOINT ["./retina/controller"]
 
 
-# agent final image for windows 
+# agent final image for windows
 FROM ${OS_VERSION} AS agent-win
+COPY --from=eBPFRetinaStage /tmp/eBPFRetina/build/native/bin/Release/retinaebpfapi.dll /retinaebpfapi.dll
 COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
 COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
 COPY --from=controller-bin /go/bin/retina/controller controller.exe
