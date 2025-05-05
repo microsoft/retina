@@ -30,7 +30,7 @@ jobs:
           go-version-file: go.mod
       - name: golangci-lint
         if: env.IS_NOT_MERGE_GROUP
-        uses: golangci/golangci-lint-action@v7
+        uses: golangci/golangci-lint-action@v8
         with:
           version: latest
           args: --concurrency 4 --verbose --config=.golangci.yaml --timeout=25m
