@@ -22,9 +22,18 @@ RUN go build -v -o captureworkload.exe -ldflags="-X github.com/microsoft/retina/
 FROM --platform=windows/amd64 ${BUILDER_IMAGE} as pktmon-builder
 WORKDIR C:\\retina
 
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:5341a0010ecff114ee2f11f5eaa4f73b721b54142954041523f3e785d5c4b978 AS golang
+FROM golang AS eBPFRetinaStage
+WORKDIR /tmp
+RUN tdnf install -y unzip && \
+    curl -L -o eBPFRetina.zip https://www.nuget.org/api/v2/package/Microsoft.Wcn.Observability.eBPF.Retina.x64/0.1.0-prerelease.3 && \
+    unzip -d eBPFRetina eBPFRetina.zip || exit 0 && \
+    if [ ! -d "eBPFRetina" ]; then echo "eBPFRetina directory not found after unzip!" && exit 1; fi
+
 FROM --platform=windows/amd64 mcr.microsoft.com/windows/nanoserver:ltsc2022 AS final
 ADD https://github.com/microsoft/etl2pcapng/releases/download/v1.10.0/etl2pcapng.exe /etl2pcapng.exe
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'Continue';"]
+COPY --from=eBPFRetinaStage /tmp/eBPFRetina/build/native/bin/Release/retinaebpfapi.dll /retinaebpfapi.dll
 COPY --from=builder C:\\retina\\windows\\kubeconfigtemplate.yaml kubeconfigtemplate.yaml
 COPY --from=builder C:\\retina\\windows\\setkubeconfigpath.ps1 setkubeconfigpath.ps1
 COPY --from=builder C:\\retina\\controller.exe controller.exe
