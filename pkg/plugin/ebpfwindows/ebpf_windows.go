@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -20,7 +21,6 @@ import (
 	metrics "github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/registry"
 	"github.com/microsoft/retina/pkg/utils"
-	"github.com/sirupsen/logrus"
 	"go.uber.org/zap"
 )
 
@@ -58,7 +58,8 @@ func New(cfg *kcfg.Config) registry.Plugin {
 
 // Init is a no-op for the ebpfwindows plugin
 func (p *Plugin) Init() error {
-	parser, err := hp.New(logrus.WithField("windowsEbpf", "parser"),
+	logger := slog.Default().With("windowsEbpf", "parser")
+	parser, err := hp.New(logger,
 		// We use noop getters here since we will use our own custom parser in hubble
 		&NoopEndpointGetter,
 		&NoopIdentityGetter,
@@ -67,6 +68,7 @@ func (p *Plugin) Init() error {
 		&NoopServiceGetter,
 		&NoopLinkGetter,
 		&NoopPodMetadataGetter,
+		false,
 	)
 
 	if err != nil {
@@ -116,7 +118,6 @@ func (p *Plugin) metricsMapIterateCallback(key *MetricsKey, value *MetricsValues
 
 // eventsMapCallback is the callback function that is called for each value  in the events map.
 func (p *Plugin) eventsMapCallback(data unsafe.Pointer, size uint32) {
-	p.l.Debug("eventsMapCallback", zap.Uint32("size", size))
 	err := p.handleTraceEvent(data, size)
 	if err != nil {
 		p.l.Error("Error handling trace event", zap.Error(err))
@@ -155,7 +156,7 @@ func (p *Plugin) pullMetricsAndEvents(ctx context.Context) {
 	}
 
 	if p.enricher != nil {
-		err := eventsMap.RegisterForCallback(p.eventsMapCallback)
+		err := eventsMap.RegisterForCallback(p.l, p.eventsMapCallback)
 		if err != nil {
 			p.l.Error("Error registering for events map callback", zap.Error(err))
 			return
@@ -228,14 +229,22 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 			},
 		})
 		if err != nil {
-			return fmt.Errorf("could not convert event to flow: %w", err)
+			return fmt.Errorf("could not convert dropnotify event to flow: %w", err)
 		}
-		p.enricher.Write(e)
 		meta := &utils.RetinaMetadata{}
 		utils.AddPacketSize(meta, size-uint32(unsafe.Sizeof(monitor.DropNotify{})))
 		fl := e.GetFlow()
-		meta.DropReason = utils.DropReason(e.GetFlow().EventType.GetSubType())
+		if fl == nil {
+			return fmt.Errorf("dropnotify flow object is nil")
+		}
+		if fl.GetEventType() == nil {
+			return fmt.Errorf("dropnotify event type is nil")
+		}
+		// Set the drop reason.
+		eventType := fl.GetEventType().GetSubType()
+		meta.DropReason = utils.DropReason(eventType)
 		utils.AddRetinaMetadata(fl, meta)
+		p.enricher.Write(e)
 	case monitorapi.MessageTypeTrace:
 		if size <= uint32(unsafe.Sizeof(monitor.TraceNotify{})) {
 			return fmt.Errorf("invalid size for TraceNotify %d", size)
@@ -245,14 +254,17 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 				Data: perfData,
 			},
 		})
-		p.enricher.Write(e)
 		if err != nil {
 			return fmt.Errorf("could not convert tracenotify event to flow: %w", err)
 		}
 		meta := &utils.RetinaMetadata{}
 		utils.AddPacketSize(meta, size-uint32(unsafe.Sizeof(monitor.TraceNotify{})))
 		fl := e.GetFlow()
+		if fl == nil {
+			return fmt.Errorf("tracenotify flow object is nil")
+		}
 		utils.AddRetinaMetadata(fl, meta)
+		p.enricher.Write(e)
 	}
 	return nil
 }
