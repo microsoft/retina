@@ -6,6 +6,7 @@ import (
 	"syscall"
 	"unsafe"
 
+	"github.com/microsoft/retina/pkg/log"
 	"golang.org/x/sys/windows"
 )
 
@@ -55,7 +56,7 @@ type IterateCallback func(*MetricsKey, *MetricsValues)
 // MetricsMap interface represents a metrics map, and can be reused to implement
 // mock maps for unit tests.
 type MetricsMap interface {
-	IterateWithCallback(IterateCallback) error
+	IterateWithCallback(*log.ZapLogger, IterateCallback) error
 }
 
 type metricsMap struct {
@@ -89,12 +90,31 @@ func NewMetricsMap() MetricsMap {
 	return &metricsMap{}
 }
 
+var callEnumMetricsMap = func(callback uintptr) (uintptr, uintptr, error) {
+	return enumMetricsMap.Call(callback)
+}
+
 // IterateWithCallback iterates through all the keys/values of a metrics map,
 // passing each key/value pair to the cb callback
-func (m metricsMap) IterateWithCallback(cb IterateCallback) error {
+func (m metricsMap) IterateWithCallback(l *log.ZapLogger, cb IterateCallback) error {
 
 	// Define the callback function in Go
 	enumCallBack = func(key unsafe.Pointer, value unsafe.Pointer, valueSize int) int {
+
+		if key == nil {
+			l.Error("MetricsKey is nil")
+			return 1
+		}
+
+		if value == nil {
+			l.Error("Metrics Value is nil")
+			return 1
+		}
+
+		if valueSize == 0 {
+			l.Error("Metrics Value size is 0")
+			return 1
+		}
 
 		var metricsValues MetricsValues
 		sh := (*reflect.SliceHeader)(unsafe.Pointer(&metricsValues))
@@ -111,9 +131,7 @@ func (m metricsMap) IterateWithCallback(cb IterateCallback) error {
 	callback := syscall.NewCallback(enumMetricsSysCallCallback)
 
 	// Call the API
-	ret, _, err := enumMetricsMap.Call(
-		uintptr(callback),
-	)
+	ret, _, err := callEnumMetricsMap(uintptr(callback))
 
 	if ret != 0 {
 		return err
