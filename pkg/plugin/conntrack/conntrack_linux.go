@@ -126,8 +126,8 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			var keysToDelete []conntrackCtV4Key
 
 			// metrics counters
-			var packetsCountForward, packetsCountReply, totConnections uint32
-			var bytesCountForward, bytesCountReply uint64
+			var packetsCountTx, packetsCountRx, totConnections uint32
+			var bytesCountTx, bytesCountRx uint64
 
 			iter := ct.ctMap.Iterate()
 			for iter.Next(&key, &value) {
@@ -150,10 +150,10 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 					// Basic metrics, node-level
 					ctMeta := value.ConntrackMetadata
 					totConnections++
-					packetsCountForward += ctMeta.PacketsForwardCount
-					packetsCountReply += ctMeta.PacketsReplyCount
-					bytesCountForward += ctMeta.BytesForwardCount
-					bytesCountReply += ctMeta.BytesReplyCount
+					bytesCountTx += ctMeta.BytesTxCount
+					bytesCountRx += ctMeta.BytesRxCount
+					packetsCountTx += ctMeta.PacketsTxCount
+					packetsCountRx += ctMeta.PacketsRxCount
 				}
 
 				ct.l.Debug("conntrack entry",
@@ -177,10 +177,10 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 
 			// create metrics
 			if conntrackMetricsEnabled {
-				metrics.ConntrackPacketsForward.WithLabelValues().Set(float64(packetsCountForward))
-				metrics.ConntrackBytesForward.WithLabelValues().Set(float64(bytesCountForward))
-				metrics.ConntrackPacketsReply.WithLabelValues().Set(float64(packetsCountReply))
-				metrics.ConntrackBytesReply.WithLabelValues().Set(float64(bytesCountReply))
+				metrics.ConntrackPacketsTx.WithLabelValues().Set(float64(packetsCountTx))
+				metrics.ConntrackBytesTx.WithLabelValues().Set(float64(bytesCountTx))
+				metrics.ConntrackPacketsRx.WithLabelValues().Set(float64(packetsCountRx))
+				metrics.ConntrackBytesRx.WithLabelValues().Set(float64(bytesCountRx))
 				metrics.ConntrackTotalConnections.WithLabelValues().Set(float64(totConnections))
 			}
 

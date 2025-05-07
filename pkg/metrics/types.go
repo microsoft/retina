@@ -45,10 +45,10 @@ const (
 	lostEventsCounterDescription                     = "Number of events lost in control plane"
 
 	// Conntrack metrics
-	ConntrackPacketForwardDescription    = "Number of forward packets"
-	ConntrackPacketReplyDescription      = "Number of reply packets"
-	ConntrackBytesForwardDescription     = "Number of forward bytes"
-	ConntrackBytesReplyDescription       = "Number of reply bytes"
+	ConntrackPacketTxDescription         = "Number of tx packets"
+	ConntrackPacketRxDescription         = "Number of rx packets"
+	ConntrackBytesTxDescription          = "Number of tx bytes"
+	ConntrackBytesRxDescription          = "Number of rx bytes"
 	ConntrackTotalConnectionsDescription = "Total number of connections"
 )
 
@@ -99,10 +99,10 @@ var (
 	InfinibandStatusParamsGauge GaugeVec
 
 	// Conntrack
-	ConntrackPacketsForward   GaugeVec
-	ConntrackPacketsReply     GaugeVec
-	ConntrackBytesForward     GaugeVec
-	ConntrackBytesReply       GaugeVec
+	ConntrackPacketsTx        GaugeVec
+	ConntrackPacketsRx        GaugeVec
+	ConntrackBytesTx          GaugeVec
+	ConntrackBytesRx          GaugeVec
 	ConntrackTotalConnections GaugeVec
 )
 
