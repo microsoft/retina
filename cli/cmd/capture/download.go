@@ -46,7 +46,7 @@ type ContainerEnvVars struct {
 }
 
 const (
-	MountPath         = "/host/mnt/retina/"
+	MountPath         = "/host/mnt/retina/captures/"
 	DefaultOutputPath = "/tmp/retina/capture/"
 )
 
