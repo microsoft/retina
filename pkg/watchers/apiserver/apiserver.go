@@ -17,7 +17,10 @@ import (
 	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
+	kclient "sigs.k8s.io/controller-runtime/pkg/client"
 	kcfg "sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
@@ -35,6 +38,7 @@ type ApiServerWatcher struct {
 	hostResolver      IHostResolver
 	filterManager     fm.IFilterManager
 	restConfig        *rest.Config
+	client            kclient.Client
 }
 
 var a *ApiServerWatcher
@@ -77,6 +81,15 @@ func (a *ApiServerWatcher) Init(ctx context.Context) error {
 			return fmt.Errorf("failed to get kubeconfig: %w", err)
 		}
 		a.restConfig = config
+	}
+
+	if a.client == nil {
+		c, err := kclient.New(a.restConfig, kclient.Options{})
+		if err != nil {
+			a.l.Error("failed to create kubernetes client", zap.Error(err))
+			return fmt.Errorf("failed to create kubernetes client: %w", err)
+		}
+		a.client = c
 	}
 
 	hostName, err := a.getHostName()
@@ -149,10 +162,23 @@ func (a *ApiServerWatcher) Refresh(ctx context.Context) error {
 }
 
 func (a *ApiServerWatcher) initNewCache(ctx context.Context) error {
+	svcIPs, err := a.ipsFromService(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve ips from kubernetes service: %w", err)
+	}
+
+	endpointIPs, err := a.ipsFromEndpoint(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve ips from kubernetes endpoint: %w", err)
+	}
+
 	ips, err := a.resolveIPs(ctx, a.apiServerHostName)
 	if err != nil {
 		return fmt.Errorf("failed to resolve IPs: %w", err)
 	}
+
+	ips = append(ips, endpointIPs...)
+	ips = append(ips, svcIPs...)
 
 	// Reset new cache.
 	a.new = make(cache)
@@ -208,6 +234,42 @@ func (a *ApiServerWatcher) resolveIPs(ctx context.Context, host string) ([]strin
 	}
 
 	return hostIPs, nil
+}
+
+// ipsFromService retrieves IP addresses from the master service "kubernetes" in the default namespace.
+// These IPs are used as a virtual-ip to the kube-apiserver.
+func (a *ApiServerWatcher) ipsFromService(ctx context.Context) ([]string, error) {
+	svc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "kubernetes",
+			Namespace: "default",
+		},
+	}
+	if err := a.client.Get(ctx, kclient.ObjectKeyFromObject(svc), svc); err != nil {
+		return nil, fmt.Errorf("retrieving kubernetes service: %w", err)
+	}
+	return svc.Spec.ClusterIPs, nil
+}
+
+// ipsFromEndpoint retrieves IP addresses from the Endpoint resource "kubernetes" in the default namespace.
+// These IPs are the addresses for the kube-apiserver.
+func (a *ApiServerWatcher) ipsFromEndpoint(ctx context.Context) ([]string, error) {
+	ep := &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "kubernetes",
+			Namespace: "default",
+		},
+	}
+	if err := a.client.Get(ctx, kclient.ObjectKeyFromObject(ep), ep); err != nil {
+		return nil, fmt.Errorf("retrieving kubernetes endpoint: %w", err)
+	}
+	ips := []string{}
+	for _, subset := range ep.Subsets {
+		for _, addr := range subset.Addresses {
+			ips = append(ips, addr.IP)
+		}
+	}
+	return ips, nil
 }
 
 func (a *ApiServerWatcher) publish(netIPs []net.IP, eventType cc.EventType) {
