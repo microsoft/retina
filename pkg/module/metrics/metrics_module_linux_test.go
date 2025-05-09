@@ -7,7 +7,10 @@ import (
 	"net"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/cilium/cilium/api/v1/flow"
+	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/cilium/pkg/hubble/container"
 	api "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/pkg/common"
@@ -17,6 +20,7 @@ import (
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/managers/filtermanager"
 	"github.com/microsoft/retina/pkg/pubsub"
+	"github.com/microsoft/retina/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -437,10 +441,11 @@ func TestModule_Reconcile(t *testing.T) {
 				},
 			},
 			m: &Module{
-				RWMutex:   &sync.RWMutex{},
-				registry:  make(map[string]AdvMetricsInterface),
-				l:         l,
-				moduleCtx: context.Background(),
+				RWMutex:       &sync.RWMutex{},
+				registry:      make(map[string]AdvMetricsInterface),
+				l:             l,
+				moduleCtx:     context.Background(),
+				resetRegistry: resetRegistry,
 			},
 			expectErr: false,
 		},
@@ -468,8 +473,9 @@ func TestModule_Reconcile(t *testing.T) {
 					"drop_count":    testDropMetric,
 					"forward_count": testForwardMetric,
 				},
-				moduleCtx: context.Background(),
-				l:         l,
+				moduleCtx:     context.Background(),
+				l:             l,
+				resetRegistry: resetRegistry,
 			},
 			expectErr: false,
 		},
@@ -507,8 +513,9 @@ func TestModule_Reconcile(t *testing.T) {
 					"forward_count": testForwardMetric,
 					"forward_bytes": testForwardMetricBytes,
 				},
-				moduleCtx: context.Background(),
-				l:         l,
+				moduleCtx:     context.Background(),
+				l:             l,
+				resetRegistry: resetRegistry,
 			},
 			expectErr: false,
 		},
@@ -546,8 +553,9 @@ func TestModule_Reconcile(t *testing.T) {
 					"forward_count": testForwardMetric,
 					"forward_bytes": testForwardMetricBytes,
 				},
-				moduleCtx: context.Background(),
-				l:         l,
+				moduleCtx:     context.Background(),
+				l:             l,
+				resetRegistry: resetRegistry,
 			},
 			expectErr: true,
 		},
@@ -580,6 +588,7 @@ func TestModule_Reconcile(t *testing.T) {
 						},
 					},
 				},
+				resetRegistry: resetRegistry,
 			},
 			expectErr:     false,
 			expectNoCalls: true,
@@ -596,6 +605,7 @@ func TestModule_Reconcile(t *testing.T) {
 		tt.m.enricher = e
 		tt.m.filterManager = fm
 		tt.m.daemonCache = c
+		tt.m.dirtyPods = common.NewDirtyCache()
 		testRing := container.NewRing(container.Capacity1)
 		testRingReader := container.NewRingReader(testRing, 0)
 		p.EXPECT().Subscribe(gomock.Any(), gomock.Any()).Return("test").AnyTimes()
@@ -640,7 +650,8 @@ func TestPodAnnotated(t *testing.T) {
 				daemonConfig: &kcfg.Config{
 					EnableAnnotations: true,
 				},
-				l: l,
+				l:             l,
+				resetRegistry: resetRegistry,
 			},
 			expected: true,
 		},
@@ -656,5 +667,164 @@ func TestPodAnnotated(t *testing.T) {
 	for _, tt := range tests {
 		l.Info("***** Running test *****", zap.String("name", tt.name))
 		assert.Equal(t, tt.expected, tt.m.podAnnotated(tt.annotations))
+	}
+}
+
+func TestModule_GenerateAdvMetrics(t *testing.T) {
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	require.NoError(t, err)
+	l := log.Logger().Named("test")
+
+	disabledAnnotations := &kcfg.Config{
+		EnableAnnotations: false,
+	}
+	enabledAnnotations := &kcfg.Config{
+		EnableAnnotations: true,
+	}
+
+	IP1 := "10.0.0.1"
+	IP2 := "10.0.0.2"
+	IP3 := "10.0.0.3"
+	IP4 := "10.0.0.4"
+
+	newFlow := func(src, dst string) *flow.Flow {
+		return utils.ToFlow(
+			l,
+			int64(0),
+			net.ParseIP(src),
+			net.ParseIP(dst),
+			uint32(8080),
+			uint32(8080),
+			uint8(6),
+			2, // Direction: Ingress
+			utils.Verdict_DNS,
+		)
+	}
+	newEvent := func(f *flow.Flow) *v1.Event {
+		return &v1.Event{
+			Event:     f,
+			Timestamp: f.GetTime(),
+		}
+	}
+
+	ip1ToIP2 := newFlow(IP1, IP2)
+	ip2ToIP1 := newFlow(IP2, IP1)
+	ip1ToIP3 := newFlow(IP1, IP3)
+	ip1ToIP4 := newFlow(IP1, IP4)
+	ip4ToIP1 := newFlow(IP4, IP1)
+
+	tests := []struct {
+		name           string
+		config         *kcfg.Config
+		IPsInCache     []net.IP
+		generatedFlows []*flow.Flow
+		processedFlows []*flow.Flow
+	}{
+		{
+			name:           "Disabled Annotations",
+			config:         disabledAnnotations,
+			IPsInCache:     []net.IP{},
+			generatedFlows: []*flow.Flow{ip1ToIP2, ip2ToIP1},
+			processedFlows: []*flow.Flow{ip1ToIP2, ip2ToIP1},
+		},
+		{
+			name:           "Enabled Annotations - no ip in cache",
+			config:         enabledAnnotations,
+			IPsInCache:     []net.IP{},
+			generatedFlows: []*flow.Flow{ip1ToIP2, ip2ToIP1},
+			processedFlows: []*flow.Flow{},
+		},
+		{
+			name:           "Enabled Annotations - ip in cache, flow ip not in cache",
+			config:         enabledAnnotations,
+			IPsInCache:     []net.IP{net.ParseIP(IP3)},
+			generatedFlows: []*flow.Flow{ip1ToIP2, ip2ToIP1},
+			processedFlows: []*flow.Flow{},
+		},
+		{
+			name:           "Enabled Annotations - 1 ip in cache, flow ip in cache",
+			config:         enabledAnnotations,
+			IPsInCache:     []net.IP{net.ParseIP(IP3)},
+			generatedFlows: []*flow.Flow{ip1ToIP3, ip2ToIP1},
+			processedFlows: []*flow.Flow{ip1ToIP3},
+		},
+		{
+			name:           "Enabled Annotations - 2 ip in cache, flows with and without ip in cache",
+			config:         enabledAnnotations,
+			IPsInCache:     []net.IP{net.ParseIP(IP2), net.ParseIP(IP3)},
+			generatedFlows: []*flow.Flow{ip1ToIP3, ip2ToIP1, ip1ToIP4, ip4ToIP1},
+			processedFlows: []*flow.Flow{ip2ToIP1, ip1ToIP3},
+		},
+	}
+
+	for _, tt := range tests {
+
+		ctrl := gomock.NewController(t)
+		mockMetricName := "mock"
+		myMockMetric := NewMockAdvMetricsInterface(ctrl) //nolint:typecheck // gomock
+
+		m := &Module{
+			wg:           sync.WaitGroup{},
+			RWMutex:      &sync.RWMutex{},
+			registry:     map[string]AdvMetricsInterface{},
+			moduleCtx:    context.TODO(),
+			daemonConfig: tt.config,
+			l:            l,
+			daemonCache:  cache.NewMockCacheInterface(ctrl),
+			resetRegistry: func(m *Module, _ []api.MetricsContextOptions) {
+				m.registry[mockMetricName] = myMockMetric
+
+				myMockMetric.Init(mockMetricName)
+			},
+		}
+
+		log.Logger().Info("***** Running test *****", zap.String("name", tt.name))
+
+		p := pubsub.NewMockPubSubInterface(ctrl)        //nolint:typecheck // gomock
+		e := enricher.NewMockEnricherInterface(ctrl)    //nolint:typecheck // gomock
+		fm := filtermanager.NewMockIFilterManager(ctrl) //nolint:typecheck // gomock
+		c := cache.NewMockCacheInterface(ctrl)          //nolint:typecheck // gomock
+		m.pubsub = p
+		m.enricher = e
+		m.filterManager = fm
+		m.daemonCache = c
+		m.dirtyPods = common.NewDirtyCache()
+
+		testRing := container.NewRing(container.Capacity7)
+		testRingReader := container.NewRingReader(testRing, testRing.OldestWrite())
+
+		fm.EXPECT().HasIP(gomock.Any()).DoAndReturn(func(ip net.IP) bool {
+			for _, cachedIP := range tt.IPsInCache {
+				if ip.Equal(cachedIP) {
+					return true
+				}
+			}
+			return false
+		}).AnyTimes()
+
+		p.EXPECT().Subscribe(gomock.Any(), gomock.Any()).Return("test").AnyTimes()
+		e.EXPECT().ExportReader().Return(testRingReader).MinTimes(1)
+		myMockMetric.EXPECT().Init(mockMetricName).AnyTimes()
+		for _, f := range tt.processedFlows {
+			myMockMetric.EXPECT().ProcessFlow(f).Times(1)
+		}
+
+		spec := (&api.MetricsSpec{}).
+			WithIncludedNamespaces([]string{}).
+			WithMetricsContextOptions([]string{mockMetricName}, []string{"ip"}, []string{"pod"})
+
+		err := m.Reconcile(spec)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+
+		for _, f := range tt.generatedFlows {
+			testRing.Write(newEvent(f))
+		}
+		// for some reason, the n-th element is read when n+1-th element is written
+		dummyFlow := newFlow("127.0.0.1", "127.0.0.2")
+		testRing.Write(newEvent(dummyFlow))
+
+		time.Sleep(1 * time.Second) // wait for goroutines to react to event
 	}
 }
