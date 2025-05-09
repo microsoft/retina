@@ -7,7 +7,6 @@ package common
 import (
 	"flag"
 	"os/user"
-	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
@@ -27,10 +26,6 @@ const (
 )
 
 var (
-	AzureLocations = []string{"eastus2", "northeurope", "uksouth", "centralindia", "westus2"}
-	Architectures  = []string{"amd64", "arm64"}
-	CreateInfra    = flag.Bool("create-infra", true, "create a Resource group, vNET and AKS cluster for testing")
-	DeleteInfra    = flag.Bool("delete-infra", true, "delete a Resource group, vNET and AKS cluster for testing")
 	ScaleTestInfra = ScaleTestInfraHandler{
 		location:       params.Location,
 		subscriptionID: params.SubscriptionID,
@@ -42,18 +37,6 @@ var (
 	// kubeconfig: path to kubeconfig file, in not provided,
 	// a new k8s cluster will be created
 	KubeConfig = flag.String("kubeConfig", "", "Path to kubeconfig file")
-)
-
-var (
-	RetinaChartPath = func(rootDir string) string {
-		return filepath.Join(rootDir, "deploy", "standard", "manifests", "controller", "helm", "retina")
-	}
-	RetinaAdvancedProfilePath = func(rootDir string) string {
-		return filepath.Join(rootDir, "test", "profiles", "advanced", "values.yaml")
-	}
-	KubeConfigFilePath = func(rootDir string) string {
-		return filepath.Join(rootDir, "test", "e2e", "test.pem")
-	}
 )
 
 type ScaleTestInfraHandler struct {
