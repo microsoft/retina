@@ -158,6 +158,36 @@ func InitializeMetrics() {
 		utils.InterfaceName,
 	)
 
+	ConntrackPacketsTx = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.DefaultRegistry,
+		utils.ConntrackPacketsTxGaugeName,
+		ConntrackPacketTxDescription,
+	)
+
+	ConntrackPacketsRx = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.DefaultRegistry,
+		utils.ConntrackPacketsRxGaugeName,
+		ConntrackPacketRxDescription,
+	)
+
+	ConntrackBytesTx = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.DefaultRegistry,
+		utils.ConntrackBytesTxGaugeName,
+		ConntrackBytesTxDescription,
+	)
+
+	ConntrackBytesRx = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.DefaultRegistry,
+		utils.ConntrackBytesRxGaugeName,
+		ConntrackBytesRxDescription,
+	)
+
+	ConntrackTotalConnections = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.DefaultRegistry,
+		utils.ConntrackTotalConnectionsName,
+		ConntrackTotalConnectionsDescription,
+	)
+
 	isInitialized = true
 	metricsLogger.Info("Metrics initialized")
 }
