@@ -100,6 +100,15 @@ func ValidateTCPMetrics(namespace, arch string) *types.Scenario {
 				SkipSavingParametersToJob: true,
 			},
 		},
+		{
+			Step: &kubernetes.DeleteKubernetesResource{
+				ResourceType:      kubernetes.TypeString(kubernetes.Deployment),
+				ResourceNamespace: namespace,
+				ResourceName:      "kapinger",
+			}, Opts: &types.StepOptions{
+				SkipSavingParametersToJob: true,
+			},
+		},
 	}
 
 	return types.NewScenario(Name, Steps...)
