@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/microsoft/retina/cmd/standard"
 	"github.com/spf13/cobra"
 )
 
@@ -27,9 +26,9 @@ var (
 		Long:  "Start Retina Agent",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Do Stuff Here
-			fmt.Println("Starting Retina Agent")
-			d := standard.NewDaemon(metricsAddr, probeAddr, cfgFile, enableLeaderElection)
-			if err := d.Start(); err != nil {
+			fmt.Println("Bootstrapping Retina")
+			b := NewBootstrapManager(metricsAddr, probeAddr, cfgFile, enableLeaderElection)
+			if err := b.Start(); err != nil {
 				return fmt.Errorf("starting daemon: %w", err)
 			}
 			return nil
