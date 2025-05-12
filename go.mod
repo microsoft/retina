@@ -300,7 +300,7 @@ require (
 	github.com/safchain/ethtool v0.6.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.20.1
-	github.com/vishvananda/netlink v1.3.1-0.20250328051554-cb48698f2590
+	github.com/vishvananda/netlink v1.3.1
 	go.opentelemetry.io/otel v1.35.0
 	go.opentelemetry.io/otel/metric v1.35.0
 	go.opentelemetry.io/otel/trace v1.35.0
