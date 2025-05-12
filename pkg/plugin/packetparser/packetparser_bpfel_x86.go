@@ -21,10 +21,10 @@ type packetparserCtEntry struct {
 	FlagsSeenRxDir     uint8
 	IsDirectionUnknown bool
 	ConntrackMetadata  struct {
-		BytesForwardCount   uint64
-		BytesReplyCount     uint64
-		PacketsForwardCount uint32
-		PacketsReplyCount   uint32
+		BytesTxCount   uint64
+		BytesRxCount   uint64
+		PacketsTxCount uint32
+		PacketsRxCount uint32
 	}
 }
 
@@ -62,10 +62,10 @@ type packetparserPacket struct {
 	IsReply           bool
 	_                 [3]byte
 	ConntrackMetadata struct {
-		BytesForwardCount   uint64
-		BytesReplyCount     uint64
-		PacketsForwardCount uint32
-		PacketsReplyCount   uint32
+		BytesTxCount   uint64
+		BytesRxCount   uint64
+		PacketsTxCount uint32
+		PacketsRxCount uint32
 	}
 }
 
