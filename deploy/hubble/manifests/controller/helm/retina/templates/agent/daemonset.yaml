@@ -120,6 +120,8 @@ spec:
               mountPath: /sys/kernel/tracing
             - name: cilium
               mountPath: /var/run/cilium
+            - name: host-os-release
+              mountPath: /etc/os-release  
           {{- if .Values.hubble.tls.enabled }}
             - name: tls
               mountPath: /var/lib/cilium/tls/hubble
@@ -146,6 +148,10 @@ spec:
         hostPath:
           path: /var/run/cilium
           type: DirectoryOrCreate
+      - name: host-os-release
+        hostPath:
+          path: /etc/os-release
+          type: FileOrCreate   
       {{- if .Values.hubble.tls.enabled }}
       - name: tls
         projected:
