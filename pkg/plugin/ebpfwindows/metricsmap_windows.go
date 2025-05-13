@@ -59,8 +59,7 @@ type MetricsMap interface {
 	IterateWithCallback(*log.ZapLogger, IterateCallback) error
 }
 
-type metricsMap struct {
-}
+type metricsMap struct{}
 
 var (
 	// Load the retinaebpfapi.dll
@@ -77,7 +76,6 @@ var enumCallBack enumMetricsCallback
 
 // This function will be passed to the Windows API
 func enumMetricsSysCallCallback(key, value unsafe.Pointer, valueSize int) uintptr {
-
 	if enumCallBack != nil {
 		return uintptr(enumCallBack(key, value, valueSize))
 	}
@@ -97,10 +95,8 @@ var callEnumMetricsMap = func(callback uintptr) (uintptr, uintptr, error) {
 // IterateWithCallback iterates through all the keys/values of a metrics map,
 // passing each key/value pair to the cb callback
 func (m metricsMap) IterateWithCallback(l *log.ZapLogger, cb IterateCallback) error {
-
 	// Define the callback function in Go
 	enumCallBack = func(key unsafe.Pointer, value unsafe.Pointer, valueSize int) int {
-
 		if key == nil {
 			l.Error("MetricsKey is nil")
 			return 1
@@ -162,22 +158,19 @@ func (k *MetricsKey) String() string {
 func (k *MetricsKey) DropForwardReason() string {
 	if k.Reason == DropPacketMonitor {
 		return k.DropPacketMonitorReason()
-	} else {
-		return DropReason(k.Reason)
 	}
+	return DropReason(k.Reason)
 }
 
 // DropPacketMonitorReason gets the Packer Monitor dropped reason in human readable string format
 func (k *MetricsKey) DropPacketMonitorReason() string {
 	if k.Reason == DropPacketMonitor {
-		ext_reason_high := k.Reserved[0]
-		ext_reason_low := k.Reserved[1]
-		ext_reason := (uint32(ext_reason_high) << 8) | uint32(ext_reason_low)
-		return DropReasonExt(k.Reason, ext_reason)
-
-	} else {
-		panic("The reason is not DropPacketMonitor")
+		extReasonHigh := k.Reserved[0]
+		extReasonLow := k.Reserved[1]
+		extReason := (uint32(extReasonHigh) << 8) | uint32(extReasonLow)
+		return DropReasonExt(k.Reason, extReason)
 	}
+	panic("The reason is not DropPacketMonitor")
 }
 
 // FileName returns the filename where the event occurred, in string format.
