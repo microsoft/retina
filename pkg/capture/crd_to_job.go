@@ -388,7 +388,7 @@ func (translator *CaptureToPodTranslator) renderJob(captureTargetOnNode *Capture
 	stringTimestamp := translator.jobTemplate.Spec.Template.ObjectMeta.Annotations[captureConstants.CaptureTimestampAnnotationKey]
 	captureTimestamp, err := file.StringToTime(stringTimestamp)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse capture start timestamp: %s", stringTimestamp)
+		return nil, fmt.Errorf("failed to parse capture start timestamp: %w", err)
 	}
 
 	fmt.Println("#########################")

@@ -42,7 +42,6 @@ const (
 
 var (
 	blobURL     string
-	extract     bool
 	captureName string
 	outputPath  string
 )
@@ -60,9 +59,6 @@ var downloadExample = templates.Examples(i18n.T(`
 
 		# Download the capture file created using the capture name
 		kubectl retina capture download --name <capture-name>
-
-		# Download the capture file created using the capture name and automatically extract the tarball
-		kubectl retina capture download --name <capture-name> -e
 
 		# Download the capture file created using the capture name and define output location
 		kubectl retina capture download --name <capture-name> -o <output-location>
@@ -91,73 +87,66 @@ var downloadCapture = &cobra.Command{
 			captureNamespace = "default"
 		}
 
-		downloadedFiles := []string{}
-
 		if captureName != "" {
-			var files []string
-			files, err = downloadFromCluster(ctx, kubeConfig, captureNamespace)
+			err = downloadFromCluster(ctx, kubeConfig, captureNamespace)
 			if err != nil {
 				return err
 			}
-			downloadedFiles = append(downloadedFiles, files...)
 		}
 
 		if blobURL != "" {
-			var files []string
-			files, err = downloadFromBlob()
+			err = downloadFromBlob()
 			if err != nil {
 				return err
 			}
-			downloadedFiles = append(downloadedFiles, files...)
 		}
 
-		return err
+		return nil
 	},
 }
 
-func downloadFromCluster(ctx context.Context, config *rest.Config, namespace string) ([]string, error) {
+func downloadFromCluster(ctx context.Context, config *rest.Config, namespace string) error {
 	kubeClient, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to initialize k8s client")
+		return errors.Wrap(err, "failed to initialize k8s client")
 	}
 
 	pods, err := getCapturePods(ctx, kubeClient, captureName, namespace)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to obtain capture pod")
+		return errors.Wrap(err, "failed to obtain capture pod")
 	}
 
 	err = os.MkdirAll(filepath.Join(outputPath, captureName), 0o775)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create directory: %w", err)
+		return fmt.Errorf("failed to create directory: %w", err)
 	}
-	downloadedFiles := []string{}
 
 	for i := range pods.Items {
 		pod := pods.Items[i]
 		if pod.Status.Phase != corev1.PodSucceeded {
-			return nil, errors.Wrap(ErrNoPodFound, captureName)
+			return errors.Wrap(ErrNoPodFound, captureName)
 		}
 
 		nodeName := pod.Spec.NodeName
 		hostPath, ok := pod.Annotations[captureConstants.CaptureHostPathAnnotaionKey]
 		if !ok {
-			return nil, errors.New("cannot obtain host path from pod annotations")
+			return errors.New("cannot obtain host path from pod annotations")
 		}
 		fileName, ok := pod.Annotations[captureConstants.CaptureFilenameAnnotationKey]
 		if !ok {
-			return nil, errors.New("cannot obtain capture file name from pod annotations")
+			return errors.New("cannot obtain capture file name from pod annotations")
 		}
 
 		srcFilePath := MountPath + fileName + ".tar.gz"
 		fmt.Println("File to be downloaded: ", srcFilePath)
 		downloadPod, err := createDownloadPod(ctx, kubeClient, namespace, nodeName, hostPath, captureName)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		exec, err := createDownloadExec(kubeClient, config, downloadPod, srcFilePath)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		var buf bytes.Buffer
@@ -166,7 +155,7 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 			Stderr: &buf,
 		}
 		if err = exec.StreamWithContext(ctx, streamOpts); err != nil {
-			return nil, fmt.Errorf("failed to exec in download container: %w", err)
+			return fmt.Errorf("failed to exec in download container: %w", err)
 		}
 
 		outputFile := filepath.Join(outputPath, captureName, fileName+".tar.gz")
@@ -174,11 +163,10 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 
 		err = os.WriteFile(outputFile, buf.Bytes(), 0o600)
 		if err != nil {
-			return nil, fmt.Errorf("failed to write file to host: %w", err)
+			return fmt.Errorf("failed to write file to host: %w", err)
 		}
 
 		fmt.Println("File written to: ", outputFile)
-		downloadedFiles = append(downloadedFiles, outputFile)
 
 		err = kubeClient.CoreV1().Pods(namespace).Delete(ctx, downloadPod.Name, metav1.DeleteOptions{})
 		if err != nil {
@@ -186,7 +174,7 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 		}
 	}
 
-	return downloadedFiles, nil
+	return nil
 }
 
 func getCapturePods(ctx context.Context, kubeClient *kubernetes.Clientset, captureName, namespace string) (*corev1.PodList, error) {
@@ -284,17 +272,17 @@ func createDownloadExec(kubeClient *kubernetes.Clientset, config *rest.Config, p
 	return exec, nil
 }
 
-func downloadFromBlob() ([]string, error) {
+func downloadFromBlob() error {
 	u, err := url.Parse(blobURL)
 	if err != nil {
 		retinacmd.Logger.Error("err: ", zap.Error(err))
-		return nil, errors.Wrapf(err, "failed to parse SAS URL %s", blobURL)
+		return errors.Wrapf(err, "failed to parse SAS URL %s", blobURL)
 	}
 
 	b, err := storage.NewAccountSASClientFromEndpointToken(u.String(), u.Query().Encode())
 	if err != nil {
 		retinacmd.Logger.Error("err: ", zap.Error(err))
-		return nil, errors.Wrap(err, "failed to create storage account client")
+		return errors.Wrap(err, "failed to create storage account client")
 	}
 
 	blobService := b.GetBlobService()
@@ -306,47 +294,45 @@ func downloadFromBlob() ([]string, error) {
 	blobList, err := blobService.GetContainerReference(containerName).ListBlobs(params)
 	if err != nil {
 		retinacmd.Logger.Error("err: ", zap.Error(err))
-		return nil, errors.Wrap(err, "failed to list blobstore ")
+		return errors.Wrap(err, "failed to list blobstore ")
 	}
 
 	if len(blobList.Blobs) == 0 {
 		retinacmd.Logger.Error("err: ", zap.Error(err))
-		return nil, errors.Errorf("no blobs found with prefix: %s", *opts.Name)
+		return errors.Errorf("no blobs found with prefix: %s", *opts.Name)
 	}
 
 	err = os.MkdirAll(outputPath, 0o775)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create output directory: %w", err)
+		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
-	files := []string{}
 	for i := range blobList.Blobs {
 		blob := blobList.Blobs[i]
 		blobRef := blobService.GetContainerReference(containerName).GetBlobReference(blob.Name)
 		readCloser, err := blobRef.Get(&storage.GetBlobOptions{})
 		if err != nil {
 			retinacmd.Logger.Error("err: ", zap.Error(err))
-			return nil, errors.Wrap(err, "failed to read from blobstore")
+			return errors.Wrap(err, "failed to read from blobstore")
 		}
 
 		blobData, err := io.ReadAll(readCloser)
 		readCloser.Close()
 		if err != nil {
 			retinacmd.Logger.Error("err: ", zap.Error(err))
-			return nil, errors.Wrap(err, "failed to obtain blob from blobstore")
+			return errors.Wrap(err, "failed to obtain blob from blobstore")
 		}
 
 		outputFile := filepath.Join(outputPath, blob.Name)
 		err = os.WriteFile(outputFile, blobData, 0o600)
 		if err != nil {
 			retinacmd.Logger.Error("err: ", zap.Error(err))
-			return nil, errors.Wrap(err, "failed to write file")
+			return errors.Wrap(err, "failed to write file")
 		}
 
-		files = append(files, outputFile)
 		fmt.Println("Downloaded: ", outputFile)
 	}
-	return files, nil
+	return nil
 }
 
 func init() {
