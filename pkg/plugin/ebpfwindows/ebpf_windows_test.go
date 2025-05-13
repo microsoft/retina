@@ -7,6 +7,7 @@ package ebpfwindows
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
 	"testing"
@@ -15,7 +16,6 @@ import (
 
 	"github.com/cilium/cilium/api/v1/flow"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
-	monitor "github.com/cilium/cilium/pkg/monitor"
 	monitorapi "github.com/cilium/cilium/pkg/monitor/api"
 	"github.com/cilium/cilium/pkg/types"
 	"github.com/google/gopacket"
@@ -30,6 +30,8 @@ import (
 const (
 	pktSizeBytes = 100
 )
+
+var errTestFailure = errors.New("test failure")
 
 func makeMockEthernetIPv4TCPPacket() []byte {
 	eth := &layers.Ethernet{
@@ -51,11 +53,19 @@ func makeMockEthernetIPv4TCPPacket() []byte {
 		SYN:     true,
 		Window:  65535,
 	}
-	tcp.SetNetworkLayerForChecksum(ip)
+
+	err := tcp.SetNetworkLayerForChecksum(ip)
+	if err != nil {
+		panic(fmt.Sprintf("failed to set network layer for TCP: %v", err))
+	}
 
 	buf := gopacket.NewSerializeBuffer()
 	opts := gopacket.SerializeOptions{ComputeChecksums: true, FixLengths: true}
-	gopacket.SerializeLayers(buf, opts, eth, ip, tcp, gopacket.Payload([]byte{0x01, 0x02, 0x03}))
+	err = gopacket.SerializeLayers(buf, opts, eth, ip, tcp, gopacket.Payload([]byte{0x01, 0x02, 0x03}))
+	if err != nil {
+		panic(fmt.Sprintf("failed to serialize layers: %v", err))
+	}
+
 	return buf.Bytes()
 }
 
@@ -113,7 +123,11 @@ func TestHandleTraceEvent_TraceNotify(t *testing.T) {
 			// Add more assertions as needed
 			return nil
 		})
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	if err != nil {
+		t.Fatalf("failed to setup logger: %v", err)
+	}
+
 	p := &Plugin{
 		cfg: &kcfg.Config{
 			MetricsInterval: 100 * time.Second,
@@ -121,18 +135,20 @@ func TestHandleTraceEvent_TraceNotify(t *testing.T) {
 		},
 		l: log.Logger().Named("test-ebpf"),
 	}
-	p.Init()
+	err = p.Init()
+	if err != nil {
+		t.Fatalf("failed to initialize plugin: %v", err)
+	}
+
 	p.enricher = mockEnricher
-	tn := monitor.TraceNotify{
-		TraceNotifyV0: monitor.TraceNotifyV0{
-			Type:    monitorapi.MessageTypeTrace,
-			Version: monitor.TraceNotifyVersion1,
-		},
-		OrigIP: types.IPv6{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, // example IPv6
+	tn := TraceNotify{
+		Type:    monitorapi.MessageTypeTrace,
+		Version: TraceNotifyVersion1,
+		OrigIP:  types.IPv6{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, // example IPv6
 	}
 
 	var buf bytes.Buffer
-	if err := binary.Write(&buf, binary.LittleEndian, tn); err != nil {
+	if err = binary.Write(&buf, binary.LittleEndian, tn); err != nil {
 		t.Fatalf("failed to serialize TraceNotify: %v", err)
 	}
 
@@ -140,7 +156,8 @@ func TestHandleTraceEvent_TraceNotify(t *testing.T) {
 	packet := makeMockEthernetIPv4TCPPacket()
 	buf.Write(packet)
 	data := buf.Bytes()
-	err := p.handleTraceEvent(unsafe.Pointer(&data[0]), uint32(len(data)))
+	//nolint:gosec // ignore G115 -- data length is guaranteed to be within uint32 bounds in test context
+	err = p.handleTraceEvent(unsafe.Pointer(&data[0]), uint32(len(data)))
 	if err != nil {
 		t.Fatalf("expected no error for handleTraceEvent, got: %v", err)
 	}
@@ -174,7 +191,11 @@ func TestHandleTraceEvent_DropNotify(t *testing.T) {
 			return nil
 		})
 
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	if err != nil {
+		t.Fatalf("failed to setup logger: %v", err)
+	}
+
 	p := &Plugin{
 		cfg: &kcfg.Config{
 			MetricsInterval: 100 * time.Second,
@@ -183,14 +204,19 @@ func TestHandleTraceEvent_DropNotify(t *testing.T) {
 		l: log.Logger().Named("test-ebpf"),
 	}
 
-	p.Init()
+	err = p.Init()
+	if err != nil {
+		t.Fatalf("failed to initialize plugin: %v", err)
+	}
+
 	p.enricher = mockEnricher
 
-	dn := monitor.DropNotify{
-		Type: monitorapi.MessageTypeDrop,
+	dn := DropNotify{
+		Type:    monitorapi.MessageTypeDrop,
+		Version: DropNotifyVersion1,
 	}
 	var buf bytes.Buffer
-	if err := binary.Write(&buf, binary.LittleEndian, dn); err != nil {
+	if err = binary.Write(&buf, binary.LittleEndian, dn); err != nil {
 		t.Fatalf("failed to serialize DropNotify: %v", err)
 	}
 
@@ -200,7 +226,8 @@ func TestHandleTraceEvent_DropNotify(t *testing.T) {
 
 	data := buf.Bytes()
 
-	err := p.handleTraceEvent(unsafe.Pointer(&data[0]), uint32(len(data)))
+	//nolint:gosec // ignore G115 -- data length is guaranteed to be within uint32 bounds in test context
+	err = p.handleTraceEvent(unsafe.Pointer(&data[0]), uint32(len(data)))
 	if err != nil {
 		t.Fatalf("expected no error for handleTraceEvent, got: %v", err)
 	}
@@ -209,7 +236,11 @@ func TestHandleTraceEvent_DropNotify(t *testing.T) {
 // TestHandleTraceEvent_UnknownEventType_NoError tests the behavior of the handleTraceEvent function
 // when an unknown event type is received.
 func TestHandleTraceEvent_UnknownEventType_NoError(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	if err != nil {
+		t.Fatalf("failed to setup logger: %v", err)
+	}
+
 	p := &Plugin{
 		cfg: &kcfg.Config{
 			MetricsInterval: 100 * time.Second,
@@ -217,10 +248,15 @@ func TestHandleTraceEvent_UnknownEventType_NoError(t *testing.T) {
 		},
 		l: log.Logger().Named("test-ebpf"),
 	}
-	p.Init()
+	err = p.Init()
+	if err != nil {
+		t.Fatalf("failed to initialize plugin: %v", err)
+	}
+
 	// Create a byte array with one byte set to 4 (Unknown event type)
 	data := []byte{8} // Neither TraceNotify nor DropNotify
-	err := p.handleTraceEvent(unsafe.Pointer(&data[0]), uint32(len(data)))
+	//nolint:gosec // ignore G115 -- data length is guaranteed to be within uint32 bounds in test context
+	err = p.handleTraceEvent(unsafe.Pointer(&data[0]), uint32(len(data)))
 	if err != nil {
 		t.Fatalf("expected no error for unknown event type, got: %v", err)
 	}
@@ -236,13 +272,18 @@ func TestHandleTraceEvent_InvalidTraceNotify(t *testing.T) {
 		},
 		l: log.Logger().Named("test-ebpf"),
 	}
-	p.Init()
+	err := p.Init()
+	if err != nil {
+		t.Fatalf("failed to initialize plugin: %v", err)
+	}
+
 	data := []byte{monitorapi.MessageTypeTrace, 0} // Invalid TraceNotify
-	err := p.handleTraceEvent(unsafe.Pointer(&data[0]), uint32(len(data)))
+	//nolint:gosec // ignore G115 -- data length is guaranteed to be within uint32 bounds in test context
+	err = p.handleTraceEvent(unsafe.Pointer(&data[0]), uint32(len(data)))
 	if err == nil {
 		t.Fatalf("expected error for invalid TraceNotify, got none")
-	} else if err.Error() != "invalid size for TraceNotify 2" {
-		t.Fatalf("expected error - invalid size for TraceNotify 2, got: %v", err)
+	} else if err.Error() != "invalid size for TraceNotify: 2" {
+		t.Fatalf("expected error - invalid size for TraceNotify: 2, got: %v", err)
 	}
 }
 
@@ -256,13 +297,18 @@ func TestHandleTraceEvent_InvalidDropNotify(t *testing.T) {
 		},
 		l: log.Logger().Named("test-ebpf"),
 	}
-	p.Init()
+	err := p.Init()
+	if err != nil {
+		t.Fatalf("failed to initialize plugin: %v", err)
+	}
+
 	data := []byte{monitorapi.MessageTypeDrop, 0} // Invalid DropNotify
-	err := p.handleTraceEvent(unsafe.Pointer(&data[0]), uint32(len(data)))
+	//nolint:gosec // ignore G115 -- data length is guaranteed to be within uint32 bounds in test context
+	err = p.handleTraceEvent(unsafe.Pointer(&data[0]), uint32(len(data)))
 	if err == nil {
 		t.Fatalf("expected error for invalid DropNotify, got none")
-	} else if err.Error() != "invalid size for DropNotify 2" {
-		t.Fatalf("expected error - invalid size for DropNotify 2, got: %v", err)
+	} else if err.Error() != "invalid size for DropNotify: 2" {
+		t.Fatalf("expected error - invalid size for DropNotify: 2, got: %v", err)
 	}
 }
 
@@ -276,9 +322,13 @@ func TestHandleTraceEvent_DataNil_SizeNonZero(t *testing.T) {
 		},
 		l: log.Logger().Named("test-ebpf"),
 	}
-	p.Init()
+	err := p.Init()
+	if err != nil {
+		t.Fatalf("failed to initialize plugin: %v", err)
+	}
+
 	var mockCiliumEventSize uint32 = 100
-	err := p.handleTraceEvent(nil, mockCiliumEventSize)
+	err = p.handleTraceEvent(nil, mockCiliumEventSize)
 	if err == nil {
 		t.Fatalf("expected error - handleTraceEvent data received is nil")
 	} else if err.Error() != "handleTraceEvent data received is nil" {
@@ -296,12 +346,16 @@ func TestHandleTraceEvent_InvalidSizeZero(t *testing.T) {
 		},
 		l: log.Logger().Named("test-ebpf"),
 	}
-	p.Init()
-	err := p.handleTraceEvent(nil, 0)
+	err := p.Init()
+	if err != nil {
+		t.Fatalf("failed to initialize plugin: %v", err)
+	}
+
+	err = p.handleTraceEvent(nil, 0)
 	if err == nil {
 		t.Fatalf("expected error - invalid size 0")
-	} else if err.Error() != "invalid size 0" {
-		t.Fatalf("expected error - invalid size 0, got %v", err)
+	} else if err.Error() != "invalid size: 0" {
+		t.Fatalf("expected error - invalid size: 0, got %v", err)
 	}
 }
 
@@ -474,7 +528,7 @@ func TestMetricsMapIterateCallback_NilValue(t *testing.T) {
 func TestIterateWithCallback_Error_NilMetricsValue(t *testing.T) {
 	// Mock the function variable to simulate a successful Windows API call
 	orig := callEnumMetricsMap
-	callEnumMetricsMap = func(callback uintptr) (uintptr, uintptr, error) {
+	callEnumMetricsMap = func(_ uintptr) (uintptr, uintptr, error) {
 		return 0, 0, nil
 	}
 	defer func() { callEnumMetricsMap = orig }()
@@ -483,7 +537,7 @@ func TestIterateWithCallback_Error_NilMetricsValue(t *testing.T) {
 	logger := log.Logger().Named("test-ebpf")
 
 	called := false
-	err := m.IterateWithCallback(logger, func(key *MetricsKey, values *MetricsValues) {
+	err := m.IterateWithCallback(logger, func(_ *MetricsKey, _ *MetricsValues) {
 		called = true
 	})
 	if err != nil {
@@ -502,7 +556,7 @@ func TestIterateWithCallback_Error_NilMetricsValue(t *testing.T) {
 func TestIterateWithCallback_Error_ZeroMetricsValueSize(t *testing.T) {
 	// Mock the function variable to simulate a successful Windows API call
 	orig := callEnumMetricsMap
-	callEnumMetricsMap = func(callback uintptr) (uintptr, uintptr, error) {
+	callEnumMetricsMap = func(_ uintptr) (uintptr, uintptr, error) {
 		return 0, 0, nil
 	}
 	defer func() { callEnumMetricsMap = orig }()
@@ -511,7 +565,7 @@ func TestIterateWithCallback_Error_ZeroMetricsValueSize(t *testing.T) {
 	logger := log.Logger().Named("test-ebpf")
 
 	called := false
-	err := m.IterateWithCallback(logger, func(key *MetricsKey, values *MetricsValues) {
+	err := m.IterateWithCallback(logger, func(_ *MetricsKey, _ *MetricsValues) {
 		called = true
 	})
 	if err != nil {
@@ -531,7 +585,7 @@ func TestIterateWithCallback_Error_ZeroMetricsValueSize(t *testing.T) {
 func TestIterateWithCallback_Error_NilMetricsKey(t *testing.T) {
 	// Mock the function variable to simulate a successful Windows API call
 	orig := callEnumMetricsMap
-	callEnumMetricsMap = func(callback uintptr) (uintptr, uintptr, error) {
+	callEnumMetricsMap = func(_ uintptr) (uintptr, uintptr, error) {
 		return 0, 0, nil
 	}
 	defer func() { callEnumMetricsMap = orig }()
@@ -540,7 +594,7 @@ func TestIterateWithCallback_Error_NilMetricsKey(t *testing.T) {
 	logger := log.Logger().Named("test-ebpf")
 
 	called := false
-	err := m.IterateWithCallback(logger, func(key *MetricsKey, values *MetricsValues) {
+	err := m.IterateWithCallback(logger, func(_ *MetricsKey, _ *MetricsValues) {
 		called = true
 	})
 	if err != nil {
@@ -559,7 +613,7 @@ func TestIterateWithCallback_Error_NilMetricsKey(t *testing.T) {
 func TestIterateWithCallback_Error_NilMetricValue(t *testing.T) {
 	// Mock the function variable to simulate a successful Windows API call
 	orig := callEnumMetricsMap
-	callEnumMetricsMap = func(callback uintptr) (uintptr, uintptr, error) {
+	callEnumMetricsMap = func(_ uintptr) (uintptr, uintptr, error) {
 		return 0, 0, nil
 	}
 	defer func() { callEnumMetricsMap = orig }()
@@ -568,7 +622,7 @@ func TestIterateWithCallback_Error_NilMetricValue(t *testing.T) {
 	logger := log.Logger().Named("test-ebpf")
 
 	called := false
-	err := m.IterateWithCallback(logger, func(key *MetricsKey, values *MetricsValues) {
+	err := m.IterateWithCallback(logger, func(_ *MetricsKey, _ *MetricsValues) {
 		called = true
 	})
 	if err != nil {
@@ -587,7 +641,7 @@ func TestIterateWithCallback_Error_NilMetricValue(t *testing.T) {
 func TestIterateWithCallback_Success(t *testing.T) {
 	// Mock the function variable to simulate a successful Windows API call
 	orig := callEnumMetricsMap
-	callEnumMetricsMap = func(callback uintptr) (uintptr, uintptr, error) {
+	callEnumMetricsMap = func(_ uintptr) (uintptr, uintptr, error) {
 		return 0, 0, nil
 	}
 	defer func() { callEnumMetricsMap = orig }()
@@ -596,7 +650,7 @@ func TestIterateWithCallback_Success(t *testing.T) {
 	logger := log.Logger().Named("test-ebpf")
 
 	called := false
-	err := m.IterateWithCallback(logger, func(key *MetricsKey, values *MetricsValues) {
+	err := m.IterateWithCallback(logger, func(_ *MetricsKey, _ *MetricsValues) {
 		called = true
 	})
 	if err != nil {
@@ -616,7 +670,7 @@ func TestIterateWithCallback_Success(t *testing.T) {
 func TestUnregisterForCallback_Success(t *testing.T) {
 	// Mock the function variable
 	orig := callUnregisterEventsMapCallback
-	callUnregisterEventsMapCallback = func(perfBuffer uintptr) (uintptr, uintptr, error) {
+	callUnregisterEventsMapCallback = func(_ uintptr) (uintptr, uintptr, error) {
 		return 0, 0, nil // Simulate success
 	}
 	defer func() { callUnregisterEventsMapCallback = orig }()
@@ -634,8 +688,8 @@ func TestUnregisterForCallback_Success(t *testing.T) {
 func TestUnregisterForCallback_Error(t *testing.T) {
 	// Mock the function variable to simulate an error
 	orig := callUnregisterEventsMapCallback
-	callUnregisterEventsMapCallback = func(perfBuffer uintptr) (uintptr, uintptr, error) {
-		return 1, 0, fmt.Errorf("error")
+	callUnregisterEventsMapCallback = func(_ uintptr) (uintptr, uintptr, error) {
+		return 1, 0, fmt.Errorf("%w", errTestFailure)
 	}
 	defer func() { callUnregisterEventsMapCallback = orig }()
 
@@ -652,7 +706,7 @@ func TestUnregisterForCallback_Error(t *testing.T) {
 func TestRegisterForCallback_Success(t *testing.T) {
 	// Mock the function variable, not the LazyProc
 	orig := callRegisterEventsMapCallback
-	callRegisterEventsMapCallback = func(callback, perfBuffer uintptr) (uintptr, uintptr, error) {
+	callRegisterEventsMapCallback = func(_, _ uintptr) (uintptr, uintptr, error) {
 		return 0, 0, nil // Simulate success
 	}
 	defer func() { callRegisterEventsMapCallback = orig }()
@@ -661,7 +715,7 @@ func TestRegisterForCallback_Success(t *testing.T) {
 	em := NewEventsMap()
 
 	called := false
-	cb := func(data unsafe.Pointer, size uint32) {
+	cb := func(_ unsafe.Pointer, _ uint32) {
 		called = true
 	}
 
@@ -681,16 +735,16 @@ func TestRegisterForCallback_Success(t *testing.T) {
 func TestRegisterForCallback_Error(t *testing.T) {
 	// Mock the function variable to simulate an error
 	orig := callRegisterEventsMapCallback
-	callRegisterEventsMapCallback = func(callback, perfBuffer uintptr) (uintptr, uintptr, error) {
-		return 1, 0, fmt.Errorf("error")
+	callRegisterEventsMapCallback = func(_, _ uintptr) (uintptr, uintptr, error) {
+		return 1, 0, fmt.Errorf("%w", errTestFailure)
 	}
 	defer func() { callRegisterEventsMapCallback = orig }()
 
 	logger := log.Logger().Named("test-ebpf")
 	em := NewEventsMap()
 
-	cb := func(data unsafe.Pointer, size uint32) {
-		//nop
+	cb := func(_ unsafe.Pointer, _ uint32) {
+		// nop
 	}
 
 	err := em.RegisterForCallback(logger, cb)

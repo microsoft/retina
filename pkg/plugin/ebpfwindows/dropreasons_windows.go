@@ -105,7 +105,6 @@ var dropErrors = map[uint8]string{
 
 // Keep in sync with __id_for_file in bpf/lib/source_info.h.
 var files = map[uint8]string{
-
 	// source files from bpf/
 	1: "bpf_host.c",
 	2: "bpf_lxc.c",
@@ -149,12 +148,12 @@ func extendedReason(extError uint32) string {
 }
 
 func DropReasonExt(reason uint8, extError uint32) string {
+	var ext string
 	if err, ok := dropErrors[reason]; ok {
-		if ext := extendedReason(extError); ext == "" {
+		if ext = extendedReason(extError); ext == "" {
 			return err
-		} else {
-			return err + ", " + ext
 		}
+		return err + ", " + ext
 	}
 	return fmt.Sprintf("%d, %d", reason, extError)
 }

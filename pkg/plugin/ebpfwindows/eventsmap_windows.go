@@ -19,7 +19,6 @@ var eventsCallback eventsMapCallback
 
 // This function will be passed to the Windows API
 func eventsMapSysCallCallback(data unsafe.Pointer, size uint32) int {
-
 	if eventsCallback != nil {
 		eventsCallback(data, size)
 	}
@@ -48,7 +47,6 @@ var callRegisterEventsMapCallback = func(callback, perfBuffer uintptr) (uintptr,
 }
 
 func (e *eventsMap) RegisterForCallback(l *log.ZapLogger, cb eventsMapCallback) error {
-
 	eventsCallback = cb
 
 	l.Info("Attempting to register")
@@ -56,7 +54,7 @@ func (e *eventsMap) RegisterForCallback(l *log.ZapLogger, cb eventsMapCallback) 
 	callback := syscall.NewCallback(eventsMapSysCallCallback)
 
 	// Call the API
-	ret, _, err := callRegisterEventsMapCallback(uintptr(callback), e.perfBuffer)
+	ret, _, err := callRegisterEventsMapCallback(uintptr(callback), uintptr(unsafe.Pointer(&e.perfBuffer)))
 
 	if ret != 0 {
 		l.Error("Error registering for events map callback")
@@ -72,7 +70,6 @@ var callUnregisterEventsMapCallback = func(perfBuffer uintptr) (uintptr, uintptr
 }
 
 func (e *eventsMap) UnregisterForCallback() error {
-
 	// Call the API
 	ret, _, err := callUnregisterEventsMapCallback(e.perfBuffer)
 

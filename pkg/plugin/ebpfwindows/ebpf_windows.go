@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -11,16 +12,13 @@ import (
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	observer "github.com/cilium/cilium/pkg/hubble/observer/types"
-	hp "github.com/cilium/cilium/pkg/hubble/parser"
-	monitor "github.com/cilium/cilium/pkg/monitor"
-	monitorapi "github.com/cilium/cilium/pkg/monitor/api"
+	monitorAPI "github.com/cilium/cilium/pkg/monitor/api"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	metrics "github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/registry"
 	"github.com/microsoft/retina/pkg/utils"
-	"github.com/sirupsen/logrus"
 	"go.uber.org/zap"
 )
 
@@ -33,7 +31,13 @@ const (
 )
 
 var (
-	ErrNilEnricher = errors.New("enricher is nil")
+	errInvalidSize             = errors.New("invalid size")
+	errNilHandleTraceEventData = errors.New("handleTraceEvent data received is nil")
+	errNilDropNotifyFlow       = errors.New("dropnotify flow object is nil")
+	errNilDropNotifyEvent      = errors.New("dropnotify event type is nil")
+	errInvalidDropNotifySize   = errors.New("invalid size for DropNotify")
+	errInvalidTraceNotifySize  = errors.New("invalid size for TraceNotify")
+	errNilTraceNotifyFlow      = errors.New("tracenotify flow object is nil")
 )
 
 // Plugin is the ebpfwindows plugin
@@ -42,7 +46,7 @@ type Plugin struct {
 	cfg             *kcfg.Config
 	enricher        enricher.EnricherInterface
 	externalChannel chan *v1.Event
-	parser          *hp.Parser
+	parser          *Parser
 }
 
 func init() {
@@ -58,17 +62,7 @@ func New(cfg *kcfg.Config) registry.Plugin {
 
 // Init is a no-op for the ebpfwindows plugin
 func (p *Plugin) Init() error {
-	parser, err := hp.New(logrus.WithField("windowsEbpf", "parser"),
-		// We use noop getters here since we will use our own custom parser in hubble
-		&NoopEndpointGetter,
-		&NoopIdentityGetter,
-		&NoopDNSGetter,
-		&NoopIPGetter,
-		&NoopServiceGetter,
-		&NoopLinkGetter,
-		&NoopPodMetadataGetter,
-	)
-
+	parser, err := NewParser(slog.Default().With("WindowsEbpf", "parser"))
 	if err != nil {
 		p.l.Error("Failed to create parser", zap.Error(err))
 		return fmt.Errorf("failed to create parser: %w", err)
@@ -140,7 +134,7 @@ func (p *Plugin) addEbpfToPath() error {
 	newPath := currPath + ";" + ebpfWindowsPath
 	if err := os.Setenv("PATH", newPath); err != nil {
 		p.l.Error("Error setting PATH environment variable", zap.Error(err))
-		return fmt.Errorf("error setting PATH environment variable: %v", err)
+		return fmt.Errorf("failed to set PATH environment variable: %w", err)
 	}
 
 	return nil
@@ -170,7 +164,10 @@ func (p *Plugin) pullMetricsAndEvents(ctx context.Context) {
 
 		defer func() {
 			p.l.Error("ebpfwindows plugin canceling", zap.Error(ctx.Err()))
-			eventsMap.UnregisterForCallback()
+			err := eventsMap.UnregisterForCallback()
+			if err != nil {
+				p.l.Error("Error unregistering events map callback", zap.Error(err))
+			}
 		}()
 	}
 
@@ -186,7 +183,6 @@ func (p *Plugin) pullMetricsAndEvents(ctx context.Context) {
 		case <-ctx.Done():
 			p.l.Error("ebpfwindows plugin canceling", zap.Error(ctx.Err()))
 			err := eventsMap.UnregisterForCallback()
-
 			if err != nil {
 				p.l.Error("Error Unregistering Events Map callback", zap.Error(err))
 			}
@@ -219,19 +215,20 @@ func (p *Plugin) Generate(context.Context) error {
 
 func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 	if uintptr(size) < unsafe.Sizeof(uint8(0)) {
-		return fmt.Errorf("invalid size %d", size)
+		return fmt.Errorf("%w: %d", errInvalidSize, size)
 	}
 
 	if data == nil {
-		return fmt.Errorf("handleTraceEvent data received is nil")
+		return fmt.Errorf("%w", errNilHandleTraceEventData)
 	}
 	perfData := unsafe.Slice((*byte)(data), size)
 	eventType := perfData[0]
 	switch eventType {
-	case monitorapi.MessageTypeDrop:
-		if size <= uint32(unsafe.Sizeof(monitor.DropNotify{})) {
-			return fmt.Errorf("invalid size for DropNotify %d", size)
+	case monitorAPI.MessageTypeDrop:
+		if size <= uint32(unsafe.Sizeof(DropNotify{})) {
+			return fmt.Errorf("%w: %d", errInvalidDropNotifySize, size)
 		}
+
 		e, err := p.parser.Decode(&observer.MonitorEvent{
 			Payload: &observer.PerfEvent{
 				Data: perfData,
@@ -241,22 +238,23 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 			return fmt.Errorf("could not convert dropnotify event to flow: %w", err)
 		}
 		meta := &utils.RetinaMetadata{}
-		utils.AddPacketSize(meta, size-uint32(unsafe.Sizeof(monitor.DropNotify{})))
+		utils.AddPacketSize(meta, size-uint32(unsafe.Sizeof(DropNotify{})))
 		fl := e.GetFlow()
 		if fl == nil {
-			return fmt.Errorf("dropnotify flow object is nil")
+			return fmt.Errorf("%w", errNilDropNotifyFlow)
 		}
 		if fl.GetEventType() == nil {
-			return fmt.Errorf("dropnotify event type is nil")
+			return fmt.Errorf("%w", errNilDropNotifyEvent)
 		}
 		// Set the drop reason.
 		eventType := fl.GetEventType().GetSubType()
 		meta.DropReason = utils.DropReason(eventType)
 		utils.AddRetinaMetadata(fl, meta)
 		p.enricher.Write(e)
-	case monitorapi.MessageTypeTrace:
-		if size <= uint32(unsafe.Sizeof(monitor.TraceNotify{})) {
-			return fmt.Errorf("invalid size for TraceNotify %d", size)
+	case monitorAPI.MessageTypeTrace:
+		e := &v1.Event{}
+		if size <= uint32(unsafe.Sizeof(TraceNotify{})) {
+			return fmt.Errorf("%w: %d", errInvalidTraceNotifySize, size)
 		}
 		e, err := p.parser.Decode(&observer.MonitorEvent{
 			Payload: &observer.PerfEvent{
@@ -267,10 +265,10 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 			return fmt.Errorf("could not convert tracenotify event to flow: %w", err)
 		}
 		meta := &utils.RetinaMetadata{}
-		utils.AddPacketSize(meta, size-uint32(unsafe.Sizeof(monitor.TraceNotify{})))
+		utils.AddPacketSize(meta, size-uint32(unsafe.Sizeof(TraceNotify{})))
 		fl := e.GetFlow()
 		if fl == nil {
-			return fmt.Errorf("tracenotify flow object is nil")
+			return fmt.Errorf("%w", errNilTraceNotifyFlow)
 		}
 		utils.AddRetinaMetadata(fl, meta)
 		p.enricher.Write(e)
