@@ -4,9 +4,7 @@
 package capture
 
 import (
-	"archive/tar"
 	"bytes"
-	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
@@ -21,7 +19,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/storage"
 	retinacmd "github.com/microsoft/retina/cli/cmd"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
-	"github.com/microsoft/retina/pkg/capture/file"
+	captureLabels "github.com/microsoft/retina/pkg/label"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -37,24 +35,16 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
-// Type ContainerEnvVars contains the required values to rebuild the name and location of a capture file on the host.
-type ContainerEnvVars struct {
-	hostPath         string
-	nodeHostName     string
-	captureName      string
-	captureStartTime string
-}
-
 const (
-	MountPath         = "/host/mnt/retina/captures/"
-	DefaultOutputPath = "/tmp/retina/capture/"
+	MountPath         = "/host/mnt/retina/captures/" // TODO: get this from a reliable place / also defined in create.go
+	DefaultOutputPath = "./"
 )
 
 var (
-	blobURL    string
-	extract    bool
-	jobName    string
-	outputPath string
+	blobURL     string
+	extract     bool
+	captureName string
+	outputPath  string
 )
 
 var (
@@ -68,14 +58,14 @@ var downloadExample = templates.Examples(i18n.T(`
 		# List Retina capture jobs
 		kubectl retina capture list
 
-		# Download the capture file created by a job
-		kubectl retina capture download --job <job-name>
+		# Download the capture file created using the capture name
+		kubectl retina capture download --name <capture-name>
 
-		# Download the capture file created by a job and automatically extract the tarball
-		kubectl retina capture download --job <job-name> -e
+		# Download the capture file created using the capture name and automatically extract the tarball
+		kubectl retina capture download --name <capture-name> -e
 
-		# Download the capture file created by a job and define output location
-		kubectl retina capture download --job <job-name> -o <output-location>
+		# Download the capture file created using the capture name and define output location
+		kubectl retina capture download --name <capture-name> -o <output-location>
 
 		# Download capture files from Blob Storage via Blob URL (Blob URl requires Read/List permissions)
 		kubectl retina capture download --blob-url "<blob-url>"
@@ -103,7 +93,7 @@ var downloadCapture = &cobra.Command{
 
 		downloadedFiles := []string{}
 
-		if jobName != "" {
+		if captureName != "" {
 			var files []string
 			files, err = downloadFromCluster(ctx, kubeConfig, captureNamespace)
 			if err != nil {
@@ -121,16 +111,6 @@ var downloadCapture = &cobra.Command{
 			downloadedFiles = append(downloadedFiles, files...)
 		}
 
-		if extract {
-			for _, outputFile := range downloadedFiles {
-				err = extractFiles(outputFile, outputPath)
-				if err != nil {
-					return err
-				}
-			}
-			fmt.Println("Extracted within: ", outputPath)
-		}
-
 		return err
 	},
 }
@@ -141,140 +121,90 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 		return nil, errors.Wrap(err, "failed to initialize k8s client")
 	}
 
-	// Currently there is no direct way to obtain the name of the capture from the job / pod / container
-	// To re-create it ourselves we do the following
-	// 1. Get pod where the capture job ran
-	// 2. Get the capture container
-	// 3. Use env variables from the container to re-create the file name
-
-	// In future, the file name should be a Pod level Label / Annotation so we don't need to dig into Container Env Vars
-
-	pod, err := getCapturePod(ctx, kubeClient, jobName, namespace)
+	pods, err := getCapturePods(ctx, kubeClient, captureName, namespace)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to obtain capture pod")
 	}
 
-	container, err := getCaptureContainer(pod)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to obtain capture container")
-	}
-
-	env := getCaptureEnvironment(container)
-	fileName, err := getCaptureFileName(env)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to recreate capture file name")
-	}
-
-	srcFilePath := MountPath + fileName
-	fmt.Println("File to be downloaded: ", srcFilePath)
-	downloadPod, err := createDownloadPod(ctx, kubeClient, namespace, env.nodeHostName, env.hostPath, jobName)
-	if err != nil {
-		return nil, err
-	}
-
-	exec, err := createDownloadExec(kubeClient, config, downloadPod, srcFilePath)
-	if err != nil {
-		return nil, err
-	}
-
-	var buf bytes.Buffer
-	streamOpts := remotecommand.StreamOptions{
-		Stdout: &buf,
-		Stderr: &buf,
-	}
-	if err = exec.StreamWithContext(ctx, streamOpts); err != nil {
-		return nil, fmt.Errorf("failed to exec tar in container: %w", err)
-	}
-
-	outputFile := filepath.Join(outputPath, fileName)
-	err = os.MkdirAll(outputPath, 0o775)
+	err = os.MkdirAll(filepath.Join(outputPath, captureName), 0o775)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create directory: %w", err)
 	}
-	err = os.WriteFile(outputFile, buf.Bytes(), 0o600)
-	if err != nil {
-		return nil, fmt.Errorf("failed to write file to host: %w", err)
-	}
-	fmt.Println("File written to: ", outputFile)
+	downloadedFiles := []string{}
 
-	err = kubeClient.CoreV1().Pods(namespace).Delete(ctx, downloadPod.Name, metav1.DeleteOptions{})
-	if err != nil {
-		retinacmd.Logger.Warn("Failed to clean up debug pod", zap.String("name", downloadPod.Name), zap.Error(err))
+	for i := range pods.Items {
+		pod := pods.Items[i]
+		if pod.Status.Phase != corev1.PodSucceeded {
+			return nil, errors.Wrap(ErrNoPodFound, captureName)
+		}
+
+		nodeName := pod.Spec.NodeName
+		hostPath, ok := pod.Annotations[captureConstants.CaptureHostPathAnnotaionKey]
+		if !ok {
+			return nil, errors.New("cannot obtain host path from pod annotations")
+		}
+		fileName, ok := pod.Annotations[captureConstants.CaptureFilenameAnnotationKey]
+		if !ok {
+			return nil, errors.New("cannot obtain capture file name from pod annotations")
+		}
+
+		srcFilePath := MountPath + fileName + ".tar.gz"
+		fmt.Println("File to be downloaded: ", srcFilePath)
+		downloadPod, err := createDownloadPod(ctx, kubeClient, namespace, nodeName, hostPath, captureName)
+		if err != nil {
+			return nil, err
+		}
+
+		exec, err := createDownloadExec(kubeClient, config, downloadPod, srcFilePath)
+		if err != nil {
+			return nil, err
+		}
+
+		var buf bytes.Buffer
+		streamOpts := remotecommand.StreamOptions{
+			Stdout: &buf,
+			Stderr: &buf,
+		}
+		if err = exec.StreamWithContext(ctx, streamOpts); err != nil {
+			return nil, fmt.Errorf("failed to exec in download container: %w", err)
+		}
+
+		outputFile := filepath.Join(outputPath, captureName, fileName+".tar.gz")
+		fmt.Println("No. of bytes: ", buf.Len())
+
+		err = os.WriteFile(outputFile, buf.Bytes(), 0o600)
+		if err != nil {
+			return nil, fmt.Errorf("failed to write file to host: %w", err)
+		}
+
+		fmt.Println("File written to: ", outputFile)
+		downloadedFiles = append(downloadedFiles, outputFile)
+
+		err = kubeClient.CoreV1().Pods(namespace).Delete(ctx, downloadPod.Name, metav1.DeleteOptions{})
+		if err != nil {
+			retinacmd.Logger.Warn("Failed to clean up debug pod", zap.String("name", downloadPod.Name), zap.Error(err))
+		}
 	}
 
-	return []string{outputFile}, nil
+	return downloadedFiles, nil
 }
 
-func getCapturePod(ctx context.Context, kubeClient *kubernetes.Clientset, jobName, namespace string) (corev1.Pod, error) {
+func getCapturePods(ctx context.Context, kubeClient *kubernetes.Clientset, captureName, namespace string) (*corev1.PodList, error) {
 	pods, err := kubeClient.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: "job-name=" + jobName,
+		LabelSelector: captureLabels.CaptureNameLabel + "=" + captureName,
 	})
 	if err != nil {
-		return corev1.Pod{}, fmt.Errorf("failed to obtain list of pods: %w", err)
+		return &corev1.PodList{}, fmt.Errorf("failed to obtain list of pods: %w", err)
 	}
 	if len(pods.Items) == 0 {
-		return corev1.Pod{}, errors.Wrap(ErrNoPodFound, jobName)
-	}
-	// The assumption is that the capture job only runs on one pod.
-	if len(pods.Items) > 1 {
-		return corev1.Pod{}, errors.Wrap(ErrManyPodsFound, jobName)
+		return &corev1.PodList{}, errors.Wrap(ErrNoPodFound, captureName)
 	}
 
-	return pods.Items[0], nil
+	return pods, nil
 }
 
-func getCaptureContainer(pod corev1.Pod) (*corev1.Container, error) {
-	containerName := captureConstants.CaptureContainername
-	var targetContainer *corev1.Container
-	for i := range pod.Spec.Containers {
-		if pod.Spec.Containers[i].Name == containerName {
-			targetContainer = &pod.Spec.Containers[i]
-			break
-		}
-	}
-	if targetContainer == nil {
-		return nil, errors.Wrap(ErrCaptureContainerNotFound, pod.Name)
-	}
-	return targetContainer, nil
-}
-
-func getCaptureEnvironment(container *corev1.Container) ContainerEnvVars {
-	captureEnv := ContainerEnvVars{}
-
-	for _, env := range container.Env {
-		switch env.Name {
-		case string(captureConstants.CaptureOutputLocationEnvKeyHostPath):
-			captureEnv.hostPath = env.Value
-		case string(captureConstants.NodeHostNameEnvKey):
-			captureEnv.nodeHostName = env.Value
-		case string(captureConstants.CaptureNameEnvKey):
-			captureEnv.captureName = env.Value
-		case string(captureConstants.CaptureStartTimestampEnvKey):
-			captureEnv.captureStartTime = env.Value
-		}
-	}
-
-	return captureEnv
-}
-
-func getCaptureFileName(env ContainerEnvVars) (string, error) {
-	timestamp, err := file.StringToTimestamp(env.captureStartTime)
-	if err != nil {
-		return "", fmt.Errorf("failed to get the timestamp for the capture file name: %w", err)
-	}
-
-	captureFile := file.CaptureFilename{
-		CaptureName:    env.captureName,
-		NodeHostname:   env.nodeHostName,
-		StartTimestamp: timestamp,
-	}
-
-	fileName := captureFile.String() + ".tar.gz"
-	return fileName, nil
-}
-
-func createDownloadPod(ctx context.Context, kubeClient *kubernetes.Clientset, namespace, nodeName, hostPath, jobName string) (*corev1.Pod, error) {
-	podName := jobName + "-download-" + rand.String(5)
+func createDownloadPod(ctx context.Context, kubeClient *kubernetes.Clientset, namespace, nodeName, hostPath, captureName string) (*corev1.Pod, error) {
+	podName := captureName + "-download-" + rand.String(5)
 
 	podSpec := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -287,7 +217,7 @@ func createDownloadPod(ctx context.Context, kubeClient *kubernetes.Clientset, na
 				{
 					Name:    "download",
 					Image:   "busybox",
-					Command: []string{"sleep", "3600"},
+					Command: []string{"sh", "-c", "echo 'Download pod ready'; ls -la " + MountPath + "; sleep 360"},
 					VolumeMounts: []corev1.VolumeMount{
 						{
 							Name:      "host-mount",
@@ -310,19 +240,22 @@ func createDownloadPod(ctx context.Context, kubeClient *kubernetes.Clientset, na
 		},
 	}
 
-	fmt.Println("Creating download pod to retrieve the files...")
+	fmt.Println("Creating download pod ...")
 	_, err := kubeClient.CoreV1().Pods(namespace).Create(ctx, podSpec, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create download pod: %w", err)
 	}
 
+	var pod *corev1.Pod
 	for {
 		time.Sleep(1 * time.Second)
-		pod, err := kubeClient.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+		pod, err = kubeClient.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get download pod: %w", err)
 		}
 		if pod.Status.Phase == corev1.PodRunning {
+			fmt.Println("Download pod is running, waiting for 3s...")
+			time.Sleep(3 * time.Second)
 			return pod, nil
 		}
 		if pod.Status.Phase == corev1.PodFailed {
@@ -335,11 +268,11 @@ func createDownloadExec(kubeClient *kubernetes.Clientset, config *rest.Config, p
 	req := kubeClient.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(pod.Name).
-		Namespace("default").
+		Namespace(pod.Namespace).
 		SubResource("exec").
 		VersionedParams(&corev1.PodExecOptions{
 			Container: "download",
-			Command:   []string{"tar", "czf", "-", "-C", filepath.Dir(srcFilePath), filepath.Base(srcFilePath)},
+			Command:   []string{"cat", srcFilePath},
 			Stdout:    true,
 			Stderr:    true,
 		}, scheme.ParameterCodec)
@@ -416,95 +349,9 @@ func downloadFromBlob() ([]string, error) {
 	return files, nil
 }
 
-func extractFiles(srcFile, outputDir string) error {
-	output := strings.TrimSuffix(filepath.Base(srcFile), ".tar.gz")
-	dest := filepath.Join(outputDir, output)
-	if err := os.MkdirAll(dest, 0o775); err != nil {
-		return fmt.Errorf("failed to create destination directory: %w", err)
-	}
-
-	file, err := os.Open(srcFile)
-	if err != nil {
-		return fmt.Errorf("failed to open file %s: %w", srcFile, err)
-	}
-	defer file.Close()
-
-	return processTarGz(file, dest)
-}
-
-func processTarGz(r io.Reader, destDir string) error {
-	gzReader, err := gzip.NewReader(r)
-	if err != nil {
-		return fmt.Errorf("failed to create gzip reader: %w", err)
-	}
-	defer gzReader.Close()
-	tarReader := tar.NewReader(gzReader)
-
-	for {
-		header, err := tarReader.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return fmt.Errorf("failed to create tar reader: %w", err)
-		}
-
-		targetPath := filepath.Join(destDir, header.Name)
-
-		switch header.Typeflag {
-		case tar.TypeDir:
-			if err := os.MkdirAll(targetPath, 0o775); err != nil {
-				return fmt.Errorf("failed to make directory %s: %w", targetPath, err)
-			}
-
-		case tar.TypeReg:
-			if err := os.MkdirAll(filepath.Dir(targetPath), 0o775); err != nil {
-				return fmt.Errorf("failed to make directory %s: %w", targetPath, err)
-			}
-
-			data, err := io.ReadAll(tarReader)
-			if err != nil {
-				return fmt.Errorf("failed to read data with tar reader: %w", err)
-			}
-
-			// Check if this is a nested tar.gz file by checking the header for the "gzip magic number"
-			isGzip := len(data) > 2 && data[0] == 0x1f && data[1] == 0x8b
-
-			if isGzip {
-				reader := bytes.NewReader(data)
-				err = processTarGz(reader, destDir)
-				if err != nil {
-					return err
-				}
-			} else {
-				err = saveFile(targetPath, data)
-				if err != nil {
-					return err
-				}
-			}
-		}
-	}
-	return nil
-}
-
-func saveFile(path string, data []byte) error {
-	outFile, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("failed to create file %s: %w", path, err)
-	}
-	defer outFile.Close()
-
-	_, err = outFile.Write(data)
-	if err != nil {
-		return fmt.Errorf("failed to write data to file %s: %w", path, err)
-	}
-	return nil
-}
-
 func init() {
 	capture.AddCommand(downloadCapture)
 	downloadCapture.Flags().StringVar(&blobURL, "blob-url", "", "Blob URL from which to download")
-	downloadCapture.Flags().BoolVarP(&extract, "extract", "e", false, "Extract the tarball upon download")
-	downloadCapture.Flags().StringVar(&jobName, "job", "", "The name of a capture job")
+	downloadCapture.Flags().StringVar(&captureName, "name", "", "The name of a the capture")
 	downloadCapture.Flags().StringVarP(&outputPath, "output", "o", DefaultOutputPath, "Path to save the downloaded capture")
 }
