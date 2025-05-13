@@ -24,6 +24,7 @@ import (
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/telemetry"
 	"github.com/pkg/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // CaptureManager captures network packets and metadata into tar ball, then send the tar ball to the location(s)
@@ -105,8 +106,8 @@ func (cm *CaptureManager) captureNodeHostName() string {
 	return os.Getenv(captureConstants.NodeHostNameEnvKey)
 }
 
-func (cm *CaptureManager) captureStartTimestamp() (*file.Timestamp, error) {
-	timestamp, err := file.StringToTimestamp((os.Getenv(captureConstants.CaptureStartTimestampEnvKey)))
+func (cm *CaptureManager) captureStartTimestamp() (*metav1.Time, error) {
+	timestamp, err := file.StringToTime((os.Getenv(captureConstants.CaptureStartTimestampEnvKey)))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse timestamp")
 	}
