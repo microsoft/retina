@@ -13,13 +13,9 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/blang/semver/v4"
 	"github.com/cilium/cilium/api/v1/flow"
 	hubblev1 "github.com/cilium/cilium/pkg/hubble/api/v1"
-	"github.com/cilium/cilium/pkg/version"
-	"github.com/cilium/cilium/pkg/versioncheck"
 	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
 	"github.com/microsoft/retina/internal/ktime"
 	kcfg "github.com/microsoft/retina/pkg/config"
@@ -131,7 +127,6 @@ func (dr *dropReason) Compile(ctx context.Context) error {
 }
 
 func (dr *dropReason) Init() error {
-	var err error
 	// Get the absolute path to this file during runtime.
 	dir, err := absPath()
 	if err != nil {
@@ -139,41 +134,12 @@ func (dr *dropReason) Init() error {
 	}
 
 	bpfOutputFile := fmt.Sprintf("%s/%s", dir, bpfObjectFileName)
-
-	var objs interface{}
-	maps := &kprobeMaps{}
-	isMariner := plugincommon.IsAzureLinux()
-	dr.l.Info("Distro check:", zap.Bool("isMariner", isMariner))
-
-	var kv semver.Version
-	kv, err = version.GetKernelVersion()
-	if err != nil {
-		dr.l.Warn("Failed to get kernel version", zap.Error(err))
-
-		kv, err = plugincommon.GetKernelVersionMajMin()
-		if err != nil {
-			return fmt.Errorf("Failed to get kernel version: %w", err) //nolint:goerr113 //wrapping error from external module
-		}
-	}
-	dr.l.Info("Detected kernel >= ", zap.String("version", kv.String()))
-
-	minVersionAmd64, _ := versioncheck.Version("5.5")
-	minVersionArm64, _ := versioncheck.Version("6.0")
-	isMinVer := (runtime.GOARCH == "amd64" && kv.GTE(minVersionAmd64)) || (runtime.GOARCH == "arm64" && kv.GTE(minVersionArm64))
-
-	switch {
-	case !isMinVer:
-		objs = &kprobeObjectsOld{} //nolint:typecheck // this is a generated struct
-		maps = &objs.(*kprobeObjectsOld).kprobeMaps
-	case !isMariner:
-		objs = &kprobeObjects{} //nolint:typecheck // this is a generated struct
-		maps = &objs.(*kprobeObjects).kprobeMaps
-	default:
-		objs = &kprobeObjectsMariner{} //nolint:typecheck // needs to match a generated struct until we fix Mariner
-		maps = &objs.(*kprobeObjectsMariner).kprobeMaps
-	}
-
 	spec, err := ebpf.LoadCollectionSpec(bpfOutputFile)
+	if err != nil {
+		return err
+	}
+
+	objs, maps, isFexit, err := dr.getEbpfPayload()
 	if err != nil {
 		return err
 	}
@@ -204,7 +170,7 @@ func (dr *dropReason) Init() error {
 	if dr.cfg.EnablePodLevel {
 		err = dr.attachKprobes(progsKprobe, progsKprobeRet)
 	} else {
-		if isMinVer {
+		if isFexit {
 			err = dr.attachFexitPrograms(progsFexit)
 		} else {
 			err = dr.attachKprobes(progsKprobe, progsKprobeRet)
@@ -433,44 +399,6 @@ func (dr *dropReason) processMapValue(dataKey dropMetricKey, dataValue dropMetri
 	dr.dropMetricAdd(dataKey.getType(), dataKey.getDirection(), pktCount, pktBytes)
 }
 
-func (dr *dropReason) attachKprobes(kprobes, kprobesRet map[string]*ebpf.Program) error {
-	for name := range kprobes {
-		progLink, err := link.Kprobe(name, kprobes[name], nil)
-		if err != nil {
-			dr.l.Error("Failed to attach kprobe", zap.String("program", name), zap.Error(err))
-			return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-		}
-		dr.hooks = append(dr.hooks, progLink)
-		dr.l.Info("Attached kprobe", zap.String("program", name))
-	}
-
-	for name := range kprobesRet {
-		progLink, err := link.Kretprobe(name, kprobesRet[name], nil)
-		if err != nil {
-			dr.l.Error("Failed to attach kretprobe", zap.String("program", name), zap.Error(err))
-			return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-		}
-		dr.hooks = append(dr.hooks, progLink)
-		dr.l.Info("Attached kretprobe", zap.String("program", name))
-	}
-
-	return nil
-}
-
-func (dr *dropReason) attachFexitPrograms(objs map[string]*ebpf.Program) error {
-	for name, prog := range objs {
-		progLink, err := link.AttachTracing(link.TracingOptions{Program: prog, AttachType: ebpf.AttachTraceFExit})
-		if err != nil {
-			dr.l.Error("Failed to attach", zap.String("program", name), zap.Error(err))
-			return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-		}
-		dr.hooks = append(dr.hooks, progLink)
-		dr.l.Info("Attached program", zap.String("program", name))
-	}
-
-	return nil
-}
-
 func (dr *dropReason) Stop() error {
 	if !dr.isRunning {
 		return nil
@@ -521,64 +449,4 @@ func absPath() (string, error) {
 	}
 	dir := path.Dir(filename)
 	return dir, nil
-}
-
-func buildKprobePrograms(objs any) (progsKprobe, progsKprobeRet map[string]*ebpf.Program) {
-	progsKprobe = make(map[string]*ebpf.Program)
-	progsKprobeRet = make(map[string]*ebpf.Program)
-
-	switch o := objs.(type) {
-	case *kprobeObjects:
-		progsKprobe[inetCskAcceptFn] = o.InetCskAccept
-		progsKprobe[nfHookSlowFn] = o.NfHookSlow
-		progsKprobe[nfNatInetFn] = o.NfNatInetFn
-		progsKprobe[nfConntrackConfirmFn] = o.NfConntrackConfirm
-
-		progsKprobeRet[nfHookSlowFn] = o.NfHookSlowRet
-		progsKprobeRet[inetCskAcceptFn] = o.InetCskAcceptRet
-		progsKprobeRet[tcpConnectFn] = o.TcpV4ConnectRet
-		progsKprobeRet[nfNatInetFn] = o.NfNatInetFnRet
-		progsKprobeRet[nfConntrackConfirmFn] = o.NfConntrackConfirmRet
-
-	case *kprobeObjectsOld:
-		progsKprobe[inetCskAcceptFn] = o.InetCskAccept
-		progsKprobe[nfHookSlowFn] = o.NfHookSlow
-		progsKprobe[nfNatInetFn] = o.NfNatInetFn
-		progsKprobe[nfConntrackConfirmFn] = o.NfConntrackConfirm
-
-		progsKprobeRet[nfHookSlowFn] = o.NfHookSlowRet
-		progsKprobeRet[inetCskAcceptFn] = o.InetCskAcceptRet
-		progsKprobeRet[tcpConnectFn] = o.TcpV4ConnectRet
-		progsKprobeRet[nfNatInetFn] = o.NfNatInetFnRet
-		progsKprobeRet[nfConntrackConfirmFn] = o.NfConntrackConfirmRet
-
-	case *kprobeObjectsMariner:
-		progsKprobe[inetCskAcceptFn] = o.InetCskAccept
-		progsKprobe[nfHookSlowFn] = o.NfHookSlow
-
-		progsKprobeRet[nfHookSlowFn] = o.NfHookSlowRet
-		progsKprobeRet[inetCskAcceptFn] = o.InetCskAcceptRet
-		progsKprobeRet[tcpConnectFn] = o.TcpV4ConnectRet
-	}
-	return progsKprobe, progsKprobeRet
-}
-
-func buildFexitPrograms(objs any) map[string]*ebpf.Program {
-	progsFexit := make(map[string]*ebpf.Program)
-
-	switch o := objs.(type) {
-	case *kprobeObjects:
-		progsFexit[inetCskAcceptFnFexit] = o.InetCskAcceptFexit
-		progsFexit[nfHookSlowFnFexit] = o.NfHookSlowFexit
-		progsFexit[tcpV4ConnectFexit] = o.TcpV4ConnectFexit
-		progsFexit[nfNatInetFnFexit] = o.NfNatInetFnFexit
-		progsFexit[nfConntrackConfirmFnFexit] = o.NfConntrackConfirmFexit
-
-	case *kprobeObjectsMariner:
-		progsFexit[inetCskAcceptFnFexit] = o.InetCskAcceptFexit
-		progsFexit[nfHookSlowFnFexit] = o.NfHookSlowFexit
-		progsFexit[tcpV4ConnectFexit] = o.TcpV4ConnectFexit
-
-	}
-	return progsFexit
 }
