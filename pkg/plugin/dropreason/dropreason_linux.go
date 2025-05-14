@@ -143,14 +143,34 @@ func (dr *dropReason) Init() error {
 	var objs interface{}
 	maps := &kprobeMaps{}
 	isMariner := plugincommon.IsAzureLinux()
+	dr.l.Info("Distro check:", zap.Bool("isMariner", isMariner))
 
-	if !isMariner {
+	var kv semver.Version
+	kv, err = version.GetKernelVersion()
+	if err != nil {
+		dr.l.Warn("Failed to get kernel version", zap.Error(err))
+
+		kv, err = plugincommon.GetKernelVersionMajMin()
+		if err != nil {
+			return fmt.Errorf("Failed to get kernel version: %w", err) //nolint:goerr113 //wrapping error from external module
+		}
+	}
+	dr.l.Info("Detected kernel >= ", zap.String("version", kv.String()))
+
+	minVersionAmd64, _ := versioncheck.Version("5.5")
+	minVersionArm64, _ := versioncheck.Version("6.0")
+	isMinVer := (runtime.GOARCH == "amd64" && kv.GTE(minVersionAmd64)) || (runtime.GOARCH == "arm64" && kv.GTE(minVersionArm64))
+
+	switch {
+	case !isMinVer:
+		objs = &kprobeObjectsOld{} //nolint:typecheck // this is a generated struct
+		maps = &objs.(*kprobeObjectsOld).kprobeMaps
+	case !isMariner:
 		objs = &kprobeObjects{} //nolint:typecheck // this is a generated struct
 		maps = &objs.(*kprobeObjects).kprobeMaps
-	} else {
+	default:
 		objs = &kprobeObjectsMariner{} //nolint:typecheck // needs to match a generated struct until we fix Mariner
 		maps = &objs.(*kprobeObjectsMariner).kprobeMaps
-		dr.l.Info("Detected Mariner distro")
 	}
 
 	spec, err := ebpf.LoadCollectionSpec(bpfOutputFile)
@@ -184,21 +204,7 @@ func (dr *dropReason) Init() error {
 	if dr.cfg.EnablePodLevel {
 		err = dr.attachKprobes(progsKprobe, progsKprobeRet)
 	} else {
-		var kv semver.Version
-		kv, err = version.GetKernelVersion()
-		if err != nil {
-			dr.l.Warn("Failed to get kernel version", zap.Error(err))
-
-			kv, err = plugincommon.GetKernelVersionMajMin()
-			if err != nil {
-				return fmt.Errorf("Failed to get kernel version: %w", err) //nolint:goerr113 //wrapping error from external module
-			}
-		}
-		dr.l.Info("Detected kernel >= ", zap.String("version", kv.String()))
-
-		minVersionAmd64, _ := versioncheck.Version("5.5")
-		minVersionArm64, _ := versioncheck.Version("6.0")
-		if (runtime.GOARCH == "amd64" && kv.GTE(minVersionAmd64)) || runtime.GOARCH == "arm64" && kv.GTE(minVersionArm64) {
+		if isMinVer {
 			err = dr.attachFexitPrograms(progsFexit)
 		} else {
 			err = dr.attachKprobes(progsKprobe, progsKprobeRet)
@@ -534,6 +540,18 @@ func buildKprobePrograms(objs any) (progsKprobe, progsKprobeRet map[string]*ebpf
 		progsKprobeRet[nfNatInetFn] = o.NfNatInetFnRet
 		progsKprobeRet[nfConntrackConfirmFn] = o.NfConntrackConfirmRet
 
+	case *kprobeObjectsOld:
+		progsKprobe[inetCskAcceptFn] = o.InetCskAccept
+		progsKprobe[nfHookSlowFn] = o.NfHookSlow
+		progsKprobe[nfNatInetFn] = o.NfNatInetFn
+		progsKprobe[nfConntrackConfirmFn] = o.NfConntrackConfirm
+
+		progsKprobeRet[nfHookSlowFn] = o.NfHookSlowRet
+		progsKprobeRet[inetCskAcceptFn] = o.InetCskAcceptRet
+		progsKprobeRet[tcpConnectFn] = o.TcpV4ConnectRet
+		progsKprobeRet[nfNatInetFn] = o.NfNatInetFnRet
+		progsKprobeRet[nfConntrackConfirmFn] = o.NfConntrackConfirmRet
+
 	case *kprobeObjectsMariner:
 		progsKprobe[inetCskAcceptFn] = o.InetCskAccept
 		progsKprobe[nfHookSlowFn] = o.NfHookSlow
@@ -541,7 +559,6 @@ func buildKprobePrograms(objs any) (progsKprobe, progsKprobeRet map[string]*ebpf
 		progsKprobeRet[nfHookSlowFn] = o.NfHookSlowRet
 		progsKprobeRet[inetCskAcceptFn] = o.InetCskAcceptRet
 		progsKprobeRet[tcpConnectFn] = o.TcpV4ConnectRet
-
 	}
 	return progsKprobe, progsKprobeRet
 }

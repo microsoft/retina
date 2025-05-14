@@ -58,6 +58,23 @@ type kprobeProgramsMariner struct {
 	TcpV4ConnectFexit  *ebpf.Program `ebpf:"tcp_v4_connect_fexit"` // nolint:revive // needs to match generated code
 }
 
+type kprobeObjectsOld struct {
+	kprobeProgramsOld
+	kprobeMaps
+}
+
+type kprobeProgramsOld struct {
+	InetCskAccept         *ebpf.Program `ebpf:"inet_csk_accept"`
+	InetCskAcceptRet      *ebpf.Program `ebpf:"inet_csk_accept_ret"`
+	NfConntrackConfirm    *ebpf.Program `ebpf:"nf_conntrack_confirm"`
+	NfConntrackConfirmRet *ebpf.Program `ebpf:"nf_conntrack_confirm_ret"`
+	NfHookSlow            *ebpf.Program `ebpf:"nf_hook_slow"`
+	NfHookSlowRet         *ebpf.Program `ebpf:"nf_hook_slow_ret"`
+	NfNatInetFn           *ebpf.Program `ebpf:"nf_nat_inet_fn"`
+	NfNatInetFnRet        *ebpf.Program `ebpf:"nf_nat_inet_fn_ret"`
+	TcpV4ConnectRet       *ebpf.Program `ebpf:"tcp_v4_connect_ret"` // nolint:revive // needs to match generated code
+}
+
 type (
 	returnValue uint32
 )
