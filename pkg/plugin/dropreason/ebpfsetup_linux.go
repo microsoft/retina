@@ -10,6 +10,7 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
@@ -60,7 +61,7 @@ module funcs:
 - nf_nat_inet_fn
 */
 
-func (dr *dropReason) getEbpfPayload() (interface{}, *kprobeMaps, bool, error) {
+func (dr *dropReason) getEbpfPayload() (objs interface{}, maps *kprobeMaps, isFexit bool, err error) {
 	isMariner := plugincommon.IsAzureLinux()
 	dr.l.Info("Distro check:", zap.Bool("isMariner", isMariner))
 
@@ -69,12 +70,12 @@ func (dr *dropReason) getEbpfPayload() (interface{}, *kprobeMaps, bool, error) {
 		dr.l.Warn("Failed to get kernel version", zap.Error(err))
 		kv, err = plugincommon.GetKernelVersionMajMin()
 		if err != nil {
-			return nil, nil, false, fmt.Errorf("failed to get kernel version: %w", err) //nolint:goerr113
+			return nil, nil, false, fmt.Errorf("failed to get kernel version: %w", err) //nolint:goerr113 //wrapping error from external module
 		}
 	}
 	dr.l.Info("Detected kernel", zap.String("version", kv.String()))
 
-	objs, maps, isFexit := resolvePayload(runtime.GOARCH, kv, isMariner)
+	objs, maps, isFexit = resolvePayload(runtime.GOARCH, kv, isMariner)
 	return objs, maps, isFexit, nil
 }
 
@@ -128,7 +129,7 @@ func (dr *dropReason) attachKprobes(kprobes, kprobesRet map[string]*ebpf.Program
 	}
 	if retprobeCount == 0 {
 		dr.l.Error("No kretprobes attached, cannot collect drop metrics")
-		return fmt.Errorf("No kretprobes attached, cannot collect drop metrics") //nolint:goerr113 //wrapping error from external module
+		return errors.New("No kretprobes attached, cannot collect drop metrics") //nolint:goerr113 // no sentinel type used
 	}
 
 	return nil
@@ -149,7 +150,7 @@ func (dr *dropReason) attachFexitPrograms(objs map[string]*ebpf.Program) error {
 
 	if progCount == 0 {
 		dr.l.Error("No programs attached, cannot collect drop metrics")
-		return fmt.Errorf("No programs attached, cannot collect drop metrics") //nolint:goerr113 //wrapping error from external module
+		return errors.New("No programs attached, cannot collect drop metrics") //nolint:goerr113 // no sentinel type used
 	}
 
 	return nil

@@ -136,7 +136,7 @@ func (dr *dropReason) Init() error {
 	bpfOutputFile := fmt.Sprintf("%s/%s", dir, bpfObjectFileName)
 	spec, err := ebpf.LoadCollectionSpec(bpfOutputFile)
 	if err != nil {
-		return err
+		return err //nolint:wrapcheck // no additional context needed
 	}
 
 	objs, maps, isFexit, err := dr.getEbpfPayload()
