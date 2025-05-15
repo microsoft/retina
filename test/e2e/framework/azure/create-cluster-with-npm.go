@@ -82,6 +82,22 @@ func (c *CreateNPMCluster) Run() error {
 	})
 
 	//nolint:appendCombine // separate for verbosity
+	npmCluster.Properties.AgentPoolProfiles = append(npmCluster.Properties.AgentPoolProfiles, &armcontainerservice.ManagedClusterAgentPoolProfile{
+		Type:               to.Ptr(armcontainerservice.AgentPoolTypeVirtualMachineScaleSets),
+		AvailabilityZones:  []*string{to.Ptr("1")},
+		Count:              to.Ptr[int32](AuxilaryNodeCount),
+		EnableNodePublicIP: to.Ptr(false),
+		EnableFIPS:         to.Ptr(true),
+		Mode:               to.Ptr(armcontainerservice.AgentPoolModeUser),
+		OSType:             to.Ptr(armcontainerservice.OSTypeLinux),
+		OSSKU:              to.Ptr(armcontainerservice.OSSKUCBLMariner),
+		ScaleDownMode:      to.Ptr(armcontainerservice.ScaleDownModeDelete),
+		VMSize:             to.Ptr(AgentSKU),
+		Name:               to.Ptr("fipsmariner"),
+		MaxPods:            to.Ptr(int32(MaxPodsPerNode)),
+	})
+
+	//nolint:appendCombine // separate for verbosity
 	npmCluster.Properties.AgentPoolProfiles = append(npmCluster.Properties.AgentPoolProfiles, &armcontainerservice.ManagedClusterAgentPoolProfile{ //nolint:all
 		Type: to.Ptr(armcontainerservice.AgentPoolTypeVirtualMachineScaleSets),
 		// AvailabilityZones:  []*string{to.Ptr("1")},
