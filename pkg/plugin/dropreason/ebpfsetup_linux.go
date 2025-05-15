@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"runtime"
 
+	"github.com/blang/semver/v4"
 	"github.com/cilium/cilium/pkg/version"
 	"github.com/cilium/cilium/pkg/versioncheck"
 	"github.com/cilium/ebpf"
@@ -58,42 +59,48 @@ module funcs:
 - nf_conntrack_confirm
 - nf_nat_inet_fn
 */
+
 func (dr *dropReason) getEbpfPayload() (interface{}, *kprobeMaps, bool, error) {
-	var objs interface{}
-	maps := &kprobeMaps{}
 	isMariner := plugincommon.IsAzureLinux()
 	dr.l.Info("Distro check:", zap.Bool("isMariner", isMariner))
 
-	// Check if the kernel version is >= 5.5 for amd64 and >= 6.0 for arm64
-	// This is needed to decide between attaching fexit and kprobe programs.
 	kv, err := version.GetKernelVersion()
 	if err != nil {
 		dr.l.Warn("Failed to get kernel version", zap.Error(err))
-
 		kv, err = plugincommon.GetKernelVersionMajMin()
 		if err != nil {
-			return nil, nil, false, fmt.Errorf("Failed to get kernel version: %w", err) //nolint:goerr113 //wrapping error from external module
+			return nil, nil, false, fmt.Errorf("failed to get kernel version: %w", err) //nolint:goerr113
 		}
 	}
-	dr.l.Info("Detected kernel >= ", zap.String("version", kv.String()))
+	dr.l.Info("Detected kernel", zap.String("version", kv.String()))
 
+	objs, maps, isFexit := resolvePayload(runtime.GOARCH, kv, isMariner)
+	return objs, maps, isFexit, nil
+}
+
+func resolvePayload(arch string, kv semver.Version, isMariner bool) (interface{}, *kprobeMaps, bool) {
 	minVersionAmd64, _ := versioncheck.Version(MinAmdVersionNum)
 	minVersionArm64, _ := versioncheck.Version(MinArmVersionNum)
-	isFexit := (runtime.GOARCH == "amd64" && kv.GTE(minVersionAmd64)) || (runtime.GOARCH == "arm64" && kv.GTE(minVersionArm64))
+
+	isFexit := (arch == "amd64" && kv.GTE(minVersionAmd64)) ||
+		(arch == "arm64" && kv.GTE(minVersionArm64))
+
+	var objs interface{}
+	var maps *kprobeMaps
 
 	switch {
 	case !isFexit:
 		objs = &kprobeObjectsOld{} //nolint:typecheck // this is a generated struct
 		maps = &objs.(*kprobeObjectsOld).kprobeMaps
 	case !isMariner:
-		objs = &kprobeObjects{} //nolint:typecheck // this is a generated struct
-		maps = &objs.(*kprobeObjects).kprobeMaps
+		objs = &fexitObjects{} //nolint:typecheck // this is a generated struct
+		maps = &objs.(*fexitObjects).kprobeMaps
 	case isMariner:
-		objs = &kprobeObjectsMariner{} //nolint:typecheck // needs to match a generated struct until we fix Mariner
-		maps = &objs.(*kprobeObjectsMariner).kprobeMaps
+		objs = &marinerObjects{} //nolint:typecheck // needs to match a generated struct until we fix Mariner
+		maps = &objs.(*marinerObjects).kprobeMaps
 	}
 
-	return objs, maps, isFexit, nil
+	return objs, maps, isFexit
 }
 
 func (dr *dropReason) attachKprobes(kprobes, kprobesRet map[string]*ebpf.Program) error {
@@ -153,18 +160,6 @@ func buildKprobePrograms(objs any) (progsKprobe, progsKprobeRet map[string]*ebpf
 	progsKprobeRet = make(map[string]*ebpf.Program)
 
 	switch o := objs.(type) {
-	case *kprobeObjects:
-		progsKprobe[inetCskAcceptFn] = o.InetCskAccept
-		progsKprobe[nfHookSlowFn] = o.NfHookSlow
-		progsKprobe[nfNatInetFn] = o.NfNatInetFn
-		progsKprobe[nfConntrackConfirmFn] = o.NfConntrackConfirm
-
-		progsKprobeRet[nfHookSlowFn] = o.NfHookSlowRet
-		progsKprobeRet[inetCskAcceptFn] = o.InetCskAcceptRet
-		progsKprobeRet[tcpConnectFn] = o.TcpV4ConnectRet
-		progsKprobeRet[nfNatInetFn] = o.NfNatInetFnRet
-		progsKprobeRet[nfConntrackConfirmFn] = o.NfConntrackConfirmRet
-
 	case *kprobeObjectsOld:
 		progsKprobe[inetCskAcceptFn] = o.InetCskAccept
 		progsKprobe[nfHookSlowFn] = o.NfHookSlow
@@ -177,7 +172,7 @@ func buildKprobePrograms(objs any) (progsKprobe, progsKprobeRet map[string]*ebpf
 		progsKprobeRet[nfNatInetFn] = o.NfNatInetFnRet
 		progsKprobeRet[nfConntrackConfirmFn] = o.NfConntrackConfirmRet
 
-	case *kprobeObjectsMariner:
+	case *marinerObjects:
 		progsKprobe[inetCskAcceptFn] = o.InetCskAccept
 		progsKprobe[nfHookSlowFn] = o.NfHookSlow
 
@@ -192,18 +187,17 @@ func buildFexitPrograms(objs any) map[string]*ebpf.Program {
 	progsFexit := make(map[string]*ebpf.Program)
 
 	switch o := objs.(type) {
-	case *kprobeObjects:
+	case *fexitObjects:
 		progsFexit[inetCskAcceptFnFexit] = o.InetCskAcceptFexit
 		progsFexit[nfHookSlowFnFexit] = o.NfHookSlowFexit
 		progsFexit[tcpV4ConnectFexit] = o.TcpV4ConnectFexit
 		progsFexit[nfNatInetFnFexit] = o.NfNatInetFnFexit
 		progsFexit[nfConntrackConfirmFnFexit] = o.NfConntrackConfirmFexit
 
-	case *kprobeObjectsMariner:
+	case *marinerObjects:
 		progsFexit[inetCskAcceptFnFexit] = o.InetCskAcceptFexit
 		progsFexit[nfHookSlowFnFexit] = o.NfHookSlowFexit
 		progsFexit[tcpV4ConnectFexit] = o.TcpV4ConnectFexit
-
 	}
 	return progsFexit
 }

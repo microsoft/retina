@@ -42,12 +42,25 @@ type dropReason struct {
 	externalChannel chan *hubblev1.Event
 }
 
-type kprobeObjectsMariner struct {
-	kprobeProgramsMariner
+type fexitObjects struct {
+	fexitPrograms
 	kprobeMaps
 }
 
-type kprobeProgramsMariner struct {
+type fexitPrograms struct {
+	InetCskAcceptFexit      *ebpf.Program `ebpf:"inet_csk_accept_fexit"`
+	NfConntrackConfirmFexit *ebpf.Program `ebpf:"nf_conntrack_confirm_fexit"`
+	NfHookSlowFexit         *ebpf.Program `ebpf:"nf_hook_slow_fexit"`
+	NfNatInetFnFexit        *ebpf.Program `ebpf:"nf_nat_inet_fn_fexit"`
+	TcpV4ConnectFexit       *ebpf.Program `ebpf:"tcp_v4_connect_fexit"` // nolint:revive // needs to match generated code
+}
+
+type marinerObjects struct {
+	marinerPrograms
+	kprobeMaps
+}
+
+type marinerPrograms struct {
 	InetCskAccept      *ebpf.Program `ebpf:"inet_csk_accept"`
 	InetCskAcceptRet   *ebpf.Program `ebpf:"inet_csk_accept_ret"`
 	InetCskAcceptFexit *ebpf.Program `ebpf:"inet_csk_accept_fexit"`

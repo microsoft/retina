@@ -9,11 +9,13 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"reflect"
 	"runtime"
 	"testing"
 	"time"
 	"unsafe"
 
+	"github.com/blang/semver/v4"
 	"github.com/cilium/ebpf/perf"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
@@ -464,6 +466,80 @@ func TestDropReasonGenerate(t *testing.T) {
 	}
 	if string(actualContents) != expectedContents {
 		t.Errorf("unexpected dynamic header file contents: got %q, want %q", string(actualContents), expectedContents)
+	}
+}
+
+func mustVersion(v string) semver.Version {
+	ver, err := semver.Parse(v)
+	if err != nil {
+		panic(err)
+	}
+	return ver
+}
+
+func TestResolveEbpfPayload(t *testing.T) {
+	tests := []struct {
+		name        string
+		arch        string
+		kv          semver.Version
+		isMariner   bool
+		wantType    string
+		wantIsFexit bool
+	}{
+		{
+			name:        "old kernel - fallback to kprobeObjectsOld",
+			arch:        "amd64",
+			kv:          mustVersion("5.4.0"),
+			isMariner:   false,
+			wantType:    "*dropreason.kprobeObjectsOld",
+			wantIsFexit: false,
+		},
+		{
+			name:        "new kernel - fexitObjects for Ubuntu",
+			arch:        "amd64",
+			kv:          mustVersion("5.10.0"),
+			isMariner:   false,
+			wantType:    "*dropreason.fexitObjects",
+			wantIsFexit: true,
+		},
+		{
+			name:        "new kernel - marinerObjects for Mariner",
+			arch:        "amd64",
+			kv:          mustVersion("5.10.0"),
+			isMariner:   true,
+			wantType:    "*dropreason.marinerObjects",
+			wantIsFexit: true,
+		},
+		{
+			name:        "arm64 old kernel - fallback to kprobeObjectsOld",
+			arch:        "arm64",
+			kv:          mustVersion("5.8.0"),
+			isMariner:   true,
+			wantType:    "*dropreason.kprobeObjectsOld",
+			wantIsFexit: false,
+		},
+		{
+			name:        "arm64 new kernel - marinerObjects",
+			arch:        "arm64",
+			kv:          mustVersion("6.1.0"),
+			isMariner:   true,
+			wantType:    "*dropreason.marinerObjects",
+			wantIsFexit: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			objs, _, isFexit := resolvePayload(tt.arch, tt.kv, tt.isMariner)
+
+			if isFexit != tt.wantIsFexit {
+				t.Errorf("isFexit = %v, want %v", isFexit, tt.wantIsFexit)
+			}
+
+			if gotType := reflect.TypeOf(objs).String(); gotType != tt.wantType {
+				t.Errorf("object type = %v, want %v", gotType, tt.wantType)
+			}
+		})
 	}
 }
 
