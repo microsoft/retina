@@ -139,7 +139,7 @@ func (dr *dropReason) Init() error {
 		return err //nolint:wrapcheck // no additional context needed
 	}
 
-	objs, maps, isFexit, err := dr.getEbpfPayload()
+	objs, maps, supportsFexit, err := dr.getEbpfPayload()
 	if err != nil {
 		return err
 	}
@@ -167,14 +167,10 @@ func (dr *dropReason) Init() error {
 	progsKprobe, progsKprobeRet := buildKprobePrograms(objs)
 	progsFexit := buildFexitPrograms(objs)
 
-	if dr.cfg.EnablePodLevel {
-		err = dr.attachKprobes(progsKprobe, progsKprobeRet)
+	if supportsFexit {
+		err = dr.attachFexitPrograms(progsFexit)
 	} else {
-		if isFexit {
-			err = dr.attachFexitPrograms(progsFexit)
-		} else {
-			err = dr.attachKprobes(progsKprobe, progsKprobeRet)
-		}
+		err = dr.attachKprobes(progsKprobe, progsKprobeRet)
 	}
 
 	dr.metricsMapData = maps.RetinaDropreasonMetrics

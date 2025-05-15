@@ -479,61 +479,76 @@ func mustVersion(v string) semver.Version {
 
 func TestResolveEbpfPayload(t *testing.T) {
 	tests := []struct {
-		name        string
-		arch        string
-		kv          semver.Version
-		isMariner   bool
-		wantType    string
-		wantIsFexit bool
+		name              string
+		arch              string
+		kv                semver.Version
+		isMariner         bool
+		isPodLevel        bool
+		wantType          string
+		wantSupportsFexit bool
 	}{
 		{
-			name:        "old kernel - fallback to kprobeObjectsOld",
-			arch:        "amd64",
-			kv:          mustVersion("5.4.0"),
-			isMariner:   false,
-			wantType:    "*dropreason.kprobeObjectsOld",
-			wantIsFexit: false,
+			name:              "old kernel - fallback to allKprobeObjects",
+			arch:              "amd64",
+			kv:                mustVersion("5.4.0"),
+			isMariner:         false,
+			isPodLevel:        false,
+			wantType:          "*dropreason.allKprobeObjects",
+			wantSupportsFexit: false,
 		},
 		{
-			name:        "new kernel - fexitObjects for Ubuntu",
-			arch:        "amd64",
-			kv:          mustVersion("5.10.0"),
-			isMariner:   false,
-			wantType:    "*dropreason.fexitObjects",
-			wantIsFexit: true,
+			name:              "new kernel - fexitObjects for Ubuntu",
+			arch:              "amd64",
+			kv:                mustVersion("5.10.0"),
+			isMariner:         false,
+			isPodLevel:        false,
+			wantType:          "*dropreason.allFexitObjects",
+			wantSupportsFexit: true,
 		},
 		{
-			name:        "new kernel - marinerObjects for Mariner",
-			arch:        "amd64",
-			kv:          mustVersion("5.10.0"),
-			isMariner:   true,
-			wantType:    "*dropreason.marinerObjects",
-			wantIsFexit: true,
+			name:              "new kernel - marinerObjects for Mariner",
+			arch:              "amd64",
+			kv:                mustVersion("5.10.0"),
+			isMariner:         true,
+			isPodLevel:        false,
+			wantType:          "*dropreason.marinerObjects",
+			wantSupportsFexit: true,
 		},
 		{
-			name:        "arm64 old kernel - fallback to kprobeObjectsOld",
-			arch:        "arm64",
-			kv:          mustVersion("5.8.0"),
-			isMariner:   true,
-			wantType:    "*dropreason.kprobeObjectsOld",
-			wantIsFexit: false,
+			name:              "arm64 old kernel - fallback to allKprobeObjects",
+			arch:              "arm64",
+			kv:                mustVersion("5.8.0"),
+			isMariner:         true,
+			isPodLevel:        false,
+			wantType:          "*dropreason.allKprobeObjects",
+			wantSupportsFexit: false,
 		},
 		{
-			name:        "arm64 new kernel - marinerObjects",
-			arch:        "arm64",
-			kv:          mustVersion("6.1.0"),
-			isMariner:   true,
-			wantType:    "*dropreason.marinerObjects",
-			wantIsFexit: true,
+			name:              "arm64 new kernel - marinerObjects",
+			arch:              "arm64",
+			kv:                mustVersion("6.1.0"),
+			isMariner:         true,
+			isPodLevel:        false,
+			wantType:          "*dropreason.marinerObjects",
+			wantSupportsFexit: true,
+		},
+		{
+			name:              "pod level - use allKprobeObjects",
+			arch:              "amd64",
+			kv:                mustVersion("5.15.0"),
+			isMariner:         false,
+			isPodLevel:        true,
+			wantType:          "*dropreason.allKprobeObjects",
+			wantSupportsFexit: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			objs, _, isFexit := resolvePayload(tt.arch, tt.kv, tt.isMariner)
+			objs, _, isFexit := resolvePayload(tt.arch, tt.kv, tt.isMariner, tt.isPodLevel)
 
-			if isFexit != tt.wantIsFexit {
-				t.Errorf("isFexit = %v, want %v", isFexit, tt.wantIsFexit)
+			if isFexit != tt.wantSupportsFexit {
+				t.Errorf("isFexit = %v, want %v", isFexit, tt.wantSupportsFexit)
 			}
 
 			if gotType := reflect.TypeOf(objs).String(); gotType != tt.wantType {

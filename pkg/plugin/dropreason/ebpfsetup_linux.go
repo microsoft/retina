@@ -61,13 +61,12 @@ module funcs:
 - nf_nat_inet_fn
 */
 
-func (dr *dropReason) getEbpfPayload() (objs interface{}, maps *kprobeMaps, isFexit bool, err error) {
+func (dr *dropReason) getEbpfPayload() (objs interface{}, maps *kprobeMaps, supportsFexit bool, err error) {
 	isMariner := plugincommon.IsAzureLinux()
 	dr.l.Info("Distro check:", zap.Bool("isMariner", isMariner))
 
 	kv, err := version.GetKernelVersion()
 	if err != nil {
-		dr.l.Warn("Failed to get kernel version", zap.Error(err))
 		kv, err = plugincommon.GetKernelVersionMajMin()
 		if err != nil {
 			return nil, nil, false, fmt.Errorf("failed to get kernel version: %w", err) //nolint:goerr113 //wrapping error from external module
@@ -75,33 +74,36 @@ func (dr *dropReason) getEbpfPayload() (objs interface{}, maps *kprobeMaps, isFe
 	}
 	dr.l.Info("Detected kernel", zap.String("version", kv.String()))
 
-	objs, maps, isFexit = resolvePayload(runtime.GOARCH, kv, isMariner)
-	return objs, maps, isFexit, nil
+	objs, maps, supportsFexit = resolvePayload(runtime.GOARCH, kv, isMariner, dr.cfg.EnablePodLevel)
+	return objs, maps, supportsFexit, nil
 }
 
-func resolvePayload(arch string, kv semver.Version, isMariner bool) (interface{}, *kprobeMaps, bool) {
+func resolvePayload(arch string, kv semver.Version, isMariner, isPodLevel bool) (interface{}, *kprobeMaps, bool) {
 	minVersionAmd64, _ := versioncheck.Version(MinAmdVersionNum)
 	minVersionArm64, _ := versioncheck.Version(MinArmVersionNum)
 
-	isFexit := (arch == "amd64" && kv.GTE(minVersionAmd64)) ||
+	supportsFexit := (arch == "amd64" && kv.GTE(minVersionAmd64)) ||
 		(arch == "arm64" && kv.GTE(minVersionArm64))
 
 	var objs interface{}
 	var maps *kprobeMaps
 
 	switch {
-	case !isFexit:
-		objs = &kprobeObjectsOld{} //nolint:typecheck // this is a generated struct
-		maps = &objs.(*kprobeObjectsOld).kprobeMaps
-	case !isMariner:
-		objs = &fexitObjects{} //nolint:typecheck // this is a generated struct
-		maps = &objs.(*fexitObjects).kprobeMaps
-	case isMariner:
+	case isPodLevel: // TODO: fexit support is being rolled out in two stages, remove this when we have it for advanced metrics.
+		objs = &allKprobeObjects{} //nolint:typecheck // this is a generated struct
+		maps = &objs.(*allKprobeObjects).kprobeMaps
+	case isMariner && supportsFexit: // Mariner supports a subset of the fexit programs, need to check for it first.
 		objs = &marinerObjects{} //nolint:typecheck // needs to match a generated struct until we fix Mariner
 		maps = &objs.(*marinerObjects).kprobeMaps
+	case supportsFexit:
+		objs = &allFexitObjects{} //nolint:typecheck // this is a generated struct
+		maps = &objs.(*allFexitObjects).kprobeMaps
+	default:
+		objs = &allKprobeObjects{} //nolint:typecheck // this is a generated struct
+		maps = &objs.(*allKprobeObjects).kprobeMaps
 	}
 
-	return objs, maps, isFexit
+	return objs, maps, (supportsFexit && !isPodLevel)
 }
 
 func (dr *dropReason) attachKprobes(kprobes, kprobesRet map[string]*ebpf.Program) error {
@@ -160,8 +162,7 @@ func buildKprobePrograms(objs any) (progsKprobe, progsKprobeRet map[string]*ebpf
 	progsKprobe = make(map[string]*ebpf.Program)
 	progsKprobeRet = make(map[string]*ebpf.Program)
 
-	switch o := objs.(type) {
-	case *kprobeObjectsOld:
+	if o, ok := objs.(*allKprobeObjects); ok {
 		progsKprobe[inetCskAcceptFn] = o.InetCskAccept
 		progsKprobe[nfHookSlowFn] = o.NfHookSlow
 		progsKprobe[nfNatInetFn] = o.NfNatInetFn
@@ -172,14 +173,6 @@ func buildKprobePrograms(objs any) (progsKprobe, progsKprobeRet map[string]*ebpf
 		progsKprobeRet[tcpConnectFn] = o.TcpV4ConnectRet
 		progsKprobeRet[nfNatInetFn] = o.NfNatInetFnRet
 		progsKprobeRet[nfConntrackConfirmFn] = o.NfConntrackConfirmRet
-
-	case *marinerObjects:
-		progsKprobe[inetCskAcceptFn] = o.InetCskAccept
-		progsKprobe[nfHookSlowFn] = o.NfHookSlow
-
-		progsKprobeRet[nfHookSlowFn] = o.NfHookSlowRet
-		progsKprobeRet[inetCskAcceptFn] = o.InetCskAcceptRet
-		progsKprobeRet[tcpConnectFn] = o.TcpV4ConnectRet
 	}
 	return progsKprobe, progsKprobeRet
 }
@@ -188,7 +181,7 @@ func buildFexitPrograms(objs any) map[string]*ebpf.Program {
 	progsFexit := make(map[string]*ebpf.Program)
 
 	switch o := objs.(type) {
-	case *fexitObjects:
+	case *allFexitObjects:
 		progsFexit[inetCskAcceptFnFexit] = o.InetCskAcceptFexit
 		progsFexit[nfHookSlowFnFexit] = o.NfHookSlowFexit
 		progsFexit[tcpV4ConnectFexit] = o.TcpV4ConnectFexit

@@ -42,12 +42,12 @@ type dropReason struct {
 	externalChannel chan *hubblev1.Event
 }
 
-type fexitObjects struct {
-	fexitPrograms
+type allFexitObjects struct {
+	allFexitPrograms
 	kprobeMaps
 }
 
-type fexitPrograms struct {
+type allFexitPrograms struct {
 	InetCskAcceptFexit      *ebpf.Program `ebpf:"inet_csk_accept_fexit"`
 	NfConntrackConfirmFexit *ebpf.Program `ebpf:"nf_conntrack_confirm_fexit"`
 	NfHookSlowFexit         *ebpf.Program `ebpf:"nf_hook_slow_fexit"`
@@ -61,22 +61,17 @@ type marinerObjects struct {
 }
 
 type marinerPrograms struct {
-	InetCskAccept      *ebpf.Program `ebpf:"inet_csk_accept"`
-	InetCskAcceptRet   *ebpf.Program `ebpf:"inet_csk_accept_ret"`
 	InetCskAcceptFexit *ebpf.Program `ebpf:"inet_csk_accept_fexit"`
-	NfHookSlow         *ebpf.Program `ebpf:"nf_hook_slow"`
-	NfHookSlowRet      *ebpf.Program `ebpf:"nf_hook_slow_ret"`
 	NfHookSlowFexit    *ebpf.Program `ebpf:"nf_hook_slow_fexit"`
-	TcpV4ConnectRet    *ebpf.Program `ebpf:"tcp_v4_connect_ret"`   // nolint:revive // needs to match generated code
 	TcpV4ConnectFexit  *ebpf.Program `ebpf:"tcp_v4_connect_fexit"` // nolint:revive // needs to match generated code
 }
 
-type kprobeObjectsOld struct {
-	kprobeProgramsOld
+type allKprobeObjects struct {
+	allKprobePrograms
 	kprobeMaps
 }
 
-type kprobeProgramsOld struct {
+type allKprobePrograms struct {
 	InetCskAccept         *ebpf.Program `ebpf:"inet_csk_accept"`
 	InetCskAcceptRet      *ebpf.Program `ebpf:"inet_csk_accept_ret"`
 	NfConntrackConfirm    *ebpf.Program `ebpf:"nf_conntrack_confirm"`
