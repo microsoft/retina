@@ -112,7 +112,7 @@ jobs:
     strategy:
       matrix:
         platform: ["linux"]
-        arch: ["amd64"]
+        arch: ["amd64", "arm64"]
 
     steps:
       - name: Checkout code
