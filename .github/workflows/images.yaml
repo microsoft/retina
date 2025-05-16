@@ -264,7 +264,6 @@ jobs:
           IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
 
   manifests:
-    if: ${{ github.event_name == 'merge_group' && success('retina-images') && success('retina-win-images') && success('operator-images') && success('retina-shell-images')}}
     name: Generate Manifests
     runs-on: ubuntu-latest
     needs:
@@ -275,6 +274,11 @@ jobs:
         retina-shell-images,
         kubectl-retina-images,
       ]
+    if: ${{ github.event_name == 'merge_group' &&
+        needs.retina-images.result == 'success' &&
+        needs.retina-win-images.result == 'success' &&
+        needs.operator-images.result == 'success' &&
+        needs.retina-shell-images.result == 'success' }}  
 
     strategy:
       matrix:
@@ -303,10 +307,10 @@ jobs:
           IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
 
   e2e:
-    if: ${{ github.event_name == 'merge_group' && success('manifests')}}
     name: Run E2E Tests
-    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'merge_group' && needs.manifests.result == 'success' }}
     needs: [manifests]
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
@@ -336,7 +340,7 @@ jobs:
           go test -v ./test/e2e/. -timeout 60m -tags=e2e -count=1  -args -image-tag=$(make version) -image-registry=${{ vars.ACR_NAME }}  -image-namespace=${{ github.repository}}
 
   perf-test-basic:
-    if: ${{ github.event_name == 'merge_group' && success('manifests')}}
+    if: ${{ github.event_name == 'merge_group' && needs.manifests.result == 'success'}}
     needs: [manifests]
     uses: ./.github/workflows/perf-template.yaml
     with:
@@ -352,7 +356,7 @@ jobs:
       azure-app-insights-key: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
   
   perf-test-advanced:
-    if: ${{ github.event_name == 'merge_group' && success('manifests')}}
+    if: ${{ github.event_name == 'merge_group' && needs.manifests.result == 'success' }}
     needs: [manifests]
     uses: ./.github/workflows/perf-template.yaml
     with:
