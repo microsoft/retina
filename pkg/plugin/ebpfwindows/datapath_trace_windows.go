@@ -134,11 +134,7 @@ func (tn *TraceNotify) TraceReasonIsEncap() bool {
 // TraceReasonIsDecap returns true when the trace reason is decapsulation
 // related, false otherwise.
 func (tn *TraceNotify) TraceReasonIsDecap() bool {
-	switch tn.TraceReason() {
-	case TraceReasonSRv6Decap:
-		return true
-	}
-	return false
+	return tn.TraceReason() == TraceReasonSRv6Decap
 }
 
 var traceNotifyLength = map[uint16]uint{

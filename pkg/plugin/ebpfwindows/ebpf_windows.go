@@ -39,7 +39,6 @@ var (
 	errInvalidDropNotifySize   = errors.New("invalid size for DropNotify")
 	errInvalidTraceNotifySize  = errors.New("invalid size for TraceNotify")
 	errNilTraceNotifyFlow      = errors.New("tracenotify flow object is nil")
-	errDataOffsetTooLarge      = errors.New("data offset too large")
 )
 
 // Plugin is the ebpfwindows plugin
@@ -231,7 +230,7 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 			return fmt.Errorf("%w: %d", errInvalidDropNotifySize, size)
 		}
 
-    	e, err := p.parser.Decode(&observer.MonitorEvent{
+		e, err := p.parser.Decode(&observer.MonitorEvent{
 			Payload: &observer.PerfEvent{
 				Data: perfData,
 			},

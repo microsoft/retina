@@ -145,7 +145,7 @@ func TestHandleTraceEvent_TraceNotify(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if err := binary.Write(&buf, binary.LittleEndian, tn); err != nil {
+	if err = binary.Write(&buf, binary.LittleEndian, tn); err != nil {
 		t.Fatalf("failed to serialize TraceNotify: %v", err)
 	}
 

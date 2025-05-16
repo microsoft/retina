@@ -4,6 +4,7 @@
 package ebpfwindows
 
 import (
+	errorTypes "errors"
 	"fmt"
 	"log/slog"
 	"net/netip"
@@ -21,7 +22,6 @@ import (
 	"go4.org/netipx"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
-	//"github.com/cilium/cilium/pkg/hubble/parser/common"
 )
 
 const MaxInt = int(^uint(0) >> 1)
@@ -33,6 +33,11 @@ type Parser struct {
 	correlateL3L4Policy bool
 	packet              *packet
 }
+
+var (
+	errDataOffsetTooLarge = errorTypes.New("data offset too large")
+	errNotEnoughBytes     = errorTypes.New("not enough bytes to decode")
+)
 
 // re-usable packet to avoid reallocating gopacket datastructures
 type packet struct {
@@ -160,9 +165,8 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error {
 		eventSubType = dn.SubType
 		offset = dn.DataOffset()
 		if offset > uint(MaxInt) {
-			return fmt.Errorf("data offset too large: %d", offset)
+			return fmt.Errorf("%w: %d", errDataOffsetTooLarge, offset)
 		}
-
 		packetOffset = int(offset)
 	case monitorAPI.MessageTypeTrace:
 		tn = &TraceNotify{}
@@ -190,7 +194,7 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error {
 	}
 
 	if len(data) < packetOffset {
-		return fmt.Errorf("not enough bytes to decode %d", data)
+		return fmt.Errorf("%w: %d", errNotEnoughBytes, data)
 	}
 
 	p.packet.Lock()
@@ -251,16 +255,17 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error {
 		SrcLabelID:            srcLabelID,
 		DstIP:                 dstIP,
 		DstLabelID:            dstLabelID,
-		TraceObservationPoint: decoded.TraceObservationPoint,
+		TraceObservationPoint: decoded.GetTraceObservationPoint(),
 	}
 	srcEndpoint := p.epResolver.ResolveEndpoint(srcIP, srcLabelID, datapathContext)
 	dstEndpoint := p.epResolver.ResolveEndpoint(dstIP, dstLabelID, datapathContext)
 
 	decoded.Verdict = decodeVerdict(dn, tn)
 	decoded.AuthType = authType
+    //nolint:staticcheck // SA1019 - temporary assignment for backward compatibility
 	decoded.DropReason = decodeDropReason(dn)
-	//nolint:gosec // ignore G115 -- data length is guaranteed to be within int32 range
-	decoded.DropReasonDesc = pb.DropReason(decoded.DropReason)
+    //nolint:staticcheck // SA1019 - temporary assignment for backward compatibility
+	decoded.DropReasonDesc = pb.DropReason(decoded.GetDropReason())
 	decoded.File = decodeFileInfo(dn)
 	decoded.Ethernet = ether
 	decoded.IP = ip
@@ -270,11 +275,13 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error {
 	decoded.Type = pb.FlowType_L3_L4
 	decoded.L7 = nil
 	decoded.IsReply = decodeIsReply(tn)
+	//nolint:staticcheck // SA1019 - temporary assignment for backward compatibility
 	decoded.Reply = decoded.GetIsReply().GetValue() // false if GetIsReply() is nil
 	decoded.EventType = decodeCiliumEventType(eventType, eventSubType)
 	decoded.TraceReason = decodeTraceReason(tn)
 	decoded.Interface = p.decodeNetworkInterface(tn)
 	decoded.ProxyPort = decodeProxyPort(tn)
+	//nolint:staticcheck // SA1019 - temporary assignment for backward compatibility
 	decoded.Summary = summary
 
 	return nil
@@ -312,8 +319,7 @@ func decodeLayers(packet *packet) (
 			summary = "ICMPv6 " + packet.ICMPv6.TypeCode.String()
 		}
 	}
-
-	return
+	return ethernet, ip, l4, sourceIP, destinationIP, sourcePort, destinationPort, summary
 }
 
 func decodeVerdict(dn *DropNotify, tn *TraceNotify) pb.Verdict {
