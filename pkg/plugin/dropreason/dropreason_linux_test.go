@@ -9,11 +9,13 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"reflect"
 	"runtime"
 	"testing"
 	"time"
 	"unsafe"
 
+	"github.com/blang/semver/v4"
 	"github.com/cilium/ebpf/perf"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
@@ -464,6 +466,95 @@ func TestDropReasonGenerate(t *testing.T) {
 	}
 	if string(actualContents) != expectedContents {
 		t.Errorf("unexpected dynamic header file contents: got %q, want %q", string(actualContents), expectedContents)
+	}
+}
+
+func mustVersion(v string) semver.Version {
+	ver, err := semver.Parse(v)
+	if err != nil {
+		panic(err)
+	}
+	return ver
+}
+
+func TestResolveEbpfPayload(t *testing.T) {
+	tests := []struct {
+		name              string
+		arch              string
+		kv                semver.Version
+		isMariner         bool
+		isPodLevel        bool
+		wantType          string
+		wantSupportsFexit bool
+	}{
+		{
+			name:              "old kernel - fallback to allKprobeObjects",
+			arch:              "amd64",
+			kv:                mustVersion("5.4.0"),
+			isMariner:         false,
+			isPodLevel:        false,
+			wantType:          "*dropreason.allKprobeObjects",
+			wantSupportsFexit: false,
+		},
+		{
+			name:              "new kernel - fexitObjects for Ubuntu",
+			arch:              "amd64",
+			kv:                mustVersion("5.10.0"),
+			isMariner:         false,
+			isPodLevel:        false,
+			wantType:          "*dropreason.allFexitObjects",
+			wantSupportsFexit: true,
+		},
+		{
+			name:              "new kernel - marinerObjects for Mariner",
+			arch:              "amd64",
+			kv:                mustVersion("5.10.0"),
+			isMariner:         true,
+			isPodLevel:        false,
+			wantType:          "*dropreason.marinerObjects",
+			wantSupportsFexit: true,
+		},
+		{
+			name:              "arm64 old kernel - fallback to allKprobeObjects",
+			arch:              "arm64",
+			kv:                mustVersion("5.8.0"),
+			isMariner:         true,
+			isPodLevel:        false,
+			wantType:          "*dropreason.allKprobeObjects",
+			wantSupportsFexit: false,
+		},
+		{
+			name:              "arm64 new kernel - marinerObjects",
+			arch:              "arm64",
+			kv:                mustVersion("6.1.0"),
+			isMariner:         true,
+			isPodLevel:        false,
+			wantType:          "*dropreason.marinerObjects",
+			wantSupportsFexit: true,
+		},
+		{
+			name:              "pod level - use allKprobeObjects",
+			arch:              "amd64",
+			kv:                mustVersion("5.15.0"),
+			isMariner:         false,
+			isPodLevel:        true,
+			wantType:          "*dropreason.allKprobeObjects",
+			wantSupportsFexit: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			objs, _, isFexit := resolvePayload(tt.arch, tt.kv, tt.isMariner, tt.isPodLevel)
+
+			if isFexit != tt.wantSupportsFexit {
+				t.Errorf("isFexit = %v, want %v", isFexit, tt.wantSupportsFexit)
+			}
+
+			if gotType := reflect.TypeOf(objs).String(); gotType != tt.wantType {
+				t.Errorf("object type = %v, want %v", gotType, tt.wantType)
+			}
+		})
 	}
 }
 
