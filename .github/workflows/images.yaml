@@ -274,11 +274,6 @@ jobs:
         retina-shell-images,
         kubectl-retina-images,
       ]
-    if: ${{
-        needs.retina-images.result == 'success' &&
-        needs.retina-win-images.result == 'success' &&
-        needs.operator-images.result == 'success' &&
-        needs.retina-shell-images.result == 'success' }}  
 
     strategy:
       matrix:
@@ -308,7 +303,6 @@ jobs:
 
   e2e:
     name: Run E2E Tests
-    if: ${{ needs.manifests.result == 'success' }}
     needs: [manifests]
     runs-on: ubuntu-latest
 
