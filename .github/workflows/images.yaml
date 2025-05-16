@@ -274,7 +274,7 @@ jobs:
         retina-shell-images,
         kubectl-retina-images,
       ]
-    if: ${{ github.event_name == 'merge_group' &&
+    if: ${{
         needs.retina-images.result == 'success' &&
         needs.retina-win-images.result == 'success' &&
         needs.operator-images.result == 'success' &&
@@ -308,7 +308,7 @@ jobs:
 
   e2e:
     name: Run E2E Tests
-    if: ${{ github.event_name == 'merge_group' && needs.manifests.result == 'success' }}
+    if: ${{ needs.manifests.result == 'success' }}
     needs: [manifests]
     runs-on: ubuntu-latest
 
