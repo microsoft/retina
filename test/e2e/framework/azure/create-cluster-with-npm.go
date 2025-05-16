@@ -72,6 +72,7 @@ func (c *CreateNPMCluster) Run() error {
 		AvailabilityZones:  []*string{to.Ptr("1")},
 		Count:              to.Ptr[int32](AuxilaryNodeCount),
 		EnableNodePublicIP: to.Ptr(false),
+		EnableFIPS:         to.Ptr(true),
 		Mode:               to.Ptr(armcontainerservice.AgentPoolModeUser),
 		OSType:             to.Ptr(armcontainerservice.OSTypeLinux),
 		OSSKU:              to.Ptr(armcontainerservice.OSSKUAzureLinux),
