@@ -213,6 +213,58 @@ jobs:
           fi
         env:
           IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
+          
+  retina-shell-win-images:
+    name: Build Retina Shell Windows Images
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        platform: ["windows"]
+        arch: ["amd64"]
+        year: ["2019", "2022"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: go.mod
+      - run: go version
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Az CLI login
+        uses: azure/login@v2
+        if: ${{ github.event_name == 'merge_group' }}
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION }}
+
+      - name: Build Images
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "TAG=$(make version)" >> $GITHUB_ENV
+          if [ "$IS_MERGE_GROUP" == "true" ]; then
+            az acr login -n ${{ vars.ACR_NAME }}
+            make retina-shell-image-win \
+              IMAGE_NAMESPACE=${{ github.repository }} \
+              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
+              IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
+              WINDOWS_YEARS=${{ matrix.year }} \
+              BUILDX_ACTION=--push
+          else
+            make retina-shell-image-win \
+              IMAGE_NAMESPACE=${{ github.repository }} \
+              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
+              WINDOWS_YEARS=${{ matrix.year }}
+          fi
+        env:
+          IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
 
   kubectl-retina-images:
     name: Build Kubectl Retina Images
@@ -273,6 +325,7 @@ jobs:
         retina-win-images,
         operator-images,
         retina-shell-images,
+        retina-shell-win-images,
         kubectl-retina-images,
       ]
 

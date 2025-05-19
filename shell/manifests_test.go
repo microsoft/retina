@@ -8,8 +8,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-const testRetinaImage = "retina-shell:v0.0.1"
-const testRetinaWindowsImage = "retina-shell:v0.0.1-windows-ltsc2022-amd64"
+const (
+	testRetinaImage        = "retina-shell:v0.0.1"
+	testRetinaWindowsImage = "retina-shell:v0.0.1-windows-ltsc2022-amd64"
+)
 
 func TestEphemeralContainerForPodDebug(t *testing.T) {
 	ec := ephemeralContainerForPodDebug(Config{RetinaShellImage: testRetinaImage})
@@ -98,14 +100,14 @@ func TestHostNetworkPodForWindowsNodeDebug(t *testing.T) {
 		NodeOS:           "windows",
 	}
 	pod := hostNetworkPodForNodeDebug(config, "kube-system", "win-node0001")
-	
+
 	// Verify Windows specific configurations
 	assert.NotNil(t, pod.Spec.SecurityContext)
 	assert.NotNil(t, pod.Spec.SecurityContext.WindowsOptions)
 	assert.NotNil(t, pod.Spec.SecurityContext.WindowsOptions.HostProcess)
 	assert.True(t, *pod.Spec.SecurityContext.WindowsOptions.HostProcess)
 	assert.Equal(t, "NT AUTHORITY\\SYSTEM", *pod.Spec.SecurityContext.WindowsOptions.RunAsUserName)
-	
+
 	// HostPID should be false for Windows regardless of setting
 	assert.False(t, pod.Spec.HostPID)
 }
@@ -117,11 +119,11 @@ func TestHostNetworkPodForWindowsNodeDebugWithMountHostFilesystem(t *testing.T) 
 		MountHostFilesystem: true,
 	}
 	pod := hostNetworkPodForNodeDebug(config, "kube-system", "win-node0001")
-	
+
 	assert.Len(t, pod.Spec.Volumes, 1)
 	assert.Equal(t, "host-filesystem", pod.Spec.Volumes[0].Name)
 	assert.Equal(t, "C:\\", pod.Spec.Volumes[0].VolumeSource.HostPath.Path)
-	
+
 	assert.Len(t, pod.Spec.Containers[0].VolumeMounts, 1)
 	assert.Equal(t, "host-filesystem", pod.Spec.Containers[0].VolumeMounts[0].Name)
 	assert.Equal(t, "C:\\host", pod.Spec.Containers[0].VolumeMounts[0].MountPath)
@@ -134,7 +136,7 @@ func TestHostNetworkPodForWindowsNodeWithHostPID(t *testing.T) {
 		HostPID:          true, // Should be ignored for Windows
 	}
 	pod := hostNetworkPodForNodeDebug(config, "kube-system", "win-node0001")
-	
+
 	// HostPID should be false for Windows regardless of the setting
 	assert.False(t, pod.Spec.HostPID)
 }

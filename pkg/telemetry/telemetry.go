@@ -193,6 +193,7 @@ func (t *TelemetryClient) heartbeat(ctx context.Context) {
 	maps.Copy(props, t.profile.GetMemoryUsage())
 	t.TrackEvent("heartbeat", props)
 }
+
 func metricsCardinality(gatherer prometheus.Gatherer) (int, error) {
 	if gatherer == nil {
 		return 0, fmt.Errorf("failed to get metrics Gatherer: %w", ErrorNilCombinedGatherer)

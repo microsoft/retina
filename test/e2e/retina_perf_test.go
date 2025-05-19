@@ -17,11 +17,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	// Add flags for the test
-	// retina-mode: basic, advanced, hubble
-	retinaMode = flag.String("retina-mode", "basic", "One of basic or advanced")
-)
+// Add flags for the test
+// retina-mode: basic, advanced, hubble
+var retinaMode = flag.String("retina-mode", "basic", "One of basic or advanced")
 
 func validateRetinaMode(t *testing.T) {
 	switch *retinaMode {

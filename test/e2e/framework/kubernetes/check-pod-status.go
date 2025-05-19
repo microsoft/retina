@@ -37,7 +37,6 @@ func (w *WaitPodsReady) Prevalidate() error {
 // Primary step where test logic is executed
 // Returning an error will cause the test to fail
 func (w *WaitPodsReady) Run() error {
-
 	config, err := clientcmd.BuildConfigFromFlags("", w.KubeConfigFilePath)
 	if err != nil {
 		return fmt.Errorf("error building kubeconfig: %w", err)
@@ -59,7 +58,6 @@ func (w *WaitPodsReady) Stop() error {
 }
 
 func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, namespace, labelSelector string) error {
-
 	printIterator := 0
 	conditionFunc := wait.ConditionWithContextFunc(func(context.Context) (bool, error) {
 		defer func() {

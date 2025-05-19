@@ -72,12 +72,12 @@ func hostNetworkPodForNodeDebug(config Config, debugPodNamespace, nodeName strin
 	if config.MountHostFilesystem || config.AllowHostFilesystemWrite {
 		hostPath := "/"
 		mountPath := "/host"
-		
+
 		if config.NodeOS == "windows" {
 			hostPath = "C:\\"
 			mountPath = "C:\\host"
 		}
-		
+
 		pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{
 			Name: "host-filesystem",
 			VolumeSource: v1.VolumeSource{
