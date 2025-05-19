@@ -18,6 +18,7 @@ type Config struct {
 	HostPID          bool
 	Capabilities     []string
 	Timeout          time.Duration
+	NodeOS           string // "linux" or "windows"
 
 	// Host filesystem access applies only to nodes, not pods.
 	MountHostFilesystem      bool
@@ -44,6 +45,13 @@ func RunInPod(config Config, podNamespace, podName string) error {
 	if err != nil {
 		return fmt.Errorf("error validating operating system for node %s: %w", pod.Spec.NodeName, err)
 	}
+
+	// Get the node OS for the pod's node
+	nodeOS, err := GetNodeOS(ctx, clientset, pod.Spec.NodeName)
+	if err != nil {
+		return fmt.Errorf("error getting OS for node %s: %w", pod.Spec.NodeName, err)
+	}
+	config.NodeOS = nodeOS
 
 	fmt.Printf("Starting ephemeral container in pod %s/%s\n", podNamespace, podName)
 	ephemeralContainer := ephemeralContainerForPodDebug(config)
@@ -76,6 +84,13 @@ func RunInNode(config Config, nodeName, debugPodNamespace string) error {
 	if err != nil {
 		return fmt.Errorf("error validating operating system for node %s: %w", nodeName, err)
 	}
+
+	// Get the node OS
+	nodeOS, err := GetNodeOS(ctx, clientset, nodeName)
+	if err != nil {
+		return fmt.Errorf("error getting OS for node %s: %w", nodeName, err)
+	}
+	config.NodeOS = nodeOS
 
 	pod := hostNetworkPodForNodeDebug(config, debugPodNamespace, nodeName)
 

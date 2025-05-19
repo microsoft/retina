@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -12,6 +13,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -22,6 +24,7 @@ var (
 	matchVersionFlags        *cmdutil.MatchVersionFlags
 	retinaShellImageRepo     string
 	retinaShellImageVersion  string
+	windowsImageTag          string
 	mountHostFilesystem      bool
 	allowHostFilesystemWrite bool
 	hostPID                  bool
@@ -37,6 +40,9 @@ var (
 	defaultRetinaShellImageVersion = buildinfo.Version
 
 	defaultTimeout = 30 * time.Second
+
+	// Default Windows image tag suffix
+	defaultWindowsImageTag = "windows-ltsc2022-amd64"
 
 	errMissingRequiredRetinaShellImageVersionArg = errors.New("missing required --retina-shell-image-version")
 	errUnsupportedResourceType                   = errors.New("unsupported resource type")
@@ -57,6 +63,10 @@ var shellCmd = &cobra.Command{
 	CLI flags (--retina-shell-image-repo and --retina-shell-image-version) or
 	environment variables (RETINA_SHELL_IMAGE_REPO and RETINA_SHELL_IMAGE_VERSION).
 	CLI flags take precedence over env vars.
+
+	For Windows nodes, the shell image will automatically use the Windows variant with the
+	specified Windows image tag suffix (--windows-image-tag). Windows support requires a 
+	Windows node with HostProcess containers enabled.
 `),
 
 	Example: templates.Examples(`
@@ -75,6 +85,9 @@ var shellCmd = &cobra.Command{
 		# start a shell in a node, with NET_RAW and NET_ADMIN capabilities
 		# (required for iptables and tcpdump)
 		kubectl retina shell node001 --capabilities NET_RAW,NET_ADMIN
+
+		# start a shell in a Windows node
+		kubectl retina shell win-node001
 `),
 	Args: cobra.ExactArgs(1),
 	RunE: func(_ *cobra.Command, args []string) error {
@@ -106,6 +119,13 @@ var shellCmd = &cobra.Command{
 			return fmt.Errorf("error constructing REST config: %w", err)
 		}
 
+		// Create Kubernetes clientset to determine node OS
+		clientset, err := kubernetes.NewForConfig(restConfig)
+		if err != nil {
+			return fmt.Errorf("error creating clientset: %w", err)
+		}
+
+		// Create a generic config for now, we'll update image based on node OS
 		config := shell.Config{
 			RestConfig:               restConfig,
 			RetinaShellImage:         fmt.Sprintf("%s:%s", retinaShellImageRepo, retinaShellImageVersion),
@@ -123,10 +143,34 @@ var shellCmd = &cobra.Command{
 
 			switch obj := info.Object.(type) {
 			case *v1.Node:
-				podDebugNamespace := namespace
 				nodeName := obj.Name
+				podDebugNamespace := namespace
+
+				// Get the OS and update the image if it's Windows
+				nodeOS := obj.Labels["kubernetes.io/os"]
+				if nodeOS == "windows" {
+					// For Windows, use the Windows-specific image tag
+					windowsImageVersion := fmt.Sprintf("%s-%s", retinaShellImageVersion, windowsImageTag)
+					config.RetinaShellImage = fmt.Sprintf("%s:%s", retinaShellImageRepo, windowsImageVersion)
+					fmt.Printf("Using Windows shell image: %s\n", config.RetinaShellImage)
+				}
+
 				return shell.RunInNode(config, nodeName, podDebugNamespace)
 			case *v1.Pod:
+				// For pods, we need to get the node OS based on the pod's node
+				ctx := context.Background()
+				nodeOS, err := shell.GetNodeOS(ctx, clientset, obj.Spec.NodeName)
+				if err != nil {
+					return fmt.Errorf("error getting node OS: %w", err)
+				}
+
+				if nodeOS == "windows" {
+					// For Windows, use the Windows-specific image tag
+					windowsImageVersion := fmt.Sprintf("%s-%s", retinaShellImageVersion, windowsImageTag)
+					config.RetinaShellImage = fmt.Sprintf("%s:%s", retinaShellImageRepo, windowsImageVersion)
+					fmt.Printf("Using Windows shell image: %s\n", config.RetinaShellImage)
+				}
+
 				return shell.RunInPod(config, obj.Namespace, obj.Name)
 			default:
 				gvk := obj.GetObjectKind().GroupVersionKind()
@@ -154,9 +198,15 @@ func init() {
 				retinaShellImageVersion = envVersion
 			}
 		}
+		if !cmd.Flags().Changed("windows-image-tag") {
+			if envWindowsTag := os.Getenv("RETINA_SHELL_WINDOWS_IMAGE_TAG"); envWindowsTag != "" {
+				windowsImageTag = envWindowsTag
+			}
+		}
 	}
 	shellCmd.Flags().StringVar(&retinaShellImageRepo, "retina-shell-image-repo", defaultRetinaShellImageRepo, "The container registry repository for the image to use for the shell container")
 	shellCmd.Flags().StringVar(&retinaShellImageVersion, "retina-shell-image-version", defaultRetinaShellImageVersion, "The version (tag) of the image to use for the shell container")
+	shellCmd.Flags().StringVar(&windowsImageTag, "windows-image-tag", defaultWindowsImageTag, "The tag suffix to use for Windows shell images (e.g., 'windows-ltsc2022-amd64')")
 	shellCmd.Flags().BoolVarP(&mountHostFilesystem, "mount-host-filesystem", "m", false, "Mount the host filesystem to /host. Applies only to nodes, not pods.")
 	shellCmd.Flags().BoolVarP(&allowHostFilesystemWrite, "allow-host-filesystem-write", "w", false,
 		"Allow write access to the host filesystem. Implies --mount-host-filesystem. Applies only to nodes, not pods.")

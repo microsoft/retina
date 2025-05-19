@@ -1,0 +1,52 @@
+ARG WINDOWS_VERSION=ltsc2022
+
+# Using a smaller Windows Server Core base image
+FROM mcr.microsoft.com/windows/servercore:${WINDOWS_VERSION}
+
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+
+# Install common network troubleshooting tools
+# - Netstat, ping, ipconfig, etc. are built into Windows
+# - NirSoft WinDump (tcpdump equivalent for Windows)
+# - Portqry - port scanner
+
+# Download and install NirSoft WinDump
+RUN mkdir -p C:\tools; \
+    Invoke-WebRequest -Uri "https://www.nirsoft.net/utils/windump_setup.exe" -OutFile "C:\tools\windump_setup.exe" -UseBasicParsing; \
+    Start-Process -FilePath "C:\tools\windump_setup.exe" -ArgumentList "/S" -Wait; \
+    Remove-Item -Path "C:\tools\windump_setup.exe" -Force
+
+# Download and install PortQry
+RUN Invoke-WebRequest -Uri "https://download.microsoft.com/download/3/b/5/3b51a025-7522-4686-87a6-47aa8ea68141/PortQryV2.exe" -OutFile "C:\Windows\System32\PortQry.exe" -UseBasicParsing
+
+# Download and extract Nmap network scanner
+RUN Invoke-WebRequest -Uri "https://nmap.org/dist/nmap-7.92-win32.zip" -OutFile "C:\tools\nmap.zip" -UseBasicParsing; \
+    Expand-Archive -Path "C:\tools\nmap.zip" -DestinationPath "C:\tools" -Force; \
+    Move-Item -Path "C:\tools\nmap-*\*" -Destination "C:\tools\" -Force; \
+    $env:PATH = "C:\tools;$env:PATH"
+
+# Create a convenience script to display available tools
+RUN Set-Content -Path "C:\tools\show-tools.cmd" -Value @"
+@echo off
+echo.
+echo Available Network Troubleshooting Tools:
+echo - ipconfig   : Show network configuration
+echo - netstat    : Show network connections
+echo - ping       : Test connectivity
+echo - tracert    : Trace route
+echo - nslookup   : DNS lookup
+echo - route      : Show/manipulate routing table
+echo - netsh      : Network shell for configuration
+echo - nmap       : Network discovery and security auditing
+echo - portqry    : Port scanner
+echo - windump    : Packet analyzer (tcpdump for Windows)
+echo.
+"@
+
+# Set PATH to include tools
+ENV PATH="C:\tools;C:\Windows\System32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0"
+
+WORKDIR C:\
+
+# Default entry point
+CMD ["cmd.exe"]

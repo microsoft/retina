@@ -296,6 +296,22 @@ retina-shell-image:
 			TAG=$(RETINA_PLATFORM_TAG) \
 			CONTEXT_DIR=$(REPO_ROOT)
 
+retina-shell-image-win:
+	for year in $(WINDOWS_YEARS); do \
+		tag=$(TAG)-windows-ltsc$$year-amd64; \
+		echo "Building retina-shell Windows image with tag $$tag"; \
+		set -e ; \
+		$(MAKE) container-$(CONTAINER_BUILDER) \
+				PLATFORM=windows/amd64 \
+				DOCKERFILE=shell/Dockerfile.windows \
+				REGISTRY=$(IMAGE_REGISTRY) \
+				IMAGE=$(RETINA_SHELL_IMAGE) \
+				OS_VERSION=ltsc$$year \
+				VERSION=$(TAG) \
+				TAG=$$tag \
+				CONTEXT_DIR=$(REPO_ROOT); \
+	done
+
 kubectl-retina-image:
 	echo "Building for $(PLATFORM)"
 	set -e ; \

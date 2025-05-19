@@ -35,7 +35,7 @@ func hostNetworkPodForNodeDebug(config Config, debugPodNamespace, nodeName strin
 			RestartPolicy: v1.RestartPolicyNever,
 			Tolerations:   []v1.Toleration{{Operator: v1.TolerationOpExists}},
 			HostNetwork:   true,
-			HostPID:       config.HostPID,
+			HostPID:       config.HostPID && config.NodeOS != "windows", // HostPID is not applicable for Windows
 			Containers: []v1.Container{
 				{
 					Name:  "retina-shell",
@@ -53,18 +53,42 @@ func hostNetworkPodForNodeDebug(config Config, debugPodNamespace, nodeName strin
 		},
 	}
 
+	// Add Windows specific settings if needed
+	if config.NodeOS == "windows" {
+		// Use hostProcess container for Windows (equivalent to privileged on Linux)
+		trueValue := true
+		falseValue := false
+		runAsUserName := "NT AUTHORITY\\SYSTEM"
+		pod.Spec.SecurityContext = &v1.PodSecurityContext{
+			WindowsOptions: &v1.WindowsSecurityContextOptions{
+				HostProcess:   &trueValue,
+				RunAsUserName: &runAsUserName,
+			},
+			RunAsNonRoot: &falseValue,
+		}
+	}
+
+	// Mount host filesystem if requested (different paths for Windows vs Linux)
 	if config.MountHostFilesystem || config.AllowHostFilesystemWrite {
+		hostPath := "/"
+		mountPath := "/host"
+		
+		if config.NodeOS == "windows" {
+			hostPath = "C:\\"
+			mountPath = "C:\\host"
+		}
+		
 		pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{
 			Name: "host-filesystem",
 			VolumeSource: v1.VolumeSource{
 				HostPath: &v1.HostPathVolumeSource{
-					Path: "/",
+					Path: hostPath,
 				},
 			},
 		})
 		pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
 			Name:      "host-filesystem",
-			MountPath: "/host",
+			MountPath: mountPath,
 			ReadOnly:  !config.AllowHostFilesystemWrite,
 		})
 	}
