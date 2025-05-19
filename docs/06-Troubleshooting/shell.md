@@ -14,6 +14,9 @@ kubectl retina shell aks-nodepool1-15232018-vmss000001
 
 # To start a shell inside a pod (pod network namespace):
 kubectl retina shell -n kube-system pods/coredns-d459997b4-7cpzx
+
+# To start a shell in a Windows node:
+kubectl retina shell win-node-001
 ```
 
 Check connectivity using `ping`:
@@ -146,6 +149,43 @@ root [ / ]# chroot /host systemctl status | head -n 2
 
 **If `systemctl` shows an error "Failed to connect to bus: No data available", check that the `retina shell` command has `--host-pid` set and that you have chroot'd to /host.**
 
+## Windows Support
+
+Retina shell supports Windows nodes by automatically detecting the node OS and using a Windows container image with appropriate networking tools.
+
+### Windows Tools and Commands
+
+When using a Windows node, you'll have access to these networking tools:
+
+- `ipconfig`: Show network configuration
+- `netstat`: Show network connections
+- `ping`: Test connectivity
+- `tracert`: Trace route to destination
+- `nslookup`: DNS lookup
+- `route`: Show/manipulate routing table
+- `netsh`: Network shell for configuration
+- `nmap`: Network discovery and security auditing
+- `portqry`: Port scanner
+- `windump`: Packet analyzer (tcpdump for Windows)
+
+### Windows Example
+
+```bash
+# Start a shell in a Windows node
+kubectl retina shell win-node-001
+
+# You can specify a specific Windows image tag variant
+kubectl retina shell win-node-001 --windows-image-tag windows-ltsc2019-amd64
+```
+
+### Windows Host Filesystem Access
+
+For Windows nodes, the host filesystem is mounted at `C:\host` when using `--mount-host-filesystem`:
+
+```bash
+kubectl retina shell win-node-001 --mount-host-filesystem
+```
+
 ## Troubleshooting
 
 ### Timeouts
@@ -176,10 +216,17 @@ export RETINA_SHELL_IMAGE_VERSION=v0.0.1 # optional, if not set defaults to the 
 kubectl retina shell node0001 # this will use the image "example.azurecr.io/retina/retina-shell:v0.0.1"
 ```
 
+For Windows images, you can also override the Windows image tag suffix:
+
+```bash
+export RETINA_SHELL_WINDOWS_IMAGE_TAG="windows-ltsc2019-amd64"
+kubectl retina shell win-node-001 # will use the Windows image with the specified tag suffix
+```
+
 ## Limitations
 
-* Windows nodes and pods are not yet supported.
 * `bpftool` and `bpftrace` are not supported.
 * The shell image links `iptables` commands to `iptables-nft`, even if the node itself links to `iptables-legacy`.
 * `nsenter` is not supported.
 * `ip netns` will not work without `chroot` to the host filesystem.
+* On Windows, commands specific to Linux containers are not available (e.g., iptables, nft).
