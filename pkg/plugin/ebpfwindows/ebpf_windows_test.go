@@ -187,18 +187,23 @@ func TestHandleTraceEvent_DropNotify(t *testing.T) {
 	p.enricher = mockEnricher
 
 	dn := monitor.DropNotify{
-		Type: monitorapi.MessageTypeDrop,
+		Type:    monitorapi.MessageTypeDrop,
+		Version: monitor.DropNotifyVersion1,
 	}
 	var buf bytes.Buffer
 	if err := binary.Write(&buf, binary.LittleEndian, dn); err != nil {
 		t.Fatalf("failed to serialize DropNotify: %v", err)
 	}
 
+	// Create a new buffer to hold the complete packet
+	var newBuf bytes.Buffer
+	newBuf.Write(buf.Bytes()[:dn.DataOffset()])
+
 	// Append mock TCP packet as payload
 	packet := makeMockEthernetIPv4TCPPacket()
-	buf.Write(packet)
+	newBuf.Write(packet)
 
-	data := buf.Bytes()
+	data := newBuf.Bytes()
 
 	err := p.handleTraceEvent(unsafe.Pointer(&data[0]), uint32(len(data)))
 	if err != nil {

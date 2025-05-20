@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -20,7 +21,6 @@ import (
 	metrics "github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/registry"
 	"github.com/microsoft/retina/pkg/utils"
-	"github.com/sirupsen/logrus"
 	"go.uber.org/zap"
 )
 
@@ -58,7 +58,7 @@ func New(cfg *kcfg.Config) registry.Plugin {
 
 // Init is a no-op for the ebpfwindows plugin
 func (p *Plugin) Init() error {
-	parser, err := hp.New(logrus.WithField("windowsEbpf", "parser"),
+	parser, err := hp.New(slog.Default().With("WindowsEbpf", "parser"),
 		// We use noop getters here since we will use our own custom parser in hubble
 		&NoopEndpointGetter,
 		&NoopIdentityGetter,
@@ -67,6 +67,7 @@ func (p *Plugin) Init() error {
 		&NoopServiceGetter,
 		&NoopLinkGetter,
 		&NoopPodMetadataGetter,
+		true,
 	)
 
 	if err != nil {
