@@ -1,0 +1,17 @@
+ARG WINDOWS_VERSION=ltsc2022
+
+# Using a smaller Windows Server Core base image
+FROM mcr.microsoft.com/windows/servercore:${WINDOWS_VERSION}
+
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+
+# PowerShell is already included in Windows Server Core
+# No additional tools needed - using only built-in Windows commands
+
+# Create a convenience script to display available tools
+RUN Set-Content -Path "C:\show-tools.cmd" -Value "@echo off\necho.\necho Available Windows Commands:\necho - ipconfig   : Show network configuration\necho - netstat    : Show network connections\necho - ping       : Test connectivity\necho - tracert    : Trace route\necho - nslookup   : DNS lookup\necho - route      : Show/manipulate routing table\necho - netsh      : Network shell for configuration\necho."
+
+WORKDIR C:\
+
+# Default entry point
+CMD ["cmd.exe"]
