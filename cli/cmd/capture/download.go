@@ -36,7 +36,6 @@ import (
 )
 
 const (
-	MountPath         = "/host/mnt/retina/captures/" // TODO: get this from a reliable place / also defined in create.go
 	DefaultOutputPath = "./"
 )
 
@@ -58,13 +57,13 @@ var downloadExample = templates.Examples(i18n.T(`
 		# List Retina capture jobs
 		kubectl retina capture list
 
-		# Download the capture file created using the capture name
+		# Download the capture file(s) created using the capture name
 		kubectl retina capture download --name <capture-name>
 
-		# Download the capture file created using the capture name and define output location
+		# Download the capture file(s) created using the capture name and define output location
 		kubectl retina capture download --name <capture-name> -o <output-location>
 
-		# Download capture files from Blob Storage via Blob URL (Blob URl requires Read/List permissions)
+		# Download capture file(s) from Blob Storage via Blob URL (Blob URL requires Read/List permissions)
 		kubectl retina capture download --blob-url "<blob-url>"
 `))
 
@@ -138,8 +137,8 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 			return errors.New("cannot obtain capture file name from pod annotations")
 		}
 
-		srcFilePath := MountPath + fileName + ".tar.gz"
-		fmt.Println("File to be downloaded: ", srcFilePath)
+		srcFilePath := filepath.Join("/host", hostPath, fileName) + ".tar.gz"
+		fmt.Println("\nFile to be downloaded: ", srcFilePath)
 		downloadPod, err := createDownloadPod(ctx, kubeClient, namespace, nodeName, hostPath, captureName)
 		if err != nil {
 			return err
@@ -165,7 +164,7 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 		}
 
 		outputFile := filepath.Join(outputPath, captureName, fileName+".tar.gz")
-		fmt.Printf("No. of bytes: %d\n", outBuf.Len())
+		fmt.Printf("Bytes retrieved: %d\n", outBuf.Len())
 
 		err = os.WriteFile(outputFile, outBuf.Bytes(), 0o600)
 		if err != nil {
@@ -215,7 +214,7 @@ func createDownloadPod(ctx context.Context, kubeClient *kubernetes.Clientset, na
 					VolumeMounts: []corev1.VolumeMount{
 						{
 							Name:      "host-mount",
-							MountPath: MountPath, // inside container
+							MountPath: filepath.Join("/host", hostPath),
 						},
 					},
 				},
@@ -226,7 +225,7 @@ func createDownloadPod(ctx context.Context, kubeClient *kubernetes.Clientset, na
 					Name: "host-mount",
 					VolumeSource: corev1.VolumeSource{
 						HostPath: &corev1.HostPathVolumeSource{
-							Path: hostPath, // on the node
+							Path: hostPath,
 						},
 					},
 				},
