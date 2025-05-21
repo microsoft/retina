@@ -137,7 +137,7 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 			return errors.New("cannot obtain capture file name from pod annotations")
 		}
 
-		srcFilePath := filepath.Join("/host", hostPath, fileName) + ".tar.gz"
+		srcFilePath := "/" + filepath.Join("host", hostPath, fileName) + ".tar.gz"
 		fmt.Println("\nFile to be downloaded: ", srcFilePath)
 		downloadPod, err := createDownloadPod(ctx, kubeClient, namespace, nodeName, hostPath, captureName)
 		if err != nil {
@@ -214,7 +214,7 @@ func createDownloadPod(ctx context.Context, kubeClient *kubernetes.Clientset, na
 					VolumeMounts: []corev1.VolumeMount{
 						{
 							Name:      "host-mount",
-							MountPath: filepath.Join("/host", hostPath),
+							MountPath: "/" + filepath.Join("host", hostPath),
 						},
 					},
 				},
