@@ -28,6 +28,9 @@ make e2e-image
 
 # Push the container
 make e2e-image-push
+
+# Build with custom registry, namespace, or tag
+make e2e-image E2E_TESTER_REGISTRY=myregistry.io E2E_TESTER_NAMESPACE=myorg E2E_TESTER_TAG=v1.0
 ```
 
 When running the container, you can pass environment variables to configure the tests:
