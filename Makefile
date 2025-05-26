@@ -169,6 +169,7 @@ KUBECTL_RETINA_IMAGE			= $(IMAGE_NAMESPACE)/kubectl-retina
 RETINA_INTEGRATION_TEST_IMAGE	= $(IMAGE_NAMESPACE)/retina-integration-test
 RETINA_PROTO_IMAGE				= $(IMAGE_NAMESPACE)/retina-proto-gen
 RETINA_GO_GEN_IMAGE				= $(IMAGE_NAMESPACE)/retina-go-gen
+RETINA_E2E_TESTER_IMAGE			= ghcr.io/microsoft/retina-e2e-tester
 KAPINGER_IMAGE 					= kapinger
 
 skopeo-export: # util target to copy a container from containers-storage to the docker daemon.
@@ -383,6 +384,21 @@ test-image: ## build the retina container image for testing.
 			IMAGE=$(RETINA_IMAGE) \
 			CONTEXT_DIR=$(REPO_ROOT) \
 			TAG=$(RETINA_PLATFORM_TAG)
+
+e2e-image: ## build container image for running e2e tests against existing Retina installation
+	$(MAKE) container-docker \
+			PLATFORM=$(PLATFORM) \
+			DOCKERFILE=./test/e2e/Dockerfile \
+			REGISTRY="" \
+			IMAGE=$(RETINA_E2E_TESTER_IMAGE) \
+			CONTEXT_DIR=$(REPO_ROOT) \
+			TAG=latest
+
+e2e-image-push: e2e-image ## build and push e2e test container image
+	$(MAKE) container-push \
+			REGISTRY="" \
+			IMAGE=$(RETINA_E2E_TESTER_IMAGE) \
+			TAG=latest
 
 COVER_PKG ?= .
 

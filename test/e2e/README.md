@@ -18,6 +18,30 @@ For reference, see the `test-all` recipe in the root [Makefile](../../Makefile).
 For sample test, please check out:
 [the Retina E2E.](./scenarios/retina/drop/scenario.go)
 
+## Running E2E Tests with Container
+
+For environments like Testkube where Retina is already installed, you can use the Retina E2E tester container:
+
+```bash
+# Build the container
+make e2e-image
+
+# Push the container
+make e2e-image-push
+```
+
+When running the container, you can pass environment variables to configure the tests:
+- `GO_TEST_FLAGS`: Configure Go test flags (default: "-test.v")
+- `E2E_TEST_FLAGS`: Configure E2E test flags (default: "-create-infra=false -delete-infra=false")
+
+Additional arguments passed to the container will be appended to the E2E flags.
+
+Example usage:
+```bash
+# Run tests with custom flags
+docker run ghcr.io/microsoft/retina-e2e-tester:latest -kubeConfig=/path/to/kubeconfig -image-namespace=your-registry -image-registry=your-namespace -image-tag=your-tag
+```
+
 ## Sample VSCode `settings.json` for running with existing cluster
 
 ```json
