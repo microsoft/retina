@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   retina-images:
-    name: Build Agent Images
+    name: Build Images and Run E2E
     runs-on: ubuntu-latest
 
     strategy:
