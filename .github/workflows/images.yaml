@@ -2,7 +2,9 @@ name: Build Images
 
 on:
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - "dev/**"
   merge_group:
     types: [checks_requested]
   workflow_dispatch:
