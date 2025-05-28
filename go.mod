@@ -9,7 +9,7 @@ require (
 	github.com/spf13/cobra v1.9.1
 	go.uber.org/zap v1.27.0
 	k8s.io/client-go v0.32.4
-	sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.6.2
+	sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.7.0
 	sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader v0.5.3
 )
 
@@ -270,7 +270,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage v1.8.0
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.1
-	github.com/Microsoft/hcsshim v0.12.9
+	github.com/Microsoft/hcsshim v0.13.0
 	github.com/Sytten/logrus-zap-hook v0.1.0
 	github.com/aws/aws-sdk-go-v2 v1.36.3
 	github.com/aws/aws-sdk-go-v2/config v1.29.14

@@ -43,6 +43,13 @@ const (
 	// Control plane metrics
 	pluginManagerFailedToReconcileCounterDescription = "Number of times the plugin manager failed to reconcile the plugins"
 	lostEventsCounterDescription                     = "Number of events lost in control plane"
+
+	// Conntrack metrics
+	ConntrackPacketTxDescription         = "Number of tx packets"
+	ConntrackPacketRxDescription         = "Number of rx packets"
+	ConntrackBytesTxDescription          = "Number of tx bytes"
+	ConntrackBytesRxDescription          = "Number of rx bytes"
+	ConntrackTotalConnectionsDescription = "Total number of connections"
 )
 
 // Metric Counters
@@ -90,6 +97,13 @@ var (
 
 	InfinibandStatsGauge        GaugeVec
 	InfinibandStatusParamsGauge GaugeVec
+
+	// Conntrack
+	ConntrackPacketsTx        GaugeVec
+	ConntrackPacketsRx        GaugeVec
+	ConntrackBytesTx          GaugeVec
+	ConntrackBytesRx          GaugeVec
+	ConntrackTotalConnections GaugeVec
 )
 
 func ToPrometheusType(metric interface{}) prometheus.Collector {

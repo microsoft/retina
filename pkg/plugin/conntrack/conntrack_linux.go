@@ -16,12 +16,15 @@ import (
 	"github.com/microsoft/retina/internal/ktime"
 	"github.com/microsoft/retina/pkg/loader"
 	"github.com/microsoft/retina/pkg/log"
+	"github.com/microsoft/retina/pkg/metrics"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
 	_ "github.com/microsoft/retina/pkg/plugin/conntrack/_cprog" // nolint // This is needed so cprog is included when vendoring
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
+
+var conntrackMetricsEnabled = false // conntrack metrics global variable
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type ct_v4_key conntrack ./_cprog/conntrack.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../lib/common/libbpf/_include/linux -I../lib/common/libbpf/_include/uapi/linux -I../lib/common/libbpf/_include/asm
 
@@ -88,6 +91,10 @@ func GenerateDynamic(ctx context.Context, dynamicHeaderPath string, conntrackMet
 	if err != nil {
 		return errors.Wrap(err, "failed to write conntrack dynamic header")
 	}
+	// set a global variable
+	if conntrackMetrics == 1 {
+		conntrackMetricsEnabled = true
+	}
 	return nil
 }
 
@@ -118,6 +125,10 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			// List of keys to be deleted
 			var keysToDelete []conntrackCtV4Key
 
+			// metrics counters
+			var packetsCountTx, packetsCountRx, totConnections uint32
+			var bytesCountTx, bytesCountRx uint64
+
 			iter := ct.ctMap.Iterate()
 			for iter.Next(&key, &value) {
 				noOfCtEntries++
@@ -133,6 +144,18 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 				dstIP := utils.Int2ip(key.DstIp).To4()
 				sourcePortShort := uint32(utils.HostToNetShort(key.SrcPort))
 				destinationPortShort := uint32(utils.HostToNetShort(key.DstPort))
+
+				// Add conntrack metrics.
+				if conntrackMetricsEnabled {
+					// Basic metrics, node-level
+					ctMeta := value.ConntrackMetadata
+					totConnections++
+					bytesCountTx += ctMeta.BytesTxCount
+					bytesCountRx += ctMeta.BytesRxCount
+					packetsCountTx += ctMeta.PacketsTxCount
+					packetsCountRx += ctMeta.PacketsRxCount
+				}
+
 				ct.l.Debug("conntrack entry",
 					zap.String("src_ip", srcIP.String()),
 					zap.Uint32("src_port", sourcePortShort),
@@ -151,6 +174,16 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			if err := iter.Err(); err != nil {
 				ct.l.Error("Iterate failed", zap.Error(err))
 			}
+
+			// create metrics
+			if conntrackMetricsEnabled {
+				metrics.ConntrackPacketsTx.WithLabelValues().Set(float64(packetsCountTx))
+				metrics.ConntrackBytesTx.WithLabelValues().Set(float64(bytesCountTx))
+				metrics.ConntrackPacketsRx.WithLabelValues().Set(float64(packetsCountRx))
+				metrics.ConntrackBytesRx.WithLabelValues().Set(float64(bytesCountRx))
+				metrics.ConntrackTotalConnections.WithLabelValues().Set(float64(totConnections))
+			}
+
 			// Delete the conntrack entries
 			for _, key := range keysToDelete {
 				if err := ct.ctMap.Delete(key); err != nil {
