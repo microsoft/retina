@@ -20,6 +20,8 @@ concurrency:
 jobs:
   get-tag:
     name: Get Image Tag
+  retina-images:
+    name: Build Images and Run E2E
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
