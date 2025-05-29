@@ -263,12 +263,10 @@ func resetRegistry(m *Module, contextOptions []api.MetricsContextOptions) {
 func (m *Module) updateMetricsContexts(spec *api.MetricsSpec, resetRegistry func(*Module, []api.MetricsContextOptions)) {
 	// clean old metrics from registry (remove prometheus collectors and remove map entry)
 	// reset the advanced metrics registry
-	m.Lock()
 	for key, metricObj := range m.registry {
 		metricObj.Clean()
 		delete(m.registry, key)
 	}
-	m.Unlock()
 
 	exporter.ResetAdvancedMetricsRegistry()
 
