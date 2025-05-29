@@ -87,6 +87,9 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           env:
+          {{- if .Values.daemonset.container.retina.env -}}
+          {{ toYaml .Values.daemonset.container.retina.env | nindent 10 }}
+          {{- end }}
           - name: POD_NAME
             valueFrom:
               fieldRef:
@@ -218,6 +221,9 @@ spec:
             - .\setkubeconfigpath.ps1; ./controller.exe --config ./retina/config.yaml --kubeconfig ./kubeconfig
             {{- end }}
           env:
+          {{- if .Values.daemonset.container.retina.env -}}
+          {{ toYaml .Values.daemonset.container.retina.env | nindent 10 }}
+          {{- end }}
           - name: POD_NAME
             valueFrom:
               fieldRef:
