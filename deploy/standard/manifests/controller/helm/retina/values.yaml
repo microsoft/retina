@@ -98,6 +98,7 @@ daemonset:
       args:
         - "--config"
         - "/retina/config/config.yaml"
+      env: []
       healthProbeBindAddress: ":18081"
       metricsBindAddress: ":18080"
       ports:
