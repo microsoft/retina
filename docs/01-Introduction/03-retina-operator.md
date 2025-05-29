@@ -6,23 +6,31 @@ The Retina Operator is a key control plane component responsible for orchestrati
 
 ## Role and Responsibilities
 
-1. **Lifecycle Management**:
-    The operator manages the lifecycle of Retina custom resources, such as capture jobs and endpoint metadata. It watches for changes in the cluster and reconciles the desired state as specified by Kubernetes CRDs (Custom Resource Definitions) and user configurations.
+Roles and responsibilities of the operator vary based on the Retina control plane.
 
-2. **CRD Management**:
-    It can install and manage the CRDs required for Retina's operation, ensuring that all necessary resources are available and up to date. The CRDs managed by the operator are `Capture`, `RetinaEndpoint` and `MetricsConfiguration`.
+### General Responsibilities
 
-3. **Configuration Propagation**:
-    The operator reads its configuration from a YAML file (default: `retina/operator-config.yaml`). It loads this configuration, applies defaults, and ensures all subcomponents (like telemetry and capture jobs) receive the correct parameters.
+**Configuration Propagation**:
+The operator reads its configuration from a YAML file (default: `retina/operator-config.yaml`). It loads this configuration, applies defaults, and ensures all subcomponents (like telemetry and capture jobs) receive the correct parameters.
 
-4. **Telemetry and Logging**:
-    The operator can send telemetry data (if enabled) and manages its logging for observability and debugging.
+**Pod Metadata and Endpoint Management**:
+The operator can monitor Pods and update a cache with metadata, which is used by Retina for enriching network flow data with Kubernetes context.
 
-5. **Capture Job Control**:
-    It is responsible for launching, managing, and limiting the number of capture jobs, which are used for network tracing and troubleshooting.
+**Telemetry and Logging**:
+The operator can send telemetry data (if enabled) and manages its logging for observability and debugging.
 
-6. **Pod Metadata and Endpoint Management**:
-    The operator can monitor Pods and update a cache with metadata, which is used by Retina for enriching network flow data with Kubernetes context.
+### Standard Control Plane
+
+**Lifecycle Management**:
+The operator manages the lifecycle of Retina custom resources, `Capture`, `RetinaEndpoint` and `MetricsConfiguration`.
+
+**Capture Job Control**:
+It is responsible for launching, managing, and limiting the number of capture jobs, which are used for network tracing and troubleshooting.
+
+### Hubble Control Plane
+
+**CRD Management**:
+The operator can install and manage the Cilium CRDs required for Retina's operation, ensuring that all necessary resources are available and up to date. The CRDs managed by the operator are `ciliumendpoint` and `ciliumidentity`.
 
 ## Configuration
 
@@ -74,7 +82,7 @@ Defaults are applied for critical settings like telemetry intervals and feature 
 
 | Function/Responsibility         | Description                                                          |
 | ------------------------------- | -------------------------------------------------------------------- |
-| CRD Management                  | Installs and manages Retina CRDs                                     |
+| CRD Management                  | Installs and manages Retina CRDs or Cilium CRDs                                   |
 | Leader Election                 | Ensures only one active operator in HA mode                          |
 | Capture Job Control             | Launches and limits capture jobs                                     |
 | Pod/Endpoint Metadata Caching   | Maintains live mapping of IPs to Kubernetes objects                  |
