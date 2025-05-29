@@ -6,3 +6,5 @@ Via [MetricsConfiguration CRD](../05-Concepts/CRDs/MetricsConfiguration.md), you
 
 - Which metrics to include
 - Which metadata to include for a metric.
+
+**Note**: If you enable [Annotations](./annotations.md), you cannot use the `MetricsConfiguration` CRD to specify which Pods to observe.
