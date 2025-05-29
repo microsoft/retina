@@ -9,22 +9,19 @@ The Retina Operator is a key control plane component responsible for orchestrati
 1. **Lifecycle Management**:
     The operator manages the lifecycle of Retina custom resources, such as capture jobs and endpoint metadata. It watches for changes in the cluster and reconciles the desired state as specified by Kubernetes CRDs (Custom Resource Definitions) and user configurations.
 
-2. **Leader Election for High Availability**:
-    The operator uses Kubernetes leader election mechanisms to support high availability (HA) deployments. Only the elected leader performs management tasks, ensuring there are no conflicting operations in multi-replica setups.
+2. **CRD Management**:
+    It can install and manage the CRDs required for Retina's operation, ensuring that all necessary resources are available and up to date. The CRDs managed by the operator are `Capture`, `RetinaEndpoint` and `MetricsConfiguration`.
 
-3. **CRD Management**:
-    It can install and manage the CRDs required for Retina's operation, ensuring that all necessary resources are available and up to date.
-
-4. **Configuration Propagation**:
+3. **Configuration Propagation**:
     The operator reads its configuration from a YAML file (default: `retina/operator-config.yaml`). It loads this configuration, applies defaults, and ensures all subcomponents (like telemetry and capture jobs) receive the correct parameters.
 
-5. **Telemetry and Logging**:
-    The operator can send telemetry data (if enabled) and manages logging for observability and debugging.
+4. **Telemetry and Logging**:
+    The operator can send telemetry data (if enabled) and manages its logging for observability and debugging.
 
-6. **Capture Job Control**:
+5. **Capture Job Control**:
     It is responsible for launching, managing, and limiting the number of capture jobs, which are used for network tracing and troubleshooting.
 
-7. **Pod Metadata and Endpoint Management**:
+6. **Pod Metadata and Endpoint Management**:
     The operator can monitor Pods and update a cache with metadata, which is used by Retina for enriching network flow data with Kubernetes context.
 
 ## Configuration
