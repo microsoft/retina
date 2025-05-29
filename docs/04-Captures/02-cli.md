@@ -1,16 +1,40 @@
 # Capture with Retina CLI
 
-The capture command in Retina allows users to capture network traffic and metadata for the capture target, and send the data to the location defined by output configuration.
+This page describes how the Retina CLI works in the context of performing packet captures.
 
-> NOTE: captures can also be performed with a [Capture CRD](../05-Concepts/CRDs/Capture.md) after [installing Retina](../02-Installation/01-Setup.md) **with capture support**.
+## Prerequisites
 
-## Capture Create
+- [Install Retina CLI](../02-Installation/02-CLI.md)
+
+## Introduction
+
+A packet capture can cover multiple Nodes. This can be explicitly specified by using `node-selectors`. It could also be implicit - for example when using `pod-selectors` and the targetted Pods are hosted across different Nodes.
+
+Whenever a capture is initiated, a Kubernetes Job is created on each relevant Node.
+
+The Job's worker Pod runs for the specified duration, captures and wraps the network information into a tarball. It then copies the tarball to the specified output location(s).
+
+As a special case, a Kubernetes secret will be created containing a storage blob SAS for security concerns, then mounted to the Pod.
+
+A random hashed name is assigned to each Retina Capture job to uniquely label it. For example, a capture named `sample-capture` could result in a job called `sample-capture-s7n8q`.
+
+The use of the Retina CLI to perform captures does **NOT** require the Retina operator pod to be running.
+
+![Overview of Retina Capture without operator](img/capture-architecture-without-operator.png "Overview of Retina Capture without operator")
+
+## Operations
+
+### Capture Create
 
 `kubectl retina capture create [--flags]` creates a Capture with underlying Kubernetes jobs.
 
-### Selecting a Target
+#### Selecting a Target
 
-The target indicates where the packet capture will be performed. This can be set via `--node-selectors`, `--node-names`, `--pod-selectors` and `--namespace-selectors` flags. Run `kubectl retina capture -h` for further details based on the Retina CLI version installed on your environment.
+The target indicates where the packet capture will be performed. This can be set via the following flags:
+
+- `--node-selectors`
+- `--node-names`
+- `--pod-selectors` and `--namespace-selectors` (pairs)
 
 Note that Node Selectors are not compatible with Pod Selectors & Namespace Selectors pairs and the capture will not go through if all are populated.
 
@@ -18,7 +42,7 @@ If nothing is set, `kubectl retina capture create` will use `--node-selectors` w
 
 You can find [target selection examples](#target-selection) below.
 
-### Configuring the Output Location
+#### Configuring the Output Location
 
 The output configuration indicates the location where the capture will be stored. At least one location needs to be specified. This can either be the host path on the node, or a remote storage option.
 
@@ -26,16 +50,17 @@ Blob-upload requires a Blob Shared Access Signature (SAS) with the write permiss
 
 You can find [output configuration examples](#output-configuration) below.
 
-### Stopping a Capture
+#### Stopping a Capture
 
 The Capture can be stopped in a number of ways:
 
-- In a given time, by the `duration` flag, or when the file reaches the maximum allowed file size defined by the `max-size` flag. When both are specified, the capture will stop whenever **either condition is first met**.
+- In a given time, by the `duration` flag, or when the file reaches the maximum allowed file size defined by the `max-size` flag. 
+  - When both are specified, the capture will stop whenever **either condition is first met**.
 - On demand by [deleting the capture](#capture-delete) before the specified conditions meets.
 
 The network traffic will be uploaded to the specified output location.
 
-### Flags
+#### Flags
 
 | Flag                  | Type       | Default  | Description                                                                 | Notes |
 |-----------------------|------------|----------|-----------------------------------------------------------------------------|-------|
@@ -66,9 +91,9 @@ The network traffic will be uploaded to the specified output location.
 | `s3-secret-access-key`| string     | ""       | S3 access secret key to upload capture files.                                |       |
 | `tcpdump-filter`      | string     | ""       | Raw tcpdump flags. Available tcpdump filters can be found in the [TCPDUMP MAN PAGE](https://www.tcpdump.org/manpages/tcpdump.1.html).  | Only works on Linux. Includes only tcpdump flags, for boolean expressions, please use include/exclude filters.     |
 
-### Examples
+#### Examples
 
-#### Target Selection
+##### Target Selection
 
 Node Selectors
 
@@ -95,7 +120,7 @@ kubectl retina capture create \
   --namespace-selectors="kubernetes.io/metadata.name=kube-system"
 ```
 
-#### Output Configuration
+##### Output Configuration
 
 Host Path
 
@@ -143,7 +168,7 @@ kubectl retina capture create \
   --s3-secret-access-key "your-secret-access-key"
 ```
 
-#### Capture Filters
+##### Capture Filters
 
 Include / Exclude Filters
 
@@ -162,7 +187,7 @@ kubectl retina capture create \
   --tcpdump-filter="udp port 53"
 ```
 
-## Capture Delete
+### Capture Delete
 
 Deleting the capture job before either of the terminating conditions have been met will stop the capture.
 
@@ -174,7 +199,7 @@ Example:
 kubectl retina capture delete --name retina-capture-zlx5v
 ```
 
-## Capture List
+### Capture List
 
 To get a list of the captures you can run `kubectl retina capture list` to get the captures in a specific namespace or in all namespaces.
 
@@ -200,7 +225,9 @@ tar -xvf retina-capture-aks-nodepool1-41844487-vmss000000-20230320013600UTC.tar.
 
 ### Name pattern of the tarball
 
-the tarball take such name pattern, `$(capturename)-$(hostname)-$(date +%Y%m%d%H%M%S%Z).tar.gz`, for example, `retina-capture-aks-nodepool1-41844487-vmss000000-20230313101436UTC.tar.gz`.
+The tarballs take the following name pattern, `$(capturename)-$(hostname)-$(date +%Y%m%d%H%M%S%Z).tar.gz`.
+
+- e.g. `retina-capture-aks-nodepool1-41844487-vmss000000-20230313101436UTC.tar.gz`
 
 ### File and directory structure inside the tarball
 
