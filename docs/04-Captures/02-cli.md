@@ -2,25 +2,15 @@
 
 This page describes how the Retina CLI works in the context of performing packet captures.
 
+The use of the Retina CLI to perform captures does **NOT** require the Retina operator pod to be running.
+
+See the [overview](./01-overview.md/#capture-jobs) for a description of how the capture jobs are created.
+
+![Overview of Retina Capture without operator](img/capture-architecture-without-operator.png "Overview of Retina Capture without operator")
+
 ## Prerequisites
 
 - [Install Retina CLI](../02-Installation/02-CLI.md)
-
-## Introduction
-
-A packet capture can cover multiple Nodes. This can be explicitly specified by using `node-selectors`. It could also be implicit - for example when using `pod-selectors` and the targetted Pods are hosted across different Nodes.
-
-Whenever a capture is initiated, a Kubernetes Job is created on each relevant Node.
-
-The Job's worker Pod runs for the specified duration, captures and wraps the network information into a tarball. It then copies the tarball to the specified output location(s).
-
-As a special case, a Kubernetes secret will be created containing a storage blob SAS for security concerns, then mounted to the Pod.
-
-A random hashed name is assigned to each Retina Capture job to uniquely label it. For example, a capture named `sample-capture` could result in a job called `sample-capture-s7n8q`.
-
-The use of the Retina CLI to perform captures does **NOT** require the Retina operator pod to be running.
-
-![Overview of Retina Capture without operator](img/capture-architecture-without-operator.png "Overview of Retina Capture without operator")
 
 ## Operations
 
@@ -54,7 +44,7 @@ You can find [output configuration examples](#output-configuration) below.
 
 The Capture can be stopped in a number of ways:
 
-- In a given time, by the `duration` flag, or when the file reaches the maximum allowed file size defined by the `max-size` flag. 
+- In a given time, by the `duration` flag, or when the file reaches the maximum allowed file size defined by the `max-size` flag.
   - When both are specified, the capture will stop whenever **either condition is first met**.
 - On demand by [deleting the capture](#capture-delete) before the specified conditions meets.
 
