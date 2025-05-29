@@ -370,6 +370,24 @@ func TestModule_NamespaceAndPodUpdates(t *testing.T) {
 	ctrl.Finish()
 }
 
+func NewTestModule(
+	l *log.ZapLogger,
+	daemonConfig *kcfg.Config,
+	registry map[string]AdvMetricsInterface,
+	currentSpec *api.MetricsSpec,
+) *Module {
+	m := &Module{
+		RWMutex:      &sync.RWMutex{},
+		registry:     registry,
+		l:            l,
+		daemonConfig: daemonConfig,
+		moduleCtx:    context.Background(),
+		currentSpec:  currentSpec,
+	}
+	m.registryResetter = NewRegistryResetter(m)
+	return m
+}
+
 func TestModule_Reconcile(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	ctrl := gomock.NewController(t)
@@ -440,13 +458,7 @@ func TestModule_Reconcile(t *testing.T) {
 					},
 				},
 			},
-			m: &Module{
-				RWMutex:       &sync.RWMutex{},
-				registry:      make(map[string]AdvMetricsInterface),
-				l:             l,
-				moduleCtx:     context.Background(),
-				resetRegistry: resetRegistry,
-			},
+			m:         NewTestModule(l, nil, make(map[string]AdvMetricsInterface), nil),
 			expectErr: false,
 		},
 		{
@@ -467,16 +479,10 @@ func TestModule_Reconcile(t *testing.T) {
 					},
 				},
 			},
-			m: &Module{
-				RWMutex: &sync.RWMutex{},
-				registry: map[string]AdvMetricsInterface{
-					"drop_count":    testDropMetric,
-					"forward_count": testForwardMetric,
-				},
-				moduleCtx:     context.Background(),
-				l:             l,
-				resetRegistry: resetRegistry,
-			},
+			m: NewTestModule(l, nil, map[string]AdvMetricsInterface{
+				"drop_count":    testDropMetric,
+				"forward_count": testForwardMetric,
+			}, nil),
 			expectErr: false,
 		},
 		{
@@ -505,18 +511,13 @@ func TestModule_Reconcile(t *testing.T) {
 					},
 				},
 			},
-			m: &Module{
-				RWMutex: &sync.RWMutex{},
-				registry: map[string]AdvMetricsInterface{
+			m: NewTestModule(l, nil,
+				map[string]AdvMetricsInterface{
 					"drop_count":    testDropMetric,
 					"drop_bytes":    testDropMetricBytes,
 					"forward_count": testForwardMetric,
 					"forward_bytes": testForwardMetricBytes,
-				},
-				moduleCtx:     context.Background(),
-				l:             l,
-				resetRegistry: resetRegistry,
-			},
+				}, nil),
 			expectErr: false,
 		},
 		{
@@ -545,18 +546,13 @@ func TestModule_Reconcile(t *testing.T) {
 					},
 				},
 			},
-			m: &Module{
-				RWMutex: &sync.RWMutex{},
-				registry: map[string]AdvMetricsInterface{
+			m: NewTestModule(l, nil,
+				map[string]AdvMetricsInterface{
 					"drop_count":    testDropMetric,
 					"drop_bytes":    testDropMetricBytes,
 					"forward_count": testForwardMetric,
 					"forward_bytes": testForwardMetricBytes,
-				},
-				moduleCtx:     context.Background(),
-				l:             l,
-				resetRegistry: resetRegistry,
-			},
+				}, nil),
 			expectErr: true,
 		},
 		{
@@ -571,14 +567,12 @@ func TestModule_Reconcile(t *testing.T) {
 					},
 				},
 			},
-			m: &Module{
-				RWMutex: &sync.RWMutex{},
-				registry: map[string]AdvMetricsInterface{
+			m: NewTestModule(
+				l, nil,
+				map[string]AdvMetricsInterface{
 					"drop_count": testDropMetric,
 				},
-				moduleCtx: context.Background(),
-				l:         l,
-				currentSpec: &api.MetricsSpec{
+				&api.MetricsSpec{
 					ContextOptions: []api.MetricsContextOptions{
 						{
 							MetricName:        "drop_count",
@@ -588,8 +582,7 @@ func TestModule_Reconcile(t *testing.T) {
 						},
 					},
 				},
-				resetRegistry: resetRegistry,
-			},
+			),
 			expectErr:     false,
 			expectNoCalls: true,
 		},
@@ -646,13 +639,11 @@ func TestPodAnnotated(t *testing.T) {
 			annotations: map[string]string{
 				common.RetinaPodAnnotation: common.RetinaPodAnnotationValue,
 			},
-			m: &Module{
-				daemonConfig: &kcfg.Config{
+			m: NewTestModule(l,
+				&kcfg.Config{
 					EnableAnnotations: true,
-				},
-				l:             l,
-				resetRegistry: resetRegistry,
-			},
+				}, nil, nil,
+			),
 			expected: true,
 		},
 		{
@@ -668,6 +659,26 @@ func TestPodAnnotated(t *testing.T) {
 		l.Info("***** Running test *****", zap.String("name", tt.name))
 		assert.Equal(t, tt.expected, tt.m.podAnnotated(tt.annotations))
 	}
+}
+
+type mockRegistryResetter struct {
+	module         *Module
+	mockMetricName string
+	mockMetric     AdvMetricsInterface
+}
+
+func newMockRegistryResetter(m *Module, mockMetricName string, mockMetric AdvMetricsInterface) *mockRegistryResetter {
+	return &mockRegistryResetter{
+		module:         m,
+		mockMetricName: mockMetricName,
+		mockMetric:     mockMetric,
+	}
+}
+
+func (mrr *mockRegistryResetter) Reset(_ []api.MetricsContextOptions) {
+	mrr.module.registry[mrr.mockMetricName] = mrr.mockMetric
+
+	mrr.mockMetric.Init(mrr.mockMetricName)
 }
 
 func TestModule_GenerateAdvMetrics(t *testing.T) {
@@ -771,12 +782,8 @@ func TestModule_GenerateAdvMetrics(t *testing.T) {
 			daemonConfig: tt.config,
 			l:            l,
 			daemonCache:  cache.NewMockCacheInterface(ctrl),
-			resetRegistry: func(m *Module, _ []api.MetricsContextOptions) {
-				m.registry[mockMetricName] = myMockMetric
-
-				myMockMetric.Init(mockMetricName)
-			},
 		}
+		m.registryResetter = newMockRegistryResetter(m, mockMetricName, myMockMetric)
 
 		log.Logger().Info("***** Running test *****", zap.String("name", tt.name))
 

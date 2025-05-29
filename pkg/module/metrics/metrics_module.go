@@ -109,8 +109,8 @@ type Module struct {
 	// pubsub subscription uuid
 	pubsubPodSub string
 
-	// resetRegistry is the function to reset the registry
-	resetRegistry func(*Module, []api.MetricsContextOptions)
+	// registryResetter implements the logic to reset the registry
+	registryResetter RegistryResetter
 }
 
 func InitModule(ctx context.Context,
@@ -136,8 +136,8 @@ func InitModule(ctx context.Context,
 			dirtyPods:     common.NewDirtyCache(),
 			pubsubPodSub:  "",
 			daemonConfig:  conf,
-			resetRegistry: resetRegistry,
 		}
+		m.registryResetter = NewRegistryResetter(m)
 	})
 
 	return m
@@ -166,7 +166,7 @@ func (m *Module) Reconcile(spec *api.MetricsSpec) error {
 	m.updateNamespaceLists(spec)
 
 	if m.currentSpec == nil || !validations.MetricsContextOptionsCompare(m.currentSpec.ContextOptions, spec.ContextOptions) {
-		m.updateMetricsContexts(spec, m.resetRegistry)
+		m.updateMetricsContexts(spec)
 	}
 
 	m.currentSpec = spec
@@ -206,11 +206,27 @@ func (m *Module) updateNamespaceLists(spec *api.MetricsSpec) {
 	}
 }
 
-func resetRegistry(m *Module, contextOptions []api.MetricsContextOptions) {
-	m.registry = make(map[string]AdvMetricsInterface)
+// RegistryResetter resets the metrics registry.
+type RegistryResetter interface {
+	Reset(contextOptions []api.MetricsContextOptions)
+}
+
+type metricsRegistryResetter struct {
+	module *Module
+}
+
+func NewRegistryResetter(m *Module) RegistryResetter {
+	return &metricsRegistryResetter{
+		module: m,
+	}
+}
+
+// Reset resets the metrics registry based on the provided context options.
+func (mrr *metricsRegistryResetter) Reset(contextOptions []api.MetricsContextOptions) {
+	mrr.module.registry = make(map[string]AdvMetricsInterface)
 
 	ctxType := remoteContext
-	if m.daemonConfig != nil && !m.daemonConfig.RemoteContext {
+	if mrr.module.daemonConfig != nil && !mrr.module.daemonConfig.RemoteContext {
 		// when localcontext is enabled, we do not need the context options for both src and dst
 		// metrics aggregation will be on a single pod basis and not the src/dst pod combination basis.
 		// so we can getaway with just one context type. For this reason we will only use srccontext
@@ -220,47 +236,47 @@ func resetRegistry(m *Module, contextOptions []api.MetricsContextOptions) {
 	for _, ctxOption := range contextOptions {
 		switch {
 		case strings.Contains(ctxOption.MetricName, forward):
-			fm := NewForwardCountMetrics(&ctxOption, m.l, ctxType)
+			fm := NewForwardCountMetrics(&ctxOption, mrr.module.l, ctxType)
 			if fm != nil {
-				m.registry[ctxOption.MetricName] = fm
+				mrr.module.registry[ctxOption.MetricName] = fm
 			}
 		case strings.Contains(ctxOption.MetricName, drop):
-			dm := NewDropCountMetrics(&ctxOption, m.l, ctxType)
+			dm := NewDropCountMetrics(&ctxOption, mrr.module.l, ctxType)
 			if dm != nil {
-				m.registry[ctxOption.MetricName] = dm
+				mrr.module.registry[ctxOption.MetricName] = dm
 			}
 		case strings.Contains(ctxOption.MetricName, tcp):
-			tm := NewTCPMetrics(&ctxOption, m.l, ctxType)
+			tm := NewTCPMetrics(&ctxOption, mrr.module.l, ctxType)
 			if tm != nil {
-				m.registry[ctxOption.MetricName] = tm
+				mrr.module.registry[ctxOption.MetricName] = tm
 			}
-			tr := NewTCPRetransMetrics(&ctxOption, m.l, ctxType)
+			tr := NewTCPRetransMetrics(&ctxOption, mrr.module.l, ctxType)
 			if tr != nil {
-				m.registry[ctxOption.MetricName] = tr
+				mrr.module.registry[ctxOption.MetricName] = tr
 			}
 		case strings.Contains(ctxOption.MetricName, nodeApiserver):
 			// Uses the pattern we will follow in future where each base metric has one instance.
 			// Example - tcp, latency, dns, etc.
-			lm := NewLatencyMetrics(&ctxOption, m.l, ctxType)
+			lm := NewLatencyMetrics(&ctxOption, mrr.module.l, ctxType)
 			if lm != nil {
-				m.registry[nodeApiserver] = lm
+				mrr.module.registry[nodeApiserver] = lm
 			}
 		case strings.Contains(ctxOption.MetricName, dns) || strings.Contains(ctxOption.MetricName, pktmon):
-			dm := NewDNSMetrics(&ctxOption, m.l, ctxType)
+			dm := NewDNSMetrics(&ctxOption, mrr.module.l, ctxType)
 			if dm != nil {
-				m.registry[ctxOption.MetricName] = dm
+				mrr.module.registry[ctxOption.MetricName] = dm
 			}
 		default:
-			m.l.Error("Invalid metric name", zap.String("metricName", ctxOption.MetricName))
+			mrr.module.l.Error("Invalid metric name", zap.String("metricName", ctxOption.MetricName))
 		}
 	}
 
-	for metricName, metricObj := range m.registry {
+	for metricName, metricObj := range mrr.module.registry {
 		metricObj.Init(metricName)
 	}
 }
 
-func (m *Module) updateMetricsContexts(spec *api.MetricsSpec, resetRegistry func(*Module, []api.MetricsContextOptions)) {
+func (m *Module) updateMetricsContexts(spec *api.MetricsSpec) {
 	// clean old metrics from registry (remove prometheus collectors and remove map entry)
 	// reset the advanced metrics registry
 	for key, metricObj := range m.registry {
@@ -270,7 +286,7 @@ func (m *Module) updateMetricsContexts(spec *api.MetricsSpec, resetRegistry func
 
 	exporter.ResetAdvancedMetricsRegistry()
 
-	resetRegistry(m, spec.ContextOptions)
+	m.registryResetter.Reset(spec.ContextOptions)
 }
 
 func (m *Module) run(newCtx context.Context) {
