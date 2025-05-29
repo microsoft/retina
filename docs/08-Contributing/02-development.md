@@ -1,5 +1,7 @@
 # Development
 
+This document provides steps to set up your dev environment and start contributing to the Retina project. You can find the complete documentation on [retina.sh](https://retina.sh)
+
 ## Quick start
 
 Retina uses a forking workflow. To contribute, fork the repository and create a branch for your changes.
@@ -8,12 +10,14 @@ The easiest way to set up your Development Environment is to use the provided Gi
 
 ## Environment Config
 
+Below is a list of required tools and dependencies you need to set up your local development environment for Retina.
 - [Go](https://go.dev/doc/install)
 - [Docker](https://docs.docker.com/engine/install/)
 - [Helm](https://helm.sh/docs/intro/install)
 - jq: `sudo apt install jq`
-- Fork the repository
 - If you want to use [ghcr.io](https://github.com/features/packages) as container registry, login following instructions [here](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-with-a-personal-access-token-classic)
+
+Once you have set up your environment fork the repository and create a branch for your changes.
 
 ### LLVM/Clang Installation
 
@@ -49,13 +53,6 @@ sudo ln -s /usr/bin/llvm-strip-16 /usr/bin/llvm-strip
 
 ## Building and Testing
 
-### Test
-
-```bash
-make test # run unit-test locally
-make test-image # run tests in docker container
-```
-
 ### Build
 
 Generate all mocks and BPF programs:
@@ -73,7 +70,7 @@ make retina
 To build a `retina-agent` container image with specific tag:
 
 ```bash
-make retina-image # also pushes to image registy
+make retina-image # also pushes to image registry
 make retina-operator-image
 ```
 
@@ -95,11 +92,18 @@ debug   packetforward   Received PacketForward data     {"Data": "IngressBytes:8
 ...
 ```
 
+### Test
+
+```bash
+make test # run unit-tests locally
+make test-image # run tests in docker container
+```
+
 ### Publishing Images and Charts
 
 To publish images to GHCR in your forked repository, simply push to `main`, or publish a tag. The `container-publish` action will run automatically and push images to your GitHub packages registry.
 
-These registries are private by default; to pull images from your registry anonymously, [navigate to "Package Settings" for each publish image repository and set the visibility to "Public"](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility#configuring-access-to-packages-for-your-personal-account).
+These registries are private by default; to pull images from your registry anonymously, [navigate to "Package Settings" for each published image repository and set the visibility to "Public"](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility#configuring-access-to-packages-for-your-personal-account).
 
 Alternatively, configure authenticated access to your registry using a [GitHub Personal Access Token](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-to-the-container-registry).
 
@@ -180,12 +184,6 @@ Uninstall `Retina`:
 make helm-uninstall
 ```
 
-## Updating Documentation
-
-The documentation available on [retina.sh](https://retina.sh) can be found within the [docs](https://github.com/microsoft/retina/tree/main/docs) folder in the repository.
-
-The diagrams used are created with [Excalidraw](https://excalidraw.com/). The source `.excalidraw` files are stored within the repository, alongside their `.png` equivalent.
-
 ## Opening a Pull Request
 
 When you're ready to open a pull request, please ensure that your branch is up-to-date with the `main` branch, updates relevant docs and tests, and passes all tests and lints.
@@ -193,15 +191,35 @@ When you're ready to open a pull request, please ensure that your branch is up-t
 ### Cryptographic Signing of Commits
 
 In order to certify the provenance of commits and defend against impersonation, we require that all commits be cryptographically signed.
-Documentation for setting up Git and Github to sign your commits can be found [here](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits).
+Documentation for setting up Git and GitHub to sign your commits can be found [here](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits).
 Additional information about Git's use of GPG can be found [here](https://git-scm.com/book/en/v2/Git-Tools-Signing-Your-Work)
 
 > To configure your Git client to sign commits by default for a local repository, run `git config --add commit.gpgsign true`.
 
 For **GitHub Codespaces** users, please follow [this doc](https://docs.github.com/en/codespaces/managing-your-codespaces/managing-gpg-verification-for-github-codespaces) to configure GitHub to automatically use GPG to sign commits you make in your Codespaces.
 
-### Developers Certificate of Origin (DCO)
+### Developer Certificate of Origin (DCO)
 
-Contributions to Retina must contain a Developers Certificate of Origin within their constituent commits.
+Contributions to Retina must contain a Developer Certificate of Origin within their constituent commits.
 This can be accomplished by providing a `-s` flag to `git commit` as documented [here](https://git-scm.com/docs/git-commit#Documentation/git-commit.txt--s).
 This will add a `Signed-off-by` trailer to your Git commit, affirming your acceptance of the Contributor License Agreement.
+
+### Updating Documentation
+
+The documentation available on [retina.sh](https://retina.sh) can be found within the [docs](https://github.com/microsoft/retina/tree/main/docs) folder in the repository.
+
+The diagrams used are created with [Excalidraw](https://excalidraw.com/). The source `.excalidraw` files are stored within the repository, alongside their `.png` equivalent.
+
+### GitHub issues and Good First Issue
+
+You can find the open issues on the repo's [GitHub issues board](https://github.com/microsoft/retina/issues)
+If you are a first-time contributor, you can find the issues that are suitable for newcomers by finding the [issues labeled as "good first issue"](https://github.com/microsoft/retina/labels/good%20first%20issue)
+
+### Code of Conduct
+
+This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
+
+
+### License
+
+See [LICENSE](../../LICENSE).
