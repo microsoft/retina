@@ -142,8 +142,3 @@ helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina-hubbl
         --set hubble.tls.auto.certValidityDuration=1 \
         --set hubble.tls.auto.schedule="*/10 * * * *"
 ```
-
-## Next Steps: Configuring Prometheus and Grafana
-
-- [Prometheus](./04-prometheus.md)
-- [Grafana](./05-grafana.md)
