@@ -4,7 +4,7 @@ This page describes how the Retina CLI works in the context of performing packet
 
 The use of the Retina CLI to perform captures does **NOT** require the Retina operator pod to be running.
 
-See the [overview](./01-overview.md/#capture-jobs) for a description of how the capture jobs are created.
+See the [overview](./01-overview.md#capture-jobs) for a description of how the capture jobs are created.
 
 ![Overview of Retina Capture without operator](img/capture-architecture-without-operator.png "Overview of Retina Capture without operator")
 
