@@ -215,11 +215,3 @@ The diagrams used are created with [Excalidraw](https://excalidraw.com/). The so
 
 You can find the open issues on the repo's [GitHub issues board](https://github.com/microsoft/retina/issues)
 If you are a first-time contributor, you can find the issues that are suitable for newcomers by finding the [issues labeled as "good first issue"](https://github.com/microsoft/retina/labels/good%20first%20issue)
-
-### Code of Conduct
-
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
-
-### License
-
-See [LICENSE](../../LICENSE).
