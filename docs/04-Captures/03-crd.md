@@ -32,8 +32,7 @@ helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
     --set logLevel=info \
     --set operator.enabled=true \
     --set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\]"
-WARNING: Kubernetes configuration file is group-readable. This is insecure. Location: /mnt/c/Users/kamilp/.kube/config
-WARNING: Kubernetes configuration file is world-readable. This is insecure. Location: /mnt/c/Users/kamilp/.kube/config
+
 Release "retina" does not exist. Installing it now.
 Pulled: ghcr.io/microsoft/retina/charts/retina:v0.0.33
 Digest: sha256:0d647b8c5090725684ad9bd0c9c988eccd4ee3cbf06a08a7270f362236057bd0
