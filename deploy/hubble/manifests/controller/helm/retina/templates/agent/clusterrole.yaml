@@ -22,7 +22,16 @@ rules:
       - get
       - list
       - watch
-  {{- if .Values.operator.enabled }}
+  - apiGroups:
+    - cilium.io
+    resources:
+    - ciliumnodes
+    - ciliumidentities
+    - ciliumendpoints
+    verbs:
+    - get
+    - list
+    - watch
   - apiGroups:
     - ""
     resources:
@@ -32,6 +41,7 @@ rules:
       - get
       - list
       - watch
+  {{- if .Values.operator.enabled }}
   - apiGroups:
       - retina.io
     resources:
@@ -74,16 +84,6 @@ rules:
     - discovery.k8s.io
     resources:
     - endpointslices
-    verbs:
-    - get
-    - list
-    - watch
-  - apiGroups:
-    - cilium.io
-    resources:
-    - ciliumnodes
-    - ciliumidentities
-    - ciliumendpoints
     verbs:
     - get
     - list
