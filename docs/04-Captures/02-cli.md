@@ -79,7 +79,7 @@ The network traffic will be uploaded to the specified output location.
 | `s3-path`             | string     | retina/captures | Prefix path within the S3 bucket where captures will be stored.              |       |
 | `s3-region`           | string     | ""       | Region where the S3 compatible bucket is located.                            |       |
 | `s3-secret-access-key`| string     | ""       | S3 access secret key to upload capture files.                                |       |
-| `tcpdump-filter`      | string     | ""       | Raw tcpdump flags. Available tcpdump filters can be found in the [TCPDUMP MAN PAGE](https://www.tcpdump.org/manpages/tcpdump.1.html).  | Only works on Linux. Includes only tcpdump flags, for boolean expressions, please use include/exclude filters.     |
+| `tcpdump-filter`      | string     | ""       | Raw tcpdump flags. Available tcpdump filters can be found in the [TCPDUMP MAN PAGE](https://www.tcpdump.org/manpages/tcpdump.1.html). By default, captures are performed on all interfaces (`-i any`). To capture on a specific interface, use this flag with `-i <interface>`.  | Only works on Linux. Includes only tcpdump flags, for boolean expressions, please use include/exclude filters.     |
 
 #### Examples
 
@@ -175,6 +175,14 @@ Tcpdump Filters
 kubectl retina capture create \
   --name example-tcpdump-filters \
   --tcpdump-filter="udp port 53"
+```
+
+Capture on a Specific Interface
+
+```sh
+kubectl retina capture create \
+  --name example-specific-interface \
+  --tcpdump-filter="-i eth0"
 ```
 
 ### Capture Delete
