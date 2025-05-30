@@ -42,6 +42,8 @@ Modes are not applicable to the Hubble control plane. For metrics related to the
 
 In order to support the use of the [Capture CRD](../05-Concepts/CRDs/Capture.md), the Standard Control Plane must be used, and the Retina operator pod needs to be running.
 
+>NOTE: Captures can still be triggered with the [CLI](../04-Captures/02-cli.md) even without the Retina operator pod running.
+
 Enable the operator with the `--set operator.enabled=true \` flag.
 
 For example, this is how you could install Retina with the Standard Control Plane and basic metric mode, with the operator.
@@ -57,8 +59,6 @@ helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
     --set operator.enabled=true \
     --set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\]"
 ```
-
-It is worth noting that even without the Retina operator pod running, captures can still be triggered with the [CLI](../04-Captures/02-cli.md).
 
 ## Installation
 
