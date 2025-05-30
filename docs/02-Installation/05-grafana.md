@@ -1,4 +1,4 @@
-# Grafana
+# Configuring Grafana
 
 Grafana is an open-source platform for monitoring and observability. It allows you to query, visualize, alert on, and explore your metrics no matter where they are stored. For more information, visit the [Grafana open-source section](https://grafana.com/oss/).
 
@@ -6,7 +6,7 @@ Grafana is an open-source platform for monitoring and observability. It allows y
 
 Make sure that you're still port-forwarding your server to [localhost:9090](http://localhost:9090) as part of [Prometheus](./04-prometheus.md) setup. Alternatively you can configure your server for some other HTTP endpoint, but that is not covered in the following instructions.
 
-## Configuring Grafana
+## Configuration
 
 If you followed the steps to install and configure [Prometheus](./04-prometheus.md), you will already have Grafana installed as part of the `kube-prometheus-stack` Helm chart.
 
