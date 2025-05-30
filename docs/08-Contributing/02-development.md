@@ -11,6 +11,7 @@ The easiest way to set up your Development Environment is to use the provided Gi
 ## Environment Config
 
 Below is a list of required tools and dependencies you need to set up your local development environment for Retina.
+
 - [Go](https://go.dev/doc/install)
 - [Docker](https://docs.docker.com/engine/install/)
 - [Helm](https://helm.sh/docs/intro/install)
@@ -218,7 +219,6 @@ If you are a first-time contributor, you can find the issues that are suitable f
 ### Code of Conduct
 
 This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
-
 
 ### License
 
