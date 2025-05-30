@@ -21,7 +21,42 @@ The full specification for the Capture CRD can be found in the [Capture CRD file
 
 Refer to the [Capture CRD](../05-Concepts/CRDs/Capture.md) page for more details.
 
-![Capture with CRD](img/capture-with-crd.png "Capture with CRD")
+```shell
+# Install Retina with Standard Control Plane and Operator enabled
+> VERSION=$( curl -sL https://api.github.com/repos/microsoft/retina/releases/latest | jq -r .name)
+helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
+    --version $VERSION \
+    --namespace kube-system \
+    --set image.tag=$VERSION \
+    --set operator.tag=$VERSION \
+    --set logLevel=info \
+    --set operator.enabled=true \
+    --set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\]"
+WARNING: Kubernetes configuration file is group-readable. This is insecure. Location: /mnt/c/Users/kamilp/.kube/config
+WARNING: Kubernetes configuration file is world-readable. This is insecure. Location: /mnt/c/Users/kamilp/.kube/config
+Release "retina" does not exist. Installing it now.
+Pulled: ghcr.io/microsoft/retina/charts/retina:v0.0.33
+Digest: sha256:0d647b8c5090725684ad9bd0c9c988eccd4ee3cbf06a08a7270f362236057bd0
+NAME: retina
+LAST DEPLOYED: Fri May 30 09:01:57 2025
+NAMESPACE: kube-system
+STATUS: deployed
+REVISION: 1
+NOTES:
+1. Installing retina service using helm: helm install retina ./deploy/standard/manifests/controller/helm/retina/ --namespace kube-system --dependency-update
+2. Cleaning up/uninstalling/deleting retina and dependencies related:
+  helm uninstall retina -n kube-system
+
+# Apply the Capture configuration
+> kubectl apply -f capture.yaml
+capture.retina.sh/hubble-cp-capture created
+
+# View the jobs which got created
+> kubectl get jobs
+NAME                        STATUS     COMPLETIONS   DURATION   AGE
+standard-cp-capture-8r8sf   Complete   1/1           11s        4m31s
+standard-cp-capture-sdtd7   Complete   1/1           11s        4m31s
+```
 
 ## Examples
 
