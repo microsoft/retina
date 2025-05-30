@@ -2,13 +2,13 @@
 
 This page describes how the Retina Capture CRD works.
 
-See the [overview](./01-overview.md/#capture-jobs) for a description of how the capture jobs are created.
+See the [overview](./01-overview.md#capture-jobs) for a description of how the capture jobs are created.
 
 ![Overview of Retina Capture with operator](img/capture-architecture-with-operator.png "Overview of Retina Capture with operator")
 
 ## Prerequisites
 
-- [Install Retina](../02-Installation/01-Setup.md/#capture-support) **with capture support**.
+- [Install Retina](../02-Installation/01-Setup.md#capture-support) **with capture support**.
 
 ## Usage
 
