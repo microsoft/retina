@@ -21,6 +21,8 @@ The full specification for the Capture CRD can be found in the [Capture CRD file
 
 Refer to the [Capture CRD](../05-Concepts/CRDs/Capture.md) page for more details.
 
+![Capture with CRD](img/capture-with-crd.png "Capture with CRD")
+
 ## Examples
 
 Node Selectors and Host Path output target

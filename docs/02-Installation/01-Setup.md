@@ -40,11 +40,11 @@ Modes are not applicable to the Hubble control plane. For metrics related to the
 
 ## Capture Support
 
-In order to support the use of the [Capture CRD](../05-Concepts/CRDs/Capture.md), the Retina operator pod needs to be running.
+In order to support the use of the [Capture CRD](../05-Concepts/CRDs/Capture.md), the Standard Control Plane must be used, and the Retina operator pod needs to be running.
 
 Enable the operator with the `--set operator.enabled=true \` flag.
 
-For example, this is how you could install Retina with the standard control plane and basic metric mode, with the operator.
+For example, this is how you could install Retina with the Standard Control Plane and basic metric mode, with the operator.
 
 ```shell
 VERSION=$( curl -sL https://api.github.com/repos/microsoft/retina/releases/latest | jq -r .name)
