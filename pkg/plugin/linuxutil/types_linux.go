@@ -8,8 +8,10 @@ import (
 	"github.com/microsoft/retina/pkg/log"
 )
 
-const name = "linuxutil"
-const defaultLimit = 2000
+const (
+	name         = "linuxutil"
+	defaultLimit = 2000
+)
 
 //go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=types_linux.go -destination=linuxutil_mock_generated_linux.go -package=linuxutil
 type linuxUtil struct {
