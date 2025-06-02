@@ -44,6 +44,7 @@ data:
       port: {{ .Values.retinaPort }}
     logLevel: {{ .Values.logLevel }}
     enabledPlugin: {{ .Values.enabledPlugin_win }}
+    enableAnnotations: {{ .Values.enableAnnotations }}
     metricsInterval: {{ .Values.metricsInterval }}
     metricsIntervalDuration: {{ .Values.metricsIntervalDuration }}
     enableTelemetry: {{ .Values.enableTelemetry }}
@@ -51,6 +52,3 @@ data:
     remoteContext: {{ .Values.remoteContext }}
     telemetryInterval: {{ .Values.daemonset.telemetryInterval }}
 {{- end}}
-
-
-
