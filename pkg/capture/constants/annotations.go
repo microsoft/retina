@@ -7,5 +7,5 @@ package constants
 const (
 	CaptureFilenameAnnotationKey  string = "retina-capture-filename"
 	CaptureTimestampAnnotationKey string = "retina-capture-timestamp"
-	CaptureHostPathAnnotaionKey   string = "retina-capture-hostpath"
+	CaptureHostPathAnnotationKey  string = "retina-capture-hostpath"
 )

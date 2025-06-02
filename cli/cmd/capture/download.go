@@ -128,7 +128,7 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 		}
 
 		nodeName := pod.Spec.NodeName
-		hostPath, ok := pod.Annotations[captureConstants.CaptureHostPathAnnotaionKey]
+		hostPath, ok := pod.Annotations[captureConstants.CaptureHostPathAnnotationKey]
 		if !ok {
 			return errors.New("cannot obtain host path from pod annotations")
 		}

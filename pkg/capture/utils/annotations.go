@@ -13,6 +13,6 @@ func GetPodAnnotationsFromCapture(capture *retinav1alpha1.Capture) map[string]st
 	return map[string]string{
 		captureConstants.CaptureFilenameAnnotationKey:  capture.Name,
 		captureConstants.CaptureTimestampAnnotationKey: file.TimeToString(capture.Status.StartTime),
-		captureConstants.CaptureHostPathAnnotaionKey:   *capture.Spec.OutputConfiguration.HostPath,
+		captureConstants.CaptureHostPathAnnotationKey:  *capture.Spec.OutputConfiguration.HostPath,
 	}
 }
