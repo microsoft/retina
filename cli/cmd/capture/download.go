@@ -239,18 +239,25 @@ func createDownloadPod(ctx context.Context, kubeClient *kubernetes.Clientset, na
 		return nil, fmt.Errorf("failed to create download pod: %w", err)
 	}
 
+	timeout := time.After(30 * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
 	var pod *corev1.Pod
 	for {
-		time.Sleep(1 * time.Second)
-		pod, err = kubeClient.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
-		if err != nil {
-			return nil, fmt.Errorf("failed to get download pod: %w", err)
-		}
-		if pod.Status.Phase == corev1.PodRunning {
-			return pod, nil
-		}
-		if pod.Status.Phase == corev1.PodFailed {
-			return nil, fmt.Errorf("download pod failed to spin up successfully: %w", err)
+		select {
+		case <-timeout:
+			return nil, fmt.Errorf("timeout waiting for download pod to become ready after 30 seconds")
+		case <-ticker.C:
+			pod, err = kubeClient.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+			if err != nil {
+				return nil, fmt.Errorf("failed to get download pod: %w", err)
+			}
+			if pod.Status.Phase == corev1.PodRunning {
+				return pod, nil
+			}
+			if pod.Status.Phase == corev1.PodFailed {
+				return nil, fmt.Errorf("download pod failed to spin up successfully")
+			}
 		}
 	}
 }
