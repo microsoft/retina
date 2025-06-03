@@ -44,6 +44,9 @@ const (
 	// workload context option
 	workloadCtxOption = "workload"
 
+	// zone context option
+	zoneCtxOption = "zone"
+
 	// localContext means only the pods on this node will be watched
 	// and only these events will be enriched
 	localContext enrichmentContext = "local"
@@ -95,6 +98,7 @@ type ContextOptions struct {
 	Workload  bool
 	Service   bool
 	Port      bool
+	Zone      bool
 }
 
 type DirtyCachePod struct {
@@ -129,6 +133,8 @@ func NewCtxOption(opts []string, option ctxOptionType) *ContextOptions {
 			c.Service = true
 		case portCtxOption:
 			c.Port = true
+		case zoneCtxOption:
+			c.Zone = true
 		}
 	}
 
@@ -168,6 +174,10 @@ func (c *ContextOptions) getLabels() []string {
 
 	if c.Port {
 		labels = append(labels, prefix+portCtxOption)
+	}
+
+	if c.Zone {
+		labels = append(labels, prefix+zoneCtxOption)
 	}
 
 	return labels
@@ -307,6 +317,15 @@ func (c *ContextOptions) getByDirectionValues(f *flow.Flow, dest bool) []string 
 			}
 		} else {
 			values = append(values, "unknown")
+		}
+	}
+
+	if c.Zone {
+		// NodeLabels is only the source node
+		if !dest {
+			values = append(values, utils.SourceZone(f))
+		} else {
+			values = append(values, utils.DestinationZone(f))
 		}
 	}
 
