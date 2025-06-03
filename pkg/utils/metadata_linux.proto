@@ -20,6 +20,10 @@ message RetinaMetadata {
     uint32 previously_observed_packets = 6;
     uint32 previously_observed_bytes = 7;
     map<string, uint32> previously_observed_tcp_flags = 8;
+
+    // Topology zones (e.g., from Kubernetes).
+    string source_zone = 9;
+    string destination_zone = 10;
 }
 
 enum DNSType {
