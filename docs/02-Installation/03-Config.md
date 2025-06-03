@@ -2,6 +2,8 @@
 
 ## Overview
 
+Retina config allows you to define the level of granularity and filtering of Retina metrics, as well as additional options related to retina-agent and retina-operator. For example, we can update Retina config to enable captures, annotations, and define data aggregation.
+
 ### Default Configuration
 
 Default settings for each component are specified in [Values file](../../deploy/standard/manifests/controller/helm/retina/values.yaml).
@@ -48,7 +50,7 @@ Apply to both Agent and Operator.
 * `metricsIntervalDuration`: Interval for gathering metrics (in `time.Duration`).
 * `enablePodLevel`: Enables gathering of advanced pod-level metrics, attaching pods' metadata to Retina's metrics.
 * `enableConntrackMetrics`: Enables conntrack metrics for packets and bytes forwarded/received.
-* `enableAnnotations`: Enables gathering of metrics for annotated resources. Resources can be annotated with `retina.sh=observe`. Requires the operator and `operator.enableRetinaEndpoint` to be enabled.
+* `enableAnnotations`: Enables gathering of metrics for annotated resources. Resources can be annotated with `retina.sh=observe`. Requires the operator and `operator.enableRetinaEndpoint` to be enabled. By enabling annotations, the agent will not use MetricsConfiguration CRD.
 * `bypassLookupIPOfInterest`: If true, plugins like `packetparser` and `dropreason` will bypass IP lookup, generating an event for each packet regardless. `enableAnnotations` will not work if this is true.
 * `dataAggregationLevel`: Defines the level of data aggregation for Retina. See [Data Aggregation](../05-Concepts/data-aggregation.md) for more details.
 

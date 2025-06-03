@@ -35,7 +35,7 @@ PLATFORM		?= $(OS)/$(ARCH)
 PLATFORMS		?= linux/amd64 linux/arm64 windows/amd64
 OS_VERSION		?= ltsc2019
 
-HUBBLE_VERSION ?= v1.17.1 # This may be modified via the update-hubble GitHub Action
+HUBBLE_VERSION ?= v1.17.3
 
 CONTAINER_BUILDER ?= docker
 CONTAINER_RUNTIME ?= docker
@@ -349,7 +349,7 @@ manifest-retina-image: ## create a multiplatform manifest for the retina image
 
 manifest-operator-image: ## create a multiplatform manifest for the operator image
 	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE):$(TAG))
-	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
 
 manifest-shell-image:
 	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_SHELL_IMAGE):$(TAG))
@@ -562,10 +562,31 @@ quick-deploy-hubble:
 	$(MAKE) helm-uninstall || true
 	$(MAKE) helm-install-without-tls HELM_IMAGE_TAG=$(TAG)-linux-amd64
 
-
 .PHONY: simplify-dashboards
 simplify-dashboards:
 	cd deploy/testutils && go test ./... -tags=dashboard,simplifydashboard -v && cd $(REPO_ROOT)
 
 run-perf-test:
 	go test -v ./test/e2e/retina_perf_test.go -timeout 2h -tags=perf -count=1  -args -image-tag=${TAG} -image-registry=${IMAGE_REGISTRY} -image-namespace=${IMAGE_NAMESPACE}
+
+.PHONY: update-hubble
+update-hubble:
+	@echo "Checking for Hubble updates..."
+	@latest_version=$$(curl -s https://api.github.com/repos/cilium/hubble/releases/latest | jq -r .tag_name); \
+    echo "Latest Hubble version: $$latest_version"; \
+    current_version=$$(grep -oP '(?<=ARG HUBBLE_VERSION=).*' controller/Dockerfile); \
+    echo "Current Hubble version: $$current_version"; \
+    if [ "$$latest_version" = "$$current_version" ]; then \
+        echo "Hubble version is up to date. No update needed."; \
+    else \
+        echo "Updating Hubble version from $$current_version to $$latest_version"; \
+        sed -i "s/^ARG HUBBLE_VERSION=.*/ARG HUBBLE_VERSION=$$latest_version/" controller/Dockerfile; \
+        sed -i "s/^HUBBLE_VERSION ?=.*/HUBBLE_VERSION ?= $$latest_version/" Makefile; \
+        echo ""; \
+        echo "Updated Hubble version in controller/Dockerfile and Makefile."; \
+        echo "Please create a branch and commit these changes:"; \
+        echo "  git checkout -b deps/update-hubble-to-$$latest_version"; \
+        echo "  git commit -am \"deps: bump Hubble version from $$current_version to $$latest_version\""; \
+        echo "  git push origin deps/update-hubble-to-$$latest_version"; \
+        echo "Then create a pull request on GitHub."; \
+    fi

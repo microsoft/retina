@@ -98,6 +98,7 @@ const config = {
       { name: "og:site_name", content: "Retina" },
       { name: "og:image:width", content: "1200" },
       { name: "og:image:height", content: "600" },
+      { name: "og:description", content: "Retina is a cloud-agnostic, open-source eBPF-based Kubernetes network observability platform that provides a centralized hub for monitoring application health, network health, and security." },
     ],
     navbar: {
       logo: {

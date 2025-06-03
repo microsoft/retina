@@ -4,6 +4,8 @@
 package metrics
 
 import (
+	"slices"
+	"strconv"
 	"strings"
 
 	v1 "github.com/cilium/cilium/api/v1/flow"
@@ -83,7 +85,9 @@ func (f *ForwardMetrics) getLabels() []string {
 		f.l.Info("dst labels", zap.Any("labels", labels))
 	}
 
-	// No additional context options
+	if slices.Contains(f.ctxOptions.AdditionalLabels, utils.IsReply) {
+		labels = append(labels, utils.IsReply)
+	}
 
 	return labels
 }
@@ -135,7 +139,9 @@ func (f *ForwardMetrics) ProcessFlow(flow *v1.Flow) {
 		}
 	}
 
-	// No additional context options
+	if slices.Contains(f.ctxOptions.AdditionalLabels, utils.IsReply) {
+		labels = append(labels, strconv.FormatBool(flow.GetIsReply().GetValue()))
+	}
 
 	f.update(flow, labels)
 	f.l.Debug("forward count metric is added", zap.Any("labels", labels))

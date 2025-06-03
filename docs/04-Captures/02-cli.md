@@ -1,16 +1,30 @@
 # Capture with Retina CLI
 
-The capture command in Retina allows users to capture network traffic and metadata for the capture target, and send the data to the location defined by output configuration.
+This page describes how the Retina CLI works in the context of performing packet captures.
 
-> NOTE: captures can also be performed with a [Capture CRD](../05-Concepts/CRDs/Capture.md) after [installing Retina](../02-Installation/01-Setup.md) **with capture support**.
+The use of the Retina CLI to perform captures does **NOT** require the Retina operator pod to be running.
 
-## Capture Create
+See the [overview](./01-overview.md#capture-jobs) for a description of how the capture jobs are created.
+
+![Overview of Retina Capture without operator](img/capture-architecture-without-operator.png "Overview of Retina Capture without operator")
+
+## Prerequisites
+
+- [Install Retina CLI](../02-Installation/02-CLI.md)
+
+## Operations
+
+### Capture Create
 
 `kubectl retina capture create [--flags]` creates a Capture with underlying Kubernetes jobs.
 
-### Selecting a Target
+#### Selecting a Target
 
-The target indicates where the packet capture will be performed. There are three choices available. These are the `--node-selectors`, `--node-names` and `pod-selectors` & `namespace-selectors` pairs.
+The target indicates where the packet capture will be performed. This can be set via the following flags:
+
+- `--node-selectors`
+- `--node-names`
+- `--pod-selectors` and `--namespace-selectors` (pairs)
 
 Note that Node Selectors are not compatible with Pod Selectors & Namespace Selectors pairs and the capture will not go through if all are populated.
 
@@ -18,7 +32,7 @@ If nothing is set, `kubectl retina capture create` will use `--node-selectors` w
 
 You can find [target selection examples](#target-selection) below.
 
-### Configuring the Output Location
+#### Configuring the Output Location
 
 The output configuration indicates the location where the capture will be stored. At least one location needs to be specified. This can either be the host path on the node, or a remote storage option.
 
@@ -26,16 +40,17 @@ Blob-upload requires a Blob Shared Access Signature (SAS) with the write permiss
 
 You can find [output configuration examples](#output-configuration) below.
 
-### Stopping a Capture
+#### Stopping a Capture
 
 The Capture can be stopped in a number of ways:
 
-- In a given time, by the `duration` flag, or when the file reaches the maximum allowed file size defined by the `max-size` flag. When both are specified, the capture will stop whenever **either condition is first met**.
+- In a given time, by the `duration` flag, or when the file reaches the maximum allowed file size defined by the `max-size` flag.
+  - When both are specified, the capture will stop whenever **either condition is first met**.
 - On demand by [deleting the capture](#capture-delete) before the specified conditions meets.
 
 The network traffic will be uploaded to the specified output location.
 
-### Flags
+#### Flags
 
 | Flag                  | Type       | Default  | Description                                                                 | Notes |
 |-----------------------|------------|----------|-----------------------------------------------------------------------------|-------|
@@ -66,87 +81,143 @@ The network traffic will be uploaded to the specified output location.
 | `s3-secret-access-key`| string     | ""       | S3 access secret key to upload capture files.                                |       |
 | `tcpdump-filter`      | string     | ""       | Raw tcpdump flags. Available tcpdump filters can be found in the [TCPDUMP MAN PAGE](https://www.tcpdump.org/manpages/tcpdump.1.html).  | Only works on Linux. Includes only tcpdump flags, for boolean expressions, please use include/exclude filters.     |
 
-### Examples
+#### Examples
 
-#### Target Selection
+##### Target Selection
 
 Node Selectors
 
-`kubectl retina capture create --name example-node-selectors --node-selectors "kubernetes.io/os=linux"`
+```sh
+kubectl retina capture create \
+  --name example-node-selectors \
+  --node-selectors "kubernetes.io/os=linux"
+```
 
 Node Names
 
-`kubectl retina capture create --name example-node-names --node-names "aks-agentpool-26113504-vmss000000,aks-agentpool-26113504-vmss000001"`
+```sh
+kubectl retina capture create \
+  --name example-node-names \
+  --node-names "aks-agentpool-26113504-vmss000000,aks-agentpool-26113504-vmss000001"
+```
 
 Pod Selectors & Namespace Selectors (Pairs)
 
-`kubectl retina capture create --name example-pod-namespace-selectors --pod-selectors="k8s-app=kube-dns" --namespace-selectors="kubernetes.io/metadata.name=kube-system"`
+```sh
+kubectl retina capture create \
+  --name example-pod-namespace-selectors \
+  --pod-selectors="k8s-app=kube-dns" \
+  --namespace-selectors="kubernetes.io/metadata.name=kube-system"
+```
 
-#### Output Configuration
+##### Output Configuration
 
 Host Path
 
-`kubectl retina capture create --name example-host-path --host-path /mnt/retina/example/captures`
+```sh
+kubectl retina capture create \
+  --name example-host-path \
+  --host-path /mnt/retina/example/captures
+```
 
 PVC
 
-`kubectl retina capture create --name example-pvc --pvc mypvc`
+```sh
+kubectl retina capture create \
+  --name example-pvc \
+  --pvc mypvc
+```
 
 Storage Account
 
-`kubectl retina capture create --name example-blob --blob-upload <Blob SAS URL with write permission>`
+```sh
+kubectl retina capture create \
+  --name example-blob \
+  --blob-upload <Blob SAS URL with write permission>
+```
 
 AWS S3
 
-`kubectl retina capture create --name example-s3 --s3-bucket "your-bucket-name" --s3-region "eu-central-1" --s3-access-key-id "your-access-key-id" --s3-secret-access-key "your-secret-access-key"`
+```sh
+kubectl retina capture create \
+  --name example-s3 \
+  --s3-bucket "your-bucket-name" \
+  --s3-region "eu-central-1" \
+  --s3-access-key-id "your-access-key-id" \
+  --s3-secret-access-key "your-secret-access-key"
+```
 
 S3 Compatible Service (MinIO)
 
-`kubectl retina capture create --name example-minio --s3-bucket "your-bucket-name" --s3-endpoint "https://play.min.io:9000" --s3-access-key-id "your-access-key-id" --s3-secret-access-key "your-secret-access-key"`
+```sh
+kubectl retina capture create \
+  --name example-minio \
+  --s3-bucket "your-bucket-name" \
+  --s3-endpoint "https://play.min.io:9000" \
+  --s3-access-key-id "your-access-key-id" \
+  --s3-secret-access-key "your-secret-access-key"
+```
 
-#### Capture Filters
+##### Capture Filters
 
 Include / Exclude Filters
 
-`kubectl retina capture create --name example-include-exclude-filters --include-filter="10.224.0.42:80,10.224.0.33:8080" --exclude-filter="10.224.0.26:80,10.224.0.34:8080"`
+```sh
+kubectl retina capture create \
+  --name example-include-exclude-filters \
+  --include-filter="10.224.0.42:80,10.224.0.33:8080" \
+  --exclude-filter="10.224.0.26:80,10.224.0.34:8080"
+```
 
 Tcpdump Filters
 
-`kubectl retina capture create --name example-tcpdump-filters --tcpdump-filter="udp port 53"`
+```sh
+kubectl retina capture create \
+  --name example-tcpdump-filters \
+  --tcpdump-filter="udp port 53"
+```
 
-## Capture Delete
+### Capture Delete
 
 Deleting the capture job before either of the terminating conditions have been met will stop the capture.
 
 `kubectl retina capture delete --name <string>` deletes a Kubernetes Jobs with the specified Capture name.
 
-**Example:**
+Example:
 
-`kubectl retina capture delete --name retina-capture-zlx5v`
+```sh
+kubectl retina capture delete --name retina-capture-zlx5v
+```
 
-## Capture List
+### Capture List
 
 To get a list of the captures you can run `kubectl retina capture list` to get the captures in a specific namespace or in all namespaces.
 
-**Example (namespace):**
+List by namespace:
 
-`kubectl retina capture list --namespace capture`
+```sh
+kubectl retina capture list --namespace capture
+```
 
-**Example (all namespaces):**
+List by all namespaces:
 
-`kubectl retina capture list --all-namespaces`
+```sh
+kubectl retina capture list --all-namespaces
+```
 
 ## Obtaining the output
 
 After downloading or copying the tarball from the location specified, extract the tarball through the `tar` command in either Linux shell or Windows Powershell, for example,
 
-```shell
+```sh
 tar -xvf retina-capture-aks-nodepool1-41844487-vmss000000-20230320013600UTC.tar.gz
 ```
 
 ### Name pattern of the tarball
 
-the tarball take such name pattern, `$(capturename)-$(hostname)-$(date +%Y%m%d%H%M%S%Z).tar.gz`, for example, `retina-capture-aks-nodepool1-41844487-vmss000000-20230313101436UTC.tar.gz`.
+The tarballs take the following name pattern, `$(capturename)-$(hostname)-$(date +%Y%m%d%H%M%S%Z).tar.gz`.
+
+- e.g. `retina-capture-aks-nodepool1-41844487-vmss000000-20230313101436UTC.tar.gz`
 
 ### File and directory structure inside the tarball
 
@@ -226,17 +297,28 @@ the tarball take such name pattern, `$(capturename)-$(hostname)-$(date +%Y%m%d%H
 
 With debug mode, when `--debug` is specified, you can overwrite the capture job's pod image.
 
-**Example:**
+Use `ghcr.io` image in default debug mode:
 
-Use `ghcr.io` image in default debug mode.
+```sh
+kubectl retina capture create \
+  --name capture-test \
+  --host-path /mnt/test \
+  --namespace capture \
+  --node-selectors "kubernetes.io/os=linux" \
+  --debug
+```
 
-`kubectl retina capture create --name capture-test --host-path /mnt/test --namespace capture --node-selectors "kubernetes.io/os=linux" --debug`
+Use custom retina-agent image by specifying it in the `RETINA_AGENT_IMAGE` environment variable:
 
-**Example:**
-
-Use custom retina-agent image by specifying it in the `RETINA_AGENT_IMAGE` environment variable.
-
-`RETINA_AGENT_IMAGE=<YOUR RETINA AGENT IMAGE> kubectl retina capture create --name capture-test --host-path /mnt/test --namespace capture --node-selectors "kubernetes.io/os=linux" --debug`
+```sh
+RETINA_AGENT_IMAGE=<YOUR RETINA AGENT IMAGE>
+kubectl retina capture create \
+  --name capture-test \
+  --host-path /mnt/test \
+  --namespace capture \
+  --node-selectors "kubernetes.io/os=linux" \
+  --
+```
 
 ## Cleanup
 

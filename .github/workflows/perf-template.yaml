@@ -1,0 +1,81 @@
+name: Network Performance Test Template
+
+on:
+  workflow_call:
+    inputs:
+      image-registry:
+        description: 'Image Registry to use for the performance test'
+        required: true
+        default: 'ghcr.io'
+        type: string
+      tag:
+        description: 'Image Tag to use for the performance test'
+        required: true
+        type: string
+      image-namespace:
+        description: 'Image Namespace to use for the performance test'
+        required: true
+        type: string
+      retina-mode:
+        description: 'Retina mode (basic or advanced)'
+        required: true
+        type: string
+      azure-location:
+        description: 'Azure location for the performance test'
+        required: true
+        type: string
+    secrets:
+        azure-subscription:
+          description: 'Azure subscription ID'
+          required: true
+        azure-tenant-id:
+          description: 'Azure tenant ID'
+          required: true
+        azure-client-id:
+          description: 'Azure client ID'
+          required: true
+        azure-app-insights-key:
+          description: 'Azure Application Insights key'
+          required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  perf-test:
+    name: Retina ${{ inputs.retina-mode }} Performance Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: go.mod
+      - run: go version
+
+      - name: Az CLI login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.azure-client-id }}
+          tenant-id: ${{ secrets.azure-tenant-id }}
+          subscription-id: ${{ secrets.azure-subscription }}
+
+      - name: Run performance measurement for Retina
+        env:
+          AZURE_APP_INSIGHTS_KEY: ${{ secrets.azure-app-insights-key }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.azure-subscription }}
+          AZURE_LOCATION: ${{ inputs.azure-location }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          
+          TAG="${{ inputs.tag }}"
+          REGISTRY="${{ inputs.image-registry }}"
+          NAMESPACE="${{ inputs.image-namespace }}"
+          MODE="${{ inputs.retina-mode }}"
+          
+          echo "Running in $MODE mode..."
+          go test -v ./test/e2e/. -timeout 2h -tags=perf -count=1 -args -image-tag=$TAG -image-registry=$REGISTRY -image-namespace=$NAMESPACE -retina-mode=$MODE

@@ -3908,7 +3908,10 @@
         "multi": false,
         "name": "cluster",
         "options": [],
-        "query": "label_values(up, cluster)",
+        "query": {
+          "query": "label_values(up, cluster)",
+          "refId": "StandardVariableQuery"
+        },
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
@@ -3922,14 +3925,17 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(up{cluster=\"$cluster\"}, instance)",
+        "definition": "label_values(up{cluster=\"$cluster\"},instance)",
         "hide": 0,
         "includeAll": true,
         "label": "Nodes",
         "multi": true,
         "name": "Nodes",
         "options": [],
-        "query": "label_values(up{cluster=\"$cluster\"}, instance)",
+        "query": {
+          "query": "label_values(up{cluster=\"$cluster\"},instance)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,

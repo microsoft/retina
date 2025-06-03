@@ -17,6 +17,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/microsoft/retina/pkg/log"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -41,6 +42,9 @@ func init() {
 }
 
 func TestMetricsConfigurationReconciler_Reconcile(t *testing.T) {
+	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
+		t.Errorf("Error setting up logger: %s", err)
+	}
 	type fields struct {
 		existingObjects []client.Object
 	}
