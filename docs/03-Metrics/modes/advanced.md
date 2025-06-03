@@ -30,10 +30,12 @@ For Advanced mode with *remote context*, default context labels are the followin
 - `source_namespace`
 - `source_pod`
 - `source_workload`
+- `source_zone`
 - `destination_ip`
 - `destination_namespace`
 - `destination_pod`
 - `destination_workload`
+- `destination_zone`
 
 ### Local Context
 
