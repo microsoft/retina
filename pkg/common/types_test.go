@@ -87,6 +87,7 @@ func TestRetinaEndpointCommonFromAPI(t *testing.T) {
 				annotations: map[string]string{
 					RetinaPodAnnotation: RetinaPodAnnotationValue,
 				},
+				zone: "zone-1",
 			},
 		},
 		{
@@ -140,13 +141,14 @@ func TestRetinaEndpointCommonFromAPI(t *testing.T) {
 				annotations: map[string]string{
 					RetinaPodAnnotation: RetinaPodAnnotationValue,
 				},
+				zone: "zone-1",
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotRetinaendpointCommon := RetinaEndpointCommonFromAPI(tt.retinaendpoint)
+			gotRetinaendpointCommon := RetinaEndpointCommonFromAPI(tt.retinaendpoint, "zone-1")
 
 			if diff := cmp.Diff(gotRetinaendpointCommon, tt.wantRetinaendpointCommon, cmpopts.IgnoreFields(BaseObject{}, "RWMutex"), cmp.AllowUnexported(BaseObject{}, RetinaEndpoint{})); diff != "" {
 				t.Fatalf("RetinaEndpointCommonFromAPI mismatch (-got, +want)\n%s", diff)
