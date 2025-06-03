@@ -203,6 +203,7 @@ type OwnerReference struct {
 type RetinaNode struct {
 	name string
 	ip   net.IP
+	zone string
 }
 
 type APIServerObject struct {

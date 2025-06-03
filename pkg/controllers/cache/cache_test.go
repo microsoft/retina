@@ -148,7 +148,7 @@ func TestCacheNodes(t *testing.T) {
 	c := New(p)
 	assert.NotNil(t, c)
 
-	addNode := common.NewRetinaNode("node1", net.IPv4(1, 2, 3, 4))
+	addNode := common.NewRetinaNode("node1", net.IPv4(1, 2, 3, 4), "zone-1")
 
 	p.EXPECT().Publish(gomock.Any(), gomock.Any()).Times(2)
 	err := c.UpdateRetinaNode(addNode)
@@ -159,11 +159,13 @@ func TestCacheNodes(t *testing.T) {
 	node := obj.(*common.RetinaNode)
 	assert.Equal(t, addNode.Name(), node.Name())
 	assert.Equal(t, addNode.IPString(), node.IPString())
+	assert.Equal(t, addNode.Zone(), node.Zone())
 
 	// normal get
 	node = c.GetNodeByIP("1.2.3.4")
 	assert.Equal(t, addNode.Name(), node.Name())
 	assert.Equal(t, addNode.IPString(), node.IPString())
+	assert.Equal(t, addNode.Zone(), node.Zone())
 
 	// delete
 	err = c.DeleteRetinaNode(addNode.Name())
@@ -210,7 +212,7 @@ func TestAddPodSvcNodeSameIP(t *testing.T) {
 	assert.Equal(t, addSvc.Name(), svc.Name())
 	assert.Equal(t, addSvc.Namespace(), svc.Namespace())
 
-	addNode := common.NewRetinaNode("node1", net.IPv4(1, 2, 3, 4))
+	addNode := common.NewRetinaNode("node1", net.IPv4(1, 2, 3, 4), "zone-1")
 
 	err = c.UpdateRetinaNode(addNode)
 	assert.NoError(t, err)
@@ -220,6 +222,7 @@ func TestAddPodSvcNodeSameIP(t *testing.T) {
 	node := obj.(*common.RetinaNode)
 	assert.Equal(t, addNode.Name(), node.Name())
 	assert.Equal(t, addNode.IPString(), node.IPString())
+	assert.Equal(t, addNode.Zone(), node.Zone())
 
 	time.Sleep(until)
 }
@@ -262,7 +265,7 @@ func TestAddPodSvcNodeSameIPDiffNS(t *testing.T) {
 	assert.Equal(t, addSvc.Name(), svc.Name())
 	assert.Equal(t, addSvc.Namespace(), svc.Namespace())
 
-	addNode := common.NewRetinaNode("node1", net.IPv4(1, 2, 3, 4))
+	addNode := common.NewRetinaNode("node1", net.IPv4(1, 2, 3, 4), "zone-1")
 
 	err = c.UpdateRetinaNode(addNode)
 	assert.NoError(t, err)
@@ -273,6 +276,7 @@ func TestAddPodSvcNodeSameIPDiffNS(t *testing.T) {
 	node := obj.(*common.RetinaNode)
 	assert.Equal(t, addNode.Name(), node.Name())
 	assert.Equal(t, addNode.IPString(), node.IPString())
+	assert.Equal(t, addNode.Zone(), node.Zone())
 
 	time.Sleep(until)
 }
@@ -340,7 +344,7 @@ func TestFailDelete(t *testing.T) {
 	err = c.DeleteRetinaSvc(svc.Key())
 	assert.Error(t, err)
 
-	node := common.NewRetinaNode("node1", net.IPv4(1, 2, 3, 4))
+	node := common.NewRetinaNode("node1", net.IPv4(1, 2, 3, 4), "zone-1")
 
 	err = c.DeleteRetinaNode(node.Name())
 	assert.Error(t, err)
