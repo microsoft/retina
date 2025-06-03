@@ -46,11 +46,12 @@ var (
 )
 
 var (
-	ErrNoPodFound               = errors.New("no pod found for job")
-	ErrManyPodsFound            = errors.New("more than one pod found for job; expected exactly one")
-	ErrCaptureContainerNotFound = errors.New("capture container not found in pod")
-	ErrFileNotAccessible        = errors.New("file does not exist or is not readable")
-	ErrEmptyDownloadOutput      = errors.New("download command produced no output")
+	ErrNoPodFound                = errors.New("no pod found for job")
+	ErrManyPodsFound             = errors.New("more than one pod found for job; expected exactly one")
+	ErrCaptureContainerNotFound  = errors.New("capture container not found in pod")
+	ErrFileNotAccessible         = errors.New("file does not exist or is not readable")
+	ErrEmptyDownloadOutput       = errors.New("download command produced no output")
+	ErrFailedToCreateDownloadPod = errors.New("failed to create download pod")
 )
 
 var downloadExample = templates.Examples(i18n.T(`
@@ -246,7 +247,7 @@ func createDownloadPod(ctx context.Context, kubeClient *kubernetes.Clientset, na
 	for {
 		select {
 		case <-timeout:
-			return nil, fmt.Errorf("timeout waiting for download pod to become ready after 30 seconds")
+			return nil, errors.Wrap(ErrFailedToCreateDownloadPod, "timeout waiting for download pod to become ready")
 		case <-ticker.C:
 			pod, err = kubeClient.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
 			if err != nil {
@@ -256,7 +257,7 @@ func createDownloadPod(ctx context.Context, kubeClient *kubernetes.Clientset, na
 				return pod, nil
 			}
 			if pod.Status.Phase == corev1.PodFailed {
-				return nil, fmt.Errorf("download pod failed to spin up successfully")
+				return nil, errors.Wrap(ErrFailedToCreateDownloadPod, "download pod failed to spin up successfully")
 			}
 		}
 	}

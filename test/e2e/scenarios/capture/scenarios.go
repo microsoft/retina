@@ -9,7 +9,7 @@ import (
 
 func ValidateCaptureCreate(kubeConfigPath, namespace string) *types.Scenario {
 	scenarioName := "Retina Capture"
-	captureName := "retina-capture-e2e" + rand.String(5)
+	captureName := "retina-capture-e2e-" + rand.String(5)
 	steps := []*types.StepWrapper{
 		{
 			Step: &validateCapture{

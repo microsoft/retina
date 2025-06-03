@@ -27,6 +27,14 @@ type validateCapture struct {
 	KubeConfigPath   string
 }
 
+var (
+	ErrInvalidCaptureName       = errors.New("invalid capture name")
+	ErrNoCaptureJobsFound       = errors.New("no capture jobs found")
+	ErrFoundNonZeroCaptureJobs  = errors.New("found non-zero amount of capture jobs when expecting zero after deletion")
+	ErrMissingEventOnCaptureJob = errors.New("missing SuccessfulCreate or Completed event on capture job")
+	ErrCaptureJobFailed         = errors.New("capture job failed")
+)
+
 func (v *validateCapture) Run() error {
 	duration, err := time.ParseDuration(v.Duration)
 	if err != nil {
@@ -36,7 +44,7 @@ func (v *validateCapture) Run() error {
 	log.Print("Running retina capture create...")
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "kubectl", "retina", "capture", "create", "--namespace", v.CaptureNamespace, "--name", v.CaptureName, "--duration", v.Duration)
+	cmd := exec.CommandContext(ctx, "kubectl", "retina", "capture", "create", "--namespace", v.CaptureNamespace, "--name", v.CaptureName, "--duration", v.Duration) //#nosec
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return errors.Wrapf(err, "failed to execute create capture command")
@@ -85,21 +93,21 @@ func (v *validateCapture) verifyJobs(ctx context.Context, clientset *kubernetes.
 	}
 
 	if len(jobList.Items) == 0 {
-		return fmt.Errorf("no capture jobs found with labels %s=%s and %s=%s",
+		return errors.Wrap(ErrNoCaptureJobsFound, fmt.Sprintf("with labels %s=%s and %s=%s",
 			label.CaptureNameLabel, v.CaptureName,
-			label.AppLabel, captureConstants.CaptureAppname)
+			label.AppLabel, captureConstants.CaptureAppname))
 	}
 
 	log.Printf("Found %d capture job(s) with appropriate labels.", len(jobList.Items))
 
 	// Check if all jobs are completed successfully
-	for _, job := range jobList.Items {
-		for _, condition := range job.Status.Conditions {
+	for i := range jobList.Items {
+		for _, condition := range jobList.Items[i].Status.Conditions {
 			if condition.Type == "Complete" && condition.Status == "True" {
-				log.Printf("Job %s has condition: Complete - True", job.Name)
+				log.Printf("Job %s has condition: Complete - True", jobList.Items[i].Name)
 			}
 			if condition.Type == "Failed" && condition.Status == "True" {
-				return fmt.Errorf("job %s failed: %s", job.Name, condition.Message)
+				return errors.Wrap(ErrCaptureJobFailed, jobList.Items[i].Name)
 			}
 		}
 	}
@@ -109,16 +117,16 @@ func (v *validateCapture) verifyJobs(ctx context.Context, clientset *kubernetes.
 	if err != nil {
 		return fmt.Errorf("failed to list events: %w", err)
 	}
-	for _, job := range jobList.Items {
-		if err := v.checkJobEvents(ctx, clientset, job.Name, events); err != nil {
-			return fmt.Errorf("failed to verify events for job %s: %w", job.Name, err)
+	for i := range jobList.Items {
+		if err = v.checkJobEvents(jobList.Items[i].Name, events); err != nil {
+			return fmt.Errorf("failed to verify events for job %s: %w", jobList.Items[i].Name, err)
 		}
-		log.Printf("Job %s has both SuccessfulCreate and Completed events.", job.Name)
+		log.Printf("Job %s has both SuccessfulCreate and Completed events.", jobList.Items[i].Name)
 	}
 
 	// Cleanup
 	log.Printf("Running retina capture delete...")
-	cmd := exec.CommandContext(ctx, "kubectl", "retina", "capture", "delete", "--namespace", v.CaptureNamespace, "--name", v.CaptureName)
+	cmd := exec.CommandContext(ctx, "kubectl", "retina", "capture", "delete", "--namespace", v.CaptureNamespace, "--name", v.CaptureName) //#nosec
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return errors.Wrapf(err, "failed to execute delete command")
@@ -133,11 +141,11 @@ func (v *validateCapture) verifyJobs(ctx context.Context, clientset *kubernetes.
 	return nil
 }
 
-func (v *validateCapture) checkJobEvents(ctx context.Context, clientset *kubernetes.Clientset, jobName string, events *v1.EventList) error {
+func (v *validateCapture) checkJobEvents(jobName string, events *v1.EventList) error {
 	var created, completed bool
-	for _, event := range events.Items {
-		if event.InvolvedObject.Kind == "Job" && event.InvolvedObject.Name == jobName {
-			switch event.Reason {
+	for i := range events.Items {
+		if events.Items[i].InvolvedObject.Kind == "Job" && events.Items[i].InvolvedObject.Name == jobName {
+			switch events.Items[i].Reason {
 			case "SuccessfulCreate":
 				created = true
 			case "Completed":
@@ -147,7 +155,7 @@ func (v *validateCapture) checkJobEvents(ctx context.Context, clientset *kuberne
 	}
 
 	if !created || !completed {
-		return fmt.Errorf("failed to find SuccessfulCreate/Completed events for job %s", jobName)
+		return errors.Wrap(ErrMissingEventOnCaptureJob, jobName)
 	}
 
 	return nil
@@ -165,7 +173,7 @@ func (v *validateCapture) verifyDelete(ctx context.Context, clientset *kubernete
 	}
 
 	if len(jobList.Items) > 0 {
-		return fmt.Errorf("expected 0 jobs remaining, but found more than 0:")
+		return ErrFoundNonZeroCaptureJobs
 	}
 
 	log.Printf("All relevant capture jobs have been successfully deleted.")
