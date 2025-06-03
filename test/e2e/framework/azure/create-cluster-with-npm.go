@@ -66,22 +66,22 @@ func (c *CreateNPMCluster) Run() error {
 		MaxPods:            to.Ptr(int32(MaxPodsPerNode)),
 	})
 
-	/* todo: add azlinux node pool
 	//nolint:appendCombine // separate for verbosity
 	npmCluster.Properties.AgentPoolProfiles = append(npmCluster.Properties.AgentPoolProfiles, &armcontainerservice.ManagedClusterAgentPoolProfile{
 		Type:               to.Ptr(armcontainerservice.AgentPoolTypeVirtualMachineScaleSets),
 		AvailabilityZones:  []*string{to.Ptr("1")},
 		Count:              to.Ptr[int32](AuxilaryNodeCount),
 		EnableNodePublicIP: to.Ptr(false),
+		EnableFIPS:         to.Ptr(true),
 		Mode:               to.Ptr(armcontainerservice.AgentPoolModeUser),
 		OSType:             to.Ptr(armcontainerservice.OSTypeLinux),
 		OSSKU:              to.Ptr(armcontainerservice.OSSKUAzureLinux),
 		ScaleDownMode:      to.Ptr(armcontainerservice.ScaleDownModeDelete),
-		VMSize:             to.Ptr(azure.AgentSKU),
+		VMSize:             to.Ptr(AgentSKU),
 		Name:               to.Ptr("azlinux"),
-		MaxPods:            to.Ptr(int32(azure.MaxPodsPerNode)),
+		MaxPods:            to.Ptr(int32(MaxPodsPerNode)),
 	})
-	*/
+
 	//nolint:appendCombine // separate for verbosity
 	npmCluster.Properties.AgentPoolProfiles = append(npmCluster.Properties.AgentPoolProfiles, &armcontainerservice.ManagedClusterAgentPoolProfile{ //nolint:all
 		Type: to.Ptr(armcontainerservice.AgentPoolTypeVirtualMachineScaleSets),

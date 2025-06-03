@@ -30,24 +30,57 @@ const (
 var perCPUBuffer = 16
 
 type dropReason struct {
-	cfg                    *kcfg.Config
-	l                      *log.ZapLogger
-	KNfHook                link.Link
-	KRetnfhook             link.Link
-	KTCPAccept             link.Link
-	KRetTCPAccept          link.Link
-	KRetTCPConnect         link.Link
-	KNfNatInet             link.Link
-	KRetNfNatInet          link.Link
-	KNfConntrackConfirm    link.Link
-	KRetNfConntrackConfirm link.Link
-	metricsMapData         IMap
-	isRunning              bool
-	reader                 IPerfReader
-	enricher               enricher.EnricherInterface
-	recordsChannel         chan perf.Record
-	wg                     sync.WaitGroup
-	externalChannel        chan *hubblev1.Event
+	cfg             *kcfg.Config
+	l               *log.ZapLogger
+	hooks           []link.Link
+	metricsMapData  IMap
+	isRunning       bool
+	reader          IPerfReader
+	enricher        enricher.EnricherInterface
+	recordsChannel  chan perf.Record
+	wg              sync.WaitGroup
+	externalChannel chan *hubblev1.Event
+}
+
+type allFexitObjects struct {
+	allFexitPrograms
+	kprobeMaps
+}
+
+type allFexitPrograms struct {
+	InetCskAcceptFexit      *ebpf.Program `ebpf:"inet_csk_accept_fexit"`
+	NfConntrackConfirmFexit *ebpf.Program `ebpf:"nf_conntrack_confirm_fexit"`
+	NfHookSlowFexit         *ebpf.Program `ebpf:"nf_hook_slow_fexit"`
+	NfNatInetFnFexit        *ebpf.Program `ebpf:"nf_nat_inet_fn_fexit"`
+	TcpV4ConnectFexit       *ebpf.Program `ebpf:"tcp_v4_connect_fexit"` // nolint:revive // needs to match generated code
+}
+
+type marinerObjects struct {
+	marinerPrograms
+	kprobeMaps
+}
+
+type marinerPrograms struct {
+	InetCskAcceptFexit *ebpf.Program `ebpf:"inet_csk_accept_fexit"`
+	NfHookSlowFexit    *ebpf.Program `ebpf:"nf_hook_slow_fexit"`
+	TcpV4ConnectFexit  *ebpf.Program `ebpf:"tcp_v4_connect_fexit"` // nolint:revive // needs to match generated code
+}
+
+type allKprobeObjects struct {
+	allKprobePrograms
+	kprobeMaps
+}
+
+type allKprobePrograms struct {
+	InetCskAccept         *ebpf.Program `ebpf:"inet_csk_accept"`
+	InetCskAcceptRet      *ebpf.Program `ebpf:"inet_csk_accept_ret"`
+	NfConntrackConfirm    *ebpf.Program `ebpf:"nf_conntrack_confirm"`
+	NfConntrackConfirmRet *ebpf.Program `ebpf:"nf_conntrack_confirm_ret"`
+	NfHookSlow            *ebpf.Program `ebpf:"nf_hook_slow"`
+	NfHookSlowRet         *ebpf.Program `ebpf:"nf_hook_slow_ret"`
+	NfNatInetFn           *ebpf.Program `ebpf:"nf_nat_inet_fn"`
+	NfNatInetFnRet        *ebpf.Program `ebpf:"nf_nat_inet_fn_ret"`
+	TcpV4ConnectRet       *ebpf.Program `ebpf:"tcp_v4_connect_ret"` // nolint:revive // needs to match generated code
 }
 
 type (

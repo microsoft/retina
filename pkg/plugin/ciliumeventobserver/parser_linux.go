@@ -2,6 +2,7 @@ package ciliumeventobserver
 
 import (
 	"errors"
+	"log/slog"
 	"time"
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
@@ -12,17 +13,15 @@ import (
 	monitorAPI "github.com/cilium/cilium/pkg/monitor/api"
 	"github.com/cilium/cilium/pkg/monitor/payload"
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 	"go.uber.org/zap"
 )
 
 var (
-	ErrNotImplemented = errors.New("Error, not implemented")
-	ErrEmptyData      = errors.New("empty data")
+	ErrEmptyData = errors.New("empty data")
 )
 
 func (p *parser) Init() error {
-	parser, err := hp.New(logrus.WithField("cilium", "parser"),
+	parser, err := hp.New(slog.Default().With("cilium", "parser"),
 		// We use noOp getters here since we will use our own custom parser in hubble
 		&hptestutils.NoopEndpointGetter,
 		&hptestutils.NoopIdentityGetter,
@@ -31,6 +30,7 @@ func (p *parser) Init() error {
 		&hptestutils.NoopServiceGetter,
 		&hptestutils.NoopLinkGetter,
 		&hptestutils.NoopPodMetadataGetter,
+		true,
 	)
 	if err != nil {
 		p.l.Fatal("Failed to create parser", zap.Error(err))
@@ -74,7 +74,7 @@ func (p *parser) Decode(pl *payload.Payload) (*v1.Event, error) {
 			// Log Records can be DNS traces for CNP related pods
 			// AccessLogs can also reflect kafka related metrics
 			monEvent.Payload = &observerTypes.AgentEvent{}
-			return nil, ErrNotImplemented //nolint:goerr113 //no specific handling expected
+			return nil, nil //nolint:goerr113 //no specific handling expected
 		// MessageTypeTraceSock and MessageTypeDebug are also perf events but have their own dedicated decoders in cilium.
 		case monitorAPI.MessageTypeDrop, monitorAPI.MessageTypeTrace, monitorAPI.MessageTypePolicyVerdict, monitorAPI.MessageTypeCapture:
 			perfEvent := &observerTypes.PerfEvent{}
