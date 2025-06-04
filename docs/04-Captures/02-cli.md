@@ -317,7 +317,7 @@ kubectl retina capture create \
   --host-path /mnt/test \
   --namespace capture \
   --node-selectors "kubernetes.io/os=linux" \
-  --
+  --debug
 ```
 
 ## Cleanup
