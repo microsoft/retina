@@ -12,6 +12,9 @@ func ValidateCaptureCreate(kubeConfigPath, namespace string) *types.Scenario {
 	captureName := "retina-capture-e2e-" + rand.String(5)
 	steps := []*types.StepWrapper{
 		{
+			Step: &InstallRetinaPlugin{},
+		},
+		{
 			Step: &validateCapture{
 				CaptureName:      captureName,
 				CaptureNamespace: namespace,
