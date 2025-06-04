@@ -68,7 +68,7 @@ func TestE2ERetina(t *testing.T) {
 		jobs.ValidateCapture(
 			common.KubeConfigFilePath(rootDir),
 			common.RetinaChartPath(rootDir),
-			common.TestPodNamespace),
+			"default"),
 	)
 	captureE2E.Run(ctx)
 }
