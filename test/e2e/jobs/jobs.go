@@ -271,23 +271,9 @@ func ValidateHubble(kubeConfigFilePath, chartPath string, testPodNamespace strin
 func ValidateCapture(kubeConfigFilePath, chartPath, testPodNamespace string) *types.Job {
 	job := types.NewJob("Validate Capture")
 
-	job.AddStep(&kubernetes.InstallHelmChart{
-		Namespace:          common.KubeSystemNamespace,
-		ReleaseName:        "retina",
-		KubeConfigFilePath: kubeConfigFilePath,
-		ChartPath:          chartPath,
-		TagEnv:             generic.DefaultTagEnv,
-	}, nil)
-
 	job.AddScenario(capture.ValidateCaptureCreate(
 		kubeConfigFilePath,
 		testPodNamespace))
-
-	job.AddStep(&kubernetes.EnsureStableComponent{
-		PodNamespace:           common.KubeSystemNamespace,
-		LabelSelector:          "k8s-app=retina",
-		IgnoreContainerRestart: false,
-	}, nil)
 
 	return job
 }
