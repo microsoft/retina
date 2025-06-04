@@ -6,6 +6,7 @@ import (
 	"github.com/cakturk/go-netstat/netstat"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
+	"github.com/safchain/ethtool"
 )
 
 const name = "linuxutil"
@@ -106,7 +107,8 @@ type EthtoolOpts struct {
 }
 
 type EthtoolInterface interface {
-	Stats(intf string) (map[string]uint64, error)
+	// the buffer is used internally by the ethtool package to avoid memory allocation churn
+	StatsWithBuffer(intf string, gstrings *ethtool.EthtoolGStrings, stats *ethtool.EthtoolStats) (map[string]uint64, error)
 	Close()
 }
 
