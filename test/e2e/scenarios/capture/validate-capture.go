@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -74,9 +75,13 @@ func (v *validateCapture) Run() error {
 		}
 		return nil
 	})
-
 	if err != nil {
 		return errors.Wrap(err, "failed to verify capture jobs were created")
+	}
+
+	err = v.downloadCapture(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to download and validate capture files")
 	}
 
 	v.deleteJobs(ctx, clientset)
@@ -210,5 +215,55 @@ func (v *validateCapture) Prevalidate() error {
 }
 
 func (v *validateCapture) Stop() error {
+	return nil
+}
+
+func (v *validateCapture) downloadCapture(ctx context.Context) error {
+	log.Print("Downloading capture files...")
+
+	outputDir := filepath.Join("./", v.CaptureName)
+
+	// Run the download command
+	cmd := exec.CommandContext(ctx, "kubectl", "retina", "capture", "download", "--namespace", v.CaptureNamespace, "--name", v.CaptureName)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return errors.Wrapf(err, "failed to execute download capture command: %s", string(output))
+	}
+	log.Printf("Download capture command output: %s\n", output)
+
+	// List files in the output directory
+	files, err := os.ReadDir(outputDir)
+	if err != nil {
+		return errors.Wrapf(err, "failed to list files in output directory %s", outputDir)
+	}
+
+	// Validate the number of files
+	if len(files) == 0 {
+		return errors.New("no capture files were downloaded")
+	}
+	log.Printf("Downloaded %d capture files", len(files))
+
+	// Validate file names and content
+	for _, file := range files {
+		filePath := filepath.Join(outputDir, file.Name())
+
+		// Check that the file has the expected tar.gz extension
+		if !strings.HasSuffix(file.Name(), ".tar.gz") {
+			return errors.Errorf("downloaded file %s does not have the expected .tar.gz extension", file.Name())
+		}
+
+		// Check that the file is not empty
+		fileInfo, err := os.Stat(filePath)
+		if err != nil {
+			return errors.Wrapf(err, "failed to get file info for %s", filePath)
+		}
+
+		if fileInfo.Size() == 0 {
+			return errors.Errorf("downloaded file %s is empty", filePath)
+		}
+
+		log.Printf("Validated file: %s (Size: %d bytes)", file.Name(), fileInfo.Size())
+	}
+
 	return nil
 }
