@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/safchain/ethtool"
 
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
@@ -38,8 +39,11 @@ func TestNewEthtool(t *testing.T) {
 		t.Fatal("failed to create cache:", err)
 	}
 
+	stats := new(ethtool.EthtoolStats)
+	gstrings := new(ethtool.EthtoolGStrings)
+
 	ethHandle := NewMockEthtoolInterface(ctrl)
-	ethReader := NewEthtoolReader(opts, ethHandle, unsupportedInterfacesCache)
+	ethReader := NewEthtoolReader(opts, ethHandle, unsupportedInterfacesCache, gstrings, stats)
 	assert.NotNil(t, ethReader)
 }
 
@@ -56,7 +60,7 @@ func TestNewEthtoolWithNil(t *testing.T) {
 		t.Fatal("failed to create cache:", err)
 	}
 
-	ethReader := NewEthtoolReader(opts, nil, unsupportedInterfacesCache)
+	ethReader := NewEthtoolReader(opts, nil, unsupportedInterfacesCache, nil, nil)
 	assert.NotNil(t, ethReader)
 }
 
@@ -127,6 +131,11 @@ func TestReadInterfaceStats(t *testing.T) {
 		},
 	}
 
+	gstrings := new(ethtool.EthtoolGStrings)
+	stats := new(ethtool.EthtoolStats)
+
+	// Create a mock EthtoolInterface
+
 	for _, tt := range tests {
 		l.Infof("Running TestReadInterfaceStats %s", tt.name)
 
@@ -135,11 +144,11 @@ func TestReadInterfaceStats(t *testing.T) {
 
 		ethHandle := NewMockEthtoolInterface(ctrl)
 
-		ethReader := NewEthtoolReader(tt.opts, ethHandle, unsupportedInterfacesCache)
+		ethReader := NewEthtoolReader(tt.opts, ethHandle, unsupportedInterfacesCache, gstrings, stats)
 
 		assert.NotNil(t, ethReader)
 
-		ethHandle.EXPECT().Stats(gomock.Any()).Return(tt.statsReturn, tt.statErr).AnyTimes()
+		ethHandle.EXPECT().StatsWithBuffer(gomock.Any(), gstrings, stats).Return(tt.statsReturn, tt.statErr).AnyTimes()
 		InitalizeMetricsForTesting(ctrl)
 
 		if tt.statErr == nil {

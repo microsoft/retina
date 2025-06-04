@@ -69,6 +69,9 @@ func (lu *linuxUtil) run(ctx context.Context) error {
 		return err
 	}
 
+	gstrings := new(ethtool.EthtoolGStrings)
+	stats := new(ethtool.EthtoolStats)
+
 	ticker := time.NewTicker(lu.cfg.MetricsInterval)
 	defer ticker.Stop()
 
@@ -109,7 +112,7 @@ func (lu *linuxUtil) run(ctx context.Context) error {
 				return fmt.Errorf("failed to create ethHandle: %w", err)
 			}
 
-			ethReader := NewEthtoolReader(ethtoolOpts, ethHandle, unsupportedInterfacesCache)
+			ethReader := NewEthtoolReader(ethtoolOpts, ethHandle, unsupportedInterfacesCache, gstrings, stats)
 			if ethReader == nil {
 				lu.l.Error("Error while creating ethReader")
 				return errors.New("error while creating ethReader")

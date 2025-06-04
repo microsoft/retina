@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/safchain/ethtool"
 
 	lru "github.com/hashicorp/golang-lru/v2"
 
@@ -26,13 +27,13 @@ func NewCachedEthtool(ethHandle EthtoolInterface, unsupportedInterfacesCache *lr
 
 var errskip = errors.New("skip interface")
 
-func (ce *CachedEthtool) Stats(intf string) (map[string]uint64, error) {
+func (ce *CachedEthtool) StatsWithBuffer(intf string, gstring *ethtool.EthtoolGStrings, stats *ethtool.EthtoolStats) (map[string]uint64, error) {
 	// Skip unsupported interfaces
 	if _, ok := ce.unsupported.Get(intf); ok {
 		return nil, errskip
 	}
 
-	ifaceStats, err := ce.EthtoolInterface.Stats(intf)
+	ifaceStats, err := ce.EthtoolInterface.StatsWithBuffer(intf, gstring, stats)
 	if err != nil {
 		if strings.Contains(err.Error(), "operation not supported") {
 			ce.unsupported.Add(intf, struct{}{})
