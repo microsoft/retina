@@ -6,7 +6,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 
 	"github.com/pkg/errors"
@@ -18,6 +20,8 @@ import (
 
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
 	"github.com/microsoft/retina/pkg/label"
+	"github.com/microsoft/retina/test/e2e/framework/generic"
+	"github.com/microsoft/retina/test/retry"
 )
 
 type validateCapture struct {
@@ -36,15 +40,16 @@ var (
 )
 
 func (v *validateCapture) Run() error {
-	duration, err := time.ParseDuration(v.Duration)
-	if err != nil {
-		return errors.Wrapf(err, "failed to parse duration: %s", v.Duration)
-	}
-
 	log.Print("Running retina capture create...")
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "kubectl", "retina", "capture", "create", "--namespace", v.CaptureNamespace, "--name", v.CaptureName, "--duration", v.Duration) //#nosec
+	ctx := context.TODO()
+
+	imageRegistry := os.Getenv(generic.DefaultImageRegistry)
+	imageNamespace := os.Getenv(generic.DefaultImageNamespace)
+	imageTag := os.Getenv(generic.DefaultTagEnv)
+
+	cmd := exec.CommandContext(ctx, "kubectl", "retina", "capture", "create", "--namespace", v.CaptureNamespace, "--name", v.CaptureName, "--duration", v.Duration, "--debug") //#nosec
+	cmd.Env = append(os.Environ(), "RETINA_AGENT_IMAGE="+filepath.Join(imageRegistry, imageNamespace, "retina-agent:"+imageTag))
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return errors.Wrapf(err, "failed to execute create capture command")
@@ -60,15 +65,27 @@ func (v *validateCapture) Run() error {
 		return errors.Wrap(err, "failed to create kubernetes clientset")
 	}
 
-	if err := v.verifyJobs(ctx, clientset, duration); err != nil {
+	retrier := retry.Retrier{Attempts: 5, Delay: 10 * time.Second, ExpBackoff: true}
+	err = retrier.Do(ctx, func() error {
+		e := v.verifyJobs(ctx, clientset)
+		if e != nil {
+			log.Printf("failed to verify capture jobs: %v, retrying...", e)
+			return e
+		}
+		return nil
+	})
+
+	if err != nil {
 		return errors.Wrap(err, "failed to verify capture jobs were created")
 	}
+
+	v.deleteJobs(ctx, clientset)
 
 	return nil
 }
 
 // Verify that capture jobs are created (with appropriate labels), and completed successfully
-func (v *validateCapture) verifyJobs(ctx context.Context, clientset *kubernetes.Clientset, duration time.Duration) error {
+func (v *validateCapture) verifyJobs(ctx context.Context, clientset *kubernetes.Clientset) error {
 	captureJobSelector := &metav1.LabelSelector{
 		MatchLabels: map[string]string{
 			label.CaptureNameLabel: v.CaptureName,
@@ -79,11 +96,6 @@ func (v *validateCapture) verifyJobs(ctx context.Context, clientset *kubernetes.
 	if err != nil {
 		return errors.Wrap(err, "failed to parse label selector")
 	}
-
-	// Wait for capture duration + buffer time to allow jobs to complete
-	waitTime := duration + (10 * time.Second)
-	log.Printf("Waiting %v for capture jobs to complete...", waitTime)
-	time.Sleep(waitTime)
 
 	jobList, err := clientset.BatchV1().Jobs(v.CaptureNamespace).List(ctx, metav1.ListOptions{
 		LabelSelector: labelSelector.String(),
@@ -124,7 +136,10 @@ func (v *validateCapture) verifyJobs(ctx context.Context, clientset *kubernetes.
 		log.Printf("Job %s has both SuccessfulCreate and Completed events.", jobList.Items[i].Name)
 	}
 
-	// Cleanup
+	return nil
+}
+
+func (v *validateCapture) deleteJobs(ctx context.Context, clientset *kubernetes.Clientset) error {
 	log.Printf("Running retina capture delete...")
 	cmd := exec.CommandContext(ctx, "kubectl", "retina", "capture", "delete", "--namespace", v.CaptureNamespace, "--name", v.CaptureName) //#nosec
 	output, err := cmd.CombinedOutput()
@@ -133,6 +148,16 @@ func (v *validateCapture) verifyJobs(ctx context.Context, clientset *kubernetes.
 	}
 	log.Printf("Delete command output: %s\n", output)
 
+	captureJobSelector := &metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			label.CaptureNameLabel: v.CaptureName,
+			label.AppLabel:         captureConstants.CaptureAppname,
+		},
+	}
+	labelSelector, err := labels.Parse(metav1.FormatLabelSelector(captureJobSelector))
+	if err != nil {
+		return errors.Wrap(err, "failed to parse label selector")
+	}
 	// Verify that jobs are deleted
 	if err := v.verifyDelete(ctx, clientset, labelSelector); err != nil {
 		return errors.Wrap(err, "failed to verify capture jobs were deleted")
