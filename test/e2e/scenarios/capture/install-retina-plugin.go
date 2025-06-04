@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -28,18 +27,14 @@ func (i *InstallRetinaPlugin) Run() error {
 	log.Print("Building kubectl-retina plugin...")
 
 	// Create binary directory if it doesn't exist
-	if err := os.MkdirAll(InstallRetinaBinaryDir, 0755); err != nil {
+	if err := os.MkdirAll(InstallRetinaBinaryDir, 0o755); err != nil {
 		return errors.Wrap(err, "failed to create binary directory")
 	}
 
-	// Determine the correct binary name based on the operating system
 	binaryName := "kubectl-retina"
-	if runtime.GOOS == "windows" {
-		binaryName = "kubectl-retina.exe"
-	}
 
 	// Run git rev-parse to find the repository root
-	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	cmd := exec.Command("git", "rev-parse", "--show-toplevel") // #nosec
 	output, err := cmd.Output()
 	if err != nil {
 		return errors.Wrap(err, "failed to detect git repository root. Make sure you're running inside a git repository")
@@ -53,7 +48,7 @@ func (i *InstallRetinaPlugin) Run() error {
 	}
 
 	// Check if the cli/main.go file exists
-	_, err = os.Stat(filepath.Join(retinaRepoRoot, "cli/main.go"))
+	_, err = os.Stat(filepath.Join(retinaRepoRoot, "cli", "main.go"))
 	if err != nil {
 		return errors.Wrap(err, "cli/main.go not found in repository root")
 	}
@@ -61,23 +56,15 @@ func (i *InstallRetinaPlugin) Run() error {
 	// Build the kubectl-retina binary
 	buildCmd := exec.Command("go", "build", "-o",
 		filepath.Join(InstallRetinaBinaryDir, binaryName),
-		filepath.Join(retinaRepoRoot, "cli/main.go"))
+		filepath.Join(retinaRepoRoot, "cli", "main.go")) // #nosec
 
 	buildCmd.Dir = retinaRepoRoot
-	buildOutput, err := buildCmd.CombinedOutput()
+	var buildOutput []byte
+	buildOutput, err = buildCmd.CombinedOutput()
 	if err != nil {
 		return errors.Wrapf(err, "failed to build kubectl-retina: %s", buildOutput)
 	}
 	log.Printf("Successfully built kubectl-retina: %s", buildOutput)
-
-	// Make the binary executable (needed for non-Windows systems)
-	if runtime.GOOS != "windows" {
-		chmodCmd := exec.Command("chmod", "+x", filepath.Join(InstallRetinaBinaryDir, binaryName))
-		chmodOutput, err := chmodCmd.CombinedOutput()
-		if err != nil {
-			return errors.Wrapf(err, "failed to make kubectl-retina executable: %s", chmodOutput)
-		}
-	}
 
 	// Add the binary directory to PATH
 	currentPath := os.Getenv("PATH")
@@ -93,7 +80,7 @@ func (i *InstallRetinaPlugin) Run() error {
 	}
 
 	// Verify the plugin is accessible via kubectl
-	verifyCmd := exec.Command("kubectl", "plugin", "list")
+	verifyCmd := exec.Command("kubectl", "plugin", "list") // #nosec
 	verifyOutput, err := verifyCmd.CombinedOutput()
 	if err != nil {
 		log.Printf("Warning: kubectl plugin list command failed: %v. Output: %s", err, verifyOutput)

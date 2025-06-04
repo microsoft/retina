@@ -268,7 +268,7 @@ func ValidateHubble(kubeConfigFilePath, chartPath string, testPodNamespace strin
 	return job
 }
 
-func ValidateCapture(kubeConfigFilePath, chartPath, testPodNamespace string) *types.Job {
+func ValidateCapture(kubeConfigFilePath, testPodNamespace string) *types.Job {
 	job := types.NewJob("Validate Capture")
 
 	job.AddScenario(capture.ValidateCaptureCreate(

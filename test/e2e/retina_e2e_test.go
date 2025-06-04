@@ -67,7 +67,6 @@ func TestE2ERetina(t *testing.T) {
 	captureE2E := types.NewRunner(t,
 		jobs.ValidateCapture(
 			common.KubeConfigFilePath(rootDir),
-			common.RetinaChartPath(rootDir),
 			"default"),
 	)
 	captureE2E.Run(ctx)

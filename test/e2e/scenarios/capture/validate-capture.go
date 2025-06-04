@@ -84,7 +84,10 @@ func (v *validateCapture) Run() error {
 		return errors.Wrap(err, "failed to download and validate capture files")
 	}
 
-	v.deleteJobs(ctx, clientset)
+	err = v.deleteJobs(ctx, clientset)
+	if err != nil {
+		return errors.Wrap(err, "failed to delete capture jobs")
+	}
 
 	return nil
 }
@@ -221,10 +224,10 @@ func (v *validateCapture) Stop() error {
 func (v *validateCapture) downloadCapture(ctx context.Context) error {
 	log.Print("Downloading capture files...")
 
-	outputDir := filepath.Join("./", v.CaptureName)
+	outputDir := filepath.Join(".", v.CaptureName)
 
 	// Run the download command
-	cmd := exec.CommandContext(ctx, "kubectl", "retina", "capture", "download", "--namespace", v.CaptureNamespace, "--name", v.CaptureName)
+	cmd := exec.CommandContext(ctx, "kubectl", "retina", "capture", "download", "--namespace", v.CaptureNamespace, "--name", v.CaptureName) // #nosec
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return errors.Wrapf(err, "failed to execute download capture command: %s", string(output))
