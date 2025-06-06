@@ -163,8 +163,8 @@ func buildArgs(ns, podSelector, nsSelector string) []string {
 	return []string{
 		"capture", "create",
 		"--namespace", ns,
-		fmt.Sprintf("--pod-selectors=%q", podSelector),
-		fmt.Sprintf("--namespace-selectors=%q", nsSelector),
+		fmt.Sprintf("--pod-selectors=%s", podSelector),
+		fmt.Sprintf("--namespace-selectors=%s", nsSelector),
 	}
 }
 
