@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
 	"sort"
 
 	"github.com/charmbracelet/bubbles/table"
@@ -24,7 +22,6 @@ type selectStep int
 type model struct {
 	table                  table.Model
 	prompt                 string
-	confirmed              bool
 	selectedType           string
 	selectedNamespace      string
 	selectedLabel          string
@@ -34,6 +31,7 @@ type model struct {
 	labelOptions           []string
 	labelToNS              map[string][]string
 	labelToName            map[string][]string
+	done                   bool // track if final state is reached
 }
 
 // Helper to create a table
@@ -45,26 +43,34 @@ func newTable(cols []table.Column, rows []table.Row, prompt string, height int) 
 
 // Initial model
 func initialModel() model {
-	cols := []table.Column{{Title: "Type", Width: 15}}
-	rows := []table.Row{{"Pod"}, {"Deployment"}, {"DaemonSet"}}
-	sort.Slice(rows, func(i, j int) bool { return rows[i][0] < rows[j][0] })
-	t := newTable(cols, rows, "Select a resource type:", 5)
-	return model{table: t, prompt: "Select a resource type:", step: stepType}
-}
-
-// Helper to run a command in the terminal asynchronously
-func runCommandInTerminal(cmdStr string) error {
-	cmd := exec.Command("bash", "-c", cmdStr)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	// Print a separator before running the command for better output clarity
-	fmt.Println("\n================ Retina CLI Output ================\n")
-	// Set environment to preserve terminal formatting (including newlines/tabs)
-	cmd.Env = os.Environ()
-	cmd.Env = append(cmd.Env, "TERM=xterm-256color")
-	err := cmd.Run()
-	fmt.Println("\n================ End Retina CLI Output ================\n")
-	return err
+	// Get namespace label selectors for the initial prompt
+	labels, labelToNS, err := captureviews.GetNamespaceLabels()
+	if err != nil || len(labels) == 0 {
+		labels = []string{"none found"}
+		labelToNS = map[string][]string{"none found": {}}
+	}
+	rows := make([]table.Row, 0, len(labels))
+	for _, label := range labels {
+		if nsList, ok := labelToNS[label]; ok && len(nsList) > 0 {
+			rows = append(rows, table.Row{captureviews.JoinOrNone(nsList), label})
+		}
+	}
+	if len(rows) == 0 {
+		rows = append(rows, table.Row{"none found", "none found"})
+	}
+	// Sort rows by the left column (Namespace(s))
+	sort.Slice(rows, func(i, j int) bool {
+		return rows[i][0] < rows[j][0]
+	})
+	cols := []table.Column{{Title: "Namespace(s)", Width: 80}, {Title: "Namespace Label Selector", Width: 40}}
+	t := newTable(cols, rows, "Select a namespace label selector:", 15)
+	return model{
+		table:        t,
+		prompt:       "Select a namespace label selector:",
+		step:         stepNamespace,
+		labelOptions: labels,
+		labelToNS:    labelToNS,
+	}
 }
 
 // Add back toMM and fromMM helpers for model <-> MainModel conversion
@@ -72,7 +78,6 @@ func (m *model) toMM() captureviews.MainModel {
 	return captureviews.MainModel{
 		Table:                  m.table,
 		Prompt:                 m.prompt,
-		Confirmed:              m.confirmed,
 		SelectedType:           m.selectedType,
 		SelectedNamespace:      m.selectedNamespace,
 		SelectedLabel:          m.selectedLabel,
@@ -88,7 +93,6 @@ func (m *model) toMM() captureviews.MainModel {
 func (m *model) fromMM(mm captureviews.MainModel) {
 	m.table = mm.Table
 	m.prompt = mm.Prompt
-	m.confirmed = mm.Confirmed
 	m.selectedType = mm.SelectedType
 	m.selectedNamespace = mm.SelectedNamespace
 	m.selectedLabel = mm.SelectedLabel
@@ -118,30 +122,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				captureviews.HandleStepLabel(&mm)
 			}
 			m.fromMM(mm)
+			if m.step == stepDone {
+				m.done = true
+				return m, tea.Quit
+			}
 			return m, nil
-		case "y":
-			if m.confirmed && m.step == stepDone {
-				var nsSelector string
-				nsSelector = m.selectedNamespaceLabel
-				hostPath := "/mnt/retina/captures"
-				cmd := fmt.Sprintf(
-					"kubectl retina capture create --name retina-capture --host-path %s --namespace-selectors \"%s\" --pod-selectors \"%s\"",
-					hostPath,
-					nsSelector,
-					m.selectedLabel,
-				)
-				// Run the command in the terminal
-				go func() {
-					_ = runCommandInTerminal(cmd)
-				}()
-				m.prompt = "Command is being executed in the terminal."
-				return m, nil
-			}
-		case "n":
-			if m.confirmed && m.step == stepDone {
-				m.prompt = "Command not executed."
-				return m, nil
-			}
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "esc":
@@ -170,6 +155,19 @@ func goBackStack() model {
 	return initialModel()
 }
 
+// Helper to build the CLI args for retina cobra
+func buildArgs(ns, podSelector, nsSelector string) []string {
+	if ns == "" {
+		ns = "default"
+	}
+	return []string{
+		"capture", "create",
+		"--namespace", ns,
+		fmt.Sprintf("--pod-selectors=%q", podSelector),
+		fmt.Sprintf("--namespace-selectors=%q", nsSelector),
+	}
+}
+
 // RunTUI launches the TUI and returns the CLI args if the user confirms, or nil if cancelled.
 func RunTUI() ([]string, error) {
 	m := initialModel()
@@ -183,17 +181,8 @@ func RunTUI() ([]string, error) {
 	if !ok {
 		return nil, fmt.Errorf("unexpected model type")
 	}
-	if mFinal.confirmed && mFinal.step == stepDone {
-		nsSelector := mFinal.selectedNamespaceLabel
-		hostPath := "/mnt/retina/captures"
-		// Build args for cobra: retina capture create --name retina-capture --host-path ... --namespace-selectors ... --pod-selectors ...
-		args := []string{
-			"capture", "create",
-			"--name", "retina-capture",
-			"--host-path", hostPath,
-			"--namespace-selectors", nsSelector,
-			"--pod-selectors", mFinal.selectedLabel,
-		}
+	if mFinal.step == stepDone {
+		args := buildArgs(mFinal.selectedNamespace, mFinal.selectedLabel, mFinal.selectedNamespaceLabel)
 		return args, nil
 	}
 	return nil, nil // user cancelled or did not confirm
@@ -213,23 +202,20 @@ func (m model) Init() tea.Cmd { return nil }
 
 // View logic remains unchanged
 func (m model) View() string {
-	if m.confirmed && m.step == stepDone {
-		var nsSelector string
-		nsSelector = m.selectedNamespaceLabel
-		hostPath := "/mnt/retina/captures"
-		cmd := fmt.Sprintf(
-			"kubectl retina capture create --name retina-capture --host-path %s --namespace-selectors \"%s\" --pod-selectors \"%s\"",
-			hostPath,
-			nsSelector,
-			m.selectedLabel, // always use the selected label as the pod selector
-		)
-		return fmt.Sprintf(
-			"Type: %s\nNamespace: %s\nNamespace selector: %s\nLabel selector: %s\n\nRetina CLI command:\n%s\n\nWould you like to run this command? (y/n)",
-			m.selectedType, m.selectedNamespace, nsSelector, m.selectedLabel, cmd,
-		)
+	if m.done {
+		return ""
 	}
 	return fmt.Sprintf("%s\n\n%s\n\n(Use ↑/↓ to move, enter to select, q to quit)",
 		m.prompt,
 		m.table.View(),
 	)
+}
+
+func needsQuoting(s string) bool {
+	for _, c := range s {
+		if c == ' ' || c == '\t' || c == '"' {
+			return true
+		}
+	}
+	return false
 }

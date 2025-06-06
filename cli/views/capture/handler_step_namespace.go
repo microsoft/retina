@@ -2,7 +2,6 @@ package captureviews
 
 import (
 	"sort"
-	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
 )
@@ -11,30 +10,35 @@ import (
 func HandleStepNamespace(m *MainModel) {
 	selected := m.Table.SelectedRow()
 	row := ToResourceRow(selected)
-	m.Prompt = "Select a resource label selector:"
+	m.Prompt = "Select a pod label selector:"
 	m.SelectedNamespaceLabel = row.NamespaceLabel
-	m.SelectedLabel = row.NamespaceLabel
+	m.SelectedLabel = ""
 	m.NsSelectorForView = row.NamespaceLabel
-	m.SelectedNamespace = ""
-	if nsList, ok := m.LabelToNS[row.NamespaceLabel]; ok {
-		for _, ns := range nsList {
-			if ns != "none found" && ns != "none" && ns != "" {
-				m.SelectedNamespace = ns
-				break
-			}
+
+	// Gather all namespaces matching the selected label
+	nsList := m.LabelToNS[row.NamespaceLabel]
+	if len(nsList) == 0 {
+		nsList = []string{}
+	}
+
+	// Collect all pod label selectors for pods in the selected namespaces
+	labelSet := make(map[string]struct{})
+	labelToName := make(map[string][]string)
+	for _, ns := range nsList {
+		labels, l2n, err := GetResourceLabels("pod", ns)
+		if err != nil {
+			continue
+		}
+		for _, label := range labels {
+			labelSet[label] = struct{}{}
+			labelToName[label] = append(labelToName[label], l2n[label]...)
 		}
 	}
-	if m.SelectedNamespace == "" && row.NamespaceNames != "none found" && row.NamespaceNames != "" {
-		names := strings.Split(row.NamespaceNames, ", ")
-		for _, name := range names {
-			if name != "none" && name != "" {
-				m.SelectedNamespace = name
-				break
-			}
-		}
+	labels := make([]string, 0, len(labelSet))
+	for label := range labelSet {
+		labels = append(labels, label)
 	}
-	labels, labelToName, err := GetResourceLabels(strings.ToLower(m.SelectedType), m.SelectedNamespace)
-	if err != nil || len(labels) == 0 {
+	if len(labels) == 0 {
 		labels = []string{"none found"}
 		labelToName = map[string][]string{"none found": {}}
 	}
@@ -42,12 +46,15 @@ func HandleStepNamespace(m *MainModel) {
 	for _, label := range labels {
 		rows = append(rows, table.Row{JoinOrNone(labelToName[label]), label})
 	}
-	sort.Slice(rows, func(i, j int) bool { return rows[i][0] < rows[j][0] })
 	if len(rows) == 0 {
 		rows = append(rows, table.Row{"none found", "none found"})
 	}
+	// Sort rows by the left column (Pod Name(s))
+	sort.Slice(rows, func(i, j int) bool {
+		return rows[i][0] < rows[j][0]
+	})
 	t := NewTable(
-		[]table.Column{{Title: strings.Title(m.SelectedType) + " Name(s)", Width: 80}, {Title: "Label Selector", Width: 40}},
+		[]table.Column{{Title: "Pod Name(s)", Width: 80}, {Title: "Pod Label Selector", Width: 40}},
 		rows,
 		m.Prompt,
 		15,
