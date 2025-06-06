@@ -88,6 +88,10 @@ var downloadCapture = &cobra.Command{
 			captureNamespace = "default"
 		}
 
+		if captureName == "" && blobURL == "" {
+			return errors.New("either --name or --blob-url must be specified")
+		}
+
 		if captureName != "" {
 			err = downloadFromCluster(ctx, kubeConfig, captureNamespace)
 			if err != nil {
