@@ -312,6 +312,8 @@ static __always_inline bool _ct_should_report_packet(struct ct_v4_key *key, stru
         last_report = READ_ONCE(entry->last_report_rx_dir);
     }
 
+    __u8 packet_flags = flags;
+
     // OR the seen flags with the new flags
     flags |= seen_flags;
     __u8 protocol = key->proto;
@@ -356,7 +358,7 @@ static __always_inline bool _ct_should_report_packet(struct ct_v4_key *key, stru
         }
         
         // Always report important TCP control flags
-        if (flags & (TCP_SYN | TCP_URG | TCP_ECE | TCP_CWR)) {
+        if (packet_flags & (TCP_SYN | TCP_URG | TCP_ECE | TCP_CWR)) {
             should_report = true;
         }
         
