@@ -7,7 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 )
 
-func ValidateCaptureCreate(kubeConfigPath, namespace string) *types.Scenario {
+func ValidateCapture(kubeConfigPath, namespace string) *types.Scenario {
 	scenarioName := "Retina Capture"
 	captureName := "retina-capture-e2e-" + rand.String(5)
 	steps := []*types.StepWrapper{
