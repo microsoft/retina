@@ -38,6 +38,7 @@
 #define TCP_URG 0x20
 #define TCP_ECE 0x40
 #define TCP_CWR 0x80
+#define TCP_NS 0x100
 
 #define CT_PACKET_DIR_TX 0x00
 #define CT_PACKET_DIR_RX 0x01
