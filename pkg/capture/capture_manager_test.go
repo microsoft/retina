@@ -53,7 +53,7 @@ func TestCaptureNetwork(t *testing.T) {
 	ctx, cancel := TestContext(t)
 	defer cancel()
 
-	tmpFilename := file.CaptureFilename{CaptureName: captureName, NodeHostname: nodeHostName, StartTimestamp: &timestamp}
+	tmpFilename := file.CaptureFilename{CaptureName: captureName, NodeHostname: nodeHostName, StartTimestamp: timestamp}
 	networkCaptureProvider.EXPECT().Setup(tmpFilename).Return(fmt.Sprintf("%s-%s-%s", captureName, nodeHostName, &timestamp), nil).Times(1)
 	networkCaptureProvider.EXPECT().CaptureNetworkPacket(ctx, filter, duration, maxSize).Return(nil).Times(1)
 
