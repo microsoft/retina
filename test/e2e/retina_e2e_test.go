@@ -57,4 +57,12 @@ func TestE2ERetina(t *testing.T) {
 	// Install and test Hubble  metrics
 	hubbleMetricsE2E := types.NewRunner(t, jobs.InstallAndTestHubbleMetrics(kubeConfigFilePath, hubblechartPath, common.TestPodNamespace))
 	hubbleMetricsE2E.Run(ctx)
+
+	// Install Retina basic and test captures
+	captureE2E := types.NewRunner(t,
+		jobs.ValidateCapture(
+			common.KubeConfigFilePath(rootDir),
+			"default"),
+	)
+	captureE2E.Run(ctx)
 }

@@ -205,6 +205,47 @@ List by all namespaces:
 kubectl retina capture list --all-namespaces
 ```
 
+### Capture Download
+
+The `kubectl retina capture download` command allows you to download capture files directly from the cluster or from blob storage.
+
+#### Download from Cluster
+
+Download capture files using the capture name:
+
+```sh
+kubectl retina capture download --name <capture-name>
+```
+
+Download capture files and specify an output location:
+
+```sh
+kubectl retina capture download --name <capture-name> -o <output-location>
+```
+
+By default, files are downloaded to the current directory.
+
+#### Download from Blob Storage
+
+Download capture files from Azure Blob Storage using a Blob URL (requires Read/List permissions):
+
+```sh
+kubectl retina capture download --blob-url "<blob-url>"
+```
+
+#### Download Output Structure
+
+The command will create a directory with the capture name and download all related capture files. Each capture file is downloaded as a `.tar.gz` archive with a name pattern matching `$(capturename)-$(hostname)-$(date +%Y%m%d%H%M%S%Z).tar.gz`.
+
+For example:
+
+```bash
+/output-directory/
+└── capture-name/
+    ├── capture-name-node1-20230320013600UTC.tar.gz
+    └── capture-name-node2-20230320013600UTC.tar.gz
+```
+
 ## Obtaining the output
 
 After downloading or copying the tarball from the location specified, extract the tarball through the `tar` command in either Linux shell or Windows Powershell, for example,
@@ -317,7 +358,7 @@ kubectl retina capture create \
   --host-path /mnt/test \
   --namespace capture \
   --node-selectors "kubernetes.io/os=linux" \
-  --
+  --debug
 ```
 
 ## Cleanup
