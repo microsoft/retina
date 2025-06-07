@@ -181,6 +181,12 @@ func (ep *RetinaEndpoint) PrimaryNetIP() (net.IP, error) {
 	return nil, errors.Wrapf(ErrNoPrimaryIPFoundEndpoint, ep.Key())
 }
 
+func (ep *RetinaEndpoint) Zone() string {
+	ep.RLock()
+	defer ep.RUnlock()
+	return ep.zone
+}
+
 func (o *OwnerReference) DeepCopy() *OwnerReference {
 	return &OwnerReference{
 		Kind:       o.Kind,
