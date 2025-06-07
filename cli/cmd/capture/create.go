@@ -28,6 +28,7 @@ import (
 	"github.com/microsoft/retina/internal/buildinfo"
 	pkgcapture "github.com/microsoft/retina/pkg/capture"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
+	"github.com/microsoft/retina/pkg/capture/file"
 	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	"github.com/microsoft/retina/pkg/config"
 )
@@ -240,6 +241,8 @@ func deleteSecret(ctx context.Context, kubeClient kubernetes.Interface, secretNa
 }
 
 func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*retinav1alpha1.Capture, error) {
+	timestamp := file.Now()
+
 	capture := &retinav1alpha1.Capture{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      *opts.Name,
@@ -253,7 +256,12 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 				CaptureOption:   retinav1alpha1.CaptureOption{},
 			},
 		},
+		Status: retinav1alpha1.CaptureStatus{
+			StartTime: timestamp,
+		},
 	}
+
+	retinacmd.Logger.Info(fmt.Sprintf("Capture timestamp: %s", timestamp))
 
 	if duration != 0 {
 		retinacmd.Logger.Info(fmt.Sprintf("The capture duration is set to %s", duration))

@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
 	"github.com/microsoft/retina/pkg/capture/file"
@@ -29,7 +30,7 @@ type NetworkCaptureProvider struct {
 	TmpCaptureDir  string
 	CaptureName    string
 	NodeHostName   string
-	StartTimestamp *file.Timestamp
+	StartTimestamp *metav1.Time
 	Filename       file.CaptureFilename
 
 	l *log.ZapLogger

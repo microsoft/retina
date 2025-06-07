@@ -124,8 +124,9 @@ func (translator *CaptureToPodTranslator) initJobTemplate(ctx context.Context, c
 			BackoffLimit: &backoffLimit,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:    captureUtils.GetContainerLabelsFromCaptureName(capture.Name),
-					Namespace: capture.Namespace,
+					Labels:      captureUtils.GetContainerLabelsFromCaptureName(capture.Name),
+					Namespace:   capture.Namespace,
+					Annotations: captureUtils.GetPodAnnotationsFromCapture(capture),
 				},
 				Spec: corev1.PodSpec{
 					HostNetwork:                   true,
@@ -384,9 +385,15 @@ func (translator *CaptureToPodTranslator) renderJob(captureTargetOnNode *Capture
 		return nil, fmt.Errorf("no nodes are selected")
 	}
 
-	captureStartTimestamp := file.Now()
+	stringTimestamp := translator.jobTemplate.Spec.Template.ObjectMeta.Annotations[captureConstants.CaptureTimestampAnnotationKey]
+	captureTimestamp, err := file.StringToTime(stringTimestamp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse capture start timestamp: %w", err)
+	}
 
-	printOutputFileNames(captureTargetOnNode, envCommon, &captureStartTimestamp)
+	fmt.Println("#########################")
+	fmt.Println("Expected Capture Files")
+	fmt.Println("#########################")
 
 	jobs := make([]*batchv1.Job, 0, len(*captureTargetOnNode))
 	for nodeName, target := range *captureTargetOnNode {
@@ -395,6 +402,14 @@ func (translator *CaptureToPodTranslator) renderJob(captureTargetOnNode *Capture
 			jobEnv[k] = v
 		}
 		job := translator.jobTemplate.DeepCopy()
+		captureFilename := &file.CaptureFilename{
+			CaptureName:    envCommon[captureConstants.CaptureNameEnvKey],
+			NodeHostname:   nodeName,
+			StartTimestamp: captureTimestamp,
+		}
+		job.Spec.Template.ObjectMeta.Annotations[captureConstants.CaptureFilenameAnnotationKey] = captureFilename.String()
+
+		fmt.Printf("%s.tar.gz\n", captureFilename.String())
 
 		job.Spec.Template.Spec.Affinity = &corev1.Affinity{
 			NodeAffinity: &corev1.NodeAffinity{
@@ -454,30 +469,15 @@ func (translator *CaptureToPodTranslator) renderJob(captureTargetOnNode *Capture
 			job.Spec.Template.Spec.Containers[0].Env = append(job.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{Name: k, Value: v})
 		}
 		job.Spec.Template.Spec.Containers[0].Env = append(job.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{Name: captureConstants.NodeHostNameEnvKey, Value: nodeName})
-		job.Spec.Template.Spec.Containers[0].Env = append(job.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{Name: captureConstants.CaptureStartTimestampEnvKey, Value: captureStartTimestamp.String()})
+		job.Spec.Template.Spec.Containers[0].Env = append(job.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{Name: captureConstants.CaptureStartTimestampEnvKey, Value: stringTimestamp})
 
 		jobs = append(jobs, job)
 	}
 
-	return jobs, nil
-}
-
-func printOutputFileNames(captureTargetOnNode *CaptureTargetsOnNode, envCommon map[string]string, timestamp *file.Timestamp) {
-	captureFileNames := []string{}
-	for k := range *captureTargetOnNode {
-		capture := file.CaptureFilename{CaptureName: envCommon[captureConstants.CaptureNameEnvKey], NodeHostname: k, StartTimestamp: timestamp}
-		captureFileNames = append(captureFileNames, capture.String())
-	}
-	fmt.Println("#########################")
-	fmt.Println("Expected Capture Files")
-	fmt.Println("#########################")
-
-	for _, v := range captureFileNames {
-		fmt.Printf("%s.tar.gz\n", v)
-	}
-
 	fmt.Println("\nNote: The file(s) may not be created if the capture job(s) fail prematurely.")
 	fmt.Println("#########################")
+
+	return jobs, nil
 }
 
 func updateTcpdumpFilterWithPodIPAddress(podIPAddresses []string, tcpdumpFilter string) string {

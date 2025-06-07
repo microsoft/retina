@@ -1737,7 +1737,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 
 			for _, env := range tt.podEnv {
 				if env.Name == captureConstants.CaptureStartTimestampEnvKey {
-					_, err := file.StringToTimestamp(env.Value)
+					_, err := file.StringToTime(env.Value)
 					if err != nil {
 						t.Errorf("TranslateCaptureToJobs() error with capture timestamp: %v", err)
 					}
