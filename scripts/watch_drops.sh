@@ -387,8 +387,8 @@ generate_diff_table() {
   # Create table header
   echo "=== Drop Counter Changes ===" > "$output_file"
   echo "" >> "$output_file"
-  printf "%-60s %15s %15s %15s\n" "Metric Name" "Previous" "Current" "Change" >> "$output_file"
-  printf "%-60s %15s %15s %15s\n" "$(printf '%*s' 60 '' | tr ' ' '-')" "$(printf '%*s' 15 '' | tr ' ' '-')" "$(printf '%*s' 15 '' | tr ' ' '-')" "$(printf '%*s' 15 '' | tr ' ' '-')" >> "$output_file"
+  printf "%-80s %15s %15s %15s\n" "Metric Name" "Previous" "Current" "Change" >> "$output_file"
+  printf "%-80s %15s %15s %15s\n" "$(printf '%*s' 80 '' | tr ' ' '-')" "$(printf '%*s' 15 '' | tr ' ' '-')" "$(printf '%*s' 15 '' | tr ' ' '-')" "$(printf '%*s' 15 '' | tr ' ' '-')" >> "$output_file"
   
   # Create associative arrays to store old and new values
   declare -A old_values new_values
@@ -466,16 +466,13 @@ generate_diff_table() {
         fi
       fi
       
-      # Truncate long metric names
+      # Don't truncate metric names - show full names
       local display_metric="$metric"
-      if [[ ${#display_metric} -gt 58 ]]; then
-        display_metric="${display_metric:0:55}..."
-      fi
       
       # Format change with arrow indicators (no colors)
       local formatted_change="$change $change_indicator"
       
-      printf "%-60s %15s %15s %15s\n" "$display_metric" "$old_val" "$new_val" "$formatted_change" >> "$output_file"
+      printf "%-80s %15s %15s %15s\n" "$display_metric" "$old_val" "$new_val" "$formatted_change" >> "$output_file"
       changes_found=1
     fi
   done
@@ -487,6 +484,10 @@ generate_diff_table() {
     echo "" >> "$output_file"
     echo "Legend: ↑ = increase (potential issue), ↓ = decrease (improvement), = = no change" >> "$output_file"
   fi
+  
+  # Add note about detailed metrics file
+  echo "" >> "$output_file"
+  echo "Note: For full metric details and complete names, see: $new_metrics_file" >> "$output_file"
   
   return $changes_found
 }
