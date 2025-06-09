@@ -353,7 +353,7 @@ jobs:
 
   manifests:
     name: Generate Manifests
-    if: ${{ github.event_name == 'merge_group' }}
+    if: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs:
@@ -393,7 +393,7 @@ jobs:
 
   e2e:
     name: Run E2E Tests
-    if: ${{ github.event_name == 'merge_group' }}
+    if: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
     needs: [manifests]
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -457,7 +457,7 @@ jobs:
       azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
       azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
       azure-app-insights-key: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
-
+  
   perf-test-advanced:
     if: ${{ github.event_name == 'merge_group'}}
     needs: [manifests, get-tag, e2e]
