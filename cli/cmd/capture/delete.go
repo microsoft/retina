@@ -87,6 +87,6 @@ var deleteCapture = &cobra.Command{
 	},
 }
 
-func init() {
-	capture.AddCommand(deleteCapture)
+func NewDeleteSubCommand() *cobra.Command {
+	return deleteCapture
 }
