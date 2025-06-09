@@ -53,7 +53,7 @@ func (v *validateCapture) Run() error {
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return errors.Wrapf(err, "failed to execute create capture command")
+		return errors.Wrapf(err, "failed to execute create capture command: %s", string(output))
 	}
 	log.Printf("Create capture command output: %s\n", output)
 
