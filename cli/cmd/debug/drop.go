@@ -160,6 +160,11 @@ func runDropMonitoring(ctx context.Context, logger *log.ZapLogger) error {
 	}
 
 	if err := dr.Init(); err != nil {
+		// Check if this is a common eBPF-related error and provide helpful message
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "operation not permitted") || strings.Contains(errMsg, "MEMLOCK") {
+			return fmt.Errorf("failed to initialize dropreason plugin: %w\n\nThis error typically occurs when:\n- Running without sufficient privileges (try sudo)\n- eBPF is not available or restricted in this environment\n- Memory lock limits are too low (ulimit -l)\n\nFor production use, this command should be run in an environment with eBPF support", err)
+		}
 		return fmt.Errorf("failed to initialize dropreason plugin: %w", err)
 	}
 
