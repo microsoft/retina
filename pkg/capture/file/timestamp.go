@@ -4,25 +4,26 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+type Timestamp struct {
+	time.Time
+}
 
 const captureFileNameTimestampFormat string = "20060102150405UTC"
 
-func Now() *metav1.Time {
-	return &metav1.Time{Time: time.Now().UTC().Truncate(time.Second)}
+func Now() Timestamp {
+	return Timestamp{Time: time.Now().UTC().Truncate(time.Second)}
 }
 
-// Converts a string in the capture file name format to metav1.Time
-func StringToTime(timestamp string) (*metav1.Time, error) {
+func (timestamp *Timestamp) String() string {
+	return timestamp.Time.Format(captureFileNameTimestampFormat)
+}
+
+func StringToTimestamp(timestamp string) (*Timestamp, error) {
 	parsedTime, err := time.Parse(captureFileNameTimestampFormat, timestamp)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create timestamp from string")
 	}
-	return &metav1.Time{Time: parsedTime}, nil
-}
-
-// Converts a metav1.Time to a string in the capture file name format
-func TimeToString(timestamp *metav1.Time) string {
-	return timestamp.Format(captureFileNameTimestampFormat)
+	return &Timestamp{parsedTime}, nil
 }

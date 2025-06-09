@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/microsoft/retina/pkg/capture/file"
 	"github.com/microsoft/retina/pkg/log"
@@ -15,10 +16,10 @@ import (
 func TestSetupAndCleanup(t *testing.T) {
 	captureName := "capture-test"
 	nodeHostName := "node1"
-	timestamp := file.Now()
+	timestamp := file.Timestamp{Time: time.Now().UTC()}
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	networkCaptureprovider := &NetworkCaptureProvider{l: log.Logger().Named("test")}
-	tmpFilename := file.CaptureFilename{CaptureName: captureName, NodeHostname: nodeHostName, StartTimestamp: timestamp}
+	tmpFilename := file.CaptureFilename{CaptureName: captureName, NodeHostname: nodeHostName, StartTimestamp: &timestamp}
 	tmpCaptureLocation, err := networkCaptureprovider.Setup(tmpFilename)
 
 	// remove temporary capture dir anyway in case Cleanup() fails.
@@ -33,7 +34,7 @@ func TestSetupAndCleanup(t *testing.T) {
 	if !strings.Contains(tmpCaptureLocation, nodeHostName) {
 		t.Errorf("Temporary capture dir name %s should contains node host name  %s", tmpCaptureLocation, nodeHostName)
 	}
-	if !strings.Contains(tmpCaptureLocation, file.TimeToString(timestamp)) {
+	if !strings.Contains(tmpCaptureLocation, timestamp.String()) {
 		t.Errorf("Temporary capture dir name %s should contain timestamp  %s", tmpCaptureLocation, timestamp)
 	}
 

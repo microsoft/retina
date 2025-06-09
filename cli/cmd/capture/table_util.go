@@ -74,23 +74,32 @@ func printCaptureResult(captureJobs []batchv1.Job) {
 
 	w := new(tabwriter.Writer)
 	w.Init(os.Stdout, 0, 8, 3, ' ', 0)
-	fmt.Fprintln(w, "NAMESPACE\tCAPTURE NAME\tJOB\tCOMPLETIONS\tAGE")
-
-	for captureRef := range captureToJobs {
-		jobs := captureToJobs[captureRef]
-		captureParts := strings.Split(captureRef, "/")
-		captureNamespace, captureName := captureParts[0], captureParts[1]
-
-		sort.SliceStable(jobs, func(i, j int) bool {
-			return jobs[i].Name < jobs[j].Name
-		})
-
-		for i := range jobs {
-			job := &jobs[i]
-			completions := fmt.Sprintf("%d/%d", job.Status.Succeeded, *job.Spec.Completions)
-			age := durationUtil.HumanDuration(time.Since(job.CreationTimestamp.Time))
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", captureNamespace, captureName, job.Name, completions, age)
+	fmt.Fprintln(w, "NAMESPACE\tCAPTURE NAME\tJOBS\tCOMPLETIONS\tAGE")
+	for captureRef, jobs := range captureToJobs {
+		captureRef := strings.Split(captureRef, "/")
+		captureNamespace, captureName := captureRef[0], captureRef[1]
+		jobNames := []string{}
+		completedJobNum := 0
+		age := ""
+		totalJobNum := len(jobs)
+		for _, job := range jobs {
+			jobNames = append(jobNames, job.Name)
+			if job.Status.CompletionTime != nil {
+				completedJobNum += 1
+			}
 		}
+		sort.SliceStable(jobNames, func(i, j int) bool {
+			return jobNames[i] < jobNames[j]
+		})
+		if len(jobs) > 0 {
+			age = durationUtil.HumanDuration(time.Since(jobs[0].CreationTimestamp.Time))
+		}
+
+		jobsNameJoined := strings.Join(jobNames, ",")
+
+		completions := fmt.Sprintf("%d/%d", completedJobNum, totalJobNum)
+		rr := fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t", captureNamespace, captureName, jobsNameJoined, completions, age)
+		fmt.Fprintln(w, rr)
 	}
 	w.Flush()
 	fmt.Println()

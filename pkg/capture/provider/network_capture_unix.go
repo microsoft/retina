@@ -20,7 +20,6 @@ import (
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
 	"github.com/microsoft/retina/pkg/capture/file"
 	"github.com/microsoft/retina/pkg/log"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type NetworkCaptureProvider struct {
@@ -28,7 +27,7 @@ type NetworkCaptureProvider struct {
 	TmpCaptureDir  string
 	CaptureName    string
 	NodeHostName   string
-	StartTimestamp *metav1.Time
+	StartTimestamp *file.Timestamp
 
 	l *log.ZapLogger
 }
