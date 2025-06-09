@@ -82,10 +82,10 @@ func printCaptureResult(captureJobs []batchv1.Job) {
 		completedJobNum := 0
 		age := ""
 		totalJobNum := len(jobs)
-		for _, job := range jobs {
-			jobNames = append(jobNames, job.Name)
-			if job.Status.CompletionTime != nil {
-				completedJobNum += 1
+		for idx := range jobs {
+			jobNames = append(jobNames, jobs[idx].Name)
+			if jobs[idx].Status.CompletionTime != nil {
+				completedJobNum++
 			}
 		}
 		sort.SliceStable(jobNames, func(i, j int) bool {
