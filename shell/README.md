@@ -16,17 +16,16 @@ Run `kubectl retina shell -h` for full documentation and examples.
 
 To use `pwru` inside the retina shell, you must grant the following Linux capabilities to the container:
 
-* `NET_ADMIN` (required)
-* `SYS_ADMIN` (required)
-* `SYS_RESOURCE` (recommended for increasing memory lock limits)
-* `SYS_PTRACE` (only needed for some advanced tracing features)
+* `NET_ADMIN`
+* `SYS_ADMIN`
 
 Capability requirements are based on common eBPF tool practices and not directly from the pwru documentation.
 
 Example command to launch a shell with the required capabilities:
 
 ```sh
-kubectl retina shell --capabilities=NET_ADMIN,SYS_ADMIN,SYS_RESOURCE,SYS_PTRACE
+# Pod debugging
+kubectl retina shell -n kube-system pod/coredns-57d886c994-8m2ph --capabilities=NET_ADMIN,SYS_ADMIN
 ```
 
 Once inside the shell, you can run:
