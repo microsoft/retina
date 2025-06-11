@@ -23,7 +23,6 @@ RUN tdnf install -y \
 	socat \
 	tcpdump \
 	wget \
-	--exclude=aznfs \
 	&& tdnf clean all
 
 CMD ["/bin/bash", "-l"]
