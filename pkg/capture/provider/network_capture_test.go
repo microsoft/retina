@@ -154,60 +154,6 @@ func TestTcpdumpCommandConstruction(t *testing.T) {
 		}
 	})
 
-	// Test all-interfaces=false flag
-	t.Run("AllInterfacesFalseFlag", func(t *testing.T) {
-		// Clear all env vars first
-		os.Unsetenv(captureConstants.TcpdumpRawFilterEnvKey)
-		os.Unsetenv(captureConstants.PacketSizeEnvKey)
-		os.Unsetenv(captureConstants.CaptureInterfacesEnvKey)
-		
-		// Set all-interfaces flag to false
-		os.Setenv(captureConstants.AllInterfacesEnvKey, "false")
-		defer os.Unsetenv(captureConstants.AllInterfacesEnvKey)
-		
-		captureFilePath := "/tmp/test.pcap"
-		cmd := constructTcpdumpCommand(captureFilePath)
-		
-		// Verify the command does NOT contain any "-i" flag
-		foundInterface := false
-		for i, arg := range cmd.Args {
-			if arg == "-i" && i+1 < len(cmd.Args) {
-				foundInterface = true
-				break
-			}
-		}
-		if foundInterface {
-			t.Errorf("Expected tcpdump command not to include any '-i' flag when all-interfaces is false, but got args: %v", cmd.Args)
-		}
-	})
-
-	// Test explicit all-interfaces=true (should behave same as default)
-	t.Run("AllInterfacesTrueFlag", func(t *testing.T) {
-		// Clear all env vars first
-		os.Unsetenv(captureConstants.TcpdumpRawFilterEnvKey)
-		os.Unsetenv(captureConstants.PacketSizeEnvKey)
-		os.Unsetenv(captureConstants.CaptureInterfacesEnvKey)
-		
-		// Set all-interfaces flag to true
-		os.Setenv(captureConstants.AllInterfacesEnvKey, "true")
-		defer os.Unsetenv(captureConstants.AllInterfacesEnvKey)
-		
-		captureFilePath := "/tmp/test.pcap"
-		cmd := constructTcpdumpCommand(captureFilePath)
-		
-		// Verify the command contains "-i any"
-		found := false
-		for i, arg := range cmd.Args {
-			if arg == "-i" && i+1 < len(cmd.Args) && cmd.Args[i+1] == "any" {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Errorf("Expected tcpdump command to include '-i any' when all-interfaces is true, but got args: %v", cmd.Args)
-		}
-	})
-
 	// Test priority: raw filter takes precedence over specific interfaces
 	t.Run("RawFilterOverridesSpecificInterfaces", func(t *testing.T) {
 		// Set both raw filter and specific interfaces
@@ -246,31 +192,38 @@ func TestTcpdumpCommandConstruction(t *testing.T) {
 		}
 	})
 
-	// Test priority: specific interfaces take precedence over all-interfaces=false
-	t.Run("SpecificInterfacesOverrideAllInterfacesFalse", func(t *testing.T) {
-		// Clear raw filter first
+	// Test priority: specific interfaces take precedence over default behavior
+	t.Run("SpecificInterfacesOverrideDefault", func(t *testing.T) {
+		// Clear all env vars first
 		os.Unsetenv(captureConstants.TcpdumpRawFilterEnvKey)
 		os.Unsetenv(captureConstants.PacketSizeEnvKey)
+		os.Unsetenv(captureConstants.AllInterfacesEnvKey)
 		
-		// Set both specific interfaces and all-interfaces=false
+		// Set specific interfaces
 		os.Setenv(captureConstants.CaptureInterfacesEnvKey, "eth0")
-		os.Setenv(captureConstants.AllInterfacesEnvKey, "false")
 		defer os.Unsetenv(captureConstants.CaptureInterfacesEnvKey)
-		defer os.Unsetenv(captureConstants.AllInterfacesEnvKey)
 		
 		captureFilePath := "/tmp/test.pcap"
 		cmd := constructTcpdumpCommand(captureFilePath)
 		
-		// Verify the command contains "-i eth0" 
+		// Verify the command contains "-i eth0" and not "-i any"
 		foundEth0 := false
+		foundAny := false
 		for i, arg := range cmd.Args {
-			if arg == "-i" && i+1 < len(cmd.Args) && cmd.Args[i+1] == "eth0" {
-				foundEth0 = true
-				break
+			if arg == "-i" && i+1 < len(cmd.Args) {
+				if cmd.Args[i+1] == "eth0" {
+					foundEth0 = true
+				}
+				if cmd.Args[i+1] == "any" {
+					foundAny = true
+				}
 			}
 		}
 		if !foundEth0 {
 			t.Errorf("Expected tcpdump command to include '-i eth0' from specific interfaces, but got args: %v", cmd.Args)
+		}
+		if foundAny {
+			t.Errorf("Expected tcpdump command not to include '-i any' when specific interfaces are set, but got args: %v", cmd.Args)
 		}
 	})
 }
@@ -305,11 +258,8 @@ func constructTcpdumpCommand(captureFilePath string) *exec.Cmd {
 				captureStartCmd.Args = append(captureStartCmd.Args, "-i", iface)
 			}
 		}
-	} else if allInterfaces := os.Getenv(captureConstants.AllInterfacesEnvKey); allInterfaces == "false" {
-		// If all-interfaces is explicitly set to false and no specific interfaces provided, don't add any -i flag
-		// tcpdump will default to the first available interface
 	} else {
-		// Default to capturing on all interfaces if no raw tcpdump filter is specified
+		// Default to capturing on all interfaces if no raw tcpdump filter or specific interfaces are specified
 		captureStartCmd.Args = append(captureStartCmd.Args, "-i", "any")
 	}
 
