@@ -1,6 +1,7 @@
 name: commit-message
 on:
   merge_group:
+    types: [checks_requested]
   pull_request:
     branches: [main]
     types:
@@ -10,7 +11,6 @@ on:
       - reopened
 jobs:
   commit-message:
-    if: ${{ github.event_name != 'merge_group' }}
     runs-on: ubuntu-24.04
     steps:
       - name: verify_commit_message
