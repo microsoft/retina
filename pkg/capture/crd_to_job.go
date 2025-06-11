@@ -937,8 +937,11 @@ func (translator *CaptureToPodTranslator) obtainCaptureOptionEnv(option retinav1
 	if len(option.Interfaces) > 0 {
 		outputEnv[captureConstants.CaptureInterfacesEnvKey] = strings.Join(option.Interfaces, ",")
 	}
-	if option.NoAllInterfaces {
-		outputEnv[captureConstants.NoAllInterfacesEnvKey] = "true"
+	if option.AllInterfaces != nil && !*option.AllInterfaces {
+		outputEnv[captureConstants.AllInterfacesEnvKey] = "false"
+	} else {
+		// Default is true (capture on all interfaces)
+		outputEnv[captureConstants.AllInterfacesEnvKey] = "true"
 	}
 	return outputEnv, nil
 }

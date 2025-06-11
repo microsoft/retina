@@ -99,8 +99,8 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, fil
 				captureStartCmd.Args = append(captureStartCmd.Args, "-i", iface)
 			}
 		}
-	} else if noAllInterfaces := os.Getenv(captureConstants.NoAllInterfacesEnvKey); noAllInterfaces == "true" {
-		// If no-all-interfaces is set and no specific interfaces provided, don't add any -i flag
+	} else if allInterfaces := os.Getenv(captureConstants.AllInterfacesEnvKey); allInterfaces == "false" {
+		// If all-interfaces is explicitly set to false and no specific interfaces provided, don't add any -i flag
 		// tcpdump will default to the first available interface
 	} else {
 		// Default to capturing on all interfaces if no raw tcpdump filter is specified

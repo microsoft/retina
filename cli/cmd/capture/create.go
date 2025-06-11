@@ -47,7 +47,7 @@ var (
 	namespaceSelectors string
 	nodeNames          string
 	nodeSelectors      string
-	noAllInterfaces    bool
+	allInterfaces      bool
 	nowait             bool
 	packetSize         int
 	podSelectors       string
@@ -74,6 +74,7 @@ const (
 	DefaultS3Path          string        = "retina/captures"
 	DefaultWaitPeriod      time.Duration = 1 * time.Minute
 	DefaultWaitTimeout     time.Duration = 5 * time.Minute
+	DefaultAllInterfaces   bool          = true
 )
 
 var createExample = templates.Examples(i18n.T(`
@@ -93,7 +94,7 @@ var createExample = templates.Examples(i18n.T(`
 		kubectl retina capture create --node-selectors="agentpool=agentpool" --interface="eth0,eth1"
 
 		# Disable capturing on all interfaces (uses first available interface)
-		kubectl retina capture create --node-selectors="agentpool=agentpool" --no-all-interfaces
+		kubectl retina capture create --node-selectors="agentpool=agentpool" --all-interfaces=false
 
 		# Select nodes using node-selector and upload the artifacts to blob storage with SAS URL https://testaccount.blob.core.windows.net/<token>
 		kubectl retina capture create --node-selectors="agentpool=agentpool" --blob-upload=https://testaccount.blob.core.windows.net/<token>
@@ -336,9 +337,10 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 		capture.Spec.CaptureConfiguration.CaptureOption.Interfaces = interfaceSlice
 	}
 
-	if noAllInterfaces {
+	if !allInterfaces {
 		retinacmd.Logger.Info("Disabling capture on all interfaces")
-		capture.Spec.CaptureConfiguration.CaptureOption.NoAllInterfaces = true
+		allInterfacesFalse := false
+		capture.Spec.CaptureConfiguration.CaptureOption.AllInterfaces = &allInterfacesFalse
 	}
 
 	if len(hostPath) != 0 {
@@ -510,7 +512,7 @@ func init() {
 	createCapture.Flags().StringVar(&s3SecretAccessKey, "s3-secret-access-key", "", "S3 access secret key to upload capture files")
 	createCapture.Flags().StringVar(&tcpdumpFilter, "tcpdump-filter", "", "Raw tcpdump flags which works only for Linux")
 	createCapture.Flags().StringVar(&interfaces, "interface", "", "Comma-separated list of network interfaces to capture on (e.g., eth0,eth1)")
-	createCapture.Flags().BoolVar(&noAllInterfaces, "no-all-interfaces", false, "Disable the default behavior of capturing on all interfaces")
+	createCapture.Flags().BoolVar(&allInterfaces, "all-interfaces", DefaultAllInterfaces, "Enable capturing on all network interfaces (default: true)")
 	createCapture.Flags().StringVar(&excludeFilter, "exclude-filter", "", "A comma-separated list of IP:Port pairs that are "+
 		"excluded from capturing network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:*")
 	createCapture.Flags().StringVar(&includeFilter, "include-filter", "", "A comma-separated list of IP:Port pairs that are "+

@@ -31,8 +31,8 @@ const (
 	NetshFilterEnvKey      string = "NETSH_FILTER"
 
 	// Interface selection environment variables
-	CaptureInterfacesEnvKey    string = "CAPTURE_INTERFACES"
-	NoAllInterfacesEnvKey      string = "NO_ALL_INTERFACES"
+	CaptureInterfacesEnvKey string = "CAPTURE_INTERFACES"
+	AllInterfacesEnvKey     string = "ALL_INTERFACES"
 
 	ApiserverEnvKey = "APISERVER"
 )

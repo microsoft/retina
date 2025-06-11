@@ -67,15 +67,16 @@ type CaptureOption struct {
 	MaxCaptureSize *int `json:"maxCaptureSize,omitempty"`
 
 	// Interfaces specifies the network interfaces on which to capture packets.
-	// If empty and NoAllInterfaces is false, captures on all interfaces.
 	// If specified, captures only on the listed interfaces.
+	// If empty and AllInterfaces is true (default), captures on all interfaces.
 	// +optional
 	Interfaces []string `json:"interfaces,omitempty"`
 
-	// NoAllInterfaces when true, disables the default behavior of capturing on all interfaces.
-	// If both NoAllInterfaces is true and Interfaces is empty, captures on the first available interface.
+	// AllInterfaces when true (default), enables capturing on all network interfaces.
+	// If both AllInterfaces is false and Interfaces is empty, captures on the first available interface.
 	// +optional
-	NoAllInterfaces bool `json:"noAllInterfaces,omitempty"`
+	// +kubebuilder:default=true
+	AllInterfaces *bool `json:"allInterfaces,omitempty"`
 }
 
 // CaptureTarget indicates the target on which the network packets capture will be performed.
