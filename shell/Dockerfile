@@ -1,5 +1,5 @@
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/azurelinux/base/core@sha256:b46476be0b5c9691ad20f78871819950c01433bdfad81d72c61618f4a6202b25
+FROM mcr.microsoft.com/azurelinux/base/core@sha256:91d58fce1e27dd0b711e569fdc173cfb0aec950ff399ea567723936d785388ba
 
 RUN tdnf install -y \
 	bind-utils \
