@@ -934,6 +934,12 @@ func (translator *CaptureToPodTranslator) obtainCaptureOptionEnv(option retinav1
 	if option.MaxCaptureSize != nil {
 		outputEnv[captureConstants.CaptureMaxSizeEnvKey] = strconv.Itoa(*option.MaxCaptureSize)
 	}
+	if len(option.Interfaces) > 0 {
+		outputEnv[captureConstants.CaptureInterfacesEnvKey] = strings.Join(option.Interfaces, ",")
+	} else {
+		// Default is true (capture on all interfaces) when no specific interfaces are provided
+		outputEnv[captureConstants.AllInterfacesEnvKey] = "true"
+	}
 	return outputEnv, nil
 }
 

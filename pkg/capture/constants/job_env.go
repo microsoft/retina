@@ -34,5 +34,9 @@ const (
 	TcpdumpRawFilterEnvKey string = "TCPDUMP_RAW_FILTER"
 	NetshFilterEnvKey      string = "NETSH_FILTER"
 
+	// Interface selection environment variables
+	CaptureInterfacesEnvKey string = "CAPTURE_INTERFACES"
+	AllInterfacesEnvKey     string = "ALL_INTERFACES"
+
 	ApiserverEnvKey = "APISERVER"
 )
