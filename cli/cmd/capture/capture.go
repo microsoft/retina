@@ -58,7 +58,7 @@ func NewCommand(kubeClient kubernetes.Interface) *cobra.Command {
 	capture.PersistentFlags().StringVar(opts.Name, "name", defaultName, "The name of the Retina Capture")
 
 	capture.AddCommand(NewCreateSubCommand(kubeClient))
-	capture.AddCommand(NewDeleteSubCommand())
+	capture.AddCommand(NewDeleteSubCommand(kubeClient))
 	capture.AddCommand(NewDownloadSubCommand())
 	capture.AddCommand(NewListSubCommand())
 
