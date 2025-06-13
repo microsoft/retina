@@ -2,6 +2,8 @@
 
 Gathers TCP/UDP statistics and network interface statistics from the `netstats` and `ethtool` Node utilities (respectively).
 
+This plugin provides interface-level drop statistics similar to node_exporter. For a comparison with other monitoring tools, see [Drop Statistics Comparison](../../drop-statistics-comparison.md).
+
 ## Capabilities
 
 The `linuxutil` plugin requires the `CAP_BPF` capability.

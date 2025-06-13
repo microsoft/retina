@@ -2,6 +2,8 @@
 
 Counts number of packets/bytes dropped on a Node, along with the direction and reason for drop.
 
+See [Drop Statistics Comparison](../../drop-statistics-comparison.md) to understand how Retina's drop statistics compare with other monitoring tools like node_exporter.
+
 ## Capabilities
 
 The `dropreason` plugin requires the `CAP_SYS_ADMIN` capability.
