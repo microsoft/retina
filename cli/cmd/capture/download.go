@@ -404,9 +404,6 @@ func downloadFromBlob() error {
 	return nil
 }
 
-func init() {
-	capture.AddCommand(downloadCapture)
-	downloadCapture.Flags().StringVar(&blobURL, "blob-url", "", "Blob URL from which to download")
-	downloadCapture.Flags().StringVar(&captureName, "name", "", "The name of a the capture")
-	downloadCapture.Flags().StringVarP(&outputPath, "output", "o", DefaultOutputPath, "Path to save the downloaded capture")
+func NewDownloadSubCommand() *cobra.Command {
+	return downloadCapture
 }
