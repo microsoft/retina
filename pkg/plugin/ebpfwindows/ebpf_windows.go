@@ -10,6 +10,8 @@ import (
 	"time"
 	"unsafe"
 
+	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
+
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	observer "github.com/cilium/cilium/pkg/hubble/observer/types"
 	monitorAPI "github.com/cilium/cilium/pkg/monitor/api"
@@ -80,9 +82,27 @@ func (p *Plugin) Name() string {
 // Start the plugin by starting a periodic timer.
 func (p *Plugin) Start(ctx context.Context) error {
 	p.l.Info("Start ebpfWindows plugin...")
-	p.pullMetricsAndEvents(ctx)
-	p.l.Info("Complete ebpfWindows plugin...")
-	return nil
+
+	ciliumEnabled, err := plugincommon.IsCiliumOnWindowsEnabled()
+
+	if ciliumEnabled {
+		p.l.Info("Cilium is enabled on Windows, proceeding with ebpfWindows plugin initialization")
+		p.pullMetricsAndEvents(ctx)
+		p.l.Info("Complete ebpfWindows plugin...")
+		return nil
+	}
+
+	if err != nil {
+		p.l.Error("Error while checking if Cilium is enabled on Windows", zap.Error(err))
+	}
+
+	// Wait for either context cancellation
+	select {
+	case <-ctx.Done():
+		p.l.Info("Context cancelled, exiting Start loop")
+		return nil
+	}
+
 }
 
 // metricsMapIterateCallback is the callback function that is called for each key-value pair in the metrics map.
