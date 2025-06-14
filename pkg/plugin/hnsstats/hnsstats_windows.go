@@ -15,6 +15,7 @@ import (
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
+	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
 	"github.com/microsoft/retina/pkg/plugin/registry"
 	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
@@ -210,8 +211,26 @@ func notifyHnsStats(h *hnsstats, stats *HnsStatsData) {
 
 func (h *hnsstats) Start(ctx context.Context) error {
 	h.l.Info("Start hnsstats plugin...")
+
 	h.state = start
-	return pullHnsStats(ctx, h)
+
+	ciliumEnabled, err := plugincommon.IsCiliumOnWindowsEnabled()
+
+	if !ciliumEnabled {
+		return pullHnsStats(ctx, h)
+	}
+
+	if err != nil {
+		h.l.Error("Error while checking if Cilium is enabled on Windows", zap.Error(err))
+	}
+
+	// Wait for either context cancellation
+	select {
+	case <-ctx.Done():
+		h.l.Info("Context cancelled, exiting Start loop")
+		return nil
+	}
+
 }
 
 func (d *hnsstats) Stop() error {
