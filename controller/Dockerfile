@@ -48,7 +48,7 @@ RUN if [ "$GOOS" = "linux" ] ; then \
 FROM golang AS eBPFRetinaStage
 WORKDIR /tmp
 RUN tdnf install -y unzip && \
-    curl -L -o eBPFRetina.zip https://www.nuget.org/api/v2/package/Microsoft.Wcn.Observability.eBPF.Retina.x64/0.1.0-prerelease.3 && \
+    curl -L -o eBPFRetina.zip https://www.nuget.org/api/v2/package/Microsoft.Wcn.Observability.eBPF.Retina.x64/0.1.0-prerelease.9 && \
     unzip -d eBPFRetina eBPFRetina.zip || exit 0 && \
     if [ ! -d "eBPFRetina" ]; then echo "eBPFRetina directory not found after unzip!" && exit 1; fi
 
@@ -142,7 +142,7 @@ ENTRYPOINT ["./retina/controller"]
 
 # agent final image for windows
 FROM ${OS_VERSION} AS agent-win
-COPY --from=eBPFRetinaStage /tmp/eBPFRetina/build/native/bin/Release/retinaebpfapi.dll /retinaebpfapi.dll
+COPY --from=eBPFRetinaStage /tmp/eBPFRetina/build/native/bin/retinaebpfapi.dll /retinaebpfapi.dll
 COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
 COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
 COPY --from=controller-bin /go/bin/retina/controller controller.exe
