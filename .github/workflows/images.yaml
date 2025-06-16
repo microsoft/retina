@@ -37,7 +37,7 @@ jobs:
 
       - name: Az CLI login
         uses: azure/login@v2
-        if: ${{ github.event_name == 'merge_group' }}
+        if: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -48,7 +48,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "TAG=$(make version)" >> $GITHUB_ENV
-          if [ "$IS_MERGE_GROUP" == "true" ]; then
+          if [ "$SHOULD_PUSH_IMAGE" == "true" ]; then
             az acr login -n ${{ vars.ACR_NAME }}
             make retina-image \
               IMAGE_NAMESPACE=${{ github.repository }} \
@@ -62,7 +62,7 @@ jobs:
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
           fi
         env:
-          IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
+          SHOULD_PUSH_IMAGE: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
 
   retina-win-images:
     name: Build Agent Windows Images
@@ -88,7 +88,7 @@ jobs:
 
       - name: Az CLI login
         uses: azure/login@v2
-        if: ${{ github.event_name == 'merge_group' }}
+        if: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -99,7 +99,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "TAG=$(make version)" >> $GITHUB_ENV
-          if [ "$IS_MERGE_GROUP" == "true" ]; then
+          if [ "$SHOULD_PUSH_IMAGE" == "true" ]; then
             az acr login -n ${{ vars.ACR_NAME }} 
             make retina-image-win \
               IMAGE_NAMESPACE=${{ github.repository }} \
@@ -115,7 +115,7 @@ jobs:
               WINDOWS_YEARS=${{ matrix.year }} 
           fi
         env:
-          IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
+          SHOULD_PUSH_IMAGE: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
 
   operator-images:
     name: Build Operator Images
@@ -140,7 +140,7 @@ jobs:
 
       - name: Az CLI login
         uses: azure/login@v2
-        if: ${{ github.event_name == 'merge_group' }}
+        if: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -151,7 +151,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "TAG=$(make version)" >> $GITHUB_ENV
-          if [ "$IS_MERGE_GROUP" == "true" ]; then
+          if [ "$SHOULD_PUSH_IMAGE" == "true" ]; then
             az acr login -n ${{ vars.ACR_NAME }}
             make retina-operator-image \
               IMAGE_NAMESPACE=${{ github.repository }} \
@@ -165,7 +165,7 @@ jobs:
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
           fi
         env:
-          IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
+          SHOULD_PUSH_IMAGE: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
 
   retina-shell-images:
     name: Build Retina Shell Images
@@ -190,7 +190,7 @@ jobs:
 
       - name: Az CLI login
         uses: azure/login@v2
-        if: ${{ github.event_name == 'merge_group' }}
+        if: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -201,7 +201,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "TAG=$(make version)" >> $GITHUB_ENV
-          if [ "$IS_MERGE_GROUP" == "true" ]; then
+          if [ "$SHOULD_PUSH_IMAGE" == "true" ]; then
             az acr login -n ${{ vars.ACR_NAME }}
             make retina-shell-image \
               IMAGE_NAMESPACE=${{ github.repository }} \
@@ -214,7 +214,7 @@ jobs:
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
           fi
         env:
-          IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
+          SHOULD_PUSH_IMAGE: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
 
   kubectl-retina-images:
     name: Build Kubectl Retina Images
@@ -239,7 +239,7 @@ jobs:
 
       - name: Az CLI login
         uses: azure/login@v2
-        if: ${{ github.event_name == 'merge_group' }}
+        if: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -250,7 +250,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "TAG=$(make version)" >> $GITHUB_ENV
-          if [ "$IS_MERGE_GROUP" == "true" ]; then
+          if [ "$SHOULD_PUSH_IMAGE" == "true" ]; then
             az acr login -n ${{ vars.ACR_NAME }}
             make kubectl-retina-image \
               IMAGE_NAMESPACE=${{ github.repository }} \
@@ -263,7 +263,7 @@ jobs:
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
           fi
         env:
-          IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
+          SHOULD_PUSH_IMAGE: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
 
   manifests:
     name: Generate Manifests
@@ -322,7 +322,7 @@ jobs:
 
       - name: Az CLI login
         uses: azure/login@v2
-        if: ${{ github.event_name == 'merge_group' }}
+        if: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
