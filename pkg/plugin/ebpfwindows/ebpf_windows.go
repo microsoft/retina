@@ -85,24 +85,20 @@ func (p *Plugin) Start(ctx context.Context) error {
 
 	ciliumEnabled, err := plugincommon.IsCiliumOnWindowsEnabled()
 
-	if ciliumEnabled {
-		p.l.Info("Cilium is enabled on Windows, proceeding with ebpfWindows plugin initialization")
-		p.pullMetricsAndEvents(ctx)
-		p.l.Info("Complete ebpfWindows plugin...")
-		return nil
-	}
-
 	if err != nil {
 		p.l.Error("Error while checking if Cilium is enabled on Windows", zap.Error(err))
+		return fmt.Errorf("Failed to check if Cilium is enabled on Windows: %w", err)
 	}
 
-	// Wait for either context cancellation
-	select {
-	case <-ctx.Done():
-		p.l.Info("Context cancelled, exiting Start loop")
+	if !ciliumEnabled {
+		p.l.Warn("Cilium is not enabled on Windows, skipping ebpfWindows plugin initialization")
 		return nil
 	}
 
+	p.l.Info("Cilium is enabled on Windows, proceeding with ebpfWindows plugin initialization")
+	p.pullMetricsAndEvents(ctx)
+	p.l.Info("Complete ebpfWindows plugin...")
+	return nil
 }
 
 // metricsMapIterateCallback is the callback function that is called for each key-value pair in the metrics map.

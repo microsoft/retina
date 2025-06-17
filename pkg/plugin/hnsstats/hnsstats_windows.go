@@ -7,6 +7,7 @@ package hnsstats
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/Microsoft/hcsshim"
@@ -216,21 +217,18 @@ func (h *hnsstats) Start(ctx context.Context) error {
 
 	ciliumEnabled, err := plugincommon.IsCiliumOnWindowsEnabled()
 
-	if !ciliumEnabled {
-		return pullHnsStats(ctx, h)
-	}
-
 	if err != nil {
 		h.l.Error("Error while checking if Cilium is enabled on Windows", zap.Error(err))
+		return fmt.Errorf("Failed to check if Cilium is enabled on Windows: %w", err)
 	}
 
-	// Wait for either context cancellation
-	select {
-	case <-ctx.Done():
-		h.l.Info("Context cancelled, exiting Start loop")
+	if ciliumEnabled {
+		h.l.Warn("Cilium is enabled on Windows, skipping hnsstats plugin initialization")
 		return nil
 	}
 
+	h.l.Info("Cilium is not enabled on Windows, proceeding with hnsstats plugin initialization")
+	return pullHnsStats(ctx, h)
 }
 
 func (d *hnsstats) Stop() error {
