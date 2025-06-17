@@ -44,7 +44,7 @@ var opts = Opts{
 	Name: new(string),
 }
 
-const defaultName = "retina-capture"
+const DefaultName = "retina-capture"
 
 func NewCommand(kubeClient kubernetes.Interface) *cobra.Command {
 	capture := &cobra.Command{
@@ -55,7 +55,7 @@ func NewCommand(kubeClient kubernetes.Interface) *cobra.Command {
 
 	opts.ConfigFlags = *genericclioptions.NewConfigFlags(true)
 	opts.AddFlags(capture.PersistentFlags())
-	capture.PersistentFlags().StringVar(opts.Name, "name", defaultName, "The name of the Retina Capture")
+	capture.PersistentFlags().StringVar(opts.Name, "name", DefaultName, "The name of the Retina Capture")
 
 	capture.AddCommand(NewCreateSubCommand(kubeClient))
 	capture.AddCommand(NewDeleteSubCommand(kubeClient))

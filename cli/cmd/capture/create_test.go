@@ -33,7 +33,7 @@ type testcase struct {
 }
 
 func randomString(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
 	result := make([]byte, length)
 	for i := range result {
 		result[i] = charset[rand.Intn(len(charset))] //nolint:gosec // this random number generator is fine
@@ -163,7 +163,7 @@ func TestCreateJobsWithNamespace(t *testing.T) {
 		{
 			name:             "create --namespace=workload --podSelector=service=A --namespace-selectors=name=workload",
 			inputName:        "",
-			wantName:         "retina-capture", // Default name for capture job
+			wantName:         DefaultName,
 			inputNamespace:   "workload",
 			wantNamespace:    "workload",
 			inputPodSelector: "service=A",
@@ -172,9 +172,31 @@ func TestCreateJobsWithNamespace(t *testing.T) {
 			wantErr:          false,
 		},
 		{
+			name:             "create --namespace=workload --podSelector=service=A",
+			inputName:        "",
+			wantName:         DefaultName,
+			inputNamespace:   "workload",
+			wantNamespace:    "workload",
+			inputPodSelector: "service=A",
+			inputNsSelector:  "",
+			wantNodes:        []string{},
+			wantErr:          true,
+		},
+		{
+			name:             "create --namespace=workload --namespace-selectors=name=workload",
+			inputName:        "",
+			wantName:         DefaultName,
+			inputNamespace:   "workload",
+			wantNamespace:    "workload",
+			inputPodSelector: "",
+			inputNsSelector:  "name=workload",
+			wantNodes:        []string{},
+			wantErr:          true,
+		},
+		{
 			name:             "create --namespace=workload --podSelector=service=B --namespace-selectors=name=workload",
 			inputName:        "",
-			wantName:         "retina-capture", // Default name for capture job
+			wantName:         DefaultName,
 			inputNamespace:   "workload",
 			wantNamespace:    "workload",
 			inputPodSelector: "service=B",
@@ -185,7 +207,7 @@ func TestCreateJobsWithNamespace(t *testing.T) {
 		{
 			name:              "create --namespace=workload --node-selectors=kubernetes.io/hostname=B1",
 			inputName:         "",
-			wantName:          "retina-capture", // Default name for capture job
+			wantName:          DefaultName,
 			inputNamespace:    "workload",
 			wantNamespace:     "workload",
 			inputNodeSelector: "kubernetes.io/hostname=B1",
@@ -195,7 +217,7 @@ func TestCreateJobsWithNamespace(t *testing.T) {
 		{
 			name:              "create --namespace=workload --podSelector=service=B --namespace-selectors=name=workload --node-selectors=kubernetes.io/hostname=B1",
 			inputName:         "",
-			wantName:          "retina-capture", // Default name for capture job
+			wantName:          DefaultName,
 			inputNamespace:    "workload",
 			wantNamespace:     "workload",
 			inputPodSelector:  "service=B",
