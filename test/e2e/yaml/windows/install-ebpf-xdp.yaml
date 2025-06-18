@@ -12,6 +12,7 @@ spec:
       labels:
         name: install-ebpf-xdp
     spec:
+<<<<<<< HEAD
       tolerations:
       - key: "os"
         value: "windows"
@@ -19,6 +20,11 @@ spec:
       containers:
       - name: install-ebpf-xdp-container
         image: ghcr.io/kumarvin123/retina/test/e2e-test-event-writer:latest
+=======
+      containers:
+      - name: install-ebpf-xdp-container
+        image: ghcr.io/microsoft/retina/e2e-test-event-writer:latest
+>>>>>>> 677a881 (E2E Tests Initial Checkin)
         imagePullPolicy: Always
         command:
           - powershell.exe
@@ -29,7 +35,11 @@ spec:
             command:
               - powershell.exe
               - -command
+<<<<<<< HEAD
               - if (!(Test-Path C:\install-ebpf-xdp-probe-ready)) { exit 1 }
+=======
+              - Test-Path C:\install-ebpf-xdp-probe-ready
+>>>>>>> 677a881 (E2E Tests Initial Checkin)
           initialDelaySeconds: 10
           periodSeconds: 5
       hostNetwork: true

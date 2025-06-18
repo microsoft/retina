@@ -10,7 +10,10 @@ on:
 permissions:
   contents: read
   id-token: write
+<<<<<<< HEAD
   packages: write
+=======
+>>>>>>> 677a881 (E2E Tests Initial Checkin)
 
 env:
   EVENT_WRITER_PATH: "${{ github.workspace }}/test/e2e/tools/event-writer/"
@@ -20,9 +23,12 @@ jobs:
     name: Build E2E Test Event Writer
     runs-on: windows-2022
 
+<<<<<<< HEAD
     env:
       IS_MERGE_GROUP: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
 
+=======
+>>>>>>> 677a881 (E2E Tests Initial Checkin)
     strategy:
       matrix:
         platform: ["windows"]
@@ -32,6 +38,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4.2.2
 
+<<<<<<< HEAD
       - name: Azure Login
         uses: azure/login@v2
         if: ${{ env.IS_MERGE_GROUP == 'true' }}
@@ -47,6 +54,14 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+=======
+      - name: Az CLI login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION }}
+>>>>>>> 677a881 (E2E Tests Initial Checkin)
 
       - name: Set MSBuild path
         run: |
@@ -67,7 +82,11 @@ jobs:
         run: |
           .\export_program_info.exe --clear
           .\export_program_info.exe
+<<<<<<< HEAD
         working-directory: ${{ env.EVENT_WRITER_PATH }}\packages\eBPF-for-Windows.x64.0.21.0\build\native\bin
+=======
+        working-directory: ${{ env.EVENT_WRITER_PATH }}\packages\eBPF-for-Windows.x64.0.20.0\build\native\bin
+>>>>>>> 677a881 (E2E Tests Initial Checkin)
 
       - name: Build Event-Writer
         shell: cmd
@@ -77,6 +96,7 @@ jobs:
         working-directory: ${{ env.EVENT_WRITER_PATH }}
 
       - name: Determine Docker tag
+<<<<<<< HEAD
         id: tag
         shell: pwsh
         run: |
@@ -101,3 +121,26 @@ jobs:
           docker build -f "./Dockerfile" -t "${image}:${tag}" -t "${image}:latest" .
           docker push "${image}:${tag}"
           docker push "${image}:latest"
+=======
+        shell: pwsh
+        run: |
+          if ($env:IS_MERGE_GROUP -eq "true") {
+            $TAG = $(git tag --points-at HEAD)
+            if (-not $TAG) {
+              $TAG = $(git rev-parse --short HEAD)
+            }
+            echo "TAG=$TAG" >> $env:GITHUB_ENV
+          }
+        env:
+          IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
+
+      - name: Build Images
+        shell: cmd
+        run: |
+          if "%IS_MERGE_GROUP%"=="true" (
+            az acr login -n ${{ vars.ACR_NAME }} && docker build --file .\Dockerfile --tag ${{ vars.ACR_NAME }}/${{ github.repository }}/e2e-test-event-writer:${{ env.TAG }} . && docker build --file .\Dockerfile --tag ${{ vars.ACR_NAME }}/${{ github.repository }}/e2e-test-event-writer:latest . && docker push ${{ vars.ACR_NAME }}/${{ github.repository }}/e2e-test-event-writer:${{ env.TAG }} && docker push ${{ vars.ACR_NAME }}/${{ github.repository }}/e2e-test-event-writer:latest
+          )
+        working-directory: ${{ env.EVENT_WRITER_PATH }}
+        env:
+          IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
+>>>>>>> 677a881 (E2E Tests Initial Checkin)

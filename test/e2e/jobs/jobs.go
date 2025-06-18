@@ -173,9 +173,15 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, test
 			name := scenario.name + " - Arch: " + arch
 			job.AddScenario(dns.ValidateBasicDNSMetrics(name, scenario.req, scenario.resp, testPodNamespace, arch))
 		}
+<<<<<<< HEAD
 	}*/
 
 	/*job.AddStep(&kubernetes.EnsureStableComponent{
+=======
+	}
+
+	job.AddStep(&kubernetes.EnsureStableComponent{
+>>>>>>> 677a881 (E2E Tests Initial Checkin)
 		PodNamespace:           common.KubeSystemNamespace,
 		LabelSelector:          "k8s-app=retina",
 		IgnoreContainerRestart: false,
@@ -244,7 +250,11 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 	}, nil)
 	time.Sleep(2 * time.Minute)
 
+<<<<<<< HEAD
 	/*for _, arch := range common.Architectures {
+=======
+	for _, arch := range common.Architectures {
+>>>>>>> 677a881 (E2E Tests Initial Checkin)
 		for _, scenario := range dnsScenarios {
 			name := scenario.name + " - Arch: " + arch
 			job.AddScenario(dns.ValidateAdvancedDNSMetrics(name, scenario.req, scenario.resp, kubeConfigFilePath, testPodNamespace, arch))
@@ -252,6 +262,13 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 	}*/
 
 	job.AddScenario(windows.ValidateWindowsBasicMetric())
+<<<<<<< HEAD
+=======
+
+	job.AddScenario(windows.ValidateWinBpfMetricScenario())
+
+	job.AddScenario(latency.ValidateLatencyMetric(testPodNamespace))
+>>>>>>> 677a881 (E2E Tests Initial Checkin)
 
 	job.AddScenario(windows.ValidateWinBpfMetricScenario())
 
