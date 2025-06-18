@@ -7,6 +7,7 @@ package hnsstats
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/Microsoft/hcsshim"
@@ -15,6 +16,7 @@ import (
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
+	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
 	"github.com/microsoft/retina/pkg/plugin/registry"
 	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
@@ -210,7 +212,22 @@ func notifyHnsStats(h *hnsstats, stats *HnsStatsData) {
 
 func (h *hnsstats) Start(ctx context.Context) error {
 	h.l.Info("Start hnsstats plugin...")
+
 	h.state = start
+
+	ciliumEnabled, err := plugincommon.IsCiliumOnWindowsEnabled()
+
+	if err != nil {
+		h.l.Error("Error while checking if Cilium is enabled on Windows", zap.Error(err))
+		return fmt.Errorf("Failed to check if Cilium is enabled on Windows: %w", err)
+	}
+
+	if ciliumEnabled {
+		h.l.Warn("Cilium is enabled on Windows, skipping hnsstats plugin initialization")
+		return nil
+	}
+
+	h.l.Info("Cilium is not enabled on Windows, proceeding with hnsstats plugin initialization")
 	return pullHnsStats(ctx, h)
 }
 
