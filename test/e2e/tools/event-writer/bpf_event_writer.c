@@ -40,7 +40,7 @@ struct {
 
 SEC(".maps")
 struct {
-    __uint(type, BPF_MAP_TYPE_RINGBUF);
+    __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
     __uint(pinning, LIBBPF_PIN_BY_NAME);
     __uint(max_entries, 512 * 4096);
 } cilium_events;
@@ -228,7 +228,7 @@ event_writer(xdp_md_t* ctx) {
         create_trace_ntfy_event(trc_elm);
         memset(trc_elm->data, 0, sizeof(trc_elm->data));
         memcpy(trc_elm->data, ctx->data, size_to_copy);
-        bpf_ringbuf_output(&cilium_events, trc_elm, sizeof(struct trace_notify), 0);
+        bpf_perf_event_output(trc_elm, &cilium_events, EBPF_MAP_FLAG_CURRENT_CPU, 0, sizeof(struct trace_notify));
     }
 
     if (flt_evttype == CILIUM_NOTIFY_DROP) {
@@ -243,7 +243,7 @@ event_writer(xdp_md_t* ctx) {
         create_drop_event(drp_elm);
         memset(drp_elm->data, 0, sizeof(drp_elm->data));
         memcpy(drp_elm->data, ctx->data, size_to_copy);
-        bpf_ringbuf_output(&cilium_events, drp_elm, sizeof(struct drop_notify), 0);
+        bpf_perf_event_output(drp_elm, &cilium_events, EBPF_MAP_FLAG_CURRENT_CPU, 0, sizeof(struct drop_notify));
     }
 
     update_metrics(size_to_copy, METRIC_INGRESS, reason, 0, 0);
