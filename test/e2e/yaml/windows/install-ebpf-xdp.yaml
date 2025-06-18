@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: install-ebpf-xdp
+  namespace: install-ebpf-xdp  # Ensure this namespace exists
+spec:
+  selector:
+    matchLabels:
+      name: install-ebpf-xdp
+  template:
+    metadata:
+      labels:
+        name: install-ebpf-xdp
+    spec:
+      containers:
+      - name: install-ebpf-xdp-container
+        image: ghcr.io/kumarvin123/retina/test/e2e-test-event-writer:latest
+        imagePullPolicy: Always
+        command:
+          - powershell.exe
+          - -command
+          - '& .\install-ebpf-xdp.ps1 ; while ($true) { Start-Sleep -Seconds 300; }'
+        readinessProbe:
+          exec:
+            command:
+              - powershell.exe
+              - -command
+              - if (!(Test-Path C:\install-ebpf-xdp-probe-ready)) { exit 1 }
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      hostNetwork: true
+      nodeSelector:
+        kubernetes.io/os: windows
+      securityContext:
+        windowsOptions:
+          hostProcess: true
+          runAsUserName: "NT AUTHORITY\\SYSTEM"
