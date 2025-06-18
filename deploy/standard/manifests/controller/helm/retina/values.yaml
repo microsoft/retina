@@ -28,20 +28,6 @@ operator:
       - "--config"
       - "/retina/operator-config.yaml"
   telemetryInterval: "5m"
-  affinity:
-    # TODO(user): Override the following values to configure the nodeAffinity expression
-    # according to the platforms which are supported by your solution.
-    # It is considered best practice to support multiple architectures. You can
-    # build your manager image using the makefile target docker-buildx.
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-          - matchExpressions:
-              - key: kubernetes.io/os
-                operator: In
-                values:
-                  - linux
-                  #- windows
 
 image:
   repository: ghcr.io/microsoft/retina/retina-agent
@@ -51,9 +37,9 @@ image:
   tag: "v0.0.2"
 
 enableConntrackMetrics: false
-enablePodLevel: false
+enablePodLevel: true
 remoteContext: false
-enableAnnotations: false
+enableAnnotations: true
 bypassLookupIPOfInterest: false
 dataAggregationLevel: "low"
 
@@ -79,7 +65,7 @@ apiServer:
 logLevel: debug
 
 enabledPlugin_linux: '["dropreason","packetforward","linuxutil","dns"]'
-enabledPlugin_win: '["hnsstats"]'
+enabledPlugin_win: '["hnsstats", "ebpfwindows"]'
 
 enableTelemetry: false
 
@@ -112,7 +98,6 @@ volumeMounts:
   cgroup: /sys/fs/cgroup
   tmp: /tmp
   config: /retina/config
-  host-os-release: /etc/os-release
 
 #volume mounts for windows
 volumeMounts_win:
@@ -285,7 +270,7 @@ metrics:
     tlsConfig: {}
     ## @param metrics.serviceMonitor.relabelings [array] Prometheus relabeling rules to apply to samples before scraping
     ##
-    relabelings: 
+    relabelings:
       - sourceLabels:
           [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
         separator: ":"
