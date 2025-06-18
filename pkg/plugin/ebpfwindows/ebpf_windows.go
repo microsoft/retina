@@ -10,6 +10,8 @@ import (
 	"time"
 	"unsafe"
 
+	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
+
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	observer "github.com/cilium/cilium/pkg/hubble/observer/types"
 	monitorAPI "github.com/cilium/cilium/pkg/monitor/api"
@@ -80,6 +82,20 @@ func (p *Plugin) Name() string {
 // Start the plugin by starting a periodic timer.
 func (p *Plugin) Start(ctx context.Context) error {
 	p.l.Info("Start ebpfWindows plugin...")
+
+	ciliumEnabled, err := plugincommon.IsCiliumOnWindowsEnabled()
+
+	if err != nil {
+		p.l.Error("Error while checking if Cilium is enabled on Windows", zap.Error(err))
+		return fmt.Errorf("Failed to check if Cilium is enabled on Windows: %w", err)
+	}
+
+	if !ciliumEnabled {
+		p.l.Warn("Cilium is not enabled on Windows, skipping ebpfWindows plugin initialization")
+		return nil
+	}
+
+	p.l.Info("Cilium is enabled on Windows, proceeding with ebpfWindows plugin initialization")
 	p.pullMetricsAndEvents(ctx)
 	p.l.Info("Complete ebpfWindows plugin...")
 	return nil
