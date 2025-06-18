@@ -121,6 +121,16 @@ var createCapture = &cobra.Command{
 			return errors.Wrap(err, "failed to initialize kubernetes client")
 		}
 
+		// Set namespace. If --namespace is not set, use namespace on user's context
+		ns, _, err := opts.ConfigFlags.ToRawKubeConfigLoader().Namespace()
+		if err != nil {
+			return errors.Wrap(err, "failed to get namespace from kubeconfig")
+		}
+
+		if opts.Namespace == nil || *opts.Namespace == "" {
+			opts.Namespace = &ns
+		}
+
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
 		defer cancel()
 
