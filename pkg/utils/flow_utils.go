@@ -273,6 +273,35 @@ func PacketSize(f *flow.Flow) uint32 {
 	return k.Bytes
 }
 
+func SourceZone(f *flow.Flow) string {
+	if f.GetExtensions() == nil {
+		return "unknown"
+	}
+	k := &RetinaMetadata{}           //nolint:typecheck // Not required to check type as we are setting it.
+	f.GetExtensions().UnmarshalTo(k) //nolint:errcheck // Not required to check error as we are setting it.
+	return k.GetSourceZone()
+}
+
+func DestinationZone(f *flow.Flow) string {
+	if f.GetExtensions() == nil {
+		return "unknown"
+	}
+	k := &RetinaMetadata{}           //nolint:typecheck // Not required to check type as we are setting it.
+	f.GetExtensions().UnmarshalTo(k) //nolint:errcheck // Not required to check error as we are setting it.
+	return k.GetDestinationZone()
+}
+
+func AddZones(f *flow.Flow, srcZone, dstZone string) {
+	if f.GetExtensions() == nil {
+		return
+	}
+	k := &RetinaMetadata{}           //nolint:typecheck // Not required to check type as we are setting it.
+	f.GetExtensions().UnmarshalTo(k) //nolint:errcheck // Not required to check error as we are setting it.
+	k.SourceZone = srcZone
+	k.DestinationZone = dstZone
+	AddRetinaMetadata(f, k)
+}
+
 // AddDropReason adds the drop reason to the flow's metadata.
 func AddDropReason(f *flow.Flow, meta *RetinaMetadata, dropReason uint16) {
 	if f == nil || meta == nil {
