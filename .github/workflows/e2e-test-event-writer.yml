@@ -30,7 +30,7 @@ jobs:
 
       - name: Az CLI login
         uses: azure/login@v2
-        if: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
+        if: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.repository == 'kumarvin123/retina') }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -75,7 +75,7 @@ jobs:
             echo "TAG=$TAG" >> $env:GITHUB_ENV
           }
         env:
-          IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
+          IS_MERGE_GROUP: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.repository == 'kumarvin123/retina') }}
 
       - name: Build Images
         shell: cmd
