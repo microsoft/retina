@@ -18,22 +18,18 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v4
 
+    - name: Set up Helm
+      uses: azure/setup-helm@v4
+
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v4
+    
     - name: Azure Login
       uses: azure/login@v2
       with:
         client-id: ${{ vars.AZURE_CLIENT_ID }}
         tenant-id: ${{ vars.AZURE_TENANT_ID }}
         subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-
-    - name: Set kubectl context for AKS
-      uses: azure/aks-set-context@v3
-      with:
-        resource-group: retina-observability-rg 
-        cluster-name: Retina-Deploy
-        admin: false
-
-    - name: Set up Helm
-      uses: azure/setup-helm@v3
 
     - name: Get IMAGE_NAMESPACE from git URL
       id: get_namespace
