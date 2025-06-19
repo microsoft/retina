@@ -31,6 +31,9 @@ jobs:
         tenant-id: ${{ vars.AZURE_TENANT_ID }}
         subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
+    - name: Set AKS Account
+      run: az account set --subscription b8c06bcd-5024-43fa-9507-691b5623f59a
+    
     - name: Set AKS credentials
       run: az aks get-credentials --resource-group retina-observability-rg --name Retina-Deploy --overwrite-existing
 
