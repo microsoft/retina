@@ -3,6 +3,7 @@ FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:
 
 ARG VERSION
 ARG APP_INSIGHTS_ID
+ARG AGENT_IMAGE_NAME="ghcr.io/microsoft/retina/retina-agent"
 
 WORKDIR /workspace
 COPY . .
@@ -17,7 +18,8 @@ ENV GOARCH=${GOARCH}
 RUN --mount=type=cache,target="/root/.cache/go-build" \
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" \
-    -X "github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID"="$APP_INSIGHTS_ID"" \
+    -X "github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID"="$APP_INSIGHTS_ID" \
+    -X "github.com/microsoft/retina/internal/buildinfo.RetinaAgentImageName"="$AGENT_IMAGE_NAME"" \
     -a -o kubectl-retina cli/main.go
 
 # mcr.microsoft.com/cbl-mariner/distroless/minimal:2.0
