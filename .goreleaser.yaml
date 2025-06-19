@@ -9,7 +9,7 @@ before:
     - go mod tidy
 
 builds:
-  - binary: kubectl-retina-{{ .Os }}-{{ .Arch }}
+  - binary: kubectl-retina{{.Env.SUFFIX}}-{{ .Os }}-{{ .Arch }}
     env:
       - CGO_ENABLED=0
     goarch:
@@ -23,6 +23,10 @@ builds:
       - darwin
     ldflags:
       - -X github.com/microsoft/retina/internal/buildinfo.Version=v{{.Version}}
+      - >-
+        {{- if index .Env "AGENT_IMAGE_NAME" }}
+          -X github.com/microsoft/retina/internal/buildinfo.RetinaAgentImageName={{.Env.AGENT_IMAGE_NAME}}
+        {{- end }}
     main: cli/main.go
 
 archives:
@@ -30,7 +34,7 @@ archives:
     wrap_in_directory: false
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [ 'zip' ]
 
 changelog:
   sort: asc
