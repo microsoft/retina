@@ -55,7 +55,7 @@ jobs:
         run: |
           .\export_program_info.exe --clear
           .\export_program_info.exe
-        working-directory: ${{ env.EVENT_WRITER_PATH }}\packages\eBPF-for-Windows.x64.0.20.0\build\native\bin
+        working-directory: ${{ env.EVENT_WRITER_PATH }}\packages\eBPF-for-Windows.x64.0.21.0\build\native\bin
 
       - name: Build Event-Writer
         shell: cmd
@@ -85,4 +85,4 @@ jobs:
           )
         working-directory: ${{ env.EVENT_WRITER_PATH }}
         env:
-          IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
+          IS_MERGE_GROUP: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch') }}
