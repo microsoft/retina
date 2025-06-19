@@ -25,6 +25,7 @@ RUN tdnf install -y \
 	wget \
 	tar \
 	file \
+	bpftool \
 	&& tdnf clean all
 
 # Re-use existing arg from Makefile target "container-docker"
