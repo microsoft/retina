@@ -174,7 +174,7 @@ func (cm *CaptureManager) OutputCapture(ctx context.Context, srcDir string) erro
 	}
 
 	if len(errStr) != 0 {
-		return fmt.Errorf(errStr)
+		return errors.New(errStr)
 	}
 
 	// Remove tarball created inside this function.
