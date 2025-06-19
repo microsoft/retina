@@ -23,8 +23,14 @@ KIND_CLUSTER = retina-cluster
 WINVER2022   ?= "10.0.20348.1906"
 WINVER2019   ?= "10.0.17763.4737"
 APP_INSIGHTS_ID ?= ""
+AGENT_IMAGE_NAME ?= ""
 GENERATE_TARGET_DIRS = \
 	./pkg/plugin/linuxutil
+
+# Set agent registry to get image from when using retina-kubectl
+ifneq ($(AGENT_IMAGE_NAME), "")
+	EXTRA_BUILD_ARGS := "--build-arg AGENT_IMAGE_NAME=$(AGENT_IMAGE_NAME)"
+endif
 
 # Default platform is linux/amd64
 GOOS			?= linux
@@ -306,7 +312,8 @@ kubectl-retina-image:
 			IMAGE=$(KUBECTL_RETINA_IMAGE) \
 			VERSION=$(TAG) \
 			TAG=$(RETINA_PLATFORM_TAG) \
-			CONTEXT_DIR=$(REPO_ROOT)
+			CONTEXT_DIR=$(REPO_ROOT) \
+			EXTRA_BUILD_ARGS=$(EXTRA_BUILD_ARGS)
 
 kapinger-image: 
 	docker buildx build --builder retina --platform windows/amd64 --target windows-amd64 -t $(IMAGE_REGISTRY)/$(KAPINGER_IMAGE):$(TAG)-windows-amd64  ./hack/tools/kapinger/ --push
