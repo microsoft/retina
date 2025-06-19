@@ -18,10 +18,12 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v4
 
-    - name: Set up Azure CLI
+    - name: Azure Login
       uses: azure/login@v2
       with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        client-id: ${{ vars.AZURE_CLIENT_ID }}
+        tenant-id: ${{ vars.AZURE_TENANT_ID }}
+        subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
     - name: Set kubectl context for AKS
       uses: azure/aks-set-context@v3
@@ -64,31 +66,3 @@ jobs:
           --set enabledPlugin_win="[ebpfwindows]" \
           --set enablePodLevel=true \
           --set enableAnnotations=true
-Update deploy-retina-aks.yml · kumarvin123/retina@c0195e2
-
-      - name: Deploy Retina with Helm
-        env:
-          IMAGE_REGISTRY: ghcr.io
-          HELM_IMAGE_TAG: ${{ github.event.inputs.helm_image_tag }}
-        run: |
-          RETINA_IMAGE="$IMAGE_NAMESPACE/retina-agent"
-          RETINA_OPERATOR_IMAGE="$IMAGE_NAMESPACE/retina-operator"
-          RETINA_INIT_IMAGE="$IMAGE_NAMESPACE/retina-init"
-
-          helm upgrade --install retina ./deploy/standard/manifests/controller/helm/retina/ \
-            --namespace kube-system \
-            --set image.repository="$IMAGE_REGISTRY/$RETINA_IMAGE" \
-            --set image.initRepository="$IMAGE_REGISTRY/$RETINA_INIT_IMAGE" \
-            --set image.tag="$HELM_IMAGE_TAG" \
-            --set operator.tag="$HELM_IMAGE_TAG" \
-            --set image.pullPolicy=Always \
-            --set logLevel=info \
-            --set os.windows=true \
-            --set operator.enabled=true \
-            --set operator.enableRetinaEndpoint=true \
-            --set operator.repository="$IMAGE_REGISTRY/$RETINA_OPERATOR_IMAGE" \
-            --skip-crds \
-            --set enabledPlugin_linux="[dropreason\,packetforward\,linuxutil\,dns\,packetparser\]" \
-            --set enabledPlugin_win="[ebpfwindows\]" \
-            --set enablePodLevel=true \
-            --set enableAnnotations=true
