@@ -7,7 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const captureFileNameTimestampFormat string = "20060102150405UTC"
+const captureFileNameTimestampFormat string = "2006-01-02 15:04:05 +0000 MST"
 
 func Now() *metav1.Time {
 	return &metav1.Time{Time: time.Now().UTC().Truncate(time.Second)}
