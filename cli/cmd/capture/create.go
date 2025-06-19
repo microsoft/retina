@@ -41,6 +41,7 @@ var (
 	hostPath           string
 	includeFilter      string
 	includeMetadata    bool
+	interfaces         string
 	jobNumLimit        int
 	maxSize            int
 	namespace          string
@@ -87,6 +88,9 @@ var createExample = templates.Examples(i18n.T(`
 
 		# Select nodes using node-selector and set duration to 10s
 		kubectl retina capture create --node-selectors="agentpool=agentpool" --duration=10s
+
+		# Capture on specific network interfaces (instead of all interfaces)
+		kubectl retina capture create --node-selectors="agentpool=agentpool" --interfaces="eth0,eth1"
 
 		# Select nodes using node-selector and upload the artifacts to blob storage with SAS URL https://testaccount.blob.core.windows.net/<token>
 		kubectl retina capture create --node-selectors="agentpool=agentpool" --blob-upload=https://testaccount.blob.core.windows.net/<token>
@@ -337,6 +341,15 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 		capture.Spec.CaptureConfiguration.CaptureOption.PacketSize = &packetSize
 	}
 
+	if interfaces != "" {
+		interfaceSlice := strings.Split(interfaces, ",")
+		for i := range interfaceSlice {
+			interfaceSlice[i] = strings.TrimSpace(interfaceSlice[i])
+		}
+		retinacmd.Logger.Info(fmt.Sprintf("Capturing on specific interfaces: %v", interfaceSlice))
+		capture.Spec.CaptureConfiguration.CaptureOption.Interfaces = interfaceSlice
+	}
+
 	if len(hostPath) != 0 {
 		capture.Spec.OutputConfiguration.HostPath = &hostPath
 	}
@@ -505,6 +518,7 @@ func init() {
 	createCapture.Flags().StringVar(&s3AccessKeyID, "s3-access-key-id", "", "S3 access key id to upload capture files")
 	createCapture.Flags().StringVar(&s3SecretAccessKey, "s3-secret-access-key", "", "S3 access secret key to upload capture files")
 	createCapture.Flags().StringVar(&tcpdumpFilter, "tcpdump-filter", "", "Raw tcpdump flags which works only for Linux")
+	createCapture.Flags().StringVar(&interfaces, "interfaces", "", "Comma-separated list of network interfaces to capture on (e.g., eth0,eth1)")
 	createCapture.Flags().StringVar(&excludeFilter, "exclude-filter", "", "A comma-separated list of IP:Port pairs that are "+
 		"excluded from capturing network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:*")
 	createCapture.Flags().StringVar(&includeFilter, "include-filter", "", "A comma-separated list of IP:Port pairs that are "+

@@ -79,7 +79,8 @@ The network traffic will be uploaded to the specified output location.
 | `s3-path`             | string     | retina/captures | Prefix path within the S3 bucket where captures will be stored.              |       |
 | `s3-region`           | string     | ""       | Region where the S3 compatible bucket is located.                            |       |
 | `s3-secret-access-key`| string     | ""       | S3 access secret key to upload capture files.                                |       |
-| `tcpdump-filter`      | string     | ""       | Raw tcpdump flags. Available tcpdump filters can be found in the [TCPDUMP MAN PAGE](https://www.tcpdump.org/manpages/tcpdump.1.html).  | Only works on Linux. Includes only tcpdump flags, for boolean expressions, please use include/exclude filters.     |
+| `interfaces`          | string     | ""       | Comma-separated list of network interfaces to capture on (e.g., "eth0,eth1"). By default, captures are performed on all network interfaces. |       |
+| `tcpdump-filter`      | string     | ""       | Raw tcpdump flags. Available tcpdump filters can be found in the [TCPDUMP MAN PAGE](https://www.tcpdump.org/manpages/tcpdump.1.html). This overrides interface selection options when specified. | Only works on Linux. Includes only tcpdump flags, for boolean expressions, please use include/exclude filters.     |
 
 #### Examples
 
@@ -108,6 +109,25 @@ kubectl retina capture create \
   --name example-pod-namespace-selectors \
   --pod-selectors="k8s-app=kube-dns" \
   --namespace-selectors="kubernetes.io/metadata.name=kube-system"
+```
+
+##### Interface Selection
+
+Capture on all interfaces (default behavior)
+
+```sh
+kubectl retina capture create \
+  --name example-all-interfaces \
+  --node-selectors "kubernetes.io/os=linux"
+```
+
+Capture on specific interfaces
+
+```sh
+kubectl retina capture create \
+  --name example-specific-interfaces \
+  --node-selectors "kubernetes.io/os=linux" \
+  --interfaces "eth0,eth1"
 ```
 
 ##### Output Configuration
