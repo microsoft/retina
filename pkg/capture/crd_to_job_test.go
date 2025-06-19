@@ -682,7 +682,7 @@ func Test_CaptureToPodTranslator_RenderJob_NodeSelected(t *testing.T) {
 
 			startTime := time.Now()
 
-			hostPath := "/tmp/capture"
+			hostPath := "/tmp/capture" // nolint:goconst // Test case needs a var
 
 			err := captureToPodTranslator.initJobTemplate(ctx, &retinav1alpha1.Capture{
 				Spec: retinav1alpha1.CaptureSpec{
