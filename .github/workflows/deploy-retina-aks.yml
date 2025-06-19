@@ -31,6 +31,9 @@ jobs:
         tenant-id: ${{ vars.AZURE_TENANT_ID }}
         subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
+    - name: Set AKS credentials
+      run: az aks get-credentials --resource-group retina-observability-rg --name Retina-Deploy --overwrite-existing
+
     - name: Get IMAGE_NAMESPACE from git URL
       id: get_namespace
       run: |
