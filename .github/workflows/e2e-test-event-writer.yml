@@ -30,6 +30,7 @@ jobs:
 
       - name: Azure Login
         uses: azure/login@v2
+        if: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
@@ -79,9 +80,7 @@ jobs:
       - name: Build Images
         shell: cmd
         run: |
-          if "%IS_MERGE_GROUP%"=="true" (
-            az acr login -n ${{ vars.ACR_NAME }} && docker build --file .\Dockerfile --tag ${{ vars.ACR_NAME }}/${{ github.repository }}/e2e-test-event-writer:${{ env.TAG }} . && docker build --file .\Dockerfile --tag ${{ vars.ACR_NAME }}/${{ github.repository }}/e2e-test-event-writer:latest . && docker push ${{ vars.ACR_NAME }}/${{ github.repository }}/e2e-test-event-writer:${{ env.TAG }} && docker push ${{ vars.ACR_NAME }}/${{ github.repository }}/e2e-test-event-writer:latest
-          )
+            docker build --file .\Dockerfile --tag ${{ vars.ACR_NAME }}/${{ github.repository }}/e2e-test-event-writer:${{ env.TAG }} . && docker build --file .\Dockerfile --tag ${{ vars.ACR_NAME }}/${{ github.repository }}/e2e-test-event-writer:latest . && docker push ${{ vars.ACR_NAME }}/${{ github.repository }}/e2e-test-event-writer:${{ env.TAG }} && docker push ${{ vars.ACR_NAME }}/${{ github.repository }}/e2e-test-event-writer:latest
         working-directory: ${{ env.EVENT_WRITER_PATH }}
         env:
           IS_MERGE_GROUP: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch') }}
