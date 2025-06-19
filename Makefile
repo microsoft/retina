@@ -22,8 +22,14 @@ KIND = /usr/local/bin/kind
 KIND_CLUSTER = retina-cluster
 WINVER2022   ?= "10.0.20348.1906"
 APP_INSIGHTS_ID ?= ""
+AGENT_IMAGE_NAME ?= ""
 GENERATE_TARGET_DIRS = \
 	./pkg/plugin/linuxutil
+
+# Set agent registry to get image from when using retina-kubectl
+ifneq ($(AGENT_IMAGE_NAME), "")
+	EXTRA_BUILD_ARGS := "--build-arg AGENT_IMAGE_NAME=$(AGENT_IMAGE_NAME)"
+endif
 
 # Default platform is linux/amd64
 GOOS			?= linux
@@ -330,7 +336,8 @@ kubectl-retina-image:
 			IMAGE=$(KUBECTL_RETINA_IMAGE) \
 			VERSION=$(TAG) \
 			TAG=$(RETINA_PLATFORM_TAG) \
-			CONTEXT_DIR=$(REPO_ROOT)
+			CONTEXT_DIR=$(REPO_ROOT) \
+			EXTRA_BUILD_ARGS=$(EXTRA_BUILD_ARGS)
 
 kubectl-retina-shell-image:
 	echo "Building shell-enabled kubectl-retina for $(PLATFORM)"
