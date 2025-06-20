@@ -1,6 +1,6 @@
 module github.com/microsoft/retina/test/multicloud/test
 
-go 1.24.2
+go 1.24.4
 
 require (
 	github.com/gruntwork-io/terratest v0.48.1
