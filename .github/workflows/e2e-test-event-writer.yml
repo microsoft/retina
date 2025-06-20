@@ -80,5 +80,5 @@ jobs:
       - name: Build Images
         shell: cmd
         run: |
-            docker buildx build --builder retina -f "./Dockerfile" --platform windows/amd64 --target windows-amd64 -t ${{ vars.ACR_NAME }}/${{ github.repository }}/e2e-test-event-writer:latest .
+            docker buildx build -f "./Dockerfile" --platform windows/amd64 --target windows-amd64 -t ${{ vars.ACR_NAME }}/${{ github.repository }}/e2e-test-event-writer:latest .
         working-directory: ${{ env.EVENT_WRITER_PATH }}
