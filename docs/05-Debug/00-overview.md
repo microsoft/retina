@@ -9,6 +9,7 @@ The Retina debug functionality provides real-time network monitoring and trouble
 The `kubectl retina debug drop` command monitors packet drop events in real-time using eBPF technology. This helps network operators and developers quickly identify and troubleshoot packet loss issues.
 
 **Key Features:**
+
 - Real-time monitoring of packet drops
 - Detailed drop reason information
 - Source and destination analysis
@@ -17,6 +18,7 @@ The `kubectl retina debug drop` command monitors packet drop events in real-time
 - Word-wrapped display for various terminal widths
 
 **Use Cases:**
+
 - Troubleshooting connectivity issues
 - Monitoring network security events
 - Performance analysis and optimization
@@ -26,7 +28,7 @@ The `kubectl retina debug drop` command monitors packet drop events in real-time
 
 The debug commands leverage Retina's existing eBPF plugins to provide real-time monitoring capabilities:
 
-```
+```text
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   kubectl CLI   │────▶│  Debug Command  │────▶│   eBPF Plugin   │
 └─────────────────┘    └─────────────────┘    └─────────────────┘

@@ -28,6 +28,7 @@ import (
 
 var dropOpts = struct {
 	duration     time.Duration
+	interval     time.Duration
 	outputFile   string
 	confirm      bool
 	portForward  bool
@@ -58,6 +59,7 @@ func init() {
 	debug.AddCommand(dropCmd)
 	
 	dropCmd.Flags().DurationVar(&dropOpts.duration, "duration", 30*time.Second, "Duration to watch for drop events")
+	dropCmd.Flags().DurationVar(&dropOpts.interval, "interval", 1*time.Second, "Interval between drop event checks")
 	dropCmd.Flags().StringVar(&dropOpts.outputFile, "output", "", "Output file to write drop events (optional)")
 	dropCmd.Flags().BoolVar(&dropOpts.confirm, "confirm", true, "Confirm before performing invasive operations")
 	dropCmd.Flags().BoolVar(&dropOpts.portForward, "port-forward", false, "Enable port forwarding for remote monitoring")
@@ -66,19 +68,16 @@ func init() {
 	dropCmd.Flags().StringVar(&dropOpts.podName, "pod-name", "", "Specific pod name to monitor (optional)")
 	dropCmd.Flags().StringSliceVar(&dropOpts.ips, "ips", nil, "IP addresses to filter for (optional)")
 	dropCmd.Flags().BoolVar(&dropOpts.verbose, "verbose", false, "Enable verbose output")
-	dropCmd.Flags().IntVar(&dropOpts.consoleWidth, "width", 0, "Console width for formatting (auto-detected if 0)")
 }
 
 func runDropCommand(cmd *cobra.Command, args []string) error {
 	logger := retinacmd.Logger.Named("debug-drop")
 	
-	// Set up console width
-	if dropOpts.consoleWidth == 0 {
-		if width, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil {
-			dropOpts.consoleWidth = width
-		} else {
-			dropOpts.consoleWidth = 80 // Default width
-		}
+	// Auto-detect console width
+	if width, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil {
+		dropOpts.consoleWidth = width
+	} else {
+		dropOpts.consoleWidth = 80 // Default width
 	}
 
 	// Confirm invasive operations
@@ -122,7 +121,7 @@ func runDropMonitoring(ctx context.Context, logger *log.ZapLogger) error {
 
 	// Create configuration
 	cfg := &kcfg.Config{
-		MetricsInterval: 1 * time.Second,
+		MetricsInterval: dropOpts.interval,
 		EnablePodLevel:  true,
 	}
 

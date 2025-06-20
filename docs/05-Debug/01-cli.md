@@ -62,7 +62,7 @@ kubectl retina debug drop --confirm=false
 
 The command displays drop events in a tabular format:
 
-```
+```text
 TIMESTAMP            SRC_IP          DST_IP          PROTO      DROP_REASON          DETAILS
 21:30:15.123         10.0.0.1        10.0.0.2        TCP        DROP(42)             Connection refused
 21:30:15.456         10.0.0.3        10.0.0.4        UDP        DROP(13)             No route to host
@@ -77,7 +77,8 @@ TIMESTAMP            SRC_IP          DST_IP          PROTO      DROP_REASON     
 
 #### Troubleshooting
 
-**Error: "operation not permitted"**
+##### Error: "operation not permitted"
+
 ```bash
 # Try running with sudo
 sudo kubectl retina debug drop
@@ -86,14 +87,16 @@ sudo kubectl retina debug drop
 ulimit -l unlimited
 ```
 
-**Error: "MEMLOCK may be too low"**
+##### Error: "MEMLOCK may be too low"
+
 ```bash
 # Increase memory lock limit
 echo "* soft memlock unlimited" >> /etc/security/limits.conf
 echo "* hard memlock unlimited" >> /etc/security/limits.conf
 ```
 
-**No events appearing**
+##### No events appearing
+
 - Ensure there is actual network traffic and drops occurring
 - Check that the specified IP filters (if any) match actual traffic
 - Verify eBPF programs are loaded correctly with verbose output
@@ -101,21 +104,25 @@ echo "* hard memlock unlimited" >> /etc/security/limits.conf
 #### Examples
 
 **Monitor all drop events for 2 minutes:**
+
 ```bash
 kubectl retina debug drop --duration=2m
 ```
 
 **Monitor drops for specific IPs and save to file:**
+
 ```bash
 kubectl retina debug drop --ips=192.168.1.10,192.168.1.20 --output=network-drops.log
 ```
 
-**Monitor with custom console width:**
+**Monitor with custom interval:**
+
 ```bash
-kubectl retina debug drop --width=120
+kubectl retina debug drop --interval=5s
 ```
 
 **Enable verbose logging for troubleshooting:**
+
 ```bash
 kubectl retina debug drop --verbose --duration=10s
 ```
