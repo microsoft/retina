@@ -80,7 +80,5 @@ jobs:
       - name: Build Images
         shell: cmd
         run: |
-            docker build --file .\Dockerfile --tag ${{ vars.ACR_NAME }}/${{ github.repository }}/e2e-test-event-writer:${{ env.TAG }} . && docker build --file .\Dockerfile --tag ${{ vars.ACR_NAME }}/${{ github.repository }}/e2e-test-event-writer:latest . && docker push ${{ vars.ACR_NAME }}/${{ github.repository }}/e2e-test-event-writer:${{ env.TAG }} && docker push ${{ vars.ACR_NAME }}/${{ github.repository }}/e2e-test-event-writer:latest
+            docker buildx build --builder retina -f .\Dockerfile --platform windows/amd64 --target windows-amd64 -t ${{ vars.ACR_NAME }}/${{ github.repository }}/e2e-test-event-writer:latest 
         working-directory: ${{ env.EVENT_WRITER_PATH }}
-        env:
-          IS_MERGE_GROUP: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch') }}
