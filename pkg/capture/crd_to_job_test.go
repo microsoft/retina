@@ -679,10 +679,20 @@ func Test_CaptureToPodTranslator_RenderJob_NodeSelected(t *testing.T) {
 			k8sClient := fakeclientset.NewSimpleClientset()
 			log.SetupZapLogger(log.GetDefaultLogOpts())
 			captureToPodTranslator := NewCaptureToPodTranslatorForTest(k8sClient)
+
+			startTime := time.Now()
+
+			hostPath := "/tmp/capture" // nolint:goconst // Test case needs a var
+
 			err := captureToPodTranslator.initJobTemplate(ctx, &retinav1alpha1.Capture{
 				Spec: retinav1alpha1.CaptureSpec{
 					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{},
-					OutputConfiguration:  retinav1alpha1.OutputConfiguration{},
+					OutputConfiguration: retinav1alpha1.OutputConfiguration{
+						HostPath: &hostPath,
+					},
+				},
+				Status: retinav1alpha1.CaptureStatus{
+					StartTime: &metav1.Time{Time: startTime},
 				},
 			})
 			if err != nil {
@@ -861,6 +871,14 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 						label.CaptureNameLabel: captureName,
 						label.AppLabel:         captureConstants.CaptureContainername,
 					},
+					Annotations: map[string]string{
+						captureConstants.CaptureFilenameAnnotationKey: (&file.CaptureFilename{
+							CaptureName:    captureName,
+							NodeHostname:   "node1",
+							StartTimestamp: timestamp,
+						}).String(),
+						captureConstants.CaptureTimestampAnnotationKey: file.TimeToString(timestamp),
+					},
 				},
 				Spec: corev1.PodSpec{
 					HostNetwork:                   true,
@@ -961,6 +979,9 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: captureName,
 				},
+				Status: retinav1alpha1.CaptureStatus{
+					StartTime: timestamp,
+				},
 				Spec: retinav1alpha1.CaptureSpec{
 					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
 						CaptureTarget: retinav1alpha1.CaptureTarget{
@@ -1005,7 +1026,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 				{Name: captureConstants.CaptureDurationEnvKey, Value: "1m0s"},
 				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: hostPath},
 				{Name: captureConstants.CaptureNameEnvKey, Value: captureName},
-				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: timestamp.String()},
+				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: file.TimeToString(timestamp)},
 				{Name: captureConstants.IncludeMetadataEnvKey, Value: "false"},
 				{Name: captureConstants.NodeHostNameEnvKey, Value: "node1"},
 				{
@@ -1092,6 +1113,9 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: captureName,
 				},
+				Status: retinav1alpha1.CaptureStatus{
+					StartTime: timestamp,
+				},
 				Spec: retinav1alpha1.CaptureSpec{
 					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
 						CaptureTarget: retinav1alpha1.CaptureTarget{
@@ -1134,7 +1158,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			podEnv: []v1.EnvVar{
 				{Name: captureConstants.CaptureDurationEnvKey, Value: "1m0s"},
 				{Name: captureConstants.CaptureNameEnvKey, Value: captureName},
-				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: timestamp.String()},
+				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: file.TimeToString(timestamp)},
 				{Name: captureConstants.IncludeMetadataEnvKey, Value: "false"},
 				{Name: string(captureConstants.CaptureOutputLocationEnvKeyPersistentVolumeClaim), Value: pvc},
 				{Name: captureConstants.NodeHostNameEnvKey, Value: "node1"},
@@ -1163,6 +1187,9 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			capture: retinav1alpha1.Capture{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: captureName,
+				},
+				Status: retinav1alpha1.CaptureStatus{
+					StartTime: timestamp,
 				},
 				Spec: retinav1alpha1.CaptureSpec{
 					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
@@ -1206,7 +1233,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			podEnv: []v1.EnvVar{
 				{Name: captureConstants.CaptureDurationEnvKey, Value: "1m0s"},
 				{Name: captureConstants.CaptureNameEnvKey, Value: captureName},
-				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: timestamp.String()},
+				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: file.TimeToString(timestamp)},
 				{Name: captureConstants.IncludeMetadataEnvKey, Value: "false"},
 				{Name: string(captureConstants.CaptureOutputLocationEnvKeyPersistentVolumeClaim), Value: pvc},
 				{Name: captureConstants.NodeHostNameEnvKey, Value: "node1"},
@@ -1234,6 +1261,9 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			capture: retinav1alpha1.Capture{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: captureName,
+				},
+				Status: retinav1alpha1.CaptureStatus{
+					StartTime: timestamp,
 				},
 				Spec: retinav1alpha1.CaptureSpec{
 					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
@@ -1292,7 +1322,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 				{Name: captureConstants.CaptureDurationEnvKey, Value: "1m0s"},
 				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: hostPath},
 				{Name: captureConstants.CaptureNameEnvKey, Value: captureName},
-				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: timestamp.String()},
+				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: file.TimeToString(timestamp)},
 				{Name: captureConstants.IncludeMetadataEnvKey, Value: "false"},
 				{Name: string(captureConstants.CaptureOutputLocationEnvKeyPersistentVolumeClaim), Value: pvc},
 				{Name: captureConstants.NodeHostNameEnvKey, Value: "node1"},
@@ -1316,10 +1346,13 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			},
 		},
 		{
-			name: "tcpdumpfilter: pod ip adddress and tcpdumpfilter coexist",
+			name: "tcpdumpfilter: pod ip address and tcpdumpfilter coexist",
 			capture: retinav1alpha1.Capture{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: captureName,
+				},
+				Status: retinav1alpha1.CaptureStatus{
+					StartTime: timestamp,
 				},
 				Spec: retinav1alpha1.CaptureSpec{
 					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
@@ -1374,7 +1407,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 				{Name: captureConstants.CaptureDurationEnvKey, Value: "1m0s"},
 				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: hostPath},
 				{Name: captureConstants.CaptureNameEnvKey, Value: captureName},
-				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: timestamp.String()},
+				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: file.TimeToString(timestamp)},
 				{Name: captureConstants.IncludeMetadataEnvKey, Value: "false"},
 				{Name: captureConstants.NodeHostNameEnvKey, Value: "node1"},
 				{Name: captureConstants.TcpdumpRawFilterEnvKey, Value: "-i eth0"},
@@ -1399,6 +1432,9 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: captureName,
 				},
+				Status: retinav1alpha1.CaptureStatus{
+					StartTime: timestamp,
+				},
 				Spec: retinav1alpha1.CaptureSpec{
 					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
 						CaptureTarget: retinav1alpha1.CaptureTarget{
@@ -1451,7 +1487,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 				{Name: captureConstants.CaptureDurationEnvKey, Value: "1m0s"},
 				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: hostPath},
 				{Name: captureConstants.CaptureNameEnvKey, Value: captureName},
-				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: timestamp.String()},
+				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: file.TimeToString(timestamp)},
 				{Name: captureConstants.IncludeMetadataEnvKey, Value: "false"},
 				{Name: captureConstants.NodeHostNameEnvKey, Value: "node1"},
 				{Name: captureConstants.TcpdumpFilterEnvKey, Value: "(host 10.225.0.4)"},
@@ -1474,6 +1510,9 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			capture: retinav1alpha1.Capture{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: captureName,
+				},
+				Status: retinav1alpha1.CaptureStatus{
+					StartTime: timestamp,
 				},
 				Spec: retinav1alpha1.CaptureSpec{
 					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
@@ -1530,7 +1569,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 				{Name: captureConstants.CaptureDurationEnvKey, Value: "1m0s"},
 				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: hostPath},
 				{Name: captureConstants.CaptureNameEnvKey, Value: captureName},
-				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: timestamp.String()},
+				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: file.TimeToString(timestamp)},
 				{Name: captureConstants.IncludeMetadataEnvKey, Value: "false"},
 				{Name: captureConstants.NodeHostNameEnvKey, Value: "node1"},
 				{Name: captureConstants.TcpdumpFilterEnvKey, Value: "(host 10.225.0.4 or host fd5c:d9f1:79c5:fd83::21e)"},
@@ -1553,6 +1592,9 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			capture: retinav1alpha1.Capture{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: captureName,
+				},
+				Status: retinav1alpha1.CaptureStatus{
+					StartTime: timestamp,
 				},
 				Spec: retinav1alpha1.CaptureSpec{
 					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
@@ -1609,7 +1651,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 				{Name: captureConstants.CaptureDurationEnvKey, Value: "1m0s"},
 				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: hostPath},
 				{Name: captureConstants.CaptureNameEnvKey, Value: captureName},
-				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: timestamp.String()},
+				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: file.TimeToString(timestamp)},
 				{Name: captureConstants.IncludeMetadataEnvKey, Value: "false"},
 				{Name: captureConstants.NodeHostNameEnvKey, Value: "node1"},
 				{Name: captureConstants.NetshFilterEnvKey, Value: "IPv4.Address=(10.225.0.4) IPv6.Address=(fd5c:d9f1:79c5:fd83::21e)"},
@@ -1629,10 +1671,13 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			isWindows: true,
 		},
 		{
-			name: "netshfilter: pod ip adddress and tcpdumpfilter coexist",
+			name: "netshfilter: pod ip address and tcpdumpfilter coexist",
 			capture: retinav1alpha1.Capture{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: captureName,
+				},
+				Status: retinav1alpha1.CaptureStatus{
+					StartTime: timestamp,
 				},
 				Spec: retinav1alpha1.CaptureSpec{
 					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
@@ -1687,7 +1732,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 				{Name: captureConstants.CaptureDurationEnvKey, Value: "1m0s"},
 				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: hostPath},
 				{Name: captureConstants.CaptureNameEnvKey, Value: captureName},
-				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: timestamp.String()},
+				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: file.TimeToString(timestamp)},
 				{Name: captureConstants.IncludeMetadataEnvKey, Value: "false"},
 				{Name: captureConstants.NodeHostNameEnvKey, Value: "node1"},
 				{Name: captureConstants.TcpdumpRawFilterEnvKey, Value: "-i eth0"},
@@ -1761,6 +1806,10 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 				job.Spec.Template.Spec.Containers[0].Command = []string{captureConstants.CaptureContainerEntrypointWin}
 			}
 
+			if tt.capture.Spec.OutputConfiguration.HostPath != nil {
+				job.Spec.Template.Annotations[captureConstants.CaptureHostPathAnnotationKey] = hostPath
+			}
+
 			cmpOption := cmp.Options{
 				cmpopts.SortSlices(func(enVar1, enVar2 corev1.EnvVar) bool { return enVar1.Name < enVar2.Name }),
 				cmp.Comparer(func(x, y corev1.EnvVar) bool {
@@ -1782,6 +1831,8 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs_JobNumLimit(t *testing.T
 	ctx, cancel := TestContext(t)
 	defer cancel()
 
+	timestamp := file.Now()
+
 	captureName := "capture-test"
 	hostPath := "/tmp/capture"
 	cases := []struct {
@@ -1796,6 +1847,9 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs_JobNumLimit(t *testing.T
 			capture: retinav1alpha1.Capture{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: captureName,
+				},
+				Status: retinav1alpha1.CaptureStatus{
+					StartTime: timestamp,
 				},
 				Spec: retinav1alpha1.CaptureSpec{
 					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
@@ -1830,6 +1884,9 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs_JobNumLimit(t *testing.T
 			capture: retinav1alpha1.Capture{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: captureName,
+				},
+				Status: retinav1alpha1.CaptureStatus{
+					StartTime: timestamp,
 				},
 				Spec: retinav1alpha1.CaptureSpec{
 					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
