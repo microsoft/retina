@@ -137,7 +137,13 @@ ENV HUBBLE_SERVER=unix:///var/run/cilium/hubble.sock
 FROM ${OS_VERSION} AS agent-win
 COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
 COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
-COPY --from=controller-bin /go/bin/retina/controller controller.exe
-COPY --from=capture-bin /go/bin/retina/captureworkload captureworkload.exe
+ARG APP_INSIGHTS_ID # set to enable AI telemetry
+ARG GOARCH=amd64 # default to amd64
+ARG GOOS=linux # default to linux
+ARG VERSION
+ENV GOARCH=${GOARCH}
+ENV GOOS=${GOOS}
+RUN --mount=type=cache,target="/root/.cache/go-build" go build -x -v -o /go/bin/retina/controller -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID="$APP_INSIGHTS_ID"" controller/main.go 
+RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/retina/captureworkload -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID="$APP_INSIGHTS_ID"" captureworkload/main.go
 # ADD https://github.com/microsoft/etl2pcapng/releases/download/v1.10.0/etl2pcapng.exe /etl2pcapng.exe
 # CMD ["controller.exe", "start", "--kubeconfig=.\\kubeconfig"]
