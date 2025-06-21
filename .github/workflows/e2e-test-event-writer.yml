@@ -80,5 +80,5 @@ jobs:
       - name: Build Images
         shell: cmd
         run: |
-            docker build --file .\Dockerfile --tag ${{ vars.ACR_NAME }}/${{ github.repository }}/e2e-test-event-writer:latest 
+            docker build --file .\Dockerfile --tag ${{ vars.ACR_NAME }}/${{ github.repository }}/e2e-test-event-writer:latest .
         working-directory: ${{ env.EVENT_WRITER_PATH }}
