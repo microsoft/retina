@@ -405,12 +405,17 @@ Function Install-eBPF
       }
 
       Write-Host 'Installing extended Berkley Packet Filter for Windows'
+      Write-Host "LocalPath:$($LocalPath)"
       # Download eBPF-for-Windows.
       $packageEbpfUrl = "https://github.com/microsoft/ebpf-for-windows/releases/download/Release-v0.21.1/Build-native-only.NativeOnlyRelease.x64.zip"
+      Write-Host "Downloading Package:$($packageEbpfUrl)"
       Invoke-WebRequest -Uri $packageEbpfUrl -OutFile "$LocalPath\Build-native-only.NativeOnlyRelease.x64.zip"
+      Write-Host 'Expanding Zip File'
       Expand-Archive -Path "$LocalPath\Build-native-only.NativeOnlyRelease.x64.zip" -DestinationPath "$LocalPath\Build-x64-native-only.NativeOnlyRelease\msi" -Force
+     
       Copy-Item "$LocalPath\Build-x64-native-only.NativeOnlyRelease\msi\Build-native-only NativeOnlyRelease x64\*.msi" -Destination $LocalPath
 
+      Write-Host 'Running Msi'
       Start-Process -FilePath "$($env:WinDir)\System32\MSIExec.exe" -ArgumentList @("/i", "$LocalPath\ebpf-for-windows.msi", "/qn", "INSTALLFOLDER=`"$($env:ProgramFiles)\ebpf-for-windows`"", "ADDLOCAL=eBPF_Runtime_Components") -PassThru | Wait-Process
       If(-Not (Assert-SoftwareInstalled -ServiceName:'eBPFCore' -Silent) -Or
          -Not (Assert-SoftwareInstalled -ServiceName:'NetEbpfExt' -Silent))
