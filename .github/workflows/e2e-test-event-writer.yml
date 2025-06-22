@@ -98,6 +98,6 @@ jobs:
           }
 
           $tag = "${{ steps.tag.outputs.tag }}"
-          docker build -f "./Dockerfile" -t "$image:$tag" -t "$image:latest" .
-          docker push "$image:$tag"
-          docker push "$image:latest"
+          docker build -f "./Dockerfile" -t "${image}:${tag}" -t "${image}:latest" .
+          docker push "${image}:${tag}"
+          docker push "${image}:latest"
