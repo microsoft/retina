@@ -42,7 +42,7 @@ SEC(".maps")
 struct {
     __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
     __uint(pinning, LIBBPF_PIN_BY_NAME);
-    __uint(max_entries, 512 * 4096);
+    __uint(max_entries, 64 * 1024);
 } cilium_events;
 
 SEC(".maps")
