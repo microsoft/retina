@@ -123,10 +123,18 @@ func (lm *LatencyMetrics) Init(metricName string) {
 	lm.cache.OnEviction(func(ctx context.Context, reason ttlcache.EvictionReason, item *ttlcache.Item[key, *val]) {
 		if reason == ttlcache.EvictionReasonExpired {
 			// Didn't get the corresponding packet.
-			lm.l.Debug("Evicted item", zap.Any("item", item))
+			k := item.Key()
+			v := item.Value()
+			lm.l.Debug("Evicted item", 
+				zap.String("srcIP", k.srcIP),
+				zap.String("dstIP", k.dstIP),
+				zap.Uint32("srcPort", k.srcP),
+				zap.Uint32("dstPort", k.dstP),
+				zap.Uint64("id", k.id),
+				zap.Int32("timestamp", v.t))
 			if lm.noResponseMetric != nil {
 				lm.noResponseMetric.WithLabelValues("no_response").Inc()
-				lm.l.Debug("Incremented no response metric", zap.Any("metric", lm.noResponseMetric))
+				lm.l.Debug("Incremented no response metric", zap.String("metric", "adv_node_apiserver_no_response"))
 			}
 		}
 	})
@@ -323,14 +331,22 @@ func (lm *LatencyMetrics) apiserverWatcherCallbackFn(obj interface{}) {
 
 	switch event.Type {
 	case cc.EventTypeAddAPIServerIPs:
-		lm.l.Debug("Add apiserver ips", zap.Any("ips", apiServerIPs))
+		ipStrings := make([]string, len(apiServerIPs))
+		for i, ip := range apiServerIPs {
+			ipStrings[i] = ip.String()
+		}
+		lm.l.Debug("Add apiserver ips", zap.Strings("ips", ipStrings))
 		lm.addIps(apiServerIPs)
 	case cc.EventTypeDeleteAPIServerIPs:
-		lm.l.Debug("Delete apiserver ips", zap.Any("ips", apiServerIPs))
+		ipStrings := make([]string, len(apiServerIPs))
+		for i, ip := range apiServerIPs {
+			ipStrings[i] = ip.String()
+		}
+		lm.l.Debug("Delete apiserver ips", zap.Strings("ips", ipStrings))
 		lm.removeIps(apiServerIPs)
 
 	default:
-		lm.l.Debug("Unknown event type", zap.Any("event", event))
+		lm.l.Debug("Unknown event type", zap.String("eventType", event.Type.String()))
 	}
 }
 
