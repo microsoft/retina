@@ -12,11 +12,11 @@ WORKDIR /usr/src/retina
 # Copy the source
 COPY . .
 
-RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /usr/bin/controller.exe -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X "github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID"="$APP_INSIGHTS_ID"" ./controller/
+RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /usr/bin/controller.exe -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X "github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID"="$APP_INSIGHTS_ID""  ./controller/
 RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /usr/bin/captureworkload.exe ./captureworkload/
 
 # Copy into final image
-FROM  --platform=windows/amd64 mcr.microsoft.com/windows/servercore:ltsc2022 as final
+FROM  mcr.microsoft.com/windows/servercore:ltsc2019 as final
 COPY --from=builder /usr/src/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
 COPY --from=builder /usr/src/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
 COPY --from=builder /usr/bin/controller.exe controller.exe

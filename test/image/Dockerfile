@@ -1,10 +1,10 @@
 # build stage
-# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.5-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26.5-azurelinux3.0@sha256:1c77c1cbb5de52db3f119fe2efe7a938e734c08196bbe3ad94b3bdadbab926f9 AS builder
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.4-cbl-mariner2.0 --format "{{.Name}}@{{.Digest}}"
+FROM mcr.microsoft.com/oss/go/microsoft/golang@sha256:8404e234fac0f624a120a43573098923a37c7e4755aebdb47783ff6212de3163 AS builder
 ENV CGO_ENABLED=0
 COPY . /go/src/github.com/microsoft/retina 
 WORKDIR /go/src/github.com/microsoft/retina
-RUN tdnf install -y clang lld bpftool libbpf-devel make git jq
+RUN tdnf install -y clang16 lld16 bpftool libbpf-devel make git jq
 RUN go generate /go/src/github.com/microsoft/retina/pkg/plugin/...
 # RUN go mod edit -module retina
 # RUN make all generate
