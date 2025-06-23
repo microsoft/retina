@@ -1,6 +1,6 @@
 module github.com/microsoft/retina/hack/tools/toolbox
 
-go 1.24.4
+go 1.24.2
 
 replace github.com/microsoft/retina/hack/tools/kapinger => ../kapinger
 
