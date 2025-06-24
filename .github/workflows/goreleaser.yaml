@@ -73,6 +73,7 @@ jobs:
       - name: Update new version in krew-index
         if: github.repository_owner == 'microsoft'
         uses: rajatjindal/krew-release-bot@v0.0.47
+  release-mcr:
     name: Release kubectl-retina-mcr
     runs-on: ubuntu-latest
     if: github.ref_type == 'tag'
