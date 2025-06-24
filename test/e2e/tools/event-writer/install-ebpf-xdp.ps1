@@ -469,9 +469,6 @@ Function Install-XDP
       }
 
       # Download XDP-for-Windows.
-      Write-Host 'Installing eXpress Data Path for Windows'
-      CertUtil.exe -addstore Root "$LocalPath\xdp.cer"
-      CertUtil.exe -addstore TrustedPublisher "$LocalPath\xdp.cer"
       Invoke-WebRequest -Uri "https://github.com/microsoft/xdp-for-windows/releases/download/v1.2.0-prerelease-793dc2a0/xdp-for-windows.x64.1.2.0-prerelease-793dc2a0.msi" -OutFile "$LocalPath\xdp-for-windows.msi"
       $certFileName = 'xdp.cer'
       Get-AuthenticodeSignature "$LocalPath\xdp-for-windows.msi" | Select-Object -ExpandProperty SignerCertificate | Export-Certificate -Type CERT -FilePath $certFileName
