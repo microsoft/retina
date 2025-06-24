@@ -406,16 +406,14 @@ Function Install-eBPF
 
       Write-Host 'Installing extended Berkley Packet Filter for Windows'
       # Download eBPF-for-Windows.
-      $packageEbpfUrl = "https://github.com/microsoft/ebpf-for-windows/releases/download/Release-v0.21.1/Build-native-only.NativeOnlyRelease.x64.zip"
-      Invoke-WebRequest -Uri $packageEbpfUrl -OutFile "$LocalPath\Build-native-only.NativeOnlyRelease.x64.zip"
-      Expand-Archive -Path "$LocalPath\Build-native-only.NativeOnlyRelease.x64.zip" -DestinationPath "$LocalPath\Build-x64-native-only.NativeOnlyRelease\msi" -Force
-      Copy-Item "$LocalPath\Build-x64-native-only.NativeOnlyRelease\msi\Build-native-only NativeOnlyRelease x64\*.msi" -Destination $LocalPath
+      $packageEbpfUrl  = "https://github.com/microsoft/ebpf-for-windows/releases/download/Release-v0.21.1/ebpf-for-windows.x64.0.21.1.msi"
+      Invoke-WebRequest -Uri $packageEbpfUrl -OutFile "$LocalPath\ebpf-for-windows.x64.0.21.1.msi"
 
-      Start-Process -FilePath "$($env:WinDir)\System32\MSIExec.exe" -ArgumentList @("/i", "$LocalPath\ebpf-for-windows.msi", "/qn", "INSTALLFOLDER=`"$($env:ProgramFiles)\ebpf-for-windows`"", "ADDLOCAL=eBPF_Runtime_Components") -PassThru | Wait-Process
+      Start-Process -FilePath "$($env:WinDir)\System32\MSIExec.exe" -ArgumentList @("/i", "$LocalPath\ebpf-for-windows.x64.0.21.1.msi", "/qn", "INSTALLFOLDER=`"$($env:ProgramFiles)\ebpf-for-windows`"", "ADDLOCAL=eBPF_Runtime_Components") -PassThru | Wait-Process
       If(-Not (Assert-SoftwareInstalled -ServiceName:'eBPFCore' -Silent) -Or
          -Not (Assert-SoftwareInstalled -ServiceName:'NetEbpfExt' -Silent))
       {
-         Write-Error -Message:"`teBPF service failed to install"
+         Write-Error -Message:"`eBPF service failed to install"
          Throw
       }
 
@@ -527,14 +525,31 @@ Function Install-EbpfXdp
          If(-Not (Enable-TestSigning -Reboot)) {Throw}
       }
 
-      $existing = Get-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Services\hns\State -Name CiliumOnWindows -ErrorAction SilentlyContinue
+      $service = Get-Service -Name "hns" -ErrorAction SilentlyContinue
+
+      If ($null -eq $service) {
+         Write-Host "HNS service not found"
+      } else 
+      {
+         $hnsPath = "HKLM:\SYSTEM\CurrentControlSet\Services\hns\State"
+         $valueName = "CiliumOnWindows"
+         $existing = Get-ItemProperty -Path $hnsPath -Name $valueName -ErrorAction SilentlyContinue
       
-      if ($null -eq $existing -or $existing.CiliumOnWindows -ne 1) {
-         New-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Services\hns\State -Name CiliumOnWindows -PropertyType DWORD -Value 1 -Force 
+         If ($null -eq $existing) {
+            Write-Host "CiliumOnWindows not found, creating it"
+            New-ItemProperty -Path $hnsPath -Name $valueName -PropertyType DWORD -Value 1 -Force 
+         }
+         else {
+            If ($existing.CiliumOnWindows -ne 1) {
+               Write-Host "Setting CiliumOnWindows to 1"
+               Set-ItemProperty -Path $hnsPath -Name $valueName -PropertyType DWORD -Value 1 -Force 
+            }
+         }
+
+         Write-Host "Restarting HNS service"
+         Restart-Service "hns"
       }
-
-      Restart-Service "hns"
-
+     
       If(-Not (Install-eBPF)) {Throw}
 
       If(-Not (Install-XDP)) {Throw}
@@ -626,7 +641,7 @@ Function Uninstall-eBPF
             }
          }
 
-         Start-Process -FilePath:"$($env:WinDir)\System32\MSIExec.exe" -ArgumentList @("/x $($LocalPath)\ebpf-for-windows.msi", '/qn') -PassThru | Wait-Process
+         Start-Process -FilePath:"$($env:WinDir)\System32\MSIExec.exe" -ArgumentList @("/x $($LocalPath)\ebpf-for-windows.x64.0.21.1.msi", '/qn') -PassThru | Wait-Process
       }
 
       If((Assert-SoftwareInstalled -ServiceName:'eBPFCore' -Silent) -or
