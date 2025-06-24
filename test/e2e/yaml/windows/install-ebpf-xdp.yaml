@@ -19,7 +19,12 @@ spec:
         command:
           - powershell.exe
           - -command
-          - '& .\install-ebpf-xdp.ps1 ; while ($true) { Start-Sleep -Seconds 300; }'
+          - |
+              # Enable HNSv2 architecture codepath
+              New-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Services\hns\State -Name CiliumOnWindows -PropertyType DWORD -Value 1
+              Get-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Services\hns\State -Name CiliumOnWindows
+              Restart-Service "hns"
+              & .\install-ebpf-xdp.ps1 ; while ($true) { Start-Sleep -Seconds 300; }
         readinessProbe:
           exec:
             command:
