@@ -147,5 +147,6 @@ COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/kubeconfi
 COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
 COPY --from=controller-bin /go/bin/retina/controller controller.exe
 COPY --from=capture-bin /go/bin/retina/captureworkload captureworkload.exe
+RUN reg add "HKLM\SYSTEM\CurrentControlSet\Services\hns\State" /v CiliumOnWindows /t REG_DWORD /d 1 /f
 ADD https://github.com/microsoft/etl2pcapng/releases/download/v1.10.0/etl2pcapng.exe /etl2pcapng.exe
 CMD ["controller.exe", "start", "--kubeconfig=.\\kubeconfig"]
