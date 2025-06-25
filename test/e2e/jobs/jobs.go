@@ -1,8 +1,6 @@
 package retina
 
 import (
-	"time"
-
 	"github.com/microsoft/retina/test/e2e/common"
 	"github.com/microsoft/retina/test/e2e/framework/azure"
 	"github.com/microsoft/retina/test/e2e/framework/generic"
@@ -10,10 +8,10 @@ import (
 	"github.com/microsoft/retina/test/e2e/framework/types"
 	"github.com/microsoft/retina/test/e2e/hubble"
 
-	/*"github.com/microsoft/retina/test/e2e/scenarios/dns"
+	"github.com/microsoft/retina/test/e2e/scenarios/dns"
 	"github.com/microsoft/retina/test/e2e/scenarios/drop"
 	"github.com/microsoft/retina/test/e2e/scenarios/latency"
-	tcp "github.com/microsoft/retina/test/e2e/scenarios/tcp"*/
+	tcp "github.com/microsoft/retina/test/e2e/scenarios/tcp"
 	"github.com/microsoft/retina/test/e2e/scenarios/windows"
 )
 
@@ -124,7 +122,7 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, test
 		TagEnv:             generic.DefaultTagEnv,
 	}, nil)
 
-	/*dnsScenarios := []struct {
+	dnsScenarios := []struct {
 		name string
 		req  *dns.RequestValidationParams
 		resp *dns.ResponseValidationParams
@@ -173,19 +171,13 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, test
 			name := scenario.name + " - Arch: " + arch
 			job.AddScenario(dns.ValidateBasicDNSMetrics(name, scenario.req, scenario.resp, testPodNamespace, arch))
 		}
-<<<<<<< HEAD
-	}*/
-
-	/*job.AddStep(&kubernetes.EnsureStableComponent{
-=======
 	}
 
 	job.AddStep(&kubernetes.EnsureStableComponent{
->>>>>>> 677a881 (E2E Tests Initial Checkin)
 		PodNamespace:           common.KubeSystemNamespace,
 		LabelSelector:          "k8s-app=retina",
 		IgnoreContainerRestart: false,
-	}, nil)*/
+	}, nil)
 
 	return job
 }
@@ -203,7 +195,7 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 		ValuesFile:         valuesFilePath,
 	}, nil)
 
-	/*dnsScenarios := []struct {
+	dnsScenarios := []struct {
 		name string
 		req  *dns.RequestValidationParams
 		resp *dns.ResponseValidationParams
@@ -242,43 +234,31 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 				ReturnCode:  "NXDOMAIN",
 			},
 		},
-	}*/
+	}
 
 	// Validate Windows BPF Metrics
 	job.AddStep(&kubernetes.ApplyYamlConfig{
 		YamlFilePath: "yaml/windows/non-hpc-pod.yaml",
 	}, nil)
-	time.Sleep(2 * time.Minute)
 
-<<<<<<< HEAD
-	/*for _, arch := range common.Architectures {
-=======
 	for _, arch := range common.Architectures {
->>>>>>> 677a881 (E2E Tests Initial Checkin)
 		for _, scenario := range dnsScenarios {
 			name := scenario.name + " - Arch: " + arch
 			job.AddScenario(dns.ValidateAdvancedDNSMetrics(name, scenario.req, scenario.resp, kubeConfigFilePath, testPodNamespace, arch))
 		}
-	}*/
+	}
 
 	job.AddScenario(windows.ValidateWindowsBasicMetric())
-<<<<<<< HEAD
-=======
 
 	job.AddScenario(windows.ValidateWinBpfMetricScenario())
 
 	job.AddScenario(latency.ValidateLatencyMetric(testPodNamespace))
->>>>>>> 677a881 (E2E Tests Initial Checkin)
 
-	job.AddScenario(windows.ValidateWinBpfMetricScenario())
-
-	/*job.AddScenario(latency.ValidateLatencyMetric(testPodNamespace))*/
-
-	/*job.AddStep(&kubernetes.EnsureStableComponent{
+	job.AddStep(&kubernetes.EnsureStableComponent{
 		PodNamespace:           common.KubeSystemNamespace,
 		LabelSelector:          "k8s-app=retina",
 		IgnoreContainerRestart: false,
-	}, nil)*/
+	}, nil)
 
 	return job
 }
@@ -298,11 +278,11 @@ func ValidateHubble(kubeConfigFilePath, chartPath string, testPodNamespace strin
 
 	job.AddScenario(hubble.ValidateHubbleUIService(kubeConfigFilePath))
 
-	/*job.AddStep(&kubernetes.EnsureStableComponent{
+	job.AddStep(&kubernetes.EnsureStableComponent{
 		PodNamespace:           common.KubeSystemNamespace,
 		LabelSelector:          "k8s-app=retina",
 		IgnoreContainerRestart: false,
-	}, nil)*/
+	}, nil)
 
 	return job
 }
