@@ -524,30 +524,24 @@ Function Install-EbpfXdp
       {
          If(-Not (Enable-TestSigning -Reboot)) {Throw}
       }
-
-      $service = Get-Service -Name "hns" -ErrorAction SilentlyContinue
-
-      If ($null -eq $service) {
-         Write-Host "HNS service not found"
-      } else 
-      {
-         $hnsPath = "HKLM:\SYSTEM\CurrentControlSet\Services\hns\State"
-         $valueName = "CiliumOnWindows"
-         $existing = Get-ItemProperty -Path $hnsPath -Name $valueName -ErrorAction SilentlyContinue
       
-         If ($null -eq $existing) {
-            Write-Host "CiliumOnWindows not found, creating it"
-            New-ItemProperty -Path $hnsPath -Name $valueName -PropertyType DWORD -Value 1 -Force 
-         }
-         else {
-            If ($existing.CiliumOnWindows -ne 1) {
-               Write-Host "Setting CiliumOnWindows to 1"
-               Set-ItemProperty -Path $hnsPath -Name $valueName -PropertyType DWORD -Value 1 -Force 
-            }
-         }
+      $hnsPath = "HKLM:\SYSTEM\CurrentControlSet\Services\hns2\State"
+      $valueName = "CiliumOnWindows"
 
-         Write-Host "Restarting HNS service"
-         Restart-Service "hns"
+      if (-not (Test-Path $hnsPath)) {
+         New-Item -Path $hnsPath -Force | Out-Null
+      }
+
+      $existing = Get-ItemProperty -Path $hnsPath -Name $valueName -ErrorAction SilentlyContinue
+   
+      If ($null -eq $existing) {
+         Write-Host "CiliumOnWindows not found, creating it"
+         New-ItemProperty -Path $hnsPath -Name $valueName -PropertyType DWORD -Value 1 -Force 
+      } else {
+         If ($existing.CiliumOnWindows -ne 1) {
+            Write-Host "Setting CiliumOnWindows to 1"
+            Set-ItemProperty -Path $hnsPath -Name $valueName -PropertyType DWORD -Value 1 -Force 
+         }
       }
      
       If(-Not (Install-eBPF)) {Throw}
