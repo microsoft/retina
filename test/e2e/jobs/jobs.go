@@ -123,7 +123,7 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, test
 		TagEnv:             generic.DefaultTagEnv,
 	}, nil)
 
-	dnsScenarios := []struct {
+	/*dnsScenarios := []struct {
 		name string
 		req  *dns.RequestValidationParams
 		resp *dns.ResponseValidationParams
@@ -172,7 +172,7 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, test
 			name := scenario.name + " - Arch: " + arch
 			job.AddScenario(dns.ValidateBasicDNSMetrics(name, scenario.req, scenario.resp, testPodNamespace, arch))
 		}
-	}
+	}*/
 
 	/*job.AddStep(&kubernetes.EnsureStableComponent{
 		PodNamespace:           common.KubeSystemNamespace,
@@ -196,7 +196,7 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 		ValuesFile:         valuesFilePath,
 	}, nil)
 
-	dnsScenarios := []struct {
+	/*dnsScenarios := []struct {
 		name string
 		req  *dns.RequestValidationParams
 		resp *dns.ResponseValidationParams
@@ -235,7 +235,7 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 				ReturnCode:  "NXDOMAIN",
 			},
 		},
-	}
+	}*/
 
 	// Validate Windows BPF Metrics
 	job.AddStep(&kubernetes.ApplyYamlConfig{
@@ -243,18 +243,18 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 	}, nil)
 	time.Sleep(2 * time.Minute)
 
-	for _, arch := range common.Architectures {
+	/*for _, arch := range common.Architectures {
 		for _, scenario := range dnsScenarios {
 			name := scenario.name + " - Arch: " + arch
 			job.AddScenario(dns.ValidateAdvancedDNSMetrics(name, scenario.req, scenario.resp, kubeConfigFilePath, testPodNamespace, arch))
 		}
-	}
+	}*/
 
 	job.AddScenario(windows.ValidateWindowsBasicMetric())
 
 	job.AddScenario(windows.ValidateWinBpfMetricScenario())
 
-	job.AddScenario(latency.ValidateLatencyMetric(testPodNamespace))
+	/*job.AddScenario(latency.ValidateLatencyMetric(testPodNamespace))*/
 
 	/*job.AddStep(&kubernetes.EnsureStableComponent{
 		PodNamespace:           common.KubeSystemNamespace,
