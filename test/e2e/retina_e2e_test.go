@@ -61,14 +61,10 @@ func TestE2ERetina(t *testing.T) {
 	installEbpfAndXDP := types.NewRunner(t, jobs.InstallEbpfXdp(common.KubeConfigFilePath(rootDir)))
 	installEbpfAndXDP.Run(ctx)
 
-<<<<<<< HEAD
 	config, _ := clientcmd.BuildConfigFromFlags("", common.KubeConfigFilePath(rootDir))
 	clientset, _ := kubernetes.NewForConfig(config)
 	err = waitForPodReadyWithClientGo(ctx, clientset, "install-ebpf-xdp", "name=install-ebpf-xdp", 10*time.Minute)
 	require.NoError(t, err)
-=======
-	time.Sleep(10 * time.Minute)
->>>>>>> 677a881 (E2E Tests Initial Checkin)
 
 	// Load and pin BPF Maps
 	loadAndPinWinBPFJob := types.NewRunner(t, jobs.LoadAndPinWinBPFJob(common.KubeConfigFilePath(rootDir)))
