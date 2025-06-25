@@ -9,10 +9,10 @@ import (
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/types"
 	"github.com/microsoft/retina/test/e2e/hubble"
-	"github.com/microsoft/retina/test/e2e/scenarios/dns"
+	/*"github.com/microsoft/retina/test/e2e/scenarios/dns"
 	"github.com/microsoft/retina/test/e2e/scenarios/drop"
 	"github.com/microsoft/retina/test/e2e/scenarios/latency"
-	tcp "github.com/microsoft/retina/test/e2e/scenarios/tcp"
+	tcp "github.com/microsoft/retina/test/e2e/scenarios/tcp"*/
 	"github.com/microsoft/retina/test/e2e/scenarios/windows"
 )
 
