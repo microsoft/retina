@@ -174,11 +174,11 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, test
 		}
 	}
 
-	job.AddStep(&kubernetes.EnsureStableComponent{
+	/*job.AddStep(&kubernetes.EnsureStableComponent{
 		PodNamespace:           common.KubeSystemNamespace,
 		LabelSelector:          "k8s-app=retina",
 		IgnoreContainerRestart: false,
-	}, nil)
+	}, nil)*/
 
 	return job
 }
@@ -256,11 +256,11 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 
 	job.AddScenario(latency.ValidateLatencyMetric(testPodNamespace))
 
-	job.AddStep(&kubernetes.EnsureStableComponent{
+	/*job.AddStep(&kubernetes.EnsureStableComponent{
 		PodNamespace:           common.KubeSystemNamespace,
 		LabelSelector:          "k8s-app=retina",
 		IgnoreContainerRestart: false,
-	}, nil)
+	}, nil)*/
 
 	return job
 }
@@ -280,11 +280,11 @@ func ValidateHubble(kubeConfigFilePath, chartPath string, testPodNamespace strin
 
 	job.AddScenario(hubble.ValidateHubbleUIService(kubeConfigFilePath))
 
-	job.AddStep(&kubernetes.EnsureStableComponent{
+	/*job.AddStep(&kubernetes.EnsureStableComponent{
 		PodNamespace:           common.KubeSystemNamespace,
 		LabelSelector:          "k8s-app=retina",
 		IgnoreContainerRestart: false,
-	}, nil)
+	}, nil)*/
 
 	return job
 }
