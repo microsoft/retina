@@ -40,7 +40,7 @@ func TestE2ERetina(t *testing.T) {
 	installEbpfAndXDP := types.NewRunner(t, jobs.InstallEbpfXdp(common.KubeConfigFilePath(rootDir)))
 	installEbpfAndXDP.Run(ctx)
 
-	time.Sleep(10 * time.Minute)
+	// time.Sleep(10 * time.Minute)
 
 	// Load and pin BPF Maps
 	loadAndPinWinBPFJob := types.NewRunner(t, jobs.LoadAndPinWinBPFJob(common.KubeConfigFilePath(rootDir)))
