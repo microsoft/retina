@@ -23,6 +23,8 @@ jobs:
           go-version-file: go.mod
       - name: Run GoReleaser build
         uses: goreleaser/goreleaser-action@v6
+        env:
+          SUFFIX: ''
         with:
           distribution: goreleaser
           version: latest
@@ -70,9 +72,11 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SUFFIX: ''
       - name: Update new version in krew-index
         if: github.repository_owner == 'microsoft'
         uses: rajatjindal/krew-release-bot@v0.0.47
+  release-mcr:
     name: Release kubectl-retina-mcr
     runs-on: ubuntu-latest
     if: github.ref_type == 'tag'
