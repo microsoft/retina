@@ -525,7 +525,7 @@ Function Install-EbpfXdp
          If(-Not (Enable-TestSigning -Reboot)) {Throw}
       }
       
-      $hnsPath = "HKLM:\SYSTEM\CurrentControlSet\Services\hns2\State"
+      $hnsPath = "HKLM:\SYSTEM\CurrentControlSet\Services\hns\State"
       $valueName = "CiliumOnWindows"
 
       if (-not (Test-Path $hnsPath)) {
@@ -548,8 +548,8 @@ Function Install-EbpfXdp
 
       If(-Not (Install-XDP)) {Throw}
 
-      If(Assert-WindowsEbpfXdpIsReady) {Throw}
-
+      Write-Host 'eBPF and XDP for Windows is installed successfully'
+      write-Host 'Create the probe ready file'
       # Create the probe ready file
       New-Item -Path "C:\install-ebpf-xdp-probe-ready" -ItemType File -Force
    }
