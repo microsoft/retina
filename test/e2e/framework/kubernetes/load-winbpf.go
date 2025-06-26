@@ -21,9 +21,9 @@ type LoadAndPinWinBPF struct {
 }
 
 func ExecCommandInWinPod(KubeConfigFilePath string, cmd string, Namespace string, LabelSelector string) (string, error) {
-	defaultRetrier = retry.Retrier{Attempts: 15, Delay: 5 * time.Second}
+	defaultRetrier = retry.Retrier{Attempts: 15, Delay: 20 * time.Second}
 	// Create a context with a timeout (e.g., 30 seconds)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 360*time.Second)
 	defer cancel()
 	config, err := clientcmd.BuildConfigFromFlags("", KubeConfigFilePath)
 	if err != nil {
@@ -81,7 +81,7 @@ func ExecCommandInWinPod(KubeConfigFilePath string, cmd string, Namespace string
 func (a *LoadAndPinWinBPF) Run() error {
 	// Copy Event Writer into Node
 	LoadAndPinWinBPFDLabelSelector := fmt.Sprintf("name=%s", a.LoadAndPinWinBPFDeamonSetName)
-	_, err := ExecCommandInWinPod(a.KubeConfigFilePath, "move /Y .\\event-writer-helper.bat C:\\event-writer-helper.bat", a.LoadAndPinWinBPFDeamonSetNamespace, LoadAndPinWinBPFDLabelSelector)
+	_, err := ExecCommandInWinPod(a.KubeConfigFilePath, "copy /Y .\\event-writer-helper.bat C:\\event-writer-helper.bat", a.LoadAndPinWinBPFDeamonSetNamespace, LoadAndPinWinBPFDLabelSelector)
 	if err != nil {
 		return err
 	}
