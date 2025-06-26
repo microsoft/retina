@@ -520,7 +520,7 @@ Function Install-EbpfXdp
          Write-Host 'eBPF and XDP for Windows is installed successfully'
          write-Host 'Create the probe ready file'
          # Create the probe ready file
-         New-Item -Path "C:\install-ebpf-xdp-probe-ready" -ItemType File -Force
+         New-Item -Path "C:\install-ebpf-xdp-probe-ready" -ItemType File -Force 
          return
       }
 
