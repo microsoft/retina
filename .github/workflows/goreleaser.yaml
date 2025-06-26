@@ -24,29 +24,7 @@ jobs:
       - name: Run GoReleaser build
         uses: goreleaser/goreleaser-action@v6
         env:
-          SUFFIX: ''
-        with:
-          distribution: goreleaser
-          version: latest
-          args: build --snapshot --clean
-  build-mcr:
-    name: Build kubectl-retina-mcr
-    if: github.ref_type == 'branch'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          fetch-depth: 0
-      - name: Set up Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
-        with:
-          go-version-file: go.mod
-      - name: Run GoReleaser build
-        uses: goreleaser/goreleaser-action@v6
-        env:
-          AGENT_IMAGE_NAME: mcr.microsoft.com/containernetworking/retina-agent
-          SUFFIX: -mcr
+          MCR_AGENT_IMAGE_NAME: mcr.microsoft.com/containernetworking/retina-agent
         with:
           distribution: goreleaser
           version: latest
@@ -72,30 +50,7 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SUFFIX: ''
+          MCR_AGENT_IMAGE_NAME: mcr.microsoft.com/containernetworking/retina-agent
       - name: Update new version in krew-index
         if: github.repository_owner == 'microsoft'
         uses: rajatjindal/krew-release-bot@v0.0.47
-  release-mcr:
-    name: Release kubectl-retina-mcr
-    runs-on: ubuntu-latest
-    if: github.ref_type == 'tag'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          fetch-depth: 0
-      - name: Set up Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
-        with:
-          go-version-file: go.mod
-      - name: Run GoReleaser release
-        uses: goreleaser/goreleaser-action@v6
-        with:
-          distribution: goreleaser
-          version: latest
-          args: release --clean
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          AGENT_IMAGE_NAME: mcr.microsoft.com/containernetworking/retina-agent
-          SUFFIX: -mcr
