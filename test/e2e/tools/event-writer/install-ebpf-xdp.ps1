@@ -517,7 +517,11 @@ Function Install-EbpfXdp
    Try
    {
       If(Assert-WindowsEbpfXdpIsReady) {
-          return
+         Write-Host 'eBPF and XDP for Windows is installed successfully'
+         write-Host 'Create the probe ready file'
+         # Create the probe ready file
+         New-Item -Path "C:\install-ebpf-xdp-probe-ready" -ItemType File -Force 
+         return
       }
 
       If(-Not (Assert-TestSigningIsEnabled -Silent))

@@ -92,7 +92,12 @@ load_pin(void) {
         goto fail;
     }
 
-    // Load cilium_events map and event_writer bpf program
+    if (EBPF_SUCCESS != ebpf_object_set_execution_type(obj, EBPF_EXECUTION_NATIVE)) {
+        fprintf(stderr, "%s - failed to set execution type to native\n", __FUNCTION__);
+        goto fail;
+    }
+
+    // Load cilium_events map and event_writer bpf  program
     if (bpf_object__load(obj) < 0) {
         fprintf(stderr, "%s - failed to load BPF sys\n", __FUNCTION__);
         goto fail;
