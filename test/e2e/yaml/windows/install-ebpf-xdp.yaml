@@ -12,6 +12,10 @@ spec:
       labels:
         name: install-ebpf-xdp
     spec:
+      tolerations:
+      - key: "os"
+        value: "windows"
+        effect: "NoSchedule"
       containers:
       - name: install-ebpf-xdp-container
         image: ghcr.io/kumarvin123/retina/test/e2e-test-event-writer:latest
@@ -25,7 +29,7 @@ spec:
             command:
               - powershell.exe
               - -command
-              - Test-Path C:\install-ebpf-xdp-probe-ready
+              - if (!(Test-Path C:\install-ebpf-xdp-probe-ready)) { exit 1 }
           initialDelaySeconds: 10
           periodSeconds: 5
       hostNetwork: true
