@@ -39,13 +39,17 @@ func ExecCommandInWinPod(KubeConfigFilePath string, cmd string, Namespace string
 		LabelSelector: LabelSelector,
 	})
 	if err != nil {
-		panic(err.Error())
+		return "", fmt.Errorf("error listing pods: %w", err)
 	}
 
 	var windowsPod *v1.Pod
-	for pod := range pods.Items {
-		if pods.Items[pod].Spec.NodeSelector["kubernetes.io/os"] == "windows" {
-			windowsPod = &pods.Items[pod]
+	for i := range pods.Items {
+		pod := &pods.Items[i]
+		if pod.Spec.NodeSelector["kubernetes.io/os"] == "windows" &&
+			pod.Status.Phase == v1.PodRunning {
+			// Optionally, check for Ready condition here
+			windowsPod = pod
+			break
 		}
 	}
 
