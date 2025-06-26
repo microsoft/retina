@@ -4,7 +4,7 @@
   <Import Project="packages\Microsoft.Windows.WDK.x64.10.0.26100.2454\build\native\Microsoft.Windows.WDK.x64.props" Condition="Exists('packages\Microsoft.Windows.WDK.x64.10.0.26100.2454\build\native\Microsoft.Windows.WDK.x64.props')" />
   <Import Project="packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.2454\build\native\Microsoft.Windows.SDK.cpp.x64.props" Condition="Exists('packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.2454\build\native\Microsoft.Windows.SDK.cpp.x64.props')" />
   <Import Project="packages\Microsoft.Windows.SDK.CPP.10.0.26100.2454\build\native\Microsoft.Windows.SDK.cpp.props" Condition="Exists('packages\Microsoft.Windows.SDK.CPP.10.0.26100.2454\build\native\Microsoft.Windows.SDK.cpp.props')" />
-  <Import Project="packages\eBPF-for-Windows.x64.0.20.0\build\native\ebpf-for-windows.x64.props" Condition="Exists('packages\eBPF-for-Windows.x64.0.20.0\build\native\ebpf-for-windows.x64.props')" />
+  <Import Project="packages\eBPF-for-Windows.x64.0.21.0\build\native\ebpf-for-windows.x64.props" Condition="Exists('packages\eBPF-for-Windows.x64.0.21.0\build\native\ebpf-for-windows.x64.props')" />
   <PropertyGroup>
     <WDKVersion>10.0.26100.2454</WDKVersion>
   </PropertyGroup>
@@ -98,7 +98,7 @@
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('packages\eBPF-for-Windows.x64.0.21.0\build\native\ebpf-for-windows.x64.props')" Text="$([System.String]::Format('$(ErrorText)', 'packages\eBPF-for-Windows.x64.0.20.0\build\native\ebpf-for-windows.x64.props'))" />
+    <Error Condition="!Exists('packages\eBPF-for-Windows.x64.0.21.0\build\native\ebpf-for-windows.x64.props')" Text="$([System.String]::Format('$(ErrorText)', 'packages\eBPF-for-Windows.x64.0.21.0\build\native\ebpf-for-windows.x64.props'))" />
     <Error Condition="!Exists('packages\Microsoft.Windows.SDK.CPP.10.0.26100.2454\build\native\Microsoft.Windows.SDK.cpp.props')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Windows.SDK.CPP.10.0.26100.2454\build\native\Microsoft.Windows.SDK.cpp.props'))" />
     <Error Condition="!Exists('packages\Microsoft.Windows.SDK.CPP.10.0.26100.2454\build\native\Microsoft.Windows.SDK.cpp.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Windows.SDK.CPP.10.0.26100.2454\build\native\Microsoft.Windows.SDK.cpp.targets'))" />
     <Error Condition="!Exists('packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.2454\build\native\Microsoft.Windows.SDK.cpp.x64.props')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.2454\build\native\Microsoft.Windows.SDK.cpp.x64.props'))" />

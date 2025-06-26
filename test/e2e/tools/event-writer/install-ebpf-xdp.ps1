@@ -406,16 +406,14 @@ Function Install-eBPF
 
       Write-Host 'Installing extended Berkley Packet Filter for Windows'
       # Download eBPF-for-Windows.
-      $packageEbpfUrl = "https://github.com/microsoft/ebpf-for-windows/releases/download/Release-v0.21.0/Build-x64-native-only.NativeOnlyRelease.zip"
-      Invoke-WebRequest -Uri $packageEbpfUrl -OutFile "$LocalPath\Build-x64-native-only.NativeOnlyRelease.zip"
-      Expand-Archive -Path "$LocalPath\Build-x64-native-only.NativeOnlyRelease.zip" -DestinationPath "$LocalPath\Build-x64-native-only.NativeOnlyRelease\msi" -Force
-      Copy-Item "$LocalPath\Build-x64-native-only.NativeOnlyRelease\msi\Build-x64-native-only NativeOnlyRelease\*.msi" -Destination $LocalPath
+      $packageEbpfUrl  = "https://github.com/microsoft/ebpf-for-windows/releases/download/Release-v0.21.1/ebpf-for-windows.x64.0.21.1.msi"
+      Invoke-WebRequest -Uri $packageEbpfUrl -OutFile "$LocalPath\ebpf-for-windows.x64.0.21.1.msi"
 
-      Start-Process -FilePath "$($env:WinDir)\System32\MSIExec.exe" -ArgumentList @("/i", "$LocalPath\ebpf-for-windows.msi", "/qn", "INSTALLFOLDER=`"$($env:ProgramFiles)\ebpf-for-windows`"", "ADDLOCAL=eBPF_Runtime_Components") -PassThru | Wait-Process
+      Start-Process -FilePath "$($env:WinDir)\System32\MSIExec.exe" -ArgumentList @("/i", "$LocalPath\ebpf-for-windows.x64.0.21.1.msi", "/qn", "INSTALLFOLDER=`"$($env:ProgramFiles)\ebpf-for-windows`"", "ADDLOCAL=eBPF_Runtime_Components") -PassThru | Wait-Process
       If(-Not (Assert-SoftwareInstalled -ServiceName:'eBPFCore' -Silent) -Or
          -Not (Assert-SoftwareInstalled -ServiceName:'NetEbpfExt' -Silent))
       {
-         Write-Error -Message:"`teBPF service failed to install"
+         Write-Error -Message:"`eBPF service failed to install"
          Throw
       }
 
@@ -472,29 +470,23 @@ Function Install-XDP
 
       # Download XDP-for-Windows.
       Write-Host 'Installing eXpress Data Path for Windows'
-      $packageXdpUrl = "https://github.com/microsoft/xdp-for-windows/releases/download/v1.1.0%2Bbed474a/bin_Release_x64.zip"
-      Invoke-WebRequest -Uri $packageXdpUrl -OutFile "$LocalPath\bin_Release_x64.zip"
-      Expand-Archive -Path "$LocalPath\bin_Release_x64.zip" -DestinationPath "$LocalPath\bin_Release_x64" -Force
-      copy "$LocalPath\bin_Release_x64\amd64fre\xdp.cer" $LocalPath
-      copy "$LocalPath\bin_Release_x64\amd64fre\xdpcfg.exe" $LocalPath
       CertUtil.exe -addstore Root "$LocalPath\xdp.cer"
       CertUtil.exe -addstore TrustedPublisher "$LocalPath\xdp.cer"
-      Invoke-WebRequest -Uri "https://github.com/microsoft/xdp-for-windows/releases/download/v1.1.0%2Bbed474a/xdp-for-windows.1.1.0.msi" -OutFile "$LocalPath\xdp-for-windows.1.1.0.msi"
-      Start-Process -FilePath:"$($env:WinDir)\System32\MSIExec.exe" -ArgumentList @("/i $LocalPath\xdp-for-windows.1.1.0.msi", '/qn') -PassThru | Wait-Process
+      Invoke-WebRequest -Uri "https://github.com/microsoft/xdp-for-windows/releases/download/v1.2.0-prerelease-793dc2a0/xdp-for-windows.x64.1.2.0-prerelease-793dc2a0.msi" -OutFile "$LocalPath\xdp-for-windows.msi"
+      $certFileName = 'xdp.cer'
+      Get-AuthenticodeSignature "$LocalPath\xdp-for-windows.msi" | Select-Object -ExpandProperty SignerCertificate | Export-Certificate -Type CERT -FilePath $certFileName
+      Import-Certificate -FilePath $certFileName -CertStoreLocation 'cert:\localmachine\root'
+      Import-Certificate -FilePath $certFileName -CertStoreLocation 'cert:\localmachine\trustedpublisher'
+      Start-Process -FilePath:"$($env:WinDir)\System32\MSIExec.exe" -ArgumentList @("/i $LocalPath\xdp-for-windows.msi", '/qn') -PassThru | Wait-Process
       sc.exe query xdp
       reg.exe add "HKLM\SYSTEM\CurrentControlSet\Services\xdp\Parameters" /v XdpEbpfEnabled /d 1 /t REG_DWORD /f
       net.exe stop xdp
       net.exe start xdp
-      Write-Output "XDP for Windows installed"
-      Write-Host "Setting SDDL for XDP service"
-      & "$LocalPath\xdpcfg.exe" SetDeviceSddl "D:P(A;;GA;;;SY)(A;;GA;;;BA)"
+
       If(-Not (Assert-SoftwareInstalled -SoftwareName:'XDP for Windows' -Silent)) {
          Throw
       }
 
-      Restart-Computer -Force
-      #to prevent any further commands in between
-      Start-Sleep -Seconds:60
    }
    Catch
    {
@@ -525,20 +517,43 @@ Function Install-EbpfXdp
    Try
    {
       If(Assert-WindowsEbpfXdpIsReady) {
-          return
+         Write-Host 'eBPF and XDP for Windows is installed successfully'
+         write-Host 'Create the probe ready file'
+         # Create the probe ready file
+         New-Item -Path "C:\install-ebpf-xdp-probe-ready" -ItemType File -Force
+         return
       }
 
       If(-Not (Assert-TestSigningIsEnabled -Silent))
       {
          If(-Not (Enable-TestSigning -Reboot)) {Throw}
       }
+      
+      $hnsPath = "HKLM:\SYSTEM\CurrentControlSet\Services\hns\State"
+      $valueName = "CiliumOnWindows"
 
+      if (-not (Test-Path $hnsPath)) {
+         New-Item -Path $hnsPath -Force | Out-Null
+      }
+
+      $existing = Get-ItemProperty -Path $hnsPath -Name $valueName -ErrorAction SilentlyContinue
+   
+      If ($null -eq $existing) {
+         Write-Host "CiliumOnWindows not found, creating it"
+         New-ItemProperty -Path $hnsPath -Name $valueName -PropertyType DWORD -Value 1 -Force 
+      } else {
+         If ($existing.CiliumOnWindows -ne 1) {
+            Write-Host "Setting CiliumOnWindows to 1"
+            Set-ItemProperty -Path $hnsPath -Name $valueName -PropertyType DWORD -Value 1 -Force 
+         }
+      }
+     
       If(-Not (Install-eBPF)) {Throw}
 
       If(-Not (Install-XDP)) {Throw}
 
-      If(Assert-WindowsEbpfXdpIsReady) {Throw}
-
+      Write-Host 'eBPF and XDP for Windows is installed successfully'
+      write-Host 'Create the probe ready file'
       # Create the probe ready file
       New-Item -Path "C:\install-ebpf-xdp-probe-ready" -ItemType File -Force
    }
@@ -624,7 +639,7 @@ Function Uninstall-eBPF
             }
          }
 
-         Start-Process -FilePath:"$($env:WinDir)\System32\MSIExec.exe" -ArgumentList @("/x $($LocalPath)\ebpf-for-windows.msi", '/qn') -PassThru | Wait-Process
+         Start-Process -FilePath:"$($env:WinDir)\System32\MSIExec.exe" -ArgumentList @("/x $($LocalPath)\ebpf-for-windows.x64.0.21.1.msi", '/qn') -PassThru | Wait-Process
       }
 
       If((Assert-SoftwareInstalled -ServiceName:'eBPFCore' -Silent) -or
@@ -714,7 +729,7 @@ Function Uninstall-XDP
          $regValue = New-ItemProperty -Path:'HKLM:\SYSTEM\CurrentControlSet\Services\xdp\Parameters' -Name:'xdpEbpfEnabled' -PropertyType:'DWORD' -Value:0 -Force
          If($regValue.xdpEbpfEnabled -IEQ 0)
          {
-            Start-Process -FilePath:"$($env:WinDir)\System32\MSIExec.exe" -ArgumentList @("/x $($LocalPath)\xdp-for-windows.1.1.0.msi", '/qn') -PassThru | Wait-Process
+            Start-Process -FilePath:"$($env:WinDir)\System32\MSIExec.exe" -ArgumentList @("/x $($LocalPath)\xdp-for-windows.msi", '/qn') -PassThru | Wait-Process
          }
       }
 

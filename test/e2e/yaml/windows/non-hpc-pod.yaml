@@ -7,9 +7,13 @@ metadata:
 spec:
   nodeSelector:
     "kubernetes.io/os": windows
+  tolerations:
+  - key: "os"
+    value: "windows"
+    effect: "NoSchedule"
   containers:
   - name: non-hpc-container
-    image: ghcr.io/microsoft/retina/e2e-test-event-writer:latest
+    image: ghcr.io/kumarvin123/retina/test/e2e-test-event-writer:latest
     command: ["powershell", "-Command", "while ($true) { Start-Sleep -Seconds 3600 }"]
     securityContext:
         windowsOptions:
