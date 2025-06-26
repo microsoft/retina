@@ -125,7 +125,7 @@ func (lm *LatencyMetrics) Init(metricName string) {
 			// Didn't get the corresponding packet.
 			k := item.Key()
 			v := item.Value()
-			lm.l.Debug("Evicted item", 
+			lm.l.Debug("Evicted item",
 				zap.String("srcIP", k.srcIP),
 				zap.String("dstIP", k.dstIP),
 				zap.Uint32("srcPort", k.srcP),
