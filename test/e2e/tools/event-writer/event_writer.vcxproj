@@ -4,7 +4,7 @@
   <Import Project="packages\Microsoft.Windows.WDK.x64.10.0.26100.2454\build\native\Microsoft.Windows.WDK.x64.props" Condition="Exists('packages\Microsoft.Windows.WDK.x64.10.0.26100.2454\build\native\Microsoft.Windows.WDK.x64.props')" />
   <Import Project="packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.2454\build\native\Microsoft.Windows.SDK.cpp.x64.props" Condition="Exists('packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.2454\build\native\Microsoft.Windows.SDK.cpp.x64.props')" />
   <Import Project="packages\Microsoft.Windows.SDK.CPP.10.0.26100.2454\build\native\Microsoft.Windows.SDK.cpp.props" Condition="Exists('packages\Microsoft.Windows.SDK.CPP.10.0.26100.2454\build\native\Microsoft.Windows.SDK.cpp.props')" />
-  <Import Project="packages\eBPF-for-Windows.x64.0.21.0\build\native\ebpf-for-windows.x64.props" Condition="Exists('packages\eBPF-for-Windows.x64.0.21.0\build\native\ebpf-for-windows.x64.props')" />
+  <Import Project="packages\eBPF-for-Windows.x64.0.21.1\build\native\ebpf-for-windows.x64.props" Condition="Exists('packages\eBPF-for-Windows.x64.0.21.1\build\native\ebpf-for-windows.x64.props')" />
   <PropertyGroup>
     <WDKVersion>10.0.26100.2454</WDKVersion>
   </PropertyGroup>
@@ -20,7 +20,7 @@
     <ProjectGuid>{A12E2603-25A2-4A9C-9B9D-9156C9520789}</ProjectGuid>
     <RootNamespace>event_writer</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
-    <EbpfPackagePath>$(SolutionDir)packages\eBPF-for-Windows.x64.0.21.0\build\native\</EbpfPackagePath>
+    <EbpfPackagePath>$(SolutionDir)packages\eBPF-for-Windows.x64.0.21.1\build\native\</EbpfPackagePath>
     <XdpPackagePath>$(SolutionDir)packages\XDP-for-Windows.1.1.0\build\native\</XdpPackagePath>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -51,7 +51,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)packages\Microsoft.Windows.SDK.CPP.10.0.26100.2454\c\Include\10.0.26100.0\um;$(SolutionDir)packages\eBPF-for-Windows.x64.0.21.0\build\native\include;$(SolutionDir)packages\XDP-for-Windows.1.1.0\build\native\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)packages\Microsoft.Windows.SDK.CPP.10.0.26100.2454\c\Include\10.0.26100.0\um;$(SolutionDir)packages\eBPF-for-Windows.x64.0.21.1\build\native\include;$(SolutionDir)packages\XDP-for-Windows.1.1.0\build\native\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
@@ -60,7 +60,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalLibraryDirectories>$(SolutionDir)packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.2454\c\um\x64;$(SolutionDir)packages\eBPF-for-Windows.x64.0.21.0\build\native\lib;$(SolutionDir)packages\XDP-for-Windows.1.1.0\build\native\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.2454\c\um\x64;$(SolutionDir)packages\eBPF-for-Windows.x64.0.21.1\build\native\lib;$(SolutionDir)packages\XDP-for-Windows.1.1.0\build\native\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>ebpfapi.lib;iphlpapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -98,7 +98,7 @@
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('packages\eBPF-for-Windows.x64.0.21.0\build\native\ebpf-for-windows.x64.props')" Text="$([System.String]::Format('$(ErrorText)', 'packages\eBPF-for-Windows.x64.0.21.0\build\native\ebpf-for-windows.x64.props'))" />
+    <Error Condition="!Exists('packages\eBPF-for-Windows.x64.0.21.1\build\native\ebpf-for-windows.x64.props')" Text="$([System.String]::Format('$(ErrorText)', 'packages\eBPF-for-Windows.x64.0.21.1\build\native\ebpf-for-windows.x64.props'))" />
     <Error Condition="!Exists('packages\Microsoft.Windows.SDK.CPP.10.0.26100.2454\build\native\Microsoft.Windows.SDK.cpp.props')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Windows.SDK.CPP.10.0.26100.2454\build\native\Microsoft.Windows.SDK.cpp.props'))" />
     <Error Condition="!Exists('packages\Microsoft.Windows.SDK.CPP.10.0.26100.2454\build\native\Microsoft.Windows.SDK.cpp.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Windows.SDK.CPP.10.0.26100.2454\build\native\Microsoft.Windows.SDK.cpp.targets'))" />
     <Error Condition="!Exists('packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.2454\build\native\Microsoft.Windows.SDK.cpp.x64.props')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.2454\build\native\Microsoft.Windows.SDK.cpp.x64.props'))" />
