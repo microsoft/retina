@@ -16,7 +16,7 @@ Below is a list of required tools and dependencies you need to set up your local
 - [Docker](https://docs.docker.com/engine/install/)
 - [Helm](https://helm.sh/docs/intro/install)
 - jq: `sudo apt install jq`
-- If you want to use [ghcr.io](https://github.com/features/packages) as container registry, login following instructions [here](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-with-a-personal-access-token-classic)
+- If you want to use [ghcr.io](https://github.com/features/packages) as container registry, login following instructions on [authenticating with a personal access token](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-with-a-personal-access-token-classic)
 
 Once you have set up your environment fork the repository and create a branch for your changes.
 
@@ -192,8 +192,8 @@ When you're ready to open a pull request, please ensure that your branch is up-t
 ### Cryptographic Signing of Commits
 
 In order to certify the provenance of commits and defend against impersonation, we require that all commits be cryptographically signed.
-Documentation for setting up Git and GitHub to sign your commits can be found [here](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits).
-Additional information about Git's use of GPG can be found [here](https://git-scm.com/book/en/v2/Git-Tools-Signing-Your-Work)
+Documentation for setting up Git and GitHub to sign your commits can be found in the [GitHub documentation on signing commits](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits).
+Additional information about Git's use of GPG can be found in the [Git documentation on signing your work](https://git-scm.com/book/en/v2/Git-Tools-Signing-Your-Work)
 
 > To configure your Git client to sign commits by default for a local repository, run `git config --add commit.gpgsign true`.
 
@@ -202,7 +202,7 @@ For **GitHub Codespaces** users, please follow [this doc](https://docs.github.co
 ### Developer Certificate of Origin (DCO)
 
 Contributions to Retina must contain a Developer Certificate of Origin within their constituent commits.
-This can be accomplished by providing a `-s` flag to `git commit` as documented [here](https://git-scm.com/docs/git-commit#Documentation/git-commit.txt--s).
+This can be accomplished by providing a `-s` flag to `git commit` as documented in the [Git commit documentation](https://git-scm.com/docs/git-commit#Documentation/git-commit.txt--s).
 This will add a `Signed-off-by` trailer to your Git commit, affirming your acceptance of the Contributor License Agreement.
 
 ### Updating Documentation
