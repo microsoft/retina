@@ -1,8 +1,6 @@
 package retina
 
 import (
-	"time"
-
 	"github.com/microsoft/retina/test/e2e/common"
 	"github.com/microsoft/retina/test/e2e/framework/azure"
 	"github.com/microsoft/retina/test/e2e/framework/generic"
@@ -238,7 +236,6 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 	job.AddStep(&kubernetes.ApplyYamlConfig{
 		YamlFilePath: "yaml/windows/non-hpc-pod.yaml",
 	}, nil)
-	time.Sleep(2 * time.Minute)
 
 	/*for _, arch := range common.Architectures {
 		for _, scenario := range dnsScenarios {
@@ -247,7 +244,7 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 		}
 	}*/
 
-	//job.AddScenario(windows.ValidateWindowsBasicMetric())
+	job.AddScenario(windows.ValidateWindowsBasicMetric())
 
 	job.AddScenario(windows.ValidateWinBpfMetricScenario())
 
