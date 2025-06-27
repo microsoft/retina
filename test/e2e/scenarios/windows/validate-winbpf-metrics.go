@@ -36,7 +36,7 @@ func (v *ValidateWinBpfMetric) GetPromMetrics() (string, error) {
 			"C:\\event-writer-helper.bat EventWriter-GetRetinaPromMetrics",
 			v.RetinaDaemonSetNamespace,
 			retinaLabelSelector,
-		)
+			false)
 
 		promOutput = prom.StripExecGarbage(promOutput)
 		if err == nil && promOutput != "" {
@@ -84,7 +84,8 @@ func (v *ValidateWinBpfMetric) Run() error {
 		v.KubeConfigFilePath,
 		"C:\\event-writer-helper.bat EventWriter-GetPodIpAddress",
 		v.NonHpcAppNamespace,
-		nonHpcLabelSelector)
+		nonHpcLabelSelector,
+		false)
 	if err != nil {
 		return err
 	}
@@ -99,7 +100,8 @@ func (v *ValidateWinBpfMetric) Run() error {
 		v.KubeConfigFilePath,
 		"C:\\event-writer-helper.bat EventWriter-GetPodIfIndex",
 		v.NonHpcAppNamespace,
-		nonHpcLabelSelector)
+		nonHpcLabelSelector,
+		false)
 	if err != nil {
 		return err
 	}
@@ -113,7 +115,8 @@ func (v *ValidateWinBpfMetric) Run() error {
 		v.KubeConfigFilePath,
 		fmt.Sprintf("C:\\event-writer-helper.bat EventWriter-Attach %s", nonHpcIfIndex),
 		v.EbpfXdpDeamonSetNamespace,
-		ebpfLabelSelector)
+		ebpfLabelSelector,
+		false)
 	if err != nil {
 		return err
 	}
@@ -129,7 +132,8 @@ func (v *ValidateWinBpfMetric) Run() error {
 		v.KubeConfigFilePath,
 		"C:\\event-writer-helper.bat EventWriter-SetFilter -event 4 -srcIP 23.192.228.84",
 		v.EbpfXdpDeamonSetNamespace,
-		ebpfLabelSelector)
+		ebpfLabelSelector,
+		false)
 	if err != nil {
 		return err
 	}
@@ -145,7 +149,8 @@ func (v *ValidateWinBpfMetric) Run() error {
 			v.KubeConfigFilePath,
 			"C:\\event-writer-helper.bat EventWriter-Curl 23.192.228.84",
 			v.NonHpcAppNamespace,
-			nonHpcLabelSelector)
+			nonHpcLabelSelector,
+			true)
 		if err != nil {
 			return err
 		}
@@ -159,7 +164,8 @@ func (v *ValidateWinBpfMetric) Run() error {
 		v.KubeConfigFilePath,
 		"C:\\event-writer-helper.bat EventWriter-SetFilter -event 1 -srcIP 23.192.228.84",
 		v.EbpfXdpDeamonSetNamespace,
-		ebpfLabelSelector)
+		ebpfLabelSelector,
+		false)
 	if err != nil {
 		return err
 	}
@@ -174,7 +180,8 @@ func (v *ValidateWinBpfMetric) Run() error {
 			v.KubeConfigFilePath,
 			"C:\\event-writer-helper.bat EventWriter-Curl 23.192.228.84",
 			v.NonHpcAppNamespace,
-			nonHpcLabelSelector)
+			nonHpcLabelSelector,
+			true)
 		if err != nil {
 			return err
 		}
@@ -216,25 +223,25 @@ func (v *ValidateWinBpfMetric) Run() error {
 		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics") {
 			return err
 		}
-		fmt.Printf("Pre test - networkobservability_forward_bytes value %f, labels: %v\n", fwdBytes, fwd_labels)
+		fmt.Printf("networkobservability_forward_bytes value %f, labels: %v\n", fwdBytes, fwd_labels)
 
 		fwdCount, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_forward_count", fwd_labels)
 		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics") {
 			return err
 		}
-		fmt.Printf("Pre test - networkobservability_forward_count value %f, labels: %v\n", fwdCount, fwd_labels)
+		fmt.Printf("networkobservability_forward_count value %f, labels: %v\n", fwdCount, fwd_labels)
 
 		drpBytes, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_drop_bytes", drp_labels)
 		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics") {
 			return err
 		}
-		fmt.Printf("Pre test - networkobservability_drop_bytes value %f, labels: %v\n", drpBytes, drp_labels)
+		fmt.Printf("networkobservability_drop_bytes value %f, labels: %v\n", drpBytes, drp_labels)
 
 		drpCount, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_drop_count", drp_labels)
 		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics") {
 			return err
 		}
-		fmt.Printf("Pre test - networkobservability_drop_count value %f, labels: %v\n", drpCount, drp_labels)
+		fmt.Printf("networkobservability_drop_count value %f, labels: %v\n", drpCount, drp_labels)
 	}
 
 	// Advanced Metrics
