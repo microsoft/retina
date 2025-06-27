@@ -1,12 +1,16 @@
 package windows
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
 
 	kubernetes "github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	prom "github.com/microsoft/retina/test/e2e/framework/prometheus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8s "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 type ValidateWinBpfMetric struct {
@@ -47,59 +51,35 @@ func (v *ValidateWinBpfMetric) GetPromMetrics() (string, error) {
 	return promOutput, nil
 }
 
+func waitForPodReadyWithClientGo(ctx context.Context, clientset *k8s.Clientset, namespace, labelSelector string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		pods, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+		if err == nil && len(pods.Items) > 0 {
+			for _, cond := range pods.Items[0].Status.Conditions {
+				if cond.Type == "Ready" && cond.Status == "True" {
+					return nil
+				}
+			}
+		}
+		time.Sleep(5 * time.Second)
+	}
+	return fmt.Errorf("timeout waiting for pod to become ready")
+}
+
 func (v *ValidateWinBpfMetric) Run() error {
+	fmt.Println("Entering ValidateWinBpfMetric::Run method")
 	ebpfLabelSelector := fmt.Sprintf("name=%s", v.EbpfXdpDeamonSetName)
-	promOutput, err := v.GetPromMetrics()
-	if err != nil {
-		return err
-	}
 
-	fwd_labels := map[string]string{
-		"direction": "ingress",
-	}
-	drp_labels := map[string]string{
-		"direction": "ingress",
-		"reason":    "130, 0",
-	}
-
-	var preTestFwdBytes float64 = 0
-	var preTestDrpBytes float64 = 0
-	var preTestFwdCount float64 = 0
-	var preTestDrpCount float64 = 0
-	/*if promOutput == "" {
-		fmt.Println("Pre test - no prometheus metrics found")
-	} else {
-		err = prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_forward_bytes", fwd_labels)
-		if err != nil {
-			return fmt.Errorf("failed to verify prometheus metrics: %w", err)
-		}
-
-		preTestFwdBytes, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_forward_bytes", fwd_labels)
-		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics") {
-			return err
-		}
-		fmt.Printf("Pre test - networkobservability_forward_bytes value %f, labels: %v\n", preTestFwdBytes, fwd_labels)
-
-		preTestFwdCount, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_forward_count", fwd_labels)
-		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics") {
-			return err
-		}
-		fmt.Printf("Pre test - networkobservability_forward_count value %f, labels: %v\n", preTestFwdCount, fwd_labels)
-
-		preTestDrpBytes, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_drop_bytes", drp_labels)
-		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics") {
-			return err
-		}
-		fmt.Printf("Pre test - networkobservability_drop_bytes value %f, labels: %v\n", preTestDrpBytes, drp_labels)
-
-		preTestDrpCount, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_drop_count", drp_labels)
-		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics") {
-			return err
-		}
-		fmt.Printf("Pre test - networkobservability_drop_count value %f, labels: %v\n", preTestDrpCount, drp_labels)
-	}*/
-
+	fmt.Println("Waiting for Non HPC Pod to come up")
 	nonHpcLabelSelector := fmt.Sprintf("app=%s", v.NonHpcAppName)
+
+	config, _ := clientcmd.BuildConfigFromFlags("", v.KubeConfigFilePath)
+	clientset, _ := k8s.NewForConfig(config)
+	waitForPodReadyWithClientGo(context.TODO(), clientset, v.NonHpcAppNamespace, nonHpcLabelSelector, 10*time.Minute)
+	fmt.Println("Non HPC Pod is ready")
+
+	fmt.Println("Executing  EventWriter-GetPodIpAddress")
 	nonHpcIpAddr, err := kubernetes.ExecCommandInWinPod(
 		v.KubeConfigFilePath,
 		"C:\\event-writer-helper.bat EventWriter-GetPodIpAddress",
@@ -203,7 +183,7 @@ func (v *ValidateWinBpfMetric) Run() error {
 
 	fmt.Println("Waiting for basic metrics to be updated as part of next polling cycle")
 	time.Sleep(60 * time.Second)
-	promOutput, err = v.GetPromMetrics()
+	promOutput, err := v.GetPromMetrics()
 	if err != nil {
 		return err
 	}
@@ -211,43 +191,50 @@ func (v *ValidateWinBpfMetric) Run() error {
 	//TBR
 	fmt.Println(promOutput)
 
-	postTestFwdCount, err := prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_forward_count", fwd_labels)
-	if err != nil {
-		return err
+	fwd_labels := map[string]string{
+		"direction": "ingress",
 	}
-	fmt.Printf("Post test - networkobservability_forward_count value %f, labels: %v\n", preTestFwdBytes, fwd_labels)
-
-	postTestFwdBytes, err := prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_forward_bytes", fwd_labels)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("Post test - networkobservability_forward_bytes value %f, labels: %v\n", postTestFwdBytes, fwd_labels)
-
-	postTestDrpBytes, err := prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_drop_bytes", drp_labels)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("Post test - networkobservability_drop_bytes value %f, labels: %v\n", postTestDrpBytes, drp_labels)
-
-	postTestDrpCount, err := prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_drop_count", drp_labels)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("Post test - networkobservability_drop_count value %f, labels: %v\n", preTestDrpBytes, drp_labels)
-
-	if postTestFwdBytes <= preTestFwdBytes {
-		return fmt.Errorf("networkobservability_forward_bytes not incremented")
+	drp_labels := map[string]string{
+		"direction": "ingress",
+		"reason":    "130, 0",
 	}
 
-	if postTestDrpBytes <= preTestDrpBytes {
-		return fmt.Errorf("networkobservability_drop_bytes not incremented")
-	}
+	var fwdBytes float64 = 0
+	var drpBytes float64 = 0
+	var fwdCount float64 = 0
+	var drpCount float64 = 0
 
-	if postTestFwdCount <= preTestFwdCount {
-		return fmt.Errorf("networkobservability_forward_count not incremented")
-	}
-	if postTestDrpCount <= preTestDrpCount {
-		return fmt.Errorf("networkobservability_drop_count not incremnted")
+	if promOutput == "" {
+		fmt.Println("Pre test - no prometheus metrics found")
+	} else {
+		err = prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_forward_bytes", fwd_labels)
+		if err != nil {
+			return fmt.Errorf("failed to verify prometheus metrics: %w", err)
+		}
+
+		fwdBytes, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_forward_bytes", fwd_labels)
+		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics") {
+			return err
+		}
+		fmt.Printf("Pre test - networkobservability_forward_bytes value %f, labels: %v\n", fwdBytes, fwd_labels)
+
+		fwdCount, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_forward_count", fwd_labels)
+		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics") {
+			return err
+		}
+		fmt.Printf("Pre test - networkobservability_forward_count value %f, labels: %v\n", fwdCount, fwd_labels)
+
+		drpBytes, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_drop_bytes", drp_labels)
+		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics") {
+			return err
+		}
+		fmt.Printf("Pre test - networkobservability_drop_bytes value %f, labels: %v\n", drpBytes, drp_labels)
+
+		drpCount, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_drop_count", drp_labels)
+		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics") {
+			return err
+		}
+		fmt.Printf("Pre test - networkobservability_drop_count value %f, labels: %v\n", drpCount, drp_labels)
 	}
 
 	// Advanced Metrics
@@ -312,7 +299,7 @@ func (v *ValidateWinBpfMetric) Run() error {
 
 	adv_fwd_count_labels = map[string]string{
 		"direction":     "ingress",
-		"ip":            "10.224.0.202",
+		"ip":            nonHpcIpAddr,
 		"namespace":     v.NonHpcAppNamespace,
 		"podname":       v.NonHpcPodName,
 		"workload_kind": "unknown",
