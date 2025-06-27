@@ -307,7 +307,7 @@ func (d *Daemon) Start() error {
 	defer controllerMgr.Stop(ctx)
 
 	// start heartbeat goroutine for application insights
-	go tel.Heartbeat(ctx, daemonConfig.TelemetryInterval)
+	go tel.Heartbeat(ctx, daemonConfig.TelemetryInterval, nil)
 
 	// Start controller manager, which will start http server and plugin manager.
 	go controllerMgr.Start(ctx)

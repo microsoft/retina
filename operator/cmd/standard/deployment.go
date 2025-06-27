@@ -234,7 +234,7 @@ func (o *Operator) Start() error {
 	}
 
 	// start heartbeat goroutine for application insights
-	go tel.Heartbeat(ctx, oconfig.TelemetryInterval)
+	go tel.Heartbeat(ctx, oconfig.TelemetryInterval, nil)
 
 	mainLogger.Info("Starting manager")
 	if err := mgr.Start(ctrlCtx); err != nil {

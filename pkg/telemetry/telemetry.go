@@ -48,7 +48,7 @@ var (
 type Telemetry interface {
 	StartPerf(name string) *PerformanceCounter
 	StopPerf(counter *PerformanceCounter)
-	Heartbeat(ctx context.Context, heartbeatInterval time.Duration)
+	Heartbeat(ctx context.Context, heartbeatInterval time.Duration, getCustomLabels func() map[string]string)
 	TrackEvent(name string, properties map[string]string)
 	TrackMetric(name string, value float64, properties map[string]string)
 	TrackTrace(name string, severity contracts.SeverityLevel, properties map[string]string)
@@ -167,7 +167,7 @@ func (t *TelemetryClient) trackWarning(err error, msg string) {
 	t.TrackTrace(msg+": "+err.Error(), contracts.Warning, GetEnvironmentProperties())
 }
 
-func (t *TelemetryClient) heartbeat(ctx context.Context) {
+func (t *TelemetryClient) heartbeat(ctx context.Context, customLabels map[string]string) {
 	kernelVersion, err := KernelVersion(ctx)
 	if err != nil {
 		t.trackWarning(err, "failed to get kernel version")
@@ -189,6 +189,7 @@ func (t *TelemetryClient) heartbeat(ctx context.Context) {
 
 	props["metricscardinality"] = strconv.Itoa(metricscardinality)
 
+	maps.Copy(props, customLabels)
 	maps.Copy(props, cpuProps)
 	maps.Copy(props, t.profile.GetMemoryUsage())
 	t.TrackEvent("heartbeat", props)
@@ -352,16 +353,21 @@ func (t *TelemetryClient) StopPerf(counter *PerformanceCounter) {
 	t.TrackMetric(counter.functionName, ms, nil)
 }
 
-func (t *TelemetryClient) Heartbeat(ctx context.Context, heartbeatInterval time.Duration) {
+func (t *TelemetryClient) Heartbeat(ctx context.Context, heartbeatInterval time.Duration, getCustomLabels func() map[string]string) {
 	ticker := time.NewTicker(heartbeatInterval) // TODOL: make configurable
 	defer ticker.Stop()
+
+	customLabels := map[string]string{}
+	if getCustomLabels != nil {
+		customLabels = getCustomLabels()
+	}
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			t.heartbeat(ctx)
+			t.heartbeat(ctx, customLabels)
 		}
 	}
 }
