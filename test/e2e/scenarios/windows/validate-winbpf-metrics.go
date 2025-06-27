@@ -75,13 +75,13 @@ func (v *ValidateWinBpfMetric) Run() error {
 		return err
 	}
 
-	fwd_labels := map[string]string{
+	/*fwd_labels := map[string]string{
 		"direction": "ingress",
 	}
 	drp_labels := map[string]string{
 		"direction": "ingress",
 		"reason":    "130, 0",
-	}
+	}*/
 
 	fmt.Println("Pre test - Prometheus metrics output:")
 	fmt.Println(promOutput)
