@@ -1,5 +1,5 @@
-# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.4-cbl-mariner2.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:8404e234fac0f624a120a43573098923a37c7e4755aebdb47783ff6212de3163
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.4-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:250d01e55a37bd79d7014ae83f9f50aa6fa5570ca910e7f19faeff4bb0132ae1
 
 # Default linux/architecture.
 ARG GOOS=linux
