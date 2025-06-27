@@ -88,7 +88,7 @@ func (v *ValidateWinBpfMetric) Run() error {
 	var preTestFwdCount float64 = 0
 	var preTestDrpCount float64 = 0
 
-	/*if promOutput == "" {
+	if promOutput == "" {
 		fmt.Println("Pre test - no prometheus metrics found")
 	} else {
 		err = prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_forward_bytes", fwd_labels)
@@ -119,7 +119,7 @@ func (v *ValidateWinBpfMetric) Run() error {
 			return err
 		}
 		fmt.Printf("Pre test - networkobservability_drop_count value %f, labels: %v\n", preTestDrpCount, drp_labels)
-	}*/
+	}
 
 	fmt.Println("Waiting for Non HPC Pod to come up")
 	nonHpcLabelSelector := fmt.Sprintf("app=%s", v.NonHpcAppName)
@@ -342,7 +342,7 @@ func (v *ValidateWinBpfMetric) Run() error {
 
 	adv_fwd_count_labels = map[string]string{
 		"direction":     "ingress",
-		"ip":            "10.224.0.202",
+		"ip":            nonHpcIpAddr,
 		"namespace":     v.NonHpcAppNamespace,
 		"podname":       v.NonHpcPodName,
 		"workload_kind": "unknown",
