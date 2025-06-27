@@ -1,12 +1,16 @@
 package windows
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
 
 	kubernetes "github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	prom "github.com/microsoft/retina/test/e2e/framework/prometheus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8s "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 type ValidateWinBpfMetric struct {
@@ -47,7 +51,24 @@ func (v *ValidateWinBpfMetric) GetPromMetrics() (string, error) {
 	return promOutput, nil
 }
 
+func waitForPodReadyWithClientGo(ctx context.Context, clientset *k8s.Clientset, namespace, labelSelector string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		pods, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+		if err == nil && len(pods.Items) > 0 {
+			for _, cond := range pods.Items[0].Status.Conditions {
+				if cond.Type == "Ready" && cond.Status == "True" {
+					return nil
+				}
+			}
+		}
+		time.Sleep(5 * time.Second)
+	}
+	return fmt.Errorf("timeout waiting for pod to become ready")
+}
+
 func (v *ValidateWinBpfMetric) Run() error {
+	fmt.Println("Entering ValidateWinBpfMetric::Run method")
 	ebpfLabelSelector := fmt.Sprintf("name=%s", v.EbpfXdpDeamonSetName)
 	promOutput, err := v.GetPromMetrics()
 	if err != nil {
@@ -66,6 +87,7 @@ func (v *ValidateWinBpfMetric) Run() error {
 	var preTestDrpBytes float64 = 0
 	var preTestFwdCount float64 = 0
 	var preTestDrpCount float64 = 0
+
 	/*if promOutput == "" {
 		fmt.Println("Pre test - no prometheus metrics found")
 	} else {
@@ -99,7 +121,15 @@ func (v *ValidateWinBpfMetric) Run() error {
 		fmt.Printf("Pre test - networkobservability_drop_count value %f, labels: %v\n", preTestDrpCount, drp_labels)
 	}*/
 
+	fmt.Println("Waiting for Non HPC Pod to come up")
 	nonHpcLabelSelector := fmt.Sprintf("app=%s", v.NonHpcAppName)
+
+	config, _ := clientcmd.BuildConfigFromFlags("", v.KubeConfigFilePath)
+	clientset, _ := k8s.NewForConfig(config)
+	waitForPodReadyWithClientGo(context.TODO(), clientset, v.NonHpcAppNamespace, nonHpcLabelSelector, 10*time.Minute)
+	fmt.Println("Non HPC Pod is ready")
+
+	fmt.Println("Executing  EventWriter-GetPodIpAddress")
 	nonHpcIpAddr, err := kubernetes.ExecCommandInWinPod(
 		v.KubeConfigFilePath,
 		"C:\\event-writer-helper.bat EventWriter-GetPodIpAddress",
