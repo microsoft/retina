@@ -18,6 +18,7 @@ func (a *UnLoadAndPinWinBPF) Run() error {
 		return err
 	}
 
+	// Best effort to wait for the eBPF program unload to complete. We dont fail the test if it fails.
 	fmt.Println(output)
 	if strings.Contains(output, "error") || strings.Contains(output, "failed") {
 		return fmt.Errorf("error in UnLoading and pinning BPF maps and program: %s", output)
