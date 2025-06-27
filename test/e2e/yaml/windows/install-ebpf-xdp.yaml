@@ -11,7 +11,8 @@ spec:
     metadata:
       labels:
         name: install-ebpf-xdp
-    containers:
+    spec:
+      containers:
       - name: install-ebpf-xdp-container
         image: ghcr.io/kumarvin123/retina/test/e2e-test-event-writer:latest
         imagePullPolicy: Always
