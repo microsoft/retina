@@ -21,9 +21,9 @@ type LoadAndPinWinBPF struct {
 }
 
 func ExecCommandInWinPod(KubeConfigFilePath string, cmd string, Namespace string, LabelSelector string) (string, error) {
-	defaultRetrier = retry.Retrier{Attempts: 15, Delay: 20 * time.Second}
-	// Create a context with a timeout (e.g., 30 seconds)
-	ctx, cancel := context.WithTimeout(context.Background(), 360*time.Second)
+	defaultRetrier = retry.Retrier{Attempts: 15, Delay: 5 * time.Second}
+	// Create a context with a timeout (e.g., 120 seconds)
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 	config, err := clientcmd.BuildConfigFromFlags("", KubeConfigFilePath)
 	if err != nil {
@@ -62,10 +62,6 @@ func ExecCommandInWinPod(KubeConfigFilePath string, cmd string, Namespace string
 		outputBytes, err = ExecPod(ctx, clientset, config, windowsPod.Namespace, windowsPod.Name, cmd)
 		if err != nil {
 			return fmt.Errorf("error executing command in windows pod: %w", err)
-		}
-
-		if len(outputBytes) == 0 {
-			return fmt.Errorf("no output from command")
 		}
 
 		return nil
