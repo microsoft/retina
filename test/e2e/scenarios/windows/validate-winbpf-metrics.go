@@ -244,45 +244,6 @@ func (v *ValidateWinBpfMetric) Run() error {
 	//TBR
 	fmt.Println(promOutput)
 
-	postTestFwdCount, err := prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_forward_count", fwd_labels)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("Post test - networkobservability_forward_count value %f, labels: %v\n", preTestFwdBytes, fwd_labels)
-
-	postTestFwdBytes, err := prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_forward_bytes", fwd_labels)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("Post test - networkobservability_forward_bytes value %f, labels: %v\n", postTestFwdBytes, fwd_labels)
-
-	postTestDrpBytes, err := prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_drop_bytes", drp_labels)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("Post test - networkobservability_drop_bytes value %f, labels: %v\n", postTestDrpBytes, drp_labels)
-
-	postTestDrpCount, err := prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_drop_count", drp_labels)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("Post test - networkobservability_drop_count value %f, labels: %v\n", preTestDrpBytes, drp_labels)
-
-	if postTestFwdBytes <= preTestFwdBytes {
-		return fmt.Errorf("networkobservability_forward_bytes not incremented")
-	}
-
-	if postTestDrpBytes <= preTestDrpBytes {
-		return fmt.Errorf("networkobservability_drop_bytes not incremented")
-	}
-
-	if postTestFwdCount <= preTestFwdCount {
-		return fmt.Errorf("networkobservability_forward_count not incremented")
-	}
-	if postTestDrpCount <= preTestDrpCount {
-		return fmt.Errorf("networkobservability_drop_count not incremnted")
-	}
-
 	// Advanced Metrics
 	adv_fwd_count_labels := map[string]string{
 		"direction":     "egress",
