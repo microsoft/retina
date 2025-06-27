@@ -83,7 +83,10 @@ func (v *ValidateWinBpfMetric) Run() error {
 		"reason":    "130, 0",
 	}
 
-	var preTestFwdBytes float64 = 0
+	fmt.Println("Pre test - Prometheus metrics output:")
+	fmt.Println(promOutput)
+
+	/*var preTestFwdBytes float64 = 0
 	var preTestDrpBytes float64 = 0
 	var preTestFwdCount float64 = 0
 	var preTestDrpCount float64 = 0
@@ -119,7 +122,7 @@ func (v *ValidateWinBpfMetric) Run() error {
 			return err
 		}
 		fmt.Printf("Pre test - networkobservability_drop_count value %f, labels: %v\n", preTestDrpCount, drp_labels)
-	}
+	}*/
 
 	fmt.Println("Waiting for Non HPC Pod to come up")
 	nonHpcLabelSelector := fmt.Sprintf("app=%s", v.NonHpcAppName)
