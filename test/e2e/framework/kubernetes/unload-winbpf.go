@@ -13,7 +13,10 @@ type UnLoadAndPinWinBPF struct {
 
 func (a *UnLoadAndPinWinBPF) Run() error {
 	UnLoadAndPinWinBPFDLabelSelector := fmt.Sprintf("name=%s", a.UnLoadAndPinWinBPFDeamonSetName)
-	output, _ := ExecCommandInWinPod(a.KubeConfigFilePath, "C:\\event-writer-helper.bat EventWriter-UnPinPrgAndMaps", a.UnLoadAndPinWinBPFDeamonSetNamespace, UnLoadAndPinWinBPFDLabelSelector)
+	output, err := ExecCommandInWinPod(a.KubeConfigFilePath, "C:\\event-writer-helper.bat EventWriter-UnPinPrgAndMaps", a.UnLoadAndPinWinBPFDeamonSetNamespace, UnLoadAndPinWinBPFDLabelSelector, true)
+	if err != nil {
+		return err
+	}
 
 	// Best effort to wait for the eBPF program unload to complete. We dont fail the test if it fails.
 	fmt.Println(output)
