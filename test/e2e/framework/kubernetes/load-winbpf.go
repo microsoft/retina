@@ -20,7 +20,7 @@ type LoadAndPinWinBPF struct {
 	LoadAndPinWinBPFDeamonSetName      string
 }
 
-func ExecCommandInWinPod(KubeConfigFilePath string, cmd string, Namespace string, LabelSelector string) (string, error) {
+func ExecCommandInWinPod(KubeConfigFilePath string, cmd string, Namespace string, LabelSelector string, expecNonZeroOutput bool) (string, error) {
 	defaultRetrier = retry.Retrier{Attempts: 15, Delay: 5 * time.Second}
 	// Create a context with a timeout (e.g., 120 seconds)
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
@@ -64,6 +64,10 @@ func ExecCommandInWinPod(KubeConfigFilePath string, cmd string, Namespace string
 			return fmt.Errorf("error executing command in windows pod: %w", err)
 		}
 
+		if len(outputBytes) == 0 && expecNonZeroOutput {
+			return fmt.Errorf("no output from command")
+		}
+
 		return nil
 	})
 
@@ -77,23 +81,22 @@ func ExecCommandInWinPod(KubeConfigFilePath string, cmd string, Namespace string
 func (a *LoadAndPinWinBPF) Run() error {
 	// Copy Event Writer into Node
 	LoadAndPinWinBPFDLabelSelector := fmt.Sprintf("name=%s", a.LoadAndPinWinBPFDeamonSetName)
-	_, err := ExecCommandInWinPod(a.KubeConfigFilePath, "copy /Y .\\event-writer-helper.bat C:\\event-writer-helper.bat", a.LoadAndPinWinBPFDeamonSetNamespace, LoadAndPinWinBPFDLabelSelector)
+	_, err := ExecCommandInWinPod(a.KubeConfigFilePath, "copy /Y .\\event-writer-helper.bat C:\\event-writer-helper.bat", a.LoadAndPinWinBPFDeamonSetNamespace, LoadAndPinWinBPFDLabelSelector, true)
 	if err != nil {
 		return err
 	}
 
-	_, err = ExecCommandInWinPod(a.KubeConfigFilePath, "C:\\event-writer-helper.bat EventWriter-Setup", a.LoadAndPinWinBPFDeamonSetNamespace, LoadAndPinWinBPFDLabelSelector)
+	_, err = ExecCommandInWinPod(a.KubeConfigFilePath, "C:\\event-writer-helper.bat EventWriter-Setup", a.LoadAndPinWinBPFDeamonSetNamespace, LoadAndPinWinBPFDLabelSelector, true)
 	if err != nil {
 		return err
 	}
 
 	// pin maps
-	output, err := ExecCommandInWinPod(a.KubeConfigFilePath, "C:\\event-writer-helper.bat EventWriter-LoadAndPinPrgAndMaps", a.LoadAndPinWinBPFDeamonSetNamespace, LoadAndPinWinBPFDLabelSelector)
+	output, err := ExecCommandInWinPod(a.KubeConfigFilePath, "C:\\event-writer-helper.bat EventWriter-LoadAndPinPrgAndMaps", a.LoadAndPinWinBPFDeamonSetNamespace, LoadAndPinWinBPFDLabelSelector, false)
 	if err != nil {
 		return err
 	}
 
-	time.Sleep(5 * time.Second)
 	fmt.Println(output)
 	if strings.Contains(output, "error") || strings.Contains(output, "failed") || strings.Contains(output, "existing") {
 		return fmt.Errorf("error in loading and pinning BPF maps and program: %s", output)
