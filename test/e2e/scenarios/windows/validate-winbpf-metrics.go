@@ -70,59 +70,6 @@ func waitForPodReadyWithClientGo(ctx context.Context, clientset *k8s.Clientset, 
 func (v *ValidateWinBpfMetric) Run() error {
 	fmt.Println("Entering ValidateWinBpfMetric::Run method")
 	ebpfLabelSelector := fmt.Sprintf("name=%s", v.EbpfXdpDeamonSetName)
-	promOutput, err := v.GetPromMetrics()
-	if err != nil {
-		return err
-	}
-
-	/*fwd_labels := map[string]string{
-		"direction": "ingress",
-	}
-	drp_labels := map[string]string{
-		"direction": "ingress",
-		"reason":    "130, 0",
-	}*/
-
-	fmt.Println("Pre test - Prometheus metrics output:")
-	fmt.Println(promOutput)
-
-	/*var preTestFwdBytes float64 = 0
-	var preTestDrpBytes float64 = 0
-	var preTestFwdCount float64 = 0
-	var preTestDrpCount float64 = 0
-
-	if promOutput == "" {
-		fmt.Println("Pre test - no prometheus metrics found")
-	} else {
-		err = prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_forward_bytes", fwd_labels)
-		if err != nil {
-			return fmt.Errorf("failed to verify prometheus metrics: %w", err)
-		}
-
-		preTestFwdBytes, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_forward_bytes", fwd_labels)
-		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics") {
-			return err
-		}
-		fmt.Printf("Pre test - networkobservability_forward_bytes value %f, labels: %v\n", preTestFwdBytes, fwd_labels)
-
-		preTestFwdCount, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_forward_count", fwd_labels)
-		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics") {
-			return err
-		}
-		fmt.Printf("Pre test - networkobservability_forward_count value %f, labels: %v\n", preTestFwdCount, fwd_labels)
-
-		preTestDrpBytes, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_drop_bytes", drp_labels)
-		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics") {
-			return err
-		}
-		fmt.Printf("Pre test - networkobservability_drop_bytes value %f, labels: %v\n", preTestDrpBytes, drp_labels)
-
-		preTestDrpCount, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_drop_count", drp_labels)
-		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics") {
-			return err
-		}
-		fmt.Printf("Pre test - networkobservability_drop_count value %f, labels: %v\n", preTestDrpCount, drp_labels)
-	}*/
 
 	fmt.Println("Waiting for Non HPC Pod to come up")
 	nonHpcLabelSelector := fmt.Sprintf("app=%s", v.NonHpcAppName)
@@ -236,13 +183,59 @@ func (v *ValidateWinBpfMetric) Run() error {
 
 	fmt.Println("Waiting for basic metrics to be updated as part of next polling cycle")
 	time.Sleep(60 * time.Second)
-	promOutput, err = v.GetPromMetrics()
+	promOutput, err := v.GetPromMetrics()
 	if err != nil {
 		return err
 	}
 
 	//TBR
 	fmt.Println(promOutput)
+
+	fwd_labels := map[string]string{
+		"direction": "ingress",
+	}
+	drp_labels := map[string]string{
+		"direction": "ingress",
+		"reason":    "130, 0",
+	}
+
+	var fwdBytes float64 = 0
+	var drpBytes float64 = 0
+	var fwdCount float64 = 0
+	var drpCount float64 = 0
+
+	if promOutput == "" {
+		fmt.Println("Pre test - no prometheus metrics found")
+	} else {
+		err = prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_forward_bytes", fwd_labels)
+		if err != nil {
+			return fmt.Errorf("failed to verify prometheus metrics: %w", err)
+		}
+
+		fwdBytes, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_forward_bytes", fwd_labels)
+		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics") {
+			return err
+		}
+		fmt.Printf("Pre test - networkobservability_forward_bytes value %f, labels: %v\n", fwdBytes, fwd_labels)
+
+		fwdCount, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_forward_count", fwd_labels)
+		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics") {
+			return err
+		}
+		fmt.Printf("Pre test - networkobservability_forward_count value %f, labels: %v\n", fwdCount, fwd_labels)
+
+		drpBytes, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_drop_bytes", drp_labels)
+		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics") {
+			return err
+		}
+		fmt.Printf("Pre test - networkobservability_drop_bytes value %f, labels: %v\n", drpBytes, drp_labels)
+
+		drpCount, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_drop_count", drp_labels)
+		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics") {
+			return err
+		}
+		fmt.Printf("Pre test - networkobservability_drop_count value %f, labels: %v\n", drpCount, drp_labels)
+	}
 
 	// Advanced Metrics
 	adv_fwd_count_labels := map[string]string{
