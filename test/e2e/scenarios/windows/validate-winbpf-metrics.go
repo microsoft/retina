@@ -30,7 +30,7 @@ func (v *ValidateWinBpfMetric) GetPromMetrics() (string, error) {
 	var err error
 	attempts := 10
 
-	for i := 0; i < attempts; i++ {
+	for range attempts {
 		promOutput, err = kubernetes.ExecCommandInWinPod(
 			v.KubeConfigFilePath,
 			"C:\\event-writer-helper.bat EventWriter-GetRetinaPromMetrics",
@@ -85,7 +85,7 @@ func (v *ValidateWinBpfMetric) Run() error {
 		"C:\\event-writer-helper.bat EventWriter-GetPodIpAddress",
 		v.NonHpcAppNamespace,
 		nonHpcLabelSelector,
-		false)
+		true)
 	if err != nil {
 		return err
 	}
