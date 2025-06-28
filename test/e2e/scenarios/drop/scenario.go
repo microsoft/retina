@@ -38,7 +38,7 @@ func ValidateDropMetric(namespace, arch string) *types.Scenario {
 		// Need this delay to guarantee that the pods will have bpf program attached
 		{
 			Step: &types.Sleep{
-				Duration: 30 * time.Second,
+				Duration: 120 * time.Second,
 			},
 			Opts: &types.StepOptions{
 				SkipSavingParametersToJob: true,
