@@ -1,5 +1,5 @@
 enablePodLevel: true
 enableAnnotations: true
 operator:
-  enabled: false
+  enabled: true
   enableRetinaEndpoint: true

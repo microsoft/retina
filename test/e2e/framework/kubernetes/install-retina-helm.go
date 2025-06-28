@@ -97,7 +97,7 @@ func (i *InstallHelmChart) Run() error {
 	chart.Values["image"].(map[string]interface{})["repository"] = imageRegistry + "/" + imageNamespace + "/retina-agent"
 	chart.Values["image"].(map[string]interface{})["initRepository"] = imageRegistry + "/" + imageNamespace + "/retina-init"
 	chart.Values["operator"].(map[string]interface{})["repository"] = imageRegistry + "/" + imageNamespace + "/retina-operator"
-	chart.Values["operator"].(map[string]interface{})["enabled"] = false
+	chart.Values["operator"].(map[string]interface{})["enabled"] = true
 
 	getclient := action.NewGet(actionConfig)
 	release, err := getclient.Run(i.ReleaseName)
