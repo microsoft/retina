@@ -3,6 +3,7 @@ package windows
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -68,18 +69,18 @@ func waitForPodReadyWithClientGo(ctx context.Context, clientset *k8s.Clientset, 
 }
 
 func (v *ValidateWinBpfMetric) Run() error {
-	fmt.Println("Entering ValidateWinBpfMetric::Run method")
+	slog.Info("Entering ValidateWinBpfMetric Run method")
 	ebpfLabelSelector := fmt.Sprintf("name=%s", v.EbpfXdpDeamonSetName)
 
-	fmt.Println("Waiting for Non HPC Pod to come up")
+	slog.Info("Waiting for Non HPC Pod to come up")
 	nonHpcLabelSelector := fmt.Sprintf("app=%s", v.NonHpcAppName)
 
 	config, _ := clientcmd.BuildConfigFromFlags("", v.KubeConfigFilePath)
 	clientset, _ := k8s.NewForConfig(config)
 	waitForPodReadyWithClientGo(context.TODO(), clientset, v.NonHpcAppNamespace, nonHpcLabelSelector, 10*time.Minute)
-	fmt.Println("Non HPC Pod is ready")
+	slog.Info("Non HPC Pod is ready")
 
-	fmt.Println("Executing  EventWriter-GetPodIpAddress")
+	slog.Info("Executing  EventWriter-GetPodIpAddress")
 	nonHpcIpAddr, err := kubernetes.ExecCommandInWinPod(
 		v.KubeConfigFilePath,
 		"C:\\event-writer-helper.bat EventWriter-GetPodIpAddress",
@@ -94,21 +95,21 @@ func (v *ValidateWinBpfMetric) Run() error {
 	if strings.Contains(nonHpcIpAddr, "failed") || strings.Contains(nonHpcIpAddr, "error") {
 		return fmt.Errorf("failed to get nonHpcIpAddr")
 	}
-	fmt.Println("Non HPC IP Addr: ", nonHpcIpAddr)
+	slog.Info("Non HPC IP Addr", "ip", nonHpcIpAddr)
 
 	nonHpcIfIndex, err := kubernetes.ExecCommandInWinPod(
 		v.KubeConfigFilePath,
 		"C:\\event-writer-helper.bat EventWriter-GetPodIfIndex",
 		v.NonHpcAppNamespace,
 		nonHpcLabelSelector,
-		false)
+		true)
 	if err != nil {
 		return err
 	}
 	if strings.Contains(nonHpcIfIndex, "failed") || strings.Contains(nonHpcIfIndex, "error") {
 		return fmt.Errorf("failed to get nonHpcIfIndex")
 	}
-	fmt.Println("Non HPC Interface Index: ", nonHpcIfIndex)
+	slog.Info("Non HPC Interface Index", "InterfaceIndex", nonHpcIfIndex)
 
 	//Attach to the non HPC pod
 	output, err := kubernetes.ExecCommandInWinPod(
@@ -116,29 +117,28 @@ func (v *ValidateWinBpfMetric) Run() error {
 		fmt.Sprintf("C:\\event-writer-helper.bat EventWriter-Attach %s", nonHpcIfIndex),
 		v.EbpfXdpDeamonSetNamespace,
 		ebpfLabelSelector,
-		false)
+		true)
 	if err != nil {
 		return err
 	}
-	fmt.Println(output)
+
 	if strings.Contains(output, "failed") || strings.Contains(output, "error") || strings.Contains(output, "exiting") {
 		return fmt.Errorf("failed to attach to non HPC pod interface %s", output)
 	}
 
+	slog.Info("Produce Trace Events\n")
 	//TRACE
-	fmt.Printf("Produce Trace Events\n")
 	//Example.com - 23.192.228.84
 	output, err = kubernetes.ExecCommandInWinPod(
 		v.KubeConfigFilePath,
 		"C:\\event-writer-helper.bat EventWriter-SetFilter -event 4 -srcIP 23.192.228.84",
 		v.EbpfXdpDeamonSetNamespace,
 		ebpfLabelSelector,
-		false)
+		true)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println(output)
 	if strings.Contains(output, "failed") || strings.Contains(output, "error") || strings.Contains(output, "exiting") {
 		return fmt.Errorf("failed to set filter for event writer")
 	}
@@ -150,22 +150,20 @@ func (v *ValidateWinBpfMetric) Run() error {
 			"C:\\event-writer-helper.bat EventWriter-Curl 23.192.228.84",
 			v.NonHpcAppNamespace,
 			nonHpcLabelSelector,
-			true)
+			false)
 		if err != nil {
 			return err
 		}
 		numcurls--
 	}
 
-	//DROP
-	time.Sleep(20 * time.Second)
-	fmt.Printf("Produce Drop Events\n")
+	slog.Info("Produce Drop Events\n")
 	output, err = kubernetes.ExecCommandInWinPod(
 		v.KubeConfigFilePath,
 		"C:\\event-writer-helper.bat EventWriter-SetFilter -event 1 -srcIP 23.192.228.84",
 		v.EbpfXdpDeamonSetNamespace,
 		ebpfLabelSelector,
-		false)
+		true)
 	if err != nil {
 		return err
 	}
@@ -181,22 +179,21 @@ func (v *ValidateWinBpfMetric) Run() error {
 			"C:\\event-writer-helper.bat EventWriter-Curl 23.192.228.84",
 			v.NonHpcAppNamespace,
 			nonHpcLabelSelector,
-			true)
+			false)
 		if err != nil {
 			return err
 		}
 		numcurls--
 	}
 
-	fmt.Println("Waiting for basic metrics to be updated as part of next polling cycle")
-	time.Sleep(60 * time.Second)
+	slog.Info("Waiting for basic metrics to be updated as part of next polling cycle")
+	time.Sleep(12 * time.Second)
 	promOutput, err := v.GetPromMetrics()
 	if err != nil {
 		return err
 	}
 
-	//TBR
-	fmt.Println(promOutput)
+	slog.Info("Prometheus metrics output", "output", promOutput)
 
 	fwd_labels := map[string]string{
 		"direction": "ingress",
@@ -212,7 +209,7 @@ func (v *ValidateWinBpfMetric) Run() error {
 	var drpCount float64 = 0
 
 	if promOutput == "" {
-		fmt.Println("Pre test - no prometheus metrics found")
+		slog.Info("No Prometheus metrics found, skipping validation")
 	} else {
 		err = prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_forward_bytes", fwd_labels)
 		if err != nil {
@@ -223,25 +220,25 @@ func (v *ValidateWinBpfMetric) Run() error {
 		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics") {
 			return err
 		}
-		fmt.Printf("networkobservability_forward_bytes value %f, labels: %v\n", fwdBytes, fwd_labels)
+		slog.Info("networkobservability_forward_bytes value", "value", fwdBytes, "labels", fwd_labels)
 
 		fwdCount, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_forward_count", fwd_labels)
 		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics") {
 			return err
 		}
-		fmt.Printf("networkobservability_forward_count value %f, labels: %v\n", fwdCount, fwd_labels)
+		slog.Info("networkobservability_forward_count value", "value", fwdCount, "labels", fwd_labels)
 
 		drpBytes, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_drop_bytes", drp_labels)
 		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics") {
 			return err
 		}
-		fmt.Printf("networkobservability_drop_bytes value %f, labels: %v\n", drpBytes, drp_labels)
+		slog.Info("networkobservability_drop_bytes value", "value", drpBytes, "labels", drp_labels)
 
 		drpCount, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_drop_count", drp_labels)
 		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics") {
 			return err
 		}
-		fmt.Printf("networkobservability_drop_count value %f, labels: %v\n", drpCount, drp_labels)
+		slog.Info("networkobservability_drop_count value", "value", drpCount, "labels", drp_labels)
 	}
 
 	// Advanced Metrics
@@ -273,7 +270,7 @@ func (v *ValidateWinBpfMetric) Run() error {
 		if err != nil {
 			return fmt.Errorf("failed to find networkobservability_adv_tcpflags_count for flag %s: %w", flag, err)
 		}
-		fmt.Printf("Found TCP flag metric for %s\n", flag)
+		slog.Info("Found TCP flag metric", "flag", flag)
 	}
 
 	adv_drop_byte_labels := map[string]string{
@@ -331,7 +328,7 @@ func (v *ValidateWinBpfMetric) Run() error {
 		if err != nil {
 			return fmt.Errorf("failed to find networkobservability_adv_tcpflags_count for flag %s: %w", flag, err)
 		}
-		fmt.Printf("Found TCP flag metric for %s\n", flag)
+		slog.Info("Found TCP flag metric", "flag", flag)
 	}
 
 	adv_drop_byte_labels = map[string]string{
