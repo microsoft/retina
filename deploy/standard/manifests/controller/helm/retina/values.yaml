@@ -51,9 +51,9 @@ image:
   tag: "v0.0.2"
 
 enableConntrackMetrics: false
-enablePodLevel: false
+enablePodLevel: true
 remoteContext: false
-enableAnnotations: false
+enableAnnotations: true
 bypassLookupIPOfInterest: false
 dataAggregationLevel: "low"
 
@@ -79,7 +79,7 @@ apiServer:
 logLevel: debug
 
 enabledPlugin_linux: '["dropreason","packetforward","linuxutil","dns"]'
-enabledPlugin_win: '["hnsstats"]'
+enabledPlugin_win: '["hnsstats", "ebpfwindows"]'
 
 enableTelemetry: false
 
@@ -285,7 +285,7 @@ metrics:
     tlsConfig: {}
     ## @param metrics.serviceMonitor.relabelings [array] Prometheus relabeling rules to apply to samples before scraping
     ##
-    relabelings: 
+    relabelings:
       - sourceLabels:
           [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
         separator: ":"
