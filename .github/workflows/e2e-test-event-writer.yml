@@ -92,7 +92,8 @@ jobs:
         run: |
           $isMergeGroup = "${{ env.IS_MERGE_GROUP }}" -eq "true"
           if (-not $isMergeGroup) {
-              $image = "ghcr.io/${{ github.repository }}/test/e2e-test-event-writer".ToLower()
+              #$image = "ghcr.io/${{ github.repository }}/test/e2e-test-event-writer".ToLower()
+              $image = "acnpublic.azurecr.io/microsoft/retina/test/e2e-test-event-writer".ToLower()
           } else {
               $image = "${{ vars.ACR_NAME }}/${{ github.repository }}/test/e2e-test-event-writer".ToLower()
           }
