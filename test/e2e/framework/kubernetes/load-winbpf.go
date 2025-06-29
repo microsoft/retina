@@ -20,6 +20,17 @@ type LoadAndPinWinBPF struct {
 	LoadAndPinWinBPFDeamonSetName      string
 }
 
+func WaitForPodReadyWithTimeOut(ctx context.Context, kubeConfigFilePath, namespace, labelSelector string, timeout time.Duration) error {
+
+	config, _ := clientcmd.BuildConfigFromFlags("", kubeConfigFilePath)
+	clientset, _ := kubernetes.NewForConfig(config)
+
+	timeoutCtx, cancelFunc := context.WithTimeout(ctx, timeout)
+	defer cancelFunc()
+
+	return WaitForPodReady(timeoutCtx, clientset, namespace, labelSelector)
+}
+
 func ExecCommandInWinPod(KubeConfigFilePath string, cmd string, Namespace string, LabelSelector string, expecNonEmptyOutput bool) (string, error) {
 	defaultRetrier = retry.Retrier{Attempts: 15, Delay: 5 * time.Second}
 	// Create a context with a timeout (e.g., 120 seconds)
