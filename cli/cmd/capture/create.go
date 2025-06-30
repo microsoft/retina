@@ -28,6 +28,7 @@ import (
 	"github.com/microsoft/retina/internal/buildinfo"
 	pkgcapture "github.com/microsoft/retina/pkg/capture"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
+	"github.com/microsoft/retina/pkg/capture/file"
 	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	"github.com/microsoft/retina/pkg/config"
 )
@@ -40,6 +41,7 @@ var (
 	hostPath           string
 	includeFilter      string
 	includeMetadata    bool
+	interfaces         string
 	jobNumLimit        int
 	maxSize            int
 	namespace          string
@@ -87,6 +89,9 @@ var createExample = templates.Examples(i18n.T(`
 		# Select nodes using node-selector and set duration to 10s
 		kubectl retina capture create --node-selectors="agentpool=agentpool" --duration=10s
 
+		# Capture on specific network interfaces (instead of all interfaces)
+		kubectl retina capture create --node-selectors="agentpool=agentpool" --interfaces="eth0,eth1"
+
 		# Select nodes using node-selector and upload the artifacts to blob storage with SAS URL https://testaccount.blob.core.windows.net/<token>
 		kubectl retina capture create --node-selectors="agentpool=agentpool" --blob-upload=https://testaccount.blob.core.windows.net/<token>
 
@@ -118,6 +123,16 @@ var createCapture = &cobra.Command{
 		kubeClient, err := kubernetes.NewForConfig(kubeConfig)
 		if err != nil {
 			return errors.Wrap(err, "failed to initialize kubernetes client")
+		}
+
+		// Set namespace. If --namespace is not set, use namespace on user's context
+		ns, _, err := opts.ConfigFlags.ToRawKubeConfigLoader().Namespace()
+		if err != nil {
+			return errors.Wrap(err, "failed to get namespace from kubeconfig")
+		}
+
+		if opts.Namespace == nil || *opts.Namespace == "" {
+			opts.Namespace = &ns
 		}
 
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
@@ -240,6 +255,8 @@ func deleteSecret(ctx context.Context, kubeClient kubernetes.Interface, secretNa
 }
 
 func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*retinav1alpha1.Capture, error) {
+	timestamp := file.Now()
+
 	capture := &retinav1alpha1.Capture{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      *opts.Name,
@@ -253,7 +270,12 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 				CaptureOption:   retinav1alpha1.CaptureOption{},
 			},
 		},
+		Status: retinav1alpha1.CaptureStatus{
+			StartTime: timestamp,
+		},
 	}
+
+	retinacmd.Logger.Info(fmt.Sprintf("Capture timestamp: %s", timestamp))
 
 	if duration != 0 {
 		retinacmd.Logger.Info(fmt.Sprintf("The capture duration is set to %s", duration))
@@ -317,6 +339,15 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 	if packetSize != 0 {
 		retinacmd.Logger.Info(fmt.Sprintf("The capture packet size is set to %d bytes", packetSize))
 		capture.Spec.CaptureConfiguration.CaptureOption.PacketSize = &packetSize
+	}
+
+	if interfaces != "" {
+		interfaceSlice := strings.Split(interfaces, ",")
+		for i := range interfaceSlice {
+			interfaceSlice[i] = strings.TrimSpace(interfaceSlice[i])
+		}
+		retinacmd.Logger.Info(fmt.Sprintf("Capturing on specific interfaces: %v", interfaceSlice))
+		capture.Spec.CaptureConfiguration.CaptureOption.Interfaces = interfaceSlice
 	}
 
 	if len(hostPath) != 0 {
@@ -487,6 +518,7 @@ func init() {
 	createCapture.Flags().StringVar(&s3AccessKeyID, "s3-access-key-id", "", "S3 access key id to upload capture files")
 	createCapture.Flags().StringVar(&s3SecretAccessKey, "s3-secret-access-key", "", "S3 access secret key to upload capture files")
 	createCapture.Flags().StringVar(&tcpdumpFilter, "tcpdump-filter", "", "Raw tcpdump flags which works only for Linux")
+	createCapture.Flags().StringVar(&interfaces, "interfaces", "", "Comma-separated list of network interfaces to capture on (e.g., eth0,eth1)")
 	createCapture.Flags().StringVar(&excludeFilter, "exclude-filter", "", "A comma-separated list of IP:Port pairs that are "+
 		"excluded from capturing network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:*")
 	createCapture.Flags().StringVar(&includeFilter, "include-filter", "", "A comma-separated list of IP:Port pairs that are "+

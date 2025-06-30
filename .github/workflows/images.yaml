@@ -25,7 +25,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: go.mod
       - run: go version
@@ -76,7 +76,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: go.mod
       - run: go version
@@ -122,13 +122,13 @@ jobs:
     strategy:
       matrix:
         platform: ["linux"]
-        arch: ["amd64"]
+        arch: ["amd64", "arm64"]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: go.mod
       - run: go version
@@ -178,7 +178,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: go.mod
       - run: go version
@@ -227,7 +227,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: go.mod
       - run: go version
@@ -264,8 +264,8 @@ jobs:
           IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
 
   manifests:
-    if: ${{ github.event_name == 'merge_group' && success('retina-images') && success('retina-win-images') && success('operator-images') && success('retina-shell-images')}}
     name: Generate Manifests
+    if: ${{ github.event_name == 'merge_group' }}
     runs-on: ubuntu-latest
     needs:
       [
@@ -303,17 +303,17 @@ jobs:
           IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
 
   e2e:
-    if: ${{ github.event_name == 'merge_group' && success('manifests')}}
     name: Run E2E Tests
-    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'merge_group' }}
     needs: [manifests]
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup go
-        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: go.mod
       - run: go version
@@ -335,70 +335,34 @@ jobs:
           set -euo pipefail
           go test -v ./test/e2e/. -timeout 60m -tags=e2e -count=1  -args -image-tag=$(make version) -image-registry=${{ vars.ACR_NAME }}  -image-namespace=${{ github.repository}}
 
-  perf-basic:
-    if: ${{ github.event_name == 'merge_group' && success('manifests')}}
-    name: Retina Basic Performance Test
-    runs-on: ubuntu-latest
+  perf-test-basic:
+    if: ${{ github.event_name == 'merge_group'}}
     needs: [manifests]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-
-      - name: Setup go
-        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
-        with:
-          go-version-file: go.mod
-      - run: go version
-
-      - name: Az CLI login
-        uses: azure/login@v2
-        if: ${{ github.event_name == 'merge_group' }}
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION }}
-
-      - name: Run Perf Tests
-        env:
-          AZURE_APP_INSIGHTS_KEY: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
-          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION }}
-          AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          go test -v ./test/e2e/. -timeout 2h -tags=perf -count=1 -args -image-tag=$(make version) -image-registry=${{ vars.ACR_NAME }} -image-namespace=${{ github.repository }} -retina-mode=basic
-
-  perf-advanced:
-    if: ${{ github.event_name == 'merge_group' && success('manifests')}}
-    name: Retina Advanced Performance Test
-    runs-on: ubuntu-latest
+    uses: ./.github/workflows/perf-template.yaml
+    with:
+      image-registry: ${{ vars.ACR_NAME }}
+      tag: $(make version)
+      image-namespace: ${{ github.repository }}
+      retina-mode: basic
+      azure-location: ${{ vars.AZURE_LOCATION }}
+    secrets:
+      azure-subscription: ${{ secrets.AZURE_SUBSCRIPTION }}
+      azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+      azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+      azure-app-insights-key: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
+  
+  perf-test-advanced:
+    if: ${{ github.event_name == 'merge_group'}}
     needs: [manifests]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-
-      - name: Setup go
-        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
-        with:
-          go-version-file: go.mod
-      - run: go version
-
-      - name: Az CLI login
-        uses: azure/login@v2
-        if: ${{ github.event_name == 'merge_group' }}
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION }}
-
-      - name: Run Perf Tests
-        env:
-          AZURE_APP_INSIGHTS_KEY: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
-          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION }}
-          AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          go test -v ./test/e2e/. -timeout 2h -tags=perf -count=1 -args -image-tag=$(make version) -image-registry=${{ vars.ACR_NAME }} -image-namespace=${{ github.repository }} -retina-mode=advanced
+    uses: ./.github/workflows/perf-template.yaml
+    with:
+      image-registry: ${{ vars.ACR_NAME }}
+      tag: $(make version)
+      image-namespace: ${{ github.repository }}
+      retina-mode: advanced
+      azure-location: ${{ vars.AZURE_LOCATION }}
+    secrets:
+      azure-subscription: ${{ secrets.AZURE_SUBSCRIPTION }}
+      azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+      azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+      azure-app-insights-key: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}

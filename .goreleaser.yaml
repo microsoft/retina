@@ -10,6 +10,7 @@ before:
 
 builds:
   - binary: kubectl-retina-{{ .Os }}-{{ .Arch }}
+    id: retina
     env:
       - CGO_ENABLED=0
     goarch:
@@ -24,13 +25,41 @@ builds:
     ldflags:
       - -X github.com/microsoft/retina/internal/buildinfo.Version=v{{.Version}}
     main: cli/main.go
+  - binary: kubectl-retina-mcr-{{ .Os }}-{{ .Arch }}
+    id: retina-mcr
+    env:
+      - CGO_ENABLED=0
+    goarch:
+      - amd64
+      - arm64
+    gcflags:
+      - -dwarflocationlists=true
+    goos:
+      - linux
+      - windows
+      - darwin
+    ldflags:
+      - -X github.com/microsoft/retina/internal/buildinfo.Version=v{{.Version}}
+      - -X github.com/microsoft/retina/internal/buildinfo.RetinaAgentImageName={{.Env.MCR_AGENT_IMAGE_NAME}}
+    main: cli/main.go
 
 archives:
   - name_template: "{{ .Binary }}-v{{ .Version }}"
+    id: retina-kubectl
+    ids:
+    - retina
     wrap_in_directory: false
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [ 'zip' ]
+  - name_template: "{{ .Binary }}-v{{ .Version }}"
+    id: retina-kubectl-mcr
+    ids:
+    - retina-mcr
+    wrap_in_directory: false
+    format_overrides:
+      - goos: windows
+        formats: [ 'zip' ]
 
 changelog:
   sort: asc

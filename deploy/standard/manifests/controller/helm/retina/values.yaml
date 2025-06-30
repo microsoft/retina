@@ -28,6 +28,20 @@ operator:
       - "--config"
       - "/retina/operator-config.yaml"
   telemetryInterval: "5m"
+  affinity:
+    # TODO(user): Override the following values to configure the nodeAffinity expression
+    # according to the platforms which are supported by your solution.
+    # It is considered best practice to support multiple architectures. You can
+    # build your manager image using the makefile target docker-buildx.
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: kubernetes.io/os
+                operator: In
+                values:
+                  - linux
+                  #- windows
 
 image:
   repository: ghcr.io/microsoft/retina/retina-agent
@@ -84,6 +98,7 @@ daemonset:
       args:
         - "--config"
         - "/retina/config/config.yaml"
+      env: []
       healthProbeBindAddress: ":18081"
       metricsBindAddress: ":18080"
       ports:
@@ -98,6 +113,7 @@ volumeMounts:
   cgroup: /sys/fs/cgroup
   tmp: /tmp
   config: /retina/config
+  host-os-release: /etc/os-release
 
 #volume mounts for windows
 volumeMounts_win:
@@ -110,6 +126,7 @@ securityContext:
       - SYS_ADMIN
       - NET_ADMIN # for packetparser plugin
       - IPC_LOCK # for mmap() calls made by NewReader(), ref: https://man7.org/linux/man-pages/man2/mmap.2.html
+      - SYS_RESOURCE # for setting rlimit
   windowsOptions:
     runAsUserName: "NT AUTHORITY\\SYSTEM"
 

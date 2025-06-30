@@ -7,3 +7,5 @@ You can then add the annotation `retina.sh: observe` to either:
 
 - individual Pods
 - Namespaces (to observe all the Pods in the namespace).
+
+**Note**: If you enable Annotations, you cannot use the `MetricsConfiguration` CRD to specify which Pods to observe.
