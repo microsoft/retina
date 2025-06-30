@@ -24,6 +24,8 @@ var (
 	retinaShellImageVersion  string
 	mountHostFilesystem      bool
 	allowHostFilesystemWrite bool
+	appArmorUnconfined       bool
+	seccompUnconfined        bool
 	hostPID                  bool
 	capabilities             []string
 	timeout                  time.Duration
@@ -113,6 +115,8 @@ var shellCmd = &cobra.Command{
 			AllowHostFilesystemWrite: allowHostFilesystemWrite,
 			HostPID:                  hostPID,
 			Capabilities:             capabilities,
+			AppArmorUnconfined:       appArmorUnconfined,
+			SeccompUnconfined:        seccompUnconfined,
 			Timeout:                  timeout,
 		}
 
@@ -163,6 +167,8 @@ func init() {
 	shellCmd.Flags().BoolVar(&hostPID, "host-pid", false, "Set HostPID on the shell container. Applies only to nodes, not pods.")
 	shellCmd.Flags().StringSliceVarP(&capabilities, "capabilities", "c", []string{}, "Add capabilities to the shell container")
 	shellCmd.Flags().DurationVar(&timeout, "timeout", defaultTimeout, "The maximum time to wait for the shell container to start")
+	shellCmd.Flags().BoolVar(&appArmorUnconfined, "apparmor-unconfined", false, "Set AppArmor profile type to unconfined. Applies only to nodes, not pods.")
+	shellCmd.Flags().BoolVar(&seccompUnconfined, "seccomp-unconfined", false, "Set Seccomp profile type to unconfined. Applies only to nodes, not pods.")
 
 	// configFlags and matchVersion flags are used to load kubeconfig.
 	// This uses the same mechanism as `kubectl debug` to connect to apiserver and attach to containers.
