@@ -26,7 +26,23 @@ RUN tdnf install -y \
 	tar \
 	file \
 	bpftool \
+	bpftrace \
 	&& tdnf clean all
+
+# Create the entrypoint script to mount tracefs if not already mounted
+SHELL ["/bin/bash", "-c"]
+
+RUN echo $'#!/bin/bash\n\
+set -e\n\
+if ! mountpoint -q /sys/kernel/tracing; then\n\
+mount -t tracefs tracefs /sys/kernel/tracing\n\
+fi\n\
+exec "$@"' > /usr/local/bin/entrypoint.sh
+
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# Set the entrypoint
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 # Re-use existing arg from Makefile target "container-docker"
 # https://github.com/microsoft/retina/blob/main/Makefile#L224
