@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/retina/pkg/common"
 	"github.com/microsoft/retina/pkg/controllers/cache"
 	"github.com/microsoft/retina/pkg/log"
+	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
 )
 
@@ -119,6 +120,12 @@ func (e *Enricher) enrich(ev *v1.Event) {
 		flow.Source = e.getEndpoint(srcObj)
 	}
 
+	srcPod := e.cache.GetPodByIP(flow.GetIP().GetSource())
+	srcZone := "unknown"
+	if srcPod != nil {
+		srcZone = srcPod.Zone()
+	}
+
 	if flow.IP.Destination == "" {
 		e.l.Debug("destination IP is empty")
 		return
@@ -128,6 +135,14 @@ func (e *Enricher) enrich(ev *v1.Event) {
 	if dstObj != nil {
 		flow.Destination = e.getEndpoint(dstObj)
 	}
+
+	dstPod := e.cache.GetPodByIP(flow.GetIP().GetDestination())
+	dstZone := "unknown"
+	if dstPod != nil {
+		dstZone = dstPod.Zone()
+	}
+
+	utils.AddZones(flow, srcZone, dstZone)
 
 	ev.Event = flow
 	e.l.Debug("enriched flow", zap.Any("flow", flow))
