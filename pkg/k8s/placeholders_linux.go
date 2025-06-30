@@ -144,6 +144,10 @@ func (n *NoOpPolicyRepository) GetSelectorPolicy(*identity.Identity, uint64, pol
 	return nil, 0, nil
 }
 
+func (n *NoOpPolicyRepository) GetPolicySnapshot() map[identity.NumericIdentity]policy.SelectorPolicy {
+	return nil
+}
+
 func (n *NoOpPolicyRepository) GetRevision() uint64 {
 	return 0
 }
@@ -177,6 +181,10 @@ type NoOpOrchestrator struct{}
 
 func (n *NoOpOrchestrator) Reinitialize(context.Context) error {
 	return nil
+}
+
+func (n *NoOpOrchestrator) DatapathInitialized() <-chan struct{} {
+	return make(<-chan struct{})
 }
 
 func (n *NoOpOrchestrator) ReloadDatapath(context.Context, datapathtypes.Endpoint, *metrics.SpanStat) (string, error) {

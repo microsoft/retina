@@ -23,11 +23,11 @@ import (
 	"github.com/cilium/cilium/pkg/k8s/synced"
 	k8sTypes "github.com/cilium/cilium/pkg/k8s/types"
 	"github.com/cilium/cilium/pkg/k8s/watchers"
+	"github.com/cilium/cilium/pkg/loadbalancer/legacy/redirectpolicy"
+	"github.com/cilium/cilium/pkg/loadbalancer/legacy/service"
 	"github.com/cilium/cilium/pkg/metrics"
 	"github.com/cilium/cilium/pkg/node"
 	"github.com/cilium/cilium/pkg/policy"
-	"github.com/cilium/cilium/pkg/redirectpolicy"
-	"github.com/cilium/cilium/pkg/service"
 	"github.com/cilium/hive/cell"
 	"github.com/cilium/statedb"
 	"github.com/microsoft/retina/pkg/common"
@@ -153,8 +153,9 @@ var Cell = cell.Module(
 
 	// Provide everything needed for the watchers.
 	cell.Provide(
-		func() *ipcache.IPCache {
+		func(l *slog.Logger) *ipcache.IPCache {
 			alloc := cache.NewCachingIdentityAllocator(
+				l,
 				&identityAllocatorOwner{},
 				cache.AllocatorConfig{},
 			)

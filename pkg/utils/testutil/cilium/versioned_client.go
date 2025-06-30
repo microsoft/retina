@@ -105,6 +105,16 @@ func (m *MockCiliumV2Client) CiliumLocalRedirectPolicies(_ string) ciliumv2.Cili
 	return nil
 }
 
+func (m *MockCiliumV2Client) CiliumCIDRGroups() ciliumv2.CiliumCIDRGroupInterface {
+	m.l.Warn("MockCiliumV2Client.CiliumCIDRGroups() called but this returns nil because it's not implemented")
+	return nil
+}
+
+func (m *MockCiliumV2Client) CiliumLoadBalancerIPPools() ciliumv2.CiliumLoadBalancerIPPoolInterface {
+	m.l.Warn("MockCiliumV2Client.CiliumLoadBalancerIPPools() called but this returns nil because it's not implemented")
+	return nil
+}
+
 func (m *MockCiliumV2Client) CiliumNetworkPolicies(_ string) ciliumv2.CiliumNetworkPolicyInterface {
 	m.l.Warn("MockCiliumV2Client.CiliumNetworkPolicies() called but this returns nil because it's not implemented")
 	return nil
