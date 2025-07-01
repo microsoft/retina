@@ -9,7 +9,7 @@ os:
 
 operator:
   name: retina-operator
-  enabled: false
+  enabled: true
   repository: ghcr.io/microsoft/retina/retina-operator
   tag: "v0.0.2"
   installCRDs: true
