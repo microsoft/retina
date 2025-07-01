@@ -20,6 +20,8 @@ jobs:
     name: Build E2E Test Event Writer
     runs-on: windows-2022
 
+    env:
+      IS_MERGE_GROUP: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
     strategy:
       matrix:
         platform: ["windows"]
@@ -87,7 +89,13 @@ jobs:
         shell: pwsh
         working-directory: ${{ env.EVENT_WRITER_PATH }}
         run: |
-          $image = "${{ vars.ACR_NAME }}/${{ github.repository }}/test/e2e-test-event-writer".ToLower()
+          $isMergeGroup = "${{ env.IS_MERGE_GROUP }}" -eq "true"
+          if (-not $isMergeGroup) {
+              $image = "ghcr.io/${{ github.repository }}/test/e2e-test-event-writer".ToLower()
+          } else {
+              $image = "${{ vars.ACR_NAME }}/${{ github.repository }}/test/e2e-test-event-writer".ToLower()
+          }
+
           $tag = "${{ steps.tag.outputs.tag }}"
           docker build -f "./Dockerfile" -t "${image}:${tag}" -t "${image}:latest" .
           docker push "${image}:${tag}"
