@@ -12,12 +12,16 @@ FROM ${OS_VERSION} AS agent-win
 ARG GOARCH=amd64 # default to amd64
 ARG GOOS=windows # default to windows
 ARG OS_VERSION=ltsc2022
+ARG REPO_PATH
+ARG BINARIES_PATH
 ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
 ENV OS_VERSION=${OS_VERSION}
-COPY drop_build_prepare/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
-COPY drop_build_prepare/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
-COPY drop_build_agent_win_${GOOS}_${GOARCH}_BinaryBuild/captureworkload.exe captureworkload.exe
-COPY drop_build_agent_win_${GOOS}_${GOARCH}_BinaryBuild/controller.exe controller.exe
+ENV BINARIES_PATH=${BINARIES_PATH}
+ENV REPO_PATH=${REPO_PATH}
+COPY ${REPO_PATH}/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
+COPY ${REPO_PATH}/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
+COPY ${BINARIES_PATH}/captureworkload.exe captureworkload.exe
+COPY ${BINARIES_PATH}/controller.exe controller.exe
 ADD https://github.com/microsoft/etl2pcapng/releases/download/v1.10.0/etl2pcapng.exe /etl2pcapng.exe
 CMD ["controller.exe", "start", "--kubeconfig=.\\kubeconfig"]
