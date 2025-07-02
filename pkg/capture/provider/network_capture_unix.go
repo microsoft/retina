@@ -238,8 +238,10 @@ func (ncp *NetworkCaptureProvider) CollectMetadata() error {
 
 	iptablesMode := obtainIptablesMode()
 	ncp.l.Info(fmt.Sprintf("Iptables mode %s is used", iptablesMode))
-	iptablesSaveCmdName := "iptables-" + iptablesMode + "-save"
-	iptablesCmdName := "iptables-" + iptablesMode
+	// Use standard command names regardless of backend mode
+	// The iptables and iptables-save commands are symlinks to the appropriate backend
+	iptablesSaveCmdName := "iptables-save"
+	iptablesCmdName := "iptables"
 
 	metadataList := []struct {
 		commands []command
