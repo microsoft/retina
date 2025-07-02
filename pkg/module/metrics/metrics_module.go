@@ -318,32 +318,28 @@ func (m *Module) run(newCtx context.Context) {
 				f := ev.Event.(*flow.Flow)
 				m.l.Debug("converted flow object", zap.Any("flow l4", f.IP))
 
-				srcIP := net.ParseIP(f.GetIP().GetSource())
-				dstIP := net.ParseIP(f.GetIP().GetDestination())
-
 				if !m.daemonConfig.EnableAnnotations {
 					for _, metricObj := range m.registry {
 						metricObj.ProcessFlow(f)
 					}
 				} else {
-					if m.filterManager.HasIP(srcIP) && m.filterManager.HasIP(dstIP) {
-						for _, metricObj := range m.registry {
-							metricObj.ProcessFlow(f)
-						}
-					} else {
+					srcIP := net.ParseIP(f.GetIP().GetSource())
+					dstIP := net.ParseIP(f.GetIP().GetDestination())
+
+					if m.filterManager.HasIP(srcIP) || m.filterManager.HasIP(dstIP) {
 						// TODO: This is a temporary fix. Metrics module should not change the flow struct.
-						if !m.filterManager.HasIP(srcIP) && m.filterManager.HasIP(dstIP) {
+						if !m.filterManager.HasIP(srcIP) {
 							f.IP.Source = ""
 							f.Source = nil
-							for _, metricObj := range m.registry {
-								metricObj.ProcessFlow(f)
-							}
-						} else if m.filterManager.HasIP(srcIP) && !m.filterManager.HasIP(dstIP) {
+						}
+
+						if !m.filterManager.HasIP(dstIP) {
 							f.IP.Destination = ""
 							f.Destination = nil
-							for _, metricObj := range m.registry {
-								metricObj.ProcessFlow(f)
-							}
+						}
+
+						for _, metricObj := range m.registry {
+							metricObj.ProcessFlow(f)
 						}
 					}
 				}
