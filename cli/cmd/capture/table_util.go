@@ -21,7 +21,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func getCaptureAndPrintCaptureResult(ctx context.Context, kubeClient *kubernetes.Clientset, name, namespace string) error {
+func getCaptureAndPrintCaptureResult(ctx context.Context, kubeClient kubernetes.Interface, name, namespace string) error {
 	return listCapturesAndPrintCaptureResults(ctx, kubeClient, name, namespace)
 }
 
@@ -30,7 +30,7 @@ func listCapturesInNamespaceAndPrintCaptureResults(ctx context.Context, kubeClie
 }
 
 // listCapturesAndPrintCaptureResults list captures and print the running jobs into properly aligned text.
-func listCapturesAndPrintCaptureResults(ctx context.Context, kubeClient *kubernetes.Clientset, name, namespace string) error {
+func listCapturesAndPrintCaptureResults(ctx context.Context, kubeClient kubernetes.Interface, name, namespace string) error {
 	jobListOpt := metav1.ListOptions{}
 	if len(name) != 0 {
 		captureJobSelector := &metav1.LabelSelector{
@@ -87,7 +87,10 @@ func printCaptureResult(captureJobs []batchv1.Job) {
 
 		for i := range jobs {
 			job := &jobs[i]
-			completions := fmt.Sprintf("%d/%d", job.Status.Succeeded, *job.Spec.Completions)
+			var completions string
+			if job.Spec.Completions != nil {
+				completions = fmt.Sprintf("%d/%d", job.Status.Succeeded, *job.Spec.Completions)
+			}
 			age := durationUtil.HumanDuration(time.Since(job.CreationTimestamp.Time))
 			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", captureNamespace, captureName, job.Name, completions, age)
 		}

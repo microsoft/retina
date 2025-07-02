@@ -68,48 +68,6 @@ var downloadExample = templates.Examples(i18n.T(`
 		kubectl retina capture download --blob-url "<blob-url>"
 `))
 
-var downloadCapture = &cobra.Command{
-	Use:     "download",
-	Short:   "Download Retina Captures",
-	Example: downloadExample,
-	RunE: func(*cobra.Command, []string) error {
-		viper.AutomaticEnv()
-
-		kubeConfig, err := opts.ToRESTConfig()
-		if err != nil {
-			return errors.Wrap(err, "failed to compose k8s rest config")
-		}
-
-		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
-		defer cancel()
-
-		captureNamespace := *opts.Namespace
-		if captureNamespace == "" {
-			captureNamespace = "default"
-		}
-
-		if captureName == "" && blobURL == "" {
-			return errors.New("either --name or --blob-url must be specified")
-		}
-
-		if captureName != "" {
-			err = downloadFromCluster(ctx, kubeConfig, captureNamespace)
-			if err != nil {
-				return err
-			}
-		}
-
-		if blobURL != "" {
-			err = downloadFromBlob()
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
-	},
-}
-
 func downloadFromCluster(ctx context.Context, config *rest.Config, namespace string) error {
 	kubeClient, err := kubernetes.NewForConfig(config)
 	if err != nil {
@@ -404,9 +362,52 @@ func downloadFromBlob() error {
 	return nil
 }
 
-func init() {
-	capture.AddCommand(downloadCapture)
+func NewDownloadSubCommand() *cobra.Command {
+	downloadCapture := &cobra.Command{
+		Use:     "download",
+		Short:   "Download Retina Captures",
+		Example: downloadExample,
+		RunE: func(*cobra.Command, []string) error {
+			viper.AutomaticEnv()
+
+			kubeConfig, err := opts.ToRESTConfig()
+			if err != nil {
+				return errors.Wrap(err, "failed to compose k8s rest config")
+			}
+
+			ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
+			defer cancel()
+
+			captureNamespace := *opts.Namespace
+			if captureNamespace == "" {
+				captureNamespace = "default"
+			}
+
+			if captureName == "" && blobURL == "" {
+				return errors.New("either --name or --blob-url must be specified")
+			}
+
+			if captureName != "" {
+				err = downloadFromCluster(ctx, kubeConfig, captureNamespace)
+				if err != nil {
+					return err
+				}
+			}
+
+			if blobURL != "" {
+				err = downloadFromBlob()
+				if err != nil {
+					return err
+				}
+			}
+
+			return nil
+		},
+	}
+
 	downloadCapture.Flags().StringVar(&blobURL, "blob-url", "", "Blob URL from which to download")
 	downloadCapture.Flags().StringVar(&captureName, "name", "", "The name of a the capture")
 	downloadCapture.Flags().StringVarP(&outputPath, "output", "o", DefaultOutputPath, "Path to save the downloaded capture")
+
+	return downloadCapture
 }
