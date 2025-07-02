@@ -80,7 +80,7 @@ var (
 				lifecycle.Append(cell.Hook{
 					OnStart: func(cell.HookContext) error {
 						l.Info("starting periodic heartbeat")
-						go tel.Heartbeat(ctx, heartbeatInterval, nil)
+						go tel.Heartbeat(ctx, heartbeatInterval)
 						return nil
 					},
 					OnStop: func(cell.HookContext) error {
