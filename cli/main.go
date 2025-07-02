@@ -8,6 +8,7 @@ import (
 
 	"github.com/microsoft/retina/cli/cmd"
 	_ "github.com/microsoft/retina/cli/cmd/capture"
+	_ "github.com/microsoft/retina/cli/cmd/debug"
 )
 
 func main() {

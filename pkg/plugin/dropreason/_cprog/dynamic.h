@@ -1,2 +1,2 @@
-// Place holder header file that will be replaced by the actual header file during runtime
-// DO NOT DELETE
+#define ADVANCED_METRICS 1 
+#define BYPASS_LOOKUP_IP_OF_INTEREST 0 
