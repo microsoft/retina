@@ -23,6 +23,8 @@ jobs:
           go-version-file: go.mod
       - name: Run GoReleaser build
         uses: goreleaser/goreleaser-action@v6
+        env:
+          MCR_AGENT_IMAGE_NAME: mcr.microsoft.com/containernetworking/retina-agent
         with:
           distribution: goreleaser
           version: latest
@@ -48,6 +50,7 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MCR_AGENT_IMAGE_NAME: mcr.microsoft.com/containernetworking/retina-agent
       - name: Update new version in krew-index
         if: github.repository_owner == 'microsoft'
         uses: rajatjindal/krew-release-bot@v0.0.47
