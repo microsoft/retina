@@ -30,7 +30,7 @@ jobs:
           echo "TAG=$(make version)" >> $GITHUB_ENV
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@76071ef0d7ec797419534a183b498b4d6366cf37
+        uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4
         with:
           image-ref: "ghcr.io/${{ github.repository }}/${{ matrix.image }}:${{ env.TAG }}"
           format: "template"
