@@ -170,8 +170,8 @@ func (f *ForwardMetrics) processLocalCtxFlow(flow *v1.Flow) {
 func (f *ForwardMetrics) update(fl *v1.Flow, labels []string) {
 	switch f.metricName {
 	case utils.ForwardPacketsGaugeName:
-		f.forwardMetric.WithLabelValues(labels...).Inc()
+		f.forwardMetric.WithLabelValues(labels...).Add(float64(utils.PreviouslyObservedPackets(fl) + 1))
 	case utils.ForwardBytesGaugeName:
-		f.forwardMetric.WithLabelValues(labels...).Add(float64(utils.PacketSize(fl)))
+		f.forwardMetric.WithLabelValues(labels...).Add(float64(utils.PacketSize(fl) + utils.PreviouslyObservedBytes(fl)))
 	}
 }
