@@ -15,6 +15,10 @@ message RetinaMetadata {
 
     // Drop reason in Retina.
     DropReason drop_reason = 5;
+
+    // Topology zones (e.g., from Kubernetes).
+    string source_zone = 6;
+    string destination_zone = 7;
 }
 
 enum DNSType {

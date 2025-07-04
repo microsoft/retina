@@ -4,16 +4,18 @@ package common
 
 import "net"
 
-func NewRetinaNode(name string, ip net.IP) *RetinaNode {
+func NewRetinaNode(name string, ip net.IP, zone string) *RetinaNode {
 	return &RetinaNode{
 		name: name,
 		ip:   ip,
+		zone: zone,
 	}
 }
 
 func (n *RetinaNode) DeepCopy() interface{} {
 	newN := &RetinaNode{
 		name: n.name,
+		zone: n.zone,
 	}
 
 	if n.ip != nil {
@@ -30,4 +32,8 @@ func (n *RetinaNode) IPString() string {
 
 func (n *RetinaNode) Name() string {
 	return n.name
+}
+
+func (n *RetinaNode) Zone() string {
+	return n.zone
 }
