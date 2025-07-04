@@ -1,7 +1,10 @@
 # Annotations
 
+**This feature is only available in Standard Control Plane.**
+
 Annotations let you specify which Pods to observe (create metrics for).
-To configure this, specify `enableAnnotations=true` in Retina's [helm installation](../02-Installation/01-Setup.md) or [ConfigMap](../02-Installation/03-Config.md).
+
+To enable it, specify `enableAnnotations=true` in Retina's Standard Control Plane [helm installation](../02-Installation/01-Setup.md) or [ConfigMap](../02-Installation/03-Config.md).
 
 You can then add the annotation `retina.sh: observe` to either:
 
