@@ -117,6 +117,10 @@ func (p *packetParser) Generate(ctx context.Context) error {
 	p.l.Info("data aggregation level", zap.String("level", p.cfg.DataAggregationLevel.String()))
 	st += fmt.Sprintf("#define DATA_AGGREGATION_LEVEL %d\n", p.cfg.DataAggregationLevel)
 
+	// Process packetparser sampling rate.
+	p.l.Info("sampling rate", zap.Uint32("rate", p.cfg.DataSamplingRate))
+	st += fmt.Sprintf("#define DATA_SAMPLING_RATE %d\n", p.cfg.DataSamplingRate)
+
 	// Generate dynamic header for packetparser.
 	err = loader.WriteFile(ctx, dynamicHeaderPath, st)
 	if err != nil {
@@ -568,6 +572,8 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 				zap.Int("worker_id", id),
 			)
 
+			metrics.ParsedPacketsCounter.WithLabelValues().Inc()
+
 			var bpfEvent packetparserPacket
 			err := binary.Read(bytes.NewReader(record.RawSample), binary.LittleEndian, &bpfEvent)
 			if err != nil {
@@ -606,6 +612,9 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 
 			// Add packet size to the flow's metadata.
 			utils.AddPacketSize(meta, bpfEvent.Bytes)
+
+			// Add packet weight to the flow's metadata.
+			utils.AddWeight(meta, bpfEvent.Weight)
 
 			// Add the TCP metadata to the flow.
 			tcpMetadata := bpfEvent.TcpMetadata

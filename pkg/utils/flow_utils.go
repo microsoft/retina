@@ -148,6 +148,24 @@ func AddTCPFlags(f *flow.Flow, syn, ack, fin, rst, psh, urg uint16) {
 	}
 }
 
+// AddWeight adds the packet weight to the flow's metadata.
+func AddWeight(meta *RetinaMetadata, weight uint32) {
+	if meta == nil {
+		return
+	}
+	meta.Weight = weight
+}
+
+func Weight(f *flow.Flow) uint32 {
+	e := f.GetExtensions()
+	if e == nil {
+		return 1
+	}
+	k := &RetinaMetadata{}
+	e.UnmarshalTo(k) //nolint:errcheck // ignore errors
+	return k.GetWeight()
+}
+
 func AddTCPFlagsBool(f *flow.Flow, syn, ack, fin, rst, psh, urg bool) {
 	if f.GetL4().GetTCP() == nil {
 		return
