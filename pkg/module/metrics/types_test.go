@@ -30,33 +30,36 @@ func TestNewCtxOps(t *testing.T) {
 		},
 		{
 			name:    "source opts 1",
-			opts:    []string{"ip", "namespace", "podName", "Workload", "PORT", "serVICE"},
+			opts:    []string{"ip", "namespace", "podName", "Workload", "PORT", "serVICE", "zone"},
 			ctxType: source,
 			expected: []string{
 				"source_ip", "source_namespace", "source_podname",
 				"source_workload_kind", "source_workload_name", "source_service", "source_port",
+				"source_zone",
 			},
 			f:            &flow.Flow{},
-			expectedVals: []string{"unknown", "unknown", "unknown", "unknown", "unknown", "unknown", "unknown"},
+			expectedVals: []string{"unknown", "unknown", "unknown", "unknown", "unknown", "unknown", "unknown", "unknown"},
 		},
 		{
 			name:    "dest opts 1",
-			opts:    []string{"ip", "namespace", "podName", "Workload", "PORT", "serVICE"},
+			opts:    []string{"ip", "namespace", "podName", "Workload", "PORT", "serVICE", "zone"},
 			ctxType: destination,
 			expected: []string{
 				"destination_ip", "destination_namespace", "destination_podname",
 				"destination_workload_kind", "destination_workload_name", "destination_service", "destination_port",
+				"destination_zone",
 			},
 			f:            &flow.Flow{},
-			expectedVals: []string{"unknown", "unknown", "unknown", "unknown", "unknown", "unknown", "unknown"},
+			expectedVals: []string{"unknown", "unknown", "unknown", "unknown", "unknown", "unknown", "unknown", "unknown"},
 		},
 		{
 			name:    "source opts with flow",
-			opts:    []string{"ip", "namespace", "podName", "Workload", "PORT", "serVICE"},
+			opts:    []string{"ip", "namespace", "podName", "Workload", "PORT", "serVICE", "zone"},
 			ctxType: source,
 			expected: []string{
 				"source_ip", "source_namespace", "source_podname",
 				"source_workload_kind", "source_workload_name", "source_service", "source_port",
+				"source_zone",
 			},
 			f: &flow.Flow{
 				Source: &flow.Endpoint{
@@ -64,15 +67,16 @@ func TestNewCtxOps(t *testing.T) {
 					PodName:   "test",
 				},
 			},
-			expectedVals: []string{"unknown", "ns", "test", "unknown", "unknown", "unknown", "unknown"},
+			expectedVals: []string{"unknown", "ns", "test", "unknown", "unknown", "unknown", "unknown", "unknown"},
 		},
 		{
-			name:    "source opts with flow",
-			opts:    []string{"ip", "namespace", "podName", "Workload", "PORT", "serVICE"},
+			name:    "dest opts with flow",
+			opts:    []string{"ip", "namespace", "podName", "Workload", "PORT", "serVICE", "zone"},
 			ctxType: destination,
 			expected: []string{
 				"destination_ip", "destination_namespace", "destination_podname",
 				"destination_workload_kind", "destination_workload_name", "destination_service", "destination_port",
+				"destination_zone",
 			},
 			f: &flow.Flow{
 				Destination: &flow.Endpoint{
@@ -80,7 +84,7 @@ func TestNewCtxOps(t *testing.T) {
 					PodName:   "test",
 				},
 			},
-			expectedVals: []string{"unknown", "ns", "test", "unknown", "unknown", "unknown", "unknown"},
+			expectedVals: []string{"unknown", "ns", "test", "unknown", "unknown", "unknown", "unknown", "unknown"},
 		},
 		{
 			name:     "source opts of ip",
