@@ -28,6 +28,25 @@ RUN tdnf install -y \
 	bpftool \
 	&& tdnf clean all
 
+# Create the entrypoint script to mount tracefs
+SHELL ["/bin/bash", "-c"]
+
+RUN echo $'#!/bin/bash\n\
+set -e\n\
+if ! mountpoint -q /sys/kernel/tracing; then\n\
+mount -t tracefs tracefs /sys/kernel/tracing\n\
+fi\n\
+exec "$@"' > /usr/local/bin/entrypoint.sh;
+
+# Environment Variables to run bpftrace in the container
+ENV APPIMAGE_EXTRACT_AND_RUN=1
+ENV NO_CLEANUP=1
+
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# Set the entrypoint
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+
 # Re-use existing arg from Makefile target "container-docker"
 # https://github.com/microsoft/retina/blob/main/Makefile#L224
 ARG GOARCH=amd64
@@ -49,5 +68,10 @@ RUN set -eux; \
     chmod +x /usr/local/bin/pwru; \
     rm /tmp/pwru.tar.gz; \
     file /usr/local/bin/pwru | grep -q 'ELF'
+
+# Download and install bpftrace v0.23.4
+RUN wget https://github.com/bpftrace/bpftrace/releases/download/v0.23.4/bpftrace; \
+    chmod +x bpftrace; \
+    mv bpftrace /usr/local/bin/bpftrace;
 
 CMD ["/bin/bash", "-l"]
