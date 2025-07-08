@@ -148,6 +148,67 @@ func AddTCPFlags(f *flow.Flow, syn, ack, fin, rst, psh, urg uint16) {
 	}
 }
 
+// AddPreviouslyObservedTCPFlags adds the previously observed TCP flags to the flows's metadata.
+func AddPreviouslyObservedTCPFlags(meta *RetinaMetadata, syn, ack, fin, rst, psh, urg uint32) {
+	if meta == nil {
+		return
+	}
+	meta.PreviouslyObservedTcpFlags = map[string]uint32{
+		SYN: syn,
+		ACK: ack,
+		FIN: fin,
+		RST: rst,
+		PSH: psh,
+		URG: urg,
+	}
+}
+
+func PreviouslyObservedTCPFlags(f *flow.Flow) map[string]uint32 {
+	e := f.GetExtensions()
+	if e == nil {
+		return nil
+	}
+	k := &RetinaMetadata{}
+	e.UnmarshalTo(k) //nolint:errcheck // ignore errors
+	return k.GetPreviouslyObservedTcpFlags()
+}
+
+// AddPreviouslyObservedBytes adds the previously observed bytes to the flow's metadata.
+func AddPreviouslyObservedBytes(meta *RetinaMetadata, bytes uint32) {
+	if meta == nil {
+		return
+	}
+	meta.PreviouslyObservedBytes = bytes
+}
+
+func PreviouslyObservedBytes(f *flow.Flow) uint32 {
+	e := f.GetExtensions()
+	if e == nil {
+		return 0
+	}
+	k := &RetinaMetadata{}
+	e.UnmarshalTo(k) //nolint:errcheck // ignore errors
+	return k.GetPreviouslyObservedBytes()
+}
+
+// AddPreviouslyObservedPackets adds the previously observed packets to the flow's metadata.
+func AddPreviouslyObservedPackets(meta *RetinaMetadata, packets uint32) {
+	if meta == nil {
+		return
+	}
+	meta.PreviouslyObservedPackets = packets
+}
+
+func PreviouslyObservedPackets(f *flow.Flow) uint32 {
+	e := f.GetExtensions()
+	if e == nil {
+		return 0
+	}
+	k := &RetinaMetadata{}
+	e.UnmarshalTo(k) //nolint:errcheck // ignore errors
+	return k.GetPreviouslyObservedPackets()
+}
+
 func AddTCPFlagsBool(f *flow.Flow, syn, ack, fin, rst, psh, urg bool) {
 	if f.GetL4().GetTCP() == nil {
 		return
