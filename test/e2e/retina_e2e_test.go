@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/microsoft/retina/test/e2e/common"
 	"github.com/microsoft/retina/test/e2e/framework/helpers"
