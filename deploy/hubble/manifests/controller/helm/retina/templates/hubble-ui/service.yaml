@@ -19,6 +19,9 @@ metadata:
     app.kubernetes.io/part-of: cilium
 spec:
   type: {{ .Values.hubble.ui.service.type | quote }}
+  {{- if and .Values.hubble.ui.service.trafficDistribution (semverCompare ">=1.31-0" .Capabilities.KubeVersion.GitVersion) }}
+  trafficDistribution: {{ .Values.hubble.ui.service.trafficDistribution }}
+  {{- end }}
   selector:
     k8s-app: hubble-ui
   ports:
