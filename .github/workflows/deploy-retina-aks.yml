@@ -1,0 +1,70 @@
+name: Deploy Retina to AKS
+
+on:
+  workflow_dispatch:
+    inputs:
+      helm_image_tag:
+        description: "Tag for Retina Docker images"
+        required: true
+        default: "latest"
+permissions:
+  id-token: write
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Helm
+      uses: azure/setup-helm@v4
+
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v4
+    
+    - name: Azure Login
+      uses: azure/login@v2
+      with:
+        client-id: ${{ vars.AZURE_CLIENT_ID }}
+        tenant-id: ${{ vars.AZURE_TENANT_ID }}
+        subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Set AKS Account
+      run: az account set --subscription b8c06bcd-5024-43fa-9507-691b5623f59a
+    
+    - name: Set AKS credentials
+      run: az aks get-credentials --resource-group retina-observability-rg --name Retina-Deploy --overwrite-existing
+
+    - name: Get IMAGE_NAMESPACE from git URL
+      id: get_namespace
+      run: |
+        git_url=$(git config --get remote.origin.url)
+        namespace=$(echo "$git_url" | sed -E 's/.*github\.com[\/:]([^/]+)\/([^/.]+)(.git)?/\1\/\2/' | tr '[:upper:]' '[:lower:]')
+        echo "IMAGE_NAMESPACE=$namespace" >> $GITHUB_ENV
+        
+    - name: Deploy Retina using Helm
+      run: |
+        IMAGE_REGISTRY="ghcr.io"
+        HELM_IMAGE_TAG="${{ github.event.inputs.helm_image_tag }}"
+        RETINA_IMAGE="$IMAGE_NAMESPACE/retina-agent"
+        RETINA_OPERATOR_IMAGE="$IMAGE_NAMESPACE/retina-operator"
+        RETINA_INIT_IMAGE="$IMAGE_NAMESPACE/retina-init"
+        helm upgrade --install retina ./deploy/standard/manifests/controller/helm/retina/ \
+          --namespace kube-system \
+          --set image.repository="$IMAGE_REGISTRY/$RETINA_IMAGE" \
+          --set image.initRepository="$IMAGE_REGISTRY/$RETINA_INIT_IMAGE" \
+          --set image.tag="$HELM_IMAGE_TAG" \
+          --set operator.tag="$HELM_IMAGE_TAG" \
+          --set image.pullPolicy=Always \
+          --set logLevel=info \
+          --set os.windows=true \
+          --set operator.enabled=true \
+          --set operator.enableRetinaEndpoint=true \
+          --set operator.repository="$IMAGE_REGISTRY/$RETINA_OPERATOR_IMAGE" \
+          --skip-crds \
+          --set enabledPlugin_linux="[dropreason\,packetforward\,linuxutil\,dns\,packetparser]" \
+          --set enabledPlugin_win="[ebpfwindows]" \
+          --set enablePodLevel=true \
+          --set enableAnnotations=true
