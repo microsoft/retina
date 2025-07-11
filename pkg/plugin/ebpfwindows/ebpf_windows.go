@@ -159,6 +159,7 @@ func (p *Plugin) addEbpfToPath() error {
 func (p *Plugin) pullMetricsAndEvents(ctx context.Context) {
 	eventsMap := NewEventsMap()
 	metricsMap := NewMetricsMap()
+	prevLostEventsCount := uint64(0)
 
 	err := p.addEbpfToPath()
 	if err != nil {
@@ -196,6 +197,20 @@ func (p *Plugin) pullMetricsAndEvents(ctx context.Context) {
 			if err != nil {
 				p.l.Error("Error iterating metrics map", zap.Error(err))
 			}
+
+			lostEventsCount, err := GetLostEventsCount()
+
+			if err != nil {
+				p.l.Error("Error getting lost events count", zap.Error(err))
+			} else {
+				// The lost events count is cumulative, so we need to calculate the difference
+				if lostEventsCount > prevLostEventsCount {
+					counterToAdd := lostEventsCount - prevLostEventsCount
+					metrics.LostEventsCounter.WithLabelValues(utils.Kernel, name).Add(float64(counterToAdd))
+					prevLostEventsCount = lostEventsCount
+				}
+			}
+
 		case <-ctx.Done():
 			p.l.Error("ebpfwindows plugin canceling", zap.Error(ctx.Err()))
 			err := eventsMap.UnregisterForCallback()

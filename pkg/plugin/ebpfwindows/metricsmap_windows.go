@@ -65,6 +65,7 @@ var (
 	retinaEbpfAPI = windows.NewLazyDLL("retinaebpfapi.dll")
 	// Load the RetinaEnumerateMetricsMap function
 	enumMetricsMap = retinaEbpfAPI.NewProc("RetinaEnumerateMetricsMap")
+	lostEventCount = retinaEbpfAPI.NewProc("RetinaGetLostEventsCount")
 )
 
 // ringBufferEventCallback type definition in Go
@@ -209,4 +210,12 @@ func (vs MetricsValues) BytesSum() uint64 {
 
 func (vs MetricsValues) String() string {
 	return fmt.Sprintf("Sum: %d, BytesSum: %d", vs.Sum(), vs.BytesSum())
+}
+
+func GetLostEventsCount() (uint64, error) {
+	ret, _, err := lostEventCount.Call()
+	if err != nil && err != syscall.Errno(0) {
+		return 0, fmt.Errorf("RetinaGetLostEventsCount call failed: %w", err)
+	}
+	return uint64(ret), nil
 }
