@@ -63,8 +63,9 @@ type metricsMap struct{}
 var (
 	// Load the retinaebpfapi.dll
 	retinaEbpfAPI = windows.NewLazyDLL("retinaebpfapi.dll")
-	// Load the RetinaEnumerateMetricsMap function
-	enumMetricsMap = retinaEbpfAPI.NewProc("RetinaEnumerateMetricsMap")
+	// Load the RetinaEnumerateMetrics function
+	enumMetricsMap = retinaEbpfAPI.NewProc("RetinaEnumerateMetrics")
+	// Load the RetinaGetLostEventsCount function
 	lostEventCount = retinaEbpfAPI.NewProc("RetinaGetLostEventsCount")
 )
 
