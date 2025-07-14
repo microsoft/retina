@@ -371,11 +371,9 @@ func TestMetricsMapIterateCallback_DropEgress(t *testing.T) {
 		l: log.Logger().Named("test-ebpf"),
 	}
 	keyDrop := &MetricsKey{
-		Reason:   2,
-		Dir:      dirEgress,
-		Line:     0,
-		File:     0,
-		Reserved: [3]uint8{0, 0, 0},
+		Reason:         2,
+		Dir:            dirEgress,
+		ExtendedReason: 0, // Extended reason is not used in this test
 	}
 	val := &MetricsValues{{Count: 1, Bytes: pktSizeBytes}}
 	p.metricsMapIterateCallback(keyDrop, val)
@@ -401,11 +399,9 @@ func TestMetricsMapIterateCallback_DropIngress(t *testing.T) {
 		l: log.Logger().Named("test-ebpf"),
 	}
 	keyDrop := &MetricsKey{
-		Reason:   2,
-		Dir:      dirIngress,
-		Line:     0,
-		File:     0,
-		Reserved: [3]uint8{0, 0, 0},
+		Reason:         2,
+		Dir:            dirIngress,
+		ExtendedReason: 0, // Extended reason is not used in this test
 	}
 	val := &MetricsValues{{Count: 1, Bytes: pktSizeBytes}}
 	p.metricsMapIterateCallback(keyDrop, val)
@@ -431,11 +427,9 @@ func TestMetricsMapIterateCallback_ForwardEgress(t *testing.T) {
 		l: log.Logger().Named("test-ebpf"),
 	}
 	keyFwd := &MetricsKey{
-		Reason:   0,
-		Dir:      dirEgress,
-		Line:     0,
-		File:     0,
-		Reserved: [3]uint8{0, 0, 0},
+		Reason:         0,
+		Dir:            dirEgress,
+		ExtendedReason: 0, // Extended reason is not used in this test
 	}
 	val := &MetricsValues{{Count: 1, Bytes: pktSizeBytes}}
 	p.metricsMapIterateCallback(keyFwd, val)
@@ -461,11 +455,9 @@ func TestMetricsMapIterateCallback_ForwardIngress(t *testing.T) {
 		l: log.Logger().Named("test-ebpf"),
 	}
 	keyFwd := &MetricsKey{
-		Reason:   0,
-		Dir:      dirIngress,
-		Line:     0,
-		File:     0,
-		Reserved: [3]uint8{0, 0, 0},
+		Reason:         0,
+		Dir:            dirIngress,
+		ExtendedReason: 0, // Extended reason is not used in this test
 	}
 	val := &MetricsValues{{Count: 1, Bytes: pktSizeBytes}}
 	p.metricsMapIterateCallback(keyFwd, val)
@@ -545,36 +537,7 @@ func TestIterateWithCallback_Error_NilMetricsValue(t *testing.T) {
 	}
 
 	fakeKey := &MetricsKey{}
-	enumCallBack(unsafe.Pointer(fakeKey), nil, 0)
-	if called {
-		t.Errorf("expected callback not to be called")
-	}
-}
-
-// TestIterateWithCallback_Error_ZeroMetricsValueSize tests the behavior of the IterateWithCallback function
-// when retinaEBPFAPI invokes enumCallBack with zero value size.
-func TestIterateWithCallback_Error_ZeroMetricsValueSize(t *testing.T) {
-	// Mock the function variable to simulate a successful Windows API call
-	orig := callEnumMetricsMap
-	callEnumMetricsMap = func(_ uintptr) (uintptr, uintptr, error) {
-		return 0, 0, nil
-	}
-	defer func() { callEnumMetricsMap = orig }()
-
-	m := NewMetricsMap()
-	logger := log.Logger().Named("test-ebpf")
-
-	called := false
-	err := m.IterateWithCallback(logger, func(_ *MetricsKey, _ *MetricsValues) {
-		called = true
-	})
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-
-	fakeKey := &MetricsKey{}
-	fakeValues := &MetricsValues{{}}
-	enumCallBack(unsafe.Pointer(fakeKey), unsafe.Pointer(&(*fakeValues)[0]), 0)
+	enumCallBack(unsafe.Pointer(fakeKey), nil)
 	if called {
 		t.Errorf("expected callback not to be called")
 	}
@@ -602,7 +565,7 @@ func TestIterateWithCallback_Error_NilMetricsKey(t *testing.T) {
 	}
 
 	fakeValues := &MetricsValues{{}}
-	enumCallBack(unsafe.Pointer(nil), unsafe.Pointer(&(*fakeValues)[0]), len(*fakeValues))
+	enumCallBack(unsafe.Pointer(nil), unsafe.Pointer(&(*fakeValues)[0]))
 	if called {
 		t.Errorf("expected callback not to be called")
 	}
@@ -630,7 +593,7 @@ func TestIterateWithCallback_Error_NilMetricValue(t *testing.T) {
 	}
 
 	fakeKey := &MetricsKey{}
-	enumCallBack(unsafe.Pointer(fakeKey), unsafe.Pointer(nil), 0)
+	enumCallBack(unsafe.Pointer(fakeKey), unsafe.Pointer(nil))
 	if called {
 		t.Errorf("expected callback not to be called")
 	}
@@ -659,7 +622,7 @@ func TestIterateWithCallback_Success(t *testing.T) {
 
 	fakeKey := &MetricsKey{}
 	fakeValues := &MetricsValues{{}}
-	enumCallBack(unsafe.Pointer(fakeKey), unsafe.Pointer(&(*fakeValues)[0]), len(*fakeValues))
+	enumCallBack(unsafe.Pointer(fakeKey), unsafe.Pointer(&(*fakeValues)[0]))
 	if !called {
 		t.Errorf("expected callback to be called")
 	}

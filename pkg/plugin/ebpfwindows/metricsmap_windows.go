@@ -27,21 +27,16 @@ var direction = map[uint8]string{
 	dirService: "SERVICE",
 }
 
-// Value must be in sync with struct metrics_key in <bpf/lib/common.h>
 type MetricsKey struct {
-	Reason uint8 `align:"reason"`
-	Dir    uint8 `align:"dir"`
-	// Line contains the line number of the metrics statement.
-	Line uint16 `align:"line"`
-	// File is the number of the source file containing the metrics statement.
-	File     uint8    `align:"file"`
-	Reserved [3]uint8 `align:"reserved"`
+	Version        uint8
+	Reason         uint8
+	Dir            uint8
+	ExtendedReason uint16
 }
 
-// Value must be in sync with struct metrics_value in <bpf/lib/common.h>
 type MetricsValue struct {
-	Count uint64 `align:"count"`
-	Bytes uint64 `align:"bytes"`
+	Count uint64
+	Bytes uint64
 }
 
 // MetricsMapValues is a slice of MetricsMapValue
@@ -70,15 +65,15 @@ var (
 )
 
 // ringBufferEventCallback type definition in Go
-type enumMetricsCallback = func(key, value unsafe.Pointer, valueSize int) int
+type enumMetricsCallback = func(key, value unsafe.Pointer) int
 
 // Callbacks in Go can only be passed as functions with specific signatures and often need to be wrapped in a syscall-compatible function.
 var enumCallBack enumMetricsCallback
 
 // This function will be passed to the Windows API
-func enumMetricsSysCallCallback(key, value unsafe.Pointer, valueSize int) uintptr {
+func enumMetricsSysCallCallback(key, value unsafe.Pointer) uintptr {
 	if enumCallBack != nil {
-		return uintptr(enumCallBack(key, value, valueSize))
+		return uintptr(enumCallBack(key, value))
 	}
 
 	return 0
@@ -97,7 +92,7 @@ var callEnumMetricsMap = func(callback uintptr) (uintptr, uintptr, error) {
 // passing each key/value pair to the cb callback
 func (m metricsMap) IterateWithCallback(l *log.ZapLogger, cb IterateCallback) error {
 	// Define the callback function in Go
-	enumCallBack = func(key unsafe.Pointer, value unsafe.Pointer, valueSize int) int {
+	enumCallBack = func(key unsafe.Pointer, value unsafe.Pointer) int {
 		if key == nil {
 			l.Error("MetricsKey is nil")
 			return 1
@@ -108,12 +103,7 @@ func (m metricsMap) IterateWithCallback(l *log.ZapLogger, cb IterateCallback) er
 			return 1
 		}
 
-		if valueSize == 0 {
-			l.Error("Metrics Value size is 0")
-			return 1
-		}
-
-		var metricsValues MetricsValues = unsafe.Slice((*MetricsValue)(value), valueSize)
+		var metricsValues MetricsValues = unsafe.Slice((*MetricsValue)(value), 1)
 		metricsKey := (*MetricsKey)(key)
 		cb(metricsKey, &metricsValues)
 		return 0
@@ -147,7 +137,7 @@ func (k *MetricsKey) Direction() string {
 
 // String returns the key in human readable string format
 func (k *MetricsKey) String() string {
-	return fmt.Sprintf("Direction: %s, Reason: %s, File: %s, Line: %d", k.Direction(), k.DropForwardReason(), BPFFileName(k.File), k.Line)
+	return fmt.Sprintf("Direction: %s, Reason: %s", k.Direction(), k.DropForwardReason())
 }
 
 // DropForwardReason gets the forwarded/dropped reason in human readable string format
@@ -161,17 +151,9 @@ func (k *MetricsKey) DropForwardReason() string {
 // DropPacketMonitorReason gets the Packer Monitor dropped reason in human readable string format
 func (k *MetricsKey) DropPacketMonitorReason() string {
 	if k.Reason == DropPacketMonitor {
-		extReasonHigh := k.Reserved[0]
-		extReasonLow := k.Reserved[1]
-		extReason := (uint32(extReasonHigh) << 8) | uint32(extReasonLow)
-		return DropReasonExt(k.Reason, extReason)
+		return DropReasonExt(k.Reason, uint32(k.ExtendedReason))
 	}
 	panic("The reason is not DropPacketMonitor")
-}
-
-// FileName returns the filename where the event occurred, in string format.
-func (k *MetricsKey) FileName() string {
-	return BPFFileName(k.File)
 }
 
 // IsDrop checks if the reason is drop or not.
