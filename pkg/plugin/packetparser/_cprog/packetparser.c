@@ -208,17 +208,32 @@ static void parse(struct __sk_buff *skb, __u8 obs)
 		p.conntrack_metadata = conntrack_metadata;
 	#endif // ENABLE_CONNTRACK_METRICS
 
-	// Process the packet in ct
-	bool report __attribute__((unused));
-	report = ct_process_packet(&p, obs);
+
+	// Calculate sampling
+	bool sampled __attribute__((unused));
+	sampled = true;
 	#ifdef DATA_AGGREGATION_LEVEL
+	#ifdef DATA_SAMPLING_RATE
+	    u32 rand __attribute__((unused));
+		rand = bpf_get_prandom_u32();
+		if (rand >= UINT32_MAX / DATA_SAMPLING_RATE) {
+			sampled = false;
+		}
+	#endif
+
+	// Process the packet in ct
+	u32 report __attribute__((unused));
+	report = ct_process_packet(&p, obs, sampled);
+
 	// If the data aggregation level is low, always send the packet to the perf buffer.
 	#if DATA_AGGREGATION_LEVEL == DATA_AGGREGATION_LEVEL_LOW
+		p.weight = 1;
 		bpf_perf_event_output(skb, &retina_packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
 		return;
 	// If the data aggregation level is high, only send the packet to the perf buffer if it needs to be reported.
 	#elif DATA_AGGREGATION_LEVEL == DATA_AGGREGATION_LEVEL_HIGH
 		if (report) {
+			p.weight = report;
 			bpf_perf_event_output(skb, &retina_packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
 		}
 	#endif
