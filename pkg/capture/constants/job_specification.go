@@ -3,6 +3,10 @@
 
 package constants
 
+import (
+	"github.com/microsoft/retina/internal/buildinfo"
+)
+
 // Capture job specification
 const (
 	CaptureHostPathVolumeName string = "hostpath"
@@ -35,9 +39,9 @@ const (
 	// CaptureOutputLocationS3UploadSecretAccessKey is the key of the secret that stores the s3 secret access key.
 	CaptureOutputLocationS3UploadSecretAccessKey string = "s3-secret-access-key"
 
-	// CaptureWorkloadImageName defines the official capture workload image repo and image name
-	CaptureWorkloadImageName string = "ghcr.io/microsoft/retina/retina-agent"
-
 	// DebugCaptureWorkloadImageName defines the capture workload image for testing and debugging
 	DebugCaptureWorkloadImageName string = "ghcr.io/microsoft/retina/retina-agent"
 )
+
+// CaptureWorkloadImageName defines the official capture workload image repo and image name
+var CaptureWorkloadImageName string = buildinfo.RetinaAgentImageName

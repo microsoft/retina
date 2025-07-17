@@ -36,7 +36,7 @@ func TestCaptureNetwork(t *testing.T) {
 	maxSize := 100
 	os.Setenv(captureConstants.CaptureNameEnvKey, captureName)
 	os.Setenv(captureConstants.NodeHostNameEnvKey, nodeHostName)
-	os.Setenv(captureConstants.CaptureStartTimestampEnvKey, timestamp.String())
+	os.Setenv(captureConstants.CaptureStartTimestampEnvKey, file.TimeToString(timestamp))
 	os.Setenv(captureConstants.TcpdumpFilterEnvKey, filter)
 	os.Setenv(captureConstants.CaptureDurationEnvKey, "10s")
 	os.Setenv(captureConstants.CaptureMaxSizeEnvKey, strconv.Itoa(maxSize))
@@ -53,8 +53,8 @@ func TestCaptureNetwork(t *testing.T) {
 	ctx, cancel := TestContext(t)
 	defer cancel()
 
-	tmpFilename := file.CaptureFilename{CaptureName: captureName, NodeHostname: nodeHostName, StartTimestamp: &timestamp}
-	networkCaptureProvider.EXPECT().Setup(tmpFilename).Return(fmt.Sprintf("%s-%s-%s", captureName, nodeHostName, &timestamp), nil).Times(1)
+	tmpFilename := file.CaptureFilename{CaptureName: captureName, NodeHostname: nodeHostName, StartTimestamp: timestamp}
+	networkCaptureProvider.EXPECT().Setup(tmpFilename).Return(fmt.Sprintf("%s-%s-%s", captureName, nodeHostName, timestamp), nil).Times(1)
 	networkCaptureProvider.EXPECT().CaptureNetworkPacket(ctx, filter, duration, maxSize).Return(nil).Times(1)
 
 	_, err := cm.CaptureNetwork(ctx)

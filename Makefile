@@ -23,8 +23,14 @@ KIND_CLUSTER = retina-cluster
 WINVER2022   ?= "10.0.20348.1906"
 WINVER2019   ?= "10.0.17763.4737"
 APP_INSIGHTS_ID ?= ""
+AGENT_IMAGE_NAME ?= ""
 GENERATE_TARGET_DIRS = \
 	./pkg/plugin/linuxutil
+
+# Set agent registry to get image from when using retina-kubectl
+ifneq ($(AGENT_IMAGE_NAME), "")
+	EXTRA_BUILD_ARGS := "--build-arg AGENT_IMAGE_NAME=$(AGENT_IMAGE_NAME)"
+endif
 
 # Default platform is linux/amd64
 GOOS			?= linux
@@ -35,7 +41,7 @@ PLATFORM		?= $(OS)/$(ARCH)
 PLATFORMS		?= linux/amd64 linux/arm64 windows/amd64
 OS_VERSION		?= ltsc2019
 
-HUBBLE_VERSION ?= v1.17.3
+HUBBLE_VERSION ?= v1.17.5
 
 CONTAINER_BUILDER ?= docker
 CONTAINER_RUNTIME ?= docker
@@ -306,7 +312,8 @@ kubectl-retina-image:
 			IMAGE=$(KUBECTL_RETINA_IMAGE) \
 			VERSION=$(TAG) \
 			TAG=$(RETINA_PLATFORM_TAG) \
-			CONTEXT_DIR=$(REPO_ROOT)
+			CONTEXT_DIR=$(REPO_ROOT) \
+			EXTRA_BUILD_ARGS=$(EXTRA_BUILD_ARGS)
 
 kapinger-image: 
 	docker buildx build --builder retina --platform windows/amd64 --target windows-amd64 -t $(IMAGE_REGISTRY)/$(KAPINGER_IMAGE):$(TAG)-windows-amd64  ./hack/tools/kapinger/ --push
@@ -338,6 +345,10 @@ go-gen: ## run go generate at the repository root
 all-gen: ## generate all code
 	$(MAKE) proto-gen
 	$(MAKE) go-gen
+
+build-windows-binaries:
+	GOOS=windows GOARCH=$(GOARCH) go build -v -o /go/bin/retina/captureworkload -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version=$(TAG) -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=$(APP_INSIGHTS_ID)" captureworkload/main.go
+	GOOS=windows GOARCH=$(GOARCH) go build -x -v -o /go/bin/retina/controller -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version=$(TAG) -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=$(APP_INSIGHTS_ID)" controller/main.go
 
 ##@ Multiplatform
 
@@ -412,7 +423,7 @@ manifests:
 	cd crd && make manifests && make generate
 
 # Fetch the latest tag from the GitHub
-LATEST_TAG := $(shell curl -s https://api.github.com/repos/microsoft/retina/releases | jq -r '.[0].name')
+LATEST_TAG := $(shell curl -s https://api.github.com/repos/microsoft/retina/releases/latest | jq -r '.name')
 
 HELM_IMAGE_TAG ?= $(LATEST_TAG)
 

@@ -27,66 +27,66 @@ var deleteExample = templates.Examples(i18n.T(`
 		kubectl retina capture delete --name retina-capture-8v6wd --namespace capture
 		`))
 
-var deleteCapture = &cobra.Command{
-	Use:     "delete",
-	Short:   "Delete a Retina capture",
-	Example: deleteExample,
-	RunE: func(*cobra.Command, []string) error {
-		kubeConfig, err := opts.ToRESTConfig()
-		if err != nil {
-			return errors.Wrap(err, "")
-		}
+func NewDeleteSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
+	deleteCapture := &cobra.Command{
+		Use:     "delete",
+		Short:   "Delete a Retina capture",
+		Example: deleteExample,
+		RunE: func(*cobra.Command, []string) error {
+			ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
+			defer cancel()
 
-		kubeClient, err := kubernetes.NewForConfig(kubeConfig)
-		if err != nil {
-			return errors.Wrap(err, "")
-		}
-
-		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
-		defer cancel()
-
-		captureJobSelector := &metav1.LabelSelector{
-			MatchLabels: map[string]string{
-				label.CaptureNameLabel: *opts.Name,
-				label.AppLabel:         captureConstants.CaptureAppname,
-			},
-		}
-		labelSelector, _ := labels.Parse(metav1.FormatLabelSelector(captureJobSelector))
-		jobListOpt := metav1.ListOptions{
-			LabelSelector: labelSelector.String(),
-		}
-
-		jobList, err := kubeClient.BatchV1().Jobs(*opts.Namespace).List(ctx, jobListOpt)
-		if err != nil {
-			return errors.Wrap(err, "failed to list capture jobs")
-		}
-		if len(jobList.Items) == 0 {
-			return errors.Errorf("capture %s in namespace %s was not found", *opts.Name, *opts.Namespace)
-		}
-
-		for _, job := range jobList.Items {
-			deletePropagationBackground := metav1.DeletePropagationBackground
-			if err := kubeClient.BatchV1().Jobs(job.Namespace).Delete(ctx, job.Name, metav1.DeleteOptions{
-				PropagationPolicy: &deletePropagationBackground,
-			}); err != nil {
-				retinacmd.Logger.Info("Failed to delete job", zap.String("job name", job.Name), zap.Error(err))
+			// Set namespace. If --namespace is not set, use namespace on user's context
+			ns, _, err := opts.ConfigFlags.ToRawKubeConfigLoader().Namespace()
+			if err != nil {
+				return errors.Wrap(err, "failed to get namespace from kubeconfig")
 			}
-		}
 
-		for _, volume := range jobList.Items[0].Spec.Template.Spec.Volumes {
-			if volume.Secret != nil {
-				if err := kubeClient.CoreV1().Secrets(*opts.Namespace).Delete(ctx, volume.Secret.SecretName, metav1.DeleteOptions{}); err != nil {
-					return errors.Wrap(err, "failed to delete capture secret")
+			if opts.Namespace == nil || *opts.Namespace == "" {
+				opts.Namespace = &ns
+			}
+
+			captureJobSelector := &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					label.CaptureNameLabel: *opts.Name,
+					label.AppLabel:         captureConstants.CaptureAppname,
+				},
+			}
+			labelSelector, _ := labels.Parse(metav1.FormatLabelSelector(captureJobSelector))
+			jobListOpt := metav1.ListOptions{
+				LabelSelector: labelSelector.String(),
+			}
+
+			jobList, err := kubeClient.BatchV1().Jobs(*opts.Namespace).List(ctx, jobListOpt)
+			if err != nil {
+				return errors.Wrap(err, "failed to list capture jobs")
+			}
+			if len(jobList.Items) == 0 {
+				return errors.Errorf("capture %s in namespace %s was not found", *opts.Name, *opts.Namespace)
+			}
+
+			for idx := range jobList.Items {
+				deletePropagationBackground := metav1.DeletePropagationBackground
+				if err := kubeClient.BatchV1().Jobs(jobList.Items[idx].Namespace).Delete(ctx, jobList.Items[idx].Name, metav1.DeleteOptions{
+					PropagationPolicy: &deletePropagationBackground,
+				}); err != nil {
+					retinacmd.Logger.Info("Failed to delete job", zap.String("job name", jobList.Items[idx].Name), zap.Error(err))
 				}
-				break
 			}
-		}
-		retinacmd.Logger.Info(fmt.Sprintf("Retina Capture %q delete", *opts.Name))
 
-		return nil
-	},
-}
+			for idx := range jobList.Items[0].Spec.Template.Spec.Volumes {
+				if jobList.Items[0].Spec.Template.Spec.Volumes[idx].Secret != nil {
+					if err := kubeClient.CoreV1().Secrets(*opts.Namespace).Delete(ctx, jobList.Items[0].Spec.Template.Spec.Volumes[idx].Secret.SecretName, metav1.DeleteOptions{}); err != nil {
+						return errors.Wrap(err, "failed to delete capture secret")
+					}
+					break
+				}
+			}
+			retinacmd.Logger.Info(fmt.Sprintf("Retina Capture %q delete", *opts.Name))
 
-func init() {
-	capture.AddCommand(deleteCapture)
+			return nil
+		},
+	}
+
+	return deleteCapture
 }
