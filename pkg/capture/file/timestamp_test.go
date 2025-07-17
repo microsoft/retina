@@ -81,12 +81,12 @@ func TestStringToTime(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := StringToTime(tt.input)
 			if tt.wantError {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Nil(t, result)
 				assert.Equal(t, tt.expected, result)
 			} else {
-				assert.NoError(t, err)
-				require.NotNil(t, result)
+				require.NoError(t, err)
+				assert.NotNil(t, result)
 				assert.Equal(t, tt.expected, result)
 			}
 		})

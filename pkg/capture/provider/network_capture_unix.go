@@ -111,7 +111,7 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, fil
 	defer cancel()
 
 	filename := file.CaptureFilename{CaptureName: ncp.CaptureName, NodeHostname: ncp.NodeHostName, StartTimestamp: ncp.StartTimestamp}
-	captureFileName := fmt.Sprintf("%s.pcap", filename.String())
+	captureFileName := filename.String() + ".pcap"
 	captureFilePath := filepath.Join(ncp.TmpCaptureDir, captureFileName)
 
 	// Remove the folder in case it already exists to mislead the file size check.
