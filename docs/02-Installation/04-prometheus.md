@@ -1,4 +1,4 @@
-# Prometheus
+# Configuring Prometheus
 
 Prometheus is an open-source system monitoring and alerting toolkit originally built at SoundCloud. It is now a standalone open source project and maintained independently of any company. Prometheus's main features include a multi-dimensional data model, a flexible query language, efficient time series database, and modern alerting approach. For more information, visit the [Prometheus website](https://prometheus.io).
 

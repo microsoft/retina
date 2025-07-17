@@ -1,16 +1,30 @@
 # Capture with Retina CLI
 
-The capture command in Retina allows users to capture network traffic and metadata for the capture target, and send the data to the location defined by output configuration.
+This page describes how the Retina CLI works in the context of performing packet captures.
 
-> NOTE: captures can also be performed with a [Capture CRD](../05-Concepts/CRDs/Capture.md) after [installing Retina](../02-Installation/01-Setup.md) **with capture support**.
+The use of the Retina CLI to perform captures does **NOT** require the Retina operator pod to be running.
 
-## Capture Create
+See the [overview](./01-overview.md#capture-jobs) for a description of how the capture jobs are created.
+
+![Overview of Retina Capture without operator](img/capture-architecture-without-operator.png "Overview of Retina Capture without operator")
+
+## Prerequisites
+
+- [Install Retina CLI](../02-Installation/02-CLI.md)
+
+## Operations
+
+### Capture Create
 
 `kubectl retina capture create [--flags]` creates a Capture with underlying Kubernetes jobs.
 
-### Selecting a Target
+#### Selecting a Target
 
-The target indicates where the packet capture will be performed. This can be set via `--node-selectors`, `--node-names`, `--pod-selectors` and `--namespace-selectors` flags. Run `kubectl retina capture -h` for further details based on the Retina CLI version installed on your environment.
+The target indicates where the packet capture will be performed. This can be set via the following flags:
+
+- `--node-selectors`
+- `--node-names`
+- `--pod-selectors` and `--namespace-selectors` (pairs)
 
 Note that Node Selectors are not compatible with Pod Selectors & Namespace Selectors pairs and the capture will not go through if all are populated.
 
@@ -18,7 +32,7 @@ If nothing is set, `kubectl retina capture create` will use `--node-selectors` w
 
 You can find [target selection examples](#target-selection) below.
 
-### Configuring the Output Location
+#### Configuring the Output Location
 
 The output configuration indicates the location where the capture will be stored. At least one location needs to be specified. This can either be the host path on the node, or a remote storage option.
 
@@ -26,16 +40,17 @@ Blob-upload requires a Blob Shared Access Signature (SAS) with the write permiss
 
 You can find [output configuration examples](#output-configuration) below.
 
-### Stopping a Capture
+#### Stopping a Capture
 
 The Capture can be stopped in a number of ways:
 
-- In a given time, by the `duration` flag, or when the file reaches the maximum allowed file size defined by the `max-size` flag. When both are specified, the capture will stop whenever **either condition is first met**.
+- In a given time, by the `duration` flag, or when the file reaches the maximum allowed file size defined by the `max-size` flag.
+  - When both are specified, the capture will stop whenever **either condition is first met**.
 - On demand by [deleting the capture](#capture-delete) before the specified conditions meets.
 
 The network traffic will be uploaded to the specified output location.
 
-### Flags
+#### Flags
 
 | Flag                  | Type       | Default  | Description                                                                 | Notes |
 |-----------------------|------------|----------|-----------------------------------------------------------------------------|-------|
@@ -64,11 +79,12 @@ The network traffic will be uploaded to the specified output location.
 | `s3-path`             | string     | retina/captures | Prefix path within the S3 bucket where captures will be stored.              |       |
 | `s3-region`           | string     | ""       | Region where the S3 compatible bucket is located.                            |       |
 | `s3-secret-access-key`| string     | ""       | S3 access secret key to upload capture files.                                |       |
-| `tcpdump-filter`      | string     | ""       | Raw tcpdump flags. Available tcpdump filters can be found in the [TCPDUMP MAN PAGE](https://www.tcpdump.org/manpages/tcpdump.1.html).  | Only works on Linux. Includes only tcpdump flags, for boolean expressions, please use include/exclude filters.     |
+| `interfaces`          | string     | ""       | Comma-separated list of network interfaces to capture on (e.g., "eth0,eth1"). By default, captures are performed on all network interfaces. |       |
+| `tcpdump-filter`      | string     | ""       | Raw tcpdump flags. Available tcpdump filters can be found in the [TCPDUMP MAN PAGE](https://www.tcpdump.org/manpages/tcpdump.1.html). This overrides interface selection options when specified. | Only works on Linux. Includes only tcpdump flags, for boolean expressions, please use include/exclude filters.     |
 
-### Examples
+#### Examples
 
-#### Target Selection
+##### Target Selection
 
 Node Selectors
 
@@ -95,7 +111,26 @@ kubectl retina capture create \
   --namespace-selectors="kubernetes.io/metadata.name=kube-system"
 ```
 
-#### Output Configuration
+##### Interface Selection
+
+Capture on all interfaces (default behavior)
+
+```sh
+kubectl retina capture create \
+  --name example-all-interfaces \
+  --node-selectors "kubernetes.io/os=linux"
+```
+
+Capture on specific interfaces
+
+```sh
+kubectl retina capture create \
+  --name example-specific-interfaces \
+  --node-selectors "kubernetes.io/os=linux" \
+  --interfaces "eth0,eth1"
+```
+
+##### Output Configuration
 
 Host Path
 
@@ -143,7 +178,7 @@ kubectl retina capture create \
   --s3-secret-access-key "your-secret-access-key"
 ```
 
-#### Capture Filters
+##### Capture Filters
 
 Include / Exclude Filters
 
@@ -162,7 +197,7 @@ kubectl retina capture create \
   --tcpdump-filter="udp port 53"
 ```
 
-## Capture Delete
+### Capture Delete
 
 Deleting the capture job before either of the terminating conditions have been met will stop the capture.
 
@@ -174,7 +209,7 @@ Example:
 kubectl retina capture delete --name retina-capture-zlx5v
 ```
 
-## Capture List
+### Capture List
 
 To get a list of the captures you can run `kubectl retina capture list` to get the captures in a specific namespace or in all namespaces.
 
@@ -190,6 +225,47 @@ List by all namespaces:
 kubectl retina capture list --all-namespaces
 ```
 
+### Capture Download
+
+The `kubectl retina capture download` command allows you to download capture files directly from the cluster or from blob storage.
+
+#### Download from Cluster
+
+Download capture files using the capture name:
+
+```sh
+kubectl retina capture download --name <capture-name>
+```
+
+Download capture files and specify an output location:
+
+```sh
+kubectl retina capture download --name <capture-name> -o <output-location>
+```
+
+By default, files are downloaded to the current directory.
+
+#### Download from Blob Storage
+
+Download capture files from Azure Blob Storage using a Blob URL (requires Read/List permissions):
+
+```sh
+kubectl retina capture download --blob-url "<blob-url>"
+```
+
+#### Download Output Structure
+
+The command will create a directory with the capture name and download all related capture files. Each capture file is downloaded as a `.tar.gz` archive with a name pattern matching `$(capturename)-$(hostname)-$(date +%Y%m%d%H%M%S%Z).tar.gz`.
+
+For example:
+
+```bash
+/output-directory/
+└── capture-name/
+    ├── capture-name-node1-20230320013600UTC.tar.gz
+    └── capture-name-node2-20230320013600UTC.tar.gz
+```
+
 ## Obtaining the output
 
 After downloading or copying the tarball from the location specified, extract the tarball through the `tar` command in either Linux shell or Windows Powershell, for example,
@@ -200,7 +276,9 @@ tar -xvf retina-capture-aks-nodepool1-41844487-vmss000000-20230320013600UTC.tar.
 
 ### Name pattern of the tarball
 
-the tarball take such name pattern, `$(capturename)-$(hostname)-$(date +%Y%m%d%H%M%S%Z).tar.gz`, for example, `retina-capture-aks-nodepool1-41844487-vmss000000-20230313101436UTC.tar.gz`.
+The tarballs take the following name pattern, `$(capturename)-$(hostname)-$(date +%Y%m%d%H%M%S%Z).tar.gz`.
+
+- e.g. `retina-capture-aks-nodepool1-41844487-vmss000000-20230313101436UTC.tar.gz`
 
 ### File and directory structure inside the tarball
 
@@ -300,7 +378,7 @@ kubectl retina capture create \
   --host-path /mnt/test \
   --namespace capture \
   --node-selectors "kubernetes.io/os=linux" \
-  --
+  --debug
 ```
 
 ## Cleanup

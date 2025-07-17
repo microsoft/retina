@@ -80,3 +80,21 @@ Return the appropriate apiVersion for cronjob.
 {{- print "batch/v1beta1" -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Return the appropriate backend for Hubble UI ingress.
+*/}}
+{{- define "ingress.paths" -}}
+{{ if semverCompare ">=1.4-0, <1.19-0" .Capabilities.KubeVersion.Version -}}
+backend:
+  serviceName: hubble-ui
+  servicePort: http
+{{- else if semverCompare "^1.19-0" .Capabilities.KubeVersion.Version -}}
+pathType: Prefix
+backend:
+  service:
+    name: hubble-ui
+    port:
+      name: http
+{{- end -}}
+{{- end -}}

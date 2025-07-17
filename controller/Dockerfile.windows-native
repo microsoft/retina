@@ -3,8 +3,8 @@
 # buildx targets, and this one requires legacy build.
 # Maybe one day: https://github.com/moby/buildkit/issues/616
 ARG BUILDER_IMAGE
-# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.2-2-windowsservercore-ltsc2022 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=windows/amd64 mcr.microsoft.com/oss/go/microsoft/golang@sha256:0fb2afcf9c877c90ca609984303da41846c447ca62c0f9e42046be113cae117e AS builder
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.4-windowsservercore-ltsc2022 --override-os windows --format "{{.Name}}@{{.Digest}}"
+FROM --platform=windows/amd64 mcr.microsoft.com/oss/go/microsoft/golang@sha256:e88cdedc8ab0299e85c1c54dede140d4f4c1c4ee595b3d9d37b4a9a103eb0a2e AS builder
 WORKDIR C:\\retina
 COPY go.mod .
 COPY go.sum .
@@ -32,6 +32,7 @@ RUN tdnf install -y unzip && \
     if [ ! -d "eBPFRetina" ]; then echo "eBPFRetina directory not found after unzip!" && exit 1; fi
 
 FROM --platform=windows/amd64 mcr.microsoft.com/windows/nanoserver:ltsc2022 AS final
+
 ADD https://github.com/microsoft/etl2pcapng/releases/download/v1.10.0/etl2pcapng.exe /etl2pcapng.exe
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'Continue';"]
 COPY --from=eBPFRetinaStage /tmp/eBPFRetina/build/native/bin/retinaebpfapi.dll /retinaebpfapi.dll
