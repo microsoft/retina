@@ -74,11 +74,11 @@ func (dr *dropReason) getEbpfPayload() (objs interface{}, maps *kprobeMaps, supp
 	}
 	dr.l.Info("Detected kernel", zap.String("version", kv.String()))
 
-	objs, maps, supportsFexit = resolvePayload(runtime.GOARCH, kv, isMariner, dr.cfg.EnablePodLevel)
+	objs, maps, supportsFexit = resolvePayload(runtime.GOARCH, kv, isMariner)
 	return objs, maps, supportsFexit, nil
 }
 
-func resolvePayload(arch string, kv semver.Version, isMariner, isPodLevel bool) (interface{}, *kprobeMaps, bool) {
+func resolvePayload(arch string, kv semver.Version, isMariner bool) (interface{}, *kprobeMaps, bool) {
 	minVersionAmd64, _ := versioncheck.Version(MinAmdVersionNum)
 	minVersionArm64, _ := versioncheck.Version(MinArmVersionNum)
 
@@ -89,9 +89,6 @@ func resolvePayload(arch string, kv semver.Version, isMariner, isPodLevel bool) 
 	var maps *kprobeMaps
 
 	switch {
-	case isPodLevel: // TODO: fexit support is being rolled out in two stages, remove this when we have it for advanced metrics.
-		objs = &allKprobeObjects{} //nolint:typecheck // this is a generated struct
-		maps = &objs.(*allKprobeObjects).kprobeMaps
 	case isMariner && supportsFexit: // Mariner supports a subset of the fexit programs, need to check for it first.
 		objs = &marinerObjects{} //nolint:typecheck // needs to match a generated struct until we fix Mariner
 		maps = &objs.(*marinerObjects).kprobeMaps
@@ -103,7 +100,7 @@ func resolvePayload(arch string, kv semver.Version, isMariner, isPodLevel bool) 
 		maps = &objs.(*allKprobeObjects).kprobeMaps
 	}
 
-	return objs, maps, (supportsFexit && !isPodLevel)
+	return objs, maps, supportsFexit
 }
 
 func (dr *dropReason) attachKprobes(kprobes, kprobesRet map[string]*ebpf.Program) error {

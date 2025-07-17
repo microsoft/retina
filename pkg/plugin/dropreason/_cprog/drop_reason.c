@@ -25,6 +25,14 @@ char __license[] SEC("license") = "Dual MIT/GPL";
 #define PACKET_HOST 0     // Incomming packets
 #define PACKET_OUTGOING 4 // Outgoing packets
 
+#ifndef ADVANCED_METRICS
+#define ADVANCED_METRICS 0
+#endif
+
+#ifndef BYPASS_LOOKUP_IP_OF_INTEREST
+#define BYPASS_LOOKUP_IP_OF_INTEREST 1
+#endif
+
 struct metrics_map_key
 {
     __u16 drop_type;
@@ -132,16 +140,14 @@ void update_metrics_map(void *ctx, drop_reason_t drop_type, int ret_val, struct 
         bpf_map_update_elem(&retina_dropreason_metrics, &key, &new_entry, 0);
     }
 // parse packet if advanced metrics are enabled
-#ifdef ADVANCED_METRICS
 #if ADVANCED_METRICS == 1
     if (p->in_filtermap)
     {
         p->drop_type = drop_type;
         p->return_val = ret_val;
         bpf_perf_event_output(ctx, &retina_dropreason_events, BPF_F_CURRENT_CPU, p, sizeof(struct packet));
-    };
+    }
 #endif
-#endif    
 }
 
 // Updates dropped packet count - ONLY use in Retina basic.
@@ -178,7 +184,6 @@ static void get_packet_from_skb(struct packet *p, struct sk_buff *skb)
     __u64 skb_len = 0;
     member_read(&skb_len, skb, len);
     p->skb_len = skb_len;
-#ifdef ADVANCED_METRICS
 #if ADVANCED_METRICS == 1
     char *head;
     __u16 nw_header, trans_header, eth_proto;
@@ -193,12 +198,10 @@ static void get_packet_from_skb(struct packet *p, struct sk_buff *skb)
     bpf_probe_read(&iphdr, sizeof(iphdr), ip_header_address);
 
     // Check if the packet is of interest.
-    #ifdef BYPASS_LOOKUP_IP_OF_INTEREST
 	#if BYPASS_LOOKUP_IP_OF_INTEREST == 0
         if (!lookup(iphdr.saddr) && !lookup(iphdr.daddr))
             return;
     #endif
-	#endif
     
     p->in_filtermap = true;
     p->src_ip = iphdr.saddr;
@@ -224,7 +227,6 @@ static void get_packet_from_skb(struct packet *p, struct sk_buff *skb)
         p->dst_port = bpf_htons(udphdr.dest);
         p->proto = iphdr.protocol;
     }
-#endif
 #endif
 }
 
@@ -315,12 +317,18 @@ SEC("fexit/nf_hook_slow")
 int BPF_PROG(nf_hook_slow_fexit, struct sk_buff *skb, struct nf_hook_state *state,
     const struct nf_hook_entries *e, unsigned int s, int retVal)
 {
-    if (retVal < 0) {
+    if (retVal < 0 && skb) {
+#if ADVANCED_METRICS == 1
+        struct packet p;
+        __builtin_memset(&p, 0, sizeof(p));
+        get_packet_from_skb(&p, skb);
+        update_metrics_map(ctx, IPTABLE_RULE_DROP, retVal, &p);
+#else
         __u32 skb_len = 0;
         member_read(&skb_len, skb, len);
         update_metrics_map_basic(IPTABLE_RULE_DROP, retVal, skb_len);
+#endif
     }
-
     return 0;
 }
 
@@ -404,10 +412,8 @@ int BPF_KRETPROBE(inet_csk_accept_ret, struct sock *sk)
     p.in_filtermap = false;
     p.skb_len = 0;
 
-#ifdef ADVANCED_METRICS
 #if ADVANCED_METRICS == 1
     get_packet_from_sock(&p, sk);
-#endif
 #endif
 
     update_metrics_map(ctx, TCP_ACCEPT_BASIC, err, &p);
@@ -421,11 +427,19 @@ int BPF_PROG(inet_csk_accept_fexit, struct sock *sk, int flags, int *err, struct
         return 0;
     }
 
+#if ADVANCED_METRICS == 1
+    if (sk) {
+        struct packet p;
+        __builtin_memset(&p, 0, sizeof(p));
+        get_packet_from_sock(&p, sk);
+        update_metrics_map(ctx, TCP_ACCEPT_BASIC, 0, &p);
+    }
+#else    
     // TODO
     // Pass 0 packet length - get_packet_from_sock above doesn't obtain this value, either.
     // Pass 0 return value; verifier failure, same as buggy kprobe above.
     update_metrics_map_basic(TCP_ACCEPT_BASIC, 0, 0); 
-
+#endif
     return 0;
 }
 
@@ -478,15 +492,27 @@ int BPF_KRETPROBE(nf_nat_inet_fn_ret, int retVal)
 SEC("fexit/nf_nat_inet_fn")
 int BPF_PROG(nf_nat_inet_fn_fexit, void *priv, struct sk_buff *skb, const struct nf_hook_state *state, int retVal)
 {
-    if (retVal != NF_DROP)
+    if (retVal != NF_DROP || !skb)
     {
         return 0;
     }
     
+    __u16 eth_proto;
+    member_read(&eth_proto, skb, protocol);
+    if (eth_proto != bpf_htons(ETH_P_IP)) {
+        return 0;
+    }
+
+#if ADVANCED_METRICS == 1
+    struct packet p;
+    __builtin_memset(&p, 0, sizeof(p));
+    get_packet_from_skb(&p, skb);
+    update_metrics_map(ctx, IPTABLE_NAT_DROP, retVal, &p);
+#else
     __u32 skb_len = 0;
     member_read(&skb_len, skb, len);
-
     update_metrics_map_basic(IPTABLE_NAT_DROP, retVal, skb_len);
+#endif
     return 0;
 }
 
@@ -539,14 +565,26 @@ int BPF_KRETPROBE(nf_conntrack_confirm_ret, int retVal)
 SEC("fexit/__nf_conntrack_confirm")
 int BPF_PROG(nf_conntrack_confirm_fexit, struct sk_buff *skb, int retVal)
 {
-    if (retVal != NF_DROP)
+    if (retVal != NF_DROP || !skb)
     {
         return 0;
     }
 
+    __u16 eth_proto;
+    member_read(&eth_proto, skb, protocol);
+    if (eth_proto != bpf_htons(ETH_P_IP)) {
+        return 0;
+    }
+
+#if ADVANCED_METRICS == 1
+    struct packet p;
+    __builtin_memset(&p, 0, sizeof(p));
+    get_packet_from_skb(&p, skb);
+    update_metrics_map(ctx, CONNTRACK_ADD_DROP, retVal, &p);
+#else
     __u32 skb_len = 0;
     member_read(&skb_len, skb, len);
-
     update_metrics_map_basic(CONNTRACK_ADD_DROP, retVal, skb_len);
+#endif
     return 0;
 }
