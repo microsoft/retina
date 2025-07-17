@@ -7,7 +7,6 @@ import (
 	"github.com/cilium/cilium/api/v1/flow"
 	"github.com/cilium/cilium/pkg/identity"
 	ipc "github.com/cilium/cilium/pkg/ipcache"
-	"github.com/cilium/cilium/pkg/k8s"
 	"github.com/cilium/cilium/pkg/labels"
 )
 
@@ -18,15 +17,22 @@ type EpDecoder interface {
 	IsEndpointOnLocalHost(ip string) bool
 }
 
+type LabelCache interface {
+	// GetLabelsFromSecurityIdentity returns the labels for a given security identity.
+	GetLabelsFromSecurityIdentity(identity.NumericIdentity) []string
+}
+
 type epDecoder struct {
 	localHostIP string
 	ipcache     *ipc.IPCache
+	labelCache  LabelCache
 }
 
-func NewEpDecoder(c *ipc.IPCache) EpDecoder {
+func NewEpDecoder(c *ipc.IPCache, lc LabelCache) EpDecoder {
 	return &epDecoder{
 		localHostIP: os.Getenv("NODE_IP"),
 		ipcache:     c,
+		labelCache:  lc,
 	}
 }
 
@@ -54,7 +60,7 @@ func (e *epDecoder) Decode(ip netip.Addr) *flow.Endpoint {
 	case identity.ReservedIdentityWorld:
 		ep.Labels = labels.LabelWorld.GetModel()
 	default:
-		// TODO: We do not have an api on the ipcache to get the labels from the ip or identity.
+		ep.Labels = e.labelCache.GetLabelsFromSecurityIdentity(id.ID)
 	}
 
 	return ep
@@ -68,21 +74,4 @@ func (e *epDecoder) IsEndpointOnLocalHost(string) bool {
 
 type SvcDecoder interface {
 	Decode(ip netip.Addr) *flow.Service
-}
-
-type svcDecoder struct {
-	svccache k8s.ServiceCache
-}
-
-func NewSvcDecoder(sc k8s.ServiceCache) SvcDecoder {
-	return &svcDecoder{
-		svccache: sc,
-	}
-}
-
-func (s *svcDecoder) Decode(netip.Addr) *flow.Service {
-	svc := &flow.Service{}
-	// TODO: serviceCache from cilium do not have a way to get the service name
-	// and namespace from the ip. We need to add this to the serviceCache.
-	return svc
 }
