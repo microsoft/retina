@@ -371,8 +371,9 @@ func TestMetricsMapIterateCallback_DropEgress(t *testing.T) {
 		l: log.Logger().Named("test-ebpf"),
 	}
 	keyDrop := &MetricsKey{
+		Version:        1,
 		Reason:         2,
-		Dir:            dirEgress,
+		Direction:      dirEgress,
 		ExtendedReason: 0, // Extended reason is not used in this test
 	}
 	val := &MetricsValue{Count: 1, Bytes: pktSizeBytes}
@@ -399,8 +400,9 @@ func TestMetricsMapIterateCallback_DropIngress(t *testing.T) {
 		l: log.Logger().Named("test-ebpf"),
 	}
 	keyDrop := &MetricsKey{
+		Version:        1,
 		Reason:         2,
-		Dir:            dirIngress,
+		Direction:      dirIngress,
 		ExtendedReason: 0, // Extended reason is not used in this test
 	}
 	val := &MetricsValue{Count: 1, Bytes: pktSizeBytes}
@@ -427,8 +429,9 @@ func TestMetricsMapIterateCallback_ForwardEgress(t *testing.T) {
 		l: log.Logger().Named("test-ebpf"),
 	}
 	keyFwd := &MetricsKey{
+		Version:        1,
 		Reason:         0,
-		Dir:            dirEgress,
+		Direction:      dirEgress,
 		ExtendedReason: 0, // Extended reason is not used in this test
 	}
 	val := &MetricsValue{Count: 1, Bytes: pktSizeBytes}
@@ -455,8 +458,9 @@ func TestMetricsMapIterateCallback_ForwardIngress(t *testing.T) {
 		l: log.Logger().Named("test-ebpf"),
 	}
 	keyFwd := &MetricsKey{
+		Version:        1,
 		Reason:         0,
-		Dir:            dirIngress,
+		Direction:      dirIngress,
 		ExtendedReason: 0, // Extended reason is not used in this test
 	}
 	val := &MetricsValue{Count: 1, Bytes: pktSizeBytes}

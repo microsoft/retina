@@ -30,7 +30,7 @@ var direction = map[uint8]string{
 type MetricsKey struct {
 	Version        uint8
 	Reason         uint8
-	Dir            uint8
+	Direction      uint8
 	ExtendedReason uint16
 }
 
@@ -127,14 +127,16 @@ func MetricDirection(dir uint8) string {
 	return direction[dirUnknown]
 }
 
-// Direction gets the direction in human readable string format
-func (k *MetricsKey) Direction() string {
-	return MetricDirection(k.Dir)
+// DirectionString gets the direction in human readable string format
+func (k *MetricsKey) DirectionString() string {
+	// The direction field is a 2-bit field in the C struct, so mask the lower 2 bits
+	direction := k.Direction & 0x03
+	return MetricDirection(direction)
 }
 
 // String returns the key in human readable string format
 func (k *MetricsKey) String() string {
-	return fmt.Sprintf("Direction: %s, Reason: %s", k.Direction(), k.DropForwardReason())
+	return fmt.Sprintf("Direction: %s, Reason: %s", k.DirectionString(), k.DropForwardReason())
 }
 
 // DropForwardReason gets the forwarded/dropped reason in human readable string format
@@ -160,12 +162,16 @@ func (k *MetricsKey) IsDrop() bool {
 
 // IsIngress checks if the direction is ingress or not.
 func (k *MetricsKey) IsIngress() bool {
-	return k.Dir == dirIngress
+	// The direction field is a 2-bit field in the C struct, so mask the lower 2 bits
+	direction := k.Direction & 0x03
+	return direction == dirIngress
 }
 
 // IsEgress checks if the direction is egress or not.
 func (k *MetricsKey) IsEgress() bool {
-	return k.Dir == dirEgress
+	// The direction field is a 2-bit field in the C struct, so mask the lower 2 bits
+	direction := k.Direction & 0x03
+	return direction == dirEgress
 }
 
 func GetLostEventsCount() (uint64, error) {
