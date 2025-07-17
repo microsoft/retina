@@ -137,8 +137,8 @@ func (t *tcpretrans) eventHandler(event *types.Event) {
 		t.l.Warn("Could not convert tracer Event to flow", zap.Any("tracer event", event))
 		return
 	}
-	syn, ack, fin, rst, psh, urg := getTcpFlags(event.Tcpflags)
-	utils.AddTCPFlags(fl, syn, ack, fin, rst, psh, urg)
+	syn, ack, fin, rst, psh, urg, ece, cwr, ns := getTCPFlags(event.Tcpflags)
+	utils.AddTCPFlags(fl, syn, ack, fin, rst, psh, urg, ece, cwr, ns)
 
 	// This is only for development purposes.
 	// Removing this makes logs way too chatter-y.
@@ -151,7 +151,8 @@ func (t *tcpretrans) eventHandler(event *types.Event) {
 	})
 }
 
-func getTcpFlags(flags string) (syn, ack, fin, rst, psh, urg uint16) {
+//nolint:gocritic // This should be rewritten to return a struct.
+func getTCPFlags(flags string) (syn, ack, fin, rst, psh, urg, ece, cwr, ns uint16) {
 	// this limiter is used in IG to put all the flags together
 	syn, ack, fin, rst, psh, urg = 0, 0, 0, 0, 0, 0
 	result := strings.Split(flags, "|")
@@ -169,6 +170,12 @@ func getTcpFlags(flags string) (syn, ack, fin, rst, psh, urg uint16) {
 			psh = 1
 		case "URG":
 			urg = 1
+		case "ECE":
+			ece = 1
+		case "CWR":
+			cwr = 1
+		case "NS":
+			ns = 1
 		}
 	}
 	return

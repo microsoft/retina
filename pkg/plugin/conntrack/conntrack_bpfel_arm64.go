@@ -13,9 +13,35 @@ import (
 )
 
 type conntrackCtEntry struct {
-	EvictionTime       uint32
-	LastReportTxDir    uint32
-	LastReportRxDir    uint32
+	EvictionTime                    uint32
+	LastReportTxDir                 uint32
+	LastReportRxDir                 uint32
+	BytesSeenSinceLastReportTxDir   uint32
+	BytesSeenSinceLastReportRxDir   uint32
+	PacketsSeenSinceLastReportTxDir uint32
+	PacketsSeenSinceLastReportRxDir uint32
+	FlagsSeenSinceLastReportTxDir   struct {
+		Syn uint32
+		Ack uint32
+		Fin uint32
+		Rst uint32
+		Psh uint32
+		Urg uint32
+		Ece uint32
+		Cwr uint32
+		Ns  uint32
+	}
+	FlagsSeenSinceLastReportRxDir struct {
+		Syn uint32
+		Ack uint32
+		Fin uint32
+		Rst uint32
+		Psh uint32
+		Urg uint32
+		Ece uint32
+		Cwr uint32
+		Ns  uint32
+	}
 	TrafficDirection   uint8
 	FlagsSeenTxDir     uint8
 	FlagsSeenRxDir     uint8

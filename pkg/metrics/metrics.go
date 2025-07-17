@@ -188,6 +188,12 @@ func InitializeMetrics() {
 		ConntrackTotalConnectionsDescription,
 	)
 
+	ParsedPacketsCounter = exporter.CreatePrometheusCounterVecForControlPlaneMetric(
+		exporter.DefaultRegistry,
+		parsedPacketsCounterName,
+		parsedPacketsCounterDescription,
+	)
+
 	isInitialized = true
 	metricsLogger.Info("Metrics initialized")
 }
