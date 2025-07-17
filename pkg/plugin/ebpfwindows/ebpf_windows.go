@@ -102,7 +102,7 @@ func (p *Plugin) Start(ctx context.Context) error {
 }
 
 // metricsMapIterateCallback is the callback function that is called for each key-value pair in the metrics map.
-func (p *Plugin) metricsMapIterateCallback(key *MetricsKey, value *MetricsValues) {
+func (p *Plugin) metricsMapIterateCallback(key *MetricsKey, value *MetricsValue) {
 	if key == nil {
 		p.l.Error("MetricsMapIterateCallback key is nil")
 		return
@@ -114,20 +114,20 @@ func (p *Plugin) metricsMapIterateCallback(key *MetricsKey, value *MetricsValues
 	if key.IsDrop() {
 		p.l.Debug("MetricsMapIterateCallback Drop", zap.String("key", key.String()))
 		if key.IsEgress() {
-			metrics.DropBytesGauge.WithLabelValues(key.DropForwardReason(), egressLabel).Set(float64(value.BytesSum()))
-			metrics.DropPacketsGauge.WithLabelValues(key.DropForwardReason(), egressLabel).Set(float64(value.Sum()))
+			metrics.DropBytesGauge.WithLabelValues(key.DropForwardReason(), egressLabel).Set(float64(value.Bytes))
+			metrics.DropPacketsGauge.WithLabelValues(key.DropForwardReason(), egressLabel).Set(float64(value.Count))
 		} else if key.IsIngress() {
-			metrics.DropBytesGauge.WithLabelValues(key.DropForwardReason(), ingressLabel).Set(float64(value.BytesSum()))
-			metrics.DropPacketsGauge.WithLabelValues(key.DropForwardReason(), ingressLabel).Set(float64(value.Sum()))
+			metrics.DropBytesGauge.WithLabelValues(key.DropForwardReason(), ingressLabel).Set(float64(value.Bytes))
+			metrics.DropPacketsGauge.WithLabelValues(key.DropForwardReason(), ingressLabel).Set(float64(value.Count))
 		}
 	} else {
 		p.l.Debug("MetricsMapIterateCallback Forward", zap.String("key", key.String()))
 		if key.IsEgress() {
-			metrics.ForwardPacketsGauge.WithLabelValues(egressLabel).Set(float64(value.Sum()))
-			metrics.ForwardBytesGauge.WithLabelValues(egressLabel).Set(float64(value.BytesSum()))
+			metrics.ForwardPacketsGauge.WithLabelValues(egressLabel).Set(float64(value.Count))
+			metrics.ForwardBytesGauge.WithLabelValues(egressLabel).Set(float64(value.Bytes))
 		} else if key.IsIngress() {
-			metrics.ForwardPacketsGauge.WithLabelValues(ingressLabel).Set(float64(value.Sum()))
-			metrics.ForwardBytesGauge.WithLabelValues(ingressLabel).Set(float64(value.BytesSum()))
+			metrics.ForwardPacketsGauge.WithLabelValues(ingressLabel).Set(float64(value.Count))
+			metrics.ForwardBytesGauge.WithLabelValues(ingressLabel).Set(float64(value.Bytes))
 		}
 	}
 }

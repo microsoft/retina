@@ -39,13 +39,10 @@ type MetricsValue struct {
 	Bytes uint64
 }
 
-// MetricsMapValues is a slice of MetricsMapValue
-type MetricsValues []MetricsValue
-
 // IterateCallback represents the signature of the callback function expected by
 // the IterateWithCallback method, which in turn is used to iterate all the
 // keys/values of a metrics map.
-type IterateCallback func(*MetricsKey, *MetricsValues)
+type IterateCallback func(*MetricsKey, *MetricsValue)
 
 // MetricsMap interface represents a metrics map, and can be reused to implement
 // mock maps for unit tests.
@@ -103,9 +100,9 @@ func (m metricsMap) IterateWithCallback(l *log.ZapLogger, cb IterateCallback) er
 			return 1
 		}
 
-		var metricsValues MetricsValues = unsafe.Slice((*MetricsValue)(value), 1)
+		metricsValue := (*MetricsValue)(value)
 		metricsKey := (*MetricsKey)(key)
-		cb(metricsKey, &metricsValues)
+		cb(metricsKey, metricsValue)
 		return 0
 	}
 
@@ -169,30 +166,6 @@ func (k *MetricsKey) IsIngress() bool {
 // IsEgress checks if the direction is egress or not.
 func (k *MetricsKey) IsEgress() bool {
 	return k.Dir == dirEgress
-}
-
-// Count returns the sum of all the per-CPU count values
-func (vs MetricsValues) Sum() uint64 {
-	c := uint64(0)
-	for _, v := range vs {
-		c += v.Count
-	}
-
-	return c
-}
-
-// Bytes returns the sum of all the per-CPU bytes values
-func (vs MetricsValues) BytesSum() uint64 {
-	b := uint64(0)
-	for _, v := range vs {
-		b += v.Bytes
-	}
-
-	return b
-}
-
-func (vs MetricsValues) String() string {
-	return fmt.Sprintf("Sum: %d, BytesSum: %d", vs.Sum(), vs.BytesSum())
 }
 
 func GetLostEventsCount() (uint64, error) {
