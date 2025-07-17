@@ -12,6 +12,7 @@ const (
 	// Control plane metrics
 	pluginManagerFailedToReconcileCounterName = "plugin_manager_failed_to_reconcile"
 	lostEventsCounterName                     = "lost_events_counter"
+	parsedPacketsCounterName                  = "parsed_packets_counter"
 
 	// Windows
 	hnsStats            = "windows_hns_stats"
@@ -43,6 +44,7 @@ const (
 	// Control plane metrics
 	pluginManagerFailedToReconcileCounterDescription = "Number of times the plugin manager failed to reconcile the plugins"
 	lostEventsCounterDescription                     = "Number of events lost in control plane"
+	parsedPacketsCounterDescription                  = "Number of packets parsed by the packetparser plugin"
 
 	// Conntrack metrics
 	ConntrackPacketTxDescription         = "Number of tx packets"
@@ -90,6 +92,7 @@ var (
 	// Control Plane Metrics
 	PluginManagerFailedToReconcileCounter CounterVec
 	LostEventsCounter                     CounterVec
+	ParsedPacketsCounter                  CounterVec
 
 	// DNS Metrics.
 	DNSRequestCounter  CounterVec

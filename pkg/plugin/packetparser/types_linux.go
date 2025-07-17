@@ -28,6 +28,7 @@ const (
 	TCPFlagURG
 	TCPFlagECE
 	TCPFlagCWR
+	TCPFlagNS
 )
 
 const (

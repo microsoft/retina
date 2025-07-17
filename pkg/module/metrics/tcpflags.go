@@ -65,6 +65,27 @@ func (t *TCPMetrics) getLabels() []string {
 	return labels
 }
 
+func combineFlagsWithPrevious(flags []string, flow *v1.Flow) map[string]uint32 {
+	var combinedFlags map[string]uint32
+
+	previous := utils.PreviouslyObservedTCPFlags(flow)
+	if previous != nil {
+		combinedFlags = previous
+	} else {
+		combinedFlags = map[string]uint32{}
+	}
+
+	for _, flag := range flags {
+		if _, ok := combinedFlags[flag]; !ok {
+			combinedFlags[flag] = 1
+		} else {
+			combinedFlags[flag]++
+		}
+	}
+
+	return combinedFlags
+}
+
 func (t *TCPMetrics) ProcessFlow(flow *v1.Flow) {
 	if flow == nil {
 		return
@@ -100,11 +121,11 @@ func (t *TCPMetrics) ProcessFlow(flow *v1.Flow) {
 		dstLabels = t.dstCtx.getValues(flow)
 	}
 
-	for _, flag := range flags {
+	for flag, count := range combineFlagsWithPrevious(flags, flow) {
 		labels := append([]string{flag}, srcLabels...)
 		labels = append(labels, dstLabels...)
-		t.tcpFlagsMetrics.WithLabelValues(labels...).Inc()
-		t.l.Debug("TCP flag metric", zap.String("flag", flag), zap.Strings("labels", labels))
+		t.tcpFlagsMetrics.WithLabelValues(labels...).Add(float64(count))
+		t.l.Debug("TCP flag metric", zap.String("flag", flag), zap.Strings("labels", labels), zap.Uint32("count", count))
 	}
 }
 
@@ -113,20 +134,23 @@ func (t *TCPMetrics) processLocalCtxFlow(flow *v1.Flow, flags []string) {
 	if labelValuesMap == nil {
 		return
 	}
+
+	combinedFlags := combineFlagsWithPrevious(flags, flow)
+
 	// Ingress values
 	if l := len(labelValuesMap[ingress]); l > 0 {
-		for _, flag := range flags {
+		for flag, count := range combinedFlags {
 			labels := append([]string{flag}, labelValuesMap[ingress]...)
-			t.tcpFlagsMetrics.WithLabelValues(labels...).Inc()
-			t.l.Debug("TCP flag metric", zap.String("flag", flag), zap.Strings("labels", labels))
+			t.tcpFlagsMetrics.WithLabelValues(labels...).Add(float64(count))
+			t.l.Debug("TCP flag metric", zap.String("flag", flag), zap.Strings("labels", labels), zap.Uint32("count", count))
 		}
 	}
 
 	if l := len(labelValuesMap[egress]); l > 0 {
-		for _, flag := range flags {
+		for flag, count := range combinedFlags {
 			labels := append([]string{flag}, labelValuesMap[egress]...)
-			t.tcpFlagsMetrics.WithLabelValues(labels...).Inc()
-			t.l.Debug("TCP flag metric", zap.String("flag", flag), zap.Strings("labels", labels))
+			t.tcpFlagsMetrics.WithLabelValues(labels...).Add(float64(count))
+			t.l.Debug("TCP flag metric", zap.String("flag", flag), zap.Strings("labels", labels), zap.Uint32("count", count))
 		}
 	}
 }
@@ -169,6 +193,10 @@ func (t *TCPMetrics) getFlagValues(flags *v1.TCPFlags) []string {
 
 	if flags.GetCWR() {
 		f = append(f, utils.CWR)
+	}
+
+	if flags.GetNS() {
+		f = append(f, utils.NS)
 	}
 
 	return f

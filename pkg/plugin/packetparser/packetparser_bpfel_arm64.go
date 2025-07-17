@@ -13,9 +13,35 @@ import (
 )
 
 type packetparserCtEntry struct {
-	EvictionTime       uint32
-	LastReportTxDir    uint32
-	LastReportRxDir    uint32
+	EvictionTime                    uint32
+	LastReportTxDir                 uint32
+	LastReportRxDir                 uint32
+	BytesSeenSinceLastReportTxDir   uint32
+	BytesSeenSinceLastReportRxDir   uint32
+	PacketsSeenSinceLastReportTxDir uint32
+	PacketsSeenSinceLastReportRxDir uint32
+	FlagsSeenSinceLastReportTxDir   struct {
+		Syn uint32
+		Ack uint32
+		Fin uint32
+		Rst uint32
+		Psh uint32
+		Urg uint32
+		Ece uint32
+		Cwr uint32
+		Ns  uint32
+	}
+	FlagsSeenSinceLastReportRxDir struct {
+		Syn uint32
+		Ack uint32
+		Fin uint32
+		Rst uint32
+		Psh uint32
+		Urg uint32
+		Ece uint32
+		Cwr uint32
+		Ns  uint32
+	}
 	TrafficDirection   uint8
 	FlagsSeenTxDir     uint8
 	FlagsSeenRxDir     uint8
@@ -55,12 +81,27 @@ type packetparserPacket struct {
 		Tsval  uint32
 		Tsecr  uint32
 	}
-	ObservationPoint  uint8
-	TrafficDirection  uint8
-	Proto             uint8
-	Flags             uint8
-	IsReply           bool
-	_                 [3]byte
+	ObservationPoint          uint8
+	TrafficDirection          uint8
+	Proto                     uint8
+	_                         [1]byte
+	Flags                     uint16
+	IsReply                   bool
+	_                         [1]byte
+	PreviouslyObservedPackets uint32
+	PreviouslyObservedBytes   uint32
+	PreviouslyObservedFlags   struct {
+		Syn uint32
+		Ack uint32
+		Fin uint32
+		Rst uint32
+		Psh uint32
+		Urg uint32
+		Ece uint32
+		Cwr uint32
+		Ns  uint32
+	}
+	_                 [4]byte
 	ConntrackMetadata struct {
 		BytesTxCount   uint64
 		BytesRxCount   uint64
