@@ -62,8 +62,8 @@ jobs:
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
           fi
         env:
-          SHOULD_PUSH_IMAGE: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
-          # SHOULD_PUSH_IMAGE: true
+          # SHOULD_PUSH_IMAGE: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
+          SHOULD_PUSH_IMAGE: true
 
   retina-win-images:
     name: Build Agent Windows Images
@@ -116,8 +116,8 @@ jobs:
               WINDOWS_YEARS=${{ matrix.year }} 
           fi
         env:
-          SHOULD_PUSH_IMAGE: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
-          # SHOULD_PUSH_IMAGE: true
+          # SHOULD_PUSH_IMAGE: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
+          SHOULD_PUSH_IMAGE: true
 
   operator-images:
     name: Build Operator Images
@@ -167,8 +167,8 @@ jobs:
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
           fi
         env:
-          SHOULD_PUSH_IMAGE: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
-          # SHOULD_PUSH_IMAGE: true
+          # SHOULD_PUSH_IMAGE: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
+          SHOULD_PUSH_IMAGE: true
 
   retina-shell-images:
     name: Build Retina Shell Images
@@ -217,8 +217,8 @@ jobs:
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
           fi
         env:
-          SHOULD_PUSH_IMAGE: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
-          # SHOULD_PUSH_IMAGE: true
+          # SHOULD_PUSH_IMAGE: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
+          SHOULD_PUSH_IMAGE: true
 
   kubectl-retina-images:
     name: Build Kubectl Retina Images
@@ -267,8 +267,8 @@ jobs:
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
           fi
         env:
-          SHOULD_PUSH_IMAGE: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
-          # SHOULD_PUSH_IMAGE: true
+          # SHOULD_PUSH_IMAGE: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
+          SHOULD_PUSH_IMAGE: true
 
   manifests:
     name: Generate Manifests
