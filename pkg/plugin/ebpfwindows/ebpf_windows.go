@@ -119,6 +119,8 @@ func (p *Plugin) metricsMapIterateCallback(key *MetricsKey, value *MetricsValue)
 		} else if key.IsIngress() {
 			metrics.DropBytesGauge.WithLabelValues(key.DropForwardReason(), ingressLabel).Set(float64(value.Bytes))
 			metrics.DropPacketsGauge.WithLabelValues(key.DropForwardReason(), ingressLabel).Set(float64(value.Count))
+		} else {
+			p.l.Error("MetricsMapIterateCallback drop key is neither ingress nor egress", zap.String("key", key.String()))
 		}
 	} else {
 		p.l.Debug("MetricsMapIterateCallback Forward", zap.String("key", key.String()))
@@ -128,6 +130,8 @@ func (p *Plugin) metricsMapIterateCallback(key *MetricsKey, value *MetricsValue)
 		} else if key.IsIngress() {
 			metrics.ForwardPacketsGauge.WithLabelValues(ingressLabel).Set(float64(value.Count))
 			metrics.ForwardBytesGauge.WithLabelValues(ingressLabel).Set(float64(value.Bytes))
+		} else {
+			p.l.Error("MetricsMapIterateCallback forward key is neither ingress nor egress", zap.String("key", key.String()))
 		}
 	}
 }
