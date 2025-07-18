@@ -371,13 +371,12 @@ func TestMetricsMapIterateCallback_DropEgress(t *testing.T) {
 		l: log.Logger().Named("test-ebpf"),
 	}
 	keyDrop := &MetricsKey{
-		Reason:   2,
-		Dir:      dirEgress,
-		Line:     0,
-		File:     0,
-		Reserved: [3]uint8{0, 0, 0},
+		Version:        1,
+		Reason:         2,
+		Direction:      dirEgress,
+		ExtendedReason: 0, // Extended reason is not used in this test
 	}
-	val := &MetricsValues{{Count: 1, Bytes: pktSizeBytes}}
+	val := &MetricsValue{Count: 1, Bytes: pktSizeBytes}
 	p.metricsMapIterateCallback(keyDrop, val)
 	_, err := metrics.DropBytesGauge.GetMetricWithLabelValues("Reason_InvalidPacket", "egress")
 	if err != nil {
@@ -401,13 +400,12 @@ func TestMetricsMapIterateCallback_DropIngress(t *testing.T) {
 		l: log.Logger().Named("test-ebpf"),
 	}
 	keyDrop := &MetricsKey{
-		Reason:   2,
-		Dir:      dirIngress,
-		Line:     0,
-		File:     0,
-		Reserved: [3]uint8{0, 0, 0},
+		Version:        1,
+		Reason:         2,
+		Direction:      dirIngress,
+		ExtendedReason: 0, // Extended reason is not used in this test
 	}
-	val := &MetricsValues{{Count: 1, Bytes: pktSizeBytes}}
+	val := &MetricsValue{Count: 1, Bytes: pktSizeBytes}
 	p.metricsMapIterateCallback(keyDrop, val)
 	_, err := metrics.DropBytesGauge.GetMetricWithLabelValues("Reason_InvalidPacket", "ingress")
 	if err != nil {
@@ -431,13 +429,12 @@ func TestMetricsMapIterateCallback_ForwardEgress(t *testing.T) {
 		l: log.Logger().Named("test-ebpf"),
 	}
 	keyFwd := &MetricsKey{
-		Reason:   0,
-		Dir:      dirEgress,
-		Line:     0,
-		File:     0,
-		Reserved: [3]uint8{0, 0, 0},
+		Version:        1,
+		Reason:         0,
+		Direction:      dirEgress,
+		ExtendedReason: 0, // Extended reason is not used in this test
 	}
-	val := &MetricsValues{{Count: 1, Bytes: pktSizeBytes}}
+	val := &MetricsValue{Count: 1, Bytes: pktSizeBytes}
 	p.metricsMapIterateCallback(keyFwd, val)
 	_, err := metrics.ForwardBytesGauge.GetMetricWithLabelValues("egress")
 	if err != nil {
@@ -461,13 +458,12 @@ func TestMetricsMapIterateCallback_ForwardIngress(t *testing.T) {
 		l: log.Logger().Named("test-ebpf"),
 	}
 	keyFwd := &MetricsKey{
-		Reason:   0,
-		Dir:      dirIngress,
-		Line:     0,
-		File:     0,
-		Reserved: [3]uint8{0, 0, 0},
+		Version:        1,
+		Reason:         0,
+		Direction:      dirIngress,
+		ExtendedReason: 0, // Extended reason is not used in this test
 	}
-	val := &MetricsValues{{Count: 1, Bytes: pktSizeBytes}}
+	val := &MetricsValue{Count: 1, Bytes: pktSizeBytes}
 	p.metricsMapIterateCallback(keyFwd, val)
 	_, err := metrics.ForwardBytesGauge.GetMetricWithLabelValues("ingress")
 	if err != nil {
@@ -497,7 +493,7 @@ func TestMetricsMapIterateCallback_NilKey(t *testing.T) {
 		},
 		l: log.Logger().Named("test-ebpf"),
 	}
-	fakeValues := &MetricsValues{{}}
+	fakeValues := &MetricsValue{}
 	p.metricsMapIterateCallback(nil, fakeValues)
 }
 
@@ -537,7 +533,7 @@ func TestIterateWithCallback_Error_NilMetricsValue(t *testing.T) {
 	logger := log.Logger().Named("test-ebpf")
 
 	called := false
-	err := m.IterateWithCallback(logger, func(_ *MetricsKey, _ *MetricsValues) {
+	err := m.IterateWithCallback(logger, func(_ *MetricsKey, _ *MetricsValue) {
 		called = true
 	})
 	if err != nil {
@@ -545,36 +541,7 @@ func TestIterateWithCallback_Error_NilMetricsValue(t *testing.T) {
 	}
 
 	fakeKey := &MetricsKey{}
-	enumCallBack(unsafe.Pointer(fakeKey), nil, 0)
-	if called {
-		t.Errorf("expected callback not to be called")
-	}
-}
-
-// TestIterateWithCallback_Error_ZeroMetricsValueSize tests the behavior of the IterateWithCallback function
-// when retinaEBPFAPI invokes enumCallBack with zero value size.
-func TestIterateWithCallback_Error_ZeroMetricsValueSize(t *testing.T) {
-	// Mock the function variable to simulate a successful Windows API call
-	orig := callEnumMetricsMap
-	callEnumMetricsMap = func(_ uintptr) (uintptr, uintptr, error) {
-		return 0, 0, nil
-	}
-	defer func() { callEnumMetricsMap = orig }()
-
-	m := NewMetricsMap()
-	logger := log.Logger().Named("test-ebpf")
-
-	called := false
-	err := m.IterateWithCallback(logger, func(_ *MetricsKey, _ *MetricsValues) {
-		called = true
-	})
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-
-	fakeKey := &MetricsKey{}
-	fakeValues := &MetricsValues{{}}
-	enumCallBack(unsafe.Pointer(fakeKey), unsafe.Pointer(&(*fakeValues)[0]), 0)
+	enumCallBack(unsafe.Pointer(fakeKey), nil)
 	if called {
 		t.Errorf("expected callback not to be called")
 	}
@@ -594,15 +561,15 @@ func TestIterateWithCallback_Error_NilMetricsKey(t *testing.T) {
 	logger := log.Logger().Named("test-ebpf")
 
 	called := false
-	err := m.IterateWithCallback(logger, func(_ *MetricsKey, _ *MetricsValues) {
+	err := m.IterateWithCallback(logger, func(_ *MetricsKey, _ *MetricsValue) {
 		called = true
 	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	fakeValues := &MetricsValues{{}}
-	enumCallBack(unsafe.Pointer(nil), unsafe.Pointer(&(*fakeValues)[0]), len(*fakeValues))
+	fakeValues := &MetricsValue{}
+	enumCallBack(unsafe.Pointer(nil), unsafe.Pointer(fakeValues))
 	if called {
 		t.Errorf("expected callback not to be called")
 	}
@@ -622,7 +589,7 @@ func TestIterateWithCallback_Error_NilMetricValue(t *testing.T) {
 	logger := log.Logger().Named("test-ebpf")
 
 	called := false
-	err := m.IterateWithCallback(logger, func(_ *MetricsKey, _ *MetricsValues) {
+	err := m.IterateWithCallback(logger, func(_ *MetricsKey, _ *MetricsValue) {
 		called = true
 	})
 	if err != nil {
@@ -630,7 +597,7 @@ func TestIterateWithCallback_Error_NilMetricValue(t *testing.T) {
 	}
 
 	fakeKey := &MetricsKey{}
-	enumCallBack(unsafe.Pointer(fakeKey), unsafe.Pointer(nil), 0)
+	enumCallBack(unsafe.Pointer(fakeKey), unsafe.Pointer(nil))
 	if called {
 		t.Errorf("expected callback not to be called")
 	}
@@ -650,7 +617,7 @@ func TestIterateWithCallback_Success(t *testing.T) {
 	logger := log.Logger().Named("test-ebpf")
 
 	called := false
-	err := m.IterateWithCallback(logger, func(_ *MetricsKey, _ *MetricsValues) {
+	err := m.IterateWithCallback(logger, func(_ *MetricsKey, _ *MetricsValue) {
 		called = true
 	})
 	if err != nil {
@@ -658,8 +625,8 @@ func TestIterateWithCallback_Success(t *testing.T) {
 	}
 
 	fakeKey := &MetricsKey{}
-	fakeValues := &MetricsValues{{}}
-	enumCallBack(unsafe.Pointer(fakeKey), unsafe.Pointer(&(*fakeValues)[0]), len(*fakeValues))
+	fakeValues := &MetricsValue{}
+	enumCallBack(unsafe.Pointer(fakeKey), unsafe.Pointer(fakeValues))
 	if !called {
 		t.Errorf("expected callback to be called")
 	}

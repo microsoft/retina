@@ -102,7 +102,7 @@ func (p *Plugin) Start(ctx context.Context) error {
 }
 
 // metricsMapIterateCallback is the callback function that is called for each key-value pair in the metrics map.
-func (p *Plugin) metricsMapIterateCallback(key *MetricsKey, value *MetricsValues) {
+func (p *Plugin) metricsMapIterateCallback(key *MetricsKey, value *MetricsValue) {
 	if key == nil {
 		p.l.Error("MetricsMapIterateCallback key is nil")
 		return
@@ -114,20 +114,20 @@ func (p *Plugin) metricsMapIterateCallback(key *MetricsKey, value *MetricsValues
 	if key.IsDrop() {
 		p.l.Debug("MetricsMapIterateCallback Drop", zap.String("key", key.String()))
 		if key.IsEgress() {
-			metrics.DropBytesGauge.WithLabelValues(key.DropForwardReason(), egressLabel).Set(float64(value.BytesSum()))
-			metrics.DropPacketsGauge.WithLabelValues(key.DropForwardReason(), egressLabel).Set(float64(value.Sum()))
+			metrics.DropBytesGauge.WithLabelValues(key.DropForwardReason(), egressLabel).Set(float64(value.Bytes))
+			metrics.DropPacketsGauge.WithLabelValues(key.DropForwardReason(), egressLabel).Set(float64(value.Count))
 		} else if key.IsIngress() {
-			metrics.DropBytesGauge.WithLabelValues(key.DropForwardReason(), ingressLabel).Set(float64(value.BytesSum()))
-			metrics.DropPacketsGauge.WithLabelValues(key.DropForwardReason(), ingressLabel).Set(float64(value.Sum()))
+			metrics.DropBytesGauge.WithLabelValues(key.DropForwardReason(), ingressLabel).Set(float64(value.Bytes))
+			metrics.DropPacketsGauge.WithLabelValues(key.DropForwardReason(), ingressLabel).Set(float64(value.Count))
 		}
 	} else {
 		p.l.Debug("MetricsMapIterateCallback Forward", zap.String("key", key.String()))
 		if key.IsEgress() {
-			metrics.ForwardPacketsGauge.WithLabelValues(egressLabel).Set(float64(value.Sum()))
-			metrics.ForwardBytesGauge.WithLabelValues(egressLabel).Set(float64(value.BytesSum()))
+			metrics.ForwardPacketsGauge.WithLabelValues(egressLabel).Set(float64(value.Count))
+			metrics.ForwardBytesGauge.WithLabelValues(egressLabel).Set(float64(value.Bytes))
 		} else if key.IsIngress() {
-			metrics.ForwardPacketsGauge.WithLabelValues(ingressLabel).Set(float64(value.Sum()))
-			metrics.ForwardBytesGauge.WithLabelValues(ingressLabel).Set(float64(value.BytesSum()))
+			metrics.ForwardPacketsGauge.WithLabelValues(ingressLabel).Set(float64(value.Count))
+			metrics.ForwardBytesGauge.WithLabelValues(ingressLabel).Set(float64(value.Bytes))
 		}
 	}
 }
@@ -159,6 +159,7 @@ func (p *Plugin) addEbpfToPath() error {
 func (p *Plugin) pullMetricsAndEvents(ctx context.Context) {
 	eventsMap := NewEventsMap()
 	metricsMap := NewMetricsMap()
+	prevLostEventsCount := uint64(0)
 
 	err := p.addEbpfToPath()
 	if err != nil {
@@ -196,6 +197,20 @@ func (p *Plugin) pullMetricsAndEvents(ctx context.Context) {
 			if err != nil {
 				p.l.Error("Error iterating metrics map", zap.Error(err))
 			}
+
+			lostEventsCount, err := GetLostEventsCount()
+
+			if err != nil {
+				p.l.Error("Error getting lost events count", zap.Error(err))
+			} else {
+				// The lost events count is cumulative, so we need to calculate the difference
+				if lostEventsCount > prevLostEventsCount {
+					counterToAdd := lostEventsCount - prevLostEventsCount
+					metrics.LostEventsCounter.WithLabelValues(utils.Kernel, name).Add(float64(counterToAdd))
+					prevLostEventsCount = lostEventsCount
+				}
+			}
+
 		case <-ctx.Done():
 			p.l.Error("ebpfwindows plugin canceling", zap.Error(ctx.Err()))
 			err := eventsMap.UnregisterForCallback()
