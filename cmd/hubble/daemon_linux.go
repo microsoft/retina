@@ -28,6 +28,7 @@ import (
 	"github.com/cilium/hive/cell"
 	"github.com/cilium/workerpool"
 
+	cilium_api_v2 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2"
 	corev1 "k8s.io/api/core/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
@@ -48,6 +49,11 @@ var (
 			if err := corev1.AddToScheme(scheme); err != nil { //nolint:govet // intentional shadow
 				logger.Error("failed to add corev1 to scheme")
 				return nil, nil, errors.Wrap(err, "failed to add corev1 to scheme")
+			}
+
+			if err := cilium_api_v2.AddToScheme(scheme); err != nil { //nolint:govet // intentional shadow
+				logger.Error("failed to add cilium.io/v2 to scheme")
+				return nil, nil, errors.Wrap(err, "failed to add cilium.io/v2 to scheme")
 			}
 
 			mgrOption := ctrl.Options{
