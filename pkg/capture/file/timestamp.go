@@ -23,6 +23,11 @@ func StringToTime(timestamp string) (*metav1.Time, error) {
 }
 
 // Converts a metav1.Time to a string in the capture file name format
+// Returns a zero time string if timestamp is nil
+// Converts to UTC if other timezone is provided
 func TimeToString(timestamp *metav1.Time) string {
-	return timestamp.Format(captureFileNameTimestampFormat)
+	if timestamp == nil {
+		return (&metav1.Time{Time: time.Time{}}).Format(captureFileNameTimestampFormat)
+	}
+	return timestamp.UTC().Format(captureFileNameTimestampFormat)
 }
