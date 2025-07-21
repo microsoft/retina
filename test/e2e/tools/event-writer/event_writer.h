@@ -171,7 +171,7 @@ struct metrics_key {
 	uint8_t	    reserved[3];	/* reserved for future extension */
 };
 
-typedef struct windows_metrics_key
+struct windows_metrics_key
 {
     uint8_t type;
     uint16_t reason; /* 0: forwarded, >0 dropped */
@@ -179,7 +179,7 @@ typedef struct windows_metrics_key
         pad : 6;
     uint16_t line; /* __MAGIC_LINE__ */
     uint8_t file;  /* __MAGIC_FILE__, needs to fit __source_file_name_to_id */
-} windows_metrics_key_t;
+};
 
 struct metrics_value {
 	uint64_t	count;

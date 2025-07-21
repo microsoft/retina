@@ -57,7 +57,7 @@ struct {
 SEC(".maps")
 struct {
 	__uint(type, BPF_MAP_TYPE_PERCPU_HASH);
-	__type(key, struct metrics_key);
+	__type(key, struct windows_metrics_key);
 	__type(value, struct metrics_value);
 	__uint(pinning, LIBBPF_PIN_BY_NAME);
 	__uint(max_entries, 512 * 4096);
