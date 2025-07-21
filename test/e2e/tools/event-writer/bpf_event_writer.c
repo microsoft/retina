@@ -89,7 +89,7 @@ void update_windows_metrics(uint64_t bytes, uint8_t direction,
                     uint16_t reason, uint16_t line, uint8_t file)
 {
     struct metrics_value *entry, new_entry = {};
-    windows_metrics_key_t key = {};
+    struct windows_metrics_key key = {};
 
     key.type   = -DROP_PKTMON;
     key.reason = reason;
