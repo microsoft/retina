@@ -11,6 +11,9 @@
 #define METRICS_MAP_PIN_PATH \
     "/ebpf/global/cilium_metrics"
 
+#define WINDOWS_METRICS_MAP_PIN_PATH \
+    "/ebpf/global/windows_metrics"
+
 #define FILTER_MAP_PIN_PATH \
     "/ebpf/global/filter_map"
 
