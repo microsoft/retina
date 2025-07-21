@@ -54,6 +54,15 @@ struct {
 	__uint(max_entries, 512 * 4096);
 } cilium_metrics;
 
+SEC(".maps")
+struct {
+	__uint(type, BPF_MAP_TYPE_PERCPU_HASH);
+	__type(key, struct windows_metrics_key);
+	__type(value, struct metrics_value);
+	__uint(pinning, LIBBPF_PIN_BY_NAME);
+	__uint(max_entries, 512 * 4096);
+} windows_metrics;
+
 void update_metrics(uint64_t bytes, uint8_t direction,
 					uint8_t reason, uint16_t line, uint8_t file)
 {
@@ -244,6 +253,28 @@ event_writer(xdp_md_t* ctx) {
         memset(drp_elm->data, 0, sizeof(drp_elm->data));
         memcpy(drp_elm->data, ctx->data, size_to_copy);
         bpf_perf_event_output(ctx, &cilium_events, EBPF_MAP_FLAG_CURRENT_CPU , drp_elm, sizeof(struct drop_notify));
+
+        // Create Windows specific drop event with hardcoded reason code
+        {
+            struct metrics_value *win_entry, win_new_entry = {};
+            struct windows_metrics_key win_key = {};
+
+            win_key.type   = -DROP_PKTMON;
+            win_key.reason = Drop_FL_InterfaceNotReady;
+            win_key.dir    = METRIC_INGRESS;
+            win_key.line   = 0;
+            win_key.file   = 0;
+
+            win_entry = bpf_map_lookup_elem(&windows_metrics, &win_key);
+            if (win_entry) {
+                win_entry->count += 1;
+                win_entry->bytes += size_to_copy;
+            } else {
+                win_new_entry.count = 1;
+                win_new_entry.bytes = size_to_copy;
+                bpf_map_update_elem(&windows_metrics, &win_key, &win_new_entry, 0);
+            }
+        }
     }
 
     update_metrics(size_to_copy, METRIC_INGRESS, reason, 0, 0);
