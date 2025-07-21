@@ -85,17 +85,16 @@ void update_metrics(uint64_t bytes, uint8_t direction,
 	}
 }
 
-void update_windows_metrics(uint64_t bytes, uint8_t direction,
-                    uint16_t reason, uint16_t line, uint8_t file)
+void update_windows_metrics(uint64_t bytes, uint8_t direction, uint8_t type, uint16_t reason)
 {
     struct metrics_value *entry, new_entry = {};
     struct windows_metrics_key key = {};
 
-    key.type   = -DROP_PKTMON;
+    key.type   = type;
     key.reason = reason;
     key.dir    = direction;
-    key.line   = line;
-    key.file   = file;
+    key.line   = 0;
+    key.file   = 0;
 
     entry = bpf_map_lookup_elem(&windows_metrics, &key);
     if (entry) {
@@ -277,8 +276,8 @@ event_writer(xdp_md_t* ctx) {
         memcpy(drp_elm->data, ctx->data, size_to_copy);
         bpf_perf_event_output(ctx, &cilium_events, EBPF_MAP_FLAG_CURRENT_CPU , drp_elm, sizeof(struct drop_notify));
 
-        //Create Windows specific drop event with hardcoded extended reason
-        update_windows_metrics(size_to_copy, METRIC_INGRESS, Drop_FL_InterfaceNotReady, 0, 0);
+        //Create Windows specific drop event with hardcoded reason code
+        update_windows_metrics(size_to_copy, METRIC_INGRESS, -DROP_PKTMON, Drop_FL_InterfaceNotReady);
     }
 
     update_metrics(size_to_copy, METRIC_INGRESS, reason, 0, 0);

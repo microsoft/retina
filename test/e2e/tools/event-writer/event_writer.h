@@ -171,14 +171,13 @@ struct metrics_key {
 	uint8_t	    reserved[3];	/* reserved for future extension */
 };
 
-struct windows_metrics_key
-{
-    uint8_t type;
+struct windows_metrics_key {
+    uint8_t  type;
     uint16_t reason; /* 0: forwarded, >0 dropped */
-    uint8_t dir : 2, /* 1: ingress 2: egress */
-        pad : 6;
+    uint8_t  dir : 2, /* 1: ingress 2: egress */
+             pad : 6;
     uint16_t line; /* __MAGIC_LINE__ */
-    uint8_t file;  /* __MAGIC_FILE__, needs to fit __source_file_name_to_id */
+    uint8_t  file;  /* __MAGIC_FILE__, needs to fit __source_file_name_to_id */
 };
 
 struct metrics_value {
