@@ -475,7 +475,7 @@ func (v *ValidateWinBpfMetric) Run() error {
 		Namespace:          v.RetinaDaemonSetNamespace,
 		LabelSelector:      "k8s-app=networkobservability",
 	}
-	logErr := logDumper.Run()
+	logErr = logDumper.Run()
 	if logErr != nil {
 		slog.Warn("Failed to dump network observability pod logs", "error", logErr)
 	}
