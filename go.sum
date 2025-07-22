@@ -240,8 +240,8 @@ github.com/atc0005/go-teams-notify/v2 v2.10.0 h1:eQvRIkyESQgBvlUdQ/iPol/lj3QcRyr
 github.com/atc0005/go-teams-notify/v2 v2.10.0/go.mod h1:SIeE1UfCcVRYMqP5b+r1ZteHyA/2UAjzWF5COnZ8q0w=
 github.com/aws/aws-sdk-go v1.53.0 h1:MMo1x1ggPPxDfHMXJnQudTbGXYlD4UigUAud1DJxPVo=
 github.com/aws/aws-sdk-go v1.53.0/go.mod h1:LF8svs817+Nz+DmiMQKTO3ubZ/6IaTpq3TjupRn3Eqk=
-github.com/aws/aws-sdk-go-v2 v1.36.5 h1:0OF9RiEMEdDdZEMqF9MRjevyxAQcf6gY+E7vwBILFj0=
-github.com/aws/aws-sdk-go-v2 v1.36.5/go.mod h1:EYrzvCCN9CMUTa5+6lf6MM4tq3Zjp8UhSGR/cBsjai0=
+github.com/aws/aws-sdk-go-v2 v1.36.6 h1:zJqGjVbRdTPojeCGWn5IR5pbJwSQSBh5RWFTQcEQGdU=
+github.com/aws/aws-sdk-go-v2 v1.36.6/go.mod h1:EYrzvCCN9CMUTa5+6lf6MM4tq3Zjp8UhSGR/cBsjai0=
 github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.11 h1:12SpdwU8Djs+YGklkinSSlcrPyj3H4VifVsKf78KbwA=
 github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.11/go.mod h1:dd+Lkp6YmMryke+qxW/VnKyhMBDTYP41Q2Bb+6gNZgY=
 github.com/aws/aws-sdk-go-v2/config v1.29.17 h1:jSuiQ5jEe4SAMH6lLRMY9OVC+TqJLP5655pBGjmnjr0=
