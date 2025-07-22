@@ -228,7 +228,7 @@ func (v *ValidateWinBpfMetric) verifyBasicMetrics(promOutput string) error {
 
 	windowsDrpLabels := map[string]string{
 		"direction": "ingress",
-		"reason":    "220, 607",
+		"reason":    "DropReason_PacketMonitor, Drop_FL_InterfaceNotReady",
 	}
 
 	if promOutput == "" {
@@ -241,42 +241,60 @@ func (v *ValidateWinBpfMetric) verifyBasicMetrics(promOutput string) error {
 		}
 
 		fwdBytes, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_forward_bytes", fwdLabels)
-		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics (networkobservability_forward_bytes)") {
+		if err != nil {
 			return fmt.Errorf("failed to get forward bytes metric: %w", err)
 		}
 		slog.Info("networkobservability_forward_bytes value", "value", fwdBytes, "labels", fwdLabels)
+		if fwdBytes == 0 {
+			return fmt.Errorf("forward bytes metric is zero, expected non-zero value")
+		}
 
 		fwdCount, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_forward_count", fwdLabels)
-		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics (networkobservability_forward_count)") {
+		if err != nil {
 			return fmt.Errorf("failed to get forward count metric: %w", err)
 		}
 		slog.Info("networkobservability_forward_count value", "value", fwdCount, "labels", fwdLabels)
+		if fwdCount == 0 {
+			return fmt.Errorf("forward count metric is zero, expected non-zero value")
+		}
 
 		// Drop event
 		drpBytes, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_drop_bytes", drpLabels)
-		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics (networkobservability_drop_bytes)") {
+		if err != nil {
 			return fmt.Errorf("failed to get drop bytes metric: %w", err)
 		}
 		slog.Info("networkobservability_drop_bytes value", "value", drpBytes, "labels", drpLabels)
+		if drpBytes == 0 {
+			return fmt.Errorf("drop bytes metric is zero, expected non-zero value")
+		}
 
 		drpCount, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_drop_count", drpLabels)
-		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics (networkobservability_drop_count)") {
+		if err != nil {
 			return fmt.Errorf("failed to get drop count metric: %w", err)
 		}
 		slog.Info("networkobservability_drop_count value", "value", drpCount, "labels", drpLabels)
+		if drpCount == 0 {
+			return fmt.Errorf("drop count metric is zero, expected non-zero value")
+		}
 
 		// Windows drop event
 		windowsDrpBytes, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_drop_bytes", windowsDrpLabels)
-		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics (windows networkobservability_drop_bytes)") {
+		if err != nil {
 			return fmt.Errorf("failed to get windows drop bytes metric: %w", err)
 		}
 		slog.Info("networkobservability_drop_bytes (windows) value", "value", windowsDrpBytes, "labels", windowsDrpLabels)
+		if windowsDrpBytes == 0 {
+			return fmt.Errorf("windows drop bytes metric is zero, expected non-zero value")
+		}
 
 		windowsDrpCount, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_drop_count", windowsDrpLabels)
-		if err != nil && strings.Contains(err.Error(), "failed to parse prometheus metrics (windows networkobservability_drop_count)") {
+		if err != nil {
 			return fmt.Errorf("failed to get windows drop count metric: %w", err)
 		}
 		slog.Info("networkobservability_drop_count (windows) value", "value", windowsDrpCount, "labels", windowsDrpLabels)
+		if windowsDrpCount == 0 {
+			return fmt.Errorf("windows drop count metric is zero, expected non-zero value")
+		}
 	}
 
 	return nil
