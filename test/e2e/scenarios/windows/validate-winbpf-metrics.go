@@ -489,6 +489,7 @@ func (v *ValidateWinBpfMetric) Run() error {
 	}
 
 	slog.Info("Prometheus metrics output", "output", promOutput)
+
 	err = v.verifyBasicMetrics(promOutput)
 	if err != nil {
 
