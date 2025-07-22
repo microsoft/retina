@@ -468,18 +468,6 @@ func (v *ValidateWinBpfMetric) Run() error {
 		slog.Warn("Failed to dump retina pod logs", "error", logErr)
 	}
 
-	// Dump network observability logs
-	slog.Info("Dumping Network Observability pod logs for debugging")
-	logDumper = &kubernetes.GetPodLogs{
-		KubeConfigFilePath: v.KubeConfigFilePath,
-		Namespace:          v.RetinaDaemonSetNamespace,
-		LabelSelector:      "k8s-app=networkobservability",
-	}
-	logErr = logDumper.Run()
-	if logErr != nil {
-		slog.Warn("Failed to dump network observability pod logs", "error", logErr)
-	}
-
 	err = v.verifyBasicMetrics(promOutput)
 	if err != nil {
 
