@@ -2,6 +2,7 @@ package windows
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -9,6 +10,21 @@ import (
 
 	kubernetes "github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	prom "github.com/microsoft/retina/test/e2e/framework/prometheus"
+)
+
+var (
+	// ErrForwardBytesZero indicates forward bytes metric is zero
+	ErrForwardBytesZero = errors.New("forward bytes metric is zero, expected non-zero value")
+	// ErrForwardCountZero indicates forward count metric is zero
+	ErrForwardCountZero = errors.New("forward count metric is zero, expected non-zero value")
+	// ErrDropBytesZero indicates drop bytes metric is zero
+	ErrDropBytesZero = errors.New("drop bytes metric is zero, expected non-zero value")
+	// ErrDropCountZero indicates drop count metric is zero
+	ErrDropCountZero = errors.New("drop count metric is zero, expected non-zero value")
+	// ErrWindowsDropBytesZero indicates windows drop bytes metric is zero
+	ErrWindowsDropBytesZero = errors.New("windows drop bytes metric is zero, expected non-zero value")
+	// ErrWindowsDropCountZero indicates windows drop count metric is zero
+	ErrWindowsDropCountZero = errors.New("windows drop count metric is zero, expected non-zero value")
 )
 
 const (
@@ -246,7 +262,7 @@ func (v *ValidateWinBpfMetric) verifyBasicMetrics(promOutput string) error {
 		}
 		slog.Info("networkobservability_forward_bytes value", "value", fwdBytes, "labels", fwdLabels)
 		if fwdBytes == 0 {
-			return fmt.Errorf("forward bytes metric is zero, expected non-zero value")
+			return ErrForwardBytesZero
 		}
 
 		fwdCount, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_forward_count", fwdLabels)
@@ -255,7 +271,7 @@ func (v *ValidateWinBpfMetric) verifyBasicMetrics(promOutput string) error {
 		}
 		slog.Info("networkobservability_forward_count value", "value", fwdCount, "labels", fwdLabels)
 		if fwdCount == 0 {
-			return fmt.Errorf("forward count metric is zero, expected non-zero value")
+			return ErrForwardCountZero
 		}
 
 		// Drop event
@@ -265,7 +281,7 @@ func (v *ValidateWinBpfMetric) verifyBasicMetrics(promOutput string) error {
 		}
 		slog.Info("networkobservability_drop_bytes value", "value", drpBytes, "labels", drpLabels)
 		if drpBytes == 0 {
-			return fmt.Errorf("drop bytes metric is zero, expected non-zero value")
+			return ErrDropBytesZero
 		}
 
 		drpCount, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_drop_count", drpLabels)
@@ -274,7 +290,7 @@ func (v *ValidateWinBpfMetric) verifyBasicMetrics(promOutput string) error {
 		}
 		slog.Info("networkobservability_drop_count value", "value", drpCount, "labels", drpLabels)
 		if drpCount == 0 {
-			return fmt.Errorf("drop count metric is zero, expected non-zero value")
+			return ErrDropCountZero
 		}
 
 		// Windows drop event
@@ -284,7 +300,7 @@ func (v *ValidateWinBpfMetric) verifyBasicMetrics(promOutput string) error {
 		}
 		slog.Info("networkobservability_drop_bytes (windows) value", "value", windowsDrpBytes, "labels", windowsDrpLabels)
 		if windowsDrpBytes == 0 {
-			return fmt.Errorf("windows drop bytes metric is zero, expected non-zero value")
+			return ErrWindowsDropBytesZero
 		}
 
 		windowsDrpCount, err = prom.GetMetricGuageValueFromBuffer([]byte(promOutput), "networkobservability_drop_count", windowsDrpLabels)
@@ -293,7 +309,7 @@ func (v *ValidateWinBpfMetric) verifyBasicMetrics(promOutput string) error {
 		}
 		slog.Info("networkobservability_drop_count (windows) value", "value", windowsDrpCount, "labels", windowsDrpLabels)
 		if windowsDrpCount == 0 {
-			return fmt.Errorf("windows drop count metric is zero, expected non-zero value")
+			return ErrWindowsDropCountZero
 		}
 	}
 
