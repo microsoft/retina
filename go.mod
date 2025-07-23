@@ -273,7 +273,7 @@ require (
 	github.com/Microsoft/hcsshim v0.13.0
 	github.com/Sytten/logrus-zap-hook v0.1.0
 	github.com/aws/aws-sdk-go-v2 v1.36.6
-	github.com/aws/aws-sdk-go-v2/config v1.29.17
+	github.com/aws/aws-sdk-go-v2/config v1.29.18
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.71
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.84.1
 	github.com/cakturk/go-netstat v0.0.0-20200220111822-e5b49efee7a5
