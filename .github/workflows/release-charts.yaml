@@ -27,7 +27,7 @@ jobs:
         id: install
       
       - name: Install Cosign
-        uses: sigstore/cosign-installer@v3.8.2
+        uses: sigstore/cosign-installer@v3.9.2
 
       - name: Log in to registry (Helm for pushing chart, Docker for signing and push signature)
         run: |

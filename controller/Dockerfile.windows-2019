@@ -1,5 +1,5 @@
-# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.4-cbl-mariner2.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:8404e234fac0f624a120a43573098923a37c7e4755aebdb47783ff6212de3163 AS builder
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.4-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:250d01e55a37bd79d7014ae83f9f50aa6fa5570ca910e7f19faeff4bb0132ae1 AS builder
 
 # Build args
 ARG VERSION
@@ -16,7 +16,8 @@ RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /usr/bin/co
 RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /usr/bin/captureworkload.exe ./captureworkload/
 
 # Copy into final image
-FROM  mcr.microsoft.com/windows/servercore:ltsc2019 as final
+# skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2019  --override-os windows --format "{{.Name}}@{{.Digest}}"
+FROM  mcr.microsoft.com/windows/servercore@sha256:862b24ccf5e399fc3bea746c7ac68c16f3fbcfa199532a3e506b7e03e57217b9 as final
 COPY --from=builder /usr/src/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
 COPY --from=builder /usr/src/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
 COPY --from=builder /usr/bin/controller.exe controller.exe

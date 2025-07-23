@@ -41,7 +41,7 @@ PLATFORM		?= $(OS)/$(ARCH)
 PLATFORMS		?= linux/amd64 linux/arm64 windows/amd64
 OS_VERSION		?= ltsc2019
 
-HUBBLE_VERSION ?= v1.17.3
+HUBBLE_VERSION ?= v1.17.5
 
 CONTAINER_BUILDER ?= docker
 CONTAINER_RUNTIME ?= docker
@@ -345,6 +345,10 @@ go-gen: ## run go generate at the repository root
 all-gen: ## generate all code
 	$(MAKE) proto-gen
 	$(MAKE) go-gen
+
+build-windows-binaries:
+	GOOS=windows GOARCH=$(GOARCH) go build -v -o /go/bin/retina/captureworkload -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version=$(TAG) -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=$(APP_INSIGHTS_ID)" captureworkload/main.go
+	GOOS=windows GOARCH=$(GOARCH) go build -x -v -o /go/bin/retina/controller -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version=$(TAG) -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=$(APP_INSIGHTS_ID)" controller/main.go
 
 ##@ Multiplatform
 
