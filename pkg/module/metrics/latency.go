@@ -134,7 +134,7 @@ func (lm *LatencyMetrics) Init(metricName string) {
 				zap.Int32("timestamp", v.t))
 			if lm.noResponseMetric != nil {
 				lm.noResponseMetric.WithLabelValues("no_response").Inc()
-				lm.l.Debug("Incremented no response metric", zap.String("metric", "adv_node_apiserver_no_response"))
+				lm.l.Debug("Incremented no response metric", zap.String("metric", noResponseFromNodeAPIServerName))
 			}
 		}
 	})
