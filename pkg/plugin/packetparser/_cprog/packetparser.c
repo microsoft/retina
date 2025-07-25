@@ -208,11 +208,24 @@ static void parse(struct __sk_buff *skb, __u8 obs)
 		p.conntrack_metadata = conntrack_metadata;
 	#endif // ENABLE_CONNTRACK_METRICS
 
+    #ifdef DATA_AGGREGATION_LEVEL
+
+	// Calculate sampling
+	bool sampled __attribute__((unused));
+	sampled = true;
+	
+	#ifdef DATA_SAMPLING_RATE
+	    u32 rand __attribute__((unused));
+		rand = bpf_get_prandom_u32();
+		if (rand >= UINT32_MAX / DATA_SAMPLING_RATE) {
+			sampled = false;
+		}
+	#endif
+	
 	// Process the packet in ct
 	struct packetreport report __attribute__((unused));
-	report = ct_process_packet(&p, obs);
+	report = ct_process_packet(&p, obs, sampled);
 
-	#ifdef DATA_AGGREGATION_LEVEL
 	// If the data aggregation level is low, always send the packet to the perf buffer.
 	#if DATA_AGGREGATION_LEVEL == DATA_AGGREGATION_LEVEL_LOW
 		p.previously_observed_packets = 0;

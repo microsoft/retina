@@ -24,8 +24,9 @@ const (
 )
 
 var (
-	ErrorTelemetryIntervalTooSmall = fmt.Errorf("telemetryInterval smaller than %v is not allowed", MinTelemetryInterval)
-	DefaultTelemetryInterval       = 15 * time.Minute
+	ErrorTelemetryIntervalTooSmall        = fmt.Errorf("telemetryInterval smaller than %v is not allowed", MinTelemetryInterval)
+	DefaultTelemetryInterval              = 15 * time.Minute
+	DefaultSamplingRate            uint32 = 1
 )
 
 func (l *Level) UnmarshalText(text []byte) error {
@@ -75,6 +76,7 @@ type Config struct {
 	DataAggregationLevel     Level         `yaml:"dataAggregationLevel"`
 	MonitorSockPath          string        `yaml:"monitorSockPath"`
 	TelemetryInterval        time.Duration `yaml:"telemetryInterval"`
+	DataSamplingRate         uint32        `yaml:"dataSamplingRate"`
 }
 
 func GetConfig(cfgFilename string) (*Config, error) {
@@ -120,6 +122,12 @@ func GetConfig(cfgFilename string) (*Config, error) {
 		config.TelemetryInterval = DefaultTelemetryInterval
 	} else if config.TelemetryInterval < MinTelemetryInterval {
 		return nil, ErrorTelemetryIntervalTooSmall
+	}
+
+	// If unset, default sampling rate to 1
+	if config.DataSamplingRate == 0 {
+		log.Printf("dataSamplingRate is not set, defaulting to %v", DefaultSamplingRate)
+		config.DataSamplingRate = DefaultSamplingRate
 	}
 
 	return &config, nil
