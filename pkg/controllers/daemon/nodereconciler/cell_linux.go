@@ -34,7 +34,6 @@ type params struct {
 	cell.In
 
 	Config  config.RetinaHubbleConfig
-	Logger  logrus.FieldLogger
 	Client  client.Client
 	IPCache *ipcache.IPCache
 }
@@ -51,7 +50,7 @@ func newNodeController(params params) (*NodeReconciler, error) {
 	n := &NodeReconciler{
 		Client:      params.Client,
 		clusterName: params.Config.ClusterName,
-		l:           params.Logger.WithField("component", "node-controller"),
+		l:           log.Logger().Named("node-controller"),
 		nodes:       make(map[string]types.Node),
 		handlers:    make(map[string]datapath.NodeHandler),
 		c:           params.IPCache,
