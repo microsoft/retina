@@ -82,7 +82,7 @@ attach_program_to_interface(int ifindx) {
 int
 load_pin(void) {
     struct bpf_program* prg = NULL;
-    struct bpf_map *map_ev = NULL, *map_met = NULL, *map_fvt = NULL, *map_flt = NULL;
+    struct bpf_map *map_ev = NULL, *map_met = NULL, *map_win_met = NULL, *map_fvt = NULL, *map_flt = NULL;
     int prg_fd = 0;
 
     // Load the BPF object file
@@ -130,7 +130,16 @@ load_pin(void) {
         fprintf(stderr, "%s - failed to find cilium_metrics by name\n", __FUNCTION__);
         goto fail;
     }
-    if (_pin(METRICS_MAP_PIN_PATH, bpf_map__fd(map_ev), true) != 0) {
+    if (_pin(METRICS_MAP_PIN_PATH, bpf_map__fd(map_met), true) != 0) {
+        goto fail;
+    }
+
+    map_win_met = bpf_object__find_map_by_name(obj, "windows_metrics");
+    if (map_win_met == NULL) {
+        fprintf(stderr, "%s - failed to find windows_metrics by name\n", __FUNCTION__);
+        goto fail;
+    }
+    if (_pin(WINDOWS_METRICS_MAP_PIN_PATH, bpf_map__fd(map_win_met), true) != 0) {
         goto fail;
     }
 
@@ -179,6 +188,10 @@ fail:
         bpf_map__unpin(map_met, METRICS_MAP_PIN_PATH);
     }
 
+    if (map_win_met != NULL) {
+        bpf_map__unpin(map_win_met, WINDOWS_METRICS_MAP_PIN_PATH);
+    }
+
     if (obj != NULL) {
         bpf_object__close(obj);
     }
@@ -209,6 +222,12 @@ unpin(void) {
         fprintf(stderr, "%s - failed to lookup cilium_metrics at %s\n", __FUNCTION__, METRICS_MAP_PIN_PATH);
     } else {
         ebpf_object_unpin(METRICS_MAP_PIN_PATH);
+    }
+
+    if (bpf_obj_get(WINDOWS_METRICS_MAP_PIN_PATH) < 0) {
+        fprintf(stderr, "%s - failed to lookup windows_metrics at %s\n", __FUNCTION__, WINDOWS_METRICS_MAP_PIN_PATH);
+    } else {
+        ebpf_object_unpin(WINDOWS_METRICS_MAP_PIN_PATH);
     }
 
     if (bpf_obj_get(FIVE_TUPLE_MAP_PIN_PATH) < 0) {
