@@ -11,6 +11,9 @@
 #define METRICS_MAP_PIN_PATH \
     "/ebpf/global/cilium_metrics"
 
+#define WINDOWS_METRICS_MAP_PIN_PATH \
+    "/ebpf/global/windows_metrics"
+
 #define FILTER_MAP_PIN_PATH \
     "/ebpf/global/filter_map"
 
@@ -19,6 +22,9 @@
 
 #define EVENT_WRITER_PIN_PATH \
     "/ebpf/global/event_writer"
+
+#define DROP_PKTMON -220
+#define Drop_FL_InterfaceNotReady 607
 
 enum {
 	CILIUM_NOTIFY_UNSPEC = 0,
@@ -166,6 +172,15 @@ struct metrics_key {
 	uint16_t	line;		/* __MAGIC_LINE__ */
 	uint8_t	    file;		/* __MAGIC_FILE__, needs to fit __source_file_name_to_id */
 	uint8_t	    reserved[3];	/* reserved for future extension */
+};
+
+struct windows_metrics_key {
+    uint8_t  type;
+    uint16_t reason; /* 0: forwarded, >0 dropped */
+    uint8_t  dir : 2, /* 1: ingress 2: egress */
+             pad : 6;
+    uint16_t line; /* __MAGIC_LINE__ */
+    uint8_t  file;  /* __MAGIC_FILE__, needs to fit __source_file_name_to_id */
 };
 
 struct metrics_value {
