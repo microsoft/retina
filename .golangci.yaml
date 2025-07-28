@@ -1,49 +1,95 @@
-issues:
-  max-same-issues: 0
-  max-issues-per-linter: 0
-  new-from-rev: origin/main
-  exclude-rules:
-    # some type names are caps/underscore to map OS primitive types
-    - path: pkg/metrics/types_windows.go
-      linters:
-        - revive
-        - var-naming
-    - path: pkg/metrics/types_linux.go
-      linters:
-        - revive
-        - var-naming
+version: "2"
 linters:
-  presets: 
-  - bugs
-  - error
-  - format
-  - performance
-  - unused
-  disable:
-  - gci
   enable:
-  - copyloopvar
-  - goconst
-  - gocritic
-  - gocyclo
-  - gofmt
-  - goprintffuncname
-  - gosimple
-  - lll
-  - misspell
-  - nakedret
-  - promlinter
-  - revive
-linters-settings:
-  gocritic:
-    enabled-tags:
-    - "diagnostic"
-    - "style"
-    - "performance"
-    disabled-checks:
-    - "hugeParam"
-  govet:
-    enable:
-    - shadow
-  lll:
-    line-length: 200
+    - asasalint
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - contextcheck
+    - copyloopvar
+    - durationcheck
+    - err113
+    - errchkjson
+    - errorlint
+    - exhaustive
+    - fatcontext
+    - gocheckcompilerdirectives
+    - gochecksumtype
+    - goconst
+    - gocritic
+    - gocyclo
+    - goprintffuncname
+    - gosec
+    - gosmopolitan
+    - lll
+    - loggercheck
+    - makezero
+    - misspell
+    - musttag
+    - nakedret
+    - nilerr
+    - nilnesserr
+    - noctx
+    - perfsprint
+    - prealloc
+    - promlinter
+    - protogetter
+    - reassign
+    - recvcheck
+    - revive
+    - rowserrcheck
+    - spancheck
+    - sqlclosecheck
+    - testifylint
+    - unparam
+    - wrapcheck
+    - zerologlint
+  settings:
+    gocritic:
+      disabled-checks:
+        - hugeParam
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+    govet:
+      enable:
+        - shadow
+    lll:
+      line-length: 200
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      # some type names are caps/underscore to map OS primitive types
+      - linters:
+          - revive
+          - var-naming
+        path: pkg/metrics/types_windows.go
+      - linters:
+          - revive
+          - var-naming
+        path: pkg/metrics/types_linux.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  new-from-rev: origin/main
+formatters:
+  enable:
+    - gofmt
+    - gofumpt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
