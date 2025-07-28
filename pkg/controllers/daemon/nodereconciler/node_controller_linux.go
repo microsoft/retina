@@ -11,12 +11,14 @@ import (
 	"sync"
 
 	"github.com/microsoft/retina/pkg/common/apiretry"
-	"github.com/sirupsen/logrus"
+	"github.com/microsoft/retina/pkg/log"
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 	errors "k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	cmtypes "github.com/cilium/cilium/pkg/clustermesh/types"
 	datapath "github.com/cilium/cilium/pkg/datapath/types"
@@ -35,26 +37,12 @@ type NodeReconciler struct {
 
 	clusterName string
 
-	l           logrus.FieldLogger
+	l           *log.ZapLogger
 	handlers    map[string]datapath.NodeHandler
 	nodes       map[string]types.Node
 	c           *ipc.IPCache
 	localNodeIP string
 	m           sync.RWMutex
-}
-
-// isNodeUpdated checks if the node has been updated.
-// This is a simple check for labels and annotations
-// being updated. Those are the only fields that are mutable.
-// AKS specific for now.
-func isNodeUpdated(n1, n2 types.Node) bool {
-	if !reflect.DeepEqual(n1.Labels, n2.Labels) {
-		return true
-	}
-	if !reflect.DeepEqual(n1.Annotations, n2.Annotations) {
-		return true
-	}
-	return false
 }
 
 func (r *NodeReconciler) addNode(node *corev1.Node) {
@@ -89,7 +77,7 @@ func (r *NodeReconciler) addNode(node *corev1.Node) {
 	nd.Cluster = r.clusterName
 
 	// Check if the node already exists.
-	if curNode, ok := r.nodes[node.Name]; ok && !isNodeUpdated(curNode, nd) {
+	if _, ok := r.nodes[node.Name]; ok {
 		r.l.Debug("Node already exists", zap.String("Node", node.Name))
 	}
 
@@ -117,7 +105,7 @@ func (r *NodeReconciler) addNode(node *corev1.Node) {
 		r.l.Debug("Added IP to ipcache", zap.String("IP", address.ToString()))
 	}
 
-	r.l.Info("Added Node", zap.String("Node", node.Name))
+	r.l.Info("Added Node", zap.String("name", nd.Name))
 }
 
 func (r *NodeReconciler) deleteNode(node *corev1.Node) {
@@ -204,8 +192,45 @@ func (r *NodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 // SetupWithManager sets up the controller with the Manager.
 func (r *NodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.l.Debug("Setting up Node controller")
+
+	// Create a predicate to filter node events
+	nodePredicate := predicate.Funcs{
+		CreateFunc: func(event.CreateEvent) bool {
+			// Always reconcile on node creation
+			return true
+		},
+		DeleteFunc: func(event.DeleteEvent) bool {
+			// Always reconcile on node deletion
+			return true
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			oldNode, ok := e.ObjectOld.(*corev1.Node)
+			if !ok {
+				r.l.Error("Failed to convert old object to Node")
+				return false
+			}
+
+			newNode, ok := e.ObjectNew.(*corev1.Node)
+			if !ok {
+				r.l.Error("Failed to convert new object to Node")
+				return false
+			}
+
+			// Compare node IP addresses
+			oldIPs := extractNodeIPs(oldNode)
+			newIPs := extractNodeIPs(newNode)
+
+			// Only reconcile if IPs changed or labels/annotations changed
+			return !reflect.DeepEqual(oldIPs, newIPs) || !reflect.DeepEqual(oldNode.Labels, newNode.Labels) || !reflect.DeepEqual(oldNode.Annotations, newNode.Annotations)
+		},
+		GenericFunc: func(event.GenericEvent) bool {
+			return false
+		},
+	}
+
 	err := ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Node{}).
+		WithEventFilter(nodePredicate).
 		Complete(r)
 	if err != nil {
 		return fmt.Errorf("setting up node controller: %w", err)
@@ -244,3 +269,14 @@ func (r *NodeReconciler) StartNeighborRefresh(datapath.NodeNeighbors) {}
 func (r *NodeReconciler) StartNodeNeighborLinkUpdater(datapath.NodeNeighbors) {}
 
 func (r *NodeReconciler) SetPrefixClusterMutatorFn(func(*types.Node) []cmtypes.PrefixClusterOpts) {}
+
+// extractNodeIPs extracts IP addresses from a node
+func extractNodeIPs(node *corev1.Node) map[string]string {
+	ips := make(map[string]string)
+	for _, addr := range node.Status.Addresses {
+		if addr.Type == corev1.NodeInternalIP || addr.Type == corev1.NodeExternalIP {
+			ips[string(addr.Type)] = addr.Address
+		}
+	}
+	return ips
+}
