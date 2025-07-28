@@ -27,30 +27,22 @@ var direction = map[uint8]string{
 	dirService: "SERVICE",
 }
 
-// Value must be in sync with struct metrics_key in <bpf/lib/common.h>
 type MetricsKey struct {
-	Reason uint8 `align:"reason"`
-	Dir    uint8 `align:"dir"`
-	// Line contains the line number of the metrics statement.
-	Line uint16 `align:"line"`
-	// File is the number of the source file containing the metrics statement.
-	File     uint8    `align:"file"`
-	Reserved [3]uint8 `align:"reserved"`
+	Version        uint8
+	Reason         uint8
+	Direction      uint8
+	ExtendedReason uint16
 }
 
-// Value must be in sync with struct metrics_value in <bpf/lib/common.h>
 type MetricsValue struct {
-	Count uint64 `align:"count"`
-	Bytes uint64 `align:"bytes"`
+	Count uint64
+	Bytes uint64
 }
-
-// MetricsMapValues is a slice of MetricsMapValue
-type MetricsValues []MetricsValue
 
 // IterateCallback represents the signature of the callback function expected by
 // the IterateWithCallback method, which in turn is used to iterate all the
 // keys/values of a metrics map.
-type IterateCallback func(*MetricsKey, *MetricsValues)
+type IterateCallback func(*MetricsKey, *MetricsValue)
 
 // MetricsMap interface represents a metrics map, and can be reused to implement
 // mock maps for unit tests.
@@ -63,20 +55,22 @@ type metricsMap struct{}
 var (
 	// Load the retinaebpfapi.dll
 	retinaEbpfAPI = windows.NewLazyDLL("retinaebpfapi.dll")
-	// Load the RetinaEnumerateMetricsMap function
-	enumMetricsMap = retinaEbpfAPI.NewProc("RetinaEnumerateMetricsMap")
+	// Load the RetinaEnumerateMetrics function
+	enumMetricsMap = retinaEbpfAPI.NewProc("RetinaEnumerateMetrics")
+	// Load the RetinaGetLostEventsCount function
+	lostEventCount = retinaEbpfAPI.NewProc("RetinaGetLostEventsCount")
 )
 
 // ringBufferEventCallback type definition in Go
-type enumMetricsCallback = func(key, value unsafe.Pointer, valueSize int) int
+type enumMetricsCallback = func(key, value unsafe.Pointer) int
 
 // Callbacks in Go can only be passed as functions with specific signatures and often need to be wrapped in a syscall-compatible function.
 var enumCallBack enumMetricsCallback
 
 // This function will be passed to the Windows API
-func enumMetricsSysCallCallback(key, value unsafe.Pointer, valueSize int) uintptr {
+func enumMetricsSysCallCallback(key, value unsafe.Pointer) uintptr {
 	if enumCallBack != nil {
-		return uintptr(enumCallBack(key, value, valueSize))
+		return uintptr(enumCallBack(key, value))
 	}
 
 	return 0
@@ -95,7 +89,7 @@ var callEnumMetricsMap = func(callback uintptr) (uintptr, uintptr, error) {
 // passing each key/value pair to the cb callback
 func (m metricsMap) IterateWithCallback(l *log.ZapLogger, cb IterateCallback) error {
 	// Define the callback function in Go
-	enumCallBack = func(key unsafe.Pointer, value unsafe.Pointer, valueSize int) int {
+	enumCallBack = func(key unsafe.Pointer, value unsafe.Pointer) int {
 		if key == nil {
 			l.Error("MetricsKey is nil")
 			return 1
@@ -106,14 +100,9 @@ func (m metricsMap) IterateWithCallback(l *log.ZapLogger, cb IterateCallback) er
 			return 1
 		}
 
-		if valueSize == 0 {
-			l.Error("Metrics Value size is 0")
-			return 1
-		}
-
-		var metricsValues MetricsValues = unsafe.Slice((*MetricsValue)(value), valueSize)
+		metricsValue := (*MetricsValue)(value)
 		metricsKey := (*MetricsKey)(key)
-		cb(metricsKey, &metricsValues)
+		cb(metricsKey, metricsValue)
 		return 0
 	}
 
@@ -138,14 +127,16 @@ func MetricDirection(dir uint8) string {
 	return direction[dirUnknown]
 }
 
-// Direction gets the direction in human readable string format
-func (k *MetricsKey) Direction() string {
-	return MetricDirection(k.Dir)
+// DirectionString gets the direction in human readable string format
+func (k *MetricsKey) DirectionString() string {
+	// The direction field is a 2-bit field in the C struct, so mask the lower 2 bits
+	direction := k.Direction & 0x03
+	return MetricDirection(direction)
 }
 
 // String returns the key in human readable string format
 func (k *MetricsKey) String() string {
-	return fmt.Sprintf("Direction: %s, Reason: %s, File: %s, Line: %d", k.Direction(), k.DropForwardReason(), BPFFileName(k.File), k.Line)
+	return fmt.Sprintf("Direction: %s, Reason: %s", k.DirectionString(), k.DropForwardReason())
 }
 
 // DropForwardReason gets the forwarded/dropped reason in human readable string format
@@ -159,17 +150,9 @@ func (k *MetricsKey) DropForwardReason() string {
 // DropPacketMonitorReason gets the Packer Monitor dropped reason in human readable string format
 func (k *MetricsKey) DropPacketMonitorReason() string {
 	if k.Reason == DropPacketMonitor {
-		extReasonHigh := k.Reserved[0]
-		extReasonLow := k.Reserved[1]
-		extReason := (uint32(extReasonHigh) << 8) | uint32(extReasonLow)
-		return DropReasonExt(k.Reason, extReason)
+		return DropReasonExt(k.Reason, uint32(k.ExtendedReason))
 	}
 	panic("The reason is not DropPacketMonitor")
-}
-
-// FileName returns the filename where the event occurred, in string format.
-func (k *MetricsKey) FileName() string {
-	return BPFFileName(k.File)
 }
 
 // IsDrop checks if the reason is drop or not.
@@ -179,34 +162,22 @@ func (k *MetricsKey) IsDrop() bool {
 
 // IsIngress checks if the direction is ingress or not.
 func (k *MetricsKey) IsIngress() bool {
-	return k.Dir == dirIngress
+	// The direction field is a 2-bit field in the C struct, so mask the lower 2 bits
+	direction := k.Direction & 0x03
+	return direction == dirIngress
 }
 
 // IsEgress checks if the direction is egress or not.
 func (k *MetricsKey) IsEgress() bool {
-	return k.Dir == dirEgress
+	// The direction field is a 2-bit field in the C struct, so mask the lower 2 bits
+	direction := k.Direction & 0x03
+	return direction == dirEgress
 }
 
-// Count returns the sum of all the per-CPU count values
-func (vs MetricsValues) Sum() uint64 {
-	c := uint64(0)
-	for _, v := range vs {
-		c += v.Count
+func GetLostEventsCount() (uint64, error) {
+	ret, _, err := lostEventCount.Call()
+	if err != nil && err != syscall.Errno(0) {
+		return 0, fmt.Errorf("RetinaGetLostEventsCount call failed: %w", err)
 	}
-
-	return c
-}
-
-// Bytes returns the sum of all the per-CPU bytes values
-func (vs MetricsValues) BytesSum() uint64 {
-	b := uint64(0)
-	for _, v := range vs {
-		b += v.Bytes
-	}
-
-	return b
-}
-
-func (vs MetricsValues) String() string {
-	return fmt.Sprintf("Sum: %d, BytesSum: %d", vs.Sum(), vs.BytesSum())
+	return uint64(ret), nil
 }
