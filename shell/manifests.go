@@ -69,6 +69,18 @@ func hostNetworkPodForNodeDebug(config Config, debugPodNamespace, nodeName strin
 		})
 	}
 
+	if config.AppArmorUnconfined {
+		pod.Spec.Containers[0].SecurityContext.AppArmorProfile = &v1.AppArmorProfile{
+			Type: v1.AppArmorProfileTypeUnconfined,
+		}
+	}
+
+	if config.SeccompUnconfined {
+		pod.Spec.Containers[0].SecurityContext.SeccompProfile = &v1.SeccompProfile{
+			Type: v1.SeccompProfileTypeUnconfined,
+		}
+	}
+
 	return pod
 }
 

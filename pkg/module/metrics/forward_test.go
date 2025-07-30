@@ -275,6 +275,33 @@ func TestNewForward(t *testing.T) {
 			metricCall:   2,
 			localContext: localContext,
 		},
+		{
+			name: "src and dest opts 1 with flow in local context and is_reply",
+			opts: &v1alpha1.MetricsContextOptions{
+				MetricName:       "FORWARD",
+				SourceLabels:     []string{"ip", "namespace", "podName", "Workload", "PORT", "serVICE"},
+				AdditionalLabels: []string{"is_reply"},
+			},
+			f: &flow.Flow{
+				Verdict:     flow.Verdict_FORWARDED,
+				Destination: &flow.Endpoint{},
+				Source:      &flow.Endpoint{},
+			},
+			checkIsAdvance: true,
+			exepectedLabels: []string{
+				"direction",
+				"ip",
+				"namespace",
+				"podname",
+				"workload_kind",
+				"workload_name",
+				"service",
+				"port",
+				"is_reply",
+			},
+			metricCall:   2,
+			localContext: localContext,
+		},
 	}
 
 	for _, tc := range tt {

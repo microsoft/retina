@@ -20,6 +20,10 @@ const (
 	NodeHostNameEnvKey          string = "NODE_HOST_NAME"
 	CaptureStartTimestampEnvKey string = "CAPTURE_START_TIMESTAMP"
 
+	NamespaceEnvKey     string = "NAMESPACE"
+	PodNameEnvKey       string = "POD_NAME"
+	ContainerNameEnvKey string = "CONTAINER_NAME"
+
 	CaptureFilterEnvKey   string = "CAPTURE_FILTER"
 	CaptureDurationEnvKey string = "CAPTURE_DURATION"
 	CaptureMaxSizeEnvKey  string = "CAPTURE_MAX_SIZE"
@@ -29,6 +33,9 @@ const (
 	TcpdumpFilterEnvKey    string = "TCPDUMP_FILTER"
 	TcpdumpRawFilterEnvKey string = "TCPDUMP_RAW_FILTER"
 	NetshFilterEnvKey      string = "NETSH_FILTER"
+
+	// Interface selection environment variables
+	CaptureInterfacesEnvKey string = "CAPTURE_INTERFACES"
 
 	ApiserverEnvKey = "APISERVER"
 )

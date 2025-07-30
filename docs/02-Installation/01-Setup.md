@@ -2,8 +2,6 @@
 
 This page provides the instructions on how to install Retina via Helm.
 
-## Installation
-
 The assumption is that a Kubernetes cluster has already been created and we have credentials to access it.
 
 >NOTE: In case you want to test out Retina quickly and you have no clusters, you can quickly create one with [kind](https://kind.sigs.k8s.io/)
@@ -25,12 +23,12 @@ kubectl cluster-info --context kind-test-retina
 Not sure what to do next? 😅  Check out https://kind.sigs.k8s.io/docs/user/quick-start/
 ```
 
-### Requirements
+## Requirements
 
 - Helm version >= v3.8.0
 - Access to a Kubernetes cluster via `kubectl`
 
-### Control Plane and Modes
+## Control Plane and Modes
 
 The installation of Retina can be configured using different control planes and modes.
 
@@ -40,7 +38,33 @@ If the "Standard" control plane is chosen, different modes are available. The av
 
 Modes are not applicable to the Hubble control plane. For metrics related to the Hubble control plane, refer to the [Hubble metrics](../03-Metrics/02-hubble_metrics.md) documentation.
 
-### Basic Mode
+## Capture Support
+
+In order to support the use of the [Capture CRD](../05-Concepts/CRDs/Capture.md), the Standard Control Plane must be used, and the Retina operator pod needs to be running.
+
+>NOTE: Captures can still be triggered with the [CLI](../04-Captures/02-cli.md) even without the Retina operator pod running.
+
+Enable the operator with the `--set operator.enabled=true \` flag.
+
+For example, this is how you could install Retina with the Standard Control Plane and basic metric mode, with the operator.
+
+```shell
+VERSION=$( curl -sL https://api.github.com/repos/microsoft/retina/releases/latest | jq -r .name)
+helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
+    --version $VERSION \
+    --namespace kube-system \
+    --set image.tag=$VERSION \
+    --set operator.tag=$VERSION \
+    --set logLevel=info \
+    --set operator.enabled=true \
+    --set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\]"
+```
+
+## Installation
+
+### Standard Control Plane
+
+#### Basic Mode
 
 ```shell
 VERSION=$( curl -sL https://api.github.com/repos/microsoft/retina/releases/latest | jq -r .name)
@@ -53,26 +77,7 @@ helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
     --set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\]"
 ```
 
-### Basic Mode (with Capture support)
-
-```shell
-VERSION=$( curl -sL https://api.github.com/repos/microsoft/retina/releases/latest | jq -r .name)
-helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
-    --version $VERSION \
-    --namespace kube-system \
-    --set image.tag=$VERSION \
-    --set operator.tag=$VERSION \
-    --set logLevel=info \
-    --set image.pullPolicy=Always \
-    --set logLevel=info \
-    --set os.windows=true \
-    --set operator.enabled=true \
-    --set operator.enableRetinaEndpoint=true \
-    --skip-crds \
-    --set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\,packetparser\]"
-```
-
-### Advanced Mode with Remote Context (with Capture support)
+#### Advanced Mode with Remote Context
 
 ```shell
 VERSION=$( curl -sL https://api.github.com/repos/microsoft/retina/releases/latest | jq -r .name)
@@ -92,7 +97,7 @@ helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
     --set remoteContext=true
 ```
 
-### Advanced Mode with Local Context (with Capture support)
+#### Advanced Mode with Local Context
 
 ```shell
 VERSION=$( curl -sL https://api.github.com/repos/microsoft/retina/releases/latest | jq -r .name)
@@ -112,7 +117,7 @@ helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
     --set enableAnnotations=true
 ```
 
-### Hubble control plane
+### Hubble Control Plane
 
 ```shell
 VERSION=$( curl -sL https://api.github.com/repos/microsoft/retina/releases/latest | jq -r .name)
@@ -137,8 +142,3 @@ helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina-hubbl
         --set hubble.tls.auto.certValidityDuration=1 \
         --set hubble.tls.auto.schedule="*/10 * * * *"
 ```
-
-## Next Steps: Configuring Prometheus and Grafana
-
-- [Prometheus](./04-prometheus.md)
-- [Grafana](./05-grafana.md)

@@ -19,6 +19,10 @@ func NewRetinaEndpoint(name, namespace string, ips *IPAddresses) *RetinaEndpoint
 	}
 }
 
+func (ep *RetinaEndpoint) String() string {
+	return ep.NamespacedName()
+}
+
 func (ep *RetinaEndpoint) DeepCopy() interface{} {
 	ep.RLock()
 	defer ep.RUnlock()
