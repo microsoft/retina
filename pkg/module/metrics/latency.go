@@ -123,10 +123,18 @@ func (lm *LatencyMetrics) Init(metricName string) {
 	lm.cache.OnEviction(func(ctx context.Context, reason ttlcache.EvictionReason, item *ttlcache.Item[key, *val]) {
 		if reason == ttlcache.EvictionReasonExpired {
 			// Didn't get the corresponding packet.
-			lm.l.Debug("Evicted item", zap.Any("item", item))
+			k := item.Key()
+			v := item.Value()
+			lm.l.Debug("Evicted item",
+				zap.String("srcIP", k.srcIP),
+				zap.String("dstIP", k.dstIP),
+				zap.Uint32("srcPort", k.srcP),
+				zap.Uint32("dstPort", k.dstP),
+				zap.Uint64("id", k.id),
+				zap.Int32("timestamp", v.t))
 			if lm.noResponseMetric != nil {
 				lm.noResponseMetric.WithLabelValues("no_response").Inc()
-				lm.l.Debug("Incremented no response metric", zap.Any("metric", lm.noResponseMetric))
+				lm.l.Debug("Incremented no response metric", zap.String("metric", noResponseFromNodeAPIServerName))
 			}
 		}
 	})
@@ -323,25 +331,33 @@ func (lm *LatencyMetrics) apiserverWatcherCallbackFn(obj interface{}) {
 
 	switch event.Type {
 	case cc.EventTypeAddAPIServerIPs:
-		lm.l.Debug("Add apiserver ips", zap.Any("ips", apiServerIPs))
-		lm.addIps(apiServerIPs)
+		ipStrings := lm.addIps(apiServerIPs)
+		lm.l.Debug("Add apiserver ips", zap.Strings("ips", ipStrings))
 	case cc.EventTypeDeleteAPIServerIPs:
-		lm.l.Debug("Delete apiserver ips", zap.Any("ips", apiServerIPs))
-		lm.removeIps(apiServerIPs)
+		ipStrings := lm.removeIps(apiServerIPs)
+		lm.l.Debug("Delete apiserver ips", zap.Strings("ips", ipStrings))
 
 	default:
-		lm.l.Debug("Unknown event type", zap.Any("event", event))
+		lm.l.Debug("Unknown event type", zap.String("eventType", event.Type.String()))
 	}
 }
 
-func (lm *LatencyMetrics) addIps(ips []net.IP) {
-	for _, ip := range ips {
-		lm.apiServerIps[ip.String()] = struct{}{}
+func (lm *LatencyMetrics) addIps(ips []net.IP) []string {
+	ipStrings := make([]string, len(ips))
+	for i, ip := range ips {
+		ipString := ip.String()
+		ipStrings[i] = ipString
+		lm.apiServerIps[ipString] = struct{}{}
 	}
+	return ipStrings
 }
 
-func (lm *LatencyMetrics) removeIps(ips []net.IP) {
-	for _, ip := range ips {
-		delete(lm.apiServerIps, ip.String())
+func (lm *LatencyMetrics) removeIps(ips []net.IP) []string {
+	ipStrings := make([]string, len(ips))
+	for i, ip := range ips {
+		ipString := ip.String()
+		ipStrings[i] = ipString
+		delete(lm.apiServerIps, ipString)
 	}
+	return ipStrings
 }
