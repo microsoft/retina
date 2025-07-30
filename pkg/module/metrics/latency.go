@@ -134,7 +134,7 @@ func (lm *LatencyMetrics) Init(metricName string) {
 				zap.Int32("timestamp", v.t))
 			if lm.noResponseMetric != nil {
 				lm.noResponseMetric.WithLabelValues("no_response").Inc()
-				lm.l.Debug("Incremented no response metric", zap.String("metric", "adv_node_apiserver_no_response"))
+				lm.l.Debug("Incremented no response metric", zap.String("metric", noResponseFromNodeAPIServerName))
 			}
 		}
 	})
@@ -331,33 +331,33 @@ func (lm *LatencyMetrics) apiserverWatcherCallbackFn(obj interface{}) {
 
 	switch event.Type {
 	case cc.EventTypeAddAPIServerIPs:
-		ipStrings := make([]string, len(apiServerIPs))
-		for i, ip := range apiServerIPs {
-			ipStrings[i] = ip.String()
-		}
+		ipStrings := lm.addIps(apiServerIPs)
 		lm.l.Debug("Add apiserver ips", zap.Strings("ips", ipStrings))
-		lm.addIps(apiServerIPs)
 	case cc.EventTypeDeleteAPIServerIPs:
-		ipStrings := make([]string, len(apiServerIPs))
-		for i, ip := range apiServerIPs {
-			ipStrings[i] = ip.String()
-		}
+		ipStrings := lm.removeIps(apiServerIPs)
 		lm.l.Debug("Delete apiserver ips", zap.Strings("ips", ipStrings))
-		lm.removeIps(apiServerIPs)
 
 	default:
 		lm.l.Debug("Unknown event type", zap.String("eventType", event.Type.String()))
 	}
 }
 
-func (lm *LatencyMetrics) addIps(ips []net.IP) {
-	for _, ip := range ips {
-		lm.apiServerIps[ip.String()] = struct{}{}
+func (lm *LatencyMetrics) addIps(ips []net.IP) []string {
+	ipStrings := make([]string, len(ips))
+	for i, ip := range ips {
+		ipString := ip.String()
+		ipStrings[i] = ipString
+		lm.apiServerIps[ipString] = struct{}{}
 	}
+	return ipStrings
 }
 
-func (lm *LatencyMetrics) removeIps(ips []net.IP) {
-	for _, ip := range ips {
-		delete(lm.apiServerIps, ip.String())
+func (lm *LatencyMetrics) removeIps(ips []net.IP) []string {
+	ipStrings := make([]string, len(ips))
+	for i, ip := range ips {
+		ipString := ip.String()
+		ipStrings[i] = ipString
+		delete(lm.apiServerIps, ipString)
 	}
+	return ipStrings
 }
