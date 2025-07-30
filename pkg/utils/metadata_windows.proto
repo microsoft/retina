@@ -15,6 +15,11 @@ message RetinaMetadata {
 
     // Drop reason in Retina.
     DropReason drop_reason = 5;
+
+    // Sampling metadata, for packetparser.
+    uint32 previously_observed_packets = 6;
+    uint32 previously_observed_bytes = 7;
+    map<string, uint32> previously_observed_tcp_flags = 8;
 }
 
 enum DNSType {

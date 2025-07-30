@@ -133,7 +133,7 @@ func AddRetinaMetadata(f *flow.Flow, meta *RetinaMetadata) {
 	f.Extensions = ext
 }
 
-func AddTCPFlags(f *flow.Flow, syn, ack, fin, rst, psh, urg uint16) {
+func AddTCPFlags(f *flow.Flow, syn, ack, fin, rst, psh, urg, ece, cwr, ns uint16) {
 	if f.GetL4().GetTCP() == nil {
 		return
 	}
@@ -145,7 +145,74 @@ func AddTCPFlags(f *flow.Flow, syn, ack, fin, rst, psh, urg uint16) {
 		RST: rst == uint16(1),
 		PSH: psh == uint16(1),
 		URG: urg == uint16(1),
+		ECE: ece == uint16(1),
+		CWR: cwr == uint16(1),
+		NS:  ns == uint16(1),
 	}
+}
+
+// AddPreviouslyObservedTCPFlags adds the previously observed TCP flags to the flows's metadata.
+func AddPreviouslyObservedTCPFlags(meta *RetinaMetadata, syn, ack, fin, rst, psh, urg, ece, cwr, ns uint32) {
+	if meta == nil {
+		return
+	}
+	meta.PreviouslyObservedTcpFlags = map[string]uint32{
+		SYN: syn,
+		ACK: ack,
+		FIN: fin,
+		RST: rst,
+		PSH: psh,
+		URG: urg,
+		ECE: ece,
+		CWR: cwr,
+		NS:  ns,
+	}
+}
+
+func PreviouslyObservedTCPFlags(f *flow.Flow) map[string]uint32 {
+	e := f.GetExtensions()
+	if e == nil {
+		return nil
+	}
+	k := &RetinaMetadata{}
+	e.UnmarshalTo(k) //nolint:errcheck // ignore errors
+	return k.GetPreviouslyObservedTcpFlags()
+}
+
+// AddPreviouslyObservedBytes adds the previously observed bytes to the flow's metadata.
+func AddPreviouslyObservedBytes(meta *RetinaMetadata, bytes uint32) {
+	if meta == nil {
+		return
+	}
+	meta.PreviouslyObservedBytes = bytes
+}
+
+func PreviouslyObservedBytes(f *flow.Flow) uint32 {
+	e := f.GetExtensions()
+	if e == nil {
+		return 0
+	}
+	k := &RetinaMetadata{}
+	e.UnmarshalTo(k) //nolint:errcheck // ignore errors
+	return k.GetPreviouslyObservedBytes()
+}
+
+// AddPreviouslyObservedPackets adds the previously observed packets to the flow's metadata.
+func AddPreviouslyObservedPackets(meta *RetinaMetadata, packets uint32) {
+	if meta == nil {
+		return
+	}
+	meta.PreviouslyObservedPackets = packets
+}
+
+func PreviouslyObservedPackets(f *flow.Flow) uint32 {
+	e := f.GetExtensions()
+	if e == nil {
+		return 0
+	}
+	k := &RetinaMetadata{}
+	e.UnmarshalTo(k) //nolint:errcheck // ignore errors
+	return k.GetPreviouslyObservedPackets()
 }
 
 func AddTCPFlagsBool(f *flow.Flow, syn, ack, fin, rst, psh, urg bool) {
