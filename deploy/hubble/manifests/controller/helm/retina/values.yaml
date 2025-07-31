@@ -108,9 +108,9 @@ securityContext:
   capabilities:
     add:
       - SYS_ADMIN
-      - SYS_RESOURCE
+      - SYS_RESOURCE # for setting rlimit
       - NET_ADMIN # for packetparser plugin
-      - IPC_LOCK # for mmap() calls made by NewReader(), ref: https://man7.org/linux/man-pages/man2/mmap.2.html
+      - IPC_LOCK # for mmap() calls made by NewReader(), ref: https://man7.org/linux/man-pages/man2/mmap.2.html 
   windowsOptions:
     runAsUserName: "NT AUTHORITY\\SYSTEM"
 
@@ -130,6 +130,9 @@ serviceAccount:
   name: "retina-agent"
 
 resources:
+  requests:
+    memory: "500Mi"
+    cpu: "500m"
   limits:
     memory: "500Mi"
     cpu: "500m"
@@ -501,6 +504,12 @@ hubble:
       type: ClusterIP
       # --- The port to use when the service type is set to NodePort.
       nodePort: 31234
+      # --- trafficDistribution field for service load balancing behavior.
+      # Valid values: PreferClose
+      # Provides better performance and reliability than annotation-based topologyAwareRouting
+      # by being built into the Service API and offering more predictable routing behavior.
+      # See https://kubernetes.io/docs/concepts/services-networking/service/#traffic-distribution
+      trafficDistribution: ""
 
     # -- Host to listen to. Specify an empty string to bind to all the interfaces.
     listenHost: ""
@@ -776,6 +785,12 @@ hubble:
       type: ClusterIP
       # --- The port to use when the service type is set to NodePort.
       nodePort: 31235
+      # --- trafficDistribution field for service load balancing behavior.
+      # Valid values: PreferClose
+      # Provides better performance and reliability than annotation-based topologyAwareRouting
+      # by being built into the Service API and offering more predictable routing behavior.
+      # See https://kubernetes.io/docs/concepts/services-networking/service/#traffic-distribution
+      trafficDistribution: ""
 
     # -- Defines base url prefix for all hubble-ui http requests.
     # It needs to be changed in case if ingress for hubble-ui is configured under some sub-path.

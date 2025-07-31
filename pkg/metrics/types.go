@@ -12,6 +12,7 @@ const (
 	// Control plane metrics
 	pluginManagerFailedToReconcileCounterName = "plugin_manager_failed_to_reconcile"
 	lostEventsCounterName                     = "lost_events_counter"
+	parsedPacketsCounterName                  = "parsed_packets_counter"
 
 	// Windows
 	hnsStats            = "windows_hns_stats"
@@ -43,6 +44,14 @@ const (
 	// Control plane metrics
 	pluginManagerFailedToReconcileCounterDescription = "Number of times the plugin manager failed to reconcile the plugins"
 	lostEventsCounterDescription                     = "Number of events lost in control plane"
+	parsedPacketsCounterDescription                  = "Number of packets parsed by the packetparser plugin"
+
+	// Conntrack metrics
+	ConntrackPacketTxDescription         = "Number of tx packets"
+	ConntrackPacketRxDescription         = "Number of rx packets"
+	ConntrackBytesTxDescription          = "Number of tx bytes"
+	ConntrackBytesRxDescription          = "Number of rx bytes"
+	ConntrackTotalConnectionsDescription = "Total number of connections"
 )
 
 // Metric Counters
@@ -83,6 +92,7 @@ var (
 	// Control Plane Metrics
 	PluginManagerFailedToReconcileCounter CounterVec
 	LostEventsCounter                     CounterVec
+	ParsedPacketsCounter                  CounterVec
 
 	// DNS Metrics.
 	DNSRequestCounter  CounterVec
@@ -90,6 +100,13 @@ var (
 
 	InfinibandStatsGauge        GaugeVec
 	InfinibandStatusParamsGauge GaugeVec
+
+	// Conntrack
+	ConntrackPacketsTx        GaugeVec
+	ConntrackPacketsRx        GaugeVec
+	ConntrackBytesTx          GaugeVec
+	ConntrackBytesRx          GaugeVec
+	ConntrackTotalConnections GaugeVec
 )
 
 func ToPrometheusType(metric interface{}) prometheus.Collector {

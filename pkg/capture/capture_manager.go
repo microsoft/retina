@@ -23,7 +23,7 @@ import (
 	captureProvider "github.com/microsoft/retina/pkg/capture/provider"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/telemetry"
-	"github.com/pkg/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // CaptureManager captures network packets and metadata into tar ball, then send the tar ball to the location(s)
@@ -105,10 +105,10 @@ func (cm *CaptureManager) captureNodeHostName() string {
 	return os.Getenv(captureConstants.NodeHostNameEnvKey)
 }
 
-func (cm *CaptureManager) captureStartTimestamp() (*file.Timestamp, error) {
-	timestamp, err := file.StringToTimestamp((os.Getenv(captureConstants.CaptureStartTimestampEnvKey)))
+func (cm *CaptureManager) captureStartTimestamp() (*metav1.Time, error) {
+	timestamp, err := file.StringToTime((os.Getenv(captureConstants.CaptureStartTimestampEnvKey)))
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse timestamp")
+		return nil, fmt.Errorf("failed to parse timestamp: %w", err)
 	}
 	return timestamp, nil
 }
@@ -155,7 +155,7 @@ func (cm *CaptureManager) captureMaxSizeMB() (int, error) {
 }
 
 func (cm *CaptureManager) OutputCapture(ctx context.Context, srcDir string) error {
-	var errStr string
+	var errs error
 
 	if _, err := os.Stat(srcDir); os.IsNotExist(err) {
 		return fmt.Errorf("capture source directory %s does not exist", srcDir)
@@ -168,12 +168,12 @@ func (cm *CaptureManager) OutputCapture(ctx context.Context, srcDir string) erro
 
 	for _, location := range cm.enabledOutputLocations() {
 		if err := location.Output(ctx, dstTarGz); err != nil {
-			errStr = errStr + fmt.Sprintf("location %q output error: %s\n", location.Name(), err)
+			errs = fmt.Errorf("%w; location %q output error: %w", errs, location.Name(), err)
 		}
 	}
 
-	if len(errStr) != 0 {
-		return fmt.Errorf(errStr)
+	if errs != nil {
+		return fmt.Errorf("failed to enable output locations: %w", errs)
 	}
 
 	// Remove tarball created inside this function.

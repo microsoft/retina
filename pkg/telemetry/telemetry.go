@@ -48,7 +48,10 @@ var (
 type Telemetry interface {
 	StartPerf(name string) *PerformanceCounter
 	StopPerf(counter *PerformanceCounter)
-	Heartbeat(ctx context.Context, heartbeatInterval time.Duration)
+	// Heartbeat sends a heartbeat event with system metrics and custom properties.
+	// funcs are optional functions that return additional properties to be included in the heartbeat event.
+	// Add custom data with caution as it will increase the size of Heartbeat obejct and may infer storage costs
+	Heartbeat(ctx context.Context, heartbeatInterval time.Duration, funcs ...func() map[string]string)
 	TrackEvent(name string, properties map[string]string)
 	TrackMetric(name string, value float64, properties map[string]string)
 	TrackTrace(name string, severity contracts.SeverityLevel, properties map[string]string)
@@ -167,7 +170,7 @@ func (t *TelemetryClient) trackWarning(err error, msg string) {
 	t.TrackTrace(msg+": "+err.Error(), contracts.Warning, GetEnvironmentProperties())
 }
 
-func (t *TelemetryClient) heartbeat(ctx context.Context) {
+func (t *TelemetryClient) heartbeat(ctx context.Context, funcs ...func() map[string]string) {
 	kernelVersion, err := KernelVersion(ctx)
 	if err != nil {
 		t.trackWarning(err, "failed to get kernel version")
@@ -188,6 +191,10 @@ func (t *TelemetryClient) heartbeat(ctx context.Context) {
 	}
 
 	props["metricscardinality"] = strconv.Itoa(metricscardinality)
+
+	for _, f := range funcs {
+		maps.Copy(props, f())
+	}
 
 	maps.Copy(props, cpuProps)
 	maps.Copy(props, t.profile.GetMemoryUsage())
@@ -352,7 +359,7 @@ func (t *TelemetryClient) StopPerf(counter *PerformanceCounter) {
 	t.TrackMetric(counter.functionName, ms, nil)
 }
 
-func (t *TelemetryClient) Heartbeat(ctx context.Context, heartbeatInterval time.Duration) {
+func (t *TelemetryClient) Heartbeat(ctx context.Context, heartbeatInterval time.Duration, funcs ...func() map[string]string) {
 	ticker := time.NewTicker(heartbeatInterval) // TODOL: make configurable
 	defer ticker.Stop()
 
@@ -361,7 +368,7 @@ func (t *TelemetryClient) Heartbeat(ctx context.Context, heartbeatInterval time.
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			t.heartbeat(ctx)
+			t.heartbeat(ctx, funcs...)
 		}
 	}
 }

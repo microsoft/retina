@@ -124,7 +124,7 @@ func TestProcessFlow(t *testing.T) {
 	f1 := utils.ToFlow(l, t1, apiSeverIp, nodeIp, 80, 443, 6, 3, 0)
 	metaf1 := &utils.RetinaMetadata{}
 	utils.AddTCPID(metaf1, 1234)
-	utils.AddTCPFlags(f1, 1, 0, 0, 0, 0, 0)
+	utils.AddTCPFlags(f1, 1, 0, 0, 0, 0, 0, 0, 0, 0)
 	utils.AddRetinaMetadata(f1, metaf1)
 	f1.Destination = &flow.Endpoint{
 		PodName: "kubernetes-apiserver",
@@ -134,7 +134,7 @@ func TestProcessFlow(t *testing.T) {
 	f2 := utils.ToFlow(l, t2, nodeIp, apiSeverIp, 443, 80, 6, 2, 0)
 	metaf2 := &utils.RetinaMetadata{}
 	utils.AddTCPID(metaf2, 1234)
-	utils.AddTCPFlags(f2, 1, 1, 0, 0, 0, 0)
+	utils.AddTCPFlags(f2, 1, 1, 0, 0, 0, 0, 0, 0, 0)
 	utils.AddRetinaMetadata(f2, metaf2)
 	f2.Source = &flow.Endpoint{
 		PodName: "kubernetes-apiserver",
@@ -147,9 +147,9 @@ func TestProcessFlow(t *testing.T) {
 	 * Test case 2: Existing TCP connection.
 	 */
 	// Node -> Api server.
-	utils.AddTCPFlags(f1, 1, 0, 0, 0, 0, 0)
+	utils.AddTCPFlags(f1, 1, 0, 0, 0, 0, 0, 0, 0, 0)
 	// Api server -> Node.
-	utils.AddTCPFlags(f2, 0, 1, 0, 0, 0, 0)
+	utils.AddTCPFlags(f2, 0, 1, 0, 0, 0, 0, 0, 0, 0)
 	// Process flow.
 	lm.ProcessFlow(f1)
 	lm.ProcessFlow(f2)
