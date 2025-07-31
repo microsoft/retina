@@ -1,7 +1,10 @@
 name: Build E2E Test Event Writer
 on:
   pull_request:
-    branches: [main]
+  push:
+    branches:
+      - main
+      - "dev/**"
   merge_group:
     types: [checks_requested]
   workflow_dispatch:
