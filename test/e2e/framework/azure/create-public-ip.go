@@ -40,7 +40,7 @@ func (c *CreatePublicIP) Run() error {
 
 	publicIPClient, err := armnetwork.NewPublicIPAddressesClient(c.SubscriptionID, cred, nil)
 	if err != nil {
-		log.Fatalf("failed to create public IP client: %v", err)
+		return fmt.Errorf("%w: failed to create public IP client", err)
 	}
 
 	publicIPParams := armnetwork.PublicIPAddress{
@@ -68,14 +68,14 @@ func (c *CreatePublicIP) Run() error {
 	case string(armnetwork.IPVersionIPv6):
 		version = "v6"
 	default:
-		log.Fatalf("invalid IP version: %s", c.IPVersion)
+		return fmt.Errorf("%w: invalid IP version: %s", err, c.IPVersion)
 	}
 
 	ipName := fmt.Sprintf("%s-%s-%s", c.IPPrefix, c.ClusterName, version)
 
 	poller, err := publicIPClient.BeginCreateOrUpdate(ctx, c.ResourceGroupName, ipName, publicIPParams, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create public IP address: %v", err)
+		return fmt.Errorf("%w: failed to create public IP address", err)
 	}
 
 	notifychan := make(chan struct{})

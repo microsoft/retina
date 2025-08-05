@@ -23,9 +23,9 @@ const IPPrefix = "serviceTaggedIp"
 func CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath string, createInfra bool) *types.Job {
 	job := types.NewJob("Create e2e test infrastructure")
 
-	publicIPId := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/publicIPAddresses", subID, clusterName)
-	publicIPv4 := fmt.Sprintf("%s/%s-%s-v4", publicIPId, IPPrefix, clusterName)
-	publicIPv6 := fmt.Sprintf("%s/%s-%s-v6", publicIPId, IPPrefix, clusterName)
+	publicIPID := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/publicIPAddresses", subID, clusterName)
+	publicIPv4FullName := fmt.Sprintf("%s/%s-%s-v4", publicIPID, IPPrefix, clusterName)
+	publicIPv6FullName := fmt.Sprintf("%s/%s-%s-v6", publicIPID, IPPrefix, clusterName)
 
 	if createInfra {
 		job.AddStep(&azure.CreateResourceGroup{
@@ -65,9 +65,9 @@ func CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath string
 			PodCidr:      "10.128.0.0/9",
 			DNSServiceIP: "192.168.0.10",
 			ServiceCidr:  "192.168.0.0/28",
-			PublicIPIDs: []string{
-				publicIPv4,
-				publicIPv6,
+			PublicIPs: []string{
+				publicIPv4FullName,
+				publicIPv6FullName,
 			},
 		}, nil)
 
