@@ -1,6 +1,9 @@
 package retina
 
 import (
+	"fmt"
+
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork"
 	"github.com/microsoft/retina/test/e2e/common"
 	"github.com/microsoft/retina/test/e2e/framework/azure"
 	"github.com/microsoft/retina/test/e2e/framework/generic"
@@ -15,8 +18,14 @@ import (
 	"github.com/microsoft/retina/test/e2e/scenarios/windows"
 )
 
+const IPPrefix = "serviceTaggedIp"
+
 func CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath string, createInfra bool) *types.Job {
 	job := types.NewJob("Create e2e test infrastructure")
+
+	publicIPID := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/publicIPAddresses", subID, clusterName)
+	publicIPv4FullName := fmt.Sprintf("%s/%s-%s-v4", publicIPID, IPPrefix, clusterName)
+	publicIPv6FullName := fmt.Sprintf("%s/%s-%s-v6", publicIPID, IPPrefix, clusterName)
 
 	if createInfra {
 		job.AddStep(&azure.CreateResourceGroup{
@@ -35,11 +44,31 @@ func CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath string
 			SubnetAddressSpace: "10.0.0.0/12",
 		}, nil)
 
+		job.AddStep(&azure.CreatePublicIP{
+			ClusterName: clusterName,
+			IPVersion:   string(armnetwork.IPVersionIPv4),
+			IPPrefix:    IPPrefix,
+		}, &types.StepOptions{
+			SkipSavingParametersToJob: true,
+		})
+
+		job.AddStep(&azure.CreatePublicIP{
+			ClusterName: clusterName,
+			IPVersion:   string(armnetwork.IPVersionIPv6),
+			IPPrefix:    IPPrefix,
+		}, &types.StepOptions{
+			SkipSavingParametersToJob: true,
+		})
+
 		job.AddStep(&azure.CreateNPMCluster{
 			ClusterName:  clusterName,
 			PodCidr:      "10.128.0.0/9",
 			DNSServiceIP: "192.168.0.10",
 			ServiceCidr:  "192.168.0.0/28",
+			PublicIPs: []string{
+				publicIPv4FullName,
+				publicIPv6FullName,
+			},
 		}, nil)
 
 		job.AddStep(&azure.GetAKSKubeConfig{
