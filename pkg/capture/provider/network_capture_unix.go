@@ -34,6 +34,8 @@ var (
 	errTcpdumpCommandNotConstructed = errors.New("tcpdump command is not constructed with expected arguments")
 	errTcpdumpStopFailed            = errors.New("tcpdump stop failed")
 	errIptablesUnavilable           = errors.New("no iptables command is available")
+	errIptablesLegacySaveFailed     = errors.New("failed to run iptables-legacy-save")
+	errIptablesNftSaveFailed        = errors.New("failed to run iptables-nft-save")
 )
 
 // constructTcpdumpCommand creates a tcpdump command with the appropriate arguments
@@ -240,14 +242,14 @@ type command struct {
 func (ncp *NetworkCaptureProvider) CollectMetadata() error {
 	ncp.l.Info("Start to collect network metadata")
 
-	iptablesMode, err := obtainIptablesMode(ncp.l)
+	iptablesModeName, err := obtainIptablesMode(ncp.l)
 	if err != nil {
 		return fmt.Errorf("failed to determine iptables modes. %w", err)
 	}
 
-	ncp.l.Info(fmt.Sprintf("Iptables mode %s is used", iptablesMode))
-	iptablesSaveCmdName := fmt.Sprintf("iptables-%s-save", iptablesMode)
-	iptablesCmdName := fmt.Sprintf("iptables-%s", iptablesMode)
+	ncp.l.Info(fmt.Sprintf("Iptables mode %s is used", iptablesModeName))
+	iptablesSaveCmdName := fmt.Sprintf("iptables-%s-save", iptablesModeName)
+	iptablesCmdName := fmt.Sprintf("iptables-%s", iptablesModeName)
 
 	metadataList := []struct {
 		commands []command
@@ -346,7 +348,7 @@ func (ncp *NetworkCaptureProvider) CollectMetadata() error {
 			ncp.processMetadataFile(metadata)
 		} else {
 			for _, command := range metadata.commands {
-				cmd := exec.Command(command.name, command.args...) // nolint:gosec // no sensitive data
+				cmd := exec.CommandContext(context.Background(), command.name, command.args...) // nolint:gosec // no sensitive data
 				// Errors will when copying kernel networking configuration for not all files under /proc/sys/net are
 				// readable, like '/proc/sys/net/ipv4/route/flush', which doesn't implement the read function.
 				if output, err := cmd.CombinedOutput(); err != nil && !command.ignoreFailure {
@@ -382,7 +384,7 @@ func (ncp *NetworkCaptureProvider) processMetadataFile(metadata struct {
 	// Print headlines for all commands in output file.
 	cmds := []*exec.Cmd{}
 	for _, command := range metadata.commands {
-		cmd := exec.Command(command.name, command.args...) // nolint:gosec // no sensitive data
+		cmd := exec.CommandContext(context.Background(), command.name, command.args...) // nolint:gosec // no sensitive data
 		cmds = append(cmds, cmd)
 		commandSummary := fmt.Sprintf("%s(%s)\n", cmd.String(), command.description)
 		if _, err := outfile.WriteString(commandSummary); err != nil {
@@ -435,9 +437,9 @@ func obtainIptablesMode(logger *log.ZapLogger) (iptablesMode, error) {
 		legacyIptablesModeAvaiable = false
 		logger.Info("iptables-legacy-save is not available", zap.Error(err))
 	} else {
-		legacySaveOut, err := exec.Command("iptables-legacy-save").CombinedOutput()
+		legacySaveOut, err := exec.CommandContext(context.Background(), "iptables-legacy-save").CombinedOutput()
 		if err != nil {
-			return "", fmt.Errorf("failed to run iptables-legacy-save, %s", err.Error()) //nolint:goerr113 //no specific handling expected
+			return "", fmt.Errorf("%w: %w", errIptablesLegacySaveFailed, err)
 		}
 		legacySaveLineNum = len(strings.Split(string(legacySaveOut), "\n"))
 	}
@@ -446,9 +448,9 @@ func obtainIptablesMode(logger *log.ZapLogger) (iptablesMode, error) {
 		nftIptablesModeAvaiable = false
 		logger.Info("iptables-nft-save is not available", zap.Error(err))
 	} else {
-		nftSaveOut, err := exec.Command("iptables-nft-save").CombinedOutput()
+		nftSaveOut, err := exec.CommandContext(context.Background(), "iptables-nft-save").CombinedOutput()
 		if err != nil {
-			return "", fmt.Errorf("failed to run iptables-nft-save, %s", err.Error()) //nolint:goerr113 //no specific handling expected
+			return "", fmt.Errorf("%w: %w", errIptablesNftSaveFailed, err)
 		}
 		nftSaveLineNum = len(strings.Split(string(nftSaveOut), "\n"))
 	}
