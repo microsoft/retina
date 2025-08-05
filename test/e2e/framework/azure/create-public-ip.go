@@ -62,11 +62,12 @@ func (c *CreatePublicIP) Run() error {
 	}
 
 	var version string
-	if c.IPVersion == string(armnetwork.IPVersionIPv4) {
+	switch c.IPVersion {
+	case string(armnetwork.IPVersionIPv4):
 		version = "v4"
-	} else if c.IPVersion == string(armnetwork.IPVersionIPv6) {
+	case string(armnetwork.IPVersionIPv6):
 		version = "v6"
-	} else {
+	default:
 		log.Fatalf("invalid IP version: %s", c.IPVersion)
 	}
 
@@ -74,7 +75,7 @@ func (c *CreatePublicIP) Run() error {
 
 	poller, err := publicIPClient.BeginCreateOrUpdate(ctx, c.ResourceGroupName, ipName, publicIPParams, nil)
 	if err != nil {
-		log.Fatalf("failed to create public IP address: %v", err)
+		return fmt.Errorf("failed to create public IP address: %v", err)
 	}
 
 	notifychan := make(chan struct{})

@@ -65,7 +65,7 @@ func CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath string
 			PodCidr:      "10.128.0.0/9",
 			DNSServiceIP: "192.168.0.10",
 			ServiceCidr:  "192.168.0.0/28",
-			PublicIpIds: []string{
+			PublicIPIDs: []string{
 				publicIPv4,
 				publicIPv6,
 			},

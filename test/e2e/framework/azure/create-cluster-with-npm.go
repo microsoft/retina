@@ -35,7 +35,7 @@ type CreateNPMCluster struct {
 	PodCidr           string
 	DNSServiceIP      string
 	ServiceCidr       string
-	PublicIpIds       []string
+	PublicIPIDs       []string
 }
 
 func (c *CreateNPMCluster) Prevalidate() error {
@@ -101,17 +101,17 @@ func (c *CreateNPMCluster) Run() error {
 		NodeOSUpgradeChannel: to.Ptr(armcontainerservice.NodeOSUpgradeChannelNodeImage),
 	}
 
-	if len(c.PublicIpIds) > 0 {
-		publicIPs := make([]*armcontainerservice.ResourceReference, 0, len(c.PublicIpIds))
+	if len(c.PublicIPIDs) > 0 {
+		publicIPs := make([]*armcontainerservice.ResourceReference, 0, len(c.PublicIPIDs))
 
-		for _, ipID := range c.PublicIpIds {
+		for _, ipID := range c.PublicIPIDs {
 			fmt.Printf("Adding Public IP ID: %s\n", ipID)
 			publicIPs = append(publicIPs, &armcontainerservice.ResourceReference{
 				ID: to.Ptr(ipID),
 			})
 		}
 
-		for _, ip := range c.PublicIpIds {
+		for _, ip := range c.PublicIPIDs {
 			fmt.Printf("Public IP ID: %s\n", ip)
 		}
 
