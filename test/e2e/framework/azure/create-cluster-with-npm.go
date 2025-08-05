@@ -35,6 +35,7 @@ type CreateNPMCluster struct {
 	PodCidr           string
 	DNSServiceIP      string
 	ServiceCidr       string
+	PublicIpIds       []string
 }
 
 func (c *CreateNPMCluster) Prevalidate() error {
@@ -98,6 +99,29 @@ func (c *CreateNPMCluster) Run() error {
 
 	npmCluster.Properties.AutoUpgradeProfile = &armcontainerservice.ManagedClusterAutoUpgradeProfile{
 		NodeOSUpgradeChannel: to.Ptr(armcontainerservice.NodeOSUpgradeChannelNodeImage),
+	}
+
+	if len(c.PublicIpIds) > 0 {
+		publicIPs := make([]*armcontainerservice.ResourceReference, 0, len(c.PublicIpIds))
+
+		for _, ipID := range c.PublicIpIds {
+			fmt.Printf("Adding Public IP ID: %s\n", ipID)
+			publicIPs = append(publicIPs, &armcontainerservice.ResourceReference{
+				ID: to.Ptr(ipID),
+			})
+		}
+
+		for _, ip := range c.PublicIpIds {
+			fmt.Printf("Public IP ID: %s\n", ip)
+		}
+
+		if npmCluster.Properties.NetworkProfile.LoadBalancerProfile == nil {
+			npmCluster.Properties.NetworkProfile.LoadBalancerProfile = &armcontainerservice.ManagedClusterLoadBalancerProfile{
+				OutboundIPs: &armcontainerservice.ManagedClusterLoadBalancerProfileOutboundIPs{
+					PublicIPs: publicIPs,
+				},
+			}
+		}
 	}
 
 	// Deploy cluster
