@@ -100,7 +100,10 @@ func (c *CreatePublicIP) Run() error {
 		case <-ticker.C:
 			log.Printf("waiting for Public IP %s to be ready...\n", ipName)
 		case <-notifychan:
-			return err
+			if err != nil {
+				return fmt.Errorf("received notification, failed to create public IP address: %w", err)
+			}
+			return nil
 		}
 	}
 }
