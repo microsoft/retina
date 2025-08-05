@@ -14,7 +14,7 @@ import (
 
 func DefaultScaleTestOptions() scaletest.Options {
 	return scaletest.Options{
-		Namespace:                     "scale-test",
+		Namespace:                     "krouthu-scale-test",
 		MaxKwokPodsPerNode:            0,
 		NumKwokDeployments:            0,
 		NumKwokReplicas:               0,
