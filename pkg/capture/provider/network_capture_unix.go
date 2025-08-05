@@ -144,8 +144,8 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, fil
 
 	// Store tcpdpump log as part of capture artifacts.
 	defer func() {
-		if tcpdumpLog, err := os.ReadFile(tcpdumpLogFile.Name()); err != nil {
-			ncp.l.Warn("Failed to read tcpdump log", zap.Error(err))
+		if tcpdumpLog, readErr := os.ReadFile(tcpdumpLogFile.Name()); readErr != nil {
+			ncp.l.Warn("Failed to read tcpdump log", zap.Error(readErr))
 		} else {
 			ncp.l.Info("Tcpdump command output: " + string(tcpdumpLog))
 		}
@@ -180,18 +180,18 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, fil
 		go func() {
 			// Chances are that the capture file is not created when we check the file size.
 			time.Sleep(time.Second * time.Duration(fileSizeCheckIntervalInSecond))
-			captureFile, err := os.Open(captureFilePath)
-			if err != nil {
-				ncp.l.Error("Failed to open capture file", zap.String("capture file path", captureFilePath), zap.Error(err))
+			captureFile, openErr := os.Open(captureFilePath)
+			if openErr != nil {
+				ncp.l.Error("Failed to open capture file", zap.String("capture file path", captureFilePath), zap.Error(openErr))
 				ncp.l.Error("Please make sure tcpdump command is constructed with expected arguments", zap.String("tcpdump args", fmt.Sprintf("%+q", captureStartCmd.Args)))
 				errChan <- errTcpdumpCommandNotConstructed
 				return
 			}
 
 			for {
-				fileStat, err := captureFile.Stat()
-				if err != nil {
-					ncp.l.Error("Failed to get capture file info", zap.String("capture file path", captureFilePath), zap.Error(err))
+				fileStat, statErr := captureFile.Stat()
+				if statErr != nil {
+					ncp.l.Error("Failed to get capture file info", zap.String("capture file path", captureFilePath), zap.Error(statErr))
 					continue
 				}
 				fileSizeBytes := fileStat.Size()
@@ -209,14 +209,14 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, fil
 	case <-doneChan:
 	case <-ctx.Done():
 		ncp.l.Info("Tcpdump will be stopped - got OS signal, or timeout reached", zap.Error(ctx.Err()))
-	case err := <-errChan:
-		return err
+	case captureErr := <-errChan:
+		return captureErr
 	}
 	ncp.l.Info("Stop tcpdump")
 	// Kill signal will not wait until the process has actually existed, thus the captured network packets may not be
 	// flushed to the capture file. Instead, we signal terminate and wait until the process to exit.
-	if err := captureStartCmd.Process.Signal(syscall.SIGTERM); err != nil {
-		ncp.l.Error("Failed to signal terminate to process, will kill the process", zap.Error(err))
+	if signalErr := captureStartCmd.Process.Signal(syscall.SIGTERM); signalErr != nil {
+		ncp.l.Error("Failed to signal terminate to process, will kill the process", zap.Error(signalErr))
 		if killErr := captureStartCmd.Process.Kill(); killErr != nil {
 			return fmt.Errorf("%w: %w", errTcpdumpStopFailed, killErr)
 		}
