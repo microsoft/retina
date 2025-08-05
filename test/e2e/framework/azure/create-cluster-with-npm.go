@@ -102,11 +102,11 @@ func (c *CreateNPMCluster) Run() error {
 	}
 
 	if len(c.PublicIPs) > 0 {
-		publicIPList := make([]*armcontainerservice.ResourceReference, 0, len(c.PublicIPs))
+		publicIPIDs := make([]*armcontainerservice.ResourceReference, 0, len(c.PublicIPs))
 
 		for _, ipID := range c.PublicIPs {
 			fmt.Printf("Adding Public IP ID: %s\n", ipID)
-			publicIPList = append(publicIPList, &armcontainerservice.ResourceReference{
+			publicIPIDs = append(publicIPIDs, &armcontainerservice.ResourceReference{
 				ID: to.Ptr(ipID),
 			})
 		}
@@ -118,7 +118,7 @@ func (c *CreateNPMCluster) Run() error {
 		if npmCluster.Properties.NetworkProfile.LoadBalancerProfile == nil {
 			npmCluster.Properties.NetworkProfile.LoadBalancerProfile = &armcontainerservice.ManagedClusterLoadBalancerProfile{
 				OutboundIPs: &armcontainerservice.ManagedClusterLoadBalancerProfileOutboundIPs{
-					PublicIPs: publicIPList,
+					PublicIPs: publicIPIDs,
 				},
 			}
 		}
