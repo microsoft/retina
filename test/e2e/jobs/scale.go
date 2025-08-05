@@ -14,7 +14,7 @@ import (
 
 func DefaultScaleTestOptions() scaletest.Options {
 	return scaletest.Options{
-		Namespace:                     "krouthu-scale-test",
+		Namespace:                     "scale-test",
 		MaxKwokPodsPerNode:            0,
 		NumKwokDeployments:            0,
 		NumKwokReplicas:               0,
@@ -57,9 +57,16 @@ func GetScaleTestInfra(subID, rg, clusterName, location, kubeConfigFilePath stri
 			Location:          location,
 		}, nil)
 
+		job.AddStep(&azure.CreatePublicIp{
+			PublicIpName: fmt.Sprintf("%s-lb-ip", clusterName)
+			IPTagType:    "FirstPartyUsage",
+			Tag:          "/NonProd"
+		}, nil)
+
 		job.AddStep((&azure.CreateCluster{
 			ClusterName: clusterName,
 			Nodes:       nodes,
+			loadBalancerOutboundIpId: fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers//Microsoft.Network/publicIPAddresses/%s-lb-ip", subID, rg, clusterName),
 		}).
 			SetPodCidr("100.64.0.0/10").
 			SetVMSize("Standard_D4_v3").
