@@ -1,5 +1,5 @@
-# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.4-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:250d01e55a37bd79d7014ae83f9f50aa6fa5570ca910e7f19faeff4bb0132ae1 AS builder
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.5-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:7f705f63001ad064018c1610455ae1c23e6c8179fbc6cc87bcd5d51d2c4760f6 AS builder
 
 # Build args
 ARG VERSION
@@ -16,7 +16,7 @@ RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -ldflags "-X g
 
 # Copy into final image
 # skopeo inspect docker://mcr.microsoft.com/windows/nanoserver:ltsc2022 --override-os windows --format "{{.Name}}@{{.Digest}}"
-FROM  mcr.microsoft.com/windows/nanoserver@sha256:23fa4e796f4d02d462beadb844f8985ca4583b1b0f75295137f5968dab255b09
+FROM  mcr.microsoft.com/windows/nanoserver@sha256:9a57174ce85e979529e4f0cd58dff2e837b65fc7832b7585b4882f6cce0e255d
 COPY --from=builder /usr/src/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
 COPY --from=builder /usr/src/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
 
