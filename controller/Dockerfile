@@ -2,8 +2,8 @@
 ARG OS_VERSION=ltsc2022
 # pinned base images
 
-# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.4-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:250d01e55a37bd79d7014ae83f9f50aa6fa5570ca910e7f19faeff4bb0132ae1 AS golang
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.5-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:7f705f63001ad064018c1610455ae1c23e6c8179fbc6cc87bcd5d51d2c4760f6 AS golang
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
 FROM mcr.microsoft.com/azurelinux/base/core@sha256:9948138108a3d69f1dae62104599ac03132225c3b7a5ac57b85a214629c8567d AS azurelinux-core
@@ -12,10 +12,10 @@ FROM mcr.microsoft.com/azurelinux/base/core@sha256:9948138108a3d69f1dae62104599a
 FROM mcr.microsoft.com/azurelinux/distroless/minimal@sha256:0801b80a0927309572b9adc99bd1813bc680473175f6e8175cd4124d95dbd50c AS azurelinux-distroless
 
 # skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2019  --override-os windows --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/windows/servercore@sha256:862b24ccf5e399fc3bea746c7ac68c16f3fbcfa199532a3e506b7e03e57217b9 AS ltsc2019
+FROM mcr.microsoft.com/windows/servercore@sha256:2a7cfebaed9241227ad68b1fc7cb764867ea1c56624ece03f926eb8bdf0c998f AS ltsc2019
 
 # skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2022  --override-os windows --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/windows/servercore@sha256:c489e1737a833a111f0f35b28257b1071d30b6db6b9ee50e88b7c08b901efc67 AS ltsc2022
+FROM mcr.microsoft.com/windows/servercore@sha256:3281482945016cdaefbe417edd8338de8119e077b6941f74e78b050da1b7bd97 AS ltsc2022
 
 # build stages
 
