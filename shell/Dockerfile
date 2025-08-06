@@ -26,7 +26,25 @@ RUN tdnf install -y \
 	tar \
 	file \
 	bpftool \
+	ig \
 	&& tdnf clean all
+
+# Create the entrypoint script to mount debugfs
+SHELL ["/bin/bash", "-c"]
+
+RUN echo $'#!/bin/bash\n\
+if ! mountpoint -q /sys/kernel/debug; then\n\
+mount -t debugfs none /sys/kernel/debug\n\
+fi\n\
+exec "$@"' > /usr/local/bin/entrypoint.sh;
+
+# Set the host root directory for IG
+ENV HOST_ROOT=/host
+
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# Set the entrypoint
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 # Re-use existing arg from Makefile target "container-docker"
 # https://github.com/microsoft/retina/blob/main/Makefile#L224
