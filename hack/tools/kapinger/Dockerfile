@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.24.4 AS builder
+FROM --platform=linux/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.24.5 AS builder
 
 WORKDIR /build
 ADD . .
