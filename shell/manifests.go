@@ -54,19 +54,35 @@ func hostNetworkPodForNodeDebug(config Config, debugPodNamespace, nodeName strin
 	}
 
 	if config.MountHostFilesystem || config.AllowHostFilesystemWrite {
-		pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{
-			Name: "host-filesystem",
-			VolumeSource: v1.VolumeSource{
-				HostPath: &v1.HostPathVolumeSource{
-					Path: "/",
+		pod.Spec.Volumes = append(pod.Spec.Volumes,
+			v1.Volume{
+				Name: "host-filesystem",
+				VolumeSource: v1.VolumeSource{
+					HostPath: &v1.HostPathVolumeSource{
+						Path: "/",
+					},
 				},
 			},
-		})
-		pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
-			Name:      "host-filesystem",
-			MountPath: "/host",
-			ReadOnly:  !config.AllowHostFilesystemWrite,
-		})
+			v1.Volume{
+				Name: "run",
+				VolumeSource: v1.VolumeSource{
+					HostPath: &v1.HostPathVolumeSource{
+						Path: "/run",
+					},
+				},
+			},
+		)
+		pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts,
+			v1.VolumeMount{
+				Name:      "host-filesystem",
+				MountPath: "/host",
+				ReadOnly:  !config.AllowHostFilesystemWrite,
+			},
+			v1.VolumeMount{
+				Name:      "run",
+				MountPath: "/run",
+			},
+		)
 	}
 
 	if config.AppArmorUnconfined {
