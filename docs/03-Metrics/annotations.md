@@ -13,4 +13,4 @@ You can then add the annotation `retina.sh: observe` to either:
 
 **Note 1**: If you enable Annotations, you cannot use the `MetricsConfiguration` CRD to specify which Pods to observe.
 
-**Note 2**: Currently DNS plugin does not consider annotations to generate DNS Metrics, hence it generates metrics for all pods.
+**Note 2**: Currently the DNS plugin does not consider annotations when generating DNS metrics, so it generates metrics for all pods.
