@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"go.uber.org/zap"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
 	"github.com/microsoft/retina/pkg/capture/file"
@@ -27,11 +26,8 @@ import (
 
 type NetworkCaptureProvider struct {
 	NetworkCaptureProviderCommon
-	TmpCaptureDir  string
-	CaptureName    string
-	NodeHostName   string
-	StartTimestamp *metav1.Time
-	Filename       file.CaptureFilename
+	TmpCaptureDir string
+	Filename      file.CaptureFilename
 
 	l *log.ZapLogger
 }
@@ -53,10 +49,7 @@ func (ncp *NetworkCaptureProvider) Setup(filename file.CaptureFilename) (string,
 	ncp.l.Info("Created temporary folder for network capture", zap.String("capture temporary folder", captureFolderDir))
 
 	ncp.TmpCaptureDir = captureFolderDir
-	ncp.CaptureName = filename.CaptureName
-	ncp.NodeHostName = filename.NodeHostname
-	ncp.StartTimestamp = filename.StartTimestamp
-	ncp.Filename = file.CaptureFilename{CaptureName: ncp.CaptureName, NodeHostname: ncp.NodeHostName, StartTimestamp: ncp.StartTimestamp}
+	ncp.Filename = filename
 
 	return ncp.TmpCaptureDir, nil
 }
@@ -302,7 +295,7 @@ func (ncp *NetworkCaptureProvider) CollectMetadata() error {
 }
 
 func (ncp *NetworkCaptureProvider) Cleanup() error {
-	ncp.l.Info("Cleanup network capture", zap.String("capture name", ncp.CaptureName), zap.String("temporary dir", ncp.TmpCaptureDir))
+	ncp.l.Info("Cleanup network capture", zap.String("capture name", ncp.Filename.CaptureName), zap.String("temporary dir", ncp.TmpCaptureDir))
 	ncp.NetworkCaptureProviderCommon.Cleanup()
 	return nil
 }

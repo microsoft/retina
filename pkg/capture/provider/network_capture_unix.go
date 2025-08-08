@@ -21,12 +21,21 @@ import (
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
 	"github.com/microsoft/retina/pkg/capture/file"
 	"github.com/microsoft/retina/pkg/log"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+type iptablesMode string
+
+const (
+	legacyIptablesMode iptablesMode = "legacy"
+	nftIptablesMode    iptablesMode = "nft"
 )
 
 var (
 	errTcpdumpCommandNotConstructed = errors.New("tcpdump command is not constructed with expected arguments")
 	errTcpdumpStopFailed            = errors.New("tcpdump stop failed")
+	errIptablesUnavilable           = errors.New("no iptables command is available")
+	errIptablesLegacySaveFailed     = errors.New("failed to run iptables-legacy-save")
+	errIptablesNftSaveFailed        = errors.New("failed to run iptables-nft-save")
 )
 
 // constructTcpdumpCommand creates a tcpdump command with the appropriate arguments
@@ -75,10 +84,8 @@ func constructTcpdumpCommand(captureFilePath string) *exec.Cmd {
 
 type NetworkCaptureProvider struct {
 	NetworkCaptureProviderCommon
-	TmpCaptureDir  string
-	CaptureName    string
-	NodeHostName   string
-	StartTimestamp *metav1.Time
+	TmpCaptureDir string
+	Filename      file.CaptureFilename
 
 	l *log.ZapLogger
 }
@@ -100,9 +107,8 @@ func (ncp *NetworkCaptureProvider) Setup(filename file.CaptureFilename) (string,
 	ncp.l.Info("Created temporary folder for network capture", zap.String("capture temporary folder", captureFolderDir))
 
 	ncp.TmpCaptureDir = captureFolderDir
-	ncp.CaptureName = filename.CaptureName
-	ncp.NodeHostName = filename.NodeHostname
-	ncp.StartTimestamp = filename.StartTimestamp
+	ncp.Filename = filename
+
 	return ncp.TmpCaptureDir, nil
 }
 
@@ -110,8 +116,7 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, fil
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(duration)*time.Second)
 	defer cancel()
 
-	filename := file.CaptureFilename{CaptureName: ncp.CaptureName, NodeHostname: ncp.NodeHostName, StartTimestamp: ncp.StartTimestamp}
-	captureFileName := filename.String() + ".pcap"
+	captureFileName := ncp.Filename.String() + ".pcap"
 	captureFilePath := filepath.Join(ncp.TmpCaptureDir, captureFileName)
 
 	// Remove the folder in case it already exists to mislead the file size check.
@@ -228,18 +233,23 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, fil
 }
 
 type command struct {
-	name        string
-	args        []string
-	description string
+	name          string
+	args          []string
+	description   string
+	ignoreFailure bool
 }
 
 func (ncp *NetworkCaptureProvider) CollectMetadata() error {
 	ncp.l.Info("Start to collect network metadata")
 
-	iptablesMode := obtainIptablesMode()
-	ncp.l.Info(fmt.Sprintf("Iptables mode %s is used", iptablesMode))
-	iptablesSaveCmdName := "iptables-" + iptablesMode + "-save"
-	iptablesCmdName := "iptables-" + iptablesMode
+	iptablesModeName, err := obtainIptablesMode(ncp.l)
+	if err != nil {
+		return fmt.Errorf("failed to determine iptables modes. %w", err)
+	}
+
+	ncp.l.Info(fmt.Sprintf("Iptables mode %s is used", iptablesModeName))
+	iptablesSaveCmdName := fmt.Sprintf("iptables-%s-save", iptablesModeName)
+	iptablesCmdName := fmt.Sprintf("iptables-%s", iptablesModeName)
 
 	metadataList := []struct {
 		commands []command
@@ -325,6 +335,9 @@ func (ncp *NetworkCaptureProvider) CollectMetadata() error {
 					name:        "cp",
 					args:        []string{"-r", "/proc/sys/net", filepath.Join(ncp.TmpCaptureDir, "proc-sys-net")},
 					description: "kernel networking configuration",
+					// Errors will occur when copying kernel networking configuration for not all files under /proc/sys/net are
+					// readable, like '/proc/sys/net/ipv4/route/flush', which doesn't implement the read function.
+					ignoreFailure: true,
 				},
 			},
 		},
@@ -335,10 +348,10 @@ func (ncp *NetworkCaptureProvider) CollectMetadata() error {
 			ncp.processMetadataFile(metadata)
 		} else {
 			for _, command := range metadata.commands {
-				cmd := exec.Command(command.name, command.args...) // #nosec G204 -- commands are predefined system utilities with safe arguments
+				cmd := exec.CommandContext(context.Background(), command.name, command.args...) // nolint:gosec // no sensitive data
 				// Errors will when copying kernel networking configuration for not all files under /proc/sys/net are
 				// readable, like '/proc/sys/net/ipv4/route/flush', which doesn't implement the read function.
-				if output, err := cmd.CombinedOutput(); err != nil {
+				if output, err := cmd.CombinedOutput(); err != nil && !command.ignoreFailure {
 					// Don't return for error to continue capturing following network metadata.
 					ncp.l.Error("Failed to execute command", zap.String("command", cmd.String()), zap.String("output", string(output)), zap.Error(err))
 				}
@@ -371,7 +384,7 @@ func (ncp *NetworkCaptureProvider) processMetadataFile(metadata struct {
 	// Print headlines for all commands in output file.
 	cmds := []*exec.Cmd{}
 	for _, command := range metadata.commands {
-		cmd := exec.Command(command.name, command.args...) // #nosec G204 -- commands are predefined system utilities with safe arguments
+		cmd := exec.CommandContext(context.Background(), command.name, command.args...) // nolint:gosec // no sensitive data
 		cmds = append(cmds, cmd)
 		commandSummary := fmt.Sprintf("%s(%s)\n", cmd.String(), command.description)
 		if _, err := outfile.WriteString(commandSummary); err != nil {
@@ -404,21 +417,58 @@ func (ncp *NetworkCaptureProvider) processMetadataFile(metadata struct {
 }
 
 func (ncp *NetworkCaptureProvider) Cleanup() error {
-	ncp.l.Info("Cleanup network capture", zap.String("capture name", ncp.CaptureName), zap.String("temporary dir", ncp.TmpCaptureDir))
+	ncp.l.Info("Cleanup network capture", zap.String("capture name", ncp.Filename.CaptureName), zap.String("temporary dir", ncp.TmpCaptureDir))
 	ncp.NetworkCaptureProviderCommon.Cleanup()
 	return nil
 }
 
-func obtainIptablesMode() string {
+// obtainIptablesMode return the available iptables mode, and returns empty when no iptables is available.
+func obtainIptablesMode(logger *log.ZapLogger) (iptablesMode, error) {
 	// Since iptables v1.8, nf_tables are introduced as an improvement of legacy iptables, but provides the same user
 	// interface as legacy iptables through iptables-nft command.
 	// based on: https://github.com/kubernetes-sigs/iptables-wrappers/blob/97b01f43a8e8db07840fc4b95e833a37c0d36b12/iptables-wrapper-installer.sh
-	legacySaveOut, _ := exec.Command("iptables-legacy-save").CombinedOutput()
-	legacySaveLineNum := len(strings.Split(string(legacySaveOut), "\n"))
-	nftSaveOut, _ := exec.Command("iptables-nft-save").CombinedOutput()
-	nftSaveLineNum := len(strings.Split(string(nftSaveOut), "\n"))
-	if legacySaveLineNum > nftSaveLineNum {
-		return "legacy"
+
+	// When both iptables modes available, we choose the one with more rules, because the other one normally outputs empty rules.
+	nftIptablesModeAvaiable := true
+	legacyIptablesModeAvaiable := true
+	legacySaveLineNum := 0
+	nftSaveLineNum := 0
+	if _, err := exec.LookPath("iptables-legacy-save"); err != nil {
+		legacyIptablesModeAvaiable = false
+		logger.Info("iptables-legacy-save is not available", zap.Error(err))
+	} else {
+		legacySaveOut, err := exec.CommandContext(context.Background(), "iptables-legacy-save").CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("%w: %w", errIptablesLegacySaveFailed, err)
+		}
+		legacySaveLineNum = len(strings.Split(string(legacySaveOut), "\n"))
 	}
-	return "nft"
+
+	if _, err := exec.LookPath("iptables-nft-save"); err != nil {
+		nftIptablesModeAvaiable = false
+		logger.Info("iptables-nft-save is not available", zap.Error(err))
+	} else {
+		nftSaveOut, err := exec.CommandContext(context.Background(), "iptables-nft-save").CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("%w: %w", errIptablesNftSaveFailed, err)
+		}
+		nftSaveLineNum = len(strings.Split(string(nftSaveOut), "\n"))
+	}
+
+	if nftIptablesModeAvaiable && legacyIptablesModeAvaiable {
+		if legacySaveLineNum > nftSaveLineNum {
+			return legacyIptablesMode, nil
+		}
+		return nftIptablesMode, nil
+	}
+
+	if nftIptablesModeAvaiable {
+		return nftIptablesMode, nil
+	}
+
+	if legacyIptablesModeAvaiable {
+		return legacyIptablesMode, nil
+	}
+
+	return "", errIptablesUnavilable
 }
