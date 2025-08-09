@@ -227,7 +227,7 @@ container-docker: buildx # util target to build container images using docker bu
 		--build-arg HUBBLE_VERSION=$(HUBBLE_VERSION) \
 		--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
 		--target=$(TARGET) \
-		-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
+		-t $(shell echo $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) | tr '[:upper:]' '[:lower:]') \
 		--output type=local,dest=$(ARTIFACTS_DIR) \
 		$(BUILDX_ACTION) \
 		$(CONTEXT_DIR) 
