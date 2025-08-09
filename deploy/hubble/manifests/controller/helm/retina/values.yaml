@@ -406,9 +406,9 @@ hubble:
     # -- Hubble-relay container image.
     image:
       override: ~
-      repository: "mcr.microsoft.com/oss/cilium/hubble-relay"
-      tag: "v1.15.0"
-      digest: "sha256:19cd56e7618832257bf88b2f281287cb57f9f7fcb9e04775a6198d4bc4daffae"
+      repository: "quay.io/cilium/hubble-relay-ci"
+      tag: "latest"
+      digest: ""
       useDigest: false
       pullPolicy: "Always"
 
@@ -650,9 +650,9 @@ hubble:
       # -- Hubble-ui backend image.
       image:
         override: ~
-        repository: "mcr.microsoft.com/oss/cilium/hubble-ui-backend"
-        tag: "v0.12.2"
-        digest: "sha256:b73dd1ac1b7159d42cdba31433964313e756daafefffad5e91c3b61b47c3782f"
+        repository: "quay.io/cilium/hubble-ui-backend"
+        tag: "v0.13.2"
+        digest: "sha256:a034b7e98e6ea796ed26df8f4e71f83fc16465a19d166eff67a03b822c0bfa15"
         useDigest: true
         pullPolicy: "Always"
 
@@ -689,9 +689,9 @@ hubble:
       # -- Hubble-ui frontend image.
       image:
         override: ~
-        repository: "mcr.microsoft.com/oss/cilium/hubble-ui"
-        tag: "v0.12.2"
-        digest: "sha256:8c53cdaebb4ae863ad061387a68ea06e38777d2911e6c0e570be1932bb4ba526"
+        repository: "quay.io/cilium/hubble-ui"
+        tag: "v0.13.2"
+        digest: "sha256:9e37c1296b802830834cc87342a9182ccbb71ffebb711971e849221bd9d59392"
         useDigest: true
         pullPolicy: "Always"
 
