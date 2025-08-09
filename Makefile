@@ -487,8 +487,8 @@ helm-install-advanced-local-context: manifests
 		--set image.pullPolicy=Always \
 		--set logLevel=info \
 		--set os.windows=true \
-		--set operator.enabled=true \
-		--set operator.enableRetinaEndpoint=true \
+		--set operator.enabled=false \
+		--set operator.enableRetinaEndpoint=false \
 		--set operator.repository=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE) \
 		--skip-crds \
 		--set enabledPlugin_linux="\[dropreason\,packetforward\,linuxutil\,dns\,packetparser\]" \

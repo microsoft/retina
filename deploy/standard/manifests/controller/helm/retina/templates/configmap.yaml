@@ -50,6 +50,7 @@ data:
     enableAnnotations: {{ .Values.enableAnnotations }}
     enablePodLevel: {{ .Values.enablePodLevel }}
     remoteContext: {{ .Values.remoteContext }}
+    enableAnnotations: {{ .Values.enableAnnotations }}
     telemetryInterval: {{ .Values.daemonset.telemetryInterval }}
 {{- end}}
 
