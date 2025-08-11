@@ -93,8 +93,8 @@ func (p *packetParser) Generate(ctx context.Context) error {
 	if p.cfg.BypassLookupIPOfInterest {
 		p.l.Info("bypassing lookup IP of interest")
 		bypassLookupIPOfInterest = 1
-		st = fmt.Sprintf("#define BYPASS_LOOKUP_IP_OF_INTEREST %d\n", bypassLookupIPOfInterest)
 	}
+	st = fmt.Sprintf("#define BYPASS_LOOKUP_IP_OF_INTEREST %d\n", bypassLookupIPOfInterest)
 
 	conntrackMetrics := 0
 	// Check if packetparser has Conntrack metrics enabled.
