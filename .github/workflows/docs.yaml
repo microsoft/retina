@@ -3,6 +3,8 @@ name: Build and Deploy Retina.sh
 on:
   push:
     branches: ["main"]
+  pull_request:
+    branches: ["main"]
   workflow_dispatch:
   merge_group:
 permissions:
@@ -13,17 +15,11 @@ concurrency:
   group: "pages"
   cancel-in-progress: false
 jobs:
-  deploy:
-    if: ${{ github.event_name != 'merge_group' }}
-    environment:
-      name: retina.sh 
-      url: ${{ steps.deployment.outputs.page_url }}
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -31,10 +27,22 @@ jobs:
         run: |
           npm install --prefix site/
           npm run build --prefix site/
-      - name: Upload artifact
+      - name: Upload build artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
         with:
           path: "./site/build"
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    environment:
+      name: retina.sh 
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

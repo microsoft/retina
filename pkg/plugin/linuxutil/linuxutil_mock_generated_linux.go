@@ -13,6 +13,7 @@ import (
 	reflect "reflect"
 
 	netstat "github.com/cakturk/go-netstat/netstat"
+	ethtool "github.com/safchain/ethtool"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -51,19 +52,19 @@ func (mr *MockEthtoolInterfaceMockRecorder) Close() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockEthtoolInterface)(nil).Close))
 }
 
-// Stats mocks base method.
-func (m *MockEthtoolInterface) Stats(intf string) (map[string]uint64, error) {
+// StatsWithBuffer mocks base method.
+func (m *MockEthtoolInterface) StatsWithBuffer(intf string, gstrings *ethtool.EthtoolGStrings, stats *ethtool.EthtoolStats) (map[string]uint64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Stats", intf)
+	ret := m.ctrl.Call(m, "StatsWithBuffer", intf, gstrings, stats)
 	ret0, _ := ret[0].(map[string]uint64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// Stats indicates an expected call of Stats.
-func (mr *MockEthtoolInterfaceMockRecorder) Stats(intf any) *gomock.Call {
+// StatsWithBuffer indicates an expected call of StatsWithBuffer.
+func (mr *MockEthtoolInterfaceMockRecorder) StatsWithBuffer(intf, gstrings, stats any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stats", reflect.TypeOf((*MockEthtoolInterface)(nil).Stats), intf)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StatsWithBuffer", reflect.TypeOf((*MockEthtoolInterface)(nil).StatsWithBuffer), intf, gstrings, stats)
 }
 
 // MockNetstatInterface is a mock of NetstatInterface interface.

@@ -28,35 +28,9 @@ import (
 	"github.com/microsoft/retina/internal/buildinfo"
 	pkgcapture "github.com/microsoft/retina/pkg/capture"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
+	"github.com/microsoft/retina/pkg/capture/file"
 	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	"github.com/microsoft/retina/pkg/config"
-)
-
-var (
-	blobUpload         string
-	debug              bool
-	duration           time.Duration
-	excludeFilter      string
-	hostPath           string
-	includeFilter      string
-	includeMetadata    bool
-	jobNumLimit        int
-	maxSize            int
-	namespace          string
-	namespaceSelectors string
-	nodeNames          string
-	nodeSelectors      string
-	nowait             bool
-	packetSize         int
-	podSelectors       string
-	pvc                string
-	s3AccessKeyID      string
-	s3Bucket           string
-	s3Endpoint         string
-	s3Path             string
-	s3Region           string
-	s3SecretAccessKey  string
-	tcpdumpFilter      string
 )
 
 const (
@@ -87,6 +61,9 @@ var createExample = templates.Examples(i18n.T(`
 		# Select nodes using node-selector and set duration to 10s
 		kubectl retina capture create --node-selectors="agentpool=agentpool" --duration=10s
 
+		# Capture on specific network interfaces (instead of all interfaces)
+		kubectl retina capture create --node-selectors="agentpool=agentpool" --interfaces="eth0,eth1"
+
 		# Select nodes using node-selector and upload the artifacts to blob storage with SAS URL https://testaccount.blob.core.windows.net/<token>
 		kubectl retina capture create --node-selectors="agentpool=agentpool" --blob-upload=https://testaccount.blob.core.windows.net/<token>
 
@@ -105,89 +82,143 @@ var createExample = templates.Examples(i18n.T(`
 			--s3-secret-access-key "your-secret-access-key"
 		`))
 
-var createCapture = &cobra.Command{
-	Use:     "create",
-	Short:   "Create a Retina Capture",
-	Example: createExample,
-	RunE: func(*cobra.Command, []string) error {
-		kubeConfig, err := opts.ToRESTConfig()
-		if err != nil {
-			return errors.Wrap(err, "failed to compose k8s rest config")
+func create(kubeClient kubernetes.Interface) error {
+	// Set namespace. If --namespace is not set, use namespace on user's context
+	ns, _, err := opts.ConfigFlags.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return errors.Wrap(err, "failed to get namespace from kubeconfig")
+	}
+
+	if opts.Namespace == nil || *opts.Namespace == "" {
+		opts.Namespace = &ns
+	}
+
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
+	defer cancel()
+
+	capture, err := createCaptureF(ctx, kubeClient)
+	if err != nil {
+		return err
+	}
+
+	jobsCreated, err := createJobs(ctx, kubeClient, capture)
+	if err != nil {
+		retinacmd.Logger.Error("Failed to create job", zap.Error(err))
+		return err
+	}
+	if opts.nowait {
+		retinacmd.Logger.Info("Please manually delete all capture jobs")
+		if capture.Spec.OutputConfiguration.BlobUpload != nil {
+			retinacmd.Logger.Info("Please manually delete capture secret", zap.String("namespace", *opts.Namespace), zap.String("secret name", *capture.Spec.OutputConfiguration.BlobUpload))
+		}
+		if capture.Spec.OutputConfiguration.S3Upload != nil && capture.Spec.OutputConfiguration.S3Upload.SecretName != "" {
+			retinacmd.Logger.Info("Please manually delete capture secret", zap.String("namespace", *opts.Namespace), zap.String("secret name", capture.Spec.OutputConfiguration.S3Upload.SecretName))
+		}
+		printCaptureResult(jobsCreated)
+		return nil
+	}
+
+	// Wait until all jobs finish then delete the jobs before the timeout, otherwise print jobs created to
+	// let the customer recycle them.
+	retinacmd.Logger.Info("Waiting for capture jobs to finish")
+
+	allJobsCompleted := waitUntilJobsComplete(ctx, kubeClient, jobsCreated)
+
+	// Delete all jobs created only if they all completed, otherwise keep the jobs for debugging.
+	if allJobsCompleted {
+		retinacmd.Logger.Info("Deleting jobs as all jobs are completed")
+		jobsFailedToDelete := deleteJobs(ctx, kubeClient, jobsCreated)
+		if len(jobsFailedToDelete) != 0 {
+			retinacmd.Logger.Info("Please manually delete capture jobs failed to delete", zap.String("namespace", *opts.Namespace), zap.String("job list", strings.Join(jobsFailedToDelete, ",")))
 		}
 
-		kubeClient, err := kubernetes.NewForConfig(kubeConfig)
-		if err != nil {
-			return errors.Wrap(err, "failed to initialize kubernetes client")
+		if capture.Spec.OutputConfiguration.BlobUpload != nil {
+			err = deleteSecret(ctx, kubeClient, capture.Spec.OutputConfiguration.BlobUpload)
+			if err != nil {
+				retinacmd.Logger.Error("Failed to delete capture secret, please manually delete it",
+					zap.String("namespace", *opts.Namespace), zap.String("secret name", *capture.Spec.OutputConfiguration.BlobUpload), zap.Error(err))
+			}
 		}
 
-		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
-		defer cancel()
-
-		capture, err := createCaptureF(ctx, kubeClient)
-		if err != nil {
-			return err
+		if capture.Spec.OutputConfiguration.S3Upload != nil && capture.Spec.OutputConfiguration.S3Upload.SecretName != "" {
+			err = deleteSecret(ctx, kubeClient, &capture.Spec.OutputConfiguration.S3Upload.SecretName)
+			if err != nil {
+				retinacmd.Logger.Error("Failed to delete capture secret, please manually delete it",
+					zap.String("namespace", *opts.Namespace),
+					zap.String("secret name", capture.Spec.OutputConfiguration.S3Upload.SecretName),
+					zap.Error(err),
+				)
+			}
 		}
 
-		jobsCreated, err := createJobs(ctx, kubeClient, capture)
-		if err != nil {
-			retinacmd.Logger.Error("Failed to create job", zap.Error(err))
-			return err
+		if len(jobsFailedToDelete) == 0 && err == nil {
+			retinacmd.Logger.Info("Done for deleting jobs")
 		}
-		if nowait {
-			retinacmd.Logger.Info("Please manually delete all capture jobs")
-			if capture.Spec.OutputConfiguration.BlobUpload != nil {
-				retinacmd.Logger.Info("Please manually delete capture secret", zap.String("namespace", *opts.Namespace), zap.String("secret name", *capture.Spec.OutputConfiguration.BlobUpload))
-			}
-			if capture.Spec.OutputConfiguration.S3Upload != nil && capture.Spec.OutputConfiguration.S3Upload.SecretName != "" {
-				retinacmd.Logger.Info("Please manually delete capture secret", zap.String("namespace", *opts.Namespace), zap.String("secret name", capture.Spec.OutputConfiguration.S3Upload.SecretName))
-			}
-			printCaptureResult(jobsCreated)
-			return nil
-		}
+		return nil
+	}
 
-		// Wait until all jobs finish then delete the jobs before the timeout, otherwise print jobs created to
-		// let the customer recycle them.
-		retinacmd.Logger.Info("Waiting for capture jobs to finish")
+	retinacmd.Logger.Info("Not all job are completed in the given time")
+	retinacmd.Logger.Info("Please manually delete the Capture")
 
-		allJobsCompleted := waitUntilJobsComplete(ctx, kubeClient, jobsCreated)
+	return getCaptureAndPrintCaptureResult(ctx, kubeClient, capture.Name, *opts.Namespace)
+}
 
-		// Delete all jobs created only if they all completed, otherwise keep the jobs for debugging.
-		if allJobsCompleted {
-			retinacmd.Logger.Info("Deleting jobs as all jobs are completed")
-			jobsFailedToDelete := deleteJobs(ctx, kubeClient, jobsCreated)
-			if len(jobsFailedToDelete) != 0 {
-				retinacmd.Logger.Info("Please manually delete capture jobs failed to delete", zap.String("namespace", *opts.Namespace), zap.String("job list", strings.Join(jobsFailedToDelete, ",")))
-			}
+func GetClientset() (*kubernetes.Clientset, error) {
+	kubeConfig, err := opts.ToRESTConfig()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to compose k8s rest config")
+	}
 
-			if capture.Spec.OutputConfiguration.BlobUpload != nil {
-				err = deleteSecret(ctx, kubeClient, capture.Spec.OutputConfiguration.BlobUpload)
-				if err != nil {
-					retinacmd.Logger.Error("Failed to delete capture secret, please manually delete it",
-						zap.String("namespace", *opts.Namespace), zap.String("secret name", *capture.Spec.OutputConfiguration.BlobUpload), zap.Error(err))
-				}
-			}
+	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to initialize kubernetes client")
+	}
 
-			if capture.Spec.OutputConfiguration.S3Upload != nil && capture.Spec.OutputConfiguration.S3Upload.SecretName != "" {
-				err = deleteSecret(ctx, kubeClient, &capture.Spec.OutputConfiguration.S3Upload.SecretName)
-				if err != nil {
-					retinacmd.Logger.Error("Failed to delete capture secret, please manually delete it",
-						zap.String("namespace", *opts.Namespace),
-						zap.String("secret name", capture.Spec.OutputConfiguration.S3Upload.SecretName),
-						zap.Error(err),
-					)
-				}
-			}
+	return kubeClient, nil
+}
 
-			if len(jobsFailedToDelete) == 0 && err == nil {
-				retinacmd.Logger.Info("Done for deleting jobs")
-			}
-			return nil
-		}
+func NewCreateSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
+	createCapture := &cobra.Command{
+		Use:     "create",
+		Short:   "Create a Retina Capture",
+		Example: createExample,
+	}
 
-		retinacmd.Logger.Info("Not all job are completed in the given time")
-		retinacmd.Logger.Info("Please manually delete the Capture")
-		return getCaptureAndPrintCaptureResult(ctx, kubeClient, capture.Name, *opts.Namespace)
-	},
+	createCapture.RunE = func(*cobra.Command, []string) error {
+		return create(kubeClient)
+	}
+
+	createCapture.Flags().DurationVar(&opts.duration, "duration", DefaultDuration, "Duration of capturing packets")
+	createCapture.Flags().IntVar(&opts.maxSize, "max-size", DefaultMaxSize, "Limit the capture file to MB in size which works only for Linux") //nolint:gomnd // default
+	createCapture.Flags().IntVar(&opts.packetSize, "packet-size", DefaultPacketSize, "Limits the each packet to bytes in size which works only for Linux")
+	createCapture.Flags().StringVar(&opts.nodeNames, "node-names", "", "A comma-separated list of node names to select nodes on which the network capture will be performed")
+	createCapture.Flags().StringVar(&opts.nodeSelectors, "node-selectors", DefaultNodeSelectors, "A comma-separated list of node labels to select nodes on which the network capture will be performed")
+	createCapture.Flags().StringVar(&opts.podSelectors, "pod-selectors", "",
+		"A comma-separated list of pod labels to select pods on which the network capture will be performed")
+	createCapture.Flags().StringVar(&opts.namespaceSelectors, "namespace-selectors", "",
+		"A comma-separated list of namespace labels to filter which namespaces will be targeted for packet capture (used with --pod-selectors)")
+	createCapture.Flags().StringVar(&opts.hostPath, "host-path", DefaultHostPath, "HostPath of the node to store the capture files")
+	createCapture.Flags().StringVar(&opts.pvc, "pvc", "", "PersistentVolumeClaim under the specified or default namespace to store capture files")
+	createCapture.Flags().StringVar(&opts.blobUpload, "blob-upload", "", "Blob SAS URL with write permission to upload capture files")
+	createCapture.Flags().StringVar(&opts.s3Region, "s3-region", "", "Region where the S3 compatible bucket is located")
+	createCapture.Flags().StringVar(&opts.s3Endpoint, "s3-endpoint", "",
+		"Endpoint for an S3 compatible storage service. Use this if you are using a custom or private S3 service that requires a specific endpoint")
+	createCapture.Flags().StringVar(&opts.s3Bucket, "s3-bucket", "", "Bucket in which to store capture files")
+	createCapture.Flags().StringVar(&opts.s3Path, "s3-path", DefaultS3Path, "Prefix path within the S3 bucket where captures will be stored")
+	createCapture.Flags().StringVar(&opts.s3AccessKeyID, "s3-access-key-id", "", "S3 access key id to upload capture files")
+	createCapture.Flags().StringVar(&opts.s3SecretAccessKey, "s3-secret-access-key", "", "S3 access secret key to upload capture files")
+	createCapture.Flags().StringVar(&opts.tcpdumpFilter, "tcpdump-filter", "", "Raw tcpdump flags which works only for Linux")
+	createCapture.Flags().StringVar(&opts.interfaces, "interfaces", "", "Comma-separated list of network interfaces to capture on (e.g., eth0,eth1)")
+	createCapture.Flags().StringVar(&opts.excludeFilter, "exclude-filter", "", "A comma-separated list of IP:Port pairs that are "+
+		"excluded from capturing network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:*")
+	createCapture.Flags().StringVar(&opts.includeFilter, "include-filter", "", "A comma-separated list of IP:Port pairs that are "+
+		"used to filter capture network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:*")
+	createCapture.Flags().BoolVar(&opts.includeMetadata, "include-metadata", DefaultIncludeMetadata, "If true, collect static network metadata into capture file")
+	createCapture.Flags().IntVar(&opts.jobNumLimit, "job-num-limit", DefaultJobNumLimit, "The maximum number of jobs can be created for each capture. 0 means no limit")
+	createCapture.Flags().BoolVar(&opts.nowait, "no-wait", DefaultNowait, "Do not wait for the long-running capture job to finish")
+	createCapture.Flags().BoolVar(&opts.debug, "debug", DefaultDebug, "When debug is true, a customized retina-agent image, determined by the environment variable RETINA_AGENT_IMAGE, is set")
+
+	return createCapture
 }
 
 func createSecretFromBlobUpload(ctx context.Context, kubeClient kubernetes.Interface, blobUpload, captureName string) (string, error) {
@@ -240,6 +271,8 @@ func deleteSecret(ctx context.Context, kubeClient kubernetes.Interface, secretNa
 }
 
 func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*retinav1alpha1.Capture, error) {
+	timestamp := file.Now()
+
 	capture := &retinav1alpha1.Capture{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      *opts.Name,
@@ -247,48 +280,53 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 		},
 		Spec: retinav1alpha1.CaptureSpec{
 			CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
-				TcpdumpFilter:   &tcpdumpFilter,
+				TcpdumpFilter:   &opts.tcpdumpFilter,
 				CaptureTarget:   retinav1alpha1.CaptureTarget{},
-				IncludeMetadata: includeMetadata,
+				IncludeMetadata: opts.includeMetadata,
 				CaptureOption:   retinav1alpha1.CaptureOption{},
 			},
 		},
+		Status: retinav1alpha1.CaptureStatus{
+			StartTime: timestamp,
+		},
 	}
 
-	if duration != 0 {
-		retinacmd.Logger.Info(fmt.Sprintf("The capture duration is set to %s", duration))
-		capture.Spec.CaptureConfiguration.CaptureOption.Duration = &metav1.Duration{Duration: duration}
+	retinacmd.Logger.Info(fmt.Sprintf("Capture timestamp: %s", timestamp))
+
+	if opts.duration != 0 {
+		retinacmd.Logger.Info(fmt.Sprintf("The capture duration is set to %s", opts.duration))
+		capture.Spec.CaptureConfiguration.CaptureOption.Duration = &metav1.Duration{Duration: opts.duration}
 	}
 
-	if namespaceSelectors != "" || podSelectors != "" {
+	if opts.namespaceSelectors != "" || opts.podSelectors != "" {
 		// if node selector is using the default value (aka hasn't been set by user), set it to nil to prevent clash with namespace and pod selector
-		if nodeSelectors == DefaultNodeSelectors {
+		if opts.nodeSelectors == DefaultNodeSelectors {
 			retinacmd.Logger.Info("Overriding default node selectors value and setting it to nil. Using namespace and pod selectors. To use node selector, please remove namespace and pod selectors.")
-			nodeSelectors = ""
+			opts.nodeSelectors = ""
 		}
 	}
 
-	nodeSelectorLabelsMap, err := labels.ConvertSelectorToLabelsMap(nodeSelectors)
+	nodeSelectorLabelsMap, err := labels.ConvertSelectorToLabelsMap(opts.nodeSelectors)
 	if err != nil {
 		return nil, err
 	}
-	podSelectorLabelsMap, err := labels.ConvertSelectorToLabelsMap(podSelectors)
+	podSelectorLabelsMap, err := labels.ConvertSelectorToLabelsMap(opts.podSelectors)
 	if err != nil {
 		return nil, err
 	}
-	namespaceSelectorLabelsMap, err := labels.ConvertSelectorToLabelsMap(namespaceSelectors)
+	namespaceSelectorLabelsMap, err := labels.ConvertSelectorToLabelsMap(opts.namespaceSelectors)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(nodeSelectorLabelsMap) != 0 || len(nodeNames) != 0 {
+	if len(nodeSelectorLabelsMap) != 0 || opts.nodeNames != "" {
 		capture.Spec.CaptureConfiguration.CaptureTarget.NodeSelector = &metav1.LabelSelector{}
 	}
 	if len(nodeSelectorLabelsMap) != 0 {
 		capture.Spec.CaptureConfiguration.CaptureTarget.NodeSelector.MatchLabels = nodeSelectorLabelsMap
 	}
-	if len(nodeNames) != 0 {
-		nodeNameSlice := strings.Split(nodeNames, ",")
+	if opts.nodeNames != "" {
+		nodeNameSlice := strings.Split(opts.nodeNames, ",")
 		if len(nodeNameSlice) != 0 {
 			capture.Spec.CaptureConfiguration.CaptureTarget.NodeSelector.MatchExpressions = []metav1.LabelSelectorRequirement{{
 				Key:      corev1.LabelHostname,
@@ -298,70 +336,82 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 		}
 	}
 
+	// Add namespace selectors if provided, regardless of other selectors
 	if len(namespaceSelectorLabelsMap) != 0 {
 		capture.Spec.CaptureConfiguration.CaptureTarget.NamespaceSelector = &metav1.LabelSelector{
 			MatchLabels: namespaceSelectorLabelsMap,
 		}
 	}
+
+	// Add pod selectors if provided
 	if len(podSelectorLabelsMap) != 0 {
 		capture.Spec.CaptureConfiguration.CaptureTarget.PodSelector = &metav1.LabelSelector{
 			MatchLabels: podSelectorLabelsMap,
 		}
 	}
 
-	if maxSize != 0 {
-		retinacmd.Logger.Info(fmt.Sprintf("The capture file max size is set to %dMB", maxSize))
-		capture.Spec.CaptureConfiguration.CaptureOption.MaxCaptureSize = &maxSize
+	if opts.maxSize != 0 {
+		retinacmd.Logger.Info(fmt.Sprintf("The capture file max size is set to %dMB", opts.maxSize))
+		capture.Spec.CaptureConfiguration.CaptureOption.MaxCaptureSize = &opts.maxSize
 	}
 
-	if packetSize != 0 {
-		retinacmd.Logger.Info(fmt.Sprintf("The capture packet size is set to %d bytes", packetSize))
-		capture.Spec.CaptureConfiguration.CaptureOption.PacketSize = &packetSize
+	if opts.packetSize != 0 {
+		retinacmd.Logger.Info(fmt.Sprintf("The capture packet size is set to %d bytes", opts.packetSize))
+		capture.Spec.CaptureConfiguration.CaptureOption.PacketSize = &opts.packetSize
 	}
 
-	if len(hostPath) != 0 {
-		capture.Spec.OutputConfiguration.HostPath = &hostPath
-	}
-	if len(pvc) != 0 {
-		capture.Spec.OutputConfiguration.PersistentVolumeClaim = &pvc
+	if opts.interfaces != "" {
+		interfaceSlice := strings.Split(opts.interfaces, ",")
+		for i := range interfaceSlice {
+			interfaceSlice[i] = strings.TrimSpace(interfaceSlice[i])
+		}
+		retinacmd.Logger.Info(fmt.Sprintf("Capturing on specific interfaces: %v", interfaceSlice))
+		capture.Spec.CaptureConfiguration.CaptureOption.Interfaces = interfaceSlice
 	}
 
-	if len(blobUpload) != 0 {
+	if opts.hostPath != "" {
+		capture.Spec.OutputConfiguration.HostPath = &opts.hostPath
+	}
+	if opts.pvc != "" {
+		capture.Spec.OutputConfiguration.PersistentVolumeClaim = &opts.pvc
+	}
+
+	if opts.blobUpload != "" {
 		// Mount blob url as secret onto the capture pod for security concern if blob url is not empty.
-		secretName, err := createSecretFromBlobUpload(ctx, kubeClient, blobUpload, *opts.Name)
+		secretName, err := createSecretFromBlobUpload(ctx, kubeClient, opts.blobUpload, *opts.Name)
 		if err != nil {
 			return nil, err
 		}
 		capture.Spec.OutputConfiguration.BlobUpload = &secretName
 	}
 
-	if s3Bucket != "" {
-		secretName, err := createSecretFromS3Upload(ctx, kubeClient, s3AccessKeyID, s3SecretAccessKey, *opts.Name)
+	if opts.s3Bucket != "" {
+		secretName, err := createSecretFromS3Upload(ctx, kubeClient, opts.s3AccessKeyID, opts.s3SecretAccessKey, *opts.Name)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create s3 upload secret: %w", err)
 		}
 		capture.Spec.OutputConfiguration.S3Upload = &retinav1alpha1.S3Upload{
-			Endpoint:   s3Endpoint,
-			Bucket:     s3Bucket,
+			Endpoint:   opts.s3Endpoint,
+			Bucket:     opts.s3Bucket,
 			SecretName: secretName,
-			Region:     s3Region,
-			Path:       s3Path,
+			Region:     opts.s3Region,
+			Path:       opts.s3Path,
 		}
 	}
 
-	if len(excludeFilter) != 0 {
+	if opts.excludeFilter != "" {
 		if capture.Spec.CaptureConfiguration.Filters == nil {
 			capture.Spec.CaptureConfiguration.Filters = &retinav1alpha1.CaptureConfigurationFilters{}
 		}
-		excludeFilterSlice := strings.Split(excludeFilter, ",")
+		excludeFilterSlice := strings.Split(opts.excludeFilter, ",")
 		capture.Spec.CaptureConfiguration.Filters.Exclude = excludeFilterSlice
 	}
 
-	if len(includeFilter) != 0 {
+	if opts.includeFilter != "" {
 		if capture.Spec.CaptureConfiguration.Filters == nil {
 			capture.Spec.CaptureConfiguration.Filters = &retinav1alpha1.CaptureConfigurationFilters{}
 		}
-		includeFilterSlice := strings.Split(includeFilter, ",")
+		includeFilterSlice := strings.Split(opts.includeFilter, ",")
 		capture.Spec.CaptureConfiguration.Filters.Include = includeFilterSlice
 	}
 	return capture, nil
@@ -370,9 +420,9 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 func getCLICaptureConfig() config.CaptureConfig {
 	return config.CaptureConfig{
 		CaptureImageVersion:       buildinfo.Version,
-		CaptureDebug:              debug,
+		CaptureDebug:              opts.debug,
 		CaptureImageVersionSource: captureUtils.VersionSourceCLIVersion,
-		CaptureJobNumLimit:        jobNumLimit,
+		CaptureJobNumLimit:        opts.jobNumLimit,
 	}
 }
 
@@ -399,15 +449,15 @@ func waitUntilJobsComplete(ctx context.Context, kubeClient kubernetes.Interface,
 	allJobsCompleted := false
 
 	// TODO: let's make the timeout and period to wait for all job to finish configurable.
-	var deadline time.Duration = DefaultWaitTimeout
-	if duration != 0 {
-		deadline = duration * 2
+	deadline := DefaultWaitTimeout
+	if opts.duration != 0 {
+		deadline = opts.duration * 2
 	}
 
-	var period time.Duration = DefaultWaitPeriod
+	period := DefaultWaitPeriod
 	// To print less noisy messages, we rely on duration to decide the wait period.
-	if period < duration/10 {
-		period = duration / 10
+	if period < opts.duration/10 {
+		period = opts.duration / 10
 	}
 	retinacmd.Logger.Info(fmt.Sprintf("Waiting timeout is set to %s", deadline))
 
@@ -463,36 +513,4 @@ func deleteJobs(ctx context.Context, kubeClient kubernetes.Interface, jobs []bat
 		}
 	}
 	return jobsFailedtoDelete
-}
-
-func init() {
-	capture.AddCommand(createCapture)
-	createCapture.Flags().DurationVar(&duration, "duration", DefaultDuration, "Duration of capturing packets")
-	createCapture.Flags().IntVar(&maxSize, "max-size", DefaultMaxSize, "Limit the capture file to MB in size which works only for Linux") //nolint:gomnd // default
-	createCapture.Flags().IntVar(&packetSize, "packet-size", DefaultPacketSize, "Limits the each packet to bytes in size which works only for Linux")
-	createCapture.Flags().StringVar(&nodeNames, "node-names", "", "A comma-separated list of node names to select nodes on which the network capture will be performed")
-	createCapture.Flags().StringVar(&nodeSelectors, "node-selectors", DefaultNodeSelectors, "A comma-separated list of node labels to select nodes on which the network capture will be performed")
-	createCapture.Flags().StringVar(&podSelectors, "pod-selectors", "",
-		"A comma-separated list of pod labels to select pods on which the network capture will be performed")
-	createCapture.Flags().StringVar(&namespaceSelectors, "namespace-selectors", "",
-		"A comma-separated list of namespace labels in which to apply the pod-selectors. By default, the pod namespace is specified by the flag namespace")
-	createCapture.Flags().StringVar(&hostPath, "host-path", DefaultHostPath, "HostPath of the node to store the capture files")
-	createCapture.Flags().StringVar(&pvc, "pvc", "", "PersistentVolumeClaim under the specified or default namespace to store capture files")
-	createCapture.Flags().StringVar(&blobUpload, "blob-upload", "", "Blob SAS URL with write permission to upload capture files")
-	createCapture.Flags().StringVar(&s3Region, "s3-region", "", "Region where the S3 compatible bucket is located")
-	createCapture.Flags().StringVar(&s3Endpoint, "s3-endpoint", "",
-		"Endpoint for an S3 compatible storage service. Use this if you are using a custom or private S3 service that requires a specific endpoint")
-	createCapture.Flags().StringVar(&s3Bucket, "s3-bucket", "", "Bucket in which to store capture files")
-	createCapture.Flags().StringVar(&s3Path, "s3-path", DefaultS3Path, "Prefix path within the S3 bucket where captures will be stored")
-	createCapture.Flags().StringVar(&s3AccessKeyID, "s3-access-key-id", "", "S3 access key id to upload capture files")
-	createCapture.Flags().StringVar(&s3SecretAccessKey, "s3-secret-access-key", "", "S3 access secret key to upload capture files")
-	createCapture.Flags().StringVar(&tcpdumpFilter, "tcpdump-filter", "", "Raw tcpdump flags which works only for Linux")
-	createCapture.Flags().StringVar(&excludeFilter, "exclude-filter", "", "A comma-separated list of IP:Port pairs that are "+
-		"excluded from capturing network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:*")
-	createCapture.Flags().StringVar(&includeFilter, "include-filter", "", "A comma-separated list of IP:Port pairs that are "+
-		"used to filter capture network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:*")
-	createCapture.Flags().BoolVar(&includeMetadata, "include-metadata", DefaultIncludeMetadata, "If true, collect static network metadata into capture file")
-	createCapture.Flags().IntVar(&jobNumLimit, "job-num-limit", DefaultJobNumLimit, "The maximum number of jobs can be created for each capture. 0 means no limit")
-	createCapture.Flags().BoolVar(&nowait, "no-wait", DefaultNowait, "Do not wait for the long-running capture job to finish")
-	createCapture.Flags().BoolVar(&debug, "debug", DefaultDebug, "When debug is true, a customized retina-agent image, determined by the environment variable RETINA_AGENT_IMAGE, is set")
 }
