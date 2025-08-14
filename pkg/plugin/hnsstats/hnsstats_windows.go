@@ -81,15 +81,6 @@ func (h *hnsstats) Init() error {
 	}
 	// Filter out any endpoints that are not in "AttachedShared" State. All running Windows pods with networking must be in this state.
 	var filterMap map[string]uint16
-	if !h.cfg.EnableStandalone {
-		filterMap = map[string]uint16{"State": HCN_ENDPOINT_STATE_ATTACHED_SHARING}
-		filter, err := json.Marshal(filterMap)
-		if err != nil {
-			return fmt.Errorf("failed to marshal filter map: %w", err)
-		}
-		h.endpointQuery.Filter = string(filter)
-	}
-
 	if h.cfg.EnableStandalone {
 		if instance := enricher.StandaloneInstance(); instance != nil {
 			InitializeAdvancedMetrics()
@@ -100,6 +91,13 @@ func (h *hnsstats) Init() error {
 		} else {
 			h.l.Warn("Standalone enricher is not initialized")
 		}
+	} else {
+		filterMap = map[string]uint16{"State": HCN_ENDPOINT_STATE_ATTACHED_SHARING}
+		filter, err := json.Marshal(filterMap)
+		if err != nil {
+			return fmt.Errorf("failed to marshal filter map: %w", err)
+		}
+		h.endpointQuery.Filter = string(filter)
 	}
 
 	h.l.Info("Exiting hnsstats Init...")
