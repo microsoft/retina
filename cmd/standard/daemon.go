@@ -5,7 +5,6 @@ package standard
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
@@ -25,6 +24,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	"github.com/go-logr/zapr"
+	"github.com/microsoft/retina/cmd/telemetry"
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/internal/buildinfo"
 	"github.com/microsoft/retina/pkg/config"
@@ -35,20 +35,17 @@ import (
 	pc "github.com/microsoft/retina/pkg/controllers/daemon/pod"
 	kec "github.com/microsoft/retina/pkg/controllers/daemon/retinaendpoint"
 	sc "github.com/microsoft/retina/pkg/controllers/daemon/service"
+	"github.com/microsoft/retina/pkg/log"
 
 	"github.com/microsoft/retina/pkg/enricher"
-	"github.com/microsoft/retina/pkg/log"
 	cm "github.com/microsoft/retina/pkg/managers/controllermanager"
 	"github.com/microsoft/retina/pkg/managers/filtermanager"
 	"github.com/microsoft/retina/pkg/metrics"
 	mm "github.com/microsoft/retina/pkg/module/metrics"
 	"github.com/microsoft/retina/pkg/pubsub"
-	"github.com/microsoft/retina/pkg/telemetry"
 )
 
 const (
-	logFileName = "retina.log"
-
 	nodeNameEnvKey = "NODE_NAME"
 	nodeIPEnvKey   = "NODE_IP"
 )
@@ -62,73 +59,45 @@ func init() {
 }
 
 type Daemon struct {
+	config               *config.Config
 	metricsAddr          string
 	probeAddr            string
 	enableLeaderElection bool
-	configFile           string
 }
 
-func NewDaemon(metricsAddr, probeAddr, configFile string, enableLeaderElection bool) *Daemon {
+func NewDaemon(daemoncfg *config.Config, metricsAddr, probeAddr string, enableLeaderElection bool) *Daemon {
 	return &Daemon{
+		config:               daemoncfg,
 		metricsAddr:          metricsAddr,
 		probeAddr:            probeAddr,
 		enableLeaderElection: enableLeaderElection,
-		configFile:           configFile,
 	}
 }
 
-func (d *Daemon) Start() error {
-	fmt.Printf("starting Retina daemon with legacy control plane %v\n", buildinfo.Version)
-
-	if buildinfo.ApplicationInsightsID != "" {
-		telemetry.InitAppInsights(buildinfo.ApplicationInsightsID, buildinfo.Version)
-		defer telemetry.ShutdownAppInsights()
-		defer telemetry.TrackPanic()
-	}
-
-	daemonConfig, err := config.GetConfig(d.configFile)
-	if err != nil {
-		panic(err)
-	}
-
+func (d *Daemon) Start(zl *log.ZapLogger) error {
+	fmt.Printf("Starting Retina daemon with legacy control plane %v\n", buildinfo.Version)
 	fmt.Println("init client-go")
-	var cfg *rest.Config
+
+	var restCfg *rest.Config
+	var err error
 	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
-		fmt.Println("KUBECONFIG set, using kubeconfig: ", kubeconfig)
-		cfg, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+		fmt.Println("KUBECONFIG detected, using kubeconfig: ", kubeconfig)
+		restCfg, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 		if err != nil {
 			return fmt.Errorf("creating controller-runtime manager: %w", err)
 		}
 	} else {
-		cfg, err = kcfg.GetConfig()
+		restCfg, err = kcfg.GetConfig()
 		if err != nil {
 			panic(err)
 		}
 	}
 
-	fmt.Println("api server: ", cfg.Host)
+	fmt.Println("api server: ", restCfg.Host)
 
-	fmt.Println("init logger")
-	zl, err := log.SetupZapLogger(&log.LogOpts{
-		Level:                 daemonConfig.LogLevel,
-		File:                  false,
-		FileName:              logFileName,
-		MaxFileSizeMB:         100, //nolint:gomnd // defaults
-		MaxBackups:            3,   //nolint:gomnd // defaults
-		MaxAgeDays:            30,  //nolint:gomnd // defaults
-		ApplicationInsightsID: buildinfo.ApplicationInsightsID,
-		EnableTelemetry:       daemonConfig.EnableTelemetry,
-	},
-		zap.String("version", buildinfo.Version),
-		zap.String("apiserver", cfg.Host),
-		zap.String("plugins", strings.Join(daemonConfig.EnabledPlugin, `,`)),
-		zap.String("data aggregation level", daemonConfig.DataAggregationLevel.String()),
+	mainLogger := zl.Named("main").Sugar().With(
+		"apiserver", restCfg.Host,
 	)
-	if err != nil {
-		panic(err)
-	}
-	defer zl.Close()
-	mainLogger := zl.Named("main").Sugar()
 
 	// Allow the current process to lock memory for eBPF resources.
 	// OS specific implementation.
@@ -138,31 +107,14 @@ func (d *Daemon) Start() error {
 	}
 
 	metrics.InitializeMetrics()
+	mainLogger.Info(zap.String("data aggregation level", d.config.DataAggregationLevel.String()))
 
-	mainLogger.Info(zap.String("data aggregation level", daemonConfig.DataAggregationLevel.String()))
-
-	var tel telemetry.Telemetry
-	if daemonConfig.EnableTelemetry {
-		if buildinfo.ApplicationInsightsID == "" {
-			panic("telemetry enabled, but ApplicationInsightsID is empty")
-		}
-		mainLogger.Info("telemetry enabled", zap.String("applicationInsightsID", buildinfo.ApplicationInsightsID))
-		tel, err = telemetry.NewAppInsightsTelemetryClient("retina-agent", map[string]string{
-			"version":   buildinfo.Version,
-			"apiserver": cfg.Host,
-			"plugins":   strings.Join(daemonConfig.EnabledPlugin, `,`),
-		})
-		if err != nil {
-			mainLogger.Error("failed to create telemetry client", zap.Error(err))
-			return fmt.Errorf("error when creating telemetry client: %w", err)
-		}
-	} else {
-		mainLogger.Info("telemetry disabled")
-		tel = telemetry.NewNoopTelemetry()
+	tel, err := telemetry.InitializeTelemetryClient(restCfg, d.config, mainLogger)
+	if err != nil {
+		return fmt.Errorf("failed to initialize telemetry client: %w", err)
 	}
 
 	// Create a manager for controller-runtime
-
 	mgrOption := crmgr.Options{
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
@@ -174,7 +126,7 @@ func (d *Daemon) Start() error {
 	}
 
 	// Local context has its meaning only when pod level(advanced) metrics is enabled.
-	if daemonConfig.EnablePodLevel && !daemonConfig.RemoteContext {
+	if d.config.EnablePodLevel && !d.config.RemoteContext {
 		mainLogger.Info("Remote context is disabled, only pods deployed on the same node as retina-agent will be monitored")
 		// the new cache sets Selector options on the Manager cache which are used
 		// to perform *server-side* filtering of the cached objects. This is very important
@@ -206,7 +158,7 @@ func (d *Daemon) Start() error {
 		}
 	}
 
-	mgr, err := crmgr.New(cfg, mgrOption)
+	mgr, err := crmgr.New(restCfg, mgrOption)
 	if err != nil {
 		mainLogger.Error("Unable to start manager", zap.Error(err))
 		return fmt.Errorf("creating controller-runtime manager: %w", err)
@@ -236,7 +188,7 @@ func (d *Daemon) Start() error {
 	ctx := ctrl.SetupSignalHandler()
 	ctrl.SetLogger(zapr.NewLogger(zl.Logger.Named("controller-runtime")))
 
-	if daemonConfig.EnablePodLevel {
+	if d.config.EnablePodLevel {
 		pubSub := pubsub.New()
 		controllerCache := controllercache.New(pubSub)
 		enrich := enricher.New(ctx, controllerCache)
@@ -247,16 +199,16 @@ func (d *Daemon) Start() error {
 		}
 		defer fm.Stop() //nolint:errcheck // best effort
 		enrich.Run()
-		metricsModule := mm.InitModule(ctx, daemonConfig, pubSub, enrich, fm, controllerCache)
+		metricsModule := mm.InitModule(ctx, d.config, pubSub, enrich, fm, controllerCache)
 
-		if !daemonConfig.RemoteContext {
+		if !d.config.RemoteContext {
 			mainLogger.Info("Initializing Pod controller")
 
 			podController := pc.New(mgr.GetClient(), controllerCache)
 			if err := podController.SetupWithManager(mgr); err != nil {
 				mainLogger.Fatal("unable to create PodController", zap.Error(err))
 			}
-		} else if daemonConfig.EnableRetinaEndpoint {
+		} else if d.config.EnableRetinaEndpoint {
 			mainLogger.Info("RetinaEndpoint is enabled")
 			mainLogger.Info("Initializing RetinaEndpoint controller")
 
@@ -278,7 +230,7 @@ func (d *Daemon) Start() error {
 			mainLogger.Fatal("unable to create svcController", zap.Error(err))
 		}
 
-		if daemonConfig.EnableAnnotations {
+		if d.config.EnableAnnotations {
 			mainLogger.Info("Initializing MetricsConfig namespaceController")
 			namespaceController := namespacecontroller.New(mgr.GetClient(), controllerCache, metricsModule)
 			if err := namespaceController.SetupWithManager(mgr); err != nil {
@@ -294,7 +246,7 @@ func (d *Daemon) Start() error {
 		}
 	}
 
-	controllerMgr, err := cm.NewControllerManager(daemonConfig, cl, tel)
+	controllerMgr, err := cm.NewControllerManager(d.config, cl, tel)
 	if err != nil {
 		mainLogger.Fatal("Failed to create controller manager", zap.Error(err))
 	}
@@ -307,7 +259,7 @@ func (d *Daemon) Start() error {
 	defer controllerMgr.Stop(ctx)
 
 	// start heartbeat goroutine for application insights
-	go tel.Heartbeat(ctx, daemonConfig.TelemetryInterval)
+	go tel.Heartbeat(ctx, d.config.TelemetryInterval)
 
 	// Start controller manager, which will start http server and plugin manager.
 	go controllerMgr.Start(ctx)

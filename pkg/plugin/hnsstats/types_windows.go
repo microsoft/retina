@@ -10,7 +10,14 @@ import (
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/hcn"
 	kcfg "github.com/microsoft/retina/pkg/config"
+	"github.com/microsoft/retina/pkg/controllers/cache"
+	"github.com/microsoft/retina/pkg/enricher"
+	"github.com/microsoft/retina/pkg/exporter"
 	"github.com/microsoft/retina/pkg/log"
+	"github.com/microsoft/retina/pkg/metrics"
+	m "github.com/microsoft/retina/pkg/module/metrics"
+	"github.com/microsoft/retina/pkg/utils"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 
@@ -18,8 +25,8 @@ import (
 )
 
 const (
-	name          string = "hnsstats"
-	HnsStatsEvent string = "hnsstatscount"
+	name string = "hnsstats"
+
 	// From HNSStats API
 	PacketsReceived        string = "win_packets_recv_count"
 	PacketsSent            string = "win_packets_sent_count"
@@ -67,12 +74,22 @@ const (
 	egressLabel  = "egress"
 )
 
+var (
+	AdvForwardPacketsGauge     *prometheus.GaugeVec
+	AdvForwardBytesGauge       *prometheus.GaugeVec
+	AdvHNSStatsGauge           *prometheus.GaugeVec
+	AdvDroppedPacketsGauge     *prometheus.GaugeVec
+	AdvTCPConnectionStatsGauge *prometheus.GaugeVec
+	AdvTCPFlagGauge            *prometheus.GaugeVec
+)
+
 type hnsstats struct {
 	cfg           *kcfg.Config
 	interval      time.Duration
 	state         int
 	l             *log.ZapLogger
 	endpointQuery hcn.HostComputeQuery
+	enricher      *enricher.StandaloneEnricher
 }
 
 type HnsStatsData struct {
@@ -146,4 +163,83 @@ func updateCounter(counterName string, attr *[]attribute.KeyValue, m metric.Mete
 func (h *HnsStatsData) String() string {
 	return fmt.Sprintf("Endpoint ID: %s, Packets received: %d, Packets sent %d, Bytes sent %d, Bytes received %d",
 		h.hnscounters.EndpointID, h.hnscounters.PacketsReceived, h.hnscounters.PacketsSent, h.hnscounters.BytesSent, h.hnscounters.BytesReceived)
+}
+
+func InitializeAdvancedMetrics() {
+	if exporter.AdvancedRegistry != nil {
+		cleanAdvMetrics()
+		exporter.ResetAdvancedMetricsRegistry()
+	}
+
+	AdvForwardPacketsGauge = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.AdvancedRegistry,
+		m.TotalCountName,
+		m.TotalCountDesc,
+		utils.Direction,
+		"ip",
+		"pod",
+		"namespace",
+	)
+	AdvForwardBytesGauge = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.AdvancedRegistry,
+		m.TotalBytesName,
+		m.TotalBytesDesc,
+		utils.Direction,
+		"ip",
+		"pod",
+		"namespace",
+	)
+	AdvHNSStatsGauge = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.AdvancedRegistry,
+		"adv_"+metrics.HNSStats,
+		metrics.HNSStatsDescription,
+		utils.Direction,
+		"ip",
+		"pod",
+		"namespace",
+	)
+	AdvDroppedPacketsGauge = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.AdvancedRegistry,
+		m.TotalDropCountName,
+		m.TotalDropCountDesc,
+		utils.Reason,
+		utils.Direction,
+		"ip",
+		"pod",
+		"namespace",
+	)
+	// Bytes not available in HNS stats
+	AdvTCPConnectionStatsGauge = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.AdvancedRegistry,
+		"adv_"+utils.TCPConnectionStatsName,
+		metrics.TCPConnectionStatsGaugeDescription,
+		utils.StatName,
+		"ip",
+		"pod",
+		"namespace",
+	)
+	AdvTCPFlagGauge = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.AdvancedRegistry,
+		m.TCPFlagsCountName,
+		m.TCPFlagsCountDesc,
+		utils.Direction,
+		utils.Flag,
+		"ip",
+		"pod",
+		"namespace",
+	)
+}
+
+func cleanAdvMetrics() {
+	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(AdvForwardPacketsGauge))
+	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(AdvForwardBytesGauge))
+	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(AdvHNSStatsGauge))
+	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(AdvDroppedPacketsGauge))
+	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(AdvTCPConnectionStatsGauge))
+	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(AdvTCPFlagGauge))
+}
+
+func updateMetric(gauge *prometheus.GaugeVec, ip string, podInfo *cache.PodInfo, value uint64, labels ...string) {
+	labels = append(labels, ip, podInfo.Name, podInfo.Namespace)
+	gauge.WithLabelValues(labels...).Set(float64(value))
 }
