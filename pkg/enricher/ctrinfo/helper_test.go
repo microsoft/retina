@@ -13,12 +13,6 @@ import (
 	"sigs.k8s.io/kind/pkg/errors"
 )
 
-var (
-	errGetPods    = errors.New("Failed to get running pods")
-	errInspectPod = errors.New("Failed to inspect pod information")
-	errJSONRead   = errors.New("unexpected end of JSON input")
-)
-
 func TestGetPodInfo(t *testing.T) {
 	invalidJSONPath := "invalid_pod_spec.json"
 	invalidJSONContent := `{"status": {"metadata": {"name": "retina-pod", "namespace": "retina-namespace"}`
