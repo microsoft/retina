@@ -1,0 +1,37 @@
+{
+    "Network": {
+        "ExternalInterfaces": {
+            "Ethernet": {
+                "Name": "Ethernet",
+                "Networks": {
+                    "mock_network": {
+                        "Endpoints": {
+                            "mock_endpoint_1": {
+                                "Id": "X",
+                                "IPAddresses": [
+                                    {
+                                        "IP": "192.0.0.5",
+                                        "Mask": "X"
+                                    }
+                                ],
+                                "PODName": "retina-pod",
+                                "PODNameSpace": "retina-namespace"
+                            },
+                            "mock_endpoint_2": {
+                                "Id": "Y",
+                                "IPAddresses": [
+                                    {
+                                        "IP": "192.0.0.4",
+                                        "Mask": "Y"
+                                    }
+                                ],
+                                "PODName": "retina2-pod",
+                                "PODNameSpace": "retina2-namespace"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

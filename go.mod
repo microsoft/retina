@@ -317,6 +317,7 @@ require (
 	k8s.io/metrics v0.32.3
 	k8s.io/perf-tests/network/benchmarks/netperf v0.0.0-00010101000000-000000000000
 	sigs.k8s.io/controller-runtime v0.20.4
+	sigs.k8s.io/kind v0.23.0
 )
 
 require (
@@ -662,7 +663,6 @@ require (
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20211110210527-619e6b92dab9 // indirect
 	sigs.k8s.io/controller-tools v0.16.5 // indirect
 	sigs.k8s.io/gateway-api v1.2.1-0.20250319040149-e8b8afabf889 // indirect
-	sigs.k8s.io/kind v0.23.0 // indirect
 	sigs.k8s.io/mcs-api v0.1.1-0.20250224121229-6c631f4730d0 // indirect
 	sigs.k8s.io/mcs-api/controllers v0.0.0-20250224121229-6c631f4730d0 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
