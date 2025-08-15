@@ -156,7 +156,9 @@ var Cell = cell.Module(
 		func() *ipcache.IPCache {
 			alloc := cache.NewCachingIdentityAllocator(
 				&identityAllocatorOwner{},
-				cache.AllocatorConfig{},
+				cache.AllocatorConfig{
+					EnableOperatorManageCIDs: true,
+				},
 			)
 			idAlloc := &cachingIdentityAllocator{
 				alloc,
