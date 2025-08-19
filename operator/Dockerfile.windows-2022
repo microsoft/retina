@@ -1,5 +1,5 @@
-# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.4-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:250d01e55a37bd79d7014ae83f9f50aa6fa5570ca910e7f19faeff4bb0132ae1 AS builder
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.6-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:da2126cc938c2ced6d2b5e786b705e6a5241995d7a157e467c30b001cdcff915 AS builder
 
 # Build args
 ARG VERSION
