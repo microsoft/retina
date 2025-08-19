@@ -121,6 +121,25 @@ void create_drop_event(struct drop_notify* drp_elm)
 	drp_elm->ifindex	= 0;
 }
 
+void create_pktmon_drop_event(struct drop_notify* drp_elm)
+{
+    memset(drp_elm, 0, sizeof(struct drop_notify));
+    drp_elm->type       = PKTMON_NOTIFY_DROP;
+	drp_elm->subtype    = 7;
+	drp_elm->source     = 10; // random source
+	drp_elm->hash       = 0;
+	drp_elm->len_orig   = 128;
+	drp_elm->len_cap    = 128;
+	drp_elm->version    = 1;
+	drp_elm->src_label	= 0;
+	drp_elm->dst_label	= 0;
+	drp_elm->dst_id		= 0;
+	drp_elm->line		= 0;
+    drp_elm->file		= 0;
+    drp_elm->ext_error	= 0;
+	drp_elm->ifindex	= 0;
+}
+
 int
 check_filter(struct filter* flt, struct five_tuple* tup) {
 
@@ -254,6 +273,7 @@ event_writer(xdp_md_t* ctx) {
         memcpy(drp_elm->data, ctx->data, size_to_copy);
         bpf_perf_event_output(ctx, &cilium_events, EBPF_MAP_FLAG_CURRENT_CPU , drp_elm, sizeof(struct drop_notify));
 
+        // TODO move this to PKTMON_NOTIFY_DROP
         // Create Windows specific drop event with hardcoded reason code
         {
             struct metrics_value *win_entry, win_new_entry = {};
@@ -275,6 +295,23 @@ event_writer(xdp_md_t* ctx) {
                 bpf_map_update_elem(&windows_metrics, &win_key, &win_new_entry, 0);
             }
         }
+    }
+
+    
+    if (flt_evttype == PKTMON_NOTIFY_DROP) {
+        struct drop_notify* drp_elm;
+
+        //Create a Mock Drop Event
+        drp_elm = (struct drop_notify *) bpf_map_lookup_elem(&drp_buffer, &buf_key);
+        if (drp_elm == NULL) {
+            return XDP_PASS;
+        }
+        reason = 130;
+        create_pktmon_drop_event(drp_elm);
+        memset(drp_elm->data, 0, sizeof(drp_elm->data));
+        memcpy(drp_elm->data, ctx->data, size_to_copy);
+        bpf_perf_event_output(ctx, &cilium_events, EBPF_MAP_FLAG_CURRENT_CPU , drp_elm, sizeof(struct drop_notify));
+
     }
 
     update_metrics(size_to_copy, METRIC_INGRESS, reason, 0, 0);
