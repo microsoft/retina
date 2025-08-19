@@ -59,7 +59,7 @@ jobs:
               BUILDX_ACTION=--push
           else
             make retina-image \
-              IMAGE_NAMESPACE=${{ github.repository }} \
+              IMAGE_NAMESPACE=$REPO_LOWER \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
           fi
         env:
@@ -112,7 +112,7 @@ jobs:
               BUILDX_ACTION=--push
           else
             make retina-image-win \
-              IMAGE_NAMESPACE=${{ github.repository }} \
+              IMAGE_NAMESPACE=$REPO_LOWER \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               WINDOWS_YEARS=${{ matrix.year }} 
           fi
@@ -164,7 +164,7 @@ jobs:
               BUILDX_ACTION=--push
           else
             make retina-operator-image \
-              IMAGE_NAMESPACE=${{ github.repository }} \
+              IMAGE_NAMESPACE=$REPO_LOWER \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
           fi
         env:
@@ -214,7 +214,7 @@ jobs:
               BUILDX_ACTION=--push
           else
             make retina-shell-image \
-              IMAGE_NAMESPACE=${{ github.repository }} \
+              IMAGE_NAMESPACE=$REPO_LOWER \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
           fi
         env:
@@ -264,7 +264,7 @@ jobs:
               BUILDX_ACTION=--push
           else
             make kubectl-retina-image \
-              IMAGE_NAMESPACE=${{ github.repository }} \
+              IMAGE_NAMESPACE=$REPO_LOWER \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
           fi
         env:
