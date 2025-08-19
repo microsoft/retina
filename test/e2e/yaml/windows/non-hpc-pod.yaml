@@ -9,7 +9,7 @@ spec:
     "kubernetes.io/os": windows
   containers:
   - name: non-hpc-container
-    image: ghcr.io/LakshK98/retina/test/e2e-test-event-writer:latest
+    image: ghcr.io/lakshk98/retina/test/e2e-test-event-writer:latest
     command: ["powershell", "-Command", "while ($true) { Start-Sleep -Seconds 3600 }"]
     securityContext:
         windowsOptions:
