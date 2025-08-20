@@ -23,7 +23,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: azure/setup-helm@v4.3.0
+      - uses: azure/setup-helm@v4.3.1
         id: install
       
       - name: Install Cosign
