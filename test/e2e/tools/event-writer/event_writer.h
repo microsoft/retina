@@ -166,6 +166,25 @@ struct drop_notify {
 	uint8_t        data[128];
 };
 
+
+struct pktmon_notify {
+	uint8_t		type;
+    uint8_t		subtype;
+	uint16_t		source;
+	uint32_t		hash;
+    uint32_t		len_orig;
+	uint16_t		len_cap;
+	uint16_t		version;
+	uint32_t		src_label;
+	uint32_t		dst_label;
+	uint32_t		dst_id; /* 0 for egress */
+	uint16_t		line;
+	uint8_t		file;
+	int8_t		ext_error;
+	uint32_t		ifindex;
+	uint8_t        data[128];
+};
+
 struct metrics_key {
 	uint8_t     reason;	/* 0: forwarded, >0 dropped */
 	uint8_t     dir:2,	/* 1: ingress 2: egress */
@@ -237,10 +256,10 @@ typedef struct _PKTMON_EVT_STREAM_PACKET_HEADER
     PKTMON_EVT_STREAM_METADATA Metadata;
 } PKTMON_EVT_STREAM_PACKET_HEADER;
 
-typedef struct pktmon_notify {
-    PKTMON_EVT_STREAM_PACKET_HEADER  header;
-    uint8_t                           data[128];
-} pktmon_notify_t;
+// typedef struct pktmon_notify {
+//     PKTMON_EVT_STREAM_PACKET_HEADER  header;
+//     uint8_t                           data[128];
+// } pktmon_notify_t;
 
 #pragma pack(pop)
 
