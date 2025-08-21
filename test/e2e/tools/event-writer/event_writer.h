@@ -35,7 +35,6 @@ enum {
 	CILIUM_NOTIFY_POLICY_VERDICT,
 	CILIUM_NOTIFY_CAPTURE,
 	CILIUM_NOTIFY_TRACE_SOCK,
-    PKTMON_NOTIFY_DROP,
 };
 
 enum {
@@ -188,59 +187,5 @@ struct metrics_value {
 	uint64_t	count;
 	uint64_t	bytes;
 };
-
-
-// enum _PKTMON_DIRECTION_TAG
-// {
-//     PktMonDirTag_Unspecified = 0,
-//     PktMonDirTag_In,
-//     PktMonDirTag_Out,
-//     PktMonDirTag_Rx,
-//     PktMonDirTag_Tx,
-//     PktMonDirTag_Ingress,
-//     PktMonDirTag_Egress
-// } PKTMON_DIRECTION_TAG;
-
-// #pragma pack(push, 1)
-
-// /* Packet descriptor used for event streaming */
-// typedef struct _PKTMON_EVT_STREAM_PACKET_DESCRIPTOR
-// {
-//     uint32_t PacketOriginalLength;
-//     uint32_t PacketLoggedLength;
-//     uint32_t PacketMetaDataLength;
-// } PKTMON_EVT_STREAM_PACKET_DESCRIPTOR;
-
-// /* Metadata information used for event streaming */
-// typedef struct _PKTMON_EVT_STREAM_METADATA
-// {
-//     uint64_t PktGroupId;
-//     uint16_t PktCount;
-//     uint16_t AppearanceCount;
-//     uint16_t DirectionName;
-//     uint16_t PacketType;
-//     uint16_t ComponentId;
-//     uint16_t EdgeId;
-//     uint16_t FilterId;
-//     uint32_t DropReason;
-//     uint32_t DropLocation;
-//     uint16_t ProcNum;
-//     uint64_t TimeStamp;
-// } PKTMON_EVT_STREAM_METADATA;
-
-// /* Packet header used for event streaming */
-// typedef struct _PKTMON_EVT_STREAM_PACKET_HEADER
-// {
-//     uint8_t EventId;
-//     PKTMON_EVT_STREAM_PACKET_DESCRIPTOR PacketDescriptor;
-//     PKTMON_EVT_STREAM_METADATA Metadata;
-// } PKTMON_EVT_STREAM_PACKET_HEADER;
-
-// typedef struct pktmon_notify {
-//     PKTMON_EVT_STREAM_PACKET_HEADER  header;
-//     uint8_t                           data[128];
-// } pktmon_notify_t;
-
-// #pragma pack(pop)
 
 #endif  /* _EVENT_WRITER__ */
