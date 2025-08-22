@@ -272,7 +272,6 @@ jobs:
 
   manifests:
     name: Generate Manifests
-    if: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
     runs-on: ubuntu-latest
     needs:
       [
@@ -311,7 +310,6 @@ jobs:
 
   e2e:
     name: Run E2E Tests
-    if: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
     needs: [manifests]
     runs-on: ubuntu-latest
 
