@@ -48,17 +48,18 @@ jobs:
         run: |
           set -euo pipefail
           echo "TAG=$(make version)" >> $GITHUB_ENV
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           if [ "$SHOULD_PUSH_IMAGE" == "true" ]; then
             az acr login -n ${{ vars.ACR_NAME }}
             make retina-image \
-              IMAGE_NAMESPACE=${{ github.repository }} \
+              IMAGE_NAMESPACE=$REPO_LOWER \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
               APP_INSIGHTS_ID=${{ secrets.AZURE_APP_INSIGHTS_KEY }} \
               BUILDX_ACTION=--push
           else
             make retina-image \
-              IMAGE_NAMESPACE=${{ github.repository }} \
+              IMAGE_NAMESPACE=$REPO_LOWER \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
           fi
         env:
@@ -99,10 +100,11 @@ jobs:
         run: |
           set -euo pipefail
           echo "TAG=$(make version)" >> $GITHUB_ENV
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           if [ "$SHOULD_PUSH_IMAGE" == "true" ]; then
             az acr login -n ${{ vars.ACR_NAME }} 
             make retina-image-win \
-              IMAGE_NAMESPACE=${{ github.repository }} \
+              IMAGE_NAMESPACE=$REPO_LOWER \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
               APP_INSIGHTS_ID=${{ secrets.AZURE_APP_INSIGHTS_KEY }} \
@@ -110,7 +112,7 @@ jobs:
               BUILDX_ACTION=--push
           else
             make retina-image-win \
-              IMAGE_NAMESPACE=${{ github.repository }} \
+              IMAGE_NAMESPACE=$REPO_LOWER \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               WINDOWS_YEARS=${{ matrix.year }} 
           fi
@@ -151,17 +153,18 @@ jobs:
         run: |
           set -euo pipefail
           echo "TAG=$(make version)" >> $GITHUB_ENV
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           if [ "$SHOULD_PUSH_IMAGE" == "true" ]; then
             az acr login -n ${{ vars.ACR_NAME }}
             make retina-operator-image \
-              IMAGE_NAMESPACE=${{ github.repository }} \
+              IMAGE_NAMESPACE=$REPO_LOWER \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               IMAGE_REGISTRY=${{ vars.ACR_NAME }} \
               APP_INSIGHTS_ID=${{ secrets.AZURE_APP_INSIGHTS_KEY }} \
               BUILDX_ACTION=--push
           else
             make retina-operator-image \
-              IMAGE_NAMESPACE=${{ github.repository }} \
+              IMAGE_NAMESPACE=$REPO_LOWER \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
           fi
         env:
@@ -201,16 +204,17 @@ jobs:
         run: |
           set -euo pipefail
           echo "TAG=$(make version)" >> $GITHUB_ENV
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           if [ "$SHOULD_PUSH_IMAGE" == "true" ]; then
             az acr login -n ${{ vars.ACR_NAME }}
             make retina-shell-image \
-              IMAGE_NAMESPACE=${{ github.repository }} \
+              IMAGE_NAMESPACE=$REPO_LOWER \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
               BUILDX_ACTION=--push
           else
             make retina-shell-image \
-              IMAGE_NAMESPACE=${{ github.repository }} \
+              IMAGE_NAMESPACE=$REPO_LOWER \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
           fi
         env:
@@ -250,16 +254,17 @@ jobs:
         run: |
           set -euo pipefail
           echo "TAG=$(make version)" >> $GITHUB_ENV
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           if [ "$SHOULD_PUSH_IMAGE" == "true" ]; then
             az acr login -n ${{ vars.ACR_NAME }}
             make kubectl-retina-image \
-              IMAGE_NAMESPACE=${{ github.repository }} \
+              IMAGE_NAMESPACE=$REPO_LOWER \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
               BUILDX_ACTION=--push
           else
             make kubectl-retina-image \
-              IMAGE_NAMESPACE=${{ github.repository }} \
+              IMAGE_NAMESPACE=$REPO_LOWER \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
           fi
         env:

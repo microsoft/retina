@@ -35,6 +35,7 @@ enum {
 	CILIUM_NOTIFY_POLICY_VERDICT,
 	CILIUM_NOTIFY_CAPTURE,
 	CILIUM_NOTIFY_TRACE_SOCK,
+    PKTMON_NOTIFY_DROP,
 };
 
 enum {
@@ -165,6 +166,25 @@ struct drop_notify {
 	uint8_t        data[128];
 };
 
+
+struct pktmon_notify {
+	uint8_t		type;
+    uint8_t		subtype;
+	uint16_t		source;
+	uint32_t		hash;
+    uint32_t		len_orig;
+	uint16_t		len_cap;
+	uint16_t		version;
+	uint32_t		src_label;
+	uint32_t		dst_label;
+	uint32_t		dst_id; /* 0 for egress */
+	uint16_t		line;
+	uint8_t		file;
+	int8_t		ext_error;
+	uint32_t		ifindex;
+	uint8_t        data[128];
+};
+
 struct metrics_key {
 	uint8_t     reason;	/* 0: forwarded, >0 dropped */
 	uint8_t     dir:2,	/* 1: ingress 2: egress */
@@ -187,5 +207,60 @@ struct metrics_value {
 	uint64_t	count;
 	uint64_t	bytes;
 };
+
+
+
+enum _PKTMON_DIRECTION_TAG
+{
+    PktMonDirTag_Unspecified = 0,
+    PktMonDirTag_In,
+    PktMonDirTag_Out,
+    PktMonDirTag_Rx,
+    PktMonDirTag_Tx,
+    PktMonDirTag_Ingress,
+    PktMonDirTag_Egress
+} PKTMON_DIRECTION_TAG;
+
+#pragma pack(push, 1)
+
+/* Packet descriptor used for event streaming */
+typedef struct _PKTMON_EVT_STREAM_PACKET_DESCRIPTOR
+{
+    uint32_t PacketOriginalLength;
+    uint32_t PacketLoggedLength;
+    uint32_t PacketMetaDataLength;
+} PKTMON_EVT_STREAM_PACKET_DESCRIPTOR;
+
+/* Metadata information used for event streaming */
+typedef struct _PKTMON_EVT_STREAM_METADATA
+{
+    uint64_t PktGroupId;
+    uint16_t PktCount;
+    uint16_t AppearanceCount;
+    uint16_t DirectionName;
+    uint16_t PacketType;
+    uint16_t ComponentId;
+    uint16_t EdgeId;
+    uint16_t FilterId;
+    uint32_t DropReason;
+    uint32_t DropLocation;
+    uint16_t ProcNum;
+    uint64_t TimeStamp;
+} PKTMON_EVT_STREAM_METADATA;
+
+/* Packet header used for event streaming */
+typedef struct _PKTMON_EVT_STREAM_PACKET_HEADER
+{
+    uint8_t EventId;
+    PKTMON_EVT_STREAM_PACKET_DESCRIPTOR PacketDescriptor;
+    PKTMON_EVT_STREAM_METADATA Metadata;
+} PKTMON_EVT_STREAM_PACKET_HEADER;
+
+// typedef struct pktmon_notify {
+//     PKTMON_EVT_STREAM_PACKET_HEADER  header;
+//     uint8_t                           data[128];
+// } pktmon_notify_t;
+
+#pragma pack(pop)
 
 #endif  /* _EVENT_WRITER__ */

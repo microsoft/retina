@@ -69,7 +69,7 @@ func (c *CreateNPMCluster) Run() error {
 	//nolint:appendCombine // separate for verbosity
 	npmCluster.Properties.AgentPoolProfiles = append(npmCluster.Properties.AgentPoolProfiles, &armcontainerservice.ManagedClusterAgentPoolProfile{
 		Type:               to.Ptr(armcontainerservice.AgentPoolTypeVirtualMachineScaleSets),
-		AvailabilityZones:  []*string{to.Ptr("1")},
+		AvailabilityZones:  []*string{to.Ptr("2")},
 		Count:              to.Ptr[int32](AuxilaryNodeCount),
 		EnableNodePublicIP: to.Ptr(false),
 		Mode:               to.Ptr(armcontainerservice.AgentPoolModeUser),

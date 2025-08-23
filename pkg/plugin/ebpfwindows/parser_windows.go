@@ -143,6 +143,8 @@ func (p *Parser) Decode(monitorEvent *observerTypes.MonitorEvent) (*v1.Event, er
 	}
 }
 
+const MessageTypePktmonDrop = 100
+
 // Decode decodes the data from 'data' into 'decoded'
 func (p *Parser) decode(data []byte, decoded *pb.Flow) error {
 	if len(data) == 0 {
@@ -191,6 +193,13 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error {
 		}
 
 		packetOffset = int(offset)
+
+	case MessageTypePktmonDrop:
+		dn = &DropNotify{}
+		if err := DecodePktmonDrop(data, dn); err != nil {
+			return fmt.Errorf("failed to parse pktmon drop: %w", err)
+		}
+
 	default:
 		return fmt.Errorf("invalid event type: %w", errors.NewErrInvalidType(eventType))
 	}

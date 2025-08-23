@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: install-ebpf-xdp-container
-        image: ghcr.io/microsoft/retina/test/e2e-test-event-writer:latest
+        image: ghcr.io/lakshk98/retina/test/e2e-test-event-writer:latest
         imagePullPolicy: Always
         command:
           - powershell.exe
