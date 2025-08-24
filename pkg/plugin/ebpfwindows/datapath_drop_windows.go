@@ -50,12 +50,34 @@ type DropNotify struct {
 	Ifindex  uint32
 }
 
-// DecodeDropNotify will decode 'data' into the provided DropNotify structure
-func DecodePktmonDrop(data []byte, dn *DropNotify) error {
-	return dn.decodePktmonDrop(data)
+type PktmonDropNotify struct {
+	Type     uint8
+	SubType  uint8
+	Source   uint16
+	Hash     uint32
+	OrigLen  uint32
+	CapLen   uint16
+	Version  uint16
+	SrcLabel identity.NumericIdentity
+	DstLabel identity.NumericIdentity
+	DstID    uint32
+	Line     uint16
+	File     uint8
+	ExtError int8
+	Ifindex  uint32
 }
 
-func (n *DropNotify) decodePktmonDrop(data []byte) error {
+// DecodeDropNotify will decode 'data' into the provided DropNotify structure
+func DecodePktmonDrop(data []byte, dn *DropNotify) error {
+	pdn := &PktmonDropNotify{}
+	if err := pdn.decodePktmonDrop(data); err != nil {
+		return err
+	}
+	*dn = DropNotify(*pdn)
+	return nil
+}
+
+func (n *PktmonDropNotify) decodePktmonDrop(data []byte) error {
 	if l := len(data); l < dropNotifyV1Len {
 		return fmt.Errorf("%w: expected at least %d but got %d", errUnexpectedDropNotifyLength, dropNotifyV1Len, l)
 	}

@@ -10,12 +10,15 @@ permissions:
   id-token: write
 
 jobs:
+  steps:
+      - name: Set lowercase repo name
+        run: echo "REPO=${{ toLower(github.repository) }}" >> $GITHUB_ENV
   perf-test-basic:
     uses: ./.github/workflows/perf-template.yaml
     with:
       image-registry: ghcr.io
-      tag: $(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r .tag_name)
-      image-namespace: ${{ github.repository }}
+      tag: $(curl -s https://api.github.com/repos/${{ env.REPO }}/releases/latest | jq -r .tag_name)
+      image-namespace: ${{ env.REPO }}
       retina-mode: basic
       azure-location: ${{ vars.AZURE_LOCATION }}
     secrets:
@@ -28,8 +31,8 @@ jobs:
     uses: ./.github/workflows/perf-template.yaml
     with:
       image-registry: ghcr.io
-      tag: $(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r .tag_name)
-      image-namespace: ${{ github.repository }}
+      tag: $(curl -s https://api.github.com/repos/${{ env.REPO }}/releases/latest | jq -r .tag_name)
+      image-namespace: ${{ env.REPO }}
       retina-mode: advanced
       azure-location: ${{ vars.AZURE_LOCATION }}
     secrets:

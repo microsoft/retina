@@ -29,6 +29,10 @@ jobs:
       #          username: ${{ github.repository_owner }}
       #          password: ${{ secrets.GITHUB_TOKEN }}
 
+
+      - name: Set lowercase repo name
+        run: echo "REPO=${{ toLower(github.repository) }}" >> $GITHUB_ENV
+
       - name: Build Windows Kapinger Image
         uses: docker/build-push-action@v6
         with:
@@ -37,7 +41,7 @@ jobs:
           platforms: windows/amd64
           push: false
           provenance: false
-          tags: ghcr.io/${{ github.repository }}/kapinger:${{ steps.vars.outputs.sha_short }}-windows
+          tags: ghcr.io/${{ env.REPO }}/kapinger:${{ steps.vars.outputs.sha_short }}-windows
 
       - name: Build Linux Kapinger Image
         uses: docker/build-push-action@v6
@@ -47,7 +51,7 @@ jobs:
           platforms: linux/amd64
           push: false
           provenance: false
-          tags: ghcr.io/${{ github.repository }}/kapinger:${{ steps.vars.outputs.sha_short }}-linux
+          tags: ghcr.io/${{ env.REPO }}/kapinger:${{ steps.vars.outputs.sha_short }}-linux
 
       - name: Build Linux Toolbox Image
         uses: docker/build-push-action@v6
@@ -57,7 +61,7 @@ jobs:
           platforms: linux/amd64
           push: false
           provenance: false
-          tags: ghcr.io/${{ github.repository }}/toolbox:${{ steps.vars.outputs.sha_short }}-linux
+          tags: ghcr.io/${{ env.REPO }}/toolbox:${{ steps.vars.outputs.sha_short }}-linux
 #      - name: Create and push manifest
 #        id: docker_manifest
 #        run: |
