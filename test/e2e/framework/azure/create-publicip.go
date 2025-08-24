@@ -10,37 +10,6 @@ type CreatePublicIp struct {
 }
 
 func (c *CreatePublicIp) Run() error {
-	// cred, err := azidentity.NewAzureCLICredential(nil)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to obtain a credential: %w", err)
-	// }
-	// ctx := context.Background()
-	// clientFactory, err := armnetwork.NewClientFactory(c.SubscriptionID, cred, nil)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to create client: %w", err)
-	// }
-
-	// log.Printf("creating public ip \"%s\" in resource group \"%s\"...", c.PublicIpName, c.ResourceGroupName)
-
-	// poller, err := clientFactory.NewPublicIPAddressesClient().BeginCreateOrUpdate(ctx, c.ResourceGroupName, c.PublicIpName, armnetwork.PublicIpAddress{
-	// 	Location: to.Ptr(c.Location),
-	// 	Properties: &armnetwork.PublicIPAddressPropertiesFormat{
-	// 		IPTags: []*armnetwork.IPTag{
-	// 			{
-	// 				IPTagType: to.Ptr(c.IPTagType),
-	// 				Tag:       to.Ptr(c.Tag),
-	// 			},
-	// 		},
-	// 	},
-	// }, nil)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to finish the request for create public ip: %w", err)
-	// }
-
-	// _, err = poller.PollUntilDone(ctx, nil)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to pull the result for create public ip: %w", err)
-	// }
 	return nil
 }
 

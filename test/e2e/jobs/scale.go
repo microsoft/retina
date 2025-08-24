@@ -1,7 +1,6 @@
 package retina
 
 import (
-	"fmt"
 	"os"
 	"time"
 
@@ -59,19 +58,10 @@ func GetScaleTestInfra(subID, rg, clusterName, location, kubeConfigFilePath stri
 		}, nil)
 
 		job.AddStep(&azure.CreatePublicIp{
-			PublicIpName: fmt.Sprintf("%s-lb-ip", clusterName),
+			PublicIpName: clusterName + "-lb-ip",
 			IPTagType:    "FirstPartyUsage",
 			Tag:          "/NonProd",
 		}, nil)
-
-		// job.AddStep((&azure.CreateCluster{
-		// 	ClusterName:              clusterName,
-		// 	Nodes:                    nodes,
-		// 	LoadBalancerOutboundIpId: fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers//Microsoft.Network/publicIPAddresses/%s-lb-ip", subID, rg, clusterName),
-		// }).
-		// 	SetPodCidr("100.64.0.0/10").
-		// 	SetVMSize("Standard_D4_v3").
-		// 	SetNetworkPluginMode("overlay"), nil)
 
 		job.AddStep(&azure.GetAKSKubeConfig{
 			KubeConfigFilePath: kubeConfigFilePath,
