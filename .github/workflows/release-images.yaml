@@ -1,16 +1,4 @@
-name: Release Retina Container Images
-
-on:
-  push:
-    branches: [main]
-    tags: ["v*"]
-
-permissions:
-  contents: read
-  packages: write
-  # This is used to complete the identity challenge
-  # with sigstore/fulcio when running outside of PRs.
-  id-token: write
+# ... (previous code unchanged)
 
 jobs:
   retina-images:
@@ -25,6 +13,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set lowercase repo name
+        run: echo "REPO=${{ toLower(github.repository) }}" >> $GITHUB_ENV
 
       - uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
         with:
@@ -46,14 +37,14 @@ jobs:
           set -euo pipefail
           echo "TAG=$(make version)" >> $GITHUB_ENV
           make retina-image \
-            IMAGE_NAMESPACE=${{ github.repository }} \
+            IMAGE_NAMESPACE=${{ env.REPO }} \
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
             BUILDX_ACTION=--push
 
       - name: Sign container image
         run: |
           for image in retina-agent retina-init; do
-            IMAGE_PATH="ghcr.io/${{ github.repository }}/$image:$TAG-${{ matrix.platform }}-${{ matrix.arch }}"
+            IMAGE_PATH="ghcr.io/${{ env.REPO }}/$image:$TAG-${{ matrix.platform }}-${{ matrix.arch }}"
             DIGEST=$(jq -r '.["containerimage.digest"]' image-metadata-$image-$TAG-${{ matrix.platform }}-${{ matrix.arch }}.json) 
             cosign sign --yes ${IMAGE_PATH}@${DIGEST} 
           done
@@ -71,6 +62,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set lowercase repo name
+        run: echo "REPO=${{ toLower(github.repository) }}" >> $GITHUB_ENV
 
       - uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
         with:
@@ -92,7 +86,7 @@ jobs:
           set -euo pipefail
           echo "TAG=$(make version)" >> $GITHUB_ENV
           make retina-image-win \
-            IMAGE_NAMESPACE=${{ github.repository }} \
+            IMAGE_NAMESPACE=${{ env.REPO }} \
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
             WINDOWS_YEARS=${{ matrix.year }} \
             BUILDX_ACTION=--push
@@ -100,7 +94,7 @@ jobs:
       - name: Sign container image
         run: |
           for image in retina-agent ; do
-            IMAGE_PATH="ghcr.io/${{ github.repository }}/$image:$TAG-windows-ltsc${{ matrix.year }}-${{ matrix.arch }}"
+            IMAGE_PATH="ghcr.io/${{ env.REPO }}/$image:$TAG-windows-ltsc${{ matrix.year }}-${{ matrix.arch }}"
             DIGEST=$(jq -r '.["containerimage.digest"]' image-metadata-$image-$TAG-windows-ltsc${{ matrix.year }}-${{ matrix.arch }}.json) 
             cosign sign --yes ${IMAGE_PATH}@${DIGEST}
           done
@@ -117,6 +111,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set lowercase repo name
+        run: echo "REPO=${{ toLower(github.repository) }}" >> $GITHUB_ENV
 
       - uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
         with:
@@ -138,14 +135,14 @@ jobs:
           set -euo pipefail
           echo "TAG=$(make version)" >> $GITHUB_ENV
           make retina-operator-image \
-            IMAGE_NAMESPACE=${{ github.repository }} \
+            IMAGE_NAMESPACE=${{ env.REPO }} \
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
             BUILDX_ACTION=--push
 
       - name: Sign container image
         run: |
           for image in retina-operator ; do
-              IMAGE_PATH="ghcr.io/${{ github.repository }}/$image:$TAG-${{ matrix.platform }}-${{ matrix.arch }}"
+              IMAGE_PATH="ghcr.io/${{ env.REPO }}/$image:$TAG-${{ matrix.platform }}-${{ matrix.arch }}"
               DIGEST=$(jq -r '.["containerimage.digest"]' image-metadata-$image-$TAG-${{ matrix.platform }}-${{ matrix.arch }}.json) 
               cosign sign --yes ${IMAGE_PATH}@${DIGEST} 
           done
@@ -162,6 +159,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set lowercase repo name
+        run: echo "REPO=${{ toLower(github.repository) }}" >> $GITHUB_ENV
 
       - uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
         with:
@@ -183,13 +183,13 @@ jobs:
           set -euo pipefail
           echo "TAG=$(make version)" >> $GITHUB_ENV
           make retina-shell-image \
-            IMAGE_NAMESPACE=${{ github.repository }} \
+            IMAGE_NAMESPACE=${{ env.REPO }} \
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
             BUILDX_ACTION=--push
 
       - name: Sign container image
         run: |
-          IMAGE_PATH="ghcr.io/${{ github.repository }}/retina-shell:$TAG-${{ matrix.platform }}-${{ matrix.arch }}"
+          IMAGE_PATH="ghcr.io/${{ env.REPO }}/retina-shell:$TAG-${{ matrix.platform }}-${{ matrix.arch }}"
           DIGEST=$(jq -r '.["containerimage.digest"]' image-metadata-retina-shell-$TAG-${{ matrix.platform }}-${{ matrix.arch }}.json)
           cosign sign --yes ${IMAGE_PATH}@${DIGEST}
 
@@ -205,6 +205,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set lowercase repo name
+        run: echo "REPO=${{ toLower(github.repository) }}" >> $GITHUB_ENV
 
       - uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
         with:
@@ -226,13 +229,13 @@ jobs:
           set -euo pipefail
           echo "TAG=$(make version)" >> $GITHUB_ENV
           make kubectl-retina-image \
-            IMAGE_NAMESPACE=${{ github.repository }} \
+            IMAGE_NAMESPACE=${{ env.REPO }} \
             PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
             BUILDX_ACTION=--push
 
       - name: Sign container image
         run: |
-          IMAGE_PATH="ghcr.io/${{ github.repository }}/kubectl-retina:$TAG-${{ matrix.platform }}-${{ matrix.arch }}"
+          IMAGE_PATH="ghcr.io/${{ env.REPO }}/kubectl-retina:$TAG-${{ matrix.platform }}-${{ matrix.arch }}"
           DIGEST=$(jq -r '.["containerimage.digest"]' image-metadata-kubectl-retina-$TAG-${{ matrix.platform }}-${{ matrix.arch }}.json)
           cosign sign --yes ${IMAGE_PATH}@${DIGEST}
 
@@ -256,6 +259,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
+      - name: Set lowercase repo name
+        run: echo "REPO=${{ toLower(github.repository) }}" >> $GITHUB_ENV
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -270,7 +276,7 @@ jobs:
         run: |
           set -euo pipefail
           make manifest \
-            IMAGE_NAMESPACE=${{ github.repository }} \
+            IMAGE_NAMESPACE=${{ env.REPO }} \
             COMPONENT=${{ matrix.component }}
 
       - name: Sign manifest
@@ -285,7 +291,7 @@ jobs:
             images=("kubectl-retina")
           fi
           for image in "${images[@]}"; do
-            IMAGE_PATH="ghcr.io/${{ github.repository }}/$image:$TAG"
+            IMAGE_PATH="ghcr.io/${{ env.REPO }}/$image:$TAG"
             DIGEST=$(docker buildx imagetools inspect $IMAGE_PATH --format "{{json .Manifest}}" | jq -r .digest)
             cosign sign --yes ${IMAGE_PATH}@${DIGEST} 
           done
