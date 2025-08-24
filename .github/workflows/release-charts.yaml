@@ -18,6 +18,9 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref_type == 'tag'
     steps:
+    
+      - name: Set lowercase repo name
+        run: echo "REPO=${{ toLower(github.repository) }}" >> $GITHUB_ENV
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -42,9 +45,9 @@ jobs:
           export TAG=$(make version)
           helm package ./deploy/standard/manifests/controller/helm/retina --version $TAG
           # Get Helm chart's SHA digest from helm push cmd output
-          helm push retina-$TAG.tgz oci://ghcr.io/${{ github.repository }}/charts >> helm_push_result.txt 2>&1
+          helm push retina-$TAG.tgz oci://ghcr.io/${{ env.REPO }}/charts >> helm_push_result.txt 2>&1
           cat helm_push_result.txt
-          cosign sign --yes ghcr.io/${{ github.repository }}/charts/retina@$(tail -n 1 helm_push_result.txt | awk '{ print $2 }')
+          cosign sign --yes ghcr.io/${{ env.REPO }}/charts/retina@$(tail -n 1 helm_push_result.txt | awk '{ print $2 }')
 
       - name: Build, Push and Sign Hubble chart
         id: build_hubble_chart
@@ -54,6 +57,6 @@ jobs:
           export TAG=$(make version)
           helm package ./deploy/hubble/manifests/controller/helm/retina --version $TAG
           # Get Helm chart's SHA digest from helm push cmd output
-          helm push retina-hubble-$TAG.tgz oci://ghcr.io/${{ github.repository }}/charts >> helm_push_hubble.txt 2>&1
+          helm push retina-hubble-$TAG.tgz oci://ghcr.io/${{ env.REPO }}/charts >> helm_push_hubble.txt 2>&1
           cat helm_push_hubble.txt
-          cosign sign --yes ghcr.io/${{ github.repository }}/charts/retina-hubble@$(tail -n 1 helm_push_hubble.txt | awk '{ print $2 }')
+          cosign sign --yes ghcr.io/${{ env.REPO }}/charts/retina-hubble@$(tail -n 1 helm_push_hubble.txt | awk '{ print $2 }')
