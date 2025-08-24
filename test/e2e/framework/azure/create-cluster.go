@@ -28,7 +28,7 @@ type CreateCluster struct {
 	vmSize                   string
 	networkPluginMode        string
 	Nodes                    int32
-	loadBalancerOutboundIpId string
+	LoadBalancerOutboundIpId string
 }
 
 func (c *CreateCluster) SetPodCidr(podCidr string) *CreateCluster {
@@ -47,7 +47,7 @@ func (c *CreateCluster) SetNetworkPluginMode(networkPluginMode string) *CreateCl
 }
 
 func (c *CreateCluster) SetPublicIP(loadBalancerOutboundIpId string) *CreateCluster {
-	c.loadBalancerOutboundIpId = loadBalancerOutboundIpId
+	c.LoadBalancerOutboundIpId = loadBalancerOutboundIpId
 	return c
 }
 
