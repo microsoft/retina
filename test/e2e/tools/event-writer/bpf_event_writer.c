@@ -133,7 +133,7 @@ void create_pktmon_drop_event(struct pktmon_notify* drp_elm)
 {
     memset(drp_elm, 0, sizeof(struct pktmon_notify));
     drp_elm->type       = CILIUM_NOTIFY_DROP;
-	drp_elm->subtype    = 6;
+	drp_elm->subtype    = 7;
 	drp_elm->source     = 10; // random source
 	drp_elm->hash       = 0;
 	drp_elm->len_orig   = 128;
