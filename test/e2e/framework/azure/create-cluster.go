@@ -21,15 +21,14 @@ const (
 var defaultClusterCreateTimeout = 30 * time.Minute
 
 type CreateCluster struct {
-	SubscriptionID           string
-	ResourceGroupName        string
-	Location                 string
-	ClusterName              string
-	podCidr                  string
-	vmSize                   string
-	networkPluginMode        string
-	Nodes                    int32
-	loadBalancerOutboundIpId string
+	SubscriptionID    string
+	ResourceGroupName string
+	Location          string
+	ClusterName       string
+	podCidr           string
+	vmSize            string
+	networkPluginMode string
+	Nodes             int32
 }
 
 func (c *CreateCluster) SetPodCidr(podCidr string) *CreateCluster {
