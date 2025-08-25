@@ -9,6 +9,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	armcontainerservice "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v4"
+	armnetwork "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v5"
 )
 
 const (
@@ -20,15 +21,15 @@ const (
 var defaultClusterCreateTimeout = 30 * time.Minute
 
 type CreateCluster struct {
-	SubscriptionID    		string
-	ResourceGroupName 		string
-	Location          		string
-	ClusterName       		string
-	podCidr           		string
-	vmSize            		string
-	networkPluginMode 		string
-	Nodes             		int32
-	loadBalancerOutboundIpId	string
+	SubscriptionID           string
+	ResourceGroupName        string
+	Location                 string
+	ClusterName              string
+	podCidr                  string
+	vmSize                   string
+	networkPluginMode        string
+	Nodes                    int32
+	loadBalancerOutboundIpId string
 }
 
 func (c *CreateCluster) SetPodCidr(podCidr string) *CreateCluster {
@@ -43,11 +44,6 @@ func (c *CreateCluster) SetVMSize(vmSize string) *CreateCluster {
 
 func (c *CreateCluster) SetNetworkPluginMode(networkPluginMode string) *CreateCluster {
 	c.networkPluginMode = networkPluginMode
-	return c
-}
-
-func (c *CreateCluster) SetPublicIP(loadBalancerOutboundIpId string) *CreateCluster {
-	c.loadBalancerOutboundIpId = loadBalancerOutboundIpId
 	return c
 }
 
@@ -81,6 +77,32 @@ func (c *CreateCluster) Run() error {
 
 	if c.networkPluginMode != "" {
 		template.Properties.NetworkProfile.NetworkPluginMode = to.Ptr(armcontainerservice.NetworkPluginMode(c.networkPluginMode))
+	}
+
+	// Create LB public ip with tag
+	publicip := armnetwork.PublicIPAddress{
+		Location: to.Ptr(c.Location),
+		Name:     to.Ptr(c.ClusterName + "-pip"),
+		ID:       to.Ptr(fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/publicIPAddresses/%s-pip", c.SubscriptionID, c.ResourceGroupName, c.ClusterName)),
+		Properties: &armnetwork.PublicIPAddressPropertiesFormat{
+			IPTags: []*armnetwork.IPTag{
+				{
+					IPTagType: to.Ptr("FirstPartyUsage"),
+					Tag:       to.Ptr("/NonProd"),
+				},
+			},
+		},
+	}
+
+	err = c.createPublicIP(ctx, publicip)
+	if err != nil {
+		return fmt.Errorf("failed to create public ip: %w", err)
+	}
+
+	template.Properties.NetworkProfile.LoadBalancerProfile.OutboundIPs.PublicIPs = []*armcontainerservice.ResourceReference{
+		{
+			ID: to.Ptr(*publicip.ID),
+		},
 	}
 
 	log.Printf("creating cluster %s in location %s...", c.ClusterName, c.Location)
@@ -134,16 +156,9 @@ func GetStarterClusterTemplate(location string) armcontainerservice.ManagedClust
 			EnableRBAC:              to.Ptr(true),
 			LinuxProfile:            nil,
 			NetworkProfile: &armcontainerservice.NetworkProfile{
-				LoadBalancerSKU: 		to.Ptr(armcontainerservice.LoadBalancerSKUStandard),
-				OutboundType:    		to.Ptr(armcontainerservice.OutboundTypeLoadBalancer),
-				NetworkPlugin:   		to.Ptr(armcontainerservice.NetworkPluginAzure),
-				LoadBalancerProfile:	&armcontainerservice.ManagedClusterLoadBalancerProfile{
-					OutboundIPs:	&armcontainerservice.ManagedClusterLoadBalancerProfileOutboundIPs{
-						PublicIPs: []*armcontainerservice.ResourceReference{
-							ID: to.Ptr(c.loadBalancerOutboundIpId)
-						}
-					}
-				}
+				LoadBalancerSKU: to.Ptr(armcontainerservice.LoadBalancerSKUStandard),
+				OutboundType:    to.Ptr(armcontainerservice.OutboundTypeLoadBalancer),
+				NetworkPlugin:   to.Ptr(armcontainerservice.NetworkPluginAzure),
 			},
 			WindowsProfile: &armcontainerservice.ManagedClusterWindowsProfile{
 				AdminPassword: to.Ptr("replacePassword1234$"),
@@ -166,5 +181,29 @@ func (c *CreateCluster) Prevalidate() error {
 }
 
 func (c *CreateCluster) Stop() error {
+	return nil
+}
+
+func (c *CreateCluster) createPublicIP(ctx context.Context, ip armnetwork.PublicIPAddress) error {
+	cred, err := azidentity.NewAzureCLICredential(nil)
+	if err != nil {
+		return fmt.Errorf("failed to obtain a credential: %w", err)
+	}
+	clientFactory, err := armnetwork.NewClientFactory(c.SubscriptionID, cred, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
+	log.Printf("creating public ip \"%s\" in resource group \"%s\"...", *ip.Name, c.ResourceGroupName)
+
+	poller, err := clientFactory.NewPublicIPAddressesClient().BeginCreateOrUpdate(ctx, c.ResourceGroupName, *ip.Name, ip, nil)
+	if err != nil {
+		return fmt.Errorf("failed to finish the request for create public ip: %w", err)
+	}
+
+	_, err = poller.PollUntilDone(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to pull the result for create public ip: %w", err)
+	}
 	return nil
 }

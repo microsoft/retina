@@ -10,7 +10,6 @@ import (
 	armnetwork "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v5"
 )
 
-
 type CreatePublicIp struct {
 	SubscriptionID    string
 	ResourceGroupName string
@@ -33,14 +32,14 @@ func (c *CreatePublicIp) Run() error {
 
 	log.Printf("creating public ip \"%s\" in resource group \"%s\"...", c.PublicIpName, c.ResourceGroupName)
 
-	poller, err := clientFactory.NewPublicIPAddressesClient().BeginCreateOrUpdate(ctx, c.ResourceGroupName, c.PublicIpName, armnetwork.PublicIpAddress{
+	poller, err := clientFactory.NewPublicIPAddressesClient().BeginCreateOrUpdate(ctx, c.ResourceGroupName, c.PublicIpName, armnetwork.PublicIPAddress{
 		Location: to.Ptr(c.Location),
 		Properties: &armnetwork.PublicIPAddressPropertiesFormat{
 			IPTags: []*armnetwork.IPTag{
 				{
 					IPTagType: to.Ptr(c.IPTagType),
-					Tag: to.Ptr(c.Tag),
-				}
+					Tag:       to.Ptr(c.Tag),
+				},
 			},
 		},
 	}, nil)
