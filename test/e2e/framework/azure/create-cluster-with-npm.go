@@ -10,6 +10,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	armcontainerservice "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v4"
+	armnetwork "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v5"
 )
 
 var (
@@ -47,8 +48,42 @@ func (c *CreateNPMCluster) Stop() error {
 
 func (c *CreateNPMCluster) Run() error {
 	// Start with default cluster template
-	npmCluster := GetStarterClusterTemplate(c.Location)
 
+	// Deploy cluster
+	cred, err := azidentity.NewAzureCLICredential(nil)
+	if err != nil {
+		return fmt.Errorf("failed to obtain a credential: %w", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), clusterTimeout)
+	defer cancel()
+
+	clientFactory, err := armcontainerservice.NewClientFactory(c.SubscriptionID, cred, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create az client: %w", err)
+	}
+
+	// create ip for public ip
+	publicip := armnetwork.PublicIPAddress{
+		Location: to.Ptr(c.Location),
+		Name:     to.Ptr(c.ClusterName + "-pip"),
+		ID:       to.Ptr(fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/publicIPAddresses/%s-pip", c.SubscriptionID, c.ResourceGroupName, c.ClusterName)),
+		Properties: &armnetwork.PublicIPAddressPropertiesFormat{
+			IPTags: []*armnetwork.IPTag{
+				{
+					IPTagType: to.Ptr("FirstPartyUsage"),
+					Tag:       to.Ptr("/NonProd"),
+				},
+			},
+		},
+	}
+
+	err = c.createPublicIP(ctx, publicip)
+	if err != nil {
+		return fmt.Errorf("failed to create public ip: %w", err)
+	}
+
+	// get cluster template to mutate
+	npmCluster := GetStarterClusterTemplate(c.Location)
 	npmCluster.Properties.NetworkProfile.NetworkPolicy = to.Ptr(armcontainerservice.NetworkPolicyAzure)
 
 	//nolint:appendCombine // separate for verbosity
@@ -99,17 +134,10 @@ func (c *CreateNPMCluster) Run() error {
 		NodeOSUpgradeChannel: to.Ptr(armcontainerservice.NodeOSUpgradeChannelNodeImage),
 	}
 
-	// Deploy cluster
-	cred, err := azidentity.NewAzureCLICredential(nil)
-	if err != nil {
-		return fmt.Errorf("failed to obtain a credential: %w", err)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), clusterTimeout)
-	defer cancel()
-
-	clientFactory, err := armcontainerservice.NewClientFactory(c.SubscriptionID, cred, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create az client: %w", err)
+	npmCluster.Properties.NetworkProfile.LoadBalancerProfile.OutboundIPs.PublicIPs = []*armcontainerservice.ResourceReference{
+		{
+			ID: to.Ptr(*publicip.ID),
+		},
 	}
 
 	log.Printf("when the cluster is ready, use the below command to access and debug")
@@ -149,4 +177,28 @@ func (c *CreateNPMCluster) Run() error {
 			return nil
 		}
 	}
+}
+
+func (c *CreateNPMCluster) createPublicIP(ctx context.Context, ip armnetwork.PublicIPAddress) error {
+	cred, err := azidentity.NewAzureCLICredential(nil)
+	if err != nil {
+		return fmt.Errorf("failed to obtain a credential: %w", err)
+	}
+	clientFactory, err := armnetwork.NewClientFactory(c.SubscriptionID, cred, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
+	log.Printf("creating public ip \"%s\" in resource group \"%s\"...", *ip.Name, c.ResourceGroupName)
+
+	poller, err := clientFactory.NewPublicIPAddressesClient().BeginCreateOrUpdate(ctx, c.ResourceGroupName, *ip.Name, ip, nil)
+	if err != nil {
+		return fmt.Errorf("failed to finish the request for create public ip: %w", err)
+	}
+
+	_, err = poller.PollUntilDone(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to pull the result for create public ip: %w", err)
+	}
+	return nil
 }
