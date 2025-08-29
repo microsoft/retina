@@ -28,7 +28,7 @@ func TestStartError(t *testing.T) {
 	_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
 
 	c := cache.New(pubsub.New())
-	e := enricher.New(ctxTimeout, c)
+	e := enricher.New(ctxTimeout, c, false)
 	e.Run()
 	defer e.Reader.Close()
 
