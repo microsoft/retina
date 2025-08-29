@@ -61,6 +61,7 @@ var (
 	ErrFileNotAccessible         = errors.New("file does not exist or is not readable")
 	ErrEmptyDownloadOutput       = errors.New("download command produced no output")
 	ErrFailedToCreateDownloadPod = errors.New("failed to create download pod")
+	ErrUnsupportedNodeOS         = errors.New("unsupported node operating system")
 )
 
 // DownloadCmd holds all OS-specific commands and configurations
@@ -74,7 +75,7 @@ type DownloadCmd struct {
 }
 
 func getDownloadCmd(node *corev1.Node, hostPath, fileName string) *DownloadCmd {
-	var nodeOS, err = getNodeOS(node)
+	nodeOS, err := getNodeOS(node)
 	if err != nil {
 		retinacmd.Logger.Error("Failed to detect node OS", zap.String("node", node.Name), zap.Error(err))
 		return nil
@@ -109,19 +110,19 @@ func getDownloadCmd(node *corev1.Node, hostPath, fileName string) *DownloadCmd {
 }
 
 func getNodeOS(node *corev1.Node) (NodeOS, error) {
-	os := strings.ToLower(node.Status.NodeInfo.OperatingSystem)
+	nodeOS := strings.ToLower(node.Status.NodeInfo.OperatingSystem)
 
-	if strings.Contains(os, "windows") {
+	if strings.Contains(nodeOS, "windows") {
 		retinacmd.Logger.Info("Detected node OS: Windows", zap.String("node", node.Name), zap.String("os", node.Status.NodeInfo.OperatingSystem))
 		return Windows, nil
 	}
 
-	if strings.Contains(os, "linux") {
+	if strings.Contains(nodeOS, "linux") {
 		retinacmd.Logger.Info("Detected node OS: Linux", zap.String("node", node.Name), zap.String("os", node.Status.NodeInfo.OperatingSystem))
 		return Linux, nil
 	}
 
-	return Linux, fmt.Errorf("unsupported operating system: %s", node.Status.NodeInfo.OperatingSystem)
+	return Linux, errors.Wrap(ErrEmptyDownloadOutput, fmt.Sprintf("unsupported operating system: %s", node.Status.NodeInfo.OperatingSystem))
 }
 
 // Detects the Windows LTSC version and returns the appropriate nanoserver image
@@ -145,7 +146,7 @@ func getWindowsContainerImage(node *corev1.Node) string {
 		suffix = "ltsc2022"
 	}
 
-	containerImage := fmt.Sprintf("mcr.microsoft.com/windows/nanoserver:%s", suffix)
+	containerImage := "mcr.microsoft.com/windows/nanoserver:" + suffix
 	retinacmd.Logger.Info("Selected Windows container image", zap.String("image", containerImage))
 
 	return containerImage
@@ -217,7 +218,7 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 		}
 
 		fmt.Println("Obtaining file...")
-		exec, err := createDownloadExec(ctx, kubeClient, config, downloadPod, downloadCmd)
+		exec, err := createDownloadExec(kubeClient, config, downloadPod, downloadCmd)
 		if err != nil {
 			return err
 		}
@@ -384,7 +385,7 @@ func verifyFileExists(ctx context.Context, kubeClient *kubernetes.Clientset, con
 	return false, errors.Wrap(ErrFileNotAccessible, downloadCmd.SrcFilePath)
 }
 
-func createDownloadExec(ctx context.Context, kubeClient *kubernetes.Clientset, config *rest.Config, pod *corev1.Pod, downloadCmd *DownloadCmd) (remotecommand.Executor, error) {
+func createDownloadExec(kubeClient *kubernetes.Clientset, config *rest.Config, pod *corev1.Pod, downloadCmd *DownloadCmd) (remotecommand.Executor, error) {
 	req := kubeClient.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(pod.Name).
