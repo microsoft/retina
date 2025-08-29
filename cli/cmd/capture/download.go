@@ -122,7 +122,7 @@ func getNodeOS(node *corev1.Node) (NodeOS, error) {
 		return Linux, nil
 	}
 
-	return Linux, errors.Wrap(ErrEmptyDownloadOutput, fmt.Sprintf("unsupported operating system: %s", node.Status.NodeInfo.OperatingSystem))
+	return Linux, errors.Wrap(ErrEmptyDownloadOutput, "unsupported operating system: "+node.Status.NodeInfo.OperatingSystem)
 }
 
 // Detects the Windows LTSC version and returns the appropriate nanoserver image
