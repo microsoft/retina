@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
-package ctrinfo
+package utils
 
 import (
 	"bytes"
@@ -9,20 +9,23 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"os/exec"
 	"strings"
 	"time"
 
-	"github.com/microsoft/retina/pkg/controllers/cache"
+	"github.com/microsoft/retina/pkg/common"
 )
+
+type CtrinfoSource struct{}
 
 type PodSpec struct {
 	Status Status `json:"status"`
 }
 
 type Status struct {
-	Metadata Metadata `json:"metadata"`
-	Network  Network  `json:"network"`
+	Metadata Metadata   `json:"metadata"`
+	Network  PodNetwork `json:"network"`
 }
 
 type Metadata struct {
@@ -30,7 +33,7 @@ type Metadata struct {
 	Namespace string `json:"namespace"`
 }
 
-type Network struct {
+type PodNetwork struct {
 	IP string `json:"ip"`
 }
 
@@ -42,13 +45,14 @@ var (
 	errJSONRead   = errors.New("error unmarshalling JSON")
 )
 
-func GetPodInfo(ip string) (*cache.PodInfo, error) {
+func (cs *CtrinfoSource) GetAllEndpoints() ([]*common.RetinaEndpoint, error) {
 	runningPods, err := crictlCommand("cmd", "/c", "crictl", "pods", "-q")
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", errGetPods, err)
+		return nil, fmt.Errorf("%v: %v", errGetPods, err)
 	}
 
 	podIDs := strings.Split(strings.TrimSpace(runningPods), "\n")
+	endpoints := []*common.RetinaEndpoint{}
 	for _, podID := range podIDs {
 		if podID == "" {
 			continue
@@ -64,15 +68,20 @@ func GetPodInfo(ip string) (*cache.PodInfo, error) {
 			return nil, fmt.Errorf("%w: %v", errJSONRead, err)
 		}
 
-		if spec.Status.Network.IP == ip {
-			return &cache.PodInfo{
-				Name:      spec.Status.Metadata.Name,
-				Namespace: spec.Status.Metadata.Namespace,
-			}, nil
+		ip := net.ParseIP(spec.Status.Network.IP)
+		if ip == nil {
+			// Skip pods with invalid or empty IPs
+			continue
 		}
+
+		endpoints = append(endpoints, common.NewRetinaEndpoint(
+			spec.Status.Metadata.Name,
+			spec.Status.Metadata.Namespace,
+			common.NewIPAddress(ip, nil),
+		))
 	}
 
-	return nil, nil
+	return endpoints, nil
 }
 
 func runCommand(command string, args ...string) (string, error) {

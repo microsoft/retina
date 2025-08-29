@@ -14,6 +14,7 @@ import (
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/microsoft/retina/pkg/common"
 	"github.com/microsoft/retina/pkg/controllers/cache"
+	"github.com/microsoft/retina/pkg/controllers/cache/standalone"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/stretchr/testify/assert"
@@ -74,7 +75,7 @@ func TestEnricherSecondaryIPs(t *testing.T) {
 	require.NoError(t, err)
 
 	// get the enricher
-	e := New(ctx, c)
+	e := New(ctx, c, false)
 	var wg sync.WaitGroup
 
 	wg.Add(1)
@@ -156,4 +157,134 @@ func addEvent(e *Enricher, sourceIP, destIP string) {
 	l.Info("Adding event", zap.Any("event", ev))
 	time.Sleep(100 * time.Millisecond)
 	e.Write(ev)
+}
+
+func TestEnricherStandalone_WithEndpointPresent(t *testing.T) {
+	opts := log.GetDefaultLogOpts()
+	opts.Level = "debug"
+	if _, err := log.SetupZapLogger(opts); err != nil {
+		t.Errorf("Error setting up logger: %s", err)
+	}
+
+	eventCount := 20
+	expectedOutputCount := eventCount - 2 // last written event is not readable due to ring buffers
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	cache := standalone.NewCache()
+	sourceIP := "1.1.1.1"
+
+	// Add endpoint to cache
+	endpoint := common.NewRetinaEndpoint("pod1", "ns1", &common.IPAddresses{IPv4: net.ParseIP(sourceIP)})
+	require.NoError(t, cache.UpdateRetinaEndpoint(endpoint))
+
+	enricher := New(ctx, cache, true)
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < eventCount; i++ {
+			ev := &v1.Event{
+				Event: &flow.Flow{
+					IP: &flow.IP{
+						Source: sourceIP,
+					},
+				},
+			}
+			enricher.Write(ev)
+			time.Sleep(25 * time.Millisecond)
+		}
+	}()
+
+	enricher.Run()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		count := 0
+		reader := enricher.ExportReader()
+		for {
+			ev := reader.NextFollow(ctx)
+			if ev == nil {
+				break
+			}
+			flow := ev.Event.(*flow.Flow)
+			sourceFlow := flow.GetSource()
+
+			require.NotNil(t, sourceFlow, "Expected flow")
+			require.Equal(t, "pod1", sourceFlow.GetPodName())
+			require.Equal(t, "ns1", sourceFlow.GetNamespace())
+
+			count++
+		}
+		assert.Equal(t, expectedOutputCount, count, "Received event count mismatch")
+	}()
+
+	time.Sleep(3 * time.Second)
+	cancel()
+	wg.Wait()
+}
+
+func TestEnricherStandalone_WithEndpointAbsent(t *testing.T) {
+	opts := log.GetDefaultLogOpts()
+	opts.Level = "debug"
+	if _, err := log.SetupZapLogger(opts); err != nil {
+		t.Errorf("Error setting up logger: %s", err)
+	}
+
+	eventCount := 20
+	expectedOutputCount := eventCount - 2
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	cache := standalone.NewCache()
+	sourceIP := "9.9.9.9" // No endpoint added to cache
+
+	enricher := New(ctx, cache, true)
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < eventCount; i++ {
+			ev := &v1.Event{
+				Event: &flow.Flow{
+					IP: &flow.IP{
+						Source: sourceIP,
+					},
+				},
+			}
+			enricher.Write(ev)
+			time.Sleep(25 * time.Millisecond)
+		}
+	}()
+
+	enricher.Run()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		count := 0
+		reader := enricher.ExportReader()
+		for {
+			ev := reader.NextFollow(ctx)
+			if ev == nil {
+				break
+			}
+			flow := ev.Event.(*flow.Flow)
+			sourceFlow := flow.GetSource()
+
+			require.Nil(t, sourceFlow)
+
+			count++
+		}
+		assert.Equal(t, expectedOutputCount, count, "Received event count mismatch")
+	}()
+
+	time.Sleep(3 * time.Second)
+	cancel()
+	wg.Wait()
 }
