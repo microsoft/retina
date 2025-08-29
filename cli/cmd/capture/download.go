@@ -146,10 +146,7 @@ func getWindowsContainerImage(node *corev1.Node) string {
 	}
 
 	containerImage := fmt.Sprintf("mcr.microsoft.com/windows/nanoserver:%s", suffix)
-	retinacmd.Logger.Info("Selected Windows container image",
-		zap.String("node", node.Name),
-		zap.String("osImage", osImage),
-		zap.String("image", containerImage))
+	retinacmd.Logger.Info("Selected Windows container image", zap.String("image", containerImage))
 
 	return containerImage
 }
