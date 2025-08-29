@@ -211,7 +211,7 @@ func createDownloadPod(ctx context.Context, kubeClient *kubernetes.Clientset, na
 
 	switch nodeOS {
 	case Windows:
-		containerImage = "mcr.microsoft.com/windows/nanoserver:ltsc2022"
+		containerImage = "mcr.microsoft.com/windows/nanoserver:ltsc2019"
 		// timeout is not available on nanoserver, use ping to simulate a wait
 		command = []string{"cmd", "/c", "echo Download pod ready & ping -n 3601 127.0.0.1 > nul"}
 		mountPath = "C:\\host" + strings.ReplaceAll(hostPath, "/", "\\")
