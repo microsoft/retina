@@ -67,12 +67,12 @@ func detectNodeOS(node *corev1.Node) (NodeOS, error) {
 	os := strings.ToLower(node.Status.NodeInfo.OperatingSystem)
 
 	if strings.Contains(os, "windows") {
-		retinacmd.Logger.Info("\nDetected node OS: Windows", zap.String("node", node.Name), zap.String("os", node.Status.NodeInfo.OperatingSystem))
+		retinacmd.Logger.Info("Detected node OS: Windows", zap.String("node", node.Name), zap.String("os", node.Status.NodeInfo.OperatingSystem))
 		return Windows, nil
 	}
 
 	if strings.Contains(os, "linux") {
-		retinacmd.Logger.Info("\nDetected node OS: Linux", zap.String("node", node.Name), zap.String("os", node.Status.NodeInfo.OperatingSystem))
+		retinacmd.Logger.Info("Detected node OS: Linux", zap.String("node", node.Name), zap.String("os", node.Status.NodeInfo.OperatingSystem))
 		return Linux, nil
 	}
 
@@ -94,6 +94,7 @@ var downloadExample = templates.Examples(i18n.T(`
 `))
 
 func downloadFromCluster(ctx context.Context, config *rest.Config, namespace string) error {
+	fmt.Println("Downloading capture: ", captureName)
 	kubeClient, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize k8s client")
@@ -143,7 +144,7 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 			srcFilePath = "/" + filepath.Join("host", hostPath, fileName) + ".tar.gz"
 		}
 
-		fmt.Println("\nFile to be downloaded: ", srcFilePath)
+		fmt.Println("File to be downloaded: ", srcFilePath)
 		downloadPod, err := createDownloadPod(ctx, kubeClient, namespace, nodeName, hostPath, captureName, nodeOS)
 		if err != nil {
 			return err
@@ -176,7 +177,7 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 			return fmt.Errorf("failed to write file to host: %w", err)
 		}
 
-		fmt.Println("File written to: ", outputFile)
+		fmt.Printf("File written to: %s\n", outputFile)
 
 		err = kubeClient.CoreV1().Pods(namespace).Delete(ctx, downloadPod.Name, metav1.DeleteOptions{})
 		if err != nil {
