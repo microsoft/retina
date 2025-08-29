@@ -1,20 +1,39 @@
 # Shell
 
-**EXPERIMENTAL: `retina shell` is an experimental feature, so the flags and behavior may change in future versions.**
+>NOTE: `retina shell` is an experimental feature. The flags and behavior may change in future versions.
 
-The `retina shell` command allows you to start an interactive shell on a Kubernetes node or pod. This runs a container image with many common networking tools installed (`ping`, `curl`, etc.).
+The `retina shell` command allows you to start an interactive shell on a Kubernetes node or pod for adhoc debugging.
 
-## Testing connectivity
+This runs a container image with many common networking tools installed (`ping`, `curl`, etc.), as well as specialized tools such as bpftool, pwru or Inspektor Gadget.
 
-Start a shell on a node or inside a pod
+Currently the Retina Shell only works in Linux environments. Windows support will be added in the future.
 
-```bash
+* The CLI command `kubectl retina shell` creates a pod with `HostNetwork=true` (for node debugging) or an ephemeral container in an existing pod (for pod debugging).
+* The container runs an image built from the Dockerfile in the `/shell` directory. The image is based on Azure Linux and includes commonly-used networking tools.
+
+## Getting Started
+
+Start a shell on a node or inside a pod:
+
+```shell
 # To start a shell in a node (root network namespace):
-kubectl retina shell aks-nodepool1-15232018-vmss000001
+kubectl retina shell <node-name>
 
 # To start a shell inside a pod (pod network namespace):
-kubectl retina shell -n kube-system pods/coredns-d459997b4-7cpzx
+kubectl retina shell -n kube-system pods/<pod-name>
+
+# To start a shell inside of a node and mount the host file system
+kubectl retina shell <node-name> --mount-host-filesystem
+
+# To start a shell inside of a node with extra capabilities
+kubectl retina shell <node-name> --capabilities=<CAPABILITIES,COMMA,SEPARATED>
 ```
+
+For testing, you can override the image used by `retina shell` either with CLI arguments (`--retina-shell-image-repo` and `--retina-shell-image-version`) or environment variables (`RETINA_SHELL_IMAGE_REPO` and `RETINA_SHELL_IMAGE_VERSION`).
+
+Run `kubectl retina shell -h` for full documentation and examples.
+
+## Testing connectivity
 
 Check connectivity using `ping`:
 
@@ -31,15 +50,6 @@ PING 10.224.0.4 (10.224.0.4) 56(84) bytes of data.
 5 packets transmitted, 5 received, 0% packet loss, time 4022ms
 rtt min/avg/max/mdev = 0.908/1.015/1.128/0.077 ms
 ```
-
-Check DNS resolution using `dig`:
-
-```text
-root [ / ]# dig example.com +short
-93.184.215.14
-```
-
-The tools `nslookup` and `drill` are also available if you prefer those.
 
 Check connectivity to apiserver using `nc` and `curl`:
 
@@ -61,12 +71,23 @@ root [ / ]# curl -k https://10.0.0.1
 }
 ```
 
-### nftables and iptables
+## DNS Resolution
+
+Check DNS resolution using `dig`:
+
+```text
+root [ / ]# dig example.com +short
+93.184.215.14
+```
+
+The tools `nslookup` and `drill` are also available if you prefer those.
+
+## nftables and iptables
 
 Accessing nftables and iptables rules requires `NET_RAW` and `NET_ADMIN` capabilities.
 
-```bash
-kubectl retina shell aks-nodepool1-15232018-vmss000002 --capabilities NET_ADMIN,NET_RAW
+```text
+kubectl retina shell <node-name> --capabilities NET_ADMIN,NET_RAW
 ```
 
 Then you can run `iptables` and `nft`:
@@ -74,22 +95,25 @@ Then you can run `iptables` and `nft`:
 ```text
 root [ / ]# iptables -nvL | head -n 2
 Chain INPUT (policy ACCEPT 1191K packets, 346M bytes)
- pkts bytes target     prot opt in     out     source               destination         
+ pkts bytes target     prot opt in     out     source               destination
+       
 root [ / ]# nft list ruleset | head -n 2
 # Warning: table ip filter is managed by iptables-nft, do not touch!
 table ip filter {
 ```
 
-**If you see the error "Operation not permitted (you must be root)", check that your `kubectl retina shell` command sets `--capabilities NET_RAW,NET_ADMIN`.**
+>NOTE: If you see the error "Operation not permitted (you must be root)", check that your `kubectl retina shell` command sets `--capabilities NET_RAW,NET_ADMIN`.
 
-`iptables` in the shell image uses `iptables-nft`, which may or may not match the configuration on the node. For example, Azure Linux 2 maps `iptables` to `iptables-legacy`. To use the exact same `iptables` binary as installed on the node, you will need to `chroot` into the host filesystem (see below).
+`iptables` in the shell image uses `iptables-nft`, which may or may not match the configuration on the node.
+
+For example, Azure Linux 2 maps `iptables` to `iptables-legacy`. To use the exact same `iptables` binary as installed on the node, you will need to `chroot` into the host filesystem (see below).
 
 ## Accessing the host filesystem
 
 On nodes, you can mount the host filesystem to `/host`:
 
-```bash
-kubectl retina shell aks-nodepool1-15232018-vmss000002 --mount-host-filesystem
+```text
+kubectl retina shell <node-name> --mount-host-filesystem
 ```
 
 This mounts the host filesystem (`/`) to `/host` in the debug pod:
@@ -108,7 +132,7 @@ Symlinks between files on the host filesystem may not resolve correctly. If you 
 `chroot` requires the `SYS_CHROOT` capability:
 
 ```bash
-kubectl retina shell aks-nodepool1-15232018-vmss000002 --mount-host-filesystem --capabilities SYS_CHROOT
+kubectl retina shell <node-name> --mount-host-filesystem --capabilities SYS_CHROOT
 ```
 
 Then you can use `chroot` to switch to start a shell inside the host filesystem:
@@ -133,7 +157,7 @@ search shncgv2kgepuhm1ls1dwgholsd.cx.internal.cloudapp.net
 `systemctl` commands require both `chroot` to the host filesystem and host PID:
 
 ```bash
-kubectl retina shell aks-nodepool1-15232018-vmss000002 --mount-host-filesystem --capabilities SYS_CHROOT --host-pid
+kubectl retina shell <node-name> --mount-host-filesystem --capabilities SYS_CHROOT --host-pid
 ```
 
 Then `chroot` to the host filesystem and run `systemctl status`:
@@ -144,7 +168,69 @@ root [ / ]# chroot /host systemctl status | head -n 2
     State: running
 ```
 
-**If `systemctl` shows an error "Failed to connect to bus: No data available", check that the `retina shell` command has `--host-pid` set and that you have chroot'd to /host.**
+>NOTE: If `systemctl` shows an error "Failed to connect to bus: No data available", check that the `retina shell` command has `--host-pid` set and that you have chroot'd to /host.
+
+## [pwru](https://github.com/cilium/pwru)
+
+eBPF-based tool for tracing network packets in the Linux kernel with advanced filtering capabilities. It allows fine-grained introspection of kernel state to facilitate debugging network connectivity issues.
+
+Requires the `NET_ADMIN` and `SYS_ADMIN` capabilities.
+
+Capability requirements are based on common eBPF tool practices and not directly from the pwru documentation.
+
+```shell
+kubectl retina shell -n kube-system pod/<pod-name> --capabilities=NET_ADMIN,SYS_ADMIN
+```
+
+You can then run, for example:
+
+```shell
+pwru -h
+pwru "tcp and (src port 8080 or dst port 8080)" 
+```
+
+## [bpftool](https://github.com/libbpf/bpftool)
+
+Allows you to list, dump, load BPF programs, etc. Reference utility to quickly inspect and manage BPF objects on your system, to manipulate BPF object files, or to perform various other BPF-related tasks.
+
+Requires the `NET_ADMIN` and `SYS_ADMIN` capabilities.
+
+```shell
+kubectl retina shell -n kube-system pod/<pod-name> --capabilities=NET_ADMIN,SYS_ADMIN
+```
+
+You can then run for example:
+
+```shell
+bpftool -h
+bpftool prog show
+bpftool map dump id <map_id>
+```
+
+## [Inspektor Gadget (ig)](https://inspektor-gadget.io/)
+
+Tools and framework for data collection and system inspection on Kubernetes clusters and Linux hosts using eBPF.
+
+To use `ig`, you need to add the `--mount-host-filesystem`,  `--apparmor-unconfined` and `--seccomp-unconfined` flags, along with the following capabilities:
+
+* `NET_ADMIN`
+* `SYS_ADMIN`
+* `SYS_RESOURCE`
+* `SYSLOG`
+* `IPC_LOCK`
+* `SYS_PTRACE`
+* `NET_RAW`
+
+```shell
+kubectl retina shell <node-name> --capabilities=NET_ADMIN,SYS_ADMIN,SYS_RESOURCE,SYSLOG,IPC_LOCK,SYS_PTRACE,NET_RAW  --mount-host-filesystem --apparmor-unconfined --seccomp-unconfined
+```
+
+You can then run for example:
+
+```shell
+ig -h
+ig run trace_dns:latest
+```
 
 ## Troubleshooting
 
@@ -158,7 +244,8 @@ If `kubectl retina shell` fails with a timeout error, then:
 Example:
 
 ```bash
-kubectl retina shell --timeout 10m node001 # increase timeout to 10 minutes
+# increase timeout to 10 minutes
+kubectl retina shell --timeout 10m <node-name>
 ```
 
 ### Firewalls and ImagePullBackoff
@@ -172,14 +259,16 @@ Example:
 
 ```bash
 export RETINA_SHELL_IMAGE_REPO="example.azurecr.io/retina/retina-shell"
-export RETINA_SHELL_IMAGE_VERSION=v0.0.1 # optional, if not set defaults to the Retina CLI version.
-kubectl retina shell node0001 # this will use the image "example.azurecr.io/retina/retina-shell:v0.0.1"
+# optional, if not set defaults to the Retina CLI version.
+export RETINA_SHELL_IMAGE_VERSION=v0.0.1
+# this will use the image "example.azurecr.io/retina/retina-shell:v0.0.1"
+kubectl retina shell <node-name>
 ```
 
 ## Limitations
 
 * Windows nodes and pods are not yet supported.
-* `bpftool` and `bpftrace` are not supported.
+* `bpftrace` not yet supported.
 * The shell image links `iptables` commands to `iptables-nft`, even if the node itself links to `iptables-legacy`.
 * `nsenter` is not supported.
 * `ip netns` will not work without `chroot` to the host filesystem.
