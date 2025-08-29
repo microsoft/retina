@@ -38,18 +38,22 @@ type Enricher struct {
 	Reader *container.RingReader
 
 	outputRing *container.Ring
+
+	// enableStandalone indicates whether the standalone enricher is enabled
+	enableStandalone bool
 }
 
-func New(ctx context.Context, cache cache.CacheInterface) *Enricher {
+func New(ctx context.Context, cache cache.CacheInterface, enableStandalone bool) *Enricher {
 	once.Do(func() {
 		ir := container.NewRing(container.Capacity1023)
 		e = &Enricher{
-			ctx:        ctx,
-			l:          log.Logger().Named("enricher"),
-			cache:      cache,
-			inputRing:  ir,
-			Reader:     container.NewRingReader(ir, ir.OldestWrite()),
-			outputRing: container.NewRing(container.Capacity1023),
+			ctx:              ctx,
+			l:                log.Logger().Named("enricher"),
+			cache:            cache,
+			inputRing:        ir,
+			Reader:           container.NewRingReader(ir, ir.OldestWrite()),
+			outputRing:       container.NewRing(container.Capacity1023),
+			enableStandalone: enableStandalone,
 		}
 		initialized = true
 	})
@@ -98,8 +102,37 @@ func (e *Enricher) Run() {
 	}()
 }
 
-// enrich takes the flow and enriches it with the information from the cache
 func (e *Enricher) enrich(ev *v1.Event) {
+	if e.enableStandalone {
+		e.enrichStandalone(ev)
+	} else {
+		e.enrichStandard(ev)
+	}
+}
+
+// enrichStandalone takes the flow and enriches it with information from the standalone cache
+func (e *Enricher) enrichStandalone(ev *v1.Event) {
+	flow := ev.Event.(*flow.Flow)
+
+	if flow.IP.Source == "" {
+		e.l.Debug("source IP is empty")
+		return
+	}
+
+	srcObj := e.cache.GetPodByIP(flow.IP.Source)
+	if srcObj != nil {
+		flow.Source = e.getEndpoint(srcObj)
+		e.l.Debug("enriched flow", zap.Any("flow", flow))
+	} else {
+		flow.Source = nil
+	}
+
+	ev.Event = flow
+	e.export(ev)
+}
+
+// enrichStandard takes the flow and enriches it with the information from the cache
+func (e *Enricher) enrichStandard(ev *v1.Event) {
 	flow := ev.Event.(*flow.Flow)
 
 	// IPversion is a enum in the flow proto

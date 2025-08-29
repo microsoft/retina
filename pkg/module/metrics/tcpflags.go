@@ -25,10 +25,12 @@ const (
 
 type TCPMetrics struct {
 	baseMetricObject
-	tcpFlagsMetrics metricsinit.GaugeVec
+	tcpFlagsMetrics  metricsinit.GaugeVec
+	metricName       string
+	enableStandalone bool
 }
 
-func NewTCPMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext) *TCPMetrics {
+func NewTCPMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext, enableStandalone bool) *TCPMetrics {
 	if ctxOptions == nil || !strings.Contains(strings.ToLower(ctxOptions.MetricName), "flag") {
 		return nil
 	}
@@ -37,6 +39,7 @@ func NewTCPMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isL
 	fl.Info("Creating TCP Flags count metrics", zap.Any("options", ctxOptions))
 	return &TCPMetrics{
 		baseMetricObject: newBaseMetricsObject(ctxOptions, fl, isLocalContext),
+		enableStandalone: enableStandalone,
 	}
 }
 
@@ -48,18 +51,26 @@ func (t *TCPMetrics) Init(metricName string) {
 		TCPFlagsCountDesc,
 		t.getLabels()...,
 	)
+	t.metricName = metricName
 }
 
 func (t *TCPMetrics) getLabels() []string {
 	labels := []string{
 		utils.Flag,
 	}
+
+	if t.enableStandalone {
+		labels = append(labels, utils.Direction)
+	}
+
 	if t.srcCtx != nil {
 		labels = append(labels, t.srcCtx.getLabels()...)
+		t.l.Info("src labels", zap.Any("labels", labels))
 	}
 
 	if t.dstCtx != nil {
 		labels = append(labels, t.dstCtx.getLabels()...)
+		t.l.Info("dst labels", zap.Any("labels", labels))
 	}
 
 	return labels
@@ -88,6 +99,11 @@ func combineFlagsWithPrevious(flags []string, flow *v1.Flow) map[string]uint32 {
 
 func (t *TCPMetrics) ProcessFlow(flow *v1.Flow) {
 	if flow == nil {
+		return
+	}
+
+	if t.enableStandalone {
+		t.processStandaloneFlow(flow)
 		return
 	}
 
@@ -155,6 +171,42 @@ func (t *TCPMetrics) processLocalCtxFlow(flow *v1.Flow, flags []string) {
 	}
 }
 
+func (t *TCPMetrics) processStandaloneFlow(fl *v1.Flow) {
+	if GetHNSMetadata(fl).VfpPortStatsData == nil {
+		return
+	}
+
+	// ingress values
+	ingressLbls := []string{
+		ingress,
+		fl.GetIP().Source,
+		fl.Source.Namespace,
+		fl.Source.PodName,
+		"",
+		"",
+	}
+
+	// egress values
+	egressLbls := []string{
+		egress,
+		fl.GetIP().Source,
+		fl.Source.Namespace,
+		fl.Source.PodName,
+		"",
+		"",
+	}
+
+	t.tcpFlagsMetrics.WithLabelValues(append([]string{utils.SYN}, ingressLbls...)...).Set(float64(GetHNSMetadata(fl).VfpPortStatsData.In.TcpCounters.PacketCounters.SynPacketCount))
+	t.tcpFlagsMetrics.WithLabelValues(append([]string{utils.SYNACK}, ingressLbls...)...).Set(float64(GetHNSMetadata(fl).VfpPortStatsData.In.TcpCounters.PacketCounters.SynAckPacketCount))
+	t.tcpFlagsMetrics.WithLabelValues(append([]string{utils.FIN}, ingressLbls...)...).Set(float64(GetHNSMetadata(fl).VfpPortStatsData.In.TcpCounters.PacketCounters.FinPacketCount))
+	t.tcpFlagsMetrics.WithLabelValues(append([]string{utils.RST}, ingressLbls...)...).Set(float64(GetHNSMetadata(fl).VfpPortStatsData.In.TcpCounters.PacketCounters.RstPacketCount))
+
+	t.tcpFlagsMetrics.WithLabelValues(append([]string{utils.SYN}, egressLbls...)...).Set(float64(GetHNSMetadata(fl).VfpPortStatsData.Out.TcpCounters.PacketCounters.SynPacketCount))
+	t.tcpFlagsMetrics.WithLabelValues(append([]string{utils.SYNACK}, egressLbls...)...).Set(float64(GetHNSMetadata(fl).VfpPortStatsData.Out.TcpCounters.PacketCounters.SynAckPacketCount))
+	t.tcpFlagsMetrics.WithLabelValues(append([]string{utils.FIN}, egressLbls...)...).Set(float64(GetHNSMetadata(fl).VfpPortStatsData.Out.TcpCounters.PacketCounters.FinPacketCount))
+	t.tcpFlagsMetrics.WithLabelValues(append([]string{utils.RST}, egressLbls...)...).Set(float64(GetHNSMetadata(fl).VfpPortStatsData.Out.TcpCounters.PacketCounters.RstPacketCount))
+}
+
 func (t *TCPMetrics) getFlagValues(flags *v1.TCPFlags) []string {
 	f := make([]string, 0)
 	if flags == nil {
@@ -203,5 +255,6 @@ func (t *TCPMetrics) getFlagValues(flags *v1.TCPFlags) []string {
 }
 
 func (t *TCPMetrics) Clean() {
+	t.l.Info("Cleaning metric", zap.String("name", t.metricName))
 	exporter.UnregisterMetric(exporter.AdvancedRegistry, metricsinit.ToPrometheusType(t.tcpFlagsMetrics))
 }

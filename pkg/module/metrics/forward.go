@@ -30,11 +30,12 @@ const (
 type ForwardMetrics struct {
 	baseMetricObject
 	forwardMetric metricsinit.GaugeVec
-	// bytesMetric metricsinit.IGaugeVec
-	metricName string
+	// bytesMetric      metricsinit.GaugeVec
+	metricName       string
+	enableStandalone bool
 }
 
-func NewForwardCountMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext) *ForwardMetrics {
+func NewForwardCountMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext, enableStandalone bool) *ForwardMetrics {
 	if ctxOptions == nil || !strings.Contains(strings.ToLower(ctxOptions.MetricName), "forward") {
 		return nil
 	}
@@ -43,6 +44,7 @@ func NewForwardCountMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLo
 	l.Info("Creating forward count metrics", zap.Any("options", ctxOptions))
 	return &ForwardMetrics{
 		baseMetricObject: newBaseMetricsObject(ctxOptions, fl, isLocalContext),
+		enableStandalone: enableStandalone,
 	}
 }
 
@@ -54,12 +56,14 @@ func (f *ForwardMetrics) Init(metricName string) {
 			TotalCountName,
 			TotalCountDesc,
 			f.getLabels()...)
+		f.l.Info("Initialized forward packets metric")
 	case utils.ForwardBytesGaugeName:
 		f.forwardMetric = exporter.CreatePrometheusGaugeVecForMetric(
 			exporter.AdvancedRegistry,
 			TotalBytesName,
 			TotalBytesDesc,
 			f.getLabels()...)
+		f.l.Info("Initialized forward bytes metric")
 	default:
 		f.l.Error("unknown metric name", zap.String("name", metricName))
 	}
@@ -93,6 +97,7 @@ func (f *ForwardMetrics) getLabels() []string {
 }
 
 func (f *ForwardMetrics) Clean() {
+	f.l.Info("Cleaning metric", zap.String("name", f.metricName))
 	exporter.UnregisterMetric(exporter.AdvancedRegistry, metricsinit.ToPrometheusType(f.forwardMetric))
 }
 
@@ -102,6 +107,11 @@ func (f *ForwardMetrics) ProcessFlow(flow *v1.Flow) {
 	// Flow does not have bytes section at the moment,
 	// so we will update only packet count
 	if flow == nil {
+		return
+	}
+
+	if f.enableStandalone {
+		f.processStandaloneFlow(flow)
 		return
 	}
 
@@ -173,5 +183,35 @@ func (f *ForwardMetrics) update(fl *v1.Flow, labels []string) {
 		f.forwardMetric.WithLabelValues(labels...).Add(float64(utils.PreviouslyObservedPackets(fl) + 1))
 	case utils.ForwardBytesGaugeName:
 		f.forwardMetric.WithLabelValues(labels...).Add(float64(utils.PacketSize(fl) + utils.PreviouslyObservedBytes(fl)))
+	}
+}
+
+func (f *ForwardMetrics) processStandaloneFlow(fl *v1.Flow) {
+	// Ingress values
+	ingressLbls := []string{
+		ingress,
+		fl.GetIP().Source,
+		fl.Source.Namespace,
+		fl.Source.PodName,
+		"",
+		"",
+	}
+	// Egress values
+	egressLbls := []string{
+		egress,
+		fl.GetIP().Source,
+		fl.Source.Namespace,
+		fl.Source.PodName,
+		"",
+		"",
+	}
+
+	switch f.metricName {
+	case utils.ForwardPacketsGaugeName:
+		f.forwardMetric.WithLabelValues(ingressLbls...).Set(float64(GetHNSMetadata(fl).EndpointStats.PacketsReceived))
+		f.forwardMetric.WithLabelValues(egressLbls...).Set(float64(GetHNSMetadata(fl).EndpointStats.PacketsSent))
+	case utils.ForwardBytesGaugeName:
+		f.forwardMetric.WithLabelValues(ingressLbls...).Set(float64(GetHNSMetadata(fl).EndpointStats.BytesReceived))
+		f.forwardMetric.WithLabelValues(egressLbls...).Set(float64(GetHNSMetadata(fl).EndpointStats.BytesSent))
 	}
 }

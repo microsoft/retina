@@ -8,10 +8,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/hcn"
+	"github.com/cilium/cilium/api/v1/flow"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
@@ -19,6 +21,7 @@ import (
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/registry"
 	"github.com/microsoft/retina/pkg/utils"
+
 	"go.uber.org/zap"
 )
 
@@ -82,14 +85,9 @@ func (h *hnsstats) Init() error {
 	// Filter out any endpoints that are not in "AttachedShared" State. All running Windows pods with networking must be in this state.
 	var filterMap map[string]uint16
 	if h.cfg.EnableStandalone {
-		if instance := enricher.StandaloneInstance(); instance != nil {
-			InitializeAdvancedMetrics()
-			h.l.Info("Metrics initialized")
-
-			h.enricher = enricher.StandaloneInstance()
+		if enricher.IsInitialized() {
+			h.enricher = enricher.Instance()
 			h.l.Info("Standalone enricher is enabled")
-		} else {
-			h.l.Warn("Standalone enricher is not initialized")
 		}
 	} else {
 		filterMap = map[string]uint16{"State": HCN_ENDPOINT_STATE_ATTACHED_SHARING}
@@ -141,13 +139,6 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 				mac := ep.MacAddress
 				ip := ep.IpConfigurations[0].IpAddress
 
-				if h.cfg.EnableStandalone {
-					if err = h.enricher.PublishEvent(ip, enricher.AddEvent); err != nil {
-						h.l.Error("Failed to publish event", zap.String(zapIPField, ip), zap.Error(err))
-						continue
-					}
-				}
-
 				if stats, err := hcsshim.GetHNSEndpointStats(id); err != nil {
 					h.l.Error("Getting endpoint stats failed", zap.String(zapEndpointIDField, id), zap.Error(err))
 				} else {
@@ -175,69 +166,43 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 						h.l.Error("Unable to find VFP port counters", zap.String(zapMACField, mac), zap.String(zapPortField, portguid), zap.Error(err))
 					}
 
+					if h.cfg.EnableStandalone {
+						h.sendFlow(ip, hnsStatsData)
+					}
 					notifyHnsStats(h, hnsStatsData)
 				}
-			}
-
-			if h.cfg.EnableStandalone {
-				h.enricher.RemoveStaleEntries()
 			}
 		}
 	}
 }
 
-func notifyHnsStats(h *hnsstats, stats *HnsStatsData) {
-	if h.cfg.EnableStandalone {
-		labels := h.enricher.GetPodInfo(stats.IPAddress)
+func (h *hnsstats) sendFlow(ip string, hnsstatsData *HnsStatsData) {
+	fl := utils.ToFlow(
+		h.l,
+		time.Now().UnixNano(),
+		net.ParseIP(ip),
+		nil,
+		uint32(0),
+		uint32(0),
+		uint8(0),
+		uint8(0),
+		flow.Verdict_VERDICT_UNKNOWN,
+	)
 
-		if labels == nil {
-			h.l.Debug("No labels found for IP", zap.String(zapIPField, stats.IPAddress))
-			return
-		}
+	hnsstats := &utils.HNSStatsMetadata{}
+	utils.AddCounters(hnsstats, toEndpointStats(hnsstatsData.hnscounters), toVfpPortCounters(hnsstatsData.vfpCounters))
+	utils.AddHNSMetadata(fl, hnsstats)
 
-		updateMetric(AdvForwardPacketsGauge, stats.IPAddress, labels, stats.hnscounters.PacketsReceived, ingressLabel)
-		h.l.Debug("emitting packets received count metric", zap.Uint64(PacketsReceived, stats.hnscounters.PacketsReceived))
-		updateMetric(AdvForwardPacketsGauge, stats.IPAddress, labels, stats.hnscounters.PacketsSent, egressLabel)
-		h.l.Debug("emitting packets sent count metric", zap.Uint64(PacketsSent, stats.hnscounters.PacketsSent))
-		updateMetric(AdvForwardBytesGauge, stats.IPAddress, labels, stats.hnscounters.BytesReceived, ingressLabel)
-		h.l.Debug("emitting bytes received count metric", zap.Uint64(BytesReceived, stats.hnscounters.BytesReceived))
-		updateMetric(AdvForwardBytesGauge, stats.IPAddress, labels, stats.hnscounters.BytesSent, egressLabel)
-		h.l.Debug("emitting bytes sent count metric", zap.Uint64(BytesSent, stats.hnscounters.BytesSent))
-
-		updateMetric(AdvHNSStatsGauge, stats.IPAddress, labels, stats.hnscounters.PacketsReceived, PacketsReceived)
-		updateMetric(AdvHNSStatsGauge, stats.IPAddress, labels, stats.hnscounters.PacketsSent, PacketsSent)
-
-		updateMetric(AdvDroppedPacketsGauge, stats.IPAddress, labels, stats.hnscounters.DroppedPacketsOutgoing, utils.Endpoint, egressLabel)
-		updateMetric(AdvDroppedPacketsGauge, stats.IPAddress, labels, stats.hnscounters.DroppedPacketsIncoming, utils.Endpoint, ingressLabel)
-
-		if stats.vfpCounters == nil {
-			h.l.Debug("will not record some metrics since VFP port counters failed to be set")
-			return
-		}
-
-		updateMetric(AdvDroppedPacketsGauge, stats.IPAddress, labels, stats.vfpCounters.In.DropCounters.AclDropPacketCount, utils.AclRule, ingressLabel)
-		updateMetric(AdvDroppedPacketsGauge, stats.IPAddress, labels, stats.vfpCounters.Out.DropCounters.AclDropPacketCount, utils.AclRule, egressLabel)
-
-		updateMetric(AdvTCPConnectionStatsGauge, stats.IPAddress, labels, stats.vfpCounters.In.TcpCounters.ConnectionCounters.ResetCount, utils.ResetCount)
-		updateMetric(AdvTCPConnectionStatsGauge, stats.IPAddress, labels, stats.vfpCounters.In.TcpCounters.ConnectionCounters.ClosedFinCount, utils.ClosedFin)
-		updateMetric(AdvTCPConnectionStatsGauge, stats.IPAddress, labels, stats.vfpCounters.In.TcpCounters.ConnectionCounters.ResetSynCount, utils.ResetSyn)
-		updateMetric(AdvTCPConnectionStatsGauge, stats.IPAddress, labels, stats.vfpCounters.In.TcpCounters.ConnectionCounters.TcpHalfOpenTimeoutsCount, utils.TcpHalfOpenTimeouts)
-		updateMetric(AdvTCPConnectionStatsGauge, stats.IPAddress, labels, stats.vfpCounters.In.TcpCounters.ConnectionCounters.VerifiedCount, utils.Verified)
-		updateMetric(AdvTCPConnectionStatsGauge, stats.IPAddress, labels, stats.vfpCounters.In.TcpCounters.ConnectionCounters.TimedOutCount, utils.TimedOutCount)
-		updateMetric(AdvTCPConnectionStatsGauge, stats.IPAddress, labels, stats.vfpCounters.In.TcpCounters.ConnectionCounters.TimeWaitExpiredCount, utils.TimeWaitExpiredCount)
-		// TCP Flag counters
-		updateMetric(AdvTCPFlagGauge, stats.IPAddress, labels, stats.vfpCounters.In.TcpCounters.PacketCounters.SynPacketCount, ingressLabel, utils.SYN)
-		updateMetric(AdvTCPFlagGauge, stats.IPAddress, labels, stats.vfpCounters.In.TcpCounters.PacketCounters.SynAckPacketCount, ingressLabel, utils.SYNACK)
-		updateMetric(AdvTCPFlagGauge, stats.IPAddress, labels, stats.vfpCounters.In.TcpCounters.PacketCounters.FinPacketCount, ingressLabel, utils.FIN)
-		updateMetric(AdvTCPFlagGauge, stats.IPAddress, labels, stats.vfpCounters.In.TcpCounters.PacketCounters.RstPacketCount, ingressLabel, utils.RST)
-
-		updateMetric(AdvTCPFlagGauge, stats.IPAddress, labels, stats.vfpCounters.Out.TcpCounters.PacketCounters.SynPacketCount, egressLabel, utils.SYN)
-		updateMetric(AdvTCPFlagGauge, stats.IPAddress, labels, stats.vfpCounters.Out.TcpCounters.PacketCounters.SynAckPacketCount, egressLabel, utils.SYNACK)
-		updateMetric(AdvTCPFlagGauge, stats.IPAddress, labels, stats.vfpCounters.Out.TcpCounters.PacketCounters.FinPacketCount, egressLabel, utils.FIN)
-		updateMetric(AdvTCPFlagGauge, stats.IPAddress, labels, stats.vfpCounters.Out.TcpCounters.PacketCounters.RstPacketCount, egressLabel, utils.RST)
-		return
+	ev := &v1.Event{
+		Event:     fl,
+		Timestamp: fl.GetTime(),
 	}
+	if h.enricher != nil {
+		h.enricher.Write(ev)
+	}
+}
 
+func notifyHnsStats(h *hnsstats, stats *HnsStatsData) {
 	// hns signals
 	metrics.ForwardPacketsGauge.WithLabelValues(ingressLabel).Set(float64(stats.hnscounters.PacketsReceived))
 	h.l.Debug("emitting packets received count metric", zap.Uint64(PacketsReceived, stats.hnscounters.PacketsReceived))
@@ -296,10 +261,6 @@ func (h *hnsstats) Stop() error {
 	if h.state != start {
 		h.l.Info("plugin not started")
 		return nil
-	}
-
-	if h.cfg.EnableStandalone {
-		cleanAdvMetrics()
 	}
 
 	h.l.Info("Stopped listening for hnsstats event...")

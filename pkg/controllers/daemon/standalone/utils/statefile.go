@@ -1,15 +1,18 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
-package statefile
+package utils
 
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 
-	"github.com/microsoft/retina/pkg/controllers/cache"
+	"github.com/microsoft/retina/pkg/common"
 )
+
+type StatefileSource struct{}
 
 var StateFileLocation = "C:/Windows/System32/azure-vnet.json"
 
@@ -40,8 +43,8 @@ type IPInfo struct {
 	IP string `json:"IP"`
 }
 
-func GetPodInfo(ip, filePath string) (*cache.PodInfo, error) {
-	data, err := os.ReadFile(filePath)
+func (ss *StatefileSource) GetAllEndpoints() ([]*common.RetinaEndpoint, error) {
+	data, err := os.ReadFile(StateFileLocation)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read CNI state file: %w", err)
 	}
@@ -55,21 +58,27 @@ func GetPodInfo(ip, filePath string) (*cache.PodInfo, error) {
 		return nil, fmt.Errorf("failed to decode CNI state file: %w", err)
 	}
 
+	endpoints := []*common.RetinaEndpoint{}
+
 	// For every HNS endpoint, we check if the equivalent IP address exists in the CNI state file
 	for _, iface := range cniState.Network.ExternalInterfaces {
 		for _, networkInfo := range iface.Networks {
 			for _, endpoint := range networkInfo.Endpoints {
 				for _, ipInfo := range endpoint.IPAddresses {
-					if ipInfo.IP == ip {
-						return &cache.PodInfo{
-							Name:      endpoint.PodName,
-							Namespace: endpoint.PodNamespace,
-						}, nil
+					ip := ipInfo.IP
+					if ip == "" {
+						continue
 					}
+
+					endpoints = append(endpoints, common.NewRetinaEndpoint(
+						endpoint.PodName,
+						endpoint.PodNamespace,
+						common.NewIPAddress(net.ParseIP(ip), nil),
+					))
 				}
 			}
 		}
 	}
 
-	return nil, nil
+	return endpoints, nil
 }

@@ -10,12 +10,15 @@ import (
 	"github.com/microsoft/retina/cmd/telemetry"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
+	"github.com/microsoft/retina/pkg/metrics"
 	"go.uber.org/zap"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/microsoft/retina/pkg/config"
-	"github.com/microsoft/retina/pkg/controllers/cache"
+	"github.com/microsoft/retina/pkg/controllers/cache/standalone"
+	sd "github.com/microsoft/retina/pkg/controllers/daemon/standalone"
 	cm "github.com/microsoft/retina/pkg/managers/controllermanager"
+	sm "github.com/microsoft/retina/pkg/module/metrics/standalone"
 )
 
 const TTL = 3 * time.Minute
@@ -34,16 +37,22 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 	zl.Info("Starting Standalone Retina daemon")
 	mainLogger := zl.Named("standalone-daemon").Sugar()
 
+	metrics.InitializeMetrics()
+
 	tel, err := telemetry.InitializeTelemetryClient(nil, d.config, mainLogger)
 	if err != nil {
 		return fmt.Errorf("failed to initialize telemetry client: %w", err)
 	}
-
 	ctx := ctrl.SetupSignalHandler()
 
-	c := cache.NewStandaloneCache(TTL)
-	enrich := enricher.NewStandaloneEnricher(ctx, c, d.config)
+	cache := standalone.NewCache()
+	enrich := enricher.New(ctx, cache, d.config.EnableStandalone)
 	enrich.Run()
+
+	metricsModule := sm.InitModule(ctx, enrich)
+
+	controller := sd.New(d.config, cache, metricsModule)
+	go controller.Run(ctx)
 
 	// pod level needs to be disabled
 	controllerMgr, err := cm.NewControllerManager(d.config, nil, tel)

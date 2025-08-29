@@ -191,7 +191,7 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 	if d.config.EnablePodLevel {
 		pubSub := pubsub.New()
 		controllerCache := controllercache.New(pubSub)
-		enrich := enricher.New(ctx, controllerCache)
+		enrich := enricher.New(ctx, controllerCache, d.config.EnableStandalone)
 		//nolint:govet // shadowing this err is fine
 		fm, err := filtermanager.Init(5) //nolint:gomnd // defaults
 		if err != nil {

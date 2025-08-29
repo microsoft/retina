@@ -26,7 +26,7 @@ func main() {
 	ctx := context.Background()
 	c := cache.New(pubsub.New())
 
-	e := enricher.New(ctx, c)
+	e := enricher.New(ctx, c, false)
 
 	e.Run()
 
