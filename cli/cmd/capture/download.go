@@ -19,6 +19,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/storage"
 	retinacmd "github.com/microsoft/retina/cli/cmd"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
+	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	captureLabels "github.com/microsoft/retina/pkg/label"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -35,14 +36,34 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
+// NodeOS represents the operating system of a Kubernetes node
+type NodeOS int
+
+const (
+	Linux NodeOS = iota
+	Windows
+)
+
 const (
 	DefaultOutputPath = "./"
 )
 
 var (
-	blobURL     string
-	captureName string
-	outputPath  string
+	blobURL string
+	// Error variables for lint compliance (err113)
+	ErrCreateDirectory    = errors.New("failed to create directory")
+	ErrGetNodeInfo        = errors.New("failed to get node information")
+	ErrWriteFileToHost    = errors.New("failed to write file to host")
+	ErrObtainPodList      = errors.New("failed to obtain list of pods")
+	ErrExecFileDownload   = errors.New("failed to exec file download in container")
+	ErrCreateDownloadPod  = errors.New("failed to create download pod")
+	ErrGetDownloadPod     = errors.New("failed to get download pod")
+	ErrCheckFileExistence = errors.New("failed to check file existence")
+	ErrCreateExecutor     = errors.New("failed to create executor")
+	ErrExecCommand        = errors.New("failed to exec command")
+	ErrCreateOutputDir    = errors.New("failed to create output directory")
+	captureName           string
+	outputPath            string
 )
 
 var (
@@ -52,7 +73,114 @@ var (
 	ErrFileNotAccessible         = errors.New("file does not exist or is not readable")
 	ErrEmptyDownloadOutput       = errors.New("download command produced no output")
 	ErrFailedToCreateDownloadPod = errors.New("failed to create download pod")
+	ErrUnsupportedNodeOS         = errors.New("unsupported node operating system")
 )
+
+// DownloadCmd holds all OS-specific commands and configurations
+type DownloadCmd struct {
+	ContainerImage   string
+	SrcFilePath      string
+	MountPath        string
+	KeepAliveCommand []string
+	FileCheckCommand []string
+	FileReadCommand  []string
+}
+
+// DownloadService encapsulates the download functionality and shared dependencies
+type DownloadService struct {
+	kubeClient kubernetes.Interface
+	config     *rest.Config
+	namespace  string
+	ctx        context.Context
+}
+
+// NewDownloadService creates a new download service with shared dependencies
+func NewDownloadService(ctx context.Context, kubeClient kubernetes.Interface, config *rest.Config, namespace string) *DownloadService {
+	return &DownloadService{
+		kubeClient: kubeClient,
+		config:     config,
+		namespace:  namespace,
+		ctx:        ctx,
+	}
+}
+
+func getDownloadCmd(node *corev1.Node, hostPath, fileName string) *DownloadCmd {
+	nodeOS, err := getNodeOS(node)
+	if err != nil {
+		retinacmd.Logger.Error("Failed to detect node OS", zap.String("node", node.Name), zap.Error(err))
+		return nil
+	}
+
+	switch nodeOS {
+	case Windows:
+		srcFilePath := "C:\\host" + strings.ReplaceAll(hostPath, "/", "\\") + "\\" + fileName + ".tar.gz"
+		mountPath := "C:\\host" + strings.ReplaceAll(hostPath, "/", "\\")
+		return &DownloadCmd{
+			ContainerImage:   getWindowsContainerImage(node),
+			SrcFilePath:      srcFilePath,
+			MountPath:        mountPath,
+			KeepAliveCommand: []string{"cmd", "/c", "echo Download pod ready & ping -n 3601 127.0.0.1 > nul"},
+			FileCheckCommand: []string{"cmd", "/c", fmt.Sprintf("if exist %s echo FILE_EXISTS", srcFilePath)},
+			FileReadCommand:  []string{"cmd", "/c", "type", srcFilePath},
+		}
+	case Linux:
+		srcFilePath := "/" + filepath.Join("host", hostPath, fileName) + ".tar.gz"
+		mountPath := "/" + filepath.Join("host", hostPath)
+		return &DownloadCmd{
+			ContainerImage:   "mcr.microsoft.com/azurelinux/busybox:1.36",
+			SrcFilePath:      srcFilePath,
+			MountPath:        mountPath,
+			KeepAliveCommand: []string{"sh", "-c", "echo 'Download pod ready'; sleep 3600"},
+			FileCheckCommand: []string{"sh", "-c", fmt.Sprintf("if [ -r %q ]; then echo 'FILE_EXISTS'; fi", srcFilePath)},
+			FileReadCommand:  []string{"cat", srcFilePath},
+		}
+	default:
+		return nil
+	}
+}
+
+func getNodeOS(node *corev1.Node) (NodeOS, error) {
+	nodeOS := strings.ToLower(node.Status.NodeInfo.OperatingSystem)
+
+	if strings.Contains(nodeOS, "windows") {
+		retinacmd.Logger.Info("Detected node OS: Windows", zap.String("node", node.Name), zap.String("os", node.Status.NodeInfo.OperatingSystem))
+		return Windows, nil
+	}
+
+	if strings.Contains(nodeOS, "linux") {
+		retinacmd.Logger.Info("Detected node OS: Linux", zap.String("node", node.Name), zap.String("os", node.Status.NodeInfo.OperatingSystem))
+		return Linux, nil
+	}
+
+	return Linux, errors.Wrap(ErrEmptyDownloadOutput, "unsupported operating system: "+node.Status.NodeInfo.OperatingSystem)
+}
+
+// Detects the Windows LTSC version and returns the appropriate nanoserver image
+func getWindowsContainerImage(node *corev1.Node) string {
+	osImage := strings.ToLower(node.Status.NodeInfo.OSImage)
+
+	var suffix string
+	switch {
+	case strings.Contains(osImage, "2025"):
+		suffix = "ltsc2025"
+	case strings.Contains(osImage, "2022"):
+		suffix = "ltsc2022"
+	case strings.Contains(osImage, "2019"):
+		suffix = "ltsc2019"
+	case strings.Contains(osImage, "2016"):
+		suffix = "ltsc2016"
+	default:
+		retinacmd.Logger.Warn("Could not determine Windows LTSC version, defaulting to ltsc2022",
+			zap.String("node", node.Name),
+			zap.String("osImage", osImage))
+		suffix = "ltsc2022"
+	}
+
+	containerImage := "mcr.microsoft.com/windows/nanoserver:" + suffix
+	retinacmd.Logger.Info("Selected Windows container image", zap.String("image", containerImage))
+
+	return containerImage
+}
 
 var downloadExample = templates.Examples(i18n.T(`
 		# List Retina capture jobs
@@ -69,10 +197,13 @@ var downloadExample = templates.Examples(i18n.T(`
 `))
 
 func downloadFromCluster(ctx context.Context, config *rest.Config, namespace string) error {
+	fmt.Println("Downloading capture: ", captureName)
 	kubeClient, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize k8s client")
 	}
+
+	downloadService := NewDownloadService(ctx, kubeClient, config, namespace)
 
 	pods, err := getCapturePods(ctx, kubeClient, captureName, namespace)
 	if err != nil {
@@ -81,7 +212,7 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 
 	err = os.MkdirAll(filepath.Join(outputPath, captureName), 0o775)
 	if err != nil {
-		return fmt.Errorf("failed to create directory: %w", err)
+		return errors.Wrap(err, ErrCreateDirectory.Error())
 	}
 
 	for i := range pods.Items {
@@ -100,57 +231,68 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 			return errors.New("cannot obtain capture file name from pod annotations")
 		}
 
-		srcFilePath := "/" + filepath.Join("host", hostPath, fileName) + ".tar.gz"
-		fmt.Println("\nFile to be downloaded: ", srcFilePath)
-		downloadPod, err := createDownloadPod(ctx, kubeClient, namespace, nodeName, hostPath, captureName)
+		err = downloadService.DownloadFile(nodeName, hostPath, fileName, captureName)
 		if err != nil {
 			return err
-		}
-
-		fmt.Println("Obtaining file...")
-		exec, err := createDownloadExec(ctx, kubeClient, config, downloadPod, srcFilePath)
-		if err != nil {
-			return err
-		}
-
-		var outBuf, errBuf bytes.Buffer
-		streamOpts := remotecommand.StreamOptions{
-			Stdout: &outBuf,
-			Stderr: &errBuf,
-		}
-		if err = exec.StreamWithContext(ctx, streamOpts); err != nil {
-			return fmt.Errorf("failed to exec in download container: %w", err)
-		}
-
-		if outBuf.Len() == 0 {
-			return errors.Wrap(ErrEmptyDownloadOutput, errBuf.String())
-		}
-
-		outputFile := filepath.Join(outputPath, captureName, fileName+".tar.gz")
-		fmt.Printf("Bytes retrieved: %d\n", outBuf.Len())
-
-		err = os.WriteFile(outputFile, outBuf.Bytes(), 0o600)
-		if err != nil {
-			return fmt.Errorf("failed to write file to host: %w", err)
-		}
-
-		fmt.Println("File written to: ", outputFile)
-
-		err = kubeClient.CoreV1().Pods(namespace).Delete(ctx, downloadPod.Name, metav1.DeleteOptions{})
-		if err != nil {
-			retinacmd.Logger.Warn("Failed to clean up debug pod", zap.String("name", downloadPod.Name), zap.Error(err))
 		}
 	}
 
 	return nil
 }
 
-func getCapturePods(ctx context.Context, kubeClient *kubernetes.Clientset, captureName, namespace string) (*corev1.PodList, error) {
+// DownloadFile downloads a capture file from a specific node
+func (ds *DownloadService) DownloadFile(nodeName, hostPath, fileName, captureName string) error {
+	node, err := ds.kubeClient.CoreV1().Nodes().Get(ds.ctx, nodeName, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrap(err, ErrGetNodeInfo.Error())
+	}
+
+	downloadCmd := getDownloadCmd(node, hostPath, fileName)
+	if downloadCmd == nil {
+		return ErrUnsupportedNodeOS
+	}
+
+	fmt.Println("File to be downloaded: ", downloadCmd.SrcFilePath)
+	downloadPod, err := ds.createDownloadPod(nodeName, hostPath, captureName, downloadCmd)
+	if err != nil {
+		return err
+	}
+
+	fileExists, err := ds.verifyFileExists(downloadPod, downloadCmd)
+	if err != nil || !fileExists {
+		return err
+	}
+
+	fmt.Println("Obtaining file...")
+	fileContent, err := ds.executeFileDownload(downloadPod, downloadCmd)
+	if err != nil {
+		return err
+	}
+
+	outputFile := filepath.Join(outputPath, captureName, fileName+".tar.gz")
+	fmt.Printf("Bytes retrieved: %d\n", len(fileContent))
+
+	err = os.WriteFile(outputFile, fileContent, 0o600)
+	if err != nil {
+		return errors.Wrap(err, ErrWriteFileToHost.Error())
+	}
+
+	fmt.Printf("File written to: %s\n", outputFile)
+
+	// Ensure cleanup
+	err = ds.kubeClient.CoreV1().Pods(ds.namespace).Delete(ds.ctx, downloadPod.Name, metav1.DeleteOptions{})
+	if err != nil {
+		retinacmd.Logger.Warn("Failed to clean up debug pod", zap.String("name", downloadPod.Name), zap.Error(err))
+	}
+	return nil
+}
+
+func getCapturePods(ctx context.Context, kubeClient kubernetes.Interface, captureName, namespace string) (*corev1.PodList, error) {
 	pods, err := kubeClient.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: captureLabels.CaptureNameLabel + "=" + captureName,
 	})
 	if err != nil {
-		return &corev1.PodList{}, fmt.Errorf("failed to obtain list of pods: %w", err)
+		return &corev1.PodList{}, errors.Wrap(err, ErrObtainPodList.Error())
 	}
 	if len(pods.Items) == 0 {
 		return &corev1.PodList{}, errors.Wrap(ErrNoPodFound, captureName)
@@ -159,25 +301,41 @@ func getCapturePods(ctx context.Context, kubeClient *kubernetes.Clientset, captu
 	return pods, nil
 }
 
-func createDownloadPod(ctx context.Context, kubeClient *kubernetes.Clientset, namespace, nodeName, hostPath, captureName string) (*corev1.Pod, error) {
+// executeFileDownload downloads the file content from the pod
+func (ds *DownloadService) executeFileDownload(pod *corev1.Pod, downloadCmd *DownloadCmd) ([]byte, error) {
+	content, err := ds.createDownloadExec(pod, downloadCmd.FileReadCommand)
+	if err != nil {
+		return nil, errors.Wrap(err, ErrExecFileDownload.Error())
+	}
+
+	if content == "" {
+		return nil, ErrEmptyDownloadOutput
+	}
+
+	return []byte(content), nil
+}
+
+// createDownloadPod creates a pod for downloading files from the host
+func (ds *DownloadService) createDownloadPod(nodeName, hostPath, captureName string, downloadCmd *DownloadCmd) (*corev1.Pod, error) {
 	podName := captureName + "-download-" + rand.String(5)
 
 	podSpec := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
-			Namespace: namespace,
+			Namespace: ds.namespace,
+			Labels:    captureUtils.GetDownloadLabelsFromCaptureName(captureName),
 		},
 		Spec: corev1.PodSpec{
 			NodeName: nodeName,
 			Containers: []corev1.Container{
 				{
-					Name:    "download",
-					Image:   "mcr.microsoft.com/azurelinux/busybox:1.36",
-					Command: []string{"sh", "-c", "echo 'Download pod ready'; sleep 3600"},
+					Name:    captureConstants.DownloadContainername,
+					Image:   downloadCmd.ContainerImage,
+					Command: downloadCmd.KeepAliveCommand,
 					VolumeMounts: []corev1.VolumeMount{
 						{
 							Name:      "host-mount",
-							MountPath: "/" + filepath.Join("host", hostPath),
+							MountPath: downloadCmd.MountPath,
 						},
 					},
 				},
@@ -197,23 +355,28 @@ func createDownloadPod(ctx context.Context, kubeClient *kubernetes.Clientset, na
 	}
 
 	fmt.Printf("Creating download pod: %s\n", podName)
-	_, err := kubeClient.CoreV1().Pods(namespace).Create(ctx, podSpec, metav1.CreateOptions{})
+	_, err := ds.kubeClient.CoreV1().Pods(ds.namespace).Create(ds.ctx, podSpec, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create download pod: %w", err)
+		return nil, errors.Wrap(err, ErrCreateDownloadPod.Error())
 	}
 
+	return ds.waitForPodReady(podName)
+}
+
+// waitForPodReady waits for the pod to be in running state
+func (ds *DownloadService) waitForPodReady(podName string) (*corev1.Pod, error) {
 	timeout := time.After(30 * time.Second)
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
-	var pod *corev1.Pod
+
 	for {
 		select {
 		case <-timeout:
 			return nil, errors.Wrap(ErrFailedToCreateDownloadPod, "timeout waiting for download pod to become ready")
 		case <-ticker.C:
-			pod, err = kubeClient.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+			pod, err := ds.kubeClient.CoreV1().Pods(ds.namespace).Get(ds.ctx, podName, metav1.GetOptions{})
 			if err != nil {
-				return nil, fmt.Errorf("failed to get download pod: %w", err)
+				return nil, errors.Wrap(err, ErrGetDownloadPod.Error())
 			}
 			if pod.Status.Phase == corev1.PodRunning {
 				return pod, nil
@@ -225,44 +388,19 @@ func createDownloadPod(ctx context.Context, kubeClient *kubernetes.Clientset, na
 	}
 }
 
-func verifyFileExists(ctx context.Context, kubeClient *kubernetes.Clientset, config *rest.Config, pod *corev1.Pod, filePath string) (bool, error) {
+// verifyFileExists checks if the target file exists and is accessible
+func (ds *DownloadService) verifyFileExists(pod *corev1.Pod, downloadCmd *DownloadCmd) (bool, error) {
 	maxAttempts := 3
 
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		checkReq := kubeClient.CoreV1().RESTClient().Post().
-			Resource("pods").
-			Name(pod.Name).
-			Namespace(pod.Namespace).
-			SubResource("exec").
-			VersionedParams(&corev1.PodExecOptions{
-				Container: "download",
-				Command:   []string{"sh", "-c", fmt.Sprintf("if [ -r %q ]; then echo 'FILE_EXISTS'; fi", filePath)},
-				Stdout:    true,
-				Stderr:    true,
-			}, scheme.ParameterCodec)
-
-		checkExec, err := remotecommand.NewSPDYExecutor(config, "POST", checkReq.URL())
+		checkOutput, err := ds.createDownloadExec(pod, downloadCmd.FileCheckCommand)
 		if err != nil {
 			if attempt == maxAttempts {
-				return false, fmt.Errorf("failed to create check executor after %d attempts: %w", attempt, err)
+				return false, errors.Wrapf(err, "failed to check file existence after %d attempts", attempt)
 			}
 			time.Sleep(time.Duration(attempt*2) * time.Second)
 			continue
 		}
-
-		var checkBuf bytes.Buffer
-		if err = checkExec.StreamWithContext(ctx, remotecommand.StreamOptions{
-			Stdout: &checkBuf,
-			Stderr: &checkBuf,
-		}); err != nil {
-			if attempt == maxAttempts {
-				return false, fmt.Errorf("failed to check file existence after %d attempts: %w", attempt, err)
-			}
-			time.Sleep(time.Duration(attempt*2) * time.Second)
-			continue
-		}
-
-		checkOutput := checkBuf.String()
 
 		if strings.Contains(checkOutput, "FILE_EXISTS") {
 			return true, nil
@@ -271,32 +409,39 @@ func verifyFileExists(ctx context.Context, kubeClient *kubernetes.Clientset, con
 		time.Sleep(time.Duration(attempt*2) * time.Second)
 	}
 
-	return false, errors.Wrap(ErrFileNotAccessible, filePath)
+	return false, errors.Wrap(ErrFileNotAccessible, downloadCmd.SrcFilePath)
 }
 
-func createDownloadExec(ctx context.Context, kubeClient *kubernetes.Clientset, config *rest.Config, pod *corev1.Pod, srcFilePath string) (remotecommand.Executor, error) {
-	fileExists, err := verifyFileExists(ctx, kubeClient, config, pod, srcFilePath)
-	if err != nil || !fileExists {
-		return nil, err
-	}
-
-	req := kubeClient.CoreV1().RESTClient().Post().
+// createDownloadExec executes a command in the pod and returns the output
+func (ds *DownloadService) createDownloadExec(pod *corev1.Pod, command []string) (string, error) {
+	req := ds.kubeClient.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(pod.Name).
 		Namespace(pod.Namespace).
 		SubResource("exec").
 		VersionedParams(&corev1.PodExecOptions{
-			Container: "download",
-			Command:   []string{"cat", srcFilePath},
+			Container: captureConstants.DownloadContainername,
+			Command:   command,
 			Stdout:    true,
 			Stderr:    true,
 		}, scheme.ParameterCodec)
 
-	exec, err := remotecommand.NewSPDYExecutor(config, "POST", req.URL())
+	exec, err := remotecommand.NewSPDYExecutor(ds.config, "POST", req.URL())
 	if err != nil {
-		return nil, fmt.Errorf("failed to create executor: %w", err)
+		return "", errors.Wrap(err, ErrCreateExecutor.Error())
 	}
-	return exec, nil
+
+	var outBuf, errBuf bytes.Buffer
+	streamOpts := remotecommand.StreamOptions{
+		Stdout: &outBuf,
+		Stderr: &errBuf,
+	}
+
+	if err = exec.StreamWithContext(ds.ctx, streamOpts); err != nil {
+		return "", errors.Wrapf(err, "failed to exec command (stderr: %s)", errBuf.String())
+	}
+
+	return outBuf.String(), nil
 }
 
 func downloadFromBlob() error {
@@ -331,7 +476,7 @@ func downloadFromBlob() error {
 
 	err = os.MkdirAll(outputPath, 0o775)
 	if err != nil {
-		return fmt.Errorf("failed to create output directory: %w", err)
+		return errors.Wrap(err, ErrCreateOutputDir.Error())
 	}
 
 	for i := range blobList.Blobs {

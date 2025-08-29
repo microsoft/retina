@@ -20,8 +20,10 @@ const (
 	CaptureContainerEntrypoint    string = "./retina/captureworkload"
 	CaptureContainerEntrypointWin string = "captureworkload.exe"
 
-	CaptureAppname       string = "capture"
-	CaptureContainername string = "capture"
+	CaptureAppname        string = "capture"
+	CaptureContainername  string = "capture"
+	DownloadAppname       string = "download"
+	DownloadContainername string = "download"
 
 	// CaptureOutputLocationBlobUploadSecretName is the name of the secret that stores the blob upload url.
 	CaptureOutputLocationBlobUploadSecretName string = "capture-blob-upload-secret"
