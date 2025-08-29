@@ -19,6 +19,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/storage"
 	retinacmd "github.com/microsoft/retina/cli/cmd"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
+	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	captureLabels "github.com/microsoft/retina/pkg/label"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -223,12 +224,13 @@ func createDownloadPod(ctx context.Context, kubeClient *kubernetes.Clientset, na
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
 			Namespace: namespace,
+			Labels:    captureUtils.GetDownloadLabelsFromCaptureName(captureName),
 		},
 		Spec: corev1.PodSpec{
 			NodeName: nodeName,
 			Containers: []corev1.Container{
 				{
-					Name:    "download",
+					Name:    captureConstants.DownloadContainername,
 					Image:   containerImage,
 					Command: command,
 					VolumeMounts: []corev1.VolumeMount{
