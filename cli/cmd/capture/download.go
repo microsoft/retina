@@ -66,12 +66,12 @@ func detectNodeOS(node *corev1.Node) (NodeOS, error) {
 	os := strings.ToLower(node.Status.NodeInfo.OperatingSystem)
 
 	if strings.Contains(os, "windows") {
-		fmt.Println("Detected node OS: Windows")
+		retinacmd.Logger.Info("\nDetected node OS: Windows", zap.String("node", node.Name), zap.String("os", node.Status.NodeInfo.OperatingSystem))
 		return Windows, nil
 	}
 
 	if strings.Contains(os, "linux") {
-		fmt.Println("Detected node OS: Linux")
+		retinacmd.Logger.Info("\nDetected node OS: Linux", zap.String("node", node.Name), zap.String("os", node.Status.NodeInfo.OperatingSystem))
 		return Linux, nil
 	}
 
