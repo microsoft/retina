@@ -63,7 +63,52 @@ var (
 	ErrFailedToCreateDownloadPod = errors.New("failed to create download pod")
 )
 
-func detectNodeOS(node *corev1.Node) (NodeOS, error) {
+// DownloadCmd holds all OS-specific commands and configurations
+type DownloadCmd struct {
+	ContainerImage   string
+	SrcFilePath      string
+	MountPath        string
+	KeepAliveCommand []string
+	FileCheckCommand []string
+	FileReadCommand  []string
+}
+
+func getDownloadCmd(node *corev1.Node, hostPath, fileName string) *DownloadCmd {
+	var nodeOS, err = getNodeOS(node)
+	if err != nil {
+		retinacmd.Logger.Error("Failed to detect node OS", zap.String("node", node.Name), zap.Error(err))
+		return nil
+	}
+
+	switch nodeOS {
+	case Windows:
+		srcFilePath := "C:\\host" + strings.ReplaceAll(hostPath, "/", "\\") + "\\" + fileName + ".tar.gz"
+		mountPath := "C:\\host" + strings.ReplaceAll(hostPath, "/", "\\")
+		return &DownloadCmd{
+			ContainerImage:   getWindowsContainerImage(node),
+			SrcFilePath:      srcFilePath,
+			MountPath:        mountPath,
+			KeepAliveCommand: []string{"cmd", "/c", "echo Download pod ready & ping -n 3601 127.0.0.1 > nul"},
+			FileCheckCommand: []string{"cmd", "/c", fmt.Sprintf("if exist %s echo FILE_EXISTS", srcFilePath)},
+			FileReadCommand:  []string{"cmd", "/c", "type", srcFilePath},
+		}
+	case Linux:
+		srcFilePath := "/" + filepath.Join("host", hostPath, fileName) + ".tar.gz"
+		mountPath := "/" + filepath.Join("host", hostPath)
+		return &DownloadCmd{
+			ContainerImage:   "busybox",
+			SrcFilePath:      srcFilePath,
+			MountPath:        mountPath,
+			KeepAliveCommand: []string{"sh", "-c", "echo 'Download pod ready'; sleep 3600"},
+			FileCheckCommand: []string{"sh", "-c", fmt.Sprintf("if [ -r %q ]; then echo 'FILE_EXISTS'; fi", srcFilePath)},
+			FileReadCommand:  []string{"cat", srcFilePath},
+		}
+	default:
+		return nil
+	}
+}
+
+func getNodeOS(node *corev1.Node) (NodeOS, error) {
 	os := strings.ToLower(node.Status.NodeInfo.OperatingSystem)
 
 	if strings.Contains(os, "windows") {
@@ -77,6 +122,36 @@ func detectNodeOS(node *corev1.Node) (NodeOS, error) {
 	}
 
 	return Linux, fmt.Errorf("unsupported operating system: %s", node.Status.NodeInfo.OperatingSystem)
+}
+
+// Detects the Windows LTSC version and returns the appropriate nanoserver image
+func getWindowsContainerImage(node *corev1.Node) string {
+	osImage := strings.ToLower(node.Status.NodeInfo.OSImage)
+
+	var suffix string
+	switch {
+	case strings.Contains(osImage, "2025"):
+		suffix = "ltsc2025"
+	case strings.Contains(osImage, "2022"):
+		suffix = "ltsc2022"
+	case strings.Contains(osImage, "2019"):
+		suffix = "ltsc2019"
+	case strings.Contains(osImage, "2016"):
+		suffix = "ltsc2016"
+	default:
+		retinacmd.Logger.Warn("Could not determine Windows LTSC version, defaulting to ltsc2022",
+			zap.String("node", node.Name),
+			zap.String("osImage", osImage))
+		suffix = "ltsc2022"
+	}
+
+	containerImage := fmt.Sprintf("mcr.microsoft.com/windows/nanoserver:%s", suffix)
+	retinacmd.Logger.Info("Selected Windows container image",
+		zap.String("node", node.Name),
+		zap.String("osImage", osImage),
+		zap.String("image", containerImage))
+
+	return containerImage
 }
 
 var downloadExample = templates.Examples(i18n.T(`
@@ -131,27 +206,21 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 			return fmt.Errorf("failed to get node information: %w", err)
 		}
 
-		nodeOS, err := detectNodeOS(node)
-		if err != nil {
-			return fmt.Errorf("failed to detect node OS: %w", err)
-		}
+		downloadCmd := getDownloadCmd(node, hostPath, fileName)
 
-		var srcFilePath string
-		switch nodeOS {
-		case Windows:
-			srcFilePath = "C:\\host" + strings.ReplaceAll(hostPath, "/", "\\") + "\\" + fileName + ".tar.gz"
-		case Linux:
-			srcFilePath = "/" + filepath.Join("host", hostPath, fileName) + ".tar.gz"
-		}
-
-		fmt.Println("File to be downloaded: ", srcFilePath)
-		downloadPod, err := createDownloadPod(ctx, kubeClient, namespace, nodeName, hostPath, captureName, nodeOS)
+		fmt.Println("File to be downloaded: ", downloadCmd.SrcFilePath)
+		downloadPod, err := createDownloadPod(ctx, kubeClient, namespace, nodeName, hostPath, captureName, downloadCmd)
 		if err != nil {
 			return err
 		}
 
+		fileExists, err := verifyFileExists(ctx, kubeClient, config, downloadPod, downloadCmd)
+		if err != nil || !fileExists {
+			return err
+		}
+
 		fmt.Println("Obtaining file...")
-		exec, err := createDownloadExec(ctx, kubeClient, config, downloadPod, srcFilePath, nodeOS)
+		exec, err := createDownloadExec(ctx, kubeClient, config, downloadPod, downloadCmd)
 		if err != nil {
 			return err
 		}
@@ -202,24 +271,8 @@ func getCapturePods(ctx context.Context, kubeClient *kubernetes.Clientset, captu
 	return pods, nil
 }
 
-func createDownloadPod(ctx context.Context, kubeClient *kubernetes.Clientset, namespace, nodeName, hostPath, captureName string, nodeOS NodeOS) (*corev1.Pod, error) {
+func createDownloadPod(ctx context.Context, kubeClient *kubernetes.Clientset, namespace, nodeName, hostPath, captureName string, downloadCmd *DownloadCmd) (*corev1.Pod, error) {
 	podName := captureName + "-download-" + rand.String(5)
-
-	var containerImage string
-	var command []string
-	var mountPath string
-
-	switch nodeOS {
-	case Windows:
-		containerImage = "mcr.microsoft.com/windows/nanoserver:ltsc2019"
-		// timeout is not available on nanoserver, use ping to simulate a wait
-		command = []string{"cmd", "/c", "echo Download pod ready & ping -n 3601 127.0.0.1 > nul"}
-		mountPath = "C:\\host" + strings.ReplaceAll(hostPath, "/", "\\")
-	case Linux:
-		containerImage = "busybox"
-		command = []string{"sh", "-c", "echo 'Download pod ready'; sleep 3600"}
-		mountPath = "/" + filepath.Join("host", hostPath)
-	}
 
 	podSpec := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -232,12 +285,12 @@ func createDownloadPod(ctx context.Context, kubeClient *kubernetes.Clientset, na
 			Containers: []corev1.Container{
 				{
 					Name:    captureConstants.DownloadContainername,
-					Image:   containerImage,
-					Command: command,
+					Image:   downloadCmd.ContainerImage,
+					Command: downloadCmd.KeepAliveCommand,
 					VolumeMounts: []corev1.VolumeMount{
 						{
 							Name:      "host-mount",
-							MountPath: mountPath,
+							MountPath: downloadCmd.MountPath,
 						},
 					},
 				},
@@ -285,16 +338,8 @@ func createDownloadPod(ctx context.Context, kubeClient *kubernetes.Clientset, na
 	}
 }
 
-func verifyFileExists(ctx context.Context, kubeClient *kubernetes.Clientset, config *rest.Config, pod *corev1.Pod, filePath string, nodeOS NodeOS) (bool, error) {
+func verifyFileExists(ctx context.Context, kubeClient *kubernetes.Clientset, config *rest.Config, pod *corev1.Pod, downloadCmd *DownloadCmd) (bool, error) {
 	maxAttempts := 3
-
-	var command []string
-	switch nodeOS {
-	case Windows:
-		command = []string{"cmd", "/c", fmt.Sprintf("if exist %s echo FILE_EXISTS", filePath)}
-	case Linux:
-		command = []string{"sh", "-c", fmt.Sprintf("if [ -r %q ]; then echo 'FILE_EXISTS'; fi", filePath)}
-	}
 
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		checkReq := kubeClient.CoreV1().RESTClient().Post().
@@ -304,7 +349,7 @@ func verifyFileExists(ctx context.Context, kubeClient *kubernetes.Clientset, con
 			SubResource("exec").
 			VersionedParams(&corev1.PodExecOptions{
 				Container: "download",
-				Command:   command,
+				Command:   downloadCmd.FileCheckCommand,
 				Stdout:    true,
 				Stderr:    true,
 			}, scheme.ParameterCodec)
@@ -339,23 +384,10 @@ func verifyFileExists(ctx context.Context, kubeClient *kubernetes.Clientset, con
 		time.Sleep(time.Duration(attempt*2) * time.Second)
 	}
 
-	return false, errors.Wrap(ErrFileNotAccessible, filePath)
+	return false, errors.Wrap(ErrFileNotAccessible, downloadCmd.SrcFilePath)
 }
 
-func createDownloadExec(ctx context.Context, kubeClient *kubernetes.Clientset, config *rest.Config, pod *corev1.Pod, srcFilePath string, nodeOS NodeOS) (remotecommand.Executor, error) {
-	fileExists, err := verifyFileExists(ctx, kubeClient, config, pod, srcFilePath, nodeOS)
-	if err != nil || !fileExists {
-		return nil, err
-	}
-
-	var command []string
-	switch nodeOS {
-	case Windows:
-		command = []string{"cmd", "/c", "type", srcFilePath}
-	case Linux:
-		command = []string{"cat", srcFilePath}
-	}
-
+func createDownloadExec(ctx context.Context, kubeClient *kubernetes.Clientset, config *rest.Config, pod *corev1.Pod, downloadCmd *DownloadCmd) (remotecommand.Executor, error) {
 	req := kubeClient.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(pod.Name).
@@ -363,7 +395,7 @@ func createDownloadExec(ctx context.Context, kubeClient *kubernetes.Clientset, c
 		SubResource("exec").
 		VersionedParams(&corev1.PodExecOptions{
 			Container: "download",
-			Command:   command,
+			Command:   downloadCmd.FileReadCommand,
 			Stdout:    true,
 			Stderr:    true,
 		}, scheme.ParameterCodec)
