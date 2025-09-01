@@ -15,7 +15,7 @@ import (
 
 	"github.com/microsoft/retina/pkg/config"
 	cache "github.com/microsoft/retina/pkg/controllers/cache/standalone"
-	controller "github.com/microsoft/retina/pkg/controllers/daemon/standalone"
+	sc "github.com/microsoft/retina/pkg/controllers/daemon/standalone"
 	cm "github.com/microsoft/retina/pkg/managers/controllermanager"
 	sm "github.com/microsoft/retina/pkg/module/metrics/standalone"
 )
@@ -43,15 +43,15 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 
 	// Initialize cache and run enricher
 	ctx := ctrl.SetupSignalHandler()
-	cache := cache.New()
-	enrich := enricher.New(ctx, cache, d.config.EnableStandalone)
+	controllerCache := cache.New()
+	enrich := enricher.New(ctx, controllerCache, d.config.EnableStandalone)
 	enrich.Run()
 
 	// Initialize metrics module
 	metricsModule := sm.InitModule(ctx, enrich)
 
 	mainLogger.Info("Initializing RetinaEndpoint controller")
-	controller := controller.New(d.config, cache, metricsModule)
+	controller := sc.New(d.config, controllerCache, metricsModule)
 	go controller.Run(ctx)
 
 	// Standalone requires pod level to be disabled

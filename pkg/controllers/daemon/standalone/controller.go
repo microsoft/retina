@@ -73,7 +73,10 @@ func (c *Controller) Reconcile(ctx context.Context) error {
 	// Remove IPs not in the running set
 	for _, ip := range cachedIPs {
 		if _, exists := runningIPs[ip]; !exists {
-			c.cache.DeleteRetinaEndpoint(ip)
+			if err := c.cache.DeleteRetinaEndpoint(ip); err != nil {
+				c.l.Error("failed to delete retina endpoint", zap.String("ip", ip), zap.Error(err))
+				return err
+			}
 		}
 	}
 
