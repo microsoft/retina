@@ -18,8 +18,8 @@ import (
 	"go.uber.org/zap"
 )
 
-type StandaloneController struct {
-	// interface for fetching endpoint information
+type Controller struct {
+	// interface for fetching retina endpoint information
 	source utils.Source
 	// cache to hold retina endpoints
 	cache *standalone.Cache
@@ -29,7 +29,8 @@ type StandaloneController struct {
 	l             *log.ZapLogger
 }
 
-func New(config *kcfg.Config, cache *standalone.Cache, metricsModule *sm.Module) *StandaloneController {
+// New creates a new instance of the standalone controller
+func New(config *kcfg.Config, cache *standalone.Cache, metricsModule *sm.Module) *Controller {
 	var source utils.Source
 
 	if config.EnableCrictl {
@@ -38,60 +39,60 @@ func New(config *kcfg.Config, cache *standalone.Cache, metricsModule *sm.Module)
 		source = &utils.StatefileSource{}
 	}
 
-	return &StandaloneController{
+	return &Controller{
 		source:        source,
 		cache:         cache,
 		config:        config,
 		metricsModule: metricsModule,
-		l:             log.Logger().Named(string("StandaloneController")),
+		l:             log.Logger().Named(string("Controller")),
 	}
 }
 
-// Reconcile syncs the state of the endpoints with the desired state
-func (sc *StandaloneController) Reconcile(ctx context.Context) error {
-	sc.l.Info("Starting standalone reconciliation")
+// Reconcile syncs the state of the running endpoints with the existing endpoints in cache
+func (c *Controller) Reconcile(ctx context.Context) error {
+	c.l.Info("Reconciling retina endpoints")
 
-	srcEndpoints, err := sc.source.GetAllEndpoints()
+	// Retrieve running pod information from the corresponding source
+	runningEps, err := c.source.GetAllEndpoints()
 	if err != nil {
-		sc.l.Error("Failed to get all endpoints", zap.Error(err))
+		c.l.Error("failed to get endpoints", zap.Error(err))
 		return err
 	}
 
-	srcIPs := make(map[string]*common.RetinaEndpoint, len(srcEndpoints))
-	for _, ep := range srcEndpoints {
+	runningIPs := make(map[string]*common.RetinaEndpoint)
+	for _, ep := range runningEps {
 		ip, err := ep.PrimaryIP()
-		if err != nil {
+		if err != nil || ip == "" {
 			continue
 		}
-		if ip == "" {
-			continue
-		}
-		srcIPs[ip] = ep
+		runningIPs[ip] = ep
 	}
 
-	cachedIPs := sc.cache.GetAllIPs()
+	cachedIPs := c.cache.GetAllIPs()
 
+	// Remove IPs not in the running set
 	for _, ip := range cachedIPs {
-		if _, exists := srcIPs[ip]; !exists {
-			sc.cache.DeleteRetinaEndpoint(ip)
-			// sc.metricsModule.RemoveSeries(ip)
+		if _, exists := runningIPs[ip]; !exists {
+			c.cache.DeleteRetinaEndpoint(ip)
 		}
 	}
 
-	for ip, ep := range srcIPs {
-		if err := sc.cache.UpdateRetinaEndpoint(ep); err != nil {
-			sc.l.Error("Failed to update retina endpoint", zap.String("ip", ip), zap.Error(err))
+	// Update IPs that are not existing in cache
+	for ip, ep := range runningIPs {
+		if err := c.cache.UpdateRetinaEndpoint(ep); err != nil {
+			c.l.Error("failed to update retina endpoint", zap.String("ip", ip), zap.Error(err))
 			return err
 		}
 	}
-	sc.metricsModule.Reconcile(ctx)
 
-	sc.l.Info("Standalone reconciliation completed")
+	c.metricsModule.Reconcile(ctx)
+	c.l.Info("Reconciliation completed")
 	return nil
 }
 
-func (sc *StandaloneController) Run(ctx context.Context) {
-	sc.l.Info("Starting Standalone Controller")
+// Run starts the controller loop
+func (sc *Controller) Run(ctx context.Context) {
+	sc.l.Info("Starting controller")
 
 	ticker := time.NewTicker(sc.config.MetricsInterval / 2)
 	defer ticker.Stop()
@@ -103,14 +104,15 @@ func (sc *StandaloneController) Run(ctx context.Context) {
 			return
 		case <-ticker.C:
 			if err := sc.Reconcile(ctx); err != nil {
-				sc.l.Error("Failed to reconcile", zap.Error(err))
+				sc.l.Error("failed to reconcile", zap.Error(err))
 			}
 		}
 	}
 }
 
-func (sc *StandaloneController) Stop() {
-	sc.l.Info("Stopping Standalone Controller")
+// Stop stops the controller and cleans up resources
+func (sc *Controller) Stop() {
+	sc.l.Info("Stopping controller")
 	sc.cache.Clear()
 	sc.metricsModule.Clear()
 }

@@ -20,15 +20,13 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-func TestStandaloneController_Reconcile(t *testing.T) {
+func TestControllerReconcile(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	// Setup logger
 	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
 	assert.NoError(t, err)
-
-	ctx := context.Background()
 
 	// Mock source
 	mockSource := utils.NewMockSource(ctrl)
@@ -37,17 +35,18 @@ func TestStandaloneController_Reconcile(t *testing.T) {
 	cache := standalone.New()
 
 	// Metrics module
+	ctx := context.Background()
 	metricsModule := sm.InitModule(ctx, nil)
 
 	// Prepopulate cache with an endpoint to simulate deletion
-	oldEndpoint := common.NewRetinaEndpoint("old-pod", "default", &common.IPAddresses{IPv4: net.ParseIP("1.1.1.2")})
-	require.NoError(t, cache.UpdateRetinaEndpoint(oldEndpoint))
+	oldEp := common.NewRetinaEndpoint("old-pod", "default", &common.IPAddresses{IPv4: net.ParseIP("1.1.1.2")})
+	require.NoError(t, cache.UpdateRetinaEndpoint(oldEp))
 
-	// Endpoint returned by the source
+	// New endpoint returned by the source
 	newEndpoint := common.NewRetinaEndpoint("new-pod", "default", &common.IPAddresses{IPv4: net.ParseIP("1.1.1.1")})
 	mockSource.EXPECT().GetAllEndpoints().Return([]*common.RetinaEndpoint{newEndpoint}, nil)
 
-	// Setup controller
+	// Setup test controller
 	cfg := &kcfg.Config{MetricsInterval: 1, EnableCrictl: false}
 	controller := New(cfg, cache, metricsModule)
 	controller.source = mockSource // inject mock source
@@ -61,9 +60,7 @@ func TestStandaloneController_Reconcile(t *testing.T) {
 	assert.Len(t, cachedIPs, 1, "only new endpoint should remain in cache")
 	assert.Contains(t, cachedIPs, "1.1.1.1")
 
-	// Validate old endpoint removed
-	assert.NotContains(t, cachedIPs, "1.1.1.2")
-
+	// Stop the controller and validate cleanup
 	controller.Stop()
 	assert.Equal(t, len(controller.cache.GetAllIPs()), 0)
 }
