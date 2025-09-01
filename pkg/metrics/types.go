@@ -15,8 +15,8 @@ const (
 	parsedPacketsCounterName                  = "parsed_packets_counter"
 
 	// Windows
-	HNSStats            = "windows_hns_stats"
-	HNSStatsDescription = "Include many different metrics from packets sent/received to closed connections"
+	hnsStats            = "windows_hns_stats"
+	hnsStatsDescription = "Include many different metrics from packets sent/received to closed connections"
 
 	// Linux only metrics (for now).
 	nodeApiServerHandshakeLatencyHistName = "node_apiserver_handshake_latency_ms"
@@ -30,8 +30,8 @@ const (
 	nodeConnectivityLatencySecondsGaugeDescription = "The last observed latency between the current Cilium agent and other Cilium nodes in seconds"
 	tcpStateGaugeDescription                       = "Number of active TCP connections by state"
 	tcpConnectionRemoteGaugeDescription            = "Number of active TCP connections by remote address"
-	TCPConnectionStatsGaugeDescription             = "TCP connections statistics"
-	TCPFlagGaugeDescription                        = "TCP gauges by flag"
+	tcpConnectionStatsGaugeDescription             = "TCP connections statistics"
+	tcpFlagGaugeDescription                        = "TCP gauges by flag"
 	ipConnectionStatsGaugeDescription              = "IP connections statistics"
 	udpConnectionStatsGaugeDescription             = "UDP connections statistics"
 	interfaceStatsGaugeDescription                 = "Interface statistics"

@@ -22,37 +22,39 @@ func TestCacheAddEndpoint(t *testing.T) {
 	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
 		t.Errorf("Error setting up logger: %s", err)
 	}
-	c := NewCache()
 
 	tests := []struct {
 		name        string
 		endpoint    *common.RetinaEndpoint
 		expectedPod string
-		expectedNS  string
+		expectedNs  string
 	}{
 		{
 			name:        "Add new endpoint",
 			endpoint:    ep1,
 			expectedPod: ep1.Name(),
-			expectedNS:  ep1.Namespace(),
+			expectedNs:  ep1.Namespace(),
 		},
 		{
 			name:        "Add identical endpoint",
 			endpoint:    ep3,
 			expectedPod: ep1.Name(),
-			expectedNS:  ep1.Namespace(),
+			expectedNs:  ep1.Namespace(),
 		},
 		{
 			name:        "Update endpoint info for same IP",
 			endpoint:    ep2,
 			expectedPod: ep2.Name(),
-			expectedNS:  ep2.Namespace(),
+			expectedNs:  ep2.Namespace(),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c.UpdateRetinaEndpoint(tt.endpoint)
+			c := New()
+
+			err := c.UpdateRetinaEndpoint(tt.endpoint)
+			require.NoError(t, err)
 
 			ip, err := tt.endpoint.PrimaryIP()
 			require.NoError(t, err)
@@ -60,7 +62,7 @@ func TestCacheAddEndpoint(t *testing.T) {
 			got := c.GetPodByIP(ip)
 			require.NotNil(t, got, "Expected retina endpoint, got nil")
 			require.Equal(t, tt.expectedPod, got.Name())
-			require.Equal(t, tt.expectedNS, got.Namespace())
+			require.Equal(t, tt.expectedNs, got.Namespace())
 		})
 	}
 }
@@ -69,40 +71,40 @@ func TestCacheDeleteEndpoint(t *testing.T) {
 	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
 		t.Errorf("Error setting up logger: %s", err)
 	}
-	c := NewCache()
-	ip, err := ep1.PrimaryIP()
-	if err != nil {
-		t.Fatalf("failed to get IP for endpoint: %v", err)
-	}
+
+	ip1, err := ep1.PrimaryIP()
+	require.NoError(t, err)
 
 	tests := []struct {
 		name             string
-		setup            func()
-		ip               string
+		add              []*common.RetinaEndpoint
+		deleteIP         string
 		expectedEndpoint *common.RetinaEndpoint
 	}{
 		{
-			name: "Delete existing endpoint",
-			setup: func() {
-				c.UpdateRetinaEndpoint(ep1)
-			},
-			ip:               ip,
+			name:             "Delete existing endpoint",
+			add:              []*common.RetinaEndpoint{ep1},
+			deleteIP:         ip1,
 			expectedEndpoint: nil,
 		},
 		{
 			name:             "Delete non-existing pod (no-op)",
-			setup:            func() {},
-			ip:               "10.0.0.2",
+			add:              []*common.RetinaEndpoint{},
+			deleteIP:         "10.0.0.2",
 			expectedEndpoint: nil,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.setup()
-			c.DeleteRetinaEndpoint(tt.ip)
+			c := New()
 
-			got := c.GetPodByIP(tt.ip)
+			for _, ep := range tt.add {
+				require.NoError(t, c.UpdateRetinaEndpoint(ep))
+			}
+			require.NoError(t, c.DeleteRetinaEndpoint(tt.deleteIP))
+
+			got := c.GetPodByIP(tt.deleteIP)
 			require.Equal(t, tt.expectedEndpoint, got)
 		})
 	}
@@ -112,52 +114,51 @@ func TestCacheGetAllIPs(t *testing.T) {
 	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
 		t.Errorf("Error setting up logger: %s", err)
 	}
-	c := NewCache()
 	ep4 := common.NewRetinaEndpoint("pod4", "ns4", &common.IPAddresses{IPv4: net.ParseIP("10.0.0.4")})
 
 	tests := []struct {
 		name    string
-		actions func()
+		add     []*common.RetinaEndpoint
+		delete  []string
 		wantIPs []string
 	}{
 		{
-			name: "Add ep1 and ep2",
-			actions: func() {
-				_ = c.UpdateRetinaEndpoint(ep1)
-				_ = c.UpdateRetinaEndpoint(ep2)
-			},
+			name:    "Add two IPs",
+			add:     []*common.RetinaEndpoint{ep1, ep2},
 			wantIPs: []string{"10.0.0.1"},
 		},
 		{
-			name: "Add ep4",
-			actions: func() {
-				_ = c.UpdateRetinaEndpoint(ep4)
-			},
+			name:    "Add two unique IPs",
+			add:     []*common.RetinaEndpoint{ep1, ep4},
 			wantIPs: []string{"10.0.0.1", "10.0.0.4"},
 		},
 		{
-			name: "Delete ep1",
-			actions: func() {
-				ip1, _ := ep1.PrimaryIP()
-				_ = c.DeleteRetinaEndpoint(ip1)
-			},
+			name:    "Add two unique IPs and delete one IP",
+			add:     []*common.RetinaEndpoint{ep1, ep4},
+			delete:  []string{"10.0.0.1"},
 			wantIPs: []string{"10.0.0.4"},
 		},
 		{
-			name: "Delete ep4",
-			actions: func() {
-				ip4, _ := ep4.PrimaryIP()
-				_ = c.DeleteRetinaEndpoint(ip4)
-			},
+			name:    "Add two unique IPs and delete two IPs",
+			add:     []*common.RetinaEndpoint{ep1, ep4},
+			delete:  []string{"10.0.0.1", "10.0.0.4"},
 			wantIPs: []string{},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.actions()
-			ips := c.GetAllIPs()
-			require.ElementsMatch(t, tt.wantIPs, ips, "IPs mismatch for test: %s", tt.name)
+			c := New()
+
+			for _, ep := range tt.add {
+				require.NoError(t, c.UpdateRetinaEndpoint(ep))
+			}
+			for _, ip := range tt.delete {
+				require.NoError(t, c.DeleteRetinaEndpoint(ip))
+			}
+
+			gotIPs := c.GetAllIPs()
+			require.ElementsMatch(t, tt.wantIPs, gotIPs, "IPs mismatch for test: %s", tt.name)
 		})
 	}
 }

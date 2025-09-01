@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
-package utils
+package source
 
 import "github.com/microsoft/retina/pkg/common"
 

@@ -42,8 +42,8 @@ func InitializeMetrics() {
 		utils.Direction)
 	HNSStatsGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
-		HNSStats,
-		HNSStatsDescription,
+		hnsStats,
+		hnsStatsDescription,
 		utils.Direction,
 	)
 	NodeConnectivityStatusGauge = exporter.CreatePrometheusGaugeVecForMetric(
@@ -74,14 +74,14 @@ func InitializeMetrics() {
 	TCPConnectionStatsGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
 		utils.TCPConnectionStatsName,
-		TCPConnectionStatsGaugeDescription,
+		tcpConnectionStatsGaugeDescription,
 		utils.StatName,
 	)
 
 	TCPFlagGauge = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
 		utils.TCPFlagGauge,
-		TCPFlagGaugeDescription,
+		tcpFlagGaugeDescription,
 		utils.Direction,
 		utils.Flag,
 	)
