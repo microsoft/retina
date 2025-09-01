@@ -102,8 +102,7 @@ func TestCtrinfoGetAllEndpoints(t *testing.T) {
 				require.NoError(t, err)
 				require.Len(t, endpoints, tt.expectedCount)
 				if tt.expectedCount > 0 {
-					ep := endpoints[0]
-					require.Equal(t, tt.expectedRetinaEndpoint, ep)
+					require.Equal(t, tt.expectedRetinaEndpoint, endpoints[0])
 				}
 			}
 		})
