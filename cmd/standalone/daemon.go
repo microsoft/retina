@@ -5,7 +5,6 @@ package standalone
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/microsoft/retina/cmd/telemetry"
 	"github.com/microsoft/retina/pkg/enricher"
@@ -15,13 +14,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/microsoft/retina/pkg/config"
-	"github.com/microsoft/retina/pkg/controllers/cache/standalone"
-	sd "github.com/microsoft/retina/pkg/controllers/daemon/standalone"
+	cache "github.com/microsoft/retina/pkg/controllers/cache/standalone"
+	controller "github.com/microsoft/retina/pkg/controllers/daemon/standalone"
 	cm "github.com/microsoft/retina/pkg/managers/controllermanager"
 	sm "github.com/microsoft/retina/pkg/module/metrics/standalone"
 )
-
-const TTL = 3 * time.Minute
 
 type Daemon struct {
 	config *config.Config
@@ -34,27 +31,30 @@ func NewDaemon(daemonCfg *config.Config) *Daemon {
 }
 
 func (d *Daemon) Start(zl *log.ZapLogger) error {
-	zl.Info("Starting Standalone Retina daemon")
-	mainLogger := zl.Named("standalone-daemon").Sugar()
+	zl.Info("Starting Retina daemon in standalone mode")
+	mainLogger := zl.Named("main").Sugar()
 
+	// Initialize basic metrics and telemetry client
 	metrics.InitializeMetrics()
-
 	tel, err := telemetry.InitializeTelemetryClient(nil, d.config, mainLogger)
 	if err != nil {
 		return fmt.Errorf("failed to initialize telemetry client: %w", err)
 	}
-	ctx := ctrl.SetupSignalHandler()
 
-	cache := standalone.NewCache()
+	// Initialize cache and run enricher
+	ctx := ctrl.SetupSignalHandler()
+	cache := cache.New()
 	enrich := enricher.New(ctx, cache, d.config.EnableStandalone)
 	enrich.Run()
 
+	// Initialize metrics module
 	metricsModule := sm.InitModule(ctx, enrich)
 
-	controller := sd.New(d.config, cache, metricsModule)
+	mainLogger.Info("Initializing RetinaEndpoint controller")
+	controller := controller.New(d.config, cache, metricsModule)
 	go controller.Run(ctx)
 
-	// pod level needs to be disabled
+	// Standalone requires pod level to be disabled
 	controllerMgr, err := cm.NewControllerManager(d.config, nil, tel)
 	if err != nil {
 		mainLogger.Fatal("Failed to create controller manager", zap.Error(err))

@@ -34,7 +34,7 @@ func TestStandaloneController_Reconcile(t *testing.T) {
 	mockSource := utils.NewMockSource(ctrl)
 
 	// Cache
-	cache := standalone.NewCache()
+	cache := standalone.New()
 
 	// Metrics module
 	metricsModule := sm.InitModule(ctx, nil)

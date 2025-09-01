@@ -13,14 +13,14 @@ import (
 )
 
 type Cache struct {
-	sync.RWMutex
-	l *log.ZapLogger
+	mu sync.RWMutex
+	l  *log.ZapLogger
 	// ipToEndpoint is a map of IP addresses to RetinaEndpoints (namespace/name)
 	ipToEndpoint map[string]*common.RetinaEndpoint
 }
 
-// NewCache returns a new instance of Cache
-func NewCache() *Cache {
+// New returns a new instance of Cache
+func New() *Cache {
 	c := &Cache{
 		l:            log.Logger().Named("Cache"),
 		ipToEndpoint: make(map[string]*common.RetinaEndpoint),
@@ -30,8 +30,8 @@ func NewCache() *Cache {
 
 // GetAllIPs returns a list of all IPs in the cache
 func (c *Cache) GetAllIPs() []string {
-	c.RLock()
-	defer c.RUnlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
 	ips := make([]string, 0, len(c.ipToEndpoint))
 	for ip := range c.ipToEndpoint {
@@ -40,17 +40,17 @@ func (c *Cache) GetAllIPs() []string {
 	return ips
 }
 
-// GetPodByIP returns the RetinaEndpoint for the given IP
+// GetPodByIP returns the retina endpoint for the given IP
 func (c *Cache) GetPodByIP(ip string) *common.RetinaEndpoint {
-	c.RLock()
-	defer c.RUnlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	return c.ipToEndpoint[ip]
 }
 
 // UpdateRetinaEndpoint updates the cache with the given retina endpoint
 func (c *Cache) UpdateRetinaEndpoint(ep *common.RetinaEndpoint) error {
-	c.Lock()
-	defer c.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	return c.updateEndpoint(ep)
 }
 
@@ -68,14 +68,14 @@ func (c *Cache) updateEndpoint(ep *common.RetinaEndpoint) error {
 		}
 	}
 	c.ipToEndpoint[ip] = ep
-	c.l.Info("Added RetinaEndpoint in cache", zap.String("ip", ip), zap.String("namespace", ep.Namespace()), zap.String("name", ep.Name()))
+	c.l.Info("Added retina endpoint to cache", zap.String("ip", ip), zap.String("namespace", ep.Namespace()), zap.String("name", ep.Name()))
 	return nil
 }
 
 // DeleteRetinaEndpoint deletes the given retina endpoint from the cache
 func (c *Cache) DeleteRetinaEndpoint(epKey string) error {
-	c.Lock()
-	defer c.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	return c.deleteEndpoint(epKey)
 }
 
@@ -83,17 +83,18 @@ func (c *Cache) DeleteRetinaEndpoint(epKey string) error {
 func (c *Cache) deleteEndpoint(epKey string) error {
 	if ep, exists := c.ipToEndpoint[epKey]; exists {
 		delete(c.ipToEndpoint, epKey)
-		c.l.Info("Deleted RetinaEndpoint from cache", zap.String("ip", epKey), zap.String("namespace", ep.Namespace()), zap.String("name", ep.Name()))
+		c.l.Info("Deleted retina endpoint from cache", zap.String("ip", epKey), zap.String("namespace", ep.Namespace()), zap.String("name", ep.Name()))
 		return nil
 	}
 	return nil
 }
 
+// Clear resets the ip to endpoint map
 func (c *Cache) Clear() {
-	c.Lock()
-	defer c.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.ipToEndpoint = make(map[string]*common.RetinaEndpoint)
-	c.l.Info("Cleared all RetinaEndpoints from cache")
+	c.l.Info("Cleared all retina endpoints from cache")
 }
 
 // No op

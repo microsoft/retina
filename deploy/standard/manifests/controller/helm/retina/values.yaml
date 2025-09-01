@@ -51,6 +51,8 @@ image:
   tag: "v0.0.2"
 
 enableConntrackMetrics: false
+enableStandalone: false
+EnableCrictl: false
 enablePodLevel: false
 remoteContext: false
 enableAnnotations: false

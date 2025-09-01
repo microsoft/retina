@@ -23,27 +23,27 @@ const (
 type BootstrapManager struct {
 	metricsAddr          string
 	probeAddr            string
-	enableLeaderElection bool
 	configFile           string
+	enableLeaderElection bool
 }
 
 func NewBootstrapManager(metricsAddr, probeAddr, configFile string, enableLeaderElection bool) *BootstrapManager {
 	return &BootstrapManager{
 		metricsAddr:          metricsAddr,
 		probeAddr:            probeAddr,
-		enableLeaderElection: enableLeaderElection,
 		configFile:           configFile,
+		enableLeaderElection: enableLeaderElection,
 	}
 }
 
-func (b *BootstrapManager) Start() error {
+func (bm *BootstrapManager) Start() error {
 	if buildinfo.ApplicationInsightsID != "" {
 		telemetry.InitAppInsights(buildinfo.ApplicationInsightsID, buildinfo.Version)
 		defer telemetry.ShutdownAppInsights()
 		defer telemetry.TrackPanic()
 	}
 
-	daemonConfig, err := config.GetConfig(b.configFile)
+	daemonConfig, err := config.GetConfig(bm.configFile)
 	if err != nil {
 		panic(err)
 	}
@@ -76,7 +76,7 @@ func (b *BootstrapManager) Start() error {
 		return nil
 	}
 
-	d := standard.NewDaemon(daemonConfig, b.metricsAddr, b.probeAddr, b.enableLeaderElection)
+	d := standard.NewDaemon(daemonConfig, bm.metricsAddr, bm.probeAddr, bm.enableLeaderElection)
 	if err := d.Start(zl); err != nil {
 		return fmt.Errorf("starting daemon: %w", err)
 	}

@@ -22,7 +22,7 @@ func TestCacheAddEndpoint(t *testing.T) {
 	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
 		t.Errorf("Error setting up logger: %s", err)
 	}
-	c := NewCache()
+	c := New()
 
 	tests := []struct {
 		name        string
@@ -69,7 +69,7 @@ func TestCacheDeleteEndpoint(t *testing.T) {
 	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
 		t.Errorf("Error setting up logger: %s", err)
 	}
-	c := NewCache()
+	c := New()
 	ip, err := ep1.PrimaryIP()
 	if err != nil {
 		t.Fatalf("failed to get IP for endpoint: %v", err)
@@ -112,7 +112,7 @@ func TestCacheGetAllIPs(t *testing.T) {
 	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
 		t.Errorf("Error setting up logger: %s", err)
 	}
-	c := NewCache()
+	c := New()
 	ep4 := common.NewRetinaEndpoint("pod4", "ns4", &common.IPAddresses{IPv4: net.ParseIP("10.0.0.4")})
 
 	tests := []struct {

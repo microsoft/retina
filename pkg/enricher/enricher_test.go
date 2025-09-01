@@ -172,7 +172,7 @@ func TestEnricherStandalone_WithEndpointPresent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cache := standalone.NewCache()
+	cache := standalone.New()
 	sourceIP := "1.1.1.1"
 
 	// Add endpoint to cache
@@ -240,7 +240,7 @@ func TestEnricherStandalone_WithEndpointAbsent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cache := standalone.NewCache()
+	cache := standalone.New()
 	sourceIP := "9.9.9.9" // No endpoint added to cache
 
 	enricher := New(ctx, cache, true)
