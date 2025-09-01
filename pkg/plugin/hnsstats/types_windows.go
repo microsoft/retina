@@ -10,7 +10,13 @@ import (
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/hcn"
 	kcfg "github.com/microsoft/retina/pkg/config"
+	"github.com/microsoft/retina/pkg/enricher"
+	"github.com/microsoft/retina/pkg/exporter"
 	"github.com/microsoft/retina/pkg/log"
+	"github.com/microsoft/retina/pkg/metrics"
+	m "github.com/microsoft/retina/pkg/module/metrics"
+	"github.com/microsoft/retina/pkg/utils"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 
@@ -18,8 +24,8 @@ import (
 )
 
 const (
-	name          string = "hnsstats"
-	HnsStatsEvent string = "hnsstatscount"
+	name string = "hnsstats"
+
 	// From HNSStats API
 	PacketsReceived        string = "win_packets_recv_count"
 	PacketsSent            string = "win_packets_sent_count"
@@ -67,12 +73,22 @@ const (
 	egressLabel  = "egress"
 )
 
+var (
+	AdvForwardPacketsGauge     *prometheus.GaugeVec
+	AdvForwardBytesGauge       *prometheus.GaugeVec
+	AdvHNSStatsGauge           *prometheus.GaugeVec
+	AdvDroppedPacketsGauge     *prometheus.GaugeVec
+	AdvTCPConnectionStatsGauge *prometheus.GaugeVec
+	AdvTCPFlagGauge            *prometheus.GaugeVec
+)
+
 type hnsstats struct {
 	cfg           *kcfg.Config
 	interval      time.Duration
 	state         int
 	l             *log.ZapLogger
 	endpointQuery hcn.HostComputeQuery
+	enricher      *enricher.Enricher
 }
 
 type HnsStatsData struct {
@@ -146,4 +162,132 @@ func updateCounter(counterName string, attr *[]attribute.KeyValue, m metric.Mete
 func (h *HnsStatsData) String() string {
 	return fmt.Sprintf("Endpoint ID: %s, Packets received: %d, Packets sent %d, Bytes sent %d, Bytes received %d",
 		h.hnscounters.EndpointID, h.hnscounters.PacketsReceived, h.hnscounters.PacketsSent, h.hnscounters.BytesSent, h.hnscounters.BytesReceived)
+}
+
+func toEndpointStats(h *hcsshim.HNSEndpointStats) *utils.EndpointStats {
+	return &utils.EndpointStats{
+		BytesReceived:          h.BytesReceived,
+		BytesSent:              h.BytesSent,
+		DroppedPacketsIncoming: h.DroppedPacketsIncoming,
+		DroppedPacketsOutgoing: h.DroppedPacketsOutgoing,
+		EndpointID:             h.EndpointID,
+		InstanceID:             h.InstanceID,
+		PacketsReceived:        h.PacketsReceived,
+		PacketsSent:            h.PacketsSent,
+	}
+}
+
+func toVfpPortCounters(vfpCounters *VfpPortStatsData) *utils.VfpPortStatsData {
+	return &utils.VfpPortStatsData{
+		In: &utils.VfpDirectedPortCounters{
+			Direction: utils.VfpDirection_IN,
+			TcpCounters: &utils.VfpTcpStats{
+				ConnectionCounters: &utils.VfpTcpConnectionStats{
+					VerifiedCount:            vfpCounters.In.TcpCounters.ConnectionCounters.VerifiedCount,
+					TimedOutCount:            vfpCounters.In.TcpCounters.ConnectionCounters.TimedOutCount,
+					ResetCount:               vfpCounters.In.TcpCounters.ConnectionCounters.ResetCount,
+					ResetSynCount:            vfpCounters.In.TcpCounters.ConnectionCounters.ResetSynCount,
+					ClosedFinCount:           vfpCounters.In.TcpCounters.ConnectionCounters.ClosedFinCount,
+					TcpHalfOpenTimeoutsCount: vfpCounters.In.TcpCounters.ConnectionCounters.TcpHalfOpenTimeoutsCount,
+					TimeWaitExpiredCount:     vfpCounters.In.TcpCounters.ConnectionCounters.TimeWaitExpiredCount,
+				},
+				PacketCounters: &utils.VfpTcpPacketStats{
+					SynPacketCount:    vfpCounters.In.TcpCounters.PacketCounters.SynPacketCount,
+					SynAckPacketCount: vfpCounters.In.TcpCounters.PacketCounters.SynAckPacketCount,
+					FinPacketCount:    vfpCounters.In.TcpCounters.PacketCounters.FinPacketCount,
+					RstPacketCount:    vfpCounters.In.TcpCounters.PacketCounters.RstPacketCount,
+				},
+			},
+			DropCounters: &utils.VfpPacketDropStats{
+				AclDropPacketCount: vfpCounters.In.DropCounters.AclDropPacketCount,
+			},
+		},
+		Out: &utils.VfpDirectedPortCounters{
+			Direction: utils.VfpDirection_OUT,
+			TcpCounters: &utils.VfpTcpStats{
+				ConnectionCounters: &utils.VfpTcpConnectionStats{
+					VerifiedCount:            vfpCounters.Out.TcpCounters.ConnectionCounters.VerifiedCount,
+					TimedOutCount:            vfpCounters.Out.TcpCounters.ConnectionCounters.TimedOutCount,
+					ResetCount:               vfpCounters.Out.TcpCounters.ConnectionCounters.ResetCount,
+					ResetSynCount:            vfpCounters.Out.TcpCounters.ConnectionCounters.ResetSynCount,
+					ClosedFinCount:           vfpCounters.Out.TcpCounters.ConnectionCounters.ClosedFinCount,
+					TcpHalfOpenTimeoutsCount: vfpCounters.Out.TcpCounters.ConnectionCounters.TcpHalfOpenTimeoutsCount,
+					TimeWaitExpiredCount:     vfpCounters.Out.TcpCounters.ConnectionCounters.TimeWaitExpiredCount,
+				},
+				PacketCounters: &utils.VfpTcpPacketStats{
+					SynPacketCount:    vfpCounters.Out.TcpCounters.PacketCounters.SynPacketCount,
+					SynAckPacketCount: vfpCounters.Out.TcpCounters.PacketCounters.SynAckPacketCount,
+					FinPacketCount:    vfpCounters.Out.TcpCounters.PacketCounters.FinPacketCount,
+					RstPacketCount:    vfpCounters.Out.TcpCounters.PacketCounters.RstPacketCount,
+				},
+			},
+			DropCounters: &utils.VfpPacketDropStats{
+				AclDropPacketCount: vfpCounters.Out.DropCounters.AclDropPacketCount,
+			},
+		},
+	}
+}
+
+func InitializeAdvancedMetrics() {
+	AdvForwardPacketsGauge = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.AdvancedRegistry,
+		m.TotalCountName,
+		m.TotalCountDesc,
+		utils.Direction,
+		"ip",
+		"pod",
+		"namespace",
+	)
+	AdvForwardBytesGauge = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.AdvancedRegistry,
+		m.TotalBytesName,
+		m.TotalBytesDesc,
+		utils.Direction,
+		"ip",
+		"pod",
+		"namespace",
+	)
+	AdvHNSStatsGauge = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.AdvancedRegistry,
+		"adv_"+metrics.HNSStats,
+		metrics.HNSStatsDescription,
+		utils.Direction,
+		"ip",
+		"pod",
+		"namespace",
+	)
+	AdvDroppedPacketsGauge = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.AdvancedRegistry,
+		m.TotalDropCountName,
+		m.TotalDropCountDesc,
+		utils.Reason,
+		utils.Direction,
+		"ip",
+		"pod",
+		"namespace",
+	)
+	// Bytes not available in HNS stats
+	AdvTCPConnectionStatsGauge = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.AdvancedRegistry,
+		"adv_"+utils.TCPConnectionStatsName,
+		metrics.TCPConnectionStatsGaugeDescription,
+		utils.StatName,
+		"ip",
+		"pod",
+		"namespace",
+	)
+	AdvTCPFlagGauge = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.AdvancedRegistry,
+		m.TCPFlagsCountName,
+		m.TCPFlagsCountDesc,
+		utils.Direction,
+		utils.Flag,
+		"ip",
+		"pod",
+		"namespace",
+	)
+
+	// func updateMetric(gauge *prometheus.GaugeVec, ip string, podInfo *cache.PodInfo, value uint64, labels ...string) {
+	// labels = append(labels, ip, podInfo.Name, podInfo.Namespace)
+	// gauge.WithLabelValues(labels...).Set(float64(value))
 }
