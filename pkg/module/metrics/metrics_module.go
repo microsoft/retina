@@ -26,9 +26,9 @@ import (
 )
 
 const (
-	Forward       string = "forward"
-	Drop          string = "drop"
-	TCP           string = "tcp"
+	forward       string = "forward"
+	drop          string = "drop"
+	tcp           string = "tcp"
 	nodeApiserver string = "node_apiserver"
 	dns           string = "dns"
 	pktmon        string = "pktmon"
@@ -217,23 +217,23 @@ func (m *Module) updateMetricsContexts(spec *api.MetricsSpec) {
 		// when localcontext is enabled, we do not need the context options for both src and dst
 		// metrics aggregation will be on a single pod basis and not the src/dst pod combination basis.
 		// so we can getaway with just one context type. For this reason we will only use srccontext
-		ctxType = LocalContext
+		ctxType = localContext
 	}
 
 	for _, ctxOption := range spec.ContextOptions {
 		switch {
-		case strings.Contains(ctxOption.MetricName, Forward):
-			fm := NewForwardCountMetrics(&ctxOption, m.l, ctxType, m.daemonConfig.EnableStandalone)
+		case strings.Contains(ctxOption.MetricName, forward):
+			fm := NewForwardCountMetrics(&ctxOption, m.l, ctxType)
 			if fm != nil {
 				m.registry[ctxOption.MetricName] = fm
 			}
-		case strings.Contains(ctxOption.MetricName, Drop):
-			dm := NewDropCountMetrics(&ctxOption, m.l, ctxType, m.daemonConfig.EnableStandalone)
+		case strings.Contains(ctxOption.MetricName, drop):
+			dm := NewDropCountMetrics(&ctxOption, m.l, ctxType)
 			if dm != nil {
 				m.registry[ctxOption.MetricName] = dm
 			}
-		case strings.Contains(ctxOption.MetricName, TCP):
-			tm := NewTCPMetrics(&ctxOption, m.l, ctxType, m.daemonConfig.EnableStandalone)
+		case strings.Contains(ctxOption.MetricName, tcp):
+			tm := NewTCPMetrics(&ctxOption, m.l, ctxType)
 			if tm != nil {
 				m.registry[ctxOption.MetricName] = tm
 			}

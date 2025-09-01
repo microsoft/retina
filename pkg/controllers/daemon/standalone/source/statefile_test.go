@@ -1,7 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT license.
-
-package utils
+package source
 
 import (
 	"net"
@@ -44,7 +43,7 @@ func TestStatefileGetAllEndpoints(t *testing.T) {
 	defer os.Remove(emptyJSONPath)
 	defer os.Remove(invalidJSONPath)
 
-	ss := &StatefileSource{}
+	ss := &Statefile{}
 
 	tests := []struct {
 		name             string

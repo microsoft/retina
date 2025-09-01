@@ -5,16 +5,12 @@
 package metrics
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/cilium/cilium/api/v1/flow"
 	"github.com/microsoft/retina/crd/api/v1alpha1"
-	api "github.com/microsoft/retina/crd/api/v1alpha1"
-	"github.com/microsoft/retina/pkg/exporter"
 	"github.com/microsoft/retina/pkg/log"
 	metricsinit "github.com/microsoft/retina/pkg/metrics"
-	"github.com/microsoft/retina/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -213,7 +209,7 @@ func TestNewDrop(t *testing.T) {
 			},
 			metricCall:   1,
 			nilObj:       false,
-			localContext: LocalContext,
+			localContext: localContext,
 		},
 		{
 			name: "drop source opts with destination flow in localcontext",
@@ -239,7 +235,7 @@ func TestNewDrop(t *testing.T) {
 			},
 			metricCall:   1,
 			nilObj:       false,
-			localContext: LocalContext,
+			localContext: localContext,
 		},
 		{
 			name: "drop source opts with source and destination flow in localcontext",
@@ -266,7 +262,7 @@ func TestNewDrop(t *testing.T) {
 			},
 			metricCall:   2,
 			nilObj:       false,
-			localContext: LocalContext,
+			localContext: localContext,
 		},
 	}
 
@@ -274,7 +270,7 @@ func TestNewDrop(t *testing.T) {
 		for _, metricName := range []string{"drop_count", "drop_bytes"} {
 			log.Logger().Info("Running test name", zap.String("name", tc.name), zap.String("metricName", metricName))
 			ctrl := gomock.NewController(t)
-			f := NewDropCountMetrics(tc.opts, log.Logger(), tc.localContext, false)
+			f := NewDropCountMetrics(tc.opts, log.Logger(), tc.localContext)
 			if tc.nilObj {
 				assert.Nil(t, f, "drop metrics should be nil Test Name: %s", tc.name)
 				continue
@@ -300,90 +296,4 @@ func TestNewDrop(t *testing.T) {
 			ctrl.Finish()
 		}
 	}
-}
-
-func TestStandaloneDropMetrics(t *testing.T) {
-	logger, err := log.SetupZapLogger(log.GetDefaultLogOpts())
-	assert.NoError(t, err)
-
-	ctxOptions := &api.MetricsContextOptions{
-		MetricName:   utils.DroppedPacketsGaugeName,
-		SourceLabels: append(DefaultCtxOptions(), utils.Reason, utils.Direction),
-	}
-
-	drop := NewDropCountMetrics(ctxOptions, logger, LocalContext, true)
-	drop.Init(ctxOptions.MetricName)
-
-	originalGetHNS := GetHNSMetadata
-	GetHNSMetadata = func(flow *flow.Flow) *utils.HNSStatsMetadata {
-		return &utils.HNSStatsMetadata{
-			EndpointStats: &utils.EndpointStats{
-				DroppedPacketsIncoming: 0,
-				DroppedPacketsOutgoing: 99,
-			},
-			VfpPortStatsData: &utils.VfpPortStatsData{
-				In: &utils.VfpDirectedPortCounters{
-					DropCounters: &utils.VfpPacketDropStats{
-						AclDropPacketCount: 100,
-					},
-				},
-				Out: &utils.VfpDirectedPortCounters{
-					DropCounters: &utils.VfpPacketDropStats{
-						AclDropPacketCount: 199,
-					},
-				},
-			},
-		}
-	}
-	defer func() { GetHNSMetadata = originalGetHNS }()
-
-	testFlow := &flow.Flow{
-		IP: &flow.IP{Source: "1.1.1.1"},
-		Source: &flow.Endpoint{
-			Namespace: "default",
-			PodName:   "test-pod",
-		},
-	}
-
-	drop.ProcessFlow(testFlow)
-
-	mfs, err := exporter.AdvancedRegistry.Gather()
-	assert.NoError(t, err)
-	var validMetricCount int
-
-	for _, mf := range mfs {
-		if !strings.Contains(mf.GetName(), utils.DroppedPacketsGaugeName) {
-			continue
-		}
-		t.Logf("Metric Family: %s", mf.GetName())
-
-		for _, m := range mf.GetMetric() {
-			labelMap := map[string]string{}
-			for _, label := range m.GetLabel() {
-				labelMap[label.GetName()] = label.GetValue()
-			}
-			assert.Equal(t, "1.1.1.1", labelMap["ip"])
-			assert.Equal(t, "default", labelMap["namespace"])
-			assert.Equal(t, "test-pod", labelMap["podname"])
-			assert.Equal(t, "", labelMap["workload_kind"])
-			assert.Equal(t, "", labelMap["workload_name"])
-
-			if labelMap["direction"] == "ingress" && labelMap["reason"] == utils.Endpoint {
-				assert.Equal(t, float64(0), m.GetGauge().GetValue())
-				validMetricCount++
-			} else if labelMap["direction"] == "ingress" && labelMap["reason"] == utils.AclRule {
-				assert.Equal(t, float64(100), m.GetGauge().GetValue())
-				validMetricCount++
-			} else if labelMap["direction"] == "egress" && labelMap["reason"] == utils.Endpoint {
-				assert.Equal(t, float64(99), m.GetGauge().GetValue())
-				validMetricCount++
-			} else if labelMap["direction"] == "egress" && labelMap["reason"] == utils.AclRule {
-				assert.Equal(t, float64(199), m.GetGauge().GetValue())
-				validMetricCount++
-			}
-		}
-	}
-
-	assert.Equal(t, 4, validMetricCount, "Expected 4 metric samples with correct labels and values")
-
 }

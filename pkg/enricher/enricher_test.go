@@ -159,7 +159,7 @@ func addEvent(e *Enricher, sourceIP, destIP string) {
 	e.Write(ev)
 }
 
-func TestEnricherStandalone_WithEndpointPresent(t *testing.T) {
+func TestEnricherStandaloneWithEndpointPresent(t *testing.T) {
 	opts := log.GetDefaultLogOpts()
 	opts.Level = "debug"
 	if _, err := log.SetupZapLogger(opts); err != nil {
@@ -172,14 +172,15 @@ func TestEnricherStandalone_WithEndpointPresent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cache := standalone.NewCache()
+	testCache := standalone.New()
 	sourceIP := "1.1.1.1"
 
 	// Add endpoint to cache
 	endpoint := common.NewRetinaEndpoint("pod1", "ns1", &common.IPAddresses{IPv4: net.ParseIP(sourceIP)})
-	require.NoError(t, cache.UpdateRetinaEndpoint(endpoint))
+	require.NoError(t, testCache.UpdateRetinaEndpoint(endpoint))
 
-	enricher := New(ctx, cache, true)
+	// Create the enricher with standalone enabled
+	enricher := New(ctx, testCache, true)
 	var wg sync.WaitGroup
 
 	wg.Add(1)
@@ -210,12 +211,12 @@ func TestEnricherStandalone_WithEndpointPresent(t *testing.T) {
 			if ev == nil {
 				break
 			}
-			flow := ev.Event.(*flow.Flow)
-			sourceFlow := flow.GetSource()
+			fl := ev.Event.(*flow.Flow)
+			receivedFlow := fl.GetSource()
 
-			require.NotNil(t, sourceFlow, "Expected flow")
-			require.Equal(t, "pod1", sourceFlow.GetPodName())
-			require.Equal(t, "ns1", sourceFlow.GetNamespace())
+			assert.NotNil(t, receivedFlow, "Expected flow")
+			assert.Equal(t, "pod1", receivedFlow.GetPodName())
+			assert.Equal(t, "ns1", receivedFlow.GetNamespace())
 
 			count++
 		}
@@ -227,7 +228,7 @@ func TestEnricherStandalone_WithEndpointPresent(t *testing.T) {
 	wg.Wait()
 }
 
-func TestEnricherStandalone_WithEndpointAbsent(t *testing.T) {
+func TestEnricherStandaloneWithEndpointAbsent(t *testing.T) {
 	opts := log.GetDefaultLogOpts()
 	opts.Level = "debug"
 	if _, err := log.SetupZapLogger(opts); err != nil {
@@ -240,10 +241,11 @@ func TestEnricherStandalone_WithEndpointAbsent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cache := standalone.NewCache()
-	sourceIP := "9.9.9.9" // No endpoint added to cache
+	testCache := standalone.New()
+	sourceIP := "9.9.9.9" // No endpoint present in cache
 
-	enricher := New(ctx, cache, true)
+	// Create the enricher with standalone enabled
+	enricher := New(ctx, testCache, true)
 	var wg sync.WaitGroup
 
 	wg.Add(1)
@@ -274,10 +276,9 @@ func TestEnricherStandalone_WithEndpointAbsent(t *testing.T) {
 			if ev == nil {
 				break
 			}
-			flow := ev.Event.(*flow.Flow)
-			sourceFlow := flow.GetSource()
-
-			require.Nil(t, sourceFlow)
+			fl := ev.Event.(*flow.Flow)
+			receivedFlow := fl.GetSource()
+			assert.Nil(t, receivedFlow)
 
 			count++
 		}

@@ -5,15 +5,12 @@
 package metrics
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/cilium/cilium/api/v1/flow"
 	"github.com/microsoft/retina/crd/api/v1alpha1"
-	"github.com/microsoft/retina/pkg/exporter"
 	"github.com/microsoft/retina/pkg/log"
 	metricsinit "github.com/microsoft/retina/pkg/metrics"
-	"github.com/microsoft/retina/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -385,7 +382,7 @@ func TestNewTCPMetrics(t *testing.T) {
 				"service",
 				"port",
 			},
-			localContext: LocalContext,
+			localContext: localContext,
 			metricCall:   7,
 		},
 		{
@@ -424,7 +421,7 @@ func TestNewTCPMetrics(t *testing.T) {
 				"service",
 				"port",
 			},
-			localContext: LocalContext,
+			localContext: localContext,
 			metricCall:   0,
 		},
 		{
@@ -465,7 +462,7 @@ func TestNewTCPMetrics(t *testing.T) {
 				"service",
 				"port",
 			},
-			localContext: LocalContext,
+			localContext: localContext,
 			metricCall:   14,
 		},
 	}
@@ -474,7 +471,7 @@ func TestNewTCPMetrics(t *testing.T) {
 		log.Logger().Info("Running test name", zap.String("name", tc.name))
 		ctrl := gomock.NewController(t)
 
-		tcp := NewTCPMetrics(tc.opts, log.Logger(), tc.localContext, false)
+		tcp := NewTCPMetrics(tc.opts, log.Logger(), tc.localContext)
 		if tc.nilObj {
 			assert.Nil(t, tcp, "forward metrics should be nil Test Name: %s", tc.name)
 			continue
@@ -497,107 +494,4 @@ func TestNewTCPMetrics(t *testing.T) {
 		tcp.ProcessFlow(tc.f)
 		ctrl.Finish()
 	}
-}
-
-func TestStandaloneTCPFlagsMetrics(t *testing.T) {
-	logger, err := log.SetupZapLogger(log.GetDefaultLogOpts())
-	assert.NoError(t, err)
-
-	ctxOptions := &v1alpha1.MetricsContextOptions{
-		MetricName:   TCPFlagsCountName,
-		SourceLabels: append([]string{utils.Flag, utils.Direction}, DefaultCtxOptions()...),
-	}
-
-	tcp := NewTCPMetrics(ctxOptions, logger, LocalContext, true)
-	tcp.Init(ctxOptions.MetricName)
-
-	originalGetHNS := GetHNSMetadata
-	GetHNSMetadata = func(flow *flow.Flow) *utils.HNSStatsMetadata {
-		return &utils.HNSStatsMetadata{
-			VfpPortStatsData: &utils.VfpPortStatsData{
-				In: &utils.VfpDirectedPortCounters{
-					TcpCounters: &utils.VfpTcpStats{
-						PacketCounters: &utils.VfpTcpPacketStats{
-							SynPacketCount:    10,
-							SynAckPacketCount: 20,
-							FinPacketCount:    30,
-							RstPacketCount:    40,
-						},
-					},
-				},
-				Out: &utils.VfpDirectedPortCounters{
-					TcpCounters: &utils.VfpTcpStats{
-						PacketCounters: &utils.VfpTcpPacketStats{
-							SynPacketCount:    50,
-							SynAckPacketCount: 60,
-							FinPacketCount:    70,
-							RstPacketCount:    80,
-						},
-					},
-				},
-			},
-		}
-	}
-	defer func() { GetHNSMetadata = originalGetHNS }()
-
-	testFlow := &flow.Flow{
-		IP: &flow.IP{Source: "1.1.1.1"},
-		Source: &flow.Endpoint{
-			Namespace: "default",
-			PodName:   "test-pod",
-		},
-	}
-
-	tcp.ProcessFlow(testFlow)
-
-	mfs, err := exporter.AdvancedRegistry.Gather()
-	assert.NoError(t, err)
-	var validMetricCount int
-
-	for _, mf := range mfs {
-		if !strings.Contains(mf.GetName(), TCPFlagsCountName) {
-			continue
-		}
-		t.Logf("Metric Family: %s", mf.GetName())
-
-		for _, m := range mf.GetMetric() {
-			labelMap := map[string]string{}
-			for _, label := range m.GetLabel() {
-				labelMap[label.GetName()] = label.GetValue()
-			}
-			assert.Equal(t, "1.1.1.1", labelMap["ip"])
-			assert.Equal(t, "default", labelMap["namespace"])
-			assert.Equal(t, "test-pod", labelMap["podname"])
-			assert.Equal(t, "", labelMap["workload_kind"])
-			assert.Equal(t, "", labelMap["workload_name"])
-
-			if labelMap["direction"] == "ingress" && labelMap["flag"] == utils.SYN {
-				assert.Equal(t, float64(10), m.GetGauge().GetValue())
-				validMetricCount++
-			} else if labelMap["direction"] == "ingress" && labelMap["flag"] == utils.SYNACK {
-				assert.Equal(t, float64(20), m.GetGauge().GetValue())
-				validMetricCount++
-			} else if labelMap["direction"] == "ingress" && labelMap["flag"] == utils.FIN {
-				assert.Equal(t, float64(30), m.GetGauge().GetValue())
-				validMetricCount++
-			} else if labelMap["direction"] == "ingress" && labelMap["flag"] == utils.RST {
-				assert.Equal(t, float64(40), m.GetGauge().GetValue())
-				validMetricCount++
-			} else if labelMap["direction"] == "egress" && labelMap["flag"] == utils.SYN {
-				assert.Equal(t, float64(50), m.GetGauge().GetValue())
-				validMetricCount++
-			} else if labelMap["direction"] == "egress" && labelMap["flag"] == utils.SYNACK {
-				assert.Equal(t, float64(60), m.GetGauge().GetValue())
-				validMetricCount++
-			} else if labelMap["direction"] == "egress" && labelMap["flag"] == utils.FIN {
-				assert.Equal(t, float64(70), m.GetGauge().GetValue())
-				validMetricCount++
-			} else if labelMap["direction"] == "egress" && labelMap["flag"] == utils.RST {
-				assert.Equal(t, float64(80), m.GetGauge().GetValue())
-				validMetricCount++
-			}
-		}
-	}
-
-	assert.Equal(t, 8, validMetricCount, "Expected 8 metric samples with correct labels and values")
 }

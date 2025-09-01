@@ -1,7 +1,6 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
-
-package utils
+package source
 
 import (
 	"net"
@@ -22,7 +21,7 @@ func TestCtrinfoGetAllEndpoints(t *testing.T) {
 	require.NoError(t, err, "failed to create invalid JSON file")
 	defer os.Remove(invalidJSONPath)
 
-	cs := &CtrinfoSource{}
+	cs := &Ctrinfo{}
 
 	tests := []struct {
 		name                   string
@@ -102,8 +101,7 @@ func TestCtrinfoGetAllEndpoints(t *testing.T) {
 				require.NoError(t, err)
 				require.Len(t, endpoints, tt.expectedCount)
 				if tt.expectedCount > 0 {
-					ep := endpoints[0]
-					require.Equal(t, tt.expectedRetinaEndpoint, ep)
+					require.Equal(t, tt.expectedRetinaEndpoint, endpoints[0])
 				}
 			}
 		})

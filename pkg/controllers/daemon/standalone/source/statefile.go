@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
-package utils
+package source
 
 import (
 	"encoding/json"
@@ -12,7 +12,7 @@ import (
 	"github.com/microsoft/retina/pkg/common"
 )
 
-type StatefileSource struct{}
+type Statefile struct{}
 
 var StateFileLocation = "C:/Windows/System32/azure-vnet.json"
 
@@ -43,7 +43,7 @@ type IPInfo struct {
 	IP string `json:"IP"`
 }
 
-func (ss *StatefileSource) GetAllEndpoints() ([]*common.RetinaEndpoint, error) {
+func (s *Statefile) GetAllEndpoints() ([]*common.RetinaEndpoint, error) {
 	data, err := os.ReadFile(StateFileLocation)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read CNI state file: %w", err)

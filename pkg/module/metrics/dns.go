@@ -238,6 +238,5 @@ func (d *DNSMetrics) processLocalCtxFlow(flow *v1.Flow) {
 }
 
 func (d *DNSMetrics) Clean() {
-	d.l.Info("Cleaning metric", zap.String("name", d.metricName))
 	exporter.UnregisterMetric(exporter.AdvancedRegistry, metricsinit.ToPrometheusType(d.dnsMetrics))
 }

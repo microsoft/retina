@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
-package utils
+package source
 
 import (
 	"bytes"
@@ -17,7 +17,7 @@ import (
 	"github.com/microsoft/retina/pkg/common"
 )
 
-type CtrinfoSource struct{}
+type Ctrinfo struct{}
 
 type PodSpec struct {
 	Status Status `json:"status"`
@@ -45,10 +45,11 @@ var (
 	errJSONRead   = errors.New("error unmarshalling JSON")
 )
 
-func (cs *CtrinfoSource) GetAllEndpoints() ([]*common.RetinaEndpoint, error) {
+func (c *Ctrinfo) GetAllEndpoints() ([]*common.RetinaEndpoint, error) {
+	// Using crictl to get all running pods
 	runningPods, err := crictlCommand("cmd", "/c", "crictl", "pods", "-q")
 	if err != nil {
-		return nil, fmt.Errorf("%v: %v", errGetPods, err)
+		return nil, fmt.Errorf("%w: %w", errGetPods, err)
 	}
 
 	podIDs := strings.Split(strings.TrimSpace(runningPods), "\n")
@@ -58,19 +59,20 @@ func (cs *CtrinfoSource) GetAllEndpoints() ([]*common.RetinaEndpoint, error) {
 			continue
 		}
 
+		// Using crictl to get pod spec
 		podSpec, err := crictlCommand("cmd", "/c", "crictl", "inspectp", podID)
 		if err != nil {
-			return nil, fmt.Errorf("%w: %v", errInspectPod, err)
+			return nil, fmt.Errorf("%w: %w", errInspectPod, err)
 		}
 
 		var spec PodSpec
 		if err := json.Unmarshal([]byte(podSpec), &spec); err != nil {
-			return nil, fmt.Errorf("%w: %v", errJSONRead, err)
+			return nil, fmt.Errorf("%w: %w", errJSONRead, err)
 		}
 
 		ip := net.ParseIP(spec.Status.Network.IP)
+		// Skip pods with invalid or empty IPs
 		if ip == nil {
-			// Skip pods with invalid or empty IPs
 			continue
 		}
 
