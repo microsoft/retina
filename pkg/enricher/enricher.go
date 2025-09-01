@@ -12,7 +12,7 @@ import (
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/cilium/pkg/hubble/container"
 	"github.com/microsoft/retina/pkg/common"
-	"github.com/microsoft/retina/pkg/controllers/cache"
+	c "github.com/microsoft/retina/pkg/controllers/cache"
 	"github.com/microsoft/retina/pkg/log"
 	"go.uber.org/zap"
 )
@@ -31,7 +31,7 @@ type Enricher struct {
 	l *log.ZapLogger
 
 	// cache is the cache of all the objects
-	cache cache.CacheInterface
+	cache c.CacheInterface
 
 	inputRing *container.Ring
 
@@ -43,7 +43,7 @@ type Enricher struct {
 	enableStandalone bool
 }
 
-func New(ctx context.Context, cache cache.CacheInterface, enableStandalone bool) *Enricher {
+func New(ctx context.Context, cache c.CacheInterface, enableStandalone bool) *Enricher {
 	once.Do(func() {
 		ir := container.NewRing(container.Capacity1023)
 		e = &Enricher{
@@ -112,22 +112,22 @@ func (e *Enricher) enrich(ev *v1.Event) {
 
 // enrichStandalone takes the flow and enriches it with information from the standalone cache
 func (e *Enricher) enrichStandalone(ev *v1.Event) {
-	flow := ev.Event.(*flow.Flow)
+	fl := ev.Event.(*flow.Flow)
 
-	if flow.IP.Source == "" {
+	if fl.IP.Source == "" {
 		e.l.Debug("source IP is empty")
 		return
 	}
 
-	srcObj := e.cache.GetPodByIP(flow.IP.Source)
+	srcObj := e.cache.GetPodByIP(fl.IP.Source)
 	if srcObj != nil {
-		flow.Source = e.getEndpoint(srcObj)
-		e.l.Debug("enriched flow", zap.Any("flow", flow))
+		fl.Source = e.getEndpoint(srcObj)
+		e.l.Debug("enriched flow", zap.Any("flow", fl))
 	} else {
-		flow.Source = nil
+		fl.Source = nil
 	}
 
-	ev.Event = flow
+	ev.Event = fl
 	e.export(ev)
 }
 
