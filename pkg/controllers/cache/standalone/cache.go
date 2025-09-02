@@ -59,7 +59,7 @@ func (c *Cache) UpdateRetinaEndpoint(ep *common.RetinaEndpoint) error {
 func (c *Cache) updateEndpoint(ep *common.RetinaEndpoint) error {
 	ip, err := ep.PrimaryIP()
 	if err != nil {
-		c.l.Error("error getting IP for endpoint", zap.Error(err))
+		c.l.Error("error getting IP for retina endpoint", zap.Error(err))
 		return fmt.Errorf("failed to get IP from retina endpoint %s: %w", ep.Key(), err)
 	}
 
