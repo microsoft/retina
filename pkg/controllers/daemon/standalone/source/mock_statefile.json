@@ -21,12 +21,12 @@
                                 "Id": "Y",
                                 "IPAddresses": [
                                     {
-                                        "IP": "192.0.0.4",
+                                        "IP": "192.0.0.6",
                                         "Mask": "Y"
                                     }
                                 ],
-                                "PODName": "retina2-pod",
-                                "PODNameSpace": "retina2-namespace"
+                                "PODName": "retina-pod2",
+                                "PODNameSpace": "retina-namespace2"
                             }
                         }
                     }
