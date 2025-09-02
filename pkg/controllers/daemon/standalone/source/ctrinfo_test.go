@@ -1,5 +1,6 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
+
 package source
 
 import (
@@ -21,7 +22,7 @@ func TestCtrinfoGetAllEndpoints(t *testing.T) {
 	require.NoError(t, err, "failed to create invalid JSON file")
 	defer os.Remove(invalidJSONPath)
 
-	cs := &Ctrinfo{}
+	src := &Ctrinfo{}
 
 	tests := []struct {
 		name                   string
@@ -92,7 +93,7 @@ func TestCtrinfoGetAllEndpoints(t *testing.T) {
 				return "", errors.New("unknown command")
 			}
 
-			endpoints, err := cs.GetAllEndpoints()
+			endpoints, err := src.GetAllEndpoints()
 			if tt.expectedErr != nil {
 				require.Error(t, err)
 				require.ErrorContains(t, err, tt.expectedErr.Error())

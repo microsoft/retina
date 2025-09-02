@@ -1,5 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT license.
+
 package source
 
 import (
@@ -43,21 +44,24 @@ func TestStatefileGetAllEndpoints(t *testing.T) {
 	defer os.Remove(emptyJSONPath)
 	defer os.Remove(invalidJSONPath)
 
-	ss := &Statefile{}
+	src := &Statefile{}
 
 	tests := []struct {
 		name             string
 		filePath         string
 		emptyFile        bool
-		expectedEndpoint *common.RetinaEndpoint
+		expectedEndpoint []*common.RetinaEndpoint
 		expectedErr      bool
 	}{
 		{
-			name:             "Valid state file",
-			filePath:         "mock_statefile.json",
-			emptyFile:        false,
-			expectedEndpoint: common.NewRetinaEndpoint("retina-pod", "retina-namespace", common.NewIPAddress(net.ParseIP("192.0.0.5"), nil)),
-			expectedErr:      false,
+			name:      "Valid state file",
+			filePath:  "mock_statefile.json",
+			emptyFile: false,
+			expectedEndpoint: []*common.RetinaEndpoint{
+				common.NewRetinaEndpoint("retina-pod", "retina-namespace", common.NewIPAddress(net.ParseIP("192.0.0.5"), nil)),
+				common.NewRetinaEndpoint("retina-pod2", "retina-namespace2", common.NewIPAddress(net.ParseIP("192.0.0.6"), nil)),
+			},
+			expectedErr: false,
 		},
 		{
 			name:             "Empty state file",
@@ -88,7 +92,7 @@ func TestStatefileGetAllEndpoints(t *testing.T) {
 			StateFileLocation = tt.filePath
 			defer func() { StateFileLocation = originalPath }()
 
-			endpoints, err := ss.GetAllEndpoints()
+			endpoints, err := src.GetAllEndpoints()
 
 			if tt.expectedErr {
 				require.Error(t, err)
@@ -98,7 +102,7 @@ func TestStatefileGetAllEndpoints(t *testing.T) {
 				if tt.emptyFile {
 					require.Empty(t, endpoints)
 				} else {
-					require.Equal(t, tt.expectedEndpoint, endpoints[0])
+					require.ElementsMatch(t, tt.expectedEndpoint, endpoints)
 				}
 			}
 		})
