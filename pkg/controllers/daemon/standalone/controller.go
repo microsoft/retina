@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/retina/pkg/controllers/cache/standalone"
 	"github.com/microsoft/retina/pkg/controllers/daemon/standalone/source"
 	"github.com/microsoft/retina/pkg/log"
+	sm "github.com/microsoft/retina/pkg/module/metrics/standalone"
 
 	"go.uber.org/zap"
 )
@@ -23,14 +24,13 @@ type Controller struct {
 	// cache to hold retina endpoints
 	cache *standalone.Cache
 
-	// metricsModule *sm.Module
-	config *kcfg.Config
-	l      *log.ZapLogger
+	metricsModule *sm.Module
+	config        *kcfg.Config
+	l             *log.ZapLogger
 }
 
 // New creates a new instance of the standalone controller
-// func New(config *kcfg.Config, cache *standalone.Cache, metricsModule *sm.Module) *Controller {
-func New(config *kcfg.Config, cache *standalone.Cache) *Controller {
+func New(config *kcfg.Config, cache *standalone.Cache, metricsModule *sm.Module) *Controller {
 	var src source.Source
 
 	if config.EnableCrictl {
@@ -40,16 +40,16 @@ func New(config *kcfg.Config, cache *standalone.Cache) *Controller {
 	}
 
 	return &Controller{
-		src:    src,
-		cache:  cache,
-		config: config,
-		// metricsModule: metricsModule,
-		l: log.Logger().Named(string("Controller")),
+		src:           src,
+		cache:         cache,
+		config:        config,
+		metricsModule: metricsModule,
+		l:             log.Logger().Named(string("Controller")),
 	}
 }
 
 // Reconcile syncs the state of the running endpoints with the existing endpoints in cache
-func (c *Controller) Reconcile(_ context.Context) error {
+func (c *Controller) Reconcile(ctx context.Context) error {
 	c.l.Info("Reconciling retina endpoints")
 
 	// Retrieve running pod information from the corresponding source
@@ -85,8 +85,7 @@ func (c *Controller) Reconcile(_ context.Context) error {
 		}
 	}
 
-	// nolint:gocritic
-	// c.metricsModule.Reconcile(ctx)
+	c.metricsModule.Reconcile(ctx)
 	c.l.Info("Reconciliation completed")
 	return nil
 }
@@ -115,6 +114,5 @@ func (c *Controller) Run(ctx context.Context) {
 func (c *Controller) Stop() {
 	c.l.Info("Stopping controller")
 	c.cache.Clear()
-	// nolint:gocritic
-	// sc.metricsModule.Clear()
+	c.metricsModule.Clear()
 }

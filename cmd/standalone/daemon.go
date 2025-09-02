@@ -15,7 +15,9 @@ import (
 
 	"github.com/microsoft/retina/pkg/config"
 	cache "github.com/microsoft/retina/pkg/controllers/cache/standalone"
+	sc "github.com/microsoft/retina/pkg/controllers/daemon/standalone"
 	cm "github.com/microsoft/retina/pkg/managers/controllermanager"
+	sm "github.com/microsoft/retina/pkg/module/metrics/standalone"
 )
 
 type Daemon struct {
@@ -46,13 +48,11 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 	enrich.Run()
 
 	// Initialize metrics module
-	// nolint:gocritic
-	// metricsModule := sm.InitModule(ctx, enrich)
+	metricsModule := sm.InitModule(ctx, enrich)
 
 	mainLogger.Info("Initializing RetinaEndpoint controller")
-	// nolint:gocritic
-	// controller := sc.New(d.config, controllerCache, metricsModule)
-	// go controller.Run(ctx)
+	controller := sc.New(d.config, controllerCache, metricsModule)
+	go controller.Run(ctx)
 
 	// Standalone requires pod level to be disabled
 	controllerMgr, err := cm.NewControllerManager(d.config, nil, tel)

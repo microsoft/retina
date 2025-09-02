@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/retina/pkg/controllers/cache/standalone"
 	"github.com/microsoft/retina/pkg/controllers/daemon/standalone/source"
 	"github.com/microsoft/retina/pkg/log"
+	sm "github.com/microsoft/retina/pkg/module/metrics/standalone"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -34,8 +35,7 @@ func TestControllerReconcile(t *testing.T) {
 
 	// Metrics module
 	ctx := context.Background()
-	// nolint:gocritic
-	// metricsModule := sm.InitModule(ctx, nil)
+	metricsModule := sm.InitModule(ctx, nil)
 
 	// Prepopulate cache with an endpoint to simulate deletion
 	oldEp := common.NewRetinaEndpoint("old-pod", "default", &common.IPAddresses{IPv4: net.ParseIP("1.1.1.2")})
@@ -47,9 +47,7 @@ func TestControllerReconcile(t *testing.T) {
 
 	// Setup test controller
 	cfg := &kcfg.Config{MetricsInterval: 1, EnableCrictl: false}
-	// nolint:gocritic
-	// controller := New(cfg, cache, metricsModule)
-	controller := New(cfg, cache)
+	controller := New(cfg, cache, metricsModule)
 	controller.src = mockSource // inject mock source
 
 	// Run Reconcile
