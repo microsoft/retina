@@ -75,7 +75,7 @@ func TestEnricherSecondaryIPs(t *testing.T) {
 	require.NoError(t, err)
 
 	// get the enricher
-	e := New(ctx, c, false)
+	e := newEnricher(ctx, c, false)
 	var wg sync.WaitGroup
 
 	wg.Add(1)
@@ -180,7 +180,7 @@ func TestEnricherStandaloneWithEndpointPresent(t *testing.T) {
 	require.NoError(t, testCache.UpdateRetinaEndpoint(endpoint))
 
 	// Create the enricher with standalone enabled
-	enricher := New(ctx, testCache, true)
+	enricher := newEnricher(ctx, testCache, true)
 	var wg sync.WaitGroup
 
 	wg.Add(1)
@@ -245,7 +245,7 @@ func TestEnricherStandaloneWithEndpointAbsent(t *testing.T) {
 	sourceIP := "9.9.9.9" // No endpoint present in cache
 
 	// Create the enricher with standalone enabled
-	enricher := New(ctx, testCache, true)
+	enricher := newEnricher(ctx, testCache, true)
 	var wg sync.WaitGroup
 
 	wg.Add(1)

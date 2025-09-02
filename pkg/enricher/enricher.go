@@ -43,21 +43,24 @@ type Enricher struct {
 	enableStandalone bool
 }
 
+func newEnricher(ctx context.Context, cache c.CacheInterface, enableStandalone bool) *Enricher {
+	ir := container.NewRing(container.Capacity1023)
+	return &Enricher{
+		ctx:              ctx,
+		l:                log.Logger().Named("enricher"),
+		cache:            cache,
+		inputRing:        ir,
+		Reader:           container.NewRingReader(ir, ir.OldestWrite()),
+		outputRing:       container.NewRing(container.Capacity1023),
+		enableStandalone: enableStandalone,
+	}
+}
+
 func New(ctx context.Context, cache c.CacheInterface, enableStandalone bool) *Enricher {
 	once.Do(func() {
-		ir := container.NewRing(container.Capacity1023)
-		e = &Enricher{
-			ctx:              ctx,
-			l:                log.Logger().Named("enricher"),
-			cache:            cache,
-			inputRing:        ir,
-			Reader:           container.NewRingReader(ir, ir.OldestWrite()),
-			outputRing:       container.NewRing(container.Capacity1023),
-			enableStandalone: enableStandalone,
-		}
+		e = newEnricher(ctx, cache, enableStandalone)
 		initialized = true
 	})
-
 	return e
 }
 
