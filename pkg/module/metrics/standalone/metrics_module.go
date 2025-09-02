@@ -15,6 +15,6 @@ func InitModule(_ context.Context, _ enricher.EnricherInterface) *Module {
 	return &Module{}
 }
 
-func (m *Module) Reconcile(ctx context.Context) {}
+func (m *Module) Reconcile(_ context.Context) {}
 
 func (m *Module) Clear() {}
