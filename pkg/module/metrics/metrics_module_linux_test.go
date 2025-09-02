@@ -371,6 +371,9 @@ func TestModule_Reconcile(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	l := log.Logger().Named("test")
+	cfg := kcfg.Config{
+		EnableStandalone: false,
+	}
 
 	testDropMetric := &DropCountMetrics{
 		baseMetricObject: baseMetricObject{
@@ -381,6 +384,7 @@ func TestModule_Reconcile(t *testing.T) {
 				DestinationLabels: []string{"pod"},
 				AdditionalLabels:  []string{"namespace"},
 			},
+			l: l,
 		},
 	}
 	testDropMetric.Init("drop_count")
@@ -391,6 +395,7 @@ func TestModule_Reconcile(t *testing.T) {
 				MetricName:   "drop_bytes",
 				SourceLabels: []string{"ip"},
 			},
+			l: l,
 		},
 	}
 	testDropMetricBytes.Init("drop_bytes")
@@ -403,6 +408,7 @@ func TestModule_Reconcile(t *testing.T) {
 				DestinationLabels: []string{"pod"},
 				AdditionalLabels:  []string{"namespace"},
 			},
+			l: l,
 		},
 	}
 	testForwardMetric.Init("forward_count")
@@ -413,6 +419,7 @@ func TestModule_Reconcile(t *testing.T) {
 				MetricName:   "forward_bytes",
 				SourceLabels: []string{"ip"},
 			},
+			l: l,
 		},
 	}
 	testForwardMetricBytes.Init("forward_bytes")
@@ -437,10 +444,11 @@ func TestModule_Reconcile(t *testing.T) {
 				},
 			},
 			m: &Module{
-				RWMutex:   &sync.RWMutex{},
-				registry:  make(map[string]AdvMetricsInterface),
-				l:         l,
-				moduleCtx: context.Background(),
+				RWMutex:      &sync.RWMutex{},
+				registry:     make(map[string]AdvMetricsInterface),
+				l:            l,
+				moduleCtx:    context.Background(),
+				daemonConfig: &cfg,
 			},
 			expectErr: false,
 		},
@@ -468,8 +476,9 @@ func TestModule_Reconcile(t *testing.T) {
 					"drop_count":    testDropMetric,
 					"forward_count": testForwardMetric,
 				},
-				moduleCtx: context.Background(),
-				l:         l,
+				moduleCtx:    context.Background(),
+				l:            l,
+				daemonConfig: &cfg,
 			},
 			expectErr: false,
 		},
@@ -507,8 +516,9 @@ func TestModule_Reconcile(t *testing.T) {
 					"forward_count": testForwardMetric,
 					"forward_bytes": testForwardMetricBytes,
 				},
-				moduleCtx: context.Background(),
-				l:         l,
+				moduleCtx:    context.Background(),
+				l:            l,
+				daemonConfig: &cfg,
 			},
 			expectErr: false,
 		},
@@ -546,8 +556,9 @@ func TestModule_Reconcile(t *testing.T) {
 					"forward_count": testForwardMetric,
 					"forward_bytes": testForwardMetricBytes,
 				},
-				moduleCtx: context.Background(),
-				l:         l,
+				moduleCtx:    context.Background(),
+				l:            l,
+				daemonConfig: &cfg,
 			},
 			expectErr: true,
 		},
@@ -568,8 +579,9 @@ func TestModule_Reconcile(t *testing.T) {
 				registry: map[string]AdvMetricsInterface{
 					"drop_count": testDropMetric,
 				},
-				moduleCtx: context.Background(),
-				l:         l,
+				moduleCtx:    context.Background(),
+				l:            l,
+				daemonConfig: &cfg,
 				currentSpec: &api.MetricsSpec{
 					ContextOptions: []api.MetricsContextOptions{
 						{
