@@ -4,12 +4,9 @@
 
 The `retina shell` command allows you to start an interactive shell on a Kubernetes node or pod for adhoc debugging.
 
-This runs a container image with many common networking tools installed (`ping`, `curl`, etc.), as well as specialized tools such as bpftool, pwru or Inspektor Gadget.
+This runs a container image built from the Dockerfile in the `/shell` directory, with many common networking tools installed (`ping`, `curl`, etc.), as well as specialized tools such as [bpftool](#bpftool), [pwru](#pwru) or [Inspektor Gadget](#inspektor-gadget-ig).
 
 Currently the Retina Shell only works in Linux environments. Windows support will be added in the future.
-
-* The CLI command `kubectl retina shell` creates a pod with `HostNetwork=true` (for node debugging) or an ephemeral container in an existing pod (for pod debugging).
-* The container runs an image built from the Dockerfile in the `/shell` directory. The image is based on Azure Linux and includes commonly-used networking tools.
 
 ## Getting Started
 
@@ -104,9 +101,7 @@ table ip filter {
 
 >NOTE: If you see the error "Operation not permitted (you must be root)", check that your `kubectl retina shell` command sets `--capabilities NET_RAW,NET_ADMIN`.
 
-`iptables` in the shell image uses `iptables-nft`, which may or may not match the configuration on the node.
-
-For example, Azure Linux 2 maps `iptables` to `iptables-legacy`. To use the exact same `iptables` binary as installed on the node, you will need to `chroot` into the host filesystem (see below).
+`iptables` in the shell image uses `iptables-nft`, which may or may not match the configuration on the node. For example, Azure Linux 2 maps `iptables` to `iptables-legacy`. To use the exact same `iptables` binary as installed on the node, you will need to `chroot` into the host filesystem (see below).
 
 ## Accessing the host filesystem
 
