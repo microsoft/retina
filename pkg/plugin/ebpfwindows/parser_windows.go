@@ -26,6 +26,8 @@ import (
 )
 
 const MaxInt = int(^uint(0) >> 1)
+const MessageTypePktmonDrop = 100
+const maxCapLength uint16 = 128
 
 // Parser is a parser for L3/L4 payloads
 type Parser struct {
@@ -155,8 +157,9 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error {
 	var offset uint
 	var dn *DropNotify
 	var tn *TraceNotify
-	var eventSubType uint8
+	var eventSubType uint32
 	var authType pb.AuthType
+	var pdn *PktmonDropNotify
 
 	switch eventType {
 	case monitorAPI.MessageTypeDrop:
@@ -164,7 +167,7 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error {
 		if err := DecodeDropNotify(data, dn); err != nil {
 			return fmt.Errorf("failed to parse drop: %w", err)
 		}
-		eventSubType = dn.SubType
+		eventSubType = uint32(dn.SubType)
 		offset = dn.DataOffset()
 		if offset > uint(MaxInt) {
 			return fmt.Errorf("%w: %d", errDataOffsetTooLarge, offset)
@@ -175,7 +178,7 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error {
 		if err := DecodeTraceNotify(data, tn); err != nil {
 			return fmt.Errorf("failed to parse trace: %w", err)
 		}
-		eventSubType = tn.ObsPoint
+		eventSubType = uint32(tn.ObsPoint)
 
 		if tn.ObsPoint != 0 {
 			decoded.TraceObservationPoint = pb.TraceObservationPoint(tn.ObsPoint)
@@ -191,6 +194,27 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error {
 		}
 
 		packetOffset = int(offset)
+
+	case MessageTypePktmonDrop:
+		pdn = &PktmonDropNotify{}
+		if err := DecodePktmonDrop(data, pdn); err != nil {
+			return fmt.Errorf("failed to parse pktmon drop: %w", err)
+		}
+		offset = pdn.DataOffset()
+
+		// Fill relevant fields for dropNotify from pktmonNotify struct
+		dn = &DropNotify{}
+		dn.Type = monitorAPI.MessageTypeDrop
+		dn.Version = pdn.VersionHeader.Version
+		dn.OrigLen = pdn.PktmonHeader.PacketDescriptor.PacketOriginalLength
+		dn.CapLen = uint16(min(uint32(maxCapLength), uint32(dn.OrigLen)))
+
+		eventSubType = pdn.PktmonHeader.Metadata.DropReason
+		if offset > uint(MaxInt) {
+			return fmt.Errorf("%w: %d", errDataOffsetTooLarge, offset)
+		}
+		packetOffset = int(offset)
+
 	default:
 		return fmt.Errorf("invalid event type: %w", errors.NewErrInvalidType(eventType))
 	}
@@ -215,13 +239,31 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error {
 		}
 
 		var err error
-		switch {
-		case !isL3Device:
-			err = p.packet.decLayerL2Dev.DecodeLayers(data[packetOffset:], &p.packet.Layers)
-		case isIPv6:
-			err = p.packet.decLayerL3Dev.IPv6.DecodeLayers(data[packetOffset:], &p.packet.Layers)
-		default:
-			err = p.packet.decLayerL3Dev.IPv4.DecodeLayers(data[packetOffset:], &p.packet.Layers)
+		if eventType == MessageTypePktmonDrop {
+			switch pdn.PktmonHeader.Metadata.PacketType {
+			case 1:
+				err = p.packet.decLayerL2Dev.DecodeLayers(data[packetOffset:], &p.packet.Layers)
+			case 3:
+				switch data[packetOffset] >> 4 {
+				case 0x4:
+					err = p.packet.decLayerL3Dev.IPv4.DecodeLayers(data[packetOffset:], &p.packet.Layers)
+				case 0x6:
+					err = p.packet.decLayerL3Dev.IPv6.DecodeLayers(data[packetOffset:], &p.packet.Layers)
+				default:
+					return fmt.Errorf("decode layers failed for unsupported IP packet type starting with %d, data: %v", data[packetOffset], data[packetOffset:])
+				}
+			default:
+				return fmt.Errorf("decode layers failed for unsupported packet type %d, data: %v", pdn.PktmonHeader.Metadata.PacketType, data[packetOffset:])
+			}
+		} else {
+			switch {
+			case !isL3Device:
+				err = p.packet.decLayerL2Dev.DecodeLayers(data[packetOffset:], &p.packet.Layers)
+			case isIPv6:
+				err = p.packet.decLayerL3Dev.IPv6.DecodeLayers(data[packetOffset:], &p.packet.Layers)
+			default:
+				err = p.packet.decLayerL3Dev.IPv4.DecodeLayers(data[packetOffset:], &p.packet.Layers)
+			}
 		}
 
 		if err != nil {
@@ -487,7 +529,7 @@ func decodeIsReply(tn *TraceNotify) *wrapperspb.BoolValue {
 	}
 }
 
-func decodeCiliumEventType(eventType, eventSubType uint8) *pb.CiliumEventType {
+func decodeCiliumEventType(eventType uint8, eventSubType uint32) *pb.CiliumEventType {
 	return &pb.CiliumEventType{
 		Type:    int32(eventType),
 		SubType: int32(eventSubType),

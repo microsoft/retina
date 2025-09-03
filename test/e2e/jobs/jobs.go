@@ -128,7 +128,7 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, test
 		resp *dns.ResponseValidationParams
 	}{
 		{
-			name: "Validate basic DNS request and response metrics for a valid domain",
+			name: "Validate basic DNS r	equest and response metrics for a valid domain",
 			req: &dns.RequestValidationParams{
 				NumResponse: "0",
 				Query:       "kubernetes.default.svc.cluster.local.",
