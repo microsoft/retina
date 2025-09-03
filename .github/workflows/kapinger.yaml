@@ -51,6 +51,10 @@ jobs:
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
 
+      - name: Set lowercase repo name
+        shell: bash
+        run: echo "REPO=${GITHUB_REPOSITORY,,}" >>${GITHUB_ENV}
+
       - name: Build Linux Kapinger Image
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
@@ -61,11 +65,11 @@ jobs:
           load: true
           push: false
           provenance: false
-          tags: ghcr.io/${{ github.repository }}/kapinger:${{ steps.vars.outputs.sha_short }}-linux-${{ matrix.arch }}
+          tags: ghcr.io/${{ env.REPO }}/kapinger:${{ steps.vars.outputs.sha_short }}-linux-${{ matrix.arch }}
 
       - name: Smoke test kapinger binary
         run: |
-          IMAGE=ghcr.io/${{ github.repository }}/kapinger:${{ steps.vars.outputs.sha_short }}-linux-${{ matrix.arch }}
+          IMAGE=ghcr.io/${{ env.REPO }}/kapinger:${{ steps.vars.outputs.sha_short }}-linux-${{ matrix.arch }}
           # Verify the binary starts and prints the expected startup log.
           # It will exit with an error because there's no K8s cluster, but
           # that confirms the binary is correctly linked and executable.
@@ -81,7 +85,7 @@ jobs:
           target: linux
           push: true
           provenance: false
-          tags: ghcr.io/${{ github.repository }}/kapinger:${{ steps.vars.outputs.sha_short }}-linux-${{ matrix.arch }}
+          tags: ghcr.io/${{ env.REPO }}/kapinger:${{ steps.vars.outputs.sha_short }}-linux-${{ matrix.arch }}
 
   build-windows:
     name: Build Windows Kapinger Image
@@ -102,6 +106,11 @@ jobs:
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
 
+
+      - name: Set lowercase repo name
+        shell: bash
+        run: echo "REPO=${GITHUB_REPOSITORY,,}" >>${GITHUB_ENV}
+
       - name: Build Windows Kapinger Image
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
@@ -111,7 +120,7 @@ jobs:
           target: windows
           push: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}
           provenance: false
-          tags: ghcr.io/${{ github.repository }}/kapinger:${{ steps.vars.outputs.sha_short }}-windows
+          tags: ghcr.io/${{ env.REPO }}/kapinger:${{ steps.vars.outputs.sha_short }}-windows
 
   manifest:
     name: Create and Push Manifest
@@ -136,7 +145,7 @@ jobs:
       - name: Create and push manifest
         run: |
           TAG=${{ steps.vars.outputs.sha_short }}
-          REPO=ghcr.io/${{ github.repository }}/kapinger
+          REPO=ghcr.io/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')/kapinger
           TAGS="-t $REPO:$TAG"
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             TAGS="$TAGS -t $REPO:${{ github.ref_name }}"
@@ -165,6 +174,10 @@ jobs:
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
 
+      - name: Set lowercase repo name
+        shell: bash
+        run: echo "REPO=${GITHUB_REPOSITORY,,}" >>${GITHUB_ENV}
+
       - name: Build Linux Toolbox Image
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
@@ -173,4 +186,4 @@ jobs:
           platforms: linux/amd64
           push: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}
           provenance: false
-          tags: ghcr.io/${{ github.repository }}/toolbox:${{ steps.vars.outputs.sha_short }}-linux
+          tags: ghcr.io/${{ env.REPO }}/toolbox:${{ steps.vars.outputs.sha_short }}-linux

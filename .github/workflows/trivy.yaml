@@ -27,6 +27,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Set lowercase repo name
+        shell: bash
+        run: echo "REPO=${GITHUB_REPOSITORY,,}" >>${GITHUB_ENV}
+
       - name: Get Tag
         env:
           GH_TOKEN: ${{ github.token }}
@@ -41,7 +45,7 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # 0.36.0
         with:
-          image-ref: "ghcr.io/${{ github.repository }}/${{ matrix.image }}:${{ env.TAG }}"
+          image-ref: "ghcr.io/${{ env.REPO }}/${{ matrix.image }}:${{ env.TAG }}"
           format: "template"
           template: "@/contrib/sarif.tpl"
           output: "trivy-results.sarif"

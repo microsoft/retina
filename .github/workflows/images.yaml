@@ -55,30 +55,20 @@ jobs:
           go-version-file: go.mod
       - run: go version
 
+      - name: Set lowercase repo name
+        shell: bash
+        run: echo "REPO=${GITHUB_REPOSITORY,,}" >>${GITHUB_ENV}
+
       - name: Az CLI login
         uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
-        if: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION }}
-
-      - name: Build Images
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "TAG=$(make version)" >> $GITHUB_ENV
-          if [ "$SHOULD_PUSH_IMAGE" == "true" ]; then
-            az acr login -n ${{ vars.ACR_NAME }}
-            make retina-image \
-              IMAGE_NAMESPACE=${{ github.repository }} \
+              IMAGE_NAMESPACE=${{ env.REPO }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
               APP_INSIGHTS_ID=${{ secrets.AZURE_APP_INSIGHTS_KEY }} \
               BUILDX_ACTION=--push
           else
             make retina-image \
-              IMAGE_NAMESPACE=${{ github.repository }} \
+              IMAGE_NAMESPACE=${{ env.REPO }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
           fi
         env:
@@ -160,6 +150,10 @@ jobs:
           }
           throw "Docker daemon failed to start within $timeout seconds"
 
+      - name: Set lowercase repo name
+        shell: bash
+        run: echo "REPO=${GITHUB_REPOSITORY,,}" >>${GITHUB_ENV}
+
       - name: Az CLI login
         uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
         if: ${{ github.event_name == 'merge_group' }} || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
@@ -176,7 +170,7 @@ jobs:
           if [ "$SHOULD_PUSH_IMAGE" == "true" ]; then
             az acr login -n ${{ vars.ACR_NAME }} 
             make retina-image-win \
-              IMAGE_NAMESPACE=${{ github.repository }} \
+              IMAGE_NAMESPACE=${{ env.REPO }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               WINDOWS_YEARS=${{ matrix.year }} \
               IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
@@ -186,7 +180,7 @@ jobs:
             docker push ${{ vars.ACR_NAME }}/${{ github.repository }}/retina-agent:${TAG}-windows-ltsc${{ matrix.year }}-${{ matrix.arch }}
           else
             make retina-image-win \
-              IMAGE_NAMESPACE=${{ github.repository }} \
+              IMAGE_NAMESPACE=${{ env.REPO }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               WINDOWS_YEARS=${{ matrix.year }} \
               BINARIES_PATH=output/windows_${{ matrix.arch }} \
@@ -219,6 +213,11 @@ jobs:
           go-version-file: go.mod
       - run: go version
 
+
+      - name: Set lowercase repo name
+        shell: bash
+        run: echo "REPO=${GITHUB_REPOSITORY,,}" >>${GITHUB_ENV}
+
       - name: Az CLI login
         uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
         if: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
@@ -235,14 +234,14 @@ jobs:
           if [ "$SHOULD_PUSH_IMAGE" == "true" ]; then
             az acr login -n ${{ vars.ACR_NAME }}
             make retina-operator-image \
-              IMAGE_NAMESPACE=${{ github.repository }} \
+              IMAGE_NAMESPACE=${{ env.REPO }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               IMAGE_REGISTRY=${{ vars.ACR_NAME }} \
               APP_INSIGHTS_ID=${{ secrets.AZURE_APP_INSIGHTS_KEY }} \
               BUILDX_ACTION=--push
           else
             make retina-operator-image \
-              IMAGE_NAMESPACE=${{ github.repository }} \
+              IMAGE_NAMESPACE=${{ env.REPO }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
           fi
         env:
@@ -272,6 +271,11 @@ jobs:
           go-version-file: go.mod
       - run: go version
 
+
+      - name: Set lowercase repo name
+        shell: bash
+        run: echo "REPO=${GITHUB_REPOSITORY,,}" >>${GITHUB_ENV}
+
       - name: Az CLI login
         uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
         if: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
@@ -288,13 +292,13 @@ jobs:
           if [ "$SHOULD_PUSH_IMAGE" == "true" ]; then
             az acr login -n ${{ vars.ACR_NAME }}
             make retina-shell-image \
-              IMAGE_NAMESPACE=${{ github.repository }} \
+              IMAGE_NAMESPACE=${{ env.REPO }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
               BUILDX_ACTION=--push
           else
             make retina-shell-image \
-              IMAGE_NAMESPACE=${{ github.repository }} \
+              IMAGE_NAMESPACE=${{ env.REPO }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
           fi
         env:
@@ -324,6 +328,11 @@ jobs:
           go-version-file: go.mod
       - run: go version
 
+
+      - name: Set lowercase repo name
+        shell: bash
+        run: echo "REPO=${GITHUB_REPOSITORY,,}" >>${GITHUB_ENV}
+
       - name: Az CLI login
         uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
         if: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
@@ -340,13 +349,13 @@ jobs:
           if [ "$SHOULD_PUSH_IMAGE" == "true" ]; then
             az acr login -n ${{ vars.ACR_NAME }}
             make kubectl-retina-image \
-              IMAGE_NAMESPACE=${{ github.repository }} \
+              IMAGE_NAMESPACE=${{ env.REPO }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
               BUILDX_ACTION=--push
           else
             make kubectl-retina-image \
-              IMAGE_NAMESPACE=${{ github.repository }} \
+              IMAGE_NAMESPACE=${{ env.REPO }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }}
           fi
         env:
@@ -402,6 +411,10 @@ jobs:
       CLUSTER_NAME: retina-e2e-${{ github.run_id }}-${{ github.run_attempt }}
 
     steps:
+    
+      - name: Set lowercase repo name
+        run: echo "REPO=${GITHUB_REPOSITORY,,}" >>${GITHUB_ENV}
+
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -429,7 +442,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          go test -v ./test/e2e/. -timeout 60m -tags=e2e -count=1  -args -image-tag=$(make version) -image-registry=${{ vars.ACR_NAME }}  -image-namespace=${{ github.repository}}
+          go test -v ./test/e2e/. -timeout 60m -tags=e2e -count=1  -args -image-tag=$(make version) -image-registry=${{ vars.ACR_NAME }}  -image-namespace=${{ env.REPO }}
 
       - name: Cleanup resource group
         if: always()
