@@ -245,7 +245,7 @@ require (
 	golang.org/x/sync v0.16.0
 	golang.org/x/sys v0.35.0
 	golang.org/x/term v0.33.0 // indirect
-	google.golang.org/protobuf v1.36.6
+	google.golang.org/protobuf v1.36.8
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/api v0.32.4
 	k8s.io/apimachinery v0.32.4
