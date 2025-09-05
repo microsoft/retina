@@ -49,5 +49,5 @@ func (b *baseMetricObject) populateCtxOptions(ctxOptions *api.MetricsContextOpti
 }
 
 func (b *baseMetricObject) isLocalContext() bool {
-	return b.contextMode == localContext
+	return b.contextMode == LocalContext
 }
