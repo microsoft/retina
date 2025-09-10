@@ -145,6 +145,28 @@ func (p *Parser) Decode(monitorEvent *observerTypes.MonitorEvent) (*v1.Event, er
 	}
 }
 
+// func (p *Parser) parsePktmonPkt(data []byte, pdn *PktmonDropNotify, decoded *pb.Flow) error {
+
+// 	packetOffset := int(pdn.DataOffset())
+// 	p.packet.Lock()
+// 	defer p.packet.Unlock()
+// 	var err error
+// 	switch pdn.PktmonHeader.Metadata.PacketType {
+// 	case 1:
+// 		slog.Info("Reached Case 1 drop Events")
+// 		err = p.packet.decLayerL2Dev.DecodeLayers(data[packetOffset:], p.packet.Layers[])
+// 	case 3:
+// 		slog.Info("Reached Case 3 drop Events")
+// 		err = p.packet.decLayerL3Dev.IPv6.DecodeLayers(data[packetOffset:], &p.packet.Layers)
+// 	default:
+// 		slog.Info("Cant parse packet of this type %d", pdn.PktmonHeader.Metadata.PacketType)
+
+// 		err = p.packet.decLayerL3Dev.IPv4.DecodeLayers(data[packetOffset:], &p.packet.Layers)
+// 		p.packet.decLayerL3Dev
+// 	}
+// 	return err
+// }
+
 // Decode decodes the data from 'data' into 'decoded'
 func (p *Parser) decode(data []byte, decoded *pb.Flow) error {
 	if len(data) == 0 {
