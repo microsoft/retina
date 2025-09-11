@@ -27,7 +27,24 @@ import (
 
 const MaxInt = int(^uint(0) >> 1)
 const MessageTypePktmonDrop = 100
-const maxCapLength uint16 = 128
+
+type PktmonPacketType uint8
+
+// pktmon packet types
+const (
+	PktMonPayloadUnknown PktmonPacketType = iota
+	PktMonPayloadEthernet
+	PktMonPayloadWiFi
+	PktMonPayloadIP
+	PktMonPayloadHTTP
+	PktMonPayloadTCP
+	PktMonPayloadUDP
+	PktMonPayloadARP
+	PktMonPayloadICMP
+	PktMonPayloadESP
+	PktMonPayloadAH
+	PktMonPayloadL4Payload
+)
 
 // Parser is a parser for L3/L4 payloads
 type Parser struct {
@@ -145,28 +162,6 @@ func (p *Parser) Decode(monitorEvent *observerTypes.MonitorEvent) (*v1.Event, er
 	}
 }
 
-// func (p *Parser) parsePktmonPkt(data []byte, pdn *PktmonDropNotify, decoded *pb.Flow) error {
-
-// 	packetOffset := int(pdn.DataOffset())
-// 	p.packet.Lock()
-// 	defer p.packet.Unlock()
-// 	var err error
-// 	switch pdn.PktmonHeader.Metadata.PacketType {
-// 	case 1:
-// 		slog.Info("Reached Case 1 drop Events")
-// 		err = p.packet.decLayerL2Dev.DecodeLayers(data[packetOffset:], p.packet.Layers[])
-// 	case 3:
-// 		slog.Info("Reached Case 3 drop Events")
-// 		err = p.packet.decLayerL3Dev.IPv6.DecodeLayers(data[packetOffset:], &p.packet.Layers)
-// 	default:
-// 		slog.Info("Cant parse packet of this type %d", pdn.PktmonHeader.Metadata.PacketType)
-
-// 		err = p.packet.decLayerL3Dev.IPv4.DecodeLayers(data[packetOffset:], &p.packet.Layers)
-// 		p.packet.decLayerL3Dev
-// 	}
-// 	return err
-// }
-
 // Decode decodes the data from 'data' into 'decoded'
 func (p *Parser) decode(data []byte, decoded *pb.Flow) error {
 	if len(data) == 0 {
@@ -226,10 +221,6 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error {
 
 		// Fill relevant fields for dropNotify from pktmonNotify struct
 		dn = &DropNotify{}
-		dn.Type = monitorAPI.MessageTypeDrop
-		dn.Version = pdn.VersionHeader.Version
-		dn.OrigLen = pdn.PktmonHeader.PacketDescriptor.PacketOriginalLength
-		dn.CapLen = uint16(min(uint32(maxCapLength), uint32(dn.OrigLen)))
 
 		eventSubType = pdn.PktmonHeader.Metadata.DropReason
 		if offset > uint(MaxInt) {
@@ -252,20 +243,13 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error {
 	// https://github.com/google/gopacket/issues/846
 	// TODO: reconsider this check if the issue is fixed upstream
 	if len(data[packetOffset:]) > 0 {
-		var isL3Device, isIPv6 bool
-		if (tn != nil && tn.IsL3Device()) || (dn != nil && dn.IsL3Device()) {
-			isL3Device = true
-		}
-		if tn != nil && tn.IsIPv6() || (dn != nil && dn.IsIPv6()) {
-			isIPv6 = true
-		}
 
 		var err error
-		if eventType == MessageTypePktmonDrop {
+		if pdn != nil {
 			switch pdn.PktmonHeader.Metadata.PacketType {
-			case 1:
+			case uint16(PktMonPayloadEthernet):
 				err = p.packet.decLayerL2Dev.DecodeLayers(data[packetOffset:], &p.packet.Layers)
-			case 3:
+			case uint16(PktMonPayloadIP):
 				switch data[packetOffset] >> 4 {
 				case 0x4:
 					err = p.packet.decLayerL3Dev.IPv4.DecodeLayers(data[packetOffset:], &p.packet.Layers)
@@ -278,6 +262,13 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error {
 				return fmt.Errorf("decode layers failed for unsupported packet type %d, data: %v", pdn.PktmonHeader.Metadata.PacketType, data[packetOffset:])
 			}
 		} else {
+			var isL3Device, isIPv6 bool
+			if (tn != nil && tn.IsL3Device()) || (dn != nil && dn.IsL3Device()) {
+				isL3Device = true
+			}
+			if tn != nil && tn.IsIPv6() || (dn != nil && dn.IsIPv6()) {
+				isIPv6 = true
+			}
 			switch {
 			case !isL3Device:
 				err = p.packet.decLayerL2Dev.DecodeLayers(data[packetOffset:], &p.packet.Layers)
@@ -329,10 +320,10 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error {
 	srcEndpoint := p.epResolver.ResolveEndpoint(srcIP, srcLabelID, datapathContext)
 	dstEndpoint := p.epResolver.ResolveEndpoint(decodedpacket.DestinationIP, dstLabelID, datapathContext)
 
-	decoded.Verdict = decodeVerdict(dn, tn)
+	decoded.Verdict = decodeVerdict(dn, tn, pdn)
 	decoded.AuthType = authType
 	//nolint:staticcheck // SA1019 - temporary assignment for backward compatibility
-	decoded.DropReason = decodeDropReason(dn)
+	decoded.DropReason = decodeDropReason(dn, pdn)
 	//nolint:staticcheck // SA1019 - temporary assignment for backward compatibility
 	dropReason := decoded.GetDropReason()
 	if dropReason > math.MaxInt32 {
@@ -420,9 +411,9 @@ func decodeLayers(packet *packet) *DecodedPacket {
 	}
 }
 
-func decodeVerdict(dn *DropNotify, tn *TraceNotify) pb.Verdict {
+func decodeVerdict(dn *DropNotify, tn *TraceNotify, pdn *PktmonDropNotify) pb.Verdict {
 	switch {
-	case dn != nil:
+	case dn != nil || pdn != nil:
 		return pb.Verdict_DROPPED
 	case tn != nil:
 		return pb.Verdict_FORWARDED
@@ -430,9 +421,12 @@ func decodeVerdict(dn *DropNotify, tn *TraceNotify) pb.Verdict {
 	return pb.Verdict_VERDICT_UNKNOWN
 }
 
-func decodeDropReason(dn *DropNotify) uint32 {
+func decodeDropReason(dn *DropNotify, pdn *PktmonDropNotify) uint32 {
 	if dn != nil {
 		return uint32(dn.SubType)
+	}
+	if pdn != nil {
+		return uint32(pdn.PktmonHeader.Metadata.DropReason)
 	}
 	return 0
 }
