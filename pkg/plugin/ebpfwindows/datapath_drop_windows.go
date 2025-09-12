@@ -57,43 +57,43 @@ type DropNotify struct {
 }
 
 type NetEventDataHeader struct {
-	Type    uint8  // uint8_t type
-	Version uint16 // uint16_t version
+	Type    uint8
+	Version uint16
 }
 
 type PktmonEvtStreamPacketDescriptor struct {
-	PacketOriginalLength uint32 // uint32_t packet_original_length
-	PacketLoggedLength   uint32 // uint32_t packet_logged_length
-	PacketMetadataLength uint32 // uint32_t packet_metadata_length
+	PacketOriginalLength uint32
+	PacketLoggedLength   uint32
+	PacketMetadataLength uint32
 }
 
 type PktmonEvtStreamMetadata struct {
-	PktGroupID      uint64 // uint64_t pkt_groupid
-	PktCount        uint16 // uint16_t pkt_count
-	AppearanceCount uint16 // uint16_t appearance_count
-	DirectionName   uint16 // uint16_t direction_name
-	PacketType      uint16 // uint16_t packet_type
-	ComponentID     uint16 // uint16_t component_id
-	EdgeID          uint16 // uint16_t edge_id
-	FilterID        uint16 // uint16_t filter_id
-	DropReason      uint32 // uint32_t drop_reason
-	DropLocation    uint32 // uint32_t drop_location
-	ProcNum         uint16 // uint16_t proc_num
-	Timestamp       uint64 // uint64_t timestamp
+	PktGroupID      uint64
+	PktCount        uint16
+	AppearanceCount uint16
+	DirectionName   uint16
+	PacketType      uint16
+	ComponentID     uint16
+	EdgeID          uint16
+	FilterID        uint16
+	DropReason      uint32
+	DropLocation    uint32
+	ProcNum         uint16
+	Timestamp       uint64
 }
 
 type PktmonEvtStreamPacketHeader struct {
-	EventID          uint8                           // uint8_t eventid
-	PacketDescriptor PktmonEvtStreamPacketDescriptor // pktmon_evt_stream_packet_descriptor
-	Metadata         PktmonEvtStreamMetadata         // pktmon_evt_stream_metadata
+	EventID          uint8
+	PacketDescriptor PktmonEvtStreamPacketDescriptor
+	Metadata         PktmonEvtStreamMetadata
 }
 
 type PktmonDropNotify struct {
-	VersionHeader NetEventDataHeader          // netevent_data_header_t version_header
-	PktmonHeader  PktmonEvtStreamPacketHeader // pktmon_evt_stream_packet_header pktmon_header
+	VersionHeader NetEventDataHeader
+	PktmonHeader  PktmonEvtStreamPacketHeader
 }
 
-// DecodeDropNotify will decode 'data' into the provided DropNotify structure
+// DecodePktmonDrop will decode 'data' into the provided DropNotify structure
 func DecodePktmonDrop(data []byte, pdn *PktmonDropNotify) error {
 	if err := pdn.decodePktmonDrop(data); err != nil {
 		return err
@@ -118,7 +118,7 @@ func (n *PktmonDropNotify) decodePktmonDrop(data []byte) error {
 		return fmt.Errorf("%w: Unrecognized drop event version %d", errInvalidPktmonDropNotifyVersion, version)
 	}
 
-	// Decode logic for version >= v0/v1.
+	// Decode logic for version = v1.
 	n.VersionHeader.Type = data[0]
 	n.VersionHeader.Version = version
 	n.PktmonHeader.EventID = data[4]
