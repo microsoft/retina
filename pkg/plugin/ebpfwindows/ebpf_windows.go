@@ -307,6 +307,34 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 		}
 		utils.AddRetinaMetadata(fl, meta)
 		p.enricher.Write(e)
+
+	case MessageTypePktmonDrop:
+		if size <= uint32(unsafe.Sizeof(PktmonDropNotify{})) {
+			return fmt.Errorf("%w: %d", errInvalidDropNotifySize, size)
+		}
+
+		e, err := p.parser.Decode(&observer.MonitorEvent{
+			Payload: &observer.PerfEvent{
+				Data: perfData,
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("could not convert pktmon dropnotify event to flow: %w", err)
+		}
+		meta := &utils.RetinaMetadata{}
+		utils.AddPacketSize(meta, size-uint32(unsafe.Sizeof(DropNotify{})))
+		fl := e.GetFlow()
+		if fl == nil {
+			return fmt.Errorf("%w", errNilDropNotifyFlow)
+		}
+		if fl.GetEventType() == nil {
+			return fmt.Errorf("%w", errNilDropNotifyEvent)
+		}
+		// Set the drop reason.
+		eventType := fl.GetEventType().GetSubType()
+		meta.DropReason = utils.DropReason(eventType)
+		utils.AddRetinaMetadata(fl, meta)
+		p.enricher.Write(e)
 	}
 	return nil
 }

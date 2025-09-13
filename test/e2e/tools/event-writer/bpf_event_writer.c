@@ -40,6 +40,14 @@ struct {
 
 SEC(".maps")
 struct {
+    __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+    __type(key, uint32_t);
+    __type(value, struct pktmon_notify);
+    __uint(max_entries, 1);
+} pktmon_buffer;
+
+SEC(".maps")
+struct {
     __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
     __uint(pinning, LIBBPF_PIN_BY_NAME);
     __uint(max_entries, 64 * 1024);
@@ -119,6 +127,15 @@ void create_drop_event(struct drop_notify* drp_elm)
     drp_elm->file		= 0;
     drp_elm->ext_error	= 0;
 	drp_elm->ifindex	= 0;
+}
+
+void create_pktmon_drop_event(pktmon_notify_t* pktmon_drp_elm)
+{
+    memset(pktmon_drp_elm, 0, sizeof(pktmon_notify_t));
+    pktmon_drp_elm->version_header.type       = PKTMON_NOTIFY_DROP;
+    pktmon_drp_elm->version_header.version    = 1;
+    pktmon_drp_elm->pktmon_header.metadata.drop_reason = 7;
+    pktmon_drp_elm->pktmon_header.metadata.packet_type = 1;
 }
 
 int
@@ -239,8 +256,7 @@ event_writer(xdp_md_t* ctx) {
         memcpy(trc_elm->data, ctx->data, size_to_copy);
         bpf_perf_event_output(ctx, &cilium_events, EBPF_MAP_FLAG_CURRENT_CPU , trc_elm, sizeof(struct trace_notify));
     }
-
-    if (flt_evttype == CILIUM_NOTIFY_DROP) {
+    else if (flt_evttype == CILIUM_NOTIFY_DROP) {
         struct drop_notify* drp_elm;
 
         //Create a Mock Drop Event
@@ -253,7 +269,28 @@ event_writer(xdp_md_t* ctx) {
         memset(drp_elm->data, 0, sizeof(drp_elm->data));
         memcpy(drp_elm->data, ctx->data, size_to_copy);
         bpf_perf_event_output(ctx, &cilium_events, EBPF_MAP_FLAG_CURRENT_CPU , drp_elm, sizeof(struct drop_notify));
+    }
+    else if (flt_evttype == PKTMON_NOTIFY_DROP) {
+        struct pktmon_notify* pkt_drp_elm;
 
+        uint64_t pktmon_size = sizeof(struct pktmon_notify);
+        uint64_t drop_size = sizeof(struct drop_notify);
+
+        //Create a Mock Drop Event
+        pkt_drp_elm = (struct pktmon_notify *) bpf_map_lookup_elem(&pktmon_buffer, &buf_key);
+        if (pkt_drp_elm == NULL) {
+            return XDP_PASS;
+        }
+        reason = 130;
+        create_pktmon_drop_event(pkt_drp_elm);
+        memset(pkt_drp_elm->data, 0, sizeof(pkt_drp_elm->data));
+        memcpy(pkt_drp_elm->data, ctx->data, size_to_copy);
+
+        bpf_printk("PKTMON_NOTIFY_DROP event: reason=%d, size_to_copy=%d \n", reason, size_to_copy);
+        bpf_printk("PKTMON_NOTIFY_DROP sizes :  pktmon_struct_size=%llu, drop_struct_size=%llu \n", pktmon_size, drop_size);
+
+        bpf_perf_event_output(ctx, &cilium_events, EBPF_MAP_FLAG_CURRENT_CPU , pkt_drp_elm, sizeof(struct pktmon_notify));
+        
         // Create Windows specific drop event with hardcoded reason code
         {
             struct metrics_value *win_entry, win_new_entry = {};
@@ -276,7 +313,6 @@ event_writer(xdp_md_t* ctx) {
             }
         }
     }
-
     update_metrics(size_to_copy, METRIC_INGRESS, reason, 0, 0);
 
     return XDP_PASS;
