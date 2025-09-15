@@ -393,7 +393,7 @@ func (v *ValidateWinBpfMetric) verifyAdvancedMetrics(nonHpcIpAddr, promOutput st
 		"ip":            "23.192.228.84",
 		"namespace":     "",
 		"podname":       "",
-		"reason":        "6",
+		"reason":        "Reason_LbNoBackend",
 		"workload_kind": "unknown",
 		"workload_name": "unknown",
 	}
@@ -407,7 +407,7 @@ func (v *ValidateWinBpfMetric) verifyAdvancedMetrics(nonHpcIpAddr, promOutput st
 		"ip":            "23.192.228.84",
 		"namespace":     "",
 		"podname":       "",
-		"reason":        "6",
+		"reason":        "Reason_LbNoBackend",
 		"workload_kind": "unknown",
 		"workload_name": "unknown",
 	}
@@ -466,7 +466,7 @@ func (v *ValidateWinBpfMetric) verifyAdvancedMetrics(nonHpcIpAddr, promOutput st
 		"ip":            nonHpcIpAddr,
 		"namespace":     v.NonHpcAppNamespace,
 		"podname":       v.NonHpcPodName,
-		"reason":        "6",
+		"reason":        "Reason_LbNoBackend",
 		"workload_kind": "unknown",
 		"workload_name": "unknown",
 	}
@@ -480,7 +480,7 @@ func (v *ValidateWinBpfMetric) verifyAdvancedMetrics(nonHpcIpAddr, promOutput st
 		"ip":            nonHpcIpAddr,
 		"namespace":     v.NonHpcAppNamespace,
 		"podname":       v.NonHpcPodName,
-		"reason":        "6",
+		"reason":        "Reason_LbNoBackend",
 		"workload_kind": "unknown",
 		"workload_name": "unknown",
 	}

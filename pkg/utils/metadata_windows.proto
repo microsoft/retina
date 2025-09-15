@@ -24,8 +24,97 @@ enum DNSType {
 }
 
 enum DropReason {
-    Drop_Invalid                      = 0;
-    Drop_Unknown                      = 0x40000000;
+    //
+    // Cilium drop reasons
+    //
+    Reason_Success                    = 0;
+    Reason_InvalidPacket              = 2;
+    Reason_PlainText                  = 3;
+    Reason_InterfaceDecrypted         = 4;
+    Reason_LbNoBackendSlot            = 5;
+    Reason_LbNoBackend                = 6;
+    Reason_LbReverseNatUpdate         = 7;
+    Resaon_LbReverseNatStale          = 8;
+    Reason_FragmentedPacket           = 9;
+    Reason_FragmentedPacketUpdated    = 10;
+    Reason_MissedCustomCall           = 11;
+    DropReason_InvalidSIP             = 132;
+    DropReason_Policy                 = 133;
+    DropReason_Invalid                = 134;
+    DropReason_CTInvalidHdr           = 135;
+    DropReason_FragNeeded             = 136;
+    DropReason_CTUnknownProto         = 137;
+    DropReason_UnknownL3              = 138;
+    DropReason_MissedTailCall         = 139;
+    DropReason_WriteError             = 140;
+    DropReason_UnknownL4              = 141;
+    DropReason_UnknownICMPCode        = 142;
+    DropReason_UnknownICMPType        = 143;
+    DropReason_UnknownICMP6Code       = 144;
+    DropReason_UnknownICMP6Type       = 145;
+    DropReason_UnknownICMP6Type_2     = 146;
+    DropReason_NoTunnelKey            = 147;
+    DropReason_Unknown_1              = 148;
+    DropReason_Unknown_2              = 149;
+    DropReason_UnknownTarget          = 150;
+    DropReason_Unroutable             = 151;
+    DropReason_Unknown_3              = 152;
+    DropReason_CSUM_L3                = 153;
+    DropReason_CSUM_L4                = 154;
+    DropReason_CTCreateFailed         = 155;
+    DropReason_InvalidExthdr          = 156;
+    DropReason_FragNoSupport          = 157;
+    DropReason_NoService              = 158;
+    DropReason_UnsuppServiceProto     = 159;
+    DropReason_NoTunnelEndpoint       = 160;
+    DropReason_NAT46X64Disabled       = 161;
+    DropReason_EDTHorizon             = 162;
+    DropReason_UnknownCT              = 163;
+    DropReason_HostUnreachable        = 164;
+    DropReason_NoConfig               = 165;
+    DropReason_UnsupportedL2          = 166;
+    DropReason_NatNoMapping           = 167;
+    DropReason_NatUnsuppProto         = 168;
+    DropReason_NoFIB                  = 169;
+    DropReason_EncapProhibited        = 170;
+    DropReason_InvalidIdentity        = 171;
+    DropReason_UnknownSender          = 172;
+    DropReason_NatNotNeeded           = 173;
+    DropReason_IsClusterIP            = 174;
+    DropReason_FragNotFound           = 175;
+    DropReason_ForbiddenICMP6         = 176;
+    DropReason_NotInSrcRange          = 177;
+    DropReason_ProxyLookupFailed      = 178;
+    DropReason_ProxySetFailed         = 179;
+    DropReason_ProxyUnknownProto      = 180;
+    DropReason_PolicyDeny             = 181;
+    DropReason_VlanFiltered           = 182;
+    DropReason_InvalidVNI             = 183;
+    DropReason_InvalidTCBuffer        = 184;
+    DropReason_NoSID                  = 185;
+    DropReason_MissingSRv6State       = 186;
+    DropReason_NAT46                  = 187;
+    DropReason_NAT64                  = 188;
+    DropReason_PolicyAuthRequired     = 189;
+    DropReason_CTNoMapFound           = 190;
+    DropReason_SNATNoMapFound         = 191;
+    DropReason_InvalidClusterID       = 192;
+    DropReason_DSR_ENCAP_UNSUPP_PROTO = 193;
+    DropReason_NoEgressGateway        = 194;
+    DropReason_UnencryptedTraffic     = 195;
+    DropReason_TTLExceeded            = 196;
+    DropReason_NoNodeID               = 197;
+    DropReason_RateLimited            = 198;
+    DropReason_IGMPHandled            = 199;
+    DropReason_IGMPSubscribed         = 200;
+    DropReason_MulticastHandled       = 201;
+    DropReason_HostNotReady           = 202;
+    DropReason_EpNotReady             = 203;
+    DropReason_PacketMonitor          = 220;
+
+    //
+    // Matching VMS_PACKET_DROP_REASON
+    //
     Drop_InvalidData                  = 0x40000001;
     Drop_InvalidPacket                = 0x40000002;
     Drop_Resources                    = 0x40000003;

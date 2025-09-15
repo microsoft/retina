@@ -7,12 +7,11 @@
 package utils
 
 import (
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
-
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -74,8 +73,92 @@ func (DNSType) EnumDescriptor() ([]byte, []int) {
 type DropReason int32
 
 const (
-	DropReason_Drop_Invalid                     DropReason = 0
-	DropReason_Drop_Unknown                     DropReason = 1073741824
+	// Cilium drop reasons
+	DropReason_Reason_Success                    DropReason = 0
+	DropReason_Reason_InvalidPacket              DropReason = 2
+	DropReason_Reason_PlainText                  DropReason = 3
+	DropReason_Reason_InterfaceDecrypted         DropReason = 4
+	DropReason_Reason_LbNoBackendSlot            DropReason = 5
+	DropReason_Reason_LbNoBackend                DropReason = 6
+	DropReason_Reason_LbReverseNatUpdate         DropReason = 7
+	DropReason_Resaon_LbReverseNatStale          DropReason = 8
+	DropReason_Reason_FragmentedPacket           DropReason = 9
+	DropReason_Reason_FragmentedPacketUpdated    DropReason = 10
+	DropReason_Reason_MissedCustomCall           DropReason = 11
+	DropReason_DropReason_InvalidSIP             DropReason = 132
+	DropReason_DropReason_Policy                 DropReason = 133
+	DropReason_DropReason_Invalid                DropReason = 134
+	DropReason_DropReason_CTInvalidHdr           DropReason = 135
+	DropReason_DropReason_FragNeeded             DropReason = 136
+	DropReason_DropReason_CTUnknownProto         DropReason = 137
+	DropReason_DropReason_UnknownL3              DropReason = 138
+	DropReason_DropReason_MissedTailCall         DropReason = 139
+	DropReason_DropReason_WriteError             DropReason = 140
+	DropReason_DropReason_UnknownL4              DropReason = 141
+	DropReason_DropReason_UnknownICMPCode        DropReason = 142
+	DropReason_DropReason_UnknownICMPType        DropReason = 143
+	DropReason_DropReason_UnknownICMP6Code       DropReason = 144
+	DropReason_DropReason_UnknownICMP6Type       DropReason = 145
+	DropReason_DropReason_UnknownICMP6Type_2     DropReason = 146
+	DropReason_DropReason_NoTunnelKey            DropReason = 147
+	DropReason_DropReason_Unknown_1              DropReason = 148
+	DropReason_DropReason_Unknown_2              DropReason = 149
+	DropReason_DropReason_UnknownTarget          DropReason = 150
+	DropReason_DropReason_Unroutable             DropReason = 151
+	DropReason_DropReason_Unknown_3              DropReason = 152
+	DropReason_DropReason_CSUM_L3                DropReason = 153
+	DropReason_DropReason_CSUM_L4                DropReason = 154
+	DropReason_DropReason_CTCreateFailed         DropReason = 155
+	DropReason_DropReason_InvalidExthdr          DropReason = 156
+	DropReason_DropReason_FragNoSupport          DropReason = 157
+	DropReason_DropReason_NoService              DropReason = 158
+	DropReason_DropReason_UnsuppServiceProto     DropReason = 159
+	DropReason_DropReason_NoTunnelEndpoint       DropReason = 160
+	DropReason_DropReason_NAT46X64Disabled       DropReason = 161
+	DropReason_DropReason_EDTHorizon             DropReason = 162
+	DropReason_DropReason_UnknownCT              DropReason = 163
+	DropReason_DropReason_HostUnreachable        DropReason = 164
+	DropReason_DropReason_NoConfig               DropReason = 165
+	DropReason_DropReason_UnsupportedL2          DropReason = 166
+	DropReason_DropReason_NatNoMapping           DropReason = 167
+	DropReason_DropReason_NatUnsuppProto         DropReason = 168
+	DropReason_DropReason_NoFIB                  DropReason = 169
+	DropReason_DropReason_EncapProhibited        DropReason = 170
+	DropReason_DropReason_InvalidIdentity        DropReason = 171
+	DropReason_DropReason_UnknownSender          DropReason = 172
+	DropReason_DropReason_NatNotNeeded           DropReason = 173
+	DropReason_DropReason_IsClusterIP            DropReason = 174
+	DropReason_DropReason_FragNotFound           DropReason = 175
+	DropReason_DropReason_ForbiddenICMP6         DropReason = 176
+	DropReason_DropReason_NotInSrcRange          DropReason = 177
+	DropReason_DropReason_ProxyLookupFailed      DropReason = 178
+	DropReason_DropReason_ProxySetFailed         DropReason = 179
+	DropReason_DropReason_ProxyUnknownProto      DropReason = 180
+	DropReason_DropReason_PolicyDeny             DropReason = 181
+	DropReason_DropReason_VlanFiltered           DropReason = 182
+	DropReason_DropReason_InvalidVNI             DropReason = 183
+	DropReason_DropReason_InvalidTCBuffer        DropReason = 184
+	DropReason_DropReason_NoSID                  DropReason = 185
+	DropReason_DropReason_MissingSRv6State       DropReason = 186
+	DropReason_DropReason_NAT46                  DropReason = 187
+	DropReason_DropReason_NAT64                  DropReason = 188
+	DropReason_DropReason_PolicyAuthRequired     DropReason = 189
+	DropReason_DropReason_CTNoMapFound           DropReason = 190
+	DropReason_DropReason_SNATNoMapFound         DropReason = 191
+	DropReason_DropReason_InvalidClusterID       DropReason = 192
+	DropReason_DropReason_DSR_ENCAP_UNSUPP_PROTO DropReason = 193
+	DropReason_DropReason_NoEgressGateway        DropReason = 194
+	DropReason_DropReason_UnencryptedTraffic     DropReason = 195
+	DropReason_DropReason_TTLExceeded            DropReason = 196
+	DropReason_DropReason_NoNodeID               DropReason = 197
+	DropReason_DropReason_RateLimited            DropReason = 198
+	DropReason_DropReason_IGMPHandled            DropReason = 199
+	DropReason_DropReason_IGMPSubscribed         DropReason = 200
+	DropReason_DropReason_MulticastHandled       DropReason = 201
+	DropReason_DropReason_HostNotReady           DropReason = 202
+	DropReason_DropReason_EpNotReady             DropReason = 203
+	DropReason_DropReason_PacketMonitor          DropReason = 220
+	// Matching VMS_PACKET_DROP_REASON
 	DropReason_Drop_InvalidData                 DropReason = 1073741825
 	DropReason_Drop_InvalidPacket               DropReason = 1073741826
 	DropReason_Drop_Resources                   DropReason = 1073741827
@@ -497,8 +580,90 @@ const (
 // Enum value maps for DropReason.
 var (
 	DropReason_name = map[int32]string{
-		0:          "Drop_Invalid",
-		1073741824: "Drop_Unknown",
+		0:          "Reason_Success",
+		2:          "Reason_InvalidPacket",
+		3:          "Reason_PlainText",
+		4:          "Reason_InterfaceDecrypted",
+		5:          "Reason_LbNoBackendSlot",
+		6:          "Reason_LbNoBackend",
+		7:          "Reason_LbReverseNatUpdate",
+		8:          "Resaon_LbReverseNatStale",
+		9:          "Reason_FragmentedPacket",
+		10:         "Reason_FragmentedPacketUpdated",
+		11:         "Reason_MissedCustomCall",
+		132:        "DropReason_InvalidSIP",
+		133:        "DropReason_Policy",
+		134:        "DropReason_Invalid",
+		135:        "DropReason_CTInvalidHdr",
+		136:        "DropReason_FragNeeded",
+		137:        "DropReason_CTUnknownProto",
+		138:        "DropReason_UnknownL3",
+		139:        "DropReason_MissedTailCall",
+		140:        "DropReason_WriteError",
+		141:        "DropReason_UnknownL4",
+		142:        "DropReason_UnknownICMPCode",
+		143:        "DropReason_UnknownICMPType",
+		144:        "DropReason_UnknownICMP6Code",
+		145:        "DropReason_UnknownICMP6Type",
+		146:        "DropReason_UnknownICMP6Type_2",
+		147:        "DropReason_NoTunnelKey",
+		148:        "DropReason_Unknown_1",
+		149:        "DropReason_Unknown_2",
+		150:        "DropReason_UnknownTarget",
+		151:        "DropReason_Unroutable",
+		152:        "DropReason_Unknown_3",
+		153:        "DropReason_CSUM_L3",
+		154:        "DropReason_CSUM_L4",
+		155:        "DropReason_CTCreateFailed",
+		156:        "DropReason_InvalidExthdr",
+		157:        "DropReason_FragNoSupport",
+		158:        "DropReason_NoService",
+		159:        "DropReason_UnsuppServiceProto",
+		160:        "DropReason_NoTunnelEndpoint",
+		161:        "DropReason_NAT46X64Disabled",
+		162:        "DropReason_EDTHorizon",
+		163:        "DropReason_UnknownCT",
+		164:        "DropReason_HostUnreachable",
+		165:        "DropReason_NoConfig",
+		166:        "DropReason_UnsupportedL2",
+		167:        "DropReason_NatNoMapping",
+		168:        "DropReason_NatUnsuppProto",
+		169:        "DropReason_NoFIB",
+		170:        "DropReason_EncapProhibited",
+		171:        "DropReason_InvalidIdentity",
+		172:        "DropReason_UnknownSender",
+		173:        "DropReason_NatNotNeeded",
+		174:        "DropReason_IsClusterIP",
+		175:        "DropReason_FragNotFound",
+		176:        "DropReason_ForbiddenICMP6",
+		177:        "DropReason_NotInSrcRange",
+		178:        "DropReason_ProxyLookupFailed",
+		179:        "DropReason_ProxySetFailed",
+		180:        "DropReason_ProxyUnknownProto",
+		181:        "DropReason_PolicyDeny",
+		182:        "DropReason_VlanFiltered",
+		183:        "DropReason_InvalidVNI",
+		184:        "DropReason_InvalidTCBuffer",
+		185:        "DropReason_NoSID",
+		186:        "DropReason_MissingSRv6State",
+		187:        "DropReason_NAT46",
+		188:        "DropReason_NAT64",
+		189:        "DropReason_PolicyAuthRequired",
+		190:        "DropReason_CTNoMapFound",
+		191:        "DropReason_SNATNoMapFound",
+		192:        "DropReason_InvalidClusterID",
+		193:        "DropReason_DSR_ENCAP_UNSUPP_PROTO",
+		194:        "DropReason_NoEgressGateway",
+		195:        "DropReason_UnencryptedTraffic",
+		196:        "DropReason_TTLExceeded",
+		197:        "DropReason_NoNodeID",
+		198:        "DropReason_RateLimited",
+		199:        "DropReason_IGMPHandled",
+		200:        "DropReason_IGMPSubscribed",
+		201:        "DropReason_MulticastHandled",
+		202:        "DropReason_HostNotReady",
+		203:        "DropReason_EpNotReady",
+		220:        "DropReason_PacketMonitor",
 		1073741825: "Drop_InvalidData",
 		1073741826: "Drop_InvalidPacket",
 		1073741827: "Drop_Resources",
@@ -903,8 +1068,90 @@ var (
 		1073745824: "Drop_Http_End",
 	}
 	DropReason_value = map[string]int32{
-		"Drop_Invalid":                                          0,
-		"Drop_Unknown":                                          1073741824,
+		"Reason_Success":                                        0,
+		"Reason_InvalidPacket":                                  2,
+		"Reason_PlainText":                                      3,
+		"Reason_InterfaceDecrypted":                             4,
+		"Reason_LbNoBackendSlot":                                5,
+		"Reason_LbNoBackend":                                    6,
+		"Reason_LbReverseNatUpdate":                             7,
+		"Resaon_LbReverseNatStale":                              8,
+		"Reason_FragmentedPacket":                               9,
+		"Reason_FragmentedPacketUpdated":                        10,
+		"Reason_MissedCustomCall":                               11,
+		"DropReason_InvalidSIP":                                 132,
+		"DropReason_Policy":                                     133,
+		"DropReason_Invalid":                                    134,
+		"DropReason_CTInvalidHdr":                               135,
+		"DropReason_FragNeeded":                                 136,
+		"DropReason_CTUnknownProto":                             137,
+		"DropReason_UnknownL3":                                  138,
+		"DropReason_MissedTailCall":                             139,
+		"DropReason_WriteError":                                 140,
+		"DropReason_UnknownL4":                                  141,
+		"DropReason_UnknownICMPCode":                            142,
+		"DropReason_UnknownICMPType":                            143,
+		"DropReason_UnknownICMP6Code":                           144,
+		"DropReason_UnknownICMP6Type":                           145,
+		"DropReason_UnknownICMP6Type_2":                         146,
+		"DropReason_NoTunnelKey":                                147,
+		"DropReason_Unknown_1":                                  148,
+		"DropReason_Unknown_2":                                  149,
+		"DropReason_UnknownTarget":                              150,
+		"DropReason_Unroutable":                                 151,
+		"DropReason_Unknown_3":                                  152,
+		"DropReason_CSUM_L3":                                    153,
+		"DropReason_CSUM_L4":                                    154,
+		"DropReason_CTCreateFailed":                             155,
+		"DropReason_InvalidExthdr":                              156,
+		"DropReason_FragNoSupport":                              157,
+		"DropReason_NoService":                                  158,
+		"DropReason_UnsuppServiceProto":                         159,
+		"DropReason_NoTunnelEndpoint":                           160,
+		"DropReason_NAT46X64Disabled":                           161,
+		"DropReason_EDTHorizon":                                 162,
+		"DropReason_UnknownCT":                                  163,
+		"DropReason_HostUnreachable":                            164,
+		"DropReason_NoConfig":                                   165,
+		"DropReason_UnsupportedL2":                              166,
+		"DropReason_NatNoMapping":                               167,
+		"DropReason_NatUnsuppProto":                             168,
+		"DropReason_NoFIB":                                      169,
+		"DropReason_EncapProhibited":                            170,
+		"DropReason_InvalidIdentity":                            171,
+		"DropReason_UnknownSender":                              172,
+		"DropReason_NatNotNeeded":                               173,
+		"DropReason_IsClusterIP":                                174,
+		"DropReason_FragNotFound":                               175,
+		"DropReason_ForbiddenICMP6":                             176,
+		"DropReason_NotInSrcRange":                              177,
+		"DropReason_ProxyLookupFailed":                          178,
+		"DropReason_ProxySetFailed":                             179,
+		"DropReason_ProxyUnknownProto":                          180,
+		"DropReason_PolicyDeny":                                 181,
+		"DropReason_VlanFiltered":                               182,
+		"DropReason_InvalidVNI":                                 183,
+		"DropReason_InvalidTCBuffer":                            184,
+		"DropReason_NoSID":                                      185,
+		"DropReason_MissingSRv6State":                           186,
+		"DropReason_NAT46":                                      187,
+		"DropReason_NAT64":                                      188,
+		"DropReason_PolicyAuthRequired":                         189,
+		"DropReason_CTNoMapFound":                               190,
+		"DropReason_SNATNoMapFound":                             191,
+		"DropReason_InvalidClusterID":                           192,
+		"DropReason_DSR_ENCAP_UNSUPP_PROTO":                     193,
+		"DropReason_NoEgressGateway":                            194,
+		"DropReason_UnencryptedTraffic":                         195,
+		"DropReason_TTLExceeded":                                196,
+		"DropReason_NoNodeID":                                   197,
+		"DropReason_RateLimited":                                198,
+		"DropReason_IGMPHandled":                                199,
+		"DropReason_IGMPSubscribed":                             200,
+		"DropReason_MulticastHandled":                           201,
+		"DropReason_HostNotReady":                               202,
+		"DropReason_EpNotReady":                                 203,
+		"DropReason_PacketMonitor":                              220,
 		"Drop_InvalidData":                                      1073741825,
 		"Drop_InvalidPacket":                                    1073741826,
 		"Drop_Resources":                                        1073741827,
@@ -1413,7 +1660,7 @@ func (x *RetinaMetadata) GetDropReason() DropReason {
 	if x != nil {
 		return x.DropReason
 	}
-	return DropReason_Drop_Invalid
+	return DropReason_Reason_Success
 }
 
 var File_metadata_windows_proto protoreflect.FileDescriptor
@@ -1431,11 +1678,94 @@ const file_metadata_windows_proto_rawDesc = "" +
 	"\aDNSType\x12\v\n" +
 	"\aUNKNOWN\x10\x00\x12\t\n" +
 	"\x05QUERY\x10\x01\x12\f\n" +
-	"\bRESPONSE\x10\x02*\xd2s\n" +
+	"\bRESPONSE\x10\x02*\xfb\x86\x01\n" +
 	"\n" +
-	"DropReason\x12\x10\n" +
-	"\fDrop_Invalid\x10\x00\x12\x14\n" +
-	"\fDrop_Unknown\x10\x80\x80\x80\x80\x04\x12\x18\n" +
+	"DropReason\x12\x12\n" +
+	"\x0eReason_Success\x10\x00\x12\x18\n" +
+	"\x14Reason_InvalidPacket\x10\x02\x12\x14\n" +
+	"\x10Reason_PlainText\x10\x03\x12\x1d\n" +
+	"\x19Reason_InterfaceDecrypted\x10\x04\x12\x1a\n" +
+	"\x16Reason_LbNoBackendSlot\x10\x05\x12\x16\n" +
+	"\x12Reason_LbNoBackend\x10\x06\x12\x1d\n" +
+	"\x19Reason_LbReverseNatUpdate\x10\a\x12\x1c\n" +
+	"\x18Resaon_LbReverseNatStale\x10\b\x12\x1b\n" +
+	"\x17Reason_FragmentedPacket\x10\t\x12\"\n" +
+	"\x1eReason_FragmentedPacketUpdated\x10\n" +
+	"\x12\x1b\n" +
+	"\x17Reason_MissedCustomCall\x10\v\x12\x1a\n" +
+	"\x15DropReason_InvalidSIP\x10\x84\x01\x12\x16\n" +
+	"\x11DropReason_Policy\x10\x85\x01\x12\x17\n" +
+	"\x12DropReason_Invalid\x10\x86\x01\x12\x1c\n" +
+	"\x17DropReason_CTInvalidHdr\x10\x87\x01\x12\x1a\n" +
+	"\x15DropReason_FragNeeded\x10\x88\x01\x12\x1e\n" +
+	"\x19DropReason_CTUnknownProto\x10\x89\x01\x12\x19\n" +
+	"\x14DropReason_UnknownL3\x10\x8a\x01\x12\x1e\n" +
+	"\x19DropReason_MissedTailCall\x10\x8b\x01\x12\x1a\n" +
+	"\x15DropReason_WriteError\x10\x8c\x01\x12\x19\n" +
+	"\x14DropReason_UnknownL4\x10\x8d\x01\x12\x1f\n" +
+	"\x1aDropReason_UnknownICMPCode\x10\x8e\x01\x12\x1f\n" +
+	"\x1aDropReason_UnknownICMPType\x10\x8f\x01\x12 \n" +
+	"\x1bDropReason_UnknownICMP6Code\x10\x90\x01\x12 \n" +
+	"\x1bDropReason_UnknownICMP6Type\x10\x91\x01\x12\"\n" +
+	"\x1dDropReason_UnknownICMP6Type_2\x10\x92\x01\x12\x1b\n" +
+	"\x16DropReason_NoTunnelKey\x10\x93\x01\x12\x19\n" +
+	"\x14DropReason_Unknown_1\x10\x94\x01\x12\x19\n" +
+	"\x14DropReason_Unknown_2\x10\x95\x01\x12\x1d\n" +
+	"\x18DropReason_UnknownTarget\x10\x96\x01\x12\x1a\n" +
+	"\x15DropReason_Unroutable\x10\x97\x01\x12\x19\n" +
+	"\x14DropReason_Unknown_3\x10\x98\x01\x12\x17\n" +
+	"\x12DropReason_CSUM_L3\x10\x99\x01\x12\x17\n" +
+	"\x12DropReason_CSUM_L4\x10\x9a\x01\x12\x1e\n" +
+	"\x19DropReason_CTCreateFailed\x10\x9b\x01\x12\x1d\n" +
+	"\x18DropReason_InvalidExthdr\x10\x9c\x01\x12\x1d\n" +
+	"\x18DropReason_FragNoSupport\x10\x9d\x01\x12\x19\n" +
+	"\x14DropReason_NoService\x10\x9e\x01\x12\"\n" +
+	"\x1dDropReason_UnsuppServiceProto\x10\x9f\x01\x12 \n" +
+	"\x1bDropReason_NoTunnelEndpoint\x10\xa0\x01\x12 \n" +
+	"\x1bDropReason_NAT46X64Disabled\x10\xa1\x01\x12\x1a\n" +
+	"\x15DropReason_EDTHorizon\x10\xa2\x01\x12\x19\n" +
+	"\x14DropReason_UnknownCT\x10\xa3\x01\x12\x1f\n" +
+	"\x1aDropReason_HostUnreachable\x10\xa4\x01\x12\x18\n" +
+	"\x13DropReason_NoConfig\x10\xa5\x01\x12\x1d\n" +
+	"\x18DropReason_UnsupportedL2\x10\xa6\x01\x12\x1c\n" +
+	"\x17DropReason_NatNoMapping\x10\xa7\x01\x12\x1e\n" +
+	"\x19DropReason_NatUnsuppProto\x10\xa8\x01\x12\x15\n" +
+	"\x10DropReason_NoFIB\x10\xa9\x01\x12\x1f\n" +
+	"\x1aDropReason_EncapProhibited\x10\xaa\x01\x12\x1f\n" +
+	"\x1aDropReason_InvalidIdentity\x10\xab\x01\x12\x1d\n" +
+	"\x18DropReason_UnknownSender\x10\xac\x01\x12\x1c\n" +
+	"\x17DropReason_NatNotNeeded\x10\xad\x01\x12\x1b\n" +
+	"\x16DropReason_IsClusterIP\x10\xae\x01\x12\x1c\n" +
+	"\x17DropReason_FragNotFound\x10\xaf\x01\x12\x1e\n" +
+	"\x19DropReason_ForbiddenICMP6\x10\xb0\x01\x12\x1d\n" +
+	"\x18DropReason_NotInSrcRange\x10\xb1\x01\x12!\n" +
+	"\x1cDropReason_ProxyLookupFailed\x10\xb2\x01\x12\x1e\n" +
+	"\x19DropReason_ProxySetFailed\x10\xb3\x01\x12!\n" +
+	"\x1cDropReason_ProxyUnknownProto\x10\xb4\x01\x12\x1a\n" +
+	"\x15DropReason_PolicyDeny\x10\xb5\x01\x12\x1c\n" +
+	"\x17DropReason_VlanFiltered\x10\xb6\x01\x12\x1a\n" +
+	"\x15DropReason_InvalidVNI\x10\xb7\x01\x12\x1f\n" +
+	"\x1aDropReason_InvalidTCBuffer\x10\xb8\x01\x12\x15\n" +
+	"\x10DropReason_NoSID\x10\xb9\x01\x12 \n" +
+	"\x1bDropReason_MissingSRv6State\x10\xba\x01\x12\x15\n" +
+	"\x10DropReason_NAT46\x10\xbb\x01\x12\x15\n" +
+	"\x10DropReason_NAT64\x10\xbc\x01\x12\"\n" +
+	"\x1dDropReason_PolicyAuthRequired\x10\xbd\x01\x12\x1c\n" +
+	"\x17DropReason_CTNoMapFound\x10\xbe\x01\x12\x1e\n" +
+	"\x19DropReason_SNATNoMapFound\x10\xbf\x01\x12 \n" +
+	"\x1bDropReason_InvalidClusterID\x10\xc0\x01\x12&\n" +
+	"!DropReason_DSR_ENCAP_UNSUPP_PROTO\x10\xc1\x01\x12\x1f\n" +
+	"\x1aDropReason_NoEgressGateway\x10\xc2\x01\x12\"\n" +
+	"\x1dDropReason_UnencryptedTraffic\x10\xc3\x01\x12\x1b\n" +
+	"\x16DropReason_TTLExceeded\x10\xc4\x01\x12\x18\n" +
+	"\x13DropReason_NoNodeID\x10\xc5\x01\x12\x1b\n" +
+	"\x16DropReason_RateLimited\x10\xc6\x01\x12\x1b\n" +
+	"\x16DropReason_IGMPHandled\x10\xc7\x01\x12\x1e\n" +
+	"\x19DropReason_IGMPSubscribed\x10\xc8\x01\x12 \n" +
+	"\x1bDropReason_MulticastHandled\x10\xc9\x01\x12\x1c\n" +
+	"\x17DropReason_HostNotReady\x10\xca\x01\x12\x1a\n" +
+	"\x15DropReason_EpNotReady\x10\xcb\x01\x12\x1d\n" +
+	"\x18DropReason_PacketMonitor\x10\xdc\x01\x12\x18\n" +
 	"\x10Drop_InvalidData\x10\x81\x80\x80\x80\x04\x12\x1a\n" +
 	"\x12Drop_InvalidPacket\x10\x82\x80\x80\x80\x04\x12\x16\n" +
 	"\x0eDrop_Resources\x10\x83\x80\x80\x80\x04\x12\x15\n" +
