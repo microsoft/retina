@@ -1,6 +1,6 @@
 module github.com/microsoft/retina
 
-go 1.24.3
+go 1.24.6
 
 require (
 	github.com/go-chi/chi/v5 v5.2.2
@@ -458,7 +458,7 @@ require (
 	github.com/go-toolsmith/astp v1.1.0 // indirect
 	github.com/go-toolsmith/strparse v1.1.0 // indirect
 	github.com/go-toolsmith/typep v1.1.0 // indirect
-	github.com/go-viper/mapstructure/v2 v2.3.0 // indirect
+	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/go-xmlfmt/xmlfmt v1.1.3 // indirect
 	github.com/gobuffalo/flect v1.0.3 // indirect
 	github.com/gofrs/flock v0.12.1 // indirect
