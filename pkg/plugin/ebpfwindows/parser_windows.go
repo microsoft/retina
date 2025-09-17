@@ -219,6 +219,9 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error {
 		}
 		offset = pdn.DataOffset()
 
+		// Second highest bit is set for pktmon drop reasons to avoid overlap with cilium drop reasons.
+		// Note: The highest bit cannot be used because the protoc compiler gives an "integer out of range" error
+		// when compiling proto files with enum values that have the highest bit set.
 		eventSubType = pdn.PktmonHeader.Metadata.DropReason | (1 << 30)
 		if offset > uint(MaxInt) {
 			return fmt.Errorf("%w: %d", errDataOffsetTooLarge, offset)
