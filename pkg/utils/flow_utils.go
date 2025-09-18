@@ -133,6 +133,29 @@ func AddRetinaMetadata(f *flow.Flow, meta *RetinaMetadata) {
 	f.Extensions = ext
 }
 
+// AddHNSStats adds the HNS stats data to the flow's extension field
+func AddHNSMetadata(f *flow.Flow, hnsStats *HNSStatsMetadata) {
+	ext, _ := anypb.New(hnsStats)
+	f.Extensions = ext
+}
+
+func AddCounters(hnsMetadata *HNSStatsMetadata, endpointStats *EndpointStats, vfpStats *VfpPortStatsData) {
+	if hnsMetadata == nil {
+		return
+	}
+	hnsMetadata.EndpointStats = endpointStats
+	hnsMetadata.VfpPortStatsData = vfpStats
+}
+
+func GetHNSMetadata(f *flow.Flow) *HNSStatsMetadata {
+	if f.GetExtensions() == nil {
+		return nil
+	}
+	k := &HNSStatsMetadata{}
+	f.GetExtensions().UnmarshalTo(k) //nolint:errcheck // ignore errors
+	return k
+}
+
 func AddTCPFlags(f *flow.Flow, syn, ack, fin, rst, psh, urg, ece, cwr, ns uint16) {
 	if f.GetL4().GetTCP() == nil {
 		return
