@@ -224,6 +224,43 @@ func (v *ValidateWinBpfMetric) generateDropEvents() error {
 	return nil
 }
 
+func (v *ValidateWinBpfMetric) generatePktmonDropEvents() error {
+	slog.Info("Generating Drop Events")
+	nonHpcLabelSelector := fmt.Sprintf("app=%s", v.NonHpcAppName)
+	ebpfLabelSelector := fmt.Sprintf("name=%s", v.EbpfXdpDeamonSetName)
+
+	output, err := kubernetes.ExecCommandInWinPod(
+		v.KubeConfigFilePath,
+		fmt.Sprintf("C:\\event-writer-helper.bat EventWriter-SetFilter -event 100 -srcIP %s", TestExternalIpAddress),
+		v.EbpfXdpDeamonSetNamespace,
+		ebpfLabelSelector,
+		true)
+
+	if err != nil {
+		return err
+	}
+
+	if strings.Contains(output, "failed") || strings.Contains(output, "error") || strings.Contains(output, "exiting") {
+		return fmt.Errorf("failed to start event writer")
+	}
+
+	numcurls := 10
+	for numcurls > 0 {
+		_, err = kubernetes.ExecCommandInWinPod(
+			v.KubeConfigFilePath,
+			fmt.Sprintf("C:\\event-writer-helper.bat EventWriter-Curl %s", TestExternalIpAddress),
+			v.NonHpcAppNamespace,
+			nonHpcLabelSelector,
+			false)
+		if err != nil {
+			return err
+		}
+		numcurls--
+	}
+
+	return nil
+}
+
 func (v *ValidateWinBpfMetric) verifyBasicMetrics(promOutput string) error {
 
 	var fwdBytes float64
@@ -356,7 +393,7 @@ func (v *ValidateWinBpfMetric) verifyAdvancedMetrics(nonHpcIpAddr, promOutput st
 		"ip":            "23.192.228.84",
 		"namespace":     "",
 		"podname":       "",
-		"reason":        "Drop_NotAccepted",
+		"reason":        "Reason_LbNoBackend",
 		"workload_kind": "unknown",
 		"workload_name": "unknown",
 	}
@@ -370,11 +407,26 @@ func (v *ValidateWinBpfMetric) verifyAdvancedMetrics(nonHpcIpAddr, promOutput st
 		"ip":            "23.192.228.84",
 		"namespace":     "",
 		"podname":       "",
-		"reason":        "Drop_NotAccepted",
+		"reason":        "Reason_LbNoBackend",
 		"workload_kind": "unknown",
 		"workload_name": "unknown",
 	}
 	err = prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_adv_drop_count", adv_drop_count_labels)
+	if err != nil {
+		return fmt.Errorf("failed to find networkobservability_adv_drop_count")
+	}
+
+	adv_pktmon_drop_count_labels := map[string]string{
+		"direction":     "egress",
+		"ip":            "23.192.228.84",
+		"namespace":     "",
+		"podname":       "",
+		"reason":        "Drop_Busy",
+		"workload_kind": "unknown",
+		"workload_name": "unknown",
+	}
+
+	err = prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_adv_drop_count", adv_pktmon_drop_count_labels)
 	if err != nil {
 		return fmt.Errorf("failed to find networkobservability_adv_drop_count")
 	}
@@ -414,7 +466,7 @@ func (v *ValidateWinBpfMetric) verifyAdvancedMetrics(nonHpcIpAddr, promOutput st
 		"ip":            nonHpcIpAddr,
 		"namespace":     v.NonHpcAppNamespace,
 		"podname":       v.NonHpcPodName,
-		"reason":        "Drop_NotAccepted",
+		"reason":        "Reason_LbNoBackend",
 		"workload_kind": "unknown",
 		"workload_name": "unknown",
 	}
@@ -428,7 +480,7 @@ func (v *ValidateWinBpfMetric) verifyAdvancedMetrics(nonHpcIpAddr, promOutput st
 		"ip":            nonHpcIpAddr,
 		"namespace":     v.NonHpcAppNamespace,
 		"podname":       v.NonHpcPodName,
-		"reason":        "Drop_NotAccepted",
+		"reason":        "Reason_LbNoBackend",
 		"workload_kind": "unknown",
 		"workload_name": "unknown",
 	}
@@ -475,6 +527,13 @@ func (v *ValidateWinBpfMetric) Run() error {
 
 	// generate drop events
 	err = v.generateDropEvents()
+
+	if err != nil {
+		return err
+	}
+
+	// generate pktmon drop events
+	err = v.generatePktmonDropEvents()
 
 	if err != nil {
 		return err
