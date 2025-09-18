@@ -26,6 +26,25 @@ import (
 )
 
 const MaxInt = int(^uint(0) >> 1)
+const MessageTypePktmonDrop = 100
+
+type PktmonPacketType uint8
+
+// pktmon packet types
+const (
+	PktMonPayloadUnknown PktmonPacketType = iota
+	PktMonPayloadEthernet
+	PktMonPayloadWiFi
+	PktMonPayloadIP
+	PktMonPayloadHTTP
+	PktMonPayloadTCP
+	PktMonPayloadUDP
+	PktMonPayloadARP
+	PktMonPayloadICMP
+	PktMonPayloadESP
+	PktMonPayloadAH
+	PktMonPayloadL4Payload
+)
 
 // Parser is a parser for L3/L4 payloads
 type Parser struct {
@@ -155,8 +174,9 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error {
 	var offset uint
 	var dn *DropNotify
 	var tn *TraceNotify
-	var eventSubType uint8
+	var eventSubType uint32
 	var authType pb.AuthType
+	var pdn *PktmonDropNotify
 
 	switch eventType {
 	case monitorAPI.MessageTypeDrop:
@@ -164,7 +184,7 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error {
 		if err := DecodeDropNotify(data, dn); err != nil {
 			return fmt.Errorf("failed to parse drop: %w", err)
 		}
-		eventSubType = dn.SubType
+		eventSubType = uint32(dn.SubType)
 		offset = dn.DataOffset()
 		if offset > uint(MaxInt) {
 			return fmt.Errorf("%w: %d", errDataOffsetTooLarge, offset)
@@ -175,7 +195,7 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error {
 		if err := DecodeTraceNotify(data, tn); err != nil {
 			return fmt.Errorf("failed to parse trace: %w", err)
 		}
-		eventSubType = tn.ObsPoint
+		eventSubType = uint32(tn.ObsPoint)
 
 		if tn.ObsPoint != 0 {
 			decoded.TraceObservationPoint = pb.TraceObservationPoint(tn.ObsPoint)
@@ -191,6 +211,23 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error {
 		}
 
 		packetOffset = int(offset)
+
+	case MessageTypePktmonDrop:
+		pdn = &PktmonDropNotify{}
+		if err := DecodePktmonDrop(data, pdn); err != nil {
+			return fmt.Errorf("failed to parse pktmon drop: %w", err)
+		}
+		offset = pdn.DataOffset()
+
+		// Second highest bit is set for pktmon drop reasons to avoid overlap with cilium drop reasons.
+		// Note: The highest bit cannot be used because the protoc compiler gives an "integer out of range" error
+		// when compiling proto files with enum values that have the highest bit set.
+		eventSubType = pdn.PktmonHeader.Metadata.DropReason | (1 << 30)
+		if offset > uint(MaxInt) {
+			return fmt.Errorf("%w: %d", errDataOffsetTooLarge, offset)
+		}
+		packetOffset = int(offset)
+
 	default:
 		return fmt.Errorf("invalid event type: %w", errors.NewErrInvalidType(eventType))
 	}
@@ -206,22 +243,40 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error {
 	// https://github.com/google/gopacket/issues/846
 	// TODO: reconsider this check if the issue is fixed upstream
 	if len(data[packetOffset:]) > 0 {
-		var isL3Device, isIPv6 bool
-		if (tn != nil && tn.IsL3Device()) || (dn != nil && dn.IsL3Device()) {
-			isL3Device = true
-		}
-		if tn != nil && tn.IsIPv6() || (dn != nil && dn.IsIPv6()) {
-			isIPv6 = true
-		}
 
 		var err error
-		switch {
-		case !isL3Device:
-			err = p.packet.decLayerL2Dev.DecodeLayers(data[packetOffset:], &p.packet.Layers)
-		case isIPv6:
-			err = p.packet.decLayerL3Dev.IPv6.DecodeLayers(data[packetOffset:], &p.packet.Layers)
-		default:
-			err = p.packet.decLayerL3Dev.IPv4.DecodeLayers(data[packetOffset:], &p.packet.Layers)
+		if pdn != nil {
+			switch pdn.PktmonHeader.Metadata.PacketType {
+			case uint16(PktMonPayloadEthernet):
+				err = p.packet.decLayerL2Dev.DecodeLayers(data[packetOffset:], &p.packet.Layers)
+			case uint16(PktMonPayloadIP):
+				switch data[packetOffset] >> 4 {
+				case 0x4:
+					err = p.packet.decLayerL3Dev.IPv4.DecodeLayers(data[packetOffset:], &p.packet.Layers)
+				case 0x6:
+					err = p.packet.decLayerL3Dev.IPv6.DecodeLayers(data[packetOffset:], &p.packet.Layers)
+				default:
+					return fmt.Errorf("decode layers failed for unsupported IP packet type starting with %d, data: %v", data[packetOffset], data[packetOffset:])
+				}
+			default:
+				return fmt.Errorf("decode layers failed for unsupported packet type %d, data: %v", pdn.PktmonHeader.Metadata.PacketType, data[packetOffset:])
+			}
+		} else {
+			var isL3Device, isIPv6 bool
+			if (tn != nil && tn.IsL3Device()) || (dn != nil && dn.IsL3Device()) {
+				isL3Device = true
+			}
+			if tn != nil && tn.IsIPv6() || (dn != nil && dn.IsIPv6()) {
+				isIPv6 = true
+			}
+			switch {
+			case !isL3Device:
+				err = p.packet.decLayerL2Dev.DecodeLayers(data[packetOffset:], &p.packet.Layers)
+			case isIPv6:
+				err = p.packet.decLayerL3Dev.IPv6.DecodeLayers(data[packetOffset:], &p.packet.Layers)
+			default:
+				err = p.packet.decLayerL3Dev.IPv4.DecodeLayers(data[packetOffset:], &p.packet.Layers)
+			}
 		}
 
 		if err != nil {
@@ -265,10 +320,10 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error {
 	srcEndpoint := p.epResolver.ResolveEndpoint(srcIP, srcLabelID, datapathContext)
 	dstEndpoint := p.epResolver.ResolveEndpoint(decodedpacket.DestinationIP, dstLabelID, datapathContext)
 
-	decoded.Verdict = decodeVerdict(dn, tn)
+	decoded.Verdict = decodeVerdict(dn, tn, pdn)
 	decoded.AuthType = authType
 	//nolint:staticcheck // SA1019 - temporary assignment for backward compatibility
-	decoded.DropReason = decodeDropReason(dn)
+	decoded.DropReason = decodeDropReason(dn, pdn)
 	//nolint:staticcheck // SA1019 - temporary assignment for backward compatibility
 	dropReason := decoded.GetDropReason()
 	if dropReason > math.MaxInt32 {
@@ -356,9 +411,9 @@ func decodeLayers(packet *packet) *DecodedPacket {
 	}
 }
 
-func decodeVerdict(dn *DropNotify, tn *TraceNotify) pb.Verdict {
+func decodeVerdict(dn *DropNotify, tn *TraceNotify, pdn *PktmonDropNotify) pb.Verdict {
 	switch {
-	case dn != nil:
+	case dn != nil || pdn != nil:
 		return pb.Verdict_DROPPED
 	case tn != nil:
 		return pb.Verdict_FORWARDED
@@ -366,9 +421,12 @@ func decodeVerdict(dn *DropNotify, tn *TraceNotify) pb.Verdict {
 	return pb.Verdict_VERDICT_UNKNOWN
 }
 
-func decodeDropReason(dn *DropNotify) uint32 {
+func decodeDropReason(dn *DropNotify, pdn *PktmonDropNotify) uint32 {
 	if dn != nil {
 		return uint32(dn.SubType)
+	}
+	if pdn != nil {
+		return uint32(pdn.PktmonHeader.Metadata.DropReason)
 	}
 	return 0
 }
@@ -487,7 +545,7 @@ func decodeIsReply(tn *TraceNotify) *wrapperspb.BoolValue {
 	}
 }
 
-func decodeCiliumEventType(eventType, eventSubType uint8) *pb.CiliumEventType {
+func decodeCiliumEventType(eventType uint8, eventSubType uint32) *pb.CiliumEventType {
 	return &pb.CiliumEventType{
 		Type:    int32(eventType),
 		SubType: int32(eventSubType),
