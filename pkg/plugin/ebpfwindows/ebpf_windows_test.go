@@ -69,13 +69,46 @@ func makeMockEthernetIPv4TCPPacket() []byte {
 	return buf.Bytes()
 }
 
-func CheckPacketFields(fl *flow.Flow, t *testing.T) {
-	if fl.GetEthernet().GetSource() != "de:ad:be:ef:00:02" {
-		t.Errorf("expected source MAC to be de:ad:be:ef:00:02, got %v", fl.GetEthernet().GetSource())
+func makeMockIPv4TCPPacket() []byte {
+	ip := &layers.IPv4{
+		Version:  4,
+		IHL:      5,
+		TTL:      64,
+		Protocol: layers.IPProtocolTCP,
+		SrcIP:    net.IP{192, 168, 1, 1},
+		DstIP:    net.IP{192, 168, 1, 2},
+	}
+	tcp := &layers.TCP{
+		SrcPort: 12345,
+		DstPort: 80,
+		SYN:     true,
+		Window:  65535,
 	}
 
-	if fl.GetEthernet().GetDestination() != "de:ad:be:ef:00:01" {
-		t.Errorf("expected destination MAC to be de:ad:be:ef:00:01, got %v", fl.GetEthernet().GetDestination())
+	err := tcp.SetNetworkLayerForChecksum(ip)
+	if err != nil {
+		panic(fmt.Sprintf("failed to set network layer for TCP: %v", err))
+	}
+
+	buf := gopacket.NewSerializeBuffer()
+	opts := gopacket.SerializeOptions{ComputeChecksums: true, FixLengths: true}
+	err = gopacket.SerializeLayers(buf, opts, ip, tcp, gopacket.Payload([]byte{0x01, 0x02, 0x03}))
+	if err != nil {
+		panic(fmt.Sprintf("failed to serialize layers: %v", err))
+	}
+
+	return buf.Bytes()
+}
+
+func CheckPacketFields(fl *flow.Flow, t *testing.T, checkEthFields bool) {
+	if checkEthFields {
+		if fl.GetEthernet().GetSource() != "de:ad:be:ef:00:02" {
+			t.Errorf("expected source MAC to be de:ad:be:ef:00:02, got %v", fl.GetEthernet().GetSource())
+		}
+
+		if fl.GetEthernet().GetDestination() != "de:ad:be:ef:00:01" {
+			t.Errorf("expected destination MAC to be de:ad:be:ef:00:01, got %v", fl.GetEthernet().GetDestination())
+		}
 	}
 
 	if fl.GetIP().GetIpVersion() != flow.IPVersion_IPv4 {
@@ -119,7 +152,7 @@ func TestHandleTraceEvent_TraceNotify(t *testing.T) {
 			if fl.GetType() != flow.FlowType_L3_L4 {
 				t.Errorf("expected flow type L3_L4, got %v", fl.GetType())
 			}
-			CheckPacketFields(fl, t)
+			CheckPacketFields(fl, t, true)
 			// Add more assertions as needed
 			return nil
 		})
@@ -186,7 +219,7 @@ func TestHandleTraceEvent_DropNotify(t *testing.T) {
 				t.Errorf("expected flow type L3_L4, got %v", fl.GetType())
 			}
 
-			CheckPacketFields(fl, t)
+			CheckPacketFields(fl, t, true)
 			// Add more assertions as needed
 			return nil
 		})
@@ -717,5 +750,182 @@ func TestRegisterForCallback_Error(t *testing.T) {
 	err := em.RegisterForCallback(logger, cb)
 	if err == nil {
 		t.Fatalf("expected error when registering callback with eventsmap, got nothing")
+	}
+}
+
+// TestHandleTraceEventWithEthPacket_PktmonDropNotify invokes the handleTraceEvent function for a valid DropNotify event
+// and check if the flow object is created correctly.
+func TestHandleTraceEventWithEthPacket_PktmonDropNotify(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockEnricher := enricher.NewMockEnricherInterface(ctrl)
+	mockEnricher.EXPECT().
+		Write(gomock.Any()).
+		DoAndReturn(func(event *v1.Event) error {
+			fl := event.GetFlow()
+			if fl == nil {
+				t.Error("expected a flow object, got nil")
+			}
+			eventType := fl.GetEventType().GetType()
+			if eventType != MessageTypePktmonDrop {
+				t.Errorf("expected event type %v, got %v", MessageTypePktmonDrop, eventType)
+			}
+
+			var testDropReason int32 = 2
+			testDropReason |= (1 << 30)
+			eventSubType := fl.GetEventType().GetSubType()
+			if eventSubType != testDropReason {
+				t.Errorf("expected event type %v, got %v", testDropReason, eventSubType)
+			}
+
+			if fl.GetType() != flow.FlowType_L3_L4 {
+				t.Errorf("expected flow type L3_L4, got %v", fl.GetType())
+			}
+
+			CheckPacketFields(fl, t, true)
+			// Add more assertions as needed
+			return nil
+		})
+
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	if err != nil {
+		t.Fatalf("failed to setup logger: %v", err)
+	}
+
+	p := &Plugin{
+		cfg: &kcfg.Config{
+			MetricsInterval: 100 * time.Second,
+			EnablePodLevel:  true,
+		},
+		l: log.Logger().Named("test-ebpf"),
+	}
+
+	err = p.Init()
+	if err != nil {
+		t.Fatalf("failed to initialize plugin: %v", err)
+	}
+
+	p.enricher = mockEnricher
+
+	pdn := [57]uint8{}
+	// type 100
+	pdn[0] = 0x64
+	// version 1
+	pdn[2] = 0x01
+	pdn[3] = 0x00
+	// PacketType 1
+	pdn[31] = 0x01
+	pdn[32] = 0x00
+
+	// DropReason 0x000003E9
+	pdn[39] = 0x02
+	pdn[40] = 0x00
+	pdn[41] = 0x00
+	pdn[42] = 0x00
+	var buf bytes.Buffer
+	if err = binary.Write(&buf, binary.LittleEndian, pdn); err != nil {
+		t.Fatalf("failed to serialize DropNotify: %v", err)
+	}
+
+	// Append mock TCP packet as payload
+	packet := makeMockEthernetIPv4TCPPacket()
+	buf.Write(packet)
+
+	data := buf.Bytes()
+
+	//nolint:gosec // ignore G115 -- data length is guaranteed to be within uint32 bounds in test context
+	err = p.handleTraceEvent(unsafe.Pointer(&data[0]), uint32(len(data)))
+	if err != nil {
+		t.Fatalf("expected no error for handleTraceEvent, got: %v", err)
+	}
+}
+
+// TestHandleTraceEventWithIpPacket_PktmonDropNotify invokes the handleTraceEvent function for a valid DropNotify event
+// and check if the flow object is created correctly.
+func TestHandleTraceEventWithIpPacket_PktmonDropNotify(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockEnricher := enricher.NewMockEnricherInterface(ctrl)
+	mockEnricher.EXPECT().
+		Write(gomock.Any()).
+		DoAndReturn(func(event *v1.Event) error {
+			fl := event.GetFlow()
+			if fl == nil {
+				t.Error("expected a flow object, got nil")
+			}
+			eventType := fl.GetEventType().GetType()
+			if eventType != MessageTypePktmonDrop {
+				t.Errorf("expected event type %v, got %v", MessageTypePktmonDrop, eventType)
+			}
+
+			var testDropReason int32 = 2
+			testDropReason |= (1 << 30)
+			eventSubType := fl.GetEventType().GetSubType()
+			if eventSubType != testDropReason {
+				t.Errorf("expected event type %v, got %v", testDropReason, eventSubType)
+			}
+
+			if fl.GetType() != flow.FlowType_L3_L4 {
+				t.Errorf("expected flow type L3_L4, got %v", fl.GetType())
+			}
+
+			CheckPacketFields(fl, t, false)
+			// Add more assertions as needed
+			return nil
+		})
+
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	if err != nil {
+		t.Fatalf("failed to setup logger: %v", err)
+	}
+
+	p := &Plugin{
+		cfg: &kcfg.Config{
+			MetricsInterval: 100 * time.Second,
+			EnablePodLevel:  true,
+		},
+		l: log.Logger().Named("test-ebpf"),
+	}
+
+	err = p.Init()
+	if err != nil {
+		t.Fatalf("failed to initialize plugin: %v", err)
+	}
+
+	p.enricher = mockEnricher
+
+	// Pktmon events use packed structs for the packet headers, manually constructing test packet
+	pdn := [57]uint8{}
+	// type 100
+	pdn[0] = 0x64
+	// version 1
+	pdn[2] = 0x01
+	pdn[3] = 0x00
+	// PacketType 3
+	pdn[31] = 0x03
+	pdn[32] = 0x00
+
+	// DropReason 0x00000002
+	pdn[39] = 0x02
+	pdn[40] = 0x00
+	pdn[41] = 0x00
+	pdn[42] = 0x00
+	var buf bytes.Buffer
+	if err = binary.Write(&buf, binary.LittleEndian, pdn); err != nil {
+		t.Fatalf("failed to serialize DropNotify: %v", err)
+	}
+
+	// Append mock TCP packet as payload
+	packet := makeMockIPv4TCPPacket()
+	buf.Write(packet)
+
+	data := buf.Bytes()
+
+	//nolint:gosec // ignore G115 -- data length is guaranteed to be within uint32 bounds in test context
+	err = p.handleTraceEvent(unsafe.Pointer(&data[0]), uint32(len(data)))
+	if err != nil {
+		t.Fatalf("expected no error for handleTraceEvent, got: %v", err)
 	}
 }
