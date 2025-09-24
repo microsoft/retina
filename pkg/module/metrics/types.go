@@ -10,6 +10,7 @@ import (
 	"github.com/cilium/cilium/api/v1/flow"
 	api "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/pkg/common"
+	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/utils"
 )
 
@@ -44,9 +45,9 @@ const (
 	// workload context option
 	workloadCtxOption = "workload"
 
-	// localContext means only the pods on this node will be watched
+	// LocalContext means only the pods on this node will be watched
 	// and only these events will be enriched
-	localContext enrichmentContext = "local"
+	LocalContext enrichmentContext = "local"
 
 	// remoteContext means all pods on the cluster will be watched
 	// and events will be enriched
@@ -327,6 +328,23 @@ func DefaultCtxOptions() []string {
 		// Port adds a ton of extra dimension to metrics
 		// so not adding it as a default option
 		// portCtxOption,
+	}
+}
+
+// DefaultStandaloneMetrics used for standalone mode (windows only)
+func DefaultStandaloneMetrics() []string {
+	return []string{
+		// forward
+		utils.ForwardPacketsGaugeName,
+		utils.ForwardBytesGaugeName,
+		// hns
+		metrics.HNSStats,
+		// drop
+		utils.DroppedPacketsGaugeName,
+		// tcp connections
+		utils.TCPConnectionStatsName,
+		// tcp flags
+		utils.TCPFlagGauge,
 	}
 }
 

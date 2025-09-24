@@ -25,11 +25,12 @@ const (
 
 type DropCountMetrics struct {
 	baseMetricObject
-	dropMetric metrics.GaugeVec
-	metricName string
+	dropMetric       metrics.GaugeVec
+	metricName       string
+	enableStandalone bool
 }
 
-func NewDropCountMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext) *DropCountMetrics {
+func NewDropCountMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext, enableStandalone bool) *DropCountMetrics {
 	if ctxOptions == nil || !strings.Contains(strings.ToLower(ctxOptions.MetricName), "drop") {
 		return nil
 	}
@@ -38,6 +39,7 @@ func NewDropCountMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogge
 	fl.Info("Creating drop count metrics", zap.Any("options", ctxOptions))
 	return &DropCountMetrics{
 		baseMetricObject: newBaseMetricsObject(ctxOptions, fl, isLocalContext),
+		enableStandalone: enableStandalone,
 	}
 }
 
@@ -83,6 +85,7 @@ func (d *DropCountMetrics) getLabels() []string {
 }
 
 func (d *DropCountMetrics) Clean() {
+	d.l.Info("Cleaning metric", zap.String("name", d.metricName))
 	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(d.dropMetric))
 }
 
@@ -92,6 +95,11 @@ func (d *DropCountMetrics) ProcessFlow(flow *v1.Flow) {
 	// Flow does not have bytes section at the moment,
 	// so we will update only packet count
 	if flow == nil {
+		return
+	}
+
+	if d.enableStandalone {
+		d.processStandaloneFlow(flow)
 		return
 	}
 
@@ -168,4 +176,37 @@ func (d *DropCountMetrics) update(fl *v1.Flow, labels []string) {
 	case utils.DropBytesGaugeName:
 		d.dropMetric.WithLabelValues(labels...).Add(float64(utils.PacketSize(fl)))
 	}
+}
+
+func (d *DropCountMetrics) processStandaloneFlow(fl *v1.Flow) {
+	// Ingress values
+	ingressLbls := []string{
+		ingress,
+		fl.GetIP().GetSource(),
+		fl.GetSource().GetNamespace(),
+		fl.GetSource().GetPodName(),
+		"",
+		"",
+	}
+	// Egress values
+	egressLbls := []string{
+		egress,
+		fl.GetIP().GetSource(),
+		fl.GetSource().GetNamespace(),
+		fl.GetSource().GetPodName(),
+		"",
+		"",
+	}
+
+	endpointStats := GetHNSMetadata(fl).GetEndpointStats()
+	d.dropMetric.WithLabelValues(append([]string{utils.Endpoint}, ingressLbls...)...).Set(float64(endpointStats.GetDroppedPacketsIncoming()))
+	d.dropMetric.WithLabelValues(append([]string{utils.Endpoint}, egressLbls...)...).Set(float64(endpointStats.GetDroppedPacketsOutgoing()))
+
+	if GetHNSMetadata(fl).GetVfpPortStatsData() == nil {
+		return
+	}
+
+	vfpStats := GetHNSMetadata(fl).GetVfpPortStatsData()
+	d.dropMetric.WithLabelValues(append([]string{utils.AclRule}, ingressLbls...)...).Set(float64(vfpStats.GetIn().GetDropCounters().GetAclDropPacketCount()))
+	d.dropMetric.WithLabelValues(append([]string{utils.AclRule}, egressLbls...)...).Set(float64(vfpStats.GetOut().GetDropCounters().GetAclDropPacketCount()))
 }

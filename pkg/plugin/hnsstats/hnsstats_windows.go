@@ -7,16 +7,21 @@ package hnsstats
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"net"
 	"time"
 
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/hcn"
+	"github.com/cilium/cilium/api/v1/flow"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	kcfg "github.com/microsoft/retina/pkg/config"
+	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/registry"
 	"github.com/microsoft/retina/pkg/utils"
+
 	"go.uber.org/zap"
 )
 
@@ -78,12 +83,20 @@ func (h *hnsstats) Init() error {
 		Flags: hcn.HostComputeQueryFlagsNone,
 	}
 	// Filter out any endpoints that are not in "AttachedShared" State. All running Windows pods with networking must be in this state.
-	filterMap := map[string]uint16{"State": HCN_ENDPOINT_STATE_ATTACHED_SHARING}
-	filter, err := json.Marshal(filterMap)
-	if err != nil {
-		return err
+	var filterMap map[string]uint16
+	if h.cfg.EnableStandalone {
+		if enricher.IsInitialized() {
+			h.enricher = enricher.Instance()
+			h.l.Info("Standalone enricher is enabled")
+		}
+	} else {
+		filterMap = map[string]uint16{"State": HCN_ENDPOINT_STATE_ATTACHED_SHARING}
+		filter, err := json.Marshal(filterMap)
+		if err != nil {
+			return fmt.Errorf("failed to marshal filter map: %w", err)
+		}
+		h.endpointQuery.Filter = string(filter)
 	}
-	h.endpointQuery.Filter = string(filter)
 
 	h.l.Info("Exiting hnsstats Init...")
 	return nil
@@ -153,10 +166,39 @@ func pullHnsStats(ctx context.Context, h *hnsstats) error {
 						h.l.Error("Unable to find VFP port counters", zap.String(zapMACField, mac), zap.String(zapPortField, portguid), zap.Error(err))
 					}
 
+					if h.cfg.EnableStandalone {
+						h.sendFlow(ip, hnsStatsData)
+					}
 					notifyHnsStats(h, hnsStatsData)
 				}
 			}
 		}
+	}
+}
+
+func (h *hnsstats) sendFlow(ip string, hnsstatsData *HnsStatsData) {
+	fl := utils.ToFlow(
+		h.l,
+		time.Now().UnixNano(),
+		net.ParseIP(ip),
+		nil,
+		uint32(0),
+		uint32(0),
+		uint8(0),
+		uint8(0),
+		flow.Verdict_VERDICT_UNKNOWN,
+	)
+
+	hnsstats := &utils.HNSStatsMetadata{}
+	utils.AddCounters(hnsstats, toEndpointStats(hnsstatsData.hnscounters), toVfpPortCounters(hnsstatsData.vfpCounters))
+	utils.AddHNSMetadata(fl, hnsstats)
+
+	ev := &v1.Event{
+		Event:     fl,
+		Timestamp: fl.GetTime(),
+	}
+	if h.enricher != nil {
+		h.enricher.Write(ev)
 	}
 }
 
@@ -214,14 +256,15 @@ func (h *hnsstats) Start(ctx context.Context) error {
 	return pullHnsStats(ctx, h)
 }
 
-func (d *hnsstats) Stop() error {
-	d.l.Info("Entered hnsstats Stop...")
-	if d.state != start {
-		d.l.Info("plugin not started")
+func (h *hnsstats) Stop() error {
+	h.l.Info("Entered hnsstats Stop...")
+	if h.state != start {
+		h.l.Info("plugin not started")
 		return nil
 	}
-	d.l.Info("Stopped listening for hnsstats event...")
-	d.state = stop
-	d.l.Info("Exiting hnsstats Stop...")
+
+	h.l.Info("Stopped listening for hnsstats event...")
+	h.state = stop
+	h.l.Info("Exiting hnsstats Stop...")
 	return nil
 }
