@@ -6,10 +6,14 @@ import (
 	"github.com/cilium/cilium/api/v1/flow"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	observer "github.com/cilium/cilium/pkg/hubble/observer/types"
+	"github.com/cilium/cilium/pkg/hubble/parser"
 	ipc "github.com/cilium/cilium/pkg/ipcache"
-	"github.com/cilium/cilium/pkg/k8s"
+	"github.com/cilium/hive/cell"
+	"github.com/microsoft/retina/pkg/hubble/common"
 	"github.com/microsoft/retina/pkg/hubble/parser/layer34"
 	"github.com/microsoft/retina/pkg/hubble/parser/seven"
+	"github.com/microsoft/retina/pkg/hubble/resources"
+
 	"github.com/sirupsen/logrus"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -22,23 +26,30 @@ var (
 	errUnknownPayload = errors.New("unknown payload")
 )
 
+type Params struct {
+	cell.In
+
+	Logger            logrus.FieldLogger
+	ServiceReconciler *resources.ServiceReconciler
+	LabelCache        common.LabelCache
+
+	IPCache *ipc.IPCache
+}
+
 type Parser struct {
-	l       logrus.FieldLogger
-	ipcache *ipc.IPCache
-	svc     k8s.ServiceCache
+	l *logrus.Entry
 
 	l34 *layer34.Parser
 	l7  *seven.Parser
 }
 
-func New(l *logrus.Entry, svc k8s.ServiceCache, c *ipc.IPCache) *Parser {
+func New(params Params) parser.Decoder {
+	logger := params.Logger.WithField("subsys", "payloadparser")
 	return &Parser{
-		l:       l,
-		ipcache: c,
-		svc:     svc,
+		l: logger,
 
-		l34: layer34.New(l, svc, c),
-		l7:  seven.New(l, svc, c),
+		l34: layer34.New(logger, params.ServiceReconciler, params.IPCache, params.LabelCache),
+		l7:  seven.New(logger, params.ServiceReconciler, params.IPCache, params.LabelCache),
 	}
 }
 
