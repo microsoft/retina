@@ -227,6 +227,16 @@ ig -h
 ig run trace_dns:latest
 ```
 
+## [mpstat](https://www.man7.org/linux/man-pages/man1/mpstat.1.html)
+
+Tool for detailed reporting of processor-related statistics. `mpstat` is useful for network troubleshooting because it shows how much CPU time is spent handling SoftIRQs, which are often triggered by network traffic, helping identify interrupt bottlenecks or imbalanced CPU usage. SoftIRQs (Software Interrupt Requests) are a type of deferred interrupt handling mechanism in the Linux kernel used to process time-consuming tasks—like network packet handling or disk I/O—outside the immediate hardware interrupt context, allowing faster and more efficient interrupt processing without blocking the system.
+
+This example usage of `mpstat` monitors CPU usage statistics, specifically focusing on SoftIRQ usage, across all CPU cores, sampled every 1 second, for 5 intervals.
+
+```shell
+mpstat -P ALL 1 5 | grep -E '(CPU|%soft|Average)'
+```
+
 ## Troubleshooting
 
 ### Timeouts
