@@ -83,7 +83,7 @@ func (m *Controller) Init(ctx context.Context) error {
 		m.cache = cache.New(m.pubsub)
 
 		// create enricher instance
-		m.enricher = enricher.New(ctx, m.cache)
+		m.enricher = enricher.New(ctx, m.cache, m.conf.EnableStandalone)
 	}
 
 	return nil
