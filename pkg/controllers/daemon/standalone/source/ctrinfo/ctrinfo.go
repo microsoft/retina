@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
-package source
+package ctrinfo
 
 import (
 	"bytes"
@@ -17,7 +17,9 @@ import (
 	"github.com/microsoft/retina/pkg/common"
 )
 
-type Ctrinfo struct{}
+type Ctrinfo struct {
+	commandTimeout time.Duration
+}
 
 type PodSpec struct {
 	Status Status `json:"status"`
@@ -38,16 +40,23 @@ type PodNetwork struct {
 }
 
 var (
-	crictlCommand = runCommand
+	getPodsCmd    = runGetPods
+	inspectPodCmd = runPodInspect
 
 	errGetPods    = errors.New("failed to get running pods")
 	errInspectPod = errors.New("failed to inspect pod information")
 	errJSONRead   = errors.New("error unmarshalling JSON")
 )
 
+func New(commandTimeout time.Duration) *Ctrinfo {
+	return &Ctrinfo{
+		commandTimeout: commandTimeout,
+	}
+}
+
 func (c *Ctrinfo) GetAllEndpoints() ([]*common.RetinaEndpoint, error) {
 	// Using crictl to get all running pods
-	runningPods, err := crictlCommand("cmd", "/c", "crictl", "pods", "-q")
+	runningPods, err := getPodsCmd(c)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", errGetPods, err)
 	}
@@ -60,7 +69,7 @@ func (c *Ctrinfo) GetAllEndpoints() ([]*common.RetinaEndpoint, error) {
 		}
 
 		// Using crictl to get pod spec
-		podSpec, err := crictlCommand("cmd", "/c", "crictl", "inspectp", podID)
+		podSpec, err := inspectPodCmd(c, podID)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", errInspectPod, err)
 		}
@@ -86,8 +95,8 @@ func (c *Ctrinfo) GetAllEndpoints() ([]*common.RetinaEndpoint, error) {
 	return endpoints, nil
 }
 
-func runCommand(command string, args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func (c *Ctrinfo) runCommand(command string, args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), c.commandTimeout)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, command, args...)

@@ -28,9 +28,10 @@ func TestStartError(t *testing.T) {
 	_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
 
 	c := cache.New(pubsub.New())
-	e := enricher.New(ctxTimeout, c, false)
+	e := enricher.NewStandard(ctxTimeout, c)
 	e.Run()
-	defer e.Reader.Close()
+	reader := e.ExportReader()
+	defer reader.Close()
 
 	cfg := &config.Config{
 		EnablePodLevel: true,

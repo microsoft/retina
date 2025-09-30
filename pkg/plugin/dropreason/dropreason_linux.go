@@ -19,7 +19,7 @@ import (
 	"github.com/cilium/ebpf/perf"
 	"github.com/microsoft/retina/internal/ktime"
 	kcfg "github.com/microsoft/retina/pkg/config"
-	"github.com/microsoft/retina/pkg/enricher"
+	enricher "github.com/microsoft/retina/pkg/enricher/base"
 	"github.com/microsoft/retina/pkg/loader"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"

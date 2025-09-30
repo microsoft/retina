@@ -24,7 +24,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	"github.com/go-logr/zapr"
-	"github.com/microsoft/retina/cmd/telemetry"
+	"github.com/microsoft/retina/cmd/observability"
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/internal/buildinfo"
 	"github.com/microsoft/retina/pkg/config"
@@ -35,7 +35,6 @@ import (
 	pc "github.com/microsoft/retina/pkg/controllers/daemon/pod"
 	kec "github.com/microsoft/retina/pkg/controllers/daemon/retinaendpoint"
 	sc "github.com/microsoft/retina/pkg/controllers/daemon/service"
-	"github.com/microsoft/retina/pkg/log"
 
 	"github.com/microsoft/retina/pkg/enricher"
 	cm "github.com/microsoft/retina/pkg/managers/controllermanager"
@@ -59,27 +58,32 @@ func init() {
 }
 
 type Daemon struct {
-	config               *config.Config
+	configFile           string
 	metricsAddr          string
 	probeAddr            string
 	enableLeaderElection bool
 }
 
-func NewDaemon(daemoncfg *config.Config, metricsAddr, probeAddr string, enableLeaderElection bool) *Daemon {
+func NewDaemon(configFile, metricsAddr, probeAddr string, enableLeaderElection bool) *Daemon {
 	return &Daemon{
-		config:               daemoncfg,
+		configFile:           configFile,
 		metricsAddr:          metricsAddr,
 		probeAddr:            probeAddr,
 		enableLeaderElection: enableLeaderElection,
 	}
 }
 
-func (d *Daemon) Start(zl *log.ZapLogger) error {
+func (d *Daemon) Start() error {
 	fmt.Printf("Starting Retina daemon with legacy control plane %v\n", buildinfo.Version)
 	fmt.Println("init client-go")
 
+	daemonCfg, err := config.GetConfig(d.configFile)
+	if err != nil {
+		panic(err)
+	}
+	zl := observability.InitializeLogger(daemonCfg.LogLevel, daemonCfg.EnableTelemetry, daemonCfg.EnabledPlugin, daemonCfg.DataAggregationLevel)
+
 	var restCfg *rest.Config
-	var err error
 	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
 		fmt.Println("KUBECONFIG detected, using kubeconfig: ", kubeconfig)
 		restCfg, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
@@ -107,9 +111,9 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 	}
 
 	metrics.InitializeMetrics()
-	mainLogger.Info(zap.String("data aggregation level", d.config.DataAggregationLevel.String()))
+	mainLogger.Info(zap.String("data aggregation level", daemonCfg.DataAggregationLevel.String()))
 
-	tel, err := telemetry.InitializeTelemetryClient(restCfg, d.config, mainLogger)
+	tel, err := observability.InitializeTelemetryClient(restCfg, daemonCfg.EnabledPlugin, daemonCfg.EnableTelemetry, mainLogger)
 	if err != nil {
 		return fmt.Errorf("failed to initialize telemetry client: %w", err)
 	}
@@ -126,7 +130,7 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 	}
 
 	// Local context has its meaning only when pod level(advanced) metrics is enabled.
-	if d.config.EnablePodLevel && !d.config.RemoteContext {
+	if daemonCfg.EnablePodLevel && !daemonCfg.RemoteContext {
 		mainLogger.Info("Remote context is disabled, only pods deployed on the same node as retina-agent will be monitored")
 		// the new cache sets Selector options on the Manager cache which are used
 		// to perform *server-side* filtering of the cached objects. This is very important
@@ -188,10 +192,10 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 	ctx := ctrl.SetupSignalHandler()
 	ctrl.SetLogger(zapr.NewLogger(zl.Logger.Named("controller-runtime")))
 
-	if d.config.EnablePodLevel {
+	if daemonCfg.EnablePodLevel {
 		pubSub := pubsub.New()
 		controllerCache := controllercache.New(pubSub)
-		enrich := enricher.New(ctx, controllerCache, d.config.EnableStandalone)
+		enrich := enricher.NewStandard(ctx, controllerCache)
 		//nolint:govet // shadowing this err is fine
 		fm, err := filtermanager.Init(5) //nolint:gomnd // defaults
 		if err != nil {
@@ -199,16 +203,16 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 		}
 		defer fm.Stop() //nolint:errcheck // best effort
 		enrich.Run()
-		metricsModule := mm.InitModule(ctx, d.config, pubSub, enrich, fm, controllerCache)
+		metricsModule := mm.InitModule(ctx, daemonCfg, pubSub, enrich, fm, controllerCache)
 
-		if !d.config.RemoteContext {
+		if !daemonCfg.RemoteContext {
 			mainLogger.Info("Initializing Pod controller")
 
 			podController := pc.New(mgr.GetClient(), controllerCache)
 			if err := podController.SetupWithManager(mgr); err != nil {
 				mainLogger.Fatal("unable to create PodController", zap.Error(err))
 			}
-		} else if d.config.EnableRetinaEndpoint {
+		} else if daemonCfg.EnableRetinaEndpoint {
 			mainLogger.Info("RetinaEndpoint is enabled")
 			mainLogger.Info("Initializing RetinaEndpoint controller")
 
@@ -230,7 +234,7 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 			mainLogger.Fatal("unable to create svcController", zap.Error(err))
 		}
 
-		if d.config.EnableAnnotations {
+		if daemonCfg.EnableAnnotations {
 			mainLogger.Info("Initializing MetricsConfig namespaceController")
 			namespaceController := namespacecontroller.New(mgr.GetClient(), controllerCache, metricsModule)
 			if err := namespaceController.SetupWithManager(mgr); err != nil {
@@ -246,7 +250,7 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 		}
 	}
 
-	controllerMgr, err := cm.NewControllerManager(d.config, cl, tel)
+	controllerMgr, err := cm.NewStandardControllerManager(daemonCfg, cl, tel)
 	if err != nil {
 		mainLogger.Fatal("Failed to create controller manager", zap.Error(err))
 	}
@@ -256,10 +260,10 @@ func (d *Daemon) Start(zl *log.ZapLogger) error {
 	// Stop is best effort. If it fails, we still want to stop the main process.
 	// This is needed for graceful shutdown of Retina plugins.
 	// Do it in the main thread as graceful shutdown is important.
-	defer controllerMgr.Stop(ctx)
+	defer controllerMgr.Stop()
 
 	// start heartbeat goroutine for application insights
-	go tel.Heartbeat(ctx, d.config.TelemetryInterval)
+	go tel.Heartbeat(ctx, daemonCfg.TelemetryInterval)
 
 	// Start controller manager, which will start http server and plugin manager.
 	go controllerMgr.Start(ctx)

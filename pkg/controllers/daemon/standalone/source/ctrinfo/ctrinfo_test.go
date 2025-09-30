@@ -1,17 +1,16 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
-package source
+package ctrinfo
 
 import (
 	"net"
 	"os"
-	"strings"
 	"testing"
+	"time"
 
 	"github.com/microsoft/retina/pkg/common"
 	"github.com/stretchr/testify/require"
-	"sigs.k8s.io/kind/pkg/errors"
 )
 
 func TestCtrinfoGetAllEndpoints(t *testing.T) {
@@ -22,7 +21,7 @@ func TestCtrinfoGetAllEndpoints(t *testing.T) {
 	require.NoError(t, err, "failed to create invalid JSON file")
 	defer os.Remove(invalidJSONPath)
 
-	src := &Ctrinfo{}
+	src := New(5 * time.Second)
 
 	tests := []struct {
 		name                   string
@@ -70,27 +69,28 @@ func TestCtrinfoGetAllEndpoints(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			originalCommand := crictlCommand
-			defer func() { crictlCommand = originalCommand }()
+			originalGetPodsCmd := getPodsCmd
+			originalInspectPodCmd := inspectPodCmd
+			defer func() {
+				getPodsCmd = originalGetPodsCmd
+				inspectPodCmd = originalInspectPodCmd
+			}()
 
-			crictlCommand = func(_ string, args ...string) (string, error) {
-				if strings.Contains(args[2], "pods") {
-					if tt.getPodsErr != nil {
-						return "", tt.getPodsErr
-					}
-					return tt.podCmdOutput, nil
+			getPodsCmd = func(_ *Ctrinfo) (string, error) {
+				if tt.getPodsErr != nil {
+					return "", tt.getPodsErr
 				}
-				if strings.Contains(args[2], "inspectp") {
-					if tt.inspectPodErr != nil {
-						return "", tt.inspectPodErr
-					}
-					content, err := os.ReadFile(tt.inspectCmdOutput)
-					if err != nil {
-						return "", errJSONRead
-					}
-					return string(content), nil
+				return tt.podCmdOutput, nil
+			}
+			inspectPodCmd = func(_ *Ctrinfo, _ string) (string, error) {
+				if tt.inspectPodErr != nil {
+					return "", tt.inspectPodErr
 				}
-				return "", errors.New("unknown command")
+				content, err := os.ReadFile(tt.inspectCmdOutput)
+				if err != nil {
+					return "", errJSONRead
+				}
+				return string(content), nil
 			}
 
 			endpoints, err := src.GetAllEndpoints()

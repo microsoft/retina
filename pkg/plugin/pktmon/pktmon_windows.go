@@ -12,7 +12,7 @@ import (
 	observerv1 "github.com/cilium/cilium/api/v1/observer"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	kcfg "github.com/microsoft/retina/pkg/config"
-	"github.com/microsoft/retina/pkg/enricher"
+	enricher "github.com/microsoft/retina/pkg/enricher/base"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/registry"

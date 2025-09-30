@@ -18,7 +18,7 @@ import (
 	"github.com/blang/semver/v4"
 	"github.com/cilium/ebpf/perf"
 	kcfg "github.com/microsoft/retina/pkg/config"
-	"github.com/microsoft/retina/pkg/enricher"
+	"github.com/microsoft/retina/pkg/enricher/base"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	mocks "github.com/microsoft/retina/pkg/plugin/dropreason/mocks"
@@ -201,7 +201,7 @@ func TestDropReasonRun(t *testing.T) {
 	mockedMap := mocks.NewMockIMap(ctrl)
 	mockedMapIterator := mocks.NewMockIMapIterator(ctrl)
 	mockedPerfReader := mocks.NewMockIPerfReader(ctrl)
-	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
+	menricher := base.NewMockEnricherInterface(ctrl) //nolint:typecheck // mock enricher interface
 
 	// reasign helper function so that it returns the mockedMapIterator
 	iMapIterator = func(x IMap) IMapIterator {
@@ -262,7 +262,7 @@ func TestDropReasonReadDataPodLevelEnabled(t *testing.T) {
 
 	mockedMap := mocks.NewMockIMap(ctrl)
 	mockedPerfReader := mocks.NewMockIPerfReader(ctrl)
-	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
+	menricher := base.NewMockEnricherInterface(ctrl) //nolint:typecheck // mock enricher interface
 
 	// create a rawSample slice and fill it with `unsafe.Sizeof(kprobePacket{})`
 	rawSample := make([]byte, unsafe.Sizeof(kprobePacket{}))

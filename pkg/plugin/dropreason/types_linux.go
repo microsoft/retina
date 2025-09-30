@@ -10,7 +10,7 @@ import (
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
 	kcfg "github.com/microsoft/retina/pkg/config"
-	"github.com/microsoft/retina/pkg/enricher"
+	"github.com/microsoft/retina/pkg/enricher/base"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/utils"
 )
@@ -36,7 +36,7 @@ type dropReason struct {
 	metricsMapData  IMap
 	isRunning       bool
 	reader          IPerfReader
-	enricher        enricher.EnricherInterface
+	enricher        base.EnricherInterface
 	recordsChannel  chan perf.Record
 	wg              sync.WaitGroup
 	externalChannel chan *hubblev1.Event

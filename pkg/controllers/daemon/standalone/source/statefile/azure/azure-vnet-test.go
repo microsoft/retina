@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT license.
 
-package source
+package azure
 
 import (
 	"net"
@@ -12,13 +12,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestStatefileGetAllEndpoints(t *testing.T) {
-	emptyJSONPath := "empty_azure_vnet.json"
+func TestAzureVnetGetAllEndpoints(t *testing.T) {
+	emptyJSONPath := "empty-azure-vnet.json"
 	emptyJSONContent := ``
 	err := os.WriteFile(emptyJSONPath, []byte(emptyJSONContent), 0o600)
 	require.NoError(t, err, "failed to create empty JSON file")
 
-	invalidJSONPath := "mock_invalid_azure_vnet.json"
+	invalidJSONPath := "mock-invalid-azure-vnet.json"
 	invalidJSONContent := `{
 		"Network": {
 			"ExternalInterfaces": {
@@ -55,7 +55,7 @@ func TestStatefileGetAllEndpoints(t *testing.T) {
 	}{
 		{
 			name:      "Valid state file",
-			filePath:  "mock_statefile.json",
+			filePath:  "azure-vnet-mock.json",
 			emptyFile: false,
 			expectedEndpoint: []*common.RetinaEndpoint{
 				common.NewRetinaEndpoint("retina-pod", "retina-namespace", common.NewIPAddress(net.ParseIP("192.0.0.5"), nil)),
@@ -72,7 +72,7 @@ func TestStatefileGetAllEndpoints(t *testing.T) {
 		},
 		{
 			name:             "Missing state file",
-			filePath:         "non_existent_file.json",
+			filePath:         "non-existent-file.json",
 			emptyFile:        false,
 			expectedEndpoint: nil,
 			expectedErr:      true,
@@ -88,10 +88,7 @@ func TestStatefileGetAllEndpoints(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			originalPath := StateFileLocation
-			StateFileLocation = tt.filePath
-			defer func() { StateFileLocation = originalPath }()
-
+			src = New(tt.filePath)
 			endpoints, err := src.GetAllEndpoints()
 
 			if tt.expectedErr {

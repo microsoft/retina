@@ -11,6 +11,7 @@ import (
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/microsoft/retina/pkg/controllers/cache"
 	"github.com/microsoft/retina/pkg/enricher"
+	"github.com/microsoft/retina/pkg/enricher/base"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/pubsub"
 	"go.uber.org/zap"
@@ -26,7 +27,7 @@ func main() {
 	ctx := context.Background()
 	c := cache.New(pubsub.New())
 
-	e := enricher.New(ctx, c, false)
+	e := enricher.NewStandard(ctx, c)
 
 	e.Run()
 
@@ -44,7 +45,7 @@ func main() {
 	}
 }
 
-func addEvent(e *enricher.Enricher) {
+func addEvent(e base.EnricherInterface) {
 	l := log.Logger().Named("addev")
 	ev := &v1.Event{
 		Timestamp: timestamppb.Now(),

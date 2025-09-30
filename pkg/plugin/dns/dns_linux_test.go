@@ -17,6 +17,7 @@ import (
 	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/controllers/cache"
 	"github.com/microsoft/retina/pkg/enricher"
+	"github.com/microsoft/retina/pkg/enricher/base"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/common/mocks"
@@ -54,9 +55,10 @@ func TestStart(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 
 	c := cache.New(pubsub.New())
-	e := enricher.New(ctxTimeout, c, false)
+	e := enricher.NewStandard(ctxTimeout, c)
 	e.Run()
-	defer e.Reader.Close()
+	reader := e.ExportReader()
+	defer reader.Close()
 
 	d := &dns{
 		l:   log.Logger().Named(name),
@@ -146,7 +148,7 @@ func TestRequestEventHandler(t *testing.T) {
 	metrics.DNSRequestCounter = mockCV
 
 	// Advanced metrics.
-	mockEnricher := enricher.NewMockEnricherInterface(ctrl)
+	mockEnricher := base.NewMockEnricherInterface(ctrl)
 	mockEnricher.EXPECT().Write(EventMatched(
 		utils.DNSType_QUERY, 0, event.DNSName, []string{event.QType}, 0, []string{},
 	)).Times(1)
@@ -196,7 +198,7 @@ func TestResponseEventHandler(t *testing.T) {
 	metrics.DNSResponseCounter = mockCV
 
 	// Advanced metrics.
-	mockEnricher := enricher.NewMockEnricherInterface(ctrl)
+	mockEnricher := base.NewMockEnricherInterface(ctrl)
 	mockEnricher.EXPECT().Write(EventMatched(
 		utils.DNSType_RESPONSE, 0, event.DNSName, []string{event.QType}, 2, []string{"1.1.1.1", "2.2.2.2"},
 	)).Times(1)

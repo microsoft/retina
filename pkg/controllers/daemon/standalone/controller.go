@@ -6,12 +6,15 @@ package standalone
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/microsoft/retina/pkg/common"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/controllers/cache/standalone"
 	"github.com/microsoft/retina/pkg/controllers/daemon/standalone/source"
+	"github.com/microsoft/retina/pkg/controllers/daemon/standalone/source/ctrinfo"
+	"github.com/microsoft/retina/pkg/controllers/daemon/standalone/source/statefile"
 	"github.com/microsoft/retina/pkg/log"
 	sm "github.com/microsoft/retina/pkg/module/metrics/standalone"
 
@@ -25,18 +28,24 @@ type Controller struct {
 	cache *standalone.Cache
 
 	metricsModule *sm.Module
-	config        *kcfg.Config
+	config        *kcfg.StandaloneConfig
 	l             *log.ZapLogger
 }
 
 // New creates a new instance of the standalone controller
-func New(config *kcfg.Config, cache *standalone.Cache, metricsModule *sm.Module) *Controller {
+func New(config *kcfg.StandaloneConfig, cache *standalone.Cache, metricsModule *sm.Module) (*Controller, error) {
 	var src source.Source
+	var err error
 
-	if config.EnableCrictl {
-		src = &source.Ctrinfo{}
-	} else {
-		src = &source.Statefile{}
+	switch {
+	case config.EnrichmentMode == "crictl":
+		src = ctrinfo.New(config.CriCtlCommandTimeout)
+
+	case strings.HasSuffix(config.EnrichmentMode, "statefile"):
+		src, err = statefile.New(config.EnrichmentMode, config.StateFileLocation)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create statefile source: %w", err)
+		}
 	}
 
 	return &Controller{
@@ -45,7 +54,7 @@ func New(config *kcfg.Config, cache *standalone.Cache, metricsModule *sm.Module)
 		config:        config,
 		metricsModule: metricsModule,
 		l:             log.Logger().Named(string("Controller")),
-	}
+	}, nil
 }
 
 // Reconcile syncs the state of the running endpoints with the existing endpoints in cache

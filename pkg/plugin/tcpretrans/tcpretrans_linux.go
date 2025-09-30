@@ -17,7 +17,7 @@ import (
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/socketenricher"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/utils/host"
 	kcfg "github.com/microsoft/retina/pkg/config"
-	"github.com/microsoft/retina/pkg/enricher"
+	"github.com/microsoft/retina/pkg/enricher/base"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/plugin/registry"
 	"github.com/microsoft/retina/pkg/utils"
@@ -76,8 +76,8 @@ func (t *tcpretrans) Start(ctx context.Context) error {
 		return nil
 	}
 	// Set up enricher
-	if enricher.IsInitialized() {
-		t.enricher = enricher.Instance()
+	if base.IsInitialized() {
+		t.enricher = base.Instance()
 	} else {
 		t.l.Error(errEnricherNotInitialized.Error())
 		return errEnricherNotInitialized

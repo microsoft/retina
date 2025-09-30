@@ -7,6 +7,7 @@ import (
 	"context"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/microsoft/retina/pkg/common"
 	kcfg "github.com/microsoft/retina/pkg/config"
@@ -45,9 +46,18 @@ func TestControllerReconcile(t *testing.T) {
 	newEndpoint := common.NewRetinaEndpoint("new-pod", "default", &common.IPAddresses{IPv4: net.ParseIP("1.1.1.1")})
 	mockSource.EXPECT().GetAllEndpoints().Return([]*common.RetinaEndpoint{newEndpoint}, nil)
 
-	// Setup test controller
-	cfg := &kcfg.Config{MetricsInterval: 1, EnableCrictl: false}
-	controller := New(cfg, cache, metricsModule)
+	// Setup test controller with invalid config to test error handling
+	invalidCfg := &kcfg.StandaloneConfig{MetricsInterval: time.Second, EnrichmentMode: "gcp-statefile"}
+	controller, err := New(invalidCfg, cache, metricsModule)
+	require.Error(t, err)
+	require.Nil(t, controller)
+
+	// Setup test controller with valid config
+	cfg := &kcfg.StandaloneConfig{MetricsInterval: time.Second, EnrichmentMode: "azure-vnet-statefile"}
+	controller, err = New(cfg, cache, metricsModule)
+	require.NoError(t, err)
+	require.NotNil(t, controller)
+
 	controller.src = mockSource // inject mock source
 
 	// Run Reconcile

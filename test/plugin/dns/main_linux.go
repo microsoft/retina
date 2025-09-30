@@ -52,7 +52,7 @@ func main() {
 	defer cancel()
 
 	c := cache.New(pubsub.New())
-	e := enricher.New(ctx, c, false)
+	e := enricher.NewStandard(ctx, c)
 	e.Run()
 
 	err = tt.Generate(ctxTimeout)

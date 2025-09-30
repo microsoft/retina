@@ -21,7 +21,7 @@ import (
 	tc "github.com/florianl/go-tc"
 	nl "github.com/mdlayher/netlink"
 	kcfg "github.com/microsoft/retina/pkg/config"
-	"github.com/microsoft/retina/pkg/enricher"
+	"github.com/microsoft/retina/pkg/enricher/base"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/packetparser/mocks"
@@ -289,7 +289,7 @@ func TestReadData_Error(t *testing.T) {
 	mperf := mocks.NewMockperfReader(ctrl)
 	mperf.EXPECT().Read().Return(perf.Record{}, errors.New("error")).AnyTimes()
 
-	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
+	menricher := base.NewMockEnricherInterface(ctrl) //nolint:typecheck // mock enricher interface
 	menricher.EXPECT().Write(gomock.Any()).Times(0)
 
 	p := &packetParser{
@@ -328,7 +328,7 @@ func TestReadDataPodLevelEnabled(t *testing.T) {
 	mperf := mocks.NewMockperfReader(ctrl)
 	mperf.EXPECT().Read().Return(record, nil).MinTimes(1)
 
-	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
+	menricher := base.NewMockEnricherInterface(ctrl) //nolint:typecheck // mock enricher interface
 	menricher.EXPECT().Write(gomock.Any()).MinTimes(1)
 
 	p := &packetParser{

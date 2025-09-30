@@ -6,12 +6,12 @@ package standalone
 import (
 	"context"
 
-	"github.com/microsoft/retina/pkg/enricher"
+	"github.com/microsoft/retina/pkg/enricher/base"
 )
 
 type Module struct{}
 
-func InitModule(_ context.Context, _ enricher.EnricherInterface) *Module {
+func InitModule(_ context.Context, _ base.EnricherInterface) *Module {
 	return &Module{}
 }
 

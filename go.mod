@@ -220,7 +220,7 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250528174236-200df99c418a // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	k8s.io/apiserver v0.32.3 // indirect
-	k8s.io/component-base v0.32.3
+	k8s.io/component-base v0.32.3 // indirect
 	k8s.io/cri-api v0.30.1 // indirect
 	oras.land/oras-go v1.2.5 // indirect
 	sigs.k8s.io/kustomize/api v0.18.0 // indirect
@@ -272,7 +272,6 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.2
 	github.com/Microsoft/hcsshim v0.13.0
 	github.com/Sytten/logrus-zap-hook v0.1.0
-	github.com/alecthomas/assert/v2 v2.11.0
 	github.com/aws/aws-sdk-go-v2 v1.38.3
 	github.com/aws/aws-sdk-go-v2/config v1.31.6
 	github.com/aws/aws-sdk-go-v2/credentials v1.18.10
@@ -318,7 +317,6 @@ require (
 	k8s.io/metrics v0.32.3
 	k8s.io/perf-tests/network/benchmarks/netperf v0.0.0-00010101000000-000000000000
 	sigs.k8s.io/controller-runtime v0.20.4
-	sigs.k8s.io/kind v0.23.0
 )
 
 require (
@@ -372,7 +370,6 @@ require (
 	github.com/OpenPeeDeeP/depguard/v2 v2.2.1 // indirect
 	github.com/ProtonMail/go-crypto v1.1.3 // indirect
 	github.com/alecthomas/go-check-sumtype v0.3.1 // indirect
-	github.com/alecthomas/repr v0.4.0 // indirect
 	github.com/alessio/shellescape v1.4.1 // indirect
 	github.com/alexkohler/nakedret/v2 v2.0.5 // indirect
 	github.com/alexkohler/prealloc v1.0.0 // indirect
@@ -665,6 +662,7 @@ require (
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20211110210527-619e6b92dab9 // indirect
 	sigs.k8s.io/controller-tools v0.16.5 // indirect
 	sigs.k8s.io/gateway-api v1.2.1-0.20250319040149-e8b8afabf889 // indirect
+	sigs.k8s.io/kind v0.23.0 // indirect
 	sigs.k8s.io/mcs-api v0.1.1-0.20250224121229-6c631f4730d0 // indirect
 	sigs.k8s.io/mcs-api/controllers v0.0.0-20250224121229-6c631f4730d0 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect

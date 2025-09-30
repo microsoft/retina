@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
-package source
+package azure
 
 import (
 	"encoding/json"
@@ -12,9 +12,9 @@ import (
 	"github.com/microsoft/retina/pkg/common"
 )
 
-type Statefile struct{}
-
-var StateFileLocation = "C:/Windows/System32/azure-vnet.json"
+type Statefile struct {
+	location string
+}
 
 type CniState struct {
 	Network Network `json:"Network"`
@@ -43,10 +43,16 @@ type IPInfo struct {
 	IP string `json:"IP"`
 }
 
-func (s *Statefile) GetAllEndpoints() ([]*common.RetinaEndpoint, error) {
-	data, err := os.ReadFile(StateFileLocation)
+func New(location string) *Statefile {
+	return &Statefile{
+		location: location,
+	}
+}
+
+func (a *Statefile) GetAllEndpoints() ([]*common.RetinaEndpoint, error) {
+	data, err := os.ReadFile(a.location)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read CNI state file: %w", err)
+		return nil, fmt.Errorf("failed to read azure-vnet state file: %w", err)
 	}
 
 	if len(data) == 0 {
@@ -55,12 +61,12 @@ func (s *Statefile) GetAllEndpoints() ([]*common.RetinaEndpoint, error) {
 
 	var cniState CniState
 	if err := json.Unmarshal(data, &cniState); err != nil {
-		return nil, fmt.Errorf("failed to decode CNI state file: %w", err)
+		return nil, fmt.Errorf("failed to decode azure-vnet state file: %w", err)
 	}
 
 	endpoints := []*common.RetinaEndpoint{}
 
-	// For every HNS endpoint, we check if the equivalent IP address exists in the CNI state file
+	// For every HNS endpoint, we check if the equivalent IP address exists in the azure-vnet state file
 	for _, iface := range cniState.Network.ExternalInterfaces {
 		for _, networkInfo := range iface.Networks {
 			for _, endpoint := range networkInfo.Endpoints {
