@@ -56,7 +56,7 @@ func New(config *kcfg.StandaloneConfig, cache *standalone.Cache, metricsModule *
 		cache:         cache,
 		config:        config,
 		metricsModule: metricsModule,
-		l:             log.Logger().Named(string("Controller")),
+		l:             log.Logger().Named(string("RetinaEndpointController")),
 	}, nil
 }
 
@@ -104,7 +104,7 @@ func (c *Controller) Reconcile(ctx context.Context) error {
 
 // Run starts the controller loop
 func (c *Controller) Run(ctx context.Context) {
-	c.l.Info("Starting controller")
+	c.l.Info("Starting RetinaEndpoint controller")
 
 	ticker := time.NewTicker(c.config.MetricsInterval)
 	defer ticker.Stop()
@@ -124,7 +124,7 @@ func (c *Controller) Run(ctx context.Context) {
 
 // Stop stops the controller and cleans up resources
 func (c *Controller) Stop() {
-	c.l.Info("Stopping controller")
+	c.l.Info("Stopping RetinaEndpoint controller")
 	c.cache.Clear()
 	c.metricsModule.Clear()
 }

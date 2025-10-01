@@ -46,14 +46,17 @@ func TestControllerReconcile(t *testing.T) {
 	newEndpoint := common.NewRetinaEndpoint("new-pod", "default", &common.IPAddresses{IPv4: net.ParseIP("1.1.1.1")})
 	mockSource.EXPECT().GetAllEndpoints().Return([]*common.RetinaEndpoint{newEndpoint}, nil)
 
+	// Need valid file path to initialize statefile source
+	testMockStatefilePath := "./source/statefile/azure/azure-vnet-mock.json"
+
 	// Setup test controller with invalid config to test error handling
-	invalidCfg := &kcfg.StandaloneConfig{MetricsInterval: time.Second, EnrichmentMode: "gcp-statefile"}
+	invalidCfg := &kcfg.StandaloneConfig{MetricsInterval: time.Second, EnrichmentMode: "gcp-statefile", StateFileLocation: testMockStatefilePath}
 	controller, err := New(invalidCfg, cache, metricsModule)
 	require.Error(t, err)
 	require.Nil(t, controller)
 
 	// Setup test controller with valid config
-	cfg := &kcfg.StandaloneConfig{MetricsInterval: time.Second, EnrichmentMode: "azure-vnet-statefile"}
+	cfg := &kcfg.StandaloneConfig{MetricsInterval: time.Second, EnrichmentMode: "azure-vnet-statefile", StateFileLocation: testMockStatefilePath}
 	controller, err = New(cfg, cache, metricsModule)
 	require.NoError(t, err)
 	require.NotNil(t, controller)
