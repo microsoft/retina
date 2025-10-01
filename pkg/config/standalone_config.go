@@ -23,7 +23,7 @@ type StandaloneConfig struct {
 	MetricsInterval      time.Duration `yaml:"metricsInterval"`
 	TelemetryInterval    time.Duration `yaml:"telemetryInterval"`
 	EnrichmentMode       string        `yaml:"enrichmentMode"`
-	CriCtlCommandTimeout time.Duration `yaml:"crictlCommandTimeout"`
+	CrictlCommandTimeout time.Duration `yaml:"crictlCommandTimeout"`
 	StateFileLocation    string        `yaml:"stateFileLocation"`
 }
 
@@ -36,7 +36,7 @@ var (
 		MetricsInterval:      time.Second,
 		EnrichmentMode:       "crictl",
 		TelemetryInterval:    DefaultTelemetryInterval,
-		CriCtlCommandTimeout: 5 * time.Second,
+		CrictlCommandTimeout: 5 * time.Second,
 	}
 
 	ErrMissingStateFileLocation = errors.New("stateFileLocation must be set when using statefile enrichment mode")
@@ -80,9 +80,9 @@ func GetStandaloneConfig(cfgFilename string) (*StandaloneConfig, error) {
 		config.TelemetryInterval = DefaultTelemetryInterval
 	}
 
-	if config.CriCtlCommandTimeout == 0 {
-		log.Printf("crictlCommandTimeout is not set, defaulting to %v", DefaultStandaloneConfig.CriCtlCommandTimeout)
-		config.CriCtlCommandTimeout = DefaultStandaloneConfig.CriCtlCommandTimeout
+	if config.CrictlCommandTimeout == 0 {
+		log.Printf("crictlCommandTimeout is not set, defaulting to %v", DefaultStandaloneConfig.CrictlCommandTimeout)
+		config.CrictlCommandTimeout = DefaultStandaloneConfig.CrictlCommandTimeout
 	}
 
 	switch {

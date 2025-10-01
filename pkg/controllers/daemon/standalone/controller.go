@@ -39,7 +39,10 @@ func New(config *kcfg.StandaloneConfig, cache *standalone.Cache, metricsModule *
 
 	switch {
 	case config.EnrichmentMode == "crictl":
-		src = ctrinfo.New(config.CriCtlCommandTimeout)
+		src, err = ctrinfo.New(config.CrictlCommandTimeout)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create crictl source: %w", err)
+		}
 
 	case strings.HasSuffix(config.EnrichmentMode, "statefile"):
 		src, err = statefile.New(config.EnrichmentMode, config.StateFileLocation)
@@ -103,7 +106,7 @@ func (c *Controller) Reconcile(ctx context.Context) error {
 func (c *Controller) Run(ctx context.Context) {
 	c.l.Info("Starting controller")
 
-	ticker := time.NewTicker(c.config.MetricsInterval / 2)
+	ticker := time.NewTicker(c.config.MetricsInterval)
 	defer ticker.Stop()
 
 	for {

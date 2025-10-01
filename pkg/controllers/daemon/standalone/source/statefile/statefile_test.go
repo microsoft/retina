@@ -36,7 +36,7 @@ func TestNew(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			src, err := New(tt.enrichmentMode, tt.location)
+			src, err := newStatefile(tt.enrichmentMode, tt.location)
 
 			if tt.wantErr != nil {
 				require.ErrorContains(t, err, tt.wantErr.Error())

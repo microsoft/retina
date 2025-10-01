@@ -48,10 +48,18 @@ var (
 	errJSONRead   = errors.New("error unmarshalling JSON")
 )
 
-func New(commandTimeout time.Duration) *Ctrinfo {
+func newCtrinfo(commandTimeout time.Duration) *Ctrinfo {
 	return &Ctrinfo{
 		commandTimeout: commandTimeout,
 	}
+}
+
+func New(commandTimeout time.Duration) (*Ctrinfo, error) {
+	_, err := exec.LookPath("crictl")
+	if err != nil {
+		return nil, fmt.Errorf("crictl not found in PATH: %w", err)
+	}
+	return newCtrinfo(commandTimeout), nil
 }
 
 func (c *Ctrinfo) GetAllEndpoints() ([]*common.RetinaEndpoint, error) {

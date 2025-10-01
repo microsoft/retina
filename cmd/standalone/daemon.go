@@ -55,20 +55,20 @@ func (d *Daemon) Start() error {
 	// Initialize metrics module
 	metricsModule := sm.InitModule(ctx, enrich)
 
-	mainLogger.Info("Initializing standalone controller")
+	mainLogger.Info("Initializing RetinaEndpoint controller")
 	controller, err := sc.New(daemonCfg, controllerCache, metricsModule)
 	if err != nil {
-		return fmt.Errorf("failed to create standalone controller: %w", err)
+		mainLogger.Fatal("failed to create RetinaEndpoint controller", zap.Error(err))
 	}
 	go controller.Run(ctx)
 
-	// Standalone requires pod level to be disabled
+	// Initialize controller manager
 	controllerMgr, err := cm.NewStandaloneControllerManager(daemonCfg, tel)
 	if err != nil {
-		mainLogger.Fatal("Failed to create controller manager", zap.Error(err))
+		mainLogger.Fatal("failed to create standalone controller manager", zap.Error(err))
 	}
 	if err := controllerMgr.Init(); err != nil {
-		mainLogger.Fatal("Failed to initialize controller manager", zap.Error(err))
+		mainLogger.Fatal("failed to initialize standalone controller manager", zap.Error(err))
 	}
 
 	// start heartbeat goroutine for application insights

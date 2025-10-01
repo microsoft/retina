@@ -21,7 +21,7 @@ func TestCtrinfoGetAllEndpoints(t *testing.T) {
 	require.NoError(t, err, "failed to create invalid JSON file")
 	defer os.Remove(invalidJSONPath)
 
-	src := New(5 * time.Second)
+	src := newCtrinfo(1 * time.Second)
 
 	tests := []struct {
 		name                   string

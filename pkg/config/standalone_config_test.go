@@ -23,7 +23,7 @@ func TestGetStandaloneConfig(t *testing.T) {
 		c.MetricsInterval != 1*time.Second ||
 		c.TelemetryInterval != 15*time.Minute ||
 		c.EnrichmentMode != "azure-vnet-statefile" ||
-		c.CriCtlCommandTimeout != 5*time.Second ||
+		c.CrictlCommandTimeout != 5*time.Second ||
 		c.StateFileLocation != "/generic/file/location/azure-vnet.json" {
 		t.Errorf("Expeted config should be same as ./testwith/config-standalone.yaml; instead got %+v", c)
 	}
