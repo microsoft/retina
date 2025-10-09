@@ -64,6 +64,10 @@ helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
 
 ### Standard Control Plane
 
+>NOTE: Before installing Retina via Helm, you need to authenticate to [GitHub Container Registry (GHCR)](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry) to pull the required images.
+
+Run the following command: `docker login ghcr.io`
+
 #### Basic Mode
 
 ```shell
