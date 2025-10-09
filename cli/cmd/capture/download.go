@@ -172,7 +172,7 @@ func createDownloadPod(ctx context.Context, kubeClient *kubernetes.Clientset, na
 			Containers: []corev1.Container{
 				{
 					Name:    "download",
-					Image:   "busybox",
+					Image:   "mcr.microsoft.com/azurelinux/busybox:1.36",
 					Command: []string{"sh", "-c", "echo 'Download pod ready'; sleep 3600"},
 					VolumeMounts: []corev1.VolumeMount{
 						{
