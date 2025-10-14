@@ -10,7 +10,7 @@ import (
 	hp "github.com/cilium/cilium/pkg/hubble/parser"
 	"github.com/cilium/cilium/pkg/monitor/payload"
 	kcfg "github.com/microsoft/retina/pkg/config"
-	"github.com/microsoft/retina/pkg/enricher"
+	"github.com/microsoft/retina/pkg/enricher/base"
 	"github.com/microsoft/retina/pkg/log"
 )
 
@@ -19,7 +19,7 @@ const name = "ciliumeventobserver"
 type ciliumeventobserver struct {
 	cfg             *kcfg.Config
 	l               *log.ZapLogger
-	enricher        enricher.EnricherInterface
+	enricher        base.EnricherInterface
 	externalChannel chan *v1.Event
 	payloadEvents   chan *payload.Payload
 	connection      net.Conn
