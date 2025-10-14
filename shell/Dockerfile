@@ -20,6 +20,7 @@ RUN tdnf install -y \
 	nmap \
 	nmap-ncat \
 	openssh \
+	procps-ng \
 	sysstat \
 	socat \
 	tcpdump \

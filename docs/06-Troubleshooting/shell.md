@@ -184,6 +184,39 @@ pwru -h
 pwru "tcp and (src port 8080 or dst port 8080)" 
 ```
 
+## [sysctl](https://man7.org/linux/man-pages/man8/sysctl.8.html)
+
+Tool for viewing and modifying kernel parameters at runtime. `sysctl` is useful for network troubleshooting as it allows you to inspect and tune various kernel networking settings such as IP forwarding, TCP congestion control, buffer sizes, and other network-related parameters.
+
+For viewing kernel parameters, no special capabilities are required:
+
+```shell
+kubectl retina shell <node-name>
+```
+
+For modifying kernel parameters, you may need the `SYS_ADMIN` capability and/or `chroot` to the host filesystem depending on the parameter:
+
+```shell
+kubectl retina shell <node-name> --capabilities=SYS_ADMIN --mount-host-filesystem
+```
+
+You can then run, for example:
+
+```shell
+# View kernel parameters
+sysctl net.ipv4.ip_forward
+sysctl -a | grep tcp_congestion
+sysctl net.core.rmem_max
+
+# View all networking-related parameters
+sysctl -a | grep net
+
+# Modify parameters (may require chroot /host)
+sysctl -w net.ipv4.ip_forward=1
+```
+
+>NOTE: `sysctl` shows different kernel parameters depending on whether you're running in the container context or the node context. To view/modify the actual node's kernel parameters, use `chroot /host` after mounting the host filesystem. Running `sysctl` without `chroot` shows the container's view, which may have limited or different parameters.
+
 ## [bpftool](https://github.com/libbpf/bpftool)
 
 Allows you to list, dump, load BPF programs, etc. Reference utility to quickly inspect and manage BPF objects on your system, to manipulate BPF object files, or to perform various other BPF-related tasks.
