@@ -358,7 +358,7 @@ int BPF_PROG(tcp_v4_connect_fexit, struct sock *sk, struct sockaddr *uaddr, int 
 }
 
 SEC("kprobe/inet_csk_accept")
-int BPF_KPROBE(inet_csk_accept, struct sock *sk, int flags, int *err, bool kern)
+int BPF_KPROBE(inet_csk_accept)
 {
     /*
     This function will save the reference value to error.
@@ -366,7 +366,22 @@ int BPF_KPROBE(inet_csk_accept, struct sock *sk, int flags, int *err, bool kern)
     */
     __u64 pid_tgid = bpf_get_current_pid_tgid();
     __u32 pid = pid_tgid >> 32;
-    __u64 err_ptr = (__u64)err;
+
+    __u64 err_ptr = 0;
+
+    // Linux v6.10-rc1+
+    // https://github.com/torvalds/linux/commit/92ef0fd55ac80dfc2e4654edfe5d1ddfa6e070fe
+    if (bpf_core_type_exists(struct proto_accept_arg)) {
+        struct proto_accept_arg *arg = (struct proto_accept_arg *)PT_REGS_PARM2(ctx);
+
+        int *err_ptr_raw = 0;
+        bpf_core_read(&err_ptr_raw, sizeof(err_ptr_raw), &arg->err);
+        err_ptr = (__u64)err_ptr_raw;
+    } else {
+        int *err = (int *)PT_REGS_PARM3(ctx);
+        err_ptr = (__u64)err;
+    }
+
     bpf_map_update_elem(&retina_dropreason_accept_pids, &pid, &err_ptr, BPF_ANY);
     return 0;
 }
