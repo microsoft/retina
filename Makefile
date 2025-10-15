@@ -3,7 +3,7 @@
 # Default platform commands
 RMDIR := rm -rf
 
-## Globals 
+## Globals
 GIT_CURRENT_BRANCH_NAME	:= $(shell git rev-parse --abbrev-ref HEAD) 
 
 REPO_ROOT = $(shell git rev-parse --show-toplevel)
