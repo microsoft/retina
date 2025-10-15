@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-# Default platform commands
+# Default platform commands 
 RMDIR := rm -rf
 
 ## Globals
