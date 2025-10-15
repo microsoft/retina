@@ -5,8 +5,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var pprofDumpCmd = &cobra.Command{
-	Use:   "pprof-dump",
+var sysdump = &cobra.Command{
+	Use:   "sysdump",
 	Short: "Dump pprof profiles from retina-agent pods",
 	Long:  "Dump pprof profiles from retina-agent pods",
 	Run: func(cmd *cobra.Command, args []string) {
@@ -16,7 +16,7 @@ var pprofDumpCmd = &cobra.Command{
 }
 
 func init() {
-	pprofDumpCmd.Flags().Int("duration", 30, "Duration in seconds for trace and CPU profile collection")
+	sysdump.Flags().Int("duration", 30, "Duration in seconds for trace and CPU profile collection")
 
-	rootCmd.AddCommand(pprofDumpCmd)
+	rootCmd.AddCommand(sysdump)
 }
