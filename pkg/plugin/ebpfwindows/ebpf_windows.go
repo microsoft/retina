@@ -281,6 +281,9 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 		if fl.GetEventType() == nil {
 			return fmt.Errorf("%w", errNilDropNotifyEvent)
 		}
+		if fl.GetIP() == nil {
+			return fmt.Errorf("%w; perfdata: %v;", errNilDropNotifyEvent, perfData)
+		}
 		// Set the drop reason.
 		eventType := fl.GetEventType().GetSubType()
 		meta.DropReason = utils.DropReason(eventType)
@@ -304,6 +307,9 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 		fl := e.GetFlow()
 		if fl == nil {
 			return fmt.Errorf("%w", errNilTraceNotifyFlow)
+		}
+		if fl.GetIP() == nil {
+			return fmt.Errorf("%w; perfdata: %v;", errNilDropNotifyEvent, perfData)
 		}
 		utils.AddRetinaMetadata(fl, meta)
 		p.enricher.Write(e)
@@ -329,6 +335,9 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 		}
 		if fl.GetEventType() == nil {
 			return fmt.Errorf("%w", errNilDropNotifyEvent)
+		}
+		if fl.GetIP() == nil {
+			return fmt.Errorf("%w; perfdata: %v;", errNilDropNotifyEvent, perfData)
 		}
 		// Set the drop reason.
 		eventType := fl.GetEventType().GetSubType()
