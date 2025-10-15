@@ -1,3 +1,20 @@
+
+# Build stage for Go binary
+FROM mcr.microsoft.com/oss/go/microsoft/golang:1.24 AS builder
+
+ARG GOARCH=amd64
+WORKDIR /workspace
+
+# Copy go mod files from shell/cmd directory
+COPY shell/cmd/go.mod shell/cmd/go.sum ./
+RUN go mod download
+
+# Copy the shell/cmd source files (includes main.go, pprof/, etc.)
+COPY shell/cmd/ ./
+
+# Build the retina CLI binary
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${GOARCH} go build -o /bin/retina .
+
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
 FROM mcr.microsoft.com/azurelinux/base/core@sha256:9948138108a3d69f1dae62104599ac03132225c3b7a5ac57b85a214629c8567d
 
@@ -31,14 +48,17 @@ RUN tdnf install -y \
 	ig \
 	&& tdnf clean all
 
+# Copy the retina binary from builder stage
+COPY --from=builder /bin/retina /usr/local/bin/retina
+
 # Create the entrypoint script to mount debugfs
 SHELL ["/bin/bash", "-c"]
 
 RUN echo $'#!/bin/bash\n\
-if ! mountpoint -q /sys/kernel/debug; then\n\
-mount -t debugfs none /sys/kernel/debug\n\
-fi\n\
-exec "$@"' > /usr/local/bin/entrypoint.sh;
+	if ! mountpoint -q /sys/kernel/debug; then\n\
+	mount -t debugfs none /sys/kernel/debug\n\
+	fi\n\
+	exec "$@"' > /usr/local/bin/entrypoint.sh;
 
 # Set the host root directory for IG
 ENV HOST_ROOT=/host
@@ -58,16 +78,16 @@ ENV PWRU_TAG=${PWRU_TAG}
 
 # Download and extract latest pwru release for the correct architecture (amd64 or arm64)
 RUN set -eux; \
-    case "$ARCH" in \
-        amd64|x86_64) PWRU_ARCH="amd64" ;; \
-        arm64|aarch64) PWRU_ARCH="arm64" ;; \
-        *) echo "Unsupported arch: $ARCH" && exit 1 ;; \
-    esac; \
-    PWRU_TAR="pwru-linux-${PWRU_ARCH}.tar.gz"; \
-    curl -fL -o /tmp/pwru.tar.gz "https://github.com/cilium/pwru/releases/download/${PWRU_TAG}/${PWRU_TAR}"; \
-    tar -xz -C /usr/local/bin -f /tmp/pwru.tar.gz pwru; \
-    chmod +x /usr/local/bin/pwru; \
-    rm /tmp/pwru.tar.gz; \
-    file /usr/local/bin/pwru | grep -q 'ELF'
+	case "$ARCH" in \
+	amd64|x86_64) PWRU_ARCH="amd64" ;; \
+	arm64|aarch64) PWRU_ARCH="arm64" ;; \
+	*) echo "Unsupported arch: $ARCH" && exit 1 ;; \
+	esac; \
+	PWRU_TAR="pwru-linux-${PWRU_ARCH}.tar.gz"; \
+	curl -fL -o /tmp/pwru.tar.gz "https://github.com/cilium/pwru/releases/download/${PWRU_TAG}/${PWRU_TAR}"; \
+	tar -xz -C /usr/local/bin -f /tmp/pwru.tar.gz pwru; \
+	chmod +x /usr/local/bin/pwru; \
+	rm /tmp/pwru.tar.gz; \
+	file /usr/local/bin/pwru | grep -q 'ELF'
 
 CMD ["/bin/bash", "-l"]

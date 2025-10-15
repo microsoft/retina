@@ -300,7 +300,7 @@ retina-shell-image:
 			IMAGE=$(RETINA_SHELL_IMAGE) \
 			VERSION=$(TAG) \
 			TAG=$(RETINA_PLATFORM_TAG) \
-			CONTEXT_DIR=$(REPO_ROOT)
+			CONTEXT_DIR=$(REPO_ROOT) 
 
 kubectl-retina-image:
 	echo "Building for $(PLATFORM)"
