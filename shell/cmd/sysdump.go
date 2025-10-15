@@ -1,7 +1,7 @@
-package cmd
+package main
 
 import (
-	"github.com/microsoft/retina/cmd/pprof"
+	"github.com/microsoft/retina/shell/cmd/pprof"
 	"github.com/spf13/cobra"
 )
 
