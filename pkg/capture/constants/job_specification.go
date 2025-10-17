@@ -23,7 +23,7 @@ const (
 	CaptureAppname        string = "capture"
 	CaptureContainername  string = "capture"
 	DownloadAppname       string = "download"
-	DownloadContainername string = "download"
+	DownloadContainerName string = "download"
 
 	// CaptureOutputLocationBlobUploadSecretName is the name of the secret that stores the blob upload url.
 	CaptureOutputLocationBlobUploadSecretName string = "capture-blob-upload-secret"

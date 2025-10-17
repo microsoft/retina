@@ -5,10 +5,11 @@ package capture
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
@@ -22,8 +23,10 @@ import (
 )
 
 const (
-	testCapture = "test-capture"
-	testFile    = "test-file"
+	testCapture  = "test-capture"
+	testFile     = "test-file"
+	cmdCommand   = "cmd"
+	shellCommand = "sh"
 )
 
 func NewLinuxNode(name string) *corev1.Node {
@@ -60,7 +63,7 @@ func NewWindowsNode(name string) *corev1.Node {
 	}
 }
 
-func NewNamespace(name string) *corev1.Namespace {
+func NewDownloadNamespace(name string) *corev1.Namespace {
 	return &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -95,8 +98,8 @@ func newDownloadKubeClient(objects []runtime.Object) *fake.Clientset {
 		objects = []runtime.Object{
 			NewLinuxNode("linux-node-1"),
 			NewWindowsNode("windows-node-1"),
-			NewNamespace("default"),
-			NewNamespace("capture-test"),
+			NewDownloadNamespace("default"),
+			NewDownloadNamespace("capture-test"),
 		}
 	}
 
@@ -106,7 +109,7 @@ func newDownloadKubeClient(objects []runtime.Object) *fake.Clientset {
 	kubeClient.PrependReactor("create", "pods", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 		createAction, ok := action.(clienttesting.CreateAction)
 		if !ok {
-			return false, nil, errors.Wrap(ErrCreateDownloadPod, "expected CreateAction")
+			return false, nil, fmt.Errorf("%w: expected CreateAction", ErrCreateDownloadPod)
 		}
 		pod := createAction.GetObject().(*corev1.Pod)
 
@@ -145,7 +148,7 @@ func TestDownloadFromCluster(t *testing.T) {
 				return []runtime.Object{
 					NewLinuxNode("linux-node-1"),
 					NewWindowsNode("windows-node-1"),
-					NewNamespace("default"),
+					NewDownloadNamespace("default"),
 					NewCapturePodsWithStatus(testCapture, "default", "linux-node-1", corev1.PodSucceeded),
 					NewCapturePodsWithStatus(testCapture, "default", "windows-node-1", corev1.PodSucceeded),
 				}
@@ -159,7 +162,7 @@ func TestDownloadFromCluster(t *testing.T) {
 			setupObjects: func() []runtime.Object {
 				return []runtime.Object{
 					NewLinuxNode("linux-node-1"),
-					NewNamespace("default"),
+					NewDownloadNamespace("default"),
 				}
 			},
 			wantErr:       true,
@@ -256,7 +259,7 @@ func TestGetNodeOS(t *testing.T) {
 					},
 				},
 			},
-			expected: Linux, // Default to Linux for unknown OS
+			expected: nil, // nil for unknown OS
 			wantErr:  true,
 		},
 	}
@@ -265,14 +268,16 @@ func TestGetNodeOS(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			result, err := getNodeOS(tc.node)
 
-			if tc.wantErr && err == nil {
-				t.Errorf("Expected error for %s, but got none", tc.name)
-				return
-			}
-
-			if !tc.wantErr && err != nil {
-				t.Errorf("Unexpected error for %s: %v", tc.name, err)
-				return
+			if tc.wantErr {
+				if err == nil {
+					t.Errorf("Expected error for %s, but got none", tc.name)
+					return
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error for %s: %v", tc.name, err)
+					return
+				}
 			}
 
 			if result != tc.expected {
@@ -288,14 +293,19 @@ func TestGetDownloadCmd(t *testing.T) {
 		node     *corev1.Node
 		hostPath string
 		fileName string
-		validate func(*testing.T, *DownloadCmd)
+		wantErr  bool
+		validate func(*testing.T, *DownloadCmd, error)
 	}{
 		{
 			name:     "Linux node download cmd",
 			node:     NewLinuxNode("linux-test"),
 			hostPath: "/tmp/captures",
 			fileName: testCapture,
-			validate: func(t *testing.T, cmd *DownloadCmd) {
+			wantErr:  false,
+			validate: func(t *testing.T, cmd *DownloadCmd, err error) {
+				if err != nil {
+					t.Fatalf("Expected no error, got: %v", err)
+				}
 				if cmd == nil {
 					t.Fatal("Expected DownloadCmd, got nil")
 				}
@@ -304,6 +314,15 @@ func TestGetDownloadCmd(t *testing.T) {
 				}
 				if !strings.Contains(cmd.SrcFilePath, "/host/tmp/captures/"+testCapture+".tar.gz") {
 					t.Errorf("Expected Linux source file path to match pattern, got %s", cmd.SrcFilePath)
+				}
+				if cmd.MountPath != "/host/tmp/captures" {
+					t.Errorf("Expected Linux mount path '/host/tmp/captures', got %s", cmd.MountPath)
+				}
+				if len(cmd.KeepAliveCommand) == 0 || cmd.KeepAliveCommand[0] != shellCommand {
+					t.Errorf("Expected Linux keep alive command to start with 'sh', got %v", cmd.KeepAliveCommand)
+				}
+				if len(cmd.FileCheckCommand) == 0 || cmd.FileCheckCommand[0] != shellCommand {
+					t.Errorf("Expected Linux file check command to start with 'sh', got %v", cmd.FileCheckCommand)
 				}
 				if len(cmd.FileReadCommand) == 0 || cmd.FileReadCommand[0] != "cat" {
 					t.Errorf("Expected Linux file read command to start with 'cat', got %v", cmd.FileReadCommand)
@@ -315,7 +334,11 @@ func TestGetDownloadCmd(t *testing.T) {
 			node:     NewWindowsNode("windows-test"),
 			hostPath: "/tmp/captures",
 			fileName: testCapture,
-			validate: func(t *testing.T, cmd *DownloadCmd) {
+			wantErr:  false,
+			validate: func(t *testing.T, cmd *DownloadCmd, err error) {
+				if err != nil {
+					t.Fatalf("Expected no error, got: %v", err)
+				}
 				if cmd == nil {
 					t.Fatal("Expected DownloadCmd, got nil")
 				}
@@ -325,8 +348,39 @@ func TestGetDownloadCmd(t *testing.T) {
 				if !strings.Contains(cmd.SrcFilePath, "C:\\host\\tmp\\captures\\"+testCapture+".tar.gz") {
 					t.Errorf("Expected Windows source file path to match pattern, got %s", cmd.SrcFilePath)
 				}
-				if len(cmd.FileReadCommand) == 0 || cmd.FileReadCommand[0] != "cmd" {
+				if cmd.MountPath != "C:\\host\\tmp\\captures" {
+					t.Errorf("Expected Windows mount path 'C:\\host\\tmp\\captures', got %s", cmd.MountPath)
+				}
+				if len(cmd.KeepAliveCommand) == 0 || cmd.KeepAliveCommand[0] != cmdCommand {
+					t.Errorf("Expected Windows keep alive command to start with 'cmd', got %v", cmd.KeepAliveCommand)
+				}
+				if len(cmd.FileCheckCommand) == 0 || cmd.FileCheckCommand[0] != cmdCommand {
+					t.Errorf("Expected Windows file check command to start with 'cmd', got %v", cmd.FileCheckCommand)
+				}
+				if len(cmd.FileReadCommand) == 0 || cmd.FileReadCommand[0] != cmdCommand {
 					t.Errorf("Expected Windows file read command to start with 'cmd', got %v", cmd.FileReadCommand)
+				}
+			},
+		},
+		{
+			name: "Unsupported node OS",
+			node: &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "unsupported-test"},
+				Status: corev1.NodeStatus{
+					NodeInfo: corev1.NodeSystemInfo{
+						OperatingSystem: "darwin",
+					},
+				},
+			},
+			hostPath: "/tmp/captures",
+			fileName: testCapture,
+			wantErr:  true,
+			validate: func(t *testing.T, cmd *DownloadCmd, err error) {
+				if err == nil {
+					t.Fatal("Expected error for unsupported OS, got nil")
+				}
+				if cmd != nil {
+					t.Errorf("Expected nil DownloadCmd for unsupported OS, got %v", cmd)
 				}
 			},
 		},
@@ -334,8 +388,8 @@ func TestGetDownloadCmd(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := getDownloadCmd(tc.node, tc.hostPath, tc.fileName)
-			tc.validate(t, result)
+			result, err := getDownloadCmd(tc.node, tc.hostPath, tc.fileName)
+			tc.validate(t, result, err)
 		})
 	}
 }
@@ -390,26 +444,22 @@ func TestGetWindowsContainerImage(t *testing.T) {
 }
 
 func TestDownloadService(t *testing.T) {
-	ctx := context.Background()
 	kubeClient := newDownloadKubeClient(nil)
 	config := &rest.Config{}
 	namespace := "test-namespace"
 
-	service := NewDownloadService(ctx, kubeClient, config, namespace)
+	service := NewDownloadService(kubeClient, config, namespace)
 
 	// Test service creation
 	if service == nil {
 		t.Fatal("Expected service to be created, got nil")
 	}
-	
+
 	if service.config != config {
 		t.Error("Expected config to match")
 	}
 	if service.namespace != namespace {
 		t.Error("Expected namespace to match")
-	}
-	if service.ctx != ctx {
-		t.Error("Expected context to match")
 	}
 }
 
@@ -455,14 +505,16 @@ func TestGetCapturePods(t *testing.T) {
 			ctx := context.Background()
 			pods, err := getCapturePods(ctx, kubeClient, tc.captureName, tc.namespace)
 
-			if tc.wantErr && err == nil {
-				t.Errorf("Expected error for %s, but got none", tc.name)
-				return
-			}
-
-			if !tc.wantErr && err != nil {
-				t.Errorf("Unexpected error for %s: %v", tc.name, err)
-				return
+			if tc.wantErr {
+				if err == nil {
+					t.Errorf("Expected error for %s, but got none", tc.name)
+					return
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error for %s: %v", tc.name, err)
+					return
+				}
 			}
 
 			if !tc.wantErr && len(pods.Items) != tc.expectedCount {
@@ -486,9 +538,9 @@ func TestDownloadFromBlobValidation(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "valid https URL",
+			name:    "valid https URL but no authentication",
 			blobURL: "https://storageaccount.blob.core.windows.net/container/blob",
-			wantErr: false,
+			wantErr: true, // Expect error due to missing authentication in test environment
 		},
 	}
 
@@ -501,15 +553,18 @@ func TestDownloadFromBlobValidation(t *testing.T) {
 
 			err := downloadFromBlob()
 
-			if tc.wantErr && err == nil {
-				t.Errorf("Expected error for %s, but got none", tc.name)
-			}
-
-			if !tc.wantErr && err == nil {
-				// For valid URLs, we expect the function to fail later due to missing authentication
-				// but URL parsing should succeed. Since we can't easily mock the Azure storage client,
-				// we'll just verify the URL parsing part works.
-				t.Logf("URL parsing succeeded for %s", tc.name)
+			if tc.wantErr {
+				if err == nil {
+					t.Errorf("Expected error for %s, but got none", tc.name)
+				} else {
+					t.Logf("Expected error occurred for %s: %v", tc.name, err)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error for %s: %v", tc.name, err)
+				} else {
+					t.Logf("Successfully completed %s", tc.name)
+				}
 			}
 		})
 	}
@@ -521,12 +576,12 @@ func TestDownloadServiceMethods(t *testing.T) {
 	// Setup test objects
 	objects := []runtime.Object{
 		NewLinuxNode("test-node"),
-		NewNamespace("test-namespace"),
+		NewDownloadNamespace("test-namespace"),
 	}
 
 	kubeClient := newDownloadKubeClient(objects)
 	config := &rest.Config{}
-	service := NewDownloadService(ctx, kubeClient, config, "test-namespace")
+	service := NewDownloadService(kubeClient, config, "test-namespace")
 
 	t.Run("createDownloadPod creates pod correctly", func(t *testing.T) {
 		downloadCmd := &DownloadCmd{
@@ -535,7 +590,7 @@ func TestDownloadServiceMethods(t *testing.T) {
 			KeepAliveCommand: []string{"sh", "-c", "echo 'Download pod ready'; sleep 3600"},
 		}
 
-		pod, err := service.createDownloadPod("test-node", "/tmp/captures", testCapture, downloadCmd)
+		pod, err := service.createDownloadPod(ctx, "test-node", "/tmp/captures", testCapture, downloadCmd)
 		if err != nil {
 			t.Fatalf("Expected no error, got: %v", err)
 		}
@@ -580,7 +635,7 @@ func TestDownloadServiceMethods(t *testing.T) {
 			t.Fatalf("Failed to create test pod: %v", err)
 		}
 
-		readyPod, err := service.waitForPodReady(podName)
+		readyPod, err := service.waitForPodReady(ctx, podName)
 		if err != nil {
 			t.Fatalf("Expected no error waiting for pod, got: %v", err)
 		}
@@ -595,7 +650,7 @@ func TestDownloadServiceErrorHandling(t *testing.T) {
 	ctx := context.Background()
 	kubeClient := newDownloadKubeClient(nil)
 	config := &rest.Config{}
-	service := NewDownloadService(ctx, kubeClient, config, "test-namespace")
+	service := NewDownloadService(kubeClient, config, "test-namespace")
 
 	t.Run("DownloadFile handles unsupported node OS", func(t *testing.T) {
 		// Create a node with unsupported OS
@@ -614,7 +669,7 @@ func TestDownloadServiceErrorHandling(t *testing.T) {
 			t.Fatalf("Failed to create test node: %v", err)
 		}
 
-		err = service.DownloadFile("unsupported-node", "/tmp", testFile, testCapture)
+		err = service.DownloadFile(ctx, "unsupported-node", "/tmp", testFile, testCapture)
 		if err == nil {
 			t.Error("Expected error for unsupported node OS, got nil")
 		}
@@ -625,7 +680,7 @@ func TestDownloadServiceErrorHandling(t *testing.T) {
 	})
 
 	t.Run("DownloadFile handles missing node", func(t *testing.T) {
-		err := service.DownloadFile("nonexistent-node", "/tmp", testFile, testCapture)
+		err := service.DownloadFile(ctx, "nonexistent-node", "/tmp", testFile, testCapture)
 		if err == nil {
 			t.Error("Expected error for missing node, got nil")
 		}
