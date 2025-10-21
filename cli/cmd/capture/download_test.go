@@ -182,26 +182,17 @@ func TestDownloadFromCluster(t *testing.T) {
 			// on testing the service methods and individual functions
 			pods, err := getCapturePods(ctx, kubeClient, captureName, tc.namespace)
 
-			if tc.wantErr {
-				if err == nil {
-					t.Errorf("Expected error for test case %s, but got none", tc.name)
-					return
-				}
-				if tc.expectedError != "" && !strings.Contains(err.Error(), tc.expectedError) {
-					t.Errorf("Expected error message to contain %q, but got %q", tc.expectedError, err.Error())
-				}
-				return
+			if tc.wantErr && err == nil {
+				t.Errorf("Expected error for test case %s, but got none", tc.name)
 			}
-
-			if err != nil {
+			if tc.wantErr && err != nil && tc.expectedError != "" && !strings.Contains(err.Error(), tc.expectedError) {
+				t.Errorf("Expected error message to contain %q, but got %q", tc.expectedError, err.Error())
+			}
+			if !tc.wantErr && err != nil {
 				t.Errorf("Unexpected error for test case %s: %v", tc.name, err)
-				return
 			}
-
-			// For successful cases, validate the pods
-			if pods == nil || len(pods.Items) == 0 {
+			if !tc.wantErr && (pods == nil || len(pods.Items) == 0) {
 				t.Errorf("Expected to find capture pods for %s, but got none", tc.name)
-				return
 			}
 
 			// Validate pod properties
@@ -268,18 +259,12 @@ func TestGetNodeOS(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			result, err := getNodeOS(tc.node)
 
-			if tc.wantErr {
-				if err == nil {
-					t.Errorf("Expected error for %s, but got none", tc.name)
-					return
-				}
-			} else {
-				if err != nil {
-					t.Errorf("Unexpected error for %s: %v", tc.name, err)
-					return
-				}
+			if tc.wantErr && err == nil {
+				t.Errorf("Expected error for %s, but got none", tc.name)
 			}
-
+			if !tc.wantErr && err != nil {
+				t.Errorf("Unexpected error for %s: %v", tc.name, err)
+			}
 			if result != tc.expected {
 				t.Errorf("Expected %v, got %v for %s", tc.expected, result, tc.name)
 			}
@@ -505,18 +490,12 @@ func TestGetCapturePods(t *testing.T) {
 			ctx := context.Background()
 			pods, err := getCapturePods(ctx, kubeClient, tc.captureName, tc.namespace)
 
-			if tc.wantErr {
-				if err == nil {
-					t.Errorf("Expected error for %s, but got none", tc.name)
-					return
-				}
-			} else {
-				if err != nil {
-					t.Errorf("Unexpected error for %s: %v", tc.name, err)
-					return
-				}
+			if tc.wantErr && err == nil {
+				t.Errorf("Expected error for %s, but got none", tc.name)
 			}
-
+			if !tc.wantErr && err != nil {
+				t.Errorf("Unexpected error for %s: %v", tc.name, err)
+			}
 			if !tc.wantErr && len(pods.Items) != tc.expectedCount {
 				t.Errorf("Expected %d pods, got %d", tc.expectedCount, len(pods.Items))
 			}
@@ -553,18 +532,17 @@ func TestDownloadFromBlobValidation(t *testing.T) {
 
 			err := downloadFromBlob()
 
-			if tc.wantErr {
-				if err == nil {
-					t.Errorf("Expected error for %s, but got none", tc.name)
-				} else {
-					t.Logf("Expected error occurred for %s: %v", tc.name, err)
-				}
-			} else {
-				if err != nil {
-					t.Errorf("Unexpected error for %s: %v", tc.name, err)
-				} else {
-					t.Logf("Successfully completed %s", tc.name)
-				}
+			if tc.wantErr && err == nil {
+				t.Errorf("Expected error for %s, but got none", tc.name)
+			}
+			if !tc.wantErr && err != nil {
+				t.Errorf("Unexpected error for %s: %v", tc.name, err)
+			}
+			if tc.wantErr && err != nil {
+				t.Logf("Expected error occurred for %s: %v", tc.name, err)
+			}
+			if !tc.wantErr && err == nil {
+				t.Logf("Successfully completed %s", tc.name)
 			}
 		})
 	}
