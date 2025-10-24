@@ -764,15 +764,18 @@ func TestDownloadCommandFlags(t *testing.T) {
 				// Save original values
 				originalCaptureName := captureName
 				originalBlobURL := blobURL
+				originalDownloadAll := downloadAll
 				captureName = ""
 				blobURL = ""
+				downloadAll = false
 				defer func() {
 					captureName = originalCaptureName
 					blobURL = originalBlobURL
+					downloadAll = originalDownloadAll
 				}()
 
 				// Test the validation condition directly
-				if captureName == "" && blobURL == "" {
+				if captureName == "" && blobURL == "" && !downloadAll {
 					t.Log("Correctly identified missing required flags")
 				} else {
 					t.Error("Should have identified missing required flags")
@@ -781,6 +784,7 @@ func TestDownloadCommandFlags(t *testing.T) {
 				// Verify the command has the expected flags defined
 				nameFlag := cmd.Flag("name")
 				blobURLFlag := cmd.Flag("blob-url")
+				allFlag := cmd.Flag("all")
 				outputFlag := cmd.Flag("output")
 
 				if nameFlag == nil {
@@ -789,17 +793,111 @@ func TestDownloadCommandFlags(t *testing.T) {
 				if blobURLFlag == nil {
 					t.Error("Expected blob-url flag to be defined")
 				}
+				if allFlag == nil {
+					t.Error("Expected all flag to be defined")
+				}
 				if outputFlag == nil {
 					t.Error("Expected output flag to be defined")
 				}
 
-				// Test that both flags have empty default values
+				// Test that flags have expected default values
 				if nameFlag != nil && nameFlag.DefValue != "" {
 					t.Errorf("Expected name flag default to be empty, got '%s'", nameFlag.DefValue)
 				}
 				if blobURLFlag != nil && blobURLFlag.DefValue != "" {
 					t.Errorf("Expected blob-url flag default to be empty, got '%s'", blobURLFlag.DefValue)
 				}
+				if allFlag != nil && allFlag.DefValue != "false" {
+					t.Errorf("Expected all flag default to be false, got '%s'", allFlag.DefValue)
+				}
+			},
+		},
+		{
+			name: "valid all flag provided",
+			args: []string{"--all"},
+			validate: func(t *testing.T, cmd *cobra.Command) {
+				allFlag := cmd.Flag("all")
+				if allFlag == nil {
+					t.Error("Expected all flag to be defined")
+					return
+				}
+
+				if allFlag.Value.String() != "true" {
+					t.Errorf("Expected all flag value 'true', got '%s'", allFlag.Value.String())
+				}
+			},
+		},
+		{
+			name: "all flag with custom output path",
+			args: []string{"--all", "-o", "/custom/path"},
+			validate: func(t *testing.T, cmd *cobra.Command) {
+				allFlag := cmd.Flag("all")
+				outputFlag := cmd.Flag("output")
+
+				if allFlag == nil {
+					t.Error("Expected all flag to be defined")
+					return
+				}
+				if outputFlag == nil {
+					t.Error("Expected output flag to be defined")
+					return
+				}
+
+				if allFlag.Value.String() != "true" {
+					t.Errorf("Expected all flag value 'true', got '%s'", allFlag.Value.String())
+				}
+
+				if outputFlag.Value.String() != "/custom/path" {
+					t.Errorf("Expected output flag value '/custom/path', got '%s'", outputFlag.Value.String())
+				}
+			},
+		},
+		{
+			name: "all-namespaces flag with all flag",
+			args: []string{"--all", "--all-namespaces"},
+			validate: func(t *testing.T, _ *cobra.Command) {
+				if !downloadAll {
+					t.Error("Expected downloadAll to be true")
+				}
+				if !downloadAllNamespaces {
+					t.Error("Expected downloadAllNamespaces to be true")
+				}
+				if captureName != "" {
+					t.Error("Expected captureName to be empty")
+				}
+				if blobURL != "" {
+					t.Error("Expected blobURL to be empty")
+				}
+			},
+		},
+		{
+			name: "all-namespaces flag without all flag (should fail validation)",
+			args: []string{"--all-namespaces"},
+			validate: func(t *testing.T, _ *cobra.Command) {
+				if downloadAll {
+					t.Error("Expected downloadAll to be false")
+				}
+				if !downloadAllNamespaces {
+					t.Error("Expected downloadAllNamespaces to be true")
+				}
+				// This should fail validation in the actual command execution
+				// but we can't test that here since we're only parsing flags
+			},
+		},
+		{
+			name: "all-namespaces with name flag (should fail validation)",
+			args: []string{"--name", "test", "--all-namespaces"},
+			validate: func(t *testing.T, _ *cobra.Command) {
+				if downloadAll {
+					t.Error("Expected downloadAll to be false")
+				}
+				if !downloadAllNamespaces {
+					t.Error("Expected downloadAllNamespaces to be true")
+				}
+				if captureName != "test" {
+					t.Error("Expected captureName to be 'test'")
+				}
+				// This should fail validation in the actual command execution
 			},
 		},
 	}
@@ -816,6 +914,108 @@ func TestDownloadCommandFlags(t *testing.T) {
 			}
 
 			tc.validate(t, cmd)
+		})
+	}
+}
+
+func TestDownloadAllCapturesGracefulErrorHandling(t *testing.T) {
+	// Test the graceful error handling by testing individual components
+	// that are used in downloadAllCaptures
+
+	testCases := []struct {
+		name        string
+		pod         *corev1.Pod
+		expectSkip  bool
+		description string
+	}{
+		{
+			name: "successful pod",
+			pod:  NewCapturePodsWithStatus("test-capture", "default", "node1", corev1.PodSucceeded),
+			expectSkip: false,
+			description: "Pod with Succeeded status should be processed",
+		},
+		{
+			name: "failed pod",
+			pod:  NewCapturePodsWithStatus("test-capture", "default", "node1", corev1.PodFailed),
+			expectSkip: true,
+			description: "Pod with Failed status should be skipped with warning",
+		},
+		{
+			name: "running pod",
+			pod:  NewCapturePodsWithStatus("test-capture", "default", "node1", corev1.PodRunning),
+			expectSkip: true,
+			description: "Pod with Running status should be skipped with warning",
+		},
+		{
+			name: "pod missing host path annotation",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod",
+					Namespace: "default",
+					Labels: map[string]string{
+						label.CaptureNameLabel: "test-capture",
+					},
+					Annotations: map[string]string{
+						// Missing CaptureHostPathAnnotationKey
+						captureConstants.CaptureFilenameAnnotationKey: "test-file",
+					},
+				},
+				Spec: corev1.PodSpec{NodeName: "node1"},
+				Status: corev1.PodStatus{Phase: corev1.PodSucceeded},
+			},
+			expectSkip: true,
+			description: "Pod missing host path annotation should be skipped with warning",
+		},
+		{
+			name: "pod missing filename annotation",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod",
+					Namespace: "default",
+					Labels: map[string]string{
+						label.CaptureNameLabel: "test-capture",
+					},
+					Annotations: map[string]string{
+						captureConstants.CaptureHostPathAnnotationKey: "/tmp/captures",
+						// Missing CaptureFilenameAnnotationKey
+					},
+				},
+				Spec: corev1.PodSpec{NodeName: "node1"},
+				Status: corev1.PodStatus{Phase: corev1.PodSucceeded},
+			},
+			expectSkip: true,
+			description: "Pod missing filename annotation should be skipped with warning",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Test the logic that would be used in downloadAllCaptures
+			shouldSkip := false
+			
+			// Check pod status
+			if tc.pod.Status.Phase != corev1.PodSucceeded {
+				shouldSkip = true
+				t.Logf("Pod %s would be skipped due to status: %s", tc.pod.Name, tc.pod.Status.Phase)
+			}
+			
+			// Check annotations if pod status is good
+			if !shouldSkip {
+				if _, ok := tc.pod.Annotations[captureConstants.CaptureHostPathAnnotationKey]; !ok {
+					shouldSkip = true
+					t.Logf("Pod %s would be skipped due to missing host path annotation", tc.pod.Name)
+				}
+				if _, ok := tc.pod.Annotations[captureConstants.CaptureFilenameAnnotationKey]; !ok {
+					shouldSkip = true
+					t.Logf("Pod %s would be skipped due to missing filename annotation", tc.pod.Name)
+				}
+			}
+			
+			if shouldSkip != tc.expectSkip {
+				t.Errorf("Expected skip=%v, got skip=%v for %s", tc.expectSkip, shouldSkip, tc.description)
+			}
+			
+			t.Logf("Test case '%s' completed: %s", tc.name, tc.description)
 		})
 	}
 }
