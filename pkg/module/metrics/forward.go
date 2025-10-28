@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	v1 "github.com/cilium/cilium/api/v1/flow"
 	api "github.com/microsoft/retina/crd/api/v1alpha1"
@@ -34,16 +35,16 @@ type ForwardMetrics struct {
 	metricName string
 }
 
-func NewForwardCountMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext) *ForwardMetrics {
+func NewForwardCountMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext, ttl time.Duration) *ForwardMetrics {
 	if ctxOptions == nil || !strings.Contains(strings.ToLower(ctxOptions.MetricName), "forward") {
 		return nil
 	}
 
 	l := fl.Named("forward-metricsmodule")
 	l.Info("Creating forward count metrics", zap.Any("options", ctxOptions))
-	return &ForwardMetrics{
-		baseMetricObject: newBaseMetricsObject(ctxOptions, fl, isLocalContext),
-	}
+	fm := ForwardMetrics{}
+	fm.baseMetricObject = newBaseMetricsObject(ctxOptions, fl, isLocalContext, fm.expire, ttl)
+	return &fm
 }
 
 func (f *ForwardMetrics) Init(metricName string) {
@@ -94,6 +95,7 @@ func (f *ForwardMetrics) getLabels() []string {
 
 func (f *ForwardMetrics) Clean() {
 	exporter.UnregisterMetric(exporter.AdvancedRegistry, metricsinit.ToPrometheusType(f.forwardMetric))
+	f.clean()
 }
 
 // TODO: update ProcessFlow with bytes metrics. We are only accounting for count.
@@ -167,11 +169,28 @@ func (f *ForwardMetrics) processLocalCtxFlow(flow *v1.Flow) {
 	}
 }
 
+func (f *ForwardMetrics) expire(labels []string) bool {
+	var d bool
+	if f.forwardMetric != nil {
+		d = f.forwardMetric.DeleteLabelValues(labels...)
+		if d {
+			metricsinit.MetricsExpiredCounter.WithLabelValues(f.metricName).Inc()
+		}
+	}
+	return d
+}
+
 func (f *ForwardMetrics) update(fl *v1.Flow, labels []string) {
+	var updated bool
 	switch f.metricName {
 	case utils.ForwardPacketsGaugeName:
+		updated = true
 		f.forwardMetric.WithLabelValues(labels...).Add(float64(utils.PreviouslyObservedPackets(fl) + 1))
 	case utils.ForwardBytesGaugeName:
+		updated = true
 		f.forwardMetric.WithLabelValues(labels...).Add(float64(utils.PacketSize(fl) + utils.PreviouslyObservedBytes(fl)))
+	}
+	if updated {
+		f.updated(labels)
 	}
 }

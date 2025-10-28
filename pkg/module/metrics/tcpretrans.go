@@ -5,6 +5,7 @@ package metrics
 
 import (
 	"strings"
+	"time"
 
 	v1 "github.com/cilium/cilium/api/v1/flow"
 	api "github.com/microsoft/retina/crd/api/v1alpha1"
@@ -28,16 +29,16 @@ type TCPRetransMetrics struct {
 	tcpRetransMetrics metricsinit.GaugeVec
 }
 
-func NewTCPRetransMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext) *TCPRetransMetrics {
+func NewTCPRetransMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext, ttl time.Duration) *TCPRetransMetrics {
 	if ctxOptions == nil || !strings.Contains(strings.ToLower(ctxOptions.MetricName), "retrans") {
 		return nil
 	}
 
 	fl = fl.Named("tcpretrans-metricsmodule")
 	fl.Info("Creating TCP retransmit count metrics", zap.Any("options", ctxOptions))
-	return &TCPRetransMetrics{
-		baseMetricObject: newBaseMetricsObject(ctxOptions, fl, isLocalContext),
-	}
+	t := &TCPRetransMetrics{}
+	t.baseMetricObject = newBaseMetricsObject(ctxOptions, fl, isLocalContext, t.expire, ttl)
+	return t
 }
 
 func (t *TCPRetransMetrics) Init(metricName string) {
@@ -96,7 +97,7 @@ func (t *TCPRetransMetrics) ProcessFlow(flow *v1.Flow) {
 		}
 	}
 
-	t.tcpRetransMetrics.WithLabelValues(labels...).Inc()
+	t.update(labels)
 }
 
 func (t *TCPRetransMetrics) processLocalCtxFlow(flow *v1.Flow) {
@@ -107,17 +108,34 @@ func (t *TCPRetransMetrics) processLocalCtxFlow(flow *v1.Flow) {
 
 	if len(labelValuesMap[ingress]) > 0 {
 		labels := append([]string{ingress}, labelValuesMap[ingress]...)
-		t.tcpRetransMetrics.WithLabelValues(labels...).Inc()
+		t.update(labels)
 		t.l.Debug("tcp retransmission count metric in INGRESS in local ctx", zap.Any("labels", labels))
 	}
 
 	if len(labelValuesMap[egress]) > 0 {
 		labels := append([]string{egress}, labelValuesMap[egress]...)
-		t.tcpRetransMetrics.WithLabelValues(labels...).Inc()
+		t.update(labels)
 		t.l.Debug("tcp retransmission count metric in EGRESS in local ctx", zap.Any("labels", labels))
 	}
 }
 
+func (t *TCPRetransMetrics) expire(labels []string) bool {
+	var d bool
+	if t.tcpRetransMetrics != nil {
+		d = t.tcpRetransMetrics.DeleteLabelValues(labels...)
+		if d {
+			metricsinit.MetricsExpiredCounter.WithLabelValues(TCPRetransCountName).Inc()
+		}
+	}
+	return d
+}
+
+func (t *TCPRetransMetrics) update(labels []string) {
+	t.tcpRetransMetrics.WithLabelValues(labels...).Inc()
+	t.updated(labels)
+}
+
 func (t *TCPRetransMetrics) Clean() {
 	exporter.UnregisterMetric(exporter.AdvancedRegistry, metricsinit.ToPrometheusType(t.tcpRetransMetrics))
+	t.clean()
 }

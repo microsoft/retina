@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	v1 "github.com/cilium/cilium/api/v1/flow"
 	api "github.com/microsoft/retina/crd/api/v1alpha1"
@@ -35,16 +36,16 @@ type DNSMetrics struct {
 	metricName string
 }
 
-func NewDNSMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext) *DNSMetrics {
+func NewDNSMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext, ttl time.Duration) *DNSMetrics {
 	if ctxOptions == nil || !strings.Contains(strings.ToLower(ctxOptions.MetricName), "dns") {
 		return nil
 	}
 
 	fl = fl.Named("dns-metricsmodule")
 	fl.Info("Creating DNS count metrics", zap.Any("options", ctxOptions))
-	return &DNSMetrics{
-		baseMetricObject: newBaseMetricsObject(ctxOptions, fl, isLocalContext),
-	}
+	d := &DNSMetrics{}
+	d.baseMetricObject = newBaseMetricsObject(ctxOptions, fl, isLocalContext, d.expire, ttl)
+	return d
 }
 
 func (d *DNSMetrics) Init(metricName string) {
@@ -197,7 +198,7 @@ func (d *DNSMetrics) ProcessFlow(flow *v1.Flow) {
 		}
 	}
 
-	d.dnsMetrics.WithLabelValues(labels...).Inc()
+	d.update(labels)
 	d.l.Debug("Update dns metric in remote ctx", zap.Any("metric", d.dnsMetrics), zap.Any("labels", labels))
 }
 
@@ -233,10 +234,27 @@ func (d *DNSMetrics) processLocalCtxFlow(flow *v1.Flow) {
 	} else {
 		return
 	}
-	d.dnsMetrics.WithLabelValues(labels...).Inc()
+	d.update(labels)
 	d.l.Debug("Update dns metric in local ctx", zap.Any("metric", d.dnsMetrics), zap.Any("labels", labels))
+}
+
+func (d *DNSMetrics) expire(labels []string) bool {
+	var del bool
+	if d.dnsMetrics != nil {
+		del = d.dnsMetrics.DeleteLabelValues(labels...)
+		if del {
+			metricsinit.MetricsExpiredCounter.WithLabelValues(d.metricName).Inc()
+		}
+	}
+	return del
+}
+
+func (d *DNSMetrics) update(labels []string) {
+	d.dnsMetrics.WithLabelValues(labels...).Inc()
+	d.updated(labels)
 }
 
 func (d *DNSMetrics) Clean() {
 	exporter.UnregisterMetric(exporter.AdvancedRegistry, metricsinit.ToPrometheusType(d.dnsMetrics))
+	d.clean()
 }

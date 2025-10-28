@@ -6,6 +6,7 @@ package metrics
 
 import (
 	"testing"
+	"time"
 
 	"github.com/cilium/cilium/api/v1/flow"
 	"github.com/microsoft/retina/crd/api/v1alpha1"
@@ -270,7 +271,7 @@ func TestNewDrop(t *testing.T) {
 		for _, metricName := range []string{"drop_count", "drop_bytes"} {
 			log.Logger().Info("Running test name", zap.String("name", tc.name), zap.String("metricName", metricName))
 			ctrl := gomock.NewController(t)
-			f := NewDropCountMetrics(tc.opts, log.Logger(), tc.localContext)
+			f := NewDropCountMetrics(tc.opts, log.Logger(), tc.localContext, time.Duration(0))
 			if tc.nilObj {
 				assert.Nil(t, f, "drop metrics should be nil Test Name: %s", tc.name)
 				continue
