@@ -6,6 +6,7 @@ package metrics
 
 import (
 	"testing"
+	"time"
 
 	"github.com/cilium/cilium/api/v1/flow"
 	"github.com/microsoft/retina/crd/api/v1alpha1"
@@ -159,7 +160,8 @@ func TestNewTCPMetrics(t *testing.T) {
 				"source_service",
 				"source_port",
 			},
-			metricCall: 1,
+			metricCall:     1,
+			trackedMetrics: 1,
 		},
 		{
 			name: "source opts with nil flow",
@@ -227,7 +229,8 @@ func TestNewTCPMetrics(t *testing.T) {
 				"source_service",
 				"source_port",
 			},
-			metricCall: 7,
+			metricCall:     7,
+			trackedMetrics: 7,
 		},
 		{
 			name: "dest opts with flow with all flags ",
@@ -266,7 +269,8 @@ func TestNewTCPMetrics(t *testing.T) {
 				"destination_service",
 				"destination_port",
 			},
-			metricCall: 7,
+			metricCall:     7,
+			trackedMetrics: 7,
 		},
 		{
 			name: "dest opts with flow with all but syn flags ",
@@ -304,7 +308,8 @@ func TestNewTCPMetrics(t *testing.T) {
 				"destination_service",
 				"destination_port",
 			},
-			metricCall: 7,
+			metricCall:     7,
+			trackedMetrics: 7,
 		},
 		{
 			name: "dest opts with flow with all flags dropped verdict",
@@ -382,8 +387,9 @@ func TestNewTCPMetrics(t *testing.T) {
 				"service",
 				"port",
 			},
-			localContext: localContext,
-			metricCall:   7,
+			localContext:   localContext,
+			metricCall:     7,
+			trackedMetrics: 7,
 		},
 		{
 			name: "local ctx dest opts with flow with all flags ",
@@ -462,8 +468,9 @@ func TestNewTCPMetrics(t *testing.T) {
 				"service",
 				"port",
 			},
-			localContext: localContext,
-			metricCall:   14,
+			localContext:   localContext,
+			metricCall:     14,
+			trackedMetrics: 7,
 		},
 	}
 
@@ -471,7 +478,7 @@ func TestNewTCPMetrics(t *testing.T) {
 		log.Logger().Info("Running test name", zap.String("name", tc.name))
 		ctrl := gomock.NewController(t)
 
-		tcp := NewTCPMetrics(tc.opts, log.Logger(), tc.localContext)
+		tcp := NewTCPMetrics(tc.opts, log.Logger(), tc.localContext, time.Duration(0))
 		if tc.nilObj {
 			assert.Nil(t, tcp, "forward metrics should be nil Test Name: %s", tc.name)
 			continue
@@ -488,10 +495,37 @@ func TestNewTCPMetrics(t *testing.T) {
 		})
 
 		tcpFlagMockMetrics.EXPECT().WithLabelValues(gomock.Any()).Return(testmetric).Times(tc.metricCall)
-		assert.Equal(t, tc.checkIsAdvance, tcp.advEnable, "IsAdvance should be %v Test Name: %s", tc.checkIsAdvance, tc.name)
+		assert.Equal(t, tc.checkIsAdvance, tcp.isAdvanced(), "IsAdvance should be %v Test Name: %s", tc.checkIsAdvance, tc.name)
 		assert.Equal(t, tc.exepectedLabels, tcp.getLabels(), "labels should be %v Test Name: %s", tc.exepectedLabels, tc.name)
 
 		tcp.ProcessFlow(tc.f)
+
+		assert.Equal(t, 0, len(tcp.trackedMetricLabels()), "there should be no tracked metrics when TTL is infinite Test Name: %s", tc.name)
+
+		// Test TTL based expiration
+		metricsinit.InitializeMetrics()
+
+		// Set the TTL to something high to ensure that our call to expire is the only one that expires the metrics
+		tcp = NewTCPMetrics(tc.opts, log.Logger(), tc.localContext, time.Minute)
+		tcp.tcpFlagsMetrics = tcpFlagMockMetrics
+
+		tcpFlagMockMetrics.EXPECT().WithLabelValues(gomock.Any()).Return(testmetric).Times(tc.metricCall)
+
+		tcp.ProcessFlow(tc.f)
+
+		tcpFlagMockMetrics.EXPECT().DeleteLabelValues(gomock.Any()).Return(true).Times(tc.trackedMetrics)
+
+		for _, ls := range tcp.trackedMetricLabels() {
+			assert.True(t, tcp.expire(ls), "metric should expire successfully Test Name: %s", tc.name)
+		}
+
+		// Test that clean calls the base object
+		baseMetricObjectMock := NewMockbaseMetricInterface(ctrl)
+		tcp.baseMetricInterface = baseMetricObjectMock
+
+		baseMetricObjectMock.EXPECT().clean().Times(1)
+
+		tcp.Clean()
 		ctrl.Finish()
 	}
 }

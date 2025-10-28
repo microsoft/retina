@@ -9,12 +9,18 @@ import (
 
 //go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=interfaces.go -destination=mock_types.go -package=metrics
 
+type MetricVec interface {
+	DeleteLabelValues(lvs ...string) bool
+}
+
 type CounterVec interface {
+	MetricVec
 	WithLabelValues(lvs ...string) prometheus.Counter
 	GetMetricWithLabelValues(lvs ...string) (prometheus.Counter, error)
 }
 
 type GaugeVec interface {
+	MetricVec
 	WithLabelValues(lvs ...string) prometheus.Gauge
 	GetMetricWithLabelValues(lvs ...string) (prometheus.Gauge, error)
 }

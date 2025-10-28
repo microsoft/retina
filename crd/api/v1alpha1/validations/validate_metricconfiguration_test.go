@@ -99,6 +99,86 @@ func TestMetricsConfiguration(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "valid metrics crd with TTL",
+			obj: &v1alpha1.MetricsConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "metricsconfig",
+				},
+				Spec: v1alpha1.MetricsSpec{
+					ContextOptions: []v1alpha1.MetricsContextOptions{
+						{
+							MetricName: "drop_count",
+							TTL:        "24h",
+						},
+					},
+					Namespaces: v1alpha1.MetricsNamespaces{
+						Exclude: []string{"kube-system"},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid metrics crd with zero TTL",
+			obj: &v1alpha1.MetricsConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "metricsconfig",
+				},
+				Spec: v1alpha1.MetricsSpec{
+					ContextOptions: []v1alpha1.MetricsContextOptions{
+						{
+							MetricName: "drop_count",
+							TTL:        "0",
+						},
+					},
+					Namespaces: v1alpha1.MetricsNamespaces{
+						Exclude: []string{"kube-system"},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid metrics crd with TTL",
+			obj: &v1alpha1.MetricsConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "metricsconfig",
+				},
+				Spec: v1alpha1.MetricsSpec{
+					ContextOptions: []v1alpha1.MetricsContextOptions{
+						{
+							MetricName: "drop_count",
+							TTL:        "24",
+						},
+					},
+					Namespaces: v1alpha1.MetricsNamespaces{
+						Exclude: []string{"kube-system"},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid metrics crd with negative TTL",
+			obj: &v1alpha1.MetricsConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "metricsconfig",
+				},
+				Spec: v1alpha1.MetricsSpec{
+					ContextOptions: []v1alpha1.MetricsContextOptions{
+						{
+							MetricName: "drop_count",
+							TTL:        "-24h",
+						},
+					},
+					Namespaces: v1alpha1.MetricsNamespaces{
+						Exclude: []string{"kube-system"},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
 			name: "invalid metrics crd with random metric name",
 			obj: &v1alpha1.MetricsConfiguration{
 				ObjectMeta: metav1.ObjectMeta{
@@ -347,6 +427,125 @@ func TestCompare(t *testing.T) {
 				},
 			},
 			equal: true,
+		},
+		{
+			name: "valid test 6",
+			old: &v1alpha1.MetricsConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "metricsconfig",
+				},
+				Spec: v1alpha1.MetricsSpec{
+					ContextOptions: []v1alpha1.MetricsContextOptions{
+						{
+							MetricName:   "drop_count",
+							SourceLabels: []string{"ns", "ip", "port"},
+							TTL:          "24h",
+						},
+					},
+					Namespaces: v1alpha1.MetricsNamespaces{
+						Include: []string{"default", "test"},
+						Exclude: []string{"kube-system"},
+					},
+				},
+			},
+			new: &v1alpha1.MetricsConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "metricsconfig",
+				},
+				Spec: v1alpha1.MetricsSpec{
+					ContextOptions: []v1alpha1.MetricsContextOptions{
+						{
+							MetricName:   "drop_count",
+							SourceLabels: []string{"ip", "port", "ns"},
+						},
+					},
+					Namespaces: v1alpha1.MetricsNamespaces{
+						Include: []string{"default", "test"},
+						Exclude: []string{"kube-system"},
+					},
+				},
+			},
+			equal: false,
+		},
+		{
+			name: "valid test 7",
+			old: &v1alpha1.MetricsConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "metricsconfig",
+				},
+				Spec: v1alpha1.MetricsSpec{
+					ContextOptions: []v1alpha1.MetricsContextOptions{
+						{
+							MetricName:   "drop_count",
+							SourceLabels: []string{"ns", "ip", "port"},
+							TTL:          "24h",
+						},
+					},
+					Namespaces: v1alpha1.MetricsNamespaces{
+						Include: []string{"default", "test"},
+						Exclude: []string{"kube-system"},
+					},
+				},
+			},
+			new: &v1alpha1.MetricsConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "metricsconfig",
+				},
+				Spec: v1alpha1.MetricsSpec{
+					ContextOptions: []v1alpha1.MetricsContextOptions{
+						{
+							MetricName:   "drop_count",
+							SourceLabels: []string{"ip", "port", "ns"},
+							TTL:          "24h",
+						},
+					},
+					Namespaces: v1alpha1.MetricsNamespaces{
+						Include: []string{"default", "test"},
+						Exclude: []string{"kube-system"},
+					},
+				},
+			},
+			equal: true,
+		},
+		{
+			name: "valid test 8",
+			old: &v1alpha1.MetricsConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "metricsconfig",
+				},
+				Spec: v1alpha1.MetricsSpec{
+					ContextOptions: []v1alpha1.MetricsContextOptions{
+						{
+							MetricName:   "drop_count",
+							SourceLabels: []string{"ns", "ip", "port"},
+							TTL:          "24h",
+						},
+					},
+					Namespaces: v1alpha1.MetricsNamespaces{
+						Include: []string{"default", "test"},
+						Exclude: []string{"kube-system"},
+					},
+				},
+			},
+			new: &v1alpha1.MetricsConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "metricsconfig",
+				},
+				Spec: v1alpha1.MetricsSpec{
+					ContextOptions: []v1alpha1.MetricsContextOptions{
+						{
+							MetricName:   "drop_count",
+							SourceLabels: []string{"ip", "port", "ns"},
+							TTL:          "12h",
+						},
+					},
+					Namespaces: v1alpha1.MetricsNamespaces{
+						Include: []string{"default", "test"},
+						Exclude: []string{"kube-system"},
+					},
+				},
+			},
+			equal: false,
 		},
 	}
 

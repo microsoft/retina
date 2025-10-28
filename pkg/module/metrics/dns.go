@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	v1 "github.com/cilium/cilium/api/v1/flow"
 	api "github.com/microsoft/retina/crd/api/v1alpha1"
@@ -30,21 +31,21 @@ var (
 )
 
 type DNSMetrics struct {
-	baseMetricObject
+	baseMetricInterface
 	dnsMetrics metricsinit.CounterVec
 	metricName string
 }
 
-func NewDNSMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext) *DNSMetrics {
+func NewDNSMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext, ttl time.Duration) *DNSMetrics {
 	if ctxOptions == nil || !strings.Contains(strings.ToLower(ctxOptions.MetricName), "dns") {
 		return nil
 	}
 
 	fl = fl.Named("dns-metricsmodule")
 	fl.Info("Creating DNS count metrics", zap.Any("options", ctxOptions))
-	return &DNSMetrics{
-		baseMetricObject: newBaseMetricsObject(ctxOptions, fl, isLocalContext),
-	}
+	d := &DNSMetrics{}
+	d.baseMetricInterface = newBaseMetricsObject(ctxOptions, fl, isLocalContext, d.expire, ttl)
+	return d
 }
 
 func (d *DNSMetrics) Init(metricName string) {
@@ -71,14 +72,14 @@ func (d *DNSMetrics) Init(metricName string) {
 
 func (d *DNSMetrics) getRequestLabels() []string {
 	labels := utils.DNSRequestLabels
-	if d.srcCtx != nil {
-		labels = append(labels, d.srcCtx.getLabels()...)
-		d.l.Info("src labels", zap.Any("labels", labels))
+	if d.sourceCtx() != nil {
+		labels = append(labels, d.sourceCtx().getLabels()...)
+		d.getLogger().Info("src labels", zap.Any("labels", labels))
 	}
 
-	if d.dstCtx != nil {
-		labels = append(labels, d.dstCtx.getLabels()...)
-		d.l.Info("dst labels", zap.Any("labels", labels))
+	if d.destinationCtx() != nil {
+		labels = append(labels, d.destinationCtx().getLabels()...)
+		d.getLogger().Info("dst labels", zap.Any("labels", labels))
 	}
 
 	return labels
@@ -86,14 +87,14 @@ func (d *DNSMetrics) getRequestLabels() []string {
 
 func (d *DNSMetrics) getResponseLabels() []string {
 	labels := utils.DNSResponseLabels
-	if d.srcCtx != nil {
-		labels = append(labels, d.srcCtx.getLabels()...)
-		d.l.Info("src labels", zap.Any("labels", labels))
+	if d.sourceCtx() != nil {
+		labels = append(labels, d.sourceCtx().getLabels()...)
+		d.getLogger().Info("src labels", zap.Any("labels", labels))
 	}
 
-	if d.dstCtx != nil {
-		labels = append(labels, d.dstCtx.getLabels()...)
-		d.l.Info("dst labels", zap.Any("labels", labels))
+	if d.destinationCtx() != nil {
+		labels = append(labels, d.destinationCtx().getLabels()...)
+		d.getLogger().Info("dst labels", zap.Any("labels", labels))
 	}
 
 	return labels
@@ -172,7 +173,7 @@ func (d *DNSMetrics) ProcessFlow(flow *v1.Flow) {
 
 	labels, err := d.getLabelsForProcessFlow(flow)
 	if err != nil {
-		d.l.Error("Failed to get labels for process flow", zap.Error(err))
+		d.getLogger().Error("Failed to get labels for process flow", zap.Error(err))
 		return
 	}
 
@@ -180,33 +181,33 @@ func (d *DNSMetrics) ProcessFlow(flow *v1.Flow) {
 		return
 	}
 
-	if d.srcCtx != nil {
-		srcLabels := d.srcCtx.getValues(flow)
+	if d.sourceCtx() != nil {
+		srcLabels := d.sourceCtx().getValues(flow)
 		if len(srcLabels) > 0 {
 			labels = append(labels, srcLabels...)
 		}
 	}
 
-	if d.dstCtx != nil {
-		dstLabels := d.dstCtx.getValues(flow)
+	if d.destinationCtx() != nil {
+		dstLabels := d.destinationCtx().getValues(flow)
 		if len(dstLabels) > 0 {
 			labels = append(labels, dstLabels...)
 		}
 	}
 
-	d.dnsMetrics.WithLabelValues(labels...).Inc()
-	d.l.Debug("Update dns metric in remote ctx", zap.Any("metric", d.dnsMetrics), zap.Any("labels", labels))
+	d.update(labels)
+	d.getLogger().Debug("Update dns metric in remote ctx", zap.Any("metric", d.dnsMetrics), zap.Any("labels", labels))
 }
 
 func (d *DNSMetrics) processLocalCtxFlow(flow *v1.Flow) {
-	labelValuesMap := d.srcCtx.getLocalCtxValues(flow)
+	labelValuesMap := d.sourceCtx().getLocalCtxValues(flow)
 	if labelValuesMap == nil {
 		return
 	}
 
 	labels, err := d.getLabelsForProcessFlow(flow)
 	if err != nil {
-		d.l.Error("Failed to get labels for process flow", zap.Error(err))
+		d.getLogger().Error("Failed to get labels for process flow", zap.Error(err))
 		return
 	}
 
@@ -230,10 +231,27 @@ func (d *DNSMetrics) processLocalCtxFlow(flow *v1.Flow) {
 	} else {
 		return
 	}
+	d.update(labels)
+	d.getLogger().Debug("Update dns metric in local ctx", zap.Any("metric", d.dnsMetrics), zap.Any("labels", labels))
+}
+
+func (d *DNSMetrics) expire(labels []string) bool {
+	var del bool
+	if d.dnsMetrics != nil {
+		del = d.dnsMetrics.DeleteLabelValues(labels...)
+		if del {
+			metricsinit.MetricsExpiredCounter.WithLabelValues(d.metricName).Inc()
+		}
+	}
+	return del
+}
+
+func (d *DNSMetrics) update(labels []string) {
 	d.dnsMetrics.WithLabelValues(labels...).Inc()
-	d.l.Debug("Update dns metric in local ctx", zap.Any("metric", d.dnsMetrics), zap.Any("labels", labels))
+	d.updated(labels)
 }
 
 func (d *DNSMetrics) Clean() {
 	exporter.UnregisterMetric(exporter.AdvancedRegistry, metricsinit.ToPrometheusType(d.dnsMetrics))
+	d.clean()
 }
