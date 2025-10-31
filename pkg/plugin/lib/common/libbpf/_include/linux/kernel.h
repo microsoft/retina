@@ -43,4 +43,18 @@
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 #define __KERNEL_DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
 
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#define be32_to_cpu(x)		__builtin_bswap32(x)
+#define cpu_to_be32(x)		__builtin_bswap32(x)
+#define be64_to_cpu(x)		__builtin_bswap64(x)
+#define cpu_to_be64(x)		__builtin_bswap64(x)
+#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#define be32_to_cpu(x)		(x)
+#define cpu_to_be32(x)		(x)
+#define be64_to_cpu(x)		(x)
+#define cpu_to_be64(x)		(x)
+#else
+# error "__BYTE_ORDER__ undefined or invalid"
+#endif
+
 #endif

@@ -312,8 +312,7 @@ int BPF_KRETPROBE(nf_hook_slow_ret, int retVal)
 }
 
 SEC("fexit/nf_hook_slow")
-int BPF_PROG(nf_hook_slow_fexit, struct sk_buff *skb, struct nf_hook_state *state,
-    const struct nf_hook_entries *e, unsigned int s, int retVal)
+int BPF_PROG(nf_hook_slow_fexit, struct sk_buff *skb, int retVal)
 {
     if (retVal < 0) {
         __u32 skb_len = 0;
@@ -358,7 +357,7 @@ int BPF_PROG(tcp_v4_connect_fexit, struct sock *sk, struct sockaddr *uaddr, int 
 }
 
 SEC("kprobe/inet_csk_accept")
-int BPF_KPROBE(inet_csk_accept, struct sock *sk, int flags, int *err, bool kern)
+int BPF_KPROBE(inet_csk_accept)
 {
     /*
     This function will save the reference value to error.
@@ -366,7 +365,22 @@ int BPF_KPROBE(inet_csk_accept, struct sock *sk, int flags, int *err, bool kern)
     */
     __u64 pid_tgid = bpf_get_current_pid_tgid();
     __u32 pid = pid_tgid >> 32;
-    __u64 err_ptr = (__u64)err;
+
+    __u64 err_ptr = 0;
+
+    // Linux v6.10-rc1+
+    // https://github.com/torvalds/linux/commit/92ef0fd55ac80dfc2e4654edfe5d1ddfa6e070fe
+    if (bpf_core_type_exists(struct proto_accept_arg)) {
+        struct proto_accept_arg *arg = (struct proto_accept_arg *)PT_REGS_PARM2(ctx);
+
+        int *err_ptr_raw = 0;
+        bpf_core_read(&err_ptr_raw, sizeof(err_ptr_raw), &arg->err);
+        err_ptr = (__u64)err_ptr_raw;
+    } else {
+        int *err = (int *)PT_REGS_PARM3(ctx);
+        err_ptr = (__u64)err;
+    }
+
     bpf_map_update_elem(&retina_dropreason_accept_pids, &pid, &err_ptr, BPF_ANY);
     return 0;
 }
@@ -415,8 +429,20 @@ int BPF_KRETPROBE(inet_csk_accept_ret, struct sock *sk)
 }
 
 SEC("fexit/inet_csk_accept")
-int BPF_PROG(inet_csk_accept_fexit, struct sock *sk, int flags, int *err, struct sock *retsk)
+int BPF_PROG(inet_csk_accept_fexit)
 {
+    // Use bpf_core_read for compatibility with both Linux v6.10-rc1+ and older versions.
+    // https://github.com/torvalds/linux/commit/92ef0fd55ac80dfc2e4654edfe5d1ddfa6e070fe
+    struct sock *retsk = NULL;
+
+    int offset;
+    if (bpf_core_type_exists(struct proto_accept_arg))
+        offset = 8 * 2;  // Linux 6.10+: 2 parameters (sk, arg)
+    else
+        offset = 8 * 4;  // Older kernels: 4 parameters (sk, newsock, flags, err)
+
+    bpf_core_read(&retsk, sizeof(retsk), (void *)ctx + offset);
+
     if (retsk != NULL) {
         return 0;
     }
@@ -424,7 +450,7 @@ int BPF_PROG(inet_csk_accept_fexit, struct sock *sk, int flags, int *err, struct
     // TODO
     // Pass 0 packet length - get_packet_from_sock above doesn't obtain this value, either.
     // Pass 0 return value; verifier failure, same as buggy kprobe above.
-    update_metrics_map_basic(TCP_ACCEPT_BASIC, 0, 0); 
+    update_metrics_map_basic(TCP_ACCEPT_BASIC, 0, 0);
 
     return 0;
 }

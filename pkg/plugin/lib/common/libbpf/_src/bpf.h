@@ -54,9 +54,12 @@ struct bpf_map_create_opts {
 	__s32 value_type_btf_obj_fd;
 
 	__u32 token_fd;
+
+	const void *excl_prog_hash;
+	__u32 excl_prog_hash_size;
 	size_t :0;
 };
-#define bpf_map_create_opts__last_field token_fd
+#define bpf_map_create_opts__last_field excl_prog_hash_size
 
 LIBBPF_API int bpf_map_create(enum bpf_map_type map_type,
 			      const char *map_name,
@@ -100,16 +103,19 @@ struct bpf_prog_load_opts {
 	__u32 log_level;
 	__u32 log_size;
 	char *log_buf;
-	/* output: actual total log contents size (including termintaing zero).
+	/* output: actual total log contents size (including terminating zero).
 	 * It could be both larger than original log_size (if log was
 	 * truncated), or smaller (if log buffer wasn't filled completely).
 	 * If kernel doesn't support this feature, log_size is left unchanged.
 	 */
 	__u32 log_true_size;
 	__u32 token_fd;
+
+	/* if set, provides the length of fd_array */
+	__u32 fd_array_cnt;
 	size_t :0;
 };
-#define bpf_prog_load_opts__last_field token_fd
+#define bpf_prog_load_opts__last_field fd_array_cnt
 
 LIBBPF_API int bpf_prog_load(enum bpf_prog_type prog_type,
 			     const char *prog_name, const char *license,
@@ -129,7 +135,7 @@ struct bpf_btf_load_opts {
 	char *log_buf;
 	__u32 log_level;
 	__u32 log_size;
-	/* output: actual total log contents size (including termintaing zero).
+	/* output: actual total log contents size (including terminating zero).
 	 * It could be both larger than original log_size (if log was
 	 * truncated), or smaller (if log buffer wasn't filled completely).
 	 * If kernel doesn't support this feature, log_size is left unchanged.
@@ -435,6 +441,11 @@ struct bpf_link_create_opts {
 			__u32 relative_id;
 			__u64 expected_revision;
 		} netkit;
+		struct {
+			__u32 relative_fd;
+			__u32 relative_id;
+			__u64 expected_revision;
+		} cgroup;
 	};
 	size_t :0;
 };
@@ -484,9 +495,10 @@ LIBBPF_API int bpf_link_get_next_id(__u32 start_id, __u32 *next_id);
 struct bpf_get_fd_by_id_opts {
 	size_t sz; /* size of this struct for forward/backward compatibility */
 	__u32 open_flags; /* permissions requested for the operation on fd */
+	__u32 token_fd;
 	size_t :0;
 };
-#define bpf_get_fd_by_id_opts__last_field open_flags
+#define bpf_get_fd_by_id_opts__last_field token_fd
 
 LIBBPF_API int bpf_prog_get_fd_by_id(__u32 id);
 LIBBPF_API int bpf_prog_get_fd_by_id_opts(__u32 id,
@@ -699,6 +711,27 @@ struct bpf_token_create_opts {
  */
 LIBBPF_API int bpf_token_create(int bpffs_fd,
 				struct bpf_token_create_opts *opts);
+
+struct bpf_prog_stream_read_opts {
+	size_t sz;
+	size_t :0;
+};
+#define bpf_prog_stream_read_opts__last_field sz
+/**
+ * @brief **bpf_prog_stream_read** reads data from the BPF stream of a given BPF
+ * program.
+ *
+ * @param prog_fd FD for the BPF program whose BPF stream is to be read.
+ * @param stream_id ID of the BPF stream to be read.
+ * @param buf Buffer to read data into from the BPF stream.
+ * @param buf_len Maximum number of bytes to read from the BPF stream.
+ * @param opts optional options, can be NULL
+ *
+ * @return The number of bytes read, on success; negative error code, otherwise
+ * (errno is also set to the error code)
+ */
+LIBBPF_API int bpf_prog_stream_read(int prog_fd, __u32 stream_id, void *buf, __u32 buf_len,
+				    struct bpf_prog_stream_read_opts *opts);
 
 #ifdef __cplusplus
 } /* extern "C" */

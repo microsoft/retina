@@ -1,5 +1,3 @@
-//go:build ignore
-
 // SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
 /*
  * Ring buffer operations.
@@ -90,8 +88,8 @@ int ring_buffer__add(struct ring_buffer *rb, int map_fd,
 	err = bpf_map_get_info_by_fd(map_fd, &info, &len);
 	if (err) {
 		err = -errno;
-		pr_warn("ringbuf: failed to get map info for fd=%d: %d\n",
-			map_fd, err);
+		pr_warn("ringbuf: failed to get map info for fd=%d: %s\n",
+			map_fd, errstr(err));
 		return libbpf_err(err);
 	}
 
@@ -125,8 +123,8 @@ int ring_buffer__add(struct ring_buffer *rb, int map_fd,
 	tmp = mmap(NULL, rb->page_size, PROT_READ | PROT_WRITE, MAP_SHARED, map_fd, 0);
 	if (tmp == MAP_FAILED) {
 		err = -errno;
-		pr_warn("ringbuf: failed to mmap consumer page for map fd=%d: %d\n",
-			map_fd, err);
+		pr_warn("ringbuf: failed to mmap consumer page for map fd=%d: %s\n",
+			map_fd, errstr(err));
 		goto err_out;
 	}
 	r->consumer_pos = tmp;
@@ -144,8 +142,8 @@ int ring_buffer__add(struct ring_buffer *rb, int map_fd,
 	tmp = mmap(NULL, (size_t)mmap_sz, PROT_READ, MAP_SHARED, map_fd, rb->page_size);
 	if (tmp == MAP_FAILED) {
 		err = -errno;
-		pr_warn("ringbuf: failed to mmap data pages for map fd=%d: %d\n",
-			map_fd, err);
+		pr_warn("ringbuf: failed to mmap data pages for map fd=%d: %s\n",
+			map_fd, errstr(err));
 		goto err_out;
 	}
 	r->producer_pos = tmp;
@@ -158,8 +156,8 @@ int ring_buffer__add(struct ring_buffer *rb, int map_fd,
 	e->data.fd = rb->ring_cnt;
 	if (epoll_ctl(rb->epoll_fd, EPOLL_CTL_ADD, map_fd, e) < 0) {
 		err = -errno;
-		pr_warn("ringbuf: failed to epoll add map fd=%d: %d\n",
-			map_fd, err);
+		pr_warn("ringbuf: failed to epoll add map fd=%d: %s\n",
+			map_fd, errstr(err));
 		goto err_out;
 	}
 
@@ -207,7 +205,7 @@ ring_buffer__new(int map_fd, ring_buffer_sample_fn sample_cb, void *ctx,
 	rb->epoll_fd = epoll_create1(EPOLL_CLOEXEC);
 	if (rb->epoll_fd < 0) {
 		err = -errno;
-		pr_warn("ringbuf: failed to create epoll instance: %d\n", err);
+		pr_warn("ringbuf: failed to create epoll instance: %s\n", errstr(err));
 		goto err_out;
 	}
 
@@ -460,7 +458,8 @@ static int user_ringbuf_map(struct user_ring_buffer *rb, int map_fd)
 	err = bpf_map_get_info_by_fd(map_fd, &info, &len);
 	if (err) {
 		err = -errno;
-		pr_warn("user ringbuf: failed to get map info for fd=%d: %d\n", map_fd, err);
+		pr_warn("user ringbuf: failed to get map info for fd=%d: %s\n",
+			map_fd, errstr(err));
 		return err;
 	}
 
@@ -476,8 +475,8 @@ static int user_ringbuf_map(struct user_ring_buffer *rb, int map_fd)
 	tmp = mmap(NULL, rb->page_size, PROT_READ, MAP_SHARED, map_fd, 0);
 	if (tmp == MAP_FAILED) {
 		err = -errno;
-		pr_warn("user ringbuf: failed to mmap consumer page for map fd=%d: %d\n",
-			map_fd, err);
+		pr_warn("user ringbuf: failed to mmap consumer page for map fd=%d: %s\n",
+			map_fd, errstr(err));
 		return err;
 	}
 	rb->consumer_pos = tmp;
@@ -496,8 +495,8 @@ static int user_ringbuf_map(struct user_ring_buffer *rb, int map_fd)
 		   map_fd, rb->page_size);
 	if (tmp == MAP_FAILED) {
 		err = -errno;
-		pr_warn("user ringbuf: failed to mmap data pages for map fd=%d: %d\n",
-			map_fd, err);
+		pr_warn("user ringbuf: failed to mmap data pages for map fd=%d: %s\n",
+			map_fd, errstr(err));
 		return err;
 	}
 
@@ -508,7 +507,7 @@ static int user_ringbuf_map(struct user_ring_buffer *rb, int map_fd)
 	rb_epoll->events = EPOLLOUT;
 	if (epoll_ctl(rb->epoll_fd, EPOLL_CTL_ADD, map_fd, rb_epoll) < 0) {
 		err = -errno;
-		pr_warn("user ringbuf: failed to epoll add map fd=%d: %d\n", map_fd, err);
+		pr_warn("user ringbuf: failed to epoll add map fd=%d: %s\n", map_fd, errstr(err));
 		return err;
 	}
 
@@ -533,7 +532,7 @@ user_ring_buffer__new(int map_fd, const struct user_ring_buffer_opts *opts)
 	rb->epoll_fd = epoll_create1(EPOLL_CLOEXEC);
 	if (rb->epoll_fd < 0) {
 		err = -errno;
-		pr_warn("user ringbuf: failed to create epoll instance: %d\n", err);
+		pr_warn("user ringbuf: failed to create epoll instance: %s\n", errstr(err));
 		goto err_out;
 	}
 

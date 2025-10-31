@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 /* Copyright (c) 2018 Facebook */
-#ifndef _UAPI__LINUX_BTF_H__
-#define _UAPI__LINUX_BTF_H__
+#ifndef __LINUX_BTF_H__
+#define __LINUX_BTF_H__
 
 #include <linux/types.h>
 
@@ -36,7 +36,8 @@ struct btf_type {
 	 * bits 24-28: kind (e.g. int, ptr, array...etc)
 	 * bits 29-30: unused
 	 * bit     31: kind_flag, currently used by
-	 *             struct, union, enum, fwd and enum64
+	 *             struct, union, enum, fwd, enum64,
+	 *             decl_tag and type_tag
 	 */
 	__u32 info;
 	/* "size" is used by INT, ENUM, STRUCT, UNION, DATASEC and ENUM64.
@@ -197,4 +198,4 @@ struct btf_enum64 {
 	__u32	val_hi32;
 };
 
-#endif /* _UAPI__LINUX_BTF_H__ */
+#endif /* __LINUX_BTF_H__ */

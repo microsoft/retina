@@ -21,7 +21,6 @@ import (
 type MockIMapIterator struct {
 	ctrl     *gomock.Controller
 	recorder *MockIMapIteratorMockRecorder
-	isgomock struct{}
 }
 
 // MockIMapIteratorMockRecorder is the mock recorder for MockIMapIterator.
@@ -73,7 +72,6 @@ func (mr *MockIMapIteratorMockRecorder) Next(keyOut, valueOut any) *gomock.Call 
 type MockIMap struct {
 	ctrl     *gomock.Controller
 	recorder *MockIMapMockRecorder
-	isgomock struct{}
 }
 
 // MockIMapMockRecorder is the mock recorder for MockIMap.
@@ -125,7 +123,6 @@ func (mr *MockIMapMockRecorder) Iterate() *gomock.Call {
 type MockIPerfReader struct {
 	ctrl     *gomock.Controller
 	recorder *MockIPerfReaderMockRecorder
-	isgomock struct{}
 }
 
 // MockIPerfReaderMockRecorder is the mock recorder for MockIPerfReader.
