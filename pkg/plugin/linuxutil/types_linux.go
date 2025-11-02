@@ -14,10 +14,9 @@ const defaultLimit = 2000
 
 //go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=types_linux.go -destination=linuxutil_mock_generated_linux.go -package=linuxutil
 type linuxUtil struct {
-	cfg              *kcfg.Config
-	l                *log.ZapLogger
-	isRunning        bool
-	prevTCPSockStats *SocketStats
+	cfg       *kcfg.Config
+	l         *log.ZapLogger
+	isRunning bool
 }
 
 var netstatCuratedKeys = map[string]struct{}{
@@ -88,9 +87,6 @@ type NetstatOpts struct {
 
 	// get only listening sockets
 	ListenSock bool
-
-	// previous TCP socket stats
-	PrevTCPSockStats *SocketStats
 }
 
 type EthtoolStats struct {
