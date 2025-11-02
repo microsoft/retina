@@ -94,11 +94,10 @@ func (lu *linuxUtil) run(ctx context.Context) error {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				tcpSocketStats, err := nsReader.readAndUpdate()
+				_, err := nsReader.readAndUpdate()
 				if err != nil {
 					lu.l.Error("Reading netstat failed", zap.Error(err))
 				}
-				lu.prevTCPSockStats = tcpSocketStats
 			}()
 
 			ethtoolOpts := &EthtoolOpts{

@@ -17,6 +17,9 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
+# logs
+*.log
+
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
@@ -48,3 +51,5 @@ netperf-*.csv
 .certs/
 
 artifacts/
+
+test-summary
