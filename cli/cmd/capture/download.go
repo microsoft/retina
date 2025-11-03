@@ -54,7 +54,7 @@ var (
 
 const (
 	DefaultOutputPath = "./"
-	TimestampFormat = "20060102150405"
+	TimestampFormat   = "20060102150405"
 )
 
 var (
@@ -106,8 +106,8 @@ type DownloadService struct {
 	namespace  string
 }
 
-// CaptureKey represents a unique capture identifier
-type CaptureKey struct {
+// Key represents a unique capture identifier
+type Key struct {
 	Name      string
 	Namespace string
 }
@@ -545,44 +545,6 @@ func downloadFromBlob() error {
 	return nil
 }
 
-func createTarGzArchive(files map[string][]byte, outputPath string) error {
-	// Create the output file
-	outFile, err := os.Create(outputPath)
-	if err != nil {
-		return fmt.Errorf("failed to create archive file: %w", err)
-	}
-	defer outFile.Close()
-
-	// Create gzip writer
-	gzipWriter := gzip.NewWriter(outFile)
-	defer gzipWriter.Close()
-
-	// Create tar writer
-	tarWriter := tar.NewWriter(gzipWriter)
-	defer tarWriter.Close()
-
-	// Add each file to the archive
-	for filePath, content := range files {
-		header := &tar.Header{
-			Name: filePath,
-			Mode: 0o600,
-			Size: int64(len(content)),
-		}
-
-		// Write header
-		if err := tarWriter.WriteHeader(header); err != nil {
-			return fmt.Errorf("failed to write header for %s: %w", filePath, err)
-		}
-
-		// Write content
-		if _, err := tarWriter.Write(content); err != nil {
-			return fmt.Errorf("failed to write content for %s: %w", filePath, err)
-		}
-	}
-
-	return nil
-}
-
 func downloadAllCaptures(ctx context.Context, config *rest.Config, namespace string) error {
 	if downloadAllNamespaces {
 		fmt.Println("Downloading all captures from all namespaces...")
@@ -634,14 +596,14 @@ func downloadAllCaptures(ctx context.Context, config *rest.Config, namespace str
 	}
 
 	// Group jobs by capture name and namespace
-	captureToJobs := make(map[CaptureKey][]batchv1.Job)
+	captureToJobs := make(map[Key][]batchv1.Job)
 	for i := range jobList.Items {
 		job := &jobList.Items[i]
 		captureNameFromLabel, ok := job.Labels[captureLabels.CaptureNameLabel]
 		if !ok {
 			continue
 		}
-		key := CaptureKey{Name: captureNameFromLabel, Namespace: job.Namespace}
+		key := Key{Name: captureNameFromLabel, Namespace: job.Namespace}
 		captureToJobs[key] = append(captureToJobs[key], *job)
 	}
 
@@ -650,7 +612,7 @@ func downloadAllCaptures(ctx context.Context, config *rest.Config, namespace str
 	// Create the final archive using streaming approach to avoid memory issues
 	timestamp := time.Now().Format(TimestampFormat)
 	finalArchivePath := filepath.Join(outputPath, fmt.Sprintf("all-captures-%s.tar.gz", timestamp))
-	
+
 	fmt.Printf("Creating final archive: %s\n", finalArchivePath)
 	err = createStreamingTarGzArchive(ctx, finalArchivePath, captureToJobs, kubeClient, config)
 	if err != nil {
@@ -662,7 +624,7 @@ func downloadAllCaptures(ctx context.Context, config *rest.Config, namespace str
 }
 
 // createStreamingTarGzArchive creates a tar.gz archive by streaming files one at a time to avoid memory issues
-func createStreamingTarGzArchive(ctx context.Context, outputPath string, captureToJobs map[CaptureKey][]batchv1.Job, kubeClient kubernetes.Interface, config *rest.Config) error {
+func createStreamingTarGzArchive(ctx context.Context, outputPath string, captureToJobs map[Key][]batchv1.Job, kubeClient kubernetes.Interface, config *rest.Config) error {
 	// Create the output file
 	outFile, err := os.Create(outputPath)
 	if err != nil {
@@ -757,9 +719,6 @@ func createStreamingTarGzArchive(ctx context.Context, outputPath string, capture
 
 			fileCount++
 			fmt.Printf("Added %s (%d bytes) to archive\n", archivePath, len(content))
-			
-			// Clear content from memory immediately after writing to archive
-			content = nil
 		}
 	}
 

@@ -929,21 +929,21 @@ func TestDownloadAllCapturesGracefulErrorHandling(t *testing.T) {
 		description string
 	}{
 		{
-			name: "successful pod",
-			pod:  NewCapturePodsWithStatus("test-capture", "default", "node1", corev1.PodSucceeded),
-			expectSkip: false,
+			name:        "successful pod",
+			pod:         NewCapturePodsWithStatus("test-capture", "default", "node1", corev1.PodSucceeded),
+			expectSkip:  false,
 			description: "Pod with Succeeded status should be processed",
 		},
 		{
-			name: "failed pod",
-			pod:  NewCapturePodsWithStatus("test-capture", "default", "node1", corev1.PodFailed),
-			expectSkip: true,
+			name:        "failed pod",
+			pod:         NewCapturePodsWithStatus("test-capture", "default", "node1", corev1.PodFailed),
+			expectSkip:  true,
 			description: "Pod with Failed status should be skipped with warning",
 		},
 		{
-			name: "running pod",
-			pod:  NewCapturePodsWithStatus("test-capture", "default", "node1", corev1.PodRunning),
-			expectSkip: true,
+			name:        "running pod",
+			pod:         NewCapturePodsWithStatus("test-capture", "default", "node1", corev1.PodRunning),
+			expectSkip:  true,
 			description: "Pod with Running status should be skipped with warning",
 		},
 		{
@@ -960,10 +960,10 @@ func TestDownloadAllCapturesGracefulErrorHandling(t *testing.T) {
 						captureConstants.CaptureFilenameAnnotationKey: "test-file",
 					},
 				},
-				Spec: corev1.PodSpec{NodeName: "node1"},
+				Spec:   corev1.PodSpec{NodeName: "node1"},
 				Status: corev1.PodStatus{Phase: corev1.PodSucceeded},
 			},
-			expectSkip: true,
+			expectSkip:  true,
 			description: "Pod missing host path annotation should be skipped with warning",
 		},
 		{
@@ -980,10 +980,10 @@ func TestDownloadAllCapturesGracefulErrorHandling(t *testing.T) {
 						// Missing CaptureFilenameAnnotationKey
 					},
 				},
-				Spec: corev1.PodSpec{NodeName: "node1"},
+				Spec:   corev1.PodSpec{NodeName: "node1"},
 				Status: corev1.PodStatus{Phase: corev1.PodSucceeded},
 			},
-			expectSkip: true,
+			expectSkip:  true,
 			description: "Pod missing filename annotation should be skipped with warning",
 		},
 	}
@@ -992,13 +992,13 @@ func TestDownloadAllCapturesGracefulErrorHandling(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Test the logic that would be used in downloadAllCaptures
 			shouldSkip := false
-			
+
 			// Check pod status
 			if tc.pod.Status.Phase != corev1.PodSucceeded {
 				shouldSkip = true
 				t.Logf("Pod %s would be skipped due to status: %s", tc.pod.Name, tc.pod.Status.Phase)
 			}
-			
+
 			// Check annotations if pod status is good
 			if !shouldSkip {
 				if _, ok := tc.pod.Annotations[captureConstants.CaptureHostPathAnnotationKey]; !ok {
@@ -1010,11 +1010,11 @@ func TestDownloadAllCapturesGracefulErrorHandling(t *testing.T) {
 					t.Logf("Pod %s would be skipped due to missing filename annotation", tc.pod.Name)
 				}
 			}
-			
+
 			if shouldSkip != tc.expectSkip {
 				t.Errorf("Expected skip=%v, got skip=%v for %s", tc.expectSkip, shouldSkip, tc.description)
 			}
-			
+
 			t.Logf("Test case '%s' completed: %s", tc.name, tc.description)
 		})
 	}
