@@ -8,18 +8,8 @@ ENV GOOS=${GOOS}
 ARG GOARCH=amd64
 ENV GOARCH=${GOARCH}
 
-RUN apt-get update &&\
-    apt-get -y install lsb-release wget software-properties-common gnupg file git make
-
 # Install clang and llvm.
-RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
-RUN add-apt-repository "deb http://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-14 main"
-RUN apt-get update
-
-RUN apt-get install -y clang-14 lldb-14 lld-14 clangd-14 man-db
-RUN apt-get install -y bpftool libbpf-dev
-
-RUN ln -s /usr/bin/clang-14 /usr/bin/clang
+RUN tdnf install -y clang lld bpftool libbpf-devel gnupg file git make lsb-release wget
 
 WORKDIR /app
 
