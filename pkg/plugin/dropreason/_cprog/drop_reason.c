@@ -228,6 +228,8 @@ static void get_packet_from_skb(struct packet *p, struct sk_buff *skb)
 #endif
 }
 
+#ifdef ADVANCED_METRICS
+#if ADVANCED_METRICS == 1
 static void get_packet_from_sock(struct packet *p, struct sock *sk)
 {
     // extract 5 tuple from pid
@@ -256,6 +258,8 @@ static void get_packet_from_sock(struct packet *p, struct sock *sk)
     p->dst_port = bpf_ntohs(dport);
     p->src_port = bpf_ntohs(sport);
 }
+#endif
+#endif
 
 /*
     This function will be saving the PID and length of skb it is working on.
@@ -312,8 +316,7 @@ int BPF_KRETPROBE(nf_hook_slow_ret, int retVal)
 }
 
 SEC("fexit/nf_hook_slow")
-int BPF_PROG(nf_hook_slow_fexit, struct sk_buff *skb, struct nf_hook_state *state,
-    const struct nf_hook_entries *e, unsigned int s, int retVal)
+int BPF_PROG(nf_hook_slow_fexit, struct sk_buff *skb, struct nf_hook_state *state, int retVal)
 {
     if (retVal < 0) {
         __u32 skb_len = 0;

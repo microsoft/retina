@@ -601,3 +601,30 @@ update-hubble:
         echo "  git push origin deps/update-hubble-to-$$latest_version"; \
         echo "Then create a pull request on GitHub."; \
     fi
+
+.PHONY: update-libbpf
+update-libbpf: ## Update libbpf headers and sources from upstream
+	@echo "Updating libbpf from upstream..."
+	@TMPDIR=$$(mktemp -d); \
+	echo "Cloning libbpf repository to $$TMPDIR..."; \
+	git clone --depth 1 https://github.com/libbpf/libbpf.git $$TMPDIR; \
+	echo "Copying libbpf source files..."; \
+	rm -rf $(REPO_ROOT)/pkg/plugin/lib/common/libbpf/_src/*; \
+	cp $$TMPDIR/src/*.c $(REPO_ROOT)/pkg/plugin/lib/common/libbpf/_src/ 2>/dev/null || true; \
+	cp $$TMPDIR/src/*.h $(REPO_ROOT)/pkg/plugin/lib/common/libbpf/_src/ 2>/dev/null || true; \
+	echo "Copying libbpf include files..."; \
+	rm -rf $(REPO_ROOT)/pkg/plugin/lib/common/libbpf/_include/linux/*; \
+	rm -rf $(REPO_ROOT)/pkg/plugin/lib/common/libbpf/_include/uapi/*; \
+	rm -rf $(REPO_ROOT)/pkg/plugin/lib/common/libbpf/_include/asm/*; \
+	cp -r $$TMPDIR/include/linux/* $(REPO_ROOT)/pkg/plugin/lib/common/libbpf/_include/linux/ 2>/dev/null || true; \
+	cp -r $$TMPDIR/include/uapi/* $(REPO_ROOT)/pkg/plugin/lib/common/libbpf/_include/uapi/ 2>/dev/null || true; \
+	cp -r $$TMPDIR/include/asm/* $(REPO_ROOT)/pkg/plugin/lib/common/libbpf/_include/asm/ 2>/dev/null || true; \
+	echo "Adding placeholder.go files..."; \
+	find $(REPO_ROOT)/pkg/plugin/lib/common/libbpf/_src -type d -exec sh -c 'echo "package placeholder" > {}/placeholder.go' \;; \
+	find $(REPO_ROOT)/pkg/plugin/lib/common/libbpf/_include -type d -exec sh -c 'echo "package placeholder" > {}/placeholder.go' \;; \
+	echo "Cleaning up temporary directory..."; \
+	rm -rf $$TMPDIR; \
+	echo ""; \
+	echo "libbpf files updated successfully!"; \
+	echo "Note: vmlinux.h files are architecture-specific and should be generated separately."; \
+	echo "To regenerate vmlinux.h, run: make update-vmlinux"
