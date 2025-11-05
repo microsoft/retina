@@ -138,3 +138,13 @@ func readIDField(path string) string {
 	}
 	return ""
 }
+
+// IsFtraceEnabled checks if ftrace is enabled in the kernel.
+// This is required for fexit/fentry programs to work.
+func IsFtraceEnabled() bool {
+	data, err := os.ReadFile("/proc/sys/kernel/ftrace_enabled")
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(string(data)) == "1"
+}
