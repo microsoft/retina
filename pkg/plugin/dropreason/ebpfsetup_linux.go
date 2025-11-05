@@ -28,6 +28,7 @@ eBPF Program Support Matrix
 
 Program Type Selection:
 - If:
+  - Ftrace is enabled AND
   - Arch == amd64 and kernel >= 5.5
   - Arch == arm64 and kernel >= 6.0
     → Use `fexit`
@@ -44,12 +45,14 @@ Scope Selection:
 +-----------+------------------------+--------------+--------+
 | Distro    | Arch + Kernel          | Prog         | Scope  |
 +-----------+------------------------+--------------+--------+
-| Mariner   | amd64, kernel >= 5.5   | fexit        | core   |
-| Mariner   | arm64, kernel >= 6.0   | fexit        | core   |
-| Non-Marin | amd64, kernel >= 5.5   | fexit        | all    |
-| Non-Marin | arm64, kernel >= 6.0   | fexit        | all    |
+| Mariner   | amd64, kernel >= 5.5   | fexit*       | core   |
+| Mariner   | arm64, kernel >= 6.0   | fexit*       | core   |
+| Non-Marin | amd64, kernel >= 5.5   | fexit*       | all    |
+| Non-Marin | arm64, kernel >= 6.0   | fexit*       | all    |
 | *         | (otherwise)            | kprobe       | per OS |
 +-----------+------------------------+--------------+--------+
+
+* fexit requires ftrace to be enabled in the kernel
 
 core kernel funcs:
 - tcp_v4_connect
@@ -74,16 +77,21 @@ func (dr *dropReason) getEbpfPayload() (objs interface{}, maps *kprobeMaps, supp
 	}
 	dr.l.Info("Detected kernel", zap.String("version", kv.String()))
 
-	objs, maps, supportsFexit = resolvePayload(runtime.GOARCH, kv, isMariner, dr.cfg.EnablePodLevel)
+	// Check if ftrace is enabled (required for fexit programs)
+	ftraceEnabled := plugincommon.IsFtraceEnabled()
+	dr.l.Info("Ftrace status", zap.Bool("enabled", ftraceEnabled))
+
+	objs, maps, supportsFexit = resolvePayload(runtime.GOARCH, kv, isMariner, dr.cfg.EnablePodLevel, ftraceEnabled)
 	return objs, maps, supportsFexit, nil
 }
 
-func resolvePayload(arch string, kv semver.Version, isMariner, isPodLevel bool) (interface{}, *kprobeMaps, bool) {
+func resolvePayload(arch string, kv semver.Version, isMariner, isPodLevel, ftraceEnabled bool) (interface{}, *kprobeMaps, bool) {
 	minVersionAmd64, _ := versioncheck.Version(MinAmdVersionNum)
 	minVersionArm64, _ := versioncheck.Version(MinArmVersionNum)
 
-	supportsFexit := (arch == "amd64" && kv.GTE(minVersionAmd64)) ||
-		(arch == "arm64" && kv.GTE(minVersionArm64))
+	supportsFexit := ftraceEnabled &&
+		((arch == "amd64" && kv.GTE(minVersionAmd64)) ||
+			(arch == "arm64" && kv.GTE(minVersionArm64)))
 
 	var objs interface{}
 	var maps *kprobeMaps
