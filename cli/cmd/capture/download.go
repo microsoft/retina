@@ -22,6 +22,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/storage"
 	retinacmd "github.com/microsoft/retina/cli/cmd"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
+	captureFile "github.com/microsoft/retina/pkg/capture/file"
 	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	captureLabels "github.com/microsoft/retina/pkg/label"
 	"github.com/spf13/cobra"
@@ -54,7 +55,6 @@ var (
 
 const (
 	DefaultOutputPath = "./"
-	TimestampFormat   = "20060102150405"
 )
 
 var (
@@ -610,7 +610,7 @@ func downloadAllCaptures(ctx context.Context, config *rest.Config, namespace str
 	fmt.Printf("Found %d capture(s) to download\n", len(captureToJobs))
 
 	// Create the final archive using streaming approach to avoid memory issues
-	timestamp := time.Now().Format(TimestampFormat)
+	timestamp := captureFile.TimeToString(captureFile.Now())
 	finalArchivePath := filepath.Join(outputPath, fmt.Sprintf("all-captures-%s.tar.gz", timestamp))
 
 	fmt.Printf("Creating final archive: %s\n", finalArchivePath)
