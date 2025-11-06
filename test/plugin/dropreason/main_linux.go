@@ -30,7 +30,7 @@ func main() {
 
 	cfg := &kcfg.Config{
 		MetricsInterval: 1 * time.Second,
-		EnablePodLevel:  true,
+		EnablePodLevel:  true, // Set to false to test fexit programs
 	}
 
 	// Filtermanager.
