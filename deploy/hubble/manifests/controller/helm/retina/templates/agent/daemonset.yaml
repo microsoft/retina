@@ -32,6 +32,9 @@ spec:
       {{- if .Values.agent.tolerations }}
       tolerations: {{- toYaml .Values.agent.tolerations | nindent 8 }}
       {{- end }}
+      {{- if .Values.agent.affinity }}
+      affinity: {{- toYaml .Values.agent.affinity | nindent 8 }}
+      {{- end }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -263,6 +266,9 @@ spec:
         kubernetes.io/os: windows
       {{- if .Values.agent.tolerations }}
       tolerations: {{- toYaml .Values.agent.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if .Values.agent.affinity }}
+      affinity: {{- toYaml .Values.agent.affinity | nindent 8 }}
       {{- end }}
       volumes:
       {{- range $name, $mountPath := .Values.volumeMounts_win }}
