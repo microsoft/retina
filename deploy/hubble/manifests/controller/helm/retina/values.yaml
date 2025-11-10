@@ -32,7 +32,6 @@ operator:
   # -- Node tolerations for pod assignment on nodes with taints
   # ref: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
   tolerations: []
-  affinity: {}
 
 agent:
   leaderElection: false
