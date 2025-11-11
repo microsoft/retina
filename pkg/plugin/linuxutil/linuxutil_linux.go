@@ -81,26 +81,6 @@ func (lu *linuxUtil) run(ctx context.Context) error {
 			lu.l.Info("Context is done, linuxutil will stop running")
 			return nil
 		case <-ticker.C:
-			opts := &NetstatOpts{
-				CuratedKeys:      true,
-				AddZeroVal:       false,
-				ListenSock:       false,
-				PrevTCPSockStats: lu.prevTCPSockStats,
-			}
-			var wg sync.WaitGroup
-
-			ns := &Netstat{}
-			nsReader := NewNetstatReader(opts, ns)
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				tcpSocketStats, err := nsReader.readAndUpdate()
-				if err != nil {
-					lu.l.Error("Reading netstat failed", zap.Error(err))
-				}
-				lu.prevTCPSockStats = tcpSocketStats
-			}()
-
 			ethtoolOpts := &EthtoolOpts{
 				errOrDropKeysOnly: true,
 				addZeroVal:        false,
@@ -117,6 +97,8 @@ func (lu *linuxUtil) run(ctx context.Context) error {
 				lu.l.Error("Error while creating ethReader")
 				return errors.New("error while creating ethReader")
 			}
+
+			var wg sync.WaitGroup
 
 			wg.Add(1)
 			go func() {

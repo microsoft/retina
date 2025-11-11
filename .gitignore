@@ -13,6 +13,7 @@
 
 # Test binary, built with `go test -c`
 *.test
+test-summary
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
@@ -48,3 +49,6 @@ netperf-*.csv
 .certs/
 
 artifacts/
+
+# logs
+*.log
