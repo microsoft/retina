@@ -28,7 +28,7 @@ var (
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Do Stuff Here
 			fmt.Println("Starting Retina Agent")
-			d := standard.NewDaemon(metricsAddr, probeAddr, cfgFile, enableLeaderElection)
+			d := standard.NewDaemon(cfgFile, metricsAddr, probeAddr, enableLeaderElection)
 			if err := d.Start(); err != nil {
 				return fmt.Errorf("starting daemon: %w", err)
 			}

@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	kcfg "github.com/microsoft/retina/pkg/config"
+	"github.com/microsoft/retina/pkg/enricher/base"
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
@@ -15,7 +16,6 @@ import (
 	nl "github.com/mdlayher/netlink"
 	"github.com/vishvananda/netlink"
 
-	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
 )
 
@@ -114,7 +114,7 @@ type packetParser struct {
 	// tcMap is a map of key to *val.
 	tcMap    *sync.Map
 	reader   perfReader
-	enricher enricher.EnricherInterface
+	enricher base.EnricherInterface
 	// interfaceLockMap is a map of key to *sync.Mutex.
 	interfaceLockMap    *sync.Map
 	endpointIngressInfo *ebpf.ProgramInfo

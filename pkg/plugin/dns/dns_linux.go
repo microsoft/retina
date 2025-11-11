@@ -14,7 +14,7 @@ import (
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/gadgets/trace/dns/types"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/utils/host"
 	kcfg "github.com/microsoft/retina/pkg/config"
-	"github.com/microsoft/retina/pkg/enricher"
+	"github.com/microsoft/retina/pkg/enricher/base"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/common"
@@ -63,8 +63,8 @@ func (d *dns) Init() error {
 
 func (d *dns) Start(ctx context.Context) error {
 	if d.cfg.EnablePodLevel {
-		if enricher.IsInitialized() {
-			d.enricher = enricher.Instance()
+		if base.IsInitialized() {
+			d.enricher = base.Instance()
 		} else {
 			d.l.Warn("retina enricher is not initialized")
 		}
