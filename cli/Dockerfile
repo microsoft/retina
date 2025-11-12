@@ -32,8 +32,8 @@ COPY --from=builder /workspace/kubectl-retina .
 # skopeo inspect docker://mcr.microsoft.com/cbl-mariner/base/core:2.0 --format "{{.Name}}@{{.Digest}}"
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/cbl-mariner/base/core@sha256:4d97d662d71c1fda938ed9df36d8f490d9107cff37e89c0efa932d073285ad85 AS shell-target
 WORKDIR /
-COPY --from=builder /workspace/kubectl-retina .
-RUN chmod +x /kubectl-retina
+COPY --from=builder /workspace/kubectl-retina /bin/kubectl-retina
+RUN chmod +x /bin/kubectl-retina
 
 # Default target (distroless for backward compatibility)
 FROM distroless-target
