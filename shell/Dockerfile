@@ -1,5 +1,5 @@
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260728@sha256:4ecd6b297db85c54ec2df07145a28536c3655a3e98e54eb2364189bc4e6eac23
+FROM mcr.microsoft.com/azurelinux/base/core:3.0@sha256:35149ae8dd179684f969944f54a337c665a64e702486154eb44253fb39c2505b
 
 RUN tdnf install -y \
 	bind-utils \
@@ -28,19 +28,15 @@ RUN tdnf install -y \
 	tar \
 	file \
 	bpftool \
-	bpftrace \
 	ig \
 	&& tdnf clean all
 
-# Create the entrypoint script to mount debugfs and tracefs
+# Create the entrypoint script to mount debugfs
 SHELL ["/bin/bash", "-c"]
 
 RUN echo $'#!/bin/bash\n\
 if ! mountpoint -q /sys/kernel/debug; then\n\
 mount -t debugfs none /sys/kernel/debug\n\
-fi\n\
-if ! mountpoint -q /sys/kernel/tracing; then\n\
-mount -t tracefs tracefs /sys/kernel/tracing\n\
 fi\n\
 exec "$@"' > /usr/local/bin/entrypoint.sh;
 
@@ -57,7 +53,7 @@ ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 ARG GOARCH=amd64
 ENV ARCH=${GOARCH}
 # https://github.com/cilium/pwru/releases
-ARG PWRU_TAG="v1.0.12"
+ARG PWRU_TAG="v1.0.9"
 ENV PWRU_TAG=${PWRU_TAG}
 
 # Download and extract latest pwru release for the correct architecture (amd64 or arm64)
