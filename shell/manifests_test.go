@@ -68,12 +68,15 @@ func TestHostNetworkPodForNodeDebugWithMountHostFilesystem(t *testing.T) {
 		MountHostFilesystem: true,
 	}
 	pod := hostNetworkPodForNodeDebug(config, "kube-system", "node0001")
-	assert.Len(t, pod.Spec.Volumes, 1)
+	assert.Len(t, pod.Spec.Volumes, 2)
 	assert.Equal(t, "host-filesystem", pod.Spec.Volumes[0].Name)
-	assert.Len(t, pod.Spec.Containers[0].VolumeMounts, 1)
+	assert.Len(t, pod.Spec.Containers[0].VolumeMounts, 2)
 	assert.Equal(t, "host-filesystem", pod.Spec.Containers[0].VolumeMounts[0].Name)
 	assert.Equal(t, "/host", pod.Spec.Containers[0].VolumeMounts[0].MountPath)
+	assert.Equal(t, "run", pod.Spec.Containers[0].VolumeMounts[1].Name)
+	assert.Equal(t, "/run", pod.Spec.Containers[0].VolumeMounts[1].MountPath)
 	assert.True(t, pod.Spec.Containers[0].VolumeMounts[0].ReadOnly)
+	assert.False(t, pod.Spec.Containers[0].VolumeMounts[1].ReadOnly)
 }
 
 func TestHostNetworkPodForNodeDebugWithMountHostFilesystemWithWriteAccess(t *testing.T) {
@@ -82,10 +85,13 @@ func TestHostNetworkPodForNodeDebugWithMountHostFilesystemWithWriteAccess(t *tes
 		AllowHostFilesystemWrite: true,
 	}
 	pod := hostNetworkPodForNodeDebug(config, "kube-system", "node0001")
-	assert.Len(t, pod.Spec.Volumes, 1)
+	assert.Len(t, pod.Spec.Volumes, 2)
 	assert.Equal(t, "host-filesystem", pod.Spec.Volumes[0].Name)
-	assert.Len(t, pod.Spec.Containers[0].VolumeMounts, 1)
+	assert.Len(t, pod.Spec.Containers[0].VolumeMounts, 2)
 	assert.Equal(t, "host-filesystem", pod.Spec.Containers[0].VolumeMounts[0].Name)
 	assert.Equal(t, "/host", pod.Spec.Containers[0].VolumeMounts[0].MountPath)
+	assert.Equal(t, "run", pod.Spec.Containers[0].VolumeMounts[1].Name)
+	assert.Equal(t, "/run", pod.Spec.Containers[0].VolumeMounts[1].MountPath)
 	assert.False(t, pod.Spec.Containers[0].VolumeMounts[0].ReadOnly)
+	assert.False(t, pod.Spec.Containers[0].VolumeMounts[1].ReadOnly)
 }

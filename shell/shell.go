@@ -22,6 +22,9 @@ type Config struct {
 	// Host filesystem access applies only to nodes, not pods.
 	MountHostFilesystem      bool
 	AllowHostFilesystemWrite bool
+
+	AppArmorUnconfined bool
+	SeccompUnconfined  bool
 }
 
 // RunInPod starts an interactive shell in a pod by creating and attaching to an ephemeral container.
