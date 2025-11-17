@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": null,
+  "id": 0,
   "links": [
     {
       "asDropdown": true,
@@ -64,7 +64,7 @@
             "steps": [
               {
                 "color": "blue",
-                "value": null
+                "value": 0
               }
             ]
           },
@@ -86,11 +86,11 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "values": false,
           "calcs": [
             "lastNotNull"
           ],
-          "fields": ""
+          "fields": "",
+          "values": false
         },
         "showPercentChange": false,
         "text": {
@@ -100,7 +100,7 @@
         "textMode": "name",
         "wideLayout": true
       },
-      "pluginVersion": "11.6.3",
+      "pluginVersion": "12.2.1",
       "targets": [
         {
           "datasource": {
@@ -109,7 +109,7 @@
           },
           "editorMode": "code",
           "expr": "vector(1)",
-          "legendFormat": "Namespace: $namespace",
+          "legendFormat": "Cluster: $cluster | Namespace: $namespace",
           "range": true,
           "refId": "A"
         }
@@ -154,6 +154,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -169,7 +170,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               }
             ]
           },
@@ -196,10 +197,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
+      "pluginVersion": "12.2.1",
       "targets": [
         {
           "datasource": {
@@ -207,7 +210,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(podname) (rate(networkobservability_adv_forward_count{namespace=~\"$namespace\", podname!=\"\"}[$__rate_interval]))",
+          "expr": "sum by(podname) (rate(networkobservability_adv_forward_count{namespace=~\"$namespace\", cluster=\"$cluster\", podname!=\"\"}[$__rate_interval]))",
           "legendFormat": "{{podname}}",
           "range": true,
           "refId": "A"
@@ -253,6 +256,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -268,7 +272,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "yellow",
@@ -303,10 +307,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
+      "pluginVersion": "12.2.1",
       "targets": [
         {
           "datasource": {
@@ -314,7 +320,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(podname) (rate(networkobservability_adv_drop_count{namespace=~\"$namespace\", podname!=\"\"}[$__rate_interval]))",
+          "expr": "sum by(podname) (rate(networkobservability_adv_drop_count{namespace=~\"$namespace\", podname!=\"\", cluster=\"$cluster\"}[$__rate_interval]))",
           "legendFormat": "{{podname}}",
           "range": true,
           "refId": "A"
@@ -338,6 +344,9 @@
             "cellOptions": {
               "type": "auto"
             },
+            "footer": {
+              "reducers": []
+            },
             "inspect": false
           },
           "mappings": [],
@@ -346,7 +355,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "yellow",
@@ -434,7 +443,7 @@
                   "steps": [
                     {
                       "color": "green",
-                      "value": null
+                      "value": 0
                     },
                     {
                       "color": "yellow",
@@ -467,14 +476,6 @@
       "id": 4,
       "options": {
         "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
         "showHeader": true,
         "sortBy": [
           {
@@ -483,7 +484,7 @@
           }
         ]
       },
-      "pluginVersion": "11.6.3",
+      "pluginVersion": "12.2.1",
       "targets": [
         {
           "datasource": {
@@ -491,7 +492,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(podname) (rate(networkobservability_adv_forward_count{namespace=~\"$namespace\", podname!=\"\"}[$__rate_interval]))",
+          "expr": "sum by(podname) (rate(networkobservability_adv_forward_count{namespace=~\"$namespace\", podname!=\"\", cluster=\"$cluster\"}[$__rate_interval]))",
           "format": "table",
           "legendFormat": "__auto",
           "range": true,
@@ -503,7 +504,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(podname) (rate(networkobservability_adv_drop_count{namespace=~\"$namespace\", podname!=\"\"}[$__rate_interval]))",
+          "expr": "sum by(podname) (rate(networkobservability_adv_drop_count{namespace=~\"$namespace\", podname!=\"\", cluster=\"$cluster\"}[$__rate_interval]))",
           "format": "table",
           "hide": false,
           "legendFormat": "__auto",
@@ -516,7 +517,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "(sum by(podname) (rate(networkobservability_adv_drop_count{namespace=~\"$namespace\", podname!=\"\"}[$__rate_interval])) / (sum by(podname) (rate(networkobservability_adv_drop_count{namespace=~\"$namespace\", podname!=\"\"}[$__rate_interval])) + sum by(podname) (rate(networkobservability_adv_forward_count{namespace=~\"$namespace\", podname!=\"\"}[$__rate_interval])))) * 100",
+          "expr": "(sum by(podname) (rate(networkobservability_adv_drop_count{namespace=~\"$namespace\", podname!=\"\", cluster=\"$cluster\"}[$__rate_interval])) / (sum by(podname) (rate(networkobservability_adv_drop_count{namespace=~\"$namespace\", podname!=\"\", cluster=\"$cluster\"}[$__rate_interval])) + sum by(podname) (rate(networkobservability_adv_forward_count{namespace=~\"$namespace\", podname!=\"\", cluster=\"$cluster\"}[$__rate_interval])))) * 100",
           "format": "table",
           "hide": false,
           "legendFormat": "__auto",
@@ -592,6 +593,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -607,7 +609,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               }
             ]
           },
@@ -633,10 +635,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
+      "pluginVersion": "12.2.1",
       "targets": [
         {
           "datasource": {
@@ -644,7 +648,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(podname, reason) (rate(networkobservability_adv_drop_count{namespace=~\"$namespace\", podname!=\"\"}[$__rate_interval]))",
+          "expr": "sum by(podname, reason) (rate(networkobservability_adv_drop_count{namespace=~\"$namespace\", podname!=\"\", cluster=\"$cluster\"}[$__rate_interval]))",
           "legendFormat": "{{podname}} - {{reason}}",
           "range": true,
           "refId": "A"
@@ -690,6 +694,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -705,7 +710,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               }
             ]
           },
@@ -731,10 +736,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
+      "pluginVersion": "12.2.1",
       "targets": [
         {
           "datasource": {
@@ -742,7 +749,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(podname, flag) (rate(networkobservability_adv_tcpflags_count{namespace=~\"$namespace\", podname!=\"\"}[$__rate_interval]))",
+          "expr": "sum by(podname, flag) (rate(networkobservability_adv_tcpflags_count{namespace=~\"$namespace\", podname!=\"\", cluster=\"$cluster\"}[$__rate_interval]))",
           "legendFormat": "{{podname}} - {{flag}}",
           "range": true,
           "refId": "A"
@@ -788,6 +795,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -803,7 +811,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               }
             ]
           },
@@ -829,10 +837,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
+      "pluginVersion": "12.2.1",
       "targets": [
         {
           "datasource": {
@@ -840,7 +850,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(workload_kind, workload_name) (rate(networkobservability_adv_forward_count{namespace=~\"$namespace\", workload_name!=\"\"}[$__rate_interval]))",
+          "expr": "sum by(workload_kind, workload_name) (rate(networkobservability_adv_forward_count{namespace=~\"$namespace\", workload_name!=\"\", cluster=\"$cluster\"}[$__rate_interval]))",
           "legendFormat": "{{workload_kind}}: {{workload_name}}",
           "range": true,
           "refId": "A"
@@ -886,6 +896,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -901,7 +912,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "yellow",
@@ -935,10 +946,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
+      "pluginVersion": "12.2.1",
       "targets": [
         {
           "datasource": {
@@ -946,7 +959,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(workload_kind, workload_name) (rate(networkobservability_adv_drop_count{namespace=~\"$namespace\", workload_name!=\"\"}[$__rate_interval]))",
+          "expr": "sum by(workload_kind, workload_name) (rate(networkobservability_adv_drop_count{namespace=~\"$namespace\", workload_name!=\"\", cluster=\"$cluster\"}[$__rate_interval]))",
           "legendFormat": "{{workload_kind}}: {{workload_name}}",
           "range": true,
           "refId": "A"
@@ -992,6 +1005,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -1007,7 +1021,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               }
             ]
           },
@@ -1033,10 +1047,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
+      "pluginVersion": "12.2.1",
       "targets": [
         {
           "datasource": {
@@ -1044,7 +1060,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(podname, direction) (rate(networkobservability_adv_forward_count{namespace=~\"$namespace\", podname!=\"\"}[$__rate_interval]))",
+          "expr": "sum by(podname, direction) (rate(networkobservability_adv_forward_count{namespace=~\"$namespace\", podname!=\"\",cluster=\"$cluster\"}[$__rate_interval]))",
           "legendFormat": "{{podname}} - {{direction}}",
           "range": true,
           "refId": "A"
@@ -1090,6 +1106,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -1105,7 +1122,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               }
             ]
           },
@@ -1131,10 +1148,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
+      "pluginVersion": "12.2.1",
       "targets": [
         {
           "datasource": {
@@ -1142,7 +1161,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(podname) (rate(networkobservability_adv_forward_bytes{namespace=~\"$namespace\", podname!=\"\"}[$__rate_interval]))",
+          "expr": "sum by(podname) (rate(networkobservability_adv_forward_bytes{namespace=~\"$namespace\", podname!=\"\",cluster=\"$cluster\"}[$__rate_interval]))",
           "legendFormat": "{{podname}}",
           "range": true,
           "refId": "A"
@@ -1212,7 +1231,7 @@
           "reverse": false
         }
       },
-      "pluginVersion": "11.6.3",
+      "pluginVersion": "12.2.1",
       "targets": [
         {
           "datasource": {
@@ -1220,7 +1239,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(podname) (rate(networkobservability_adv_forward_count{namespace=~\"$namespace\", podname!=\"\"}[$__rate_interval]))",
+          "expr": "sum by(podname) (rate(networkobservability_adv_forward_count{namespace=~\"$namespace\", podname!=\"\", cluster=\"$cluster\"}[$__rate_interval]))",
           "legendFormat": "{{podname}}",
           "range": true,
           "refId": "A"
@@ -1290,7 +1309,7 @@
           "reverse": false
         }
       },
-      "pluginVersion": "11.6.3",
+      "pluginVersion": "12.2.1",
       "targets": [
         {
           "datasource": {
@@ -1298,7 +1317,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(podname) (rate(networkobservability_adv_drop_count{namespace=~\"$namespace\", podname!=\"\"}[$__rate_interval]))",
+          "expr": "sum by(podname) (rate(networkobservability_adv_drop_count{namespace=~\"$namespace\", podname!=\"\", cluster=\"$cluster\"}[$__rate_interval]))",
           "legendFormat": "{{podname}}",
           "range": true,
           "refId": "A"
@@ -1310,7 +1329,7 @@
   ],
   "preload": false,
   "refresh": "30s",
-  "schemaVersion": 41,
+  "schemaVersion": 42,
   "tags": [
     "k8s:retina-network-observability",
     "windows-ebpf",
@@ -1320,8 +1339,7 @@
     "list": [
       {
         "current": {
-          "selected": false,
-          "text": "prometheus",
+          "text": "Prometheus",
           "value": "prometheus"
         },
         "includeAll": false,
@@ -1335,19 +1353,16 @@
       },
       {
         "current": {
-          "selected": true,
-          "text": "wcn",
-          "value": "wcn"
+          "text": "gatekeeper-system",
+          "value": "gatekeeper-system"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
         },
         "definition": "label_values(networkobservability_adv_forward_count, namespace)",
-        "hide": 0,
         "includeAll": false,
         "label": "Namespace",
-        "multi": false,
         "name": "namespace",
         "options": [],
         "query": {
@@ -1356,7 +1371,34 @@
         },
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": [
+            "myCluster"
+          ],
+          "value": [
+            "myCluster"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(up,cluster)",
+        "includeAll": false,
+        "label": "Cluster",
+        "name": "cluster",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(up,cluster)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
         "sort": 1,
         "type": "query"
       }
@@ -1370,5 +1412,5 @@
   "timezone": "",
   "title": "Kubernetes / Networking / Retina (Standard) / Windows eBPF Namespace Deep Dive",
   "uid": "RetinaWindowsEBPFNamespace",
-  "version": 1
+  "version": 32
 }
