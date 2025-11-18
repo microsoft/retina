@@ -105,8 +105,6 @@ jobs:
       - name: Build Images
         shell: bash
         run: |
-          docker system prune -a -f
-          docker builder prune -a -f
           set -euo pipefail
           echo "TAG=$(make version)" >> $GITHUB_ENV
           if [ "$SHOULD_PUSH_IMAGE" == "true" ]; then
