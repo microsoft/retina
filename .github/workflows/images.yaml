@@ -72,7 +72,7 @@ jobs:
       matrix:
         platform: ["windows"]
         arch: ["amd64"]
-        year: ["2022"]
+        year: ["2019", "2022"]
 
     steps:
       - name: Checkout code
@@ -97,6 +97,8 @@ jobs:
       - name: Build Images
         shell: bash
         run: |
+          docker system prune -a -f
+          docker builder prune -a -f
           set -euo pipefail
           echo "TAG=$(make version)" >> $GITHUB_ENV
           if [ "$SHOULD_PUSH_IMAGE" == "true" ]; then
