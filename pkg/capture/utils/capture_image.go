@@ -6,6 +6,7 @@ package utils
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"go.uber.org/zap"
 
@@ -47,12 +48,28 @@ func CaptureWorkloadImage(logger *log.ZapLogger, imageVersion string, debug bool
 		}
 
 		debugCaptureWorkloadImageName := captureConstants.DebugCaptureWorkloadImageName
+		
+		// If the debug image name already includes a tag, use it as-is
+		if strings.Contains(debugCaptureWorkloadImageName, ":") {
+			logger.Info(fmt.Sprintf("Debug mode: Using capture workload image %s with version determined by %s", debugCaptureWorkloadImageName, vs))
+			return debugCaptureWorkloadImageName
+		}
+		
+		// Otherwise, append the version tag
 		debugCaptureWorkloadImage := debugCaptureWorkloadImageName + ":" + defaultCaptureWorkloadImageVersion
 		logger.Info(fmt.Sprintf("Debug mode: Using capture workload image %s with version determined by %s", debugCaptureWorkloadImage, vs))
 		return debugCaptureWorkloadImage
 	}
 
 	defaultCaptureWorkloadImageName := captureConstants.CaptureWorkloadImageName
+	
+	// If the image name already includes a tag, use it as-is
+	if strings.Contains(defaultCaptureWorkloadImageName, ":") {
+		logger.Info(fmt.Sprintf("Using capture workload image %s with version determined by %s", defaultCaptureWorkloadImageName, vs))
+		return defaultCaptureWorkloadImageName
+	}
+	
+	// Otherwise, append the version tag
 	captureWorkloadImage := defaultCaptureWorkloadImageName + ":" + defaultCaptureWorkloadImageVersion
 	logger.Info(fmt.Sprintf("Using capture workload image %s with version determined by %s", captureWorkloadImage, vs))
 
