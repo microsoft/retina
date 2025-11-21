@@ -5,6 +5,7 @@ package utils
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,6 +27,12 @@ const (
 	DebugModeEnvKey string = "DEBUG"
 )
 
+var (
+	ErrInvalidImageFormat   = errors.New("invalid image name format")
+	ErrMCRAPIRequestFailed  = errors.New("MCR API request failed")
+	ErrNoVersionTagsFound   = errors.New("no version tags found in MCR")
+)
+
 type VersionSource string
 
 const (
@@ -40,35 +47,36 @@ func getMostRecentMCRTag(imageName string) (string, error) {
 	// Extract repository path from image name (e.g., "mcr.microsoft.com/containernetworking/retina-agent")
 	parts := strings.SplitN(imageName, "/", 2)
 	if len(parts) != 2 {
-		return "", fmt.Errorf("invalid image name format: %s", imageName)
+		return "", fmt.Errorf("%w: %s", ErrInvalidImageFormat, imageName)
 	}
-	
+
 	repo := parts[1]
 	url := fmt.Sprintf("https://mcr.microsoft.com/v2/%s/tags/list", repo)
-	
+
+	// #nosec G107 -- URL is constructed from trusted image name parameter
 	resp, err := http.Get(url)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch tags from MCR: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("MCR API returned status %d", resp.StatusCode)
+		return "", fmt.Errorf("%w with status code %d", ErrMCRAPIRequestFailed, resp.StatusCode)
 	}
-	
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
-	
+
 	var result struct {
 		Tags []string `json:"tags"`
 	}
-	
+
 	if err := json.Unmarshal(body, &result); err != nil {
 		return "", fmt.Errorf("failed to parse JSON response: %w", err)
 	}
-	
+
 	// Find the most recent version tag by iterating in reverse (tags are typically sorted)
 	// Look for tags that start with 'v' and don't contain platform suffixes
 	for i := len(result.Tags) - 1; i >= 0; i-- {
@@ -77,8 +85,8 @@ func getMostRecentMCRTag(imageName string) (string, error) {
 			return tag, nil
 		}
 	}
-	
-	return "", fmt.Errorf("no version tags found in MCR")
+
+	return "", ErrNoVersionTagsFound
 }
 
 // CaptureWorkloadImage returns the container image to use for capture workload jobs.
@@ -88,19 +96,17 @@ func CaptureWorkloadImage(logger *log.ZapLogger, imageVersion string, debug bool
 	defaultCaptureWorkloadImageVersion := imageVersion
 	defaultCaptureWorkloadImageName := captureConstants.CaptureWorkloadImageName
 
-		
 	// If the image is from MCR, fetch the most recent tag
 	if strings.HasPrefix(defaultCaptureWorkloadImageName, "mcr.microsoft.com/") {
-		if latestTag, err := getMostRecentMCRTag(defaultCaptureWorkloadImageName); err == nil {
+		latestTag, err := getMostRecentMCRTag(defaultCaptureWorkloadImageName)
+		if err == nil {
 			captureWorkloadImage := defaultCaptureWorkloadImageName + ":" + latestTag
 			logger.Info(fmt.Sprintf("Using MCR capture workload image %s with latest tag from MCR registry", captureWorkloadImage))
 			return captureWorkloadImage
-		} else {
-			logger.Warn("Failed to fetch latest MCR tag, falling back to CLI version", zap.Error(err))
 		}
+		logger.Warn("Failed to fetch latest MCR tag, falling back to CLI version", zap.Error(err))
 	}
 
-	
 	// For testing.
 	if debug {
 		captureWorkloadImageFromEnv := os.Getenv(captureWorkloadImageEnvKey)
