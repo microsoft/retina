@@ -86,6 +86,7 @@ func getMostRecentMCRTag(imageName string) (string, error) {
 // Otherwise, it uses the CLI version or allows override via environment variable for testing.
 func CaptureWorkloadImage(logger *log.ZapLogger, imageVersion string, debug bool, vs VersionSource) string {
 	defaultCaptureWorkloadImageVersion := imageVersion
+	defaultCaptureWorkloadImageName := captureConstants.CaptureWorkloadImageName
 
 		
 	// If the image is from MCR, fetch the most recent tag
@@ -114,7 +115,6 @@ func CaptureWorkloadImage(logger *log.ZapLogger, imageVersion string, debug bool
 		return debugCaptureWorkloadImage
 	}
 
-	defaultCaptureWorkloadImageName := captureConstants.CaptureWorkloadImageName
 	captureWorkloadImage := defaultCaptureWorkloadImageName + ":" + defaultCaptureWorkloadImageVersion
 	logger.Info(fmt.Sprintf("Using capture workload image %s with version determined by %s", captureWorkloadImage, vs))
 
