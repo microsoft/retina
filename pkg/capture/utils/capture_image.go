@@ -4,6 +4,7 @@
 package utils
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -28,9 +30,9 @@ const (
 )
 
 var (
-	ErrInvalidImageFormat   = errors.New("invalid image name format")
-	ErrMCRAPIRequestFailed  = errors.New("MCR API request failed")
-	ErrNoVersionTagsFound   = errors.New("no version tags found in MCR")
+	ErrInvalidImageFormat  = errors.New("invalid image name format")
+	ErrMCRAPIRequestFailed = errors.New("MCR API request failed")
+	ErrNoVersionTagsFound  = errors.New("no version tags found in MCR")
 )
 
 type VersionSource string
@@ -53,8 +55,17 @@ func getMostRecentMCRTag(imageName string) (string, error) {
 	repo := parts[1]
 	url := fmt.Sprintf("https://mcr.microsoft.com/v2/%s/tags/list", repo)
 
-	// #nosec G107 -- URL is constructed from trusted image name parameter
-	resp, err := http.Get(url)
+	// Create request with context and timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch tags from MCR: %w", err)
 	}
@@ -90,14 +101,22 @@ func getMostRecentMCRTag(imageName string) (string, error) {
 }
 
 // CaptureWorkloadImage returns the container image to use for capture workload jobs.
-// For MCR images, it automatically fetches the most recent version tag from the registry.
+// For MCR images without a tag, it automatically fetches the most recent version tag from the registry.
+// If a tag is already specified, it uses that tag directly.
 // Otherwise, it uses the CLI version or allows override via environment variable for testing.
 func CaptureWorkloadImage(logger *log.ZapLogger, imageVersion string, debug bool, vs VersionSource) string {
 	defaultCaptureWorkloadImageVersion := imageVersion
 	defaultCaptureWorkloadImageName := captureConstants.CaptureWorkloadImageName
 
-	// If the image is from MCR, fetch the most recent tag
+	// If the image is from MCR and doesn't already have a tag, fetch the most recent tag
 	if strings.HasPrefix(defaultCaptureWorkloadImageName, "mcr.microsoft.com/") {
+		// Check if a tag is already specified
+		if strings.Contains(defaultCaptureWorkloadImageName, ":") {
+			logger.Info(fmt.Sprintf("Using MCR capture workload image %s with specified tag", defaultCaptureWorkloadImageName))
+			return defaultCaptureWorkloadImageName
+		}
+
+		// No tag specified, fetch the most recent one
 		latestTag, err := getMostRecentMCRTag(defaultCaptureWorkloadImageName)
 		if err == nil {
 			captureWorkloadImage := defaultCaptureWorkloadImageName + ":" + latestTag
