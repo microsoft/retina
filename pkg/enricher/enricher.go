@@ -124,6 +124,8 @@ func (e *Enricher) enrich(ev *v1.Event) {
 	srcZone := "unknown"
 	if srcPod != nil {
 		srcZone = srcPod.Zone()
+	} else {
+		e.l.Debug("source zone is unknown")
 	}
 
 	if flow.IP.Destination == "" {
@@ -140,6 +142,8 @@ func (e *Enricher) enrich(ev *v1.Event) {
 	dstZone := "unknown"
 	if dstPod != nil {
 		dstZone = dstPod.Zone()
+	} else {
+		e.l.Debug("destination zone is unknown")
 	}
 
 	utils.AddZones(flow, srcZone, dstZone)
