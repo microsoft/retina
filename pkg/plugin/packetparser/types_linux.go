@@ -80,7 +80,7 @@ type tcValue struct {
 	qdisc *tc.Object
 }
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=types_linux.go -destination=mocks/mock_types.go -package=mocks
+//go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=types_linux.go -destination=mocks/mock_types_linux.go -package=mocks
 
 // tc qdisc interface
 type qdisc interface {
