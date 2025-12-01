@@ -234,7 +234,7 @@ static __always_inline __u8 _ct_get_traffic_direction(__u8 observation_point) {
  * @arg observation_point The point in the network stack where the packet is observed.
  * @arg is_reply true if the packet is a SYN-ACK packet. False if it is a SYN packet.
  */
-static __always_inline bool _ct_create_new_tcp_connection(struct packet *p, struct ct_v4_key key,  __u8 observation_point, bool is_reply) {
+static __always_inline bool _ct_create_new_tcp_connection(struct packet *p, struct ct_v4_key *key,  __u8 observation_point, bool is_reply) {
     struct ct_entry new_value;
     __builtin_memset(&new_value, 0, sizeof(struct ct_entry));
     __u64 now = bpf_mono_now();
@@ -272,7 +272,7 @@ static __always_inline bool _ct_create_new_tcp_connection(struct packet *p, stru
     // Update packet
     p->is_reply = is_reply;
     p->traffic_direction = new_value.traffic_direction;
-    bpf_map_update_elem(&retina_conntrack, &key, &new_value, BPF_ANY);
+    bpf_map_update_elem(&retina_conntrack, key, &new_value, BPF_ANY);
     return true;
 }
 
@@ -282,7 +282,10 @@ static __always_inline bool _ct_create_new_tcp_connection(struct packet *p, stru
  * @arg key The key to be used to create the new connection.
  * @arg observation_point The point in the network stack where the packet is observed.
  */
-static __always_inline bool _ct_handle_udp_connection(struct packet *p, struct ct_v4_key key, __u8 observation_point) {
+static __always_inline bool _ct_handle_udp_connection(struct packet *p, struct ct_v4_key *key, __u8 observation_point) {
+    if (!p || !key) {
+        return false;
+    }
     struct ct_entry new_value;
     __builtin_memset(&new_value, 0, sizeof(struct ct_entry));
     __u64 now = bpf_mono_now();
@@ -306,7 +309,7 @@ static __always_inline bool _ct_handle_udp_connection(struct packet *p, struct c
     // Update packet
     p->is_reply = false;
     p->traffic_direction = new_value.traffic_direction;
-    bpf_map_update_elem(&retina_conntrack, &key, &new_value, BPF_ANY);
+    bpf_map_update_elem(&retina_conntrack, key, &new_value, BPF_ANY);
     return true;
 }
 
@@ -317,12 +320,15 @@ static __always_inline bool _ct_handle_udp_connection(struct packet *p, struct c
  * @arg reverse_key The reverse key to be used to handle the connection.
  * @arg observation_point The point in the network stack where the packet is observed.
  */
-static __always_inline bool _ct_handle_tcp_connection(struct packet *p, struct ct_v4_key key, struct ct_v4_key reverse_key, __u8 observation_point) {
+static __always_inline bool _ct_handle_tcp_connection(struct packet *p, struct ct_v4_key *key, struct ct_v4_key *reverse_key, __u8 observation_point) {
+    if (!p || !key || !reverse_key) {
+        return false;
+    }
     u8 tcp_handshake = p->flags & (TCP_SYN|TCP_ACK);
     if (tcp_handshake == TCP_SYN) {
         // We have a SYN, we set `is_reply` to false and we provide `key`
         return _ct_create_new_tcp_connection(p, key, observation_point, false);
-    } else if(tcp_handshake == TCP_SYN|TCP_ACK) {
+    } else if(tcp_handshake == (TCP_SYN|TCP_ACK)) {
         // We have a SYN-ACK, we set `is_reply` to true and we provide `reverse_key`
         return _ct_create_new_tcp_connection(p, reverse_key, observation_point, true);
     }
@@ -354,7 +360,7 @@ static __always_inline bool _ct_handle_tcp_connection(struct packet *p, struct c
             new_value.conntrack_metadata.bytes_rx_count = p->bytes;
             new_value.conntrack_metadata.packets_rx_count = 1;
         #endif // ENABLE_CONNTRACK_METRICS
-        bpf_map_update_elem(&retina_conntrack, &reverse_key, &new_value, BPF_ANY);
+        bpf_map_update_elem(&retina_conntrack, reverse_key, &new_value, BPF_ANY);
     } else { // Otherwise, the packet is considered as a packet in the send direction.
         p->is_reply = false;
         new_value.flags_seen_tx_dir = p->flags;
@@ -365,7 +371,7 @@ static __always_inline bool _ct_handle_tcp_connection(struct packet *p, struct c
             new_value.conntrack_metadata.bytes_tx_count = p->bytes;
             new_value.conntrack_metadata.packets_tx_count = 1;
         #endif // ENABLE_CONNTRACK_METRICS
-        bpf_map_update_elem(&retina_conntrack, &key, &new_value, BPF_ANY);
+        bpf_map_update_elem(&retina_conntrack, key, &new_value, BPF_ANY);
     }
     #ifdef ENABLE_CONNTRACK_METRICS
         // Update packet's conntrack metadata.
@@ -381,12 +387,15 @@ static __always_inline bool _ct_handle_tcp_connection(struct packet *p, struct c
  * @arg reverse_key The reverse key to be used to handle the connection.
  * @arg observation_point The point in the network stack where the packet is observed.
  */
-static __always_inline struct packetreport _ct_handle_new_connection(struct packet *p, struct ct_v4_key key, struct ct_v4_key reverse_key, __u8 observation_point) {
+static __always_inline struct packetreport _ct_handle_new_connection(struct packet *p, struct ct_v4_key *key, struct ct_v4_key *reverse_key, __u8 observation_point) {
     struct packetreport report;
     __builtin_memset(&report, 0, sizeof(struct packetreport));
-    if (key.proto & IPPROTO_TCP) {
+    if (!p || !key || !reverse_key) {
+        return report;
+    }
+    if (key->proto & IPPROTO_TCP) {
         report.report = _ct_handle_tcp_connection(p, key, reverse_key, observation_point);
-    } else if (key.proto & IPPROTO_UDP) {
+    } else if (key->proto & IPPROTO_UDP) {
         report.report = _ct_handle_udp_connection(p, key, observation_point);
     } else {
         report.report = false; // We are not interested in other protocols.
@@ -618,5 +627,5 @@ static __always_inline __attribute__((unused)) struct packetreport ct_process_pa
     }
 
     // If the connection is still not found, the connection is new.
-    return _ct_handle_new_connection(p, key, reverse_key, observation_point);
+    return _ct_handle_new_connection(p, &key, &reverse_key, observation_point);
 }
