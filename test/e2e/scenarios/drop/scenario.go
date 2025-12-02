@@ -16,8 +16,8 @@ const (
 	IPTableRuleDrop = "IPTABLE_RULE_DROP"
 )
 
-func ValidateDropMetric(namespace string) *types.Scenario {
-	name := "Drop Metrics"
+func ValidateDropMetric(namespace, arch string) *types.Scenario {
+	name := "Drop Metrics - Arch: " + arch
 	steps := []*types.StepWrapper{
 		{
 			Step: &kubernetes.CreateDenyAllNetworkPolicy{
@@ -29,6 +29,7 @@ func ValidateDropMetric(namespace string) *types.Scenario {
 			Step: &kubernetes.CreateAgnhostStatefulSet{
 				AgnhostNamespace: namespace,
 				AgnhostName:      "agnhost-drop",
+				AgnhostArch:      arch,
 			},
 		},
 		// Need this delay to guarantee that the pods will have bpf program attached

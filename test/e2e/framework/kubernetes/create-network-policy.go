@@ -36,8 +36,8 @@ func (c *CreateDenyAllNetworkPolicy) Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	agnhostStatefulest := getNetworkPolicy(c.NetworkPolicyNamespace, c.DenyAllLabelSelector)
-	err = CreateResource(ctx, agnhostStatefulest, clientset)
+	networkPolicy := getNetworkPolicy(c.NetworkPolicyNamespace, c.DenyAllLabelSelector)
+	err = CreateResource(ctx, networkPolicy, clientset)
 	if err != nil {
 		return fmt.Errorf("error creating simple deny-all network policy: %w", err)
 	}
@@ -96,8 +96,8 @@ func (d *DeleteDenyAllNetworkPolicy) Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	agnhostStatefulest := getNetworkPolicy(d.NetworkPolicyNamespace, d.DenyAllLabelSelector)
-	err = DeleteResource(ctx, agnhostStatefulest, clientset)
+	networkPolicy := getNetworkPolicy(d.NetworkPolicyNamespace, d.DenyAllLabelSelector)
+	err = DeleteResource(ctx, networkPolicy, clientset)
 	if err != nil {
 		return fmt.Errorf("error creating simple deny-all network policy: %w", err)
 	}

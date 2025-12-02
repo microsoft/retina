@@ -9,7 +9,6 @@ import (
 	"github.com/microsoft/retina/test/e2e/framework/generic"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/types"
-	"github.com/microsoft/retina/test/e2e/hubble"
 	"github.com/microsoft/retina/test/e2e/scenarios/capture"
 	"github.com/microsoft/retina/test/e2e/scenarios/dns"
 	"github.com/microsoft/retina/test/e2e/scenarios/drop"
@@ -144,12 +143,6 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, test
 		TagEnv:             generic.DefaultTagEnv,
 	}, nil)
 
-	job.AddScenario(drop.ValidateDropMetric(testPodNamespace))
-
-	job.AddScenario(tcp.ValidateTCPMetrics(testPodNamespace))
-
-	job.AddScenario(windows.ValidateWindowsBasicMetric())
-
 	dnsScenarios := []struct {
 		name string
 		req  *dns.RequestValidationParams
@@ -191,8 +184,16 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, test
 		},
 	}
 
-	for _, scenario := range dnsScenarios {
-		job.AddScenario(dns.ValidateBasicDNSMetrics(scenario.name, scenario.req, scenario.resp, testPodNamespace))
+	for _, arch := range common.Architectures {
+		job.AddScenario(drop.ValidateDropMetric(testPodNamespace, arch))
+		job.AddScenario(tcp.ValidateTCPMetrics(testPodNamespace, arch))
+
+		for _, scenario := range dnsScenarios {
+			name := scenario.name + " - Arch: " + arch
+			job.AddScenario(dns.ValidateBasicDNSMetrics(name, scenario.req, scenario.resp, testPodNamespace, arch))
+		}
+
+		job.AddScenario(windows.ValidateWindowsBasicMetric())
 	}
 
 	job.AddStep(&kubernetes.EnsureStableComponent{
@@ -257,8 +258,11 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 		},
 	}
 
-	for _, scenario := range dnsScenarios {
-		job.AddScenario(dns.ValidateAdvancedDNSMetrics(scenario.name, scenario.req, scenario.resp, kubeConfigFilePath, testPodNamespace))
+	for _, arch := range common.Architectures {
+		for _, scenario := range dnsScenarios {
+			name := scenario.name + " - Arch: " + arch
+			job.AddScenario(dns.ValidateAdvancedDNSMetrics(name, scenario.req, scenario.resp, kubeConfigFilePath, testPodNamespace, arch))
+		}
 	}
 
 	job.AddScenario(latency.ValidateLatencyMetric(testPodNamespace))

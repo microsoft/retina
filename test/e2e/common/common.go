@@ -28,6 +28,7 @@ const (
 
 var (
 	AzureLocations = []string{"eastus2", "northeurope", "uksouth", "centralindia", "westus2"}
+	Architectures  = []string{"amd64", "arm64"}
 	CreateInfra    = flag.Bool("create-infra", true, "create a Resource group, vNET and AKS cluster for testing")
 	DeleteInfra    = flag.Bool("delete-infra", true, "delete a Resource group, vNET and AKS cluster for testing")
 	ScaleTestInfra = ScaleTestInfraHandler{

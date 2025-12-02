@@ -17,8 +17,10 @@ import (
 var ErrLabelMissingFromPod = fmt.Errorf("label missing from pod")
 
 const (
-	AgnhostHTTPPort = 80
-	AgnhostReplicas = 1
+	AgnhostHTTPPort  = 80
+	AgnhostReplicas  = 1
+	AgnhostArchAmd64 = "amd64"
+	AgnhostArchArm64 = "arm64"
 )
 
 type CreateAgnhostStatefulSet struct {
@@ -26,6 +28,7 @@ type CreateAgnhostStatefulSet struct {
 	AgnhostNamespace   string
 	ScheduleOnSameNode bool
 	KubeConfigFilePath string
+	AgnhostArch        string
 }
 
 func (c *CreateAgnhostStatefulSet) Run() error {
@@ -42,14 +45,19 @@ func (c *CreateAgnhostStatefulSet) Run() error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeoutSeconds*time.Second)
 	defer cancel()
 
-	agnhostStatefulest := c.getAgnhostDeployment()
+	// set default arch to amd64
+	if c.AgnhostArch == "" {
+		c.AgnhostArch = AgnhostArchAmd64
+	}
 
-	err = CreateResource(ctx, agnhostStatefulest, clientset)
+	agnhostStatefulSet := c.getAgnhostDeployment(c.AgnhostArch)
+
+	err = CreateResource(ctx, agnhostStatefulSet, clientset)
 	if err != nil {
 		return fmt.Errorf("error agnhost component: %w", err)
 	}
 
-	selector, exists := agnhostStatefulest.Spec.Selector.MatchLabels["app"]
+	selector, exists := agnhostStatefulSet.Spec.Selector.MatchLabels["app"]
 	if !exists {
 		return fmt.Errorf("missing label \"app=%s\" from agnhost statefulset: %w", c.AgnhostName, ErrLabelMissingFromPod)
 	}
@@ -71,7 +79,7 @@ func (c *CreateAgnhostStatefulSet) Stop() error {
 	return nil
 }
 
-func (c *CreateAgnhostStatefulSet) getAgnhostDeployment() *appsv1.StatefulSet {
+func (c *CreateAgnhostStatefulSet) getAgnhostDeployment(arch string) *appsv1.StatefulSet {
 	reps := int32(AgnhostReplicas)
 
 	var affinity *v1.Affinity
@@ -90,7 +98,6 @@ func (c *CreateAgnhostStatefulSet) getAgnhostDeployment() *appsv1.StatefulSet {
 				},
 			},
 		}
-
 	} else {
 		affinity = &v1.Affinity{
 			PodAntiAffinity: &v1.PodAntiAffinity{
@@ -141,12 +148,13 @@ func (c *CreateAgnhostStatefulSet) getAgnhostDeployment() *appsv1.StatefulSet {
 				Spec: v1.PodSpec{
 					Affinity: affinity,
 					NodeSelector: map[string]string{
-						"kubernetes.io/os": "linux",
+						"kubernetes.io/os":   "linux",
+						"kubernetes.io/arch": arch,
 					},
 					Containers: []v1.Container{
 						{
 							Name:  c.AgnhostName,
-							Image: "acnpublic.azurecr.io/agnhost:2.40",
+							Image: "registry.k8s.io/e2e-test-images/agnhost:2.40",
 							Resources: v1.ResourceRequirements{
 								Requests: v1.ResourceList{
 									"memory": resource.MustParse("20Mi"),

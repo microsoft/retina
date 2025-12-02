@@ -16,8 +16,8 @@ const (
 	IPTableRuleDrop = "IPTABLE_RULE_DROP"
 )
 
-func ValidateTCPMetrics(namespace string) *types.Scenario {
-	Name := "Flow Metrics"
+func ValidateTCPMetrics(namespace, arch string) *types.Scenario {
+	Name := "Flow Metrics - Arch: " + arch
 	Steps := []*types.StepWrapper{
 		{
 			Step: &kubernetes.CreateKapingerDeployment{
@@ -29,6 +29,7 @@ func ValidateTCPMetrics(namespace string) *types.Scenario {
 			Step: &kubernetes.CreateAgnhostStatefulSet{
 				AgnhostName:      "agnhost-a",
 				AgnhostNamespace: namespace,
+				AgnhostArch:      arch,
 			},
 		},
 		{
