@@ -243,6 +243,18 @@ Download capture files and specify an output location:
 kubectl retina capture download --name <capture-name> -o <output-location>
 ```
 
+Download all available captures in the current namespace:
+
+```sh
+kubectl retina capture download --all
+```
+
+Download all available captures from all namespaces:
+
+```sh
+kubectl retina capture download --all --all-namespaces
+```
+
 By default, files are downloaded to the current directory.
 
 #### Download from Blob Storage
@@ -255,15 +267,90 @@ kubectl retina capture download --blob-url "<blob-url>"
 
 #### Download Output Structure
 
-The command will create a directory with the capture name and download all related capture files. Each capture file is downloaded as a `.tar.gz` archive with a name pattern matching `$(capturename)-$(hostname)-$(date +%Y%m%d%H%M%S%Z).tar.gz`.
+The command will create different output structures depending on the options used:
 
-For example:
+##### Individual Capture Download
+
+For individual capture downloads using `--name`, files are organized by capture name:
 
 ```bash
 /output-directory/
 └── capture-name/
     ├── capture-name-node1-20230320013600UTC.tar.gz
     └── capture-name-node2-20230320013600UTC.tar.gz
+```
+
+##### All Captures Download
+
+When using `--all`, all captures are consolidated into a single timestamped archive:
+
+```bash
+/output-directory/
+└── all-captures-20230320134500.tar.gz
+```
+
+The archive contents are organized by capture name:
+
+```bash
+# Contents of all-captures-20230320134500.tar.gz
+capture-name-1/
+├── capture-name-1-node1-20230320013600UTC.tar.gz
+└── capture-name-1-node2-20230320013600UTC.tar.gz
+capture-name-2/
+├── capture-name-2-node1-20230320014500UTC.tar.gz
+└── capture-name-2-node2-20230320014500UTC.tar.gz
+```
+
+##### All Captures with All Namespaces
+
+When using `--all --all-namespaces`, the archive contents include namespace information:
+
+```bash
+# Contents of all-captures-20230320134500.tar.gz
+namespace-1/
+└── capture-name-1/
+    ├── capture-name-1-node1-20230320013600UTC.tar.gz
+    └── capture-name-1-node2-20230320013600UTC.tar.gz
+namespace-2/
+└── capture-name-2/
+    ├── capture-name-2-node1-20230320014500UTC.tar.gz
+    └── capture-name-2-node2-20230320014500UTC.tar.gz
+```
+
+#### Download Options
+
+| Flag | Description | Notes |
+|------|-------------|-------|
+| `--name` | Download capture files for a specific capture name | Creates individual files in capture-specific directory |
+| `--all` | Download all available captures in the current namespace | Creates single consolidated archive |
+| `--all-namespaces` | Download captures from all namespaces (requires `--all`) | Includes namespace in archive structure |
+| `--blob-url` | Download from Azure Blob Storage using SAS URL | Requires Read/List permissions |
+| `-o, --output` | Specify output directory | Defaults to current directory |
+
+#### Examples
+
+Download a specific capture:
+
+```sh
+kubectl retina capture download --name my-capture
+```
+
+Download all captures with custom output location:
+
+```sh
+kubectl retina capture download --all -o /tmp/retina-downloads
+```
+
+Download all captures from all namespaces:
+
+```sh
+kubectl retina capture download --all --all-namespaces
+```
+
+Download from blob storage:
+
+```sh
+kubectl retina capture download --blob-url "https://mystorageaccount.blob.core.windows.net/captures?sp=rl&st=..."
 ```
 
 ## Obtaining the output
