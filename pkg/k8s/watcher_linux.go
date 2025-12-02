@@ -43,7 +43,12 @@ func Start(ctx context.Context, k *watchers.K8sWatcher) {
 // retinaK8sErrorHandler is a custom error handler for the watcher
 // that logs the error and tags the error to easily identify
 func k8sWatcherErrorHandler(c context.Context, e error, s string, i ...interface{}) {
+	if e == nil {
+		return
+	}
+
 	errStr := e.Error()
+
 	logError := func(er, r string) {
 		logger.WithFields(logrus.Fields{
 			"underlyingError": er,
