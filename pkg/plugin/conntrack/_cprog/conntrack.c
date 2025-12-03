@@ -233,8 +233,9 @@ static __always_inline __u8 _ct_get_traffic_direction(__u8 observation_point) {
  * @arg key The key to be used to create the new connection.
  * @arg observation_point The point in the network stack where the packet is observed.
  * @arg is_reply true if the packet is a SYN-ACK packet. False if it is a SYN packet.
+ * @arg sampled Whether or not the packet was sampled for reporting.
  */
-static __always_inline bool _ct_create_new_tcp_connection(struct packet *p, struct ct_v4_key *key,  __u8 observation_point, bool is_reply) {
+static __always_inline bool _ct_create_new_tcp_connection(struct packet *p, struct ct_v4_key *key, __u8 observation_point, bool is_reply, bool sampled) {
     struct ct_entry new_value;
     __builtin_memset(&new_value, 0, sizeof(struct ct_entry));
     __u64 now = bpf_mono_now();
@@ -245,14 +246,20 @@ static __always_inline bool _ct_create_new_tcp_connection(struct packet *p, stru
     new_value.eviction_time = now + CT_SYN_TIMEOUT;
     if(is_reply) {
         new_value.flags_seen_rx_dir = p->flags;
-        new_value.last_report_rx_dir = now;
-        new_value.bytes_seen_since_last_report_rx_dir = 0;
-        new_value.packets_seen_since_last_report_rx_dir = 0;
+        new_value.last_report_rx_dir = sampled ? now : 0;
+        new_value.bytes_seen_since_last_report_rx_dir = !sampled ? p->bytes : 0;
+        new_value.packets_seen_since_last_report_rx_dir = !sampled;
+        if (!sampled) {
+            _ct_record_tcp_flags(p->flags, &new_value.flags_seen_since_last_report_rx_dir);
+        }
     } else {
         new_value.flags_seen_tx_dir = p->flags;
-        new_value.last_report_tx_dir = now;
-        new_value.bytes_seen_since_last_report_tx_dir = 0;
-        new_value.packets_seen_since_last_report_tx_dir = 0;
+        new_value.last_report_tx_dir = sampled ? now : 0;
+        new_value.bytes_seen_since_last_report_tx_dir = !sampled ? p->bytes : 0;
+        new_value.packets_seen_since_last_report_tx_dir = !sampled;
+        if (!sampled) {
+            _ct_record_tcp_flags(p->flags, &new_value.flags_seen_since_last_report_tx_dir);
+        }
     }
     new_value.is_direction_unknown = false;
     new_value.traffic_direction = _ct_get_traffic_direction(observation_point);
@@ -273,7 +280,7 @@ static __always_inline bool _ct_create_new_tcp_connection(struct packet *p, stru
     p->is_reply = is_reply;
     p->traffic_direction = new_value.traffic_direction;
     bpf_map_update_elem(&retina_conntrack, key, &new_value, BPF_ANY);
-    return true;
+    return sampled;
 }
 
 /**
@@ -281,8 +288,9 @@ static __always_inline bool _ct_create_new_tcp_connection(struct packet *p, stru
  * @arg *p pointer to the packet to be processed.
  * @arg key The key to be used to create the new connection.
  * @arg observation_point The point in the network stack where the packet is observed.
+ * @arg sampled Whether or not the packet was sampled for reporting. 
  */
-static __always_inline bool _ct_handle_udp_connection(struct packet *p, struct ct_v4_key *key, __u8 observation_point) {
+static __always_inline bool _ct_handle_udp_connection(struct packet *p, struct ct_v4_key *key, __u8 observation_point, bool sampled) {
     if (!p || !key) {
         return false;
     }
@@ -295,9 +303,9 @@ static __always_inline bool _ct_handle_udp_connection(struct packet *p, struct c
     }
     new_value.eviction_time = now + CT_CONNECTION_LIFETIME_NONTCP;
     new_value.flags_seen_tx_dir = p->flags;
-    new_value.last_report_tx_dir = now;
-    new_value.bytes_seen_since_last_report_tx_dir = 0;
-    new_value.packets_seen_since_last_report_tx_dir = 0;
+    new_value.last_report_tx_dir = sampled ? now : 0;
+    new_value.bytes_seen_since_last_report_tx_dir = !sampled ? p->bytes : 0;
+    new_value.packets_seen_since_last_report_tx_dir = !sampled;
     new_value.traffic_direction = _ct_get_traffic_direction(observation_point);
     #ifdef ENABLE_CONNTRACK_METRICS
         new_value.conntrack_metadata.packets_tx_count = 1;
@@ -310,7 +318,7 @@ static __always_inline bool _ct_handle_udp_connection(struct packet *p, struct c
     p->is_reply = false;
     p->traffic_direction = new_value.traffic_direction;
     bpf_map_update_elem(&retina_conntrack, key, &new_value, BPF_ANY);
-    return true;
+    return sampled;
 }
 
 /**
@@ -319,18 +327,19 @@ static __always_inline bool _ct_handle_udp_connection(struct packet *p, struct c
  * @arg key The key to be used to handle the connection.
  * @arg reverse_key The reverse key to be used to handle the connection.
  * @arg observation_point The point in the network stack where the packet is observed.
+ * @arg sampled Whether or not the packet was sampled for reporting.
  */
-static __always_inline bool _ct_handle_tcp_connection(struct packet *p, struct ct_v4_key *key, struct ct_v4_key *reverse_key, __u8 observation_point) {
+static __always_inline bool _ct_handle_tcp_connection(struct packet *p, struct ct_v4_key *key, struct ct_v4_key *reverse_key, __u8 observation_point, bool sampled) {
     if (!p || !key || !reverse_key) {
         return false;
     }
     u8 tcp_handshake = p->flags & (TCP_SYN|TCP_ACK);
     if (tcp_handshake == TCP_SYN) {
         // We have a SYN, we set `is_reply` to false and we provide `key`
-        return _ct_create_new_tcp_connection(p, key, observation_point, false);
+        return _ct_create_new_tcp_connection(p, key, observation_point, false, sampled);
     } else if(tcp_handshake == (TCP_SYN|TCP_ACK)) {
         // We have a SYN-ACK, we set `is_reply` to true and we provide `reverse_key`
-        return _ct_create_new_tcp_connection(p, reverse_key, observation_point, true);
+        return _ct_create_new_tcp_connection(p, reverse_key, observation_point, true, sampled);
     }
 
     // The packet is not a SYN packet and the connection corresponding to this packet is not found.
@@ -353,9 +362,12 @@ static __always_inline bool _ct_handle_tcp_connection(struct packet *p, struct c
     if (p->flags & TCP_ACK) {
         p->is_reply = true;
         new_value.flags_seen_rx_dir = p->flags;
-        new_value.last_report_rx_dir = now;
-        new_value.bytes_seen_since_last_report_rx_dir = 0;
-        new_value.packets_seen_since_last_report_rx_dir = 0;
+        new_value.last_report_rx_dir = sampled ? now : 0;
+        new_value.bytes_seen_since_last_report_rx_dir = !sampled ? p->bytes : 0;
+        new_value.packets_seen_since_last_report_rx_dir = !sampled;
+        if (!sampled) {
+            _ct_record_tcp_flags(p->flags, &new_value.flags_seen_since_last_report_rx_dir);
+        }
         #ifdef ENABLE_CONNTRACK_METRICS
             new_value.conntrack_metadata.bytes_rx_count = p->bytes;
             new_value.conntrack_metadata.packets_rx_count = 1;
@@ -364,9 +376,12 @@ static __always_inline bool _ct_handle_tcp_connection(struct packet *p, struct c
     } else { // Otherwise, the packet is considered as a packet in the send direction.
         p->is_reply = false;
         new_value.flags_seen_tx_dir = p->flags;
-        new_value.last_report_tx_dir = now;
-        new_value.bytes_seen_since_last_report_tx_dir = 0;
-        new_value.packets_seen_since_last_report_tx_dir = 0;
+        new_value.last_report_tx_dir = sampled ? now : 0;
+        new_value.bytes_seen_since_last_report_tx_dir = !sampled ? p->bytes : 0;
+        new_value.packets_seen_since_last_report_tx_dir = !sampled;
+        if (!sampled) {
+            _ct_record_tcp_flags(p->flags, &new_value.flags_seen_since_last_report_tx_dir);
+        }
         #ifdef ENABLE_CONNTRACK_METRICS
             new_value.conntrack_metadata.bytes_tx_count = p->bytes;
             new_value.conntrack_metadata.packets_tx_count = 1;
@@ -377,7 +392,7 @@ static __always_inline bool _ct_handle_tcp_connection(struct packet *p, struct c
         // Update packet's conntrack metadata.
         __builtin_memcpy(&p->conntrack_metadata, &new_value.conntrack_metadata, sizeof(struct conntrackmetadata));
     #endif // ENABLE_CONNTRACK_METRICS
-    return true;
+    return sampled;
 }
 
 /**
@@ -386,17 +401,18 @@ static __always_inline bool _ct_handle_tcp_connection(struct packet *p, struct c
  * @arg key The key to be used to handle the connection.
  * @arg reverse_key The reverse key to be used to handle the connection.
  * @arg observation_point The point in the network stack where the packet is observed.
+ * @arg sampled Whether or not the packet was sampled for reporting.
  */
-static __always_inline struct packetreport _ct_handle_new_connection(struct packet *p, struct ct_v4_key *key, struct ct_v4_key *reverse_key, __u8 observation_point) {
+static __always_inline struct packetreport _ct_handle_new_connection(struct packet *p, struct ct_v4_key *key, struct ct_v4_key *reverse_key, __u8 observation_point, bool sampled) {
     struct packetreport report;
     __builtin_memset(&report, 0, sizeof(struct packetreport));
     if (!p || !key || !reverse_key) {
         return report;
     }
     if (key->proto & IPPROTO_TCP) {
-        report.report = _ct_handle_tcp_connection(p, key, reverse_key, observation_point);
+        report.report = _ct_handle_tcp_connection(p, key, reverse_key, observation_point, sampled);
     } else if (key->proto & IPPROTO_UDP) {
-        report.report = _ct_handle_udp_connection(p, key, observation_point);
+        report.report = _ct_handle_udp_connection(p, key, observation_point, sampled);
     } else {
         report.report = false; // We are not interested in other protocols.
     }
@@ -410,9 +426,10 @@ static __always_inline struct packetreport _ct_handle_new_connection(struct pack
  * @arg flags The flags of the packet.
  * @arg direction The direction of the packet in relation to the connection.
  * @arg bytes The size of the packet in bytes.
+ * @arg sampled Whether or not the packet was sampled for reporting.
  * Returns a packetreport struct representing if the packet should be reported to userspace.
  */
-static __always_inline struct packetreport _ct_should_report_packet(struct ct_v4_key *key, struct ct_entry *entry, __u8 flags, __u8 direction, __u32 bytes) {
+static __always_inline struct packetreport _ct_should_report_packet(struct ct_v4_key *key, struct ct_entry *entry, __u8 flags, __u8 direction, __u32 bytes, bool sampled) {
     struct packetreport report;
     __builtin_memset(&report, 0, sizeof(struct packetreport));
     report.report = false;
@@ -522,21 +539,27 @@ static __always_inline struct packetreport _ct_should_report_packet(struct ct_v4
         WRITE_ONCE(entry->eviction_time, now + CT_CONNECTION_LIFETIME_NONTCP);
     }
 
+    if (flags != seen_flags) {
+        if (direction == CT_PACKET_DIR_TX) {
+            WRITE_ONCE(entry->flags_seen_tx_dir, flags);
+        } else {
+            WRITE_ONCE(entry->flags_seen_rx_dir, flags);
+        }
+    }
+
     // Report if:
     // 1. We already decided to report based on protocol-specific rules, or
-    // 2. New flags have appeared, or
+    // 2. New flags have appeared and the packet has been sampled, or
     // 3. Reporting interval has elapsed
-    if (should_report || flags != seen_flags || now - last_report >= CT_REPORT_INTERVAL) {
+    if (should_report || (sampled && flags != seen_flags) || now - last_report >= CT_REPORT_INTERVAL) {
         report.report = true;
         // Update the connection's state
         if (direction == CT_PACKET_DIR_TX) {
-            WRITE_ONCE(entry->flags_seen_tx_dir, flags);
             WRITE_ONCE(entry->last_report_tx_dir, now);
             WRITE_ONCE(entry->bytes_seen_since_last_report_tx_dir, 0);
             WRITE_ONCE(entry->packets_seen_since_last_report_tx_dir, 0);
             __builtin_memset(&entry->flags_seen_since_last_report_tx_dir, 0, sizeof(struct tcpflagscount));
         } else {
-            WRITE_ONCE(entry->flags_seen_rx_dir, flags);
             WRITE_ONCE(entry->last_report_rx_dir, now);
             WRITE_ONCE(entry->bytes_seen_since_last_report_rx_dir, 0);
             WRITE_ONCE(entry->packets_seen_since_last_report_rx_dir, 0);
@@ -565,9 +588,10 @@ static __always_inline struct packetreport _ct_should_report_packet(struct ct_v4
  * Process a packet and update the connection tracking map.
  * @arg *p pointer to the packet to be processed.
  * @arg observation_point The point in the network stack where the packet is observed.
+ * @arg sampled Whether or not the packet has been sampled for reporting.
  * Returns a packetreport struct representing if the packet should be reported to userspace.
  */
-static __always_inline __attribute__((unused)) struct packetreport ct_process_packet(struct packet *p, __u8 observation_point) {
+static __always_inline __attribute__((unused)) struct packetreport ct_process_packet(struct packet *p, __u8 observation_point, bool sampled) {
     if (!p) {
         struct packetreport report;
         __builtin_memset(&report, 0, sizeof(struct packetreport));
@@ -601,7 +625,7 @@ static __always_inline __attribute__((unused)) struct packetreport ct_process_pa
             // Update packet's conntract metadata.
             __builtin_memcpy(&p->conntrack_metadata, &entry->conntrack_metadata, sizeof(struct conntrackmetadata));
         #endif // ENABLE_CONNTRACK_METRICS
-        return _ct_should_report_packet(&key, entry, p->flags, CT_PACKET_DIR_TX, p->bytes);
+        return _ct_should_report_packet(&key, entry, p->flags, CT_PACKET_DIR_TX, p->bytes, sampled);
     }
     
     // The connection is not found in the send direction. Check the reply direction by reversing the key.
@@ -623,9 +647,9 @@ static __always_inline __attribute__((unused)) struct packetreport ct_process_pa
             // Update packet's conntract metadata.
             __builtin_memcpy(&p->conntrack_metadata, &entry->conntrack_metadata, sizeof(struct conntrackmetadata));
         #endif // ENABLE_CONNTRACK_METRICS
-        return _ct_should_report_packet(&reverse_key, entry, p->flags, CT_PACKET_DIR_RX, p->bytes);
+        return _ct_should_report_packet(&reverse_key, entry, p->flags, CT_PACKET_DIR_RX, p->bytes, sampled);
     }
 
     // If the connection is still not found, the connection is new.
-    return _ct_handle_new_connection(p, &key, &reverse_key, observation_point);
+    return _ct_handle_new_connection(p, &key, &reverse_key, observation_point, sampled);
 }
