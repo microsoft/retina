@@ -38,38 +38,20 @@ func TestEnricherSecondaryIPs(t *testing.T) {
 	c := cache.New(pubsub.New())
 
 	// construct the source endpoint
-	sourceEndpoints := common.NewRetinaEndpoint("pod1", "ns1", nil)
-	sourceEndpoints.SetLabels(map[string]string{
-		"app": "app1",
-	})
-
-	sourceEndpoints.SetOwnerRefs([]*common.OwnerReference{
-		{
-			Kind: "Pod",
-			Name: "pod1-deployment",
-		},
-	})
-
-	sourceEndpoints.SetIPs(&common.IPAddresses{
+	sourceEndpoints := common.NewRetinaEndpoint("pod1", "ns1", &common.IPAddresses{
 		IPv4:       net.IPv4(1, 1, 1, 1),
 		OtherIPv4s: []net.IP{net.IPv4(1, 1, 1, 2)},
 	})
+
 	err := c.UpdateRetinaEndpoint(sourceEndpoints)
 	require.NoError(t, err)
 
 	// construct the destination endpoint
-	destEndpoints := common.NewRetinaEndpoint("pod2", "ns2", nil)
-	destEndpoints.SetLabels(map[string]string{"app": "app2"})
-	destEndpoints.SetOwnerRefs([]*common.OwnerReference{
-		{
-			Kind: "Pod",
-			Name: "pod2-deployment",
-		},
-	})
-	destEndpoints.SetIPs(&common.IPAddresses{
+	destEndpoints := common.NewRetinaEndpoint("pod2", "ns2", &common.IPAddresses{
 		IPv4:       net.IPv4(2, 2, 2, 2),
 		OtherIPv4s: []net.IP{net.IPv4(2, 2, 2, 3)},
 	})
+
 	err = c.UpdateRetinaEndpoint(destEndpoints)
 	require.NoError(t, err)
 
@@ -101,12 +83,8 @@ func TestEnricherSecondaryIPs(t *testing.T) {
 
 			l.Info("One Received event", zap.Any("event", ev))
 			// check whether the event is enriched correctly
-			sourceFlowEndPoint := ev.Event.(*flow.Flow).GetSource()
-			assert.Equal(t, sourceEndpoints.Namespace(), sourceFlowEndPoint.GetNamespace())
-			assert.Equal(t, sourceEndpoints.Name(), sourceFlowEndPoint.GetPodName())
-			destFlowEndPoint := ev.Event.(*flow.Flow).GetDestination()
-			assert.Equal(t, destEndpoints.Namespace(), destFlowEndPoint.GetNamespace())
-			assert.Equal(t, destEndpoints.Name(), destFlowEndPoint.GetPodName())
+			assertEqualEndpoint(t, sourceEndpoints, ev.Event.(*flow.Flow).GetSource())
+			assertEqualEndpoint(t, destEndpoints, ev.Event.(*flow.Flow).GetDestination())
 			count++
 		}
 		assert.Equal(t, expectedOutputCount, count, "one")
@@ -123,12 +101,8 @@ func TestEnricherSecondaryIPs(t *testing.T) {
 				break
 			}
 			// check whether the event is enriched correctly
-			sourceFlowEndPoint := ev.Event.(*flow.Flow).GetSource()
-			assert.Equal(t, sourceEndpoints.Namespace(), sourceFlowEndPoint.GetNamespace())
-			assert.Equal(t, sourceEndpoints.Name(), sourceFlowEndPoint.GetPodName())
-			destFlowEndPoint := ev.Event.(*flow.Flow).GetDestination()
-			assert.Equal(t, destEndpoints.Namespace(), destFlowEndPoint.GetNamespace())
-			assert.Equal(t, destEndpoints.Name(), destFlowEndPoint.GetPodName())
+			assertEqualEndpoint(t, sourceEndpoints, ev.Event.(*flow.Flow).GetSource())
+			assertEqualEndpoint(t, destEndpoints, ev.Event.(*flow.Flow).GetDestination())
 			count++
 		}
 		assert.Equal(t, expectedOutputCount, count, "two")
@@ -156,4 +130,9 @@ func addEvent(e *Enricher, sourceIP, destIP string) {
 	l.Info("Adding event", zap.Any("event", ev))
 	time.Sleep(100 * time.Millisecond)
 	e.Write(ev)
+}
+
+func assertEqualEndpoint(t *testing.T, expected *common.RetinaEndpoint, actual *flow.Endpoint) {
+	assert.Equal(t, expected.Namespace(), actual.GetNamespace())
+	assert.Equal(t, expected.Name(), actual.GetPodName())
 }
