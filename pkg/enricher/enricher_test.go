@@ -88,17 +88,18 @@ func writeEventToEnricher(t *testing.T, e *Enricher, ev *v1.Event) {
 func TestEnricher(t *testing.T) {
 	opts := log.GetDefaultLogOpts()
 	opts.Level = "debug"
-	log.SetupZapLogger(opts)
+	_, err := log.SetupZapLogger(opts)
+	require.NoError(t, err)
 
 	c := cache.New(pubsub.New())
 
-	err := c.UpdateRetinaEndpoint(sourcePod)
+	err = c.UpdateRetinaEndpoint(sourcePod)
 	require.NoError(t, err)
 
 	err = c.UpdateRetinaEndpoint(destPod)
 	require.NoError(t, err)
 
-	e := new(context.Background(), c)
+	e := newEnricher(context.Background(), c)
 
 	var wg sync.WaitGroup
 	defer wg.Wait()
@@ -131,7 +132,6 @@ func TestEnricher(t *testing.T) {
 	}()
 
 	time.Sleep(3 * time.Second)
-
 }
 
 func TestEnricherSecondaryIPs(t *testing.T) {
@@ -156,7 +156,7 @@ func TestEnricherSecondaryIPs(t *testing.T) {
 	require.NoError(t, err)
 
 	// create new enricher (not using singleton here)
-	e := new(ctx, c)
+	e := newEnricher(ctx, c)
 	var wg sync.WaitGroup
 
 	wg.Add(1)

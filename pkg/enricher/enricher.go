@@ -40,26 +40,26 @@ type Enricher struct {
 	outputRing *container.Ring
 }
 
-func New(ctx context.Context, cache cache.CacheInterface) *Enricher {
+func New(ctx context.Context, c cache.CacheInterface) *Enricher {
 	once.Do(func() {
-		e = new(ctx, cache)
+		e = newEnricher(ctx, c)
 	})
 
 	return e
 }
 
-func new(ctx context.Context, cache cache.CacheInterface) *Enricher {
+func newEnricher(ctx context.Context, c cache.CacheInterface) *Enricher {
 	ir := container.NewRing(container.Capacity1023)
-	e := &Enricher{
+	enricher := &Enricher{
 		ctx:        ctx,
 		l:          log.Logger().Named("enricher"),
-		cache:      cache,
+		cache:      c,
 		inputRing:  ir,
 		Reader:     container.NewRingReader(ir, ir.OldestWrite()),
 		outputRing: container.NewRing(container.Capacity1023),
 	}
 	initialized = true
-	return e
+	return enricher
 }
 
 func Instance() *Enricher {
@@ -116,7 +116,7 @@ func (e *Enricher) enrich(ev *v1.Event) {
 		return
 	}
 
-	if flow.IP == nil {
+	if flow.GetIP() == nil {
 		e.l.Debug("flow IP is nil", zap.Any("flow", flow))
 		return
 	}
