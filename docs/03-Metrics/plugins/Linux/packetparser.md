@@ -15,6 +15,14 @@ The `packetparser` plugin requires the `CAP_NET_ADMIN` and `CAP_SYS_ADMIN` capab
 
 `packetparser` does not produce Basic metrics. In Advanced mode (refer to [Metric Modes](../../modes/modes.md)), the plugin transforms an eBPF result into an enriched `Flow` by adding Pod information based on IP. It then sends the `Flow` to an external channel, enabling *several modules* to generate Pod-Level metrics.
 
+## Sampling
+
+Since `packetparser` produces many enriched `Flow` objects it can be quite expensive for user space to process.  Thus, when operating in `high` [data aggregation](../../../05-Concepts/data-aggregation.md) level optional sampling for reported packets is available via the `dataSamplingRate` configuration option.
+
+`dataSamplingRate` is expressed in 1 out of N terms, where N is the `dataSamplingRate` value.  For example, if `dataSamplingRate` is 3 1/3rd of packets will be sampled for reporting.
+
+Keep in mind that there are cases where reporting will happen anyways as to ensure metric accuracy.
+
 ### Code locations
 
 - Plugin and eBPF code: *pkg/plugin/packetparser/*

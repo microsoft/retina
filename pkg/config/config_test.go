@@ -28,7 +28,8 @@ func TestGetConfig(t *testing.T) {
 		c.RemoteContext ||
 		c.EnableAnnotations ||
 		c.TelemetryInterval != 15*time.Minute ||
-		c.DataAggregationLevel != Low {
+		c.DataAggregationLevel != Low ||
+		c.DataSamplingRate != 1 {
 		t.Errorf("Expeted config should be same as ./testwith/config.yaml; instead got %+v", c)
 	}
 }
@@ -65,6 +66,5 @@ func TestDecodeLevelHook(t *testing.T) {
 		result, err := decodeLevelHook(reflect.TypeOf(test.input), reflect.TypeOf(Level(0)), test.input)
 		require.NoError(t, err)
 		assert.Equal(t, test.expected, result)
-
 	}
 }
