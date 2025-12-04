@@ -118,7 +118,6 @@ func (d *DeleteAndReAddLabels) addLabels(ctx context.Context, clientset *kuberne
 }
 
 func (d *DeleteAndReAddLabels) deleteLabels(ctx context.Context, clientset *kubernetes.Clientset, pods *corev1.PodList, patch string) error {
-
 	for _, pod := range pods.Items {
 		log.Println("Deleting label from Pod", pod.Name)
 
