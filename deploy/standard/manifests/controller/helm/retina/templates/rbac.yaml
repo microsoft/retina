@@ -21,6 +21,15 @@ rules:
       - retina.sh
     resources:
       - retinaendpoints
+      - captures
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - batch
+    resources:
+      - jobs
     verbs:
       - get
       - list

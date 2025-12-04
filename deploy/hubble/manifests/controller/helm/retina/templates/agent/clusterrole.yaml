@@ -15,9 +15,25 @@ rules:
     resources: ["clusterobservers"]
     verbs: ["get", "list", "watch"]
   - apiGroups:
-      - retina.io
+      - retina.sh
     resources:
       - retinaendpoints
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - retina.sh
+    resources:
+      - captures
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - batch
+    resources:
+      - jobs
     verbs:
       - get
       - list
@@ -43,7 +59,7 @@ rules:
       - watch
   {{- if .Values.operator.enabled }}
   - apiGroups:
-      - retina.io
+      - retina.sh
     resources:
       - retinaendpoints
     verbs:
@@ -55,7 +71,7 @@ rules:
       - update
       - watch
   - apiGroups:
-      - retina.io
+      - retina.sh
     resources:
       - metricsconfigurations
     verbs:
@@ -67,13 +83,13 @@ rules:
       - update
       - watch
   - apiGroups:
-      - retina.io
+      - retina.sh
     resources:
       - retinaendpoints/finalizers
     verbs:
       - update
   - apiGroups:
-      - retina.io
+      - retina.sh
     resources:
       - retinaendpoints/status
     verbs:
