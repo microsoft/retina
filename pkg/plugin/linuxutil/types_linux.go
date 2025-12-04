@@ -88,9 +88,6 @@ type NetstatOpts struct {
 
 	// get only listening sockets
 	ListenSock bool
-
-	// previous TCP socket stats
-	PrevTCPSockStats *SocketStats
 }
 
 type EthtoolStats struct {

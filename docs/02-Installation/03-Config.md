@@ -53,6 +53,7 @@ Apply to both Agent and Operator.
 * `enableAnnotations`: Enables gathering of metrics for annotated resources. Resources can be annotated with `retina.sh=observe`. Requires the operator and `operator.enableRetinaEndpoint` to be enabled. By enabling annotations, the agent will not use MetricsConfiguration CRD.
 * `bypassLookupIPOfInterest`: If true, plugins like `packetparser` and `dropreason` will bypass IP lookup, generating an event for each packet regardless. `enableAnnotations` will not work if this is true.
 * `dataAggregationLevel`: Defines the level of data aggregation for Retina. See [Data Aggregation](../05-Concepts/data-aggregation.md) for more details.
+* `dataSamplingRate`: Defines the data sampling rate for `packetparser`.  See [Sampling](../03-Metrics/plugins/Linux/packetparser.md#sampling) for more details.
 
 ## Operator Configuration
 
