@@ -17,7 +17,6 @@ import (
 )
 
 const (
-	RetinaPort int = 10093
 	// netObsRGtag is used to tag resources created by this test suite
 	NetObsRGtag            = "-e2e-netobs-"
 	KubeSystemNamespace    = "kube-system"
@@ -50,6 +49,9 @@ var (
 	}
 	RetinaAdvancedProfilePath = func(rootDir string) string {
 		return filepath.Join(rootDir, "test", "profiles", "advanced", "values.yaml")
+	}
+	HubbleChartPath = func(rootDir string) string {
+		return filepath.Join(rootDir, "deploy", "hubble", "manifests", "controller", "helm", "retina")
 	}
 	KubeConfigFilePath = func(rootDir string) string {
 		return filepath.Join(rootDir, "test", "e2e", "test.pem")

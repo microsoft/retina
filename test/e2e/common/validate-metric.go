@@ -1,3 +1,4 @@
+//nolint:revive // package name "common" is used across the E2E test suite
 package common
 
 import (
@@ -8,22 +9,21 @@ import (
 	prom "github.com/microsoft/retina/test/e2e/framework/prometheus"
 )
 
-var (
-	ErrMetricFound = errors.New("unexpected metric found")
-)
+var ErrMetricFound = errors.New("unexpected metric found")
 
 type ValidateMetric struct {
 	ForwardedPort string
 	MetricName    string
 	ValidMetrics  []map[string]string
 	ExpectMetric  bool
+	PartialMatch  bool // If true, only the specified labels need to match (metric can have additional labels)
 }
 
 func (v *ValidateMetric) Run() error {
 	promAddress := fmt.Sprintf("http://localhost:%s/metrics", v.ForwardedPort)
 
 	for _, validMetric := range v.ValidMetrics {
-		err := prom.CheckMetric(promAddress, v.MetricName, validMetric)
+		err := prom.CheckMetric(promAddress, v.MetricName, validMetric, v.PartialMatch)
 		if err != nil {
 			// If we expect the metric not to be found, return nil if it's not found.
 			if !v.ExpectMetric && errors.Is(err, prom.ErrNoMetricFound) {

@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/retina/test/e2e/scenarios/dns"
 	"github.com/microsoft/retina/test/e2e/scenarios/drop"
 	hubble_dns "github.com/microsoft/retina/test/e2e/scenarios/hubble/dns"
+	hubble_drop "github.com/microsoft/retina/test/e2e/scenarios/hubble/drop"
 	hubble_flow "github.com/microsoft/retina/test/e2e/scenarios/hubble/flow"
 	hubble_service "github.com/microsoft/retina/test/e2e/scenarios/hubble/service"
 	hubble_tcp "github.com/microsoft/retina/test/e2e/scenarios/hubble/tcp"
@@ -276,7 +277,7 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 	return job
 }
 
-func InstallAndTestHubbleMetrics(kubeConfigFilePath, chartPath string, testPodNamespace string) *types.Job {
+func InstallAndTestHubbleMetrics(kubeConfigFilePath, chartPath string) *types.Job {
 	job := types.NewJob("Validate Hubble")
 
 	job.AddStep(&kubernetes.InstallHubbleHelmChart{
@@ -287,16 +288,23 @@ func InstallAndTestHubbleMetrics(kubeConfigFilePath, chartPath string, testPodNa
 		TagEnv:             generic.DefaultTagEnv,
 	}, nil)
 
-	hubbleScrenarios := []*types.Scenario{
-		hubble_dns.ValidateDNSMetric(),
-		hubble_flow.ValidateFlowMetric(),
-		//hubble_drop.ValidateDropMetric(),
-		hubble_tcp.ValidateTCPMetric(),
+	hubbleScenarios := []*types.Scenario{
 		hubble_service.ValidateHubbleRelayService(),
 		hubble_service.ValidateHubbleUIService(kubeConfigFilePath),
 	}
 
-	for _, scenario := range hubbleScrenarios {
+	for _, arch := range common.Architectures {
+		hubbleScenarios = append(hubbleScenarios,
+			hubble_dns.ValidateDNSMetric(arch),
+			hubble_flow.ValidatePodToPodIntraNodeHubbleFlowMetric(arch),
+			hubble_flow.ValidatePodToPodInterNodeHubbleFlowMetric(arch),
+			hubble_flow.ValidatePodToWorldHubbleFlowMetric(arch),
+			hubble_drop.ValidateDropMetric(arch),
+			hubble_tcp.ValidateTCPMetric(arch),
+		)
+	}
+
+	for _, scenario := range hubbleScenarios {
 		job.AddScenario(scenario)
 	}
 

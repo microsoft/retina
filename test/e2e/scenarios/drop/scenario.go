@@ -4,16 +4,13 @@ import (
 	"time"
 
 	"github.com/microsoft/retina/test/e2e/common"
+	"github.com/microsoft/retina/test/e2e/framework/constants"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/types"
 )
 
 const (
 	sleepDelay = 5 * time.Second
-	TCP        = "TCP"
-	UDP        = "UDP"
-
-	IPTableRuleDrop = "IPTABLE_RULE_DROP"
 )
 
 func ValidateDropMetric(namespace, arch string) *types.Scenario {
@@ -22,13 +19,13 @@ func ValidateDropMetric(namespace, arch string) *types.Scenario {
 		{
 			Step: &kubernetes.CreateDenyAllNetworkPolicy{
 				NetworkPolicyNamespace: namespace,
-				DenyAllLabelSelector:   "app=agnhost-drop",
+				DenyAllLabelSelector:   "app=" + agnhostName,
 			},
 		},
 		{
 			Step: &kubernetes.CreateAgnhostStatefulSet{
 				AgnhostNamespace: namespace,
-				AgnhostName:      "agnhost-drop",
+				AgnhostName:      agnhostName,
 				AgnhostArch:      arch,
 			},
 		},
@@ -44,7 +41,7 @@ func ValidateDropMetric(namespace, arch string) *types.Scenario {
 		{
 			Step: &kubernetes.ExecInPod{
 				PodNamespace: namespace,
-				PodName:      "agnhost-drop-0",
+				PodName:      podName,
 				Command:      "curl -s -m 5 bing.com",
 			},
 			Opts: &types.StepOptions{
@@ -60,7 +57,7 @@ func ValidateDropMetric(namespace, arch string) *types.Scenario {
 		{
 			Step: &kubernetes.ExecInPod{
 				PodNamespace: namespace,
-				PodName:      "agnhost-drop-0",
+				PodName:      podName,
 				Command:      "curl -s -m 5 bing.com",
 			},
 			Opts: &types.StepOptions{
@@ -72,27 +69,28 @@ func ValidateDropMetric(namespace, arch string) *types.Scenario {
 			Step: &kubernetes.PortForward{
 				Namespace:             common.KubeSystemNamespace,
 				LabelSelector:         "k8s-app=retina",
-				LocalPort:             "10093",
-				RemotePort:            "10093",
+				LocalPort:             constants.RetinaMetricsPort,
+				RemotePort:            constants.RetinaMetricsPort,
 				Endpoint:              "metrics",
-				OptionalLabelAffinity: "app=agnhost-drop", // port forward to a pod on a node that also has this pod with this label, assuming same namespace
+				OptionalLabelAffinity: "app=" + agnhostName, // port forward to a pod on a node that also has this pod with this label, assuming same namespace
 			},
 			Opts: &types.StepOptions{
-				RunInBackgroundWithID: "drop-port-forward",
+				RunInBackgroundWithID:     "drop-port-forward" + arch,
+				SkipSavingParametersToJob: true,
 			},
 		},
 		{
 			Step: &ValidateRetinaDropMetric{
-				PortForwardedRetinaPort: "10093",
-				Source:                  "agnhost-drop",
-				Reason:                  IPTableRuleDrop,
-				Direction:               "unknown",
-				Protocol:                UDP,
+				PortForwardedRetinaPort: constants.RetinaMetricsPort,
+				Source:                  agnhostName,
+				Reason:                  constants.IPTableRuleDrop,
+				Direction:               validRetinaDropMetricLabels[constants.RetinaDirectionLabel],
+				Protocol:                constants.UDP,
 			},
 		},
 		{
 			Step: &types.Stop{
-				BackgroundID: "drop-port-forward",
+				BackgroundID: "drop-port-forward" + arch,
 			},
 		},
 
@@ -109,7 +107,7 @@ func ValidateDropMetric(namespace, arch string) *types.Scenario {
 			Step: &kubernetes.DeleteKubernetesResource{
 				ResourceType:      kubernetes.TypeString(kubernetes.StatefulSet),
 				ResourceNamespace: namespace,
-				ResourceName:      "agnhost-drop",
+				ResourceName:      agnhostName,
 			}, Opts: &types.StepOptions{
 				SkipSavingParametersToJob: true,
 			},

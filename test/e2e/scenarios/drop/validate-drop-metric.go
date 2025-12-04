@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/microsoft/retina/test/e2e/framework/constants"
 	prom "github.com/microsoft/retina/test/e2e/framework/prometheus"
 )
 
@@ -32,7 +33,7 @@ func (v *ValidateRetinaDropMetric) Run() error {
 	promAddress := fmt.Sprintf("http://localhost:%s/metrics", v.PortForwardedRetinaPort)
 
 	metric := map[string]string{
-		directionKey: v.Direction, reasonKey: IPTableRuleDrop,
+		directionKey: v.Direction, reasonKey: constants.IPTableRuleDrop,
 	}
 
 	err := prom.CheckMetric(promAddress, dropCountMetricName, metric)

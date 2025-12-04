@@ -66,7 +66,7 @@ func ValidateTCPMetrics(namespace, arch string) *types.Scenario {
 			},
 			Opts: &types.StepOptions{
 				SkipSavingParametersToJob: true,
-				RunInBackgroundWithID:     "drop-flow-forward",
+				RunInBackgroundWithID:     "drop-flow-forward" + arch,
 			},
 		},
 		{
@@ -85,7 +85,7 @@ func ValidateTCPMetrics(namespace, arch string) *types.Scenario {
 		},
 		{
 			Step: &types.Stop{
-				BackgroundID: "drop-flow-forward",
+				BackgroundID: "drop-flow-forward" + arch,
 			},
 		},
 		{

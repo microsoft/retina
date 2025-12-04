@@ -13,8 +13,8 @@ const (
 	sleepDelay = 5 * time.Second
 )
 
-func ValidateDNSMetric() *types.Scenario {
-	name := "DNS Metrics"
+func ValidateDNSMetric(arch string) *types.Scenario {
+	name := "DNS Metrics - Arch: " + arch
 	agnhostName := "agnhost-dns"
 	podName := agnhostName + "-0"
 	steps := []*types.StepWrapper{
@@ -22,6 +22,7 @@ func ValidateDNSMetric() *types.Scenario {
 			Step: &kubernetes.CreateAgnhostStatefulSet{
 				AgnhostName:      agnhostName,
 				AgnhostNamespace: common.TestPodNamespace,
+				AgnhostArch:      arch,
 			},
 		},
 		{
@@ -78,6 +79,13 @@ func ValidateDNSMetric() *types.Scenario {
 		{
 			Step: &types.Stop{
 				BackgroundID: "hubble-dns-port-forward",
+			},
+		},
+		{
+			Step: &kubernetes.DeleteKubernetesResource{
+				ResourceType:      kubernetes.TypeString(kubernetes.StatefulSet),
+				ResourceName:      agnhostName,
+				ResourceNamespace: common.TestPodNamespace,
 			},
 		},
 	}

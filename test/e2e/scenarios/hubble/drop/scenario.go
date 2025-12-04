@@ -13,14 +13,12 @@ const (
 	sleepDelay = 5 * time.Second
 )
 
-func ValidateDropMetric() *types.Scenario {
-	name := "Drop Metrics"
-	agnhostName := "agnhost-drop"
-	podName := agnhostName + "-0"
+func ValidateDropMetric(arch string) *types.Scenario {
+	name := "Drop Metrics - Arch: " + arch
 	steps := []*types.StepWrapper{
 		{
 			Step: &kubernetes.CreateDenyAllNetworkPolicy{
-				NetworkPolicyNamespace: common.KubeSystemNamespace,
+				NetworkPolicyNamespace: common.TestPodNamespace,
 				DenyAllLabelSelector:   "app=" + agnhostName,
 			},
 		},
@@ -28,6 +26,29 @@ func ValidateDropMetric() *types.Scenario {
 			Step: &kubernetes.CreateAgnhostStatefulSet{
 				AgnhostName:      agnhostName,
 				AgnhostNamespace: common.TestPodNamespace,
+				AgnhostArch:      arch,
+			},
+		},
+		// Need this delay to guarantee that the pods will have bpf program attached
+		{
+			Step: &types.Sleep{
+				Duration: 30 * time.Second,
+			},
+			Opts: &types.StepOptions{
+				SkipSavingParametersToJob: true,
+			},
+		},
+		{
+			Step: &kubernetes.PortForward{
+				LabelSelector:         "k8s-app=retina",
+				LocalPort:             constants.RetinaMetricsPort,
+				RemotePort:            constants.RetinaMetricsPort,
+				Endpoint:              constants.MetricsEndpoint,
+				OptionalLabelAffinity: "app=" + agnhostName, // port forward to a pod on a node that also has this pod with this label, assuming same namespace
+			},
+			Opts: &types.StepOptions{
+				RunInBackgroundWithID:     "retina-drop-port-forward",
+				SkipSavingParametersToJob: true,
 			},
 		},
 		{
@@ -35,34 +56,11 @@ func ValidateDropMetric() *types.Scenario {
 				LabelSelector:         "k8s-app=retina",
 				LocalPort:             constants.HubbleMetricsPort,
 				RemotePort:            constants.HubbleMetricsPort,
-				Namespace:             common.KubeSystemNamespace,
-				Endpoint:              "metrics",
+				Endpoint:              constants.MetricsEndpoint,
 				OptionalLabelAffinity: "app=" + agnhostName, // port forward hubble metrics to a pod on a node that also has this pod with this label, assuming same namespace
 			},
 			Opts: &types.StepOptions{
-				RunInBackgroundWithID: "hubble-drop-port-forward",
-			},
-		},
-		{
-			Step: &common.ValidateMetric{
-				ForwardedPort: constants.HubbleMetricsPort,
-				MetricName:    constants.HubbleDropMetricName,
-				ValidMetrics:  []map[string]string{validHubbleDropMetricLabels},
-				ExpectMetric:  false,
-			},
-			Opts: &types.StepOptions{
-				SkipSavingParametersToJob: true,
-			},
-		},
-
-		{
-			Step: &kubernetes.ExecInPod{
-				PodName:      podName,
-				PodNamespace: common.TestPodNamespace,
-				Command:      "curl -s -m 5 bing.com",
-			},
-			Opts: &types.StepOptions{
-				ExpectError:               true,
+				RunInBackgroundWithID:     "hubble-drop-port-forward",
 				SkipSavingParametersToJob: true,
 			},
 		},
@@ -84,10 +82,22 @@ func ValidateDropMetric() *types.Scenario {
 		},
 		{
 			Step: &common.ValidateMetric{
+				ForwardedPort: constants.RetinaMetricsPort,
+				MetricName:    constants.RetinaDropMetricName,
+				ValidMetrics:  []map[string]string{validRetinaDropMetricLabels},
+				ExpectMetric:  true,
+			},
+			Opts: &types.StepOptions{
+				SkipSavingParametersToJob: true,
+			},
+		},
+		{
+			Step: &common.ValidateMetric{
 				ForwardedPort: constants.HubbleMetricsPort,
 				MetricName:    constants.HubbleDropMetricName,
 				ValidMetrics:  []map[string]string{validHubbleDropMetricLabels},
 				ExpectMetric:  true,
+				PartialMatch:  true,
 			},
 			Opts: &types.StepOptions{
 				SkipSavingParametersToJob: true,
@@ -99,10 +109,28 @@ func ValidateDropMetric() *types.Scenario {
 			},
 		},
 		{
+			Step: &types.Stop{
+				BackgroundID: "retina-drop-port-forward",
+			},
+		},
+		{
 			Step: &kubernetes.DeleteKubernetesResource{
 				ResourceType:      kubernetes.TypeString(kubernetes.NetworkPolicy),
 				ResourceName:      "deny-all",
-				ResourceNamespace: common.KubeSystemNamespace,
+				ResourceNamespace: common.TestPodNamespace,
+			},
+			Opts: &types.StepOptions{
+				SkipSavingParametersToJob: true,
+			},
+		},
+		{
+			Step: &kubernetes.DeleteKubernetesResource{
+				ResourceType:      kubernetes.TypeString(kubernetes.StatefulSet),
+				ResourceName:      agnhostName,
+				ResourceNamespace: common.TestPodNamespace,
+			},
+			Opts: &types.StepOptions{
+				SkipSavingParametersToJob: true,
 			},
 		},
 	}

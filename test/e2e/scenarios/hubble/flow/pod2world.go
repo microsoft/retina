@@ -1,4 +1,4 @@
-package tcp
+package flow
 
 import (
 	"time"
@@ -9,18 +9,35 @@ import (
 	"github.com/microsoft/retina/test/e2e/framework/types"
 )
 
-const (
-	sleepDelay = 5 * time.Second
-)
-
-func ValidateTCPMetric(arch string) *types.Scenario {
-	name := "TCP Flags Metrics - Arch: " + arch
-	agnhostName := "agnhost-tcp"
-	podName := agnhostName + "-0"
+func ValidatePodToWorldHubbleFlowMetric(arch string) *types.Scenario {
+	var (
+		podName                               = "agnhost-flow-world"
+		validHubbleFlowToWorldTCPToStackLabel = map[string]string{
+			constants.HubbleSourceLabel:      common.TestPodNamespace + "/" + podName + "-0",
+			constants.HubbleDestinationLabel: "",
+			constants.HubbleProtocolLabel:    constants.TCP,
+			constants.HubbleSubtypeLabel:     "to-stack",
+			constants.HubbleTypeLabel:        "Trace",
+			constants.HubbleVerdictLabel:     "FORWARDED",
+		}
+		validHubbleFlowToWorldUDPToStackLabel = map[string]string{
+			constants.HubbleSourceLabel:      common.TestPodNamespace + "/" + podName + "-0",
+			constants.HubbleDestinationLabel: "",
+			constants.HubbleProtocolLabel:    constants.UDP,
+			constants.HubbleSubtypeLabel:     "to-stack",
+			constants.HubbleTypeLabel:        "Trace",
+			constants.HubbleVerdictLabel:     "FORWARDED",
+		}
+		validHubbleFlowMetricsLabels = []map[string]string{
+			validHubbleFlowToWorldTCPToStackLabel,
+			validHubbleFlowToWorldUDPToStackLabel,
+		}
+	)
+	name := "Validate pod to world Hubble flow metrics - Arch: " + arch
 	steps := []*types.StepWrapper{
 		{
 			Step: &kubernetes.CreateAgnhostStatefulSet{
-				AgnhostName:      agnhostName,
+				AgnhostName:      podName,
 				AgnhostNamespace: common.TestPodNamespace,
 				AgnhostArch:      arch,
 			},
@@ -39,18 +56,17 @@ func ValidateTCPMetric(arch string) *types.Scenario {
 				LabelSelector:         "k8s-app=retina",
 				LocalPort:             constants.HubbleMetricsPort,
 				RemotePort:            constants.HubbleMetricsPort,
-				Namespace:             common.KubeSystemNamespace,
 				Endpoint:              constants.MetricsEndpoint,
-				OptionalLabelAffinity: "app=" + agnhostName, // port forward to a pod on a node that also has this pod with this label, assuming same namespace
+				OptionalLabelAffinity: "app=" + podName,
 			},
 			Opts: &types.StepOptions{
-				RunInBackgroundWithID:     "hubble-tcp-port-forward",
+				RunInBackgroundWithID:     "hubble-flow-to-world-port-forward",
 				SkipSavingParametersToJob: true,
 			},
 		},
 		{
 			Step: &kubernetes.ExecInPod{
-				PodName:      podName,
+				PodName:      podName + "-0",
 				PodNamespace: common.TestPodNamespace,
 				Command:      "curl -s -m 5 bing.com",
 			},
@@ -66,30 +82,23 @@ func ValidateTCPMetric(arch string) *types.Scenario {
 		{
 			Step: &common.ValidateMetric{
 				ForwardedPort: constants.HubbleMetricsPort,
-				MetricName:    constants.HubbleTCPFlagsMetricName,
-				ValidMetrics:  validHubbleTCPMetricsLabels,
+				MetricName:    constants.HubbleFlowMetricName,
+				ValidMetrics:  validHubbleFlowMetricsLabels,
 				ExpectMetric:  true,
-			},
-			Opts: &types.StepOptions{
-				SkipSavingParametersToJob: true,
 			},
 		},
 		{
 			Step: &types.Stop{
-				BackgroundID: "hubble-tcp-port-forward",
+				BackgroundID: "hubble-flow-to-world-port-forward",
 			},
 		},
 		{
 			Step: &kubernetes.DeleteKubernetesResource{
 				ResourceType:      kubernetes.TypeString(kubernetes.StatefulSet),
-				ResourceName:      agnhostName,
+				ResourceName:      podName,
 				ResourceNamespace: common.TestPodNamespace,
-			},
-			Opts: &types.StepOptions{
-				SkipSavingParametersToJob: true,
 			},
 		},
 	}
-
 	return types.NewScenario(name, steps...)
 }
