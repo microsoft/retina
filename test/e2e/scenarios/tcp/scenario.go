@@ -17,9 +17,6 @@ const (
 )
 
 func ValidateTCPMetrics(namespace, arch string) *types.Scenario {
-	id := "flow-port-forward-" + arch
-	agnhostName := "agnhost-tcp"
-	podName := agnhostName + "-0"
 	Name := "Flow Metrics - Arch: " + arch
 	Steps := []*types.StepWrapper{
 		{
@@ -30,14 +27,14 @@ func ValidateTCPMetrics(namespace, arch string) *types.Scenario {
 		},
 		{
 			Step: &kubernetes.CreateAgnhostStatefulSet{
-				AgnhostName:      agnhostName,
+				AgnhostName:      "agnhost-a",
 				AgnhostNamespace: namespace,
 				AgnhostArch:      arch,
 			},
 		},
 		{
 			Step: &kubernetes.ExecInPod{
-				PodName:      podName,
+				PodName:      "agnhost-a-0",
 				PodNamespace: namespace,
 				Command:      "curl -s -m 5 bing.com",
 			}, Opts: &types.StepOptions{
@@ -51,7 +48,7 @@ func ValidateTCPMetrics(namespace, arch string) *types.Scenario {
 		},
 		{
 			Step: &kubernetes.ExecInPod{
-				PodName:      podName,
+				PodName:      "agnhost-a-0",
 				PodNamespace: namespace,
 				Command:      "curl -s -m 5 bing.com",
 			}, Opts: &types.StepOptions{
@@ -65,11 +62,11 @@ func ValidateTCPMetrics(namespace, arch string) *types.Scenario {
 				LocalPort:             "10093",
 				RemotePort:            "10093",
 				Endpoint:              "metrics",
-				OptionalLabelAffinity: "app=" + agnhostName, // port forward to a pod on a node that also has this pod with this label, assuming same namespace
+				OptionalLabelAffinity: "app=agnhost-a", // port forward to a pod on a node that also has this pod with this label, assuming same namespace
 			},
 			Opts: &types.StepOptions{
 				SkipSavingParametersToJob: true,
-				RunInBackgroundWithID:     id,
+				RunInBackgroundWithID:     "drop-flow-forward" + arch,
 			},
 		},
 		{
@@ -88,13 +85,13 @@ func ValidateTCPMetrics(namespace, arch string) *types.Scenario {
 		},
 		{
 			Step: &types.Stop{
-				BackgroundID: id,
+				BackgroundID: "drop-flow-forward" + arch,
 			},
 		},
 		{
 			Step: &kubernetes.DeleteKubernetesResource{
 				ResourceType:      kubernetes.TypeString(kubernetes.StatefulSet),
-				ResourceName:      agnhostName,
+				ResourceName:      "agnhost-a",
 				ResourceNamespace: namespace,
 			}, Opts: &types.StepOptions{
 				SkipSavingParametersToJob: true,
