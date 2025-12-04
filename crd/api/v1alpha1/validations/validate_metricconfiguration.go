@@ -7,6 +7,7 @@ package validations
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/pkg/utils"
@@ -39,6 +40,15 @@ func MetricsSpec(metricsSpec v1alpha1.MetricsSpec) error {
 	for _, contextOption := range metricsSpec.ContextOptions {
 		if !utils.IsAdvancedMetric(contextOption.MetricName) {
 			return fmt.Errorf("%s is not a valid metric", contextOption.MetricName)
+		}
+		if contextOption.TTL != "" {
+			ttl, err := time.ParseDuration(contextOption.TTL)
+			if err != nil {
+				return fmt.Errorf("invalid TTL format for metric %s: %v", contextOption.MetricName, err)
+			}
+			if ttl < 0 {
+				return fmt.Errorf("TTL cannot be negative for metric %s", contextOption.MetricName)
+			}
 		}
 	}
 
@@ -152,10 +162,13 @@ func MetricsContextOptionsCompare(old, new []v1alpha1.MetricsContextOptions) boo
 			return false
 		}
 
-		if !utils.CompareStringSlice(oldContextOption.AdditionalLabels, newContextOption.AdditionalLabels) {
+		if oldContextOption.TTL != newContextOption.TTL {
 			return false
 		}
 
+		if !utils.CompareStringSlice(oldContextOption.AdditionalLabels, newContextOption.AdditionalLabels) {
+			return false
+		}
 	}
 
 	return true
