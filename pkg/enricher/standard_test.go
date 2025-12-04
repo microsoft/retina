@@ -14,6 +14,8 @@ import (
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/microsoft/retina/pkg/common"
 	"github.com/microsoft/retina/pkg/controllers/cache"
+	"github.com/microsoft/retina/pkg/enricher/base"
+
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/stretchr/testify/assert"
@@ -74,7 +76,7 @@ func TestEnricherSecondaryIPs(t *testing.T) {
 	require.NoError(t, err)
 
 	// get the enricher
-	e := New(ctx, c)
+	e := newStandard(ctx, c)
 	var wg sync.WaitGroup
 
 	wg.Add(1)
@@ -140,7 +142,7 @@ func TestEnricherSecondaryIPs(t *testing.T) {
 	wg.Wait()
 }
 
-func addEvent(e *Enricher, sourceIP, destIP string) {
+func addEvent(e base.EnricherInterface, sourceIP, destIP string) {
 	l := log.Logger().Named("addev")
 	ev := &v1.Event{
 		Timestamp: timestamppb.Now(),

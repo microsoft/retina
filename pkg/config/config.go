@@ -106,7 +106,7 @@ func GetConfig(cfgFilename string) (*Config, error) {
 
 	err = viper.Unmarshal(&config, decoderConfigOption)
 	if err != nil {
-		return nil, fmt.Errorf("fatal error config file: %s", err)
+		return nil, fmt.Errorf("fatal error unmarshalling config file: %w", err)
 	}
 
 	if config.MetricsIntervalDuration != 0 {
