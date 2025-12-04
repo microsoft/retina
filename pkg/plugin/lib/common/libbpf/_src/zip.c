@@ -1,5 +1,3 @@
-//go:build ignore
-
 // SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
 /*
  * Routines for dealing with .zip archives.
@@ -225,7 +223,7 @@ struct zip_archive *zip_archive_open(const char *path)
 	if (!archive) {
 		munmap(data, size);
 		return ERR_PTR(-ENOMEM);
-	};
+	}
 
 	archive->data = data;
 	archive->size = size;
