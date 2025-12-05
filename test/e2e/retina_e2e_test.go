@@ -26,8 +26,6 @@ func TestE2ERetina(t *testing.T) {
 	// Get to root of the repo by going up two directories
 	rootDir := filepath.Dir(filepath.Dir(cwd))
 
-	hubblechartPath := filepath.Join(rootDir, "deploy", "hubble", "manifests", "controller", "helm", "retina")
-
 	err = jobs.LoadGenericFlags().Run()
 	require.NoError(t, err, "failed to load generic flags")
 
@@ -54,14 +52,9 @@ func TestE2ERetina(t *testing.T) {
 	)
 	advanceMetricsE2E.Run(ctx)
 
-	// Install and test Hubble basic metrics
-	validatehubble := types.NewRunner(t,
-		jobs.ValidateHubble(
-			common.KubeConfigFilePath(rootDir),
-			hubblechartPath,
-			common.TestPodNamespace),
-	)
-	validatehubble.Run(ctx)
+	// Install and test Hubble  metrics
+	hubbleMetricsE2E := types.NewRunner(t, jobs.InstallAndTestHubbleMetrics(common.KubeConfigFilePath(rootDir), common.HubbleChartPath(rootDir)))
+	hubbleMetricsE2E.Run(ctx)
 
 	// Install Retina basic and test captures
 	captureE2E := types.NewRunner(t,
