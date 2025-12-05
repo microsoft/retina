@@ -19,6 +19,7 @@ import (
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
+	"github.com/microsoft/retina/pkg/plugin/common"
 	"github.com/microsoft/retina/pkg/plugin/registry"
 	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
@@ -53,6 +54,14 @@ func (t *tcpretrans) Init() error {
 		t.l.Warn("tcpretrans will not init because pod level is disabled")
 		return nil
 	}
+
+	if err := common.CheckAndMountFilesystems(t.l); err != nil {
+		t.l.Error("Required filesystems not available for tcpretrans plugin", zap.Error(err))
+		// Return error to let retina decide whether to continue without tcpretrans plugin
+		// or fail the entire agent initialization
+		return fmt.Errorf("required filesystems not available: %w", err)
+	}
+
 	// Create tracer. In this case no parameters are passed.
 	if err := host.Init(host.Config{}); err != nil {
 		t.l.Error("failed to init host", zap.Error(err))
