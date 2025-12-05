@@ -25,6 +25,7 @@ data:
     bypassLookupIPOfInterest: {{ .Values.bypassLookupIPOfInterest }}
     dataAggregationLevel: {{ .Values.dataAggregationLevel }}
     telemetryInterval: {{ .Values.daemonset.telemetryInterval }}
+    dataSamplingRate: {{ .Values.dataSamplingRate }}
 {{- end}}
 ---
 {{- if .Values.os.windows}}
