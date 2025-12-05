@@ -6,6 +6,7 @@ package dns
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os"
 
@@ -47,8 +48,21 @@ func (d *dns) Compile(ctx context.Context) error {
 }
 
 func (d *dns) Init() error {
-	// Create tracer. In this case no parameters are passed.
-	err := host.Init(host.Config{})
+	// Check and mount filesystems before calling host.Init to avoid os.Exit()
+	if err := common.CheckAndMountFilesystems(d.l); err != nil {
+		d.l.Error("Required filesystems not available for DNS plugin", zap.Error(err))
+		// Return error to let retina decide whether to continue without DNS plugin
+		// or fail the entire agent initialization
+		return fmt.Errorf("required filesystems not available: %w", err)
+	}
+
+	// Filesystems are available, safe to call host.Init()
+	if err := host.Init(host.Config{}); err != nil {
+		d.l.Error("Host initialization failed", zap.Error(err))
+		return fmt.Errorf("host initialization failed: %w", err)
+	}
+
+	// Create tracer
 	tracer, err := tracer.NewTracer()
 	if err != nil {
 		d.l.Error("Failed to create tracer", zap.Error(err))
