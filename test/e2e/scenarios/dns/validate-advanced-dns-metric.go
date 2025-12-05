@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/microsoft/retina/test/e2e/common"
+	"github.com/microsoft/retina/test/e2e/framework/constants"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	prom "github.com/microsoft/retina/test/e2e/framework/prometheus"
 	"github.com/pkg/errors"
@@ -29,7 +29,7 @@ type ValidateAdvancedDNSRequestMetrics struct {
 }
 
 func (v *ValidateAdvancedDNSRequestMetrics) Run() error {
-	metricsEndpoint := fmt.Sprintf("http://localhost:%d/metrics", common.RetinaPort)
+	metricsEndpoint := fmt.Sprintf("http://localhost:%s/metrics", constants.RetinaMetricsPort)
 	// Get Pod IP address
 	podIP, err := kubernetes.GetPodIP(v.KubeConfigFilePath, v.PodNamespace, v.PodName)
 	if err != nil {
@@ -78,7 +78,7 @@ type ValidateAdvanceDNSResponseMetrics struct {
 }
 
 func (v *ValidateAdvanceDNSResponseMetrics) Run() error {
-	metricsEndpoint := fmt.Sprintf("http://localhost:%d/metrics", common.RetinaPort)
+	metricsEndpoint := fmt.Sprintf("http://localhost:%s/metrics", constants.RetinaMetricsPort)
 	// Get Pod IP address
 	podIP, err := kubernetes.GetPodIP(v.KubeConfigFilePath, v.PodNamespace, v.PodName)
 	if err != nil {
