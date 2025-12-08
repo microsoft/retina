@@ -86,7 +86,10 @@ func (c *CreateAgnhostStatefulSet) Stop() error {
 }
 
 func (c *CreateAgnhostStatefulSet) getAgnhostDeployment(arch string, replicas int) *appsv1.StatefulSet {
-	reps := int32(replicas)
+	if replicas < 1 {
+		replicas = 1
+	}
+	reps := int32(replicas) //nolint:gosec // replicas controlled by test code
 
 	var affinity *v1.Affinity
 	if c.ScheduleOnSameNode {
