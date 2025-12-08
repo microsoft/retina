@@ -44,7 +44,7 @@ func ValidateTCPMetric(arch string) *types.Scenario {
 				OptionalLabelAffinity: "app=" + agnhostName, // port forward to a pod on a node that also has this pod with this label, assuming same namespace
 			},
 			Opts: &types.StepOptions{
-				RunInBackgroundWithID:     "hubble-tcp-port-forward",
+				RunInBackgroundWithID:     "hubble-tcp-port-forward" + arch,
 				SkipSavingParametersToJob: true,
 			},
 		},
@@ -76,7 +76,7 @@ func ValidateTCPMetric(arch string) *types.Scenario {
 		},
 		{
 			Step: &types.Stop{
-				BackgroundID: "hubble-tcp-port-forward",
+				BackgroundID: "hubble-tcp-port-forward" + arch,
 			},
 		},
 		{

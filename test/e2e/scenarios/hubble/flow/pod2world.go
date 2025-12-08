@@ -60,7 +60,7 @@ func ValidatePodToWorldHubbleFlowMetric(arch string) *types.Scenario {
 				OptionalLabelAffinity: "app=" + podName,
 			},
 			Opts: &types.StepOptions{
-				RunInBackgroundWithID:     "hubble-flow-to-world-port-forward",
+				RunInBackgroundWithID:     "hubble-flow-to-world-port-forward" + arch,
 				SkipSavingParametersToJob: true,
 			},
 		},
@@ -89,7 +89,7 @@ func ValidatePodToWorldHubbleFlowMetric(arch string) *types.Scenario {
 		},
 		{
 			Step: &types.Stop{
-				BackgroundID: "hubble-flow-to-world-port-forward",
+				BackgroundID: "hubble-flow-to-world-port-forward" + arch,
 			},
 		},
 		{

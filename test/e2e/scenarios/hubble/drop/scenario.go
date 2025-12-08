@@ -47,7 +47,7 @@ func ValidateDropMetric(arch string) *types.Scenario {
 				OptionalLabelAffinity: "app=" + agnhostName, // port forward to a pod on a node that also has this pod with this label, assuming same namespace
 			},
 			Opts: &types.StepOptions{
-				RunInBackgroundWithID:     "retina-drop-port-forward",
+				RunInBackgroundWithID:     "retina-drop-port-forward" + arch,
 				SkipSavingParametersToJob: true,
 			},
 		},
@@ -60,7 +60,7 @@ func ValidateDropMetric(arch string) *types.Scenario {
 				OptionalLabelAffinity: "app=" + agnhostName, // port forward hubble metrics to a pod on a node that also has this pod with this label, assuming same namespace
 			},
 			Opts: &types.StepOptions{
-				RunInBackgroundWithID:     "hubble-drop-port-forward",
+				RunInBackgroundWithID:     "hubble-drop-port-forward" + arch,
 				SkipSavingParametersToJob: true,
 			},
 		},
@@ -105,12 +105,12 @@ func ValidateDropMetric(arch string) *types.Scenario {
 		},
 		{
 			Step: &types.Stop{
-				BackgroundID: "hubble-drop-port-forward",
+				BackgroundID: "hubble-drop-port-forward" + arch,
 			},
 		},
 		{
 			Step: &types.Stop{
-				BackgroundID: "retina-drop-port-forward",
+				BackgroundID: "retina-drop-port-forward" + arch,
 			},
 		},
 		{

@@ -35,7 +35,7 @@ func ValidateDNSMetric(arch string) *types.Scenario {
 				OptionalLabelAffinity: "app=" + agnhostName, // port forward hubble metrics to a pod on a node that also has this pod with this label, assuming same namespace
 			},
 			Opts: &types.StepOptions{
-				RunInBackgroundWithID: "hubble-dns-port-forward",
+				RunInBackgroundWithID: "hubble-dns-port-forward" + arch,
 			},
 		},
 		{
@@ -78,7 +78,7 @@ func ValidateDNSMetric(arch string) *types.Scenario {
 		},
 		{
 			Step: &types.Stop{
-				BackgroundID: "hubble-dns-port-forward",
+				BackgroundID: "hubble-dns-port-forward" + arch,
 			},
 		},
 		{

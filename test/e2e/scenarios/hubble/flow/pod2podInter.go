@@ -94,7 +94,7 @@ func ValidatePodToPodInterNodeHubbleFlowMetric(arch string) *types.Scenario {
 				OptionalLabelAffinity: "app=" + podnameSrc,
 			},
 			Opts: &types.StepOptions{
-				RunInBackgroundWithID:     "hubble-src-flow-port-forward",
+				RunInBackgroundWithID:     "hubble-src-flow-port-forward" + arch,
 				SkipSavingParametersToJob: true,
 			},
 		},
@@ -107,7 +107,7 @@ func ValidatePodToPodInterNodeHubbleFlowMetric(arch string) *types.Scenario {
 				OptionalLabelAffinity: "app=" + podnameDst,
 			},
 			Opts: &types.StepOptions{
-				RunInBackgroundWithID:     "hubble-dst-flow-port-forward",
+				RunInBackgroundWithID:     "hubble-dst-flow-port-forward" + arch,
 				SkipSavingParametersToJob: true,
 			},
 		},
@@ -151,7 +151,7 @@ func ValidatePodToPodInterNodeHubbleFlowMetric(arch string) *types.Scenario {
 		},
 		{
 			Step: &types.Stop{
-				BackgroundID: "hubble-src-flow-port-forward",
+				BackgroundID: "hubble-src-flow-port-forward" + arch,
 			},
 			Opts: &types.StepOptions{
 				SkipSavingParametersToJob: true,
@@ -159,7 +159,7 @@ func ValidatePodToPodInterNodeHubbleFlowMetric(arch string) *types.Scenario {
 		},
 		{
 			Step: &types.Stop{
-				BackgroundID: "hubble-dst-flow-port-forward",
+				BackgroundID: "hubble-dst-flow-port-forward" + arch,
 			},
 		},
 		{

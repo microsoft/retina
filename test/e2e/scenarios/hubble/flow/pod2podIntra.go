@@ -84,7 +84,7 @@ func ValidatePodToPodIntraNodeHubbleFlowMetric(arch string) *types.Scenario {
 				OptionalLabelAffinity: "app=" + podname, // port forward to a pod on a node that also has this pod with this label, assuming same namespace
 			},
 			Opts: &types.StepOptions{
-				RunInBackgroundWithID:     "hubble-flow-intra-port-forward",
+				RunInBackgroundWithID:     "hubble-flow-intra-port-forward" + arch,
 				SkipSavingParametersToJob: true,
 			},
 		},
@@ -114,7 +114,7 @@ func ValidatePodToPodIntraNodeHubbleFlowMetric(arch string) *types.Scenario {
 		},
 		{
 			Step: &types.Stop{
-				BackgroundID: "hubble-flow-intra-port-forward",
+				BackgroundID: "hubble-flow-intra-port-forward" + arch,
 			},
 		},
 		{
