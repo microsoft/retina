@@ -14,6 +14,8 @@ The plugins have a very specific scope by design, and Retina is designed to be e
 
 The plugins are responsible for installing the eBPF programs into the host kernel during startup. These eBPF programs collect metrics from events in the kernel level, which are then passed to the user space where they are parsed and converted into a `flow` data structure. Depending on the Control Plane being used, the data will either be sent to a Retina Enricher, or written to an external channel which is consumed by a Hubble observer - more on this in the [Control Plane](#control-plane) section below. It is not required for a plugin to use eBPF, it can also use syscalls or other API calls. In either case, the plugins will implement the same [interface](https://github.com/microsoft/retina/blob/main/pkg/plugin/registry/registry.go).
 
+**Data Transfer Mechanisms:** eBPF programs transfer data from kernel to user space using specialized data structures. The `packetparser` plugin currently uses **perf arrays** (BPF_MAP_TYPE_PERF_EVENT_ARRAY), which create per-CPU buffers. Community users have reported performance considerations with this approach on high-core-count systems. See [packetparser performance considerations](../03-Metrics/plugins/Linux/packetparser.md#performance-considerations) for details.
+
 Some examlpes of existing Retina plugins:
 
 - Drop Reason - measures the number of packets/bytes dropped and the reason and the direction of the drop.
