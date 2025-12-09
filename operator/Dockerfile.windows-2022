@@ -16,7 +16,7 @@ RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -ldflags "-X g
 
 # Copy into final image
 # skopeo inspect docker://mcr.microsoft.com/windows/nanoserver:ltsc2022 --override-os windows --format "{{.Name}}@{{.Digest}}"
-FROM  mcr.microsoft.com/windows/nanoserver@sha256:580b7fa4040be7b47d79c25fb73e3d6da2e68f32b95d9d4dfb70bde33564fc4a
+FROM  mcr.microsoft.com/windows/nanoserver@sha256:643adf84ee2338ee4811fd891adb9e912917dc6c0ca85399982e1bebda4f2295
 COPY --from=builder /usr/src/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
 COPY --from=builder /usr/src/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
 
