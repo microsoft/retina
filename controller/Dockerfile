@@ -12,10 +12,10 @@ FROM mcr.microsoft.com/azurelinux/base/core@sha256:9948138108a3d69f1dae62104599a
 FROM mcr.microsoft.com/azurelinux/distroless/minimal@sha256:0801b80a0927309572b9adc99bd1813bc680473175f6e8175cd4124d95dbd50c AS azurelinux-distroless
 
 # skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2019  --override-os windows --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/windows/servercore@sha256:dfd0f4a06d08d7cad271efcfac0d05ca9dc5fa7c55df15b0d8491c81105974a9 AS ltsc2019
+FROM mcr.microsoft.com/windows/servercore@sha256:a3d7773c4a836c2efd3ecb89f4fcb41199ee56d454225cf72a65b603bf569eca AS ltsc2019
 
 # skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2022  --override-os windows --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/windows/servercore@sha256:92659de869382c14a0276a5e93215d88cb182dc22f1ff3ada1f1b68b8648f3b2 AS ltsc2022
+FROM mcr.microsoft.com/windows/servercore@sha256:3750d7fcd320130cc2ce61954902b71729e85ec2c07c5a2e83a6d6c7f34a61e5 AS ltsc2022
 
 # build stages
 
