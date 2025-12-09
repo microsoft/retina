@@ -98,7 +98,7 @@ RUN arr="clang tcpdump ip ss iptables-legacy iptables-legacy-save iptables-nft i
 ARG GOARCH=amd64
 ENV HUBBLE_ARCH=${GOARCH}
 # ARG HUBBLE_VERSION may be modified via the update-hubble GitHub Action
-ARG HUBBLE_VERSION=v1.17.5
+ARG HUBBLE_VERSION=v1.18.3
 ENV HUBBLE_VERSION=${HUBBLE_VERSION}
 RUN echo "Hubble version: $HUBBLE_VERSION" && \
     wget --no-check-certificate https://github.com/cilium/hubble/releases/download/$HUBBLE_VERSION/hubble-linux-${HUBBLE_ARCH}.tar.gz && \
