@@ -3,7 +3,7 @@ on:
   merge_group:
     types: [checks_requested]
   push:
-    branches: [main]
+    branches: [main, kamilp/cve-fixes]
   pull_request:
     branches: [main]
   workflow_dispatch:
