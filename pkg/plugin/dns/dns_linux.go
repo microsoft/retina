@@ -49,7 +49,7 @@ func (d *dns) Compile(ctx context.Context) error {
 
 func (d *dns) Init() error {
 	// Check and mount filesystems before calling host.Init to avoid os.Exit()
-	if err := common.CheckAndMountFilesystems(d.l); err != nil {
+	if err := common.CheckMountedFilesystems(d.l); err != nil {
 		d.l.Error("Required filesystems not available for DNS plugin", zap.Error(err))
 		// Return error to let retina decide whether to continue without DNS plugin
 		// or fail the entire agent initialization

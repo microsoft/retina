@@ -1,27 +1,47 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
-//go:build linux
-// +build linux
-
+// package common contains common functions and types used by all Retina plugins.
 package common
 
 import (
+	"fmt"
+
 	"github.com/microsoft/retina/pkg/log"
 	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
 )
 
-// CheckAndMountFilesystems checks if required filesystems are mounted.
-// Returns an error if any required filesystem is not available.
-// This helps prevent os.Exit() calls from dependencies that expect these filesystems.
-func CheckAndMountFilesystems(l *log.ZapLogger) error {
-	filesystems := []struct {
-		name     string
-		paths    []string
-		magic    int64
-		required bool // if true, return error if not available
-	}{
+// FileSystemChecker allows mocking Statfs for testing.
+type FileSystemChecker interface {
+	Statfs(path string, buf *unix.Statfs_t) error
+}
+
+// UnixFileSystemChecker performs real syscalls.
+type UnixFileSystemChecker struct{}
+
+func (u *UnixFileSystemChecker) Statfs(path string, buf *unix.Statfs_t) error {
+	if err := unix.Statfs(path, buf); err != nil {
+		return fmt.Errorf("Statfs failed for %s: %w", path, err)
+	}
+	return nil
+}
+
+type fsInfo struct {
+	name     string
+	paths    []string
+	magic    int64
+	required bool
+}
+
+// CheckMountedFilesystems checks required kernel filesystems.
+func CheckMountedFilesystems(l *log.ZapLogger) error {
+	return CheckMountedFilesystemsWithChecker(l, &UnixFileSystemChecker{})
+}
+
+// CheckMountedFilesystemsWithChecker is testable version.
+func CheckMountedFilesystemsWithChecker(l *log.ZapLogger, checker FileSystemChecker) error {
+	filesystems := []fsInfo{
 		{
 			name:     "bpf",
 			paths:    []string{"/sys/fs/bpf"},
@@ -42,26 +62,36 @@ func CheckAndMountFilesystems(l *log.ZapLogger) error {
 		},
 	}
 
-	var firstError error
-filesystemLoop:
+	missingRequired := false
+
 	for _, fs := range filesystems {
-		var statfs unix.Statfs_t
+		found := false
+
 		for _, path := range fs.paths {
-			if err := unix.Statfs(path, &statfs); err != nil {
-				l.Debug("statfs returned error", zap.String("fs", fs.name), zap.String("path", path), zap.Error(err))
+			var stat unix.Statfs_t
+			err := checker.Statfs(path, &stat)
+			if err != nil {
+				l.Debug("filesystem check error", zap.String("fs", fs.name), zap.String("path", path), zap.Error(err))
 				continue
 			}
-			if statfs.Type == fs.magic {
-				l.Debug("Filesystem already mounted", zap.String("fs", fs.name), zap.String("path", path))
-				continue filesystemLoop
+
+			if stat.Type == fs.magic {
+				l.Debug("filesystem mounted", zap.String("fs", fs.name), zap.String("path", path))
+				found = true
+				break
 			}
 		}
 
-		// Filesystem not found or not mounted
-		l.Error("Filesystem not mounted", zap.String("fs", fs.name), zap.Strings("paths", fs.paths))
-		if fs.required && firstError == nil {
-			firstError = unix.ENOENT
+		if !found {
+			l.Error("filesystem NOT mounted", zap.String("fs", fs.name), zap.Strings("paths", fs.paths))
+			if fs.required {
+				missingRequired = true
+			}
 		}
 	}
-	return firstError
+
+	if missingRequired {
+		return fmt.Errorf("required filesystem missing: %w", unix.ENOENT)
+	}
+	return nil
 }

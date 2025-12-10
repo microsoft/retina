@@ -55,7 +55,7 @@ func (t *tcpretrans) Init() error {
 		return nil
 	}
 
-	if err := common.CheckAndMountFilesystems(t.l); err != nil {
+	if err := common.CheckMountedFilesystems(t.l); err != nil {
 		t.l.Error("Required filesystems not available for tcpretrans plugin", zap.Error(err))
 		// Return error to let retina decide whether to continue without tcpretrans plugin
 		// or fail the entire agent initialization
