@@ -6,6 +6,7 @@ package retinaendpoint
 import (
 	"context"
 	"fmt"
+	"net"
 	"sync"
 	"time"
 
@@ -40,6 +41,9 @@ func retinaEndpoitCmpComparer() cmp.Option {
 			return false
 		}
 		if !cmp.Equal(x.Labels(), y.Labels()) {
+			return false
+		}
+		if !cmp.Equal(x.Zone(), y.Zone()) {
 			return false
 		}
 		return true
@@ -97,6 +101,10 @@ var _ = Describe("Test Retina Capture Controller", func() {
 		})
 
 		It("Should create capture successfully", func() {
+			By("Add a RetinaNode to the cache")
+			retinaNode := retinaCommon.NewRetinaNode("test-node", net.ParseIP("10.10.10.10"), "zone-1")
+			Expect(retinaEndpointReconciler.cache.UpdateRetinaNode(retinaNode)).Should(Succeed())
+
 			By("Creating a new RetinaEndpoint")
 			ctx := context.Background()
 			retinaEndpoint := &retinav1alpha1.RetinaEndpoint{
@@ -126,7 +134,7 @@ var _ = Describe("Test Retina Capture Controller", func() {
 			}, timeout, interval).Should(BeTrue())
 
 			By("Checking the common RetinaEndpoint is created in Cache")
-			expectedRetinaEndpointCommon := retinaCommon.RetinaEndpointCommonFromAPI(createdRetinaEndpoint)
+			expectedRetinaEndpointCommon := retinaCommon.RetinaEndpointCommonFromAPI(createdRetinaEndpoint, "zone-1")
 			Eventually(func() string {
 				retinaEndpointCommon := retinaEndpointReconciler.cache.GetPodByIP(createdRetinaEndpoint.Spec.PodIP)
 				return cmp.Diff(retinaEndpointCommon, expectedRetinaEndpointCommon, retinaEndpoitCmpComparer())
@@ -138,7 +146,7 @@ var _ = Describe("Test Retina Capture Controller", func() {
 			Expect(k8sClient.Update(ctx, createdRetinaEndpoint)).Should(Succeed())
 
 			By("Checking the common RetinaEndpoint is updated in Cache")
-			expectedRetinaEndpointCommon = retinaCommon.RetinaEndpointCommonFromAPI(createdRetinaEndpoint)
+			expectedRetinaEndpointCommon = retinaCommon.RetinaEndpointCommonFromAPI(createdRetinaEndpoint, "zone-1")
 			Eventually(func() string {
 				retinaEndpointCommon := retinaEndpointReconciler.cache.GetPodByIP(retinaEndpoint.Spec.PodIP)
 				return cmp.Diff(retinaEndpointCommon, expectedRetinaEndpointCommon, retinaEndpoitCmpComparer())
@@ -148,7 +156,7 @@ var _ = Describe("Test Retina Capture Controller", func() {
 			Expect(k8sClient.Delete(ctx, createdRetinaEndpoint)).Should(Succeed())
 
 			By("Checking the common RetinaEndpoint is not in Cache")
-			expectedRetinaEndpointCommon = retinaCommon.RetinaEndpointCommonFromAPI(createdRetinaEndpoint)
+			expectedRetinaEndpointCommon = retinaCommon.RetinaEndpointCommonFromAPI(createdRetinaEndpoint, "zone-1")
 			Eventually(func() bool {
 				retinaEndpointCommon := retinaEndpointReconciler.cache.GetPodByIP(retinaEndpoint.Spec.PodIP)
 				return retinaEndpointCommon == nil
