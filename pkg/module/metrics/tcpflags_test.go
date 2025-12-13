@@ -6,6 +6,7 @@ package metrics
 
 import (
 	"testing"
+	"time"
 
 	"github.com/cilium/cilium/api/v1/flow"
 	"github.com/microsoft/retina/crd/api/v1alpha1"
@@ -471,7 +472,7 @@ func TestNewTCPMetrics(t *testing.T) {
 		log.Logger().Info("Running test name", zap.String("name", tc.name))
 		ctrl := gomock.NewController(t)
 
-		tcp := NewTCPMetrics(tc.opts, log.Logger(), tc.localContext)
+		tcp := NewTCPMetrics(tc.opts, log.Logger(), tc.localContext, time.Duration(0))
 		if tc.nilObj {
 			assert.Nil(t, tcp, "forward metrics should be nil Test Name: %s", tc.name)
 			continue

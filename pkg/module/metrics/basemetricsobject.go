@@ -3,25 +3,119 @@
 package metrics
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"fmt"
+	"sync"
+	"time"
+
 	api "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/pkg/log"
+	"go.uber.org/zap"
 )
 
+type expireFn func(lbs []string) bool
+
+type updated struct {
+	t   time.Time
+	lbs []string
+}
+
 type baseMetricObject struct {
+	*sync.Mutex
 	advEnable   bool
 	contextMode enrichmentContext
 	ctxOptions  *api.MetricsContextOptions
 	srcCtx      ContextOptionsInterface
 	dstCtx      ContextOptionsInterface
 	l           *log.ZapLogger
+	lastUpdated map[string]updated
+	expireFn    expireFn
 }
 
-func newBaseMetricsObject(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext) baseMetricObject {
+func (b *baseMetricObject) expire(ttl time.Duration) int {
+	if b.expireFn == nil {
+		return 0
+	}
+
+	b.Lock()
+	defer b.Unlock()
+
+	var expired int
+	n := make(map[string]updated)
+
+	for h, u := range b.lastUpdated {
+		if time.Since(u.t) >= ttl {
+			d := b.expireFn(u.lbs)
+			if d {
+				expired++
+			}
+		} else {
+			n[h] = u
+		}
+	}
+
+	b.lastUpdated = n
+
+	return expired
+}
+
+func (b *baseMetricObject) updated(lbs []string) {
+	// no expiration function is defined, so we don't need to track updates
+	if b.expireFn == nil {
+		return
+	}
+
+	var bf bytes.Buffer
+
+	for _, l := range lbs {
+		bf.WriteString(l)
+	}
+
+	h := sha256.New()
+	h.Write(bf.Bytes())
+
+	s := string(h.Sum(nil))
+
+	b.Lock()
+	defer b.Unlock()
+
+	b.lastUpdated[s] = updated{
+		t:   time.Now(),
+		lbs: lbs,
+	}
+}
+
+func newBaseMetricsObject(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext, expire expireFn, ttl time.Duration) baseMetricObject {
+	expireOrInfiniteTTL := expire
+	if ttl <= 0 {
+		// infinite TTL, so make sure the expiration function is unset
+		expireOrInfiniteTTL = nil
+	}
+
 	b := baseMetricObject{
+		Mutex:       &sync.Mutex{},
 		advEnable:   ctxOptions.IsAdvanced(),
 		ctxOptions:  ctxOptions,
 		l:           fl,
 		contextMode: isLocalContext,
+		lastUpdated: make(map[string]updated),
+		expireFn:    expireOrInfiniteTTL,
+	}
+
+	if expireOrInfiniteTTL != nil {
+		go func() {
+			for {
+				b.l.Debug(fmt.Sprintf("Expiring metrics: %s", ctxOptions.MetricName))
+				n := b.expire(ttl)
+				b.l.Debug(
+					fmt.Sprintf("Metric expiration finished: %s", ctxOptions.MetricName),
+					zap.Time("next_expiration", time.Now().Add(ttl)),
+					zap.Int("expired", n),
+				)
+				time.Sleep(ttl)
+			}
+		}()
 	}
 
 	b.populateCtxOptions(ctxOptions)

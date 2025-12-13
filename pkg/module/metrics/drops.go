@@ -5,12 +5,14 @@ package metrics
 
 import (
 	"strings"
+	"time"
 
 	v1 "github.com/cilium/cilium/api/v1/flow"
 	api "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/pkg/exporter"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
+	metricsinit "github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
 )
@@ -29,16 +31,16 @@ type DropCountMetrics struct {
 	metricName string
 }
 
-func NewDropCountMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext) *DropCountMetrics {
+func NewDropCountMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext, ttl time.Duration) *DropCountMetrics {
 	if ctxOptions == nil || !strings.Contains(strings.ToLower(ctxOptions.MetricName), "drop") {
 		return nil
 	}
 
 	fl = fl.Named("dropreason-metricsmodule")
 	fl.Info("Creating drop count metrics", zap.Any("options", ctxOptions))
-	return &DropCountMetrics{
-		baseMetricObject: newBaseMetricsObject(ctxOptions, fl, isLocalContext),
-	}
+	d := &DropCountMetrics{}
+	d.baseMetricObject = newBaseMetricsObject(ctxOptions, fl, isLocalContext, d.expire, ttl)
+	return d
 }
 
 func (d *DropCountMetrics) Init(metricName string) {
@@ -161,11 +163,28 @@ func (d *DropCountMetrics) processLocalCtxFlow(flow *v1.Flow) {
 	}
 }
 
+func (d *DropCountMetrics) expire(labels []string) bool {
+	var del bool
+	if d.dropMetric != nil {
+		del = d.dropMetric.DeleteLabelValues(labels...)
+		if del {
+			metricsinit.MetricsExpiredCounter.WithLabelValues(d.metricName).Inc()
+		}
+	}
+	return del
+}
+
 func (d *DropCountMetrics) update(fl *v1.Flow, labels []string) {
+	var updated bool
 	switch d.metricName {
 	case utils.DroppedPacketsGaugeName:
+		updated = true
 		d.dropMetric.WithLabelValues(labels...).Inc()
 	case utils.DropBytesGaugeName:
+		updated = true
 		d.dropMetric.WithLabelValues(labels...).Add(float64(utils.PacketSize(fl)))
+	}
+	if updated {
+		d.updated(labels)
 	}
 }
