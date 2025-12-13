@@ -7,7 +7,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/microsoft/retina/test/e2e/common"
+	"github.com/microsoft/retina/test/e2e/framework/constants"
 	k8s "github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	prom "github.com/microsoft/retina/test/e2e/framework/prometheus"
 	"github.com/microsoft/retina/test/retry"
@@ -74,7 +74,7 @@ func (v *ValidateHNSMetric) Run() error {
 	// wrap this in a retrier because windows is slow
 	var output []byte
 	err = defaultRetrier.Do(context.TODO(), func() error {
-		output, err = k8s.ExecPod(context.TODO(), clientset, config, windowsRetinaPod.Namespace, windowsRetinaPod.Name, fmt.Sprintf("curl -s http://localhost:%d/metrics", common.RetinaPort))
+		output, err = k8s.ExecPod(context.TODO(), clientset, config, windowsRetinaPod.Namespace, windowsRetinaPod.Name, fmt.Sprintf("curl -s http://localhost:%s/metrics", constants.RetinaMetricsPort))
 		if err != nil {
 			return fmt.Errorf("error executing command in windows retina pod: %w", err)
 		}

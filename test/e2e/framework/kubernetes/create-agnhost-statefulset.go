@@ -18,7 +18,6 @@ var ErrLabelMissingFromPod = fmt.Errorf("label missing from pod")
 
 const (
 	AgnhostHTTPPort  = 80
-	AgnhostReplicas  = 1
 	AgnhostArchAmd64 = "amd64"
 	AgnhostArchArm64 = "arm64"
 )
@@ -29,6 +28,7 @@ type CreateAgnhostStatefulSet struct {
 	ScheduleOnSameNode bool
 	KubeConfigFilePath string
 	AgnhostArch        string
+	AgnhostReplicas    *int
 }
 
 func (c *CreateAgnhostStatefulSet) Run() error {
@@ -50,7 +50,13 @@ func (c *CreateAgnhostStatefulSet) Run() error {
 		c.AgnhostArch = AgnhostArchAmd64
 	}
 
-	agnhostStatefulSet := c.getAgnhostDeployment(c.AgnhostArch)
+	// set default replicas to 1
+	replicas := 1
+	if c.AgnhostReplicas != nil {
+		replicas = *c.AgnhostReplicas
+	}
+
+	agnhostStatefulSet := c.getAgnhostDeployment(c.AgnhostArch, replicas)
 
 	err = CreateResource(ctx, agnhostStatefulSet, clientset)
 	if err != nil {
@@ -79,8 +85,11 @@ func (c *CreateAgnhostStatefulSet) Stop() error {
 	return nil
 }
 
-func (c *CreateAgnhostStatefulSet) getAgnhostDeployment(arch string) *appsv1.StatefulSet {
-	reps := int32(AgnhostReplicas)
+func (c *CreateAgnhostStatefulSet) getAgnhostDeployment(arch string, replicas int) *appsv1.StatefulSet {
+	if replicas < 1 {
+		replicas = 1
+	}
+	reps := int32(replicas) //nolint:gosec // replicas controlled by test code
 
 	var affinity *v1.Affinity
 	if c.ScheduleOnSameNode {
