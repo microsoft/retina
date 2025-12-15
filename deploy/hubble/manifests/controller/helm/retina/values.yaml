@@ -68,6 +68,8 @@ enableAnnotations: false
 bypassLookupIPOfInterest: true
 dataAggregationLevel: "high"
 monitorSockPath: "/var/run/cilium/monitor1_2.sock"
+enablePacketParserRingBuffer: false
+packetParserRingBufferSize: 8388608
 
 imagePullSecrets: []
 nameOverride: "retina"
