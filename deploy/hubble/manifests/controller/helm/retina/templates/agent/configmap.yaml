@@ -114,6 +114,8 @@ data:
     bypassLookupIPOfInterest: {{ .Values.bypassLookupIPOfInterest }}
     dataAggregationLevel: {{ .Values.dataAggregationLevel }}
     monitorSockPath: {{ .Values.monitorSockPath }}
+    enablePacketParserRingBuffer: {{ .Values.enablePacketParserRingBuffer }}
+    packetParserRingBufferSize: {{ .Values.packetParserRingBufferSize }}
 {{- end}}
 ---
 {{- if .Values.os.windows}}

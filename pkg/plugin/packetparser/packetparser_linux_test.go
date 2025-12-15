@@ -56,6 +56,11 @@ var (
 		BypassLookupIPOfInterest: true,
 		EnableConntrackMetrics:   true,
 	}
+	cfgRingBufferEnabled = &kcfg.Config{
+		EnablePodLevel:               true,
+		EnablePacketParserRingBuffer: true,
+		PacketParserRingBufferSize:   4096,
+	}
 )
 
 func TestCleanAll(t *testing.T) {
@@ -345,7 +350,8 @@ func TestReadDataPodLevelEnabled(t *testing.T) {
 	metrics.LostEventsCounter = mICounterVec
 
 	mParsedPacketsCounter := metrics.NewMockCounterVec(ctrl)
-	mParsedPacketsCounter.EXPECT().WithLabelValues(gomock.Any()).Return(prometheus.NewCounter(prometheus.CounterOpts{})).AnyTimes()
+	mParsedPacketsCounter.EXPECT().WithLabelValues(gomock.Any()).
+		Return(prometheus.NewCounter(prometheus.CounterOpts{})).AnyTimes()
 	metrics.ParsedPacketsCounter = mParsedPacketsCounter
 
 	exCh := make(chan *v1.Event, 10)
@@ -562,24 +568,33 @@ func TestPacketParseGenerate(t *testing.T) {
 		expectedContents string
 	}{
 		{
-			name:             "PodLevelEnabled",
-			cfg:              cfgPodLevelEnabled,
-			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n#define DATA_AGGREGATION_LEVEL 0\n#define DATA_SAMPLING_RATE 0\n",
+			name: "PodLevelEnabled",
+			cfg:  cfgPodLevelEnabled,
+			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n" +
+				"#define DATA_AGGREGATION_LEVEL 0\n" +
+				"#define DATA_SAMPLING_RATE 0\n",
 		},
 		{
-			name:             "ConntrackMetricsEnabled",
-			cfg:              cfgConntrackMetricsEnabled,
-			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n#define ENABLE_CONNTRACK_METRICS 1\n#define DATA_AGGREGATION_LEVEL 1\n#define DATA_SAMPLING_RATE 0\n",
+			name: "ConntrackMetricsEnabled",
+			cfg:  cfgConntrackMetricsEnabled,
+			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n" +
+				"#define ENABLE_CONNTRACK_METRICS 1\n" +
+				"#define DATA_AGGREGATION_LEVEL 1\n" +
+				"#define DATA_SAMPLING_RATE 0\n",
 		},
 		{
-			name:             "DataAggregationLevelLow",
-			cfg:              cfgDataAggregationLevelLow,
-			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 0\n#define DATA_AGGREGATION_LEVEL 0\n#define DATA_SAMPLING_RATE 0\n",
+			name: "DataAggregationLevelLow",
+			cfg:  cfgDataAggregationLevelLow,
+			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 0\n" +
+				"#define DATA_AGGREGATION_LEVEL 0\n" +
+				"#define DATA_SAMPLING_RATE 0\n",
 		},
 		{
-			name:             "DataAggregationLevelHigh",
-			cfg:              cfgDataAggregationLevelHigh,
-			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 0\n#define DATA_AGGREGATION_LEVEL 1\n#define DATA_SAMPLING_RATE 0\n",
+			name: "DataAggregationLevelHigh",
+			cfg:  cfgDataAggregationLevelHigh,
+			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 0\n" +
+				"#define DATA_AGGREGATION_LEVEL 1\n" +
+				"#define DATA_SAMPLING_RATE 0\n",
 		},
 	}
 
@@ -620,6 +635,37 @@ func TestCompile(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	p := &packetParser{
 		cfg: cfgPodLevelEnabled,
+		l:   log.Logger().Named(name),
+	}
+	dir, _ := absPath()
+	expectedOutputFile := fmt.Sprintf("%s/%s", dir, bpfObjectFileName)
+
+	err := os.Remove(expectedOutputFile)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("Expected no error. Error: %+v", err)
+	}
+
+	err = p.Generate(context.Background())
+	if err != nil {
+		t.Fatalf("Expected no error. Error: %+v", err)
+	}
+
+	err = p.Compile(context.Background())
+	if err != nil {
+		t.Fatalf("Expected no error. Error: %+v", err)
+	}
+	if _, err := os.Stat(expectedOutputFile); errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("File %+v doesn't exist", expectedOutputFile)
+	}
+}
+
+func TestCompileRingBuffer(t *testing.T) {
+	takeBackup()
+	defer restoreBackup()
+
+	log.SetupZapLogger(log.GetDefaultLogOpts()) //nolint:errcheck // ignore
+	p := &packetParser{
+		cfg: cfgRingBufferEnabled,
 		l:   log.Logger().Named(name),
 	}
 	dir, _ := absPath()

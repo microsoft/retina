@@ -65,18 +65,20 @@ type Config struct {
 	EnabledPlugin   []string      `yaml:"enabledPlugin"`
 	MetricsInterval time.Duration `yaml:"metricsInterval"`
 	// Deprecated: Use only MetricsInterval instead in the go code.
-	MetricsIntervalDuration  time.Duration `yaml:"metricsIntervalDuration"`
-	EnableTelemetry          bool          `yaml:"enableTelemetry"`
-	EnableRetinaEndpoint     bool          `yaml:"enableRetinaEndpoint"`
-	EnablePodLevel           bool          `yaml:"enablePodLevel"`
-	EnableConntrackMetrics   bool          `yaml:"enableConntrackMetrics"`
-	RemoteContext            bool          `yaml:"remoteContext"`
-	EnableAnnotations        bool          `yaml:"enableAnnotations"`
-	BypassLookupIPOfInterest bool          `yaml:"bypassLookupIPOfInterest"`
-	DataAggregationLevel     Level         `yaml:"dataAggregationLevel"`
-	MonitorSockPath          string        `yaml:"monitorSockPath"`
-	TelemetryInterval        time.Duration `yaml:"telemetryInterval"`
-	DataSamplingRate         uint32        `yaml:"dataSamplingRate"`
+	MetricsIntervalDuration      time.Duration `yaml:"metricsIntervalDuration"`
+	EnableTelemetry              bool          `yaml:"enableTelemetry"`
+	EnableRetinaEndpoint         bool          `yaml:"enableRetinaEndpoint"`
+	EnablePodLevel               bool          `yaml:"enablePodLevel"`
+	EnableConntrackMetrics       bool          `yaml:"enableConntrackMetrics"`
+	RemoteContext                bool          `yaml:"remoteContext"`
+	EnableAnnotations            bool          `yaml:"enableAnnotations"`
+	BypassLookupIPOfInterest     bool          `yaml:"bypassLookupIPOfInterest"`
+	DataAggregationLevel         Level         `yaml:"dataAggregationLevel"`
+	MonitorSockPath              string        `yaml:"monitorSockPath"`
+	TelemetryInterval            time.Duration `yaml:"telemetryInterval"`
+	DataSamplingRate             uint32        `yaml:"dataSamplingRate"`
+	EnablePacketParserRingBuffer bool          `yaml:"enablePacketParserRingBuffer"`
+	PacketParserRingBufferSize   uint32        `yaml:"packetParserRingBufferSize"`
 }
 
 func GetConfig(cfgFilename string) (*Config, error) {
