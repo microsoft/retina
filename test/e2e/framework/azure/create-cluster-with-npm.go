@@ -18,11 +18,12 @@ var (
 )
 
 const (
-	clusterTimeout      = 15 * time.Minute
-	clusterCreateTicker = 30 * time.Second
-	pollFrequency       = 5 * time.Second
-	AgentARMSKU         = "Standard_D4pls_v5"
-	AuxilaryNodeCount   = 1
+	clusterTimeout       = 15 * time.Minute
+	clusterCreateTicker  = 30 * time.Second
+	pollFrequency        = 5 * time.Second
+	AgentARMSKU          = "Standard_D4pls_v5"
+	AuxilaryNodeCount    = 1
+	AuxilaryARMNodeCount = 2
 )
 
 type CreateNPMCluster struct {
@@ -87,7 +88,7 @@ func (c *CreateNPMCluster) Run() error {
 	npmCluster.Properties.AgentPoolProfiles = append(npmCluster.Properties.AgentPoolProfiles, &armcontainerservice.ManagedClusterAgentPoolProfile{ //nolint:all
 		Type: to.Ptr(armcontainerservice.AgentPoolTypeVirtualMachineScaleSets),
 		// AvailabilityZones:  []*string{to.Ptr("1")},
-		Count:              to.Ptr[int32](AuxilaryNodeCount),
+		Count:              to.Ptr[int32](AuxilaryARMNodeCount),
 		EnableNodePublicIP: to.Ptr(false),
 		Mode:               to.Ptr(armcontainerservice.AgentPoolModeUser),
 		OSType:             to.Ptr(armcontainerservice.OSTypeLinux),

@@ -601,6 +601,9 @@ simplify-dashboards:
 run-perf-test:
 	go test -v ./test/e2e/retina_perf_test.go -timeout 2h -tags=perf -count=1  -args -image-tag=${TAG} -image-registry=${IMAGE_REGISTRY} -image-namespace=${IMAGE_NAMESPACE}
 
+run-e2e-test:
+	go test -v ./test/e2e/ -timeout 1h -tags=e2e -count=1  -args -image-tag=${TAG} -image-registry=${IMAGE_REGISTRY} -image-namespace=${IMAGE_NAMESPACE}
+
 .PHONY: update-hubble
 update-hubble:
 	@echo "Checking for Hubble updates..."
