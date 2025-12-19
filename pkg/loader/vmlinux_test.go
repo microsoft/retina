@@ -29,7 +29,7 @@ func TestGenerateVmlinuxH(t *testing.T) {
 	info, err := os.Stat(vmlinuxPath)
 	require.NoError(t, err)
 	require.False(t, info.IsDir())
-	require.Greater(t, info.Size(), int64(0))
+	require.Positive(t, info.Size())
 
 	// Optional: Check content starts with typedef or similar C code
 	content, err := os.ReadFile(vmlinuxPath)

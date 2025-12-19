@@ -15,7 +15,7 @@ func GenerateVmlinuxH(ctx context.Context, outputDir string) error {
 	l := log.Logger().Named("vmlinux-generator")
 	vmlinuxPath := filepath.Join(outputDir, "vmlinux.h")
 
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 

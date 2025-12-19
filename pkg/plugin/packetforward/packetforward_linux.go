@@ -127,10 +127,10 @@ func (p *packetForward) Compile(ctx context.Context) error {
 
 	// Generate vmlinux.h
 	runtimeHeaderDir := "/tmp/retina/include"
-	if err := loader.GenerateVmlinuxH(ctx, runtimeHeaderDir); err != nil {
+	if err = loader.GenerateVmlinuxH(ctx, runtimeHeaderDir); err != nil {
 		p.l.Warn("Failed to generate vmlinux.h, falling back to static headers", zap.Error(err))
 	}
-	runtimeIncludeDir := fmt.Sprintf("-I%s", runtimeHeaderDir)
+	runtimeIncludeDir := "-I" + runtimeHeaderDir
 
 	// Keep target as bpf, otherwise clang compilation yields bpf object that elf reader cannot load.
 	err = loader.CompileEbpf(ctx, "-target", "bpf", "-Wall", targetArch, "-g", "-O2", "-c", bpfSourceFile, "-o", bpfOutputFile, runtimeIncludeDir, includeDir, libbpfDir)
