@@ -81,6 +81,7 @@ RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/ret
 FROM azurelinux-core AS tools
 RUN tdnf install -y \
     clang \
+    bpftool \
     iproute \
     iptables \
     tcpdump \
@@ -90,7 +91,7 @@ RUN tdnf install -y \
     ca-certificates \
     tar
 RUN mkdir -p /tmp/bin
-RUN arr="clang tcpdump ip ss iptables-legacy iptables-legacy-save iptables-nft iptables-nft-save cp uname" ;\
+RUN arr="clang bpftool tcpdump ip ss iptables-legacy iptables-legacy-save iptables-nft iptables-nft-save cp uname" ;\
     for i in $arr; do    \
     cp $(which $i) /tmp/bin;   \
     done
