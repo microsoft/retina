@@ -1,0 +1,28 @@
+{"level":"info","ts":"2025-09-19T22:08:35.013Z","caller":"log/zap_test.go:29","msg":"test","i":0}
+{"level":"info","ts":"2025-09-19T22:08:35.013Z","caller":"log/zap_test.go:29","msg":"test","i":1}
+{"level":"info","ts":"2025-09-19T22:08:35.013Z","caller":"log/zap_test.go:29","msg":"test","i":2}
+{"level":"info","ts":"2025-09-19T22:08:35.013Z","caller":"log/zap_test.go:29","msg":"test","i":3}
+{"level":"info","ts":"2025-09-19T22:08:35.014Z","caller":"log/zap_test.go:29","msg":"test","i":4}
+{"level":"info","ts":"2025-09-19T22:08:35.014Z","caller":"log/zap_test.go:29","msg":"test","i":5}
+{"level":"info","ts":"2025-09-19T22:08:35.014Z","caller":"log/zap_test.go:29","msg":"test","i":6}
+{"level":"info","ts":"2025-09-19T22:08:35.014Z","caller":"log/zap_test.go:29","msg":"test","i":7}
+{"level":"info","ts":"2025-09-19T22:08:35.014Z","caller":"log/zap_test.go:29","msg":"test","i":8}
+{"level":"info","ts":"2025-09-19T22:08:35.014Z","caller":"log/zap_test.go:29","msg":"test","i":9}
+{"level":"info","ts":"2025-09-19T22:08:35.014Z","caller":"log/zap_test.go:43","msg":"Filename: ","path":"/home/runner/work/retina/retina/pkg/log","name":"log"}
+{"level":"info","ts":"2025-09-19T22:08:35.014Z","caller":"log/zap_test.go:43","msg":"Filename: ","path":"/home/runner/work/retina/retina/pkg/log/test.log","name":"test.log"}
+{"level":"info","ts":"2025-09-19T22:08:35.014Z","caller":"log/zap_test.go:43","msg":"Filename: ","path":"/home/runner/work/retina/retina/pkg/log/zap.go","name":"zap.go"}
+{"level":"info","ts":"2025-09-19T22:08:35.014Z","caller":"log/zap_test.go:43","msg":"Filename: ","path":"/home/runner/work/retina/retina/pkg/log/zap_test.go","name":"zap_test.go"}
+{"level":"info","ts":"2025-09-19T22:19:00.419Z","caller":"log/zap_test.go:29","msg":"test","i":0}
+{"level":"info","ts":"2025-09-19T22:19:00.419Z","caller":"log/zap_test.go:29","msg":"test","i":1}
+{"level":"info","ts":"2025-09-19T22:19:00.419Z","caller":"log/zap_test.go:29","msg":"test","i":2}
+{"level":"info","ts":"2025-09-19T22:19:00.419Z","caller":"log/zap_test.go:29","msg":"test","i":3}
+{"level":"info","ts":"2025-09-19T22:19:00.419Z","caller":"log/zap_test.go:29","msg":"test","i":4}
+{"level":"info","ts":"2025-09-19T22:19:00.419Z","caller":"log/zap_test.go:29","msg":"test","i":5}
+{"level":"info","ts":"2025-09-19T22:19:00.419Z","caller":"log/zap_test.go:29","msg":"test","i":6}
+{"level":"info","ts":"2025-09-19T22:19:00.419Z","caller":"log/zap_test.go:29","msg":"test","i":7}
+{"level":"info","ts":"2025-09-19T22:19:00.419Z","caller":"log/zap_test.go:29","msg":"test","i":8}
+{"level":"info","ts":"2025-09-19T22:19:00.419Z","caller":"log/zap_test.go:29","msg":"test","i":9}
+{"level":"info","ts":"2025-09-19T22:19:00.419Z","caller":"log/zap_test.go:43","msg":"Filename: ","path":"/home/runner/work/retina/retina/pkg/log","name":"log"}
+{"level":"info","ts":"2025-09-19T22:19:00.419Z","caller":"log/zap_test.go:43","msg":"Filename: ","path":"/home/runner/work/retina/retina/pkg/log/test.log","name":"test.log"}
+{"level":"info","ts":"2025-09-19T22:19:00.419Z","caller":"log/zap_test.go:43","msg":"Filename: ","path":"/home/runner/work/retina/retina/pkg/log/zap.go","name":"zap.go"}
+{"level":"info","ts":"2025-09-19T22:19:00.419Z","caller":"log/zap_test.go:43","msg":"Filename: ","path":"/home/runner/work/retina/retina/pkg/log/zap_test.go","name":"zap_test.go"}
