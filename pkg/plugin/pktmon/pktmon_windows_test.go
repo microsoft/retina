@@ -25,9 +25,15 @@ import (
 
 	observerv1 "github.com/cilium/cilium/api/v1/observer"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/metadata"
 
 	"github.com/microsoft/retina/pkg/log"
+)
+
+var (
+	errEOF            = errors.New("EOF")
+	errConnectionLost = errors.New("connection lost")
 )
 
 // MockGetFlowsClient implements observerv1.Observer_GetFlowsClient for testing
@@ -56,7 +62,7 @@ func (m *MockGetFlowsClient) Recv() (*observerv1.GetFlowsResponse, error) {
 	}
 
 	if m.index >= len(m.responses) {
-		return nil, errors.New("EOF")
+		return nil, errEOF
 	}
 
 	resp := m.responses[m.index]
@@ -94,12 +100,12 @@ func (m *MockGetFlowsClient) Context() context.Context {
 }
 
 // SendMsg implements grpc.ClientStream
-func (m *MockGetFlowsClient) SendMsg(m2 interface{}) error {
+func (m *MockGetFlowsClient) SendMsg(_ interface{}) error {
 	return nil
 }
 
 // RecvMsg implements grpc.ClientStream
-func (m *MockGetFlowsClient) RecvMsg(m2 interface{}) error {
+func (m *MockGetFlowsClient) RecvMsg(_ interface{}) error {
 	return nil
 }
 
@@ -119,20 +125,19 @@ func Test_verifyEventStream_NoEventsTimeout(t *testing.T) {
 	err := plugin.verifyEventStream(ctx)
 	elapsed := time.Since(start)
 
-	assert.Error(t, err, "verifyEventStream should fail when no events are received within timeout")
+	require.Error(t, err, "verifyEventStream should fail when no events are received within timeout")
 	assert.ErrorContains(t, err, "no events received", "error should mention no events received")
 	// Should timeout around eventHealthCheckFirstEvent (10s)
 	// But our context only allows 5s so we timeout on context
-	assert.True(t, elapsed >= 4*time.Second, "should respect timeout")
+	assert.GreaterOrEqual(t, elapsed, 4*time.Second, "should respect timeout")
 }
 
 // Test_verifyEventStream_StreamRecvError tests error handling when Recv() fails
 func Test_verifyEventStream_StreamRecvError(t *testing.T) {
-	recvErr := errors.New("connection lost")
 	plugin := &Plugin{
 		l: NewTestLogger(),
 		stream: &MockGetFlowsClient{
-			responses: []interface{}{recvErr},
+			responses: []interface{}{errConnectionLost},
 		},
 	}
 
@@ -141,7 +146,7 @@ func Test_verifyEventStream_StreamRecvError(t *testing.T) {
 
 	err := plugin.verifyEventStream(ctx)
 
-	assert.Error(t, err, "verifyEventStream should fail when Recv() returns an error")
+	require.Error(t, err, "verifyEventStream should fail when Recv() returns an error")
 	assert.ErrorContains(t, err, "failed to receive first event", "error should mention failed event reception")
 }
 
@@ -159,7 +164,7 @@ func Test_verifyEventStream_NilFlow(t *testing.T) {
 
 	err := plugin.verifyEventStream(ctx)
 
-	assert.Error(t, err, "verifyEventStream should fail when received event has nil flow")
+	require.Error(t, err, "verifyEventStream should fail when received event has nil flow")
 	assert.ErrorContains(t, err, "received nil flow", "error should mention nil flow")
 }
 
@@ -177,7 +182,7 @@ func Test_verifyEventStream_ContextCancellation(t *testing.T) {
 
 	err := plugin.verifyEventStream(ctx)
 
-	assert.Error(t, err, "verifyEventStream should fail when context is cancelled")
+	require.Error(t, err, "verifyEventStream should fail when context is cancelled")
 }
 
 // Test_verifyEventStream_EventWithDelay tests successful reception of delayed event
@@ -202,8 +207,8 @@ func Test_verifyEventStream_EventWithDelay(t *testing.T) {
 	// Since blockFor causes recv to sleep, then returns EOF (no events),
 	// this will timeout after eventHealthCheckFirstEvent
 	// So we expect an error, but we're testing the timeout enforcement
-	assert.Error(t, err, "should get timeout error")
-	assert.True(t, elapsed >= 2*time.Second, "should wait at least for blockFor duration")
+	require.Error(t, err, "should get timeout error")
+	assert.GreaterOrEqual(t, elapsed, 2*time.Second, "should wait at least for blockFor duration")
 }
 
 // Test_verifyEventStream_TimeoutExactlyAtLimit tests timeout enforcement
@@ -222,10 +227,10 @@ func Test_verifyEventStream_TimeoutExactlyAtLimit(t *testing.T) {
 	err := plugin.verifyEventStream(ctx)
 	elapsed := time.Since(start)
 
-	assert.Error(t, err, "verifyEventStream should fail when event reception exceeds timeout")
+	require.Error(t, err, "verifyEventStream should fail when event reception exceeds timeout")
 	// Should timeout after approximately eventHealthCheckFirstEvent (10s)
-	assert.True(t, elapsed >= eventHealthCheckFirstEvent, "should wait at least the timeout duration")
-	assert.True(t, elapsed < eventHealthCheckFirstEvent+5*time.Second, "should not wait significantly longer than timeout")
+	assert.GreaterOrEqual(t, elapsed, eventHealthCheckFirstEvent, "should wait at least the timeout duration")
+	assert.Less(t, elapsed, eventHealthCheckFirstEvent+5*time.Second, "should not wait significantly longer than timeout")
 }
 
 // Test_verifyEventStream_MultipleEvents tests that verification stops after first valid event
@@ -236,7 +241,7 @@ func Test_verifyEventStream_MultipleEvents(t *testing.T) {
 		l: NewTestLogger(),
 		stream: &MockGetFlowsClient{
 			// First response is nil (will trigger nil flow error)
-			// Second response is nil  
+			// Second response is nil
 			// If verifyEventStream consumes more than 1, that would be wrong
 			responses: []interface{}{nil, nil, nil},
 		},
@@ -247,8 +252,8 @@ func Test_verifyEventStream_MultipleEvents(t *testing.T) {
 
 	err := plugin.verifyEventStream(ctx)
 
-	assert.Error(t, err, "should get nil flow error")
-	assert.Equal(t, 1, plugin.stream.(*MockGetFlowsClient).index, 
+	require.Error(t, err, "should get nil flow error")
+	assert.Equal(t, 1, plugin.stream.(*MockGetFlowsClient).index,
 		"should only consume exactly one event before returning error")
 }
 
@@ -266,7 +271,7 @@ func Test_verifyEventStream_ErrorMessageContent(t *testing.T) {
 
 	err := plugin.verifyEventStream(ctx)
 
-	assert.Error(t, err, "verifyEventStream should fail")
+	require.Error(t, err, "verifyEventStream should fail")
 	errMsg := err.Error()
 	assert.Contains(t, errMsg, "no events received from pktmon", "error should mention pktmon")
 	assert.Contains(t, errMsg, "ETW consumer", "error should mention ETW")
@@ -282,7 +287,7 @@ func Test_StartStream_WithNilGrpcClient(t *testing.T) {
 
 	err := plugin.StartStream(context.Background())
 
-	assert.Error(t, err, "StartStream should fail when grpcClient is nil")
+	require.Error(t, err, "StartStream should fail when grpcClient is nil")
 	assert.ErrorIs(t, err, ErrNilGrpcClient, "error should be ErrNilGrpcClient")
 }
 
