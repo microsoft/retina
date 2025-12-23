@@ -126,7 +126,7 @@ func Test_verifyEventStream_NoEventsTimeout(t *testing.T) {
 	elapsed := time.Since(start)
 
 	require.Error(t, err, "verifyEventStream should fail when no events are received within timeout")
-	assert.ErrorContains(t, err, "no events received", "error should mention no events received")
+	require.ErrorContains(t, err, "no events received", "error should mention no events received")
 	// Should timeout around eventHealthCheckFirstEvent (10s)
 	// But our context only allows 5s so we timeout on context
 	assert.GreaterOrEqual(t, elapsed, 4*time.Second, "should respect timeout")
