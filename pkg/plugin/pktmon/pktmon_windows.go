@@ -27,10 +27,10 @@ import (
 )
 
 var (
-	ErrNilEnricher      = errors.New("enricher is nil")
-	ErrUnexpectedExit   = errors.New("unexpected exit")
-	ErrNilGrpcClient    = errors.New("grpc client is nil")
-	ErrNoEventsReceived = errors.New("no events received from pktmon - another consumer may be active")
+	ErrNilEnricher             = errors.New("enricher is nil")
+	ErrUnexpectedExit          = errors.New("unexpected exit")
+	ErrNilGrpcClient           = errors.New("grpc client is nil")
+	ErrStreamHealthCheckFailed = errors.New("pktmon stream health check failed - likely another ETW consumer is active or stream is broken")
 
 	socket = "/temp/retina-pktmon.sock"
 )
@@ -39,8 +39,8 @@ const (
 	name                       = "pktmon"
 	connectionRetryAttempts    = 5
 	eventChannelSize           = 1000
-	eventHealthCheckTimeout    = 30 * time.Second
-	eventHealthCheckFirstEvent = 10 * time.Second
+	eventHealthCheckFirstEvent = 30 * time.Second
+	maxNilFlowsAllowed         = 5
 )
 
 type Plugin struct {
@@ -229,9 +229,10 @@ func (p *Plugin) StartStream(ctx context.Context) error {
 	return nil
 }
 
-// verifyEventStream checks that events are flowing from the pktmon server.
+// verifyEventStream checks that the gRPC stream is responding and that events can flow.
 // This detects scenarios where ETW registration silently fails because another
-// consumer is already active on the EVENTS_MAP.
+// consumer is already active on the EVENTS_MAP (indicated by gRPC errors).
+// If the stream is healthy but no traffic is present, it logs a warning but continues.
 func (p *Plugin) verifyEventStream(ctx context.Context) error {
 	healthCtx, cancel := context.WithTimeout(ctx, eventHealthCheckFirstEvent)
 	defer cancel()
@@ -239,30 +240,49 @@ func (p *Plugin) verifyEventStream(ctx context.Context) error {
 	p.l.Info("verifying pktmon event stream health", zap.Duration("timeout", eventHealthCheckFirstEvent))
 
 	// Create a channel to receive the result
+	// Note: healthCtx is a child of the parent ctx, so if the parent ctx times out
+	// before eventHealthCheckFirstEvent, the health check will be canceled early
 	resultCh := make(chan error, 1)
 
 	go func() {
-		event, err := p.stream.Recv()
-		if err != nil {
-			resultCh <- errors.Wrapf(err, "failed to receive first event during health check")
+		nilFlowCount := 0
+
+		for {
+			event, err := p.stream.Recv()
+			if err != nil {
+				resultCh <- errors.Wrapf(err, "failed to receive first event during health check")
+				return
+			}
+
+			if event.GetFlow() == nil {
+				nilFlowCount++
+				if nilFlowCount > maxNilFlowsAllowed {
+					resultCh <- errors.New("received too many nil flows during health check - likely proto mismatch")
+					return
+				}
+				// Skip nil flows and wait for next event
+				continue
+			}
+
+			// Got a valid flow
+			resultCh <- nil
 			return
 		}
-		if event.GetFlow() == nil {
-			resultCh <- errors.New("received nil flow during health check")
-			return
-		}
-		resultCh <- nil
 	}()
 
 	// Wait for either a successful event or timeout
 	select {
 	case <-healthCtx.Done():
-		return errors.Wrapf(ErrNoEventsReceived,
-			"no events received within %v - check if another ETW consumer is active or if there is network traffic to monitor",
-			eventHealthCheckFirstEvent)
+		// Timeout occurred - no events received, but stream connection is working.
+		// This could be due to low/no traffic rather than ETW registration failure.
+		p.l.Warn("no events received during health check",
+			zap.Duration("timeout", eventHealthCheckFirstEvent),
+			zap.String("cause", "likely no network traffic or node is idle"))
+		return nil
 	case err := <-resultCh:
 		if err != nil {
-			return err
+			// Stream error indicates ETW registration failure or connection issue
+			return errors.Wrapf(ErrStreamHealthCheckFailed, "%v", err)
 		}
 		p.l.Info("pktmon event stream verified - events flowing normally")
 		return nil

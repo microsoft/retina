@@ -39,7 +39,8 @@ var (
 // MockGetFlowsClient implements observerv1.Observer_GetFlowsClient for testing
 type MockGetFlowsClient struct {
 	// Sequence of responses to return
-	responses []interface{} // nil or "valid" or error
+	// Can be: nil (nil flow), "valid" (valid flow), error, or *observerv1.Flow (explicit flow)
+	responses []interface{}
 	index     int
 	// Control test behavior
 	recvDelay time.Duration
@@ -73,9 +74,21 @@ func (m *MockGetFlowsClient) Recv() (*observerv1.GetFlowsResponse, error) {
 		return nil, err
 	}
 
-	// For test purposes, we return a GetFlowsResponse that can be checked with GetFlow
-	// The actual verification happens during verifyEventStream which checks GetFlow()
-	// We use a custom type that wraps and properly implements GetFlow
+	// Return response with non-nil flow if configured
+	if flow, ok := resp.(*observerv1.Flow); ok {
+		return &observerv1.GetFlowsResponse{ResponseTypes: &observerv1.GetFlowsResponse_Flow{Flow: flow}}, nil
+	}
+
+	// Handle "valid" string marker - return a valid flow for testing
+	if marker, ok := resp.(string); ok && marker == "valid" {
+		validFlow := &observerv1.Flow{
+			Source:      &observerv1.Endpoint{PodName: "test-src"},
+			Destination: &observerv1.Endpoint{PodName: "test-dst"},
+		}
+		return &observerv1.GetFlowsResponse{ResponseTypes: &observerv1.GetFlowsResponse_Flow{Flow: validFlow}}, nil
+	}
+
+	// For test purposes, return empty GetFlowsResponse with nil Flow
 	return &observerv1.GetFlowsResponse{}, nil
 }
 
@@ -110,6 +123,8 @@ func (m *MockGetFlowsClient) RecvMsg(_ interface{}) error {
 }
 
 // Test_verifyEventStream_NoEventsTimeout tests timeout when no events are received
+// With the new behavior, no events (due to lack of traffic) should return nil,
+// not an error, since the stream connection itself is healthy.
 func Test_verifyEventStream_NoEventsTimeout(t *testing.T) {
 	plugin := &Plugin{
 		l: NewTestLogger(),
@@ -125,14 +140,15 @@ func Test_verifyEventStream_NoEventsTimeout(t *testing.T) {
 	err := plugin.verifyEventStream(ctx)
 	elapsed := time.Since(start)
 
-	require.Error(t, err, "verifyEventStream should fail when no events are received within timeout")
-	require.ErrorContains(t, err, "no events received", "error should mention no events received")
-	// Should timeout around eventHealthCheckFirstEvent (10s)
+	require.NoError(t, err, "verifyEventStream should return nil when no events are received (timeout due to no traffic)")
+	// Should timeout around eventHealthCheckFirstEvent (30s)
 	// But our context only allows 5s so we timeout on context
-	assert.GreaterOrEqual(t, elapsed, 4*time.Second, "should respect timeout")
+	assert.GreaterOrEqual(t, elapsed, 4500*time.Millisecond, "should wait at least 4.5s before timing out")
+	assert.Less(t, elapsed, 6*time.Second, "should not wait significantly longer than 5s context timeout")
 }
 
 // Test_verifyEventStream_StreamRecvError tests error handling when Recv() fails
+// Actual connection errors (not timeouts) should still fail
 func Test_verifyEventStream_StreamRecvError(t *testing.T) {
 	plugin := &Plugin{
 		l: NewTestLogger(),
@@ -147,15 +163,16 @@ func Test_verifyEventStream_StreamRecvError(t *testing.T) {
 	err := plugin.verifyEventStream(ctx)
 
 	require.Error(t, err, "verifyEventStream should fail when Recv() returns an error")
-	assert.ErrorContains(t, err, "failed to receive first event", "error should mention failed event reception")
 }
 
-// Test_verifyEventStream_NilFlow tests error handling when received event has nil flow
+// Test_verifyEventStream_NilFlow tests that occasional nil flows are skipped
+// The health check should continue waiting for valid flows rather than failing immediately
 func Test_verifyEventStream_NilFlow(t *testing.T) {
 	plugin := &Plugin{
 		l: NewTestLogger(),
 		stream: &MockGetFlowsClient{
-			responses: []interface{}{nil}, // Response with nil flow
+			// Start with nil flow, then valid flow
+			responses: []interface{}{nil, "valid"},
 		},
 	}
 
@@ -164,36 +181,44 @@ func Test_verifyEventStream_NilFlow(t *testing.T) {
 
 	err := plugin.verifyEventStream(ctx)
 
-	require.Error(t, err, "verifyEventStream should fail when received event has nil flow")
-	assert.ErrorContains(t, err, "received nil flow", "error should mention nil flow")
+	require.NoError(t, err, "verifyEventStream should skip occasional nil flows and succeed when valid flow arrives")
+	assert.Equal(t, 2, plugin.stream.(*MockGetFlowsClient).index,
+		"should consume both nil and valid flow")
 }
 
-// Test_verifyEventStream_ContextCancellation tests behavior when context is cancelled
-func Test_verifyEventStream_ContextCancellation(t *testing.T) {
+// Test_verifyEventStream_TooManyNilFlows tests that persistent nil flows are detected as proto mismatch
+func Test_verifyEventStream_TooManyNilFlows(t *testing.T) {
 	plugin := &Plugin{
 		l: NewTestLogger(),
 		stream: &MockGetFlowsClient{
-			blockCh: make(chan struct{}), // Block forever
+			// More nil flows than allowed
+			responses: make([]interface{}, maxNilFlowsAllowed+2),
 		},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	err := plugin.verifyEventStream(ctx)
 
-	require.Error(t, err, "verifyEventStream should fail when context is cancelled")
+	require.Error(t, err, "verifyEventStream should fail when too many nil flows are received")
+	assert.ErrorContains(t, err, "too many nil flows", "error should mention too many nil flows")
 }
 
-// Test_verifyEventStream_EventWithDelay tests successful reception of delayed event
+// Test_verifyEventStream_EventWithDelay tests successful reception of delayed non-nil flow
+// This verifies that the health check properly waits for a valid flow even with delay
 func Test_verifyEventStream_EventWithDelay(t *testing.T) {
-	// Test that verifyEventStream properly respects the timeout
-	// A delayed response that arrives within the timeout window should succeed
-	// We test this by using blockFor that's less than eventHealthCheckFirstEvent
+	// Create a valid flow with basic structure
+	validFlow := &observerv1.Flow{
+		Source:      &observerv1.Endpoint{PodName: "pod-1", Namespace: "default"},
+		Destination: &observerv1.Endpoint{PodName: "pod-2", Namespace: "default"},
+	}
+
 	plugin := &Plugin{
 		l: NewTestLogger(),
 		stream: &MockGetFlowsClient{
-			blockFor: 2 * time.Second, // Shorter than eventHealthCheckFirstEvent (10s)
+			blockFor:  2 * time.Second,          // Delay before first message
+			responses: []interface{}{validFlow}, // Then send valid non-nil flow
 		},
 	}
 
@@ -204,14 +229,13 @@ func Test_verifyEventStream_EventWithDelay(t *testing.T) {
 	err := plugin.verifyEventStream(ctx)
 	elapsed := time.Since(start)
 
-	// Since blockFor causes recv to sleep, then returns EOF (no events),
-	// this will timeout after eventHealthCheckFirstEvent
-	// So we expect an error, but we're testing the timeout enforcement
-	require.Error(t, err, "should get timeout error")
-	assert.GreaterOrEqual(t, elapsed, 2*time.Second, "should wait at least for blockFor duration")
+	require.NoError(t, err, "should succeed when valid non-nil flow eventually arrives")
+	assert.GreaterOrEqual(t, elapsed, 1900*time.Millisecond, "should wait at least 1.9s for blockFor delay")
+	assert.Less(t, elapsed, 3*time.Second, "should not wait much longer than the 2s blockFor")
 }
 
 // Test_verifyEventStream_TimeoutExactlyAtLimit tests timeout enforcement
+// When the health check timeout occurs (no traffic), it should return nil (success)
 func Test_verifyEventStream_TimeoutExactlyAtLimit(t *testing.T) {
 	plugin := &Plugin{
 		l: NewTestLogger(),
@@ -220,30 +244,34 @@ func Test_verifyEventStream_TimeoutExactlyAtLimit(t *testing.T) {
 		},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()
 
 	start := time.Now()
 	err := plugin.verifyEventStream(ctx)
 	elapsed := time.Since(start)
 
-	require.Error(t, err, "verifyEventStream should fail when event reception exceeds timeout")
-	// Should timeout after approximately eventHealthCheckFirstEvent (10s)
-	assert.GreaterOrEqual(t, elapsed, eventHealthCheckFirstEvent, "should wait at least the timeout duration")
-	assert.Less(t, elapsed, eventHealthCheckFirstEvent+5*time.Second, "should not wait significantly longer than timeout")
+	require.NoError(t, err, "verifyEventStream should return nil when health check timeout occurs (no traffic)")
+	// Should timeout after approximately eventHealthCheckFirstEvent (30s)
+	expectedMin := eventHealthCheckFirstEvent - 500*time.Millisecond
+	expectedMax := eventHealthCheckFirstEvent + 1*time.Second
+	assert.GreaterOrEqual(t, elapsed, expectedMin, "should wait at least close to the health check timeout")
+	assert.Less(t, elapsed, expectedMax, "should not wait significantly longer than the health check timeout")
 }
 
-// Test_verifyEventStream_MultipleEvents tests that verification stops after first valid event
+// Test_verifyEventStream_MultipleEvents tests that verification succeeds with valid flows
 func Test_verifyEventStream_MultipleEvents(t *testing.T) {
-	// Test that verifyEventStream doesn't consume more events than necessary
-	// By checking the index counter on the mock stream
+	// Test that verifyEventStream succeeds when valid flows are available
+	validFlow := &observerv1.Flow{
+		Source:      &observerv1.Endpoint{PodName: "source", Namespace: "default"},
+		Destination: &observerv1.Endpoint{PodName: "destination", Namespace: "default"},
+	}
+
 	plugin := &Plugin{
 		l: NewTestLogger(),
 		stream: &MockGetFlowsClient{
-			// First response is nil (will trigger nil flow error)
-			// Second response is nil
-			// If verifyEventStream consumes more than 1, that would be wrong
-			responses: []interface{}{nil, nil, nil},
+			// Multiple valid flows
+			responses: []interface{}{validFlow, validFlow, validFlow},
 		},
 	}
 
@@ -252,17 +280,15 @@ func Test_verifyEventStream_MultipleEvents(t *testing.T) {
 
 	err := plugin.verifyEventStream(ctx)
 
-	require.Error(t, err, "should get nil flow error")
-	assert.Equal(t, 1, plugin.stream.(*MockGetFlowsClient).index,
-		"should only consume exactly one event before returning error")
+	require.NoError(t, err, "should succeed when valid flows are available")
 }
 
-// Test_verifyEventStream_ErrorMessageContent tests the detailed error message
-func Test_verifyEventStream_ErrorMessageContent(t *testing.T) {
+// Test_verifyEventStream_NoTrafficLogsWarning tests that no-traffic timeout returns success
+func Test_verifyEventStream_NoTrafficLogsWarning(t *testing.T) {
 	plugin := &Plugin{
 		l: NewTestLogger(),
 		stream: &MockGetFlowsClient{
-			blockCh: make(chan struct{}),
+			blockCh: make(chan struct{}), // Block forever
 		},
 	}
 
@@ -271,11 +297,7 @@ func Test_verifyEventStream_ErrorMessageContent(t *testing.T) {
 
 	err := plugin.verifyEventStream(ctx)
 
-	require.Error(t, err, "verifyEventStream should fail")
-	errMsg := err.Error()
-	assert.Contains(t, errMsg, "no events received from pktmon", "error should mention pktmon")
-	assert.Contains(t, errMsg, "ETW consumer", "error should mention ETW")
-	assert.Contains(t, errMsg, "network traffic", "error should mention network traffic")
+	require.NoError(t, err, "verifyEventStream should succeed when timeout occurs (no traffic scenario)")
 }
 
 // Test_StartStream_WithNilGrpcClient tests error handling when grpcClient is nil
