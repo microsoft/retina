@@ -125,26 +125,24 @@ func (m *MockGetFlowsClient) RecvMsg(_ interface{}) error {
 // Test_verifyEventStream_NoEventsTimeout tests timeout when no events are received
 // With the new behavior, no events (due to lack of traffic) should return nil,
 // not an error, since the stream connection itself is healthy.
+// Note: verifyEventStream() uses an independent 60-second internal timeout,
+// so the test context parameter is not used for timeout control.
 func Test_verifyEventStream_NoEventsTimeout(t *testing.T) {
 	plugin := &Plugin{
 		l: NewTestLogger(),
 		stream: &MockGetFlowsClient{
-			blockCh: make(chan struct{}), // Block forever
+			blockCh: make(chan struct{}), // Block forever - will timeout internally
 		},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	start := time.Now()
-	err := plugin.verifyEventStream(ctx)
+	err := plugin.verifyEventStream()
 	elapsed := time.Since(start)
 
 	require.NoError(t, err, "verifyEventStream should return nil when no events are received (timeout due to no traffic)")
-	// Should timeout around eventHealthCheckFirstEvent (30s)
-	// But our context only allows 5s so we timeout on context
-	assert.GreaterOrEqual(t, elapsed, 4500*time.Millisecond, "should wait at least 4.5s before timing out")
-	assert.Less(t, elapsed, 6*time.Second, "should not wait significantly longer than 5s context timeout")
+	// Should timeout after approximately eventHealthCheckFirstEvent (60s)
+	assert.GreaterOrEqual(t, elapsed, 59*time.Second, "should wait close to the 60s health check timeout")
+	assert.Less(t, elapsed, 62*time.Second, "should not wait significantly longer than the 60s timeout")
 }
 
 // Test_verifyEventStream_StreamRecvError tests error handling when Recv() fails
@@ -157,10 +155,7 @@ func Test_verifyEventStream_StreamRecvError(t *testing.T) {
 		},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	err := plugin.verifyEventStream(ctx)
+	err := plugin.verifyEventStream()
 
 	require.Error(t, err, "verifyEventStream should fail when Recv() returns an error")
 }
@@ -176,10 +171,7 @@ func Test_verifyEventStream_NilFlow(t *testing.T) {
 		},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	err := plugin.verifyEventStream(ctx)
+	err := plugin.verifyEventStream()
 
 	require.NoError(t, err, "verifyEventStream should skip occasional nil flows and succeed when valid flow arrives")
 	assert.Equal(t, 2, plugin.stream.(*MockGetFlowsClient).index,
@@ -196,10 +188,7 @@ func Test_verifyEventStream_TooManyNilFlows(t *testing.T) {
 		},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	err := plugin.verifyEventStream(ctx)
+	err := plugin.verifyEventStream()
 
 	require.Error(t, err, "verifyEventStream should fail when too many nil flows are received")
 	assert.ErrorContains(t, err, "too many nil flows", "error should mention too many nil flows")
@@ -222,11 +211,8 @@ func Test_verifyEventStream_EventWithDelay(t *testing.T) {
 		},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
 	start := time.Now()
-	err := plugin.verifyEventStream(ctx)
+	err := plugin.verifyEventStream()
 	elapsed := time.Since(start)
 
 	require.NoError(t, err, "should succeed when valid non-nil flow eventually arrives")
@@ -236,6 +222,7 @@ func Test_verifyEventStream_EventWithDelay(t *testing.T) {
 
 // Test_verifyEventStream_TimeoutExactlyAtLimit tests timeout enforcement
 // When the health check timeout occurs (no traffic), it should return nil (success)
+// Note: verifyEventStream() uses an independent 60-second internal context
 func Test_verifyEventStream_TimeoutExactlyAtLimit(t *testing.T) {
 	plugin := &Plugin{
 		l: NewTestLogger(),
@@ -244,17 +231,14 @@ func Test_verifyEventStream_TimeoutExactlyAtLimit(t *testing.T) {
 		},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
-	defer cancel()
-
 	start := time.Now()
-	err := plugin.verifyEventStream(ctx)
+	err := plugin.verifyEventStream()
 	elapsed := time.Since(start)
 
 	require.NoError(t, err, "verifyEventStream should return nil when health check timeout occurs (no traffic)")
-	// Should timeout after approximately eventHealthCheckFirstEvent (30s)
+	// Should timeout after approximately eventHealthCheckFirstEvent (60s)
 	expectedMin := eventHealthCheckFirstEvent - 500*time.Millisecond
-	expectedMax := eventHealthCheckFirstEvent + 1*time.Second
+	expectedMax := eventHealthCheckFirstEvent + 2*time.Second
 	assert.GreaterOrEqual(t, elapsed, expectedMin, "should wait at least close to the health check timeout")
 	assert.Less(t, elapsed, expectedMax, "should not wait significantly longer than the health check timeout")
 }
@@ -275,27 +259,22 @@ func Test_verifyEventStream_MultipleEvents(t *testing.T) {
 		},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	err := plugin.verifyEventStream(ctx)
+	err := plugin.verifyEventStream()
 
 	require.NoError(t, err, "should succeed when valid flows are available")
 }
 
 // Test_verifyEventStream_NoTrafficLogsWarning tests that no-traffic timeout returns success
+// Note: verifyEventStream() uses an independent 60-second internal context
 func Test_verifyEventStream_NoTrafficLogsWarning(t *testing.T) {
 	plugin := &Plugin{
 		l: NewTestLogger(),
 		stream: &MockGetFlowsClient{
-			blockCh: make(chan struct{}), // Block forever
+			blockCh: make(chan struct{}), // Block forever - will timeout internally
 		},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	err := plugin.verifyEventStream(ctx)
+	err := plugin.verifyEventStream()
 
 	require.NoError(t, err, "verifyEventStream should succeed when timeout occurs (no traffic scenario)")
 }
