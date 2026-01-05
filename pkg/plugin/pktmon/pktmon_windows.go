@@ -39,7 +39,7 @@ const (
 	name                       = "pktmon"
 	connectionRetryAttempts    = 5
 	eventChannelSize           = 1000
-	eventHealthCheckFirstEvent = 30 * time.Second
+	eventHealthCheckFirstEvent = 60 * time.Second
 	maxNilFlowsAllowed         = 5
 )
 
@@ -242,9 +242,6 @@ func (p *Plugin) verifyEventStream(ctx context.Context) error {
 	// while the health check is still running
 	healthCtx, cancel := context.WithTimeout(context.Background(), eventHealthCheckFirstEvent)
 	defer cancel()
-
-	p.l.Info("verifying pktmon event stream health", zap.Duration("timeout", eventHealthCheckFirstEvent))
-	_ = p.l.Logger.Sync() // Ensure log is flushed immediately
 
 	// Create a channel to receive the result
 	resultCh := make(chan error, 1)
