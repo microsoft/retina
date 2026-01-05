@@ -169,7 +169,7 @@ func (p *Plugin) Start(ctx context.Context) error {
 
 	// Verify that the event stream is producing events
 	// This detects silent ETW registration failures where another consumer is already active
-	err = p.verifyEventStream(ctx)
+	err = p.verifyEventStream()
 	if err != nil {
 		return errors.Wrapf(err, "pktmon event stream health check failed")
 	}
@@ -236,7 +236,7 @@ func (p *Plugin) StartStream(ctx context.Context) error {
 // This detects scenarios where ETW registration silently fails because another
 // consumer is already active on the EVENTS_MAP (indicated by gRPC errors).
 // If the stream is healthy but no traffic is present, it logs a warning but continues.
-func (p *Plugin) verifyEventStream(ctx context.Context) error {
+func (p *Plugin) verifyEventStream() error {
 	// Create an independent background context for the health check
 	// This is NOT a child of the parent ctx to avoid cancellation when the parent shuts down
 	// while the health check is still running
