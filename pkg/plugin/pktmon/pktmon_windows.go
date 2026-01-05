@@ -234,14 +234,15 @@ func (p *Plugin) StartStream(ctx context.Context) error {
 // consumer is already active on the EVENTS_MAP (indicated by gRPC errors).
 // If the stream is healthy but no traffic is present, it logs a warning but continues.
 func (p *Plugin) verifyEventStream(ctx context.Context) error {
-	healthCtx, cancel := context.WithTimeout(ctx, eventHealthCheckFirstEvent)
+	// Create an independent background context for the health check
+	// This is NOT a child of the parent ctx to avoid cancellation when the parent shuts down
+	// while the health check is still running
+	healthCtx, cancel := context.WithTimeout(context.Background(), eventHealthCheckFirstEvent)
 	defer cancel()
 
 	p.l.Info("verifying pktmon event stream health", zap.Duration("timeout", eventHealthCheckFirstEvent))
 
 	// Create a channel to receive the result
-	// Note: healthCtx is a child of the parent ctx, so if the parent ctx times out
-	// before eventHealthCheckFirstEvent, the health check will be canceled early
 	resultCh := make(chan error, 1)
 
 	go func() {
