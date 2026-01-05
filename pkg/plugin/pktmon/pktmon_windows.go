@@ -215,7 +215,10 @@ func (p *Plugin) StartStream(ctx context.Context) error {
 
 	var err error
 	fn := func() error {
-		p.stream, err = p.grpcClient.GetFlows(ctx, &observerv1.GetFlowsRequest{})
+		// Use a long timeout for stream setup, independent of parent context cancellation
+		streamCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		p.stream, err = p.grpcClient.GetFlows(streamCtx, &observerv1.GetFlowsRequest{})
 		if err != nil {
 			return errors.Wrapf(err, "failed to open pktmon stream")
 		}
@@ -241,6 +244,7 @@ func (p *Plugin) verifyEventStream(ctx context.Context) error {
 	defer cancel()
 
 	p.l.Info("verifying pktmon event stream health", zap.Duration("timeout", eventHealthCheckFirstEvent))
+	_ = p.l.Logger.Sync() // Ensure log is flushed immediately
 
 	// Create a channel to receive the result
 	resultCh := make(chan error, 1)
