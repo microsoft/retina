@@ -344,6 +344,10 @@ func TestReadDataPodLevelEnabled(t *testing.T) {
 
 	metrics.LostEventsCounter = mICounterVec
 
+	mParsedPacketsCounter := metrics.NewMockCounterVec(ctrl)
+	mParsedPacketsCounter.EXPECT().WithLabelValues(gomock.Any()).Return(prometheus.NewCounter(prometheus.CounterOpts{})).AnyTimes()
+	metrics.ParsedPacketsCounter = mParsedPacketsCounter
+
 	exCh := make(chan *v1.Event, 10)
 	p.SetupChannel(exCh)
 
@@ -560,22 +564,22 @@ func TestPacketParseGenerate(t *testing.T) {
 		{
 			name:             "PodLevelEnabled",
 			cfg:              cfgPodLevelEnabled,
-			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n#define DATA_AGGREGATION_LEVEL 0\n",
+			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n#define DATA_AGGREGATION_LEVEL 0\n#define DATA_SAMPLING_RATE 0\n",
 		},
 		{
 			name:             "ConntrackMetricsEnabled",
 			cfg:              cfgConntrackMetricsEnabled,
-			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n#define ENABLE_CONNTRACK_METRICS 1\n#define DATA_AGGREGATION_LEVEL 1\n",
+			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n#define ENABLE_CONNTRACK_METRICS 1\n#define DATA_AGGREGATION_LEVEL 1\n#define DATA_SAMPLING_RATE 0\n",
 		},
 		{
 			name:             "DataAggregationLevelLow",
 			cfg:              cfgDataAggregationLevelLow,
-			expectedContents: "#define DATA_AGGREGATION_LEVEL 0\n",
+			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 0\n#define DATA_AGGREGATION_LEVEL 0\n#define DATA_SAMPLING_RATE 0\n",
 		},
 		{
 			name:             "DataAggregationLevelHigh",
 			cfg:              cfgDataAggregationLevelHigh,
-			expectedContents: "#define DATA_AGGREGATION_LEVEL 1\n",
+			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 0\n#define DATA_AGGREGATION_LEVEL 1\n#define DATA_SAMPLING_RATE 0\n",
 		},
 	}
 

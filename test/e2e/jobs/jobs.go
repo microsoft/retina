@@ -9,10 +9,14 @@ import (
 	"github.com/microsoft/retina/test/e2e/framework/generic"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/types"
-	"github.com/microsoft/retina/test/e2e/hubble"
 	"github.com/microsoft/retina/test/e2e/scenarios/capture"
 	"github.com/microsoft/retina/test/e2e/scenarios/dns"
 	"github.com/microsoft/retina/test/e2e/scenarios/drop"
+	hubble_dns "github.com/microsoft/retina/test/e2e/scenarios/hubble/dns"
+	hubble_drop "github.com/microsoft/retina/test/e2e/scenarios/hubble/drop"
+	hubble_flow "github.com/microsoft/retina/test/e2e/scenarios/hubble/flow"
+	hubble_service "github.com/microsoft/retina/test/e2e/scenarios/hubble/service"
+	hubble_tcp "github.com/microsoft/retina/test/e2e/scenarios/hubble/tcp"
 	"github.com/microsoft/retina/test/e2e/scenarios/latency"
 	tcp "github.com/microsoft/retina/test/e2e/scenarios/tcp"
 	"github.com/microsoft/retina/test/e2e/scenarios/windows"
@@ -273,10 +277,10 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 	return job
 }
 
-func ValidateHubble(kubeConfigFilePath, chartPath string, testPodNamespace string) *types.Job {
+func InstallAndTestHubbleMetrics(kubeConfigFilePath, chartPath string) *types.Job {
 	job := types.NewJob("Validate Hubble")
 
-	job.AddStep(&kubernetes.ValidateHubbleStep{
+	job.AddStep(&kubernetes.InstallHubbleHelmChart{
 		Namespace:          common.KubeSystemNamespace,
 		ReleaseName:        "retina",
 		KubeConfigFilePath: kubeConfigFilePath,
@@ -284,9 +288,25 @@ func ValidateHubble(kubeConfigFilePath, chartPath string, testPodNamespace strin
 		TagEnv:             generic.DefaultTagEnv,
 	}, nil)
 
-	job.AddScenario(hubble.ValidateHubbleRelayService())
+	hubbleScenarios := []*types.Scenario{
+		hubble_service.ValidateHubbleRelayService(),
+		hubble_service.ValidateHubbleUIService(kubeConfigFilePath),
+	}
 
-	job.AddScenario(hubble.ValidateHubbleUIService(kubeConfigFilePath))
+	for _, arch := range common.Architectures {
+		hubbleScenarios = append(hubbleScenarios,
+			hubble_dns.ValidateDNSMetric(arch),
+			hubble_flow.ValidatePodToPodIntraNodeHubbleFlowMetric(arch),
+			hubble_flow.ValidatePodToPodInterNodeHubbleFlowMetric(arch),
+			hubble_flow.ValidatePodToWorldHubbleFlowMetric(arch),
+			hubble_drop.ValidateDropMetric(arch),
+			hubble_tcp.ValidateTCPMetric(arch),
+		)
+	}
+
+	for _, scenario := range hubbleScenarios {
+		job.AddScenario(scenario)
+	}
 
 	job.AddStep(&kubernetes.EnsureStableComponent{
 		PodNamespace:           common.KubeSystemNamespace,

@@ -22,12 +22,15 @@ var (
 	defaultRetryAttempts = 60
 )
 
-func CheckMetric(promAddress, metricName string, validMetric map[string]string) error {
+func CheckMetric(promAddress, metricName string, validMetric map[string]string, partial ...bool) error {
 	defaultRetrier := retry.Retrier{Attempts: defaultRetryAttempts, Delay: defaultRetryDelay}
 
 	ctx := context.Background()
 	pctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
+	// Default partial to false if not provided
+	usePartial := len(partial) > 0 && partial[0]
 
 	metrics := map[string]*promclient.MetricFamily{}
 	scrapeMetricsFn := func() error {
@@ -42,7 +45,11 @@ func CheckMetric(promAddress, metricName string, validMetric map[string]string) 
 
 		// loop through each metric to check for a match,
 		// if none is found then log and return an error which will trigger a retry
-		err = verifyValidMetricPresent(metricName, metrics, validMetric)
+		if usePartial {
+			err = verifyValidMetricPresentPartial(metricName, metrics, validMetric)
+		} else {
+			err = verifyValidMetricPresent(metricName, metrics, validMetric)
+		}
 		if err != nil {
 			log.Printf("failed to find metric matching %s: %+v\n", metricName, validMetric)
 			return ErrNoMetricFound
@@ -117,6 +124,43 @@ func getAllPrometheusMetricsFromURL(url string) (map[string]*promclient.MetricFa
 	}
 
 	return metrics, nil
+}
+
+// verifyValidMetricPresentPartial checks if a metric exists with labels that contain
+// all the key-value pairs in validMetric (partial matching - the metric can have additional labels)
+func verifyValidMetricPresentPartial(metricName string, data map[string]*promclient.MetricFamily, validMetric map[string]string) error {
+	for _, metric := range data {
+		if metric.GetName() == metricName {
+			for _, metric := range metric.GetMetric() {
+
+				// get all labels and values on the metric
+				metricLabels := map[string]string{}
+				for _, label := range metric.GetLabel() {
+					metricLabels[label.GetName()] = label.GetValue()
+				}
+
+				// if valid metric is empty, then we just need to make sure the metric and value is present
+				if len(validMetric) == 0 && len(metricLabels) > 0 {
+					return nil
+				}
+
+				// Check if all key-value pairs in validMetric exist in metricLabels
+				allMatch := true
+				for key, value := range validMetric {
+					if metricLabels[key] != value {
+						allMatch = false
+						break
+					}
+				}
+
+				if allMatch {
+					return nil
+				}
+			}
+		}
+	}
+
+	return fmt.Errorf("failed to find metric matching: %+v: %w", validMetric, ErrNoMetricFound)
 }
 
 func getAllPrometheusMetricsFromBuffer(buf []byte) (map[string]*promclient.MetricFamily, error) {
