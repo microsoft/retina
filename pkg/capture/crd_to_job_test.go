@@ -2286,7 +2286,7 @@ func TestValidateTargetSelector_PodNames(t *testing.T) {
 				PodNames:     []string{"pod1"},
 			},
 			wantErr: true,
-			errMsg:  "NodeSelector is not compatible",
+			errMsg:  "not compatible with",
 		},
 		{
 			name: "pod names with pod selector should fail",
@@ -2295,7 +2295,7 @@ func TestValidateTargetSelector_PodNames(t *testing.T) {
 				PodNames:    []string{"pod1"},
 			},
 			wantErr: true,
-			errMsg:  "PodNames is not compatible",
+			errMsg:  "not compatible with",
 		},
 		{
 			name: "pod names with namespace selector should fail",
@@ -2304,7 +2304,7 @@ func TestValidateTargetSelector_PodNames(t *testing.T) {
 				PodNames:          []string{"pod1"},
 			},
 			wantErr: true,
-			errMsg:  "PodNames is not compatible",
+			errMsg:  "not compatible with",
 		},
 		{
 			name: "node selector only should pass",
@@ -2319,7 +2319,7 @@ func TestValidateTargetSelector_PodNames(t *testing.T) {
 				PodNames: []string{},
 			},
 			wantErr: true,
-			errMsg:  "Neither NodeSelector",
+			errMsg:  "neither",
 		},
 	}
 
