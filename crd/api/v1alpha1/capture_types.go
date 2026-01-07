@@ -91,6 +91,12 @@ type CaptureTarget struct {
 	// selector semantics.
 	// +optional
 	PodSelector *metav1.LabelSelector `json:"podSelector,omitempty"`
+
+	// PodNames allows selecting specific pods by their names.
+	// If specified, the capture will be performed on the pods with matching names in the specified namespace.
+	// PodNames is incompatible with NodeSelector, NamespaceSelector, and PodSelector.
+	// +optional
+	PodNames []string `json:"podNames,omitempty"`
 }
 
 // CaptureConfiguration indicates the configurations of the network capture.
