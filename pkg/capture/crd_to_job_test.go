@@ -2734,7 +2734,7 @@ func TestGetCaptureTargetsOnNode_WithPodNames(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.NotNil(t, targets)
-				require.Equal(t, tc.wantNodeLen, len(*targets))
+				require.Len(t, *targets, tc.wantNodeLen)
 			}
 		})
 	}

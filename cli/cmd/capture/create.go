@@ -199,7 +199,8 @@ func NewCreateSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 	createCapture.Flags().IntVar(&opts.packetSize, "packet-size", DefaultPacketSize, "Limits the each packet to bytes in size which works only for Linux")
 	createCapture.Flags().StringVar(&opts.nodeNames, "node-names", "", "A comma-separated list of node names to select nodes on which the network capture will be performed")
 	createCapture.Flags().StringVar(&opts.nodeSelectors, "node-selectors", DefaultNodeSelectors, "A comma-separated list of node labels to select nodes on which the network capture will be performed")
-	createCapture.Flags().StringVar(&opts.podNames, "pod-names", "", "A comma-separated list of pod names to select specific pods on which the network capture will be performed (must be in the specified namespace)")
+	createCapture.Flags().StringVar(&opts.podNames, "pod-names", "",
+		"A comma-separated list of pod names to select specific pods on which the network capture will be performed (must be in the specified namespace)")
 	createCapture.Flags().StringVar(&opts.podSelectors, "pod-selectors", "",
 		"A comma-separated list of pod labels to select pods on which the network capture will be performed")
 	createCapture.Flags().StringVar(&opts.namespaceSelectors, "namespace-selectors", "",
@@ -308,7 +309,8 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 	if opts.namespaceSelectors != "" || opts.podSelectors != "" || opts.podNames != "" {
 		// if node selector is using the default value (aka hasn't been set by user), set it to nil to prevent clash with namespace and pod selector
 		if opts.nodeSelectors == DefaultNodeSelectors {
-			retinacmd.Logger.Info("Overriding default node selectors value and setting it to nil. Using namespace, pod selectors, or pod names. To use node selector, please remove namespace and pod selectors.")
+			retinacmd.Logger.Info("Overriding default node selectors value and setting it to nil. Using namespace, pod selectors, or pod names. " +
+				"To use node selector, please remove namespace and pod selectors.")
 			opts.nodeSelectors = ""
 		}
 	}

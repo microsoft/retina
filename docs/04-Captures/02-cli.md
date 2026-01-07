@@ -28,6 +28,7 @@ The target indicates where the packet capture will be performed. This can be set
 - `--pod-selectors` and `--namespace-selectors` (pairs for label-based pod selection)
 
 Note that the following combinations are not allowed:
+
 - Node Selectors are not compatible with Pod Selectors & Namespace Selectors pairs
 - Pod Names are not compatible with Node Selectors, Pod Selectors, or Namespace Selectors
 
@@ -114,7 +115,7 @@ kubectl retina capture create \
   --pod-selectors="k8s-app=kube-dns" \
   --namespace-selectors="kubernetes.io/metadata.name=kube-system"
 ```
-
+ 
 Pod Names (Specific Pods)
 
 ```sh
