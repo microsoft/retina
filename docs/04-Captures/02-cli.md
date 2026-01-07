@@ -115,7 +115,7 @@ kubectl retina capture create \
   --pod-selectors="k8s-app=kube-dns" \
   --namespace-selectors="kubernetes.io/metadata.name=kube-system"
 ```
- 
+
 Pod Names (Specific Pods)
 
 ```sh

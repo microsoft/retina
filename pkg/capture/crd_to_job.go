@@ -33,7 +33,12 @@ import (
 
 const anyIPOrPort = ""
 
-var errNoTargetsSelected = errors.New("no targets are selected by node selector, pod selector, or pod names")
+var (
+	errNoTargetsSelected    = errors.New("no targets are selected by node selector, pod selector, or pod names")
+	errNoValidSelector      = errors.New("neither NodeSelector, NamespaceSelector&PodSelector, nor PodNames is set")
+	errNodeSelectorIncompat = errors.New("NodeSelector is not compatible with NamespaceSelector&PodSelector or PodNames, please use one or the other")
+	errPodNamesIncompat     = errors.New("PodNames is not compatible with NamespaceSelector or PodSelector, please use one or the other")
+)
 
 // CaptureTarget indicates on which the network capture will be performed on a given node.
 type CaptureTarget struct {
@@ -544,15 +549,15 @@ func getNetshFilterWithPodIPAddress(podIPAddresses []string) string {
 func (translator *CaptureToPodTranslator) validateTargetSelector(captureTarget retinav1alpha1.CaptureTarget) error {
 	// When NamespaceSelector is nil while PodSelector is specified, the namespace will be determined by capture.Namespace.
 	if captureTarget.NodeSelector == nil && captureTarget.PodSelector == nil && len(captureTarget.PodNames) == 0 {
-		return fmt.Errorf("neither NodeSelector, NamespaceSelector&PodSelector, nor PodNames is set")
+		return errNoValidSelector
 	}
 
 	if captureTarget.NodeSelector != nil && (captureTarget.NamespaceSelector != nil || captureTarget.PodSelector != nil || len(captureTarget.PodNames) > 0) {
-		return fmt.Errorf("NodeSelector is not compatible with NamespaceSelector&PodSelector or PodNames, please use one or the other")
+		return errNodeSelectorIncompat
 	}
 
 	if len(captureTarget.PodNames) > 0 && (captureTarget.NamespaceSelector != nil || captureTarget.PodSelector != nil) {
-		return fmt.Errorf("PodNames is not compatible with NamespaceSelector or PodSelector, please use one or the other")
+		return errPodNamesIncompat
 	}
 
 	return nil
