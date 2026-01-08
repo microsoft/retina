@@ -9,9 +9,6 @@ import (
 	"github.com/cilium/cilium/pkg/gops"
 	hubblecell "github.com/cilium/cilium/pkg/hubble/cell"
 	exportercell "github.com/cilium/cilium/pkg/hubble/exporter/cell"
-	hubbleParser "github.com/cilium/cilium/pkg/hubble/parser"
-	"github.com/cilium/cilium/pkg/ipcache"
-	"github.com/cilium/cilium/pkg/k8s"
 	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
 	"github.com/cilium/cilium/pkg/logging"
 	"github.com/cilium/cilium/pkg/logging/logfields"
@@ -20,13 +17,13 @@ import (
 	"github.com/cilium/cilium/pkg/pprof"
 	"github.com/cilium/cilium/pkg/recorder"
 	"github.com/cilium/hive/cell"
-	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/rest"
 
 	"github.com/microsoft/retina/internal/buildinfo"
 	"github.com/microsoft/retina/pkg/config"
 	rnode "github.com/microsoft/retina/pkg/controllers/daemon/nodereconciler"
 	"github.com/microsoft/retina/pkg/hubble/parser"
+	"github.com/microsoft/retina/pkg/hubble/resources"
 	retinak8s "github.com/microsoft/retina/pkg/k8s"
 	"github.com/microsoft/retina/pkg/managers/pluginmanager"
 	"github.com/microsoft/retina/pkg/monitoragent"
@@ -97,11 +94,9 @@ var (
 
 		recorder.Cell,
 
-		cell.Provide(
-			func(l logrus.FieldLogger, ipc *ipcache.IPCache, sc *k8s.ServiceCacheImpl) hubbleParser.Decoder {
-				return parser.New(l.WithField("decoder", nil), sc, ipc)
-			},
-		),
+		// Provides resources for hubble
+		resources.Cell,
+		cell.Provide(parser.New),
 
 		// Provides the node reconciler as node manager
 		rnode.Cell,
