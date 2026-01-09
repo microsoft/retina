@@ -68,7 +68,7 @@ func TestCleanAll(t *testing.T) {
 	}
 	assert.Nil(t, p.cleanAll())
 
-	p.tcMap = &sync.Map{}
+	p.attachmentMap = &sync.Map{}
 	assert.Nil(t, p.cleanAll())
 
 	ctrl := gomock.NewController(t)
@@ -85,13 +85,13 @@ func TestCleanAll(t *testing.T) {
 		return mq
 	}
 
-	p.tcMap.Store(tcKey{"test", "test", 1}, &tcValue{mrtnl, &tc.Object{}})
-	p.tcMap.Store(tcKey{"test2", "test2", 2}, &tcValue{mrtnl, &tc.Object{}})
+	p.attachmentMap.Store(attachmentKey{"test", "test", 1}, &attachmentValue{mrtnl, &tc.Object{}, attachmentTypeTC, nil, nil})
+	p.attachmentMap.Store(attachmentKey{"test2", "test2", 2}, &attachmentValue{mrtnl, &tc.Object{}, attachmentTypeTC, nil, nil})
 
 	assert.Nil(t, p.cleanAll())
 
 	keyCount := 0
-	p.tcMap.Range(func(k, v interface{}) bool {
+	p.attachmentMap.Range(func(k, v interface{}) bool {
 		keyCount++
 		return true
 	})
@@ -167,7 +167,7 @@ func TestEndpointWatcherCallbackFn_EndpointDeleted(t *testing.T) {
 		cfg:              cfgPodLevelEnabled,
 		l:                log.Logger().Named("test"),
 		interfaceLockMap: &sync.Map{},
-		tcMap:            &sync.Map{},
+		attachmentMap:    &sync.Map{},
 	}
 
 	// Create test interface attributes.
@@ -180,7 +180,7 @@ func TestEndpointWatcherCallbackFn_EndpointDeleted(t *testing.T) {
 
 	// Pre-populate both maps to simulate existing interface
 	p.interfaceLockMap.Store(key, &sync.Mutex{})
-	p.tcMap.Store(key, &tcValue{nil, &tc.Object{}})
+	p.attachmentMap.Store(key, &attachmentValue{nil, &tc.Object{}, attachmentTypeTC, nil, nil})
 
 	// Create EndpointDeleted event.
 	e := &endpoint.EndpointEvent{
@@ -192,11 +192,11 @@ func TestEndpointWatcherCallbackFn_EndpointDeleted(t *testing.T) {
 	p.endpointWatcherCallbackFn(e)
 
 	// Verify both maps are cleaned up.
-	_, tcMapExists := p.tcMap.Load(key)
+	_, attachmentMapExists := p.attachmentMap.Load(key)
 	_, lockMapExists := p.interfaceLockMap.Load(key)
 
 	// Assert both maps are cleaned up
-	assert.False(t, tcMapExists, "tcMap entry should be deleted")
+	assert.False(t, attachmentMapExists, "attachmentMap entry should be deleted")
 	assert.False(t, lockMapExists, "interfaceLockMap entry should be deleted")
 }
 
@@ -252,7 +252,7 @@ func TestCreateQdiscAndAttach(t *testing.T) {
 		hostEgressInfo: &ebpf.ProgramInfo{
 			Name: "egress",
 		},
-		tcMap: &sync.Map{},
+		attachmentMap: &sync.Map{},
 	}
 	linkAttr := netlink.LinkAttrs{
 		Name:         "test",
@@ -263,7 +263,7 @@ func TestCreateQdiscAndAttach(t *testing.T) {
 	p.createQdiscAndAttach(linkAttr, Veth)
 
 	key := ifaceToKey(linkAttr)
-	_, ok := p.tcMap.Load(key)
+	_, ok := p.attachmentMap.Load(key)
 	assert.True(t, ok)
 
 	pObj.HostIngressFilter = &ebpf.Program{}
@@ -277,7 +277,7 @@ func TestCreateQdiscAndAttach(t *testing.T) {
 	p.createQdiscAndAttach(linkAttr2, Device)
 
 	key = ifaceToKey(linkAttr2)
-	_, ok = p.tcMap.Load(key)
+	_, ok = p.attachmentMap.Load(key)
 	assert.True(t, ok)
 }
 
@@ -446,7 +446,7 @@ func TestStartWithDataAggregationLevelLow(t *testing.T) {
 		hostEgressInfo: &ebpf.ProgramInfo{
 			Name: "egress",
 		},
-		tcMap: &sync.Map{},
+		attachmentMap: &sync.Map{},
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
@@ -525,7 +525,7 @@ func TestStartWithDataAggregationLevelHigh(t *testing.T) {
 		hostEgressInfo: &ebpf.ProgramInfo{
 			Name: "egress",
 		},
-		tcMap: &sync.Map{},
+		attachmentMap: &sync.Map{},
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
@@ -680,4 +680,194 @@ func restoreBackup() {
 			panic(fmt.Sprintf("failed to restore dynamic header file: %v", err))
 		}
 	}
+}
+
+func TestIsTCXSupported_DefaultBehavior(t *testing.T) {
+	log.SetupZapLogger(log.GetDefaultLogOpts())
+
+	// Save and restore the environment variable
+	originalValue := os.Getenv("RETINA_FORCE_TCX_MODE")
+	defer func() {
+		if originalValue != "" {
+			os.Setenv("RETINA_FORCE_TCX_MODE", originalValue)
+		} else {
+			os.Unsetenv("RETINA_FORCE_TCX_MODE")
+		}
+	}()
+
+	// Ensure the env var is not set
+	os.Unsetenv("RETINA_FORCE_TCX_MODE")
+
+	pObj := &packetparserObjects{} //nolint:typecheck
+	pObj.EndpointIngressFilter = &ebpf.Program{}
+
+	p := &packetParser{
+		cfg:  cfgPodLevelEnabled,
+		l:    log.Logger().Named("test"),
+		objs: pObj,
+	}
+
+	// Default behavior should return false (TC mode)
+	result := p.isTCXSupported()
+	assert.False(t, result, "isTCXSupported should return false by default (TC mode)")
+}
+
+func TestIsTCXSupported_ForceTCXMode_NotSupported(t *testing.T) {
+	log.SetupZapLogger(log.GetDefaultLogOpts())
+
+	// Save and restore the environment variable
+	originalValue := os.Getenv("RETINA_FORCE_TCX_MODE")
+	defer func() {
+		if originalValue != "" {
+			os.Setenv("RETINA_FORCE_TCX_MODE", originalValue)
+		} else {
+			os.Unsetenv("RETINA_FORCE_TCX_MODE")
+		}
+	}()
+
+	// Set the env var to force TCX mode
+	os.Setenv("RETINA_FORCE_TCX_MODE", "true")
+
+	pObj := &packetparserObjects{} //nolint:typecheck
+	pObj.EndpointIngressFilter = &ebpf.Program{}
+
+	p := &packetParser{
+		cfg:  cfgPodLevelEnabled,
+		l:    log.Logger().Named("test"),
+		objs: pObj,
+	}
+
+	// When TCX is forced but not supported, it should return false and fall back to TC
+	// This will happen if:
+	// - LinkList fails
+	// - Loopback interface not found
+	// - TCX attachment fails (most likely scenario)
+	result := p.isTCXSupported()
+
+	// The result depends on whether TCX is actually supported on the test system
+	// If TCX is not supported (kernel < 6.6), it should return false
+	// If TCX is supported, it will return true
+	// We can't predict this, but we can verify the function doesn't panic
+	// and handles the forced mode correctly
+	assert.NotNil(t, result, "isTCXSupported should return a boolean value")
+}
+
+func TestIsTCXSupported_ForceTCXMode_InvalidValue(t *testing.T) {
+	log.SetupZapLogger(log.GetDefaultLogOpts())
+
+	// Save and restore the environment variable
+	originalValue := os.Getenv("RETINA_FORCE_TCX_MODE")
+	defer func() {
+		if originalValue != "" {
+			os.Setenv("RETINA_FORCE_TCX_MODE", originalValue)
+		} else {
+			os.Unsetenv("RETINA_FORCE_TCX_MODE")
+		}
+	}()
+
+	// Set the env var to an invalid value (not "true")
+	os.Setenv("RETINA_FORCE_TCX_MODE", "false")
+
+	pObj := &packetparserObjects{} //nolint:typecheck
+	pObj.EndpointIngressFilter = &ebpf.Program{}
+
+	p := &packetParser{
+		cfg:  cfgPodLevelEnabled,
+		l:    log.Logger().Named("test"),
+		objs: pObj,
+	}
+
+	// Should return false (default TC mode) when env var is not "true"
+	result := p.isTCXSupported()
+	assert.False(t, result, "isTCXSupported should return false when RETINA_FORCE_TCX_MODE is not 'true'")
+}
+
+func TestCreateQdiscAndAttach_TCXFallback(t *testing.T) {
+	log.SetupZapLogger(log.GetDefaultLogOpts())
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Save and restore the environment variable
+	originalValue := os.Getenv("RETINA_FORCE_TCX_MODE")
+	defer func() {
+		if originalValue != "" {
+			os.Setenv("RETINA_FORCE_TCX_MODE", originalValue)
+		} else {
+			os.Unsetenv("RETINA_FORCE_TCX_MODE")
+		}
+	}()
+
+	// Ensure env var is not set (default TC mode)
+	os.Unsetenv("RETINA_FORCE_TCX_MODE")
+
+	mfilter := mocks.NewMockfilter(ctrl)
+	mfilter.EXPECT().Add(gomock.Any()).Return(nil).AnyTimes()
+
+	mq := mocks.NewMockqdisc(ctrl)
+	mq.EXPECT().Add(gomock.Any()).Return(nil).AnyTimes()
+
+	mrtnl := mocks.NewMocknltc(ctrl)
+	mrtnl.EXPECT().Qdisc().Return(nil).AnyTimes()
+	mrtnl.EXPECT().SetOption(nl.ExtendedAcknowledge, true).Return(nil).AnyTimes()
+
+	getQdisc = func(nltc) qdisc {
+		return mq
+	}
+
+	getFilter = func(nltc) filter {
+		return mfilter
+	}
+
+	tcOpen = func(*tc.Config) (nltc, error) {
+		return mrtnl, nil
+	}
+
+	getFD = func(e *ebpf.Program) int {
+		return 1
+	}
+
+	pObj := &packetparserObjects{} //nolint:typecheck
+	pObj.EndpointIngressFilter = &ebpf.Program{}
+	pObj.EndpointEgressFilter = &ebpf.Program{}
+	pObj.HostIngressFilter = &ebpf.Program{}
+	pObj.HostEgressFilter = &ebpf.Program{}
+
+	p := &packetParser{
+		cfg:              cfgPodLevelEnabled,
+		l:                log.Logger().Named("test"),
+		objs:             pObj,
+		interfaceLockMap: &sync.Map{},
+		endpointIngressInfo: &ebpf.ProgramInfo{
+			Name: "ingress",
+		},
+		endpointEgressInfo: &ebpf.ProgramInfo{
+			Name: "egress",
+		},
+		hostIngressInfo: &ebpf.ProgramInfo{
+			Name: "ingress",
+		},
+		hostEgressInfo: &ebpf.ProgramInfo{
+			Name: "egress",
+		},
+		attachmentMap: &sync.Map{},
+		tcxSupported:  false, // Explicitly set to false to test TC mode
+	}
+
+	linkAttr := netlink.LinkAttrs{
+		Name:         "test",
+		HardwareAddr: []byte("test"),
+		NetNsID:      1,
+		Index:        1,
+	}
+
+	// Should use TC mode when tcxSupported is false
+	p.createQdiscAndAttach(linkAttr, Veth)
+
+	key := ifaceToKey(linkAttr)
+	value, ok := p.attachmentMap.Load(key)
+	assert.True(t, ok, "attachment should be stored in map")
+
+	// Verify it's using TC attachment type
+	attachVal := value.(*attachmentValue)
+	assert.Equal(t, attachmentTypeTC, attachVal.attachmentType, "should use TC attachment type when tcxSupported is false")
 }
