@@ -6,6 +6,7 @@ package metrics
 
 import (
 	"testing"
+	"time"
 
 	"github.com/cilium/cilium/api/v1/flow"
 	"github.com/microsoft/retina/crd/api/v1alpha1"
@@ -309,7 +310,7 @@ func TestNewForward(t *testing.T) {
 			l.Info("Running test", zap.String("name", tc.name), zap.String("metricName", metricName))
 			ctrl := gomock.NewController(t)
 
-			f := NewForwardCountMetrics(tc.opts, log.Logger(), tc.localContext)
+			f := NewForwardCountMetrics(tc.opts, log.Logger(), tc.localContext, time.Duration(0))
 			if tc.nilObj {
 				assert.Nil(t, f, "forward metrics should be nil Test Name: %s", tc.name)
 				continue
