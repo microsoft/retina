@@ -24,7 +24,7 @@ The `Capture` CRD is defined with the following specifications:
 
 - **spec.captureConfiguration:** Specifies the configuration for capturing network packets. It includes the following properties:
   - `captureOption`: Lists options for the capture, such as duration, maximum capture size, and packet size.
-  - `captureTarget`: Defines the target on which the network packets will be captured. It includes namespace, node, and pod selectors.
+  - `captureTarget`: Defines the target on which the network packets will be captured. It includes namespace, node, and pod selectors, as well as specific pod names.
   - `filters`: Specifies filters for including or excluding network packets based on IP or port.
   - `includeMetadata`: Indicates whether networking metadata should be captured.
   - `tcpdumpFilter`: Allows specifying a raw tcpdump filter string.

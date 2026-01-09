@@ -29,6 +29,7 @@ type Opts struct {
 	nodeSelectors      string
 	nowait             bool
 	packetSize         int
+	podNames           string
 	podSelectors       string
 	pvc                string
 	s3AccessKeyID      string

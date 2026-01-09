@@ -55,6 +55,12 @@ var createExample = templates.Examples(i18n.T(`
 		# Select pods determined by pod-selectors and namespace-selectors
 		kubectl retina capture create --namespace capture --pod-selectors="k8s-app=kube-dns" --namespace-selectors="kubernetes.io/metadata.name=kube-system"
 
+		# Select specific pods by name
+		kubectl retina capture create --namespace default --pod-names "pod1,pod2" --duration 30s
+
+		# Select a single pod by name
+		kubectl retina capture create --namespace myapp --pod-names "my-app-pod-abc123" --duration 60s
+
 		# Select nodes with label "agentpool=agentpool" and "version:v20"
 		kubectl retina capture create --node-selectors="agentpool=agentpool,version:v20"
 
@@ -193,6 +199,8 @@ func NewCreateSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 	createCapture.Flags().IntVar(&opts.packetSize, "packet-size", DefaultPacketSize, "Limits the each packet to bytes in size which works only for Linux")
 	createCapture.Flags().StringVar(&opts.nodeNames, "node-names", "", "A comma-separated list of node names to select nodes on which the network capture will be performed")
 	createCapture.Flags().StringVar(&opts.nodeSelectors, "node-selectors", DefaultNodeSelectors, "A comma-separated list of node labels to select nodes on which the network capture will be performed")
+	createCapture.Flags().StringVar(&opts.podNames, "pod-names", "",
+		"A comma-separated list of pod names to select specific pods on which the network capture will be performed (must be in the specified namespace)")
 	createCapture.Flags().StringVar(&opts.podSelectors, "pod-selectors", "",
 		"A comma-separated list of pod labels to select pods on which the network capture will be performed")
 	createCapture.Flags().StringVar(&opts.namespaceSelectors, "namespace-selectors", "",
@@ -298,10 +306,11 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 		capture.Spec.CaptureConfiguration.CaptureOption.Duration = &metav1.Duration{Duration: opts.duration}
 	}
 
-	if opts.namespaceSelectors != "" || opts.podSelectors != "" {
+	if opts.namespaceSelectors != "" || opts.podSelectors != "" || opts.podNames != "" {
 		// if node selector is using the default value (aka hasn't been set by user), set it to nil to prevent clash with namespace and pod selector
 		if opts.nodeSelectors == DefaultNodeSelectors {
-			retinacmd.Logger.Info("Overriding default node selectors value and setting it to nil. Using namespace and pod selectors. To use node selector, please remove namespace and pod selectors.")
+			retinacmd.Logger.Info("Overriding default node selectors value and setting it to nil. Using namespace, pod selectors, or pod names. " +
+				"To use node selector, please remove namespace and pod selectors.")
 			opts.nodeSelectors = ""
 		}
 	}
@@ -348,6 +357,16 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 		capture.Spec.CaptureConfiguration.CaptureTarget.PodSelector = &metav1.LabelSelector{
 			MatchLabels: podSelectorLabelsMap,
 		}
+	}
+
+	// Add pod names if provided
+	if opts.podNames != "" {
+		podNameSlice := strings.Split(opts.podNames, ",")
+		for i := range podNameSlice {
+			podNameSlice[i] = strings.TrimSpace(podNameSlice[i])
+		}
+		retinacmd.Logger.Info(fmt.Sprintf("Capturing on specific pods: %v", podNameSlice))
+		capture.Spec.CaptureConfiguration.CaptureTarget.PodNames = podNameSlice
 	}
 
 	if opts.maxSize != 0 {
