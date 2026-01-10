@@ -20,6 +20,7 @@ import (
 	"github.com/cilium/cilium/api/v1/flow"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
 	tc "github.com/florianl/go-tc"
 	helper "github.com/florianl/go-tc/core"
@@ -228,8 +229,11 @@ func (p *packetParser) Init() error {
 		return err
 	}
 
-	p.tcMap = &sync.Map{}
+	p.attachmentMap = &sync.Map{}
 	p.interfaceLockMap = &sync.Map{}
+
+	// Check if TCX is supported
+	p.tcxSupported = p.isTCXSupported()
 
 	return nil
 }
@@ -346,13 +350,17 @@ func (p *packetParser) SetupChannel(ch chan *v1.Event) error {
 // Not required for now.
 func (p *packetParser) cleanAll() error {
 	// Delete tunnel and qdiscs.
-	if p.tcMap == nil {
+	if p.attachmentMap == nil {
 		return nil
 	}
 
-	p.tcMap.Range(func(key, value interface{}) bool {
-		v := value.(*tcValue)
-		p.clean(v.tc, v.qdisc)
+	p.attachmentMap.Range(func(key, value interface{}) bool {
+		v := value.(*attachmentValue)
+		if v.attachmentType == attachmentTypeTCX {
+			p.cleanTCX(v.tcxIngressLink, v.tcxEgressLink)
+		} else {
+			p.clean(v.tc, v.qdisc)
+		}
 		return true
 	})
 
@@ -360,7 +368,7 @@ func (p *packetParser) cleanAll() error {
 	// It is OK to do this without a lock because
 	// cleanAll is only invoked from Stop(), and Stop can
 	// only be called from PluginManager (which is single threaded).
-	p.tcMap = &sync.Map{}
+	p.attachmentMap = &sync.Map{}
 	return nil
 }
 
@@ -374,6 +382,119 @@ func (p *packetParser) clean(rtnl nltc, qdisc *tc.Object) {
 			p.l.Warn("could not close rtnetlink socket", zap.Error(err))
 		}
 	}
+}
+
+// cleanTCX cleans up TCX links. This is best effort.
+func (p *packetParser) cleanTCX(ingressLink, egressLink link.Link) {
+	if ingressLink != nil {
+		if err := ingressLink.Close(); err != nil {
+			p.l.Debug("could not close ingress TCX link", zap.Error(err))
+		}
+	}
+	if egressLink != nil {
+		if err := egressLink.Close(); err != nil {
+			p.l.Debug("could not close egress TCX link", zap.Error(err))
+		}
+	}
+}
+
+// isTCXSupported checks if TCX is supported by attempting to attach a test program.
+// TCX is available in kernel 6.6+.
+// Defaults to TC mode for backwards compatibility. Set RETINA_FORCE_TCX_MODE=true to enable TCX.
+func (p *packetParser) isTCXSupported() bool {
+	// Check for environment variable to force TCX mode
+	forceTCX := os.Getenv("RETINA_FORCE_TCX_MODE") == "true"
+
+	// Default to TC mode for backwards compatibility
+	if !forceTCX {
+		return false
+	}
+
+	// TCX is forced, try to detect support
+	p.l.Info("RETINA_FORCE_TCX_MODE is set, attempting to use TCX")
+
+	// Try to get a test interface to check TCX support
+	links, err := netlink.LinkList()
+	if err != nil || len(links) == 0 {
+		p.l.Warn("Could not list network interfaces for TCX detection, falling back to traditional TC", zap.Error(err))
+		return false
+	}
+
+	// Use loopback interface for testing
+	var loopback netlink.Link
+	for _, l := range links {
+		if l.Attrs().Name == "lo" {
+			loopback = l
+			break
+		}
+	}
+	if loopback == nil {
+		p.l.Warn("Loopback interface not found for TCX detection, falling back to traditional TC")
+		return false
+	}
+
+	// Try to attach a TCX program to check support
+	// We'll use the endpoint ingress program for testing
+	testLink, err := link.AttachTCX(link.TCXOptions{
+		Program:   p.objs.EndpointIngressFilter,
+		Attach:    ebpf.AttachTCXIngress,
+		Interface: loopback.Attrs().Index,
+	})
+	if err != nil {
+		p.l.Warn("TCX not supported on this system (kernel 6.6+ required), falling back to traditional TC", zap.Error(err))
+		return false
+	}
+
+	// Clean up test link
+	if err := testLink.Close(); err != nil {
+		p.l.Debug("Error cleaning up TCX test link", zap.Error(err))
+	}
+	p.l.Info("TCX support detected, will use TCX for BPF program attachment")
+	return true
+}
+
+// attachTCX attaches BPF programs using TCX (TC eXpress).
+// Returns ingress link, egress link, and error.
+func (p *packetParser) attachTCX(iface netlink.LinkAttrs, ifaceType interfaceType) (link.Link, link.Link, error) {
+	var ingressProgram, egressProgram *ebpf.Program
+
+	switch ifaceType {
+	case Device:
+		ingressProgram = p.objs.HostIngressFilter
+		egressProgram = p.objs.HostEgressFilter
+	case Veth:
+		ingressProgram = p.objs.EndpointIngressFilter
+		egressProgram = p.objs.EndpointEgressFilter
+	default:
+		return nil, nil, fmt.Errorf("unknown interface type: %s", ifaceType)
+	}
+
+	// Attach ingress program
+	ingressLink, err := link.AttachTCX(link.TCXOptions{
+		Program:   ingressProgram,
+		Attach:    ebpf.AttachTCXIngress,
+		Interface: iface.Index,
+		Anchor:    link.Head(),
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not attach TCX ingress program: %w", err)
+	}
+
+	// Attach egress program
+	egressLink, err := link.AttachTCX(link.TCXOptions{
+		Program:   egressProgram,
+		Attach:    ebpf.AttachTCXEgress,
+		Interface: iface.Index,
+		Anchor:    link.Head(),
+	})
+	if err != nil {
+		// Clean up ingress link if egress fails
+		ingressLink.Close()
+		return nil, nil, fmt.Errorf("could not attach TCX egress program: %w", err)
+	}
+
+	p.l.Debug("Successfully attached TCX programs", zap.String("interface", iface.Name))
+	return ingressLink, egressLink, nil
 }
 
 func (p *packetParser) endpointWatcherCallbackFn(obj interface{}) {
@@ -398,11 +519,15 @@ func (p *packetParser) endpointWatcherCallbackFn(obj interface{}) {
 	case endpoint.EndpointDeleted:
 		p.l.Debug("Endpoint deleted", zap.String("name", iface.Name))
 		// Clean.
-		if value, ok := p.tcMap.Load(ifaceKey); ok {
-			v := value.(*tcValue)
-			p.clean(v.tc, v.qdisc)
+		if value, ok := p.attachmentMap.Load(ifaceKey); ok {
+			v := value.(*attachmentValue)
+			if v.attachmentType == attachmentTypeTCX {
+				p.cleanTCX(v.tcxIngressLink, v.tcxEgressLink)
+			} else {
+				p.clean(v.tc, v.qdisc)
+			}
 			// Delete from map.
-			p.tcMap.Delete(ifaceKey)
+			p.attachmentMap.Delete(ifaceKey)
 		}
 		// Delete from lock map.
 		p.interfaceLockMap.Delete(ifaceKey)
@@ -413,10 +538,34 @@ func (p *packetParser) endpointWatcherCallbackFn(obj interface{}) {
 }
 
 // createQdiscAndAttach creates a qdisc of type clsact on the interface and attaches the ingress and egress bpf filter programs to it.
+// If TCX is supported, it will use TCX instead of traditional TC.
 // Only support interfaces of type veth and device.
 func (p *packetParser) createQdiscAndAttach(iface netlink.LinkAttrs, ifaceType interfaceType) {
-	p.l.Debug("Starting qdisc attachment", zap.String("interface", iface.Name))
+	p.l.Debug("Starting BPF program attachment", zap.String("interface", iface.Name), zap.Bool("tcx_supported", p.tcxSupported))
 
+	// Try TCX first if supported
+	if p.tcxSupported {
+		ingressLink, egressLink, err := p.attachTCX(iface, ifaceType)
+		if err != nil {
+			p.l.Warn("Failed to attach using TCX, falling back to traditional TC",
+				zap.String("interface", iface.Name),
+				zap.Error(err))
+			// Fall through to traditional TC attachment
+		} else {
+			// TCX attachment succeeded
+			ifaceKey := ifaceToKey(iface)
+			attachVal := &attachmentValue{
+				attachmentType: attachmentTypeTCX,
+				tcxIngressLink: ingressLink,
+				tcxEgressLink:  egressLink,
+			}
+			p.attachmentMap.Store(ifaceKey, attachVal)
+			p.l.Debug("Successfully attached BPF programs using TCX", zap.String("interface", iface.Name))
+			return
+		}
+	}
+
+	// Traditional TC attachment
 	var (
 		ingressProgram, egressProgram *ebpf.Program
 		ingressInfo, egressInfo       *ebpf.ProgramInfo
@@ -523,13 +672,14 @@ func (p *packetParser) createQdiscAndAttach(iface netlink.LinkAttrs, ifaceType i
 
 	// Cache.
 	ifaceKey := ifaceToKey(iface)
-	tcValue := &tcValue{
-		tc:    rtnl,
-		qdisc: clsactQdisc,
+	attachVal := &attachmentValue{
+		tc:             rtnl,
+		qdisc:          clsactQdisc,
+		attachmentType: attachmentTypeTC,
 	}
-	p.tcMap.Store(ifaceKey, tcValue)
+	p.attachmentMap.Store(ifaceKey, attachVal)
 
-	p.l.Debug("Successfully added bpf", zap.String("interface", iface.Name))
+	p.l.Debug("Successfully attached BPF programs using traditional TC", zap.String("interface", iface.Name))
 }
 
 func (p *packetParser) run(ctx context.Context) error {
