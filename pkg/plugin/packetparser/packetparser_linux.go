@@ -21,6 +21,7 @@ import (
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/perf"
+	"github.com/cilium/ebpf/ringbuf"
 	tc "github.com/florianl/go-tc"
 	helper "github.com/florianl/go-tc/core"
 	nl "github.com/mdlayher/netlink"
@@ -152,7 +153,8 @@ func (p *packetParser) Compile(ctx context.Context) error {
 		targetArch = "-D__TARGET_ARCH_arm64"
 	}
 	// Keep target as bpf, otherwise clang compilation yields bpf object that elf reader cannot load.
-	err = loader.CompileEbpf(ctx, "-target", "bpf", "-Wall", targetArch, "-g", "-O2", "-c", bpfSourceFile, "-o", bpfOutputFile,
+	cflags := []string{
+		"-target", "bpf", "-Wall", targetArch, "-g", "-O2", "-c", bpfSourceFile, "-o", bpfOutputFile,
 		archLibDir,
 		libbpfSrcDir,
 		libbpfIncludeAsmDir,
@@ -160,7 +162,17 @@ func (p *packetParser) Compile(ctx context.Context) error {
 		libbpfIncludeUapiLinuxDir,
 		filterDir,
 		conntrackDir,
-	)
+	}
+
+	if p.cfg.EnablePacketParserRingBuffer {
+		p.l.Info("Compiling with Ring Buffer enabled", zap.Uint32("size", p.cfg.PacketParserRingBufferSize))
+		cflags = append(cflags, "-DUSE_RING_BUFFER")
+		if p.cfg.PacketParserRingBufferSize > 0 {
+			cflags = append(cflags, fmt.Sprintf("-DRING_BUFFER_SIZE=%d", p.cfg.PacketParserRingBufferSize))
+		}
+	}
+
+	err = loader.CompileEbpf(ctx, cflags...)
 	if err != nil {
 		return err
 	}
@@ -222,10 +234,22 @@ func (p *packetParser) Init() error {
 		return err
 	}
 
-	p.reader, err = plugincommon.NewPerfReader(p.l, objs.RetinaPacketparserEvents, perCPUBuffer, 1)
-	if err != nil {
-		p.l.Error("Error NewReader", zap.Error(err))
-		return err
+	if p.cfg.EnablePacketParserRingBuffer {
+		p.l.Info("Initializing Ring Buffer reader")
+		var rb *ringbuf.Reader
+		rb, err = ringbuf.NewReader(objs.RetinaPacketparserEvents)
+		if err != nil {
+			p.l.Error("Error NewReader ringbuf", zap.Error(err))
+			return fmt.Errorf("failed to create ringbuf reader: %w", err)
+		}
+		p.reader = &ringBufReaderWrapper{reader: rb}
+	} else {
+		p.l.Info("Initializing Perf Reader")
+		p.reader, err = plugincommon.NewPerfReader(p.l, objs.RetinaPacketparserEvents, perCPUBuffer, 1)
+		if err != nil {
+			p.l.Error("Error NewReader", zap.Error(err))
+			return fmt.Errorf("failed to create perf reader: %w", err)
+		}
 	}
 
 	p.tcMap = &sync.Map{}
@@ -730,4 +754,25 @@ func absPath() (string, error) {
 	}
 	dir := path.Dir(filename)
 	return dir, nil
+}
+
+type ringBufReaderWrapper struct {
+	reader *ringbuf.Reader
+}
+
+func (r *ringBufReaderWrapper) Read() (perf.Record, error) {
+	rec, err := r.reader.Read()
+	if err != nil {
+		return perf.Record{}, fmt.Errorf("failed to read from ringbuf: %w", err)
+	}
+	return perf.Record{
+		RawSample: rec.RawSample,
+	}, nil
+}
+
+func (r *ringBufReaderWrapper) Close() error {
+	if err := r.reader.Close(); err != nil {
+		return fmt.Errorf("failed to close ringbuf reader: %w", err)
+	}
+	return nil
 }
