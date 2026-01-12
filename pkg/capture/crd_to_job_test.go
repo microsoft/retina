@@ -2562,7 +2562,7 @@ func TestCalculateCaptureTargetsByPodNames(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			objects := []runtime.Object{}
+			objects := make([]runtime.Object, 0, len(tc.pods))
 			for _, pod := range tc.pods {
 				objects = append(objects, pod)
 			}
@@ -2715,7 +2715,7 @@ func TestGetCaptureTargetsOnNode_WithPodNames(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			objects := []runtime.Object{}
+			objects := make([]runtime.Object, 0, len(tc.pods))
 			for _, pod := range tc.pods {
 				objects = append(objects, pod)
 			}
