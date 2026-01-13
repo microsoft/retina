@@ -4,6 +4,7 @@
 package capture
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"testing"
@@ -396,7 +397,7 @@ func Test_CaptureToPodTranslator_GetCaptureTargetsOnNode(t *testing.T) {
 
 			k8sClient := fakeclientset.NewSimpleClientset(objects...)
 			captureToPodTranslator := NewCaptureToPodTranslatorForTest(k8sClient)
-			gotCaptureTargetsOnNode, err := captureToPodTranslator.getCaptureTargetsOnNode(ctx, tt.captureTarget)
+			gotCaptureTargetsOnNode, err := captureToPodTranslator.getCaptureTargetsOnNode(ctx, tt.captureTarget, "default")
 			if tt.wantErr != (err != nil) {
 				t.Errorf("getCaptureTargetsOnNode() want(%t) error, got error %s", tt.wantErr, err)
 			}
@@ -2257,6 +2258,483 @@ func TestGetNetshFilterWithPodIPAddress(t *testing.T) {
 			gotNetshFilter := getNetshFilterWithPodIPAddress(tt.podIPAddresses)
 			if diff := cmp.Diff(tt.wantedNetshFilter, gotNetshFilter); diff != "" {
 				t.Errorf("getNetshFilterWithPodIPAddress() mismatch (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// Pod Names Tests - Tests for capturing by specific pod names
+
+func TestValidateTargetSelector_PodNames(t *testing.T) {
+	cases := []struct {
+		name          string
+		captureTarget retinav1alpha1.CaptureTarget
+		wantErr       bool
+		errMsg        string
+	}{
+		{
+			name: "valid pod names only",
+			captureTarget: retinav1alpha1.CaptureTarget{
+				PodNames: []string{"pod1", "pod2"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "pod names with node selector should fail",
+			captureTarget: retinav1alpha1.CaptureTarget{
+				NodeSelector: &metav1.LabelSelector{},
+				PodNames:     []string{"pod1"},
+			},
+			wantErr: true,
+			errMsg:  "not compatible with",
+		},
+		{
+			name: "pod names with pod selector should fail",
+			captureTarget: retinav1alpha1.CaptureTarget{
+				PodSelector: &metav1.LabelSelector{},
+				PodNames:    []string{"pod1"},
+			},
+			wantErr: true,
+			errMsg:  "not compatible with",
+		},
+		{
+			name: "pod names with namespace selector should fail",
+			captureTarget: retinav1alpha1.CaptureTarget{
+				NamespaceSelector: &metav1.LabelSelector{},
+				PodNames:          []string{"pod1"},
+			},
+			wantErr: true,
+			errMsg:  "not compatible with",
+		},
+		{
+			name: "node selector only should pass",
+			captureTarget: retinav1alpha1.CaptureTarget{
+				NodeSelector: &metav1.LabelSelector{},
+			},
+			wantErr: false,
+		},
+		{
+			name: "neither selector nor pod names should fail",
+			captureTarget: retinav1alpha1.CaptureTarget{
+				PodNames: []string{},
+			},
+			wantErr: true,
+			errMsg:  "neither",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			kubeClient := fakeclientset.NewClientset()
+			translator := NewCaptureToPodTranslatorForTest(kubeClient)
+			err := translator.validateTargetSelector(tc.captureTarget)
+			if tc.wantErr {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tc.errMsg)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestCalculateCaptureTargetsByPodNames(t *testing.T) {
+	// Combined test for pod name resolution including basic and edge cases
+	cases := []struct {
+		name        string
+		podNames    []string
+		namespace   string
+		pods        []*corev1.Pod
+		wantErr     bool
+		wantTargets map[string][]string // node -> pod IPs
+		errMsg      string
+	}{
+		// Basic cases
+		{
+			name:      "single pod by name",
+			podNames:  []string{"test-pod-1"},
+			namespace: "default",
+			pods: []*corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-pod-1", Namespace: "default"},
+					Spec:       corev1.PodSpec{NodeName: "node1"},
+					Status: corev1.PodStatus{
+						PodIPs: []corev1.PodIP{{IP: "10.0.0.1"}},
+					},
+				},
+			},
+			wantErr: false,
+			wantTargets: map[string][]string{
+				"node1": {"10.0.0.1"},
+			},
+		},
+		{
+			name:      "multiple pods by name",
+			podNames:  []string{"test-pod-1", "test-pod-2"},
+			namespace: "default",
+			pods: []*corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-pod-1", Namespace: "default"},
+					Spec:       corev1.PodSpec{NodeName: "node1"},
+					Status: corev1.PodStatus{
+						PodIPs: []corev1.PodIP{{IP: "10.0.0.1"}},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-pod-2", Namespace: "default"},
+					Spec:       corev1.PodSpec{NodeName: "node2"},
+					Status: corev1.PodStatus{
+						PodIPs: []corev1.PodIP{{IP: "10.0.0.2"}},
+					},
+				},
+			},
+			wantErr: false,
+			wantTargets: map[string][]string{
+				"node1": {"10.0.0.1"},
+				"node2": {"10.0.0.2"},
+			},
+		},
+		{
+			name:      "pod not found",
+			podNames:  []string{"nonexistent-pod"},
+			namespace: "default",
+			pods:      []*corev1.Pod{},
+			wantErr:   true,
+			errMsg:    "failed to get pod",
+		},
+		// Edge cases
+		{
+			name:      "pod with multiple IP addresses",
+			podNames:  []string{"test-pod-1"},
+			namespace: "default",
+			pods: []*corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-pod-1", Namespace: "default"},
+					Spec:       corev1.PodSpec{NodeName: "node1"},
+					Status: corev1.PodStatus{
+						PodIPs: []corev1.PodIP{{IP: "10.0.0.1"}, {IP: "fd00::1"}},
+					},
+				},
+			},
+			wantErr: false,
+			wantTargets: map[string][]string{
+				"node1": {"10.0.0.1", "fd00::1"},
+			},
+		},
+		{
+			name:      "pods on same node",
+			podNames:  []string{"test-pod-1", "test-pod-2"},
+			namespace: "default",
+			pods: []*corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-pod-1", Namespace: "default"},
+					Spec:       corev1.PodSpec{NodeName: "node1"},
+					Status: corev1.PodStatus{
+						PodIPs: []corev1.PodIP{{IP: "10.0.0.1"}},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-pod-2", Namespace: "default"},
+					Spec:       corev1.PodSpec{NodeName: "node1"},
+					Status: corev1.PodStatus{
+						PodIPs: []corev1.PodIP{{IP: "10.0.0.2"}},
+					},
+				},
+			},
+			wantErr: false,
+			wantTargets: map[string][]string{
+				"node1": {"10.0.0.1", "10.0.0.2"},
+			},
+		},
+		{
+			name:      "pod with no IP addresses",
+			podNames:  []string{"test-pod-1"},
+			namespace: "default",
+			pods: []*corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-pod-1", Namespace: "default"},
+					Spec:       corev1.PodSpec{NodeName: "node1"},
+					Status:     corev1.PodStatus{PodIPs: []corev1.PodIP{}},
+				},
+			},
+			wantErr: false,
+			wantTargets: map[string][]string{
+				"node1": {},
+			},
+		},
+		{
+			name:      "multiple pods on different nodes",
+			podNames:  []string{"test-pod-1", "test-pod-2", "test-pod-3"},
+			namespace: "default",
+			pods: []*corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-pod-1", Namespace: "default"},
+					Spec:       corev1.PodSpec{NodeName: "node1"},
+					Status: corev1.PodStatus{
+						PodIPs: []corev1.PodIP{{IP: "10.0.0.1"}},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-pod-2", Namespace: "default"},
+					Spec:       corev1.PodSpec{NodeName: "node2"},
+					Status: corev1.PodStatus{
+						PodIPs: []corev1.PodIP{{IP: "10.0.0.2"}},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-pod-3", Namespace: "default"},
+					Spec:       corev1.PodSpec{NodeName: "node3"},
+					Status: corev1.PodStatus{
+						PodIPs: []corev1.PodIP{{IP: "10.0.0.3"}},
+					},
+				},
+			},
+			wantErr: false,
+			wantTargets: map[string][]string{
+				"node1": {"10.0.0.1"},
+				"node2": {"10.0.0.2"},
+				"node3": {"10.0.0.3"},
+			},
+		},
+		{
+			name:      "pod with IPv4 and IPv6 addresses",
+			podNames:  []string{"test-pod-1"},
+			namespace: "default",
+			pods: []*corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-pod-1", Namespace: "default"},
+					Spec:       corev1.PodSpec{NodeName: "node1"},
+					Status: corev1.PodStatus{
+						PodIPs: []corev1.PodIP{{IP: "10.0.0.1"}, {IP: "2001:db8::1"}, {IP: "fd00::1"}},
+					},
+				},
+			},
+			wantErr: false,
+			wantTargets: map[string][]string{
+				"node1": {"10.0.0.1", "2001:db8::1", "fd00::1"},
+			},
+		},
+		{
+			name:      "pod in different namespace",
+			podNames:  []string{"test-pod-1"},
+			namespace: "custom-ns",
+			pods: []*corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-pod-1", Namespace: "custom-ns"},
+					Spec:       corev1.PodSpec{NodeName: "node1"},
+					Status: corev1.PodStatus{
+						PodIPs: []corev1.PodIP{{IP: "10.0.0.1"}},
+					},
+				},
+			},
+			wantErr: false,
+			wantTargets: map[string][]string{
+				"node1": {"10.0.0.1"},
+			},
+		},
+		{
+			name:      "multiple pods with same IP on different nodes",
+			podNames:  []string{"test-pod-1", "test-pod-2"},
+			namespace: "default",
+			pods: []*corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-pod-1", Namespace: "default"},
+					Spec:       corev1.PodSpec{NodeName: "node1"},
+					Status: corev1.PodStatus{
+						PodIPs: []corev1.PodIP{{IP: "10.0.0.1"}},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-pod-2", Namespace: "default"},
+					Spec:       corev1.PodSpec{NodeName: "node2"},
+					Status: corev1.PodStatus{
+						PodIPs: []corev1.PodIP{{IP: "10.0.0.1"}},
+					},
+				},
+			},
+			wantErr: false,
+			wantTargets: map[string][]string{
+				"node1": {"10.0.0.1"},
+				"node2": {"10.0.0.1"},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			objects := make([]runtime.Object, 0, len(tc.pods))
+			for _, pod := range tc.pods {
+				objects = append(objects, pod)
+			}
+			kubeClient := fakeclientset.NewClientset(objects...)
+			translator := NewCaptureToPodTranslatorForTest(kubeClient)
+
+			captureTarget := retinav1alpha1.CaptureTarget{
+				PodNames: tc.podNames,
+			}
+
+			ctx := context.Background()
+			targets, err := translator.calculateCaptureTargetsByPodNames(ctx, captureTarget, tc.namespace)
+
+			if tc.wantErr {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tc.errMsg)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, targets)
+
+				gotTargets := make(map[string][]string)
+				for nodeName, target := range *targets {
+					gotTargets[nodeName] = target.PodIpAddresses
+				}
+
+				if diff := cmp.Diff(tc.wantTargets, gotTargets); diff != "" {
+					t.Errorf("calculateCaptureTargetsByPodNames() mismatch (-want, +got):\n%s", diff)
+				}
+			}
+		})
+	}
+}
+
+func TestGetCaptureTargetsOnNode_WithPodNames(t *testing.T) {
+	// Combined test for getCaptureTargetsOnNode and CalculateCaptureTargetsOnNode with pod names
+	cases := []struct {
+		name        string
+		podNames    []string
+		namespace   string
+		pods        []*corev1.Pod
+		wantErr     bool
+		wantNodeLen int
+	}{
+		{
+			name:      "pod names with valid pods",
+			podNames:  []string{"test-pod-1"},
+			namespace: "default",
+			pods: []*corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod-1",
+						Namespace: "default",
+					},
+					Spec: corev1.PodSpec{
+						NodeName: "node1",
+					},
+					Status: corev1.PodStatus{
+						PodIPs: []corev1.PodIP{
+							{IP: "10.0.0.1"},
+						},
+					},
+				},
+			},
+			wantErr:     false,
+			wantNodeLen: 1,
+		},
+		{
+			name:        "empty pod names list",
+			podNames:    []string{},
+			namespace:   "default",
+			pods:        []*corev1.Pod{},
+			wantErr:     true,
+			wantNodeLen: 0,
+		},
+		{
+			name:      "multiple valid pod names on different nodes",
+			podNames:  []string{"test-pod-1", "test-pod-2"},
+			namespace: "default",
+			pods: []*corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod-1",
+						Namespace: "default",
+					},
+					Spec: corev1.PodSpec{
+						NodeName: "node1",
+					},
+					Status: corev1.PodStatus{
+						PodIPs: []corev1.PodIP{
+							{IP: "10.0.0.1"},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod-2",
+						Namespace: "default",
+					},
+					Spec: corev1.PodSpec{
+						NodeName: "node2",
+					},
+					Status: corev1.PodStatus{
+						PodIPs: []corev1.PodIP{
+							{IP: "10.0.0.2"},
+						},
+					},
+				},
+			},
+			wantErr:     false,
+			wantNodeLen: 2,
+		},
+		{
+			name:      "pods on same node aggregated",
+			podNames:  []string{"test-pod-1", "test-pod-2"},
+			namespace: "default",
+			pods: []*corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod-1",
+						Namespace: "default",
+					},
+					Spec: corev1.PodSpec{
+						NodeName: "node1",
+					},
+					Status: corev1.PodStatus{
+						PodIPs: []corev1.PodIP{
+							{IP: "10.0.0.1"},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod-2",
+						Namespace: "default",
+					},
+					Spec: corev1.PodSpec{
+						NodeName: "node1",
+					},
+					Status: corev1.PodStatus{
+						PodIPs: []corev1.PodIP{
+							{IP: "10.0.0.2"},
+						},
+					},
+				},
+			},
+			wantErr:     false,
+			wantNodeLen: 1,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			objects := make([]runtime.Object, 0, len(tc.pods))
+			for _, pod := range tc.pods {
+				objects = append(objects, pod)
+			}
+			kubeClient := fakeclientset.NewClientset(objects...)
+			translator := NewCaptureToPodTranslatorForTest(kubeClient)
+
+			captureTarget := retinav1alpha1.CaptureTarget{
+				PodNames: tc.podNames,
+			}
+
+			ctx := context.Background()
+			targets, err := translator.getCaptureTargetsOnNode(ctx, captureTarget, tc.namespace)
+
+			if tc.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, targets)
+				require.Len(t, *targets, tc.wantNodeLen)
 			}
 		})
 	}
