@@ -1,5 +1,3 @@
-# Only applicable for windows images
-ARG OS_VERSION=ltsc2022
 # pinned base images
 
 # skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.11-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
@@ -13,9 +11,6 @@ FROM mcr.microsoft.com/azurelinux/distroless/minimal@sha256:0801b80a0927309572b9
 
 # skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2019  --override-os windows --format "{{.Name}}@{{.Digest}}"
 FROM mcr.microsoft.com/windows/servercore@sha256:a3d7773c4a836c2efd3ecb89f4fcb41199ee56d454225cf72a65b603bf569eca AS ltsc2019
-
-# skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2022  --override-os windows --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/windows/servercore@sha256:3750d7fcd320130cc2ce61954902b71729e85ec2c07c5a2e83a6d6c7f34a61e5 AS ltsc2022
 
 # build stages
 
@@ -131,9 +126,9 @@ COPY --from=tools /usr/local/hubble /bin/hubble
 ENV HUBBLE_SERVER=unix:///var/run/cilium/hubble.sock
 ENTRYPOINT ["./retina/controller"]
 
-
-# agent final image for windows 
-FROM ${OS_VERSION} AS agent-win
+# agent final image for windows 2019
+# windows 2022 is built from a Dockerfile.windows as it runs on a Windows host
+FROM ltsc2019 AS agent-win
 COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
 COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
 COPY --from=controller-bin /go/bin/retina/controller controller.exe

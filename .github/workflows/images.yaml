@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   retina-images:
-    name: Build Agent Images
+    name: Build Agent Images - Linux
     runs-on: ubuntu-latest
 
     strategy:
@@ -62,15 +62,15 @@ jobs:
         env:
           IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
 
-  retina-win-images:
-    name: Build Agent Windows Images
+  retina-image-win-2019:
+    name: Build Agent Image - Windows 2019 
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
         platform: ["windows"]
         arch: ["amd64"]
-        year: ["2019", "2022"]
+        year: ["2019"]
 
     steps:
       - name: Checkout code
@@ -91,7 +91,7 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION }}
-          
+
       - run: df -h
       - name: "node-cleanup"
         run: |
@@ -106,19 +106,69 @@ jobs:
           set -euo pipefail
           echo "TAG=$(make version)" >> $GITHUB_ENV
           if [ "$IS_MERGE_GROUP" == "true" ]; then
+            az acr login -n ${{ vars.ACR_NAME }}
+            make retina-image-win-buildx \
+              IMAGE_NAMESPACE=${{ github.repository }} \
+              WINDOWS_YEARS=${{ matrix.year }} \
+              IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
+              APP_INSIGHTS_ID=${{ secrets.AZURE_APP_INSIGHTS_KEY }} \
+              BUILDX_ACTION=--push
+          else
+            make retina-image-win-buildx \
+              IMAGE_NAMESPACE=${{ github.repository }} \
+              WINDOWS_YEARS=${{ matrix.year }}
+          fi
+        env:
+          IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
+
+
+  retina-image-win-2022:
+    name: Build Agent Image - Windows 2022 
+    runs-on: windows-2022
+    
+    strategy:
+      matrix:
+        platform: ["windows"]
+        arch: ["amd64"]
+        year: ["2022"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+        with:
+          go-version-file: go.mod
+      - run: go version
+
+      - name: Az CLI login
+        uses: azure/login@v2
+        if: ${{ github.event_name == 'merge_group' }}
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION }}
+
+      - name: Build Images
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG=$(make version)
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          if [ "$IS_MERGE_GROUP" == "true" ]; then
             az acr login -n ${{ vars.ACR_NAME }} 
             make retina-image-win \
               IMAGE_NAMESPACE=${{ github.repository }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
-              IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
-              APP_INSIGHTS_ID=${{ secrets.AZURE_APP_INSIGHTS_KEY }} \
               WINDOWS_YEARS=${{ matrix.year }} \
-              BUILDX_ACTION=--push
+              IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
+              APP_INSIGHTS_ID=${{ secrets.AZURE_APP_INSIGHTS_KEY }}
+            docker push ${{ vars.ACR_NAME }}/${{ github.repository }}/retina-agent:${TAG}-windows-ltsc${{ matrix.year }}-${{ matrix.arch }}
           else
             make retina-image-win \
               IMAGE_NAMESPACE=${{ github.repository }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
-              WINDOWS_YEARS=${{ matrix.year }} 
+              WINDOWS_YEARS=${{ matrix.year }}
           fi
         env:
           IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
@@ -278,7 +328,8 @@ jobs:
     needs:
       [
         retina-images,
-        retina-win-images,
+        retina-image-win-2019,
+        retina-image-win-2022,
         operator-images,
         retina-shell-images,
         kubectl-retina-images,
