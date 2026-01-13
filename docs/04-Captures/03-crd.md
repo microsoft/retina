@@ -108,4 +108,45 @@ spec:
     hostPath: /captures
 ```
 
+Single Pod by Name
+
+```yaml
+apiVersion: retina.sh/v1alpha1
+kind: Capture
+metadata:
+  name: example-pod-names
+  namespace: myapp
+spec:
+  captureConfiguration:
+    captureOption:
+      duration: "60s"
+      maxCaptureSize: 100
+    captureTarget:
+      podNames:
+        - my-app-pod-abc123
+  outputConfiguration:
+    hostPath: /captures
+```
+
+Multiple Pods by Name
+
+```yaml
+apiVersion: retina.sh/v1alpha1
+kind: Capture
+metadata:
+  name: example-multiple-pod-names
+  namespace: myapp
+spec:
+  captureConfiguration:
+    captureOption:
+      duration: "30s"
+      maxCaptureSize: 100
+    captureTarget:
+      podNames:
+        - my-app-pod-abc123
+        - my-app-pod-def456
+  outputConfiguration:
+    hostPath: /captures
+```
+
 Additional examples can also be found in the [GitHub capture samples](https://github.com/microsoft/retina/tree/main/samples/capture).
