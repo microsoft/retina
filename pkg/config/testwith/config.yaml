@@ -10,3 +10,5 @@ metricsIntervalDuration: "10s"
 telemetryEnabled: true
 dataAggregationLevel: "low"
 telemetryInterval: "15m"
+enablePacketParserRingBuffer: false
+packetParserRingBufferSize: 8388608
