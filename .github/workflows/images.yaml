@@ -112,6 +112,7 @@ jobs:
             az acr login -n ${{ vars.ACR_NAME }}
             make retina-image-win \
               IMAGE_NAMESPACE=${{ github.repository }} \
+              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               WINDOWS_YEARS=${{ matrix.year }} \
               IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
               APP_INSIGHTS_ID=${{ secrets.AZURE_APP_INSIGHTS_KEY }} \
@@ -119,6 +120,7 @@ jobs:
           else
             make retina-image-win \
               IMAGE_NAMESPACE=${{ github.repository }} \
+              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               WINDOWS_YEARS=${{ matrix.year }}
           fi
         env:
