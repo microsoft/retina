@@ -1,13 +1,15 @@
-# Only applicable for windows images
+# Only applicable for Windows 2022.
+# There is a discinction between Windows 2019 and other years.
+# 2019 is built on a Linux host using buildx.
+# 2022 is built on a Windows host using docker build without buildx.
+# This is done to mitigate CVE-2013-3900 on Windows 2022.
+
 ARG OS_VERSION=ltsc2022
 ARG BUILDPLATFORM
 # pinned base images
 
 # skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.11-1-windowsservercore-ltsc2022 --format "{{.Name}}@{{.Digest}}"
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:55675a714b620fa84e103f71e4dcc430a6eda0bb511e26deaad96d1a72b16972 AS golang
-
-# skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2019  --override-os windows --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/windows/servercore@sha256:a3d7773c4a836c2efd3ecb89f4fcb41199ee56d454225cf72a65b603bf569eca AS ltsc2019
 
 # skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2022  --override-os windows --format "{{.Name}}@{{.Digest}}"
 FROM mcr.microsoft.com/windows/servercore@sha256:3750d7fcd320130cc2ce61954902b71729e85ec2c07c5a2e83a6d6c7f34a61e5 AS ltsc2022

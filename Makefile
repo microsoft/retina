@@ -238,7 +238,7 @@ container-docker: buildx # util target to build container images using docker bu
 		$(BUILDX_ACTION) \
 		$(CONTEXT_DIR) 
 
-container-docker-windows: # util target to build Windows container images using docker build. do not invoke directly.
+container-docker-windows: # util target to build Windows container images without buildx. do not invoke directly.
 	os=$$(echo $(PLATFORM) | cut -d'/' -f1); \
 	arch=$$(echo $(PLATFORM) | cut -d'/' -f2); \
 	image_name=$$(basename $(IMAGE)); \
@@ -278,31 +278,25 @@ retina-image: ## build the retina linux container image.
 				TARGET=$$target; \
 	done
 
-retina-image-win-buildx: ## build the retina Windows container image using buildx.
-	for year in $(WINDOWS_YEARS); do \
-		tag=$(TAG)-windows-ltsc$$year-amd64; \
-		echo "Building $(RETINA_PLATFORM_TAG)"; \
-		set -e ; \
-		$(MAKE) container-$(CONTAINER_BUILDER) \
-				PLATFORM=windows/amd64 \
-				DOCKERFILE=controller/Dockerfile \
-				REGISTRY=$(IMAGE_REGISTRY) \
-				IMAGE=$(RETINA_IMAGE) \
-				OS_VERSION=ltsc$$year \
-				VERSION=$(TAG) \
-				TAG=$$tag \
-				TARGET=agent-win \
-				CONTEXT_DIR=$(REPO_ROOT); \
-	done
-
 retina-image-win: ## build the retina Windows container image.
+# There is a discinction between Windows 2019 and other years.
+# 2019 is built on a Linux host using buildx.
+# 2022 is built on a Windows host using docker build without buildx.
+# This is done to mitigate CVE-2013-3900 on Windows 2022.
 	for year in $(WINDOWS_YEARS); do \
 		tag=$(TAG)-windows-ltsc$$year-amd64; \
-		echo "Building $(RETINA_PLATFORM_TAG)"; \
+		echo "Building $$tag"; \
 		set -e ; \
-		$(MAKE) container-docker-windows \
+		if [ "$$year" = "2019" ]; then \
+			builder_target="container-$(CONTAINER_BUILDER)"; \
+			dockerfile="controller/Dockerfile"; \
+		else \
+			builder_target="container-docker-windows"; \
+			dockerfile="controller/Dockerfile.windows"; \
+		fi; \
+		$(MAKE) $$builder_target \
 				PLATFORM=windows/amd64 \
-				DOCKERFILE=controller/Dockerfile.windows \
+				DOCKERFILE=$$dockerfile \
 				REGISTRY=$(IMAGE_REGISTRY) \
 				IMAGE=$(RETINA_IMAGE) \
 				OS_VERSION=ltsc$$year \

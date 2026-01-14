@@ -64,6 +64,9 @@ jobs:
 
   retina-image-win-2019:
     name: Build Agent Image - Windows 2019 
+    # Windows 2019 is intentionally being built on Ubuntu.
+    # There is no Microsoft Golang image for Windows 2019,
+    # thus 2019 cannot be used as the host.
     runs-on: ubuntu-latest
 
     strategy:
@@ -107,14 +110,14 @@ jobs:
           echo "TAG=$(make version)" >> $GITHUB_ENV
           if [ "$IS_MERGE_GROUP" == "true" ]; then
             az acr login -n ${{ vars.ACR_NAME }}
-            make retina-image-win-buildx \
+            make retina-image-win \
               IMAGE_NAMESPACE=${{ github.repository }} \
               WINDOWS_YEARS=${{ matrix.year }} \
               IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
               APP_INSIGHTS_ID=${{ secrets.AZURE_APP_INSIGHTS_KEY }} \
               BUILDX_ACTION=--push
           else
-            make retina-image-win-buildx \
+            make retina-image-win \
               IMAGE_NAMESPACE=${{ github.repository }} \
               WINDOWS_YEARS=${{ matrix.year }}
           fi

@@ -127,7 +127,7 @@ ENV HUBBLE_SERVER=unix:///var/run/cilium/hubble.sock
 ENTRYPOINT ["./retina/controller"]
 
 # agent final image for windows 2019
-# windows 2022 is built from a Dockerfile.windows as it runs on a Windows host
+# windows 2022 is built from Dockerfile.windows as it runs on a Windows host
 FROM ltsc2019 AS agent-win
 COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
 COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
