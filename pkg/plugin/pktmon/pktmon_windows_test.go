@@ -140,7 +140,7 @@ func Test_verifyEventStream_NoEventsTimeout(t *testing.T) {
 	elapsed := time.Since(start)
 
 	require.NoError(t, err, "verifyEventStream should return nil when no events are received (timeout due to no traffic)")
-	// Should timeout after approximately eventHealthCheckFirstEvent (60s)
+	// Should timeout after approximately pktmonHealthCheckTimeout (60s)
 	assert.GreaterOrEqual(t, elapsed, 59*time.Second, "should wait close to the 60s health check timeout")
 	assert.Less(t, elapsed, 62*time.Second, "should not wait significantly longer than the 60s timeout")
 }
@@ -191,7 +191,8 @@ func Test_verifyEventStream_TooManyNilFlows(t *testing.T) {
 	err := plugin.verifyEventStream()
 
 	require.Error(t, err, "verifyEventStream should fail when too many nil flows are received")
-	assert.ErrorContains(t, err, "too many nil flows", "error should mention too many nil flows")
+	// The error is wrapped as ErrStreamHealthCheckFailed which contains ErrTooManyNilFlows
+	assert.ErrorIs(t, err, ErrStreamHealthCheckFailed, "error should be a stream health check failure")
 }
 
 // Test_verifyEventStream_EventWithDelay tests successful reception of delayed non-nil flow
@@ -227,7 +228,7 @@ func Test_verifyEventStream_TimeoutExactlyAtLimit(t *testing.T) {
 	plugin := &Plugin{
 		l: NewTestLogger(),
 		stream: &MockGetFlowsClient{
-			blockFor: eventHealthCheckFirstEvent + 100*time.Millisecond,
+			blockFor: pktmonHealthCheckTimeout + 100*time.Millisecond,
 		},
 	}
 
@@ -236,9 +237,9 @@ func Test_verifyEventStream_TimeoutExactlyAtLimit(t *testing.T) {
 	elapsed := time.Since(start)
 
 	require.NoError(t, err, "verifyEventStream should return nil when health check timeout occurs (no traffic)")
-	// Should timeout after approximately eventHealthCheckFirstEvent (60s)
-	expectedMin := eventHealthCheckFirstEvent - 500*time.Millisecond
-	expectedMax := eventHealthCheckFirstEvent + 2*time.Second
+	// Should timeout after approximately pktmonHealthCheckTimeout (60s)
+	expectedMin := pktmonHealthCheckTimeout - 500*time.Millisecond
+	expectedMax := pktmonHealthCheckTimeout + 2*time.Second
 	assert.GreaterOrEqual(t, elapsed, expectedMin, "should wait at least close to the health check timeout")
 	assert.Less(t, elapsed, expectedMax, "should not wait significantly longer than the health check timeout")
 }
