@@ -67,7 +67,7 @@ RETINA_PLATFORM_TAG        ?= $(TAG)-$(subst /,-,$(PLATFORM))
 # used for looping through components in container build
 AGENT_TARGETS ?= init agent
 
-WINDOWS_YEARS ?= "2019 2022"
+WINDOWS_YEARS ?= 2019 2022
 
 # for windows os, add year to the platform tag
 ifeq ($(OS),windows)
@@ -214,7 +214,6 @@ buildx:
 	fi;
 
 
-
 container-docker: buildx # util target to build container images using docker buildx. do not invoke directly.
 	os=$$(echo $(PLATFORM) | cut -d'/' -f1); \
 	arch=$$(echo $(PLATFORM) | cut -d'/' -f2); \
@@ -239,6 +238,24 @@ container-docker: buildx # util target to build container images using docker bu
 		$(BUILDX_ACTION) \
 		$(CONTEXT_DIR) 
 
+container-docker-windows: # util target to build Windows container images without buildx. do not invoke directly.
+	os=$$(echo $(PLATFORM) | cut -d'/' -f1); \
+	arch=$$(echo $(PLATFORM) | cut -d'/' -f2); \
+	image_name=$$(basename $(IMAGE)); \
+	echo "Building $$image_name for $$os/$$arch "; \
+	docker build \
+		--platform $(PLATFORM) \
+		-f $(DOCKERFILE) \
+		--build-arg BUILDPLATFORM=$(PLATFORM) \
+		--build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
+		--build-arg GOARCH=$$arch \
+		--build-arg GOOS=$$os \
+		--build-arg OS_VERSION=$(OS_VERSION) \
+		--build-arg HUBBLE_VERSION=$(HUBBLE_VERSION) \
+		--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
+		--target=$(TARGET) \
+		-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
+		$(CONTEXT_DIR)
 
 retina-image: ## build the retina linux container image.
 	echo "Building for $(PLATFORM)"
@@ -262,13 +279,24 @@ retina-image: ## build the retina linux container image.
 	done
 
 retina-image-win: ## build the retina Windows container image.
+# There is a discinction between Windows 2019 and other years.
+# 2019 is built on a Linux host using buildx.
+# 2022 is built on a Windows host using docker build without buildx.
+# This is done to mitigate CVE-2013-3900 on Windows 2022.
 	for year in $(WINDOWS_YEARS); do \
 		tag=$(TAG)-windows-ltsc$$year-amd64; \
-		echo "Building $(RETINA_PLATFORM_TAG)"; \
+		echo "Building $$tag"; \
 		set -e ; \
-		$(MAKE) container-$(CONTAINER_BUILDER) \
+		if [ "$$year" = "2019" ]; then \
+			builder_target="container-$(CONTAINER_BUILDER)"; \
+			dockerfile="controller/Dockerfile"; \
+		else \
+			builder_target="container-docker-windows"; \
+			dockerfile="controller/Dockerfile.windows"; \
+		fi; \
+		$(MAKE) $$builder_target \
 				PLATFORM=windows/amd64 \
-				DOCKERFILE=controller/Dockerfile \
+				DOCKERFILE=$$dockerfile \
 				REGISTRY=$(IMAGE_REGISTRY) \
 				IMAGE=$(RETINA_IMAGE) \
 				OS_VERSION=ltsc$$year \
