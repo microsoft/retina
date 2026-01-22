@@ -81,6 +81,7 @@ jobs:
           TAG=$(make version)
           echo "TAG=$TAG" >> $GITHUB_ENV
           make build-windows-binaries \
+            GOOS=windows \
             GOARCH=amd64 \
             TAG=$TAG \
             APP_INSIGHTS_ID=${{ secrets.AZURE_APP_INSIGHTS_KEY }}
