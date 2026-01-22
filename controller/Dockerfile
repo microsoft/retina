@@ -126,6 +126,7 @@ COPY --from=tools /usr/local/hubble /bin/hubble
 ENV HUBBLE_SERVER=unix:///var/run/cilium/hubble.sock
 ENTRYPOINT ["./retina/controller"]
 
+
 # agent final image for windows 2019
 # windows 2022 is built from Dockerfile.windows as it runs on a Windows host
 FROM ltsc2019 AS agent-win

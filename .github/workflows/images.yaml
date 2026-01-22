@@ -62,12 +62,42 @@ jobs:
         env:
           IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
 
+  build-windows-binaries:
+    name: Build Windows Binaries
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+        with:
+          go-version-file: go.mod
+      - run: go version
+
+      - name: Build Windows Binaries
+        shell: bash
+        run: |
+          TAG=$(make version)
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          make build-windows-binaries \
+            GOARCH=amd64 \
+            TAG=$TAG \
+            APP_INSIGHTS_ID=${{ secrets.AZURE_APP_INSIGHTS_KEY }}
+        env:
+          APP_INSIGHTS_ID: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
+
+      - name: Upload Windows Binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-binaries
+          path: output/windows_amd64/
+          retention-days: 1
+
   retina-image-win-2019:
     name: Build Agent Image - Windows 2019 
-    # Windows 2019 is intentionally being built on Ubuntu.
-    # There is no Microsoft Golang image for Windows 2019,
-    # thus 2019 cannot be used as the host.
-    runs-on: ubuntu-latest
+    needs: build-windows-binaries
+    runs-on: windows-2019
 
     strategy:
       matrix:
@@ -79,72 +109,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
 
-      - uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+      - name: Download Windows Binaries
+        uses: actions/download-artifact@v4
         with:
-          go-version-file: go.mod
-      - run: go version
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Az CLI login
-        uses: azure/login@v2
-        if: ${{ github.event_name == 'merge_group' }}
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION }}
-
-      - run: df -h
-      - name: "node-cleanup"
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
-          sudo docker image prune --all --force
-          sudo docker builder prune -a
-      - run: df -h
-
-      - name: Build Images
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "TAG=$(make version)" >> $GITHUB_ENV
-          if [ "$IS_MERGE_GROUP" == "true" ]; then
-            az acr login -n ${{ vars.ACR_NAME }}
-            make retina-image-win \
-              IMAGE_NAMESPACE=${{ github.repository }} \
-              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
-              WINDOWS_YEARS=${{ matrix.year }} \
-              IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
-              APP_INSIGHTS_ID=${{ secrets.AZURE_APP_INSIGHTS_KEY }} \
-              BUILDX_ACTION=--push
-          else
-            make retina-image-win \
-              IMAGE_NAMESPACE=${{ github.repository }} \
-              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
-              WINDOWS_YEARS=${{ matrix.year }}
-          fi
-        env:
-          IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
-
-
-  retina-image-win-2022:
-    name: Build Agent Image - Windows 2022 
-    runs-on: windows-2022
-    
-    strategy:
-      matrix:
-        platform: ["windows"]
-        arch: ["amd64"]
-        year: ["2022"]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-
-      - uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
-        with:
-          go-version-file: go.mod
-      - run: go version
+          name: windows-binaries
+          path: output/windows_amd64/
 
       - name: Az CLI login
         uses: azure/login@v2
@@ -167,13 +136,75 @@ jobs:
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               WINDOWS_YEARS=${{ matrix.year }} \
               IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
-              APP_INSIGHTS_ID=${{ secrets.AZURE_APP_INSIGHTS_KEY }}
+              APP_INSIGHTS_ID=${{ secrets.AZURE_APP_INSIGHTS_KEY }} \
+              BINARIES_PATH=output/windows_${{ matrix.arch }} \
+              REPO_PATH=.
             docker push ${{ vars.ACR_NAME }}/${{ github.repository }}/retina-agent:${TAG}-windows-ltsc${{ matrix.year }}-${{ matrix.arch }}
           else
             make retina-image-win \
               IMAGE_NAMESPACE=${{ github.repository }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
-              WINDOWS_YEARS=${{ matrix.year }}
+              WINDOWS_YEARS=${{ matrix.year }} \
+              BINARIES_PATH=output/windows_${{ matrix.arch }} \
+              REPO_PATH=.
+          fi
+        env:
+          IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
+
+
+  retina-image-win-2022:
+    name: Build Agent Image - Windows 2022 
+    needs: build-windows-binaries
+    runs-on: windows-2022
+    
+    strategy:
+      matrix:
+        platform: ["windows"]
+        arch: ["amd64"]
+        year: ["2022"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Download Windows Binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-binaries
+          path: output/windows_amd64/
+
+      - name: Az CLI login
+        uses: azure/login@v2
+        if: ${{ github.event_name == 'merge_group' }}
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION }}
+
+      - name: Build Images
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG=$(make version)
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          if [ "$IS_MERGE_GROUP" == "true" ]; then
+            az acr login -n ${{ vars.ACR_NAME }} 
+            make retina-image-win \
+              IMAGE_NAMESPACE=${{ github.repository }} \
+              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
+              WINDOWS_YEARS=${{ matrix.year }} \
+              IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
+              APP_INSIGHTS_ID=${{ secrets.AZURE_APP_INSIGHTS_KEY }} \
+              BINARIES_PATH=output/windows_${{ matrix.arch }} \
+              REPO_PATH=.
+            docker push ${{ vars.ACR_NAME }}/${{ github.repository }}/retina-agent:${TAG}-windows-ltsc${{ matrix.year }}-${{ matrix.arch }}
+          else
+            make retina-image-win \
+              IMAGE_NAMESPACE=${{ github.repository }} \
+              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
+              WINDOWS_YEARS=${{ matrix.year }} \
+              BINARIES_PATH=output/windows_${{ matrix.arch }} \
+              REPO_PATH=.
           fi
         env:
           IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}

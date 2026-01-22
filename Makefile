@@ -287,13 +287,8 @@ retina-image-win: ## build the retina Windows container image.
 		tag=$(TAG)-windows-ltsc$$year-amd64; \
 		echo "Building $$tag"; \
 		set -e ; \
-		if [ "$$year" = "2019" ]; then \
-			builder_target="container-$(CONTAINER_BUILDER)"; \
-			dockerfile="controller/Dockerfile"; \
-		else \
-			builder_target="container-docker-windows"; \
-			dockerfile="controller/Dockerfile.windows"; \
-		fi; \
+		builder_target="container-docker-windows"; \
+		dockerfile="controller/Dockerfile.windows-retina-oss-build"; \
 		$(MAKE) $$builder_target \
 				PLATFORM=windows/amd64 \
 				DOCKERFILE=$$dockerfile \
