@@ -252,7 +252,10 @@ container-docker-windows: # util target to build Windows container images withou
 		--build-arg GOOS=$$os \
 		--build-arg OS_VERSION=$(OS_VERSION) \
 		--build-arg HUBBLE_VERSION=$(HUBBLE_VERSION) \
-		--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg REPO_PATH=$(REPO_PATH) \
+		--build-arg BINARIES_PATH=$(BINARIES_PATH) \
+		$(EXTRA_BUILD_ARGS) \
 		--target=$(TARGET) \
 		-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
 		$(CONTEXT_DIR)
@@ -298,6 +301,8 @@ retina-image-win: ## build the retina Windows container image.
 				VERSION=$(TAG) \
 				TAG=$$tag \
 				TARGET=agent-win \
+				REPO_PATH=$(REPO_PATH) \
+				BINARIES_PATH=$(BINARIES_PATH) \
 				CONTEXT_DIR=$(REPO_ROOT); \
 	done
 
@@ -384,9 +389,20 @@ all-gen: ## generate all code
 	$(MAKE) proto-gen
 	$(MAKE) go-gen
 
-build-windows-binaries:
-	GOOS=windows GOARCH=$(GOARCH) go build -v -o /go/bin/retina/captureworkload -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version=$(TAG) -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=$(APP_INSIGHTS_ID)" captureworkload/main.go
-	GOOS=windows GOARCH=$(GOARCH) go build -x -v -o /go/bin/retina/controller -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version=$(TAG) -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=$(APP_INSIGHTS_ID)" controller/main.go
+build-windows-binaries: ## Build Windows binaries
+	@echo "Building Windows binaries for $(GOARCH)..."
+	@mkdir -p $(BUILD_DIR)
+	CGO_ENABLED=0 GOOS=windows GOARCH=$(GOARCH) go build -v \
+		-o $(BUILD_DIR)/captureworkload.exe \
+		-ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version=$(TAG) \
+		-X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=$(APP_INSIGHTS_ID)" \
+		$(CAPTURE_WORKLOAD_DIR)/main.go
+	CGO_ENABLED=0 GOOS=windows GOARCH=$(GOARCH) go build -v \
+		-o $(BUILD_DIR)/controller.exe \
+		-ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version=$(TAG) \
+		-X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=$(APP_INSIGHTS_ID)" \
+		$(RETINA_DIR)/main.go
+	@echo "Windows binaries built successfully in $(BUILD_DIR)"
 
 ##@ Multiplatform
 
