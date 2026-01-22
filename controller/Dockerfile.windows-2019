@@ -1,11 +1,8 @@
-# Only applicable for windows images
-ARG OS_VERSION=ltsc2019
-# pinned base images
-
+# pinned base image
 # skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2019  --override-os windows --format "{{.Name}}@{{.Digest}}"
 FROM mcr.microsoft.com/windows/servercore@sha256:a3d7773c4a836c2efd3ecb89f4fcb41199ee56d454225cf72a65b603bf569eca AS ltsc2019
 
-FROM ${OS_VERSION} AS agent-win
+FROM ltsc2019 AS agent-win
 ARG GOARCH=amd64 # default to amd64
 ARG GOOS=windows # default to windows
 ARG OS_VERSION=ltsc2019

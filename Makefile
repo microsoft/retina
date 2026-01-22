@@ -282,19 +282,15 @@ retina-image: ## build the retina linux container image.
 	done
 
 retina-image-win: ## build the retina Windows container image.
-# There is a discinction between Windows 2019 and other years.
-# 2019 is built on a Linux host using buildx.
-# 2022 is built on a Windows host using docker build without buildx.
-# This is done to mitigate CVE-2013-3900 on Windows 2022.
+# The Windows images are built on a corresponding Windows host without buildx.
+# This is done to mitigate CVE-2013-3900.
 	for year in $(WINDOWS_YEARS); do \
 		tag=$(TAG)-windows-ltsc$$year-amd64; \
 		echo "Building $$tag"; \
 		set -e ; \
-		builder_target="container-docker-windows"; \
-		dockerfile="controller/Dockerfile.windows-$$year"; \
-		$(MAKE) $$builder_target \
+		$(MAKE) container-docker-windows \
 				PLATFORM=windows/amd64 \
-				DOCKERFILE=$$dockerfile \
+				DOCKERFILE=controller/Dockerfile.windows-$$year \
 				REGISTRY=$(IMAGE_REGISTRY) \
 				IMAGE=$(RETINA_IMAGE) \
 				OS_VERSION=ltsc$$year \
