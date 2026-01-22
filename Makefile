@@ -291,7 +291,7 @@ retina-image-win: ## build the retina Windows container image.
 		echo "Building $$tag"; \
 		set -e ; \
 		builder_target="container-docker-windows"; \
-		dockerfile="controller/Dockerfile.windows-retina-oss-build"; \
+		dockerfile="controller/Dockerfile.windows-$$year"; \
 		$(MAKE) $$builder_target \
 				PLATFORM=windows/amd64 \
 				DOCKERFILE=$$dockerfile \
