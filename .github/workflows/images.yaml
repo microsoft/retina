@@ -100,12 +100,6 @@ jobs:
     needs: build-windows-binaries
     runs-on: windows-2019
 
-    strategy:
-      matrix:
-        platform: ["windows"]
-        arch: ["amd64"]
-        year: ["2019"]
-
     steps:
       - name: Checkout code
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -134,22 +128,25 @@ jobs:
             az acr login -n ${{ vars.ACR_NAME }} 
             make retina-image-win \
               IMAGE_NAMESPACE=${{ github.repository }} \
-              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
-              WINDOWS_YEARS=${{ matrix.year }} \
+              PLATFORM=${PLATFORM}/${ARCH} \
+              WINDOWS_YEARS=${YEAR} \
               IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
               APP_INSIGHTS_ID=${{ secrets.AZURE_APP_INSIGHTS_KEY }} \
-              BINARIES_PATH=output/windows_${{ matrix.arch }} \
+              BINARIES_PATH=output/windows_${ARCH} \
               REPO_PATH=.
-            docker push ${{ vars.ACR_NAME }}/${{ github.repository }}/retina-agent:${TAG}-windows-ltsc${{ matrix.year }}-${{ matrix.arch }}
+            docker push ${{ vars.ACR_NAME }}/${{ github.repository }}/retina-agent:${TAG}-windows-ltsc${YEAR}-${ARCH}
           else
             make retina-image-win \
               IMAGE_NAMESPACE=${{ github.repository }} \
-              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
-              WINDOWS_YEARS=${{ matrix.year }} \
-              BINARIES_PATH=output/windows_${{ matrix.arch }} \
+              PLATFORM=${PLATFORM}/${ARCH} \
+              WINDOWS_YEARS=${YEAR} \
+              BINARIES_PATH=output/windows_${ARCH} \
               REPO_PATH=.
           fi
         env:
+          PLATFORM: windows
+          ARCH: amd64
+          YEAR: "2019"
           IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
 
 
@@ -157,12 +154,6 @@ jobs:
     name: Build Agent Image - Windows 2022 
     needs: build-windows-binaries
     runs-on: windows-2022
-    
-    strategy:
-      matrix:
-        platform: ["windows"]
-        arch: ["amd64"]
-        year: ["2022"]
 
     steps:
       - name: Checkout code
@@ -192,22 +183,25 @@ jobs:
             az acr login -n ${{ vars.ACR_NAME }} 
             make retina-image-win \
               IMAGE_NAMESPACE=${{ github.repository }} \
-              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
-              WINDOWS_YEARS=${{ matrix.year }} \
+              PLATFORM=${PLATFORM}/${ARCH} \
+              WINDOWS_YEARS=${YEAR} \
               IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
               APP_INSIGHTS_ID=${{ secrets.AZURE_APP_INSIGHTS_KEY }} \
-              BINARIES_PATH=output/windows_${{ matrix.arch }} \
+              BINARIES_PATH=output/windows_${ARCH} \
               REPO_PATH=.
-            docker push ${{ vars.ACR_NAME }}/${{ github.repository }}/retina-agent:${TAG}-windows-ltsc${{ matrix.year }}-${{ matrix.arch }}
+            docker push ${{ vars.ACR_NAME }}/${{ github.repository }}/retina-agent:${TAG}-windows-ltsc${YEAR}-${ARCH}
           else
             make retina-image-win \
               IMAGE_NAMESPACE=${{ github.repository }} \
-              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
-              WINDOWS_YEARS=${{ matrix.year }} \
-              BINARIES_PATH=output/windows_${{ matrix.arch }} \
+              PLATFORM=${PLATFORM}/${ARCH} \
+              WINDOWS_YEARS=${YEAR} \
+              BINARIES_PATH=output/windows_${ARCH} \
               REPO_PATH=.
           fi
         env:
+          PLATFORM: windows
+          ARCH: amd64
+          YEAR: "2022"
           IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
 
   operator-images:
