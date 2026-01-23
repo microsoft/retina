@@ -24,9 +24,13 @@ The target indicates where the packet capture will be performed. This can be set
 
 - `--node-selectors`
 - `--node-names`
-- `--pod-selectors` and `--namespace-selectors` (pairs)
+- `--pod-names` (for specific pods)
+- `--pod-selectors` and `--namespace-selectors` (pairs for label-based pod selection)
 
-Note that Node Selectors are not compatible with Pod Selectors & Namespace Selectors pairs and the capture will not go through if all are populated.
+Note that the following combinations are not allowed:
+
+- Node Selectors are not compatible with Pod Selectors & Namespace Selectors pairs
+- Pod Names are not compatible with Node Selectors, Pod Selectors, or Namespace Selectors
 
 If nothing is set, `kubectl retina capture create` will use `--node-selectors` with the default value shown below in [Flags](#flags).
 
@@ -71,6 +75,7 @@ The network traffic will be uploaded to the specified output location.
 | `node-selectors`      | string     | kubernetes.io/os=linux | A comma-separated list of node labels to select nodes on which the network capture will be performed. |       |
 | `no-wait`             | bool       | true     | By default, Retina capture CLI will exit before the jobs are completed. If false, the CLI will wait until the jobs are completed and clean up the Kubernetes resources created. |       |
 | `packet-size`         | int        | 0        | Limit the packet size in bytes. Packets longer than the defined maximum size will be truncated. The default value 0 indicates no limit. This is beneficial when the user wants to reduce the capture file size or hide customer data due to security concerns. | Only works on Linux.      |
+| `pod-names`           | string     | ""       | A comma-separated list of specific pod names to select pods on which the network capture will be performed. | Mutually exclusive with `node-selectors`, `pod-selectors`, and `namespace-selectors`.      |
 | `pod-selectors`       | string     | ""       | A comma-separated list of pod labels to select pods on which the network capture will be performed. | Pair with `namespace-selectors`.      |
 | `pvc`                 | string     | ""       | PersistentVolumeClaim under the specified or default namespace to store capture files. |       |
 | `s3-access-key-id`    | string     | ""       | S3 access key id to upload capture files.                                   |       |
@@ -109,6 +114,25 @@ kubectl retina capture create \
   --name example-pod-namespace-selectors \
   --pod-selectors="k8s-app=kube-dns" \
   --namespace-selectors="kubernetes.io/metadata.name=kube-system"
+```
+
+Pod Names (Specific Pods)
+
+```sh
+kubectl retina capture create \
+  --name example-pod-names \
+  --namespace myapp \
+  --pod-names "my-app-pod-abc123,my-app-pod-def456"
+```
+
+Single Pod by Name
+
+```sh
+kubectl retina capture create \
+  --name example-single-pod \
+  --namespace myapp \
+  --pod-names "my-app-pod-abc123" \
+  --duration 60s
 ```
 
 ##### Interface Selection
