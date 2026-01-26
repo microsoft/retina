@@ -281,7 +281,7 @@ retina-image: ## build the retina linux container image.
 				TARGET=$$target; \
 	done
 
-retina-image-win: ## build the retina Windows container image.
+retina-image-win: build-windows-binaries ## build the retina Windows container image.
 # The Windows images are built on a corresponding Windows host without buildx.
 # This is done to mitigate CVE-2013-3900.
 	for year in $(WINDOWS_YEARS); do \
