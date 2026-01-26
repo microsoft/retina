@@ -19,10 +19,11 @@ ENV GOOS=${GOOS}
 ENV OS_VERSION=${OS_VERSION}
 ENV BINARIES_PATH=${BINARIES_PATH}
 ENV REPO_PATH=${REPO_PATH}
+# CVE-2013-3900 Mitigation
 RUN reg add "HKEY_LOCAL_MACHINE\Software\Microsoft\Cryptography\Wintrust\Config" /v "EnableCertPaddingCheck" /t REG_DWORD /d "1" /f
 RUN reg add "HKEY_LOCAL_MACHINE\Software\Wow6432Node\Microsoft\Cryptography\Wintrust\Config" /v "EnableCertPaddingCheck" /t REG_DWORD /d "1" /f
-COPY ${REPO_PATH}/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
-COPY ${REPO_PATH}/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
+COPY ${REPO_PATH}/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
+COPY ${REPO_PATH}/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
 COPY ${BINARIES_PATH}/captureworkload.exe captureworkload.exe
 COPY ${BINARIES_PATH}/controller.exe controller.exe
 ADD https://github.com/microsoft/etl2pcapng/releases/download/v1.10.0/etl2pcapng.exe /etl2pcapng.exe
