@@ -95,10 +95,16 @@ jobs:
           path: output/windows_amd64/
           retention-days: 1
 
-  retina-image-win-2019:
-    name: Build Agent Image - Windows 2019 
+  retina-image-win:
+    name: Build Agent Image - Windows ${{ matrix.year }}
     needs: build-windows-binaries
-    runs-on: windows-2019
+    runs-on: windows-${{ matrix.year }}
+
+    strategy:
+      matrix:
+        year: ["2019", "2022"]
+        platform: ["windows"]
+        arch: ["amd64"]
 
     steps:
       - name: Checkout code
@@ -128,80 +134,22 @@ jobs:
             az acr login -n ${{ vars.ACR_NAME }} 
             make retina-image-win \
               IMAGE_NAMESPACE=${{ github.repository }} \
-              PLATFORM=${PLATFORM}/${ARCH} \
-              WINDOWS_YEARS=${YEAR} \
+              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
+              WINDOWS_YEARS=${{ matrix.year }} \
               IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
               APP_INSIGHTS_ID=${{ secrets.AZURE_APP_INSIGHTS_KEY }} \
-              BINARIES_PATH=output/windows_${ARCH} \
+              BINARIES_PATH=output/windows_${{ matrix.arch }} \
               REPO_PATH=.
-            docker push ${{ vars.ACR_NAME }}/${{ github.repository }}/retina-agent:${TAG}-windows-ltsc${YEAR}-${ARCH}
+            docker push ${{ vars.ACR_NAME }}/${{ github.repository }}/retina-agent:${TAG}-windows-ltsc${{ matrix.year }}-${{ matrix.arch }}
           else
             make retina-image-win \
               IMAGE_NAMESPACE=${{ github.repository }} \
-              PLATFORM=${PLATFORM}/${ARCH} \
-              WINDOWS_YEARS=${YEAR} \
-              BINARIES_PATH=output/windows_${ARCH} \
+              PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
+              WINDOWS_YEARS=${{ matrix.year }} \
+              BINARIES_PATH=output/windows_${{ matrix.arch }} \
               REPO_PATH=.
           fi
         env:
-          PLATFORM: windows
-          ARCH: amd64
-          YEAR: "2019"
-          IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
-
-
-  retina-image-win-2022:
-    name: Build Agent Image - Windows 2022 
-    needs: build-windows-binaries
-    runs-on: windows-2022
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-
-      - name: Download Windows Binaries
-        uses: actions/download-artifact@v4
-        with:
-          name: windows-binaries
-          path: output/windows_amd64/
-
-      - name: Az CLI login
-        uses: azure/login@v2
-        if: ${{ github.event_name == 'merge_group' }}
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION }}
-
-      - name: Build Images
-        shell: bash
-        run: |
-          set -euo pipefail
-          TAG=$(make version)
-          echo "TAG=$TAG" >> "$GITHUB_ENV"
-          if [ "$IS_MERGE_GROUP" == "true" ]; then
-            az acr login -n ${{ vars.ACR_NAME }} 
-            make retina-image-win \
-              IMAGE_NAMESPACE=${{ github.repository }} \
-              PLATFORM=${PLATFORM}/${ARCH} \
-              WINDOWS_YEARS=${YEAR} \
-              IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
-              APP_INSIGHTS_ID=${{ secrets.AZURE_APP_INSIGHTS_KEY }} \
-              BINARIES_PATH=output/windows_${ARCH} \
-              REPO_PATH=.
-            docker push ${{ vars.ACR_NAME }}/${{ github.repository }}/retina-agent:${TAG}-windows-ltsc${YEAR}-${ARCH}
-          else
-            make retina-image-win \
-              IMAGE_NAMESPACE=${{ github.repository }} \
-              PLATFORM=${PLATFORM}/${ARCH} \
-              WINDOWS_YEARS=${YEAR} \
-              BINARIES_PATH=output/windows_${ARCH} \
-              REPO_PATH=.
-          fi
-        env:
-          PLATFORM: windows
-          ARCH: amd64
-          YEAR: "2022"
           IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
 
   operator-images:
@@ -359,8 +307,7 @@ jobs:
     needs:
       [
         retina-images,
-        retina-image-win-2019,
-        retina-image-win-2022,
+        retina-image-win,
         operator-images,
         retina-shell-images,
         kubectl-retina-images,
