@@ -38,7 +38,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
 
       - name: Log in to registry
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+        run: echo "${{ secrets.GH_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
 
       - name: Build/Push Images
         shell: bash
@@ -113,7 +113,7 @@ jobs:
         uses: sigstore/cosign-installer@v4.0.0
 
       - name: Log in to registry
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+        run: echo "${{ secrets.GH_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
 
       - name: Build/Push Images
         shell: bash
@@ -162,7 +162,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
 
       - name: Log in to registry
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+        run: echo "${{ secrets.GH_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
 
       - name: Build/Push Images
         shell: bash
@@ -207,7 +207,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
 
       - name: Log in to registry
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+        run: echo "${{ secrets.GH_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
 
       - name: Build/Push Images
         shell: bash
@@ -250,7 +250,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
 
       - name: Log in to registry
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+        run: echo "${{ secrets.GH_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
 
       - name: Build/Push Images
         shell: bash
@@ -295,7 +295,7 @@ jobs:
         uses: sigstore/cosign-installer@v4.0.0
 
       - name: Log in to registry
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+        run: echo "${{ secrets.GH_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
 
       - name: Generate Manifests
         shell: bash
