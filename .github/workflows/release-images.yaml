@@ -119,7 +119,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "TAG=$(make version)" >> $GITHUB_ENV
+          TAG=$(make version)
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
           make retina-image-win \
               IMAGE_NAMESPACE=${{ github.repository }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
