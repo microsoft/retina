@@ -134,7 +134,7 @@ jobs:
         run: |
           for image in retina-agent ; do
             IMAGE_PATH="ghcr.io/${{ github.repository }}/$image:$TAG-windows-ltsc${{ matrix.year }}-${{ matrix.arch }}"
-            DIGEST=$(jq -r '.["containerimage.digest"]' image-metadata-$image-$TAG-windows-ltsc${{ matrix.year }}-${{ matrix.arch }}.json) 
+            DIGEST=$(docker manifest inspect $IMAGE_PATH -v | jq -r '.Descriptor.digest')
             cosign sign --yes ${IMAGE_PATH}@${DIGEST}
           done
 
