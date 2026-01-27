@@ -67,7 +67,7 @@ RETINA_PLATFORM_TAG        ?= $(TAG)-$(subst /,-,$(PLATFORM))
 # used for looping through components in container build
 AGENT_TARGETS ?= init agent
 
-WINDOWS_YEARS ?= "2019 2022"
+WINDOWS_YEARS ?= 2019 2022
 
 # for windows os, add year to the platform tag
 ifeq ($(OS),windows)
@@ -214,7 +214,6 @@ buildx:
 	fi;
 
 
-
 container-docker: buildx # util target to build container images using docker buildx. do not invoke directly.
 	os=$$(echo $(PLATFORM) | cut -d'/' -f1); \
 	arch=$$(echo $(PLATFORM) | cut -d'/' -f2); \
@@ -239,6 +238,27 @@ container-docker: buildx # util target to build container images using docker bu
 		$(BUILDX_ACTION) \
 		$(CONTEXT_DIR) 
 
+container-docker-windows: # util target to build Windows container images without buildx. do not invoke directly.
+	os=$$(echo $(PLATFORM) | cut -d'/' -f1); \
+	arch=$$(echo $(PLATFORM) | cut -d'/' -f2); \
+	image_name=$$(basename $(IMAGE)); \
+	echo "Building $$image_name for $$os/$$arch "; \
+	docker build \
+		--platform $(PLATFORM) \
+		-f $(DOCKERFILE) \
+		--build-arg BUILDPLATFORM=$(PLATFORM) \
+		--build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
+		--build-arg GOARCH=$$arch \
+		--build-arg GOOS=$$os \
+		--build-arg OS_VERSION=$(OS_VERSION) \
+		--build-arg HUBBLE_VERSION=$(HUBBLE_VERSION) \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg REPO_PATH=$(REPO_PATH) \
+		--build-arg BINARIES_PATH=$(BINARIES_PATH) \
+		$(EXTRA_BUILD_ARGS) \
+		--target=$(TARGET) \
+		-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
+		$(CONTEXT_DIR)
 
 retina-image: ## build the retina linux container image.
 	echo "Building for $(PLATFORM)"
@@ -261,20 +281,24 @@ retina-image: ## build the retina linux container image.
 				TARGET=$$target; \
 	done
 
-retina-image-win: ## build the retina Windows container image.
+retina-image-win: build-windows-binaries ## build the retina Windows container image.
+# The Windows images are built on a corresponding Windows host without buildx.
+# This is done to mitigate CVE-2013-3900.
 	for year in $(WINDOWS_YEARS); do \
 		tag=$(TAG)-windows-ltsc$$year-amd64; \
-		echo "Building $(RETINA_PLATFORM_TAG)"; \
+		echo "Building $$tag"; \
 		set -e ; \
-		$(MAKE) container-$(CONTAINER_BUILDER) \
+		$(MAKE) container-docker-windows \
 				PLATFORM=windows/amd64 \
-				DOCKERFILE=controller/Dockerfile \
+				DOCKERFILE=controller/Dockerfile.windows-$$year \
 				REGISTRY=$(IMAGE_REGISTRY) \
 				IMAGE=$(RETINA_IMAGE) \
 				OS_VERSION=ltsc$$year \
 				VERSION=$(TAG) \
 				TAG=$$tag \
 				TARGET=agent-win \
+				REPO_PATH=$(REPO_PATH) \
+				BINARIES_PATH=$(BINARIES_PATH) \
 				CONTEXT_DIR=$(REPO_ROOT); \
 	done
 
@@ -361,9 +385,20 @@ all-gen: ## generate all code
 	$(MAKE) proto-gen
 	$(MAKE) go-gen
 
-build-windows-binaries:
-	GOOS=windows GOARCH=$(GOARCH) go build -v -o /go/bin/retina/captureworkload -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version=$(TAG) -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=$(APP_INSIGHTS_ID)" captureworkload/main.go
-	GOOS=windows GOARCH=$(GOARCH) go build -x -v -o /go/bin/retina/controller -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version=$(TAG) -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=$(APP_INSIGHTS_ID)" controller/main.go
+build-windows-binaries: ## Build Windows binaries
+	@echo "Building Windows binaries for $(GOARCH)..."
+	@mkdir -p $(BUILD_DIR)
+	CGO_ENABLED=0 GOOS=windows GOARCH=$(GOARCH) go build -v \
+		-o $(BUILD_DIR)/captureworkload.exe \
+		-ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version=$(TAG) \
+		-X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=$(APP_INSIGHTS_ID)" \
+		$(CAPTURE_WORKLOAD_DIR)/main.go
+	CGO_ENABLED=0 GOOS=windows GOARCH=$(GOARCH) go build -v \
+		-o $(BUILD_DIR)/controller.exe \
+		-ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version=$(TAG) \
+		-X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=$(APP_INSIGHTS_ID)" \
+		$(RETINA_DIR)/main.go
+	@echo "Windows binaries built successfully in $(BUILD_DIR)"
 
 ##@ Multiplatform
 
