@@ -130,6 +130,7 @@ jobs:
           docker push ghcr.io/${{ github.repository }}/retina-agent:${TAG}-windows-ltsc${{ matrix.year }}-${{ matrix.arch }}
               
       - name: Sign container image
+        shell: bash
         run: |
           for image in retina-agent ; do
             IMAGE_PATH="ghcr.io/${{ github.repository }}/$image:$TAG-windows-ltsc${{ matrix.year }}-${{ matrix.arch }}"
