@@ -2,9 +2,8 @@ name: Release Retina Container Images
 
 on:
   push:
-    branches: [main]
-    tags: ["v*"]
-  workflow_dispatch:
+    branches: [main, kamilp/release-windows]
+    # tags: ["v*"]
 
 permissions:
   contents: read
