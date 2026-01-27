@@ -1,5 +1,3 @@
-# Only applicable for windows images
-ARG OS_VERSION=ltsc2022
 # pinned base images
 
 # skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.4-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
@@ -10,13 +8,6 @@ FROM mcr.microsoft.com/azurelinux/base/core:3.0@sha256:35149ae8dd179684f969944f5
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/distroless/minimal:3.0 --format "{{.Name}}@{{.Digest}}"
 FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0@sha256:5a66f9f16ac675db2a8229dac72d83811b73b502d6ad192d8b374c7f3be498af AS azurelinux-distroless
-
-# skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2019  --override-os windows --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/windows/servercore@sha256:cd96c9b4873aba2f63716934ed5e535ec21c8d3dc32d29d9bc778be28f19cbfa AS ltsc2019
-
-# skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2022  --override-os windows --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/windows/servercore@sha256:86da395cfd2b35dbfc2e9d08719550c51b0570c394bff8f92622a19234766185 AS ltsc2022
-
 
 # build stages
 
@@ -56,7 +47,6 @@ ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
 RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/retina/captureworkload -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID="$APP_INSIGHTS_ID"" captureworkload/main.go
 
-
 # controller binary
 FROM intermediate AS controller-bin
 ARG APP_INSIGHTS_ID # set to enable AI telemetry
@@ -67,7 +57,6 @@ ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
 RUN --mount=type=cache,target="/root/.cache/go-build" go build -x -v -o /go/bin/retina/controller -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID="$APP_INSIGHTS_ID"" controller/main.go
 
-
 # init binary
 FROM intermediate AS init-bin
 ARG APP_INSIGHTS_ID # set to enable AI telemetry
@@ -77,7 +66,6 @@ ARG VERSION
 ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
 RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/retina/initretina -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID="$APP_INSIGHTS_ID"" init/retina/main_linux.go
-
 
 # tools image
 FROM azurelinux-core AS tools
@@ -116,7 +104,6 @@ COPY --from=tools /lib/ /lib
 COPY --from=tools /usr/lib/ /usr/lib
 ENTRYPOINT ["./retina/initretina"]
 
-
 # agent final image
 # mcr.microsoft.com/azurelinux/distroless/minimal:3.0
 # mcr.microsoft.com/azurelinux/distroless/minimal@sha256:0801b80a0927309572b9adc99bd1813bc680473175f6e8175cd4124d95dbd50c
@@ -132,13 +119,3 @@ COPY --from=tools /usr/local/hubble /bin/hubble
 # Set Hubble server.
 ENV HUBBLE_SERVER=unix:///var/run/cilium/hubble.sock
 ENTRYPOINT ["./retina/controller"]
-
-
-# agent final image for windows
-FROM ${OS_VERSION} AS agent-win
-COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
-COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
-COPY --from=controller-bin /go/bin/retina/controller controller.exe
-COPY --from=capture-bin /go/bin/retina/captureworkload captureworkload.exe
-ADD https://github.com/microsoft/etl2pcapng/releases/download/v1.10.0/etl2pcapng.exe /etl2pcapng.exe
-CMD ["controller.exe", "start", "--kubeconfig=.\\kubeconfig"]
