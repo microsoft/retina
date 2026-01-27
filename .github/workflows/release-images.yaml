@@ -79,10 +79,7 @@ jobs:
           make build-windows-binaries \
             GOOS=windows \
             GOARCH=amd64 \
-            TAG=$TAG \
-            APP_INSIGHTS_ID=${{ secrets.AZURE_APP_INSIGHTS_KEY }}
-        env:
-          APP_INSIGHTS_ID: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
+            TAG=$TAG
 
       - name: Upload Windows Binaries
         uses: actions/upload-artifact@v4
@@ -127,11 +124,9 @@ jobs:
               IMAGE_NAMESPACE=${{ github.repository }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
               WINDOWS_YEARS=${{ matrix.year }} \
-              IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
-              APP_INSIGHTS_ID=${{ secrets.AZURE_APP_INSIGHTS_KEY }} \
               BINARIES_PATH=output/windows_${{ matrix.arch }} \
               REPO_PATH=.
-          docker push ${{ vars.ACR_NAME }}/${{ github.repository }}/retina-agent:${TAG}-windows-ltsc${{ matrix.year }}-${{ matrix.arch }}
+          docker push ghcr.io/${{ github.repository }}/retina-agent:${TAG}-windows-ltsc${{ matrix.year }}-${{ matrix.arch }}
               
       - name: Sign container image
         run: |
