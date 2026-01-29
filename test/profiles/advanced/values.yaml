@@ -1,5 +1,6 @@
 enablePodLevel: true
 enableAnnotations: true
+enablePacketParserRingBuffer: true
 operator:
   enabled: true
   enableRetinaEndpoint: true
