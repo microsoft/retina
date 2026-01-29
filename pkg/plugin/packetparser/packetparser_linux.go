@@ -131,6 +131,38 @@ func (p *packetParser) Generate(ctx context.Context) error {
 	return nil
 }
 
+// validateRingBufferSize validates the ring buffer size and returns the adjusted size if necessary.
+// It also returns a reason for the adjustment, if any.
+func validateRingBufferSize(size uint32) (uint32, string) {
+	// Default to 8MB if not specified.
+	// This should match the default in pkg/plugin/packetparser/_cprog/packetparser.c
+	const defaultSize = 8 * 1024 * 1024
+	const maxSize = 1 * 1024 * 1024 * 1024 // 1GB
+	pageSize := uint32(os.Getpagesize())
+
+	// This is only for testing purposes where we can't reliably mock os.Getpagesize().
+	// In tests on some systems, page size might be different, but we assume > 0.
+	if pageSize == 0 {
+		pageSize = 4096
+	}
+
+	if size == 0 {
+		return defaultSize, ""
+	}
+	if size < pageSize {
+		return defaultSize, fmt.Sprintf("Ring buffer size (%d) is smaller than page size (%d), falling back to default (%d)", size, pageSize, defaultSize)
+	}
+	if size > maxSize {
+		return defaultSize, fmt.Sprintf("Ring buffer size (%d) is larger than allowed maximum (%d), falling back to default (%d)", size, maxSize, defaultSize)
+	}
+	// Check if size is a power of 2.
+	if (size & (size - 1)) != 0 {
+		return defaultSize, fmt.Sprintf("Ring buffer size (%d) is not a power of 2, falling back to default (%d)", size, defaultSize)
+	}
+
+	return size, ""
+}
+
 func (p *packetParser) Compile(ctx context.Context) error {
 	// Get the absolute path to this file during runtime.
 	dir, err := absPath()
@@ -165,11 +197,15 @@ func (p *packetParser) Compile(ctx context.Context) error {
 	}
 
 	if p.cfg.EnablePacketParserRingBuffer {
+		var reason string
+		p.cfg.PacketParserRingBufferSize, reason = validateRingBufferSize(p.cfg.PacketParserRingBufferSize)
+		if reason != "" {
+			p.l.Warn(reason)
+		}
+
 		p.l.Info("Compiling with Ring Buffer enabled", zap.Uint32("size", p.cfg.PacketParserRingBufferSize))
 		cflags = append(cflags, "-DUSE_RING_BUFFER")
-		if p.cfg.PacketParserRingBufferSize > 0 {
-			cflags = append(cflags, fmt.Sprintf("-DRING_BUFFER_SIZE=%d", p.cfg.PacketParserRingBufferSize))
-		}
+		cflags = append(cflags, fmt.Sprintf("-DRING_BUFFER_SIZE=%d", p.cfg.PacketParserRingBufferSize))
 	}
 
 	err = loader.CompileEbpf(ctx, cflags...)
