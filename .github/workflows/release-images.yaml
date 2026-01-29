@@ -82,7 +82,7 @@ jobs:
             TAG=$TAG
 
       - name: Upload Windows Binaries
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: windows-binaries
           path: output/windows_amd64/
