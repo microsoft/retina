@@ -44,6 +44,14 @@ struct bpf_dynptr;
 struct iphdr;
 struct ipv6hdr;
 
+#ifndef __bpf_fastcall
+#if __has_attribute(bpf_fastcall)
+#define __bpf_fastcall __attribute__((bpf_fastcall))
+#else
+#define __bpf_fastcall
+#endif
+#endif
+
 /*
  * bpf_map_lookup_elem
  *
@@ -203,17 +211,21 @@ static __u32 (* const bpf_get_prandom_u32)(void) = (void *) 7;
  * Returns
  * 	The SMP id of the processor running the program.
  */
-static __u32 (* const bpf_get_smp_processor_id)(void) = (void *) 8;
+static __bpf_fastcall __u32 (* const bpf_get_smp_processor_id)(void) = (void *) 8;
 
 /*
  * bpf_skb_store_bytes
  *
  * 	Store *len* bytes from address *from* into the packet
- * 	associated to *skb*, at *offset*. *flags* are a combination of
- * 	**BPF_F_RECOMPUTE_CSUM** (automatically recompute the
- * 	checksum for the packet after storing the bytes) and
- * 	**BPF_F_INVALIDATE_HASH** (set *skb*\ **->hash**, *skb*\
- * 	**->swhash** and *skb*\ **->l4hash** to 0).
+ * 	associated to *skb*, at *offset*. The *flags* are a combination
+ * 	of the following values:
+ *
+ * 	**BPF_F_RECOMPUTE_CSUM**
+ * 		Automatically update *skb*\ **->csum** after storing the
+ * 		bytes.
+ * 	**BPF_F_INVALIDATE_HASH**
+ * 		Set *skb*\ **->hash**, *skb*\ **->swhash** and *skb*\
+ * 		**->l4hash** to 0.
  *
  * 	A call to this helper is susceptible to change the underlying
  * 	packet buffer. Therefore, at load time, all checks on pointers
@@ -273,7 +285,8 @@ static long (* const bpf_l3_csum_replace)(struct __sk_buff *skb, __u32 offset, _
  * 	untouched (unless **BPF_F_MARK_ENFORCE** is added as well), and
  * 	for updates resulting in a null checksum the value is set to
  * 	**CSUM_MANGLED_0** instead. Flag **BPF_F_PSEUDO_HDR** indicates
- * 	the checksum is to be computed against a pseudo-header.
+ * 	that the modified header field is part of the pseudo-header.
+ * 	Flag **BPF_F_IPV6** should be set for IPv6 packets.
  *
  * 	This helper works in combination with **bpf_csum_diff**\ (),
  * 	which does not update the checksum in-place, but offers more
@@ -676,7 +689,7 @@ static __u32 (* const bpf_get_route_realm)(struct __sk_buff *skb) = (void *) 24;
  * 	into it. An example is available in file
  * 	*samples/bpf/trace_output_user.c* in the Linux kernel source
  * 	tree (the eBPF program counterpart is in
- * 	*samples/bpf/trace_output_kern.c*).
+ * 	*samples/bpf/trace_output.bpf.c*).
  *
  * 	**bpf_perf_event_output**\ () achieves better performance
  * 	than **bpf_trace_printk**\ () for sharing data with user
@@ -1224,7 +1237,7 @@ static long (* const bpf_set_hash)(struct __sk_buff *skb, __u32 hash) = (void *)
  * 	  **TCP_SYNCNT**, **TCP_USER_TIMEOUT**, **TCP_NOTSENT_LOWAT**,
  * 	  **TCP_NODELAY**, **TCP_MAXSEG**, **TCP_WINDOW_CLAMP**,
  * 	  **TCP_THIN_LINEAR_TIMEOUTS**, **TCP_BPF_DELACK_MAX**,
- * 	  **TCP_BPF_RTO_MIN**.
+ * 	  **TCP_BPF_RTO_MIN**, **TCP_BPF_SOCK_OPS_CB_FLAGS**.
  * 	* **IPPROTO_IP**, which supports *optname* **IP_TOS**.
  * 	* **IPPROTO_IPV6**, which supports the following *optname*\ s:
  * 	  **IPV6_TCLASS**, **IPV6_AUTOFLOWLABEL**.
@@ -1510,10 +1523,6 @@ static long (* const bpf_getsockopt)(void *bpf_socket, int level, int optname, v
  * 	with the **CONFIG_BPF_KPROBE_OVERRIDE** configuration
  * 	option, and in this case it only works on functions tagged with
  * 	**ALLOW_ERROR_INJECTION** in the kernel code.
- *
- * 	Also, the helper is only available for the architectures having
- * 	the CONFIG_FUNCTION_ERROR_INJECTION option. As of this writing,
- * 	x86 architecture is the only one to support this feature.
  *
  * Returns
  * 	0
@@ -3549,7 +3558,7 @@ static int (* const bpf_inode_storage_delete)(void *map, void *inode) = (void *)
  * 	including the trailing NUL character. On error, a negative
  * 	value.
  */
-static long (* const bpf_d_path)(struct path *path, char *buf, __u32 sz) = (void *) 147;
+static long (* const bpf_d_path)(const struct path *path, char *buf, __u32 sz) = (void *) 147;
 
 /*
  * bpf_copy_from_user
@@ -3697,6 +3706,9 @@ static void *(* const bpf_this_cpu_ptr)(const void *percpu_ptr) = (void *) 154;
  * 	that the redirection happens to the *ifindex*' peer device and
  * 	the netns switch takes place from ingress to ingress without
  * 	going through the CPU's backlog queue.
+ *
+ * 	*skb*\ **->mark** and *skb*\ **->tstamp** are not cleared during
+ * 	the netns switch.
  *
  * 	The *flags* argument is reserved and must be 0. The helper is
  * 	currently only supported for tc BPF program types at the
@@ -4220,7 +4232,7 @@ static long (* const bpf_find_vma)(struct task_struct *task, __u64 addr, void *c
  * 	Currently, the **flags** must be 0. Currently, nr_loops is
  * 	limited to 1 << 23 (~8 million) loops.
  *
- * 	long (\*callback_fn)(u32 index, void \*ctx);
+ * 	long (\*callback_fn)(u64 index, void \*ctx);
  *
  * 	where **index** is the current index in the loop. The index
  * 	is zero-indexed.
@@ -4424,9 +4436,10 @@ static long (* const bpf_ima_file_hash)(struct file *file, void *dst, __u32 size
 /*
  * bpf_kptr_xchg
  *
- * 	Exchange kptr at pointer *map_value* with *ptr*, and return the
- * 	old value. *ptr* can be NULL, otherwise it must be a referenced
- * 	pointer which will be released when this helper is called.
+ * 	Exchange kptr at pointer *dst* with *ptr*, and return the old value.
+ * 	*dst* can be map value or local kptr. *ptr* can be NULL, otherwise
+ * 	it must be a referenced pointer which will be released when this helper
+ * 	is called.
  *
  * Returns
  * 	The old value of kptr (which can be NULL). The returned pointer
@@ -4434,7 +4447,7 @@ static long (* const bpf_ima_file_hash)(struct file *file, void *dst, __u32 size
  * 	corresponding release function, or moved into a BPF map before
  * 	program exit.
  */
-static void *(* const bpf_kptr_xchg)(void *map_value, void *ptr) = (void *) 194;
+static void *(* const bpf_kptr_xchg)(void *dst, void *ptr) = (void *) 194;
 
 /*
  * bpf_map_lookup_percpu_elem

@@ -167,6 +167,9 @@ LIBBPF_API const char *btf__str_by_offset(const struct btf *btf, __u32 offset);
 LIBBPF_API struct btf_ext *btf_ext__new(const __u8 *data, __u32 size);
 LIBBPF_API void btf_ext__free(struct btf_ext *btf_ext);
 LIBBPF_API const void *btf_ext__raw_data(const struct btf_ext *btf_ext, __u32 *size);
+LIBBPF_API enum btf_endianness btf_ext__endianness(const struct btf_ext *btf_ext);
+LIBBPF_API int btf_ext__set_endianness(struct btf_ext *btf_ext,
+				       enum btf_endianness endian);
 
 LIBBPF_API int btf__find_str(struct btf *btf, const char *s);
 LIBBPF_API int btf__add_str(struct btf *btf, const char *s);
@@ -224,6 +227,7 @@ LIBBPF_API int btf__add_volatile(struct btf *btf, int ref_type_id);
 LIBBPF_API int btf__add_const(struct btf *btf, int ref_type_id);
 LIBBPF_API int btf__add_restrict(struct btf *btf, int ref_type_id);
 LIBBPF_API int btf__add_type_tag(struct btf *btf, const char *value, int ref_type_id);
+LIBBPF_API int btf__add_type_attr(struct btf *btf, const char *value, int ref_type_id);
 
 /* func and func_proto construction APIs */
 LIBBPF_API int btf__add_func(struct btf *btf, const char *name,
@@ -240,6 +244,8 @@ LIBBPF_API int btf__add_datasec_var_info(struct btf *btf, int var_type_id,
 /* tag construction API */
 LIBBPF_API int btf__add_decl_tag(struct btf *btf, const char *value, int ref_type_id,
 			    int component_idx);
+LIBBPF_API int btf__add_decl_attr(struct btf *btf, const char *value, int ref_type_id,
+				  int component_idx);
 
 struct btf_dedup_opts {
 	size_t sz;
@@ -286,7 +292,7 @@ LIBBPF_API void btf_dump__free(struct btf_dump *d);
 LIBBPF_API int btf_dump__dump_type(struct btf_dump *d, __u32 id);
 
 struct btf_dump_emit_type_decl_opts {
-	/* size of this struct, for forward/backward compatiblity */
+	/* size of this struct, for forward/backward compatibility */
 	size_t sz;
 	/* optional field name for type declaration, e.g.:
 	 * - struct my_struct <FNAME>
@@ -320,9 +326,10 @@ struct btf_dump_type_data_opts {
 	bool compact;		/* no newlines/indentation */
 	bool skip_names;	/* skip member/type names */
 	bool emit_zeroes;	/* show 0-valued fields */
+	bool emit_strings;	/* print char arrays as strings */
 	size_t :0;
 };
-#define btf_dump_type_data_opts__last_field emit_zeroes
+#define btf_dump_type_data_opts__last_field emit_strings
 
 LIBBPF_API int
 btf_dump__dump_type_data(struct btf_dump *d, __u32 id,
