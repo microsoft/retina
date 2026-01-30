@@ -281,3 +281,33 @@ int host_egress_filter(struct __sk_buff *skb)
 	// Always return TC_ACT_UNSPEC to allow packet to pass to the next BPF program.
 	return TC_ACT_UNSPEC;
 }
+
+// TCX-compatible sections (kernel 6.6+)
+// These sections can be used with the newer TCX attachment mechanism
+SEC("tcx/ingress")
+int tcx_endpoint_ingress_filter(struct __sk_buff *skb)
+{
+	parse(skb, OBSERVATION_POINT_FROM_ENDPOINT);
+	return TC_ACT_UNSPEC;
+}
+
+SEC("tcx/egress")
+int tcx_endpoint_egress_filter(struct __sk_buff *skb)
+{
+	parse(skb, OBSERVATION_POINT_TO_ENDPOINT);
+	return TC_ACT_UNSPEC;
+}
+
+SEC("tcx/ingress")
+int tcx_host_ingress_filter(struct __sk_buff *skb)
+{
+	parse(skb, OBSERVATION_POINT_FROM_NETWORK);
+	return TC_ACT_UNSPEC;
+}
+
+SEC("tcx/egress")
+int tcx_host_egress_filter(struct __sk_buff *skb)
+{
+	parse(skb, OBSERVATION_POINT_TO_NETWORK);
+	return TC_ACT_UNSPEC;
+}
