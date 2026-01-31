@@ -28,6 +28,9 @@ jobs:
         if: env.IS_NOT_MERGE_GROUP
         with:
           go-version-file: go.mod
+      - name: Check BPF object stubs
+        if: env.IS_NOT_MERGE_GROUP
+        run: make lint-bpf-objects
       - name: golangci-lint
         if: env.IS_NOT_MERGE_GROUP
         uses: golangci/golangci-lint-action@v9

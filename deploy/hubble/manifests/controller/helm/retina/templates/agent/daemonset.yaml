@@ -124,7 +124,7 @@ spec:
             - name: cilium
               mountPath: /var/run/cilium
             - name: host-os-release
-              mountPath: /etc/os-release  
+              mountPath: /etc/os-release
           {{- if .Values.hubble.tls.enabled }}
             - name: tls
               mountPath: /var/lib/cilium/tls/hubble
@@ -154,7 +154,7 @@ spec:
       - name: host-os-release
         hostPath:
           path: /etc/os-release
-          type: FileOrCreate   
+          type: FileOrCreate
       {{- if .Values.hubble.tls.enabled }}
       - name: tls
         projected:

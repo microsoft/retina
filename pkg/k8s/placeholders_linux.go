@@ -66,7 +66,11 @@ func (w *internalconfigs) KVstoreEnabledWithoutPodNetworkSupport() bool {
 
 type identityAllocatorOwner struct{}
 
-func (i *identityAllocatorOwner) UpdateIdentities(identity.IdentityMap, identity.IdentityMap) {}
+func (i *identityAllocatorOwner) UpdateIdentities(identity.IdentityMap, identity.IdentityMap) <-chan struct{} {
+	ch := make(chan struct{})
+	close(ch)
+	return ch
+}
 
 func (i *identityAllocatorOwner) GetNodeSuffix() string {
 	return ""
@@ -166,11 +170,15 @@ func (n *NoOpPolicyRepository) ReplaceByLabels(api.Rules, []labels.LabelArray) (
 	return nil, 0, 0
 }
 
-func (n *NoOpPolicyRepository) Search(labels.LabelArray) (r api.Rules, i uint64) {
+func (n *NoOpPolicyRepository) Search(labels.LabelArray) (api.Rules, uint64) {
 	return nil, 0
 }
 
 func (n *NoOpPolicyRepository) SetEnvoyRulesFunc(func(certificatemanager.SecretManager, *api.L7Rules, string, string) (*cilium.HttpNetworkPolicyRules, bool)) {
+}
+
+func (n *NoOpPolicyRepository) GetPolicySnapshot() map[identity.NumericIdentity]policy.SelectorPolicy {
+	return nil
 }
 
 type NoOpOrchestrator struct{}
@@ -196,3 +204,9 @@ func (n *NoOpOrchestrator) WriteEndpointConfig(io.Writer, datapathtypes.Endpoint
 }
 
 func (n *NoOpOrchestrator) Unload(datapathtypes.Endpoint) {}
+
+func (n *NoOpOrchestrator) DatapathInitialized() <-chan struct{} {
+	ch := make(chan struct{})
+	close(ch)
+	return ch
+}

@@ -13,7 +13,10 @@ import (
 	"path"
 	"runtime"
 	"sync"
+	"unsafe"
 
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
@@ -120,6 +123,12 @@ func (p *packetParser) Generate(ctx context.Context) error {
 	// Process packetparser sampling rate.
 	p.l.Info("sampling rate", zap.Uint32("rate", p.cfg.DataSamplingRate))
 	st += fmt.Sprintf("#define DATA_SAMPLING_RATE %d\n", p.cfg.DataSamplingRate)
+
+	// Process DNS parsing flag.
+	if p.cfg.EnableDNSParsing {
+		p.l.Info("DNS parsing enabled in packetparser")
+		st += "#define ENABLE_DNS_PARSING 1\n"
+	}
 
 	// Generate dynamic header for packetparser.
 	err = loader.WriteFile(ctx, dynamicHeaderPath, st)
@@ -652,6 +661,11 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 				utils.AddTCPID(meta, uint64(tcpMetadata.Tsecr))
 			}
 
+			// Process DNS packets if DNS parsing is enabled
+			if p.cfg.EnableDNSParsing && bpfEvent.IsDns == 1 {
+				p.processDNSPacket(record.RawSample, &bpfEvent, fl, meta)
+			}
+
 			// Add metadata to the flow.
 			utils.AddRetinaMetadata(fl, meta)
 
@@ -730,4 +744,87 @@ func absPath() (string, error) {
 	}
 	dir := path.Dir(filename)
 	return dir, nil
+}
+
+// processDNSPacket handles DNS packet processing for flow enrichment.
+// It extracts DNS metadata from the packet data and adds it to the flow.
+func (p *packetParser) processDNSPacket(rawSample []byte, event *packetparserPacket, fl *flow.Flow, meta *utils.RetinaMetadata) {
+	// Calculate the size of the packet struct
+	eventSize := int(unsafe.Sizeof(*event))
+
+	// The packet data follows the event struct
+	if len(rawSample) <= eventSize {
+		p.l.Debug("No packet data appended for DNS packet")
+		return
+	}
+
+	packetData := rawSample[eventSize:]
+
+	// Use dns_off to find DNS payload within the packet
+	dnsOff := int(event.DnsMetadata.DnsOff)
+	if dnsOff >= len(packetData) {
+		p.l.Debug("DNS offset beyond packet data", zap.Int("dns_off", dnsOff), zap.Int("packet_len", len(packetData)))
+		return
+	}
+
+	dnsPayload := packetData[dnsOff:]
+
+	// Parse DNS payload to extract query name, types, and addresses
+	dnsName, qTypes, addresses := p.parseDNSPayload(dnsPayload, event.DnsMetadata.Qr == 1)
+
+	// Determine if query or response
+	var qrStr string
+	if event.DnsMetadata.Qr == 0 {
+		qrStr = "Q"
+		metrics.DNSRequestCounter.WithLabelValues().Inc()
+	} else {
+		qrStr = "R"
+		metrics.DNSResponseCounter.WithLabelValues().Inc()
+	}
+
+	// Add DNS info to the flow
+	utils.AddDNSInfo(fl, meta, qrStr, uint32(event.DnsMetadata.Rcode), dnsName, qTypes, int(event.DnsMetadata.Ancount), addresses)
+}
+
+// parseDNSPayload parses the DNS payload and extracts the query name, query types,
+// and response addresses (for responses).
+func (p *packetParser) parseDNSPayload(payload []byte, isResponse bool) (dnsName string, qTypes []string, addresses []string) {
+	if len(payload) < 12 { // Minimum DNS header size
+		return "", nil, nil
+	}
+
+	// Use gopacket to parse the DNS layer
+	dns := &layers.DNS{}
+	if err := dns.DecodeFromBytes(payload, gopacket.NilDecodeFeedback); err != nil {
+		p.l.Debug("Failed to parse DNS payload", zap.Error(err))
+		return "", nil, nil
+	}
+
+	// Extract query name from questions
+	if len(dns.Questions) > 0 {
+		dnsName = string(dns.Questions[0].Name)
+		for _, q := range dns.Questions {
+			qTypes = append(qTypes, q.Type.String())
+		}
+	}
+
+	// For responses, extract answer addresses
+	if isResponse {
+		for _, ans := range dns.Answers {
+			switch ans.Type {
+			case layers.DNSTypeA:
+				if ans.IP != nil {
+					addresses = append(addresses, ans.IP.String())
+				}
+			case layers.DNSTypeAAAA:
+				if ans.IP != nil {
+					addresses = append(addresses, ans.IP.String())
+				}
+			case layers.DNSTypeCNAME:
+				addresses = append(addresses, string(ans.CNAME))
+			}
+		}
+	}
+
+	return dnsName, qTypes, addresses
 }

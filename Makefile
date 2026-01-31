@@ -10,8 +10,8 @@ REPO_ROOT = $(shell git rev-parse --show-toplevel)
 ifndef TAG
 	TAG ?= $(shell git describe --tags --always)
 endif
-OUTPUT_DIR = $(REPO_ROOT)/output
-ARTIFACTS_DIR = $(REPO_ROOT)/artifacts
+OUTPUT_DIR = $(REPO_ROOT)/.output
+ARTIFACTS_DIR = $(REPO_ROOT)/.artifacts
 BUILD_DIR = $(OUTPUT_DIR)/$(GOOS)_$(GOARCH)
 RETINA_BUILD_DIR = $(BUILD_DIR)/retina
 RETINA_DIR = $(REPO_ROOT)/controller
@@ -144,6 +144,20 @@ lint: ## Fast lint vs default branch showing only new issues.
 
 lint-existing: ## Lint the current branch in entirety.
 	$(GOLANGCI_LINT) run -v $(LINT_PKG)/...
+
+lint-bpf-objects: ## Check that committed .o files are empty stubs (build generates real ones).
+	@echo "Checking for non-empty .o files..."
+	@non_empty=$$(git ls-files '*.o' | xargs -I{} sh -c 'test -s "{}" && echo "{}"'); \
+	if [ -n "$$non_empty" ]; then \
+		echo "ERROR: The following .o files must be empty stubs:"; \
+		echo "$$non_empty"; \
+		echo "Run 'make empty-bpf-objects' to fix."; \
+		exit 1; \
+	fi
+	@echo "All .o files are empty stubs. OK."
+
+empty-bpf-objects: ## Empty all tracked .o files (they are stubs for the linter).
+	git ls-files '*.o' | xargs -I{} truncate -s 0 {}
 
 clean: ## clean build artifacts
 	$(RMDIR) $(OUTPUT_DIR)

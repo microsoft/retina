@@ -11,7 +11,6 @@ import (
 	"github.com/cilium/cilium/pkg/monitor/agent/listener"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/hive/cell"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 )
 
@@ -24,7 +23,7 @@ var (
 		cell.Config(defaultConfig),
 	)
 
-	log = logging.DefaultLogger.WithField(logfields.LogSubsys, "monitor-agent")
+	log = logging.DefaultSlogLogger.With(logfields.LogSubsys, "monitor-agent")
 )
 
 type AgentConfig struct {
@@ -48,7 +47,6 @@ type agentParams struct {
 	cell.In
 
 	Lifecycle cell.Lifecycle
-	Log       logrus.FieldLogger
 	Config    AgentConfig
 }
 

@@ -1,55 +1,43 @@
-# If you prefer the allow list template instead of the deny list, see community template:
-# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
-#
-# Binaries for programs and plugins
+# Binaries
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-
-# Avoid checking in keys
-*.pem
-
-# Test binary, built with `go test -c`
 *.test
+*.o
+bin/
+dist/
 
-# Output of the go coverage tool, specifically when used with LiteIDE
-*.out
-
-# logs
-*.log
-
-# Dependency directories (remove the comment below to include it)
-# vendor/
-
-# Go workspace file
+# Go
 go.work
 
-# Object files
-*.o
+# Keys and certificates
+*.pem
+.certs/
 
-# docusaurus
+# Logs and output
+*.log
+*.out
+.output/
+
+# Test artifacts
+*results*.json
+netperf-*.json
+netperf-*.csv
+image-metadata-*.json
+*packetmonitorsupport*/
+test-summary
+
+# Build artifacts
+.artifacts/
+
+# Documentation site
 site/yarn.lock
 site/.docusaurus/
 site/node_modules/
 
-output
-#vscode 
+# IDE and editor
 .vscode/
-
-dist/
-bin/
-
-image-metadata-*.json
-*packetmonitorsupport*/
-*.pem
-*results*.json
-netperf-*.json
-netperf-*.csv
-
-.certs/
-
-artifacts/
-
-test-summary
+.clangd
+.clang-format

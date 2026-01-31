@@ -1,6 +1,7 @@
 package nodereconciler
 
 import (
+	"log/slog"
 	"os"
 
 	datapath "github.com/cilium/cilium/pkg/datapath/types"
@@ -10,7 +11,6 @@ import (
 	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -20,10 +20,10 @@ var Cell = cell.Module(
 	"Node Controller monitors Node CRUD events",
 	cell.Provide(newNodeController),
 	// Setting up the node controller with the controller manager
-	cell.Invoke(func(l logrus.FieldLogger, nr *NodeReconciler, ctrlManager ctrl.Manager) error {
+	cell.Invoke(func(l *slog.Logger, nr *NodeReconciler, ctrlManager ctrl.Manager) error {
 		l.Info("Setting up node controller with manager")
 		if err := nr.SetupWithManager(ctrlManager); err != nil {
-			l.Errorf("failed to setup node controller with manager: %v", err)
+			l.Error("failed to setup node controller with manager", "error", err)
 			return errors.Wrap(err, "failed to setup node controller with manager")
 		}
 		return nil

@@ -31,6 +31,12 @@ const (
 	TCPFlagNS
 )
 
+// DNS port constants
+const (
+	DNSPort     uint16 = 53   // Standard DNS port
+	DNSMDNSPort uint16 = 5353 // Multicast DNS port
+)
+
 const (
 	name                  string = "packetparser"
 	toEndpoint            string = "toEndpoint"

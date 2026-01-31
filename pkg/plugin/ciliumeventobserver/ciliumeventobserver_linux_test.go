@@ -4,6 +4,7 @@ package ciliumeventobserver
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net"
 	"testing"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"github.com/microsoft/retina/pkg/controllers/cache"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
+	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/pubsub"
 	"gotest.tools/assert"
 )
@@ -99,6 +101,7 @@ func TestParse(t *testing.T) {
 	ctxWithCancel, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
+	metrics.InitializeMetrics(slog.Default())
 	cfg := &config.Config{
 		EnablePodLevel: true,
 	}

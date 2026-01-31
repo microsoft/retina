@@ -42,10 +42,6 @@ func InitGlobalFlags(cmd *cobra.Command, vp *viper.Viper) {
 	// NOTE: without this the option gets overridden from the default value to the zero value via option.Config.Populate(vp)
 	// specifically, here options.Config.AllocatorListTimeout gets overridden from the default value to 0s
 	flags.Duration(option.AllocatorListTimeoutName, defaults.AllocatorListTimeout, "timeout to list initial allocator state")
-	// similar overriding happens for option.Config.KVstoreConnectivityTimeout
-	flags.Duration(option.KVstoreConnectivityTimeout, defaults.KVstoreConnectivityTimeout, "Time after which an incomplete kvstore operation  is considered failed")
-	// similar overriding happens for option.Config.KVstorePeriodicSync
-	flags.Duration(option.KVstorePeriodicSync, defaults.KVstorePeriodicSync, "Periodic KVstore synchronization interval")
 
 	flags.Duration(operatorOption.EndpointGCInterval, operatorOption.EndpointGCIntervalDefault, "GC interval for cilium endpoints")
 	option.BindEnv(vp, operatorOption.EndpointGCInterval)

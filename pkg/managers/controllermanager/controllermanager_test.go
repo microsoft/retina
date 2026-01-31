@@ -5,6 +5,7 @@ package controllermanager
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -33,7 +34,7 @@ func TestNewControllerManager(t *testing.T) {
 
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	kubeclient := k8sfake.NewSimpleClientset()
-	cm, err := NewControllerManager(c, kubeclient, telemetry.NewNoopTelemetry())
+	cm, err := NewControllerManager(c, kubeclient, telemetry.NewNoopTelemetry(), slog.Default())
 	assert.NoError(t, err, "Expected no error, instead got %+v", err)
 	assert.NotNil(t, cm)
 }
@@ -45,7 +46,7 @@ func TestNewControllerManagerWin(t *testing.T) {
 
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	kubeclient := k8sfake.NewSimpleClientset()
-	cm, err := NewControllerManager(c, kubeclient, telemetry.NewNoopTelemetry())
+	cm, err := NewControllerManager(c, kubeclient, telemetry.NewNoopTelemetry(), slog.Default())
 	assert.Error(t, err, "Expected error of not recognising windows plugins in linux, instead got no error")
 	assert.Nil(t, cm)
 }
@@ -57,7 +58,7 @@ func TestNewControllerManagerInit(t *testing.T) {
 
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	kubeclient := k8sfake.NewSimpleClientset()
-	cm, err := NewControllerManager(c, kubeclient, telemetry.NewNoopTelemetry())
+	cm, err := NewControllerManager(c, kubeclient, telemetry.NewNoopTelemetry(), slog.Default())
 	assert.NoError(t, err, "Expected no error, instead got %+v", err)
 	assert.NotNil(t, cm)
 
@@ -72,7 +73,7 @@ func TestControllerPluginManagerStartFail(t *testing.T) {
 
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	kubeclient := k8sfake.NewSimpleClientset()
-	cm, err := NewControllerManager(c, kubeclient, telemetry.NewNoopTelemetry())
+	cm, err := NewControllerManager(c, kubeclient, telemetry.NewNoopTelemetry(), slog.Default())
 	assert.NoError(t, err, "Expected no error, instead got %+v", err)
 	assert.NotNil(t, cm)
 
@@ -86,7 +87,7 @@ func TestControllerPluginManagerStartFail(t *testing.T) {
 		EnablePodLevel:  true,
 		EnabledPlugin:   []string{pluginName},
 	}
-	mgr, err := pm.NewPluginManager(cfg, telemetry.NewNoopTelemetry())
+	mgr, err := pm.NewPluginManager(cfg, telemetry.NewNoopTelemetry(), slog.Default())
 	require.NoError(t, err, "Expected no error, instead got %+v", err)
 
 	mockPlugin := plugin.NewMockPlugin(ctl)

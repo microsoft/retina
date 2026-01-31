@@ -4,12 +4,11 @@ package ciliumutil
 
 import (
 	"context"
+	"log/slog"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
-
-	"github.com/sirupsen/logrus"
 
 	v2 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2"
 	ciliumv2 "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned/typed/cilium.io/v2"
@@ -23,14 +22,14 @@ var _ ciliumv2.CiliumIdentityInterface = &MockIdentityClient{}
 // - CRDBackend within the Allocator within the IdentityManager
 // - identitygc cell
 type MockIdentityClient struct {
-	l logrus.FieldLogger
+	l *slog.Logger
 	// identities maps identity name to identity
 	// namespace is irrelevant since identity names must be globally unique numbers
 	identities map[string]*v2.CiliumIdentity
 	watchers   []watch.Interface
 }
 
-func NewMockIdentityClient(l logrus.FieldLogger) *MockIdentityClient {
+func NewMockIdentityClient(l *slog.Logger) *MockIdentityClient {
 	return &MockIdentityClient{
 		l:          l,
 		identities: make(map[string]*v2.CiliumIdentity),
