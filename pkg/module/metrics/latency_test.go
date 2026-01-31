@@ -122,20 +122,20 @@ func TestProcessFlow(t *testing.T) {
 	 */
 	// Node -> Api server.
 	f1 := utils.ToFlow(l, t1, apiSeverIp, nodeIp, 80, 443, 6, 3, 0)
-	metaf1 := &utils.RetinaMetadata{}
-	utils.AddTCPID(metaf1, 1234)
+	ext1 := utils.NewExtensions()
+	utils.AddTCPID(ext1, 1234)
 	utils.AddTCPFlags(f1, 1, 0, 0, 0, 0, 0, 0, 0, 0)
-	utils.AddRetinaMetadata(f1, metaf1)
+	utils.SetExtensions(f1, ext1)
 	f1.Destination = &flow.Endpoint{
 		PodName: "kubernetes-apiserver",
 	}
 
 	// Api server -> Node.
 	f2 := utils.ToFlow(l, t2, nodeIp, apiSeverIp, 443, 80, 6, 2, 0)
-	metaf2 := &utils.RetinaMetadata{}
-	utils.AddTCPID(metaf2, 1234)
+	ext2 := utils.NewExtensions()
+	utils.AddTCPID(ext2, 1234)
 	utils.AddTCPFlags(f2, 1, 1, 0, 0, 0, 0, 0, 0, 0)
-	utils.AddRetinaMetadata(f2, metaf2)
+	utils.SetExtensions(f2, ext2)
 	f2.Source = &flow.Endpoint{
 		PodName: "kubernetes-apiserver",
 	}

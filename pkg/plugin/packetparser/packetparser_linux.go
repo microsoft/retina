@@ -18,6 +18,7 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/pkg/errors"
+	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"github.com/cilium/cilium/api/v1/flow"
@@ -617,14 +618,14 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 			// Add the traffic direction to the flow.
 			fl.TrafficDirection = flow.TrafficDirection(bpfEvent.TrafficDirection)
 
-			meta := &utils.RetinaMetadata{}
+			ext := utils.NewExtensions()
 
-			// Add packet size to the flow's metadata.
-			utils.AddPacketSize(meta, bpfEvent.Bytes)
+			// Add packet size to the flow's extensions.
+			utils.AddPacketSize(ext, bpfEvent.Bytes)
 
-			// Add previously observed byte and packet counts to the flow's metadata
-			utils.AddPreviouslyObservedBytes(meta, bpfEvent.PreviouslyObservedBytes)
-			utils.AddPreviouslyObservedPackets(meta, bpfEvent.PreviouslyObservedPackets)
+			// Add previously observed byte and packet counts to the flow's extensions
+			utils.AddPreviouslyObservedBytes(ext, bpfEvent.PreviouslyObservedBytes)
+			utils.AddPreviouslyObservedPackets(ext, bpfEvent.PreviouslyObservedPackets)
 
 			// Add the TCP metadata to the flow.
 			tcpMetadata := bpfEvent.TcpMetadata
@@ -641,7 +642,7 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 				uint16((bpfEvent.Flags&TCPFlagNS)>>8),  // nolint:gomnd // 8 is the offset for NS.
 			)
 			utils.AddPreviouslyObservedTCPFlags(
-				meta,
+				ext,
 				bpfEvent.PreviouslyObservedFlags.Syn,
 				bpfEvent.PreviouslyObservedFlags.Ack,
 				bpfEvent.PreviouslyObservedFlags.Fin,
@@ -656,18 +657,18 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 			// For packets originating from node, we use tsval as the tcpID.
 			// Packets coming back has the tsval echoed in tsecr.
 			if fl.GetTraceObservationPoint() == flow.TraceObservationPoint_TO_NETWORK {
-				utils.AddTCPID(meta, uint64(tcpMetadata.Tsval))
+				utils.AddTCPID(ext, uint64(tcpMetadata.Tsval))
 			} else if fl.GetTraceObservationPoint() == flow.TraceObservationPoint_FROM_NETWORK {
-				utils.AddTCPID(meta, uint64(tcpMetadata.Tsecr))
+				utils.AddTCPID(ext, uint64(tcpMetadata.Tsecr))
 			}
 
 			// Process DNS packets if DNS parsing is enabled
 			if p.cfg.EnableDNSParsing && bpfEvent.IsDns == 1 {
-				p.processDNSPacket(record.RawSample, &bpfEvent, fl, meta)
+				p.processDNSPacket(record.RawSample, &bpfEvent, fl, ext)
 			}
 
-			// Add metadata to the flow.
-			utils.AddRetinaMetadata(fl, meta)
+			// Set extensions on the flow.
+			utils.SetExtensions(fl, ext)
 
 			// Write the event to the enricher.
 			ev := &v1.Event{
@@ -748,7 +749,7 @@ func absPath() (string, error) {
 
 // processDNSPacket handles DNS packet processing for flow enrichment.
 // It extracts DNS metadata from the packet data and adds it to the flow.
-func (p *packetParser) processDNSPacket(rawSample []byte, event *packetparserPacket, fl *flow.Flow, meta *utils.RetinaMetadata) {
+func (p *packetParser) processDNSPacket(rawSample []byte, event *packetparserPacket, fl *flow.Flow, ext *structpb.Struct) {
 	// Calculate the size of the packet struct
 	eventSize := int(unsafe.Sizeof(*event))
 
@@ -783,7 +784,7 @@ func (p *packetParser) processDNSPacket(rawSample []byte, event *packetparserPac
 	}
 
 	// Add DNS info to the flow
-	utils.AddDNSInfo(fl, meta, qrStr, uint32(event.DnsMetadata.Rcode), dnsName, qTypes, int(event.DnsMetadata.Ancount), addresses)
+	utils.AddDNSInfo(fl, ext, qrStr, uint32(event.DnsMetadata.Rcode), dnsName, qTypes, int(event.DnsMetadata.Ancount), addresses)
 }
 
 // parseDNSPayload parses the DNS payload and extracts the query name, query types,

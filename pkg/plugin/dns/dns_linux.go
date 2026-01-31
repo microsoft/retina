@@ -323,9 +323,9 @@ func (d *dns) handleDNSEvent(record perf.Record) {
 	}
 
 	// Add DNS metadata
-	meta := &utils.RetinaMetadata{}
-	utils.AddDNSInfo(fl, meta, qrStr, uint32(event.Rcode), dnsName, qTypes, int(event.Ancount), addresses)
-	utils.AddRetinaMetadata(fl, meta)
+	ext := utils.NewExtensions()
+	utils.AddDNSInfo(fl, ext, qrStr, uint32(event.Rcode), dnsName, qTypes, int(event.Ancount), addresses)
+	utils.SetExtensions(fl, ext)
 
 	ev := &v1.Event{
 		Event:     fl,

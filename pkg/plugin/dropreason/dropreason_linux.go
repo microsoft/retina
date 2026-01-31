@@ -318,16 +318,16 @@ func (dr *dropReason) processRecord(ctx context.Context, id int) {
 			// IsReply is not applicable for DROPPED verdicts.
 			fl.IsReply = nil
 
-			meta := &utils.RetinaMetadata{}
+			ext := utils.NewExtensions()
 
-			// Add drop reason to the flow's metadata.
-			utils.AddDropReason(fl, meta, bpfEvent.DropType)
+			// Add drop reason to the flow's extensions.
+			utils.AddDropReason(fl, ext, bpfEvent.DropType)
 
-			// Add packet size to the flow's metadata.
-			utils.AddPacketSize(meta, bpfEvent.SkbLen)
+			// Add packet size to the flow's extensions.
+			utils.AddPacketSize(ext, bpfEvent.SkbLen)
 
-			// Add metadata to the flow.
-			utils.AddRetinaMetadata(fl, meta)
+			// Set extensions on the flow.
+			utils.SetExtensions(fl, ext)
 
 			// This is only for development purposes.
 			// Removing this makes logs way too chatter-y.
