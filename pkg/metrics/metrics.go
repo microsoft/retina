@@ -3,16 +3,17 @@
 package metrics
 
 import (
+	"log/slog"
+
 	"github.com/microsoft/retina/pkg/exporter"
-	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 )
 
 // Initiates and creates the common metrics
-func InitializeMetrics() {
-	metricsLogger = log.Logger().Named("metrics")
+func InitializeMetrics(logger *slog.Logger) {
+	metricsLogger = logger.With("module", "metrics")
 
 	if isInitialized {
 		metricsLogger.Warn("Metrics already initialized. Exiting.")

@@ -2,6 +2,7 @@ package parser
 
 import (
 	"errors"
+	"log/slog"
 
 	"github.com/cilium/cilium/api/v1/flow"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
@@ -13,8 +14,6 @@ import (
 	"github.com/microsoft/retina/pkg/hubble/parser/layer34"
 	"github.com/microsoft/retina/pkg/hubble/parser/seven"
 
-	"github.com/sirupsen/logrus"
-	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -28,7 +27,7 @@ var (
 type Params struct {
 	cell.In
 
-	Logger            logrus.FieldLogger
+	Logger            *slog.Logger
 	ServiceReconciler common.SvcDecoder
 	LabelCache        common.LabelCache
 
@@ -36,14 +35,14 @@ type Params struct {
 }
 
 type Parser struct {
-	l *logrus.Entry
+	l *slog.Logger
 
 	l34 *layer34.Parser
 	l7  *seven.Parser
 }
 
 func New(params Params) parser.Decoder {
-	logger := params.Logger.WithField("subsys", "payloadparser")
+	logger := params.Logger.With("subsys", "payloadparser")
 	return &Parser{
 		l: logger,
 
@@ -84,11 +83,11 @@ func (p *Parser) _decode(event *v1.Event) *flow.Flow {
 	// node names.
 	f, ok := event.Event.(*flow.Flow)
 	if !ok {
-		p.l.Warn("Failed to cast event to flow", zap.Any("event", event.Event))
+		p.l.Warn("Failed to cast event to flow", "event", event.Event)
 		return nil
 	}
 	if f == nil {
-		p.l.Warn("Failed to get flow from event", zap.Any("event", event))
+		p.l.Warn("Failed to get flow from event", "event", event)
 		return nil
 	}
 
@@ -99,9 +98,9 @@ func (p *Parser) _decode(event *v1.Event) *flow.Flow {
 	case flow.FlowType_L7:
 		f = p.l7.Decode(f)
 	default:
-		p.l.Warn("Unknown flow type", zap.Any("flow", f))
+		p.l.Warn("Unknown flow type", "flow", f)
 	}
 
-	p.l.Debug("Enriched flow", zap.Any("flow", f))
+	p.l.Debug("Enriched flow", "flow", f)
 	return f
 }

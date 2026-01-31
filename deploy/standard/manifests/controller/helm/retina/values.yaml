@@ -82,6 +82,10 @@ logLevel: debug
 enabledPlugin_linux: '["dropreason","packetforward","linuxutil","dns"]'
 enabledPlugin_win: '["hnsstats"]'
 
+# Enable DNS parsing in packetparser plugin instead of using separate dns plugin.
+# When true, the dns plugin is automatically disabled.
+enableDNSParsing: false
+
 enableTelemetry: false
 
 # Interval, in duration, to scrape/publish metrics.

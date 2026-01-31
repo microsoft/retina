@@ -1,7 +1,7 @@
 # pinned base images
 
 # skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.11-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:531bd02db17b0c2ec919f10fc203a6a8c825e8ca01f40c3a1e32e1cf7119c6d8 AS golang
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:a1a9699ff2ee1c3a2b5a23e6226ea431b6c876c84b52f78b2f514edcb9816340 AS golang
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
 FROM mcr.microsoft.com/azurelinux/base/core@sha256:9948138108a3d69f1dae62104599ac03132225c3b7a5ac57b85a214629c8567d AS azurelinux-core
@@ -19,21 +19,23 @@ ARG GOOS=linux # default to linux
 ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
 RUN if [ "$GOOS" = "linux" ] ; then \
-      tdnf install -y clang lld bpftool libbpf-devel; \
+    tdnf install -y clang lld bpftool libbpf-devel; \
     fi
 COPY ./pkg/plugin /go/src/github.com/microsoft/retina/pkg/plugin
 WORKDIR /go/src/github.com/microsoft/retina
 RUN if [ "$GOOS" = "linux" ] ; then \
-      go mod init github.com/microsoft/retina; \
-      go generate -skip "mockgen" -x /go/src/github.com/microsoft/retina/pkg/plugin/...; \
-      tar czf /gen.tar.gz ./pkg/plugin; \
-      rm go.mod; \
+    go mod init github.com/microsoft/retina; \
+    go generate -skip "mockgen" -x /go/src/github.com/microsoft/retina/pkg/plugin/...; \
+    tar czf /gen.tar.gz ./pkg/plugin; \
+    rm go.mod; \
     fi
 COPY ./go.mod ./go.sum ./
 RUN go mod download
 COPY . .
 RUN if [ "$GOOS" = "linux" ] ; then \
-      rm -rf ./pkg/plugin && tar xvf /gen.tar.gz ./pkg/plugin; \
+    rm -rf ./pkg/plugin && tar xvf /gen.tar.gz ./pkg/plugin; \
+    find ./pkg/plugin -path "*/_cprog/*.go" -delete; \
+    find ./pkg/plugin -name "*.go" -exec sed -i '/^[[:space:]]*_[[:space:]]*".*\/_cprog"/d' {} \;; \
     fi
 
 # capture binary

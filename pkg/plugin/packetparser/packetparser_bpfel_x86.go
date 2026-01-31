@@ -108,6 +108,15 @@ type packetparserPacket struct {
 		PacketsTxCount uint32
 		PacketsRxCount uint32
 	}
+	DnsMetadata struct {
+		Id      uint16
+		Qr      uint8
+		Rcode   uint8
+		Ancount uint16
+		DnsOff  uint16
+	}
+	IsDns uint8
+	_     [7]byte
 }
 
 // loadPacketparser returns the embedded CollectionSpec for packetparser.

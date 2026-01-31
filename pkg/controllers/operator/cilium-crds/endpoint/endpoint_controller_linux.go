@@ -14,8 +14,6 @@ import (
 	"github.com/microsoft/retina/pkg/controllers/operator/cilium-crds/cache"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-	"go.uber.org/zap"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -28,6 +26,7 @@ import (
 	slim_corev1 "github.com/cilium/cilium/pkg/k8s/slim/k8s/api/core/v1"
 	slim_clientset "github.com/cilium/cilium/pkg/k8s/slim/k8s/client/clientset/versioned"
 	"github.com/cilium/cilium/pkg/labels"
+	"github.com/cilium/cilium/pkg/logging"
 	"github.com/cilium/hive/cell"
 	"github.com/cilium/workerpool"
 )
@@ -47,7 +46,7 @@ var ErrClientsetDisabled = errors.New("failure due to clientset disabled")
 // endpointReconciler managed the lifecycle of CiliumEndpoints and CiliumIdentities from Pods.
 type endpointReconciler struct {
 	*sync.Mutex
-	l                   logrus.FieldLogger
+	l                   *slog.Logger
 	clientset           versioned.Interface
 	ciliumSlimClientSet slim_clientset.Interface
 	// podEvents represents Pod CRUD events relayed from the Pod controller. If the Pod was deleted, the PodCacheObject.Pod field will be nil
@@ -76,7 +75,6 @@ type endpointReconciler struct {
 type params struct {
 	cell.In
 
-	Logger          logrus.FieldLogger
 	Lifecycle       cell.Lifecycle
 	Clientset       k8sClient.Clientset
 	CiliumEndpoints resource.Resource[*ciliumv2.CiliumEndpoint]
@@ -89,7 +87,7 @@ func registerEndpointController(p params) error {
 		return ErrClientsetDisabled
 	}
 
-	l := p.Logger.WithField("component", "endpointcontroller")
+	l := logging.DefaultSlogLogger.With("component", "endpointcontroller")
 	r := &endpointReconciler{
 		Mutex:               &sync.Mutex{},
 		l:                   l,
@@ -106,10 +104,10 @@ func registerEndpointController(p params) error {
 	return nil
 }
 
-func (r *endpointReconciler) Start(_ cell.HookContext) error {
+func (r *endpointReconciler) Start(ctx cell.HookContext) error {
 	// NOTE: we must create IdentityManager on leader election since its allocator auto-starts on creation.
 	// There is a way to disable auto-start but then there is no exposed function to simply start().
-	im, err := NewIdentityManager(r.l, r.clientset)
+	im, err := NewIdentityManager(ctx, r.l, r.clientset)
 	if err != nil {
 		return errors.Wrap(err, "failed to create identity manager")
 	}
@@ -152,7 +150,7 @@ func (r *endpointReconciler) run(pctx context.Context) error {
 			}
 
 			if ev.Object != nil && ev.Object.Spec.HostNetwork {
-				r.l.WithField("podKey", ev.Key.String()).Debug("pod is host networked, skipping")
+				r.l.Debug("pod is host networked, skipping", "podKey", ev.Key.String())
 				ev.Done(nil)
 				continue
 			}
@@ -161,7 +159,7 @@ func (r *endpointReconciler) run(pctx context.Context) error {
 				return r.runEventHandler(ctx, ev)
 			})
 			if err != nil {
-				r.l.WithError(err).WithField("podKey", ev.Key.String()).Error("failed to submit pod event handler")
+				r.l.Error("failed to submit pod event handler", "error", err, "podKey", ev.Key.String())
 			}
 
 		case <-pctx.Done():
@@ -180,7 +178,7 @@ func (r *endpointReconciler) runEventHandler(pctx context.Context, ev resource.E
 	case resource.Upsert:
 		// HANDLE UPSERT
 		if ev.Object != nil && ev.Object.Spec.HostNetwork {
-			r.l.WithField("podKey", ev.Key.String()).Debug("pod is host networked, skipping")
+			r.l.Debug("pod is host networked, skipping", "podKey", ev.Key.String())
 		} else {
 			err = r.ReconcilePod(ctx, ev.Key, ev.Object)
 		}
@@ -190,7 +188,7 @@ func (r *endpointReconciler) runEventHandler(pctx context.Context, ev resource.E
 	cancel()
 
 	if err != nil {
-		r.l.WithError(err).WithField("podKey", ev.Key.String()).Error("error creating cilium endpoint. requeuing pod")
+		r.l.Error("error creating cilium endpoint. requeuing pod", "error", err, "podKey", ev.Key.String())
 	}
 	ev.Done(err)
 
@@ -224,7 +222,7 @@ func (r *endpointReconciler) runNamespaceEvents(pctx context.Context) error {
 			cancel()
 
 			if err != nil {
-				r.l.WithError(err).WithField("namespaceKey", ev.Key.String()).Error("error creating cilium endpoint. requeuing namespace")
+				r.l.Error("error creating cilium endpoint. requeuing namespace", "error", err, "namespaceKey", ev.Key.String())
 			}
 			ev.Done(err)
 		case <-pctx.Done():
@@ -237,17 +235,17 @@ func (r *endpointReconciler) runNamespaceEvents(pctx context.Context) error {
 func (r *endpointReconciler) ReconcilePodsInNamespace(ctx context.Context, namespace string) error {
 	r.Mutex.Lock()
 	defer r.Mutex.Unlock()
-	r.l.Debug("reconciling pods in namespace", zap.String("namespace ", namespace))
+	r.l.Debug("reconciling pods in namespace", "namespace", namespace)
 	podList := r.store.ListPodKeysByNamespace(namespace)
 	for _, podKey := range podList {
 		pod, ok := r.store.GetPod(podKey)
 		if !ok {
-			r.l.WithField("podKey", podKey.String()).Debug("pod not found in cache, skipping")
+			r.l.Debug("pod not found in cache, skipping", "podKey", podKey.String())
 			continue
 		}
 
 		if pod.toDelete {
-			r.l.WithField("podKey", podKey.String()).Debug("pod marked for deletion, skipping")
+			r.l.Debug("pod marked for deletion, skipping", "podKey", podKey.String())
 			continue
 		}
 
@@ -259,17 +257,16 @@ func (r *endpointReconciler) ReconcilePodsInNamespace(ctx context.Context, names
 		newPEP.lbls = endpointsLabels
 
 		r.l.Debug("upserting pod in namespace",
-			zap.String("namespace ", namespace),
-			zap.String("podKey", podKey.String()),
-			zap.Any("old labels ", pod.lbls),
-			zap.Any("new labels ", newPEP.lbls),
+			"namespace", namespace,
+			"podKey", podKey.String(),
+			"old labels", pod.lbls,
+			"new labels", newPEP.lbls,
 		)
 
 		err = r.handlePodUpsert(ctx, newPEP)
 		if err != nil {
-			r.l.Error("failed to upsert pod", zap.Error(err), zap.String("podKey", podKey.String()))
+			r.l.Error("failed to upsert pod", "error", err, "podKey", podKey.String())
 		}
-
 		if err != nil {
 			return errors.Wrap(err, "failed to upsert pod")
 		}
@@ -282,7 +279,7 @@ func (r *endpointReconciler) ReconcilePodsInNamespace(ctx context.Context, names
 func (r *endpointReconciler) ReconcilePod(ctx context.Context, podKey resource.Key, pod *slim_corev1.Pod) error {
 	r.Mutex.Lock()
 	defer r.Mutex.Unlock()
-	r.l.Debug("reconciling pod with lock", zap.String("namespace", podKey.Namespace), zap.String("pod ", podKey.Name))
+	r.l.Debug("reconciling pod with lock", "namespace", podKey.Namespace, "pod", podKey.Name)
 	return r.reconcilePod(ctx, podKey, pod)
 }
 
@@ -297,7 +294,7 @@ func (r *endpointReconciler) reconcilePod(ctx context.Context, podKey resource.K
 	}
 
 	if pod.Status.PodIP == "" || pod.Status.HostIP == "" {
-		r.l.WithField("podKey", podKey.String()).Trace("pod missing an IP, skipping")
+		r.l.Debug("pod missing an IP, skipping", "podKey", podKey.String())
 		return nil
 	}
 
@@ -326,7 +323,7 @@ func (r *endpointReconciler) reconcilePod(ctx context.Context, podKey resource.K
 func (r *endpointReconciler) HandlePodDelete(ctx context.Context, n resource.Key) error {
 	r.Mutex.Lock()
 	defer r.Mutex.Unlock()
-	r.l.Debug("handling pod delete with lock", zap.String("podKey", n.String()))
+	r.l.Debug("handling pod delete with lock", "podKey", n.String())
 	return r.handlePodDelete(ctx, n)
 }
 
@@ -335,20 +332,20 @@ func (r *endpointReconciler) handlePodDelete(ctx context.Context, n resource.Key
 	if !ok {
 		// do not do anything if we have not processed the pod
 		// let endpointgc delete the CiliumEndpoint as necessary
-		r.l.WithField("podKey", n.String()).Trace("pod not found in cache, skipping deletion")
+		r.l.Debug("pod not found in cache, skipping deletion", "podKey", n.String())
 		return nil
 	}
 
-	r.l.WithField("podKey", n.String()).Trace("handling pod delete")
+	r.l.Debug("handling pod delete", "podKey", n.String())
 
 	// delete CEP even if we haven't processed the Pod (and incremented identity reference count)
 	err := r.clientset.CiliumV2().CiliumEndpoints(n.Namespace).Delete(ctx, n.Name, metav1.DeleteOptions{})
 	if err != nil && !k8serrors.IsNotFound(err) {
-		r.l.WithError(err).WithField("podKey", n.String()).Error("failed to delete CiliumEndpoint")
+		r.l.Error("failed to delete CiliumEndpoint", "error", err, "podKey", n.String())
 		return errors.Wrap(err, "failed to delete endpoint")
 	}
 
-	r.l.WithField("podKey", n.String()).Debug("deleted CiliumEndpoint")
+	r.l.Debug("deleted CiliumEndpoint", "podKey", n.String())
 
 	// Identity reference count must be modified after CiliumEndpoint is successfully deleted.
 	// Otherwise, we could decrement reference multiple times if CiliumEndpoint deletion fails and we retry this method.
@@ -359,15 +356,15 @@ func (r *endpointReconciler) handlePodDelete(ctx context.Context, n resource.Key
 }
 
 func (r *endpointReconciler) handlePodUpsert(ctx context.Context, newPEP *PodEndpoint) error { //nolint:gocyclo // This function is too complex and should be refactored
-	r.l.WithField("podKey", newPEP.key.String()).Trace("handling pod upsert")
+	r.l.Debug("handling pod upsert", "podKey", newPEP.key.String())
 
 	oldPEP, inCache := r.store.GetPod(newPEP.key)
 	inStore := false
 	if inCache {
-		r.l.WithFields(logrus.Fields{
-			"podKey": newPEP.key.String(),
-			"pep":    oldPEP,
-		}).Trace("PodEndpoint found in cache")
+		r.l.Debug("PodEndpoint found in cache",
+			"podKey", newPEP.key.String(),
+			"pep", oldPEP,
+		)
 	} else {
 		// this call will block until the store is synced with API Server
 		store, err := r.ciliumEndpoints.Store(ctx)
@@ -384,21 +381,21 @@ func (r *endpointReconciler) handlePodUpsert(ctx context.Context, newPEP *PodEnd
 		inStore = ok
 
 		if inStore {
-			r.l.WithFields(logrus.Fields{
-				"podKey":          newPEP.key.String(),
-				"ownerReferences": oldCEP.ObjectMeta.OwnerReferences,
-				"endpointID":      oldCEP.Status.ID,
-				"identity":        oldCEP.Status.Identity,
-				"networking":      oldCEP.Status.Networking,
-			}).Trace("CiliumEndpoint found in store")
+			r.l.Debug("CiliumEndpoint found in store",
+				"podKey", newPEP.key.String(),
+				"ownerReferences", oldCEP.ObjectMeta.OwnerReferences,
+				"endpointID", oldCEP.Status.ID,
+				"identity", oldCEP.Status.Identity,
+				"networking", oldCEP.Status.Networking,
+			)
 
 			if oldCEP.Status.Networking == nil || len(oldCEP.Status.Networking.Addressing) == 0 || oldCEP.Status.Networking.Addressing[0].IPV4 == "" {
 				// FIXME handle IPv6 and dual-stack
 				inStore = false
-				r.l.WithFields(logrus.Fields{
-					"podKey": newPEP.key.String(),
-					"cep":    oldCEP,
-				}).Warn("CiliumEndpoint has no ipv4 address, ignoring")
+				r.l.Warn("CiliumEndpoint has no ipv4 address, ignoring",
+					"podKey", newPEP.key.String(),
+					"cep", oldCEP,
+				)
 			} else {
 				oldPEP = &PodEndpoint{
 					key:        newPEP.key,
@@ -424,23 +421,23 @@ func (r *endpointReconciler) handlePodUpsert(ctx context.Context, newPEP *PodEnd
 		sameNetworking := newPEP.ipv4 == oldPEP.ipv4 && newPEP.nodeIP == oldPEP.nodeIP
 		equalLabels := newPEP.lbls.Equals(oldPEP.lbls)
 
-		r.l.WithFields(logrus.Fields{
-			"podKey":         newPEP.key.String(),
-			"inCache":        inCache,
-			"sameNetworking": sameNetworking,
-			"equalLabels":    equalLabels,
-			"oldLbls":        oldPEP.lbls,
-			"newLbls":        newPEP.lbls,
-		}).Trace("patching CiliumEndpoint")
+		r.l.Debug("patching CiliumEndpoint",
+			"podKey", newPEP.key.String(),
+			"inCache", inCache,
+			"sameNetworking", sameNetworking,
+			"equalLabels", equalLabels,
+			"oldLbls", oldPEP.lbls,
+			"newLbls", newPEP.lbls,
+		)
 
 		// allocate new identity if labels have changed or if we haven't assigned an identity ID to this pod yet
 		// TODO when implementing follower check if inCache or processedAsLeader
 		shouldAllocateNewIdentity := !inCache || !equalLabels || newPEP.identityID == 0
 		if shouldAllocateNewIdentity {
-			r.l.WithFields(logrus.Fields{
-				"podKey": newPEP.key.String(),
-				"pep":    oldPEP,
-			}).Trace("creating new identity for pod")
+			r.l.Debug("creating new identity for pod",
+				"podKey", newPEP.key.String(),
+				"pep", oldPEP,
+			)
 
 			identityID, err := r.identityManager.GetIdentityAndIncrementReference(ctx, newPEP.lbls)
 			if err != nil {
@@ -452,13 +449,13 @@ func (r *endpointReconciler) handlePodUpsert(ctx context.Context, newPEP *PodEnd
 
 		if sameNetworking && equalLabels {
 			// nothing to do. pod already has a CEP with the same networking and labels
-			r.l.WithField("podKey", newPEP.key.String()).Trace("pod already processed")
+			r.l.Debug("pod already processed", "podKey", newPEP.key.String())
 			r.store.AddPod(newPEP)
 			return nil
 		}
 
 		if !sameNetworking {
-			r.l.WithField("podKey", newPEP.key.String()).Trace("pod networking has changed")
+			r.l.Debug("pod networking has changed", "podKey", newPEP.key.String())
 			// change endpoint id since networking has changed
 			// FIXME use endpoint allocator to get new endpoint ID
 			newPEP.endpointID++
@@ -493,15 +490,15 @@ func (r *endpointReconciler) handlePodUpsert(ctx context.Context, newPEP *PodEnd
 
 		createStatusPatch, err := json.Marshal(replaceCEPStatus)
 		if err != nil {
-			r.l.WithFields(logrus.Fields{
-				"podKey": newPEP.key.String(),
-				"pep":    newPEP,
-				"uid":    newPEP.uid,
-			}).Debug("marshalling status failed")
+			r.l.Debug("marshalling status failed",
+				"podKey", newPEP.key.String(),
+				"pep", newPEP,
+				"uid", newPEP.uid,
+			)
 
 			if shouldAllocateNewIdentity {
 				// decrement reference for new identity
-				r.l.WithField("podKey", newPEP.key.String()).Trace("marshal failed, decrementing reference for new identity")
+				r.l.Debug("marshal failed, decrementing reference for new identity", "podKey", newPEP.key.String())
 				r.identityManager.DecrementReference(ctx, newPEP.lbls)
 			}
 
@@ -526,7 +523,7 @@ func (r *endpointReconciler) handlePodUpsert(ctx context.Context, newPEP *PodEnd
 			// Decrement reference for new identity.
 			// May end up incrementing reference count for this same identity again if we try to create the CEP below.
 			// No downside to decrementing reference here and then incrementing again below (will not affect API Server).
-			r.l.WithField("podKey", newPEP.key.String()).Trace("patch unsuccessful, decrementing reference for new identity")
+			r.l.Debug("patch unsuccessful, decrementing reference for new identity", "podKey", newPEP.key.String())
 			r.identityManager.DecrementReference(ctx, newPEP.lbls)
 		}
 
@@ -535,16 +532,18 @@ func (r *endpointReconciler) handlePodUpsert(ctx context.Context, newPEP *PodEnd
 		// No downside to this.
 
 		if !k8serrors.IsNotFound(err) {
-			r.l.WithError(err).WithFields(logrus.Fields{
-				"podKey": newPEP.key.String(),
-				"pep":    newPEP,
-				"uid":    newPEP.uid,
-			}).Error("failed to patch CiliumEndpoint")
+			r.l.Error("failed to patch CiliumEndpoint",
+				"error", err,
+				"podKey", newPEP.key.String(),
+				"pep", newPEP,
+				"uid", newPEP.uid,
+			)
 
 			return errors.Wrap(err, "failed to patch endpoint")
 		}
 
-		r.l.WithField("podKey", newPEP.key.String()).Debug("patch unsuccessful because CiliumEndpoint is not in API Server. now creating CiliumEndpoint")
+		r.l.Debug("patch unsuccessful because CiliumEndpoint is not in API Server. now creating CiliumEndpoint",
+		"podKey", newPEP.key.String())
 
 		// Endpoint was not found, create it below.
 		// Make sure the pod does not exist in the cache so that we don't try to patch it again (in case of a retry after a failure below).
@@ -585,13 +584,13 @@ func (r *endpointReconciler) handlePodUpsert(ctx context.Context, newPEP *PodEnd
 
 	_, err = r.clientset.CiliumV2().CiliumEndpoints(newPEP.key.Namespace).Create(ctx, newCEP, metav1.CreateOptions{})
 	if err != nil {
-		r.l.WithError(err).WithField("podKey", newPEP.key.String()).Error("failed to create CiliumEndpoint")
+		r.l.Error("failed to create CiliumEndpoint", "error", err, "podKey", newPEP.key.String())
 		r.identityManager.DecrementReference(ctx, newPEP.lbls)
 		// FIXME release newly allocated endpoint ID
 		return errors.Wrap(err, "failed to create endpoint")
 	}
 
-	r.l.WithField("podKey", newPEP.key.String()).Debug("created CiliumEndpoint")
+	r.l.Debug("created CiliumEndpoint", "podKey", newPEP.key.String())
 	r.store.AddPod(newPEP)
 	return nil
 }
@@ -609,7 +608,7 @@ func (r *endpointReconciler) reconcileNamespace(ctx context.Context, namespace *
 	// check if namespace is in cache
 	oldNs, ok := r.store.GetNamespace(namespace.GetName())
 	if !ok {
-		r.l.Debug("Adding new namespace to cache", zap.String("namespace ", namespace.GetName()))
+		r.l.Debug("Adding new namespace to cache", "namespace", namespace.GetName())
 		// if this is the first time we see this namespace, add it to cache
 		// there might not be any pods in this namespace yet
 		r.store.AddNamespace(namespace)
@@ -617,16 +616,16 @@ func (r *endpointReconciler) reconcileNamespace(ctx context.Context, namespace *
 	}
 
 	if oldNs.GetResourceVersion() == namespace.GetResourceVersion() {
-		r.l.Debug("Namespace already processed", zap.String("namespace ", namespace.GetName()))
+		r.l.Debug("Namespace already processed", "namespace", namespace.GetName())
 		return nil
 	}
 
 	if reflect.DeepEqual(oldNs.Labels, namespace.Labels) {
-		r.l.Debug("Namespace labels are the same", zap.String("namespace ", namespace.GetName()))
+		r.l.Debug("Namespace labels are the same", "namespace", namespace.GetName())
 		return nil
 	}
 
-	r.l.Debug("Updating namespace in cache", zap.String("namespace ", namespace.GetName()))
+	r.l.Debug("Updating namespace in cache", "namespace", namespace.GetName())
 	r.store.AddNamespace(namespace)
 
 	// now get all pods and update them as well
@@ -640,11 +639,11 @@ func (r *endpointReconciler) reconcileNamespace(ctx context.Context, namespace *
 func (r *endpointReconciler) handleNamespaceDelete(_ context.Context, namespaceName string) error {
 	_, ok := r.store.GetNamespace(namespaceName)
 	if !ok {
-		r.l.Debug("Adding new namespace to cache", zap.String("namespace ", namespaceName))
+		r.l.Debug("Adding new namespace to cache", "namespace", namespaceName)
 		return nil
 	}
 
-	r.l.Debug("Deleting namespace from cache", zap.String("namespace ", namespaceName))
+	r.l.Debug("Deleting namespace from cache", "namespace", namespaceName)
 	// Ignore deleting the pods for this NS, pod controller will eventually clean it up.
 	// Once deleting all the pods in the namespace, delete the namespace
 	r.store.DeleteNamespace(namespaceName)
@@ -658,20 +657,22 @@ func (r *endpointReconciler) ciliumEndpointsLabels(ctx context.Context, pod *sli
 	if !ok {
 		ns, err = r.ciliumSlimClientSet.CoreV1().Namespaces().Get(ctx, pod.Namespace, metav1.GetOptions{})
 		if err != nil {
-			r.l.WithError(err).WithFields(logrus.Fields{
-				"podKey": pod.Name,
-				"ns":     pod.Namespace,
-			}).Error("failed to get namespace")
+			r.l.Error("failed to get namespace",
+				"error", err,
+				"podKey", pod.Name,
+				"ns", pod.Namespace,
+			)
 			return nil, errors.Wrap(err, "failed to get namespace")
 		}
 		r.store.AddNamespace(ns)
 	}
 	_, ciliumLabels := k8s.GetPodMetadata(slog.Default(), ns, pod)
 	if err != nil {
-		r.l.WithError(err).WithFields(logrus.Fields{
-			"podKey": pod.Name,
-			"ns":     pod.Namespace,
-		}).Error("failed to get pod metadata")
+		r.l.Error("failed to get pod metadata",
+			"error", err,
+			"podKey", pod.Name,
+			"ns", pod.Namespace,
+		)
 		return nil, errors.Wrap(err, "failed to get pod metadata")
 	}
 	lbls := make(labels.Labels, len(ciliumLabels))

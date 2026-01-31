@@ -77,6 +77,7 @@ type Config struct {
 	MonitorSockPath          string        `yaml:"monitorSockPath"`
 	TelemetryInterval        time.Duration `yaml:"telemetryInterval"`
 	DataSamplingRate         uint32        `yaml:"dataSamplingRate"`
+	EnableDNSParsing         bool          `yaml:"enableDNSParsing"`
 }
 
 func GetConfig(cfgFilename string) (*Config, error) {
