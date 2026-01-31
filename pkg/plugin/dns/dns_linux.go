@@ -136,12 +136,12 @@ func (d *dns) eventHandler(event *types.Event) {
 		utils.Verdict_DNS,
 	)
 
-	meta := &utils.RetinaMetadata{}
+	ext := utils.NewExtensions()
 
-	utils.AddDNSInfo(fl, meta, string(event.Qr), common.RCodeToFlow(event.Rcode), event.DNSName, []string{event.QType}, event.NumAnswers, event.Addresses)
+	utils.AddDNSInfo(fl, ext, string(event.Qr), common.RCodeToFlow(event.Rcode), event.DNSName, []string{event.QType}, event.NumAnswers, event.Addresses)
 
-	// Add metadata to the flow.
-	utils.AddRetinaMetadata(fl, meta)
+	// Set extensions on the flow.
+	utils.SetExtensions(fl, ext)
 
 	ev := (&v1.Event{
 		Event:     fl,
