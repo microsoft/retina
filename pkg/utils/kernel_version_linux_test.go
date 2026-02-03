@@ -3,6 +3,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
+//revive:disable-next-line:var-naming
 package utils
 
 import (
