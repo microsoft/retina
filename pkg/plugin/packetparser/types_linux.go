@@ -10,7 +10,6 @@ import (
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/perf"
 	tc "github.com/florianl/go-tc"
 	nl "github.com/mdlayher/netlink"
 	"github.com/vishvananda/netlink"
@@ -102,8 +101,15 @@ type nltc interface {
 }
 
 type perfReader interface {
-	Read() (perf.Record, error)
+	Read() (perfRecord, error)
 	Close() error
+}
+
+type perfRecord struct {
+	CPU         int
+	LostSamples uint64
+	RawSample   []byte
+	Remaining   int
 }
 
 type packetParser struct {
@@ -122,7 +128,7 @@ type packetParser struct {
 	hostIngressInfo     *ebpf.ProgramInfo
 	hostEgressInfo      *ebpf.ProgramInfo
 	wg                  sync.WaitGroup
-	recordsChannel      chan perf.Record
+	recordsChannel      chan perfRecord
 	externalChannel     chan *v1.Event
 }
 

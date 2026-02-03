@@ -281,11 +281,13 @@ func (p *packetParser) Init() error {
 		p.reader = &ringBufReaderWrapper{reader: rb}
 	} else {
 		p.l.Info("Initializing Perf Reader")
-		p.reader, err = plugincommon.NewPerfReader(p.l, objs.RetinaPacketparserEvents, perCPUBuffer, 1)
+		var pr *perf.Reader
+		pr, err = plugincommon.NewPerfReader(p.l, objs.RetinaPacketparserEvents, perCPUBuffer, 1)
 		if err != nil {
 			p.l.Error("Error NewReader", zap.Error(err))
 			return fmt.Errorf("failed to create perf reader: %w", err)
 		}
+		p.reader = &perfReaderWrapper{reader: pr}
 	}
 
 	p.tcMap = &sync.Map{}
@@ -344,7 +346,7 @@ func (p *packetParser) Start(ctx context.Context) error {
 	}
 
 	// Create the channel.
-	p.recordsChannel = make(chan perf.Record, buffer)
+	p.recordsChannel = make(chan perfRecord, buffer)
 	p.l.Debug("Created records channel")
 
 	return p.run(ctx)
@@ -756,7 +758,7 @@ func (p *packetParser) readData() {
 	// This is unblocked by the close call.
 	record, err := p.reader.Read()
 	if err != nil {
-		if errors.Is(err, perf.ErrClosed) {
+		if errors.Is(err, perf.ErrClosed) || errors.Is(err, ringbuf.ErrClosed) {
 			p.l.Error("Perf array is empty")
 			// nothing to do, we're done
 		} else {
@@ -796,13 +798,14 @@ type ringBufReaderWrapper struct {
 	reader *ringbuf.Reader
 }
 
-func (r *ringBufReaderWrapper) Read() (perf.Record, error) {
+func (r *ringBufReaderWrapper) Read() (perfRecord, error) {
 	rec, err := r.reader.Read()
 	if err != nil {
-		return perf.Record{}, fmt.Errorf("failed to read from ringbuf: %w", err)
+		return perfRecord{}, fmt.Errorf("failed to read from ringbuf: %w", err)
 	}
-	return perf.Record{
+	return perfRecord{
 		RawSample: rec.RawSample,
+		Remaining: rec.Remaining,
 	}, nil
 }
 
@@ -811,4 +814,24 @@ func (r *ringBufReaderWrapper) Close() error {
 		return fmt.Errorf("failed to close ringbuf reader: %w", err)
 	}
 	return nil
+}
+
+type perfReaderWrapper struct {
+	reader *perf.Reader
+}
+
+func (r *perfReaderWrapper) Read() (perfRecord, error) {
+	rec, err := r.reader.Read()
+	if err != nil {
+		return perfRecord{}, err
+	}
+	return perfRecord{
+		CPU:         rec.CPU,
+		LostSamples: rec.LostSamples,
+		RawSample:   rec.RawSample,
+	}, nil
+}
+
+func (r *perfReaderWrapper) Close() error {
+	return r.reader.Close()
 }
