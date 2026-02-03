@@ -145,20 +145,38 @@ func validateRingBufferSize(size uint32) (adjustedSize uint32, reason string) {
 	if intPageSize > int(^uint32(0)) {
 		intPageSize = int(^uint32(0))
 	}
+	//nolint:gosec // bounded to uint32
 	pageSize := uint32(intPageSize)
 
 	if size == 0 {
 		return defaultSize, ""
 	}
 	if size < pageSize {
-		return defaultSize, fmt.Sprintf("Ring buffer size (%d) is smaller than page size (%d), falling back to default (%d)", size, pageSize, defaultSize)
+		return defaultSize, fmt.Sprintf(
+			"Ring buffer size (%d) is smaller than page size (%d), "+
+				"falling back to default (%d)",
+			size,
+			pageSize,
+			defaultSize,
+		)
 	}
 	if size > maxSize {
-		return defaultSize, fmt.Sprintf("Ring buffer size (%d) is larger than allowed maximum (%d), falling back to default (%d)", size, maxSize, defaultSize)
+		return defaultSize, fmt.Sprintf(
+			"Ring buffer size (%d) is larger than allowed maximum (%d), "+
+				"falling back to default (%d)",
+			size,
+			maxSize,
+			defaultSize,
+		)
 	}
 	// Check if size is a power of 2.
 	if (size & (size - 1)) != 0 {
-		return defaultSize, fmt.Sprintf("Ring buffer size (%d) is not a power of 2, falling back to default (%d)", size, defaultSize)
+		return defaultSize, fmt.Sprintf(
+			"Ring buffer size (%d) is not a power of 2, "+
+				"falling back to default (%d)",
+			size,
+			defaultSize,
+		)
 	}
 
 	return size, ""
