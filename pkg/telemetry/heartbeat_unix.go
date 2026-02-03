@@ -7,17 +7,16 @@ package telemetry
 
 import (
 	"context"
-	"os/exec"
-	"strings"
 
+	"github.com/microsoft/retina/pkg/utils"
 	"github.com/pkg/errors"
 )
 
 func KernelVersion(ctx context.Context) (string, error) {
-	cmd := exec.CommandContext(ctx, "uname", "-r")
-	output, err := cmd.CombinedOutput()
+	_ = ctx
+	release, err := utils.KernelRelease()
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to get linux kernel version: %s", string(output))
+		return "", errors.Wrap(err, "failed to get linux kernel version")
 	}
-	return strings.TrimSuffix(string(output), "\n"), nil
+	return release, nil
 }
