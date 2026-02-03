@@ -133,18 +133,19 @@ func (p *packetParser) Generate(ctx context.Context) error {
 
 // validateRingBufferSize validates the ring buffer size and returns the adjusted size if necessary.
 // It also returns a reason for the adjustment, if any.
-func validateRingBufferSize(size uint32) (uint32, string) {
+func validateRingBufferSize(size uint32) (adjustedSize uint32, reason string) {
 	// Default to 8MB if not specified.
 	// This should match the default in pkg/plugin/packetparser/_cprog/packetparser.c
 	const defaultSize = 8 * 1024 * 1024
 	const maxSize = 1 * 1024 * 1024 * 1024 // 1GB
-	pageSize := uint32(os.Getpagesize())
-
-	// This is only for testing purposes where we can't reliably mock os.Getpagesize().
-	// In tests on some systems, page size might be different, but we assume > 0.
-	if pageSize == 0 {
-		pageSize = 4096
+	intPageSize := os.Getpagesize()
+	if intPageSize <= 0 {
+		intPageSize = 4096
 	}
+	if intPageSize > int(^uint32(0)) {
+		intPageSize = int(^uint32(0))
+	}
+	pageSize := uint32(intPageSize)
 
 	if size == 0 {
 		return defaultSize, ""
@@ -204,8 +205,10 @@ func (p *packetParser) Compile(ctx context.Context) error {
 		}
 
 		p.l.Info("Compiling with Ring Buffer enabled", zap.Uint32("size", p.cfg.PacketParserRingBufferSize))
-		cflags = append(cflags, "-DUSE_RING_BUFFER")
-		cflags = append(cflags, fmt.Sprintf("-DRING_BUFFER_SIZE=%d", p.cfg.PacketParserRingBufferSize))
+		cflags = append(cflags,
+			"-DUSE_RING_BUFFER",
+			fmt.Sprintf("-DRING_BUFFER_SIZE=%d", p.cfg.PacketParserRingBufferSize),
+		)
 	}
 
 	err = loader.CompileEbpf(ctx, cflags...)
@@ -823,7 +826,7 @@ type perfReaderWrapper struct {
 func (r *perfReaderWrapper) Read() (perfRecord, error) {
 	rec, err := r.reader.Read()
 	if err != nil {
-		return perfRecord{}, err
+		return perfRecord{}, fmt.Errorf("failed to read perf record: %w", err)
 	}
 	return perfRecord{
 		CPU:         rec.CPU,
@@ -833,5 +836,8 @@ func (r *perfReaderWrapper) Read() (perfRecord, error) {
 }
 
 func (r *perfReaderWrapper) Close() error {
-	return r.reader.Close()
+	if err := r.reader.Close(); err != nil {
+		return fmt.Errorf("failed to close perf reader: %w", err)
+	}
+	return nil
 }
