@@ -23,6 +23,7 @@ func TestValidateRingBufferSize(t *testing.T) {
 	if intPageSize > int(^uint32(0)) {
 		intPageSize = int(^uint32(0))
 	}
+	//nolint:gosec // bounded to uint32
 	pageSize := uint32(intPageSize)
 
 	tests := []struct {
