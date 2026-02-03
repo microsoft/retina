@@ -40,6 +40,8 @@ The table below outlines the different metrics generated.
 | **networkobservability_dns_request_count**     | Total DNS request count | | ✅ | ❌ |
 | **networkobservability_dns_response_count**    | Total DNS response count | | ✅ | ❌ |
 | **networkobservability_windows_hns_stats**     | Windows HNS statistics (packets sent/received) | `statistic` | ❌ | ✅ |
+| **networkobservability_node_connectivity_status** | Connectivity status between nodes (1=connected, 0=not) | `source_node_name`, `target_node_name` | ✅ | ✅ |
+| **networkobservability_node_connectivity_latency_seconds** | Latency in seconds between nodes | `source_node_name`, `target_node_name` | ✅ | ✅ |
 
 ### Pod-Level Metrics (Hubble Metrics)
 
