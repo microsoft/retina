@@ -59,10 +59,10 @@ func (c *CreateNPMCluster) Run() error {
 		EnableNodePublicIP: to.Ptr(false),
 		Mode:               to.Ptr(armcontainerservice.AgentPoolModeUser),
 		OSType:             to.Ptr(armcontainerservice.OSTypeWindows),
-		OSSKU:              to.Ptr(armcontainerservice.OSSKUWindows2022),
+		OSSKU:              to.Ptr(armcontainerservice.OSSKU("Windows2025")), // Windows Server 2025 (preview) - requires AksWindows2025Preview feature flag and K8s 1.32+
 		ScaleDownMode:      to.Ptr(armcontainerservice.ScaleDownModeDelete),
 		VMSize:             to.Ptr(AgentSKU),
-		Name:               to.Ptr("ws22"),
+		Name:               to.Ptr("ws25"),
 		MaxPods:            to.Ptr(int32(MaxPodsPerNode)),
 	})
 
