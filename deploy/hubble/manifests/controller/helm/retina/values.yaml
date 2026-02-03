@@ -68,7 +68,11 @@ enableAnnotations: false
 bypassLookupIPOfInterest: true
 dataAggregationLevel: "high"
 monitorSockPath: "/var/run/cilium/monitor1_2.sock"
+# Use a mmap'd shared-memory ring buffer (BPF_MAP_TYPE_RINGBUF) to stream events to user space (libbpf ringbuf API) instead of BPF_PERF_EVENT_ARRAY.
+# Pros: typically lower per-event overhead at high event rates, simpler variable-sized records, often more consistent latency.
+# Cons: fixed-size pre-allocated (locked) memory that can be wasted on low traffic; events are dropped when the buffer fills (reserve fails); 
 enablePacketParserRingBuffer: false
+# Ring buffer size in bytes (only used when enablePacketParserRingBuffer=true).
 packetParserRingBufferSize: 8388608
 
 imagePullSecrets: []
