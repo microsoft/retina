@@ -33,6 +33,27 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+type perfReaderAdapter struct {
+	mock *mocks.MockperfReader
+}
+
+func (p *perfReaderAdapter) Read() (perfRecord, error) {
+	rec, err := p.mock.Read()
+	if err != nil {
+		return perfRecord{}, err
+	}
+	return perfRecord{
+		CPU:         rec.CPU,
+		LostSamples: rec.LostSamples,
+		RawSample:   rec.RawSample,
+		Remaining:   rec.Remaining,
+	}, nil
+}
+
+func (p *perfReaderAdapter) Close() error {
+	return p.mock.Close()
+}
+
 var (
 	cfgPodLevelEnabled = &kcfg.Config{
 		EnablePodLevel:           true,
@@ -300,7 +321,7 @@ func TestReadData_Error(t *testing.T) {
 	p := &packetParser{
 		cfg:    cfgPodLevelEnabled,
 		l:      log.Logger().Named("test"),
-		reader: mperf,
+		reader: &perfReaderAdapter{mock: mperf},
 	}
 	p.readData()
 
@@ -339,9 +360,9 @@ func TestReadDataPodLevelEnabled(t *testing.T) {
 	p := &packetParser{
 		cfg:            cfgPodLevelEnabled,
 		l:              log.Logger().Named("test"),
-		reader:         mperf,
+		reader:         &perfReaderAdapter{mock: mperf},
 		enricher:       menricher,
-		recordsChannel: make(chan perf.Record, buffer),
+		recordsChannel: make(chan perfRecord, buffer),
 	}
 
 	mICounterVec := metrics.NewMockCounterVec(ctrl)
@@ -437,8 +458,8 @@ func TestStartWithDataAggregationLevelLow(t *testing.T) {
 		cfg:              cfgDataAggregationLevelLow,
 		l:                log.Logger().Named("test"),
 		objs:             pObj,
-		reader:           mockReader,
-		recordsChannel:   make(chan perf.Record, buffer),
+		reader:           &perfReaderAdapter{mock: mockReader},
+		recordsChannel:   make(chan perfRecord, buffer),
 		interfaceLockMap: &sync.Map{},
 		endpointIngressInfo: &ebpf.ProgramInfo{
 			Name: "ingress",
@@ -516,8 +537,8 @@ func TestStartWithDataAggregationLevelHigh(t *testing.T) {
 		cfg:              cfgDataAggregationLevelHigh,
 		l:                log.Logger().Named("test"),
 		objs:             pObj,
-		reader:           mockReader,
-		recordsChannel:   make(chan perf.Record, buffer),
+		reader:           &perfReaderAdapter{mock: mockReader},
+		recordsChannel:   make(chan perfRecord, buffer),
 		interfaceLockMap: &sync.Map{},
 		endpointIngressInfo: &ebpf.ProgramInfo{
 			Name: "ingress",
