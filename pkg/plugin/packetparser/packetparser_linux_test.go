@@ -40,7 +40,7 @@ type perfReaderAdapter struct {
 func (p *perfReaderAdapter) Read() (perfRecord, error) {
 	rec, err := p.mock.Read()
 	if err != nil {
-		return perfRecord{}, err
+		return perfRecord{}, fmt.Errorf("failed to read perf record: %w", err)
 	}
 	return perfRecord{
 		CPU:         rec.CPU,
@@ -51,7 +51,10 @@ func (p *perfReaderAdapter) Read() (perfRecord, error) {
 }
 
 func (p *perfReaderAdapter) Close() error {
-	return p.mock.Close()
+	if err := p.mock.Close(); err != nil {
+		return fmt.Errorf("failed to close perf reader: %w", err)
+	}
+	return nil
 }
 
 var (

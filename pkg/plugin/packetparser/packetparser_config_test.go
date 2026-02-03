@@ -16,11 +16,14 @@ import (
 func TestValidateRingBufferSize(t *testing.T) {
 	const defaultSize = 8 * 1024 * 1024
 	const maxSize = 1 * 1024 * 1024 * 1024 // 1GB
-	pageSize := uint32(os.Getpagesize())
-	// In case os.Getpagesize() returns 0 or something weird in test env
-	if pageSize == 0 {
-		pageSize = 4096
+	intPageSize := os.Getpagesize()
+	if intPageSize <= 0 {
+		intPageSize = 4096
 	}
+	if intPageSize > int(^uint32(0)) {
+		intPageSize = int(^uint32(0))
+	}
+	pageSize := uint32(intPageSize)
 
 	tests := []struct {
 		name           string
