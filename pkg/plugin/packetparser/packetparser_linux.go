@@ -53,6 +53,13 @@ import (
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type packet packetparser ./_cprog/packetparser.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../lib/common/libbpf/_include/linux -I../lib/common/libbpf/_include/uapi/linux -I../lib/common/libbpf/_include/asm -I../filter/_cprog/ -I../conntrack/_cprog/
 var errNoOutgoingLinks = errors.New("could not determine any outgoing links")
+var errRingBufKernelTooOld = errors.New("ring buffer requires newer kernel")
+
+const (
+	ringBufMinKernelMajor = 5
+	ringBufMinKernelMinor = 8
+	ringBufMinKernelPatch = 0
+)
 
 func init() {
 	registry.Add(name, New)
@@ -242,6 +249,11 @@ func (p *packetParser) Init() error {
 	if !p.cfg.EnablePodLevel {
 		p.l.Warn("packet parser and latency plugin will not init because pod level is disabled")
 		return nil
+	}
+	if p.cfg.EnablePacketParserRingBuffer {
+		if ringBufErr := ensureRingBufKernelSupported(); ringBufErr != nil {
+			return ringBufErr
+		}
 	}
 	// Get the absolute path to this file during runtime.
 	dir, err := absPath()
@@ -857,5 +869,22 @@ func (r *perfReaderWrapper) Close() error {
 	if err := r.reader.Close(); err != nil {
 		return fmt.Errorf("failed to close perf reader: %w", err)
 	}
+	return nil
+}
+
+func ensureRingBufKernelSupported() error {
+	kv, err := utils.LinuxKernelVersion()
+	if err != nil {
+		return fmt.Errorf("failed to detect kernel version for ring buffer support: %w", err)
+	}
+
+	if !kv.AtLeast(ringBufMinKernelMajor, ringBufMinKernelMinor, ringBufMinKernelPatch) {
+		return fmt.Errorf(
+			"%w: requires >= %d.%d.%d, current: %s",
+			errRingBufKernelTooOld,
+			ringBufMinKernelMajor, ringBufMinKernelMinor, ringBufMinKernelPatch, kv.Release,
+		)
+	}
+
 	return nil
 }
