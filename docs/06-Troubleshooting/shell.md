@@ -4,7 +4,7 @@
 
 The `retina shell` command allows you to start an interactive shell on a Kubernetes node or pod for adhoc debugging.
 
-This runs a container image built from the Dockerfile in the `/shell` directory, with many common networking tools installed (`ping`, `curl`, etc.), as well as specialized tools such as [bpftool](#bpftool), [bpftrace](#bpftrace) [pwru](#pwru) or [Inspektor Gadget](#inspektor-gadget-ig).
+This runs a container image built from the Dockerfile in the `/shell` directory, with many common networking tools installed (`ping`, `curl`, etc.), as well as specialized tools such as [bpftool](#bpftool), [pwru](#pwru) or [Inspektor Gadget](#inspektor-gadget-ig).
 
 Currently the Retina Shell only works in Linux environments. Windows support will be added in the future.
 
@@ -233,32 +233,6 @@ You can then run for example:
 bpftool -h
 bpftool prog show
 bpftool map dump id <map_id>
-```
-
-## [bpftrace](https://bpftrace.org/)
-
-bpftrace is a high-level tracing language for Linux and provides a quick and easy way for people to write observability-based eBPF programs.
-
-Requires the the flags `--mount-host-filesystem`,  `--apparmor-unconfined`, `--seccomp-unconfined`, and the following capabilities:
-
-* `NET_ADMIN`
-* `SYS_ADMIN`
-* `SYS_RESOURCE`
-* `BPF`
-* `MKNOD`
-* `SYS_CHROOT`
-
-```sh
-# e.g. pod debugging
-kubectl retina shell -n kube-system pod/<pod-name> --capabilities=NET_ADMIN,SYS_ADMIN,SYS_RESOURCE,BPF,MKNOD,SYS_CHROOT --mount-host-filesystem --apparmor-unconfined --seccomp-unconfined
-```
-
-You can then run for example:
-
-```shell
-bpftrace --help
-bpftrace -e 'kprobe:tcp_v4_rcv { printf("tcp packet received\n"); }'
-bpftrace -e 'tracepoint:syscalls:sys_enter_connect { printf("connect\n"); }'
 ```
 
 ## [Inspektor Gadget (ig)](https://inspektor-gadget.io/)
