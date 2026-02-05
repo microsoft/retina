@@ -12,6 +12,7 @@ ifndef TAG
 endif
 OUTPUT_DIR = $(REPO_ROOT)/output
 ARTIFACTS_DIR = $(REPO_ROOT)/artifacts
+OUTPUT_LOCAL ?= --output type=local,dest=$(ARTIFACTS_DIR)
 BUILD_DIR = $(OUTPUT_DIR)/$(GOOS)_$(GOARCH)
 RETINA_BUILD_DIR = $(BUILD_DIR)/retina
 RETINA_DIR = $(REPO_ROOT)/controller
@@ -234,7 +235,7 @@ container-docker: buildx # util target to build container images using docker bu
 		--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
 		--target=$(TARGET) \
 		-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
-		--output type=local,dest=$(ARTIFACTS_DIR) \
+		$(OUTPUT_LOCAL) \
 		$(BUILDX_ACTION) \
 		$(CONTEXT_DIR) 
 
@@ -325,6 +326,7 @@ retina-shell-image:
 			IMAGE=$(RETINA_SHELL_IMAGE) \
 			VERSION=$(TAG) \
 			TAG=$(RETINA_PLATFORM_TAG) \
+			OUTPUT_LOCAL= \
 			CONTEXT_DIR=$(REPO_ROOT)
 
 kubectl-retina-image:

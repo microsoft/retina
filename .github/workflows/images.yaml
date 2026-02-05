@@ -203,13 +203,18 @@ jobs:
           IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
 
   retina-shell-images:
-    name: Build Retina Shell Images
-    runs-on: ubuntu-latest
+    name: Build Retina Shell Images (${{ matrix.platform }}, ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
 
     strategy:
       matrix:
-        platform: ["linux"]
-        arch: ["amd64", "arm64"]
+        include:
+          - platform: linux
+            arch: amd64
+            runner: ubuntu-latest
+          - platform: linux
+            arch: arm64
+            runner: ubuntu-24.04-arm
 
     steps:
       - name: Checkout code
@@ -219,9 +224,6 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go version
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
 
       - name: Az CLI login
         uses: azure/login@v2
