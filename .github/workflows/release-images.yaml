@@ -184,13 +184,18 @@ jobs:
           done
 
   retina-shell-images:
-    name: Build Retina Shell Images
-    runs-on: ubuntu-latest
+    name: Build Retina Shell Images (${{ matrix.platform }}, ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
 
     strategy:
       matrix:
-        platform: ["linux"]
-        arch: ["amd64", "arm64"]
+        include:
+          - platform: linux
+            arch: amd64
+            runner: ubuntu-latest
+          - platform: linux
+            arch: arm64
+            runner: ubuntu-24.04-arm
 
     steps:
       - name: Checkout code
@@ -203,9 +208,6 @@ jobs:
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@v4.0.0
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
 
       - name: Log in to registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
