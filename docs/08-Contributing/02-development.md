@@ -185,6 +185,65 @@ Uninstall `Retina`:
 make helm-uninstall
 ```
 
+## Dependency and Security Management
+
+Retina uses automated dependency management and security scanning to maintain secure and up-to-date container images and dependencies.
+
+### Dependabot Configuration
+
+The repository uses [Dependabot](https://github.com/dependabot) to automatically track and update dependencies:
+
+- **Docker Base Images**: Automatically monitored for security updates and new versions
+- **Go Modules**: Tracked for dependency updates  
+- **GitHub Actions**: Workflow dependencies are kept current
+
+#### Docker Base Image Tracking
+
+Retina has Dockerfiles in multiple directories, and each is tracked separately by Dependabot:
+- `/controller` - Main retina controller images (daily checks)
+- `/shell` - Shell utility images (daily checks)  
+- `/cli` - CLI tool images (daily checks)
+- `/operator` - Operator images (daily checks)
+- `/test/image` - Test images (daily checks)
+- `/hack/tools/kapinger` - Kapinger tool images (weekly checks)
+- `/hack/tools/toolbox` - Toolbox utility images (weekly checks)
+
+When Dependabot detects a security vulnerability (CVE) in a base image, it will automatically create a pull request to update the image SHA to a patched version.
+
+#### Validating Dependabot Coverage
+
+To ensure all Dockerfiles are tracked by Dependabot, run the validation script:
+
+```bash
+./scripts/validate-dependabot-docker-coverage.sh
+```
+
+This script will report any Dockerfiles that are not covered by the Dependabot configuration.
+
+### Security Scanning
+
+In addition to Dependabot, Retina uses [Trivy](https://trivy.dev/) for comprehensive security scanning:
+
+- **Container Images**: Scanned for vulnerabilities after building
+- **Scheduled Scanning**: Weekly security scans of published images  
+- **CI Integration**: Security alerts are generated for critical and high severity issues
+
+The Trivy workflow runs automatically and uploads results to GitHub Security tab for tracking.
+
+### Adding New Dockerfiles
+
+When adding new Dockerfiles to the repository:
+
+1. Add the directory containing the Dockerfile to `.github/dependabot.yaml`
+2. Run the validation script to ensure coverage
+3. Consider the update frequency (daily for critical components, weekly for tools)
+
+## Cleanup
+
+Uninstall `Retina`:
+
+```bash
+
 ## Opening a Pull Request
 
 When you're ready to open a pull request, please ensure that your branch is up-to-date with the `main` branch, updates relevant docs and tests, and passes all tests and lints.
