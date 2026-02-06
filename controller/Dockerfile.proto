@@ -13,4 +13,6 @@ RUN unzip protoc-24.2-linux-x86_64.zip -d protoc
 RUN mv protoc/bin/protoc /usr/bin/protoc
 
 WORKDIR /app
-ENTRYPOINT protoc -I=. --go_out=paths=source_relative:. ./pkg/utils/metadata_linux.proto
+ENTRYPOINT /bin/sh -c "protoc -I=. --go_out=paths=source_relative:. ./pkg/utils/metadata_linux.proto && \
+	protoc -I=. --go_out=paths=source_relative:. ./pkg/utils/metadata_darwin.proto && \
+	protoc -I=. --go_out=paths=source_relative:. ./pkg/utils/metadata_windows.proto"
