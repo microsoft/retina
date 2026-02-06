@@ -5,6 +5,7 @@ package metrics
 
 import (
 	"strings"
+	"time"
 
 	v1 "github.com/cilium/cilium/api/v1/flow"
 	api "github.com/microsoft/retina/crd/api/v1alpha1"
@@ -29,16 +30,16 @@ type DropCountMetrics struct {
 	metricName string
 }
 
-func NewDropCountMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext) *DropCountMetrics {
+func NewDropCountMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext, ttl time.Duration) *DropCountMetrics {
 	if ctxOptions == nil || !strings.Contains(strings.ToLower(ctxOptions.MetricName), "drop") {
 		return nil
 	}
 
 	fl = fl.Named("dropreason-metricsmodule")
 	fl.Info("Creating drop count metrics", zap.Any("options", ctxOptions))
-	return &DropCountMetrics{
-		baseMetricObject: newBaseMetricsObject(ctxOptions, fl, isLocalContext),
-	}
+	d := &DropCountMetrics{}
+	d.baseMetricObject = newBaseMetricsObject(ctxOptions, fl, isLocalContext, d.expire, ttl)
+	return d
 }
 
 func (d *DropCountMetrics) Init(metricName string) {
@@ -84,6 +85,7 @@ func (d *DropCountMetrics) getLabels() []string {
 
 func (d *DropCountMetrics) Clean() {
 	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(d.dropMetric))
+	d.clean()
 }
 
 // TODO: update ProcessFlow with bytes metrics. We are only accounting for count.
@@ -161,11 +163,28 @@ func (d *DropCountMetrics) processLocalCtxFlow(flow *v1.Flow) {
 	}
 }
 
+func (d *DropCountMetrics) expire(labels []string) bool {
+	var del bool
+	if d.dropMetric != nil {
+		del = d.dropMetric.DeleteLabelValues(labels...)
+		if del {
+			metrics.MetricsExpiredCounter.WithLabelValues(d.metricName).Inc()
+		}
+	}
+	return del
+}
+
 func (d *DropCountMetrics) update(fl *v1.Flow, labels []string) {
+	var updated bool
 	switch d.metricName {
 	case utils.DroppedPacketsGaugeName:
+		updated = true
 		d.dropMetric.WithLabelValues(labels...).Inc()
 	case utils.DropBytesGaugeName:
+		updated = true
 		d.dropMetric.WithLabelValues(labels...).Add(float64(utils.PacketSize(fl)))
+	}
+	if updated {
+		d.updated(labels)
 	}
 }
