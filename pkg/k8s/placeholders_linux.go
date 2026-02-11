@@ -9,7 +9,6 @@ import (
 
 	"github.com/cilium/cilium/api/v1/models"
 	"github.com/cilium/cilium/pkg/container/set"
-	"github.com/cilium/cilium/pkg/crypto/certificatemanager"
 	"github.com/cilium/cilium/pkg/datapath/iptables/ipset"
 	"github.com/cilium/cilium/pkg/datapath/loader/metrics"
 	datapathtypes "github.com/cilium/cilium/pkg/datapath/types"
@@ -18,11 +17,12 @@ import (
 	"github.com/cilium/cilium/pkg/ipcache"
 	ipcachetypes "github.com/cilium/cilium/pkg/ipcache/types"
 	"github.com/cilium/cilium/pkg/k8s/resource"
-	"github.com/cilium/cilium/pkg/labels"
 	"github.com/cilium/cilium/pkg/policy"
 	"github.com/cilium/cilium/pkg/policy/api"
+	policytypes "github.com/cilium/cilium/pkg/policy/types"
 	cilium "github.com/cilium/proxy/go/cilium/api"
 	k8sRuntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/util/workqueue"
 )
 
 type fakeresource[T k8sRuntime.Object] struct{}
@@ -160,21 +160,18 @@ func (n *NoOpPolicyRepository) GetSelectorCache() *policy.SelectorCache {
 	return nil
 }
 
-func (n *NoOpPolicyRepository) Iterate(func(*api.Rule)) {}
+func (n *NoOpPolicyRepository) GetSubjectSelectorCache() *policy.SelectorCache {
+	return nil
+}
 
-func (n *NoOpPolicyRepository) ReplaceByResource(api.Rules, ipcachetypes.ResourceID) (affectedIDs *set.Set[identity.NumericIdentity], rev uint64, oldRevCnt int) {
+func (n *NoOpPolicyRepository) Iterate(func(*policytypes.PolicyEntry)) {}
+
+func (n *NoOpPolicyRepository) ReplaceByResource(policytypes.PolicyEntries, ipcachetypes.ResourceID) (affectedIDs *set.Set[identity.NumericIdentity], rev uint64, oldRevCnt int) {
 	return nil, 0, 0
 }
 
-func (n *NoOpPolicyRepository) ReplaceByLabels(api.Rules, []labels.LabelArray) (affectedIDs *set.Set[identity.NumericIdentity], rev uint64, oldRevCnt int) {
-	return nil, 0, 0
-}
-
-func (n *NoOpPolicyRepository) Search(labels.LabelArray) (api.Rules, uint64) {
+func (n *NoOpPolicyRepository) Search() (policytypes.PolicyEntries, uint64) {
 	return nil, 0
-}
-
-func (n *NoOpPolicyRepository) SetEnvoyRulesFunc(func(certificatemanager.SecretManager, *api.L7Rules, string, string) (*cilium.HttpNetworkPolicyRules, bool)) {
 }
 
 func (n *NoOpPolicyRepository) GetPolicySnapshot() map[identity.NumericIdentity]policy.SelectorPolicy {
@@ -210,3 +207,26 @@ func (n *NoOpOrchestrator) DatapathInitialized() <-chan struct{} {
 	close(ch)
 	return ch
 }
+
+// noopMetricsProvider is a no-op implementation of workqueue.MetricsProvider
+// used to satisfy the MetricsProvider parameter required by resource.New in Cilium v1.19.0.
+type noopMetricsProvider struct{}
+
+func (noopMetricsProvider) NewDepthMetric(string) workqueue.GaugeMetric             { return noopMetric{} }
+func (noopMetricsProvider) NewAddsMetric(string) workqueue.CounterMetric             { return noopMetric{} }
+func (noopMetricsProvider) NewLatencyMetric(string) workqueue.HistogramMetric         { return noopMetric{} }
+func (noopMetricsProvider) NewWorkDurationMetric(string) workqueue.HistogramMetric    { return noopMetric{} }
+func (noopMetricsProvider) NewUnfinishedWorkSecondsMetric(string) workqueue.SettableGaugeMetric {
+	return noopMetric{}
+}
+func (noopMetricsProvider) NewLongestRunningProcessorSecondsMetric(string) workqueue.SettableGaugeMetric {
+	return noopMetric{}
+}
+func (noopMetricsProvider) NewRetriesMetric(string) workqueue.CounterMetric { return noopMetric{} }
+
+type noopMetric struct{}
+
+func (noopMetric) Inc()            {}
+func (noopMetric) Dec()            {}
+func (noopMetric) Set(float64)     {}
+func (noopMetric) Observe(float64) {}

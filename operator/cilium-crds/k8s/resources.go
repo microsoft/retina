@@ -16,6 +16,7 @@ import (
 	"github.com/cilium/cilium/pkg/k8s/resource"
 	slim_corev1 "github.com/cilium/cilium/pkg/k8s/slim/k8s/api/core/v1"
 	"github.com/cilium/hive/cell"
+	"k8s.io/client-go/util/workqueue"
 )
 
 const (
@@ -33,16 +34,57 @@ var ResourcesCell = cell.Module(
 
 	cell.Config(k8s.DefaultConfig),
 	cell.Provide(
+		// Provide a no-op MetricsProvider for resource.New calls.
+		func() workqueue.MetricsProvider { return noopMetricsProvider{} },
 		k8s.CiliumIdentityResource,
 		CiliumEndpointResource,
 		CiliumEndpointSliceResource,
 		func() resource.Resource[*cilium_api_v2.CiliumNode] {
 			return &fakeresource[*cilium_api_v2.CiliumNode]{}
 		},
-		k8s.PodResource,
+		PodResource,
 		k8s.NamespaceResource,
 	),
 )
+
+// noopMetricsProvider is a no-op implementation of workqueue.MetricsProvider
+// used to satisfy the MetricsProvider parameter required by resource.New in Cilium v1.19.0.
+type noopMetricsProvider struct{}
+
+func (noopMetricsProvider) NewDepthMetric(name string) workqueue.GaugeMetric {
+	return noopMetric{}
+}
+
+func (noopMetricsProvider) NewAddsMetric(name string) workqueue.CounterMetric {
+	return noopMetric{}
+}
+
+func (noopMetricsProvider) NewLatencyMetric(name string) workqueue.HistogramMetric {
+	return noopMetric{}
+}
+
+func (noopMetricsProvider) NewWorkDurationMetric(name string) workqueue.HistogramMetric {
+	return noopMetric{}
+}
+
+func (noopMetricsProvider) NewUnfinishedWorkSecondsMetric(name string) workqueue.SettableGaugeMetric {
+	return noopMetric{}
+}
+
+func (noopMetricsProvider) NewLongestRunningProcessorSecondsMetric(name string) workqueue.SettableGaugeMetric {
+	return noopMetric{}
+}
+
+func (noopMetricsProvider) NewRetriesMetric(name string) workqueue.CounterMetric {
+	return noopMetric{}
+}
+
+type noopMetric struct{}
+
+func (noopMetric) Inc()                             {}
+func (noopMetric) Dec()                             {}
+func (noopMetric) Set(float64)                      {}
+func (noopMetric) Observe(float64)                  {}
 
 // Resources is a convenience struct to group all the operator k8s resources as cell constructor parameters.
 type Resources struct {

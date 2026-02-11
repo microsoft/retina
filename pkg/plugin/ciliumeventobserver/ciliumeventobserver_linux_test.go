@@ -107,7 +107,7 @@ func TestParse(t *testing.T) {
 	}
 	cil := New(cfg)
 	_ = cil.Init()
-	exChannel := make(chan *v1.Event)
+	exChannel := make(chan *v1.Event, 1)
 	_ = cil.SetupChannel(exChannel)
 	cil.(*ciliumeventobserver).retryDelay = 1 * time.Millisecond
 	cil.(*ciliumeventobserver).maxAttempts = 1

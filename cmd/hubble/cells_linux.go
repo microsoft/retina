@@ -18,7 +18,6 @@ import (
 	"github.com/cilium/cilium/pkg/node/manager"
 	"github.com/cilium/cilium/pkg/option"
 	"github.com/cilium/cilium/pkg/pprof"
-	"github.com/cilium/cilium/pkg/recorder"
 	"github.com/cilium/hive/cell"
 	"github.com/cilium/statedb"
 	"k8s.io/client-go/rest"
@@ -122,8 +121,6 @@ var (
 		servermanager.Cell,
 
 		retinak8s.Cell,
-
-		recorder.Cell,
 
 		// Provides resources for hubble
 		resources.Cell,

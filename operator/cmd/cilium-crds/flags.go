@@ -52,7 +52,7 @@ func InitGlobalFlags(cmd *cobra.Command, vp *viper.Viper) {
 	flags.StringSlice(option.LogDriver, []string{}, "Logging endpoints to use for example syslog")
 	option.BindEnv(vp, option.LogDriver)
 
-	flags.Var(option.NewNamedMapOptions(option.LogOpt, &option.Config.LogOpt, nil),
+	flags.Var(option.NewMapOptions(&option.Config.LogOpt),
 		option.LogOpt, `Log driver options for cilium-operator, `+
 			`configmap example for syslog driver: {"syslog.level":"info","syslog.facility":"local4"}`)
 	option.BindEnv(vp, option.LogOpt)

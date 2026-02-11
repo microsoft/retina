@@ -34,6 +34,7 @@ import (
 	"github.com/cilium/hive/cell"
 	"github.com/cilium/statedb"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/workqueue"
 
 	"github.com/microsoft/retina/pkg/common"
 	"github.com/microsoft/retina/pkg/pubsub"
@@ -57,7 +58,6 @@ var Cell = cell.Module(
 		tables.NewDeviceTable,
 		statedb.RWTable[*tables.Device].ToTable,
 	),
-	cell.Invoke(registerDeviceTable),
 
 	// Node address table (required by service cache)
 	svcCacheCell,
@@ -127,6 +127,9 @@ var Cell = cell.Module(
 	loadbalancer.ConfigCell,
 	cell.Provide(newFrontendsTable),
 
+	// No-op MetricsProvider for resource.New calls
+	cell.Provide(func() workqueue.MetricsProvider { return noopMetricsProvider{} }),
+
 	// Fake resources for features Retina doesn't use
 	cell.Provide(
 		func() resource.Resource[*slim_corev1.Namespace] { return &fakeresource[*slim_corev1.Namespace]{} },
@@ -156,13 +159,6 @@ var Cell = cell.Module(
 // CELL HELPER FUNCTIONS
 // ============================================================
 
-func registerDeviceTable(db *statedb.DB, t statedb.Table[*tables.Device], l *slog.Logger) {
-	if err := db.RegisterTable(t); err != nil {
-		l.Error("Failed to register device table", "error", err)
-		panic("Failed to register device table: " + err.Error())
-	}
-}
-
 func initLabelFilter(l *slog.Logger) {
 	if err := labelsfilter.ParseLabelPrefixCfg(l, nil, nil, ""); err != nil {
 		l.Error("Failed to parse label prefix config", "error", err)
@@ -187,22 +183,22 @@ func newNodeSynchronizer(l *slog.Logger) node.LocalNodeSynchronizer {
 	return &nodeSynchronizer{l: l.With("module", "node-synchronizer")}
 }
 
-func newCiliumEndpointResource(lc cell.Lifecycle, cs client.Clientset) (resource.Resource[*k8sTypes.CiliumEndpoint], error) {
+func newCiliumEndpointResource(lc cell.Lifecycle, cs client.Clientset, mp workqueue.MetricsProvider) (resource.Resource[*k8sTypes.CiliumEndpoint], error) {
 	return ciliumk8s.CiliumSlimEndpointResource(ciliumk8s.CiliumResourceParams{
 		Lifecycle: lc,
 		ClientSet: cs,
-	}, nil, func(*metav1.ListOptions) {})
+	}, nil, mp, func(*metav1.ListOptions) {})
 }
 
-func newEndpointsResource(l *slog.Logger, lc cell.Lifecycle, cs client.Clientset) (resource.Resource[*ciliumk8s.Endpoints], error) {
+func newEndpointsResource(l *slog.Logger, lc cell.Lifecycle, cs client.Clientset, mp workqueue.MetricsProvider) (resource.Resource[*ciliumk8s.Endpoints], error) {
 	//nolint:wrapcheck // wrapped error here is of dubious value
 	return ciliumk8s.EndpointsResource(l, lc, ciliumk8s.ConfigParams{
 		Config:      ciliumk8s.Config{K8sServiceProxyName: ""},
 		WatchConfig: ciliumk8s.ServiceWatchConfig{EnableHeadlessServiceWatch: true},
-	}, cs)
+	}, cs, mp)
 }
 
-func newServiceResource(lc cell.Lifecycle, cs client.Clientset) (resource.Resource[*slim_corev1.Service], error) {
+func newServiceResource(lc cell.Lifecycle, cs client.Clientset, mp workqueue.MetricsProvider) (resource.Resource[*slim_corev1.Service], error) {
 	//nolint:wrapcheck // wrapped error here is of dubious value
 	return ciliumk8s.ServiceResource(
 		lc,
@@ -211,6 +207,7 @@ func newServiceResource(lc cell.Lifecycle, cs client.Clientset) (resource.Resour
 			WatchConfig: ciliumk8s.ServiceWatchConfig{EnableHeadlessServiceWatch: false},
 		},
 		cs,
+		mp,
 		func(*metav1.ListOptions) {},
 	)
 }
@@ -235,15 +232,10 @@ func subscribeAPIServerEvents(a *APIServerEventHandler) {
 // ============================================================
 
 var svcCacheCell = cell.Group(
-	cell.Provide(func() (statedb.Table[tables.NodeAddress], error) {
-		return statedb.NewTable(tables.NodeAddressTableName, tables.NodeAddressIndex)
+	cell.Provide(func(db *statedb.DB) (statedb.RWTable[tables.NodeAddress], error) {
+		return statedb.NewTable(db, tables.NodeAddressTableName, tables.NodeAddressIndex)
 	}),
-	cell.Invoke(func(db *statedb.DB, t statedb.Table[tables.NodeAddress], l *slog.Logger) {
-		if err := db.RegisterTable(t); err != nil {
-			l.Error("Failed to register node address table", "error", err)
-			panic("Failed to register node address table: " + err.Error())
-		}
-	}),
+	cell.Provide(statedb.RWTable[tables.NodeAddress].ToTable),
 )
 
 // ============================================================
