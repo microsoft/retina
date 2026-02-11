@@ -7,7 +7,10 @@ import (
 
 	daemonk8s "github.com/cilium/cilium/daemon/k8s"
 	cgmngr "github.com/cilium/cilium/pkg/cgroups/manager"
+	cmtypes "github.com/cilium/cilium/pkg/clustermesh/types"
 	"github.com/cilium/cilium/pkg/datapath/iptables/ipset"
+	"github.com/cilium/cilium/pkg/endpointstate"
+	"github.com/cilium/cilium/pkg/promise"
 	"github.com/cilium/cilium/pkg/datapath/tables"
 	datapath "github.com/cilium/cilium/pkg/datapath/types"
 	"github.com/cilium/cilium/pkg/endpointmanager"
@@ -31,6 +34,7 @@ import (
 	"github.com/cilium/cilium/pkg/node"
 	"github.com/cilium/cilium/pkg/policy"
 	policycell "github.com/cilium/cilium/pkg/policy/cell"
+	wgtypes "github.com/cilium/cilium/pkg/wireguard/types"
 	"github.com/cilium/hive/cell"
 	"github.com/cilium/statedb"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -123,6 +127,9 @@ var Cell = cell.Module(
 	// Retina doesn't use these, but Cilium's code requires them
 	// ============================================================
 
+	// Cluster info (required by some Cilium cells)
+	cell.Provide(func() cmtypes.ClusterInfo { return cmtypes.DefaultClusterInfo }),
+
 	// Loadbalancer config (required by some Cilium cells)
 	loadbalancer.ConfigCell,
 	cell.Provide(newFrontendsTable),
@@ -149,6 +156,14 @@ var Cell = cell.Module(
 		func() *policy.Updater { return &policy.Updater{} },
 		func() datapath.BandwidthManager { return &fakeBandwidthManager{} },
 		func() ipset.Manager { return &fakeIpsetMgr{} },
+		func() wgtypes.WireguardConfig { return fakeWireguardConfig{} },
+		func() datapath.IPsecConfig { return fakeIPsecConfig{} },
+		func() datapath.IptablesManager { return fakeIptablesManager{} },
+		func() promise.Promise[endpointstate.Restorer] {
+			r, p := promise.New[endpointstate.Restorer]()
+			r.Resolve(fakeRestorer{})
+			return p
+		},
 	),
 )
 

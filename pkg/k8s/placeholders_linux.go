@@ -206,3 +206,33 @@ func (n *NoOpOrchestrator) DatapathInitialized() <-chan struct{} {
 	close(ch)
 	return ch
 }
+
+// fakeRestorer is a no-op endpointstate.Restorer (Retina doesn't restore endpoints).
+type fakeRestorer struct{}
+
+func (fakeRestorer) WaitForEndpointRestoreWithoutRegeneration(context.Context) error { return nil }
+func (fakeRestorer) WaitForEndpointRestore(context.Context) error                    { return nil }
+func (fakeRestorer) WaitForInitialPolicy(context.Context) error                      { return nil }
+
+// fakeWireguardConfig is a no-op WireguardConfig (Retina doesn't use WireGuard).
+type fakeWireguardConfig struct{}
+
+func (fakeWireguardConfig) Enabled() bool { return false }
+
+// fakeIPsecConfig is a no-op IPsecConfig (Retina doesn't use IPsec).
+type fakeIPsecConfig struct{}
+
+func (fakeIPsecConfig) Enabled() bool                                              { return false }
+func (fakeIPsecConfig) UseCiliumInternalIP() bool                                  { return false }
+func (fakeIPsecConfig) DNSProxyInsecureSkipTransparentModeCheckEnabled() bool       { return false }
+
+// fakeIptablesManager is a no-op IptablesManager (Retina doesn't manage iptables).
+type fakeIptablesManager struct{}
+
+func (fakeIptablesManager) InstallProxyRules(uint16, string)                   {}
+func (fakeIptablesManager) SupportsOriginalSourceAddr() bool                   { return false }
+func (fakeIptablesManager) GetProxyPorts() map[string]uint16                   { return nil }
+func (fakeIptablesManager) InstallNoTrackRules(netip.Addr, uint16)             {}
+func (fakeIptablesManager) RemoveNoTrackRules(netip.Addr, uint16)              {}
+func (fakeIptablesManager) AddNoTrackHostPorts(string, string, []string)       {}
+func (fakeIptablesManager) RemoveNoTrackHostPorts(string, string)              {}
