@@ -127,9 +127,6 @@ var Cell = cell.Module(
 	loadbalancer.ConfigCell,
 	cell.Provide(newFrontendsTable),
 
-	// No-op MetricsProvider for resource.New calls
-	cell.Provide(func() workqueue.MetricsProvider { return noopMetricsProvider{} }),
-
 	// Fake resources for features Retina doesn't use
 	cell.Provide(
 		func() resource.Resource[*slim_corev1.Namespace] { return &fakeresource[*slim_corev1.Namespace]{} },

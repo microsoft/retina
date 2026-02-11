@@ -22,7 +22,6 @@ import (
 	policytypes "github.com/cilium/cilium/pkg/policy/types"
 	cilium "github.com/cilium/proxy/go/cilium/api"
 	k8sRuntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/util/workqueue"
 )
 
 type fakeresource[T k8sRuntime.Object] struct{}
@@ -207,26 +206,3 @@ func (n *NoOpOrchestrator) DatapathInitialized() <-chan struct{} {
 	close(ch)
 	return ch
 }
-
-// noopMetricsProvider is a no-op implementation of workqueue.MetricsProvider
-// used to satisfy the MetricsProvider parameter required by resource.New in Cilium v1.19.0.
-type noopMetricsProvider struct{}
-
-func (noopMetricsProvider) NewDepthMetric(string) workqueue.GaugeMetric             { return noopMetric{} }
-func (noopMetricsProvider) NewAddsMetric(string) workqueue.CounterMetric             { return noopMetric{} }
-func (noopMetricsProvider) NewLatencyMetric(string) workqueue.HistogramMetric         { return noopMetric{} }
-func (noopMetricsProvider) NewWorkDurationMetric(string) workqueue.HistogramMetric    { return noopMetric{} }
-func (noopMetricsProvider) NewUnfinishedWorkSecondsMetric(string) workqueue.SettableGaugeMetric {
-	return noopMetric{}
-}
-func (noopMetricsProvider) NewLongestRunningProcessorSecondsMetric(string) workqueue.SettableGaugeMetric {
-	return noopMetric{}
-}
-func (noopMetricsProvider) NewRetriesMetric(string) workqueue.CounterMetric { return noopMetric{} }
-
-type noopMetric struct{}
-
-func (noopMetric) Inc()            {}
-func (noopMetric) Dec()            {}
-func (noopMetric) Set(float64)     {}
-func (noopMetric) Observe(float64) {}
