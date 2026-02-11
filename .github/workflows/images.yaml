@@ -14,7 +14,7 @@ permissions:
 jobs:
   retina-images:
     name: Build Agent Images - Linux
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
 
     strategy:
       matrix:
@@ -29,9 +29,6 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go version
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
 
       - name: Az CLI login
         uses: azure/login@v2
@@ -65,7 +62,7 @@ jobs:
   build-windows-binaries:
     name: Build Windows Binaries
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -131,7 +128,7 @@ jobs:
           TAG=$(make version)
           echo "TAG=$TAG" >> "$GITHUB_ENV"
           if [ "$IS_MERGE_GROUP" == "true" ]; then
-            az acr login -n ${{ vars.ACR_NAME }} 
+            az acr login -n ${{ vars.ACR_NAME }}
             make retina-image-win \
               IMAGE_NAMESPACE=${{ github.repository }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
@@ -154,7 +151,7 @@ jobs:
 
   operator-images:
     name: Build Operator Images
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
 
     strategy:
       matrix:
@@ -169,9 +166,6 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go version
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
 
       - name: Az CLI login
         uses: azure/login@v2
@@ -203,18 +197,13 @@ jobs:
           IS_MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
 
   retina-shell-images:
-    name: Build Retina Shell Images (${{ matrix.platform }}, ${{ matrix.arch }})
-    runs-on: ${{ matrix.runner }}
+    name: Build Retina Shell Images
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
 
     strategy:
       matrix:
-        include:
-          - platform: linux
-            arch: amd64
-            runner: ubuntu-latest
-          - platform: linux
-            arch: arm64
-            runner: ubuntu-24.04-arm
+        platform: ["linux"]
+        arch: ["amd64", "arm64"]
 
     steps:
       - name: Checkout code
@@ -255,7 +244,7 @@ jobs:
 
   kubectl-retina-images:
     name: Build Kubectl Retina Images
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
 
     strategy:
       matrix:
@@ -270,9 +259,6 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go version
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
 
       - name: Az CLI login
         uses: azure/login@v2
@@ -337,7 +323,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          az acr login -n ${{ vars.ACR_NAME }}  
+          az acr login -n ${{ vars.ACR_NAME }}
           make manifest COMPONENT=${{ matrix.components }} \
           IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
 
@@ -389,7 +375,7 @@ jobs:
       azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
       azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
       azure-app-insights-key: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
-  
+
   perf-test-advanced:
     if: ${{ github.event_name == 'merge_group'}}
     needs: [manifests]

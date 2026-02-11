@@ -162,9 +162,10 @@ func (d *dns) Start(ctx context.Context) error {
 	d.l.Info("Starting DNS plugin")
 	d.isRunning = true
 
+	d.recordsChannel = make(chan perf.Record, recordsBuffer)
+
 	// Setup enricher if pod-level metrics enabled
 	if d.cfg.EnablePodLevel {
-		d.recordsChannel = make(chan perf.Record, recordsBuffer)
 		if enricher.IsInitialized() {
 			d.enricher = enricher.Instance()
 		} else {
