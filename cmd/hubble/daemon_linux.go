@@ -7,11 +7,12 @@ package hubble
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 
 	"github.com/microsoft/retina/pkg/config"
+	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/managers/pluginmanager"
 	"github.com/microsoft/retina/pkg/managers/servermanager"
 
@@ -20,7 +21,6 @@ import (
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	hubblecell "github.com/cilium/cilium/pkg/hubble/cell"
 	"github.com/cilium/cilium/pkg/ipcache"
-	"github.com/cilium/cilium/pkg/k8s"
 	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
 	"github.com/cilium/cilium/pkg/k8s/watchers"
 	monitoragent "github.com/cilium/cilium/pkg/monitor/agent"
@@ -34,7 +34,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	zapf "sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
@@ -44,7 +43,9 @@ var (
 		"daemon",
 		"Retina-Agent Daemon",
 		// Create the controller manager, provides the hive with the controller manager and its client
-		cell.Provide(func(k8sCfg *rest.Config, logger logrus.FieldLogger, rcfg config.RetinaHubbleConfig) (ctrl.Manager, client.Client, error) {
+		cell.Provide(func(
+			k8sCfg *rest.Config, logger *slog.Logger, rcfg config.RetinaHubbleConfig,
+		) (ctrl.Manager, client.Client, error) {
 			if err := corev1.AddToScheme(scheme); err != nil { //nolint:govet // intentional shadow
 				logger.Error("failed to add corev1 to scheme")
 				return nil, nil, errors.Wrap(err, "failed to add corev1 to scheme")
@@ -60,7 +61,7 @@ var (
 				LeaderElectionID:       "ecaf1259.retina.io",
 			}
 
-			logf.SetLogger(zapf.New())
+			logf.SetLogger(log.LogrLogger())
 			ctrlManager, err := ctrl.NewManager(k8sCfg, mgrOption)
 			if err != nil {
 				logger.Error("failed to create manager")
@@ -71,7 +72,7 @@ var (
 		}),
 
 		// Start the controller manager
-		cell.Invoke(func(l logrus.FieldLogger, lifecycle cell.Lifecycle, ctrlManager ctrl.Manager) {
+		cell.Invoke(func(l *slog.Logger, lifecycle cell.Lifecycle, ctrlManager ctrl.Manager) {
 			var wp *workerpool.WorkerPool
 			lifecycle.Append(
 				cell.Hook{
@@ -99,7 +100,7 @@ var (
 type Daemon struct {
 	clientset k8sClient.Clientset
 
-	log            logrus.FieldLogger
+	log            *slog.Logger
 	monitorAgent   monitoragent.Agent
 	pluginManager  *pluginmanager.PluginManager
 	HTTPServer     *servermanager.HTTPServer
@@ -108,7 +109,6 @@ type Daemon struct {
 	k8swatcher     *watchers.K8sWatcher
 	localNodeStore *node.LocalNodeStore
 	ipc            *ipcache.IPCache
-	svcCache       k8s.ServiceCache
 	hubble         hubblecell.HubbleIntegration
 }
 
@@ -124,33 +124,34 @@ func newDaemon(params *daemonParams) *Daemon {
 		k8swatcher:     params.K8sWatcher,
 		localNodeStore: params.Lnds,
 		ipc:            params.IPC,
-		svcCache:       params.SvcCache,
 		hubble:         params.Hubble,
 	}
 }
 
 func (d *Daemon) Run(ctx context.Context) error {
 	// Start K8s watcher
-	d.log.WithField("localNodeStore", d.localNodeStore).Info("Starting local node store")
+	d.log.Info("Starting local node store", "localNodeStore", d.localNodeStore)
 
 	// Start K8s watcher. Will block till sync is complete or timeout.
 	// If sync doesn't complete within timeout (3 minutes), causes fatal error.
 	retinak8s.Start(ctx, d.k8swatcher)
 
+	d.log.Info("Starting generateEvents goroutine", "eventChanCap", cap(d.eventChan))
 	go d.generateEvents(ctx)
 	return nil
 }
 
 func (d *Daemon) generateEvents(ctx context.Context) {
+	d.log.Info("generateEvents started, waiting for events on eventChan")
 	for {
 		select {
 		case <-ctx.Done():
+			d.log.Info("generateEvents context done, exiting")
 			return
 		case event := <-d.eventChan:
-			d.log.WithField("event", event).Debug("Sending event to monitor agent")
 			err := d.monitorAgent.SendEvent(0, event)
 			if err != nil {
-				d.log.WithError(err).Error("Unable to send event to monitor agent")
+				d.log.Error("Unable to send event to monitor agent", "error", err)
 			}
 		}
 	}
