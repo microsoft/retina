@@ -3,12 +3,12 @@
 package config
 
 import (
+	"log/slog"
 	"path/filepath"
 
 	"github.com/cilium/cilium/pkg/option"
 	"github.com/cilium/hive/cell"
 	sharedconfig "github.com/microsoft/retina/pkg/shared/config"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 )
 
@@ -64,14 +64,14 @@ var (
 
 		cell.Config(DefaultRetinaHubbleConfig),
 
-		cell.Provide(func(logger logrus.FieldLogger) (Config, error) {
+		cell.Provide(func(logger *slog.Logger) (Config, error) {
 			retinaConfigFile := filepath.Join(option.Config.ConfigDir, configFileName)
 			conf, err := GetConfig(retinaConfigFile)
 			if err != nil {
-				logger.Error(err)
+				logger.Error("failed to get config", "error", err)
 				conf = DefaultRetinaConfig
 			}
-			logger.Info(conf)
+			logger.Info("loaded config", "config", conf)
 			return *conf, nil
 		}),
 		sharedconfig.Cell,

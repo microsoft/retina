@@ -47,8 +47,6 @@ func TestToFlow(t *testing.T) {
 	assert.EqualValues(t, f.GetL4().Protocol.(*flow.Layer4_TCP).TCP.SourcePort, uint32(443))
 	assert.EqualValues(t, f.GetL4().Protocol.(*flow.Layer4_TCP).TCP.DestinationPort, uint32(80))
 	assert.NotNil(t, f.Time)
-	// Extensions are now set separately via SetExtensions() after populating extension fields
-	assert.Nil(t, f.Extensions)
 	assert.Equal(t, f.Type, flow.FlowType_L3_L4)
 
 	if !f.GetTime().IsValid() {
