@@ -14,12 +14,17 @@ permissions:
 jobs:
   retina-images:
     name: Build Agent Images - Linux
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
 
     strategy:
       matrix:
         platform: ["linux"]
         arch: ["amd64", "arm64"]
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
 
     steps:
       - name: Checkout code
@@ -29,9 +34,6 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go version
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
 
       - name: Az CLI login
         uses: azure/login@v2
@@ -154,12 +156,17 @@ jobs:
 
   operator-images:
     name: Build Operator Images
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
 
     strategy:
       matrix:
         platform: ["linux"]
         arch: ["amd64", "arm64"]
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
 
     steps:
       - name: Checkout code
@@ -169,9 +176,6 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go version
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
 
       - name: Az CLI login
         uses: azure/login@v2
@@ -255,12 +259,17 @@ jobs:
 
   kubectl-retina-images:
     name: Build Kubectl Retina Images
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
 
     strategy:
       matrix:
         platform: ["linux"]
         arch: ["amd64", "arm64"]
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
 
     steps:
       - name: Checkout code
@@ -270,9 +279,6 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go version
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
 
       - name: Az CLI login
         uses: azure/login@v2
