@@ -608,14 +608,14 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 			// Add the traffic direction to the flow.
 			fl.TrafficDirection = flow.TrafficDirection(bpfEvent.TrafficDirection)
 
-			meta := &utils.RetinaMetadata{}
+			ext := utils.NewExtensions()
 
-			// Add packet size to the flow's metadata.
-			utils.AddPacketSize(meta, bpfEvent.Bytes)
+			// Add packet size to the flow's extensions.
+			utils.AddPacketSize(ext, bpfEvent.Bytes)
 
-			// Add previously observed byte and packet counts to the flow's metadata
-			utils.AddPreviouslyObservedBytes(meta, bpfEvent.PreviouslyObservedBytes)
-			utils.AddPreviouslyObservedPackets(meta, bpfEvent.PreviouslyObservedPackets)
+			// Add previously observed byte and packet counts to the flow's extensions
+			utils.AddPreviouslyObservedBytes(ext, bpfEvent.PreviouslyObservedBytes)
+			utils.AddPreviouslyObservedPackets(ext, bpfEvent.PreviouslyObservedPackets)
 
 			// Add the TCP metadata to the flow.
 			tcpMetadata := bpfEvent.TcpMetadata
@@ -632,7 +632,7 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 				uint16((bpfEvent.Flags&TCPFlagNS)>>8),  // nolint:gomnd // 8 is the offset for NS.
 			)
 			utils.AddPreviouslyObservedTCPFlags(
-				meta,
+				ext,
 				bpfEvent.PreviouslyObservedFlags.Syn,
 				bpfEvent.PreviouslyObservedFlags.Ack,
 				bpfEvent.PreviouslyObservedFlags.Fin,
@@ -647,13 +647,13 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 			// For packets originating from node, we use tsval as the tcpID.
 			// Packets coming back has the tsval echoed in tsecr.
 			if fl.GetTraceObservationPoint() == flow.TraceObservationPoint_TO_NETWORK {
-				utils.AddTCPID(meta, uint64(tcpMetadata.Tsval))
+				utils.AddTCPID(ext, uint64(tcpMetadata.Tsval))
 			} else if fl.GetTraceObservationPoint() == flow.TraceObservationPoint_FROM_NETWORK {
-				utils.AddTCPID(meta, uint64(tcpMetadata.Tsecr))
+				utils.AddTCPID(ext, uint64(tcpMetadata.Tsecr))
 			}
 
-			// Add metadata to the flow.
-			utils.AddRetinaMetadata(fl, meta)
+			// Set extensions on the flow.
+			utils.SetExtensions(fl, ext)
 
 			// Write the event to the enricher.
 			ev := &v1.Event{
