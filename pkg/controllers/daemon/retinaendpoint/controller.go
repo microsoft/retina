@@ -72,7 +72,13 @@ func (r *RetinaEndpointReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, nil
 	}
 
-	retinaEndpointCommon := retinaCommon.RetinaEndpointCommonFromAPI(retinaEndpoint)
+	var zone string
+	node := r.cache.GetNodeByIP(retinaEndpoint.Spec.NodeIP)
+	if node != nil {
+		zone = node.Zone()
+	}
+	retinaEndpointCommon := retinaCommon.RetinaEndpointCommonFromAPI(retinaEndpoint, zone)
+
 	if err := r.cache.UpdateRetinaEndpoint(retinaEndpointCommon); err != nil {
 		r.l.Error("Failed to update RetinaEndpoint in Cache", zap.Error(err), zap.String("RetinaEndpoint", req.NamespacedName.String()))
 		return ctrl.Result{}, err
