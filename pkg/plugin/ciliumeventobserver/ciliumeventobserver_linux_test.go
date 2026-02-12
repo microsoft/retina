@@ -13,6 +13,7 @@ import (
 	"github.com/cilium/cilium/pkg/monitor"
 	monitorAPI "github.com/cilium/cilium/pkg/monitor/api"
 	"github.com/cilium/cilium/pkg/monitor/payload"
+	"github.com/gopacket/gopacket/layers"
 	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/controllers/cache"
 	"github.com/microsoft/retina/pkg/enricher"
@@ -46,19 +47,20 @@ func TestStartError(t *testing.T) {
 
 func TestStart(t *testing.T) {
 	ctxWithCancel, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
 
 	cfg := &config.Config{
 		EnablePodLevel: true,
 	}
 	cil := New(cfg)
-	exChan := make(chan *v1.Event)
+	exChan := make(chan *v1.Event, 1)
 	_ = cil.SetupChannel(exChan)
 	_ = cil.Init()
 	md := NewMockDialer(false)
 	cil.(*ciliumeventobserver).d = md
 	cil.(*ciliumeventobserver).connection = md.reader
+	cil.(*ciliumeventobserver).retryDelay = 1 * time.Millisecond
+	cil.(*ciliumeventobserver).maxAttempts = 1
 
 	go cil.Start(ctxWithCancel) //nolint:errcheck // do not need for test
 	pl := getPayload()
@@ -66,6 +68,11 @@ func TestStart(t *testing.T) {
 	_, _ = md.writer.Write(msg)
 	event := <-exChan
 	assert.Assert(t, event != nil)
+
+	// Clean up: cancel context then close pipe to unblock monitorLoop.
+	cancel()
+	md.reader.Close()
+	md.writer.Close()
 }
 
 func TestMonitorLoop(t *testing.T) {
@@ -92,19 +99,22 @@ func TestMonitorLoop(t *testing.T) {
 	time.Sleep(2 * time.Second)
 	plEvent := <-cil.(*ciliumeventobserver).payloadEvents
 	assert.Assert(t, plEvent != nil)
+
+	// Clean up: cancel context then close pipe to unblock monitorLoop.
 	cancel()
+	md.reader.Close()
+	md.writer.Close()
 }
 
 func TestParse(t *testing.T) {
 	ctxWithCancel, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
 	cfg := &config.Config{
 		EnablePodLevel: true,
 	}
 	cil := New(cfg)
 	_ = cil.Init()
-	exChannel := make(chan *v1.Event)
+	exChannel := make(chan *v1.Event, 1)
 	_ = cil.SetupChannel(exChannel)
 	cil.(*ciliumeventobserver).retryDelay = 1 * time.Millisecond
 	cil.(*ciliumeventobserver).maxAttempts = 1
@@ -123,6 +133,11 @@ func TestParse(t *testing.T) {
 	assert.Assert(t, len(cil.(*ciliumeventobserver).payloadEvents) == 0)
 	event := <-exChannel
 	assert.Assert(t, event != nil)
+
+	// Clean up: cancel context then close pipe to unblock monitorLoop.
+	cancel()
+	md.reader.Close()
+	md.writer.Close()
 }
 
 func getPayload() payload.Payload {
@@ -131,12 +146,30 @@ func getPayload() payload.Payload {
 		SubType: uint8(130),
 	}
 
-	data, _ := testutils.CreateL3L4Payload(dn)
+	eth := &layers.Ethernet{
+		SrcMAC:       net.HardwareAddr{1, 2, 3, 4, 5, 6},
+		DstMAC:       net.HardwareAddr{6, 5, 4, 3, 2, 1},
+		EthernetType: layers.EthernetTypeIPv4,
+	}
+	ip := &layers.IPv4{
+		SrcIP:    net.IP{1, 2, 3, 4},
+		DstIP:    net.IP{5, 6, 7, 8},
+		Version:  4,
+		Protocol: layers.IPProtocolTCP,
+		TTL:      64,
+	}
+	tcp := &layers.TCP{
+		SrcPort: 12345,
+		DstPort: 80,
+	}
+	_ = tcp.SetNetworkLayerForChecksum(ip)
+
+	data, _ := testutils.CreateL3L4Payload(dn, eth, ip, tcp)
 	pl := payload.Payload{
 		Data: data,
 		CPU:  0,
 		Lost: 0,
-		Type: 9,
+		Type: payload.EventSample,
 	}
 	return pl
 }

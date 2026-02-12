@@ -285,6 +285,7 @@ require (
 	github.com/florianl/go-tc v0.4.5
 	github.com/go-logr/zapr v1.3.0
 	github.com/google/gopacket v1.1.19
+	github.com/gopacket/gopacket v1.3.1
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/inspektor-gadget/inspektor-gadget v0.27.0
 	github.com/jellydator/ttlcache/v3 v3.4.0
@@ -481,7 +482,6 @@ require (
 	github.com/google/wire v0.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.4 // indirect
 	github.com/googleapis/gax-go/v2 v2.14.1 // indirect
-	github.com/gopacket/gopacket v1.3.1 // indirect
 	github.com/gordonklaus/ineffassign v0.1.0 // indirect
 	github.com/goreleaser/chglog v0.6.1 // indirect
 	github.com/goreleaser/fileglob v1.3.0 // indirect
@@ -659,7 +659,7 @@ require (
 	lukechampine.com/blake3 v1.2.1 // indirect
 	mvdan.cc/gofumpt v0.7.0 // indirect
 	mvdan.cc/unparam v0.0.0-20240528143540-8a5130ca722f // indirect
-	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20211110210527-619e6b92dab9 // indirect
+	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20250517180713-32e5e9e948a5 // indirect
 	sigs.k8s.io/controller-tools v0.16.5 // indirect
 	sigs.k8s.io/gateway-api v1.2.1-0.20250319040149-e8b8afabf889 // indirect
 	sigs.k8s.io/kind v0.23.0 // indirect
