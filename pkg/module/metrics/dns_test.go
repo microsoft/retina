@@ -94,19 +94,19 @@ func TestGetLabels(t *testing.T) {
 
 func TestValues(t *testing.T) {
 	testR := &flow.Flow{}
-	metaR := &utils.RetinaMetadata{}
-	utils.AddDNSInfo(testR, metaR, "R", 0, "bing.com", []string{"A"}, 1, []string{"1.1.1.1"})
-	utils.AddRetinaMetadata(testR, metaR)
+	extR := utils.NewExtensions()
+	utils.AddDNSInfo(testR, extR, "R", 0, "bing.com", []string{"A"}, 1, []string{"1.1.1.1"})
+	utils.SetExtensions(testR, extR)
 
 	testQ := &flow.Flow{}
-	metaQ := &utils.RetinaMetadata{}
-	utils.AddDNSInfo(testQ, metaQ, "Q", 0, "bing.com", []string{"A"}, 0, []string{})
-	utils.AddRetinaMetadata(testQ, metaQ)
+	extQ := utils.NewExtensions()
+	utils.AddDNSInfo(testQ, extQ, "Q", 0, "bing.com", []string{"A"}, 0, []string{})
+	utils.SetExtensions(testQ, extQ)
 
 	testU := &flow.Flow{}
-	metaU := &utils.RetinaMetadata{}
-	utils.AddDNSInfo(testU, metaU, "U", 0, "bing.com", []string{"A"}, 0, []string{})
-	utils.AddRetinaMetadata(testU, metaU)
+	extU := utils.NewExtensions()
+	utils.AddDNSInfo(testU, extU, "U", 0, "bing.com", []string{"A"}, 0, []string{})
+	utils.SetExtensions(testU, extU)
 
 	tests := []struct {
 		name   string
@@ -203,19 +203,19 @@ func TestProcessLocalCtx(t *testing.T) {
 	defer ctrl.Finish()
 
 	testR := &flow.Flow{}
-	metaR := &utils.RetinaMetadata{}
-	utils.AddDNSInfo(testR, metaR, "R", 0, "bing.com", []string{"A"}, 1, []string{"1.1.1.1"})
-	utils.AddRetinaMetadata(testR, metaR)
+	extR := utils.NewExtensions()
+	utils.AddDNSInfo(testR, extR, "R", 0, "bing.com", []string{"A"}, 1, []string{"1.1.1.1"})
+	utils.SetExtensions(testR, extR)
 
 	testIngress := &flow.Flow{TrafficDirection: flow.TrafficDirection_INGRESS}
-	metaIngress := &utils.RetinaMetadata{}
-	utils.AddDNSInfo(testIngress, metaIngress, "R", 0, "bing.com", []string{"A"}, 1, []string{"1.1.1.1"})
-	utils.AddRetinaMetadata(testIngress, metaIngress)
+	extIngress := utils.NewExtensions()
+	utils.AddDNSInfo(testIngress, extIngress, "R", 0, "bing.com", []string{"A"}, 1, []string{"1.1.1.1"})
+	utils.SetExtensions(testIngress, extIngress)
 
 	testEgress := &flow.Flow{TrafficDirection: flow.TrafficDirection_EGRESS}
-	metaEgress := &utils.RetinaMetadata{}
-	utils.AddDNSInfo(testEgress, metaEgress, "R", 0, "bing.com", []string{"A"}, 1, []string{"1.1.1.1"})
-	utils.AddRetinaMetadata(testEgress, metaEgress)
+	extEgress := utils.NewExtensions()
+	utils.AddDNSInfo(testEgress, extEgress, "R", 0, "bing.com", []string{"A"}, 1, []string{"1.1.1.1"})
+	utils.SetExtensions(testEgress, extEgress)
 
 	tests := []struct {
 		name           string

@@ -141,18 +141,15 @@ func (d *DNSMetrics) responseValues(flow *v1.Flow) []string {
 func (d *DNSMetrics) getLabelsForProcessFlow(flow *v1.Flow) ([]string, error) {
 	var labels []string
 	// Get the DNS query type
-	meta := utils.RetinaMetadata{}
-	if err := flow.GetExtensions().UnmarshalTo(&meta); err != nil {
-		return labels, errors.Wrapf(err, "failed to unmarshal flow extensions")
-	}
-	switch meta.GetDnsType() {
+	_, dnsType, _ := utils.GetDNS(flow)
+	switch dnsType {
 	case utils.DNSType_QUERY:
 		labels = d.requestValues(flow)
 	case utils.DNSType_RESPONSE:
 		labels = d.responseValues(flow)
 	case utils.DNSType_UNKNOWN:
 	default:
-		return labels, errors.Errorf("invalid DNS type %d", int32(meta.GetDnsType()))
+		return labels, errors.Errorf("invalid DNS type %d", int32(dnsType))
 	}
 	return labels, nil
 }
