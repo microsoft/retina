@@ -2,11 +2,12 @@
 ARG OS_VERSION=ltsc2022
 # pinned base images
 
-# mcr.microsoft.com/windows/servercore:ltsc2019 
-FROM mcr.microsoft.com/windows/servercore@sha256:1883d9fb02b90ec20783f9376e004e125b28c652a73d821416444aadde6600b0 AS ltsc2019
+# mcr.microsoft.com/windows/servercore:ltsc2019
+FROM mcr.microsoft.com/windows/servercore@sha256:8077f3e5b0987c388735917f0d15a3dd5fc773f8b5699c612ccb539d42644185 AS ltsc2019
 
 # mcr.microsoft.com/windows/servercore:ltsc2022
-FROM mcr.microsoft.com/windows/servercore@sha256:d31ac6a9b0c435679f941677661dd2fc555620348198c506e78e9ba70352e406 AS ltsc2022
+FROM mcr.microsoft.com/windows/servercore@sha256:e000e9a1712065a0218447c20ae19984b447fa741d11cf64696b8a1172fcd7da    AS ltsc2022
+
 
 FROM ${OS_VERSION} AS agent-win
 ARG GOARCH=amd64 # default to amd64
