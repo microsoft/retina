@@ -65,8 +65,8 @@ Metrics enabled when `dropreason` plugin is enabled (see [Metrics Configuration]
 | ----------------------- | ---------------------------------------------- | --------------------- |
 | `drop_count`            | *Basic*: dropped packet count                  | `direction`, `reason` |
 | `drop_bytes`            | *Basic*: dropped byte count                    | `direction`, `reason` |
-| `adv_drop_count`        | ***Advanced/Pod-Level***: dropped packet count | `direction`, `reason`, context labels |
-| `adv_drop_bytes`        | ***Advanced/Pod-Level***: dropped byte count   | `direction`, `reason`, context labels |
+
+> **Note:** Pod-level drop metrics with source/destination context are not available in Advanced mode. The `dropreason` plugin only provides node-level aggregated drop metrics. For pod-level network visibility, use the `packetparser` plugin metrics (`adv_forward_count`, `adv_forward_bytes`, `adv_tcpflags_count`).
 
 #### Label Values
 
