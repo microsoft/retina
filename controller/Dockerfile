@@ -19,21 +19,21 @@ ARG GOOS=linux # default to linux
 ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
 RUN if [ "$GOOS" = "linux" ] ; then \
-      tdnf install -y clang lld bpftool libbpf-devel; \
+    tdnf install -y clang lld bpftool libbpf-devel; \
     fi
 COPY ./pkg/plugin /go/src/github.com/microsoft/retina/pkg/plugin
 WORKDIR /go/src/github.com/microsoft/retina
 RUN if [ "$GOOS" = "linux" ] ; then \
-      go mod init github.com/microsoft/retina; \
-      go generate -skip "mockgen" -x /go/src/github.com/microsoft/retina/pkg/plugin/...; \
-      tar czf /gen.tar.gz ./pkg/plugin; \
-      rm go.mod; \
+    go mod init github.com/microsoft/retina; \
+    go generate -skip "mockgen" -x /go/src/github.com/microsoft/retina/pkg/plugin/...; \
+    tar czf /gen.tar.gz ./pkg/plugin; \
+    rm go.mod; \
     fi
 COPY ./go.mod ./go.sum ./
 RUN go mod download
 COPY . .
 RUN if [ "$GOOS" = "linux" ] ; then \
-      rm -rf ./pkg/plugin && tar xvf /gen.tar.gz ./pkg/plugin; \
+    rm -rf ./pkg/plugin && tar xvf /gen.tar.gz ./pkg/plugin; \
     fi
 
 # capture binary
@@ -87,7 +87,7 @@ RUN arr="clang tcpdump ip ss iptables-legacy iptables-legacy-save iptables-nft i
 ARG GOARCH=amd64
 ENV HUBBLE_ARCH=${GOARCH}
 # ARG HUBBLE_VERSION may be modified via the update-hubble GitHub Action
-ARG HUBBLE_VERSION=v1.18.3
+ARG HUBBLE_VERSION=v1.18.6
 ENV HUBBLE_VERSION=${HUBBLE_VERSION}
 RUN echo "Hubble version: $HUBBLE_VERSION" && \
     wget --no-check-certificate https://github.com/cilium/hubble/releases/download/$HUBBLE_VERSION/hubble-linux-${HUBBLE_ARCH}.tar.gz && \
