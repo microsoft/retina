@@ -55,12 +55,6 @@ import (
 var errNoOutgoingLinks = errors.New("could not determine any outgoing links")
 var errRingBufKernelTooOld = errors.New("ring buffer requires newer kernel")
 
-const (
-	ringBufMinKernelMajor = 5
-	ringBufMinKernelMinor = 8
-	ringBufMinKernelPatch = 0
-)
-
 func init() {
 	registry.Add(name, New)
 }
@@ -222,7 +216,7 @@ func (p *packetParser) Compile(ctx context.Context) error {
 		conntrackDir,
 	}
 
-	if p.cfg.EnablePacketParserRingBuffer {
+	if p.cfg.PacketParserRingBuffer.IsEnabled() {
 		var reason string
 		p.cfg.PacketParserRingBufferSize, reason = validateRingBufferSize(p.cfg.PacketParserRingBufferSize)
 		if reason != "" {
@@ -250,7 +244,7 @@ func (p *packetParser) Init() error {
 		p.l.Warn("packet parser and latency plugin will not init because pod level is disabled")
 		return nil
 	}
-	if p.cfg.EnablePacketParserRingBuffer {
+	if p.cfg.PacketParserRingBuffer.IsEnabled() {
 		if ringBufErr := ensureRingBufKernelSupported(); ringBufErr != nil {
 			return ringBufErr
 		}
@@ -303,7 +297,7 @@ func (p *packetParser) Init() error {
 		return err
 	}
 
-	if p.cfg.EnablePacketParserRingBuffer {
+	if p.cfg.PacketParserRingBuffer.IsEnabled() {
 		p.l.Info("Initializing Ring Buffer reader")
 		var rb *ringbuf.Reader
 		rb, err = ringbuf.NewReader(objs.RetinaPacketparserEvents)

@@ -81,9 +81,9 @@ var (
 		EnableConntrackMetrics:   true,
 	}
 	cfgRingBufferEnabled = &kcfg.Config{
-		EnablePodLevel:               true,
-		EnablePacketParserRingBuffer: true,
-		PacketParserRingBufferSize:   4096,
+		EnablePodLevel:             true,
+		PacketParserRingBuffer:     kcfg.PacketParserRingBufferEnabled,
+		PacketParserRingBufferSize: 4096,
 	}
 )
 
