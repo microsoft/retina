@@ -2,6 +2,8 @@ package pluginmanager
 
 import (
 	"context"
+	"log/slog"
+	"os"
 	"sync"
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
@@ -9,7 +11,6 @@ import (
 	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/telemetry"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -30,7 +31,7 @@ var Cell = cell.Module(
 type pluginManagerParams struct {
 	cell.In
 
-	Log       logrus.FieldLogger
+	Log       *slog.Logger
 	Lifecycle cell.Lifecycle
 	Config    config.Config
 	Telemetry telemetry.Telemetry
@@ -38,12 +39,12 @@ type pluginManagerParams struct {
 }
 
 func newPluginManager(params pluginManagerParams) (*PluginManager, error) {
-	logger := params.Log.WithField("module", "pluginmanager")
+	logger := params.Log.With("module", "pluginmanager")
 
 	// Enable Metrics in retina
-	metrics.InitializeMetrics()
+	metrics.InitializeMetrics(params.Log)
 
-	pluginMgr, err := NewPluginManager(&params.Config, params.Telemetry)
+	pluginMgr, err := NewPluginManager(&params.Config, params.Telemetry, params.Log)
 	if err != nil {
 		return &PluginManager{}, err
 	}
@@ -61,7 +62,8 @@ func newPluginManager(params pluginManagerParams) (*PluginManager, error) {
 				defer wg.Done()
 				err = pluginMgr.Start(pmCtx)
 				if err != nil {
-					logger.WithError(err).Fatal("failed to start plugin manager")
+					logger.Error("failed to start plugin manager", "error", err)
+					os.Exit(1)
 				}
 			}()
 
