@@ -40,6 +40,12 @@ func (g *ScriptGenerator) Generate() string {
 	// Write RST tracepoints
 	sb.WriteString(g.generateRSTTracepoints())
 
+	// Write socket error tracepoint
+	sb.WriteString(g.generateSocketErrorTracepoint())
+
+	// Write TCP retransmit tracepoint
+	sb.WriteString(g.generateRetransmitTracepoint())
+
 	// Write END block
 	sb.WriteString(g.generateEndBlock())
 
@@ -73,11 +79,11 @@ func (g *ScriptGenerator) generateBeginBlock() string {
 	} else {
 		sb.WriteString(`    printf("Tracing network issues... Press Ctrl-C to stop.\n\n");`)
 		sb.WriteString("\n")
-		sb.WriteString(`    printf("%-12s %-10s %-6s %-18s %s\n",`)
+		sb.WriteString(`    printf("%-12s %-10s %-18s %-18s %s\n",`)
 		sb.WriteString("\n")
 		sb.WriteString(`           "TIME", "TYPE", "REASON", "PROBE", "SRC -> DST");`)
 		sb.WriteString("\n")
-		sb.WriteString(`    printf("──────────────────────────────────────────────────────────────────────────────────────────────────────────\n");`)
+		sb.WriteString(`    printf("────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n");`)
 	}
 
 	sb.WriteString("\n}\n\n")
@@ -196,7 +202,7 @@ func (g *ScriptGenerator) generateRSTSentTracepoint() string {
            $daddr, $dport);
 `)
 	} else {
-		sb.WriteString(`    printf("%-12s %-10s %-6s %-18s %s:%-5d  ->  %s:%-5d\n",
+		sb.WriteString(`    printf("%-12s %-10s %-18s %-18s %s:%-5d  ->  %s:%-5d\n",
            strftime("%H:%M:%S", nsecs),
            "RST_SENT",
            "-",
@@ -241,11 +247,121 @@ func (g *ScriptGenerator) generateRSTReceivedTracepoint() string {
            $daddr, $dport);
 `)
 	} else {
-		sb.WriteString(`    printf("%-12s %-10s %-6s %-18s %s:%-5d  ->  %s:%-5d\n",
+		sb.WriteString(`    printf("%-12s %-10s %-18s %-18s %s:%-5d  ->  %s:%-5d\n",
            strftime("%H:%M:%S", nsecs),
            "RST_RECV",
            "-",
            "tcp_receive_reset",
+           $saddr, $sport,
+           $daddr, $dport);
+`)
+	}
+
+	sb.WriteString("}\n\n")
+	return sb.String()
+}
+
+// generateSocketErrorTracepoint creates the inet_sk_error_report tracepoint.
+// This captures socket errors like ECONNREFUSED, ETIMEDOUT, etc.
+func (g *ScriptGenerator) generateSocketErrorTracepoint() string {
+	var sb strings.Builder
+
+	sb.WriteString("tracepoint:sock:inet_sk_error_report\n")
+
+	// Add filter - same args structure as TCP tracepoints
+	filter := g.buildTCPFilterCondition()
+	if filter != "" {
+		sb.WriteString(filter)
+	}
+
+	sb.WriteString("{\n")
+
+	// Only process IPv4 (family == 2) and skip error=0 (not a real error)
+	sb.WriteString(`    if (args->family != 2) { return; }
+    if (args->error == 0) { return; }  // Skip non-error events (socket cleanup)
+
+    $saddr = ntop(2, args->saddr);
+    $daddr = ntop(2, args->daddr);
+    $sport = args->sport;
+    $dport = args->dport;
+    $error = args->error;
+
+`)
+
+	if g.config.OutputJSON {
+		// JSON output: use error code only (parsers can decode POSIX errno)
+		sb.WriteString(`    printf("{\"time\":\"%s\",\"type\":\"SOCK_ERR\",\"reason_code\":%d,\"probe\":\"inet_sk_error_report\",\"src_ip\":\"%s\",\"src_port\":%d,\"dst_ip\":\"%s\",\"dst_port\":%d}\n",
+           strftime("%H:%M:%S", nsecs),
+           $error,
+           $saddr, $sport,
+           $daddr, $dport);
+`)
+	} else {
+		// Table output: decode errno to human-readable name
+		sb.WriteString(`    // Decode common socket errno values (POSIX standard)
+    $errno_name = $error == 104 ? "ECONNRESET" :
+                  $error == 110 ? "ETIMEDOUT" :
+                  $error == 111 ? "ECONNREFUSED" :
+                  $error == 113 ? "EHOSTUNREACH" :
+                  $error == 101 ? "ENETUNREACH" :
+                  $error == 99  ? "EADDRNOTAVAIL" :
+                  $error == 112 ? "EHOSTDOWN" :
+                  $error == 103 ? "ECONNABORTED" :
+                  "UNKNOWN";
+
+    printf("%-12s %-10s %-18s %-18s %s:%-5d  ->  %s:%-5d\n",
+           strftime("%H:%M:%S", nsecs),
+           "SOCK_ERR",
+           $errno_name,
+           "inet_sk_error_report",
+           $saddr, $sport,
+           $daddr, $dport);
+`)
+	}
+
+	sb.WriteString("}\n\n")
+	return sb.String()
+}
+
+// generateRetransmitTracepoint creates the tcp_retransmit_skb tracepoint.
+// This captures TCP retransmissions which indicate packet loss or congestion.
+func (g *ScriptGenerator) generateRetransmitTracepoint() string {
+	var sb strings.Builder
+
+	sb.WriteString("tracepoint:tcp:tcp_retransmit_skb\n")
+
+	// Add filter - same args structure as TCP tracepoints
+	filter := g.buildTCPFilterCondition()
+	if filter != "" {
+		sb.WriteString(filter)
+	}
+
+	sb.WriteString("{\n")
+
+	// Only process IPv4 (family == 2)
+	sb.WriteString(`    if (args->family != 2) { return; }
+
+    $saddr = ntop(2, args->saddr);
+    $daddr = ntop(2, args->daddr);
+    $sport = args->sport;
+    $dport = args->dport;
+    $state = args->state;
+
+`)
+
+	if g.config.OutputJSON {
+		sb.WriteString(`    printf("{\"time\":\"%s\",\"type\":\"RETRANS\",\"reason_code\":%d,\"probe\":\"tcp_retransmit_skb\",\"src_ip\":\"%s\",\"src_port\":%d,\"dst_ip\":\"%s\",\"dst_port\":%d}\n",
+           strftime("%H:%M:%S", nsecs),
+           $state,
+           $saddr, $sport,
+           $daddr, $dport);
+`)
+	} else {
+		sb.WriteString(`    printf("%-12s %-10s %-18d %-18s %s:%-5d  ->  %s:%-5d\n",
+           strftime("%H:%M:%S", nsecs),
+           "RETRANS",
+           $state,
+           "tcp_retransmit_skb",
            $saddr, $sport,
            $daddr, $dport);
 `)
@@ -324,7 +440,7 @@ func (g *ScriptGenerator) cidrToTCPFilterCondition(cidr *net.IPNet) string {
 func (g *ScriptGenerator) generateTableOutput() string {
 	return `    // Format source and destination with numeric reason code
     if ($sport > 0) {
-        printf("%-12s %-10s %-6d %-18s %s:%-5d  ->  %s:%-5d\n",
+        printf("%-12s %-10s %-18d %-18s %s:%-5d  ->  %s:%-5d\n",
                strftime("%H:%M:%S", nsecs),
                "DROP",
                $reason,
@@ -332,7 +448,7 @@ func (g *ScriptGenerator) generateTableOutput() string {
                $saddr, $sport,
                $daddr, $dport);
     } else {
-        printf("%-12s %-10s %-6d %-18s %s  ->  %s\n",
+        printf("%-12s %-10s %-18d %-18s %s  ->  %s\n",
                strftime("%H:%M:%S", nsecs),
                "DROP",
                $reason,
