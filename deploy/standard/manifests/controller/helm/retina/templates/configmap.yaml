@@ -26,7 +26,7 @@ data:
     dataAggregationLevel: {{ .Values.dataAggregationLevel }}
     telemetryInterval: {{ .Values.daemonset.telemetryInterval }}
     dataSamplingRate: {{ .Values.dataSamplingRate }}
-    enablePacketParserRingBuffer: {{ .Values.enablePacketParserRingBuffer }}
+    packetParserRingBuffer: {{ .Values.packetParserRingBuffer }}
     packetParserRingBufferSize: {{ .Values.packetParserRingBufferSize }}
 {{- end}}
 ---

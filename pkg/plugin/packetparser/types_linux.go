@@ -50,6 +50,12 @@ const (
 	Device interfaceType = "device"
 )
 
+const (
+	ringBufMinKernelMajor = 5
+	ringBufMinKernelMinor = 8
+	ringBufMinKernelPatch = 0
+)
+
 var (
 	getQdisc = func(tcnl nltc) qdisc {
 		return tcnl.Qdisc()

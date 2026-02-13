@@ -57,7 +57,7 @@ enableAnnotations: false
 bypassLookupIPOfInterest: false
 dataAggregationLevel: "low"
 dataSamplingRate: 1
-enablePacketParserRingBuffer: false
+packetParserRingBuffer: "disabled"
 packetParserRingBufferSize: 8388608
 
 imagePullSecrets: []
