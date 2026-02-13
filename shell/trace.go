@@ -34,6 +34,9 @@ type TraceConfig struct {
 	// Output configuration
 	OutputJSON bool // true for JSON output, false for table
 
+	// Feature flags
+	EnableNetfilter bool // Enable netfilter table/chain enrichment (requires BTF)
+
 	// Timing configuration
 	TraceDuration time.Duration // How long to trace (0 = until Ctrl-C)
 	Timeout       time.Duration // Pod startup timeout
@@ -220,7 +223,7 @@ func hostNetworkPodForTrace(config TraceConfig, debugPodNamespace, nodeName stri
 				{
 					Name:  "retina-trace",
 					Image: config.RetinaShellImage,
-					Args:  args, // Use Args to preserve entrypoint.sh
+					Args:  args,  // Use Args to preserve entrypoint.sh
 					Stdin: false, // Not interactive
 					TTY:   false, // Not interactive
 					SecurityContext: &v1.SecurityContext{

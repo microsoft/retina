@@ -133,9 +133,12 @@ func TestGenerateDropScript(t *testing.T) {
 	if !strings.Contains(script, "DROP") {
 		t.Error("script missing DROP output")
 	}
-	// Should note that reason codes are kernel-specific
-	if !strings.Contains(script, "kernel-version specific") {
-		t.Error("script should note that reason codes are kernel-specific")
+	// Should have netfilter enrichment
+	if !strings.Contains(script, "nft_do_chain") {
+		t.Error("script missing netfilter enrichment (nft_do_chain)")
+	}
+	if !strings.Contains(script, "@nf_table") {
+		t.Error("script missing netfilter table map")
 	}
 }
 
@@ -218,6 +221,12 @@ func TestGenerateDropScriptJSONOutput(t *testing.T) {
 	if !strings.Contains(script, `\"src_ip\"`) {
 		t.Error("JSON script missing src_ip field")
 	}
+	if !strings.Contains(script, `\"table\"`) {
+		t.Error("JSON script missing table field")
+	}
+	if !strings.Contains(script, `\"chain\"`) {
+		t.Error("JSON script missing chain field")
+	}
 }
 
 func TestGenerateDropScriptTableOutput(t *testing.T) {
@@ -241,6 +250,12 @@ func TestGenerateDropScriptTableOutput(t *testing.T) {
 	}
 	if !strings.Contains(script, "DST") {
 		t.Error("table script missing DST header")
+	}
+	if !strings.Contains(script, "TABLE") {
+		t.Error("table script missing TABLE header")
+	}
+	if !strings.Contains(script, "CHAIN") {
+		t.Error("table script missing CHAIN header")
 	}
 }
 
