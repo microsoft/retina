@@ -4,12 +4,16 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
+	"github.com/microsoft/retina/shell"
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -194,23 +198,48 @@ func runNettrace(_ *cobra.Command, args []string) error {
 			nodeName := obj.Name
 			podNamespace := namespace
 
-			// Log validated configuration (for debugging)
-			fmt.Printf("Tracing network issues on node %s\n", nodeName)
-			if filterIP != nil {
-				fmt.Printf("Filter: IP %s (src or dst)\n", filterIP)
+			// Build TraceConfig with validated, typed values only
+			traceConfig := shell.TraceConfig{
+				RestConfig:       restConfig,
+				RetinaShellImage: fmt.Sprintf("%s:%s", traceRetinaShellImageRepo, traceRetinaShellImageVersion),
+				FilterIPs:        nil,
+				FilterCIDRs:      nil,
+				OutputJSON:       outputFormat == TraceOutputJSON,
+				TraceDuration:    traceDuration,
+				Timeout:          traceTimeout,
 			}
-			if filterCIDR != nil {
-				fmt.Printf("Filter: CIDR %s (src or dst)\n", filterCIDR)
-			}
-			if traceDuration > 0 {
-				fmt.Printf("Duration: %s\n", traceDuration)
-			}
-			fmt.Printf("Output: %s\n", outputFormat)
 
-			// TODO: Step 2 will implement shell.RunTrace()
-			_ = restConfig
-			_ = podNamespace
-			return errors.New("nettrace command not yet implemented - Step 2 will add RunTrace()")
+			// Add validated IP filter (already typed as net.IP)
+			if filterIP != nil {
+				traceConfig.FilterIPs = append(traceConfig.FilterIPs, filterIP)
+			}
+
+			// Add validated CIDR filter (already typed as *net.IPNet)
+			if filterCIDR != nil {
+				traceConfig.FilterCIDRs = append(traceConfig.FilterCIDRs, filterCIDR)
+			}
+
+			// Create context with cancellation for Ctrl-C handling
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			// Handle Ctrl-C gracefully
+			sigCh := make(chan os.Signal, 1)
+			signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+			go func() {
+				<-sigCh
+				fmt.Println("\nReceived interrupt, cleaning up...")
+				cancel()
+			}()
+
+			// Apply duration timeout if specified
+			if traceDuration > 0 {
+				var timeoutCancel context.CancelFunc
+				ctx, timeoutCancel = context.WithTimeout(ctx, traceDuration)
+				defer timeoutCancel()
+			}
+
+			return shell.RunTrace(ctx, traceConfig, nodeName, podNamespace)
 
 		case *v1.Pod:
 			return errNodeOnly
