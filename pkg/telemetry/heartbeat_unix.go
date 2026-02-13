@@ -12,8 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func KernelVersion(ctx context.Context) (string, error) {
-	_ = ctx
+func KernelVersion(context.Context) (string, error) {
 	release, err := utils.KernelRelease()
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get linux kernel version")
