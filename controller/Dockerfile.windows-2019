@@ -1,24 +1,29 @@
-# pinned base image
-# skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2019  --override-os windows --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/windows/servercore@sha256:a3d7773c4a836c2efd3ecb89f4fcb41199ee56d454225cf72a65b603bf569eca AS ltsc2019
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.25.7-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
+ARG BUILDPLATFORM
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:408661cbcfcbf24c06fc4f85c23566b42af722fdef5a5044782859e682916be7 AS builder
 
-FROM ltsc2019 AS agent-win
-ARG GOARCH=amd64 # default to amd64
-ARG GOOS=windows # default to windows
-ARG OS_VERSION=ltsc2019
-ARG REPO_PATH
-ARG BINARIES_PATH
-ENV GOARCH=${GOARCH}
-ENV GOOS=${GOOS}
-ENV OS_VERSION=${OS_VERSION}
-ENV BINARIES_PATH=${BINARIES_PATH}
-ENV REPO_PATH=${REPO_PATH}
-# CVE-2013-3900 Mitigation
-RUN reg add "HKEY_LOCAL_MACHINE\Software\Microsoft\Cryptography\Wintrust\Config" /v "EnableCertPaddingCheck" /t REG_DWORD /d "1" /f
-RUN reg add "HKEY_LOCAL_MACHINE\Software\Wow6432Node\Microsoft\Cryptography\Wintrust\Config" /v "EnableCertPaddingCheck" /t REG_DWORD /d "1" /f
-COPY ${REPO_PATH}/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
-COPY ${REPO_PATH}/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
-COPY ${BINARIES_PATH}/captureworkload.exe captureworkload.exe
-COPY ${BINARIES_PATH}/controller.exe controller.exe
+# Build args
+ARG VERSION
+ARG APP_INSIGHTS_ID
+
+ENV GOOS=windows
+ENV GOARCH=amd64 
+
+WORKDIR /usr/src/retina
+# Copy the source
+COPY . .
+
+RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /usr/bin/controller.exe -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X "github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID"="$APP_INSIGHTS_ID""  ./controller/
+RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /usr/bin/captureworkload.exe ./captureworkload/
+
+# Copy into final image
+# skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2019  --override-os windows --format "{{.Name}}@{{.Digest}}"
+FROM  mcr.microsoft.com/windows/servercore@sha256:a3d7773c4a836c2efd3ecb89f4fcb41199ee56d454225cf72a65b603bf569eca AS agent-win
+COPY --from=builder /usr/src/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
+COPY --from=builder /usr/src/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
+COPY --from=builder /usr/bin/controller.exe controller.exe
+COPY --from=builder /usr/bin/captureworkload.exe captureworkload.exe
+
 ADD https://github.com/microsoft/etl2pcapng/releases/download/v1.10.0/etl2pcapng.exe /etl2pcapng.exe
+
 CMD ["controller.exe", "start", "--kubeconfig=.\\kubeconfig"]

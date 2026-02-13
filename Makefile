@@ -96,7 +96,7 @@ help: ## Display this help
 ##@ Tools 
 
 GOFUMPT			= go tool mvdan.cc/gofumpt
-GOLANGCI_LINT	= go tool github.com/golangci/golangci-lint/cmd/golangci-lint
+GOLANGCI_LINT	= go tool github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 GORELEASER		= go tool github.com/goreleaser/goreleaser
 CONTROLLER_GEN	= go tool sigs.k8s.io/controller-tools/cmd/controller-gen
 GINKGO			= go tool github.com/onsi/ginkgo
@@ -141,10 +141,24 @@ fmt: ## run gofumpt on $FMT_PKG (default "retina").
 	$(GOFUMPT) -w $(FMT_PKG)
 
 lint: ## Fast lint vs default branch showing only new issues.
-	$(GOLANGCI_LINT) run --new-from-rev main --timeout 10m -v $(LINT_PKG)/...
+	CGO_ENABLED=0 $(GOLANGCI_LINT) run --new-from-rev main --timeout 10m -v $(LINT_PKG)/...
 
 lint-existing: ## Lint the current branch in entirety.
-	$(GOLANGCI_LINT) run -v $(LINT_PKG)/...
+	CGO_ENABLED=0 $(GOLANGCI_LINT) run -v $(LINT_PKG)/...
+
+lint-bpf-objects: ## Check that committed .o files are empty stubs (build generates real ones).
+	@echo "Checking for non-empty .o files..."
+	@non_empty=$$(git ls-files '*.o' | xargs -I{} sh -c 'test -s "{}" && echo "{}"'); \
+	if [ -n "$$non_empty" ]; then \
+		echo "ERROR: The following .o files must be empty stubs:"; \
+		echo "$$non_empty"; \
+		echo "Run 'make empty-bpf-objects' to fix."; \
+		exit 1; \
+	fi
+	@echo "All .o files are empty stubs. OK."
+
+empty-bpf-objects: ## Empty all tracked .o files (they are stubs for the linter).
+	git ls-files '*.o' | xargs -I{} truncate -s 0 {}
 
 clean: ## clean build artifacts
 	$(RMDIR) $(OUTPUT_DIR)
