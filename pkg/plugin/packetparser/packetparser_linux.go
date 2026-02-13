@@ -21,6 +21,7 @@ import (
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/perf"
+	"github.com/cilium/ebpf/ringbuf"
 	tc "github.com/florianl/go-tc"
 	helper "github.com/florianl/go-tc/core"
 	nl "github.com/mdlayher/netlink"
@@ -52,6 +53,7 @@ import (
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type packet packetparser ./_cprog/packetparser.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../lib/common/libbpf/_include/linux -I../lib/common/libbpf/_include/uapi/linux -I../lib/common/libbpf/_include/asm -I../filter/_cprog/ -I../conntrack/_cprog/
 var errNoOutgoingLinks = errors.New("could not determine any outgoing links")
+var errRingBufKernelTooOld = errors.New("ring buffer requires newer kernel")
 
 func init() {
 	registry.Add(name, New)
@@ -130,6 +132,57 @@ func (p *packetParser) Generate(ctx context.Context) error {
 	return nil
 }
 
+// validateRingBufferSize validates the ring buffer size and returns the adjusted size if necessary.
+// It also returns a reason for the adjustment, if any.
+func validateRingBufferSize(size uint32) (adjustedSize uint32, reason string) {
+	// Default to 8MB if not specified.
+	// This should match the default in pkg/plugin/packetparser/_cprog/packetparser.c
+	const defaultSize = 8 * 1024 * 1024
+	const maxSize = 1 * 1024 * 1024 * 1024 // 1GB
+	intPageSize := os.Getpagesize()
+	if intPageSize <= 0 {
+		intPageSize = 4096
+	}
+	if intPageSize > int(^uint32(0)) {
+		intPageSize = int(^uint32(0))
+	}
+	//nolint:gosec // bounded to uint32
+	pageSize := uint32(intPageSize)
+
+	if size == 0 {
+		return defaultSize, ""
+	}
+	if size < pageSize {
+		return defaultSize, fmt.Sprintf(
+			"Ring buffer size (%d) is smaller than page size (%d), "+
+				"falling back to default (%d)",
+			size,
+			pageSize,
+			defaultSize,
+		)
+	}
+	if size > maxSize {
+		return defaultSize, fmt.Sprintf(
+			"Ring buffer size (%d) is larger than allowed maximum (%d), "+
+				"falling back to default (%d)",
+			size,
+			maxSize,
+			defaultSize,
+		)
+	}
+	// Check if size is a power of 2.
+	if (size & (size - 1)) != 0 {
+		return defaultSize, fmt.Sprintf(
+			"Ring buffer size (%d) is not a power of 2, "+
+				"falling back to default (%d)",
+			size,
+			defaultSize,
+		)
+	}
+
+	return size, ""
+}
+
 func (p *packetParser) Compile(ctx context.Context) error {
 	// Get the absolute path to this file during runtime.
 	dir, err := absPath()
@@ -152,7 +205,8 @@ func (p *packetParser) Compile(ctx context.Context) error {
 		targetArch = "-D__TARGET_ARCH_arm64"
 	}
 	// Keep target as bpf, otherwise clang compilation yields bpf object that elf reader cannot load.
-	err = loader.CompileEbpf(ctx, "-target", "bpf", "-Wall", targetArch, "-g", "-O2", "-c", bpfSourceFile, "-o", bpfOutputFile,
+	cflags := []string{
+		"-target", "bpf", "-Wall", targetArch, "-g", "-O2", "-c", bpfSourceFile, "-o", bpfOutputFile,
 		archLibDir,
 		libbpfSrcDir,
 		libbpfIncludeAsmDir,
@@ -160,7 +214,23 @@ func (p *packetParser) Compile(ctx context.Context) error {
 		libbpfIncludeUapiLinuxDir,
 		filterDir,
 		conntrackDir,
-	)
+	}
+
+	if p.cfg.PacketParserRingBuffer.IsEnabled() {
+		var reason string
+		p.cfg.PacketParserRingBufferSize, reason = validateRingBufferSize(p.cfg.PacketParserRingBufferSize)
+		if reason != "" {
+			p.l.Warn(reason)
+		}
+
+		p.l.Info("Compiling with Ring Buffer enabled", zap.Uint32("size", p.cfg.PacketParserRingBufferSize))
+		cflags = append(cflags,
+			"-DUSE_RING_BUFFER",
+			fmt.Sprintf("-DRING_BUFFER_SIZE=%d", p.cfg.PacketParserRingBufferSize),
+		)
+	}
+
+	err = loader.CompileEbpf(ctx, cflags...)
 	if err != nil {
 		return err
 	}
@@ -173,6 +243,11 @@ func (p *packetParser) Init() error {
 	if !p.cfg.EnablePodLevel {
 		p.l.Warn("packet parser and latency plugin will not init because pod level is disabled")
 		return nil
+	}
+	if p.cfg.PacketParserRingBuffer.IsEnabled() {
+		if ringBufErr := ensureRingBufKernelSupported(); ringBufErr != nil {
+			return ringBufErr
+		}
 	}
 	// Get the absolute path to this file during runtime.
 	dir, err := absPath()
@@ -222,10 +297,24 @@ func (p *packetParser) Init() error {
 		return err
 	}
 
-	p.reader, err = plugincommon.NewPerfReader(p.l, objs.RetinaPacketparserEvents, perCPUBuffer, 1)
-	if err != nil {
-		p.l.Error("Error NewReader", zap.Error(err))
-		return err
+	if p.cfg.PacketParserRingBuffer.IsEnabled() {
+		p.l.Info("Initializing Ring Buffer reader")
+		var rb *ringbuf.Reader
+		rb, err = ringbuf.NewReader(objs.RetinaPacketparserEvents)
+		if err != nil {
+			p.l.Error("Error NewReader ringbuf", zap.Error(err))
+			return fmt.Errorf("failed to create ringbuf reader: %w", err)
+		}
+		p.reader = &ringBufReaderWrapper{reader: rb}
+	} else {
+		p.l.Info("Initializing Perf Reader")
+		var pr *perf.Reader
+		pr, err = plugincommon.NewPerfReader(p.l, objs.RetinaPacketparserEvents, perCPUBuffer, 1)
+		if err != nil {
+			p.l.Error("Error NewReader", zap.Error(err))
+			return fmt.Errorf("failed to create perf reader: %w", err)
+		}
+		p.reader = &perfReaderWrapper{reader: pr}
 	}
 
 	p.tcMap = &sync.Map{}
@@ -284,7 +373,7 @@ func (p *packetParser) Start(ctx context.Context) error {
 	}
 
 	// Create the channel.
-	p.recordsChannel = make(chan perf.Record, buffer)
+	p.recordsChannel = make(chan perfRecord, buffer)
 	p.l.Debug("Created records channel")
 
 	return p.run(ctx)
@@ -696,7 +785,7 @@ func (p *packetParser) readData() {
 	// This is unblocked by the close call.
 	record, err := p.reader.Read()
 	if err != nil {
-		if errors.Is(err, perf.ErrClosed) {
+		if errors.Is(err, perf.ErrClosed) || errors.Is(err, ringbuf.ErrClosed) {
 			p.l.Error("Perf array is empty")
 			// nothing to do, we're done
 		} else {
@@ -730,4 +819,66 @@ func absPath() (string, error) {
 	}
 	dir := path.Dir(filename)
 	return dir, nil
+}
+
+type ringBufReaderWrapper struct {
+	reader *ringbuf.Reader
+}
+
+func (r *ringBufReaderWrapper) Read() (perfRecord, error) {
+	rec, err := r.reader.Read()
+	if err != nil {
+		return perfRecord{}, fmt.Errorf("failed to read from ringbuf: %w", err)
+	}
+	return perfRecord{
+		RawSample: rec.RawSample,
+		Remaining: rec.Remaining,
+	}, nil
+}
+
+func (r *ringBufReaderWrapper) Close() error {
+	if err := r.reader.Close(); err != nil {
+		return fmt.Errorf("failed to close ringbuf reader: %w", err)
+	}
+	return nil
+}
+
+type perfReaderWrapper struct {
+	reader *perf.Reader
+}
+
+func (r *perfReaderWrapper) Read() (perfRecord, error) {
+	rec, err := r.reader.Read()
+	if err != nil {
+		return perfRecord{}, fmt.Errorf("failed to read perf record: %w", err)
+	}
+	return perfRecord{
+		CPU:         rec.CPU,
+		LostSamples: rec.LostSamples,
+		RawSample:   rec.RawSample,
+	}, nil
+}
+
+func (r *perfReaderWrapper) Close() error {
+	if err := r.reader.Close(); err != nil {
+		return fmt.Errorf("failed to close perf reader: %w", err)
+	}
+	return nil
+}
+
+func ensureRingBufKernelSupported() error {
+	kv, err := utils.LinuxKernelVersion()
+	if err != nil {
+		return fmt.Errorf("failed to detect kernel version for ring buffer support: %w", err)
+	}
+
+	if !kv.AtLeast(ringBufMinKernelMajor, ringBufMinKernelMinor, ringBufMinKernelPatch) {
+		return fmt.Errorf(
+			"%w: requires >= %d.%d.%d, current: %s",
+			errRingBufKernelTooOld,
+			ringBufMinKernelMajor, ringBufMinKernelMinor, ringBufMinKernelPatch, kv.Release,
+		)
+	}
+
+	return nil
 }

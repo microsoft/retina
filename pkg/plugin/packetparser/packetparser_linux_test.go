@@ -33,6 +33,30 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+type perfReaderAdapter struct {
+	mock *mocks.MockperfReader
+}
+
+func (p *perfReaderAdapter) Read() (perfRecord, error) {
+	rec, err := p.mock.Read()
+	if err != nil {
+		return perfRecord{}, fmt.Errorf("failed to read perf record: %w", err)
+	}
+	return perfRecord{
+		CPU:         rec.CPU,
+		LostSamples: rec.LostSamples,
+		RawSample:   rec.RawSample,
+		Remaining:   rec.Remaining,
+	}, nil
+}
+
+func (p *perfReaderAdapter) Close() error {
+	if err := p.mock.Close(); err != nil {
+		return fmt.Errorf("failed to close perf reader: %w", err)
+	}
+	return nil
+}
+
 var (
 	cfgPodLevelEnabled = &kcfg.Config{
 		EnablePodLevel:           true,
@@ -55,6 +79,11 @@ var (
 		DataAggregationLevel:     kcfg.High,
 		BypassLookupIPOfInterest: true,
 		EnableConntrackMetrics:   true,
+	}
+	cfgRingBufferEnabled = &kcfg.Config{
+		EnablePodLevel:             true,
+		PacketParserRingBuffer:     kcfg.PacketParserRingBufferEnabled,
+		PacketParserRingBufferSize: 4096,
 	}
 )
 
@@ -295,7 +324,7 @@ func TestReadData_Error(t *testing.T) {
 	p := &packetParser{
 		cfg:    cfgPodLevelEnabled,
 		l:      log.Logger().Named("test"),
-		reader: mperf,
+		reader: &perfReaderAdapter{mock: mperf},
 	}
 	p.readData()
 
@@ -334,9 +363,9 @@ func TestReadDataPodLevelEnabled(t *testing.T) {
 	p := &packetParser{
 		cfg:            cfgPodLevelEnabled,
 		l:              log.Logger().Named("test"),
-		reader:         mperf,
+		reader:         &perfReaderAdapter{mock: mperf},
 		enricher:       menricher,
-		recordsChannel: make(chan perf.Record, buffer),
+		recordsChannel: make(chan perfRecord, buffer),
 	}
 
 	mICounterVec := metrics.NewMockCounterVec(ctrl)
@@ -345,7 +374,8 @@ func TestReadDataPodLevelEnabled(t *testing.T) {
 	metrics.LostEventsCounter = mICounterVec
 
 	mParsedPacketsCounter := metrics.NewMockCounterVec(ctrl)
-	mParsedPacketsCounter.EXPECT().WithLabelValues(gomock.Any()).Return(prometheus.NewCounter(prometheus.CounterOpts{})).AnyTimes()
+	mParsedPacketsCounter.EXPECT().WithLabelValues(gomock.Any()).
+		Return(prometheus.NewCounter(prometheus.CounterOpts{})).AnyTimes()
 	metrics.ParsedPacketsCounter = mParsedPacketsCounter
 
 	exCh := make(chan *v1.Event, 10)
@@ -431,8 +461,8 @@ func TestStartWithDataAggregationLevelLow(t *testing.T) {
 		cfg:              cfgDataAggregationLevelLow,
 		l:                log.Logger().Named("test"),
 		objs:             pObj,
-		reader:           mockReader,
-		recordsChannel:   make(chan perf.Record, buffer),
+		reader:           &perfReaderAdapter{mock: mockReader},
+		recordsChannel:   make(chan perfRecord, buffer),
 		interfaceLockMap: &sync.Map{},
 		endpointIngressInfo: &ebpf.ProgramInfo{
 			Name: "ingress",
@@ -510,8 +540,8 @@ func TestStartWithDataAggregationLevelHigh(t *testing.T) {
 		cfg:              cfgDataAggregationLevelHigh,
 		l:                log.Logger().Named("test"),
 		objs:             pObj,
-		reader:           mockReader,
-		recordsChannel:   make(chan perf.Record, buffer),
+		reader:           &perfReaderAdapter{mock: mockReader},
+		recordsChannel:   make(chan perfRecord, buffer),
 		interfaceLockMap: &sync.Map{},
 		endpointIngressInfo: &ebpf.ProgramInfo{
 			Name: "ingress",
@@ -562,24 +592,33 @@ func TestPacketParseGenerate(t *testing.T) {
 		expectedContents string
 	}{
 		{
-			name:             "PodLevelEnabled",
-			cfg:              cfgPodLevelEnabled,
-			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n#define DATA_AGGREGATION_LEVEL 0\n#define DATA_SAMPLING_RATE 0\n",
+			name: "PodLevelEnabled",
+			cfg:  cfgPodLevelEnabled,
+			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n" +
+				"#define DATA_AGGREGATION_LEVEL 0\n" +
+				"#define DATA_SAMPLING_RATE 0\n",
 		},
 		{
-			name:             "ConntrackMetricsEnabled",
-			cfg:              cfgConntrackMetricsEnabled,
-			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n#define ENABLE_CONNTRACK_METRICS 1\n#define DATA_AGGREGATION_LEVEL 1\n#define DATA_SAMPLING_RATE 0\n",
+			name: "ConntrackMetricsEnabled",
+			cfg:  cfgConntrackMetricsEnabled,
+			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n" +
+				"#define ENABLE_CONNTRACK_METRICS 1\n" +
+				"#define DATA_AGGREGATION_LEVEL 1\n" +
+				"#define DATA_SAMPLING_RATE 0\n",
 		},
 		{
-			name:             "DataAggregationLevelLow",
-			cfg:              cfgDataAggregationLevelLow,
-			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 0\n#define DATA_AGGREGATION_LEVEL 0\n#define DATA_SAMPLING_RATE 0\n",
+			name: "DataAggregationLevelLow",
+			cfg:  cfgDataAggregationLevelLow,
+			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 0\n" +
+				"#define DATA_AGGREGATION_LEVEL 0\n" +
+				"#define DATA_SAMPLING_RATE 0\n",
 		},
 		{
-			name:             "DataAggregationLevelHigh",
-			cfg:              cfgDataAggregationLevelHigh,
-			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 0\n#define DATA_AGGREGATION_LEVEL 1\n#define DATA_SAMPLING_RATE 0\n",
+			name: "DataAggregationLevelHigh",
+			cfg:  cfgDataAggregationLevelHigh,
+			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 0\n" +
+				"#define DATA_AGGREGATION_LEVEL 1\n" +
+				"#define DATA_SAMPLING_RATE 0\n",
 		},
 	}
 
@@ -620,6 +659,37 @@ func TestCompile(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	p := &packetParser{
 		cfg: cfgPodLevelEnabled,
+		l:   log.Logger().Named(name),
+	}
+	dir, _ := absPath()
+	expectedOutputFile := fmt.Sprintf("%s/%s", dir, bpfObjectFileName)
+
+	err := os.Remove(expectedOutputFile)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("Expected no error. Error: %+v", err)
+	}
+
+	err = p.Generate(context.Background())
+	if err != nil {
+		t.Fatalf("Expected no error. Error: %+v", err)
+	}
+
+	err = p.Compile(context.Background())
+	if err != nil {
+		t.Fatalf("Expected no error. Error: %+v", err)
+	}
+	if _, err := os.Stat(expectedOutputFile); errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("File %+v doesn't exist", expectedOutputFile)
+	}
+}
+
+func TestCompileRingBuffer(t *testing.T) {
+	takeBackup()
+	defer restoreBackup()
+
+	log.SetupZapLogger(log.GetDefaultLogOpts()) //nolint:errcheck // ignore
+	p := &packetParser{
+		cfg: cfgRingBufferEnabled,
 		l:   log.Logger().Named(name),
 	}
 	dir, _ := absPath()

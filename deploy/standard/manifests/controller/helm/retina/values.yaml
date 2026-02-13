@@ -57,6 +57,8 @@ enableAnnotations: false
 bypassLookupIPOfInterest: false
 dataAggregationLevel: "low"
 dataSamplingRate: 1
+packetParserRingBuffer: "disabled"
+packetParserRingBufferSize: 8388608
 
 imagePullSecrets: []
 nameOverride: "retina"
