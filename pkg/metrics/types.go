@@ -3,9 +3,9 @@
 package metrics
 
 import (
-	"github.com/microsoft/retina/pkg/log"
+	"log/slog"
+
 	"github.com/prometheus/client_golang/prometheus"
-	"go.uber.org/zap"
 )
 
 const (
@@ -87,7 +87,7 @@ var (
 	// Interface Stats
 	InterfaceStatsGauge GaugeVec
 
-	metricsLogger *log.ZapLogger
+	metricsLogger *slog.Logger
 
 	// Control Plane Metrics
 	PluginManagerFailedToReconcileCounter CounterVec
@@ -119,7 +119,9 @@ func ToPrometheusType(metric interface{}) prometheus.Collector {
 	case CounterVec:
 		return m.(*prometheus.CounterVec)
 	default:
-		metricsLogger.Error("error converting unknown metric type", zap.Any("metric", m))
+		if metricsLogger != nil {
+			metricsLogger.Error("error converting unknown metric type", slog.Any("metric", m))
+		}
 		return nil
 	}
 }

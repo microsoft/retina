@@ -39,7 +39,7 @@ var ResourcesCell = cell.Module(
 		func() resource.Resource[*cilium_api_v2.CiliumNode] {
 			return &fakeresource[*cilium_api_v2.CiliumNode]{}
 		},
-		k8s.PodResource,
+		PodResource,
 		k8s.NamespaceResource,
 	),
 )

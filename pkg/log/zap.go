@@ -3,6 +3,7 @@
 package log
 
 import (
+	"log/slog"
 	"net/http"
 	"os"
 	"runtime"
@@ -10,10 +11,13 @@ import (
 
 	"github.com/Azure/azure-container-networking/zapai"
 	"github.com/go-chi/chi/middleware"
+	"github.com/go-logr/logr"
+	"github.com/go-logr/zapr"
 	logfmt "github.com/jsternberg/zap-logfmt"
 	"github.com/microsoft/ApplicationInsights-Go/appinsights"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"go.uber.org/zap/exp/zapslog"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
@@ -46,6 +50,11 @@ func GetDefaultLogOpts() *LogOpts {
 }
 
 func Logger() *ZapLogger {
+	if global == nil {
+		// Auto-initialize with default options if not already set
+		// This provides a fallback for code that accesses Logger() before SetupZapLogger()
+		_, _ = SetupZapLogger(GetDefaultLogOpts())
+	}
 	return global
 }
 
@@ -201,4 +210,36 @@ func (lOpts *LogOpts) validate() {
 			lOpts.MaxAgeDays = defaultMaxAge
 		}
 	}
+}
+
+// SlogHandler returns an slog.Handler backed by the global zap core.
+// All slog messages will flow through zap's pipeline (stdout + Application Insights).
+func SlogHandler() slog.Handler {
+	if global == nil {
+		return slog.NewTextHandler(os.Stdout, nil)
+	}
+	return zapslog.NewHandler(global.Core(), zapslog.WithCaller(true))
+}
+
+// SetDefaultSlog sets Go's global slog default to use the zap-backed handler.
+// After calling this, slog.Default() returns a logger that routes through zap.
+func SetDefaultSlog() {
+	slog.SetDefault(slog.New(SlogHandler()))
+}
+
+// SlogLogger returns a new *slog.Logger backed by the global zap core.
+func SlogLogger() *slog.Logger {
+	return slog.New(SlogHandler())
+}
+
+// LogrLogger returns a logr.Logger backed by the global zap logger.
+// This is useful for integrating with controller-runtime and other libraries
+// that use logr.Logger, ensuring consistent log format across the application.
+func LogrLogger() logr.Logger {
+	if global == nil {
+		// Fallback to a basic zap logger if global is not initialized
+		zapLogger, _ := zap.NewProduction()
+		return zapr.NewLogger(zapLogger)
+	}
+	return zapr.NewLogger(global.Logger)
 }

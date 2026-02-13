@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"strings"
@@ -32,7 +33,7 @@ func main() {
 	log.SetupZapLogger(opts)
 	l := log.Logger().Named("test-packetparser")
 
-	metrics.InitializeMetrics()
+	metrics.InitializeMetrics(slog.Default())
 
 	ctx := context.Background()
 

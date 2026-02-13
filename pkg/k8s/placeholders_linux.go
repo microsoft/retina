@@ -9,7 +9,6 @@ import (
 
 	"github.com/cilium/cilium/api/v1/models"
 	"github.com/cilium/cilium/pkg/container/set"
-	"github.com/cilium/cilium/pkg/crypto/certificatemanager"
 	"github.com/cilium/cilium/pkg/datapath/iptables/ipset"
 	"github.com/cilium/cilium/pkg/datapath/loader/metrics"
 	datapathtypes "github.com/cilium/cilium/pkg/datapath/types"
@@ -18,9 +17,9 @@ import (
 	"github.com/cilium/cilium/pkg/ipcache"
 	ipcachetypes "github.com/cilium/cilium/pkg/ipcache/types"
 	"github.com/cilium/cilium/pkg/k8s/resource"
-	"github.com/cilium/cilium/pkg/labels"
 	"github.com/cilium/cilium/pkg/policy"
 	"github.com/cilium/cilium/pkg/policy/api"
+	policytypes "github.com/cilium/cilium/pkg/policy/types"
 	cilium "github.com/cilium/proxy/go/cilium/api"
 	k8sRuntime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -66,7 +65,11 @@ func (w *internalconfigs) KVstoreEnabledWithoutPodNetworkSupport() bool {
 
 type identityAllocatorOwner struct{}
 
-func (i *identityAllocatorOwner) UpdateIdentities(identity.IdentityMap, identity.IdentityMap) {}
+func (i *identityAllocatorOwner) UpdateIdentities(identity.IdentityMap, identity.IdentityMap) <-chan struct{} {
+	ch := make(chan struct{})
+	close(ch)
+	return ch
+}
 
 func (i *identityAllocatorOwner) GetNodeSuffix() string {
 	return ""
@@ -156,21 +159,24 @@ func (n *NoOpPolicyRepository) GetSelectorCache() *policy.SelectorCache {
 	return nil
 }
 
-func (n *NoOpPolicyRepository) Iterate(func(*api.Rule)) {}
+func (n *NoOpPolicyRepository) GetSubjectSelectorCache() *policy.SelectorCache {
+	return nil
+}
 
-func (n *NoOpPolicyRepository) ReplaceByResource(api.Rules, ipcachetypes.ResourceID) (affectedIDs *set.Set[identity.NumericIdentity], rev uint64, oldRevCnt int) {
+func (n *NoOpPolicyRepository) Iterate(func(*policytypes.PolicyEntry)) {}
+
+func (n *NoOpPolicyRepository) ReplaceByResource(
+	_ policytypes.PolicyEntries, _ ipcachetypes.ResourceID,
+) (affectedIDs *set.Set[identity.NumericIdentity], rev uint64, oldRevCnt int) {
 	return nil, 0, 0
 }
 
-func (n *NoOpPolicyRepository) ReplaceByLabels(api.Rules, []labels.LabelArray) (affectedIDs *set.Set[identity.NumericIdentity], rev uint64, oldRevCnt int) {
-	return nil, 0, 0
-}
-
-func (n *NoOpPolicyRepository) Search(labels.LabelArray) (r api.Rules, i uint64) {
+func (n *NoOpPolicyRepository) Search() (entries policytypes.PolicyEntries, rev uint64) {
 	return nil, 0
 }
 
-func (n *NoOpPolicyRepository) SetEnvoyRulesFunc(func(certificatemanager.SecretManager, *api.L7Rules, string, string) (*cilium.HttpNetworkPolicyRules, bool)) {
+func (n *NoOpPolicyRepository) GetPolicySnapshot() map[identity.NumericIdentity]policy.SelectorPolicy {
+	return nil
 }
 
 type NoOpOrchestrator struct{}
@@ -196,3 +202,39 @@ func (n *NoOpOrchestrator) WriteEndpointConfig(io.Writer, datapathtypes.Endpoint
 }
 
 func (n *NoOpOrchestrator) Unload(datapathtypes.Endpoint) {}
+
+func (n *NoOpOrchestrator) DatapathInitialized() <-chan struct{} {
+	ch := make(chan struct{})
+	close(ch)
+	return ch
+}
+
+// fakeRestorer is a no-op endpointstate.Restorer (Retina doesn't restore endpoints).
+type fakeRestorer struct{}
+
+func (fakeRestorer) WaitForEndpointRestoreWithoutRegeneration(context.Context) error { return nil }
+func (fakeRestorer) WaitForEndpointRestore(context.Context) error                    { return nil }
+func (fakeRestorer) WaitForInitialPolicy(context.Context) error                      { return nil }
+
+// fakeWireguardConfig is a no-op WireguardConfig (Retina doesn't use WireGuard).
+type fakeWireguardConfig struct{}
+
+func (fakeWireguardConfig) Enabled() bool { return false }
+
+// fakeIPsecConfig is a no-op IPsecConfig (Retina doesn't use IPsec).
+type fakeIPsecConfig struct{}
+
+func (fakeIPsecConfig) Enabled() bool                                         { return false }
+func (fakeIPsecConfig) UseCiliumInternalIP() bool                             { return false }
+func (fakeIPsecConfig) DNSProxyInsecureSkipTransparentModeCheckEnabled() bool { return false }
+
+// fakeIptablesManager is a no-op IptablesManager (Retina doesn't manage iptables).
+type fakeIptablesManager struct{}
+
+func (fakeIptablesManager) InstallProxyRules(uint16, string)             {}
+func (fakeIptablesManager) SupportsOriginalSourceAddr() bool             { return false }
+func (fakeIptablesManager) GetProxyPorts() map[string]uint16             { return nil }
+func (fakeIptablesManager) InstallNoTrackRules(netip.Addr, uint16)       {}
+func (fakeIptablesManager) RemoveNoTrackRules(netip.Addr, uint16)        {}
+func (fakeIptablesManager) AddNoTrackHostPorts(string, string, []string) {}
+func (fakeIptablesManager) RemoveNoTrackHostPorts(string, string)        {}

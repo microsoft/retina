@@ -101,8 +101,10 @@ func createCRD(crdVersionedName, crdMetaName string) func(clientset apiextension
 			clientset,
 			constructV1CRD(crdMetaName, ciliumCRD),
 			crdhelpers.NewDefaultPoller(),
-			k8sconst.CustomResourceDefinitionSchemaVersionKey,
-			versioncheck.MustVersion(k8sconst.CustomResourceDefinitionSchemaVersion),
+			crdhelpers.NeedsUpdateV1Factory(
+				k8sconst.CustomResourceDefinitionSchemaVersionKey,
+				versioncheck.MustVersion(k8sconst.CustomResourceDefinitionSchemaVersion),
+			),
 		)
 		if err != nil {
 			return fmt.Errorf("Unable to create CRD %s: %w", crdMetaName, err)
