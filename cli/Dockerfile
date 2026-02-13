@@ -27,6 +27,7 @@ RUN --mount=type=cache,target="/root/.cache/go-build" \
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/azurelinux/distroless/minimal@sha256:c9a1ed9515e033bca0c0b3171eccec41790bfcb9e47f05130cddc0a458de46ba AS distroless-target
 COPY --from=builder /lib/ /lib
 COPY --from=builder /usr/lib/ /usr/lib
+COPY --from=builder /etc/pki/tls/ /etc/pki/tls/
 WORKDIR /
 COPY --from=builder /workspace/kubectl-retina .
 

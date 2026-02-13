@@ -101,6 +101,7 @@ FROM azurelinux-distroless AS init
 COPY --from=init-bin /go/bin/retina/initretina /retina/initretina
 COPY --from=tools /lib/ /lib
 COPY --from=tools /usr/lib/ /usr/lib
+COPY --from=tools /etc/pki/tls/ /etc/pki/tls/
 ENTRYPOINT ["./retina/initretina"]
 
 # agent final image
@@ -109,6 +110,7 @@ ENTRYPOINT ["./retina/initretina"]
 FROM azurelinux-distroless AS agent
 COPY --from=tools /lib/ /lib
 COPY --from=tools /usr/lib/ /usr/lib
+COPY --from=tools /etc/pki/tls/ /etc/pki/tls/
 COPY --from=tools /tmp/bin/ /bin
 COPY --from=controller-bin /go/bin/retina/controller /retina/controller
 COPY --from=controller-bin /go/src/github.com/microsoft/retina/pkg/plugin /go/src/github.com/microsoft/retina/pkg/plugin

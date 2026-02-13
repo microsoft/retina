@@ -29,6 +29,7 @@ FROM --platform=$BUILDPLATFORM mcr.microsoft.com/azurelinux/distroless/minimal@s
 WORKDIR /
 COPY --from=builder /lib /lib
 COPY --from=builder /usr/lib/ /usr/lib
+COPY --from=builder /etc/pki/tls/ /etc/pki/tls/
 COPY --from=builder /workspace/retina-operator .
 USER 65532:65532
 
