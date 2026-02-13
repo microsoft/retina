@@ -7,12 +7,13 @@ on:
 jobs:
   stale:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write
       issues: write
       pull-requests: write
     steps:
-      - uses: actions/stale@main
+      - uses: actions/stale@997185467fa4f803885201cee163a9f38240193d # v10.1.1
         id: stale
         with:
           ascending: true
@@ -31,4 +32,4 @@ jobs:
           stale-issue-message: "This issue will be closed in 7 days due to inactivity."
           stale-pr-message: "This PR will be closed in 7 days due to inactivity."
       - name: Print outputs
-        run: echo ${{ join(steps.stale.outputs.*, ',') }}
+        run: echo "${{ join(steps.stale.outputs.*, ',') }}"

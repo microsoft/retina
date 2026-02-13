@@ -11,10 +11,28 @@ permissions:
   contents: read
   id-token: write
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  get-tag:
+    name: Get Image Tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.get_tag.outputs.tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Get tag
+        id: get_tag
+        run: echo "tag=$(make version)" >> $GITHUB_OUTPUT
+
   retina-images:
     name: Build Agent Images - Linux
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
 
     strategy:
       matrix:
@@ -36,7 +54,7 @@ jobs:
       - run: go version
 
       - name: Az CLI login
-        uses: azure/login@v2
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         if: ${{ github.event_name == 'merge_group' }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -67,7 +85,8 @@ jobs:
   build-windows-binaries:
     name: Build Windows Binaries
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 30
+
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -91,7 +110,7 @@ jobs:
           APP_INSIGHTS_ID: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
 
       - name: Upload Windows Binaries
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: windows-binaries
           path: output/windows_amd64/
@@ -101,6 +120,7 @@ jobs:
     name: Build Agent Image - Windows ${{ matrix.year }}
     needs: build-windows-binaries
     runs-on: windows-${{ matrix.year }}
+    timeout-minutes: 60
 
     strategy:
       matrix:
@@ -113,13 +133,13 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Download Windows Binaries
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: windows-binaries
           path: output/windows_amd64/
 
       - name: Az CLI login
-        uses: azure/login@v2
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         if: ${{ github.event_name == 'merge_group' }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -157,6 +177,7 @@ jobs:
   operator-images:
     name: Build Operator Images
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
 
     strategy:
       matrix:
@@ -178,7 +199,7 @@ jobs:
       - run: go version
 
       - name: Az CLI login
-        uses: azure/login@v2
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         if: ${{ github.event_name == 'merge_group' }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -209,6 +230,7 @@ jobs:
   retina-shell-images:
     name: Build Retina Shell Images (${{ matrix.platform }}, ${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
 
     strategy:
       matrix:
@@ -230,7 +252,7 @@ jobs:
       - run: go version
 
       - name: Az CLI login
-        uses: azure/login@v2
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         if: ${{ github.event_name == 'merge_group' }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -260,6 +282,7 @@ jobs:
   kubectl-retina-images:
     name: Build Kubectl Retina Images
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
 
     strategy:
       matrix:
@@ -281,7 +304,7 @@ jobs:
       - run: go version
 
       - name: Az CLI login
-        uses: azure/login@v2
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         if: ${{ github.event_name == 'merge_group' }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -312,6 +335,7 @@ jobs:
     name: Generate Manifests
     if: ${{ github.event_name == 'merge_group' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs:
       [
         retina-images,
@@ -330,10 +354,10 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Setup QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
 
       - name: Azure CLI login
-        uses: azure/login@v2
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -352,6 +376,7 @@ jobs:
     if: ${{ github.event_name == 'merge_group' }}
     needs: [manifests]
     runs-on: ubuntu-latest
+    timeout-minutes: 90
 
     steps:
       - name: Checkout code
@@ -364,7 +389,7 @@ jobs:
       - run: go version
 
       - name: Az CLI login
-        uses: azure/login@v2
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         if: ${{ github.event_name == 'merge_group' }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -382,11 +407,11 @@ jobs:
 
   perf-test-basic:
     if: ${{ github.event_name == 'merge_group'}}
-    needs: [manifests]
+    needs: [manifests, get-tag]
     uses: ./.github/workflows/perf-template.yaml
     with:
       image-registry: ${{ vars.ACR_NAME }}
-      tag: $(make version)
+      tag: ${{ needs.get-tag.outputs.tag }}
       image-namespace: ${{ github.repository }}
       retina-mode: basic
       azure-location: ${{ vars.AZURE_LOCATION }}
@@ -395,14 +420,14 @@ jobs:
       azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
       azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
       azure-app-insights-key: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
-  
+
   perf-test-advanced:
     if: ${{ github.event_name == 'merge_group'}}
-    needs: [manifests]
+    needs: [manifests, get-tag]
     uses: ./.github/workflows/perf-template.yaml
     with:
       image-registry: ${{ vars.ACR_NAME }}
-      tag: $(make version)
+      tag: ${{ needs.get-tag.outputs.tag }}
       image-namespace: ${{ github.repository }}
       retina-mode: advanced
       azure-location: ${{ vars.AZURE_LOCATION }}

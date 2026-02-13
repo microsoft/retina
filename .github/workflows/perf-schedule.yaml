@@ -10,11 +10,27 @@ permissions:
   id-token: write
 
 jobs:
+  get-tag:
+    name: Get Latest Release Tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.get_tag.outputs.tag }}
+    steps:
+      - name: Get latest release tag
+        id: get_tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=$(gh release view --repo ${{ github.repository }} --json tagName -q .tagName)
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
   perf-test-basic:
+    needs: get-tag
     uses: ./.github/workflows/perf-template.yaml
     with:
       image-registry: ghcr.io
-      tag: $(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r .tag_name)
+      tag: ${{ needs.get-tag.outputs.tag }}
       image-namespace: ${{ github.repository }}
       retina-mode: basic
       azure-location: ${{ vars.AZURE_LOCATION }}
@@ -25,10 +41,11 @@ jobs:
       azure-app-insights-key: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
 
   perf-test-advanced:
+    needs: get-tag
     uses: ./.github/workflows/perf-template.yaml
     with:
       image-registry: ghcr.io
-      tag: $(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r .tag_name)
+      tag: ${{ needs.get-tag.outputs.tag }}
       image-namespace: ${{ github.repository }}
       retina-mode: advanced
       azure-location: ${{ vars.AZURE_LOCATION }}
