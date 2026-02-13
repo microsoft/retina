@@ -9,7 +9,7 @@ headers = {"Authorization": f"Bearer {token}"}
 pr_num = os.environ.get("PULL_REQUEST_NUMBER")
 print("PR number is", pr_num)
 # Set repository information
-owner = "azure"
+owner = "microsoft"
 repo = "retina"
 
 current_branch_file = "coverageexpanded.out"
@@ -42,7 +42,7 @@ current_parsed_data = {}
 # read the current branch coverage file
 with open(current_branch_file, "r") as f:
     current_branch_lines = f.readlines()
-    if current_branch_lines is None:
+    if not current_branch_lines:
         print("No coverage data found for current branch")
         exit(1)
     for line in current_branch_lines:
@@ -74,7 +74,7 @@ main_parsed_data = {}
 # read the main branch coverage file
 with open(main_branch_file, "r") as f:
     main_branch_lines = f.readlines()
-    if main_branch_lines is None:
+    if not main_branch_lines:
         print("No coverage data found for main branch")
         exit(1)
     for line in main_branch_lines:
