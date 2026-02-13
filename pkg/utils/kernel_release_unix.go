@@ -3,7 +3,10 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
+//revive:disable:var-naming
 package utils
+
+//revive:enable:var-naming
 
 import (
 	"fmt"

@@ -47,6 +47,14 @@ func TestParseLinuxKernelRelease(t *testing.T) {
 			expectErr:   false,
 		},
 		{
+			name:        "extra numeric segment",
+			release:     "5.15.153.1-microsoft-standard-WSL2",
+			expectMajor: 5,
+			expectMinor: 15,
+			expectPatch: 153,
+			expectErr:   false,
+		},
+		{
 			name:      "invalid format",
 			release:   "foo",
 			expectErr: true,
