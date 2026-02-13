@@ -9,7 +9,7 @@ headers = {"Authorization": f"Bearer {token}"}
 pr_num = os.environ.get("PULL_REQUEST_NUMBER")
 print("PR number is", pr_num)
 # Set repository information
-owner = "azure"
+owner = "microsoft"
 repo = "retina"
 
 current_branch_file = "coverageexpanded.out"
@@ -42,7 +42,7 @@ current_parsed_data = {}
 # read the current branch coverage file
 with open(current_branch_file, "r") as f:
     current_branch_lines = f.readlines()
-    if current_branch_lines is None:
+    if not current_branch_lines:
         print("No coverage data found for current branch")
         exit(1)
     for line in current_branch_lines:
@@ -74,7 +74,7 @@ main_parsed_data = {}
 # read the main branch coverage file
 with open(main_branch_file, "r") as f:
     main_branch_lines = f.readlines()
-    if main_branch_lines is None:
+    if not main_branch_lines:
         print("No coverage data found for main branch")
         exit(1)
     for line in main_branch_lines:
@@ -266,13 +266,14 @@ if existing_comment:
 
     # Make the API call to update the comment
     update_response = requests.patch(update_url, headers=headers, json=payload)
-    if update_response.status_code != 200:
+    if update_response.status_code == 403:
+        print("Insufficient permissions to update PR comment (expected for fork PRs)")
+    elif update_response.status_code != 200:
         print(
             f"Failed to update the comment with url {update_url}", update_response.content)
         exit(1)
-
-    # Print the response to confirm that the comment was updated successfully
-    print(update_response.content)
+    else:
+        print("Successfully updated coverage comment on PR")
 
 # If there is no existing comment, add a new comment
 else:
@@ -283,10 +284,17 @@ else:
 
     # Make the API call to add the new comment
     add_response = requests.post(comments_url, headers=headers, json=payload)
-    if add_response.status_code != 201:
+    if add_response.status_code == 403:
+        print("Insufficient permissions to post PR comment (expected for fork PRs)")
+    elif add_response.status_code != 201:
         print(
             f"Failed to add the comment with url {comments_url}", add_response.content)
         exit(1)
+    else:
+        print("Successfully posted coverage comment on PR")
 
-    # Print the response to confirm that the comment was added successfully
-    print(add_response.content)
+# Write coverage report to step summary file if available (always visible)
+step_summary = os.environ.get("GITHUB_STEP_SUMMARY")
+if step_summary:
+    with open(step_summary, "a") as f:
+        f.write("\n" + body_of_comment + "\n")
