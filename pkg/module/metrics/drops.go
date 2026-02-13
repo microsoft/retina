@@ -5,6 +5,7 @@ package metrics
 
 import (
 	"strings"
+	"time"
 
 	v1 "github.com/cilium/cilium/api/v1/flow"
 	api "github.com/microsoft/retina/crd/api/v1alpha1"
@@ -24,21 +25,21 @@ const (
 )
 
 type DropCountMetrics struct {
-	baseMetricObject
+	baseMetricInterface
 	dropMetric metrics.GaugeVec
 	metricName string
 }
 
-func NewDropCountMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext) *DropCountMetrics {
+func NewDropCountMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext, ttl time.Duration) *DropCountMetrics {
 	if ctxOptions == nil || !strings.Contains(strings.ToLower(ctxOptions.MetricName), "drop") {
 		return nil
 	}
 
 	fl = fl.Named("dropreason-metricsmodule")
 	fl.Info("Creating drop count metrics", zap.Any("options", ctxOptions))
-	return &DropCountMetrics{
-		baseMetricObject: newBaseMetricsObject(ctxOptions, fl, isLocalContext),
-	}
+	d := &DropCountMetrics{}
+	d.baseMetricInterface = newBaseMetricsObject(ctxOptions, fl, isLocalContext, d.expire, ttl)
+	return d
 }
 
 func (d *DropCountMetrics) Init(metricName string) {
@@ -56,7 +57,7 @@ func (d *DropCountMetrics) Init(metricName string) {
 			TotalDropBytesDesc,
 			d.getLabels()...)
 	default:
-		d.l.Error("unknown metric name", zap.String("metricName", metricName))
+		d.getLogger().Error("unknown metric name", zap.String("metricName", metricName))
 	}
 	d.metricName = metricName
 }
@@ -67,14 +68,14 @@ func (d *DropCountMetrics) getLabels() []string {
 		utils.Direction,
 	}
 
-	if d.srcCtx != nil {
-		labels = append(labels, d.srcCtx.getLabels()...)
-		d.l.Info("src labels", zap.Any("labels", labels))
+	if d.sourceCtx() != nil {
+		labels = append(labels, d.sourceCtx().getLabels()...)
+		d.getLogger().Info("src labels", zap.Any("labels", labels))
 	}
 
-	if d.dstCtx != nil {
-		labels = append(labels, d.dstCtx.getLabels()...)
-		d.l.Info("dst labels", zap.Any("labels", labels))
+	if d.destinationCtx() != nil {
+		labels = append(labels, d.destinationCtx().getLabels()...)
+		d.getLogger().Info("dst labels", zap.Any("labels", labels))
 	}
 
 	// No additional context options
@@ -84,6 +85,7 @@ func (d *DropCountMetrics) getLabels() []string {
 
 func (d *DropCountMetrics) Clean() {
 	exporter.UnregisterMetric(exporter.AdvancedRegistry, metrics.ToPrometheusType(d.dropMetric))
+	d.clean()
 }
 
 // TODO: update ProcessFlow with bytes metrics. We are only accounting for count.
@@ -111,20 +113,20 @@ func (d *DropCountMetrics) ProcessFlow(flow *v1.Flow) {
 		flow.TrafficDirection.String(),
 	}
 
-	if !d.advEnable {
+	if !d.isAdvanced() {
 		d.update(flow, labels)
 		return
 	}
 
-	if d.srcCtx != nil {
-		srcLabels := d.srcCtx.getValues(flow)
+	if d.sourceCtx() != nil {
+		srcLabels := d.sourceCtx().getValues(flow)
 		if len(srcLabels) > 0 {
 			labels = append(labels, srcLabels...)
 		}
 	}
 
-	if d.dstCtx != nil {
-		dstLabel := d.dstCtx.getValues(flow)
+	if d.destinationCtx() != nil {
+		dstLabel := d.destinationCtx().getValues(flow)
 		if len(dstLabel) > 0 {
 			labels = append(labels, dstLabel...)
 		}
@@ -133,11 +135,11 @@ func (d *DropCountMetrics) ProcessFlow(flow *v1.Flow) {
 	// No additional context options
 
 	d.update(flow, labels)
-	d.l.Debug("drop count metric is added", zap.Any("labels", labels))
+	d.getLogger().Debug("drop count metric is added", zap.Any("labels", labels))
 }
 
 func (d *DropCountMetrics) processLocalCtxFlow(flow *v1.Flow) {
-	labelValuesMap := d.srcCtx.getLocalCtxValues(flow)
+	labelValuesMap := d.sourceCtx().getLocalCtxValues(flow)
 	if labelValuesMap == nil {
 		return
 	}
@@ -149,7 +151,7 @@ func (d *DropCountMetrics) processLocalCtxFlow(flow *v1.Flow) {
 		labels = append(labels, dropReason, ingress)
 		labels = append(labels, labelValuesMap[ingress]...)
 		d.update(flow, labels)
-		d.l.Debug("drop count metric is added in INGRESS in local ctx", zap.Any("labels", labels))
+		d.getLogger().Debug("drop count metric is added in INGRESS in local ctx", zap.Any("labels", labels))
 	}
 
 	if l := len(labelValuesMap[egress]); l > 0 {
@@ -157,15 +159,32 @@ func (d *DropCountMetrics) processLocalCtxFlow(flow *v1.Flow) {
 		labels = append(labels, dropReason, egress)
 		labels = append(labels, labelValuesMap[egress]...)
 		d.update(flow, labels)
-		d.l.Debug("drop count metric is added in EGRESS in local ctx", zap.Any("labels", labels))
+		d.getLogger().Debug("drop count metric is added in EGRESS in local ctx", zap.Any("labels", labels))
 	}
 }
 
+func (d *DropCountMetrics) expire(labels []string) bool {
+	var del bool
+	if d.dropMetric != nil {
+		del = d.dropMetric.DeleteLabelValues(labels...)
+		if del {
+			metrics.MetricsExpiredCounter.WithLabelValues(d.metricName).Inc()
+		}
+	}
+	return del
+}
+
 func (d *DropCountMetrics) update(fl *v1.Flow, labels []string) {
+	var updated bool
 	switch d.metricName {
 	case utils.DroppedPacketsGaugeName:
+		updated = true
 		d.dropMetric.WithLabelValues(labels...).Inc()
 	case utils.DropBytesGaugeName:
+		updated = true
 		d.dropMetric.WithLabelValues(labels...).Add(float64(utils.PacketSize(fl)))
+	}
+	if updated {
+		d.updated(labels)
 	}
 }
