@@ -1,7 +1,8 @@
-FROM mcr.microsoft.com/oss/go/microsoft/golang:1.24.11 AS build
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.0 --format "{{.Name}}@{{.Digest}}"
+FROM mcr.microsoft.com/oss/go/microsoft/golang@sha256:58360a7ce64a2cf2e4a4315979c48ded5bb8d30e984ea2ae8e17d5660404a69f AS build
 ADD . .
 WORKDIR /go/toolbox/
-RUN CGO_ENABLED=0 GOOS=linux go build -o server .
+RUN GOOS=linux go build -o server .
 
 FROM mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
 RUN apt-get update
