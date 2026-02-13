@@ -49,6 +49,8 @@ func TraceCapabilities() []string {
 		"NET_ADMIN",    // Network tracing
 		"SYS_PTRACE",   // Process tracing (for stack traces)
 		"SYS_RESOURCE", // Increase rlimits for BPF maps
+		"MKNOD",        // Required for bpftrace debugfs access
+		"SYS_CHROOT",   // Required for bpftrace
 	}
 }
 
@@ -97,12 +99,32 @@ func RunTrace(ctx context.Context, config TraceConfig, nodeName, debugPodNamespa
 
 	fmt.Printf("Trace pod ready, starting trace...\n")
 
-	// TODO: Step 4 will generate the actual bpftrace script
-	// For now, run a simple test command to verify exec works
-	testCommand := []string{"echo", "bpftrace exec test successful"}
-
-	err = execInPod(ctx, config.RestConfig, clientset, debugPodNamespace, createdPod.Name, createdPod.Spec.Containers[0].Name, testCommand, os.Stdout, os.Stderr)
+	// First, fetch and display drop reason codes from kernel
+	// These are kernel-version specific so we read them at runtime
+	fmt.Printf("\n")
+	reasonsCommand := DropReasonsCommand()
+	err = execInPod(ctx, config.RestConfig, clientset, debugPodNamespace, createdPod.Name, createdPod.Spec.Containers[0].Name, reasonsCommand, os.Stdout, os.Stderr)
 	if err != nil {
+		// Non-fatal: continue even if we can't get reason codes
+		fmt.Fprintf(os.Stderr, "warning: could not fetch drop reason codes: %v\n", err)
+	}
+	fmt.Printf("\n")
+
+	// Generate and run the bpftrace script
+	gen := NewScriptGenerator(config)
+	script := gen.Generate()
+
+	// Run bpftrace with the generated script
+	// SECURITY: The script is passed via -e flag, not interpolated into a shell command
+	bpftraceCommand := []string{"bpftrace", "-e", script}
+
+	err = execInPod(ctx, config.RestConfig, clientset, debugPodNamespace, createdPod.Name, createdPod.Spec.Containers[0].Name, bpftraceCommand, os.Stdout, os.Stderr)
+	if err != nil {
+		// If duration was specified and context was cancelled, it's expected behavior
+		if config.TraceDuration > 0 && ctx.Err() != nil {
+			fmt.Printf("\nTrace completed after %s\n", config.TraceDuration)
+			return nil
+		}
 		return fmt.Errorf("error executing trace command: %w", err)
 	}
 
@@ -174,9 +196,9 @@ func execInPod(
 // hostNetworkPodForTrace creates a pod manifest for network tracing.
 // The pod runs with host network and required capabilities for bpftrace.
 func hostNetworkPodForTrace(config TraceConfig, debugPodNamespace, nodeName string) *v1.Pod {
-	// Use a long sleep command - we'll exec into it
-	// The entrypoint.sh in retina-shell image mounts debugfs/tracefs
-	command := []string{"sleep", "infinity"}
+	// Use Args (not Command) to preserve the image entrypoint.
+	// The entrypoint.sh in retina-shell image mounts debugfs/tracefs which bpftrace needs.
+	args := []string{"sleep", "infinity"}
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -196,20 +218,23 @@ func hostNetworkPodForTrace(config TraceConfig, debugPodNamespace, nodeName stri
 			HostPID:       true, // Required for full process visibility
 			Containers: []v1.Container{
 				{
-					Name:    "retina-trace",
-					Image:   config.RetinaShellImage,
-					Command: command,
-					Stdin:   false, // Not interactive
-					TTY:     false, // Not interactive
+					Name:  "retina-trace",
+					Image: config.RetinaShellImage,
+					Args:  args, // Use Args to preserve entrypoint.sh
+					Stdin: false, // Not interactive
+					TTY:   false, // Not interactive
 					SecurityContext: &v1.SecurityContext{
 						Privileged: boolPtr(false), // Use capabilities instead
 						Capabilities: &v1.Capabilities{
 							Drop: []v1.Capability{"ALL"},
 							Add:  stringSliceToCapabilities(TraceCapabilities()),
 						},
-						// Required for bpftrace
+						// Required for bpftrace (per shell.md documentation)
 						SeccompProfile: &v1.SeccompProfile{
 							Type: v1.SeccompProfileTypeUnconfined,
+						},
+						AppArmorProfile: &v1.AppArmorProfile{
+							Type: v1.AppArmorProfileTypeUnconfined,
 						},
 					},
 				},
