@@ -54,7 +54,7 @@ const (
 	ConntrackTotalConnectionsDescription = "Total number of connections"
 
 	// Build info
-	buildInfoDescription = "Retina build information"
+	BuildInfoDescription = "Retina build information"
 )
 
 // Metric Counters

@@ -201,7 +201,7 @@ func InitializeMetrics() {
 	BuildInfo = exporter.CreatePrometheusGaugeVecForMetric(
 		exporter.DefaultRegistry,
 		utils.BuildInfoName,
-		buildInfoDescription,
+		BuildInfoDescription,
 		utils.BuildVersion,
 		utils.BuildArchitecture,
 		utils.BuildOS,
