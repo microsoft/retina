@@ -48,7 +48,9 @@ func TestBuildInfo(t *testing.T) {
 	}
 
 	// Verify that the build info gauge has been set with runtime information
-	// Get the metric value to verify it was set correctly
+	// Note: buildinfo.Version is populated via ldflags during build, so in tests it will
+	// use the "unknown" fallback. The actual version label is tested in integration tests
+	// or when running a built binary.
 	metric := &dto.Metric{}
 	// Use the actual runtime values that were used to set the metric
 	err := BuildInfo.WithLabelValues("unknown", runtime.GOARCH, runtime.GOOS).Write(metric)
