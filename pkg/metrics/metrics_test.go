@@ -4,9 +4,11 @@
 package metrics
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/microsoft/retina/pkg/log"
+	dto "github.com/prometheus/client_model/go"
 )
 
 func TestInitialization_FirstInit(t *testing.T) {
@@ -46,6 +48,21 @@ func TestBuildInfo(t *testing.T) {
 	}
 
 	// Verify that the build info gauge has been set with runtime information
-	// We can't check the exact values without knowing the build-time injected version,
-	// but we can verify the metric exists and has the expected labels
+	// Get the metric value to verify it was set correctly
+	metric := &dto.Metric{}
+	// Use the actual runtime values that were used to set the metric
+	err := BuildInfo.WithLabelValues("unknown", runtime.GOARCH, runtime.GOOS).Write(metric)
+	if err != nil {
+		t.Fatalf("Failed to write metric: %v", err)
+	}
+
+	if metric.Gauge == nil {
+		t.Fatalf("Expected gauge metric, got nil")
+	}
+
+	if *metric.Gauge.Value != 1 {
+		t.Errorf("Expected gauge value to be 1, got %f", *metric.Gauge.Value)
+	}
+
+	t.Logf("✓ BuildInfo metric correctly set to 1 with labels: version=unknown, arch=%s, os=%s", runtime.GOARCH, runtime.GOOS)
 }

@@ -207,7 +207,12 @@ func InitializeMetrics() {
 		utils.BuildOS,
 	)
 	// Set the build info to 1 with the current build information
-	BuildInfo.WithLabelValues(buildinfo.Version, runtime.GOARCH, runtime.GOOS).Set(1)
+	// Use "unknown" as fallback if version is not set during build
+	version := buildinfo.Version
+	if version == "" {
+		version = "unknown"
+	}
+	BuildInfo.WithLabelValues(version, runtime.GOARCH, runtime.GOOS).Set(1)
 
 	isInitialized = true
 	metricsLogger.Info("Metrics initialized")
