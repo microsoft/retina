@@ -202,9 +202,9 @@ func InitializeMetrics() {
 		exporter.DefaultRegistry,
 		utils.BuildInfoName,
 		buildInfoDescription,
-		utils.Version,
-		utils.Architecture,
-		utils.OS,
+		utils.BuildVersion,
+		utils.BuildArchitecture,
+		utils.BuildOS,
 	)
 	// Set the build info to 1 with the current build information
 	BuildInfo.WithLabelValues(buildinfo.Version, runtime.GOARCH, runtime.GOOS).Set(1)

@@ -49,9 +49,9 @@ var (
 	Device                = "device"
 
 	// Build Info labels
-	Version      = "version"
-	Architecture = "architecture"
-	OS           = "os"
+	BuildVersion      = "version"
+	BuildArchitecture = "architecture"
+	BuildOS           = "os"
 
 	// TCP Connection Statistic Names
 	ResetCount           = "ResetCount"
