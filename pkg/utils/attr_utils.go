@@ -48,6 +48,11 @@ var (
 	Active                = "ACTIVE"
 	Device                = "device"
 
+	// Build Info labels
+	Version      = "version"
+	Architecture = "architecture"
+	OS           = "os"
+
 	// TCP Connection Statistic Names
 	ResetCount           = "ResetCount"
 	ClosedFin            = "ClosedFin"
