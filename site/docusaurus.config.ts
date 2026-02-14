@@ -12,7 +12,6 @@ const config = {
   organizationName: 'Azure',
   projectName: 'Retina',
   onBrokenLinks: 'throw',
-  onBrokenMarkdownLinks: 'warn',
 
   i18n: {
     defaultLocale: 'en',
@@ -22,6 +21,9 @@ const config = {
   markdown: {
     format: "detect",
     mermaid: true,
+    hooks: {
+      onBrokenMarkdownLinks: 'warn',
+    },
   },
 
   plugins: [
@@ -55,12 +57,12 @@ const config = {
       'classic',
       {
         docs: {
-          sidebarPath: require.resolve('./sidebars.js'),
+          sidebarPath: './sidebars.ts',
           path: '../docs',
           editUrl: 'https://github.com/microsoft/retina/blob/main/docs',
         },
         theme: {
-          customCss: require.resolve('./src/css/custom.css'),
+          customCss: './src/css/custom.css',
         },
       },
     ],
