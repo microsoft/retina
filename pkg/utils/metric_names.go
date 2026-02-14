@@ -41,6 +41,9 @@ const (
 	ConntrackBytesTxGaugeName     = "conntrack_bytes_tx"
 	ConntrackBytesRxGaugeName     = "conntrack_bytes_rx"
 	ConntrackTotalConnectionsName = "conntrack_total_connections"
+
+	// Build Info
+	BuildInfoName = "build_info"
 )
 
 // IsAdvancedMetric is a helper function to determine if a name is an advanced metric

@@ -3,6 +3,9 @@
 package metrics
 
 import (
+	"runtime"
+
+	"github.com/microsoft/retina/internal/buildinfo"
 	"github.com/microsoft/retina/pkg/exporter"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/utils"
@@ -193,6 +196,23 @@ func InitializeMetrics() {
 		parsedPacketsCounterName,
 		parsedPacketsCounterDescription,
 	)
+
+	// Build Info metric - set to 1 with version and architecture labels
+	BuildInfo = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.DefaultRegistry,
+		utils.BuildInfoName,
+		BuildInfoDescription,
+		utils.BuildVersion,
+		utils.BuildArchitecture,
+		utils.BuildOS,
+	)
+	// Set the build info to 1 with the current build information
+	// Use "unknown" as fallback if version is not set during build
+	version := buildinfo.Version
+	if version == "" {
+		version = "unknown"
+	}
+	BuildInfo.WithLabelValues(version, runtime.GOARCH, runtime.GOOS).Set(1)
 
 	isInitialized = true
 	metricsLogger.Info("Metrics initialized")
