@@ -94,7 +94,7 @@ func TestIPToHexOnlyHexOutput(t *testing.T) {
 
 		// Verify only contains 0-9, a-f, x
 		for _, c := range formatted {
-			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || c == 'x') {
+			if (c < '0' || c > '9') && (c < 'a' || c > 'f') && c != 'x' {
 				t.Errorf("ipToHex(%s) produced non-hex character: %c in %s", ipStr, c, formatted)
 			}
 		}
@@ -150,7 +150,6 @@ func TestGenerateDropScriptNoFilter(t *testing.T) {
 func TestGenerateDropScriptWithIPFilter(t *testing.T) {
 	ip := net.ParseIP("10.0.0.1")
 	config := TraceConfig{
-
 		FilterIPs:  []net.IP{ip},
 		OutputJSON: false,
 	}
@@ -176,7 +175,6 @@ func TestGenerateDropScriptWithCIDRFilter(t *testing.T) {
 	}
 
 	config := TraceConfig{
-
 		FilterCIDRs: []*net.IPNet{cidr},
 		OutputJSON:  false,
 	}
@@ -251,7 +249,6 @@ func TestScriptGeneratorNoUserStringInterpolation(t *testing.T) {
 	// Note: This IP is valid but we verify it's converted to hex
 	ip := net.ParseIP("127.0.0.1")
 	config := TraceConfig{
-
 		FilterIPs:  []net.IP{ip},
 		OutputJSON: false,
 	}
@@ -321,7 +318,6 @@ func TestBuildIPFilter(t *testing.T) {
 			}
 
 			config := TraceConfig{
-
 				FilterIPs:  parsedIPs,
 				OutputJSON: false,
 			}
@@ -389,7 +385,6 @@ func TestBuildCIDRFilter(t *testing.T) {
 			}
 
 			config := TraceConfig{
-
 				FilterCIDRs: []*net.IPNet{cidr},
 				OutputJSON:  false,
 			}
@@ -412,7 +407,6 @@ func TestMixedIPAndCIDRFilter(t *testing.T) {
 	_, cidr, _ := net.ParseCIDR("192.168.0.0/16")
 
 	config := TraceConfig{
-
 		FilterIPs:   []net.IP{ip},
 		FilterCIDRs: []*net.IPNet{cidr},
 		OutputJSON:  false,

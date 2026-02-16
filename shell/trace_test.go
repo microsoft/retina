@@ -6,6 +6,7 @@ package shell
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net"
 	"strings"
 	"testing"
@@ -237,7 +238,7 @@ func TestExecInPodCommandIsArray(t *testing.T) {
 
 	// Verify the function signature accepts []string for command
 	// If this compiles, the function correctly uses array, not string
-	var commandArray []string = []string{"bpftrace", "-e", "tracepoint:skb:kfree_skb { }"}
+	commandArray := []string{"bpftrace", "-e", "tracepoint:skb:kfree_skb { }"}
 
 	// Ensure the command array contains separate elements
 	if len(commandArray) != 3 {
@@ -278,7 +279,7 @@ func TestExecInPodContextCancellation(t *testing.T) {
 	select {
 	case <-ctx.Done():
 		// Expected - context should be cancelled
-		if ctx.Err() != context.Canceled {
+		if !errors.Is(ctx.Err(), context.Canceled) {
 			t.Errorf("Expected context.Canceled, got %v", ctx.Err())
 		}
 	default:
@@ -298,7 +299,7 @@ func TestExecInPodTimeoutContext(t *testing.T) {
 	// Verify context is done due to deadline
 	select {
 	case <-ctx.Done():
-		if ctx.Err() != context.DeadlineExceeded {
+		if !errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			t.Errorf("Expected context.DeadlineExceeded, got %v", ctx.Err())
 		}
 	default:

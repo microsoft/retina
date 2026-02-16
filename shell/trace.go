@@ -83,14 +83,15 @@ func RunTrace(ctx context.Context, config TraceConfig, nodeName, debugPodNamespa
 	}
 
 	// Ensure cleanup on exit (Ctrl-C, error, or normal termination)
-	defer func() {
+	// Note: intentionally using context.Background() for cleanup so it runs even if ctx is canceled
+	defer func() { //nolint:contextcheck // cleanup must run regardless of parent context state
 		fmt.Printf("Cleaning up trace pod %s/%s\n", debugPodNamespace, createdPod.Name)
 		deleteCtx := context.Background() // Use fresh context for cleanup
-		err := clientset.CoreV1().
+		deleteErr := clientset.CoreV1().
 			Pods(debugPodNamespace).
 			Delete(deleteCtx, createdPod.Name, metav1.DeleteOptions{})
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: failed to delete trace pod %s: %v\n", createdPod.Name, err)
+		if deleteErr != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to delete trace pod %s: %v\n", createdPod.Name, deleteErr)
 		}
 	}()
 
@@ -190,7 +191,7 @@ func execInPod(
 	if err != nil {
 		// Check if it was a context cancellation (user pressed Ctrl-C)
 		if ctx.Err() != nil {
-			return ctx.Err()
+			return fmt.Errorf("context error: %w", ctx.Err())
 		}
 		return fmt.Errorf("error streaming command output: %w", err)
 	}

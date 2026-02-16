@@ -81,7 +81,7 @@ func ValidateFilterCIDR(input string) (*net.IPNet, error) {
 	}
 	_, ipnet, err := net.ParseCIDR(input)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %q: %v", errInvalidCIDR, input, err)
+		return nil, fmt.Errorf("%w: %q: %w", errInvalidCIDR, input, err)
 	}
 	return ipnet, nil
 }
@@ -188,7 +188,7 @@ func runNettrace(_ *cobra.Command, args []string) error {
 	}
 
 	// Visit the resource (should be a node)
-	return r.Visit(func(info *resource.Info, err error) error {
+	return r.Visit(func(info *resource.Info, err error) error { //nolint:wrapcheck // visitor pattern returns errors as-is
 		if err != nil {
 			return err
 		}
