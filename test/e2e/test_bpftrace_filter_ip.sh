@@ -1,13 +1,13 @@
 #!/bin/bash
-# Test script for nettrace --filter-ip flag
+# Test script for bpftrace --ip flag
 # This validates that IP filtering works correctly in bpftrace scripts
-# Usage: ./test_nettrace_filter_ip.sh [kubeconfig_path]
+# Usage: ./test_bpftrace_filter_ip.sh [kubeconfig_path]
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-echo "=== Nettrace --filter-ip Flag Test ==="
+echo "=== Bpftrace --ip Flag Test ==="
 echo ""
 
 # Get first node
@@ -41,8 +41,8 @@ fi
 echo "Target pod IP: $TARGET_IP"
 
 echo ""
-echo "=== Test 1: Verify --filter-ip flag doesn't cause bpftrace errors ==="
-echo "Running nettrace with --filter-ip $TARGET_IP for 20s..."
+echo "=== Test 1: Verify --ip flag doesn't cause bpftrace errors ==="
+echo "Running bpftrace with --ip $TARGET_IP for 20s..."
 echo ""
 
 # Create output file
@@ -51,8 +51,8 @@ ERROR_FILE=$(mktemp)
 trap "rm -f $OUTPUT_FILE $ERROR_FILE; kubectl delete pod filter-test-target --force --grace-period=0 2>/dev/null || true; kubectl delete pod -l app=retina-trace --force --grace-period=0 2>/dev/null || true" EXIT
 
 # Run trace with IP filter and capture both stdout and stderr
-"$REPO_ROOT/kubectl-retina" nettrace "$NODE" --duration 20s --timeout 60s \
-    --filter-ip "$TARGET_IP" \
+"$REPO_ROOT/kubectl-retina" bpftrace "$NODE" --duration 20s --startup-timeout 60s \
+    --ip "$TARGET_IP" \
     --retina-shell-image-version v1.0.3 > "$OUTPUT_FILE" 2>"$ERROR_FILE" &
 TRACE_PID=$!
 
@@ -111,10 +111,10 @@ fi
 echo ""
 if [[ "$CAST_ERROR" == "true" ]]; then
     echo "TEST FAILED: bpftrace casting error"
-    echo "The --filter-ip flag is generating code that bpftrace cannot execute."
+    echo "The --ip flag is generating code that bpftrace cannot execute."
     exit 1
 elif [[ "$TRACE_STARTED" == "true" ]]; then
-    echo "TEST PASSED: nettrace with --filter-ip works correctly"
+    echo "TEST PASSED: bpftrace with --ip works correctly"
     exit 0
 else
     echo "TEST INCONCLUSIVE: Trace may not have started"

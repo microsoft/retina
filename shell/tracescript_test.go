@@ -109,7 +109,12 @@ func hexChar(b uint32) byte {
 }
 
 func TestGenerateDropScript(t *testing.T) {
-	config := TraceConfig{}
+	config := TraceConfig{
+		EnableDrops:       true,
+		EnableRST:         true,
+		EnableErrors:      true,
+		EnableRetransmits: true,
+	}
 
 	gen := NewScriptGenerator(config)
 	script := gen.Generate()
@@ -136,7 +141,9 @@ func TestGenerateDropScript(t *testing.T) {
 }
 
 func TestGenerateDropScriptNoFilter(t *testing.T) {
-	config := TraceConfig{}
+	config := TraceConfig{
+		EnableDrops: true,
+	}
 
 	gen := NewScriptGenerator(config)
 	filter := gen.buildSkbIPFilterCondition()
@@ -195,7 +202,11 @@ func TestGenerateDropScriptWithCIDRFilter(t *testing.T) {
 
 func TestGenerateDropScriptJSONOutput(t *testing.T) {
 	config := TraceConfig{
-		OutputJSON: true,
+		OutputJSON:        true,
+		EnableDrops:       true,
+		EnableRST:         true,
+		EnableErrors:      true,
+		EnableRetransmits: true,
 	}
 
 	gen := NewScriptGenerator(config)
@@ -215,7 +226,12 @@ func TestGenerateDropScriptJSONOutput(t *testing.T) {
 }
 
 func TestGenerateDropScriptTableOutput(t *testing.T) {
-	config := TraceConfig{}
+	config := TraceConfig{
+		EnableDrops:       true,
+		EnableRST:         true,
+		EnableErrors:      true,
+		EnableRetransmits: true,
+	}
 
 	gen := NewScriptGenerator(config)
 	script := gen.Generate()
@@ -452,7 +468,9 @@ func TestDropReasonsCommand(t *testing.T) {
 }
 
 func TestScriptUsesNumericReasonCode(t *testing.T) {
-	config := TraceConfig{}
+	config := TraceConfig{
+		EnableDrops: true,
+	}
 
 	gen := NewScriptGenerator(config)
 	script := gen.Generate()

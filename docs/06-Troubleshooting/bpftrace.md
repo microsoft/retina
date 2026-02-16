@@ -1,8 +1,8 @@
-# Network Trace (nettrace)
+# BPF Trace (bpftrace)
 
->NOTE: `retina nettrace` is an experimental feature. The flags and behavior may change in future versions.
+>NOTE: `retina bpftrace` is an experimental feature. The flags and behavior may change in future versions.
 
-The `retina nettrace` command allows you to trace network issues on a Kubernetes node in real-time using eBPF/bpftrace.
+The `retina bpftrace` command allows you to trace network issues on a Kubernetes node in real-time using eBPF/bpftrace.
 
 This is useful for debugging connectivity problems such as:
 - Packet drops (with reason codes)
@@ -15,30 +15,33 @@ This is useful for debugging connectivity problems such as:
 Trace network issues on a node:
 
 ```shell
-# Basic usage - trace all network issues on a node for 30 seconds
-kubectl retina nettrace <node-name>
+# Basic usage - trace all network issues on a node
+kubectl retina bpftrace <node-name>
 
 # With custom duration
-kubectl retina nettrace <node-name> --duration 60s
+kubectl retina bpftrace <node-name> --duration 60s
 
 # Filter by IP address
-kubectl retina nettrace <node-name> --filter-ip 10.224.0.5
+kubectl retina bpftrace <node-name> --ip 10.224.0.5
 
 # Filter by CIDR
-kubectl retina nettrace <node-name> --filter-cidr 10.224.0.0/16
+kubectl retina bpftrace <node-name> --cidr 10.224.0.0/16
 
 # Output as JSON (for parsing)
-kubectl retina nettrace <node-name> -o json
+kubectl retina bpftrace <node-name> -o json
 
-# Specify custom timeout for trace pod operations
-kubectl retina nettrace <node-name> --timeout 120s
+# Trace only specific event types
+kubectl retina bpftrace <node-name> --drops --rst
+
+# Specify custom timeout for trace pod startup
+kubectl retina bpftrace <node-name> --startup-timeout 120s
 ```
 
-Run `kubectl retina nettrace -h` for full documentation and examples.
+Run `kubectl retina bpftrace -h` for full documentation and examples.
 
 ## Event Types
 
-The nettrace command captures several types of network events:
+The bpftrace command captures several types of network events:
 
 ### DROP - Packet Drops
 
@@ -105,10 +108,15 @@ TIME         TYPE       REASON             PROBE              SRC -> DST
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--duration` | duration | 30s | Duration to run the trace |
-| `--timeout` | duration | 60s | Timeout for trace pod operations |
-| `--filter-ip` | string | "" | Filter events by IP address (matches either source or destination) |
-| `--filter-cidr` | string | "" | Filter events by CIDR (matches either source or destination, e.g., 10.0.0.0/8) |
+| `--duration` | duration | 0 | Duration to run the trace (0 = until Ctrl-C) |
+| `--startup-timeout` | duration | 30s | Timeout for trace pod startup |
+| `--ip` | string | "" | Filter events by IP address (matches src or dst) |
+| `--cidr` | string | "" | Filter events by CIDR (matches src or dst) |
+| `--drops` | bool | false | Enable only packet drop events |
+| `--rst` | bool | false | Enable only TCP RST events |
+| `--errors` | bool | false | Enable only socket error events |
+| `--retransmits` | bool | false | Enable only retransmit events |
+| `--all` | bool | false | Enable all event types (default when no event flags specified) |
 | `-o, --output` | string | table | Output format: table or json |
 | `--retina-shell-image-repo` | string | (default) | Override the retina-shell image repository |
 | `--retina-shell-image-version` | string | (default) | Override the retina-shell image version |
@@ -119,7 +127,7 @@ When pods can't communicate due to NetworkPolicy:
 
 ```shell
 # Start tracing on the node where the destination pod runs
-kubectl retina nettrace aks-nodepool1-12345678-vmss000000 --duration 60s
+kubectl retina bpftrace aks-nodepool1-12345678-vmss000000 --drops --duration 60s
 
 # In another terminal, attempt the connection
 kubectl exec -it client-pod -- curl http://server-service:80
@@ -140,7 +148,7 @@ The `DROP` with reason code `6` (NETFILTER_DROP) confirms NetworkPolicy is block
 When connecting to a service that's not listening:
 
 ```shell
-kubectl retina nettrace node-name --filter-ip 10.224.0.5
+kubectl retina bpftrace node-name --rst --errors --ip 10.224.0.5
 ```
 
 ```text
@@ -158,4 +166,4 @@ This shows the TCP RST and corresponding socket error, indicating no service is 
 ## Limitations
 
 - IPv6 filtering not currently supported
-- Netfilter table/chain enrichment not available on nftables-based kernels (drop reason code identifies netfilter drops)
+- Cilium CNI: DROP events won't capture Cilium policy drops (Cilium uses eBPF datapath, not netfilter/kfree_skb)

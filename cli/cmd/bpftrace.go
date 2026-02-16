@@ -37,9 +37,16 @@ var (
 	traceFilterCIDR string
 
 	// Output settings
-	traceOutputFormat string
-	traceDuration     time.Duration
-	traceTimeout      time.Duration
+	traceOutputFormat   string
+	traceDuration       time.Duration
+	traceStartupTimeout time.Duration
+
+	// Event selection flags
+	traceAll         bool
+	traceDrops       bool
+	traceRST         bool
+	traceErrors      bool
+	traceRetransmits bool
 )
 
 // TraceOutputFormat represents validated output format options
@@ -55,7 +62,7 @@ var (
 	errInvalidIP           = errors.New("invalid IP address")
 	errInvalidCIDR         = errors.New("invalid CIDR notation")
 	errInvalidOutputFormat = errors.New("invalid output format: must be 'table' or 'json'")
-	errNodeOnly            = errors.New("nettrace command only supports nodes, not pods")
+	errNodeOnly            = errors.New("bpftrace command only supports nodes, not pods")
 )
 
 // ValidateFilterIP validates an IP address string and returns the parsed IP.
@@ -98,48 +105,56 @@ func ValidateOutputFormat(input string) (TraceOutputFormat, error) {
 	}
 }
 
-var nettraceCmd = &cobra.Command{
-	Use:   "nettrace NODE",
-	Short: "[EXPERIMENTAL] Trace network issues on a node",
+var bpftraceCmd = &cobra.Command{
+	Use:   "bpftrace NODE",
+	Short: "[EXPERIMENTAL] Trace network issues on a node using bpftrace",
 	Long: templates.LongDesc(`
 	[EXPERIMENTAL] This is an experimental command. The flags and behavior may change in the future.
 
-	Trace network issues (packet drops, TCP resets, connection errors) on a node in real-time.
+	Trace network issues (packet drops, TCP resets, connection errors) on a node in real-time
+	using bpftrace.
 
 	This creates a privileged pod on the target node that runs bpftrace to capture:
-	* Packet drops (with drop reason: NETFILTER_DROP, NO_SOCKET, etc.)
-	* TCP RST sent/received (connection refused, reset by peer)
-	* Socket errors (ECONNREFUSED, ETIMEDOUT, etc.)
-	* TCP retransmissions (packet loss indicators)
+	* Packet drops (with drop reason: NETFILTER_DROP, NO_SOCKET, etc.) [--drops]
+	* TCP RST sent/received (connection refused, reset by peer) [--rst]
+	* Socket errors (ECONNREFUSED, ETIMEDOUT, etc.) [--errors]
+	* TCP retransmissions (packet loss indicators) [--retransmits]
 
-	Use --filter-ip or --filter-cidr to focus on specific endpoints.
+	By default, all event types are traced. Use individual flags to trace specific events only.
+
+	Use --ip or --cidr to focus on specific endpoints.
 	The filter matches both source AND destination addresses.
+
+	Note: Currently supports IPv4 only.
 `),
 
 	Example: templates.Examples(`
-		# trace all network issues on a node
-		kubectl retina nettrace node0001
+		# trace all network issues on a node (default)
+		kubectl retina bpftrace node0001
 
-		# trace issues involving a specific IP
-		kubectl retina nettrace node0001 --filter-ip 10.244.1.15
+		# trace only packet drops
+		kubectl retina bpftrace node0001 --drops
 
-		# trace issues for a subnet
-		kubectl retina nettrace node0001 --filter-cidr 10.244.0.0/16
+		# trace drops and RSTs for a specific IP
+		kubectl retina bpftrace node0001 --drops --rst --ip 10.244.1.15
+
+		# trace retransmits for a subnet
+		kubectl retina bpftrace node0001 --retransmits --cidr 10.244.0.0/16
 
 		# trace for 60 seconds and exit
-		kubectl retina nettrace node0001 --duration 60s
+		kubectl retina bpftrace node0001 --duration 60s
 
 		# output in JSON format (for scripting)
-		kubectl retina nettrace node0001 --output json
+		kubectl retina bpftrace node0001 --output json
 
-		# combine filters
-		kubectl retina nettrace node0001 --filter-ip 10.244.1.15 --duration 30s --output json
+		# combine options
+		kubectl retina bpftrace node0001 --ip 10.244.1.15 --duration 30s --output json
 `),
 	Args: cobra.ExactArgs(1),
-	RunE: runNettrace,
+	RunE: runBpftrace,
 }
 
-func runNettrace(_ *cobra.Command, args []string) error {
+func runBpftrace(_ *cobra.Command, args []string) error {
 	// Validate image version
 	if traceRetinaShellImageVersion == "" {
 		return errMissingRequiredRetinaShellImageVersionArg
@@ -150,13 +165,13 @@ func runNettrace(_ *cobra.Command, args []string) error {
 	// Validate IP filter (strict parsing)
 	filterIP, err := ValidateFilterIP(traceFilterIP)
 	if err != nil {
-		return fmt.Errorf("invalid --filter-ip: %w", err)
+		return fmt.Errorf("invalid --ip: %w", err)
 	}
 
 	// Validate CIDR filter (strict parsing)
 	filterCIDR, err := ValidateFilterCIDR(traceFilterCIDR)
 	if err != nil {
-		return fmt.Errorf("invalid --filter-cidr: %w", err)
+		return fmt.Errorf("invalid --cidr: %w", err)
 	}
 
 	// Validate output format (whitelist)
@@ -198,15 +213,23 @@ func runNettrace(_ *cobra.Command, args []string) error {
 			nodeName := obj.Name
 			podNamespace := namespace
 
+			// Determine which events to trace
+			// If no individual flags set, or --all is set, enable all events
+			enableAll := traceAll || (!traceDrops && !traceRST && !traceErrors && !traceRetransmits)
+
 			// Build TraceConfig with validated, typed values only
 			traceConfig := shell.TraceConfig{
-				RestConfig:       restConfig,
-				RetinaShellImage: fmt.Sprintf("%s:%s", traceRetinaShellImageRepo, traceRetinaShellImageVersion),
-				FilterIPs:        nil,
-				FilterCIDRs:      nil,
-				OutputJSON:       outputFormat == TraceOutputJSON,
-				TraceDuration:    traceDuration,
-				Timeout:          traceTimeout,
+				RestConfig:        restConfig,
+				RetinaShellImage:  fmt.Sprintf("%s:%s", traceRetinaShellImageRepo, traceRetinaShellImageVersion),
+				FilterIPs:         nil,
+				FilterCIDRs:       nil,
+				OutputJSON:        outputFormat == TraceOutputJSON,
+				TraceDuration:     traceDuration,
+				Timeout:           traceStartupTimeout,
+				EnableDrops:       enableAll || traceDrops,
+				EnableRST:         enableAll || traceRST,
+				EnableErrors:      enableAll || traceErrors,
+				EnableRetransmits: enableAll || traceRetransmits,
 			}
 
 			// Add validated IP filter (already typed as net.IP)
@@ -252,9 +275,9 @@ func runNettrace(_ *cobra.Command, args []string) error {
 }
 
 func init() {
-	Retina.AddCommand(nettraceCmd)
+	Retina.AddCommand(bpftraceCmd)
 
-	nettraceCmd.PersistentPreRun = func(cmd *cobra.Command, _ []string) {
+	bpftraceCmd.PersistentPreRun = func(cmd *cobra.Command, _ []string) {
 		cmd.SilenceUsage = true
 		cmd.SilenceErrors = true
 
@@ -272,28 +295,40 @@ func init() {
 	}
 
 	// Image flags (same as shell command)
-	nettraceCmd.Flags().StringVar(&traceRetinaShellImageRepo, "retina-shell-image-repo",
+	bpftraceCmd.Flags().StringVar(&traceRetinaShellImageRepo, "retina-shell-image-repo",
 		defaultRetinaShellImageRepo, "The container registry repository for the retina-shell image")
-	nettraceCmd.Flags().StringVar(&traceRetinaShellImageVersion, "retina-shell-image-version",
+	bpftraceCmd.Flags().StringVar(&traceRetinaShellImageVersion, "retina-shell-image-version",
 		defaultRetinaShellImageVersion, "The version (tag) of the retina-shell image")
 
 	// Filter flags
-	nettraceCmd.Flags().StringVar(&traceFilterIP, "filter-ip", "",
+	bpftraceCmd.Flags().StringVar(&traceFilterIP, "ip", "",
 		"Filter by IP address (matches source OR destination)")
-	nettraceCmd.Flags().StringVar(&traceFilterCIDR, "filter-cidr", "",
+	bpftraceCmd.Flags().StringVar(&traceFilterCIDR, "cidr", "",
 		"Filter by CIDR (matches source OR destination)")
 
+	// Event selection flags
+	bpftraceCmd.Flags().BoolVar(&traceAll, "all", false,
+		"Enable all event types (default behavior when no event flags specified)")
+	bpftraceCmd.Flags().BoolVar(&traceDrops, "drops", false,
+		"Enable packet drop events (kfree_skb tracepoint)")
+	bpftraceCmd.Flags().BoolVar(&traceRST, "rst", false,
+		"Enable TCP RST events (tcp_send_reset/tcp_receive_reset)")
+	bpftraceCmd.Flags().BoolVar(&traceErrors, "errors", false,
+		"Enable socket error events (inet_sk_error_report)")
+	bpftraceCmd.Flags().BoolVar(&traceRetransmits, "retransmits", false,
+		"Enable TCP retransmit events (tcp_retransmit_skb)")
+
 	// Output flags
-	nettraceCmd.Flags().StringVarP(&traceOutputFormat, "output", "o", "table",
+	bpftraceCmd.Flags().StringVarP(&traceOutputFormat, "output", "o", "table",
 		"Output format: 'table' (human-readable) or 'json' (machine-readable)")
-	nettraceCmd.Flags().DurationVar(&traceDuration, "duration", 0,
+	bpftraceCmd.Flags().DurationVar(&traceDuration, "duration", 0,
 		"How long to trace (e.g., 30s, 5m). 0 means until Ctrl-C.")
-	nettraceCmd.Flags().DurationVar(&traceTimeout, "timeout", defaultTimeout,
+	bpftraceCmd.Flags().DurationVar(&traceStartupTimeout, "startup-timeout", defaultTimeout,
 		"Timeout for starting the trace pod")
 
 	// Kubernetes config flags
 	traceConfigFlags = genericclioptions.NewConfigFlags(true)
-	traceConfigFlags.AddFlags(nettraceCmd.PersistentFlags())
+	traceConfigFlags.AddFlags(bpftraceCmd.PersistentFlags())
 	traceMatchVersionFlags = cmdutil.NewMatchVersionFlags(traceConfigFlags)
-	traceMatchVersionFlags.AddFlags(nettraceCmd.PersistentFlags())
+	traceMatchVersionFlags.AddFlags(bpftraceCmd.PersistentFlags())
 }

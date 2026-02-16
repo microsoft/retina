@@ -1,12 +1,12 @@
 #!/bin/bash
-# Test script for nettrace - tests drops, RST, socket errors, and retransmits
-# Usage: ./test_nettrace_drops.sh [kubeconfig_path]
+# Test script for bpftrace - tests drops, RST, socket errors, and retransmits
+# Usage: ./test_bpftrace_drops.sh [kubeconfig_path]
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-echo "=== Nettrace Network Issue Detection Test ==="
+echo "=== Bpftrace Network Issue Detection Test ==="
 echo ""
 
 # Get first node
@@ -27,7 +27,7 @@ if [[ ! -f "$REPO_ROOT/kubectl-retina" ]]; then
 fi
 
 echo ""
-echo "=== Starting nettrace (50s duration) ==="
+echo "=== Starting bpftrace (50s duration) ==="
 echo "This will capture drops, RST, socket errors, and retransmits on $NODE"
 echo ""
 
@@ -36,7 +36,7 @@ OUTPUT_FILE=$(mktemp)
 trap "rm -f $OUTPUT_FILE" EXIT
 
 # Run trace in background and capture output
-"$REPO_ROOT/kubectl-retina" nettrace "$NODE" --duration 50s --timeout 120s --retina-shell-image-version v1.0.3 > "$OUTPUT_FILE" 2>&1 &
+"$REPO_ROOT/kubectl-retina" bpftrace "$NODE" --duration 50s --startup-timeout 120s --retina-shell-image-version v1.0.3 > "$OUTPUT_FILE" 2>&1 &
 TRACE_PID=$!
 
 # Wait for trace to start
