@@ -376,20 +376,36 @@ func (g *ScriptGenerator) generateRetransmitTracepoint() string {
     $dport = args->dport;
     $state = args->state;
 
+    // Decode TCP state to human-readable name (fixed values from include/net/tcp_states.h)
+    $state_name = $state == 1  ? "ESTABLISHED" :
+                  $state == 2  ? "SYN_SENT" :
+                  $state == 3  ? "SYN_RECV" :
+                  $state == 4  ? "FIN_WAIT1" :
+                  $state == 5  ? "FIN_WAIT2" :
+                  $state == 6  ? "TIME_WAIT" :
+                  $state == 7  ? "CLOSE" :
+                  $state == 8  ? "CLOSE_WAIT" :
+                  $state == 9  ? "LAST_ACK" :
+                  $state == 10 ? "LISTEN" :
+                  $state == 11 ? "CLOSING" :
+                  $state == 12 ? "NEW_SYN_RECV" :
+                  "UNKNOWN";
+
 `)
 
 	if g.config.OutputJSON {
-		sb.WriteString(`    printf("{\"time\":\"%s\",\"type\":\"RETRANS\",\"reason_code\":%d,\"probe\":\"tcp_retransmit_skb\",\"src_ip\":\"%s\",\"src_port\":%d,\"dst_ip\":\"%s\",\"dst_port\":%d}\n",
+		// tcp_state is the TCP socket state name (ESTABLISHED, SYN_SENT, etc.)
+		sb.WriteString(`    printf("{\"time\":\"%s\",\"type\":\"RETRANS\",\"tcp_state\":\"%s\",\"probe\":\"tcp_retransmit_skb\",\"src_ip\":\"%s\",\"src_port\":%d,\"dst_ip\":\"%s\",\"dst_port\":%d}\n",
            strftime("%H:%M:%S", nsecs),
-           $state,
+           $state_name,
            $saddr, $sport,
            $daddr, $dport);
 `)
 	} else {
-		sb.WriteString(`    printf("%-12s %-10s %-18d %-18s %s:%-5d  ->  %s:%-5d\n",
+		sb.WriteString(`    printf("%-12s %-10s %-18s %-18s %s:%-5d  ->  %s:%-5d\n",
            strftime("%H:%M:%S", nsecs),
            "RETRANS",
-           $state,
+           $state_name,
            "tcp_retransmit_skb",
            $saddr, $sport,
            $daddr, $dport);
@@ -694,5 +710,21 @@ func DropReasonsCommand() []string {
 			`sed 's/{ \([0-9]*\), "\([^"]*\)" }/\1 = \2/' | ` +
 			`head -30 || ` +
 			`echo "(Could not read drop reasons - requires debugfs mounted)"`,
+	}
+}
+
+// TcpRetransReasonsCommand returns the command to fetch TCP retransmit reason enum from kernel.
+// The tcp_retransmit_skb tracepoint has a 'reason' field (sk_tcp_rtx_reason enum) that indicates
+// why the retransmission occurred. These values are kernel-version specific.
+// Note: The 'reason' field was added in kernel 5.12+, older kernels may not have it.
+func TcpRetransReasonsCommand() []string {
+	return []string{
+		"sh", "-c",
+		`echo "=== TCP Retransmit Reason Codes (kernel-specific, 5.12+) ===" && ` +
+			`cat /sys/kernel/debug/tracing/events/tcp/tcp_retransmit_skb/format 2>/dev/null | ` +
+			`grep -oE '\{ [0-9]+, "[^"]+" \}' | ` +
+			`sed 's/{ \([0-9]*\), "\([^"]*\)" }/\1 = \2/' | ` +
+			`head -20 || ` +
+			`echo "(Could not read retrans reasons - requires debugfs mounted or kernel 5.12+)"`,
 	}
 }
