@@ -115,16 +115,6 @@ func RunTrace(ctx context.Context, config TraceConfig, nodeName, debugPodNamespa
 	}
 	fmt.Printf("\n")
 
-	// Display TCP retransmit reason codes (for RETRANS events, kernel 5.12+)
-	// Note: TCP socket state names (ESTABLISHED, SYN_SENT, etc.) are shown directly in RETRANS output
-	retransReasonsCommand := TcpRetransReasonsCommand()
-	err = execInPod(ctx, config.RestConfig, clientset, debugPodNamespace, createdPod.Name, createdPod.Spec.Containers[0].Name, retransReasonsCommand, os.Stdout, os.Stderr)
-	if err != nil {
-		// Non-fatal: continue even if we can't get reason codes
-		fmt.Fprintf(os.Stderr, "warning: could not fetch TCP retransmit reason codes: %v\n", err)
-	}
-	fmt.Printf("\n")
-
 	// Generate and run the bpftrace script
 	gen := NewScriptGenerator(config)
 	script := gen.Generate()

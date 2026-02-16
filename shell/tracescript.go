@@ -79,11 +79,11 @@ func (g *ScriptGenerator) generateBeginBlock() string {
 	} else {
 		sb.WriteString(`    printf("Tracing network issues... Press Ctrl-C to stop.\n\n");`)
 		sb.WriteString("\n")
-		sb.WriteString(`    printf("%-12s %-10s %-18s %-18s %s\n",`)
+		sb.WriteString(`    printf("%-12s %-10s %-18s %-18s %-18s %s\n",`)
 		sb.WriteString("\n")
-		sb.WriteString(`           "TIME", "TYPE", "REASON", "PROBE", "SRC -> DST");`)
+		sb.WriteString(`           "TIME", "TYPE", "REASON", "STATE", "PROBE", "SRC -> DST");`)
 		sb.WriteString("\n")
-		sb.WriteString(`    printf("────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n");`)
+		sb.WriteString(`    printf("────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n");`)
 	}
 
 	sb.WriteString("\n}\n\n")
@@ -213,9 +213,10 @@ func (g *ScriptGenerator) generateRSTSentTracepoint() string {
            $daddr, $dport);
 `)
 	} else {
-		sb.WriteString(`    printf("%-12s %-10s %-18s %-18s %s:%-5d  ->  %s:%-5d\n",
+		sb.WriteString(`    printf("%-12s %-10s %-18s %-18s %-18s %s:%-5d  ->  %s:%-5d\n",
            strftime("%H:%M:%S", nsecs),
            "RST_SENT",
+           "-",
            "-",
            "tcp_send_reset",
            $saddr, $sport,
@@ -264,9 +265,10 @@ func (g *ScriptGenerator) generateRSTReceivedTracepoint() string {
            $daddr, $dport);
 `)
 	} else {
-		sb.WriteString(`    printf("%-12s %-10s %-18s %-18s %s:%-5d  ->  %s:%-5d\n",
+		sb.WriteString(`    printf("%-12s %-10s %-18s %-18s %-18s %s:%-5d  ->  %s:%-5d\n",
            strftime("%H:%M:%S", nsecs),
            "RST_RECV",
+           "-",
            "-",
            "tcp_receive_reset",
            $saddr, $sport,
@@ -313,7 +315,7 @@ func (g *ScriptGenerator) generateSocketErrorTracepoint() string {
 
 	if g.config.OutputJSON {
 		// JSON output: use error code only (parsers can decode POSIX errno)
-		sb.WriteString(`    printf("{\"time\":\"%s\",\"type\":\"SOCK_ERR\",\"reason_code\":%d,\"probe\":\"inet_sk_error_report\",\"src_ip\":\"%s\",\"src_port\":%d,\"dst_ip\":\"%s\",\"dst_port\":%d}\n",
+		sb.WriteString(`    printf("{\"time\":\"%s\",\"type\":\"SOCK_ERR\",\"errno\":%d,\"probe\":\"inet_sk_error_report\",\"src_ip\":\"%s\",\"src_port\":%d,\"dst_ip\":\"%s\",\"dst_port\":%d}\n",
            strftime("%H:%M:%S", nsecs),
            $error,
            $saddr, $sport,
@@ -332,10 +334,11 @@ func (g *ScriptGenerator) generateSocketErrorTracepoint() string {
                   $error == 103 ? "ECONNABORTED" :
                   "UNKNOWN";
 
-    printf("%-12s %-10s %-18s %-18s %s:%-5d  ->  %s:%-5d\n",
+    printf("%-12s %-10s %-18s %-18s %-18s %s:%-5d  ->  %s:%-5d\n",
            strftime("%H:%M:%S", nsecs),
            "SOCK_ERR",
            $errno_name,
+           "-",
            "inet_sk_error_report",
            $saddr, $sport,
            $daddr, $dport);
@@ -376,8 +379,20 @@ func (g *ScriptGenerator) generateRetransmitTracepoint() string {
     $dport = args->dport;
     $state = args->state;
 
-    // Decode TCP state to human-readable name (fixed values from include/net/tcp_states.h)
-    $state_name = $state == 1  ? "ESTABLISHED" :
+`)
+
+	if g.config.OutputJSON {
+		// JSON: use numeric tcp_state to avoid BPF verifier complexity with string variables
+		// State values: 1=ESTABLISHED, 2=SYN_SENT, 3=SYN_RECV, 4=FIN_WAIT1, etc.
+		sb.WriteString(`    printf("{\"time\":\"%s\",\"type\":\"RETRANS\",\"tcp_state\":%d,\"probe\":\"tcp_retransmit_skb\",\"src_ip\":\"%s\",\"src_port\":%d,\"dst_ip\":\"%s\",\"dst_port\":%d}\n",
+           strftime("%H:%M:%S", nsecs),
+           $state,
+           $saddr, $sport,
+           $daddr, $dport);
+`)
+	} else {
+		// Table: decode TCP state to human-readable name (fixed values from include/net/tcp_states.h)
+		sb.WriteString(`    $state_name = $state == 1  ? "ESTABLISHED" :
                   $state == 2  ? "SYN_SENT" :
                   $state == 3  ? "SYN_RECV" :
                   $state == 4  ? "FIN_WAIT1" :
@@ -391,20 +406,10 @@ func (g *ScriptGenerator) generateRetransmitTracepoint() string {
                   $state == 12 ? "NEW_SYN_RECV" :
                   "UNKNOWN";
 
-`)
-
-	if g.config.OutputJSON {
-		// tcp_state is the TCP socket state name (ESTABLISHED, SYN_SENT, etc.)
-		sb.WriteString(`    printf("{\"time\":\"%s\",\"type\":\"RETRANS\",\"tcp_state\":\"%s\",\"probe\":\"tcp_retransmit_skb\",\"src_ip\":\"%s\",\"src_port\":%d,\"dst_ip\":\"%s\",\"dst_port\":%d}\n",
-           strftime("%H:%M:%S", nsecs),
-           $state_name,
-           $saddr, $sport,
-           $daddr, $dport);
-`)
-	} else {
-		sb.WriteString(`    printf("%-12s %-10s %-18s %-18s %s:%-5d  ->  %s:%-5d\n",
+    printf("%-12s %-10s %-18s %-18s %-18s %s:%-5d  ->  %s:%-5d\n",
            strftime("%H:%M:%S", nsecs),
            "RETRANS",
+           "-",
            $state_name,
            "tcp_retransmit_skb",
            $saddr, $sport,
@@ -593,18 +598,20 @@ func (g *ScriptGenerator) cidrToTCPFilterCondition(cidr *net.IPNet) string {
 func (g *ScriptGenerator) generateTableOutput() string {
 	return `    // Format source and destination with numeric reason code
     if ($sport > 0) {
-        printf("%-12s %-10s %-18d %-18s %s:%-5d  ->  %s:%-5d\n",
+        printf("%-12s %-10s %-18d %-18s %-18s %s:%-5d  ->  %s:%-5d\n",
                strftime("%H:%M:%S", nsecs),
                "DROP",
                $reason,
+               "-",
                "kfree_skb",
                $saddr, $sport,
                $daddr, $dport);
     } else {
-        printf("%-12s %-10s %-18d %-18s %s  ->  %s\n",
+        printf("%-12s %-10s %-18d %-18s %-18s %s  ->  %s\n",
                strftime("%H:%M:%S", nsecs),
                "DROP",
                $reason,
+               "-",
                "kfree_skb",
                $saddr,
                $daddr);
@@ -710,21 +717,5 @@ func DropReasonsCommand() []string {
 			`sed 's/{ \([0-9]*\), "\([^"]*\)" }/\1 = \2/' | ` +
 			`head -30 || ` +
 			`echo "(Could not read drop reasons - requires debugfs mounted)"`,
-	}
-}
-
-// TcpRetransReasonsCommand returns the command to fetch TCP retransmit reason enum from kernel.
-// The tcp_retransmit_skb tracepoint has a 'reason' field (sk_tcp_rtx_reason enum) that indicates
-// why the retransmission occurred. These values are kernel-version specific.
-// Note: The 'reason' field was added in kernel 5.12+, older kernels may not have it.
-func TcpRetransReasonsCommand() []string {
-	return []string{
-		"sh", "-c",
-		`echo "=== TCP Retransmit Reason Codes (kernel-specific, 5.12+) ===" && ` +
-			`cat /sys/kernel/debug/tracing/events/tcp/tcp_retransmit_skb/format 2>/dev/null | ` +
-			`grep -oE '\{ [0-9]+, "[^"]+" \}' | ` +
-			`sed 's/{ \([0-9]*\), "\([^"]*\)" }/\1 = \2/' | ` +
-			`head -20 || ` +
-			`echo "(Could not read retrans reasons - requires debugfs mounted or kernel 5.12+)"`,
 	}
 }
