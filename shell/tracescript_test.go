@@ -133,20 +133,13 @@ func TestGenerateDropScript(t *testing.T) {
 	if !strings.Contains(script, "DROP") {
 		t.Error("script missing DROP output")
 	}
-	// Should have netfilter enrichment
-	if !strings.Contains(script, "nft_do_chain") {
-		t.Error("script missing netfilter enrichment (nft_do_chain)")
-	}
-	if !strings.Contains(script, "@nf_table") {
-		t.Error("script missing netfilter table map")
-	}
 }
 
 func TestGenerateDropScriptNoFilter(t *testing.T) {
 	config := TraceConfig{}
 
 	gen := NewScriptGenerator(config)
-	filter := gen.buildFilterCondition()
+	filter := gen.buildSkbIPFilterCondition()
 
 	// No filter should be empty
 	if filter != "" {
@@ -163,7 +156,7 @@ func TestGenerateDropScriptWithIPFilter(t *testing.T) {
 	}
 
 	gen := NewScriptGenerator(config)
-	filter := gen.buildFilterCondition()
+	filter := gen.buildSkbIPFilterCondition()
 
 	// Should contain hex representation
 	if !strings.Contains(filter, "0x0a000001") {
@@ -189,7 +182,7 @@ func TestGenerateDropScriptWithCIDRFilter(t *testing.T) {
 	}
 
 	gen := NewScriptGenerator(config)
-	filter := gen.buildFilterCondition()
+	filter := gen.buildSkbIPFilterCondition()
 
 	// Should contain hex network
 	if !strings.Contains(filter, "0x0a000000") {
@@ -221,12 +214,6 @@ func TestGenerateDropScriptJSONOutput(t *testing.T) {
 	if !strings.Contains(script, `\"src_ip\"`) {
 		t.Error("JSON script missing src_ip field")
 	}
-	if !strings.Contains(script, `\"table\"`) {
-		t.Error("JSON script missing table field")
-	}
-	if !strings.Contains(script, `\"chain\"`) {
-		t.Error("JSON script missing chain field")
-	}
 }
 
 func TestGenerateDropScriptTableOutput(t *testing.T) {
@@ -242,20 +229,14 @@ func TestGenerateDropScriptTableOutput(t *testing.T) {
 	if !strings.Contains(script, "TYPE") {
 		t.Error("table script missing TYPE header")
 	}
-	if !strings.Contains(script, "CODE") {
-		t.Error("table script missing CODE header")
+	if !strings.Contains(script, "REASON") {
+		t.Error("table script missing REASON header")
 	}
-	if !strings.Contains(script, "SRC") {
-		t.Error("table script missing SRC header")
+	if !strings.Contains(script, "STATE") {
+		t.Error("table script missing STATE header")
 	}
-	if !strings.Contains(script, "DST") {
-		t.Error("table script missing DST header")
-	}
-	if !strings.Contains(script, "TABLE") {
-		t.Error("table script missing TABLE header")
-	}
-	if !strings.Contains(script, "CHAIN") {
-		t.Error("table script missing CHAIN header")
+	if !strings.Contains(script, "PROBE") {
+		t.Error("table script missing PROBE header")
 	}
 }
 
@@ -276,7 +257,7 @@ func TestScriptGeneratorNoUserStringInterpolation(t *testing.T) {
 	}
 
 	gen := NewScriptGenerator(config)
-	filter := gen.buildFilterCondition()
+	filter := gen.buildSkbIPFilterCondition()
 
 	// The node name should NOT appear in the filter
 	if strings.Contains(filter, "evil-node") {
@@ -346,7 +327,7 @@ func TestBuildIPFilter(t *testing.T) {
 			}
 
 			gen := NewScriptGenerator(config)
-			filter := gen.buildFilterCondition()
+			filter := gen.buildSkbIPFilterCondition()
 
 			// Verify hex IPs are present
 			for _, hexIP := range tt.expectHexIPs {
@@ -414,7 +395,7 @@ func TestBuildCIDRFilter(t *testing.T) {
 			}
 
 			gen := NewScriptGenerator(config)
-			filter := gen.buildFilterCondition()
+			filter := gen.buildSkbIPFilterCondition()
 
 			if !strings.Contains(filter, tt.expectNet) {
 				t.Errorf("expected filter to contain network %s, got: %s", tt.expectNet, filter)
@@ -438,7 +419,7 @@ func TestMixedIPAndCIDRFilter(t *testing.T) {
 	}
 
 	gen := NewScriptGenerator(config)
-	filter := gen.buildFilterCondition()
+	filter := gen.buildSkbIPFilterCondition()
 
 	// Should contain both IP and CIDR hex values
 	if !strings.Contains(filter, "0x0a000001") {
