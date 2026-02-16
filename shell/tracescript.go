@@ -105,14 +105,9 @@ func (g *ScriptGenerator) generateDropTracepoint() string {
 	var sb strings.Builder
 
 	// Tracepoint for packet drops
+	// Note: No pre-filter here because we need to parse skb to get IPs.
+	// IP filtering is done in the body after extracting addresses.
 	sb.WriteString("tracepoint:skb:kfree_skb\n")
-
-	// Add filter condition if IPs/CIDRs specified
-	filter := g.buildFilterCondition()
-	if filter != "" {
-		sb.WriteString(filter)
-	}
-
 	sb.WriteString("{\n")
 
 	// Extract packet info
@@ -128,11 +123,21 @@ func (g *ScriptGenerator) generateDropTracepoint() string {
     if (bswap($protocol) != 0x0800) { return; }
 
     $iph = (struct iphdr *)($skb->head + $skb->network_header);
-    $saddr = ntop(2, $iph->saddr);
-    $daddr = ntop(2, $iph->daddr);
+    $saddr_raw = $iph->saddr;
+    $daddr_raw = $iph->daddr;
+    $saddr = ntop(2, $saddr_raw);
+    $daddr = ntop(2, $daddr_raw);
     $ipproto = $iph->protocol;
 
-    $sport = (uint16)0;
+`)
+
+	// Add IP/CIDR filter inside the body if specified
+	ipFilter := g.buildSkbIPFilterCondition()
+	if ipFilter != "" {
+		sb.WriteString(ipFilter)
+	}
+
+	sb.WriteString(`    $sport = (uint16)0;
     $dport = (uint16)0;
 
     // Extract ports for TCP/UDP
@@ -176,19 +181,25 @@ func (g *ScriptGenerator) generateRSTSentTracepoint() string {
 	var sb strings.Builder
 
 	sb.WriteString("tracepoint:tcp:tcp_send_reset\n")
-
-	// Add filter - tcp tracepoints have different args than skb
-	filter := g.buildTCPFilterCondition()
-	if filter != "" {
-		sb.WriteString(filter)
-	}
-
 	sb.WriteString("{\n")
 
 	// Only process IPv4 (family == 2)
 	sb.WriteString(`    if (args->family != 2) { return; }
 
-    $saddr = ntop(2, args->saddr);
+`)
+
+	// Extract bytes into local vars first (required for BPF verifier)
+	if g.hasIPFilter() {
+		sb.WriteString(`    // Read IP bytes into local vars for filtering
+    $s0 = args->saddr[0]; $s1 = args->saddr[1]; $s2 = args->saddr[2]; $s3 = args->saddr[3];
+    $d0 = args->daddr[0]; $d1 = args->daddr[1]; $d2 = args->daddr[2]; $d3 = args->daddr[3];
+
+`)
+		// Add IP filter using local vars
+		sb.WriteString(g.buildTCPIPFilterCheckFromLocalVars())
+	}
+
+	sb.WriteString(`    $saddr = ntop(2, args->saddr);
     $daddr = ntop(2, args->daddr);
     $sport = args->sport;
     $dport = args->dport;
@@ -221,19 +232,25 @@ func (g *ScriptGenerator) generateRSTReceivedTracepoint() string {
 	var sb strings.Builder
 
 	sb.WriteString("tracepoint:tcp:tcp_receive_reset\n")
-
-	// Add filter
-	filter := g.buildTCPFilterCondition()
-	if filter != "" {
-		sb.WriteString(filter)
-	}
-
 	sb.WriteString("{\n")
 
 	// Only process IPv4 (family == 2)
 	sb.WriteString(`    if (args->family != 2) { return; }
 
-    $saddr = ntop(2, args->saddr);
+`)
+
+	// Extract bytes into local vars first (required for BPF verifier)
+	if g.hasIPFilter() {
+		sb.WriteString(`    // Read IP bytes into local vars for filtering
+    $s0 = args->saddr[0]; $s1 = args->saddr[1]; $s2 = args->saddr[2]; $s3 = args->saddr[3];
+    $d0 = args->daddr[0]; $d1 = args->daddr[1]; $d2 = args->daddr[2]; $d3 = args->daddr[3];
+
+`)
+		// Add IP filter using local vars
+		sb.WriteString(g.buildTCPIPFilterCheckFromLocalVars())
+	}
+
+	sb.WriteString(`    $saddr = ntop(2, args->saddr);
     $daddr = ntop(2, args->daddr);
     $sport = args->sport;
     $dport = args->dport;
@@ -267,20 +284,26 @@ func (g *ScriptGenerator) generateSocketErrorTracepoint() string {
 	var sb strings.Builder
 
 	sb.WriteString("tracepoint:sock:inet_sk_error_report\n")
-
-	// Add filter - same args structure as TCP tracepoints
-	filter := g.buildTCPFilterCondition()
-	if filter != "" {
-		sb.WriteString(filter)
-	}
-
 	sb.WriteString("{\n")
 
 	// Only process IPv4 (family == 2) and skip error=0 (not a real error)
 	sb.WriteString(`    if (args->family != 2) { return; }
     if (args->error == 0) { return; }  // Skip non-error events (socket cleanup)
 
-    $saddr = ntop(2, args->saddr);
+`)
+
+	// Extract bytes into local vars first (required for BPF verifier)
+	if g.hasIPFilter() {
+		sb.WriteString(`    // Read IP bytes into local vars for filtering
+    $s0 = args->saddr[0]; $s1 = args->saddr[1]; $s2 = args->saddr[2]; $s3 = args->saddr[3];
+    $d0 = args->daddr[0]; $d1 = args->daddr[1]; $d2 = args->daddr[2]; $d3 = args->daddr[3];
+
+`)
+		// Add IP filter using local vars
+		sb.WriteString(g.buildTCPIPFilterCheckFromLocalVars())
+	}
+
+	sb.WriteString(`    $saddr = ntop(2, args->saddr);
     $daddr = ntop(2, args->daddr);
     $sport = args->sport;
     $dport = args->dport;
@@ -329,19 +352,25 @@ func (g *ScriptGenerator) generateRetransmitTracepoint() string {
 	var sb strings.Builder
 
 	sb.WriteString("tracepoint:tcp:tcp_retransmit_skb\n")
-
-	// Add filter - same args structure as TCP tracepoints
-	filter := g.buildTCPFilterCondition()
-	if filter != "" {
-		sb.WriteString(filter)
-	}
-
 	sb.WriteString("{\n")
 
 	// Only process IPv4 (family == 2)
 	sb.WriteString(`    if (args->family != 2) { return; }
 
-    $saddr = ntop(2, args->saddr);
+`)
+
+	// Extract bytes into local vars first (required for BPF verifier)
+	if g.hasIPFilter() {
+		sb.WriteString(`    // Read IP bytes into local vars for filtering
+    $s0 = args->saddr[0]; $s1 = args->saddr[1]; $s2 = args->saddr[2]; $s3 = args->saddr[3];
+    $d0 = args->daddr[0]; $d1 = args->daddr[1]; $d2 = args->daddr[2]; $d3 = args->daddr[3];
+
+`)
+		// Add IP filter using local vars
+		sb.WriteString(g.buildTCPIPFilterCheckFromLocalVars())
+	}
+
+	sb.WriteString(`    $saddr = ntop(2, args->saddr);
     $daddr = ntop(2, args->daddr);
     $sport = args->sport;
     $dport = args->dport;
@@ -371,8 +400,112 @@ func (g *ScriptGenerator) generateRetransmitTracepoint() string {
 	return sb.String()
 }
 
-// buildTCPFilterCondition creates filter for TCP tracepoints (different args structure).
-// TCP tracepoints have args->saddr[4] and args->daddr[4] as byte arrays.
+// buildTCPIPFilterCheck creates an if-statement to filter by IP inside TCP tracepoint bodies.
+// Uses byte-by-byte comparison since TCP tracepoints have args->saddr as uint8[4].
+// SECURITY: IPs are converted to integer byte values - no string interpolation.
+func (g *ScriptGenerator) buildTCPIPFilterCheck() string {
+	if len(g.config.FilterIPs) == 0 && len(g.config.FilterCIDRs) == 0 {
+		return "" // No filter
+	}
+
+	var conditions []string
+
+	// Add IP filters - compare byte by byte
+	for _, ip := range g.config.FilterIPs {
+		ipv4 := ip.To4()
+		if ipv4 == nil {
+			continue
+		}
+		// Match either source or destination, byte by byte
+		conditions = append(conditions, fmt.Sprintf(
+			"((args->saddr[0] == %d && args->saddr[1] == %d && args->saddr[2] == %d && args->saddr[3] == %d) || (args->daddr[0] == %d && args->daddr[1] == %d && args->daddr[2] == %d && args->daddr[3] == %d))",
+			ipv4[0], ipv4[1], ipv4[2], ipv4[3],
+			ipv4[0], ipv4[1], ipv4[2], ipv4[3]))
+	}
+
+	// Add CIDR filters - mask and compare byte by byte
+	for _, cidr := range g.config.FilterCIDRs {
+		if cidr == nil {
+			continue
+		}
+		ipv4 := cidr.IP.To4()
+		mask := cidr.Mask
+		if ipv4 == nil || len(mask) != 4 {
+			continue
+		}
+		// (byte & mask) == network_byte for each byte
+		conditions = append(conditions, fmt.Sprintf(
+			"(((args->saddr[0] & %d) == %d && (args->saddr[1] & %d) == %d && (args->saddr[2] & %d) == %d && (args->saddr[3] & %d) == %d) || ((args->daddr[0] & %d) == %d && (args->daddr[1] & %d) == %d && (args->daddr[2] & %d) == %d && (args->daddr[3] & %d) == %d))",
+			mask[0], ipv4[0], mask[1], ipv4[1], mask[2], ipv4[2], mask[3], ipv4[3],
+			mask[0], ipv4[0], mask[1], ipv4[1], mask[2], ipv4[2], mask[3], ipv4[3]))
+	}
+
+	if len(conditions) == 0 {
+		return ""
+	}
+
+	// Generate an if-statement that returns early if no condition matches
+	combined := strings.Join(conditions, " || ")
+	return fmt.Sprintf("    // IP/CIDR filter: skip if not matching\n    if (!(%s)) { return; }\n\n", combined)
+}
+
+// hasIPFilter returns true if any IP or CIDR filter is configured.
+func (g *ScriptGenerator) hasIPFilter() bool {
+	return len(g.config.FilterIPs) > 0 || len(g.config.FilterCIDRs) > 0
+}
+
+// buildTCPIPFilterCheckFromLocalVars creates a filter using local vars $s0-$s3 and $d0-$d3.
+// This is required because the BPF verifier doesn't allow reading from different
+// offsets of args after a probe_read. We read bytes into local vars first, then filter.
+// SECURITY: IPs are converted to integer byte values - no string interpolation.
+func (g *ScriptGenerator) buildTCPIPFilterCheckFromLocalVars() string {
+	if len(g.config.FilterIPs) == 0 && len(g.config.FilterCIDRs) == 0 {
+		return "" // No filter
+	}
+
+	var conditions []string
+
+	// Add IP filters - compare using local vars
+	for _, ip := range g.config.FilterIPs {
+		ipv4 := ip.To4()
+		if ipv4 == nil {
+			continue
+		}
+		// Match either source or destination using local vars
+		conditions = append(conditions, fmt.Sprintf(
+			"(($s0 == %d && $s1 == %d && $s2 == %d && $s3 == %d) || ($d0 == %d && $d1 == %d && $d2 == %d && $d3 == %d))",
+			ipv4[0], ipv4[1], ipv4[2], ipv4[3],
+			ipv4[0], ipv4[1], ipv4[2], ipv4[3]))
+	}
+
+	// Add CIDR filters - mask and compare using local vars
+	for _, cidr := range g.config.FilterCIDRs {
+		if cidr == nil {
+			continue
+		}
+		ipv4 := cidr.IP.To4()
+		mask := cidr.Mask
+		if ipv4 == nil || len(mask) != 4 {
+			continue
+		}
+		// (byte & mask) == network_byte for each byte
+		conditions = append(conditions, fmt.Sprintf(
+			"((($s0 & %d) == %d && ($s1 & %d) == %d && ($s2 & %d) == %d && ($s3 & %d) == %d) || (($d0 & %d) == %d && ($d1 & %d) == %d && ($d2 & %d) == %d && ($d3 & %d) == %d))",
+			mask[0], ipv4[0], mask[1], ipv4[1], mask[2], ipv4[2], mask[3], ipv4[3],
+			mask[0], ipv4[0], mask[1], ipv4[1], mask[2], ipv4[2], mask[3], ipv4[3]))
+	}
+
+	if len(conditions) == 0 {
+		return ""
+	}
+
+	// Generate an if-statement that returns early if no condition matches
+	combined := strings.Join(conditions, " || ")
+	return fmt.Sprintf("    // IP/CIDR filter: skip if not matching\n    if (!(%s)) { return; }\n\n", combined)
+}
+
+// buildTCPFilterCondition is deprecated - use buildTCPIPFilterCheck instead.
+// Kept for backwards compatibility with tests.
 func (g *ScriptGenerator) buildTCPFilterCondition() string {
 	if len(g.config.FilterIPs) == 0 && len(g.config.FilterCIDRs) == 0 {
 		return "" // No filter
@@ -405,35 +538,39 @@ func (g *ScriptGenerator) buildTCPFilterCondition() string {
 }
 
 // ipToTCPFilterCondition converts a net.IP to a filter for TCP tracepoints.
-// TCP tracepoints store IPs as __u8[4] arrays, which bpftrace reads as uint32.
+// TCP tracepoints store IPs as __u8[4] arrays.
 func (g *ScriptGenerator) ipToTCPFilterCondition(ip net.IP) string {
 	ipv4 := ip.To4()
 	if ipv4 == nil {
 		return ""
 	}
 
-	// For TCP tracepoints, args->saddr is __u8[4] - need to compare each byte or cast
-	// bpftrace can read the 4-byte array as a uint32 pointer
-	ipHex := ipToHex(ipv4)
-	return fmt.Sprintf("(*(uint32*)args->saddr == 0x%08x || *(uint32*)args->daddr == 0x%08x)", ipHex, ipHex)
+	// For TCP tracepoints, args->saddr and args->daddr are uint8[4] byte arrays.
+	// bpftrace cannot cast uint8[4] to uint32*, so we compare byte-by-byte.
+	// Each byte is compared as: (args->saddr[i] == byte_value)
+	return fmt.Sprintf("((args->saddr[0] == %d && args->saddr[1] == %d && args->saddr[2] == %d && args->saddr[3] == %d) || (args->daddr[0] == %d && args->daddr[1] == %d && args->daddr[2] == %d && args->daddr[3] == %d))",
+		ipv4[0], ipv4[1], ipv4[2], ipv4[3],
+		ipv4[0], ipv4[1], ipv4[2], ipv4[3])
 }
 
 // cidrToTCPFilterCondition converts a net.IPNet to a filter for TCP tracepoints.
+// For CIDR matching on uint8[4] arrays, we compare each byte with the masked value.
 func (g *ScriptGenerator) cidrToTCPFilterCondition(cidr *net.IPNet) string {
 	if cidr == nil {
 		return ""
 	}
 
 	ipv4 := cidr.IP.To4()
-	if ipv4 == nil {
+	mask := cidr.Mask
+	if ipv4 == nil || len(mask) != 4 {
 		return ""
 	}
 
-	networkHex := ipToHex(ipv4)
-	maskHex := ipToHex(net.IP(cidr.Mask).To4())
-
-	return fmt.Sprintf("((*(uint32*)args->saddr & 0x%08x) == 0x%08x || (*(uint32*)args->daddr & 0x%08x) == 0x%08x)",
-		maskHex, networkHex, maskHex, networkHex)
+	// For CIDR matching, we compare (byte & mask_byte) == network_byte for each byte
+	// Example: 10.224.0.0/16 means mask=[255,255,0,0], network=[10,224,0,0]
+	return fmt.Sprintf("(((args->saddr[0] & %d) == %d && (args->saddr[1] & %d) == %d && (args->saddr[2] & %d) == %d && (args->saddr[3] & %d) == %d) || ((args->daddr[0] & %d) == %d && (args->daddr[1] & %d) == %d && (args->daddr[2] & %d) == %d && (args->daddr[3] & %d) == %d))",
+		mask[0], ipv4[0], mask[1], ipv4[1], mask[2], ipv4[2], mask[3], ipv4[3],
+		mask[0], ipv4[0], mask[1], ipv4[1], mask[2], ipv4[2], mask[3], ipv4[3])
 }
 
 // generateTableOutput generates printf for table format.
@@ -485,79 +622,54 @@ func (g *ScriptGenerator) generateEndBlock() string {
 `
 }
 
-// buildFilterCondition creates the bpftrace filter condition for IPs/CIDRs.
+// buildSkbIPFilterCondition creates an if-statement to filter by IP inside kfree_skb body.
+// This is used instead of a pre-filter because we need to parse the skb to get the IPs.
 // SECURITY: IPs are converted to hex integers - no string interpolation of user input.
-func (g *ScriptGenerator) buildFilterCondition() string {
+func (g *ScriptGenerator) buildSkbIPFilterCondition() string {
 	if len(g.config.FilterIPs) == 0 && len(g.config.FilterCIDRs) == 0 {
 		return "" // No filter
 	}
 
 	var conditions []string
 
-	// Add IP filters
+	// Add IP filters - compare against the raw uint32 IP values
 	for _, ip := range g.config.FilterIPs {
-		cond := g.ipToFilterCondition(ip)
-		if cond != "" {
-			conditions = append(conditions, cond)
+		ipv4 := ip.To4()
+		if ipv4 == nil {
+			continue
 		}
+		ipHex := ipToHex(ipv4)
+		// Match either source or destination (network byte order)
+		conditions = append(conditions, fmt.Sprintf("($saddr_raw == 0x%08x || $daddr_raw == 0x%08x)", ipHex, ipHex))
 	}
 
-	// Add CIDR filters
+	// Add CIDR filters - mask and compare
 	for _, cidr := range g.config.FilterCIDRs {
-		cond := g.cidrToFilterCondition(cidr)
-		if cond != "" {
-			conditions = append(conditions, cond)
+		if cidr == nil {
+			continue
 		}
+		ipv4 := cidr.IP.To4()
+		if ipv4 == nil {
+			continue
+		}
+		networkHex := ipToHex(ipv4)
+		maskHex := ipToHex(net.IP(cidr.Mask).To4())
+		conditions = append(conditions, fmt.Sprintf("(($saddr_raw & 0x%08x) == 0x%08x || ($daddr_raw & 0x%08x) == 0x%08x)",
+			maskHex, networkHex, maskHex, networkHex))
 	}
 
 	if len(conditions) == 0 {
 		return ""
 	}
 
-	// Combine with OR - match if ANY filter matches
+	// Generate an if-statement that returns early if no condition matches
 	combined := strings.Join(conditions, " || ")
-	return fmt.Sprintf("/ %s /\n", combined)
+	return fmt.Sprintf("    // IP/CIDR filter: skip if not matching\n    if (!(%s)) { return; }\n\n", combined)
 }
 
-// ipToFilterCondition converts a net.IP to a bpftrace filter condition.
-// SECURITY: The IP is converted to a hex integer, preventing any injection.
-// Output: ($saddr_raw == 0x0a000001 || $daddr_raw == 0x0a000001)
-func (g *ScriptGenerator) ipToFilterCondition(ip net.IP) string {
-	ipv4 := ip.To4()
-	if ipv4 == nil {
-		return "" // Skip IPv6 for now
-	}
-
-	// Convert to uint32 in network byte order (big endian)
-	// This is safe: only hex digits can appear in the output
-	ipHex := ipToHex(ipv4)
-
-	// Match either source or destination
-	// Note: We compare against the raw IP header fields (network byte order)
-	return fmt.Sprintf("(((struct iphdr *)(@skb[args->skbaddr]->head + @skb[args->skbaddr]->network_header))->saddr == 0x%08x || ((struct iphdr *)(@skb[args->skbaddr]->head + @skb[args->skbaddr]->network_header))->daddr == 0x%08x)", ipHex, ipHex)
-}
-
-// cidrToFilterCondition converts a net.IPNet to a bpftrace filter condition.
-// SECURITY: The network and mask are converted to hex integers.
-// Output: ((saddr & mask) == network || (daddr & mask) == network)
-func (g *ScriptGenerator) cidrToFilterCondition(cidr *net.IPNet) string {
-	if cidr == nil {
-		return ""
-	}
-
-	ipv4 := cidr.IP.To4()
-	if ipv4 == nil {
-		return "" // Skip IPv6 for now
-	}
-
-	// Get network address and mask as hex
-	networkHex := ipToHex(ipv4)
-	maskHex := ipToHex(net.IP(cidr.Mask).To4())
-
-	// Match: (ip & mask) == network for either src or dst
-	return fmt.Sprintf("((((struct iphdr *)(@skb[args->skbaddr]->head + @skb[args->skbaddr]->network_header))->saddr & 0x%08x) == 0x%08x || (((struct iphdr *)(@skb[args->skbaddr]->head + @skb[args->skbaddr]->network_header))->daddr & 0x%08x) == 0x%08x)",
-		maskHex, networkHex, maskHex, networkHex)
-}
+// Note: ipToFilterCondition and cidrToFilterCondition are no longer used for kfree_skb.
+// For kfree_skb, we use buildSkbIPFilterCondition() which filters inside the body.
+// For TCP tracepoints, we use ipToTCPFilterCondition() and cidrToTCPFilterCondition().
 
 // ipToHex converts an IPv4 address to a uint32 in network byte order.
 // SECURITY: This function only outputs hex digits - no user input passes through.
