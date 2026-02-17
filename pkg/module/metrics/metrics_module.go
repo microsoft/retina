@@ -221,23 +221,33 @@ func (m *Module) updateMetricsContexts(spec *api.MetricsSpec) {
 	}
 
 	for _, ctxOption := range spec.ContextOptions {
+		var ttl time.Duration
+		var err error
+		if ctxOption.TTL != "" {
+			ttl, err = time.ParseDuration(ctxOption.TTL)
+			// this shouldn't happen since we've already validated the CRD, but put some safety here just in case
+			if err != nil {
+				m.l.Error("Invalid TTL format", zap.String("metricName", ctxOption.MetricName), zap.Error(err))
+				continue
+			}
+		}
 		switch {
 		case strings.Contains(ctxOption.MetricName, forward):
-			fm := NewForwardCountMetrics(&ctxOption, m.l, ctxType)
+			fm := NewForwardCountMetrics(&ctxOption, m.l, ctxType, ttl)
 			if fm != nil {
 				m.registry[ctxOption.MetricName] = fm
 			}
 		case strings.Contains(ctxOption.MetricName, drop):
-			dm := NewDropCountMetrics(&ctxOption, m.l, ctxType)
+			dm := NewDropCountMetrics(&ctxOption, m.l, ctxType, ttl)
 			if dm != nil {
 				m.registry[ctxOption.MetricName] = dm
 			}
 		case strings.Contains(ctxOption.MetricName, tcp):
-			tm := NewTCPMetrics(&ctxOption, m.l, ctxType)
+			tm := NewTCPMetrics(&ctxOption, m.l, ctxType, ttl)
 			if tm != nil {
 				m.registry[ctxOption.MetricName] = tm
 			}
-			tr := NewTCPRetransMetrics(&ctxOption, m.l, ctxType)
+			tr := NewTCPRetransMetrics(&ctxOption, m.l, ctxType, ttl)
 			if tr != nil {
 				m.registry[ctxOption.MetricName] = tr
 			}
@@ -249,7 +259,7 @@ func (m *Module) updateMetricsContexts(spec *api.MetricsSpec) {
 				m.registry[nodeApiserver] = lm
 			}
 		case strings.Contains(ctxOption.MetricName, dns) || strings.Contains(ctxOption.MetricName, pktmon):
-			dm := NewDNSMetrics(&ctxOption, m.l, ctxType)
+			dm := NewDNSMetrics(&ctxOption, m.l, ctxType, ttl)
 			if dm != nil {
 				m.registry[ctxOption.MetricName] = dm
 			}

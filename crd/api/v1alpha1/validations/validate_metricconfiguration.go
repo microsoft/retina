@@ -6,11 +6,15 @@ Licensed under the MIT license.
 package validations
 
 import (
+	"errors"
 	"fmt"
+	"time"
 
 	"github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/pkg/utils"
 )
+
+var ErrNegativeTTL = errors.New("TTL cannot be negative")
 
 // MetricsConfiguration validates the metrics configuration
 func MetricsCRD(metricsConfig *v1alpha1.MetricsConfiguration) error {
@@ -39,6 +43,15 @@ func MetricsSpec(metricsSpec v1alpha1.MetricsSpec) error {
 	for _, contextOption := range metricsSpec.ContextOptions {
 		if !utils.IsAdvancedMetric(contextOption.MetricName) {
 			return fmt.Errorf("%s is not a valid metric", contextOption.MetricName)
+		}
+		if contextOption.TTL != "" {
+			ttl, err := time.ParseDuration(contextOption.TTL)
+			if err != nil {
+				return fmt.Errorf("invalid TTL format for metric %s: %w", contextOption.MetricName, err)
+			}
+			if ttl < 0 {
+				return fmt.Errorf("%w for metric %s", ErrNegativeTTL, contextOption.MetricName)
+			}
 		}
 	}
 
@@ -152,10 +165,13 @@ func MetricsContextOptionsCompare(old, new []v1alpha1.MetricsContextOptions) boo
 			return false
 		}
 
-		if !utils.CompareStringSlice(oldContextOption.AdditionalLabels, newContextOption.AdditionalLabels) {
+		if oldContextOption.TTL != newContextOption.TTL {
 			return false
 		}
 
+		if !utils.CompareStringSlice(oldContextOption.AdditionalLabels, newContextOption.AdditionalLabels) {
+			return false
+		}
 	}
 
 	return true
