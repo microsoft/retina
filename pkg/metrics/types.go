@@ -52,6 +52,9 @@ const (
 	ConntrackBytesTxDescription          = "Number of tx bytes"
 	ConntrackBytesRxDescription          = "Number of rx bytes"
 	ConntrackTotalConnectionsDescription = "Total number of connections"
+
+	// Build info
+	BuildInfoDescription = "Retina build information"
 )
 
 // Metric Counters
@@ -107,6 +110,9 @@ var (
 	ConntrackBytesTx          GaugeVec
 	ConntrackBytesRx          GaugeVec
 	ConntrackTotalConnections GaugeVec
+
+	// Build Info
+	BuildInfo GaugeVec
 )
 
 func ToPrometheusType(metric interface{}) prometheus.Collector {
