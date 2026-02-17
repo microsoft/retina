@@ -194,6 +194,13 @@ func InitializeMetrics() {
 		parsedPacketsCounterDescription,
 	)
 
+	MetricsExpiredCounter = exporter.CreatePrometheusCounterVecForControlPlaneMetric(
+		exporter.DefaultRegistry,
+		expiredMetricsCounterName,
+		expiredMetricsCounterDescription,
+		utils.Metric,
+	)
+
 	isInitialized = true
 	metricsLogger.Info("Metrics initialized")
 }

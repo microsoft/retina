@@ -41,6 +41,10 @@ type MetricsContextOptions struct {
 	// +optional
 	// +listType=set
 	AdditionalLabels []string `json:"additionalLabels,omitempty"`
+	// TTL represents the time-to-live of the metrics collected
+	// Metrics which have not been updated within the TTL will be removed from export
+	// +optional
+	TTL string `json:"ttl,omitempty"`
 }
 
 // MetricsNamespaces indicates the namespaces to include or exclude in metric collection

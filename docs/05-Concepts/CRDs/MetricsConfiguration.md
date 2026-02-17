@@ -24,6 +24,7 @@ The `MetricsConfiguration` CRD is defined with the following specifications:
   - `destinationLabels`: Represents the destination context labels, such as IP, Pod, port, workload (deployment/replicaset/statefulset/daemonset).
   - `metricName`: Indicates the name of the metric.
   - `sourceLabels`: Represents the source context labels, such as IP, Pod, port.
+  - `ttl`: Represents the time-to-live for the metric.  If there are no metric updates for a particular set of context labels for this duration the metric will be removed from export.  The value of `ttl` must be a valid Golang `time.Duration` string and non-negative.  A zero `ttl` (the default) means that metrics are never removed from export.
 
 - **spec.namespaces:** Specifies the namespaces to include or exclude in metric collection. It includes the following properties:
   - `exclude`: Specifies namespaces to be excluded from metric collection.
@@ -51,6 +52,7 @@ spec:
         - port
       additionalLabels:
         - direction
+      ttl: 24h
     - metricName: forward_count
       sourceLabels:
         - ip

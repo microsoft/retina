@@ -13,6 +13,7 @@ const (
 	pluginManagerFailedToReconcileCounterName = "plugin_manager_failed_to_reconcile"
 	lostEventsCounterName                     = "lost_events_counter"
 	parsedPacketsCounterName                  = "parsed_packets_counter"
+	expiredMetricsCounterName                 = "expired_metrics_counter"
 
 	// Windows
 	hnsStats            = "windows_hns_stats"
@@ -45,6 +46,7 @@ const (
 	pluginManagerFailedToReconcileCounterDescription = "Number of times the plugin manager failed to reconcile the plugins"
 	lostEventsCounterDescription                     = "Number of events lost in control plane"
 	parsedPacketsCounterDescription                  = "Number of packets parsed by the packetparser plugin"
+	expiredMetricsCounterDescription                 = "Number of metrics expired due to lack of updates and no longer exported"
 
 	// Conntrack metrics
 	ConntrackPacketTxDescription         = "Number of tx packets"
@@ -93,6 +95,7 @@ var (
 	PluginManagerFailedToReconcileCounter CounterVec
 	LostEventsCounter                     CounterVec
 	ParsedPacketsCounter                  CounterVec
+	MetricsExpiredCounter                 CounterVec
 
 	// DNS Metrics.
 	DNSRequestCounter  CounterVec
