@@ -48,6 +48,18 @@ struct tcpflagscount
     __u32 ns;
 };
 
+/**
+ * DNS metadata extracted from DNS packets.
+ * Used for DNS flow enrichment when ENABLE_DNS_PARSING is set.
+ */
+struct dnsmetadata {
+    __u16 id;       // DNS query ID
+    __u8 qr;        // Query(0) or Response(1)
+    __u8 rcode;     // Response code (0=NOERROR, 3=NXDOMAIN, etc.)
+    __u16 ancount;  // Answer count
+    __u16 dns_off;  // Offset to DNS payload from start of packet data
+};
+
 struct packet
 {
     __u64 t_nsec; // timestamp in nanoseconds
@@ -66,6 +78,9 @@ struct packet
     __u32 previously_observed_bytes; // When sampling, this is the number of observed bytes since the last report.
     struct tcpflagscount previously_observed_flags; // When sampling, this is the previously observed TCP flags since the last report.
     struct conntrackmetadata conntrack_metadata;
+    // DNS metadata (populated when ENABLE_DNS_PARSING is set and packet is DNS)
+    struct dnsmetadata dns_metadata;
+    __u8 is_dns; // Flag: 1 if this is a DNS packet (UDP port 53 or 5353)
 };
 
 /**

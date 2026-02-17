@@ -16,13 +16,6 @@ import (
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
-// Additional Verdicts to be used for flow objects
-const (
-	Verdict_RETRANSMISSION flow.Verdict = 15
-	Verdict_DNS            flow.Verdict = 16
-	TypeUrl                string       = "retina.sh"
-)
-
 // Extension field keys for structpb.Struct
 const (
 	ExtKeyBytes                = "bytes"
@@ -33,6 +26,13 @@ const (
 	ExtKeyPrevObservedPackets  = "previously_observed_packets"
 	ExtKeyPrevObservedBytes    = "previously_observed_bytes"
 	ExtKeyPrevObservedTCPFlags = "previously_observed_tcp_flags"
+)
+
+// Additional Verdicts to be used for flow objects
+const (
+	Verdict_RETRANSMISSION flow.Verdict = 15
+	Verdict_DNS            flow.Verdict = 16
+	TypeUrl                string       = "retina.sh"
 )
 
 // ToFlow returns a flow.Flow object.
@@ -203,7 +203,7 @@ func AddPreviouslyObservedTCPFlags(s *structpb.Struct, syn, ack, fin, rst, psh, 
 		CWR: structpb.NewNumberValue(float64(cwr)),
 		NS:  structpb.NewNumberValue(float64(ns)),
 	}}
-	s.Fields[ExtKeyPrevObservedTCPFlags] = structpb.NewStructValue(tcpFlags)
+	s.GetFields()[ExtKeyPrevObservedTCPFlags] = structpb.NewStructValue(tcpFlags)
 }
 
 func PreviouslyObservedTCPFlags(f *flow.Flow) map[string]uint32 {
@@ -227,7 +227,7 @@ func AddPreviouslyObservedBytes(s *structpb.Struct, bytes uint32) {
 	if s == nil || bytes == 0 {
 		return
 	}
-	s.Fields[ExtKeyPrevObservedBytes] = structpb.NewNumberValue(float64(bytes))
+	s.GetFields()[ExtKeyPrevObservedBytes] = structpb.NewNumberValue(float64(bytes))
 }
 
 func PreviouslyObservedBytes(f *flow.Flow) uint32 {
@@ -247,7 +247,7 @@ func AddPreviouslyObservedPackets(s *structpb.Struct, packets uint32) {
 	if s == nil || packets == 0 {
 		return
 	}
-	s.Fields[ExtKeyPrevObservedPackets] = structpb.NewNumberValue(float64(packets))
+	s.GetFields()[ExtKeyPrevObservedPackets] = structpb.NewNumberValue(float64(packets))
 }
 
 func PreviouslyObservedPackets(f *flow.Flow) uint32 {
@@ -284,7 +284,7 @@ func AddTCPID(s *structpb.Struct, id uint64) {
 	if s == nil || id == 0 {
 		return
 	}
-	s.Fields[ExtKeyTCPID] = structpb.NewNumberValue(float64(id))
+	s.GetFields()[ExtKeyTCPID] = structpb.NewNumberValue(float64(id))
 }
 
 func GetTCPID(f *flow.Flow) uint64 {
@@ -303,7 +303,10 @@ func GetTCPID(f *flow.Flow) uint64 {
 }
 
 // AddDNSInfo adds DNS information to the flow and its extensions.
-func AddDNSInfo(f *flow.Flow, s *structpb.Struct, qType string, rCode uint32, query string, qTypes []string, numAnswers int, ips []string) {
+func AddDNSInfo(
+	f *flow.Flow, s *structpb.Struct, qType string, rCode uint32,
+	query string, qTypes []string, numAnswers int, ips []string,
+) {
 	if f == nil || s == nil {
 		return
 	}
@@ -326,17 +329,17 @@ func AddDNSInfo(f *flow.Flow, s *structpb.Struct, qType string, rCode uint32, qu
 	}
 	switch qType {
 	case "Q":
-		s.Fields[ExtKeyDNSType] = structpb.NewStringValue(DNSType_QUERY.String())
+		s.GetFields()[ExtKeyDNSType] = structpb.NewStringValue(DNSType_QUERY.String())
 		f.L7.Type = flow.L7FlowType_REQUEST
 	case "R":
-		s.Fields[ExtKeyDNSType] = structpb.NewStringValue(DNSType_RESPONSE.String())
+		s.GetFields()[ExtKeyDNSType] = structpb.NewStringValue(DNSType_RESPONSE.String())
 		f.L7.Type = flow.L7FlowType_RESPONSE
 		f.IsReply = &wrapperspb.BoolValue{Value: true} // we can definitely say that this is a reply
 	default:
 		f.L7.Type = flow.L7FlowType_UNKNOWN_L7_TYPE
 	}
 	if numAnswers > 0 {
-		s.Fields[ExtKeyNumResponses] = structpb.NewNumberValue(float64(numAnswers))
+		s.GetFields()[ExtKeyNumResponses] = structpb.NewNumberValue(float64(numAnswers))
 	}
 }
 
@@ -396,7 +399,7 @@ func AddPacketSize(s *structpb.Struct, packetSize uint32) {
 	if s == nil || packetSize == 0 {
 		return
 	}
-	s.Fields[ExtKeyBytes] = structpb.NewNumberValue(float64(packetSize))
+	s.GetFields()[ExtKeyBytes] = structpb.NewNumberValue(float64(packetSize))
 }
 
 func PacketSize(f *flow.Flow) uint32 {
@@ -418,7 +421,7 @@ func AddDropReason(f *flow.Flow, s *structpb.Struct, dropReason uint16) {
 	}
 
 	dr := DropReason(dropReason)
-	s.Fields[ExtKeyDropReason] = structpb.NewStringValue(dr.String())
+	s.GetFields()[ExtKeyDropReason] = structpb.NewStringValue(dr.String())
 
 	f.Verdict = flow.Verdict_DROPPED
 

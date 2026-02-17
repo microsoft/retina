@@ -1,5 +1,5 @@
-# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.11-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:531bd02db17b0c2ec919f10fc203a6a8c825e8ca01f40c3a1e32e1cf7119c6d8 AS builder
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.25.7-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
+FROM mcr.microsoft.com/oss/go/microsoft/golang@sha256:408661cbcfcbf24c06fc4f85c23566b42af722fdef5a5044782859e682916be7 AS builder
 
 ARG VERSION
 ARG APP_INSIGHTS_ID
@@ -16,7 +16,7 @@ ARG GOARCH=amd64
 ENV GOARCH=${GOARCH}
 
 RUN --mount=type=cache,target="/root/.cache/go-build" \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    GOOS=$GOOS GOARCH=$GOARCH go build \
     -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" \
     -X "github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID"="$APP_INSIGHTS_ID" \
     -X "github.com/microsoft/retina/internal/buildinfo.RetinaAgentImageName"="$AGENT_IMAGE_NAME"" \
@@ -24,13 +24,13 @@ RUN --mount=type=cache,target="/root/.cache/go-build" \
 
 # Target 1: Distroless (secure, minimal)
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/distroless/minimal:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/azurelinux/distroless/minimal@sha256:0801b80a0927309572b9adc99bd1813bc680473175f6e8175cd4124d95dbd50c AS distroless-target
+FROM mcr.microsoft.com/azurelinux/distroless/minimal@sha256:0801b80a0927309572b9adc99bd1813bc680473175f6e8175cd4124d95dbd50c AS distroless-target
 WORKDIR /
 COPY --from=builder /workspace/kubectl-retina .
 
 # Target 2: Shell-enabled (operational, init container support)
 # skopeo inspect docker://mcr.microsoft.com/cbl-mariner/base/core:2.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/cbl-mariner/base/core@sha256:4d97d662d71c1fda938ed9df36d8f490d9107cff37e89c0efa932d073285ad85 AS shell-target
+FROM mcr.microsoft.com/cbl-mariner/base/core@sha256:4d97d662d71c1fda938ed9df36d8f490d9107cff37e89c0efa932d073285ad85 AS shell-target
 WORKDIR /
 COPY --from=builder /workspace/kubectl-retina /bin/kubectl-retina
 RUN chmod +x /bin/kubectl-retina

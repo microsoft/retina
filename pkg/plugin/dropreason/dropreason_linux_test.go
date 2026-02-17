@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path"
 	"reflect"
@@ -121,7 +122,7 @@ func TestCompile(t *testing.T) {
 
 func TestProcessMapValue(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
-	metrics.InitializeMetrics()
+	metrics.InitializeMetrics(slog.Default())
 	dr := &dropReason{
 		cfg: cfgPodLevelEnabled,
 		l:   log.Logger().Named(name),

@@ -12,18 +12,22 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 
 	cilium_api_v2 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2"
 	cilium_api_v2alpha1 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2alpha1"
 	"github.com/cilium/cilium/pkg/k8s/client"
 	"github.com/cilium/cilium/pkg/k8s/resource"
+	slim_corev1 "github.com/cilium/cilium/pkg/k8s/slim/k8s/api/core/v1"
 	"github.com/cilium/cilium/pkg/k8s/utils"
 	"github.com/cilium/hive/cell"
 )
 
 var ErrNotACiliumEndpoint = errors.New("object is not a *cilium_api_v2.CiliumEndpoint")
 
-func CiliumEndpointResource(lc cell.Lifecycle, cs client.Clientset, opts ...func(*metav1.ListOptions)) (resource.Resource[*cilium_api_v2.CiliumEndpoint], error) {
+func CiliumEndpointResource(
+	lc cell.Lifecycle, cs client.Clientset, mp workqueue.MetricsProvider, opts ...func(*metav1.ListOptions),
+) (resource.Resource[*cilium_api_v2.CiliumEndpoint], error) {
 	if !cs.IsEnabled() {
 		return nil, nil
 	}
@@ -36,7 +40,7 @@ func CiliumEndpointResource(lc cell.Lifecycle, cs client.Clientset, opts ...func
 		CiliumEndpointIndexIdentity: identityIndexFunc,
 	}
 	return resource.New[*cilium_api_v2.CiliumEndpoint](
-		lc, lw, resource.WithMetric("CiliumEndpoint"), resource.WithIndexers(indexers)), nil
+		lc, lw, mp, resource.WithMetric("CiliumEndpoint"), resource.WithIndexers(indexers)), nil
 }
 
 func identityIndexFunc(obj interface{}) ([]string, error) {
@@ -50,7 +54,9 @@ func identityIndexFunc(obj interface{}) ([]string, error) {
 	return nil, fmt.Errorf("%w - found %T", ErrNotACiliumEndpoint, obj)
 }
 
-func CiliumEndpointSliceResource(lc cell.Lifecycle, cs client.Clientset, opts ...func(*metav1.ListOptions)) (resource.Resource[*cilium_api_v2alpha1.CiliumEndpointSlice], error) {
+func CiliumEndpointSliceResource(
+	lc cell.Lifecycle, cs client.Clientset, mp workqueue.MetricsProvider, opts ...func(*metav1.ListOptions),
+) (resource.Resource[*cilium_api_v2alpha1.CiliumEndpointSlice], error) {
 	if !cs.IsEnabled() {
 		return nil, nil
 	}
@@ -58,5 +64,20 @@ func CiliumEndpointSliceResource(lc cell.Lifecycle, cs client.Clientset, opts ..
 		utils.ListerWatcherFromTyped[*cilium_api_v2alpha1.CiliumEndpointSliceList](cs.CiliumV2alpha1().CiliumEndpointSlices()),
 		opts...,
 	)
-	return resource.New[*cilium_api_v2alpha1.CiliumEndpointSlice](lc, lw, resource.WithMetric("CiliumEndpointSlice")), nil
+	return resource.New[*cilium_api_v2alpha1.CiliumEndpointSlice](
+		lc, lw, mp, resource.WithMetric("CiliumEndpointSlice"),
+	), nil
+}
+
+// PodResource provides a resource.Resource[*slim_corev1.Pod].
+// This was previously provided by github.com/cilium/cilium/pkg/k8s but was
+// moved to the operator package in Cilium v1.19.0.
+func PodResource(
+	lc cell.Lifecycle, cs client.Clientset, mp workqueue.MetricsProvider, _ ...func(*metav1.ListOptions),
+) (resource.Resource[*slim_corev1.Pod], error) {
+	if !cs.IsEnabled() {
+		return nil, nil
+	}
+	lw := utils.ListerWatcherFromTyped[*slim_corev1.PodList](cs.Slim().CoreV1().Pods(""))
+	return resource.New[*slim_corev1.Pod](lc, lw, mp, resource.WithMetric("Pod")), nil
 }

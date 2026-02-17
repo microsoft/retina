@@ -98,6 +98,7 @@ func (o *Operator) Start() error {
 	}
 
 	defer zl.Close()
+	log.SetDefaultSlog() // Set Go's global slog to use zap-backed handler
 	mainLogger := zl.Named("main").Sugar()
 
 	mainLogger.Info("Operator configuration", zap.Any("configuration", oconfig))
