@@ -124,7 +124,7 @@ if grep -qP '\bDROP\b.*kfree_skb' "$OUTPUT_FILE"; then
     DROPS_FOUND=true
     echo "✓ DROP events captured"
 else
-    echo "✗ DROP events NOT captured"
+    echo "✗ DROP events NOT captured (requires cluster NetworkPolicy support)"
 fi
 
 if grep -qP '\bRST_(SENT|RECV)\b' "$OUTPUT_FILE"; then

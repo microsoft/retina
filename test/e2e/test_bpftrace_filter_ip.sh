@@ -189,7 +189,7 @@ if grep -qP '\bDROP\b.*kfree_skb' "$OUTPUT_FILE"; then
         echo "✗ DROP events captured but NOT for filtered IP $TARGET_IP — filter may be broken"
     fi
 else
-    echo "✗ DROP events NOT captured"
+    echo "✗ DROP events NOT captured (requires cluster NetworkPolicy support)"
 fi
 
 if grep -qP '\bRST_(SENT|RECV)\b' "$OUTPUT_FILE"; then
