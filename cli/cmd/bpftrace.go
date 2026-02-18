@@ -149,6 +149,12 @@ var bpftraceCmd = &cobra.Command{
 		# output in JSON format (for scripting)
 		kubectl retina bpftrace node0001 --output json
 
+		# trace only socket errors
+		kubectl retina bpftrace node0001 --errors
+
+		# trace NFQUEUE drops (packets hitting iptables NFQUEUE with no consumer)
+		kubectl retina bpftrace node0001 --nfqueue-drops
+
 		# combine options
 		kubectl retina bpftrace node0001 --ip 10.244.1.15 --duration 30s --output json
 `),

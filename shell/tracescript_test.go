@@ -102,10 +102,12 @@ func TestIPToHexOnlyHexOutput(t *testing.T) {
 }
 
 func hexChar(b uint32) byte {
-	if b < 10 {
-		return byte('0' + b)
+	// Mask to 4 bits to guarantee 0-15 range and prevent G115 overflow.
+	n := byte(b & 0xf)
+	if n < 10 {
+		return '0' + n
 	}
-	return byte('a' + b - 10)
+	return 'a' + n - 10
 }
 
 func TestGenerateDropScript(t *testing.T) {
