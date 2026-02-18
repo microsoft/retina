@@ -42,11 +42,12 @@ var (
 	traceStartupTimeout time.Duration
 
 	// Event selection flags
-	traceAll         bool
-	traceDrops       bool
-	traceRST         bool
-	traceErrors      bool
-	traceRetransmits bool
+	traceAll          bool
+	traceDrops        bool
+	traceRST          bool
+	traceErrors       bool
+	traceRetransmits  bool
+	traceNfqueueDrops bool
 )
 
 // TraceOutputFormat represents validated output format options
@@ -119,6 +120,7 @@ var bpftraceCmd = &cobra.Command{
 	* TCP RST sent/received (connection refused, reset by peer) [--rst]
 	* Socket errors (ECONNREFUSED, ETIMEDOUT, etc.) [--errors]
 	* TCP retransmissions (packet loss indicators) [--retransmits]
+	* NFQUEUE drops (no consumer on iptables NFQUEUE target) [--nfqueue-drops]
 
 	By default, all event types are traced. Use individual flags to trace specific events only.
 
@@ -215,21 +217,22 @@ func runBpftrace(_ *cobra.Command, args []string) error {
 
 			// Determine which events to trace
 			// If no individual flags set, or --all is set, enable all events
-			enableAll := traceAll || (!traceDrops && !traceRST && !traceErrors && !traceRetransmits)
+			enableAll := traceAll || (!traceDrops && !traceRST && !traceErrors && !traceRetransmits && !traceNfqueueDrops)
 
 			// Build TraceConfig with validated, typed values only
 			traceConfig := shell.TraceConfig{
-				RestConfig:        restConfig,
-				RetinaShellImage:  fmt.Sprintf("%s:%s", traceRetinaShellImageRepo, traceRetinaShellImageVersion),
-				FilterIPs:         nil,
-				FilterCIDRs:       nil,
-				OutputJSON:        outputFormat == TraceOutputJSON,
-				TraceDuration:     traceDuration,
-				Timeout:           traceStartupTimeout,
-				EnableDrops:       enableAll || traceDrops,
-				EnableRST:         enableAll || traceRST,
-				EnableErrors:      enableAll || traceErrors,
-				EnableRetransmits: enableAll || traceRetransmits,
+				RestConfig:         restConfig,
+				RetinaShellImage:   fmt.Sprintf("%s:%s", traceRetinaShellImageRepo, traceRetinaShellImageVersion),
+				FilterIPs:          nil,
+				FilterCIDRs:        nil,
+				OutputJSON:         outputFormat == TraceOutputJSON,
+				TraceDuration:      traceDuration,
+				Timeout:            traceStartupTimeout,
+				EnableDrops:        enableAll || traceDrops,
+				EnableRST:          enableAll || traceRST,
+				EnableErrors:       enableAll || traceErrors,
+				EnableRetransmits:  enableAll || traceRetransmits,
+				EnableNfqueueDrops: enableAll || traceNfqueueDrops,
 			}
 
 			// Add validated IP filter (already typed as net.IP)
@@ -317,6 +320,8 @@ func init() {
 		"Enable socket error events (inet_sk_error_report)")
 	bpftraceCmd.Flags().BoolVar(&traceRetransmits, "retransmits", false,
 		"Enable TCP retransmit events (tcp_retransmit_skb)")
+	bpftraceCmd.Flags().BoolVar(&traceNfqueueDrops, "nfqueue-drops", false,
+		"Enable NFQUEUE drop events (fexit:vmlinux:__nf_queue, requires BTF)")
 
 	// Output flags
 	bpftraceCmd.Flags().StringVarP(&traceOutputFormat, "output", "o", "table",

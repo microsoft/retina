@@ -15,7 +15,7 @@ echo "Target node: $NODE"
 
 # Clean up any leftover test pods
 echo "Cleaning up previous test pods..."
-kubectl delete pod drop-gen rst-gen --force --grace-period=0 2>/dev/null || true
+kubectl delete pod drop-gen rst-gen nfqueue-helper --force --grace-period=0 2>/dev/null || true
 kubectl delete pod -l app=retina-trace --force --grace-period=0 2>/dev/null || true
 sleep 2
 
@@ -27,8 +27,8 @@ if [[ ! -f "$REPO_ROOT/kubectl-retina" ]]; then
 fi
 
 echo ""
-echo "=== Starting bpftrace (50s duration) ==="
-echo "This will capture drops, RST, socket errors, and retransmits on $NODE"
+echo "=== Starting bpftrace (70s duration) ==="
+echo "This will capture drops, RST, socket errors, retransmits, and NFQUEUE drops on $NODE"
 echo ""
 
 # Create output file
@@ -36,7 +36,9 @@ OUTPUT_FILE=$(mktemp)
 trap "rm -f $OUTPUT_FILE" EXIT
 
 # Run trace in background and capture output
-"$REPO_ROOT/kubectl-retina" bpftrace "$NODE" --duration 50s --startup-timeout 120s --retina-shell-image-version v1.0.3 > "$OUTPUT_FILE" 2>&1 &
+# Duration must be long enough for all test phases: RST, DROP/RETRANS, and NFQUEUE
+# (each phase takes ~15-30s including pod startup and traffic generation)
+"$REPO_ROOT/kubectl-retina" bpftrace "$NODE" --duration 70s --startup-timeout 120s --retina-shell-image-version v1.0.3 > "$OUTPUT_FILE" 2>&1 &
 TRACE_PID=$!
 
 # Wait for trace to start
@@ -96,6 +98,46 @@ echo 'Traffic generation complete'
 " 2>&1 || true
 
 echo ""
+echo "=== Test 3: NFQ_DROP (iptables NFQUEUE with no consumer) ==="
+# Add an iptables -j NFQUEUE rule pointing to a queue with no reader.
+# The kernel calls __nf_queue which returns -ESRCH, and fexit catches it.
+echo "Creating privileged pod to add NFQUEUE iptables rule..."
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nfqueue-helper
+  namespace: default
+spec:
+  nodeName: "$NODE"
+  hostNetwork: true
+  restartPolicy: Never
+  containers:
+  - name: nfqueue-helper
+    image: alpine
+    securityContext:
+      privileged: true
+    command: ["sh", "-c"]
+    args:
+    - |
+      apk add --no-cache iptables >/dev/null 2>&1
+      echo "Adding NFQUEUE rule on OUTPUT to $TARGET_IP:80 queue 42 (no consumer)..."
+      iptables -I OUTPUT -d $TARGET_IP -p tcp --dport 80 -j NFQUEUE --queue-num 42
+      for i in 1 2 3 4 5; do
+        echo "attempt \$i: connecting to $TARGET_IP:80 via NFQUEUE..."
+        nc -zv -w2 $TARGET_IP 80 2>&1 || true
+        sleep 0.5
+      done
+      echo "Removing NFQUEUE rule..."
+      iptables -D OUTPUT -d $TARGET_IP -p tcp --dport 80 -j NFQUEUE --queue-num 42 2>/dev/null
+      echo "NFQUEUE test done"
+EOF
+kubectl wait --for=condition=Ready pod/nfqueue-helper --timeout=60s 2>/dev/null || true
+kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/nfqueue-helper --timeout=60s 2>/dev/null || true
+kubectl logs nfqueue-helper 2>/dev/null || true
+kubectl delete pod nfqueue-helper --force --grace-period=0 2>/dev/null || true
+
+echo ""
 echo "=== Waiting for trace to complete ==="
 wait $TRACE_PID || true
 
@@ -107,6 +149,7 @@ echo ""
 echo "=== Cleanup ==="
 kubectl delete networkpolicy deny-all-test 2>/dev/null || true
 kubectl delete pod drop-target --force --grace-period=0 2>/dev/null || true
+kubectl delete pod nfqueue-helper --force --grace-period=0 2>/dev/null || true
 kubectl delete pod -l app=retina-trace --force --grace-period=0 2>/dev/null || true
 
 echo ""
@@ -119,6 +162,7 @@ DROPS_FOUND=false
 RST_FOUND=false
 SOCK_ERR_FOUND=false
 RETRANS_FOUND=false
+NFQ_DROP_FOUND=false
 
 if grep -qP '\bDROP\b.*kfree_skb' "$OUTPUT_FILE"; then
     DROPS_FOUND=true
@@ -148,20 +192,28 @@ else
     echo "✗ RETRANS events NOT captured"
 fi
 
+if grep -qP '\bNFQ_DROP\b.*__nf_queue' "$OUTPUT_FILE"; then
+    NFQ_DROP_FOUND=true
+    echo "✓ NFQ_DROP events captured"
+else
+    echo "✗ NFQ_DROP events NOT captured (requires iptables/NFQUEUE support)"
+fi
+
 # Count successes
 SUCCESSES=0
 $DROPS_FOUND && ((SUCCESSES++)) || true
 $RST_FOUND && ((SUCCESSES++)) || true
 $SOCK_ERR_FOUND && ((SUCCESSES++)) || true
 $RETRANS_FOUND && ((SUCCESSES++)) || true
+$NFQ_DROP_FOUND && ((SUCCESSES++)) || true
 
 if [ $SUCCESSES -ge 3 ]; then
     echo ""
-    echo "SUCCESS: $SUCCESSES/4 event types captured!"
+    echo "SUCCESS: $SUCCESSES/5 event types captured!"
     exit 0
 elif [ $SUCCESSES -ge 1 ]; then
     echo ""
-    echo "PARTIAL SUCCESS: $SUCCESSES/4 event types captured"
+    echo "PARTIAL SUCCESS: $SUCCESSES/5 event types captured"
     echo "Note: Some events may not occur depending on kernel behavior"
     exit 0
 else

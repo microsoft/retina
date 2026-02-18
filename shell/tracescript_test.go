@@ -503,3 +503,131 @@ func TestScriptUsesNumericReasonCode(t *testing.T) {
 		t.Error("script should use $reason variable for numeric code")
 	}
 }
+
+func TestGenerateNfqueueDropProbe(t *testing.T) {
+	config := TraceConfig{
+		EnableNfqueueDrops: true,
+	}
+
+	gen := NewScriptGenerator(config)
+	script := gen.Generate()
+
+	// Verify fexit probe is present
+	if !strings.Contains(script, "fexit:vmlinux:__nf_queue") {
+		t.Error("script missing fexit:vmlinux:__nf_queue probe")
+	}
+
+	// Verify it checks return value
+	if !strings.Contains(script, "retval") {
+		t.Error("script missing retval check")
+	}
+
+	// Verify it accesses args->skb
+	if !strings.Contains(script, "args->skb") {
+		t.Error("script missing args->skb access")
+	}
+
+	// Verify it reads queue number
+	if !strings.Contains(script, "args->queuenum") {
+		t.Error("script missing args->queuenum access")
+	}
+
+	// Verify NFQ_DROP event type in table output
+	if !strings.Contains(script, "NFQ_DROP") {
+		t.Error("script missing NFQ_DROP event type")
+	}
+
+	// Verify __nf_queue probe name in output
+	if !strings.Contains(script, "__nf_queue") {
+		t.Error("script missing __nf_queue probe name in output")
+	}
+
+	// Verify errno decoding
+	if !strings.Contains(script, "ESRCH") {
+		t.Error("script missing ESRCH errno name")
+	}
+	if !strings.Contains(script, "ENOMEM") {
+		t.Error("script missing ENOMEM errno name")
+	}
+}
+
+func TestGenerateNfqueueDropProbeJSON(t *testing.T) {
+	config := TraceConfig{
+		EnableNfqueueDrops: true,
+		OutputJSON:         true,
+	}
+
+	gen := NewScriptGenerator(config)
+	script := gen.Generate()
+
+	// Verify JSON output fields
+	if !strings.Contains(script, `\"type\":\"NFQ_DROP\"`) {
+		t.Error("JSON script missing NFQ_DROP type field")
+	}
+	if !strings.Contains(script, `\"queue\"`) {
+		t.Error("JSON script missing queue field")
+	}
+	if !strings.Contains(script, `\"errno\"`) {
+		t.Error("JSON script missing errno field")
+	}
+	if !strings.Contains(script, `\"probe\":\"__nf_queue\"`) {
+		t.Error("JSON script missing __nf_queue probe field")
+	}
+}
+
+func TestGenerateNfqueueDropProbeWithIPFilter(t *testing.T) {
+	ip := net.ParseIP("10.0.0.1")
+	config := TraceConfig{
+		EnableNfqueueDrops: true,
+		FilterIPs:          []net.IP{ip},
+	}
+
+	gen := NewScriptGenerator(config)
+	script := gen.Generate()
+
+	// Should contain fexit probe
+	if !strings.Contains(script, "fexit:vmlinux:__nf_queue") {
+		t.Error("script missing fexit probe")
+	}
+
+	// Should contain IP filter hex
+	if !strings.Contains(script, "0x0a000001") {
+		t.Error("script missing hex IP in NFQUEUE probe filter")
+	}
+
+	// Should use bswap for filter
+	if !strings.Contains(script, "bswap($saddr_raw)") {
+		t.Error("script missing bswap in NFQUEUE probe filter")
+	}
+}
+
+func TestGenerateAllProbesIncludingNfqueue(t *testing.T) {
+	// Verify all probes can be generated together
+	config := TraceConfig{
+		EnableDrops:        true,
+		EnableRST:          true,
+		EnableErrors:       true,
+		EnableRetransmits:  true,
+		EnableNfqueueDrops: true,
+	}
+
+	gen := NewScriptGenerator(config)
+	script := gen.Generate()
+
+	// All probes should be present
+	if !strings.Contains(script, "tracepoint:skb:kfree_skb") {
+		t.Error("script missing kfree_skb probe")
+	}
+	if !strings.Contains(script, "tcp_send_reset") {
+		t.Error("script missing RST probe")
+	}
+	if !strings.Contains(script, "inet_sk_error_report") {
+		t.Error("script missing socket error probe")
+	}
+	if !strings.Contains(script, "tcp_retransmit_skb") {
+		t.Error("script missing retransmit probe")
+	}
+	if !strings.Contains(script, "fexit:vmlinux:__nf_queue") {
+		t.Error("script missing NFQUEUE probe")
+	}
+}

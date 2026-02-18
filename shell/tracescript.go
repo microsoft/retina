@@ -48,6 +48,10 @@ func (g *ScriptGenerator) Generate() string {
 		sb.WriteString(g.generateRetransmitTracepoint())
 	}
 
+	if g.config.EnableNfqueueDrops {
+		sb.WriteString(g.generateNfqueueDropProbe())
+	}
+
 	// Write END block
 	sb.WriteString(g.generateEndBlock())
 
@@ -404,6 +408,92 @@ func (g *ScriptGenerator) generateRetransmitTracepoint() string {
            "-",
            $state_name,
            "tcp_retransmit_skb",
+           $saddr, $sport,
+           $daddr, $dport);
+`)
+	}
+
+	sb.WriteString("}\n\n")
+	return sb.String()
+}
+
+// generateNfqueueDropProbe creates the fexit probe for NFQUEUE drops.
+// Detects packets sent to NFQUEUE when no userspace consumer is bound to the queue.
+// Uses fexit:vmlinux:__nf_queue which provides access to both function arguments
+// and return value in a single probe. Requires kernel >= 5.5 with BTF support.
+//
+// __nf_queue returns negative errno on failure:
+//
+//	-ESRCH (-3): no queue handler registered (no consumer on the queue)
+//	-ENOMEM (-12): failed to allocate queue entry
+//	-ENETDOWN (-100): network interface down during queue
+func (g *ScriptGenerator) generateNfqueueDropProbe() string {
+	var sb strings.Builder
+
+	sb.WriteString("fexit:vmlinux:__nf_queue\n")
+	sb.WriteString("{\n")
+
+	// Only report failures (retval < 0 means queue delivery failed)
+	sb.WriteString(`    if (retval >= 0) { return; }
+
+    $skb = args->skb;
+
+    // Only process IPv4
+    $protocol = $skb->protocol;
+    if (bswap($protocol) != 0x0800) { return; }
+
+    $iph = (struct iphdr *)($skb->head + $skb->network_header);
+    $saddr_raw = $iph->saddr;
+    $daddr_raw = $iph->daddr;
+
+`)
+
+	// Add IP/CIDR filter if specified (reuses the same bswap-based filter as kfree_skb)
+	ipFilter := g.buildSkbIPFilterCondition()
+	if ipFilter != "" {
+		sb.WriteString(ipFilter)
+	}
+
+	sb.WriteString(`    $saddr = ntop(2, $saddr_raw);
+    $daddr = ntop(2, $daddr_raw);
+    $queuenum = args->queuenum;
+    $ipproto = $iph->protocol;
+
+    $sport = (uint16)0;
+    $dport = (uint16)0;
+
+    // Extract ports for TCP/UDP
+    if ($ipproto == 6 || $ipproto == 17) {
+        $transport_off = $skb->transport_header;
+        if ($transport_off > 0 && $transport_off < 65535) {
+            $th = $skb->head + $transport_off;
+            $sport = bswap(*(uint16*)($th));
+            $dport = bswap(*(uint16*)($th + 2));
+        }
+    }
+
+`)
+
+	if g.config.OutputJSON {
+		sb.WriteString(`    printf("{\"time\":\"%s\",\"type\":\"NFQ_DROP\",\"queue\":%d,\"errno\":%d,\"probe\":\"__nf_queue\",\"src_ip\":\"%s\",\"src_port\":%d,\"dst_ip\":\"%s\",\"dst_port\":%d}\n",
+           strftime("%H:%M:%S", nsecs),
+           $queuenum, retval,
+           $saddr, $sport,
+           $daddr, $dport);
+`)
+	} else {
+		sb.WriteString(`    // Decode errno to human-readable name
+    $errno_name = retval == -3   ? "ESRCH" :
+                  retval == -12  ? "ENOMEM" :
+                  retval == -100 ? "ENETDOWN" :
+                  "UNKNOWN";
+
+    printf("%-12s %-10s %-18s %-18s %-18s %s:%-5d  ->  %s:%-5d\n",
+           strftime("%H:%M:%S", nsecs),
+           "NFQ_DROP",
+           $errno_name,
+           "-",
+           "__nf_queue",
            $saddr, $sport,
            $daddr, $dport);
 `)

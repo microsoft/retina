@@ -17,7 +17,7 @@ echo "Target node: $NODE"
 
 # Clean up any leftover test pods
 echo "Cleaning up previous test pods..."
-kubectl delete pod drop-gen rst-gen traffic-gen filter-test-target --force --grace-period=0 2>/dev/null || true
+kubectl delete pod drop-gen rst-gen traffic-gen filter-test-target nfqueue-helper --force --grace-period=0 2>/dev/null || true
 kubectl delete pod -l app=retina-trace --force --grace-period=0 2>/dev/null || true
 kubectl delete networkpolicy deny-all-filter-ip-test 2>/dev/null || true
 sleep 2
@@ -43,17 +43,19 @@ fi
 echo "Target pod IP: $TARGET_IP"
 
 echo ""
-echo "=== Starting bpftrace with --ip $TARGET_IP (50s duration) ==="
-echo "This will capture drops, RST, socket errors, and retransmits filtered to $TARGET_IP on $NODE"
+echo "=== Starting bpftrace with --ip $TARGET_IP (70s duration) ==="
+echo "This will capture drops, RST, socket errors, retransmits, and NFQUEUE drops filtered to $TARGET_IP on $NODE"
 echo ""
 
 # Create output files
 OUTPUT_FILE=$(mktemp)
 ERROR_FILE=$(mktemp)
-trap "rm -f $OUTPUT_FILE $ERROR_FILE; kubectl delete networkpolicy deny-all-filter-ip-test 2>/dev/null || true; kubectl delete pod filter-test-target --force --grace-period=0 2>/dev/null || true; kubectl delete pod -l app=retina-trace --force --grace-period=0 2>/dev/null || true" EXIT
+trap "rm -f $OUTPUT_FILE $ERROR_FILE; kubectl delete networkpolicy deny-all-filter-ip-test 2>/dev/null || true; kubectl delete pod filter-test-target nfqueue-helper --force --grace-period=0 2>/dev/null || true; kubectl delete pod -l app=retina-trace --force --grace-period=0 2>/dev/null || true" EXIT
 
 # Run trace with IP filter in background and capture output
-"$REPO_ROOT/kubectl-retina" bpftrace "$NODE" --duration 50s --startup-timeout 120s \
+# Duration must be long enough for all test phases: RST, DROP/RETRANS, NFQUEUE, extra traffic
+# (each phase takes ~15-30s including pod startup and traffic generation)
+"$REPO_ROOT/kubectl-retina" bpftrace "$NODE" --duration 70s --startup-timeout 120s \
     --ip "$TARGET_IP" \
     --retina-shell-image-version v1.0.3 > "$OUTPUT_FILE" 2>"$ERROR_FILE" &
 TRACE_PID=$!
@@ -111,7 +113,50 @@ echo 'Traffic generation complete'
 " 2>&1 || true
 
 echo ""
-echo "=== Test 3: Additional traffic to filtered IP ==="
+echo "=== Test 3: NFQ_DROP with IP filter ==="
+# Add an iptables -j NFQUEUE rule for traffic to TARGET_IP; no consumer on queue.
+# The fexit:vmlinux:__nf_queue probe should capture the drop and the IP filter
+# should ensure only events involving TARGET_IP appear.
+# NOTE: This test runs before the "additional traffic" test to ensure it completes
+# within the trace window. The nfqueue-helper pod needs time to install iptables.
+echo "Creating privileged pod to add NFQUEUE iptables rule..."
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nfqueue-helper
+  namespace: default
+spec:
+  nodeName: "$NODE"
+  hostNetwork: true
+  restartPolicy: Never
+  containers:
+  - name: nfqueue-helper
+    image: alpine
+    securityContext:
+      privileged: true
+    command: ["sh", "-c"]
+    args:
+    - |
+      apk add --no-cache iptables >/dev/null 2>&1
+      echo "Adding NFQUEUE rule on OUTPUT to $TARGET_IP:80 queue 42 (no consumer)..."
+      iptables -I OUTPUT -d $TARGET_IP -p tcp --dport 80 -j NFQUEUE --queue-num 42
+      for i in 1 2 3 4 5; do
+        echo "attempt \$i: connecting to $TARGET_IP:80 via NFQUEUE..."
+        nc -zv -w2 $TARGET_IP 80 2>&1 || true
+        sleep 0.5
+      done
+      echo "Removing NFQUEUE rule..."
+      iptables -D OUTPUT -d $TARGET_IP -p tcp --dport 80 -j NFQUEUE --queue-num 42 2>/dev/null
+      echo "NFQUEUE test done"
+EOF
+kubectl wait --for=condition=Ready pod/nfqueue-helper --timeout=60s 2>/dev/null || true
+kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/nfqueue-helper --timeout=60s 2>/dev/null || true
+kubectl logs nfqueue-helper 2>/dev/null || true
+kubectl delete pod nfqueue-helper --force --grace-period=0 2>/dev/null || true
+
+echo ""
+echo "=== Test 4: Additional traffic to filtered IP ==="
 # Generate extra traffic to the filtered IP to increase chances of capture
 echo "Generating additional traffic to $TARGET_IP..."
 kubectl run traffic-gen --rm -i --restart=Never --image=busybox --overrides="{\"spec\":{\"nodeName\":\"$NODE\"}}" -- sh -c "
@@ -140,7 +185,7 @@ cat "$ERROR_FILE"
 echo ""
 echo "=== Cleanup ==="
 kubectl delete networkpolicy deny-all-filter-ip-test 2>/dev/null || true
-kubectl delete pod filter-test-target --force --grace-period=0 2>/dev/null || true
+kubectl delete pod filter-test-target nfqueue-helper --force --grace-period=0 2>/dev/null || true
 kubectl delete pod -l app=retina-trace --force --grace-period=0 2>/dev/null || true
 
 echo ""
@@ -180,6 +225,7 @@ DROPS_FOUND=false
 RST_FOUND=false
 SOCK_ERR_FOUND=false
 RETRANS_FOUND=false
+NFQ_DROP_FOUND=false
 
 if grep -qP '\bDROP\b.*kfree_skb' "$OUTPUT_FILE"; then
     if grep -P '\bDROP\b.*kfree_skb' "$OUTPUT_FILE" | grep -qF "$TARGET_IP"; then
@@ -225,12 +271,24 @@ else
     echo "✗ RETRANS events NOT captured"
 fi
 
+if grep -qP '\bNFQ_DROP\b.*__nf_queue' "$OUTPUT_FILE"; then
+    if grep -P '\bNFQ_DROP\b.*__nf_queue' "$OUTPUT_FILE" | grep -qF "$TARGET_IP"; then
+        NFQ_DROP_FOUND=true
+        echo "✓ NFQ_DROP events captured for $TARGET_IP"
+    else
+        echo "✗ NFQ_DROP events captured but NOT for filtered IP $TARGET_IP — filter may be broken"
+    fi
+else
+    echo "✗ NFQ_DROP events NOT captured (requires iptables/NFQUEUE support)"
+fi
+
 # Count successes
 SUCCESSES=0
 $DROPS_FOUND && ((SUCCESSES++)) || true
 $RST_FOUND && ((SUCCESSES++)) || true
 $SOCK_ERR_FOUND && ((SUCCESSES++)) || true
 $RETRANS_FOUND && ((SUCCESSES++)) || true
+$NFQ_DROP_FOUND && ((SUCCESSES++)) || true
 
 if [[ "$TRACE_STARTED" != "true" ]]; then
     echo ""
@@ -241,11 +299,11 @@ fi
 
 if [ $SUCCESSES -ge 3 ]; then
     echo ""
-    echo "SUCCESS: $SUCCESSES/4 event types captured with --ip filter!"
+    echo "SUCCESS: $SUCCESSES/5 event types captured with --ip filter!"
     exit 0
 elif [ $SUCCESSES -ge 1 ]; then
     echo ""
-    echo "PARTIAL SUCCESS: $SUCCESSES/4 event types captured with --ip filter"
+    echo "PARTIAL SUCCESS: $SUCCESSES/5 event types captured with --ip filter"
     echo "Note: Some events may not occur depending on kernel behavior"
     exit 0
 else

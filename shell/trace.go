@@ -35,10 +35,11 @@ type TraceConfig struct {
 	OutputJSON bool // true for JSON output, false for table
 
 	// Event selection - which probes to enable
-	EnableDrops       bool // Enable packet drop tracing (kfree_skb)
-	EnableRST         bool // Enable TCP RST tracing (tcp_send_reset/tcp_receive_reset)
-	EnableErrors      bool // Enable socket error tracing (inet_sk_error_report)
-	EnableRetransmits bool // Enable TCP retransmit tracing (tcp_retransmit_skb)
+	EnableDrops        bool // Enable packet drop tracing (kfree_skb)
+	EnableRST          bool // Enable TCP RST tracing (tcp_send_reset/tcp_receive_reset)
+	EnableErrors       bool // Enable socket error tracing (inet_sk_error_report)
+	EnableRetransmits  bool // Enable TCP retransmit tracing (tcp_retransmit_skb)
+	EnableNfqueueDrops bool // Enable NFQUEUE drop tracing (fexit:vmlinux:__nf_queue)
 
 	// Timing configuration
 	TraceDuration time.Duration // How long to trace (0 = until Ctrl-C)
