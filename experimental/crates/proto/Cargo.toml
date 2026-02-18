@@ -1,0 +1,15 @@
+[package]
+name = "retina-proto"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+prost.workspace = true
+prost-types.workspace = true
+tonic.workspace = true
+tonic-prost.workspace = true
+
+[build-dependencies]
+tonic-prost-build.workspace = true

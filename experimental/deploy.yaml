@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: retina-rust
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: retina-agent
+  namespace: retina-rust
+  labels:
+    app: retina-agent
+spec:
+  selector:
+    matchLabels:
+      app: retina-agent
+  template:
+    metadata:
+      labels:
+        app: retina-agent
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "10093"
+        prometheus.io/path: "/metrics"
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: retina-agent
+          image: retina-rust:local
+          imagePullPolicy: Never
+          args:
+            - "--grpc-port=4244"
+            - "--log-level=info"
+            - "--pod-level"
+            - "--operator-addr=http://retina-operator.retina-rust.svc.cluster.local:9090"
+            - "--metrics-port=10093"
+          env:
+            - name: AYA_LOGS
+              value: "1"
+          securityContext:
+            privileged: true
+          ports:
+            - containerPort: 4244
+              name: hubble
+              protocol: TCP
+            - containerPort: 10093
+              name: retina
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: retina
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 1
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: retina
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 1
+            failureThreshold: 3
+      tolerations:
+        - operator: Exists

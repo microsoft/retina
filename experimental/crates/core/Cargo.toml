@@ -1,0 +1,19 @@
+[package]
+name = "retina-core"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+retina-common.workspace = true
+retina-proto.workspace = true
+
+anyhow.workspace = true
+async-trait.workspace = true
+libc.workspace = true
+prometheus-client.workspace = true
+prost.workspace = true
+prost-types.workspace = true
+tokio.workspace = true
+tracing.workspace = true

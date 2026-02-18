@@ -1,0 +1,79 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: retina-operator
+  namespace: retina-rust
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: retina-operator
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "nodes"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: retina-operator
+subjects:
+  - kind: ServiceAccount
+    name: retina-operator
+    namespace: retina-rust
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: retina-operator
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: retina-operator
+  namespace: retina-rust
+  labels:
+    app: retina-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: retina-operator
+  template:
+    metadata:
+      labels:
+        app: retina-operator
+    spec:
+      serviceAccountName: retina-operator
+      containers:
+        - name: retina-operator
+          image: retina-operator:local
+          imagePullPolicy: Never
+          args:
+            - "--grpc-port=9090"
+          ports:
+            - containerPort: 9090
+              name: grpc
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: retina-operator
+  namespace: retina-rust
+  labels:
+    app: retina-operator
+spec:
+  selector:
+    app: retina-operator
+  ports:
+    - port: 9090
+      targetPort: grpc
+      protocol: TCP
+      name: grpc

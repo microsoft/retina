@@ -1,0 +1,20 @@
+[package]
+name = "retina-operator"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+retina-proto.workspace = true
+
+anyhow.workspace = true
+clap.workspace = true
+futures.workspace = true
+kube.workspace = true
+k8s-openapi.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+tonic.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
