@@ -522,6 +522,12 @@ func (g *ScriptGenerator) generateEndBlock() string {
 // buildSkbIPFilterCondition creates an if-statement to filter by IP inside kfree_skb body.
 // This is used instead of a pre-filter because we need to parse the skb to get the IPs.
 // SECURITY: IPs are converted to hex integers - no string interpolation of user input.
+//
+// IMPORTANT: $saddr_raw/$daddr_raw come from $iph->saddr which is __be32 (big-endian).
+// bpftrace reads struct fields as native integers, so on little-endian (x86) the value
+// is byte-swapped relative to network order. We use bswap() to convert back to network
+// byte order before comparing with the big-endian hex constants from ipToHex().
+// This mirrors how $skb->protocol is handled: bswap($protocol) != 0x0800.
 func (g *ScriptGenerator) buildSkbIPFilterCondition() string {
 	if len(g.config.FilterIPs) == 0 && len(g.config.FilterCIDRs) == 0 {
 		return "" // No filter
@@ -530,17 +536,19 @@ func (g *ScriptGenerator) buildSkbIPFilterCondition() string {
 	var conditions []string
 
 	// Add IP filters - compare against the raw uint32 IP values
+	// bswap() converts $saddr_raw from host byte order to network byte order
 	for _, ip := range g.config.FilterIPs {
 		ipv4 := ip.To4()
 		if ipv4 == nil {
 			continue
 		}
 		ipHex := ipToHex(ipv4)
-		// Match either source or destination (network byte order)
-		conditions = append(conditions, fmt.Sprintf("($saddr_raw == 0x%08x || $daddr_raw == 0x%08x)", ipHex, ipHex))
+		// Match either source or destination (bswap to network byte order first)
+		conditions = append(conditions, fmt.Sprintf("(bswap($saddr_raw) == 0x%08x || bswap($daddr_raw) == 0x%08x)", ipHex, ipHex))
 	}
 
 	// Add CIDR filters - mask and compare
+	// bswap() converts to network byte order before masking
 	for _, cidr := range g.config.FilterCIDRs {
 		if cidr == nil {
 			continue
@@ -551,7 +559,7 @@ func (g *ScriptGenerator) buildSkbIPFilterCondition() string {
 		}
 		networkHex := ipToHex(ipv4)
 		maskHex := ipToHex(net.IP(cidr.Mask).To4())
-		conditions = append(conditions, fmt.Sprintf("(($saddr_raw & 0x%08x) == 0x%08x || ($daddr_raw & 0x%08x) == 0x%08x)",
+		conditions = append(conditions, fmt.Sprintf("((bswap($saddr_raw) & 0x%08x) == 0x%08x || (bswap($daddr_raw) & 0x%08x) == 0x%08x)",
 			maskHex, networkHex, maskHex, networkHex))
 	}
 

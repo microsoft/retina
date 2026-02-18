@@ -169,6 +169,11 @@ func TestGenerateDropScriptWithIPFilter(t *testing.T) {
 		t.Errorf("expected filter to contain hex IP 0x0a000001, got: %s", filter)
 	}
 
+	// Should use bswap() to handle endianness (kfree_skb reads __be32 as native int)
+	if !strings.Contains(filter, "bswap($saddr_raw)") || !strings.Contains(filter, "bswap($daddr_raw)") {
+		t.Errorf("expected filter to use bswap() for endianness conversion, got: %s", filter)
+	}
+
 	// Should NOT contain the original IP string (security check)
 	if strings.Contains(filter, "10.0.0.1") {
 		t.Error("filter should not contain original IP string - security risk")
@@ -197,6 +202,11 @@ func TestGenerateDropScriptWithCIDRFilter(t *testing.T) {
 	// Should contain hex mask for /24
 	if !strings.Contains(filter, "0xffffff00") {
 		t.Errorf("expected filter to contain hex mask 0xffffff00, got: %s", filter)
+	}
+
+	// Should use bswap() for endianness
+	if !strings.Contains(filter, "bswap($saddr_raw)") {
+		t.Errorf("expected filter to use bswap() for endianness conversion, got: %s", filter)
 	}
 }
 
