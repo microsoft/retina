@@ -112,30 +112,40 @@ kubectl delete pod -l app=retina-trace --force --grace-period=0 2>/dev/null || t
 echo ""
 echo "=== Test Complete ==="
 
-# Check results
+# Check results.
+# Use precise patterns to match actual event output lines and avoid false
+# positives from verbose/startup logs that may mention these keywords.
 DROPS_FOUND=false
 RST_FOUND=false
 SOCK_ERR_FOUND=false
 RETRANS_FOUND=false
 
-if grep -q "DROP" "$OUTPUT_FILE"; then
+if grep -qP '\bDROP\b.*kfree_skb' "$OUTPUT_FILE"; then
     DROPS_FOUND=true
     echo "✓ DROP events captured"
+else
+    echo "✗ DROP events NOT captured"
 fi
 
-if grep -q "RST_" "$OUTPUT_FILE"; then
+if grep -qP '\bRST_(SENT|RECV)\b' "$OUTPUT_FILE"; then
     RST_FOUND=true
     echo "✓ RST events captured"
+else
+    echo "✗ RST events NOT captured"
 fi
 
-if grep -q "SOCK_ERR" "$OUTPUT_FILE"; then
+if grep -qP '\bSOCK_ERR\b.*inet_sk_error_report' "$OUTPUT_FILE"; then
     SOCK_ERR_FOUND=true
     echo "✓ SOCK_ERR events captured"
+else
+    echo "✗ SOCK_ERR events NOT captured"
 fi
 
-if grep -q "RETRANS" "$OUTPUT_FILE"; then
+if grep -qP '\bRETRANS\b.*tcp_retransmit_skb' "$OUTPUT_FILE"; then
     RETRANS_FOUND=true
     echo "✓ RETRANS events captured"
+else
+    echo "✗ RETRANS events NOT captured"
 fi
 
 # Count successes
