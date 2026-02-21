@@ -1,17 +1,40 @@
 use std::net::IpAddr;
 use std::sync::Arc;
+use std::time::Duration;
 
 use futures::TryStreamExt;
 use k8s_openapi::api::core::v1::{Node, Pod, Service};
 use kube::runtime::watcher::{self, Event};
 use kube::{Api, Client};
 use retina_proto::ipcache::Workload;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::state::{CachedIdentity, OperatorState};
 
+const MAX_BACKOFF: Duration = Duration::from_secs(60);
+
 /// Watch all pods cluster-wide and upsert/delete their IPs.
-pub async fn watch_pods(client: Client, state: Arc<OperatorState>) -> anyhow::Result<()> {
+/// Automatically restarts with backoff on stream errors.
+pub async fn watch_pods(client: Client, state: Arc<OperatorState>) {
+    let mut backoff = Duration::from_secs(1);
+
+    loop {
+        info!("starting pod watcher");
+        match try_watch_pods(client.clone(), state.clone()).await {
+            Ok(()) => {
+                warn!("pod watcher stream ended, restarting");
+                backoff = Duration::from_secs(1);
+            }
+            Err(e) => {
+                error!(backoff_secs = backoff.as_secs(), "pod watcher error: {e}");
+            }
+        }
+        tokio::time::sleep(backoff).await;
+        backoff = (backoff * 2).min(MAX_BACKOFF);
+    }
+}
+
+async fn try_watch_pods(client: Client, state: Arc<OperatorState>) -> anyhow::Result<()> {
     let pods: Api<Pod> = Api::all(client);
     let stream = watcher::watcher(pods, watcher::Config::default());
 
@@ -29,7 +52,6 @@ pub async fn watch_pods(client: Client, state: Arc<OperatorState>) -> anyhow::Re
         }
     }
 
-    info!("pod watcher stream ended");
     Ok(())
 }
 
@@ -116,6 +138,17 @@ fn handle_pod_apply(pod: &Pod, state: &OperatorState) {
 fn handle_pod_delete(pod: &Pod, state: &OperatorState) {
     let name = pod.metadata.name.as_deref().unwrap_or_default();
 
+    // Skip pods with host networking — their IPs are node IPs managed by
+    // the node watcher. Deleting here would remove the node entry.
+    if pod
+        .spec
+        .as_ref()
+        .and_then(|s| s.host_network)
+        .unwrap_or(false)
+    {
+        return;
+    }
+
     if let Some(status) = pod.status.as_ref() {
         if let Some(pod_ips) = status.pod_ips.as_ref() {
             for pod_ip in pod_ips {
@@ -131,7 +164,27 @@ fn handle_pod_delete(pod: &Pod, state: &OperatorState) {
 }
 
 /// Watch all services cluster-wide and upsert/delete their ClusterIP and LB IPs.
-pub async fn watch_services(client: Client, state: Arc<OperatorState>) -> anyhow::Result<()> {
+/// Automatically restarts with backoff on stream errors.
+pub async fn watch_services(client: Client, state: Arc<OperatorState>) {
+    let mut backoff = Duration::from_secs(1);
+
+    loop {
+        info!("starting service watcher");
+        match try_watch_services(client.clone(), state.clone()).await {
+            Ok(()) => {
+                warn!("service watcher stream ended, restarting");
+                backoff = Duration::from_secs(1);
+            }
+            Err(e) => {
+                error!(backoff_secs = backoff.as_secs(), "service watcher error: {e}");
+            }
+        }
+        tokio::time::sleep(backoff).await;
+        backoff = (backoff * 2).min(MAX_BACKOFF);
+    }
+}
+
+async fn try_watch_services(client: Client, state: Arc<OperatorState>) -> anyhow::Result<()> {
     let services: Api<Service> = Api::all(client);
     let stream = watcher::watcher(services, watcher::Config::default());
 
@@ -149,7 +202,6 @@ pub async fn watch_services(client: Client, state: Arc<OperatorState>) -> anyhow
         }
     }
 
-    info!("service watcher stream ended");
     Ok(())
 }
 
@@ -215,7 +267,27 @@ fn handle_service_delete(svc: &Service, state: &OperatorState) {
 }
 
 /// Watch all nodes and upsert/delete their InternalIP addresses.
-pub async fn watch_nodes(client: Client, state: Arc<OperatorState>) -> anyhow::Result<()> {
+/// Automatically restarts with backoff on stream errors.
+pub async fn watch_nodes(client: Client, state: Arc<OperatorState>) {
+    let mut backoff = Duration::from_secs(1);
+
+    loop {
+        info!("starting node watcher");
+        match try_watch_nodes(client.clone(), state.clone()).await {
+            Ok(()) => {
+                warn!("node watcher stream ended, restarting");
+                backoff = Duration::from_secs(1);
+            }
+            Err(e) => {
+                error!(backoff_secs = backoff.as_secs(), "node watcher error: {e}");
+            }
+        }
+        tokio::time::sleep(backoff).await;
+        backoff = (backoff * 2).min(MAX_BACKOFF);
+    }
+}
+
+async fn try_watch_nodes(client: Client, state: Arc<OperatorState>) -> anyhow::Result<()> {
     let nodes: Api<Node> = Api::all(client);
     let stream = watcher::watcher(nodes, watcher::Config::default());
 
@@ -233,7 +305,6 @@ pub async fn watch_nodes(client: Client, state: Arc<OperatorState>) -> anyhow::R
         }
     }
 
-    info!("node watcher stream ended");
     Ok(())
 }
 

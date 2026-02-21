@@ -191,6 +191,7 @@ async fn main() -> anyhow::Result<()> {
         agent_event_tx,
         agent_event_store,
         agent_state,
+        ip_cache,
     ));
 
     info!("retina-agent running");

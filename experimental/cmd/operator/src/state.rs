@@ -80,4 +80,19 @@ impl OperatorState {
     pub fn subscribe(&self) -> broadcast::Receiver<IpCacheUpdate> {
         self.updates_tx.subscribe()
     }
+
+    /// Return the number of entries in the cache.
+    pub fn len(&self) -> usize {
+        self.cache.read().unwrap().len()
+    }
+
+    /// Return a snapshot of all entries for debugging.
+    pub fn dump(&self) -> Vec<(IpAddr, CachedIdentity)> {
+        self.cache
+            .read()
+            .unwrap()
+            .iter()
+            .map(|(ip, id)| (*ip, id.clone()))
+            .collect()
+    }
 }

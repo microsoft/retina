@@ -2116,11 +2116,13 @@ name = "retina-operator"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "axum",
  "clap",
  "futures",
  "k8s-openapi",
  "kube",
  "retina-proto",
+ "serde_json",
  "tokio",
  "tokio-stream",
  "tonic",

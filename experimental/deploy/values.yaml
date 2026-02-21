@@ -1,0 +1,62 @@
+namespace: retina-rust
+clusterName: default
+
+agent:
+  image:
+    repository: acnpublic.azurecr.io/retina-rust
+    tag: local
+    pullPolicy: Always
+  grpcPort: 4244
+  logLevel: info
+  podLevel: true
+  metricsPort: 10093
+  ayaLogs: "1"
+  resources: {}
+
+operator:
+  enabled: true
+  image:
+    repository: acnpublic.azurecr.io/retina-operator
+    tag: local
+    pullPolicy: Always
+  replicas: 1
+  grpcPort: 9090
+  debugPort: 9091
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+hubble:
+  enabled: true
+  relay:
+    enabled: true
+    image:
+      repository: mcr.microsoft.com/oss/cilium/hubble-relay
+      tag: v1.15.0
+      pullPolicy: IfNotPresent
+    replicas: 1
+    listenPort: 4245
+    resources:
+      requests:
+        cpu: 100m
+        memory: 64Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+  ui:
+    enabled: true
+    frontend:
+      image:
+        repository: mcr.microsoft.com/oss/cilium/hubble-ui
+        tag: v0.12.2
+        pullPolicy: IfNotPresent
+    backend:
+      image:
+        repository: mcr.microsoft.com/oss/cilium/hubble-ui-backend
+        tag: v0.12.2
+        pullPolicy: IfNotPresent
+    replicas: 1

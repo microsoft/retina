@@ -258,6 +258,33 @@ async fn readyz(State(state): State<DebugState>) -> Response {
     }
 }
 
+async fn ipcache_dump(State(state): State<DebugState>) -> impl IntoResponse {
+    let entries = state.ip_cache.dump();
+    let map: std::collections::BTreeMap<String, serde_json::Value> = entries
+        .into_iter()
+        .map(|(ip, id)| {
+            let mut obj = serde_json::Map::new();
+            if !id.namespace.is_empty() {
+                obj.insert("namespace".into(), id.namespace.into());
+            }
+            if !id.pod_name.is_empty() {
+                obj.insert("pod_name".into(), id.pod_name.into());
+            }
+            if !id.service_name.is_empty() {
+                obj.insert("service_name".into(), id.service_name.into());
+            }
+            if !id.node_name.is_empty() {
+                obj.insert("node_name".into(), id.node_name.into());
+            }
+            if !id.labels.is_empty() {
+                obj.insert("labels".into(), id.labels.into());
+            }
+            (ip.to_string(), serde_json::Value::Object(obj))
+        })
+        .collect();
+    axum::Json(map)
+}
+
 async fn config_dump(State(state): State<DebugState>) -> impl IntoResponse {
     let dump = ConfigDump {
         config: state.config,
@@ -343,6 +370,7 @@ pub async fn serve(
         .route("/healthz", get(healthz))
         .route("/readyz", get(readyz))
         .route("/debug/config", get(config_dump))
+        .route("/debug/ipcache", get(ipcache_dump))
         .route("/debug/mem", get(mem_info))
         .route("/debug/pprof/profile", get(pprof_profile))
         .with_state(state);

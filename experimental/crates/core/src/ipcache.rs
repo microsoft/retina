@@ -3,6 +3,15 @@ use std::hash::{Hash, Hasher};
 use std::net::IpAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::RwLock;
+use tokio::sync::{broadcast, Notify};
+
+/// Change event emitted by the IpCache when entries are modified.
+#[derive(Clone, Debug)]
+pub enum IpCacheEvent {
+    Upsert(IpAddr, Identity),
+    Delete(IpAddr),
+    Clear,
+}
 
 // Reserved numeric identities (matching Cilium conventions).
 pub const IDENTITY_UNKNOWN: u32 = 0;
@@ -97,16 +106,26 @@ pub struct Workload {
 pub struct IpCache {
     inner: RwLock<HashMap<IpAddr, Identity>>,
     synced: AtomicBool,
+    synced_notify: Notify,
     local_node_name: RwLock<String>,
+    event_tx: broadcast::Sender<IpCacheEvent>,
 }
 
 impl IpCache {
     pub fn new() -> Self {
+        let (event_tx, _) = broadcast::channel(4096);
         Self {
             inner: RwLock::new(HashMap::new()),
             synced: AtomicBool::new(false),
+            synced_notify: Notify::new(),
             local_node_name: RwLock::new(String::new()),
+            event_tx,
         }
+    }
+
+    /// Subscribe to change notifications from this cache.
+    pub fn subscribe(&self) -> broadcast::Receiver<IpCacheEvent> {
+        self.event_tx.subscribe()
     }
 
     /// Set the local node name. Used to distinguish Host (local) vs RemoteNode.
@@ -142,11 +161,14 @@ impl IpCache {
     }
 
     pub fn upsert(&self, ip: IpAddr, identity: Identity) {
-        self.inner.write().unwrap().insert(ip, identity);
+        self.inner.write().unwrap().insert(ip, identity.clone());
+        let _ = self.event_tx.send(IpCacheEvent::Upsert(ip, identity));
     }
 
     pub fn delete(&self, ip: &IpAddr) {
-        self.inner.write().unwrap().remove(ip);
+        if self.inner.write().unwrap().remove(ip).is_some() {
+            let _ = self.event_tx.send(IpCacheEvent::Delete(*ip));
+        }
     }
 
     pub fn get(&self, ip: &IpAddr) -> Option<Identity> {
@@ -155,20 +177,61 @@ impl IpCache {
 
     pub fn mark_synced(&self) {
         self.synced.store(true, Ordering::Release);
+        self.synced_notify.notify_waiters();
     }
 
     pub fn is_synced(&self) -> bool {
         self.synced.load(Ordering::Acquire)
     }
 
+    /// Wait until the cache has completed its initial sync, or the timeout expires.
+    pub async fn wait_synced(&self, timeout: std::time::Duration) -> bool {
+        if self.is_synced() {
+            return true;
+        }
+        // Register interest BEFORE re-checking, so a mark_synced() call
+        // between the check and the await is not lost.
+        let notified = self.synced_notify.notified();
+        if self.is_synced() {
+            return true;
+        }
+        tokio::select! {
+            _ = notified => self.is_synced(),
+            _ = tokio::time::sleep(timeout) => self.is_synced(),
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.inner.read().unwrap().len()
+    }
+
+    /// Return a snapshot of all entries for debugging.
+    pub fn dump(&self) -> Vec<(IpAddr, Identity)> {
+        self.inner
+            .read()
+            .unwrap()
+            .iter()
+            .map(|(ip, id)| (*ip, id.clone()))
+            .collect()
+    }
+
+    /// Return all node entries as (node_name, ip) pairs.
+    pub fn get_node_peers(&self) -> Vec<(String, IpAddr)> {
+        let inner = self.inner.read().unwrap();
+        let mut seen = std::collections::HashSet::new();
+        inner
+            .iter()
+            .filter(|(_, id)| !id.node_name.is_empty())
+            .filter(|(_, id)| seen.insert(id.node_name.clone()))
+            .map(|(ip, id)| (id.node_name.clone(), *ip))
+            .collect()
     }
 
     /// Clear all entries and mark as unsynced. Called on reconnect.
     pub fn clear(&self) {
         self.synced.store(false, Ordering::Release);
         self.inner.write().unwrap().clear();
+        let _ = self.event_tx.send(IpCacheEvent::Clear);
     }
 }
 

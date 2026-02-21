@@ -1,3 +1,4 @@
+mod debug;
 mod grpc;
 mod state;
 mod watchers;
@@ -19,6 +20,10 @@ struct Cli {
     /// gRPC port for IpCache service.
     #[arg(long, default_value_t = 9090)]
     grpc_port: u16,
+
+    /// Debug HTTP port.
+    #[arg(long, default_value_t = 9091)]
+    debug_port: u16,
 
     /// Log level.
     #[arg(long, default_value = "info")]
@@ -47,7 +52,10 @@ async fn main() -> anyhow::Result<()> {
     let node_handle = tokio::spawn(watchers::watch_nodes(client.clone(), state.clone()));
 
     // Start gRPC server.
-    let grpc_handle = tokio::spawn(grpc::serve(cli.grpc_port, state));
+    let grpc_handle = tokio::spawn(grpc::serve(cli.grpc_port, state.clone()));
+
+    // Start debug HTTP server.
+    let debug_handle = tokio::spawn(debug::serve(cli.debug_port, state));
 
     info!("retina-operator running");
 
@@ -62,6 +70,7 @@ async fn main() -> anyhow::Result<()> {
     svc_handle.abort();
     node_handle.abort();
     grpc_handle.abort();
+    debug_handle.abort();
 
     info!("retina-operator stopped");
     Ok(())

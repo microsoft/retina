@@ -1,0 +1,84 @@
+{{- if .Values.operator.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: retina-operator
+  namespace: {{ include "retina-rust.namespace" . }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: retina-operator
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "nodes"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: retina-operator
+subjects:
+  - kind: ServiceAccount
+    name: retina-operator
+    namespace: {{ include "retina-rust.namespace" . }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: retina-operator
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: retina-operator
+  namespace: {{ include "retina-rust.namespace" . }}
+  labels:
+    {{- include "retina-rust.operator.selectorLabels" . | nindent 4 }}
+    {{- include "retina-rust.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.operator.replicas }}
+  selector:
+    matchLabels:
+      {{- include "retina-rust.operator.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "retina-rust.operator.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: retina-operator
+      containers:
+        - name: retina-operator
+          image: {{ .Values.operator.image.repository }}:{{ .Values.operator.image.tag }}
+          imagePullPolicy: {{ .Values.operator.image.pullPolicy }}
+          args:
+            - "--grpc-port={{ .Values.operator.grpcPort }}"
+            - "--debug-port={{ .Values.operator.debugPort }}"
+          ports:
+            - containerPort: {{ .Values.operator.grpcPort }}
+              name: grpc
+              protocol: TCP
+            - containerPort: {{ .Values.operator.debugPort }}
+              name: debug
+              protocol: TCP
+          {{- with .Values.operator.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: retina-operator
+  namespace: {{ include "retina-rust.namespace" . }}
+  labels:
+    {{- include "retina-rust.operator.selectorLabels" . | nindent 4 }}
+    {{- include "retina-rust.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "retina-rust.operator.selectorLabels" . | nindent 4 }}
+  ports:
+    - port: {{ .Values.operator.grpcPort }}
+      targetPort: grpc
+      protocol: TCP
+      name: grpc
+{{- end }}

@@ -13,3 +13,7 @@ pub mod relay {
 pub mod ipcache {
     tonic::include_proto!("ipcache");
 }
+
+pub mod peer {
+    tonic::include_proto!("peer");
+}

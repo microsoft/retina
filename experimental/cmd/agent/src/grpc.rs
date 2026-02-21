@@ -5,6 +5,7 @@ use std::sync::atomic::Ordering;
 use prost_types::Timestamp;
 use retina_core::agent_events::AgentEventStore;
 use retina_core::filter::FlowFilterSet;
+use retina_core::ipcache::{IpCache, IpCacheEvent};
 use retina_core::metrics::AgentState;
 use retina_core::store::FlowStore;
 use retina_proto::{
@@ -15,6 +16,10 @@ use retina_proto::{
         GetDebugEventsResponse, GetFlowsRequest, GetFlowsResponse, GetNamespacesRequest,
         GetNamespacesResponse, GetNodesRequest, GetNodesResponse, Namespace, Node, ServerStatusRequest,
         ServerStatusResponse, Tls,
+    },
+    peer::{
+        peer_server::{Peer, PeerServer},
+        ChangeNotification, ChangeNotificationType, NotifyRequest,
     },
     relay::NodeState,
 };
@@ -292,6 +297,148 @@ impl Observer for HubbleObserver {
     }
 }
 
+struct HubblePeer {
+    grpc_port: u16,
+    ip_cache: Arc<IpCache>,
+}
+
+#[tonic::async_trait]
+impl Peer for HubblePeer {
+    type NotifyStream = ReceiverStream<Result<ChangeNotification, Status>>;
+
+    async fn notify(
+        &self,
+        _request: Request<NotifyRequest>,
+    ) -> Result<Response<Self::NotifyStream>, Status> {
+        let (tx, rx) = tokio::sync::mpsc::channel(64);
+        let ip_cache = self.ip_cache.clone();
+        let grpc_port = self.grpc_port;
+
+        tokio::spawn(async move {
+            // Wait for the ipcache to sync with the operator so we have the
+            // full node list before reporting peers.
+            ip_cache
+                .wait_synced(std::time::Duration::from_secs(15))
+                .await;
+
+            // Report all known nodes as peers.
+            let nodes = ip_cache.get_node_peers();
+            for (name, ip) in &nodes {
+                let notification = ChangeNotification {
+                    name: name.clone(),
+                    address: format!("{}:{}", ip, grpc_port),
+                    r#type: ChangeNotificationType::PeerAdded.into(),
+                    tls: None,
+                };
+                if tx.send(Ok(notification)).await.is_err() {
+                    return;
+                }
+            }
+
+            // Subscribe to ipcache changes for reactive peer notifications.
+            let mut known: std::collections::HashMap<String, std::net::IpAddr> =
+                nodes.into_iter().collect();
+            let mut events = ip_cache.subscribe();
+            loop {
+                match events.recv().await {
+                    Ok(IpCacheEvent::Upsert(ip, identity)) => {
+                        if identity.node_name.is_empty() {
+                            continue;
+                        }
+                        let name = &identity.node_name;
+                        let change_type = match known.get(name) {
+                            Some(old_ip) if *old_ip == ip => continue,
+                            Some(_) => ChangeNotificationType::PeerUpdated,
+                            None => ChangeNotificationType::PeerAdded,
+                        };
+                        known.insert(name.clone(), ip);
+                        let notification = ChangeNotification {
+                            name: name.clone(),
+                            address: format!("{}:{}", ip, grpc_port),
+                            r#type: change_type.into(),
+                            tls: None,
+                        };
+                        if tx.send(Ok(notification)).await.is_err() {
+                            return;
+                        }
+                    }
+                    Ok(IpCacheEvent::Delete(ip)) => {
+                        // Find and remove the peer with this IP.
+                        let name = known
+                            .iter()
+                            .find(|(_, v)| **v == ip)
+                            .map(|(k, _)| k.clone());
+                        if let Some(name) = name {
+                            known.remove(&name);
+                            let notification = ChangeNotification {
+                                name,
+                                address: String::new(),
+                                r#type: ChangeNotificationType::PeerDeleted.into(),
+                                tls: None,
+                            };
+                            if tx.send(Ok(notification)).await.is_err() {
+                                return;
+                            }
+                        }
+                    }
+                    Ok(IpCacheEvent::Clear) => {
+                        // Cache was reset (operator reconnect) — remove all known peers.
+                        for name in known.keys() {
+                            let notification = ChangeNotification {
+                                name: name.clone(),
+                                address: String::new(),
+                                r#type: ChangeNotificationType::PeerDeleted.into(),
+                                tls: None,
+                            };
+                            if tx.send(Ok(notification)).await.is_err() {
+                                return;
+                            }
+                        }
+                        known.clear();
+                    }
+                    Err(broadcast::error::RecvError::Lagged(n)) => {
+                        tracing::warn!("peer subscriber lagged by {} events, reconciling", n);
+                        // After lag, reconcile by diffing known state against current cache.
+                        let current: std::collections::HashMap<String, std::net::IpAddr> =
+                            ip_cache.get_node_peers().into_iter().collect();
+                        for name in known.keys().filter(|n| !current.contains_key(*n)) {
+                            let notification = ChangeNotification {
+                                name: name.clone(),
+                                address: String::new(),
+                                r#type: ChangeNotificationType::PeerDeleted.into(),
+                                tls: None,
+                            };
+                            if tx.send(Ok(notification)).await.is_err() {
+                                return;
+                            }
+                        }
+                        for (name, ip) in &current {
+                            let change_type = match known.get(name) {
+                                Some(old_ip) if *old_ip == *ip => continue,
+                                Some(_) => ChangeNotificationType::PeerUpdated,
+                                None => ChangeNotificationType::PeerAdded,
+                            };
+                            let notification = ChangeNotification {
+                                name: name.clone(),
+                                address: format!("{}:{}", ip, grpc_port),
+                                r#type: change_type.into(),
+                                tls: None,
+                            };
+                            if tx.send(Ok(notification)).await.is_err() {
+                                return;
+                            }
+                        }
+                        known = current;
+                    }
+                    Err(broadcast::error::RecvError::Closed) => return,
+                }
+            }
+        });
+
+        Ok(Response::new(ReceiverStream::new(rx)))
+    }
+}
+
 /// Start the Hubble Observer gRPC server.
 pub async fn serve(
     port: u16,
@@ -301,6 +448,7 @@ pub async fn serve(
     agent_event_tx: broadcast::Sender<Arc<AgentEvent>>,
     agent_event_store: Arc<AgentEventStore>,
     agent_state: Arc<AgentState>,
+    ip_cache: Arc<IpCache>,
 ) -> anyhow::Result<()> {
     let addr = format!("0.0.0.0:{}", port).parse()?;
     let observer = HubbleObserver {
@@ -310,6 +458,10 @@ pub async fn serve(
         agent_event_tx,
         agent_event_store,
     };
+    let peer = HubblePeer {
+        grpc_port: port,
+        ip_cache,
+    };
 
     info!(%addr, "starting Hubble Observer gRPC server");
 
@@ -317,6 +469,7 @@ pub async fn serve(
 
     tonic::transport::Server::builder()
         .add_service(ObserverServer::new(observer))
+        .add_service(PeerServer::new(peer))
         .serve(addr)
         .await?;
 

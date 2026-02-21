@@ -1,6 +1,6 @@
 use std::net::IpAddr;
 
-use retina_proto::flow::{self, Flow, FlowFilter, TcpFlags};
+use retina_proto::flow::{self, EventTypeFilter, Flow, FlowFilter, TcpFlags};
 
 /// Compiled filter set for matching flows against whitelist/blacklist rules.
 ///
@@ -45,6 +45,8 @@ struct CompiledFilter {
     destination_ip: Vec<IpMatcher>,
     source_pod: Vec<PodMatcher>,
     destination_pod: Vec<PodMatcher>,
+    source_fqdn: Vec<String>,
+    destination_fqdn: Vec<String>,
     source_label: Vec<String>,
     destination_label: Vec<String>,
     verdict: Vec<i32>,
@@ -53,6 +55,7 @@ struct CompiledFilter {
     source_port: Vec<u32>,
     destination_port: Vec<u32>,
     tcp_flags: Vec<TcpFlags>,
+    event_type: Vec<EventTypeFilter>,
     reply: Vec<bool>,
     ip_version: Vec<i32>,
     node_name: Vec<NodeNameMatcher>,
@@ -67,6 +70,8 @@ impl CompiledFilter {
             destination_ip: f.destination_ip.iter().filter_map(|s| IpMatcher::parse(s)).collect(),
             source_pod: f.source_pod.iter().map(|s| PodMatcher::parse(s)).collect(),
             destination_pod: f.destination_pod.iter().map(|s| PodMatcher::parse(s)).collect(),
+            source_fqdn: f.source_fqdn.clone(),
+            destination_fqdn: f.destination_fqdn.clone(),
             source_label: f.source_label.clone(),
             destination_label: f.destination_label.clone(),
             verdict: f.verdict.clone(),
@@ -83,6 +88,7 @@ impl CompiledFilter {
                 .filter_map(|s| s.parse::<u32>().ok())
                 .collect(),
             tcp_flags: f.tcp_flags.clone(),
+            event_type: f.event_type.clone(),
             reply: f.reply.clone(),
             ip_version: f.ip_version.clone(),
             node_name: f.node_name.iter().map(|s| NodeNameMatcher::parse(s)).collect(),
@@ -97,6 +103,8 @@ impl CompiledFilter {
             && self.match_destination_ip(flow)
             && self.match_source_pod(flow)
             && self.match_destination_pod(flow)
+            && self.match_source_fqdn(flow)
+            && self.match_destination_fqdn(flow)
             && self.match_source_label(flow)
             && self.match_destination_label(flow)
             && self.match_verdict(flow)
@@ -105,6 +113,7 @@ impl CompiledFilter {
             && self.match_source_port(flow)
             && self.match_destination_port(flow)
             && self.match_tcp_flags(flow)
+            && self.match_event_type(flow)
             && self.match_reply(flow)
             && self.match_ip_version(flow)
             && self.match_node_name(flow)
@@ -162,6 +171,30 @@ impl CompiledFilter {
             None => return false,
         };
         self.destination_pod.iter().any(|m| m.matches(&ep.namespace, &ep.pod_name))
+    }
+
+    fn match_source_fqdn(&self, flow: &Flow) -> bool {
+        if self.source_fqdn.is_empty() {
+            return true;
+        }
+        if flow.source_names.is_empty() {
+            return false;
+        }
+        self.source_fqdn
+            .iter()
+            .any(|pattern| flow.source_names.iter().any(|name| glob_match(pattern, name)))
+    }
+
+    fn match_destination_fqdn(&self, flow: &Flow) -> bool {
+        if self.destination_fqdn.is_empty() {
+            return true;
+        }
+        if flow.destination_names.is_empty() {
+            return false;
+        }
+        self.destination_fqdn
+            .iter()
+            .any(|pattern| flow.destination_names.iter().any(|name| glob_match(pattern, name)))
     }
 
     fn match_source_label(&self, flow: &Flow) -> bool {
@@ -265,6 +298,20 @@ impl CompiledFilter {
         };
         // Any of the filter flag sets must be a subset of the flow's flags.
         self.tcp_flags.iter().any(|f| tcp_flags_subset(f, flow_flags))
+    }
+
+    fn match_event_type(&self, flow: &Flow) -> bool {
+        if self.event_type.is_empty() {
+            return true;
+        }
+        let flow_et = match flow.event_type.as_ref() {
+            Some(et) => et,
+            None => return false,
+        };
+        self.event_type.iter().any(|f| {
+            f.r#type == flow_et.r#type
+                && (!f.match_sub_type || f.sub_type == flow_et.sub_type)
+        })
     }
 
     fn match_reply(&self, flow: &Flow) -> bool {

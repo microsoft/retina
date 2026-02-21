@@ -1,0 +1,285 @@
+{{- if .Values.hubble.enabled }}
+# Hubble Peer Service — relay connects here to call Peer.Notify() on the
+# local agent, which reports all cluster nodes.
+apiVersion: v1
+kind: Service
+metadata:
+  name: hubble-peer
+  namespace: {{ include "retina-rust.namespace" . }}
+  labels:
+    app: hubble-peer
+    {{- include "retina-rust.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "retina-rust.agent.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: peer-service
+      port: 80
+      targetPort: {{ .Values.agent.grpcPort }}
+      protocol: TCP
+  internalTrafficPolicy: Local
+{{- if .Values.hubble.relay.enabled }}
+---
+# Hubble Relay ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hubble-relay-config
+  namespace: {{ include "retina-rust.namespace" . }}
+data:
+  config.yaml: |
+    cluster-name: {{ .Values.clusterName }}
+    peer-service: "hubble-peer.{{ include "retina-rust.namespace" . }}.svc.cluster.local:80"
+    listen-address: :{{ .Values.hubble.relay.listenPort }}
+    dial-timeout: 5s
+    retry-timeout: 5s
+    sort-buffer-len-max: 100
+    sort-buffer-drain-timeout: 1s
+    disable-client-tls: true
+    disable-server-tls: true
+---
+# Hubble Relay Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hubble-relay
+  namespace: {{ include "retina-rust.namespace" . }}
+  labels:
+    app: hubble-relay
+    {{- include "retina-rust.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.hubble.relay.replicas }}
+  selector:
+    matchLabels:
+      app: hubble-relay
+  template:
+    metadata:
+      labels:
+        app: hubble-relay
+    spec:
+      containers:
+        - name: hubble-relay
+          image: {{ .Values.hubble.relay.image.repository }}:{{ .Values.hubble.relay.image.tag }}
+          imagePullPolicy: {{ .Values.hubble.relay.image.pullPolicy }}
+          command:
+            - hubble-relay
+          args:
+            - serve
+            - --disable-client-tls
+            - --disable-server-tls
+          ports:
+            - name: grpc
+              containerPort: {{ .Values.hubble.relay.listenPort }}
+          readinessProbe:
+            grpc:
+              port: {{ .Values.hubble.relay.listenPort }}
+            timeoutSeconds: 3
+          livenessProbe:
+            grpc:
+              port: {{ .Values.hubble.relay.listenPort }}
+            timeoutSeconds: 3
+          startupProbe:
+            grpc:
+              port: {{ .Values.hubble.relay.listenPort }}
+            failureThreshold: 20
+            periodSeconds: 3
+            timeoutSeconds: 3
+          {{- with .Values.hubble.relay.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/hubble-relay
+              readOnly: true
+          terminationMessagePolicy: FallbackToLogsOnError
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 1
+      volumes:
+        - name: config
+          configMap:
+            name: hubble-relay-config
+            items:
+              - key: config.yaml
+                path: config.yaml
+---
+# Hubble Relay Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: hubble-relay
+  namespace: {{ include "retina-rust.namespace" . }}
+  labels:
+    app: hubble-relay
+    {{- include "retina-rust.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: hubble-relay
+  ports:
+    - name: grpc
+      port: 80
+      targetPort: {{ .Values.hubble.relay.listenPort }}
+      protocol: TCP
+{{- end }}
+{{- if .Values.hubble.ui.enabled }}
+---
+# Hubble UI RBAC
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hubble-ui
+  namespace: {{ include "retina-rust.namespace" . }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: hubble-ui
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: hubble-ui
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: hubble-ui
+subjects:
+  - kind: ServiceAccount
+    name: hubble-ui
+    namespace: {{ include "retina-rust.namespace" . }}
+---
+# Hubble UI nginx config
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hubble-ui-nginx
+  namespace: {{ include "retina-rust.namespace" . }}
+data:
+  nginx.conf: |
+    server {
+        listen       8081;
+        server_name  localhost;
+        root /app;
+        index index.html;
+        client_max_body_size 1G;
+
+        location / {
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+
+            # CORS
+            add_header Access-Control-Allow-Methods "GET, POST, PUT, HEAD, DELETE, OPTIONS";
+            add_header Access-Control-Allow-Origin *;
+            add_header Access-Control-Max-Age 1728000;
+            add_header Access-Control-Expose-Headers content-length,grpc-status,grpc-message;
+            add_header Access-Control-Allow-Headers range,keep-alive,user-agent,cache-control,content-type,content-transfer-encoding,x-accept-content-transfer-encoding,x-accept-response-streaming,x-user-agent,x-grpc-web,grpc-timeout;
+            if ($request_method = OPTIONS) {
+                return 204;
+            }
+            # /CORS
+
+            location /api {
+                proxy_http_version 1.1;
+                proxy_pass_request_headers on;
+                proxy_hide_header Access-Control-Allow-Origin;
+                proxy_pass http://127.0.0.1:8090;
+            }
+
+            location / {
+                try_files $uri $uri/ /index.html /index.html;
+            }
+
+            # Liveness probe
+            location /healthz {
+                access_log off;
+                add_header Content-Type text/plain;
+                return 200 'ok';
+            }
+        }
+    }
+---
+# Hubble UI Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hubble-ui
+  namespace: {{ include "retina-rust.namespace" . }}
+  labels:
+    app: hubble-ui
+    {{- include "retina-rust.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.hubble.ui.replicas }}
+  selector:
+    matchLabels:
+      app: hubble-ui
+  template:
+    metadata:
+      labels:
+        app: hubble-ui
+    spec:
+      serviceAccountName: hubble-ui
+      containers:
+        - name: frontend
+          image: {{ .Values.hubble.ui.frontend.image.repository }}:{{ .Values.hubble.ui.frontend.image.tag }}
+          imagePullPolicy: {{ .Values.hubble.ui.frontend.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8081
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8081
+          volumeMounts:
+            - name: hubble-ui-nginx-conf
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: nginx.conf
+            - name: tmp-dir
+              mountPath: /tmp
+          terminationMessagePolicy: FallbackToLogsOnError
+        - name: backend
+          image: {{ .Values.hubble.ui.backend.image.repository }}:{{ .Values.hubble.ui.backend.image.tag }}
+          imagePullPolicy: {{ .Values.hubble.ui.backend.image.pullPolicy }}
+          env:
+            - name: EVENTS_SERVER_PORT
+              value: "8090"
+            - name: FLOWS_API_ADDR
+              value: "hubble-relay:80"
+          ports:
+            - name: grpc
+              containerPort: 8090
+          terminationMessagePolicy: FallbackToLogsOnError
+      volumes:
+        - name: hubble-ui-nginx-conf
+          configMap:
+            name: hubble-ui-nginx
+            defaultMode: 420
+        - name: tmp-dir
+          emptyDir: {}
+---
+# Hubble UI Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: hubble-ui
+  namespace: {{ include "retina-rust.namespace" . }}
+  labels:
+    app: hubble-ui
+    {{- include "retina-rust.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: hubble-ui
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8081
+      protocol: TCP
+{{- end }}
+{{- end }}

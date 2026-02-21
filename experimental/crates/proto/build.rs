@@ -20,6 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "proto/observer/observer.proto",
                 "proto/relay/relay.proto",
                 "proto/ipcache/ipcache.proto",
+                "proto/peer/peer.proto",
             ],
             &[proto_dir],
         )?;
