@@ -1,17 +1,22 @@
+use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
+use prost_types::Timestamp;
+use retina_core::agent_events::AgentEventStore;
+use retina_core::filter::FlowFilterSet;
 use retina_core::metrics::AgentState;
 use retina_core::store::FlowStore;
 use retina_proto::{
-    flow::Flow,
+    flow::{AgentEvent, Flow},
     observer::{
         observer_server::{Observer, ObserverServer},
         GetAgentEventsRequest, GetAgentEventsResponse, GetDebugEventsRequest,
         GetDebugEventsResponse, GetFlowsRequest, GetFlowsResponse, GetNamespacesRequest,
-        GetNamespacesResponse, GetNodesRequest, GetNodesResponse, ServerStatusRequest,
-        ServerStatusResponse,
+        GetNamespacesResponse, GetNodesRequest, GetNodesResponse, Namespace, Node, ServerStatusRequest,
+        ServerStatusResponse, Tls,
     },
+    relay::NodeState,
 };
 use tokio::sync::broadcast;
 use tokio_stream::wrappers::ReceiverStream;
@@ -19,8 +24,43 @@ use tonic::{Request, Response, Status};
 use tracing::info;
 
 struct HubbleObserver {
+    node_name: String,
     flow_tx: broadcast::Sender<Arc<Flow>>,
     flow_store: Arc<FlowStore>,
+    agent_event_tx: broadcast::Sender<Arc<AgentEvent>>,
+    agent_event_store: Arc<AgentEventStore>,
+}
+
+/// Check if a flow's timestamp falls within `since..until`.
+fn flow_in_time_range(flow: &Flow, since: Option<&Timestamp>, until: Option<&Timestamp>) -> bool {
+    let flow_ts = match flow.time.as_ref() {
+        Some(ts) => ts,
+        None => return true,
+    };
+    if let Some(s) = since {
+        if (flow_ts.seconds, flow_ts.nanos) < (s.seconds, s.nanos) {
+            return false;
+        }
+    }
+    if let Some(u) = until {
+        if (flow_ts.seconds, flow_ts.nanos) > (u.seconds, u.nanos) {
+            return false;
+        }
+    }
+    true
+}
+
+/// Check if a flow's timestamp is past the `until` bound.
+fn flow_past_until(flow: &Flow, until: Option<&Timestamp>) -> bool {
+    let u = match until {
+        Some(u) => u,
+        None => return false,
+    };
+    let flow_ts = match flow.time.as_ref() {
+        Some(ts) => ts,
+        None => return false,
+    };
+    (flow_ts.seconds, flow_ts.nanos) > (u.seconds, u.nanos)
 }
 
 #[tonic::async_trait]
@@ -36,21 +76,32 @@ impl Observer for HubbleObserver {
         let req = request.into_inner();
         let (tx, rx) = tokio::sync::mpsc::channel(256);
 
+        let filter = FlowFilterSet::compile(&req.whitelist, &req.blacklist);
+        let node_name = self.node_name.clone();
+
         if req.follow {
             // Live streaming mode.
             let mut broadcast_rx = self.flow_tx.subscribe();
+            let until = req.until.clone();
             tokio::spawn(async move {
                 loop {
                     match broadcast_rx.recv().await {
                         Ok(flow) => {
+                            // Stop streaming if past the `until` bound.
+                            if flow_past_until(&flow, until.as_ref()) {
+                                break;
+                            }
+                            if !filter.is_empty() && !filter.matches(&flow) {
+                                continue;
+                            }
                             let resp = GetFlowsResponse {
                                 response_types: Some(
                                     retina_proto::observer::get_flows_response::ResponseTypes::Flow(
                                         (*flow).clone(),
                                     ),
                                 ),
-                                node_name: String::new(),
-                                time: flow.time,
+                                node_name: node_name.clone(),
+                                time: flow.time.clone(),
                             };
                             if tx.send(Ok(resp)).await.is_err() {
                                 break; // Client disconnected.
@@ -64,26 +115,37 @@ impl Observer for HubbleObserver {
                 }
             });
         } else {
-            // Historical mode: return last N flows.
+            // Historical mode.
             let n = if req.number > 0 {
                 req.number as usize
             } else {
                 100
             };
-            let flows = self.flow_store.last_n(n);
-            let tx_clone = tx.clone();
+            let flows = if req.first {
+                self.flow_store.first_n(n)
+            } else {
+                self.flow_store.last_n(n)
+            };
+            let since = req.since.clone();
+            let until = req.until.clone();
             tokio::spawn(async move {
                 for flow in flows {
+                    if !flow_in_time_range(&flow, since.as_ref(), until.as_ref()) {
+                        continue;
+                    }
+                    if !filter.is_empty() && !filter.matches(&flow) {
+                        continue;
+                    }
                     let resp = GetFlowsResponse {
                         response_types: Some(
                             retina_proto::observer::get_flows_response::ResponseTypes::Flow(
                                 (*flow).clone(),
                             ),
                         ),
-                        node_name: String::new(),
-                        time: flow.time,
+                        node_name: node_name.clone(),
+                        time: flow.time.clone(),
                     };
-                    if tx_clone.send(Ok(resp)).await.is_err() {
+                    if tx.send(Ok(resp)).await.is_err() {
                         break;
                     }
                 }
@@ -95,30 +157,121 @@ impl Observer for HubbleObserver {
 
     async fn get_agent_events(
         &self,
-        _request: Request<GetAgentEventsRequest>,
+        request: Request<GetAgentEventsRequest>,
     ) -> Result<Response<Self::GetAgentEventsStream>, Status> {
-        Err(Status::unimplemented("GetAgentEvents not implemented"))
+        let req = request.into_inner();
+        let (tx, rx) = tokio::sync::mpsc::channel(256);
+        let node_name = self.node_name.clone();
+
+        if req.follow {
+            let mut broadcast_rx = self.agent_event_tx.subscribe();
+            tokio::spawn(async move {
+                loop {
+                    match broadcast_rx.recv().await {
+                        Ok(event) => {
+                            let resp = GetAgentEventsResponse {
+                                agent_event: Some((*event).clone()),
+                                node_name: node_name.clone(),
+                                time: None,
+                            };
+                            if tx.send(Ok(resp)).await.is_err() {
+                                break;
+                            }
+                        }
+                        Err(broadcast::error::RecvError::Lagged(n)) => {
+                            tracing::warn!("agent event subscriber lagged by {} events", n);
+                        }
+                        Err(broadcast::error::RecvError::Closed) => break,
+                    }
+                }
+            });
+        } else {
+            let n = if req.number > 0 {
+                req.number as usize
+            } else {
+                100
+            };
+            let events = if req.first {
+                self.agent_event_store.first_n(n)
+            } else {
+                self.agent_event_store.last_n(n)
+            };
+            tokio::spawn(async move {
+                for event in events {
+                    let resp = GetAgentEventsResponse {
+                        agent_event: Some((*event).clone()),
+                        node_name: node_name.clone(),
+                        time: None,
+                    };
+                    if tx.send(Ok(resp)).await.is_err() {
+                        break;
+                    }
+                }
+            });
+        }
+
+        Ok(Response::new(ReceiverStream::new(rx)))
     }
 
     async fn get_debug_events(
         &self,
         _request: Request<GetDebugEventsRequest>,
     ) -> Result<Response<Self::GetDebugEventsStream>, Status> {
-        Err(Status::unimplemented("GetDebugEvents not implemented"))
+        // No eBPF debug events exist yet — return an empty stream rather than
+        // Unimplemented so `hubble observe --debug-events` doesn't error out.
+        let (_tx, rx) = tokio::sync::mpsc::channel(1);
+        Ok(Response::new(ReceiverStream::new(rx)))
     }
 
     async fn get_nodes(
         &self,
         _request: Request<GetNodesRequest>,
     ) -> Result<Response<GetNodesResponse>, Status> {
-        Err(Status::unimplemented("GetNodes not implemented"))
+        let node = Node {
+            name: self.node_name.clone(),
+            version: env!("CARGO_PKG_VERSION").to_string(),
+            address: String::new(),
+            state: NodeState::NodeConnected.into(),
+            tls: Some(Tls {
+                enabled: false,
+                server_name: String::new(),
+            }),
+            uptime_ns: self.flow_store.uptime_ns(),
+            num_flows: self.flow_store.num_flows(),
+            max_flows: self.flow_store.capacity() as u64,
+            seen_flows: self.flow_store.seen_flows(),
+        };
+        Ok(Response::new(GetNodesResponse { nodes: vec![node] }))
     }
 
     async fn get_namespaces(
         &self,
         _request: Request<GetNamespacesRequest>,
     ) -> Result<Response<GetNamespacesResponse>, Status> {
-        Err(Status::unimplemented("GetNamespaces not implemented"))
+        let flows = self.flow_store.all_flows();
+        let mut namespaces = BTreeSet::new();
+        for flow in &flows {
+            if let Some(ref src) = flow.source {
+                if !src.namespace.is_empty() {
+                    namespaces.insert(src.namespace.clone());
+                }
+            }
+            if let Some(ref dst) = flow.destination {
+                if !dst.namespace.is_empty() {
+                    namespaces.insert(dst.namespace.clone());
+                }
+            }
+        }
+        let ns_list: Vec<Namespace> = namespaces
+            .into_iter()
+            .map(|ns| Namespace {
+                cluster: String::new(),
+                namespace: ns,
+            })
+            .collect();
+        Ok(Response::new(GetNamespacesResponse {
+            namespaces: ns_list,
+        }))
     }
 
     async fn server_status(
@@ -130,7 +283,11 @@ impl Observer for HubbleObserver {
             max_flows: self.flow_store.capacity() as u64,
             seen_flows: self.flow_store.seen_flows(),
             uptime_ns: self.flow_store.uptime_ns(),
-            ..Default::default()
+            num_connected_nodes: Some(1),
+            num_unavailable_nodes: Some(0),
+            unavailable_nodes: vec![],
+            version: env!("CARGO_PKG_VERSION").to_string(),
+            flows_rate: self.flow_store.flows_rate(),
         }))
     }
 }
@@ -138,14 +295,20 @@ impl Observer for HubbleObserver {
 /// Start the Hubble Observer gRPC server.
 pub async fn serve(
     port: u16,
+    node_name: String,
     flow_tx: broadcast::Sender<Arc<Flow>>,
     flow_store: Arc<FlowStore>,
+    agent_event_tx: broadcast::Sender<Arc<AgentEvent>>,
+    agent_event_store: Arc<AgentEventStore>,
     agent_state: Arc<AgentState>,
 ) -> anyhow::Result<()> {
     let addr = format!("0.0.0.0:{}", port).parse()?;
     let observer = HubbleObserver {
+        node_name,
         flow_tx,
         flow_store,
+        agent_event_tx,
+        agent_event_store,
     };
 
     info!(%addr, "starting Hubble Observer gRPC server");

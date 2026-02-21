@@ -27,8 +27,8 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: retina-agent
-          image: retina-rust:local
-          imagePullPolicy: Never
+          image: acnpublic.azurecr.io/retina-rust:grpc-v2
+          imagePullPolicy: Always
           args:
             - "--grpc-port=4244"
             - "--log-level=info"

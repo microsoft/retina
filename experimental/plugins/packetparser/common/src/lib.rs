@@ -74,12 +74,14 @@ pub struct PacketEvent {
     pub proto: u8,
     pub observation_point: u8,
     pub traffic_direction: u8,
+    pub _pad1: u8,
     pub flags: u16,
     pub is_reply: u8,
-    pub _pad: u8,
+    pub _pad2: u8,
     pub previously_observed_packets: u32,
     pub previously_observed_bytes: u32,
     pub prev_flags: TcpFlagsCount,
+    pub _pad3: u32,
     pub ct_metadata: ConntrackMetadata,
 }
 

@@ -17,6 +17,7 @@ clap.workspace = true
 pprof.workspace = true
 prometheus-client.workspace = true
 prost-pprof = { package = "prost", version = "0.12" }
+prost-types.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true

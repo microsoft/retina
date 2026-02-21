@@ -6,7 +6,7 @@ use aya::programs::tc::SchedClassifierLink;
 use aya::Ebpf;
 use futures::stream::{StreamExt, TryStreamExt};
 use netlink_packet_core::NetlinkPayload;
-use netlink_packet_route::link::{InfoKind, LinkAttribute, LinkInfo, LinkMessage};
+use netlink_packet_route::link::{LinkAttribute, LinkMessage};
 use netlink_packet_route::RouteNetlinkMessage;
 use netlink_sys::{AsyncSocket, SocketAddr};
 use rtnetlink::constants::RTMGRP_LINK;
@@ -113,31 +113,26 @@ impl VethWatcher {
     }
 }
 
-/// Extract (ifindex, ifname) from a link message if it's a veth.
+/// Extract (ifindex, ifname) from a link message if it's a pod veth.
+///
+/// Detection is CNI-agnostic: any interface whose peer lives in a different
+/// network namespace (indicated by the `NetNsId` netlink attribute) is a pod
+/// veth. This works for all CNI implementations regardless of naming convention.
 fn parse_veth_msg(msg: &LinkMessage) -> Option<(u32, String)> {
     let ifindex = msg.header.index;
     let mut ifname = None;
-    let mut is_veth = false;
+    let mut has_peer_netns = false;
 
     for attr in &msg.attributes {
         match attr {
             LinkAttribute::IfName(name) => ifname = Some(name.clone()),
-            LinkAttribute::LinkInfo(infos) => {
-                for info in infos {
-                    if let LinkInfo::Kind(InfoKind::Veth) = info {
-                        is_veth = true;
-                    }
-                }
-            }
+            LinkAttribute::LinkNetNsId(_) => has_peer_netns = true,
             _ => {}
         }
     }
 
-    if is_veth {
-        // Only attach to interfaces with the standard pod-veth naming
-        // convention (e.g. vethc38b9e28). In kind clusters, eth0 is also
-        // a veth but carries node-level traffic we don't want here.
-        ifname.filter(|name| name.starts_with("veth")).map(|name| (ifindex, name))
+    if has_peer_netns {
+        ifname.map(|name| (ifindex, name))
     } else {
         None
     }

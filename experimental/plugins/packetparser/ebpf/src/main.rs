@@ -51,15 +51,13 @@ fn try_parse(ctx: &TcContext, obs_point: u8) -> Result<i32, ()> {
     let dst_ip = ipv4_hdr.dst_addr;
     let proto = ipv4_hdr.proto;
 
-    let mut pkt = PacketEvent {
-        ts_ns,
-        bytes: skb_len,
-        src_ip: u32::from_be_bytes(src_ip),
-        dst_ip: u32::from_be_bytes(dst_ip),
-        proto: proto as u8,
-        observation_point: obs_point,
-        ..PacketEvent::default()
-    };
+    let mut pkt: PacketEvent = unsafe { core::mem::zeroed() };
+    pkt.ts_ns = ts_ns;
+    pkt.bytes = skb_len;
+    pkt.src_ip = u32::from_be_bytes(src_ip);
+    pkt.dst_ip = u32::from_be_bytes(dst_ip);
+    pkt.proto = proto as u8;
+    pkt.observation_point = obs_point;
 
     let ip_hdr_len = EthHdr::LEN + Ipv4Hdr::LEN;
 

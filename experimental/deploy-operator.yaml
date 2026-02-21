@@ -46,8 +46,8 @@ spec:
       serviceAccountName: retina-operator
       containers:
         - name: retina-operator
-          image: retina-operator:local
-          imagePullPolicy: Never
+          image: acnpublic.azurecr.io/retina-operator:latest
+          imagePullPolicy: Always
           args:
             - "--grpc-port=9090"
           ports:

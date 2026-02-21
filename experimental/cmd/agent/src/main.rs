@@ -8,10 +8,12 @@ use std::sync::Arc;
 use anyhow::Context as _;
 use clap::Parser;
 use packetparser::plugin::PacketParser;
+use retina_core::agent_events::AgentEventStore;
 use retina_core::ipcache::IpCache;
 use retina_core::metrics::{AgentState, Metrics};
 use retina_core::plugin::{Plugin, PluginContext};
 use retina_core::store::FlowStore;
+use retina_proto::flow::{AgentEvent, AgentEventType, TimeNotification};
 use serde::Serialize;
 use tokio::sync::broadcast;
 use tracing::info;
@@ -95,6 +97,10 @@ async fn main() -> anyhow::Result<()> {
     // Flow ring buffer for historical queries.
     let flow_store = Arc::new(FlowStore::new(4096));
 
+    // Broadcast channel and store for agent events.
+    let (agent_event_tx, _) = broadcast::channel::<Arc<AgentEvent>>(256);
+    let agent_event_store = Arc::new(AgentEventStore::new(1024));
+
     // IP cache for flow enrichment.
     let ip_cache = Arc::new(IpCache::new());
 
@@ -103,6 +109,26 @@ async fn main() -> anyhow::Result<()> {
         .map(|h| h.to_string_lossy().into_owned())
         .unwrap_or_default();
     ip_cache.set_local_node_name(local_node_name.clone());
+
+    // Emit AGENT_STARTED event.
+    {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default();
+        let started_event = Arc::new(AgentEvent {
+            r#type: AgentEventType::AgentStarted.into(),
+            notification: Some(
+                retina_proto::flow::agent_event::Notification::AgentStart(TimeNotification {
+                    time: Some(prost_types::Timestamp {
+                        seconds: now.as_secs() as i64,
+                        nanos: now.subsec_nanos() as i32,
+                    }),
+                }),
+            ),
+        });
+        agent_event_store.push(started_event.clone());
+        let _ = agent_event_tx.send(started_event);
+    }
 
     // Metrics and agent state for observability and health probes.
     let metrics = Arc::new(Metrics::new());
@@ -127,9 +153,11 @@ async fn main() -> anyhow::Result<()> {
     let ipcache_handle = if let Some(ref addr) = cli.operator_addr {
         let cache = ip_cache.clone();
         let addr = addr.clone();
-        let node_name = local_node_name;
+        let node_name = local_node_name.clone();
+        let event_tx = agent_event_tx.clone();
+        let event_store = agent_event_store.clone();
         Some(tokio::spawn(async move {
-            ipcache_sync::run_ipcache_sync(addr, cache, node_name).await;
+            ipcache_sync::run_ipcache_sync(addr, cache, node_name, event_tx, event_store).await;
         }))
     } else {
         info!("no --operator-addr set, flow enrichment disabled");
@@ -155,7 +183,15 @@ async fn main() -> anyhow::Result<()> {
     ));
 
     // Start gRPC server.
-    let grpc_handle = tokio::spawn(grpc::serve(cli.grpc_port, flow_tx, flow_store, agent_state));
+    let grpc_handle = tokio::spawn(grpc::serve(
+        cli.grpc_port,
+        local_node_name,
+        flow_tx,
+        flow_store,
+        agent_event_tx,
+        agent_event_store,
+        agent_state,
+    ));
 
     info!("retina-agent running");
 

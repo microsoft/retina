@@ -2076,6 +2076,7 @@ dependencies = [
  "pprof",
  "prometheus-client",
  "prost 0.12.6",
+ "prost-types 0.14.3",
  "retina-core",
  "retina-proto",
  "serde",
