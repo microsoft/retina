@@ -61,6 +61,7 @@ const (
 // Validation errors
 var (
 	errInvalidIP           = errors.New("invalid IP address")
+	errIPv6NotSupported    = errors.New("IPv6 is not supported, please provide an IPv4 address")
 	errInvalidCIDR         = errors.New("invalid CIDR notation")
 	errInvalidOutputFormat = errors.New("invalid output format: must be 'table' or 'json'")
 	errNodeOnly            = errors.New("bpftrace command only supports nodes, not pods")
@@ -76,6 +77,9 @@ func ValidateFilterIP(input string) (net.IP, error) {
 	ip := net.ParseIP(input)
 	if ip == nil {
 		return nil, fmt.Errorf("%w: %q", errInvalidIP, input)
+	}
+	if ip.To4() == nil {
+		return nil, fmt.Errorf("%w: %q", errIPv6NotSupported, input)
 	}
 	return ip, nil
 }
@@ -258,9 +262,10 @@ func runBpftrace(_ *cobra.Command, args []string) error {
 			// Handle Ctrl-C gracefully
 			sigCh := make(chan os.Signal, 1)
 			signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+			defer signal.Stop(sigCh)
 			go func() {
 				<-sigCh
-				fmt.Println("\nReceived interrupt, cleaning up...")
+				fmt.Fprintln(os.Stderr, "\nReceived interrupt, cleaning up...")
 				cancel()
 			}()
 

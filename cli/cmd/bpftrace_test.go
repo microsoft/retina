@@ -29,16 +29,16 @@ func TestValidateFilterIP(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "valid IPv6 loopback",
+			name:    "IPv6 loopback rejected",
 			input:   "::1",
-			wantIP:  net.ParseIP("::1"),
-			wantErr: false,
+			wantIP:  nil,
+			wantErr: true,
 		},
 		{
-			name:    "valid IPv6 full",
+			name:    "IPv6 full rejected",
 			input:   "2001:db8::1",
-			wantIP:  net.ParseIP("2001:db8::1"),
-			wantErr: false,
+			wantIP:  nil,
+			wantErr: true,
 		},
 		{
 			name:    "empty string - no filter",
