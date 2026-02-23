@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::net::IpAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::RwLock;
-use tokio::sync::{broadcast, Notify};
+use std::sync::{Arc, RwLock};
+use tokio::sync::{Notify, broadcast};
 
 /// Change event emitted by the IpCache when entries are modified.
 #[derive(Clone, Debug)]
@@ -35,14 +35,17 @@ const IDENTITY_IRRELEVANT_LABELS: &[&str] = &[
 ];
 
 /// Kubernetes identity associated with an IP address.
+///
+/// Fields use `Arc<str>` so that cloning an Identity (on every packet lookup)
+/// is nearly free (atomic ref bumps instead of heap String copies).
 #[derive(Debug, Clone)]
 pub struct Identity {
-    pub namespace: String,
-    pub pod_name: String,
-    pub service_name: String,
-    pub node_name: String,
-    pub labels: Vec<String>,
-    pub workloads: Vec<Workload>,
+    pub namespace: Arc<str>,
+    pub pod_name: Arc<str>,
+    pub service_name: Arc<str>,
+    pub node_name: Arc<str>,
+    pub labels: Arc<[Arc<str>]>,
+    pub workloads: Arc<[Workload]>,
 }
 
 impl Identity {
@@ -98,8 +101,8 @@ fn hash_labels_to_identity<S: AsRef<str>>(namespace: &str, labels: &[S]) -> u32 
 
 #[derive(Debug, Clone)]
 pub struct Workload {
-    pub name: String,
-    pub kind: String,
+    pub name: Arc<str>,
+    pub kind: Arc<str>,
 }
 
 /// Thread-safe IP-to-identity cache populated by the operator stream.
@@ -109,6 +112,12 @@ pub struct IpCache {
     synced_notify: Notify,
     local_node_name: RwLock<String>,
     event_tx: broadcast::Sender<IpCacheEvent>,
+}
+
+impl Default for IpCache {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl IpCache {
@@ -130,7 +139,7 @@ impl IpCache {
 
     /// Set the local node name. Used to distinguish Host (local) vs RemoteNode.
     pub fn set_local_node_name(&self, name: String) {
-        *self.local_node_name.write().unwrap() = name;
+        *self.local_node_name.write().expect("lock poisoned") = name;
     }
 
     /// Resolve the numeric identity for a cached identity, taking into account
@@ -144,14 +153,14 @@ impl IpCache {
     /// - Unknown → `IDENTITY_WORLD` (2)
     pub fn resolve_identity(&self, id: &Identity) -> u32 {
         // Kubernetes API server service.
-        if id.namespace == "default" && id.service_name == "kubernetes" {
+        if &*id.namespace == "default" && &*id.service_name == "kubernetes" {
             return IDENTITY_KUBE_APISERVER;
         }
 
         // Local node vs remote node.
         if !id.node_name.is_empty() {
-            let local = self.local_node_name.read().unwrap();
-            if !local.is_empty() && *local == id.node_name {
+            let local = self.local_node_name.read().expect("lock poisoned");
+            if !local.is_empty() && *local == *id.node_name {
                 return IDENTITY_HOST;
             }
             return IDENTITY_REMOTE_NODE;
@@ -161,18 +170,53 @@ impl IpCache {
     }
 
     pub fn upsert(&self, ip: IpAddr, identity: Identity) {
-        self.inner.write().unwrap().insert(ip, identity.clone());
+        self.inner
+            .write()
+            .expect("lock poisoned")
+            .insert(ip, identity.clone());
         let _ = self.event_tx.send(IpCacheEvent::Upsert(ip, identity));
     }
 
     pub fn delete(&self, ip: &IpAddr) {
-        if self.inner.write().unwrap().remove(ip).is_some() {
+        if self
+            .inner
+            .write()
+            .expect("lock poisoned")
+            .remove(ip)
+            .is_some()
+        {
             let _ = self.event_tx.send(IpCacheEvent::Delete(*ip));
         }
     }
 
     pub fn get(&self, ip: &IpAddr) -> Option<Identity> {
-        self.inner.read().unwrap().get(ip).cloned()
+        self.inner.read().expect("lock poisoned").get(ip).cloned()
+    }
+
+    /// Look up two IPs in a single lock acquisition (hot-path optimization).
+    pub fn get_pair(&self, ip1: &IpAddr, ip2: &IpAddr) -> (Option<Identity>, Option<Identity>) {
+        let inner = self.inner.read().expect("lock poisoned");
+        (inner.get(ip1).cloned(), inner.get(ip2).cloned())
+    }
+
+    /// Return the local node name.
+    pub fn local_node_name(&self) -> String {
+        self.local_node_name.read().expect("lock poisoned").clone()
+    }
+
+    /// Resolve numeric identity using a pre-fetched local node name (avoids
+    /// acquiring the `local_node_name` RwLock on every call).
+    pub fn resolve_identity_with_local(&self, id: &Identity, local_node_name: &str) -> u32 {
+        if &*id.namespace == "default" && &*id.service_name == "kubernetes" {
+            return IDENTITY_KUBE_APISERVER;
+        }
+        if !id.node_name.is_empty() {
+            if !local_node_name.is_empty() && local_node_name == &*id.node_name {
+                return IDENTITY_HOST;
+            }
+            return IDENTITY_REMOTE_NODE;
+        }
+        id.numeric_identity()
     }
 
     pub fn mark_synced(&self) {
@@ -202,14 +246,18 @@ impl IpCache {
     }
 
     pub fn len(&self) -> usize {
-        self.inner.read().unwrap().len()
+        self.inner.read().expect("lock poisoned").len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     /// Return a snapshot of all entries for debugging.
     pub fn dump(&self) -> Vec<(IpAddr, Identity)> {
         self.inner
             .read()
-            .unwrap()
+            .expect("lock poisoned")
             .iter()
             .map(|(ip, id)| (*ip, id.clone()))
             .collect()
@@ -217,20 +265,20 @@ impl IpCache {
 
     /// Return all node entries as (node_name, ip) pairs.
     pub fn get_node_peers(&self) -> Vec<(String, IpAddr)> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().expect("lock poisoned");
         let mut seen = std::collections::HashSet::new();
         inner
             .iter()
             .filter(|(_, id)| !id.node_name.is_empty())
             .filter(|(_, id)| seen.insert(id.node_name.clone()))
-            .map(|(ip, id)| (id.node_name.clone(), *ip))
+            .map(|(ip, id)| (id.node_name.to_string(), *ip))
             .collect()
     }
 
     /// Clear all entries and mark as unsynced. Called on reconnect.
     pub fn clear(&self) {
         self.synced.store(false, Ordering::Release);
-        self.inner.write().unwrap().clear();
+        self.inner.write().expect("lock poisoned").clear();
         let _ = self.event_tx.send(IpCacheEvent::Clear);
     }
 }
@@ -247,21 +295,23 @@ mod tests {
         cache.upsert(
             ip,
             Identity {
-                namespace: "default".into(),
-                pod_name: "nginx-abc".into(),
-                service_name: String::new(),
-                node_name: String::new(),
-                labels: vec!["app=nginx".into()],
+                namespace: Arc::from("default"),
+                pod_name: Arc::from("nginx-abc"),
+                service_name: Arc::from(""),
+                node_name: Arc::from(""),
+                labels: vec![Arc::from("app=nginx")].into(),
                 workloads: vec![Workload {
-                    name: "nginx".into(),
-                    kind: "Deployment".into(),
-                }],
+                    name: Arc::from("nginx"),
+                    kind: Arc::from("Deployment"),
+                }]
+                .into(),
             },
         );
         let id = cache.get(&ip).unwrap();
-        assert_eq!(id.namespace, "default");
-        assert_eq!(id.pod_name, "nginx-abc");
-        assert_eq!(id.labels, vec!["app=nginx"]);
+        assert_eq!(&*id.namespace, "default");
+        assert_eq!(&*id.pod_name, "nginx-abc");
+        assert_eq!(id.labels.len(), 1);
+        assert_eq!(&*id.labels[0], "app=nginx");
     }
 
     #[test]
@@ -271,12 +321,12 @@ mod tests {
         cache.upsert(
             ip,
             Identity {
-                namespace: "kube-system".into(),
-                pod_name: "coredns".into(),
-                service_name: String::new(),
-                node_name: String::new(),
-                labels: vec![],
-                workloads: vec![],
+                namespace: Arc::from("kube-system"),
+                pod_name: Arc::from("coredns"),
+                service_name: Arc::from(""),
+                node_name: Arc::from(""),
+                labels: vec![].into(),
+                workloads: vec![].into(),
             },
         );
         cache.delete(&ip);
@@ -296,12 +346,12 @@ mod tests {
     #[test]
     fn pod_numeric_identity_in_cluster_range() {
         let id = Identity {
-            namespace: "default".into(),
-            pod_name: "nginx-abc".into(),
-            service_name: String::new(),
-            node_name: String::new(),
-            labels: vec!["app=nginx".into(), "tier=frontend".into()],
-            workloads: vec![],
+            namespace: Arc::from("default"),
+            pod_name: Arc::from("nginx-abc"),
+            service_name: Arc::from(""),
+            node_name: Arc::from(""),
+            labels: vec![Arc::from("app=nginx"), Arc::from("tier=frontend")].into(),
+            workloads: vec![].into(),
         };
         let num = id.numeric_identity();
         assert!(num >= MIN_CLUSTER_IDENTITY && num <= MAX_CLUSTER_IDENTITY);
@@ -310,20 +360,20 @@ mod tests {
     #[test]
     fn same_labels_same_identity() {
         let id1 = Identity {
-            namespace: "default".into(),
-            pod_name: "nginx-abc".into(),
-            service_name: String::new(),
-            node_name: String::new(),
-            labels: vec!["app=nginx".into(), "tier=frontend".into()],
-            workloads: vec![],
+            namespace: Arc::from("default"),
+            pod_name: Arc::from("nginx-abc"),
+            service_name: Arc::from(""),
+            node_name: Arc::from(""),
+            labels: vec![Arc::from("app=nginx"), Arc::from("tier=frontend")].into(),
+            workloads: vec![].into(),
         };
         let id2 = Identity {
-            namespace: "default".into(),
-            pod_name: "nginx-xyz".into(),
-            service_name: String::new(),
-            node_name: String::new(),
-            labels: vec!["tier=frontend".into(), "app=nginx".into()], // different order
-            workloads: vec![],
+            namespace: Arc::from("default"),
+            pod_name: Arc::from("nginx-xyz"),
+            service_name: Arc::from(""),
+            node_name: Arc::from(""),
+            labels: vec![Arc::from("tier=frontend"), Arc::from("app=nginx")].into(), // different order
+            workloads: vec![].into(),
         };
         assert_eq!(id1.numeric_identity(), id2.numeric_identity());
     }
@@ -331,20 +381,20 @@ mod tests {
     #[test]
     fn different_labels_likely_different_identity() {
         let id1 = Identity {
-            namespace: "default".into(),
-            pod_name: "nginx".into(),
-            service_name: String::new(),
-            node_name: String::new(),
-            labels: vec!["app=nginx".into()],
-            workloads: vec![],
+            namespace: Arc::from("default"),
+            pod_name: Arc::from("nginx"),
+            service_name: Arc::from(""),
+            node_name: Arc::from(""),
+            labels: vec![Arc::from("app=nginx")].into(),
+            workloads: vec![].into(),
         };
         let id2 = Identity {
-            namespace: "default".into(),
-            pod_name: "redis".into(),
-            service_name: String::new(),
-            node_name: String::new(),
-            labels: vec!["app=redis".into()],
-            workloads: vec![],
+            namespace: Arc::from("default"),
+            pod_name: Arc::from("redis"),
+            service_name: Arc::from(""),
+            node_name: Arc::from(""),
+            labels: vec![Arc::from("app=redis")].into(),
+            workloads: vec![].into(),
         };
         // Not guaranteed, but extremely unlikely to collide with SipHash.
         assert_ne!(id1.numeric_identity(), id2.numeric_identity());
@@ -353,20 +403,20 @@ mod tests {
     #[test]
     fn different_namespace_different_identity() {
         let id1 = Identity {
-            namespace: "default".into(),
-            pod_name: "nginx".into(),
-            service_name: String::new(),
-            node_name: String::new(),
-            labels: vec!["app=nginx".into()],
-            workloads: vec![],
+            namespace: Arc::from("default"),
+            pod_name: Arc::from("nginx"),
+            service_name: Arc::from(""),
+            node_name: Arc::from(""),
+            labels: vec![Arc::from("app=nginx")].into(),
+            workloads: vec![].into(),
         };
         let id2 = Identity {
-            namespace: "production".into(),
-            pod_name: "nginx".into(),
-            service_name: String::new(),
-            node_name: String::new(),
-            labels: vec!["app=nginx".into()],
-            workloads: vec![],
+            namespace: Arc::from("production"),
+            pod_name: Arc::from("nginx"),
+            service_name: Arc::from(""),
+            node_name: Arc::from(""),
+            labels: vec![Arc::from("app=nginx")].into(),
+            workloads: vec![].into(),
         };
         assert_ne!(id1.numeric_identity(), id2.numeric_identity());
     }
@@ -374,24 +424,25 @@ mod tests {
     #[test]
     fn irrelevant_labels_ignored() {
         let id1 = Identity {
-            namespace: "default".into(),
-            pod_name: "nginx-abc".into(),
-            service_name: String::new(),
-            node_name: String::new(),
-            labels: vec!["app=nginx".into()],
-            workloads: vec![],
+            namespace: Arc::from("default"),
+            pod_name: Arc::from("nginx-abc"),
+            service_name: Arc::from(""),
+            node_name: Arc::from(""),
+            labels: vec![Arc::from("app=nginx")].into(),
+            workloads: vec![].into(),
         };
         let id2 = Identity {
-            namespace: "default".into(),
-            pod_name: "nginx-xyz".into(),
-            service_name: String::new(),
-            node_name: String::new(),
+            namespace: Arc::from("default"),
+            pod_name: Arc::from("nginx-xyz"),
+            service_name: Arc::from(""),
+            node_name: Arc::from(""),
             labels: vec![
-                "app=nginx".into(),
-                "pod-template-hash=abc123".into(),
-                "controller-revision-hash=xyz789".into(),
-            ],
-            workloads: vec![],
+                Arc::from("app=nginx"),
+                Arc::from("pod-template-hash=abc123"),
+                Arc::from("controller-revision-hash=xyz789"),
+            ]
+            .into(),
+            workloads: vec![].into(),
         };
         assert_eq!(id1.numeric_identity(), id2.numeric_identity());
     }
@@ -399,12 +450,12 @@ mod tests {
     #[test]
     fn node_identity_is_remote_node() {
         let id = Identity {
-            namespace: String::new(),
-            pod_name: String::new(),
-            service_name: String::new(),
-            node_name: "node-1".into(),
-            labels: vec![],
-            workloads: vec![],
+            namespace: Arc::from(""),
+            pod_name: Arc::from(""),
+            service_name: Arc::from(""),
+            node_name: Arc::from("node-1"),
+            labels: vec![].into(),
+            workloads: vec![].into(),
         };
         assert_eq!(id.numeric_identity(), IDENTITY_REMOTE_NODE);
     }
@@ -412,12 +463,12 @@ mod tests {
     #[test]
     fn service_identity_in_cluster_range() {
         let id = Identity {
-            namespace: "backend".into(),
-            pod_name: String::new(),
-            service_name: "redis".into(),
-            node_name: String::new(),
-            labels: vec![],
-            workloads: vec![],
+            namespace: Arc::from("backend"),
+            pod_name: Arc::from(""),
+            service_name: Arc::from("redis"),
+            node_name: Arc::from(""),
+            labels: vec![].into(),
+            workloads: vec![].into(),
         };
         let num = id.numeric_identity();
         assert!(num >= MIN_CLUSTER_IDENTITY && num <= MAX_CLUSTER_IDENTITY);
@@ -426,12 +477,12 @@ mod tests {
     #[test]
     fn empty_identity_is_world() {
         let id = Identity {
-            namespace: String::new(),
-            pod_name: String::new(),
-            service_name: String::new(),
-            node_name: String::new(),
-            labels: vec![],
-            workloads: vec![],
+            namespace: Arc::from(""),
+            pod_name: Arc::from(""),
+            service_name: Arc::from(""),
+            node_name: Arc::from(""),
+            labels: vec![].into(),
+            workloads: vec![].into(),
         };
         assert_eq!(id.numeric_identity(), IDENTITY_WORLD);
     }
@@ -440,12 +491,12 @@ mod tests {
     fn resolve_kubernetes_service_is_apiserver() {
         let cache = IpCache::new();
         let id = Identity {
-            namespace: "default".into(),
-            pod_name: String::new(),
-            service_name: "kubernetes".into(),
-            node_name: String::new(),
-            labels: vec![],
-            workloads: vec![],
+            namespace: Arc::from("default"),
+            pod_name: Arc::from(""),
+            service_name: Arc::from("kubernetes"),
+            node_name: Arc::from(""),
+            labels: vec![].into(),
+            workloads: vec![].into(),
         };
         assert_eq!(cache.resolve_identity(&id), IDENTITY_KUBE_APISERVER);
     }
@@ -455,12 +506,12 @@ mod tests {
         let cache = IpCache::new();
         cache.set_local_node_name("my-node".into());
         let id = Identity {
-            namespace: String::new(),
-            pod_name: String::new(),
-            service_name: String::new(),
-            node_name: "my-node".into(),
-            labels: vec![],
-            workloads: vec![],
+            namespace: Arc::from(""),
+            pod_name: Arc::from(""),
+            service_name: Arc::from(""),
+            node_name: Arc::from("my-node"),
+            labels: vec![].into(),
+            workloads: vec![].into(),
         };
         assert_eq!(cache.resolve_identity(&id), IDENTITY_HOST);
     }
@@ -470,12 +521,12 @@ mod tests {
         let cache = IpCache::new();
         cache.set_local_node_name("my-node".into());
         let id = Identity {
-            namespace: String::new(),
-            pod_name: String::new(),
-            service_name: String::new(),
-            node_name: "other-node".into(),
-            labels: vec![],
-            workloads: vec![],
+            namespace: Arc::from(""),
+            pod_name: Arc::from(""),
+            service_name: Arc::from(""),
+            node_name: Arc::from("other-node"),
+            labels: vec![].into(),
+            workloads: vec![].into(),
         };
         assert_eq!(cache.resolve_identity(&id), IDENTITY_REMOTE_NODE);
     }
@@ -485,12 +536,12 @@ mod tests {
         let cache = IpCache::new();
         // local_node_name not set — all nodes are remote.
         let id = Identity {
-            namespace: String::new(),
-            pod_name: String::new(),
-            service_name: String::new(),
-            node_name: "node-1".into(),
-            labels: vec![],
-            workloads: vec![],
+            namespace: Arc::from(""),
+            pod_name: Arc::from(""),
+            service_name: Arc::from(""),
+            node_name: Arc::from("node-1"),
+            labels: vec![].into(),
+            workloads: vec![].into(),
         };
         assert_eq!(cache.resolve_identity(&id), IDENTITY_REMOTE_NODE);
     }

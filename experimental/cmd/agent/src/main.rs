@@ -5,13 +5,18 @@ mod ipcache_sync;
 use std::net::{SocketAddr, TcpListener};
 use std::sync::Arc;
 
+const FLOW_BROADCAST_CAPACITY: usize = 4096;
+const FLOW_STORE_CAPACITY: usize = 4096;
+const AGENT_EVENT_BROADCAST_CAPACITY: usize = 256;
+const AGENT_EVENT_STORE_CAPACITY: usize = 1024;
+
 use anyhow::Context as _;
 use clap::Parser;
 use packetparser::plugin::PacketParser;
-use retina_core::agent_events::AgentEventStore;
 use retina_core::ipcache::IpCache;
 use retina_core::metrics::{AgentState, Metrics};
 use retina_core::plugin::{Plugin, PluginContext};
+use retina_core::store::AgentEventStore;
 use retina_core::store::FlowStore;
 use retina_proto::flow::{AgentEvent, AgentEventType, TimeNotification};
 use serde::Serialize;
@@ -42,6 +47,18 @@ struct Cli {
     #[arg(long)]
     operator_addr: Option<String>,
 
+    /// Packet sampling rate (1 = no sampling, N = report ~1/N packets).
+    /// Control-plane events (SYN, FIN, RST) and periodic reports are
+    /// always emitted regardless of sampling.
+    #[arg(long, default_value_t = 1)]
+    sampling_rate: u32,
+
+    /// BPF ring buffer size in bytes (must be a power of 2, minimum 65536).
+    /// Only used on kernels >= 5.8; ignored when falling back to perf buffers.
+    /// Default: 2MB. Increase for high-throughput nodes to reduce drops.
+    #[arg(long, default_value_t = 2_097_152)]
+    ring_buffer_size: u32,
+
     /// Log level.
     #[arg(long, default_value = "info")]
     log_level: String,
@@ -57,6 +74,8 @@ pub struct AgentConfig {
     pub pod_level: bool,
     pub grpc_port: u16,
     pub operator_addr: Option<String>,
+    pub sampling_rate: u32,
+    pub ring_buffer_size: u32,
     pub log_level: String,
     pub metrics_port: u16,
 }
@@ -72,7 +91,7 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
-    info!(interface = ?cli.interface, grpc_port = cli.grpc_port, pod_level = cli.pod_level, "starting retina-agent");
+    info!(interface = ?cli.interface, grpc_port = cli.grpc_port, pod_level = cli.pod_level, sampling_rate = cli.sampling_rate, "starting retina-agent");
 
     // Pre-flight: verify the gRPC port is available. A stale retina-agent
     // process holding this port is a common dev pitfall — fail fast with a
@@ -92,14 +111,14 @@ async fn main() -> anyhow::Result<()> {
     // Drop the test listener immediately so tonic can bind it.
 
     // Broadcast channel for flow fan-out to gRPC subscribers.
-    let (flow_tx, _) = broadcast::channel::<Arc<retina_proto::flow::Flow>>(4096);
+    let (flow_tx, _) = broadcast::channel::<Arc<retina_proto::flow::Flow>>(FLOW_BROADCAST_CAPACITY);
 
     // Flow ring buffer for historical queries.
-    let flow_store = Arc::new(FlowStore::new(4096));
+    let flow_store = Arc::new(FlowStore::new(FLOW_STORE_CAPACITY));
 
     // Broadcast channel and store for agent events.
-    let (agent_event_tx, _) = broadcast::channel::<Arc<AgentEvent>>(256);
-    let agent_event_store = Arc::new(AgentEventStore::new(1024));
+    let (agent_event_tx, _) = broadcast::channel::<Arc<AgentEvent>>(AGENT_EVENT_BROADCAST_CAPACITY);
+    let agent_event_store = Arc::new(AgentEventStore::new(AGENT_EVENT_STORE_CAPACITY));
 
     // IP cache for flow enrichment.
     let ip_cache = Arc::new(IpCache::new());
@@ -117,14 +136,14 @@ async fn main() -> anyhow::Result<()> {
             .unwrap_or_default();
         let started_event = Arc::new(AgentEvent {
             r#type: AgentEventType::AgentStarted.into(),
-            notification: Some(
-                retina_proto::flow::agent_event::Notification::AgentStart(TimeNotification {
+            notification: Some(retina_proto::flow::agent_event::Notification::AgentStart(
+                TimeNotification {
                     time: Some(prost_types::Timestamp {
                         seconds: now.as_secs() as i64,
                         nanos: now.subsec_nanos() as i32,
                     }),
-                }),
-            ),
+                },
+            )),
         });
         agent_event_store.push(started_event.clone());
         let _ = agent_event_tx.send(started_event);
@@ -143,7 +162,12 @@ async fn main() -> anyhow::Result<()> {
         state: agent_state.clone(),
     };
 
-    let mut plugin = PacketParser::new(cli.interface.clone(), cli.pod_level);
+    let mut plugin = PacketParser::new(
+        cli.interface.clone(),
+        cli.pod_level,
+        cli.sampling_rate,
+        cli.ring_buffer_size,
+    );
     plugin
         .start(ctx)
         .await
@@ -170,6 +194,8 @@ async fn main() -> anyhow::Result<()> {
         pod_level: cli.pod_level,
         grpc_port: cli.grpc_port,
         operator_addr: cli.operator_addr.clone(),
+        sampling_rate: cli.sampling_rate,
+        ring_buffer_size: cli.ring_buffer_size,
         log_level: cli.log_level.clone(),
         metrics_port: cli.metrics_port,
     };

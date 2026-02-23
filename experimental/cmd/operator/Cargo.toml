@@ -6,6 +6,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+retina-core.workspace = true
 retina-proto.workspace = true
 
 anyhow.workspace = true

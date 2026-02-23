@@ -3,23 +3,23 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
 use prost_types::Timestamp;
-use retina_core::agent_events::AgentEventStore;
 use retina_core::filter::FlowFilterSet;
 use retina_core::ipcache::{IpCache, IpCacheEvent};
 use retina_core::metrics::AgentState;
+use retina_core::store::AgentEventStore;
 use retina_core::store::FlowStore;
 use retina_proto::{
     flow::{AgentEvent, Flow},
     observer::{
-        observer_server::{Observer, ObserverServer},
         GetAgentEventsRequest, GetAgentEventsResponse, GetDebugEventsRequest,
         GetDebugEventsResponse, GetFlowsRequest, GetFlowsResponse, GetNamespacesRequest,
-        GetNamespacesResponse, GetNodesRequest, GetNodesResponse, Namespace, Node, ServerStatusRequest,
-        ServerStatusResponse, Tls,
+        GetNamespacesResponse, GetNodesRequest, GetNodesResponse, Namespace, Node,
+        ServerStatusRequest, ServerStatusResponse, Tls,
+        observer_server::{Observer, ObserverServer},
     },
     peer::{
-        peer_server::{Peer, PeerServer},
         ChangeNotification, ChangeNotificationType, NotifyRequest,
+        peer_server::{Peer, PeerServer},
     },
     relay::NodeState,
 };
@@ -27,6 +27,11 @@ use tokio::sync::broadcast;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tracing::info;
+
+const GRPC_CHANNEL_CAPACITY: usize = 256;
+const PEER_CHANNEL_CAPACITY: usize = 64;
+const DEFAULT_FLOW_COUNT: usize = 100;
+const IPCACHE_SYNC_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
 struct HubbleObserver {
     node_name: String,
@@ -42,15 +47,15 @@ fn flow_in_time_range(flow: &Flow, since: Option<&Timestamp>, until: Option<&Tim
         Some(ts) => ts,
         None => return true,
     };
-    if let Some(s) = since {
-        if (flow_ts.seconds, flow_ts.nanos) < (s.seconds, s.nanos) {
-            return false;
-        }
+    if let Some(s) = since
+        && (flow_ts.seconds, flow_ts.nanos) < (s.seconds, s.nanos)
+    {
+        return false;
     }
-    if let Some(u) = until {
-        if (flow_ts.seconds, flow_ts.nanos) > (u.seconds, u.nanos) {
-            return false;
-        }
+    if let Some(u) = until
+        && (flow_ts.seconds, flow_ts.nanos) > (u.seconds, u.nanos)
+    {
+        return false;
     }
     true
 }
@@ -79,7 +84,7 @@ impl Observer for HubbleObserver {
         request: Request<GetFlowsRequest>,
     ) -> Result<Response<Self::GetFlowsStream>, Status> {
         let req = request.into_inner();
-        let (tx, rx) = tokio::sync::mpsc::channel(256);
+        let (tx, rx) = tokio::sync::mpsc::channel(GRPC_CHANNEL_CAPACITY);
 
         let filter = FlowFilterSet::compile(&req.whitelist, &req.blacklist);
         let node_name = self.node_name.clone();
@@ -87,7 +92,7 @@ impl Observer for HubbleObserver {
         if req.follow {
             // Live streaming mode.
             let mut broadcast_rx = self.flow_tx.subscribe();
-            let until = req.until.clone();
+            let until = req.until;
             tokio::spawn(async move {
                 loop {
                     match broadcast_rx.recv().await {
@@ -106,7 +111,7 @@ impl Observer for HubbleObserver {
                                     ),
                                 ),
                                 node_name: node_name.clone(),
-                                time: flow.time.clone(),
+                                time: flow.time,
                             };
                             if tx.send(Ok(resp)).await.is_err() {
                                 break; // Client disconnected.
@@ -124,15 +129,15 @@ impl Observer for HubbleObserver {
             let n = if req.number > 0 {
                 req.number as usize
             } else {
-                100
+                DEFAULT_FLOW_COUNT
             };
             let flows = if req.first {
                 self.flow_store.first_n(n)
             } else {
                 self.flow_store.last_n(n)
             };
-            let since = req.since.clone();
-            let until = req.until.clone();
+            let since = req.since;
+            let until = req.until;
             tokio::spawn(async move {
                 for flow in flows {
                     if !flow_in_time_range(&flow, since.as_ref(), until.as_ref()) {
@@ -148,7 +153,7 @@ impl Observer for HubbleObserver {
                             ),
                         ),
                         node_name: node_name.clone(),
-                        time: flow.time.clone(),
+                        time: flow.time,
                     };
                     if tx.send(Ok(resp)).await.is_err() {
                         break;
@@ -165,7 +170,7 @@ impl Observer for HubbleObserver {
         request: Request<GetAgentEventsRequest>,
     ) -> Result<Response<Self::GetAgentEventsStream>, Status> {
         let req = request.into_inner();
-        let (tx, rx) = tokio::sync::mpsc::channel(256);
+        let (tx, rx) = tokio::sync::mpsc::channel(GRPC_CHANNEL_CAPACITY);
         let node_name = self.node_name.clone();
 
         if req.follow {
@@ -194,7 +199,7 @@ impl Observer for HubbleObserver {
             let n = if req.number > 0 {
                 req.number as usize
             } else {
-                100
+                DEFAULT_FLOW_COUNT
             };
             let events = if req.first {
                 self.agent_event_store.first_n(n)
@@ -256,15 +261,15 @@ impl Observer for HubbleObserver {
         let flows = self.flow_store.all_flows();
         let mut namespaces = BTreeSet::new();
         for flow in &flows {
-            if let Some(ref src) = flow.source {
-                if !src.namespace.is_empty() {
-                    namespaces.insert(src.namespace.clone());
-                }
+            if let Some(ref src) = flow.source
+                && !src.namespace.is_empty()
+            {
+                namespaces.insert(src.namespace.clone());
             }
-            if let Some(ref dst) = flow.destination {
-                if !dst.namespace.is_empty() {
-                    namespaces.insert(dst.namespace.clone());
-                }
+            if let Some(ref dst) = flow.destination
+                && !dst.namespace.is_empty()
+            {
+                namespaces.insert(dst.namespace.clone());
             }
         }
         let ns_list: Vec<Namespace> = namespaces
@@ -310,16 +315,14 @@ impl Peer for HubblePeer {
         &self,
         _request: Request<NotifyRequest>,
     ) -> Result<Response<Self::NotifyStream>, Status> {
-        let (tx, rx) = tokio::sync::mpsc::channel(64);
+        let (tx, rx) = tokio::sync::mpsc::channel(PEER_CHANNEL_CAPACITY);
         let ip_cache = self.ip_cache.clone();
         let grpc_port = self.grpc_port;
 
         tokio::spawn(async move {
             // Wait for the ipcache to sync with the operator so we have the
             // full node list before reporting peers.
-            ip_cache
-                .wait_synced(std::time::Duration::from_secs(15))
-                .await;
+            ip_cache.wait_synced(IPCACHE_SYNC_TIMEOUT).await;
 
             // Report all known nodes as peers.
             let nodes = ip_cache.get_node_peers();
@@ -345,15 +348,15 @@ impl Peer for HubblePeer {
                         if identity.node_name.is_empty() {
                             continue;
                         }
-                        let name = &identity.node_name;
+                        let name: &str = &identity.node_name;
                         let change_type = match known.get(name) {
                             Some(old_ip) if *old_ip == ip => continue,
                             Some(_) => ChangeNotificationType::PeerUpdated,
                             None => ChangeNotificationType::PeerAdded,
                         };
-                        known.insert(name.clone(), ip);
+                        known.insert(name.to_string(), ip);
                         let notification = ChangeNotification {
-                            name: name.clone(),
+                            name: name.to_string(),
                             address: format!("{}:{}", ip, grpc_port),
                             r#type: change_type.into(),
                             tls: None,
@@ -440,6 +443,7 @@ impl Peer for HubblePeer {
 }
 
 /// Start the Hubble Observer gRPC server.
+#[allow(clippy::too_many_arguments)]
 pub async fn serve(
     port: u16,
     node_name: String,

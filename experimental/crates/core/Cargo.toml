@@ -4,12 +4,14 @@ edition.workspace = true
 version.workspace = true
 license.workspace = true
 repository.workspace = true
+autobenches = false
 
 [dependencies]
 retina-common.workspace = true
 retina-proto.workspace = true
 
 anyhow.workspace = true
+dashmap.workspace = true
 async-trait.workspace = true
 libc.workspace = true
 prometheus-client.workspace = true
@@ -17,3 +19,38 @@ prost.workspace = true
 prost-types.workspace = true
 tokio.workspace = true
 tracing.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+
+[[bench]]
+name = "flow_bench"
+harness = false
+
+[[bench]]
+name = "enricher_bench"
+harness = false
+
+[[bench]]
+name = "ipcache_bench"
+harness = false
+
+[[bench]]
+name = "filter_bench"
+harness = false
+
+[[bench]]
+name = "metrics_bench"
+harness = false
+
+[[bench]]
+name = "store_bench"
+harness = false
+
+[[bench]]
+name = "pipeline_bench"
+harness = false
+
+[[bench]]
+name = "contention_bench"
+harness = false

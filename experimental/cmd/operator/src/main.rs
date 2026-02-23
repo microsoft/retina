@@ -11,6 +11,8 @@ use tracing::info;
 
 use state::OperatorState;
 
+const UPDATE_BROADCAST_CAPACITY: usize = 8192;
+
 #[derive(Parser)]
 #[command(
     name = "retina-operator",
@@ -44,15 +46,25 @@ async fn main() -> anyhow::Result<()> {
     info!(grpc_port = cli.grpc_port, "starting retina-operator");
 
     let client = Client::try_default().await?;
-    let state = Arc::new(OperatorState::new(8192));
+    let state = Arc::new(OperatorState::new(UPDATE_BROADCAST_CAPACITY));
+
+    // Shutdown signal — notifies the gRPC server to drain gracefully.
+    let shutdown = Arc::new(tokio::sync::Notify::new());
 
     // Spawn K8s watchers.
     let pod_handle = tokio::spawn(watchers::watch_pods(client.clone(), state.clone()));
     let svc_handle = tokio::spawn(watchers::watch_services(client.clone(), state.clone()));
     let node_handle = tokio::spawn(watchers::watch_nodes(client.clone(), state.clone()));
 
-    // Start gRPC server.
-    let grpc_handle = tokio::spawn(grpc::serve(cli.grpc_port, state.clone()));
+    // Start gRPC server with graceful shutdown support.
+    let grpc_handle = {
+        let shutdown = shutdown.clone();
+        tokio::spawn(grpc::serve(
+            cli.grpc_port,
+            state.clone(),
+            async move { shutdown.notified().await },
+        ))
+    };
 
     // Start debug HTTP server.
     let debug_handle = tokio::spawn(debug::serve(cli.debug_port, state));
@@ -65,6 +77,13 @@ async fn main() -> anyhow::Result<()> {
         _ = sigterm.recv() => {},
     }
     info!("shutting down...");
+
+    // Signal the gRPC server to drain in-flight streams gracefully,
+    // so agents see a clean end-of-stream instead of an h2 crash.
+    shutdown.notify_one();
+
+    // Give streams a moment to drain before aborting everything.
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
     pod_handle.abort();
     svc_handle.abort();

@@ -2,12 +2,12 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use anyhow::{Context as _, Result};
-use aya::programs::tc::SchedClassifierLink;
 use aya::Ebpf;
+use aya::programs::tc::SchedClassifierLink;
 use futures::stream::{StreamExt, TryStreamExt};
 use netlink_packet_core::NetlinkPayload;
-use netlink_packet_route::link::{LinkAttribute, LinkMessage};
 use netlink_packet_route::RouteNetlinkMessage;
+use netlink_packet_route::link::{LinkAttribute, LinkMessage};
 use netlink_sys::{AsyncSocket, SocketAddr};
 use rtnetlink::constants::RTMGRP_LINK;
 use tracing::{info, warn};
@@ -34,8 +34,8 @@ impl VethWatcher {
     }
 
     pub async fn run(&mut self) -> Result<()> {
-        let (mut connection, handle, mut messages) = rtnetlink::new_connection()
-            .context("failed to create netlink connection")?;
+        let (mut connection, handle, mut messages) =
+            rtnetlink::new_connection().context("failed to create netlink connection")?;
 
         // Subscribe to link events before spawning the connection.
         let addr = SocketAddr::new(0, RTMGRP_LINK);

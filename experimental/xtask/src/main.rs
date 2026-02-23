@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-use anyhow::{bail, Context as _};
+use anyhow::{Context as _, bail};
 use clap::Parser;
 
 /// Workspace root directory (parent of xtask/).
@@ -34,10 +34,7 @@ fn output(cmd: &mut Command) -> anyhow::Result<String> {
 
 /// Detect whether the current kubectl context points to a kind cluster.
 fn is_kind_cluster() -> bool {
-    if let Ok(ctx) = output(
-        Command::new("kubectl")
-            .args(["config", "current-context"]),
-    ) {
+    if let Ok(ctx) = output(Command::new("kubectl").args(["config", "current-context"])) {
         ctx.starts_with("kind-")
     } else {
         false
@@ -204,6 +201,14 @@ fn build_ebpf(release: bool) -> anyhow::Result<()> {
         bail!("cannot find plugins/packetparser/ebpf/Cargo.toml");
     }
 
+    let profile = if release { "release" } else { "debug" };
+    let output_path = workspace_dir()
+        .join("plugins/packetparser/ebpf/target/bpfel-unknown-none")
+        .join(profile)
+        .join("packetparser-ebpf");
+    let ringbuf_path = output_path.with_file_name("packetparser-ebpf-ringbuf");
+
+    // 1. Build perf variant (default, no features).
     let mut cmd = Command::new("cargo");
     cmd.env_remove("RUSTUP_TOOLCHAIN")
         .args(["+nightly-2025-12-01", "build", "--manifest-path"])
@@ -212,9 +217,39 @@ fn build_ebpf(release: bool) -> anyhow::Result<()> {
     if release {
         cmd.arg("--release");
     }
-
     run(&mut cmd)?;
-    println!("eBPF programs built successfully");
+    println!("eBPF perf variant built");
+
+    // Save the perf variant before the ringbuf build overwrites it.
+    let perf_backup = output_path.with_file_name("packetparser-ebpf-perf-tmp");
+    std::fs::copy(&output_path, &perf_backup)
+        .context("failed to backup perf eBPF binary")?;
+
+    // 2. Build ringbuf variant (--features ringbuf).
+    let mut cmd = Command::new("cargo");
+    cmd.env_remove("RUSTUP_TOOLCHAIN")
+        .args(["+nightly-2025-12-01", "build", "--manifest-path"])
+        .arg(&manifest_path)
+        .args([
+            "--target=bpfel-unknown-none",
+            "-Z",
+            "build-std=core",
+            "--features",
+            "ringbuf",
+        ]);
+    if release {
+        cmd.arg("--release");
+    }
+    run(&mut cmd)?;
+    println!("eBPF ringbuf variant built");
+
+    // 3. Move ringbuf output to its final name, restore perf variant.
+    std::fs::rename(&output_path, &ringbuf_path)
+        .context("failed to rename ringbuf eBPF binary")?;
+    std::fs::rename(&perf_backup, &output_path)
+        .context("failed to restore perf eBPF binary")?;
+
+    println!("eBPF programs built successfully (perf + ringbuf)");
     Ok(())
 }
 
@@ -246,22 +281,28 @@ fn build_operator(release: bool) -> anyhow::Result<()> {
 
 fn image_agent(tag: &str) -> anyhow::Result<()> {
     let dir = workspace_dir();
-    run(
-        Command::new("docker")
-            .current_dir(&dir)
-            .args(["build", "-t", tag, "-f", "Dockerfile.local", "."]),
-    )?;
+    run(Command::new("docker").current_dir(&dir).args([
+        "build",
+        "-t",
+        tag,
+        "-f",
+        "Dockerfile.local",
+        ".",
+    ]))?;
     println!("Agent image built: {tag}");
     Ok(())
 }
 
 fn image_operator(tag: &str) -> anyhow::Result<()> {
     let dir = workspace_dir();
-    run(
-        Command::new("docker")
-            .current_dir(&dir)
-            .args(["build", "-t", tag, "-f", "Dockerfile.operator.local", "."]),
-    )?;
+    run(Command::new("docker").current_dir(&dir).args([
+        "build",
+        "-t",
+        tag,
+        "-f",
+        "Dockerfile.operator.local",
+        ".",
+    ]))?;
     println!("Operator image built: {tag}");
     Ok(())
 }
@@ -335,16 +376,16 @@ fn split_image_ref(image_ref: &str) -> (&str, &str) {
 fn helm_upgrade(namespace: &str, sets: &[(&str, &str)]) -> anyhow::Result<()> {
     let chart = chart_dir();
     let mut cmd = Command::new("helm");
-    cmd.args([
-        "upgrade", "--install", "retina-rust",
-    ]);
+    cmd.args(["upgrade", "--install", "retina-rust"]);
     cmd.arg(chart.as_os_str());
     cmd.args([
-        "-n", namespace,
+        "-n",
+        namespace,
         "--create-namespace",
         "--reuse-values",
         "--wait",
-        "--timeout", "120s",
+        "--timeout",
+        "120s",
     ]);
     for (k, v) in sets {
         cmd.args(["--set", &format!("{k}={v}")]);
@@ -368,19 +409,16 @@ fn deploy_agent(
     let local_tag = "retina-rust:local";
     image_agent(local_tag)?;
 
-    let image_ref = distribute_image(
-        local_tag,
-        "retina-rust",
-        tag,
-        registry.as_deref(),
-        cluster,
-    )?;
+    let image_ref = distribute_image(local_tag, "retina-rust", tag, registry.as_deref(), cluster)?;
 
     let (repo, img_tag) = split_image_ref(&image_ref);
-    helm_upgrade(namespace, &[
-        ("agent.image.repository", repo),
-        ("agent.image.tag", img_tag),
-    ])?;
+    helm_upgrade(
+        namespace,
+        &[
+            ("agent.image.repository", repo),
+            ("agent.image.tag", img_tag),
+        ],
+    )?;
 
     if registry.is_none() {
         port_forward(namespace)?;
@@ -410,17 +448,18 @@ fn deploy_operator(
     )?;
 
     let (repo, img_tag) = split_image_ref(&image_ref);
-    helm_upgrade(namespace, &[
-        ("operator.image.repository", repo),
-        ("operator.image.tag", img_tag),
-    ])
+    helm_upgrade(
+        namespace,
+        &[
+            ("operator.image.repository", repo),
+            ("operator.image.tag", img_tag),
+        ],
+    )
 }
 
 fn deploy_hubble(namespace: &str) -> anyhow::Result<()> {
     println!("Deploying Hubble components (relay + UI)...");
-    helm_upgrade(namespace, &[
-        ("hubble.enabled", "true"),
-    ])?;
+    helm_upgrade(namespace, &[("hubble.enabled", "true")])?;
     println!("Hubble components deployed");
     Ok(())
 }
@@ -462,13 +501,16 @@ fn deploy_all(
     let (agent_repo, agent_tag) = split_image_ref(&agent_ref);
     let (operator_repo, operator_tag) = split_image_ref(&operator_ref);
 
-    helm_upgrade(namespace, &[
-        ("agent.image.repository", agent_repo),
-        ("agent.image.tag", agent_tag),
-        ("operator.image.repository", operator_repo),
-        ("operator.image.tag", operator_tag),
-        ("hubble.enabled", "true"),
-    ])?;
+    helm_upgrade(
+        namespace,
+        &[
+            ("agent.image.repository", agent_repo),
+            ("agent.image.tag", agent_tag),
+            ("operator.image.repository", operator_repo),
+            ("operator.image.tag", operator_tag),
+            ("hubble.enabled", "true"),
+        ],
+    )?;
 
     if registry.is_none() {
         port_forward(namespace)?;
@@ -488,7 +530,8 @@ fn port_forward(namespace: &str) -> anyhow::Result<()> {
     Command::new("kubectl")
         .args([
             "port-forward",
-            "-n", namespace,
+            "-n",
+            namespace,
             "daemonset/retina-agent",
             "4244:4244",
         ])
@@ -505,10 +548,7 @@ fn kill_stale() -> anyhow::Result<()> {
     println!("Checking for stale processes on gRPC port 4244...");
 
     // Kill stale retina-agent processes.
-    if let Ok(output) = Command::new("sudo")
-        .args(["lsof", "-ti", ":4244"])
-        .output()
-    {
+    if let Ok(output) = Command::new("sudo").args(["lsof", "-ti", ":4244"]).output() {
         let pids = String::from_utf8_lossy(&output.stdout);
         for pid_str in pids.split_whitespace() {
             if let Ok(pid) = pid_str.parse::<u32>() {
@@ -538,15 +578,10 @@ fn kill_stale() -> anyhow::Result<()> {
 }
 
 fn clean_port() -> anyhow::Result<()> {
-    if let Ok(output) = Command::new("sudo")
-        .args(["lsof", "-ti", ":4244"])
-        .output()
-    {
+    if let Ok(output) = Command::new("sudo").args(["lsof", "-ti", ":4244"]).output() {
         let pids = String::from_utf8_lossy(&output.stdout);
         for pid_str in pids.split_whitespace() {
-            let _ = Command::new("sudo")
-                .args(["kill", pid_str.trim()])
-                .status();
+            let _ = Command::new("sudo").args(["kill", pid_str.trim()]).status();
         }
     }
     println!("Port 4244 cleared");
@@ -554,10 +589,5 @@ fn clean_port() -> anyhow::Result<()> {
 }
 
 fn logs(namespace: &str) -> anyhow::Result<()> {
-    run(Command::new("kubectl").args([
-        "logs",
-        "-n", namespace,
-        "daemonset/retina-agent",
-        "-f",
-    ]))
+    run(Command::new("kubectl").args(["logs", "-n", namespace, "daemonset/retina-agent", "-f"]))
 }

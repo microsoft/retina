@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::net::IpAddr;
 use std::sync::RwLock;
 
-use retina_proto::ipcache::{ip_cache_update::UpdateType, IpCacheUpdate, Workload};
+use retina_proto::ipcache::{IpCacheUpdate, Workload, ip_cache_update::UpdateType};
 use tokio::sync::broadcast;
 
 /// Canonical operator state: maps IPs to identities and broadcasts changes.

@@ -31,8 +31,7 @@ impl FlowFilterSet {
 
     /// Returns true if the flow matches the filter set.
     pub fn matches(&self, flow: &Flow) -> bool {
-        let wl_ok =
-            self.whitelist.is_empty() || self.whitelist.iter().any(|f| f.matches(flow));
+        let wl_ok = self.whitelist.is_empty() || self.whitelist.iter().any(|f| f.matches(flow));
         let bl_ok = !self.blacklist.iter().any(|f| f.matches(flow));
         wl_ok && bl_ok
     }
@@ -66,10 +65,22 @@ struct CompiledFilter {
 impl CompiledFilter {
     fn from_proto(f: &FlowFilter) -> Self {
         Self {
-            source_ip: f.source_ip.iter().filter_map(|s| IpMatcher::parse(s)).collect(),
-            destination_ip: f.destination_ip.iter().filter_map(|s| IpMatcher::parse(s)).collect(),
+            source_ip: f
+                .source_ip
+                .iter()
+                .filter_map(|s| IpMatcher::parse(s))
+                .collect(),
+            destination_ip: f
+                .destination_ip
+                .iter()
+                .filter_map(|s| IpMatcher::parse(s))
+                .collect(),
             source_pod: f.source_pod.iter().map(|s| PodMatcher::parse(s)).collect(),
-            destination_pod: f.destination_pod.iter().map(|s| PodMatcher::parse(s)).collect(),
+            destination_pod: f
+                .destination_pod
+                .iter()
+                .map(|s| PodMatcher::parse(s))
+                .collect(),
             source_fqdn: f.source_fqdn.clone(),
             destination_fqdn: f.destination_fqdn.clone(),
             source_label: f.source_label.clone(),
@@ -91,7 +102,11 @@ impl CompiledFilter {
             event_type: f.event_type.clone(),
             reply: f.reply.clone(),
             ip_version: f.ip_version.clone(),
-            node_name: f.node_name.iter().map(|s| NodeNameMatcher::parse(s)).collect(),
+            node_name: f
+                .node_name
+                .iter()
+                .map(|s| NodeNameMatcher::parse(s))
+                .collect(),
             source_identity: f.source_identity.clone(),
             destination_identity: f.destination_identity.clone(),
         }
@@ -159,7 +174,9 @@ impl CompiledFilter {
             Some(ep) => ep,
             None => return false,
         };
-        self.source_pod.iter().any(|m| m.matches(&ep.namespace, &ep.pod_name))
+        self.source_pod
+            .iter()
+            .any(|m| m.matches(&ep.namespace, &ep.pod_name))
     }
 
     fn match_destination_pod(&self, flow: &Flow) -> bool {
@@ -170,7 +187,9 @@ impl CompiledFilter {
             Some(ep) => ep,
             None => return false,
         };
-        self.destination_pod.iter().any(|m| m.matches(&ep.namespace, &ep.pod_name))
+        self.destination_pod
+            .iter()
+            .any(|m| m.matches(&ep.namespace, &ep.pod_name))
     }
 
     fn match_source_fqdn(&self, flow: &Flow) -> bool {
@@ -180,9 +199,11 @@ impl CompiledFilter {
         if flow.source_names.is_empty() {
             return false;
         }
-        self.source_fqdn
-            .iter()
-            .any(|pattern| flow.source_names.iter().any(|name| glob_match(pattern, name)))
+        self.source_fqdn.iter().any(|pattern| {
+            flow.source_names
+                .iter()
+                .any(|name| glob_match(pattern, name))
+        })
     }
 
     fn match_destination_fqdn(&self, flow: &Flow) -> bool {
@@ -192,9 +213,11 @@ impl CompiledFilter {
         if flow.destination_names.is_empty() {
             return false;
         }
-        self.destination_fqdn
-            .iter()
-            .any(|pattern| flow.destination_names.iter().any(|name| glob_match(pattern, name)))
+        self.destination_fqdn.iter().any(|pattern| {
+            flow.destination_names
+                .iter()
+                .any(|name| glob_match(pattern, name))
+        })
     }
 
     fn match_source_label(&self, flow: &Flow) -> bool {
@@ -227,16 +250,14 @@ impl CompiledFilter {
         if self.verdict.is_empty() {
             return true;
         }
-        self.verdict.iter().any(|v| *v == flow.verdict)
+        self.verdict.contains(&flow.verdict)
     }
 
     fn match_traffic_direction(&self, flow: &Flow) -> bool {
         if self.traffic_direction.is_empty() {
             return true;
         }
-        self.traffic_direction
-            .iter()
-            .any(|d| *d == flow.traffic_direction)
+        self.traffic_direction.contains(&flow.traffic_direction)
     }
 
     fn match_protocol(&self, flow: &Flow) -> bool {
@@ -265,7 +286,7 @@ impl CompiledFilter {
         }
         let port = extract_source_port(flow);
         match port {
-            Some(p) => self.source_port.iter().any(|sp| *sp == p),
+            Some(p) => self.source_port.contains(&p),
             None => false,
         }
     }
@@ -276,7 +297,7 @@ impl CompiledFilter {
         }
         let port = extract_destination_port(flow);
         match port {
-            Some(p) => self.destination_port.iter().any(|dp| *dp == p),
+            Some(p) => self.destination_port.contains(&p),
             None => false,
         }
     }
@@ -285,11 +306,7 @@ impl CompiledFilter {
         if self.tcp_flags.is_empty() {
             return true;
         }
-        let flow_flags = match flow
-            .l4
-            .as_ref()
-            .and_then(|l4| l4.protocol.as_ref())
-        {
+        let flow_flags = match flow.l4.as_ref().and_then(|l4| l4.protocol.as_ref()) {
             Some(flow::layer4::Protocol::Tcp(tcp)) => match tcp.flags.as_ref() {
                 Some(f) => f,
                 None => return false,
@@ -297,7 +314,9 @@ impl CompiledFilter {
             _ => return false,
         };
         // Any of the filter flag sets must be a subset of the flow's flags.
-        self.tcp_flags.iter().any(|f| tcp_flags_subset(f, flow_flags))
+        self.tcp_flags
+            .iter()
+            .any(|f| tcp_flags_subset(f, flow_flags))
     }
 
     fn match_event_type(&self, flow: &Flow) -> bool {
@@ -309,8 +328,7 @@ impl CompiledFilter {
             None => return false,
         };
         self.event_type.iter().any(|f| {
-            f.r#type == flow_et.r#type
-                && (!f.match_sub_type || f.sub_type == flow_et.sub_type)
+            f.r#type == flow_et.r#type && (!f.match_sub_type || f.sub_type == flow_et.sub_type)
         })
     }
 
@@ -322,7 +340,7 @@ impl CompiledFilter {
             Some(v) => v,
             None => return false,
         };
-        self.reply.iter().any(|r| *r == is_reply)
+        self.reply.contains(&is_reply)
     }
 
     fn match_ip_version(&self, flow: &Flow) -> bool {
@@ -333,7 +351,7 @@ impl CompiledFilter {
             Some(ip) => ip.ip_version,
             None => return false,
         };
-        self.ip_version.iter().any(|v| *v == ver)
+        self.ip_version.contains(&ver)
     }
 
     fn match_node_name(&self, flow: &Flow) -> bool {
@@ -351,7 +369,7 @@ impl CompiledFilter {
             Some(ep) => ep.identity,
             None => return false,
         };
-        self.source_identity.iter().any(|i| *i == id)
+        self.source_identity.contains(&id)
     }
 
     fn match_destination_identity(&self, flow: &Flow) -> bool {
@@ -362,7 +380,7 @@ impl CompiledFilter {
             Some(ep) => ep.identity,
             None => return false,
         };
-        self.destination_identity.iter().any(|i| *i == id)
+        self.destination_identity.contains(&id)
     }
 }
 
@@ -423,7 +441,11 @@ impl PodMatcher {
     fn parse(s: &str) -> Self {
         if let Some((ns, name)) = s.split_once('/') {
             Self {
-                namespace: if ns.is_empty() { None } else { Some(ns.to_string()) },
+                namespace: if ns.is_empty() {
+                    None
+                } else {
+                    Some(ns.to_string())
+                },
                 name_prefix: if name.is_empty() {
                     None
                 } else {
@@ -440,15 +462,15 @@ impl PodMatcher {
     }
 
     fn matches(&self, namespace: &str, pod_name: &str) -> bool {
-        if let Some(ref ns) = self.namespace {
-            if namespace != ns {
-                return false;
-            }
+        if let Some(ref ns) = self.namespace
+            && namespace != ns
+        {
+            return false;
         }
-        if let Some(ref prefix) = self.name_prefix {
-            if !pod_name.starts_with(prefix.as_str()) {
-                return false;
-            }
+        if let Some(ref prefix) = self.name_prefix
+            && !pod_name.starts_with(prefix.as_str())
+        {
+            return false;
         }
         true
     }

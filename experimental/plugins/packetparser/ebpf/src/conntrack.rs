@@ -97,6 +97,7 @@ fn ct_should_report_packet(
     flags: u8,
     direction: u8,
     bytes: u32,
+    sampled: bool,
 ) -> PacketReport {
     let mut report = PacketReport::empty();
 
@@ -201,7 +202,12 @@ fn ct_should_report_packet(
     }
 
     // Decide whether to report.
-    if should_report || now.wrapping_sub(last_report) >= CT_REPORT_INTERVAL {
+    // Control flags and periodic interval always trigger.
+    // New flag combinations only trigger when the packet is sampled.
+    if should_report
+        || (sampled && combined_flags != seen_flags)
+        || now.wrapping_sub(last_report) >= CT_REPORT_INTERVAL
+    {
         report.report = true;
         // Reset counters on report.
         if direction == CT_PACKET_DIR_TX {
@@ -241,6 +247,7 @@ fn ct_create_new_tcp_connection(
     key: &CtV4Key,
     obs_point: u8,
     is_reply: bool,
+    sampled: bool,
 ) -> PacketReport {
     let now = bpf_mono_now();
     let timeout = if (pkt.flags & TCP_SYN) != 0 && (pkt.flags & TCP_ACK) == 0 {
@@ -261,14 +268,24 @@ fn ct_create_new_tcp_connection(
 
     if is_reply {
         entry.flags_seen_rx = pkt.flags as u8;
-        entry.last_report_rx_dir = now;
+        entry.last_report_rx_dir = if sampled { now } else { 0 };
         entry.ct_metadata.pkts_rx = 1;
         entry.ct_metadata.bytes_rx = pkt.bytes as u64;
+        if !sampled {
+            entry.bytes_since_report_rx = pkt.bytes;
+            entry.pkts_since_report_rx = 1;
+            ct_record_tcp_flags(pkt.flags, &mut entry.flags_since_report_rx);
+        }
     } else {
         entry.flags_seen_tx = pkt.flags as u8;
-        entry.last_report_tx_dir = now;
+        entry.last_report_tx_dir = if sampled { now } else { 0 };
         entry.ct_metadata.pkts_tx = 1;
         entry.ct_metadata.bytes_tx = pkt.bytes as u64;
+        if !sampled {
+            entry.bytes_since_report_tx = pkt.bytes;
+            entry.pkts_since_report_tx = 1;
+            ct_record_tcp_flags(pkt.flags, &mut entry.flags_since_report_tx);
+        }
     }
 
     pkt.is_reply = is_reply as u8;
@@ -278,7 +295,7 @@ fn ct_create_new_tcp_connection(
     let _ = conntrack.insert(key, &entry, 0);
 
     PacketReport {
-        report: true,
+        report: sampled,
         previously_observed_packets: 0,
         previously_observed_bytes: 0,
         previously_observed_flags: TcpFlagsCount::default(),
@@ -293,14 +310,15 @@ fn ct_handle_tcp_connection(
     key: &CtV4Key,
     reverse_key: &CtV4Key,
     obs_point: u8,
+    sampled: bool,
 ) -> PacketReport {
     let handshake = pkt.flags & (TCP_SYN | TCP_ACK);
 
     if handshake == TCP_SYN {
-        return ct_create_new_tcp_connection(conntrack, pkt, key, obs_point, false);
+        return ct_create_new_tcp_connection(conntrack, pkt, key, obs_point, false, sampled);
     }
     if handshake == (TCP_SYN | TCP_ACK) {
-        return ct_create_new_tcp_connection(conntrack, pkt, reverse_key, obs_point, true);
+        return ct_create_new_tcp_connection(conntrack, pkt, reverse_key, obs_point, true, sampled);
     }
 
     // Mid-stream: missed the handshake.
@@ -320,23 +338,33 @@ fn ct_handle_tcp_connection(
     if (pkt.flags & TCP_ACK) != 0 {
         pkt.is_reply = 1;
         entry.flags_seen_rx = pkt.flags as u8;
-        entry.last_report_rx_dir = now;
+        entry.last_report_rx_dir = if sampled { now } else { 0 };
         entry.ct_metadata.bytes_rx = pkt.bytes as u64;
         entry.ct_metadata.pkts_rx = 1;
+        if !sampled {
+            entry.bytes_since_report_rx = pkt.bytes;
+            entry.pkts_since_report_rx = 1;
+            ct_record_tcp_flags(pkt.flags, &mut entry.flags_since_report_rx);
+        }
         pkt.ct_metadata = entry.ct_metadata;
         let _ = conntrack.insert(reverse_key, &entry, 0);
     } else {
         pkt.is_reply = 0;
         entry.flags_seen_tx = pkt.flags as u8;
-        entry.last_report_tx_dir = now;
+        entry.last_report_tx_dir = if sampled { now } else { 0 };
         entry.ct_metadata.bytes_tx = pkt.bytes as u64;
         entry.ct_metadata.pkts_tx = 1;
+        if !sampled {
+            entry.bytes_since_report_tx = pkt.bytes;
+            entry.pkts_since_report_tx = 1;
+            ct_record_tcp_flags(pkt.flags, &mut entry.flags_since_report_tx);
+        }
         pkt.ct_metadata = entry.ct_metadata;
         let _ = conntrack.insert(key, &entry, 0);
     }
 
     PacketReport {
-        report: true,
+        report: sampled,
         previously_observed_packets: 0,
         previously_observed_bytes: 0,
         previously_observed_flags: TcpFlagsCount::default(),
@@ -350,6 +378,7 @@ fn ct_handle_udp_connection(
     pkt: &mut PacketEvent,
     key: &CtV4Key,
     obs_point: u8,
+    sampled: bool,
 ) -> PacketReport {
     let now = bpf_mono_now();
     let eviction_time = match now.checked_add(CT_LIFETIME_NONTCP) {
@@ -361,9 +390,14 @@ fn ct_handle_udp_connection(
     entry.eviction_time = eviction_time;
     entry.traffic_direction = ct_get_traffic_direction(obs_point);
     entry.flags_seen_tx = pkt.flags as u8;
-    entry.last_report_tx_dir = now;
+    entry.last_report_tx_dir = if sampled { now } else { 0 };
     entry.ct_metadata.pkts_tx = 1;
     entry.ct_metadata.bytes_tx = pkt.bytes as u64;
+
+    if !sampled {
+        entry.bytes_since_report_tx = pkt.bytes;
+        entry.pkts_since_report_tx = 1;
+    }
 
     pkt.is_reply = 0;
     pkt.traffic_direction = entry.traffic_direction;
@@ -372,7 +406,7 @@ fn ct_handle_udp_connection(
     let _ = conntrack.insert(key, &entry, 0);
 
     PacketReport {
-        report: true,
+        report: sampled,
         previously_observed_packets: 0,
         previously_observed_bytes: 0,
         previously_observed_flags: TcpFlagsCount::default(),
@@ -385,6 +419,7 @@ pub fn ct_process_packet(
     conntrack: &LruHashMap<CtV4Key, CtEntry>,
     pkt: &mut PacketEvent,
     obs_point: u8,
+    sampled: bool,
 ) -> PacketReport {
     // Build forward key.
     let key = CtV4Key {
@@ -408,7 +443,7 @@ pub fn ct_process_packet(
         entry.ct_metadata.bytes_tx = entry.ct_metadata.bytes_tx.saturating_add(pkt.bytes as u64);
         pkt.ct_metadata = entry.ct_metadata;
 
-        return ct_should_report_packet(conntrack, &key, entry, pkt.flags as u8, CT_PACKET_DIR_TX, pkt.bytes);
+        return ct_should_report_packet(conntrack, &key, entry, pkt.flags as u8, CT_PACKET_DIR_TX, pkt.bytes, sampled);
     }
 
     // Lookup reverse direction.
@@ -423,14 +458,14 @@ pub fn ct_process_packet(
         entry.ct_metadata.bytes_rx = entry.ct_metadata.bytes_rx.saturating_add(pkt.bytes as u64);
         pkt.ct_metadata = entry.ct_metadata;
 
-        return ct_should_report_packet(conntrack, &reverse_key, entry, pkt.flags as u8, CT_PACKET_DIR_RX, pkt.bytes);
+        return ct_should_report_packet(conntrack, &reverse_key, entry, pkt.flags as u8, CT_PACKET_DIR_RX, pkt.bytes, sampled);
     }
 
     // New connection.
     if key.proto == IPPROTO_TCP {
-        ct_handle_tcp_connection(conntrack, pkt, &key, &reverse_key, obs_point)
+        ct_handle_tcp_connection(conntrack, pkt, &key, &reverse_key, obs_point, sampled)
     } else if key.proto == IPPROTO_UDP {
-        ct_handle_udp_connection(conntrack, pkt, &key, obs_point)
+        ct_handle_udp_connection(conntrack, pkt, &key, obs_point, sampled)
     } else {
         PacketReport::empty()
     }

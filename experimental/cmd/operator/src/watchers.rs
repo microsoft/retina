@@ -1,37 +1,23 @@
 use std::net::IpAddr;
 use std::sync::Arc;
-use std::time::Duration;
 
 use futures::TryStreamExt;
 use k8s_openapi::api::core::v1::{Node, Pod, Service};
 use kube::runtime::watcher::{self, Event};
 use kube::{Api, Client};
+use retina_core::retry::retry_with_backoff;
 use retina_proto::ipcache::Workload;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, warn};
 
 use crate::state::{CachedIdentity, OperatorState};
-
-const MAX_BACKOFF: Duration = Duration::from_secs(60);
 
 /// Watch all pods cluster-wide and upsert/delete their IPs.
 /// Automatically restarts with backoff on stream errors.
 pub async fn watch_pods(client: Client, state: Arc<OperatorState>) {
-    let mut backoff = Duration::from_secs(1);
-
-    loop {
-        info!("starting pod watcher");
-        match try_watch_pods(client.clone(), state.clone()).await {
-            Ok(()) => {
-                warn!("pod watcher stream ended, restarting");
-                backoff = Duration::from_secs(1);
-            }
-            Err(e) => {
-                error!(backoff_secs = backoff.as_secs(), "pod watcher error: {e}");
-            }
-        }
-        tokio::time::sleep(backoff).await;
-        backoff = (backoff * 2).min(MAX_BACKOFF);
-    }
+    retry_with_backoff("pod watcher", || {
+        try_watch_pods(client.clone(), state.clone())
+    })
+    .await
 }
 
 async fn try_watch_pods(client: Client, state: Arc<OperatorState>) -> anyhow::Result<()> {
@@ -149,15 +135,15 @@ fn handle_pod_delete(pod: &Pod, state: &OperatorState) {
         return;
     }
 
-    if let Some(status) = pod.status.as_ref() {
-        if let Some(pod_ips) = status.pod_ips.as_ref() {
-            for pod_ip in pod_ips {
-                if !pod_ip.ip.is_empty() {
-                    if let Ok(ip) = pod_ip.ip.parse::<IpAddr>() {
-                        debug!(pod = name, %ip, "delete pod");
-                        state.delete(&ip);
-                    }
-                }
+    if let Some(status) = pod.status.as_ref()
+        && let Some(pod_ips) = status.pod_ips.as_ref()
+    {
+        for pod_ip in pod_ips {
+            if !pod_ip.ip.is_empty()
+                && let Ok(ip) = pod_ip.ip.parse::<IpAddr>()
+            {
+                debug!(pod = name, %ip, "delete pod");
+                state.delete(&ip);
             }
         }
     }
@@ -166,22 +152,10 @@ fn handle_pod_delete(pod: &Pod, state: &OperatorState) {
 /// Watch all services cluster-wide and upsert/delete their ClusterIP and LB IPs.
 /// Automatically restarts with backoff on stream errors.
 pub async fn watch_services(client: Client, state: Arc<OperatorState>) {
-    let mut backoff = Duration::from_secs(1);
-
-    loop {
-        info!("starting service watcher");
-        match try_watch_services(client.clone(), state.clone()).await {
-            Ok(()) => {
-                warn!("service watcher stream ended, restarting");
-                backoff = Duration::from_secs(1);
-            }
-            Err(e) => {
-                error!(backoff_secs = backoff.as_secs(), "service watcher error: {e}");
-            }
-        }
-        tokio::time::sleep(backoff).await;
-        backoff = (backoff * 2).min(MAX_BACKOFF);
-    }
+    retry_with_backoff("service watcher", || {
+        try_watch_services(client.clone(), state.clone())
+    })
+    .await
 }
 
 async fn try_watch_services(client: Client, state: Arc<OperatorState>) -> anyhow::Result<()> {
@@ -210,26 +184,24 @@ fn service_ips(svc: &Service) -> Vec<IpAddr> {
 
     if let Some(spec) = svc.spec.as_ref() {
         // ClusterIP (skip headless "None").
-        if let Some(cluster_ip) = spec.cluster_ip.as_deref() {
-            if cluster_ip != "None" {
-                if let Ok(ip) = cluster_ip.parse() {
-                    ips.push(ip);
-                }
-            }
+        if let Some(cluster_ip) = spec.cluster_ip.as_deref()
+            && cluster_ip != "None"
+            && let Ok(ip) = cluster_ip.parse()
+        {
+            ips.push(ip);
         }
     }
 
     // LoadBalancer IPs.
-    if let Some(status) = svc.status.as_ref() {
-        if let Some(lb) = status.load_balancer.as_ref() {
-            if let Some(ingresses) = lb.ingress.as_ref() {
-                for ingress in ingresses {
-                    if let Some(ip_str) = ingress.ip.as_deref() {
-                        if let Ok(ip) = ip_str.parse() {
-                            ips.push(ip);
-                        }
-                    }
-                }
+    if let Some(status) = svc.status.as_ref()
+        && let Some(lb) = status.load_balancer.as_ref()
+        && let Some(ingresses) = lb.ingress.as_ref()
+    {
+        for ingress in ingresses {
+            if let Some(ip_str) = ingress.ip.as_deref()
+                && let Ok(ip) = ip_str.parse()
+            {
+                ips.push(ip);
             }
         }
     }
@@ -269,22 +241,10 @@ fn handle_service_delete(svc: &Service, state: &OperatorState) {
 /// Watch all nodes and upsert/delete their InternalIP addresses.
 /// Automatically restarts with backoff on stream errors.
 pub async fn watch_nodes(client: Client, state: Arc<OperatorState>) {
-    let mut backoff = Duration::from_secs(1);
-
-    loop {
-        info!("starting node watcher");
-        match try_watch_nodes(client.clone(), state.clone()).await {
-            Ok(()) => {
-                warn!("node watcher stream ended, restarting");
-                backoff = Duration::from_secs(1);
-            }
-            Err(e) => {
-                error!(backoff_secs = backoff.as_secs(), "node watcher error: {e}");
-            }
-        }
-        tokio::time::sleep(backoff).await;
-        backoff = (backoff * 2).min(MAX_BACKOFF);
-    }
+    retry_with_backoff("node watcher", || {
+        try_watch_nodes(client.clone(), state.clone())
+    })
+    .await
 }
 
 async fn try_watch_nodes(client: Client, state: Arc<OperatorState>) -> anyhow::Result<()> {
@@ -313,26 +273,26 @@ fn node_ips(node: &Node) -> Vec<IpAddr> {
     let mut ips = Vec::new();
 
     // InternalIP from status.addresses.
-    if let Some(status) = node.status.as_ref() {
-        if let Some(addresses) = status.addresses.as_ref() {
-            for addr in addresses {
-                if addr.type_ == "InternalIP" {
-                    if let Ok(ip) = addr.address.parse() {
-                        ips.push(ip);
-                    }
-                }
+    if let Some(status) = node.status.as_ref()
+        && let Some(addresses) = status.addresses.as_ref()
+    {
+        for addr in addresses {
+            if addr.type_ == "InternalIP"
+                && let Ok(ip) = addr.address.parse()
+            {
+                ips.push(ip);
             }
         }
     }
 
     // Pod CIDR gateway IPs (first usable IP in each CIDR, e.g. 10.244.0.1).
     // The node uses this IP as the gateway on veth pairs to pods.
-    if let Some(spec) = node.spec.as_ref() {
-        if let Some(cidrs) = spec.pod_cidrs.as_ref() {
-            for cidr in cidrs {
-                if let Some(gw) = pod_cidr_gateway(cidr) {
-                    ips.push(gw);
-                }
+    if let Some(spec) = node.spec.as_ref()
+        && let Some(cidrs) = spec.pod_cidrs.as_ref()
+    {
+        for cidr in cidrs {
+            if let Some(gw) = pod_cidr_gateway(cidr) {
+                ips.push(gw);
             }
         }
     }

@@ -2,13 +2,15 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use retina_core::agent_events::AgentEventStore;
 use retina_core::ipcache::{Identity, IpCache, Workload};
+use retina_core::retry::retry_with_backoff;
+use retina_core::store::AgentEventStore;
 use retina_proto::flow::{AgentEvent, AgentEventType, IpCacheNotification};
 use retina_proto::ipcache::ip_cache_client::IpCacheClient;
-use retina_proto::ipcache::{ip_cache_update::UpdateType, IpCacheRequest};
+use retina_proto::ipcache::{IpCacheRequest, ip_cache_update::UpdateType};
 use tokio::sync::broadcast;
-use tracing::{debug, error, info, warn};
+use tonic::transport::Endpoint;
+use tracing::{debug, info, warn};
 
 /// Connect to the operator and stream IP cache updates into the local cache.
 ///
@@ -20,35 +22,23 @@ pub async fn run_ipcache_sync(
     agent_event_tx: broadcast::Sender<Arc<AgentEvent>>,
     agent_event_store: Arc<AgentEventStore>,
 ) {
-    let mut backoff = Duration::from_secs(1);
-    let max_backoff = Duration::from_secs(60);
-
-    loop {
-        info!(%operator_addr, "connecting to retina-operator");
-
-        match try_stream(
+    retry_with_backoff("ipcache sync", || {
+        let result = try_stream(
             &operator_addr,
             &cache,
             &node_name,
             &agent_event_tx,
             &agent_event_store,
-        )
-        .await
-        {
-            Ok(()) => {
-                info!("operator stream ended cleanly");
-            }
-            Err(e) => {
-                error!("operator stream error: {}", e);
-            }
-        }
-
+        );
         // Clear cache on disconnect — no stale data.
-        cache.clear();
-        info!(backoff_secs = backoff.as_secs(), "reconnecting after backoff");
-        tokio::time::sleep(backoff).await;
-        backoff = (backoff * 2).min(max_backoff);
-    }
+        let cache = cache.clone();
+        async move {
+            let r = result.await;
+            cache.clear();
+            r
+        }
+    })
+    .await
 }
 
 async fn try_stream(
@@ -58,11 +48,16 @@ async fn try_stream(
     agent_event_tx: &broadcast::Sender<Arc<AgentEvent>>,
     agent_event_store: &AgentEventStore,
 ) -> anyhow::Result<()> {
-    let mut client = IpCacheClient::connect(operator_addr.to_string()).await?;
+    let channel = Endpoint::from_shared(operator_addr.to_string())?
+        .connect_timeout(Duration::from_secs(5))
+        .http2_keep_alive_interval(Duration::from_secs(10))
+        .keep_alive_timeout(Duration::from_secs(20))
+        .keep_alive_while_idle(true)
+        .connect()
+        .await?;
+    let mut client = IpCacheClient::new(channel);
     info!("connected to operator, requesting stream");
 
-    // Reset backoff on successful connection (caller manages backoff variable,
-    // but a successful stream implicitly resets it since we return Ok).
     let request = IpCacheRequest {
         node_name: node_name.to_string(),
     };
@@ -82,39 +77,40 @@ async fn try_stream(
                     }
                 };
                 let identity = Identity {
-                    namespace: update.namespace.clone(),
-                    pod_name: update.pod_name.clone(),
-                    service_name: update.service_name,
-                    node_name: update.node_name,
-                    labels: update.labels,
+                    namespace: Arc::from(update.namespace.as_str()),
+                    pod_name: Arc::from(update.pod_name.as_str()),
+                    service_name: Arc::from(update.service_name.as_str()),
+                    node_name: Arc::from(update.node_name.as_str()),
+                    labels: update
+                        .labels
+                        .iter()
+                        .map(|l| Arc::from(l.as_str()))
+                        .collect::<Vec<_>>()
+                        .into(),
                     workloads: update
                         .workloads
                         .into_iter()
                         .map(|w| Workload {
-                            name: w.name,
-                            kind: w.kind,
+                            name: Arc::from(w.name.as_str()),
+                            kind: Arc::from(w.kind.as_str()),
                         })
-                        .collect(),
+                        .collect::<Vec<_>>()
+                        .into(),
                 };
                 debug!(%ip, ns = %identity.namespace, pod = %identity.pod_name, svc = %identity.service_name, node = %identity.node_name, "upsert");
                 cache.upsert(ip, identity);
 
-                // Emit IPCACHE_UPSERTED agent event.
-                let event = Arc::new(AgentEvent {
-                    r#type: AgentEventType::IpcacheUpserted.into(),
-                    notification: Some(
-                        retina_proto::flow::agent_event::Notification::IpcacheUpdate(
-                            IpCacheNotification {
-                                cidr: update.ip,
-                                namespace: update.namespace,
-                                pod_name: update.pod_name,
-                                ..Default::default()
-                            },
-                        ),
-                    ),
-                });
-                agent_event_store.push(event.clone());
-                let _ = agent_event_tx.send(event);
+                emit_agent_event(
+                    AgentEventType::IpcacheUpserted,
+                    IpCacheNotification {
+                        cidr: update.ip,
+                        namespace: update.namespace,
+                        pod_name: update.pod_name,
+                        ..Default::default()
+                    },
+                    agent_event_store,
+                    agent_event_tx,
+                );
             }
             UpdateType::Delete => {
                 let ip: IpAddr = match update.ip.parse() {
@@ -126,20 +122,15 @@ async fn try_stream(
                 };
                 cache.delete(&ip);
 
-                // Emit IPCACHE_DELETED agent event.
-                let event = Arc::new(AgentEvent {
-                    r#type: AgentEventType::IpcacheDeleted.into(),
-                    notification: Some(
-                        retina_proto::flow::agent_event::Notification::IpcacheUpdate(
-                            IpCacheNotification {
-                                cidr: update.ip,
-                                ..Default::default()
-                            },
-                        ),
-                    ),
-                });
-                agent_event_store.push(event.clone());
-                let _ = agent_event_tx.send(event);
+                emit_agent_event(
+                    AgentEventType::IpcacheDeleted,
+                    IpCacheNotification {
+                        cidr: update.ip,
+                        ..Default::default()
+                    },
+                    agent_event_store,
+                    agent_event_tx,
+                );
             }
             UpdateType::SyncComplete => {
                 cache.mark_synced();
@@ -149,4 +140,20 @@ async fn try_stream(
     }
 
     Ok(())
+}
+
+fn emit_agent_event(
+    event_type: AgentEventType,
+    notification: IpCacheNotification,
+    store: &AgentEventStore,
+    tx: &broadcast::Sender<Arc<AgentEvent>>,
+) {
+    let event = Arc::new(AgentEvent {
+        r#type: event_type.into(),
+        notification: Some(
+            retina_proto::flow::agent_event::Notification::IpcacheUpdate(notification),
+        ),
+    });
+    store.push(event.clone());
+    let _ = tx.send(event);
 }

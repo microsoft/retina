@@ -19,14 +19,20 @@ const TRACE_TO_NETWORK: i32 = 11;
 ///
 /// Call once at startup; the result stays valid for the process lifetime.
 pub fn boot_to_realtime_offset() -> i64 {
-    let mut boot = libc::timespec { tv_sec: 0, tv_nsec: 0 };
-    let mut real = libc::timespec { tv_sec: 0, tv_nsec: 0 };
+    let mut boot = libc::timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
+    let mut real = libc::timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
     unsafe {
         libc::clock_gettime(libc::CLOCK_BOOTTIME, &mut boot);
         libc::clock_gettime(libc::CLOCK_REALTIME, &mut real);
     }
-    let boot_ns = boot.tv_sec as i64 * 1_000_000_000 + boot.tv_nsec as i64;
-    let real_ns = real.tv_sec as i64 * 1_000_000_000 + real.tv_nsec as i64;
+    let boot_ns = boot.tv_sec * 1_000_000_000 + boot.tv_nsec;
+    let real_ns = real.tv_sec * 1_000_000_000 + real.tv_nsec;
     real_ns - boot_ns
 }
 
@@ -58,7 +64,7 @@ pub fn packet_event_to_flow(pkt: &PacketEvent, boot_offset_ns: i64) -> flow::Flo
                 protocol: Some(flow::layer4::Protocol::Tcp(flow::Tcp {
                     source_port: pkt.src_port as u32,
                     destination_port: pkt.dst_port as u32,
-                    flags: Some(tcp_flags.clone()),
+                    flags: Some(tcp_flags),
                 })),
             }),
             tcp_flags_summary(&tcp_flags),
@@ -100,7 +106,10 @@ pub fn packet_event_to_flow(pkt: &PacketEvent, boot_offset_ns: i64) -> flow::Flo
 
     #[allow(deprecated)]
     flow::Flow {
-        time: Some(Timestamp { seconds: secs, nanos }),
+        time: Some(Timestamp {
+            seconds: secs,
+            nanos,
+        }),
         verdict: flow::Verdict::Forwarded.into(),
         ip,
         l4,
@@ -117,7 +126,8 @@ pub fn packet_event_to_flow(pkt: &PacketEvent, boot_offset_ns: i64) -> flow::Flo
 }
 
 /// Build the extensions Any field containing packet byte count.
-fn make_extensions(bytes: u32) -> Option<prost_types::Any> {
+#[doc(hidden)]
+pub fn make_extensions(bytes: u32) -> Option<prost_types::Any> {
     if bytes == 0 {
         return None;
     }
@@ -129,7 +139,7 @@ fn make_extensions(bytes: u32) -> Option<prost_types::Any> {
             },
         )]),
     };
-    let mut buf = Vec::new();
+    let mut buf = Vec::with_capacity(s.encoded_len());
     s.encode(&mut buf).ok()?;
     Some(prost_types::Any {
         type_url: "type.googleapis.com/google.protobuf.Struct".to_string(),
@@ -138,48 +148,70 @@ fn make_extensions(bytes: u32) -> Option<prost_types::Any> {
 }
 
 /// Build a human-readable summary string from TCP flags (matching Go Retina).
-fn tcp_flags_summary(flags: &flow::TcpFlags) -> String {
-    let mut parts = Vec::new();
-    if flags.syn && flags.ack {
-        parts.push("SYN-ACK");
-    } else {
+#[doc(hidden)]
+pub fn tcp_flags_summary(flags: &flow::TcpFlags) -> String {
+    // Fast paths for the 3 most common patterns (>95% of real traffic).
+    let other =
+        flags.fin || flags.rst || flags.psh || flags.urg || flags.ece || flags.cwr || flags.ns;
+    if !other {
+        if flags.syn && flags.ack {
+            return "TCP Flags: SYN-ACK".into();
+        }
         if flags.syn {
-            parts.push("SYN");
+            return "TCP Flags: SYN".into();
         }
         if flags.ack {
-            parts.push("ACK");
+            return "TCP Flags: ACK".into();
         }
+        return "TCP".into();
     }
-    if flags.fin {
-        parts.push("FIN");
+
+    // General case: fixed-size array on the stack instead of Vec.
+    let mut parts: [&str; 9] = [""; 9];
+    let mut n = 0;
+    macro_rules! push {
+        ($cond:expr, $s:expr) => {
+            if $cond {
+                parts[n] = $s;
+                n += 1;
+            }
+        };
     }
-    if flags.rst {
-        parts.push("RST");
-    }
-    if flags.psh {
-        parts.push("PSH");
-    }
-    if flags.urg {
-        parts.push("URG");
-    }
-    if flags.ece {
-        parts.push("ECE");
-    }
-    if flags.cwr {
-        parts.push("CWR");
-    }
-    if flags.ns {
-        parts.push("NS");
-    }
-    if parts.is_empty() {
-        "TCP".to_string()
+    if flags.syn && flags.ack {
+        parts[n] = "SYN-ACK";
+        n += 1;
     } else {
-        format!("TCP Flags: {}", parts.join(", "))
+        push!(flags.syn, "SYN");
+        push!(flags.ack, "ACK");
+    }
+    push!(flags.fin, "FIN");
+    push!(flags.rst, "RST");
+    push!(flags.psh, "PSH");
+    push!(flags.urg, "URG");
+    push!(flags.ece, "ECE");
+    push!(flags.cwr, "CWR");
+    push!(flags.ns, "NS");
+
+    if n == 0 {
+        "TCP".into()
+    } else {
+        // Pre-calculate capacity: "TCP Flags: " (12) + parts + separators.
+        let cap = 12 + parts[..n].iter().map(|p| p.len()).sum::<usize>() + (n - 1) * 2;
+        let mut s = String::with_capacity(cap);
+        s.push_str("TCP Flags: ");
+        for (i, part) in parts[..n].iter().enumerate() {
+            if i > 0 {
+                s.push_str(", ");
+            }
+            s.push_str(part);
+        }
+        s
     }
 }
 
 /// Convert a TCP flags bitmask into a Hubble TcpFlags proto.
-fn tcp_flags_to_proto(flags: u16) -> flow::TcpFlags {
+#[doc(hidden)]
+pub fn tcp_flags_to_proto(flags: u16) -> flow::TcpFlags {
     flow::TcpFlags {
         fin: (flags & TCP_FIN) != 0,
         syn: (flags & TCP_SYN) != 0,
@@ -237,10 +269,7 @@ mod tests {
         let pkt = make_pkt();
         let f = packet_event_to_flow(&pkt, 0);
         let any = f.extensions.unwrap();
-        assert_eq!(
-            any.type_url,
-            "type.googleapis.com/google.protobuf.Struct"
-        );
+        assert_eq!(any.type_url, "type.googleapis.com/google.protobuf.Struct");
         let s = prost_types::Struct::decode(any.value.as_slice()).unwrap();
         let val = s.fields.get("bytes").unwrap();
         assert_eq!(

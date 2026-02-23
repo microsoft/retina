@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
+use axum::Router;
 use axum::extract::{Query, State};
 use axum::http::{HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
-use axum::Router;
 use prometheus_client::encoding::text::encode;
+use prost_pprof::Message as _;
 use retina_core::ipcache::IpCache;
 use retina_core::metrics::{AgentState, Metrics};
 use retina_core::store::FlowStore;
-use prost_pprof::Message as _;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 use tracing::info;
@@ -82,6 +82,8 @@ struct MapsSummary {
     total_regions: usize,
     perf_event_rings: usize,
     perf_event_kb: u64,
+    ring_buf_regions: usize,
+    ring_buf_kb: u64,
     bpf_map_regions: usize,
     bpf_map_kb: u64,
     heap_kb: u64,
@@ -122,7 +124,10 @@ async fn mem_info() -> Response {
     let status = match fs::read_to_string("/proc/self/status").await {
         Ok(s) => s,
         Err(e) => {
-            return (StatusCode::INTERNAL_SERVER_ERROR, format!("failed to read /proc/self/status: {e}"))
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("failed to read /proc/self/status: {e}"),
+            )
                 .into_response();
         }
     };
@@ -190,6 +195,9 @@ async fn mem_info() -> Response {
             if line.contains("perf_event") {
                 summary.perf_event_rings += 1;
                 summary.perf_event_kb += size_kb;
+            } else if line.contains("bpf-ringbuf") {
+                summary.ring_buf_regions += 1;
+                summary.ring_buf_kb += size_kb;
             } else if line.contains("bpf-map") {
                 summary.bpf_map_regions += 1;
                 summary.bpf_map_kb += size_kb;
@@ -214,7 +222,10 @@ async fn mem_info() -> Response {
 async fn metrics_handler(State(state): State<DebugState>) -> Response {
     let mut buf = String::new();
     if let Err(e) = encode(&mut buf, &state.metrics.registry) {
-        return (StatusCode::INTERNAL_SERVER_ERROR, format!("encode error: {e}"))
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("encode error: {e}"),
+        )
             .into_response();
     }
     let mut response = Response::new(axum::body::Body::from(buf));
@@ -226,11 +237,11 @@ async fn metrics_handler(State(state): State<DebugState>) -> Response {
 }
 
 async fn healthz(State(state): State<DebugState>) -> Response {
-    // Liveness: at least one perf reader task is alive.
+    // Liveness: at least one event reader task is alive.
     if state.state.perf_readers_alive() > 0 {
         (StatusCode::OK, "ok").into_response()
     } else {
-        (StatusCode::SERVICE_UNAVAILABLE, "no perf readers alive").into_response()
+        (StatusCode::SERVICE_UNAVAILABLE, "no event readers alive").into_response()
     }
 }
 
@@ -244,7 +255,7 @@ async fn readyz(State(state): State<DebugState>) -> Response {
         reasons.push("gRPC not bound");
     }
     if state.state.perf_readers_alive() == 0 {
-        reasons.push("no perf readers alive");
+        reasons.push("no event readers alive");
     }
     // IpCache: only check if operator is configured (otherwise enrichment is disabled).
     if state.config.operator_addr.is_some() && !state.ip_cache.is_synced() {
@@ -265,19 +276,20 @@ async fn ipcache_dump(State(state): State<DebugState>) -> impl IntoResponse {
         .map(|(ip, id)| {
             let mut obj = serde_json::Map::new();
             if !id.namespace.is_empty() {
-                obj.insert("namespace".into(), id.namespace.into());
+                obj.insert("namespace".into(), id.namespace.to_string().into());
             }
             if !id.pod_name.is_empty() {
-                obj.insert("pod_name".into(), id.pod_name.into());
+                obj.insert("pod_name".into(), id.pod_name.to_string().into());
             }
             if !id.service_name.is_empty() {
-                obj.insert("service_name".into(), id.service_name.into());
+                obj.insert("service_name".into(), id.service_name.to_string().into());
             }
             if !id.node_name.is_empty() {
-                obj.insert("node_name".into(), id.node_name.into());
+                obj.insert("node_name".into(), id.node_name.to_string().into());
             }
             if !id.labels.is_empty() {
-                obj.insert("labels".into(), id.labels.into());
+                let labels: Vec<String> = id.labels.iter().map(|l| l.to_string()).collect();
+                obj.insert("labels".into(), labels.into());
             }
             (ip.to_string(), serde_json::Value::Object(obj))
         })
@@ -312,7 +324,10 @@ async fn pprof_profile(Query(params): Query<ProfileParams>) -> Response {
     {
         Ok(g) => g,
         Err(e) => {
-            return (StatusCode::INTERNAL_SERVER_ERROR, format!("failed to start profiler: {e}"))
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("failed to start profiler: {e}"),
+            )
                 .into_response();
         }
     };
@@ -322,7 +337,10 @@ async fn pprof_profile(Query(params): Query<ProfileParams>) -> Response {
     let report = match guard.report().build() {
         Ok(r) => r,
         Err(e) => {
-            return (StatusCode::INTERNAL_SERVER_ERROR, format!("failed to build report: {e}"))
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("failed to build report: {e}"),
+            )
                 .into_response();
         }
     };
@@ -330,14 +348,20 @@ async fn pprof_profile(Query(params): Query<ProfileParams>) -> Response {
     let profile = match report.pprof() {
         Ok(p) => p,
         Err(e) => {
-            return (StatusCode::INTERNAL_SERVER_ERROR, format!("failed to generate pprof: {e}"))
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("failed to generate pprof: {e}"),
+            )
                 .into_response();
         }
     };
 
     let mut body = Vec::new();
     if let Err(e) = profile.encode(&mut body) {
-        return (StatusCode::INTERNAL_SERVER_ERROR, format!("failed to encode pprof: {e}"))
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("failed to encode pprof: {e}"),
+        )
             .into_response();
     }
 

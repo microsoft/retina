@@ -1,7 +1,7 @@
 use retina_proto::flow;
 
 use crate::ipcache::{
-    IpCache, IDENTITY_HOST, IDENTITY_KUBE_APISERVER, IDENTITY_REMOTE_NODE, IDENTITY_WORLD,
+    IDENTITY_HOST, IDENTITY_KUBE_APISERVER, IDENTITY_REMOTE_NODE, IDENTITY_WORLD, IpCache,
 };
 
 /// Enrich a flow's source and destination endpoints from the IP cache.
@@ -20,19 +20,31 @@ pub fn enrich_flow(flow: &mut flow::Flow, cache: &IpCache) {
         None => return,
     };
 
-    if let Ok(src) = ip_header.source.parse() {
-        if let Some(id) = cache.get(&src) {
-            flow.source_names = identity_names(&id);
-            flow.source = Some(identity_to_endpoint(&id, cache));
+    let src_ip: Option<std::net::IpAddr> = ip_header.source.parse().ok();
+    let dst_ip: Option<std::net::IpAddr> = ip_header.destination.parse().ok();
+
+    // Batch lookup: single lock for both IPs + single local_node_name read.
+    let (src_id, dst_id) = match (src_ip.as_ref(), dst_ip.as_ref()) {
+        (Some(s), Some(d)) => cache.get_pair(s, d),
+        (Some(s), None) => (cache.get(s), None),
+        (None, Some(d)) => (None, cache.get(d)),
+        (None, None) => return,
+    };
+    let local_name = cache.local_node_name();
+
+    if src_ip.is_some() {
+        if let Some(id) = &src_id {
+            flow.source_names = identity_names(id);
+            flow.source = Some(identity_to_endpoint_with_local(id, cache, &local_name));
         } else {
             flow.source = Some(world_endpoint());
         }
     }
 
-    if let Ok(dst) = ip_header.destination.parse() {
-        if let Some(id) = cache.get(&dst) {
-            flow.destination_names = identity_names(&id);
-            flow.destination = Some(identity_to_endpoint(&id, cache));
+    if dst_ip.is_some() {
+        if let Some(id) = &dst_id {
+            flow.destination_names = identity_names(id);
+            flow.destination = Some(identity_to_endpoint_with_local(id, cache, &local_name));
         } else {
             flow.destination = Some(world_endpoint());
         }
@@ -41,29 +53,40 @@ pub fn enrich_flow(flow: &mut flow::Flow, cache: &IpCache) {
 
 /// Build the `source_names` / `destination_names` repeated string field.
 /// Hubble compact format uses this to display identity (e.g. "default/nginx").
-fn identity_names(id: &crate::ipcache::Identity) -> Vec<String> {
+#[doc(hidden)]
+pub fn identity_names(id: &crate::ipcache::Identity) -> Vec<String> {
     if !id.pod_name.is_empty() {
-        vec![format!("{}/{}", id.namespace, id.pod_name)]
+        let mut s = String::with_capacity(id.namespace.len() + 1 + id.pod_name.len());
+        s.push_str(&id.namespace);
+        s.push('/');
+        s.push_str(&id.pod_name);
+        vec![s]
     } else if !id.service_name.is_empty() {
-        vec![format!("{}/{}", id.namespace, id.service_name)]
+        let mut s = String::with_capacity(id.namespace.len() + 1 + id.service_name.len());
+        s.push_str(&id.namespace);
+        s.push('/');
+        s.push_str(&id.service_name);
+        vec![s]
     } else if !id.node_name.is_empty() {
-        vec![id.node_name.clone()]
+        vec![id.node_name.to_string()]
     } else {
         vec![]
     }
 }
 
-fn identity_to_endpoint(id: &crate::ipcache::Identity, cache: &IpCache) -> flow::Endpoint {
-    let numeric_id = cache.resolve_identity(id);
+#[doc(hidden)]
+pub fn identity_to_endpoint_with_local(
+    id: &crate::ipcache::Identity,
+    cache: &IpCache,
+    local_node_name: &str,
+) -> flow::Endpoint {
+    let numeric_id = cache.resolve_identity_with_local(id, local_node_name);
 
-    let mut labels = id.labels.clone();
+    let mut labels: Vec<String> = id.labels.iter().map(|l| l.to_string()).collect();
 
     // For service IPs, encode service name as a label (matching Go enricher).
     if !id.service_name.is_empty() {
-        labels.push(format!(
-            "k8s:io.kubernetes.svc.name={}",
-            id.service_name
-        ));
+        labels.push(format!("k8s:io.kubernetes.svc.name={}", id.service_name));
     }
 
     // Append the reserved label matching the resolved identity.
@@ -74,12 +97,11 @@ fn identity_to_endpoint(id: &crate::ipcache::Identity, cache: &IpCache) -> flow:
     flow::Endpoint {
         id: numeric_id,
         identity: numeric_id,
-        namespace: id.namespace.clone(),
+        namespace: id.namespace.to_string(),
         pod_name: if !id.pod_name.is_empty() {
-            id.pod_name.clone()
+            id.pod_name.to_string()
         } else if !id.node_name.is_empty() {
-            // For node IPs, set pod_name to node name (matching Go enricher).
-            id.node_name.clone()
+            id.node_name.to_string()
         } else {
             String::new()
         },
@@ -88,8 +110,8 @@ fn identity_to_endpoint(id: &crate::ipcache::Identity, cache: &IpCache) -> flow:
             .workloads
             .iter()
             .map(|w| flow::Workload {
-                name: w.name.clone(),
-                kind: w.kind.clone(),
+                name: w.name.to_string(),
+                kind: w.kind.to_string(),
             })
             .collect(),
         ..Default::default()
@@ -121,10 +143,11 @@ fn world_endpoint() -> flow::Endpoint {
 mod tests {
     use super::*;
     use crate::ipcache::{
-        Identity, Workload, IDENTITY_HOST, IDENTITY_KUBE_APISERVER, IDENTITY_REMOTE_NODE,
-        IDENTITY_WORLD,
+        IDENTITY_HOST, IDENTITY_KUBE_APISERVER, IDENTITY_REMOTE_NODE, IDENTITY_WORLD, Identity,
+        Workload,
     };
     use std::net::{IpAddr, Ipv4Addr};
+    use std::sync::Arc;
 
     fn make_flow(src: &str, dst: &str) -> flow::Flow {
         flow::Flow {
@@ -143,26 +166,27 @@ mod tests {
         cache.upsert(
             IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
             Identity {
-                namespace: "default".into(),
-                pod_name: "client-abc".into(),
-                service_name: String::new(),
-                node_name: String::new(),
-                labels: vec!["app=client".into()],
+                namespace: Arc::from("default"),
+                pod_name: Arc::from("client-abc"),
+                service_name: Arc::from(""),
+                node_name: Arc::from(""),
+                labels: vec![Arc::from("app=client")].into(),
                 workloads: vec![Workload {
-                    name: "client".into(),
-                    kind: "Deployment".into(),
-                }],
+                    name: Arc::from("client"),
+                    kind: Arc::from("Deployment"),
+                }]
+                .into(),
             },
         );
         cache.upsert(
             IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)),
             Identity {
-                namespace: "backend".into(),
-                pod_name: "server-xyz".into(),
-                service_name: String::new(),
-                node_name: String::new(),
-                labels: vec!["app=server".into()],
-                workloads: vec![],
+                namespace: Arc::from("backend"),
+                pod_name: Arc::from("server-xyz"),
+                service_name: Arc::from(""),
+                node_name: Arc::from(""),
+                labels: vec![Arc::from("app=server")].into(),
+                workloads: vec![].into(),
             },
         );
         cache.mark_synced();
@@ -191,12 +215,12 @@ mod tests {
         cache.upsert(
             IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
             Identity {
-                namespace: "default".into(),
-                pod_name: "pod".into(),
-                service_name: String::new(),
-                node_name: String::new(),
-                labels: vec![],
-                workloads: vec![],
+                namespace: Arc::from("default"),
+                pod_name: Arc::from("pod"),
+                service_name: Arc::from(""),
+                node_name: Arc::from(""),
+                labels: vec![].into(),
+                workloads: vec![].into(),
             },
         );
         // Not calling mark_synced()
@@ -214,12 +238,12 @@ mod tests {
         cache.upsert(
             IpAddr::V4(Ipv4Addr::new(10, 96, 0, 1)),
             Identity {
-                namespace: "default".into(),
-                pod_name: String::new(),
-                service_name: "kubernetes".into(),
-                node_name: String::new(),
-                labels: vec![],
-                workloads: vec![],
+                namespace: Arc::from("default"),
+                pod_name: Arc::from(""),
+                service_name: Arc::from("kubernetes"),
+                node_name: Arc::from(""),
+                labels: vec![].into(),
+                workloads: vec![].into(),
             },
         );
         cache.mark_synced();
@@ -230,12 +254,11 @@ mod tests {
         let src = flow.source.unwrap();
         assert_eq!(src.id, IDENTITY_KUBE_APISERVER);
         assert_eq!(src.identity, IDENTITY_KUBE_APISERVER);
-        assert!(src
-            .labels
-            .contains(&"reserved:kube-apiserver".to_string()));
-        assert!(src
-            .labels
-            .contains(&"k8s:io.kubernetes.svc.name=kubernetes".to_string()));
+        assert!(src.labels.contains(&"reserved:kube-apiserver".to_string()));
+        assert!(
+            src.labels
+                .contains(&"k8s:io.kubernetes.svc.name=kubernetes".to_string())
+        );
     }
 
     #[test]
@@ -244,12 +267,12 @@ mod tests {
         cache.upsert(
             IpAddr::V4(Ipv4Addr::new(10, 96, 0, 10)),
             Identity {
-                namespace: "backend".into(),
-                pod_name: String::new(),
-                service_name: "redis".into(),
-                node_name: String::new(),
-                labels: vec![],
-                workloads: vec![],
+                namespace: Arc::from("backend"),
+                pod_name: Arc::from(""),
+                service_name: Arc::from("redis"),
+                node_name: Arc::from(""),
+                labels: vec![].into(),
+                workloads: vec![].into(),
             },
         );
         cache.mark_synced();
@@ -270,12 +293,12 @@ mod tests {
         cache.upsert(
             IpAddr::V4(Ipv4Addr::new(192, 168, 1, 10)),
             Identity {
-                namespace: String::new(),
-                pod_name: String::new(),
-                service_name: String::new(),
-                node_name: "node-1".into(),
-                labels: vec![],
-                workloads: vec![],
+                namespace: Arc::from(""),
+                pod_name: Arc::from(""),
+                service_name: Arc::from(""),
+                node_name: Arc::from("node-1"),
+                labels: vec![].into(),
+                workloads: vec![].into(),
             },
         );
         cache.mark_synced();
@@ -311,12 +334,12 @@ mod tests {
         cache.upsert(
             IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
             Identity {
-                namespace: "default".into(),
-                pod_name: "nginx-abc".into(),
-                service_name: String::new(),
-                node_name: String::new(),
-                labels: vec!["app=nginx".into(), "tier=frontend".into()],
-                workloads: vec![],
+                namespace: Arc::from("default"),
+                pod_name: Arc::from("nginx-abc"),
+                service_name: Arc::from(""),
+                node_name: Arc::from(""),
+                labels: vec![Arc::from("app=nginx"), Arc::from("tier=frontend")].into(),
+                workloads: vec![].into(),
             },
         );
         cache.mark_synced();
@@ -337,12 +360,12 @@ mod tests {
         cache.upsert(
             IpAddr::V4(Ipv4Addr::new(192, 168, 1, 10)),
             Identity {
-                namespace: String::new(),
-                pod_name: String::new(),
-                service_name: String::new(),
-                node_name: "node-1".into(),
-                labels: vec![],
-                workloads: vec![],
+                namespace: Arc::from(""),
+                pod_name: Arc::from(""),
+                service_name: Arc::from(""),
+                node_name: Arc::from("node-1"),
+                labels: vec![].into(),
+                workloads: vec![].into(),
             },
         );
         cache.mark_synced();
@@ -363,12 +386,12 @@ mod tests {
         cache.upsert(
             IpAddr::V4(Ipv4Addr::new(192, 168, 1, 5)),
             Identity {
-                namespace: String::new(),
-                pod_name: String::new(),
-                service_name: String::new(),
-                node_name: "my-node".into(),
-                labels: vec![],
-                workloads: vec![],
+                namespace: Arc::from(""),
+                pod_name: Arc::from(""),
+                service_name: Arc::from(""),
+                node_name: Arc::from("my-node"),
+                labels: vec![].into(),
+                workloads: vec![].into(),
             },
         );
         cache.mark_synced();

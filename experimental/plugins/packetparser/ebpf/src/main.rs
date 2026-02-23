@@ -4,9 +4,13 @@
 use aya_ebpf::{
     bindings::TC_ACT_UNSPEC,
     macros::{classifier, map},
-    maps::{LruHashMap, PerfEventArray},
+    maps::{Array, LruHashMap},
     programs::TcContext,
 };
+#[cfg(feature = "ringbuf")]
+use aya_ebpf::maps::RingBuf;
+#[cfg(not(feature = "ringbuf"))]
+use aya_ebpf::maps::PerfEventArray;
 use aya_log_ebpf::trace;
 use network_types::{
     eth::{EthHdr, EtherType},
@@ -18,11 +22,34 @@ use retina_common::*;
 
 mod conntrack;
 
+#[cfg(feature = "ringbuf")]
+#[map]
+static EVENTS: RingBuf = RingBuf::with_byte_size(2_097_152, 0); // 2MB
+
+#[cfg(not(feature = "ringbuf"))]
 #[map]
 static EVENTS: PerfEventArray<PacketEvent> = PerfEventArray::new(0);
 
 #[map]
 static CONNTRACK: LruHashMap<CtV4Key, CtEntry> = LruHashMap::with_max_entries(CT_MAP_SIZE, 0);
+
+/// Runtime configuration map. Index 0 = sampling rate (u32).
+/// 0 or 1 = no sampling; N = report ~1/N packets probabilistically.
+#[map]
+static RETINA_CONFIG: Array<u32> = Array::with_max_entries(1, 0);
+
+/// Determine if this packet is sampled based on the configured rate.
+/// Returns true if the packet should be considered for reporting.
+#[inline(always)]
+fn is_sampled() -> bool {
+    let rate = match RETINA_CONFIG.get(0) {
+        Some(&r) if r > 1 => r,
+        _ => return true, // rate 0 or 1 = no sampling
+    };
+    let threshold = u32::MAX / rate;
+    let rand = unsafe { aya_ebpf::helpers::bpf_get_prandom_u32() } as u32;
+    rand < threshold
+}
 
 /// Core packet parsing and conntrack processing.
 #[inline(always)]
@@ -91,8 +118,11 @@ fn try_parse(ctx: &TcContext, obs_point: u8) -> Result<i32, ()> {
         }
     }
 
+    // Compute sampling decision.
+    let sampled = is_sampled();
+
     // Process through conntrack.
-    let report = conntrack::ct_process_packet(&CONNTRACK, &mut pkt, obs_point);
+    let report = conntrack::ct_process_packet(&CONNTRACK, &mut pkt, obs_point, sampled);
 
     if report.report {
         pkt.previously_observed_packets = report.previously_observed_packets;
@@ -108,7 +138,14 @@ fn try_parse(ctx: &TcContext, obs_point: u8) -> Result<i32, ()> {
             skb_len,
         );
 
-        EVENTS.output(ctx, &pkt, 0);
+        #[cfg(feature = "ringbuf")]
+        {
+            let _ = EVENTS.output::<PacketEvent>(&pkt, 0);
+        }
+        #[cfg(not(feature = "ringbuf"))]
+        {
+            EVENTS.output(ctx, &pkt, 0);
+        }
     }
 
     Ok(TC_ACT_UNSPEC)

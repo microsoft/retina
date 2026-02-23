@@ -8,6 +8,10 @@ edition = "2021"
 # bpfel-unknown-none target and cannot share a workspace with userspace crates.
 [workspace]
 
+[features]
+default = []
+ringbuf = []
+
 [[bin]]
 name = "packetparser-ebpf"
 path = "src/main.rs"

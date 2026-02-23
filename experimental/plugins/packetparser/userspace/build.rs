@@ -12,7 +12,9 @@ fn main() {
             std::fs::create_dir_all(parent).expect("failed to create eBPF target directory");
         }
         std::fs::write(&ebpf_path, []).expect("failed to write eBPF stub");
-        println!("cargo::warning=eBPF binary not found; wrote empty stub. Run `cargo xtask build-ebpf --release` for a real build.");
+        println!(
+            "cargo::warning=eBPF binary not found; wrote empty stub. Run `cargo xtask build-ebpf --release` for a real build."
+        );
     }
 
     // Re-run if the eBPF binary changes (e.g. after a real build).

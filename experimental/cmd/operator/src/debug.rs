@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
+use axum::Router;
 use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::routing::get;
-use axum::Router;
 use tracing::info;
 
 use crate::state::OperatorState;
@@ -46,8 +46,14 @@ async fn ipcache_dump(State(state): State<DebugState>) -> impl IntoResponse {
 async fn stats(State(state): State<DebugState>) -> impl IntoResponse {
     let entries = state.state.len();
     let dump = state.state.dump();
-    let nodes = dump.iter().filter(|(_, id)| !id.node_name.is_empty()).count();
-    let pods = dump.iter().filter(|(_, id)| !id.pod_name.is_empty()).count();
+    let nodes = dump
+        .iter()
+        .filter(|(_, id)| !id.node_name.is_empty())
+        .count();
+    let pods = dump
+        .iter()
+        .filter(|(_, id)| !id.pod_name.is_empty())
+        .count();
     let services = dump
         .iter()
         .filter(|(_, id)| !id.service_name.is_empty())

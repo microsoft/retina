@@ -1,7 +1,7 @@
-use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::Mutex;
 use std::time::{Duration, Instant};
+
+use dashmap::DashMap;
 
 use prometheus_client::encoding::{EncodeLabelSet, EncodeLabelValue, LabelValueEncoder};
 use prometheus_client::metrics::counter::Counter;
@@ -75,12 +75,7 @@ fn endpoint_fields(ep: Option<&flow::Endpoint>) -> (String, String, String, Stri
                 .first()
                 .map(|w| (w.kind.clone(), w.name.clone()))
                 .unwrap_or_default();
-            (
-                ep.namespace.clone(),
-                ep.pod_name.clone(),
-                wl_kind,
-                wl_name,
-            )
+            (ep.namespace.clone(), ep.pod_name.clone(), wl_kind, wl_name)
         }
         None => Default::default(),
     }
@@ -128,8 +123,14 @@ pub struct Metrics {
 
     pub registry: Registry,
 
-    // TTL tracking for forward metric label sets.
-    forward_last_seen: Mutex<HashMap<ForwardLabels, Instant>>,
+    // TTL tracking for forward metric label sets (DashMap for lock-per-shard concurrency).
+    forward_last_seen: DashMap<ForwardLabels, Instant>,
+}
+
+impl Default for Metrics {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Metrics {
@@ -147,13 +148,41 @@ impl Metrics {
         // Register data-plane metrics.
         {
             let dp = registry.sub_registry_with_prefix("networkobservability");
-            dp.register("forward_count", "Forwarded packets by direction", forward_count.clone());
-            dp.register("forward_bytes", "Forwarded bytes by direction", forward_bytes.clone());
-            dp.register("conntrack_total_connections", "Current conntrack entries", conntrack_total_connections.clone());
-            dp.register("conntrack_packets_tx", "Conntrack TX packets", conntrack_packets_tx.clone());
-            dp.register("conntrack_packets_rx", "Conntrack RX packets", conntrack_packets_rx.clone());
-            dp.register("conntrack_bytes_tx", "Conntrack TX bytes", conntrack_bytes_tx.clone());
-            dp.register("conntrack_bytes_rx", "Conntrack RX bytes", conntrack_bytes_rx.clone());
+            dp.register(
+                "forward_count",
+                "Forwarded packets by direction",
+                forward_count.clone(),
+            );
+            dp.register(
+                "forward_bytes",
+                "Forwarded bytes by direction",
+                forward_bytes.clone(),
+            );
+            dp.register(
+                "conntrack_total_connections",
+                "Current conntrack entries",
+                conntrack_total_connections.clone(),
+            );
+            dp.register(
+                "conntrack_packets_tx",
+                "Conntrack TX packets",
+                conntrack_packets_tx.clone(),
+            );
+            dp.register(
+                "conntrack_packets_rx",
+                "Conntrack RX packets",
+                conntrack_packets_rx.clone(),
+            );
+            dp.register(
+                "conntrack_bytes_tx",
+                "Conntrack TX bytes",
+                conntrack_bytes_tx.clone(),
+            );
+            dp.register(
+                "conntrack_bytes_rx",
+                "Conntrack RX bytes",
+                conntrack_bytes_rx.clone(),
+            );
         }
 
         let parsed_packets_counter = Counter::default();
@@ -162,8 +191,16 @@ impl Metrics {
         // Register control-plane metrics.
         {
             let cp = registry.sub_registry_with_prefix("controlplane_networkobservability");
-            cp.register("parsed_packets_counter", "Packets parsed by packetparser", parsed_packets_counter.clone());
-            cp.register("lost_events_counter", "Events lost from perf ring buffers", lost_events_counter.clone());
+            cp.register(
+                "parsed_packets_counter",
+                "Packets parsed by packetparser",
+                parsed_packets_counter.clone(),
+            );
+            cp.register(
+                "lost_events_counter",
+                "Events lost from perf ring buffers",
+                lost_events_counter.clone(),
+            );
         }
 
         Self {
@@ -177,29 +214,29 @@ impl Metrics {
             parsed_packets_counter,
             lost_events_counter,
             registry,
-            forward_last_seen: Mutex::new(HashMap::new()),
+            forward_last_seen: DashMap::new(),
         }
     }
 
     /// Record that `labels` was just observed (updates TTL timestamp).
-    pub fn touch_forward(&self, labels: &ForwardLabels) {
-        self.forward_last_seen
-            .lock()
-            .unwrap()
-            .insert(labels.clone(), Instant::now());
+    /// Takes ownership to avoid cloning on the hot path.
+    pub fn touch_forward(&self, labels: ForwardLabels) {
+        self.forward_last_seen.insert(labels, Instant::now());
     }
 
     /// Remove forward metric label sets not seen within `ttl`.
     pub fn sweep_stale_forward(&self, ttl: Duration) {
         let now = Instant::now();
-        let mut last_seen = self.forward_last_seen.lock().unwrap();
-        let stale: Vec<ForwardLabels> = last_seen
-            .iter()
-            .filter(|(_, ts)| now.duration_since(**ts) > ttl)
-            .map(|(k, _)| k.clone())
-            .collect();
+        let mut stale = Vec::new();
+        self.forward_last_seen.retain(|labels, ts| {
+            if now.duration_since(*ts) > ttl {
+                stale.push(labels.clone());
+                false
+            } else {
+                true
+            }
+        });
         for labels in &stale {
-            last_seen.remove(labels);
             self.forward_count.remove(labels);
             self.forward_bytes.remove(labels);
         }
@@ -213,6 +250,12 @@ pub struct AgentState {
     pub plugin_started: AtomicBool,
     pub grpc_bound: AtomicBool,
     pub perf_readers_alive: AtomicUsize,
+}
+
+impl Default for AgentState {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl AgentState {
@@ -251,6 +294,8 @@ impl PerfReaderGuard {
 
 impl Drop for PerfReaderGuard {
     fn drop(&mut self) {
-        self.state.perf_readers_alive.fetch_sub(1, Ordering::Release);
+        self.state
+            .perf_readers_alive
+            .fetch_sub(1, Ordering::Release);
     }
 }
