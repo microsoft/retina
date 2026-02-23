@@ -132,12 +132,8 @@ func (p *packetParser) Generate(ctx context.Context) error {
 	return nil
 }
 
-// validateRingBufferSize validates the ring buffer size and returns the adjusted size if necessary.
-// It also returns a reason for the adjustment, if any.
-func validateRingBufferSize(size uint32) (adjustedSize uint32, reason string) {
-	// Default to 8MB if not specified.
-	// This should match the default in pkg/plugin/packetparser/_cprog/packetparser.c
-	const defaultSize = 8 * 1024 * 1024
+// validateRingBufferSize validates the ring buffer size and returns an error for invalid values.
+func validateRingBufferSize(size uint32) error {
 	const maxSize = 1 * 1024 * 1024 * 1024 // 1GB
 	intPageSize := os.Getpagesize()
 	if intPageSize <= 0 {
@@ -150,37 +146,28 @@ func validateRingBufferSize(size uint32) (adjustedSize uint32, reason string) {
 	pageSize := uint32(intPageSize)
 
 	if size == 0 {
-		return defaultSize, ""
+		return fmt.Errorf("ring buffer size must be set when ring buffers are enabled")
 	}
 	if size < pageSize {
-		return defaultSize, fmt.Sprintf(
-			"Ring buffer size (%d) is smaller than page size (%d), "+
-				"falling back to default (%d)",
+		return fmt.Errorf(
+			"ring buffer size (%d) is smaller than the kernel page size (%d)",
 			size,
 			pageSize,
-			defaultSize,
 		)
 	}
 	if size > maxSize {
-		return defaultSize, fmt.Sprintf(
-			"Ring buffer size (%d) is larger than allowed maximum (%d), "+
-				"falling back to default (%d)",
+		return fmt.Errorf(
+			"ring buffer size (%d) is larger than the allowed maximum (%d)",
 			size,
 			maxSize,
-			defaultSize,
 		)
 	}
 	// Check if size is a power of 2.
 	if (size & (size - 1)) != 0 {
-		return defaultSize, fmt.Sprintf(
-			"Ring buffer size (%d) is not a power of 2, "+
-				"falling back to default (%d)",
-			size,
-			defaultSize,
-		)
+		return fmt.Errorf("ring buffer size (%d) is not a power of 2", size)
 	}
 
-	return size, ""
+	return nil
 }
 
 func (p *packetParser) Compile(ctx context.Context) error {
@@ -217,10 +204,8 @@ func (p *packetParser) Compile(ctx context.Context) error {
 	}
 
 	if p.cfg.PacketParserRingBuffer.IsEnabled() {
-		var reason string
-		p.cfg.PacketParserRingBufferSize, reason = validateRingBufferSize(p.cfg.PacketParserRingBufferSize)
-		if reason != "" {
-			p.l.Warn(reason)
+		if err := validateRingBufferSize(p.cfg.PacketParserRingBufferSize); err != nil {
+			return err
 		}
 
 		p.l.Info("Compiling with Ring Buffer enabled", zap.Uint32("size", p.cfg.PacketParserRingBufferSize))

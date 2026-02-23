@@ -14,7 +14,6 @@ import (
 )
 
 func TestValidateRingBufferSize(t *testing.T) {
-	const defaultSize = 8 * 1024 * 1024
 	const maxSize = 1 * 1024 * 1024 * 1024 // 1GB
 	intPageSize := os.Getpagesize()
 	if intPageSize <= 0 {
@@ -27,63 +26,62 @@ func TestValidateRingBufferSize(t *testing.T) {
 	pageSize := uint32(intPageSize)
 
 	tests := []struct {
-		name           string
-		inputSize      uint32
-		expectedSize   uint32
-		expectedReason string
+		name        string
+		inputSize   uint32
+		expectedErr bool
+		expectedMsg string
 	}{
 		{
-			name:           "Zero input returns default",
-			inputSize:      0,
-			expectedSize:   defaultSize,
-			expectedReason: "",
+			name:        "Zero input returns error",
+			inputSize:   0,
+			expectedErr: true,
+			expectedMsg: "must be set",
 		},
 		{
-			name:           "Below page size returns default",
-			inputSize:      pageSize - 1,
-			expectedSize:   defaultSize,
-			expectedReason: "Ring buffer size", // partial match
+			name:        "Below page size returns error",
+			inputSize:   pageSize - 1,
+			expectedErr: true,
+			expectedMsg: "page size",
 		},
 		{
-			name:           "Above max size returns default",
-			inputSize:      maxSize + 1,
-			expectedSize:   defaultSize,
-			expectedReason: "Ring buffer size", // partial match
+			name:        "Above max size returns error",
+			inputSize:   maxSize + 1,
+			expectedErr: true,
+			expectedMsg: "maximum",
 		},
 		{
-			name:           "Not power of 2 returns default",
-			inputSize:      defaultSize + 1,
-			expectedSize:   defaultSize,
-			expectedReason: "Ring buffer size", // partial match
+			name:        "Not power of 2 returns error",
+			inputSize:   (8 * 1024 * 1024) + 1,
+			expectedErr: true,
+			expectedMsg: "power of 2",
 		},
 		{
-			name:           "Valid size returns same size",
-			inputSize:      16 * 1024 * 1024,
-			expectedSize:   16 * 1024 * 1024,
-			expectedReason: "",
+			name:        "Valid size returns no error",
+			inputSize:   16 * 1024 * 1024,
+			expectedErr: false,
 		},
 		{
-			name:           "Valid max size returns same size",
-			inputSize:      maxSize,
-			expectedSize:   maxSize,
-			expectedReason: "",
+			name:        "Valid max size returns no error",
+			inputSize:   maxSize,
+			expectedErr: false,
 		},
 		{
-			name:           "Valid page size returns same size (assuming page size is power of 2)",
-			inputSize:      pageSize,
-			expectedSize:   pageSize,
-			expectedReason: "",
+			name:        "Valid page size returns no error (assuming page size is power of 2)",
+			inputSize:   pageSize,
+			expectedErr: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			size, reason := validateRingBufferSize(tt.inputSize)
-			assert.Equal(t, tt.expectedSize, size)
-			if tt.expectedReason != "" {
-				assert.Contains(t, reason, tt.expectedReason)
+			err := validateRingBufferSize(tt.inputSize)
+			if tt.expectedErr {
+				assert.Error(t, err)
+				if tt.expectedMsg != "" {
+					assert.Contains(t, err.Error(), tt.expectedMsg)
+				}
 			} else {
-				assert.Empty(t, reason)
+				assert.NoError(t, err)
 			}
 		})
 	}
