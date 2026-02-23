@@ -42,6 +42,16 @@ where
 /// Returns `true` for transient connection/transport errors that are expected
 /// during rolling updates, operator restarts, and network blips.
 fn is_transient(err: &anyhow::Error) -> bool {
+    // Match tonic gRPC status codes directly (avoids fragile string matching).
+    if let Some(status) = err.downcast_ref::<tonic::Status>() {
+        return matches!(
+            status.code(),
+            tonic::Code::Unavailable | tonic::Code::DataLoss | tonic::Code::Aborted
+        );
+    }
+
+    // Fall back to string matching for transport/connection errors
+    // (covers kube::Error, tonic::transport::Error, hyper errors, etc.).
     let msg = format!("{err:#}");
     msg.contains("h2 protocol error")
         || msg.contains("connection reset")

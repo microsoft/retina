@@ -25,6 +25,7 @@ use retina_proto::{
 };
 use tokio::sync::broadcast;
 use tokio_stream::wrappers::ReceiverStream;
+use tonic::codec::CompressionEncoding;
 use tonic::{Request, Response, Status};
 use tracing::info;
 
@@ -472,8 +473,16 @@ pub async fn serve(
     agent_state.grpc_bound.store(true, Ordering::Release);
 
     tonic::transport::Server::builder()
-        .add_service(ObserverServer::new(observer))
-        .add_service(PeerServer::new(peer))
+        .add_service(
+            ObserverServer::new(observer)
+                .accept_compressed(CompressionEncoding::Gzip)
+                .send_compressed(CompressionEncoding::Gzip),
+        )
+        .add_service(
+            PeerServer::new(peer)
+                .accept_compressed(CompressionEncoding::Gzip)
+                .send_compressed(CompressionEncoding::Gzip),
+        )
         .serve(addr)
         .await?;
 

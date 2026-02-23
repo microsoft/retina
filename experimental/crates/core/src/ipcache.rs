@@ -14,7 +14,6 @@ pub enum IpCacheEvent {
 }
 
 // Reserved numeric identities (matching Cilium conventions).
-pub const IDENTITY_UNKNOWN: u32 = 0;
 pub const IDENTITY_HOST: u32 = 1;
 pub const IDENTITY_WORLD: u32 = 2;
 pub const IDENTITY_REMOTE_NODE: u32 = 6;
@@ -142,33 +141,6 @@ impl IpCache {
         *self.local_node_name.write().expect("lock poisoned") = name;
     }
 
-    /// Resolve the numeric identity for a cached identity, taking into account
-    /// reserved identities that require context (local node, API server).
-    ///
-    /// - `default/kubernetes` service → `IDENTITY_KUBE_APISERVER` (7)
-    /// - Local node → `IDENTITY_HOST` (1)
-    /// - Remote node → `IDENTITY_REMOTE_NODE` (6)
-    /// - Pods → hash labels into \[256, 65535\]
-    /// - Other services → hash into \[256, 65535\]
-    /// - Unknown → `IDENTITY_WORLD` (2)
-    pub fn resolve_identity(&self, id: &Identity) -> u32 {
-        // Kubernetes API server service.
-        if &*id.namespace == "default" && &*id.service_name == "kubernetes" {
-            return IDENTITY_KUBE_APISERVER;
-        }
-
-        // Local node vs remote node.
-        if !id.node_name.is_empty() {
-            let local = self.local_node_name.read().expect("lock poisoned");
-            if !local.is_empty() && *local == *id.node_name {
-                return IDENTITY_HOST;
-            }
-            return IDENTITY_REMOTE_NODE;
-        }
-
-        id.numeric_identity()
-    }
-
     pub fn upsert(&self, ip: IpAddr, identity: Identity) {
         self.inner
             .write()
@@ -245,12 +217,9 @@ impl IpCache {
         }
     }
 
+    #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
         self.inner.read().expect("lock poisoned").len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
     }
 
     /// Return a snapshot of all entries for debugging.
@@ -498,13 +467,15 @@ mod tests {
             labels: vec![].into(),
             workloads: vec![].into(),
         };
-        assert_eq!(cache.resolve_identity(&id), IDENTITY_KUBE_APISERVER);
+        assert_eq!(
+            cache.resolve_identity_with_local(&id, ""),
+            IDENTITY_KUBE_APISERVER
+        );
     }
 
     #[test]
     fn resolve_local_node_is_host() {
         let cache = IpCache::new();
-        cache.set_local_node_name("my-node".into());
         let id = Identity {
             namespace: Arc::from(""),
             pod_name: Arc::from(""),
@@ -513,13 +484,15 @@ mod tests {
             labels: vec![].into(),
             workloads: vec![].into(),
         };
-        assert_eq!(cache.resolve_identity(&id), IDENTITY_HOST);
+        assert_eq!(
+            cache.resolve_identity_with_local(&id, "my-node"),
+            IDENTITY_HOST
+        );
     }
 
     #[test]
     fn resolve_remote_node_stays_remote() {
         let cache = IpCache::new();
-        cache.set_local_node_name("my-node".into());
         let id = Identity {
             namespace: Arc::from(""),
             pod_name: Arc::from(""),
@@ -528,7 +501,10 @@ mod tests {
             labels: vec![].into(),
             workloads: vec![].into(),
         };
-        assert_eq!(cache.resolve_identity(&id), IDENTITY_REMOTE_NODE);
+        assert_eq!(
+            cache.resolve_identity_with_local(&id, "my-node"),
+            IDENTITY_REMOTE_NODE
+        );
     }
 
     #[test]
@@ -543,6 +519,9 @@ mod tests {
             labels: vec![].into(),
             workloads: vec![].into(),
         };
-        assert_eq!(cache.resolve_identity(&id), IDENTITY_REMOTE_NODE);
+        assert_eq!(
+            cache.resolve_identity_with_local(&id, ""),
+            IDENTITY_REMOTE_NODE
+        );
     }
 }

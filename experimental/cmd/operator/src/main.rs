@@ -59,15 +59,13 @@ async fn main() -> anyhow::Result<()> {
     // Start gRPC server with graceful shutdown support.
     let grpc_handle = {
         let shutdown = shutdown.clone();
-        tokio::spawn(grpc::serve(
-            cli.grpc_port,
-            state.clone(),
-            async move { shutdown.notified().await },
-        ))
+        tokio::spawn(grpc::serve(cli.grpc_port, state.clone(), async move {
+            shutdown.notified().await
+        }))
     };
 
     // Start debug HTTP server.
-    let debug_handle = tokio::spawn(debug::serve(cli.debug_port, state));
+    let debug_handle = tokio::spawn(debug::serve(cli.debug_port, state.clone()));
 
     info!("retina-operator running");
 
@@ -77,6 +75,13 @@ async fn main() -> anyhow::Result<()> {
         _ = sigterm.recv() => {},
     }
     info!("shutting down...");
+
+    // Notify agents of graceful shutdown so they preserve their cache.
+    state.broadcast_shutdown();
+
+    // Brief pause for the SHUTDOWN message to propagate through the
+    // broadcast channel and MPSC channels to connected agents.
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
     // Signal the gRPC server to drain in-flight streams gracefully,
     // so agents see a clean end-of-stream instead of an h2 crash.

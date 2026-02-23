@@ -16,11 +16,7 @@ pub enum EventSource {
     Ring(RingBuf<MapData>),
 }
 
-pub type EbpfHandles = (
-    Ebpf,
-    EventSource,
-    HashMap<MapData, CtV4Key, CtEntry>,
-);
+pub type EbpfHandles = (Ebpf, EventSource, HashMap<MapData, CtV4Key, CtEntry>);
 
 /// Force 8-byte alignment on embedded byte data so the `object` crate's ELF
 /// parser can cast the pointer to `Elf64_Ehdr` without misalignment.
@@ -81,7 +77,10 @@ pub fn load_and_attach(
     ring_buffer_size: u32,
 ) -> anyhow::Result<EbpfHandles> {
     let use_ringbuf = kernel_supports_ringbuf();
-    info!(use_ringbuf, "selecting event buffer type based on kernel version");
+    info!(
+        use_ringbuf,
+        "selecting event buffer type based on kernel version"
+    );
 
     let mut ebpf = if use_ringbuf {
         info!(ring_buffer_size, "loading ringbuf eBPF variant");

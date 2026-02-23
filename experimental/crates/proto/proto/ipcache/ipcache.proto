@@ -2,11 +2,15 @@ syntax = "proto3";
 package ipcache;
 
 service IpCache {
-    rpc StreamUpdates(IpCacheRequest) returns (stream IpCacheUpdate) {}
+    rpc StreamUpdates(IpCacheRequest) returns (stream IpCacheBatch) {}
 }
 
 message IpCacheRequest {
     string node_name = 1;
+}
+
+message IpCacheBatch {
+    repeated IpCacheUpdate updates = 1;
 }
 
 message IpCacheUpdate {
@@ -23,6 +27,7 @@ message IpCacheUpdate {
         UPSERT = 0;
         DELETE = 1;
         SYNC_COMPLETE = 2;
+        SHUTDOWN = 3;
     }
 }
 

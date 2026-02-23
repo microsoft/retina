@@ -2,7 +2,7 @@ mod bench_helpers;
 
 use std::time::Duration;
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use retina_core::metrics::{ForwardLabels, Metrics};
 
 fn bench_forward_labels(c: &mut Criterion) {

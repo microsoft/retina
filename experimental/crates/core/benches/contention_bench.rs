@@ -4,7 +4,7 @@ use std::net::Ipv4Addr;
 use std::sync::{Arc, Barrier};
 use std::time::Instant;
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use retina_core::enricher::enrich_flow;
 use retina_core::flow::packet_event_to_flow;
 use retina_core::metrics::{ForwardLabels, Metrics};
@@ -98,8 +98,7 @@ fn bench_full_pipeline_contention(c: &mut Criterion) {
                                 let barrier = barrier.clone();
                                 std::thread::spawn(move || {
                                     let mut pkt = bench_helpers::make_tcp_ack_event();
-                                    pkt.src_ip =
-                                        u32::from(Ipv4Addr::new(10, 0, 0, (t as u8) + 1));
+                                    pkt.src_ip = u32::from(Ipv4Addr::new(10, 0, 0, (t as u8) + 1));
                                     barrier.wait();
                                     let start = Instant::now();
                                     for _ in 0..ITERATIONS_PER_THREAD {

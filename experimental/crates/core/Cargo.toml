@@ -11,6 +11,7 @@ retina-common.workspace = true
 retina-proto.workspace = true
 
 anyhow.workspace = true
+tonic.workspace = true
 dashmap.workspace = true
 async-trait.workspace = true
 libc.workspace = true

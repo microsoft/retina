@@ -2,7 +2,7 @@ mod bench_helpers;
 
 use std::sync::Arc;
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use retina_core::enricher::enrich_flow;
 use retina_core::flow::packet_event_to_flow;
 use retina_core::metrics::{ForwardLabels, Metrics};

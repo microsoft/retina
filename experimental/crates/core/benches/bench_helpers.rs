@@ -147,12 +147,7 @@ pub fn make_populated_ipcache(n: usize) -> IpCache {
         };
         let labels: &[&str] = match i % 3 {
             0 => &["app=nginx", "tier=frontend", "env=prod"],
-            1 => &[
-                "app=redis",
-                "tier=backend",
-                "env=prod",
-                "version=v2",
-            ],
+            1 => &["app=redis", "tier=backend", "env=prod", "version=v2"],
             _ => &[
                 "app=coredns",
                 "k8s-app=kube-dns",
@@ -161,10 +156,7 @@ pub fn make_populated_ipcache(n: usize) -> IpCache {
                 "managed-by=helm",
             ],
         };
-        cache.upsert(
-            ip,
-            make_pod_identity(ns, &format!("pod-{i}"), labels),
-        );
+        cache.upsert(ip, make_pod_identity(ns, &format!("pod-{i}"), labels));
     }
     cache.mark_synced();
     cache

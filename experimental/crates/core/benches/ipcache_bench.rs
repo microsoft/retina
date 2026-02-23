@@ -3,7 +3,7 @@ mod bench_helpers;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use retina_core::ipcache::{Identity, Workload};
 
 fn bench_ipcache_get(c: &mut Criterion) {

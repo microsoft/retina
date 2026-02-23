@@ -1,6 +1,6 @@
 mod bench_helpers;
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use retina_core::flow::{make_extensions, packet_event_to_flow, tcp_flags_summary};
 use retina_proto::flow::TcpFlags;
 
@@ -37,9 +37,7 @@ fn bench_tcp_flags_summary(c: &mut Criterion) {
         syn: true,
         ..Default::default()
     };
-    group.bench_function("syn", |b| {
-        b.iter(|| tcp_flags_summary(black_box(&syn)))
-    });
+    group.bench_function("syn", |b| b.iter(|| tcp_flags_summary(black_box(&syn))));
 
     let syn_ack = TcpFlags {
         syn: true,
@@ -54,9 +52,7 @@ fn bench_tcp_flags_summary(c: &mut Criterion) {
         ack: true,
         ..Default::default()
     };
-    group.bench_function("ack", |b| {
-        b.iter(|| tcp_flags_summary(black_box(&ack)))
-    });
+    group.bench_function("ack", |b| b.iter(|| tcp_flags_summary(black_box(&ack))));
 
     let fin_rst = TcpFlags {
         fin: true,
@@ -73,13 +69,9 @@ fn bench_tcp_flags_summary(c: &mut Criterion) {
 fn bench_make_extensions(c: &mut Criterion) {
     let mut group = c.benchmark_group("make_extensions");
 
-    group.bench_function("nonzero", |b| {
-        b.iter(|| make_extensions(black_box(1500)))
-    });
+    group.bench_function("nonzero", |b| b.iter(|| make_extensions(black_box(1500))));
 
-    group.bench_function("zero", |b| {
-        b.iter(|| make_extensions(black_box(0)))
-    });
+    group.bench_function("zero", |b| b.iter(|| make_extensions(black_box(0))));
 
     group.finish();
 }

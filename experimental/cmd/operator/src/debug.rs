@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use axum::Router;
 use axum::extract::State;
@@ -20,21 +21,25 @@ async fn ipcache_dump(State(state): State<DebugState>) -> impl IntoResponse {
         .map(|(ip, id)| {
             let mut obj = serde_json::Map::new();
             if !id.namespace.is_empty() {
-                obj.insert("namespace".into(), id.namespace.into());
+                obj.insert("namespace".into(), id.namespace.to_string().into());
             }
             if !id.pod_name.is_empty() {
-                obj.insert("pod_name".into(), id.pod_name.into());
+                obj.insert("pod_name".into(), id.pod_name.to_string().into());
             }
             if !id.service_name.is_empty() {
-                obj.insert("service_name".into(), id.service_name.into());
+                obj.insert("service_name".into(), id.service_name.to_string().into());
             }
             if !id.node_name.is_empty() {
-                obj.insert("node_name".into(), id.node_name.into());
+                obj.insert("node_name".into(), id.node_name.to_string().into());
             }
             if !id.labels.is_empty() {
                 obj.insert(
                     "labels".into(),
-                    id.labels.into_iter().collect::<Vec<_>>().into(),
+                    id.labels
+                        .iter()
+                        .map(|l| l.to_string())
+                        .collect::<Vec<_>>()
+                        .into(),
                 );
             }
             (ip.to_string(), serde_json::Value::Object(obj))
@@ -44,7 +49,6 @@ async fn ipcache_dump(State(state): State<DebugState>) -> impl IntoResponse {
 }
 
 async fn stats(State(state): State<DebugState>) -> impl IntoResponse {
-    let entries = state.state.len();
     let dump = state.state.dump();
     let nodes = dump
         .iter()
@@ -59,10 +63,16 @@ async fn stats(State(state): State<DebugState>) -> impl IntoResponse {
         .filter(|(_, id)| !id.service_name.is_empty())
         .count();
     axum::Json(serde_json::json!({
-        "total_entries": entries,
+        "total_entries": dump.len(),
         "nodes": nodes,
         "pods": pods,
         "services": services,
+        "upserts_total": state.state.upserts_total.load(Ordering::Relaxed),
+        "upserts_skipped": state.state.upserts_skipped.load(Ordering::Relaxed),
+        "deletes_total": state.state.deletes_total.load(Ordering::Relaxed),
+        "connected_agents": state.state.connected_agents.load(Ordering::Relaxed),
+        "broadcast_queue_depth": state.state.broadcast_queue_depth(),
+        "broadcast_capacity": state.state.broadcast_capacity(),
     }))
 }
 

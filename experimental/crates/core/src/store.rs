@@ -59,12 +59,9 @@ impl<T> RingBuffer<T> {
     }
 
     /// Current number of items in the buffer.
+    #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> u64 {
         self.items.read().expect("lock poisoned").len() as u64
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
     }
 
     /// Cumulative count of items ever pushed.

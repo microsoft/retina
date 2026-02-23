@@ -2,7 +2,7 @@ mod bench_helpers;
 
 use std::sync::Arc;
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use retina_core::store::FlowStore;
 use retina_proto::flow::Flow;
 

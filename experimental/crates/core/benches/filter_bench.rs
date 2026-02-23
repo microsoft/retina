@@ -1,6 +1,6 @@
 mod bench_helpers;
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use retina_core::filter::FlowFilterSet;
 
 fn bench_filter_compile(c: &mut Criterion) {
@@ -30,9 +30,7 @@ fn bench_filter_matches(c: &mut Criterion) {
 
     let (ew, eb) = bench_helpers::empty_filters();
     let empty_fs = FlowFilterSet::compile(&ew, &eb);
-    group.bench_function("empty", |b| {
-        b.iter(|| empty_fs.matches(black_box(&flow)))
-    });
+    group.bench_function("empty", |b| b.iter(|| empty_fs.matches(black_box(&flow))));
 
     let (sw, sb) = bench_helpers::simple_whitelist();
     let simple_fs = FlowFilterSet::compile(&sw, &sb);

@@ -30,9 +30,6 @@ pub const CT_SYN_TIMEOUT: u32 = 60;
 pub const CT_REPORT_INTERVAL: u32 = 30;
 pub const CT_MAP_SIZE: u32 = 262_144;
 
-// ── Ethernet constants ───────────────────────────────────────────────
-pub const ETH_P_IP: u16 = 0x0800;
-
 // ── IP protocol numbers ──────────────────────────────────────────────
 pub const IPPROTO_TCP: u8 = 6;
 pub const IPPROTO_UDP: u8 = 17;

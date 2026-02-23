@@ -50,13 +50,12 @@ impl Plugin for PacketParser {
     }
 
     async fn start(&mut self, ctx: PluginContext) -> anyhow::Result<()> {
-        let (mut ebpf, event_source, conntrack_map) =
-            loader::load_and_attach(
-                self.host_iface.as_deref(),
-                self.sampling_rate,
-                self.ring_buffer_size,
-            )
-            .context("failed to load and attach eBPF programs")?;
+        let (mut ebpf, event_source, conntrack_map) = loader::load_and_attach(
+            self.host_iface.as_deref(),
+            self.sampling_rate,
+            self.ring_buffer_size,
+        )
+        .context("failed to load and attach eBPF programs")?;
 
         // Set up aya-log forwarding (best-effort).
         let ebpf_logger = match aya_log::EbpfLogger::init(&mut ebpf) {
@@ -144,8 +143,9 @@ impl Plugin for PacketParser {
         // Conditionally spawn veth watcher for pod-level monitoring.
         if self.pod_level {
             let ebpf_clone = ebpf.clone();
+            let watcher_ip_cache = ctx.ip_cache.clone();
             self.watcher_handle = Some(tokio::spawn(async move {
-                let mut w = crate::watcher::VethWatcher::new(ebpf_clone);
+                let mut w = crate::watcher::VethWatcher::new(ebpf_clone, watcher_ip_cache);
                 if let Err(e) = w.run().await {
                     error!("veth watcher error: {e}");
                 }

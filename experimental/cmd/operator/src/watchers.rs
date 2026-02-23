@@ -6,10 +6,9 @@ use k8s_openapi::api::core::v1::{Node, Pod, Service};
 use kube::runtime::watcher::{self, Event};
 use kube::{Api, Client};
 use retina_core::retry::retry_with_backoff;
-use retina_proto::ipcache::Workload;
 use tracing::{debug, warn};
 
-use crate::state::{CachedIdentity, OperatorState};
+use crate::state::{CachedIdentity, CachedWorkload, OperatorState, ResourceKind};
 
 /// Watch all pods cluster-wide and upsert/delete their IPs.
 /// Automatically restarts with backoff on stream errors.
@@ -67,14 +66,19 @@ fn handle_pod_apply(pod: &Pod, state: &OperatorState) {
     };
 
     // Build labels as "key=value".
-    let labels: Vec<String> = meta
+    let labels: Arc<[Arc<str>]> = meta
         .labels
         .as_ref()
-        .map(|m| m.iter().map(|(k, v)| format!("{k}={v}")).collect())
-        .unwrap_or_default();
+        .map(|m| {
+            m.iter()
+                .map(|(k, v)| Arc::from(format!("{k}={v}").as_str()))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default()
+        .into();
 
     // Extract workloads from owner references.
-    let workloads: Vec<Workload> = meta
+    let workloads: Arc<[CachedWorkload]> = meta
         .owner_references
         .as_ref()
         .map(|refs| {
@@ -85,13 +89,14 @@ fn handle_pod_apply(pod: &Pod, state: &OperatorState) {
                         "ReplicaSet" | "Deployment" | "StatefulSet" | "DaemonSet" | "Job"
                     )
                 })
-                .map(|r| Workload {
-                    name: r.name.clone(),
-                    kind: r.kind.clone(),
+                .map(|r| CachedWorkload {
+                    name: Arc::from(r.name.as_str()),
+                    kind: Arc::from(r.kind.as_str()),
                 })
-                .collect()
+                .collect::<Vec<_>>()
         })
-        .unwrap_or_default();
+        .unwrap_or_default()
+        .into();
 
     for pod_ip in pod_ips {
         let ip_str = &pod_ip.ip;
@@ -110,10 +115,11 @@ fn handle_pod_apply(pod: &Pod, state: &OperatorState) {
         state.upsert(
             ip,
             CachedIdentity {
-                namespace: namespace.to_string(),
-                pod_name: name.to_string(),
-                service_name: String::new(),
-                node_name: String::new(),
+                resource_kind: ResourceKind::Pod,
+                namespace: Arc::from(namespace),
+                pod_name: Arc::from(name),
+                service_name: Arc::from(""),
+                node_name: Arc::from(""),
                 labels: labels.clone(),
                 workloads: workloads.clone(),
             },
@@ -143,7 +149,7 @@ fn handle_pod_delete(pod: &Pod, state: &OperatorState) {
                 && let Ok(ip) = pod_ip.ip.parse::<IpAddr>()
             {
                 debug!(pod = name, %ip, "delete pod");
-                state.delete(&ip);
+                state.delete(&ip, ResourceKind::Pod);
             }
         }
     }
@@ -219,12 +225,13 @@ fn handle_service_apply(svc: &Service, state: &OperatorState) {
         state.upsert(
             ip,
             CachedIdentity {
-                namespace: namespace.to_string(),
-                pod_name: String::new(),
-                service_name: name.to_string(),
-                node_name: String::new(),
-                labels: Vec::new(),
-                workloads: Vec::new(),
+                resource_kind: ResourceKind::Service,
+                namespace: Arc::from(namespace),
+                pod_name: Arc::from(""),
+                service_name: Arc::from(name),
+                node_name: Arc::from(""),
+                labels: vec![].into(),
+                workloads: vec![].into(),
             },
         );
     }
@@ -234,7 +241,7 @@ fn handle_service_delete(svc: &Service, state: &OperatorState) {
     let name = svc.metadata.name.as_deref().unwrap_or_default();
     for ip in service_ips(svc) {
         debug!(svc = name, %ip, "delete service");
-        state.delete(&ip);
+        state.delete(&ip, ResourceKind::Service);
     }
 }
 
@@ -307,12 +314,12 @@ fn pod_cidr_gateway(cidr: &str) -> Option<IpAddr> {
     let ip: IpAddr = ip_str.parse().ok()?;
     match ip {
         IpAddr::V4(v4) => {
-            let bits = u32::from(v4);
-            Some(IpAddr::V4((bits + 1).into()))
+            let bits = u32::from(v4).checked_add(1)?;
+            Some(IpAddr::V4(bits.into()))
         }
         IpAddr::V6(v6) => {
-            let bits = u128::from(v6);
-            Some(IpAddr::V6((bits + 1).into()))
+            let bits = u128::from(v6).checked_add(1)?;
+            Some(IpAddr::V6(bits.into()))
         }
     }
 }
@@ -324,12 +331,13 @@ fn handle_node_apply(node: &Node, state: &OperatorState) {
         state.upsert(
             ip,
             CachedIdentity {
-                namespace: String::new(),
-                pod_name: String::new(),
-                service_name: String::new(),
-                node_name: name.to_string(),
-                labels: Vec::new(),
-                workloads: Vec::new(),
+                resource_kind: ResourceKind::Node,
+                namespace: Arc::from(""),
+                pod_name: Arc::from(""),
+                service_name: Arc::from(""),
+                node_name: Arc::from(name),
+                labels: vec![].into(),
+                workloads: vec![].into(),
             },
         );
     }
@@ -339,6 +347,6 @@ fn handle_node_delete(node: &Node, state: &OperatorState) {
     let name = node.metadata.name.as_deref().unwrap_or_default();
     for ip in node_ips(node) {
         debug!(node = name, %ip, "delete node");
-        state.delete(&ip);
+        state.delete(&ip, ResourceKind::Node);
     }
 }

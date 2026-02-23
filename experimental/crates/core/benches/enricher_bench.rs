@@ -1,6 +1,6 @@
 mod bench_helpers;
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use retina_core::enricher::{enrich_flow, identity_names};
 use retina_core::flow::packet_event_to_flow;
 use retina_core::ipcache::IpCache;
@@ -48,21 +48,14 @@ fn bench_enrich_flow(c: &mut Criterion) {
 fn bench_identity_names(c: &mut Criterion) {
     let mut group = c.benchmark_group("identity_names");
 
-    let pod_id =
-        bench_helpers::make_pod_identity("default", "nginx-abc123", &["app=nginx"]);
-    group.bench_function("pod", |b| {
-        b.iter(|| identity_names(black_box(&pod_id)))
-    });
+    let pod_id = bench_helpers::make_pod_identity("default", "nginx-abc123", &["app=nginx"]);
+    group.bench_function("pod", |b| b.iter(|| identity_names(black_box(&pod_id))));
 
     let svc_id = bench_helpers::make_service_identity("default", "kubernetes");
-    group.bench_function("service", |b| {
-        b.iter(|| identity_names(black_box(&svc_id)))
-    });
+    group.bench_function("service", |b| b.iter(|| identity_names(black_box(&svc_id))));
 
     let node_id = bench_helpers::make_node_identity("node-1");
-    group.bench_function("node", |b| {
-        b.iter(|| identity_names(black_box(&node_id)))
-    });
+    group.bench_function("node", |b| b.iter(|| identity_names(black_box(&node_id))));
 
     group.finish();
 }

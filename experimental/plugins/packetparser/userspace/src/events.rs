@@ -208,7 +208,14 @@ pub async fn run_ring_reader(
             // Drop item now to advance the consumer position promptly.
             drop(item);
 
-            process_packet_event(&pkt, boot_offset_ns, &flow_tx, &flow_store, &ip_cache, &metrics);
+            process_packet_event(
+                &pkt,
+                boot_offset_ns,
+                &flow_tx,
+                &flow_store,
+                &ip_cache,
+                &metrics,
+            );
         }
 
         // Clear readiness so we wait for the next epoll wakeup.

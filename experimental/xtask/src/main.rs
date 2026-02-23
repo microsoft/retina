@@ -222,8 +222,7 @@ fn build_ebpf(release: bool) -> anyhow::Result<()> {
 
     // Save the perf variant before the ringbuf build overwrites it.
     let perf_backup = output_path.with_file_name("packetparser-ebpf-perf-tmp");
-    std::fs::copy(&output_path, &perf_backup)
-        .context("failed to backup perf eBPF binary")?;
+    std::fs::copy(&output_path, &perf_backup).context("failed to backup perf eBPF binary")?;
 
     // 2. Build ringbuf variant (--features ringbuf).
     let mut cmd = Command::new("cargo");
@@ -244,10 +243,8 @@ fn build_ebpf(release: bool) -> anyhow::Result<()> {
     println!("eBPF ringbuf variant built");
 
     // 3. Move ringbuf output to its final name, restore perf variant.
-    std::fs::rename(&output_path, &ringbuf_path)
-        .context("failed to rename ringbuf eBPF binary")?;
-    std::fs::rename(&perf_backup, &output_path)
-        .context("failed to restore perf eBPF binary")?;
+    std::fs::rename(&output_path, &ringbuf_path).context("failed to rename ringbuf eBPF binary")?;
+    std::fs::rename(&perf_backup, &output_path).context("failed to restore perf eBPF binary")?;
 
     println!("eBPF programs built successfully (perf + ringbuf)");
     Ok(())

@@ -1,9 +1,13 @@
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use retina_proto::ipcache::ip_cache_server::{IpCache, IpCacheServer};
-use retina_proto::ipcache::{IpCacheRequest, IpCacheUpdate, ip_cache_update::UpdateType};
+use retina_proto::ipcache::{
+    IpCacheBatch, IpCacheRequest, IpCacheUpdate, ip_cache_update::UpdateType,
+};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
+use tonic::codec::CompressionEncoding;
 use tonic::{Request, Response, Status};
 use tracing::{info, warn};
 
@@ -22,18 +26,31 @@ impl IpCacheService {
 
     pub fn into_server(self) -> IpCacheServer<Self> {
         IpCacheServer::new(self)
+            .accept_compressed(CompressionEncoding::Gzip)
+            .send_compressed(CompressionEncoding::Gzip)
+    }
+}
+
+/// Drop guard that decrements the connected agent counter when the
+/// per-agent streaming task ends (by any means, including panics).
+struct AgentDisconnectGuard(Arc<OperatorState>);
+
+impl Drop for AgentDisconnectGuard {
+    fn drop(&mut self) {
+        self.0.connected_agents.fetch_sub(1, Ordering::Relaxed);
     }
 }
 
 #[tonic::async_trait]
 impl IpCache for IpCacheService {
-    type StreamUpdatesStream = ReceiverStream<Result<IpCacheUpdate, Status>>;
+    type StreamUpdatesStream = ReceiverStream<Result<IpCacheBatch, Status>>;
 
     async fn stream_updates(
         &self,
         request: Request<IpCacheRequest>,
     ) -> Result<Response<Self::StreamUpdatesStream>, Status> {
         let node_name = request.into_inner().node_name;
+        self.state.connected_agents.fetch_add(1, Ordering::Relaxed);
         info!(%node_name, "agent connected, starting IP cache stream");
 
         let (tx, rx) = mpsc::channel(SNAPSHOT_CHANNEL_CAPACITY);
@@ -41,25 +58,29 @@ impl IpCache for IpCacheService {
         // Subscribe BEFORE snapshot to avoid missing updates.
         let mut broadcast_rx = self.state.subscribe();
 
-        // Send full snapshot.
+        // Send full snapshot as a single batch message.
         let snapshot = self.state.snapshot();
         let snapshot_len = snapshot.len();
 
-        let tx_clone = tx.clone();
+        let state = self.state.clone();
         tokio::spawn(async move {
-            // Send all snapshot entries.
-            for update in snapshot {
-                if tx_clone.send(Ok(update)).await.is_err() {
-                    return; // Client disconnected.
-                }
+            // Guard decrements connected_agents on any exit.
+            let _guard = AgentDisconnectGuard(state);
+
+            // Send entire snapshot as one batch (single gRPC frame).
+            let snapshot_batch = IpCacheBatch { updates: snapshot };
+            if tx.send(Ok(snapshot_batch)).await.is_err() {
+                return; // Client disconnected.
             }
 
             // Send SYNC_COMPLETE marker.
-            let sync_complete = IpCacheUpdate {
-                update_type: UpdateType::SyncComplete.into(),
-                ..Default::default()
+            let sync_complete = IpCacheBatch {
+                updates: vec![IpCacheUpdate {
+                    update_type: UpdateType::SyncComplete.into(),
+                    ..Default::default()
+                }],
             };
-            if tx_clone.send(Ok(sync_complete)).await.is_err() {
+            if tx.send(Ok(sync_complete)).await.is_err() {
                 return;
             }
 
@@ -69,27 +90,39 @@ impl IpCache for IpCacheService {
             );
 
             // Forward incremental updates.
+            // Use select! to also detect client disconnect via tx.closed(),
+            // so we don't leak tasks when no broadcast updates are flowing
+            // (e.g. when change detection skips redundant upserts).
             loop {
-                match broadcast_rx.recv().await {
-                    Ok(update) => {
-                        if tx_clone.send(Ok(update)).await.is_err() {
-                            break; // Client disconnected.
+                tokio::select! {
+                    result = broadcast_rx.recv() => {
+                        match result {
+                            Ok(update) => {
+                                let batch = IpCacheBatch { updates: vec![update] };
+                                if tx.send(Ok(batch)).await.is_err() {
+                                    break; // Client disconnected.
+                                }
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                                warn!(
+                                    node_name,
+                                    lagged = n,
+                                    "broadcast overflow, forcing client reconnect"
+                                );
+                                let _ = tx
+                                    .send(Err(Status::data_loss(
+                                        "broadcast overflow, please reconnect",
+                                    )))
+                                    .await;
+                                break;
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                         }
                     }
-                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                        warn!(
-                            node_name,
-                            lagged = n,
-                            "broadcast overflow, forcing client reconnect"
-                        );
-                        let _ = tx_clone
-                            .send(Err(Status::data_loss(
-                                "broadcast overflow, please reconnect",
-                            )))
-                            .await;
+                    _ = tx.closed() => {
+                        info!(node_name, "agent disconnected");
                         break;
                     }
-                    Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                 }
             }
         });
