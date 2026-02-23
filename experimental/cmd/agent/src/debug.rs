@@ -103,9 +103,8 @@ fn parse_kb_field(line: &str) -> u64 {
 
 fn parse_map_region_size(line: &str) -> u64 {
     // Format: "7f1234-7f5678 ..."
-    let range = match line.split_whitespace().next() {
-        Some(r) => r,
-        None => return 0,
+    let Some(range) = line.split_whitespace().next() else {
+        return 0;
     };
     let mut parts = range.split('-');
     let start = parts

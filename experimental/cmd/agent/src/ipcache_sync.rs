@@ -38,10 +38,10 @@ pub async fn run_ipcache_sync(
             &node_name,
             &agent_event_tx,
             &agent_event_store,
-            preserve_cache.clone(),
+            Arc::clone(&preserve_cache),
         );
-        let cache = cache.clone();
-        let preserve = preserve_cache.clone();
+        let cache = Arc::clone(&cache);
+        let preserve = Arc::clone(&preserve_cache);
         async move {
             let r = result.await;
             // Only clear cache on unexpected disconnects; preserve it
@@ -193,6 +193,6 @@ fn emit_agent_event(
             retina_proto::flow::agent_event::Notification::IpcacheUpdate(notification),
         ),
     });
-    store.push(event.clone());
+    store.push(Arc::clone(&event));
     let _ = tx.send(event);
 }

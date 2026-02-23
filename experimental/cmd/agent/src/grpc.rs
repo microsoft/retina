@@ -44,9 +44,8 @@ struct HubbleObserver {
 
 /// Check if a flow's timestamp falls within `since..until`.
 fn flow_in_time_range(flow: &Flow, since: Option<&Timestamp>, until: Option<&Timestamp>) -> bool {
-    let flow_ts = match flow.time.as_ref() {
-        Some(ts) => ts,
-        None => return true,
+    let Some(flow_ts) = flow.time.as_ref() else {
+        return true;
     };
     if let Some(s) = since
         && (flow_ts.seconds, flow_ts.nanos) < (s.seconds, s.nanos)
@@ -63,13 +62,11 @@ fn flow_in_time_range(flow: &Flow, since: Option<&Timestamp>, until: Option<&Tim
 
 /// Check if a flow's timestamp is past the `until` bound.
 fn flow_past_until(flow: &Flow, until: Option<&Timestamp>) -> bool {
-    let u = match until {
-        Some(u) => u,
-        None => return false,
+    let Some(u) = until else {
+        return false;
     };
-    let flow_ts = match flow.time.as_ref() {
-        Some(ts) => ts,
-        None => return false,
+    let Some(flow_ts) = flow.time.as_ref() else {
+        return false;
     };
     (flow_ts.seconds, flow_ts.nanos) > (u.seconds, u.nanos)
 }
@@ -317,7 +314,7 @@ impl Peer for HubblePeer {
         _request: Request<NotifyRequest>,
     ) -> Result<Response<Self::NotifyStream>, Status> {
         let (tx, rx) = tokio::sync::mpsc::channel(PEER_CHANNEL_CAPACITY);
-        let ip_cache = self.ip_cache.clone();
+        let ip_cache = Arc::clone(&self.ip_cache);
         let grpc_port = self.grpc_port;
 
         tokio::spawn(async move {

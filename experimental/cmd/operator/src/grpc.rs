@@ -62,7 +62,7 @@ impl IpCache for IpCacheService {
         let snapshot = self.state.snapshot();
         let snapshot_len = snapshot.len();
 
-        let state = self.state.clone();
+        let state = Arc::clone(&self.state);
         tokio::spawn(async move {
             // Guard decrements connected_agents on any exit.
             let _guard = AgentDisconnectGuard(state);

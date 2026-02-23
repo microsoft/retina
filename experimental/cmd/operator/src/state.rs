@@ -64,7 +64,7 @@ impl OperatorState {
 
     pub fn upsert(&self, ip: IpAddr, identity: CachedIdentity) {
         {
-            let mut cache = self.cache.write().unwrap();
+            let mut cache = self.cache.write().expect("lock poisoned");
             if cache.get(&ip) == Some(&identity) {
                 self.upserts_skipped.fetch_add(1, Ordering::Relaxed);
                 return; // No change, skip broadcast.
@@ -84,7 +84,7 @@ impl OperatorState {
     /// remove a node entry that shares the same IP.
     pub fn delete(&self, ip: &IpAddr, kind: ResourceKind) {
         let removed = {
-            let mut cache = self.cache.write().unwrap();
+            let mut cache = self.cache.write().expect("lock poisoned");
             match cache.get(ip) {
                 Some(existing) if existing.resource_kind == kind => cache.remove(ip).is_some(),
                 _ => false,
@@ -107,7 +107,7 @@ impl OperatorState {
         let entries: Vec<_> = self
             .cache
             .read()
-            .unwrap()
+            .expect("lock poisoned")
             .iter()
             .map(|(ip, id)| (*ip, id.clone()))
             .collect();
@@ -148,7 +148,7 @@ impl OperatorState {
     pub fn dump(&self) -> Vec<(IpAddr, CachedIdentity)> {
         self.cache
             .read()
-            .unwrap()
+            .expect("lock poisoned")
             .iter()
             .map(|(ip, id)| (*ip, id.clone()))
             .collect()

@@ -11,11 +11,11 @@ use crate::state::OperatorState;
 
 #[derive(Clone)]
 struct DebugState {
-    state: Arc<OperatorState>,
+    operator: Arc<OperatorState>,
 }
 
 async fn ipcache_dump(State(state): State<DebugState>) -> impl IntoResponse {
-    let entries = state.state.dump();
+    let entries = state.operator.dump();
     let map: std::collections::BTreeMap<String, serde_json::Value> = entries
         .into_iter()
         .map(|(ip, id)| {
@@ -49,7 +49,7 @@ async fn ipcache_dump(State(state): State<DebugState>) -> impl IntoResponse {
 }
 
 async fn stats(State(state): State<DebugState>) -> impl IntoResponse {
-    let dump = state.state.dump();
+    let dump = state.operator.dump();
     let nodes = dump
         .iter()
         .filter(|(_, id)| !id.node_name.is_empty())
@@ -67,17 +67,17 @@ async fn stats(State(state): State<DebugState>) -> impl IntoResponse {
         "nodes": nodes,
         "pods": pods,
         "services": services,
-        "upserts_total": state.state.upserts_total.load(Ordering::Relaxed),
-        "upserts_skipped": state.state.upserts_skipped.load(Ordering::Relaxed),
-        "deletes_total": state.state.deletes_total.load(Ordering::Relaxed),
-        "connected_agents": state.state.connected_agents.load(Ordering::Relaxed),
-        "broadcast_queue_depth": state.state.broadcast_queue_depth(),
-        "broadcast_capacity": state.state.broadcast_capacity(),
+        "upserts_total": state.operator.upserts_total.load(Ordering::Relaxed),
+        "upserts_skipped": state.operator.upserts_skipped.load(Ordering::Relaxed),
+        "deletes_total": state.operator.deletes_total.load(Ordering::Relaxed),
+        "connected_agents": state.operator.connected_agents.load(Ordering::Relaxed),
+        "broadcast_queue_depth": state.operator.broadcast_queue_depth(),
+        "broadcast_capacity": state.operator.broadcast_capacity(),
     }))
 }
 
 pub async fn serve(port: u16, state: Arc<OperatorState>) {
-    let debug_state = DebugState { state };
+    let debug_state = DebugState { operator: state };
 
     let app = Router::new()
         .route("/debug/ipcache", get(ipcache_dump))

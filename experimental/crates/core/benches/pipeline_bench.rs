@@ -33,7 +33,7 @@ fn bench_full_pipeline(c: &mut Criterion) {
             metrics.touch_forward(labels);
 
             let flow_arc = Arc::new(hubble_flow);
-            store.push(flow_arc.clone());
+            store.push(Arc::clone(&flow_arc));
             let _ = flow_tx.send(flow_arc);
         })
     });
@@ -47,7 +47,7 @@ fn bench_full_pipeline(c: &mut Criterion) {
             let labels = ForwardLabels::from_flow(&hubble_flow);
             metrics.touch_forward(labels);
             let flow_arc = Arc::new(hubble_flow);
-            store.push(flow_arc.clone());
+            store.push(Arc::clone(&flow_arc));
             let _ = flow_tx.send(flow_arc);
         })
     });
@@ -62,7 +62,7 @@ fn bench_full_pipeline(c: &mut Criterion) {
             let labels = ForwardLabels::from_flow(&hubble_flow);
             metrics.touch_forward(labels);
             let flow_arc = Arc::new(hubble_flow);
-            store.push(flow_arc.clone());
+            store.push(Arc::clone(&flow_arc));
             filter.matches(&flow_arc);
             let _ = flow_tx.send(flow_arc);
         })

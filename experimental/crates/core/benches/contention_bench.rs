@@ -30,8 +30,8 @@ fn bench_ipcache_contention(c: &mut Criterion) {
                         let barrier = Arc::new(Barrier::new(n));
                         let handles: Vec<_> = (0..n)
                             .map(|t| {
-                                let cache = cache.clone();
-                                let barrier = barrier.clone();
+                                let cache = Arc::clone(&cache);
+                                let barrier = Arc::clone(&barrier);
                                 std::thread::spawn(move || {
                                     let ip1 = std::net::IpAddr::V4(Ipv4Addr::new(
                                         10,
@@ -91,11 +91,11 @@ fn bench_full_pipeline_contention(c: &mut Criterion) {
                         let barrier = Arc::new(Barrier::new(n));
                         let handles: Vec<_> = (0..n)
                             .map(|t| {
-                                let cache = cache.clone();
-                                let metrics = metrics.clone();
-                                let store = store.clone();
+                                let cache = Arc::clone(&cache);
+                                let metrics = Arc::clone(&metrics);
+                                let store = Arc::clone(&store);
                                 let tx = flow_tx.clone();
-                                let barrier = barrier.clone();
+                                let barrier = Arc::clone(&barrier);
                                 std::thread::spawn(move || {
                                     let mut pkt = bench_helpers::make_tcp_ack_event();
                                     pkt.src_ip = u32::from(Ipv4Addr::new(10, 0, 0, (t as u8) + 1));
@@ -107,7 +107,7 @@ fn bench_full_pipeline_contention(c: &mut Criterion) {
                                         let labels = ForwardLabels::from_flow(&flow);
                                         metrics.touch_forward(labels);
                                         let arc = Arc::new(flow);
-                                        store.push(arc.clone());
+                                        store.push(Arc::clone(&arc));
                                         let _ = tx.send(arc);
                                     }
                                     start.elapsed()

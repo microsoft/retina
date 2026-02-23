@@ -14,7 +14,7 @@ use crate::state::{CachedIdentity, CachedWorkload, OperatorState, ResourceKind};
 /// Automatically restarts with backoff on stream errors.
 pub async fn watch_pods(client: Client, state: Arc<OperatorState>) {
     retry_with_backoff("pod watcher", || {
-        try_watch_pods(client.clone(), state.clone())
+        try_watch_pods(client.clone(), Arc::clone(&state))
     })
     .await
 }
@@ -45,9 +45,8 @@ fn handle_pod_apply(pod: &Pod, state: &OperatorState) {
     let name = meta.name.as_deref().unwrap_or_default();
     let namespace = meta.namespace.as_deref().unwrap_or_default();
 
-    let status = match pod.status.as_ref() {
-        Some(s) => s,
-        None => return,
+    let Some(status) = pod.status.as_ref() else {
+        return;
     };
 
     // Skip pods with host networking.
@@ -60,9 +59,8 @@ fn handle_pod_apply(pod: &Pod, state: &OperatorState) {
         return;
     }
 
-    let pod_ips = match status.pod_ips.as_ref() {
-        Some(ips) => ips,
-        None => return,
+    let Some(pod_ips) = status.pod_ips.as_ref() else {
+        return;
     };
 
     // Build labels as "key=value".
@@ -120,8 +118,8 @@ fn handle_pod_apply(pod: &Pod, state: &OperatorState) {
                 pod_name: Arc::from(name),
                 service_name: Arc::from(""),
                 node_name: Arc::from(""),
-                labels: labels.clone(),
-                workloads: workloads.clone(),
+                labels: Arc::clone(&labels),
+                workloads: Arc::clone(&workloads),
             },
         );
     }
@@ -159,7 +157,7 @@ fn handle_pod_delete(pod: &Pod, state: &OperatorState) {
 /// Automatically restarts with backoff on stream errors.
 pub async fn watch_services(client: Client, state: Arc<OperatorState>) {
     retry_with_backoff("service watcher", || {
-        try_watch_services(client.clone(), state.clone())
+        try_watch_services(client.clone(), Arc::clone(&state))
     })
     .await
 }
@@ -249,7 +247,7 @@ fn handle_service_delete(svc: &Service, state: &OperatorState) {
 /// Automatically restarts with backoff on stream errors.
 pub async fn watch_nodes(client: Client, state: Arc<OperatorState>) {
     retry_with_backoff("node watcher", || {
-        try_watch_nodes(client.clone(), state.clone())
+        try_watch_nodes(client.clone(), Arc::clone(&state))
     })
     .await
 }

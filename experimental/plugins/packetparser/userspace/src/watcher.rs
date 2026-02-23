@@ -98,20 +98,16 @@ impl VethWatcher {
 
         // Scope the mutex guard so it's dropped before any .await.
         let result = {
-            let mut ebpf = self.ebpf.lock().unwrap();
+            let mut ebpf = self.ebpf.lock().expect("lock poisoned");
             loader::attach_endpoint(&mut ebpf, &ifname)
         };
 
         match result {
             Ok((ingress, egress)) => {
-                let pod_owner = resolve_pod_name(ifindex, handle, &self.ip_cache).await;
-                match pod_owner {
-                    Some((ns, pod)) => {
-                        info!(ifindex, ifname = %ifname, pod = %format!("{ns}/{pod}"), "attached endpoint programs to veth");
-                    }
-                    None => {
-                        info!(ifindex, ifname = %ifname, "attached endpoint programs to veth");
-                    }
+                if let Some((ns, pod)) = resolve_pod_name(ifindex, handle, &self.ip_cache).await {
+                    info!(ifindex, ifname = %ifname, pod = %format!("{ns}/{pod}"), "attached endpoint programs to veth");
+                } else {
+                    info!(ifindex, ifname = %ifname, "attached endpoint programs to veth");
                 }
 
                 self.attached.insert(

@@ -140,13 +140,11 @@ impl CompiledFilter {
         if self.source_ip.is_empty() {
             return true;
         }
-        let ip_str = match flow.ip.as_ref() {
-            Some(ip) => &ip.source,
-            None => return false,
+        let Some(ip_header) = flow.ip.as_ref() else {
+            return false;
         };
-        let ip: IpAddr = match ip_str.parse() {
-            Ok(ip) => ip,
-            Err(_) => return false,
+        let Ok(ip) = ip_header.source.parse::<IpAddr>() else {
+            return false;
         };
         self.source_ip.iter().any(|m| m.matches(ip))
     }
@@ -155,13 +153,11 @@ impl CompiledFilter {
         if self.destination_ip.is_empty() {
             return true;
         }
-        let ip_str = match flow.ip.as_ref() {
-            Some(ip) => &ip.destination,
-            None => return false,
+        let Some(ip_header) = flow.ip.as_ref() else {
+            return false;
         };
-        let ip: IpAddr = match ip_str.parse() {
-            Ok(ip) => ip,
-            Err(_) => return false,
+        let Ok(ip) = ip_header.destination.parse::<IpAddr>() else {
+            return false;
         };
         self.destination_ip.iter().any(|m| m.matches(ip))
     }
@@ -170,9 +166,8 @@ impl CompiledFilter {
         if self.source_pod.is_empty() {
             return true;
         }
-        let ep = match flow.source.as_ref() {
-            Some(ep) => ep,
-            None => return false,
+        let Some(ep) = flow.source.as_ref() else {
+            return false;
         };
         self.source_pod
             .iter()
@@ -183,9 +178,8 @@ impl CompiledFilter {
         if self.destination_pod.is_empty() {
             return true;
         }
-        let ep = match flow.destination.as_ref() {
-            Some(ep) => ep,
-            None => return false,
+        let Some(ep) = flow.destination.as_ref() else {
+            return false;
         };
         self.destination_pod
             .iter()
@@ -224,9 +218,8 @@ impl CompiledFilter {
         if self.source_label.is_empty() {
             return true;
         }
-        let ep = match flow.source.as_ref() {
-            Some(ep) => ep,
-            None => return false,
+        let Some(ep) = flow.source.as_ref() else {
+            return false;
         };
         self.source_label
             .iter()
@@ -237,9 +230,8 @@ impl CompiledFilter {
         if self.destination_label.is_empty() {
             return true;
         }
-        let ep = match flow.destination.as_ref() {
-            Some(ep) => ep,
-            None => return false,
+        let Some(ep) = flow.destination.as_ref() else {
+            return false;
         };
         self.destination_label
             .iter()
@@ -264,9 +256,8 @@ impl CompiledFilter {
         if self.protocol.is_empty() {
             return true;
         }
-        let l4 = match flow.l4.as_ref().and_then(|l4| l4.protocol.as_ref()) {
-            Some(p) => p,
-            None => return false,
+        let Some(l4) = flow.l4.as_ref().and_then(|l4| l4.protocol.as_ref()) else {
+            return false;
         };
         let flow_proto = match l4 {
             flow::layer4::Protocol::Tcp(_) => "tcp",
@@ -284,22 +275,14 @@ impl CompiledFilter {
         if self.source_port.is_empty() {
             return true;
         }
-        let port = extract_source_port(flow);
-        match port {
-            Some(p) => self.source_port.contains(&p),
-            None => false,
-        }
+        extract_source_port(flow).is_some_and(|p| self.source_port.contains(&p))
     }
 
     fn match_destination_port(&self, flow: &Flow) -> bool {
         if self.destination_port.is_empty() {
             return true;
         }
-        let port = extract_destination_port(flow);
-        match port {
-            Some(p) => self.destination_port.contains(&p),
-            None => false,
-        }
+        extract_destination_port(flow).is_some_and(|p| self.destination_port.contains(&p))
     }
 
     fn match_tcp_flags(&self, flow: &Flow) -> bool {
@@ -323,9 +306,8 @@ impl CompiledFilter {
         if self.event_type.is_empty() {
             return true;
         }
-        let flow_et = match flow.event_type.as_ref() {
-            Some(et) => et,
-            None => return false,
+        let Some(flow_et) = flow.event_type.as_ref() else {
+            return false;
         };
         self.event_type.iter().any(|f| {
             f.r#type == flow_et.r#type && (!f.match_sub_type || f.sub_type == flow_et.sub_type)
@@ -336,9 +318,8 @@ impl CompiledFilter {
         if self.reply.is_empty() {
             return true;
         }
-        let is_reply = match flow.is_reply {
-            Some(v) => v,
-            None => return false,
+        let Some(is_reply) = flow.is_reply else {
+            return false;
         };
         self.reply.contains(&is_reply)
     }
@@ -347,11 +328,10 @@ impl CompiledFilter {
         if self.ip_version.is_empty() {
             return true;
         }
-        let ver = match flow.ip.as_ref() {
-            Some(ip) => ip.ip_version,
-            None => return false,
+        let Some(ip_header) = flow.ip.as_ref() else {
+            return false;
         };
-        self.ip_version.contains(&ver)
+        self.ip_version.contains(&ip_header.ip_version)
     }
 
     fn match_node_name(&self, flow: &Flow) -> bool {
@@ -365,22 +345,20 @@ impl CompiledFilter {
         if self.source_identity.is_empty() {
             return true;
         }
-        let id = match flow.source.as_ref() {
-            Some(ep) => ep.identity,
-            None => return false,
+        let Some(ep) = flow.source.as_ref() else {
+            return false;
         };
-        self.source_identity.contains(&id)
+        self.source_identity.contains(&ep.identity)
     }
 
     fn match_destination_identity(&self, flow: &Flow) -> bool {
         if self.destination_identity.is_empty() {
             return true;
         }
-        let id = match flow.destination.as_ref() {
-            Some(ep) => ep.identity,
-            None => return false,
+        let Some(ep) = flow.destination.as_ref() else {
+            return false;
         };
-        self.destination_identity.contains(&id)
+        self.destination_identity.contains(&ep.identity)
     }
 }
 

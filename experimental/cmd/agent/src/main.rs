@@ -145,7 +145,7 @@ async fn main() -> anyhow::Result<()> {
                 },
             )),
         });
-        agent_event_store.push(started_event.clone());
+        agent_event_store.push(Arc::clone(&started_event));
         let _ = agent_event_tx.send(started_event);
     }
 
@@ -156,10 +156,10 @@ async fn main() -> anyhow::Result<()> {
     // Build plugin context and start the packetparser plugin.
     let ctx = PluginContext {
         flow_tx: flow_tx.clone(),
-        flow_store: flow_store.clone(),
-        ip_cache: ip_cache.clone(),
-        metrics: metrics.clone(),
-        state: agent_state.clone(),
+        flow_store: Arc::clone(&flow_store),
+        ip_cache: Arc::clone(&ip_cache),
+        metrics: Arc::clone(&metrics),
+        state: Arc::clone(&agent_state),
     };
 
     let mut plugin = PacketParser::new(
@@ -175,11 +175,11 @@ async fn main() -> anyhow::Result<()> {
 
     // Spawn IP cache sync if operator address is provided.
     let ipcache_handle = if let Some(ref addr) = cli.operator_addr {
-        let cache = ip_cache.clone();
+        let cache = Arc::clone(&ip_cache);
         let addr = addr.clone();
         let node_name = local_node_name.clone();
         let event_tx = agent_event_tx.clone();
-        let event_store = agent_event_store.clone();
+        let event_store = Arc::clone(&agent_event_store);
         Some(tokio::spawn(async move {
             ipcache_sync::run_ipcache_sync(addr, cache, node_name, event_tx, event_store).await;
         }))
@@ -202,10 +202,10 @@ async fn main() -> anyhow::Result<()> {
     let debug_handle = tokio::spawn(debug::serve(
         cli.metrics_port,
         agent_config,
-        ip_cache.clone(),
-        flow_store.clone(),
-        metrics.clone(),
-        agent_state.clone(),
+        Arc::clone(&ip_cache),
+        Arc::clone(&flow_store),
+        Arc::clone(&metrics),
+        Arc::clone(&agent_state),
     ));
 
     // Start gRPC server.

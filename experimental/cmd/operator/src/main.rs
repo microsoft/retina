@@ -52,20 +52,20 @@ async fn main() -> anyhow::Result<()> {
     let shutdown = Arc::new(tokio::sync::Notify::new());
 
     // Spawn K8s watchers.
-    let pod_handle = tokio::spawn(watchers::watch_pods(client.clone(), state.clone()));
-    let svc_handle = tokio::spawn(watchers::watch_services(client.clone(), state.clone()));
-    let node_handle = tokio::spawn(watchers::watch_nodes(client.clone(), state.clone()));
+    let pod_handle = tokio::spawn(watchers::watch_pods(client.clone(), Arc::clone(&state)));
+    let svc_handle = tokio::spawn(watchers::watch_services(client.clone(), Arc::clone(&state)));
+    let node_handle = tokio::spawn(watchers::watch_nodes(client.clone(), Arc::clone(&state)));
 
     // Start gRPC server with graceful shutdown support.
     let grpc_handle = {
-        let shutdown = shutdown.clone();
-        tokio::spawn(grpc::serve(cli.grpc_port, state.clone(), async move {
+        let shutdown = Arc::clone(&shutdown);
+        tokio::spawn(grpc::serve(cli.grpc_port, Arc::clone(&state), async move {
             shutdown.notified().await
         }))
     };
 
     // Start debug HTTP server.
-    let debug_handle = tokio::spawn(debug::serve(cli.debug_port, state.clone()));
+    let debug_handle = tokio::spawn(debug::serve(cli.debug_port, Arc::clone(&state)));
 
     info!("retina-operator running");
 

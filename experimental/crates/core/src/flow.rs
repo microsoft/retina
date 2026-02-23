@@ -3,7 +3,11 @@ use std::net::Ipv4Addr;
 
 use prost::Message;
 use prost_types::Timestamp;
-use retina_common::*;
+use retina_common::{
+    PacketEvent, DIR_EGRESS, DIR_INGRESS, IPPROTO_TCP, IPPROTO_UDP, OBS_FROM_ENDPOINT,
+    OBS_FROM_NETWORK, OBS_TO_ENDPOINT, OBS_TO_NETWORK, TCP_ACK, TCP_CWR, TCP_ECE, TCP_FIN,
+    TCP_NS, TCP_PSH, TCP_RST, TCP_SYN, TCP_URG,
+};
 use retina_proto::flow;
 
 // Cilium monitor API message types (from cilium/pkg/monitor/api/types.go).

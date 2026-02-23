@@ -15,9 +15,8 @@ pub fn enrich_flow(flow: &mut flow::Flow, cache: &IpCache) {
         return;
     }
 
-    let ip_header = match flow.ip.as_ref() {
-        Some(ip) => ip,
-        None => return,
+    let Some(ip_header) = flow.ip.as_ref() else {
+        return;
     };
 
     let src_ip: Option<std::net::IpAddr> = ip_header.source.parse().ok();
