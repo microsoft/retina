@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::net::Ipv4Addr;
 use std::os::fd::{AsFd as _, AsRawFd};
 use std::sync::Arc;
 
@@ -82,6 +83,40 @@ fn errno_name(ret: i32) -> String {
     format!("{name} ({ret})")
 }
 
+/// Resolve the source pod IP from a process ID by reading its network namespace.
+///
+/// Parses `/proc/{pid}/net/fib_trie` looking for `/32 host LOCAL` entries to find
+/// IPs assigned in the process's network namespace. Returns the first non-loopback
+/// local IP (typically the pod's primary IP).
+///
+/// Returns `None` if the process has exited, /proc is unreadable, or no suitable IP
+/// is found. This is best-effort — only called for drops with `src_ip == 0`.
+fn resolve_src_ip_from_pid(pid: u32) -> Option<Ipv4Addr> {
+    let path = format!("/proc/{pid}/net/fib_trie");
+    let content = std::fs::read_to_string(path).ok()?;
+
+    // Sliding window: when we see an IP on a `|-- x.x.x.x` line, check if the
+    // NEXT line contains `/32 host LOCAL`. If so, it's a locally-assigned address.
+    let mut last_ip: Option<Ipv4Addr> = None;
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if let Some(ip_str) = trimmed.strip_prefix("|-- ") {
+            last_ip = ip_str.trim().parse::<Ipv4Addr>().ok();
+        } else if trimmed.contains("/32 host LOCAL") {
+            if let Some(ip) = last_ip {
+                // Skip loopback (127.0.0.0/8).
+                if ip.octets()[0] != 127 {
+                    return Some(ip);
+                }
+            }
+        } else {
+            // Reset on non-matching lines (e.g. subnet headers).
+            last_ip = None;
+        }
+    }
+    None
+}
+
 /// Convert a [`DropEvent`] to a Hubble Flow with `verdict: DROPPED`.
 fn drop_event_to_flow(event: &DropEvent, boot_offset_ns: i64) -> flow::Flow {
     let wall_ns = event.ts_ns as i64 + boot_offset_ns;
@@ -147,6 +182,14 @@ fn drop_event_to_flow(event: &DropEvent, boot_offset_ns: i64) -> flow::Flow {
                 },
             );
         }
+        if event.pid > 0 {
+            fields.insert(
+                "pid".to_string(),
+                prost_types::Value {
+                    kind: Some(prost_types::value::Kind::NumberValue(event.pid as f64)),
+                },
+            );
+        }
         let s = prost_types::Struct { fields };
         let mut buf = Vec::with_capacity(s.encoded_len());
         if s.encode(&mut buf).is_ok() {
@@ -185,6 +228,10 @@ fn drop_event_to_flow(event: &DropEvent, boot_offset_ns: i64) -> flow::Flow {
 }
 
 /// Process a single DropEvent: convert to Hubble Flow, enrich, broadcast, store.
+///
+/// When `src_ip` is 0 (e.g. early tcp_v4_connect failure before source IP
+/// assignment), attempts to resolve the source pod IP from the PID's network
+/// namespace via `/proc/{pid}/net/fib_trie`.
 #[inline]
 fn process_drop_event(
     event: &DropEvent,
@@ -193,7 +240,16 @@ fn process_drop_event(
     flow_store: &FlowStore,
     ip_cache: &IpCache,
 ) {
-    let mut hubble_flow = drop_event_to_flow(event, boot_offset_ns);
+    // Resolve source IP from PID when the socket didn't have one.
+    let mut patched = *event;
+    if patched.src_ip == 0
+        && patched.pid > 0
+        && let Some(ip) = resolve_src_ip_from_pid(patched.pid)
+    {
+        patched.src_ip = u32::from(ip);
+    }
+
+    let mut hubble_flow = drop_event_to_flow(&patched, boot_offset_ns);
     retina_core::enricher::enrich_flow(&mut hubble_flow, ip_cache);
 
     let flow_arc = Arc::new(hubble_flow);

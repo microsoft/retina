@@ -112,7 +112,8 @@ pub struct DropEvent {
     pub direction: u8,
     /// Kernel return value (truncated to i8; errno range -125..0 fits).
     pub return_val: i8,
-    pub _pad: [u8; 4],
+    /// PID (tgid) of the process that triggered the drop, or 0 if unavailable.
+    pub pid: u32,
 }
 
 // ── Metrics map types ───────────────────────────────────────────────────────

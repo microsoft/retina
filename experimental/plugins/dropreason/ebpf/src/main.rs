@@ -2,7 +2,7 @@
 #![no_main]
 
 use aya_ebpf::{
-    helpers::{bpf_ktime_get_boot_ns, bpf_probe_read_kernel},
+    helpers::{bpf_get_current_pid_tgid, bpf_ktime_get_boot_ns, bpf_probe_read_kernel},
     macros::{fexit, map},
     maps::{Array, PerCpuHashMap},
     programs::FExitContext,
@@ -333,6 +333,7 @@ fn try_tcp_v4_connect(ctx: &FExitContext) -> Result<(), ()> {
         drop_reason: DropReason::TcpConnectDrop as u8,
         direction: DIR_EGRESS,
         return_val: ret as i8,
+        pid: (bpf_get_current_pid_tgid() >> 32) as u32,
         ..DropEvent::default()
     };
 
@@ -409,6 +410,7 @@ fn try_inet_csk_accept(ctx: &FExitContext) -> Result<(), ()> {
         drop_reason: DropReason::TcpAcceptDrop as u8,
         direction: DIR_INGRESS,
         return_val: err_val as i8,
+        pid: (bpf_get_current_pid_tgid() >> 32) as u32,
         ..DropEvent::default()
     };
 

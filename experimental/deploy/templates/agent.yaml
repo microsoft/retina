@@ -20,6 +20,7 @@ spec:
         prometheus.io/path: "/metrics"
     spec:
       hostNetwork: true
+      hostPID: true
       dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: retina-agent
