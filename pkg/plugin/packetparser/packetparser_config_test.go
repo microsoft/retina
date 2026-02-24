@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidateRingBufferSize(t *testing.T) {
@@ -76,7 +77,7 @@ func TestValidateRingBufferSize(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validateRingBufferSize(tt.inputSize)
 			if tt.expectedErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				if tt.expectedMsg != "" {
 					assert.Contains(t, err.Error(), tt.expectedMsg)
 				}

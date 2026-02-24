@@ -52,8 +52,14 @@ import (
 )
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type packet packetparser ./_cprog/packetparser.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../lib/common/libbpf/_include/linux -I../lib/common/libbpf/_include/uapi/linux -I../lib/common/libbpf/_include/asm -I../filter/_cprog/ -I../conntrack/_cprog/
-var errNoOutgoingLinks = errors.New("could not determine any outgoing links")
-var errRingBufKernelTooOld = errors.New("ring buffer requires newer kernel")
+var (
+	errNoOutgoingLinks          = errors.New("could not determine any outgoing links")
+	errRingBufKernelTooOld      = errors.New("ring buffer requires newer kernel")
+	errRingBufSizeUnset         = errors.New("ring buffer size must be set when ring buffers are enabled")
+	errRingBufSizeTooSmall      = errors.New("ring buffer size is smaller than the kernel page size")
+	errRingBufSizeTooLarge      = errors.New("ring buffer size is larger than the allowed maximum")
+	errRingBufSizeNotPowerOfTwo = errors.New("ring buffer size is not a power of 2")
+)
 
 func init() {
 	registry.Add(name, New)
@@ -146,25 +152,17 @@ func validateRingBufferSize(size uint32) error {
 	pageSize := uint32(intPageSize)
 
 	if size == 0 {
-		return fmt.Errorf("ring buffer size must be set when ring buffers are enabled")
+		return errRingBufSizeUnset
 	}
 	if size < pageSize {
-		return fmt.Errorf(
-			"ring buffer size (%d) is smaller than the kernel page size (%d)",
-			size,
-			pageSize,
-		)
+		return fmt.Errorf("%w: size=%d page_size=%d", errRingBufSizeTooSmall, size, pageSize)
 	}
 	if size > maxSize {
-		return fmt.Errorf(
-			"ring buffer size (%d) is larger than the allowed maximum (%d)",
-			size,
-			maxSize,
-		)
+		return fmt.Errorf("%w: size=%d max_size=%d", errRingBufSizeTooLarge, size, maxSize)
 	}
 	// Check if size is a power of 2.
 	if (size & (size - 1)) != 0 {
-		return fmt.Errorf("ring buffer size (%d) is not a power of 2", size)
+		return fmt.Errorf("%w: size=%d", errRingBufSizeNotPowerOfTwo, size)
 	}
 
 	return nil
@@ -204,8 +202,8 @@ func (p *packetParser) Compile(ctx context.Context) error {
 	}
 
 	if p.cfg.PacketParserRingBuffer.IsEnabled() {
-		if err := validateRingBufferSize(p.cfg.PacketParserRingBufferSize); err != nil {
-			return err
+		if validateErr := validateRingBufferSize(p.cfg.PacketParserRingBufferSize); validateErr != nil {
+			return validateErr
 		}
 
 		p.l.Info("Compiling with Ring Buffer enabled", zap.Uint32("size", p.cfg.PacketParserRingBufferSize))
