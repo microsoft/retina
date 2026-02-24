@@ -11,6 +11,7 @@ agent:
   podLevel: true
   metricsPort: 10093
   ayaLogs: "1"
+  enableDropReason: true
   resources: {}
 
 operator:

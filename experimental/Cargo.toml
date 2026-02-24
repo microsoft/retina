@@ -5,12 +5,14 @@ members = [
     "cmd/operator",
     "crates/core",
     "crates/proto",
+    "plugins/dropreason/common",
+    "plugins/dropreason/userspace",
     "plugins/packetparser/common",
     "plugins/packetparser/userspace",
     "xtask",
 ]
 
-# plugins/packetparser/ebpf is built separately via xtask (different target)
+# plugins/*/ebpf are built separately via xtask (different target triple)
 
 [workspace.package]
 edition = "2024"
@@ -24,9 +26,12 @@ async-trait = "0.1"
 aya = { git = "https://github.com/aya-rs/aya", branch = "main" }
 aya-log = { git = "https://github.com/aya-rs/aya", branch = "main" }
 axum = "0.8"
+btf-rs = "1"
 bytes = "1"
 clap = { version = "4", features = ["derive"] }
 dashmap = "6"
+dropreason-common = { path = "plugins/dropreason/common" }
+dropreason = { path = "plugins/dropreason/userspace" }
 futures = "0.3"
 hostname = "0.4"
 k8s-openapi = { version = "0.27", features = ["v1_32"] }

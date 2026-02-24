@@ -16,6 +16,7 @@ const AGENT_EVENT_STORE_CAPACITY: usize = 1024;
 
 use anyhow::Context as _;
 use clap::Parser;
+use dropreason::plugin::DropReasonPlugin;
 use packetparser::plugin::PacketParser;
 use retina_core::ipcache::IpCache;
 use retina_core::metrics::{AgentState, Metrics};
@@ -64,6 +65,17 @@ struct Cli {
     #[arg(long, default_value_t = 2_097_152)]
     ring_buffer_size: u32,
 
+    /// Enable the dropreason plugin for packet drop monitoring.
+    /// Requires kernel >= 5.5 (x86) / 6.0 (arm64) with BTF support.
+    #[arg(long)]
+    enable_dropreason: bool,
+
+    /// BPF ring buffer size for dropreason events in bytes (power of 2).
+    /// Only used on kernels >= 5.8; ignored when falling back to perf buffers.
+    /// Default: 1MB.
+    #[arg(long, default_value_t = 1_048_576)]
+    dropreason_ring_buffer_size: u32,
+
     /// Log level.
     #[arg(long, default_value = "info")]
     log_level: String,
@@ -81,6 +93,8 @@ pub struct AgentConfig {
     pub operator_addr: Option<String>,
     pub sampling_rate: u32,
     pub ring_buffer_size: u32,
+    pub enable_dropreason: bool,
+    pub dropreason_ring_buffer_size: u32,
     pub log_level: String,
     pub metrics_port: u16,
 }
@@ -187,6 +201,24 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("failed to start packetparser plugin")?;
 
+    // Optionally start the dropreason plugin.
+    let mut dropreason_plugin: Option<DropReasonPlugin> = if cli.enable_dropreason {
+        let dr_ctx = PluginContext {
+            flow_tx: flow_tx.clone(),
+            flow_store: Arc::clone(&flow_store),
+            ip_cache: Arc::clone(&ip_cache),
+            metrics: Arc::clone(&metrics),
+            state: Arc::clone(&agent_state),
+        };
+        let mut dr = DropReasonPlugin::new(cli.dropreason_ring_buffer_size);
+        dr.start(dr_ctx)
+            .await
+            .context("failed to start dropreason plugin")?;
+        Some(dr)
+    } else {
+        None
+    };
+
     // Spawn IP cache sync if operator address is provided.
     let ipcache_handle = if let Some(ref addr) = cli.operator_addr {
         let cache = Arc::clone(&ip_cache);
@@ -210,6 +242,8 @@ async fn main() -> anyhow::Result<()> {
         operator_addr: cli.operator_addr.clone(),
         sampling_rate: cli.sampling_rate,
         ring_buffer_size: cli.ring_buffer_size,
+        enable_dropreason: cli.enable_dropreason,
+        dropreason_ring_buffer_size: cli.dropreason_ring_buffer_size,
         log_level: cli.log_level.clone(),
         metrics_port: cli.metrics_port,
     };
@@ -245,7 +279,10 @@ async fn main() -> anyhow::Result<()> {
 
     info!("shutting down...");
 
-    // Stop the plugin (aborts eBPF tasks, drops TC filters).
+    // Stop plugins.
+    if let Some(ref mut dr) = dropreason_plugin {
+        dr.stop().await?;
+    }
     plugin.stop().await?;
 
     // Abort agent-level tasks.

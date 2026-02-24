@@ -1,0 +1,13 @@
+[package]
+name = "dropreason-common"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = []
+userspace = ["aya"]
+
+[dependencies]
+aya = { workspace = true, optional = true }

@@ -82,6 +82,12 @@ fn endpoint_fields(ep: Option<&flow::Endpoint>) -> (String, String, String, Stri
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
+pub struct DropLabels {
+    pub reason: String,
+    pub direction: String,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
 pub struct LostEventLabels {
     pub r#type: String,
     pub reason: String,
@@ -111,6 +117,8 @@ pub struct Metrics {
     // Data-plane (networkobservability_*)
     pub forward_count: Family<ForwardLabels, Gauge>,
     pub forward_bytes: Family<ForwardLabels, Gauge>,
+    pub drop_count: Family<DropLabels, Gauge>,
+    pub drop_bytes: Family<DropLabels, Gauge>,
     pub conntrack_total_connections: Gauge,
     pub conntrack_packets_tx: Gauge,
     pub conntrack_packets_rx: Gauge,
@@ -139,6 +147,8 @@ impl Metrics {
 
         let forward_count = Family::<ForwardLabels, Gauge>::default();
         let forward_bytes = Family::<ForwardLabels, Gauge>::default();
+        let drop_count = Family::<DropLabels, Gauge>::default();
+        let drop_bytes = Family::<DropLabels, Gauge>::default();
         let conntrack_total_connections = Gauge::default();
         let conntrack_packets_tx = Gauge::default();
         let conntrack_packets_rx = Gauge::default();
@@ -157,6 +167,16 @@ impl Metrics {
                 "forward_bytes",
                 "Forwarded bytes by direction",
                 forward_bytes.clone(),
+            );
+            dp.register(
+                "drop_count",
+                "Dropped packets by reason and direction",
+                drop_count.clone(),
+            );
+            dp.register(
+                "drop_bytes",
+                "Dropped bytes by reason and direction",
+                drop_bytes.clone(),
             );
             dp.register(
                 "conntrack_total_connections",
@@ -206,6 +226,8 @@ impl Metrics {
         Self {
             forward_count,
             forward_bytes,
+            drop_count,
+            drop_bytes,
             conntrack_total_connections,
             conntrack_packets_tx,
             conntrack_packets_rx,

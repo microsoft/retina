@@ -1,0 +1,23 @@
+[package]
+name = "dropreason"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+dropreason-common = { workspace = true, features = ["userspace"] }
+retina-core.workspace = true
+retina-proto.workspace = true
+
+anyhow.workspace = true
+btf-rs.workspace = true
+async-trait.workspace = true
+aya.workspace = true
+aya-log.workspace = true
+bytes.workspace = true
+libc.workspace = true
+prost.workspace = true
+prost-types.workspace = true
+tokio.workspace = true
+tracing.workspace = true

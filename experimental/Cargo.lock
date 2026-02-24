@@ -339,6 +339,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "btf-rs"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe86bb5e4b3b6428b947ecfd9bef6c504c000c0174200dc52a2df432d5fd88fc"
+dependencies = [
+ "anyhow",
+ "byteorder",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -349,6 +359,12 @@ name = "bytemuck"
 version = "1.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8efb64bd706a16a1bdde310ae86b351e4d21550d98d056f22f8a7f7a2183fec"
+
+[[package]]
+name = "byteorder"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "bytes"
@@ -672,6 +688,33 @@ checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
  "block-buffer",
  "crypto-common",
+]
+
+[[package]]
+name = "dropreason"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "aya",
+ "aya-log",
+ "btf-rs",
+ "bytes",
+ "dropreason-common",
+ "libc",
+ "prost 0.14.3",
+ "prost-types 0.14.3",
+ "retina-core",
+ "retina-proto",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "dropreason-common"
+version = "0.1.0"
+dependencies = [
+ "aya",
 ]
 
 [[package]]
@@ -2276,6 +2319,7 @@ dependencies = [
  "anyhow",
  "axum",
  "clap",
+ "dropreason",
  "hostname",
  "packetparser",
  "pprof",

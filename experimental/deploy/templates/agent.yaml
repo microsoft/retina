@@ -31,6 +31,9 @@ spec:
             {{- if .Values.agent.podLevel }}
             - "--pod-level"
             {{- end }}
+            {{- if .Values.agent.enableDropReason }}
+            - "--enable-dropreason"
+            {{- end }}
             - "--operator-addr={{ include "retina-rust.operator.addr" . }}"
             - "--metrics-port={{ .Values.agent.metricsPort }}"
           env:

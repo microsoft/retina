@@ -6,6 +6,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+dropreason.workspace = true
 packetparser.workspace = true
 retina-core.workspace = true
 retina-proto.workspace = true
