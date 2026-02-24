@@ -117,7 +117,7 @@ eBPF TC classifiers ──→ ring buffer / perf array
 | File | Responsibility |
 |------|---------------|
 | `plugin.rs` | Plugin entry point — loads eBPF, starts event reader, veth watcher, conntrack GC |
-| `loader.rs` | eBPF ELF loader — kernel version detection, ringbuf vs perf selection, `Align8` wrapper |
+| `loader.rs` | eBPF ELF loader — kernel version detection, ringbuf vs perf selection, TC attach (TCX / legacy), `Align8` wrapper |
 | `events.rs` | Event reader — perf (one OS thread per CPU) or ring buffer (single thread) |
 | `watcher.rs` | Veth watcher — netlink monitoring for pod network interfaces, TC program attachment |
 | `conntrack_gc.rs` | Conntrack garbage collector — sweeps expired entries every 15s |
@@ -133,6 +133,15 @@ Source files in `crates/proto/proto/`:
 | `peer/peer.proto` | `Peer` service — `Notify` (node discovery) |
 | `relay/relay.proto` | `Relay` service (Hubble relay compatibility) |
 | `ipcache/ipcache.proto` | `IpCache` service — `StreamIpCacheUpdates`, `GetIpCacheSnapshot` |
+
+## TC Attach Strategy
+
+The agent attaches TC classifiers using a two-tier strategy to coexist with other TC programs (e.g. Cilium) on the same interfaces:
+
+- **TCX (kernel >= 6.6)**: Uses `LinkOrder::first()` to insert Retina at the head of the TCX chain, ensuring it runs before any other TC programs. All eBPF programs return `TC_ACT_UNSPEC` (`TCX_NEXT`), so the chain continues to subsequent programs unimpeded.
+- **Legacy TC (kernel < 6.6)**: Falls back to netlink-based `cls_bpf` filters with priority 1 (lowest usable value). `TC_ACT_UNSPEC` causes `continue` in `cls_bpf`, allowing subsequent filters to run. Ordering within the same priority depends on attachment order.
+
+This passive-observer design means Retina never affects packet verdicts — it observes and passes through, letting other programs (network policy enforcement, etc.) make the final decision.
 
 ## eBPF Programs
 

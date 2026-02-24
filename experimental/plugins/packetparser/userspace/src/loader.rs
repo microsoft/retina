@@ -3,8 +3,8 @@ use aya::{
     Ebpf, EbpfLoader,
     maps::{Array, HashMap, MapData, PerfEventArray, RingBuf},
     programs::{
-        SchedClassifier,
-        tc::{SchedClassifierLink, TcAttachType},
+        LinkOrder, SchedClassifier,
+        tc::{NlOptions, SchedClassifierLink, TcAttachOptions, TcAttachType},
     },
 };
 use retina_common::{CtEntry, CtV4Key};
@@ -60,6 +60,90 @@ fn kernel_supports_ringbuf() -> bool {
     }
 }
 
+/// Attach a TC classifier, preferring TCX with head-of-chain ordering so Retina
+/// runs before any other TC programs on the interface. Falls back to legacy TC
+/// on kernels < 6.6.
+///
+/// Our eBPF programs return `TC_ACT_UNSPEC`, which maps to `TCX_NEXT` in TCX
+/// (continues the chain) and `continue` in legacy `cls_bpf` (next filter runs).
+/// This lets Retina passively observe every packet without affecting the verdict
+/// of subsequent programs.
+fn attach_tc(
+    prog: &mut SchedClassifier,
+    iface: &str,
+    direction: TcAttachType,
+) -> anyhow::Result<()> {
+    let dir = dir_label(direction);
+
+    // TCX (kernel >= 6.6): insert at head so we run before all other TC programs.
+    match prog.attach_with_options(iface, direction, TcAttachOptions::TcxOrder(LinkOrder::first()))
+    {
+        Ok(_) => {
+            info!("attached {dir} via TCX (head of chain) to {iface}");
+            return Ok(());
+        }
+        Err(e) => {
+            info!("TCX not available for {dir}, falling back to legacy TC: {e}");
+        }
+    }
+
+    // Legacy TC: use the lowest usable priority (1) so Retina runs as early as
+    // possible. If another program already holds priority 1, ordering within
+    // the same priority depends on insertion order — whoever attached first
+    // runs first, and Retina may miss packets dropped by the earlier program.
+    prog.attach_with_options(
+        iface,
+        direction,
+        TcAttachOptions::Netlink(NlOptions {
+            priority: 1,
+            handle: 0,
+        }),
+    )?;
+    info!("attached {dir} via legacy TC (priority 1) to {iface}");
+    Ok(())
+}
+
+/// Attach a TC classifier to an endpoint veth, returning the owned link for
+/// lifetime-based detach. Same TCX-first strategy as [`attach_tc`].
+fn attach_tc_linked(
+    prog: &mut SchedClassifier,
+    iface: &str,
+    direction: TcAttachType,
+) -> anyhow::Result<SchedClassifierLink> {
+    let dir = dir_label(direction);
+
+    // TCX (kernel >= 6.6): insert at head so we run before all other TC programs.
+    match prog.attach_with_options(iface, direction, TcAttachOptions::TcxOrder(LinkOrder::first()))
+    {
+        Ok(id) => {
+            info!("attached {dir} via TCX (head of chain) to {iface}");
+            return prog.take_link(id).context("take_link after TCX attach");
+        }
+        Err(e) => {
+            info!("TCX not available for {dir}, falling back to legacy TC: {e}");
+        }
+    }
+
+    let id = prog.attach_with_options(
+        iface,
+        direction,
+        TcAttachOptions::Netlink(NlOptions {
+            priority: 1,
+            handle: 0,
+        }),
+    )?;
+    info!("attached {dir} via legacy TC (priority 1) to {iface}");
+    prog.take_link(id).context("take_link after legacy TC attach")
+}
+
+fn dir_label(direction: TcAttachType) -> &'static str {
+    match direction {
+        TcAttachType::Ingress => "ingress",
+        TcAttachType::Egress => "egress",
+        TcAttachType::Custom(_) => "custom",
+    }
+}
+
 /// Load eBPF programs and optionally attach host classifiers.
 ///
 /// When `host_iface` is `Some`, `host_ingress`/`host_egress` are loaded and
@@ -99,16 +183,14 @@ pub fn load_and_attach(
             .context("eBPF program 'host_ingress' not found")?
             .try_into()?;
         prog.load()?;
-        prog.attach(iface, TcAttachType::Ingress)?;
-        info!("attached host_ingress to {iface}");
+        attach_tc(prog, iface, TcAttachType::Ingress)?;
 
         let prog: &mut SchedClassifier = ebpf
             .program_mut("host_egress")
             .context("eBPF program 'host_egress' not found")?
             .try_into()?;
         prog.load()?;
-        prog.attach(iface, TcAttachType::Egress)?;
-        info!("attached host_egress to {iface}");
+        attach_tc(prog, iface, TcAttachType::Egress)?;
     }
 
     // Load endpoint programs (verify bytecode) but don't attach yet.
@@ -174,15 +256,13 @@ pub fn attach_endpoint(
         .program_mut("endpoint_ingress")
         .context("eBPF program 'endpoint_ingress' not found")?
         .try_into()?;
-    let ingress_id = prog.attach(iface, TcAttachType::Ingress)?;
-    let ingress_link = prog.take_link(ingress_id)?;
+    let ingress_link = attach_tc_linked(prog, iface, TcAttachType::Ingress)?;
 
     let prog: &mut SchedClassifier = ebpf
         .program_mut("endpoint_egress")
         .context("eBPF program 'endpoint_egress' not found")?
         .try_into()?;
-    let egress_id = prog.attach(iface, TcAttachType::Egress)?;
-    let egress_link = prog.take_link(egress_id)?;
+    let egress_link = attach_tc_linked(prog, iface, TcAttachType::Egress)?;
 
     Ok((ingress_link, egress_link))
 }
