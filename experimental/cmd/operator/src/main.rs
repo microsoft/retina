@@ -11,12 +11,17 @@ use tracing::info;
 
 use state::OperatorState;
 
+const GIT_VERSION: &str = env!("GIT_VERSION");
+const GIT_COMMIT: &str = env!("GIT_COMMIT");
+const RUSTC_VERSION: &str = env!("RUSTC_VERSION");
+
 const UPDATE_BROADCAST_CAPACITY: usize = 8192;
 
 #[derive(Parser)]
 #[command(
     name = "retina-operator",
-    about = "Retina operator — streams K8s IP-to-identity mappings to agents"
+    about = "Retina operator — streams K8s IP-to-identity mappings to agents",
+    version = concat!(env!("GIT_VERSION"), " (", env!("GIT_COMMIT"), ", ", env!("RUSTC_VERSION"), ")"),
 )]
 struct Cli {
     /// gRPC port for IpCache service.
@@ -43,7 +48,13 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
-    info!(grpc_port = cli.grpc_port, "starting retina-operator");
+    info!(
+        version = GIT_VERSION,
+        commit = GIT_COMMIT,
+        rustc = RUSTC_VERSION,
+        grpc_port = cli.grpc_port,
+        "starting retina-operator",
+    );
 
     let client = Client::try_default().await?;
     let state = Arc::new(OperatorState::new(UPDATE_BROADCAST_CAPACITY));

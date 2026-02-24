@@ -5,6 +5,10 @@ mod ipcache_sync;
 use std::net::{SocketAddr, TcpListener};
 use std::sync::Arc;
 
+const GIT_VERSION: &str = env!("GIT_VERSION");
+const GIT_COMMIT: &str = env!("GIT_COMMIT");
+const RUSTC_VERSION: &str = env!("RUSTC_VERSION");
+
 const FLOW_BROADCAST_CAPACITY: usize = 4096;
 const FLOW_STORE_CAPACITY: usize = 4096;
 const AGENT_EVENT_BROADCAST_CAPACITY: usize = 256;
@@ -26,7 +30,8 @@ use tracing::info;
 #[derive(Parser)]
 #[command(
     name = "retina-agent",
-    about = "Retina Rust agent with Hubble gRPC observer"
+    about = "Retina Rust agent with Hubble gRPC observer",
+    version = concat!(env!("GIT_VERSION"), " (", env!("GIT_COMMIT"), ", ", env!("RUSTC_VERSION"), ")"),
 )]
 struct Cli {
     /// Network interface to attach host TC programs to.
@@ -91,7 +96,16 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
-    info!(interface = ?cli.interface, grpc_port = cli.grpc_port, pod_level = cli.pod_level, sampling_rate = cli.sampling_rate, "starting retina-agent");
+    info!(
+        version = GIT_VERSION,
+        commit = GIT_COMMIT,
+        rustc = RUSTC_VERSION,
+        interface = ?cli.interface,
+        grpc_port = cli.grpc_port,
+        pod_level = cli.pod_level,
+        sampling_rate = cli.sampling_rate,
+        "starting retina-agent",
+    );
 
     // Pre-flight: verify the gRPC port is available. A stale retina-agent
     // process holding this port is a common dev pitfall — fail fast with a
