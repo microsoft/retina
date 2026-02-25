@@ -55,7 +55,7 @@ func extractFileName(rawURL string) (string, error) {
 }
 
 func saveToFile(filename string, data []byte) error {
-	err := os.WriteFile(filename, data, 0644)
+	err := os.WriteFile(filename, data, 0o644)
 	if err != nil {
 		return fmt.Errorf("failed to write crd.yaml to /crds dir : %w", err)
 	}

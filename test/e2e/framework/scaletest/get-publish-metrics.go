@@ -76,7 +76,6 @@ func (g *GetAndPublishMetrics) Run() error {
 	g.errs = new(errgroup.Group)
 
 	g.errs.Go(func() error {
-
 		t := time.NewTicker(defaultInterval)
 		defer t.Stop()
 
@@ -100,7 +99,6 @@ func (g *GetAndPublishMetrics) Run() error {
 
 			}
 		}
-
 	})
 
 	return nil
@@ -135,7 +133,6 @@ func (g *GetAndPublishMetrics) Prevalidate() error {
 }
 
 func (g *GetAndPublishMetrics) getAndPublishMetrics() error {
-
 	ctx := context.TODO()
 
 	labelSelector := labels.Set(g.Labels).String()
@@ -161,7 +158,6 @@ func (g *GetAndPublishMetrics) getAndPublishMetrics() error {
 		log.Println("Publishing metrics to AppInsights")
 		for _, metric := range allMetrics {
 			g.telemetryClient.TrackEvent("scale-test", metric)
-
 		}
 	}
 
@@ -192,7 +188,6 @@ func (g *GetAndPublishMetrics) getAndPublishMetrics() error {
 type metric map[string]string
 
 func (g *GetAndPublishMetrics) getPodsMetrics(ctx context.Context, labelSelector string) ([]metric, error) {
-
 	var pods *v1.PodList
 
 	retrier := retry.Retrier{Attempts: defaultRetryAttempts, Delay: defaultRetryDelay}

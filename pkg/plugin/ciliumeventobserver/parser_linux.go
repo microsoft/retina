@@ -16,9 +16,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var (
-	ErrEmptyData = errors.New("empty data")
-)
+var ErrEmptyData = errors.New("empty data")
 
 func (p *parser) Init() error {
 	parser, err := hp.New(slog.Default().With("cilium", "parser"),

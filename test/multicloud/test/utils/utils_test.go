@@ -159,7 +159,7 @@ func TestFetchSensitiveOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to marshal mock state: %v", err)
 	}
-	if err := os.WriteFile(stateFilePath, stateData, 0644); err != nil {
+	if err := os.WriteFile(stateFilePath, stateData, 0o644); err != nil {
 		t.Fatalf("Failed to write mock state file: %v", err)
 	}
 
