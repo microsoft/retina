@@ -1,15 +1,90 @@
 version: 2
 updates:
+  # Docker base image tracking - Main controller
   - package-ecosystem: "docker"
-    directory: "/"
+    directory: "/controller"
     schedule:
       interval: "daily"
     reviewers:
       - "microsoft/retina"
     commit-message:
       prefix: "deps"
-    labels: ["area/infra", "area/dependencies"]
-    open-pull-requests-limit: 10
+      prefix-development: "deps"
+    labels: ["area/infra", "area/dependencies", "area/security"]
+    open-pull-requests-limit: 5
+  # Docker base image tracking - Shell utilities
+  - package-ecosystem: "docker"
+    directory: "/shell"
+    schedule:
+      interval: "daily"
+    reviewers:
+      - "microsoft/retina"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps"
+    labels: ["area/infra", "area/dependencies", "area/security"]
+    open-pull-requests-limit: 5
+  # Docker base image tracking - CLI
+  - package-ecosystem: "docker"
+    directory: "/cli"
+    schedule:
+      interval: "daily"
+    reviewers:
+      - "microsoft/retina"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps"
+    labels: ["area/infra", "area/dependencies", "area/security"]
+    open-pull-requests-limit: 5
+  # Docker base image tracking - Operator
+  - package-ecosystem: "docker"
+    directory: "/operator"
+    schedule:
+      interval: "daily"
+    reviewers:
+      - "microsoft/retina"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps"
+    labels: ["area/infra", "area/dependencies", "area/security"]
+    open-pull-requests-limit: 5
+  # Docker base image tracking - Test images
+  - package-ecosystem: "docker"
+    directory: "/test/image"
+    schedule:
+      interval: "daily"
+    reviewers:
+      - "microsoft/retina"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps"
+    labels: ["area/infra", "area/dependencies", "area/testing"]
+    open-pull-requests-limit: 3
+  # Docker base image tracking - Tools (kapinger)
+  - package-ecosystem: "docker"
+    directory: "/hack/tools/kapinger"
+    schedule:
+      interval: "weekly"
+    reviewers:
+      - "microsoft/retina"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps"
+    labels: ["area/infra", "area/dependencies", "area/tools"]
+    open-pull-requests-limit: 3
+  # Docker base image tracking - Tools (toolbox)
+  - package-ecosystem: "docker"
+    directory: "/hack/tools/toolbox"
+    schedule:
+      interval: "weekly"
+    reviewers:
+      - "microsoft/retina"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps"
+    labels: ["area/infra", "area/dependencies", "area/tools"]
+    open-pull-requests-limit: 3
+  # GitHub Actions tracking
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -20,6 +95,7 @@ updates:
       prefix: "deps"
     labels: ["area/infra", "area/dependencies"]
     open-pull-requests-limit: 10
+  # Go modules tracking
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
