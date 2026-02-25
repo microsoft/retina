@@ -2,6 +2,9 @@
     "MD013": false,
     "MD010": false,
     "MD033": false,
+    "MD058": false,
+    "MD059": false,
+    "MD060": false,
     "MD024": {
         "siblings_only": true
     }
