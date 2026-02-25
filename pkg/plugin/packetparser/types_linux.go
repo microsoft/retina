@@ -10,8 +10,6 @@ import (
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/link"
-	"github.com/cilium/ebpf/perf"
 	tc "github.com/florianl/go-tc"
 	nl "github.com/mdlayher/netlink"
 	"github.com/vishvananda/netlink"
@@ -76,29 +74,15 @@ var (
 	perCPUBuffer = 32
 )
 
-// attachmentKey uniquely identifies a network interface for BPF program attachment
-type attachmentKey struct {
+type tcKey struct {
 	name         string
 	hardwareAddr string
 	netNs        int
 }
 
-// attachmentType represents the method used to attach BPF programs
-type attachmentType int
-
-const (
-	attachmentTypeTC  attachmentType = iota // Traditional TC with clsact qdisc
-	attachmentTypeTCX                       // TCX (TC eXpress) - kernel 6.6+
-)
-
-// attachmentValue stores the attachment details for a network interface
-type attachmentValue struct {
-	tc             nltc
-	qdisc          *tc.Object
-	attachmentType attachmentType
-	// TCX-specific fields
-	tcxIngressLink link.Link
-	tcxEgressLink  link.Link
+type tcValue struct {
+	tc    nltc
+	qdisc *tc.Object
 }
 
 //go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=types_linux.go -destination=mocks/mock_types_linux.go -package=mocks
@@ -139,10 +123,10 @@ type packetParser struct {
 	l          *log.ZapLogger
 	callbackID string
 	objs       *packetparserObjects //nolint:typecheck
-	// attachmentMap is a map of interface key to attachment details (TC or TCX).
-	attachmentMap *sync.Map
-	reader        perfReader
-	enricher      enricher.EnricherInterface
+	// tcMap is a map of key to *val.
+	tcMap    *sync.Map
+	reader   perfReader
+	enricher enricher.EnricherInterface
 	// interfaceLockMap is a map of key to *sync.Mutex.
 	interfaceLockMap    *sync.Map
 	endpointIngressInfo *ebpf.ProgramInfo
@@ -152,11 +136,10 @@ type packetParser struct {
 	wg                  sync.WaitGroup
 	recordsChannel      chan perfRecord
 	externalChannel     chan *v1.Event
-	tcxSupported        bool // Whether TCX is supported on this system
 }
 
-func ifaceToKey(iface netlink.LinkAttrs) attachmentKey {
-	return attachmentKey{
+func ifaceToKey(iface netlink.LinkAttrs) tcKey {
+	return tcKey{
 		name:         iface.Name,
 		hardwareAddr: iface.HardwareAddr.String(),
 		netNs:        iface.NetNsID,
