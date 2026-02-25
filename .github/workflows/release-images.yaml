@@ -100,7 +100,7 @@ jobs:
 
     strategy:
       matrix:
-        year: ["2019", "2022"]
+        year: ["2022"]
         platform: ["windows"]
         arch: ["amd64"]
 

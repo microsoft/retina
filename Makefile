@@ -22,7 +22,6 @@ CAPTURE_WORKLOAD_DIR = $(REPO_ROOT)/captureworkload
 KIND = /usr/local/bin/kind
 KIND_CLUSTER = retina-cluster
 WINVER2022   ?= "10.0.20348.1906"
-WINVER2019   ?= "10.0.17763.4737"
 APP_INSIGHTS_ID ?= ""
 AGENT_IMAGE_NAME ?= ""
 GENERATE_TARGET_DIRS = \
@@ -40,7 +39,7 @@ OS				?= $(GOOS)
 ARCH			?= $(GOARCH)
 PLATFORM		?= $(OS)/$(ARCH)
 PLATFORMS		?= linux/amd64 linux/arm64 windows/amd64
-OS_VERSION		?= ltsc2019
+OS_VERSION		?= ltsc2022
 
 HUBBLE_VERSION ?= v1.18.6
 
@@ -68,7 +67,7 @@ RETINA_PLATFORM_TAG        ?= $(TAG)-$(subst /,-,$(PLATFORM))
 # used for looping through components in container build
 AGENT_TARGETS ?= init agent
 
-WINDOWS_YEARS ?= 2019 2022
+WINDOWS_YEARS ?= 2022
 
 # for windows os, add year to the platform tag
 ifeq ($(OS),windows)
@@ -407,7 +406,7 @@ build-windows-binaries: ## Build Windows binaries
 manifest-retina-image: ## create a multiplatform manifest for the retina image
 	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_IMAGE):$(TAG))
 	$(eval FULL_INIT_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE):$(TAG))
-	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64 windows-ltsc2019-amd64 windows-ltsc2022-amd64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64 windows-ltsc2022-amd64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
 	docker buildx imagetools create -t $(FULL_INIT_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_INIT_IMAGE_NAME)-$(subst /,-,$(platform)))
 
 manifest-operator-image: ## create a multiplatform manifest for the operator image
