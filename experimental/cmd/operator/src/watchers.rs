@@ -1,22 +1,37 @@
 use std::net::IpAddr;
 use std::sync::Arc;
+use std::time::Duration;
 
+use backon::{ExponentialBuilder, Retryable};
 use futures::TryStreamExt;
 use k8s_openapi::api::core::v1::{Node, Pod, Service};
 use kube::runtime::watcher::{self, Event};
 use kube::{Api, Client};
-use retina_core::retry::retry_with_backoff;
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 use crate::state::{CachedIdentity, CachedWorkload, OperatorState, ResourceKind};
+
+fn backoff() -> ExponentialBuilder {
+    ExponentialBuilder::default()
+        .with_min_delay(Duration::from_secs(1))
+        .with_max_delay(Duration::from_secs(60))
+        .with_jitter()
+}
 
 /// Watch all pods cluster-wide and upsert/delete their IPs.
 /// Automatically restarts with backoff on stream errors.
 pub async fn watch_pods(client: Client, state: Arc<OperatorState>) {
-    retry_with_backoff("pod watcher", || {
-        try_watch_pods(client.clone(), Arc::clone(&state))
-    })
-    .await;
+    loop {
+        info!("starting pod watcher");
+        let _ = (|| try_watch_pods(client.clone(), Arc::clone(&state)))
+            .retry(backoff())
+            .notify(|err, dur: Duration| {
+                warn!(backoff_secs = dur.as_secs(), "pod watcher error: {err}, retrying");
+            })
+            .await;
+        warn!("pod watcher stream ended, reconnecting");
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
 }
 
 async fn try_watch_pods(client: Client, state: Arc<OperatorState>) -> anyhow::Result<()> {
@@ -156,10 +171,17 @@ fn handle_pod_delete(pod: &Pod, state: &OperatorState) {
 /// Watch all services cluster-wide and upsert/delete their `ClusterIP` and LB IPs.
 /// Automatically restarts with backoff on stream errors.
 pub async fn watch_services(client: Client, state: Arc<OperatorState>) {
-    retry_with_backoff("service watcher", || {
-        try_watch_services(client.clone(), Arc::clone(&state))
-    })
-    .await;
+    loop {
+        info!("starting service watcher");
+        let _ = (|| try_watch_services(client.clone(), Arc::clone(&state)))
+            .retry(backoff())
+            .notify(|err, dur: Duration| {
+                warn!(backoff_secs = dur.as_secs(), "service watcher error: {err}, retrying");
+            })
+            .await;
+        warn!("service watcher stream ended, reconnecting");
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
 }
 
 async fn try_watch_services(client: Client, state: Arc<OperatorState>) -> anyhow::Result<()> {
@@ -246,10 +268,17 @@ fn handle_service_delete(svc: &Service, state: &OperatorState) {
 /// Watch all nodes and upsert/delete their `InternalIP` addresses.
 /// Automatically restarts with backoff on stream errors.
 pub async fn watch_nodes(client: Client, state: Arc<OperatorState>) {
-    retry_with_backoff("node watcher", || {
-        try_watch_nodes(client.clone(), Arc::clone(&state))
-    })
-    .await;
+    loop {
+        info!("starting node watcher");
+        let _ = (|| try_watch_nodes(client.clone(), Arc::clone(&state)))
+            .retry(backoff())
+            .notify(|err, dur: Duration| {
+                warn!(backoff_secs = dur.as_secs(), "node watcher error: {err}, retrying");
+            })
+            .await;
+        warn!("node watcher stream ended, reconnecting");
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
 }
 
 async fn try_watch_nodes(client: Client, state: Arc<OperatorState>) -> anyhow::Result<()> {

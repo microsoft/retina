@@ -12,6 +12,7 @@ retina-core.workspace = true
 retina-proto.workspace = true
 
 anyhow.workspace = true
+backon.workspace = true
 axum.workspace = true
 hostname.workspace = true
 clap.workspace = true

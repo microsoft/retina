@@ -2318,6 +2318,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
+ "backon",
  "clap",
  "dropreason",
  "hostname",
@@ -2370,6 +2371,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
+ "backon",
  "clap",
  "futures",
  "k8s-openapi",

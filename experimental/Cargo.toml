@@ -25,6 +25,7 @@ anyhow = "1"
 async-trait = "0.1"
 aya = { git = "https://github.com/aya-rs/aya", branch = "main" }
 aya-log = { git = "https://github.com/aya-rs/aya", branch = "main" }
+backon = "1"
 axum = "0.8"
 btf-rs = "1"
 bytes = "1"

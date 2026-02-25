@@ -4,8 +4,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
+use backon::{ExponentialBuilder, Retryable};
 use retina_core::ipcache::{Identity, IpCache, Workload};
-use retina_core::retry::retry_with_backoff;
 use retina_core::store::AgentEventStore;
 use retina_proto::flow::{AgentEvent, AgentEventType, IpCacheNotification};
 use retina_proto::ipcache::ip_cache_client::IpCacheClient;
@@ -29,31 +29,46 @@ pub async fn run_ipcache_sync(
 ) {
     let preserve_cache = Arc::new(AtomicBool::new(false));
 
-    retry_with_backoff("ipcache sync", || {
-        // Reset the preserve flag for each connection attempt.
-        preserve_cache.store(false, Ordering::Release);
+    loop {
+        info!("starting ipcache sync");
+        let _ = (|| {
+            // Reset the preserve flag for each connection attempt.
+            preserve_cache.store(false, Ordering::Release);
 
-        let result = try_stream(
-            &operator_addr,
-            &cache,
-            &node_name,
-            &agent_event_tx,
-            &agent_event_store,
-            Arc::clone(&preserve_cache),
-        );
-        let cache = Arc::clone(&cache);
-        let preserve = Arc::clone(&preserve_cache);
-        async move {
-            let r = result.await;
-            // Only clear cache on unexpected disconnects; preserve it
-            // when the operator sent a graceful SHUTDOWN message.
-            if !preserve.load(Ordering::Acquire) {
-                cache.clear();
+            let result = try_stream(
+                &operator_addr,
+                &cache,
+                &node_name,
+                &agent_event_tx,
+                &agent_event_store,
+                Arc::clone(&preserve_cache),
+            );
+            let cache = Arc::clone(&cache);
+            let preserve = Arc::clone(&preserve_cache);
+            async move {
+                let r = result.await;
+                // Only clear cache on unexpected disconnects; preserve it
+                // when the operator sent a graceful SHUTDOWN message.
+                if !preserve.load(Ordering::Acquire) {
+                    cache.clear();
+                }
+                r
             }
-            r
-        }
-    })
-    .await;
+        })
+            .retry(
+                ExponentialBuilder::default()
+                    .with_min_delay(Duration::from_secs(1))
+                    .with_max_delay(Duration::from_secs(60))
+                    .with_jitter(),
+            )
+            .notify(|err, dur: Duration| {
+                warn!(backoff_secs = dur.as_secs(), "ipcache sync error: {err}, retrying");
+            })
+            .await;
+
+        warn!("ipcache sync stream ended, reconnecting");
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
 }
 
 async fn try_stream(

@@ -63,7 +63,7 @@ fn bench_full_pipeline(c: &mut Criterion) {
             metrics.touch_forward(labels);
             let flow_arc = Arc::new(hubble_flow);
             store.push(Arc::clone(&flow_arc));
-            filter.matches(&flow_arc);
+            let _ = filter.matches(&flow_arc);
             let _ = flow_tx.send(flow_arc);
         })
     });
