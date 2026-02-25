@@ -15,7 +15,7 @@ spec:
   ports:
     - name: peer-service
       port: 80
-      targetPort: {{ .Values.agent.grpcPort }}
+      targetPort: {{ .Values.agent.hubblePort }}
       protocol: TCP
   internalTrafficPolicy: Local
 {{- if .Values.hubble.relay.enabled }}

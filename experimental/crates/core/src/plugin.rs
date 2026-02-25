@@ -1,3 +1,5 @@
+//! Plugin trait and context for eBPF-based data collection plugins.
+
 use std::sync::Arc;
 
 use tokio::sync::broadcast;

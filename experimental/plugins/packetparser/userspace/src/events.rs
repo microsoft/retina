@@ -4,41 +4,19 @@ use std::sync::Arc;
 use aya::maps::{MapData, PerfEventArray, RingBuf};
 use bytes::BytesMut;
 use retina_common::PacketEvent;
-use tokio::sync::broadcast;
-use tracing::{debug, warn};
-
+use retina_core::ebpf::poll_readable;
 use retina_core::ipcache::IpCache;
 use retina_core::metrics::{AgentState, ForwardLabels, LostEventLabels, Metrics, PerfReaderGuard};
 use retina_core::store::FlowStore;
+use tokio::sync::broadcast;
+use tracing::{debug, warn};
 
 /// Number of pages per perf buffer (per CPU).
 const PERF_BUFFER_PAGES: usize = 256;
 /// Number of reusable read buffers per CPU reader.
 const PERF_READ_BUFFERS: usize = 16;
 
-/// Block until the given fd is readable via `poll(2)`.
-/// Returns `true` when ready, `false` on unrecoverable error.
-fn poll_readable(fd: i32) -> bool {
-    let mut pfd = libc::pollfd {
-        fd,
-        events: libc::POLLIN,
-        revents: 0,
-    };
-    loop {
-        let ret = unsafe { libc::poll(&mut pfd, 1, -1) };
-        if ret >= 0 {
-            return true;
-        }
-        let err = std::io::Error::last_os_error();
-        if err.kind() == std::io::ErrorKind::Interrupted {
-            continue;
-        }
-        warn!("poll error on fd {fd}: {err}");
-        return false;
-    }
-}
-
-/// Process a single PacketEvent: convert to Hubble Flow, enrich, broadcast, store.
+/// Process a single `PacketEvent`: convert to Hubble Flow, enrich, broadcast, store.
 #[inline]
 fn process_packet_event(
     pkt: &PacketEvent,
@@ -71,7 +49,7 @@ fn process_packet_event(
 ///
 /// Spawns one thread per online CPU. Each thread blocks on `poll(2)` waiting
 /// for its per-CPU perf buffer, then drains events synchronously.
-pub fn run_perf_reader(
+pub(crate) fn run_perf_reader(
     mut perf_array: PerfEventArray<MapData>,
     flow_tx: broadcast::Sender<Arc<retina_proto::flow::Flow>>,
     flow_store: Arc<FlowStore>,
@@ -81,7 +59,7 @@ pub fn run_perf_reader(
 ) -> anyhow::Result<()> {
     let boot_offset_ns = retina_core::flow::boot_to_realtime_offset();
 
-    let cpus = aya::util::online_cpus().map_err(|e| anyhow::anyhow!("online_cpus: {:?}", e))?;
+    let cpus = aya::util::online_cpus().map_err(|e| anyhow::anyhow!("online_cpus: {e:?}"))?;
     let mut handles = Vec::with_capacity(cpus.len());
 
     for cpu_id in cpus {
@@ -134,9 +112,7 @@ pub fn run_perf_reader(
                                     }
 
                                     let pkt: PacketEvent = unsafe {
-                                        core::ptr::read_unaligned(
-                                            b.as_ptr() as *const PacketEvent
-                                        )
+                                        core::ptr::read_unaligned(b.as_ptr() as *const PacketEvent)
                                     };
 
                                     process_packet_event(
@@ -174,7 +150,7 @@ pub fn run_perf_reader(
 /// Unlike the perf reader (one thread per CPU), this uses a single shared ring
 /// buffer and a single reader thread. The kernel handles multi-producer
 /// synchronization; we only need one consumer.
-pub fn run_ring_reader(
+pub(crate) fn run_ring_reader(
     mut ring_buf: RingBuf<MapData>,
     flow_tx: broadcast::Sender<Arc<retina_proto::flow::Flow>>,
     flow_store: Arc<FlowStore>,

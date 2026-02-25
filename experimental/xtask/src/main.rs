@@ -15,7 +15,7 @@ fn workspace_dir() -> PathBuf {
 fn run(cmd: &mut Command) -> anyhow::Result<()> {
     let status = cmd.status().context("failed to execute command")?;
     if !status.success() {
-        bail!("command exited with status: {}", status);
+        bail!("command exited with status: {status}");
     }
     Ok(())
 }
@@ -30,6 +30,19 @@ fn output(cmd: &mut Command) -> anyhow::Result<String> {
         );
     }
     Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+}
+
+/// Return the short git SHA of HEAD (e.g. "469533c").
+fn git_short_sha() -> anyhow::Result<String> {
+    output(Command::new("git").args(["rev-parse", "--short", "HEAD"]))
+}
+
+/// Resolve the image tag: use the explicit value if provided, otherwise
+/// default to the git short SHA so every deploy gets a unique, immutable tag.
+fn resolve_tag(tag: Option<String>) -> String {
+    let tag = tag.unwrap_or_else(|| git_short_sha().unwrap_or_else(|_| "local".into()));
+    println!("Using image tag: {tag}");
+    tag
 }
 
 /// Detect whether the current kubectl context points to a kind cluster.
@@ -90,9 +103,9 @@ enum Cli {
         /// If omitted, auto-detects: kind clusters use `kind load`, others require this flag.
         #[clap(long)]
         registry: Option<String>,
-        /// Image tag suffix (default: "local")
-        #[clap(long, default_value = "local")]
-        tag: String,
+        /// Image tag (default: git short SHA)
+        #[clap(long)]
+        tag: Option<String>,
     },
     /// Build and deploy operator
     DeployOperator {
@@ -105,9 +118,9 @@ enum Cli {
         /// Container registry to push images to
         #[clap(long)]
         registry: Option<String>,
-        /// Image tag suffix (default: "local")
-        #[clap(long, default_value = "local")]
-        tag: String,
+        /// Image tag (default: git short SHA)
+        #[clap(long)]
+        tag: Option<String>,
     },
     /// Deploy Hubble components (relay + UI)
     DeployHubble {
@@ -127,9 +140,9 @@ enum Cli {
         /// If omitted, auto-detects: kind clusters use `kind load`, others require this flag.
         #[clap(long)]
         registry: Option<String>,
-        /// Image tag suffix (default: "local")
-        #[clap(long, default_value = "local")]
-        tag: String,
+        /// Image tag (default: git short SHA)
+        #[clap(long)]
+        tag: Option<String>,
     },
     /// Set up kubectl port-forward to agent gRPC (4244)
     PortForward {
@@ -170,23 +183,29 @@ fn main() -> anyhow::Result<()> {
             namespace,
             registry,
             tag,
-        } => deploy_agent(&cluster, &namespace, registry.as_deref(), &tag),
+        } => deploy_agent(&cluster, &namespace, registry.as_deref(), &resolve_tag(tag)),
         Cli::DeployOperator {
             cluster,
             namespace,
             registry,
             tag,
-        } => deploy_operator(&cluster, &namespace, registry.as_deref(), &tag),
+        } => deploy_operator(&cluster, &namespace, registry.as_deref(), &resolve_tag(tag)),
         Cli::DeployHubble { namespace } => deploy_hubble(&namespace),
         Cli::Deploy {
             cluster,
             namespace,
             registry,
             tag,
-        } => deploy_all(&cluster, &namespace, registry.as_deref(), &tag),
+        } => deploy_all(&cluster, &namespace, registry.as_deref(), &resolve_tag(tag)),
         Cli::PortForward { namespace } => port_forward(&namespace),
-        Cli::KillStale => kill_stale(),
-        Cli::CleanPort => clean_port(),
+        Cli::KillStale => {
+            kill_stale();
+            Ok(())
+        }
+        Cli::CleanPort => {
+            clean_port();
+            Ok(())
+        }
         Cli::Logs { namespace } => logs(&namespace),
     }
 }
@@ -342,26 +361,23 @@ fn distribute_image(
     registry: Option<&str>,
     kind_cluster: &str,
 ) -> anyhow::Result<String> {
-    match registry {
-        Some(reg) => {
-            let full_ref = format!("{reg}/{remote_name}:{remote_tag}");
-            println!("Tagging {local_tag} → {full_ref}");
-            run(Command::new("docker").args(["tag", local_tag, &full_ref]))?;
-            println!("Pushing {full_ref}");
-            run(Command::new("docker").args(["push", &full_ref]))?;
-            Ok(full_ref)
-        }
-        None => {
-            println!("Loading {local_tag} into kind cluster {kind_cluster}");
-            run(Command::new("kind").args([
-                "load",
-                "docker-image",
-                local_tag,
-                "--name",
-                kind_cluster,
-            ]))?;
-            Ok(local_tag.to_string())
-        }
+    if let Some(reg) = registry {
+        let full_ref = format!("{reg}/{remote_name}:{remote_tag}");
+        println!("Tagging {local_tag} → {full_ref}");
+        run(Command::new("docker").args(["tag", local_tag, &full_ref]))?;
+        println!("Pushing {full_ref}");
+        run(Command::new("docker").args(["push", &full_ref]))?;
+        Ok(full_ref)
+    } else {
+        println!("Loading {local_tag} into kind cluster {kind_cluster}");
+        run(Command::new("kind").args([
+            "load",
+            "docker-image",
+            local_tag,
+            "--name",
+            kind_cluster,
+        ]))?;
+        Ok(local_tag.to_string())
     }
 }
 
@@ -411,7 +427,7 @@ fn deploy_agent(
 ) -> anyhow::Result<()> {
     let registry = resolve_registry(registry)?;
 
-    kill_stale()?;
+    kill_stale();
     build_agent(true)?;
 
     let local_tag = "retina-rust:local";
@@ -480,7 +496,7 @@ fn deploy_all(
 ) -> anyhow::Result<()> {
     let registry = resolve_registry(registry)?;
 
-    kill_stale()?;
+    kill_stale();
 
     // Build both binaries and images.
     build_agent(true)?;
@@ -552,7 +568,7 @@ fn port_forward(namespace: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn kill_stale() -> anyhow::Result<()> {
+fn kill_stale() {
     println!("Checking for stale processes on gRPC port 4244...");
 
     // Kill stale retina-agent processes.
@@ -581,11 +597,9 @@ fn kill_stale() -> anyhow::Result<()> {
     let _ = Command::new("pkill")
         .args(["-f", "kubectl.*port-forward.*4244"])
         .status();
-
-    Ok(())
 }
 
-fn clean_port() -> anyhow::Result<()> {
+fn clean_port() {
     if let Ok(output) = Command::new("sudo").args(["lsof", "-ti", ":4244"]).output() {
         let pids = String::from_utf8_lossy(&output.stdout);
         for pid_str in pids.split_whitespace() {
@@ -593,7 +607,6 @@ fn clean_port() -> anyhow::Result<()> {
         }
     }
     println!("Port 4244 cleared");
-    Ok(())
 }
 
 fn logs(namespace: &str) -> anyhow::Result<()> {

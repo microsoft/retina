@@ -1,3 +1,5 @@
+//! Exponential-backoff retry helper for transient gRPC/network errors.
+
 use std::future::Future;
 use std::time::Duration;
 use tracing::{error, info, warn};

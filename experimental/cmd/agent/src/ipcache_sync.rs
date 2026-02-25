@@ -1,3 +1,4 @@
+use anyhow::Context as _;
 use std::net::IpAddr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -52,7 +53,7 @@ pub async fn run_ipcache_sync(
             r
         }
     })
-    .await
+    .await;
 }
 
 async fn try_stream(
@@ -63,13 +64,15 @@ async fn try_stream(
     agent_event_store: &AgentEventStore,
     preserve_cache: Arc<AtomicBool>,
 ) -> anyhow::Result<()> {
-    let channel = Endpoint::from_shared(operator_addr.to_string())?
+    let channel = Endpoint::from_shared(operator_addr.to_string())
+        .context("invalid operator gRPC endpoint URL")?
         .connect_timeout(Duration::from_secs(5))
         .http2_keep_alive_interval(Duration::from_secs(10))
         .keep_alive_timeout(Duration::from_secs(20))
         .keep_alive_while_idle(true)
         .connect()
-        .await?;
+        .await
+        .context("failed to connect to operator gRPC service")?;
     let mut client = IpCacheClient::new(channel)
         .accept_compressed(CompressionEncoding::Gzip)
         .send_compressed(CompressionEncoding::Gzip);

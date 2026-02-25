@@ -24,7 +24,7 @@ struct EndpointAttachment {
     ifname: String,
 }
 
-pub struct VethWatcher {
+pub(crate) struct VethWatcher {
     ebpf: Arc<Mutex<Ebpf>>,
     ip_cache: Arc<IpCache>,
     attached: HashMap<u32, EndpointAttachment>, // ifindex → attachment

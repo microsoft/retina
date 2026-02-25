@@ -8,23 +8,16 @@ use aya::{
     },
 };
 use retina_common::{CtEntry, CtV4Key};
+use retina_core::ebpf::{Align8, kernel_supports_ringbuf};
 use tracing::info;
 
 /// Event source abstraction: ring buffer (Linux 5.8+) or perf event array.
-pub enum EventSource {
+pub(crate) enum EventSource {
     Perf(PerfEventArray<MapData>),
     Ring(RingBuf<MapData>),
 }
 
-pub type EbpfHandles = (Ebpf, EventSource, HashMap<MapData, CtV4Key, CtEntry>);
-
-/// Force 8-byte alignment on embedded byte data so the `object` crate's ELF
-/// parser can cast the pointer to `Elf64_Ehdr` without misalignment.
-/// (`include_bytes!` only guarantees 1-byte alignment.)
-#[repr(C, align(8))]
-struct Align8<Bytes: ?Sized> {
-    bytes: Bytes,
-}
+pub(crate) type EbpfHandles = (Ebpf, EventSource, HashMap<MapData, CtV4Key, CtEntry>);
 
 /// eBPF object (perf variant) embedded at compile time.
 /// Requires `cargo xtask build-ebpf --release` to run first.
@@ -43,23 +36,6 @@ static EBPF_OBJ_RINGBUF: &Align8<[u8]> = &Align8 {
     )),
 };
 
-/// Check if the running kernel supports BPF ring buffers (>= 5.8).
-fn kernel_supports_ringbuf() -> bool {
-    unsafe {
-        let mut utsname: libc::utsname = core::mem::zeroed();
-        if libc::uname(&mut utsname) != 0 {
-            return false;
-        }
-        let release = core::ffi::CStr::from_ptr(utsname.release.as_ptr());
-        let release = release.to_string_lossy();
-        // Parse "major.minor..." from uname release string.
-        let mut parts = release.split('.');
-        let major: u32 = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0);
-        let minor: u32 = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0);
-        major > 5 || (major == 5 && minor >= 8)
-    }
-}
-
 /// Attach a TC classifier, preferring TCX with head-of-chain ordering so Retina
 /// runs before any other TC programs on the interface. Falls back to legacy TC
 /// on kernels < 6.6.
@@ -76,8 +52,11 @@ fn attach_tc(
     let dir = dir_label(direction);
 
     // TCX (kernel >= 6.6): insert at head so we run before all other TC programs.
-    match prog.attach_with_options(iface, direction, TcAttachOptions::TcxOrder(LinkOrder::first()))
-    {
+    match prog.attach_with_options(
+        iface,
+        direction,
+        TcAttachOptions::TcxOrder(LinkOrder::first()),
+    ) {
         Ok(_) => {
             info!("attached {dir} via TCX (head of chain) to {iface}");
             return Ok(());
@@ -113,8 +92,11 @@ fn attach_tc_linked(
     let dir = dir_label(direction);
 
     // TCX (kernel >= 6.6): insert at head so we run before all other TC programs.
-    match prog.attach_with_options(iface, direction, TcAttachOptions::TcxOrder(LinkOrder::first()))
-    {
+    match prog.attach_with_options(
+        iface,
+        direction,
+        TcAttachOptions::TcxOrder(LinkOrder::first()),
+    ) {
         Ok(id) => {
             info!("attached {dir} via TCX (head of chain) to {iface}");
             return prog.take_link(id).context("take_link after TCX attach");
@@ -133,7 +115,8 @@ fn attach_tc_linked(
         }),
     )?;
     info!("attached {dir} via legacy TC (priority 1) to {iface}");
-    prog.take_link(id).context("take_link after legacy TC attach")
+    prog.take_link(id)
+        .context("take_link after legacy TC attach")
 }
 
 fn dir_label(direction: TcAttachType) -> &'static str {
@@ -146,8 +129,9 @@ fn dir_label(direction: TcAttachType) -> &'static str {
 
 /// Load eBPF programs and optionally attach host classifiers.
 ///
-/// When `host_iface` is `Some`, `host_ingress`/`host_egress` are loaded and
-/// attached to that interface. When `None`, host programs are skipped entirely.
+/// When `extra_interfaces` is non-empty, `host_ingress`/`host_egress` are
+/// loaded and attached to each listed interface. When empty, host programs
+/// are skipped entirely.
 ///
 /// Endpoint programs (`endpoint_ingress`/`endpoint_egress`) are always loaded
 /// but NOT attached — use [`attach_endpoint`] to attach them to individual
@@ -155,8 +139,8 @@ fn dir_label(direction: TcAttachType) -> &'static str {
 ///
 /// `sampling_rate`: 0 or 1 = no sampling, N = report ~1/N packets.
 /// `ring_buffer_size`: size in bytes for the BPF ring buffer (must be power of 2).
-pub fn load_and_attach(
-    host_iface: Option<&str>,
+pub(crate) fn load_and_attach(
+    extra_interfaces: &[String],
     sampling_rate: u32,
     ring_buffer_size: u32,
 ) -> anyhow::Result<EbpfHandles> {
@@ -170,27 +154,42 @@ pub fn load_and_attach(
         info!(ring_buffer_size, "loading ringbuf eBPF variant");
         EbpfLoader::new()
             .map_max_entries("EVENTS", ring_buffer_size)
-            .load(&EBPF_OBJ_RINGBUF.bytes)?
+            .load(&EBPF_OBJ_RINGBUF.bytes)
+            .context("failed to load ringbuf eBPF variant")?
     } else {
-        Ebpf::load(&EBPF_OBJ_PERF.bytes)?
+        Ebpf::load(&EBPF_OBJ_PERF.bytes).context("failed to load perf eBPF variant")?
     };
 
-    if let Some(iface) = host_iface {
-        let _ = aya::programs::tc::qdisc_add_clsact(iface);
-
+    if !extra_interfaces.is_empty() {
         let prog: &mut SchedClassifier = ebpf
             .program_mut("host_ingress")
             .context("eBPF program 'host_ingress' not found")?
             .try_into()?;
-        prog.load()?;
-        attach_tc(prog, iface, TcAttachType::Ingress)?;
+        prog.load()
+            .context("failed to verify host_ingress eBPF program")?;
 
         let prog: &mut SchedClassifier = ebpf
             .program_mut("host_egress")
             .context("eBPF program 'host_egress' not found")?
             .try_into()?;
-        prog.load()?;
-        attach_tc(prog, iface, TcAttachType::Egress)?;
+        prog.load()
+            .context("failed to verify host_egress eBPF program")?;
+
+        for iface in extra_interfaces {
+            let _ = aya::programs::tc::qdisc_add_clsact(iface);
+
+            let prog: &mut SchedClassifier = ebpf
+                .program_mut("host_ingress")
+                .context("eBPF program 'host_ingress' not found")?
+                .try_into()?;
+            attach_tc(prog, iface, TcAttachType::Ingress)?;
+
+            let prog: &mut SchedClassifier = ebpf
+                .program_mut("host_egress")
+                .context("eBPF program 'host_egress' not found")?
+                .try_into()?;
+            attach_tc(prog, iface, TcAttachType::Egress)?;
+        }
     }
 
     // Load endpoint programs (verify bytecode) but don't attach yet.
@@ -198,14 +197,16 @@ pub fn load_and_attach(
         .program_mut("endpoint_ingress")
         .context("eBPF program 'endpoint_ingress' not found")?
         .try_into()?;
-    prog.load()?;
+    prog.load()
+        .context("failed to verify endpoint_ingress eBPF program")?;
     info!("loaded endpoint_ingress");
 
     let prog: &mut SchedClassifier = ebpf
         .program_mut("endpoint_egress")
         .context("eBPF program 'endpoint_egress' not found")?
         .try_into()?;
-    prog.load()?;
+    prog.load()
+        .context("failed to verify endpoint_egress eBPF program")?;
     info!("loaded endpoint_egress");
 
     // Set sampling rate in RETINA_CONFIG map (index 0).
@@ -245,7 +246,7 @@ pub fn load_and_attach(
 ///
 /// Returns owned [`SchedClassifierLink`]s — dropping them auto-detaches the
 /// programs from the interface.
-pub fn attach_endpoint(
+pub(crate) fn attach_endpoint(
     ebpf: &mut Ebpf,
     iface: &str,
 ) -> anyhow::Result<(SchedClassifierLink, SchedClassifierLink)> {

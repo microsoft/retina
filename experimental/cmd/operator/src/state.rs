@@ -118,7 +118,7 @@ impl OperatorState {
             .collect()
     }
 
-    /// Subscribe to incremental updates. Must be called BEFORE snapshot()
+    /// Subscribe to incremental updates. Must be called BEFORE `snapshot()`
     /// to avoid missing updates between snapshot and subscribe.
     pub fn subscribe(&self) -> broadcast::Receiver<IpCacheUpdate> {
         self.updates_tx.subscribe()
@@ -154,6 +154,26 @@ impl OperatorState {
             .collect()
     }
 
+    /// Return aggregate counts without cloning the cache.
+    pub fn stats(&self) -> (usize, usize, usize, usize) {
+        let cache = self.cache.read().expect("lock poisoned");
+        let total = cache.len();
+        let (mut nodes, mut pods, mut services) = (0, 0, 0);
+        for id in cache.values() {
+            if !id.node_name.is_empty() {
+                nodes += 1;
+            }
+            if !id.pod_name.is_empty() {
+                pods += 1;
+            }
+            if !id.service_name.is_empty() {
+                services += 1;
+            }
+        }
+        drop(cache);
+        (total, nodes, pods, services)
+    }
+
     /// Convert a cached identity to a proto update message.
     fn to_proto(update_type: UpdateType, ip: &IpAddr, id: &CachedIdentity) -> IpCacheUpdate {
         IpCacheUpdate {
@@ -163,7 +183,11 @@ impl OperatorState {
             pod_name: id.pod_name.to_string(),
             service_name: id.service_name.to_string(),
             node_name: id.node_name.to_string(),
-            labels: id.labels.iter().map(|l| l.to_string()).collect(),
+            labels: id
+                .labels
+                .iter()
+                .map(std::string::ToString::to_string)
+                .collect(),
             workloads: id
                 .workloads
                 .iter()

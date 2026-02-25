@@ -1,3 +1,6 @@
+//! Hubble flow filtering: compiles whitelist/blacklist `FlowFilter` protobufs
+//! into an efficient matcher for live gRPC subscriptions.
+
 use std::net::IpAddr;
 
 use retina_proto::flow::{self, EventTypeFilter, Flow, FlowFilter, TcpFlags};
@@ -5,18 +8,20 @@ use retina_proto::flow::{self, EventTypeFilter, Flow, FlowFilter, TcpFlags};
 /// Compiled filter set for matching flows against whitelist/blacklist rules.
 ///
 /// Hubble semantics:
-/// - Within one FlowFilter: all non-empty fields must match (AND).
+/// - Within one `FlowFilter`: all non-empty fields must match (AND).
 ///   Each repeated field is OR across its elements.
-/// - Whitelist: OR across FlowFilters (any match includes).
-/// - Blacklist: OR across FlowFilters (any match excludes).
+/// - Whitelist: OR across `FlowFilters` (any match includes).
+/// - Blacklist: OR across `FlowFilters` (any match excludes).
 /// - Result: `(whitelist_empty OR matches_whitelist) AND NOT matches_blacklist`.
+#[derive(Debug)]
 pub struct FlowFilterSet {
     whitelist: Vec<CompiledFilter>,
     blacklist: Vec<CompiledFilter>,
 }
 
 impl FlowFilterSet {
-    /// Compile proto FlowFilter lists into an efficient filter set.
+    /// Compile proto `FlowFilter` lists into an efficient filter set.
+    #[must_use]
     pub fn compile(whitelist: &[FlowFilter], blacklist: &[FlowFilter]) -> Self {
         Self {
             whitelist: whitelist.iter().map(CompiledFilter::from_proto).collect(),
@@ -25,11 +30,13 @@ impl FlowFilterSet {
     }
 
     /// Returns true if no filters are configured (pass everything through).
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.whitelist.is_empty() && self.blacklist.is_empty()
     }
 
     /// Returns true if the flow matches the filter set.
+    #[must_use]
     pub fn matches(&self, flow: &Flow) -> bool {
         let wl_ok = self.whitelist.is_empty() || self.whitelist.iter().any(|f| f.matches(flow));
         let bl_ok = !self.blacklist.iter().any(|f| f.matches(flow));
@@ -39,6 +46,7 @@ impl FlowFilterSet {
 
 // ── Compiled individual filter ──────────────────────────────────────────────
 
+#[derive(Debug)]
 struct CompiledFilter {
     source_ip: Vec<IpMatcher>,
     destination_ip: Vec<IpMatcher>,
@@ -58,6 +66,8 @@ struct CompiledFilter {
     reply: Vec<bool>,
     ip_version: Vec<i32>,
     node_name: Vec<NodeNameMatcher>,
+    source_service: Vec<String>,
+    destination_service: Vec<String>,
     source_identity: Vec<u32>,
     destination_identity: Vec<u32>,
 }
@@ -107,6 +117,8 @@ impl CompiledFilter {
                 .iter()
                 .map(|s| NodeNameMatcher::parse(s))
                 .collect(),
+            source_service: f.source_service.clone(),
+            destination_service: f.destination_service.clone(),
             source_identity: f.source_identity.clone(),
             destination_identity: f.destination_identity.clone(),
         }
@@ -132,6 +144,8 @@ impl CompiledFilter {
             && self.match_reply(flow)
             && self.match_ip_version(flow)
             && self.match_node_name(flow)
+            && self.match_source_service(flow)
+            && self.match_destination_service(flow)
             && self.match_source_identity(flow)
             && self.match_destination_identity(flow)
     }
@@ -341,6 +355,26 @@ impl CompiledFilter {
         self.node_name.iter().any(|m| m.matches(&flow.node_name))
     }
 
+    fn match_source_service(&self, flow: &Flow) -> bool {
+        if self.source_service.is_empty() {
+            return true;
+        }
+        let Some(svc) = flow.source_service.as_ref() else {
+            return false;
+        };
+        self.source_service.iter().any(|s| s == &svc.name)
+    }
+
+    fn match_destination_service(&self, flow: &Flow) -> bool {
+        if self.destination_service.is_empty() {
+            return true;
+        }
+        let Some(svc) = flow.destination_service.as_ref() else {
+            return false;
+        };
+        self.destination_service.iter().any(|s| s == &svc.name)
+    }
+
     fn match_source_identity(&self, flow: &Flow) -> bool {
         if self.source_identity.is_empty() {
             return true;
@@ -364,6 +398,7 @@ impl CompiledFilter {
 
 // ── Helper types ────────────────────────────────────────────────────────────
 
+#[derive(Debug)]
 enum IpMatcher {
     Exact(IpAddr),
     Cidr(IpAddr, u8),
@@ -374,17 +409,17 @@ impl IpMatcher {
         if let Some((addr_str, prefix_str)) = s.split_once('/') {
             let addr: IpAddr = addr_str.parse().ok()?;
             let prefix: u8 = prefix_str.parse().ok()?;
-            Some(IpMatcher::Cidr(addr, prefix))
+            Some(Self::Cidr(addr, prefix))
         } else {
             let addr: IpAddr = s.parse().ok()?;
-            Some(IpMatcher::Exact(addr))
+            Some(Self::Exact(addr))
         }
     }
 
     fn matches(&self, ip: IpAddr) -> bool {
         match self {
-            IpMatcher::Exact(addr) => ip == *addr,
-            IpMatcher::Cidr(network, prefix) => cidr_contains(*network, *prefix, ip),
+            Self::Exact(addr) => ip == *addr,
+            Self::Cidr(network, prefix) => cidr_contains(*network, *prefix, ip),
         }
     }
 }
@@ -409,6 +444,7 @@ fn cidr_contains(network: IpAddr, prefix: u8, ip: IpAddr) -> bool {
     }
 }
 
+#[derive(Debug)]
 struct PodMatcher {
     namespace: Option<String>,
     name_prefix: Option<String>,
@@ -454,6 +490,7 @@ impl PodMatcher {
     }
 }
 
+#[derive(Debug)]
 struct NodeNameMatcher {
     pattern: String,
 }
@@ -870,5 +907,55 @@ mod tests {
         }];
         let fs = FlowFilterSet::compile(&wl, &[]);
         assert!(fs.matches(&make_flow()));
+    }
+
+    #[test]
+    fn filter_destination_service() {
+        let mut f = make_flow();
+        f.destination_service = Some(flow::Service {
+            name: "redis".into(),
+            namespace: "backend".into(),
+        });
+
+        let wl = vec![FlowFilter {
+            destination_service: vec!["redis".to_string()],
+            ..Default::default()
+        }];
+        let fs = FlowFilterSet::compile(&wl, &[]);
+        assert!(fs.matches(&f));
+
+        let wl_miss = vec![FlowFilter {
+            destination_service: vec!["postgres".to_string()],
+            ..Default::default()
+        }];
+        let fs_miss = FlowFilterSet::compile(&wl_miss, &[]);
+        assert!(!fs_miss.matches(&f));
+    }
+
+    #[test]
+    fn filter_source_service() {
+        let mut f = make_flow();
+        f.source_service = Some(flow::Service {
+            name: "frontend".into(),
+            namespace: "default".into(),
+        });
+
+        let wl = vec![FlowFilter {
+            source_service: vec!["frontend".to_string()],
+            ..Default::default()
+        }];
+        let fs = FlowFilterSet::compile(&wl, &[]);
+        assert!(fs.matches(&f));
+    }
+
+    #[test]
+    fn filter_service_no_match_when_absent() {
+        let f = make_flow(); // no service set
+        let wl = vec![FlowFilter {
+            destination_service: vec!["redis".to_string()],
+            ..Default::default()
+        }];
+        let fs = FlowFilterSet::compile(&wl, &[]);
+        assert!(!fs.matches(&f));
     }
 }

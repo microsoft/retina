@@ -3,6 +3,9 @@ name = "xtask"
 edition.workspace = true
 version.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true

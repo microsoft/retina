@@ -37,7 +37,7 @@ async fn ipcache_dump(State(state): State<DebugState>) -> impl IntoResponse {
                     "labels".into(),
                     id.labels
                         .iter()
-                        .map(|l| l.to_string())
+                        .map(std::string::ToString::to_string)
                         .collect::<Vec<_>>()
                         .into(),
                 );
@@ -49,21 +49,9 @@ async fn ipcache_dump(State(state): State<DebugState>) -> impl IntoResponse {
 }
 
 async fn stats(State(state): State<DebugState>) -> impl IntoResponse {
-    let dump = state.operator.dump();
-    let nodes = dump
-        .iter()
-        .filter(|(_, id)| !id.node_name.is_empty())
-        .count();
-    let pods = dump
-        .iter()
-        .filter(|(_, id)| !id.pod_name.is_empty())
-        .count();
-    let services = dump
-        .iter()
-        .filter(|(_, id)| !id.service_name.is_empty())
-        .count();
+    let (total, nodes, pods, services) = state.operator.stats();
     axum::Json(serde_json::json!({
-        "total_entries": dump.len(),
+        "total_entries": total,
         "nodes": nodes,
         "pods": pods,
         "services": services,

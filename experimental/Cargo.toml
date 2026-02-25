@@ -51,6 +51,7 @@ retina-proto = { path = "crates/proto" }
 rtnetlink = "0.20"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+serde_yaml = "0.9"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 tonic = { version = "0.14", features = ["gzip"] }
@@ -60,6 +61,51 @@ tonic-prost-build = "0.14"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "tracing-log"] }
 criterion = { version = "0.5", features = ["html_reports"] }
+
+[workspace.lints.clippy]
+# Enable pedantic and nursery with targeted exceptions for this codebase.
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+# Generated proto code and tonic trait impls trigger these unavoidably.
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+# Style preferences that don't improve clarity in this codebase.
+module_name_repetitions = "allow"
+# Too noisy: many small pure functions. We add #[must_use] where it matters.
+must_use_candidate = "allow"
+# Long functions are acceptable for loader/event code that's sequential by nature.
+too_many_lines = "allow"
+cognitive_complexity = "allow"
+# These match the intended struct layout; we add #[must_use] and const manually.
+trivially_copy_pass_by_ref = "allow"
+# Style: we use both `Option::map_or` and `if let` depending on readability.
+option_if_let_else = "allow"
+# We use `as` casts for eBPF/kernel interop where From isn't available.
+cast_possible_truncation = "allow"
+cast_sign_loss = "allow"
+cast_possible_wrap = "allow"
+cast_precision_loss = "allow"
+cast_lossless = "allow"
+# eBPF structs must be pub for Pod impls; padding fields are intentional.
+pub_underscore_fields = "allow"
+# Implicit borrows as raw pointers are safe in our read_unaligned patterns.
+ref_as_ptr = "allow"
+# Some functions genuinely need many arguments (eBPF handles, gRPC serve).
+too_many_arguments = "allow"
+# Allow redundant else blocks for readability in match-heavy code.
+redundant_else = "allow"
+# Allow struct field re-statement in constructors for clarity.
+needless_pass_by_value = "allow"
+# Nursery: many false positives — functions with async callers, trait bounds, etc.
+missing_const_for_fn = "allow"
+# AgentState and similar structs genuinely track multiple boolean flags.
+struct_excessive_bools = "allow"
+# Internal APIs don't need generic hashers; std HashMap/HashSet are fine.
+implicit_hasher = "allow"
+# eBPF/kernel interop requires raw pointer casts (constness changes are intentional).
+ptr_as_ptr = "allow"
+# Variable names like `src`/`dst` or `key`/`val` are clear in context.
+similar_names = "allow"
 
 [profile.release]
 lto = true

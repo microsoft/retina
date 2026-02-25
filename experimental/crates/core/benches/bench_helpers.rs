@@ -8,8 +8,8 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
 
 use retina_common::{
-    PacketEvent, DIR_EGRESS, DIR_INGRESS, IPPROTO_TCP, IPPROTO_UDP, OBS_FROM_ENDPOINT,
-    OBS_TO_ENDPOINT, TCP_ACK, TCP_SYN,
+    DIR_EGRESS, DIR_INGRESS, IPPROTO_TCP, IPPROTO_UDP, OBS_FROM_ENDPOINT, OBS_TO_ENDPOINT,
+    PacketEvent, TCP_ACK, TCP_SYN,
 };
 use retina_core::ipcache::{Identity, IpCache, Workload};
 use retina_proto::flow::{self, Flow, FlowFilter, IpVersion, TcpFlags, TrafficDirection, Verdict};

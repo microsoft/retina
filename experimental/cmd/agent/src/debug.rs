@@ -67,6 +67,7 @@ struct MemInfo {
 }
 
 #[derive(Serialize, Default)]
+#[allow(clippy::struct_field_names)] // _kb suffix denotes units, not redundancy
 struct SmapsRollup {
     pss_kb: u64,
     pss_anon_kb: u64,
@@ -287,7 +288,11 @@ async fn ipcache_dump(State(state): State<DebugState>) -> impl IntoResponse {
                 obj.insert("node_name".into(), id.node_name.to_string().into());
             }
             if !id.labels.is_empty() {
-                let labels: Vec<String> = id.labels.iter().map(|l| l.to_string()).collect();
+                let labels: Vec<String> = id
+                    .labels
+                    .iter()
+                    .map(std::string::ToString::to_string)
+                    .collect();
                 obj.insert("labels".into(), labels.into());
             }
             (ip.to_string(), serde_json::Value::Object(obj))

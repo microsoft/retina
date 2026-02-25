@@ -1,12 +1,14 @@
+//! Conversion from eBPF `PacketEvent` structs to Hubble `Flow` protobufs.
+
 use std::collections::BTreeMap;
 use std::net::Ipv4Addr;
 
 use prost::Message;
 use prost_types::Timestamp;
 use retina_common::{
-    PacketEvent, DIR_EGRESS, DIR_INGRESS, IPPROTO_TCP, IPPROTO_UDP, OBS_FROM_ENDPOINT,
-    OBS_FROM_NETWORK, OBS_TO_ENDPOINT, OBS_TO_NETWORK, TCP_ACK, TCP_CWR, TCP_ECE, TCP_FIN,
-    TCP_NS, TCP_PSH, TCP_RST, TCP_SYN, TCP_URG,
+    DIR_EGRESS, DIR_INGRESS, IPPROTO_TCP, IPPROTO_UDP, OBS_FROM_ENDPOINT, OBS_FROM_NETWORK,
+    OBS_TO_ENDPOINT, OBS_TO_NETWORK, PacketEvent, TCP_ACK, TCP_CWR, TCP_ECE, TCP_FIN, TCP_NS,
+    TCP_PSH, TCP_RST, TCP_SYN, TCP_URG,
 };
 use retina_proto::flow;
 
@@ -19,9 +21,10 @@ const TRACE_FROM_LXC: i32 = 5;
 const TRACE_FROM_NETWORK: i32 = 10;
 const TRACE_TO_NETWORK: i32 = 11;
 
-/// Compute the offset (in nanoseconds) to convert CLOCK_BOOTTIME → CLOCK_REALTIME.
+/// Compute the offset (in nanoseconds) to convert `CLOCK_BOOTTIME` → `CLOCK_REALTIME`.
 ///
 /// Call once at startup; the result stays valid for the process lifetime.
+#[must_use]
 pub fn boot_to_realtime_offset() -> i64 {
     let mut boot = libc::timespec {
         tv_sec: 0,
@@ -32,18 +35,19 @@ pub fn boot_to_realtime_offset() -> i64 {
         tv_nsec: 0,
     };
     unsafe {
-        libc::clock_gettime(libc::CLOCK_BOOTTIME, &mut boot);
-        libc::clock_gettime(libc::CLOCK_REALTIME, &mut real);
+        libc::clock_gettime(libc::CLOCK_BOOTTIME, &raw mut boot);
+        libc::clock_gettime(libc::CLOCK_REALTIME, &raw mut real);
     }
     let boot_ns = boot.tv_sec * 1_000_000_000 + boot.tv_nsec;
     let real_ns = real.tv_sec * 1_000_000_000 + real.tv_nsec;
     real_ns - boot_ns
 }
 
-/// Convert a PacketEvent from eBPF into a Hubble Flow protobuf.
+/// Convert a `PacketEvent` from eBPF into a Hubble Flow protobuf.
 ///
 /// `boot_offset_ns` is the value returned by [`boot_to_realtime_offset`] and
-/// converts the kernel CLOCK_BOOTTIME timestamp to wall-clock time.
+/// converts the kernel `CLOCK_BOOTTIME` timestamp to wall-clock time.
+#[must_use]
 pub fn packet_event_to_flow(pkt: &PacketEvent, boot_offset_ns: i64) -> flow::Flow {
     let wall_ns = pkt.ts_ns as i64 + boot_offset_ns;
     let secs = wall_ns / 1_000_000_000;

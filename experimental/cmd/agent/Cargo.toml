@@ -21,8 +21,12 @@ prost-pprof = { package = "prost", version = "0.12" }
 prost-types.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+serde_yaml.workspace = true
 tokio.workspace = true
 tokio-stream.workspace = true
 tonic.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+
+[lints]
+workspace = true

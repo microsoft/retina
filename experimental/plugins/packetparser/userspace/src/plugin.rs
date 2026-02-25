@@ -7,11 +7,11 @@ use tracing::{error, info, warn};
 
 use crate::loader;
 
-/// PacketParser plugin: loads eBPF TC classifiers, reads events (ring buffer
+/// `PacketParser` plugin: loads eBPF TC classifiers, reads events (ring buffer
 /// or perf), converts to Hubble flows, and optionally watches for new veth
 /// interfaces.
 pub struct PacketParser {
-    host_iface: Option<String>,
+    extra_interfaces: Vec<String>,
     pod_level: bool,
     sampling_rate: u32,
     ring_buffer_size: u32,
@@ -25,13 +25,13 @@ pub struct PacketParser {
 
 impl PacketParser {
     pub fn new(
-        host_iface: Option<String>,
+        extra_interfaces: Vec<String>,
         pod_level: bool,
         sampling_rate: u32,
         ring_buffer_size: u32,
     ) -> Self {
         Self {
-            host_iface,
+            extra_interfaces,
             pod_level,
             sampling_rate,
             ring_buffer_size,
@@ -46,13 +46,13 @@ impl PacketParser {
 
 #[async_trait::async_trait]
 impl Plugin for PacketParser {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "packetparser"
     }
 
     async fn start(&mut self, ctx: PluginContext) -> anyhow::Result<()> {
         let (mut ebpf, event_source, conntrack_map) = loader::load_and_attach(
-            self.host_iface.as_deref(),
+            &self.extra_interfaces,
             self.sampling_rate,
             self.ring_buffer_size,
         )

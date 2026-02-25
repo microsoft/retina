@@ -7,7 +7,11 @@ fn main() {
 
     // Git tag if HEAD is exactly on a tag, otherwise "dev".
     let tag = run("git", &["describe", "--tags", "--exact-match"]);
-    let version = if tag.is_empty() { "dev".to_string() } else { tag };
+    let version = if tag.is_empty() {
+        "dev".to_string()
+    } else {
+        tag
+    };
     println!("cargo:rustc-env=GIT_VERSION={version}");
 
     // Rust compiler version.

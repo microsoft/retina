@@ -17,7 +17,7 @@ fn boot_time_secs() -> u32 {
         tv_nsec: 0,
     };
     unsafe {
-        libc::clock_gettime(libc::CLOCK_BOOTTIME, &mut ts);
+        libc::clock_gettime(libc::CLOCK_BOOTTIME, &raw mut ts);
     }
     ts.tv_sec as u32
 }
@@ -25,7 +25,10 @@ fn boot_time_secs() -> u32 {
 /// Run periodic conntrack garbage collection.
 /// Iterates the conntrack map and removes expired entries.
 /// Also sweeps stale forward metric label sets every 60s (4 × 15s ticks).
-pub async fn run_gc(mut conntrack: HashMap<MapData, CtV4Key, CtEntry>, metrics: Arc<Metrics>) {
+pub(crate) async fn run_gc(
+    mut conntrack: HashMap<MapData, CtV4Key, CtEntry>,
+    metrics: Arc<Metrics>,
+) {
     let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(GC_INTERVAL_SECS));
     let mut sweep_counter: u32 = 0;
 
@@ -44,7 +47,7 @@ pub async fn run_gc(mut conntrack: HashMap<MapData, CtV4Key, CtEntry>, metrics: 
         let mut total_bytes_rx = 0i64;
 
         // Iterate all entries.
-        for item in conntrack.iter() {
+        for item in &conntrack {
             total += 1;
             match item {
                 Ok((key, entry)) => {

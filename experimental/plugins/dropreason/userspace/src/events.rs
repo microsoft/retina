@@ -1,17 +1,20 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::net::Ipv4Addr;
 use std::os::fd::{AsFd as _, AsRawFd};
 use std::sync::Arc;
 
-use aya::maps::{MapData, PerCpuHashMap, PerfEventArray, RingBuf};
+use aya::maps::{MapData, PerCpuArray, PerCpuHashMap, PerfEventArray, RingBuf};
 use bytes::BytesMut;
 use dropreason_common::{
-    DropEvent, DropMetricsKey, DropMetricsValue, DropReason, DIR_EGRESS, DIR_INGRESS,
+    DIR_EGRESS, DIR_INGRESS, DropEvent, DropMetricsKey, DropMetricsValue, DropReason,
 };
 use prost::Message;
 use prost_types::Timestamp;
+use retina_core::ebpf::poll_readable;
 use retina_core::ipcache::IpCache;
-use retina_core::metrics::{AgentState, DropLabels, LostEventLabels, Metrics, PerfReaderGuard};
+use retina_core::metrics::{
+    AgentState, DropFlowLabels, DropLabels, LostEventLabels, Metrics, PerfReaderGuard,
+};
 use retina_core::store::FlowStore;
 use retina_proto::flow;
 use tokio::sync::broadcast;
@@ -25,27 +28,6 @@ const PERF_READ_BUFFERS: usize = 8;
 
 // Cilium monitor API message type for drops.
 const MESSAGE_TYPE_DROP: i32 = 1;
-
-/// Block until the given fd is readable via `poll(2)`.
-fn poll_readable(fd: i32) -> bool {
-    let mut pfd = libc::pollfd {
-        fd,
-        events: libc::POLLIN,
-        revents: 0,
-    };
-    loop {
-        let ret = unsafe { libc::poll(&mut pfd, 1, -1) };
-        if ret >= 0 {
-            return true;
-        }
-        let err = std::io::Error::last_os_error();
-        if err.kind() == std::io::ErrorKind::Interrupted {
-            continue;
-        }
-        warn!("dropreason: poll error on fd {fd}: {err}");
-        return false;
-    }
-}
 
 fn direction_label(dir: u8) -> &'static str {
     match dir {
@@ -118,7 +100,11 @@ fn resolve_src_ip_from_pid(pid: u32) -> Option<Ipv4Addr> {
 }
 
 /// Convert a [`DropEvent`] to a Hubble Flow with `verdict: DROPPED`.
-fn drop_event_to_flow(event: &DropEvent, boot_offset_ns: i64) -> flow::Flow {
+fn drop_event_to_flow(
+    event: &DropEvent,
+    boot_offset_ns: i64,
+    kernel_drop_reasons: &HashMap<u32, String>,
+) -> flow::Flow {
     let wall_ns = event.ts_ns as i64 + boot_offset_ns;
     let secs = wall_ns / 1_000_000_000;
     let nanos = (wall_ns % 1_000_000_000) as i32;
@@ -153,9 +139,28 @@ fn drop_event_to_flow(event: &DropEvent, boot_offset_ns: i64) -> flow::Flow {
         _ => None,
     };
 
-    let ret = event.return_val as i32;
-    let errno_str = errno_name(ret);
-    let summary = format!("Drop: {} ({errno_str})", reason.as_str());
+    // Build summary string.
+    let summary = match reason {
+        // kfree_skb: show the kernel's own drop reason name.
+        DropReason::KernelDrop => {
+            let kernel_reason = kernel_drop_reasons
+                .get(&event.kernel_drop_reason)
+                .map_or("UNKNOWN", std::string::String::as_str);
+            format!("Drop: {kernel_reason}")
+        }
+        // fexit hooks: show the kernel return code / errno.
+        DropReason::IptableRuleDrop
+        | DropReason::IptableNatDrop
+        | DropReason::TcpConnectDrop
+        | DropReason::TcpAcceptDrop
+        | DropReason::ConntrackDrop => {
+            let ret = event.return_val as i32;
+            let errno_str = errno_name(ret);
+            format!("Drop: {} ({errno_str})", reason.as_str())
+        }
+        // TCP tracepoints + unknown: just show the reason name.
+        _ => format!("Drop: {}", reason.as_str()),
+    };
 
     // Build extensions with drop reason, return code, and byte count.
     let extensions = {
@@ -168,12 +173,35 @@ fn drop_event_to_flow(event: &DropEvent, boot_offset_ns: i64) -> flow::Flow {
                 )),
             },
         );
-        fields.insert(
-            "return_code".to_string(),
-            prost_types::Value {
-                kind: Some(prost_types::value::Kind::StringValue(errno_str)),
-            },
-        );
+        // For KernelDrop, include the specific kernel reason name.
+        if reason == DropReason::KernelDrop && event.kernel_drop_reason > 0 {
+            let kernel_reason = kernel_drop_reasons
+                .get(&event.kernel_drop_reason)
+                .cloned()
+                .unwrap_or_else(|| format!("UNKNOWN_{}", event.kernel_drop_reason));
+            fields.insert(
+                "kernel_drop_reason".to_string(),
+                prost_types::Value {
+                    kind: Some(prost_types::value::Kind::StringValue(kernel_reason)),
+                },
+            );
+        } else if matches!(
+            reason,
+            DropReason::IptableRuleDrop
+                | DropReason::IptableNatDrop
+                | DropReason::TcpConnectDrop
+                | DropReason::TcpAcceptDrop
+                | DropReason::ConntrackDrop
+        ) {
+            let ret = event.return_val as i32;
+            let errno_str = errno_name(ret);
+            fields.insert(
+                "return_code".to_string(),
+                prost_types::Value {
+                    kind: Some(prost_types::value::Kind::StringValue(errno_str)),
+                },
+            );
+        }
         if event.bytes > 0 {
             fields.insert(
                 "bytes".to_string(),
@@ -214,7 +242,7 @@ fn drop_event_to_flow(event: &DropEvent, boot_offset_ns: i64) -> flow::Flow {
         l4,
         r#type: flow::FlowType::L3L4.into(),
         node_name: String::new(),
-        is_reply: None,
+        is_reply: Some(false),
         event_type: Some(flow::CiliumEventType {
             r#type: MESSAGE_TYPE_DROP,
             sub_type: 0,
@@ -227,19 +255,37 @@ fn drop_event_to_flow(event: &DropEvent, boot_offset_ns: i64) -> flow::Flow {
     }
 }
 
-/// Process a single DropEvent: convert to Hubble Flow, enrich, broadcast, store.
+/// Process a single `DropEvent`: convert to Hubble Flow, enrich, broadcast, store,
+/// and update per-flow drop metrics.
 ///
-/// When `src_ip` is 0 (e.g. early tcp_v4_connect failure before source IP
+/// When `src_ip` is 0 (e.g. early `tcp_v4_connect` failure before source IP
 /// assignment), attempts to resolve the source pod IP from the PID's network
 /// namespace via `/proc/{pid}/net/fib_trie`.
 #[inline]
+#[allow(clippy::too_many_arguments)]
 fn process_drop_event(
     event: &DropEvent,
     boot_offset_ns: i64,
     flow_tx: &broadcast::Sender<Arc<flow::Flow>>,
     flow_store: &FlowStore,
     ip_cache: &IpCache,
+    metrics: &Metrics,
+    kernel_drop_reasons: &HashMap<u32, String>,
+    suppressed_reasons: &HashSet<String>,
 ) {
+    // Check userspace suppress filter before doing any work.
+    let reason = DropReason::from_u8(event.drop_reason);
+    let reason_name = if reason == DropReason::KernelDrop {
+        kernel_drop_reasons
+            .get(&event.kernel_drop_reason)
+            .map_or("", std::string::String::as_str)
+    } else {
+        reason.as_str()
+    };
+    if suppressed_reasons.contains(reason_name) {
+        return;
+    }
+
     // Resolve source IP from PID when the socket didn't have one.
     let mut patched = *event;
     if patched.src_ip == 0
@@ -249,8 +295,17 @@ fn process_drop_event(
         patched.src_ip = u32::from(ip);
     }
 
-    let mut hubble_flow = drop_event_to_flow(&patched, boot_offset_ns);
+    let mut hubble_flow = drop_event_to_flow(&patched, boot_offset_ns, kernel_drop_reasons);
     retina_core::enricher::enrich_flow(&mut hubble_flow, ip_cache);
+
+    // Update per-flow drop metrics with full K8s context.
+    let labels = DropFlowLabels::from_flow(reason_name, &hubble_flow);
+    metrics.drop_flow_count.get_or_create(&labels).inc();
+    metrics
+        .drop_flow_bytes
+        .get_or_create(&labels)
+        .inc_by(patched.bytes as i64);
+    metrics.touch_drop(labels);
 
     let flow_arc = Arc::new(hubble_flow);
     flow_store.push(Arc::clone(&flow_arc));
@@ -258,12 +313,16 @@ fn process_drop_event(
 }
 
 /// Read events from a shared BPF ring buffer on a dedicated OS thread.
-pub fn run_ring_reader(
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn run_ring_reader(
     mut ring_buf: RingBuf<MapData>,
     flow_tx: broadcast::Sender<Arc<flow::Flow>>,
     flow_store: Arc<FlowStore>,
     ip_cache: Arc<IpCache>,
+    metrics: Arc<Metrics>,
     state: Arc<AgentState>,
+    kernel_drop_reasons: Arc<HashMap<u32, String>>,
+    suppressed_reasons: Arc<HashSet<String>>,
 ) {
     let boot_offset_ns = retina_core::flow::boot_to_realtime_offset();
     let _guard = PerfReaderGuard::new(state);
@@ -284,19 +343,31 @@ pub fn run_ring_reader(
                 unsafe { core::ptr::read_unaligned(item.as_ptr() as *const DropEvent) };
             drop(item);
 
-            process_drop_event(&event, boot_offset_ns, &flow_tx, &flow_store, &ip_cache);
+            process_drop_event(
+                &event,
+                boot_offset_ns,
+                &flow_tx,
+                &flow_store,
+                &ip_cache,
+                &metrics,
+                &kernel_drop_reasons,
+                &suppressed_reasons,
+            );
         }
     }
 }
 
 /// Read events from per-CPU perf buffers on dedicated OS threads.
-pub fn run_perf_reader(
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn run_perf_reader(
     mut perf_array: PerfEventArray<MapData>,
     flow_tx: broadcast::Sender<Arc<flow::Flow>>,
     flow_store: Arc<FlowStore>,
     ip_cache: Arc<IpCache>,
     metrics: Arc<Metrics>,
     state: Arc<AgentState>,
+    kernel_drop_reasons: Arc<HashMap<u32, String>>,
+    suppressed_reasons: Arc<HashSet<String>>,
 ) -> anyhow::Result<()> {
     let boot_offset_ns = retina_core::flow::boot_to_realtime_offset();
 
@@ -310,6 +381,8 @@ pub fn run_perf_reader(
         let cache = Arc::clone(&ip_cache);
         let metrics = Arc::clone(&metrics);
         let state = Arc::clone(&state);
+        let kdr = Arc::clone(&kernel_drop_reasons);
+        let sr = Arc::clone(&suppressed_reasons);
 
         let handle = std::thread::Builder::new()
             .name(format!("retina-drop-perf-{cpu_id}"))
@@ -346,9 +419,7 @@ pub fn run_perf_reader(
                                         continue;
                                     }
                                     let event: DropEvent = unsafe {
-                                        core::ptr::read_unaligned(
-                                            b.as_ptr() as *const DropEvent,
-                                        )
+                                        core::ptr::read_unaligned(b.as_ptr() as *const DropEvent)
                                     };
                                     process_drop_event(
                                         &event,
@@ -356,6 +427,9 @@ pub fn run_perf_reader(
                                         &tx,
                                         &store,
                                         &cache,
+                                        &metrics,
+                                        &kdr,
+                                        &sr,
                                     );
                                 }
                             }
@@ -382,16 +456,27 @@ pub fn run_perf_reader(
 /// This runs as a tokio task and updates `drop_count` / `drop_bytes` every 10
 /// seconds. The per-CPU map is the authoritative source for aggregate metrics
 /// (it never loses data, unlike ring buffer events which can be dropped).
-pub async fn run_metrics_reader(
+///
+/// For fexit hooks, multiple eBPF map entries with different `return_val` may
+/// share the same Prometheus label (e.g. `IPTABLE_RULE_DROP`). We accumulate
+/// counts across all return values before setting the gauge, so no entry
+/// overwrites another.
+pub(crate) async fn run_metrics_reader(
     metrics_map: PerCpuHashMap<MapData, DropMetricsKey, DropMetricsValue>,
     metrics: Arc<Metrics>,
+    kernel_drop_reasons: Arc<HashMap<u32, String>>,
+    ring_lost_map: Option<PerCpuArray<MapData, u64>>,
 ) {
     let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(10));
+    let mut prev_ring_lost: u64 = 0;
 
     loop {
         interval.tick().await;
 
-        for item in metrics_map.iter() {
+        // Accumulate across return_val variants that share the same label.
+        let mut acc: HashMap<(String, String), (u64, u64)> = HashMap::new();
+
+        for item in &metrics_map {
             match item {
                 Ok((key, per_cpu_values)) => {
                     // Sum across all CPUs.
@@ -403,17 +488,56 @@ pub async fn run_metrics_reader(
                     }
 
                     let reason = DropReason::from_u8(key.drop_reason);
-                    let labels = DropLabels {
-                        reason: reason.as_str().to_string(),
-                        direction: direction_label(key.direction).to_string(),
+
+                    // For KernelDrop, resolve the specific kernel reason from
+                    // return_val (which stores the skb_drop_reason enum value).
+                    let reason_label = if reason == DropReason::KernelDrop {
+                        kernel_drop_reasons
+                            .get(&(key.return_val as u32))
+                            .cloned()
+                            .unwrap_or_else(|| format!("KERNEL_DROP_{}", key.return_val))
+                    } else {
+                        reason.as_str().to_string()
                     };
-                    metrics.drop_count.get_or_create(&labels).set(total_count as i64);
-                    metrics.drop_bytes.get_or_create(&labels).set(total_bytes as i64);
+
+                    let direction = direction_label(key.direction).to_string();
+                    let entry = acc.entry((reason_label, direction)).or_insert((0, 0));
+                    entry.0 += total_count;
+                    entry.1 += total_bytes;
                 }
                 Err(e) => {
                     debug!("dropreason metrics iter error: {e}");
                     break;
                 }
+            }
+        }
+
+        for ((reason_label, direction), (count, bytes)) in &acc {
+            let labels = DropLabels {
+                reason: reason_label.clone(),
+                direction: direction.clone(),
+            };
+            metrics.drop_count.get_or_create(&labels).set(*count as i64);
+            metrics.drop_bytes.get_or_create(&labels).set(*bytes as i64);
+        }
+
+        // Sweep stale per-flow drop metric label sets (5 min TTL).
+        metrics.sweep_stale_drop(std::time::Duration::from_secs(300));
+
+        // Report ring buffer lost events (delta since last tick).
+        if let Some(ref map) = ring_lost_map
+            && let Ok(per_cpu) = map.get(&0, 0)
+        {
+            let total: u64 = per_cpu.iter().sum();
+            if total > prev_ring_lost {
+                metrics
+                    .lost_events_counter
+                    .get_or_create(&LostEventLabels {
+                        r#type: "ring".into(),
+                        reason: "dropreason_ring_full".into(),
+                    })
+                    .inc_by(total - prev_ring_lost);
+                prev_ring_lost = total;
             }
         }
     }

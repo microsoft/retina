@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
+use anyhow::Context as _;
 use retina_proto::ipcache::ip_cache_server::{IpCache, IpCacheServer};
 use retina_proto::ipcache::{
     IpCacheBatch, IpCacheRequest, IpCacheUpdate, ip_cache_update::UpdateType,
@@ -119,7 +120,7 @@ impl IpCache for IpCacheService {
                             Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                         }
                     }
-                    _ = tx.closed() => {
+                    () = tx.closed() => {
                         info!(node_name, "agent disconnected");
                         break;
                     }
@@ -131,7 +132,7 @@ impl IpCache for IpCacheService {
     }
 }
 
-/// Start the IpCache gRPC server with graceful shutdown support.
+/// Start the `IpCache` gRPC server with graceful shutdown support.
 ///
 /// When the `shutdown` future completes, the server stops accepting new RPCs
 /// and drains in-flight streams so agents see a clean end-of-stream instead
@@ -151,7 +152,8 @@ pub async fn serve(
         .http2_keepalive_timeout(Some(std::time::Duration::from_secs(20)))
         .add_service(service.into_server())
         .serve_with_shutdown(addr, shutdown)
-        .await?;
+        .await
+        .context("IpCache gRPC server failed")?;
 
     Ok(())
 }

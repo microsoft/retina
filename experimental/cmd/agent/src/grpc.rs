@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
+use anyhow::Context as _;
 use prost_types::Timestamp;
 use retina_core::filter::FlowFilterSet;
 use retina_core::ipcache::{IpCache, IpCacheEvent};
@@ -301,7 +302,7 @@ impl Observer for HubbleObserver {
 }
 
 struct HubblePeer {
-    grpc_port: u16,
+    hubble_port: u16,
     ip_cache: Arc<IpCache>,
 }
 
@@ -315,7 +316,7 @@ impl Peer for HubblePeer {
     ) -> Result<Response<Self::NotifyStream>, Status> {
         let (tx, rx) = tokio::sync::mpsc::channel(PEER_CHANNEL_CAPACITY);
         let ip_cache = Arc::clone(&self.ip_cache);
-        let grpc_port = self.grpc_port;
+        let hubble_port = self.hubble_port;
 
         tokio::spawn(async move {
             // Wait for the ipcache to sync with the operator so we have the
@@ -327,7 +328,7 @@ impl Peer for HubblePeer {
             for (name, ip) in &nodes {
                 let notification = ChangeNotification {
                     name: name.clone(),
-                    address: format!("{}:{}", ip, grpc_port),
+                    address: format!("{ip}:{hubble_port}"),
                     r#type: ChangeNotificationType::PeerAdded.into(),
                     tls: None,
                 };
@@ -355,7 +356,7 @@ impl Peer for HubblePeer {
                         known.insert(name.to_string(), ip);
                         let notification = ChangeNotification {
                             name: name.to_string(),
-                            address: format!("{}:{}", ip, grpc_port),
+                            address: format!("{ip}:{hubble_port}"),
                             r#type: change_type.into(),
                             tls: None,
                         };
@@ -421,7 +422,7 @@ impl Peer for HubblePeer {
                             };
                             let notification = ChangeNotification {
                                 name: name.clone(),
-                                address: format!("{}:{}", ip, grpc_port),
+                                address: format!("{ip}:{hubble_port}"),
                                 r#type: change_type.into(),
                                 tls: None,
                             };
@@ -452,7 +453,7 @@ pub async fn serve(
     agent_state: Arc<AgentState>,
     ip_cache: Arc<IpCache>,
 ) -> anyhow::Result<()> {
-    let addr = format!("0.0.0.0:{}", port).parse()?;
+    let addr = format!("0.0.0.0:{port}").parse()?;
     let observer = HubbleObserver {
         node_name,
         flow_tx,
@@ -461,7 +462,7 @@ pub async fn serve(
         agent_event_store,
     };
     let peer = HubblePeer {
-        grpc_port: port,
+        hubble_port: port,
         ip_cache,
     };
 
@@ -481,7 +482,8 @@ pub async fn serve(
                 .send_compressed(CompressionEncoding::Gzip),
         )
         .serve(addr)
-        .await?;
+        .await
+        .context("Hubble Observer gRPC server failed")?;
 
     Ok(())
 }

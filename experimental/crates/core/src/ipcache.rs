@@ -1,3 +1,6 @@
+//! Thread-safe IP-to-identity cache with broadcast notifications.
+//! Maps IP addresses to Kubernetes identity metadata (pod, service, node).
+
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::net::IpAddr;
@@ -5,7 +8,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
 use tokio::sync::{Notify, broadcast};
 
-/// Change event emitted by the IpCache when entries are modified.
+/// Change event emitted by the `IpCache` when entries are modified.
 #[derive(Clone, Debug)]
 pub enum IpCacheEvent {
     Upsert(IpAddr, Identity),
@@ -54,9 +57,13 @@ impl Identity {
     /// - Pods → hash identity-relevant labels into \[256, 65535\]
     /// - Services → hash namespace + service name into \[256, 65535\]
     /// - Empty/unknown → `IDENTITY_WORLD` (2)
+    #[must_use]
     pub fn numeric_identity(&self) -> u32 {
         if !self.node_name.is_empty() {
-            return IDENTITY_REMOTE_NODE;
+            return hash_labels_to_identity(
+                "",
+                &[format!("k8s:io.kubernetes.node.name={}", self.node_name)],
+            );
         }
 
         if !self.pod_name.is_empty() {
@@ -76,18 +83,18 @@ impl Identity {
 /// Hash a namespace + set of labels into the cluster-local identity range [256, 65535].
 ///
 /// Labels are filtered to remove high-cardinality/ephemeral keys, sorted for
-/// determinism, then hashed with SipHash. The result is mapped into the range.
+/// determinism, then hashed with `SipHash`. The result is mapped into the range.
 fn hash_labels_to_identity<S: AsRef<str>>(namespace: &str, labels: &[S]) -> u32 {
     let mut relevant: Vec<&str> = labels
         .iter()
-        .map(|l| l.as_ref())
+        .map(std::convert::AsRef::as_ref)
         .filter(|l| {
             !IDENTITY_IRRELEVANT_LABELS
                 .iter()
                 .any(|prefix| l.starts_with(prefix))
         })
         .collect();
-    relevant.sort();
+    relevant.sort_unstable();
 
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     namespace.hash(&mut hasher);
@@ -120,6 +127,7 @@ impl Default for IpCache {
 }
 
 impl IpCache {
+    #[must_use]
     pub fn new() -> Self {
         let (event_tx, _) = broadcast::channel(4096);
         Self {
@@ -136,7 +144,7 @@ impl IpCache {
         self.event_tx.subscribe()
     }
 
-    /// Set the local node name. Used to distinguish Host (local) vs RemoteNode.
+    /// Set the local node name. Used to distinguish Host (local) vs `RemoteNode`.
     pub fn set_local_node_name(&self, name: String) {
         *self.local_node_name.write().expect("lock poisoned") = name;
     }
@@ -161,11 +169,13 @@ impl IpCache {
         }
     }
 
+    #[must_use]
     pub fn get(&self, ip: &IpAddr) -> Option<Identity> {
         self.inner.read().expect("lock poisoned").get(ip).cloned()
     }
 
     /// Look up two IPs in a single lock acquisition (hot-path optimization).
+    #[must_use]
     pub fn get_pair(&self, ip1: &IpAddr, ip2: &IpAddr) -> (Option<Identity>, Option<Identity>) {
         let inner = self.inner.read().expect("lock poisoned");
         (inner.get(ip1).cloned(), inner.get(ip2).cloned())
@@ -176,17 +186,13 @@ impl IpCache {
         self.local_node_name.read().expect("lock poisoned").clone()
     }
 
-    /// Resolve numeric identity using a pre-fetched local node name (avoids
-    /// acquiring the `local_node_name` RwLock on every call).
-    pub fn resolve_identity_with_local(&self, id: &Identity, local_node_name: &str) -> u32 {
+    /// Resolve numeric identity. The `local_node_name` parameter is unused
+    /// here (node host/remote distinction is now in enricher labels) but kept
+    /// in the signature for API compatibility with callers that also need it.
+    #[must_use]
+    pub fn resolve_identity_with_local(&self, id: &Identity, _local_node_name: &str) -> u32 {
         if &*id.namespace == "default" && &*id.service_name == "kubernetes" {
             return IDENTITY_KUBE_APISERVER;
-        }
-        if !id.node_name.is_empty() {
-            if !local_node_name.is_empty() && local_node_name == &*id.node_name {
-                return IDENTITY_HOST;
-            }
-            return IDENTITY_REMOTE_NODE;
         }
         id.numeric_identity()
     }
@@ -196,6 +202,7 @@ impl IpCache {
         self.synced_notify.notify_waiters();
     }
 
+    #[must_use]
     pub fn is_synced(&self) -> bool {
         self.synced.load(Ordering::Acquire)
     }
@@ -212,8 +219,8 @@ impl IpCache {
             return true;
         }
         tokio::select! {
-            _ = notified => self.is_synced(),
-            _ = tokio::time::sleep(timeout) => self.is_synced(),
+            () = notified => self.is_synced(),
+            () = tokio::time::sleep(timeout) => self.is_synced(),
         }
     }
 
@@ -232,7 +239,7 @@ impl IpCache {
             .collect()
     }
 
-    /// Return all node entries as (node_name, ip) pairs.
+    /// Return all node entries as (`node_name`, ip) pairs.
     pub fn get_node_peers(&self) -> Vec<(String, IpAddr)> {
         let inner = self.inner.read().expect("lock poisoned");
         let mut seen = std::collections::HashSet::new();
@@ -417,7 +424,7 @@ mod tests {
     }
 
     #[test]
-    fn node_identity_is_remote_node() {
+    fn node_identity_is_unique_per_node() {
         let id = Identity {
             namespace: Arc::from(""),
             pod_name: Arc::from(""),
@@ -426,7 +433,18 @@ mod tests {
             labels: vec![].into(),
             workloads: vec![].into(),
         };
-        assert_eq!(id.numeric_identity(), IDENTITY_REMOTE_NODE);
+        let num = id.numeric_identity();
+        assert!(num >= MIN_CLUSTER_IDENTITY && num <= MAX_CLUSTER_IDENTITY);
+
+        let id2 = Identity {
+            namespace: Arc::from(""),
+            pod_name: Arc::from(""),
+            service_name: Arc::from(""),
+            node_name: Arc::from("node-2"),
+            labels: vec![].into(),
+            workloads: vec![].into(),
+        };
+        assert_ne!(id.numeric_identity(), id2.numeric_identity());
     }
 
     #[test]
@@ -474,7 +492,7 @@ mod tests {
     }
 
     #[test]
-    fn resolve_local_node_is_host() {
+    fn resolve_node_uses_hashed_identity() {
         let cache = IpCache::new();
         let id = Identity {
             namespace: Arc::from(""),
@@ -484,44 +502,18 @@ mod tests {
             labels: vec![].into(),
             workloads: vec![].into(),
         };
+        // Local and remote nodes get the same hashed identity (distinction
+        // is now in enricher labels, not the numeric ID).
+        let expected = id.numeric_identity();
+        assert!(expected >= MIN_CLUSTER_IDENTITY && expected <= MAX_CLUSTER_IDENTITY);
         assert_eq!(
             cache.resolve_identity_with_local(&id, "my-node"),
-            IDENTITY_HOST
+            expected
         );
-    }
-
-    #[test]
-    fn resolve_remote_node_stays_remote() {
-        let cache = IpCache::new();
-        let id = Identity {
-            namespace: Arc::from(""),
-            pod_name: Arc::from(""),
-            service_name: Arc::from(""),
-            node_name: Arc::from("other-node"),
-            labels: vec![].into(),
-            workloads: vec![].into(),
-        };
         assert_eq!(
-            cache.resolve_identity_with_local(&id, "my-node"),
-            IDENTITY_REMOTE_NODE
+            cache.resolve_identity_with_local(&id, "other-node"),
+            expected
         );
-    }
-
-    #[test]
-    fn resolve_node_without_local_name_is_remote() {
-        let cache = IpCache::new();
-        // local_node_name not set — all nodes are remote.
-        let id = Identity {
-            namespace: Arc::from(""),
-            pod_name: Arc::from(""),
-            service_name: Arc::from(""),
-            node_name: Arc::from("node-1"),
-            labels: vec![].into(),
-            workloads: vec![].into(),
-        };
-        assert_eq!(
-            cache.resolve_identity_with_local(&id, ""),
-            IDENTITY_REMOTE_NODE
-        );
+        assert_eq!(cache.resolve_identity_with_local(&id, ""), expected);
     }
 }

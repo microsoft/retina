@@ -11,5 +11,12 @@ prost-types.workspace = true
 tonic.workspace = true
 tonic-prost.workspace = true
 
+[lints]
+workspace = true
+
+# prost, prost-types, and tonic-prost are used by generated code from tonic::include_proto!()
+[package.metadata.cargo-machete]
+ignored = ["prost", "prost-types", "tonic-prost"]
+
 [build-dependencies]
 tonic-prost-build.workspace = true

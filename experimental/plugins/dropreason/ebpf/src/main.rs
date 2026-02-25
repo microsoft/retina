@@ -3,10 +3,13 @@
 
 use aya_ebpf::{
     helpers::{bpf_get_current_pid_tgid, bpf_ktime_get_boot_ns, bpf_probe_read_kernel},
-    macros::{fexit, map},
-    maps::{Array, PerCpuHashMap},
-    programs::FExitContext,
+    macros::{btf_tracepoint, fexit, map},
+    maps::{Array, HashMap, PerCpuHashMap},
+    programs::{BtfTracePointContext, FExitContext},
+    EbpfContext,
 };
+#[cfg(feature = "ringbuf")]
+use aya_ebpf::maps::PerCpuArray;
 #[cfg(feature = "ringbuf")]
 use aya_ebpf::maps::RingBuf;
 #[cfg(not(feature = "ringbuf"))]
@@ -32,6 +35,12 @@ static DROPREASON_METRICS: PerCpuHashMap<DropMetricsKey, DropMetricsValue> =
 /// Each entry is a byte offset (stored as u32). Indexed by `OFFSET_*` constants.
 #[map]
 static DROPREASON_OFFSETS: Array<u32> = Array::with_max_entries(OFFSET_MAP_SIZE, 0);
+
+/// Kernel drop reason suppress set. If a `skb_drop_reason` value exists in this
+/// map, the kfree_skb event is suppressed (not emitted to the ring buffer).
+/// Metrics are always collected regardless. Populated by userspace from ConfigMap.
+#[map]
+static DROPREASON_SUPPRESS: HashMap<u32, u8> = HashMap::with_max_entries(256, 0);
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -81,12 +90,22 @@ fn update_metrics(reason: DropReason, direction: u8, ret_val: i32, pkt_bytes: u3
     }
 }
 
+/// Per-CPU counter tracking ring buffer output failures (ringbuf mode only).
+/// Userspace reads this periodically to report lost events.
+#[cfg(feature = "ringbuf")]
+#[map]
+static DROPREASON_RING_LOST: PerCpuArray<u64> = PerCpuArray::with_max_entries(1, 0);
+
 /// Emit a DropEvent to the ring buffer or perf event array.
 #[inline(always)]
-fn emit_event(#[allow(unused)] ctx: &FExitContext, event: &DropEvent) {
+fn emit_event<C: EbpfContext>(#[allow(unused)] ctx: &C, event: &DropEvent) {
     #[cfg(feature = "ringbuf")]
     {
-        let _ = DROPREASON_EVENTS.output::<DropEvent>(event, 0);
+        if DROPREASON_EVENTS.output::<DropEvent>(event, 0).is_err() {
+            if let Some(v) = DROPREASON_RING_LOST.get_ptr_mut(0) {
+                unsafe { *v += 1 };
+            }
+        }
     }
     #[cfg(not(feature = "ringbuf"))]
     {
@@ -159,6 +178,15 @@ unsafe fn extract_from_sock(sk: *const u8, event: &mut DropEvent) {
     event.dst_ip = u32::from_be(daddr);
     event.src_port = sport; // skc_num is already host byte order
     event.dst_port = u16::from_be(dport_be); // skc_dport is network byte order
+}
+
+/// Read `skb->pkt_type` (3-bit bitfield, bits 0–2 of its byte on LE) and
+/// convert to a traffic direction.
+#[inline(always)]
+unsafe fn direction_from_skb_pkt_type(skb: *const u8) -> u8 {
+    let byte: u8 = read_kernel(skb, get_offset(OFFSET_SKB_PKT_TYPE));
+    let pkt_type = byte & 0x07;
+    pkt_type_to_direction(pkt_type)
 }
 
 /// Read the netfilter hook number from `struct nf_hook_state` and convert
@@ -287,10 +315,16 @@ fn try_nf_conntrack_confirm(ctx: &FExitContext) -> Result<(), ()> {
 
     let skb: *const u8 = ctx.arg(0);
 
+    let direction = if !skb.is_null() {
+        unsafe { direction_from_skb_pkt_type(skb) }
+    } else {
+        DIR_UNKNOWN
+    };
+
     let mut event = DropEvent {
         ts_ns: unsafe { bpf_ktime_get_boot_ns() },
         drop_reason: DropReason::ConntrackDrop as u8,
-        direction: DIR_UNKNOWN,
+        direction,
         return_val: 0,
         ..DropEvent::default()
     };
@@ -299,7 +333,7 @@ fn try_nf_conntrack_confirm(ctx: &FExitContext) -> Result<(), ()> {
         unsafe { extract_from_skb(skb, &mut event) };
     }
 
-    update_metrics(DropReason::ConntrackDrop, DIR_UNKNOWN, ret as i32, event.bytes);
+    update_metrics(DropReason::ConntrackDrop, direction, ret as i32, event.bytes);
     emit_event(ctx, &event);
     Ok(())
 }
@@ -422,6 +456,172 @@ fn try_inet_csk_accept(ctx: &FExitContext) -> Result<(), ()> {
         err_val, event.src_ip, event.src_port, event.dst_ip, event.dst_port);
 
     update_metrics(DropReason::TcpAcceptDrop, DIR_INGRESS, err_val, event.bytes);
+    emit_event(ctx, &event);
+    Ok(())
+}
+
+// ── BTF tracepoint programs ──────────────────────────────────────────────────
+
+/// `kfree_skb`: kernel packet drop tracepoint (5.17+ for reason arg).
+///
+/// Catches ALL kernel packet drops with the kernel's own `skb_drop_reason` enum.
+/// The hidden `void *__data` tracepoint context is stripped by the verifier;
+/// BPF programs see the actual tracepoint args starting at index 0.
+///
+/// Tracepoint args: (skb=0, location=1, reason=2)
+#[btf_tracepoint(function = "kfree_skb")]
+pub fn kfree_skb_tp(ctx: BtfTracePointContext) -> i32 {
+    match try_kfree_skb(&ctx) {
+        Ok(()) | Err(()) => 0,
+    }
+}
+
+#[inline(always)]
+fn try_kfree_skb(ctx: &BtfTracePointContext) -> Result<(), ()> {
+    let reason: u32 = ctx.arg(2);
+
+    // Filter non-drops: SKB_NOT_DROPPED_YET(0) and SKB_CONSUMED(1).
+    if reason <= 1 {
+        return Ok(());
+    }
+
+    let skb: *const u8 = ctx.arg(0);
+
+    let direction = if !skb.is_null() {
+        unsafe { direction_from_skb_pkt_type(skb) }
+    } else {
+        DIR_UNKNOWN
+    };
+
+    let mut event = DropEvent {
+        ts_ns: unsafe { bpf_ktime_get_boot_ns() },
+        drop_reason: DropReason::KernelDrop as u8,
+        direction,
+        return_val: 0,
+        pid: 0, // kfree_skb fires in softirq context; PID is not meaningful
+        kernel_drop_reason: reason,
+        ..DropEvent::default()
+    };
+
+    if !skb.is_null() {
+        unsafe { extract_from_skb(skb, &mut event) };
+    }
+
+    // Skip non-IP packets (ARP, etc.) where we couldn't extract any addresses.
+    // These are noisy and produce 0.0.0.0 <> 0.0.0.0 flows with no useful data.
+    if event.src_ip == 0 && event.dst_ip == 0 {
+        return Ok(());
+    }
+
+    update_metrics(DropReason::KernelDrop, direction, reason as i32, event.bytes);
+
+    // Check suppress set — skip event emission if this kernel reason is filtered.
+    if unsafe { DROPREASON_SUPPRESS.get(&reason).is_some() } {
+        return Ok(());
+    }
+
+    emit_event(ctx, &event);
+    Ok(())
+}
+
+/// `tcp_retransmit_skb`: TCP retransmission tracepoint.
+///
+/// Tracepoint args: (sk=0, skb=1)
+#[btf_tracepoint(function = "tcp_retransmit_skb")]
+pub fn tcp_retransmit_skb_tp(ctx: BtfTracePointContext) -> i32 {
+    match try_tcp_retransmit_skb(&ctx) {
+        Ok(()) | Err(()) => 0,
+    }
+}
+
+#[inline(always)]
+fn try_tcp_retransmit_skb(ctx: &BtfTracePointContext) -> Result<(), ()> {
+    let sk: *const u8 = ctx.arg(0);
+
+    let mut event = DropEvent {
+        ts_ns: unsafe { bpf_ktime_get_boot_ns() },
+        drop_reason: DropReason::TcpRetransmit as u8,
+        direction: DIR_EGRESS,
+        ..DropEvent::default()
+    };
+
+    if !sk.is_null() {
+        unsafe { extract_from_sock(sk, &mut event) };
+    }
+
+    // Read skb->len for actual byte count (extract_from_sock sets bytes=0).
+    let skb: *const u8 = ctx.arg(1);
+    if !skb.is_null() {
+        event.bytes = unsafe { read_kernel::<u32>(skb, get_offset(OFFSET_SKB_LEN)) };
+    }
+
+    update_metrics(DropReason::TcpRetransmit, DIR_EGRESS, 0, event.bytes);
+    emit_event(ctx, &event);
+    Ok(())
+}
+
+/// `tcp_send_reset`: TCP RST sent tracepoint.
+///
+/// Tracepoint args: (sk=0, skb=1)
+#[btf_tracepoint(function = "tcp_send_reset")]
+pub fn tcp_send_reset_tp(ctx: BtfTracePointContext) -> i32 {
+    match try_tcp_send_reset(&ctx) {
+        Ok(()) | Err(()) => 0,
+    }
+}
+
+#[inline(always)]
+fn try_tcp_send_reset(ctx: &BtfTracePointContext) -> Result<(), ()> {
+    let sk: *const u8 = ctx.arg(0);
+
+    let mut event = DropEvent {
+        ts_ns: unsafe { bpf_ktime_get_boot_ns() },
+        drop_reason: DropReason::TcpSendReset as u8,
+        direction: DIR_EGRESS,
+        ..DropEvent::default()
+    };
+
+    if !sk.is_null() {
+        unsafe { extract_from_sock(sk, &mut event) };
+    }
+
+    // Read skb->len for actual byte count (extract_from_sock sets bytes=0).
+    let skb: *const u8 = ctx.arg(1);
+    if !skb.is_null() {
+        event.bytes = unsafe { read_kernel::<u32>(skb, get_offset(OFFSET_SKB_LEN)) };
+    }
+
+    update_metrics(DropReason::TcpSendReset, DIR_EGRESS, 0, event.bytes);
+    emit_event(ctx, &event);
+    Ok(())
+}
+
+/// `tcp_receive_reset`: TCP RST received tracepoint.
+///
+/// Tracepoint args: (sk=0)
+#[btf_tracepoint(function = "tcp_receive_reset")]
+pub fn tcp_receive_reset_tp(ctx: BtfTracePointContext) -> i32 {
+    match try_tcp_receive_reset(&ctx) {
+        Ok(()) | Err(()) => 0,
+    }
+}
+
+#[inline(always)]
+fn try_tcp_receive_reset(ctx: &BtfTracePointContext) -> Result<(), ()> {
+    let sk: *const u8 = ctx.arg(0);
+
+    let mut event = DropEvent {
+        ts_ns: unsafe { bpf_ktime_get_boot_ns() },
+        drop_reason: DropReason::TcpReceiveReset as u8,
+        direction: DIR_INGRESS,
+        ..DropEvent::default()
+    };
+
+    if !sk.is_null() {
+        unsafe { extract_from_sock(sk, &mut event) };
+    }
+
+    update_metrics(DropReason::TcpReceiveReset, DIR_INGRESS, 0, event.bytes);
     emit_event(ctx, &event);
     Ok(())
 }

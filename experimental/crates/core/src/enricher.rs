@@ -1,8 +1,9 @@
+//! Flow enrichment: decorates Hubble flows with Kubernetes identity metadata
+//! (pod name, namespace, labels, workloads) from the IP cache.
+
 use retina_proto::flow;
 
-use crate::ipcache::{
-    IDENTITY_HOST, IDENTITY_KUBE_APISERVER, IDENTITY_REMOTE_NODE, IDENTITY_WORLD, IpCache,
-};
+use crate::ipcache::{IDENTITY_KUBE_APISERVER, IDENTITY_WORLD, IpCache};
 
 /// Enrich a flow's source and destination endpoints from the IP cache.
 ///
@@ -35,6 +36,7 @@ pub fn enrich_flow(flow: &mut flow::Flow, cache: &IpCache) {
         if let Some(id) = &src_id {
             flow.source_names = identity_names(id);
             flow.source = Some(identity_to_endpoint_with_local(id, cache, &local_name));
+            flow.source_service = service_from_identity(id);
         } else {
             flow.source = Some(world_endpoint());
         }
@@ -44,6 +46,7 @@ pub fn enrich_flow(flow: &mut flow::Flow, cache: &IpCache) {
         if let Some(id) = &dst_id {
             flow.destination_names = identity_names(id);
             flow.destination = Some(identity_to_endpoint_with_local(id, cache, &local_name));
+            flow.destination_service = service_from_identity(id);
         } else {
             flow.destination = Some(world_endpoint());
         }
@@ -81,11 +84,17 @@ pub fn identity_to_endpoint_with_local(
 ) -> flow::Endpoint {
     let numeric_id = cache.resolve_identity_with_local(id, local_node_name);
 
-    let mut labels: Vec<String> = id.labels.iter().map(|l| l.to_string()).collect();
+    let mut labels = Vec::with_capacity(id.labels.len() + 2);
+    labels.extend(id.labels.iter().map(std::string::ToString::to_string));
 
     // For service IPs, encode service name as a label (matching Go enricher).
     if !id.service_name.is_empty() {
         labels.push(format!("k8s:io.kubernetes.svc.name={}", id.service_name));
+    }
+
+    // For node identities, add a node-name label so the UI can display it.
+    if !id.node_name.is_empty() {
+        labels.push(format!("k8s:io.kubernetes.node.name={}", id.node_name));
     }
 
     // Append the reserved label matching the resolved identity.
@@ -120,9 +129,7 @@ pub fn identity_to_endpoint_with_local(
 /// Return the Cilium-style reserved label for a reserved numeric identity.
 fn reserved_label_for(id: u32) -> Option<&'static str> {
     match id {
-        IDENTITY_HOST => Some("reserved:host"),
         IDENTITY_WORLD => Some("reserved:world"),
-        IDENTITY_REMOTE_NODE => Some("reserved:remote-node"),
         IDENTITY_KUBE_APISERVER => Some("reserved:kube-apiserver"),
         _ => None,
     }
@@ -138,12 +145,22 @@ fn world_endpoint() -> flow::Endpoint {
     }
 }
 
+/// Build a `Service` proto if this identity represents a Kubernetes service.
+fn service_from_identity(id: &crate::ipcache::Identity) -> Option<flow::Service> {
+    if id.service_name.is_empty() {
+        return None;
+    }
+    Some(flow::Service {
+        name: id.service_name.to_string(),
+        namespace: id.namespace.to_string(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::ipcache::{
-        IDENTITY_HOST, IDENTITY_KUBE_APISERVER, IDENTITY_REMOTE_NODE, IDENTITY_WORLD, Identity,
-        Workload,
+        IDENTITY_KUBE_APISERVER, IDENTITY_WORLD, Identity, Workload,
     };
     use std::net::{IpAddr, Ipv4Addr};
     use std::sync::Arc;
@@ -353,7 +370,7 @@ mod tests {
     }
 
     #[test]
-    fn remote_node_gets_remote_node_identity() {
+    fn remote_node_gets_unique_identity_with_node_label() {
         let cache = IpCache::new();
         cache.set_local_node_name("my-node".into());
         cache.upsert(
@@ -373,13 +390,17 @@ mod tests {
         enrich_flow(&mut flow, &cache);
 
         let src = flow.source.unwrap();
-        assert_eq!(src.id, IDENTITY_REMOTE_NODE);
-        assert_eq!(src.identity, IDENTITY_REMOTE_NODE);
-        assert!(src.labels.contains(&"reserved:remote-node".to_string()));
+        assert!(src.id >= 256 && src.id <= 65535);
+        assert_eq!(src.id, src.identity);
+        assert!(!src.labels.iter().any(|l| l.starts_with("reserved:")));
+        assert!(src
+            .labels
+            .contains(&"k8s:io.kubernetes.node.name=node-1".to_string()));
+        assert_eq!(src.pod_name, "node-1");
     }
 
     #[test]
-    fn local_node_gets_host_identity() {
+    fn local_node_gets_unique_identity_with_node_label() {
         let cache = IpCache::new();
         cache.set_local_node_name("my-node".into());
         cache.upsert(
@@ -399,9 +420,123 @@ mod tests {
         enrich_flow(&mut flow, &cache);
 
         let src = flow.source.unwrap();
-        assert_eq!(src.id, IDENTITY_HOST);
-        assert_eq!(src.identity, IDENTITY_HOST);
-        assert!(src.labels.contains(&"reserved:host".to_string()));
+        assert!(src.id >= 256 && src.id <= 65535);
+        assert_eq!(src.id, src.identity);
+        assert!(!src.labels.iter().any(|l| l.starts_with("reserved:")));
+        assert!(src
+            .labels
+            .contains(&"k8s:io.kubernetes.node.name=my-node".to_string()));
         assert_eq!(src.pod_name, "my-node");
+    }
+
+    #[test]
+    fn different_nodes_get_different_identities() {
+        let cache = IpCache::new();
+        cache.set_local_node_name("my-node".into());
+        cache.upsert(
+            IpAddr::V4(Ipv4Addr::new(192, 168, 1, 5)),
+            Identity {
+                namespace: Arc::from(""),
+                pod_name: Arc::from(""),
+                service_name: Arc::from(""),
+                node_name: Arc::from("my-node"),
+                labels: vec![].into(),
+                workloads: vec![].into(),
+            },
+        );
+        cache.upsert(
+            IpAddr::V4(Ipv4Addr::new(192, 168, 1, 10)),
+            Identity {
+                namespace: Arc::from(""),
+                pod_name: Arc::from(""),
+                service_name: Arc::from(""),
+                node_name: Arc::from("other-node"),
+                labels: vec![].into(),
+                workloads: vec![].into(),
+            },
+        );
+        cache.mark_synced();
+
+        let mut flow1 = make_flow("192.168.1.5", "10.0.0.1");
+        enrich_flow(&mut flow1, &cache);
+        let mut flow2 = make_flow("192.168.1.10", "10.0.0.1");
+        enrich_flow(&mut flow2, &cache);
+
+        let src1 = flow1.source.unwrap();
+        let src2 = flow2.source.unwrap();
+        assert_ne!(src1.id, src2.id);
+    }
+
+    #[test]
+    fn service_ip_populates_source_service() {
+        let cache = IpCache::new();
+        cache.upsert(
+            IpAddr::V4(Ipv4Addr::new(10, 96, 0, 10)),
+            Identity {
+                namespace: Arc::from("backend"),
+                pod_name: Arc::from(""),
+                service_name: Arc::from("redis"),
+                node_name: Arc::from(""),
+                labels: vec![].into(),
+                workloads: vec![].into(),
+            },
+        );
+        cache.mark_synced();
+
+        let mut flow = make_flow("10.96.0.10", "10.0.0.1");
+        enrich_flow(&mut flow, &cache);
+
+        let svc = flow.source_service.unwrap();
+        assert_eq!(svc.name, "redis");
+        assert_eq!(svc.namespace, "backend");
+    }
+
+    #[test]
+    fn service_ip_populates_destination_service() {
+        let cache = IpCache::new();
+        cache.upsert(
+            IpAddr::V4(Ipv4Addr::new(10, 96, 0, 10)),
+            Identity {
+                namespace: Arc::from("backend"),
+                pod_name: Arc::from(""),
+                service_name: Arc::from("redis"),
+                node_name: Arc::from(""),
+                labels: vec![].into(),
+                workloads: vec![].into(),
+            },
+        );
+        cache.mark_synced();
+
+        let mut flow = make_flow("10.0.0.1", "10.96.0.10");
+        enrich_flow(&mut flow, &cache);
+
+        let svc = flow.destination_service.unwrap();
+        assert_eq!(svc.name, "redis");
+        assert_eq!(svc.namespace, "backend");
+        // Source is a pod IP not in cache, should have no service.
+        assert!(flow.source_service.is_none());
+    }
+
+    #[test]
+    fn pod_ip_has_no_service() {
+        let cache = IpCache::new();
+        cache.upsert(
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
+            Identity {
+                namespace: Arc::from("default"),
+                pod_name: Arc::from("nginx"),
+                service_name: Arc::from(""),
+                node_name: Arc::from(""),
+                labels: vec![Arc::from("app=nginx")].into(),
+                workloads: vec![].into(),
+            },
+        );
+        cache.mark_synced();
+
+        let mut flow = make_flow("10.0.0.1", "10.0.0.2");
+        enrich_flow(&mut flow, &cache);
+
+        assert!(flow.source_service.is_none());
+        assert!(flow.destination_service.is_none());
     }
 }

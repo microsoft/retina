@@ -53,6 +53,7 @@ spec:
           args:
             - "--grpc-port={{ .Values.operator.grpcPort }}"
             - "--debug-port={{ .Values.operator.debugPort }}"
+            - "--log-level={{ .Values.operator.logLevel }}"
           ports:
             - containerPort: {{ .Values.operator.grpcPort }}
               name: grpc

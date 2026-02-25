@@ -16,7 +16,7 @@ pub async fn watch_pods(client: Client, state: Arc<OperatorState>) {
     retry_with_backoff("pod watcher", || {
         try_watch_pods(client.clone(), Arc::clone(&state))
     })
-    .await
+    .await;
 }
 
 async fn try_watch_pods(client: Client, state: Arc<OperatorState>) -> anyhow::Result<()> {
@@ -153,13 +153,13 @@ fn handle_pod_delete(pod: &Pod, state: &OperatorState) {
     }
 }
 
-/// Watch all services cluster-wide and upsert/delete their ClusterIP and LB IPs.
+/// Watch all services cluster-wide and upsert/delete their `ClusterIP` and LB IPs.
 /// Automatically restarts with backoff on stream errors.
 pub async fn watch_services(client: Client, state: Arc<OperatorState>) {
     retry_with_backoff("service watcher", || {
         try_watch_services(client.clone(), Arc::clone(&state))
     })
-    .await
+    .await;
 }
 
 async fn try_watch_services(client: Client, state: Arc<OperatorState>) -> anyhow::Result<()> {
@@ -243,13 +243,13 @@ fn handle_service_delete(svc: &Service, state: &OperatorState) {
     }
 }
 
-/// Watch all nodes and upsert/delete their InternalIP addresses.
+/// Watch all nodes and upsert/delete their `InternalIP` addresses.
 /// Automatically restarts with backoff on stream errors.
 pub async fn watch_nodes(client: Client, state: Arc<OperatorState>) {
     retry_with_backoff("node watcher", || {
         try_watch_nodes(client.clone(), Arc::clone(&state))
     })
-    .await
+    .await;
 }
 
 async fn try_watch_nodes(client: Client, state: Arc<OperatorState>) -> anyhow::Result<()> {
@@ -273,7 +273,7 @@ async fn try_watch_nodes(client: Client, state: Arc<OperatorState>) -> anyhow::R
     Ok(())
 }
 
-/// Collect all IPs that represent this node: InternalIP + pod CIDR gateway IPs.
+/// Collect all IPs that represent this node: `InternalIP` + pod CIDR gateway IPs.
 fn node_ips(node: &Node) -> Vec<IpAddr> {
     let mut ips = Vec::new();
 
@@ -306,7 +306,7 @@ fn node_ips(node: &Node) -> Vec<IpAddr> {
 }
 
 /// Parse a CIDR string and return the first usable IP (gateway).
-/// e.g. "10.244.0.0/24" → 10.244.0.1, "fd00:10:244::/64" → fd00:10:244::1
+/// e.g. "10.244.0.0/24" → 10.244.0.1, "`fd00:10:244::/64`" → `fd00:10:244::1`
 fn pod_cidr_gateway(cidr: &str) -> Option<IpAddr> {
     let (ip_str, _) = cidr.split_once('/')?;
     let ip: IpAddr = ip_str.parse().ok()?;

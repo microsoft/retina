@@ -1,3 +1,5 @@
+//! Fixed-capacity ring buffer stores for flows and agent events.
+
 use std::{
     collections::VecDeque,
     sync::{
@@ -21,6 +23,7 @@ pub struct RingBuffer<T> {
 }
 
 impl<T> RingBuffer<T> {
+    #[must_use]
     pub fn new(capacity: usize) -> Self {
         Self {
             items: RwLock::new(VecDeque::with_capacity(capacity)),
@@ -82,11 +85,12 @@ impl<T> RingBuffer<T> {
 /// Ring buffer for recent flows, with flow-rate calculation.
 pub struct FlowStore {
     inner: RingBuffer<Flow>,
-    /// Snapshot for computing flows_rate over a sliding window.
+    /// Snapshot for computing `flows_rate` over a sliding window.
     rate_snapshot: Mutex<(Instant, u64)>,
 }
 
 impl FlowStore {
+    #[must_use]
     pub fn new(capacity: usize) -> Self {
         Self {
             inner: RingBuffer::new(capacity),

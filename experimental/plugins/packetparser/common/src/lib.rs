@@ -1,3 +1,5 @@
+//! `no_std` C-compatible structs shared between eBPF and userspace for the
+//! packetparser plugin: `PacketEvent`, conntrack types, and protocol constants.
 #![no_std]
 
 // ── Observation points ───────────────────────────────────────────────

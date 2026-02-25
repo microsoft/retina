@@ -5,6 +5,7 @@ mod watchers;
 
 use std::sync::Arc;
 
+use anyhow::Context as _;
 use clap::Parser;
 use kube::Client;
 use tracing::info;
@@ -24,7 +25,7 @@ const UPDATE_BROADCAST_CAPACITY: usize = 8192;
     version = concat!(env!("GIT_VERSION"), " (", env!("GIT_COMMIT"), ", ", env!("RUSTC_VERSION"), ")"),
 )]
 struct Cli {
-    /// gRPC port for IpCache service.
+    /// gRPC port for `IpCache` service.
     #[arg(long, default_value_t = 9090)]
     grpc_port: u16,
 
@@ -56,7 +57,9 @@ async fn main() -> anyhow::Result<()> {
         "starting retina-operator",
     );
 
-    let client = Client::try_default().await?;
+    let client = Client::try_default()
+        .await
+        .context("failed to create Kubernetes API client")?;
     let state = Arc::new(OperatorState::new(UPDATE_BROADCAST_CAPACITY));
 
     // Shutdown signal — notifies the gRPC server to drain gracefully.
@@ -71,7 +74,7 @@ async fn main() -> anyhow::Result<()> {
     let grpc_handle = {
         let shutdown = Arc::clone(&shutdown);
         tokio::spawn(grpc::serve(cli.grpc_port, Arc::clone(&state), async move {
-            shutdown.notified().await
+            shutdown.notified().await;
         }))
     };
 

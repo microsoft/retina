@@ -1,3 +1,5 @@
+//! `no_std` C-compatible structs shared between eBPF and userspace for the
+//! dropreason plugin: `DropEvent`, `DropReason`, metrics types, and kernel constants.
 #![no_std]
 
 // ── Direction constants (shared with retina-common for consistency) ──────────
@@ -8,7 +10,7 @@ pub const DIR_EGRESS: u8 = 2;
 
 // ── Netfilter hook constants ────────────────────────────────────────────────
 
-/// Hooks <= NF_INET_FORWARD are ingress, >= NF_INET_LOCAL_OUT are egress.
+/// Hooks <= `NF_INET_FORWARD` are ingress, >= `NF_INET_LOCAL_OUT` are egress.
 pub const NF_INET_PRE_ROUTING: u32 = 0;
 pub const NF_INET_LOCAL_IN: u32 = 1;
 pub const NF_INET_FORWARD: u32 = 2;
@@ -44,9 +46,30 @@ pub const OFFSET_SOCK_SKC_RCV_SADDR: u32 = 5;
 pub const OFFSET_SOCK_SKC_DPORT: u32 = 6;
 pub const OFFSET_SOCK_SKC_NUM: u32 = 7;
 pub const OFFSET_NF_HOOK_STATE_HOOK: u32 = 8;
+/// Byte offset of the `pkt_type` bitfield byte within `struct sk_buff`.
+/// The 3-bit `pkt_type` value occupies bits 0–2 of this byte (little-endian).
+pub const OFFSET_SKB_PKT_TYPE: u32 = 9;
 
 /// Total number of slots in the offsets map (room to grow).
 pub const OFFSET_MAP_SIZE: u32 = 16;
+
+// ── Packet type constants (from linux/if_packet.h) ──────────────────────────
+
+pub const PACKET_HOST: u8 = 0;
+pub const PACKET_BROADCAST: u8 = 1;
+pub const PACKET_MULTICAST: u8 = 2;
+pub const PACKET_OUTGOING: u8 = 4;
+
+/// Map `skb->pkt_type` (3-bit field) to a traffic direction.
+#[inline]
+#[must_use]
+pub fn pkt_type_to_direction(pkt_type: u8) -> u8 {
+    match pkt_type {
+        PACKET_HOST | PACKET_BROADCAST | PACKET_MULTICAST => DIR_INGRESS,
+        PACKET_OUTGOING => DIR_EGRESS,
+        _ => DIR_UNKNOWN,
+    }
+}
 
 // ── Drop reason codes ───────────────────────────────────────────────────────
 
@@ -59,10 +82,20 @@ pub enum DropReason {
     TcpConnectDrop = 2,
     TcpAcceptDrop = 3,
     ConntrackDrop = 4,
-    Unknown = 5,
+    /// Kernel packet drop via `kfree_skb` tracepoint (kernel 5.17+).
+    /// The specific reason is in [`DropEvent::kernel_drop_reason`].
+    KernelDrop = 5,
+    /// TCP retransmission via `tcp_retransmit_skb` tracepoint.
+    TcpRetransmit = 6,
+    /// TCP RST sent via `tcp_send_reset` tracepoint.
+    TcpSendReset = 7,
+    /// TCP RST received via `tcp_receive_reset` tracepoint.
+    TcpReceiveReset = 8,
+    Unknown = 255,
 }
 
 impl DropReason {
+    #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
             Self::IptableRuleDrop => "IPTABLE_RULE_DROP",
@@ -70,10 +103,15 @@ impl DropReason {
             Self::TcpConnectDrop => "TCP_CONNECT_DROP",
             Self::TcpAcceptDrop => "TCP_ACCEPT_DROP",
             Self::ConntrackDrop => "CONNTRACK_DROP",
+            Self::KernelDrop => "KERNEL_DROP",
+            Self::TcpRetransmit => "TCP_RETRANSMIT",
+            Self::TcpSendReset => "TCP_SEND_RESET",
+            Self::TcpReceiveReset => "TCP_RECEIVE_RESET",
             Self::Unknown => "UNKNOWN",
         }
     }
 
+    #[must_use]
     pub fn from_u8(v: u8) -> Self {
         match v {
             0 => Self::IptableRuleDrop,
@@ -81,6 +119,10 @@ impl DropReason {
             2 => Self::TcpConnectDrop,
             3 => Self::TcpAcceptDrop,
             4 => Self::ConntrackDrop,
+            5 => Self::KernelDrop,
+            6 => Self::TcpRetransmit,
+            7 => Self::TcpSendReset,
+            8 => Self::TcpReceiveReset,
             _ => Self::Unknown,
         }
     }
@@ -88,7 +130,7 @@ impl DropReason {
 
 // ── Event struct emitted from eBPF to userspace ─────────────────────────────
 
-/// 32 bytes, power-of-2 aligned. Emitted via RingBuf or PerfEventArray.
+/// 36 bytes, 4-byte aligned. Emitted via `RingBuf` or `PerfEventArray`.
 #[repr(C)]
 #[derive(Copy, Clone, Default)]
 pub struct DropEvent {
@@ -114,6 +156,9 @@ pub struct DropEvent {
     pub return_val: i8,
     /// PID (tgid) of the process that triggered the drop, or 0 if unavailable.
     pub pid: u32,
+    /// Raw kernel `enum skb_drop_reason` value for [`DropReason::KernelDrop`] events.
+    /// 0 for all other drop reasons.
+    pub kernel_drop_reason: u32,
 }
 
 // ── Metrics map types ───────────────────────────────────────────────────────
@@ -149,6 +194,7 @@ unsafe impl aya::Pod for DropMetricsValue {}
 
 /// Map a netfilter hook number to a traffic direction.
 #[inline]
+#[must_use]
 pub fn nf_hook_to_direction(hook: u32) -> u8 {
     match hook {
         NF_INET_PRE_ROUTING | NF_INET_LOCAL_IN | NF_INET_FORWARD => DIR_INGRESS,

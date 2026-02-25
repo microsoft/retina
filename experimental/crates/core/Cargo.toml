@@ -21,6 +21,9 @@ prost-types.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 
+[lints]
+workspace = true
+
 [dev-dependencies]
 criterion.workspace = true
 

@@ -2,6 +2,7 @@ mod debug;
 mod grpc;
 mod ipcache_sync;
 
+use std::collections::HashSet;
 use std::net::{SocketAddr, TcpListener};
 use std::sync::Arc;
 
@@ -24,9 +25,9 @@ use retina_core::plugin::{Plugin, PluginContext};
 use retina_core::store::AgentEventStore;
 use retina_core::store::FlowStore;
 use retina_proto::flow::{AgentEvent, AgentEventType, TimeNotification};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
-use tracing::info;
+use tracing::{info, warn};
 
 #[derive(Parser)]
 #[command(
@@ -35,20 +36,21 @@ use tracing::info;
     version = concat!(env!("GIT_VERSION"), " (", env!("GIT_COMMIT"), ", ", env!("RUSTC_VERSION"), ")"),
 )]
 struct Cli {
-    /// Network interface to attach host TC programs to.
-    /// If omitted, host programs are loaded but not attached (pod-level only).
+    /// Additional host interfaces to attach TC programs to, beyond the
+    /// auto-discovered pod veths. May be specified multiple times.
+    /// If omitted, only pod-level veth programs are attached.
     #[arg(long)]
-    interface: Option<String>,
+    extra_interfaces: Vec<String>,
 
     /// Enable pod-level monitoring via veth endpoint programs.
     #[arg(long)]
     pod_level: bool,
 
-    /// gRPC port for Hubble Observer service.
+    /// Port for Hubble Observer and Peer gRPC services.
     #[arg(long, default_value_t = 4244)]
-    grpc_port: u16,
+    hubble_port: u16,
 
-    /// Operator gRPC address for IP cache enrichment (e.g. http://retina-operator:9090).
+    /// Operator gRPC address for IP cache enrichment (e.g. <http://retina-operator:9090>).
     /// If not set, flow enrichment is disabled.
     #[arg(long)]
     operator_addr: Option<String>,
@@ -76,6 +78,11 @@ struct Cli {
     #[arg(long, default_value_t = 1_048_576)]
     dropreason_ring_buffer_size: u32,
 
+    /// Path to dropreason filter config (YAML with suppressedDropReasons list).
+    /// Mounted from `ConfigMap`. If the file is missing, no filtering is applied.
+    #[arg(long, default_value = "/etc/retina/dropreason-filter.yaml")]
+    dropreason_filter_path: String,
+
     /// Log level.
     #[arg(long, default_value = "info")]
     log_level: String,
@@ -87,16 +94,43 @@ struct Cli {
 
 #[derive(Clone, Serialize)]
 pub struct AgentConfig {
-    pub interface: Option<String>,
+    pub extra_interfaces: Vec<String>,
     pub pod_level: bool,
-    pub grpc_port: u16,
+    pub hubble_port: u16,
     pub operator_addr: Option<String>,
     pub sampling_rate: u32,
     pub ring_buffer_size: u32,
     pub enable_dropreason: bool,
     pub dropreason_ring_buffer_size: u32,
+    pub suppressed_drop_reasons: Vec<String>,
     pub log_level: String,
     pub metrics_port: u16,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct DropReasonFilterConfig {
+    #[serde(default)]
+    suppressed_drop_reasons: Vec<String>,
+}
+
+fn load_dropreason_filter(path: &str) -> HashSet<String> {
+    let content = match std::fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(e) => {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                warn!("dropreason: failed to read filter config {path}: {e}");
+            }
+            return HashSet::new();
+        }
+    };
+    match serde_yaml::from_str::<DropReasonFilterConfig>(&content) {
+        Ok(config) => config.suppressed_drop_reasons.into_iter().collect(),
+        Err(e) => {
+            warn!("dropreason: failed to parse filter config {path}: {e}");
+            HashSet::new()
+        }
+    }
 }
 
 #[tokio::main]
@@ -114,8 +148,8 @@ async fn main() -> anyhow::Result<()> {
         version = GIT_VERSION,
         commit = GIT_COMMIT,
         rustc = RUSTC_VERSION,
-        interface = ?cli.interface,
-        grpc_port = cli.grpc_port,
+        extra_interfaces = ?cli.extra_interfaces,
+        hubble_port = cli.hubble_port,
         pod_level = cli.pod_level,
         sampling_rate = cli.sampling_rate,
         "starting retina-agent",
@@ -124,16 +158,16 @@ async fn main() -> anyhow::Result<()> {
     // Pre-flight: verify the gRPC port is available. A stale retina-agent
     // process holding this port is a common dev pitfall — fail fast with a
     // clear message instead of silently losing traffic to the old process.
-    let grpc_addr: SocketAddr = format!("0.0.0.0:{}", cli.grpc_port).parse()?;
+    let grpc_addr: SocketAddr = format!("0.0.0.0:{}", cli.hubble_port).parse()?;
     if let Err(e) = TcpListener::bind(grpc_addr) {
         anyhow::bail!(
             "cannot bind gRPC port {}: {}\n\
              Hint: a stale retina-agent may already be running. Try:\n  \
              sudo lsof -i :{} -P -n\n  \
              sudo kill <PID>",
-            cli.grpc_port,
+            cli.hubble_port,
             e,
-            cli.grpc_port,
+            cli.hubble_port,
         );
     }
     // Drop the test listener immediately so tonic can bind it.
@@ -191,7 +225,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let mut plugin = PacketParser::new(
-        cli.interface.clone(),
+        cli.extra_interfaces.clone(),
         cli.pod_level,
         cli.sampling_rate,
         cli.ring_buffer_size,
@@ -200,6 +234,9 @@ async fn main() -> anyhow::Result<()> {
         .start(ctx)
         .await
         .context("failed to start packetparser plugin")?;
+
+    // Load dropreason filter once (used by both the plugin and the debug config).
+    let suppressed_reasons = load_dropreason_filter(&cli.dropreason_filter_path);
 
     // Optionally start the dropreason plugin.
     let mut dropreason_plugin: Option<DropReasonPlugin> = if cli.enable_dropreason {
@@ -210,7 +247,11 @@ async fn main() -> anyhow::Result<()> {
             metrics: Arc::clone(&metrics),
             state: Arc::clone(&agent_state),
         };
-        let mut dr = DropReasonPlugin::new(cli.dropreason_ring_buffer_size);
+        if !suppressed_reasons.is_empty() {
+            info!(count = suppressed_reasons.len(), reasons = ?suppressed_reasons, "dropreason: loaded suppress filter");
+        }
+        let mut dr =
+            DropReasonPlugin::new(cli.dropreason_ring_buffer_size, suppressed_reasons.clone());
         dr.start(dr_ctx)
             .await
             .context("failed to start dropreason plugin")?;
@@ -236,14 +277,15 @@ async fn main() -> anyhow::Result<()> {
 
     // Start HTTP server (metrics, probes, debug).
     let agent_config = AgentConfig {
-        interface: cli.interface.clone(),
+        extra_interfaces: cli.extra_interfaces.clone(),
         pod_level: cli.pod_level,
-        grpc_port: cli.grpc_port,
+        hubble_port: cli.hubble_port,
         operator_addr: cli.operator_addr.clone(),
         sampling_rate: cli.sampling_rate,
         ring_buffer_size: cli.ring_buffer_size,
         enable_dropreason: cli.enable_dropreason,
         dropreason_ring_buffer_size: cli.dropreason_ring_buffer_size,
+        suppressed_drop_reasons: suppressed_reasons.iter().cloned().collect(),
         log_level: cli.log_level.clone(),
         metrics_port: cli.metrics_port,
     };
@@ -258,7 +300,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Start gRPC server.
     let grpc_handle = tokio::spawn(grpc::serve(
-        cli.grpc_port,
+        cli.hubble_port,
         local_node_name,
         flow_tx,
         flow_store,

@@ -5,6 +5,9 @@ version.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 dropreason-common = { workspace = true, features = ["userspace"] }
 retina-core.workspace = true
