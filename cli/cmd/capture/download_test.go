@@ -391,11 +391,6 @@ func TestGetWindowsContainerImage(t *testing.T) {
 			expectedSuffix: "ltsc2022",
 		},
 		{
-			name:           "Windows Server 2019",
-			osImage:        "Windows Server 2019 Datacenter",
-			expectedSuffix: "ltsc2019",
-		},
-		{
 			name:           "Windows Server 2025",
 			osImage:        "Windows Server 2025 Datacenter",
 			expectedSuffix: "ltsc2025",
