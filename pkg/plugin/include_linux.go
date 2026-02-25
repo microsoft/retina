@@ -11,5 +11,6 @@ import (
 	_ "github.com/microsoft/retina/pkg/plugin/mockplugin"
 	_ "github.com/microsoft/retina/pkg/plugin/packetforward"
 	_ "github.com/microsoft/retina/pkg/plugin/packetparser"
+	_ "github.com/microsoft/retina/pkg/plugin/packetparsertcx"
 	_ "github.com/microsoft/retina/pkg/plugin/tcpretrans"
 )

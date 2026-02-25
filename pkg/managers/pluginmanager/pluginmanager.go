@@ -15,6 +15,7 @@ import (
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin"
 	"github.com/microsoft/retina/pkg/plugin/conntrack"
+	"github.com/microsoft/retina/pkg/plugin/packetparsertcx"
 	"github.com/microsoft/retina/pkg/telemetry"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -26,11 +27,15 @@ const (
 	// In any run I haven't seen reconcile take longer than 5 seconds,
 	// and 10 seconds seems like a reasonable SLA for reconciliation to be completed
 	MAX_RECONCILE_TIME = 10 * time.Second
+
+	// plugin name used for resolution and conntrack GC
+	pluginNamePacketparser = "packetparser"
 )
 
 var (
-	ErrNilCfg       = errors.New("pluginmanager requires a non-nil config")
-	ErrZeroInterval = errors.New("pluginmanager requires a positive MetricsInterval in its config")
+	ErrNilCfg         = errors.New("pluginmanager requires a non-nil config")
+	ErrZeroInterval   = errors.New("pluginmanager requires a positive MetricsInterval in its config")
+	ErrPluginNotFound = errors.New("plugin not found in registry")
 )
 
 type PluginManager struct {
@@ -59,14 +64,41 @@ func NewPluginManager(cfg *kcfg.Config, tel telemetry.Telemetry) (*PluginManager
 	}
 
 	for _, name := range cfg.EnabledPlugin {
-		newPluginFn, ok := plugin.Get(name)
-		if !ok {
-			return nil, fmt.Errorf("plugin %s not found in registry", name)
+		resolvedName := name
+		if name == pluginNamePacketparser {
+			resolvedName = mgr.resolvePacketParserPlugin()
 		}
-		mgr.plugins[name] = newPluginFn(mgr.cfg)
+		newPluginFn, ok := plugin.Get(resolvedName)
+		if !ok {
+			return nil, errors.Wrapf(ErrPluginNotFound, "%s", resolvedName)
+		}
+		mgr.plugins[resolvedName] = newPluginFn(mgr.cfg)
 	}
 
 	return mgr, nil
+}
+
+// resolvePacketParserPlugin determines whether to use the TC or TCX variant of
+// the packetparser plugin based on the EnableTCX config and kernel support.
+func (p *PluginManager) resolvePacketParserPlugin() string {
+	switch p.cfg.EnableTCX {
+	case kcfg.TCXModeAlways:
+		p.l.Info("EnableTCX=always: using packetparsertcx plugin")
+		return "packetparsertcx"
+	case kcfg.TCXModeOff:
+		p.l.Info("EnableTCX=off: using traditional packetparser (TC) plugin")
+		return pluginNamePacketparser
+	case kcfg.TCXModeAuto:
+		if packetparsertcx.IsTCXSupported() {
+			p.l.Info("EnableTCX=auto: TCX supported, using packetparsertcx plugin")
+			return "packetparsertcx"
+		}
+		p.l.Info("EnableTCX=auto: TCX not supported, falling back to packetparser (TC) plugin")
+		return pluginNamePacketparser
+	default:
+		// Unknown TCXMode; treat as TC fallback.
+		return pluginNamePacketparser
+	}
 }
 
 func (p *PluginManager) Stop() {
@@ -136,9 +168,10 @@ func (p *PluginManager) Start(ctx context.Context) error {
 	}
 
 	g, ctx := errgroup.WithContext(ctx)
-	_, isPacketParserEnabled := p.plugins["packetparser"]
-	// run conntrack GC only if packetparser is enabled
-	if isPacketParserEnabled {
+	_, isPacketParserEnabled := p.plugins[pluginNamePacketparser]
+	_, isPacketParserTCXEnabled := p.plugins["packetparsertcx"]
+	// run conntrack GC only if packetparser (TC or TCX) is enabled
+	if isPacketParserEnabled || isPacketParserTCXEnabled {
 		ct, connErr := conntrack.New()
 		if connErr != nil {
 			return errors.Wrap(connErr, "failed to get conntrack instance")

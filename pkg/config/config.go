@@ -17,6 +17,18 @@ import (
 // Level defines the level of monitor aggregation.
 type Level int
 
+// TCXMode controls whether TCX (TC eXpress) attachment is used for packetparser.
+type TCXMode string
+
+const (
+	// TCXModeAuto detects kernel support and uses TCX if available, falling back to TC.
+	TCXModeAuto TCXMode = "auto"
+	// TCXModeAlways requires TCX and fails if not supported.
+	TCXModeAlways TCXMode = "always"
+	// TCXModeOff disables TCX and always uses traditional TC.
+	TCXModeOff TCXMode = "off"
+)
+
 const MinTelemetryInterval time.Duration = 2 * time.Minute
 
 const (
@@ -121,6 +133,7 @@ type Config struct {
 	DataSamplingRate           uint32                     `yaml:"dataSamplingRate"`
 	PacketParserRingBuffer     PacketParserRingBufferMode `yaml:"packetParserRingBuffer"`
 	PacketParserRingBufferSize uint32                     `yaml:"packetParserRingBufferSize"`
+	EnableTCX                  TCXMode                    `yaml:"enableTCX"`
 }
 
 func GetConfig(cfgFilename string) (*Config, error) {
@@ -173,6 +186,11 @@ func GetConfig(cfgFilename string) (*Config, error) {
 	if config.DataSamplingRate == 0 {
 		log.Printf("dataSamplingRate is not set, defaulting to %v", DefaultSamplingRate)
 		config.DataSamplingRate = DefaultSamplingRate
+	}
+
+	// Default EnableTCX to "auto" if unset.
+	if config.EnableTCX == "" {
+		config.EnableTCX = TCXModeAuto
 	}
 
 	switch config.PacketParserRingBuffer { //nolint:exhaustive // we only care about Auto and empty (default) here
