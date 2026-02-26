@@ -57,6 +57,17 @@ enableAnnotations: false
 bypassLookupIPOfInterest: false
 dataAggregationLevel: "low"
 dataSamplingRate: 1
+# Use BPF ring buffers (BPF_MAP_TYPE_RINGBUF) instead of BPF_PERF_EVENT_ARRAY.
+# Pros: lower per-event overhead at high event rates, simpler variable-sized records, more consistent latency.
+# Cons: fixed-size pre-allocated (locked) memory that can be wasted on low traffic; events are dropped when the buffer fills (reserve fails).
+# Possible values: "enabled", "disabled".
+packetParserRingBuffer: "disabled"
+# Ring buffer size in bytes (only used when packetParserRingBuffer="enabled").
+# Default: 8MiB (8388608).
+# Valid range: power of two between the kernel page size and 1GiB (inclusive).
+# Invalid values cause startup to fail with a validation error.
+# This value is not applied when ring buffers are disabled.
+packetParserRingBufferSize: 8388608
 
 imagePullSecrets: []
 nameOverride: "retina"
