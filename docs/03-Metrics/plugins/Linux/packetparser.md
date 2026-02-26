@@ -27,7 +27,7 @@ A detailed analysis by a Retina user (see [this blog post](https://blog.zmalik.d
 
 **Current Implementation:**
 
-The `packetparser` plugin currently uses **BPF_MAP_TYPE_PERF_EVENT_ARRAY** for kernel-to-userspace data transfer. This architecture creates per-CPU buffers that must be polled by a single reader thread. On systems with many CPU cores, this can lead to:
+By default, `packetparser` uses **BPF_MAP_TYPE_PERF_EVENT_ARRAY** for kernel-to-userspace data transfer. This architecture creates per-CPU buffers that must be polled by a single reader thread. On systems with many CPU cores, this can lead to:
 
 - Increased context switching overhead
 - Memory access patterns that may not scale linearly
@@ -35,7 +35,9 @@ The `packetparser` plugin currently uses **BPF_MAP_TYPE_PERF_EVENT_ARRAY** for k
 
 **Alternative Approaches:**
 
-Alternative data transfer mechanisms like BPF ring buffers (BPF_MAP_TYPE_RINGBUF, available in Linux kernel 5.8+) use a shared buffer architecture that may perform better on high-core-count systems. However, **Retina does not currently support ring buffers for packetparser**. Future versions may provide configurable data transfer mechanisms.
+Alternative data transfer mechanisms like BPF ring buffers (BPF_MAP_TYPE_RINGBUF, available in Linux kernel 5.8+) use a shared buffer architecture that may perform better on high-core-count systems. Retina supports ring buffers for `packetparser` via `packetParserRingBuffer=enabled` and `packetParserRingBufferSize`.
+
+**Note:** Ring buffer mode requires Linux kernel 5.8 or newer.
 
 #### If You Experience Performance Issues
 
