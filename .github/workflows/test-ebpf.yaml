@@ -1,0 +1,49 @@
+name: eBPF Program Tests
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pkg/plugin/**/_cprog/**'
+      - 'pkg/plugin/ebpftest/**'
+      - 'pkg/plugin/packetparser/packetparser_ebpf_test.go'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'pkg/plugin/**/_cprog/**'
+      - 'pkg/plugin/ebpftest/**'
+      - 'pkg/plugin/packetparser/packetparser_ebpf_test.go'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ebpf-tests:
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+        with:
+          go-version-file: go.mod
+
+      - name: Install clang and llvm-strip
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang llvm
+
+      - name: Compile eBPF programs
+        run: |
+          GOARCH=${{ matrix.arch }} go generate ./pkg/plugin/packetparser/
+
+      - name: Run eBPF program tests
+        run: |
+          sudo $(which go) test -tags=ebpf -v -count=1 ./pkg/plugin/packetparser/ ./pkg/plugin/ebpftest/
