@@ -240,7 +240,16 @@ func (dr *dropReason) run(ctx context.Context) error {
 func (dr *dropReason) readBasicMetricsData(ctx context.Context) {
 	var dataKey dropMetricKey
 	var dataValue dropMetricValues
-	ticker := time.NewTicker(dr.cfg.MetricsInterval)
+	interval := time.Duration(dr.cfg.MetricsInterval) * time.Second
+
+	// Safety guard: Don't allow a 0 or negative ticker
+	if interval <= 0 {
+		// Log a warning so the operator knows the config is being ignored
+		dr.l.Warn("MetricsInterval is invalid or unset; defaulting to 10s", zap.Duration("interval", interval))
+		interval = 10 * time.Second
+	}
+
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
 		select {

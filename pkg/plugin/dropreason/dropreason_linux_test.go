@@ -387,6 +387,56 @@ func TestDropReasonReadData_WithPerfArrayLostSamples(t *testing.T) {
 	time.Sleep(2 * time.Second)
 }
 
+func TestReadBasicMetricsData_InvalidIntervalDefaultsTo10s(t *testing.T) {
+	tests := []struct {
+		name     string
+		interval time.Duration
+	}{
+		{"zero interval", 0},
+		{"negative interval", -1 * time.Second},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			log.SetupZapLogger(log.GetDefaultLogOpts())
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockedMap := mocks.NewMockIMap(ctrl)
+			mockedMapIterator := mocks.NewMockIMapIterator(ctrl)
+			iMapIterator = func(x IMap) IMapIterator {
+				return mockedMapIterator
+			}
+			mockedMapIterator.EXPECT().Err().Return(nil).AnyTimes()
+			mockedMapIterator.EXPECT().Next(gomock.Any(), gomock.Any()).Return(false).AnyTimes()
+
+			dr := &dropReason{
+				cfg: &kcfg.Config{
+					MetricsInterval: tt.interval,
+					EnablePodLevel:  false,
+				},
+				l:             log.Logger().Named(name),
+				metricsMapData: mockedMap,
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+			defer cancel()
+
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				dr.readBasicMetricsData(ctx)
+			}()
+
+			select {
+			case <-done:
+				// Goroutine exited cleanly when context was cancelled; no panic.
+			case <-time.After(2 * time.Second):
+				t.Fatal("readBasicMetricsData did not exit after context timeout")
+			}
+		})
+	}
+}
+
 func TestDropReasonReadData_WithUnknownError(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	ctrl := gomock.NewController(t)
