@@ -451,6 +451,43 @@ func TestStopPluginManagerGracefully(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestResolvePacketParserPlugin(t *testing.T) {
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	require.NoError(t, err)
+
+	tests := []struct {
+		name     string
+		tcxMode  kcfg.TCXMode
+		wantName string
+	}{
+		{
+			name:     "TCX mode off uses TC",
+			tcxMode:  kcfg.TCXModeOff,
+			wantName: "packetparser",
+		},
+		{
+			name:     "TCX mode always uses TCX",
+			tcxMode:  kcfg.TCXModeAlways,
+			wantName: "packetparsertcx",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := cfgPodLevelEnabled
+			cfg.EnableTCX = tt.tcxMode
+			mgr := &PluginManager{
+				cfg:     &cfg,
+				l:       log.Logger().Named("plugin-manager"),
+				plugins: make(map[string]plugin.Plugin),
+				tel:     telemetry.NewNoopTelemetry(),
+			}
+			got := mgr.resolvePacketParserPlugin()
+			assert.Equal(t, tt.wantName, got)
+		})
+	}
+}
+
 func TestWatcherManagerFailure(t *testing.T) {
 	ctl := gomock.NewController(t)
 	defer ctl.Finish()

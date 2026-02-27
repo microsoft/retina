@@ -595,13 +595,12 @@ func (p *packetParser) createQdiscAndAttach(iface netlink.LinkAttrs, ifaceType i
 
 	// Cache.
 	ifaceKey := ifaceToKey(iface)
-	tcValue := &tcValue{
+	p.tcMap.Store(ifaceKey, &tcValue{
 		tc:    rtnl,
 		qdisc: clsactQdisc,
-	}
-	p.tcMap.Store(ifaceKey, tcValue)
+	})
 
-	p.l.Debug("Successfully added bpf", zap.String("interface", iface.Name))
+	p.l.Debug("Successfully attached BPF programs using traditional TC", zap.String("interface", iface.Name))
 }
 
 func (p *packetParser) run(ctx context.Context) error {
