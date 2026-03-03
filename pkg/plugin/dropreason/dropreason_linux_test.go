@@ -413,9 +413,9 @@ func TestReadBasicMetricsData_InvalidIntervalDefaultsTo10s(t *testing.T) {
 			dr := &dropReason{
 				cfg: &kcfg.Config{
 					MetricsInterval: tt.interval,
-					EnablePodLevel: false,
+					EnablePodLevel:  false,
 				},
-				l:             log.Logger().Named(name),
+				l:              log.Logger().Named(name),
 				metricsMapData: mockedMap,
 			}
 
