@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/oss/go/microsoft/golang:1.24.11 AS build
+FROM mcr.microsoft.com/oss/go/microsoft/golang:1.25.7 AS build
 ADD . .
 WORKDIR /go/toolbox/
 RUN CGO_ENABLED=0 GOOS=linux go build -o server .
