@@ -55,6 +55,22 @@ func TestParseLinuxKernelRelease(t *testing.T) {
 			expectErr:   false,
 		},
 		{
+			name:        "plus suffix (GKE Container-Optimized OS)",
+			release:     "6.6.113+",
+			expectMajor: 6,
+			expectMinor: 6,
+			expectPatch: 113,
+			expectErr:   false,
+		},
+		{
+			name:        "plus suffix with build metadata",
+			release:     "6.6.113+gke-12345",
+			expectMajor: 6,
+			expectMinor: 6,
+			expectPatch: 113,
+			expectErr:   false,
+		},
+		{
 			name:      "invalid format",
 			release:   "foo",
 			expectErr: true,

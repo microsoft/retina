@@ -65,6 +65,7 @@ func kernelSemverFromParts(major, minor, patch int) string {
 
 func normalizeKernelReleaseToSemver(release string) (version string, major, minor, patch int, err error) {
 	base := strings.SplitN(release, "-", 2)[0]
+	base = strings.SplitN(base, "+", 2)[0]
 	parts := strings.Split(base, ".")
 	if len(parts) < 2 {
 		return "", 0, 0, 0, fmt.Errorf("%w: %q", errUnexpectedKernelReleaseFormat, release)
