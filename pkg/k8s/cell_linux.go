@@ -26,8 +26,6 @@ import (
 	"github.com/cilium/cilium/pkg/metrics"
 	"github.com/cilium/cilium/pkg/node"
 	"github.com/cilium/cilium/pkg/policy"
-	"github.com/cilium/cilium/pkg/redirectpolicy"
-	"github.com/cilium/cilium/pkg/service"
 	"github.com/cilium/hive/cell"
 	"github.com/cilium/statedb"
 	"github.com/microsoft/retina/pkg/common"
@@ -97,16 +95,8 @@ var Cell = cell.Module(
 		return &policy.Updater{}
 	}),
 
-	cell.Provide(func() *redirectpolicy.Manager {
-		return &redirectpolicy.Manager{}
-	}),
-
 	cell.Provide(func() datapath.BandwidthManager {
 		return &fakeBandwidthManager{}
-	}),
-
-	cell.Provide(func() service.ServiceManager {
-		return &service.Service{}
 	}),
 
 	cgmngr.Cell,
