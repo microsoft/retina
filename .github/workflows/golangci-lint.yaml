@@ -34,10 +34,14 @@ jobs:
       - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
           go-version-file: go.mod
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
+      - name: Cache golangci-lint binary
+        id: lint-cache
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
-          version: latest
-          args: --concurrency 4 --verbose --config=.golangci.yaml --timeout=25m
-          only-new-issues: true
-          skip-cache: true
+          path: /tmp/golangci-lint
+          key: golangci-lint-${{ hashFiles('go.sum') }}
+      - name: Build golangci-lint
+        if: steps.lint-cache.outputs.cache-hit != 'true'
+        run: GOOS=linux GOARCH=amd64 go build -o /tmp/golangci-lint github.com/golangci/golangci-lint/cmd/golangci-lint
+      - name: golangci-lint
+        run: /tmp/golangci-lint run --new-from-rev=${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'HEAD~1' }} --concurrency 4 --verbose --config=.golangci.yaml --timeout=25m
