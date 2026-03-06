@@ -120,7 +120,7 @@ func TestCleanAll(t *testing.T) {
 	assert.Nil(t, p.cleanAll())
 
 	keyCount := 0
-	p.tcMap.Range(func(k, v interface{}) bool {
+	p.tcMap.Range(func(_ interface{}, _ interface{}) bool {
 		keyCount++
 		return true
 	})
@@ -224,7 +224,6 @@ func TestEndpointWatcherCallbackFn_EndpointDeleted(t *testing.T) {
 	_, tcMapExists := p.tcMap.Load(key)
 	_, lockMapExists := p.interfaceLockMap.Load(key)
 
-	// Assert both maps are cleaned up
 	assert.False(t, tcMapExists, "tcMap entry should be deleted")
 	assert.False(t, lockMapExists, "interfaceLockMap entry should be deleted")
 }
@@ -256,7 +255,7 @@ func TestCreateQdiscAndAttach(t *testing.T) {
 		return mrtnl, nil
 	}
 
-	getFD = func(e *ebpf.Program) int {
+	getFD = func(_ *ebpf.Program) int {
 		return 1
 	}
 
