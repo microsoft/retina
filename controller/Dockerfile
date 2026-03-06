@@ -44,6 +44,7 @@ ARG GOOS=linux # default to linux
 ARG VERSION
 ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
+ENV CGO_ENABLED=0
 RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/retina/captureworkload -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID="$APP_INSIGHTS_ID"" captureworkload/main.go
 
 # controller binary
@@ -54,6 +55,7 @@ ARG GOOS=linux # default to linux
 ARG VERSION
 ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
+ENV CGO_ENABLED=0
 RUN --mount=type=cache,target="/root/.cache/go-build" go build -x -v -o /go/bin/retina/controller -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID="$APP_INSIGHTS_ID"" controller/main.go 
 
 # init binary
@@ -64,6 +66,7 @@ ARG GOOS=linux # default to linux
 ARG VERSION
 ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
+ENV CGO_ENABLED=0
 RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/retina/initretina -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID="$APP_INSIGHTS_ID"" init/retina/main_linux.go
 
 # tools image
