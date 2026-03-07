@@ -10,7 +10,9 @@ import (
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/hcn"
 	kcfg "github.com/microsoft/retina/pkg/config"
+	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
+	"github.com/microsoft/retina/pkg/plugin/api"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 
@@ -18,8 +20,21 @@ import (
 )
 
 const (
-	name          string = "hnsstats"
-	HnsStatsEvent string = "hnsstatscount"
+	Name          api.PluginName = "hnsstats"
+	HnsStatsEvent string         = "hnsstatscount"
+
+	// Advanced metric
+	AdvHNSStatsName        string = "adv_windows_hns_stats"
+	AdvHNSStatsDescription string = "Include many different metrics from packets sent/received to closed connections"
+
+	// Advanced metric labels
+	Ip           string = "ip"
+	Port         string = "port"
+	Namespace    string = "namespace"
+	PodName      string = "podname"
+	WorkloadKind string = "workload_kind"
+	WorkloadName string = "workload_name"
+
 	// From HNSStats API
 	PacketsReceived        string = "win_packets_recv_count"
 	PacketsSent            string = "win_packets_sent_count"
@@ -73,12 +88,14 @@ type hnsstats struct {
 	state         int
 	l             *log.ZapLogger
 	endpointQuery hcn.HostComputeQuery
+	enricher      enricher.EnricherInterface
 }
 
 type HnsStatsData struct {
 	hnscounters *hcsshim.HNSEndpointStats
 	IPAddress   string
 	vfpCounters *VfpPortStatsData
+	Port        string
 }
 
 // handles event signals such as incrementing a metric counter
