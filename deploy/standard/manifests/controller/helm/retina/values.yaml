@@ -96,6 +96,8 @@ enabledPlugin_win: '["hnsstats"]'
 enableTelemetry: false
 
 # Interval, in duration, to scrape/publish metrics.
+# Default when unset or invalid (used by pluginmanager and all plugins).
+metricsInterval: "10s"
 metricsIntervalDuration: "10s"
 
 azure:

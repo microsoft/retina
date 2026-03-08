@@ -151,6 +151,66 @@ func TestNewManagerStart(t *testing.T) {
 	}
 }
 
+func TestStart_InvalidMetricsIntervalDefaultsTo10s(t *testing.T) {
+	log.SetupZapLogger(log.GetDefaultLogOpts())
+
+	pluginName := "mockplugin"
+
+	tests := []struct {
+		name     string
+		interval time.Duration
+	}{
+		{"zero interval", 0},
+		{"negative interval", -1 * time.Second},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctl := gomock.NewController(t)
+			defer ctl.Finish()
+
+			cfg := cfgPodLevelDisabled
+			cfg.MetricsInterval = tt.interval
+			cfg.EnabledPlugin = append(cfg.EnabledPlugin, pluginName)
+
+			mgr, err := NewPluginManager(&cfg, telemetry.NewNoopTelemetry())
+			require.NoError(t, err)
+			require.NotNil(t, mgr)
+			mgr.watcherManager = setupWatcherManagerMock(ctl)
+
+			mockPlugin := pluginmock.NewMockPlugin(ctl)
+			mockPlugin.EXPECT().Generate(gomock.Any()).Return(nil).AnyTimes()
+			mockPlugin.EXPECT().Compile(gomock.Any()).Return(nil).AnyTimes()
+			mockPlugin.EXPECT().Stop().Return(nil).AnyTimes()
+			mockPlugin.EXPECT().Init().Return(nil).AnyTimes()
+			mockPlugin.EXPECT().Start(gomock.Any()).Return(nil).AnyTimes()
+			mockPlugin.EXPECT().Name().Return(pluginName).AnyTimes()
+			mgr.plugins[pluginName] = mockPlugin
+
+			ctx, cancel := context.WithCancel(context.Background())
+			done := make(chan error, 1)
+			go func() {
+				done <- mgr.Start(ctx)
+			}()
+
+			// Give Start() time to apply the default
+			time.Sleep(100 * time.Millisecond)
+			require.Equal(t, DefaultMetricsInterval, mgr.cfg.MetricsInterval,
+				"MetricsInterval should be defaulted to DefaultMetricsInterval")
+
+			cancel()
+			// Start returns when context is cancelled (plugins exit)
+			err = <-done
+			if err != nil {
+				// Ignore conntrack-related errors in this test
+				if !strings.Contains(err.Error(), "failed to get conntrack instance") &&
+					!strings.Contains(err.Error(), "failed to run conntrack GC") {
+					require.NoError(t, err)
+				}
+			}
+		})
+	}
+}
+
 func TestNewManagerWithPluginStartFailure(t *testing.T) {
 	ctl := gomock.NewController(t)
 	defer ctl.Finish()
