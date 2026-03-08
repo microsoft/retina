@@ -160,7 +160,7 @@ func TestDropReasonRun_Error(t *testing.T) {
 	mockedMapIterator := mocks.NewMockIMapIterator(ctrl)
 
 	// reasign helper function so that it returns the mockedMapIterator
-	iMapIterator = func(_ IMap) IMapIterator {
+	iMapIterator = func(x IMap) IMapIterator {
 		return mockedMapIterator
 	}
 	mockedMapIterator.EXPECT().Err().Return(errors.New("test error")).MinTimes(1)
@@ -204,7 +204,7 @@ func TestDropReasonRun(t *testing.T) {
 	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
 
 	// reasign helper function so that it returns the mockedMapIterator
-	iMapIterator = func(_ IMap) IMapIterator {
+	iMapIterator = func(x IMap) IMapIterator {
 		return mockedMapIterator
 	}
 	mockedMapIterator.EXPECT().Err().Return(nil).MinTimes(1)
