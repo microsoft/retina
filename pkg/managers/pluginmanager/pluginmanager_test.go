@@ -24,7 +24,8 @@ import (
 )
 
 const (
-	timeInter = time.Second * 10
+	timeInter      = time.Second * 10
+	mockPluginName = "mockplugin"
 )
 
 var (
@@ -152,9 +153,8 @@ func TestNewManagerStart(t *testing.T) {
 }
 
 func TestStart_InvalidMetricsIntervalDefaultsTo10s(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
-
-	pluginName := "mockplugin"
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	require.NoError(t, err)
 
 	tests := []struct {
 		name     string
@@ -170,7 +170,7 @@ func TestStart_InvalidMetricsIntervalDefaultsTo10s(t *testing.T) {
 
 			cfg := cfgPodLevelDisabled
 			cfg.MetricsInterval = tt.interval
-			cfg.EnabledPlugin = append(cfg.EnabledPlugin, pluginName)
+			cfg.EnabledPlugin = append(cfg.EnabledPlugin, mockPluginName)
 
 			mgr, err := NewPluginManager(&cfg, telemetry.NewNoopTelemetry())
 			require.NoError(t, err)
@@ -183,8 +183,8 @@ func TestStart_InvalidMetricsIntervalDefaultsTo10s(t *testing.T) {
 			mockPlugin.EXPECT().Stop().Return(nil).AnyTimes()
 			mockPlugin.EXPECT().Init().Return(nil).AnyTimes()
 			mockPlugin.EXPECT().Start(gomock.Any()).Return(nil).AnyTimes()
-			mockPlugin.EXPECT().Name().Return(pluginName).AnyTimes()
-			mgr.plugins[pluginName] = mockPlugin
+			mockPlugin.EXPECT().Name().Return(mockPluginName).AnyTimes()
+			mgr.plugins[mockPluginName] = mockPlugin
 
 			ctx, cancel := context.WithCancel(context.Background())
 			done := make(chan error, 1)
