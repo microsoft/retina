@@ -64,5 +64,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MCR_AGENT_IMAGE_NAME: mcr.microsoft.com/containernetworking/retina-agent
       - name: Update new version in krew-index
-        if: github.repository_owner == 'microsoft'
+        if: github.repository_owner == 'microsoft' && !contains(github.ref_name, '-')
         uses: rajatjindal/krew-release-bot@c970b8a8f6dbc2f2285a26e3ae160903b87002c3 # v0.0.51
