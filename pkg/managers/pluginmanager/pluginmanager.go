@@ -15,7 +15,6 @@ import (
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin"
 	"github.com/microsoft/retina/pkg/plugin/conntrack"
-	"github.com/microsoft/retina/pkg/plugin/packetparsertcx"
 	"github.com/microsoft/retina/pkg/telemetry"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -28,7 +27,7 @@ const (
 	// and 10 seconds seems like a reasonable SLA for reconciliation to be completed
 	MAX_RECONCILE_TIME = 10 * time.Second
 
-	// plugin name used for resolution and conntrack GC
+	// plugin name used for conntrack GC check
 	pluginNamePacketparser = "packetparser"
 )
 
@@ -64,41 +63,14 @@ func NewPluginManager(cfg *kcfg.Config, tel telemetry.Telemetry) (*PluginManager
 	}
 
 	for _, name := range cfg.EnabledPlugin {
-		resolvedName := name
-		if name == pluginNamePacketparser {
-			resolvedName = mgr.resolvePacketParserPlugin()
-		}
-		newPluginFn, ok := plugin.Get(resolvedName)
+		newPluginFn, ok := plugin.Get(name)
 		if !ok {
-			return nil, errors.Wrapf(ErrPluginNotFound, "%s", resolvedName)
+			return nil, errors.Wrapf(ErrPluginNotFound, "%s", name)
 		}
-		mgr.plugins[resolvedName] = newPluginFn(mgr.cfg)
+		mgr.plugins[name] = newPluginFn(mgr.cfg)
 	}
 
 	return mgr, nil
-}
-
-// resolvePacketParserPlugin determines whether to use the TC or TCX variant of
-// the packetparser plugin based on the EnableTCX config and kernel support.
-func (p *PluginManager) resolvePacketParserPlugin() string {
-	switch p.cfg.EnableTCX {
-	case kcfg.TCXModeAlways:
-		p.l.Info("EnableTCX=always: using packetparsertcx plugin")
-		return "packetparsertcx"
-	case kcfg.TCXModeOff:
-		p.l.Info("EnableTCX=off: using traditional packetparser (TC) plugin")
-		return pluginNamePacketparser
-	case kcfg.TCXModeAuto:
-		if packetparsertcx.IsTCXSupported() {
-			p.l.Info("EnableTCX=auto: TCX supported, using packetparsertcx plugin")
-			return "packetparsertcx"
-		}
-		p.l.Info("EnableTCX=auto: TCX not supported, falling back to packetparser (TC) plugin")
-		return pluginNamePacketparser
-	default:
-		// Unknown TCXMode; treat as TC fallback.
-		return pluginNamePacketparser
-	}
 }
 
 func (p *PluginManager) Stop() {
@@ -169,9 +141,8 @@ func (p *PluginManager) Start(ctx context.Context) error {
 
 	g, ctx := errgroup.WithContext(ctx)
 	_, isPacketParserEnabled := p.plugins[pluginNamePacketparser]
-	_, isPacketParserTCXEnabled := p.plugins["packetparsertcx"]
-	// run conntrack GC only if packetparser (TC or TCX) is enabled
-	if isPacketParserEnabled || isPacketParserTCXEnabled {
+	// run conntrack GC only if packetparser is enabled
+	if isPacketParserEnabled {
 		ct, connErr := conntrack.New()
 		if connErr != nil {
 			return errors.Wrap(connErr, "failed to get conntrack instance")

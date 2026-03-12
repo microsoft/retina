@@ -23,8 +23,6 @@ type TCXMode string
 const (
 	// TCXModeAuto detects kernel support and uses TCX if available, falling back to TC.
 	TCXModeAuto TCXMode = "auto"
-	// TCXModeAlways requires TCX and fails if not supported.
-	TCXModeAlways TCXMode = "always"
 	// TCXModeOff disables TCX and always uses traditional TC.
 	TCXModeOff TCXMode = "off"
 )
@@ -57,8 +55,8 @@ var (
 		"telemetryInterval smaller than %v is not allowed",
 		MinTelemetryInterval,
 	)
-	DefaultTelemetryInterval              = 15 * time.Minute
-	DefaultSamplingRate            uint32 = 1
+	DefaultTelemetryInterval        = 15 * time.Minute
+	DefaultSamplingRate      uint32 = 1
 )
 
 func (l *Level) UnmarshalText(text []byte) error {
