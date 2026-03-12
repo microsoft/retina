@@ -23,8 +23,6 @@ type TCXMode string
 const (
 	// TCXModeAuto detects kernel support and uses TCX if available, falling back to TC.
 	TCXModeAuto TCXMode = "auto"
-	// TCXModeAlways requires TCX and fails if not supported.
-	TCXModeAlways TCXMode = "always"
 	// TCXModeOff disables TCX and always uses traditional TC.
 	TCXModeOff TCXMode = "off"
 )
@@ -190,15 +188,14 @@ func GetConfig(cfgFilename string) (*Config, error) {
 		config.DataSamplingRate = DefaultSamplingRate
 	}
 
-<<<<<<< HEAD
 	// Default filter map max entries to 255 if not set.
 	if config.FilterMapMaxEntries == 0 {
 		config.FilterMapMaxEntries = DefaultFilterMapMaxEntries
-=======
+	}
+
 	// Default EnableTCX to "auto" if unset.
 	if config.EnableTCX == "" {
 		config.EnableTCX = TCXModeAuto
->>>>>>> 54e3825 (Add TCX (TC eXpress) packetparser plugin with configurable TC/TCX selection)
 	}
 
 	switch config.PacketParserRingBuffer { //nolint:exhaustive // we only care about Auto and empty (default) here
