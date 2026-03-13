@@ -1,0 +1,46 @@
+name: DevContainer
+on:
+  merge_group:
+  push:
+    branches: [main]
+    paths:
+      - ".devcontainer/**"
+      - "go.mod"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".devcontainer/**"
+      - "go.mod"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build DevContainer
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Build and validate devcontainer
+        uses: devcontainers/ci@8bf61b26e9c3a98f69cb6ce2f88d24ff59b785c6 # v0.3.1900000417
+        with:
+          runCmd: |
+            clang --version
+            llvm-strip --version
+            go version
+            EXPECTED_GO=$(grep '^go ' go.mod | awk '{print $2}')
+            ACTUAL_GO=$(go version | grep -oP '\d+\.\d+\.\d+')
+            if [ "$EXPECTED_GO" != "$ACTUAL_GO" ]; then
+              echo "::error::Go version mismatch: devcontainer has $ACTUAL_GO but go.mod requires $EXPECTED_GO"
+              exit 1
+            fi
+            kubectl version --client
+            helm version
+            kind version
+            grep -rl 'go:generate.*bpf2go' pkg/plugin/ | xargs -I{} go generate {}

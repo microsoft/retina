@@ -2,25 +2,101 @@
   "name": "retina",
   "image": "mcr.microsoft.com/devcontainers/base:noble",
   "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
-    "ghcr.io/devcontainers/features/github-cli:1": {},
-    "ghcr.io/devcontainers/features/go:1": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2.16.1": {},
+    "ghcr.io/devcontainers/features/github-cli:1.1.0": {},
+    "ghcr.io/devcontainers/features/go:1.3.3": {
       "version": "1.24.11"
     },
-    "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {},
-    "ghcr.io/devcontainers-extra/features/kind:1": {},
-    "ghcr.io/devcontainers/features/azure-cli:1": {}
+    "ghcr.io/devcontainers/features/kubectl-helm-minikube:1.3.1": {},
+    "ghcr.io/devcontainers-extra/features/kind:1.0.15": {},
+    "ghcr.io/devcontainers/features/azure-cli:1.2.9": {},
+    // LLVM 17 is the minimum version available for Ubuntu Noble on apt.llvm.org.
+    // Provides clang and llvm-strip needed for eBPF compilation.
+    "ghcr.io/devcontainers-community/features/llvm:3.2.0": {
+      "version": "17"
+    }
   },
-  "postCreateCommand": "bash .devcontainer/installMoreTools.sh && while ! docker info >/dev/null 2>&1; do sleep 1; done && kind create cluster",
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "8gb",
+    "storage": "32gb"
+  },
+  // Persist Go module and build caches across container rebuilds.
+  "mounts": [
+    {
+      "type": "volume",
+      "source": "retina-gomodcache",
+      "target": "/go/pkg/mod"
+    },
+    {
+      "type": "volume",
+      "source": "retina-gobuildcache",
+      "target": "/home/vscode/.cache/go-build"
+    }
+  ],
+  // These commands run in parallel during container creation.
+  "onCreateCommand": {
+    // The LLVM feature installs versioned binaries (clang-17, llvm-strip-17).
+    // Create unversioned symlinks so the build system can find them.
+    "symlinks": "sudo ln -sf /usr/bin/clang-17 /usr/bin/clang && sudo ln -sf /usr/bin/llvm-strip-17 /usr/bin/llvm-strip",
+    // Fix ownership of volume mounts (created as root) and cache dirs,
+    // then download Go modules.
+    "go-setup": "sudo chown -R vscode:vscode /go /home/vscode/.cache && go mod download",
+    // Install jq (needed by some Makefile targets and scripts).
+    "apt-deps": "sudo apt-get update && sudo apt-get install -y --no-install-recommends jq && sudo rm -rf /var/lib/apt/lists/*"
+  },
+  // Wait for Docker-in-Docker to be ready, then create a Kind cluster for local testing.
+  "postStartCommand": {
+    "kind": "while ! docker info >/dev/null 2>&1; do sleep 1; done && kind create cluster 2>/dev/null || true"
+  },
+  "waitFor": "onCreateCommand",
+  "forwardPorts": [
+    9965,
+    4244,
+    10093
+  ],
+  "portsAttributes": {
+    "9965": {
+      "label": "Hubble Metrics",
+      "onAutoForward": "silent"
+    },
+    "4244": {
+      "label": "Hubble Relay",
+      "onAutoForward": "silent"
+    },
+    "10093": {
+      "label": "Retina Metrics",
+      "onAutoForward": "silent"
+    }
+  },
   "customizations": {
     "vscode": {
       "extensions": [
-        "esbenp.prettier-vscode",
         "golang.go",
-        "mutantdino.resourcemonitor",
         "ms-vscode.makefile-tools",
-        "ms-kubernetes-tools.vscode-kubernetes-tools"
-      ]
+        "ms-kubernetes-tools.vscode-kubernetes-tools",
+        "ms-azuretools.vscode-docker",
+        "redhat.vscode-yaml",
+        "mutantdino.resourcemonitor",
+        "DavidAnson.vscode-markdownlint"
+      ],
+      "settings": {
+        "go.lintTool": "golangci-lint",
+        "go.lintFlags": [
+          "--config=.golangci.yaml",
+          "--timeout=10m"
+        ],
+        "go.formatTool": "gofumpt",
+        "files.insertFinalNewline": true,
+        "markdownlint.config": {
+          "extends": ".github/.markdownlint.json"
+        },
+        "[markdown]": {
+          "editor.codeActionsOnSave": {
+            "source.fixAll.markdownlint": "explicit"
+          }
+        }
+      }
     }
   }
 }
