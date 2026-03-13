@@ -106,6 +106,17 @@ type DirtyCachePod struct {
 	Namespaced bool
 }
 
+// metadataTrackingInfo tracks which metadata type(s) were used when adding an IP
+// This ensures DELETE uses the same metadata as ADD, preventing leaks from metadata mismatches
+type metadataTrackingInfo struct {
+	// addedWithPodMetadata indicates IP was added with modulePodReqMetadata
+	addedWithPodMetadata bool
+	// addedWithNamespaceMetadata indicates IP was added with moduleReqMetadata
+	addedWithNamespaceMetadata bool
+	// podName is the pod that owns this IP (for debugging)
+	podName string
+}
+
 func NewCtxOption(opts []string, option ctxOptionType) *ContextOptions {
 	c := &ContextOptions{
 		option: option,
