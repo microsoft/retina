@@ -493,3 +493,14 @@ func (c *Cache) GetAnnotatedNamespaces() []string {
 	sort.Strings(ns)
 	return ns
 }
+
+// GetAllNamespaces returns all namespaces that have endpoints in the cache
+func (c *Cache) GetAllNamespaces() []string {
+	c.RLock()
+	defer c.RUnlock()
+	namespaces := make([]string, 0, len(c.nsMap))
+	for ns := range c.nsMap {
+		namespaces = append(namespaces, ns)
+	}
+	return namespaces
+}
