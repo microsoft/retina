@@ -52,7 +52,7 @@ func main() {
 	}()
 
 	// Filtermanager.
-	f, err := filtermanager.Init(5)
+	f, err := filtermanager.Init(5, 255)
 	if err != nil {
 		l.Error("Failed to start Filtermanager", zap.Error(err))
 		panic(err)

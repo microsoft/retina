@@ -245,6 +245,12 @@ func (p *packetParser) Init() error {
 	if err != nil {
 		return err
 	}
+
+	// Override filter map max entries to match the configured size from init container.
+	if mapSpec, ok := spec.Maps[plugincommon.FilterMapName]; ok && p.cfg.FilterMapMaxEntries > 0 {
+		mapSpec.MaxEntries = p.cfg.FilterMapMaxEntries
+	}
+
 	//nolint:typecheck
 	if err := spec.LoadAndAssign(objs, &ebpf.CollectionOptions{ //nolint:typecheck
 		Maps: ebpf.MapOptions{

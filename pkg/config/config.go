@@ -121,6 +121,7 @@ type Config struct {
 	DataSamplingRate           uint32                     `yaml:"dataSamplingRate"`
 	PacketParserRingBuffer     PacketParserRingBufferMode `yaml:"packetParserRingBuffer"`
 	PacketParserRingBufferSize uint32                     `yaml:"packetParserRingBufferSize"`
+	FilterMapMaxEntries        uint32                     `yaml:"filterMapMaxEntries"`
 }
 
 func GetConfig(cfgFilename string) (*Config, error) {
@@ -173,6 +174,11 @@ func GetConfig(cfgFilename string) (*Config, error) {
 	if config.DataSamplingRate == 0 {
 		log.Printf("dataSamplingRate is not set, defaulting to %v", DefaultSamplingRate)
 		config.DataSamplingRate = DefaultSamplingRate
+	}
+
+	// Default filter map max entries to 255 if not set.
+	if config.FilterMapMaxEntries == 0 {
+		config.FilterMapMaxEntries = 255
 	}
 
 	switch config.PacketParserRingBuffer { //nolint:exhaustive // we only care about Auto and empty (default) here
