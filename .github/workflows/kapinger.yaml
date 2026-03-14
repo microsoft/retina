@@ -6,7 +6,68 @@ on:
       - main
 
 jobs:
-  build:
+  build-linux:
+    name: Build Linux Kapinger Image (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      matrix:
+        arch: ["amd64", "arm64"]
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set outputs
+        id: vars
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+
+      - name: Build Linux Kapinger Image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: hack/tools/kapinger
+          file: hack/tools/kapinger/Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          target: linux
+          load: true
+          push: false
+          provenance: false
+          tags: ghcr.io/${{ github.repository }}/kapinger:${{ steps.vars.outputs.sha_short }}-linux-${{ matrix.arch }}
+
+      - name: Smoke test kapinger binary
+        run: |
+          IMAGE=ghcr.io/${{ github.repository }}/kapinger:${{ steps.vars.outputs.sha_short }}-linux-${{ matrix.arch }}
+          # Verify the binary starts and prints the expected startup log.
+          # It will exit with an error because there's no K8s cluster, but
+          # that confirms the binary is correctly linked and executable.
+          docker run --rm "$IMAGE" 2>&1 | grep -q "starting kapinger"
+
+      - name: Push Linux Kapinger Image
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: hack/tools/kapinger
+          file: hack/tools/kapinger/Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          target: linux
+          push: true
+          provenance: false
+          tags: ghcr.io/${{ github.repository }}/kapinger:${{ steps.vars.outputs.sha_short }}-linux-${{ matrix.arch }}
+
+  build-windows:
+    name: Build Windows Kapinger Image
     runs-on: ubuntu-latest
 
     steps:
@@ -16,50 +77,83 @@ jobs:
       - name: Set outputs
         id: vars
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-      - name: Check outputs
-        run: echo ${{ steps.vars.outputs.sha_short }}
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      #      - name: Login to GitHub Container Registry
-      #        uses: docker/login-action@v1
-      #        with:
-      #          registry: ghcr.io
-      #          username: ${{ github.repository_owner }}
-      #          password: ${{ secrets.GITHUB_TOKEN }}
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
 
       - name: Build Windows Kapinger Image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: hack/tools/kapinger
           file: hack/tools/kapinger/Dockerfile
           platforms: windows/amd64
-          push: false
+          target: windows
+          push: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}
           provenance: false
           tags: ghcr.io/${{ github.repository }}/kapinger:${{ steps.vars.outputs.sha_short }}-windows
 
-      - name: Build Linux Kapinger Image
-        uses: docker/build-push-action@v6
-        with:
-          context: hack/tools/kapinger
-          file: hack/tools/kapinger/Dockerfile
-          platforms: linux/amd64
-          push: false
-          provenance: false
-          tags: ghcr.io/${{ github.repository }}/kapinger:${{ steps.vars.outputs.sha_short }}-linux
+  manifest:
+    name: Create and Push Manifest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    needs: [build-linux, build-windows]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set outputs
+        id: vars
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+
+      - name: Create and push manifest
+        run: |
+          TAG=${{ steps.vars.outputs.sha_short }}
+          REPO=ghcr.io/${{ github.repository }}/kapinger
+          TAGS="-t $REPO:$TAG"
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            TAGS="$TAGS -t $REPO:${{ github.ref_name }}"
+          fi
+          docker buildx imagetools create $TAGS \
+            "$REPO:$TAG-linux-amd64" \
+            "$REPO:$TAG-linux-arm64" \
+            "$REPO:$TAG-windows"
+
+  build-toolbox:
+    name: Build Linux Toolbox Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set outputs
+        id: vars
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
 
       - name: Build Linux Toolbox Image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: hack/tools
           file: hack/tools/toolbox/Dockerfile
           platforms: linux/amd64
-          push: false
+          push: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}
           provenance: false
           tags: ghcr.io/${{ github.repository }}/toolbox:${{ steps.vars.outputs.sha_short }}-linux
-#      - name: Create and push manifest
-#        id: docker_manifest
-#        run: |
-#          docker manifest create ghcr.io/${{ github.repository }}/kapinger:latest ghcr.io/${{ github.repository }}/kapinger:${{ steps.vars.outputs.sha_short }}-windows ghcr.io/${{ github.repository }}/kapinger:${{ steps.vars.outputs.sha_short }}-linux
-#          docker manifest push ghcr.io/${{ github.repository }}/kapinger:latest
