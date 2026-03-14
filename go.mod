@@ -299,7 +299,7 @@ require (
 	github.com/prometheus/client_model v0.6.2
 	github.com/prometheus/common v0.65.0
 	github.com/safchain/ethtool v0.7.0
-	github.com/sirupsen/logrus v1.9.3
+	github.com/sirupsen/logrus v1.9.4
 	github.com/spf13/viper v1.20.1
 	github.com/vishvananda/netlink v1.3.1
 	go.opentelemetry.io/otel v1.37.0
