@@ -1,0 +1,107 @@
+namespace: retina-rust
+clusterName: default
+
+agent:
+  image:
+    repository: acnpublic.azurecr.io/retina-rust
+    tag: local
+    pullPolicy: Always
+  # Additional host interfaces to attach TC programs to (e.g. [eth0, eth1]).
+  # Pod veths are auto-discovered; these are extra interfaces beyond those.
+  extraInterfaces: []
+  # Port for Hubble Observer and Peer gRPC services.
+  hubblePort: 4244
+  # Agent log level (trace, debug, info, warn, error).
+  logLevel: info
+  # Enable pod-level monitoring via veth endpoint programs.
+  podLevel: true
+  # Packet sampling rate: 1 = no sampling (all packets), N = report ~1/N packets.
+  # Control-plane events (SYN/FIN/RST) are always reported regardless of sampling.
+  samplingRate: 1
+  # BPF ring buffer size in bytes (must be power of 2, minimum 65536).
+  # Only used on kernels >= 5.8; ignored when falling back to perf buffers.
+  ringBufferSize: 2097152
+  # HTTP port for Prometheus metrics, health probes, and debug endpoints.
+  metricsPort: 10093
+  # Enable aya-rs eBPF log forwarding ("1" = enabled, "0" = disabled).
+  ayaLogs: "1"
+  # Enable the dropreason plugin for packet drop monitoring.
+  # Requires kernel >= 5.5 (x86) / 6.0 (arm64) with BTF support.
+  enableDropReason: true
+  # BPF ring buffer size for dropreason events in bytes (power of 2).
+  # Only used on kernels >= 5.8; ignored when falling back to perf buffers.
+  dropReasonRingBufferSize: 1048576
+  dropReasonFilter:
+    # Drop reasons to suppress from the Hubble event stream.
+    # Metrics are still collected for suppressed reasons.
+    # Use the UPPERCASE reason names shown in Hubble and Prometheus.
+    #
+    # Plugin drop reasons:
+    #   IPTABLE_RULE_DROP   - Packet dropped by iptables rule
+    #   IPTABLE_NAT_DROP    - Packet dropped by iptables NAT
+    #   TCP_CONNECT_DROP    - TCP connect attempt failed (fexit tcp_v4_connect)
+    #   TCP_ACCEPT_DROP     - TCP accept failed (fexit inet_csk_accept)
+    #   CONNTRACK_DROP      - Conntrack lookup/update drop
+    #   TCP_RETRANSMIT      - TCP retransmission (tcp_retransmit_skb tracepoint)
+    #   TCP_SEND_RESET      - TCP RST sent (tcp_send_reset tracepoint)
+    #   TCP_RECEIVE_RESET   - TCP RST received (tcp_receive_reset tracepoint)
+    #   UNKNOWN             - Unrecognized drop reason
+    #
+    # Kernel drop reasons (KERNEL_DROP sub-reasons, resolved from BTF at runtime):
+    #   These use the kernel's own enum skb_drop_reason names, e.g.:
+    #   NOT_SPECIFIED, NO_SOCKET, PKT_TOO_SMALL, TCP_CSUM, TCP_FILTER,
+    #   UDP_CSUM, NETFILTER_DROP, TCP_OLD_SEQUENCE, TCP_INVALID_SEQUENCE,
+    #   IP_OUTNOROUTES, QUEUE_PURGE, etc.
+    #   The full set depends on the kernel version running on the node.
+    suppressedDropReasons: []
+  # CPU/memory resource requests and limits for the agent container.
+  resources: {}
+
+operator:
+  enabled: true
+  image:
+    repository: acnpublic.azurecr.io/retina-operator
+    tag: local
+    pullPolicy: Always
+  replicas: 1
+  grpcPort: 9090
+  debugPort: 9091
+  logLevel: info
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+hubble:
+  enabled: true
+  relay:
+    enabled: true
+    image:
+      repository: quay.io/cilium/hubble-relay
+      tag: v1.19.1
+      pullPolicy: IfNotPresent
+    replicas: 1
+    listenPort: 4245
+    resources:
+      requests:
+        cpu: 100m
+        memory: 64Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+  ui:
+    enabled: true
+    frontend:
+      image:
+        repository: quay.io/cilium/hubble-ui
+        tag: v0.13.3
+        pullPolicy: IfNotPresent
+    backend:
+      image:
+        repository: quay.io/cilium/hubble-ui-backend
+        tag: v0.13.3
+        pullPolicy: IfNotPresent
+    replicas: 1
