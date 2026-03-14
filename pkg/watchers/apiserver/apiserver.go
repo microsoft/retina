@@ -66,7 +66,7 @@ func (a *ApiServerWatcher) Init(ctx context.Context) error {
 	// Get filter manager.
 	if a.filterManager == nil {
 		var err error
-		a.filterManager, err = fm.Init(filterManagerRetries)
+		a.filterManager, err = fm.Init(filterManagerRetries, 0)
 		if err != nil {
 			a.l.Error("failed to init filter manager", zap.Error(err))
 			return fmt.Errorf("failed to init filter manager: %w", err)

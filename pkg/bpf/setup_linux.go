@@ -55,7 +55,7 @@ func mountBpfFs() error {
 	return nil
 }
 
-func Setup(l *zap.Logger) error {
+func Setup(l *zap.Logger, filterMapMaxEntries uint32) error {
 	err := mountBpfFs()
 	if err != nil {
 		return errors.Wrap(err, "failed to mount BPF filesystem")
@@ -71,7 +71,7 @@ func Setup(l *zap.Logger) error {
 
 	// Initialize the filter map.
 	// This will create the filter map in kernel and pin it to /sys/fs/bpf.
-	_, err = filter.Init()
+	_, err = filter.Init(filterMapMaxEntries)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize filter map")
 	}

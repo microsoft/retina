@@ -6,6 +6,9 @@ package filtermanager
 import (
 	"net"
 	"sync"
+
+	"github.com/microsoft/retina/pkg/log"
+	"go.uber.org/zap"
 )
 
 var fc = &filterCache{data: make(map[string]requests)}
@@ -61,6 +64,7 @@ func (f *filterCache) addIP(ip net.IP, r Requestor, m RequestMetadata) {
 	defer f.mu.Unlock()
 
 	key := ip.String()
+
 	if _, ok := f.data[key]; !ok {
 		f.data[key] = make(requests)
 	}
@@ -68,6 +72,7 @@ func (f *filterCache) addIP(ip net.IP, r Requestor, m RequestMetadata) {
 		f.data[key][r] = make(map[RequestMetadata]bool)
 	}
 	f.data[key][r][m] = true
+
 }
 
 // Return true if the IP was deleted from the cache.
@@ -91,6 +96,21 @@ func (f *filterCache) deleteIP(ip net.IP, r Requestor, m RequestMetadata) bool {
 				delete(f.data, key)
 				ipDeleted = true
 			}
+
+		} else {
+			if log.Logger() != nil {
+				log.Logger().Warn("deleteIP - requestor not found",
+					zap.String("ip", key),
+					zap.String("requestor", string(r)),
+					zap.String("metadata_ruleID", m.RuleID))
+			}
+		}
+	} else {
+		if log.Logger() != nil {
+			log.Logger().Warn("deleteIP - IP not found in cache",
+				zap.String("ip", key),
+				zap.String("requestor", string(r)),
+				zap.String("metadata_ruleID", m.RuleID))
 		}
 	}
 	return ipDeleted
