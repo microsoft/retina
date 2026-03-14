@@ -4,6 +4,23 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "hack/tools/kapinger/**"
+      - ".github/workflows/kapinger.yaml"
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "hack/tools/kapinger/**"
+      - ".github/workflows/kapinger.yaml"
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   build-linux:
