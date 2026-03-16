@@ -660,7 +660,7 @@ func TestPodAnnotated(t *testing.T) {
 }
 
 func TestNsOfInterest(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
 
 	tests := []struct {
 		name               string
@@ -721,7 +721,7 @@ func TestNsOfInterest(t *testing.T) {
 }
 
 func TestAppendExcludeList(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
 	cfg, err := kcfg.GetConfig(testCfgFile)
 	require.NoError(t, err)
 	ctrl := gomock.NewController(t)
@@ -794,7 +794,7 @@ func TestAppendExcludeList(t *testing.T) {
 }
 
 func TestUpdateNamespaceListsExclude(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
 	cfg, err := kcfg.GetConfig(testCfgFile)
 	require.NoError(t, err)
 	ctrl := gomock.NewController(t)
@@ -860,7 +860,7 @@ func TestUpdateNamespaceListsExclude(t *testing.T) {
 }
 
 func TestPodCallBackExclude(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	cfg, _ := kcfg.GetConfig(testCfgFile)
@@ -904,11 +904,11 @@ func TestPodCallBackExclude(t *testing.T) {
 	pod1 := common.NewRetinaEndpoint("pod1", "default", &common.IPAddresses{IPv4: net.IPv4(10, 0, 0, 1)})
 	me.PodCallBackFn(cache.NewCacheEvent(cache.EventTypePodAdded, pod1))
 	adds := me.dirtyPods.GetAddList()
-	assert.Equal(t, 1, len(adds), "pod in non-excluded namespace should be added to dirty pods")
+	assert.Len(t, adds, 1, "pod in non-excluded namespace should be added to dirty pods")
 
 	// Pod in excluded namespace should NOT be tracked
 	pod2 := common.NewRetinaEndpoint("pod2", "ns1", &common.IPAddresses{IPv4: net.IPv4(10, 0, 0, 2)})
 	me.PodCallBackFn(cache.NewCacheEvent(cache.EventTypePodAdded, pod2))
 	adds = me.dirtyPods.GetAddList()
-	assert.Equal(t, 1, len(adds), "pod in excluded namespace should not be added to dirty pods")
+	assert.Len(t, adds, 1, "pod in excluded namespace should not be added to dirty pods")
 }
