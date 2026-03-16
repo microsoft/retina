@@ -440,7 +440,8 @@ func (m *Module) PodCallBackFn(obj interface{}) {
 	}
 
 	m.Lock()
-	if !m.nsOfInterest(pod.Namespace()) && !m.podOfInterest(ip, pod.Annotations()) {
+	if event.Type != cache.EventTypePodDeleted &&
+		!m.nsOfInterest(pod.Namespace()) && !m.podOfInterest(ip, pod.Annotations()) {
 		m.Unlock()
 		return
 	}
@@ -527,35 +528,26 @@ func (m *Module) applyDirtyPodsAdd() {
 	m.dirtyPods.ClearAdd()
 }
 
-// applyDirtyPodsDelete deletes pod ips from filtermanager
+// applyDirtyPodsDelete deletes pod ips from filtermanager.
+// Always attempts deletion with both metadata types (pod and namespace).
+// The filtermanager cache makes extra deletes a safe no-op when the metadata doesn't exist.
 func (m *Module) applyDirtyPodsDelete() {
 	deletes := m.dirtyPods.GetDeleteList()
 	if len(deletes) > 0 {
-		podOfInterestDeleteList := make([]net.IP, 0)
-		namespaceOfInterestDeleteList := make([]net.IP, 0)
+		ipsToDelete := make([]net.IP, 0, len(deletes))
 		for _, entry := range deletes {
 			podEntry := entry.(DirtyCachePod)
-			if podEntry.Annotated {
-				podOfInterestDeleteList = append(podOfInterestDeleteList, podEntry.IP)
-			}
-			if podEntry.Namespaced {
-				namespaceOfInterestDeleteList = append(namespaceOfInterestDeleteList, podEntry.IP)
-			}
+			ipsToDelete = append(ipsToDelete, podEntry.IP)
 		}
 
-		if len(podOfInterestDeleteList) > 0 {
-			m.l.Debug("Deleting Ips in dirty pods from filtermap", zap.Any("IPs", podOfInterestDeleteList))
-			err := m.filterManager.DeleteIPs(podOfInterestDeleteList, metricModuleReq, modulePodReqMetadata)
-			if err != nil {
-				m.l.Error("Error deleting pod IP from filter manager", zap.Error(err))
-			}
+		m.l.Debug("Deleting Ips in dirty pods from filtermap", zap.Any("IPs", ipsToDelete))
+		err := m.filterManager.DeleteIPs(ipsToDelete, metricModuleReq, modulePodReqMetadata)
+		if err != nil {
+			m.l.Error("Error deleting pod IP from filter manager", zap.Error(err))
 		}
-		if len(namespaceOfInterestDeleteList) > 0 {
-			m.l.Debug("Deleting Ips in dirty pods from filtermap", zap.Any("IPs", namespaceOfInterestDeleteList))
-			err := m.filterManager.DeleteIPs(namespaceOfInterestDeleteList, metricModuleReq, moduleReqMetadata)
-			if err != nil {
-				m.l.Error("Error deleting pod IP from filter manager", zap.Error(err))
-			}
+		err = m.filterManager.DeleteIPs(ipsToDelete, metricModuleReq, moduleReqMetadata)
+		if err != nil {
+			m.l.Error("Error deleting pod IP from filter manager", zap.Error(err))
 		}
 	}
 
