@@ -733,6 +733,7 @@ func TestAppendExcludeList(t *testing.T) {
 	c := cache.NewMockCacheInterface(ctrl)
 
 	c.EXPECT().GetIPsByNamespace(gomock.Any()).Return([]net.IP{}).AnyTimes()
+	c.EXPECT().GetAllNamespaces().Return([]string{}).AnyTimes()
 	fm.EXPECT().AddIPs(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	fm.EXPECT().DeleteIPs(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
@@ -805,6 +806,7 @@ func TestUpdateNamespaceListsExclude(t *testing.T) {
 	c := cache.NewMockCacheInterface(ctrl)
 
 	c.EXPECT().GetIPsByNamespace(gomock.Any()).Return([]net.IP{}).AnyTimes()
+	c.EXPECT().GetAllNamespaces().Return([]string{}).AnyTimes()
 	fm.EXPECT().AddIPs(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	fm.EXPECT().DeleteIPs(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
@@ -869,6 +871,7 @@ func TestPodCallBackExclude(t *testing.T) {
 	c := cache.NewMockCacheInterface(ctrl)
 
 	c.EXPECT().GetIPsByNamespace(gomock.Any()).Return([]net.IP{}).AnyTimes()
+	c.EXPECT().GetAllNamespaces().Return([]string{}).AnyTimes()
 	fm.EXPECT().AddIPs(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	fm.EXPECT().DeleteIPs(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	fm.EXPECT().HasIP(gomock.Any()).Return(false).AnyTimes()

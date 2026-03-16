@@ -381,3 +381,32 @@ func TestCachingNamespace(t *testing.T) {
 	namespaces = c.GetAnnotatedNamespaces()
 	assert.Equal(t, 0, len(namespaces))
 }
+
+func TestGetAllNamespaces(t *testing.T) {
+	log.SetupZapLogger(log.GetDefaultLogOpts())
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	p := pubsub.NewMockPubSubInterface(ctrl)
+	p.EXPECT().Subscribe(common.PubSubAPIServer, gomock.Any()).Times(1)
+	p.EXPECT().Publish(gomock.Any(), gomock.Any()).AnyTimes()
+	c := New(p)
+
+	// Empty cache should return empty list
+	namespaces := c.GetAllNamespaces()
+	assert.Equal(t, 0, len(namespaces))
+
+	// Add endpoints in different namespaces
+	ep1 := common.NewRetinaEndpoint("pod1", "ns1", &common.IPAddresses{IPv4: net.IPv4(10, 0, 0, 1)})
+	ep2 := common.NewRetinaEndpoint("pod2", "ns2", &common.IPAddresses{IPv4: net.IPv4(10, 0, 0, 2)})
+	ep3 := common.NewRetinaEndpoint("pod3", "ns1", &common.IPAddresses{IPv4: net.IPv4(10, 0, 0, 3)})
+	err := c.UpdateRetinaEndpoint(ep1)
+	assert.NoError(t, err)
+	err = c.UpdateRetinaEndpoint(ep2)
+	assert.NoError(t, err)
+	err = c.UpdateRetinaEndpoint(ep3)
+	assert.NoError(t, err)
+
+	namespaces = c.GetAllNamespaces()
+	assert.Equal(t, 2, len(namespaces))
+	assert.ElementsMatch(t, []string{"ns1", "ns2"}, namespaces)
+}
