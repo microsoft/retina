@@ -658,3 +658,254 @@ func TestPodAnnotated(t *testing.T) {
 		assert.Equal(t, tt.expected, tt.m.podAnnotated(tt.annotations))
 	}
 }
+
+func TestNsOfInterest(t *testing.T) {
+	log.SetupZapLogger(log.GetDefaultLogOpts())
+
+	tests := []struct {
+		name               string
+		includedNamespaces map[string]struct{}
+		excludedNamespaces map[string]struct{}
+		ns                 string
+		expected           bool
+	}{
+		{
+			name:               "no filters configured (empty maps) - no namespace is of interest",
+			includedNamespaces: map[string]struct{}{},
+			excludedNamespaces: map[string]struct{}{},
+			ns:                 "default",
+			expected:           false,
+		},
+		{
+			name:               "no filters configured (nil maps) - no namespace is of interest",
+			includedNamespaces: nil,
+			excludedNamespaces: nil,
+			ns:                 "default",
+			expected:           false,
+		},
+		{
+			name:               "included namespace matches",
+			includedNamespaces: map[string]struct{}{"ns1": {}},
+			ns:                 "ns1",
+			expected:           true,
+		},
+		{
+			name:               "included namespace does not match",
+			includedNamespaces: map[string]struct{}{"ns1": {}},
+			ns:                 "ns2",
+			expected:           false,
+		},
+		{
+			name:               "excluded namespace matches - should not be of interest",
+			excludedNamespaces: map[string]struct{}{"ns1": {}},
+			ns:                 "ns1",
+			expected:           false,
+		},
+		{
+			name:               "excluded namespace does not match - should be of interest",
+			excludedNamespaces: map[string]struct{}{"ns1": {}},
+			ns:                 "ns2",
+			expected:           true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &Module{
+				includedNamespaces: tt.includedNamespaces,
+				excludedNamespaces: tt.excludedNamespaces,
+			}
+			assert.Equal(t, tt.expected, m.nsOfInterest(tt.ns))
+		})
+	}
+}
+
+func TestAppendExcludeList(t *testing.T) {
+	log.SetupZapLogger(log.GetDefaultLogOpts())
+	cfg, err := kcfg.GetConfig(testCfgFile)
+	require.NoError(t, err)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	p := pubsub.NewMockPubSubInterface(ctrl)
+	e := enricher.NewMockEnricherInterface(ctrl)
+	fm := filtermanager.NewMockIFilterManager(ctrl)
+	c := cache.NewMockCacheInterface(ctrl)
+
+	c.EXPECT().GetIPsByNamespace(gomock.Any()).Return([]net.IP{}).AnyTimes()
+	fm.EXPECT().AddIPs(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	fm.EXPECT().DeleteIPs(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+
+	me := &Module{
+		RWMutex:       &sync.RWMutex{},
+		l:             log.Logger().Named("MetricModule"),
+		pubsub:        p,
+		configs:       make([]*api.MetricsConfiguration, 0),
+		enricher:      e,
+		wg:            sync.WaitGroup{},
+		registry:      make(map[string]AdvMetricsInterface),
+		moduleCtx:     context.Background(),
+		filterManager: fm,
+		daemonCache:   c,
+		dirtyPods:     common.NewDirtyCache(),
+		pubsubPodSub:  "",
+		daemonConfig:  cfg,
+	}
+
+	testcases := []struct {
+		description            string
+		namespaces             []string
+		wantExcludedNamespaces map[string]struct{}
+	}{
+		{
+			"input 0 namespaces",
+			[]string{},
+			map[string]struct{}{},
+		},
+		{
+			"input 1 namespace (add)",
+			[]string{"ns1"},
+			map[string]struct{}{"ns1": {}},
+		},
+		{
+			"input 1 namespace different than previous (add 1 & remove 1)",
+			[]string{"ns2"},
+			map[string]struct{}{"ns2": {}},
+		},
+		{
+			"input 2 namespaces (add 1)",
+			[]string{"ns1", "ns2"},
+			map[string]struct{}{"ns1": {}, "ns2": {}},
+		},
+		{
+			"input 0 namespaces (remove all)",
+			[]string{},
+			map[string]struct{}{},
+		},
+	}
+
+	for _, test := range testcases {
+		t.Run(test.description, func(t *testing.T) {
+			me.appendExcludeList(test.namespaces)
+			assert.Equal(t, test.wantExcludedNamespaces, me.excludedNamespaces)
+		})
+	}
+}
+
+func TestUpdateNamespaceListsExclude(t *testing.T) {
+	log.SetupZapLogger(log.GetDefaultLogOpts())
+	cfg, err := kcfg.GetConfig(testCfgFile)
+	require.NoError(t, err)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	p := pubsub.NewMockPubSubInterface(ctrl)
+	e := enricher.NewMockEnricherInterface(ctrl)
+	fm := filtermanager.NewMockIFilterManager(ctrl)
+	c := cache.NewMockCacheInterface(ctrl)
+
+	c.EXPECT().GetIPsByNamespace(gomock.Any()).Return([]net.IP{}).AnyTimes()
+	fm.EXPECT().AddIPs(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	fm.EXPECT().DeleteIPs(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+
+	me := &Module{
+		RWMutex:       &sync.RWMutex{},
+		l:             log.Logger().Named("MetricModule"),
+		pubsub:        p,
+		configs:       make([]*api.MetricsConfiguration, 0),
+		enricher:      e,
+		wg:            sync.WaitGroup{},
+		registry:      make(map[string]AdvMetricsInterface),
+		moduleCtx:     context.Background(),
+		filterManager: fm,
+		daemonCache:   c,
+		dirtyPods:     common.NewDirtyCache(),
+		pubsubPodSub:  "",
+		daemonConfig:  cfg,
+	}
+
+	testcases := []struct {
+		description            string
+		spec                   *api.MetricsSpec
+		wantIncludedNamespaces map[string]struct{}
+		wantExcludedNamespaces map[string]struct{}
+	}{
+		{
+			"exclude only - should populate excludedNamespaces",
+			&api.MetricsSpec{
+				Namespaces: api.MetricsNamespaces{
+					Exclude: []string{"ns1"},
+				},
+			},
+			map[string]struct{}{},
+			map[string]struct{}{"ns1": {}},
+		},
+		{
+			"neither set - both empty",
+			&api.MetricsSpec{},
+			map[string]struct{}{},
+			map[string]struct{}{},
+		},
+	}
+
+	for _, test := range testcases {
+		t.Run(test.description, func(t *testing.T) {
+			me.updateNamespaceLists(test.spec)
+			assert.Equal(t, test.wantIncludedNamespaces, me.includedNamespaces)
+			assert.Equal(t, test.wantExcludedNamespaces, me.excludedNamespaces)
+		})
+	}
+}
+
+func TestPodCallBackExclude(t *testing.T) {
+	log.SetupZapLogger(log.GetDefaultLogOpts())
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cfg, _ := kcfg.GetConfig(testCfgFile)
+
+	p := pubsub.NewMockPubSubInterface(ctrl)
+	e := enricher.NewMockEnricherInterface(ctrl)
+	fm := filtermanager.NewMockIFilterManager(ctrl)
+	c := cache.NewMockCacheInterface(ctrl)
+
+	c.EXPECT().GetIPsByNamespace(gomock.Any()).Return([]net.IP{}).AnyTimes()
+	fm.EXPECT().AddIPs(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	fm.EXPECT().DeleteIPs(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	fm.EXPECT().HasIP(gomock.Any()).Return(false).AnyTimes()
+
+	me := &Module{
+		RWMutex:       &sync.RWMutex{},
+		l:             log.Logger().Named("MetricModule"),
+		pubsub:        p,
+		configs:       make([]*api.MetricsConfiguration, 0),
+		enricher:      e,
+		wg:            sync.WaitGroup{},
+		registry:      make(map[string]AdvMetricsInterface),
+		moduleCtx:     context.Background(),
+		filterManager: fm,
+		daemonCache:   c,
+		dirtyPods:     common.NewDirtyCache(),
+		pubsubPodSub:  "",
+		daemonConfig:  cfg,
+	}
+
+	// Setup exclude list via updateNamespaceLists
+	spec := &api.MetricsSpec{
+		Namespaces: api.MetricsNamespaces{
+			Exclude: []string{"ns1"},
+		},
+	}
+	me.updateNamespaceLists(spec)
+
+	// Pod in non-excluded namespace should be tracked
+	pod1 := common.NewRetinaEndpoint("pod1", "default", &common.IPAddresses{IPv4: net.IPv4(10, 0, 0, 1)})
+	me.PodCallBackFn(cache.NewCacheEvent(cache.EventTypePodAdded, pod1))
+	adds := me.dirtyPods.GetAddList()
+	assert.Equal(t, 1, len(adds), "pod in non-excluded namespace should be added to dirty pods")
+
+	// Pod in excluded namespace should NOT be tracked
+	pod2 := common.NewRetinaEndpoint("pod2", "ns1", &common.IPAddresses{IPv4: net.IPv4(10, 0, 0, 2)})
+	me.PodCallBackFn(cache.NewCacheEvent(cache.EventTypePodAdded, pod2))
+	adds = me.dirtyPods.GetAddList()
+	assert.Equal(t, 1, len(adds), "pod in excluded namespace should not be added to dirty pods")
+}
