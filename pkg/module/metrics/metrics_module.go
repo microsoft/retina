@@ -4,6 +4,7 @@ package metrics
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"strings"
 	"sync"
@@ -393,7 +394,7 @@ func (m *Module) appendIncludeList(namespaces []string) {
 	// toAdd namespace IPs to filter manager
 	for _, ns := range toAdd {
 		ips := m.daemonCache.GetIPsByNamespace(ns)
-		m.l.Info("Adding IPs to filter manager", zap.String("namespace", ns), zap.Any("ips", ips))
+		m.l.Info("Adding IPs to filter manager", zap.String("namespace", ns), zap.String("ips", fmt.Sprint(ips)))
 
 		err := m.filterManager.AddIPs(ips, metricModuleReq, moduleReqMetadata)
 		if err != nil {
@@ -404,7 +405,7 @@ func (m *Module) appendIncludeList(namespaces []string) {
 	// toRemove namespace IPs from filter manager
 	for _, ns := range toRemove {
 		ips := m.daemonCache.GetIPsByNamespace(ns)
-		m.l.Info("Removing IPs from filter manager", zap.String("namespace", ns), zap.Any("ips", ips))
+		m.l.Info("Removing IPs from filter manager", zap.String("namespace", ns), zap.String("ips", fmt.Sprint(ips)))
 
 		err := m.filterManager.DeleteIPs(ips, metricModuleReq, moduleReqMetadata)
 		if err != nil {
@@ -511,14 +512,14 @@ func (m *Module) applyDirtyPodsAdd() {
 			}
 		}
 		if len(podsToAdd) > 0 {
-			m.l.Debug("Adding annotated pod IPs to filtermap", zap.Any("IPs", podsToAdd))
+			m.l.Debug("Adding annotated pod IPs to filtermap", zap.String("IPs", fmt.Sprint(podsToAdd)))
 			err := m.filterManager.AddIPs(podsToAdd, metricModuleReq, modulePodReqMetadata)
 			if err != nil {
 				m.l.Error("Error adding pod IP to filter manager", zap.Error(err))
 			}
 		}
 		if len(podsToAddNamespaced) > 0 {
-			m.l.Debug("Adding namespaced pod IPs to filtermap", zap.Any("IPs", podsToAddNamespaced))
+			m.l.Debug("Adding namespaced pod IPs to filtermap", zap.String("IPs", fmt.Sprint(podsToAddNamespaced)))
 			err := m.filterManager.AddIPs(podsToAddNamespaced, metricModuleReq, moduleReqMetadata)
 			if err != nil {
 				m.l.Error("Error adding pod IP to filter manager", zap.Error(err))
@@ -540,7 +541,7 @@ func (m *Module) applyDirtyPodsDelete() {
 			ipsToDelete = append(ipsToDelete, podEntry.IP)
 		}
 
-		m.l.Debug("Deleting Ips in dirty pods from filtermap", zap.Any("IPs", ipsToDelete))
+		m.l.Debug("Deleting Ips in dirty pods from filtermap", zap.String("IPs", fmt.Sprint(ipsToDelete)))
 		err := m.filterManager.DeleteIPs(ipsToDelete, metricModuleReq, modulePodReqMetadata)
 		if err != nil {
 			m.l.Error("Error deleting pod IP from filter manager", zap.Error(err))
