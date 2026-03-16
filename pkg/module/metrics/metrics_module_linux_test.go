@@ -660,7 +660,8 @@ func TestPodAnnotated(t *testing.T) {
 }
 
 func TestDeletePodAfterNamespaceRemoved(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	require.NoError(t, err)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	cfg, _ := kcfg.GetConfig(testCfgFile)
@@ -717,7 +718,8 @@ func TestDeletePodAfterNamespaceRemoved(t *testing.T) {
 }
 
 func TestDeletePodAfterAnnotationRemovedDirectDelete(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	require.NoError(t, err)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	cfg, _ := kcfg.GetConfig(testCfgFile)
@@ -766,7 +768,8 @@ func TestDeletePodAfterAnnotationRemovedDirectDelete(t *testing.T) {
 }
 
 func TestDeletePodTrackedByBothAfterNamespaceRemoved(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	require.NoError(t, err)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	cfg, _ := kcfg.GetConfig(testCfgFile)
@@ -825,7 +828,8 @@ func TestDeletePodTrackedByBothAfterNamespaceRemoved(t *testing.T) {
 }
 
 func TestDeletePodNeverTracked(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	require.NoError(t, err)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	cfg, _ := kcfg.GetConfig(testCfgFile)
@@ -863,7 +867,8 @@ func TestDeletePodNeverTracked(t *testing.T) {
 }
 
 func TestNormalPodLifecycleInTrackedNamespace(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	require.NoError(t, err)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	cfg, _ := kcfg.GetConfig(testCfgFile)
@@ -910,7 +915,8 @@ func TestNormalPodLifecycleInTrackedNamespace(t *testing.T) {
 }
 
 func TestAnnotatedPodNormalLifecycle(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	require.NoError(t, err)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	cfg, _ := kcfg.GetConfig(testCfgFile)
