@@ -227,8 +227,11 @@ func TestRetinaEndpointReconciler_ReconcilePod(t *testing.T) {
 				require.Eventually(t, func() bool {
 					err := client.Get(context.Background(), tt.fields.newlyCachedPod.Key, &got)
 					fmt.Println(err)
-					return !apierrors.IsNotFound(err)
-				}, 5*time.Second, 1*time.Second, "RetinaEndpoint should be created")
+					if apierrors.IsNotFound(err) {
+						return false
+					}
+					return got.Spec.PodIP == tt.wantedRetinaEndpoint.Spec.PodIP
+				}, 5*time.Second, 1*time.Second, "RetinaEndpoint should be created/updated")
 				require.Equal(t, *tt.wantedRetinaEndpoint, got)
 			}
 		})
