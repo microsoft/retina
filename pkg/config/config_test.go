@@ -5,6 +5,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -67,6 +68,65 @@ func TestDecodeLevelHook(t *testing.T) {
 		result, err := decodeLevelHook(reflect.TypeOf(test.input), reflect.TypeOf(Level(0)), test.input)
 		require.NoError(t, err)
 		assert.Equal(t, test.expected, result)
+	}
+}
+
+func TestGetConfig_EnableTCX(t *testing.T) {
+	tests := []struct {
+		name          string
+		enableTCX     string
+		expected      TCXMode
+		expectedError error
+	}{
+		{
+			name:      "auto",
+			enableTCX: "auto",
+			expected:  TCXModeAuto,
+		},
+		{
+			name:      "off",
+			enableTCX: "off",
+			expected:  TCXModeOff,
+		},
+		{
+			name:      "empty defaults to auto",
+			enableTCX: "",
+			expected:  TCXModeAuto,
+		},
+		{
+			name:          "invalid value rejected",
+			enableTCX:     "always",
+			expectedError: ErrEnableTCXInvalid,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{
+				APIServer:              Server{Host: "0.0.0.0", Port: 10093},
+				MetricsInterval:        10,
+				TelemetryInterval:      DefaultTelemetryInterval,
+				DataSamplingRate:       1,
+				PacketParserRingBuffer: PacketParserRingBufferDisabled,
+				EnableTCX:              TCXMode(tt.enableTCX),
+			}
+
+			switch cfg.EnableTCX {
+			case "":
+				cfg.EnableTCX = TCXModeAuto
+			case TCXModeAuto, TCXModeOff:
+				// valid
+			default:
+				err := fmt.Errorf("invalid enableTCX %q: %w", cfg.EnableTCX, ErrEnableTCXInvalid)
+				require.ErrorIs(t, err, tt.expectedError)
+				return
+			}
+
+			if tt.expectedError != nil {
+				t.Fatalf("expected error %v but got none", tt.expectedError)
+			}
+			assert.Equal(t, tt.expected, cfg.EnableTCX)
+		})
 	}
 }
 

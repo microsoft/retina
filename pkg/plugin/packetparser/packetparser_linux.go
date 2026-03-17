@@ -20,7 +20,7 @@ import (
 	"github.com/cilium/cilium/api/v1/flow"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
-	asm "github.com/cilium/ebpf/asm"
+	"github.com/cilium/ebpf/asm"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
 	"github.com/cilium/ebpf/ringbuf"
@@ -323,6 +323,8 @@ func (p *packetParser) Init() error {
 		} else {
 			p.l.Info("EnableTCX=auto: TCX not supported, will use traditional TC attachment")
 		}
+	default:
+		p.l.Warn("Unknown EnableTCX value, defaulting to traditional TC attachment", zap.String("enableTCX", string(p.cfg.EnableTCX)))
 	}
 
 	return nil
@@ -490,19 +492,8 @@ func (p *packetParser) cleanTCX(ingressLink, egressLink link.Link) {
 // isTCXSupported probes whether the running kernel supports TCX attachment (kernel 6.6+)
 // by creating a minimal BPF program and attempting to attach it to the loopback interface.
 func isTCXSupported() bool {
-	links, err := netlink.LinkList()
-	if err != nil || len(links) == 0 {
-		return false
-	}
-
-	var loopback netlink.Link
-	for _, l := range links {
-		if l.Attrs().Name == "lo" {
-			loopback = l
-			break
-		}
-	}
-	if loopback == nil {
+	loopback, err := netlink.LinkByName("lo")
+	if err != nil {
 		return false
 	}
 
@@ -603,6 +594,11 @@ func (p *packetParser) attachViaTCX(iface netlink.LinkAttrs, ifaceType interface
 		return
 	}
 
+	// Attach at the head of the TCX chain so Retina sees every packet before
+	// any policy-enforcing program (e.g. Cilium) can drop it. This is safe
+	// because Retina's programs always return TC_ACT_UNSPEC, which passes
+	// control to the next program in the chain without making any forwarding
+	// decision.
 	ingressLink, err := link.AttachTCX(link.TCXOptions{
 		Program:   ingressProgram,
 		Attach:    ebpf.AttachTCXIngress,

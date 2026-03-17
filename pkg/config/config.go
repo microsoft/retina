@@ -43,6 +43,7 @@ const (
 )
 
 var (
+	ErrEnableTCXInvalid                       = errors.New("enableTCX must be \"auto\" or \"off\"")
 	ErrPacketParserRingBufferAutoNotSupported = errors.New("packetParserRingBuffer mode auto is not supported yet")
 	ErrPacketParserRingBufferInvalid          = errors.New("packetParserRingBuffer must be set to enabled or disabled")
 	ErrPacketParserRingBufferInvalidBool      = errors.New(
@@ -193,9 +194,14 @@ func GetConfig(cfgFilename string) (*Config, error) {
 		config.FilterMapMaxEntries = DefaultFilterMapMaxEntries
 	}
 
-	// Default EnableTCX to "auto" if unset.
-	if config.EnableTCX == "" {
+	// Default EnableTCX to "auto" if unset, reject unknown values.
+	switch config.EnableTCX {
+	case "":
 		config.EnableTCX = TCXModeAuto
+	case TCXModeAuto, TCXModeOff:
+		// valid
+	default:
+		return nil, fmt.Errorf("invalid enableTCX %q: %w", config.EnableTCX, ErrEnableTCXInvalid)
 	}
 
 	switch config.PacketParserRingBuffer { //nolint:exhaustive // we only care about Auto and empty (default) here
