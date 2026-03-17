@@ -28,6 +28,7 @@ data:
     dataSamplingRate: {{ .Values.dataSamplingRate }}
     packetParserRingBuffer: {{ .Values.packetParserRingBuffer }}
     packetParserRingBufferSize: {{ .Values.packetParserRingBufferSize }}
+    filterMapMaxEntries: {{ .Values.filterMapMaxEntries }}
 {{- end}}
 ---
 {{- if .Values.os.windows}}

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"testing"
 
+	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
 	mock "github.com/microsoft/retina/pkg/managers/watchermanager/mocks"
 	"github.com/stretchr/testify/require"
@@ -20,7 +21,7 @@ func TestStopWatcherManagerGracefully(t *testing.T) {
 	ctl := gomock.NewController(t)
 	defer ctl.Finish()
 	log.SetupZapLogger(log.GetDefaultLogOpts())
-	mgr := NewWatcherManager()
+	mgr := NewWatcherManager(kcfg.DefaultFilterMapMaxEntries)
 
 	mockAPIServerWatcher := mock.NewMockIWatcher(ctl)
 	mockEndpointWatcher := mock.NewMockIWatcher(ctl)
@@ -56,7 +57,7 @@ func TestWatcherInitFailsGracefully(t *testing.T) {
 	mockAPIServerWatcher := mock.NewMockIWatcher(ctl)
 	mockEndpointWatcher := mock.NewMockIWatcher(ctl)
 
-	mgr := NewWatcherManager()
+	mgr := NewWatcherManager(kcfg.DefaultFilterMapMaxEntries)
 	mgr.Watchers = []IWatcher{
 		mockAPIServerWatcher,
 		mockEndpointWatcher,
@@ -74,7 +75,7 @@ func TestWatcherStopWithoutStart(t *testing.T) {
 	defer ctl.Finish()
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 
-	mgr := NewWatcherManager()
+	mgr := NewWatcherManager(kcfg.DefaultFilterMapMaxEntries)
 
 	err := mgr.Stop(context.Background())
 	require.Nil(t, err, "Expected no error when stopping watcher manager without starting it")
