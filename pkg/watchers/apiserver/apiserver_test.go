@@ -35,8 +35,8 @@ func TestGetWatcher(t *testing.T) {
 	a := Watcher(kcfg.DefaultFilterMapMaxEntries)
 	assert.NotNil(t, a)
 
-	a_again := Watcher(kcfg.DefaultFilterMapMaxEntries)
-	assert.Equal(t, a, a_again, "Expected the same veth watcher instance")
+	aAgain := Watcher(kcfg.DefaultFilterMapMaxEntries)
+	assert.Equal(t, a, aAgain, "Expected the same veth watcher instance")
 }
 
 func TestAPIServerWatcherStop(t *testing.T) {
