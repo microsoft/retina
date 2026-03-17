@@ -45,8 +45,9 @@ var (
 		"telemetryInterval smaller than %v is not allowed",
 		MinTelemetryInterval,
 	)
-	DefaultTelemetryInterval              = 15 * time.Minute
-	DefaultSamplingRate            uint32 = 1
+	DefaultTelemetryInterval          = 15 * time.Minute
+	DefaultSamplingRate        uint32 = 1
+	DefaultFilterMapMaxEntries uint32 = 255
 )
 
 func (l *Level) UnmarshalText(text []byte) error {
@@ -178,7 +179,7 @@ func GetConfig(cfgFilename string) (*Config, error) {
 
 	// Default filter map max entries to 255 if not set.
 	if config.FilterMapMaxEntries == 0 {
-		config.FilterMapMaxEntries = 255
+		config.FilterMapMaxEntries = DefaultFilterMapMaxEntries
 	}
 
 	switch config.PacketParserRingBuffer { //nolint:exhaustive // we only care about Auto and empty (default) here

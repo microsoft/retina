@@ -53,7 +53,7 @@ func NewPluginManager(cfg *kcfg.Config, tel telemetry.Telemetry) (*PluginManager
 
 	if mgr.cfg.EnablePodLevel {
 		mgr.l.Info("plugin manager has pod level enabled")
-		mgr.watcherManager = watchermanager.NewWatcherManager()
+		mgr.watcherManager = watchermanager.NewWatcherManager(mgr.cfg.FilterMapMaxEntries)
 	} else {
 		mgr.l.Info("plugin manager has pod level disabled")
 	}

@@ -19,11 +19,11 @@ const (
 	DefaultRefreshRate = 30 * time.Second
 )
 
-func NewWatcherManager() *WatcherManager {
+func NewWatcherManager(filterMapMaxEntries uint32) *WatcherManager {
 	return &WatcherManager{
 		Watchers: []IWatcher{
 			endpoint.Watcher(),
-			apiserver.Watcher(),
+			apiserver.Watcher(filterMapMaxEntries),
 		},
 		l:           log.Logger().Named("watcher-manager"),
 		refreshRate: DefaultRefreshRate,

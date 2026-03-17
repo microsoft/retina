@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
 	filtermanagermocks "github.com/microsoft/retina/pkg/managers/filtermanager"
 	"github.com/microsoft/retina/pkg/watchers/apiserver/mocks"
@@ -31,10 +32,10 @@ var errDNS = errors.New("DNS error")
 func TestGetWatcher(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 
-	a := Watcher()
+	a := Watcher(kcfg.DefaultFilterMapMaxEntries)
 	assert.NotNil(t, a)
 
-	a_again := Watcher()
+	a_again := Watcher(kcfg.DefaultFilterMapMaxEntries)
 	assert.Equal(t, a, a_again, "Expected the same veth watcher instance")
 }
 
