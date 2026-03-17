@@ -34,7 +34,7 @@ func main() {
 	}
 
 	// Filtermanager.
-	f, err := filtermanager.Init(3)
+	f, err := filtermanager.Init(3, kcfg.DefaultFilterMapMaxEntries)
 	if err != nil {
 		l.Error("Start filtermanager failed", zap.Error(err))
 		return
