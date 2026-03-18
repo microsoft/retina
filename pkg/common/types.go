@@ -40,6 +40,7 @@ type RetinaEndpoint struct {
 	containers  []*RetinaContainer
 	labels      map[string]string
 	annotations map[string]string
+	nodeIP      string
 }
 
 func isIPV4(ipAddress string) bool {
@@ -59,6 +60,7 @@ func RetinaEndpointCommonFromAPI(retinaEndpoint *retinav1alpha1.RetinaEndpoint) 
 		containers:  []*RetinaContainer{},
 		labels:      retinaEndpoint.Labels,
 		annotations: make(map[string]string),
+		nodeIP:      retinaEndpoint.Spec.NodeIP,
 	}
 
 	for _, ownerRef := range retinaEndpoint.Spec.OwnerReferences {
@@ -203,6 +205,7 @@ type OwnerReference struct {
 type RetinaNode struct {
 	name string
 	ip   net.IP
+	zone string
 }
 
 type APIServerObject struct {
