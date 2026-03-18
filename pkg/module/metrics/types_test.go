@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/cilium/cilium/api/v1/flow"
+	"github.com/microsoft/retina/pkg/utils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -130,6 +131,34 @@ func TestNewCtxOps(t *testing.T) {
 			},
 			expectedVals: []string{"", "unknown", "unknown"},
 		},
+		{
+			name:    "source zone option",
+			opts:    []string{"namespace", "zone"},
+			ctxType: source,
+			expected: []string{
+				"source_namespace", "source_zone",
+			},
+			f:            flowWithZones("zone-1", "zone-2"),
+			expectedVals: []string{"unknown", "zone-1"},
+		},
+		{
+			name:    "destination zone option",
+			opts:    []string{"namespace", "zone"},
+			ctxType: destination,
+			expected: []string{
+				"destination_namespace", "destination_zone",
+			},
+			f:            flowWithZones("zone-1", "zone-2"),
+			expectedVals: []string{"unknown", "zone-2"},
+		},
+		{
+			name:     "zone with no extensions",
+			opts:     []string{"zone"},
+			ctxType:  source,
+			expected: []string{"source_zone"},
+			f:            &flow.Flow{},
+			expectedVals: []string{"unknown"},
+		},
 	}
 
 	for _, tc := range tt {
@@ -138,4 +167,13 @@ func TestNewCtxOps(t *testing.T) {
 		values := c.getValues(tc.f)
 		assert.Equal(t, tc.expectedVals, values, "values should match %s", tc.name)
 	}
+}
+
+// flowWithZones creates a flow with zone extensions populated.
+func flowWithZones(srcZone, dstZone string) *flow.Flow {
+	f := &flow.Flow{}
+	ext := utils.NewExtensions()
+	utils.AddZones(ext, srcZone, dstZone)
+	utils.SetExtensions(f, ext)
+	return f
 }
