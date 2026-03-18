@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/retina/pkg/common"
 	"github.com/microsoft/retina/pkg/controllers/cache"
 	"github.com/microsoft/retina/pkg/log"
+	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
 )
 
@@ -148,6 +149,19 @@ func (e *Enricher) enrich(ev *v1.Event) {
 		flow.Destination = e.getEndpoint(dstObj)
 	}
 
+	// Resolve zones lazily from the node cache using the pod's nodeIP.
+	srcZone := e.zoneFromObj(srcObj)
+	dstZone := e.zoneFromObj(dstObj)
+
+	if ext := utils.GetExtensionsStruct(flow); ext != nil {
+		utils.AddZones(ext, srcZone, dstZone)
+		utils.SetExtensions(flow, ext)
+	} else {
+		ext := utils.NewExtensions()
+		utils.AddZones(ext, srcZone, dstZone)
+		utils.SetExtensions(flow, ext)
+	}
+
 	ev.Event = flow
 	e.l.Debug("enriched flow", zap.Any("flow", flow))
 	e.export(ev)
@@ -207,4 +221,24 @@ func (e *Enricher) Write(ev *v1.Event) {
 
 func (e *Enricher) ExportReader() *container.RingReader {
 	return container.NewRingReader(e.outputRing, e.outputRing.OldestWrite())
+}
+
+// zoneFromObj resolves the availability zone for a cached object by looking up
+// the node from the cache at flow time, avoiding startup race conditions.
+func (e *Enricher) zoneFromObj(obj interface{}) string {
+	if obj == nil {
+		return "unknown"
+	}
+	switch o := obj.(type) {
+	case *common.RetinaEndpoint:
+		if nodeIP := o.NodeIP(); nodeIP != "" {
+			node := e.cache.GetNodeByIP(nodeIP)
+			if node != nil {
+				if z := node.Zone(); z != "" {
+					return z
+				}
+			}
+		}
+	}
+	return "unknown"
 }
