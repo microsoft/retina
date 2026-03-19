@@ -10,9 +10,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/microsoft/retina/test/e2ev3/framework/constants"
-	"github.com/microsoft/retina/test/e2ev3/framework/kubernetes"
-	prom "github.com/microsoft/retina/test/e2ev3/framework/prometheus"
+	"github.com/microsoft/retina/test/e2ev3/pkg/config"
+	"github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
+	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 )
 
 // EmptyResponse is a sentinel value that gets converted to an empty string
@@ -30,7 +30,7 @@ var (
 type ValidateBasicDNSRequestStep struct{}
 
 func (v *ValidateBasicDNSRequestStep) Do(_ context.Context) error {
-	metricsEndpoint := fmt.Sprintf("http://localhost:%s/metrics", constants.RetinaMetricsPort)
+	metricsEndpoint := fmt.Sprintf("http://localhost:%s/metrics", config.RetinaMetricsPort)
 
 	validBasicDNSRequestMetricLabels := map[string]string{}
 
@@ -52,7 +52,7 @@ type ValidateBasicDNSResponseStep struct {
 }
 
 func (v *ValidateBasicDNSResponseStep) Do(_ context.Context) error {
-	metricsEndpoint := fmt.Sprintf("http://localhost:%s/metrics", constants.RetinaMetricsPort)
+	metricsEndpoint := fmt.Sprintf("http://localhost:%s/metrics", config.RetinaMetricsPort)
 
 	if v.Response == EmptyResponse {
 		v.Response = ""
@@ -81,7 +81,7 @@ type ValidateAdvancedDNSRequestStep struct {
 }
 
 func (v *ValidateAdvancedDNSRequestStep) Do(_ context.Context) error {
-	metricsEndpoint := fmt.Sprintf("http://localhost:%s/metrics", constants.RetinaMetricsPort)
+	metricsEndpoint := fmt.Sprintf("http://localhost:%s/metrics", config.RetinaMetricsPort)
 
 	podIP, err := kubernetes.GetPodIP(v.KubeConfigFilePath, v.PodNamespace, v.PodName)
 	if err != nil {
@@ -123,7 +123,7 @@ type ValidateAdvancedDNSResponseStep struct {
 }
 
 func (v *ValidateAdvancedDNSResponseStep) Do(_ context.Context) error {
-	metricsEndpoint := fmt.Sprintf("http://localhost:%s/metrics", constants.RetinaMetricsPort)
+	metricsEndpoint := fmt.Sprintf("http://localhost:%s/metrics", config.RetinaMetricsPort)
 
 	podIP, err := kubernetes.GetPodIP(v.KubeConfigFilePath, v.PodNamespace, v.PodName)
 	if err != nil {

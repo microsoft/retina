@@ -9,7 +9,7 @@ import (
 	"context"
 	"fmt"
 
-	k8s "github.com/microsoft/retina/test/e2ev3/framework/kubernetes"
+	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 )

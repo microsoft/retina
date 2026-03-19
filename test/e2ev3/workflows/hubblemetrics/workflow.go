@@ -8,21 +8,26 @@ package hubblemetrics
 import (
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/common"
-	k8s "github.com/microsoft/retina/test/e2ev3/framework/kubernetes"
+	"github.com/microsoft/retina/test/e2ev3/pkg/config"
+	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
+	"github.com/microsoft/retina/test/e2ev3/steps"
 )
 
 // InstallAndTestHubbleMetrics installs Hubble, validates its services, and runs
 // DNS, flow (intra-node, inter-node, pod-to-world), drop, and TCP metric
 // scenarios for each architecture.
-func InstallAndTestHubbleMetrics(kubeConfigFilePath, chartPath string) *flow.Workflow {
-	wf := new(flow.Workflow)
+func InstallAndTestHubbleMetrics(kubeConfigFilePath, chartPath string, imgCfg *config.ImageConfig, helmCfg *config.HelmConfig) *flow.Workflow {
+	wf := &flow.Workflow{DontPanic: true}
 
 	installHubble := &k8s.InstallHubbleHelmChart{
 		Namespace:          common.KubeSystemNamespace,
 		ReleaseName:        "retina",
 		KubeConfigFilePath: kubeConfigFilePath,
 		ChartPath:          chartPath,
-		TagEnv:             "TAG",
+		ImageTag:           imgCfg.Tag,
+		ImageRegistry:      imgCfg.Registry,
+		ImageNamespace:     imgCfg.Namespace,
+		HelmDriver:         helmCfg.Driver,
 	}
 	wf.Add(flow.Step(installHubble))
 
@@ -61,6 +66,13 @@ func InstallAndTestHubbleMetrics(kubeConfigFilePath, chartPath string) *flow.Wor
 		IgnoreContainerRestart: false,
 	}
 	wf.Add(flow.Step(ensureStable).DependsOn(allScenarioTails...))
+
+	debug := &steps.DebugOnFailure{
+		KubeConfigFilePath: kubeConfigFilePath,
+		Namespace:          common.KubeSystemNamespace,
+		LabelSelector:      "k8s-app=retina",
+	}
+	wf.Add(flow.Step(debug).DependsOn(ensureStable).When(flow.AnyFailed))
 
 	return wf
 }

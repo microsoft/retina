@@ -8,22 +8,22 @@ package advancedmetrics
 import (
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/common"
-	"github.com/microsoft/retina/test/e2ev3/framework/generic"
-	k8s "github.com/microsoft/retina/test/e2ev3/framework/kubernetes"
+	"github.com/microsoft/retina/test/e2ev3/pkg/config"
+	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 	"github.com/microsoft/retina/test/e2ev3/steps"
 )
 
 // UpgradeAndTestRetinaAdvancedMetrics creates a workflow that upgrades Retina
 // with the advanced profile and validates advanced DNS and latency metrics.
-func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFilePath, testPodNamespace string) *flow.Workflow {
-	wf := new(flow.Workflow)
+func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFilePath, testPodNamespace string, helmCfg *config.HelmConfig) *flow.Workflow {
+	wf := &flow.Workflow{DontPanic: true}
 
 	upgradeRetina := &k8s.UpgradeRetinaHelmChart{
 		Namespace:          common.KubeSystemNamespace,
 		ReleaseName:        "retina",
 		KubeConfigFilePath: kubeConfigFilePath,
 		ChartPath:          chartPath,
-		TagEnv:             generic.DefaultTagEnv,
+		HelmDriver:         helmCfg.Driver,
 		ValuesFile:         valuesFilePath,
 	}
 	wf.Add(flow.Step(upgradeRetina))
@@ -56,6 +56,13 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 		IgnoreContainerRestart: false,
 	}
 	wf.Add(flow.Step(ensureStable).DependsOn(scenarioTails...))
+
+	debug := &steps.DebugOnFailure{
+		KubeConfigFilePath: kubeConfigFilePath,
+		Namespace:          common.KubeSystemNamespace,
+		LabelSelector:      "k8s-app=retina",
+	}
+	wf.Add(flow.Step(debug).DependsOn(ensureStable).When(flow.AnyFailed))
 
 	return wf
 }

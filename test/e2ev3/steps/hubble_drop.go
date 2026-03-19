@@ -6,7 +6,7 @@
 package steps
 
 import (
-	"github.com/microsoft/retina/test/e2ev3/framework/constants"
+	"github.com/microsoft/retina/test/e2ev3/pkg/config"
 )
 
 // Hubble drop label maps used with common.ValidateMetricStep.
@@ -15,8 +15,8 @@ var (
 	HubbleDropAgnhostName = "agnhost-drop"
 
 	ValidRetinaDropMetricLabels = map[string]string{
-		constants.RetinaReasonLabel:    constants.IPTableRuleDrop,
-		constants.RetinaDirectionLabel: "unknown",
+		config.RetinaReasonLabel:    config.IPTableRuleDrop,
+		config.RetinaDirectionLabel: "unknown",
 	}
 
 	// Note: When the agnhost pod (with deny-all network policy) tries to curl bing.com,
@@ -25,8 +25,8 @@ var (
 	// than the source (agnhost) egress side.
 	// We partially validate this metric.
 	ValidHubbleDropMetricLabels = map[string]string{
-		constants.HubbleSourceLabel:   "",
-		constants.HubbleProtocolLabel: constants.UDP,
-		constants.HubbleReasonLabel:   "POLICY_DENIED",
+		config.HubbleSourceLabel:   "",
+		config.HubbleProtocolLabel: config.UDP,
+		config.HubbleReasonLabel:   "POLICY_DENIED",
 	}
 )

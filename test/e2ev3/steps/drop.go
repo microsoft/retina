@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"log"
 
-	prom "github.com/microsoft/retina/test/e2ev3/framework/prometheus"
+	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 )
 
 var (

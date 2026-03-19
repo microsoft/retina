@@ -17,7 +17,6 @@ import (
 
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
 	"github.com/microsoft/retina/pkg/label"
-	"github.com/microsoft/retina/test/e2ev3/framework/generic"
 	"github.com/microsoft/retina/test/retry"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -107,15 +106,18 @@ type ValidateCaptureStep struct {
 	CaptureNamespace string
 	Duration         string
 	KubeConfigPath   string
+	ImageTag         string
+	ImageRegistry    string
+	ImageNamespace   string
 }
 
 func (v *ValidateCaptureStep) Do(_ context.Context) error {
 	log.Print("Running retina capture create...")
 	ctx := context.TODO()
 
-	imageRegistry := os.Getenv(generic.DefaultImageRegistry)
-	imageNamespace := os.Getenv(generic.DefaultImageNamespace)
-	imageTag := os.Getenv(generic.DefaultTagEnv)
+	imageRegistry := v.ImageRegistry
+	imageNamespace := v.ImageNamespace
+	imageTag := v.ImageTag
 
 	os.Setenv("KUBECONFIG", v.KubeConfigPath) //nolint:errcheck // best effort
 	log.Printf("KUBECONFIG: %s\n", os.Getenv("KUBECONFIG"))

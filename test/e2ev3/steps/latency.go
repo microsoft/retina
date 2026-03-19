@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/microsoft/retina/test/e2ev3/framework/constants"
-	prom "github.com/microsoft/retina/test/e2ev3/framework/prometheus"
+	"github.com/microsoft/retina/test/e2ev3/pkg/config"
+	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 )
 
 var latencyBucketMetricName = "networkobservability_adv_node_apiserver_tcp_handshake_latency"
@@ -21,7 +21,7 @@ var latencyBucketMetricName = "networkobservability_adv_node_apiserver_tcp_hands
 type ValidateAPIServerLatencyStep struct{}
 
 func (v *ValidateAPIServerLatencyStep) Do(_ context.Context) error {
-	promAddress := fmt.Sprintf("http://localhost:%s/metrics", constants.RetinaMetricsPort)
+	promAddress := fmt.Sprintf("http://localhost:%s/metrics", config.RetinaMetricsPort)
 
 	metric := map[string]string{}
 	err := prom.CheckMetric(promAddress, latencyBucketMetricName, metric)

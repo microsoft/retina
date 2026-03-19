@@ -6,7 +6,7 @@
 package steps
 
 import (
-	"github.com/microsoft/retina/test/e2ev3/framework/constants"
+	"github.com/microsoft/retina/test/e2ev3/pkg/config"
 	"github.com/microsoft/retina/test/e2ev3/common"
 )
 
@@ -15,17 +15,17 @@ var (
 	HubbleTCPPodName = "agnhost-tcp-0"
 
 	ValidHubbleTCPSYNFlag = map[string]string{
-		constants.HubbleSourceLabel:      common.TestPodNamespace + "/" + HubbleTCPPodName,
-		constants.HubbleDestinationLabel: "",
-		constants.HubbleFamilyLabel:      constants.IPV4,
-		constants.HubbleFlagLabel:        constants.SYN,
+		config.HubbleSourceLabel:      common.TestPodNamespace + "/" + HubbleTCPPodName,
+		config.HubbleDestinationLabel: "",
+		config.HubbleFamilyLabel:      config.IPV4,
+		config.HubbleFlagLabel:        config.SYN,
 	}
 
 	ValidHubbleTCPFINFlag = map[string]string{
-		constants.HubbleSourceLabel:      common.TestPodNamespace + "/" + HubbleTCPPodName,
-		constants.HubbleDestinationLabel: "",
-		constants.HubbleFamilyLabel:      constants.IPV4,
-		constants.HubbleFlagLabel:        constants.FIN,
+		config.HubbleSourceLabel:      common.TestPodNamespace + "/" + HubbleTCPPodName,
+		config.HubbleDestinationLabel: "",
+		config.HubbleFamilyLabel:      config.IPV4,
+		config.HubbleFlagLabel:        config.FIN,
 	}
 
 	ValidHubbleTCPMetricsLabels = []map[string]string{

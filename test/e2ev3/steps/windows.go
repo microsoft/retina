@@ -12,9 +12,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/microsoft/retina/test/e2ev3/framework/constants"
-	k8s "github.com/microsoft/retina/test/e2ev3/framework/kubernetes"
-	prom "github.com/microsoft/retina/test/e2ev3/framework/prometheus"
+	"github.com/microsoft/retina/test/e2ev3/pkg/config"
+	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
+	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 	"github.com/microsoft/retina/test/retry"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,12 +44,12 @@ type ValidateHNSMetricStep struct {
 }
 
 func (v *ValidateHNSMetricStep) Do(_ context.Context) error {
-	config, err := clientcmd.BuildConfigFromFlags("", v.KubeConfigFilePath)
+	restConfig, err := clientcmd.BuildConfigFromFlags("", v.KubeConfigFilePath)
 	if err != nil {
 		return fmt.Errorf("error building kubeconfig: %w", err)
 	}
 
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
@@ -78,7 +78,7 @@ func (v *ValidateHNSMetricStep) Do(_ context.Context) error {
 	log.Printf("checking for metric %s with labels %+v\n", hnsMetricName, labels)
 
 	err = defaultRetrier.Do(context.TODO(), func() error {
-		output, execErr := k8s.ExecPod(context.TODO(), clientset, config, windowsRetinaPod.Namespace, windowsRetinaPod.Name, fmt.Sprintf("curl -s http://localhost:%s/metrics", constants.RetinaMetricsPort))
+		output, execErr := k8s.ExecPod(context.TODO(), clientset, restConfig, windowsRetinaPod.Namespace, windowsRetinaPod.Name, fmt.Sprintf("curl -s http://localhost:%s/metrics", config.RetinaMetricsPort))
 		if execErr != nil {
 			return fmt.Errorf("error executing command in windows retina pod: %w", execErr)
 		}

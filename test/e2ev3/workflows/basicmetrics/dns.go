@@ -11,8 +11,8 @@ import (
 
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/common"
-	"github.com/microsoft/retina/test/e2ev3/framework/constants"
-	k8s "github.com/microsoft/retina/test/e2ev3/framework/kubernetes"
+	"github.com/microsoft/retina/test/e2ev3/pkg/config"
+	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 	"github.com/microsoft/retina/test/e2ev3/steps"
 )
 
@@ -23,7 +23,6 @@ func addBasicDNSScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFil
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
 		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, KubeConfigFilePath: kubeConfigFilePath,
 	}
-	sleep30 := &steps.SleepStep{Duration: 30 * time.Second}
 	execCmd1 := flow.Func("basic-dns-"+variant+"-1-"+arch, func(ctx context.Context) error {
 		err := (&k8s.ExecInPod{PodName: podName, PodNamespace: namespace, Command: command, KubeConfigFilePath: kubeConfigFilePath}).Do(ctx)
 		if expectError {
@@ -31,7 +30,6 @@ func addBasicDNSScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFil
 		}
 		return err
 	})
-	sleep5a := &steps.SleepStep{Duration: 5 * time.Second}
 	execCmd2 := flow.Func("basic-dns-"+variant+"-2-"+arch, func(ctx context.Context) error {
 		err := (&k8s.ExecInPod{PodName: podName, PodNamespace: namespace, Command: command, KubeConfigFilePath: kubeConfigFilePath}).Do(ctx)
 		if expectError {
@@ -39,21 +37,23 @@ func addBasicDNSScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFil
 		}
 		return err
 	})
-	sleep5b := &steps.SleepStep{Duration: 5 * time.Second}
-	pf := &k8s.PortForward{
-		Namespace: common.KubeSystemNamespace, LabelSelector: "k8s-app=retina",
-		LocalPort: constants.RetinaMetricsPort, RemotePort: constants.RetinaMetricsPort,
-		Endpoint: "metrics", KubeConfigFilePath: kubeConfigFilePath, OptionalLabelAffinity: "app=" + agnhostName,
-	}
 	validateReq := &steps.ValidateBasicDNSRequestStep{}
 	validateResp := &steps.ValidateBasicDNSResponseStep{}
-	stopPF := &steps.StopPortForwardStep{PF: pf}
+	validateWithPF := &steps.WithPortForward{
+		PF: &k8s.PortForward{
+			Namespace: common.KubeSystemNamespace, LabelSelector: "k8s-app=retina",
+			LocalPort: config.RetinaMetricsPort, RemotePort: config.RetinaMetricsPort,
+			Endpoint: "metrics", KubeConfigFilePath: kubeConfigFilePath, OptionalLabelAffinity: "app=" + agnhostName,
+		},
+		Steps: []flow.Steper{validateReq, validateResp},
+	}
 	deleteAgnhost := &k8s.DeleteKubernetesResource{
 		ResourceType: k8s.TypeString(k8s.StatefulSet), ResourceName: agnhostName, ResourceNamespace: namespace, KubeConfigFilePath: kubeConfigFilePath,
 	}
-	sleep5c := &steps.SleepStep{Duration: 5 * time.Second}
 
-	chain := []flow.Steper{createAgnhost, sleep30, execCmd1, sleep5a, execCmd2, sleep5b, pf, validateReq, validateResp, stopPF, deleteAgnhost, sleep5c}
-	wf.Add(flow.Pipe(chain...).DependsOn(dependsOn))
-	return sleep5c
+	chain := []flow.Steper{createAgnhost, execCmd1, execCmd2}
+	wf.Add(flow.Pipe(chain...).DependsOn(dependsOn).Timeout(10 * time.Minute))
+	wf.Add(flow.Step(validateWithPF).DependsOn(execCmd2).Retry(steps.RetryValidation()...))
+	wf.Add(flow.Steps(deleteAgnhost).DependsOn(validateWithPF).When(flow.Always))
+	return deleteAgnhost
 }

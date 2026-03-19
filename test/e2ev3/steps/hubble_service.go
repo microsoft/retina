@@ -12,7 +12,7 @@ import (
 	"net/http"
 	"time"
 
-	k8s "github.com/microsoft/retina/test/e2ev3/framework/kubernetes"
+	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 )
 
 // ValidateHubbleRelayServiceStep validates that the hubble-relay-service

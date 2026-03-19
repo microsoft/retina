@@ -6,12 +6,11 @@
 package basicmetrics
 
 import (
-	"context"
 	"time"
 
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/common"
-	k8s "github.com/microsoft/retina/test/e2ev3/framework/kubernetes"
+	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 	"github.com/microsoft/retina/test/e2ev3/steps"
 )
 
@@ -25,23 +24,21 @@ func addDropScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFilePat
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
 		AgnhostNamespace: namespace, AgnhostName: agnhostName, AgnhostArch: arch, KubeConfigFilePath: kubeConfigFilePath,
 	}
-	sleep30 := &steps.SleepStep{Duration: 30 * time.Second}
-	execCurl1 := flow.Func("drop-curl-1-"+arch, func(ctx context.Context) error {
-		_ = (&k8s.ExecInPod{PodNamespace: namespace, PodName: podName, Command: "curl -s -m 5 bing.com", KubeConfigFilePath: kubeConfigFilePath}).Do(ctx)
-		return nil
+	execCurl1 := steps.CurlExpectFail("drop-curl-1-"+arch, &k8s.ExecInPod{
+		PodNamespace: namespace, PodName: podName, Command: "curl -s -m 5 bing.com", KubeConfigFilePath: kubeConfigFilePath,
 	})
-	sleep5a := &steps.SleepStep{Duration: 5 * time.Second}
-	execCurl2 := flow.Func("drop-curl-2-"+arch, func(ctx context.Context) error {
-		_ = (&k8s.ExecInPod{PodNamespace: namespace, PodName: podName, Command: "curl -s -m 5 bing.com", KubeConfigFilePath: kubeConfigFilePath}).Do(ctx)
-		return nil
+	execCurl2 := steps.CurlExpectFail("drop-curl-2-"+arch, &k8s.ExecInPod{
+		PodNamespace: namespace, PodName: podName, Command: "curl -s -m 5 bing.com", KubeConfigFilePath: kubeConfigFilePath,
 	})
-	pf := &k8s.PortForward{
-		Namespace: common.KubeSystemNamespace, LabelSelector: "k8s-app=retina",
-		LocalPort: "10093", RemotePort: "10093", Endpoint: "metrics",
-		KubeConfigFilePath: kubeConfigFilePath, OptionalLabelAffinity: "app=" + agnhostName,
-	}
 	validateDrop := &steps.ValidateRetinaDropMetricStep{PortForwardedRetinaPort: "10093", Direction: "unknown", Reason: steps.IPTableRuleDrop}
-	stopPF := &steps.StopPortForwardStep{PF: pf}
+	validateWithPF := &steps.WithPortForward{
+		PF: &k8s.PortForward{
+			Namespace: common.KubeSystemNamespace, LabelSelector: "k8s-app=retina",
+			LocalPort: "10093", RemotePort: "10093", Endpoint: "metrics",
+			KubeConfigFilePath: kubeConfigFilePath, OptionalLabelAffinity: "app=" + agnhostName,
+		},
+		Steps: []flow.Steper{validateDrop},
+	}
 	deleteNetPol := &k8s.DeleteKubernetesResource{
 		ResourceType: k8s.TypeString(k8s.NetworkPolicy), ResourceName: "deny-all", ResourceNamespace: namespace, KubeConfigFilePath: kubeConfigFilePath,
 	}
@@ -49,7 +46,9 @@ func addDropScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFilePat
 		ResourceType: k8s.TypeString(k8s.StatefulSet), ResourceName: agnhostName, ResourceNamespace: namespace, KubeConfigFilePath: kubeConfigFilePath,
 	}
 
-	chain := []flow.Steper{createNetPol, createAgnhost, sleep30, execCurl1, sleep5a, execCurl2, pf, validateDrop, stopPF, deleteNetPol, deleteAgnhost}
-	wf.Add(flow.Pipe(chain...).DependsOn(dependsOn))
+	chain := []flow.Steper{createNetPol, createAgnhost, execCurl1, execCurl2}
+	wf.Add(flow.Pipe(chain...).DependsOn(dependsOn).Timeout(10 * time.Minute))
+	wf.Add(flow.Step(validateWithPF).DependsOn(execCurl2).Retry(steps.RetryValidation()...))
+	wf.Add(flow.Pipe(deleteNetPol, deleteAgnhost).DependsOn(validateWithPF).When(flow.Always))
 	return deleteAgnhost
 }

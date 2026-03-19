@@ -10,8 +10,8 @@ import (
 
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/common"
-	"github.com/microsoft/retina/test/e2ev3/framework/constants"
-	k8s "github.com/microsoft/retina/test/e2ev3/framework/kubernetes"
+	"github.com/microsoft/retina/test/e2ev3/pkg/config"
+	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 	"github.com/microsoft/retina/test/e2ev3/steps"
 )
 
@@ -19,12 +19,12 @@ func addHubbleFlowInterNodeScenario(wf *flow.Workflow, upstream flow.Steper, kub
 	podnameSrc := "agnhost-flow-inter-src"
 	podnameDst := "agnhost-flow-inter-dst"
 	validSrcLabels := []map[string]string{
-		{"source": common.TestPodNamespace + "/" + podnameSrc + "-0", "destination": "", "protocol": constants.TCP, "subtype": "to-stack", "type": "Trace", "verdict": "FORWARDED"},
-		{"source": common.TestPodNamespace + "/" + podnameDst + "-0", "destination": "", "protocol": constants.TCP, "subtype": "to-endpoint", "type": "Trace", "verdict": "FORWARDED"},
+		{"source": common.TestPodNamespace + "/" + podnameSrc + "-0", "destination": "", "protocol": config.TCP, "subtype": "to-stack", "type": "Trace", "verdict": "FORWARDED"},
+		{"source": common.TestPodNamespace + "/" + podnameDst + "-0", "destination": "", "protocol": config.TCP, "subtype": "to-endpoint", "type": "Trace", "verdict": "FORWARDED"},
 	}
 	validDstLabels := []map[string]string{
-		{"source": "", "destination": common.TestPodNamespace + "/" + podnameSrc + "-0", "protocol": constants.TCP, "subtype": "to-stack", "type": "Trace", "verdict": "FORWARDED"},
-		{"source": "", "destination": common.TestPodNamespace + "/" + podnameDst + "-0", "protocol": constants.TCP, "subtype": "to-endpoint", "type": "Trace", "verdict": "FORWARDED"},
+		{"source": "", "destination": common.TestPodNamespace + "/" + podnameSrc + "-0", "protocol": config.TCP, "subtype": "to-stack", "type": "Trace", "verdict": "FORWARDED"},
+		{"source": "", "destination": common.TestPodNamespace + "/" + podnameDst + "-0", "protocol": config.TCP, "subtype": "to-endpoint", "type": "Trace", "verdict": "FORWARDED"},
 	}
 
 	createSrc := &k8s.CreateAgnhostStatefulSet{
@@ -35,31 +35,35 @@ func addHubbleFlowInterNodeScenario(wf *flow.Workflow, upstream flow.Steper, kub
 		AgnhostName: podnameDst, AgnhostNamespace: common.TestPodNamespace,
 		AgnhostArch: arch, KubeConfigFilePath: kubeConfigFilePath,
 	}
-	sleep30 := &steps.SleepStep{Duration: 30 * time.Second}
-	pfSrc := &k8s.PortForward{
-		LabelSelector: "k8s-app=retina", LocalPort: constants.HubbleMetricsPort, RemotePort: constants.HubbleMetricsPort,
-		Endpoint: constants.MetricsEndpoint, KubeConfigFilePath: kubeConfigFilePath, OptionalLabelAffinity: "app=" + podnameSrc,
-	}
-	pfDst := &k8s.PortForward{
-		LabelSelector: "k8s-app=retina", LocalPort: "9966", RemotePort: constants.HubbleMetricsPort,
-		Endpoint: constants.MetricsEndpoint, KubeConfigFilePath: kubeConfigFilePath, OptionalLabelAffinity: "app=" + podnameDst,
-	}
 	curlPod := &steps.CurlPodStep{
 		SrcPodName: podnameSrc + "-0", SrcPodNamespace: common.TestPodNamespace,
 		DstPodName: podnameDst + "-0", DstPodNamespace: common.TestPodNamespace,
 		KubeConfigFilePath: kubeConfigFilePath,
 	}
-	sleep5 := &steps.SleepStep{Duration: 5 * time.Second}
 	validateSrc := &common.ValidateMetricStep{
-		ForwardedPort: constants.HubbleMetricsPort, MetricName: constants.HubbleFlowMetricName,
+		ForwardedPort: config.HubbleMetricsPort, MetricName: config.HubbleFlowMetricName,
 		ValidMetrics: validSrcLabels, ExpectMetric: true,
 	}
 	validateDst := &common.ValidateMetricStep{
-		ForwardedPort: "9966", MetricName: constants.HubbleFlowMetricName,
+		ForwardedPort: "9966", MetricName: config.HubbleFlowMetricName,
 		ValidMetrics: validDstLabels, ExpectMetric: true,
 	}
-	stopPFSrc := &steps.StopPortForwardStep{PF: pfSrc}
-	stopPFDst := &steps.StopPortForwardStep{PF: pfDst}
+	validateWithPF := &steps.WithPortForward{
+		PF: &k8s.PortForward{
+			LabelSelector: "k8s-app=retina", LocalPort: config.HubbleMetricsPort, RemotePort: config.HubbleMetricsPort,
+			Endpoint: config.MetricsEndpoint, KubeConfigFilePath: kubeConfigFilePath, OptionalLabelAffinity: "app=" + podnameSrc,
+		},
+		Steps: []flow.Steper{
+			validateSrc,
+			&steps.WithPortForward{
+				PF: &k8s.PortForward{
+					LabelSelector: "k8s-app=retina", LocalPort: "9966", RemotePort: config.HubbleMetricsPort,
+					Endpoint: config.MetricsEndpoint, KubeConfigFilePath: kubeConfigFilePath, OptionalLabelAffinity: "app=" + podnameDst,
+				},
+				Steps: []flow.Steper{validateDst},
+			},
+		},
+	}
 	deleteSrc := &k8s.DeleteKubernetesResource{
 		ResourceType: k8s.TypeString(k8s.StatefulSet), ResourceName: podnameSrc,
 		ResourceNamespace: common.TestPodNamespace, KubeConfigFilePath: kubeConfigFilePath,
@@ -69,12 +73,8 @@ func addHubbleFlowInterNodeScenario(wf *flow.Workflow, upstream flow.Steper, kub
 		ResourceNamespace: common.TestPodNamespace, KubeConfigFilePath: kubeConfigFilePath,
 	}
 
-	wf.Add(flow.Pipe(
-		createSrc, createDst, sleep30,
-		pfSrc, pfDst, curlPod, sleep5,
-		validateSrc, validateDst,
-		stopPFSrc, stopPFDst,
-		deleteSrc, deleteDst,
-	).DependsOn(upstream))
+	wf.Add(flow.Pipe(createSrc, createDst, curlPod).DependsOn(upstream).Timeout(10 * time.Minute))
+	wf.Add(flow.Step(validateWithPF).DependsOn(curlPod).Retry(steps.RetryValidation()...))
+	wf.Add(flow.Pipe(deleteSrc, deleteDst).DependsOn(validateWithPF).When(flow.Always))
 	return deleteDst
 }

@@ -640,6 +640,9 @@ run-perf-test:
 run-e2e-test:
 	go test -v ./test/e2e/ -timeout 1h -tags=e2e -count=1  -args -image-tag=${TAG} -image-registry=${IMAGE_REGISTRY} -image-namespace=${IMAGE_NAMESPACE}
 
+run-e2ev3-test:
+	go test -v ./test/e2ev3/ -timeout 1h -tags=e2e -count=1  -args -image-tag=${TAG} -image-registry=${IMAGE_REGISTRY} -image-namespace=${IMAGE_NAMESPACE}
+
 .PHONY: update-hubble
 update-hubble:
 	@echo "Checking for Hubble updates..."

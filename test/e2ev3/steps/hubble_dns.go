@@ -6,7 +6,7 @@
 package steps
 
 import (
-	"github.com/microsoft/retina/test/e2ev3/framework/constants"
+	"github.com/microsoft/retina/test/e2ev3/pkg/config"
 	"github.com/microsoft/retina/test/e2ev3/common"
 )
 
@@ -15,20 +15,20 @@ var (
 	HubbleDNSPodName = "agnhost-dns-0"
 
 	ValidHubbleDNSQueryMetricLabels = map[string]string{
-		constants.HubbleDestinationLabel: "",
-		constants.HubbleSourceLabel:      common.TestPodNamespace + "/" + HubbleDNSPodName,
-		constants.HubbleIPsRetunedLabel:  "0",
-		constants.HubbleQTypesLabel:      "A",
-		constants.HubbleRCodeLabel:       "",
-		constants.HubbleQueryLabel:       "one.one.one.one.",
+		config.HubbleDestinationLabel: "",
+		config.HubbleSourceLabel:      common.TestPodNamespace + "/" + HubbleDNSPodName,
+		config.HubbleIPsRetunedLabel:  "0",
+		config.HubbleQTypesLabel:      "A",
+		config.HubbleRCodeLabel:       "",
+		config.HubbleQueryLabel:       "one.one.one.one.",
 	}
 
 	ValidHubbleDNSResponseMetricLabels = map[string]string{
-		constants.HubbleDestinationLabel: common.TestPodNamespace + "/" + HubbleDNSPodName,
-		constants.HubbleSourceLabel:      "",
-		constants.HubbleIPsRetunedLabel:  "2",
-		constants.HubbleQTypesLabel:      "A",
-		constants.HubbleRCodeLabel:       "No Error",
-		constants.HubbleQueryLabel:       "one.one.one.one.",
+		config.HubbleDestinationLabel: common.TestPodNamespace + "/" + HubbleDNSPodName,
+		config.HubbleSourceLabel:      "",
+		config.HubbleIPsRetunedLabel:  "2",
+		config.HubbleQTypesLabel:      "A",
+		config.HubbleRCodeLabel:       "No Error",
+		config.HubbleQueryLabel:       "one.one.one.one.",
 	}
 )
