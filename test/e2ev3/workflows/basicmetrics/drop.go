@@ -6,12 +6,15 @@
 package basicmetrics
 
 import (
-	"time"
+	"context"
+	"fmt"
+	"log"
 
 	flow "github.com/Azure/go-workflow"
-	"github.com/microsoft/retina/test/e2ev3/common"
+	"github.com/microsoft/retina/test/e2ev3/config"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
-	"github.com/microsoft/retina/test/e2ev3/steps"
+	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
 func addDropScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFilePath, namespace, arch string) flow.Steper {
@@ -24,16 +27,16 @@ func addDropScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFilePat
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
 		AgnhostNamespace: namespace, AgnhostName: agnhostName, AgnhostArch: arch, KubeConfigFilePath: kubeConfigFilePath,
 	}
-	execCurl1 := steps.CurlExpectFail("drop-curl-1-"+arch, &k8s.ExecInPod{
+	execCurl1 := utils.CurlExpectFail("drop-curl-1-"+arch, &k8s.ExecInPod{
 		PodNamespace: namespace, PodName: podName, Command: "curl -s -m 5 bing.com", KubeConfigFilePath: kubeConfigFilePath,
 	})
-	execCurl2 := steps.CurlExpectFail("drop-curl-2-"+arch, &k8s.ExecInPod{
+	execCurl2 := utils.CurlExpectFail("drop-curl-2-"+arch, &k8s.ExecInPod{
 		PodNamespace: namespace, PodName: podName, Command: "curl -s -m 5 bing.com", KubeConfigFilePath: kubeConfigFilePath,
 	})
-	validateDrop := &steps.ValidateRetinaDropMetricStep{PortForwardedRetinaPort: "10093", Direction: "unknown", Reason: steps.IPTableRuleDrop}
-	validateWithPF := &steps.WithPortForward{
+	validateDrop := &ValidateRetinaDropMetricStep{PortForwardedRetinaPort: "10093", Direction: "unknown", Reason: IPTableRuleDrop}
+	validateWithPF := &utils.WithPortForward{
 		PF: &k8s.PortForward{
-			Namespace: common.KubeSystemNamespace, LabelSelector: "k8s-app=retina",
+			Namespace: config.KubeSystemNamespace, LabelSelector: "k8s-app=retina",
 			LocalPort: "10093", RemotePort: "10093", Endpoint: "metrics",
 			KubeConfigFilePath: kubeConfigFilePath, OptionalLabelAffinity: "app=" + agnhostName,
 		},
@@ -46,9 +49,69 @@ func addDropScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFilePat
 		ResourceType: k8s.TypeString(k8s.StatefulSet), ResourceName: agnhostName, ResourceNamespace: namespace, KubeConfigFilePath: kubeConfigFilePath,
 	}
 
-	chain := []flow.Steper{createNetPol, createAgnhost, execCurl1, execCurl2}
-	wf.Add(flow.Pipe(chain...).DependsOn(dependsOn).Timeout(10 * time.Minute))
-	wf.Add(flow.Step(validateWithPF).DependsOn(execCurl2).Retry(steps.RetryValidation()...))
-	wf.Add(flow.Pipe(deleteNetPol, deleteAgnhost).DependsOn(validateWithPF).When(flow.Always))
+	// Setup: provision resources and generate traffic.
+	wf.Add(
+		flow.Pipe(createNetPol, createAgnhost, execCurl1, execCurl2).
+			DependsOn(dependsOn).
+			Timeout(utils.DefaultScenarioTimeout),
+	)
+
+	// Validate: retry with exponential backoff until metrics appear.
+	wf.Add(
+		flow.Step(validateWithPF).
+			DependsOn(execCurl2).
+			Retry(utils.RetryWithBackoff),
+	)
+
+	// Cleanup: always runs, even if validation fails.
+	wf.Add(
+		flow.Pipe(deleteNetPol, deleteAgnhost).
+			DependsOn(validateWithPF).
+			When(flow.Always),
+	)
 	return deleteAgnhost
+}
+
+
+
+var (
+	dropCountMetricName = "networkobservability_drop_count"
+	dropBytesMetricName = "networkobservability_drop_bytes"
+)
+
+const (
+	IPTableRuleDrop = "IPTABLE_RULE_DROP"
+
+	directionKey = "direction"
+	reasonKey    = "reason"
+)
+
+// ValidateRetinaDropMetricStep checks that drop count and drop bytes metrics
+// are present with the expected direction and reason labels.
+type ValidateRetinaDropMetricStep struct {
+	PortForwardedRetinaPort string
+	Direction               string
+	Reason                  string
+}
+
+func (v *ValidateRetinaDropMetricStep) Do(_ context.Context) error {
+	promAddress := fmt.Sprintf("http://localhost:%s/metrics", v.PortForwardedRetinaPort)
+
+	metric := map[string]string{
+		directionKey: v.Direction,
+		reasonKey:    IPTableRuleDrop,
+	}
+
+	err := prom.CheckMetric(promAddress, dropCountMetricName, metric)
+	if err != nil {
+		return fmt.Errorf("failed to verify prometheus metrics %s: %w", dropCountMetricName, err)
+	}
+
+	err = prom.CheckMetric(promAddress, dropBytesMetricName, metric)
+	if err != nil {
+		return fmt.Errorf("failed to verify prometheus metrics %s: %w", dropBytesMetricName, err)
+	}
+
+	log.Printf("found metrics matching %+v\n", metric)
+	return nil
 }

@@ -6,13 +6,11 @@
 package hubblemetrics
 
 import (
-	"time"
-
 	flow "github.com/Azure/go-workflow"
-	"github.com/microsoft/retina/test/e2ev3/common"
-	"github.com/microsoft/retina/test/e2ev3/pkg/config"
+	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
+	"github.com/microsoft/retina/test/e2ev3/config"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
-	"github.com/microsoft/retina/test/e2ev3/steps"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
 func addHubbleTCPScenario(wf *flow.Workflow, upstream flow.Steper, kubeConfigFilePath, arch string) flow.Steper {
@@ -20,32 +18,49 @@ func addHubbleTCPScenario(wf *flow.Workflow, upstream flow.Steper, kubeConfigFil
 	podName := agnhostName + "-0"
 
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
-		AgnhostName: agnhostName, AgnhostNamespace: common.TestPodNamespace,
+		AgnhostName: agnhostName, AgnhostNamespace: config.TestPodNamespace,
 		AgnhostArch: arch, KubeConfigFilePath: kubeConfigFilePath,
 	}
 	execCurl := &k8s.ExecInPod{
-		PodName: podName, PodNamespace: common.TestPodNamespace,
+		PodName: podName, PodNamespace: config.TestPodNamespace,
 		Command: "curl -s -m 5 bing.com", KubeConfigFilePath: kubeConfigFilePath,
 	}
-	validateTCP := &common.ValidateMetricStep{
+	validateTCP := &prom.ValidateMetricStep{
 		ForwardedPort: config.HubbleMetricsPort, MetricName: config.HubbleTCPFlagsMetricName,
-		ValidMetrics: steps.ValidHubbleTCPMetricsLabels, ExpectMetric: true,
+		ValidMetrics: ValidHubbleTCPMetricsLabels, ExpectMetric: true,
 	}
-	validateWithPF := &steps.WithPortForward{
+	validateWithPF := &utils.WithPortForward{
 		PF: &k8s.PortForward{
 			LabelSelector: "k8s-app=retina", LocalPort: config.HubbleMetricsPort, RemotePort: config.HubbleMetricsPort,
-			Namespace: common.KubeSystemNamespace, Endpoint: config.MetricsEndpoint,
+			Namespace: config.KubeSystemNamespace, Endpoint: config.MetricsEndpoint,
 			KubeConfigFilePath: kubeConfigFilePath, OptionalLabelAffinity: "app=" + agnhostName,
 		},
 		Steps: []flow.Steper{validateTCP},
 	}
 	deleteAgnhost := &k8s.DeleteKubernetesResource{
 		ResourceType: k8s.TypeString(k8s.StatefulSet), ResourceName: agnhostName,
-		ResourceNamespace: common.TestPodNamespace, KubeConfigFilePath: kubeConfigFilePath,
+		ResourceNamespace: config.TestPodNamespace, KubeConfigFilePath: kubeConfigFilePath,
 	}
 
-	wf.Add(flow.Pipe(createAgnhost, execCurl).DependsOn(upstream).Timeout(10 * time.Minute))
-	wf.Add(flow.Step(validateWithPF).DependsOn(execCurl).Retry(steps.RetryValidation()...))
-	wf.Add(flow.Step(deleteAgnhost).DependsOn(validateWithPF).When(flow.Always))
+	// Setup: provision resources and generate traffic.
+	wf.Add(
+		flow.Pipe(createAgnhost, execCurl).
+			DependsOn(upstream).
+			Timeout(utils.DefaultScenarioTimeout),
+	)
+
+	// Validate: retry with exponential backoff until metrics appear.
+	wf.Add(
+		flow.Step(validateWithPF).
+			DependsOn(execCurl).
+			Retry(utils.RetryWithBackoff),
+	)
+
+	// Cleanup: always runs, even if validation fails.
+	wf.Add(
+		flow.Pipe(deleteAgnhost).
+			DependsOn(validateWithPF).
+			When(flow.Always),
+	)
 	return deleteAgnhost
 }

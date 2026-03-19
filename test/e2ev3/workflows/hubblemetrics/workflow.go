@@ -7,20 +7,20 @@ package hubblemetrics
 
 import (
 	flow "github.com/Azure/go-workflow"
-	"github.com/microsoft/retina/test/e2ev3/common"
-	"github.com/microsoft/retina/test/e2ev3/pkg/config"
+	"github.com/microsoft/retina/test/e2ev3/config"
+	"github.com/microsoft/retina/test/e2ev3/pkg/images"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
-	"github.com/microsoft/retina/test/e2ev3/steps"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
 // InstallAndTestHubbleMetrics installs Hubble, validates its services, and runs
 // DNS, flow (intra-node, inter-node, pod-to-world), drop, and TCP metric
 // scenarios for each architecture.
-func InstallAndTestHubbleMetrics(kubeConfigFilePath, chartPath string, imgCfg *config.ImageConfig, helmCfg *config.HelmConfig) *flow.Workflow {
+func InstallAndTestHubbleMetrics(kubeConfigFilePath, chartPath string, imgCfg *config.ImageConfig, helmCfg *config.HelmConfig, loader images.Loader) *flow.Workflow {
 	wf := &flow.Workflow{DontPanic: true}
 
 	installHubble := &k8s.InstallHubbleHelmChart{
-		Namespace:          common.KubeSystemNamespace,
+		Namespace:          config.KubeSystemNamespace,
 		ReleaseName:        "retina",
 		KubeConfigFilePath: kubeConfigFilePath,
 		ChartPath:          chartPath,
@@ -28,6 +28,7 @@ func InstallAndTestHubbleMetrics(kubeConfigFilePath, chartPath string, imgCfg *c
 		ImageRegistry:      imgCfg.Registry,
 		ImageNamespace:     imgCfg.Namespace,
 		HelmDriver:         helmCfg.Driver,
+		ImageLoader:        loader,
 	}
 	wf.Add(flow.Step(installHubble))
 
@@ -39,7 +40,7 @@ func InstallAndTestHubbleMetrics(kubeConfigFilePath, chartPath string, imgCfg *c
 	uiTail := addHubbleUIValidation(wf, installHubble, kubeConfigFilePath)
 	allScenarioTails = append(allScenarioTails, uiTail)
 
-	for _, arch := range common.Architectures {
+	for _, arch := range config.Architectures {
 		dnsTail := addHubbleDNSScenario(wf, installHubble, kubeConfigFilePath, arch)
 		allScenarioTails = append(allScenarioTails, dnsTail)
 
@@ -60,16 +61,16 @@ func InstallAndTestHubbleMetrics(kubeConfigFilePath, chartPath string, imgCfg *c
 	}
 
 	ensureStable := &k8s.EnsureStableComponent{
-		PodNamespace:           common.KubeSystemNamespace,
+		PodNamespace:           config.KubeSystemNamespace,
 		LabelSelector:          "k8s-app=retina",
 		KubeConfigFilePath:     kubeConfigFilePath,
 		IgnoreContainerRestart: false,
 	}
 	wf.Add(flow.Step(ensureStable).DependsOn(allScenarioTails...))
 
-	debug := &steps.DebugOnFailure{
+	debug := &utils.DebugOnFailure{
 		KubeConfigFilePath: kubeConfigFilePath,
-		Namespace:          common.KubeSystemNamespace,
+		Namespace:          config.KubeSystemNamespace,
 		LabelSelector:      "k8s-app=retina",
 	}
 	wf.Add(flow.Step(debug).DependsOn(ensureStable).When(flow.AnyFailed))

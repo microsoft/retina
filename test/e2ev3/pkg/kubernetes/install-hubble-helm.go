@@ -7,7 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/microsoft/retina/test/e2ev3/common"
+	e2ecfg "github.com/microsoft/retina/test/e2ev3/config"
+	"github.com/microsoft/retina/test/e2ev3/pkg/images"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/cli"
@@ -30,6 +31,7 @@ type InstallHubbleHelmChart struct {
 	ImageRegistry      string
 	ImageNamespace     string
 	HelmDriver         string
+	ImageLoader        images.Loader
 }
 
 func (v *InstallHubbleHelmChart) Do(_ context.Context) error {
@@ -46,7 +48,7 @@ func (v *InstallHubbleHelmChart) Do(_ context.Context) error {
 	}
 
 	// Creating extra namespace to deploy test pods
-	err = CreateNamespaceFn(v.KubeConfigFilePath, common.TestPodNamespace)
+	err = CreateNamespaceFn(v.KubeConfigFilePath, e2ecfg.TestPodNamespace)
 	if err != nil {
 		return fmt.Errorf("failed to create namespace %s: %w", v.Namespace, err)
 	}
@@ -71,10 +73,8 @@ func (v *InstallHubbleHelmChart) Do(_ context.Context) error {
 		return fmt.Errorf("failed to load chart from path %s: %w", v.ChartPath, err)
 	}
 
-	chart.Values["imagePullSecrets"] = []map[string]interface{}{
-		{
-			"name": "acr-credentials",
-		},
+	if secrets := v.ImageLoader.PullSecrets(); len(secrets) > 0 {
+		chart.Values["imagePullSecrets"] = secrets
 	}
 	chart.Values["operator"].(map[string]interface{})["enabled"] = true
 	chart.Values["operator"].(map[string]interface{})["repository"] = imageRegistry + "/" + imageNamespace + "/retina-operator"

@@ -8,7 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/microsoft/retina/test/e2ev3/common"
+	e2ecfg "github.com/microsoft/retina/test/e2ev3/config"
+	"github.com/microsoft/retina/test/e2ev3/pkg/images"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/cli"
@@ -35,6 +36,7 @@ type InstallHelmChart struct {
 	ImageRegistry      string
 	ImageNamespace     string
 	HelmDriver         string
+	ImageLoader        images.Loader
 	EnableHeartbeat    bool
 }
 
@@ -77,7 +79,7 @@ func (i *InstallHelmChart) Do(_ context.Context) error {
 	}
 
 	// Creating extra namespace to deploy test pods
-	err = CreateNamespaceFn(i.KubeConfigFilePath, common.TestPodNamespace)
+	err = CreateNamespaceFn(i.KubeConfigFilePath, e2ecfg.TestPodNamespace)
 	if err != nil {
 		return fmt.Errorf("failed to create namespace %s: %w", i.Namespace, err)
 	}
@@ -94,10 +96,8 @@ func (i *InstallHelmChart) Do(_ context.Context) error {
 		return fmt.Errorf("failed to load chart from path %s: %w", i.ChartPath, err)
 	}
 
-	chart.Values["imagePullSecrets"] = []map[string]interface{}{
-		{
-			"name": "acr-credentials",
-		},
+	if secrets := i.ImageLoader.PullSecrets(); len(secrets) > 0 {
+		chart.Values["imagePullSecrets"] = secrets
 	}
 
 	if i.EnableHeartbeat {
@@ -106,7 +106,7 @@ func (i *InstallHelmChart) Do(_ context.Context) error {
 	}
 
 	chart.Values["image"].(map[string]interface{})["tag"] = tag
-	chart.Values["image"].(map[string]interface{})["pullPolicy"] = "Always"
+	chart.Values["image"].(map[string]interface{})["pullPolicy"] = i.ImageLoader.PullPolicy()
 	chart.Values["operator"].(map[string]interface{})["tag"] = tag
 	chart.Values["image"].(map[string]interface{})["repository"] = imageRegistry + "/" + imageNamespace + "/retina-agent"
 	chart.Values["image"].(map[string]interface{})["initRepository"] = imageRegistry + "/" + imageNamespace + "/retina-init"

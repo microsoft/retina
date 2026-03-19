@@ -6,40 +6,43 @@
 package hubblemetrics
 
 import (
-	"time"
+	"context"
+	"fmt"
 
 	flow "github.com/Azure/go-workflow"
-	"github.com/microsoft/retina/test/e2ev3/common"
-	"github.com/microsoft/retina/test/e2ev3/pkg/config"
+	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
+	"github.com/microsoft/retina/test/e2ev3/config"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
-	"github.com/microsoft/retina/test/e2ev3/steps"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 func addHubbleFlowIntraNodeScenario(wf *flow.Workflow, upstream flow.Steper, kubeConfigFilePath, arch string) flow.Steper {
 	podname := "agnhost-flow-intra"
 	replicas := 2
 	validLabels := []map[string]string{
-		{"source": common.TestPodNamespace + "/" + podname + "-0", "destination": "", "protocol": config.TCP, "subtype": "to-stack", "type": "Trace", "verdict": "FORWARDED"},
-		{"source": common.TestPodNamespace + "/" + podname + "-0", "destination": "", "protocol": config.TCP, "subtype": "to-endpoint", "type": "Trace", "verdict": "FORWARDED"},
-		{"source": common.TestPodNamespace + "/" + podname + "-1", "destination": "", "protocol": config.TCP, "subtype": "to-stack", "type": "Trace", "verdict": "FORWARDED"},
-		{"source": common.TestPodNamespace + "/" + podname + "-1", "destination": "", "protocol": config.TCP, "subtype": "to-endpoint", "type": "Trace", "verdict": "FORWARDED"},
+		{"source": config.TestPodNamespace + "/" + podname + "-0", "destination": "", "protocol": config.TCP, "subtype": "to-stack", "type": "Trace", "verdict": "FORWARDED"},
+		{"source": config.TestPodNamespace + "/" + podname + "-0", "destination": "", "protocol": config.TCP, "subtype": "to-endpoint", "type": "Trace", "verdict": "FORWARDED"},
+		{"source": config.TestPodNamespace + "/" + podname + "-1", "destination": "", "protocol": config.TCP, "subtype": "to-stack", "type": "Trace", "verdict": "FORWARDED"},
+		{"source": config.TestPodNamespace + "/" + podname + "-1", "destination": "", "protocol": config.TCP, "subtype": "to-endpoint", "type": "Trace", "verdict": "FORWARDED"},
 	}
 
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
-		AgnhostName: podname, AgnhostNamespace: common.TestPodNamespace,
+		AgnhostName: podname, AgnhostNamespace: config.TestPodNamespace,
 		ScheduleOnSameNode: true, AgnhostReplicas: &replicas,
 		AgnhostArch: arch, KubeConfigFilePath: kubeConfigFilePath,
 	}
-	curlPod := &steps.CurlPodStep{
-		SrcPodName: podname + "-0", SrcPodNamespace: common.TestPodNamespace,
-		DstPodName: podname + "-1", DstPodNamespace: common.TestPodNamespace,
+	curlPod := &CurlPodStep{
+		SrcPodName: podname + "-0", SrcPodNamespace: config.TestPodNamespace,
+		DstPodName: podname + "-1", DstPodNamespace: config.TestPodNamespace,
 		KubeConfigFilePath: kubeConfigFilePath,
 	}
-	validateFlow := &common.ValidateMetricStep{
+	validateFlow := &prom.ValidateMetricStep{
 		ForwardedPort: config.HubbleMetricsPort, MetricName: config.HubbleFlowMetricName,
 		ValidMetrics: validLabels, ExpectMetric: true,
 	}
-	validateWithPF := &steps.WithPortForward{
+	validateWithPF := &utils.WithPortForward{
 		PF: &k8s.PortForward{
 			LabelSelector: "k8s-app=retina", LocalPort: config.HubbleMetricsPort, RemotePort: config.HubbleMetricsPort,
 			Endpoint: config.MetricsEndpoint, KubeConfigFilePath: kubeConfigFilePath, OptionalLabelAffinity: "app=" + podname,
@@ -48,11 +51,66 @@ func addHubbleFlowIntraNodeScenario(wf *flow.Workflow, upstream flow.Steper, kub
 	}
 	deleteAgnhost := &k8s.DeleteKubernetesResource{
 		ResourceType: k8s.TypeString(k8s.StatefulSet), ResourceName: podname,
-		ResourceNamespace: common.TestPodNamespace, KubeConfigFilePath: kubeConfigFilePath,
+		ResourceNamespace: config.TestPodNamespace, KubeConfigFilePath: kubeConfigFilePath,
 	}
 
-	wf.Add(flow.Pipe(createAgnhost, curlPod).DependsOn(upstream).Timeout(10 * time.Minute))
-	wf.Add(flow.Step(validateWithPF).DependsOn(curlPod).Retry(steps.RetryValidation()...))
-	wf.Add(flow.Step(deleteAgnhost).DependsOn(validateWithPF).When(flow.Always))
+	// Setup: provision resources and generate traffic.
+	wf.Add(
+		flow.Pipe(createAgnhost, curlPod).
+			DependsOn(upstream).
+			Timeout(utils.DefaultScenarioTimeout),
+	)
+
+	// Validate: retry with exponential backoff until metrics appear.
+	wf.Add(
+		flow.Step(validateWithPF).
+			DependsOn(curlPod).
+			Retry(utils.RetryWithBackoff),
+	)
+
+	// Cleanup: always runs, even if validation fails.
+	wf.Add(
+		flow.Pipe(deleteAgnhost).
+			DependsOn(validateWithPF).
+			When(flow.Always),
+	)
 	return deleteAgnhost
+}
+
+
+
+// CurlPodStep executes a curl command from a source pod to a destination pod
+// for flow testing. It resolves the destination pod's IP and runs the command.
+type CurlPodStep struct {
+	SrcPodName         string
+	SrcPodNamespace    string
+	DstPodName         string
+	DstPodNamespace    string
+	KubeConfigFilePath string
+}
+
+func (c *CurlPodStep) Do(_ context.Context) error {
+	config, err := clientcmd.BuildConfigFromFlags("", c.KubeConfigFilePath)
+	if err != nil {
+		return fmt.Errorf("error building kubeconfig: %w", err)
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("error creating Kubernetes client: %w", err)
+	}
+
+	dstPodIP, err := k8s.GetPodIP(c.KubeConfigFilePath, c.DstPodNamespace, c.DstPodName)
+	if err != nil {
+		return fmt.Errorf("error getting pod IP: %w", err)
+	}
+
+	cmd := fmt.Sprintf("curl -s -m 5 %s:80", dstPodIP)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	_, err = k8s.ExecPod(ctx, clientset, config, c.SrcPodNamespace, c.SrcPodName, cmd)
+	if err != nil {
+		return fmt.Errorf("error executing command: %w", err)
+	}
+	return nil
 }

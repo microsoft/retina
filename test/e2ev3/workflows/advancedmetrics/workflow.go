@@ -7,10 +7,9 @@ package advancedmetrics
 
 import (
 	flow "github.com/Azure/go-workflow"
-	"github.com/microsoft/retina/test/e2ev3/common"
-	"github.com/microsoft/retina/test/e2ev3/pkg/config"
+	"github.com/microsoft/retina/test/e2ev3/config"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
-	"github.com/microsoft/retina/test/e2ev3/steps"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
 // UpgradeAndTestRetinaAdvancedMetrics creates a workflow that upgrades Retina
@@ -19,7 +18,7 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 	wf := &flow.Workflow{DontPanic: true}
 
 	upgradeRetina := &k8s.UpgradeRetinaHelmChart{
-		Namespace:          common.KubeSystemNamespace,
+		Namespace:          config.KubeSystemNamespace,
 		ReleaseName:        "retina",
 		KubeConfigFilePath: kubeConfigFilePath,
 		ChartPath:          chartPath,
@@ -30,7 +29,7 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 
 	var scenarioTails []flow.Steper
 
-	for _, arch := range common.Architectures {
+	for _, arch := range config.Architectures {
 		dnsValidTail := addAdvancedDNSScenario(wf, upgradeRetina, kubeConfigFilePath, testPodNamespace, arch,
 			"valid", "nslookup kubernetes.default", false,
 			"kubernetes.default.svc.cluster.local.", "A", "StatefulSet",
@@ -41,7 +40,7 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 		dnsNXTail := addAdvancedDNSScenario(wf, upgradeRetina, kubeConfigFilePath, testPodNamespace, arch,
 			"nxdomain", "nslookup some.non.existent.domain.", true,
 			"some.non.existent.domain.", "A", "StatefulSet",
-			"0", "some.non.existent.domain.", "A", "NXDOMAIN", steps.EmptyResponse,
+			"0", "some.non.existent.domain.", "A", "NXDOMAIN", EmptyResponse,
 		)
 		scenarioTails = append(scenarioTails, dnsNXTail)
 	}
@@ -50,16 +49,16 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 	scenarioTails = append(scenarioTails, latencyTail)
 
 	ensureStable := &k8s.EnsureStableComponent{
-		PodNamespace:           common.KubeSystemNamespace,
+		PodNamespace:           config.KubeSystemNamespace,
 		LabelSelector:          "k8s-app=retina",
 		KubeConfigFilePath:     kubeConfigFilePath,
 		IgnoreContainerRestart: false,
 	}
 	wf.Add(flow.Step(ensureStable).DependsOn(scenarioTails...))
 
-	debug := &steps.DebugOnFailure{
+	debug := &utils.DebugOnFailure{
 		KubeConfigFilePath: kubeConfigFilePath,
-		Namespace:          common.KubeSystemNamespace,
+		Namespace:          config.KubeSystemNamespace,
 		LabelSelector:      "k8s-app=retina",
 	}
 	wf.Add(flow.Step(debug).DependsOn(ensureStable).When(flow.AnyFailed))
