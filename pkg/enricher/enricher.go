@@ -229,8 +229,7 @@ func (e *Enricher) zoneFromObj(obj interface{}) string {
 	if obj == nil {
 		return "unknown"
 	}
-	switch o := obj.(type) {
-	case *common.RetinaEndpoint:
+	if o, ok := obj.(*common.RetinaEndpoint); ok {
 		if nodeIP := o.NodeIP(); nodeIP != "" {
 			node := e.cache.GetNodeByIP(nodeIP)
 			if node != nil {

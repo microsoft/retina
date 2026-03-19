@@ -246,7 +246,8 @@ func assertEqualEndpoint(t *testing.T, expected *common.RetinaEndpoint, actual *
 func TestEnricherZoneResolution(t *testing.T) {
 	opts := log.GetDefaultLogOpts()
 	opts.Level = "debug"
-	log.SetupZapLogger(opts)
+	_, err := log.SetupZapLogger(opts)
+	require.NoError(t, err)
 
 	c := cache.New(pubsub.New())
 
@@ -310,7 +311,8 @@ func TestEnricherZoneResolution(t *testing.T) {
 func TestEnricherZoneResolution_NoNode(t *testing.T) {
 	opts := log.GetDefaultLogOpts()
 	opts.Level = "debug"
-	log.SetupZapLogger(opts)
+	_, err := log.SetupZapLogger(opts)
+	require.NoError(t, err)
 
 	c := cache.New(pubsub.New())
 

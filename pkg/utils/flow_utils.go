@@ -35,6 +35,8 @@ const (
 	ExtKeyPrevObservedTCPFlags = "previously_observed_tcp_flags"
 	ExtKeySourceZone           = "source_zone"
 	ExtKeyDestinationZone      = "destination_zone"
+
+	zoneUnknown = "unknown"
 )
 
 // ToFlow returns a flow.Flow object.
@@ -476,11 +478,11 @@ func AddZones(s *structpb.Struct, srcZone, dstZone string) {
 func SourceZone(f *flow.Flow) string {
 	s := GetExtensionsStruct(f)
 	if s == nil {
-		return "unknown"
+		return zoneUnknown
 	}
 	v, ok := s.GetFields()[ExtKeySourceZone]
 	if !ok {
-		return "unknown"
+		return zoneUnknown
 	}
 	return v.GetStringValue()
 }
@@ -489,11 +491,11 @@ func SourceZone(f *flow.Flow) string {
 func DestinationZone(f *flow.Flow) string {
 	s := GetExtensionsStruct(f)
 	if s == nil {
-		return "unknown"
+		return zoneUnknown
 	}
 	v, ok := s.GetFields()[ExtKeyDestinationZone]
 	if !ok {
-		return "unknown"
+		return zoneUnknown
 	}
 	return v.GetStringValue()
 }
