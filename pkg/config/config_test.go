@@ -5,7 +5,6 @@ package config
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -74,57 +73,40 @@ func TestDecodeLevelHook(t *testing.T) {
 func TestGetConfig_EnableTCX(t *testing.T) {
 	tests := []struct {
 		name          string
-		enableTCX     string
+		configFile    string
 		expected      TCXMode
 		expectedError error
 	}{
 		{
-			name:      "auto",
-			enableTCX: "auto",
-			expected:  TCXModeAuto,
+			name:       "auto",
+			configFile: "./testwith/config-tcx-auto.yaml",
+			expected:   TCXModeAuto,
 		},
 		{
-			name:      "off",
-			enableTCX: "off",
-			expected:  TCXModeOff,
+			name:       "off",
+			configFile: "./testwith/config-tcx-off.yaml",
+			expected:   TCXModeOff,
 		},
 		{
-			name:      "empty defaults to auto",
-			enableTCX: "",
-			expected:  TCXModeAuto,
+			name:       "empty defaults to auto",
+			configFile: "./testwith/config-tcx-empty.yaml",
+			expected:   TCXModeAuto,
 		},
 		{
 			name:          "invalid value rejected",
-			enableTCX:     "always",
+			configFile:    "./testwith/config-tcx-invalid.yaml",
 			expectedError: ErrEnableTCXInvalid,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := &Config{
-				APIServer:              Server{Host: "0.0.0.0", Port: 10093},
-				MetricsInterval:        10,
-				TelemetryInterval:      DefaultTelemetryInterval,
-				DataSamplingRate:       1,
-				PacketParserRingBuffer: PacketParserRingBufferDisabled,
-				EnableTCX:              TCXMode(tt.enableTCX),
-			}
-
-			switch cfg.EnableTCX {
-			case "":
-				cfg.EnableTCX = TCXModeAuto
-			case TCXModeAuto, TCXModeOff:
-				// valid
-			default:
-				err := fmt.Errorf("invalid enableTCX %q: %w", cfg.EnableTCX, ErrEnableTCXInvalid)
+			cfg, err := GetConfig(tt.configFile)
+			if tt.expectedError != nil {
 				require.ErrorIs(t, err, tt.expectedError)
 				return
 			}
-
-			if tt.expectedError != nil {
-				t.Fatalf("expected error %v but got none", tt.expectedError)
-			}
+			require.NoError(t, err)
 			assert.Equal(t, tt.expected, cfg.EnableTCX)
 		})
 	}
