@@ -20,6 +20,8 @@ import (
 	"github.com/cilium/cilium/api/v1/flow"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/asm"
+	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
 	"github.com/cilium/ebpf/ringbuf"
 	tc "github.com/florianl/go-tc"
@@ -306,8 +308,24 @@ func (p *packetParser) Init() error {
 		p.reader = &perfReaderWrapper{reader: pr}
 	}
 
-	p.tcMap = &sync.Map{}
+	p.attachmentMap = &sync.Map{}
 	p.interfaceLockMap = &sync.Map{}
+
+	// Resolve TCX support based on config.
+	switch p.cfg.EnableTCX {
+	case kcfg.TCXModeOff:
+		p.tcxSupported = false
+		p.l.Info("EnableTCX=off: will use traditional TC attachment")
+	case kcfg.TCXModeAuto:
+		p.tcxSupported = isTCXSupported()
+		if p.tcxSupported {
+			p.l.Info("EnableTCX=auto: TCX supported, will use TCX attachment")
+		} else {
+			p.l.Info("EnableTCX=auto: TCX not supported, will use traditional TC attachment")
+		}
+	default:
+		p.l.Warn("Unknown EnableTCX value, defaulting to traditional TC attachment", zap.String("enableTCX", string(p.cfg.EnableTCX)))
+	}
 
 	return nil
 }
@@ -423,14 +441,17 @@ func (p *packetParser) SetupChannel(ch chan *v1.Event) error {
 // cleanAll is NOT thread safe.
 // Not required for now.
 func (p *packetParser) cleanAll() error {
-	// Delete tunnel and qdiscs.
-	if p.tcMap == nil {
+	if p.attachmentMap == nil {
 		return nil
 	}
 
-	p.tcMap.Range(func(key, value interface{}) bool {
-		v := value.(*tcValue)
-		p.clean(v.tc, v.qdisc)
+	p.attachmentMap.Range(func(_, value interface{}) bool {
+		v := value.(*attachmentValue)
+		if v.attachmentType == attachmentTypeTCX {
+			p.cleanTCX(v.tcxIngressLink, v.tcxEgressLink)
+		} else {
+			p.clean(v.tc, v.qdisc)
+		}
 		return true
 	})
 
@@ -438,7 +459,7 @@ func (p *packetParser) cleanAll() error {
 	// It is OK to do this without a lock because
 	// cleanAll is only invoked from Stop(), and Stop can
 	// only be called from PluginManager (which is single threaded).
-	p.tcMap = &sync.Map{}
+	p.attachmentMap = &sync.Map{}
 	return nil
 }
 
@@ -452,6 +473,55 @@ func (p *packetParser) clean(rtnl nltc, qdisc *tc.Object) {
 			p.l.Warn("could not close rtnetlink socket", zap.Error(err))
 		}
 	}
+}
+
+// cleanTCX closes TCX links. This is best effort.
+func (p *packetParser) cleanTCX(ingressLink, egressLink link.Link) {
+	if ingressLink != nil {
+		if err := ingressLink.Close(); err != nil {
+			p.l.Debug("could not close ingress TCX link", zap.Error(err))
+		}
+	}
+	if egressLink != nil {
+		if err := egressLink.Close(); err != nil {
+			p.l.Debug("could not close egress TCX link", zap.Error(err))
+		}
+	}
+}
+
+// isTCXSupported probes whether the running kernel supports TCX attachment (kernel 6.6+)
+// by creating a minimal BPF program and attempting to attach it to the loopback interface.
+func isTCXSupported() bool {
+	loopback, err := netlink.LinkByName("lo")
+	if err != nil {
+		return false
+	}
+
+	progSpec := &ebpf.ProgramSpec{
+		Type:       ebpf.SchedCLS,
+		AttachType: ebpf.AttachTCXIngress,
+		License:    "Dual MIT/GPL",
+		Instructions: asm.Instructions{
+			asm.Mov.Imm(asm.R0, -1),
+			asm.Return(),
+		},
+	}
+	prog, err := ebpf.NewProgram(progSpec)
+	if err != nil {
+		return false
+	}
+	defer prog.Close()
+
+	testLink, err := link.AttachTCX(link.TCXOptions{
+		Program:   prog,
+		Attach:    ebpf.AttachTCXIngress,
+		Interface: loopback.Attrs().Index,
+	})
+	if err != nil {
+		return false
+	}
+	testLink.Close() //nolint:errcheck // probe cleanup
+	return true
 }
 
 func (p *packetParser) endpointWatcherCallbackFn(obj interface{}) {
@@ -476,11 +546,15 @@ func (p *packetParser) endpointWatcherCallbackFn(obj interface{}) {
 	case endpoint.EndpointDeleted:
 		p.l.Debug("Endpoint deleted", zap.String("name", iface.Name))
 		// Clean.
-		if value, ok := p.tcMap.Load(ifaceKey); ok {
-			v := value.(*tcValue)
-			p.clean(v.tc, v.qdisc)
+		if value, ok := p.attachmentMap.Load(ifaceKey); ok {
+			v := value.(*attachmentValue)
+			if v.attachmentType == attachmentTypeTCX {
+				p.cleanTCX(v.tcxIngressLink, v.tcxEgressLink)
+			} else {
+				p.clean(v.tc, v.qdisc)
+			}
 			// Delete from map.
-			p.tcMap.Delete(ifaceKey)
+			p.attachmentMap.Delete(ifaceKey)
 		}
 		// Delete from lock map.
 		p.interfaceLockMap.Delete(ifaceKey)
@@ -490,9 +564,75 @@ func (p *packetParser) endpointWatcherCallbackFn(obj interface{}) {
 	}
 }
 
-// createQdiscAndAttach creates a qdisc of type clsact on the interface and attaches the ingress and egress bpf filter programs to it.
+// createQdiscAndAttach attaches BPF ingress/egress programs to the interface using TCX or TC
+// depending on kernel support and configuration.
 // Only support interfaces of type veth and device.
 func (p *packetParser) createQdiscAndAttach(iface netlink.LinkAttrs, ifaceType interfaceType) {
+	p.l.Debug("Starting attachment", zap.String("interface", iface.Name))
+
+	if p.tcxSupported {
+		p.attachViaTCX(iface, ifaceType)
+		return
+	}
+
+	p.attachViaTC(iface, ifaceType)
+}
+
+// attachViaTCX attaches BPF programs using TCX (TC eXpress, kernel 6.6+).
+func (p *packetParser) attachViaTCX(iface netlink.LinkAttrs, ifaceType interfaceType) {
+	var ingressProgram, egressProgram *ebpf.Program
+
+	switch ifaceType {
+	case Device:
+		ingressProgram = p.objs.HostIngressFilter
+		egressProgram = p.objs.HostEgressFilter
+	case Veth:
+		ingressProgram = p.objs.EndpointIngressFilter
+		egressProgram = p.objs.EndpointEgressFilter
+	default:
+		p.l.Error("Unknown interface type for TCX", zap.String("interface type", string(ifaceType)))
+		return
+	}
+
+	// Attach at the head of the TCX chain so Retina sees every packet before
+	// any policy-enforcing program (e.g. Cilium) can drop it. This is safe
+	// because Retina's programs always return TC_ACT_UNSPEC, which passes
+	// control to the next program in the chain without making any forwarding
+	// decision.
+	ingressLink, err := link.AttachTCX(link.TCXOptions{
+		Program:   ingressProgram,
+		Attach:    ebpf.AttachTCXIngress,
+		Interface: iface.Index,
+		Anchor:    link.Head(),
+	})
+	if err != nil {
+		p.l.Error("could not attach TCX ingress program", zap.String("interface", iface.Name), zap.Error(err))
+		return
+	}
+
+	egressLink, err := link.AttachTCX(link.TCXOptions{
+		Program:   egressProgram,
+		Attach:    ebpf.AttachTCXEgress,
+		Interface: iface.Index,
+		Anchor:    link.Head(),
+	})
+	if err != nil {
+		p.l.Error("could not attach TCX egress program", zap.String("interface", iface.Name), zap.Error(err))
+		ingressLink.Close() //nolint:errcheck // best effort
+		return
+	}
+
+	ifaceKey := ifaceToKey(iface)
+	p.attachmentMap.Store(ifaceKey, &attachmentValue{
+		attachmentType: attachmentTypeTCX,
+		tcxIngressLink: ingressLink,
+		tcxEgressLink:  egressLink,
+	})
+	p.l.Debug("Successfully attached BPF programs using TCX", zap.String("interface", iface.Name))
+}
+
+// attachViaTC attaches BPF programs using traditional TC with a clsact qdisc.
+func (p *packetParser) attachViaTC(iface netlink.LinkAttrs, ifaceType interfaceType) {
 	p.l.Debug("Starting qdisc attachment", zap.String("interface", iface.Name))
 
 	var (
@@ -513,7 +653,7 @@ func (p *packetParser) createQdiscAndAttach(iface netlink.LinkAttrs, ifaceType i
 		ingressInfo = p.endpointIngressInfo
 		egressInfo = p.endpointEgressInfo
 	default:
-		p.l.Error("Unknown interface type", zap.String("interface type", string(ifaceType)))
+		p.l.Error("Unknown interface type for TC", zap.String("interface type", string(ifaceType)))
 		return
 	}
 
@@ -601,13 +741,13 @@ func (p *packetParser) createQdiscAndAttach(iface netlink.LinkAttrs, ifaceType i
 
 	// Cache.
 	ifaceKey := ifaceToKey(iface)
-	tcValue := &tcValue{
-		tc:    rtnl,
-		qdisc: clsactQdisc,
-	}
-	p.tcMap.Store(ifaceKey, tcValue)
+	p.attachmentMap.Store(ifaceKey, &attachmentValue{
+		attachmentType: attachmentTypeTC,
+		tc:             rtnl,
+		qdisc:          clsactQdisc,
+	})
 
-	p.l.Debug("Successfully added bpf", zap.String("interface", iface.Name))
+	p.l.Debug("Successfully attached BPF programs using traditional TC", zap.String("interface", iface.Name))
 }
 
 func (p *packetParser) run(ctx context.Context) error {
