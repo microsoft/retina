@@ -26,11 +26,15 @@ const (
 	// In any run I haven't seen reconcile take longer than 5 seconds,
 	// and 10 seconds seems like a reasonable SLA for reconciliation to be completed
 	MAX_RECONCILE_TIME = 10 * time.Second
+
+	// plugin name used for conntrack GC check
+	pluginNamePacketparser = "packetparser"
 )
 
 var (
-	ErrNilCfg       = errors.New("pluginmanager requires a non-nil config")
-	ErrZeroInterval = errors.New("pluginmanager requires a positive MetricsInterval in its config")
+	ErrNilCfg         = errors.New("pluginmanager requires a non-nil config")
+	ErrZeroInterval   = errors.New("pluginmanager requires a positive MetricsInterval in its config")
+	ErrPluginNotFound = errors.New("plugin not found in registry")
 )
 
 type PluginManager struct {
@@ -61,7 +65,7 @@ func NewPluginManager(cfg *kcfg.Config, tel telemetry.Telemetry) (*PluginManager
 	for _, name := range cfg.EnabledPlugin {
 		newPluginFn, ok := plugin.Get(name)
 		if !ok {
-			return nil, fmt.Errorf("plugin %s not found in registry", name)
+			return nil, errors.Wrapf(ErrPluginNotFound, "%s", name)
 		}
 		mgr.plugins[name] = newPluginFn(mgr.cfg)
 	}
@@ -136,7 +140,7 @@ func (p *PluginManager) Start(ctx context.Context) error {
 	}
 
 	g, ctx := errgroup.WithContext(ctx)
-	_, isPacketParserEnabled := p.plugins["packetparser"]
+	_, isPacketParserEnabled := p.plugins[pluginNamePacketparser]
 	// run conntrack GC only if packetparser is enabled
 	if isPacketParserEnabled {
 		ct, connErr := conntrack.New()

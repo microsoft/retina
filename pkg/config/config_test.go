@@ -70,6 +70,48 @@ func TestDecodeLevelHook(t *testing.T) {
 	}
 }
 
+func TestGetConfig_EnableTCX(t *testing.T) {
+	tests := []struct {
+		name          string
+		configFile    string
+		expected      TCXMode
+		expectedError error
+	}{
+		{
+			name:       "auto",
+			configFile: "./testwith/config-tcx-auto.yaml",
+			expected:   TCXModeAuto,
+		},
+		{
+			name:       "off",
+			configFile: "./testwith/config-tcx-off.yaml",
+			expected:   TCXModeOff,
+		},
+		{
+			name:       "empty defaults to auto",
+			configFile: "./testwith/config-tcx-empty.yaml",
+			expected:   TCXModeAuto,
+		},
+		{
+			name:          "invalid value rejected",
+			configFile:    "./testwith/config-tcx-invalid.yaml",
+			expectedError: ErrEnableTCXInvalid,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := GetConfig(tt.configFile)
+			if tt.expectedError != nil {
+				require.ErrorIs(t, err, tt.expectedError)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, cfg.EnableTCX)
+		})
+	}
+}
+
 func TestDecodePacketParserRingBufferModeHook(t *testing.T) {
 	tests := []struct {
 		name          string

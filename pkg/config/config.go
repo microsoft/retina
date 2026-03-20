@@ -17,6 +17,16 @@ import (
 // Level defines the level of monitor aggregation.
 type Level int
 
+// TCXMode controls whether TCX (TC eXpress) attachment is used for packetparser.
+type TCXMode string
+
+const (
+	// TCXModeAuto detects kernel support and uses TCX if available, falling back to TC.
+	TCXModeAuto TCXMode = "auto"
+	// TCXModeOff disables TCX and always uses traditional TC.
+	TCXModeOff TCXMode = "off"
+)
+
 const MinTelemetryInterval time.Duration = 2 * time.Minute
 
 const (
@@ -33,6 +43,7 @@ const (
 )
 
 var (
+	ErrEnableTCXInvalid                       = errors.New("enableTCX must be \"auto\" or \"off\"")
 	ErrPacketParserRingBufferAutoNotSupported = errors.New("packetParserRingBuffer mode auto is not supported yet")
 	ErrPacketParserRingBufferInvalid          = errors.New("packetParserRingBuffer must be set to enabled or disabled")
 	ErrPacketParserRingBufferInvalidBool      = errors.New(
@@ -123,6 +134,7 @@ type Config struct {
 	PacketParserRingBuffer     PacketParserRingBufferMode `yaml:"packetParserRingBuffer"`
 	PacketParserRingBufferSize uint32                     `yaml:"packetParserRingBufferSize"`
 	FilterMapMaxEntries        uint32                     `yaml:"filterMapMaxEntries"`
+	EnableTCX                  TCXMode                    `yaml:"enableTCX"`
 }
 
 func GetConfig(cfgFilename string) (*Config, error) {
@@ -180,6 +192,16 @@ func GetConfig(cfgFilename string) (*Config, error) {
 	// Default filter map max entries to 255 if not set.
 	if config.FilterMapMaxEntries == 0 {
 		config.FilterMapMaxEntries = DefaultFilterMapMaxEntries
+	}
+
+	// Default EnableTCX to "auto" if unset, reject unknown values.
+	switch config.EnableTCX {
+	case "":
+		config.EnableTCX = TCXModeAuto
+	case TCXModeAuto, TCXModeOff:
+		// valid
+	default:
+		return nil, fmt.Errorf("invalid enableTCX %q: %w", config.EnableTCX, ErrEnableTCXInvalid)
 	}
 
 	switch config.PacketParserRingBuffer { //nolint:exhaustive // we only care about Auto and empty (default) here
