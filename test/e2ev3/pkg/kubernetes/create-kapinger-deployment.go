@@ -29,7 +29,7 @@ type CreateKapingerDeployment struct {
 	KubeConfigFilePath string
 }
 
-func (c *CreateKapingerDeployment) Do(_ context.Context) error {
+func (c *CreateKapingerDeployment) Do(ctx context.Context) error {
 	_, err := strconv.Atoi(c.KapingerReplicas)
 	if err != nil {
 		return fmt.Errorf("error converting replicas to int for Kapinger replicas: %w", err)
@@ -44,9 +44,6 @@ func (c *CreateKapingerDeployment) Do(_ context.Context) error {
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	resources := []runtime.Object{
 		c.GetKapingerService(),

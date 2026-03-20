@@ -13,7 +13,8 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addNodeConnectivityScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFilePath string) flow.Steper {
+func addNodeConnectivityScenario(kubeConfigFilePath string) *flow.Workflow {
+	wf := &flow.Workflow{DontPanic: true}
 	validateStatus := &prom.ValidateMetricStep{
 		ForwardedPort: config.RetinaMetricsPort,
 		MetricName:    "networkobservability_node_connectivity_status",
@@ -40,8 +41,7 @@ func addNodeConnectivityScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeC
 	// Validate: retry with exponential backoff until metrics appear.
 	wf.Add(
 		flow.Step(validateWithPF).
-			DependsOn(dependsOn).
 			Retry(utils.RetryWithBackoff),
 	)
-	return validateWithPF
+	return wf
 }

@@ -6,6 +6,8 @@
 package experimental
 
 import (
+	"context"
+
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/config"
 	"github.com/microsoft/retina/test/e2ev3/pkg/images"
@@ -13,12 +15,23 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-// InstallAndTestRetinaBasicMetricsExperimental creates a workflow that installs Retina
-// and validates experimental basic metrics: forward, conntrack, TCP stats,
-// network stats (IP/UDP/interface), and node connectivity.
-func InstallAndTestRetinaBasicMetricsExperimental(kubeConfigFilePath, chartPath, testPodNamespace string, imgCfg *config.ImageConfig, helmCfg *config.HelmConfig, loader images.Loader) *flow.Workflow {
-	wf := &flow.Workflow{DontPanic: true}
+// Workflow runs the experimental basic metrics workflow.
+type Workflow struct {
+	Params *config.E2EParams
+}
 
+func (w *Workflow) String() string { return "basic-metrics-experimental" }
+
+func (w *Workflow) Do(ctx context.Context) error {
+	p := w.Params
+	kubeConfigFilePath := p.Paths.KubeConfig
+	chartPath := p.Paths.RetinaChart
+	testPodNamespace := config.TestPodNamespace
+	imgCfg := &p.Cfg.Image
+	helmCfg := &p.Cfg.Helm
+	loader := images.NewLoader(*config.Provider, p.Cfg.Azure.ClusterName)
+
+	// Construct steps.
 	installRetina := &k8s.InstallHelmChart{
 		Namespace:          config.KubeSystemNamespace,
 		ReleaseName:        "retina",
@@ -30,27 +43,19 @@ func InstallAndTestRetinaBasicMetricsExperimental(kubeConfigFilePath, chartPath,
 		HelmDriver:         helmCfg.Driver,
 		ImageLoader:        loader,
 	}
-	wf.Add(flow.Step(installRetina))
 
 	var scenarioTails []flow.Steper
-
 	for _, arch := range config.Architectures {
-		fwdTail := addForwardScenario(wf, installRetina, kubeConfigFilePath, testPodNamespace, arch)
-		scenarioTails = append(scenarioTails, fwdTail)
-
-		ctTail := addConntrackScenario(wf, installRetina, kubeConfigFilePath, testPodNamespace, arch)
-		scenarioTails = append(scenarioTails, ctTail)
-
-		tcpStatsTail := addTCPStatsScenario(wf, installRetina, kubeConfigFilePath, testPodNamespace, arch)
-		scenarioTails = append(scenarioTails, tcpStatsTail)
+		scenarioTails = append(scenarioTails,
+			addForwardScenario(kubeConfigFilePath, testPodNamespace, arch),
+			addConntrackScenario(kubeConfigFilePath, testPodNamespace, arch),
+			addTCPStatsScenario(kubeConfigFilePath, testPodNamespace, arch),
+		)
 	}
-
-	// Node-level metrics — not per-arch.
-	netStatsTail := addNetworkStatsScenario(wf, installRetina, kubeConfigFilePath)
-	scenarioTails = append(scenarioTails, netStatsTail)
-
-	nodeConnTail := addNodeConnectivityScenario(wf, installRetina, kubeConfigFilePath)
-	scenarioTails = append(scenarioTails, nodeConnTail)
+	scenarioTails = append(scenarioTails,
+		addNetworkStatsScenario(kubeConfigFilePath),
+		addNodeConnectivityScenario(kubeConfigFilePath),
+	)
 
 	ensureStable := &k8s.EnsureStableComponent{
 		PodNamespace:           config.KubeSystemNamespace,
@@ -58,14 +63,21 @@ func InstallAndTestRetinaBasicMetricsExperimental(kubeConfigFilePath, chartPath,
 		KubeConfigFilePath:     kubeConfigFilePath,
 		IgnoreContainerRestart: false,
 	}
-	wf.Add(flow.Step(ensureStable).DependsOn(scenarioTails...))
 
 	debug := &utils.DebugOnFailure{
 		KubeConfigFilePath: kubeConfigFilePath,
 		Namespace:          config.KubeSystemNamespace,
 		LabelSelector:      "k8s-app=retina",
 	}
+
+	// Wire dependencies and register.
+	wf := &flow.Workflow{DontPanic: true}
+	wf.Add(flow.Step(installRetina))
+	for _, s := range scenarioTails {
+		wf.Add(flow.Step(s).DependsOn(installRetina))
+	}
+	wf.Add(flow.Step(ensureStable).DependsOn(scenarioTails...))
 	wf.Add(flow.Step(debug).DependsOn(ensureStable).When(flow.AnyFailed))
 
-	return wf
+	return wf.Do(ctx)
 }

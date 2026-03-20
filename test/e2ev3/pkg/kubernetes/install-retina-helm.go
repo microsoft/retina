@@ -40,7 +40,7 @@ type InstallHelmChart struct {
 	EnableHeartbeat    bool
 }
 
-func (i *InstallHelmChart) Do(_ context.Context) error {
+func (i *InstallHelmChart) Do(ctx context.Context) error {
 	// Prevalidation: check chart path and tag env
 	_, err := os.Stat(i.ChartPath)
 	if os.IsNotExist(err) {
@@ -67,7 +67,7 @@ func (i *InstallHelmChart) Do(_ context.Context) error {
 	imageRegistry := i.ImageRegistry
 	imageNamespace := i.ImageNamespace
 
-	ctx, cancel := context.WithTimeout(context.Background(), createTimeout)
+	ctx, cancel := context.WithTimeout(ctx, createTimeout)
 	defer cancel()
 	settings := cli.New()
 	settings.KubeConfig = i.KubeConfigFilePath
@@ -79,7 +79,7 @@ func (i *InstallHelmChart) Do(_ context.Context) error {
 	}
 
 	// Creating extra namespace to deploy test pods
-	err = CreateNamespaceFn(i.KubeConfigFilePath, e2ecfg.TestPodNamespace)
+	err = CreateNamespaceFn(ctx, i.KubeConfigFilePath, e2ecfg.TestPodNamespace)
 	if err != nil {
 		return fmt.Errorf("failed to create namespace %s: %w", i.Namespace, err)
 	}

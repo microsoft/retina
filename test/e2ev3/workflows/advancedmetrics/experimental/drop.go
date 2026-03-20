@@ -13,7 +13,8 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addAdvancedDropScenario(wf *flow.Workflow, upstream flow.Steper, kubeConfigFilePath, namespace, arch string) flow.Steper {
+func addAdvancedDropScenario(kubeConfigFilePath, namespace, arch string) *flow.Workflow {
+	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-adv-drop-" + arch
 	podName := agnhostName + "-0"
 
@@ -55,7 +56,6 @@ func addAdvancedDropScenario(wf *flow.Workflow, upstream flow.Steper, kubeConfig
 	// Setup: provision resources and generate traffic.
 	wf.Add(
 		flow.Pipe(createNetPol, createAgnhost, execCurl).
-			DependsOn(upstream).
 			Timeout(utils.DefaultScenarioTimeout),
 	)
 
@@ -72,5 +72,5 @@ func addAdvancedDropScenario(wf *flow.Workflow, upstream flow.Steper, kubeConfig
 			DependsOn(validateWithPF).
 			When(flow.Always),
 	)
-	return deleteAgnhost
+	return wf
 }

@@ -6,6 +6,8 @@
 package hubblemetrics
 
 import (
+	"context"
+
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/config"
 	"github.com/microsoft/retina/test/e2ev3/pkg/images"
@@ -13,12 +15,22 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-// InstallAndTestHubbleMetrics installs Hubble, validates its services, and runs
-// DNS, flow (intra-node, inter-node, pod-to-world), drop, and TCP metric
-// scenarios for each architecture.
-func InstallAndTestHubbleMetrics(kubeConfigFilePath, chartPath string, imgCfg *config.ImageConfig, helmCfg *config.HelmConfig, loader images.Loader) *flow.Workflow {
-	wf := &flow.Workflow{DontPanic: true}
+// Workflow runs the hubble metrics workflow.
+type Workflow struct {
+	Params *config.E2EParams
+}
 
+func (w *Workflow) String() string { return "hubble-metrics" }
+
+func (w *Workflow) Do(ctx context.Context) error {
+	p := w.Params
+	kubeConfigFilePath := p.Paths.KubeConfig
+	chartPath := p.Paths.HubbleChart
+	imgCfg := &p.Cfg.Image
+	helmCfg := &p.Cfg.Helm
+	loader := images.NewLoader(*config.Provider, p.Cfg.Azure.ClusterName)
+
+	// Construct steps.
 	installHubble := &k8s.InstallHubbleHelmChart{
 		Namespace:          config.KubeSystemNamespace,
 		ReleaseName:        "retina",
@@ -30,34 +42,20 @@ func InstallAndTestHubbleMetrics(kubeConfigFilePath, chartPath string, imgCfg *c
 		HelmDriver:         helmCfg.Driver,
 		ImageLoader:        loader,
 	}
-	wf.Add(flow.Step(installHubble))
 
-	var allScenarioTails []flow.Steper
-
-	relayTail := addHubbleRelayValidation(wf, installHubble, kubeConfigFilePath)
-	allScenarioTails = append(allScenarioTails, relayTail)
-
-	uiTail := addHubbleUIValidation(wf, installHubble, kubeConfigFilePath)
-	allScenarioTails = append(allScenarioTails, uiTail)
-
+	scenarioTails := []flow.Steper{
+		addHubbleRelayValidation(kubeConfigFilePath),
+		addHubbleUIValidation(kubeConfigFilePath),
+	}
 	for _, arch := range config.Architectures {
-		dnsTail := addHubbleDNSScenario(wf, installHubble, kubeConfigFilePath, arch)
-		allScenarioTails = append(allScenarioTails, dnsTail)
-
-		flowIntraTail := addHubbleFlowIntraNodeScenario(wf, installHubble, kubeConfigFilePath, arch)
-		allScenarioTails = append(allScenarioTails, flowIntraTail)
-
-		flowInterTail := addHubbleFlowInterNodeScenario(wf, installHubble, kubeConfigFilePath, arch)
-		allScenarioTails = append(allScenarioTails, flowInterTail)
-
-		flowWorldTail := addHubbleFlowToWorldScenario(wf, installHubble, kubeConfigFilePath, arch)
-		allScenarioTails = append(allScenarioTails, flowWorldTail)
-
-		dropTail := addHubbleDropScenario(wf, installHubble, kubeConfigFilePath, arch)
-		allScenarioTails = append(allScenarioTails, dropTail)
-
-		tcpTail := addHubbleTCPScenario(wf, installHubble, kubeConfigFilePath, arch)
-		allScenarioTails = append(allScenarioTails, tcpTail)
+		scenarioTails = append(scenarioTails,
+			addHubbleDNSScenario(kubeConfigFilePath, arch),
+			addHubbleFlowIntraNodeScenario(kubeConfigFilePath, arch),
+			addHubbleFlowInterNodeScenario(kubeConfigFilePath, arch),
+			addHubbleFlowToWorldScenario(kubeConfigFilePath, arch),
+			addHubbleDropScenario(kubeConfigFilePath, arch),
+			addHubbleTCPScenario(kubeConfigFilePath, arch),
+		)
 	}
 
 	ensureStable := &k8s.EnsureStableComponent{
@@ -66,14 +64,21 @@ func InstallAndTestHubbleMetrics(kubeConfigFilePath, chartPath string, imgCfg *c
 		KubeConfigFilePath:     kubeConfigFilePath,
 		IgnoreContainerRestart: false,
 	}
-	wf.Add(flow.Step(ensureStable).DependsOn(allScenarioTails...))
 
 	debug := &utils.DebugOnFailure{
 		KubeConfigFilePath: kubeConfigFilePath,
 		Namespace:          config.KubeSystemNamespace,
 		LabelSelector:      "k8s-app=retina",
 	}
+
+	// Wire dependencies and register.
+	wf := &flow.Workflow{DontPanic: true}
+	wf.Add(flow.Step(installHubble))
+	for _, s := range scenarioTails {
+		wf.Add(flow.Step(s).DependsOn(installHubble))
+	}
+	wf.Add(flow.Step(ensureStable).DependsOn(scenarioTails...))
 	wf.Add(flow.Step(debug).DependsOn(ensureStable).When(flow.AnyFailed))
 
-	return wf
+	return wf.Do(ctx)
 }

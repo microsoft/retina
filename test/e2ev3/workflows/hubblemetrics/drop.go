@@ -13,7 +13,8 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addHubbleDropScenario(wf *flow.Workflow, upstream flow.Steper, kubeConfigFilePath, arch string) flow.Steper {
+func addHubbleDropScenario(kubeConfigFilePath, arch string) *flow.Workflow {
+	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := HubbleDropAgnhostName
 	podName := HubbleDropPodName
 
@@ -66,7 +67,6 @@ func addHubbleDropScenario(wf *flow.Workflow, upstream flow.Steper, kubeConfigFi
 	// Setup: provision resources and generate traffic.
 	wf.Add(
 		flow.Pipe(createNetPol, createAgnhost, execCurl).
-			DependsOn(upstream).
 			Timeout(utils.DefaultScenarioTimeout),
 	)
 
@@ -83,5 +83,5 @@ func addHubbleDropScenario(wf *flow.Workflow, upstream flow.Steper, kubeConfigFi
 			DependsOn(validateWithPF).
 			When(flow.Always),
 	)
-	return deleteAgnhost
+	return wf
 }

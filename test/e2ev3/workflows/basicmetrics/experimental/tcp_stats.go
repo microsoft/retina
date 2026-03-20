@@ -13,7 +13,8 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addTCPStatsScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFilePath, namespace, arch string) flow.Steper {
+func addTCPStatsScenario(kubeConfigFilePath, namespace, arch string) *flow.Workflow {
+	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-tcpstats-" + arch
 	podName := agnhostName + "-0"
 
@@ -67,7 +68,6 @@ func addTCPStatsScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFil
 	// Setup: provision resources and generate traffic.
 	wf.Add(
 		flow.Pipe(createKapinger, createAgnhost, waitKapinger, execCurl1, execCurl2).
-			DependsOn(dependsOn).
 			Timeout(utils.DefaultScenarioTimeout),
 	)
 
@@ -84,5 +84,5 @@ func addTCPStatsScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFil
 			DependsOn(validateWithPF).
 			When(flow.Always),
 	)
-	return deleteKapinger
+	return wf
 }

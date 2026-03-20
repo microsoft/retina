@@ -13,7 +13,8 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addHubbleTCPScenario(wf *flow.Workflow, upstream flow.Steper, kubeConfigFilePath, arch string) flow.Steper {
+func addHubbleTCPScenario(kubeConfigFilePath, arch string) *flow.Workflow {
+	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-tcp"
 	podName := agnhostName + "-0"
 
@@ -45,7 +46,6 @@ func addHubbleTCPScenario(wf *flow.Workflow, upstream flow.Steper, kubeConfigFil
 	// Setup: provision resources and generate traffic.
 	wf.Add(
 		flow.Pipe(createAgnhost, execCurl).
-			DependsOn(upstream).
 			Timeout(utils.DefaultScenarioTimeout),
 	)
 
@@ -62,5 +62,5 @@ func addHubbleTCPScenario(wf *flow.Workflow, upstream flow.Steper, kubeConfigFil
 			DependsOn(validateWithPF).
 			When(flow.Always),
 	)
-	return deleteAgnhost
+	return wf
 }

@@ -6,18 +6,30 @@
 package experimental
 
 import (
+	"context"
+
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/config"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-// UpgradeAndTestRetinaAdvancedMetricsExperimental creates a workflow that upgrades Retina
-// with the advanced profile and validates experimental advanced metrics: drop, forward,
-// TCP flags/retransmissions, and API server latency.
-func UpgradeAndTestRetinaAdvancedMetricsExperimental(kubeConfigFilePath, chartPath, valuesFilePath, testPodNamespace string, helmCfg *config.HelmConfig) *flow.Workflow {
-	wf := &flow.Workflow{DontPanic: true}
+// Workflow runs the experimental advanced metrics workflow.
+type Workflow struct {
+	Params *config.E2EParams
+}
 
+func (w *Workflow) String() string { return "advanced-metrics-experimental" }
+
+func (w *Workflow) Do(ctx context.Context) error {
+	p := w.Params
+	kubeConfigFilePath := p.Paths.KubeConfig
+	chartPath := p.Paths.RetinaChart
+	valuesFilePath := p.Paths.AdvancedProfile
+	testPodNamespace := config.TestPodNamespace
+	helmCfg := &p.Cfg.Helm
+
+	// Construct steps.
 	upgradeRetina := &k8s.UpgradeRetinaHelmChart{
 		Namespace:          config.KubeSystemNamespace,
 		ReleaseName:        "retina",
@@ -26,24 +38,16 @@ func UpgradeAndTestRetinaAdvancedMetricsExperimental(kubeConfigFilePath, chartPa
 		HelmDriver:         helmCfg.Driver,
 		ValuesFile:         valuesFilePath,
 	}
-	wf.Add(flow.Step(upgradeRetina))
 
 	var scenarioTails []flow.Steper
-
 	for _, arch := range config.Architectures {
-		dropTail := addAdvancedDropScenario(wf, upgradeRetina, kubeConfigFilePath, testPodNamespace, arch)
-		scenarioTails = append(scenarioTails, dropTail)
-
-		fwdTail := addAdvancedForwardScenario(wf, upgradeRetina, kubeConfigFilePath, testPodNamespace, arch)
-		scenarioTails = append(scenarioTails, fwdTail)
-
-		tcpTail := addAdvancedTCPScenario(wf, upgradeRetina, kubeConfigFilePath, testPodNamespace, arch)
-		scenarioTails = append(scenarioTails, tcpTail)
+		scenarioTails = append(scenarioTails,
+			addAdvancedDropScenario(kubeConfigFilePath, testPodNamespace, arch),
+			addAdvancedForwardScenario(kubeConfigFilePath, testPodNamespace, arch),
+			addAdvancedTCPScenario(kubeConfigFilePath, testPodNamespace, arch),
+		)
 	}
-
-	// API server latency is node-level, not per-arch.
-	latencyTail := addAPIServerLatencyScenario(wf, upgradeRetina, kubeConfigFilePath)
-	scenarioTails = append(scenarioTails, latencyTail)
+	scenarioTails = append(scenarioTails, addAPIServerLatencyScenario(kubeConfigFilePath))
 
 	ensureStable := &k8s.EnsureStableComponent{
 		PodNamespace:           config.KubeSystemNamespace,
@@ -51,14 +55,21 @@ func UpgradeAndTestRetinaAdvancedMetricsExperimental(kubeConfigFilePath, chartPa
 		KubeConfigFilePath:     kubeConfigFilePath,
 		IgnoreContainerRestart: false,
 	}
-	wf.Add(flow.Step(ensureStable).DependsOn(scenarioTails...))
 
 	debug := &utils.DebugOnFailure{
 		KubeConfigFilePath: kubeConfigFilePath,
 		Namespace:          config.KubeSystemNamespace,
 		LabelSelector:      "k8s-app=retina",
 	}
+
+	// Wire dependencies and register.
+	wf := &flow.Workflow{DontPanic: true}
+	wf.Add(flow.Step(upgradeRetina))
+	for _, s := range scenarioTails {
+		wf.Add(flow.Step(s).DependsOn(upgradeRetina))
+	}
+	wf.Add(flow.Step(ensureStable).DependsOn(scenarioTails...))
 	wf.Add(flow.Step(debug).DependsOn(ensureStable).When(flow.AnyFailed))
 
-	return wf
+	return wf.Do(ctx)
 }

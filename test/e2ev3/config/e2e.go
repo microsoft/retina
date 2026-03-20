@@ -71,21 +71,14 @@ const (
 )
 
 // Architectures lists the CPU architectures to test across.
-var Architectures = []string{"amd64", "arm64"}
-
-// ImageLoader loads container images into a cluster.
-type ImageLoader interface {
-	Load(ctx context.Context, images []string) error
-	PullPolicy() string
-	PullSecrets() []map[string]interface{}
-}
+// Kind clusters are single-arch (amd64), so arm64 is only tested on Azure.
+var Architectures []string
 
 // E2EParams holds shared mutable state populated by early pipeline steps
 // and read by later ones. Safe under flow.Pipe because steps run sequentially.
 type E2EParams struct {
-	Cfg    *E2EConfig
-	Paths  *Paths
-	Loader ImageLoader
+	Cfg   *E2EConfig
+	Paths *Paths
 }
 
 // Paths returns resolved filesystem paths relative to the repository root.
@@ -204,6 +197,13 @@ func LoadE2EConfig() (*E2EConfig, error) {
 	}
 
 	log.Printf("using image %s/%s:%s", cfg.Image.Registry, cfg.Image.Namespace, cfg.Image.Tag)
+
+	// Kind clusters are single-arch (amd64); Azure supports both.
+	if *Provider == "kind" {
+		Architectures = []string{"amd64"}
+	} else {
+		Architectures = []string{"amd64", "arm64"}
+	}
 
 	return cfg, nil
 }

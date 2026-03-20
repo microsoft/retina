@@ -26,7 +26,7 @@ type WaitPodsReady struct {
 	LabelSelector      string
 }
 
-func (w *WaitPodsReady) Do(_ context.Context) error {
+func (w *WaitPodsReady) Do(ctx context.Context) error {
 
 	config, err := clientcmd.BuildConfigFromFlags("", w.KubeConfigFilePath)
 	if err != nil {
@@ -37,8 +37,6 @@ func (w *WaitPodsReady) Do(_ context.Context) error {
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
-
-	ctx := context.TODO()
 
 	return WaitForPodReady(ctx, clientset, w.Namespace, w.LabelSelector)
 }

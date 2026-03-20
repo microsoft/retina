@@ -13,7 +13,8 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addHubbleDNSScenario(wf *flow.Workflow, upstream flow.Steper, kubeConfigFilePath, arch string) flow.Steper {
+func addHubbleDNSScenario(kubeConfigFilePath, arch string) *flow.Workflow {
+	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-dns"
 
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
@@ -62,7 +63,6 @@ func addHubbleDNSScenario(wf *flow.Workflow, upstream flow.Steper, kubeConfigFil
 	// Setup: provision resources and generate traffic.
 	wf.Add(
 		flow.Pipe(createAgnhost, execNslookup).
-			DependsOn(upstream).
 			Timeout(utils.DefaultScenarioTimeout),
 	)
 
@@ -79,5 +79,5 @@ func addHubbleDNSScenario(wf *flow.Workflow, upstream flow.Steper, kubeConfigFil
 			DependsOn(validateWithPF).
 			When(flow.Always),
 	)
-	return deleteAgnhost
+	return wf
 }

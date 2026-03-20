@@ -13,7 +13,8 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addHubbleFlowToWorldScenario(wf *flow.Workflow, upstream flow.Steper, kubeConfigFilePath, arch string) flow.Steper {
+func addHubbleFlowToWorldScenario(kubeConfigFilePath, arch string) *flow.Workflow {
+	wf := &flow.Workflow{DontPanic: true}
 	podname := "agnhost-flow-world"
 	validLabels := []map[string]string{
 		{"source": config.TestPodNamespace + "/" + podname + "-0", "destination": "", "protocol": config.TCP, "subtype": "to-stack", "type": "Trace", "verdict": "FORWARDED"},
@@ -47,7 +48,6 @@ func addHubbleFlowToWorldScenario(wf *flow.Workflow, upstream flow.Steper, kubeC
 	// Setup: provision resources and generate traffic.
 	wf.Add(
 		flow.Pipe(createAgnhost, execCurl).
-			DependsOn(upstream).
 			Timeout(utils.DefaultScenarioTimeout),
 	)
 
@@ -64,5 +64,5 @@ func addHubbleFlowToWorldScenario(wf *flow.Workflow, upstream flow.Steper, kubeC
 			DependsOn(validateWithPF).
 			When(flow.Always),
 	)
-	return deleteAgnhost
+	return wf
 }

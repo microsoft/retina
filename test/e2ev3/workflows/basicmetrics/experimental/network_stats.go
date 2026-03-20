@@ -13,7 +13,8 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addNetworkStatsScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFilePath string) flow.Steper {
+func addNetworkStatsScenario(kubeConfigFilePath string) *flow.Workflow {
+	wf := &flow.Workflow{DontPanic: true}
 	validateIPStats := &prom.ValidateMetricStep{
 		ForwardedPort: config.RetinaMetricsPort,
 		MetricName:    "networkobservability_ip_connection_stats",
@@ -47,8 +48,7 @@ func addNetworkStatsScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfi
 	// Validate: retry with exponential backoff until metrics appear.
 	wf.Add(
 		flow.Step(validateWithPF).
-			DependsOn(dependsOn).
 			Retry(utils.RetryWithBackoff),
 	)
-	return validateWithPF
+	return wf
 }

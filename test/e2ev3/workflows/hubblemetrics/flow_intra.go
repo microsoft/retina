@@ -18,7 +18,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-func addHubbleFlowIntraNodeScenario(wf *flow.Workflow, upstream flow.Steper, kubeConfigFilePath, arch string) flow.Steper {
+func addHubbleFlowIntraNodeScenario(kubeConfigFilePath, arch string) *flow.Workflow {
+	wf := &flow.Workflow{DontPanic: true}
 	podname := "agnhost-flow-intra"
 	replicas := 2
 	validLabels := []map[string]string{
@@ -57,7 +58,6 @@ func addHubbleFlowIntraNodeScenario(wf *flow.Workflow, upstream flow.Steper, kub
 	// Setup: provision resources and generate traffic.
 	wf.Add(
 		flow.Pipe(createAgnhost, curlPod).
-			DependsOn(upstream).
 			Timeout(utils.DefaultScenarioTimeout),
 	)
 
@@ -74,7 +74,7 @@ func addHubbleFlowIntraNodeScenario(wf *flow.Workflow, upstream flow.Steper, kub
 			DependsOn(validateWithPF).
 			When(flow.Always),
 	)
-	return deleteAgnhost
+	return wf
 }
 
 
@@ -89,7 +89,7 @@ type CurlPodStep struct {
 	KubeConfigFilePath string
 }
 
-func (c *CurlPodStep) Do(_ context.Context) error {
+func (c *CurlPodStep) Do(ctx context.Context) error {
 	config, err := clientcmd.BuildConfigFromFlags("", c.KubeConfigFilePath)
 	if err != nil {
 		return fmt.Errorf("error building kubeconfig: %w", err)
@@ -100,14 +100,12 @@ func (c *CurlPodStep) Do(_ context.Context) error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	dstPodIP, err := k8s.GetPodIP(c.KubeConfigFilePath, c.DstPodNamespace, c.DstPodName)
+	dstPodIP, err := k8s.GetPodIP(ctx, c.KubeConfigFilePath, c.DstPodNamespace, c.DstPodName)
 	if err != nil {
 		return fmt.Errorf("error getting pod IP: %w", err)
 	}
 
 	cmd := fmt.Sprintf("curl -s -m 5 %s:80", dstPodIP)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	_, err = k8s.ExecPod(ctx, clientset, config, c.SrcPodNamespace, c.SrcPodName, cmd)
 	if err != nil {
 		return fmt.Errorf("error executing command: %w", err)

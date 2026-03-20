@@ -28,9 +28,19 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// ValidateCapture creates a workflow that installs the retina kubectl plugin
-// and validates packet capture functionality (create, verify, download, delete).
-func ValidateCapture(kubeConfigFilePath, testPodNamespace string, imgCfg *config.ImageConfig) *flow.Workflow {
+// Workflow runs the capture validation workflow.
+type Workflow struct {
+	Params *config.E2EParams
+}
+
+func (w *Workflow) String() string { return "capture" }
+
+func (w *Workflow) Do(ctx context.Context) error {
+	p := w.Params
+	kubeConfigFilePath := p.Paths.KubeConfig
+	testPodNamespace := "default"
+	imgCfg := &p.Cfg.Image
+
 	wf := new(flow.Workflow)
 
 	captureName := "retina-capture-e2e-" + rand.String(5)
@@ -48,7 +58,7 @@ func ValidateCapture(kubeConfigFilePath, testPodNamespace string, imgCfg *config
 
 	wf.Add(flow.Pipe(installPlugin, validateCap))
 
-	return wf
+	return wf.Do(ctx)
 }
 
 
@@ -62,7 +72,7 @@ const (
 // to allow e2e tests to run kubectl retina commands.
 type InstallRetinaPluginStep struct{}
 
-func (i *InstallRetinaPluginStep) Do(_ context.Context) error {
+func (i *InstallRetinaPluginStep) Do(ctx context.Context) error {
 	log.Print("Building kubectl-retina plugin...")
 
 	if err := os.MkdirAll(InstallRetinaBinaryDir, 0o755); err != nil {
@@ -139,9 +149,8 @@ type ValidateCaptureStep struct {
 	ImageNamespace   string
 }
 
-func (v *ValidateCaptureStep) Do(_ context.Context) error {
+func (v *ValidateCaptureStep) Do(ctx context.Context) error {
 	log.Print("Running retina capture create...")
-	ctx := context.TODO()
 
 	imageRegistry := v.ImageRegistry
 	imageNamespace := v.ImageNamespace
@@ -184,6 +193,12 @@ func (v *ValidateCaptureStep) Do(_ context.Context) error {
 	if err := v.downloadCapture(ctx); err != nil {
 		return fmt.Errorf("failed to download and validate capture files: %w", err)
 	}
+	defer func() {
+		outputDir := filepath.Join(".", v.CaptureName)
+		if err := os.RemoveAll(outputDir); err != nil {
+			log.Printf("warning: failed to clean up capture files in %s: %v", outputDir, err)
+		}
+	}()
 
 	if err := v.deleteJobs(ctx, clientset); err != nil {
 		return fmt.Errorf("failed to delete capture jobs: %w", err)
@@ -284,18 +299,22 @@ func (v *ValidateCaptureStep) deleteJobs(ctx context.Context, clientset *kuberne
 		return fmt.Errorf("failed to parse label selector: %w", err)
 	}
 
-	// Wait for deletion to propagate
-	time.Sleep(5 * time.Second)
-
-	jobList, err := clientset.BatchV1().Jobs(v.CaptureNamespace).List(ctx, metav1.ListOptions{
-		LabelSelector: labelSelector.String(),
+	// Poll until jobs are gone instead of sleeping a fixed duration.
+	pollRetrier := retry.Retrier{Attempts: 10, Delay: 1 * time.Second, ExpBackoff: true}
+	err = pollRetrier.Do(ctx, func() error {
+		jobList, listErr := clientset.BatchV1().Jobs(v.CaptureNamespace).List(ctx, metav1.ListOptions{
+			LabelSelector: labelSelector.String(),
+		})
+		if listErr != nil {
+			return fmt.Errorf("failed to list jobs during delete verification: %w", listErr)
+		}
+		if len(jobList.Items) > 0 {
+			return ErrFoundNonZeroCaptureJobs
+		}
+		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("failed to list jobs during delete verification: %w", err)
-	}
-
-	if len(jobList.Items) > 0 {
-		return ErrFoundNonZeroCaptureJobs
+		return err
 	}
 
 	log.Printf("All relevant capture jobs have been successfully deleted.")

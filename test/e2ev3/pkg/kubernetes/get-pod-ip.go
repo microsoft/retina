@@ -9,7 +9,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-func GetPodIP(kubeConfigFilePath, namespace, podName string) (string, error) {
+func GetPodIP(ctx context.Context, kubeConfigFilePath, namespace, podName string) (string, error) {
 	config, err := clientcmd.BuildConfigFromFlags("", kubeConfigFilePath)
 	if err != nil {
 		return "", errors.Wrapf(err, "error building kubeconfig")
@@ -20,7 +20,7 @@ func GetPodIP(kubeConfigFilePath, namespace, podName string) (string, error) {
 		return "", errors.Wrapf(err, "error creating Kubernetes clientset")
 	}
 
-	pod, err := clientset.CoreV1().Pods(namespace).Get(context.Background(), podName, metav1.GetOptions{})
+	pod, err := clientset.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
 	if err != nil {
 		return "", errors.Wrapf(err, "error getting pod %s in namespace %s", podName, namespace)
 	}

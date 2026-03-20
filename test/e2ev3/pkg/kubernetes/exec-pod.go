@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
@@ -26,8 +27,8 @@ type ExecInPod struct {
 	Command            string
 }
 
-func (e *ExecInPod) Do(_ context.Context) error {
-	ctx, cancel := context.WithCancel(context.Background())
+func (e *ExecInPod) Do(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
 	config, err := clientcmd.BuildConfigFromFlags("", e.KubeConfigFilePath)

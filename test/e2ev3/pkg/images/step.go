@@ -15,5 +15,6 @@ func (l *Step) String() string { return "load-images" }
 
 func (l *Step) Do(ctx context.Context) error {
 	p := l.Params
-	return p.Loader.Load(ctx, RetinaImages(p.Cfg.Image.Registry, p.Cfg.Image.Namespace, p.Cfg.Image.Tag))
+	loader := NewLoader(*config.Provider, p.Cfg.Azure.ClusterName)
+	return loader.Load(ctx, RetinaImages(p.Cfg.Image.Registry, p.Cfg.Image.Namespace, p.Cfg.Image.Tag))
 }

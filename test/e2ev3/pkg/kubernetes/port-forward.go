@@ -43,12 +43,11 @@ type PortForward struct {
 	pf *PortForwarder
 }
 
-func (p *PortForward) Do(_ context.Context) error {
+func (p *PortForward) Do(ctx context.Context) error {
 	lport, _ := strconv.Atoi(p.LocalPort)
 	rport, _ := strconv.Atoi(p.RemotePort)
 
-	pctx := context.Background()
-	portForwardCtx, cancel := context.WithTimeout(pctx, defaultTimeoutSeconds*time.Second)
+	portForwardCtx, cancel := context.WithTimeout(ctx, defaultTimeoutSeconds*time.Second)
 	defer cancel()
 
 	config, err := clientcmd.BuildConfigFromFlags("", p.KubeConfigFilePath)
@@ -66,7 +65,7 @@ func (p *PortForward) Do(_ context.Context) error {
 	if p.OptionalLabelAffinity != "" {
 		// get all pods with label
 		log.Printf("attempting to find pod with label \"%s\", on a node with a pod with label \"%s\"\n", p.LabelSelector, p.OptionalLabelAffinity)
-		targetPodName, err = p.findPodsWithAffinity(pctx, clientset)
+		targetPodName, err = p.findPodsWithAffinity(ctx, clientset)
 		if err != nil {
 			return fmt.Errorf("could not find pod with affinity: %w", err)
 		}
@@ -91,7 +90,7 @@ func (p *PortForward) Do(_ context.Context) error {
 		if err != nil {
 			return fmt.Errorf("could not create port forwarder: %w", err)
 		}
-		err = p.pf.Forward(pctx)
+		err = p.pf.Forward(ctx)
 		if err != nil {
 			return fmt.Errorf("could not start port forward: %w", err)
 		}

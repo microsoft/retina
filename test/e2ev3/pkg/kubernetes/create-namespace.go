@@ -16,8 +16,8 @@ type CreateNamespace struct {
 	KubeConfigFilePath string
 }
 
-func (c *CreateNamespace) Do(_ context.Context) error {
-	return CreateNamespaceFn(c.KubeConfigFilePath, c.Namespace)
+func (c *CreateNamespace) Do(ctx context.Context) error {
+	return CreateNamespaceFn(ctx, c.KubeConfigFilePath, c.Namespace)
 }
 
 func (c *CreateNamespace) getNamespace() *v1.Namespace {
@@ -32,7 +32,7 @@ func (c *CreateNamespace) getNamespace() *v1.Namespace {
 	}
 }
 
-func CreateNamespaceFn(kubeconfigpath, namespace string) error {
+func CreateNamespaceFn(ctx context.Context, kubeconfigpath, namespace string) error {
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfigpath)
 	if err != nil {
 		return fmt.Errorf("error building kubeconfig: %w", err)
@@ -42,8 +42,6 @@ func CreateNamespaceFn(kubeconfigpath, namespace string) error {
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
-
-	ctx := context.TODO()
 
 	_, err = clientset.CoreV1().Namespaces().Create(ctx, &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{

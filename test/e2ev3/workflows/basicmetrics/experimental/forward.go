@@ -15,7 +15,8 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addForwardScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFilePath, namespace, arch string) flow.Steper {
+func addForwardScenario(kubeConfigFilePath, namespace, arch string) *flow.Workflow {
+	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-fwd-" + arch
 	podName := agnhostName + "-0"
 
@@ -58,7 +59,6 @@ func addForwardScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFile
 	// Setup: provision resources and generate traffic.
 	wf.Add(
 		flow.Pipe(createAgnhost, execCurl1, execCurl2).
-			DependsOn(dependsOn).
 			Timeout(utils.DefaultScenarioTimeout),
 	)
 
@@ -75,5 +75,5 @@ func addForwardScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFile
 			DependsOn(validateWithPF).
 			When(flow.Always),
 	)
-	return deleteAgnhost
+	return wf
 }

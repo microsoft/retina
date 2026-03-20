@@ -31,7 +31,7 @@ type CreateAgnhostStatefulSet struct {
 	AgnhostReplicas    *int
 }
 
-func (c *CreateAgnhostStatefulSet) Do(_ context.Context) error {
+func (c *CreateAgnhostStatefulSet) Do(ctx context.Context) error {
 	config, err := clientcmd.BuildConfigFromFlags("", c.KubeConfigFilePath)
 	if err != nil {
 		return fmt.Errorf("error building kubeconfig: %w", err)
@@ -42,7 +42,7 @@ func (c *CreateAgnhostStatefulSet) Do(_ context.Context) error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeoutSeconds*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeoutSeconds*time.Second)
 	defer cancel()
 
 	// set default arch to amd64

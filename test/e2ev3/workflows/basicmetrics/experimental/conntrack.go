@@ -15,7 +15,8 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addConntrackScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFilePath, namespace, arch string) flow.Steper {
+func addConntrackScenario(kubeConfigFilePath, namespace, arch string) *flow.Workflow {
+	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-ct-" + arch
 	podName := agnhostName + "-0"
 
@@ -63,7 +64,6 @@ func addConntrackScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFi
 	// Setup: provision resources and generate traffic.
 	wf.Add(
 		flow.Pipe(createAgnhost, execCurl1, execCurl2).
-			DependsOn(dependsOn).
 			Timeout(utils.DefaultScenarioTimeout),
 	)
 
@@ -80,5 +80,5 @@ func addConntrackScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFi
 			DependsOn(validateWithPF).
 			When(flow.Always),
 	)
-	return deleteAgnhost
+	return wf
 }

@@ -17,7 +17,8 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addTCPScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFilePath, namespace, arch string) flow.Steper {
+func addTCPScenario(kubeConfigFilePath, namespace, arch string) *flow.Workflow {
+	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-tcp-" + arch
 	podName := agnhostName + "-0"
 
@@ -51,11 +52,13 @@ func addTCPScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFilePath
 	deleteAgnhost := &k8s.DeleteKubernetesResource{
 		ResourceType: k8s.TypeString(k8s.StatefulSet), ResourceName: agnhostName, ResourceNamespace: namespace, KubeConfigFilePath: kubeConfigFilePath,
 	}
+	deleteKapinger := &k8s.DeleteKubernetesResource{
+		ResourceType: k8s.TypeString(k8s.Deployment), ResourceName: "kapinger", ResourceNamespace: namespace, KubeConfigFilePath: kubeConfigFilePath,
+	}
 
 	// Setup: provision resources and generate traffic.
 	wf.Add(
 		flow.Pipe(createKapinger, createAgnhost, waitKapinger, execCurl1, execCurl2).
-			DependsOn(dependsOn).
 			Timeout(utils.DefaultScenarioTimeout),
 	)
 
@@ -68,11 +71,11 @@ func addTCPScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFilePath
 
 	// Cleanup: always runs, even if validation fails.
 	wf.Add(
-		flow.Pipe(deleteAgnhost).
+		flow.Pipe(deleteAgnhost, deleteKapinger).
 			DependsOn(validateWithPF).
 			When(flow.Always),
 	)
-	return deleteAgnhost
+	return wf
 }
 
 
@@ -96,7 +99,7 @@ type ValidateRetinaTCPStateStep struct {
 	PortForwardedRetinaPort string
 }
 
-func (v *ValidateRetinaTCPStateStep) Do(_ context.Context) error {
+func (v *ValidateRetinaTCPStateStep) Do(ctx context.Context) error {
 	promAddress := fmt.Sprintf("http://localhost:%s/metrics", v.PortForwardedRetinaPort)
 
 	validMetrics := []map[string]string{
@@ -106,7 +109,7 @@ func (v *ValidateRetinaTCPStateStep) Do(_ context.Context) error {
 	}
 
 	for _, metric := range validMetrics {
-		err := prom.CheckMetric(promAddress, tcpStateMetricName, metric)
+		err := prom.CheckMetric(ctx, promAddress, tcpStateMetricName, metric)
 		if err != nil {
 			return fmt.Errorf("failed to verify prometheus metrics: %w", err)
 		}
@@ -122,13 +125,13 @@ type ValidateRetinaTCPConnectionRemoteStep struct {
 	PortForwardedRetinaPort string
 }
 
-func (v *ValidateRetinaTCPConnectionRemoteStep) Do(_ context.Context) error {
+func (v *ValidateRetinaTCPConnectionRemoteStep) Do(ctx context.Context) error {
 	promAddress := fmt.Sprintf("http://localhost:%s/metrics", v.PortForwardedRetinaPort)
 
 	validMetrics := []map[string]string{}
 
 	for _, metric := range validMetrics {
-		err := prom.CheckMetric(promAddress, tcpConnectionRemoteMetricName, metric)
+		err := prom.CheckMetric(ctx, promAddress, tcpConnectionRemoteMetricName, metric)
 		if err != nil {
 			return fmt.Errorf("failed to verify prometheus metrics: %w", err)
 		}

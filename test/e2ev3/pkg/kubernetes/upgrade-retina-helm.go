@@ -25,7 +25,7 @@ type UpgradeRetinaHelmChart struct {
 	ValuesFile         string
 }
 
-func (u *UpgradeRetinaHelmChart) Do(_ context.Context) error {
+func (u *UpgradeRetinaHelmChart) Do(ctx context.Context) error {
 	settings := cli.New()
 	settings.KubeConfig = u.KubeConfigFilePath
 	actionConfig := new(action.Configuration)

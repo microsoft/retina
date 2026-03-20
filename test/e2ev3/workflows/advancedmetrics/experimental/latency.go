@@ -13,7 +13,8 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addAPIServerLatencyScenario(wf *flow.Workflow, upstream flow.Steper, kubeConfigFilePath string) flow.Steper {
+func addAPIServerLatencyScenario(kubeConfigFilePath string) *flow.Workflow {
+	wf := &flow.Workflow{DontPanic: true}
 	validateLatency := &prom.ValidateMetricStep{
 		ForwardedPort: config.RetinaMetricsPort, MetricName: "networkobservability_adv_node_apiserver_latency",
 		ValidMetrics: []map[string]string{{}}, ExpectMetric: true, PartialMatch: true,
@@ -34,8 +35,7 @@ func addAPIServerLatencyScenario(wf *flow.Workflow, upstream flow.Steper, kubeCo
 	// Validate: retry with exponential backoff until metrics appear.
 	wf.Add(
 		flow.Step(validateWithPF).
-			DependsOn(upstream).
 			Retry(utils.RetryWithBackoff),
 	)
-	return validateWithPF
+	return wf
 }

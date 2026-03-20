@@ -6,7 +6,6 @@ import (
 
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/config"
-	"github.com/microsoft/retina/test/e2ev3/pkg/images/load"
 	"github.com/microsoft/retina/test/e2ev3/pkg/infra/providers/kind"
 )
 
@@ -21,7 +20,6 @@ func (s *Workflow) String() string { return "setup-infra" }
 func (s *Workflow) Do(ctx context.Context) error {
 	p := s.Params
 	if *config.KubeConfig != "" {
-		p.Loader = &load.Registry{}
 		return nil
 	}
 
@@ -30,11 +28,9 @@ func (s *Workflow) Do(ctx context.Context) error {
 	case "kind":
 		kindCfg := kind.DefaultE2EKindConfig(p.Cfg.Azure.ClusterName)
 		steps = KindSteps(s.T, kindCfg, p.Paths.KubeConfig, *config.CreateInfra, *config.DeleteInfra)
-		p.Loader = &load.Kind{ClusterName: kindCfg.ClusterName}
 	default:
 		infraCfg := ResolveInfraConfig(s.T, &p.Cfg.Azure)
 		steps = AzureSteps(s.T, infraCfg, p.Paths.KubeConfig, *config.CreateInfra, *config.DeleteInfra)
-		p.Loader = &load.Registry{}
 	}
 
 	inner := new(flow.Workflow)

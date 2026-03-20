@@ -17,7 +17,8 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addLatencyScenario(wf *flow.Workflow, upstream flow.Steper, kubeConfigFilePath string) flow.Steper {
+func addLatencyScenario(kubeConfigFilePath string) *flow.Workflow {
+	wf := &flow.Workflow{DontPanic: true}
 	validateLatency := &ValidateAPIServerLatencyStep{}
 	validateWithPF := &utils.WithPortForward{
 		PF: &k8s.PortForward{
@@ -31,10 +32,9 @@ func addLatencyScenario(wf *flow.Workflow, upstream flow.Steper, kubeConfigFileP
 	// Validate: retry with exponential backoff until metrics appear.
 	wf.Add(
 		flow.Step(validateWithPF).
-			DependsOn(upstream).
 			Retry(utils.RetryWithBackoff),
 	)
-	return validateWithPF
+	return wf
 }
 
 
@@ -45,11 +45,11 @@ var latencyBucketMetricName = "networkobservability_adv_node_apiserver_tcp_hands
 // latency metric is present.
 type ValidateAPIServerLatencyStep struct{}
 
-func (v *ValidateAPIServerLatencyStep) Do(_ context.Context) error {
+func (v *ValidateAPIServerLatencyStep) Do(ctx context.Context) error {
 	promAddress := fmt.Sprintf("http://localhost:%s/metrics", config.RetinaMetricsPort)
 
 	metric := map[string]string{}
-	err := prom.CheckMetric(promAddress, latencyBucketMetricName, metric)
+	err := prom.CheckMetric(ctx, promAddress, latencyBucketMetricName, metric)
 	if err != nil {
 		return fmt.Errorf("failed to verify latency metrics %s: %w", latencyBucketMetricName, err)
 	}

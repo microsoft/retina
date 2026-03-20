@@ -22,7 +22,7 @@ type CreateDenyAllNetworkPolicy struct {
 	DenyAllLabelSelector   string
 }
 
-func (c *CreateDenyAllNetworkPolicy) Do(_ context.Context) error {
+func (c *CreateDenyAllNetworkPolicy) Do(ctx context.Context) error {
 	config, err := clientcmd.BuildConfigFromFlags("", c.KubeConfigFilePath)
 	if err != nil {
 		return fmt.Errorf("error building kubeconfig: %w", err)
@@ -32,9 +32,6 @@ func (c *CreateDenyAllNetworkPolicy) Do(_ context.Context) error {
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	networkPolicy := getNetworkPolicy(c.NetworkPolicyNamespace, c.DenyAllLabelSelector)
 	err = CreateResource(ctx, networkPolicy, clientset)
@@ -74,7 +71,7 @@ type DeleteDenyAllNetworkPolicy struct {
 	DenyAllLabelSelector   string
 }
 
-func (d *DeleteDenyAllNetworkPolicy) Do(_ context.Context) error {
+func (d *DeleteDenyAllNetworkPolicy) Do(ctx context.Context) error {
 	config, err := clientcmd.BuildConfigFromFlags("", d.KubeConfigFilePath)
 	if err != nil {
 		return fmt.Errorf("error building kubeconfig: %w", err)
@@ -84,9 +81,6 @@ func (d *DeleteDenyAllNetworkPolicy) Do(_ context.Context) error {
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	networkPolicy := getNetworkPolicy(d.NetworkPolicyNamespace, d.DenyAllLabelSelector)
 	err = DeleteResource(ctx, networkPolicy, clientset)

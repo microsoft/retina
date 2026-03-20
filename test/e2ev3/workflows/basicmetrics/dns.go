@@ -17,7 +17,8 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addBasicDNSScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFilePath, namespace, arch, variant, command string, expectError bool) flow.Steper {
+func addBasicDNSScenario(kubeConfigFilePath, namespace, arch, variant, command string, expectError bool) *flow.Workflow {
+	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-dns-basic-" + variant + "-" + arch
 	podName := agnhostName + "-0"
 
@@ -55,7 +56,6 @@ func addBasicDNSScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFil
 	// Setup: provision resources and generate traffic.
 	wf.Add(
 		flow.Pipe(createAgnhost, execCmd1, execCmd2).
-			DependsOn(dependsOn).
 			Timeout(utils.DefaultScenarioTimeout),
 	)
 
@@ -72,7 +72,7 @@ func addBasicDNSScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFil
 			DependsOn(validateWithPF).
 			When(flow.Always),
 	)
-	return deleteAgnhost
+	return wf
 }
 
 
@@ -87,12 +87,12 @@ type ValidateBasicDNSRequestStep struct {
 	Variant string // distinguishes instances in the DAG (e.g. "valid-domain-amd64")
 }
 
-func (v *ValidateBasicDNSRequestStep) Do(_ context.Context) error {
+func (v *ValidateBasicDNSRequestStep) Do(ctx context.Context) error {
 	metricsEndpoint := fmt.Sprintf("http://localhost:%s/metrics", config.RetinaMetricsPort)
 
 	validBasicDNSRequestMetricLabels := map[string]string{}
 
-	err := prom.CheckMetric(metricsEndpoint, dnsBasicRequestCountMetricName, validBasicDNSRequestMetricLabels)
+	err := prom.CheckMetric(ctx, metricsEndpoint, dnsBasicRequestCountMetricName, validBasicDNSRequestMetricLabels)
 	if err != nil {
 		return fmt.Errorf("failed to verify basic dns request metrics %s: %w", dnsBasicRequestCountMetricName, err)
 	}
@@ -110,7 +110,7 @@ type ValidateBasicDNSResponseStep struct {
 	Response    string
 }
 
-func (v *ValidateBasicDNSResponseStep) Do(_ context.Context) error {
+func (v *ValidateBasicDNSResponseStep) Do(ctx context.Context) error {
 	metricsEndpoint := fmt.Sprintf("http://localhost:%s/metrics", config.RetinaMetricsPort)
 
 	if v.Response == emptyResponse {
@@ -119,7 +119,7 @@ func (v *ValidateBasicDNSResponseStep) Do(_ context.Context) error {
 
 	validBasicDNSResponseMetricLabels := map[string]string{}
 
-	err := prom.CheckMetric(metricsEndpoint, dnsBasicResponseCountMetricName, validBasicDNSResponseMetricLabels)
+	err := prom.CheckMetric(ctx, metricsEndpoint, dnsBasicResponseCountMetricName, validBasicDNSResponseMetricLabels)
 	if err != nil {
 		return fmt.Errorf("failed to verify basic dns response metrics %s: %w", dnsBasicResponseCountMetricName, err)
 	}

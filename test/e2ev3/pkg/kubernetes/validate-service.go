@@ -26,7 +26,7 @@ type ValidateResource struct {
 	KubeConfigFilePath string
 }
 
-func (v *ValidateResource) Do(_ context.Context) error {
+func (v *ValidateResource) Do(ctx context.Context) error {
 	config, err := clientcmd.BuildConfigFromFlags("", v.KubeConfigFilePath)
 	if err != nil {
 		return fmt.Errorf("error building kubeconfig: %w", err)
@@ -37,7 +37,7 @@ func (v *ValidateResource) Do(_ context.Context) error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeoutSeconds*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeoutSeconds*time.Second)
 	defer cancel()
 
 	switch v.ResourceType {

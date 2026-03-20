@@ -17,11 +17,12 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addAdvancedDNSScenario(wf *flow.Workflow, upstream flow.Steper, kubeConfigFilePath, namespace, arch, variant string,
+func addAdvancedDNSScenario(kubeConfigFilePath, namespace, arch, variant string,
 	command string, expectError bool,
 	reqQuery, reqQueryType, workloadKind string,
 	respNumResponse, respQuery, respQueryType, respReturnCode, respResponse string,
-) flow.Steper {
+) *flow.Workflow {
+	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-adv-dns-" + variant + "-" + arch
 	podName := agnhostName + "-0"
 
@@ -66,7 +67,6 @@ func addAdvancedDNSScenario(wf *flow.Workflow, upstream flow.Steper, kubeConfigF
 	// Setup: provision resources and generate traffic.
 	wf.Add(
 		flow.Pipe(createAgnhost, execCmd1, execCmd2).
-			DependsOn(upstream).
 			Timeout(utils.DefaultScenarioTimeout),
 	)
 
@@ -83,7 +83,7 @@ func addAdvancedDNSScenario(wf *flow.Workflow, upstream flow.Steper, kubeConfigF
 			DependsOn(validateWithPF).
 			When(flow.Always),
 	)
-	return deleteAgnhost
+	return wf
 }
 
 
@@ -109,10 +109,10 @@ type ValidateAdvancedDNSRequestStep struct {
 	KubeConfigFilePath string
 }
 
-func (v *ValidateAdvancedDNSRequestStep) Do(_ context.Context) error {
+func (v *ValidateAdvancedDNSRequestStep) Do(ctx context.Context) error {
 	metricsEndpoint := fmt.Sprintf("http://localhost:%s/metrics", config.RetinaMetricsPort)
 
-	podIP, err := k8s.GetPodIP(v.KubeConfigFilePath, v.PodNamespace, v.PodName)
+	podIP, err := k8s.GetPodIP(ctx, v.KubeConfigFilePath, v.PodNamespace, v.PodName)
 	if err != nil {
 		return fmt.Errorf("failed to get pod IP address: %w", err)
 	}
@@ -127,7 +127,7 @@ func (v *ValidateAdvancedDNSRequestStep) Do(_ context.Context) error {
 		"workload_name": v.WorkloadName,
 	}
 
-	err = prom.CheckMetric(metricsEndpoint, dnsAdvRequestCountMetricName, validateAdvancedDNSRequestMetrics)
+	err = prom.CheckMetric(ctx, metricsEndpoint, dnsAdvRequestCountMetricName, validateAdvancedDNSRequestMetrics)
 	if err != nil {
 		return fmt.Errorf("failed to verify advance dns request metrics %s: %w", dnsAdvRequestCountMetricName, err)
 	}
@@ -151,10 +151,10 @@ type ValidateAdvancedDNSResponseStep struct {
 	KubeConfigFilePath string
 }
 
-func (v *ValidateAdvancedDNSResponseStep) Do(_ context.Context) error {
+func (v *ValidateAdvancedDNSResponseStep) Do(ctx context.Context) error {
 	metricsEndpoint := fmt.Sprintf("http://localhost:%s/metrics", config.RetinaMetricsPort)
 
-	podIP, err := k8s.GetPodIP(v.KubeConfigFilePath, v.PodNamespace, v.PodName)
+	podIP, err := k8s.GetPodIP(ctx, v.KubeConfigFilePath, v.PodNamespace, v.PodName)
 	if err != nil {
 		return fmt.Errorf("failed to get pod IP address: %w", err)
 	}
@@ -176,7 +176,7 @@ func (v *ValidateAdvancedDNSResponseStep) Do(_ context.Context) error {
 		"workload_name": v.WorkloadName,
 	}
 
-	err = prom.CheckMetric(metricsEndpoint, dnsAdvResponseCountMetricName, validateAdvanceDNSResponseMetrics)
+	err = prom.CheckMetric(ctx, metricsEndpoint, dnsAdvResponseCountMetricName, validateAdvanceDNSResponseMetrics)
 	if err != nil {
 		return fmt.Errorf("failed to verify advance dns response metrics %s: %w", dnsAdvResponseCountMetricName, err)
 	}

@@ -25,11 +25,23 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// InstallAndTestRetinaBasicMetrics creates a workflow that installs Retina
-// and validates basic metrics: drop, TCP, DNS, and Windows HNS for each architecture.
-func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath, testPodNamespace string, imgCfg *config.ImageConfig, helmCfg *config.HelmConfig, loader images.Loader) *flow.Workflow {
-	wf := &flow.Workflow{DontPanic: true}
+// Workflow runs the basic metrics workflow.
+type Workflow struct {
+	Params *config.E2EParams
+}
 
+func (w *Workflow) String() string { return "basic-metrics" }
+
+func (w *Workflow) Do(ctx context.Context) error {
+	p := w.Params
+	kubeConfigFilePath := p.Paths.KubeConfig
+	chartPath := p.Paths.RetinaChart
+	testPodNamespace := config.TestPodNamespace
+	imgCfg := &p.Cfg.Image
+	helmCfg := &p.Cfg.Helm
+	loader := images.NewLoader(*config.Provider, p.Cfg.Azure.ClusterName)
+
+	// Construct steps.
 	installRetina := &k8s.InstallHelmChart{
 		Namespace:          config.KubeSystemNamespace,
 		ReleaseName:        "retina",
@@ -41,32 +53,25 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath, testPodName
 		HelmDriver:         helmCfg.Driver,
 		ImageLoader:        loader,
 	}
-	wf.Add(flow.Step(installRetina))
 
 	var scenarioTails []flow.Steper
-
 	for _, arch := range config.Architectures {
-		dropTail := addDropScenario(wf, installRetina, kubeConfigFilePath, testPodNamespace, arch)
-		scenarioTails = append(scenarioTails, dropTail)
+		scenarioTails = append(scenarioTails,
+			addDropScenario(kubeConfigFilePath, testPodNamespace, arch),
+			addTCPScenario(kubeConfigFilePath, testPodNamespace, arch),
+			addBasicDNSScenario(kubeConfigFilePath, testPodNamespace, arch,
+				"valid-domain", "nslookup kubernetes.default", false),
+			addBasicDNSScenario(kubeConfigFilePath, testPodNamespace, arch,
+				"nxdomain", "nslookup some.non.existent.domain", true),
+		)
+	}
 
-		tcpTail := addTCPScenario(wf, installRetina, kubeConfigFilePath, testPodNamespace, arch)
-		scenarioTails = append(scenarioTails, tcpTail)
-
-		dns1Tail := addBasicDNSScenario(wf, installRetina, kubeConfigFilePath, testPodNamespace, arch,
-			"valid-domain", "nslookup kubernetes.default", false)
-		scenarioTails = append(scenarioTails, dns1Tail)
-
-		dns2Tail := addBasicDNSScenario(wf, installRetina, kubeConfigFilePath, testPodNamespace, arch,
-			"nxdomain", "nslookup some.non.existent.domain", true)
-		scenarioTails = append(scenarioTails, dns2Tail)
-
-		winStep := &ValidateHNSMetricStep{
+	if *config.Provider != "kind" {
+		scenarioTails = append(scenarioTails, &ValidateHNSMetricStep{
 			KubeConfigFilePath:       kubeConfigFilePath,
 			RetinaDaemonSetNamespace: config.KubeSystemNamespace,
 			RetinaDaemonSetName:      "retina-agent-win",
-		}
-		wf.Add(flow.Step(winStep).DependsOn(installRetina))
-		scenarioTails = append(scenarioTails, winStep)
+		})
 	}
 
 	ensureStable := &k8s.EnsureStableComponent{
@@ -75,16 +80,23 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath, testPodName
 		KubeConfigFilePath:     kubeConfigFilePath,
 		IgnoreContainerRestart: false,
 	}
-	wf.Add(flow.Step(ensureStable).DependsOn(scenarioTails...))
 
 	debug := &utils.DebugOnFailure{
 		KubeConfigFilePath: kubeConfigFilePath,
 		Namespace:          config.KubeSystemNamespace,
 		LabelSelector:      "k8s-app=retina",
 	}
+
+	// Wire dependencies and register.
+	wf := &flow.Workflow{DontPanic: true}
+	wf.Add(flow.Step(installRetina))
+	for _, s := range scenarioTails {
+		wf.Add(flow.Step(s).DependsOn(installRetina))
+	}
+	wf.Add(flow.Step(ensureStable).DependsOn(scenarioTails...))
 	wf.Add(flow.Step(debug).DependsOn(ensureStable).When(flow.AnyFailed))
 
-	return wf
+	return wf.Do(ctx)
 }
 
 
@@ -99,7 +111,7 @@ var (
 	ErrNoMetricFound  = fmt.Errorf("no metric found")
 
 	hnsMetricName  = "networkobservability_windows_hns_stats"
-	defaultRetrier = retry.Retrier{Attempts: defaultRetryAttempts, Delay: defaultRetryDelay}
+	defaultRetrier = retry.Retrier{Attempts: defaultRetryAttempts, Delay: defaultRetryDelay, ExpBackoff: true}
 )
 
 // ValidateHNSMetricStep finds a Windows retina pod, curls the metrics endpoint
@@ -110,7 +122,7 @@ type ValidateHNSMetricStep struct {
 	RetinaDaemonSetName      string
 }
 
-func (v *ValidateHNSMetricStep) Do(_ context.Context) error {
+func (v *ValidateHNSMetricStep) Do(ctx context.Context) error {
 	restConfig, err := clientcmd.BuildConfigFromFlags("", v.KubeConfigFilePath)
 	if err != nil {
 		return fmt.Errorf("error building kubeconfig: %w", err)
@@ -121,7 +133,7 @@ func (v *ValidateHNSMetricStep) Do(_ context.Context) error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	pods, err := clientset.CoreV1().Pods(v.RetinaDaemonSetNamespace).List(context.TODO(), metav1.ListOptions{
+	pods, err := clientset.CoreV1().Pods(v.RetinaDaemonSetNamespace).List(ctx, metav1.ListOptions{
 		LabelSelector: "k8s-app=retina",
 	})
 	if err != nil {
@@ -144,8 +156,8 @@ func (v *ValidateHNSMetricStep) Do(_ context.Context) error {
 
 	log.Printf("checking for metric %s with labels %+v\n", hnsMetricName, labels)
 
-	err = defaultRetrier.Do(context.TODO(), func() error {
-		output, execErr := k8s.ExecPod(context.TODO(), clientset, restConfig, windowsRetinaPod.Namespace, windowsRetinaPod.Name, fmt.Sprintf("curl -s http://localhost:%s/metrics", config.RetinaMetricsPort))
+	err = defaultRetrier.Do(ctx, func() error {
+		output, execErr := k8s.ExecPod(ctx, clientset, restConfig, windowsRetinaPod.Namespace, windowsRetinaPod.Name, fmt.Sprintf("curl -s http://localhost:%s/metrics", config.RetinaMetricsPort))
 		if execErr != nil {
 			return fmt.Errorf("error executing command in windows retina pod: %w", execErr)
 		}

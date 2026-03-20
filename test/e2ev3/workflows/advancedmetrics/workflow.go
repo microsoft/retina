@@ -6,17 +6,30 @@
 package advancedmetrics
 
 import (
+	"context"
+
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/config"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-// UpgradeAndTestRetinaAdvancedMetrics creates a workflow that upgrades Retina
-// with the advanced profile and validates advanced DNS and latency metrics.
-func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFilePath, testPodNamespace string, helmCfg *config.HelmConfig) *flow.Workflow {
-	wf := &flow.Workflow{DontPanic: true}
+// Workflow runs the advanced metrics workflow.
+type Workflow struct {
+	Params *config.E2EParams
+}
 
+func (w *Workflow) String() string { return "advanced-metrics" }
+
+func (w *Workflow) Do(ctx context.Context) error {
+	p := w.Params
+	kubeConfigFilePath := p.Paths.KubeConfig
+	chartPath := p.Paths.RetinaChart
+	valuesFilePath := p.Paths.AdvancedProfile
+	testPodNamespace := config.TestPodNamespace
+	helmCfg := &p.Cfg.Helm
+
+	// Construct steps.
 	upgradeRetina := &k8s.UpgradeRetinaHelmChart{
 		Namespace:          config.KubeSystemNamespace,
 		ReleaseName:        "retina",
@@ -25,28 +38,23 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 		HelmDriver:         helmCfg.Driver,
 		ValuesFile:         valuesFilePath,
 	}
-	wf.Add(flow.Step(upgradeRetina))
 
 	var scenarioTails []flow.Steper
-
 	for _, arch := range config.Architectures {
-		dnsValidTail := addAdvancedDNSScenario(wf, upgradeRetina, kubeConfigFilePath, testPodNamespace, arch,
-			"valid", "nslookup kubernetes.default", false,
-			"kubernetes.default.svc.cluster.local.", "A", "StatefulSet",
-			"1", "kubernetes.default.svc.cluster.local.", "A", "NOERROR", "10.0.0.1",
+		scenarioTails = append(scenarioTails,
+			addAdvancedDNSScenario(kubeConfigFilePath, testPodNamespace, arch,
+				"valid", "nslookup kubernetes.default", false,
+				"kubernetes.default.svc.cluster.local.", "A", "StatefulSet",
+				"1", "kubernetes.default.svc.cluster.local.", "A", "NOERROR", "10.0.0.1",
+			),
+			addAdvancedDNSScenario(kubeConfigFilePath, testPodNamespace, arch,
+				"nxdomain", "nslookup some.non.existent.domain.", true,
+				"some.non.existent.domain.", "A", "StatefulSet",
+				"0", "some.non.existent.domain.", "A", "NXDOMAIN", EmptyResponse,
+			),
 		)
-		scenarioTails = append(scenarioTails, dnsValidTail)
-
-		dnsNXTail := addAdvancedDNSScenario(wf, upgradeRetina, kubeConfigFilePath, testPodNamespace, arch,
-			"nxdomain", "nslookup some.non.existent.domain.", true,
-			"some.non.existent.domain.", "A", "StatefulSet",
-			"0", "some.non.existent.domain.", "A", "NXDOMAIN", EmptyResponse,
-		)
-		scenarioTails = append(scenarioTails, dnsNXTail)
 	}
-
-	latencyTail := addLatencyScenario(wf, upgradeRetina, kubeConfigFilePath)
-	scenarioTails = append(scenarioTails, latencyTail)
+	scenarioTails = append(scenarioTails, addLatencyScenario(kubeConfigFilePath))
 
 	ensureStable := &k8s.EnsureStableComponent{
 		PodNamespace:           config.KubeSystemNamespace,
@@ -54,14 +62,21 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 		KubeConfigFilePath:     kubeConfigFilePath,
 		IgnoreContainerRestart: false,
 	}
-	wf.Add(flow.Step(ensureStable).DependsOn(scenarioTails...))
 
 	debug := &utils.DebugOnFailure{
 		KubeConfigFilePath: kubeConfigFilePath,
 		Namespace:          config.KubeSystemNamespace,
 		LabelSelector:      "k8s-app=retina",
 	}
+
+	// Wire dependencies and register.
+	wf := &flow.Workflow{DontPanic: true}
+	wf.Add(flow.Step(upgradeRetina))
+	for _, s := range scenarioTails {
+		wf.Add(flow.Step(s).DependsOn(upgradeRetina))
+	}
+	wf.Add(flow.Step(ensureStable).DependsOn(scenarioTails...))
 	wf.Add(flow.Step(debug).DependsOn(ensureStable).When(flow.AnyFailed))
 
-	return wf
+	return wf.Do(ctx)
 }

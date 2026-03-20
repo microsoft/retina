@@ -13,7 +13,8 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addHubbleFlowInterNodeScenario(wf *flow.Workflow, upstream flow.Steper, kubeConfigFilePath, arch string) flow.Steper {
+func addHubbleFlowInterNodeScenario(kubeConfigFilePath, arch string) *flow.Workflow {
+	wf := &flow.Workflow{DontPanic: true}
 	podnameSrc := "agnhost-flow-inter-src"
 	podnameDst := "agnhost-flow-inter-dst"
 	validSrcLabels := []map[string]string{
@@ -74,7 +75,6 @@ func addHubbleFlowInterNodeScenario(wf *flow.Workflow, upstream flow.Steper, kub
 	// Setup: provision resources and generate traffic.
 	wf.Add(
 		flow.Pipe(createSrc, createDst, curlPod).
-			DependsOn(upstream).
 			Timeout(utils.DefaultScenarioTimeout),
 	)
 
@@ -91,5 +91,5 @@ func addHubbleFlowInterNodeScenario(wf *flow.Workflow, upstream flow.Steper, kub
 			DependsOn(validateWithPF).
 			When(flow.Always),
 	)
-	return deleteDst
+	return wf
 }

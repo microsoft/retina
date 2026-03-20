@@ -25,7 +25,7 @@ type LabelNodes struct {
 	Labels             map[string]string
 }
 
-func (l *LabelNodes) Do(_ context.Context) error {
+func (l *LabelNodes) Do(ctx context.Context) error {
 	config, err := clientcmd.BuildConfigFromFlags("", l.KubeConfigFilePath)
 	if err != nil {
 		return fmt.Errorf("error building kubeconfig: %w", err)
@@ -35,8 +35,6 @@ func (l *LabelNodes) Do(_ context.Context) error {
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
-
-	ctx := context.TODO()
 
 	var nodes *corev1.NodeList
 

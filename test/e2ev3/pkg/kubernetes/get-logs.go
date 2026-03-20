@@ -18,7 +18,7 @@ type GetPodLogs struct {
 	LabelSelector      string
 }
 
-func (p *GetPodLogs) Do(_ context.Context) error {
+func (p *GetPodLogs) Do(ctx context.Context) error {
 	fmt.Printf("printing pod logs for namespace: %s, labelselector: %s\n", p.Namespace, p.LabelSelector)
 	// Load the kubeconfig file to get the configuration to access the cluster
 	config, err := clientcmd.BuildConfigFromFlags("", p.KubeConfigFilePath)
@@ -32,7 +32,7 @@ func (p *GetPodLogs) Do(_ context.Context) error {
 		log.Printf("error creating clientset: %s\n", err)
 	}
 
-	PrintPodLogs(context.Background(), clientset, p.Namespace, p.LabelSelector)
+	PrintPodLogs(ctx, clientset, p.Namespace, p.LabelSelector)
 
 	return nil
 }
@@ -53,7 +53,7 @@ func PrintPodLogs(ctx context.Context, clientset *kubernetes.Clientset, namespac
 
 		// Get the logs for the pod
 		req := clientset.CoreV1().Pods(namespace).GetLogs(pod.Name, &corev1.PodLogOptions{})
-		podLogs, err := req.Stream(context.Background())
+		podLogs, err := req.Stream(ctx)
 		if err != nil {
 			fmt.Printf("error getting logs for pod %s: %s\n", pod.Name, err)
 		}

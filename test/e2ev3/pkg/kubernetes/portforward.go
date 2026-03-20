@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"math/rand"
 	"net/http"
+	"sort"
 	"sync"
 	"time"
 
@@ -81,8 +81,11 @@ func (p *PortForwarder) Forward(ctx context.Context) error {
 			return fmt.Errorf("no pods found in %q with label %q", p.opts.Namespace, p.opts.LabelSelector) //nolint:goerr113 //no specific handling expected
 		}
 
-		randomIndex := rand.Intn(len(pods.Items)) //nolint:gosec //this is going to be revised in the future anyways, avoid random pods
-		podName = pods.Items[randomIndex].Name
+		// Deterministic selection: sort by name and pick the first pod.
+		sort.Slice(pods.Items, func(i, j int) bool {
+			return pods.Items[i].Name < pods.Items[j].Name
+		})
+		podName = pods.Items[0].Name
 	} else {
 		podName = p.opts.PodName
 	}

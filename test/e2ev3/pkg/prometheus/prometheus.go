@@ -24,12 +24,8 @@ var (
 	defaultRetryAttempts = 60
 )
 
-func CheckMetric(promAddress, metricName string, validMetric map[string]string, partial ...bool) error {
+func CheckMetric(ctx context.Context, promAddress, metricName string, validMetric map[string]string, partial ...bool) error {
 	defaultRetrier := retry.Retrier{Attempts: defaultRetryAttempts, Delay: defaultRetryDelay}
-
-	ctx := context.Background()
-	pctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 
 	// Default partial to false if not provided
 	usePartial := len(partial) > 0 && partial[0]
@@ -60,7 +56,7 @@ func CheckMetric(promAddress, metricName string, validMetric map[string]string, 
 		return nil
 	}
 
-	err := defaultRetrier.Do(pctx, scrapeMetricsFn)
+	err := defaultRetrier.Do(ctx, scrapeMetricsFn)
 	if err != nil {
 		return fmt.Errorf("failed to get prometheus metrics: %w", err)
 	}
@@ -200,11 +196,11 @@ type ValidateMetricStep struct {
 	PartialMatch  bool
 }
 
-func (v *ValidateMetricStep) Do(_ context.Context) error {
+func (v *ValidateMetricStep) Do(ctx context.Context) error {
 	promAddress := fmt.Sprintf("http://localhost:%s/metrics", v.ForwardedPort)
 
 	for _, validMetric := range v.ValidMetrics {
-		err := CheckMetric(promAddress, v.MetricName, validMetric, v.PartialMatch)
+		err := CheckMetric(ctx, promAddress, v.MetricName, validMetric, v.PartialMatch)
 		if err != nil {
 			if !v.ExpectMetric && errors.Is(err, ErrNoMetricFound) {
 				log.Printf("metric %s not found, as expected\n", v.MetricName)

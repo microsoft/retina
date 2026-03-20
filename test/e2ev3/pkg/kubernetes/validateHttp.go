@@ -17,8 +17,8 @@ type ValidateHTTPResponse struct {
 	ExpectedStatus int
 }
 
-func (v *ValidateHTTPResponse) Do(_ context.Context) error {
-	ctx, cancel := context.WithTimeout(context.Background(), RequestTimeout)
+func (v *ValidateHTTPResponse) Do(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, RequestTimeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, v.URL, nil)

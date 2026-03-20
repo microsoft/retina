@@ -21,7 +21,7 @@ type EnsureStableComponent struct {
 	IgnoreContainerRestart bool
 }
 
-func (n *EnsureStableComponent) Do(_ context.Context) error {
+func (n *EnsureStableComponent) Do(ctx context.Context) error {
 	config, err := clientcmd.BuildConfigFromFlags("", n.KubeConfigFilePath)
 	if err != nil {
 		return fmt.Errorf("error building kubeconfig: %w", err)
@@ -32,13 +32,13 @@ func (n *EnsureStableComponent) Do(_ context.Context) error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	err = WaitForPodReady(context.TODO(), clientset, n.PodNamespace, n.LabelSelector)
+	err = WaitForPodReady(ctx, clientset, n.PodNamespace, n.LabelSelector)
 	if err != nil {
 		return fmt.Errorf("error waiting for retina pods to be ready: %w", err)
 	}
 
 	if !n.IgnoreContainerRestart {
-		err = CheckContainerRestart(context.TODO(), clientset, n.PodNamespace, n.LabelSelector)
+		err = CheckContainerRestart(ctx, clientset, n.PodNamespace, n.LabelSelector)
 		if err != nil {
 			return fmt.Errorf("error checking pod restarts: %w", err)
 		}

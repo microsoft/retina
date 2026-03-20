@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	e2ecfg "github.com/microsoft/retina/test/e2ev3/config"
@@ -34,8 +35,8 @@ type InstallHubbleHelmChart struct {
 	ImageLoader        images.Loader
 }
 
-func (v *InstallHubbleHelmChart) Do(_ context.Context) error {
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeoutSeconds*time.Second)
+func (v *InstallHubbleHelmChart) Do(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeoutSeconds*time.Second)
 	defer cancel()
 
 	settings := cli.New()
@@ -48,7 +49,7 @@ func (v *InstallHubbleHelmChart) Do(_ context.Context) error {
 	}
 
 	// Creating extra namespace to deploy test pods
-	err = CreateNamespaceFn(v.KubeConfigFilePath, e2ecfg.TestPodNamespace)
+	err = CreateNamespaceFn(ctx, v.KubeConfigFilePath, e2ecfg.TestPodNamespace)
 	if err != nil {
 		return fmt.Errorf("failed to create namespace %s: %w", v.Namespace, err)
 	}
@@ -132,15 +133,27 @@ func (v *InstallHubbleHelmChart) Do(_ context.Context) error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	// Validate Hubble Relay Pod
-	if err := WaitForPodReady(ctx, clientset, HubbleNamespace, "k8s-app="+HubbleRelayApp); err != nil {
-		return fmt.Errorf("error waiting for Hubble Relay pods to be ready: %w", err)
+	// Validate Hubble Relay and UI pods in parallel.
+	var relayErr, uiErr error
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		relayErr = WaitForPodReady(ctx, clientset, HubbleNamespace, "k8s-app="+HubbleRelayApp)
+	}()
+	go func() {
+		defer wg.Done()
+		uiErr = WaitForPodReady(ctx, clientset, HubbleNamespace, "k8s-app="+HubbleUIApp)
+	}()
+	wg.Wait()
+
+	if relayErr != nil {
+		return fmt.Errorf("error waiting for Hubble Relay pods to be ready: %w", relayErr)
 	}
 	log.Printf("Hubble Relay Pod is ready")
 
-	// Validate Hubble UI Pod
-	if err := WaitForPodReady(ctx, clientset, HubbleNamespace, "k8s-app="+HubbleUIApp); err != nil {
-		return fmt.Errorf("error waiting for Hubble UI pods to be ready: %w", err)
+	if uiErr != nil {
+		return fmt.Errorf("error waiting for Hubble UI pods to be ready: %w", uiErr)
 	}
 	log.Printf("Hubble UI Pod is ready")
 

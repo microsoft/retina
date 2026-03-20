@@ -17,7 +17,8 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addDropScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFilePath, namespace, arch string) flow.Steper {
+func addDropScenario(kubeConfigFilePath, namespace, arch string) *flow.Workflow {
+	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-drop-" + arch
 	podName := agnhostName + "-0"
 
@@ -52,7 +53,6 @@ func addDropScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFilePat
 	// Setup: provision resources and generate traffic.
 	wf.Add(
 		flow.Pipe(createNetPol, createAgnhost, execCurl1, execCurl2).
-			DependsOn(dependsOn).
 			Timeout(utils.DefaultScenarioTimeout),
 	)
 
@@ -69,7 +69,7 @@ func addDropScenario(wf *flow.Workflow, dependsOn flow.Steper, kubeConfigFilePat
 			DependsOn(validateWithPF).
 			When(flow.Always),
 	)
-	return deleteAgnhost
+	return wf
 }
 
 
@@ -94,7 +94,7 @@ type ValidateRetinaDropMetricStep struct {
 	Reason                  string
 }
 
-func (v *ValidateRetinaDropMetricStep) Do(_ context.Context) error {
+func (v *ValidateRetinaDropMetricStep) Do(ctx context.Context) error {
 	promAddress := fmt.Sprintf("http://localhost:%s/metrics", v.PortForwardedRetinaPort)
 
 	metric := map[string]string{
@@ -102,12 +102,12 @@ func (v *ValidateRetinaDropMetricStep) Do(_ context.Context) error {
 		reasonKey:    IPTableRuleDrop,
 	}
 
-	err := prom.CheckMetric(promAddress, dropCountMetricName, metric)
+	err := prom.CheckMetric(ctx, promAddress, dropCountMetricName, metric)
 	if err != nil {
 		return fmt.Errorf("failed to verify prometheus metrics %s: %w", dropCountMetricName, err)
 	}
 
-	err = prom.CheckMetric(promAddress, dropBytesMetricName, metric)
+	err = prom.CheckMetric(ctx, promAddress, dropBytesMetricName, metric)
 	if err != nil {
 		return fmt.Errorf("failed to verify prometheus metrics %s: %w", dropBytesMetricName, err)
 	}

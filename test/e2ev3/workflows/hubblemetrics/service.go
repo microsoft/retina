@@ -16,16 +16,18 @@ import (
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 )
 
-func addHubbleRelayValidation(wf *flow.Workflow, upstream flow.Steper, kubeConfigFilePath string) flow.Steper {
+func addHubbleRelayValidation(kubeConfigFilePath string) *flow.Workflow {
+	wf := &flow.Workflow{DontPanic: true}
 	validateRelay := &ValidateHubbleRelayServiceStep{KubeConfigFilePath: kubeConfigFilePath}
-	wf.Add(flow.Step(validateRelay).DependsOn(upstream))
-	return validateRelay
+	wf.Add(flow.Step(validateRelay))
+	return wf
 }
 
-func addHubbleUIValidation(wf *flow.Workflow, upstream flow.Steper, kubeConfigFilePath string) flow.Steper {
+func addHubbleUIValidation(kubeConfigFilePath string) *flow.Workflow {
+	wf := &flow.Workflow{DontPanic: true}
 	validateUI := &ValidateHubbleUIServiceStep{KubeConfigFilePath: kubeConfigFilePath}
-	wf.Add(flow.Step(validateUI).DependsOn(upstream))
-	return validateUI
+	wf.Add(flow.Step(validateUI))
+	return wf
 }
 
 

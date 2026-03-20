@@ -122,13 +122,11 @@ IMAGE_REGISTRY=ghcr.io/microsoft \
 
 ### Running a Specific Sub-Test
 
-Use `go test -run` from the repository root:
-
-```bash
-go test -v -tags e2e ./test/e2ev3/ -run TestE2ERetina/BasicMetrics -provider=kind -timeout 60m
-```
-
-Available sub-tests: `BasicMetrics`, `AdvancedMetrics`, `HubbleMetrics`, `Capture`, `BasicMetricsExperimental`, `AdvancedMetricsExperimental`.
+> **Note:** The test pipeline runs as a single `flow.Pipe` — there are no Go
+> sub-tests. The individual Makefile targets (`test-basic-metrics`, etc.)
+> currently run the full pipeline. To run a subset, use `-kubeconfig` to point
+> at an existing cluster and comment out unwanted steps in
+> `retina_e2e_test.go`.
 
 ## Workflow Structure
 
@@ -147,23 +145,27 @@ create → exec → validate (retry with backoff) → cleanup (always)
 
 ```
 test/e2ev3/
-├── retina_e2e_test.go              # Test entry point (TestE2ERetina only)
-├── Makefile                        # Make targets for each sub-test
-├── config/                         # E2E config (viper env loader, flags, paths, context)
+├── retina_e2e_test.go              # Test entry point (declarative pipeline)
+├── Makefile                        # Make targets
+├── config/                         # E2E config, flags, paths, shared params
+│   ├── e2e.go                      # Config types, env loading, E2EParams
+│   └── load_step.go                # config.Step — resolves config + image tag
 ├── pkg/
-│   ├── images/                     # Image loading interface
-│   │   ├── build/                  # Build images from source
+│   ├── images/                     # Image loading interface + images.Step
+│   │   ├── build/                  # Build images from source + build.Step
 │   │   └── load/                   # Load images onto clusters (Kind sideload vs registry pull)
-│   ├── infra/                      # Infrastructure setup orchestration
+│   ├── infra/                      # Infrastructure orchestration + infra.Workflow
 │   │   └── providers/
 │   │       ├── azure/              # AKS cluster provisioning (ARM templates)
-│   │       └── kind/               # Kind cluster lifecycle
+│   │       └── kind/               # Kind cluster lifecycle (native SDK)
 │   ├── kubernetes/                 # Reusable K8s steps (Helm, pods, port-forward, exec)
 │   ├── prometheus/                 # Prometheus metric scraping and validation
 │   └── utils/                      # Shared utilities
 └── workflows/
     ├── basicmetrics/               # Drop, TCP, DNS scenarios
+    │   └── experimental/           # Experimental basic metrics (conntrack, forward, etc.)
     ├── advancedmetrics/            # DNS, latency scenarios (upgraded Helm profile)
+    │   └── experimental/           # Experimental advanced metrics (drop, forward, etc.)
     ├── hubblemetrics/              # Hubble drop, TCP, DNS, flow scenarios
     └── capture/                    # Packet capture validation
 ```

@@ -68,7 +68,7 @@ type DeleteKubernetesResource struct {
 	KubeConfigFilePath string
 }
 
-func (d *DeleteKubernetesResource) Do(_ context.Context) error {
+func (d *DeleteKubernetesResource) Do(ctx context.Context) error {
 	// Prevalidation: check resource type before proceeding
 	restype := ResourceType(d.ResourceType)
 	if restype == Unknown {
@@ -85,7 +85,7 @@ func (d *DeleteKubernetesResource) Do(_ context.Context) error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeoutSeconds*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeoutSeconds*time.Second)
 	defer cancel()
 
 	res := ResourceType(d.ResourceType)

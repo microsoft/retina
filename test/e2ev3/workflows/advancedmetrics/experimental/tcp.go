@@ -13,7 +13,8 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addAdvancedTCPScenario(wf *flow.Workflow, upstream flow.Steper, kubeConfigFilePath, namespace, arch string) flow.Steper {
+func addAdvancedTCPScenario(kubeConfigFilePath, namespace, arch string) *flow.Workflow {
+	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-adv-tcp-" + arch
 	podName := agnhostName + "-0"
 
@@ -48,7 +49,6 @@ func addAdvancedTCPScenario(wf *flow.Workflow, upstream flow.Steper, kubeConfigF
 	// Setup: provision resources and generate traffic.
 	wf.Add(
 		flow.Pipe(createAgnhost, execCurl).
-			DependsOn(upstream).
 			Timeout(utils.DefaultScenarioTimeout),
 	)
 
@@ -65,5 +65,5 @@ func addAdvancedTCPScenario(wf *flow.Workflow, upstream flow.Steper, kubeConfigF
 			DependsOn(validateWithPF).
 			When(flow.Always),
 	)
-	return deleteAgnhost
+	return wf
 }

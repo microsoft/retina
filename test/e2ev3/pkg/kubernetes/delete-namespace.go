@@ -19,7 +19,7 @@ type DeleteNamespace struct {
 	KubeConfigFilePath string
 }
 
-func (d *DeleteNamespace) Do(_ context.Context) error {
+func (d *DeleteNamespace) Do(ctx context.Context) error {
 	config, err := clientcmd.BuildConfigFromFlags("", d.KubeConfigFilePath)
 	if err != nil {
 		return fmt.Errorf("error building kubeconfig: %w", err)
@@ -29,8 +29,6 @@ func (d *DeleteNamespace) Do(_ context.Context) error {
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
-
-	ctx := context.TODO()
 
 	err = clientset.CoreV1().Namespaces().Delete(ctx, d.Namespace, metaV1.DeleteOptions{})
 	if err != nil {
