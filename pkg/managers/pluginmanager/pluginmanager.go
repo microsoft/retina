@@ -22,6 +22,8 @@ import (
 )
 
 const (
+	// DefaultMetricsInterval is used when MetricsInterval is zero or negative.
+	DefaultMetricsInterval = 10 * time.Second
 
 	// In any run I haven't seen reconcile take longer than 5 seconds,
 	// and 10 seconds seems like a reasonable SLA for reconciliation to be completed
@@ -126,8 +128,9 @@ func (p *PluginManager) Start(ctx context.Context) error {
 		return ErrNilCfg
 	}
 
-	if p.cfg.MetricsInterval == 0 {
-		return ErrZeroInterval
+	if p.cfg.MetricsInterval <= 0 {
+		p.l.Warn("MetricsInterval is invalid or unset; defaulting to 10s", zap.Duration("interval", p.cfg.MetricsInterval))
+		p.cfg.MetricsInterval = DefaultMetricsInterval
 	}
 
 	if p.cfg.EnablePodLevel {
