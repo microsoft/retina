@@ -28,6 +28,7 @@ type GetAKSKubeConfig struct {
 func (c *GetAKSKubeConfig) String() string { return "get-aks-kubeconfig" }
 
 func (c *GetAKSKubeConfig) Do(ctx context.Context) error {
+	log := slog.With("step", c.String())
 	cred, err := azidentity.NewAzureCLICredential(nil)
 	if err != nil {
 		return fmt.Errorf("failed to obtain a credential: %w", err)
@@ -47,7 +48,7 @@ func (c *GetAKSKubeConfig) Do(ctx context.Context) error {
 		return fmt.Errorf("failed to write kubeconfig to %q: %w", c.KubeConfigFilePath, err)
 	}
 
-	slog.Info("kubeconfig for cluster written", "cluster", c.ClusterName, "path", c.KubeConfigFilePath)
+	log.Info("kubeconfig for cluster written", "cluster", c.ClusterName, "path", c.KubeConfigFilePath)
 	return nil
 }
 

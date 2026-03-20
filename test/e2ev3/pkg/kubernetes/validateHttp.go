@@ -20,6 +20,7 @@ type ValidateHTTPResponse struct {
 func (v *ValidateHTTPResponse) String() string { return "validate-http-response" }
 
 func (v *ValidateHTTPResponse) Do(ctx context.Context) error {
+	log := slog.With("step", v.String())
 	ctx, cancel := context.WithTimeout(ctx, RequestTimeout)
 	defer cancel()
 
@@ -38,7 +39,7 @@ func (v *ValidateHTTPResponse) Do(ctx context.Context) error {
 	if resp.StatusCode != v.ExpectedStatus {
 		return fmt.Errorf("unexpected status code: got %d, want %d", resp.StatusCode, v.ExpectedStatus)
 	}
-	slog.Info("HTTP validation succeeded", "url", v.URL, "statusCode", resp.StatusCode)
+	log.Info("HTTP validation succeeded", "url", v.URL, "statusCode", resp.StatusCode)
 
 	return nil
 }

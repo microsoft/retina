@@ -29,6 +29,7 @@ type ExecInPod struct {
 func (e *ExecInPod) String() string { return "exec-in-pod" }
 
 func (e *ExecInPod) Do(ctx context.Context) error {
+	log := slog.With("step", e.String())
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
@@ -43,7 +44,7 @@ func (e *ExecInPod) Do(ctx context.Context) error {
 	}, func() error {
 		_, execErr := ExecPod(ctx, clientset, e.RestConfig, e.PodNamespace, e.PodName, e.Command)
 		if execErr != nil {
-			slog.Error("executing command, retrying", "command", e.Command, "error", execErr)
+			log.Error("executing command, retrying", "command", e.Command, "error", execErr)
 		}
 		return execErr
 	})

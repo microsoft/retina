@@ -230,14 +230,17 @@ type ValidateMetricStep struct {
 	PartialMatch  bool
 }
 
+func (v *ValidateMetricStep) String() string { return "validate-metric" }
+
 func (v *ValidateMetricStep) Do(ctx context.Context) error {
+	log := slog.With("step", v.String())
 	promAddress := fmt.Sprintf("http://localhost:%s/metrics", v.ForwardedPort)
 
 	for _, validMetric := range v.ValidMetrics {
 		err := CheckMetric(ctx, promAddress, v.MetricName, validMetric, v.PartialMatch)
 		if err != nil {
 			if !v.ExpectMetric && errors.Is(err, ErrNoMetricFound) {
-				slog.Info("metric not found as expected", "metric", v.MetricName)
+				log.Info("metric not found as expected", "metric", v.MetricName)
 				return nil
 			}
 			return fmt.Errorf("failed to verify prometheus metrics: %w", err)
@@ -247,7 +250,7 @@ func (v *ValidateMetricStep) Do(ctx context.Context) error {
 			return fmt.Errorf("did not expect to find metric %s matching %+v: %w", v.MetricName, validMetric, ErrMetricFound)
 		}
 
-		slog.Info("found matching metric", "metric", v.MetricName, "match", validMetric)
+		log.Info("found matching metric", "metric", v.MetricName, "match", validMetric)
 	}
 	return nil
 }

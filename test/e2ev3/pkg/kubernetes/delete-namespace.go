@@ -22,6 +22,7 @@ type DeleteNamespace struct {
 func (d *DeleteNamespace) String() string { return "delete-namespace" }
 
 func (d *DeleteNamespace) Do(ctx context.Context) error {
+	log := slog.With("step", d.String())
 	clientset, err := kubernetes.NewForConfig(d.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
@@ -44,7 +45,7 @@ func (d *DeleteNamespace) Do(ctx context.Context) error {
 	// Check if namespace was deleted
 	return retry.OnError(backoff,
 		func(err error) bool {
-			slog.Info("namespace deletion pending", "error", err)
+			log.Info("namespace deletion pending", "error", err)
 
 			return true
 		},

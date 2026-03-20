@@ -28,11 +28,12 @@ type UpgradeRetinaHelmChart struct {
 func (u *UpgradeRetinaHelmChart) String() string { return "upgrade-retina-helm" }
 
 func (u *UpgradeRetinaHelmChart) Do(ctx context.Context) error {
+	log := slog.With("step", u.String())
 	settings := cli.New()
 	settings.KubeConfig = u.KubeConfigFilePath
 	actionConfig := new(action.Configuration)
 
-	err := actionConfig.Init(settings.RESTClientGetter(), u.Namespace, u.HelmDriver, func(format string, v ...any) { slog.Info(fmt.Sprintf(format, v...)) })
+	err := actionConfig.Init(settings.RESTClientGetter(), u.Namespace, u.HelmDriver, func(format string, v ...any) { log.Info(fmt.Sprintf(format, v...)) })
 	if err != nil {
 		return fmt.Errorf("failed to initialize helm action config: %w", err)
 	}
@@ -64,15 +65,15 @@ func (u *UpgradeRetinaHelmChart) Do(ctx context.Context) error {
 		return fmt.Errorf("failed to merge values: %w", err)
 	}
 	// logs values to be set during upgrade
-	slog.Info("values to be set during upgrade", "values", values)
+	log.Info("values to be set during upgrade", "values", values)
 
 	rel, err = client.Run(u.ReleaseName, chart, values)
 	if err != nil {
 		return fmt.Errorf("failed to upgrade chart: %w", err)
 	}
 
-	slog.Info("upgraded chart", "release", rel.Name, "namespace", rel.Namespace)
-	slog.Info("chart values", "config", rel.Config)
+	log.Info("upgraded chart", "release", rel.Name, "namespace", rel.Namespace)
+	log.Info("chart values", "config", rel.Config)
 
 	return nil
 }

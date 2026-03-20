@@ -20,6 +20,7 @@ type CreateCluster struct {
 func (c *CreateCluster) String() string { return "create-kind-cluster" }
 
 func (c *CreateCluster) Do(ctx context.Context) error {
+	log := slog.With("step", c.String())
 	provider := cluster.NewProvider()
 
 	clusters, err := provider.List()
@@ -28,12 +29,12 @@ func (c *CreateCluster) Do(ctx context.Context) error {
 	}
 	for _, name := range clusters {
 		if name == c.Config.ClusterName {
-			slog.Info("Kind cluster already exists, skipping creation", "cluster", c.Config.ClusterName)
+			log.Info("Kind cluster already exists, skipping creation", "cluster", c.Config.ClusterName)
 			return nil
 		}
 	}
 
-	slog.Info("creating Kind cluster", "cluster", c.Config.ClusterName)
+	log.Info("creating Kind cluster", "cluster", c.Config.ClusterName)
 
 	opts := []cluster.CreateOption{
 		cluster.CreateWithWaitForReady(c.Config.WaitForReady),
@@ -53,6 +54,6 @@ func (c *CreateCluster) Do(ctx context.Context) error {
 		return fmt.Errorf("failed to create Kind cluster %q: %w", c.Config.ClusterName, err)
 	}
 
-	slog.Info("Kind cluster created successfully", "cluster", c.Config.ClusterName)
+	log.Info("Kind cluster created successfully", "cluster", c.Config.ClusterName)
 	return nil
 }

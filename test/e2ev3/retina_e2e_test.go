@@ -8,6 +8,8 @@
 package retina
 
 import (
+	"log/slog"
+	"os"
 	"testing"
 	"time"
 
@@ -16,6 +18,7 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/images"
 	"github.com/microsoft/retina/test/e2ev3/pkg/images/build"
 	"github.com/microsoft/retina/test/e2ev3/pkg/infra"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"github.com/microsoft/retina/test/e2ev3/workflows/advancedmetrics"
 	advexp "github.com/microsoft/retina/test/e2ev3/workflows/advancedmetrics/experimental"
 	"github.com/microsoft/retina/test/e2ev3/workflows/basicmetrics"
@@ -28,6 +31,8 @@ import (
 // TestE2ERetina drives image build, cluster provisioning, and all Retina
 // workflow tests in sequence against a single cluster.
 func TestE2ERetina(t *testing.T) {
+	slog.SetDefault(slog.New(utils.NewStepHandler(os.Stderr, slog.LevelInfo)))
+
 	ctx, cancel := config.TestContext(t)
 	defer cancel()
 

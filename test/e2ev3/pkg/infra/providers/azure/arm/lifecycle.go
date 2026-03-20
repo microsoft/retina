@@ -24,7 +24,8 @@ type DeleteInfra struct {
 func (d *DeleteInfra) String() string { return "delete-azure-infra" }
 
 func (d *DeleteInfra) Do(ctx context.Context) error {
-	slog.Info("deleting resource group and all resources within", "resourceGroup", d.Config.ResourceGroupName)
+	log := slog.With("step", d.String())
+	log.Info("deleting resource group and all resources within", "resourceGroup", d.Config.ResourceGroupName)
 
 	cred, err := azidentity.NewAzureCLICredential(nil)
 	if err != nil {
@@ -60,12 +61,12 @@ func (d *DeleteInfra) Do(ctx context.Context) error {
 		case <-ctx.Done():
 			return fmt.Errorf("resource group deletion timed out: %w", ctx.Err())
 		case <-ticker.C:
-			slog.Info("waiting for resource group deletion", "resourceGroup", d.Config.ResourceGroupName)
+			log.Info("waiting for resource group deletion", "resourceGroup", d.Config.ResourceGroupName)
 		case <-notifychan:
 			if err != nil {
 				return fmt.Errorf("resource group %q deletion failed: %w", d.Config.ResourceGroupName, err)
 			}
-			slog.Info("resource group deleted successfully", "resourceGroup", d.Config.ResourceGroupName)
+			log.Info("resource group deleted successfully", "resourceGroup", d.Config.ResourceGroupName)
 			return nil
 		}
 	}

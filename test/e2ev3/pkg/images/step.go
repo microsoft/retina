@@ -15,9 +15,10 @@ type Step struct {
 func (l *Step) String() string { return "load-images" }
 
 func (l *Step) Do(ctx context.Context) error {
+	log := slog.With("step", l.String())
 	p := l.Cfg
 	imgs := RetinaImages(p.Image.Registry, p.Image.Namespace, p.Image.Tag)
-	slog.Info("loading images into cluster", "count", len(imgs), "cluster", p.Cluster.ClusterName())
+	log.Info("loading images into cluster", "count", len(imgs), "cluster", p.Cluster.ClusterName())
 	return p.Cluster.LoadImages(ctx, imgs)
 }
 

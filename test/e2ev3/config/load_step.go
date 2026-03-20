@@ -20,7 +20,8 @@ type Step struct {
 
 func (l *Step) String() string { return "load-config" }
 
-func (l *Step) Do(_ context.Context) error {
+func (l *Step) Do(ctx context.Context) error {
+	log := slog.With("step", l.String())
 	cfg, err := LoadE2EConfig()
 	if err != nil {
 		return fmt.Errorf("load e2e config: %w", err)

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	flow "github.com/Azure/go-workflow"
+	"github.com/cenkalti/backoff/v4"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 )
 
@@ -38,11 +39,12 @@ type WithPortForward struct {
 func (w *WithPortForward) String() string { return "with-port-forward" }
 
 func (w *WithPortForward) Do(ctx context.Context) error {
+	log := slog.With("step", w.String())
 	if err := w.PF.Do(ctx); err != nil {
 		return fmt.Errorf("port-forward failed: %w", err)
 	}
 	defer func() {
-		slog.Info("stopping port-forward", "local", w.PF.LocalPort, "remote", w.PF.RemotePort)
+		log.Info("stopping port-forward", "local", w.PF.LocalPort, "remote", w.PF.RemotePort)
 		w.PF.Stop() //nolint:errcheck // best-effort cleanup
 	}()
 
@@ -72,7 +74,11 @@ func CurlExpectFail(name string, exec *k8s.ExecInPod) flow.Steper {
 
 // RetryWithBackoff configures exponential backoff for metric validation.
 func RetryWithBackoff(ro *flow.RetryOption) {
+	bo := backoff.NewExponentialBackOff()
+	bo.InitialInterval = 5 * time.Second
+	bo.MaxInterval = 30 * time.Second
+	bo.MaxElapsedTime = 5 * time.Minute
+	ro.Backoff = bo
 	ro.Attempts = DefaultRetryAttempts
 	ro.TimeoutPerTry = 30 * time.Second
-	// Backoff is exponential by default (flow.DefaultRetryOption uses exponential backoff).
 }

@@ -9,6 +9,8 @@ import (
 	"context"
 	"fmt"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
 	flow "github.com/Azure/go-workflow"
@@ -30,19 +32,15 @@ func addAdvancedDNSScenario(restConfig *rest.Config, namespace, arch, variant st
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
 		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, RestConfig: restConfig,
 	}
-	execCmd1 := flow.Func("adv-dns-"+variant+"-1-"+arch, func(ctx context.Context) error {
-		err := (&k8s.ExecInPod{PodName: podName, PodNamespace: namespace, Command: command, RestConfig: restConfig}).Do(ctx)
-		if expectError {
-			return nil
+	// Generate traffic inside the validation loop so packetparser captures it.
+	execTraffic := flow.Func("adv-dns-"+variant+"-traffic-"+arch, func(ctx context.Context) error {
+		exec := &k8s.ExecInPod{PodName: podName, PodNamespace: namespace, Command: command, RestConfig: restConfig}
+		for i := 0; i < 2; i++ {
+			if err := exec.Do(ctx); err != nil && !expectError {
+				return err
+			}
 		}
-		return err
-	})
-	execCmd2 := flow.Func("adv-dns-"+variant+"-2-"+arch, func(ctx context.Context) error {
-		err := (&k8s.ExecInPod{PodName: podName, PodNamespace: namespace, Command: command, RestConfig: restConfig}).Do(ctx)
-		if expectError {
-			return nil
-		}
-		return err
+		return nil
 	})
 	validateReq := &ValidateAdvancedDNSRequestStep{
 		PodNamespace: namespace, PodName: podName, Query: reqQuery, QueryType: reqQueryType,
@@ -59,22 +57,22 @@ func addAdvancedDNSScenario(restConfig *rest.Config, namespace, arch, variant st
 			LocalPort: config.RetinaMetricsPort, RemotePort: config.RetinaMetricsPort,
 			Endpoint: "metrics", RestConfig: restConfig, OptionalLabelAffinity: "app=" + agnhostName,
 		},
-		Steps: []flow.Steper{validateReq, validateResp},
+		Steps: []flow.Steper{execTraffic, validateReq, validateResp},
 	}
 	deleteAgnhost := &k8s.DeleteKubernetesResource{
 		ResourceType: k8s.TypeString(k8s.StatefulSet), ResourceName: agnhostName, ResourceNamespace: namespace, RestConfig: restConfig,
 	}
 
-	// Setup: provision resources and generate traffic.
+	// Setup: provision the agnhost pod.
 	wf.Add(
-		flow.Pipe(createAgnhost, execCmd1, execCmd2).
+		flow.Step(createAgnhost).
 			Timeout(utils.DefaultScenarioTimeout),
 	)
 
-	// Validate: retry with exponential backoff until metrics appear.
+	// Validate: generate traffic + check metrics, retrying with backoff.
 	wf.Add(
 		flow.Step(validateWithPF).
-			DependsOn(execCmd2).
+			DependsOn(createAgnhost).
 			Retry(utils.RetryWithBackoff),
 	)
 
@@ -92,6 +90,10 @@ func addAdvancedDNSScenario(restConfig *rest.Config, namespace, arch, variant st
 // EmptyResponse is a sentinel value that gets converted to an empty string
 // for metric label matching.
 const EmptyResponse = "emptyResponse"
+
+// KubeServiceIP is a sentinel value that gets resolved at runtime to the
+// ClusterIP of the kubernetes.default service.
+const KubeServiceIP = "kubeServiceIP"
 
 var (
 	dnsAdvRequestCountMetricName  = "networkobservability_adv_dns_request_count"
@@ -161,6 +163,17 @@ func (v *ValidateAdvancedDNSResponseStep) Do(ctx context.Context) error {
 
 	if v.Response == EmptyResponse {
 		v.Response = ""
+	}
+	if v.Response == KubeServiceIP {
+		clientset, err := kubernetes.NewForConfig(v.RestConfig)
+		if err != nil {
+			return fmt.Errorf("failed to create kubernetes clientset: %w", err)
+		}
+		svc, err := clientset.CoreV1().Services("default").Get(ctx, "kubernetes", metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to get kubernetes service ClusterIP: %w", err)
+		}
+		v.Response = svc.Spec.ClusterIP
 	}
 
 	validateAdvanceDNSResponseMetrics := map[string]string{

@@ -22,6 +22,7 @@ type Workflow struct {
 func (w *Workflow) String() string { return "hubble-metrics" }
 
 func (w *Workflow) Do(ctx context.Context) error {
+	ctx = utils.WithWorkflow(ctx, w.String())
 	p := w.Cfg
 	restConfig := p.Cluster.RestConfig()
 	chartPath := p.Paths.HubbleChart

@@ -22,7 +22,8 @@ type InstallNPM struct {
 func (n *InstallNPM) String() string { return "install-azure-npm" }
 
 func (n *InstallNPM) Do(ctx context.Context) error {
-	slog.Info("installing Azure NPM for NetworkPolicy enforcement")
+	log := slog.With("step", n.String())
+	log.Info("installing Azure NPM for NetworkPolicy enforcement")
 	cmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", npmManifestURL)
 	if n.KubeConfigFilePath != "" {
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+n.KubeConfigFilePath)
@@ -36,7 +37,7 @@ func (n *InstallNPM) Do(ctx context.Context) error {
 	cmdOut.Flush()
 
 	// Wait for the DaemonSet to be ready.
-	slog.Info("waiting for Azure NPM DaemonSet to be ready")
+	log.Info("waiting for Azure NPM DaemonSet to be ready")
 	waitCmd := exec.CommandContext(ctx, "kubectl", "rollout", "status", "daemonset/azure-npm",
 		"-n", "kube-system", "--timeout=120s")
 	if n.KubeConfigFilePath != "" {
@@ -50,6 +51,6 @@ func (n *InstallNPM) Do(ctx context.Context) error {
 	}
 	waitOut.Flush()
 
-	slog.Info("Azure NPM installed successfully")
+	log.Info("Azure NPM installed successfully")
 	return nil
 }

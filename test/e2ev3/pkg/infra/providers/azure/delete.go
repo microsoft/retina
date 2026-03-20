@@ -25,7 +25,8 @@ type DeleteResourceGroup struct {
 func (d *DeleteResourceGroup) String() string { return "delete-resource-group" }
 
 func (d *DeleteResourceGroup) Do(ctx context.Context) error {
-	slog.Info("deleting resource group", "resourceGroup", d.ResourceGroupName)
+	log := slog.With("step", d.String())
+	log.Info("deleting resource group", "resourceGroup", d.ResourceGroupName)
 
 	cred, err := azidentity.NewAzureCLICredential(nil)
 	if err != nil {
@@ -46,7 +47,7 @@ func (d *DeleteResourceGroup) Do(ctx context.Context) error {
 		return fmt.Errorf("failed to delete resource group %q: %w", d.ResourceGroupName, err)
 	}
 
-	slog.Info("resource group deleted successfully", "resourceGroup", d.ResourceGroupName)
+	log.Info("resource group deleted successfully", "resourceGroup", d.ResourceGroupName)
 	return nil
 }
 
@@ -61,7 +62,8 @@ type DeleteCluster struct {
 func (d *DeleteCluster) String() string { return "delete-aks-cluster" }
 
 func (d *DeleteCluster) Do(ctx context.Context) error {
-	slog.Info("deleting cluster", "cluster", d.ClusterName, "resourceGroup", d.ResourceGroupName)
+	log := slog.With("step", d.String())
+	log.Info("deleting cluster", "cluster", d.ClusterName, "resourceGroup", d.ResourceGroupName)
 
 	cred, err := azidentity.NewAzureCLICredential(nil)
 	if err != nil {
@@ -82,6 +84,6 @@ func (d *DeleteCluster) Do(ctx context.Context) error {
 		return fmt.Errorf("failed to delete cluster %q: %w", d.ClusterName, err)
 	}
 
-	slog.Info("cluster deleted successfully", "cluster", d.ClusterName)
+	log.Info("cluster deleted successfully", "cluster", d.ClusterName)
 	return nil
 }

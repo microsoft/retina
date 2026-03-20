@@ -19,11 +19,12 @@ type UninstallHelmChart struct {
 func (i *UninstallHelmChart) String() string { return "uninstall-helm" }
 
 func (i *UninstallHelmChart) Do(ctx context.Context) error {
+	log := slog.With("step", i.String())
 	settings := cli.New()
 	settings.KubeConfig = i.KubeConfigFilePath
 	actionConfig := new(action.Configuration)
 
-	err := actionConfig.Init(settings.RESTClientGetter(), i.Namespace, i.HelmDriver, func(format string, v ...any) { slog.Info(fmt.Sprintf(format, v...)) })
+	err := actionConfig.Init(settings.RESTClientGetter(), i.Namespace, i.HelmDriver, func(format string, v ...any) { log.Info(fmt.Sprintf(format, v...)) })
 	if err != nil {
 		return fmt.Errorf("failed to initialize helm action config: %w", err)
 	}

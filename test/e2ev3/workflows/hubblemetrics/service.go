@@ -61,6 +61,7 @@ type ValidateHubbleUIServiceStep struct {
 func (v *ValidateHubbleUIServiceStep) String() string { return "validate-hubble-ui-service" }
 
 func (v *ValidateHubbleUIServiceStep) Do(ctx context.Context) error {
+	log := slog.With("step", v.String())
 	validateStep := &k8s.ValidateResource{
 		ResourceName:      k8s.HubbleUIApp,
 		ResourceNamespace: k8s.HubbleNamespace,
@@ -94,7 +95,7 @@ func (v *ValidateHubbleUIServiceStep) Do(ctx context.Context) error {
 		return fmt.Errorf("failed to validate hubble-ui HTTP response: %w", err)
 	}
 
-	slog.Info("Hubble UI service validation succeeded")
+	log.Info("Hubble UI service validation succeeded")
 	return nil
 }
 

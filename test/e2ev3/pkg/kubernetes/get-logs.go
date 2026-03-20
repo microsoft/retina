@@ -20,25 +20,26 @@ type GetPodLogs struct {
 func (p *GetPodLogs) String() string { return "get-pod-logs" }
 
 func (p *GetPodLogs) Do(ctx context.Context) error {
-	slog.Info("printing pod logs", "namespace", p.Namespace, "labelSelector", p.LabelSelector)
+	log := slog.With("step", p.String())
+	log.Info("printing pod logs", "namespace", p.Namespace, "labelSelector", p.LabelSelector)
 
 	clientset, err := kubernetes.NewForConfig(p.RestConfig)
 	if err != nil {
-		slog.Error("creating clientset", "error", err)
+		log.Error("creating clientset", "error", err)
 	}
 
-	PrintPodLogs(ctx, clientset, p.Namespace, p.LabelSelector)
+	PrintPodLogs(ctx, log, clientset, p.Namespace, p.LabelSelector)
 
 	return nil
 }
 
-func PrintPodLogs(ctx context.Context, clientset *kubernetes.Clientset, namespace, labelSelector string) {
+func PrintPodLogs(ctx context.Context, log *slog.Logger, clientset *kubernetes.Clientset, namespace, labelSelector string) {
 	// List all the pods in the namespace
 	pods, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: labelSelector,
 	})
 	if err != nil {
-		slog.Error("listing pods", "error", err)
+		log.Error("listing pods", "error", err)
 	}
 
 	// Iterate over the pods and get the logs for each pod
@@ -49,18 +50,18 @@ func PrintPodLogs(ctx context.Context, clientset *kubernetes.Clientset, namespac
 		req := clientset.CoreV1().Pods(namespace).GetLogs(pod.Name, &corev1.PodLogOptions{})
 		podLogs, err := req.Stream(ctx)
 		if err != nil {
-			slog.Error("getting logs for pod", "pod", pod.Name, "error", err)
+			log.Error("getting logs for pod", "pod", pod.Name, "error", err)
 		}
 
 		// Read the logs
 		buf, err := io.ReadAll(podLogs)
 		if err != nil {
-			slog.Error("reading logs for pod", "pod", pod.Name, "error", err)
+			log.Error("reading logs for pod", "pod", pod.Name, "error", err)
 		}
 
 		podLogs.Close()
 
 		// Print the logs
-		slog.Info("pod logs", "pod", pod.Name, "logs", string(buf))
+		log.Info("pod logs", "pod", pod.Name, "logs", string(buf))
 	}
 }

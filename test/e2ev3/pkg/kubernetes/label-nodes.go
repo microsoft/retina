@@ -28,6 +28,7 @@ type LabelNodes struct {
 func (l *LabelNodes) String() string { return "label-nodes" }
 
 func (l *LabelNodes) Do(ctx context.Context) error {
+	log := slog.With("step", l.String())
 	clientset, err := kubernetes.NewForConfig(l.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
@@ -61,7 +62,7 @@ func (l *LabelNodes) Do(ctx context.Context) error {
 	}
 
 	for i := range nodes.Items {
-		slog.Info("labeling node", "node", nodes.Items[i].Name)
+		log.Info("labeling node", "node", nodes.Items[i].Name)
 		err = retrier.Do(ctx, func() error {
 			_, err = clientset.CoreV1().Nodes().Patch(ctx, nodes.Items[i].Name, types.JSONPatchType, b, metav1.PatchOptions{})
 			if err != nil {

@@ -32,13 +32,14 @@ type DeployInfra struct {
 func (d *DeployInfra) String() string { return "deploy-azure-infra" }
 
 func (d *DeployInfra) Do(ctx context.Context) error {
+	log := slog.With("step", d.String())
 	template := GenerateTemplate(d.Config)
 
 	templateJSON, err := json.MarshalIndent(template, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal ARM template: %w", err)
 	}
-	slog.Info("generated ARM template", "bytes", len(templateJSON), "cluster", d.Config.ClusterName, "location", d.Config.Location)
+	log.Info("generated ARM template", "bytes", len(templateJSON), "cluster", d.Config.ClusterName, "location", d.Config.Location)
 
 	cred, err := azidentity.NewAzureCLICredential(nil)
 	if err != nil {
@@ -51,7 +52,7 @@ func (d *DeployInfra) Do(ctx context.Context) error {
 	}
 
 	deploymentName := fmt.Sprintf("e2e-%s", d.Config.ClusterName)
-	slog.Info("starting ARM deployment at subscription scope", "deployment", deploymentName)
+	log.Info("starting ARM deployment at subscription scope", "deployment", deploymentName)
 
 	poller, err := client.BeginCreateOrUpdateAtSubscriptionScope(ctx, deploymentName, armresources.Deployment{
 		Location: to.Ptr(d.Config.Location),
@@ -79,12 +80,12 @@ func (d *DeployInfra) Do(ctx context.Context) error {
 		case <-ctx.Done():
 			return fmt.Errorf("ARM deployment timed out: %w", ctx.Err())
 		case <-ticker.C:
-			slog.Info("waiting for ARM deployment to complete", "deployment", deploymentName)
+			log.Info("waiting for ARM deployment to complete", "deployment", deploymentName)
 		case <-notifychan:
 			if err != nil {
 				return fmt.Errorf("ARM deployment %q failed: %w", deploymentName, err)
 			}
-			slog.Info("ARM deployment completed successfully", "deployment", deploymentName)
+			log.Info("ARM deployment completed successfully", "deployment", deploymentName)
 			return nil
 		}
 	}

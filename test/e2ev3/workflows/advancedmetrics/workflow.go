@@ -22,6 +22,7 @@ type Workflow struct {
 func (w *Workflow) String() string { return "advanced-metrics" }
 
 func (w *Workflow) Do(ctx context.Context) error {
+	ctx = utils.WithWorkflow(ctx, w.String())
 	p := w.Cfg
 	restConfig := p.Cluster.RestConfig()
 	chartPath := p.Paths.RetinaChart
@@ -45,7 +46,7 @@ func (w *Workflow) Do(ctx context.Context) error {
 			addAdvancedDNSScenario(restConfig, testPodNamespace, arch,
 				"valid", "nslookup kubernetes.default", false,
 				"kubernetes.default.svc.cluster.local.", "A", "StatefulSet",
-				"1", "kubernetes.default.svc.cluster.local.", "A", "NOERROR", "10.0.0.1",
+				"1", "kubernetes.default.svc.cluster.local.", "A", "NOERROR", KubeServiceIP,
 			),
 			addAdvancedDNSScenario(restConfig, testPodNamespace, arch,
 				"nxdomain", "nslookup some.non.existent.domain.", true,

@@ -46,6 +46,7 @@ type PortForward struct {
 func (p *PortForward) String() string { return "port-forward" }
 
 func (p *PortForward) Do(ctx context.Context) error {
+	log := slog.With("step", p.String())
 	lport, _ := strconv.Atoi(p.LocalPort)
 	rport, _ := strconv.Atoi(p.RemotePort)
 
@@ -61,7 +62,7 @@ func (p *PortForward) Do(ctx context.Context) error {
 	targetPodName := ""
 	if p.OptionalLabelAffinity != "" {
 		// get all pods with label
-		slog.Info("finding pod with affinity", "label", p.LabelSelector, "affinityLabel", p.OptionalLabelAffinity)
+		log.Info("finding pod with affinity", "label", p.LabelSelector, "affinityLabel", p.OptionalLabelAffinity)
 		targetPodName, err = p.findPodsWithAffinity(ctx, clientset)
 		if err != nil {
 			return fmt.Errorf("could not find pod with affinity: %w", err)
@@ -81,7 +82,7 @@ func (p *PortForward) Do(ctx context.Context) error {
 			opts.PodName = targetPodName
 		}
 
-		slog.Info("attempting port forward", "pod", targetPodName, "label", p.LabelSelector, "namespace", p.Namespace)
+		log.Info("attempting port forward", "pod", targetPodName, "label", p.LabelSelector, "namespace", p.Namespace)
 
 		p.pf, err = NewPortForwarder(p.RestConfig, logger{}, opts)
 		if err != nil {
@@ -98,13 +99,13 @@ func (p *PortForward) Do(ctx context.Context) error {
 		}
 		resp, err := client.Get(p.pf.Address() + "/" + p.Endpoint) //nolint
 		if err != nil {
-			slog.Error("port forward validation failed", "address", p.pf.Address(), "error", err)
+			log.Error("port forward validation failed", "address", p.pf.Address(), "error", err)
 			p.pf.Stop()
 			return fmt.Errorf("port forward validation HTTP request to %s failed: %w", p.pf.Address(), err)
 		}
 		defer resp.Body.Close()
 
-		slog.Info("port forward validation succeeded", "address", p.pf.Address(), "status", resp.Status)
+		log.Info("port forward validation succeeded", "address", p.pf.Address(), "status", resp.Status)
 
 		return nil
 	}
@@ -112,7 +113,7 @@ func (p *PortForward) Do(ctx context.Context) error {
 	if err = defaultRetrier.Do(portForwardCtx, portForwardFn); err != nil {
 		return fmt.Errorf("could not start port forward within %ds: %w", defaultTimeoutSeconds, err)
 	}
-	slog.Info("successfully port forwarded", "address", p.pf.Address())
+	log.Info("successfully port forwarded", "address", p.pf.Address())
 	return nil
 }
 
