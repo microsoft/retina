@@ -9,6 +9,7 @@ package retina
 
 import (
 	"testing"
+	"time"
 
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/config"
@@ -30,20 +31,27 @@ func TestE2ERetina(t *testing.T) {
 	ctx, cancel := config.TestContext(t)
 	defer cancel()
 
-	p := &config.E2EConfig{}
+	c := &config.E2EConfig{}
+
+	loadConfig := &config.Step{Cfg: c}
+	buildImages := &build.Step{Cfg: c}
+	setupInfra := &infra.Workflow{Cfg: c, T: t}
+	loadImages := &images.Step{Cfg: c}
+
+	basic := &basicmetrics.Workflow{Cfg: c}
+	advanced := &advancedmetrics.Workflow{Cfg: c}
+	hubble := &hubblemetrics.Workflow{Cfg: c}
+	basicExp := &basicexp.Workflow{Cfg: c}
+	advExp := &advexp.Workflow{Cfg: c}
+	cap := &capture.Workflow{Cfg: c}
 
 	wf := &flow.Workflow{DontPanic: true}
-	wf.Add(flow.Pipe(
-		&config.Step{Cfg: p},
-		&build.Step{Cfg: p},
-		&infra.Workflow{Cfg: p, T: t},
-		&images.Step{Cfg: p},
-		&basicmetrics.Workflow{Cfg: p},
-		&advancedmetrics.Workflow{Cfg: p},
-		&hubblemetrics.Workflow{Cfg: p},
-		&basicexp.Workflow{Cfg: p},
-		&advexp.Workflow{Cfg: p},
-		&capture.Workflow{Cfg: p},
+	wf.Add(flow.BatchPipe(
+		flow.Steps(loadConfig).Timeout(1*time.Minute),
+		flow.Steps(buildImages, setupInfra).Timeout(30*time.Minute),
+		flow.Steps(loadImages).Timeout(10*time.Minute),
+		flow.Pipe(basic, advanced, hubble, basicExp, advExp, cap),
 	))
+
 	require.NoError(t, wf.Do(ctx), "e2e workflow failed")
 }

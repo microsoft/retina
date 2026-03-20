@@ -7,37 +7,44 @@ import (
 
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/config"
+	"github.com/microsoft/retina/test/e2ev3/pkg/infra/providers/azure"
 	"github.com/microsoft/retina/test/e2ev3/pkg/infra/providers/kind"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
 // Workflow provisions a cluster via the configured provider.
 type Workflow struct {
 	Cfg *config.E2EConfig
-	T      *testing.T
+	T   *testing.T
 }
 
 func (s *Workflow) String() string { return "setup-infra" }
 
 func (s *Workflow) Do(ctx context.Context) error {
 	p := s.Cfg
+	kubeCfgPath := p.Cluster.KubeConfigPath()
+
 	if *config.KubeConfig != "" {
-		rc, err := clientcmd.BuildConfigFromFlags("", p.Paths.KubeConfig)
+		rc, err := clientcmd.BuildConfigFromFlags("", kubeCfgPath)
 		if err != nil {
 			return fmt.Errorf("build rest config: %w", err)
 		}
-		p.RestConfig = rc
+		setRestConfig(p.Cluster, rc)
 		return nil
 	}
 
 	var steps []flow.Steper
 	switch *config.Provider {
 	case "kind":
-		kindCfg := kind.DefaultE2EKindConfig(p.Azure.ClusterName)
-		steps = KindSteps(s.T, kindCfg, p.Paths.KubeConfig, *config.CreateInfra, *config.DeleteInfra)
+		kc := p.Cluster.(*kind.Cluster)
+		kindCfg := kind.DefaultE2EKindConfig(kc.Name)
+		kc.Name = kindCfg.ClusterName
+		steps = KindSteps(s.T, kindCfg, kubeCfgPath, *config.CreateInfra, *config.DeleteInfra)
 	default:
-		infraCfg := ResolveInfraConfig(s.T, &p.Azure)
-		steps = AzureSteps(s.T, infraCfg, p.Paths.KubeConfig, *config.CreateInfra, *config.DeleteInfra)
+		ac := p.Cluster.(*azure.Cluster)
+		infraCfg := ResolveInfraConfig(s.T, ac)
+		steps = AzureSteps(s.T, infraCfg, kubeCfgPath, *config.CreateInfra, *config.DeleteInfra)
 	}
 
 	inner := new(flow.Workflow)
@@ -46,10 +53,19 @@ func (s *Workflow) Do(ctx context.Context) error {
 		return err
 	}
 
-	rc, err := clientcmd.BuildConfigFromFlags("", p.Paths.KubeConfig)
+	rc, err := clientcmd.BuildConfigFromFlags("", kubeCfgPath)
 	if err != nil {
 		return fmt.Errorf("build rest config: %w", err)
 	}
-	p.RestConfig = rc
+	setRestConfig(p.Cluster, rc)
 	return nil
+}
+
+func setRestConfig(c config.ClusterProvider, rc *rest.Config) {
+	switch t := c.(type) {
+	case *kind.Cluster:
+		t.RC = rc
+	case *azure.Cluster:
+		t.RC = rc
+	}
 }

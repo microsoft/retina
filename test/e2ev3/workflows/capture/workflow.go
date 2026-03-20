@@ -37,7 +37,7 @@ func (w *Workflow) String() string { return "capture" }
 
 func (w *Workflow) Do(ctx context.Context) error {
 	p := w.Cfg
-	kubeConfigFilePath := p.Paths.KubeConfig
+	kubeConfigFilePath := p.Cluster.KubeConfigPath()
 	testPodNamespace := "default"
 	imgCfg := &p.Image
 
@@ -51,7 +51,7 @@ func (w *Workflow) Do(ctx context.Context) error {
 		CaptureNamespace: testPodNamespace,
 		Duration:         "5s",
 		KubeConfigPath:   kubeConfigFilePath,
-		RestConfig:       p.RestConfig,
+		RestConfig:       p.Cluster.RestConfig(),
 		ImageTag:         imgCfg.Tag,
 		ImageRegistry:    imgCfg.Registry,
 		ImageNamespace:   imgCfg.Namespace,
@@ -72,6 +72,8 @@ const (
 // InstallRetinaPluginStep builds and installs the kubectl-retina plugin
 // to allow e2e tests to run kubectl retina commands.
 type InstallRetinaPluginStep struct{}
+
+func (i *InstallRetinaPluginStep) String() string { return "install-retina-plugin" }
 
 func (i *InstallRetinaPluginStep) Do(ctx context.Context) error {
 	log.Print("Building kubectl-retina plugin...")
@@ -150,6 +152,8 @@ type ValidateCaptureStep struct {
 	ImageRegistry    string
 	ImageNamespace   string
 }
+
+func (v *ValidateCaptureStep) String() string { return "validate-capture" }
 
 func (v *ValidateCaptureStep) Do(ctx context.Context) error {
 	log.Print("Running retina capture create...")

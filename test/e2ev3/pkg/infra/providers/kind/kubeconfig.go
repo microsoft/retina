@@ -21,6 +21,8 @@ type ExportKubeConfig struct {
 	KubeConfigFilePath string
 }
 
+func (e *ExportKubeConfig) String() string { return "export-kind-kubeconfig" }
+
 func (e *ExportKubeConfig) Do(_ context.Context) error {
 	log.Printf("exporting kubeconfig for Kind cluster %q to %q...", e.ClusterName, e.KubeConfigFilePath)
 

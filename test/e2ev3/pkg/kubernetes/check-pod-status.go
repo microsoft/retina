@@ -26,6 +26,8 @@ type WaitPodsReady struct {
 	LabelSelector string
 }
 
+func (w *WaitPodsReady) String() string { return "wait-pods-ready" }
+
 func (w *WaitPodsReady) Do(ctx context.Context) error {
 	clientset, err := kubernetes.NewForConfig(w.RestConfig)
 	if err != nil {

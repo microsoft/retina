@@ -21,6 +21,8 @@ type DebugOnFailure struct {
 	LabelSelector string
 }
 
+func (d *DebugOnFailure) String() string { return "debug-on-failure" }
+
 func (d *DebugOnFailure) Do(_ context.Context) error {
 	log.Printf("[DEBUG] Capturing logs for pods in %s with label %s", d.Namespace, d.LabelSelector)
 	getLogs := &k8s.GetPodLogs{

@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/microsoft/retina/test/e2ev3/pkg/infra/providers/azure"
+	"github.com/microsoft/retina/test/e2ev3/pkg/infra/providers/kind"
 	"github.com/spf13/viper"
 	"k8s.io/client-go/rest"
 )
@@ -23,20 +25,22 @@ import (
 // E2EConfig holds all configuration and runtime state for e2e tests.
 // Fields are populated incrementally by pipeline steps.
 type E2EConfig struct {
-	Azure      AzureConfig
-	Image      ImageConfig
-	Scale      ScaleConfig
-	Helm       HelmConfig
-	Paths      Paths
-	RestConfig *rest.Config
+	Cluster ClusterProvider
+	Image   ImageConfig
+	Scale   ScaleConfig
+	Helm    HelmConfig
+	Paths   Paths
 }
 
-// AzureConfig holds Azure infrastructure settings.
-type AzureConfig struct {
-	SubscriptionID string
-	Location       string
-	ResourceGroup  string
-	ClusterName    string
+// ClusterProvider abstracts cluster-specific behaviors.
+// Implementations live in pkg/infra/providers/{kind,azure}.
+type ClusterProvider interface {
+	ClusterName() string
+	KubeConfigPath() string
+	RestConfig() *rest.Config
+	LoadImages(ctx context.Context, images []string) error
+	ImagePullPolicy() string
+	ImagePullSecrets() []map[string]interface{}
 }
 
 // ImageConfig holds container image coordinates.
@@ -66,6 +70,7 @@ var (
 	DeleteInfra = flag.Bool("delete-infra", true, "delete infrastructure after testing")
 	KubeConfig  = flag.String("kubeconfig", "", "path to kubeconfig file")
 	Provider    = flag.String("provider", "azure", "infrastructure provider: azure or kind")
+	ForceBuild  = flag.Bool("force-build", false, "rebuild images even if they already exist locally")
 )
 
 const (
@@ -80,10 +85,9 @@ var Architectures []string
 
 // Paths holds resolved filesystem paths relative to the repository root.
 type Paths struct {
-	RootDir    string
-	KubeConfig string
-	RetinaChart string
-	HubbleChart string
+	RootDir         string
+	RetinaChart     string
+	HubbleChart     string
 	AdvancedProfile string
 }
 
@@ -91,7 +95,6 @@ type Paths struct {
 func ResolvePaths(rootDir string) *Paths {
 	return &Paths{
 		RootDir:         rootDir,
-		KubeConfig:      filepath.Join(rootDir, "test", "e2e", "test.pem"),
 		RetinaChart:     filepath.Join(rootDir, "deploy", "standard", "manifests", "controller", "helm", "retina"),
 		HubbleChart:     filepath.Join(rootDir, "deploy", "hubble", "manifests", "controller", "helm", "retina"),
 		AdvancedProfile: filepath.Join(rootDir, "test", "profiles", "advanced", "values.yaml"),
@@ -162,13 +165,26 @@ func LoadE2EConfig() (*E2EConfig, error) {
 		}
 	}
 
-	cfg := &E2EConfig{
-		Azure: AzureConfig{
+	// Build the provider-specific cluster config.
+	var cluster ClusterProvider
+	switch *Provider {
+	case "kind":
+		Architectures = []string{"amd64"}
+		cluster = &kind.Cluster{
+			Name: v.GetString("azure.clustername"),
+		}
+	default:
+		Architectures = []string{"amd64", "arm64"}
+		cluster = &azure.Cluster{
 			SubscriptionID: v.GetString("azure.subscriptionid"),
 			Location:       v.GetString("azure.location"),
 			ResourceGroup:  v.GetString("azure.resourcegroup"),
-			ClusterName:    v.GetString("azure.clustername"),
-		},
+			Name:           v.GetString("azure.clustername"),
+		}
+	}
+
+	cfg := &E2EConfig{
+		Cluster: cluster,
 		Image: ImageConfig{
 			Tag:       v.GetString("image.tag"),
 			Namespace: v.GetString("image.namespace"),
@@ -194,13 +210,6 @@ func LoadE2EConfig() (*E2EConfig, error) {
 	}
 
 	log.Printf("using image %s/%s:%s", cfg.Image.Registry, cfg.Image.Namespace, cfg.Image.Tag)
-
-	// Kind clusters are single-arch (amd64); Azure supports both.
-	if *Provider == "kind" {
-		Architectures = []string{"amd64"}
-	} else {
-		Architectures = []string{"amd64", "arm64"}
-	}
 
 	return cfg, nil
 }

@@ -26,6 +26,8 @@ type ValidateResource struct {
 	RestConfig        *rest.Config
 }
 
+func (v *ValidateResource) String() string { return "validate-resource" }
+
 func (v *ValidateResource) Do(ctx context.Context) error {
 	clientset, err := kubernetes.NewForConfig(v.RestConfig)
 	if err != nil {

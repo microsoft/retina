@@ -19,6 +19,8 @@ type DeleteNamespace struct {
 	RestConfig *rest.Config
 }
 
+func (d *DeleteNamespace) String() string { return "delete-namespace" }
+
 func (d *DeleteNamespace) Do(ctx context.Context) error {
 	clientset, err := kubernetes.NewForConfig(d.RestConfig)
 	if err != nil {

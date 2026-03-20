@@ -25,6 +25,8 @@ type LabelNodes struct {
 	Labels     map[string]string
 }
 
+func (l *LabelNodes) String() string { return "label-nodes" }
+
 func (l *LabelNodes) Do(ctx context.Context) error {
 	clientset, err := kubernetes.NewForConfig(l.RestConfig)
 	if err != nil {

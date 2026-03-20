@@ -17,6 +17,8 @@ type ValidateHTTPResponse struct {
 	ExpectedStatus int
 }
 
+func (v *ValidateHTTPResponse) String() string { return "validate-http-response" }
+
 func (v *ValidateHTTPResponse) Do(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, RequestTimeout)
 	defer cancel()

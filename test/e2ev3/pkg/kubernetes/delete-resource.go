@@ -68,6 +68,8 @@ type DeleteKubernetesResource struct {
 	RestConfig        *rest.Config
 }
 
+func (d *DeleteKubernetesResource) String() string { return "delete-kubernetes-resource" }
+
 func (d *DeleteKubernetesResource) Do(ctx context.Context) error {
 	// Prevalidation: check resource type before proceeding
 	restype := ResourceType(d.ResourceType)

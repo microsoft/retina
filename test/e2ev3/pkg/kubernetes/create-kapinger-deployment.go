@@ -29,6 +29,8 @@ type CreateKapingerDeployment struct {
 	RestConfig        *rest.Config
 }
 
+func (c *CreateKapingerDeployment) String() string { return "create-kapinger-deployment" }
+
 func (c *CreateKapingerDeployment) Do(ctx context.Context) error {
 	_, err := strconv.Atoi(c.KapingerReplicas)
 	if err != nil {

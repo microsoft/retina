@@ -21,6 +21,8 @@ type DeleteInfra struct {
 	Config *azure.InfraConfig
 }
 
+func (d *DeleteInfra) String() string { return "delete-azure-infra" }
+
 func (d *DeleteInfra) Do(ctx context.Context) error {
 	log.Printf("deleting resource group %q (and all resources within)...", d.Config.ResourceGroupName)
 
@@ -75,6 +77,8 @@ type GetKubeConfig struct {
 	Config             *azure.InfraConfig
 	KubeConfigFilePath string
 }
+
+func (g *GetKubeConfig) String() string { return "get-arm-kubeconfig" }
 
 func (g *GetKubeConfig) Do(ctx context.Context) error {
 	step := &azure.GetAKSKubeConfig{

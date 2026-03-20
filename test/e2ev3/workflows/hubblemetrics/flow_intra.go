@@ -89,6 +89,8 @@ type CurlPodStep struct {
 	RestConfig      *rest.Config
 }
 
+func (c *CurlPodStep) String() string { return "curl-pod" }
+
 func (c *CurlPodStep) Do(ctx context.Context) error {
 	clientset, err := kubernetes.NewForConfig(c.RestConfig)
 	if err != nil {

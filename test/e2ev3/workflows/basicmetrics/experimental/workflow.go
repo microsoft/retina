@@ -10,7 +10,6 @@ import (
 
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/config"
-	"github.com/microsoft/retina/test/e2ev3/pkg/images"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
@@ -24,24 +23,23 @@ func (w *Workflow) String() string { return "basic-metrics-experimental" }
 
 func (w *Workflow) Do(ctx context.Context) error {
 	p := w.Cfg
-	restConfig := p.RestConfig
+	restConfig := p.Cluster.RestConfig()
 	chartPath := p.Paths.RetinaChart
 	testPodNamespace := config.TestPodNamespace
 	imgCfg := &p.Image
 	helmCfg := &p.Helm
-	loader := images.NewLoader(*config.Provider, p.Azure.ClusterName)
 
 	// Construct steps.
 	installRetina := &k8s.InstallHelmChart{
 		Namespace:          config.KubeSystemNamespace,
 		ReleaseName:        "retina",
-		KubeConfigFilePath: p.Paths.KubeConfig,
+		KubeConfigFilePath: p.Cluster.KubeConfigPath(),
 		ChartPath:          chartPath,
 		ImageTag:           imgCfg.Tag,
 		ImageRegistry:      imgCfg.Registry,
 		ImageNamespace:     imgCfg.Namespace,
 		HelmDriver:         helmCfg.Driver,
-		ImageLoader:        loader,
+		ImageLoader:        p.Cluster,
 	}
 
 	var scenarios []flow.Steper
@@ -71,12 +69,15 @@ func (w *Workflow) Do(ctx context.Context) error {
 	}
 
 	// Wire dependencies and register.
+	// Scenarios run sequentially because they share the same port-forward port.
 	wf := &flow.Workflow{DontPanic: true}
 	wf.Add(flow.Step(installRetina))
+	prev := flow.Steper(installRetina)
 	for _, s := range scenarios {
-		wf.Add(flow.Step(s).DependsOn(installRetina))
+		wf.Add(flow.Step(s).DependsOn(prev))
+		prev = s
 	}
-	wf.Add(flow.Step(ensureStable).DependsOn(scenarios...))
+	wf.Add(flow.Step(ensureStable).DependsOn(prev))
 	wf.Add(flow.Step(debug).DependsOn(ensureStable).When(flow.AnyFailed))
 
 	return wf.Do(ctx)

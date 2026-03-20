@@ -31,6 +31,8 @@ type CreateAgnhostStatefulSet struct {
 	AgnhostReplicas    *int
 }
 
+func (c *CreateAgnhostStatefulSet) String() string { return "create-agnhost-statefulset" }
+
 func (c *CreateAgnhostStatefulSet) Do(ctx context.Context) error {
 	clientset, err := kubernetes.NewForConfig(c.RestConfig)
 	if err != nil {

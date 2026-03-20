@@ -18,6 +18,8 @@ type GetPodLogs struct {
 	LabelSelector string
 }
 
+func (p *GetPodLogs) String() string { return "get-pod-logs" }
+
 func (p *GetPodLogs) Do(ctx context.Context) error {
 	fmt.Printf("printing pod logs for namespace: %s, labelselector: %s\n", p.Namespace, p.LabelSelector)
 

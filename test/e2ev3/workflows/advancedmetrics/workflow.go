@@ -23,7 +23,7 @@ func (w *Workflow) String() string { return "advanced-metrics" }
 
 func (w *Workflow) Do(ctx context.Context) error {
 	p := w.Cfg
-	restConfig := p.RestConfig
+	restConfig := p.Cluster.RestConfig()
 	chartPath := p.Paths.RetinaChart
 	valuesFilePath := p.Paths.AdvancedProfile
 	testPodNamespace := config.TestPodNamespace
@@ -33,7 +33,7 @@ func (w *Workflow) Do(ctx context.Context) error {
 	upgradeRetina := &k8s.UpgradeRetinaHelmChart{
 		Namespace:          config.KubeSystemNamespace,
 		ReleaseName:        "retina",
-		KubeConfigFilePath: p.Paths.KubeConfig,
+		KubeConfigFilePath: p.Cluster.KubeConfigPath(),
 		ChartPath:          chartPath,
 		HelmDriver:         helmCfg.Driver,
 		ValuesFile:         valuesFilePath,
@@ -70,12 +70,15 @@ func (w *Workflow) Do(ctx context.Context) error {
 	}
 
 	// Wire dependencies and register.
+	// Scenarios run sequentially because they share the same port-forward port.
 	wf := &flow.Workflow{DontPanic: true}
 	wf.Add(flow.Step(upgradeRetina))
+	prev := flow.Steper(upgradeRetina)
 	for _, s := range scenarios {
-		wf.Add(flow.Step(s).DependsOn(upgradeRetina))
+		wf.Add(flow.Step(s).DependsOn(prev))
+		prev = s
 	}
-	wf.Add(flow.Step(ensureStable).DependsOn(scenarios...))
+	wf.Add(flow.Step(ensureStable).DependsOn(prev))
 	wf.Add(flow.Step(debug).DependsOn(ensureStable).When(flow.AnyFailed))
 
 	return wf.Do(ctx)

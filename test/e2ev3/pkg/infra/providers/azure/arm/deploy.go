@@ -29,6 +29,8 @@ type DeployInfra struct {
 	Config *azure.InfraConfig
 }
 
+func (d *DeployInfra) String() string { return "deploy-azure-infra" }
+
 func (d *DeployInfra) Do(ctx context.Context) error {
 	template := GenerateTemplate(d.Config)
 

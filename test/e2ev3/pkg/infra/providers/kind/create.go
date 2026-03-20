@@ -17,6 +17,8 @@ type CreateCluster struct {
 	Config *Config
 }
 
+func (c *CreateCluster) String() string { return "create-kind-cluster" }
+
 func (c *CreateCluster) Do(ctx context.Context) error {
 	provider := cluster.NewProvider()
 

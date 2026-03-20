@@ -26,6 +26,8 @@ type ExecInPod struct {
 	Command      string
 }
 
+func (e *ExecInPod) String() string { return "exec-in-pod" }
+
 func (e *ExecInPod) Do(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()

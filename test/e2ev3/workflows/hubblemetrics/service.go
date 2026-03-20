@@ -39,6 +39,8 @@ type ValidateHubbleRelayServiceStep struct {
 	RestConfig *rest.Config
 }
 
+func (v *ValidateHubbleRelayServiceStep) String() string { return "validate-hubble-relay-service" }
+
 func (v *ValidateHubbleRelayServiceStep) Do(ctx context.Context) error {
 	step := &k8s.ValidateResource{
 		ResourceName:      "hubble-relay-service",
@@ -55,6 +57,8 @@ func (v *ValidateHubbleRelayServiceStep) Do(ctx context.Context) error {
 type ValidateHubbleUIServiceStep struct {
 	RestConfig *rest.Config
 }
+
+func (v *ValidateHubbleUIServiceStep) String() string { return "validate-hubble-ui-service" }
 
 func (v *ValidateHubbleUIServiceStep) Do(ctx context.Context) error {
 	validateStep := &k8s.ValidateResource{
@@ -101,6 +105,8 @@ type ValidateHTTPResponseStep struct {
 	URL            string
 	ExpectedStatus int
 }
+
+func (v *ValidateHTTPResponseStep) String() string { return "validate-http-response" }
 
 func (v *ValidateHTTPResponseStep) Do(ctx context.Context) error {
 	step := &k8s.ValidateHTTPResponse{

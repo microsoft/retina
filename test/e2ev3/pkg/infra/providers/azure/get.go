@@ -25,6 +25,8 @@ type GetAKSKubeConfig struct {
 	KubeConfigFilePath string
 }
 
+func (c *GetAKSKubeConfig) String() string { return "get-aks-kubeconfig" }
+
 func (c *GetAKSKubeConfig) Do(ctx context.Context) error {
 	cred, err := azidentity.NewAzureCLICredential(nil)
 	if err != nil {

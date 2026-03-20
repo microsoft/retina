@@ -5,29 +5,28 @@ import (
 	"testing"
 
 	flow "github.com/Azure/go-workflow"
-	"github.com/microsoft/retina/test/e2ev3/config"
 	"github.com/microsoft/retina/test/e2ev3/pkg/infra/providers/azure"
 	"github.com/microsoft/retina/test/e2ev3/pkg/infra/providers/azure/arm"
 )
 
 // ResolveInfraConfig builds the Azure infrastructure config from viper-loaded values,
 // falling back to a random location and generated cluster name when not set.
-func ResolveInfraConfig(t *testing.T, azureCfg *config.AzureConfig) *azure.InfraConfig {
+func ResolveInfraConfig(t *testing.T, ac *azure.Cluster) *azure.InfraConfig {
 	t.Helper()
 
-	subID := azureCfg.SubscriptionID
+	subID := ac.SubscriptionID
 	if subID == "" {
 		t.Fatal("AZURE_SUBSCRIPTION_ID must be set")
 	}
 
-	location := azureCfg.Location
+	location := ac.Location
 	if location == "" {
 		location = azure.RandomLocation(t)
 	}
 
-	clusterName := azure.ClusterNameForE2ETest(t, azureCfg.ClusterName)
+	clusterName := azure.ClusterNameForE2ETest(t, ac.Name)
 
-	rg := azureCfg.ResourceGroup
+	rg := ac.ResourceGroup
 	if rg == "" {
 		rg = clusterName
 	}

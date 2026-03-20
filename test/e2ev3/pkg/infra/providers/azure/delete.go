@@ -22,6 +22,8 @@ type DeleteResourceGroup struct {
 	Location          string
 }
 
+func (d *DeleteResourceGroup) String() string { return "delete-resource-group" }
+
 func (d *DeleteResourceGroup) Do(ctx context.Context) error {
 	log.Printf("deleting resource group %q...", d.ResourceGroupName)
 
@@ -55,6 +57,8 @@ type DeleteCluster struct {
 	ResourceGroupName string
 	Location          string
 }
+
+func (d *DeleteCluster) String() string { return "delete-aks-cluster" }
 
 func (d *DeleteCluster) Do(ctx context.Context) error {
 	log.Printf("deleting cluster %q in resource group %q...", d.ClusterName, d.ResourceGroupName)

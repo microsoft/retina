@@ -8,6 +8,9 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/microsoft/retina/test/e2ev3/pkg/infra/providers/azure"
+	"github.com/microsoft/retina/test/e2ev3/pkg/infra/providers/kind"
 )
 
 // Step resolves e2e config, paths, and image tag.
@@ -29,6 +32,14 @@ func (l *Step) Do(_ context.Context) error {
 	}
 	*l.Cfg = *cfg
 	l.Cfg.Paths = *ResolvePaths(filepath.Dir(filepath.Dir(cwd)))
+
+	kubeCfgPath := filepath.Join(l.Cfg.Paths.RootDir, "test", "e2e", "test.pem")
+	switch c := l.Cfg.Cluster.(type) {
+	case *kind.Cluster:
+		c.KubeCfgPath = kubeCfgPath
+	case *azure.Cluster:
+		c.KubeCfgPath = kubeCfgPath
+	}
 
 	if l.Cfg.Image.Tag == "" {
 		tag, err := DevTag(l.Cfg.Paths.RootDir)

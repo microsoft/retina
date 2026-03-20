@@ -43,6 +43,8 @@ type PortForward struct {
 	pf *PortForwarder
 }
 
+func (p *PortForward) String() string { return "port-forward" }
+
 func (p *PortForward) Do(ctx context.Context) error {
 	lport, _ := strconv.Atoi(p.LocalPort)
 	rport, _ := strconv.Atoi(p.RemotePort)

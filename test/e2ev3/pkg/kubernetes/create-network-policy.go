@@ -22,6 +22,8 @@ type CreateDenyAllNetworkPolicy struct {
 	DenyAllLabelSelector   string
 }
 
+func (c *CreateDenyAllNetworkPolicy) String() string { return "create-deny-all-network-policy" }
+
 func (c *CreateDenyAllNetworkPolicy) Do(ctx context.Context) error {
 	clientset, err := kubernetes.NewForConfig(c.RestConfig)
 	if err != nil {
@@ -65,6 +67,8 @@ type DeleteDenyAllNetworkPolicy struct {
 	RestConfig             *rest.Config
 	DenyAllLabelSelector   string
 }
+
+func (d *DeleteDenyAllNetworkPolicy) String() string { return "delete-deny-all-network-policy" }
 
 func (d *DeleteDenyAllNetworkPolicy) Do(ctx context.Context) error {
 	clientset, err := kubernetes.NewForConfig(d.RestConfig)

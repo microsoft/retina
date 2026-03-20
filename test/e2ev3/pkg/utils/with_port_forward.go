@@ -20,7 +20,7 @@ const (
 	DefaultValidationTimeout = 5 * time.Minute
 
 	// DefaultRetryAttempts for metric validation (metrics may need time to appear).
-	DefaultRetryAttempts = 5
+	DefaultRetryAttempts = 10
 
 	// DefaultScenarioTimeout bounds the total setup phase of a scenario.
 	DefaultScenarioTimeout = 10 * time.Minute
@@ -34,6 +34,8 @@ type WithPortForward struct {
 	PF    *k8s.PortForward
 	Steps []flow.Steper
 }
+
+func (w *WithPortForward) String() string { return "with-port-forward" }
 
 func (w *WithPortForward) Do(ctx context.Context) error {
 	if err := w.PF.Do(ctx); err != nil {

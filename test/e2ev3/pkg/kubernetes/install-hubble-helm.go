@@ -9,7 +9,6 @@ import (
 	"time"
 
 	e2ecfg "github.com/microsoft/retina/test/e2ev3/config"
-	"github.com/microsoft/retina/test/e2ev3/pkg/images"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/cli"
@@ -32,8 +31,10 @@ type InstallHubbleHelmChart struct {
 	ImageRegistry      string
 	ImageNamespace     string
 	HelmDriver         string
-	ImageLoader        images.Loader
+	ImageLoader        e2ecfg.ClusterProvider
 }
+
+func (v *InstallHubbleHelmChart) String() string { return "install-hubble-helm" }
 
 func (v *InstallHubbleHelmChart) Do(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, defaultTimeoutSeconds*time.Second)
@@ -78,7 +79,7 @@ func (v *InstallHubbleHelmChart) Do(ctx context.Context) error {
 		return fmt.Errorf("failed to load chart from path %s: %w", v.ChartPath, err)
 	}
 
-	if secrets := v.ImageLoader.PullSecrets(); len(secrets) > 0 {
+	if secrets := v.ImageLoader.ImagePullSecrets(); len(secrets) > 0 {
 		chart.Values["imagePullSecrets"] = secrets
 	}
 	chart.Values["operator"].(map[string]interface{})["enabled"] = true

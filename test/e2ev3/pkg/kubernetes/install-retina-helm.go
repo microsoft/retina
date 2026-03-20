@@ -9,7 +9,6 @@ import (
 	"time"
 
 	e2ecfg "github.com/microsoft/retina/test/e2ev3/config"
-	"github.com/microsoft/retina/test/e2ev3/pkg/images"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/cli"
@@ -36,9 +35,11 @@ type InstallHelmChart struct {
 	ImageRegistry      string
 	ImageNamespace     string
 	HelmDriver         string
-	ImageLoader        images.Loader
+	ImageLoader        e2ecfg.ClusterProvider
 	EnableHeartbeat    bool
 }
+
+func (i *InstallHelmChart) String() string { return "install-retina-helm" }
 
 func (i *InstallHelmChart) Do(ctx context.Context) error {
 	// Prevalidation: check chart path and tag env
@@ -100,7 +101,7 @@ func (i *InstallHelmChart) Do(ctx context.Context) error {
 		return fmt.Errorf("failed to load chart from path %s: %w", i.ChartPath, err)
 	}
 
-	if secrets := i.ImageLoader.PullSecrets(); len(secrets) > 0 {
+	if secrets := i.ImageLoader.ImagePullSecrets(); len(secrets) > 0 {
 		chart.Values["imagePullSecrets"] = secrets
 	}
 
@@ -110,7 +111,7 @@ func (i *InstallHelmChart) Do(ctx context.Context) error {
 	}
 
 	chart.Values["image"].(map[string]interface{})["tag"] = tag
-	chart.Values["image"].(map[string]interface{})["pullPolicy"] = i.ImageLoader.PullPolicy()
+	chart.Values["image"].(map[string]interface{})["pullPolicy"] = i.ImageLoader.ImagePullPolicy()
 	chart.Values["operator"].(map[string]interface{})["tag"] = tag
 	chart.Values["image"].(map[string]interface{})["repository"] = imageRegistry + "/" + imageNamespace + "/retina-agent"
 	chart.Values["image"].(map[string]interface{})["initRepository"] = imageRegistry + "/" + imageNamespace + "/retina-init"

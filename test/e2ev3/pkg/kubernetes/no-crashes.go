@@ -21,6 +21,8 @@ type EnsureStableComponent struct {
 	IgnoreContainerRestart bool
 }
 
+func (n *EnsureStableComponent) String() string { return "ensure-stable-component" }
+
 func (n *EnsureStableComponent) Do(ctx context.Context) error {
 	clientset, err := kubernetes.NewForConfig(n.RestConfig)
 	if err != nil {

@@ -22,6 +22,12 @@ func KindSteps(t *testing.T, cfg *kind.Config, kubeConfigFilePath string, create
 		KubeConfigFilePath: kubeConfigFilePath,
 	})
 
+	if createInfra {
+		steps = append(steps, &kind.InstallNPM{
+			KubeConfigFilePath: kubeConfigFilePath,
+		})
+	}
+
 	if deleteInfra {
 		t.Cleanup(func() {
 			del := &kind.DeleteCluster{

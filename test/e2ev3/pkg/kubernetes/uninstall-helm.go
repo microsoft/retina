@@ -16,6 +16,8 @@ type UninstallHelmChart struct {
 	HelmDriver         string
 }
 
+func (i *UninstallHelmChart) String() string { return "uninstall-helm" }
+
 func (i *UninstallHelmChart) Do(ctx context.Context) error {
 	settings := cli.New()
 	settings.KubeConfig = i.KubeConfigFilePath

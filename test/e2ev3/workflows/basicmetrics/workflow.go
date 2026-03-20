@@ -14,7 +14,6 @@ import (
 
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/config"
-	"github.com/microsoft/retina/test/e2ev3/pkg/images"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
@@ -34,13 +33,12 @@ func (w *Workflow) String() string { return "basic-metrics" }
 
 func (w *Workflow) Do(ctx context.Context) error {
 	p := w.Cfg
-	kubeConfigFilePath := p.Paths.KubeConfig
-	restConfig := p.RestConfig
+	kubeConfigFilePath := p.Cluster.KubeConfigPath()
+	restConfig := p.Cluster.RestConfig()
 	chartPath := p.Paths.RetinaChart
 	testPodNamespace := config.TestPodNamespace
 	imgCfg := &p.Image
 	helmCfg := &p.Helm
-	loader := images.NewLoader(*config.Provider, p.Azure.ClusterName)
 
 	// Construct steps.
 	installRetina := &k8s.InstallHelmChart{
@@ -52,7 +50,7 @@ func (w *Workflow) Do(ctx context.Context) error {
 		ImageRegistry:      imgCfg.Registry,
 		ImageNamespace:     imgCfg.Namespace,
 		HelmDriver:         helmCfg.Driver,
-		ImageLoader:        loader,
+		ImageLoader:        p.Cluster,
 	}
 
 	var scenarios []flow.Steper
@@ -89,12 +87,15 @@ func (w *Workflow) Do(ctx context.Context) error {
 	}
 
 	// Wire dependencies and register.
+	// Scenarios run sequentially because they share the same port-forward port.
 	wf := &flow.Workflow{DontPanic: true}
 	wf.Add(flow.Step(installRetina))
+	prev := flow.Steper(installRetina)
 	for _, s := range scenarios {
-		wf.Add(flow.Step(s).DependsOn(installRetina))
+		wf.Add(flow.Step(s).DependsOn(prev))
+		prev = s
 	}
-	wf.Add(flow.Step(ensureStable).DependsOn(scenarios...))
+	wf.Add(flow.Step(ensureStable).DependsOn(prev))
 	wf.Add(flow.Step(debug).DependsOn(ensureStable).When(flow.AnyFailed))
 
 	return wf.Do(ctx)
@@ -122,6 +123,8 @@ type ValidateHNSMetricStep struct {
 	RetinaDaemonSetNamespace string
 	RetinaDaemonSetName      string
 }
+
+func (v *ValidateHNSMetricStep) String() string { return "validate-hns-metrics" }
 
 func (v *ValidateHNSMetricStep) Do(ctx context.Context) error {
 	clientset, err := kubernetes.NewForConfig(v.RestConfig)

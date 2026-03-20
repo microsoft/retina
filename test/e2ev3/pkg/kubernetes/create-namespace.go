@@ -16,6 +16,8 @@ type CreateNamespace struct {
 	RestConfig *rest.Config
 }
 
+func (c *CreateNamespace) String() string { return "create-namespace" }
+
 func (c *CreateNamespace) Do(ctx context.Context) error {
 	return CreateNamespaceFn(ctx, c.RestConfig, c.Namespace)
 }

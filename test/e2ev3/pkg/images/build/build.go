@@ -12,25 +12,38 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/microsoft/retina/test/e2ev3/config"
+	"github.com/microsoft/retina/test/e2ev3/pkg/images"
 )
 
-// Images builds Retina container images by invoking the top-level Makefile.
+// Step builds Retina container images by invoking the top-level Makefile.
 // It builds the agent, init, and operator images for linux/amd64.
-type Images struct {
-	RootDir   string
-	Registry  string
-	Namespace string
-	Tag       string
-	Push      bool // push to registry after build (for Azure); if false, loads into local docker daemon (for Kind)
+// If all images already exist locally and ForceBuild is false, the build is skipped.
+type Step struct {
+	Cfg *config.E2EConfig
 }
 
-func (b *Images) Do(ctx context.Context) error {
+func (b *Step) String() string { return "build-images" }
+
+func (b *Step) Do(ctx context.Context) error {
+	img := &b.Cfg.Image
+	if !*config.ForceBuild && allImagesExist(img.Registry, img.Namespace, img.Tag) {
+		log.Printf("all images already present locally, skipping build")
+		return nil
+	}
+
+	push := *config.Provider != "kind"
+	return b.build(ctx, b.Cfg.Paths.RootDir, img.Registry, img.Namespace, img.Tag, push)
+}
+
+func (b *Step) build(ctx context.Context, rootDir, registry, namespace, tag string, push bool) error {
 	targets := []string{"retina-image", "retina-operator-image"}
 
 	errs := make(chan error, len(targets))
 	for _, target := range targets {
 		go func(t string) {
-			errs <- b.runMake(ctx, t)
+			errs <- runMake(ctx, rootDir, registry, namespace, tag, push, t)
 		}(target)
 	}
 
@@ -43,16 +56,16 @@ func (b *Images) Do(ctx context.Context) error {
 	return firstErr
 }
 
-func (b *Images) runMake(ctx context.Context, target string) error {
+func runMake(ctx context.Context, rootDir, registry, namespace, tag string, push bool, target string) error {
 	args := []string{
 		target,
 		"PLATFORM=linux/amd64",
-		"TAG=" + b.Tag,
-		"RETINA_PLATFORM_TAG=" + b.Tag, // use base tag so image refs match Helm values
-		"IMAGE_REGISTRY=" + b.Registry,
-		"IMAGE_NAMESPACE=" + b.Namespace,
+		"TAG=" + tag,
+		"RETINA_PLATFORM_TAG=" + tag,
+		"IMAGE_REGISTRY=" + registry,
+		"IMAGE_NAMESPACE=" + namespace,
 	}
-	if b.Push {
+	if push {
 		args = append(args, "BUILDX_ACTION=--push", "OUTPUT_LOCAL=")
 	} else {
 		// Load into local docker daemon for Kind sideloading.
@@ -63,9 +76,7 @@ func (b *Images) runMake(ctx context.Context, target string) error {
 	log.Printf("building: make %s", strings.Join(args, " "))
 
 	cmd := exec.CommandContext(ctx, "make", args...)
-	cmd.Dir = b.RootDir
-
-	// Stream both stdout and stderr so buildx progress is visible.
+	cmd.Dir = rootDir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -75,4 +86,14 @@ func (b *Images) runMake(ctx context.Context, target string) error {
 	return nil
 }
 
+// allImagesExist returns true if every Retina image is already in the local Docker daemon.
+func allImagesExist(registry, namespace, tag string) bool {
+	for _, ref := range images.RetinaImages(registry, namespace, tag) {
+		cmd := exec.Command("docker", "image", "inspect", ref)
+		if err := cmd.Run(); err != nil {
+			return false
+		}
+	}
+	return true
+}
 

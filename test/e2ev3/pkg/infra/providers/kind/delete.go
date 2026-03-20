@@ -18,6 +18,8 @@ type DeleteCluster struct {
 	KubeConfigFilePath string
 }
 
+func (d *DeleteCluster) String() string { return "delete-kind-cluster" }
+
 func (d *DeleteCluster) Do(_ context.Context) error {
 	log.Printf("deleting Kind cluster %q...", d.ClusterName)
 
