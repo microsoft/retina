@@ -6,6 +6,7 @@
 package hubblemetrics
 
 import (
+	"k8s.io/client-go/rest"
 	"context"
 	"fmt"
 
@@ -15,10 +16,9 @@ import (
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
-func addHubbleFlowIntraNodeScenario(kubeConfigFilePath, arch string) *flow.Workflow {
+func addHubbleFlowIntraNodeScenario(restConfig *rest.Config, arch string) *flow.Workflow {
 	wf := &flow.Workflow{DontPanic: true}
 	podname := "agnhost-flow-intra"
 	replicas := 2
@@ -32,12 +32,12 @@ func addHubbleFlowIntraNodeScenario(kubeConfigFilePath, arch string) *flow.Workf
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
 		AgnhostName: podname, AgnhostNamespace: config.TestPodNamespace,
 		ScheduleOnSameNode: true, AgnhostReplicas: &replicas,
-		AgnhostArch: arch, KubeConfigFilePath: kubeConfigFilePath,
+		AgnhostArch: arch, RestConfig: restConfig,
 	}
 	curlPod := &CurlPodStep{
 		SrcPodName: podname + "-0", SrcPodNamespace: config.TestPodNamespace,
 		DstPodName: podname + "-1", DstPodNamespace: config.TestPodNamespace,
-		KubeConfigFilePath: kubeConfigFilePath,
+		RestConfig: restConfig,
 	}
 	validateFlow := &prom.ValidateMetricStep{
 		ForwardedPort: config.HubbleMetricsPort, MetricName: config.HubbleFlowMetricName,
@@ -46,13 +46,13 @@ func addHubbleFlowIntraNodeScenario(kubeConfigFilePath, arch string) *flow.Workf
 	validateWithPF := &utils.WithPortForward{
 		PF: &k8s.PortForward{
 			LabelSelector: "k8s-app=retina", LocalPort: config.HubbleMetricsPort, RemotePort: config.HubbleMetricsPort,
-			Endpoint: config.MetricsEndpoint, KubeConfigFilePath: kubeConfigFilePath, OptionalLabelAffinity: "app=" + podname,
+			Endpoint: config.MetricsEndpoint, RestConfig: restConfig, OptionalLabelAffinity: "app=" + podname,
 		},
 		Steps: []flow.Steper{validateFlow},
 	}
 	deleteAgnhost := &k8s.DeleteKubernetesResource{
 		ResourceType: k8s.TypeString(k8s.StatefulSet), ResourceName: podname,
-		ResourceNamespace: config.TestPodNamespace, KubeConfigFilePath: kubeConfigFilePath,
+		ResourceNamespace: config.TestPodNamespace, RestConfig: restConfig,
 	}
 
 	// Setup: provision resources and generate traffic.
@@ -82,31 +82,26 @@ func addHubbleFlowIntraNodeScenario(kubeConfigFilePath, arch string) *flow.Workf
 // CurlPodStep executes a curl command from a source pod to a destination pod
 // for flow testing. It resolves the destination pod's IP and runs the command.
 type CurlPodStep struct {
-	SrcPodName         string
-	SrcPodNamespace    string
-	DstPodName         string
-	DstPodNamespace    string
-	KubeConfigFilePath string
+	SrcPodName      string
+	SrcPodNamespace string
+	DstPodName      string
+	DstPodNamespace string
+	RestConfig      *rest.Config
 }
 
 func (c *CurlPodStep) Do(ctx context.Context) error {
-	config, err := clientcmd.BuildConfigFromFlags("", c.KubeConfigFilePath)
-	if err != nil {
-		return fmt.Errorf("error building kubeconfig: %w", err)
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := kubernetes.NewForConfig(c.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	dstPodIP, err := k8s.GetPodIP(ctx, c.KubeConfigFilePath, c.DstPodNamespace, c.DstPodName)
+	dstPodIP, err := k8s.GetPodIP(ctx, c.RestConfig, c.DstPodNamespace, c.DstPodName)
 	if err != nil {
 		return fmt.Errorf("error getting pod IP: %w", err)
 	}
 
 	cmd := fmt.Sprintf("curl -s -m 5 %s:80", dstPodIP)
-	_, err = k8s.ExecPod(ctx, clientset, config, c.SrcPodNamespace, c.SrcPodName, cmd)
+	_, err = k8s.ExecPod(ctx, clientset, c.RestConfig, c.SrcPodNamespace, c.SrcPodName, cmd)
 	if err != nil {
 		return fmt.Errorf("error executing command: %w", err)
 	}

@@ -6,6 +6,7 @@
 package experimental
 
 import (
+	"k8s.io/client-go/rest"
 	flow "github.com/Azure/go-workflow"
 	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 	"github.com/microsoft/retina/test/e2ev3/config"
@@ -13,27 +14,27 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addTCPStatsScenario(kubeConfigFilePath, namespace, arch string) *flow.Workflow {
+func addTCPStatsScenario(restConfig *rest.Config, namespace, arch string) *flow.Workflow {
 	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-tcpstats-" + arch
 	podName := agnhostName + "-0"
 
 	createKapinger := &k8s.CreateKapingerDeployment{
-		KapingerNamespace: namespace, KapingerReplicas: "1", KubeConfigFilePath: kubeConfigFilePath,
+		KapingerNamespace: namespace, KapingerReplicas: "1", RestConfig: restConfig,
 	}
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
-		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, KubeConfigFilePath: kubeConfigFilePath,
+		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, RestConfig: restConfig,
 	}
 	waitKapinger := &k8s.WaitPodsReady{
-		KubeConfigFilePath: kubeConfigFilePath,
+		RestConfig: restConfig,
 		Namespace:          namespace,
 		LabelSelector:      "app=kapinger",
 	}
 	execCurl1 := &k8s.ExecInPod{
-		PodName: podName, PodNamespace: namespace, Command: "curl -s -m 5 kapinger:80", KubeConfigFilePath: kubeConfigFilePath,
+		PodName: podName, PodNamespace: namespace, Command: "curl -s -m 5 kapinger:80", RestConfig: restConfig,
 	}
 	execCurl2 := &k8s.ExecInPod{
-		PodName: podName, PodNamespace: namespace, Command: "curl -s -m 5 kapinger:80", KubeConfigFilePath: kubeConfigFilePath,
+		PodName: podName, PodNamespace: namespace, Command: "curl -s -m 5 kapinger:80", RestConfig: restConfig,
 	}
 	validateConnStats := &prom.ValidateMetricStep{
 		ForwardedPort: config.RetinaMetricsPort,
@@ -53,16 +54,16 @@ func addTCPStatsScenario(kubeConfigFilePath, namespace, arch string) *flow.Workf
 		PF: &k8s.PortForward{
 			Namespace: config.KubeSystemNamespace, LabelSelector: "k8s-app=retina",
 			LocalPort: config.RetinaMetricsPort, RemotePort: config.RetinaMetricsPort,
-			Endpoint: config.MetricsEndpoint, KubeConfigFilePath: kubeConfigFilePath,
+			Endpoint: config.MetricsEndpoint, RestConfig: restConfig,
 			OptionalLabelAffinity: "app=" + agnhostName,
 		},
 		Steps: []flow.Steper{validateConnStats, validateFlagGauges},
 	}
 	deleteAgnhost := &k8s.DeleteKubernetesResource{
-		ResourceType: k8s.TypeString(k8s.StatefulSet), ResourceName: agnhostName, ResourceNamespace: namespace, KubeConfigFilePath: kubeConfigFilePath,
+		ResourceType: k8s.TypeString(k8s.StatefulSet), ResourceName: agnhostName, ResourceNamespace: namespace, RestConfig: restConfig,
 	}
 	deleteKapinger := &k8s.DeleteKubernetesResource{
-		ResourceType: k8s.TypeString(k8s.Deployment), ResourceName: "kapinger", ResourceNamespace: namespace, KubeConfigFilePath: kubeConfigFilePath,
+		ResourceType: k8s.TypeString(k8s.Deployment), ResourceName: "kapinger", ResourceNamespace: namespace, RestConfig: restConfig,
 	}
 
 	// Setup: provision resources and generate traffic.

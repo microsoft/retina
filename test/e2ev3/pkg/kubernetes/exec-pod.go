@@ -12,7 +12,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubectl/pkg/scheme"
@@ -21,22 +20,17 @@ import (
 const ExecSubResources = "exec"
 
 type ExecInPod struct {
-	PodNamespace       string
-	KubeConfigFilePath string
-	PodName            string
-	Command            string
+	PodNamespace string
+	RestConfig   *rest.Config
+	PodName      string
+	Command      string
 }
 
 func (e *ExecInPod) Do(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
-	config, err := clientcmd.BuildConfigFromFlags("", e.KubeConfigFilePath)
-	if err != nil {
-		return fmt.Errorf("error building kubeconfig: %w", err)
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := kubernetes.NewForConfig(e.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
@@ -45,7 +39,7 @@ func (e *ExecInPod) Do(ctx context.Context) error {
 		// Retry on every error
 		return true
 	}, func() error {
-		_, execErr := ExecPod(ctx, clientset, config, e.PodNamespace, e.PodName, e.Command)
+		_, execErr := ExecPod(ctx, clientset, e.RestConfig, e.PodNamespace, e.PodName, e.Command)
 		if execErr != nil {
 			log.Printf("error executing command, retrying [%s]: %v", e.Command, execErr)
 		}

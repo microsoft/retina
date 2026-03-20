@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/rest"
 )
 
 type patchStringValue struct {
@@ -21,17 +21,12 @@ type patchStringValue struct {
 }
 
 type LabelNodes struct {
-	KubeConfigFilePath string
-	Labels             map[string]string
+	RestConfig *rest.Config
+	Labels     map[string]string
 }
 
 func (l *LabelNodes) Do(ctx context.Context) error {
-	config, err := clientcmd.BuildConfigFromFlags("", l.KubeConfigFilePath)
-	if err != nil {
-		return fmt.Errorf("error building kubeconfig: %w", err)
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := kubernetes.NewForConfig(l.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}

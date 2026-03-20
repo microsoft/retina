@@ -6,6 +6,7 @@
 package hubblemetrics
 
 import (
+	"k8s.io/client-go/rest"
 	flow "github.com/Azure/go-workflow"
 	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 	"github.com/microsoft/retina/test/e2ev3/config"
@@ -13,7 +14,7 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addHubbleFlowInterNodeScenario(kubeConfigFilePath, arch string) *flow.Workflow {
+func addHubbleFlowInterNodeScenario(restConfig *rest.Config, arch string) *flow.Workflow {
 	wf := &flow.Workflow{DontPanic: true}
 	podnameSrc := "agnhost-flow-inter-src"
 	podnameDst := "agnhost-flow-inter-dst"
@@ -28,16 +29,16 @@ func addHubbleFlowInterNodeScenario(kubeConfigFilePath, arch string) *flow.Workf
 
 	createSrc := &k8s.CreateAgnhostStatefulSet{
 		AgnhostName: podnameSrc, AgnhostNamespace: config.TestPodNamespace,
-		AgnhostArch: arch, KubeConfigFilePath: kubeConfigFilePath,
+		AgnhostArch: arch, RestConfig: restConfig,
 	}
 	createDst := &k8s.CreateAgnhostStatefulSet{
 		AgnhostName: podnameDst, AgnhostNamespace: config.TestPodNamespace,
-		AgnhostArch: arch, KubeConfigFilePath: kubeConfigFilePath,
+		AgnhostArch: arch, RestConfig: restConfig,
 	}
 	curlPod := &CurlPodStep{
 		SrcPodName: podnameSrc + "-0", SrcPodNamespace: config.TestPodNamespace,
 		DstPodName: podnameDst + "-0", DstPodNamespace: config.TestPodNamespace,
-		KubeConfigFilePath: kubeConfigFilePath,
+		RestConfig: restConfig,
 	}
 	validateSrc := &prom.ValidateMetricStep{
 		ForwardedPort: config.HubbleMetricsPort, MetricName: config.HubbleFlowMetricName,
@@ -50,14 +51,14 @@ func addHubbleFlowInterNodeScenario(kubeConfigFilePath, arch string) *flow.Workf
 	validateWithPF := &utils.WithPortForward{
 		PF: &k8s.PortForward{
 			LabelSelector: "k8s-app=retina", LocalPort: config.HubbleMetricsPort, RemotePort: config.HubbleMetricsPort,
-			Endpoint: config.MetricsEndpoint, KubeConfigFilePath: kubeConfigFilePath, OptionalLabelAffinity: "app=" + podnameSrc,
+			Endpoint: config.MetricsEndpoint, RestConfig: restConfig, OptionalLabelAffinity: "app=" + podnameSrc,
 		},
 		Steps: []flow.Steper{
 			validateSrc,
 			&utils.WithPortForward{
 				PF: &k8s.PortForward{
 					LabelSelector: "k8s-app=retina", LocalPort: "9966", RemotePort: config.HubbleMetricsPort,
-					Endpoint: config.MetricsEndpoint, KubeConfigFilePath: kubeConfigFilePath, OptionalLabelAffinity: "app=" + podnameDst,
+					Endpoint: config.MetricsEndpoint, RestConfig: restConfig, OptionalLabelAffinity: "app=" + podnameDst,
 				},
 				Steps: []flow.Steper{validateDst},
 			},
@@ -65,11 +66,11 @@ func addHubbleFlowInterNodeScenario(kubeConfigFilePath, arch string) *flow.Workf
 	}
 	deleteSrc := &k8s.DeleteKubernetesResource{
 		ResourceType: k8s.TypeString(k8s.StatefulSet), ResourceName: podnameSrc,
-		ResourceNamespace: config.TestPodNamespace, KubeConfigFilePath: kubeConfigFilePath,
+		ResourceNamespace: config.TestPodNamespace, RestConfig: restConfig,
 	}
 	deleteDst := &k8s.DeleteKubernetesResource{
 		ResourceType: k8s.TypeString(k8s.StatefulSet), ResourceName: podnameDst,
-		ResourceNamespace: config.TestPodNamespace, KubeConfigFilePath: kubeConfigFilePath,
+		ResourceNamespace: config.TestPodNamespace, RestConfig: restConfig,
 	}
 
 	// Setup: provision resources and generate traffic.

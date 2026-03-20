@@ -30,20 +30,20 @@ func TestE2ERetina(t *testing.T) {
 	ctx, cancel := config.TestContext(t)
 	defer cancel()
 
-	p := &config.E2EParams{}
+	p := &config.E2EConfig{}
 
 	wf := &flow.Workflow{DontPanic: true}
 	wf.Add(flow.Pipe(
-		&config.Step{Params: p},
-		&build.Step{Params: p},
-		&infra.Workflow{Params: p, T: t},
-		&images.Step{Params: p},
-		&basicmetrics.Workflow{Params: p},
-		&advancedmetrics.Workflow{Params: p},
-		&hubblemetrics.Workflow{Params: p},
-		&basicexp.Workflow{Params: p},
-		&advexp.Workflow{Params: p},
-		&capture.Workflow{Params: p},
+		&config.Step{Cfg: p},
+		&build.Step{Cfg: p},
+		&infra.Workflow{Cfg: p, T: t},
+		&images.Step{Cfg: p},
+		&basicmetrics.Workflow{Cfg: p},
+		&advancedmetrics.Workflow{Cfg: p},
+		&hubblemetrics.Workflow{Cfg: p},
+		&basicexp.Workflow{Cfg: p},
+		&advexp.Workflow{Cfg: p},
+		&capture.Workflow{Cfg: p},
 	))
 	require.NoError(t, wf.Do(ctx), "e2e workflow failed")
 }

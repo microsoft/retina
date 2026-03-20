@@ -14,7 +14,7 @@ import (
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/rest"
 )
 
 var ErrDeleteNilResource = fmt.Errorf("cannot create nil resource")
@@ -62,10 +62,10 @@ func TypeString(resourceType ResourceType) string {
 }
 
 type DeleteKubernetesResource struct {
-	ResourceType       string // can't use enum, breaks parameter parsing, all must be strings
-	ResourceName       string
-	ResourceNamespace  string
-	KubeConfigFilePath string
+	ResourceType      string // can't use enum, breaks parameter parsing, all must be strings
+	ResourceName      string
+	ResourceNamespace string
+	RestConfig        *rest.Config
 }
 
 func (d *DeleteKubernetesResource) Do(ctx context.Context) error {
@@ -75,12 +75,7 @@ func (d *DeleteKubernetesResource) Do(ctx context.Context) error {
 		return ErrUnknownResourceType
 	}
 
-	config, err := clientcmd.BuildConfigFromFlags("", d.KubeConfigFilePath)
-	if err != nil {
-		return fmt.Errorf("error building kubeconfig: %w", err)
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := kubernetes.NewForConfig(d.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}

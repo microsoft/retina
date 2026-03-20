@@ -8,13 +8,13 @@ import (
 
 // Step loads container images into the cluster.
 type Step struct {
-	Params *config.E2EParams
+	Cfg *config.E2EConfig
 }
 
 func (l *Step) String() string { return "load-images" }
 
 func (l *Step) Do(ctx context.Context) error {
-	p := l.Params
-	loader := NewLoader(*config.Provider, p.Cfg.Azure.ClusterName)
-	return loader.Load(ctx, RetinaImages(p.Cfg.Image.Registry, p.Cfg.Image.Namespace, p.Cfg.Image.Tag))
+	p := l.Cfg
+	loader := NewLoader(*config.Provider, p.Azure.ClusterName)
+	return loader.Load(ctx, RetinaImages(p.Image.Registry, p.Image.Namespace, p.Image.Tag))
 }

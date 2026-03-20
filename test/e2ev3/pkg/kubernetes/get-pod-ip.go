@@ -6,16 +6,11 @@ import (
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/rest"
 )
 
-func GetPodIP(ctx context.Context, kubeConfigFilePath, namespace, podName string) (string, error) {
-	config, err := clientcmd.BuildConfigFromFlags("", kubeConfigFilePath)
-	if err != nil {
-		return "", errors.Wrapf(err, "error building kubeconfig")
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
+func GetPodIP(ctx context.Context, restConfig *rest.Config, namespace, podName string) (string, error) {
+	clientset, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
 		return "", errors.Wrapf(err, "error creating Kubernetes clientset")
 	}

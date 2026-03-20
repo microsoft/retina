@@ -8,16 +8,16 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/rest"
 )
 
 type CreateNamespace struct {
-	Namespace          string
-	KubeConfigFilePath string
+	Namespace  string
+	RestConfig *rest.Config
 }
 
 func (c *CreateNamespace) Do(ctx context.Context) error {
-	return CreateNamespaceFn(ctx, c.KubeConfigFilePath, c.Namespace)
+	return CreateNamespaceFn(ctx, c.RestConfig, c.Namespace)
 }
 
 func (c *CreateNamespace) getNamespace() *v1.Namespace {
@@ -32,13 +32,8 @@ func (c *CreateNamespace) getNamespace() *v1.Namespace {
 	}
 }
 
-func CreateNamespaceFn(ctx context.Context, kubeconfigpath, namespace string) error {
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfigpath)
-	if err != nil {
-		return fmt.Errorf("error building kubeconfig: %w", err)
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
+func CreateNamespaceFn(ctx context.Context, restConfig *rest.Config, namespace string) error {
+	clientset, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}

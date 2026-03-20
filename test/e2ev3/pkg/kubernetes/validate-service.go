@@ -8,7 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/rest"
 )
 
 type ResourceTypes string
@@ -19,20 +19,15 @@ const (
 )
 
 type ValidateResource struct {
-	ResourceName       string
-	ResourceNamespace  string
-	ResourceType       string
-	Labels             string
-	KubeConfigFilePath string
+	ResourceName      string
+	ResourceNamespace string
+	ResourceType      string
+	Labels            string
+	RestConfig        *rest.Config
 }
 
 func (v *ValidateResource) Do(ctx context.Context) error {
-	config, err := clientcmd.BuildConfigFromFlags("", v.KubeConfigFilePath)
-	if err != nil {
-		return fmt.Errorf("error building kubeconfig: %w", err)
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := kubernetes.NewForConfig(v.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}

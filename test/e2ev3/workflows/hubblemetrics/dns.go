@@ -6,6 +6,7 @@
 package hubblemetrics
 
 import (
+	"k8s.io/client-go/rest"
 	flow "github.com/Azure/go-workflow"
 	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 	"github.com/microsoft/retina/test/e2ev3/config"
@@ -13,7 +14,7 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addHubbleDNSScenario(kubeConfigFilePath, arch string) *flow.Workflow {
+func addHubbleDNSScenario(restConfig *rest.Config, arch string) *flow.Workflow {
 	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-dns"
 
@@ -21,13 +22,13 @@ func addHubbleDNSScenario(kubeConfigFilePath, arch string) *flow.Workflow {
 		AgnhostName:        agnhostName,
 		AgnhostNamespace:   config.TestPodNamespace,
 		AgnhostArch:        arch,
-		KubeConfigFilePath: kubeConfigFilePath,
+		RestConfig: restConfig,
 	}
 	execNslookup := &k8s.ExecInPod{
 		PodName:            agnhostName + "-0",
 		PodNamespace:       config.TestPodNamespace,
 		Command:            "nslookup -type=a one.one.one.one",
-		KubeConfigFilePath: kubeConfigFilePath,
+		RestConfig: restConfig,
 	}
 	validateQuery := &prom.ValidateMetricStep{
 		ForwardedPort: config.HubbleMetricsPort,
@@ -48,7 +49,7 @@ func addHubbleDNSScenario(kubeConfigFilePath, arch string) *flow.Workflow {
 			RemotePort:            config.HubbleMetricsPort,
 			Namespace:             config.KubeSystemNamespace,
 			Endpoint:              "metrics",
-			KubeConfigFilePath:    kubeConfigFilePath,
+			RestConfig:            restConfig,
 			OptionalLabelAffinity: "app=" + agnhostName,
 		},
 		Steps: []flow.Steper{validateQuery, validateResponse},
@@ -57,7 +58,7 @@ func addHubbleDNSScenario(kubeConfigFilePath, arch string) *flow.Workflow {
 		ResourceType:       k8s.TypeString(k8s.StatefulSet),
 		ResourceName:       agnhostName,
 		ResourceNamespace:  config.TestPodNamespace,
-		KubeConfigFilePath: kubeConfigFilePath,
+		RestConfig: restConfig,
 	}
 
 	// Setup: provision resources and generate traffic.

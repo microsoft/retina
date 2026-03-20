@@ -12,7 +12,7 @@ import (
 
 // Step resolves e2e config, paths, and image tag.
 type Step struct {
-	Params *E2EParams
+	Cfg *E2EConfig
 }
 
 func (l *Step) String() string { return "load-config" }
@@ -27,15 +27,15 @@ func (l *Step) Do(_ context.Context) error {
 	if err != nil {
 		return fmt.Errorf("get cwd: %w", err)
 	}
-	l.Params.Cfg = cfg
-	l.Params.Paths = ResolvePaths(filepath.Dir(filepath.Dir(cwd)))
+	*l.Cfg = *cfg
+	l.Cfg.Paths = *ResolvePaths(filepath.Dir(filepath.Dir(cwd)))
 
-	if cfg.Image.Tag == "" {
-		tag, err := DevTag(l.Params.Paths.RootDir)
+	if l.Cfg.Image.Tag == "" {
+		tag, err := DevTag(l.Cfg.Paths.RootDir)
 		if err != nil {
 			return fmt.Errorf("generate dev tag: %w", err)
 		}
-		cfg.Image.Tag = tag
+		l.Cfg.Image.Tag = tag
 		log.Printf("no TAG provided, will build images as %s", tag)
 	}
 	return nil

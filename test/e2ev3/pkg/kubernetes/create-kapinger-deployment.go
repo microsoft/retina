@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/rest"
 )
 
 const (
@@ -24,9 +24,9 @@ const (
 )
 
 type CreateKapingerDeployment struct {
-	KapingerNamespace  string
-	KapingerReplicas   string
-	KubeConfigFilePath string
+	KapingerNamespace string
+	KapingerReplicas  string
+	RestConfig        *rest.Config
 }
 
 func (c *CreateKapingerDeployment) Do(ctx context.Context) error {
@@ -35,12 +35,7 @@ func (c *CreateKapingerDeployment) Do(ctx context.Context) error {
 		return fmt.Errorf("error converting replicas to int for Kapinger replicas: %w", err)
 	}
 
-	config, err := clientcmd.BuildConfigFromFlags("", c.KubeConfigFilePath)
-	if err != nil {
-		return fmt.Errorf("error building kubeconfig: %w", err)
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := kubernetes.NewForConfig(c.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}

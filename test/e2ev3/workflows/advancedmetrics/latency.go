@@ -6,6 +6,7 @@
 package advancedmetrics
 
 import (
+	"k8s.io/client-go/rest"
 	"context"
 	"fmt"
 	"log"
@@ -17,14 +18,14 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addLatencyScenario(kubeConfigFilePath string) *flow.Workflow {
+func addLatencyScenario(restConfig *rest.Config) *flow.Workflow {
 	wf := &flow.Workflow{DontPanic: true}
 	validateLatency := &ValidateAPIServerLatencyStep{}
 	validateWithPF := &utils.WithPortForward{
 		PF: &k8s.PortForward{
 			Namespace: config.KubeSystemNamespace, LabelSelector: "k8s-app=retina",
 			LocalPort: "10093", RemotePort: "10093", Endpoint: "metrics",
-			KubeConfigFilePath: kubeConfigFilePath, OptionalLabelAffinity: "k8s-app=retina",
+			RestConfig: restConfig, OptionalLabelAffinity: "k8s-app=retina",
 		},
 		Steps: []flow.Steper{validateLatency},
 	}

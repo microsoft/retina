@@ -25,21 +25,21 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/rest"
 )
 
 // Workflow runs the capture validation workflow.
 type Workflow struct {
-	Params *config.E2EParams
+	Cfg *config.E2EConfig
 }
 
 func (w *Workflow) String() string { return "capture" }
 
 func (w *Workflow) Do(ctx context.Context) error {
-	p := w.Params
+	p := w.Cfg
 	kubeConfigFilePath := p.Paths.KubeConfig
 	testPodNamespace := "default"
-	imgCfg := &p.Cfg.Image
+	imgCfg := &p.Image
 
 	wf := new(flow.Workflow)
 
@@ -51,6 +51,7 @@ func (w *Workflow) Do(ctx context.Context) error {
 		CaptureNamespace: testPodNamespace,
 		Duration:         "5s",
 		KubeConfigPath:   kubeConfigFilePath,
+		RestConfig:       p.RestConfig,
 		ImageTag:         imgCfg.Tag,
 		ImageRegistry:    imgCfg.Registry,
 		ImageNamespace:   imgCfg.Namespace,
@@ -144,6 +145,7 @@ type ValidateCaptureStep struct {
 	CaptureNamespace string
 	Duration         string
 	KubeConfigPath   string
+	RestConfig       *rest.Config
 	ImageTag         string
 	ImageRegistry    string
 	ImageNamespace   string
@@ -168,11 +170,7 @@ func (v *ValidateCaptureStep) Do(ctx context.Context) error {
 	}
 	log.Printf("Create capture command output: %s\n", output)
 
-	config, err := clientcmd.BuildConfigFromFlags("", v.KubeConfigPath)
-	if err != nil {
-		return fmt.Errorf("failed to build kubeconfig: %w", err)
-	}
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := kubernetes.NewForConfig(v.RestConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create kubernetes clientset: %w", err)
 	}

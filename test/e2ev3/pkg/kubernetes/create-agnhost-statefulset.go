@@ -11,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/rest"
 )
 
 var ErrLabelMissingFromPod = fmt.Errorf("label missing from pod")
@@ -26,18 +26,13 @@ type CreateAgnhostStatefulSet struct {
 	AgnhostName        string
 	AgnhostNamespace   string
 	ScheduleOnSameNode bool
-	KubeConfigFilePath string
+	RestConfig         *rest.Config
 	AgnhostArch        string
 	AgnhostReplicas    *int
 }
 
 func (c *CreateAgnhostStatefulSet) Do(ctx context.Context) error {
-	config, err := clientcmd.BuildConfigFromFlags("", c.KubeConfigFilePath)
-	if err != nil {
-		return fmt.Errorf("error building kubeconfig: %w", err)
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := kubernetes.NewForConfig(c.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}

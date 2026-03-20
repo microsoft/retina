@@ -6,6 +6,7 @@
 package hubblemetrics
 
 import (
+	"k8s.io/client-go/rest"
 	"context"
 	"fmt"
 	"log"
@@ -16,16 +17,16 @@ import (
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 )
 
-func addHubbleRelayValidation(kubeConfigFilePath string) *flow.Workflow {
+func addHubbleRelayValidation(restConfig *rest.Config) *flow.Workflow {
 	wf := &flow.Workflow{DontPanic: true}
-	validateRelay := &ValidateHubbleRelayServiceStep{KubeConfigFilePath: kubeConfigFilePath}
+	validateRelay := &ValidateHubbleRelayServiceStep{RestConfig: restConfig}
 	wf.Add(flow.Step(validateRelay))
 	return wf
 }
 
-func addHubbleUIValidation(kubeConfigFilePath string) *flow.Workflow {
+func addHubbleUIValidation(restConfig *rest.Config) *flow.Workflow {
 	wf := &flow.Workflow{DontPanic: true}
-	validateUI := &ValidateHubbleUIServiceStep{KubeConfigFilePath: kubeConfigFilePath}
+	validateUI := &ValidateHubbleUIServiceStep{RestConfig: restConfig}
 	wf.Add(flow.Step(validateUI))
 	return wf
 }
@@ -35,16 +36,16 @@ func addHubbleUIValidation(kubeConfigFilePath string) *flow.Workflow {
 // ValidateHubbleRelayServiceStep validates that the hubble-relay-service
 // exists in the cluster.
 type ValidateHubbleRelayServiceStep struct {
-	KubeConfigFilePath string
+	RestConfig *rest.Config
 }
 
 func (v *ValidateHubbleRelayServiceStep) Do(ctx context.Context) error {
 	step := &k8s.ValidateResource{
-		ResourceName:       "hubble-relay-service",
-		ResourceNamespace:  k8s.HubbleNamespace,
-		ResourceType:       k8s.ResourceTypeService,
-		Labels:             "k8s-app=" + k8s.HubbleRelayApp,
-		KubeConfigFilePath: v.KubeConfigFilePath,
+		ResourceName:      "hubble-relay-service",
+		ResourceNamespace: k8s.HubbleNamespace,
+		ResourceType:      k8s.ResourceTypeService,
+		Labels:            "k8s-app=" + k8s.HubbleRelayApp,
+		RestConfig:        v.RestConfig,
 	}
 	return step.Do(ctx)
 }
@@ -52,16 +53,16 @@ func (v *ValidateHubbleRelayServiceStep) Do(ctx context.Context) error {
 // ValidateHubbleUIServiceStep validates that the hubble-ui service exists
 // and that it responds with HTTP 200.
 type ValidateHubbleUIServiceStep struct {
-	KubeConfigFilePath string
+	RestConfig *rest.Config
 }
 
 func (v *ValidateHubbleUIServiceStep) Do(ctx context.Context) error {
 	validateStep := &k8s.ValidateResource{
-		ResourceName:       k8s.HubbleUIApp,
-		ResourceNamespace:  k8s.HubbleNamespace,
-		ResourceType:       k8s.ResourceTypeService,
-		Labels:             "k8s-app=" + k8s.HubbleUIApp,
-		KubeConfigFilePath: v.KubeConfigFilePath,
+		ResourceName:      k8s.HubbleUIApp,
+		ResourceNamespace: k8s.HubbleNamespace,
+		ResourceType:      k8s.ResourceTypeService,
+		Labels:            "k8s-app=" + k8s.HubbleUIApp,
+		RestConfig:        v.RestConfig,
 	}
 	if err := validateStep.Do(ctx); err != nil {
 		return fmt.Errorf("failed to validate hubble-ui service: %w", err)
@@ -74,7 +75,7 @@ func (v *ValidateHubbleUIServiceStep) Do(ctx context.Context) error {
 		RemotePort:            "8081",
 		OptionalLabelAffinity: "k8s-app=hubble-ui",
 		Endpoint:              "?namespace=default",
-		KubeConfigFilePath:    v.KubeConfigFilePath,
+		RestConfig:            v.RestConfig,
 	}
 	if err := pf.Do(ctx); err != nil {
 		return fmt.Errorf("failed to port forward to hubble-ui: %w", err)

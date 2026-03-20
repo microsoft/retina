@@ -14,7 +14,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/rest"
 )
 
 const (
@@ -36,7 +36,7 @@ type PortForward struct {
 	LocalPort             string
 	RemotePort            string
 	Endpoint              string
-	KubeConfigFilePath    string
+	RestConfig            *rest.Config
 	OptionalLabelAffinity string
 
 	// local properties
@@ -50,12 +50,7 @@ func (p *PortForward) Do(ctx context.Context) error {
 	portForwardCtx, cancel := context.WithTimeout(ctx, defaultTimeoutSeconds*time.Second)
 	defer cancel()
 
-	config, err := clientcmd.BuildConfigFromFlags("", p.KubeConfigFilePath)
-	if err != nil {
-		return fmt.Errorf("error building kubeconfig: %w", err)
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := kubernetes.NewForConfig(p.RestConfig)
 	if err != nil {
 		return fmt.Errorf("could not create clientset: %w", err)
 	}
@@ -86,7 +81,7 @@ func (p *PortForward) Do(ctx context.Context) error {
 
 		log.Printf("attempting port forward to pod name \"%s\" with label \"%s\", in namespace \"%s\"...\n", targetPodName, p.LabelSelector, p.Namespace)
 
-		p.pf, err = NewPortForwarder(config, logger{}, opts)
+		p.pf, err = NewPortForwarder(p.RestConfig, logger{}, opts)
 		if err != nil {
 			return fmt.Errorf("could not create port forwarder: %w", err)
 		}

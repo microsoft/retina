@@ -6,6 +6,7 @@
 package experimental
 
 import (
+	"k8s.io/client-go/rest"
 	flow "github.com/Azure/go-workflow"
 	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 	"github.com/microsoft/retina/test/e2ev3/config"
@@ -13,7 +14,7 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addNetworkStatsScenario(kubeConfigFilePath string) *flow.Workflow {
+func addNetworkStatsScenario(restConfig *rest.Config) *flow.Workflow {
 	wf := &flow.Workflow{DontPanic: true}
 	validateIPStats := &prom.ValidateMetricStep{
 		ForwardedPort: config.RetinaMetricsPort,
@@ -40,7 +41,7 @@ func addNetworkStatsScenario(kubeConfigFilePath string) *flow.Workflow {
 		PF: &k8s.PortForward{
 			Namespace: config.KubeSystemNamespace, LabelSelector: "k8s-app=retina",
 			LocalPort: config.RetinaMetricsPort, RemotePort: config.RetinaMetricsPort,
-			Endpoint: config.MetricsEndpoint, KubeConfigFilePath: kubeConfigFilePath,
+			Endpoint: config.MetricsEndpoint, RestConfig: restConfig,
 		},
 		Steps: []flow.Steper{validateIPStats, validateUDPStats, validateIfaceStats},
 	}

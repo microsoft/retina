@@ -17,24 +17,24 @@ import (
 
 // Workflow runs the hubble metrics workflow.
 type Workflow struct {
-	Params *config.E2EParams
+	Cfg *config.E2EConfig
 }
 
 func (w *Workflow) String() string { return "hubble-metrics" }
 
 func (w *Workflow) Do(ctx context.Context) error {
-	p := w.Params
-	kubeConfigFilePath := p.Paths.KubeConfig
+	p := w.Cfg
+	restConfig := p.RestConfig
 	chartPath := p.Paths.HubbleChart
-	imgCfg := &p.Cfg.Image
-	helmCfg := &p.Cfg.Helm
-	loader := images.NewLoader(*config.Provider, p.Cfg.Azure.ClusterName)
+	imgCfg := &p.Image
+	helmCfg := &p.Helm
+	loader := images.NewLoader(*config.Provider, p.Azure.ClusterName)
 
 	// Construct steps.
 	installHubble := &k8s.InstallHubbleHelmChart{
 		Namespace:          config.KubeSystemNamespace,
 		ReleaseName:        "retina",
-		KubeConfigFilePath: kubeConfigFilePath,
+		KubeConfigFilePath: p.Paths.KubeConfig,
 		ChartPath:          chartPath,
 		ImageTag:           imgCfg.Tag,
 		ImageRegistry:      imgCfg.Registry,
@@ -43,41 +43,41 @@ func (w *Workflow) Do(ctx context.Context) error {
 		ImageLoader:        loader,
 	}
 
-	scenarioTails := []flow.Steper{
-		addHubbleRelayValidation(kubeConfigFilePath),
-		addHubbleUIValidation(kubeConfigFilePath),
+	scenarios := []flow.Steper{
+		addHubbleRelayValidation(restConfig),
+		addHubbleUIValidation(restConfig),
 	}
 	for _, arch := range config.Architectures {
-		scenarioTails = append(scenarioTails,
-			addHubbleDNSScenario(kubeConfigFilePath, arch),
-			addHubbleFlowIntraNodeScenario(kubeConfigFilePath, arch),
-			addHubbleFlowInterNodeScenario(kubeConfigFilePath, arch),
-			addHubbleFlowToWorldScenario(kubeConfigFilePath, arch),
-			addHubbleDropScenario(kubeConfigFilePath, arch),
-			addHubbleTCPScenario(kubeConfigFilePath, arch),
+		scenarios = append(scenarios,
+			addHubbleDNSScenario(restConfig, arch),
+			addHubbleFlowIntraNodeScenario(restConfig, arch),
+			addHubbleFlowInterNodeScenario(restConfig, arch),
+			addHubbleFlowToWorldScenario(restConfig, arch),
+			addHubbleDropScenario(restConfig, arch),
+			addHubbleTCPScenario(restConfig, arch),
 		)
 	}
 
 	ensureStable := &k8s.EnsureStableComponent{
 		PodNamespace:           config.KubeSystemNamespace,
 		LabelSelector:          "k8s-app=retina",
-		KubeConfigFilePath:     kubeConfigFilePath,
+		RestConfig:             restConfig,
 		IgnoreContainerRestart: false,
 	}
 
 	debug := &utils.DebugOnFailure{
-		KubeConfigFilePath: kubeConfigFilePath,
-		Namespace:          config.KubeSystemNamespace,
-		LabelSelector:      "k8s-app=retina",
+		RestConfig:    restConfig,
+		Namespace:     config.KubeSystemNamespace,
+		LabelSelector: "k8s-app=retina",
 	}
 
 	// Wire dependencies and register.
 	wf := &flow.Workflow{DontPanic: true}
 	wf.Add(flow.Step(installHubble))
-	for _, s := range scenarioTails {
+	for _, s := range scenarios {
 		wf.Add(flow.Step(s).DependsOn(installHubble))
 	}
-	wf.Add(flow.Step(ensureStable).DependsOn(scenarioTails...))
+	wf.Add(flow.Step(ensureStable).DependsOn(scenarios...))
 	wf.Add(flow.Step(debug).DependsOn(ensureStable).When(flow.AnyFailed))
 
 	return wf.Do(ctx)

@@ -6,6 +6,7 @@
 package hubblemetrics
 
 import (
+	"k8s.io/client-go/rest"
 	flow "github.com/Azure/go-workflow"
 	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 	"github.com/microsoft/retina/test/e2ev3/config"
@@ -13,7 +14,7 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addHubbleFlowToWorldScenario(kubeConfigFilePath, arch string) *flow.Workflow {
+func addHubbleFlowToWorldScenario(restConfig *rest.Config, arch string) *flow.Workflow {
 	wf := &flow.Workflow{DontPanic: true}
 	podname := "agnhost-flow-world"
 	validLabels := []map[string]string{
@@ -23,11 +24,11 @@ func addHubbleFlowToWorldScenario(kubeConfigFilePath, arch string) *flow.Workflo
 
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
 		AgnhostName: podname, AgnhostNamespace: config.TestPodNamespace,
-		AgnhostArch: arch, KubeConfigFilePath: kubeConfigFilePath,
+		AgnhostArch: arch, RestConfig: restConfig,
 	}
 	execCurl := &k8s.ExecInPod{
 		PodName: podname + "-0", PodNamespace: config.TestPodNamespace,
-		Command: "curl -s -m 5 bing.com", KubeConfigFilePath: kubeConfigFilePath,
+		Command: "curl -s -m 5 bing.com", RestConfig: restConfig,
 	}
 	validateFlow := &prom.ValidateMetricStep{
 		ForwardedPort: config.HubbleMetricsPort, MetricName: config.HubbleFlowMetricName,
@@ -36,13 +37,13 @@ func addHubbleFlowToWorldScenario(kubeConfigFilePath, arch string) *flow.Workflo
 	validateWithPF := &utils.WithPortForward{
 		PF: &k8s.PortForward{
 			LabelSelector: "k8s-app=retina", LocalPort: config.HubbleMetricsPort, RemotePort: config.HubbleMetricsPort,
-			Endpoint: config.MetricsEndpoint, KubeConfigFilePath: kubeConfigFilePath, OptionalLabelAffinity: "app=" + podname,
+			Endpoint: config.MetricsEndpoint, RestConfig: restConfig, OptionalLabelAffinity: "app=" + podname,
 		},
 		Steps: []flow.Steper{validateFlow},
 	}
 	deleteAgnhost := &k8s.DeleteKubernetesResource{
 		ResourceType: k8s.TypeString(k8s.StatefulSet), ResourceName: podname,
-		ResourceNamespace: config.TestPodNamespace, KubeConfigFilePath: kubeConfigFilePath,
+		ResourceNamespace: config.TestPodNamespace, RestConfig: restConfig,
 	}
 
 	// Setup: provision resources and generate traffic.

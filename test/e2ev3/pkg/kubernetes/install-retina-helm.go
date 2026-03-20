@@ -79,7 +79,11 @@ func (i *InstallHelmChart) Do(ctx context.Context) error {
 	}
 
 	// Creating extra namespace to deploy test pods
-	err = CreateNamespaceFn(ctx, i.KubeConfigFilePath, e2ecfg.TestPodNamespace)
+	rc, err := clientcmd.BuildConfigFromFlags("", i.KubeConfigFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to build rest config: %w", err)
+	}
+	err = CreateNamespaceFn(ctx, rc, e2ecfg.TestPodNamespace)
 	if err != nil {
 		return fmt.Errorf("failed to create namespace %s: %w", i.Namespace, err)
 	}

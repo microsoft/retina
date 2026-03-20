@@ -5,15 +5,15 @@ import (
 	"fmt"
 
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/rest"
 )
 
 var ErrPodCrashed = fmt.Errorf("pod has crashes")
 
 type EnsureStableComponent struct {
-	LabelSelector      string
-	PodNamespace       string
-	KubeConfigFilePath string
+	LabelSelector string
+	PodNamespace  string
+	RestConfig    *rest.Config
 
 	// Container restarts can occur for various reason, they do not necessarily mean the entire cluster
 	// is unstable or needs to be recreated. In some cases, container restarts are expected and acceptable.
@@ -22,12 +22,7 @@ type EnsureStableComponent struct {
 }
 
 func (n *EnsureStableComponent) Do(ctx context.Context) error {
-	config, err := clientcmd.BuildConfigFromFlags("", n.KubeConfigFilePath)
-	if err != nil {
-		return fmt.Errorf("error building kubeconfig: %w", err)
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := kubernetes.NewForConfig(n.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}

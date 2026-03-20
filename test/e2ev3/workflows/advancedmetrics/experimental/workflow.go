@@ -16,48 +16,48 @@ import (
 
 // Workflow runs the experimental advanced metrics workflow.
 type Workflow struct {
-	Params *config.E2EParams
+	Cfg *config.E2EConfig
 }
 
 func (w *Workflow) String() string { return "advanced-metrics-experimental" }
 
 func (w *Workflow) Do(ctx context.Context) error {
-	p := w.Params
-	kubeConfigFilePath := p.Paths.KubeConfig
+	p := w.Cfg
+	restConfig := p.RestConfig
 	chartPath := p.Paths.RetinaChart
 	valuesFilePath := p.Paths.AdvancedProfile
 	testPodNamespace := config.TestPodNamespace
-	helmCfg := &p.Cfg.Helm
+	helmCfg := &p.Helm
 
 	// Construct steps.
 	upgradeRetina := &k8s.UpgradeRetinaHelmChart{
 		Namespace:          config.KubeSystemNamespace,
 		ReleaseName:        "retina",
-		KubeConfigFilePath: kubeConfigFilePath,
+		KubeConfigFilePath: p.Paths.KubeConfig,
 		ChartPath:          chartPath,
 		HelmDriver:         helmCfg.Driver,
 		ValuesFile:         valuesFilePath,
 	}
 
-	var scenarioTails []flow.Steper
+	var scenarios []flow.Steper
 	for _, arch := range config.Architectures {
-		scenarioTails = append(scenarioTails,
-			addAdvancedDropScenario(kubeConfigFilePath, testPodNamespace, arch),
-			addAdvancedForwardScenario(kubeConfigFilePath, testPodNamespace, arch),
-			addAdvancedTCPScenario(kubeConfigFilePath, testPodNamespace, arch),
+		scenarios = append(scenarios,
+			addAdvancedDropScenario(restConfig, testPodNamespace, arch),
+			addAdvancedForwardScenario(restConfig, testPodNamespace, arch),
+			addAdvancedTCPScenario(restConfig, testPodNamespace, arch),
 		)
 	}
-	scenarioTails = append(scenarioTails, addAPIServerLatencyScenario(kubeConfigFilePath))
+	scenarios = append(scenarios, addAPIServerLatencyScenario(restConfig))
 
 	ensureStable := &k8s.EnsureStableComponent{
 		PodNamespace:           config.KubeSystemNamespace,
 		LabelSelector:          "k8s-app=retina",
-		KubeConfigFilePath:     kubeConfigFilePath,
+		RestConfig:             restConfig,
 		IgnoreContainerRestart: false,
 	}
 
 	debug := &utils.DebugOnFailure{
-		KubeConfigFilePath: kubeConfigFilePath,
+		RestConfig: restConfig,
 		Namespace:          config.KubeSystemNamespace,
 		LabelSelector:      "k8s-app=retina",
 	}
@@ -65,10 +65,10 @@ func (w *Workflow) Do(ctx context.Context) error {
 	// Wire dependencies and register.
 	wf := &flow.Workflow{DontPanic: true}
 	wf.Add(flow.Step(upgradeRetina))
-	for _, s := range scenarioTails {
+	for _, s := range scenarios {
 		wf.Add(flow.Step(s).DependsOn(upgradeRetina))
 	}
-	wf.Add(flow.Step(ensureStable).DependsOn(scenarioTails...))
+	wf.Add(flow.Step(ensureStable).DependsOn(scenarios...))
 	wf.Add(flow.Step(debug).DependsOn(ensureStable).When(flow.AnyFailed))
 
 	return wf.Do(ctx)

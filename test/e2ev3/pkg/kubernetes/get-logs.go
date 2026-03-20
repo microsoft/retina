@@ -9,25 +9,19 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/rest"
 )
 
 type GetPodLogs struct {
-	KubeConfigFilePath string
-	Namespace          string
-	LabelSelector      string
+	RestConfig    *rest.Config
+	Namespace     string
+	LabelSelector string
 }
 
 func (p *GetPodLogs) Do(ctx context.Context) error {
 	fmt.Printf("printing pod logs for namespace: %s, labelselector: %s\n", p.Namespace, p.LabelSelector)
-	// Load the kubeconfig file to get the configuration to access the cluster
-	config, err := clientcmd.BuildConfigFromFlags("", p.KubeConfigFilePath)
-	if err != nil {
-		log.Printf("error building kubeconfig: %s\n", err)
-	}
 
-	// Create a new clientset to interact with the cluster
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := kubernetes.NewForConfig(p.RestConfig)
 	if err != nil {
 		log.Printf("error creating clientset: %s\n", err)
 	}

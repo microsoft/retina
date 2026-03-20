@@ -17,14 +17,18 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
+	"k8s.io/client-go/rest"
 )
 
-// E2EConfig holds all environment-driven configuration for e2e tests.
+// E2EConfig holds all configuration and runtime state for e2e tests.
+// Fields are populated incrementally by pipeline steps.
 type E2EConfig struct {
-	Azure AzureConfig
-	Image ImageConfig
-	Scale ScaleConfig
-	Helm  HelmConfig
+	Azure      AzureConfig
+	Image      ImageConfig
+	Scale      ScaleConfig
+	Helm       HelmConfig
+	Paths      Paths
+	RestConfig *rest.Config
 }
 
 // AzureConfig holds Azure infrastructure settings.
@@ -74,14 +78,7 @@ const (
 // Kind clusters are single-arch (amd64), so arm64 is only tested on Azure.
 var Architectures []string
 
-// E2EParams holds shared mutable state populated by early pipeline steps
-// and read by later ones. Safe under flow.Pipe because steps run sequentially.
-type E2EParams struct {
-	Cfg   *E2EConfig
-	Paths *Paths
-}
-
-// Paths returns resolved filesystem paths relative to the repository root.
+// Paths holds resolved filesystem paths relative to the repository root.
 type Paths struct {
 	RootDir    string
 	KubeConfig string

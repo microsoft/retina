@@ -8,7 +8,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/rest"
 )
 
 const (
@@ -18,17 +18,12 @@ const (
 
 type CreateDenyAllNetworkPolicy struct {
 	NetworkPolicyNamespace string
-	KubeConfigFilePath     string
+	RestConfig             *rest.Config
 	DenyAllLabelSelector   string
 }
 
 func (c *CreateDenyAllNetworkPolicy) Do(ctx context.Context) error {
-	config, err := clientcmd.BuildConfigFromFlags("", c.KubeConfigFilePath)
-	if err != nil {
-		return fmt.Errorf("error building kubeconfig: %w", err)
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := kubernetes.NewForConfig(c.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
@@ -67,17 +62,12 @@ func getNetworkPolicy(namespace, labelSelector string) *networkingv1.NetworkPoli
 
 type DeleteDenyAllNetworkPolicy struct {
 	NetworkPolicyNamespace string
-	KubeConfigFilePath     string
+	RestConfig             *rest.Config
 	DenyAllLabelSelector   string
 }
 
 func (d *DeleteDenyAllNetworkPolicy) Do(ctx context.Context) error {
-	config, err := clientcmd.BuildConfigFromFlags("", d.KubeConfigFilePath)
-	if err != nil {
-		return fmt.Errorf("error building kubeconfig: %w", err)
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := kubernetes.NewForConfig(d.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}

@@ -6,6 +6,7 @@
 package advancedmetrics
 
 import (
+	"k8s.io/client-go/rest"
 	"context"
 	"fmt"
 	"log"
@@ -17,7 +18,7 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addAdvancedDNSScenario(kubeConfigFilePath, namespace, arch, variant string,
+func addAdvancedDNSScenario(restConfig *rest.Config, namespace, arch, variant string,
 	command string, expectError bool,
 	reqQuery, reqQueryType, workloadKind string,
 	respNumResponse, respQuery, respQueryType, respReturnCode, respResponse string,
@@ -27,17 +28,17 @@ func addAdvancedDNSScenario(kubeConfigFilePath, namespace, arch, variant string,
 	podName := agnhostName + "-0"
 
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
-		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, KubeConfigFilePath: kubeConfigFilePath,
+		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, RestConfig: restConfig,
 	}
 	execCmd1 := flow.Func("adv-dns-"+variant+"-1-"+arch, func(ctx context.Context) error {
-		err := (&k8s.ExecInPod{PodName: podName, PodNamespace: namespace, Command: command, KubeConfigFilePath: kubeConfigFilePath}).Do(ctx)
+		err := (&k8s.ExecInPod{PodName: podName, PodNamespace: namespace, Command: command, RestConfig: restConfig}).Do(ctx)
 		if expectError {
 			return nil
 		}
 		return err
 	})
 	execCmd2 := flow.Func("adv-dns-"+variant+"-2-"+arch, func(ctx context.Context) error {
-		err := (&k8s.ExecInPod{PodName: podName, PodNamespace: namespace, Command: command, KubeConfigFilePath: kubeConfigFilePath}).Do(ctx)
+		err := (&k8s.ExecInPod{PodName: podName, PodNamespace: namespace, Command: command, RestConfig: restConfig}).Do(ctx)
 		if expectError {
 			return nil
 		}
@@ -45,23 +46,23 @@ func addAdvancedDNSScenario(kubeConfigFilePath, namespace, arch, variant string,
 	})
 	validateReq := &ValidateAdvancedDNSRequestStep{
 		PodNamespace: namespace, PodName: podName, Query: reqQuery, QueryType: reqQueryType,
-		WorkloadKind: workloadKind, WorkloadName: agnhostName, KubeConfigFilePath: kubeConfigFilePath,
+		WorkloadKind: workloadKind, WorkloadName: agnhostName, RestConfig: restConfig,
 	}
 	validateResp := &ValidateAdvancedDNSResponseStep{
 		PodNamespace: namespace, NumResponse: respNumResponse, PodName: podName,
 		Query: respQuery, QueryType: respQueryType, Response: respResponse, ReturnCode: respReturnCode,
-		WorkloadKind: workloadKind, WorkloadName: agnhostName, KubeConfigFilePath: kubeConfigFilePath,
+		WorkloadKind: workloadKind, WorkloadName: agnhostName, RestConfig: restConfig,
 	}
 	validateWithPF := &utils.WithPortForward{
 		PF: &k8s.PortForward{
 			Namespace: config.KubeSystemNamespace, LabelSelector: "k8s-app=retina",
 			LocalPort: config.RetinaMetricsPort, RemotePort: config.RetinaMetricsPort,
-			Endpoint: "metrics", KubeConfigFilePath: kubeConfigFilePath, OptionalLabelAffinity: "app=" + agnhostName,
+			Endpoint: "metrics", RestConfig: restConfig, OptionalLabelAffinity: "app=" + agnhostName,
 		},
 		Steps: []flow.Steper{validateReq, validateResp},
 	}
 	deleteAgnhost := &k8s.DeleteKubernetesResource{
-		ResourceType: k8s.TypeString(k8s.StatefulSet), ResourceName: agnhostName, ResourceNamespace: namespace, KubeConfigFilePath: kubeConfigFilePath,
+		ResourceType: k8s.TypeString(k8s.StatefulSet), ResourceName: agnhostName, ResourceNamespace: namespace, RestConfig: restConfig,
 	}
 
 	// Setup: provision resources and generate traffic.
@@ -106,13 +107,13 @@ type ValidateAdvancedDNSRequestStep struct {
 	QueryType          string
 	WorkloadKind       string
 	WorkloadName       string
-	KubeConfigFilePath string
+	RestConfig *rest.Config
 }
 
 func (v *ValidateAdvancedDNSRequestStep) Do(ctx context.Context) error {
 	metricsEndpoint := fmt.Sprintf("http://localhost:%s/metrics", config.RetinaMetricsPort)
 
-	podIP, err := k8s.GetPodIP(ctx, v.KubeConfigFilePath, v.PodNamespace, v.PodName)
+	podIP, err := k8s.GetPodIP(ctx, v.RestConfig, v.PodNamespace, v.PodName)
 	if err != nil {
 		return fmt.Errorf("failed to get pod IP address: %w", err)
 	}
@@ -148,13 +149,13 @@ type ValidateAdvancedDNSResponseStep struct {
 	ReturnCode         string
 	WorkloadKind       string
 	WorkloadName       string
-	KubeConfigFilePath string
+	RestConfig *rest.Config
 }
 
 func (v *ValidateAdvancedDNSResponseStep) Do(ctx context.Context) error {
 	metricsEndpoint := fmt.Sprintf("http://localhost:%s/metrics", config.RetinaMetricsPort)
 
-	podIP, err := k8s.GetPodIP(ctx, v.KubeConfigFilePath, v.PodNamespace, v.PodName)
+	podIP, err := k8s.GetPodIP(ctx, v.RestConfig, v.PodNamespace, v.PodName)
 	if err != nil {
 		return fmt.Errorf("failed to get pod IP address: %w", err)
 	}

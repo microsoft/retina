@@ -10,22 +10,17 @@ import (
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 )
 
 type DeleteNamespace struct {
-	Namespace          string
-	KubeConfigFilePath string
+	Namespace  string
+	RestConfig *rest.Config
 }
 
 func (d *DeleteNamespace) Do(ctx context.Context) error {
-	config, err := clientcmd.BuildConfigFromFlags("", d.KubeConfigFilePath)
-	if err != nil {
-		return fmt.Errorf("error building kubeconfig: %w", err)
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := kubernetes.NewForConfig(d.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
