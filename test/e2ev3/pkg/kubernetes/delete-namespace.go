@@ -3,7 +3,7 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -44,7 +44,7 @@ func (d *DeleteNamespace) Do(ctx context.Context) error {
 	// Check if namespace was deleted
 	return retry.OnError(backoff,
 		func(err error) bool {
-			log.Printf("%v. Checking again soon...", err)
+			slog.Info("namespace deletion pending", "error", err)
 
 			return true
 		},

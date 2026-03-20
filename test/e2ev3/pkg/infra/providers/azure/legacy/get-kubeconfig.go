@@ -3,7 +3,7 @@ package legacy
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -40,6 +40,6 @@ func (c *GetAKSKubeConfig) Do(_ context.Context) error {
 		return fmt.Errorf("failed to write kubeconfig to file \"%s\": %w", c.KubeConfigFilePath, err)
 	}
 
-	log.Printf("kubeconfig for cluster \"%s\" in resource group \"%s\" written to \"%s\"\n", c.ClusterName, c.ResourceGroupName, c.KubeConfigFilePath)
+	slog.Info("kubeconfig written", "cluster", c.ClusterName, "resourceGroup", c.ResourceGroupName, "path", c.KubeConfigFilePath)
 	return nil
 }

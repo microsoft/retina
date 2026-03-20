@@ -8,7 +8,6 @@ package basicmetrics
 import (
 	"context"
 	"fmt"
-	"log"
 
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/config"
@@ -115,8 +114,6 @@ func (v *ValidateRetinaTCPStateStep) Do(ctx context.Context) error {
 			return fmt.Errorf("failed to verify prometheus metrics: %w", err)
 		}
 	}
-
-	log.Printf("found metrics matching %+v\n", validMetrics)
 	return nil
 }
 
@@ -137,7 +134,5 @@ func (v *ValidateRetinaTCPConnectionRemoteStep) Do(ctx context.Context) error {
 			return fmt.Errorf("failed to verify prometheus metrics: %w", err)
 		}
 	}
-
-	log.Printf("found metrics matching %+v\n", tcpConnectionRemoteMetricName)
 	return nil
 }

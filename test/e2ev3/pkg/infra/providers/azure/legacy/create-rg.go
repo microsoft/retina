@@ -3,7 +3,7 @@ package legacy
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -26,7 +26,7 @@ func (c *CreateResourceGroup) Do(_ context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create resource group client: %w", err)
 	}
-	log.Printf("creating resource group %s in location %s...", c.ResourceGroupName, c.Location)
+	slog.Info("creating resource group", "resourceGroup", c.ResourceGroupName, "location", c.Location)
 
 	_, err = clientFactory.NewResourceGroupsClient().CreateOrUpdate(ctx, c.ResourceGroupName, armresources.ResourceGroup{
 		Location: to.Ptr(c.Location),
@@ -35,6 +35,6 @@ func (c *CreateResourceGroup) Do(_ context.Context) error {
 		return fmt.Errorf("failed to finish the request: %w", err)
 	}
 
-	log.Printf("resource group created %s in location %s", c.ResourceGroupName, c.Location)
+	slog.Info("resource group created", "resourceGroup", c.ResourceGroupName, "location", c.Location)
 	return nil
 }

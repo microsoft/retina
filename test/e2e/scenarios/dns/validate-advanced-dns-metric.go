@@ -4,7 +4,6 @@ package dns
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/microsoft/retina/test/e2e/framework/constants"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
@@ -50,8 +49,6 @@ func (v *ValidateAdvancedDNSRequestMetrics) Run() error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to verify advance dns request metrics %s", dnsAdvRequestCountMetricName)
 	}
-	log.Printf("found metrics matching %+v\n", dnsAdvRequestCountMetricName)
-
 	return nil
 }
 
@@ -106,8 +103,6 @@ func (v *ValidateAdvanceDNSResponseMetrics) Run() error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to verify advance dns response metrics %s", dnsAdvRequestCountMetricName)
 	}
-	log.Printf("found metrics matching %+v\n", dnsAdvResponseCountMetricName)
-
 	return nil
 }
 

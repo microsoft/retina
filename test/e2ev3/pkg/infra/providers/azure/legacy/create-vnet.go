@@ -3,7 +3,7 @@ package legacy
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -31,7 +31,7 @@ func (c *CreateVNet) Do(_ context.Context) error {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	log.Printf("creating vnet \"%s\" in resource group \"%s\"...", c.VnetName, c.ResourceGroupName)
+	slog.Info("creating vnet", "vnet", c.VnetName, "resourceGroup", c.ResourceGroupName)
 
 	poller, err := clientFactory.NewVirtualNetworksClient().BeginCreateOrUpdate(ctx, c.ResourceGroupName, c.VnetName, armnetwork.VirtualNetwork{
 		Location: to.Ptr(c.Location),
@@ -75,7 +75,7 @@ func (c *CreateSubnet) Do(_ context.Context) error {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	log.Printf("creating subnet \"%s\" in vnet \"%s\" in resource group \"%s\"...", c.SubnetName, c.VnetName, c.ResourceGroupName)
+	slog.Info("creating subnet", "subnet", c.SubnetName, "vnet", c.VnetName, "resourceGroup", c.ResourceGroupName)
 
 	poller, err := clientFactory.NewSubnetsClient().BeginCreateOrUpdate(ctx, c.ResourceGroupName, c.VnetName, c.SubnetName, armnetwork.Subnet{
 		Properties: &armnetwork.SubnetPropertiesFormat{

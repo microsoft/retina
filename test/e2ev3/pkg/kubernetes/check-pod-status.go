@@ -3,7 +3,7 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -51,7 +51,7 @@ func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, names
 		}
 
 		if len(podList.Items) == 0 {
-			log.Printf("no pods found in namespace \"%s\" with label \"%s\"", namespace, labelSelector)
+			slog.Info("no pods found", "namespace", namespace, "label", labelSelector)
 			return false, nil
 		}
 
@@ -61,7 +61,7 @@ func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, names
 			// Check the Pod phase
 			if podList.Items[i].Status.Phase != corev1.PodRunning {
 				if printIterator%printInterval == 0 {
-					log.Printf("pod \"%s\" is not in Running state yet. Waiting...\n", podList.Items[i].Name)
+					slog.Info("pod not ready, waiting", "pod", podList.Items[i].Name)
 				}
 				return false, nil
 			}
@@ -69,13 +69,13 @@ func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, names
 			// Check all container status.
 			for j := range podList.Items[i].Status.ContainerStatuses {
 				if !podList.Items[i].Status.ContainerStatuses[j].Ready {
-					log.Printf("container \"%s\" in pod \"%s\" is not ready yet. Waiting...\n", podList.Items[i].Status.ContainerStatuses[j].Name, podList.Items[i].Name)
+					slog.Info("container not ready, waiting", "container", podList.Items[i].Status.ContainerStatuses[j].Name, "pod", podList.Items[i].Name)
 					return false, nil
 				}
 			}
 
 		}
-		log.Printf("all pods in namespace \"%s\" with label \"%s\" are in Running state\n", namespace, labelSelector)
+		slog.Info("all pods running", "namespace", namespace, "label", labelSelector)
 		return true, nil
 	})
 

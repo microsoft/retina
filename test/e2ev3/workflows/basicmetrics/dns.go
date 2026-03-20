@@ -8,7 +8,6 @@ package basicmetrics
 import (
 	"context"
 	"fmt"
-	"log"
 
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/config"
@@ -97,7 +96,6 @@ func (v *ValidateBasicDNSRequestStep) Do(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to verify basic dns request metrics %s: %w", dnsBasicRequestCountMetricName, err)
 	}
-	log.Printf("found metrics matching %+v\n", dnsBasicRequestCountMetricName)
 	return nil
 }
 
@@ -124,7 +122,6 @@ func (v *ValidateBasicDNSResponseStep) Do(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to verify basic dns response metrics %s: %w", dnsBasicResponseCountMetricName, err)
 	}
-	log.Printf("found metrics matching %+v\n", dnsBasicResponseCountMetricName)
 	return nil
 }
 

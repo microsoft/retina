@@ -6,8 +6,7 @@ package kind
 import (
 	"context"
 	"fmt"
-	"log"
-	"os"
+	"log/slog"
 	"os/exec"
 
 	"k8s.io/client-go/rest"
@@ -27,14 +26,16 @@ func (k *Cluster) RestConfig() *rest.Config        { return k.RC }
 
 func (k *Cluster) LoadImages(ctx context.Context, images []string) error {
 	for _, image := range images {
-		log.Printf("loading image %s onto kind cluster %q", image, k.Name)
+		slog.Info("loading image onto kind cluster", "image", image, "cluster", k.Name)
 		args := []string{"load", "docker-image", "--name", k.Name, image}
 		cmd := exec.CommandContext(ctx, "kind", args...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
+		cmdOut := &slogWriter{level: slog.LevelInfo, source: "kind-load"}
+		cmd.Stdout = cmdOut
+		cmd.Stderr = cmdOut
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("kind load docker-image %s: %w", image, err)
 		}
+		cmdOut.Flush()
 	}
 	return nil
 }

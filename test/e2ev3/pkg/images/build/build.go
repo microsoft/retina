@@ -8,13 +8,13 @@ package build
 import (
 	"context"
 	"fmt"
-	"log"
-	"os"
+	"log/slog"
 	"os/exec"
 	"strings"
 
 	"github.com/microsoft/retina/test/e2ev3/config"
 	"github.com/microsoft/retina/test/e2ev3/pkg/images"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
 // Step builds Retina container images by invoking the top-level Makefile.
@@ -29,7 +29,7 @@ func (b *Step) String() string { return "build-images" }
 func (b *Step) Do(ctx context.Context) error {
 	img := &b.Cfg.Image
 	if !*config.ForceBuild && allImagesExist(img.Registry, img.Namespace, img.Tag) {
-		log.Printf("all images already present locally, skipping build")
+		slog.Info("all images already present locally, skipping build")
 		return nil
 	}
 
@@ -73,16 +73,19 @@ func runMake(ctx context.Context, rootDir, registry, namespace, tag string, push
 		args = append(args, "BUILDX_ACTION=--load --provenance=false --sbom=false", "OUTPUT_LOCAL=")
 	}
 
-	log.Printf("building: make %s", strings.Join(args, " "))
+	slog.Info("building image", "command", "make "+strings.Join(args, " "))
 
 	cmd := exec.CommandContext(ctx, "make", args...)
 	cmd.Dir = rootDir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmdOut := &utils.SlogWriter{Level: slog.LevelInfo, Source: "make-" + target}
+	cmd.Stdout = cmdOut
+	cmd.Stderr = cmdOut
 
 	if err := cmd.Run(); err != nil {
+		cmdOut.Flush()
 		return fmt.Errorf("make %s failed: %w", target, err)
 	}
+	cmdOut.Flush()
 	return nil
 }
 

@@ -6,7 +6,7 @@ package kind
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 )
@@ -22,30 +22,34 @@ type InstallNPM struct {
 func (n *InstallNPM) String() string { return "install-azure-npm" }
 
 func (n *InstallNPM) Do(ctx context.Context) error {
-	log.Printf("installing Azure NPM for NetworkPolicy enforcement...")
+	slog.Info("installing Azure NPM for NetworkPolicy enforcement")
 	cmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", npmManifestURL)
 	if n.KubeConfigFilePath != "" {
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+n.KubeConfigFilePath)
 	}
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmdOut := &slogWriter{level: slog.LevelInfo, source: "kubectl-apply"}
+	cmd.Stdout = cmdOut
+	cmd.Stderr = cmdOut
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to install Azure NPM: %w", err)
 	}
+	cmdOut.Flush()
 
 	// Wait for the DaemonSet to be ready.
-	log.Printf("waiting for Azure NPM DaemonSet to be ready...")
+	slog.Info("waiting for Azure NPM DaemonSet to be ready")
 	waitCmd := exec.CommandContext(ctx, "kubectl", "rollout", "status", "daemonset/azure-npm",
 		"-n", "kube-system", "--timeout=120s")
 	if n.KubeConfigFilePath != "" {
 		waitCmd.Env = append(os.Environ(), "KUBECONFIG="+n.KubeConfigFilePath)
 	}
-	waitCmd.Stdout = os.Stdout
-	waitCmd.Stderr = os.Stderr
+	waitOut := &slogWriter{level: slog.LevelInfo, source: "kubectl-rollout"}
+	waitCmd.Stdout = waitOut
+	waitCmd.Stderr = waitOut
 	if err := waitCmd.Run(); err != nil {
 		return fmt.Errorf("Azure NPM DaemonSet not ready: %w", err)
 	}
+	waitOut.Flush()
 
-	log.Printf("Azure NPM installed successfully")
+	slog.Info("Azure NPM installed successfully")
 	return nil
 }

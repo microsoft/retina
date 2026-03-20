@@ -8,7 +8,6 @@ package basicmetrics
 import (
 	"context"
 	"fmt"
-	"log"
 
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/config"
@@ -112,7 +111,5 @@ func (v *ValidateRetinaDropMetricStep) Do(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to verify prometheus metrics %s: %w", dropBytesMetricName, err)
 	}
-
-	log.Printf("found metrics matching %+v\n", metric)
 	return nil
 }

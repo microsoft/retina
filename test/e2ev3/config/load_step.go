@@ -5,7 +5,7 @@ package config
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -47,7 +47,7 @@ func (l *Step) Do(_ context.Context) error {
 			return fmt.Errorf("generate dev tag: %w", err)
 		}
 		l.Cfg.Image.Tag = tag
-		log.Printf("no TAG provided, will build images as %s", tag)
+		slog.Info("no TAG provided, will build images", "tag", tag)
 	}
 	return nil
 }

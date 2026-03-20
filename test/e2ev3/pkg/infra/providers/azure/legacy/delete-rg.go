@@ -3,7 +3,7 @@ package legacy
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -17,7 +17,7 @@ type DeleteResourceGroup struct {
 }
 
 func (d *DeleteResourceGroup) Do(_ context.Context) error {
-	log.Printf("deleting resource group \"%s\"...", d.ResourceGroupName)
+	slog.Info("deleting resource group", "resourceGroup", d.ResourceGroupName)
 	cred, err := azidentity.NewAzureCLICredential(nil)
 	if err != nil {
 		return fmt.Errorf("failed to obtain a credential: %w", err)
@@ -33,6 +33,6 @@ func (d *DeleteResourceGroup) Do(_ context.Context) error {
 		return fmt.Errorf("failed to finish the delete resource group request: %w", err)
 	}
 
-	log.Printf("resource group \"%s\" deleted successfully", d.ResourceGroupName)
+	slog.Info("resource group deleted successfully", "resourceGroup", d.ResourceGroupName)
 	return nil
 }

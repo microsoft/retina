@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strconv"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -63,7 +64,7 @@ func (c *CreateKapingerDeployment) Do(ctx context.Context) error {
 func (c *CreateKapingerDeployment) GetKapingerDeployment() *appsv1.Deployment {
 	replicas, err := strconv.ParseInt(c.KapingerReplicas, 10, 32)
 	if err != nil {
-		fmt.Println("Error converting replicas to int for Kapinger replicas: ", err)
+		slog.Error("converting kapinger replicas", "error", err)
 		return nil
 	}
 	reps := int32(replicas)

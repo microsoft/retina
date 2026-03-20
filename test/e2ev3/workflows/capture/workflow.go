@@ -8,7 +8,7 @@ package capture
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -76,7 +76,7 @@ type InstallRetinaPluginStep struct{}
 func (i *InstallRetinaPluginStep) String() string { return "install-retina-plugin" }
 
 func (i *InstallRetinaPluginStep) Do(ctx context.Context) error {
-	log.Print("Building kubectl-retina plugin...")
+	slog.Info("building kubectl-retina plugin")
 
 	if err := os.MkdirAll(InstallRetinaBinaryDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create binary directory: %w", err)
@@ -90,7 +90,7 @@ func (i *InstallRetinaPluginStep) Do(ctx context.Context) error {
 		return fmt.Errorf("failed to detect git repository root: %w", err)
 	}
 	retinaRepoRoot := strings.TrimSpace(string(output))
-	log.Printf("Auto-detected repository root: %s", retinaRepoRoot)
+	slog.Info("auto-detected repository root", "path", retinaRepoRoot)
 
 	if _, err := os.Stat(retinaRepoRoot); err != nil {
 		return fmt.Errorf("invalid RetinaRepoRoot path: %w", err)
@@ -108,7 +108,7 @@ func (i *InstallRetinaPluginStep) Do(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to build kubectl-retina: %s: %w", buildOutput, err)
 	}
-	log.Printf("Successfully built kubectl-retina: %s", buildOutput)
+	slog.Info("successfully built kubectl-retina", "output", string(buildOutput))
 
 	currentPath := os.Getenv("PATH")
 	if !strings.Contains(currentPath, InstallRetinaBinaryDir) {
@@ -116,17 +116,17 @@ func (i *InstallRetinaPluginStep) Do(ctx context.Context) error {
 		if err := os.Setenv("PATH", newPath); err != nil {
 			return fmt.Errorf("failed to update PATH environment variable: %w", err)
 		}
-		log.Printf("Added %s to PATH", InstallRetinaBinaryDir)
+		slog.Info("added directory to PATH", "dir", InstallRetinaBinaryDir)
 	}
 
 	verifyCmd := exec.Command("kubectl", "plugin", "list") // #nosec
 	verifyOutput, err := verifyCmd.CombinedOutput()
 	if err != nil {
-		log.Printf("Warning: kubectl plugin list command failed: %v. Output: %s", err, verifyOutput)
+		slog.Warn("kubectl plugin list command failed", "error", err, "output", string(verifyOutput))
 	} else {
-		log.Printf("kubectl plugin list output: %s", verifyOutput)
+		slog.Info("kubectl plugin list", "output", string(verifyOutput))
 		if !strings.Contains(string(verifyOutput), "retina") {
-			log.Printf("Warning: retina plugin not found in kubectl plugin list output")
+			slog.Warn("retina plugin not found in kubectl plugin list output")
 		}
 	}
 
@@ -156,14 +156,14 @@ type ValidateCaptureStep struct {
 func (v *ValidateCaptureStep) String() string { return "validate-capture" }
 
 func (v *ValidateCaptureStep) Do(ctx context.Context) error {
-	log.Print("Running retina capture create...")
+	slog.Info("running retina capture create")
 
 	imageRegistry := v.ImageRegistry
 	imageNamespace := v.ImageNamespace
 	imageTag := v.ImageTag
 
 	os.Setenv("KUBECONFIG", v.KubeConfigPath) //nolint:errcheck // best effort
-	log.Printf("KUBECONFIG: %s\n", os.Getenv("KUBECONFIG"))
+	slog.Info("KUBECONFIG set", "path", os.Getenv("KUBECONFIG"))
 
 	cmd := exec.CommandContext(ctx, "kubectl", "retina", "capture", "create", "--namespace", v.CaptureNamespace, "--name", v.CaptureName, "--duration", v.Duration, "--debug") //#nosec
 	cmd.Env = append(os.Environ(), "RETINA_AGENT_IMAGE="+filepath.Join(imageRegistry, imageNamespace, "retina-agent:"+imageTag))
@@ -172,7 +172,7 @@ func (v *ValidateCaptureStep) Do(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to execute create capture command: %s: %w", string(output), err)
 	}
-	log.Printf("Create capture command output: %s\n", output)
+	slog.Info("create capture command completed", "output", string(output))
 
 	clientset, err := kubernetes.NewForConfig(v.RestConfig)
 	if err != nil {
@@ -183,7 +183,7 @@ func (v *ValidateCaptureStep) Do(ctx context.Context) error {
 	err = retrier.Do(ctx, func() error {
 		e := v.verifyJobs(ctx, clientset)
 		if e != nil {
-			log.Printf("failed to verify capture jobs: %v, retrying...", e)
+			slog.Warn("failed to verify capture jobs, retrying", "error", e)
 			return e
 		}
 		return nil
@@ -198,7 +198,7 @@ func (v *ValidateCaptureStep) Do(ctx context.Context) error {
 	defer func() {
 		outputDir := filepath.Join(".", v.CaptureName)
 		if err := os.RemoveAll(outputDir); err != nil {
-			log.Printf("warning: failed to clean up capture files in %s: %v", outputDir, err)
+			slog.Warn("failed to clean up capture files", "dir", outputDir, "error", err)
 		}
 	}()
 
@@ -234,12 +234,12 @@ func (v *ValidateCaptureStep) verifyJobs(ctx context.Context, clientset *kuberne
 			label.AppLabel, captureConstants.CaptureAppname, ErrNoCaptureJobsFound)
 	}
 
-	log.Printf("Found %d capture job(s) with appropriate labels.", len(jobList.Items))
+	slog.Info("found capture jobs", "count", len(jobList.Items))
 
 	for i := range jobList.Items {
 		for _, condition := range jobList.Items[i].Status.Conditions {
 			if condition.Type == "Complete" && condition.Status == "True" {
-				log.Printf("Job %s has condition: Complete - True", jobList.Items[i].Name)
+				slog.Info("job completed", "job", jobList.Items[i].Name)
 			}
 			if condition.Type == "Failed" && condition.Status == "True" {
 				return fmt.Errorf("%s: %w", jobList.Items[i].Name, ErrCaptureJobFailed)
@@ -255,7 +255,7 @@ func (v *ValidateCaptureStep) verifyJobs(ctx context.Context, clientset *kuberne
 		if err := v.checkJobEvents(jobList.Items[i].Name, events); err != nil {
 			return fmt.Errorf("failed to verify events for job %s: %w", jobList.Items[i].Name, err)
 		}
-		log.Printf("Job %s has both SuccessfulCreate and Completed events.", jobList.Items[i].Name)
+		slog.Info("job has required events", "job", jobList.Items[i].Name)
 	}
 
 	return nil
@@ -282,13 +282,13 @@ func (v *ValidateCaptureStep) checkJobEvents(jobName string, events *v1.EventLis
 }
 
 func (v *ValidateCaptureStep) deleteJobs(ctx context.Context, clientset *kubernetes.Clientset) error {
-	log.Printf("Running retina capture delete...")
+	slog.Info("running retina capture delete")
 	cmd := exec.CommandContext(ctx, "kubectl", "retina", "capture", "delete", "--namespace", v.CaptureNamespace, "--name", v.CaptureName) //#nosec
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to execute delete command: %w", err)
 	}
-	log.Printf("Delete command output: %s\n", output)
+	slog.Info("delete command completed", "output", string(output))
 
 	captureJobSelector := &metav1.LabelSelector{
 		MatchLabels: map[string]string{
@@ -319,12 +319,12 @@ func (v *ValidateCaptureStep) deleteJobs(ctx context.Context, clientset *kuberne
 		return err
 	}
 
-	log.Printf("All relevant capture jobs have been successfully deleted.")
+	slog.Info("all relevant capture jobs deleted")
 	return nil
 }
 
 func (v *ValidateCaptureStep) downloadCapture(ctx context.Context) error {
-	log.Print("Downloading capture files...")
+	slog.Info("downloading capture files")
 
 	outputDir := filepath.Join(".", v.CaptureName)
 
@@ -333,7 +333,7 @@ func (v *ValidateCaptureStep) downloadCapture(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to execute download capture command: %s: %w", string(output), err)
 	}
-	log.Printf("Download capture command output: %s\n", output)
+	slog.Info("download capture command completed", "output", string(output))
 
 	files, err := os.ReadDir(outputDir)
 	if err != nil {
@@ -343,7 +343,7 @@ func (v *ValidateCaptureStep) downloadCapture(ctx context.Context) error {
 	if len(files) == 0 {
 		return fmt.Errorf("no capture files were downloaded")
 	}
-	log.Printf("Downloaded %d capture files", len(files))
+	slog.Info("downloaded capture files", "count", len(files))
 
 	for _, file := range files {
 		filePath := filepath.Join(outputDir, file.Name())
@@ -361,7 +361,7 @@ func (v *ValidateCaptureStep) downloadCapture(ctx context.Context) error {
 			return fmt.Errorf("downloaded file %s is empty", filePath)
 		}
 
-		log.Printf("Validated file: %s (Size: %d bytes)", file.Name(), fileInfo.Size())
+		slog.Info("validated file", "file", file.Name(), "size", fileInfo.Size())
 	}
 
 	return nil

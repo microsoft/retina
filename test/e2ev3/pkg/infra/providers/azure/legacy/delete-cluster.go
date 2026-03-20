@@ -3,7 +3,7 @@ package legacy
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	armcontainerservice "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v4"
@@ -27,7 +27,7 @@ func (d *DeleteCluster) Do(_ context.Context) error {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	log.Printf("deleting cluster %s in resource group %s...", d.ClusterName, d.ResourceGroupName)
+	slog.Info("deleting cluster", "cluster", d.ClusterName, "resourceGroup", d.ResourceGroupName)
 	poller, err := clientFactory.NewManagedClustersClient().BeginDelete(ctx, d.ResourceGroupName, d.ClusterName, nil)
 	if err != nil {
 		return fmt.Errorf("failed to finish the request: %w", err)

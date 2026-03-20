@@ -2,7 +2,7 @@ package images
 
 import (
 	"context"
-	"log"
+	"log/slog"
 
 	"github.com/microsoft/retina/test/e2ev3/config"
 )
@@ -17,7 +17,7 @@ func (l *Step) String() string { return "load-images" }
 func (l *Step) Do(ctx context.Context) error {
 	p := l.Cfg
 	imgs := RetinaImages(p.Image.Registry, p.Image.Namespace, p.Image.Tag)
-	log.Printf("loading %d images into cluster %q", len(imgs), p.Cluster.ClusterName())
+	slog.Info("loading images into cluster", "count", len(imgs), "cluster", p.Cluster.ClusterName())
 	return p.Cluster.LoadImages(ctx, imgs)
 }
 

@@ -3,7 +3,7 @@ package legacy
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
@@ -24,7 +24,7 @@ type CreatePublicIP struct {
 func (c *CreatePublicIP) Do(_ context.Context) error {
 	cred, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("failed to obtain a credential: %w", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), clusterTimeout)
@@ -76,9 +76,9 @@ func (c *CreatePublicIP) Do(_ context.Context) error {
 			Frequency: 5 * time.Second,
 		})
 		if err != nil {
-			log.Printf("failed to create Public IP - %s : %v\n", ipName, err)
+			slog.Error("failed to create public IP", "name", ipName, "error", err)
 		} else {
-			log.Printf("Public IP %s created\n", ipName)
+			slog.Info("public IP created", "name", ipName)
 		}
 		close(notifychan)
 	}()
@@ -90,7 +90,7 @@ func (c *CreatePublicIP) Do(_ context.Context) error {
 		case <-ctx.Done():
 			return fmt.Errorf("failed to create Public IP: %w", ctx.Err())
 		case <-ticker.C:
-			log.Printf("waiting for Public IP %s to be ready...\n", ipName)
+			slog.Info("waiting for public IP to be ready", "name", ipName)
 		case <-notifychan:
 			if err != nil {
 				return fmt.Errorf("received notification, failed to create public IP address: %w", err)

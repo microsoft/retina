@@ -3,7 +3,7 @@ package legacy
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
@@ -98,14 +98,14 @@ func (c *CreateNPMCluster) Do(_ context.Context) error {
 		publicIPIDs := make([]*armcontainerservice.ResourceReference, 0, len(c.PublicIPs))
 
 		for _, ipID := range c.PublicIPs {
-			fmt.Printf("Adding Public IP ID: %s\n", ipID)
+			slog.Info("adding public IP", "id", ipID)
 			publicIPIDs = append(publicIPIDs, &armcontainerservice.ResourceReference{
 				ID: to.Ptr(ipID),
 			})
 		}
 
 		for _, ip := range c.PublicIPs {
-			fmt.Printf("Public IP ID: %s\n", ip)
+			slog.Info("public IP", "id", ip)
 		}
 
 		if npmCluster.Properties.NetworkProfile.LoadBalancerProfile == nil {
@@ -130,9 +130,9 @@ func (c *CreateNPMCluster) Do(_ context.Context) error {
 		return fmt.Errorf("failed to create az client: %w", err)
 	}
 
-	log.Printf("when the cluster is ready, use the below command to access and debug")
-	log.Printf("az aks get-credentials --resource-group %s --name %s --subscription %s", c.ResourceGroupName, c.ClusterName, c.SubscriptionID)
-	log.Printf("creating cluster \"%s\" in resource group \"%s\"...", c.ClusterName, c.ResourceGroupName)
+	slog.Info("when the cluster is ready, use the below command to access and debug")
+	slog.Info("az aks get-credentials", "resourceGroup", c.ResourceGroupName, "cluster", c.ClusterName, "subscription", c.SubscriptionID)
+	slog.Info("creating cluster", "cluster", c.ClusterName, "resourceGroup", c.ResourceGroupName)
 
 	poller, err := clientFactory.NewManagedClustersClient().BeginCreateOrUpdate(ctx, c.ResourceGroupName, c.ClusterName, npmCluster, nil)
 	if err != nil {
@@ -145,9 +145,9 @@ func (c *CreateNPMCluster) Do(_ context.Context) error {
 			Frequency: pollFrequency,
 		})
 		if err != nil {
-			log.Printf("failed to create cluster: %v\n", err)
+			slog.Error("failed to create cluster", "error", err)
 		} else {
-			log.Printf("cluster %s is ready\n", c.ClusterName)
+			slog.Info("cluster is ready", "cluster", c.ClusterName)
 		}
 		close(notifychan)
 	}()
@@ -159,7 +159,7 @@ func (c *CreateNPMCluster) Do(_ context.Context) error {
 		case <-ctx.Done():
 			return fmt.Errorf("failed to create cluster: %w", ctx.Err())
 		case <-ticker.C:
-			log.Printf("waiting for cluster %s to be ready...\n", c.ClusterName)
+			slog.Info("waiting for cluster to be ready", "cluster", c.ClusterName)
 		case <-notifychan:
 			if err != nil {
 				return fmt.Errorf("received notification, failed to create cluster: %w", err)

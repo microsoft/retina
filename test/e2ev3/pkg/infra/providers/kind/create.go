@@ -6,7 +6,7 @@ package kind
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"sigs.k8s.io/kind/pkg/cluster"
 )
@@ -28,12 +28,12 @@ func (c *CreateCluster) Do(ctx context.Context) error {
 	}
 	for _, name := range clusters {
 		if name == c.Config.ClusterName {
-			log.Printf("Kind cluster %q already exists, skipping creation", c.Config.ClusterName)
+			slog.Info("Kind cluster already exists, skipping creation", "cluster", c.Config.ClusterName)
 			return nil
 		}
 	}
 
-	log.Printf("creating Kind cluster %q...", c.Config.ClusterName)
+	slog.Info("creating Kind cluster", "cluster", c.Config.ClusterName)
 
 	opts := []cluster.CreateOption{
 		cluster.CreateWithWaitForReady(c.Config.WaitForReady),
@@ -53,6 +53,6 @@ func (c *CreateCluster) Do(ctx context.Context) error {
 		return fmt.Errorf("failed to create Kind cluster %q: %w", c.Config.ClusterName, err)
 	}
 
-	log.Printf("Kind cluster %q created successfully", c.Config.ClusterName)
+	slog.Info("Kind cluster created successfully", "cluster", c.Config.ClusterName)
 	return nil
 }

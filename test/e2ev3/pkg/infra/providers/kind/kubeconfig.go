@@ -6,7 +6,7 @@ package kind
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 
 	"sigs.k8s.io/kind/pkg/cluster"
@@ -24,7 +24,7 @@ type ExportKubeConfig struct {
 func (e *ExportKubeConfig) String() string { return "export-kind-kubeconfig" }
 
 func (e *ExportKubeConfig) Do(_ context.Context) error {
-	log.Printf("exporting kubeconfig for Kind cluster %q to %q...", e.ClusterName, e.KubeConfigFilePath)
+	slog.Info("exporting kubeconfig for Kind cluster", "cluster", e.ClusterName, "path", e.KubeConfigFilePath)
 
 	provider := cluster.NewProvider()
 
@@ -37,6 +37,6 @@ func (e *ExportKubeConfig) Do(_ context.Context) error {
 		return fmt.Errorf("failed to write kubeconfig to %q: %w", e.KubeConfigFilePath, err)
 	}
 
-	log.Printf("kubeconfig for Kind cluster %q written to %q", e.ClusterName, e.KubeConfigFilePath)
+	slog.Info("kubeconfig for Kind cluster written", "cluster", e.ClusterName, "path", e.KubeConfigFilePath)
 	return nil
 }

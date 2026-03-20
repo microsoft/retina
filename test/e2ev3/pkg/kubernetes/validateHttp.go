@@ -3,7 +3,7 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 )
@@ -38,7 +38,7 @@ func (v *ValidateHTTPResponse) Do(ctx context.Context) error {
 	if resp.StatusCode != v.ExpectedStatus {
 		return fmt.Errorf("unexpected status code: got %d, want %d", resp.StatusCode, v.ExpectedStatus)
 	}
-	log.Printf("HTTP validation succeeded for URL: %s with status code %d\n", v.URL, resp.StatusCode)
+	slog.Info("HTTP validation succeeded", "url", v.URL, "statusCode", resp.StatusCode)
 
 	return nil
 }

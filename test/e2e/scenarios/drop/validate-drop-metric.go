@@ -2,7 +2,6 @@ package drop
 
 import (
 	"fmt"
-	"log"
 
 	prom "github.com/microsoft/retina/test/e2e/framework/prometheus"
 )
@@ -45,7 +44,6 @@ func (v *ValidateRetinaDropMetric) Run() error {
 		return fmt.Errorf("failed to verify prometheus metrics %s: %w", dropBytesMetricName, err)
 	}
 
-	log.Printf("found metrics matching %+v\n", metric)
 	return nil
 }
 

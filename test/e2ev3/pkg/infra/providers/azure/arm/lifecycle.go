@@ -6,7 +6,7 @@ package arm
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
@@ -24,7 +24,7 @@ type DeleteInfra struct {
 func (d *DeleteInfra) String() string { return "delete-azure-infra" }
 
 func (d *DeleteInfra) Do(ctx context.Context) error {
-	log.Printf("deleting resource group %q (and all resources within)...", d.Config.ResourceGroupName)
+	slog.Info("deleting resource group and all resources within", "resourceGroup", d.Config.ResourceGroupName)
 
 	cred, err := azidentity.NewAzureCLICredential(nil)
 	if err != nil {
@@ -60,12 +60,12 @@ func (d *DeleteInfra) Do(ctx context.Context) error {
 		case <-ctx.Done():
 			return fmt.Errorf("resource group deletion timed out: %w", ctx.Err())
 		case <-ticker.C:
-			log.Printf("waiting for resource group %q deletion...", d.Config.ResourceGroupName)
+			slog.Info("waiting for resource group deletion", "resourceGroup", d.Config.ResourceGroupName)
 		case <-notifychan:
 			if err != nil {
 				return fmt.Errorf("resource group %q deletion failed: %w", d.Config.ResourceGroupName, err)
 			}
-			log.Printf("resource group %q deleted successfully", d.Config.ResourceGroupName)
+			slog.Info("resource group deleted successfully", "resourceGroup", d.Config.ResourceGroupName)
 			return nil
 		}
 	}

@@ -3,7 +3,7 @@ package kubernetes
 import (
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -27,8 +27,8 @@ func downloadExternalCRDs(chartPath string) error {
 			return err
 		}
 
-		log.Printf("CRD exists %s", crdName)
-		log.Printf("File path to be written to %s", filepath.Join(chartPath, "/crds/"+crdName))
+		slog.Info("CRD exists", "name", crdName)
+		slog.Info("writing CRD file", "path", filepath.Join(chartPath, "/crds/"+crdName))
 		err = saveToFile(filepath.Join(chartPath, "/crds/"+crdName), crd)
 		if err != nil {
 			return err

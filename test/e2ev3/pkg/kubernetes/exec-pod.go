@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -43,7 +43,7 @@ func (e *ExecInPod) Do(ctx context.Context) error {
 	}, func() error {
 		_, execErr := ExecPod(ctx, clientset, e.RestConfig, e.PodNamespace, e.PodName, e.Command)
 		if execErr != nil {
-			log.Printf("error executing command, retrying [%s]: %v", e.Command, execErr)
+			slog.Error("executing command, retrying", "command", e.Command, "error", execErr)
 		}
 		return execErr
 	})
@@ -55,7 +55,7 @@ func (e *ExecInPod) Do(ctx context.Context) error {
 }
 
 func ExecPod(ctx context.Context, clientset *kubernetes.Clientset, config *rest.Config, namespace, podName, command string) ([]byte, error) {
-	log.Printf("executing command \"%s\" on pod \"%s\" in namespace \"%s\"...", command, podName, namespace)
+	slog.Info("executing command", "command", command, "pod", podName, "namespace", namespace)
 	req := clientset.CoreV1().RESTClient().Post().Resource("pods").Name(podName).
 		Namespace(namespace).SubResource(ExecSubResources)
 	option := &v1.PodExecOptions{

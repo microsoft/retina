@@ -3,7 +3,7 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -44,7 +44,7 @@ func (v *InstallHubbleHelmChart) Do(ctx context.Context) error {
 	settings.KubeConfig = v.KubeConfigFilePath
 	actionConfig := new(action.Configuration)
 
-	err := actionConfig.Init(settings.RESTClientGetter(), v.Namespace, v.HelmDriver, log.Printf)
+	err := actionConfig.Init(settings.RESTClientGetter(), v.Namespace, v.HelmDriver, func(format string, v ...any) { slog.Info(fmt.Sprintf(format, v...)) })
 	if err != nil {
 		return fmt.Errorf("failed to initialize helm action config: %w", err)
 	}
@@ -98,7 +98,7 @@ func (v *InstallHubbleHelmChart) Do(ctx context.Context) error {
 	getclient := action.NewGet(actionConfig)
 	release, err := getclient.Run(v.ReleaseName)
 	if err == nil && release != nil {
-		log.Printf("found existing release by same name, removing before installing %s", release.Name)
+		slog.Info("found existing release, removing before installing", "release", release.Name)
 		delclient := action.NewUninstall(actionConfig)
 		delclient.Wait = true
 		delclient.Timeout = deleteTimeout
@@ -123,9 +123,8 @@ func (v *InstallHubbleHelmChart) Do(ctx context.Context) error {
 		return fmt.Errorf("failed to install chart: %w", err)
 	}
 
-	log.Printf("installed chart from path: %s in namespace: %s\n", rel.Name, rel.Namespace)
-	// this will confirm the values set during installation
-	log.Printf("chart values: %v\n", rel.Config)
+	slog.Info("installed chart", "release", rel.Name, "namespace", rel.Namespace)
+	slog.Info("chart values", "config", rel.Config)
 
 	// ensure all pods are running, since helm doesn't care about windows
 	config, err := clientcmd.BuildConfigFromFlags("", v.KubeConfigFilePath)
@@ -155,12 +154,12 @@ func (v *InstallHubbleHelmChart) Do(ctx context.Context) error {
 	if relayErr != nil {
 		return fmt.Errorf("error waiting for Hubble Relay pods to be ready: %w", relayErr)
 	}
-	log.Printf("Hubble Relay Pod is ready")
+	slog.Info("Hubble Relay pod is ready")
 
 	if uiErr != nil {
 		return fmt.Errorf("error waiting for Hubble UI pods to be ready: %w", uiErr)
 	}
-	log.Printf("Hubble UI Pod is ready")
+	slog.Info("Hubble UI pod is ready")
 
 	return nil
 }

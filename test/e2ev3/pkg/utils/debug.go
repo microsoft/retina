@@ -7,7 +7,7 @@ package utils
 
 import (
 	"context"
-	"log"
+	"log/slog"
 
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 	"k8s.io/client-go/rest"
@@ -24,14 +24,14 @@ type DebugOnFailure struct {
 func (d *DebugOnFailure) String() string { return "debug-on-failure" }
 
 func (d *DebugOnFailure) Do(_ context.Context) error {
-	log.Printf("[DEBUG] Capturing logs for pods in %s with label %s", d.Namespace, d.LabelSelector)
+	slog.Info("capturing logs for pods", "namespace", d.Namespace, "label", d.LabelSelector)
 	getLogs := &k8s.GetPodLogs{
 		RestConfig:    d.RestConfig,
 		Namespace:          d.Namespace,
 		LabelSelector:      d.LabelSelector,
 	}
 	if err := getLogs.Do(context.Background()); err != nil {
-		log.Printf("[DEBUG] Failed to capture logs: %v", err)
+		slog.Error("failed to capture logs", "error", err)
 	}
 	return nil // never fail the debug step itself
 }

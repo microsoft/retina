@@ -6,7 +6,7 @@ package kind
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"sigs.k8s.io/kind/pkg/cluster"
 )
@@ -21,7 +21,7 @@ type DeleteCluster struct {
 func (d *DeleteCluster) String() string { return "delete-kind-cluster" }
 
 func (d *DeleteCluster) Do(_ context.Context) error {
-	log.Printf("deleting Kind cluster %q...", d.ClusterName)
+	slog.Info("deleting Kind cluster", "cluster", d.ClusterName)
 
 	provider := cluster.NewProvider()
 
@@ -29,6 +29,6 @@ func (d *DeleteCluster) Do(_ context.Context) error {
 		return fmt.Errorf("failed to delete Kind cluster %q: %w", d.ClusterName, err)
 	}
 
-	log.Printf("Kind cluster %q deleted successfully", d.ClusterName)
+	slog.Info("Kind cluster deleted successfully", "cluster", d.ClusterName)
 	return nil
 }

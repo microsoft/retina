@@ -8,7 +8,7 @@ package utils
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	flow "github.com/Azure/go-workflow"
@@ -42,7 +42,7 @@ func (w *WithPortForward) Do(ctx context.Context) error {
 		return fmt.Errorf("port-forward failed: %w", err)
 	}
 	defer func() {
-		log.Printf("stopping port-forward %s → %s", w.PF.LocalPort, w.PF.RemotePort)
+		slog.Info("stopping port-forward", "local", w.PF.LocalPort, "remote", w.PF.RemotePort)
 		w.PF.Stop() //nolint:errcheck // best-effort cleanup
 	}()
 
@@ -64,7 +64,7 @@ func (w *WithPortForward) Unwrap() []flow.Steper {
 func CurlExpectFail(name string, exec *k8s.ExecInPod) flow.Steper {
 	return flow.Func(name, func(ctx context.Context) error {
 		if err := exec.Do(ctx); err != nil {
-			log.Printf("[%s] curl failed as expected: %v", name, err)
+			slog.Info("curl failed as expected", "step", name, "error", err)
 		}
 		return nil
 	})

@@ -9,7 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	flow "github.com/Azure/go-workflow"
@@ -153,7 +153,7 @@ func (v *ValidateHNSMetricStep) Do(ctx context.Context) error {
 		"direction": "win_packets_sent_count",
 	}
 
-	log.Printf("checking for metric %s with labels %+v\n", hnsMetricName, labels)
+	slog.Info("checking for metric", "metric", hnsMetricName, "labels", labels)
 
 	err = defaultRetrier.Do(ctx, func() error {
 		output, execErr := k8s.ExecPod(ctx, clientset, v.RestConfig, windowsRetinaPod.Namespace, windowsRetinaPod.Name, fmt.Sprintf("curl -s http://localhost:%s/metrics", config.RetinaMetricsPort))
@@ -175,6 +175,6 @@ func (v *ValidateHNSMetricStep) Do(ctx context.Context) error {
 		return err
 	}
 
-	log.Printf("found metric matching %+v: with labels %+v\n", hnsMetricName, labels)
+	slog.Info("found matching metric", "metric", hnsMetricName, "labels", labels)
 	return nil
 }

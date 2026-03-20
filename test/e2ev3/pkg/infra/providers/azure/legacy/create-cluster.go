@@ -3,7 +3,7 @@ package legacy
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
@@ -77,7 +77,7 @@ func (c *CreateCluster) Do(_ context.Context) error {
 		template.Properties.NetworkProfile.NetworkPluginMode = to.Ptr(armcontainerservice.NetworkPluginMode(c.networkPluginMode))
 	}
 
-	log.Printf("creating cluster %s in location %s...", c.ClusterName, c.Location)
+	slog.Info("creating cluster", "cluster", c.ClusterName, "location", c.Location)
 	poller, err := clientFactory.NewManagedClustersClient().BeginCreateOrUpdate(ctx, c.ResourceGroupName, c.ClusterName, template, nil)
 	if err != nil {
 		return fmt.Errorf("failed to finish the create cluster request: %w", err)
@@ -86,7 +86,7 @@ func (c *CreateCluster) Do(_ context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to pull the create cluster result: %w", err)
 	}
-	log.Printf("cluster created %s in location %s...", c.ClusterName, c.Location)
+	slog.Info("cluster created", "cluster", c.ClusterName, "location", c.Location)
 
 	return nil
 }

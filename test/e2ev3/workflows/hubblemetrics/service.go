@@ -9,7 +9,7 @@ import (
 	"k8s.io/client-go/rest"
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -94,7 +94,7 @@ func (v *ValidateHubbleUIServiceStep) Do(ctx context.Context) error {
 		return fmt.Errorf("failed to validate hubble-ui HTTP response: %w", err)
 	}
 
-	log.Printf("Hubble UI service validation succeeded")
+	slog.Info("Hubble UI service validation succeeded")
 	return nil
 }
 

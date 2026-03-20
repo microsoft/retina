@@ -7,7 +7,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
@@ -209,7 +209,7 @@ func LoadE2EConfig() (*E2EConfig, error) {
 		cfg.Image.Namespace = "microsoft/retina"
 	}
 
-	log.Printf("using image %s/%s:%s", cfg.Image.Registry, cfg.Image.Namespace, cfg.Image.Tag)
+	slog.Info("using image", "registry", cfg.Image.Registry, "namespace", cfg.Image.Namespace, "tag", cfg.Image.Tag)
 
 	return cfg, nil
 }

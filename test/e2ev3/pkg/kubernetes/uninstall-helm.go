@@ -3,7 +3,7 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/cli"
@@ -23,7 +23,7 @@ func (i *UninstallHelmChart) Do(ctx context.Context) error {
 	settings.KubeConfig = i.KubeConfigFilePath
 	actionConfig := new(action.Configuration)
 
-	err := actionConfig.Init(settings.RESTClientGetter(), i.Namespace, i.HelmDriver, log.Printf)
+	err := actionConfig.Init(settings.RESTClientGetter(), i.Namespace, i.HelmDriver, func(format string, v ...any) { slog.Info(fmt.Sprintf(format, v...)) })
 	if err != nil {
 		return fmt.Errorf("failed to initialize helm action config: %w", err)
 	}

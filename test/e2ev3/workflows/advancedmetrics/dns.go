@@ -6,10 +6,10 @@
 package advancedmetrics
 
 import (
-	"k8s.io/client-go/rest"
 	"context"
 	"fmt"
-	"log"
+
+	"k8s.io/client-go/rest"
 
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/config"
@@ -132,7 +132,6 @@ func (v *ValidateAdvancedDNSRequestStep) Do(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to verify advance dns request metrics %s: %w", dnsAdvRequestCountMetricName, err)
 	}
-	log.Printf("found metrics matching %+v\n", dnsAdvRequestCountMetricName)
 	return nil
 }
 
@@ -181,6 +180,5 @@ func (v *ValidateAdvancedDNSResponseStep) Do(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to verify advance dns response metrics %s: %w", dnsAdvResponseCountMetricName, err)
 	}
-	log.Printf("found metrics matching %+v\n", dnsAdvResponseCountMetricName)
 	return nil
 }

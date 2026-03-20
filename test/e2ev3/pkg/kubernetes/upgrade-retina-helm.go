@@ -5,7 +5,7 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"helm.sh/helm/v3/pkg/action"
@@ -32,7 +32,7 @@ func (u *UpgradeRetinaHelmChart) Do(ctx context.Context) error {
 	settings.KubeConfig = u.KubeConfigFilePath
 	actionConfig := new(action.Configuration)
 
-	err := actionConfig.Init(settings.RESTClientGetter(), u.Namespace, u.HelmDriver, log.Printf)
+	err := actionConfig.Init(settings.RESTClientGetter(), u.Namespace, u.HelmDriver, func(format string, v ...any) { slog.Info(fmt.Sprintf(format, v...)) })
 	if err != nil {
 		return fmt.Errorf("failed to initialize helm action config: %w", err)
 	}
@@ -64,16 +64,15 @@ func (u *UpgradeRetinaHelmChart) Do(ctx context.Context) error {
 		return fmt.Errorf("failed to merge values: %w", err)
 	}
 	// logs values to be set during upgrade
-	log.Printf("values to be set during upgrade: %v\n", values)
+	slog.Info("values to be set during upgrade", "values", values)
 
 	rel, err = client.Run(u.ReleaseName, chart, values)
 	if err != nil {
 		return fmt.Errorf("failed to upgrade chart: %w", err)
 	}
 
-	log.Printf("upgraded chart from path: %s in namespace: %s\n", rel.Name, rel.Namespace)
-	// this will confirm the values set during installation
-	log.Printf("chart values: %v\n", rel.Config)
+	slog.Info("upgraded chart", "release", rel.Name, "namespace", rel.Namespace)
+	slog.Info("chart values", "config", rel.Config)
 
 	return nil
 }

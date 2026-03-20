@@ -6,10 +6,10 @@
 package advancedmetrics
 
 import (
-	"k8s.io/client-go/rest"
 	"context"
 	"fmt"
-	"log"
+
+	"k8s.io/client-go/rest"
 
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/config"
@@ -54,7 +54,5 @@ func (v *ValidateAPIServerLatencyStep) Do(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to verify latency metrics %s: %w", latencyBucketMetricName, err)
 	}
-
-	log.Printf("found metrics matching %s\n", latencyBucketMetricName)
 	return nil
 }

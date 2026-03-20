@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -49,7 +50,7 @@ func CreateNamespaceFn(ctx context.Context, restConfig *rest.Config, namespace s
 		return fmt.Errorf("failed to create namespace \"%s\": %w", namespace, err)
 	}
 
-	fmt.Printf("Namespace \"%s\" created.\n", namespace)
+	slog.Info("namespace created", "namespace", namespace)
 
 	return nil
 }

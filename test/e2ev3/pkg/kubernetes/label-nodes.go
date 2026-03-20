@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 
 	retry "github.com/microsoft/retina/test/retry"
 	corev1 "k8s.io/api/core/v1"
@@ -61,7 +61,7 @@ func (l *LabelNodes) Do(ctx context.Context) error {
 	}
 
 	for i := range nodes.Items {
-		log.Println("Labeling node", nodes.Items[i].Name)
+		slog.Info("labeling node", "node", nodes.Items[i].Name)
 		err = retrier.Do(ctx, func() error {
 			_, err = clientset.CoreV1().Nodes().Patch(ctx, nodes.Items[i].Name, types.JSONPatchType, b, metav1.PatchOptions{})
 			if err != nil {

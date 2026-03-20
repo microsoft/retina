@@ -5,7 +5,7 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -61,7 +61,7 @@ func (p *PortForward) Do(ctx context.Context) error {
 	targetPodName := ""
 	if p.OptionalLabelAffinity != "" {
 		// get all pods with label
-		log.Printf("attempting to find pod with label \"%s\", on a node with a pod with label \"%s\"\n", p.LabelSelector, p.OptionalLabelAffinity)
+		slog.Info("finding pod with affinity", "label", p.LabelSelector, "affinityLabel", p.OptionalLabelAffinity)
 		targetPodName, err = p.findPodsWithAffinity(ctx, clientset)
 		if err != nil {
 			return fmt.Errorf("could not find pod with affinity: %w", err)
@@ -81,7 +81,7 @@ func (p *PortForward) Do(ctx context.Context) error {
 			opts.PodName = targetPodName
 		}
 
-		log.Printf("attempting port forward to pod name \"%s\" with label \"%s\", in namespace \"%s\"...\n", targetPodName, p.LabelSelector, p.Namespace)
+		slog.Info("attempting port forward", "pod", targetPodName, "label", p.LabelSelector, "namespace", p.Namespace)
 
 		p.pf, err = NewPortForwarder(p.RestConfig, logger{}, opts)
 		if err != nil {
@@ -98,13 +98,13 @@ func (p *PortForward) Do(ctx context.Context) error {
 		}
 		resp, err := client.Get(p.pf.Address() + "/" + p.Endpoint) //nolint
 		if err != nil {
-			log.Printf("port forward validation HTTP request to %s failed: %v\n", p.pf.Address(), err)
+			slog.Error("port forward validation failed", "address", p.pf.Address(), "error", err)
 			p.pf.Stop()
 			return fmt.Errorf("port forward validation HTTP request to %s failed: %w", p.pf.Address(), err)
 		}
 		defer resp.Body.Close()
 
-		log.Printf("port forward validation HTTP request to \"%s\" succeeded, response: %s\n", p.pf.Address(), resp.Status)
+		slog.Info("port forward validation succeeded", "address", p.pf.Address(), "status", resp.Status)
 
 		return nil
 	}
@@ -112,7 +112,7 @@ func (p *PortForward) Do(ctx context.Context) error {
 	if err = defaultRetrier.Do(portForwardCtx, portForwardFn); err != nil {
 		return fmt.Errorf("could not start port forward within %ds: %w", defaultTimeoutSeconds, err)
 	}
-	log.Printf("successfully port forwarded to \"%s\"\n", p.pf.Address())
+	slog.Info("successfully port forwarded", "address", p.pf.Address())
 	return nil
 }
 
@@ -167,5 +167,5 @@ func (p *PortForward) Stop() error {
 type logger struct{}
 
 func (l *logger) Logf(format string, args ...interface{}) {
-	log.Printf(format, args...)
+	slog.Info(fmt.Sprintf(format, args...))
 }

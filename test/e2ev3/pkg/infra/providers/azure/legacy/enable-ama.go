@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
@@ -24,7 +24,7 @@ type CreateAzureMonitor struct {
 }
 
 func (c *CreateAzureMonitor) Do(_ context.Context) error {
-	log.Printf(`this will deploy azure monitor workspace and grafana, but as of 1/9/2024, the api docs don't show how to do 
+	slog.Info(`this will deploy azure monitor workspace and grafana, but as of 1/9/2024, the api docs don't show how to do 
 az aks update --enable-azure-monitor-metrics \
 -n $NAME \
 -g $CLUSTER_RESOURCE_GROUP \
@@ -42,7 +42,7 @@ az aks update --enable-azure-monitor-metrics \
 	if err != nil {
 		return fmt.Errorf("failed to create azure monitor workspace client: %w", err)
 	}
-	log.Printf("creating resource group %s in location %s...", c.ResourceGroupName, c.Location)
+	slog.Info("creating resource group", "resourceGroup", c.ResourceGroupName, "location", c.Location)
 
 	// create azure monitor
 	_, err = amaClientFactory.NewAzureMonitorWorkspacesClient().Create(ctx, c.ResourceGroupName, "test", armmonitor.AzureMonitorWorkspaceResource{
@@ -64,7 +64,7 @@ az aks update --enable-azure-monitor-metrics \
 		return fmt.Errorf("failed to create grafana: %w", err)
 	}
 
-	log.Printf("azure monitor workspace %s in location %s", c.ResourceGroupName, c.Location)
+	slog.Info("azure monitor workspace created", "resourceGroup", c.ResourceGroupName, "location", c.Location)
 
 	// update aks cluster
 
