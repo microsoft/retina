@@ -259,6 +259,8 @@ func TestPodCallBack(t *testing.T) {
 		fm := filtermanager.NewMockIFilterManager(ctrl) //nolint:typecheck
 		c := cache.NewMockCacheInterface(ctrl)          //nolint:typecheck
 		c.EXPECT().GetIPsByNamespace(gomock.Any()).Return([]net.IP{}).AnyTimes()
+		c.EXPECT().GetPodByIP(gomock.Any()).Return(nil).AnyTimes()
+		c.EXPECT().GetAllNamespaces().Return([]string{}).AnyTimes()
 		fm.EXPECT().AddIPs([]net.IP{}, gomock.Any(), gomock.Any()).Return(nil).Times(1)
 		fm.EXPECT().HasIP(gomock.Any()).Return(tt.fmHasIP).AnyTimes()
 		if len(tt.addExpected) > 0 {
@@ -269,19 +271,20 @@ func TestPodCallBack(t *testing.T) {
 		}
 
 		me := &Module{
-			RWMutex:       &sync.RWMutex{},
-			l:             log.Logger().Named(string("MetricModule")),
-			pubsub:        p,
-			configs:       make([]*api.MetricsConfiguration, 0),
-			enricher:      e,
-			wg:            sync.WaitGroup{},
-			registry:      make(map[string]AdvMetricsInterface),
-			moduleCtx:     context.Background(),
-			filterManager: fm,
-			daemonCache:   c,
-			dirtyPods:     common.NewDirtyCache(),
-			pubsubPodSub:  "",
-			daemonConfig:  cfg,
+			RWMutex:            &sync.RWMutex{},
+			l:                  log.Logger().Named(string("MetricModule")),
+			pubsub:             p,
+			configs:            make([]*api.MetricsConfiguration, 0),
+			enricher:           e,
+			wg:                 sync.WaitGroup{},
+			registry:           make(map[string]AdvMetricsInterface),
+			moduleCtx:          context.Background(),
+			filterManager:      fm,
+			daemonCache:        c,
+			dirtyPods:          common.NewDirtyCache(),
+			ipMetadataTracking: make(map[string]metadataTrackingInfo),
+			pubsubPodSub:       "",
+			daemonConfig:       cfg,
 		}
 		assert.NotNil(t, me)
 		me.appendIncludeList(tt.includeNslist)
@@ -339,6 +342,7 @@ func TestModule_NamespaceAndPodUpdates(t *testing.T) {
 		filterManager:      fm,
 		daemonCache:        c,
 		dirtyPods:          common.NewDirtyCache(),
+		ipMetadataTracking: make(map[string]metadataTrackingInfo),
 		pubsubPodSub:       "",
 		daemonConfig:       cfg,
 		includedNamespaces: includedNs,

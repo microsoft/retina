@@ -22,6 +22,8 @@ type CacheInterface interface {
 	GetIPsByNamespace(ns string) []net.IP
 	// GetAnnotatedNamespaces returns list of namespaces that are annotated with retina to observe.
 	GetAnnotatedNamespaces() []string
+	// GetAllNamespaces returns all namespaces that have endpoints in the cache.
+	GetAllNamespaces() []string
 
 	// UpdateRetinaEndpoint updates the retina endpoint in the cache.
 	UpdateRetinaEndpoint(ep *common.RetinaEndpoint) error

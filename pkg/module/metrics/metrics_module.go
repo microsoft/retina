@@ -106,6 +106,11 @@ type Module struct {
 	// todo need metadata , not just net.ip (need new struct)
 	dirtyPods *common.DirtyCache
 
+	// ipMetadataTracking tracks which metadata type(s) were used when adding each IP
+	// Key: IP address string, Value: metadata tracking info
+	// This ensures DELETE uses the same metadata as ADD
+	ipMetadataTracking map[string]metadataTrackingInfo
+
 	// pubsub subscription uuid
 	pubsubPodSub string
 }
@@ -120,19 +125,20 @@ func InitModule(ctx context.Context,
 	// this is a thread-safe singleton instance of the metric module
 	once.Do(func() {
 		m = &Module{
-			RWMutex:       &sync.RWMutex{},
-			l:             log.Logger().Named(string("MetricModule")),
-			pubsub:        pubsub,
-			configs:       make([]*api.MetricsConfiguration, 0),
-			enricher:      enricher,
-			wg:            sync.WaitGroup{},
-			registry:      make(map[string]AdvMetricsInterface),
-			moduleCtx:     ctx,
-			filterManager: fm,
-			daemonCache:   cache,
-			dirtyPods:     common.NewDirtyCache(),
-			pubsubPodSub:  "",
-			daemonConfig:  conf,
+			RWMutex:            &sync.RWMutex{},
+			l:                  log.Logger().Named(string("MetricModule")),
+			pubsub:             pubsub,
+			configs:            make([]*api.MetricsConfiguration, 0),
+			enricher:           enricher,
+			wg:                 sync.WaitGroup{},
+			registry:           make(map[string]AdvMetricsInterface),
+			moduleCtx:          ctx,
+			filterManager:      fm,
+			daemonCache:        cache,
+			dirtyPods:          common.NewDirtyCache(),
+			ipMetadataTracking: make(map[string]metadataTrackingInfo),
+			pubsubPodSub:       "",
+			daemonConfig:       conf,
 		}
 	})
 
@@ -177,29 +183,26 @@ func (m *Module) Reconcile(spec *api.MetricsSpec) error {
 func (m *Module) updateNamespaceLists(spec *api.MetricsSpec) {
 	if len(spec.Namespaces.Include) > 0 && len(spec.Namespaces.Exclude) > 0 {
 		m.l.Error("Both included and excluded namespaces are specified. Cannot reconcile.")
+		return
 	}
 
-	if len(spec.Namespaces.Include) == 0 {
-		m.appendIncludeList([]string{})
-		m.appendExcludeList([]string{})
-	}
-
-	if len(spec.Namespaces.Exclude) == 0 {
-		m.appendIncludeList([]string{})
-		m.appendExcludeList([]string{})
-	}
-
+	// Handle include list
 	if len(spec.Namespaces.Include) > 0 {
 		m.l.Info("Including namespaces", zap.Strings("namespaces", spec.Namespaces.Include))
 		m.appendIncludeList(spec.Namespaces.Include)
+		m.appendExcludeList([]string{}) // Clear exclude list when using include
+	} else if len(spec.Namespaces.Exclude) > 0 {
+		// Handle exclude list
+		m.l.Info("Excluding namespaces", zap.Strings("namespaces", spec.Namespaces.Exclude))
+		m.appendExcludeList(spec.Namespaces.Exclude)
+		m.appendIncludeList([]string{}) // Clear include list when using exclude
+	} else {
+		// Neither include nor exclude specified - clear both
+		m.l.Info("No namespace filtering specified - clearing both include and exclude lists")
+		m.appendIncludeList([]string{})
 		m.appendExcludeList([]string{})
 	}
 
-	if len(spec.Namespaces.Exclude) > 0 {
-		m.l.Info("Excluding namespaces", zap.Strings("namespaces", spec.Namespaces.Exclude))
-		m.appendExcludeList(spec.Namespaces.Exclude)
-		m.appendIncludeList([]string{})
-	}
 }
 
 func (m *Module) updateMetricsContexts(spec *api.MetricsSpec) {
@@ -413,13 +416,52 @@ func (m *Module) appendIncludeList(namespaces []string) {
 	}
 }
 
-func (m *Module) appendExcludeList(ns []string) {
+func (m *Module) appendExcludeList(namespaces []string) {
 	if m.excludedNamespaces == nil {
 		m.excludedNamespaces = make(map[string]struct{})
 	}
 
-	// TODO here we will need to check for IP which
-	// needs to be added to filter manager and which needs to be removed
+	m.l.Info("Appending namespaces to exclude list", zap.Strings("namespaces", namespaces))
+
+	// Build new excluded namespaces map
+	tempNewNs := make(map[string]struct{})
+	for _, ns := range namespaces {
+		tempNewNs[ns] = struct{}{}
+	}
+
+	// Track if this is initial setup
+	isInitialSetup := len(m.excludedNamespaces) == 0 && len(tempNewNs) > 0
+
+	// Update the excluded namespaces map
+	m.excludedNamespaces = tempNewNs
+
+	// Log the exclude list for debugging
+	excludeList := make([]string, 0, len(m.excludedNamespaces))
+	for ns := range m.excludedNamespaces {
+		excludeList = append(excludeList, ns)
+	}
+	m.l.Info("Current excluded namespaces", zap.Strings("namespaces", excludeList), zap.Int("count", len(m.excludedNamespaces)))
+
+	// For initial setup, add IPs from ALL existing non-excluded namespaces
+	if isInitialSetup {
+		m.l.Info("Initial exclude list setup - adding IPs from all non-excluded namespaces")
+		allNamespaces := m.daemonCache.GetAllNamespaces()
+
+		for _, ns := range allNamespaces {
+			if _, excluded := m.excludedNamespaces[ns]; !excluded {
+				ips := m.daemonCache.GetIPsByNamespace(ns)
+				if len(ips) > 0 {
+					m.l.Info("Adding IPs to filter manager",
+						zap.String("namespace", ns),
+						zap.Int("ip_count", len(ips)))
+					err := m.filterManager.AddIPs(ips, metricModuleReq, moduleReqMetadata)
+					if err != nil {
+						m.l.Error("Error adding IPs to filter manager", zap.Error(err))
+					}
+				}
+			}
+		}
+	}
 }
 
 func (m *Module) PodCallBackFn(obj interface{}) {
@@ -440,7 +482,10 @@ func (m *Module) PodCallBackFn(obj interface{}) {
 	}
 
 	m.Lock()
-	if !m.nsOfInterest(pod.Namespace()) && !m.podOfInterest(ip, pod.Annotations()) {
+	nsInterest := m.nsOfInterest(pod.Namespace())
+	podInterest := m.podOfInterest(ip, pod.Annotations())
+
+	if !nsInterest && !podInterest {
 		m.Unlock()
 		return
 	}
@@ -459,22 +504,35 @@ func handlePodEvent(event *cache.CacheEvent, m *Module, pod *common.RetinaEndpoi
 		Annotated:  m.podAnnotated(pod.Annotations()),
 		Namespaced: m.nsOfInterest(pod.Namespace()),
 	}
+
 	switch event.Type {
 	case cache.EventTypePodAdded:
 		// Pod is not annotated NOR is it namespaced (in crd or annotated).
 		// This means that we have the stale pod ip in the filtermap so we should remove it.
-		// This case should only occur when the pod annotation is removed since this is an EventTypePodAdded (also accounts for pod update)
+		// This case handles IP reuse - when an IP is reassigned to a pod that's not of interest.
+		// FIX: Don't force flags - let the tracking system use the correct metadata from ADD time
 		if !podCacheEntry.Annotated && !podCacheEntry.Namespaced {
 			m.l.Info("Adding pod IP to DELETE dirty pods cache. Pod not annotated or in namespace of interest.", zap.String("pod name", pod.NamespacedName()))
-			podCacheEntry.Annotated = true
-			m.dirtyPods.ToDelete(ip.String(), podCacheEntry)
+			ipKey := ip.String()
+			// Don't force flags - the DELETE will use tracked metadata
+			m.dirtyPods.ToDelete(ipKey, podCacheEntry)
 			return
 		}
 		m.l.Info("Adding pod IP to ADD dirty pods cache", zap.String("pod name", pod.NamespacedName()))
 		m.dirtyPods.ToAdd(podCacheEntry.IP.String(), podCacheEntry)
 	case cache.EventTypePodDeleted:
+		// Verify the pod is actually gone from the cache before deleting from filter
+		// This prevents spurious DELETE events during startup from removing valid pods
+		if endpoint := m.daemonCache.GetPodByIP(ip.String()); endpoint != nil {
+			m.l.Info("Ignoring DELETE event - pod still exists in cache",
+				zap.String("pod", pod.NamespacedName()),
+				zap.String("ip", ip.String()))
+			return
+		}
+
+		ipKey := ip.String()
 		m.l.Info("Adding pod IP to DELETE dirty pods cache", zap.String("pod name", pod.NamespacedName()))
-		m.dirtyPods.ToDelete(ip.String(), podCacheEntry)
+		m.dirtyPods.ToDelete(ipKey, podCacheEntry)
 	default:
 		m.l.Warn("Unknown cache event type", zap.Any("event", event))
 		return
@@ -514,6 +572,14 @@ func (m *Module) applyDirtyPodsAdd() {
 			err := m.filterManager.AddIPs(podsToAdd, metricModuleReq, modulePodReqMetadata)
 			if err != nil {
 				m.l.Error("Error adding pod IP to filter manager", zap.Error(err))
+			} else {
+				// Track that these IPs were added with pod metadata
+				for _, ip := range podsToAdd {
+					ipKey := ip.String()
+					tracking := m.ipMetadataTracking[ipKey]
+					tracking.addedWithPodMetadata = true
+					m.ipMetadataTracking[ipKey] = tracking
+				}
 			}
 		}
 		if len(podsToAddNamespaced) > 0 {
@@ -521,6 +587,14 @@ func (m *Module) applyDirtyPodsAdd() {
 			err := m.filterManager.AddIPs(podsToAddNamespaced, metricModuleReq, moduleReqMetadata)
 			if err != nil {
 				m.l.Error("Error adding pod IP to filter manager", zap.Error(err))
+			} else {
+				// Track that these IPs were added with namespace metadata
+				for _, ip := range podsToAddNamespaced {
+					ipKey := ip.String()
+					tracking := m.ipMetadataTracking[ipKey]
+					tracking.addedWithNamespaceMetadata = true
+					m.ipMetadataTracking[ipKey] = tracking
+				}
 			}
 		}
 	}
@@ -535,11 +609,29 @@ func (m *Module) applyDirtyPodsDelete() {
 		namespaceOfInterestDeleteList := make([]net.IP, 0)
 		for _, entry := range deletes {
 			podEntry := entry.(DirtyCachePod)
-			if podEntry.Annotated {
-				podOfInterestDeleteList = append(podOfInterestDeleteList, podEntry.IP)
-			}
-			if podEntry.Namespaced {
-				namespaceOfInterestDeleteList = append(namespaceOfInterestDeleteList, podEntry.IP)
+			ipKey := podEntry.IP.String()
+
+			// Use tracked metadata from ADD time, not current flags
+			tracking, exists := m.ipMetadataTracking[ipKey]
+
+			if !exists {
+				m.l.Warn("No metadata tracking info found for IP, using current flags",
+					zap.String("ip", ipKey))
+				// Fallback to current flags if no tracking info
+				if podEntry.Annotated {
+					podOfInterestDeleteList = append(podOfInterestDeleteList, podEntry.IP)
+				}
+				if podEntry.Namespaced {
+					namespaceOfInterestDeleteList = append(namespaceOfInterestDeleteList, podEntry.IP)
+				}
+			} else {
+				// Use tracked metadata from ADD time
+				if tracking.addedWithPodMetadata {
+					podOfInterestDeleteList = append(podOfInterestDeleteList, podEntry.IP)
+				}
+				if tracking.addedWithNamespaceMetadata {
+					namespaceOfInterestDeleteList = append(namespaceOfInterestDeleteList, podEntry.IP)
+				}
 			}
 		}
 
@@ -548,6 +640,14 @@ func (m *Module) applyDirtyPodsDelete() {
 			err := m.filterManager.DeleteIPs(podOfInterestDeleteList, metricModuleReq, modulePodReqMetadata)
 			if err != nil {
 				m.l.Error("Error deleting pod IP from filter manager", zap.Error(err))
+			} else {
+				// Clear pod metadata tracking after successful delete
+				for _, ip := range podOfInterestDeleteList {
+					ipKey := ip.String()
+					tracking := m.ipMetadataTracking[ipKey]
+					tracking.addedWithPodMetadata = false
+					m.ipMetadataTracking[ipKey] = tracking
+				}
 			}
 		}
 		if len(namespaceOfInterestDeleteList) > 0 {
@@ -555,6 +655,24 @@ func (m *Module) applyDirtyPodsDelete() {
 			err := m.filterManager.DeleteIPs(namespaceOfInterestDeleteList, metricModuleReq, moduleReqMetadata)
 			if err != nil {
 				m.l.Error("Error deleting pod IP from filter manager", zap.Error(err))
+			} else {
+				// Clear namespace metadata tracking after successful delete
+				for _, ip := range namespaceOfInterestDeleteList {
+					ipKey := ip.String()
+					tracking := m.ipMetadataTracking[ipKey]
+					tracking.addedWithNamespaceMetadata = false
+					m.ipMetadataTracking[ipKey] = tracking
+				}
+			}
+		}
+
+		// Clean up tracking map for IPs that have no metadata left
+		for _, entry := range deletes {
+			ipKey := entry.(DirtyCachePod).IP.String()
+			if tracking, exists := m.ipMetadataTracking[ipKey]; exists {
+				if !tracking.addedWithPodMetadata && !tracking.addedWithNamespaceMetadata {
+					delete(m.ipMetadataTracking, ipKey)
+				}
 			}
 		}
 	}
@@ -566,20 +684,14 @@ func (m *Module) applyDirtyPodsDelete() {
 // included namespaces can be defined by crd or automatically applied by annotated namespaces.
 func (m *Module) nsOfInterest(ns string) bool {
 	if len(m.includedNamespaces) > 0 {
-		if _, ok := m.includedNamespaces[ns]; ok {
-			return true
-		}
-		return false
+		_, ok := m.includedNamespaces[ns]
+		return ok
+	} else if len(m.excludedNamespaces) > 0 {
+		_, ok := m.excludedNamespaces[ns]
+		return !ok
 	}
-
-	if len(m.excludedNamespaces) > 0 {
-		if _, ok := m.excludedNamespaces[ns]; ok {
-			return false
-		}
-		return true
-	}
-
-	return false
+	// No filtering specified - track everything by default
+	return true
 }
 
 func (m *Module) podAnnotated(annotations map[string]string) bool {
