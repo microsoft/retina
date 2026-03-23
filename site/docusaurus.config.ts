@@ -29,6 +29,17 @@ const config = {
   plugins: [
     "docusaurus-lunr-search",
     [
+      "@docusaurus/plugin-client-redirects",
+      {
+        redirects: [
+          {
+            from: ["/docs/intro", "/intro"],
+            to: "/docs/Introduction/intro",
+          },
+        ],
+      },
+    ],
+    [
       "@docusaurus/plugin-ideal-image",
       {
         quality: 70,

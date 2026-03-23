@@ -144,6 +144,11 @@ func (dr *dropReason) Init() error {
 		return err
 	}
 
+	// Override filter map max entries to match the configured size from init container.
+	if mapSpec, ok := spec.Maps[plugincommon.FilterMapName]; ok && dr.cfg.FilterMapMaxEntries > 0 {
+		mapSpec.MaxEntries = dr.cfg.FilterMapMaxEntries
+	}
+
 	// TODO remove the opts
 	if err := spec.LoadAndAssign(objs, &ebpf.CollectionOptions{
 		Programs: ebpf.ProgramOptions{

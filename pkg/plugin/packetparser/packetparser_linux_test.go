@@ -97,7 +97,7 @@ func TestCleanAll(t *testing.T) {
 	}
 	assert.Nil(t, p.cleanAll())
 
-	p.tcMap = &sync.Map{}
+	p.attachmentMap = &sync.Map{}
 	assert.Nil(t, p.cleanAll())
 
 	ctrl := gomock.NewController(t)
@@ -114,13 +114,13 @@ func TestCleanAll(t *testing.T) {
 		return mq
 	}
 
-	p.tcMap.Store(tcKey{"test", "test", 1}, &tcValue{mrtnl, &tc.Object{}})
-	p.tcMap.Store(tcKey{"test2", "test2", 2}, &tcValue{mrtnl, &tc.Object{}})
+	p.attachmentMap.Store(attachmentKey{"test", "test", 1}, &attachmentValue{tc: mrtnl, qdisc: &tc.Object{}})
+	p.attachmentMap.Store(attachmentKey{"test2", "test2", 2}, &attachmentValue{tc: mrtnl, qdisc: &tc.Object{}})
 
 	assert.Nil(t, p.cleanAll())
 
 	keyCount := 0
-	p.tcMap.Range(func(k, v interface{}) bool {
+	p.attachmentMap.Range(func(_ interface{}, _ interface{}) bool {
 		keyCount++
 		return true
 	})
@@ -196,7 +196,7 @@ func TestEndpointWatcherCallbackFn_EndpointDeleted(t *testing.T) {
 		cfg:              cfgPodLevelEnabled,
 		l:                log.Logger().Named("test"),
 		interfaceLockMap: &sync.Map{},
-		tcMap:            &sync.Map{},
+		attachmentMap:    &sync.Map{},
 	}
 
 	// Create test interface attributes.
@@ -209,7 +209,7 @@ func TestEndpointWatcherCallbackFn_EndpointDeleted(t *testing.T) {
 
 	// Pre-populate both maps to simulate existing interface
 	p.interfaceLockMap.Store(key, &sync.Mutex{})
-	p.tcMap.Store(key, &tcValue{nil, &tc.Object{}})
+	p.attachmentMap.Store(key, &attachmentValue{tc: nil, qdisc: &tc.Object{}})
 
 	// Create EndpointDeleted event.
 	e := &endpoint.EndpointEvent{
@@ -221,11 +221,10 @@ func TestEndpointWatcherCallbackFn_EndpointDeleted(t *testing.T) {
 	p.endpointWatcherCallbackFn(e)
 
 	// Verify both maps are cleaned up.
-	_, tcMapExists := p.tcMap.Load(key)
+	_, attachmentMapExists := p.attachmentMap.Load(key)
 	_, lockMapExists := p.interfaceLockMap.Load(key)
 
-	// Assert both maps are cleaned up
-	assert.False(t, tcMapExists, "tcMap entry should be deleted")
+	assert.False(t, attachmentMapExists, "attachmentMap entry should be deleted")
 	assert.False(t, lockMapExists, "interfaceLockMap entry should be deleted")
 }
 
@@ -256,7 +255,7 @@ func TestCreateQdiscAndAttach(t *testing.T) {
 		return mrtnl, nil
 	}
 
-	getFD = func(e *ebpf.Program) int {
+	getFD = func(_ *ebpf.Program) int {
 		return 1
 	}
 
@@ -281,7 +280,7 @@ func TestCreateQdiscAndAttach(t *testing.T) {
 		hostEgressInfo: &ebpf.ProgramInfo{
 			Name: "egress",
 		},
-		tcMap: &sync.Map{},
+		attachmentMap: &sync.Map{},
 	}
 	linkAttr := netlink.LinkAttrs{
 		Name:         "test",
@@ -292,7 +291,7 @@ func TestCreateQdiscAndAttach(t *testing.T) {
 	p.createQdiscAndAttach(linkAttr, Veth)
 
 	key := ifaceToKey(linkAttr)
-	_, ok := p.tcMap.Load(key)
+	_, ok := p.attachmentMap.Load(key)
 	assert.True(t, ok)
 
 	pObj.HostIngressFilter = &ebpf.Program{}
@@ -306,7 +305,7 @@ func TestCreateQdiscAndAttach(t *testing.T) {
 	p.createQdiscAndAttach(linkAttr2, Device)
 
 	key = ifaceToKey(linkAttr2)
-	_, ok = p.tcMap.Load(key)
+	_, ok = p.attachmentMap.Load(key)
 	assert.True(t, ok)
 }
 
@@ -476,7 +475,7 @@ func TestStartWithDataAggregationLevelLow(t *testing.T) {
 		hostEgressInfo: &ebpf.ProgramInfo{
 			Name: "egress",
 		},
-		tcMap: &sync.Map{},
+		attachmentMap: &sync.Map{},
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
@@ -555,7 +554,7 @@ func TestStartWithDataAggregationLevelHigh(t *testing.T) {
 		hostEgressInfo: &ebpf.ProgramInfo{
 			Name: "egress",
 		},
-		tcMap: &sync.Map{},
+		attachmentMap: &sync.Map{},
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()

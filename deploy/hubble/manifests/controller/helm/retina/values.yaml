@@ -101,9 +101,16 @@ logLevel: info
 enabledPlugin_linux: '["linuxutil","packetforward","packetparser","dns", "dropreason"]'
 enabledPlugin_win: '["hnsstats"]'
 
+# TCX Support
+# Supported Values: "auto", "off"
+# Default: auto
+enableTCX: "auto"
+
 enableTelemetry: false
 
 # Interval, in duration, to scrape/publish metrics.
+# Default when unset or invalid (used by pluginmanager and all plugins).
+metricsInterval: "10s"
 metricsIntervalDuration: "10s"
 
 azure:

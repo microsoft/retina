@@ -5,6 +5,10 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build-linux:
     name: Build Linux Kapinger Image (${{ matrix.arch }})

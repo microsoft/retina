@@ -58,7 +58,7 @@ func run(args ...string) error {
 	}
 
 	// Setup BPF
-	err = bpf.Setup(l)
+	err = bpf.Setup(l, cfg.FilterMapMaxEntries)
 	if err != nil {
 		return errors.Wrap(err, "failed to setup Retina bpf filesystem")
 	}
