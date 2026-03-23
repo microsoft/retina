@@ -3,9 +3,10 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"time"
+
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
 const (
@@ -20,7 +21,7 @@ type ValidateHTTPResponse struct {
 func (v *ValidateHTTPResponse) String() string { return "validate-http-response" }
 
 func (v *ValidateHTTPResponse) Do(ctx context.Context) error {
-	log := slog.With("step", v.String())
+	ctx, log := utils.StepLogger(ctx, v)
 	ctx, cancel := context.WithTimeout(ctx, RequestTimeout)
 	defer cancel()
 

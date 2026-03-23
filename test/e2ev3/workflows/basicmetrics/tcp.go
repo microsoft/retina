@@ -13,7 +13,6 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/config"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
-	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"k8s.io/client-go/rest"
 )
 
@@ -41,7 +40,7 @@ func addTCPScenario(restConfig *rest.Config, namespace, arch string) *flow.Workf
 	}
 	validateState := &ValidateRetinaTCPStateStep{PortForwardedRetinaPort: "10093"}
 	validateRemote := &ValidateRetinaTCPConnectionRemoteStep{PortForwardedRetinaPort: "10093"}
-	validateWithPF := &utils.WithPortForward{
+	validateWithPF := &k8s.WithPortForward{
 		PF: &k8s.PortForward{
 			Namespace: config.KubeSystemNamespace, LabelSelector: "k8s-app=retina",
 			LocalPort: "10093", RemotePort: "10093", Endpoint: "metrics",
@@ -59,9 +58,9 @@ func addTCPScenario(restConfig *rest.Config, namespace, arch string) *flow.Workf
 	wf.Add(
 		flow.BatchPipe(
 			flow.Pipe(createKapinger, createAgnhost, waitKapinger, execCurl1, execCurl2).
-				Timeout(utils.DefaultScenarioTimeout),
+				Timeout(k8s.DefaultScenarioTimeout),
 			flow.Steps(validateWithPF).
-				Retry(utils.RetryWithBackoff),
+				Retry(k8s.RetryWithBackoff),
 			flow.Pipe(deleteAgnhost, deleteKapinger).
 				When(flow.Always),
 		),

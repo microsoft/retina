@@ -8,11 +8,12 @@ package capture
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
 const (
@@ -27,7 +28,7 @@ type InstallRetinaPluginStep struct{}
 func (i *InstallRetinaPluginStep) String() string { return "install-retina-plugin" }
 
 func (i *InstallRetinaPluginStep) Do(ctx context.Context) error {
-	log := slog.With("step", i.String())
+	ctx, log := utils.StepLogger(ctx, i)
 	log.Info("building kubectl-retina plugin")
 
 	if err := os.MkdirAll(InstallRetinaBinaryDir, 0o755); err != nil {

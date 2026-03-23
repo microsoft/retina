@@ -12,7 +12,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/microsoft/retina/test/e2ev3/pkg/stepname"
 )
 
 // These mock types simulate the real e2e call stack:
@@ -39,7 +38,7 @@ func (w *Workflow) Do() {
 	}
 	// Real workflows create a logger and pass it to scenarios — they
 	// don't log directly. This matches basicmetrics.Workflow.Do().
-	log := slog.Default().With("workflow", stepname.StepName(w))
+	log := slog.Default().With("workflow", StepName(w))
 
 	// Simulate passing logger to scenario.
 	s := &MockScenario{log: log}
@@ -70,7 +69,7 @@ func (pf *MockPortForward) Do() {
 	if log == nil {
 		log = slog.Default()
 	}
-	log = log.With("step", stepname.StepName(pf))
+	log = log.With("step", StepName(pf))
 	log.Info("finding pod with affinity", "label", "k8s-app=retina")
 	log.Info("attempting port forward", "pod", "retina-agent-abc", "namespace", "kube-system")
 	log.Info("port forward validation succeeded", "address", "http://localhost:10093")
@@ -326,7 +325,7 @@ func TestHandlerFormat_NoPrefix(t *testing.T) {
 func TestStepName_GenericTypes(t *testing.T) {
 	// Verify that generic type "Workflow" resolves to package name, not "workflow".
 	w := &Workflow{}
-	name := stepname.StepName(w)
+	name := StepName(w)
 	// In this test file (package utils), it should be "utils".
 	if name != "utils" {
 		t.Errorf("StepName(*Workflow) = %q, want %q", name, "utils")
@@ -334,13 +333,13 @@ func TestStepName_GenericTypes(t *testing.T) {
 
 	// Non-generic types keep their own name.
 	pf := &MockPortForward{}
-	name = stepname.StepName(pf)
+	name = StepName(pf)
 	if name != "mock-port-forward" {
 		t.Errorf("StepName(*MockPortForward) = %q, want %q", name, "mock-port-forward")
 	}
 
 	mcd := &MockCallerDetected{}
-	name = stepname.StepName(mcd)
+	name = StepName(mcd)
 	if name != "mock-caller-detected" {
 		t.Errorf("StepName(*MockCallerDetected) = %q, want %q", name, "mock-caller-detected")
 	}

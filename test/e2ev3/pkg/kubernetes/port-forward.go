@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
+
 	retry "github.com/microsoft/retina/test/retry"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,7 +48,7 @@ type PortForward struct {
 func (p *PortForward) String() string { return "port-forward" }
 
 func (p *PortForward) Do(ctx context.Context) error {
-	log := slog.With("step", p.String())
+	ctx, log := utils.StepLogger(ctx, p)
 	lport, _ := strconv.Atoi(p.LocalPort)
 	rport, _ := strconv.Atoi(p.RemotePort)
 

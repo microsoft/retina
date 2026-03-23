@@ -71,7 +71,7 @@ func (w *Workflow) Do(ctx context.Context) error {
 		IgnoreContainerRestart: false,
 	}
 
-	debug := &utils.DebugOnFailure{
+	debug := &k8s.DebugOnFailure{
 		RestConfig:    restConfig,
 		Namespace:     config.KubeSystemNamespace,
 		LabelSelector: "k8s-app=retina",

@@ -5,6 +5,8 @@ import (
 	"io"
 	"log/slog"
 
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -18,7 +20,7 @@ type GetPodLogs struct {
 }
 
 func (p *GetPodLogs) Do(ctx context.Context) error {
-	log := slog.Default()
+	ctx, log := utils.StepLogger(ctx, p)
 
 	log.Info("printing pod logs", "namespace", p.Namespace, "labelselector", p.LabelSelector)
 

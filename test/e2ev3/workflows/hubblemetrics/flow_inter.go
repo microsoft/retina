@@ -10,7 +10,6 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/config"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
-	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"k8s.io/client-go/rest"
 )
 
@@ -51,7 +50,7 @@ func addHubbleFlowInterNodeScenario(restConfig *rest.Config, arch string) *flow.
 		ForwardedPort: "9966", MetricName: config.HubbleFlowMetricName,
 		ValidMetrics: validDstLabels, ExpectMetric: true,
 	}
-	validateWithPF := &utils.WithPortForward{
+	validateWithPF := &k8s.WithPortForward{
 		PF: &k8s.PortForward{
 			LabelSelector: "k8s-app=retina", LocalPort: config.HubbleMetricsPort, RemotePort: config.HubbleMetricsPort,
 			Namespace: config.KubeSystemNamespace, Endpoint: config.MetricsEndpoint, RestConfig: restConfig, OptionalLabelAffinity: "app=" + podnameSrc,
@@ -59,7 +58,7 @@ func addHubbleFlowInterNodeScenario(restConfig *rest.Config, arch string) *flow.
 		Steps: []flow.Steper{
 			curlPod,
 			validateSrc,
-			&utils.WithPortForward{
+			&k8s.WithPortForward{
 				PF: &k8s.PortForward{
 					LabelSelector: "k8s-app=retina", LocalPort: "9966", RemotePort: config.HubbleMetricsPort,
 					Namespace: config.KubeSystemNamespace, Endpoint: config.MetricsEndpoint, RestConfig: restConfig, OptionalLabelAffinity: "app=" + podnameDst,
@@ -81,10 +80,10 @@ func addHubbleFlowInterNodeScenario(restConfig *rest.Config, arch string) *flow.
 		flow.BatchPipe(
 			// Setup: provision resources.
 			flow.Pipe(createSrc, createDst).
-				Timeout(utils.DefaultScenarioTimeout),
+				Timeout(k8s.DefaultScenarioTimeout),
 			// Validate: generate traffic and check metrics, retry with backoff.
 			flow.Steps(validateWithPF).
-				Retry(utils.RetryWithBackoff),
+				Retry(k8s.RetryWithBackoff),
 			// Cleanup: always runs, even if validation fails.
 			flow.Pipe(deleteSrc, deleteDst).
 				When(flow.Always),

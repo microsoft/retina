@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/microsoft/retina/test/e2ev3/pkg/stepname"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"sigs.k8s.io/kind/pkg/cluster"
 )
 
@@ -24,7 +24,7 @@ type ExportKubeConfig struct {
 func (e *ExportKubeConfig) String() string { return "export-kind-kubeconfig" }
 
 func (e *ExportKubeConfig) Do(ctx context.Context) error {
-	_, log := stepname.StepLogger(ctx, e)
+	ctx, log := utils.StepLogger(ctx, e)
 	log.Info("exporting kubeconfig for Kind cluster", "cluster", e.ClusterName, "path", e.KubeConfigFilePath)
 
 	provider := cluster.NewProvider()

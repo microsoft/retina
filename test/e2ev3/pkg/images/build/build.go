@@ -27,7 +27,7 @@ type Step struct {
 func (b *Step) String() string { return "build-images" }
 
 func (b *Step) Do(ctx context.Context) error {
-	log := slog.With("step", b.String())
+	ctx, log := utils.StepLogger(ctx, b)
 	img := &b.Cfg.Image
 	if !*config.ForceBuild && allImagesExist(img.Registry, img.Namespace, img.Tag) {
 		log.Info("all images already present locally, skipping build")

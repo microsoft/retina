@@ -13,7 +13,6 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/config"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
-	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"k8s.io/client-go/rest"
 )
 
@@ -28,14 +27,14 @@ func addDropScenario(restConfig *rest.Config, namespace, arch string) *flow.Work
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
 		AgnhostNamespace: namespace, AgnhostName: agnhostName, AgnhostArch: arch, RestConfig: restConfig,
 	}
-	execCurl1 := utils.CurlExpectFail("drop-curl-1-"+arch, &k8s.ExecInPod{
+	execCurl1 := k8s.CurlExpectFail("drop-curl-1-"+arch, &k8s.ExecInPod{
 		PodNamespace: namespace, PodName: podName, Command: "curl -s -m 5 bing.com", RestConfig: restConfig,
 	})
-	execCurl2 := utils.CurlExpectFail("drop-curl-2-"+arch, &k8s.ExecInPod{
+	execCurl2 := k8s.CurlExpectFail("drop-curl-2-"+arch, &k8s.ExecInPod{
 		PodNamespace: namespace, PodName: podName, Command: "curl -s -m 5 bing.com", RestConfig: restConfig,
 	})
 	validateDrop := &ValidateRetinaDropMetricStep{PortForwardedRetinaPort: "10093", Direction: "unknown", Reason: IPTableRuleDrop}
-	validateWithPF := &utils.WithPortForward{
+	validateWithPF := &k8s.WithPortForward{
 		PF: &k8s.PortForward{
 			Namespace: config.KubeSystemNamespace, LabelSelector: "k8s-app=retina",
 			LocalPort: "10093", RemotePort: "10093", Endpoint: "metrics",
@@ -53,9 +52,9 @@ func addDropScenario(restConfig *rest.Config, namespace, arch string) *flow.Work
 	wf.Add(
 		flow.BatchPipe(
 			flow.Pipe(createNetPol, createAgnhost, execCurl1, execCurl2).
-				Timeout(utils.DefaultScenarioTimeout),
+				Timeout(k8s.DefaultScenarioTimeout),
 			flow.Steps(validateWithPF).
-				Retry(utils.RetryWithBackoff),
+				Retry(k8s.RetryWithBackoff),
 			flow.Pipe(deleteNetPol, deleteAgnhost).
 				When(flow.Always),
 		),

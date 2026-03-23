@@ -6,15 +6,16 @@
 package hubblemetrics
 
 import (
-	"k8s.io/client-go/rest"
 	"context"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"time"
 
+	"k8s.io/client-go/rest"
+
 	flow "github.com/Azure/go-workflow"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
 func addHubbleRelayValidation(restConfig *rest.Config) *flow.Workflow {
@@ -61,7 +62,7 @@ type ValidateHubbleUIServiceStep struct {
 func (v *ValidateHubbleUIServiceStep) String() string { return "validate-hubble-ui-service" }
 
 func (v *ValidateHubbleUIServiceStep) Do(ctx context.Context) error {
-	log := slog.With("step", v.String())
+	ctx, log := utils.StepLogger(ctx, v)
 	validateStep := &k8s.ValidateResource{
 		ResourceName:      k8s.HubbleUIApp,
 		ResourceNamespace: k8s.HubbleNamespace,

@@ -10,7 +10,6 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/config"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
-	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"k8s.io/client-go/rest"
 )
 
@@ -34,7 +33,7 @@ func addAdvancedForwardScenario(restConfig *rest.Config, namespace, arch string)
 		ForwardedPort: config.RetinaMetricsPort, MetricName: "networkobservability_adv_forward_bytes",
 		ValidMetrics: []map[string]string{{}}, ExpectMetric: true, PartialMatch: true,
 	}
-	validateWithPF := &utils.WithPortForward{
+	validateWithPF := &k8s.WithPortForward{
 		PF: &k8s.PortForward{
 			Namespace: config.KubeSystemNamespace, LabelSelector: "k8s-app=retina",
 			LocalPort: config.RetinaMetricsPort, RemotePort: config.RetinaMetricsPort,
@@ -50,9 +49,9 @@ func addAdvancedForwardScenario(restConfig *rest.Config, namespace, arch string)
 	wf.Add(
 		flow.BatchPipe(
 			// Setup: provision resources and generate traffic.
-			flow.Pipe(createAgnhost, execCurl).Timeout(utils.DefaultScenarioTimeout),
+			flow.Pipe(createAgnhost, execCurl).Timeout(k8s.DefaultScenarioTimeout),
 			// Validate: retry with exponential backoff until metrics appear.
-			flow.Steps(validateWithPF).Retry(utils.RetryWithBackoff),
+			flow.Steps(validateWithPF).Retry(k8s.RetryWithBackoff),
 			// Cleanup: always runs, even if validation fails.
 			flow.Pipe(deleteAgnhost).When(flow.Always),
 		),

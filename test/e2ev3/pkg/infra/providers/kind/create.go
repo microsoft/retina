@@ -7,7 +7,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/microsoft/retina/test/e2ev3/pkg/stepname"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"sigs.k8s.io/kind/pkg/cluster"
 )
 
@@ -20,7 +20,7 @@ type CreateCluster struct {
 func (c *CreateCluster) String() string { return "create-kind-cluster" }
 
 func (c *CreateCluster) Do(ctx context.Context) error {
-	_, log := stepname.StepLogger(ctx, c)
+	ctx, log := utils.StepLogger(ctx, c)
 	provider := cluster.NewProvider()
 
 	clusters, err := provider.List()

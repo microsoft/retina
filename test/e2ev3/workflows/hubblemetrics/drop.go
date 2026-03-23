@@ -10,7 +10,6 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/config"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
-	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"k8s.io/client-go/rest"
 )
 
@@ -28,7 +27,7 @@ func addHubbleDropScenario(restConfig *rest.Config, arch string) *flow.Workflow 
 		AgnhostName: agnhostName, AgnhostNamespace: config.TestPodNamespace,
 		AgnhostArch: arch, RestConfig: restConfig,
 	}
-	execCurl := utils.CurlExpectFail("hubble-drop-curl-"+arch, &k8s.ExecInPod{
+	execCurl := k8s.CurlExpectFail("hubble-drop-curl-"+arch, &k8s.ExecInPod{
 		PodName: podName, PodNamespace: config.TestPodNamespace,
 		Command: "curl -s -m 5 bing.com", RestConfig: restConfig,
 	})
@@ -40,7 +39,7 @@ func addHubbleDropScenario(restConfig *rest.Config, arch string) *flow.Workflow 
 		ForwardedPort: config.HubbleMetricsPort, MetricName: config.HubbleDropMetricName,
 		ValidMetrics: []map[string]string{ValidHubbleDropMetricLabels}, ExpectMetric: true, PartialMatch: true,
 	}
-	validateWithPF := &utils.WithPortForward{
+	validateWithPF := &k8s.WithPortForward{
 		PF: &k8s.PortForward{
 			LabelSelector: "k8s-app=retina", LocalPort: config.RetinaMetricsPort, RemotePort: config.RetinaMetricsPort,
 			Namespace: config.KubeSystemNamespace, Endpoint: config.MetricsEndpoint, RestConfig: restConfig, OptionalLabelAffinity: "app=" + agnhostName,
@@ -48,7 +47,7 @@ func addHubbleDropScenario(restConfig *rest.Config, arch string) *flow.Workflow 
 		Steps: []flow.Steper{
 			execCurl,
 			validateRetinaDrop,
-			&utils.WithPortForward{
+			&k8s.WithPortForward{
 				PF: &k8s.PortForward{
 					LabelSelector: "k8s-app=retina", LocalPort: config.HubbleMetricsPort, RemotePort: config.HubbleMetricsPort,
 					Namespace: config.KubeSystemNamespace, Endpoint: config.MetricsEndpoint, RestConfig: restConfig, OptionalLabelAffinity: "app=" + agnhostName,
@@ -70,10 +69,10 @@ func addHubbleDropScenario(restConfig *rest.Config, arch string) *flow.Workflow 
 		flow.BatchPipe(
 			// Setup: provision resources.
 			flow.Pipe(createNetPol, createAgnhost).
-				Timeout(utils.DefaultScenarioTimeout),
+				Timeout(k8s.DefaultScenarioTimeout),
 			// Validate: generate traffic and check metrics, retry with backoff.
 			flow.Steps(validateWithPF).
-				Retry(utils.RetryWithBackoff),
+				Retry(k8s.RetryWithBackoff),
 			// Cleanup: always runs, even if validation fails.
 			flow.Pipe(deleteNetPol, deleteAgnhost).
 				When(flow.Always),

@@ -13,7 +13,6 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/config"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
-	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
 func addConntrackScenario(restConfig *rest.Config, namespace, arch string) *flow.Workflow {
@@ -49,7 +48,7 @@ func addConntrackScenario(restConfig *rest.Config, namespace, arch string) *flow
 		})
 	}
 
-	validateWithPF := &utils.WithPortForward{
+	validateWithPF := &k8s.WithPortForward{
 		PF: &k8s.PortForward{
 			Namespace: config.KubeSystemNamespace, LabelSelector: "k8s-app=retina",
 			LocalPort: config.RetinaMetricsPort, RemotePort: config.RetinaMetricsPort,
@@ -66,10 +65,10 @@ func addConntrackScenario(restConfig *rest.Config, namespace, arch string) *flow
 		flow.BatchPipe(
 			// Setup: provision resources and generate traffic.
 			flow.Pipe(createAgnhost, execCurl1, execCurl2).
-				Timeout(utils.DefaultScenarioTimeout),
+				Timeout(k8s.DefaultScenarioTimeout),
 			// Validate: retry with exponential backoff until metrics appear.
 			flow.Steps(validateWithPF).
-				Retry(utils.RetryWithBackoff),
+				Retry(k8s.RetryWithBackoff),
 			// Cleanup: always runs, even if validation fails.
 			flow.Pipe(deleteAgnhost).
 				When(flow.Always),

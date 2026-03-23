@@ -3,12 +3,12 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 	"time"
 
 	e2ecfg "github.com/microsoft/retina/test/e2ev3/config"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/cli"
@@ -40,6 +40,7 @@ type InstallHelmChart struct {
 }
 
 func (i *InstallHelmChart) Do(ctx context.Context) error {
+	ctx, log := utils.StepLogger(ctx, i)
 	// Prevalidation: check chart path and tag env
 	_, err := os.Stat(i.ChartPath)
 	if os.IsNotExist(err) {
@@ -47,10 +48,10 @@ func (i *InstallHelmChart) Do(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to get current working directory %s: %w", cwd, err)
 		}
-		log.Printf("the current working directory %s", cwd)
+		log.Info("current working directory", "cwd", cwd)
 		return fmt.Errorf("directory not found at %s:  working directory: %s: %w", i.ChartPath, cwd, errDirectoryNotFound)
 	}
-	log.Printf("found chart at %s", i.ChartPath)
+	log.Info("found chart", "path", i.ChartPath)
 
 	if i.ImageTag == "" {
 		return fmt.Errorf("image tag is not set: %w", errEmpty)
@@ -72,7 +73,7 @@ func (i *InstallHelmChart) Do(ctx context.Context) error {
 	settings.KubeConfig = i.KubeConfigFilePath
 	actionConfig := new(action.Configuration)
 
-	err = actionConfig.Init(settings.RESTClientGetter(), i.Namespace, i.HelmDriver, log.Printf)
+	err = actionConfig.Init(settings.RESTClientGetter(), i.Namespace, i.HelmDriver, func(format string, v ...any) { log.Info(fmt.Sprintf(format, v...)) })
 	if err != nil {
 		return fmt.Errorf("failed to initialize helm action config: %w", err)
 	}
@@ -119,7 +120,7 @@ func (i *InstallHelmChart) Do(ctx context.Context) error {
 	getclient := action.NewGet(actionConfig)
 	release, err := getclient.Run(i.ReleaseName)
 	if err == nil && release != nil {
-		log.Printf("found existing release by same name, removing before installing %s", release.Name)
+		log.Info("found existing release, removing before installing", "release", release.Name)
 		delclient := action.NewUninstall(actionConfig)
 		delclient.Wait = true
 		delclient.Timeout = deleteTimeout
@@ -144,9 +145,9 @@ func (i *InstallHelmChart) Do(ctx context.Context) error {
 		return fmt.Errorf("failed to install chart: %w", err)
 	}
 
-	log.Printf("installed chart from path: %s in namespace: %s\n", rel.Name, rel.Namespace)
+	log.Info("installed chart", "release", rel.Name, "namespace", rel.Namespace)
 	// this will confirm the values set during installation
-	log.Printf("chart values: %v\n", rel.Config)
+	log.Info("chart values", "config", rel.Config)
 
 	// ensure all pods are running, since helm doesn't care about windows
 	config, err := clientcmd.BuildConfigFromFlags("", i.KubeConfigFilePath)

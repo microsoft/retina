@@ -7,7 +7,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/microsoft/retina/test/e2ev3/pkg/stepname"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"sigs.k8s.io/kind/pkg/cluster"
 )
 
@@ -21,7 +21,7 @@ type DeleteCluster struct {
 func (d *DeleteCluster) String() string { return "delete-kind-cluster" }
 
 func (d *DeleteCluster) Do(ctx context.Context) error {
-	_, log := stepname.StepLogger(ctx, d)
+	ctx, log := utils.StepLogger(ctx, d)
 	log.Info("deleting Kind cluster", "cluster", d.ClusterName)
 
 	provider := cluster.NewProvider()

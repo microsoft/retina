@@ -3,13 +3,12 @@
 
 //go:build e2e
 
-package utils
+package kubernetes
 
 import (
 	"context"
-	"log/slog"
 
-	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"k8s.io/client-go/rest"
 )
 
@@ -23,15 +22,16 @@ type DebugOnFailure struct {
 
 func (d *DebugOnFailure) String() string { return "debug-on-failure" }
 
-func (d *DebugOnFailure) Do(_ context.Context) error {
-	slog.Info("capturing logs for pods", "namespace", d.Namespace, "label", d.LabelSelector)
-	getLogs := &k8s.GetPodLogs{
+func (d *DebugOnFailure) Do(ctx context.Context) error {
+	ctx, log := utils.StepLogger(ctx, d)
+	log.Info("capturing logs for pods", "namespace", d.Namespace, "label", d.LabelSelector)
+	getLogs := &GetPodLogs{
 		RestConfig:    d.RestConfig,
-		Namespace:          d.Namespace,
-		LabelSelector:      d.LabelSelector,
+		Namespace:     d.Namespace,
+		LabelSelector: d.LabelSelector,
 	}
 	if err := getLogs.Do(context.Background()); err != nil {
-		slog.Error("failed to capture logs", "error", err)
+		log.Error("failed to capture logs", "error", err)
 	}
 	return nil // never fail the debug step itself
 }

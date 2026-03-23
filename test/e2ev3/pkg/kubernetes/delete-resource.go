@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -71,6 +73,7 @@ type DeleteKubernetesResource struct {
 func (d *DeleteKubernetesResource) String() string { return "delete-kubernetes-resource" }
 
 func (d *DeleteKubernetesResource) Do(ctx context.Context) error {
+	ctx, _ = utils.StepLogger(ctx, d)
 	// Prevalidation: check resource type before proceeding
 	restype := ResourceType(d.ResourceType)
 	if restype == Unknown {

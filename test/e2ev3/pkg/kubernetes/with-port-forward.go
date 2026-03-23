@@ -3,7 +3,7 @@
 
 //go:build e2e
 
-package utils
+package kubernetes
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 
 	flow "github.com/Azure/go-workflow"
 	"github.com/cenkalti/backoff/v4"
-	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
 const (
@@ -32,14 +32,14 @@ const (
 //  2. Runs all inner steps sequentially (as a Pipe)
 //  3. Guarantees the port-forward is stopped via defer, even on error
 type WithPortForward struct {
-	PF    *k8s.PortForward
+	PF    *PortForward
 	Steps []flow.Steper
 }
 
 func (w *WithPortForward) String() string { return "with-port-forward" }
 
 func (w *WithPortForward) Do(ctx context.Context) error {
-	log := slog.With("step", w.String())
+	ctx, log := utils.StepLogger(ctx, w)
 	if err := w.PF.Do(ctx); err != nil {
 		return fmt.Errorf("port-forward failed: %w", err)
 	}
@@ -63,7 +63,7 @@ func (w *WithPortForward) Unwrap() []flow.Steper {
 
 // CurlExpectFail creates a named step that runs a command expected to fail
 // (e.g., curl behind a deny-all network policy). The error is intentionally swallowed.
-func CurlExpectFail(name string, exec *k8s.ExecInPod) flow.Steper {
+func CurlExpectFail(name string, exec *ExecInPod) flow.Steper {
 	return flow.Func(name, func(ctx context.Context) error {
 		if err := exec.Do(ctx); err != nil {
 			slog.Info("curl failed as expected", "step", name, "error", err)

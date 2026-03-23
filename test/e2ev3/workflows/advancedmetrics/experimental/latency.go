@@ -11,7 +11,6 @@ import (
 	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 	"github.com/microsoft/retina/test/e2ev3/config"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
-	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
 func addAPIServerLatencyScenario(restConfig *rest.Config) *flow.Workflow {
@@ -24,7 +23,7 @@ func addAPIServerLatencyScenario(restConfig *rest.Config) *flow.Workflow {
 		ForwardedPort: config.RetinaMetricsPort, MetricName: "networkobservability_adv_node_apiserver_no_response",
 		ValidMetrics: []map[string]string{{}}, ExpectMetric: true, PartialMatch: true,
 	}
-	validateWithPF := &utils.WithPortForward{
+	validateWithPF := &k8s.WithPortForward{
 		PF: &k8s.PortForward{
 			Namespace: config.KubeSystemNamespace, LabelSelector: "k8s-app=retina",
 			LocalPort: config.RetinaMetricsPort, RemotePort: config.RetinaMetricsPort,
@@ -36,7 +35,7 @@ func addAPIServerLatencyScenario(restConfig *rest.Config) *flow.Workflow {
 	// Validate: retry with exponential backoff until metrics appear.
 	wf.Add(
 		flow.Step(validateWithPF).
-			Retry(utils.RetryWithBackoff),
+			Retry(k8s.RetryWithBackoff),
 	)
 	return wf
 }

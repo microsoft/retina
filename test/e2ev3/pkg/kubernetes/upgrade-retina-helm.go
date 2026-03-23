@@ -5,9 +5,9 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"time"
 
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/cli"
 	helmValues "helm.sh/helm/v3/pkg/cli/values"
@@ -28,7 +28,7 @@ type UpgradeRetinaHelmChart struct {
 func (u *UpgradeRetinaHelmChart) String() string { return "upgrade-retina-helm" }
 
 func (u *UpgradeRetinaHelmChart) Do(ctx context.Context) error {
-	log := slog.Default().With("step", u.String())
+	ctx, log := utils.StepLogger(ctx, u)
 	settings := cli.New()
 	settings.KubeConfig = u.KubeConfigFilePath
 	actionConfig := new(action.Configuration)

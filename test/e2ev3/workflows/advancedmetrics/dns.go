@@ -17,7 +17,6 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/config"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
-	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
 func addAdvancedDNSScenario(restConfig *rest.Config, namespace, arch, variant string,
@@ -51,7 +50,7 @@ func addAdvancedDNSScenario(restConfig *rest.Config, namespace, arch, variant st
 		Query: respQuery, QueryType: respQueryType, Response: respResponse, ReturnCode: respReturnCode,
 		WorkloadKind: workloadKind, WorkloadName: agnhostName, RestConfig: restConfig,
 	}
-	validateWithPF := &utils.WithPortForward{
+	validateWithPF := &k8s.WithPortForward{
 		PF: &k8s.PortForward{
 			Namespace: config.KubeSystemNamespace, LabelSelector: "k8s-app=retina",
 			LocalPort: config.RetinaMetricsPort, RemotePort: config.RetinaMetricsPort,
@@ -66,9 +65,9 @@ func addAdvancedDNSScenario(restConfig *rest.Config, namespace, arch, variant st
 	wf.Add(
 		flow.BatchPipe(
 			// Setup: provision the agnhost pod.
-			flow.Steps(createAgnhost).Timeout(utils.DefaultScenarioTimeout),
+			flow.Steps(createAgnhost).Timeout(k8s.DefaultScenarioTimeout),
 			// Validate: generate traffic + check metrics, retrying with backoff.
-			flow.Steps(validateWithPF).Retry(utils.RetryWithBackoff),
+			flow.Steps(validateWithPF).Retry(k8s.RetryWithBackoff),
 			// Cleanup: always runs, even if validation fails.
 			flow.Pipe(deleteAgnhost).When(flow.Always),
 		),

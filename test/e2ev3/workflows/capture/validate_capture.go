@@ -17,6 +17,7 @@ import (
 
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
 	"github.com/microsoft/retina/pkg/label"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"github.com/microsoft/retina/test/retry"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,7 +49,7 @@ type ValidateCaptureStep struct {
 func (v *ValidateCaptureStep) String() string { return "validate-capture" }
 
 func (v *ValidateCaptureStep) Do(ctx context.Context) error {
-	log := slog.With("step", v.String())
+	ctx, log := utils.StepLogger(ctx, v)
 	log.Info("running retina capture create")
 
 	imageRegistry := v.ImageRegistry

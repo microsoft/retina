@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	retry "github.com/microsoft/retina/test/retry"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,7 +28,7 @@ type LabelNodes struct {
 func (l *LabelNodes) String() string { return "label-nodes" }
 
 func (l *LabelNodes) Do(ctx context.Context) error {
-	log := slog.With("step", l.String())
+	ctx, log := utils.StepLogger(ctx, l)
 	clientset, err := kubernetes.NewForConfig(l.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)

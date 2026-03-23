@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"strings"
 	"time"
 
@@ -29,7 +31,7 @@ type ExecInPod struct {
 func (e *ExecInPod) String() string { return "exec-in-pod" }
 
 func (e *ExecInPod) Do(ctx context.Context) error {
-	log := slog.With("step", e.String())
+	ctx, log := utils.StepLogger(ctx, e)
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 

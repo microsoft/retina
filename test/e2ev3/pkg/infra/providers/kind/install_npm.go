@@ -10,7 +10,7 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/microsoft/retina/test/e2ev3/pkg/stepname"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
 const npmManifestURL = "https://raw.githubusercontent.com/Azure/azure-container-networking/master/npm/azure-npm.yaml"
@@ -24,7 +24,7 @@ type InstallNPM struct {
 func (n *InstallNPM) String() string { return "install-azure-npm" }
 
 func (n *InstallNPM) Do(ctx context.Context) error {
-	_, log := stepname.StepLogger(ctx, n)
+	ctx, log := utils.StepLogger(ctx, n)
 	log.Info("installing Azure NPM for NetworkPolicy enforcement")
 	cmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", npmManifestURL)
 	if n.KubeConfigFilePath != "" {

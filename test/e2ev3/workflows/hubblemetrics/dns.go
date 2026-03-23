@@ -10,7 +10,6 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/config"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
-	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"k8s.io/client-go/rest"
 )
 
@@ -42,7 +41,7 @@ func addHubbleDNSScenario(restConfig *rest.Config, arch string) *flow.Workflow {
 		ValidMetrics:  []map[string]string{ValidHubbleDNSResponseMetricLabels},
 		ExpectMetric:  true,
 	}
-	validateWithPF := &utils.WithPortForward{
+	validateWithPF := &k8s.WithPortForward{
 		PF: &k8s.PortForward{
 			LabelSelector:         "k8s-app=retina",
 			LocalPort:             config.HubbleMetricsPort,
@@ -65,10 +64,10 @@ func addHubbleDNSScenario(restConfig *rest.Config, arch string) *flow.Workflow {
 		flow.BatchPipe(
 			// Setup: provision resources.
 			flow.Pipe(createAgnhost).
-				Timeout(utils.DefaultScenarioTimeout),
+				Timeout(k8s.DefaultScenarioTimeout),
 			// Validate: generate traffic and check metrics, retry with backoff.
 			flow.Steps(validateWithPF).
-				Retry(utils.RetryWithBackoff),
+				Retry(k8s.RetryWithBackoff),
 			// Cleanup: always runs, even if validation fails.
 			flow.Pipe(deleteAgnhost).
 				When(flow.Always),

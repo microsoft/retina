@@ -3,7 +3,7 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-	"log/slog"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -22,7 +22,7 @@ type DeleteNamespace struct {
 func (d *DeleteNamespace) String() string { return "delete-namespace" }
 
 func (d *DeleteNamespace) Do(ctx context.Context) error {
-	log := slog.With("step", d.String())
+	ctx, log := utils.StepLogger(ctx, d)
 	clientset, err := kubernetes.NewForConfig(d.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
