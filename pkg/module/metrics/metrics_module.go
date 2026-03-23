@@ -4,6 +4,7 @@ package metrics
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"strings"
 	"sync"
@@ -393,7 +394,7 @@ func (m *Module) appendIncludeList(namespaces []string) {
 	// toAdd namespace IPs to filter manager
 	for _, ns := range toAdd {
 		ips := m.daemonCache.GetIPsByNamespace(ns)
-		m.l.Info("Adding IPs to filter manager", zap.String("namespace", ns), zap.Any("ips", ips))
+		m.l.Info("Adding IPs to filter manager", zap.String("namespace", ns), zap.String("ips", fmt.Sprint(ips)))
 
 		err := m.filterManager.AddIPs(ips, metricModuleReq, moduleReqMetadata)
 		if err != nil {
@@ -404,7 +405,7 @@ func (m *Module) appendIncludeList(namespaces []string) {
 	// toRemove namespace IPs from filter manager
 	for _, ns := range toRemove {
 		ips := m.daemonCache.GetIPsByNamespace(ns)
-		m.l.Info("Removing IPs from filter manager", zap.String("namespace", ns), zap.Any("ips", ips))
+		m.l.Info("Removing IPs from filter manager", zap.String("namespace", ns), zap.String("ips", fmt.Sprint(ips)))
 
 		err := m.filterManager.DeleteIPs(ips, metricModuleReq, moduleReqMetadata)
 		if err != nil {
@@ -440,7 +441,8 @@ func (m *Module) PodCallBackFn(obj interface{}) {
 	}
 
 	m.Lock()
-	if !m.nsOfInterest(pod.Namespace()) && !m.podOfInterest(ip, pod.Annotations()) {
+	if event.Type != cache.EventTypePodDeleted &&
+		!m.nsOfInterest(pod.Namespace()) && !m.podOfInterest(ip, pod.Annotations()) {
 		m.Unlock()
 		return
 	}
@@ -466,13 +468,22 @@ func handlePodEvent(event *cache.CacheEvent, m *Module, pod *common.RetinaEndpoi
 		// This case should only occur when the pod annotation is removed since this is an EventTypePodAdded (also accounts for pod update)
 		if !podCacheEntry.Annotated && !podCacheEntry.Namespaced {
 			m.l.Info("Adding pod IP to DELETE dirty pods cache. Pod not annotated or in namespace of interest.", zap.String("pod name", pod.NamespacedName()))
-			podCacheEntry.Annotated = true
 			m.dirtyPods.ToDelete(ip.String(), podCacheEntry)
 			return
 		}
 		m.l.Info("Adding pod IP to ADD dirty pods cache", zap.String("pod name", pod.NamespacedName()))
 		m.dirtyPods.ToAdd(podCacheEntry.IP.String(), podCacheEntry)
 	case cache.EventTypePodDeleted:
+		// Guard against spurious DELETE events during pod churn / IP reuse.
+		// The daemon cache is updated before events are published, so if a new pod
+		// reused this IP the cache still contains an entry. Deleting would remove a valid IP.
+		if endpoint := m.daemonCache.GetPodByIP(ip.String()); endpoint != nil {
+			m.l.Debug("Ignoring DELETE for reused IP — pod still exists in cache",
+				zap.String("deleted pod", pod.NamespacedName()),
+				zap.String("ip", ip.String()),
+				zap.String("cached pod", endpoint.NamespacedName()))
+			return
+		}
 		m.l.Info("Adding pod IP to DELETE dirty pods cache", zap.String("pod name", pod.NamespacedName()))
 		m.dirtyPods.ToDelete(ip.String(), podCacheEntry)
 	default:
@@ -510,14 +521,14 @@ func (m *Module) applyDirtyPodsAdd() {
 			}
 		}
 		if len(podsToAdd) > 0 {
-			m.l.Debug("Adding annotated pod IPs to filtermap", zap.Any("IPs", podsToAdd))
+			m.l.Debug("Adding annotated pod IPs to filtermap", zap.String("IPs", fmt.Sprint(podsToAdd)))
 			err := m.filterManager.AddIPs(podsToAdd, metricModuleReq, modulePodReqMetadata)
 			if err != nil {
 				m.l.Error("Error adding pod IP to filter manager", zap.Error(err))
 			}
 		}
 		if len(podsToAddNamespaced) > 0 {
-			m.l.Debug("Adding namespaced pod IPs to filtermap", zap.Any("IPs", podsToAddNamespaced))
+			m.l.Debug("Adding namespaced pod IPs to filtermap", zap.String("IPs", fmt.Sprint(podsToAddNamespaced)))
 			err := m.filterManager.AddIPs(podsToAddNamespaced, metricModuleReq, moduleReqMetadata)
 			if err != nil {
 				m.l.Error("Error adding pod IP to filter manager", zap.Error(err))
@@ -527,35 +538,26 @@ func (m *Module) applyDirtyPodsAdd() {
 	m.dirtyPods.ClearAdd()
 }
 
-// applyDirtyPodsDelete deletes pod ips from filtermanager
+// applyDirtyPodsDelete deletes pod ips from filtermanager.
+// Always attempts deletion with both metadata types (pod and namespace).
+// The filtermanager cache makes extra deletes a safe no-op when the metadata doesn't exist.
 func (m *Module) applyDirtyPodsDelete() {
 	deletes := m.dirtyPods.GetDeleteList()
 	if len(deletes) > 0 {
-		podOfInterestDeleteList := make([]net.IP, 0)
-		namespaceOfInterestDeleteList := make([]net.IP, 0)
+		ipsToDelete := make([]net.IP, 0, len(deletes))
 		for _, entry := range deletes {
 			podEntry := entry.(DirtyCachePod)
-			if podEntry.Annotated {
-				podOfInterestDeleteList = append(podOfInterestDeleteList, podEntry.IP)
-			}
-			if podEntry.Namespaced {
-				namespaceOfInterestDeleteList = append(namespaceOfInterestDeleteList, podEntry.IP)
-			}
+			ipsToDelete = append(ipsToDelete, podEntry.IP)
 		}
 
-		if len(podOfInterestDeleteList) > 0 {
-			m.l.Debug("Deleting Ips in dirty pods from filtermap", zap.Any("IPs", podOfInterestDeleteList))
-			err := m.filterManager.DeleteIPs(podOfInterestDeleteList, metricModuleReq, modulePodReqMetadata)
-			if err != nil {
-				m.l.Error("Error deleting pod IP from filter manager", zap.Error(err))
-			}
+		m.l.Debug("Deleting Ips in dirty pods from filtermap", zap.String("IPs", fmt.Sprint(ipsToDelete)))
+		err := m.filterManager.DeleteIPs(ipsToDelete, metricModuleReq, modulePodReqMetadata)
+		if err != nil {
+			m.l.Error("Error deleting pod IP from filter manager", zap.Error(err))
 		}
-		if len(namespaceOfInterestDeleteList) > 0 {
-			m.l.Debug("Deleting Ips in dirty pods from filtermap", zap.Any("IPs", namespaceOfInterestDeleteList))
-			err := m.filterManager.DeleteIPs(namespaceOfInterestDeleteList, metricModuleReq, moduleReqMetadata)
-			if err != nil {
-				m.l.Error("Error deleting pod IP from filter manager", zap.Error(err))
-			}
+		err = m.filterManager.DeleteIPs(ipsToDelete, metricModuleReq, moduleReqMetadata)
+		if err != nil {
+			m.l.Error("Error deleting pod IP from filter manager", zap.Error(err))
 		}
 	}
 
