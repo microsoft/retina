@@ -68,6 +68,10 @@ packetParserRingBuffer: "disabled"
 # Invalid values cause startup to fail with a validation error.
 # This value is not applied when ring buffers are disabled.
 packetParserRingBufferSize: 8388608
+# Maximum number of entries in the eBPF filter map (retina_filter).
+# This map tracks IP addresses of pods of interest for network observability.
+# Default: 255. Increase for large clusters with many tracked pods.
+filterMapMaxEntries: 255
 
 imagePullSecrets: []
 nameOverride: "retina"
@@ -96,6 +100,8 @@ enabledPlugin_win: '["hnsstats"]'
 enableTelemetry: false
 
 # Interval, in duration, to scrape/publish metrics.
+# Default when unset or invalid (used by pluginmanager and all plugins).
+metricsInterval: "10s"
 metricsIntervalDuration: "10s"
 
 azure:

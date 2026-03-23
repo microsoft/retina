@@ -5,6 +5,7 @@
 The `retina bpftrace` command allows you to trace network issues on a Kubernetes node in real-time using eBPF/bpftrace.
 
 This is useful for debugging connectivity problems such as:
+
 - Packet drops (with reason codes)
 - TCP RST events (connection resets)
 - Socket errors (ECONNREFUSED, ETIMEDOUT, etc.)
@@ -60,6 +61,7 @@ The full list of drop reasons is kernel-version specific and is printed at the s
 ### RST_SENT / RST_RECV - TCP Reset Events
 
 Captures TCP RST packets sent or received. These indicate:
+
 - Connection refused (no service listening)
 - Connection reset by peer
 - Firewall rejecting connections
@@ -78,6 +80,7 @@ Captures socket-level errors reported to applications:
 ### RETRANS - TCP Retransmissions
 
 Captures TCP segment retransmissions, which indicate:
+
 - Packet loss in the network
 - Network congestion
 - Slow or unresponsive peers

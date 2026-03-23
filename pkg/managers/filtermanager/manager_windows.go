@@ -11,7 +11,7 @@ import (
 
 type FilterManager struct{}
 
-func Init(_ int) (*FilterManager, error) {
+func Init(_ int, _ uint32) (*FilterManager, error) {
 	return nil, nil
 }
 
