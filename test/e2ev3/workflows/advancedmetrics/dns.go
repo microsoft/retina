@@ -8,6 +8,7 @@ package advancedmetrics
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -20,17 +21,18 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addAdvancedDNSScenario(restConfig *rest.Config, namespace, arch, variant string,
+func addAdvancedDNSScenario(log *slog.Logger, restConfig *rest.Config, namespace, arch, variant string,
 	command string, expectError bool,
 	reqQuery, reqQueryType, workloadKind string,
 	respNumResponse, respQuery, respQueryType, respReturnCode, respResponse string,
 ) *flow.Workflow {
+	log = log.With("test", "dns")
 	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-adv-dns-" + variant + "-" + arch
 	podName := agnhostName + "-0"
 
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
-		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, RestConfig: restConfig,
+		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, RestConfig: restConfig, Log: log,
 	}
 	// Generate traffic inside the validation loop so packetparser captures it.
 	execTraffic := flow.Func("adv-dns-"+variant+"-traffic-"+arch, func(ctx context.Context) error {
@@ -63,29 +65,18 @@ func addAdvancedDNSScenario(restConfig *rest.Config, namespace, arch, variant st
 		ResourceType: k8s.TypeString(k8s.StatefulSet), ResourceName: agnhostName, ResourceNamespace: namespace, RestConfig: restConfig,
 	}
 
-	// Setup: provision the agnhost pod.
 	wf.Add(
-		flow.Step(createAgnhost).
-			Timeout(utils.DefaultScenarioTimeout),
-	)
-
-	// Validate: generate traffic + check metrics, retrying with backoff.
-	wf.Add(
-		flow.Step(validateWithPF).
-			DependsOn(createAgnhost).
-			Retry(utils.RetryWithBackoff),
-	)
-
-	// Cleanup: always runs, even if validation fails.
-	wf.Add(
-		flow.Pipe(deleteAgnhost).
-			DependsOn(validateWithPF).
-			When(flow.Always),
+		flow.BatchPipe(
+			// Setup: provision the agnhost pod.
+			flow.Steps(createAgnhost).Timeout(utils.DefaultScenarioTimeout),
+			// Validate: generate traffic + check metrics, retrying with backoff.
+			flow.Steps(validateWithPF).Retry(utils.RetryWithBackoff),
+			// Cleanup: always runs, even if validation fails.
+			flow.Pipe(deleteAgnhost).When(flow.Always),
+		),
 	)
 	return wf
 }
-
-
 
 // EmptyResponse is a sentinel value that gets converted to an empty string
 // for metric label matching.
@@ -103,13 +94,13 @@ var (
 // ValidateAdvancedDNSRequestStep checks the advanced DNS request count metric
 // with labels including pod IP, namespace, pod name, query info, and workload info.
 type ValidateAdvancedDNSRequestStep struct {
-	PodNamespace       string
-	PodName            string
-	Query              string
-	QueryType          string
-	WorkloadKind       string
-	WorkloadName       string
-	RestConfig *rest.Config
+	PodNamespace string
+	PodName      string
+	Query        string
+	QueryType    string
+	WorkloadKind string
+	WorkloadName string
+	RestConfig   *rest.Config
 }
 
 func (v *ValidateAdvancedDNSRequestStep) Do(ctx context.Context) error {
@@ -141,16 +132,16 @@ func (v *ValidateAdvancedDNSRequestStep) Do(ctx context.Context) error {
 // with labels including pod IP, namespace, pod name, num_response, query info,
 // response, return_code, and workload info.
 type ValidateAdvancedDNSResponseStep struct {
-	PodNamespace       string
-	NumResponse        string
-	PodName            string
-	Query              string
-	QueryType          string
-	Response           string
-	ReturnCode         string
-	WorkloadKind       string
-	WorkloadName       string
-	RestConfig *rest.Config
+	PodNamespace string
+	NumResponse  string
+	PodName      string
+	Query        string
+	QueryType    string
+	Response     string
+	ReturnCode   string
+	WorkloadKind string
+	WorkloadName string
+	RestConfig   *rest.Config
 }
 
 func (v *ValidateAdvancedDNSResponseStep) Do(ctx context.Context) error {

@@ -48,7 +48,7 @@ func (l *Step) Do(ctx context.Context) error {
 			return fmt.Errorf("generate dev tag: %w", err)
 		}
 		l.Cfg.Image.Tag = tag
-		slog.Info("no TAG provided, will build images", "tag", tag)
+		log.Info("no TAG provided, will build images", "tag", tag)
 	}
 	return nil
 }

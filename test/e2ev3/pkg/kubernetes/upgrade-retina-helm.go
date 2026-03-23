@@ -23,12 +23,17 @@ type UpgradeRetinaHelmChart struct {
 	ChartPath          string
 	HelmDriver         string
 	ValuesFile         string
+	Log                *slog.Logger
 }
 
 func (u *UpgradeRetinaHelmChart) String() string { return "upgrade-retina-helm" }
 
 func (u *UpgradeRetinaHelmChart) Do(ctx context.Context) error {
-	log := slog.With("step", u.String())
+	log := u.Log
+	if log == nil {
+		log = slog.Default()
+	}
+	log = log.With("step", u.String())
 	settings := cli.New()
 	settings.KubeConfig = u.KubeConfigFilePath
 	actionConfig := new(action.Configuration)

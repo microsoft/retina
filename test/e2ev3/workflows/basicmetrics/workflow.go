@@ -22,7 +22,7 @@ type Workflow struct {
 func (w *Workflow) String() string { return "basic-metrics" }
 
 func (w *Workflow) Do(ctx context.Context) error {
-	ctx = utils.WithWorkflow(ctx, w.String())
+	ctx, log := utils.WorkflowLogger(ctx, w.String())
 	p := w.Cfg
 	kubeConfigFilePath := p.Cluster.KubeConfigPath()
 	restConfig := p.Cluster.RestConfig()
@@ -42,16 +42,17 @@ func (w *Workflow) Do(ctx context.Context) error {
 		ImageNamespace:     imgCfg.Namespace,
 		HelmDriver:         helmCfg.Driver,
 		ImageLoader:        p.Cluster,
+		Log:                log,
 	}
 
 	var scenarios []flow.Steper
 	for _, arch := range config.Architectures {
 		scenarios = append(scenarios,
-			addDropScenario(restConfig, testPodNamespace, arch),
-			addTCPScenario(restConfig, testPodNamespace, arch),
-			addBasicDNSScenario(restConfig, testPodNamespace, arch,
+			addDropScenario(log, restConfig, testPodNamespace, arch),
+			addTCPScenario(log, restConfig, testPodNamespace, arch),
+			addBasicDNSScenario(log, restConfig, testPodNamespace, arch,
 				"valid-domain", "nslookup kubernetes.default", false),
-			addBasicDNSScenario(restConfig, testPodNamespace, arch,
+			addBasicDNSScenario(log, restConfig, testPodNamespace, arch,
 				"nxdomain", "nslookup some.non.existent.domain", true),
 		)
 	}
@@ -69,6 +70,7 @@ func (w *Workflow) Do(ctx context.Context) error {
 		LabelSelector:          "k8s-app=retina",
 		RestConfig:             restConfig,
 		IgnoreContainerRestart: false,
+		Log:                    log,
 	}
 
 	debug := &utils.DebugOnFailure{

@@ -5,12 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"log/slog"
 	"net/http"
 	"reflect"
 	"strings"
 	"time"
 
+	"github.com/microsoft/retina/test/e2ev3/pkg/stepname"
 	"github.com/microsoft/retina/test/retry"
 	promclient "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
@@ -32,7 +34,7 @@ func CheckMetric(ctx context.Context, promAddress, metricName string, validMetri
 
 	metrics := map[string]*promclient.MetricFamily{}
 	scrapeMetricsFn := func() error {
-		slog.Info("checking for metrics", "address", promAddress)
+		log.Printf("checking for metrics on %s", promAddress)
 		var err error
 
 		// obtain a full dump of all metrics on the endpoint
@@ -49,7 +51,7 @@ func CheckMetric(ctx context.Context, promAddress, metricName string, validMetri
 			err = verifyValidMetricPresent(metricName, metrics, validMetric)
 		}
 		if err != nil {
-			slog.Warn("metric not found", "metric", metricName, "match", validMetric)
+			log.Printf("failed to find metric matching %s: %+v\n", metricName, validMetric)
 			return ErrNoMetricFound
 		}
 
@@ -71,62 +73,30 @@ func CheckMetricFromBuffer(prometheusMetricData []byte, metricName string, valid
 
 	err = verifyValidMetricPresent(metricName, metrics, validMetric)
 	if err != nil {
-		slog.Warn("metric not found", "metric", metricName, "match", validMetric)
+		log.Printf("failed to find metric matching %s: %+v\n", metricName, validMetric)
 		return ErrNoMetricFound
 	}
 
 	return nil
 }
 
-func formatMetricDetail(name string, mf *promclient.MetricFamily, m *promclient.Metric) string {
-	var sb strings.Builder
-	sb.WriteString(name)
-	sb.WriteString("{")
-	for i, label := range m.GetLabel() {
-		if i > 0 {
-			sb.WriteString(", ")
-		}
-		fmt.Fprintf(&sb, "%s=%q", label.GetName(), label.GetValue())
-	}
-	sb.WriteString("}")
-
-	switch mf.GetType() {
-	case promclient.MetricType_COUNTER:
-		fmt.Fprintf(&sb, " counter:%v", m.GetCounter().GetValue())
-	case promclient.MetricType_GAUGE:
-		fmt.Fprintf(&sb, " gauge:%v", m.GetGauge().GetValue())
-	case promclient.MetricType_HISTOGRAM:
-		h := m.GetHistogram()
-		fmt.Fprintf(&sb, " histogram:count=%v sum=%v", h.GetSampleCount(), h.GetSampleSum())
-	case promclient.MetricType_SUMMARY:
-		s := m.GetSummary()
-		fmt.Fprintf(&sb, " summary:count=%v sum=%v", s.GetSampleCount(), s.GetSampleSum())
-	case promclient.MetricType_UNTYPED:
-		fmt.Fprintf(&sb, " untyped:%v", m.GetUntyped().GetValue())
-	}
-
-	return sb.String()
-}
-
 func verifyValidMetricPresent(metricName string, data map[string]*promclient.MetricFamily, validMetric map[string]string) error {
-	for _, mf := range data {
-		if mf.GetName() == metricName {
-			for _, m := range mf.GetMetric() {
+	for _, metric := range data {
+		if metric.GetName() == metricName {
+			for _, metric := range metric.GetMetric() {
 
 				// get all labels and values on the metric
 				metricLabels := map[string]string{}
-				for _, label := range m.GetLabel() {
+				for _, label := range metric.GetLabel() {
 					metricLabels[label.GetName()] = label.GetValue()
 				}
 
 				// if valid metric is empty, then we just need to make sure the metric and value is present
 				if len(validMetric) == 0 && len(metricLabels) > 0 {
-					slog.Info("found matching metric", "detail", formatMetricDetail(metricName, mf, m))
 					return nil
 				}
 
 				if reflect.DeepEqual(metricLabels, validMetric) {
-					slog.Info("found matching metric", "detail", formatMetricDetail(metricName, mf, m))
 					return nil
 				}
 			}
@@ -159,19 +129,18 @@ func getAllPrometheusMetricsFromURL(url string) (map[string]*promclient.MetricFa
 // verifyValidMetricPresentPartial checks if a metric exists with labels that contain
 // all the key-value pairs in validMetric (partial matching - the metric can have additional labels)
 func verifyValidMetricPresentPartial(metricName string, data map[string]*promclient.MetricFamily, validMetric map[string]string) error {
-	for _, mf := range data {
-		if mf.GetName() == metricName {
-			for _, m := range mf.GetMetric() {
+	for _, metric := range data {
+		if metric.GetName() == metricName {
+			for _, metric := range metric.GetMetric() {
 
 				// get all labels and values on the metric
 				metricLabels := map[string]string{}
-				for _, label := range m.GetLabel() {
+				for _, label := range metric.GetLabel() {
 					metricLabels[label.GetName()] = label.GetValue()
 				}
 
 				// if valid metric is empty, then we just need to make sure the metric and value is present
 				if len(validMetric) == 0 && len(metricLabels) > 0 {
-					slog.Info("found matching metric", "detail", formatMetricDetail(metricName, mf, m))
 					return nil
 				}
 
@@ -185,7 +154,6 @@ func verifyValidMetricPresentPartial(metricName string, data map[string]*promcli
 				}
 
 				if allMatch {
-					slog.Info("found matching metric", "detail", formatMetricDetail(metricName, mf, m))
 					return nil
 				}
 			}
@@ -228,19 +196,23 @@ type ValidateMetricStep struct {
 	ValidMetrics  []map[string]string
 	ExpectMetric  bool
 	PartialMatch  bool
+	Log           *slog.Logger
 }
 
-func (v *ValidateMetricStep) String() string { return "validate-metric" }
-
 func (v *ValidateMetricStep) Do(ctx context.Context) error {
-	log := slog.With("step", v.String())
+	slogger := v.Log
+	if slogger == nil {
+		slogger = slog.Default()
+	}
+	slogger = slogger.With("step", stepname.StepName(v))
+
 	promAddress := fmt.Sprintf("http://localhost:%s/metrics", v.ForwardedPort)
 
 	for _, validMetric := range v.ValidMetrics {
 		err := CheckMetric(ctx, promAddress, v.MetricName, validMetric, v.PartialMatch)
 		if err != nil {
 			if !v.ExpectMetric && errors.Is(err, ErrNoMetricFound) {
-				log.Info("metric not found as expected", "metric", v.MetricName)
+				slogger.Info("metric not found, as expected", "metric", v.MetricName)
 				return nil
 			}
 			return fmt.Errorf("failed to verify prometheus metrics: %w", err)
@@ -250,7 +222,7 @@ func (v *ValidateMetricStep) Do(ctx context.Context) error {
 			return fmt.Errorf("did not expect to find metric %s matching %+v: %w", v.MetricName, validMetric, ErrMetricFound)
 		}
 
-		log.Info("found matching metric", "metric", v.MetricName, "match", validMetric)
+		slogger.Info("found metric", "metric", v.MetricName, "labels", validMetric)
 	}
 	return nil
 }

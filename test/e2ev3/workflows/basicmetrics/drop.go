@@ -8,6 +8,7 @@ package basicmetrics
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/config"
@@ -17,16 +18,17 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func addDropScenario(restConfig *rest.Config, namespace, arch string) *flow.Workflow {
+func addDropScenario(log *slog.Logger, restConfig *rest.Config, namespace, arch string) *flow.Workflow {
+	log = log.With("test", "drop")
 	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-drop-" + arch
 	podName := agnhostName + "-0"
 
 	createNetPol := &k8s.CreateDenyAllNetworkPolicy{
-		NetworkPolicyNamespace: namespace, RestConfig: restConfig, DenyAllLabelSelector: "app=" + agnhostName,
+		NetworkPolicyNamespace: namespace, RestConfig: restConfig, DenyAllLabelSelector: "app=" + agnhostName, Log: log,
 	}
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
-		AgnhostNamespace: namespace, AgnhostName: agnhostName, AgnhostArch: arch, RestConfig: restConfig,
+		AgnhostNamespace: namespace, AgnhostName: agnhostName, AgnhostArch: arch, RestConfig: restConfig, Log: log,
 	}
 	execCurl1 := utils.CurlExpectFail("drop-curl-1-"+arch, &k8s.ExecInPod{
 		PodNamespace: namespace, PodName: podName, Command: "curl -s -m 5 bing.com", RestConfig: restConfig,
@@ -50,29 +52,18 @@ func addDropScenario(restConfig *rest.Config, namespace, arch string) *flow.Work
 		ResourceType: k8s.TypeString(k8s.StatefulSet), ResourceName: agnhostName, ResourceNamespace: namespace, RestConfig: restConfig,
 	}
 
-	// Setup: provision resources and generate traffic.
 	wf.Add(
-		flow.Pipe(createNetPol, createAgnhost, execCurl1, execCurl2).
-			Timeout(utils.DefaultScenarioTimeout),
-	)
-
-	// Validate: retry with exponential backoff until metrics appear.
-	wf.Add(
-		flow.Step(validateWithPF).
-			DependsOn(execCurl2).
-			Retry(utils.RetryWithBackoff),
-	)
-
-	// Cleanup: always runs, even if validation fails.
-	wf.Add(
-		flow.Pipe(deleteNetPol, deleteAgnhost).
-			DependsOn(validateWithPF).
-			When(flow.Always),
+		flow.BatchPipe(
+			flow.Pipe(createNetPol, createAgnhost, execCurl1, execCurl2).
+				Timeout(utils.DefaultScenarioTimeout),
+			flow.Steps(validateWithPF).
+				Retry(utils.RetryWithBackoff),
+			flow.Pipe(deleteNetPol, deleteAgnhost).
+				When(flow.Always),
+		),
 	)
 	return wf
 }
-
-
 
 var (
 	dropCountMetricName = "networkobservability_drop_count"

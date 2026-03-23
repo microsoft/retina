@@ -3,8 +3,10 @@ package kubernetes
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
+	"github.com/microsoft/retina/test/e2ev3/pkg/stepname"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -24,11 +26,16 @@ type ValidateResource struct {
 	ResourceType      string
 	Labels            string
 	RestConfig        *rest.Config
+	Log               *slog.Logger
 }
 
-func (v *ValidateResource) String() string { return "validate-resource" }
-
 func (v *ValidateResource) Do(ctx context.Context) error {
+	log := v.Log
+	if log == nil {
+		log = slog.Default()
+	}
+	log = log.With("step", stepname.StepName(v))
+
 	clientset, err := kubernetes.NewForConfig(v.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
@@ -39,7 +46,7 @@ func (v *ValidateResource) Do(ctx context.Context) error {
 
 	switch v.ResourceType {
 	case ResourceTypePod:
-		err = WaitForPodReady(ctx, clientset, v.ResourceNamespace, v.Labels)
+		err = WaitForPodReady(ctx, clientset, v.ResourceNamespace, v.Labels, log)
 		if err != nil {
 			return fmt.Errorf("pod not found: %w", err)
 		}

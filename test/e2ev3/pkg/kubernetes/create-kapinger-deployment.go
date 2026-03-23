@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"strconv"
 
+	"github.com/microsoft/retina/test/e2ev3/pkg/stepname"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -28,15 +29,20 @@ type CreateKapingerDeployment struct {
 	KapingerNamespace string
 	KapingerReplicas  string
 	RestConfig        *rest.Config
+	Log               *slog.Logger
 }
-
-func (c *CreateKapingerDeployment) String() string { return "create-kapinger-deployment" }
 
 func (c *CreateKapingerDeployment) Do(ctx context.Context) error {
 	_, err := strconv.Atoi(c.KapingerReplicas)
 	if err != nil {
 		return fmt.Errorf("error converting replicas to int for Kapinger replicas: %w", err)
 	}
+
+	log := c.Log
+	if log == nil {
+		log = slog.Default()
+	}
+	log = log.With("step", stepname.StepName(c))
 
 	clientset, err := kubernetes.NewForConfig(c.RestConfig)
 	if err != nil {
@@ -64,7 +70,7 @@ func (c *CreateKapingerDeployment) Do(ctx context.Context) error {
 func (c *CreateKapingerDeployment) GetKapingerDeployment() *appsv1.Deployment {
 	replicas, err := strconv.ParseInt(c.KapingerReplicas, 10, 32)
 	if err != nil {
-		slog.Error("converting kapinger replicas", "error", err)
+		fmt.Println("Error converting replicas to int for Kapinger replicas: ", err)
 		return nil
 	}
 	reps := int32(replicas)

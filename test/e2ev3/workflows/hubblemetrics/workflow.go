@@ -22,7 +22,7 @@ type Workflow struct {
 func (w *Workflow) String() string { return "hubble-metrics" }
 
 func (w *Workflow) Do(ctx context.Context) error {
-	ctx = utils.WithWorkflow(ctx, w.String())
+	ctx, log := utils.WorkflowLogger(ctx, w.String())
 	p := w.Cfg
 	restConfig := p.Cluster.RestConfig()
 	chartPath := p.Paths.HubbleChart
@@ -40,6 +40,7 @@ func (w *Workflow) Do(ctx context.Context) error {
 		ImageNamespace:     imgCfg.Namespace,
 		HelmDriver:         helmCfg.Driver,
 		ImageLoader:        p.Cluster,
+		Log:                log,
 	}
 
 	scenarios := []flow.Steper{
@@ -48,12 +49,12 @@ func (w *Workflow) Do(ctx context.Context) error {
 	}
 	for _, arch := range config.Architectures {
 		scenarios = append(scenarios,
-			addHubbleDNSScenario(restConfig, arch),
-			addHubbleFlowIntraNodeScenario(restConfig, arch),
-			addHubbleFlowInterNodeScenario(restConfig, arch),
-			addHubbleFlowToWorldScenario(restConfig, arch),
-			addHubbleDropScenario(restConfig, arch),
-			addHubbleTCPScenario(restConfig, arch),
+			addHubbleDNSScenario(log, restConfig, arch),
+			addHubbleFlowIntraNodeScenario(log, restConfig, arch),
+			addHubbleFlowInterNodeScenario(log, restConfig, arch),
+			addHubbleFlowToWorldScenario(log, restConfig, arch),
+			addHubbleDropScenario(log, restConfig, arch),
+			addHubbleTCPScenario(log, restConfig, arch),
 		)
 	}
 
@@ -62,6 +63,7 @@ func (w *Workflow) Do(ctx context.Context) error {
 		LabelSelector:          "k8s-app=retina",
 		RestConfig:             restConfig,
 		IgnoreContainerRestart: false,
+		Log:                    log,
 	}
 
 	debug := &utils.DebugOnFailure{

@@ -17,12 +17,17 @@ const npmManifestURL = "https://raw.githubusercontent.com/Azure/azure-container-
 // enforcement on Kind clusters.
 type InstallNPM struct {
 	KubeConfigFilePath string
+	Log                *slog.Logger
 }
 
 func (n *InstallNPM) String() string { return "install-azure-npm" }
 
 func (n *InstallNPM) Do(ctx context.Context) error {
-	log := slog.With("step", n.String())
+	log := n.Log
+	if log == nil {
+		log = slog.Default()
+	}
+	log = log.With("step", n.String())
 	log.Info("installing Azure NPM for NetworkPolicy enforcement")
 	cmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", npmManifestURL)
 	if n.KubeConfigFilePath != "" {

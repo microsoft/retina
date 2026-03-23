@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"context"
 	"fmt"
+	"log"
 	"log/slog"
 	"strings"
 	"sync"
@@ -32,12 +33,10 @@ type InstallHubbleHelmChart struct {
 	ImageNamespace     string
 	HelmDriver         string
 	ImageLoader        e2ecfg.ClusterProvider
+	Log                *slog.Logger
 }
 
-func (v *InstallHubbleHelmChart) String() string { return "install-hubble-helm" }
-
 func (v *InstallHubbleHelmChart) Do(ctx context.Context) error {
-	log := slog.With("step", v.String())
 	ctx, cancel := context.WithTimeout(ctx, defaultTimeoutSeconds*time.Second)
 	defer cancel()
 
@@ -45,7 +44,7 @@ func (v *InstallHubbleHelmChart) Do(ctx context.Context) error {
 	settings.KubeConfig = v.KubeConfigFilePath
 	actionConfig := new(action.Configuration)
 
-	err := actionConfig.Init(settings.RESTClientGetter(), v.Namespace, v.HelmDriver, func(format string, v ...any) { log.Info(fmt.Sprintf(format, v...)) })
+	err := actionConfig.Init(settings.RESTClientGetter(), v.Namespace, v.HelmDriver, log.Printf)
 	if err != nil {
 		return fmt.Errorf("failed to initialize helm action config: %w", err)
 	}
@@ -55,7 +54,7 @@ func (v *InstallHubbleHelmChart) Do(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to build rest config: %w", err)
 	}
-	err = CreateNamespaceFn(ctx, rc, e2ecfg.TestPodNamespace)
+	err = CreateNamespaceFn(ctx, v.Log, rc, e2ecfg.TestPodNamespace)
 	if err != nil {
 		return fmt.Errorf("failed to create namespace %s: %w", v.Namespace, err)
 	}
@@ -103,7 +102,7 @@ func (v *InstallHubbleHelmChart) Do(ctx context.Context) error {
 	getclient := action.NewGet(actionConfig)
 	release, err := getclient.Run(v.ReleaseName)
 	if err == nil && release != nil {
-		log.Info("found existing release, removing before installing", "release", release.Name)
+		log.Printf("found existing release by same name, removing before installing %s", release.Name)
 		delclient := action.NewUninstall(actionConfig)
 		delclient.Wait = true
 		delclient.Timeout = deleteTimeout
@@ -128,8 +127,9 @@ func (v *InstallHubbleHelmChart) Do(ctx context.Context) error {
 		return fmt.Errorf("failed to install chart: %w", err)
 	}
 
-	log.Info("installed chart", "release", rel.Name, "namespace", rel.Namespace)
-	log.Info("chart values", "config", rel.Config)
+	log.Printf("installed chart from path: %s in namespace: %s\n", rel.Name, rel.Namespace)
+	// this will confirm the values set during installation
+	log.Printf("chart values: %v\n", rel.Config)
 
 	// ensure all pods are running, since helm doesn't care about windows
 	config, err := clientcmd.BuildConfigFromFlags("", v.KubeConfigFilePath)
@@ -148,23 +148,23 @@ func (v *InstallHubbleHelmChart) Do(ctx context.Context) error {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		relayErr = WaitForPodReady(ctx, clientset, HubbleNamespace, "k8s-app="+HubbleRelayApp)
+		relayErr = WaitForPodReady(ctx, clientset, HubbleNamespace, "k8s-app="+HubbleRelayApp, v.Log)
 	}()
 	go func() {
 		defer wg.Done()
-		uiErr = WaitForPodReady(ctx, clientset, HubbleNamespace, "k8s-app="+HubbleUIApp)
+		uiErr = WaitForPodReady(ctx, clientset, HubbleNamespace, "k8s-app="+HubbleUIApp, v.Log)
 	}()
 	wg.Wait()
 
 	if relayErr != nil {
 		return fmt.Errorf("error waiting for Hubble Relay pods to be ready: %w", relayErr)
 	}
-	log.Info("Hubble Relay pod is ready")
+	log.Printf("Hubble Relay Pod is ready")
 
 	if uiErr != nil {
 		return fmt.Errorf("error waiting for Hubble UI pods to be ready: %w", uiErr)
 	}
-	log.Info("Hubble UI pod is ready")
+	log.Printf("Hubble UI Pod is ready")
 
 	return nil
 }

@@ -15,12 +15,17 @@ import (
 // using the native Kind Go SDK.
 type CreateCluster struct {
 	Config *Config
+	Log    *slog.Logger
 }
 
 func (c *CreateCluster) String() string { return "create-kind-cluster" }
 
 func (c *CreateCluster) Do(ctx context.Context) error {
-	log := slog.With("step", c.String())
+	log := c.Log
+	if log == nil {
+		log = slog.Default()
+	}
+	log = log.With("step", c.String())
 	provider := cluster.NewProvider()
 
 	clusters, err := provider.List()

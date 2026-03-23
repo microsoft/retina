@@ -6,29 +6,32 @@
 package hubblemetrics
 
 import (
-	"k8s.io/client-go/rest"
 	flow "github.com/Azure/go-workflow"
-	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 	"github.com/microsoft/retina/test/e2ev3/config"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
+	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
+	"k8s.io/client-go/rest"
+	"log/slog"
 )
 
-func addHubbleDNSScenario(restConfig *rest.Config, arch string) *flow.Workflow {
+func addHubbleDNSScenario(log *slog.Logger, restConfig *rest.Config, arch string) *flow.Workflow {
+	log = log.With("test", "dns")
 	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-dns"
 
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
-		AgnhostName:        agnhostName,
-		AgnhostNamespace:   config.TestPodNamespace,
-		AgnhostArch:        arch,
-		RestConfig: restConfig,
+		AgnhostName:      agnhostName,
+		AgnhostNamespace: config.TestPodNamespace,
+		AgnhostArch:      arch,
+		RestConfig:       restConfig,
+		Log:              log,
 	}
 	execNslookup := &k8s.ExecInPod{
-		PodName:            agnhostName + "-0",
-		PodNamespace:       config.TestPodNamespace,
-		Command:            "nslookup -type=a one.one.one.one",
-		RestConfig: restConfig,
+		PodName:      agnhostName + "-0",
+		PodNamespace: config.TestPodNamespace,
+		Command:      "nslookup -type=a one.one.one.one",
+		RestConfig:   restConfig,
 	}
 	validateQuery := &prom.ValidateMetricStep{
 		ForwardedPort: config.HubbleMetricsPort,
@@ -52,33 +55,27 @@ func addHubbleDNSScenario(restConfig *rest.Config, arch string) *flow.Workflow {
 			RestConfig:            restConfig,
 			OptionalLabelAffinity: "app=" + agnhostName,
 		},
-		Steps: []flow.Steper{validateQuery, validateResponse},
+		Steps: []flow.Steper{execNslookup, validateQuery, validateResponse},
 	}
 	deleteAgnhost := &k8s.DeleteKubernetesResource{
-		ResourceType:       k8s.TypeString(k8s.StatefulSet),
-		ResourceName:       agnhostName,
-		ResourceNamespace:  config.TestPodNamespace,
-		RestConfig: restConfig,
+		ResourceType:      k8s.TypeString(k8s.StatefulSet),
+		ResourceName:      agnhostName,
+		ResourceNamespace: config.TestPodNamespace,
+		RestConfig:        restConfig,
 	}
 
-	// Setup: provision resources and generate traffic.
 	wf.Add(
-		flow.Pipe(createAgnhost, execNslookup).
-			Timeout(utils.DefaultScenarioTimeout),
-	)
-
-	// Validate: retry with exponential backoff until metrics appear.
-	wf.Add(
-		flow.Step(validateWithPF).
-			DependsOn(execNslookup).
-			Retry(utils.RetryWithBackoff),
-	)
-
-	// Cleanup: always runs, even if validation fails.
-	wf.Add(
-		flow.Pipe(deleteAgnhost).
-			DependsOn(validateWithPF).
-			When(flow.Always),
+		flow.BatchPipe(
+			// Setup: provision resources.
+			flow.Pipe(createAgnhost).
+				Timeout(utils.DefaultScenarioTimeout),
+			// Validate: generate traffic and check metrics, retry with backoff.
+			flow.Steps(validateWithPF).
+				Retry(utils.RetryWithBackoff),
+			// Cleanup: always runs, even if validation fails.
+			flow.Pipe(deleteAgnhost).
+				When(flow.Always),
+		),
 	)
 	return wf
 }

@@ -16,12 +16,18 @@ import (
 type DeleteCluster struct {
 	ClusterName        string
 	KubeConfigFilePath string
+	Log                *slog.Logger
 }
 
 func (d *DeleteCluster) String() string { return "delete-kind-cluster" }
 
 func (d *DeleteCluster) Do(_ context.Context) error {
-	slog.Info("deleting Kind cluster", "cluster", d.ClusterName)
+	log := d.Log
+	if log == nil {
+		log = slog.Default()
+	}
+	log = log.With("step", d.String())
+	log.Info("deleting Kind cluster", "cluster", d.ClusterName)
 
 	provider := cluster.NewProvider()
 
@@ -29,6 +35,6 @@ func (d *DeleteCluster) Do(_ context.Context) error {
 		return fmt.Errorf("failed to delete Kind cluster %q: %w", d.ClusterName, err)
 	}
 
-	slog.Info("Kind cluster deleted successfully", "cluster", d.ClusterName)
+	log.Info("Kind cluster deleted successfully", "cluster", d.ClusterName)
 	return nil
 }

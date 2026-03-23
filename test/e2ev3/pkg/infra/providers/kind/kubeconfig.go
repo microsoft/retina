@@ -19,12 +19,18 @@ const kubeConfigPerms = 0o600
 type ExportKubeConfig struct {
 	ClusterName        string
 	KubeConfigFilePath string
+	Log                *slog.Logger
 }
 
 func (e *ExportKubeConfig) String() string { return "export-kind-kubeconfig" }
 
 func (e *ExportKubeConfig) Do(_ context.Context) error {
-	slog.Info("exporting kubeconfig for Kind cluster", "cluster", e.ClusterName, "path", e.KubeConfigFilePath)
+	log := e.Log
+	if log == nil {
+		log = slog.Default()
+	}
+	log = log.With("step", e.String())
+	log.Info("exporting kubeconfig for Kind cluster", "cluster", e.ClusterName, "path", e.KubeConfigFilePath)
 
 	provider := cluster.NewProvider()
 
@@ -37,6 +43,6 @@ func (e *ExportKubeConfig) Do(_ context.Context) error {
 		return fmt.Errorf("failed to write kubeconfig to %q: %w", e.KubeConfigFilePath, err)
 	}
 
-	slog.Info("kubeconfig for Kind cluster written", "cluster", e.ClusterName, "path", e.KubeConfigFilePath)
+	log.Info("kubeconfig for Kind cluster written", "cluster", e.ClusterName, "path", e.KubeConfigFilePath)
 	return nil
 }

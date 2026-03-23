@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/microsoft/retina/test/e2ev3/pkg/stepname"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -24,20 +25,28 @@ type WaitPodsReady struct {
 	RestConfig    *rest.Config
 	Namespace     string
 	LabelSelector string
+	Log           *slog.Logger
 }
 
-func (w *WaitPodsReady) String() string { return "wait-pods-ready" }
-
 func (w *WaitPodsReady) Do(ctx context.Context) error {
+	log := w.Log
+	if log == nil {
+		log = slog.Default()
+	}
+	log = log.With("step", stepname.StepName(w))
+
 	clientset, err := kubernetes.NewForConfig(w.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	return WaitForPodReady(ctx, clientset, w.Namespace, w.LabelSelector)
+	return WaitForPodReady(ctx, clientset, w.Namespace, w.LabelSelector, log)
 }
 
-func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, namespace, labelSelector string) error {
+func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, namespace, labelSelector string, log *slog.Logger) error {
+	if log == nil {
+		log = slog.Default()
+	}
 
 	printIterator := 0
 	conditionFunc := wait.ConditionWithContextFunc(func(context.Context) (bool, error) {
@@ -51,7 +60,7 @@ func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, names
 		}
 
 		if len(podList.Items) == 0 {
-			slog.Info("no pods found", "namespace", namespace, "label", labelSelector)
+			log.Info("no pods found", "namespace", namespace, "label", labelSelector)
 			return false, nil
 		}
 
@@ -61,7 +70,7 @@ func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, names
 			// Check the Pod phase
 			if podList.Items[i].Status.Phase != corev1.PodRunning {
 				if printIterator%printInterval == 0 {
-					slog.Info("pod not ready, waiting", "pod", podList.Items[i].Name)
+					log.Info("pod not ready, waiting", "pod", podList.Items[i].Name)
 				}
 				return false, nil
 			}
@@ -69,19 +78,19 @@ func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, names
 			// Check all container status.
 			for j := range podList.Items[i].Status.ContainerStatuses {
 				if !podList.Items[i].Status.ContainerStatuses[j].Ready {
-					slog.Info("container not ready, waiting", "container", podList.Items[i].Status.ContainerStatuses[j].Name, "pod", podList.Items[i].Name)
+					log.Info("container not ready, waiting", "container", podList.Items[i].Status.ContainerStatuses[j].Name, "pod", podList.Items[i].Name)
 					return false, nil
 				}
 			}
 
 		}
-		slog.Info("all pods running", "namespace", namespace, "label", labelSelector)
+		log.Info("all pods running", "namespace", namespace, "label", labelSelector)
 		return true, nil
 	})
 
 	err := wait.PollUntilContextCancel(ctx, RetryIntervalPodsReady, true, conditionFunc)
 	if err != nil {
-		PrintPodLogs(ctx, clientset, namespace, labelSelector)
+		PrintPodLogs(ctx, clientset, namespace, labelSelector, log)
 		return fmt.Errorf("error waiting for pods in namespace \"%s\" with label \"%s\" to be in Running state: %w", namespace, labelSelector, err)
 	}
 	return nil

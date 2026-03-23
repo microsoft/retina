@@ -8,6 +8,7 @@ package basicmetrics
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/config"
@@ -17,21 +18,23 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func addTCPScenario(restConfig *rest.Config, namespace, arch string) *flow.Workflow {
+func addTCPScenario(log *slog.Logger, restConfig *rest.Config, namespace, arch string) *flow.Workflow {
+	log = log.With("test", "tcp")
 	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-tcp-" + arch
 	podName := agnhostName + "-0"
 
 	createKapinger := &k8s.CreateKapingerDeployment{
-		KapingerNamespace: namespace, KapingerReplicas: "1", RestConfig: restConfig,
+		KapingerNamespace: namespace, KapingerReplicas: "1", RestConfig: restConfig, Log: log,
 	}
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
-		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, RestConfig: restConfig,
+		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, RestConfig: restConfig, Log: log,
 	}
 	waitKapinger := &k8s.WaitPodsReady{
 		RestConfig:    restConfig,
 		Namespace:     namespace,
 		LabelSelector: "app=kapinger",
+		Log:           log,
 	}
 	execCurl1 := &k8s.ExecInPod{
 		PodName: podName, PodNamespace: namespace, Command: "curl -s -m 5 bing.com", RestConfig: restConfig,
@@ -56,29 +59,18 @@ func addTCPScenario(restConfig *rest.Config, namespace, arch string) *flow.Workf
 		ResourceType: k8s.TypeString(k8s.Deployment), ResourceName: "kapinger", ResourceNamespace: namespace, RestConfig: restConfig,
 	}
 
-	// Setup: provision resources and generate traffic.
 	wf.Add(
-		flow.Pipe(createKapinger, createAgnhost, waitKapinger, execCurl1, execCurl2).
-			Timeout(utils.DefaultScenarioTimeout),
-	)
-
-	// Validate: retry with exponential backoff until metrics appear.
-	wf.Add(
-		flow.Step(validateWithPF).
-			DependsOn(execCurl2).
-			Retry(utils.RetryWithBackoff),
-	)
-
-	// Cleanup: always runs, even if validation fails.
-	wf.Add(
-		flow.Pipe(deleteAgnhost, deleteKapinger).
-			DependsOn(validateWithPF).
-			When(flow.Always),
+		flow.BatchPipe(
+			flow.Pipe(createKapinger, createAgnhost, waitKapinger, execCurl1, execCurl2).
+				Timeout(utils.DefaultScenarioTimeout),
+			flow.Steps(validateWithPF).
+				Retry(utils.RetryWithBackoff),
+			flow.Pipe(deleteAgnhost, deleteKapinger).
+				When(flow.Always),
+		),
 	)
 	return wf
 }
-
-
 
 var (
 	tcpStateMetricName            = "networkobservability_tcp_state"

@@ -22,7 +22,7 @@ type Workflow struct {
 func (w *Workflow) String() string { return "capture" }
 
 func (w *Workflow) Do(ctx context.Context) error {
-	ctx = utils.WithWorkflow(ctx, w.String())
+	ctx, _ = utils.WorkflowLogger(ctx, w.String())
 	p := w.Cfg
 	kubeConfigFilePath := p.Cluster.KubeConfigPath()
 	testPodNamespace := "default"

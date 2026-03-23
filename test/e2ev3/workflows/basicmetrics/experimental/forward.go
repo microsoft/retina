@@ -6,23 +6,25 @@
 package experimental
 
 import (
-	"k8s.io/client-go/rest"
 	"context"
+	"k8s.io/client-go/rest"
+	"log/slog"
 
 	flow "github.com/Azure/go-workflow"
-	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 	"github.com/microsoft/retina/test/e2ev3/config"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
+	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addForwardScenario(restConfig *rest.Config, namespace, arch string) *flow.Workflow {
+func addForwardScenario(log *slog.Logger, restConfig *rest.Config, namespace, arch string) *flow.Workflow {
+	log = log.With("test", "forward")
 	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-fwd-" + arch
 	podName := agnhostName + "-0"
 
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
-		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, RestConfig: restConfig,
+		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, RestConfig: restConfig, Log: log,
 	}
 	execCurl1 := flow.Func("fwd-curl-1-"+arch, func(ctx context.Context) error {
 		return (&k8s.ExecInPod{PodNamespace: namespace, PodName: podName, Command: "curl -s -m 5 bing.com", RestConfig: restConfig}).Do(ctx)
@@ -57,24 +59,18 @@ func addForwardScenario(restConfig *rest.Config, namespace, arch string) *flow.W
 		ResourceType: k8s.TypeString(k8s.StatefulSet), ResourceName: agnhostName, ResourceNamespace: namespace, RestConfig: restConfig,
 	}
 
-	// Setup: provision resources and generate traffic.
 	wf.Add(
-		flow.Pipe(createAgnhost, execCurl1, execCurl2).
-			Timeout(utils.DefaultScenarioTimeout),
-	)
-
-	// Validate: retry with exponential backoff until metrics appear.
-	wf.Add(
-		flow.Step(validateWithPF).
-			DependsOn(execCurl2).
-			Retry(utils.RetryWithBackoff),
-	)
-
-	// Cleanup: always runs, even if validation fails.
-	wf.Add(
-		flow.Pipe(deleteAgnhost).
-			DependsOn(validateWithPF).
-			When(flow.Always),
+		flow.BatchPipe(
+			// Setup: provision resources and generate traffic.
+			flow.Pipe(createAgnhost, execCurl1, execCurl2).
+				Timeout(utils.DefaultScenarioTimeout),
+			// Validate: retry with exponential backoff until metrics appear.
+			flow.Steps(validateWithPF).
+				Retry(utils.RetryWithBackoff),
+			// Cleanup: always runs, even if validation fails.
+			flow.Pipe(deleteAgnhost).
+				When(flow.Always),
+		),
 	)
 	return wf
 }

@@ -6,24 +6,26 @@
 package experimental
 
 import (
-	"k8s.io/client-go/rest"
 	flow "github.com/Azure/go-workflow"
-	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 	"github.com/microsoft/retina/test/e2ev3/config"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
+	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
+	"k8s.io/client-go/rest"
+	"log/slog"
 )
 
-func addAdvancedDropScenario(restConfig *rest.Config, namespace, arch string) *flow.Workflow {
+func addAdvancedDropScenario(log *slog.Logger, restConfig *rest.Config, namespace, arch string) *flow.Workflow {
+	log = log.With("test", "drop")
 	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-adv-drop-" + arch
 	podName := agnhostName + "-0"
 
 	createNetPol := &k8s.CreateDenyAllNetworkPolicy{
-		NetworkPolicyNamespace: namespace, RestConfig: restConfig, DenyAllLabelSelector: "app=" + agnhostName,
+		NetworkPolicyNamespace: namespace, RestConfig: restConfig, DenyAllLabelSelector: "app=" + agnhostName, Log: log,
 	}
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
-		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, RestConfig: restConfig,
+		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, RestConfig: restConfig, Log: log,
 	}
 	execCurl := utils.CurlExpectFail("adv-drop-curl-"+arch, &k8s.ExecInPod{
 		PodName: podName, PodNamespace: namespace,
@@ -54,24 +56,15 @@ func addAdvancedDropScenario(restConfig *rest.Config, namespace, arch string) *f
 		ResourceNamespace: namespace, RestConfig: restConfig,
 	}
 
-	// Setup: provision resources and generate traffic.
 	wf.Add(
-		flow.Pipe(createNetPol, createAgnhost, execCurl).
-			Timeout(utils.DefaultScenarioTimeout),
-	)
-
-	// Validate: retry with exponential backoff until metrics appear.
-	wf.Add(
-		flow.Step(validateWithPF).
-			DependsOn(execCurl).
-			Retry(utils.RetryWithBackoff),
-	)
-
-	// Cleanup: always runs, even if validation fails.
-	wf.Add(
-		flow.Pipe(deleteNetPol, deleteAgnhost).
-			DependsOn(validateWithPF).
-			When(flow.Always),
+		flow.BatchPipe(
+			// Setup: provision resources and generate traffic.
+			flow.Pipe(createNetPol, createAgnhost, execCurl).Timeout(utils.DefaultScenarioTimeout),
+			// Validate: retry with exponential backoff until metrics appear.
+			flow.Steps(validateWithPF).Retry(utils.RetryWithBackoff),
+			// Cleanup: always runs, even if validation fails.
+			flow.Pipe(deleteNetPol, deleteAgnhost).When(flow.Always),
+		),
 	)
 	return wf
 }

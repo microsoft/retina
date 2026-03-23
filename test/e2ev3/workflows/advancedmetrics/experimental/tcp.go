@@ -6,21 +6,23 @@
 package experimental
 
 import (
-	"k8s.io/client-go/rest"
 	flow "github.com/Azure/go-workflow"
-	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 	"github.com/microsoft/retina/test/e2ev3/config"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
+	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
+	"k8s.io/client-go/rest"
+	"log/slog"
 )
 
-func addAdvancedTCPScenario(restConfig *rest.Config, namespace, arch string) *flow.Workflow {
+func addAdvancedTCPScenario(log *slog.Logger, restConfig *rest.Config, namespace, arch string) *flow.Workflow {
+	log = log.With("test", "tcp")
 	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-adv-tcp-" + arch
 	podName := agnhostName + "-0"
 
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
-		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, RestConfig: restConfig,
+		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, RestConfig: restConfig, Log: log,
 	}
 	execCurl := &k8s.ExecInPod{
 		PodName: podName, PodNamespace: namespace,
@@ -47,24 +49,15 @@ func addAdvancedTCPScenario(restConfig *rest.Config, namespace, arch string) *fl
 		ResourceNamespace: namespace, RestConfig: restConfig,
 	}
 
-	// Setup: provision resources and generate traffic.
 	wf.Add(
-		flow.Pipe(createAgnhost, execCurl).
-			Timeout(utils.DefaultScenarioTimeout),
-	)
-
-	// Validate: retry with exponential backoff until metrics appear.
-	wf.Add(
-		flow.Step(validateWithPF).
-			DependsOn(execCurl).
-			Retry(utils.RetryWithBackoff),
-	)
-
-	// Cleanup: always runs, even if validation fails.
-	wf.Add(
-		flow.Pipe(deleteAgnhost).
-			DependsOn(validateWithPF).
-			When(flow.Always),
+		flow.BatchPipe(
+			// Setup: provision resources and generate traffic.
+			flow.Pipe(createAgnhost, execCurl).Timeout(utils.DefaultScenarioTimeout),
+			// Validate: retry with exponential backoff until metrics appear.
+			flow.Steps(validateWithPF).Retry(utils.RetryWithBackoff),
+			// Cleanup: always runs, even if validation fails.
+			flow.Pipe(deleteAgnhost).When(flow.Always),
+		),
 	)
 	return wf
 }

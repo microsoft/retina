@@ -8,6 +8,7 @@ package basicmetrics
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/config"
@@ -17,13 +18,14 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func addBasicDNSScenario(restConfig *rest.Config, namespace, arch, variant, command string, expectError bool) *flow.Workflow {
+func addBasicDNSScenario(log *slog.Logger, restConfig *rest.Config, namespace, arch, variant, command string, expectError bool) *flow.Workflow {
+	log = log.With("test", "dns")
 	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-dns-basic-" + variant + "-" + arch
 	podName := agnhostName + "-0"
 
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
-		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, RestConfig: restConfig,
+		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, RestConfig: restConfig, Log: log,
 	}
 	execCmd1 := flow.Func("basic-dns-"+variant+"-1-"+arch, func(ctx context.Context) error {
 		err := (&k8s.ExecInPod{PodName: podName, PodNamespace: namespace, Command: command, RestConfig: restConfig}).Do(ctx)
@@ -53,29 +55,18 @@ func addBasicDNSScenario(restConfig *rest.Config, namespace, arch, variant, comm
 		ResourceType: k8s.TypeString(k8s.StatefulSet), ResourceName: agnhostName, ResourceNamespace: namespace, RestConfig: restConfig,
 	}
 
-	// Setup: provision resources and generate traffic.
 	wf.Add(
-		flow.Pipe(createAgnhost, execCmd1, execCmd2).
-			Timeout(utils.DefaultScenarioTimeout),
-	)
-
-	// Validate: retry with exponential backoff until metrics appear.
-	wf.Add(
-		flow.Step(validateWithPF).
-			DependsOn(execCmd2).
-			Retry(utils.RetryWithBackoff),
-	)
-
-	// Cleanup: always runs, even if validation fails.
-	wf.Add(
-		flow.Pipe(deleteAgnhost).
-			DependsOn(validateWithPF).
-			When(flow.Always),
+		flow.BatchPipe(
+			flow.Pipe(createAgnhost, execCmd1, execCmd2).
+				Timeout(utils.DefaultScenarioTimeout),
+			flow.Steps(validateWithPF).
+				Retry(utils.RetryWithBackoff),
+			flow.Pipe(deleteAgnhost).
+				When(flow.Always),
+		),
 	)
 	return wf
 }
-
-
 
 var (
 	dnsBasicRequestCountMetricName  = "networkobservability_dns_request_count"

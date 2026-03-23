@@ -6,15 +6,17 @@
 package hubblemetrics
 
 import (
-	"k8s.io/client-go/rest"
 	flow "github.com/Azure/go-workflow"
-	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 	"github.com/microsoft/retina/test/e2ev3/config"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
+	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
+	"k8s.io/client-go/rest"
+	"log/slog"
 )
 
-func addHubbleDropScenario(restConfig *rest.Config, arch string) *flow.Workflow {
+func addHubbleDropScenario(log *slog.Logger, restConfig *rest.Config, arch string) *flow.Workflow {
+	log = log.With("test", "drop")
 	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := HubbleDropAgnhostName
 	podName := HubbleDropPodName
@@ -23,10 +25,11 @@ func addHubbleDropScenario(restConfig *rest.Config, arch string) *flow.Workflow 
 		NetworkPolicyNamespace: config.TestPodNamespace,
 		RestConfig:             restConfig,
 		DenyAllLabelSelector:   "app=" + agnhostName,
+		Log:                    log,
 	}
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
 		AgnhostName: agnhostName, AgnhostNamespace: config.TestPodNamespace,
-		AgnhostArch: arch, RestConfig: restConfig,
+		AgnhostArch: arch, RestConfig: restConfig, Log: log,
 	}
 	execCurl := utils.CurlExpectFail("hubble-drop-curl-"+arch, &k8s.ExecInPod{
 		PodName: podName, PodNamespace: config.TestPodNamespace,
@@ -43,14 +46,15 @@ func addHubbleDropScenario(restConfig *rest.Config, arch string) *flow.Workflow 
 	validateWithPF := &utils.WithPortForward{
 		PF: &k8s.PortForward{
 			LabelSelector: "k8s-app=retina", LocalPort: config.RetinaMetricsPort, RemotePort: config.RetinaMetricsPort,
-			Endpoint: config.MetricsEndpoint, RestConfig: restConfig, OptionalLabelAffinity: "app=" + agnhostName,
+			Namespace: config.KubeSystemNamespace, Endpoint: config.MetricsEndpoint, RestConfig: restConfig, OptionalLabelAffinity: "app=" + agnhostName,
 		},
 		Steps: []flow.Steper{
+			execCurl,
 			validateRetinaDrop,
 			&utils.WithPortForward{
 				PF: &k8s.PortForward{
 					LabelSelector: "k8s-app=retina", LocalPort: config.HubbleMetricsPort, RemotePort: config.HubbleMetricsPort,
-					Endpoint: config.MetricsEndpoint, RestConfig: restConfig, OptionalLabelAffinity: "app=" + agnhostName,
+					Namespace: config.KubeSystemNamespace, Endpoint: config.MetricsEndpoint, RestConfig: restConfig, OptionalLabelAffinity: "app=" + agnhostName,
 				},
 				Steps: []flow.Steper{validateHubbleDrop},
 			},
@@ -65,24 +69,18 @@ func addHubbleDropScenario(restConfig *rest.Config, arch string) *flow.Workflow 
 		ResourceNamespace: config.TestPodNamespace, RestConfig: restConfig,
 	}
 
-	// Setup: provision resources and generate traffic.
 	wf.Add(
-		flow.Pipe(createNetPol, createAgnhost, execCurl).
-			Timeout(utils.DefaultScenarioTimeout),
-	)
-
-	// Validate: retry with exponential backoff until metrics appear.
-	wf.Add(
-		flow.Step(validateWithPF).
-			DependsOn(execCurl).
-			Retry(utils.RetryWithBackoff),
-	)
-
-	// Cleanup: always runs, even if validation fails.
-	wf.Add(
-		flow.Pipe(deleteNetPol, deleteAgnhost).
-			DependsOn(validateWithPF).
-			When(flow.Always),
+		flow.BatchPipe(
+			// Setup: provision resources.
+			flow.Pipe(createNetPol, createAgnhost).
+				Timeout(utils.DefaultScenarioTimeout),
+			// Validate: generate traffic and check metrics, retry with backoff.
+			flow.Steps(validateWithPF).
+				Retry(utils.RetryWithBackoff),
+			// Cleanup: always runs, even if validation fails.
+			flow.Pipe(deleteNetPol, deleteAgnhost).
+				When(flow.Always),
+		),
 	)
 	return wf
 }

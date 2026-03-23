@@ -6,15 +6,17 @@
 package hubblemetrics
 
 import (
-	"k8s.io/client-go/rest"
 	flow "github.com/Azure/go-workflow"
-	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 	"github.com/microsoft/retina/test/e2ev3/config"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
+	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
+	"k8s.io/client-go/rest"
+	"log/slog"
 )
 
-func addHubbleFlowInterNodeScenario(restConfig *rest.Config, arch string) *flow.Workflow {
+func addHubbleFlowInterNodeScenario(log *slog.Logger, restConfig *rest.Config, arch string) *flow.Workflow {
+	log = log.With("test", "flow-inter")
 	wf := &flow.Workflow{DontPanic: true}
 	podnameSrc := "agnhost-flow-inter-src"
 	podnameDst := "agnhost-flow-inter-dst"
@@ -22,23 +24,27 @@ func addHubbleFlowInterNodeScenario(restConfig *rest.Config, arch string) *flow.
 		{"source": config.TestPodNamespace + "/" + podnameSrc + "-0", "destination": "", "protocol": config.TCP, "subtype": "to-stack", "type": "Trace", "verdict": "FORWARDED"},
 		{"source": config.TestPodNamespace + "/" + podnameDst + "-0", "destination": "", "protocol": config.TCP, "subtype": "to-endpoint", "type": "Trace", "verdict": "FORWARDED"},
 	}
+	// Validate from dst pod's perspective using source-based labels.
+	// With sourceEgressContext=pod, flow metrics always populate 'source' with the local pod
+	// and leave 'destination' empty — so we check dst-0 appears as source for both directions.
 	validDstLabels := []map[string]string{
-		{"source": "", "destination": config.TestPodNamespace + "/" + podnameSrc + "-0", "protocol": config.TCP, "subtype": "to-stack", "type": "Trace", "verdict": "FORWARDED"},
-		{"source": "", "destination": config.TestPodNamespace + "/" + podnameDst + "-0", "protocol": config.TCP, "subtype": "to-endpoint", "type": "Trace", "verdict": "FORWARDED"},
+		{"source": config.TestPodNamespace + "/" + podnameDst + "-0", "destination": "", "protocol": config.TCP, "subtype": "to-stack", "type": "Trace", "verdict": "FORWARDED"},
+		{"source": config.TestPodNamespace + "/" + podnameDst + "-0", "destination": "", "protocol": config.TCP, "subtype": "to-endpoint", "type": "Trace", "verdict": "FORWARDED"},
 	}
 
 	createSrc := &k8s.CreateAgnhostStatefulSet{
 		AgnhostName: podnameSrc, AgnhostNamespace: config.TestPodNamespace,
-		AgnhostArch: arch, RestConfig: restConfig,
+		AgnhostArch: arch, RestConfig: restConfig, Log: log,
 	}
 	createDst := &k8s.CreateAgnhostStatefulSet{
 		AgnhostName: podnameDst, AgnhostNamespace: config.TestPodNamespace,
-		AgnhostArch: arch, RestConfig: restConfig,
+		AgnhostArch: arch, RestConfig: restConfig, Log: log,
 	}
 	curlPod := &CurlPodStep{
 		SrcPodName: podnameSrc + "-0", SrcPodNamespace: config.TestPodNamespace,
 		DstPodName: podnameDst + "-0", DstPodNamespace: config.TestPodNamespace,
 		RestConfig: restConfig,
+		Log:        log,
 	}
 	validateSrc := &prom.ValidateMetricStep{
 		ForwardedPort: config.HubbleMetricsPort, MetricName: config.HubbleFlowMetricName,
@@ -51,14 +57,15 @@ func addHubbleFlowInterNodeScenario(restConfig *rest.Config, arch string) *flow.
 	validateWithPF := &utils.WithPortForward{
 		PF: &k8s.PortForward{
 			LabelSelector: "k8s-app=retina", LocalPort: config.HubbleMetricsPort, RemotePort: config.HubbleMetricsPort,
-			Endpoint: config.MetricsEndpoint, RestConfig: restConfig, OptionalLabelAffinity: "app=" + podnameSrc,
+			Namespace: config.KubeSystemNamespace, Endpoint: config.MetricsEndpoint, RestConfig: restConfig, OptionalLabelAffinity: "app=" + podnameSrc,
 		},
 		Steps: []flow.Steper{
+			curlPod,
 			validateSrc,
 			&utils.WithPortForward{
 				PF: &k8s.PortForward{
 					LabelSelector: "k8s-app=retina", LocalPort: "9966", RemotePort: config.HubbleMetricsPort,
-					Endpoint: config.MetricsEndpoint, RestConfig: restConfig, OptionalLabelAffinity: "app=" + podnameDst,
+					Namespace: config.KubeSystemNamespace, Endpoint: config.MetricsEndpoint, RestConfig: restConfig, OptionalLabelAffinity: "app=" + podnameDst,
 				},
 				Steps: []flow.Steper{validateDst},
 			},
@@ -73,24 +80,18 @@ func addHubbleFlowInterNodeScenario(restConfig *rest.Config, arch string) *flow.
 		ResourceNamespace: config.TestPodNamespace, RestConfig: restConfig,
 	}
 
-	// Setup: provision resources and generate traffic.
 	wf.Add(
-		flow.Pipe(createSrc, createDst, curlPod).
-			Timeout(utils.DefaultScenarioTimeout),
-	)
-
-	// Validate: retry with exponential backoff until metrics appear.
-	wf.Add(
-		flow.Step(validateWithPF).
-			DependsOn(curlPod).
-			Retry(utils.RetryWithBackoff),
-	)
-
-	// Cleanup: always runs, even if validation fails.
-	wf.Add(
-		flow.Pipe(deleteSrc, deleteDst).
-			DependsOn(validateWithPF).
-			When(flow.Always),
+		flow.BatchPipe(
+			// Setup: provision resources.
+			flow.Pipe(createSrc, createDst).
+				Timeout(utils.DefaultScenarioTimeout),
+			// Validate: generate traffic and check metrics, retry with backoff.
+			flow.Steps(validateWithPF).
+				Retry(utils.RetryWithBackoff),
+			// Cleanup: always runs, even if validation fails.
+			flow.Pipe(deleteSrc, deleteDst).
+				When(flow.Always),
+		),
 	)
 	return wf
 }
