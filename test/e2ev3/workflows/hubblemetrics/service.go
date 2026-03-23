@@ -1,0 +1,118 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
+//go:build e2e
+
+package hubblemetrics
+
+import (
+	"k8s.io/client-go/rest"
+	"context"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"time"
+
+	flow "github.com/Azure/go-workflow"
+	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
+)
+
+func addHubbleRelayValidation(restConfig *rest.Config) *flow.Workflow {
+	wf := &flow.Workflow{DontPanic: true}
+	validateRelay := &ValidateHubbleRelayServiceStep{RestConfig: restConfig}
+	wf.Add(flow.Step(validateRelay))
+	return wf
+}
+
+func addHubbleUIValidation(restConfig *rest.Config) *flow.Workflow {
+	wf := &flow.Workflow{DontPanic: true}
+	validateUI := &ValidateHubbleUIServiceStep{RestConfig: restConfig}
+	wf.Add(flow.Step(validateUI))
+	return wf
+}
+
+
+
+// ValidateHubbleRelayServiceStep validates that the hubble-relay-service
+// exists in the cluster.
+type ValidateHubbleRelayServiceStep struct {
+	RestConfig *rest.Config
+}
+
+func (v *ValidateHubbleRelayServiceStep) String() string { return "validate-hubble-relay-service" }
+
+func (v *ValidateHubbleRelayServiceStep) Do(ctx context.Context) error {
+	step := &k8s.ValidateResource{
+		ResourceName:      "hubble-relay-service",
+		ResourceNamespace: k8s.HubbleNamespace,
+		ResourceType:      k8s.ResourceTypeService,
+		Labels:            "k8s-app=" + k8s.HubbleRelayApp,
+		RestConfig:        v.RestConfig,
+	}
+	return step.Do(ctx)
+}
+
+// ValidateHubbleUIServiceStep validates that the hubble-ui service exists
+// and that it responds with HTTP 200.
+type ValidateHubbleUIServiceStep struct {
+	RestConfig *rest.Config
+}
+
+func (v *ValidateHubbleUIServiceStep) String() string { return "validate-hubble-ui-service" }
+
+func (v *ValidateHubbleUIServiceStep) Do(ctx context.Context) error {
+	log := slog.With("step", v.String())
+	validateStep := &k8s.ValidateResource{
+		ResourceName:      k8s.HubbleUIApp,
+		ResourceNamespace: k8s.HubbleNamespace,
+		ResourceType:      k8s.ResourceTypeService,
+		Labels:            "k8s-app=" + k8s.HubbleUIApp,
+		RestConfig:        v.RestConfig,
+	}
+	if err := validateStep.Do(ctx); err != nil {
+		return fmt.Errorf("failed to validate hubble-ui service: %w", err)
+	}
+
+	// Port forward and validate HTTP response
+	pf := &k8s.PortForward{
+		LabelSelector:         "k8s-app=hubble-ui",
+		LocalPort:             "8080",
+		RemotePort:            "8081",
+		OptionalLabelAffinity: "k8s-app=hubble-ui",
+		Endpoint:              "?namespace=default",
+		RestConfig:            v.RestConfig,
+	}
+	if err := pf.Do(ctx); err != nil {
+		return fmt.Errorf("failed to port forward to hubble-ui: %w", err)
+	}
+	defer pf.Stop() //nolint:errcheck // best effort cleanup
+
+	httpStep := &k8s.ValidateHTTPResponse{
+		URL:            "http://localhost:8080",
+		ExpectedStatus: http.StatusOK,
+	}
+	if err := httpStep.Do(ctx); err != nil {
+		return fmt.Errorf("failed to validate hubble-ui HTTP response: %w", err)
+	}
+
+	log.Info("Hubble UI service validation succeeded")
+	return nil
+}
+
+const hubbleUIRequestTimeout = 30 * time.Second
+
+// ValidateHTTPResponseStep wraps the old ValidateHTTPResponse step.
+type ValidateHTTPResponseStep struct {
+	URL            string
+	ExpectedStatus int
+}
+
+func (v *ValidateHTTPResponseStep) String() string { return "validate-http-response" }
+
+func (v *ValidateHTTPResponseStep) Do(ctx context.Context) error {
+	step := &k8s.ValidateHTTPResponse{
+		URL:            v.URL,
+		ExpectedStatus: v.ExpectedStatus,
+	}
+	return step.Do(ctx)
+}

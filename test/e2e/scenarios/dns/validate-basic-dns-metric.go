@@ -4,7 +4,6 @@ package dns
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/microsoft/retina/test/e2e/framework/constants"
 	prom "github.com/microsoft/retina/test/e2e/framework/prometheus"
@@ -30,8 +29,6 @@ func (v *validateBasicDNSRequestMetrics) Run() error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to verify basic dns request metrics %s", dnsBasicRequestCountMetricName)
 	}
-	log.Printf("found metrics matching %+v\n", dnsBasicRequestCountMetricName)
-
 	return nil
 }
 
@@ -64,8 +61,6 @@ func (v *validateBasicDNSResponseMetrics) Run() error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to verify basic dns response metrics %s", dnsBasicResponseCountMetricName)
 	}
-	log.Printf("found metrics matching %+v\n", dnsBasicResponseCountMetricName)
-
 	return nil
 }
 

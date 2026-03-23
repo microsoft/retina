@@ -1,0 +1,44 @@
+package kubernetes
+
+import (
+	"context"
+	"fmt"
+
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+)
+
+var ErrPodCrashed = fmt.Errorf("pod has crashes")
+
+type EnsureStableComponent struct {
+	LabelSelector string
+	PodNamespace  string
+	RestConfig    *rest.Config
+
+	// Container restarts can occur for various reason, they do not necessarily mean the entire cluster
+	// is unstable or needs to be recreated. In some cases, container restarts are expected and acceptable.
+	// This flag should be set to true only in those cases and provide additional why restart restarts are acceptable.
+	IgnoreContainerRestart bool
+}
+
+func (n *EnsureStableComponent) String() string { return "ensure-stable-component" }
+
+func (n *EnsureStableComponent) Do(ctx context.Context) error {
+	clientset, err := kubernetes.NewForConfig(n.RestConfig)
+	if err != nil {
+		return fmt.Errorf("error creating Kubernetes client: %w", err)
+	}
+
+	err = WaitForPodReady(ctx, clientset, n.PodNamespace, n.LabelSelector)
+	if err != nil {
+		return fmt.Errorf("error waiting for retina pods to be ready: %w", err)
+	}
+
+	if !n.IgnoreContainerRestart {
+		err = CheckContainerRestart(ctx, clientset, n.PodNamespace, n.LabelSelector)
+		if err != nil {
+			return fmt.Errorf("error checking pod restarts: %w", err)
+		}
+	}
+	return nil
+}

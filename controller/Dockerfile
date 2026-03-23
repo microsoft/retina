@@ -18,7 +18,8 @@ ARG GOARCH=amd64 # default to amd64
 ARG GOOS=linux # default to linux
 ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
-RUN if [ "$GOOS" = "linux" ] ; then \
+RUN --mount=type=cache,target=/var/cache/tdnf \
+    if [ "$GOOS" = "linux" ] ; then \
     tdnf install -y clang lld bpftool libbpf-devel; \
     fi
 COPY ./pkg/plugin /go/src/github.com/microsoft/retina/pkg/plugin
@@ -68,7 +69,7 @@ RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/ret
 
 # tools image
 FROM azurelinux-core AS tools
-RUN tdnf install -y \
+RUN --mount=type=cache,target=/var/cache/tdnf tdnf install -y \
     clang \
     iproute \
     iptables \

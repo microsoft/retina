@@ -1,0 +1,92 @@
+package kubernetes
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"log/slog"
+	"os"
+	"strings"
+	"time"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/client-go/util/retry"
+	"k8s.io/kubectl/pkg/scheme"
+)
+
+const ExecSubResources = "exec"
+
+type ExecInPod struct {
+	PodNamespace string
+	RestConfig   *rest.Config
+	PodName      string
+	Command      string
+}
+
+func (e *ExecInPod) String() string { return "exec-in-pod" }
+
+func (e *ExecInPod) Do(ctx context.Context) error {
+	log := slog.With("step", e.String())
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+
+	clientset, err := kubernetes.NewForConfig(e.RestConfig)
+	if err != nil {
+		return fmt.Errorf("error creating Kubernetes client: %w", err)
+	}
+
+	err = retry.OnError(retry.DefaultRetry, func(err error) bool {
+		// Retry on every error
+		return true
+	}, func() error {
+		_, execErr := ExecPod(ctx, clientset, e.RestConfig, e.PodNamespace, e.PodName, e.Command)
+		if execErr != nil {
+			log.Error("executing command, retrying", "command", e.Command, "error", execErr)
+		}
+		return execErr
+	})
+	if err != nil {
+		return fmt.Errorf("error executing command, all retries exhausted [%s]: %w", e.Command, err)
+	}
+
+	return nil
+}
+
+func ExecPod(ctx context.Context, clientset *kubernetes.Clientset, config *rest.Config, namespace, podName, command string) ([]byte, error) {
+	slog.Info("executing command", "command", command, "pod", podName, "namespace", namespace)
+	req := clientset.CoreV1().RESTClient().Post().Resource("pods").Name(podName).
+		Namespace(namespace).SubResource(ExecSubResources)
+	option := &v1.PodExecOptions{
+		Command: strings.Fields(command),
+		Stdin:   true,
+		Stdout:  true,
+		Stderr:  true,
+		TTY:     false,
+	}
+
+	req.VersionedParams(
+		option,
+		scheme.ParameterCodec,
+	)
+
+	var buf bytes.Buffer
+	exec, err := remotecommand.NewSPDYExecutor(config, "POST", req.URL())
+	if err != nil {
+		return buf.Bytes(), fmt.Errorf("error creating executor: %w", err)
+	}
+
+	err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
+		Stdin:  os.Stdin,
+		Stdout: &buf,
+		Stderr: &buf,
+	})
+	if err != nil {
+		return buf.Bytes(), fmt.Errorf("error executing command: %w", err)
+	}
+
+	res := buf.Bytes()
+	return res, nil
+}

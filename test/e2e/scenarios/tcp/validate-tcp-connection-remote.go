@@ -2,7 +2,6 @@ package flow
 
 import (
 	"fmt"
-	"log"
 
 	prom "github.com/microsoft/retina/test/e2e/framework/prometheus"
 )
@@ -30,7 +29,6 @@ func (v *ValidateRetinaTCPConnectionRemoteMetric) Run() error {
 		}
 	}
 
-	log.Printf("found metrics matching %+v\n", tcpConnectionRemoteMetricName)
 	return nil
 }
 
