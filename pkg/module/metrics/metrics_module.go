@@ -468,13 +468,22 @@ func handlePodEvent(event *cache.CacheEvent, m *Module, pod *common.RetinaEndpoi
 		// This case should only occur when the pod annotation is removed since this is an EventTypePodAdded (also accounts for pod update)
 		if !podCacheEntry.Annotated && !podCacheEntry.Namespaced {
 			m.l.Info("Adding pod IP to DELETE dirty pods cache. Pod not annotated or in namespace of interest.", zap.String("pod name", pod.NamespacedName()))
-			podCacheEntry.Annotated = true
 			m.dirtyPods.ToDelete(ip.String(), podCacheEntry)
 			return
 		}
 		m.l.Info("Adding pod IP to ADD dirty pods cache", zap.String("pod name", pod.NamespacedName()))
 		m.dirtyPods.ToAdd(podCacheEntry.IP.String(), podCacheEntry)
 	case cache.EventTypePodDeleted:
+		// Guard against spurious DELETE events during pod churn / IP reuse.
+		// The daemon cache is updated before events are published, so if a new pod
+		// reused this IP the cache still contains an entry. Deleting would remove a valid IP.
+		if endpoint := m.daemonCache.GetPodByIP(ip.String()); endpoint != nil {
+			m.l.Debug("Ignoring DELETE for reused IP — pod still exists in cache",
+				zap.String("deleted pod", pod.NamespacedName()),
+				zap.String("ip", ip.String()),
+				zap.String("cached pod", endpoint.NamespacedName()))
+			return
+		}
 		m.l.Info("Adding pod IP to DELETE dirty pods cache", zap.String("pod name", pod.NamespacedName()))
 		m.dirtyPods.ToDelete(ip.String(), podCacheEntry)
 	default:
