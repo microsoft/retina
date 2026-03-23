@@ -112,6 +112,20 @@ func (mr *MockCacheInterfaceMockRecorder) DeleteRetinaSvc(arg0 any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRetinaSvc", reflect.TypeOf((*MockCacheInterface)(nil).DeleteRetinaSvc), arg0)
 }
 
+// GetAllNamespaces mocks base method.
+func (m *MockCacheInterface) GetAllNamespaces() []string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAllNamespaces")
+	ret0, _ := ret[0].([]string)
+	return ret0
+}
+
+// GetAllNamespaces indicates an expected call of GetAllNamespaces.
+func (mr *MockCacheInterfaceMockRecorder) GetAllNamespaces() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllNamespaces", reflect.TypeOf((*MockCacheInterface)(nil).GetAllNamespaces))
+}
+
 // GetAnnotatedNamespaces mocks base method.
 func (m *MockCacheInterface) GetAnnotatedNamespaces() []string {
 	m.ctrl.T.Helper()
