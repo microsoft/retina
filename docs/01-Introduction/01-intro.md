@@ -1,3 +1,7 @@
+---
+slug: /Introduction/intro
+---
+
 # What is Retina?
 
 ## Introduction
