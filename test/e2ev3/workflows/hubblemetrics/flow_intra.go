@@ -7,7 +7,6 @@ package hubblemetrics
 
 import (
 	"k8s.io/client-go/rest"
-	"log/slog"
 
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/config"
@@ -16,8 +15,7 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addHubbleFlowIntraNodeScenario(log *slog.Logger, restConfig *rest.Config, arch string) *flow.Workflow {
-	log = log.With("test", "flow-intra")
+func addHubbleFlowIntraNodeScenario(restConfig *rest.Config, arch string) *flow.Workflow {
 	wf := &flow.Workflow{DontPanic: true}
 	podname := "agnhost-flow-intra"
 	replicas := 2
@@ -31,13 +29,12 @@ func addHubbleFlowIntraNodeScenario(log *slog.Logger, restConfig *rest.Config, a
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
 		AgnhostName: podname, AgnhostNamespace: config.TestPodNamespace,
 		ScheduleOnSameNode: true, AgnhostReplicas: &replicas,
-		AgnhostArch: arch, RestConfig: restConfig, Log: log,
+		AgnhostArch: arch, RestConfig: restConfig,
 	}
 	curlPod := &CurlPodStep{
 		SrcPodName: podname + "-0", SrcPodNamespace: config.TestPodNamespace,
 		DstPodName: podname + "-1", DstPodNamespace: config.TestPodNamespace,
 		RestConfig: restConfig,
-		Log:        log,
 	}
 	validateFlow := &prom.ValidateMetricStep{
 		ForwardedPort: config.HubbleMetricsPort, MetricName: config.HubbleFlowMetricName,

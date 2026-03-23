@@ -12,26 +12,23 @@ import (
 	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"k8s.io/client-go/rest"
-	"log/slog"
 )
 
-func addTCPStatsScenario(log *slog.Logger, restConfig *rest.Config, namespace, arch string) *flow.Workflow {
-	log = log.With("test", "tcp-stats")
+func addTCPStatsScenario(restConfig *rest.Config, namespace, arch string) *flow.Workflow {
 	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-tcpstats-" + arch
 	podName := agnhostName + "-0"
 
 	createKapinger := &k8s.CreateKapingerDeployment{
-		KapingerNamespace: namespace, KapingerReplicas: "1", RestConfig: restConfig, Log: log,
+		KapingerNamespace: namespace, KapingerReplicas: "1", RestConfig: restConfig,
 	}
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
-		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, RestConfig: restConfig, Log: log,
+		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, RestConfig: restConfig,
 	}
 	waitKapinger := &k8s.WaitPodsReady{
 		RestConfig:    restConfig,
 		Namespace:     namespace,
 		LabelSelector: "app=kapinger",
-		Log:           log,
 	}
 	execCurl1 := &k8s.ExecInPod{
 		PodName: podName, PodNamespace: namespace, Command: "curl -s -m 5 kapinger:80", RestConfig: restConfig,

@@ -3,13 +3,13 @@ package infra
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"testing"
 
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/config"
 	"github.com/microsoft/retina/test/e2ev3/pkg/infra/providers/azure"
 	"github.com/microsoft/retina/test/e2ev3/pkg/infra/providers/kind"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -23,7 +23,7 @@ type Workflow struct {
 func (s *Workflow) Do(ctx context.Context) error {
 	p := s.Cfg
 	kubeCfgPath := p.Cluster.KubeConfigPath()
-	log := slog.Default().With("workflow", "infra")
+	ctx, _ = utils.StepLogger(ctx, s)
 
 	if *config.KubeConfig != "" {
 		rc, err := clientcmd.BuildConfigFromFlags("", kubeCfgPath)
@@ -40,7 +40,7 @@ func (s *Workflow) Do(ctx context.Context) error {
 		kc := p.Cluster.(*kind.Cluster)
 		kindCfg := kind.DefaultE2EKindConfig(kc.Name)
 		kc.Name = kindCfg.ClusterName
-		steps = KindSteps(s.T, kindCfg, kubeCfgPath, *config.CreateInfra, *config.DeleteInfra, log)
+		steps = KindSteps(s.T, kindCfg, kubeCfgPath, *config.CreateInfra, *config.DeleteInfra)
 	default:
 		ac := p.Cluster.(*azure.Cluster)
 		infraCfg := ResolveInfraConfig(s.T, ac)

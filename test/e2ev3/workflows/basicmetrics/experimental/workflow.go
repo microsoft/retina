@@ -22,7 +22,7 @@ type Workflow struct {
 func (w *Workflow) String() string { return "basic-metrics-experimental" }
 
 func (w *Workflow) Do(ctx context.Context) error {
-	ctx, log := utils.WorkflowLogger(ctx, w.String())
+	ctx, _ = utils.StepLogger(ctx, w)
 	p := w.Cfg
 	restConfig := p.Cluster.RestConfig()
 	chartPath := p.Paths.RetinaChart
@@ -47,9 +47,9 @@ func (w *Workflow) Do(ctx context.Context) error {
 	var scenarios []flow.Steper
 	for _, arch := range config.Architectures {
 		scenarios = append(scenarios,
-			addForwardScenario(log, restConfig, testPodNamespace, arch),
-			addConntrackScenario(log, restConfig, testPodNamespace, arch),
-			addTCPStatsScenario(log, restConfig, testPodNamespace, arch),
+			addForwardScenario(restConfig, testPodNamespace, arch),
+			addConntrackScenario(restConfig, testPodNamespace, arch),
+			addTCPStatsScenario(restConfig, testPodNamespace, arch),
 		)
 	}
 	scenarios = append(scenarios,

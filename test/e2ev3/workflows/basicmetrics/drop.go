@@ -8,7 +8,6 @@ package basicmetrics
 import (
 	"context"
 	"fmt"
-	"log/slog"
 
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/config"
@@ -18,17 +17,16 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func addDropScenario(log *slog.Logger, restConfig *rest.Config, namespace, arch string) *flow.Workflow {
-	log = log.With("test", "drop")
+func addDropScenario(restConfig *rest.Config, namespace, arch string) *flow.Workflow {
 	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-drop-" + arch
 	podName := agnhostName + "-0"
 
 	createNetPol := &k8s.CreateDenyAllNetworkPolicy{
-		NetworkPolicyNamespace: namespace, RestConfig: restConfig, DenyAllLabelSelector: "app=" + agnhostName, Log: log,
+		NetworkPolicyNamespace: namespace, RestConfig: restConfig, DenyAllLabelSelector: "app=" + agnhostName,
 	}
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
-		AgnhostNamespace: namespace, AgnhostName: agnhostName, AgnhostArch: arch, RestConfig: restConfig, Log: log,
+		AgnhostNamespace: namespace, AgnhostName: agnhostName, AgnhostArch: arch, RestConfig: restConfig,
 	}
 	execCurl1 := utils.CurlExpectFail("drop-curl-1-"+arch, &k8s.ExecInPod{
 		PodNamespace: namespace, PodName: podName, Command: "curl -s -m 5 bing.com", RestConfig: restConfig,

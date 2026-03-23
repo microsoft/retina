@@ -12,11 +12,9 @@ import (
 	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"k8s.io/client-go/rest"
-	"log/slog"
 )
 
-func addHubbleDNSScenario(log *slog.Logger, restConfig *rest.Config, arch string) *flow.Workflow {
-	log = log.With("test", "dns")
+func addHubbleDNSScenario(restConfig *rest.Config, arch string) *flow.Workflow {
 	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-dns"
 
@@ -25,7 +23,6 @@ func addHubbleDNSScenario(log *slog.Logger, restConfig *rest.Config, arch string
 		AgnhostNamespace: config.TestPodNamespace,
 		AgnhostArch:      arch,
 		RestConfig:       restConfig,
-		Log:              log,
 	}
 	execNslookup := &k8s.ExecInPod{
 		PodName:      agnhostName + "-0",

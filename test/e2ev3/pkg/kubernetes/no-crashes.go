@@ -3,7 +3,6 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-	"log/slog"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -20,7 +19,6 @@ type EnsureStableComponent struct {
 	// is unstable or needs to be recreated. In some cases, container restarts are expected and acceptable.
 	// This flag should be set to true only in those cases and provide additional why restart restarts are acceptable.
 	IgnoreContainerRestart bool
-	Log                    *slog.Logger
 }
 
 func (n *EnsureStableComponent) Do(ctx context.Context) error {
@@ -29,7 +27,7 @@ func (n *EnsureStableComponent) Do(ctx context.Context) error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	err = WaitForPodReady(ctx, clientset, n.PodNamespace, n.LabelSelector, n.Log)
+	err = WaitForPodReady(ctx, clientset, n.PodNamespace, n.LabelSelector)
 	if err != nil {
 		return fmt.Errorf("error waiting for retina pods to be ready: %w", err)
 	}

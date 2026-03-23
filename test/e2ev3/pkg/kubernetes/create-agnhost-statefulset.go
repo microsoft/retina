@@ -3,11 +3,9 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"strconv"
 	"time"
 
-	"github.com/microsoft/retina/test/e2ev3/pkg/stepname"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -31,16 +29,9 @@ type CreateAgnhostStatefulSet struct {
 	RestConfig         *rest.Config
 	AgnhostArch        string
 	AgnhostReplicas    *int
-	Log                *slog.Logger
 }
 
 func (c *CreateAgnhostStatefulSet) Do(ctx context.Context) error {
-	log := c.Log
-	if log == nil {
-		log = slog.Default()
-	}
-	log = log.With("step", stepname.StepName(c))
-
 	clientset, err := kubernetes.NewForConfig(c.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
@@ -73,7 +64,7 @@ func (c *CreateAgnhostStatefulSet) Do(ctx context.Context) error {
 	}
 
 	labelSelector := fmt.Sprintf("app=%s", selector)
-	err = WaitForPodReady(ctx, clientset, c.AgnhostNamespace, labelSelector, log)
+	err = WaitForPodReady(ctx, clientset, c.AgnhostNamespace, labelSelector)
 	if err != nil {
 		return fmt.Errorf("error waiting for agnhost pod to be ready: %w", err)
 	}

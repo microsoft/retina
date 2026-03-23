@@ -8,12 +8,10 @@ package hubblemetrics
 import (
 	"context"
 	"fmt"
-	"log/slog"
 
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"github.com/microsoft/retina/test/e2ev3/pkg/stepname"
 )
 
 // CurlPodStep executes a curl command from a source pod to a destination pod
@@ -24,15 +22,9 @@ type CurlPodStep struct {
 	DstPodName      string
 	DstPodNamespace string
 	RestConfig      *rest.Config
-	Log             *slog.Logger
 }
 
 func (c *CurlPodStep) Do(ctx context.Context) error {
-	log := c.Log
-	if log == nil {
-		log = slog.Default()
-	}
-	log = log.With("step", stepname.StepName(c))
 	clientset, err := kubernetes.NewForConfig(c.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)

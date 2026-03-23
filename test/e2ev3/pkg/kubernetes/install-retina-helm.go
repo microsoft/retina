@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -38,7 +37,6 @@ type InstallHelmChart struct {
 	HelmDriver         string
 	ImageLoader        e2ecfg.ClusterProvider
 	EnableHeartbeat    bool
-	Log                *slog.Logger
 }
 
 func (i *InstallHelmChart) Do(ctx context.Context) error {
@@ -84,7 +82,7 @@ func (i *InstallHelmChart) Do(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to build rest config: %w", err)
 	}
-	err = CreateNamespaceFn(ctx, i.Log, rc, e2ecfg.TestPodNamespace)
+	err = CreateNamespaceFn(ctx, rc, e2ecfg.TestPodNamespace)
 	if err != nil {
 		return fmt.Errorf("failed to create namespace %s: %w", i.Namespace, err)
 	}
@@ -162,7 +160,7 @@ func (i *InstallHelmChart) Do(ctx context.Context) error {
 	}
 
 	labelSelector := "k8s-app=retina"
-	err = WaitForPodReady(ctx, clientset, "kube-system", labelSelector, i.Log)
+	err = WaitForPodReady(ctx, clientset, "kube-system", labelSelector)
 	if err != nil {
 		return fmt.Errorf("error waiting for retina pods to be ready: %w", err)
 	}

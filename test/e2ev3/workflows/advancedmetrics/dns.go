@@ -8,7 +8,6 @@ package advancedmetrics
 import (
 	"context"
 	"fmt"
-	"log/slog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -21,18 +20,17 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addAdvancedDNSScenario(log *slog.Logger, restConfig *rest.Config, namespace, arch, variant string,
+func addAdvancedDNSScenario(restConfig *rest.Config, namespace, arch, variant string,
 	command string, expectError bool,
 	reqQuery, reqQueryType, workloadKind string,
 	respNumResponse, respQuery, respQueryType, respReturnCode, respResponse string,
 ) *flow.Workflow {
-	log = log.With("test", "dns")
 	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-adv-dns-" + variant + "-" + arch
 	podName := agnhostName + "-0"
 
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
-		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, RestConfig: restConfig, Log: log,
+		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, RestConfig: restConfig,
 	}
 	// Generate traffic inside the validation loop so packetparser captures it.
 	execTraffic := flow.Func("adv-dns-"+variant+"-traffic-"+arch, func(ctx context.Context) error {

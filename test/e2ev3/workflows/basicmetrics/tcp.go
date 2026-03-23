@@ -8,7 +8,6 @@ package basicmetrics
 import (
 	"context"
 	"fmt"
-	"log/slog"
 
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/config"
@@ -18,23 +17,21 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func addTCPScenario(log *slog.Logger, restConfig *rest.Config, namespace, arch string) *flow.Workflow {
-	log = log.With("test", "tcp")
+func addTCPScenario(restConfig *rest.Config, namespace, arch string) *flow.Workflow {
 	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-tcp-" + arch
 	podName := agnhostName + "-0"
 
 	createKapinger := &k8s.CreateKapingerDeployment{
-		KapingerNamespace: namespace, KapingerReplicas: "1", RestConfig: restConfig, Log: log,
+		KapingerNamespace: namespace, KapingerReplicas: "1", RestConfig: restConfig,
 	}
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
-		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, RestConfig: restConfig, Log: log,
+		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, RestConfig: restConfig,
 	}
 	waitKapinger := &k8s.WaitPodsReady{
 		RestConfig:    restConfig,
 		Namespace:     namespace,
 		LabelSelector: "app=kapinger",
-		Log:           log,
 	}
 	execCurl1 := &k8s.ExecInPod{
 		PodName: podName, PodNamespace: namespace, Command: "curl -s -m 5 bing.com", RestConfig: restConfig,

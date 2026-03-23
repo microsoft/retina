@@ -6,8 +6,8 @@ package kind
 import (
 	"context"
 	"fmt"
-	"log/slog"
 
+	"github.com/microsoft/retina/test/e2ev3/pkg/stepname"
 	"sigs.k8s.io/kind/pkg/cluster"
 )
 
@@ -15,17 +15,12 @@ import (
 // using the native Kind Go SDK.
 type CreateCluster struct {
 	Config *Config
-	Log    *slog.Logger
 }
 
 func (c *CreateCluster) String() string { return "create-kind-cluster" }
 
 func (c *CreateCluster) Do(ctx context.Context) error {
-	log := c.Log
-	if log == nil {
-		log = slog.Default()
-	}
-	log = log.With("step", c.String())
+	_, log := stepname.StepLogger(ctx, c)
 	provider := cluster.NewProvider()
 
 	clusters, err := provider.List()

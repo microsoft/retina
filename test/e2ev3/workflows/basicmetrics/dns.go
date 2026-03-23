@@ -8,7 +8,6 @@ package basicmetrics
 import (
 	"context"
 	"fmt"
-	"log/slog"
 
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/config"
@@ -18,14 +17,13 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func addBasicDNSScenario(log *slog.Logger, restConfig *rest.Config, namespace, arch, variant, command string, expectError bool) *flow.Workflow {
-	log = log.With("test", "dns")
+func addBasicDNSScenario(restConfig *rest.Config, namespace, arch, variant, command string, expectError bool) *flow.Workflow {
 	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-dns-basic-" + variant + "-" + arch
 	podName := agnhostName + "-0"
 
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
-		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, RestConfig: restConfig, Log: log,
+		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, RestConfig: restConfig,
 	}
 	execCmd1 := flow.Func("basic-dns-"+variant+"-1-"+arch, func(ctx context.Context) error {
 		err := (&k8s.ExecInPod{PodName: podName, PodNamespace: namespace, Command: command, RestConfig: restConfig}).Do(ctx)

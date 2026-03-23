@@ -6,8 +6,8 @@ package kind
 import (
 	"context"
 	"fmt"
-	"log/slog"
 
+	"github.com/microsoft/retina/test/e2ev3/pkg/stepname"
 	"sigs.k8s.io/kind/pkg/cluster"
 )
 
@@ -16,17 +16,12 @@ import (
 type DeleteCluster struct {
 	ClusterName        string
 	KubeConfigFilePath string
-	Log                *slog.Logger
 }
 
 func (d *DeleteCluster) String() string { return "delete-kind-cluster" }
 
-func (d *DeleteCluster) Do(_ context.Context) error {
-	log := d.Log
-	if log == nil {
-		log = slog.Default()
-	}
-	log = log.With("step", d.String())
+func (d *DeleteCluster) Do(ctx context.Context) error {
+	_, log := stepname.StepLogger(ctx, d)
 	log.Info("deleting Kind cluster", "cluster", d.ClusterName)
 
 	provider := cluster.NewProvider()

@@ -3,10 +3,8 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"strings"
 
-	"github.com/microsoft/retina/test/e2ev3/pkg/stepname"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -22,16 +20,9 @@ type CreateDenyAllNetworkPolicy struct {
 	NetworkPolicyNamespace string
 	RestConfig             *rest.Config
 	DenyAllLabelSelector   string
-	Log                    *slog.Logger
 }
 
 func (c *CreateDenyAllNetworkPolicy) Do(ctx context.Context) error {
-	log := c.Log
-	if log == nil {
-		log = slog.Default()
-	}
-	log = log.With("step", stepname.StepName(c))
-
 	clientset, err := kubernetes.NewForConfig(c.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
@@ -73,16 +64,9 @@ type DeleteDenyAllNetworkPolicy struct {
 	NetworkPolicyNamespace string
 	RestConfig             *rest.Config
 	DenyAllLabelSelector   string
-	Log                    *slog.Logger
 }
 
 func (d *DeleteDenyAllNetworkPolicy) Do(ctx context.Context) error {
-	log := d.Log
-	if log == nil {
-		log = slog.Default()
-	}
-	log = log.With("step", stepname.StepName(d))
-
 	clientset, err := kubernetes.NewForConfig(d.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)

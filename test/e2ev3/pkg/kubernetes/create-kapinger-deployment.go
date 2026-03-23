@@ -3,10 +3,8 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"strconv"
 
-	"github.com/microsoft/retina/test/e2ev3/pkg/stepname"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -29,7 +27,6 @@ type CreateKapingerDeployment struct {
 	KapingerNamespace string
 	KapingerReplicas  string
 	RestConfig        *rest.Config
-	Log               *slog.Logger
 }
 
 func (c *CreateKapingerDeployment) Do(ctx context.Context) error {
@@ -37,12 +34,6 @@ func (c *CreateKapingerDeployment) Do(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("error converting replicas to int for Kapinger replicas: %w", err)
 	}
-
-	log := c.Log
-	if log == nil {
-		log = slog.Default()
-	}
-	log = log.With("step", stepname.StepName(c))
 
 	clientset, err := kubernetes.NewForConfig(c.RestConfig)
 	if err != nil {

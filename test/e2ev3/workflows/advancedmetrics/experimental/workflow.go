@@ -22,7 +22,7 @@ type Workflow struct {
 func (w *Workflow) String() string { return "advanced-metrics-experimental" }
 
 func (w *Workflow) Do(ctx context.Context) error {
-	ctx, log := utils.WorkflowLogger(ctx, w.String())
+	ctx, _ = utils.StepLogger(ctx, w)
 	p := w.Cfg
 	restConfig := p.Cluster.RestConfig()
 	chartPath := p.Paths.RetinaChart
@@ -44,9 +44,9 @@ func (w *Workflow) Do(ctx context.Context) error {
 	var scenarios []flow.Steper
 	for _, arch := range config.Architectures {
 		scenarios = append(scenarios,
-			addAdvancedDropScenario(log, restConfig, testPodNamespace, arch),
-			addAdvancedForwardScenario(log, restConfig, testPodNamespace, arch),
-			addAdvancedTCPScenario(log, restConfig, testPodNamespace, arch),
+			addAdvancedDropScenario(restConfig, testPodNamespace, arch),
+			addAdvancedForwardScenario(restConfig, testPodNamespace, arch),
+			addAdvancedTCPScenario(restConfig, testPodNamespace, arch),
 		)
 	}
 	scenarios = append(scenarios, addAPIServerLatencyScenario(restConfig))

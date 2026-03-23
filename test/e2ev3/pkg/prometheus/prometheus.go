@@ -6,13 +6,12 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"log/slog"
 	"net/http"
 	"reflect"
 	"strings"
 	"time"
 
-	"github.com/microsoft/retina/test/e2ev3/pkg/stepname"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"github.com/microsoft/retina/test/retry"
 	promclient "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
@@ -196,15 +195,10 @@ type ValidateMetricStep struct {
 	ValidMetrics  []map[string]string
 	ExpectMetric  bool
 	PartialMatch  bool
-	Log           *slog.Logger
 }
 
 func (v *ValidateMetricStep) Do(ctx context.Context) error {
-	slogger := v.Log
-	if slogger == nil {
-		slogger = slog.Default()
-	}
-	slogger = slogger.With("step", stepname.StepName(v))
+	_, slogger := utils.StepLogger(ctx, v)
 
 	promAddress := fmt.Sprintf("http://localhost:%s/metrics", v.ForwardedPort)
 

@@ -12,11 +12,9 @@ import (
 	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"k8s.io/client-go/rest"
-	"log/slog"
 )
 
-func addHubbleFlowInterNodeScenario(log *slog.Logger, restConfig *rest.Config, arch string) *flow.Workflow {
-	log = log.With("test", "flow-inter")
+func addHubbleFlowInterNodeScenario(restConfig *rest.Config, arch string) *flow.Workflow {
 	wf := &flow.Workflow{DontPanic: true}
 	podnameSrc := "agnhost-flow-inter-src"
 	podnameDst := "agnhost-flow-inter-dst"
@@ -34,17 +32,16 @@ func addHubbleFlowInterNodeScenario(log *slog.Logger, restConfig *rest.Config, a
 
 	createSrc := &k8s.CreateAgnhostStatefulSet{
 		AgnhostName: podnameSrc, AgnhostNamespace: config.TestPodNamespace,
-		AgnhostArch: arch, RestConfig: restConfig, Log: log,
+		AgnhostArch: arch, RestConfig: restConfig,
 	}
 	createDst := &k8s.CreateAgnhostStatefulSet{
 		AgnhostName: podnameDst, AgnhostNamespace: config.TestPodNamespace,
-		AgnhostArch: arch, RestConfig: restConfig, Log: log,
+		AgnhostArch: arch, RestConfig: restConfig,
 	}
 	curlPod := &CurlPodStep{
 		SrcPodName: podnameSrc + "-0", SrcPodNamespace: config.TestPodNamespace,
 		DstPodName: podnameDst + "-0", DstPodNamespace: config.TestPodNamespace,
 		RestConfig: restConfig,
-		Log:        log,
 	}
 	validateSrc := &prom.ValidateMetricStep{
 		ForwardedPort: config.HubbleMetricsPort, MetricName: config.HubbleFlowMetricName,

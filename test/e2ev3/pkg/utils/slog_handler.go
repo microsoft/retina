@@ -105,10 +105,7 @@ func (h *StepHandler) Handle(ctx context.Context, r slog.Record) error {
 		r.Time.Format("15:04:05"),
 		r.Level.String())
 
-	// Build the [prefix] bracket.
-	if prefix == "" {
-		prefix = buildPrefix(workflow, test, step)
-	}
+	// Render the [prefix] bracket.
 	if prefix != "" {
 		if h.color {
 			code := colorForPrefix(prefix)

@@ -22,7 +22,7 @@ type Workflow struct {
 func (w *Workflow) String() string { return "advanced-metrics" }
 
 func (w *Workflow) Do(ctx context.Context) error {
-	ctx, log := utils.WorkflowLogger(ctx, w.String())
+	ctx, _ = utils.StepLogger(ctx, w)
 	p := w.Cfg
 	restConfig := p.Cluster.RestConfig()
 	chartPath := p.Paths.RetinaChart
@@ -38,18 +38,17 @@ func (w *Workflow) Do(ctx context.Context) error {
 		ChartPath:          chartPath,
 		HelmDriver:         helmCfg.Driver,
 		ValuesFile:         valuesFilePath,
-		Log:                log,
 	}
 
 	var scenarios []flow.Steper
 	for _, arch := range config.Architectures {
 		scenarios = append(scenarios,
-			addAdvancedDNSScenario(log, restConfig, testPodNamespace, arch,
+			addAdvancedDNSScenario(restConfig, testPodNamespace, arch,
 				"valid", "nslookup kubernetes.default", false,
 				"kubernetes.default.svc.cluster.local.", "A", "StatefulSet",
 				"1", "kubernetes.default.svc.cluster.local.", "A", "NOERROR", KubeServiceIP,
 			),
-			addAdvancedDNSScenario(log, restConfig, testPodNamespace, arch,
+			addAdvancedDNSScenario(restConfig, testPodNamespace, arch,
 				"nxdomain", "nslookup some.non.existent.domain.", true,
 				"some.non.existent.domain.", "A", "StatefulSet",
 				"0", "some.non.existent.domain.", "A", "NXDOMAIN", EmptyResponse,
@@ -63,7 +62,6 @@ func (w *Workflow) Do(ctx context.Context) error {
 		LabelSelector:          "k8s-app=retina",
 		RestConfig:             restConfig,
 		IgnoreContainerRestart: false,
-		Log:                    log,
 	}
 
 	debug := &utils.DebugOnFailure{

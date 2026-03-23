@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/microsoft/retina/test/e2ev3/pkg/stepname"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -25,28 +24,19 @@ type WaitPodsReady struct {
 	RestConfig    *rest.Config
 	Namespace     string
 	LabelSelector string
-	Log           *slog.Logger
 }
 
 func (w *WaitPodsReady) Do(ctx context.Context) error {
-	log := w.Log
-	if log == nil {
-		log = slog.Default()
-	}
-	log = log.With("step", stepname.StepName(w))
-
 	clientset, err := kubernetes.NewForConfig(w.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	return WaitForPodReady(ctx, clientset, w.Namespace, w.LabelSelector, log)
+	return WaitForPodReady(ctx, clientset, w.Namespace, w.LabelSelector)
 }
 
-func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, namespace, labelSelector string, log *slog.Logger) error {
-	if log == nil {
-		log = slog.Default()
-	}
+func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, namespace, labelSelector string) error {
+	log := slog.Default()
 
 	printIterator := 0
 	conditionFunc := wait.ConditionWithContextFunc(func(context.Context) (bool, error) {
@@ -90,7 +80,7 @@ func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, names
 
 	err := wait.PollUntilContextCancel(ctx, RetryIntervalPodsReady, true, conditionFunc)
 	if err != nil {
-		PrintPodLogs(ctx, clientset, namespace, labelSelector, log)
+		PrintPodLogs(ctx, clientset, namespace, labelSelector)
 		return fmt.Errorf("error waiting for pods in namespace \"%s\" with label \"%s\" to be in Running state: %w", namespace, labelSelector, err)
 	}
 	return nil

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -33,7 +32,6 @@ type InstallHubbleHelmChart struct {
 	ImageNamespace     string
 	HelmDriver         string
 	ImageLoader        e2ecfg.ClusterProvider
-	Log                *slog.Logger
 }
 
 func (v *InstallHubbleHelmChart) Do(ctx context.Context) error {
@@ -54,7 +52,7 @@ func (v *InstallHubbleHelmChart) Do(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to build rest config: %w", err)
 	}
-	err = CreateNamespaceFn(ctx, v.Log, rc, e2ecfg.TestPodNamespace)
+	err = CreateNamespaceFn(ctx, rc, e2ecfg.TestPodNamespace)
 	if err != nil {
 		return fmt.Errorf("failed to create namespace %s: %w", v.Namespace, err)
 	}
@@ -148,11 +146,11 @@ func (v *InstallHubbleHelmChart) Do(ctx context.Context) error {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		relayErr = WaitForPodReady(ctx, clientset, HubbleNamespace, "k8s-app="+HubbleRelayApp, v.Log)
+		relayErr = WaitForPodReady(ctx, clientset, HubbleNamespace, "k8s-app="+HubbleRelayApp)
 	}()
 	go func() {
 		defer wg.Done()
-		uiErr = WaitForPodReady(ctx, clientset, HubbleNamespace, "k8s-app="+HubbleUIApp, v.Log)
+		uiErr = WaitForPodReady(ctx, clientset, HubbleNamespace, "k8s-app="+HubbleUIApp)
 	}()
 	wg.Wait()
 

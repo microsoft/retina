@@ -12,18 +12,16 @@ import (
 	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"k8s.io/client-go/rest"
-	"log/slog"
 )
 
-func addHubbleTCPScenario(log *slog.Logger, restConfig *rest.Config, arch string) *flow.Workflow {
-	log = log.With("test", "tcp")
+func addHubbleTCPScenario(restConfig *rest.Config, arch string) *flow.Workflow {
 	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-tcp"
 	podName := agnhostName + "-0"
 
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
 		AgnhostName: agnhostName, AgnhostNamespace: config.TestPodNamespace,
-		AgnhostArch: arch, RestConfig: restConfig, Log: log,
+		AgnhostArch: arch, RestConfig: restConfig,
 	}
 	execCurl := &k8s.ExecInPod{
 		PodName: podName, PodNamespace: config.TestPodNamespace,

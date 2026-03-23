@@ -6,9 +6,9 @@ package kind
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os"
 
+	"github.com/microsoft/retina/test/e2ev3/pkg/stepname"
 	"sigs.k8s.io/kind/pkg/cluster"
 )
 
@@ -19,17 +19,12 @@ const kubeConfigPerms = 0o600
 type ExportKubeConfig struct {
 	ClusterName        string
 	KubeConfigFilePath string
-	Log                *slog.Logger
 }
 
 func (e *ExportKubeConfig) String() string { return "export-kind-kubeconfig" }
 
-func (e *ExportKubeConfig) Do(_ context.Context) error {
-	log := e.Log
-	if log == nil {
-		log = slog.Default()
-	}
-	log = log.With("step", e.String())
+func (e *ExportKubeConfig) Do(ctx context.Context) error {
+	_, log := stepname.StepLogger(ctx, e)
 	log.Info("exporting kubeconfig for Kind cluster", "cluster", e.ClusterName, "path", e.KubeConfigFilePath)
 
 	provider := cluster.NewProvider()

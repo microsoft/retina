@@ -5,7 +5,6 @@ import (
 	"io"
 	"log/slog"
 
-	"github.com/microsoft/retina/test/e2ev3/pkg/stepname"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -16,15 +15,10 @@ type GetPodLogs struct {
 	RestConfig    *rest.Config
 	Namespace     string
 	LabelSelector string
-	Log           *slog.Logger
 }
 
 func (p *GetPodLogs) Do(ctx context.Context) error {
-	log := p.Log
-	if log == nil {
-		log = slog.Default()
-	}
-	log = log.With("step", stepname.StepName(p))
+	log := slog.Default()
 
 	log.Info("printing pod logs", "namespace", p.Namespace, "labelselector", p.LabelSelector)
 
@@ -33,15 +27,13 @@ func (p *GetPodLogs) Do(ctx context.Context) error {
 		log.Error("error creating clientset", "error", err)
 	}
 
-	PrintPodLogs(ctx, clientset, p.Namespace, p.LabelSelector, log)
+	PrintPodLogs(ctx, clientset, p.Namespace, p.LabelSelector)
 
 	return nil
 }
 
-func PrintPodLogs(ctx context.Context, clientset *kubernetes.Clientset, namespace, labelSelector string, log *slog.Logger) {
-	if log == nil {
-		log = slog.Default()
-	}
+func PrintPodLogs(ctx context.Context, clientset *kubernetes.Clientset, namespace, labelSelector string) {
+	log := slog.Default()
 	// List all the pods in the namespace
 	pods, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: labelSelector,

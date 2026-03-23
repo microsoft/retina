@@ -12,11 +12,9 @@ import (
 	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"k8s.io/client-go/rest"
-	"log/slog"
 )
 
-func addHubbleFlowToWorldScenario(log *slog.Logger, restConfig *rest.Config, arch string) *flow.Workflow {
-	log = log.With("test", "flow-world")
+func addHubbleFlowToWorldScenario(restConfig *rest.Config, arch string) *flow.Workflow {
 	wf := &flow.Workflow{DontPanic: true}
 	podname := "agnhost-flow-world"
 	validLabels := []map[string]string{
@@ -26,7 +24,7 @@ func addHubbleFlowToWorldScenario(log *slog.Logger, restConfig *rest.Config, arc
 
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
 		AgnhostName: podname, AgnhostNamespace: config.TestPodNamespace,
-		AgnhostArch: arch, RestConfig: restConfig, Log: log,
+		AgnhostArch: arch, RestConfig: restConfig,
 	}
 	execCurl := &k8s.ExecInPod{
 		PodName: podname + "-0", PodNamespace: config.TestPodNamespace,

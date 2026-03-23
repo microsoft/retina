@@ -8,7 +8,6 @@ package experimental
 import (
 	"context"
 	"k8s.io/client-go/rest"
-	"log/slog"
 
 	flow "github.com/Azure/go-workflow"
 	"github.com/microsoft/retina/test/e2ev3/config"
@@ -17,14 +16,13 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func addConntrackScenario(log *slog.Logger, restConfig *rest.Config, namespace, arch string) *flow.Workflow {
-	log = log.With("test", "conntrack")
+func addConntrackScenario(restConfig *rest.Config, namespace, arch string) *flow.Workflow {
 	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-ct-" + arch
 	podName := agnhostName + "-0"
 
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
-		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, RestConfig: restConfig, Log: log,
+		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, RestConfig: restConfig,
 	}
 	execCurl1 := flow.Func("ct-curl-1-"+arch, func(ctx context.Context) error {
 		return (&k8s.ExecInPod{PodNamespace: namespace, PodName: podName, Command: "curl -s -m 5 bing.com", RestConfig: restConfig}).Do(ctx)
