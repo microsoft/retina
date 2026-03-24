@@ -153,14 +153,12 @@ func (e *Enricher) enrich(ev *v1.Event) {
 	srcZone := e.zoneFromObj(srcObj)
 	dstZone := e.zoneFromObj(dstObj)
 
-	if ext := utils.GetExtensionsStruct(flow); ext != nil {
-		utils.AddZones(ext, srcZone, dstZone)
-		utils.SetExtensions(flow, ext)
-	} else {
-		ext := utils.NewExtensions()
-		utils.AddZones(ext, srcZone, dstZone)
-		utils.SetExtensions(flow, ext)
+	ext := utils.GetExtensionsStruct(flow)
+	if ext == nil {
+		ext = utils.NewExtensions()
 	}
+	utils.AddZones(ext, srcZone, dstZone)
+	utils.SetExtensions(flow, ext)
 
 	ev.Event = flow
 	e.l.Debug("enriched flow", zap.Any("flow", flow))
