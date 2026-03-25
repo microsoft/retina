@@ -33,6 +33,10 @@ const (
 	ExtKeyPrevObservedPackets  = "previously_observed_packets"
 	ExtKeyPrevObservedBytes    = "previously_observed_bytes"
 	ExtKeyPrevObservedTCPFlags = "previously_observed_tcp_flags"
+	ExtKeySourceZone           = "source_zone"
+	ExtKeyDestinationZone      = "destination_zone"
+
+	zoneUnknown = "unknown"
 )
 
 // ToFlow returns a flow.Flow object.
@@ -152,9 +156,9 @@ func SetExtensions(f *flow.Flow, s *structpb.Struct) {
 	f.Extensions = ext
 }
 
-// getExtensionsStruct extracts the structpb.Struct from flow.Extensions.
+// GetExtensionsStruct extracts the structpb.Struct from flow.Extensions.
 // Returns nil if Extensions is nil or not a Struct.
-func getExtensionsStruct(f *flow.Flow) *structpb.Struct {
+func GetExtensionsStruct(f *flow.Flow) *structpb.Struct {
 	if f == nil || f.GetExtensions() == nil {
 		return nil
 	}
@@ -207,7 +211,7 @@ func AddPreviouslyObservedTCPFlags(s *structpb.Struct, syn, ack, fin, rst, psh, 
 }
 
 func PreviouslyObservedTCPFlags(f *flow.Flow) map[string]uint32 {
-	s := getExtensionsStruct(f)
+	s := GetExtensionsStruct(f)
 	if s == nil {
 		return nil
 	}
@@ -231,7 +235,7 @@ func AddPreviouslyObservedBytes(s *structpb.Struct, bytes uint32) {
 }
 
 func PreviouslyObservedBytes(f *flow.Flow) uint32 {
-	s := getExtensionsStruct(f)
+	s := GetExtensionsStruct(f)
 	if s == nil {
 		return 0
 	}
@@ -251,7 +255,7 @@ func AddPreviouslyObservedPackets(s *structpb.Struct, packets uint32) {
 }
 
 func PreviouslyObservedPackets(f *flow.Flow) uint32 {
-	s := getExtensionsStruct(f)
+	s := GetExtensionsStruct(f)
 	if s == nil {
 		return 0
 	}
@@ -291,7 +295,7 @@ func GetTCPID(f *flow.Flow) uint64 {
 	if f.GetL4() == nil || f.GetL4().GetTCP() == nil {
 		return 0
 	}
-	s := getExtensionsStruct(f)
+	s := GetExtensionsStruct(f)
 	if s == nil {
 		return 0
 	}
@@ -345,7 +349,7 @@ func GetDNS(f *flow.Flow) (*flow.DNS, DNSType, uint32) {
 		return nil, DNSType_UNKNOWN, 0
 	}
 	dns := f.L7.GetDns()
-	s := getExtensionsStruct(f)
+	s := GetExtensionsStruct(f)
 	if s == nil {
 		return dns, DNSType_UNKNOWN, 0
 	}
@@ -400,7 +404,7 @@ func AddPacketSize(s *structpb.Struct, packetSize uint32) {
 }
 
 func PacketSize(f *flow.Flow) uint32 {
-	s := getExtensionsStruct(f)
+	s := GetExtensionsStruct(f)
 	if s == nil {
 		return 0
 	}
@@ -438,7 +442,7 @@ func DropReasonDescription(f *flow.Flow) string {
 	if f == nil {
 		return ""
 	}
-	s := getExtensionsStruct(f)
+	s := GetExtensionsStruct(f)
 	if s == nil {
 		return ""
 	}
@@ -459,4 +463,39 @@ func decodeTime(nanoseconds int64) (pbTime *timestamppb.Timestamp, err error) {
 		return nil, err
 	}
 	return pbTime, nil
+}
+
+// AddZones adds source and destination availability zones to the flow's extensions.
+func AddZones(s *structpb.Struct, srcZone, dstZone string) {
+	if s == nil {
+		return
+	}
+	s.Fields[ExtKeySourceZone] = structpb.NewStringValue(srcZone)
+	s.Fields[ExtKeyDestinationZone] = structpb.NewStringValue(dstZone)
+}
+
+// SourceZone returns the source availability zone from the flow's extensions.
+func SourceZone(f *flow.Flow) string {
+	s := GetExtensionsStruct(f)
+	if s == nil {
+		return zoneUnknown
+	}
+	v, ok := s.GetFields()[ExtKeySourceZone]
+	if !ok {
+		return zoneUnknown
+	}
+	return v.GetStringValue()
+}
+
+// DestinationZone returns the destination availability zone from the flow's extensions.
+func DestinationZone(f *flow.Flow) string {
+	s := GetExtensionsStruct(f)
+	if s == nil {
+		return zoneUnknown
+	}
+	v, ok := s.GetFields()[ExtKeyDestinationZone]
+	if !ok {
+		return zoneUnknown
+	}
+	return v.GetStringValue()
 }

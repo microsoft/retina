@@ -167,6 +167,54 @@ func TestAddDropReason(t *testing.T) {
 	}
 }
 
+func TestZoneHelpers(t *testing.T) {
+	tests := []struct {
+		name            string
+		srcZone         string
+		dstZone         string
+		expectedSrcZone string
+		expectedDstZone string
+	}{
+		{
+			name:            "both zones set",
+			srcZone:         "zone-1",
+			dstZone:         "zone-2",
+			expectedSrcZone: "zone-1",
+			expectedDstZone: "zone-2",
+		},
+		{
+			name:            "empty zones stored as empty strings",
+			srcZone:         "",
+			dstZone:         "",
+			expectedSrcZone: "",
+			expectedDstZone: "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			f := &flow.Flow{}
+			ext := NewExtensions()
+			AddZones(ext, tc.srcZone, tc.dstZone)
+			SetExtensions(f, ext)
+
+			assert.Equal(t, tc.expectedSrcZone, SourceZone(f))
+			assert.Equal(t, tc.expectedDstZone, DestinationZone(f))
+		})
+	}
+}
+
+func TestZoneHelpers_NilExtensions(t *testing.T) {
+	f := &flow.Flow{}
+	assert.Equal(t, "unknown", SourceZone(f))
+	assert.Equal(t, "unknown", DestinationZone(f))
+}
+
+func TestAddZones_NilStruct(t *testing.T) {
+	// Should not panic.
+	AddZones(nil, "zone-1", "zone-2")
+}
+
 func TestIsDefaultRoute(t *testing.T) {
 	tests := []struct {
 		Route           netlink.Route

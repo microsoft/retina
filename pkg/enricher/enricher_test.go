@@ -12,14 +12,17 @@ import (
 
 	"github.com/cilium/cilium/api/v1/flow"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
+	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/pkg/common"
 	"github.com/microsoft/retina/pkg/controllers/cache"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/pubsub"
+	"github.com/microsoft/retina/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
@@ -238,4 +241,119 @@ func addEvent(e *Enricher, sourceIP, destIP string) {
 func assertEqualEndpoint(t *testing.T, expected *common.RetinaEndpoint, actual *flow.Endpoint) {
 	assert.Equal(t, expected.Namespace(), actual.GetNamespace())
 	assert.Equal(t, expected.Name(), actual.GetPodName())
+}
+
+func TestEnricherZoneResolution(t *testing.T) {
+	opts := log.GetDefaultLogOpts()
+	opts.Level = "debug"
+	_, err := log.SetupZapLogger(opts)
+	require.NoError(t, err)
+
+	c := cache.New(pubsub.New())
+
+	// Add a node with a zone to the cache.
+	node := common.NewRetinaNode("node-1", net.IPv4(10, 0, 0, 100), "zone-1")
+	require.NoError(t, c.UpdateRetinaNode(node))
+
+	// Create endpoints with nodeIP pointing to the node above.
+	srcEp := common.RetinaEndpointCommonFromAPI(&retinav1alpha1.RetinaEndpoint{
+		ObjectMeta: metav1.ObjectMeta{Name: "src-pod", Namespace: "ns1"},
+		Spec: retinav1alpha1.RetinaEndpointSpec{
+			PodIP:  "1.1.1.1",
+			PodIPs: []string{"1.1.1.1"},
+			NodeIP: "10.0.0.100",
+		},
+	})
+	dstEp := common.RetinaEndpointCommonFromAPI(&retinav1alpha1.RetinaEndpoint{
+		ObjectMeta: metav1.ObjectMeta{Name: "dst-pod", Namespace: "ns2"},
+		Spec: retinav1alpha1.RetinaEndpointSpec{
+			PodIP:  "2.2.2.2",
+			PodIPs: []string{"2.2.2.2"},
+			NodeIP: "10.0.0.100",
+		},
+	})
+
+	require.NoError(t, c.UpdateRetinaEndpoint(srcEp))
+	require.NoError(t, c.UpdateRetinaEndpoint(dstEp))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	e := newEnricher(ctx, c)
+
+	// Get the export reader before running and writing, so we don't miss events.
+	oreader := e.ExportReader()
+	e.Run()
+
+	// Write multiple events to ensure at least one makes it through the ring.
+	for range 3 {
+		e.Write(&v1.Event{
+			Timestamp: timestamppb.Now(),
+			Event: &flow.Flow{
+				IP: &flow.IP{
+					IpVersion:   1,
+					Source:      "1.1.1.1",
+					Destination: "2.2.2.2",
+				},
+			},
+		})
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	enrichedEv := oreader.NextFollow(ctx)
+	require.NotNil(t, enrichedEv)
+
+	enrichedFlow := enrichedEv.Event.(*flow.Flow)
+	assert.Equal(t, "zone-1", utils.SourceZone(enrichedFlow))
+	assert.Equal(t, "zone-1", utils.DestinationZone(enrichedFlow))
+}
+
+func TestEnricherZoneResolution_NoNode(t *testing.T) {
+	opts := log.GetDefaultLogOpts()
+	opts.Level = "debug"
+	_, err := log.SetupZapLogger(opts)
+	require.NoError(t, err)
+
+	c := cache.New(pubsub.New())
+
+	// Create endpoint with nodeIP but no node in cache.
+	ep := common.RetinaEndpointCommonFromAPI(&retinav1alpha1.RetinaEndpoint{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: "ns1"},
+		Spec: retinav1alpha1.RetinaEndpointSpec{
+			PodIP:  "3.3.3.3",
+			PodIPs: []string{"3.3.3.3"},
+			NodeIP: "10.0.0.200",
+		},
+	})
+	require.NoError(t, c.UpdateRetinaEndpoint(ep))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	e := newEnricher(ctx, c)
+
+	oreader := e.ExportReader()
+	e.Run()
+
+	for range 3 {
+		e.Write(&v1.Event{
+			Timestamp: timestamppb.Now(),
+			Event: &flow.Flow{
+				IP: &flow.IP{
+					IpVersion:   1,
+					Source:      "3.3.3.3",
+					Destination: "9.9.9.9",
+				},
+			},
+		})
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	enrichedEv := oreader.NextFollow(ctx)
+	require.NotNil(t, enrichedEv)
+
+	enrichedFlow := enrichedEv.Event.(*flow.Flow)
+	// Node not in cache, so zone should be "unknown".
+	assert.Equal(t, "unknown", utils.SourceZone(enrichedFlow))
+	assert.Equal(t, "unknown", utils.DestinationZone(enrichedFlow))
 }
