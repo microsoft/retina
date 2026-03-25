@@ -21,7 +21,7 @@ const (
 	clusterTimeout       = 15 * time.Minute
 	clusterCreateTicker  = 30 * time.Second
 	pollFrequency        = 5 * time.Second
-	AgentARMSKU          = "Standard_D4pls_v5"
+	AgentARMSKU          = "Standard_D4pls_v6"
 	AuxilaryNodeCount    = 1
 	AuxilaryARMNodeCount = 2
 )
@@ -55,15 +55,14 @@ func (c *CreateNPMCluster) Run() error {
 
 	//nolint:appendCombine // separate for verbosity
 	npmCluster.Properties.AgentPoolProfiles = append(npmCluster.Properties.AgentPoolProfiles, &armcontainerservice.ManagedClusterAgentPoolProfile{ //nolint:all
-		Type: to.Ptr(armcontainerservice.AgentPoolTypeVirtualMachineScaleSets),
-		// AvailabilityZones:  []*string{to.Ptr("1")},
+		Type:               to.Ptr(armcontainerservice.AgentPoolTypeVirtualMachineScaleSets),
 		Count:              to.Ptr[int32](AuxilaryNodeCount),
 		EnableNodePublicIP: to.Ptr(false),
 		Mode:               to.Ptr(armcontainerservice.AgentPoolModeUser),
 		OSType:             to.Ptr(armcontainerservice.OSTypeWindows),
 		OSSKU:              to.Ptr(armcontainerservice.OSSKUWindows2022),
 		ScaleDownMode:      to.Ptr(armcontainerservice.ScaleDownModeDelete),
-		VMSize:             to.Ptr(AgentSKU),
+		VMSize:             to.Ptr(AgentWindowsSKU),
 		Name:               to.Ptr("ws22"),
 		MaxPods:            to.Ptr(int32(MaxPodsPerNode)),
 	})
@@ -71,7 +70,6 @@ func (c *CreateNPMCluster) Run() error {
 	//nolint:appendCombine // separate for verbosity
 	npmCluster.Properties.AgentPoolProfiles = append(npmCluster.Properties.AgentPoolProfiles, &armcontainerservice.ManagedClusterAgentPoolProfile{
 		Type:               to.Ptr(armcontainerservice.AgentPoolTypeVirtualMachineScaleSets),
-		AvailabilityZones:  []*string{to.Ptr("1")},
 		Count:              to.Ptr[int32](AuxilaryNodeCount),
 		EnableNodePublicIP: to.Ptr(false),
 		EnableFIPS:         to.Ptr(true),
@@ -86,8 +84,7 @@ func (c *CreateNPMCluster) Run() error {
 
 	//nolint:appendCombine // separate for verbosity
 	npmCluster.Properties.AgentPoolProfiles = append(npmCluster.Properties.AgentPoolProfiles, &armcontainerservice.ManagedClusterAgentPoolProfile{ //nolint:all
-		Type: to.Ptr(armcontainerservice.AgentPoolTypeVirtualMachineScaleSets),
-		// AvailabilityZones:  []*string{to.Ptr("1")},
+		Type:               to.Ptr(armcontainerservice.AgentPoolTypeVirtualMachineScaleSets),
 		Count:              to.Ptr[int32](AuxilaryARMNodeCount),
 		EnableNodePublicIP: to.Ptr(false),
 		Mode:               to.Ptr(armcontainerservice.AgentPoolModeUser),

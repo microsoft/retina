@@ -14,7 +14,8 @@ import (
 const (
 	MaxNumberOfNodes = 3
 	MaxPodsPerNode   = 250
-	AgentSKU         = "Standard_DS4_v2"
+	AgentSKU         = "Standard_D4s_v6"
+	AgentWindowsSKU  = "Standard_D4s_v4"
 )
 
 var defaultClusterCreateTimeout = 30 * time.Minute
@@ -110,8 +111,7 @@ func GetStarterClusterTemplate(location string) armcontainerservice.ManagedClust
 			*/
 			AgentPoolProfiles: []*armcontainerservice.ManagedClusterAgentPoolProfile{
 				{
-					Type: to.Ptr(armcontainerservice.AgentPoolTypeVirtualMachineScaleSets),
-					// AvailabilityZones:  []*string{to.Ptr("1")},
+					Type:               to.Ptr(armcontainerservice.AgentPoolTypeVirtualMachineScaleSets),
 					Count:              to.Ptr[int32](MaxNumberOfNodes),
 					EnableNodePublicIP: to.Ptr(false),
 					Mode:               to.Ptr(armcontainerservice.AgentPoolModeSystem),
