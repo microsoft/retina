@@ -3,9 +3,6 @@ external-docs/
 tools/__pycache__/
 docs/
 docs
-versioned_docs/
-versioned_sidebars/
-versions.json
 node_modules/
 
 # Dependencies

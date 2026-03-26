@@ -70,7 +70,19 @@ const config = {
         docs: {
           sidebarPath: './sidebars.ts',
           path: '../docs',
-          editUrl: 'https://github.com/microsoft/retina/blob/main/docs',
+          editUrl: 'https://github.com/microsoft/retina/edit/main/docs',
+          lastVersion: 'v1.1.0',
+          versions: {
+            current: {
+              label: 'Latest',
+              path: 'latest',
+              banner: 'unreleased',
+            },
+            'v1.1.0': {
+              label: 'v1.1.0 (stable)',
+              banner: 'none',
+            },
+          },
         },
         theme: {
           customCss: './src/css/custom.css',
@@ -135,6 +147,10 @@ const config = {
           label: "Docs",
         },
         {
+          type: 'docsVersionDropdown',
+          position: 'right',
+        },
+        {
           href: 'https://github.com/microsoft/retina',
           label: 'GitHub',
           position: 'right',
@@ -156,7 +172,7 @@ const config = {
           items: [
             {
               label: "Contribute",
-              href: "https://github.com/microsoft/retina/tree/main/docs/08-Contributing",
+              to: "/docs/Contributing/overview",
             },
             {
               label: "Github",

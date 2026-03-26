@@ -81,12 +81,14 @@ Verify installation:
 
 ```bash
 $ kubectl retina
+A kubectl plugin for Retina
 Retina is an eBPF distributed networking observability tool for Kubernetes.
 
 Usage:
   kubectl-retina [command]
 
 Available Commands:
+  bpftrace    [EXPERIMENTAL] Trace network issues on a node using bpftrace
   capture     Capture network traffic
   completion  Generate the autocompletion script for the specified shell
   config      Configure retina CLI
