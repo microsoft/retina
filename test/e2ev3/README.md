@@ -24,10 +24,11 @@ End-to-end tests built on [go-workflow](https://github.com/Azure/go-workflow), a
 
 | Flag | Default | Description |
 |---|---|---|
-| `-provider` | `azure` | Infrastructure provider: `azure` or `kind` |
+| `-provider` | `azure` | Infrastructure provider: `azure` or `kind`. Makefile overrides this to `kind`. |
 | `-kubeconfig` | `""` | Path to an existing kubeconfig (skips infra creation) |
 | `-create-infra` | `true` | Create infrastructure before tests |
 | `-delete-infra` | `true` | Delete infrastructure after tests |
+| `-force-build` | `false` | Rebuild images even if they already exist locally |
 
 ## Running Tests
 
@@ -132,7 +133,7 @@ IMAGE_REGISTRY=ghcr.io/microsoft \
 
 Each scenario follows the same DAG pattern:
 
-```
+```text
 create → exec → validate (retry with backoff) → cleanup (always)
 ```
 
@@ -143,17 +144,18 @@ create → exec → validate (retry with backoff) → cleanup (always)
 
 ## Directory Layout
 
-```
+```text
 test/e2ev3/
 ├── retina_e2e_test.go              # Test entry point (declarative pipeline)
 ├── Makefile                        # Make targets
 ├── config/                         # E2E config, flags, paths, shared params
 │   ├── e2e.go                      # Config types, env loading, E2EParams
-│   └── load_step.go                # config.Step — resolves config + image tag
+│   ├── load_step.go                # config.Step — resolves config + image tag
+│   ├── metrics.go                  # Metric name and label constants (Retina + Hubble)
+│   └── network.go                  # Network protocol and flag constants
 ├── pkg/
 │   ├── images/                     # Image loading interface + images.Step
-│   │   ├── build/                  # Build images from source + build.Step
-│   │   └── load/                   # Load images onto clusters (Kind sideload vs registry pull)
+│   │   └── build/                  # Build images from source + build.Step
 │   ├── infra/                      # Infrastructure orchestration + infra.Workflow
 │   │   └── providers/
 │   │       ├── azure/              # AKS cluster provisioning (ARM templates)
