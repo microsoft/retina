@@ -107,8 +107,7 @@ func NewCaptureToPodTranslator(kubeClient kubernetes.Interface, logger *log.ZapL
 
 	apierverURL, err := telemetry.GetK8SApiserverURLFromKubeConfig()
 	if err != nil {
-		captureToPodTranslator.l.Error("Failed to get apiserver URL", zap.Error(err))
-		// TODO(mainred): should we return error here?
+		captureToPodTranslator.l.Warn("Failed to get apiserver URL, capture jobs will run without apiserver identifier", zap.Error(err))
 		captureToPodTranslator.Apiserver = ""
 	} else {
 		captureToPodTranslator.Apiserver = apierverURL
