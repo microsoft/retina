@@ -405,6 +405,27 @@ jobs:
           set -euo pipefail
           go test -v ./test/e2e/. -timeout 60m -tags=e2e -count=1  -args -image-tag=$(make version) -image-registry=${{ vars.ACR_NAME }}  -image-namespace=${{ github.repository}}
 
+  e2ev3:
+    name: Run E2Ev3 Tests (Kind)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup go
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
+        with:
+          go-version-file: go.mod
+      - run: go version
+
+      - name: Run E2Ev3 Tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -v ./test/e2ev3/ -timeout 60m -tags=e2e -count=1 -provider=kind
+
   perf-test-basic:
     if: ${{ github.event_name == 'merge_group'}}
     needs: [manifests, get-tag]
