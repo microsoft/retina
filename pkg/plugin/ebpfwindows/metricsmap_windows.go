@@ -85,6 +85,25 @@ var callEnumMetricsMap = func(callback uintptr) (uintptr, uintptr, error) {
 	return enumMetricsMap.Call(callback)
 }
 
+var loadRetinaEbpfAPI = func() error {
+	if err := retinaEbpfAPI.Load(); err != nil {
+		return err
+	}
+
+	for _, proc := range []*windows.LazyProc{
+		enumMetricsMap,
+		lostEventCount,
+		registerEventsMapCallback,
+		unregisterEventsMapCallback,
+	} {
+		if err := proc.Find(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // IterateWithCallback iterates through all the keys/values of a metrics map,
 // passing each key/value pair to the cb callback
 func (m metricsMap) IterateWithCallback(l *log.ZapLogger, cb IterateCallback) error {
