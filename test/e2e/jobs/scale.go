@@ -62,7 +62,7 @@ func GetScaleTestInfra(subID, rg, clusterName, location, kubeConfigFilePath stri
 			Nodes:       nodes,
 		}).
 			SetPodCidr("100.64.0.0/10").
-			SetVMSize("Standard_D4s_v6").
+			SetVMSize("Standard_D4ds_v4").
 			SetNetworkPluginMode("overlay"), nil)
 
 		job.AddStep(&azure.GetAKSKubeConfig{
