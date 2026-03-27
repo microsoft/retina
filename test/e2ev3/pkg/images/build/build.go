@@ -39,13 +39,20 @@ func (b *Step) Do(ctx context.Context) error {
 }
 
 func (b *Step) build(ctx context.Context, rootDir, registry, namespace, tag string, push bool) error {
-	targets := []string{"retina-image", "retina-operator-image"}
+	// Build init, agent, and operator images fully in parallel.
+	// The retina-image Makefile target loops over AGENT_TARGETS sequentially,
+	// so we override AGENT_TARGETS per invocation to parallelize all three.
+	targets := [][]string{
+		{"retina-image", "AGENT_TARGETS=init"},
+		{"retina-image", "AGENT_TARGETS=agent"},
+		{"retina-operator-image"},
+	}
 
 	errs := make(chan error, len(targets))
-	for _, target := range targets {
-		go func(t string) {
-			errs <- runMake(ctx, rootDir, registry, namespace, tag, push, t)
-		}(target)
+	for _, t := range targets {
+		go func(target []string) {
+			errs <- runMake(ctx, rootDir, registry, namespace, tag, push, target[0], target[1:]...)
+		}(t)
 	}
 
 	var firstErr error
@@ -57,7 +64,7 @@ func (b *Step) build(ctx context.Context, rootDir, registry, namespace, tag stri
 	return firstErr
 }
 
-func runMake(ctx context.Context, rootDir, registry, namespace, tag string, push bool, target string) error {
+func runMake(ctx context.Context, rootDir, registry, namespace, tag string, push bool, target string, extraArgs ...string) error {
 	args := []string{
 		target,
 		"PLATFORM=linux/amd64",
@@ -66,6 +73,7 @@ func runMake(ctx context.Context, rootDir, registry, namespace, tag string, push
 		"IMAGE_REGISTRY=" + registry,
 		"IMAGE_NAMESPACE=" + namespace,
 	}
+	args = append(args, extraArgs...)
 	if push {
 		args = append(args, "BUILDX_ACTION=--push", "OUTPUT_LOCAL=")
 	} else {
