@@ -9,11 +9,11 @@ package ciliumcrds
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync/atomic"
 
 	"github.com/microsoft/retina/internal/buildinfo"
 	"github.com/microsoft/retina/pkg/shared/telemetry"
-	"github.com/sirupsen/logrus"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -34,10 +34,12 @@ import (
 	cmtypes "github.com/cilium/cilium/pkg/clustermesh/types"
 	"github.com/cilium/cilium/pkg/controller"
 	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
+	"github.com/cilium/cilium/pkg/kvstore"
 	"github.com/cilium/cilium/pkg/kvstore/store"
 	"github.com/cilium/cilium/pkg/option"
 	"github.com/cilium/cilium/pkg/pprof"
 	"github.com/cilium/hive/cell"
+	"github.com/cilium/statedb"
 )
 
 const operatorK8sNamespace = "kube-system"
@@ -47,7 +49,7 @@ var (
 		"operator",
 		"Retina Operator",
 
-		cell.Invoke(func(l logrus.FieldLogger) {
+		cell.Invoke(func(l *slog.Logger) {
 			// to help prevent user confusion, explain why logs may include lines referencing "cilium" or "cilium operator"
 			// e.g. level=info msg="Cilium Operator  go version go1.21.4 linux/amd64" subsys=retina-operator
 			l.Info("starting hive. Some logs will say 'cilium' since some code is derived from cilium")
@@ -90,6 +92,11 @@ var (
 
 		// Provides Clientset, API for accessing Kubernetes objects.
 		k8sClient.Cell,
+
+		// Provide in-memory kvstore client for identity GC (not using etcd in Retina)
+		cell.Provide(func(db *statedb.DB) kvstore.Client {
+			return kvstore.NewInMemoryClient(db, "default")
+		}),
 
 		// Provides the modular metrics registry, metric HTTP server and standard metrics cell.
 		// NOTE: no server/metrics are created when --enable-metrics=false (default)
