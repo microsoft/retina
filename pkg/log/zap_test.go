@@ -3,12 +3,14 @@
 package log
 
 import (
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
 
@@ -50,4 +52,68 @@ func TestLogFileRotation(t *testing.T) {
 	})
 	assert.NoError(t, err, "Test log file walk through failed with err")
 	assert.Equal(t, expectedReplicas, curReplicas, "Test log file replicas are not as expected on 2nd try")
+}
+
+func TestSlogHandler(t *testing.T) {
+	// Reset the global logger for this test
+	global = nil
+
+	_, err := SetupZapLogger(GetDefaultLogOpts())
+	require.NoError(t, err)
+
+	handler := SlogHandler()
+	require.NotNil(t, handler)
+
+	logger := slog.New(handler)
+	// Should not panic
+	logger.Info("test message from slog", "key", "value")
+
+	// SetDefaultSlog should make slog.Default() return zap-backed logger
+	SetDefaultSlog()
+	slog.Default().Info("default slog test", "source", "TestSlogHandler")
+
+	// SlogLogger should return a new logger
+	slogLogger := SlogLogger()
+	require.NotNil(t, slogLogger)
+	slogLogger.Info("from SlogLogger", "test", true)
+}
+
+func TestSlogHandlerFallback(t *testing.T) {
+	// Reset global to test fallback behavior
+	global = nil
+
+	// Without zap setup, SlogHandler should return a fallback text handler
+	handler := SlogHandler()
+	require.NotNil(t, handler)
+
+	// Should not panic even without zap being setup
+	logger := slog.New(handler)
+	logger.Info("fallback test message", "key", "value")
+}
+
+func TestLogrLogger(t *testing.T) {
+	// Reset the global logger for this test
+	global = nil
+
+	_, err := SetupZapLogger(GetDefaultLogOpts())
+	require.NoError(t, err)
+
+	logrLogger := LogrLogger()
+	require.NotNil(t, logrLogger)
+
+	// Should not panic and should log using the same format as Retina's zap logger
+	logrLogger.Info("test message from logr", "key", "value")
+	logrLogger.V(1).Info("debug message from logr", "level", 1)
+}
+
+func TestLogrLoggerFallback(t *testing.T) {
+	// Reset global to test fallback behavior
+	global = nil
+
+	// Without zap setup, LogrLogger should return a fallback logger
+	logrLogger := LogrLogger()
+	require.NotNil(t, logrLogger)
+
+	// Should not panic even without zap being setup
+	logrLogger.Info("fallback logr test message", "key", "value")
 }
