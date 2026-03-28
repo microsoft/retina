@@ -13,7 +13,6 @@ import (
 	"github.com/cilium/cilium/pkg/monitor/agent/listener"
 	"github.com/cilium/cilium/pkg/monitor/api"
 	"github.com/cilium/cilium/pkg/monitor/payload"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -118,13 +117,13 @@ func (a *monitorAgent) RegisterNewListener(newListener listener.MonitorListener)
 		a.listeners[newListener] = struct{}{}
 	default:
 		newListener.Close()
-		log.WithField("version", version).Error("Closing listener from unsupported monitor client version")
+		log.Error("Closing listener from unsupported monitor client version", "version", version)
 	}
 
-	log.WithFields(logrus.Fields{
-		"count.listener": len(a.listeners),
-		"version":        version,
-	}).Debug("New listener connected")
+	log.Debug("New listener connected",
+		"count.listener", len(a.listeners),
+		"version", version,
+	)
 }
 
 func (a *monitorAgent) RemoveListener(ml listener.MonitorListener) {
@@ -137,15 +136,18 @@ func (a *monitorAgent) RemoveListener(ml listener.MonitorListener) {
 
 	// Remove the listener and close it.
 	delete(a.listeners, ml)
-	log.WithFields(logrus.Fields{
-		"count.listener": len(a.listeners),
-		"version":        ml.Version(),
-	}).Debug("Removed listener")
+	log.Debug("Removed listener",
+		"count.listener", len(a.listeners),
+		"version", ml.Version(),
+	)
 	ml.Close()
 }
 
 func (a *monitorAgent) RegisterNewConsumer(newConsumer consumer.MonitorConsumer) {
 	if a == nil || newConsumer == nil {
+		log.Info("RegisterNewConsumer called with nil agent or consumer",
+			"agentNil", a == nil,
+			"consumerNil", newConsumer == nil)
 		return
 	}
 
@@ -158,6 +160,9 @@ func (a *monitorAgent) RegisterNewConsumer(newConsumer consumer.MonitorConsumer)
 	defer a.Unlock()
 
 	a.consumers[newConsumer] = struct{}{}
+	log.Info("Registered new consumer with monitor agent",
+		"consumerCount", len(a.consumers),
+		"consumerType", fmt.Sprintf("%T", newConsumer))
 }
 
 func (a *monitorAgent) RemoveConsumer(mc consumer.MonitorConsumer) {
@@ -207,8 +212,7 @@ func (a *monitorAgent) sendToListenersLocked(pl *payload.Payload) {
 	}
 }
 
-// notifyAgentEvent notifies all consumers about an agent event.
-func (a *monitorAgent) notifyAgentEvent(typ int, message interface{}) {
+func (a *monitorAgent) notifyAgentEvent(typ int, message any) {
 	a.Lock()
 	defer a.Unlock()
 	for mc := range a.consumers {

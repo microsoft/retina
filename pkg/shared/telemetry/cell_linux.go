@@ -3,12 +3,12 @@ package telemetry
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/cilium/hive/cell"
 	"github.com/microsoft/retina/pkg/telemetry"
-	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/rest"
 )
 
@@ -34,11 +34,11 @@ var (
 	Constructor = cell.Module(
 		"telemetry",
 		"provides telemetry",
-		cell.Provide(func(p params, l logrus.FieldLogger) (telemetry.Telemetry, error) {
-			l.WithFields(logrus.Fields{
-				"app-insights-id": p.Config.ApplicationInsightsID,
-				"retina-version":  p.Config.RetinaVersion,
-			}).Info("configuring telemetry")
+		cell.Provide(func(p params, l *slog.Logger) (telemetry.Telemetry, error) {
+			l.Info("configuring telemetry",
+				"app-insights-id", p.Config.ApplicationInsightsID,
+				"retina-version", p.Config.RetinaVersion,
+			)
 
 			if p.Config.EnableTelemetry {
 				if p.Config.ApplicationInsightsID == "" {
@@ -75,7 +75,7 @@ var (
 		"heartbeat",
 		"sends periodic telemetry heartbeat",
 		cell.Invoke(
-			func(tel telemetry.Telemetry, lifecycle cell.Lifecycle, l logrus.FieldLogger) {
+			func(tel telemetry.Telemetry, lifecycle cell.Lifecycle, l *slog.Logger) {
 				ctx, cancelCtx := context.WithCancel(context.Background())
 				lifecycle.Append(cell.Hook{
 					OnStart: func(cell.HookContext) error {

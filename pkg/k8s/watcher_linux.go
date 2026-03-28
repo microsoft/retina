@@ -12,7 +12,6 @@ import (
 	"github.com/cilium/cilium/pkg/logging"
 	"github.com/cilium/cilium/pkg/logging/logfields"
 	"github.com/cilium/cilium/pkg/option"
-	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -24,19 +23,14 @@ func init() {
 }
 
 var (
-	logger = logging.DefaultLogger.WithField(logfields.LogSubsys, "k8s-watcher")
+	logger = logging.DefaultSlogLogger.With(logfields.LogSubsys, "k8s-watcher")
 )
 
 func Start(ctx context.Context, k *watchers.K8sWatcher) {
 	logger.Info("Starting Kubernetes watcher")
 
 	option.Config.K8sSyncTimeout = 3 * time.Minute //nolint:gomnd // this duration is self-explanatory
-	syncdCache := make(chan struct{})
-	go k.InitK8sSubsystem(ctx, syncdCache)
-	logger.WithField("k8s resources", k8sResources).Info("Kubernetes watcher started, will wait for cache sync")
-
-	// Wait for K8s watcher to sync. If doesn't complete in 3 minutes, causes fatal error.
-	<-syncdCache
+	k.InitK8sSubsystem(ctx)
 	logger.Info("Kubernetes watcher synced")
 }
 
@@ -46,17 +40,17 @@ func k8sWatcherErrorHandler(c context.Context, e error, s string, i ...interface
 	if e == nil {
 		// TODO: handle key/values pairs in a better way
 		// current example output: time="2009-11-10T23:00:00Z" level=error msg="msg: Some error message -- key/values: [int 1 str world]"
-		logger.WithContext(c).Errorf("msg: %s -- key/values: %+v", s, i)
+		logger.ErrorContext(c, "msg: "+s, "key_values", i)
 		return
 	}
 
 	errStr := e.Error()
 
 	logError := func(er, r string) {
-		logger.WithFields(logrus.Fields{
-			"underlyingError": er,
-			"resource":        r,
-		}).Error("Error watching k8s resource")
+		logger.Error("Error watching k8s resource",
+			"underlyingError", er,
+			"resource", r,
+		)
 	}
 
 	switch {
