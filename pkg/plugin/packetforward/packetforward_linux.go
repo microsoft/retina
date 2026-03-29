@@ -156,12 +156,16 @@ func (p *packetForward) Init() error {
 
 	p.hashmapData = objs.RetinaPacketforwardMetrics
 
-	// The steps to attach ebpf to socket is documented in cilium/ebpf
-	// https://github.com/cilium/ebpf/blob/master/example_sock_elf_test.go#L85.
-	// MIT license.
-	p.sock, err = utils.OpenRawSocket(socketIndex)
+	// Bind to the default route interface to avoid multi-counting.
+	// With ifindex=0 the raw socket sees packets on every interface (eth0 + all pod veths),
+	// so a single packet is counted once per interface it traverses.
+	ifIndex, ifErr := utils.GetDefaultIfaceIndex()
+	if ifErr != nil {
+		p.l.Warn("Could not determine default interface, falling back to all interfaces", zap.Error(ifErr))
+	}
+	p.sock, err = utils.OpenRawSocket(ifIndex)
 	if err != nil {
-		p.l.Error("Error opening socket %d: %w", zap.Int("eth", socketIndex), zap.Error(err))
+		p.l.Error("Error opening socket", zap.Int("ifindex", ifIndex), zap.Error(err))
 		return err
 	}
 

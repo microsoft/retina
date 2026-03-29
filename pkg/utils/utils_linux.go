@@ -115,6 +115,19 @@ func isDefaultRoute(route netlink.Route) bool {
 	return false
 }
 
+// GetDefaultIfaceIndex returns the ifindex of the default route interface.
+// Returns 0 (all interfaces) if the default route cannot be determined.
+func GetDefaultIfaceIndex() (int, error) {
+	links, err := GetDefaultOutgoingLinks()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get default outgoing links: %w", err)
+	}
+	if len(links) == 0 {
+		return 0, fmt.Errorf("no default outgoing link found")
+	}
+	return links[0].Attrs().Index, nil
+}
+
 func GetDropReasonDesc(dr DropReason) flow.DropReason {
 	// Set the drop reason.
 	// Retina drop reasons are different from the drop reasons available in flow library.
