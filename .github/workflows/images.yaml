@@ -353,7 +353,8 @@ jobs:
 
   manifests:
     name: Generate Manifests
-    if: ${{ github.event_name == 'merge_group' }}
+    # TODO: revert before merge — temporarily enabled on PR for cilium v1.19 validation
+    if: ${{ github.event_name == 'merge_group' || github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs:
@@ -393,7 +394,8 @@ jobs:
 
   e2e:
     name: Run E2E Tests
-    if: ${{ github.event_name == 'merge_group' }}
+    # TODO: revert before merge — temporarily enabled on PR for cilium v1.19 validation
+    if: ${{ github.event_name == 'merge_group' || github.event_name == 'pull_request' }}
     needs: [manifests]
     runs-on: ubuntu-latest
     timeout-minutes: 90
