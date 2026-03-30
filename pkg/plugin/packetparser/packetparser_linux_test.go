@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"reflect"
 	"runtime"
 	"sync"
 	"testing"
@@ -17,7 +18,6 @@ import (
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/perf"
 	tc "github.com/florianl/go-tc"
 	nl "github.com/mdlayher/netlink"
 	kcfg "github.com/microsoft/retina/pkg/config"
@@ -33,29 +33,49 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-type perfReaderAdapter struct {
-	mock *mocks.MockperfReader
+// mockPerfReader is a gomock-based mock for the perfReader interface.
+// Defined here (not in mocks/) because perfReader uses the unexported perfRecord type.
+type mockPerfReader struct {
+	ctrl     *gomock.Controller
+	recorder *mockPerfReaderRecorder
 }
 
-func (p *perfReaderAdapter) Read() (perfRecord, error) {
-	rec, err := p.mock.Read()
-	if err != nil {
-		return perfRecord{}, fmt.Errorf("failed to read perf record: %w", err)
-	}
-	return perfRecord{
-		CPU:         rec.CPU,
-		LostSamples: rec.LostSamples,
-		RawSample:   rec.RawSample,
-		Remaining:   rec.Remaining,
-	}, nil
+type mockPerfReaderRecorder struct {
+	mock *mockPerfReader
 }
 
-func (p *perfReaderAdapter) Close() error {
-	if err := p.mock.Close(); err != nil {
-		return fmt.Errorf("failed to close perf reader: %w", err)
-	}
-	return nil
+func newMockPerfReader(ctrl *gomock.Controller) *mockPerfReader {
+	m := &mockPerfReader{ctrl: ctrl}
+	m.recorder = &mockPerfReaderRecorder{m}
+	return m
 }
+
+func (m *mockPerfReader) EXPECT() *mockPerfReaderRecorder { return m.recorder }
+
+func (m *mockPerfReader) Read() (perfRecord, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Read")
+	rec, _ := ret[0].(perfRecord)
+	err, _ := ret[1].(error)
+	return rec, err
+}
+
+func (mr *mockPerfReaderRecorder) Read() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Read", reflect.TypeOf((*mockPerfReader)(nil).Read))
+}
+
+func (m *mockPerfReader) Close() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Close")
+	err, _ := ret[0].(error)
+	return err
+}
+
+func (mr *mockPerfReaderRecorder) Close() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*mockPerfReader)(nil).Close))
+}
+
+var errTestRead = errors.New("error")
 
 var (
 	cfgPodLevelEnabled = &kcfg.Config{
@@ -314,8 +334,8 @@ func TestReadData_Error(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mperf := mocks.NewMockperfReader(ctrl)
-	mperf.EXPECT().Read().Return(perf.Record{}, errors.New("error")).AnyTimes()
+	mperf := newMockPerfReader(ctrl)
+	mperf.EXPECT().Read().Return(perfRecord{}, errTestRead).AnyTimes()
 
 	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
 	menricher.EXPECT().Write(gomock.Any()).Times(0)
@@ -323,12 +343,12 @@ func TestReadData_Error(t *testing.T) {
 	p := &packetParser{
 		cfg:    cfgPodLevelEnabled,
 		l:      log.Logger().Named("test"),
-		reader: &perfReaderAdapter{mock: mperf},
+		reader: mperf,
 	}
 	p.readData()
 
 	// Lost samples.
-	mperf.EXPECT().Read().Return(perf.Record{
+	mperf.EXPECT().Read().Return(perfRecord{
 		LostSamples: 1,
 	}, nil).AnyTimes()
 	p.readData()
@@ -348,12 +368,12 @@ func TestReadDataPodLevelEnabled(t *testing.T) {
 		DstPort:          uint16(443),
 	}
 	bytes, _ := json.Marshal(bpfEvent)
-	record := perf.Record{
+	record := perfRecord{
 		LostSamples: 0,
 		RawSample:   bytes,
 	}
 
-	mperf := mocks.NewMockperfReader(ctrl)
+	mperf := newMockPerfReader(ctrl)
 	mperf.EXPECT().Read().Return(record, nil).MinTimes(1)
 
 	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
@@ -362,7 +382,7 @@ func TestReadDataPodLevelEnabled(t *testing.T) {
 	p := &packetParser{
 		cfg:            cfgPodLevelEnabled,
 		l:              log.Logger().Named("test"),
-		reader:         &perfReaderAdapter{mock: mperf},
+		reader:         mperf,
 		enricher:       menricher,
 		recordsChannel: make(chan perfRecord, buffer),
 	}
@@ -428,12 +448,12 @@ func TestStartWithDataAggregationLevelLow(t *testing.T) {
 	}
 	bytes, err := json.Marshal(bpfEvent) // nolint:musttag // ignore
 	require.NoError(t, err)
-	record := perf.Record{
+	record := perfRecord{
 		LostSamples: 0,
 		RawSample:   bytes,
 	}
 
-	mockReader := mocks.NewMockperfReader(ctrl)
+	mockReader := newMockPerfReader(ctrl)
 	mockReader.EXPECT().Read().Return(record, nil).MinTimes(1)
 
 	getQdisc = func(_ nltc) qdisc {
@@ -460,7 +480,7 @@ func TestStartWithDataAggregationLevelLow(t *testing.T) {
 		cfg:              cfgDataAggregationLevelLow,
 		l:                log.Logger().Named("test"),
 		objs:             pObj,
-		reader:           &perfReaderAdapter{mock: mockReader},
+		reader:           mockReader,
 		recordsChannel:   make(chan perfRecord, buffer),
 		interfaceLockMap: &sync.Map{},
 		endpointIngressInfo: &ebpf.ProgramInfo{
@@ -507,12 +527,12 @@ func TestStartWithDataAggregationLevelHigh(t *testing.T) {
 	}
 	bytes, err := json.Marshal(bpfEvent) // nolint:musttag // ignore
 	require.NoError(t, err)
-	record := perf.Record{
+	record := perfRecord{
 		LostSamples: 0,
 		RawSample:   bytes,
 	}
 
-	mockReader := mocks.NewMockperfReader(ctrl)
+	mockReader := newMockPerfReader(ctrl)
 	mockReader.EXPECT().Read().Return(record, nil).MinTimes(1)
 
 	getQdisc = func(_ nltc) qdisc {
@@ -539,7 +559,7 @@ func TestStartWithDataAggregationLevelHigh(t *testing.T) {
 		cfg:              cfgDataAggregationLevelHigh,
 		l:                log.Logger().Named("test"),
 		objs:             pObj,
-		reader:           &perfReaderAdapter{mock: mockReader},
+		reader:           mockReader,
 		recordsChannel:   make(chan perfRecord, buffer),
 		interfaceLockMap: &sync.Map{},
 		endpointIngressInfo: &ebpf.ProgramInfo{

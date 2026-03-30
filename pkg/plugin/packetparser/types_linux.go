@@ -101,7 +101,7 @@ type attachmentValue struct {
 	tcxEgressLink  link.Link
 }
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=types_linux.go -destination=mocks/mock_types_linux.go -package=mocks
+//go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=types_linux.go -destination=mocks/mock_types_linux.go -package=mocks -exclude_interfaces=perfReader
 
 // tc qdisc interface
 type qdisc interface {
