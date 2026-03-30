@@ -21,7 +21,7 @@ const (
 	clusterTimeout       = 15 * time.Minute
 	clusterCreateTicker  = 30 * time.Second
 	pollFrequency        = 5 * time.Second
-	AgentARMSKU          = "Standard_D4pls_v6"
+	AgentARMSKU          = "Standard_D4pds_v5"
 	AuxilaryNodeCount    = 1
 	AuxilaryARMNodeCount = 2
 )
