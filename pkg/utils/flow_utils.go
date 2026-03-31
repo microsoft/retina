@@ -41,7 +41,8 @@ const (
 
 // ToFlow returns a flow.Flow object.
 // This sets up a L3/L4 flow object.
-// sourceIP, destIP are IPv4 addresses.
+// sourceIP, destIP are IPv4 or IPv6 addresses; IpVersion is derived from the
+// address family via net.IP.To4().
 // sourcePort, destPort are TCP/UDP ports.
 // proto is the protocol number. Ref: https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml .
 // observationPoint is the observation point+direction of the flow. 0 is from n/w stack to container, 1 is from container to stack,
@@ -112,6 +113,11 @@ func ToFlow(
 		verdict = flow.Verdict_FORWARDED
 	}
 
+	ipVersion := flow.IPVersion_IPv4
+	if sourceIP.To4() == nil {
+		ipVersion = flow.IPVersion_IPv6
+	}
+
 	f := &flow.Flow{
 		Type: flow.FlowType_L3_L4,
 		EventType: &flow.CiliumEventType{
@@ -121,8 +127,7 @@ func ToFlow(
 		IP: &flow.IP{
 			Source:      sourceIP.String(),
 			Destination: destIP.String(),
-			// We only support IPv4 for now.
-			IpVersion: flow.IPVersion_IPv4,
+			IpVersion:   ipVersion,
 		},
 		L4:                    l4,
 		TraceObservationPoint: checkpoint,
