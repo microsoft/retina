@@ -457,7 +457,11 @@ COVER_PKG ?= .
 .PHONY: test
 test: # Run unit tests.
 	go build -o test-summary ./test/utsummary/main.go
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit,dashboard -skip=TestE2E* -coverprofile=coverage.out -v -json ./... | ./test-summary --progress --verbose
+	bash -o pipefail -c 'KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit,dashboard -skip=TestE2E* -coverprofile=coverage.out -v -json ./... | ./test-summary --progress --verbose'
+
+.PHONY: test-ebpf
+test-ebpf: # Run eBPF program tests (requires root/CAP_BPF).
+	sudo $$(which go) test -tags=ebpf -v -count=1 ./pkg/plugin/...
 
 coverage: # Code coverage.
 #	go generate ./... && go test -tags=unit -coverprofile=coverage.out.tmp ./...
