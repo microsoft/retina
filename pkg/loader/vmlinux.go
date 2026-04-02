@@ -95,10 +95,7 @@ func GenerateVmlinuxH(ctx context.Context, outputDir string) error {
 
 	l.Info("Generating vmlinux.h", zap.String("path", vmlinuxPath))
 	if err := cmd.Run(); err != nil {
-		l.Error("Failed to generate vmlinux.h", zap.Error(err))
-		// If bpftool fails (e.g. /sys/kernel/btf/vmlinux doesn't exist), we might want to fallback or error out.
-		// If it fails, the compilation will likely fail later if we rely on this header.
-		return fmt.Errorf("failed to run bpftool: %w", err)
+		return fmt.Errorf("failed to generate vmlinux.h: %w", err)
 	}
 
 	l.Info("Generated vmlinux.h", zap.String("path", vmlinuxPath), zap.Duration("duration", time.Since(start)))
