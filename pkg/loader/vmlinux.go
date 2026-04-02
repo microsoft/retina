@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/microsoft/retina/pkg/log"
 	"go.uber.org/zap"
@@ -20,6 +21,9 @@ const (
 	VmlinuxHeaderDirEnv = "RETINA_VMLINUX_HEADER_DIR"
 	// VmlinuxHeaderFileName is the generated runtime BTF header filename.
 	VmlinuxHeaderFileName = "vmlinux.h"
+	// VmlinuxKernelReleaseFileName stores the kernel release used to generate vmlinux.h.
+	VmlinuxKernelReleaseFileName = "vmlinux.kernel.release"
+	kernelReleasePath            = "/proc/sys/kernel/osrelease"
 )
 
 // VmlinuxHeaderDir returns the runtime directory where vmlinux.h is expected.
@@ -41,10 +45,17 @@ func VmlinuxHeaderPath() string {
 func PrepareVmlinuxH(ctx context.Context) (string, error) {
 	headerDir := VmlinuxHeaderDir()
 	headerPath := filepath.Join(headerDir, VmlinuxHeaderFileName)
+	kernelRelease, err := currentKernelRelease()
+	if err != nil {
+		return headerDir, err
+	}
 
 	if info, err := os.Stat(headerPath); err == nil {
 		if info.Size() > 0 {
-			return headerDir, nil
+			cachedKernelRelease, readErr := readCachedKernelRelease(headerDir)
+			if readErr == nil && cachedKernelRelease == kernelRelease {
+				return headerDir, nil
+			}
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return headerDir, fmt.Errorf("failed to stat %s: %w", headerPath, err)
@@ -54,23 +65,21 @@ func PrepareVmlinuxH(ctx context.Context) (string, error) {
 		return headerDir, err
 	}
 
+	if err := writeCachedKernelRelease(headerDir, kernelRelease); err != nil {
+		return headerDir, err
+	}
+
 	return headerDir, nil
 }
 
 func GenerateVmlinuxH(ctx context.Context, outputDir string) error {
 	l := log.Logger().Named("vmlinux-generator")
 	vmlinuxPath := filepath.Join(outputDir, VmlinuxHeaderFileName)
+	start := time.Now()
 
 	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
-
-	// Check if vmlinux.h already exists to avoid regenerating it unnecessarily?
-	// However, if the pod restarts on a different node (unlikely for same pod instance but possible if volume persisted?),
-	// or if we want to be sure.
-	// Given the startup time is not critical and it's fast, let's generate it.
-	// But we can check if it exists and is non-empty.
-	// For now, let's just generate it.
 
 	cmd := exec.CommandContext(ctx, "bpftool", "btf", "dump", "file", "/sys/kernel/btf/vmlinux", "format", "c")
 
@@ -90,6 +99,45 @@ func GenerateVmlinuxH(ctx context.Context, outputDir string) error {
 		// If bpftool fails (e.g. /sys/kernel/btf/vmlinux doesn't exist), we might want to fallback or error out.
 		// If it fails, the compilation will likely fail later if we rely on this header.
 		return fmt.Errorf("failed to run bpftool: %w", err)
+	}
+
+	l.Info("Generated vmlinux.h", zap.String("path", vmlinuxPath), zap.Duration("duration", time.Since(start)))
+
+	return nil
+}
+
+func currentKernelRelease() (string, error) {
+	b, err := os.ReadFile(kernelReleasePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read %s: %w", kernelReleasePath, err)
+	}
+
+	release := strings.TrimSpace(string(b))
+	if release == "" {
+		return "", fmt.Errorf("kernel release from %s is empty", kernelReleasePath)
+	}
+
+	return release, nil
+}
+
+func readCachedKernelRelease(outputDir string) (string, error) {
+	b, err := os.ReadFile(filepath.Join(outputDir, VmlinuxKernelReleaseFileName))
+	if err != nil {
+		return "", err
+	}
+
+	release := strings.TrimSpace(string(b))
+	if release == "" {
+		return "", errors.New("cached kernel release is empty")
+	}
+
+	return release, nil
+}
+
+func writeCachedKernelRelease(outputDir, kernelRelease string) error {
+	metaPath := filepath.Join(outputDir, VmlinuxKernelReleaseFileName)
+	if err := os.WriteFile(metaPath, []byte(kernelRelease+"\n"), 0o644); err != nil {
+		return fmt.Errorf("failed to write cached kernel release %s: %w", metaPath, err)
 	}
 
 	return nil
