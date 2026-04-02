@@ -357,7 +357,7 @@ func TestReadData_Error(t *testing.T) {
 }
 
 func TestReadData_RingBufClosed(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	log.SetupZapLogger(log.GetDefaultLogOpts()) //nolint:errcheck // ignore
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -791,7 +791,7 @@ func TestEnsureRingBufKernelSupported(t *testing.T) {
 
 	t.Run("Kernel version error", func(t *testing.T) {
 		getKernelVersion = func() (utils.KernelVersion, error) {
-			return utils.KernelVersion{}, errors.New("failed to get kernel version")
+			return utils.KernelVersion{}, errors.New("failed to get kernel version") //nolint:err113 // ignore
 		}
 		err := ensureRingBufKernelSupported()
 		assert.Error(t, err)
