@@ -177,28 +177,20 @@ func (m *Module) Reconcile(spec *api.MetricsSpec) error {
 func (m *Module) updateNamespaceLists(spec *api.MetricsSpec) {
 	if len(spec.Namespaces.Include) > 0 && len(spec.Namespaces.Exclude) > 0 {
 		m.l.Error("Both included and excluded namespaces are specified. Cannot reconcile.")
-	}
-
-	if len(spec.Namespaces.Include) == 0 {
-		m.appendIncludeList([]string{})
-		m.appendExcludeList([]string{})
-	}
-
-	if len(spec.Namespaces.Exclude) == 0 {
-		m.appendIncludeList([]string{})
-		m.appendExcludeList([]string{})
+		return
 	}
 
 	if len(spec.Namespaces.Include) > 0 {
 		m.l.Info("Including namespaces", zap.Strings("namespaces", spec.Namespaces.Include))
-		m.appendIncludeList(spec.Namespaces.Include)
 		m.appendExcludeList([]string{})
-	}
-
-	if len(spec.Namespaces.Exclude) > 0 {
+		m.appendIncludeList(spec.Namespaces.Include)
+	} else if len(spec.Namespaces.Exclude) > 0 {
 		m.l.Info("Excluding namespaces", zap.Strings("namespaces", spec.Namespaces.Exclude))
-		m.appendExcludeList(spec.Namespaces.Exclude)
 		m.appendIncludeList([]string{})
+		m.appendExcludeList(spec.Namespaces.Exclude)
+	} else {
+		m.appendIncludeList([]string{})
+		m.appendExcludeList([]string{})
 	}
 }
 
@@ -418,8 +410,72 @@ func (m *Module) appendExcludeList(ns []string) {
 		m.excludedNamespaces = make(map[string]struct{})
 	}
 
-	// TODO here we will need to check for IP which
-	// needs to be added to filter manager and which needs to be removed
+	m.l.Info("Appending namespaces to exclude list", zap.Strings("namespaces", ns))
+
+	tempNewNs := make(map[string]struct{})
+	for _, n := range ns {
+		tempNewNs[n] = struct{}{}
+	}
+
+	m.l.Info("Current excluded namespaces", zap.Any("namespaces", m.excludedNamespaces))
+	newlyExcluded, newlyUnexcluded := make([]string, 0), make([]string, 0)
+
+	// Namespaces that are in the new list but not in the old list
+	for _, n := range ns {
+		if _, ok := m.excludedNamespaces[n]; !ok {
+			newlyExcluded = append(newlyExcluded, n)
+		}
+	}
+
+	// Namespaces that were in the old list but not in the new list
+	for n := range m.excludedNamespaces {
+		if _, ok := tempNewNs[n]; !ok {
+			newlyUnexcluded = append(newlyUnexcluded, n)
+		}
+	}
+
+	m.excludedNamespaces = tempNewNs
+
+	m.l.Info("Namespaces newly excluded", zap.Strings("namespaces", newlyExcluded))
+	m.l.Info("Namespaces newly un-excluded", zap.Strings("namespaces", newlyUnexcluded))
+
+	// For newly excluded namespaces: remove their IPs from filtermanager
+	for _, n := range newlyExcluded {
+		ips := m.daemonCache.GetIPsByNamespace(n)
+		m.l.Info("Removing IPs from filter manager (excluded)", zap.String("namespace", n), zap.Any("ips", ips))
+
+		err := m.filterManager.DeleteIPs(ips, metricModuleReq, moduleReqMetadata)
+		if err != nil {
+			m.l.Error("Error removing IPs from filter manager", zap.Error(err))
+		}
+	}
+
+	// For newly un-excluded namespaces: add their IPs to filtermanager
+	for _, n := range newlyUnexcluded {
+		ips := m.daemonCache.GetIPsByNamespace(n)
+		m.l.Info("Adding IPs to filter manager (un-excluded)", zap.String("namespace", n), zap.Any("ips", ips))
+
+		err := m.filterManager.AddIPs(ips, metricModuleReq, moduleReqMetadata)
+		if err != nil {
+			m.l.Error("Error adding IPs to filter manager", zap.Error(err))
+		}
+	}
+
+	// When transitioning to exclude mode, add IPs for all non-excluded namespaces
+	if len(newlyExcluded) > 0 && len(newlyUnexcluded) == 0 && len(newlyExcluded) == len(ns) {
+		allNs := m.daemonCache.GetAllNamespaces()
+		for _, n := range allNs {
+			if _, excluded := m.excludedNamespaces[n]; !excluded {
+				ips := m.daemonCache.GetIPsByNamespace(n)
+				m.l.Info("Adding IPs to filter manager (non-excluded)", zap.String("namespace", n), zap.Any("ips", ips))
+
+				err := m.filterManager.AddIPs(ips, metricModuleReq, moduleReqMetadata)
+				if err != nil {
+					m.l.Error("Error adding IPs to filter manager", zap.Error(err))
+				}
+			}
+		}
+	}
 }
 
 func (m *Module) PodCallBackFn(obj interface{}) {
@@ -562,8 +618,10 @@ func (m *Module) applyDirtyPodsDelete() {
 	m.dirtyPods.ClearDelete()
 }
 
-// nsOfInterest checks if the namespace is in the included or excluded list
-// included namespaces can be defined by crd or automatically applied by annotated namespaces.
+// nsOfInterest checks if the namespace is in the included or excluded list.
+// Included namespaces can be defined by CRD or automatically applied by annotated namespaces.
+// When no namespace filters are configured (both lists empty), returns false — pods must be
+// individually annotated or already present in the filtermap to be tracked.
 func (m *Module) nsOfInterest(ns string) bool {
 	if len(m.includedNamespaces) > 0 {
 		if _, ok := m.includedNamespaces[ns]; ok {

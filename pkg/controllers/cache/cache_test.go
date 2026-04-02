@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -380,4 +381,33 @@ func TestCachingNamespace(t *testing.T) {
 	c.DeleteAnnotatedNamespace(ns)
 	namespaces = c.GetAnnotatedNamespaces()
 	assert.Equal(t, 0, len(namespaces))
+}
+
+func TestGetAllNamespaces(t *testing.T) {
+	_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	p := pubsub.NewMockPubSubInterface(ctrl)
+	p.EXPECT().Subscribe(common.PubSubAPIServer, gomock.Any()).Times(1)
+	p.EXPECT().Publish(gomock.Any(), gomock.Any()).AnyTimes()
+	c := New(p)
+
+	// Empty cache should return empty list
+	namespaces := c.GetAllNamespaces()
+	assert.Empty(t, namespaces)
+
+	// Add endpoints in different namespaces
+	ep1 := common.NewRetinaEndpoint("pod1", "ns1", &common.IPAddresses{IPv4: net.IPv4(10, 0, 0, 1)})
+	ep2 := common.NewRetinaEndpoint("pod2", "ns2", &common.IPAddresses{IPv4: net.IPv4(10, 0, 0, 2)})
+	ep3 := common.NewRetinaEndpoint("pod3", "ns1", &common.IPAddresses{IPv4: net.IPv4(10, 0, 0, 3)})
+	err := c.UpdateRetinaEndpoint(ep1)
+	require.NoError(t, err)
+	err = c.UpdateRetinaEndpoint(ep2)
+	require.NoError(t, err)
+	err = c.UpdateRetinaEndpoint(ep3)
+	require.NoError(t, err)
+
+	namespaces = c.GetAllNamespaces()
+	assert.Len(t, namespaces, 2)
+	assert.ElementsMatch(t, []string{"ns1", "ns2"}, namespaces)
 }

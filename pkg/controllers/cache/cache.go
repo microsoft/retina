@@ -168,6 +168,22 @@ func (c *Cache) GetObjByIP(ip string) interface{} {
 	return nil
 }
 
+func (c *Cache) GetAllNamespaces() []string {
+	c.RLock()
+	defer c.RUnlock()
+
+	unique := make(map[string]struct{})
+	for _, ep := range c.epMap {
+		unique[ep.Namespace()] = struct{}{}
+	}
+
+	namespaces := make([]string, 0, len(unique))
+	for ns := range unique {
+		namespaces = append(namespaces, ns)
+	}
+	return namespaces
+}
+
 func (c *Cache) GetIPsByNamespace(ns string) []net.IP {
 	c.RLock()
 	defer c.RUnlock()
