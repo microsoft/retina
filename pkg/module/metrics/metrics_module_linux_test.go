@@ -1029,3 +1029,67 @@ func TestSpuriousDeleteIPReuse(t *testing.T) {
 	me.PodCallBackFn(cache.NewCacheEvent(cache.EventTypePodDeleted, pod1))
 	me.applyDirtyPods() // No DeleteIPs expected
 }
+
+// TestPodCallBackConcurrentWithReconcile verifies that PodCallBackFn (which reads
+// namespace maps under RLock) does not race with appendIncludeList (which mutates
+// them under Lock). Run with -race to detect data races.
+func TestPodCallBackConcurrentWithReconcile(t *testing.T) {
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	require.NoError(t, err)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cfg, _ := kcfg.GetConfig(testCfgFile)
+	cfg.EnableAnnotations = true
+
+	p := pubsub.NewMockPubSubInterface(ctrl)
+	e := enricher.NewMockEnricherInterface(ctrl)
+	fm := filtermanager.NewMockIFilterManager(ctrl)
+	c := cache.NewMockCacheInterface(ctrl)
+
+	c.EXPECT().GetIPsByNamespace(gomock.Any()).Return([]net.IP{}).AnyTimes()
+	fm.EXPECT().AddIPs(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	fm.EXPECT().DeleteIPs(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	fm.EXPECT().HasIP(gomock.Any()).Return(false).AnyTimes()
+	c.EXPECT().GetPodByIP(gomock.Any()).Return(nil).AnyTimes()
+
+	me := &Module{
+		RWMutex:       &sync.RWMutex{},
+		l:             log.Logger().Named("MetricModule"),
+		pubsub:        p,
+		configs:       make([]*api.MetricsConfiguration, 0),
+		enricher:      e,
+		wg:            sync.WaitGroup{},
+		registry:      make(map[string]AdvMetricsInterface),
+		moduleCtx:     context.Background(),
+		filterManager: fm,
+		daemonCache:   c,
+		dirtyPods:     common.NewDirtyCache(),
+		pubsubPodSub:  "",
+		daemonConfig:  cfg,
+	}
+
+	me.appendIncludeList([]string{"ns1"})
+
+	pod := common.NewRetinaEndpoint("pod1", "ns1", &common.IPAddresses{IPv4: net.IPv4(10, 0, 0, 1)})
+	pod.SetAnnotations(map[string]string{common.RetinaPodAnnotation: common.RetinaPodAnnotationValue})
+
+	// Run PodCallBackFn and appendIncludeList concurrently.
+	// With -race this will catch any unprotected map access.
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100; i++ {
+			me.PodCallBackFn(cache.NewCacheEvent(cache.EventTypePodAdded, pod))
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100; i++ {
+			me.Lock()
+			me.appendIncludeList([]string{"ns1", "ns2"})
+			me.Unlock()
+		}
+	}()
+	wg.Wait()
+}

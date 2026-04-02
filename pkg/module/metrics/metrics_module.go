@@ -440,26 +440,32 @@ func (m *Module) PodCallBackFn(obj interface{}) {
 		return
 	}
 
-	m.Lock()
-	if event.Type != cache.EventTypePodDeleted &&
-		!m.nsOfInterest(pod.Namespace()) && !m.podOfInterest(ip, pod.Annotations()) {
-		m.Unlock()
+	// Compute interest flags under RLock so we don't race with Reconcile/appendIncludeList
+	// which mutate the namespace maps under Lock.
+	m.RLock()
+	annotated := m.podAnnotated(pod.Annotations())
+	namespaced := m.nsOfInterest(pod.Namespace())
+	m.RUnlock()
+
+	if event.Type != cache.EventTypePodDeleted && !namespaced && !m.filterManager.HasIP(ip) && !annotated {
 		return
 	}
-	m.Unlock()
 
-	handlePodEvent(event, m, pod, ip)
+	handlePodEvent(event, m, pod, ip, annotated, namespaced)
 }
 
-func handlePodEvent(event *cache.CacheEvent, m *Module, pod *common.RetinaEndpoint, ip net.IP) {
+func handlePodEvent(
+	event *cache.CacheEvent, m *Module, pod *common.RetinaEndpoint,
+	ip net.IP, annotated, namespaced bool,
+) {
 	if pod.Name() == common.APIServerEndpointName && pod.Namespace() == common.APIServerEndpointName {
 		m.l.Debug("Ignoring apiserver endpoint")
 		return
 	}
 	podCacheEntry := DirtyCachePod{
 		IP:         ip,
-		Annotated:  m.podAnnotated(pod.Annotations()),
-		Namespaced: m.nsOfInterest(pod.Namespace()),
+		Annotated:  annotated,
+		Namespaced: namespaced,
 	}
 	switch event.Type {
 	case cache.EventTypePodAdded:
@@ -475,8 +481,10 @@ func handlePodEvent(event *cache.CacheEvent, m *Module, pod *common.RetinaEndpoi
 		m.dirtyPods.ToAdd(podCacheEntry.IP.String(), podCacheEntry)
 	case cache.EventTypePodDeleted:
 		// Guard against spurious DELETE events during pod churn / IP reuse.
-		// The daemon cache is updated before events are published, so if a new pod
-		// reused this IP the cache still contains an entry. Deleting would remove a valid IP.
+		// The cache (pkg/controllers/cache/cache.go) updates its maps synchronously
+		// (epMap/ipToEpKey) and then publishes events asynchronously via a goroutine.
+		// So when we process this DELETE, if a new pod already reused the IP, the
+		// cache will still contain a valid entry. Deleting would incorrectly remove it.
 		if endpoint := m.daemonCache.GetPodByIP(ip.String()); endpoint != nil {
 			m.l.Debug("Ignoring DELETE for reused IP — pod still exists in cache",
 				zap.String("deleted pod", pod.NamespacedName()),
