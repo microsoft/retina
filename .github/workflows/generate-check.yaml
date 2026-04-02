@@ -1,0 +1,113 @@
+name: Check Generated Code
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generate-check:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    name: Generate (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
+        with:
+          go-version-file: go.mod
+
+      - name: Check that committed .o files are empty stubs
+        run: |
+          RED='\033[0;31m'
+          YELLOW='\033[1;33m'
+          CYAN='\033[0;36m'
+          NC='\033[0m'
+          # Tracked .o files must be empty (0 bytes) in the committed tree.
+          # They exist so Go source with bpf2go references compiles without
+          # running go generate. Real BPF objects are built at image build time.
+          # This check runs BEFORE generate since generate populates them.
+          non_empty=$(git ls-files '*.o' | while read -r f; do
+            size=$(git cat-file -s "HEAD:$f" 2>/dev/null || echo 0)
+            if [ "$size" -gt 0 ]; then echo "$f ($size bytes)"; fi
+          done || true)
+          if [ -n "$non_empty" ]; then
+            echo ""
+            echo -e "${RED}============================================================${NC}"
+            echo -e "${RED}ERROR: The following .o files must be empty stubs (0 bytes).${NC}"
+            echo ""
+            echo -e "${YELLOW}${non_empty}${NC}"
+            echo ""
+            echo -e "${CYAN}Run 'make empty-bpf-objects' to truncate them, then commit.${NC}"
+            echo -e "${RED}============================================================${NC}"
+            echo "::error::Non-empty .o files committed. Run 'make empty-bpf-objects' and commit the result."
+            exit 1
+          fi
+
+      - name: Install BPF build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends clang llvm lld libbpf-dev linux-headers-$(uname -r)
+          sudo apt-get install -y --no-install-recommends linux-tools-$(uname -r) linux-tools-common || true
+
+      - name: Run make generate for ${{ matrix.arch }}
+        run: |
+          # Generate BPF objects and Go bindings for this runner's native arch only,
+          # then run the remaining (non-BPF) generators.
+          GOARCH=${{ matrix.arch }} go generate ./pkg/plugin/...
+          go generate ./...
+
+      - name: Check for uncommitted changes
+        run: |
+          RED='\033[0;31m'
+          YELLOW='\033[1;33m'
+          CYAN='\033[0;36m'
+          NC='\033[0m'
+          failed=0
+
+          # 1. Check generated .go files match committed code.
+          #    Ignore .o files — they are empty stubs in the repo and get
+          #    populated with real BPF objects during generate.
+          if ! git diff --quiet -- ':!*.o'; then
+            echo ""
+            echo -e "${RED}============================================================${NC}"
+            echo -e "${RED}ERROR: Generated code is out of date.${NC}"
+            echo ""
+            echo -e "${YELLOW}The following files differ after running 'make generate':${NC}"
+            git diff --name-only -- ':!*.o'
+            echo ""
+            echo -e "${CYAN}Please run 'make generate' locally and commit the changes.${NC}"
+            echo -e "${RED}============================================================${NC}"
+            echo "::error::Generated code is out of date. Run 'make generate' locally and commit the changes."
+            failed=1
+          fi
+
+          # 2. Check for new generated files that weren't committed.
+          untracked=$(git ls-files --others --exclude-standard -- '*.go' | head -20)
+          if [ -n "$untracked" ]; then
+            echo ""
+            echo -e "${RED}============================================================${NC}"
+            echo -e "${RED}ERROR: New generated files are not committed.${NC}"
+            echo ""
+            echo -e "${YELLOW}${untracked}${NC}"
+            echo ""
+            echo -e "${CYAN}Please run 'make generate' locally and commit the new files.${NC}"
+            echo -e "${RED}============================================================${NC}"
+            echo "::error::New generated files are not committed. Run 'make generate' locally and commit the new files."
+            failed=1
+          fi
+
+          exit $failed
