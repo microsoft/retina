@@ -307,6 +307,16 @@ func (cr *CaptureReconciler) handleUpdate(ctx context.Context, capture *retinav1
 		return cr.updateCaptureStatusFromJobs(ctx, capture, captureJobList.Items)
 	}
 
+	// Set StartTime for CRD-created captures since the operator doesn't do it by default
+	// (unlike the CLI), and missing it causes a timestamp parsing error in the capture job.
+	if capture.Status.StartTime == nil {
+		now := metav1.Now()
+		capture.Status.StartTime = &now
+		if _, err := cr.updateStatus(ctx, capture); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	// create SAS URL and then secret for the Capture if managed storage account is enabled.
 	// Don't repeat the process if the secret already exists.
 	if cr.managedStorageAccountEnabled() {

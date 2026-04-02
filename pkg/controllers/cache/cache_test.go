@@ -153,7 +153,7 @@ func TestCacheNodes(t *testing.T) {
 	c := New(p)
 	assert.NotNil(t, c)
 
-	addNode := common.NewRetinaNode("node1", net.IPv4(1, 2, 3, 4))
+	addNode := common.NewRetinaNode("node1", net.IPv4(1, 2, 3, 4), "zone-1")
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -222,7 +222,7 @@ func TestAddPodSvcNodeSameIP(t *testing.T) {
 	assert.Equal(t, addSvc.Name(), svc.Name())
 	assert.Equal(t, addSvc.Namespace(), svc.Namespace())
 
-	addNode := common.NewRetinaNode("node1", net.IPv4(1, 2, 3, 4))
+	addNode := common.NewRetinaNode("node1", net.IPv4(1, 2, 3, 4), "zone-1")
 
 	err = c.UpdateRetinaNode(addNode)
 	assert.NoError(t, err)
@@ -277,7 +277,7 @@ func TestAddPodSvcNodeSameIPDiffNS(t *testing.T) {
 	assert.Equal(t, addSvc.Name(), svc.Name())
 	assert.Equal(t, addSvc.Namespace(), svc.Namespace())
 
-	addNode := common.NewRetinaNode("node1", net.IPv4(1, 2, 3, 4))
+	addNode := common.NewRetinaNode("node1", net.IPv4(1, 2, 3, 4), "zone-1")
 
 	err = c.UpdateRetinaNode(addNode)
 	assert.NoError(t, err)
@@ -359,7 +359,7 @@ func TestFailDelete(t *testing.T) {
 	err = c.DeleteRetinaSvc(svc.Key())
 	assert.Error(t, err)
 
-	node := common.NewRetinaNode("node1", net.IPv4(1, 2, 3, 4))
+	node := common.NewRetinaNode("node1", net.IPv4(1, 2, 3, 4), "zone-1")
 
 	err = c.DeleteRetinaNode(node.Name())
 	assert.Error(t, err)
