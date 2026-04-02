@@ -67,7 +67,11 @@ func run(args ...string) error {
 
 	runtimeHeaderDir, headerErr := loader.PrepareVmlinuxH(context.Background())
 	if headerErr != nil {
-		l.Warn("failed to prepare runtime vmlinux.h in init container, falling back to static headers", zap.String("path", runtimeHeaderDir), zap.Error(headerErr))
+		l.Warn(
+			"failed to prepare runtime vmlinux.h in init container, falling back to static headers",
+			zap.String("path", runtimeHeaderDir),
+			zap.Error(headerErr),
+		)
 	} else {
 		l.Info("prepared runtime vmlinux.h in init container", zap.String("path", loader.VmlinuxHeaderPath()))
 	}

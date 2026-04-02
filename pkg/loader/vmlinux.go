@@ -26,6 +26,11 @@ const (
 	kernelReleasePath            = "/proc/sys/kernel/osrelease"
 )
 
+var (
+	errKernelReleaseEmpty       = errors.New("kernel release is empty")
+	errCachedKernelReleaseEmpty = errors.New("cached kernel release is empty")
+)
+
 // VmlinuxHeaderDir returns the runtime directory where vmlinux.h is expected.
 func VmlinuxHeaderDir() string {
 	dir := strings.TrimSpace(os.Getenv(VmlinuxHeaderDirEnv))
@@ -111,21 +116,22 @@ func currentKernelRelease() (string, error) {
 
 	release := strings.TrimSpace(string(b))
 	if release == "" {
-		return "", fmt.Errorf("kernel release from %s is empty", kernelReleasePath)
+		return "", fmt.Errorf("%w: %s", errKernelReleaseEmpty, kernelReleasePath)
 	}
 
 	return release, nil
 }
 
 func readCachedKernelRelease(outputDir string) (string, error) {
-	b, err := os.ReadFile(filepath.Join(outputDir, VmlinuxKernelReleaseFileName))
+	metaPath := filepath.Join(outputDir, VmlinuxKernelReleaseFileName)
+	b, err := os.ReadFile(metaPath)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to read cached kernel release %s: %w", metaPath, err)
 	}
 
 	release := strings.TrimSpace(string(b))
 	if release == "" {
-		return "", errors.New("cached kernel release is empty")
+		return "", errCachedKernelReleaseEmpty
 	}
 
 	return release, nil
@@ -133,7 +139,7 @@ func readCachedKernelRelease(outputDir string) (string, error) {
 
 func writeCachedKernelRelease(outputDir, kernelRelease string) error {
 	metaPath := filepath.Join(outputDir, VmlinuxKernelReleaseFileName)
-	if err := os.WriteFile(metaPath, []byte(kernelRelease+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(metaPath, []byte(kernelRelease+"\n"), 0o600); err != nil {
 		return fmt.Errorf("failed to write cached kernel release %s: %w", metaPath, err)
 	}
 
