@@ -45,6 +45,8 @@ spec:
             mountPropagation: Bidirectional
           - name: config
             mountPath: /retina/config
+          - name: tmp
+            mountPath: /tmp
       containers:
         - name: {{ include "retina.name" . }} 
           readinessProbe:

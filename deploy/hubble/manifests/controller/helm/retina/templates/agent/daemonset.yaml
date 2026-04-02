@@ -54,6 +54,8 @@ spec:
             mountPath: /var/run/cilium
           - name: config
             mountPath: /retina/config
+          - name: tmp
+            mountPath: /tmp
       containers:
         - name: {{ include "retina.name" . }} 
           image: {{ .Values.agent.repository }}:{{ .Values.agent.tag }}
@@ -125,6 +127,8 @@ spec:
               mountPath: /var/run/cilium
             - name: host-os-release
               mountPath: /etc/os-release  
+            - name: tmp
+              mountPath: /tmp
           {{- if .Values.hubble.tls.enabled }}
             - name: tls
               mountPath: /var/lib/cilium/tls/hubble
@@ -155,6 +159,8 @@ spec:
         hostPath:
           path: /etc/os-release
           type: FileOrCreate   
+      - name: tmp
+        emptyDir: {}
       {{- if .Values.hubble.tls.enabled }}
       - name: tls
         projected:

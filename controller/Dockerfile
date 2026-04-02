@@ -70,6 +70,7 @@ RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/ret
 FROM azurelinux-core AS tools
 RUN tdnf install -y \
     clang \
+    bpftool \
     iproute \
     iptables \
     tcpdump \
@@ -83,6 +84,8 @@ RUN arr="clang tcpdump ip ss iptables-legacy iptables-legacy-save iptables-nft i
     for i in $arr; do    \
     cp $(which $i) /tmp/bin;   \
     done
+RUN mkdir -p /tmp/init-bin
+RUN cp $(which bpftool) /tmp/init-bin
 # Download Hubble
 ARG GOARCH=amd64
 ENV HUBBLE_ARCH=${GOARCH}
@@ -102,6 +105,7 @@ COPY --from=init-bin /go/bin/retina/initretina /retina/initretina
 COPY --from=tools /lib/ /lib
 COPY --from=tools /usr/lib/ /usr/lib
 COPY --from=tools /etc/pki/tls/ /etc/pki/tls/
+COPY --from=tools /tmp/init-bin/ /bin/
 ENTRYPOINT ["./retina/initretina"]
 
 # agent final image

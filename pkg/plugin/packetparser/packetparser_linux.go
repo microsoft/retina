@@ -191,9 +191,13 @@ func (p *packetParser) Compile(ctx context.Context) error {
 	if arch == "arm64" {
 		targetArch = "-D__TARGET_ARCH_arm64"
 	}
+
+	runtimeIncludeDir := "-I" + loader.VmlinuxHeaderDir()
+
 	// Keep target as bpf, otherwise clang compilation yields bpf object that elf reader cannot load.
 	cflags := []string{
 		"-target", "bpf", "-Wall", targetArch, "-g", "-O2", "-c", bpfSourceFile, "-o", bpfOutputFile,
+		runtimeIncludeDir,
 		archLibDir,
 		libbpfSrcDir,
 		libbpfIncludeAsmDir,

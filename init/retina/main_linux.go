@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"github.com/microsoft/retina/internal/buildinfo"
 	"github.com/microsoft/retina/pkg/bpf"
 	"github.com/microsoft/retina/pkg/config"
+	"github.com/microsoft/retina/pkg/loader"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/telemetry"
 	"github.com/pkg/errors"
@@ -61,6 +63,17 @@ func run(args ...string) error {
 	err = bpf.Setup(l, cfg.FilterMapMaxEntries)
 	if err != nil {
 		return errors.Wrap(err, "failed to setup Retina bpf filesystem")
+	}
+
+	runtimeHeaderDir, headerErr := loader.PrepareVmlinuxH(context.Background())
+	if headerErr != nil {
+		l.Warn(
+			"failed to prepare runtime vmlinux.h in init container, falling back to static headers",
+			zap.String("path", runtimeHeaderDir),
+			zap.Error(headerErr),
+		)
+	} else {
+		l.Info("prepared runtime vmlinux.h in init container", zap.String("path", loader.VmlinuxHeaderPath()))
 	}
 
 	return nil
