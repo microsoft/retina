@@ -18,6 +18,7 @@ import (
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/perf"
+	"github.com/cilium/ebpf/ringbuf"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/microsoft/retina/pkg/loader"
 	"github.com/microsoft/retina/pkg/log"
@@ -612,12 +613,13 @@ type compileOpts struct {
 	enableConntrack  bool
 	aggregationLevel int
 	samplingRate     int
+	enableRingBuf    bool
 }
 
-// compileAndLoadVariant compiles the packetparser eBPF program with custom
-// dynamic.h settings and returns loaded objects + perf reader.
+// compileAndLoadVariantBase compiles the packetparser eBPF program with custom
+// dynamic.h settings and returns loaded objects + perf/ringbuf reader.
 // Requires clang to be installed.
-func compileAndLoadVariant(t *testing.T, opts compileOpts) (*packetparserObjects, *perf.Reader) {
+func compileAndLoadVariantBase(t *testing.T, opts compileOpts) (*packetparserObjects, *perf.Reader, *ringbuf.Reader) {
 	t.Helper()
 	ebpftest.RequirePrivileged(t)
 
@@ -666,7 +668,8 @@ func compileAndLoadVariant(t *testing.T, opts compileOpts) (*packetparserObjects
 	}
 
 	log.SetupZapLogger(log.GetDefaultLogOpts()) //nolint:errcheck
-	err = loader.CompileEbpf(context.Background(),
+
+	cflags := []string{
 		"-target", "bpf", "-Wall", targetArch, "-g", "-O2",
 		"-c", bpfSourceFile, "-o", outputFile,
 		fmt.Sprintf("-I%s/../lib/_%s", dir, arch),
@@ -676,7 +679,12 @@ func compileAndLoadVariant(t *testing.T, opts compileOpts) (*packetparserObjects
 		fmt.Sprintf("-I%s/../lib/common/libbpf/_include/asm", dir),
 		fmt.Sprintf("-I%s/../filter/_cprog/", dir),
 		fmt.Sprintf("-I%s/../conntrack/_cprog/", dir),
-	)
+	}
+	if opts.enableRingBuf {
+		cflags = append(cflags, "-DUSE_RING_BUFFER", "-DRING_BUFFER_SIZE=4096")
+	}
+
+	err = loader.CompileEbpf(context.Background(), cflags...)
 	require.NoError(t, err, "failed to compile eBPF program")
 
 	// Load the compiled object.
@@ -689,11 +697,30 @@ func compileAndLoadVariant(t *testing.T, opts compileOpts) (*packetparserObjects
 	require.NoError(t, err)
 	t.Cleanup(func() { objs.Close() })
 
-	reader, err := perf.NewReader(objs.RetinaPacketparserEvents, os.Getpagesize()*4)
-	require.NoError(t, err)
-	t.Cleanup(func() { reader.Close() })
+	var pReader *perf.Reader
+	var rReader *ringbuf.Reader
+	if opts.enableRingBuf {
+		rReader, err = ringbuf.NewReader(objs.RetinaPacketparserEvents)
+		require.NoError(t, err)
+		t.Cleanup(func() { rReader.Close() })
+	} else {
+		pReader, err = perf.NewReader(objs.RetinaPacketparserEvents, os.Getpagesize()*4)
+		require.NoError(t, err)
+		t.Cleanup(func() { pReader.Close() })
+	}
 
-	return &objs, reader
+	return &objs, pReader, rReader
+}
+
+func compileAndLoadVariant(t *testing.T, opts compileOpts) (*packetparserObjects, *perf.Reader) {
+	objs, pReader, _ := compileAndLoadVariantBase(t, opts)
+	return objs, pReader
+}
+
+func compileAndLoadRingBufVariant(t *testing.T, opts compileOpts) (*packetparserObjects, *ringbuf.Reader) {
+	opts.enableRingBuf = true
+	objs, _, rReader := compileAndLoadVariantBase(t, opts)
+	return objs, rReader
 }
 
 func TestConntrackMetricsEnabled(t *testing.T) {
@@ -1187,4 +1214,88 @@ func TestConntrackEvictionTimeExtended(t *testing.T) {
 	assert.True(t, entry.EvictionTime > synEviction,
 		"eviction time should increase after ACK (60s SYN timeout → 360s established), got %d → %d",
 		synEviction, entry.EvictionTime)
+}
+
+func TestEndpointIngressFilter_TCP_RingBuf(t *testing.T) {
+	if err := ensureRingBufKernelSupported(); err != nil {
+		t.Skipf("ring buffer not supported: %v", err)
+	}
+
+	objs, reader := compileAndLoadRingBufVariant(t, compileOpts{
+		bypassFilter:     1,
+		enableConntrack:  false,
+		aggregationLevel: 0,
+		samplingRate:     1,
+	})
+
+	srcIP := net.ParseIP("10.0.0.1")
+	dstIP := net.ParseIP("10.0.0.2")
+	ebpftest.PopulateFilterMap(t, objs.RetinaFilter, srcIP, dstIP)
+
+	pkt := ebpftest.BuildTCPPacket(ebpftest.TCPPacketOpts{
+		SrcIP:   srcIP,
+		DstIP:   dstIP,
+		SrcPort: 12345,
+		DstPort: 80,
+		SYN:     true,
+		SeqNum:  1000,
+	})
+
+	// Run program
+	ret := ebpftest.RunProgram(t, objs.EndpointIngressFilter, pkt)
+	assert.Equal(t, uint32(tcActUnspec), ret, "expected TC_ACT_UNSPEC return value")
+
+	// Read event from Ring Buffer
+	event, ok := ebpftest.ReadRingBufEvent[packetparserPacket](t, reader, perfReaderTimeout)
+	require.True(t, ok, "expected a ringbuf event")
+
+	assert.Equal(t, ebpftest.IPToNative("10.0.0.1"), event.SrcIp)
+	assert.Equal(t, ebpftest.IPToNative("10.0.0.2"), event.DstIp)
+	assert.Equal(t, ebpftest.PortToNetwork(12345), event.SrcPort)
+	assert.Equal(t, ebpftest.PortToNetwork(80), event.DstPort)
+	assert.Equal(t, uint8(protoTCP), event.Proto)
+}
+
+func TestRingBufReaderWrapper(t *testing.T) {
+	if err := ensureRingBufKernelSupported(); err != nil {
+		t.Skipf("ring buffer not supported: %v", err)
+	}
+
+	objs, reader := compileAndLoadRingBufVariant(t, compileOpts{
+		bypassFilter:     1,
+		enableConntrack:  false,
+		aggregationLevel: 0,
+		samplingRate:     1,
+	})
+
+	wrapper := &ringBufReaderWrapper{reader: reader}
+
+	srcIP := net.ParseIP("10.0.0.1")
+	dstIP := net.ParseIP("10.0.0.2")
+	ebpftest.PopulateFilterMap(t, objs.RetinaFilter, srcIP, dstIP)
+
+	pkt := ebpftest.BuildTCPPacket(ebpftest.TCPPacketOpts{
+		SrcIP:   srcIP,
+		DstIP:   dstIP,
+		SrcPort: 54321,
+		DstPort: 80,
+		SYN:     true,
+		SeqNum:  2000,
+	})
+
+	// Run program to generate an event
+	ebpftest.RunProgram(t, objs.EndpointIngressFilter, pkt)
+
+	// Test Read() behavior
+	rec, err := wrapper.Read()
+	require.NoError(t, err)
+	require.NotNil(t, rec.RawSample)
+
+	// Test Close() behavior
+	err = wrapper.Close()
+	require.NoError(t, err)
+
+	// After closing, Read() should return ringbuf.ErrClosed
+	_, err = wrapper.Read()
+	assert.ErrorIs(t, err, ringbuf.ErrClosed)
 }

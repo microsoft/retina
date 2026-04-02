@@ -18,6 +18,7 @@ import (
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/ringbuf"
 	tc "github.com/florianl/go-tc"
 	nl "github.com/mdlayher/netlink"
 	kcfg "github.com/microsoft/retina/pkg/config"
@@ -25,6 +26,7 @@ import (
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/packetparser/mocks"
+	"github.com/microsoft/retina/pkg/utils"
 	"github.com/microsoft/retina/pkg/watchers/endpoint"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
@@ -351,6 +353,25 @@ func TestReadData_Error(t *testing.T) {
 	mperf.EXPECT().Read().Return(perfRecord{
 		LostSamples: 1,
 	}, nil).AnyTimes()
+	p.readData()
+}
+
+func TestReadData_RingBufClosed(t *testing.T) {
+	log.SetupZapLogger(log.GetDefaultLogOpts()) //nolint:errcheck // ignore
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mperf := newMockPerfReader(ctrl)
+	mperf.EXPECT().Read().Return(perfRecord{}, ringbuf.ErrClosed).AnyTimes()
+
+	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
+	menricher.EXPECT().Write(gomock.Any()).Times(0)
+
+	p := &packetParser{
+		cfg:    cfgRingBufferEnabled,
+		l:      log.Logger().Named("test"),
+		reader: mperf,
+	}
 	p.readData()
 }
 
@@ -731,6 +752,50 @@ func TestCompileRingBuffer(t *testing.T) {
 	if _, err := os.Stat(expectedOutputFile); errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("File %+v doesn't exist", expectedOutputFile)
 	}
+}
+
+func TestEnsureRingBufKernelSupported(t *testing.T) {
+	orig := getKernelVersion
+	defer func() { getKernelVersion = orig }()
+
+	tests := []struct {
+		name      string
+		major     int
+		minor     int
+		patch     int
+		errExists bool
+	}{
+		{"Supported", 5, 8, 0, false},
+		{"Supported newer", 6, 1, 0, false},
+		{"Not supported old major", 4, 15, 0, true},
+		{"Not supported old minor", 5, 7, 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			getKernelVersion = func() (utils.KernelVersion, error) {
+				return utils.KernelVersion{
+					Major: tt.major,
+					Minor: tt.minor,
+					Patch: tt.patch,
+				}, nil
+			}
+			err := ensureRingBufKernelSupported()
+			if tt.errExists {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+
+	t.Run("Kernel version error", func(t *testing.T) {
+		getKernelVersion = func() (utils.KernelVersion, error) {
+			return utils.KernelVersion{}, errors.New("failed to get kernel version") //nolint:err113 // ignore
+		}
+		err := ensureRingBufKernelSupported()
+		assert.Error(t, err)
+	})
 }
 
 // Helpers.

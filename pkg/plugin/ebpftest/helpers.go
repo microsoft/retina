@@ -17,6 +17,7 @@ import (
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/perf"
+	"github.com/cilium/ebpf/ringbuf"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
 )
@@ -192,4 +193,36 @@ func ReadPerCPUMap[T any](t *testing.T, m *ebpf.Map, key uint32) (T, bool) {
 	}
 	var zero T
 	return zero, false
+}
+
+// ReadRingBufEvent reads one ringbuf record from the reader within the given timeout,
+// decodes it into T using binary.Read (little-endian), and returns it.
+// Returns (zero, false) if the deadline expires without an event.
+func ReadRingBufEvent[T any](t *testing.T, rb *ringbuf.Reader, timeout time.Duration) (T, bool) {
+	t.Helper()
+
+	type result struct {
+		rec ringbuf.Record
+		err error
+	}
+
+	// ringbuf.Read is blocking, so we run it in a goroutine to support timeout.
+	// When the test ends or rb is closed, this should unblock.
+	ch := make(chan result, 1)
+	go func() {
+		rec, err := rb.Read()
+		ch <- result{rec, err}
+	}()
+
+	select {
+	case res := <-ch:
+		require.NoError(t, res.err)
+		var event T
+		err := binary.Read(bytes.NewReader(res.rec.RawSample), binary.LittleEndian, &event)
+		require.NoError(t, err)
+		return event, true
+	case <-time.After(timeout):
+		// Caller should cleanup reader to stop the goroutine
+		return *new(T), false
+	}
 }

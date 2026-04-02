@@ -995,8 +995,10 @@ func (r *perfReaderWrapper) Close() error {
 	return nil
 }
 
+var getKernelVersion = utils.LinuxKernelVersion
+
 func ensureRingBufKernelSupported() error {
-	kv, err := utils.LinuxKernelVersion()
+	kv, err := getKernelVersion()
 	if err != nil {
 		return fmt.Errorf("failed to detect kernel version for ring buffer support: %w", err)
 	}
