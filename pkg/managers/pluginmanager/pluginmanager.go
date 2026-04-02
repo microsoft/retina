@@ -10,7 +10,6 @@ import (
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	kcfg "github.com/microsoft/retina/pkg/config"
-	"github.com/microsoft/retina/pkg/loader"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/managers/watchermanager"
 	"github.com/microsoft/retina/pkg/metrics"
@@ -132,13 +131,6 @@ func (p *PluginManager) Start(ctx context.Context) error {
 	if p.cfg.MetricsInterval <= 0 {
 		p.l.Warn("MetricsInterval is invalid or unset; defaulting to 10s", zap.Duration("interval", p.cfg.MetricsInterval))
 		p.cfg.MetricsInterval = DefaultMetricsInterval
-	}
-
-	runtimeHeaderDir, headerErr := loader.PrepareVmlinuxH(ctx)
-	if headerErr != nil {
-		p.l.Warn("Failed to prepare runtime vmlinux.h, falling back to static headers", zap.String("path", runtimeHeaderDir), zap.Error(headerErr))
-	} else {
-		p.l.Info("Prepared runtime vmlinux.h", zap.String("path", loader.VmlinuxHeaderPath()))
 	}
 
 	if p.cfg.EnablePodLevel {

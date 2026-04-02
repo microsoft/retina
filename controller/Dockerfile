@@ -80,10 +80,12 @@ RUN tdnf install -y \
     ca-certificates \
     tar
 RUN mkdir -p /tmp/bin
-RUN arr="clang bpftool tcpdump ip ss iptables-legacy iptables-legacy-save iptables-nft iptables-nft-save cp uname" ;\
+RUN arr="clang tcpdump ip ss iptables-legacy iptables-legacy-save iptables-nft iptables-nft-save cp uname" ;\
     for i in $arr; do    \
     cp $(which $i) /tmp/bin;   \
     done
+RUN mkdir -p /tmp/init-bin
+RUN cp $(which bpftool) /tmp/init-bin
 # Download Hubble
 ARG GOARCH=amd64
 ENV HUBBLE_ARCH=${GOARCH}
@@ -103,6 +105,7 @@ COPY --from=init-bin /go/bin/retina/initretina /retina/initretina
 COPY --from=tools /lib/ /lib
 COPY --from=tools /usr/lib/ /usr/lib
 COPY --from=tools /etc/pki/tls/ /etc/pki/tls/
+COPY --from=tools /tmp/init-bin/ /bin/
 ENTRYPOINT ["./retina/initretina"]
 
 # agent final image
