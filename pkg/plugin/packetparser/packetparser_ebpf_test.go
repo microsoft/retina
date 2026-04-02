@@ -1255,3 +1255,47 @@ func TestEndpointIngressFilter_TCP_RingBuf(t *testing.T) {
 	assert.Equal(t, ebpftest.PortToNetwork(80), event.DstPort)
 	assert.Equal(t, uint8(protoTCP), event.Proto)
 }
+
+func TestRingBufReaderWrapper(t *testing.T) {
+	if err := ensureRingBufKernelSupported(); err != nil {
+		t.Skipf("ring buffer not supported: %v", err)
+	}
+
+	objs, reader := compileAndLoadRingBufVariant(t, compileOpts{
+		bypassFilter:     1,
+		enableConntrack:  false,
+		aggregationLevel: 0,
+		samplingRate:     1,
+	})
+
+	wrapper := &ringBufReaderWrapper{reader: reader}
+
+	srcIP := net.ParseIP("10.0.0.1")
+	dstIP := net.ParseIP("10.0.0.2")
+	ebpftest.PopulateFilterMap(t, objs.RetinaFilter, srcIP, dstIP)
+
+	pkt := ebpftest.BuildTCPPacket(ebpftest.TCPPacketOpts{
+		SrcIP:   srcIP,
+		DstIP:   dstIP,
+		SrcPort: 54321,
+		DstPort: 80,
+		SYN:     true,
+		SeqNum:  2000,
+	})
+
+	// Run program to generate an event
+	ebpftest.RunProgram(t, objs.EndpointIngressFilter, pkt)
+
+	// Test Read() behavior
+	rec, err := wrapper.Read()
+	require.NoError(t, err)
+	require.NotNil(t, rec.RawSample)
+
+	// Test Close() behavior
+	err = wrapper.Close()
+	require.NoError(t, err)
+
+	// After closing, Read() should return ringbuf.ErrClosed
+	_, err = wrapper.Read()
+	assert.ErrorIs(t, err, ringbuf.ErrClosed)
+}
