@@ -73,7 +73,8 @@ type DeleteKubernetesResource struct {
 func (d *DeleteKubernetesResource) String() string { return "delete-kubernetes-resource" }
 
 func (d *DeleteKubernetesResource) Do(ctx context.Context) error {
-	ctx, _ = utils.StepLogger(ctx, d)
+	ctx, log := utils.StepLogger(ctx, d)
+	_ = log
 	// Prevalidation: check resource type before proceeding
 	restype := ResourceType(d.ResourceType)
 	if restype == Unknown {
@@ -194,146 +195,148 @@ func DeleteResource(ctx context.Context, obj runtime.Object, clientset *kubernet
 		return ErrCreateNilResource
 	}
 
+	log := slog.With("prefix", utils.Prefix(ctx))
+
 	switch o := obj.(type) {
 	case *appsv1.DaemonSet:
-		slog.Info("deleting DaemonSet", "name", o.Name, "namespace", o.Namespace)
+		log.Info("deleting DaemonSet", "name", o.Name, "namespace", o.Namespace)
 		client := clientset.AppsV1().DaemonSets(o.Namespace)
 		err := client.Delete(ctx, o.Name, metaV1.DeleteOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
-				slog.Info("resource does not exist", "kind", "DaemonSet", "name", o.Name, "namespace", o.Namespace)
+				log.Info("resource does not exist", "kind", "DaemonSet", "name", o.Name, "namespace", o.Namespace)
 				return nil
 			}
 			return fmt.Errorf("failed to delete DaemonSet \"%s\" in namespace \"%s\": %w", o.Name, o.Namespace, err)
 		}
 
 	case *appsv1.Deployment:
-		slog.Info("deleting Deployment", "name", o.Name, "namespace", o.Namespace)
+		log.Info("deleting Deployment", "name", o.Name, "namespace", o.Namespace)
 		client := clientset.AppsV1().Deployments(o.Namespace)
 		err := client.Delete(ctx, o.Name, metaV1.DeleteOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
-				slog.Info("resource does not exist", "kind", "Deployment", "name", o.Name, "namespace", o.Namespace)
+				log.Info("resource does not exist", "kind", "Deployment", "name", o.Name, "namespace", o.Namespace)
 				return nil
 			}
 			return fmt.Errorf("failed to delete Deployment \"%s\" in namespace \"%s\": %w", o.Name, o.Namespace, err)
 		}
 
 	case *appsv1.StatefulSet:
-		slog.Info("deleting StatefulSet", "name", o.Name, "namespace", o.Namespace)
+		log.Info("deleting StatefulSet", "name", o.Name, "namespace", o.Namespace)
 		client := clientset.AppsV1().StatefulSets(o.Namespace)
 		err := client.Delete(ctx, o.Name, metaV1.DeleteOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
-				slog.Info("resource does not exist", "kind", "StatefulSet", "name", o.Name, "namespace", o.Namespace)
+				log.Info("resource does not exist", "kind", "StatefulSet", "name", o.Name, "namespace", o.Namespace)
 				return nil
 			}
 			return fmt.Errorf("failed to delete StatefulSet \"%s\" in namespace \"%s\": %w", o.Name, o.Namespace, err)
 		}
 
 	case *v1.Service:
-		slog.Info("deleting Service", "name", o.Name, "namespace", o.Namespace)
+		log.Info("deleting Service", "name", o.Name, "namespace", o.Namespace)
 		client := clientset.CoreV1().Services(o.Namespace)
 		err := client.Delete(ctx, o.Name, metaV1.DeleteOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
-				slog.Info("resource does not exist", "kind", "Service", "name", o.Name, "namespace", o.Namespace)
+				log.Info("resource does not exist", "kind", "Service", "name", o.Name, "namespace", o.Namespace)
 				return nil
 			}
 			return fmt.Errorf("failed to delete Service \"%s\" in namespace \"%s\": %w", o.Name, o.Namespace, err)
 		}
 
 	case *v1.ServiceAccount:
-		slog.Info("deleting ServiceAccount", "name", o.Name, "namespace", o.Namespace)
+		log.Info("deleting ServiceAccount", "name", o.Name, "namespace", o.Namespace)
 		client := clientset.CoreV1().ServiceAccounts(o.Namespace)
 		err := client.Delete(ctx, o.Name, metaV1.DeleteOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
-				slog.Info("resource does not exist", "kind", "ServiceAccount", "name", o.Name, "namespace", o.Namespace)
+				log.Info("resource does not exist", "kind", "ServiceAccount", "name", o.Name, "namespace", o.Namespace)
 				return nil
 			}
 			return fmt.Errorf("failed to delete ServiceAccount \"%s\" in namespace \"%s\": %w", o.Name, o.Namespace, err)
 		}
 
 	case *rbacv1.Role:
-		slog.Info("deleting Role", "name", o.Name, "namespace", o.Namespace)
+		log.Info("deleting Role", "name", o.Name, "namespace", o.Namespace)
 		client := clientset.RbacV1().Roles(o.Namespace)
 		err := client.Delete(ctx, o.Name, metaV1.DeleteOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
-				slog.Info("resource does not exist", "kind", "Role", "name", o.Name, "namespace", o.Namespace)
+				log.Info("resource does not exist", "kind", "Role", "name", o.Name, "namespace", o.Namespace)
 				return nil
 			}
 			return fmt.Errorf("failed to delete Role \"%s\" in namespace \"%s\": %w", o.Name, o.Namespace, err)
 		}
 
 	case *rbacv1.RoleBinding:
-		slog.Info("deleting RoleBinding", "name", o.Name, "namespace", o.Namespace)
+		log.Info("deleting RoleBinding", "name", o.Name, "namespace", o.Namespace)
 		client := clientset.RbacV1().RoleBindings(o.Namespace)
 		err := client.Delete(ctx, o.Name, metaV1.DeleteOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
-				slog.Info("resource does not exist", "kind", "RoleBinding", "name", o.Name, "namespace", o.Namespace)
+				log.Info("resource does not exist", "kind", "RoleBinding", "name", o.Name, "namespace", o.Namespace)
 				return nil
 			}
 			return fmt.Errorf("failed to delete RoleBinding \"%s\" in namespace \"%s\": %w", o.Name, o.Namespace, err)
 		}
 
 	case *rbacv1.ClusterRole:
-		slog.Info("deleting ClusterRole", "name", o.Name)
+		log.Info("deleting ClusterRole", "name", o.Name)
 		client := clientset.RbacV1().ClusterRoles()
 		err := client.Delete(ctx, o.Name, metaV1.DeleteOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
-				slog.Info("resource does not exist", "kind", "ClusterRole", "name", o.Name, "namespace", o.Namespace)
+				log.Info("resource does not exist", "kind", "ClusterRole", "name", o.Name, "namespace", o.Namespace)
 				return nil
 			}
 			return fmt.Errorf("failed to delete ClusterRole \"%s\" in namespace \"%s\": %w", o.Name, o.Namespace, err)
 		}
 
 	case *rbacv1.ClusterRoleBinding:
-		slog.Info("deleting ClusterRoleBinding", "name", o.Name)
+		log.Info("deleting ClusterRoleBinding", "name", o.Name)
 		client := clientset.RbacV1().ClusterRoleBindings()
 		err := client.Delete(ctx, o.Name, metaV1.DeleteOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
-				slog.Info("resource does not exist", "kind", "ClusterRoleBinding", "name", o.Name, "namespace", o.Namespace)
+				log.Info("resource does not exist", "kind", "ClusterRoleBinding", "name", o.Name, "namespace", o.Namespace)
 				return nil
 			}
 			return fmt.Errorf("failed to delete ClusterRoleBinding \"%s\" in namespace \"%s\": %w", o.Name, o.Namespace, err)
 		}
 
 	case *v1.ConfigMap:
-		slog.Info("deleting ConfigMap", "name", o.Name, "namespace", o.Namespace)
+		log.Info("deleting ConfigMap", "name", o.Name, "namespace", o.Namespace)
 		client := clientset.CoreV1().ConfigMaps(o.Namespace)
 		err := client.Delete(ctx, o.Name, metaV1.DeleteOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
-				slog.Info("resource does not exist", "kind", "ConfigMap", "name", o.Name, "namespace", o.Namespace)
+				log.Info("resource does not exist", "kind", "ConfigMap", "name", o.Name, "namespace", o.Namespace)
 				return nil
 			}
 			return fmt.Errorf("failed to delete ConfigMap \"%s\" in namespace \"%s\": %w", o.Name, o.Namespace, err)
 		}
 
 	case *networkingv1.NetworkPolicy:
-		slog.Info("deleting NetworkPolicy", "name", o.Name, "namespace", o.Namespace)
+		log.Info("deleting NetworkPolicy", "name", o.Name, "namespace", o.Namespace)
 		client := clientset.NetworkingV1().NetworkPolicies(o.Namespace)
 		err := client.Delete(ctx, o.Name, metaV1.DeleteOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
-				slog.Info("resource does not exist", "kind", "NetworkPolicy", "name", o.Name, "namespace", o.Namespace)
+				log.Info("resource does not exist", "kind", "NetworkPolicy", "name", o.Name, "namespace", o.Namespace)
 				return nil
 			}
 			return fmt.Errorf("failed to delete NetworkPolicy \"%s\" in namespace \"%s\": %w", o.Name, o.Namespace, err)
 		}
 
 	case *v1.Secret:
-		slog.Info("deleting Secret", "name", o.Name, "namespace", o.Namespace)
+		log.Info("deleting Secret", "name", o.Name, "namespace", o.Namespace)
 		client := clientset.CoreV1().Secrets(o.Namespace)
 		err := client.Delete(ctx, o.Name, metaV1.DeleteOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
-				slog.Info("resource does not exist", "kind", "Secret", "name", o.Name, "namespace", o.Namespace)
+				log.Info("resource does not exist", "kind", "Secret", "name", o.Name, "namespace", o.Namespace)
 				return nil
 			}
 			return fmt.Errorf("failed to delete Secret \"%s\" in namespace \"%s\": %w", o.Name, o.Namespace, err)

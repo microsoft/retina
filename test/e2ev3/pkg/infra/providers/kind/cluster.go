@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os/exec"
 
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"k8s.io/client-go/rest"
 )
 
@@ -25,11 +26,12 @@ func (k *Cluster) KubeConfigPath() string          { return k.KubeCfgPath }
 func (k *Cluster) RestConfig() *rest.Config        { return k.RC }
 
 func (k *Cluster) LoadImages(ctx context.Context, images []string) error {
+	prefix := utils.Prefix(ctx)
 	for _, image := range images {
-		slog.Info("loading image onto kind cluster", "image", image, "cluster", k.Name)
+		slog.With("prefix", prefix).Info("loading image onto kind cluster", "image", image, "cluster", k.Name)
 		args := []string{"load", "docker-image", "--name", k.Name, image}
 		cmd := exec.CommandContext(ctx, "kind", args...)
-		cmdOut := &slogWriter{level: slog.LevelInfo, source: "kind-load"}
+		cmdOut := &utils.SlogWriter{Level: slog.LevelInfo, Source: prefix}
 		cmd.Stdout = cmdOut
 		cmd.Stderr = cmdOut
 		if err := cmd.Run(); err != nil {

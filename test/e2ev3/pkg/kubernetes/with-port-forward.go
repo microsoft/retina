@@ -56,17 +56,12 @@ func (w *WithPortForward) Do(ctx context.Context) error {
 	return nil
 }
 
-// Unwrap exposes inner steps to go-workflow for visibility/debugging.
-func (w *WithPortForward) Unwrap() []flow.Steper {
-	return w.Steps
-}
-
 // CurlExpectFail creates a named step that runs a command expected to fail
 // (e.g., curl behind a deny-all network policy). The error is intentionally swallowed.
 func CurlExpectFail(name string, exec *ExecInPod) flow.Steper {
 	return flow.Func(name, func(ctx context.Context) error {
 		if err := exec.Do(ctx); err != nil {
-			slog.Info("curl failed as expected", "step", name, "error", err)
+			slog.With("prefix", utils.Prefix(ctx)).Info("curl failed as expected", "step", name, "error", err)
 		}
 		return nil
 	})

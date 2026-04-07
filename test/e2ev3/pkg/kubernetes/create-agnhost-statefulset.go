@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -32,6 +34,8 @@ type CreateAgnhostStatefulSet struct {
 }
 
 func (c *CreateAgnhostStatefulSet) Do(ctx context.Context) error {
+	ctx, log := utils.StepLogger(ctx, c)
+	_ = log
 	clientset, err := kubernetes.NewForConfig(c.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)

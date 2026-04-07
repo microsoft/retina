@@ -10,24 +10,26 @@ import (
 )
 
 // Hubble DNS test fixtures: pod name and expected metric labels.
-var (
-	HubbleDNSPodName = "agnhost-dns-0"
+var HubbleDNSPodName = "agnhost-dns-0"
 
-	ValidHubbleDNSQueryMetricLabels = map[string]string{
+func ValidHubbleDNSQueryMetricLabels(namespace string) map[string]string {
+	return map[string]string{
 		config.HubbleDestinationLabel: "",
-		config.HubbleSourceLabel:      config.TestPodNamespace + "/" + HubbleDNSPodName,
+		config.HubbleSourceLabel:      namespace + "/" + HubbleDNSPodName,
 		config.HubbleIPsRetunedLabel:  "0",
 		config.HubbleQTypesLabel:      "A",
 		config.HubbleRCodeLabel:       "",
 		config.HubbleQueryLabel:       "one.one.one.one.",
 	}
+}
 
-	ValidHubbleDNSResponseMetricLabels = map[string]string{
-		config.HubbleDestinationLabel: config.TestPodNamespace + "/" + HubbleDNSPodName,
+func ValidHubbleDNSResponseMetricLabels(namespace string) map[string]string {
+	return map[string]string{
+		config.HubbleDestinationLabel: namespace + "/" + HubbleDNSPodName,
 		config.HubbleSourceLabel:      "",
 		config.HubbleIPsRetunedLabel:  "2",
 		config.HubbleQTypesLabel:      "A",
 		config.HubbleRCodeLabel:       "No Error",
 		config.HubbleQueryLabel:       "one.one.one.one.",
 	}
-)
+}

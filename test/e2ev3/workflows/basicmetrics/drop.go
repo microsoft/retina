@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/config"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"k8s.io/client-go/rest"
 )
 
@@ -83,6 +84,8 @@ type ValidateRetinaDropMetricStep struct {
 }
 
 func (v *ValidateRetinaDropMetricStep) Do(ctx context.Context) error {
+	ctx, log := utils.StepLogger(ctx, v)
+	_ = log
 	promAddress := fmt.Sprintf("http://localhost:%s/metrics", v.PortForwardedRetinaPort)
 
 	metric := map[string]string{

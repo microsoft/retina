@@ -17,6 +17,7 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/config"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
 func addAdvancedDNSScenario(restConfig *rest.Config, namespace, arch, variant string,
@@ -101,6 +102,8 @@ type ValidateAdvancedDNSRequestStep struct {
 }
 
 func (v *ValidateAdvancedDNSRequestStep) Do(ctx context.Context) error {
+	ctx, log := utils.StepLogger(ctx, v)
+	_ = log
 	metricsEndpoint := fmt.Sprintf("http://localhost:%s/metrics", config.RetinaMetricsPort)
 
 	podIP, err := k8s.GetPodIP(ctx, v.RestConfig, v.PodNamespace, v.PodName)
@@ -142,6 +145,8 @@ type ValidateAdvancedDNSResponseStep struct {
 }
 
 func (v *ValidateAdvancedDNSResponseStep) Do(ctx context.Context) error {
+	ctx, log := utils.StepLogger(ctx, v)
+	_ = log
 	metricsEndpoint := fmt.Sprintf("http://localhost:%s/metrics", config.RetinaMetricsPort)
 
 	podIP, err := k8s.GetPodIP(ctx, v.RestConfig, v.PodNamespace, v.PodName)

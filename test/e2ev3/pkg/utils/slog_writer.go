@@ -27,7 +27,7 @@ func (w *SlogWriter) Write(p []byte) (int, error) {
 		line := string(bytes.TrimRight(w.buf[:idx], "\r"))
 		w.buf = w.buf[idx+1:]
 		if line != "" {
-			slog.Log(context.Background(), w.Level, line, "source", w.Source)
+			slog.Log(context.Background(), w.Level, line, "prefix", w.Source)
 		}
 	}
 	return len(p), nil
@@ -38,7 +38,7 @@ func (w *SlogWriter) Flush() {
 	if len(w.buf) > 0 {
 		line := string(bytes.TrimRight(w.buf, "\r\n"))
 		if line != "" {
-			slog.Log(context.Background(), w.Level, line, "source", w.Source)
+			slog.Log(context.Background(), w.Level, line, "prefix", w.Source)
 		}
 		w.buf = nil
 	}

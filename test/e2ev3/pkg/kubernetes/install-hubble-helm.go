@@ -32,6 +32,7 @@ type InstallHubbleHelmChart struct {
 	ImageNamespace     string
 	HelmDriver         string
 	ImageLoader        e2ecfg.ClusterProvider
+	TestPodNamespace   string
 }
 
 func (v *InstallHubbleHelmChart) Do(ctx context.Context) error {
@@ -53,7 +54,11 @@ func (v *InstallHubbleHelmChart) Do(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to build rest config: %w", err)
 	}
-	err = CreateNamespaceFn(ctx, rc, e2ecfg.TestPodNamespace)
+	testNS := v.TestPodNamespace
+	if testNS == "" {
+		testNS = e2ecfg.TestPodNamespace
+	}
+	err = CreateNamespaceFn(ctx, rc, testNS)
 	if err != nil {
 		return fmt.Errorf("failed to create namespace %s: %w", v.Namespace, err)
 	}

@@ -13,33 +13,33 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func addHubbleFlowInterNodeScenario(restConfig *rest.Config, arch string) *flow.Workflow {
+func addHubbleFlowInterNodeScenario(restConfig *rest.Config, namespace string, arch string) *flow.Workflow {
 	wf := &flow.Workflow{DontPanic: true}
 	podnameSrc := "agnhost-flow-inter-src"
 	podnameDst := "agnhost-flow-inter-dst"
 	validSrcLabels := []map[string]string{
-		{"source": config.TestPodNamespace + "/" + podnameSrc + "-0", "destination": "", "protocol": config.TCP, "subtype": "to-stack", "type": "Trace", "verdict": "FORWARDED"},
-		{"source": config.TestPodNamespace + "/" + podnameDst + "-0", "destination": "", "protocol": config.TCP, "subtype": "to-endpoint", "type": "Trace", "verdict": "FORWARDED"},
+		{"source": namespace + "/" + podnameSrc + "-0", "destination": "", "protocol": config.TCP, "subtype": "to-stack", "type": "Trace", "verdict": "FORWARDED"},
+		{"source": namespace + "/" + podnameDst + "-0", "destination": "", "protocol": config.TCP, "subtype": "to-endpoint", "type": "Trace", "verdict": "FORWARDED"},
 	}
 	// Validate from dst pod's perspective using source-based labels.
 	// With sourceEgressContext=pod, flow metrics always populate 'source' with the local pod
 	// and leave 'destination' empty — so we check dst-0 appears as source for both directions.
 	validDstLabels := []map[string]string{
-		{"source": config.TestPodNamespace + "/" + podnameDst + "-0", "destination": "", "protocol": config.TCP, "subtype": "to-stack", "type": "Trace", "verdict": "FORWARDED"},
-		{"source": config.TestPodNamespace + "/" + podnameDst + "-0", "destination": "", "protocol": config.TCP, "subtype": "to-endpoint", "type": "Trace", "verdict": "FORWARDED"},
+		{"source": namespace + "/" + podnameDst + "-0", "destination": "", "protocol": config.TCP, "subtype": "to-stack", "type": "Trace", "verdict": "FORWARDED"},
+		{"source": namespace + "/" + podnameDst + "-0", "destination": "", "protocol": config.TCP, "subtype": "to-endpoint", "type": "Trace", "verdict": "FORWARDED"},
 	}
 
 	createSrc := &k8s.CreateAgnhostStatefulSet{
-		AgnhostName: podnameSrc, AgnhostNamespace: config.TestPodNamespace,
+		AgnhostName: podnameSrc, AgnhostNamespace: namespace,
 		AgnhostArch: arch, RestConfig: restConfig,
 	}
 	createDst := &k8s.CreateAgnhostStatefulSet{
-		AgnhostName: podnameDst, AgnhostNamespace: config.TestPodNamespace,
+		AgnhostName: podnameDst, AgnhostNamespace: namespace,
 		AgnhostArch: arch, RestConfig: restConfig,
 	}
 	curlPod := &CurlPodStep{
-		SrcPodName: podnameSrc + "-0", SrcPodNamespace: config.TestPodNamespace,
-		DstPodName: podnameDst + "-0", DstPodNamespace: config.TestPodNamespace,
+		SrcPodName: podnameSrc + "-0", SrcPodNamespace: namespace,
+		DstPodName: podnameDst + "-0", DstPodNamespace: namespace,
 		RestConfig: restConfig,
 	}
 	validateSrc := &prom.ValidateMetricStep{
@@ -69,11 +69,11 @@ func addHubbleFlowInterNodeScenario(restConfig *rest.Config, arch string) *flow.
 	}
 	deleteSrc := &k8s.DeleteKubernetesResource{
 		ResourceType: k8s.TypeString(k8s.StatefulSet), ResourceName: podnameSrc,
-		ResourceNamespace: config.TestPodNamespace, RestConfig: restConfig,
+		ResourceNamespace: namespace, RestConfig: restConfig,
 	}
 	deleteDst := &k8s.DeleteKubernetesResource{
 		ResourceType: k8s.TypeString(k8s.StatefulSet), ResourceName: podnameDst,
-		ResourceNamespace: config.TestPodNamespace, RestConfig: restConfig,
+		ResourceNamespace: namespace, RestConfig: restConfig,
 	}
 
 	wf.Add(

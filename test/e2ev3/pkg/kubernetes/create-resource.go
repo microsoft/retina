@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -25,9 +27,11 @@ func CreateResource(ctx context.Context, obj runtime.Object, clientset *kubernet
 		return ErrCreateNilResource
 	}
 
+	log := slog.With("prefix", utils.Prefix(ctx))
+
 	switch o := obj.(type) {
 	case *appsv1.DaemonSet:
-		slog.Info("creating DaemonSet", "name", o.Name, "namespace", o.Namespace)
+		log.Info("creating DaemonSet", "name", o.Name, "namespace", o.Namespace)
 		client := clientset.AppsV1().DaemonSets(o.Namespace)
 		_, err := client.Get(ctx, o.Name, metaV1.GetOptions{})
 		if errors.IsNotFound(err) {
@@ -43,7 +47,7 @@ func CreateResource(ctx context.Context, obj runtime.Object, clientset *kubernet
 		}
 
 	case *appsv1.Deployment:
-		slog.Info("creating Deployment", "name", o.Name, "namespace", o.Namespace)
+		log.Info("creating Deployment", "name", o.Name, "namespace", o.Namespace)
 		client := clientset.AppsV1().Deployments(o.Namespace)
 		_, err := client.Get(ctx, o.Name, metaV1.GetOptions{})
 		if errors.IsNotFound(err) {
@@ -59,7 +63,7 @@ func CreateResource(ctx context.Context, obj runtime.Object, clientset *kubernet
 		}
 
 	case *appsv1.StatefulSet:
-		slog.Info("creating StatefulSet", "name", o.Name, "namespace", o.Namespace)
+		log.Info("creating StatefulSet", "name", o.Name, "namespace", o.Namespace)
 		client := clientset.AppsV1().StatefulSets(o.Namespace)
 		_, err := client.Get(ctx, o.Name, metaV1.GetOptions{})
 		if errors.IsNotFound(err) {
@@ -75,7 +79,7 @@ func CreateResource(ctx context.Context, obj runtime.Object, clientset *kubernet
 		}
 
 	case *v1.Service:
-		slog.Info("creating Service", "name", o.Name, "namespace", o.Namespace)
+		log.Info("creating Service", "name", o.Name, "namespace", o.Namespace)
 		client := clientset.CoreV1().Services(o.Namespace)
 		_, err := client.Get(ctx, o.Name, metaV1.GetOptions{})
 		if errors.IsNotFound(err) {
@@ -91,7 +95,7 @@ func CreateResource(ctx context.Context, obj runtime.Object, clientset *kubernet
 		}
 
 	case *v1.ServiceAccount:
-		slog.Info("creating ServiceAccount", "name", o.Name, "namespace", o.Namespace)
+		log.Info("creating ServiceAccount", "name", o.Name, "namespace", o.Namespace)
 		client := clientset.CoreV1().ServiceAccounts(o.Namespace)
 		_, err := client.Get(ctx, o.Name, metaV1.GetOptions{})
 		if errors.IsNotFound(err) {
@@ -107,7 +111,7 @@ func CreateResource(ctx context.Context, obj runtime.Object, clientset *kubernet
 		}
 
 	case *rbacv1.Role:
-		slog.Info("creating Role", "name", o.Name, "namespace", o.Namespace)
+		log.Info("creating Role", "name", o.Name, "namespace", o.Namespace)
 		client := clientset.RbacV1().Roles(o.Namespace)
 		_, err := client.Get(ctx, o.Name, metaV1.GetOptions{})
 		if errors.IsNotFound(err) {
@@ -123,7 +127,7 @@ func CreateResource(ctx context.Context, obj runtime.Object, clientset *kubernet
 		}
 
 	case *rbacv1.RoleBinding:
-		slog.Info("creating RoleBinding", "name", o.Name, "namespace", o.Namespace)
+		log.Info("creating RoleBinding", "name", o.Name, "namespace", o.Namespace)
 		client := clientset.RbacV1().RoleBindings(o.Namespace)
 		_, err := client.Get(ctx, o.Name, metaV1.GetOptions{})
 		if errors.IsNotFound(err) {
@@ -139,7 +143,7 @@ func CreateResource(ctx context.Context, obj runtime.Object, clientset *kubernet
 		}
 
 	case *rbacv1.ClusterRole:
-		slog.Info("creating ClusterRole", "name", o.Name)
+		log.Info("creating ClusterRole", "name", o.Name)
 		client := clientset.RbacV1().ClusterRoles()
 		_, err := client.Get(ctx, o.Name, metaV1.GetOptions{})
 		if errors.IsNotFound(err) {
@@ -155,7 +159,7 @@ func CreateResource(ctx context.Context, obj runtime.Object, clientset *kubernet
 		}
 
 	case *rbacv1.ClusterRoleBinding:
-		slog.Info("creating ClusterRoleBinding", "name", o.Name)
+		log.Info("creating ClusterRoleBinding", "name", o.Name)
 		client := clientset.RbacV1().ClusterRoleBindings()
 		_, err := client.Get(ctx, o.Name, metaV1.GetOptions{})
 		if errors.IsNotFound(err) {
@@ -171,7 +175,7 @@ func CreateResource(ctx context.Context, obj runtime.Object, clientset *kubernet
 		}
 
 	case *v1.ConfigMap:
-		slog.Info("creating ConfigMap", "name", o.Name, "namespace", o.Namespace)
+		log.Info("creating ConfigMap", "name", o.Name, "namespace", o.Namespace)
 		client := clientset.CoreV1().ConfigMaps(o.Namespace)
 		_, err := client.Get(ctx, o.Name, metaV1.GetOptions{})
 		if errors.IsNotFound(err) {
@@ -187,7 +191,7 @@ func CreateResource(ctx context.Context, obj runtime.Object, clientset *kubernet
 		}
 
 	case *networkingv1.NetworkPolicy:
-		slog.Info("creating NetworkPolicy", "name", o.Name, "namespace", o.Namespace)
+		log.Info("creating NetworkPolicy", "name", o.Name, "namespace", o.Namespace)
 		client := clientset.NetworkingV1().NetworkPolicies(o.Namespace)
 		_, err := client.Get(ctx, o.Name, metaV1.GetOptions{})
 		if errors.IsNotFound(err) {
@@ -203,7 +207,7 @@ func CreateResource(ctx context.Context, obj runtime.Object, clientset *kubernet
 		}
 
 	case *v1.Secret:
-		slog.Info("creating Secret", "name", o.Name, "namespace", o.Namespace)
+		log.Info("creating Secret", "name", o.Name, "namespace", o.Namespace)
 		client := clientset.CoreV1().Secrets(o.Namespace)
 		_, err := client.Get(ctx, o.Name, metaV1.GetOptions{})
 		if errors.IsNotFound(err) {

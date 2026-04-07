@@ -58,7 +58,8 @@ func (e *ExecInPod) Do(ctx context.Context) error {
 }
 
 func ExecPod(ctx context.Context, clientset *kubernetes.Clientset, config *rest.Config, namespace, podName, command string) ([]byte, error) {
-	slog.Info("executing command", "command", command, "pod", podName, "namespace", namespace)
+	log := slog.With("prefix", utils.Prefix(ctx))
+	log.Info("executing command", "command", command, "pod", podName, "namespace", namespace)
 	req := clientset.CoreV1().RESTClient().Post().Resource("pods").Name(podName).
 		Namespace(namespace).SubResource(ExecSubResources)
 	option := &v1.PodExecOptions{

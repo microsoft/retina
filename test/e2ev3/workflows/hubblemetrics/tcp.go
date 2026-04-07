@@ -13,22 +13,22 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func addHubbleTCPScenario(restConfig *rest.Config, arch string) *flow.Workflow {
+func addHubbleTCPScenario(restConfig *rest.Config, namespace string, arch string) *flow.Workflow {
 	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-tcp"
 	podName := agnhostName + "-0"
 
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
-		AgnhostName: agnhostName, AgnhostNamespace: config.TestPodNamespace,
+		AgnhostName: agnhostName, AgnhostNamespace: namespace,
 		AgnhostArch: arch, RestConfig: restConfig,
 	}
 	execCurl := &k8s.ExecInPod{
-		PodName: podName, PodNamespace: config.TestPodNamespace,
+		PodName: podName, PodNamespace: namespace,
 		Command: "curl -s -m 5 bing.com", RestConfig: restConfig,
 	}
 	validateTCP := &prom.ValidateMetricStep{
 		ForwardedPort: config.HubbleMetricsPort, MetricName: config.HubbleTCPFlagsMetricName,
-		ValidMetrics: ValidHubbleTCPMetricsLabels, ExpectMetric: true,
+		ValidMetrics: ValidHubbleTCPMetricsLabels(namespace), ExpectMetric: true,
 	}
 	validateWithPF := &k8s.WithPortForward{
 		PF: &k8s.PortForward{
@@ -40,7 +40,7 @@ func addHubbleTCPScenario(restConfig *rest.Config, arch string) *flow.Workflow {
 	}
 	deleteAgnhost := &k8s.DeleteKubernetesResource{
 		ResourceType: k8s.TypeString(k8s.StatefulSet), ResourceName: agnhostName,
-		ResourceNamespace: config.TestPodNamespace, RestConfig: restConfig,
+		ResourceNamespace: namespace, RestConfig: restConfig,
 	}
 
 	wf.Add(

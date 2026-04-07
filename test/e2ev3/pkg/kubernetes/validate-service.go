@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -27,6 +28,8 @@ type ValidateResource struct {
 }
 
 func (v *ValidateResource) Do(ctx context.Context) error {
+	ctx, log := utils.StepLogger(ctx, v)
+	_ = log
 	clientset, err := kubernetes.NewForConfig(v.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)

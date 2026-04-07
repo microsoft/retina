@@ -11,11 +11,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
+
 	"k8s.io/client-go/rest"
 
 	flow "github.com/Azure/go-workflow"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
-	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
 func addHubbleRelayValidation(restConfig *rest.Config) *flow.Workflow {
@@ -43,6 +44,8 @@ type ValidateHubbleRelayServiceStep struct {
 func (v *ValidateHubbleRelayServiceStep) String() string { return "validate-hubble-relay-service" }
 
 func (v *ValidateHubbleRelayServiceStep) Do(ctx context.Context) error {
+	ctx, log := utils.StepLogger(ctx, v)
+	_ = log
 	step := &k8s.ValidateResource{
 		ResourceName:      "hubble-relay-service",
 		ResourceNamespace: k8s.HubbleNamespace,
@@ -76,6 +79,7 @@ func (v *ValidateHubbleUIServiceStep) Do(ctx context.Context) error {
 
 	// Port forward and validate HTTP response
 	pf := &k8s.PortForward{
+		Namespace:             k8s.HubbleNamespace,
 		LabelSelector:         "k8s-app=hubble-ui",
 		LocalPort:             "8080",
 		RemotePort:            "8081",
@@ -111,6 +115,8 @@ type ValidateHTTPResponseStep struct {
 func (v *ValidateHTTPResponseStep) String() string { return "validate-http-response" }
 
 func (v *ValidateHTTPResponseStep) Do(ctx context.Context) error {
+	ctx, log := utils.StepLogger(ctx, v)
+	_ = log
 	step := &k8s.ValidateHTTPResponse{
 		URL:            v.URL,
 		ExpectedStatus: v.ExpectedStatus,

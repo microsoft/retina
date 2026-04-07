@@ -6,12 +6,12 @@ package azure
 import (
 	"context"
 	"fmt"
-	"log/slog"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	armcontainerservice "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v4"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
 // DeleteResourceGroup is a go-workflow step that deletes a resource group
@@ -25,7 +25,7 @@ type DeleteResourceGroup struct {
 func (d *DeleteResourceGroup) String() string { return "delete-resource-group" }
 
 func (d *DeleteResourceGroup) Do(ctx context.Context) error {
-	log := slog.With("step", d.String())
+	ctx, log := utils.StepLogger(ctx, d)
 	log.Info("deleting resource group", "resourceGroup", d.ResourceGroupName)
 
 	cred, err := azidentity.NewAzureCLICredential(nil)
@@ -62,7 +62,7 @@ type DeleteCluster struct {
 func (d *DeleteCluster) String() string { return "delete-aks-cluster" }
 
 func (d *DeleteCluster) Do(ctx context.Context) error {
-	log := slog.With("step", d.String())
+	ctx, log := utils.StepLogger(ctx, d)
 	log.Info("deleting cluster", "cluster", d.ClusterName, "resourceGroup", d.ResourceGroupName)
 
 	cred, err := azidentity.NewAzureCLICredential(nil)

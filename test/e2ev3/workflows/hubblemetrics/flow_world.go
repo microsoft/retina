@@ -13,20 +13,20 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func addHubbleFlowToWorldScenario(restConfig *rest.Config, arch string) *flow.Workflow {
+func addHubbleFlowToWorldScenario(restConfig *rest.Config, namespace string, arch string) *flow.Workflow {
 	wf := &flow.Workflow{DontPanic: true}
 	podname := "agnhost-flow-world"
 	validLabels := []map[string]string{
-		{"source": config.TestPodNamespace + "/" + podname + "-0", "destination": "", "protocol": config.TCP, "subtype": "to-stack", "type": "Trace", "verdict": "FORWARDED"},
-		{"source": config.TestPodNamespace + "/" + podname + "-0", "destination": "", "protocol": config.UDP, "subtype": "to-stack", "type": "Trace", "verdict": "FORWARDED"},
+		{"source": namespace + "/" + podname + "-0", "destination": "", "protocol": config.TCP, "subtype": "to-stack", "type": "Trace", "verdict": "FORWARDED"},
+		{"source": namespace + "/" + podname + "-0", "destination": "", "protocol": config.UDP, "subtype": "to-stack", "type": "Trace", "verdict": "FORWARDED"},
 	}
 
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
-		AgnhostName: podname, AgnhostNamespace: config.TestPodNamespace,
+		AgnhostName: podname, AgnhostNamespace: namespace,
 		AgnhostArch: arch, RestConfig: restConfig,
 	}
 	execCurl := &k8s.ExecInPod{
-		PodName: podname + "-0", PodNamespace: config.TestPodNamespace,
+		PodName: podname + "-0", PodNamespace: namespace,
 		Command: "curl -s -m 5 bing.com", RestConfig: restConfig,
 	}
 	validateFlow := &prom.ValidateMetricStep{
@@ -42,7 +42,7 @@ func addHubbleFlowToWorldScenario(restConfig *rest.Config, arch string) *flow.Wo
 	}
 	deleteAgnhost := &k8s.DeleteKubernetesResource{
 		ResourceType: k8s.TypeString(k8s.StatefulSet), ResourceName: podname,
-		ResourceNamespace: config.TestPodNamespace, RestConfig: restConfig,
+		ResourceNamespace: namespace, RestConfig: restConfig,
 	}
 
 	wf.Add(

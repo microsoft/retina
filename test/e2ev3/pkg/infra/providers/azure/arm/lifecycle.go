@@ -6,13 +6,13 @@ package arm
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
 	"github.com/microsoft/retina/test/e2ev3/pkg/infra/providers/azure"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
 // DeleteInfra is a go-workflow step that deletes the resource group created
@@ -24,7 +24,7 @@ type DeleteInfra struct {
 func (d *DeleteInfra) String() string { return "delete-azure-infra" }
 
 func (d *DeleteInfra) Do(ctx context.Context) error {
-	log := slog.With("step", d.String())
+	ctx, log := utils.StepLogger(ctx, d)
 	log.Info("deleting resource group and all resources within", "resourceGroup", d.Config.ResourceGroupName)
 
 	cred, err := azidentity.NewAzureCLICredential(nil)
@@ -82,6 +82,8 @@ type GetKubeConfig struct {
 func (g *GetKubeConfig) String() string { return "get-arm-kubeconfig" }
 
 func (g *GetKubeConfig) Do(ctx context.Context) error {
+	ctx, log := utils.StepLogger(ctx, g)
+	_ = log
 	step := &azure.GetAKSKubeConfig{
 		ClusterName:        g.Config.ClusterName,
 		SubscriptionID:     g.Config.SubscriptionID,

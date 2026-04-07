@@ -14,25 +14,25 @@ import (
 	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 )
 
-func addHubbleFlowIntraNodeScenario(restConfig *rest.Config, arch string) *flow.Workflow {
+func addHubbleFlowIntraNodeScenario(restConfig *rest.Config, namespace string, arch string) *flow.Workflow {
 	wf := &flow.Workflow{DontPanic: true}
 	podname := "agnhost-flow-intra"
 	replicas := 2
 	validLabels := []map[string]string{
-		{"source": config.TestPodNamespace + "/" + podname + "-0", "destination": "", "protocol": config.TCP, "subtype": "to-stack", "type": "Trace", "verdict": "FORWARDED"},
-		{"source": config.TestPodNamespace + "/" + podname + "-0", "destination": "", "protocol": config.TCP, "subtype": "to-endpoint", "type": "Trace", "verdict": "FORWARDED"},
-		{"source": config.TestPodNamespace + "/" + podname + "-1", "destination": "", "protocol": config.TCP, "subtype": "to-stack", "type": "Trace", "verdict": "FORWARDED"},
-		{"source": config.TestPodNamespace + "/" + podname + "-1", "destination": "", "protocol": config.TCP, "subtype": "to-endpoint", "type": "Trace", "verdict": "FORWARDED"},
+		{"source": namespace + "/" + podname + "-0", "destination": "", "protocol": config.TCP, "subtype": "to-stack", "type": "Trace", "verdict": "FORWARDED"},
+		{"source": namespace + "/" + podname + "-0", "destination": "", "protocol": config.TCP, "subtype": "to-endpoint", "type": "Trace", "verdict": "FORWARDED"},
+		{"source": namespace + "/" + podname + "-1", "destination": "", "protocol": config.TCP, "subtype": "to-stack", "type": "Trace", "verdict": "FORWARDED"},
+		{"source": namespace + "/" + podname + "-1", "destination": "", "protocol": config.TCP, "subtype": "to-endpoint", "type": "Trace", "verdict": "FORWARDED"},
 	}
 
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
-		AgnhostName: podname, AgnhostNamespace: config.TestPodNamespace,
+		AgnhostName: podname, AgnhostNamespace: namespace,
 		ScheduleOnSameNode: true, AgnhostReplicas: &replicas,
 		AgnhostArch: arch, RestConfig: restConfig,
 	}
 	curlPod := &CurlPodStep{
-		SrcPodName: podname + "-0", SrcPodNamespace: config.TestPodNamespace,
-		DstPodName: podname + "-1", DstPodNamespace: config.TestPodNamespace,
+		SrcPodName: podname + "-0", SrcPodNamespace: namespace,
+		DstPodName: podname + "-1", DstPodNamespace: namespace,
 		RestConfig: restConfig,
 	}
 	validateFlow := &prom.ValidateMetricStep{
@@ -48,7 +48,7 @@ func addHubbleFlowIntraNodeScenario(restConfig *rest.Config, arch string) *flow.
 	}
 	deleteAgnhost := &k8s.DeleteKubernetesResource{
 		ResourceType: k8s.TypeString(k8s.StatefulSet), ResourceName: podname,
-		ResourceNamespace: config.TestPodNamespace, RestConfig: restConfig,
+		ResourceNamespace: namespace, RestConfig: restConfig,
 	}
 
 	wf.Add(

@@ -5,7 +5,6 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -86,7 +85,7 @@ func (p *PortForward) Do(ctx context.Context) error {
 
 		log.Info("attempting port forward", "pod", targetPodName, "label", p.LabelSelector, "namespace", p.Namespace)
 
-		p.pf, err = NewPortForwarder(p.RestConfig, logger{}, opts)
+		p.pf, err = NewPortForwarder(p.RestConfig, log, opts)
 		if err != nil {
 			return fmt.Errorf("could not create port forwarder: %w", err)
 		}
@@ -165,10 +164,4 @@ func (p *PortForward) findPodsWithAffinity(ctx context.Context, clientset *kuber
 func (p *PortForward) Stop() error {
 	p.pf.Stop()
 	return nil
-}
-
-type logger struct{}
-
-func (l *logger) Logf(format string, args ...interface{}) {
-	slog.Info(fmt.Sprintf(format, args...))
 }

@@ -10,6 +10,7 @@ import (
 	"fmt"
 
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -25,6 +26,8 @@ type CurlPodStep struct {
 }
 
 func (c *CurlPodStep) Do(ctx context.Context) error {
+	ctx, log := utils.StepLogger(ctx, c)
+	_ = log
 	clientset, err := kubernetes.NewForConfig(c.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)

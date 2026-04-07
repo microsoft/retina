@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
+
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -23,6 +25,8 @@ type CreateDenyAllNetworkPolicy struct {
 }
 
 func (c *CreateDenyAllNetworkPolicy) Do(ctx context.Context) error {
+	ctx, log := utils.StepLogger(ctx, c)
+	_ = log
 	clientset, err := kubernetes.NewForConfig(c.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
@@ -67,6 +71,8 @@ type DeleteDenyAllNetworkPolicy struct {
 }
 
 func (d *DeleteDenyAllNetworkPolicy) Do(ctx context.Context) error {
+	ctx, log := utils.StepLogger(ctx, d)
+	_ = log
 	clientset, err := kubernetes.NewForConfig(d.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)

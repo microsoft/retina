@@ -27,7 +27,7 @@ func (w *Workflow) Do(ctx context.Context) error {
 	kubeConfigFilePath := p.Cluster.KubeConfigPath()
 	restConfig := p.Cluster.RestConfig()
 	chartPath := p.Paths.RetinaChart
-	testPodNamespace := config.TestPodNamespace
+	testPodNamespace := "basic-metrics-test"
 	imgCfg := &p.Image
 	helmCfg := &p.Helm
 
@@ -42,6 +42,7 @@ func (w *Workflow) Do(ctx context.Context) error {
 		ImageNamespace:     imgCfg.Namespace,
 		HelmDriver:         helmCfg.Driver,
 		ImageLoader:        p.Cluster,
+		TestPodNamespace:   testPodNamespace,
 	}
 
 	var scenarios []flow.Steper

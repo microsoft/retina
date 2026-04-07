@@ -12,6 +12,8 @@ import (
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/cli"
+	helmValues "helm.sh/helm/v3/pkg/cli/values"
+	"helm.sh/helm/v3/pkg/getter"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -31,12 +33,14 @@ type InstallHelmChart struct {
 	ReleaseName        string
 	KubeConfigFilePath string
 	ChartPath          string
+	ValuesFile         string
 	ImageTag           string
 	ImageRegistry      string
 	ImageNamespace     string
 	HelmDriver         string
 	ImageLoader        e2ecfg.ClusterProvider
 	EnableHeartbeat    bool
+	TestPodNamespace   string
 }
 
 func (i *InstallHelmChart) Do(ctx context.Context) error {
@@ -83,13 +87,17 @@ func (i *InstallHelmChart) Do(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to build rest config: %w", err)
 	}
-	err = CreateNamespaceFn(ctx, rc, e2ecfg.TestPodNamespace)
+	testNS := i.TestPodNamespace
+	if testNS == "" {
+		testNS = e2ecfg.TestPodNamespace
+	}
+	err = CreateNamespaceFn(ctx, rc, testNS)
 	if err != nil {
 		return fmt.Errorf("failed to create namespace %s: %w", i.Namespace, err)
 	}
 
 	//Download necessary CRD's
-	err = downloadExternalCRDs(i.ChartPath)
+	err = downloadExternalCRDs(ctx, i.ChartPath)
 	if err != nil {
 		return fmt.Errorf("failed to load external crd's: %w", err)
 	}
@@ -98,6 +106,22 @@ func (i *InstallHelmChart) Do(ctx context.Context) error {
 	chart, err := loader.Load(i.ChartPath)
 	if err != nil {
 		return fmt.Errorf("failed to load chart from path %s: %w", i.ChartPath, err)
+	}
+
+	// merge values from an optional profile file
+	if i.ValuesFile != "" {
+		options := helmValues.Options{
+			ValueFiles: []string{i.ValuesFile},
+		}
+		provider := getter.All(settings)
+		overrides, mergeErr := options.MergeValues(provider)
+		if mergeErr != nil {
+			return fmt.Errorf("failed to merge values from %s: %w", i.ValuesFile, mergeErr)
+		}
+		for k, v := range overrides {
+			chart.Values[k] = v
+		}
+		log.Info("applied values file", "file", i.ValuesFile, "overrides", overrides)
 	}
 
 	if secrets := i.ImageLoader.ImagePullSecrets(); len(secrets) > 0 {

@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -27,6 +29,8 @@ type WaitPodsReady struct {
 }
 
 func (w *WaitPodsReady) Do(ctx context.Context) error {
+	ctx, log := utils.StepLogger(ctx, w)
+	_ = log
 	clientset, err := kubernetes.NewForConfig(w.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
@@ -36,7 +40,13 @@ func (w *WaitPodsReady) Do(ctx context.Context) error {
 }
 
 func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, namespace, labelSelector string) error {
-	log := slog.Default()
+	prefix := utils.Prefix(ctx)
+	if prefix != "" {
+		prefix += "/wait-for-pod-ready"
+	} else {
+		prefix = "wait-for-pod-ready"
+	}
+	log := slog.With("prefix", prefix)
 
 	printIterator := 0
 	conditionFunc := wait.ConditionWithContextFunc(func(context.Context) (bool, error) {

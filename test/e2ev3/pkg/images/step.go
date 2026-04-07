@@ -2,9 +2,9 @@ package images
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/microsoft/retina/test/e2ev3/config"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
 // Step loads container images into the cluster.
@@ -15,7 +15,7 @@ type Step struct {
 func (l *Step) String() string { return "load-images" }
 
 func (l *Step) Do(ctx context.Context) error {
-	log := slog.With("step", l.String())
+	ctx, log := utils.StepLogger(ctx, l)
 	p := l.Cfg
 	imgs := RetinaImages(p.Image.Registry, p.Image.Namespace, p.Image.Tag)
 	log.Info("loading images into cluster", "count", len(imgs), "cluster", p.Cluster.ClusterName())

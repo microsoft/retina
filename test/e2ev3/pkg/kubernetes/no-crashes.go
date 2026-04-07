@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -22,6 +23,8 @@ type EnsureStableComponent struct {
 }
 
 func (n *EnsureStableComponent) Do(ctx context.Context) error {
+	ctx, log := utils.StepLogger(ctx, n)
+	_ = log
 	clientset, err := kubernetes.NewForConfig(n.RestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)

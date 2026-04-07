@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
@@ -15,6 +14,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
 	"github.com/microsoft/retina/test/e2ev3/pkg/infra/providers/azure"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
 const (
@@ -32,7 +32,7 @@ type DeployInfra struct {
 func (d *DeployInfra) String() string { return "deploy-azure-infra" }
 
 func (d *DeployInfra) Do(ctx context.Context) error {
-	log := slog.With("step", d.String())
+	ctx, log := utils.StepLogger(ctx, d)
 	template := GenerateTemplate(d.Config)
 
 	templateJSON, err := json.MarshalIndent(template, "", "  ")

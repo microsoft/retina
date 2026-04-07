@@ -10,25 +10,29 @@ import (
 )
 
 // Hubble TCP test fixtures: pod name and expected metric labels.
-var (
-	HubbleTCPPodName = "agnhost-tcp-0"
+var HubbleTCPPodName = "agnhost-tcp-0"
 
-	ValidHubbleTCPSYNFlag = map[string]string{
-		config.HubbleSourceLabel:      config.TestPodNamespace + "/" + HubbleTCPPodName,
+func ValidHubbleTCPSYNFlag(namespace string) map[string]string {
+	return map[string]string{
+		config.HubbleSourceLabel:      namespace + "/" + HubbleTCPPodName,
 		config.HubbleDestinationLabel: "",
 		config.HubbleFamilyLabel:      config.IPV4,
 		config.HubbleFlagLabel:        config.SYN,
 	}
+}
 
-	ValidHubbleTCPFINFlag = map[string]string{
-		config.HubbleSourceLabel:      config.TestPodNamespace + "/" + HubbleTCPPodName,
+func ValidHubbleTCPFINFlag(namespace string) map[string]string {
+	return map[string]string{
+		config.HubbleSourceLabel:      namespace + "/" + HubbleTCPPodName,
 		config.HubbleDestinationLabel: "",
 		config.HubbleFamilyLabel:      config.IPV4,
 		config.HubbleFlagLabel:        config.FIN,
 	}
+}
 
-	ValidHubbleTCPMetricsLabels = []map[string]string{
-		ValidHubbleTCPSYNFlag,
-		ValidHubbleTCPFINFlag,
+func ValidHubbleTCPMetricsLabels(namespace string) []map[string]string {
+	return []map[string]string{
+		ValidHubbleTCPSYNFlag(namespace),
+		ValidHubbleTCPFINFlag(namespace),
 	}
-)
+}

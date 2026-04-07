@@ -1,0 +1,2 @@
+enableConntrackMetrics: true
+enabledPlugin_linux: '["dropreason","packetforward","linuxutil","dns","packetparser"]'

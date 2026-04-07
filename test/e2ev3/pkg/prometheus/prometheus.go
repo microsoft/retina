@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"reflect"
 	"strings"
@@ -28,12 +28,20 @@ var (
 func CheckMetric(ctx context.Context, promAddress, metricName string, validMetric map[string]string, partial ...bool) error {
 	defaultRetrier := retry.Retrier{Attempts: defaultRetryAttempts, Delay: defaultRetryDelay}
 
+	prefix := utils.Prefix(ctx)
+	if prefix != "" {
+		prefix += "/check-metric"
+	} else {
+		prefix = "check-metric"
+	}
+	logger := slog.With("prefix", prefix)
+
 	// Default partial to false if not provided
 	usePartial := len(partial) > 0 && partial[0]
 
 	metrics := map[string]*promclient.MetricFamily{}
 	scrapeMetricsFn := func() error {
-		log.Printf("checking for metrics on %s", promAddress)
+		logger.Info("checking for metrics on " + promAddress)
 		var err error
 
 		// obtain a full dump of all metrics on the endpoint
@@ -44,16 +52,18 @@ func CheckMetric(ctx context.Context, promAddress, metricName string, validMetri
 
 		// loop through each metric to check for a match,
 		// if none is found then log and return an error which will trigger a retry
+		var foundLabels map[string]string
 		if usePartial {
-			err = verifyValidMetricPresentPartial(metricName, metrics, validMetric)
+			foundLabels, err = verifyValidMetricPresentPartial(metricName, metrics, validMetric)
 		} else {
-			err = verifyValidMetricPresent(metricName, metrics, validMetric)
+			foundLabels, err = verifyValidMetricPresent(metricName, metrics, validMetric)
 		}
 		if err != nil {
-			log.Printf("failed to find metric matching %s: %+v\n", metricName, validMetric)
+			logger.Info(fmt.Sprintf("failed to find metric matching %s: %+v", metricName, validMetric))
 			return ErrNoMetricFound
 		}
 
+		logger.Info("found metric", "metric", metricName, "labels", foundLabels)
 		return nil
 	}
 
@@ -70,16 +80,16 @@ func CheckMetricFromBuffer(prometheusMetricData []byte, metricName string, valid
 		return fmt.Errorf("failed to parse prometheus metrics: %w", err)
 	}
 
-	err = verifyValidMetricPresent(metricName, metrics, validMetric)
+	_, err = verifyValidMetricPresent(metricName, metrics, validMetric)
 	if err != nil {
-		log.Printf("failed to find metric matching %s: %+v\n", metricName, validMetric)
+		slog.Info(fmt.Sprintf("failed to find metric matching %s: %+v", metricName, validMetric))
 		return ErrNoMetricFound
 	}
 
 	return nil
 }
 
-func verifyValidMetricPresent(metricName string, data map[string]*promclient.MetricFamily, validMetric map[string]string) error {
+func verifyValidMetricPresent(metricName string, data map[string]*promclient.MetricFamily, validMetric map[string]string) (map[string]string, error) {
 	for _, metric := range data {
 		if metric.GetName() == metricName {
 			for _, metric := range metric.GetMetric() {
@@ -92,17 +102,17 @@ func verifyValidMetricPresent(metricName string, data map[string]*promclient.Met
 
 				// if valid metric is empty, then we just need to make sure the metric and value is present
 				if len(validMetric) == 0 && len(metricLabels) > 0 {
-					return nil
+					return metricLabels, nil
 				}
 
 				if reflect.DeepEqual(metricLabels, validMetric) {
-					return nil
+					return metricLabels, nil
 				}
 			}
 		}
 	}
 
-	return fmt.Errorf("failed to find metric matching: %+v: %w", validMetric, ErrNoMetricFound)
+	return nil, fmt.Errorf("failed to find metric matching: %+v: %w", validMetric, ErrNoMetricFound)
 }
 
 func getAllPrometheusMetricsFromURL(url string) (map[string]*promclient.MetricFamily, error) {
@@ -127,7 +137,7 @@ func getAllPrometheusMetricsFromURL(url string) (map[string]*promclient.MetricFa
 
 // verifyValidMetricPresentPartial checks if a metric exists with labels that contain
 // all the key-value pairs in validMetric (partial matching - the metric can have additional labels)
-func verifyValidMetricPresentPartial(metricName string, data map[string]*promclient.MetricFamily, validMetric map[string]string) error {
+func verifyValidMetricPresentPartial(metricName string, data map[string]*promclient.MetricFamily, validMetric map[string]string) (map[string]string, error) {
 	for _, metric := range data {
 		if metric.GetName() == metricName {
 			for _, metric := range metric.GetMetric() {
@@ -140,7 +150,7 @@ func verifyValidMetricPresentPartial(metricName string, data map[string]*promcli
 
 				// if valid metric is empty, then we just need to make sure the metric and value is present
 				if len(validMetric) == 0 && len(metricLabels) > 0 {
-					return nil
+					return metricLabels, nil
 				}
 
 				// Check if all key-value pairs in validMetric exist in metricLabels
@@ -153,13 +163,13 @@ func verifyValidMetricPresentPartial(metricName string, data map[string]*promcli
 				}
 
 				if allMatch {
-					return nil
+					return metricLabels, nil
 				}
 			}
 		}
 	}
 
-	return fmt.Errorf("failed to find metric matching: %+v: %w", validMetric, ErrNoMetricFound)
+	return nil, fmt.Errorf("failed to find metric matching: %+v: %w", validMetric, ErrNoMetricFound)
 }
 
 func getAllPrometheusMetricsFromBuffer(buf []byte) (map[string]*promclient.MetricFamily, error) {

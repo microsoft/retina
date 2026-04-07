@@ -28,6 +28,7 @@ func (w *Workflow) Do(ctx context.Context) error {
 	chartPath := p.Paths.HubbleChart
 	imgCfg := &p.Image
 	helmCfg := &p.Helm
+	testPodNamespace := "hubble-metrics-test"
 
 	// Construct steps.
 	installHubble := &k8s.InstallHubbleHelmChart{
@@ -40,6 +41,7 @@ func (w *Workflow) Do(ctx context.Context) error {
 		ImageNamespace:     imgCfg.Namespace,
 		HelmDriver:         helmCfg.Driver,
 		ImageLoader:        p.Cluster,
+		TestPodNamespace:   testPodNamespace,
 	}
 
 	scenarios := []flow.Steper{
@@ -48,12 +50,12 @@ func (w *Workflow) Do(ctx context.Context) error {
 	}
 	for _, arch := range config.Architectures {
 		scenarios = append(scenarios,
-			addHubbleDNSScenario(restConfig, arch),
-			addHubbleFlowIntraNodeScenario(restConfig, arch),
-			addHubbleFlowInterNodeScenario(restConfig, arch),
-			addHubbleFlowToWorldScenario(restConfig, arch),
-			addHubbleDropScenario(restConfig, arch),
-			addHubbleTCPScenario(restConfig, arch),
+			addHubbleDNSScenario(restConfig, testPodNamespace, arch),
+			addHubbleFlowIntraNodeScenario(restConfig, testPodNamespace, arch),
+			addHubbleFlowInterNodeScenario(restConfig, testPodNamespace, arch),
+			addHubbleFlowToWorldScenario(restConfig, testPodNamespace, arch),
+			addHubbleDropScenario(restConfig, testPodNamespace, arch),
+			addHubbleTCPScenario(restConfig, testPodNamespace, arch),
 		)
 	}
 

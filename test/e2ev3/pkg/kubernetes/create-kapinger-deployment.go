@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -30,6 +32,8 @@ type CreateKapingerDeployment struct {
 }
 
 func (c *CreateKapingerDeployment) Do(ctx context.Context) error {
+	ctx, log := utils.StepLogger(ctx, c)
+	_ = log
 	_, err := strconv.Atoi(c.KapingerReplicas)
 	if err != nil {
 		return fmt.Errorf("error converting replicas to int for Kapinger replicas: %w", err)

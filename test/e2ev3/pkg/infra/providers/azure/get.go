@@ -6,11 +6,11 @@ package azure
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	armcontainerservice "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v4"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
 const kubeConfigPerms = 0o600
@@ -28,7 +28,7 @@ type GetAKSKubeConfig struct {
 func (c *GetAKSKubeConfig) String() string { return "get-aks-kubeconfig" }
 
 func (c *GetAKSKubeConfig) Do(ctx context.Context) error {
-	log := slog.With("step", c.String())
+	ctx, log := utils.StepLogger(ctx, c)
 	cred, err := azidentity.NewAzureCLICredential(nil)
 	if err != nil {
 		return fmt.Errorf("failed to obtain a credential: %w", err)

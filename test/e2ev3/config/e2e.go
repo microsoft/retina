@@ -18,6 +18,7 @@ import (
 
 	"github.com/microsoft/retina/test/e2ev3/pkg/infra/providers/azure"
 	"github.com/microsoft/retina/test/e2ev3/pkg/infra/providers/kind"
+	"github.com/microsoft/retina/test/e2ev3/pkg/summary"
 	"github.com/spf13/viper"
 	"k8s.io/client-go/rest"
 )
@@ -30,6 +31,7 @@ type E2EConfig struct {
 	Scale   ScaleConfig
 	Helm    HelmConfig
 	Paths   Paths
+	Summary *summary.TestSummary
 }
 
 // ClusterProvider abstracts cluster-specific behaviors.
@@ -85,19 +87,21 @@ var Architectures []string
 
 // Paths holds resolved filesystem paths relative to the repository root.
 type Paths struct {
-	RootDir         string
-	RetinaChart     string
-	HubbleChart     string
-	AdvancedProfile string
+	RootDir              string
+	RetinaChart          string
+	HubbleChart          string
+	AdvancedProfile      string
+	ExperimentalProfile  string
 }
 
 // ResolvePaths computes all standard paths from the repository root directory.
 func ResolvePaths(rootDir string) *Paths {
 	return &Paths{
-		RootDir:         rootDir,
-		RetinaChart:     filepath.Join(rootDir, "deploy", "standard", "manifests", "controller", "helm", "retina"),
-		HubbleChart:     filepath.Join(rootDir, "deploy", "hubble", "manifests", "controller", "helm", "retina"),
-		AdvancedProfile: filepath.Join(rootDir, "test", "profiles", "advanced", "values.yaml"),
+		RootDir:             rootDir,
+		RetinaChart:         filepath.Join(rootDir, "deploy", "standard", "manifests", "controller", "helm", "retina"),
+		HubbleChart:         filepath.Join(rootDir, "deploy", "hubble", "manifests", "controller", "helm", "retina"),
+		AdvancedProfile:     filepath.Join(rootDir, "test", "profiles", "advanced", "values.yaml"),
+		ExperimentalProfile: filepath.Join(rootDir, "test", "profiles", "experimental", "values.yaml"),
 	}
 }
 

@@ -56,10 +56,12 @@ func (v *ValidateCaptureStep) Do(ctx context.Context) error {
 	imageNamespace := v.ImageNamespace
 	imageTag := v.ImageTag
 
-	os.Setenv("KUBECONFIG", v.KubeConfigPath) //nolint:errcheck // best effort
-	log.Info("KUBECONFIG set", "path", os.Getenv("KUBECONFIG"))
+	log.Info("using kubeconfig", "path", v.KubeConfigPath)
 
-	cmd := exec.CommandContext(ctx, "kubectl", "retina", "capture", "create", "--namespace", v.CaptureNamespace, "--name", v.CaptureName, "--duration", v.Duration, "--debug") //#nosec
+	cmd := exec.CommandContext(ctx, "kubectl", "retina", "capture", "create",
+		"--namespace", v.CaptureNamespace, "--name", v.CaptureName,
+		"--duration", v.Duration, "--debug",
+		"--kubeconfig", v.KubeConfigPath) //#nosec
 	cmd.Env = append(os.Environ(), "RETINA_AGENT_IMAGE="+filepath.Join(imageRegistry, imageNamespace, "retina-agent:"+imageTag))
 
 	output, err := cmd.CombinedOutput()
@@ -177,7 +179,9 @@ func (v *ValidateCaptureStep) checkJobEvents(jobName string, events *v1.EventLis
 
 func (v *ValidateCaptureStep) deleteJobs(ctx context.Context, log *slog.Logger, clientset *kubernetes.Clientset) error {
 	log.Info("running retina capture delete")
-	cmd := exec.CommandContext(ctx, "kubectl", "retina", "capture", "delete", "--namespace", v.CaptureNamespace, "--name", v.CaptureName) //#nosec
+	cmd := exec.CommandContext(ctx, "kubectl", "retina", "capture", "delete",
+		"--namespace", v.CaptureNamespace, "--name", v.CaptureName,
+		"--kubeconfig", v.KubeConfigPath) //#nosec
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to execute delete command: %w", err)
@@ -221,7 +225,9 @@ func (v *ValidateCaptureStep) downloadCapture(ctx context.Context, log *slog.Log
 
 	outputDir := filepath.Join(".", v.CaptureName)
 
-	cmd := exec.CommandContext(ctx, "kubectl", "retina", "capture", "download", "--namespace", v.CaptureNamespace, "--name", v.CaptureName) // #nosec
+	cmd := exec.CommandContext(ctx, "kubectl", "retina", "capture", "download",
+		"--namespace", v.CaptureNamespace, "--name", v.CaptureName,
+		"--kubeconfig", v.KubeConfigPath) // #nosec
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to execute download capture command: %s: %w", string(output), err)

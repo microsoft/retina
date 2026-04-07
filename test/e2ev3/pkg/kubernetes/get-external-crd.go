@@ -1,6 +1,7 @@
 package kubernetes
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -9,9 +10,12 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
-func downloadExternalCRDs(chartPath string) error {
+func downloadExternalCRDs(ctx context.Context, chartPath string) error {
+	log := slog.With("prefix", utils.Prefix(ctx))
 	crdUrls := []string{
 		"https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml",
 	}
@@ -27,8 +31,8 @@ func downloadExternalCRDs(chartPath string) error {
 			return err
 		}
 
-		slog.Info("CRD exists", "name", crdName)
-		slog.Info("writing CRD file", "path", filepath.Join(chartPath, "/crds/"+crdName))
+		log.Info("CRD exists", "name", crdName)
+		log.Info("writing CRD file", "path", filepath.Join(chartPath, "/crds/"+crdName))
 		err = saveToFile(filepath.Join(chartPath, "/crds/"+crdName), crd)
 		if err != nil {
 			return err

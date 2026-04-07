@@ -30,10 +30,10 @@ func addTCPStatsScenario(restConfig *rest.Config, namespace, arch string) *flow.
 		LabelSelector: "app=kapinger",
 	}
 	execCurl1 := &k8s.ExecInPod{
-		PodName: podName, PodNamespace: namespace, Command: "curl -s -m 5 kapinger:80", RestConfig: restConfig,
+		PodName: podName, PodNamespace: namespace, Command: "curl -s -m 5 kapinger-service:8080", RestConfig: restConfig,
 	}
 	execCurl2 := &k8s.ExecInPod{
-		PodName: podName, PodNamespace: namespace, Command: "curl -s -m 5 kapinger:80", RestConfig: restConfig,
+		PodName: podName, PodNamespace: namespace, Command: "curl -s -m 5 kapinger-service:8080", RestConfig: restConfig,
 	}
 	validateConnStats := &prom.ValidateMetricStep{
 		ForwardedPort: config.RetinaMetricsPort,
@@ -42,13 +42,8 @@ func addTCPStatsScenario(restConfig *rest.Config, namespace, arch string) *flow.
 		ExpectMetric:  true,
 		PartialMatch:  true,
 	}
-	validateFlagGauges := &prom.ValidateMetricStep{
-		ForwardedPort: config.RetinaMetricsPort,
-		MetricName:    "networkobservability_tcp_flag_gauges",
-		ValidMetrics:  []map[string]string{{"flag": config.SYN}},
-		ExpectMetric:  true,
-		PartialMatch:  true,
-	}
+	// NOTE: tcp_flag_gauges is only emitted by the Windows HNS plugin.
+	// On Linux, only tcp_connection_stats is available (from linuxutil /proc/net/snmp).
 	validateWithPF := &k8s.WithPortForward{
 		PF: &k8s.PortForward{
 			Namespace: config.KubeSystemNamespace, LabelSelector: "k8s-app=retina",
@@ -56,7 +51,7 @@ func addTCPStatsScenario(restConfig *rest.Config, namespace, arch string) *flow.
 			Endpoint: config.MetricsEndpoint, RestConfig: restConfig,
 			OptionalLabelAffinity: "app=" + agnhostName,
 		},
-		Steps: []flow.Steper{validateConnStats, validateFlagGauges},
+		Steps: []flow.Steper{validateConnStats},
 	}
 	deleteAgnhost := &k8s.DeleteKubernetesResource{
 		ResourceType: k8s.TypeString(k8s.StatefulSet), ResourceName: agnhostName, ResourceNamespace: namespace, RestConfig: restConfig,

@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/config"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"k8s.io/client-go/rest"
 )
 
@@ -76,6 +77,8 @@ type ValidateBasicDNSRequestStep struct {
 }
 
 func (v *ValidateBasicDNSRequestStep) Do(ctx context.Context) error {
+	ctx, log := utils.StepLogger(ctx, v)
+	_ = log
 	metricsEndpoint := fmt.Sprintf("http://localhost:%s/metrics", config.RetinaMetricsPort)
 
 	validBasicDNSRequestMetricLabels := map[string]string{}
@@ -98,6 +101,8 @@ type ValidateBasicDNSResponseStep struct {
 }
 
 func (v *ValidateBasicDNSResponseStep) Do(ctx context.Context) error {
+	ctx, log := utils.StepLogger(ctx, v)
+	_ = log
 	metricsEndpoint := fmt.Sprintf("http://localhost:%s/metrics", config.RetinaMetricsPort)
 
 	if v.Response == emptyResponse {

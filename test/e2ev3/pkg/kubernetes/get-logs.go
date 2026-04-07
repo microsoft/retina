@@ -35,7 +35,7 @@ func (p *GetPodLogs) Do(ctx context.Context) error {
 }
 
 func PrintPodLogs(ctx context.Context, clientset *kubernetes.Clientset, namespace, labelSelector string) {
-	log := slog.Default()
+	log := slog.With("prefix", utils.Prefix(ctx))
 	// List all the pods in the namespace
 	pods, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: labelSelector,

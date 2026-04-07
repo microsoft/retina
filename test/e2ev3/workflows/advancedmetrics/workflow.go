@@ -27,10 +27,14 @@ func (w *Workflow) Do(ctx context.Context) error {
 	restConfig := p.Cluster.RestConfig()
 	chartPath := p.Paths.RetinaChart
 	valuesFilePath := p.Paths.AdvancedProfile
-	testPodNamespace := config.TestPodNamespace
+	testPodNamespace := "advanced-metrics-test"
 	helmCfg := &p.Helm
 
 	// Construct steps.
+	createNS := &k8s.CreateNamespace{
+		Namespace:  testPodNamespace,
+		RestConfig: restConfig,
+	}
 	upgradeRetina := &k8s.UpgradeRetinaHelmChart{
 		Namespace:          config.KubeSystemNamespace,
 		ReleaseName:        "retina",
@@ -73,7 +77,8 @@ func (w *Workflow) Do(ctx context.Context) error {
 	// Wire dependencies and register.
 	// Scenarios run sequentially because they share the same port-forward port.
 	wf := &flow.Workflow{DontPanic: true}
-	wf.Add(flow.Step(upgradeRetina))
+	wf.Add(flow.Step(createNS))
+	wf.Add(flow.Step(upgradeRetina).DependsOn(createNS))
 	prev := flow.Steper(upgradeRetina)
 	for _, s := range scenarios {
 		wf.Add(flow.Step(s).DependsOn(prev))

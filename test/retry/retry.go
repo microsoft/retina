@@ -15,30 +15,26 @@ type Retrier struct {
 }
 
 func (r Retrier) Do(ctx context.Context, f func() error) error {
-	done := make(chan struct{})
 	var err error
-	go func() {
-		defer func() { done <- struct{}{} }()
-		for i := 0; i < r.Attempts; i++ {
-			err = f()
-			if err == nil {
-				break
-			}
-			time.Sleep(r.Delay)
-			if r.ExpBackoff {
-				r.Delay *= 2
-			}
+	for i := 0; i < r.Attempts; i++ {
+		if ctx.Err() != nil {
+			return fmt.Errorf("context error: %w", ctx.Err())
 		}
-	}()
-
-	select {
-	case <-ctx.Done():
-		ctxErr := ctx.Err()
-		if ctxErr != nil {
-			return fmt.Errorf("context error: %w", ctxErr)
+		err = f()
+		if err == nil {
+			return nil
 		}
-		return nil
-	case <-done:
-		return err
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("context error: %w", ctx.Err())
+		case <-time.After(r.Delay):
+		}
+		if r.ExpBackoff {
+			r.Delay *= 2
+		}
 	}
+	if err != nil {
+		return fmt.Errorf("all retries exhausted [%w]", err)
+	}
+	return nil
 }

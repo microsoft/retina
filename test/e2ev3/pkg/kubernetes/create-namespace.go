@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,6 +20,8 @@ type CreateNamespace struct {
 }
 
 func (c *CreateNamespace) Do(ctx context.Context) error {
+	ctx, log := utils.StepLogger(ctx, c)
+	_ = log
 	return CreateNamespaceFn(ctx, c.RestConfig, c.Namespace)
 }
 
@@ -34,7 +38,7 @@ func (c *CreateNamespace) getNamespace() *v1.Namespace {
 }
 
 func CreateNamespaceFn(ctx context.Context, restConfig *rest.Config, namespace string) error {
-	log := slog.Default()
+	log := slog.With("prefix", utils.Prefix(ctx))
 	clientset, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)

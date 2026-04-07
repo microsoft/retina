@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/retina/test/e2ev3/config"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
 	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 	"k8s.io/client-go/rest"
 )
 
@@ -88,6 +89,8 @@ type ValidateRetinaTCPStateStep struct {
 }
 
 func (v *ValidateRetinaTCPStateStep) Do(ctx context.Context) error {
+	ctx, log := utils.StepLogger(ctx, v)
+	_ = log
 	promAddress := fmt.Sprintf("http://localhost:%s/metrics", v.PortForwardedRetinaPort)
 
 	validMetrics := []map[string]string{
@@ -112,6 +115,8 @@ type ValidateRetinaTCPConnectionRemoteStep struct {
 }
 
 func (v *ValidateRetinaTCPConnectionRemoteStep) Do(ctx context.Context) error {
+	ctx, log := utils.StepLogger(ctx, v)
+	_ = log
 	promAddress := fmt.Sprintf("http://localhost:%s/metrics", v.PortForwardedRetinaPort)
 
 	validMetrics := []map[string]string{}

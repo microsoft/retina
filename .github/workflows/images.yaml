@@ -420,6 +420,18 @@ jobs:
           go-version-file: go.mod
       - run: go version
 
+      - name: Build Images
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG=$(git describe --tags --always)
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          make retina-image retina-operator-image \
+            IMAGE_NAMESPACE=${{ github.repository }} \
+            PLATFORM=linux/amd64 \
+            BUILDX_ACTION="--load --provenance=false --sbom=false" \
+            OUTPUT_LOCAL=
+
       - name: Run E2Ev3 Tests
         shell: bash
         run: |

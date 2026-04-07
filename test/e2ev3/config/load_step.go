@@ -5,12 +5,12 @@ package config
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 
 	"github.com/microsoft/retina/test/e2ev3/pkg/infra/providers/azure"
 	"github.com/microsoft/retina/test/e2ev3/pkg/infra/providers/kind"
+	"github.com/microsoft/retina/test/e2ev3/pkg/utils"
 )
 
 // Step resolves e2e config, paths, and image tag.
@@ -21,7 +21,7 @@ type Step struct {
 func (l *Step) String() string { return "load-config" }
 
 func (l *Step) Do(ctx context.Context) error {
-	log := slog.With("step", l.String())
+	ctx, log := utils.StepLogger(ctx, l)
 	cfg, err := LoadE2EConfig()
 	if err != nil {
 		return fmt.Errorf("load e2e config: %w", err)
@@ -31,7 +31,9 @@ func (l *Step) Do(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("get cwd: %w", err)
 	}
+	saved := l.Cfg.Summary
 	*l.Cfg = *cfg
+	l.Cfg.Summary = saved
 	l.Cfg.Paths = *ResolvePaths(filepath.Dir(filepath.Dir(cwd)))
 
 	kubeCfgPath := filepath.Join(l.Cfg.Paths.RootDir, "test", "e2e", "test.pem")

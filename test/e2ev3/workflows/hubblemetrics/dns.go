@@ -13,32 +13,32 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func addHubbleDNSScenario(restConfig *rest.Config, arch string) *flow.Workflow {
+func addHubbleDNSScenario(restConfig *rest.Config, namespace string, arch string) *flow.Workflow {
 	wf := &flow.Workflow{DontPanic: true}
 	agnhostName := "agnhost-dns"
 
 	createAgnhost := &k8s.CreateAgnhostStatefulSet{
 		AgnhostName:      agnhostName,
-		AgnhostNamespace: config.TestPodNamespace,
+		AgnhostNamespace: namespace,
 		AgnhostArch:      arch,
 		RestConfig:       restConfig,
 	}
 	execNslookup := &k8s.ExecInPod{
 		PodName:      agnhostName + "-0",
-		PodNamespace: config.TestPodNamespace,
+		PodNamespace: namespace,
 		Command:      "nslookup -type=a one.one.one.one",
 		RestConfig:   restConfig,
 	}
 	validateQuery := &prom.ValidateMetricStep{
 		ForwardedPort: config.HubbleMetricsPort,
 		MetricName:    config.HubbleDNSQueryMetricName,
-		ValidMetrics:  []map[string]string{ValidHubbleDNSQueryMetricLabels},
+		ValidMetrics:  []map[string]string{ValidHubbleDNSQueryMetricLabels(namespace)},
 		ExpectMetric:  true,
 	}
 	validateResponse := &prom.ValidateMetricStep{
 		ForwardedPort: config.HubbleMetricsPort,
 		MetricName:    config.HubbleDNSResponseMetricName,
-		ValidMetrics:  []map[string]string{ValidHubbleDNSResponseMetricLabels},
+		ValidMetrics:  []map[string]string{ValidHubbleDNSResponseMetricLabels(namespace)},
 		ExpectMetric:  true,
 	}
 	validateWithPF := &k8s.WithPortForward{
@@ -56,7 +56,7 @@ func addHubbleDNSScenario(restConfig *rest.Config, arch string) *flow.Workflow {
 	deleteAgnhost := &k8s.DeleteKubernetesResource{
 		ResourceType:      k8s.TypeString(k8s.StatefulSet),
 		ResourceName:      agnhostName,
-		ResourceNamespace: config.TestPodNamespace,
+		ResourceNamespace: namespace,
 		RestConfig:        restConfig,
 	}
 

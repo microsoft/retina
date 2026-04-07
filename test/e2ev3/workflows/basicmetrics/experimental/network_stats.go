@@ -6,15 +6,20 @@
 package experimental
 
 import (
-	"k8s.io/client-go/rest"
 	flow "github.com/Azure/go-workflow"
-	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
 	"github.com/microsoft/retina/test/e2ev3/config"
 	k8s "github.com/microsoft/retina/test/e2ev3/pkg/kubernetes"
+	prom "github.com/microsoft/retina/test/e2ev3/pkg/prometheus"
+	"k8s.io/client-go/rest"
 )
 
-func addNetworkStatsScenario(restConfig *rest.Config) *flow.Workflow {
+func addNetworkStatsScenario(restConfig *rest.Config, namespace, arch string) *flow.Workflow {
 	wf := &flow.Workflow{DontPanic: true}
+	agnhostName := "agnhost-netstats-" + arch
+
+	createAgnhost := &k8s.CreateAgnhostStatefulSet{
+		AgnhostName: agnhostName, AgnhostNamespace: namespace, AgnhostArch: arch, RestConfig: restConfig,
+	}
 	validateIPStats := &prom.ValidateMetricStep{
 		ForwardedPort: config.RetinaMetricsPort,
 		MetricName:    "networkobservability_ip_connection_stats",
@@ -41,14 +46,26 @@ func addNetworkStatsScenario(restConfig *rest.Config) *flow.Workflow {
 			Namespace: config.KubeSystemNamespace, LabelSelector: "k8s-app=retina",
 			LocalPort: config.RetinaMetricsPort, RemotePort: config.RetinaMetricsPort,
 			Endpoint: config.MetricsEndpoint, RestConfig: restConfig,
+			OptionalLabelAffinity: "app=" + agnhostName,
 		},
 		Steps: []flow.Steper{validateIPStats, validateUDPStats, validateIfaceStats},
 	}
+	deleteAgnhost := &k8s.DeleteKubernetesResource{
+		ResourceType: k8s.TypeString(k8s.StatefulSet), ResourceName: agnhostName, ResourceNamespace: namespace, RestConfig: restConfig,
+	}
 
-	// Validate: retry with exponential backoff until metrics appear.
 	wf.Add(
-		flow.Step(validateWithPF).
-			Retry(k8s.RetryWithBackoff),
+		flow.BatchPipe(
+			// Setup: create an anchor pod on a worker node for port-forward affinity.
+			flow.Pipe(createAgnhost).
+				Timeout(k8s.DefaultScenarioTimeout),
+			// Validate: retry with exponential backoff until metrics appear.
+			flow.Steps(validateWithPF).
+				Retry(k8s.RetryWithBackoff),
+			// Cleanup: always runs, even if validation fails.
+			flow.Pipe(deleteAgnhost).
+				When(flow.Always),
+		),
 	)
 	return wf
 }

@@ -26,7 +26,7 @@ func (w *Workflow) Do(ctx context.Context) error {
 	p := w.Cfg
 	restConfig := p.Cluster.RestConfig()
 	chartPath := p.Paths.RetinaChart
-	testPodNamespace := config.TestPodNamespace
+	testPodNamespace := "basic-metrics-exp-test"
 	imgCfg := &p.Image
 	helmCfg := &p.Helm
 
@@ -41,6 +41,8 @@ func (w *Workflow) Do(ctx context.Context) error {
 		ImageNamespace:     imgCfg.Namespace,
 		HelmDriver:         helmCfg.Driver,
 		ImageLoader:        p.Cluster,
+		ValuesFile:         p.Paths.ExperimentalProfile,
+		TestPodNamespace:   testPodNamespace,
 	}
 
 
@@ -52,10 +54,22 @@ func (w *Workflow) Do(ctx context.Context) error {
 			addTCPStatsScenario(restConfig, testPodNamespace, arch),
 		)
 	}
-	scenarios = append(scenarios,
-		addNetworkStatsScenario(restConfig),
-		addNodeConnectivityScenario(restConfig),
-	)
+	// network_stats and node_connectivity metrics rely on host-level counters
+	// that are typically zero or unavailable on Kind nodes, so skip them.
+	if *config.Provider == "kind" {
+		wfName := w.String()
+		if p.Summary != nil {
+			p.Summary.Skip(wfName, "network_stats", "host-level counters are zero on Kind nodes")
+			p.Summary.Skip(wfName, "node_connectivity", "host-level counters are zero on Kind nodes")
+		}
+	} else {
+		for _, arch := range config.Architectures {
+			scenarios = append(scenarios,
+				addNetworkStatsScenario(restConfig, testPodNamespace, arch),
+				addNodeConnectivityScenario(restConfig, testPodNamespace, arch),
+			)
+		}
+	}
 
 	ensureStable := &k8s.EnsureStableComponent{
 		PodNamespace:           config.KubeSystemNamespace,
