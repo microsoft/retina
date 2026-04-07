@@ -259,6 +259,7 @@ func TestPodCallBack(t *testing.T) {
 		fm := filtermanager.NewMockIFilterManager(ctrl) //nolint:typecheck
 		c := cache.NewMockCacheInterface(ctrl)          //nolint:typecheck
 		c.EXPECT().GetIPsByNamespace(gomock.Any()).Return([]net.IP{}).AnyTimes()
+		c.EXPECT().GetPodByIP(gomock.Any()).Return(nil).AnyTimes()
 		fm.EXPECT().AddIPs([]net.IP{}, gomock.Any(), gomock.Any()).Return(nil).Times(1)
 		fm.EXPECT().HasIP(gomock.Any()).Return(tt.fmHasIP).AnyTimes()
 		if len(tt.addExpected) > 0 {
@@ -911,4 +912,438 @@ func TestPodCallBackExclude(t *testing.T) {
 	me.PodCallBackFn(cache.NewCacheEvent(cache.EventTypePodAdded, pod2))
 	adds = me.dirtyPods.GetAddList()
 	assert.Len(t, adds, 1, "pod in excluded namespace should not be added to dirty pods")
+}
+
+func TestDeletePodAfterNamespaceRemoved(t *testing.T) {
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	require.NoError(t, err)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cfg, _ := kcfg.GetConfig(testCfgFile)
+	cfg.EnableAnnotations = false
+
+	p := pubsub.NewMockPubSubInterface(ctrl)
+	e := enricher.NewMockEnricherInterface(ctrl)
+	fm := filtermanager.NewMockIFilterManager(ctrl)
+	c := cache.NewMockCacheInterface(ctrl)
+
+	ip1 := net.IPv4(10, 0, 0, 1)
+
+	// appendIncludeList(["ns1"]) will add namespace IPs
+	c.EXPECT().GetIPsByNamespace("ns1").Return([]net.IP{}).Times(1)
+	fm.EXPECT().AddIPs([]net.IP{}, gomock.Any(), gomock.Any()).Return(nil).Times(1)
+	// PodAdded: add with namespace metadata
+	fm.EXPECT().AddIPs([]net.IP{ip1}, gomock.Any(), moduleReqMetadata).Return(nil).Times(1)
+	// appendIncludeList([]) removes ns1
+	c.EXPECT().GetIPsByNamespace("ns1").Return([]net.IP{ip1}).Times(1)
+	fm.EXPECT().DeleteIPs([]net.IP{ip1}, gomock.Any(), moduleReqMetadata).Return(nil).Times(1)
+	// PodDeleted: applyDirtyPodsDelete should attempt both metadata types
+	fm.EXPECT().HasIP(gomock.Any()).Return(false).AnyTimes()
+	fm.EXPECT().DeleteIPs([]net.IP{ip1}, gomock.Any(), modulePodReqMetadata).Return(nil).Times(1)
+	fm.EXPECT().DeleteIPs([]net.IP{ip1}, gomock.Any(), moduleReqMetadata).Return(nil).Times(1)
+	// Pod is genuinely deleted — GetPodByIP returns nil
+	c.EXPECT().GetPodByIP(gomock.Any()).Return(nil).AnyTimes()
+
+	me := &Module{
+		RWMutex:       &sync.RWMutex{},
+		l:             log.Logger().Named("MetricModule"),
+		pubsub:        p,
+		configs:       make([]*api.MetricsConfiguration, 0),
+		enricher:      e,
+		wg:            sync.WaitGroup{},
+		registry:      make(map[string]AdvMetricsInterface),
+		moduleCtx:     context.Background(),
+		filterManager: fm,
+		daemonCache:   c,
+		dirtyPods:     common.NewDirtyCache(),
+		pubsubPodSub:  "",
+		daemonConfig:  cfg,
+	}
+
+	// Add pod in tracked namespace
+	me.appendIncludeList([]string{"ns1"})
+	pod1 := common.NewRetinaEndpoint("pod1", "ns1", &common.IPAddresses{IPv4: ip1})
+	me.PodCallBackFn(cache.NewCacheEvent(cache.EventTypePodAdded, pod1))
+	me.applyDirtyPods()
+
+	// Remove namespace from include list
+	me.appendIncludeList([]string{})
+
+	// Delete pod — ns no longer of interest
+	me.PodCallBackFn(cache.NewCacheEvent(cache.EventTypePodDeleted, pod1))
+	me.applyDirtyPods()
+}
+
+func TestDeletePodAfterAnnotationRemovedDirectDelete(t *testing.T) {
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	require.NoError(t, err)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cfg, _ := kcfg.GetConfig(testCfgFile)
+	cfg.EnableAnnotations = true
+
+	p := pubsub.NewMockPubSubInterface(ctrl)
+	e := enricher.NewMockEnricherInterface(ctrl)
+	fm := filtermanager.NewMockIFilterManager(ctrl)
+	c := cache.NewMockCacheInterface(ctrl)
+
+	ip1 := net.IPv4(10, 0, 0, 1)
+
+	// PodAdded: add with pod metadata (annotated, ns not of interest)
+	fm.EXPECT().HasIP(gomock.Any()).Return(false).AnyTimes()
+	fm.EXPECT().AddIPs([]net.IP{ip1}, gomock.Any(), modulePodReqMetadata).Return(nil).Times(1)
+	// PodDeleted: applyDirtyPodsDelete should attempt both metadata types
+	fm.EXPECT().DeleteIPs([]net.IP{ip1}, gomock.Any(), modulePodReqMetadata).Return(nil).Times(1)
+	fm.EXPECT().DeleteIPs([]net.IP{ip1}, gomock.Any(), moduleReqMetadata).Return(nil).Times(1)
+	// Pod is genuinely deleted — GetPodByIP returns nil
+	c.EXPECT().GetPodByIP(gomock.Any()).Return(nil).AnyTimes()
+
+	me := &Module{
+		RWMutex:       &sync.RWMutex{},
+		l:             log.Logger().Named("MetricModule"),
+		pubsub:        p,
+		configs:       make([]*api.MetricsConfiguration, 0),
+		enricher:      e,
+		wg:            sync.WaitGroup{},
+		registry:      make(map[string]AdvMetricsInterface),
+		moduleCtx:     context.Background(),
+		filterManager: fm,
+		daemonCache:   c,
+		dirtyPods:     common.NewDirtyCache(),
+		pubsubPodSub:  "",
+		daemonConfig:  cfg,
+	}
+
+	// Add annotated pod
+	pod1 := common.NewRetinaEndpoint("pod1", "ns1", &common.IPAddresses{IPv4: ip1})
+	pod1.SetAnnotations(map[string]string{common.RetinaPodAnnotation: common.RetinaPodAnnotationValue})
+	me.PodCallBackFn(cache.NewCacheEvent(cache.EventTypePodAdded, pod1))
+	me.applyDirtyPods()
+
+	// Delete pod with annotation already removed (no intermediate update event)
+	pod1NoAnnotation := common.NewRetinaEndpoint("pod1", "ns1", &common.IPAddresses{IPv4: ip1})
+	me.PodCallBackFn(cache.NewCacheEvent(cache.EventTypePodDeleted, pod1NoAnnotation))
+	me.applyDirtyPods()
+}
+
+func TestDeletePodTrackedByBothAfterNamespaceRemoved(t *testing.T) {
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	require.NoError(t, err)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cfg, _ := kcfg.GetConfig(testCfgFile)
+	cfg.EnableAnnotations = true
+
+	p := pubsub.NewMockPubSubInterface(ctrl)
+	e := enricher.NewMockEnricherInterface(ctrl)
+	fm := filtermanager.NewMockIFilterManager(ctrl)
+	c := cache.NewMockCacheInterface(ctrl)
+
+	ip1 := net.IPv4(10, 0, 0, 1)
+
+	// appendIncludeList(["ns1"]) initial setup
+	c.EXPECT().GetIPsByNamespace("ns1").Return([]net.IP{}).Times(1)
+	fm.EXPECT().AddIPs([]net.IP{}, gomock.Any(), gomock.Any()).Return(nil).Times(1)
+	// PodAdded: add with both metadata types (annotated + namespaced)
+	fm.EXPECT().HasIP(gomock.Any()).Return(true).AnyTimes()
+	fm.EXPECT().AddIPs([]net.IP{ip1}, gomock.Any(), modulePodReqMetadata).Return(nil).Times(1)
+	fm.EXPECT().AddIPs([]net.IP{ip1}, gomock.Any(), moduleReqMetadata).Return(nil).Times(1)
+	// appendIncludeList([]) removes ns1
+	c.EXPECT().GetIPsByNamespace("ns1").Return([]net.IP{ip1}).Times(1)
+	fm.EXPECT().DeleteIPs([]net.IP{ip1}, gomock.Any(), moduleReqMetadata).Return(nil).Times(1)
+	// PodDeleted: applyDirtyPodsDelete should attempt both metadata types
+	fm.EXPECT().DeleteIPs([]net.IP{ip1}, gomock.Any(), modulePodReqMetadata).Return(nil).Times(1)
+	fm.EXPECT().DeleteIPs([]net.IP{ip1}, gomock.Any(), moduleReqMetadata).Return(nil).Times(1)
+	// Pod is genuinely deleted — GetPodByIP returns nil
+	c.EXPECT().GetPodByIP(gomock.Any()).Return(nil).AnyTimes()
+
+	me := &Module{
+		RWMutex:       &sync.RWMutex{},
+		l:             log.Logger().Named("MetricModule"),
+		pubsub:        p,
+		configs:       make([]*api.MetricsConfiguration, 0),
+		enricher:      e,
+		wg:            sync.WaitGroup{},
+		registry:      make(map[string]AdvMetricsInterface),
+		moduleCtx:     context.Background(),
+		filterManager: fm,
+		daemonCache:   c,
+		dirtyPods:     common.NewDirtyCache(),
+		pubsubPodSub:  "",
+		daemonConfig:  cfg,
+	}
+
+	// Add annotated pod in tracked namespace
+	me.appendIncludeList([]string{"ns1"})
+	pod1 := common.NewRetinaEndpoint("pod1", "ns1", &common.IPAddresses{IPv4: ip1})
+	pod1.SetAnnotations(map[string]string{common.RetinaPodAnnotation: common.RetinaPodAnnotationValue})
+	me.PodCallBackFn(cache.NewCacheEvent(cache.EventTypePodAdded, pod1))
+	me.applyDirtyPods()
+
+	// Remove namespace from include list
+	me.appendIncludeList([]string{})
+
+	// Delete pod — annotation still present but ns no longer of interest
+	me.PodCallBackFn(cache.NewCacheEvent(cache.EventTypePodDeleted, pod1))
+	me.applyDirtyPods()
+}
+
+func TestDeletePodNeverTracked(t *testing.T) {
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	require.NoError(t, err)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cfg, _ := kcfg.GetConfig(testCfgFile)
+	cfg.EnableAnnotations = false
+
+	p := pubsub.NewMockPubSubInterface(ctrl)
+	e := enricher.NewMockEnricherInterface(ctrl)
+	fm := filtermanager.NewMockIFilterManager(ctrl)
+	c := cache.NewMockCacheInterface(ctrl)
+
+	fm.EXPECT().HasIP(gomock.Any()).Return(false).AnyTimes()
+	fm.EXPECT().DeleteIPs(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	// Pod is genuinely deleted — GetPodByIP returns nil
+	c.EXPECT().GetPodByIP(gomock.Any()).Return(nil).AnyTimes()
+
+	me := &Module{
+		RWMutex:            &sync.RWMutex{},
+		l:                  log.Logger().Named("MetricModule"),
+		pubsub:             p,
+		configs:            make([]*api.MetricsConfiguration, 0),
+		enricher:           e,
+		wg:                 sync.WaitGroup{},
+		registry:           make(map[string]AdvMetricsInterface),
+		moduleCtx:          context.Background(),
+		filterManager:      fm,
+		daemonCache:        c,
+		dirtyPods:          common.NewDirtyCache(),
+		pubsubPodSub:       "",
+		daemonConfig:       cfg,
+		includedNamespaces: map[string]struct{}{"ns1": {}},
+	}
+
+	// Delete a pod in ns2 (not tracked, never added)
+	pod1 := common.NewRetinaEndpoint("pod1", "ns2", &common.IPAddresses{IPv4: net.IPv4(10, 0, 0, 1)})
+	me.PodCallBackFn(cache.NewCacheEvent(cache.EventTypePodDeleted, pod1))
+	me.applyDirtyPods()
+}
+
+func TestNormalPodLifecycleInTrackedNamespace(t *testing.T) {
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	require.NoError(t, err)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cfg, _ := kcfg.GetConfig(testCfgFile)
+	cfg.EnableAnnotations = false
+
+	p := pubsub.NewMockPubSubInterface(ctrl)
+	e := enricher.NewMockEnricherInterface(ctrl)
+	fm := filtermanager.NewMockIFilterManager(ctrl)
+	c := cache.NewMockCacheInterface(ctrl)
+
+	ip1 := net.IPv4(10, 0, 0, 1)
+
+	c.EXPECT().GetIPsByNamespace("ns1").Return([]net.IP{}).Times(1)
+	fm.EXPECT().AddIPs([]net.IP{}, gomock.Any(), gomock.Any()).Return(nil).Times(1)
+	fm.EXPECT().HasIP(gomock.Any()).Return(false).AnyTimes()
+	fm.EXPECT().AddIPs([]net.IP{ip1}, gomock.Any(), moduleReqMetadata).Return(nil).Times(1)
+	fm.EXPECT().DeleteIPs([]net.IP{ip1}, gomock.Any(), moduleReqMetadata).Return(nil).Times(1)
+	// Allow the extra modulePodReqMetadata delete (no-op) after fix
+	fm.EXPECT().DeleteIPs([]net.IP{ip1}, gomock.Any(), modulePodReqMetadata).Return(nil).AnyTimes()
+	// Pod is genuinely deleted — GetPodByIP returns nil
+	c.EXPECT().GetPodByIP(gomock.Any()).Return(nil).AnyTimes()
+
+	me := &Module{
+		RWMutex:       &sync.RWMutex{},
+		l:             log.Logger().Named("MetricModule"),
+		pubsub:        p,
+		configs:       make([]*api.MetricsConfiguration, 0),
+		enricher:      e,
+		wg:            sync.WaitGroup{},
+		registry:      make(map[string]AdvMetricsInterface),
+		moduleCtx:     context.Background(),
+		filterManager: fm,
+		daemonCache:   c,
+		dirtyPods:     common.NewDirtyCache(),
+		pubsubPodSub:  "",
+		daemonConfig:  cfg,
+	}
+
+	me.appendIncludeList([]string{"ns1"})
+	pod1 := common.NewRetinaEndpoint("pod1", "ns1", &common.IPAddresses{IPv4: ip1})
+	me.PodCallBackFn(cache.NewCacheEvent(cache.EventTypePodAdded, pod1))
+	me.applyDirtyPods()
+
+	me.PodCallBackFn(cache.NewCacheEvent(cache.EventTypePodDeleted, pod1))
+	me.applyDirtyPods()
+}
+
+func TestAnnotatedPodNormalLifecycle(t *testing.T) {
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	require.NoError(t, err)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cfg, _ := kcfg.GetConfig(testCfgFile)
+	cfg.EnableAnnotations = true
+
+	p := pubsub.NewMockPubSubInterface(ctrl)
+	e := enricher.NewMockEnricherInterface(ctrl)
+	fm := filtermanager.NewMockIFilterManager(ctrl)
+	c := cache.NewMockCacheInterface(ctrl)
+
+	ip1 := net.IPv4(10, 0, 0, 1)
+
+	fm.EXPECT().HasIP(gomock.Any()).Return(false).AnyTimes()
+	fm.EXPECT().AddIPs([]net.IP{ip1}, gomock.Any(), modulePodReqMetadata).Return(nil).Times(1)
+	fm.EXPECT().DeleteIPs([]net.IP{ip1}, gomock.Any(), modulePodReqMetadata).Return(nil).Times(1)
+	// Allow the extra moduleReqMetadata delete (no-op) after fix
+	fm.EXPECT().DeleteIPs([]net.IP{ip1}, gomock.Any(), moduleReqMetadata).Return(nil).AnyTimes()
+	// Pod is genuinely deleted — GetPodByIP returns nil
+	c.EXPECT().GetPodByIP(gomock.Any()).Return(nil).AnyTimes()
+
+	me := &Module{
+		RWMutex:       &sync.RWMutex{},
+		l:             log.Logger().Named("MetricModule"),
+		pubsub:        p,
+		configs:       make([]*api.MetricsConfiguration, 0),
+		enricher:      e,
+		wg:            sync.WaitGroup{},
+		registry:      make(map[string]AdvMetricsInterface),
+		moduleCtx:     context.Background(),
+		filterManager: fm,
+		daemonCache:   c,
+		dirtyPods:     common.NewDirtyCache(),
+		pubsubPodSub:  "",
+		daemonConfig:  cfg,
+	}
+
+	pod1 := common.NewRetinaEndpoint("pod1", "ns1", &common.IPAddresses{IPv4: ip1})
+	pod1.SetAnnotations(map[string]string{common.RetinaPodAnnotation: common.RetinaPodAnnotationValue})
+	me.PodCallBackFn(cache.NewCacheEvent(cache.EventTypePodAdded, pod1))
+	me.applyDirtyPods()
+
+	me.PodCallBackFn(cache.NewCacheEvent(cache.EventTypePodDeleted, pod1))
+	me.applyDirtyPods()
+}
+
+// TestSpuriousDeleteIPReuse verifies that a DELETE event is ignored when the
+// daemon cache still contains a pod at the same IP (IP reuse by a new pod).
+func TestSpuriousDeleteIPReuse(t *testing.T) {
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	require.NoError(t, err)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cfg, _ := kcfg.GetConfig(testCfgFile)
+	cfg.EnableAnnotations = false
+
+	p := pubsub.NewMockPubSubInterface(ctrl)
+	e := enricher.NewMockEnricherInterface(ctrl)
+	fm := filtermanager.NewMockIFilterManager(ctrl)
+	c := cache.NewMockCacheInterface(ctrl)
+
+	ip1 := net.IPv4(10, 0, 0, 1)
+
+	// Setup tracked namespace
+	c.EXPECT().GetIPsByNamespace("ns1").Return([]net.IP{}).Times(1)
+	fm.EXPECT().AddIPs([]net.IP{}, gomock.Any(), gomock.Any()).Return(nil).Times(1)
+	fm.EXPECT().HasIP(gomock.Any()).Return(false).AnyTimes()
+	fm.EXPECT().AddIPs([]net.IP{ip1}, gomock.Any(), moduleReqMetadata).Return(nil).Times(1)
+
+	// Pod still exists in daemon cache (IP reused) — GetPodByIP returns a valid endpoint.
+	// No DeleteIPs calls should occur because the DELETE event is skipped.
+	newPod := common.NewRetinaEndpoint("pod2", "ns1", &common.IPAddresses{IPv4: ip1})
+	c.EXPECT().GetPodByIP(ip1.String()).Return(newPod).Times(1)
+
+	me := &Module{
+		RWMutex:       &sync.RWMutex{},
+		l:             log.Logger().Named("MetricModule"),
+		pubsub:        p,
+		configs:       make([]*api.MetricsConfiguration, 0),
+		enricher:      e,
+		wg:            sync.WaitGroup{},
+		registry:      make(map[string]AdvMetricsInterface),
+		moduleCtx:     context.Background(),
+		filterManager: fm,
+		daemonCache:   c,
+		dirtyPods:     common.NewDirtyCache(),
+		pubsubPodSub:  "",
+		daemonConfig:  cfg,
+	}
+
+	me.appendIncludeList([]string{"ns1"})
+
+	// Add original pod
+	pod1 := common.NewRetinaEndpoint("pod1", "ns1", &common.IPAddresses{IPv4: ip1})
+	me.PodCallBackFn(cache.NewCacheEvent(cache.EventTypePodAdded, pod1))
+	me.applyDirtyPods()
+
+	// Simulate spurious DELETE — daemon cache already has pod2 at the same IP.
+	// The DELETE should be ignored; dirty pods delete list should remain empty.
+	me.PodCallBackFn(cache.NewCacheEvent(cache.EventTypePodDeleted, pod1))
+	me.applyDirtyPods() // No DeleteIPs expected
+}
+
+// TestPodCallBackConcurrentWithReconcile verifies that PodCallBackFn (which reads
+// namespace maps under RLock) does not race with appendIncludeList (which mutates
+// them under Lock). Run with -race to detect data races.
+func TestPodCallBackConcurrentWithReconcile(t *testing.T) {
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	require.NoError(t, err)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cfg, _ := kcfg.GetConfig(testCfgFile)
+	cfg.EnableAnnotations = true
+
+	p := pubsub.NewMockPubSubInterface(ctrl)
+	e := enricher.NewMockEnricherInterface(ctrl)
+	fm := filtermanager.NewMockIFilterManager(ctrl)
+	c := cache.NewMockCacheInterface(ctrl)
+
+	c.EXPECT().GetIPsByNamespace(gomock.Any()).Return([]net.IP{}).AnyTimes()
+	fm.EXPECT().AddIPs(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	fm.EXPECT().DeleteIPs(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	fm.EXPECT().HasIP(gomock.Any()).Return(false).AnyTimes()
+	c.EXPECT().GetPodByIP(gomock.Any()).Return(nil).AnyTimes()
+
+	me := &Module{
+		RWMutex:       &sync.RWMutex{},
+		l:             log.Logger().Named("MetricModule"),
+		pubsub:        p,
+		configs:       make([]*api.MetricsConfiguration, 0),
+		enricher:      e,
+		wg:            sync.WaitGroup{},
+		registry:      make(map[string]AdvMetricsInterface),
+		moduleCtx:     context.Background(),
+		filterManager: fm,
+		daemonCache:   c,
+		dirtyPods:     common.NewDirtyCache(),
+		pubsubPodSub:  "",
+		daemonConfig:  cfg,
+	}
+
+	me.appendIncludeList([]string{"ns1"})
+
+	pod := common.NewRetinaEndpoint("pod1", "ns1", &common.IPAddresses{IPv4: net.IPv4(10, 0, 0, 1)})
+	pod.SetAnnotations(map[string]string{common.RetinaPodAnnotation: common.RetinaPodAnnotationValue})
+
+	// Run PodCallBackFn and appendIncludeList concurrently.
+	// With -race this will catch any unprotected map access.
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100; i++ {
+			me.PodCallBackFn(cache.NewCacheEvent(cache.EventTypePodAdded, pod))
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100; i++ {
+			me.Lock()
+			me.appendIncludeList([]string{"ns1", "ns2"})
+			me.Unlock()
+		}
+	}()
+	wg.Wait()
 }
