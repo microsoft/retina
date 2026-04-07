@@ -148,6 +148,9 @@ lint-existing: ## Lint the current branch in entirety.
 clean: ## clean build artifacts
 	$(RMDIR) $(OUTPUT_DIR)
 
+bump-images: ## update all Dockerfile base image digests to latest
+	@./scripts/bump-images.sh
+
 ##@ Build Binaries
 
 retina: ## builds retina binary

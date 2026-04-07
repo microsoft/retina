@@ -3,8 +3,8 @@
 # buildx targets, and this one requires legacy build.
 # Maybe one day: https://github.com/moby/buildkit/issues/616
 ARG BUILDER_IMAGE
-# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.0-windowsservercore-ltsc2022 --override-os windows --format "{{.Name}}@{{.Digest}}"
-FROM --platform=windows/amd64 mcr.microsoft.com/oss/go/microsoft/golang@sha256:179ddfa34eda50f58ea0011202f559585ade9668a298fe81ac01cebdc9bef15c AS builder
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.1-windowsservercore-ltsc2022 --override-os windows --format "{{.Name}}@{{.Digest}}"
+FROM --platform=windows/amd64 mcr.microsoft.com/oss/go/microsoft/golang@sha256:11f72a416664b71f9891f528fd5fdcb5de51d2c2f3946fa39a0fa549001058e6 AS builder
 WORKDIR C:\\retina
 COPY go.mod .
 COPY go.sum .
@@ -24,7 +24,7 @@ FROM --platform=windows/amd64 ${BUILDER_IMAGE} as pktmon-builder
 WORKDIR C:\\retina
 
 # skopeo inspect docker://mcr.microsoft.com/windows/nanoserver:ltsc2022 --override-os windows --format "{{.Name}}@{{.Digest}}"
-FROM --platform=windows/amd64 mcr.microsoft.com/windows/nanoserver@sha256:60612a30303eb5a15ce7f53fa2eecf70bca41d72657de0482fbde601ae5f3403 AS final
+FROM --platform=windows/amd64 mcr.microsoft.com/windows/nanoserver@sha256:be41510eb214c55def9162ef1fb5e71f1b71ce4d64d91bc963199f2383e034ea AS final
 ADD https://github.com/microsoft/etl2pcapng/releases/download/v1.10.0/etl2pcapng.exe /etl2pcapng.exe
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'Continue';"]
 COPY --from=builder C:\\retina\\windows\\kubeconfigtemplate.yaml kubeconfigtemplate.yaml

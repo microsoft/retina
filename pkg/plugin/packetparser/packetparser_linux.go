@@ -191,9 +191,13 @@ func (p *packetParser) Compile(ctx context.Context) error {
 	if arch == "arm64" {
 		targetArch = "-D__TARGET_ARCH_arm64"
 	}
+
+	runtimeIncludeDir := "-I" + loader.VmlinuxHeaderDir()
+
 	// Keep target as bpf, otherwise clang compilation yields bpf object that elf reader cannot load.
 	cflags := []string{
 		"-target", "bpf", "-Wall", targetArch, "-g", "-O2", "-c", bpfSourceFile, "-o", bpfOutputFile,
+		runtimeIncludeDir,
 		archLibDir,
 		libbpfSrcDir,
 		libbpfIncludeAsmDir,
@@ -995,8 +999,10 @@ func (r *perfReaderWrapper) Close() error {
 	return nil
 }
 
+var getKernelVersion = utils.LinuxKernelVersion
+
 func ensureRingBufKernelSupported() error {
-	kv, err := utils.LinuxKernelVersion()
+	kv, err := getKernelVersion()
 	if err != nil {
 		return fmt.Errorf("failed to detect kernel version for ring buffer support: %w", err)
 	}

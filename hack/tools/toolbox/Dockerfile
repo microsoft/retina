@@ -1,10 +1,11 @@
-# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/oss/go/microsoft/golang@sha256:66a04c4bcea1fafc935246c96af236eb4d91d501387e061ae59f134c8993dae9 AS build
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.1 --format "{{.Name}}@{{.Digest}}"
+FROM mcr.microsoft.com/oss/go/microsoft/golang@sha256:4650f4a1d3e9bcd39aa39df373837a7fe3f2d0ef75ce2836d1e8e44249c03e82 AS build
 ADD . .
 WORKDIR /go/toolbox/
 RUN GOOS=linux go build -o server .
 
-FROM mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
+# skopeo inspect docker://mcr.microsoft.com/mirror/docker/library/ubuntu:24.04 --format "{{.Name}}@{{.Digest}}"
+FROM mcr.microsoft.com/mirror/docker/library/ubuntu@sha256:c35e29c9450151419d9448b0fd75374fec4fff364a27f176fb458d472dfc9e54
 RUN apt-get update
 RUN apt-get install -y \
     axel \
