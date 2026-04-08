@@ -4,7 +4,8 @@
 RMDIR := rm -rf
 
 ## Globals
-GIT_CURRENT_BRANCH_NAME	:= $(shell git rev-parse --abbrev-ref HEAD) 
+GIT_CURRENT_BRANCH_NAME	:= $(shell git rev-parse --abbrev-ref HEAD)
+GIT_COMMIT := $(shell git rev-parse --short HEAD)
 
 REPO_ROOT = $(shell git rev-parse --show-toplevel)
 ifndef TAG
@@ -158,7 +159,7 @@ retina: ## builds retina binary
 
 retina-binary: ## build the Retina binary
 	go generate ./... && \
-	go build -v -o $(RETINA_BUILD_DIR)/retina$(EXE_EXT) -gcflags="-dwarflocationlists=true" -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version=$(TAG) -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=$(APP_INSIGHTS_ID)" $(RETINA_DIR)/main.go
+	go build -v -o $(RETINA_BUILD_DIR)/retina$(EXE_EXT) -gcflags="-dwarflocationlists=true" -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version=$(TAG) -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=$(APP_INSIGHTS_ID) -X github.com/microsoft/retina/internal/buildinfo.GitCommit=$(GIT_COMMIT)" $(RETINA_DIR)/main.go
 
 retina-capture-workload: ## build the Retina capture workload
 	cd $(CAPTURE_WORKLOAD_DIR) && go build -v -o $(RETINA_BUILD_DIR)/captureworkload$(EXE_EXT) -gcflags="-dwarflocationlists=true"  -ldflags "-X main.version=$(TAG)"
@@ -395,12 +396,14 @@ build-windows-binaries: ## Build Windows binaries
 	CGO_ENABLED=0 GOOS=windows GOARCH=$(GOARCH) go build -v \
 		-o $(BUILD_DIR)/captureworkload.exe \
 		-ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version=$(TAG) \
-		-X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=$(APP_INSIGHTS_ID)" \
+		-X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=$(APP_INSIGHTS_ID) \
+		-X github.com/microsoft/retina/internal/buildinfo.GitCommit=$(GIT_COMMIT)" \
 		$(CAPTURE_WORKLOAD_DIR)/main.go
 	CGO_ENABLED=0 GOOS=windows GOARCH=$(GOARCH) go build -v \
 		-o $(BUILD_DIR)/controller.exe \
 		-ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version=$(TAG) \
-		-X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=$(APP_INSIGHTS_ID)" \
+		-X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=$(APP_INSIGHTS_ID) \
+		-X github.com/microsoft/retina/internal/buildinfo.GitCommit=$(GIT_COMMIT)" \
 		$(RETINA_DIR)/main.go
 	@echo "Windows binaries built successfully in $(BUILD_DIR)"
 

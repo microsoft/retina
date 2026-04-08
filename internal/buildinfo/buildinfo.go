@@ -9,5 +9,6 @@ var (
 	// If it is set, the application will send telemetry to the corresponding Application Insights resource.
 	ApplicationInsightsID string
 	Version               string
+	GitCommit             string
 	RetinaAgentImageName  = "ghcr.io/microsoft/retina/retina-agent"
 )

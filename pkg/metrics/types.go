@@ -42,6 +42,9 @@ const (
 	infinibandStatsGaugeDescription                = "InfiniBand statistics gauge"
 	infinibandStatusParamsGaugeDescription         = "InfiniBand Status Parameters gauge"
 
+	buildInfoGaugeName        = "build_info"
+	buildInfoGaugeDescription = "Build information for retina agent"
+
 	// Control plane metrics
 	pluginManagerFailedToReconcileCounterDescription = "Number of times the plugin manager failed to reconcile the plugins"
 	lostEventsCounterDescription                     = "Number of events lost in control plane"

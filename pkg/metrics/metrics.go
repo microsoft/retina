@@ -3,10 +3,14 @@
 package metrics
 
 import (
+	"runtime"
+
+	"github.com/microsoft/retina/internal/buildinfo"
 	"github.com/microsoft/retina/pkg/exporter"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	dto "github.com/prometheus/client_model/go"
 )
 
@@ -200,6 +204,23 @@ func InitializeMetrics() {
 		expiredMetricsCounterDescription,
 		utils.Metric,
 	)
+
+	// Build info metric - exposes version/commit/platform as labels with a constant value of 1
+	buildInfo := promauto.With(exporter.DefaultRegistry).NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: exporter.RetinaNamespace,
+			Name:      buildInfoGaugeName,
+			Help:      buildInfoGaugeDescription,
+		},
+		[]string{"version", "git_commit", "goversion", "os", "arch"},
+	)
+	buildInfo.WithLabelValues(
+		buildinfo.Version,
+		buildinfo.GitCommit,
+		runtime.Version(),
+		runtime.GOOS,
+		runtime.GOARCH,
+	).Set(1)
 
 	isInitialized = true
 	metricsLogger.Info("Metrics initialized")
