@@ -1,6 +1,6 @@
 module github.com/microsoft/retina
 
-go 1.24.11
+go 1.24.13
 
 require (
 	github.com/go-chi/chi/v5 v5.2.4
