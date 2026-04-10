@@ -276,7 +276,7 @@ require (
 	github.com/inspektor-gadget/inspektor-gadget v0.27.0
 	github.com/jellydator/ttlcache/v3 v3.4.0
 	github.com/jsternberg/zap-logfmt v1.3.0
-	github.com/mdlayher/netlink v1.8.0
+	github.com/mdlayher/netlink v1.10.0
 	github.com/microsoft/ApplicationInsights-Go v0.4.4
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onsi/ginkgo/v2 v2.28.1
