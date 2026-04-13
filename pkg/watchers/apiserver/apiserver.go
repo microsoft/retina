@@ -9,16 +9,18 @@ import (
 	"net"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/microsoft/retina/pkg/common"
 	cc "github.com/microsoft/retina/pkg/controllers/cache"
 	"github.com/microsoft/retina/pkg/log"
 	fm "github.com/microsoft/retina/pkg/managers/filtermanager"
 	"github.com/microsoft/retina/pkg/pubsub"
-	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	kclient "sigs.k8s.io/controller-runtime/pkg/client"
 	kcfg "sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -26,8 +28,14 @@ import (
 
 const (
 	filterManagerRetries = 3
-	hostLookupRetries    = 6 // 6 retries for a total of 63 seconds.
 )
+
+// defaultRetryBackoff is the production backoff: 6 steps with exponential delay (1s, 2s, 4s, 8s, 16s, 32s ≈ 63s total).
+var defaultRetryBackoff = wait.Backoff{
+	Steps:    6,
+	Duration: 1 * time.Second,
+	Factor:   2.0,
+}
 
 type ApiServerWatcher struct {
 	isRunning           bool
@@ -40,6 +48,7 @@ type ApiServerWatcher struct {
 	restConfig          *rest.Config
 	client              kclient.Client
 	filterMapMaxEntries uint32
+	retryBackoff        wait.Backoff
 }
 
 var a *ApiServerWatcher
@@ -53,6 +62,7 @@ func Watcher(filterMapMaxEntries uint32) *ApiServerWatcher {
 			current:             make(cache),
 			hostResolver:        net.DefaultResolver,
 			filterMapMaxEntries: filterMapMaxEntries,
+			retryBackoff:        defaultRetryBackoff,
 		}
 	}
 
@@ -215,20 +225,16 @@ func (a *ApiServerWatcher) resolveIPs(ctx context.Context, host string) ([]strin
 	// 	- Network errors ie timeout, unreachable DNS server.
 	// 	-Other DNS-related errors encapsulated in a DNSError.
 	var hostIPs []string
-	var err error
-
-	retryFunc := func() error {
-		hostIPs, err = a.hostResolver.LookupHost(ctx, host)
-		if err != nil {
-			return fmt.Errorf("APIServer LookupHost failed: %w", err)
+	var lastErr error
+	_ = wait.ExponentialBackoff(a.retryBackoff, func() (bool, error) {
+		hostIPs, lastErr = a.hostResolver.LookupHost(ctx, host)
+		if lastErr != nil {
+			return false, nil //nolint:nilerr // return nil to signal retry, lastErr is checked after the loop
 		}
-		return nil
-	}
-
-	// Retry the lookup for hostIPs in case of failure.
-	err = utils.Retry(retryFunc, hostLookupRetries)
-	if err != nil {
-		return nil, err
+		return true, nil
+	})
+	if lastErr != nil {
+		return nil, fmt.Errorf("APIServer LookupHost failed: %w", lastErr)
 	}
 
 	if len(hostIPs) == 0 {
@@ -253,22 +259,24 @@ func (a *ApiServerWatcher) ipsFromService(ctx context.Context) ([]string, error)
 	return svc.Spec.ClusterIPs, nil
 }
 
-// ipsFromEndpoint retrieves IP addresses from the Endpoint resource "kubernetes" in the default namespace.
-// These IPs are the addresses for the kube-apiserver.
+// ipsFromEndpoint retrieves IP addresses from the EndpointSlice resources for the "kubernetes" service
+// in the default namespace. These IPs are the addresses for the kube-apiserver.
 func (a *ApiServerWatcher) ipsFromEndpoint(ctx context.Context) ([]string, error) {
-	ep := &corev1.Endpoints{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "kubernetes",
-			Namespace: "default",
-		},
+	var sliceList discoveryv1.EndpointSliceList
+	if err := a.client.List(ctx, &sliceList,
+		kclient.InNamespace("default"),
+		kclient.MatchingLabels{discoveryv1.LabelServiceName: "kubernetes"},
+	); err != nil {
+		return nil, fmt.Errorf("listing kubernetes endpointslices: %w", err)
 	}
-	if err := a.client.Get(ctx, kclient.ObjectKeyFromObject(ep), ep); err != nil {
-		return nil, fmt.Errorf("retrieving kubernetes endpoint: %w", err)
-	}
-	ips := []string{}
-	for _, subset := range ep.Subsets {
-		for _, addr := range subset.Addresses {
-			ips = append(ips, addr.IP)
+	var ips []string
+	for i := range sliceList.Items {
+		for j := range sliceList.Items[i].Endpoints {
+			ep := &sliceList.Items[i].Endpoints[j]
+			if ep.Conditions.Ready != nil && !*ep.Conditions.Ready {
+				continue
+			}
+			ips = append(ips, ep.Addresses...)
 		}
 	}
 	return ips, nil
