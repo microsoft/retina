@@ -126,7 +126,7 @@ spec:
             - name: cilium
               mountPath: /var/run/cilium
             - name: host-os-release
-              mountPath: /etc/os-release  
+              mountPath: /etc/os-release
             - name: tmp
               mountPath: /tmp
           {{- if .Values.hubble.tls.enabled }}
@@ -158,7 +158,7 @@ spec:
       - name: host-os-release
         hostPath:
           path: /etc/os-release
-          type: FileOrCreate   
+          type: FileOrCreate
       - name: tmp
         emptyDir: {}
       {{- if .Values.hubble.tls.enabled }}

@@ -6,8 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
-	"github.com/sirupsen/logrus"
+	"log/slog"
 
 	v2 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2"
 	ciliumv2 "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned/typed/cilium.io/v2"
@@ -21,13 +20,15 @@ import (
 var _ ciliumv2.CiliumEndpointInterface = &MockEndpointClient{}
 
 type MockEndpointClient struct {
-	l               logrus.FieldLogger
+	l               *slog.Logger
 	namespace       string
 	ciliumEndpoints *MockResource[*v2.CiliumEndpoint]
 	watchers        []watch.Interface
 }
 
-func NewMockEndpointClient(l logrus.FieldLogger, namespace string, ciliumEndpoints *MockResource[*v2.CiliumEndpoint]) *MockEndpointClient {
+func NewMockEndpointClient(
+	l *slog.Logger, namespace string, ciliumEndpoints *MockResource[*v2.CiliumEndpoint],
+) *MockEndpointClient {
 	return &MockEndpointClient{
 		l:               l,
 		namespace:       namespace,
