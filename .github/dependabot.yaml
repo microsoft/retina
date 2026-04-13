@@ -1,7 +1,8 @@
 version: 2
 updates:
+  # Docker base image tracking - Critical components (daily)
   - package-ecosystem: "docker"
-    directory: "/"
+    directory: "/controller"
     schedule:
       interval: "daily"
     reviewers:
@@ -9,7 +10,69 @@ updates:
     commit-message:
       prefix: "deps"
     labels: ["area/infra", "area/dependencies"]
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
+  - package-ecosystem: "docker"
+    directory: "/shell"
+    schedule:
+      interval: "daily"
+    reviewers:
+      - "microsoft/retina"
+    commit-message:
+      prefix: "deps"
+    labels: ["area/infra", "area/dependencies"]
+    open-pull-requests-limit: 5
+  - package-ecosystem: "docker"
+    directory: "/cli"
+    schedule:
+      interval: "daily"
+    reviewers:
+      - "microsoft/retina"
+    commit-message:
+      prefix: "deps"
+    labels: ["area/infra", "area/dependencies"]
+    open-pull-requests-limit: 5
+  - package-ecosystem: "docker"
+    directory: "/operator"
+    schedule:
+      interval: "daily"
+    reviewers:
+      - "microsoft/retina"
+    commit-message:
+      prefix: "deps"
+    labels: ["area/infra", "area/dependencies"]
+    open-pull-requests-limit: 5
+  - package-ecosystem: "docker"
+    directory: "/test/image"
+    schedule:
+      interval: "daily"
+    reviewers:
+      - "microsoft/retina"
+    commit-message:
+      prefix: "deps"
+    labels: ["area/infra", "area/dependencies"]
+    open-pull-requests-limit: 3
+  # Docker base image tracking - Tools (weekly)
+  - package-ecosystem: "docker"
+    directory: "/hack/tools/kapinger"
+    schedule:
+      interval: "weekly"
+    reviewers:
+      - "microsoft/retina"
+    commit-message:
+      prefix: "deps"
+    labels: ["area/infra", "area/dependencies"]
+    open-pull-requests-limit: 3
+  - package-ecosystem: "docker"
+    directory: "/hack/tools/toolbox"
+    schedule:
+      interval: "weekly"
+    reviewers:
+      - "microsoft/retina"
+    commit-message:
+      prefix: "deps"
+    labels: ["area/infra", "area/dependencies"]
+    open-pull-requests-limit: 3
+  # GitHub Actions tracking
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -20,6 +83,7 @@ updates:
       prefix: "deps"
     labels: ["area/infra", "area/dependencies"]
     open-pull-requests-limit: 10
+  # Go modules tracking
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
