@@ -271,7 +271,7 @@ require (
 	github.com/florianl/go-tc v0.4.5
 	github.com/go-logr/zapr v1.3.0
 	github.com/google/gopacket v1.1.19
-	github.com/gopacket/gopacket v1.3.1
+	github.com/gopacket/gopacket v1.5.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/inspektor-gadget/inspektor-gadget v0.27.0
 	github.com/jellydator/ttlcache/v3 v3.4.0
