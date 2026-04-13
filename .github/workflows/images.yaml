@@ -397,6 +397,8 @@ jobs:
     needs: [manifests]
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    env:
+      CLUSTER_NAME: retina-e2e-${{ github.run_id }}-${{ github.run_attempt }}
 
     steps:
       - name: Checkout code
@@ -424,6 +426,15 @@ jobs:
         run: |
           set -euo pipefail
           go test -v ./test/e2e/. -timeout 60m -tags=e2e -count=1  -args -image-tag=$(make version) -image-registry=${{ vars.ACR_NAME }}  -image-namespace=${{ github.repository}}
+
+      - name: Cleanup resource group
+        if: always()
+        shell: bash
+        run: |
+          if az group exists --name "$CLUSTER_NAME" 2>/dev/null | grep -q true; then
+            echo "Deleting resource group $CLUSTER_NAME..."
+            az group delete --name "$CLUSTER_NAME" --yes --no-wait || true
+          fi
 
   perf-test-basic:
     if: ${{ github.event_name == 'merge_group'}}

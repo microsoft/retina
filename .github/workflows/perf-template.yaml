@@ -47,6 +47,8 @@ jobs:
     name: Retina ${{ inputs.retina-mode }} Performance Test
     runs-on: ubuntu-latest
     timeout-minutes: 150
+    env:
+      CLUSTER_NAME: retina-perf-${{ inputs.retina-mode }}-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -72,11 +74,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          
+
           TAG="${{ inputs.tag }}"
           REGISTRY="${{ inputs.image-registry }}"
           NAMESPACE="${{ inputs.image-namespace }}"
           MODE="${{ inputs.retina-mode }}"
-          
+
           echo "Running in $MODE mode..."
           go test -v ./test/e2e/. -timeout 2h -tags=perf -count=1 -args -image-tag=$TAG -image-registry=$REGISTRY -image-namespace=$NAMESPACE -retina-mode=$MODE
+
+      - name: Cleanup resource group
+        if: always()
+        shell: bash
+        run: |
+          if az group exists --name "$CLUSTER_NAME" 2>/dev/null | grep -q true; then
+            echo "Deleting resource group $CLUSTER_NAME..."
+            az group delete --name "$CLUSTER_NAME" --yes --no-wait || true
+          fi
