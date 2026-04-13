@@ -23,9 +23,7 @@ func init() {
 	}
 }
 
-var (
-	logger = logging.DefaultLogger.WithField(logfields.LogSubsys, "k8s-watcher")
-)
+var logger = logging.DefaultLogger.WithField(logfields.LogSubsys, "k8s-watcher")
 
 func Start(ctx context.Context, k *watchers.K8sWatcher) {
 	logger.Info("Starting Kubernetes watcher")

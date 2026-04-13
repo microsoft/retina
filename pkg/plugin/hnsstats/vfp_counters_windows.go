@@ -152,7 +152,6 @@ func getVfpPortCountersRaw(portGUID string) (string, error) {
 
 	cmd := exec.Command("cmd", "/c", vfpCmd)
 	out, err := cmd.Output()
-
 	if err != nil {
 		return "", errors.Wrap(err, "errored while running vfpctrl /get-port-counter")
 	}

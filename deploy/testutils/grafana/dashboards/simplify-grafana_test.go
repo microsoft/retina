@@ -12,7 +12,6 @@ import (
 func TestDashboardsAreSimplified(t *testing.T) {
 	// get all json's in this folder
 	files, err := filepath.Glob("../../../grafana-dashboards/*.json")
-
 	if err != nil {
 		t.Fatal(err)
 	}
