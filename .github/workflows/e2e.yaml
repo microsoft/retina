@@ -84,6 +84,8 @@ jobs:
     name: E2E
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    env:
+      CLUSTER_NAME: retina-e2e-${{ github.run_id }}-${{ github.run_attempt }}
 
     steps:
       - name: Checkout code
@@ -116,4 +118,12 @@ jobs:
           fi
 
           go test -v ./test/e2e/. -timeout 60m -tags=e2e -count=1  -args -image-tag=${{ inputs.image_tag }} -image-registry=${{ inputs.image_registry }} -image-namespace=${{ inputs.image_namespace }} -create-infra=${{ !inputs.use_existing_infra }} -delete-infra=${{ !inputs.use_existing_infra }}
-      
+
+      - name: Cleanup resource group
+        if: always()
+        shell: bash
+        run: |
+          if az group exists --name "$CLUSTER_NAME" 2>/dev/null | grep -q true; then
+            echo "Deleting resource group $CLUSTER_NAME..."
+            az group delete --name "$CLUSTER_NAME" --yes --no-wait || true
+          fi
