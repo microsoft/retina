@@ -427,7 +427,7 @@ jobs:
 
   perf-test-basic:
     if: ${{ github.event_name == 'merge_group'}}
-    needs: [manifests, get-tag]
+    needs: [manifests, get-tag, e2e]
     uses: ./.github/workflows/perf-template.yaml
     with:
       image-registry: ${{ vars.ACR_NAME }}
@@ -443,7 +443,7 @@ jobs:
 
   perf-test-advanced:
     if: ${{ github.event_name == 'merge_group'}}
-    needs: [manifests, get-tag]
+    needs: [manifests, get-tag, e2e]
     uses: ./.github/workflows/perf-template.yaml
     with:
       image-registry: ${{ vars.ACR_NAME }}
