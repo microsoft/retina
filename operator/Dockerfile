@@ -5,9 +5,14 @@ ARG VERSION
 ARG APP_INSIGHTS_ID
 
 WORKDIR /workspace
+
+# Cache module download separately from source changes.
+COPY go.mod go.sum ./
+RUN go mod download
+
 COPY . .
 
-RUN tdnf install -y jq
+RUN --mount=type=cache,target=/var/cache/tdnf tdnf install -y jq
 
 # Default linux/architecture.
 ARG GOOS=linux

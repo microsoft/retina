@@ -1,0 +1,38 @@
+package legacy
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
+)
+
+type DeleteResourceGroup struct {
+	SubscriptionID    string
+	ResourceGroupName string
+	Location          string
+}
+
+func (d *DeleteResourceGroup) Do(_ context.Context) error {
+	slog.Info("deleting resource group", "resourceGroup", d.ResourceGroupName)
+	cred, err := azidentity.NewAzureCLICredential(nil)
+	if err != nil {
+		return fmt.Errorf("failed to obtain a credential: %w", err)
+	}
+	ctx := context.Background()
+	clientFactory, err := armresources.NewClientFactory(d.SubscriptionID, cred, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create resource group client: %w", err)
+	}
+	forceDeleteType := "Microsoft.Compute/virtualMachines,Microsoft.Compute/virtualMachineScaleSets"
+	_, err = clientFactory.NewResourceGroupsClient().BeginDelete(ctx, d.ResourceGroupName, &armresources.ResourceGroupsClientBeginDeleteOptions{ForceDeletionTypes: to.Ptr(forceDeleteType)})
+	if err != nil {
+		return fmt.Errorf("failed to finish the delete resource group request: %w", err)
+	}
+
+	slog.Info("resource group deleted successfully", "resourceGroup", d.ResourceGroupName)
+	return nil
+}

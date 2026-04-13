@@ -1,0 +1,18 @@
+# Test and CI artifacts — changes here should not invalidate build cache.
+test/
+.github/
+docs/
+site/
+samples/
+
+# Build outputs and metadata
+bin/
+output/
+artifacts/
+image-metadata-*.json
+
+# Developer and repo files
+.git/
+*.md
+LICENSE
+NOTICE.txt

@@ -1,6 +1,7 @@
 enablePodLevel: true
 enableAnnotations: true
 packetParserRingBuffer: "enabled"
+enabledPlugin_linux: '["dropreason","packetforward","linuxutil","dns","packetparser"]'
 operator:
   enabled: true
   enableRetinaEndpoint: true

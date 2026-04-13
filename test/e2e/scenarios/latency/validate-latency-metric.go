@@ -2,7 +2,6 @@ package latency
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/microsoft/retina/test/e2e/framework/constants"
 	prom "github.com/microsoft/retina/test/e2e/framework/prometheus"
@@ -25,8 +24,6 @@ func (v *ValidateAPIServerLatencyMetric) Run() error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to verify latency metrics %s", latencyBucketMetricName)
 	}
-
-	log.Printf("found metrics matching %s\n", latencyBucketMetricName)
 	return nil
 }
 
