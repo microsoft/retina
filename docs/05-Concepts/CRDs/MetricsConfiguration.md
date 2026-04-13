@@ -22,7 +22,7 @@ The `MetricsConfiguration` CRD is defined with the following specifications:
 - **spec.contextOptions:** Specifies the configuration for retina plugin metrics context. It includes the following properties:
   - `additionalLabels`: Represents additional context labels to be collected, such as Direction (ingress/egress).
   - `destinationLabels`: Represents the destination context labels, such as IP, Pod, port, workload (deployment/replicaset/statefulset/daemonset).
-  - `metricName`: Indicates the name of the metric.
+  - `metricName`: Indicates the base metric name used by the CRD. This is not always identical to the exported Prometheus metric name. For the full mapping, see [MetricsConfiguration Names](../../03-Metrics/modes/advanced.md#metricsconfiguration-names).
   - `sourceLabels`: Represents the source context labels, such as IP, Pod, port.
   - `ttl`: Represents the time-to-live for the metric.  If there are no metric updates for a particular set of context labels for this duration the metric will be removed from export.  The value of `ttl` must be a valid Golang `time.Duration` string and non-negative.  A zero `ttl` (the default) means that metrics are never removed from export.
 

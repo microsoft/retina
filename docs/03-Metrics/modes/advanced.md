@@ -22,6 +22,24 @@ There are Pod-Level context labels for metrics prepended with `adv_`.
 
 To customize context labels, see [MetricsConfiguration CRD](../../05-Concepts/CRDs/MetricsConfiguration.md).
 
+## MetricsConfiguration Names
+
+The metric tables below list the exported Prometheus metric names. When configuring `spec.contextOptions[].metricName` in a `MetricsConfiguration` CRD, use the base metric name instead of the exported `adv_` name.
+
+| Exported Prometheus metric                 | `MetricsConfiguration` `metricName` |
+| ------------------------------------------ | ----------------------------------- |
+| `adv_drop_count`                           | `drop_count`                        |
+| `adv_drop_bytes`                           | `drop_bytes`                        |
+| `adv_dns_request_count`                    | `dns_request_count`                 |
+| `adv_dns_response_count`                   | `dns_response_count`                |
+| `adv_forward_count`                        | `forward_count`                     |
+| `adv_forward_bytes`                        | `forward_bytes`                     |
+| `adv_tcpflags_count`                       | `tcp_flag_gauges`                   |
+| `adv_node_apiserver_latency`               | `node_apiserver_latency`            |
+| `adv_node_apiserver_no_response`           | `node_apiserver_no_response`        |
+| `adv_node_apiserver_tcp_handshake_latency` | `node_apiserver_handshake_latency`  |
+| `adv_tcpretrans_count`                     | `tcp_retransmission_count`          |
+
 ### Remote Context
 
 For Advanced mode with *remote context*, default context labels are the following:
