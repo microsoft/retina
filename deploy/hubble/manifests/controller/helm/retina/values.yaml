@@ -424,7 +424,7 @@ hubble:
     # -- Hubble-relay container image.
     image:
       override: ~
-      repository: "mcr.microsoft.com/oss/cilium/hubble-relay"
+      repository: "quay.io/cilium/hubble-relay"
       tag: "1.16.1"
       digest: "sha256:c2812bce56602ac1c26a80db4b1671e087f4d4733cb6aceebeec2ac9c48e5aae"
       useDigest: false
@@ -668,10 +668,10 @@ hubble:
       # -- Hubble-ui backend image.
       image:
         override: ~
-        repository: "mcr.microsoft.com/oss/cilium/hubble-ui-backend"
+        repository: "quay.io/cilium/hubble-ui-backend"
         tag: "v0.12.2"
         digest: "sha256:b73dd1ac1b7159d42cdba31433964313e756daafefffad5e91c3b61b47c3782f"
-        useDigest: true
+        useDigest: false
         pullPolicy: "Always"
 
       # -- Hubble-ui backend security context.
@@ -707,10 +707,10 @@ hubble:
       # -- Hubble-ui frontend image.
       image:
         override: ~
-        repository: "mcr.microsoft.com/oss/cilium/hubble-ui"
+        repository: "quay.io/cilium/hubble-ui"
         tag: "v0.12.2"
         digest: "sha256:8c53cdaebb4ae863ad061387a68ea06e38777d2911e6c0e570be1932bb4ba526"
-        useDigest: true
+        useDigest: false
         pullPolicy: "Always"
 
       # -- Hubble-ui frontend security context.
@@ -887,7 +887,7 @@ hubble:
 certgen:
   image:
     override: ~
-    repository: "mcr.microsoft.com/oss/cilium/certgen"
+    repository: "quay.io/cilium/certgen"
     tag: "v0.1.9"
     #digest: "sha256:89a0847753686444daabde9474b48340993bd19c7bea66a46e45b2974b82041f"
     useDigest: false
