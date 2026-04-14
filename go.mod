@@ -6,7 +6,7 @@ require (
 	github.com/go-chi/chi/v5 v5.2.4
 	github.com/google/uuid v1.6.0
 	github.com/prometheus/client_golang v1.23.0
-	github.com/spf13/cobra v1.10.1
+	github.com/spf13/cobra v1.10.2
 	go.uber.org/zap v1.27.1
 	k8s.io/client-go v0.32.4
 	sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.16.0
