@@ -5,6 +5,7 @@ You can enable/disable metrics by including/omitting their Plugin from `enabledP
 Via [MetricsConfiguration CRD](../05-Concepts/CRDs/MetricsConfiguration.md), you can further customize the following for your enabled plugins:
 
 - Which metrics to include
-- Which metadata to include for a metric.
+- Which metadata to include for a metric
+- Time-to-live for a metric
 
 **Note**: If you enable [Annotations](./annotations.md), you cannot use the `MetricsConfiguration` CRD to specify which Pods to observe.

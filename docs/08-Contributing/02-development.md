@@ -6,7 +6,22 @@ This document provides steps to set up your dev environment and start contributi
 
 Retina uses a forking workflow. To contribute, fork the repository and create a branch for your changes.
 
-The easiest way to set up your Development Environment is to use the provided GitHub Codespaces configuration.
+### Using a devcontainer (recommended)
+
+The easiest way to get started is to use the provided [devcontainer](https://github.com/microsoft/retina/blob/main/.devcontainer/devcontainer.json), which works with both [GitHub Codespaces](https://github.com/features/codespaces) and [VS Code Dev Containers](https://code.visualstudio.com/docs/devcontainers/containers).
+
+The devcontainer comes pre-configured with all required tools:
+
+- Go, clang/LLVM (for eBPF compilation), Docker, Helm, kubectl, Kind, Azure CLI, GitHub CLI, and jq
+- Go modules are pre-downloaded; run `make generate` to compile eBPF programs and generate mocks before building
+- A Kind cluster is created on startup for local testing
+- VS Code is configured with golangci-lint and gofumpt so editor feedback matches CI
+
+To launch in Codespaces, click **Code > Codespaces > New codespace** on the repository page. To use locally, open the repository in VS Code and select **Reopen in Container** from the command palette.
+
+### Manual setup
+
+If you prefer to set up your environment manually, see the requirements below.
 
 ## Environment Config
 

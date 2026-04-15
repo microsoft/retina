@@ -22,7 +22,6 @@ CAPTURE_WORKLOAD_DIR = $(REPO_ROOT)/captureworkload
 KIND = /usr/local/bin/kind
 KIND_CLUSTER = retina-cluster
 WINVER2022   ?= "10.0.20348.1906"
-WINVER2019   ?= "10.0.17763.4737"
 APP_INSIGHTS_ID ?= ""
 AGENT_IMAGE_NAME ?= ""
 GENERATE_TARGET_DIRS = \
@@ -40,9 +39,9 @@ OS				?= $(GOOS)
 ARCH			?= $(GOARCH)
 PLATFORM		?= $(OS)/$(ARCH)
 PLATFORMS		?= linux/amd64 linux/arm64 windows/amd64
-OS_VERSION		?= ltsc2019
+OS_VERSION		?= ltsc2022
 
-HUBBLE_VERSION ?= v1.18.3
+HUBBLE_VERSION ?= v1.18.6
 
 CONTAINER_BUILDER ?= docker
 CONTAINER_RUNTIME ?= docker
@@ -68,7 +67,7 @@ RETINA_PLATFORM_TAG        ?= $(TAG)-$(subst /,-,$(PLATFORM))
 # used for looping through components in container build
 AGENT_TARGETS ?= init agent
 
-WINDOWS_YEARS ?= 2019 2022
+WINDOWS_YEARS ?= 2022
 
 # for windows os, add year to the platform tag
 ifeq ($(OS),windows)
@@ -148,6 +147,9 @@ lint-existing: ## Lint the current branch in entirety.
 
 clean: ## clean build artifacts
 	$(RMDIR) $(OUTPUT_DIR)
+
+bump-images: ## update all Dockerfile base image digests to latest
+	@./scripts/bump-images.sh
 
 ##@ Build Binaries
 
@@ -407,7 +409,7 @@ build-windows-binaries: ## Build Windows binaries
 manifest-retina-image: ## create a multiplatform manifest for the retina image
 	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_IMAGE):$(TAG))
 	$(eval FULL_INIT_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE):$(TAG))
-	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64 windows-ltsc2019-amd64 windows-ltsc2022-amd64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64 windows-ltsc2022-amd64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
 	docker buildx imagetools create -t $(FULL_INIT_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_INIT_IMAGE_NAME)-$(subst /,-,$(platform)))
 
 manifest-operator-image: ## create a multiplatform manifest for the operator image
@@ -458,11 +460,15 @@ COVER_PKG ?= .
 .PHONY: test
 test: # Run unit tests.
 	go build -o test-summary ./test/utsummary/main.go
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit,dashboard -skip=TestE2E* -coverprofile=coverage.out -v -json ./... | ./test-summary --progress --verbose
+	bash -o pipefail -c 'KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit,dashboard -skip=TestE2E* -coverprofile=coverage.out -v -json ./... | ./test-summary --progress --verbose'
+
+.PHONY: test-ebpf
+test-ebpf: # Run eBPF program tests (requires root/CAP_BPF).
+	sudo $$(which go) test -tags=ebpf -v -count=1 ./pkg/plugin/...
 
 coverage: # Code coverage.
 #	go generate ./... && go test -tags=unit -coverprofile=coverage.out.tmp ./...
-	cat coverage.out | grep -v "_bpf.go\|_bpfel_x86.go\|_bpfel_arm64.go|_generated.go|mock_" | grep -v mock > coveragenew.out
+	cat coverage.out | grep -Ev '_bpf\.go|_bpfel_x86\.go|_bpfel_arm64\.go|_generated\.go|mock_' > coveragenew.out
 	go tool cover -html coveragenew.out -o coverage.html
 	go tool cover -func=coveragenew.out -o coverageexpanded.out
 	ls -al

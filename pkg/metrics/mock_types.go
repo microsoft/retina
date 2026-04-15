@@ -17,6 +17,47 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
+// MockMetricVec is a mock of MetricVec interface.
+type MockMetricVec struct {
+	ctrl     *gomock.Controller
+	recorder *MockMetricVecMockRecorder
+}
+
+// MockMetricVecMockRecorder is the mock recorder for MockMetricVec.
+type MockMetricVecMockRecorder struct {
+	mock *MockMetricVec
+}
+
+// NewMockMetricVec creates a new mock instance.
+func NewMockMetricVec(ctrl *gomock.Controller) *MockMetricVec {
+	mock := &MockMetricVec{ctrl: ctrl}
+	mock.recorder = &MockMetricVecMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockMetricVec) EXPECT() *MockMetricVecMockRecorder {
+	return m.recorder
+}
+
+// DeleteLabelValues mocks base method.
+func (m *MockMetricVec) DeleteLabelValues(lvs ...string) bool {
+	m.ctrl.T.Helper()
+	varargs := []any{}
+	for _, a := range lvs {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "DeleteLabelValues", varargs...)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// DeleteLabelValues indicates an expected call of DeleteLabelValues.
+func (mr *MockMetricVecMockRecorder) DeleteLabelValues(lvs ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteLabelValues", reflect.TypeOf((*MockMetricVec)(nil).DeleteLabelValues), lvs...)
+}
+
 // MockCounterVec is a mock of CounterVec interface.
 type MockCounterVec struct {
 	ctrl     *gomock.Controller
@@ -38,6 +79,24 @@ func NewMockCounterVec(ctrl *gomock.Controller) *MockCounterVec {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockCounterVec) EXPECT() *MockCounterVecMockRecorder {
 	return m.recorder
+}
+
+// DeleteLabelValues mocks base method.
+func (m *MockCounterVec) DeleteLabelValues(lvs ...string) bool {
+	m.ctrl.T.Helper()
+	varargs := []any{}
+	for _, a := range lvs {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "DeleteLabelValues", varargs...)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// DeleteLabelValues indicates an expected call of DeleteLabelValues.
+func (mr *MockCounterVecMockRecorder) DeleteLabelValues(lvs ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteLabelValues", reflect.TypeOf((*MockCounterVec)(nil).DeleteLabelValues), lvs...)
 }
 
 // GetMetricWithLabelValues mocks base method.
@@ -98,6 +157,24 @@ func NewMockGaugeVec(ctrl *gomock.Controller) *MockGaugeVec {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockGaugeVec) EXPECT() *MockGaugeVecMockRecorder {
 	return m.recorder
+}
+
+// DeleteLabelValues mocks base method.
+func (m *MockGaugeVec) DeleteLabelValues(lvs ...string) bool {
+	m.ctrl.T.Helper()
+	varargs := []any{}
+	for _, a := range lvs {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "DeleteLabelValues", varargs...)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// DeleteLabelValues indicates an expected call of DeleteLabelValues.
+func (mr *MockGaugeVecMockRecorder) DeleteLabelValues(lvs ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteLabelValues", reflect.TypeOf((*MockGaugeVec)(nil).DeleteLabelValues), lvs...)
 }
 
 // GetMetricWithLabelValues mocks base method.

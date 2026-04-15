@@ -105,6 +105,13 @@ func NewAppInsightsTelemetryClient(processName string, additionalproperties map[
 
 	properties := GetEnvironmentProperties()
 
+	kernelVer, err := KernelVersion(context.Background())
+	if err != nil {
+		fmt.Printf("failed to get kernel version for telemetry properties: %v\n", err)
+	} else {
+		properties[kernelversion] = kernelVer
+	}
+
 	for k, v := range additionalproperties {
 		properties[k] = v
 	}

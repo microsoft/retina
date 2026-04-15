@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	v1 "github.com/cilium/cilium/api/v1/flow"
 	api "github.com/microsoft/retina/crd/api/v1alpha1"
@@ -28,22 +29,22 @@ const (
 )
 
 type ForwardMetrics struct {
-	baseMetricObject
+	baseMetricInterface
 	forwardMetric metricsinit.GaugeVec
 	// bytesMetric metricsinit.IGaugeVec
 	metricName string
 }
 
-func NewForwardCountMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext) *ForwardMetrics {
+func NewForwardCountMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext, ttl time.Duration) *ForwardMetrics {
 	if ctxOptions == nil || !strings.Contains(strings.ToLower(ctxOptions.MetricName), "forward") {
 		return nil
 	}
 
 	l := fl.Named("forward-metricsmodule")
 	l.Info("Creating forward count metrics", zap.Any("options", ctxOptions))
-	return &ForwardMetrics{
-		baseMetricObject: newBaseMetricsObject(ctxOptions, fl, isLocalContext),
-	}
+	fm := ForwardMetrics{}
+	fm.baseMetricInterface = newBaseMetricsObject(ctxOptions, fl, isLocalContext, fm.expire, ttl)
+	return &fm
 }
 
 func (f *ForwardMetrics) Init(metricName string) {
@@ -61,7 +62,7 @@ func (f *ForwardMetrics) Init(metricName string) {
 			TotalBytesDesc,
 			f.getLabels()...)
 	default:
-		f.l.Error("unknown metric name", zap.String("name", metricName))
+		f.getLogger().Error("unknown metric name", zap.String("name", metricName))
 	}
 	f.metricName = metricName
 }
@@ -71,21 +72,21 @@ func (f *ForwardMetrics) getLabels() []string {
 		utils.Direction,
 	}
 
-	if !f.advEnable {
+	if !f.isAdvanced() {
 		return labels
 	}
 
-	if f.srcCtx != nil {
-		labels = append(labels, f.srcCtx.getLabels()...)
-		f.l.Info("src labels", zap.Any("labels", labels))
+	if f.sourceCtx() != nil {
+		labels = append(labels, f.sourceCtx().getLabels()...)
+		f.getLogger().Info("src labels", zap.Any("labels", labels))
 	}
 
-	if f.dstCtx != nil {
-		labels = append(labels, f.dstCtx.getLabels()...)
-		f.l.Info("dst labels", zap.Any("labels", labels))
+	if f.destinationCtx() != nil {
+		labels = append(labels, f.destinationCtx().getLabels()...)
+		f.getLogger().Info("dst labels", zap.Any("labels", labels))
 	}
 
-	if slices.Contains(f.ctxOptions.AdditionalLabels, utils.IsReply) {
+	if slices.Contains(f.additionalLabels(), utils.IsReply) {
 		labels = append(labels, utils.IsReply)
 	}
 
@@ -94,6 +95,7 @@ func (f *ForwardMetrics) getLabels() []string {
 
 func (f *ForwardMetrics) Clean() {
 	exporter.UnregisterMetric(exporter.AdvancedRegistry, metricsinit.ToPrometheusType(f.forwardMetric))
+	f.clean()
 }
 
 // TODO: update ProcessFlow with bytes metrics. We are only accounting for count.
@@ -120,35 +122,35 @@ func (f *ForwardMetrics) ProcessFlow(flow *v1.Flow) {
 		flow.TrafficDirection.String(),
 	}
 
-	if !f.advEnable {
+	if !f.isAdvanced() {
 		f.update(flow, labels)
 		return
 	}
 
-	if f.srcCtx != nil {
-		srcLabels := f.srcCtx.getValues(flow)
+	if f.sourceCtx() != nil {
+		srcLabels := f.sourceCtx().getValues(flow)
 		if len(srcLabels) > 0 {
 			labels = append(labels, srcLabels...)
 		}
 	}
 
-	if f.dstCtx != nil {
-		dstLabel := f.dstCtx.getValues(flow)
+	if f.destinationCtx() != nil {
+		dstLabel := f.destinationCtx().getValues(flow)
 		if len(dstLabel) > 0 {
 			labels = append(labels, dstLabel...)
 		}
 	}
 
-	if slices.Contains(f.ctxOptions.AdditionalLabels, utils.IsReply) {
+	if slices.Contains(f.additionalLabels(), utils.IsReply) {
 		labels = append(labels, strconv.FormatBool(flow.GetIsReply().GetValue()))
 	}
 
 	f.update(flow, labels)
-	f.l.Debug("forward count metric is added", zap.Any("labels", labels))
+	f.getLogger().Debug("forward count metric is added", zap.Any("labels", labels))
 }
 
 func (f *ForwardMetrics) processLocalCtxFlow(flow *v1.Flow) {
-	labelValuesMap := f.srcCtx.getLocalCtxValues(flow)
+	labelValuesMap := f.sourceCtx().getLocalCtxValues(flow)
 	if labelValuesMap == nil {
 		return
 	}
@@ -156,22 +158,39 @@ func (f *ForwardMetrics) processLocalCtxFlow(flow *v1.Flow) {
 	if len(labelValuesMap[ingress]) > 0 {
 		labels := append([]string{ingress}, labelValuesMap[ingress]...)
 		f.update(flow, labels)
-		f.l.Debug("forward count metric in INGRESS in local ctx", zap.Any("labels", labels))
+		f.getLogger().Debug("forward count metric in INGRESS in local ctx", zap.Any("labels", labels))
 	}
 
 	// Egress values.
 	if len(labelValuesMap[egress]) > 0 {
 		labels := append([]string{egress}, labelValuesMap[egress]...)
 		f.update(flow, labels)
-		f.l.Debug("forward count metric in EGRESS in local ctx", zap.Any("labels", labels))
+		f.getLogger().Debug("forward count metric in EGRESS in local ctx", zap.Any("labels", labels))
 	}
 }
 
+func (f *ForwardMetrics) expire(labels []string) bool {
+	var d bool
+	if f.forwardMetric != nil {
+		d = f.forwardMetric.DeleteLabelValues(labels...)
+		if d {
+			metricsinit.MetricsExpiredCounter.WithLabelValues(f.metricName).Inc()
+		}
+	}
+	return d
+}
+
 func (f *ForwardMetrics) update(fl *v1.Flow, labels []string) {
+	var updated bool
 	switch f.metricName {
 	case utils.ForwardPacketsGaugeName:
+		updated = true
 		f.forwardMetric.WithLabelValues(labels...).Add(float64(utils.PreviouslyObservedPackets(fl) + 1))
 	case utils.ForwardBytesGaugeName:
+		updated = true
 		f.forwardMetric.WithLabelValues(labels...).Add(float64(utils.PacketSize(fl) + utils.PreviouslyObservedBytes(fl)))
+	}
+	if updated {
+		f.updated(labels)
 	}
 }

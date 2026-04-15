@@ -61,6 +61,12 @@ archives:
       - goos: windows
         formats: [ 'zip' ]
 
+checksum:
+  name_template: 'checksums.txt'
+
+sboms:
+  - artifacts: archive
+
 changelog:
   sort: asc
   filters:

@@ -75,6 +75,11 @@ spec:
                         type: string
                       type: array
                       x-kubernetes-list-type: set
+                    ttl:
+                      description: |-
+                        TTL represents the time-to-live of the metrics collected
+                        Metrics which have not been updated within the TTL will be removed from export
+                      type: string
                   required:
                   - metricName
                   type: object
@@ -136,6 +141,11 @@ spec:
                             type: string
                           type: array
                           x-kubernetes-list-type: set
+                        ttl:
+                          description: |-
+                            TTL represents the time-to-live of the metrics collected
+                            Metrics which have not been updated within the TTL will be removed from export
+                          type: string
                       required:
                       - metricName
                       type: object

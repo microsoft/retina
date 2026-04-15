@@ -124,8 +124,15 @@ func (p *packetForward) Compile(ctx context.Context) error {
 	if arch == "arm64" {
 		targetArch = "-D__TARGET_ARCH_arm64"
 	}
+
+	runtimeIncludeDir := "-I" + loader.VmlinuxHeaderDir()
+
 	// Keep target as bpf, otherwise clang compilation yields bpf object that elf reader cannot load.
-	err = loader.CompileEbpf(ctx, "-target", "bpf", "-Wall", targetArch, "-g", "-O2", "-c", bpfSourceFile, "-o", bpfOutputFile, includeDir, libbpfDir)
+	err = loader.CompileEbpf(
+		ctx,
+		"-target", "bpf", "-Wall", targetArch, "-g", "-O2", "-c", bpfSourceFile,
+		"-o", bpfOutputFile, runtimeIncludeDir, includeDir, libbpfDir,
+	)
 	if err != nil {
 		return errors.Wrap(err, "error compiling ebpf code")
 	}

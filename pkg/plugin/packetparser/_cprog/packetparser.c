@@ -16,8 +16,16 @@ char __license[] SEC("license") = "Dual MIT/GPL";
 
 struct
 {
+#ifdef USE_RING_BUFFER
+	__uint(type, BPF_MAP_TYPE_RINGBUF);
+#ifndef RING_BUFFER_SIZE
+#define RING_BUFFER_SIZE (8 * 1024 * 1024)
+#endif
+	__uint(max_entries, RING_BUFFER_SIZE);
+#else
 	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
 	__uint(max_entries, 16384);
+#endif
 } retina_packetparser_events SEC(".maps");
 
 // Define const variables to avoid warnings.
@@ -231,7 +239,11 @@ static void parse(struct __sk_buff *skb, __u8 obs)
 		p.previously_observed_packets = 0;
 		p.previously_observed_bytes = 0;
 		__builtin_memset(&p.previously_observed_flags, 0, sizeof(struct tcpflagscount));
+#ifdef USE_RING_BUFFER
+		bpf_ringbuf_output(&retina_packetparser_events, &p, sizeof(p), 0);
+#else
 		bpf_perf_event_output(skb, &retina_packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
+#endif
 		return;
 	// If the data aggregation level is high, only send the packet to the perf buffer if it needs to be reported.
 	#elif DATA_AGGREGATION_LEVEL == DATA_AGGREGATION_LEVEL_HIGH
@@ -239,7 +251,11 @@ static void parse(struct __sk_buff *skb, __u8 obs)
 			p.previously_observed_packets = report.previously_observed_packets;
 			p.previously_observed_bytes = report.previously_observed_bytes;
 			p.previously_observed_flags = report.previously_observed_flags;
+#ifdef USE_RING_BUFFER
+			bpf_ringbuf_output(&retina_packetparser_events, &p, sizeof(p), 0);
+#else
 			bpf_perf_event_output(skb, &retina_packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
+#endif
 		}
 	#endif
 	#endif

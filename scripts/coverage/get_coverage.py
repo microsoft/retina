@@ -18,10 +18,10 @@ if not token:
     exit(0)
 
 # Set repository information
-owner = "azure"
+owner = "microsoft"
 repo = "retina"
 
-ut_workflow_yaml = "retina-test.yaml"
+ut_workflow_yaml = "test.yaml"
 
 # Get the id of UT workflow
 wf_url = f"https://api.github.com/repos/{owner}/{repo}/actions/workflows/{ut_workflow_yaml}"
@@ -34,7 +34,10 @@ runs_url = f"https://api.github.com/repos/{owner}/{repo}/actions/workflows/{wf_i
 params = {"branch": "main", "status": "completed", "per_page": 10}
 response = requests.get(runs_url, headers=headers, params=params)
 response.raise_for_status()
-artifacts_url = response.json()["workflow_runs"][0]["artifacts_url"]
+workflow_runs = response.json()["workflow_runs"]
+if not workflow_runs:
+    print("No completed workflow runs found on main branch")
+    exit(0)
 
 # Create the main branch folder for coverage
 folder_name = "mainbranchcoverage"
@@ -42,7 +45,7 @@ file_name = "coverage.out"
 if not os.path.exists(folder_name):
     os.makedirs(folder_name)
 
-for wf in response.json()["workflow_runs"]:
+for wf in workflow_runs:
     artifacts_url = wf["artifacts_url"]
     # Get any artifacts named "coverage" for the specified workflow run
     # artifacts_url = f"https://api.github.com/repos/{owner}/{repo}/actions/runs/{run_id}/artifacts"

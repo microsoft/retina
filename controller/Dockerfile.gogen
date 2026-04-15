@@ -1,5 +1,5 @@
-# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.11-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:531bd02db17b0c2ec919f10fc203a6a8c825e8ca01f40c3a1e32e1cf7119c6d8
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.2-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:33d887d995c314d0efbc0e8693a6821495f7b1b92516316fd9c8b43f74579dbd
 
 # Default linux/architecture.
 ARG GOOS=linux
@@ -14,4 +14,4 @@ RUN tdnf install -y clang lld bpftool libbpf-devel gnupg file git make lsb-relea
 WORKDIR /app
 
 # Generate go code.
-ENTRYPOINT mkdir /tmp/.cache && export GOCACHE=/tmp/.cache && CGO_ENABLED=0 go generate ./...
+ENTRYPOINT mkdir /tmp/.cache && export GOCACHE=/tmp/.cache && go generate ./...

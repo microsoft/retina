@@ -11,30 +11,50 @@ permissions:
   contents: read
   id-token: write
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  get-tag:
+    name: Get Image Tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.get_tag.outputs.tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Get tag
+        id: get_tag
+        run: echo "tag=$(make version)" >> $GITHUB_OUTPUT
+
   retina-images:
     name: Build Agent Images - Linux
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
 
     strategy:
       matrix:
         platform: ["linux"]
         arch: ["amd64", "arm64"]
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
 
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
           go-version-file: go.mod
       - run: go version
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Az CLI login
-        uses: azure/login@v2
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
         if: ${{ github.event_name == 'merge_group' }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -65,12 +85,13 @@ jobs:
   build-windows-binaries:
     name: Build Windows Binaries
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 30
+
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
           go-version-file: go.mod
       - run: go version
@@ -89,7 +110,7 @@ jobs:
           APP_INSIGHTS_ID: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
 
       - name: Upload Windows Binaries
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: windows-binaries
           path: output/windows_amd64/
@@ -99,10 +120,11 @@ jobs:
     name: Build Agent Image - Windows ${{ matrix.year }}
     needs: build-windows-binaries
     runs-on: windows-${{ matrix.year }}
+    timeout-minutes: 60
 
     strategy:
       matrix:
-        year: ["2019", "2022"]
+        year: ["2022"]
         platform: ["windows"]
         arch: ["amd64"]
 
@@ -111,13 +133,33 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Download Windows Binaries
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: windows-binaries
           path: output/windows_amd64/
 
+      - name: Ensure Docker daemon is running
+        shell: pwsh
+        run: |
+          $timeout = 120
+          $timer = [Diagnostics.Stopwatch]::StartNew()
+          while ($timer.Elapsed.TotalSeconds -lt $timeout) {
+            $svc = Get-Service docker -ErrorAction SilentlyContinue
+            if ($svc -and $svc.Status -ne 'Running') {
+              Start-Service docker -ErrorAction SilentlyContinue
+            }
+            $result = docker info 2>&1
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "Docker daemon is ready"
+              return
+            }
+            Write-Host "Waiting for Docker daemon to start..."
+            Start-Sleep -Seconds 5
+          }
+          throw "Docker daemon failed to start within $timeout seconds"
+
       - name: Az CLI login
-        uses: azure/login@v2
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
         if: ${{ github.event_name == 'merge_group' }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -154,27 +196,30 @@ jobs:
 
   operator-images:
     name: Build Operator Images
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
 
     strategy:
       matrix:
         platform: ["linux"]
         arch: ["amd64", "arm64"]
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
 
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
           go-version-file: go.mod
       - run: go version
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Az CLI login
-        uses: azure/login@v2
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
         if: ${{ github.event_name == 'merge_group' }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -205,6 +250,7 @@ jobs:
   retina-shell-images:
     name: Build Retina Shell Images (${{ matrix.platform }}, ${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
 
     strategy:
       matrix:
@@ -220,13 +266,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
           go-version-file: go.mod
       - run: go version
 
       - name: Az CLI login
-        uses: azure/login@v2
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
         if: ${{ github.event_name == 'merge_group' }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -255,27 +301,30 @@ jobs:
 
   kubectl-retina-images:
     name: Build Kubectl Retina Images
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
 
     strategy:
       matrix:
         platform: ["linux"]
         arch: ["amd64", "arm64"]
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
 
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
           go-version-file: go.mod
       - run: go version
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Az CLI login
-        uses: azure/login@v2
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
         if: ${{ github.event_name == 'merge_group' }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -306,6 +355,7 @@ jobs:
     name: Generate Manifests
     if: ${{ github.event_name == 'merge_group' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs:
       [
         retina-images,
@@ -324,10 +374,10 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Setup QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
 
       - name: Azure CLI login
-        uses: azure/login@v2
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -346,19 +396,22 @@ jobs:
     if: ${{ github.event_name == 'merge_group' }}
     needs: [manifests]
     runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CLUSTER_NAME: retina-e2e-${{ github.run_id }}-${{ github.run_attempt }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Setup go
-        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
           go-version-file: go.mod
       - run: go version
 
       - name: Az CLI login
-        uses: azure/login@v2
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
         if: ${{ github.event_name == 'merge_group' }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -374,13 +427,22 @@ jobs:
           set -euo pipefail
           go test -v ./test/e2e/. -timeout 60m -tags=e2e -count=1  -args -image-tag=$(make version) -image-registry=${{ vars.ACR_NAME }}  -image-namespace=${{ github.repository}}
 
+      - name: Cleanup resource group
+        if: always()
+        shell: bash
+        run: |
+          if az group exists --name "$CLUSTER_NAME" 2>/dev/null | grep -q true; then
+            echo "Deleting resource group $CLUSTER_NAME..."
+            az group delete --name "$CLUSTER_NAME" --yes --no-wait || true
+          fi
+
   perf-test-basic:
     if: ${{ github.event_name == 'merge_group'}}
-    needs: [manifests]
+    needs: [manifests, get-tag, e2e]
     uses: ./.github/workflows/perf-template.yaml
     with:
       image-registry: ${{ vars.ACR_NAME }}
-      tag: $(make version)
+      tag: ${{ needs.get-tag.outputs.tag }}
       image-namespace: ${{ github.repository }}
       retina-mode: basic
       azure-location: ${{ vars.AZURE_LOCATION }}
@@ -389,14 +451,14 @@ jobs:
       azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
       azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
       azure-app-insights-key: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
-  
+
   perf-test-advanced:
     if: ${{ github.event_name == 'merge_group'}}
-    needs: [manifests]
+    needs: [manifests, get-tag, e2e]
     uses: ./.github/workflows/perf-template.yaml
     with:
       image-registry: ${{ vars.ACR_NAME }}
-      tag: $(make version)
+      tag: ${{ needs.get-tag.outputs.tag }}
       image-namespace: ${{ github.repository }}
       retina-mode: advanced
       azure-location: ${{ vars.AZURE_LOCATION }}

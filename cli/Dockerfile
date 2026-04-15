@@ -1,5 +1,5 @@
-# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.11-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:531bd02db17b0c2ec919f10fc203a6a8c825e8ca01f40c3a1e32e1cf7119c6d8 AS builder
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.2-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:33d887d995c314d0efbc0e8693a6821495f7b1b92516316fd9c8b43f74579dbd AS builder
 
 ARG VERSION
 ARG APP_INSIGHTS_ID
@@ -16,21 +16,29 @@ ARG GOARCH=amd64
 ENV GOARCH=${GOARCH}
 
 RUN --mount=type=cache,target="/root/.cache/go-build" \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    go build \
     -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" \
     -X "github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID"="$APP_INSIGHTS_ID" \
     -X "github.com/microsoft/retina/internal/buildinfo.RetinaAgentImageName"="$AGENT_IMAGE_NAME"" \
     -a -o kubectl-retina cli/main.go
 
+# minimal libs stage — provides only the system libraries needed by the CGO-enabled binary,
+# without the bloat of the full Go SDK image (python, gcc, systemd, etc.)
+# skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
+FROM mcr.microsoft.com/azurelinux/base/core@sha256:35149ae8dd179684f969944f54a337c665a64e702486154eb44253fb39c2505b AS libs
+
 # Target 1: Distroless (secure, minimal)
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/distroless/minimal:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/azurelinux/distroless/minimal@sha256:0801b80a0927309572b9adc99bd1813bc680473175f6e8175cd4124d95dbd50c AS distroless-target
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/azurelinux/distroless/minimal@sha256:5a66f9f16ac675db2a8229dac72d83811b73b502d6ad192d8b374c7f3be498af AS distroless-target
+COPY --from=libs /lib/ /lib
+COPY --from=libs /usr/lib/ /usr/lib
+COPY --from=libs /etc/pki/tls/ /etc/pki/tls/
 WORKDIR /
 COPY --from=builder /workspace/kubectl-retina .
 
 # Target 2: Shell-enabled (operational, init container support)
-# skopeo inspect docker://mcr.microsoft.com/cbl-mariner/base/core:2.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/cbl-mariner/base/core@sha256:4d97d662d71c1fda938ed9df36d8f490d9107cff37e89c0efa932d073285ad85 AS shell-target
+# skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/azurelinux/base/core@sha256:35149ae8dd179684f969944f54a337c665a64e702486154eb44253fb39c2505b AS shell-target
 WORKDIR /
 COPY --from=builder /workspace/kubectl-retina /bin/kubectl-retina
 RUN chmod +x /bin/kubectl-retina

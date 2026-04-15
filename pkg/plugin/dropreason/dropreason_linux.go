@@ -117,8 +117,15 @@ func (dr *dropReason) Compile(ctx context.Context) error {
 	if arch == "arm64" {
 		targetArch = "-D__TARGET_ARCH_arm64"
 	}
+
+	runtimeIncludeDir := "-I" + loader.VmlinuxHeaderDir()
+
 	// Keep target as bpf, otherwise clang compilation yields bpf object that elf reader cannot load.
-	err = loader.CompileEbpf(ctx, "-target", "bpf", "-Wall", targetArch, "-g", "-O2", "-c", bpfSourceFile, "-o", bpfOutputFile, includeDir, libbpfDir, filterDir)
+	err = loader.CompileEbpf(
+		ctx,
+		"-target", "bpf", "-Wall", targetArch, "-g", "-O2", "-c", bpfSourceFile,
+		"-o", bpfOutputFile, runtimeIncludeDir, includeDir, libbpfDir, filterDir,
+	)
 	if err != nil {
 		return errors.Wrap(err, "unable to compile eBPF code")
 	}
@@ -142,6 +149,11 @@ func (dr *dropReason) Init() error {
 	objs, maps, supportsFexit, err := dr.getEbpfPayload()
 	if err != nil {
 		return err
+	}
+
+	// Override filter map max entries to match the configured size from init container.
+	if mapSpec, ok := spec.Maps[plugincommon.FilterMapName]; ok && dr.cfg.FilterMapMaxEntries > 0 {
+		mapSpec.MaxEntries = dr.cfg.FilterMapMaxEntries
 	}
 
 	// TODO remove the opts
@@ -318,16 +330,16 @@ func (dr *dropReason) processRecord(ctx context.Context, id int) {
 			// IsReply is not applicable for DROPPED verdicts.
 			fl.IsReply = nil
 
-			meta := &utils.RetinaMetadata{}
+			ext := utils.NewExtensions()
 
-			// Add drop reason to the flow's metadata.
-			utils.AddDropReason(fl, meta, bpfEvent.DropType)
+			// Add drop reason to the flow's extensions.
+			utils.AddDropReason(fl, ext, bpfEvent.DropType)
 
-			// Add packet size to the flow's metadata.
-			utils.AddPacketSize(meta, bpfEvent.SkbLen)
+			// Add packet size to the flow's extensions.
+			utils.AddPacketSize(ext, bpfEvent.SkbLen)
 
-			// Add metadata to the flow.
-			utils.AddRetinaMetadata(fl, meta)
+			// Set extensions on the flow.
+			utils.SetExtensions(fl, ext)
 
 			// This is only for development purposes.
 			// Removing this makes logs way too chatter-y.

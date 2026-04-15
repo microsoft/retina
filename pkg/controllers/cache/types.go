@@ -20,6 +20,8 @@ type CacheInterface interface {
 	GetObjByIP(ip string) interface{}
 	// GetIPsByNamespace returns the net.IPs for a given namespace.
 	GetIPsByNamespace(ns string) []net.IP
+	// GetAllNamespaces returns all unique namespaces that have at least one endpoint in the cache.
+	GetAllNamespaces() []string
 	// GetAnnotatedNamespaces returns list of namespaces that are annotated with retina to observe.
 	GetAnnotatedNamespaces() []string
 

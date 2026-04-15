@@ -30,27 +30,29 @@ const (
 )
 
 type ApiServerWatcher struct {
-	isRunning         bool
-	l                 *log.ZapLogger
-	current           cache
-	new               cache
-	apiServerHostName string
-	hostResolver      IHostResolver
-	filterManager     fm.IFilterManager
-	restConfig        *rest.Config
-	client            kclient.Client
+	isRunning           bool
+	l                   *log.ZapLogger
+	current             cache
+	new                 cache
+	apiServerHostName   string
+	hostResolver        IHostResolver
+	filterManager       fm.IFilterManager
+	restConfig          *rest.Config
+	client              kclient.Client
+	filterMapMaxEntries uint32
 }
 
 var a *ApiServerWatcher
 
 // Watcher creates a new ApiServerWatcher instance.
-func Watcher() *ApiServerWatcher {
+func Watcher(filterMapMaxEntries uint32) *ApiServerWatcher {
 	if a == nil {
 		a = &ApiServerWatcher{
-			isRunning:    false,
-			l:            log.Logger().Named("apiserver-watcher"),
-			current:      make(cache),
-			hostResolver: net.DefaultResolver,
+			isRunning:           false,
+			l:                   log.Logger().Named("apiserver-watcher"),
+			current:             make(cache),
+			hostResolver:        net.DefaultResolver,
+			filterMapMaxEntries: filterMapMaxEntries,
 		}
 	}
 
@@ -66,7 +68,7 @@ func (a *ApiServerWatcher) Init(ctx context.Context) error {
 	// Get filter manager.
 	if a.filterManager == nil {
 		var err error
-		a.filterManager, err = fm.Init(filterManagerRetries)
+		a.filterManager, err = fm.Init(filterManagerRetries, a.filterMapMaxEntries)
 		if err != nil {
 			a.l.Error("failed to init filter manager", zap.Error(err))
 			return fmt.Errorf("failed to init filter manager: %w", err)

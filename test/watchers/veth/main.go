@@ -8,6 +8,7 @@ import (
 	"context"
 	"time"
 
+	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/managers/watchermanager"
 	"github.com/microsoft/retina/pkg/watchers/endpoint"
@@ -23,7 +24,7 @@ func main() {
 	ctx := context.Background()
 
 	// watcher manager
-	wm := watchermanager.NewWatcherManager()
+	wm := watchermanager.NewWatcherManager(kcfg.DefaultFilterMapMaxEntries)
 	wm.Watchers = []watchermanager.IWatcher{endpoint.Watcher()}
 
 	err := wm.Start(ctx)

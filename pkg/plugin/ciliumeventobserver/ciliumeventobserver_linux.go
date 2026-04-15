@@ -156,24 +156,23 @@ func (c *ciliumeventobserver) monitorLoop(ctx context.Context) error {
 	decoder := gob.NewDecoder(c.connection)
 	for {
 		var pl payload.Payload
+		if err := pl.DecodeBinary(decoder); err != nil {
+			// Check if context was cancelled (e.g. connection closed during shutdown).
+			if ctx.Err() != nil {
+				c.l.Info("Context done, exiting monitor loop")
+				return ctx.Err() //nolint:wrapcheck // no additional context needed
+			}
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+				return err //nolint:wrapcheck // Error is handled by the caller
+			}
+			c.l.Warn("Failed to decode payload from cilium", zap.Error(err))
+			metrics.LostEventsCounter.WithLabelValues(parserMetric, name).Inc()
+			continue
+		}
 		select {
-		case <-ctx.Done(): // cancelled or done
-			c.l.Info("Context done, exiting monitor loop")
-			return nil
+		case c.payloadEvents <- &pl:
 		default:
-			if err := pl.DecodeBinary(decoder); err != nil {
-				if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-					return err //nolint:wrapcheck // Error is handled by the caller
-				}
-				c.l.Warn("Failed to decode payload from cilium", zap.Error(err))
-				metrics.LostEventsCounter.WithLabelValues(parserMetric, name).Inc()
-				continue
-			}
-			select {
-			case c.payloadEvents <- &pl:
-			default:
-				metrics.LostEventsCounter.WithLabelValues(utils.BufferedChannel, name).Inc()
-			}
+			metrics.LostEventsCounter.WithLabelValues(utils.BufferedChannel, name).Inc()
 		}
 	}
 }

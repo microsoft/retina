@@ -8,6 +8,7 @@ import (
 	"context"
 	"time"
 
+	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/managers/filtermanager"
 	"github.com/microsoft/retina/pkg/managers/watchermanager"
@@ -24,7 +25,7 @@ func main() {
 	ctx := context.Background()
 
 	// Filtermanager.
-	f, err := filtermanager.Init(5)
+	f, err := filtermanager.Init(5, kcfg.DefaultFilterMapMaxEntries)
 	if err != nil {
 		l.Error("Failed to start Filtermanager", zap.Error(err))
 		panic(err)
@@ -35,8 +36,8 @@ func main() {
 		}
 	}()
 	// watcher manager
-	wm := watchermanager.NewWatcherManager()
-	wm.Watchers = []watchermanager.IWatcher{apiserver.Watcher()}
+	wm := watchermanager.NewWatcherManager(kcfg.DefaultFilterMapMaxEntries)
+	wm.Watchers = []watchermanager.IWatcher{apiserver.Watcher(kcfg.DefaultFilterMapMaxEntries)}
 
 	// apiserver watcher.
 	err = wm.Start(ctx)
