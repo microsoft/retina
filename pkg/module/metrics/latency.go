@@ -33,10 +33,11 @@ const (
 	apiServerHandshakeLatencyDesc                 = "Latency of node apiserver tcp handshake in ms"
 	TTL                             time.Duration = 500 * time.Millisecond
 	LIMIT                           uint64        = 100000
-	// Bucket size.
-	start = 0
-	width = 0.5
-	count = 10
+	// Histogram bucket parameters (units: milliseconds).
+	// Produces buckets: 0.5, 1.5, 2.5, ..., 63.5, +Inf.
+	start = 0.5
+	width = 1
+	count = 64
 )
 
 type key struct {
