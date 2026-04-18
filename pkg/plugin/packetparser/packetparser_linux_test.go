@@ -660,6 +660,19 @@ func TestPacketParseGenerate(t *testing.T) {
 				"#define DATA_AGGREGATION_LEVEL 1\n" +
 				"#define DATA_SAMPLING_RATE 0\n",
 		},
+		{
+			name: "RingBufferIgnoresSamplingRate",
+			cfg: &kcfg.Config{
+				EnablePodLevel:             true,
+				BypassLookupIPOfInterest:   true,
+				DataAggregationLevel:       kcfg.High,
+				DataSamplingRate:           99,
+				PacketParserRingBuffer:     kcfg.PacketParserRingBufferEnabled,
+				PacketParserRingBufferSize: 4096,
+			},
+			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n" +
+				"#define DATA_AGGREGATION_LEVEL 1\n",
+		},
 	}
 
 	for _, tt := range tests {

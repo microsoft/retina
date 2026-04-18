@@ -127,9 +127,14 @@ func (p *packetParser) Generate(ctx context.Context) error {
 	p.l.Info("data aggregation level", zap.String("level", p.cfg.DataAggregationLevel.String()))
 	st += fmt.Sprintf("#define DATA_AGGREGATION_LEVEL %d\n", p.cfg.DataAggregationLevel)
 
-	// Process packetparser sampling rate.
-	p.l.Info("sampling rate", zap.Uint32("rate", p.cfg.DataSamplingRate))
-	st += fmt.Sprintf("#define DATA_SAMPLING_RATE %d\n", p.cfg.DataSamplingRate)
+	// Perf-buffer mode supports static sampling. Ring-buffer mode relies on
+	// reserve()/submit() back-pressure instead and therefore ignores the rate.
+	if p.cfg.PacketParserRingBuffer.IsEnabled() {
+		p.l.Info("ring buffer back-pressure enabled; ignoring sampling rate", zap.Uint32("rate", p.cfg.DataSamplingRate))
+	} else {
+		p.l.Info("sampling rate", zap.Uint32("rate", p.cfg.DataSamplingRate))
+		st += fmt.Sprintf("#define DATA_SAMPLING_RATE %d\n", p.cfg.DataSamplingRate)
+	}
 
 	// Generate dynamic header for packetparser.
 	err = loader.WriteFile(ctx, dynamicHeaderPath, st)

@@ -44,9 +44,10 @@ Alternative data transfer mechanisms like BPF ring buffers (BPF_MAP_TYPE_RINGBUF
 If you observe performance degradation on high-core-count nodes:
 
 1. **Disable `packetparser`**: Use Basic metrics mode which doesn't require this plugin
-2. **Enable Sampling**: Use the `dataSamplingRate` configuration option (see [Sampling](#sampling) section)
-3. **Use High Data Aggregation**: Configure `high` [data aggregation](../../../05-Concepts/data-aggregation.md)
-4. **Monitor Impact**: Watch for elevated CPU usage, context switches, or throughput changes
+2. **Enable Ring Buffers**: Use `packetParserRingBuffer=enabled` and size the shared buffer with `packetParserRingBufferSize`
+3. **Enable Sampling**: If you stay on perf event arrays, use `dataSamplingRate` (see [Sampling](#sampling))
+4. **Use High Data Aggregation**: Configure `high` [data aggregation](../../../05-Concepts/data-aggregation.md)
+5. **Monitor Impact**: Watch for elevated CPU usage, context switches, or throughput changes
 
 **Note:** The Retina team is evaluating options for addressing reported performance concerns, including potential support for alternative data transfer mechanisms. Community feedback and contributions are welcome.
 
@@ -57,6 +58,8 @@ Since `packetparser` produces many enriched `Flow` objects it can be quite expen
 `dataSamplingRate` is expressed in 1 out of N terms, where N is the `dataSamplingRate` value.  For example, if `dataSamplingRate` is 3 1/3rd of packets will be sampled for reporting.
 
 Keep in mind that there are cases where reporting will happen anyways as to ensure metric accuracy.
+
+When `packetParserRingBuffer=enabled`, `packetparser` ignores `dataSamplingRate`. In that mode the shared BPF ring buffer is the adaptation mechanism: events are emitted normally while capacity exists, and additional events are dropped only when `bpf_ringbuf_reserve()` cannot reserve space.
 
 ### Code locations
 

@@ -73,9 +73,27 @@ helm upgrade retina oci://ghcr.io/microsoft/retina/charts/retina \
 
 **Trade-off:** You'll have node-level metrics only, not pod-level metrics.
 
-### Option 2: Enable Data Sampling
+### Option 2: Enable Ring Buffer Back-Pressure
 
-Reduce event volume by sampling packets:
+Switch `packetparser` to `BPF_MAP_TYPE_RINGBUF` so event dropping only happens when the shared buffer is actually full:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: retina-config
+  namespace: kube-system
+data:
+  config.yaml: |
+    packetParserRingBuffer: "enabled"
+    packetParserRingBufferSize: 8388608
+```
+
+**Trade-off:** Uses a fixed amount of locked memory, and burst capacity is bounded by `packetParserRingBufferSize`.
+
+### Option 3: Enable Data Sampling
+
+If you stay on perf event arrays, reduce event volume by sampling packets:
 
 ```yaml
 apiVersion: v1
@@ -90,7 +108,9 @@ data:
 
 **Trade-off:** Reduced data granularity, but lower overhead.
 
-### Option 3: Use High Data Aggregation Level
+**Note:** `dataSamplingRate` is ignored when `packetParserRingBuffer="enabled"`.
+
+### Option 4: Use High Data Aggregation Level
 
 Reduce events at the eBPF level:
 
@@ -107,7 +127,7 @@ data:
 
 **Trade-off:** Disables host interface monitoring; API server latency metrics may be less reliable.
 
-### Option 4: Selective Deployment
+### Option 5: Selective Deployment
 
 Deploy Retina only on nodes where you need detailed observability:
 
@@ -142,7 +162,7 @@ bpftool map list | grep retina
 bpftool map show name retina_packetparser_events
 ```
 
-Currently, `packetparser` uses `BPF_MAP_TYPE_PERF_EVENT_ARRAY`.
+By default, `packetparser` uses `BPF_MAP_TYPE_PERF_EVENT_ARRAY`. If `packetParserRingBuffer=enabled`, it uses `BPF_MAP_TYPE_RINGBUF`.
 
 ### Monitoring Event Rates (Advanced)
 

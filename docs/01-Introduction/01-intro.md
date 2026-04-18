@@ -108,8 +108,9 @@ Community users have reported performance considerations when using **Advanced m
 If you plan to deploy Retina in Advanced mode on large node types with network-intensive workloads, consider:
 
 1. **Start with Basic metrics mode** (does not use `packetparser`)
-2. Enable `dataSamplingRate` if you need Advanced metrics
-3. Monitor CPU usage and network throughput after deployment
-4. See [`packetparser` performance considerations](../03-Metrics/plugins/Linux/packetparser.md#performance-considerations) for more information
+2. Enable `packetParserRingBuffer` if you need Advanced metrics on high-throughput nodes
+3. If you stay on perf event arrays, tune `dataSamplingRate`
+4. Monitor CPU usage and network throughput after deployment
+5. See [`packetparser` performance considerations](../03-Metrics/plugins/Linux/packetparser.md#performance-considerations) for more information
 
 The Retina team is evaluating options to address these reported concerns in future releases.
