@@ -30,7 +30,6 @@ func (p *parser) Init() error {
 		&hptestutils.NoopServiceGetter,
 		&hptestutils.NoopLinkGetter,
 		&hptestutils.NoopPodMetadataGetter,
-		true,
 	)
 	if err != nil {
 		p.l.Fatal("Failed to create parser", zap.Error(err))

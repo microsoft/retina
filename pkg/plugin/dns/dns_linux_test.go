@@ -5,6 +5,7 @@ package dns
 
 import (
 	"context"
+	"log/slog"
 	"net"
 	"os"
 	"testing"
@@ -26,7 +27,7 @@ import (
 
 func TestMain(m *testing.M) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
-	metrics.InitializeMetrics()
+	metrics.InitializeMetrics(slog.Default())
 	os.Exit(m.Run())
 }
 

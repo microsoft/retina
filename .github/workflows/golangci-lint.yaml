@@ -35,7 +35,7 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Build golangci-lint
-        run: GOOS=linux GOARCH=amd64 go build -o "$RUNNER_TEMP/golangci-lint" github.com/golangci/golangci-lint/cmd/golangci-lint
+        run: GOOS=linux GOARCH=amd64 go build -o "$RUNNER_TEMP/golangci-lint" github.com/golangci/golangci-lint/v2/cmd/golangci-lint
       - name: golangci-lint
         run: |
           "$RUNNER_TEMP/golangci-lint" run --new-from-rev=${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'HEAD~1' }} --concurrency 4 --verbose --config=.golangci.yaml --timeout=25m

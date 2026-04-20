@@ -95,7 +95,7 @@ help: ## Display this help
 ##@ Tools 
 
 GOFUMPT			= go tool mvdan.cc/gofumpt
-GOLANGCI_LINT	= go tool github.com/golangci/golangci-lint/cmd/golangci-lint
+GOLANGCI_LINT	= go tool github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 GORELEASER		= go tool github.com/goreleaser/goreleaser
 CONTROLLER_GEN	= go tool sigs.k8s.io/controller-tools/cmd/controller-gen
 GINKGO			= go tool github.com/onsi/ginkgo

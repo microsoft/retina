@@ -2,6 +2,7 @@ package layer34
 
 import (
 	"fmt"
+	"log/slog"
 	"net/netip"
 
 	"github.com/cilium/cilium/api/v1/flow"
@@ -9,19 +10,17 @@ import (
 
 	"github.com/microsoft/retina/pkg/hubble/common"
 	"github.com/microsoft/retina/pkg/utils"
-	"github.com/sirupsen/logrus"
-	"go.uber.org/zap"
 )
 
 type Parser struct {
-	l   *logrus.Entry
+	l   *slog.Logger
 	svd common.SvcDecoder
 	epd common.EpDecoder
 }
 
-func New(l *logrus.Entry, svc common.SvcDecoder, c *ipc.IPCache, labelCache common.LabelCache) *Parser {
+func New(l *slog.Logger, svc common.SvcDecoder, c *ipc.IPCache, labelCache common.LabelCache) *Parser {
 	p := &Parser{
-		l:   l.WithField("subsys", "layer34"),
+		l:   l.With("subsys", "layer34"),
 		svd: svc,
 		epd: common.NewEpDecoder(c, labelCache),
 	}
@@ -35,17 +34,17 @@ func (p *Parser) Decode(f *flow.Flow) *flow.Flow {
 		return nil
 	}
 	if f.GetIP() == nil {
-		p.l.Warn("Failed to get IP from flow", zap.Any("flow", f))
+		p.l.Warn("Failed to get IP from flow", "flow", f)
 		return f
 	}
 	sourceIP, err := netip.ParseAddr(f.GetIP().GetSource())
 	if err != nil {
-		p.l.Warn("Failed to parse source IP", zap.Error(err))
+		p.l.Warn("Failed to parse source IP", "error", err)
 		return f
 	}
 	destIP, err := netip.ParseAddr(f.GetIP().GetDestination())
 	if err != nil {
-		p.l.Warn("Failed to parse destination IP", zap.Error(err))
+		p.l.Warn("Failed to parse destination IP", "error", err)
 		return f
 	}
 

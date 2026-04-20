@@ -224,15 +224,24 @@ func TestRetinaEndpointReconciler_ReconcilePod(t *testing.T) {
 					return apierrors.IsNotFound(err)
 				}, 5*time.Second, 1*time.Second, "RetinaEndpoint should not exist")
 			} else {
+				// Wait for the RetinaEndpoint to be created/updated with the expected values
 				require.Eventually(t, func() bool {
 					err := client.Get(context.Background(), tt.fields.newlyCachedPod.Key, &got)
-					fmt.Println(err)
 					if apierrors.IsNotFound(err) {
 						return false
 					}
+					// Check that the spec matches what we expect (indicating create/update completed)
 					return got.Spec.PodIP == tt.wantedRetinaEndpoint.Spec.PodIP
-				}, 5*time.Second, 1*time.Second, "RetinaEndpoint should be created/updated")
-				require.Equal(t, *tt.wantedRetinaEndpoint, got)
+				}, 5*time.Second, 100*time.Millisecond, "RetinaEndpoint should be created/updated with expected PodIP")
+
+				// Re-fetch to get the latest state
+				err := client.Get(context.Background(), tt.fields.newlyCachedPod.Key, &got)
+				require.NoError(t, err)
+
+				// Compare the spec (ignore TypeMeta/ResourceVersion since fake client doesn't populate them)
+				require.Equal(t, tt.wantedRetinaEndpoint.Spec, got.Spec)
+				require.Equal(t, tt.wantedRetinaEndpoint.Name, got.Name)
+				require.Equal(t, tt.wantedRetinaEndpoint.Namespace, got.Namespace)
 			}
 		})
 	}

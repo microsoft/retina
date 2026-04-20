@@ -4,6 +4,7 @@
 package tcpretrans
 
 import (
+	"log/slog"
 	"net"
 	"os"
 	"testing"
@@ -22,7 +23,7 @@ import (
 
 func TestMain(m *testing.M) {
 	_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
-	metrics.InitializeMetrics()
+	metrics.InitializeMetrics(slog.Default())
 	os.Exit(m.Run())
 }
 

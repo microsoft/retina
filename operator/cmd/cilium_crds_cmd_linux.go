@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/cilium/cilium/pkg/hive"
+	"github.com/cilium/cilium/pkg/logging"
 	"github.com/cilium/cilium/pkg/option"
 	ciliumcrds "github.com/microsoft/retina/operator/cmd/cilium-crds"
 	"github.com/spf13/cobra"
@@ -40,7 +41,7 @@ func init() {
 	}
 
 	cobra.OnInitialize(
-		option.InitConfig(cmd, "Retina-Operator", "retina-operators", h.Viper()),
+		option.InitConfig(logging.DefaultSlogLogger, cmd, "Retina-Operator", "retina-operators", h.Viper()),
 	)
 
 	rootCmd.AddCommand(cmd)

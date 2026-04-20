@@ -18,10 +18,6 @@ import (
 	"github.com/cilium/hive/cell"
 )
 
-const (
-	CiliumEndpointIndexIdentity = "identity"
-)
-
 // ResourcesCell provides a set of handles to Kubernetes resources used throughout the
 // operator. Each of the resources share a client-go informer and backing store so we only
 // have one watch API call for each resource kind and that we maintain only one copy of each object.
@@ -39,7 +35,7 @@ var ResourcesCell = cell.Module(
 		func() resource.Resource[*cilium_api_v2.CiliumNode] {
 			return &fakeresource[*cilium_api_v2.CiliumNode]{}
 		},
-		k8s.PodResource,
+		PodResource,
 		k8s.NamespaceResource,
 	),
 )

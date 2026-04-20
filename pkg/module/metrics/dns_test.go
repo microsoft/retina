@@ -4,6 +4,7 @@
 package metrics
 
 import (
+	"log/slog"
 	"reflect"
 	"testing"
 	"time"
@@ -305,7 +306,7 @@ func TestProcessLocalCtx(t *testing.T) {
 			assert.Equal(t, 0, len(d.trackedMetricLabels()), "there should be no tracked metrics when TTL is infinite")
 
 			// Test TTL based expiration
-			metricsinit.InitializeMetrics()
+			metricsinit.InitializeMetrics(slog.Default())
 
 			// Set the TTL to something high to ensure that our call to expire is the only one that expires the metrics
 			d = NewDNSMetrics(ctxOptions, l, localContext, time.Minute)

@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"log/slog"
 	"net"
 	"time"
 
@@ -27,7 +28,7 @@ func main() {
 	log.SetupZapLogger(opts)
 	l := log.Logger().Named("test-packetparser")
 
-	metrics.InitializeMetrics()
+	metrics.InitializeMetrics(slog.Default())
 
 	ctxTimeout, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 

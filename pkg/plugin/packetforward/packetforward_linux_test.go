@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"testing"
 	"time"
@@ -181,7 +182,7 @@ func TestShutdown(t *testing.T) {
 
 func TestRun(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
-	metrics.InitializeMetrics()
+	metrics.InitializeMetrics(slog.Default())
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -214,7 +215,7 @@ func TestRun(t *testing.T) {
 
 func TestRun_ReturnError_Ingress(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
-	metrics.InitializeMetrics()
+	metrics.InitializeMetrics(slog.Default())
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -247,7 +248,7 @@ func TestRun_ReturnError_Ingress(t *testing.T) {
 
 func TestRun_ReturnError_Egress(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
-	metrics.InitializeMetrics()
+	metrics.InitializeMetrics(slog.Default())
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
