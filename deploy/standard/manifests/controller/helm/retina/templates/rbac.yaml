@@ -9,7 +9,10 @@ metadata:
   name: retina-cluster-reader
 rules:
   - apiGroups: [""] # "" indicates the core API group
-    resources: ["endpoints", "pods", "services", "replicationcontrollers", "nodes", "namespaces"]
+    resources: ["pods", "services", "replicationcontrollers", "nodes", "namespaces"]
+    verbs: ["get", "watch", "list"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
     verbs: ["get", "watch", "list"]
   - apiGroups: ["apps"]
     resources: ["deployments", "replicasets"]
@@ -26,15 +29,6 @@ rules:
       - list
       - watch
   {{- if .Values.operator.enabled }}
-  - apiGroups:
-    - ""
-    resources:
-      - namespaces
-      - endpoints
-    verbs:
-      - get
-      - list
-      - watch
   - apiGroups:
       - retina.sh
     resources:
