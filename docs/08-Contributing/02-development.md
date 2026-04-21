@@ -200,6 +200,39 @@ Uninstall `Retina`:
 make helm-uninstall
 ```
 
+## Dependency and Security Management
+
+Retina uses automated dependency management and security scanning to maintain secure and up-to-date container images and dependencies.
+
+### Dependabot Configuration
+
+The repository uses [Dependabot](https://github.com/dependabot) to automatically track and update dependencies:
+
+- **Docker Base Images**: Automatically monitored for security updates and new versions
+- **Go Modules**: Tracked for dependency updates  
+- **GitHub Actions**: Workflow dependencies are kept current
+
+#### Docker Base Image Tracking
+
+Retina has Dockerfiles in multiple directories, and each is tracked separately by Dependabot:
+
+- `/controller` - Main retina controller images (daily checks)
+- `/shell` - Shell utility images (daily checks)  
+- `/cli` - CLI tool images (daily checks)
+- `/operator` - Operator images (daily checks)
+- `/test/image` - Test images (daily checks)
+- `/hack/tools/kapinger` - Kapinger tool images (weekly checks)
+- `/hack/tools/toolbox` - Toolbox utility images (weekly checks)
+
+When Dependabot detects a security vulnerability (CVE) in a base image, it will automatically create a pull request to update the image SHA to a patched version.
+
+### Adding New Dockerfiles
+
+When adding new Dockerfiles to the repository:
+
+1. Add the directory containing the Dockerfile to `.github/dependabot.yaml`
+2. Choose an appropriate schedule: daily for critical components, weekly for tools
+
 ## Opening a Pull Request
 
 When you're ready to open a pull request, please ensure that your branch is up-to-date with the `main` branch, updates relevant docs and tests, and passes all tests and lints.
