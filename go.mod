@@ -241,7 +241,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jellydator/ttlcache/v3 v3.4.0
 	github.com/jsternberg/zap-logfmt v1.3.0
-	github.com/mdlayher/netlink v1.11.0
+	github.com/mdlayher/netlink v1.11.1
 	github.com/microsoft/ApplicationInsights-Go v0.4.4
 	github.com/mitchellh/mapstructure v1.5.1-0.20231216201459-8508981c8b6c
 	github.com/onsi/ginkgo/v2 v2.28.1
