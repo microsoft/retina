@@ -33,14 +33,13 @@ rules:
     - list
     - watch
   - apiGroups:
-    - ""
+    - discovery.k8s.io
     resources:
-      - namespaces
-      - endpoints
+    - endpointslices
     verbs:
-      - get
-      - list
-      - watch
+    - get
+    - list
+    - watch
   {{- if .Values.operator.enabled }}
   - apiGroups:
       - retina.sh
@@ -80,14 +79,6 @@ rules:
       - get
       - patch
       - update
-  - apiGroups:
-    - discovery.k8s.io
-    resources:
-    - endpointslices
-    verbs:
-    - get
-    - list
-    - watch
   {{- end }}
 
 {{- end}}

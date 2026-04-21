@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -198,21 +199,21 @@ func getMockKubeClient() client.Client {
 		},
 	}
 
-	ep := corev1.Endpoints{
+	slice := discoveryv1.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "kubernetes",
 			Namespace: "default",
-		},
-		Subsets: []corev1.EndpointSubset{
-			{
-				Addresses: []corev1.EndpointAddress{
-					{IP: "100.64.83.200"},
-					{IP: "100.64.83.201"},
-				},
+			Labels: map[string]string{
+				discoveryv1.LabelServiceName: "kubernetes",
 			},
 		},
+		AddressType: discoveryv1.AddressTypeIPv4,
+		Endpoints: []discoveryv1.Endpoint{
+			{Addresses: []string{"100.64.83.200"}},
+			{Addresses: []string{"100.64.83.201"}},
+		},
 	}
-	return fake.NewFakeClient(&ep, &kubernetesSvc)
+	return fake.NewFakeClient(&slice, &kubernetesSvc)
 }
 
 func TestRefreshFailsFirstFourAttemptsSucceedsOnFifth(t *testing.T) {
