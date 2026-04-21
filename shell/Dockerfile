@@ -86,10 +86,12 @@ RUN set -eux; \
     esac; \
     HOTSPOT_TAR="hotspot-bpf-linux-${HOTSPOT_ARCH}.tar.gz"; \
     curl -fL -o /tmp/hotspot.tar.gz "https://github.com/SRodi/hotspot-bpf/releases/download/${HOTSPOT_TAG}/${HOTSPOT_TAR}"; \
+    curl -fL -o /tmp/hotspot.tar.gz.sha256 "https://github.com/SRodi/hotspot-bpf/releases/download/${HOTSPOT_TAG}/${HOTSPOT_TAR}.sha256"; \
+    cd /tmp && sha256sum -c hotspot.tar.gz.sha256; \
     tar -xz -C /usr/local/bin -f /tmp/hotspot.tar.gz "hotspot-bpf-linux-${HOTSPOT_ARCH}"; \
     mv "/usr/local/bin/hotspot-bpf-linux-${HOTSPOT_ARCH}" /usr/local/bin/hotspot; \
     chmod +x /usr/local/bin/hotspot; \
-    rm /tmp/hotspot.tar.gz; \
+    rm /tmp/hotspot.tar.gz /tmp/hotspot.tar.gz.sha256; \
     file /usr/local/bin/hotspot | grep -q 'ELF'
 
 CMD ["/bin/bash", "-l"]
