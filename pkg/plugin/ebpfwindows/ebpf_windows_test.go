@@ -6,6 +6,7 @@ package ebpfwindows
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -750,6 +751,33 @@ func TestRegisterForCallback_Error(t *testing.T) {
 	err := em.RegisterForCallback(logger, cb)
 	if err == nil {
 		t.Fatalf("expected error when registering callback with eventsmap, got nothing")
+	}
+}
+
+func TestStart_GracefullySkipsWhenRetinaEbpfAPIMissing(t *testing.T) {
+	origIsCiliumOnWindowsEnabled := isCiliumOnWindowsEnabled
+	origLoadRetinaEbpfAPI := loadRetinaEbpfAPI
+	isCiliumOnWindowsEnabled = func() (bool, error) {
+		return true, nil
+	}
+	loadRetinaEbpfAPI = func() error {
+		return fmt.Errorf("module not found")
+	}
+	defer func() {
+		isCiliumOnWindowsEnabled = origIsCiliumOnWindowsEnabled
+		loadRetinaEbpfAPI = origLoadRetinaEbpfAPI
+	}()
+
+	p := &Plugin{
+		cfg: &kcfg.Config{
+			MetricsInterval: 100 * time.Second,
+			EnablePodLevel:  true,
+		},
+		l: log.Logger().Named("test-ebpf"),
+	}
+
+	if err := p.Start(context.Background()); err != nil {
+		t.Fatalf("expected plugin to skip gracefully when retinaebpfapi.dll is missing, got %v", err)
 	}
 }
 
