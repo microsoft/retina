@@ -75,7 +75,7 @@ RUN set -eux; \
     file /usr/local/bin/pwru | grep -q 'ELF'
 
 # https://github.com/SRodi/hotspot-bpf/releases
-ARG HOTSPOT_TAG="v0.1.0"
+ARG HOTSPOT_TAG="v0.1.1"
 ENV HOTSPOT_TAG=${HOTSPOT_TAG}
 
 # Download and extract hotspot-bpf release (amd64 only for now)
