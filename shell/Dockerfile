@@ -85,13 +85,13 @@ RUN set -eux; \
         *) echo "Skipping hotspot-bpf: unsupported arch $ARCH" && exit 0 ;; \
     esac; \
     HOTSPOT_TAR="hotspot-bpf-linux-${HOTSPOT_ARCH}.tar.gz"; \
-    curl -fL -o /tmp/hotspot.tar.gz "https://github.com/SRodi/hotspot-bpf/releases/download/${HOTSPOT_TAG}/${HOTSPOT_TAR}"; \
-    curl -fL -o /tmp/hotspot.tar.gz.sha256 "https://github.com/SRodi/hotspot-bpf/releases/download/${HOTSPOT_TAG}/${HOTSPOT_TAR}.sha256"; \
-    cd /tmp && sha256sum -c hotspot.tar.gz.sha256; \
-    tar -xz -C /usr/local/bin -f /tmp/hotspot.tar.gz "hotspot-bpf-linux-${HOTSPOT_ARCH}"; \
+    curl -fL -o "/tmp/${HOTSPOT_TAR}" "https://github.com/SRodi/hotspot-bpf/releases/download/${HOTSPOT_TAG}/${HOTSPOT_TAR}"; \
+    curl -fL -o "/tmp/${HOTSPOT_TAR}.sha256" "https://github.com/SRodi/hotspot-bpf/releases/download/${HOTSPOT_TAG}/${HOTSPOT_TAR}.sha256"; \
+    cd /tmp && sha256sum -c "${HOTSPOT_TAR}.sha256"; \
+    tar -xz -C /usr/local/bin -f "/tmp/${HOTSPOT_TAR}" "hotspot-bpf-linux-${HOTSPOT_ARCH}"; \
     mv "/usr/local/bin/hotspot-bpf-linux-${HOTSPOT_ARCH}" /usr/local/bin/hotspot; \
     chmod +x /usr/local/bin/hotspot; \
-    rm /tmp/hotspot.tar.gz /tmp/hotspot.tar.gz.sha256; \
+    rm "/tmp/${HOTSPOT_TAR}" "/tmp/${HOTSPOT_TAR}.sha256"; \
     file /usr/local/bin/hotspot | grep -q 'ELF'
 
 CMD ["/bin/bash", "-l"]
