@@ -8,7 +8,7 @@ require (
 	github.com/prometheus/client_golang v1.23.2
 	github.com/spf13/cobra v1.10.2
 	go.uber.org/zap v1.27.1
-	k8s.io/client-go v0.35.3
+	k8s.io/client-go v0.35.4
 	sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.17.0
 	sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader v0.13.0
 )
@@ -201,8 +201,8 @@ require (
 	golang.org/x/term v0.42.0 // indirect
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/api v0.35.3
-	k8s.io/apimachinery v0.35.3
+	k8s.io/api v0.35.4
+	k8s.io/apimachinery v0.35.4
 	k8s.io/klog/v2 v2.140.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912 // indirect
 	k8s.io/utils v0.0.0-20260319190234-28399d86e0b5
@@ -266,7 +266,7 @@ require (
 	k8s.io/apiextensions-apiserver v0.35.3
 	k8s.io/cli-runtime v0.35.3
 	k8s.io/kubectl v0.35.3
-	k8s.io/metrics v0.35.3
+	k8s.io/metrics v0.35.4
 	k8s.io/perf-tests/network/benchmarks/netperf v0.0.0-00010101000000-000000000000
 	sigs.k8s.io/controller-runtime v0.23.3
 )
@@ -679,7 +679,7 @@ require (
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	honnef.co/go/tools v0.7.0 // indirect
-	k8s.io/code-generator v0.35.3 // indirect
+	k8s.io/code-generator v0.35.4 // indirect
 	k8s.io/component-helpers v0.35.3 // indirect
 	k8s.io/gengo/v2 v2.0.0-20250922181213-ec3ebc5fd46b // indirect
 	lukechampine.com/blake3 v1.2.1 // indirect
