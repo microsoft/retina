@@ -40,6 +40,7 @@ var (
 	errInvalidDropNotifySize   = errors.New("invalid size for DropNotify")
 	errInvalidTraceNotifySize  = errors.New("invalid size for TraceNotify")
 	errNilTraceNotifyFlow      = errors.New("tracenotify flow object is nil")
+	isCiliumOnWindowsEnabled   = plugincommon.IsCiliumOnWindowsEnabled
 )
 
 // Plugin is the ebpfwindows plugin
@@ -83,7 +84,7 @@ func (p *Plugin) Name() string {
 func (p *Plugin) Start(ctx context.Context) error {
 	p.l.Info("Start ebpfWindows plugin...")
 
-	ciliumEnabled, err := plugincommon.IsCiliumOnWindowsEnabled()
+	ciliumEnabled, err := isCiliumOnWindowsEnabled()
 
 	if err != nil {
 		p.l.Error("Error while checking if Cilium is enabled on Windows", zap.Error(err))
@@ -95,9 +96,26 @@ func (p *Plugin) Start(ctx context.Context) error {
 		return nil
 	}
 
+	if err := p.ensureRetinaEbpfAPIAvailable(); err != nil {
+		p.l.Warn("retinaebpfapi.dll is unavailable, skipping ebpfWindows plugin initialization", zap.Error(err))
+		return nil
+	}
+
 	p.l.Info("Cilium is enabled on Windows, proceeding with ebpfWindows plugin initialization")
 	p.pullMetricsAndEvents(ctx)
 	p.l.Info("Complete ebpfWindows plugin...")
+	return nil
+}
+
+func (p *Plugin) ensureRetinaEbpfAPIAvailable() error {
+	if err := p.addEbpfToPath(); err != nil {
+		return err
+	}
+
+	if err := loadRetinaEbpfAPI(); err != nil {
+		return fmt.Errorf("loading retinaebpfapi.dll or required exports: %w", err)
+	}
+
 	return nil
 }
 
@@ -164,11 +182,6 @@ func (p *Plugin) pullMetricsAndEvents(ctx context.Context) {
 	eventsMap := NewEventsMap()
 	metricsMap := NewMetricsMap()
 	prevLostEventsCount := uint64(0)
-
-	err := p.addEbpfToPath()
-	if err != nil {
-		return
-	}
 
 	if enricher.IsInitialized() && p.cfg.EnablePodLevel {
 		p.enricher = enricher.Instance()
