@@ -233,7 +233,7 @@ require (
 	github.com/cilium/ebpf v0.21.0
 	github.com/cilium/hive v0.0.0-20260108104938-97756f6ff54c
 	github.com/cilium/proxy v0.0.0-20250623105955-2136f59a4ea1
-	github.com/cilium/workerpool v1.3.0
+	github.com/cilium/workerpool v1.4.0
 	github.com/florianl/go-tc v0.4.8
 	github.com/go-logr/zapr v1.3.0
 	github.com/google/gopacket v1.1.19
