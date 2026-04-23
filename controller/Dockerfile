@@ -1,7 +1,7 @@
 # pinned base images
 
 # skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.2-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26.2-azurelinux3.0@sha256:eb3ce814e96f3319f1b5985021021682b47975f6decfe00eaac84abff0ae25c9 AS golang
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26.2-azurelinux3.0@sha256:d904c53bb6a3a572482ff630fbd90cf487d5b8b3c4c8fe0e1d0b59d5d251bc8c AS golang
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
 FROM mcr.microsoft.com/azurelinux/base/core:3.0@sha256:35149ae8dd179684f969944f54a337c665a64e702486154eb44253fb39c2505b AS azurelinux-core
