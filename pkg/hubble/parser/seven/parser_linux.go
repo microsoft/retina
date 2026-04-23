@@ -2,6 +2,7 @@ package seven
 
 import (
 	"fmt"
+	"log/slog"
 	"net/netip"
 	"strings"
 
@@ -9,19 +10,17 @@ import (
 	ipc "github.com/cilium/cilium/pkg/ipcache"
 	"github.com/google/gopacket/layers"
 	"github.com/microsoft/retina/pkg/hubble/common"
-	"github.com/sirupsen/logrus"
-	"go.uber.org/zap"
 )
 
 type Parser struct {
-	l   *logrus.Entry
+	l   *slog.Logger
 	svd common.SvcDecoder
 	epd common.EpDecoder
 }
 
-func New(l *logrus.Entry, svc common.SvcDecoder, c *ipc.IPCache, labelCache common.LabelCache) *Parser {
+func New(l *slog.Logger, svc common.SvcDecoder, c *ipc.IPCache, labelCache common.LabelCache) *Parser {
 	return &Parser{
-		l:   l.WithField("subsys", "seven"),
+		l:   l.With("subsys", "seven"),
 		svd: svc,
 		epd: common.NewEpDecoder(c, labelCache),
 	}
@@ -62,17 +61,17 @@ func (p *Parser) decodeIP(f *flow.Flow) {
 
 	// Decode the flow's source and destination IPs to their respective service.
 	if f.GetIP() == nil {
-		p.l.Warn("Failed to get IP from flow", zap.Any("flow", f))
+		p.l.Warn("Failed to get IP from flow", "flow", f)
 		return
 	}
 	sourceIP, err := netip.ParseAddr(f.GetIP().GetSource())
 	if err != nil {
-		p.l.Warn("Failed to parse source IP", zap.Error(err))
+		p.l.Warn("Failed to parse source IP", "error", err)
 		return
 	}
 	destIP, err := netip.ParseAddr(f.GetIP().GetDestination())
 	if err != nil {
-		p.l.Warn("Failed to parse destination IP", zap.Error(err))
+		p.l.Warn("Failed to parse destination IP", "error", err)
 		return
 	}
 

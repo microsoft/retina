@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	kcfg "github.com/microsoft/retina/pkg/config"
@@ -19,7 +20,7 @@ func main() {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	l := log.Logger().Named("test-linuxutil")
 
-	metrics.InitializeMetrics()
+	metrics.InitializeMetrics(slog.Default())
 
 	cfg := &kcfg.Config{
 		MetricsInterval: 1 * time.Second,

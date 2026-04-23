@@ -4,6 +4,7 @@ package standard
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -24,6 +25,7 @@ import (
 	crmgr "sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+	"github.com/cilium/cilium/pkg/logging"
 	"github.com/go-logr/zapr"
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/internal/buildinfo"
@@ -128,6 +130,10 @@ func (d *Daemon) Start() error {
 		panic(err)
 	}
 	defer zl.Close()
+	// Tee Cilium's MultiSlogHandler into zap so any DefaultSlogLogger call
+	// (including package-var captures) reaches Application Insights.
+	logging.AddHandlers(log.SlogHandler())
+	log.SetDefaultSlog() // Set Go's global slog to use zap-backed handler
 	mainLogger := zl.Named("main").Sugar()
 
 	// Allow the current process to lock memory for eBPF resources.
@@ -137,7 +143,7 @@ func (d *Daemon) Start() error {
 		mainLogger.Fatal("failed to remove memlock", zap.Error(err))
 	}
 
-	metrics.InitializeMetrics()
+	metrics.InitializeMetrics(slog.Default())
 
 	mainLogger.Info(zap.String("data aggregation level", daemonConfig.DataAggregationLevel.String()))
 
@@ -294,7 +300,7 @@ func (d *Daemon) Start() error {
 		}
 	}
 
-	controllerMgr, err := cm.NewControllerManager(daemonConfig, cl, tel)
+	controllerMgr, err := cm.NewControllerManager(daemonConfig, cl, tel, slog.Default())
 	if err != nil {
 		mainLogger.Fatal("Failed to create controller manager", zap.Error(err))
 	}

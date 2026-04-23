@@ -1,15 +1,37 @@
 version: 2
 updates:
+  # Docker base images across all Dockerfiles
   - package-ecosystem: "docker"
-    directory: "/"
+    directories:
+      - "/controller"
+      - "/shell"
+      - "/cli"
+      - "/operator"
+      - "/test/image"
+      - "/hack/tools/kapinger"
+      - "/hack/tools/toolbox"
     schedule:
-      interval: "daily"
+      interval: "weekly"
     reviewers:
       - "microsoft/retina"
     commit-message:
       prefix: "deps"
     labels: ["area/infra", "area/dependencies"]
     open-pull-requests-limit: 10
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      golang-base:
+        patterns: ["*golang*"]
+      azurelinux-base:
+        patterns: ["*azurelinux*"]
+      windows-base:
+        patterns: ["*windows*", "*nanoserver*", "*servercore*"]
+      ubuntu-base:
+        patterns: ["*ubuntu*"]
+
+  # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -20,6 +42,35 @@ updates:
       prefix: "deps"
     labels: ["area/infra", "area/dependencies"]
     open-pull-requests-limit: 10
+    cooldown:
+      default-days: 3
+      semver-major-days: 14
+    groups:
+      actions-patch:
+        update-types: ["patch"]
+
+  # npm (Docusaurus site)
+  - package-ecosystem: "npm"
+    directory: "/site"
+    schedule:
+      interval: "weekly"
+    reviewers:
+      - "microsoft/retina"
+    commit-message:
+      prefix: "deps"
+    labels: ["area/docs", "area/dependencies"]
+    open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      docusaurus:
+        patterns:
+          - "@docusaurus/*"
+          - "@mdx-js/*"
+        update-types: ["patch"]
+
+  # Go modules
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
@@ -29,6 +80,32 @@ updates:
     commit-message:
       prefix: "deps"
     labels: ["lang/go", "area/dependencies"]
-    ignore:
-      - dependency-name: "github.com/inspektor-gadget/inspektor-gadget"
     open-pull-requests-limit: 10
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      k8s:
+        patterns:
+          - "k8s.io/*"
+          - "sigs.k8s.io/*"
+        exclude-patterns:
+          - "sigs.k8s.io/cloud-provider-azure/*"
+        update-types: ["patch"]
+      cilium:
+        patterns:
+          - "github.com/cilium/*"
+        update-types: ["patch"]
+      aws-sdk:
+        patterns:
+          - "github.com/aws/aws-sdk-go-v2/*"
+        update-types: ["patch"]
+      azure-sdk:
+        patterns:
+          - "github.com/Azure/*"
+          - "sigs.k8s.io/cloud-provider-azure/*"
+        update-types: ["patch"]
+      otel:
+        patterns:
+          - "go.opentelemetry.io/*"
+        update-types: ["patch"]
