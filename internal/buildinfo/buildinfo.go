@@ -11,3 +11,8 @@ var (
 	Version               string
 	RetinaAgentImageName  = "ghcr.io/microsoft/retina/retina-agent"
 )
+
+var (
+	Revision string
+	Branch   string
+)

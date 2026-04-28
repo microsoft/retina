@@ -9,9 +9,14 @@ import (
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+	"github.com/microsoft/retina/internal/buildinfo"
+	"runtime"
 )
 
 // Initiates and creates the common metrics
+// BuildInfo is a gauge that exposes Retina build metadata.
+var BuildInfo *prometheus.GaugeVec
+
 func InitializeMetrics(logger *slog.Logger) {
 	if logger == nil {
 		logger = slog.Default()
@@ -219,3 +224,22 @@ func GetCounterValue(m prometheus.Counter) float64 {
 	}
 	return 0
 }
+
+// InitBuildInfo registers the retina_build_info gauge and sets it.
+func InitBuildInfo(reg prometheus.Registerer) {
+	BuildInfo = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "retina_build_info",
+			Help: "Retina build information",
+		},
+		[]string{"version", "revision", "branch", "goversion"},
+	)
+	reg.MustRegister(BuildInfo)
+	BuildInfo.WithLabelValues(
+		buildinfo.Version,
+		buildinfo.Revision,
+		buildinfo.Branch,
+		runtime.Version(),
+	).Set(1)
+}
+
