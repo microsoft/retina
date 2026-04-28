@@ -7,7 +7,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/spf13/cobra v1.10.2
-	go.uber.org/zap v1.27.1
+	go.uber.org/zap v1.28.0
 	k8s.io/client-go v0.35.4
 	sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.19.0
 	sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader v0.14.0
