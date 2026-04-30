@@ -45,6 +45,26 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Ensure Docker daemon is running
+        shell: pwsh
+        run: |
+          $timeout = 120
+          $timer = [Diagnostics.Stopwatch]::StartNew()
+          while ($timer.Elapsed.TotalSeconds -lt $timeout) {
+            $svc = Get-Service docker -ErrorAction SilentlyContinue
+            if ($svc -and $svc.Status -ne 'Running') {
+              Start-Service docker -ErrorAction SilentlyContinue
+            }
+            $result = docker info 2>&1
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "Docker daemon is ready"
+              return
+            }
+            Write-Host "Waiting for Docker daemon to start..."
+            Start-Sleep -Seconds 5
+          }
+          throw "Docker daemon failed to start within $timeout seconds"
+
       - name: Docker Login to ghcr.io
         uses: docker/login-action@v3
         if: ${{ env.IS_MERGE_GROUP != 'true' }}
