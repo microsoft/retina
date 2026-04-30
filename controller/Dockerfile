@@ -11,10 +11,10 @@ FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26.5-
 FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260711@sha256:4d0522bb656cfe2bc567c254bb87c2b086a002db6cba51f71870eb5c6630195c AS azurelinux-core
 
 # mcr.microsoft.com/windows/servercore:ltsc2019
-FROM mcr.microsoft.com/windows/servercore@sha256:1883d9fb02b90ec20783f9376e004e125b28c652a73d821416444aadde6600b0 AS ltsc2019
+FROM mcr.microsoft.com/windows/servercore@sha256:8077f3e5b0987c388735917f0d15a3dd5fc773f8b5699c612ccb539d42644185 AS ltsc2019
 
 # mcr.microsoft.com/windows/servercore:ltsc2022
-FROM mcr.microsoft.com/windows/servercore@sha256:d31ac6a9b0c435679f941677661dd2fc555620348198c506e78e9ba70352e406 AS ltsc2022
+FROM mcr.microsoft.com/windows/servercore@sha256:e000e9a1712065a0218447c20ae19984b447fa741d11cf64696b8a1172fcd7da AS ltsc2022
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/distroless/minimal:3.0 --format "{{.Name}}@{{.Digest}}"
 FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20260706@sha256:576d9769c0146cbf0cf7946bacf536c5758464c29eadfa03ef5090ae708e641f AS azurelinux-distroless
@@ -71,7 +71,7 @@ RUN if [ "$GOOS" = "linux" ] ; then \
 FROM golang AS eBPFRetinaStage
 WORKDIR /tmp
 RUN tdnf install -y unzip && \
-    curl -L -o eBPFRetina.zip https://www.nuget.org/api/v2/package/Microsoft.Wcn.Observability.eBPF.Retina.x64/0.1.0-prerelease.11 && \
+    curl -L -o eBPFRetina.zip https://www.nuget.org/api/v2/package/Microsoft.Wcn.Observability.eBPF.Retina.x64/1.3.0 && \
     unzip -d eBPFRetina eBPFRetina.zip || exit 0 && \
     if [ ! -d "eBPFRetina" ]; then echo "eBPFRetina directory not found after unzip!" && exit 1; fi
 
