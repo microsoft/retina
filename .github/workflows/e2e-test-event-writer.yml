@@ -17,6 +17,8 @@ permissions:
 
 env:
   EVENT_WRITER_PATH: "${{ github.workspace }}/test/e2e/tools/event-writer/"
+  EBPF_VERSION: "1.1.0"
+  XDP_SDK_VERSION: "1.3.0"
 
 jobs:
   retina-win-e2e-bpf-images:
@@ -42,6 +44,26 @@ jobs:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Ensure Docker daemon is running
+        shell: pwsh
+        run: |
+          $timeout = 120
+          $timer = [Diagnostics.Stopwatch]::StartNew()
+          while ($timer.Elapsed.TotalSeconds -lt $timeout) {
+            $svc = Get-Service docker -ErrorAction SilentlyContinue
+            if ($svc -and $svc.Status -ne 'Running') {
+              Start-Service docker -ErrorAction SilentlyContinue
+            }
+            $result = docker info 2>&1
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "Docker daemon is ready"
+              return
+            }
+            Write-Host "Waiting for Docker daemon to start..."
+            Start-Sleep -Seconds 5
+          }
+          throw "Docker daemon failed to start within $timeout seconds"
 
       - name: Docker Login to ghcr.io
         uses: docker/login-action@v3
@@ -80,13 +102,13 @@ jobs:
         run: |
           .\export_program_info.exe --clear
           .\export_program_info.exe
-        working-directory: ${{ env.EVENT_WRITER_PATH }}\packages\eBPF-for-Windows.x64.0.21.1\build\native\bin
+        working-directory: ${{ env.EVENT_WRITER_PATH }}\packages\eBPF-for-Windows.x64.${{ env.EBPF_VERSION }}\build\native\bin
 
       - name: Build Event-Writer
         shell: cmd
         run: |
           msbuild /m /t:Clean /p:Configuration=Release /p:Platform=x64 /restore event_writer.sln
-          msbuild /m /p:Configuration=Release /p:Platform=x64 /restore event_writer.sln
+          msbuild /m /p:Configuration=Release /p:Platform=x64 /restore /v:detailed event_writer.sln
         working-directory: ${{ env.EVENT_WRITER_PATH }}
 
       - name: Determine Docker tag

@@ -12,10 +12,10 @@ FROM mcr.microsoft.com/cbl-mariner/base/core@sha256:8deab931d4af66264253cce66471
 FROM mcr.microsoft.com/cbl-mariner/distroless/minimal@sha256:0b09ee9e988e338f86432484c980c9c334d2b35b3bec6ce14298b754ecb6460b AS mariner-distroless
 
 # mcr.microsoft.com/windows/servercore:ltsc2019
-FROM mcr.microsoft.com/windows/servercore@sha256:1883d9fb02b90ec20783f9376e004e125b28c652a73d821416444aadde6600b0 AS ltsc2019
+FROM mcr.microsoft.com/windows/servercore@sha256:8077f3e5b0987c388735917f0d15a3dd5fc773f8b5699c612ccb539d42644185 AS ltsc2019
 
 # mcr.microsoft.com/windows/servercore:ltsc2022
-FROM mcr.microsoft.com/windows/servercore@sha256:d31ac6a9b0c435679f941677661dd2fc555620348198c506e78e9ba70352e406 AS ltsc2022
+FROM mcr.microsoft.com/windows/servercore@sha256:e000e9a1712065a0218447c20ae19984b447fa741d11cf64696b8a1172fcd7da AS ltsc2022
 
 
 # build stages
@@ -48,7 +48,7 @@ RUN if [ "$GOOS" = "linux" ] ; then \
 FROM golang AS eBPFRetinaStage
 WORKDIR /tmp
 RUN tdnf install -y unzip && \
-    curl -L -o eBPFRetina.zip https://www.nuget.org/api/v2/package/Microsoft.Wcn.Observability.eBPF.Retina.x64/0.1.0-prerelease.11 && \
+    curl -L -o eBPFRetina.zip https://www.nuget.org/api/v2/package/Microsoft.Wcn.Observability.eBPF.Retina.x64/1.3.0 && \
     unzip -d eBPFRetina eBPFRetina.zip || exit 0 && \
     if [ ! -d "eBPFRetina" ]; then echo "eBPFRetina directory not found after unzip!" && exit 1; fi
 
