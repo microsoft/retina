@@ -422,11 +422,18 @@ hubble:
     rollOutPods: false
 
     # -- Hubble-relay container image.
+    # Pinned to the official Cilium registry (quay.io/cilium/hubble-relay) and
+    # to v1.17.15 — the lowest currently-supported minor (1.17) at its latest
+    # patch. This intentionally minimises the major jump from the previous
+    # default (v1.15.0) so users have the smallest supported delta to validate.
+    # See https://github.com/cilium/cilium/releases/tag/v1.17.15 for release
+    # notes and https://quay.io/repository/cilium/hubble-relay?tab=tags for
+    # available tags.
     image:
       override: ~
-      repository: "mcr.microsoft.com/oss/cilium/hubble-relay"
-      tag: "v1.15.0"
-      digest: "sha256:19cd56e7618832257bf88b2f281287cb57f9f7fcb9e04775a6198d4bc4daffae"
+      repository: "quay.io/cilium/hubble-relay"
+      tag: "v1.17.15"
+      digest: "sha256:60dcac76e5841a14d5c4813377cb463822db78568146e8c93ffc5b5cc0e894fb"
       useDigest: false
       pullPolicy: "Always"
 
