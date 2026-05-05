@@ -2,19 +2,19 @@
 ARG OS_VERSION=ltsc2022
 # pinned base images
 
-# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.2-2-cbl-mariner2.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:5341a0010ecff114ee2f11f5eaa4f73b721b54142954041523f3e785d5c4b978 AS golang
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.4-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.24.4-azurelinux3.0@sha256:250d01e55a37bd79d7014ae83f9f50aa6fa5570ca910e7f19faeff4bb0132ae1 AS golang
 
-# skopeo inspect docker://mcr.microsoft.com/cbl-mariner/base/core:2.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/cbl-mariner/base/core@sha256:8deab931d4af66264253cce66471a04742dc6f8d5d175d4c18e930eda615c0aa AS mariner-core
+# skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
+FROM mcr.microsoft.com/azurelinux/base/core:3.0@sha256:35149ae8dd179684f969944f54a337c665a64e702486154eb44253fb39c2505b AS azurelinux-core
 
-# skopeo inspect docker://mcr.microsoft.com/cbl-mariner/distroless/minimal:2.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/cbl-mariner/distroless/minimal@sha256:0b09ee9e988e338f86432484c980c9c334d2b35b3bec6ce14298b754ecb6460b AS mariner-distroless
+# skopeo inspect docker://mcr.microsoft.com/azurelinux/distroless/minimal:3.0 --format "{{.Name}}@{{.Digest}}"
+FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0@sha256:5a66f9f16ac675db2a8229dac72d83811b73b502d6ad192d8b374c7f3be498af AS azurelinux-distroless
 
-# mcr.microsoft.com/windows/servercore:ltsc2019
+# skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2019  --override-os windows --format "{{.Name}}@{{.Digest}}"
 FROM mcr.microsoft.com/windows/servercore@sha256:8077f3e5b0987c388735917f0d15a3dd5fc773f8b5699c612ccb539d42644185 AS ltsc2019
 
-# mcr.microsoft.com/windows/servercore:ltsc2022
+# skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2022  --override-os windows --format "{{.Name}}@{{.Digest}}"
 FROM mcr.microsoft.com/windows/servercore@sha256:e000e9a1712065a0218447c20ae19984b447fa741d11cf64696b8a1172fcd7da AS ltsc2022
 
 
@@ -28,7 +28,7 @@ ARG GOOS=linux # default to linux
 ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
 RUN if [ "$GOOS" = "linux" ] ; then \
-      tdnf install -y clang16 lld16 bpftool libbpf-devel; \
+      tdnf install -y clang lld bpftool libbpf-devel; \
     fi
 COPY ./pkg/plugin /go/src/github.com/microsoft/retina/pkg/plugin
 WORKDIR /go/src/github.com/microsoft/retina
@@ -80,9 +80,9 @@ RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/ret
 
 
 # tools image
-FROM mariner-core AS tools
+FROM azurelinux-core AS tools
 RUN tdnf install -y \
-    clang16 \
+    clang \
     iproute \
     iptables \
     tcpdump \
@@ -110,7 +110,7 @@ RUN echo "Hubble version: $HUBBLE_VERSION" && \
     rm hubble-linux-${HUBBLE_ARCH}.tar.gz && rm hubble-linux-${HUBBLE_ARCH}.tar.gz.sha256sum
 
 # init final image
-FROM mariner-distroless AS init
+FROM azurelinux-distroless AS init
 COPY --from=init-bin /go/bin/retina/initretina /retina/initretina
 COPY --from=tools /lib/ /lib
 COPY --from=tools /usr/lib/ /usr/lib
@@ -118,9 +118,9 @@ ENTRYPOINT ["./retina/initretina"]
 
 
 # agent final image
-# mcr.microsoft.com/cbl-mariner/distroless/minimal:2.0
-# mcr.microsoft.com/cbl-mariner/distroless/minimal@sha256:63a0a70ceaa1320bc6eb98b81106667d43e46b674731ea8d28e4de1b87e0747f
-FROM mariner-distroless AS agent
+# mcr.microsoft.com/azurelinux/distroless/minimal:3.0
+# mcr.microsoft.com/azurelinux/distroless/minimal@sha256:0801b80a0927309572b9adc99bd1813bc680473175f6e8175cd4124d95dbd50c
+FROM azurelinux-distroless AS agent
 COPY --from=tools /lib/ /lib
 COPY --from=tools /usr/lib/ /usr/lib
 COPY --from=tools /tmp/bin/ /bin
