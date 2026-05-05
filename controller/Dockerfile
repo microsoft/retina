@@ -1,3 +1,5 @@
+# Only applicable for windows images
+ARG OS_VERSION=ltsc2022
 # pinned base images
 
 # skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.2-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
@@ -8,6 +10,12 @@ FROM mcr.microsoft.com/azurelinux/base/core:3.0@sha256:35149ae8dd179684f969944f5
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/distroless/minimal:3.0 --format "{{.Name}}@{{.Digest}}"
 FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0@sha256:5a66f9f16ac675db2a8229dac72d83811b73b502d6ad192d8b374c7f3be498af AS azurelinux-distroless
+
+# skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2019 --override-os windows --format "{{.Name}}@{{.Digest}}"
+FROM mcr.microsoft.com/windows/servercore@sha256:8077f3e5b0987c388735917f0d15a3dd5fc773f8b5699c612ccb539d42644185 AS ltsc2019
+
+# skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2022 --override-os windows --format "{{.Name}}@{{.Digest}}"
+FROM mcr.microsoft.com/windows/servercore@sha256:e000e9a1712065a0218447c20ae19984b447fa741d11cf64696b8a1172fcd7da AS ltsc2022
 
 # build stages
 
@@ -35,6 +43,14 @@ COPY . .
 RUN if [ "$GOOS" = "linux" ] ; then \
     rm -rf ./pkg/plugin && tar xvf /gen.tar.gz ./pkg/plugin; \
     fi
+
+# eBPF for Windows: download retinaebpfapi.dll from NuGet
+FROM golang AS eBPFRetinaStage
+WORKDIR /tmp
+RUN tdnf install -y unzip && \
+    curl -L -o eBPFRetina.zip https://www.nuget.org/api/v2/package/Microsoft.Wcn.Observability.eBPF.Retina.x64/1.3.0 && \
+    unzip -d eBPFRetina eBPFRetina.zip || exit 0 && \
+    if [ ! -d "eBPFRetina" ]; then echo "eBPFRetina directory not found after unzip!" && exit 1; fi
 
 # capture binary
 FROM intermediate AS capture-bin
@@ -124,3 +140,14 @@ COPY --from=tools /usr/local/hubble /bin/hubble
 # Set Hubble server.
 ENV HUBBLE_SERVER=unix:///var/run/cilium/hubble.sock
 ENTRYPOINT ["./retina/controller"]
+
+
+# agent final image for windows
+FROM ${OS_VERSION} AS agent-win
+COPY --from=eBPFRetinaStage /tmp/eBPFRetina/build/native/bin/retinaebpfapi.dll /retinaebpfapi.dll
+COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
+COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
+COPY --from=controller-bin /go/bin/retina/controller controller.exe
+COPY --from=capture-bin /go/bin/retina/captureworkload captureworkload.exe
+ADD https://github.com/microsoft/etl2pcapng/releases/download/v1.10.0/etl2pcapng.exe /etl2pcapng.exe
+CMD ["controller.exe", "start", "--kubeconfig=.\\kubeconfig"]

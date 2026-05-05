@@ -2,8 +2,12 @@
 ARG OS_VERSION=ltsc2022
 # pinned base images
 
-# skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2022  --override-os windows --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/windows/servercore:ltsc2022@sha256:e000e9a1712065a0218447c20ae19984b447fa741d11cf64696b8a1172fcd7da AS ltsc2022
+# skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2019 --override-os windows --format "{{.Name}}@{{.Digest}}"
+FROM mcr.microsoft.com/windows/servercore@sha256:8077f3e5b0987c388735917f0d15a3dd5fc773f8b5699c612ccb539d42644185 AS ltsc2019
+
+# skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2022 --override-os windows --format "{{.Name}}@{{.Digest}}"
+FROM mcr.microsoft.com/windows/servercore@sha256:e000e9a1712065a0218447c20ae19984b447fa741d11cf64696b8a1172fcd7da AS ltsc2022
+
 
 FROM ${OS_VERSION} AS agent-win
 ARG GOARCH=amd64 # default to amd64
@@ -19,8 +23,8 @@ ENV REPO_PATH=${REPO_PATH}
 # CVE-2013-3900 Mitigation
 RUN reg add "HKEY_LOCAL_MACHINE\Software\Microsoft\Cryptography\Wintrust\Config" /v "EnableCertPaddingCheck" /t REG_DWORD /d "1" /f
 RUN reg add "HKEY_LOCAL_MACHINE\Software\Wow6432Node\Microsoft\Cryptography\Wintrust\Config" /v "EnableCertPaddingCheck" /t REG_DWORD /d "1" /f
-COPY ${REPO_PATH}/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
-COPY ${REPO_PATH}/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
+COPY ${REPO_PATH}/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
+COPY ${REPO_PATH}/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
 COPY ${BINARIES_PATH}/captureworkload.exe captureworkload.exe
 COPY ${BINARIES_PATH}/controller.exe controller.exe
 ADD https://github.com/microsoft/etl2pcapng/releases/download/v1.10.0/etl2pcapng.exe /etl2pcapng.exe
