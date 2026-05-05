@@ -121,7 +121,7 @@ jobs:
           }
           echo "tag=$TAG" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
     
-      - name: Build and push images
+      - name: Build image
         shell: pwsh
         working-directory: ${{ env.EVENT_WRITER_PATH }}
         run: |
@@ -133,6 +133,14 @@ jobs:
           }
 
           $tag = "${{ steps.tag.outputs.tag }}"
+          echo "EVENT_WRITER_IMAGE=$image" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "EVENT_WRITER_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           docker build -f "./Dockerfile" -t "${image}:${tag}" -t "${image}:latest" .
-          docker push "${image}:${tag}"
-          docker push "${image}:latest"
+
+      - name: Push images
+        if: ${{ github.event_name != 'pull_request' }}
+        shell: pwsh
+        working-directory: ${{ env.EVENT_WRITER_PATH }}
+        run: |
+          docker push "${env:EVENT_WRITER_IMAGE}:${env:EVENT_WRITER_TAG}"
+          docker push "${env:EVENT_WRITER_IMAGE}:latest"
