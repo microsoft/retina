@@ -9,11 +9,10 @@ FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26.5-
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
 FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260711@sha256:4d0522bb656cfe2bc567c254bb87c2b086a002db6cba51f71870eb5c6630195c AS azurelinux-core
-
-# mcr.microsoft.com/windows/servercore:ltsc2019
+# skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2019  --override-os windows --format "{{.Name}}@{{.Digest}}"
 FROM mcr.microsoft.com/windows/servercore@sha256:8077f3e5b0987c388735917f0d15a3dd5fc773f8b5699c612ccb539d42644185 AS ltsc2019
 
-# mcr.microsoft.com/windows/servercore:ltsc2022
+# skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2022  --override-os windows --format "{{.Name}}@{{.Digest}}"
 FROM mcr.microsoft.com/windows/servercore@sha256:e000e9a1712065a0218447c20ae19984b447fa741d11cf64696b8a1172fcd7da AS ltsc2022
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/distroless/minimal:3.0 --format "{{.Name}}@{{.Digest}}"
@@ -56,6 +55,10 @@ ARG GOARCH=amd64 # default to amd64
 ARG GOOS=linux # default to linux
 ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
+RUN if [ "$GOOS" = "linux" ] ; then \
+      tdnf install -y clang lld bpftool libbpf-devel; \
+    fi
+COPY ./pkg/plugin /go/src/github.com/microsoft/retina/pkg/plugin
 WORKDIR /go/src/github.com/microsoft/retina
 # eBPF .o files were built in the bpf-gen stage (at $TARGETPLATFORM). Import
 # the tarball here and extract after `COPY . .` so bpf-gen's outputs replace
@@ -68,12 +71,6 @@ RUN if [ "$GOOS" = "linux" ] ; then \
     rm -rf ./pkg/plugin && tar xvf /gen.tar.gz ./pkg/plugin; \
     fi
 
-FROM golang AS eBPFRetinaStage
-WORKDIR /tmp
-RUN tdnf install -y unzip && \
-    curl -L -o eBPFRetina.zip https://www.nuget.org/api/v2/package/Microsoft.Wcn.Observability.eBPF.Retina.x64/1.3.0 && \
-    unzip -d eBPFRetina eBPFRetina.zip || exit 0 && \
-    if [ ! -d "eBPFRetina" ]; then echo "eBPFRetina directory not found after unzip!" && exit 1; fi
 
 # capture binary
 FROM intermediate AS capture-bin
@@ -166,7 +163,6 @@ ENTRYPOINT ["./retina/controller"]
 
 # agent final image for windows
 FROM ${OS_VERSION} AS agent-win
-COPY --from=eBPFRetinaStage /tmp/eBPFRetina/build/native/bin/retinaebpfapi.dll /retinaebpfapi.dll
 COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
 COPY --from=controller-bin /go/src/github.com/microsoft/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
 COPY --from=controller-bin /go/bin/retina/controller controller.exe
