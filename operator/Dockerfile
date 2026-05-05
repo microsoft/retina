@@ -1,8 +1,7 @@
-# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.3-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26.5-2-azurelinux3.0@sha256:1c77c1cbb5de52db3f119fe2efe7a938e734c08196bbe3ad94b3bdadbab926f9 AS builder
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.5-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26.5-azurelinux3.0@sha256:1c77c1cbb5de52db3f119fe2efe7a938e734c08196bbe3ad94b3bdadbab926f9 AS builder
 
-# systemcrypto without cgo — required for arm64 cross-compile from amd64 host.
-# Becomes redundant with Go 1.27+ (auto-selected when CGO_ENABLED=0).
+# enable no-cgo OpenSSL crypto for arm64 cross-compile (Go <=1.26)
 ENV GOEXPERIMENT=ms_nocgo_opensslcrypto
 
 ARG VERSION
@@ -20,10 +19,7 @@ ENV GOOS=${GOOS}
 ARG GOARCH=amd64
 ENV GOARCH=${GOARCH}
 
-# make manifests runs controller-gen, a build-time host tool that must be
-# compiled for and executed on the build host, not the target arch. Unset the
-# cross-compile env for this step so `go tool` doesn't produce an arm64 binary
-# and then fail to exec it on the amd64 builder.
+# controller-gen is a host tool; run it natively (unset cross-compile env) so it isn't built for arm64 then exec-failed on the amd64 builder
 RUN env -u GOOS -u GOARCH make manifests
 RUN --mount=type=cache,target="/root/.cache/go-build" \
 	GOOS=$GOOS GOARCH=$GOARCH go build \
@@ -40,7 +36,6 @@ FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20260809@sha256:4435f90
 WORKDIR /
 COPY --from=builder /lib /lib
 COPY --from=builder /usr/lib/ /usr/lib
-COPY --from=builder /etc/pki/tls/ /etc/pki/tls/
 COPY --from=builder /workspace/retina-operator .
 USER 65532:65532
 
