@@ -74,7 +74,7 @@ func (ncp *NetworkCaptureProvider) Setup(filename file.CaptureFilename) (string,
 	return ncp.TmpCaptureDir, nil
 }
 
-func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, filter string, duration, maxSizeMB int) error {
+func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, includeExcludeFilter string, duration, maxSizeMB, fileCount int) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*time.Duration(duration))
 	defer cancel()
 

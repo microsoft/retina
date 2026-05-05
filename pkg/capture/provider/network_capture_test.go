@@ -709,3 +709,67 @@ func TestFilterPrecedenceValue(t *testing.T) {
 		})
 	}
 }
+
+// hasArg checks if the command contains a specific argument
+func hasArg(cmd *exec.Cmd, arg string) bool {
+	for _, a := range cmd.Args {
+		if a == arg {
+			return true
+		}
+	}
+	return false
+}
+
+// hasArgPair checks if the command contains a flag followed by a specific value
+func hasArgPair(cmd *exec.Cmd, flag, value string) bool {
+	for i, arg := range cmd.Args {
+		if arg == flag && i+1 < len(cmd.Args) && cmd.Args[i+1] == value {
+			return true
+		}
+	}
+	return false
+}
+
+func TestTcpdumpCommandBaseArgs(t *testing.T) {
+	resetEnvVars()
+
+	cmd := constructTcpdumpCommand(testCaptureFilePath)
+
+	// Verify base args are always present
+	if cmd.Args[0] != "tcpdump" {
+		t.Errorf("Expected first arg to be 'tcpdump', got %s", cmd.Args[0])
+	}
+	if !hasArgPair(cmd, "-w", testCaptureFilePath) {
+		t.Errorf("Expected '-w %s' in args, got: %v", testCaptureFilePath, cmd.Args)
+	}
+	if !hasArg(cmd, "--relinquish-privileges=root") {
+		t.Errorf("Expected '--relinquish-privileges=root' in args, got: %v", cmd.Args)
+	}
+}
+
+func TestTcpdumpPacketSizeArg(t *testing.T) {
+	resetEnvVars()
+	os.Setenv(captureConstants.PacketSizeEnvKey, "96")
+	defer os.Unsetenv(captureConstants.PacketSizeEnvKey)
+
+	cmd := constructTcpdumpCommand(testCaptureFilePath)
+
+	if !hasArgPair(cmd, "-s", "96") {
+		t.Errorf("Expected '-s 96' in args, got: %v", cmd.Args)
+	}
+}
+
+func TestTcpdumpNoRotatingArgsWithoutFileCount(t *testing.T) {
+	// Verify that constructTcpdumpCommand does NOT add -C/-W flags
+	// (those are added at CaptureNetworkPacket level, not constructTcpdumpCommand)
+	resetEnvVars()
+
+	cmd := constructTcpdumpCommand(testCaptureFilePath)
+
+	if hasArg(cmd, "-C") {
+		t.Errorf("constructTcpdumpCommand should not add -C flag, got: %v", cmd.Args)
+	}
+	if hasArg(cmd, "-W") {
+		t.Errorf("constructTcpdumpCommand should not add -W flag, got: %v", cmd.Args)
+	}
+}

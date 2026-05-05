@@ -614,6 +614,11 @@ func (translator *CaptureToPodTranslator) validateCapture(capture *retinav1alpha
 		return fmt.Errorf("Neither duration nor maxCaptureSize is set to stop the capture")
 	}
 
+	// FileCount requires MaxCaptureSize to define the per-file size limit.
+	if capture.Spec.CaptureConfiguration.CaptureOption.FileCount != nil && capture.Spec.CaptureConfiguration.CaptureOption.MaxCaptureSize == nil {
+		return fmt.Errorf("fileCount requires maxCaptureSize to be set as per-file size limit")
+	}
+
 	if capture.Spec.OutputConfiguration.BlobUpload == nil &&
 		capture.Spec.OutputConfiguration.HostPath == nil &&
 		capture.Spec.OutputConfiguration.PersistentVolumeClaim == nil &&
@@ -1024,6 +1029,9 @@ func (translator *CaptureToPodTranslator) obtainCaptureOptionEnv(option retinav1
 	}
 	if option.MaxCaptureSize != nil {
 		outputEnv[captureConstants.CaptureMaxSizeEnvKey] = strconv.Itoa(*option.MaxCaptureSize)
+	}
+	if option.FileCount != nil {
+		outputEnv[captureConstants.CaptureFileCountEnvKey] = strconv.Itoa(*option.FileCount)
 	}
 	if len(option.Interfaces) > 0 {
 		outputEnv[captureConstants.CaptureInterfacesEnvKey] = strings.Join(option.Interfaces, ",")

@@ -66,7 +66,12 @@ func (cm *CaptureManager) CaptureNetwork(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	if err := cm.networkCaptureProvider.CaptureNetworkPacket(ctx, captureFilter, captureDuration, captureMaxSizeMB); err != nil {
+	captureFileCount, err := cm.captureFileCount()
+	if err != nil {
+		return "", err
+	}
+
+	if err := cm.networkCaptureProvider.CaptureNetworkPacket(ctx, captureFilter, captureDuration, captureMaxSizeMB, captureFileCount); err != nil {
 		return "", err
 	}
 
@@ -83,6 +88,7 @@ func (cm *CaptureManager) CaptureNetwork(ctx context.Context) (string, error) {
 		"filter":      captureFilter,
 		"duration":    strconv.Itoa(captureDuration),
 		"maxSizeMB":   strconv.Itoa(captureMaxSizeMB),
+		"fileCount":   strconv.Itoa(captureFileCount),
 	})
 
 	return tmpLocation, nil
@@ -123,6 +129,9 @@ func (cm *CaptureManager) captureFilter() string {
 
 func (cm *CaptureManager) captureDuration() (int, error) {
 	captureDurationStr := os.Getenv(captureConstants.CaptureDurationEnvKey)
+	if len(captureDurationStr) == 0 {
+		return 0, nil
+	}
 	duration, err := time.ParseDuration(captureDurationStr)
 	if err != nil {
 		return 0, err
@@ -152,6 +161,14 @@ func (cm *CaptureManager) captureMaxSizeMB() (int, error) {
 		return 0, nil
 	}
 	return strconv.Atoi(captureMaxSizeMBStr)
+}
+
+func (cm *CaptureManager) captureFileCount() (int, error) {
+	captureFileCountStr := os.Getenv(captureConstants.CaptureFileCountEnvKey)
+	if len(captureFileCountStr) == 0 {
+		return 0, nil
+	}
+	return strconv.Atoi(captureFileCountStr)
 }
 
 func (cm *CaptureManager) OutputCapture(ctx context.Context, srcDir string) error {

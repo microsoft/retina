@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -205,9 +206,14 @@ func (ncp *NetworkCaptureProvider) Setup(filename file.CaptureFilename) (string,
 	return ncp.TmpCaptureDir, nil
 }
 
-func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, includeExcludeFilter string, duration, maxSizeMB int) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(duration)*time.Second)
-	defer cancel()
+func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, includeExcludeFilter string, duration, maxSizeMB, fileCount int) error {
+	// For rotating captures, we don't use context timeout based on duration alone;
+	// the capture runs until explicitly stopped (or until duration expires if set).
+	if duration != 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(duration)*time.Second)
+		defer cancel()
+	}
 
 	captureFileName := ncp.Filename.String() + ".pcap"
 	captureFilePath := filepath.Join(ncp.TmpCaptureDir, captureFileName)
@@ -232,6 +238,16 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, inc
 
 	// Construct tcpdump command with combined filter
 	captureStartCmd := constructTcpdumpCommand(captureFilePath, combinedFilter)
+
+	// When fileCount is set, use tcpdump's native rotating buffer feature:
+	// -C <size_MB>: rotate file when it reaches this size (in millions of bytes)
+	// -W <count>: limit the number of files, overwriting oldest when limit is reached
+	if fileCount > 0 && maxSizeMB > 0 {
+		captureStartCmd.Args = append(captureStartCmd.Args,
+			"-C", strconv.Itoa(maxSizeMB),
+			"-W", strconv.Itoa(fileCount),
+		)
+	}
 
 	ncp.l.Info("Running tcpdump with args", zap.String("tcpdump command", captureStartCmd.String()), zap.Any("tcpdump args", captureStartCmd.Args))
 
@@ -269,11 +285,12 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, inc
 		}()
 	}
 
-	// TODO(mainred): make check interval configurable.
-	fileSizeCheckIntervalInSecond := 5
-	// Tcpdump cannot stop when a specified size reaches, so we check the capture file size with a const time interval,
-	// and stop tcpdump process when the file size meets the requirement.
-	if maxSizeMB != 0 {
+	// For non-rotating captures, check file size by polling and stop when limit is reached.
+	// For rotating captures (fileCount > 0), tcpdump handles rotation natively via -C and -W flags,
+	// so we skip manual file size checking.
+	if maxSizeMB != 0 && fileCount == 0 {
+		// TODO(mainred): make check interval configurable.
+		fileSizeCheckIntervalInSecond := 5
 		ncp.l.Info(fmt.Sprintf("Tcpdump will stop when the capture file size reaches %dMB.", maxSizeMB))
 		go func() {
 			// Chances are that the capture file is not created when we check the file size.

@@ -4,6 +4,8 @@ Retina Capture allows users to perform distributed packet captures across the cl
 
 Captures are on-demand and can be output to persistent storage such as the host filesystem, a storage blob or PVC.
 
+Retina also supports **rotating captures** for long-running debugging of intermittent issues. A rotating capture maintains a fixed number of files in a circular buffer, keeping only the most recent network traffic. See [CLI](./02-cli.md#rotating-capture-long-running) or [CRD](./03-crd.md) docs for details.
+
 There are two methods for triggering a Capture:
 
 - [CLI command](./02-cli.md)

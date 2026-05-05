@@ -4,8 +4,13 @@
 package capture
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"fmt"
+	"io"
 	"os"
+	"path/filepath"
+	"sort"
 	"strconv"
 	"testing"
 
@@ -55,11 +60,103 @@ func TestCaptureNetwork(t *testing.T) {
 
 	tmpFilename := file.CaptureFilename{CaptureName: captureName, NodeHostname: nodeHostName, StartTimestamp: timestamp}
 	networkCaptureProvider.EXPECT().Setup(tmpFilename).Return(fmt.Sprintf("%s-%s-%s", captureName, nodeHostName, timestamp), nil).Times(1)
-	networkCaptureProvider.EXPECT().CaptureNetworkPacket(ctx, filter, duration, maxSize).Return(nil).Times(1)
+	networkCaptureProvider.EXPECT().CaptureNetworkPacket(ctx, filter, duration, maxSize, 0).Return(nil).Times(1)
 
 	_, err := cm.CaptureNetwork(ctx)
 	if err != nil {
 		t.Errorf("CaptureNetwork should have not fail with error %s", err)
+	}
+}
+
+func TestCaptureNetworkWithRotatingCapture(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	networkCaptureProvider := provider.NewMockNetworkCaptureProviderInterface(ctrl)
+	cm := &CaptureManager{
+		networkCaptureProvider: networkCaptureProvider,
+		tel:                    telemetry.NewNoopTelemetry(),
+	}
+
+	timestamp := file.Now()
+	captureName := "capture-rotating"
+	nodeHostName := "node-host-name"
+	filter := ""
+	maxSize := 50
+	fileCount := 10
+	os.Setenv(captureConstants.CaptureNameEnvKey, captureName)
+	os.Setenv(captureConstants.NodeHostNameEnvKey, nodeHostName)
+	os.Setenv(captureConstants.CaptureStartTimestampEnvKey, file.TimeToString(timestamp))
+	os.Setenv(captureConstants.CaptureDurationEnvKey, "3600s")
+	os.Setenv(captureConstants.CaptureMaxSizeEnvKey, strconv.Itoa(maxSize))
+	os.Setenv(captureConstants.CaptureFileCountEnvKey, strconv.Itoa(fileCount))
+
+	defer func() {
+		os.Unsetenv(captureConstants.CaptureNameEnvKey)
+		os.Unsetenv(captureConstants.NodeHostNameEnvKey)
+		os.Unsetenv(captureConstants.CaptureStartTimestampEnvKey)
+		os.Unsetenv(captureConstants.TcpdumpFilterEnvKey)
+		os.Unsetenv(captureConstants.CaptureDurationEnvKey)
+		os.Unsetenv(captureConstants.CaptureMaxSizeEnvKey)
+		os.Unsetenv(captureConstants.CaptureFileCountEnvKey)
+	}()
+
+	ctx, cancel := TestContext(t)
+	defer cancel()
+
+	tmpFilename := file.CaptureFilename{CaptureName: captureName, NodeHostname: nodeHostName, StartTimestamp: timestamp}
+	networkCaptureProvider.EXPECT().Setup(tmpFilename).Return(fmt.Sprintf("%s-%s-%s", captureName, nodeHostName, timestamp), nil).Times(1)
+	networkCaptureProvider.EXPECT().CaptureNetworkPacket(ctx, filter, 3600, maxSize, fileCount).Return(nil).Times(1)
+
+	_, err := cm.CaptureNetwork(ctx)
+	if err != nil {
+		t.Errorf("CaptureNetwork with rotating capture should have not fail with error %s", err)
+	}
+}
+
+func TestCaptureNetworkWithNoDuration(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	networkCaptureProvider := provider.NewMockNetworkCaptureProviderInterface(ctrl)
+	cm := &CaptureManager{
+		networkCaptureProvider: networkCaptureProvider,
+		tel:                    telemetry.NewNoopTelemetry(),
+	}
+
+	timestamp := file.Now()
+	captureName := "capture-no-duration"
+	nodeHostName := "node-host-name"
+	maxSize := 100
+	fileCount := 5
+	os.Setenv(captureConstants.CaptureNameEnvKey, captureName)
+	os.Setenv(captureConstants.NodeHostNameEnvKey, nodeHostName)
+	os.Setenv(captureConstants.CaptureStartTimestampEnvKey, file.TimeToString(timestamp))
+	// No CAPTURE_DURATION set - simulating rotating capture without duration
+	os.Setenv(captureConstants.CaptureMaxSizeEnvKey, strconv.Itoa(maxSize))
+	os.Setenv(captureConstants.CaptureFileCountEnvKey, strconv.Itoa(fileCount))
+
+	defer func() {
+		os.Unsetenv(captureConstants.CaptureNameEnvKey)
+		os.Unsetenv(captureConstants.NodeHostNameEnvKey)
+		os.Unsetenv(captureConstants.CaptureStartTimestampEnvKey)
+		os.Unsetenv(captureConstants.TcpdumpFilterEnvKey)
+		os.Unsetenv(captureConstants.CaptureDurationEnvKey)
+		os.Unsetenv(captureConstants.CaptureMaxSizeEnvKey)
+		os.Unsetenv(captureConstants.CaptureFileCountEnvKey)
+	}()
+
+	ctx, cancel := TestContext(t)
+	defer cancel()
+
+	tmpFilename := file.CaptureFilename{CaptureName: captureName, NodeHostname: nodeHostName, StartTimestamp: timestamp}
+	networkCaptureProvider.EXPECT().Setup(tmpFilename).Return(fmt.Sprintf("%s-%s-%s", captureName, nodeHostName, timestamp), nil).Times(1)
+	// duration=0 when env is not set, fileCount=5
+	networkCaptureProvider.EXPECT().CaptureNetworkPacket(ctx, "", 0, maxSize, fileCount).Return(nil).Times(1)
+
+	_, err := cm.CaptureNetwork(ctx)
+	if err != nil {
+		t.Errorf("CaptureNetwork with no duration should have not fail with error %s", err)
 	}
 }
 
@@ -142,4 +239,138 @@ func TestCleanup(t *testing.T) {
 	if err := cm.Cleanup(); err != nil {
 		t.Errorf("Cleanup should have not fail with error %s", err)
 	}
+}
+
+func TestCompressFolderToTarGzIncludesRotatedFiles(t *testing.T) {
+	// Simulate rotating capture output: tcpdump with -C and -W creates
+	// files like capture.pcap0, capture.pcap1, capture.pcap2, etc.
+	srcDir := t.TempDir()
+
+	rotatedFiles := []string{
+		"capture.pcap0",
+		"capture.pcap1",
+		"capture.pcap2",
+		"capture.pcap3",
+	}
+
+	for i, name := range rotatedFiles {
+		content := fmt.Sprintf("pcap-data-file-%d", i)
+		if err := os.WriteFile(filepath.Join(srcDir, name), []byte(content), 0o600); err != nil {
+			t.Fatalf("failed to create test file %s: %v", name, err)
+		}
+	}
+
+	dstFile := filepath.Join(t.TempDir(), "output.tar.gz")
+	if err := compressFolderToTarGz(srcDir, dstFile); err != nil {
+		t.Fatalf("compressFolderToTarGz failed: %v", err)
+	}
+
+	// Extract and verify all rotated files are present
+	archivedFiles := extractTarGzFileNames(t, dstFile)
+	sort.Strings(archivedFiles)
+	sort.Strings(rotatedFiles)
+
+	if diff := cmp.Diff(rotatedFiles, archivedFiles); diff != "" {
+		t.Errorf("archived files mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestCompressFolderToTarGzPreservesContent(t *testing.T) {
+	srcDir := t.TempDir()
+
+	files := map[string]string{
+		"capture.pcap0": "data-for-file-0",
+		"capture.pcap1": "data-for-file-1",
+	}
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(srcDir, name), []byte(content), 0o600); err != nil {
+			t.Fatalf("failed to create test file %s: %v", name, err)
+		}
+	}
+
+	dstFile := filepath.Join(t.TempDir(), "output.tar.gz")
+	if err := compressFolderToTarGz(srcDir, dstFile); err != nil {
+		t.Fatalf("compressFolderToTarGz failed: %v", err)
+	}
+
+	// Extract and verify content
+	extracted := extractTarGzContents(t, dstFile)
+	for name, wantContent := range files {
+		got, ok := extracted[name]
+		if !ok {
+			t.Errorf("file %s not found in archive", name)
+			continue
+		}
+		if got != wantContent {
+			t.Errorf("file %s: got content %q, want %q", name, got, wantContent)
+		}
+	}
+}
+
+// extractTarGzFileNames returns the names of regular files in a tar.gz archive.
+func extractTarGzFileNames(t *testing.T, archivePath string) []string {
+	t.Helper()
+	f, err := os.Open(archivePath)
+	if err != nil {
+		t.Fatalf("failed to open archive: %v", err)
+	}
+	defer f.Close()
+
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		t.Fatalf("failed to create gzip reader: %v", err)
+	}
+	defer gz.Close()
+
+	tr := tar.NewReader(gz)
+	var names []string
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("failed to read tar entry: %v", err)
+		}
+		if hdr.Typeflag == tar.TypeReg {
+			names = append(names, hdr.Name)
+		}
+	}
+	return names
+}
+
+// extractTarGzContents returns a map of filename -> content for regular files.
+func extractTarGzContents(t *testing.T, archivePath string) map[string]string {
+	t.Helper()
+	f, err := os.Open(archivePath)
+	if err != nil {
+		t.Fatalf("failed to open archive: %v", err)
+	}
+	defer f.Close()
+
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		t.Fatalf("failed to create gzip reader: %v", err)
+	}
+	defer gz.Close()
+
+	tr := tar.NewReader(gz)
+	contents := make(map[string]string)
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("failed to read tar entry: %v", err)
+		}
+		if hdr.Typeflag == tar.TypeReg {
+			data, err := io.ReadAll(tr)
+			if err != nil {
+				t.Fatalf("failed to read file %s: %v", hdr.Name, err)
+			}
+			contents[hdr.Name] = string(data)
+		}
+	}
+	return contents
 }

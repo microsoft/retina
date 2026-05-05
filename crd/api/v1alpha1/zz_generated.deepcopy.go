@@ -138,6 +138,11 @@ func (in *CaptureOption) DeepCopyInto(out *CaptureOption) {
 		*out = new(int)
 		**out = **in
 	}
+	if in.FileCount != nil {
+		in, out := &in.FileCount, &out.FileCount
+		*out = new(int)
+		**out = **in
+	}
 	if in.Interfaces != nil {
 		in, out := &in.Interfaces, &out.Interfaces
 		*out = make([]string, len(*in))
