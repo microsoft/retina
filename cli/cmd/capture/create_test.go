@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"strings"
 	"testing"
 
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
@@ -67,18 +68,6 @@ func NewNode(name string) *corev1.Node {
 			Labels: map[string]string{
 				"kubernetes.io/hostname": name,
 				"kubernetes.io/os":       "linux",
-			},
-		},
-	}
-}
-
-func NewWindowsNode(name string) *corev1.Node {
-	return &corev1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-			Labels: map[string]string{
-				"kubernetes.io/hostname": name,
-				"kubernetes.io/os":       "windows",
 			},
 		},
 	}
@@ -606,8 +595,9 @@ func TestNodeNamesClearsDefaultNodeSelector(t *testing.T) {
 			require.NoError(t, err, "capture create should succeed for node-names targeting %v", tc.wantNodes)
 
 			// Verify jobs were created for the expected nodes
+			captureName := strings.TrimPrefix(tc.args[1], "--name=")
 			jobs, err := kubeClient.BatchV1().Jobs("default").List(context.TODO(), metav1.ListOptions{
-				LabelSelector: fmt.Sprintf("%s=%s", label.CaptureNameLabel, tc.args[2][len("--name="):]),
+				LabelSelector: fmt.Sprintf("%s=%s", label.CaptureNameLabel, captureName),
 			})
 			require.NoError(t, err)
 			require.Len(t, jobs.Items, len(tc.wantNodes), "should create one job per target node")
