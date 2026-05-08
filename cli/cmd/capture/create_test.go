@@ -595,9 +595,8 @@ func TestNodeNamesClearsDefaultNodeSelector(t *testing.T) {
 			require.NoError(t, err, "capture create should succeed for node-names targeting %v", tc.wantNodes)
 
 			// Verify jobs were created for the expected nodes
-			captureName := strings.TrimPrefix(tc.args[1], "--name=")
 			jobs, err := kubeClient.BatchV1().Jobs("default").List(context.TODO(), metav1.ListOptions{
-				LabelSelector: fmt.Sprintf("%s=%s", label.CaptureNameLabel, captureName),
+				LabelSelector: fmt.Sprintf("%s=%s", label.CaptureNameLabel, strings.TrimPrefix(tc.args[1], "--name=")),
 			})
 			require.NoError(t, err)
 			require.Len(t, jobs.Items, len(tc.wantNodes), "should create one job per target node")
