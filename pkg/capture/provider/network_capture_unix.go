@@ -60,11 +60,8 @@ func constructTcpdumpCommand(captureFilePath string) *exec.Cmd {
 		)
 	}
 
-	// If we set flag and value into the arg item of args, the space between flag and value will not treated as part of
-	// value, for example, "-i eth0" will be treated as "-i" and " eth0", thus brings a tcpdump unknown interface error.
 	if tcpdumpRawFilter := os.Getenv(captureConstants.TcpdumpRawFilterEnvKey); tcpdumpRawFilter != "" {
-		tcpdumpRawFilterSlice := strings.Split(tcpdumpRawFilter, " ")
-		captureStartCmd.Args = append(captureStartCmd.Args, tcpdumpRawFilterSlice...)
+		captureStartCmd.Args = append(captureStartCmd.Args, "--", tcpdumpRawFilter)
 	} else if specificInterfaces := os.Getenv(captureConstants.CaptureInterfacesEnvKey); specificInterfaces != "" {
 		// Use specific interfaces if provided
 		interfaceList := strings.Split(specificInterfaces, ",")

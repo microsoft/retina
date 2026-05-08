@@ -71,8 +71,12 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, fil
 	captureFilePath := filepath.Join(ncp.TmpCaptureDir, captureFileName)
 
 	captureStartCmd := exec.Command(
-		"cmd", "/C",
-		fmt.Sprintf("netsh trace start capture=yes report=disabled overwrite=yes"),
+		"netsh",
+		"trace",
+		"start",
+		"capture=yes",
+		"report=disabled",
+		"overwrite=yes",
 		fmt.Sprintf("tracefile=%s", captureFilePath),
 	)
 
@@ -82,7 +86,7 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, fil
 	// as the argument and the rest as the value of IPv4.Address.
 	// "IPv4.Address=(10.244.1.85,10.244.1.235) IPv6.Address=(fd5c:d9f1:79c5:fd83::1bc,fd5c:d9f1:79c5:fd83::11b)"
 	if len(filter) != 0 {
-		netshFilterSlice := strings.Split(filter, " ")
+		netshFilterSlice := strings.Fields(filter)
 		captureStartCmd.Args = append(captureStartCmd.Args, netshFilterSlice...)
 	}
 

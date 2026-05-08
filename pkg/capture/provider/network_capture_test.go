@@ -8,6 +8,7 @@ package provider
 import (
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"testing"
 
@@ -21,7 +22,6 @@ const (
 	interfaceEth0       = "eth0"
 	interfaceEth1       = "eth1"
 	interfaceAny        = "any"
-	interfaceLo         = "lo"
 )
 
 func TestSetupAndCleanup(t *testing.T) {
@@ -92,13 +92,17 @@ func TestTcpdumpDefaultBehavior(t *testing.T) {
 
 func TestTcpdumpRawFilterOverride(t *testing.T) {
 	resetEnvVars()
-	os.Setenv(captureConstants.TcpdumpRawFilterEnvKey, "-i "+interfaceEth0)
+	rawFilter := "host 10.244.0.1 and port 80"
+	os.Setenv(captureConstants.TcpdumpRawFilterEnvKey, rawFilter)
 	defer os.Unsetenv(captureConstants.TcpdumpRawFilterEnvKey)
 
 	cmd := constructTcpdumpCommand(testCaptureFilePath)
 
-	if !hasInterface(cmd, interfaceEth0) {
-		t.Errorf("Expected tcpdump command to include '-i %s' from raw filter, but got args: %v", interfaceEth0, cmd.Args)
+	if !slices.Contains(cmd.Args, rawFilter) {
+		t.Errorf("Expected tcpdump command to include raw filter %q as one argument, but got args: %v", rawFilter, cmd.Args)
+	}
+	if !slices.Contains(cmd.Args, "--") {
+		t.Errorf("Expected tcpdump command to include '--' before raw filter, but got args: %v", cmd.Args)
 	}
 	if hasInterface(cmd, interfaceAny) {
 		t.Errorf("Expected tcpdump command not to include '-i any' when raw filter is set, but got args: %v", cmd.Args)
@@ -125,18 +129,38 @@ func TestTcpdumpSpecificInterfaces(t *testing.T) {
 
 func TestTcpdumpRawFilterPriority(t *testing.T) {
 	resetEnvVars()
-	os.Setenv(captureConstants.TcpdumpRawFilterEnvKey, "-i "+interfaceLo)
+	rawFilter := "host 10.244.0.1"
+	os.Setenv(captureConstants.TcpdumpRawFilterEnvKey, rawFilter)
 	os.Setenv(captureConstants.CaptureInterfacesEnvKey, interfaceEth0+","+interfaceEth1)
 	defer os.Unsetenv(captureConstants.TcpdumpRawFilterEnvKey)
 	defer os.Unsetenv(captureConstants.CaptureInterfacesEnvKey)
 
 	cmd := constructTcpdumpCommand(testCaptureFilePath)
 
-	if !hasInterface(cmd, interfaceLo) {
-		t.Errorf("Expected tcpdump command to include '-i %s' from raw filter, but got args: %v", interfaceLo, cmd.Args)
+	if !slices.Contains(cmd.Args, rawFilter) {
+		t.Errorf("Expected tcpdump command to include raw filter %q, but got args: %v", rawFilter, cmd.Args)
 	}
 	if hasInterface(cmd, interfaceEth0) || hasInterface(cmd, interfaceEth1) {
 		t.Errorf("Expected tcpdump command not to include specific interfaces when raw filter is set, but got args: %v", cmd.Args)
+	}
+}
+
+func TestTcpdumpRawFilterOptionInjectionGuard(t *testing.T) {
+	resetEnvVars()
+	rawFilter := "-i eth0 -G 1 -W 1 -w /host/etc/passwd"
+	os.Setenv(captureConstants.TcpdumpRawFilterEnvKey, rawFilter)
+	defer os.Unsetenv(captureConstants.TcpdumpRawFilterEnvKey)
+
+	cmd := constructTcpdumpCommand(testCaptureFilePath)
+
+	if !slices.Contains(cmd.Args, "--") {
+		t.Errorf("Expected tcpdump command to include '--' before raw filter, but got args: %v", cmd.Args)
+	}
+	if !slices.Contains(cmd.Args, rawFilter) {
+		t.Errorf("Expected tcpdump command to include unsplit raw filter argument %q, but got args: %v", rawFilter, cmd.Args)
+	}
+	if hasInterface(cmd, interfaceEth0) {
+		t.Errorf("Expected tcpdump command not to parse raw filter as '-i %s', but got args: %v", interfaceEth0, cmd.Args)
 	}
 }
 
@@ -160,5 +184,6 @@ func TestTcpdumpCommandConstruction(t *testing.T) {
 	t.Run("RawFilterOverridesDefault", TestTcpdumpRawFilterOverride)
 	t.Run("SpecificInterfaceSelection", TestTcpdumpSpecificInterfaces)
 	t.Run("RawFilterOverridesSpecificInterfaces", TestTcpdumpRawFilterPriority)
+	t.Run("RawFilterOptionInjectionGuard", TestTcpdumpRawFilterOptionInjectionGuard)
 	t.Run("SpecificInterfacesOverrideDefault", TestTcpdumpInterfaceOverrideDefault)
 }
