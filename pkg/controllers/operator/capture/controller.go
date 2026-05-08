@@ -351,10 +351,10 @@ func (cr *CaptureReconciler) handleUpdate(ctx context.Context, capture *retinav1
 			// TODO(mainred): update Capture with container/blob info to simply the following blob download
 			capture.Spec.OutputConfiguration.BlobUpload = to.Ptr(secret.Name)
 			if err = cr.Client.Update(ctx, capture); err != nil {
-				cr.logger.Error("Failed to update capture with managed secret", zap.Error(err), zap.String("secret", secret.Name), zap.String("Capture", captureRef.String()))
+				cr.logger.Error("Failed to update capture with managed secret", zap.Error(err), zap.String("Capture", captureRef.String()))
 				return ctrl.Result{}, fmt.Errorf("failed to update capture with managed secret: %w", err)
 			}
-			cr.logger.Info("Use the existing secret", zap.Error(err), zap.String("Capture", captureRef.String()), zap.String("secret", *capture.Spec.OutputConfiguration.BlobUpload))
+			cr.logger.Info("Capture updated with managed secret", zap.String("Capture", captureRef.String()))
 		}
 	}
 
