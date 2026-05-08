@@ -147,6 +147,8 @@ func TestTcpdumpRawFilterPriority(t *testing.T) {
 
 func TestTcpdumpRawFilterOptionInjectionGuard(t *testing.T) {
 	resetEnvVars()
+	// Simulates a malicious CR payload attempting to inject tcpdump options for interface override,
+	// rotation control, and writing to a sensitive host path.
 	rawFilter := "-i eth0 -G 1 -W 1 -w /host/etc/passwd"
 	os.Setenv(captureConstants.TcpdumpRawFilterEnvKey, rawFilter)
 	defer os.Unsetenv(captureConstants.TcpdumpRawFilterEnvKey)
