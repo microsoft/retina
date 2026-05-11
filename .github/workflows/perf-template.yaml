@@ -24,6 +24,21 @@ on:
         description: 'Azure location for the performance test'
         required: true
         type: string
+      azure-agent-linux-sku:
+        description: 'VM SKU for the Linux agent pool'
+        required: false
+        default: ''
+        type: string
+      azure-agent-windows-sku:
+        description: 'VM SKU for the Windows agent pool'
+        required: false
+        default: ''
+        type: string
+      azure-agent-linux-arm-sku:
+        description: 'VM SKU for the ARM64 agent pool'
+        required: false
+        default: ''
+        type: string
     secrets:
         azure-subscription:
           description: 'Azure subscription ID'
@@ -71,6 +86,9 @@ jobs:
           AZURE_APP_INSIGHTS_KEY: ${{ secrets.azure-app-insights-key }}
           AZURE_SUBSCRIPTION_ID: ${{ secrets.azure-subscription }}
           AZURE_LOCATION: ${{ inputs.azure-location }}
+          AZURE_AGENT_LINUX_SKU: ${{ inputs.azure-agent-linux-sku }}
+          AZURE_AGENT_WINDOWS_SKU: ${{ inputs.azure-agent-windows-sku }}
+          AZURE_AGENT_LINUX_ARM_SKU: ${{ inputs.azure-agent-linux-arm-sku }}
         shell: bash
         run: |
           set -euo pipefail

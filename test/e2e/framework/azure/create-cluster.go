@@ -14,8 +14,6 @@ import (
 const (
 	MaxNumberOfNodes = 3
 	MaxPodsPerNode   = 250
-	AgentSKU         = "Standard_D4ds_v4"
-	AgentWindowsSKU  = "Standard_D4ds_v4"
 )
 
 var defaultClusterCreateTimeout = 30 * time.Minute
@@ -117,7 +115,7 @@ func GetStarterClusterTemplate(location string) armcontainerservice.ManagedClust
 					Mode:               to.Ptr(armcontainerservice.AgentPoolModeSystem),
 					OSType:             to.Ptr(armcontainerservice.OSTypeLinux),
 					ScaleDownMode:      to.Ptr(armcontainerservice.ScaleDownModeDelete),
-					VMSize:             to.Ptr(AgentSKU),
+					VMSize:             to.Ptr(AgentLinuxSKU),
 					Name:               to.Ptr("nodepool1"),
 					MaxPods:            to.Ptr(int32(MaxPodsPerNode)),
 				},
