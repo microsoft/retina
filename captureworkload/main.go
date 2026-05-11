@@ -4,6 +4,8 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strconv"
 	"syscall"
 
 	"go.uber.org/zap"
@@ -63,6 +65,71 @@ func main() {
 	}
 	if err := cm.OutputCapture(ctx, srcDir); err != nil {
 		l.Error("Failed to output network traffic", zap.Error(err))
+	} else {
+		cleanupHostPathCaptureFiles(l)
 	}
 	l.Info("Done for capturing network traffic")
+}
+
+// cleanupHostPathCaptureFiles removes capture files from the node host path
+// after a successful upload to a remote output location (blob, S3, or PVC).
+// It is a no-op when:
+// - CLEANUP_HOST_PATH env is not "true"
+// - host path is the only configured output (refuses to destroy only copy)
+// - no remote output is configured
+func cleanupHostPathCaptureFiles(l *log.ZapLogger) {
+	cleanupStr := os.Getenv(captureConstants.CleanupHostPathEnvKey)
+	if cleanupStr == "" {
+		return
+	}
+	cleanup, err := strconv.ParseBool(cleanupStr)
+	if err != nil || !cleanup {
+		return
+	}
+
+	hostPath := os.Getenv(string(captureConstants.CaptureOutputLocationEnvKeyHostPath))
+	if hostPath == "" {
+		// Host path not configured, nothing to clean up.
+		return
+	}
+
+	// Check that at least one remote output location is configured.
+	hasRemoteOutput := os.Getenv(string(captureConstants.CaptureOutputLocationEnvKeyPersistentVolumeClaim)) != "" ||
+		os.Getenv(string(captureConstants.CaptureOutputLocationEnvKeyS3Bucket)) != ""
+	if !hasRemoteOutput {
+		// Check for blob upload secret mount as indicator of blob output.
+		if _, err := os.Stat(captureConstants.CaptureOutputLocationBlobUploadSecretPath); os.IsNotExist(err) {
+			l.Info("Skipping host-path cleanup: no remote output configured, host path is the only copy")
+			return
+		}
+	}
+
+	// Remove capture files from host path directory.
+	entries, err := os.ReadDir(hostPath)
+	if err != nil {
+		l.Error("Failed to read host path directory for cleanup", zap.String("hostPath", hostPath), zap.Error(err))
+		return
+	}
+
+	captureName := os.Getenv(captureConstants.CaptureNameEnvKey)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		// Only remove files that match the capture name prefix to avoid deleting unrelated files.
+		if captureName != "" && !matchesCaptureFile(entry.Name(), captureName) {
+			continue
+		}
+		filePath := filepath.Join(hostPath, entry.Name())
+		if err := os.Remove(filePath); err != nil {
+			l.Error("Failed to remove capture file from host path", zap.String("file", filePath), zap.Error(err))
+		} else {
+			l.Info("Cleaned up capture file from host path", zap.String("file", filePath))
+		}
+	}
+}
+
+// matchesCaptureFile checks whether a filename belongs to this capture based on name prefix.
+func matchesCaptureFile(filename, captureName string) bool {
+	return len(filename) >= len(captureName) && filename[:len(captureName)] == captureName
 }

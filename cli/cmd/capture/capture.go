@@ -15,6 +15,7 @@ type Opts struct {
 	genericclioptions.ConfigFlags
 	Name               *string
 	blobUpload         string
+	cleanupHostPath    bool
 	debug              bool
 	duration           time.Duration
 	excludeFilter      string

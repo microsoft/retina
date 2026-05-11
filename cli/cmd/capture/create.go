@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -34,6 +35,7 @@ import (
 )
 
 const (
+	DefaultCleanupHostPath bool          = true
 	DefaultDebug           bool          = false
 	DefaultDuration        time.Duration = 1 * time.Minute
 	DefaultHostPath        string        = "/mnt/retina/captures"
@@ -225,6 +227,7 @@ func NewCreateSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 	createCapture.Flags().IntVar(&opts.jobNumLimit, "job-num-limit", DefaultJobNumLimit, "The maximum number of jobs can be created for each capture. 0 means no limit")
 	createCapture.Flags().BoolVar(&opts.nowait, "no-wait", DefaultNowait, "Do not wait for the long-running capture job to finish")
 	createCapture.Flags().BoolVar(&opts.debug, "debug", DefaultDebug, "When debug is true, a customized retina-agent image, determined by the environment variable RETINA_AGENT_IMAGE, is set")
+	createCapture.Flags().BoolVar(&opts.cleanupHostPath, "cleanup-host-path", DefaultCleanupHostPath, "Delete capture files from node host path after successful upload to a remote output (blob, S3, PVC)")
 
 	return createCapture
 }
@@ -454,6 +457,14 @@ func createJobs(ctx context.Context, kubeClient kubernetes.Interface, capture *r
 
 	jobsCreated := []batchv1.Job{}
 	for _, job := range jobs {
+		// Inject cleanup-host-path env var into capture containers.
+		for i := range job.Spec.Template.Spec.Containers {
+			job.Spec.Template.Spec.Containers[i].Env = append(job.Spec.Template.Spec.Containers[i].Env, corev1.EnvVar{
+				Name:  captureConstants.CleanupHostPathEnvKey,
+				Value: strconv.FormatBool(opts.cleanupHostPath),
+			})
+		}
+
 		jobCreated, err := kubeClient.BatchV1().Jobs(*opts.Namespace).Create(ctx, job, metav1.CreateOptions{})
 		if err != nil {
 			return nil, err

@@ -59,6 +59,7 @@ The network traffic will be uploaded to the specified output location.
 | Flag                  | Type       | Default  | Description                                                                 | Notes |
 |-----------------------|------------|----------|-----------------------------------------------------------------------------|-------|
 | `blob-upload`         | string     | ""       | Blob SAS URL with write permission to upload capture files.                  |       |
+| `cleanup-host-path`   | bool       | true     | Delete capture files from the node host path after successful upload to a remote output (blob, S3, or PVC). Has no effect when host path is the only output location. | See [Host Path Cleanup](#host-path-cleanup). |
 | `debug`               | bool       | false    | When debug is true, a customized retina-agent image, determined by the environment variable RETINA_AGENT_IMAGE, is set. |       |
 | `duration`            | string     | 1m0s     | Maximum duration of the packet capture - in minutes / seconds.              |       |
 | `exclude-filter`      | string     | ""       | A comma-separated list of IP:Port pairs that are excluded from capturing network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:* | Only works on Linux.     |
@@ -200,6 +201,29 @@ kubectl retina capture create \
   --s3-endpoint "https://play.min.io:9000" \
   --s3-access-key-id "your-access-key-id" \
   --s3-secret-access-key "your-secret-access-key"
+```
+
+##### Host Path Cleanup
+
+By default, when a remote output location (blob, S3, or PVC) is configured alongside the host path, capture files are automatically deleted from the node host path after a successful upload. This prevents capture files from accumulating on node disks.
+
+The cleanup is skipped when host path is the **only** configured output to avoid destroying the only copy of the capture data.
+
+To keep capture files on the node host path even after a successful remote upload, disable cleanup:
+
+```sh
+kubectl retina capture create \
+  --name example-keep-local \
+  --blob-upload <Blob SAS URL with write permission> \
+  --cleanup-host-path=false
+```
+
+With the default behavior (`--cleanup-host-path=true`), capture files are cleaned up automatically:
+
+```sh
+kubectl retina capture create \
+  --name example-auto-cleanup \
+  --blob-upload <Blob SAS URL with write permission>
 ```
 
 ##### Capture Filters

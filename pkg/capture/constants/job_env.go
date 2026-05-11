@@ -37,5 +37,9 @@ const (
 	// Interface selection environment variables
 	CaptureInterfacesEnvKey string = "CAPTURE_INTERFACES"
 
+	// CleanupHostPathEnvKey controls whether the host-path capture file is deleted
+	// after a successful upload to a remote output location (blob, S3, PVC).
+	CleanupHostPathEnvKey string = "CLEANUP_HOST_PATH"
+
 	ApiserverEnvKey = "APISERVER"
 )
