@@ -1,0 +1,19 @@
+{{- if .Values.operator.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ .Values.operator.name }}-config"
+  namespace: {{ .Values.namespace }}
+data:
+  operator-config.yaml: |-
+    installCRDs: {{ .Values.operator.installCRDs }}
+    enableTelemetry: {{ .Values.enableTelemetry }}
+    remoteContext: {{ .Values.remoteContext }}
+    captureDebug: {{ .Values.capture.debug }}
+    captureJobNumLimit: {{ .Values.capture.jobNumLimit }}
+    enableManagedStorageAccount: {{ .Values.capture.enableManagedStorageAccount }}
+    telemetryInterval: {{ .Values.operator.telemetryInterval }}
+{{- if .Values.capture.enableManagedStorageAccount }}
+    azureCredentialConfig: /etc/cloud-config/azure.json
+{{- end }}
+{{- end }}
