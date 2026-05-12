@@ -4,7 +4,7 @@
 # Maybe one day: https://github.com/moby/buildkit/issues/616
 ARG BUILDER_IMAGE
 # skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.2-windowsservercore-ltsc2022 --override-os windows --format "{{.Name}}@{{.Digest}}"
-FROM --platform=windows/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.26.2-windowsservercore-ltsc2022@sha256:7dc9ddecd32b6c338f2c9ac9b87f51eb7f1bc603af4fe389abefa0db310a8239 AS builder
+FROM --platform=windows/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.26.3-windowsservercore-ltsc2022@sha256:58d69eaa704978128e3ff640db70412786a5100be4999e46c5670bdeea5fb320 AS builder
 WORKDIR C:\\retina
 COPY go.mod .
 COPY go.sum .

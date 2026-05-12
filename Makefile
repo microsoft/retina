@@ -136,6 +136,9 @@ generate-bpf-go: ## generate ebpf wrappers for plugins for all archs
 FMT_PKG  ?= .
 LINT_PKG ?= .
 
+empty-bpf-objects: ## truncate all tracked .o files to 0 bytes
+	git ls-files '*.o' | xargs truncate -s 0
+
 fmt: ## run gofumpt on $FMT_PKG (default "retina").
 	$(GOFUMPT) -w $(FMT_PKG)
 
