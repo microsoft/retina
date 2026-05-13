@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
+	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
 	"github.com/microsoft/retina/pkg/label"
 	"github.com/stretchr/testify/require"
 	batchv1 "k8s.io/api/batch/v1"
@@ -509,4 +510,327 @@ func TestCaptureTarget_PodNames_MutualExclusivity(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCreateJobsTTLSetInNowaitMode(t *testing.T) {
+	kubeClient := fake.NewClientset(
+		NewNode("node1"),
+	)
+	kubeClient.PrependReactor("create", "jobs", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+		createAction, ok := action.(clienttesting.CreateAction)
+		if !ok {
+			return false, nil, fmt.Errorf("expected CreateAction, got %T", action) //nolint:err113 // test code
+		}
+		job := createAction.GetObject().(*batchv1.Job)
+		if job.Name == "" {
+			job.Name = job.GenerateName + randomString(5)
+		}
+		job.UID = "test-uid-123"
+		return false, job, nil
+	})
+
+	cmd := NewCommand(kubeClient)
+	cmd.SetArgs([]string{
+		"create",
+		"--name", "ttl-test",
+		"--node-selectors", "kubernetes.io/hostname=node1",
+		"--no-wait",
+	})
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+
+	err := cmd.Execute()
+	require.NoError(t, err)
+
+	jobs, err := kubeClient.BatchV1().Jobs("default").List(context.TODO(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", label.CaptureNameLabel, "ttl-test"),
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, jobs.Items)
+
+	for _, job := range jobs.Items {
+		require.NotNil(t, job.Spec.TTLSecondsAfterFinished,
+			"TTLSecondsAfterFinished should be set in no-wait mode")
+		require.Equal(t, JobTTLSecondsAfterFinished, *job.Spec.TTLSecondsAfterFinished)
+	}
+}
+
+func TestSetSecretOwnerReferences(t *testing.T) {
+	ns := "test-ns"
+	secretName := "blob-secret-abc"
+
+	kubeClient := fake.NewClientset(
+		&corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: ns,
+			},
+		},
+	)
+
+	// Save and restore opts
+	origNs := opts.Namespace
+	opts.Namespace = &ns
+	defer func() { opts.Namespace = origNs }()
+
+	blobUpload := secretName
+	capture := &retinav1alpha1.Capture{
+		Spec: retinav1alpha1.CaptureSpec{
+			OutputConfiguration: retinav1alpha1.OutputConfiguration{
+				BlobUpload: &blobUpload,
+			},
+		},
+	}
+
+	jobs := []batchv1.Job{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "job-1",
+				Namespace: ns,
+				UID:       "uid-1",
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "job-2",
+				Namespace: ns,
+				UID:       "uid-2",
+			},
+		},
+	}
+
+	err := setSecretOwnerReferences(context.Background(), kubeClient, capture, jobs)
+	require.NoError(t, err)
+
+	secret, err := kubeClient.CoreV1().Secrets(ns).Get(context.Background(), secretName, metav1.GetOptions{})
+	require.NoError(t, err)
+	require.Len(t, secret.OwnerReferences, 2, "secret should have owner references for both jobs")
+	require.Equal(t, "job-1", secret.OwnerReferences[0].Name)
+	require.Equal(t, "job-2", secret.OwnerReferences[1].Name)
+	require.Equal(t, "batch/v1", secret.OwnerReferences[0].APIVersion)
+	require.Equal(t, "Job", secret.OwnerReferences[0].Kind)
+}
+
+func TestSetSecretOwnerReferences_NoSecrets(t *testing.T) {
+	kubeClient := fake.NewClientset()
+
+	capture := &retinav1alpha1.Capture{
+		Spec: retinav1alpha1.CaptureSpec{
+			OutputConfiguration: retinav1alpha1.OutputConfiguration{},
+		},
+	}
+
+	err := setSecretOwnerReferences(context.Background(), kubeClient, capture, []batchv1.Job{})
+	require.NoError(t, err)
+}
+
+func TestCreateJobsActiveDeadlineSeconds(t *testing.T) {
+	newKubeClient := func() *fake.Clientset {
+		kubeClient := fake.NewClientset(NewNode("node1"))
+		kubeClient.PrependReactor("create", "jobs", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+			createAction, ok := action.(clienttesting.CreateAction)
+			if !ok {
+				return false, nil, fmt.Errorf("expected CreateAction, got %T", action) //nolint:err113 // test code
+			}
+			job := createAction.GetObject().(*batchv1.Job)
+			if job.Name == "" {
+				job.Name = job.GenerateName + randomString(5)
+			}
+			job.UID = "test-uid"
+			return false, job, nil
+		})
+		return kubeClient
+	}
+
+	t.Run("deadline set with default duration", func(t *testing.T) {
+		kubeClient := newKubeClient()
+		cmd := NewCommand(kubeClient)
+		cmd.SetArgs([]string{
+			"create",
+			"--name", "deadline-test",
+			"--node-selectors", "kubernetes.io/hostname=node1",
+		})
+		cmd.SetOut(new(bytes.Buffer))
+
+		err := cmd.Execute()
+		require.NoError(t, err)
+
+		jobs, err := kubeClient.BatchV1().Jobs("default").List(context.TODO(), metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("%s=%s", label.CaptureNameLabel, "deadline-test"),
+		})
+		require.NoError(t, err)
+		require.NotEmpty(t, jobs.Items)
+
+		expectedDeadline := int64(DefaultDuration.Seconds()) + JobActiveDeadlineBufferSeconds
+		for _, job := range jobs.Items {
+			require.NotNil(t, job.Spec.ActiveDeadlineSeconds,
+				"ActiveDeadlineSeconds should be set when duration > 0")
+			require.Equal(t, expectedDeadline, *job.Spec.ActiveDeadlineSeconds)
+		}
+	})
+
+	t.Run("deadline scales with custom duration", func(t *testing.T) {
+		kubeClient := newKubeClient()
+		cmd := NewCommand(kubeClient)
+		cmd.SetArgs([]string{
+			"create",
+			"--name", "deadline-1h",
+			"--node-selectors", "kubernetes.io/hostname=node1",
+			"--duration", "1h",
+		})
+		cmd.SetOut(new(bytes.Buffer))
+
+		err := cmd.Execute()
+		require.NoError(t, err)
+
+		jobs, err := kubeClient.BatchV1().Jobs("default").List(context.TODO(), metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("%s=%s", label.CaptureNameLabel, "deadline-1h"),
+		})
+		require.NoError(t, err)
+		require.NotEmpty(t, jobs.Items)
+
+		// 1h = 3600s + 1800s buffer = 5400s
+		expectedDeadline := int64(3600) + JobActiveDeadlineBufferSeconds
+		for _, job := range jobs.Items {
+			require.NotNil(t, job.Spec.ActiveDeadlineSeconds)
+			require.Equal(t, expectedDeadline, *job.Spec.ActiveDeadlineSeconds)
+		}
+	})
+}
+
+func TestCreateJobsCleanupHostPathEnvInjected(t *testing.T) {
+	kubeClient := fake.NewClientset(NewNode("node1"))
+	kubeClient.PrependReactor("create", "jobs", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+		createAction, ok := action.(clienttesting.CreateAction)
+		if !ok {
+			return false, nil, fmt.Errorf("expected CreateAction, got %T", action) //nolint:err113 // test code
+		}
+		job := createAction.GetObject().(*batchv1.Job)
+		if job.Name == "" {
+			job.Name = job.GenerateName + randomString(5)
+		}
+		job.UID = "test-uid"
+		return false, job, nil
+	})
+
+	cmd := NewCommand(kubeClient)
+	cmd.SetArgs([]string{
+		"create",
+		"--name", "env-test",
+		"--node-selectors", "kubernetes.io/hostname=node1",
+	})
+	cmd.SetOut(new(bytes.Buffer))
+
+	err := cmd.Execute()
+	require.NoError(t, err)
+
+	jobs, err := kubeClient.BatchV1().Jobs("default").List(context.TODO(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", label.CaptureNameLabel, "env-test"),
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, jobs.Items)
+
+	for _, job := range jobs.Items {
+		for _, container := range job.Spec.Template.Spec.Containers {
+			found := false
+			for _, env := range container.Env {
+				if env.Name == captureConstants.CleanupHostPathEnvKey {
+					found = true
+					require.Equal(t, "true", env.Value,
+						"CLEANUP_HOST_PATH should default to true")
+				}
+			}
+			require.True(t, found,
+				"CLEANUP_HOST_PATH env var should be injected into container %s", container.Name)
+		}
+	}
+}
+
+func TestCreateJobsTTLNotSetInWaitMode(t *testing.T) {
+	kubeClient := fake.NewClientset(NewNode("node1"))
+	kubeClient.PrependReactor("create", "jobs", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+		createAction, ok := action.(clienttesting.CreateAction)
+		if !ok {
+			return false, nil, fmt.Errorf("expected CreateAction, got %T", action) //nolint:err113 // test code
+		}
+		job := createAction.GetObject().(*batchv1.Job)
+		if job.Name == "" {
+			job.Name = job.GenerateName + randomString(5)
+		}
+		job.UID = "test-uid"
+		return false, job, nil
+	})
+
+	cmd := NewCommand(kubeClient)
+	cmd.SetArgs([]string{
+		"create",
+		"--name", "wait-test",
+		"--node-selectors", "kubernetes.io/hostname=node1",
+		"--no-wait=false",
+		"--duration", "1s",
+	})
+	cmd.SetOut(new(bytes.Buffer))
+
+	err := cmd.Execute()
+	require.NoError(t, err)
+
+	jobs, err := kubeClient.BatchV1().Jobs("default").List(context.TODO(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", label.CaptureNameLabel, "wait-test"),
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, jobs.Items)
+
+	for _, job := range jobs.Items {
+		require.Nil(t, job.Spec.TTLSecondsAfterFinished,
+			"TTLSecondsAfterFinished should NOT be set in wait mode")
+	}
+}
+
+func TestSetSecretOwnerReferences_S3Secret(t *testing.T) {
+	ns := "test-ns"
+	secretName := "s3-secret-xyz"
+
+	kubeClient := fake.NewClientset(
+		&corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: ns,
+			},
+		},
+	)
+
+	origNs := opts.Namespace
+	opts.Namespace = &ns
+	defer func() { opts.Namespace = origNs }()
+
+	capture := &retinav1alpha1.Capture{
+		Spec: retinav1alpha1.CaptureSpec{
+			OutputConfiguration: retinav1alpha1.OutputConfiguration{
+				S3Upload: &retinav1alpha1.S3Upload{
+					SecretName: secretName,
+					Bucket:     "my-bucket",
+				},
+			},
+		},
+	}
+
+	jobs := []batchv1.Job{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "job-a",
+				Namespace: ns,
+				UID:       "uid-a",
+			},
+		},
+	}
+
+	err := setSecretOwnerReferences(context.Background(), kubeClient, capture, jobs)
+	require.NoError(t, err)
+
+	secret, err := kubeClient.CoreV1().Secrets(ns).Get(context.Background(), secretName, metav1.GetOptions{})
+	require.NoError(t, err)
+	require.Len(t, secret.OwnerReferences, 1, "secret should have owner reference for the job")
+	require.Equal(t, "job-a", secret.OwnerReferences[0].Name)
+	require.Equal(t, "batch/v1", secret.OwnerReferences[0].APIVersion)
+	require.Equal(t, "Job", secret.OwnerReferences[0].Kind)
 }

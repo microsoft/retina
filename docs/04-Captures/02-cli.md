@@ -74,7 +74,7 @@ The network traffic will be uploaded to the specified output location.
 | `namespace-selectors` | string     | ""       | Capture network captures on pods filtered by the provided namespace selectors. | Pair with `pod-selectors`.      |
 | `node-names`          | string     | ""       | A comma-separated list of node names to select nodes on which the network capture will be performed. |       |
 | `node-selectors`      | string     | kubernetes.io/os=linux | A comma-separated list of node labels to select nodes on which the network capture will be performed. |       |
-| `no-wait`             | bool       | true     | By default, Retina capture CLI will exit before the jobs are completed. If false, the CLI will wait until the jobs are completed and clean up the Kubernetes resources created. |       |
+| `no-wait`             | bool       | true     | By default, Retina capture CLI will exit before the jobs are completed. Jobs, pods, and secrets are automatically cleaned up after completion via TTL and owner references. If false, the CLI will wait until the jobs are completed and clean up the Kubernetes resources created. |       |
 | `packet-size`         | int        | 0        | Limit the packet size in bytes. Packets longer than the defined maximum size will be truncated. The default value 0 indicates no limit. This is beneficial when the user wants to reduce the capture file size or hide customer data due to security concerns. | Only works on Linux.      |
 | `pod-names`           | string     | ""       | A comma-separated list of specific pod names to select pods on which the network capture will be performed. | Mutually exclusive with `node-selectors`, `pod-selectors`, and `namespace-selectors`.      |
 | `pod-selectors`       | string     | ""       | A comma-separated list of pod labels to select pods on which the network capture will be performed. | Pair with `namespace-selectors`.      |
@@ -225,6 +225,17 @@ kubectl retina capture create \
   --name example-auto-cleanup \
   --blob-upload <Blob SAS URL with write permission>
 ```
+
+##### Resource Cleanup
+
+When using `--no-wait` (the default), all Kubernetes resources created for a capture are automatically cleaned up:
+
+- **Jobs and Pods**: Deleted by Kubernetes via `TTLSecondsAfterFinished` (5 minutes after the job completes or fails).
+- **Secrets** (blob SAS URL, S3 credentials): Garbage-collected via owner references when their associated jobs are deleted.
+- **Host path files**: Removed by the capture workload after successful upload (see [Host Path Cleanup](#host-path-cleanup)).
+- **Hung jobs**: Each job has an `activeDeadlineSeconds` set to the capture duration plus a 30-minute upload buffer. If a capture process hangs, Kubernetes marks the job as failed after the deadline, and the TTL cleanup takes over.
+
+When using `--no-wait=false`, the CLI waits for jobs to complete and deletes all resources explicitly.
 
 ##### Capture Filters
 

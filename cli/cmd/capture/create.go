@@ -48,6 +48,15 @@ const (
 	DefaultS3Path          string        = "retina/captures"
 	DefaultWaitPeriod      time.Duration = 1 * time.Minute
 	DefaultWaitTimeout     time.Duration = 5 * time.Minute
+
+	// JobTTLSecondsAfterFinished is how long completed/failed jobs and their
+	// pods are kept before Kubernetes garbage-collects them (no-wait mode).
+	JobTTLSecondsAfterFinished int32 = 300 // 5 minutes
+
+	// JobActiveDeadlineBufferSeconds is added to the capture duration to form
+	// the Job's activeDeadlineSeconds. This buffer accounts for output upload
+	// and cleanup time after the capture itself finishes.
+	JobActiveDeadlineBufferSeconds int64 = 1800 // 30 minutes
 )
 
 var createExample = templates.Examples(i18n.T(`
@@ -114,14 +123,16 @@ func create(kubeClient kubernetes.Interface) error {
 		retinacmd.Logger.Error("Failed to create job", zap.Error(err))
 		return err
 	}
+
+	// Set owner references on secrets so they are garbage-collected when the
+	// jobs are removed (by TTL, explicit deletion, or manual kubectl delete).
+	if err := setSecretOwnerReferences(ctx, kubeClient, capture, jobsCreated); err != nil {
+		retinacmd.Logger.Error("Failed to set owner references on capture secrets for automatic cleanup", zap.Error(err))
+	}
+
 	if opts.nowait {
-		retinacmd.Logger.Info("Please manually delete all capture jobs")
-		if capture.Spec.OutputConfiguration.BlobUpload != nil {
-			retinacmd.Logger.Info("Please manually delete capture secret", zap.String("namespace", *opts.Namespace), zap.String("secret name", *capture.Spec.OutputConfiguration.BlobUpload))
-		}
-		if capture.Spec.OutputConfiguration.S3Upload != nil && capture.Spec.OutputConfiguration.S3Upload.SecretName != "" {
-			retinacmd.Logger.Info("Please manually delete capture secret", zap.String("namespace", *opts.Namespace), zap.String("secret name", capture.Spec.OutputConfiguration.S3Upload.SecretName))
-		}
+		retinacmd.Logger.Info("Capture jobs, pods, and secrets will be automatically cleaned up after completion",
+			zap.Int32("ttlSecondsAfterFinished", JobTTLSecondsAfterFinished))
 		printCaptureResult(jobsCreated)
 		return nil
 	}
@@ -279,6 +290,47 @@ func deleteSecret(ctx context.Context, kubeClient kubernetes.Interface, secretNa
 	}
 
 	return kubeClient.CoreV1().Secrets(*opts.Namespace).Delete(ctx, *secretName, metav1.DeleteOptions{}) //nolint:wrapcheck //internal return
+}
+
+// setSecretOwnerReferences adds owner references from capture secrets to the
+// created jobs so that Kubernetes garbage-collects the secrets when the jobs
+// are deleted (e.g. by TTL). All jobs are listed as owners; the secret is only
+// removed once every owning job has been deleted.
+func setSecretOwnerReferences(ctx context.Context, kubeClient kubernetes.Interface, capture *retinav1alpha1.Capture, jobs []batchv1.Job) error {
+	secretNames := []string{}
+	if capture.Spec.OutputConfiguration.BlobUpload != nil && *capture.Spec.OutputConfiguration.BlobUpload != "" {
+		secretNames = append(secretNames, *capture.Spec.OutputConfiguration.BlobUpload)
+	}
+	if capture.Spec.OutputConfiguration.S3Upload != nil && capture.Spec.OutputConfiguration.S3Upload.SecretName != "" {
+		secretNames = append(secretNames, capture.Spec.OutputConfiguration.S3Upload.SecretName)
+	}
+	if len(secretNames) == 0 {
+		return nil
+	}
+
+	ownerRefs := make([]metav1.OwnerReference, 0, len(jobs))
+	for i := range jobs {
+		ownerRefs = append(ownerRefs, metav1.OwnerReference{
+			APIVersion: "batch/v1",
+			Kind:       "Job",
+			Name:       jobs[i].Name,
+			UID:        jobs[i].UID,
+		})
+	}
+
+	var errs error
+	for _, name := range secretNames {
+		secret, err := kubeClient.CoreV1().Secrets(*opts.Namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			errs = fmt.Errorf("%w; failed to get secret %s: %w", errs, name, err)
+			continue
+		}
+		secret.OwnerReferences = append(secret.OwnerReferences, ownerRefs...)
+		if _, err := kubeClient.CoreV1().Secrets(*opts.Namespace).Update(ctx, secret, metav1.UpdateOptions{}); err != nil {
+			errs = fmt.Errorf("%w; failed to update secret %s with owner references: %w", errs, name, err)
+		}
+	}
+	return errs
 }
 
 func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*retinav1alpha1.Capture, error) {
@@ -463,6 +515,19 @@ func createJobs(ctx context.Context, kubeClient kubernetes.Interface, capture *r
 				Name:  captureConstants.CleanupHostPathEnvKey,
 				Value: strconv.FormatBool(opts.cleanupHostPath),
 			})
+		}
+
+		// In no-wait mode, set TTL so Kubernetes auto-deletes completed jobs and their pods.
+		if opts.nowait {
+			ttl := JobTTLSecondsAfterFinished
+			job.Spec.TTLSecondsAfterFinished = &ttl
+		}
+
+		// Set a hard deadline to prevent jobs from running indefinitely if the
+		// capture process hangs. Deadline = capture duration + upload buffer.
+		if opts.duration > 0 {
+			deadline := int64(opts.duration.Seconds()) + JobActiveDeadlineBufferSeconds
+			job.Spec.ActiveDeadlineSeconds = &deadline
 		}
 
 		jobCreated, err := kubeClient.BatchV1().Jobs(*opts.Namespace).Create(ctx, job, metav1.CreateOptions{})
