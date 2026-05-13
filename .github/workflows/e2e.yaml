@@ -19,6 +19,21 @@ on:
         required: true
         type: string
         description: The Azure location to use for the E2E tests.
+      azure_agent_linux_sku:
+        required: false
+        default: ''
+        type: string
+        description: VM SKU for the Linux agent pool. Falls back to the in-code default when empty.
+      azure_agent_windows_sku:
+        required: false
+        default: ''
+        type: string
+        description: VM SKU for the Windows agent pool. Falls back to the in-code default when empty.
+      azure_agent_linux_arm_sku:
+        required: false
+        default: ''
+        type: string
+        description: VM SKU for the ARM64 agent pool. Falls back to the in-code default when empty.
       use_existing_infra:
         required: false
         default: false
@@ -61,6 +76,21 @@ on:
         required: false
         type: string
         description: The Azure location to use for the E2E tests.
+      azure_agent_linux_sku:
+        required: false
+        default: ''
+        type: string
+        description: VM SKU for the Linux agent pool. Falls back to the in-code default when empty.
+      azure_agent_windows_sku:
+        required: false
+        default: ''
+        type: string
+        description: VM SKU for the Windows agent pool. Falls back to the in-code default when empty.
+      azure_agent_linux_arm_sku:
+        required: false
+        default: ''
+        type: string
+        description: VM SKU for the ARM64 agent pool. Falls back to the in-code default when empty.
       use_existing_infra:
         required: false
         default: false
@@ -108,6 +138,9 @@ jobs:
         env:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION }}
           AZURE_LOCATION: ${{ inputs.azure_location }}
+          AZURE_AGENT_LINUX_SKU: ${{ inputs.azure_agent_linux_sku }}
+          AZURE_AGENT_WINDOWS_SKU: ${{ inputs.azure_agent_windows_sku }}
+          AZURE_AGENT_LINUX_ARM_SKU: ${{ inputs.azure_agent_linux_arm_sku }}
         shell: bash
         run: |
           set -euo pipefail

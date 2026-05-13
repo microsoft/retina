@@ -422,6 +422,9 @@ jobs:
         env:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION }}
           AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+          AZURE_AGENT_LINUX_SKU: ${{ vars.AZURE_AGENT_LINUX_SKU }}
+          AZURE_AGENT_WINDOWS_SKU: ${{ vars.AZURE_AGENT_WINDOWS_SKU }}
+          AZURE_AGENT_LINUX_ARM_SKU: ${{ vars.AZURE_AGENT_LINUX_ARM_SKU }}
         shell: bash
         run: |
           set -euo pipefail
@@ -446,6 +449,9 @@ jobs:
       image-namespace: ${{ github.repository }}
       retina-mode: basic
       azure-location: ${{ vars.AZURE_LOCATION }}
+      azure-agent-linux-sku: ${{ vars.AZURE_AGENT_LINUX_SKU }}
+      azure-agent-windows-sku: ${{ vars.AZURE_AGENT_WINDOWS_SKU }}
+      azure-agent-linux-arm-sku: ${{ vars.AZURE_AGENT_LINUX_ARM_SKU }}
     secrets:
       azure-subscription: ${{ secrets.AZURE_SUBSCRIPTION }}
       azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -462,6 +468,9 @@ jobs:
       image-namespace: ${{ github.repository }}
       retina-mode: advanced
       azure-location: ${{ vars.AZURE_LOCATION }}
+      azure-agent-linux-sku: ${{ vars.AZURE_AGENT_LINUX_SKU }}
+      azure-agent-windows-sku: ${{ vars.AZURE_AGENT_WINDOWS_SKU }}
+      azure-agent-linux-arm-sku: ${{ vars.AZURE_AGENT_LINUX_ARM_SKU }}
     secrets:
       azure-subscription: ${{ secrets.AZURE_SUBSCRIPTION }}
       azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
