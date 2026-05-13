@@ -4,7 +4,7 @@
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2.16.1": {},
     "ghcr.io/devcontainers/features/github-cli:1.1.0": {},
-    "ghcr.io/devcontainers/features/go:1.3.3": {
+    "ghcr.io/devcontainers/features/go:1.3.4": {
       "version": "1.24.11"
     },
     "ghcr.io/devcontainers/features/kubectl-helm-minikube:1.3.1": {},
