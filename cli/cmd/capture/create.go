@@ -306,10 +306,11 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 		capture.Spec.CaptureConfiguration.CaptureOption.Duration = &metav1.Duration{Duration: opts.duration}
 	}
 
-	if opts.namespaceSelectors != "" || opts.podSelectors != "" || opts.podNames != "" {
-		// if node selector is using the default value (aka hasn't been set by user), set it to nil to prevent clash with namespace and pod selector
+	if opts.namespaceSelectors != "" || opts.podSelectors != "" || opts.podNames != "" || opts.nodeNames != "" {
+		// if node selector is using the default value (aka hasn't been set by user), set it to nil to prevent clash
+		// with namespace/pod selectors, pod names, or explicit node names
 		if opts.nodeSelectors == DefaultNodeSelectors {
-			retinacmd.Logger.Info("Overriding default node selectors value and setting it to nil. Using namespace, pod selectors, or pod names. " +
+			retinacmd.Logger.Info("Overriding default node selectors value and setting it to nil. Using namespace, pod selectors, pod names, or node names. " +
 				"To use node selector, please remove namespace and pod selectors.")
 			opts.nodeSelectors = ""
 		}

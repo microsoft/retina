@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"strings"
 	"testing"
 
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
@@ -66,6 +67,7 @@ func NewNode(name string) *corev1.Node {
 			Name: name,
 			Labels: map[string]string{
 				"kubernetes.io/hostname": name,
+				"kubernetes.io/os":       "linux",
 			},
 		},
 	}
@@ -506,6 +508,116 @@ func TestCaptureTarget_PodNames_MutualExclusivity(t *testing.T) {
 				t.Logf("✓ Valid selector combination: %s", tc.name)
 			} else {
 				t.Logf("✓ Invalid selector combination (will be caught by validation): %s", tc.name)
+			}
+		})
+	}
+}
+
+func TestNodeNamesClearsDefaultNodeSelector(t *testing.T) {
+	// When --node-names is specified, the default kubernetes.io/os=linux node-selector
+	// must be cleared so that Windows nodes can be targeted by name.
+	winNode := NewWindowsNode("win-node-1")
+	linNode := NewNode("lin-node-1")
+
+	kubeClient := fake.NewClientset(winNode, linNode)
+	kubeClient.PrependReactor("create", "jobs", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+		createAction, ok := action.(clienttesting.CreateAction)
+		if !ok {
+			return false, nil, fmt.Errorf("expected CreateAction, got %T", action) //nolint:err113 // test code
+		}
+		job := createAction.GetObject().(*batchv1.Job)
+		if job.Name == "" {
+			job.Name = job.GenerateName + randomString(5)
+		}
+		return false, job, nil
+	})
+
+	cases := []struct {
+		name      string
+		args      []string
+		wantNodes []string
+		wantErr   bool
+	}{
+		{
+			name: "node-names targets a Windows node without explicit node-selectors",
+			args: []string{
+				"create",
+				"--name=test-win",
+				"--namespace=default",
+				"--node-names=win-node-1",
+				"--duration=10s",
+				"--host-path=/tmp/capture",
+			},
+			wantNodes: []string{"win-node-1"},
+			wantErr:   false,
+		},
+		{
+			name: "node-names targets a Linux node without explicit node-selectors",
+			args: []string{
+				"create",
+				"--name=test-lin",
+				"--namespace=default",
+				"--node-names=lin-node-1",
+				"--duration=10s",
+				"--host-path=/tmp/capture",
+			},
+			wantNodes: []string{"lin-node-1"},
+			wantErr:   false,
+		},
+		{
+			name: "node-names targets both Linux and Windows nodes",
+			args: []string{
+				"create",
+				"--name=test-both",
+				"--namespace=default",
+				"--node-names=lin-node-1,win-node-1",
+				"--duration=10s",
+				"--host-path=/tmp/capture",
+			},
+			wantNodes: []string{"lin-node-1", "win-node-1"},
+			wantErr:   false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := NewCommand(kubeClient)
+			cmd.SetArgs(tc.args)
+			buf := new(bytes.Buffer)
+			cmd.SetOut(buf)
+
+			err := cmd.Execute()
+
+			if tc.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err, "capture create should succeed for node-names targeting %v", tc.wantNodes)
+
+			// Verify jobs were created for the expected nodes
+			jobs, err := kubeClient.BatchV1().Jobs("default").List(context.TODO(), metav1.ListOptions{
+				LabelSelector: fmt.Sprintf("%s=%s", label.CaptureNameLabel, strings.TrimPrefix(tc.args[1], "--name=")),
+			})
+			require.NoError(t, err)
+			require.Len(t, jobs.Items, len(tc.wantNodes), "should create one job per target node")
+
+			gotNodes := map[string]bool{}
+			for _, job := range jobs.Items {
+				nodeAffinity := job.Spec.Template.Spec.Affinity.NodeAffinity
+				require.NotNil(t, nodeAffinity)
+				for _, term := range nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+					for _, expr := range term.MatchExpressions {
+						if expr.Key == "kubernetes.io/hostname" {
+							for _, v := range expr.Values {
+								gotNodes[v] = true
+							}
+						}
+					}
+				}
+			}
+
+			for _, wantNode := range tc.wantNodes {
+				require.True(t, gotNodes[wantNode], "expected job targeting node %s", wantNode)
 			}
 		})
 	}

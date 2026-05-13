@@ -52,6 +52,7 @@ func NewWindowsNode(name string) *corev1.Node {
 			Name: name,
 			Labels: map[string]string{
 				"kubernetes.io/hostname": name,
+				"kubernetes.io/os":       "windows",
 			},
 		},
 		Status: corev1.NodeStatus{
