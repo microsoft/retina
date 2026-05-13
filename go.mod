@@ -230,7 +230,7 @@ require (
 	github.com/cakturk/go-netstat v0.0.0-20200220111822-e5b49efee7a5
 	github.com/cilium/cilium v1.19.3
 	github.com/cilium/ebpf v0.21.0
-	github.com/cilium/hive v0.0.0-20260108104938-97756f6ff54c
+	github.com/cilium/hive v1.0.0
 	github.com/cilium/proxy v0.0.0-20250623105955-2136f59a4ea1
 	github.com/cilium/workerpool v1.4.0
 	github.com/florianl/go-tc v0.4.8
@@ -272,7 +272,7 @@ require (
 
 require (
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
-	github.com/cilium/statedb v0.5.6
+	github.com/cilium/statedb v0.8.0
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/containerd/platforms v1.0.0-rc.1 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
