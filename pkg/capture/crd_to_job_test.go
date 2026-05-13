@@ -41,10 +41,11 @@ const (
 func NewCaptureToPodTranslatorForTest(kubeClient kubernetes.Interface) *CaptureToPodTranslator {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	config := config.CaptureConfig{
-		CaptureDebug:              true,
-		CaptureImageVersion:       "v0.0.1-pre",
-		CaptureImageVersionSource: captureUtils.VersionSourceOperatorImageVersion,
-		CaptureJobNumLimit:        10,
+		CaptureDebug:                   true,
+		CaptureImageVersion:            "v0.0.1-pre",
+		CaptureImageVersionSource:      captureUtils.VersionSourceOperatorImageVersion,
+		CaptureJobNumLimit:             10,
+		CaptureHostPathAllowedPrefixes: []string{"/tmp/capture"},
 	}
 
 	captureToPodTranslator := NewCaptureToPodTranslator(kubeClient, log.Logger().Named("test"), config)

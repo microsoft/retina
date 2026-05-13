@@ -53,5 +53,12 @@ func GetConfig(cfgFileName string) (*OperatorConfig, error) {
 		return nil, ErrorTelemetryIntervalTooSmall
 	}
 
+	// If unset, default the HostPath allowlist so that Capture CRs cannot mount arbitrary
+	// host directories into the privileged capture pod.
+	if len(cfg.CaptureHostPathAllowedPrefixes) == 0 {
+		log.Printf("captureHostPathAllowedPrefixes is not set, defaulting to [/var/log/retina/captures]")
+		cfg.CaptureHostPathAllowedPrefixes = []string{"/var/log/retina/captures"}
+	}
+
 	return &cfg, nil
 }

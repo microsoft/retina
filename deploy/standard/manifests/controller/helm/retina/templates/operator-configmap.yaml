@@ -11,6 +11,12 @@ data:
     remoteContext: {{ .Values.remoteContext }}
     captureDebug: {{ .Values.capture.debug }}
     captureJobNumLimit: {{ .Values.capture.jobNumLimit }}
+{{- with .Values.capture.hostPathAllowedPrefixes }}
+    captureHostPathAllowedPrefixes:
+{{- range . }}
+      - {{ . | quote }}
+{{- end }}
+{{- end }}
     enableManagedStorageAccount: {{ .Values.capture.enableManagedStorageAccount }}
     telemetryInterval: {{ .Values.operator.telemetryInterval }}
 {{- if .Values.capture.enableManagedStorageAccount }}

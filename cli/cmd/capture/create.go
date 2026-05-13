@@ -438,12 +438,19 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 }
 
 func getCLICaptureConfig() config.CaptureConfig {
-	return config.CaptureConfig{
+	cfg := config.CaptureConfig{
 		CaptureImageVersion:       buildinfo.Version,
 		CaptureDebug:              opts.debug,
 		CaptureImageVersionSource: captureUtils.VersionSourceCLIVersion,
 		CaptureJobNumLimit:        opts.jobNumLimit,
 	}
+	// The CLI is an authenticated client; the user explicitly types the HostPath. Allow that
+	// exact path so HostPath-allowlist enforcement (intended for CRD-author abuse via the
+	// operator) does not break CLI UX.
+	if opts.hostPath != "" {
+		cfg.CaptureHostPathAllowedPrefixes = []string{opts.hostPath}
+	}
+	return cfg
 }
 
 func createJobs(ctx context.Context, kubeClient kubernetes.Interface, capture *retinav1alpha1.Capture) ([]batchv1.Job, error) {

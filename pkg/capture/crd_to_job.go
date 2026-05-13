@@ -211,7 +211,11 @@ func (translator *CaptureToPodTranslator) initJobTemplate(ctx context.Context, c
 		translator.l.Info("HostPath is not empty", zap.String("HostPath", *capture.Spec.OutputConfiguration.HostPath))
 
 		captureFolderHostPathType := corev1.HostPathDirectoryOrCreate
-		hostPath := *capture.Spec.OutputConfiguration.HostPath
+		hostPath, err := validateHostPath(*capture.Spec.OutputConfiguration.HostPath, translator.config.CaptureHostPathAllowedPrefixes)
+		if err != nil {
+			translator.l.Error("Rejected HostPath in Capture", zap.Error(err), zap.String("HostPath", *capture.Spec.OutputConfiguration.HostPath))
+			return fmt.Errorf("invalid OutputConfiguration.HostPath: %w", err)
+		}
 		hostPathVolume := corev1.Volume{
 			Name: captureConstants.CaptureHostPathVolumeName,
 			VolumeSource: corev1.VolumeSource{
@@ -578,6 +582,12 @@ func (translator *CaptureToPodTranslator) validateCapture(capture *retinav1alpha
 		capture.Spec.OutputConfiguration.PersistentVolumeClaim == nil &&
 		capture.Spec.OutputConfiguration.S3Upload == nil {
 		return fmt.Errorf("At least one output configuration should be set")
+	}
+
+	if capture.Spec.OutputConfiguration.HostPath != nil && *capture.Spec.OutputConfiguration.HostPath != "" {
+		if _, err := validateHostPath(*capture.Spec.OutputConfiguration.HostPath, translator.config.CaptureHostPathAllowedPrefixes); err != nil {
+			return fmt.Errorf("invalid OutputConfiguration.HostPath: %w", err)
+		}
 	}
 	return nil
 }
