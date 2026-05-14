@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -208,37 +207,19 @@ func TestRetinaEndpointReconciler_ReconcilePod(t *testing.T) {
 			client := fake.NewClientBuilder().WithScheme(fakescheme).WithObjects(tt.fields.existingObjects...).Build()
 			podchannel := make(chan cache.PodCacheObject, 10)
 			r := New(client, podchannel)
-			ctx, cancel := context.WithCancel(context.Background())
-			go r.ReconcilePod(ctx)
+			ctx, cancel := context.WithTimeout(context.Background(), REQUEST_TIMEOUT)
 			defer cancel()
 
+			err := r.reconcileRetinaEndpointFromPod(ctx, tt.fields.newlyCachedPod)
+			require.NoError(t, err)
+
 			got := retinav1alpha1.RetinaEndpoint{}
+			err = client.Get(context.Background(), tt.fields.newlyCachedPod.Key, &got)
 
-			podchannel <- tt.fields.newlyCachedPod
-
-			// Nil wantedRetinaEndpoint indicates no RetinaEndpoint is created from the newlyCachedPod.
 			if tt.wantedRetinaEndpoint == nil {
-				// No retinaEndpoint should be created consistently within timeout.
-				require.Eventually(t, func() bool {
-					err := client.Get(context.Background(), tt.fields.newlyCachedPod.Key, &got)
-					return apierrors.IsNotFound(err)
-				}, 5*time.Second, 1*time.Second, "RetinaEndpoint should not exist")
+				require.True(t, apierrors.IsNotFound(err), "RetinaEndpoint should not exist")
 			} else {
-				// Wait for the RetinaEndpoint to be created/updated with the expected values
-				require.Eventually(t, func() bool {
-					err := client.Get(context.Background(), tt.fields.newlyCachedPod.Key, &got)
-					if apierrors.IsNotFound(err) {
-						return false
-					}
-					// Check that the spec matches what we expect (indicating create/update completed)
-					return got.Spec.PodIP == tt.wantedRetinaEndpoint.Spec.PodIP
-				}, 5*time.Second, 100*time.Millisecond, "RetinaEndpoint should be created/updated with expected PodIP")
-
-				// Re-fetch to get the latest state
-				err := client.Get(context.Background(), tt.fields.newlyCachedPod.Key, &got)
 				require.NoError(t, err)
-
-				// Compare the spec (ignore TypeMeta/ResourceVersion since fake client doesn't populate them)
 				require.Equal(t, tt.wantedRetinaEndpoint.Spec, got.Spec)
 				require.Equal(t, tt.wantedRetinaEndpoint.Name, got.Name)
 				require.Equal(t, tt.wantedRetinaEndpoint.Namespace, got.Namespace)

@@ -198,7 +198,12 @@ func TestStart(t *testing.T) {
 	r := New(client, cache, mm)
 	// add multiple reocncile calls to the channel to confirm reconcile is only called once
 	ctx, cancel := context.WithCancel(context.Background())
-	go r.Start(ctx)
+	done := make(chan struct{})
+	go func() {
+		r.Start(ctx)
+		close(done)
+	}()
 	time.Sleep(15 * time.Second)
 	cancel()
+	<-done
 }
