@@ -23,16 +23,12 @@ updates:
     groups:
       golang-base:
         patterns: ["*golang*"]
-        group-by: "dependency-name"
       azurelinux-base:
         patterns: ["*azurelinux*"]
-        group-by: "dependency-name"
       windows-base:
         patterns: ["*windows*", "*nanoserver*", "*servercore*"]
-        group-by: "dependency-name"
       ubuntu-base:
         patterns: ["*ubuntu*"]
-        group-by: "dependency-name"
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
