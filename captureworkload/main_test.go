@@ -4,6 +4,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -96,6 +97,65 @@ func TestCleanupHostPathCaptureFiles(t *testing.T) {
 
 		if _, err := os.Stat(filepath.Join(hostDir, "test-cap-host1.tar.gz")); !os.IsNotExist(err) {
 			t.Error("capture file was not deleted after PVC upload")
+		}
+	})
+}
+
+func TestHandleOutputResult(t *testing.T) {
+	log.SetupZapLogger(log.GetDefaultLogOpts())
+	l := log.Logger().Named("test")
+
+	t.Run("returns error when output fails", func(t *testing.T) {
+		outputErr := errors.New("upload failed: 403 AuthorizationPermissionMismatch")
+		err := handleOutputResult(outputErr, l)
+		if err == nil {
+			t.Fatal("expected error to be returned when output fails")
+		}
+		if err != outputErr {
+			t.Errorf("expected original error, got %v", err)
+		}
+	})
+
+	t.Run("returns nil and runs cleanup on success", func(t *testing.T) {
+		hostDir := t.TempDir()
+		captureFile := filepath.Join(hostDir, "my-capture-node1.tar.gz")
+		if err := os.WriteFile(captureFile, []byte("data"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+
+		t.Setenv(captureConstants.CleanupHostPathEnvKey, "true")
+		t.Setenv(string(captureConstants.CaptureOutputLocationEnvKeyHostPath), hostDir)
+		t.Setenv(string(captureConstants.CaptureOutputLocationEnvKeyS3Bucket), "my-bucket")
+		t.Setenv(captureConstants.CaptureNameEnvKey, "my-capture")
+
+		err := handleOutputResult(nil, l)
+		if err != nil {
+			t.Fatalf("expected nil error on success, got %v", err)
+		}
+
+		// Capture file should have been cleaned up.
+		if _, err := os.Stat(captureFile); !os.IsNotExist(err) {
+			t.Error("capture file should have been deleted after successful output")
+		}
+	})
+
+	t.Run("does not run cleanup when output fails", func(t *testing.T) {
+		hostDir := t.TempDir()
+		captureFile := filepath.Join(hostDir, "my-capture-node1.tar.gz")
+		if err := os.WriteFile(captureFile, []byte("data"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+
+		t.Setenv(captureConstants.CleanupHostPathEnvKey, "true")
+		t.Setenv(string(captureConstants.CaptureOutputLocationEnvKeyHostPath), hostDir)
+		t.Setenv(string(captureConstants.CaptureOutputLocationEnvKeyS3Bucket), "my-bucket")
+		t.Setenv(captureConstants.CaptureNameEnvKey, "my-capture")
+
+		_ = handleOutputResult(errors.New("upload failed"), l)
+
+		// Capture file should NOT have been cleaned up.
+		if _, err := os.Stat(captureFile); os.IsNotExist(err) {
+			t.Error("capture file should NOT be deleted when output fails")
 		}
 	})
 }

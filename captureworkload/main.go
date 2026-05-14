@@ -63,12 +63,21 @@ func main() {
 		l.Error("Failed to capture network traffic", zap.Error(err))
 		os.Exit(1)
 	}
-	if err := cm.OutputCapture(ctx, srcDir); err != nil {
+	if err := handleOutputResult(cm.OutputCapture(ctx, srcDir), l); err != nil {
 		l.Error("Failed to output network traffic", zap.Error(err))
-	} else {
-		cleanupHostPathCaptureFiles(l)
+		os.Exit(1)
 	}
 	l.Info("Done for capturing network traffic")
+}
+
+// handleOutputResult returns the output error if non-nil (signaling the caller
+// should exit non-zero), otherwise runs host-path cleanup and returns nil.
+func handleOutputResult(outputErr error, l *log.ZapLogger) error {
+	if outputErr != nil {
+		return outputErr
+	}
+	cleanupHostPathCaptureFiles(l)
+	return nil
 }
 
 // cleanupHostPathCaptureFiles removes capture files from the node host path
