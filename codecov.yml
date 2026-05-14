@@ -1,0 +1,23 @@
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 0.5%
+    patch:
+      default:
+        target: auto
+        threshold: 0%
+
+comment:
+  layout: "header, diff, files"
+  require_changes: false
+
+ignore:
+  - "**/*_bpf.go"
+  - "**/*_bpfel_x86.go"
+  - "**/*_bpfel_arm64.go"
+  - "**/*_generated.go"
+  - "**/zz_generated_*.go"
+  - "**/mock_*.go"
+  - "vendor/**"

@@ -469,19 +469,11 @@ test: # Run unit tests.
 test-ebpf: # Run eBPF program tests (requires root/CAP_BPF).
 	sudo $$(which go) test -tags=ebpf -v -count=1 ./pkg/plugin/...
 
-coverage: # Code coverage.
-#	go generate ./... && go test -tags=unit -coverprofile=coverage.out.tmp ./...
+coverage: # Generate a local HTML coverage report from coverage.out. PR-level diffing is handled by Codecov in CI.
 	cat coverage.out | grep -Ev '_bpf\.go|_bpfel_x86\.go|_bpfel_arm64\.go|_generated\.go|mock_' > coveragenew.out
 	go tool cover -html coveragenew.out -o coverage.html
-	go tool cover -func=coveragenew.out -o coverageexpanded.out
-	ls -al
 	rm coverage.out
 	mv coveragenew.out coverage.out
-	if [ "$(GIT_CURRENT_BRANCH_NAME)" != "main" ]; then \
-		python3 scripts/coverage/get_coverage.py; \
-		go tool cover -func=mainbranchcoverage/coverage.out -o maincoverageexpanded.out; \
-		python3 scripts/coverage/compare_cov.py; \
-	fi;
 
 ## Reusable targets for building multiplat container image manifests.
 

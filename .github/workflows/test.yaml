@@ -81,42 +81,10 @@ jobs:
             echo "</details>"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Compare coverage with main branch
-        if: github.event_name == 'pull_request'
-        continue-on-error: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          COVERAGE_FILE="./artifacts/coverage.out"
-          if [ ! -s "$COVERAGE_FILE" ]; then
-            echo "Coverage file is empty or missing, skipping comparison"
-            exit 0
-          fi
-
-          # Filter generated files and prepare current branch coverage
-          grep -Ev '_bpf\.go|_bpfel_x86\.go|_bpfel_arm64\.go|_generated\.go|mock_' "$COVERAGE_FILE" > coveragenew.out
-          cp coveragenew.out coverage.out
-          go tool cover -func=coveragenew.out -o coverageexpanded.out
-
-          # Install Python dependency for GitHub API calls
-          pip install --quiet requests
-
-          # Fetch main branch coverage
-          python3 scripts/coverage/get_coverage.py
-
-          # Check if main branch coverage was downloaded
-          if [ ! -f mainbranchcoverage/coverage.out ]; then
-            echo "No main branch coverage found, skipping comparison"
-            exit 0
-          fi
-
-          # Filter main branch coverage
-          grep -Ev '_bpf\.go|_bpfel_x86\.go|_bpfel_arm64\.go|_generated\.go|mock_' mainbranchcoverage/coverage.out > mainbranchcoverage/coverage_filtered.out
-          mv mainbranchcoverage/coverage_filtered.out mainbranchcoverage/coverage.out
-
-          # Generate expanded coverage for main branch
-          go tool cover -func=mainbranchcoverage/coverage.out -o maincoverageexpanded.out
-
-          # Post PR comment with coverage diff
-          python3 scripts/coverage/compare_cov.py
+      - name: Upload coverage to Codecov
+        if: hashFiles('./artifacts/coverage.out') != ''
+        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
+        with:
+          files: ./artifacts/coverage.out
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
