@@ -535,6 +535,7 @@ func TestCreateJobsTTLSetInNowaitMode(t *testing.T) {
 		"--name", "ttl-test",
 		"--node-selectors", "kubernetes.io/hostname=node1",
 		"--no-wait",
+		"--blob-upload", "https://example.blob.core.windows.net/captures?sv=2021-06-08",
 	})
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
@@ -552,6 +553,45 @@ func TestCreateJobsTTLSetInNowaitMode(t *testing.T) {
 		require.NotNil(t, job.Spec.TTLSecondsAfterFinished,
 			"TTLSecondsAfterFinished should be set in no-wait mode")
 		require.Equal(t, JobTTLSecondsAfterFinished, *job.Spec.TTLSecondsAfterFinished)
+	}
+}
+
+func TestCreateJobsTTLNotSetForHostPathOnly(t *testing.T) {
+	kubeClient := fake.NewClientset(NewNode("node1"))
+	kubeClient.PrependReactor("create", "jobs", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+		createAction, ok := action.(clienttesting.CreateAction)
+		if !ok {
+			return false, nil, fmt.Errorf("expected CreateAction, got %T", action) //nolint:err113 // test code
+		}
+		job := createAction.GetObject().(*batchv1.Job)
+		if job.Name == "" {
+			job.Name = job.GenerateName + randomString(5)
+		}
+		job.UID = "test-uid-456"
+		return false, job, nil
+	})
+
+	cmd := NewCommand(kubeClient)
+	cmd.SetArgs([]string{
+		"create",
+		"--name", "hostpath-ttl-test",
+		"--node-selectors", "kubernetes.io/hostname=node1",
+		"--no-wait",
+	})
+	cmd.SetOut(new(bytes.Buffer))
+
+	err := cmd.Execute()
+	require.NoError(t, err)
+
+	jobs, err := kubeClient.BatchV1().Jobs("default").List(context.TODO(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", label.CaptureNameLabel, "hostpath-ttl-test"),
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, jobs.Items)
+
+	for _, job := range jobs.Items {
+		require.Nil(t, job.Spec.TTLSecondsAfterFinished,
+			"TTLSecondsAfterFinished should NOT be set for host-path-only captures")
 	}
 }
 

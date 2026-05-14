@@ -59,6 +59,13 @@ const (
 	JobActiveDeadlineBufferSeconds int64 = 1800 // 30 minutes
 )
 
+// hasRemoteDestination returns true if a remote upload destination (blob, S3,
+// or PVC) is configured, meaning the capture file will be retrievable even
+// after the job is deleted.
+func hasRemoteDestination(o Opts) bool {
+	return o.blobUpload != "" || o.s3Bucket != "" || o.pvc != ""
+}
+
 var createExample = templates.Examples(i18n.T(`
 		# Select nodes by node name and copy the artifacts to the node host path
 		kubectl retina capture create --host-path /mnt/retina/testcapture --node-names "<nodename1>,<nodename2>"
@@ -131,8 +138,12 @@ func create(kubeClient kubernetes.Interface) error {
 	}
 
 	if opts.nowait {
-		retinacmd.Logger.Info("Capture jobs, pods, and secrets will be automatically cleaned up after completion",
-			zap.Int32("ttlSecondsAfterFinished", JobTTLSecondsAfterFinished))
+		if hasRemoteDestination(opts) {
+			retinacmd.Logger.Info("Capture jobs, pods, and secrets will be automatically cleaned up after completion",
+				zap.Int32("ttlSecondsAfterFinished", JobTTLSecondsAfterFinished))
+		} else {
+			retinacmd.Logger.Info("Capture stored to host-path only; jobs will NOT be auto-deleted. Clean up manually with: kubectl delete jobs -l capture-name=" + *opts.Name)
+		}
 		printCaptureResult(jobsCreated)
 		return nil
 	}
@@ -517,8 +528,10 @@ func createJobs(ctx context.Context, kubeClient kubernetes.Interface, capture *r
 			})
 		}
 
-		// In no-wait mode, set TTL so Kubernetes auto-deletes completed jobs and their pods.
-		if opts.nowait {
+		// In no-wait mode, set TTL so Kubernetes auto-deletes completed jobs and their pods,
+		// but only when a remote upload destination is configured. When host-path only,
+		// the job metadata is needed to locate and retrieve the capture file.
+		if opts.nowait && hasRemoteDestination(opts) {
 			ttl := JobTTLSecondsAfterFinished
 			job.Spec.TTLSecondsAfterFinished = &ttl
 		}
