@@ -32,8 +32,12 @@ func (c *Retina) StartTrace(operationID, filter string) error {
 	if err != nil {
 		return err
 	}
+	defer response.Body.Close()
 
-	response.Body.Close()
+	if response.StatusCode >= 400 {
+		return fmt.Errorf("unexpected status code: %d", response.StatusCode)
+	}
+
 	return nil
 }
 
@@ -43,7 +47,11 @@ func (c *Retina) GetTrace(operationID string) error {
 	if err != nil {
 		return err
 	}
+	defer response.Body.Close()
 
-	response.Body.Close()
+	if response.StatusCode >= 400 {
+		return fmt.Errorf("unexpected status code: %d", response.StatusCode)
+	}
+
 	return nil
 }
