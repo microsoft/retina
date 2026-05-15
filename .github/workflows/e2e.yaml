@@ -141,16 +141,27 @@ jobs:
           AZURE_AGENT_LINUX_SKU: ${{ inputs.azure_agent_linux_sku }}
           AZURE_AGENT_WINDOWS_SKU: ${{ inputs.azure_agent_windows_sku }}
           AZURE_AGENT_LINUX_ARM_SKU: ${{ inputs.azure_agent_linux_arm_sku }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          IMAGE_REGISTRY: ${{ inputs.image_registry }}
+          IMAGE_NAMESPACE: ${{ inputs.image_namespace }}
+          USE_EXISTING_INFRA: ${{ inputs.use_existing_infra }}
+          INPUT_CLUSTER_NAME: ${{ inputs.cluster_name }}
+          INPUT_RESOURCE_GROUP: ${{ inputs.resource_group }}
         shell: bash
         run: |
           set -euo pipefail
 
-          if [ "${{ inputs.use_existing_infra }}" = "true" ]; then
-            export CLUSTER_NAME=${{ inputs.cluster_name }}
-            export AZURE_RESOURCE_GROUP=${{ inputs.resource_group }}
+          if [ "$USE_EXISTING_INFRA" = "true" ]; then
+            export CLUSTER_NAME="$INPUT_CLUSTER_NAME"
+            export AZURE_RESOURCE_GROUP="$INPUT_RESOURCE_GROUP"
+            CREATE_INFRA=false
+            DELETE_INFRA=false
+          else
+            CREATE_INFRA=true
+            DELETE_INFRA=true
           fi
 
-          go test -v ./test/e2e/. -timeout 60m -tags=e2e -count=1  -args -image-tag=${{ inputs.image_tag }} -image-registry=${{ inputs.image_registry }} -image-namespace=${{ inputs.image_namespace }} -create-infra=${{ !inputs.use_existing_infra }} -delete-infra=${{ !inputs.use_existing_infra }}
+          go test -v ./test/e2e/. -timeout 60m -tags=e2e -count=1  -args -image-tag="$IMAGE_TAG" -image-registry="$IMAGE_REGISTRY" -image-namespace="$IMAGE_NAMESPACE" -create-infra="$CREATE_INFRA" -delete-infra="$DELETE_INFRA"
 
       - name: Cleanup resource group
         if: always()
