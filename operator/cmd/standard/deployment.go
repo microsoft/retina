@@ -6,8 +6,6 @@ package standard
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"net/http/pprof"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -241,20 +239,6 @@ func (o *Operator) Start() error {
 	}
 
 	return nil
-}
-
-func EnablePProf() {
-	pprofmux := http.NewServeMux()
-	pprofmux.HandleFunc("/debug/pprof/", pprof.Index)
-	pprofmux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	pprofmux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	pprofmux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	pprofmux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-	pprofmux.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
-
-	if err := http.ListenAndServe(":8082", pprofmux); err != nil { //nolint:gosec // TODO replace with secure server that supports timeout
-		panic(err)
-	}
 }
 
 func initLogging(cfg *config.OperatorConfig, applicationInsightsID string) (*log.ZapLogger, error) {
