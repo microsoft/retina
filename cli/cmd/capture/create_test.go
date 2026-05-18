@@ -12,6 +12,8 @@ import (
 	"testing"
 
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
+	"github.com/microsoft/retina/internal/buildinfo"
+	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	"github.com/microsoft/retina/pkg/label"
 	"github.com/stretchr/testify/require"
 	batchv1 "k8s.io/api/batch/v1"
@@ -621,4 +623,21 @@ func TestNodeNamesClearsDefaultNodeSelector(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetCLICaptureConfig(t *testing.T) {
+	saved := opts
+	t.Cleanup(func() { opts = saved })
+
+	opts.debug = true
+	opts.jobNumLimit = 7
+	opts.hostPathBaseDir = "/mnt/captures"
+
+	got := getCLICaptureConfig()
+
+	require.Equal(t, buildinfo.Version, got.CaptureImageVersion)
+	require.Equal(t, captureUtils.VersionSourceCLIVersion, got.CaptureImageVersionSource)
+	require.True(t, got.CaptureDebug)
+	require.Equal(t, 7, got.CaptureJobNumLimit)
+	require.Equal(t, "/mnt/captures", got.CaptureHostPathBaseDir)
 }
