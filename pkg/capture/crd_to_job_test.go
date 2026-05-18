@@ -41,11 +41,11 @@ const (
 func NewCaptureToPodTranslatorForTest(kubeClient kubernetes.Interface) *CaptureToPodTranslator {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	config := config.CaptureConfig{
-		CaptureDebug:                   true,
-		CaptureImageVersion:            "v0.0.1-pre",
-		CaptureImageVersionSource:      captureUtils.VersionSourceOperatorImageVersion,
-		CaptureJobNumLimit:             10,
-		CaptureHostPathAllowedPrefixes: []string{"/tmp/capture"},
+		CaptureDebug:              true,
+		CaptureImageVersion:       "v0.0.1-pre",
+		CaptureImageVersionSource: captureUtils.VersionSourceOperatorImageVersion,
+		CaptureJobNumLimit:        10,
+		CaptureHostPathBaseDir:    "/tmp",
 	}
 
 	captureToPodTranslator := NewCaptureToPodTranslator(kubeClient, log.Logger().Named("test"), config)
@@ -497,7 +497,7 @@ func Test_CaptureToPodTranslator_ObtainCaptureJobPodEnv(t *testing.T) {
 			capture: retinav1alpha1.Capture{
 				Spec: retinav1alpha1.CaptureSpec{
 					OutputConfiguration: retinav1alpha1.OutputConfiguration{
-						HostPath: pointerUtil.String("/tmp/capture"),
+						HostPath: pointerUtil.String("capture"),
 					},
 				},
 			},
@@ -684,7 +684,7 @@ func Test_CaptureToPodTranslator_RenderJob_NodeSelected(t *testing.T) {
 
 			startTime := time.Now()
 
-			hostPath := "/tmp/capture" // nolint:goconst // Test case needs a var
+			hostPath := "capture" // nolint:goconst // Test case needs a var
 
 			err := captureToPodTranslator.initJobTemplate(ctx, &retinav1alpha1.Capture{
 				Spec: retinav1alpha1.CaptureSpec{
@@ -727,7 +727,7 @@ func Test_CaptureToPodTranslator_RenderJob_NodeSelected(t *testing.T) {
 
 func Test_CaptureToPodTranslator_ValidateCapture(t *testing.T) {
 	captureName := "capture-test"
-	hostPath := "/tmp/capture"
+	hostPath := "capture"
 	nodeName := "node-name"
 	cases := []struct {
 		name    string
@@ -826,6 +826,55 @@ func Test_CaptureToPodTranslator_ValidateCapture(t *testing.T) {
 		},
 	}
 
+	// Additional negative cases for HostPath validation; share the rest of the spec.
+	captureSpecWithHostPath := func(hp string) retinav1alpha1.Capture {
+		return retinav1alpha1.Capture{
+			ObjectMeta: metav1.ObjectMeta{Name: captureName},
+			Spec: retinav1alpha1.CaptureSpec{
+				CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
+					CaptureTarget: retinav1alpha1.CaptureTarget{
+						NodeSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"nodename": nodeName},
+						},
+					},
+					CaptureOption: retinav1alpha1.CaptureOption{
+						Duration: &metav1.Duration{Duration: 10 * time.Second},
+					},
+				},
+				OutputConfiguration: retinav1alpha1.OutputConfiguration{HostPath: &hp},
+			},
+		}
+	}
+	cases = append(cases,
+		struct {
+			name    string
+			capture retinav1alpha1.Capture
+			wantErr bool
+		}{
+			name:    "raise error when HostPath is absolute",
+			capture: captureSpecWithHostPath("/tmp/retina"),
+			wantErr: true,
+		},
+		struct {
+			name    string
+			capture retinav1alpha1.Capture
+			wantErr bool
+		}{
+			name:    "raise error when HostPath contains traversal",
+			capture: captureSpecWithHostPath("foo/../bar"),
+			wantErr: true,
+		},
+		struct {
+			name    string
+			capture retinav1alpha1.Capture
+			wantErr bool
+		}{
+			name:    "raise error when HostPath uses parent segment",
+			capture: captureSpecWithHostPath("../etc"),
+			wantErr: true,
+		},
+	)
+
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			k8sClient := fakeclientset.NewSimpleClientset()
@@ -850,7 +899,8 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 	defer cancel()
 
 	captureName := "capture-test"
-	hostPath := "/tmp/capture"
+	hostPath := "capture"
+	resolvedHostPath := "/tmp/capture"
 	timestamp := file.Now()
 	pvc := "capture-pvc"
 	backoffLimit := int32(0)
@@ -1010,7 +1060,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			volumeMounts: []corev1.VolumeMount{
 				{
 					Name:      captureConstants.CaptureHostPathVolumeName,
-					MountPath: hostPath,
+					MountPath: resolvedHostPath,
 				},
 			},
 			volumes: []corev1.Volume{
@@ -1018,7 +1068,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 					Name: captureConstants.CaptureHostPathVolumeName,
 					VolumeSource: corev1.VolumeSource{
 						HostPath: &corev1.HostPathVolumeSource{
-							Path: hostPath,
+							Path: resolvedHostPath,
 							Type: &captureFolderHostPathType,
 						},
 					},
@@ -1026,7 +1076,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			},
 			podEnv: []v1.EnvVar{
 				{Name: captureConstants.CaptureDurationEnvKey, Value: "1m0s"},
-				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: hostPath},
+				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: resolvedHostPath},
 				{Name: captureConstants.CaptureNameEnvKey, Value: captureName},
 				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: file.TimeToString(timestamp)},
 				{Name: captureConstants.IncludeMetadataEnvKey, Value: "false"},
@@ -1294,7 +1344,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			volumeMounts: []corev1.VolumeMount{
 				{
 					Name:      captureConstants.CaptureHostPathVolumeName,
-					MountPath: hostPath,
+					MountPath: resolvedHostPath,
 				},
 				{
 					Name:      captureConstants.CapturePVCVolumeName,
@@ -1306,7 +1356,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 					Name: captureConstants.CaptureHostPathVolumeName,
 					VolumeSource: corev1.VolumeSource{
 						HostPath: &corev1.HostPathVolumeSource{
-							Path: hostPath,
+							Path: resolvedHostPath,
 							Type: &captureFolderHostPathType,
 						},
 					},
@@ -1322,7 +1372,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			},
 			podEnv: []v1.EnvVar{
 				{Name: captureConstants.CaptureDurationEnvKey, Value: "1m0s"},
-				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: hostPath},
+				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: resolvedHostPath},
 				{Name: captureConstants.CaptureNameEnvKey, Value: captureName},
 				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: file.TimeToString(timestamp)},
 				{Name: captureConstants.IncludeMetadataEnvKey, Value: "false"},
@@ -1391,7 +1441,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			volumeMounts: []corev1.VolumeMount{
 				{
 					Name:      captureConstants.CaptureHostPathVolumeName,
-					MountPath: hostPath,
+					MountPath: resolvedHostPath,
 				},
 			},
 			volumes: []corev1.Volume{
@@ -1399,7 +1449,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 					Name: captureConstants.CaptureHostPathVolumeName,
 					VolumeSource: corev1.VolumeSource{
 						HostPath: &corev1.HostPathVolumeSource{
-							Path: hostPath,
+							Path: resolvedHostPath,
 							Type: &captureFolderHostPathType,
 						},
 					},
@@ -1407,7 +1457,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			},
 			podEnv: []v1.EnvVar{
 				{Name: captureConstants.CaptureDurationEnvKey, Value: "1m0s"},
-				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: hostPath},
+				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: resolvedHostPath},
 				{Name: captureConstants.CaptureNameEnvKey, Value: captureName},
 				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: file.TimeToString(timestamp)},
 				{Name: captureConstants.IncludeMetadataEnvKey, Value: "false"},
@@ -1471,7 +1521,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			volumeMounts: []corev1.VolumeMount{
 				{
 					Name:      captureConstants.CaptureHostPathVolumeName,
-					MountPath: hostPath,
+					MountPath: resolvedHostPath,
 				},
 			},
 			volumes: []corev1.Volume{
@@ -1479,7 +1529,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 					Name: captureConstants.CaptureHostPathVolumeName,
 					VolumeSource: corev1.VolumeSource{
 						HostPath: &corev1.HostPathVolumeSource{
-							Path: hostPath,
+							Path: resolvedHostPath,
 							Type: &captureFolderHostPathType,
 						},
 					},
@@ -1487,7 +1537,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			},
 			podEnv: []v1.EnvVar{
 				{Name: captureConstants.CaptureDurationEnvKey, Value: "1m0s"},
-				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: hostPath},
+				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: resolvedHostPath},
 				{Name: captureConstants.CaptureNameEnvKey, Value: captureName},
 				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: file.TimeToString(timestamp)},
 				{Name: captureConstants.IncludeMetadataEnvKey, Value: "false"},
@@ -1553,7 +1603,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			volumeMounts: []corev1.VolumeMount{
 				{
 					Name:      captureConstants.CaptureHostPathVolumeName,
-					MountPath: hostPath,
+					MountPath: resolvedHostPath,
 				},
 			},
 			volumes: []corev1.Volume{
@@ -1561,7 +1611,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 					Name: captureConstants.CaptureHostPathVolumeName,
 					VolumeSource: corev1.VolumeSource{
 						HostPath: &corev1.HostPathVolumeSource{
-							Path: hostPath,
+							Path: resolvedHostPath,
 							Type: &captureFolderHostPathType,
 						},
 					},
@@ -1569,7 +1619,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			},
 			podEnv: []v1.EnvVar{
 				{Name: captureConstants.CaptureDurationEnvKey, Value: "1m0s"},
-				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: hostPath},
+				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: resolvedHostPath},
 				{Name: captureConstants.CaptureNameEnvKey, Value: captureName},
 				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: file.TimeToString(timestamp)},
 				{Name: captureConstants.IncludeMetadataEnvKey, Value: "false"},
@@ -1635,7 +1685,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			volumeMounts: []corev1.VolumeMount{
 				{
 					Name:      captureConstants.CaptureHostPathVolumeName,
-					MountPath: hostPath,
+					MountPath: resolvedHostPath,
 				},
 			},
 			volumes: []corev1.Volume{
@@ -1643,7 +1693,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 					Name: captureConstants.CaptureHostPathVolumeName,
 					VolumeSource: corev1.VolumeSource{
 						HostPath: &corev1.HostPathVolumeSource{
-							Path: hostPath,
+							Path: resolvedHostPath,
 							Type: &captureFolderHostPathType,
 						},
 					},
@@ -1651,7 +1701,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			},
 			podEnv: []v1.EnvVar{
 				{Name: captureConstants.CaptureDurationEnvKey, Value: "1m0s"},
-				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: hostPath},
+				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: resolvedHostPath},
 				{Name: captureConstants.CaptureNameEnvKey, Value: captureName},
 				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: file.TimeToString(timestamp)},
 				{Name: captureConstants.IncludeMetadataEnvKey, Value: "false"},
@@ -1716,7 +1766,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			volumeMounts: []corev1.VolumeMount{
 				{
 					Name:      captureConstants.CaptureHostPathVolumeName,
-					MountPath: hostPath,
+					MountPath: resolvedHostPath,
 				},
 			},
 			volumes: []corev1.Volume{
@@ -1724,7 +1774,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 					Name: captureConstants.CaptureHostPathVolumeName,
 					VolumeSource: corev1.VolumeSource{
 						HostPath: &corev1.HostPathVolumeSource{
-							Path: hostPath,
+							Path: resolvedHostPath,
 							Type: &captureFolderHostPathType,
 						},
 					},
@@ -1732,7 +1782,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			},
 			podEnv: []v1.EnvVar{
 				{Name: captureConstants.CaptureDurationEnvKey, Value: "1m0s"},
-				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: hostPath},
+				{Name: string(captureConstants.CaptureOutputLocationEnvKeyHostPath), Value: resolvedHostPath},
 				{Name: captureConstants.CaptureNameEnvKey, Value: captureName},
 				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: file.TimeToString(timestamp)},
 				{Name: captureConstants.IncludeMetadataEnvKey, Value: "false"},
@@ -1836,7 +1886,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs_JobNumLimit(t *testing.T
 	timestamp := file.Now()
 
 	captureName := "capture-test"
-	hostPath := "/tmp/capture"
+	hostPath := "capture"
 	cases := []struct {
 		name        string
 		capture     retinav1alpha1.Capture

@@ -211,7 +211,7 @@ func (translator *CaptureToPodTranslator) initJobTemplate(ctx context.Context, c
 		translator.l.Info("HostPath is not empty", zap.String("HostPath", *capture.Spec.OutputConfiguration.HostPath))
 
 		captureFolderHostPathType := corev1.HostPathDirectoryOrCreate
-		hostPath, err := validateHostPath(*capture.Spec.OutputConfiguration.HostPath, translator.config.CaptureHostPathAllowedPrefixes)
+		hostPath, err := validateHostPath(*capture.Spec.OutputConfiguration.HostPath, translator.config.CaptureHostPathBaseDir)
 		if err != nil {
 			translator.l.Error("Rejected HostPath in Capture", zap.Error(err), zap.String("HostPath", *capture.Spec.OutputConfiguration.HostPath))
 			return fmt.Errorf("invalid OutputConfiguration.HostPath: %w", err)
@@ -585,7 +585,7 @@ func (translator *CaptureToPodTranslator) validateCapture(capture *retinav1alpha
 	}
 
 	if capture.Spec.OutputConfiguration.HostPath != nil && *capture.Spec.OutputConfiguration.HostPath != "" {
-		if _, err := validateHostPath(*capture.Spec.OutputConfiguration.HostPath, translator.config.CaptureHostPathAllowedPrefixes); err != nil {
+		if _, err := validateHostPath(*capture.Spec.OutputConfiguration.HostPath, translator.config.CaptureHostPathBaseDir); err != nil {
 			return fmt.Errorf("invalid OutputConfiguration.HostPath: %w", err)
 		}
 	}
@@ -956,8 +956,14 @@ func (translator *CaptureToPodTranslator) obtainTcpdumpFilters(captureConfig ret
 
 func (translator *CaptureToPodTranslator) obtainCaptureOutputEnv(outputConfiguration retinav1alpha1.OutputConfiguration) (map[captureConstants.CaptureOutputLocationEnvKey]string, error) {
 	outputEnv := map[captureConstants.CaptureOutputLocationEnvKey]string{}
-	if outputConfiguration.HostPath != nil {
-		outputEnv[captureConstants.CaptureOutputLocationEnvKeyHostPath] = *outputConfiguration.HostPath
+	if outputConfiguration.HostPath != nil && *outputConfiguration.HostPath != "" {
+		resolved, err := validateHostPath(*outputConfiguration.HostPath, translator.config.CaptureHostPathBaseDir)
+		if err != nil {
+			return nil, fmt.Errorf("invalid OutputConfiguration.HostPath: %w", err)
+		}
+		// Emit the resolved (joined, cleaned) path so the workload writes where
+		// the HostPath volume is actually mounted in the capture pod.
+		outputEnv[captureConstants.CaptureOutputLocationEnvKeyHostPath] = resolved
 	}
 	if outputConfiguration.PersistentVolumeClaim != nil {
 		outputEnv[captureConstants.CaptureOutputLocationEnvKeyPersistentVolumeClaim] = *outputConfiguration.PersistentVolumeClaim

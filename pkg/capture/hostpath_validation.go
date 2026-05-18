@@ -7,80 +7,103 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
-// DefaultHostPathAllowedPrefix is the safe default location under which Capture CRs may
-// place captured artifacts on a node when no operator-level allowlist is configured.
-const DefaultHostPathAllowedPrefix = "/var/log/retina/captures"
+// DefaultHostPathBaseDir is the safe default location under which Capture CRs may
+// place captured artifacts on a node when no operator-level base directory is configured.
+const DefaultHostPathBaseDir = "/var/log/retina/captures"
 
 var (
 	// ErrHostPathEmpty is returned when the supplied HostPath is empty.
 	ErrHostPathEmpty = errors.New("hostPath is empty")
-	// ErrHostPathNotAbsolute is returned when the supplied HostPath is not an absolute path.
-	ErrHostPathNotAbsolute = errors.New("hostPath must be an absolute path")
+	// ErrHostPathAbsolute is returned when the supplied HostPath is absolute. The
+	// CR field is a subpath name only; it must not contain a leading separator
+	// (POSIX or Windows) or a drive-letter prefix.
+	ErrHostPathAbsolute = errors.New("hostPath must be a relative subpath name, not an absolute path")
 	// ErrHostPathTraversal is returned when the supplied HostPath contains a parent-directory traversal.
 	ErrHostPathTraversal = errors.New("hostPath must not contain '..' path segments")
-	// ErrHostPathNotAllowed is returned when the supplied HostPath is not under any configured allowed prefix.
-	ErrHostPathNotAllowed = errors.New("hostPath is not under an allowed prefix")
+	// ErrHostPathEscapesBase is a defense-in-depth error returned when, after
+	// joining and cleaning, the resulting path would lie outside the configured base directory.
+	ErrHostPathEscapesBase = errors.New("hostPath resolves outside the configured base directory")
+	// ErrHostPathBaseDir is returned when the operator-provided base directory is not usable.
+	ErrHostPathBaseDir = errors.New("invalid hostPath base directory")
 )
 
-// validateHostPath ensures that the user-supplied HostPath from a Capture CR is safe to
-// mount into the privileged capture pod. It returns the cleaned path on success.
+// winDriveLetter matches a Windows drive-letter prefix such as "C:\" or "c:/".
+var winDriveLetter = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
+
+// validateHostPath ensures that the user-supplied HostPath from a Capture CR is safe
+// to mount into the privileged capture pod and returns the absolute, cleaned path the
+// capture artifacts will live at on the node.
 //
-// Rules:
+// The CR's HostPath is treated as a relative subpath name and joined under baseDir;
+// CR authors cannot escape that directory. Rules:
+//
 //   - The path must be non-empty.
-//   - The path must be absolute.
-//   - The path must not contain any ".." segment (rejected both pre- and post-clean).
-//   - After cleaning, the path must be exactly one of, or nested under, an entry in
-//     allowedPrefixes. Comparison uses a trailing separator to prevent prefix-confusion
-//     (e.g. "/foo" must not match "/foo-evil").
+//   - The path must not be absolute (no leading "/" or "\\", no Windows drive letter).
+//   - The path must not contain any ".." segment, checked both on the raw input and
+//     after filepath.Clean.
+//   - As defense in depth, the joined path must still resolve under baseDir.
 //
-// If allowedPrefixes is empty, DefaultHostPathAllowedPrefix is used.
-func validateHostPath(raw string, allowedPrefixes []string) (string, error) {
+// If baseDir is empty, DefaultHostPathBaseDir is used.
+func validateHostPath(raw, baseDir string) (string, error) {
 	if raw == "" {
 		return "", ErrHostPathEmpty
 	}
 
-	// Reject literal ".." segments before cleaning so traversal attempts are rejected
-	// even if filepath.Clean would normalize them away.
-	for _, seg := range strings.Split(filepath.ToSlash(raw), "/") {
-		if seg == ".." {
-			return "", fmt.Errorf("%w: %q", ErrHostPathTraversal, raw)
-		}
+	if baseDir == "" {
+		baseDir = DefaultHostPathBaseDir
+	}
+	cleanedBase := filepath.Clean(baseDir)
+	if !filepath.IsAbs(cleanedBase) {
+		return "", fmt.Errorf("%w: %q must be absolute", ErrHostPathBaseDir, baseDir)
 	}
 
-	if !filepath.IsAbs(raw) {
-		return "", fmt.Errorf("%w: %q", ErrHostPathNotAbsolute, raw)
+	// Reject absolute paths up front, in both POSIX and Windows styles, so existing
+	// CRs that supplied an absolute host path fail loudly instead of being silently
+	// rewritten by filepath.Join.
+	if filepath.IsAbs(raw) ||
+		strings.HasPrefix(raw, "/") ||
+		strings.HasPrefix(raw, `\`) ||
+		winDriveLetter.MatchString(raw) {
+		return "", fmt.Errorf("%w: %q", ErrHostPathAbsolute, raw)
 	}
 
-	cleaned := filepath.Clean(raw)
-
-	// Defense in depth: re-check after cleaning.
-	if !filepath.IsAbs(cleaned) {
-		return "", fmt.Errorf("%w: %q", ErrHostPathNotAbsolute, raw)
-	}
-	for _, seg := range strings.Split(filepath.ToSlash(cleaned), "/") {
-		if seg == ".." {
-			return "", fmt.Errorf("%w: %q", ErrHostPathTraversal, raw)
-		}
+	// Reject literal ".." segments before cleaning so traversal attempts are
+	// rejected even if filepath.Clean would normalize them away.
+	if containsParentSegment(raw) {
+		return "", fmt.Errorf("%w: %q", ErrHostPathTraversal, raw)
 	}
 
-	prefixes := allowedPrefixes
-	if len(prefixes) == 0 {
-		prefixes = []string{DefaultHostPathAllowedPrefix}
+	cleanedSub := filepath.Clean(raw)
+	if cleanedSub == "." || cleanedSub == "" {
+		return "", ErrHostPathEmpty
+	}
+	if filepath.IsAbs(cleanedSub) || strings.HasPrefix(cleanedSub, "/") || strings.HasPrefix(cleanedSub, `\`) {
+		return "", fmt.Errorf("%w: %q", ErrHostPathAbsolute, raw)
+	}
+	if containsParentSegment(cleanedSub) {
+		return "", fmt.Errorf("%w: %q", ErrHostPathTraversal, raw)
 	}
 
+	joined := filepath.Clean(filepath.Join(cleanedBase, cleanedSub))
 	sep := string(filepath.Separator)
-	for _, p := range prefixes {
-		if p == "" {
-			continue
-		}
-		cp := filepath.Clean(p)
-		if cleaned == cp || strings.HasPrefix(cleaned, cp+sep) {
-			return cleaned, nil
-		}
+	if joined != cleanedBase && !strings.HasPrefix(joined, cleanedBase+sep) {
+		return "", fmt.Errorf("%w: %q resolves to %q (base %q)", ErrHostPathEscapesBase, raw, joined, cleanedBase)
 	}
 
-	return "", fmt.Errorf("%w: %q (allowed prefixes: %v)", ErrHostPathNotAllowed, raw, prefixes)
+	return joined, nil
+}
+
+// containsParentSegment returns true if any path segment of p (split on either
+// forward or back slashes) equals "..".
+func containsParentSegment(p string) bool {
+	for _, seg := range strings.FieldsFunc(p, func(r rune) bool { return r == '/' || r == '\\' }) {
+		if seg == ".." {
+			return true
+		}
+	}
+	return false
 }

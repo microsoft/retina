@@ -178,6 +178,12 @@ capture:
   debug: true
   # jobNumLimit indicates the maximum number of jobs that can be created for each Capture.
   jobNumLimit: 0
+  # hostPathBaseDir is the absolute directory on every node under which Capture
+  # CRs may write artifacts. The CR field outputConfiguration.hostPath is treated
+  # as a relative subpath name and joined under this directory; CR authors
+  # cannot influence the base. Leave empty to use the operator default
+  # (/var/log/retina/captures).
+  hostPathBaseDir: ""
   # enableManagedStorageAccount toggles the use of managed storage account for storing artifacts.
   # If set to true, the following fields related to Azure credentials must be set.
   # Ref: docs/captures/managed-storage-account.md

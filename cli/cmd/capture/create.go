@@ -34,9 +34,15 @@ import (
 )
 
 const (
-	DefaultDebug           bool          = false
-	DefaultDuration        time.Duration = 1 * time.Minute
-	DefaultHostPath        string        = "/mnt/retina/captures"
+	DefaultDebug    bool          = false
+	DefaultDuration time.Duration = 1 * time.Minute
+	// DefaultHostPath is the default subpath (joined under DefaultHostPathBaseDir on
+	// the node) where capture artifacts are stored. It is a bare name, not an
+	// absolute path: absolute paths are rejected by the operator.
+	DefaultHostPath string = "retina"
+	// DefaultHostPathBaseDir is the default node-side parent directory for capture
+	// artifacts; the user-supplied --host-path subpath is joined under it.
+	DefaultHostPathBaseDir string        = "/var/log/retina/captures"
 	DefaultIncludeMetadata bool          = true
 	DefaultJobNumLimit     int           = 0
 	DefaultMaxSize         int           = 100
@@ -50,7 +56,8 @@ const (
 
 var createExample = templates.Examples(i18n.T(`
 		# Select nodes by node name and copy the artifacts to the node host path
-		kubectl retina capture create --host-path /mnt/retina/testcapture --node-names "<nodename1>,<nodename2>"
+		# (joined under the operator-configured base directory; default /var/log/retina/captures/testcapture)
+		kubectl retina capture create --host-path testcapture --node-names "<nodename1>,<nodename2>"
 
 		# Select pods determined by pod-selectors and namespace-selectors
 		kubectl retina capture create --namespace capture --pod-selectors="k8s-app=kube-dns" --namespace-selectors="kubernetes.io/metadata.name=kube-system"
@@ -205,7 +212,8 @@ func NewCreateSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 		"A comma-separated list of pod labels to select pods on which the network capture will be performed")
 	createCapture.Flags().StringVar(&opts.namespaceSelectors, "namespace-selectors", "",
 		"A comma-separated list of namespace labels to filter which namespaces will be targeted for packet capture (used with --pod-selectors)")
-	createCapture.Flags().StringVar(&opts.hostPath, "host-path", DefaultHostPath, "HostPath of the node to store the capture files")
+	createCapture.Flags().StringVar(&opts.hostPath, "host-path", DefaultHostPath, "Subpath name (joined under --host-path-base-dir) for capture artifacts on the node. Must be a relative subpath and must not contain '..'.")
+	createCapture.Flags().StringVar(&opts.hostPathBaseDir, "host-path-base-dir", DefaultHostPathBaseDir, "Absolute base directory on the node under which --host-path is joined")
 	createCapture.Flags().StringVar(&opts.pvc, "pvc", "", "PersistentVolumeClaim under the specified or default namespace to store capture files")
 	createCapture.Flags().StringVar(&opts.blobUpload, "blob-upload", "", "Blob SAS URL with write permission to upload capture files")
 	createCapture.Flags().StringVar(&opts.s3Region, "s3-region", "", "Region where the S3 compatible bucket is located")
@@ -438,19 +446,13 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 }
 
 func getCLICaptureConfig() config.CaptureConfig {
-	cfg := config.CaptureConfig{
+	return config.CaptureConfig{
 		CaptureImageVersion:       buildinfo.Version,
 		CaptureDebug:              opts.debug,
 		CaptureImageVersionSource: captureUtils.VersionSourceCLIVersion,
 		CaptureJobNumLimit:        opts.jobNumLimit,
+		CaptureHostPathBaseDir:    opts.hostPathBaseDir,
 	}
-	// The CLI is an authenticated client; the user explicitly types the HostPath. Allow that
-	// exact path so HostPath-allowlist enforcement (intended for CRD-author abuse via the
-	// operator) does not break CLI UX.
-	if opts.hostPath != "" {
-		cfg.CaptureHostPathAllowedPrefixes = []string{opts.hostPath}
-	}
-	return cfg
 }
 
 func createJobs(ctx context.Context, kubeClient kubernetes.Interface, capture *retinav1alpha1.Capture) ([]batchv1.Job, error) {

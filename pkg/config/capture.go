@@ -28,9 +28,11 @@ type CaptureConfig struct {
 	// AzureCredentialConfig indicates the path of Azure credential configuration file.
 	AzureCredentialConfig string `yaml:"azureCredentialConfig"`
 
-	// CaptureHostPathAllowedPrefixes restricts the host directories that a Capture CR may mount via
-	// OutputConfiguration.HostPath. Any HostPath supplied in a CR must, after path cleaning, be an
-	// absolute path equal to or nested under one of these prefixes; otherwise the capture is rejected.
-	// If unset, the operator applies a safe default (see operator config loader).
-	CaptureHostPathAllowedPrefixes []string `yaml:"captureHostPathAllowedPrefixes"`
+	// CaptureHostPathBaseDir is the absolute, operator-controlled directory on every
+	// node under which Capture CRs may write artifacts. The user-supplied
+	// OutputConfiguration.HostPath is treated as a relative subpath name and joined
+	// under this directory. CR authors cannot influence the base, so they cannot
+	// place artifacts anywhere else on the node filesystem.
+	// If unset, the operator defaults to /var/log/retina/captures.
+	CaptureHostPathBaseDir string `yaml:"captureHostPathBaseDir"`
 }

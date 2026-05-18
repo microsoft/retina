@@ -31,7 +31,7 @@ The `Capture` CRD is defined with the following specifications:
 
 - **spec.outputConfiguration:** Indicates where the captured data will be stored. It includes the following properties:
   - `blobUpload`: Specifies a secret containing the blob SAS URL for storing the capture data.
-  - `hostPath`: Stores the capture files into the specified host filesystem.
+  - `hostPath`: A relative subpath name (e.g. `my-capture`) joined under the operator-configured host base directory (default `/var/log/retina/captures`) on every node that runs a capture pod. Capture files are written to that joined directory. Absolute paths and `..` segments are rejected.
   - `persistentVolumeClaim`: Mounts a PersistentVolumeClaim into the Pod to store capture files.
   - `s3Upload`: Specifies the configuration for uploading capture files to an S3-compatible storage service, including the bucket name, region, and optional custom endpoint.
 
@@ -59,7 +59,7 @@ spec:
         matchLabels:
           app: target-app
   outputConfiguration:
-    hostPath: /captures
+    hostPath: example-capture
     blobUpload: blob-sas-url
     s3Upload:
       bucket: retina-bucket

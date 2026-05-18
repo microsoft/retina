@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"log"
+	"path/filepath"
 	"time"
 
 	"github.com/microsoft/retina/pkg/config"
@@ -53,11 +54,16 @@ func GetConfig(cfgFileName string) (*OperatorConfig, error) {
 		return nil, ErrorTelemetryIntervalTooSmall
 	}
 
-	// If unset, default the HostPath allowlist so that Capture CRs cannot mount arbitrary
-	// host directories into the privileged capture pod.
-	if len(cfg.CaptureHostPathAllowedPrefixes) == 0 {
-		log.Printf("captureHostPathAllowedPrefixes is not set, defaulting to [/var/log/retina/captures]")
-		cfg.CaptureHostPathAllowedPrefixes = []string{"/var/log/retina/captures"}
+	// If unset, default the HostPath base directory so that Capture CRs cannot
+	// place artifacts arbitrarily on the node filesystem. The CR's HostPath is
+	// always joined under this directory.
+	if cfg.CaptureHostPathBaseDir == "" {
+		log.Printf("captureHostPathBaseDir is not set, defaulting to /var/log/retina/captures")
+		cfg.CaptureHostPathBaseDir = "/var/log/retina/captures"
+	}
+	cfg.CaptureHostPathBaseDir = filepath.Clean(cfg.CaptureHostPathBaseDir)
+	if !filepath.IsAbs(cfg.CaptureHostPathBaseDir) {
+		return nil, fmt.Errorf("captureHostPathBaseDir must be an absolute path, got %q", cfg.CaptureHostPathBaseDir)
 	}
 
 	return &cfg, nil
