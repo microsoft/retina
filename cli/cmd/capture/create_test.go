@@ -626,8 +626,12 @@ func TestNodeNamesClearsDefaultNodeSelector(t *testing.T) {
 }
 
 func TestGetCLICaptureConfig(t *testing.T) {
-	saved := opts
-	t.Cleanup(func() { opts = saved })
+	savedDebug, savedJobNumLimit, savedHostPathBaseDir := opts.debug, opts.jobNumLimit, opts.hostPathBaseDir
+	t.Cleanup(func() {
+		opts.debug = savedDebug
+		opts.jobNumLimit = savedJobNumLimit
+		opts.hostPathBaseDir = savedHostPathBaseDir
+	})
 
 	opts.debug = true
 	opts.jobNumLimit = 7

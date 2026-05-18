@@ -13,8 +13,9 @@ import (
 const MinTelemetryInterval time.Duration = 2 * time.Minute
 
 var (
-	DefaultTelemetryInterval       = 5 * time.Minute
-	ErrorTelemetryIntervalTooSmall = fmt.Errorf("telemetryInterval smaller than %v is not allowed", MinTelemetryInterval)
+	DefaultTelemetryInterval             = 5 * time.Minute
+	ErrorTelemetryIntervalTooSmall       = fmt.Errorf("telemetryInterval smaller than %v is not allowed", MinTelemetryInterval)
+	ErrCaptureHostPathBaseDirNotAbsolute = fmt.Errorf("captureHostPathBaseDir must be an absolute path")
 )
 
 type OperatorConfig struct {
@@ -63,7 +64,7 @@ func GetConfig(cfgFileName string) (*OperatorConfig, error) {
 	}
 	cfg.CaptureHostPathBaseDir = filepath.Clean(cfg.CaptureHostPathBaseDir)
 	if !filepath.IsAbs(cfg.CaptureHostPathBaseDir) {
-		return nil, fmt.Errorf("captureHostPathBaseDir must be an absolute path, got %q", cfg.CaptureHostPathBaseDir)
+		return nil, fmt.Errorf("%w: got %q", ErrCaptureHostPathBaseDirNotAbsolute, cfg.CaptureHostPathBaseDir)
 	}
 
 	return &cfg, nil

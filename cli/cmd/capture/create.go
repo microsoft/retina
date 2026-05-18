@@ -212,7 +212,8 @@ func NewCreateSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 		"A comma-separated list of pod labels to select pods on which the network capture will be performed")
 	createCapture.Flags().StringVar(&opts.namespaceSelectors, "namespace-selectors", "",
 		"A comma-separated list of namespace labels to filter which namespaces will be targeted for packet capture (used with --pod-selectors)")
-	createCapture.Flags().StringVar(&opts.hostPath, "host-path", DefaultHostPath, "Subpath name (joined under --host-path-base-dir) for capture artifacts on the node. Must be a relative subpath and must not contain '..'.")
+	createCapture.Flags().StringVar(&opts.hostPath, "host-path", DefaultHostPath,
+		"Subpath name (joined under --host-path-base-dir) for capture artifacts on the node. Must be a relative subpath and must not contain '..'.")
 	createCapture.Flags().StringVar(&opts.hostPathBaseDir, "host-path-base-dir", DefaultHostPathBaseDir, "Absolute base directory on the node under which --host-path is joined")
 	createCapture.Flags().StringVar(&opts.pvc, "pvc", "", "PersistentVolumeClaim under the specified or default namespace to store capture files")
 	createCapture.Flags().StringVar(&opts.blobUpload, "blob-upload", "", "Blob SAS URL with write permission to upload capture files")
