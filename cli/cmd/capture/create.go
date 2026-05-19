@@ -215,8 +215,35 @@ func NewCreateSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 	createCapture.Flags().StringVar(&opts.s3Path, "s3-path", DefaultS3Path, "Prefix path within the S3 bucket where captures will be stored")
 	createCapture.Flags().StringVar(&opts.s3AccessKeyID, "s3-access-key-id", "", "S3 access key id to upload capture files")
 	createCapture.Flags().StringVar(&opts.s3SecretAccessKey, "s3-secret-access-key", "", "S3 access secret key to upload capture files")
-	createCapture.Flags().StringVar(&opts.tcpdumpFilter, "tcpdump-filter", "", "Raw tcpdump flags which works only for Linux")
+	createCapture.Flags().StringVar(&opts.tcpdumpFilter, "tcpdump-filter", "",
+		"DEPRECATED: Use --pcap-filter for BPF expressions. BPF filter expression without flags (e.g., 'host 10.0.0.1', 'tcp port 443')")
+	createCapture.Flags().StringVar(&opts.pcapFilter, "pcap-filter", "",
+		"BPF filter expression for packet filtering (e.g., 'host 10.0.0.1', 'tcp port 443'). See https://www.tcpdump.org/manpages/pcap-filter.7.html")
 	createCapture.Flags().StringVar(&opts.interfaces, "interfaces", "", "Comma-separated list of network interfaces to capture on (e.g., eth0,eth1)")
+
+	// Tcpdump boolean flags for capture behavior and display options
+	createCapture.Flags().BoolVar(&opts.noPromiscuous, "no-promiscuous", false, "Disable promiscuous mode (tcpdump -p flag)")
+	createCapture.Flags().BoolVar(&opts.packetBuffered, "packet-buffered", false, "Enable packet-buffered output (tcpdump -U flag)")
+	createCapture.Flags().BoolVar(&opts.immediateMode, "immediate-mode", false, "Enable immediate mode for packet capture (tcpdump --immediate-mode)")
+	createCapture.Flags().BoolVar(&opts.noResolveDNS, "no-resolve-dns", false, "Don't resolve hostnames (tcpdump -n flag)")
+	createCapture.Flags().BoolVar(&opts.noResolvePort, "no-resolve-port", false, "Don't resolve hostnames or port names (tcpdump -nn flag)")
+	createCapture.Flags().BoolVar(&opts.verbose, "verbose", false, "Verbose output (tcpdump -v flag)")
+	createCapture.Flags().BoolVar(&opts.extraVerbose, "extra-verbose", false, "Extra verbose output (tcpdump -vv flag)")
+	createCapture.Flags().BoolVar(&opts.maxVerbose, "max-verbose", false, "Maximum verbose output (tcpdump -vvv flag)")
+	createCapture.Flags().BoolVar(&opts.printDataHex, "print-data-hex", false, "Print packet data in hex and ASCII (tcpdump -X flag)")
+	createCapture.Flags().BoolVar(&opts.printDataHexLink, "print-data-hex-link", false, "Print packet data with link-level header in hex and ASCII (tcpdump -XX flag)")
+	createCapture.Flags().BoolVar(&opts.printDataASCII, "print-data-ascii", false, "Print packet data in ASCII (tcpdump -A flag)")
+	createCapture.Flags().BoolVar(&opts.printDataASCIILink, "print-data-ascii-link", false, "Print packet data with link-level header in ASCII (tcpdump -AA flag)")
+	createCapture.Flags().BoolVar(&opts.printLinkHeader, "print-link-header", false, "Print link-level headers (tcpdump -e flag)")
+	createCapture.Flags().BoolVar(&opts.quietOutput, "quiet-output", false, "Quick/quiet output mode (tcpdump -q flag)")
+	createCapture.Flags().BoolVar(&opts.absoluteSeq, "absolute-seq", false, "Print absolute TCP sequence numbers (tcpdump -S flag)")
+	createCapture.Flags().BoolVar(&opts.noTimestamp, "no-timestamp", false, "Don't print timestamps (tcpdump -t flag)")
+	createCapture.Flags().BoolVar(&opts.unformattedTimestamp, "unformatted-timestamp", false, "Print unformatted timestamps (tcpdump -tt flag)")
+	createCapture.Flags().BoolVar(&opts.deltaTimestamp, "delta-timestamp", false, "Print time delta between packets (tcpdump -ttt flag)")
+	createCapture.Flags().BoolVar(&opts.dateTimestamp, "date-timestamp", false, "Print timestamp with date (tcpdump -tttt flag)")
+	createCapture.Flags().BoolVar(&opts.deltaSinceFirst, "delta-since-first", false, "Print time delta since first packet (tcpdump -ttttt flag)")
+	createCapture.Flags().BoolVar(&opts.dontVerifyChecksum, "dont-verify-checksum", false, "Don't verify TCP checksums (tcpdump -K flag)")
+
 	createCapture.Flags().StringVar(&opts.excludeFilter, "exclude-filter", "", "A comma-separated list of IP:Port pairs that are "+
 		"excluded from capturing network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:*")
 	createCapture.Flags().StringVar(&opts.includeFilter, "include-filter", "", "A comma-separated list of IP:Port pairs that are "+
@@ -386,6 +413,93 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 		}
 		retinacmd.Logger.Info(fmt.Sprintf("Capturing on specific interfaces: %v", interfaceSlice))
 		capture.Spec.CaptureConfiguration.CaptureOption.Interfaces = interfaceSlice
+	}
+
+	// Set pcap-filter if provided
+	if opts.pcapFilter != "" {
+		capture.Spec.CaptureConfiguration.CaptureOption.PcapFilter = &opts.pcapFilter
+	}
+
+	// Set boolean capture and display flags
+	if opts.noPromiscuous {
+		capture.Spec.CaptureConfiguration.CaptureOption.NoPromiscuous = &opts.noPromiscuous
+	}
+
+	if opts.packetBuffered {
+		capture.Spec.CaptureConfiguration.CaptureOption.PacketBuffered = &opts.packetBuffered
+	}
+
+	if opts.immediateMode {
+		capture.Spec.CaptureConfiguration.CaptureOption.ImmediateMode = &opts.immediateMode
+	}
+
+	if opts.noResolveDNS {
+		capture.Spec.CaptureConfiguration.CaptureOption.NoResolveDNS = &opts.noResolveDNS
+	}
+	if opts.noResolvePort {
+		capture.Spec.CaptureConfiguration.CaptureOption.NoResolvePort = &opts.noResolvePort
+	}
+
+	if opts.verbose {
+		capture.Spec.CaptureConfiguration.CaptureOption.Verbose = &opts.verbose
+	}
+	if opts.extraVerbose {
+		capture.Spec.CaptureConfiguration.CaptureOption.ExtraVerbose = &opts.extraVerbose
+	}
+
+	if opts.maxVerbose {
+		capture.Spec.CaptureConfiguration.CaptureOption.MaxVerbose = &opts.maxVerbose
+	}
+	if opts.printDataHex {
+		capture.Spec.CaptureConfiguration.CaptureOption.PrintDataHex = &opts.printDataHex
+	}
+
+	if opts.printDataHexLink {
+		capture.Spec.CaptureConfiguration.CaptureOption.PrintDataHexLink = &opts.printDataHexLink
+	}
+
+	if opts.printDataASCII {
+		capture.Spec.CaptureConfiguration.CaptureOption.PrintDataASCII = &opts.printDataASCII
+	}
+
+	if opts.printDataASCIILink {
+		capture.Spec.CaptureConfiguration.CaptureOption.PrintDataASCIILink = &opts.printDataASCIILink
+	}
+
+	if opts.printLinkHeader {
+		capture.Spec.CaptureConfiguration.CaptureOption.PrintLinkHeader = &opts.printLinkHeader
+	}
+
+	if opts.quietOutput {
+		capture.Spec.CaptureConfiguration.CaptureOption.QuietOutput = &opts.quietOutput
+	}
+
+	if opts.absoluteSeq {
+		capture.Spec.CaptureConfiguration.CaptureOption.AbsoluteSeq = &opts.absoluteSeq
+	}
+
+	if opts.noTimestamp {
+		capture.Spec.CaptureConfiguration.CaptureOption.NoTimestamp = &opts.noTimestamp
+	}
+
+	if opts.unformattedTimestamp {
+		capture.Spec.CaptureConfiguration.CaptureOption.UnformattedTimestamp = &opts.unformattedTimestamp
+	}
+
+	if opts.deltaTimestamp {
+		capture.Spec.CaptureConfiguration.CaptureOption.DeltaTimestamp = &opts.deltaTimestamp
+	}
+
+	if opts.dateTimestamp {
+		capture.Spec.CaptureConfiguration.CaptureOption.DateTimestamp = &opts.dateTimestamp
+	}
+
+	if opts.deltaSinceFirst {
+		capture.Spec.CaptureConfiguration.CaptureOption.DeltaSinceFirst = &opts.deltaSinceFirst
+	}
+
+	if opts.dontVerifyChecksum {
+		capture.Spec.CaptureConfiguration.CaptureOption.DontVerifyChecksum = &opts.dontVerifyChecksum
 	}
 
 	if opts.hostPath != "" {

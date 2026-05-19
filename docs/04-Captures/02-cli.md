@@ -85,7 +85,29 @@ The network traffic will be uploaded to the specified output location.
 | `s3-region`           | string     | ""       | Region where the S3 compatible bucket is located.                            |       |
 | `s3-secret-access-key`| string     | ""       | S3 access secret key to upload capture files.                                |       |
 | `interfaces`          | string     | ""       | Comma-separated list of network interfaces to capture on (e.g., "eth0,eth1"). By default, captures are performed on all network interfaces. |       |
-| `tcpdump-filter`      | string     | ""       | Raw tcpdump flags. Available tcpdump filters can be found in the [TCPDUMP MAN PAGE](https://www.tcpdump.org/manpages/tcpdump.1.html). This overrides interface selection options when specified. | Only works on Linux. Includes only tcpdump flags, for boolean expressions, please use include/exclude filters.     |
+| `pcap-filter`         | string     | ""       | BPF filter expression for packet filtering (e.g., "host 10.0.0.1", "tcp port 443"). See [PCAP-FILTER](https://www.tcpdump.org/manpages/pcap-filter.7.html) for BPF syntax. Does NOT accept flags (arguments starting with '-'). |       |
+| `tcpdump-filter`      | string     | ""       | DEPRECATED: Use `--pcap-filter` instead. BPF filter expression for packet filtering. Does NOT accept flags (arguments starting with '-'). |       |
+| `no-promiscuous`      | bool       | false    | Disable promiscuous mode (equivalent to tcpdump -p flag). |       |
+| `packet-buffered`     | bool       | false    | Enable packet-buffered output (equivalent to tcpdump -U flag). |       |
+| `immediate-mode`      | bool       | false    | Enable immediate mode for packet capture (equivalent to tcpdump --immediate-mode). |       |
+| `no-resolve-dns`      | bool       | false    | Don't resolve hostnames (equivalent to tcpdump -n flag). |       |
+| `no-resolve-port`     | bool       | false    | Don't resolve hostnames or port names (equivalent to tcpdump -nn flag). |       |
+| `verbose`             | bool       | false    | Verbose output (equivalent to tcpdump -v flag). |       |
+| `extra-verbose`       | bool       | false    | Extra verbose output (equivalent to tcpdump -vv flag). |       |
+| `max-verbose`         | bool       | false    | Maximum verbose output (equivalent to tcpdump -vvv flag). |       |
+| `print-data-hex`      | bool       | false    | Print packet data in hex (equivalent to tcpdump -x flag). |       |
+| `print-data-hex-link` | bool       | false    | Print packet data with link-level header in hex (equivalent to tcpdump -xx flag). |       |
+| `print-data-ascii`    | bool       | false    | Print packet data in ASCII (equivalent to tcpdump -A flag). |       |
+| `print-data-ascii-link`| bool      | false    | Print packet data with link-level header in ASCII (equivalent to tcpdump -AA flag). |       |
+| `print-link-header`   | bool       | false    | Print link-level headers (equivalent to tcpdump -e flag). |       |
+| `quiet-output`        | bool       | false    | Quick/quiet output mode (equivalent to tcpdump -q flag). |       |
+| `absolute-seq`        | bool       | false    | Print absolute TCP sequence numbers (equivalent to tcpdump -S flag). |       |
+| `no-timestamp`        | bool       | false    | Don't print timestamps (equivalent to tcpdump -t flag). |       |
+| `unformatted-timestamp`| bool      | false    | Print unformatted timestamps (equivalent to tcpdump -tt flag). |       |
+| `delta-timestamp`     | bool       | false    | Print time delta between packets (equivalent to tcpdump -ttt flag). |       |
+| `date-timestamp`      | bool       | false    | Print timestamp with date (equivalent to tcpdump -tttt flag). |       |
+| `delta-since-first`   | bool       | false    | Print time delta since first packet (equivalent to tcpdump -ttttt flag). |       |
+| `dont-verify-checksum`| bool       | false    | Don't verify TCP checksums (equivalent to tcpdump -K flag). |       |
 
 #### Examples
 
@@ -213,12 +235,47 @@ kubectl retina capture create \
   --exclude-filter="10.224.0.26:80,10.224.0.34:8080"
 ```
 
-Tcpdump Filters
+BPF Packet Filters
 
 ```sh
 kubectl retina capture create \
-  --name example-tcpdump-filters \
-  --tcpdump-filter="udp port 53"
+  --name example-pcap-filters \
+  --pcap-filter="udp port 53"
+```
+
+Capture with Display Options
+
+```sh
+kubectl retina capture create \
+  --name example-with-display-options \
+  --pcap-filter="tcp port 443" \
+  --no-resolve-dns \
+  --verbose \
+  --print-data-hex
+```
+
+This example:
+
+- Captures only HTTPS traffic (tcp port 443)
+- Doesn't resolve hostnames (--no-resolve-dns, equivalent to tcpdump -n)
+- Shows verbose output (--verbose, equivalent to tcpdump -v)
+- Displays packet data in hex (--print-data-hex, equivalent to tcpdump -x)
+
+Additional display option examples:
+
+```sh
+# Don't resolve names or ports, capture HTTP traffic
+kubectl retina capture create \
+  --name example-http \
+  --pcap-filter="tcp port 80" \
+  --no-resolve-port
+
+# Show timestamps with date and link-level headers for ICMP
+kubectl retina capture create \
+  --name example-icmp \
+  --pcap-filter="icmp" \
+  --date-timestamp \
+  --print-link-header
 ```
 
 ### Capture Delete

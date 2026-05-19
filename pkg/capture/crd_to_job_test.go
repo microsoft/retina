@@ -570,6 +570,113 @@ func Test_CaptureToPodTranslator_ObtainCaptureJobPodEnv(t *testing.T) {
 				captureConstants.PacketSizeEnvKey:                                         strconv.Itoa(packetSize),
 			},
 		},
+		{
+			name: "pcapFilter",
+			capture: retinav1alpha1.Capture{
+				Spec: retinav1alpha1.CaptureSpec{
+					OutputConfiguration: retinav1alpha1.OutputConfiguration{
+						PersistentVolumeClaim: pointerUtil.String("capture-pvc"),
+					},
+					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
+						CaptureOption: retinav1alpha1.CaptureOption{
+							PcapFilter: pointerUtil.String("tcp port 80"),
+						},
+					},
+				},
+			},
+			wantJobEnv: map[string]string{
+				string(captureConstants.CaptureOutputLocationEnvKeyPersistentVolumeClaim): "capture-pvc",
+				captureConstants.IncludeMetadataEnvKey:                                    "false",
+				captureConstants.PcapFilterEnvKey:                                         "tcp port 80",
+			},
+		},
+		{
+			name: "deprecated tcpdumpFilter",
+			capture: retinav1alpha1.Capture{
+				Spec: retinav1alpha1.CaptureSpec{
+					OutputConfiguration: retinav1alpha1.OutputConfiguration{
+						PersistentVolumeClaim: pointerUtil.String("capture-pvc"),
+					},
+					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
+						TcpdumpFilter: pointerUtil.String("udp port 53"),
+					},
+				},
+			},
+			wantJobEnv: map[string]string{
+				string(captureConstants.CaptureOutputLocationEnvKeyPersistentVolumeClaim): "capture-pvc",
+				captureConstants.IncludeMetadataEnvKey:                                    "false",
+				captureConstants.TcpdumpRawFilterEnvKey:                                   "udp port 53",
+			},
+		},
+		{
+			name: "tcpdump boolean flags",
+			capture: retinav1alpha1.Capture{
+				Spec: retinav1alpha1.CaptureSpec{
+					OutputConfiguration: retinav1alpha1.OutputConfiguration{
+						PersistentVolumeClaim: pointerUtil.String("capture-pvc"),
+					},
+					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
+						CaptureOption: retinav1alpha1.CaptureOption{
+							NoPromiscuous: pointerUtil.Bool(true),
+							Verbose:       pointerUtil.Bool(true),
+						},
+					},
+				},
+			},
+			wantJobEnv: map[string]string{
+				string(captureConstants.CaptureOutputLocationEnvKeyPersistentVolumeClaim): "capture-pvc",
+				captureConstants.IncludeMetadataEnvKey:                                    "false",
+				captureConstants.TcpdumpFlagsEnvKey:                                       "-p -v",
+			},
+		},
+		{
+			name: "multiple tcpdump boolean flags",
+			capture: retinav1alpha1.Capture{
+				Spec: retinav1alpha1.CaptureSpec{
+					OutputConfiguration: retinav1alpha1.OutputConfiguration{
+						PersistentVolumeClaim: pointerUtil.String("capture-pvc"),
+					},
+					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
+						CaptureOption: retinav1alpha1.CaptureOption{
+							NoPromiscuous: pointerUtil.Bool(true),
+							NoResolveDNS:  pointerUtil.Bool(true),
+							Verbose:       pointerUtil.Bool(true),
+							PrintDataHex:  pointerUtil.Bool(true),
+							AbsoluteSeq:   pointerUtil.Bool(true),
+							NoTimestamp:   pointerUtil.Bool(true),
+						},
+					},
+				},
+			},
+			wantJobEnv: map[string]string{
+				string(captureConstants.CaptureOutputLocationEnvKeyPersistentVolumeClaim): "capture-pvc",
+				captureConstants.IncludeMetadataEnvKey:                                    "false",
+				captureConstants.TcpdumpFlagsEnvKey:                                       "-p -n -v -x -S -t",
+			},
+		},
+		{
+			name: "pcapFilter and boolean flags combined",
+			capture: retinav1alpha1.Capture{
+				Spec: retinav1alpha1.CaptureSpec{
+					OutputConfiguration: retinav1alpha1.OutputConfiguration{
+						PersistentVolumeClaim: pointerUtil.String("capture-pvc"),
+					},
+					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
+						CaptureOption: retinav1alpha1.CaptureOption{
+							PcapFilter:    pointerUtil.String("tcp port 443"),
+							NoPromiscuous: pointerUtil.Bool(true),
+							Verbose:       pointerUtil.Bool(true),
+						},
+					},
+				},
+			},
+			wantJobEnv: map[string]string{
+				string(captureConstants.CaptureOutputLocationEnvKeyPersistentVolumeClaim): "capture-pvc",
+				captureConstants.IncludeMetadataEnvKey:                                    "false",
+				captureConstants.PcapFilterEnvKey:                                         "tcp port 443",
+				captureConstants.TcpdumpFlagsEnvKey:                                       "-p -v",
+			},
+		},
 	}
 
 	for _, tt := range cases {
@@ -854,7 +961,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 	pvc := "capture-pvc"
 	backoffLimit := int32(0)
 	rootUser := int64(0)
-	tcpdumpFilter := "-i eth0"
+	tcpdumpFilter := "tcp port 443"
 	captureFolderHostPathType := corev1.HostPathDirectoryOrCreate
 	commonJob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1411,7 +1518,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: file.TimeToString(timestamp)},
 				{Name: captureConstants.IncludeMetadataEnvKey, Value: "false"},
 				{Name: captureConstants.NodeHostNameEnvKey, Value: "node1"},
-				{Name: captureConstants.TcpdumpRawFilterEnvKey, Value: "-i eth0"},
+				{Name: captureConstants.TcpdumpRawFilterEnvKey, Value: "tcp port 443"},
 				{Name: captureConstants.TcpdumpFilterEnvKey, Value: "(host 10.225.0.4)"},
 				{
 					Name: telemetry.EnvPodName,
@@ -1736,7 +1843,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 				{Name: captureConstants.CaptureStartTimestampEnvKey, Value: file.TimeToString(timestamp)},
 				{Name: captureConstants.IncludeMetadataEnvKey, Value: "false"},
 				{Name: captureConstants.NodeHostNameEnvKey, Value: "node1"},
-				{Name: captureConstants.TcpdumpRawFilterEnvKey, Value: "-i eth0"},
+				{Name: captureConstants.TcpdumpRawFilterEnvKey, Value: "tcp port 443"},
 				{Name: captureConstants.NetshFilterEnvKey, Value: "IPv4.Address=(10.225.0.4)"},
 				{
 					Name: telemetry.EnvPodName,

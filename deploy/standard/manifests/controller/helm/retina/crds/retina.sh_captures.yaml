@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.5
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: captures.retina.sh
 spec:
   group: retina.sh
@@ -48,16 +48,53 @@ spec:
                   captureOption:
                     description: CaptureOption lists the options of the capture.
                     properties:
+                      absoluteSeq:
+                        description: |-
+                          AbsoluteSeq prints absolute TCP sequence numbers (equivalent to tcpdump -S flag).
+                          Shows actual sequence numbers instead of relative numbers.
+                        type: boolean
+                      dateTimestamp:
+                        description: |-
+                          DateTimestamp prints timestamp with date (equivalent to tcpdump -tttt flag).
+                          Shows full date and time for each packet.
+                        type: boolean
+                      deltaSinceFirst:
+                        description: |-
+                          DeltaSinceFirst prints time delta since first packet (equivalent to tcpdump -ttttt flag).
+                          Shows time elapsed since the first captured packet.
+                        type: boolean
+                      deltaTimestamp:
+                        description: |-
+                          DeltaTimestamp prints time delta between packets (equivalent to tcpdump -ttt flag).
+                          Shows time elapsed since previous packet.
+                        type: boolean
+                      dontVerifyChecksum:
+                        description: |-
+                          DontVerifyChecksum disables TCP checksum verification (equivalent to tcpdump -K flag).
+                          Skips TCP checksum validation for captured packets.
+                        type: boolean
                       duration:
                         description: Duration indicates length of time that the capture
                           should continue for.
                         pattern: ^([0-9]+(\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$
                         type: string
+                      extraVerbose:
+                        description: |-
+                          ExtraVerbose enables extra verbose output (equivalent to tcpdump -vv flag).
+                          Provides even more detailed protocol information than Verbose.
+                        type: boolean
+                      immediateMode:
+                        description: |-
+                          ImmediateMode enables immediate mode for packet capture (equivalent to tcpdump --immediate-mode).
+                          When true, packets are delivered to the application immediately rather than being buffered.
+                          This can reduce latency but may increase CPU usage.
+                        type: boolean
                       interfaces:
                         description: |-
                           Interfaces specifies the network interfaces on which to capture packets.
-                          If specified, captures only on the listed interfaces.
+                          If specified, captures only on the listed interfaces (e.g., ["eth0", "eth1"]).
                           If empty, captures on all interfaces by default.
+                          Use this field to select specific interfaces, NOT the tcpdumpFilter field.
                         items:
                           type: string
                         type: array
@@ -66,10 +103,91 @@ spec:
                         description: MaxCaptureSize limits the capture file to MB
                           in size.
                         type: integer
+                      maxVerbose:
+                        description: |-
+                          MaxVerbose enables maximum verbose output (equivalent to tcpdump -vvv flag).
+                          Provides the most detailed protocol information available.
+                        type: boolean
+                      noPromiscuous:
+                        description: |-
+                          NoPromiscuous disables promiscuous mode for packet capture.
+                          When true, only packets destined for this host are captured (equivalent to tcpdump -p flag).
+                          When false or unset, captures all packets on the network segment (default behavior).
+                        type: boolean
+                      noResolveDNS:
+                        description: |-
+                          NoResolveDNS disables DNS resolution for captured addresses (equivalent to tcpdump -n flag).
+                          When true, IP addresses are displayed numerically without resolving hostnames.
+                          This speeds up capture processing and avoids DNS lookup overhead.
+                        type: boolean
+                      noResolvePort:
+                        description: |-
+                          NoResolvePort disables port name resolution (equivalent to tcpdump -nn flag).
+                          When true, both IP addresses and port numbers are displayed numerically.
+                          This prevents service name lookups for port numbers.
+                        type: boolean
+                      noTimestamp:
+                        description: |-
+                          NoTimestamp disables printing timestamps (equivalent to tcpdump -t flag).
+                          Omits timestamp information from output.
+                        type: boolean
+                      packetBuffered:
+                        description: |-
+                          PacketBuffered enables packet-buffered output mode (equivalent to tcpdump -U flag).
+                          When true, packets are written to output as soon as they're captured rather than being buffered.
+                          Useful for real-time monitoring but may impact performance.
+                        type: boolean
                       packetSize:
                         description: PacketSize limits the each packet to bytes in
                           size and packets longer than PacketSize will be truncated.
                         type: integer
+                      pcapFilter:
+                        description: |-
+                          PcapFilter specifies a BPF filter expression for packet filtering (e.g., "tcp port 443", "host 10.0.0.1").
+                          Only BPF expressions are allowed, no flags. See https://www.tcpdump.org/manpages/pcap-filter.7.html
+                        maxLength: 1024
+                        pattern: ^[^-]*$
+                        type: string
+                      printDataASCII:
+                        description: |-
+                          PrintDataASCII prints packet data in ASCII (equivalent to tcpdump -A flag).
+                          Useful for inspecting text protocols like HTTP.
+                        type: boolean
+                      printDataASCIILink:
+                        description: |-
+                          PrintDataASCIILink prints packet data including link-level header in ASCII (equivalent to tcpdump -AA flag).
+                          Like PrintDataASCII but also includes the link-layer (Ethernet) header.
+                        type: boolean
+                      printDataHex:
+                        description: |-
+                          PrintDataHex prints packet data in hex and ASCII (equivalent to tcpdump -X flag).
+                          Shows packet payload in both hexadecimal and ASCII format.
+                        type: boolean
+                      printDataHexLink:
+                        description: |-
+                          PrintDataHexLink prints packet data including link-level header in hex and ASCII (equivalent to tcpdump -XX flag).
+                          Like PrintDataHex but also includes the link-layer (Ethernet) header.
+                        type: boolean
+                      printLinkHeader:
+                        description: |-
+                          PrintLinkHeader prints link-level (Ethernet) headers (equivalent to tcpdump -e flag).
+                          Shows MAC addresses and other link-layer information.
+                        type: boolean
+                      quietOutput:
+                        description: |-
+                          QuietOutput enables quiet/quick output mode (equivalent to tcpdump -q flag).
+                          Prints less protocol information for shorter output lines.
+                        type: boolean
+                      unformattedTimestamp:
+                        description: |-
+                          UnformattedTimestamp prints unformatted timestamp (equivalent to tcpdump -tt flag).
+                          Shows timestamps as seconds since epoch.
+                        type: boolean
+                      verbose:
+                        description: |-
+                          Verbose enables verbose output for packet capture (equivalent to tcpdump -v flag).
+                          Provides additional protocol information in capture output.
+                        type: boolean
                     type: object
                   captureTarget:
                     description: CaptureTarget indicates the target on which the network
@@ -263,7 +381,11 @@ spec:
                       - Network statistics information
                     type: boolean
                   tcpdumpFilter:
-                    description: TcpdumpFilter is a raw tcpdump filter string.
+                    description: |-
+                      TcpdumpFilter accepts BPF filter expressions only (no flags).
+                      DEPRECATED: Use captureOption.pcapFilter for BPF expressions and captureOption boolean flags for display options.
+                    maxLength: 1024
+                    pattern: ^[^-]*$
                     type: string
                 required:
                 - captureTarget

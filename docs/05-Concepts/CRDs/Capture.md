@@ -23,11 +23,30 @@ The `Capture` CRD is defined with the following specifications:
 ### Fields
 
 - **spec.captureConfiguration:** Specifies the configuration for capturing network packets. It includes the following properties:
-  - `captureOption`: Lists options for the capture, such as duration, maximum capture size, and packet size.
+  - `captureOption`: Lists options for the capture, such as:
+    - `duration`: Capture duration
+    - `maxCaptureSize`: Maximum capture file size in MB
+    - `packetSize`: Maximum packet size to capture
+    - `interfaces`: Array of network interface names to capture from (e.g., `["eth0", "eth1"]`). If empty, captures from all interfaces.
+    - `pcapFilter`: BPF filter expression for packet filtering (e.g., `"host 10.0.0.1"`, `"tcp port 443"`). Does NOT accept flags.
+    - Boolean flags for tcpdump capture behavior and display options:
+      - `noPromiscuous`: Disable promiscuous mode (tcpdump -p)
+      - `packetBuffered`: Enable packet-buffered output (tcpdump -U)
+      - `immediateMode`: Enable immediate mode (tcpdump --immediate-mode)
+      - `noResolveDNS`: Don't resolve hostnames (tcpdump -n)
+      - `noResolvePort`: Don't resolve hostnames or port names (tcpdump -nn)
+      - `verbose`, `extraVerbose`, `maxVerbose`: Verbose output levels (tcpdump -v, -vv, -vvv)
+      - `printDataHex`, `printDataHexLink`: Show packet data in hex (tcpdump -x, -xx)
+      - `printDataASCII`, `printDataASCIILink`: Show packet data in ASCII (tcpdump -A, -AA)
+      - `printLinkHeader`: Print link-level headers (tcpdump -e)
+      - `quietOutput`: Quick/quiet output (tcpdump -q)
+      - `absoluteSeq`: Print absolute TCP sequence numbers (tcpdump -S)
+      - `noTimestamp`, `unformattedTimestamp`, `deltaTimestamp`, `dateTimestamp`, `deltaSinceFirst`: Timestamp options (tcpdump -t, -tt, -ttt, -tttt, -ttttt)
+      - `dontVerifyChecksum`: Don't verify TCP checksums (tcpdump -K)
   - `captureTarget`: Defines the target on which the network packets will be captured. It includes namespace, node, and pod selectors, as well as specific pod names.
   - `filters`: Specifies filters for including or excluding network packets based on IP or port.
   - `includeMetadata`: Indicates whether networking metadata should be captured.
-  - `tcpdumpFilter`: Allows specifying a raw tcpdump filter string.
+  - `tcpdumpFilter`: DEPRECATED. Accepts BPF filter expressions only (no flags). Use `captureOption.pcapFilter` for BPF expressions and `captureOption` boolean flags for display/output options.
 
 - **spec.outputConfiguration:** Indicates where the captured data will be stored. It includes the following properties:
   - `blobUpload`: Specifies a secret containing the blob SAS URL for storing the capture data.
@@ -75,6 +94,124 @@ data:
   s3-access-key-id: <based-encode-s3-access-key-id>
   s3-secret-access-key: <based-encode-s3-secret-access-key>
 ```
+
+### Advanced Filtering
+
+#### Capturing on Specific Network Interfaces
+
+To capture packets only on specific network interfaces, use the `captureOption.interfaces` field:
+
+```yaml
+apiVersion: retina.sh/v1alpha1
+kind: Capture
+metadata:
+  name: capture-specific-interfaces
+spec:
+  captureConfiguration:
+    captureOption:
+      duration: "1m"
+      interfaces: ["eth0", "eth1"]  # Capture only on these interfaces
+    captureTarget:
+      nodeSelector:
+        matchLabels:
+          kubernetes.io/hostname: node-1
+  outputConfiguration:
+    hostPath: /tmp/captures
+```
+
+#### Using BPF Filters with Display Options
+
+The `captureOption.pcapFilter` field accepts BPF (Berkeley Packet Filter) expressions for packet filtering. Use boolean flags in `captureOption` for display and output formatting.
+
+##### BPF Filters Only
+
+To apply packet filtering using BPF syntax:
+
+```yaml
+apiVersion: retina.sh/v1alpha1
+kind: Capture
+metadata:
+  name: capture-with-bpf-filter
+spec:
+  captureConfiguration:
+    captureOption:
+      duration: "1m"
+      pcapFilter: "tcp and (port 443 or port 80)"  # Only capture HTTP/HTTPS traffic
+    captureTarget:
+      nodeSelector:
+        matchLabels:
+          kubernetes.io/hostname: node-1
+  outputConfiguration:
+    hostPath: /tmp/captures
+```
+
+**Valid BPF filter examples:**
+
+- `"host 10.0.0.1"` - Capture packets to/from specific host
+- `"tcp port 443"` - Capture HTTPS traffic
+- `"net 192.168.0.0/16 and not port 22"` - Capture subnet traffic except SSH
+- `"tcp and (port 80 or port 443)"` - Capture HTTP and HTTPS traffic
+
+##### Using Display Options with BPF Filters
+
+Combine BPF filters with display option boolean flags:
+
+```yaml
+apiVersion: retina.sh/v1alpha1
+kind: Capture
+metadata:
+  name: capture-with-display-options
+spec:
+  captureConfiguration:
+    captureOption:
+      duration: "1m"
+      pcapFilter: "tcp port 443"
+      noResolveDNS: true     # Don't resolve hostnames (tcpdump -n)
+      verbose: true          # Verbose output (tcpdump -v)
+      printDataHex: true     # Show hex data (tcpdump -x)
+    captureTarget:
+      nodeSelector:
+        matchLabels:
+          kubernetes.io/hostname: node-1
+  outputConfiguration:
+    hostPath: /tmp/captures
+```
+
+**Examples with different display options:**
+
+```yaml
+# Don't resolve names or ports, very verbose, capture HTTP
+captureOption:
+  pcapFilter: "tcp port 80"
+  noResolvePort: true    # tcpdump -nn
+  extraVerbose: true     # tcpdump -vv
+```
+
+```yaml
+# Show hex data with timestamps, capture ICMP
+captureOption:
+  pcapFilter: "icmp"
+  printDataHex: true     # tcpdump -x
+  dateTimestamp: true    # tcpdump -tttt
+```
+
+**Available display option boolean flags:**
+
+- `noResolveDNS`, `noResolvePort`: Don't resolve hostnames/port names (tcpdump -n, -nn)
+- `verbose`, `extraVerbose`, `maxVerbose`: Verbose output levels (tcpdump -v, -vv, -vvv)
+- `printDataHex`, `printDataHexLink`: Show packet data in hex (tcpdump -x, -xx)
+- `printDataASCII`, `printDataASCIILink`: Show packet data in ASCII (tcpdump -A, -AA)
+- `printLinkHeader`: Print link-level headers (tcpdump -e)
+- `quietOutput`: Quick/quiet output (tcpdump -q)
+- `absoluteSeq`: Print absolute TCP sequence numbers (tcpdump -S)
+- `noTimestamp`, `unformattedTimestamp`, `deltaTimestamp`, `dateTimestamp`, `deltaSinceFirst`: Timestamp options
+- `dontVerifyChecksum`: Don't verify TCP checksums (tcpdump -K)
+
+**Capture behavior options:**
+
+- `noPromiscuous`: Disable promiscuous mode (tcpdump -p)
+- `packetBuffered`: Enable packet-buffered output (tcpdump -U)
+- `immediateMode`: Enable immediate mode (tcpdump --immediate-mode)
 
 ### Capture Lifecycle
 

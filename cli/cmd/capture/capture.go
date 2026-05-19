@@ -38,7 +38,30 @@ type Opts struct {
 	s3Path             string
 	s3Region           string
 	s3SecretAccessKey  string
-	tcpdumpFilter      string
+	// tcpdumpFilter is Obsolete use captureOption.pcapFilter and captureOption boolean flags for display options.
+	tcpdumpFilter        string
+	pcapFilter           string
+	noPromiscuous        bool
+	packetBuffered       bool
+	immediateMode        bool
+	noResolveDNS         bool
+	noResolvePort        bool
+	verbose              bool
+	extraVerbose         bool
+	maxVerbose           bool
+	printDataHex         bool
+	printDataHexLink     bool
+	printDataASCII       bool
+	printDataASCIILink   bool
+	printLinkHeader      bool
+	quietOutput          bool
+	absoluteSeq          bool
+	noTimestamp          bool
+	unformattedTimestamp bool
+	deltaTimestamp       bool
+	dateTimestamp        bool
+	deltaSinceFirst      bool
+	dontVerifyChecksum   bool
 }
 
 var opts = Opts{

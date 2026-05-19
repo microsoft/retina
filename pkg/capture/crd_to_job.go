@@ -40,6 +40,34 @@ var (
 	errPodNamesIncompat     = errors.New("PodNames is not compatible with NamespaceSelector or PodSelector, please use one or the other")
 )
 
+// tcpdumpFlagMapping defines the mapping between CaptureOption boolean fields and their corresponding tcpdump flags.
+var tcpdumpFlagMappings = []struct {
+	getBool func(*retinav1alpha1.CaptureOption) *bool
+	flag    string
+}{
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.NoPromiscuous }, "-p"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.PacketBuffered }, "-U"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.ImmediateMode }, "--immediate-mode"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.NoResolveDNS }, "-n"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.NoResolvePort }, "-nn"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.Verbose }, "-v"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.ExtraVerbose }, "-vv"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.MaxVerbose }, "-vvv"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.PrintDataHex }, "-x"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.PrintDataHexLink }, "-xx"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.PrintDataASCII }, "-A"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.PrintDataASCIILink }, "-AA"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.PrintLinkHeader }, "-e"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.QuietOutput }, "-q"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.AbsoluteSeq }, "-S"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.NoTimestamp }, "-t"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.UnformattedTimestamp }, "-tt"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.DeltaTimestamp }, "-ttt"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.DateTimestamp }, "-tttt"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.DeltaSinceFirst }, "-ttttt"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.DontVerifyChecksum }, "-K"},
+}
+
 // CaptureTarget indicates on which the network capture will be performed on a given node.
 type CaptureTarget struct {
 	// PodIpAddresses indicates the capture is performed on the Pods per their IP addresses.
@@ -1013,8 +1041,24 @@ func (translator *CaptureToPodTranslator) ObtainCaptureJobPodEnv(capture retinav
 		jobPodEnv[captureConstants.PacketSizeEnvKey] = strconv.Itoa(*capture.Spec.CaptureConfiguration.CaptureOption.PacketSize)
 	}
 
+	if capture.Spec.CaptureConfiguration.CaptureOption.PcapFilter != nil {
+		jobPodEnv[captureConstants.PcapFilterEnvKey] = *capture.Spec.CaptureConfiguration.CaptureOption.PcapFilter
+	}
+
 	if capture.Spec.CaptureConfiguration.TcpdumpFilter != nil {
 		jobPodEnv[captureConstants.TcpdumpRawFilterEnvKey] = *capture.Spec.CaptureConfiguration.TcpdumpFilter
+	}
+
+	// Build tcpdump flags from CaptureOption boolean fields using the mapping table
+	var tcpdumpFlags []string
+	opt := &capture.Spec.CaptureConfiguration.CaptureOption
+	for _, mapping := range tcpdumpFlagMappings {
+		if boolVal := mapping.getBool(opt); boolVal != nil && *boolVal {
+			tcpdumpFlags = append(tcpdumpFlags, mapping.flag)
+		}
+	}
+	if len(tcpdumpFlags) > 0 {
+		jobPodEnv[captureConstants.TcpdumpFlagsEnvKey] = strings.Join(tcpdumpFlags, " ")
 	}
 
 	if len(capture.Name) != 0 {

@@ -67,10 +67,128 @@ type CaptureOption struct {
 	MaxCaptureSize *int `json:"maxCaptureSize,omitempty"`
 
 	// Interfaces specifies the network interfaces on which to capture packets.
-	// If specified, captures only on the listed interfaces.
+	// If specified, captures only on the listed interfaces (e.g., ["eth0", "eth1"]).
 	// If empty, captures on all interfaces by default.
+	// Use this field to select specific interfaces, NOT the tcpdumpFilter field.
 	// +optional
 	Interfaces []string `json:"interfaces,omitempty"`
+
+	// PcapFilter specifies a BPF filter expression for packet filtering (e.g., "tcp port 443", "host 10.0.0.1").
+	// Only BPF expressions are allowed, no flags. See https://www.tcpdump.org/manpages/pcap-filter.7.html
+	// +optional
+	// +kubebuilder:validation:MaxLength=1024
+	// +kubebuilder:validation:Pattern="^[^-]*$"
+	PcapFilter *string `json:"pcapFilter,omitempty"`
+
+	// NoPromiscuous disables promiscuous mode for packet capture.
+	// When true, only packets destined for this host are captured (equivalent to tcpdump -p flag).
+	// When false or unset, captures all packets on the network segment (default behavior).
+	// +optional
+	NoPromiscuous *bool `json:"noPromiscuous,omitempty"`
+
+	// PacketBuffered enables packet-buffered output mode (equivalent to tcpdump -U flag).
+	// When true, packets are written to output as soon as they're captured rather than being buffered.
+	// Useful for real-time monitoring but may impact performance.
+	// +optional
+	PacketBuffered *bool `json:"packetBuffered,omitempty"`
+
+	// ImmediateMode enables immediate mode for packet capture (equivalent to tcpdump --immediate-mode).
+	// When true, packets are delivered to the application immediately rather than being buffered.
+	// This can reduce latency but may increase CPU usage.
+	// +optional
+	ImmediateMode *bool `json:"immediateMode,omitempty"`
+
+	// NoResolveDNS disables DNS resolution for captured addresses (equivalent to tcpdump -n flag).
+	// When true, IP addresses are displayed numerically without resolving hostnames.
+	// This speeds up capture processing and avoids DNS lookup overhead.
+	// +optional
+	NoResolveDNS *bool `json:"noResolveDNS,omitempty"`
+
+	// NoResolvePort disables port name resolution (equivalent to tcpdump -nn flag).
+	// When true, both IP addresses and port numbers are displayed numerically.
+	// This prevents service name lookups for port numbers.
+	// +optional
+	NoResolvePort *bool `json:"noResolvePort,omitempty"`
+
+	// Verbose enables verbose output for packet capture (equivalent to tcpdump -v flag).
+	// Provides additional protocol information in capture output.
+	// +optional
+	Verbose *bool `json:"verbose,omitempty"`
+
+	// ExtraVerbose enables extra verbose output (equivalent to tcpdump -vv flag).
+	// Provides even more detailed protocol information than Verbose.
+	// +optional
+	ExtraVerbose *bool `json:"extraVerbose,omitempty"`
+
+	// MaxVerbose enables maximum verbose output (equivalent to tcpdump -vvv flag).
+	// Provides the most detailed protocol information available.
+	// +optional
+	MaxVerbose *bool `json:"maxVerbose,omitempty"`
+
+	// PrintDataHex prints packet data in hex and ASCII (equivalent to tcpdump -X flag).
+	// Shows packet payload in both hexadecimal and ASCII format.
+	// +optional
+	PrintDataHex *bool `json:"printDataHex,omitempty"`
+
+	// PrintDataHexLink prints packet data including link-level header in hex and ASCII (equivalent to tcpdump -XX flag).
+	// Like PrintDataHex but also includes the link-layer (Ethernet) header.
+	// +optional
+	PrintDataHexLink *bool `json:"printDataHexLink,omitempty"`
+
+	// PrintDataASCII prints packet data in ASCII (equivalent to tcpdump -A flag).
+	// Useful for inspecting text protocols like HTTP.
+	// +optional
+	PrintDataASCII *bool `json:"printDataASCII,omitempty"`
+
+	// PrintDataASCIILink prints packet data including link-level header in ASCII (equivalent to tcpdump -AA flag).
+	// Like PrintDataASCII but also includes the link-layer (Ethernet) header.
+	// +optional
+	PrintDataASCIILink *bool `json:"printDataASCIILink,omitempty"`
+
+	// PrintLinkHeader prints link-level (Ethernet) headers (equivalent to tcpdump -e flag).
+	// Shows MAC addresses and other link-layer information.
+	// +optional
+	PrintLinkHeader *bool `json:"printLinkHeader,omitempty"`
+
+	// QuietOutput enables quiet/quick output mode (equivalent to tcpdump -q flag).
+	// Prints less protocol information for shorter output lines.
+	// +optional
+	QuietOutput *bool `json:"quietOutput,omitempty"`
+
+	// AbsoluteSeq prints absolute TCP sequence numbers (equivalent to tcpdump -S flag).
+	// Shows actual sequence numbers instead of relative numbers.
+	// +optional
+	AbsoluteSeq *bool `json:"absoluteSeq,omitempty"`
+
+	// NoTimestamp disables printing timestamps (equivalent to tcpdump -t flag).
+	// Omits timestamp information from output.
+	// +optional
+	NoTimestamp *bool `json:"noTimestamp,omitempty"`
+
+	// UnformattedTimestamp prints unformatted timestamp (equivalent to tcpdump -tt flag).
+	// Shows timestamps as seconds since epoch.
+	// +optional
+	UnformattedTimestamp *bool `json:"unformattedTimestamp,omitempty"`
+
+	// DeltaTimestamp prints time delta between packets (equivalent to tcpdump -ttt flag).
+	// Shows time elapsed since previous packet.
+	// +optional
+	DeltaTimestamp *bool `json:"deltaTimestamp,omitempty"`
+
+	// DateTimestamp prints timestamp with date (equivalent to tcpdump -tttt flag).
+	// Shows full date and time for each packet.
+	// +optional
+	DateTimestamp *bool `json:"dateTimestamp,omitempty"`
+
+	// DeltaSinceFirst prints time delta since first packet (equivalent to tcpdump -ttttt flag).
+	// Shows time elapsed since the first captured packet.
+	// +optional
+	DeltaSinceFirst *bool `json:"deltaSinceFirst,omitempty"`
+
+	// DontVerifyChecksum disables TCP checksum verification (equivalent to tcpdump -K flag).
+	// Skips TCP checksum validation for captured packets.
+	// +optional
+	DontVerifyChecksum *bool `json:"dontVerifyChecksum,omitempty"`
 }
 
 // CaptureTarget indicates the target on which the network packets capture will be performed.
@@ -106,8 +224,12 @@ type CaptureConfiguration struct {
 	// +optional
 	Filters *CaptureConfigurationFilters `json:"filters,omitempty"`
 
-	// TcpdumpFilter is a raw tcpdump filter string.
+	// TcpdumpFilter accepts BPF filter expressions only (no flags).
+	//
+	// Deprecated: Use captureOption.pcapFilter for BPF expressions and captureOption boolean flags for display options.
 	// +optional
+	// +kubebuilder:validation:MaxLength=1024
+	// +kubebuilder:validation:Pattern="^[^-]*$"
 	TcpdumpFilter *string `json:"tcpdumpFilter,omitempty"`
 
 	// IncludeMetadata represents whether or not networking metadata should be captured.
