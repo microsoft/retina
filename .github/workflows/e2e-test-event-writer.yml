@@ -134,5 +134,10 @@ jobs:
 
           $tag = "${{ steps.tag.outputs.tag }}"
           docker build -f "./Dockerfile" -t "${image}:${tag}" -t "${image}:latest" .
-          docker push "${image}:${tag}"
-          docker push "${image}:latest"
+
+          if ("${{ github.event_name }}" -ne "pull_request") {                                             
+              docker push "${image}:${tag}"                                                                  
+              docker push "${image}:latest"                                                                  
+          } else {                                                                                         
+              Write-Host "Skipping image push for pull_request runs"                                         
+          }  
