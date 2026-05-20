@@ -19,6 +19,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -63,6 +64,14 @@ const (
 	// the Job's activeDeadlineSeconds. This buffer accounts for output upload
 	// and cleanup time after the capture itself finishes.
 	JobActiveDeadlineBufferSeconds int64 = 1800 // 30 minutes
+
+	// WaitDeadlineBuffer is extra time added to the capture duration when
+	// computing the wait deadline, to account for upload and scheduling overhead.
+	WaitDeadlineBuffer time.Duration = 5 * time.Minute
+
+	// MinPollAttempts is the minimum number of polling iterations before the
+	// wait deadline expires. Used to compute a fallback poll period.
+	MinPollAttempts = 4
 )
 
 var errCleanupRequiresRemoteStorage = errors.New("--cleanup-after-upload requires remote storage (--blob-upload, --s3-bucket, or --pvc)")
@@ -666,7 +675,7 @@ func waitUntilJobsComplete(ctx context.Context, kubeClient kubernetes.Interface,
 	if opts.duration != 0 {
 		// Allow time for capture + upload + scheduling overhead (Windows
 		// nodes in particular need extra time for image pull and pod start).
-		deadline = opts.duration + 5*time.Minute
+		deadline = opts.duration + WaitDeadlineBuffer
 		if deadline < DefaultWaitTimeout {
 			deadline = DefaultWaitTimeout
 		}
@@ -679,7 +688,7 @@ func waitUntilJobsComplete(ctx context.Context, kubeClient kubernetes.Interface,
 	}
 	// Ensure poll period is less than the deadline so we get multiple checks.
 	if period >= deadline {
-		period = deadline / 4
+		period = deadline / MinPollAttempts
 	}
 	retinacmd.Logger.Info(fmt.Sprintf("Waiting timeout is set to %s", deadline))
 
@@ -756,7 +765,7 @@ func setSecretOwnerReferences(ctx context.Context, kubeClient kubernetes.Interfa
 	ownerRefs := make([]metav1.OwnerReference, 0, len(jobs))
 	for i := range jobs {
 		ownerRefs = append(ownerRefs, metav1.OwnerReference{
-			APIVersion: "batch/v1",
+			APIVersion: batchv1.SchemeGroupVersion.String(),
 			Kind:       "Job",
 			Name:       jobs[i].Name,
 			UID:        jobs[i].UID,
@@ -768,7 +777,16 @@ func setSecretOwnerReferences(ctx context.Context, kubeClient kubernetes.Interfa
 		if err != nil {
 			return fmt.Errorf("failed to get secret %s: %w", secretName, err)
 		}
-		secret.OwnerReferences = append(secret.OwnerReferences, ownerRefs...)
+		// Deduplicate owner references to avoid appending the same refs on retries.
+		existing := make(map[types.UID]struct{}, len(secret.OwnerReferences))
+		for _, ref := range secret.OwnerReferences {
+			existing[ref.UID] = struct{}{}
+		}
+		for _, ref := range ownerRefs {
+			if _, found := existing[ref.UID]; !found {
+				secret.OwnerReferences = append(secret.OwnerReferences, ref)
+			}
+		}
 		if _, err := kubeClient.CoreV1().Secrets(*opts.Namespace).Update(ctx, secret, metav1.UpdateOptions{}); err != nil {
 			return fmt.Errorf("failed to update secret %s with owner references: %w", secretName, err)
 		}

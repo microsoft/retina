@@ -221,20 +221,24 @@ func (cr *CaptureReconciler) updateCaptureStatusFromJobs(ctx context.Context, ca
 
 	// If CleanUpAfterUpload is enabled and all jobs succeeded (uploaded to remote storage),
 	// automatically delete the Capture resource which triggers cleanup via the finalizer.
-	if capture.Spec.CleanUpAfterUpload && len(failedJobs) == 0 {
-		hasRemoteStorage := capture.Spec.OutputConfiguration.BlobUpload != nil || capture.Spec.OutputConfiguration.S3Upload != nil || capture.Spec.OutputConfiguration.PersistentVolumeClaim != nil
-		if hasRemoteStorage {
-			cr.logger.Info("All capture jobs completed successfully with remote storage upload, performing automatic cleanup",
-				zap.String("Capture", captureRef.String()))
-			if err := cr.Delete(ctx, capture); err != nil {
-				cr.logger.Error("Failed to auto-delete Capture after successful upload",
-					zap.Error(err), zap.String("Capture", captureRef.String()))
-				return ctrl.Result{}, fmt.Errorf("failed to auto-delete Capture after successful upload: %w", err)
-			}
-			return ctrl.Result{}, nil
-		}
+	if !capture.Spec.CleanUpAfterUpload || len(failedJobs) != 0 {
+		return ctrl.Result{}, nil
 	}
 
+	hasRemoteStorage := capture.Spec.OutputConfiguration.BlobUpload != nil ||
+		capture.Spec.OutputConfiguration.S3Upload != nil ||
+		capture.Spec.OutputConfiguration.PersistentVolumeClaim != nil
+	if !hasRemoteStorage {
+		return ctrl.Result{}, nil
+	}
+
+	cr.logger.Info("All capture jobs completed successfully with remote storage upload, performing automatic cleanup",
+		zap.String("Capture", captureRef.String()))
+	if err := cr.Delete(ctx, capture); err != nil {
+		cr.logger.Error("Failed to auto-delete Capture after successful upload",
+			zap.Error(err), zap.String("Capture", captureRef.String()))
+		return ctrl.Result{}, fmt.Errorf("failed to auto-delete Capture after successful upload: %w", err)
+	}
 	return ctrl.Result{}, nil
 }
 

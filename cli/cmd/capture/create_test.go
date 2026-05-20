@@ -776,6 +776,53 @@ func TestSetSecretOwnerReferences(t *testing.T) {
 	require.Equal(t, "Job", secret.OwnerReferences[0].Kind)
 }
 
+func TestSetSecretOwnerReferences_Idempotent(t *testing.T) {
+	ns := testNamespace
+	secretName := "blob-secret-idem"
+
+	kubeClient := fake.NewClientset(
+		&corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: ns,
+			},
+		},
+	)
+
+	origNs := opts.Namespace
+	opts.Namespace = &ns
+	defer func() { opts.Namespace = origNs }()
+
+	blobUpload := secretName
+	capture := &retinav1alpha1.Capture{
+		Spec: retinav1alpha1.CaptureSpec{
+			OutputConfiguration: retinav1alpha1.OutputConfiguration{
+				BlobUpload: &blobUpload,
+			},
+		},
+	}
+
+	jobs := []batchv1.Job{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "job-1",
+				Namespace: ns,
+				UID:       "uid-1",
+			},
+		},
+	}
+
+	// Call twice to simulate retry/re-reconcile.
+	err := setSecretOwnerReferences(context.Background(), kubeClient, capture, jobs)
+	require.NoError(t, err)
+	err = setSecretOwnerReferences(context.Background(), kubeClient, capture, jobs)
+	require.NoError(t, err)
+
+	secret, err := kubeClient.CoreV1().Secrets(ns).Get(context.Background(), secretName, metav1.GetOptions{})
+	require.NoError(t, err)
+	require.Len(t, secret.OwnerReferences, 1, "duplicate owner references should not be added")
+}
+
 func TestSetSecretOwnerReferences_NoSecrets(t *testing.T) {
 	kubeClient := fake.NewClientset()
 
