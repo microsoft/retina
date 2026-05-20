@@ -121,6 +121,77 @@ func NewNetworkCaptureProvider(logger *log.ZapLogger) NetworkCaptureProviderInte
 	}
 }
 
+// obtainAndValidateUserFilter retrieves the user-provided BPF filter from environment variables,
+// validates it (rejecting flags), and returns the trimmed filter and its source name.
+func (ncp *NetworkCaptureProvider) obtainAndValidateUserFilter() (trimmedFilter, filterSource string, err error) {
+	pcapFilter := os.Getenv(captureConstants.PcapFilterEnvKey)
+	tcpdumpRawFilter := os.Getenv(captureConstants.TcpdumpRawFilterEnvKey)
+
+	// PcapFilter takes precedence over TcpdumpFilter
+	if pcapFilter != "" {
+		trimmedFilter = strings.TrimSpace(pcapFilter)
+		filterSource = "pcapFilter"
+		ncp.l.Info("Using pcapFilter", zap.String("filter", trimmedFilter))
+		if tcpdumpRawFilter != "" {
+			ncp.l.Warn("Both pcapFilter and tcpdumpFilter provided; using pcapFilter (tcpdumpFilter is deprecated)",
+				zap.String("ignored_tcpdumpFilter", tcpdumpRawFilter))
+		}
+	} else if tcpdumpRawFilter != "" {
+		trimmedFilter = strings.TrimSpace(tcpdumpRawFilter)
+		filterSource = "tcpdumpFilter (deprecated)"
+		ncp.l.Info("Using deprecated tcpdumpFilter; consider migrating to pcapFilter", zap.String("filter", trimmedFilter))
+	}
+
+	// Check for whitespace-only input
+	if trimmedFilter == "" && (pcapFilter != "" || tcpdumpRawFilter != "") {
+		return "", "", errTcpdumpFilterEmptyOrWhitespace
+	}
+
+	// SECURITY: Reject any input containing flags (starting with '-')
+	// This prevents dangerous flags like -w, -i, -c from being passed to tcpdump
+	if trimmedFilter != "" {
+		tokens := strings.FieldsSeq(trimmedFilter)
+		for token := range tokens {
+			if strings.HasPrefix(token, "-") {
+				return "", "", fmt.Errorf("%s contains flag %q: %w", filterSource, token, errTcpdumpFilterContainsFlag)
+			}
+		}
+	}
+
+	return trimmedFilter, filterSource, nil
+}
+
+// combineFilters combines the user filter with the system filter using proper BPF syntax.
+func combineFilters(userFilter, systemFilter string) string {
+	switch {
+	case userFilter != "" && systemFilter != "":
+		// Both filters: wrap each in parentheses to ensure correct operator precedence
+		return fmt.Sprintf("(%s) and (%s)", userFilter, systemFilter)
+	case userFilter != "":
+		return userFilter
+	case systemFilter != "":
+		return systemFilter
+	default:
+		return ""
+	}
+}
+
+// validateBPFFilterSyntax validates the BPF filter syntax using tcpdump -d.
+func (ncp *NetworkCaptureProvider) validateBPFFilterSyntax(ctx context.Context, filter string) error {
+	if filter == "" {
+		return nil
+	}
+
+	//nolint:gosec // G702: tcpdump -d is used for BPF syntax validation only, filter is constructed from validated input
+	validateCmd := exec.CommandContext(ctx, "tcpdump", "-d", filter)
+	if err := validateCmd.Run(); err != nil {
+		ncp.l.Error("BPF filter validation failed", zap.String("filter", filter), zap.Error(err))
+		return fmt.Errorf("invalid BPF filter syntax: %w (filter: %q)", err, filter)
+	}
+	ncp.l.Info("BPF filter syntax validated successfully", zap.String("filter", filter))
+	return nil
+}
+
 func (ncp *NetworkCaptureProvider) Setup(filename file.CaptureFilename) (string, error) {
 	captureFolderDir, err := ncp.NetworkCaptureProviderCommon.Setup(filename)
 	if err != nil {
@@ -144,72 +215,19 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, inc
 	// Remove the folder in case it already exists to mislead the file size check.
 	os.Remove(captureFilePath) //nolint:errcheck // File may not exist, ok to ignore error
 
-	// Combine user BPF filter with system-generated filter (include/exclude Pod IPs)
-	// PcapFilter takes precedence over deprecated TcpdumpFilter if both are provided
-	var combinedFilter string
-
-	// Check for PcapFilter first (new, preferred)
-	pcapFilter := os.Getenv(captureConstants.PcapFilterEnvKey)
-	tcpdumpRawFilter := os.Getenv(captureConstants.TcpdumpRawFilterEnvKey)
-
-	var trimmedUserInput string
-	var filterSource string
-
-	// PcapFilter takes precedence over TcpdumpFilter
-	if pcapFilter != "" {
-		trimmedUserInput = strings.TrimSpace(pcapFilter)
-		filterSource = "pcapFilter"
-		ncp.l.Info("Using pcapFilter", zap.String("filter", trimmedUserInput))
-		if tcpdumpRawFilter != "" {
-			ncp.l.Warn("Both pcapFilter and tcpdumpFilter provided; using pcapFilter (tcpdumpFilter is deprecated)", zap.String("ignored_tcpdumpFilter", tcpdumpRawFilter))
-		}
-	} else if tcpdumpRawFilter != "" {
-		trimmedUserInput = strings.TrimSpace(tcpdumpRawFilter)
-		filterSource = "tcpdumpFilter (deprecated)"
-		ncp.l.Info("Using deprecated tcpdumpFilter; consider migrating to pcapFilter", zap.String("filter", trimmedUserInput))
+	// Obtain and validate user-provided BPF filter
+	userFilter, _, err := ncp.obtainAndValidateUserFilter()
+	if err != nil {
+		return err
 	}
 
-	// SECURITY: Reject any input containing flags (starting with '-')
-	// This prevents dangerous flags like -w, -i, -c from being passed to tcpdump
-	// Split by whitespace and check if any token starts with '-'
-	// CRD types basic validation, but we enforce this again here for defense in depth and for CLI.
-	if trimmedUserInput != "" {
-		tokens := strings.FieldsSeq(trimmedUserInput) // Fields splits on any whitespace
-		for token := range tokens {
-			if strings.HasPrefix(token, "-") {
-				return fmt.Errorf("%s contains flag %q: %w", filterSource, token, errTcpdumpFilterContainsFlag)
-			}
-		}
-	}
-
-	if trimmedUserInput == "" && (pcapFilter != "" || tcpdumpRawFilter != "") {
-		return errTcpdumpFilterEmptyOrWhitespace
-	}
-
-	// Combine BPF filters using 'and' operator if both are present
-	switch {
-	case trimmedUserInput != "" && includeExcludeFilter != "":
-		// User filter + system filter: "(tcp port 80 or udp port 53) and (host 10.0.0.1)"
-		// Parentheses ensure correct operator precedence (AND has higher precedence than OR in BPF)
-		combinedFilter = fmt.Sprintf("(%s) and (%s)", trimmedUserInput, includeExcludeFilter)
-	case trimmedUserInput != "":
-		// Only user filter
-		combinedFilter = trimmedUserInput
-	case includeExcludeFilter != "":
-		// Only system filter (include/exclude Pod IPs)
-		combinedFilter = includeExcludeFilter
-		// else: no filters at all, capture everything
-	}
+	// Combine user filter with system filter (include/exclude Pod IPs)
+	combinedFilter := combineFilters(userFilter, includeExcludeFilter)
 
 	// Validate BPF filter syntax before starting capture
-	if combinedFilter != "" {
-		//nolint:gosec // G702: tcpdump -d is used for BPF syntax validation only, combinedFilter is constructed from validated user input (flag-free BPF expressions) and system filters
-		validateCmd := exec.CommandContext(ctx, "tcpdump", "-d", combinedFilter)
-		if err := validateCmd.Run(); err != nil {
-			ncp.l.Error("BPF filter validation failed", zap.String("filter", combinedFilter), zap.Error(err))
-			return fmt.Errorf("invalid BPF filter syntax: %w (filter: %q)", err, combinedFilter)
-		}
-		ncp.l.Info("BPF filter syntax validated successfully", zap.String("filter", combinedFilter))
+	err = ncp.validateBPFFilterSyntax(ctx, combinedFilter)
+	if err != nil {
+		return err
 	}
 
 	// Construct tcpdump command with combined filter
