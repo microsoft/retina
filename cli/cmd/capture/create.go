@@ -250,7 +250,7 @@ func NewCreateSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 	// Enum-based flags for mutually exclusive options
 	createCapture.Flags().StringVar(&verbosityStr, "verbosity", "", "Verbosity level: verbose, extra, max (tcpdump -v/-vv/-vvv)")
 	createCapture.Flags().StringVar(&timestampStr, "timestamp-format", "", "Timestamp format: none, unformatted, delta, date, delta-since-first (tcpdump -t/-tt/-ttt/-tttt/-ttttt)")
-	createCapture.Flags().StringVar(&printDataStr, "print-data", "", "Print packet data: hex, hex-with-link, ascii, ascii-with-link (tcpdump -X/-XX/-A/-AA)")
+	createCapture.Flags().StringVar(&printDataStr, "print-data", "", "Print packet data: hex, hex-with-link, ascii, ascii-with-link (tcpdump -x/-xx/-A/-AA)")
 
 	// Filters
 	createCapture.Flags().StringVar(&opts.excludeFilter, "exclude-filter", "", "A comma-separated list of IP:Port pairs that are "+
@@ -316,7 +316,38 @@ func deleteSecret(ctx context.Context, kubeClient kubernetes.Interface, secretNa
 	return kubeClient.CoreV1().Secrets(*opts.Namespace).Delete(ctx, *secretName, metav1.DeleteOptions{}) //nolint:wrapcheck //internal return
 }
 
+// validateBPFFilter checks that a BPF filter string doesn't contain flags (tokens starting with '-').
+// This prevents command injection attacks by ensuring only BPF expressions are provided.
+func validateBPFFilter(filter, filterName string) error {
+	if filter == "" {
+		return nil
+	}
+
+	trimmed := strings.TrimSpace(filter)
+	if trimmed == "" {
+		return fmt.Errorf("%s: %w", filterName, ErrBPFFilterEmpty)
+	}
+
+	// Check for flags (tokens starting with '-')
+	tokens := strings.Fields(trimmed)
+	for _, token := range tokens {
+		if strings.HasPrefix(token, "-") {
+			return fmt.Errorf("%s contains flag %q: %w", filterName, token, ErrBPFFilterContainsFlag)
+		}
+	}
+
+	return nil
+}
+
 func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*retinav1alpha1.Capture, error) {
+	// Validate filters early to provide immediate feedback
+	if err := validateBPFFilter(opts.tcpdumpFilter, "--tcpdump-filter"); err != nil {
+		return nil, err
+	}
+	if err := validateBPFFilter(opts.pcapFilter, "--pcap-filter"); err != nil {
+		return nil, err
+	}
+
 	timestamp := file.Now()
 
 	capture := &retinav1alpha1.Capture{

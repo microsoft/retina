@@ -80,8 +80,18 @@ func hasInterface(cmd *exec.Cmd, expectedInterface string) bool {
 // Helper function to reset environment variables
 func resetEnvVars() {
 	os.Unsetenv(captureConstants.TcpdumpRawFilterEnvKey)
+	os.Unsetenv(captureConstants.PcapFilterEnvKey)
 	os.Unsetenv(captureConstants.PacketSizeEnvKey)
 	os.Unsetenv(captureConstants.CaptureInterfacesEnvKey)
+	os.Unsetenv(captureConstants.TcpdumpFlagsEnvKey)
+}
+
+// Helper function to check if tcpdump is available on the system
+func requireTcpdump(t *testing.T) {
+	t.Helper()
+	if _, err := exec.LookPath("tcpdump"); err != nil {
+		t.Skipf("tcpdump not available on system: %v", err)
+	}
 }
 
 // TestTcpdumpEmptyFilter verifies that empty filter falls back to default interface
@@ -368,6 +378,7 @@ func TestTcpdumpFlagsEnvVar(t *testing.T) {
 
 // TestFilterValidation tests flag rejection in filter input
 func TestFilterValidation(t *testing.T) {
+	requireTcpdump(t)
 	resetEnvVars()
 
 	_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
@@ -465,8 +476,9 @@ func TestFilterValidation(t *testing.T) {
 					t.Errorf("Expected error containing '%s', but got: %v", tt.errorMsg, err)
 				}
 			} else {
-				if err != nil && !strings.Contains(err.Error(), "tcpdump") {
-					// Ignore errors from actually running tcpdump (we're just testing validation)
+				// For valid filters, we may get tcpdump execution errors (duration too short, etc.)
+				// but we should NOT get validation errors
+				if err != nil && (strings.Contains(err.Error(), "contains flag") || strings.Contains(err.Error(), "whitespace-only")) {
 					t.Errorf("Expected no validation error, but got: %v", err)
 				}
 			}
@@ -543,6 +555,7 @@ func TestFilterWhitespaceValidation(t *testing.T) {
 
 // TestFilterPrecedence tests that pcapFilter takes precedence over tcpdumpFilter
 func TestFilterPrecedence(t *testing.T) {
+	requireTcpdump(t)
 	resetEnvVars()
 
 	_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
@@ -609,6 +622,7 @@ func TestFilterPrecedence(t *testing.T) {
 				if err != nil && strings.Contains(err.Error(), "contains flag") {
 					t.Errorf("Unexpected validation error: %v", err)
 				}
+				// Other errors (e.g., tcpdump execution failures) are acceptable for these tests
 			}
 		})
 	}

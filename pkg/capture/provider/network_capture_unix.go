@@ -134,7 +134,7 @@ func (ncp *NetworkCaptureProvider) Setup(filename file.CaptureFilename) (string,
 	return ncp.TmpCaptureDir, nil
 }
 
-func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, filter string, duration, maxSizeMB int) error {
+func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, includeExcludeFilter string, duration, maxSizeMB int) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(duration)*time.Second)
 	defer cancel()
 
@@ -188,15 +188,16 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, fil
 
 	// Combine BPF filters using 'and' operator if both are present
 	switch {
-	case trimmedUserInput != "" && filter != "":
-		// User filter + system filter: "tcp port 80 and (host 10.0.0.1)"
-		combinedFilter = fmt.Sprintf("%s and %s", trimmedUserInput, filter)
+	case trimmedUserInput != "" && includeExcludeFilter != "":
+		// User filter + system filter: "(tcp port 80 or udp port 53) and (host 10.0.0.1)"
+		// Parentheses ensure correct operator precedence (AND has higher precedence than OR in BPF)
+		combinedFilter = fmt.Sprintf("(%s) and (%s)", trimmedUserInput, includeExcludeFilter)
 	case trimmedUserInput != "":
 		// Only user filter
 		combinedFilter = trimmedUserInput
-	case filter != "":
+	case includeExcludeFilter != "":
 		// Only system filter (include/exclude Pod IPs)
-		combinedFilter = filter
+		combinedFilter = includeExcludeFilter
 		// else: no filters at all, capture everything
 	}
 

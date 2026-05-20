@@ -17,6 +17,8 @@ var (
 	ErrInvalidVerbosityLevel  = errors.New("invalid verbosity level")
 	ErrInvalidTimestampFormat = errors.New("invalid timestamp format")
 	ErrInvalidPrintDataFormat = errors.New("invalid print data format")
+	ErrBPFFilterEmpty         = errors.New("BPF filter cannot be empty or whitespace-only")
+	ErrBPFFilterContainsFlag  = errors.New("BPF filter contains flag which is not allowed")
 )
 
 // VerbosityLevel represents the verbosity level for packet capture output
