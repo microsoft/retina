@@ -4,7 +4,7 @@
 
 # Version configuration
 $Script:eBPFVersion = "1.1.0"
-$Script:RetinaEbpfAPIVersion = "1.3.0"
+$Script:RetinaEbpfAPIVersion = "1.6.0"
 $Script:XDPRuntimeVersion = "1.3.0"
 
 Function Assert-SoftwareInstalled
