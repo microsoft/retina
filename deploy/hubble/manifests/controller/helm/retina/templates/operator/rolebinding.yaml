@@ -18,6 +18,6 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: retina-operator
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ .Values.Namespace }}
 
 {{- end -}}
