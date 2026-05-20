@@ -16,8 +16,8 @@ import (
 	"go.uber.org/zap"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
@@ -35,7 +35,7 @@ import (
 )
 
 const (
-	DefaultCleanUpAfterUpload bool          = false
+	DefaultCleanUpAfterUpload bool        = false
 	DefaultDebug    bool          = false
 	DefaultDuration time.Duration = 1 * time.Minute
 	// DefaultHostPath is the default subpath (joined under DefaultHostPathBaseDir on
@@ -64,6 +64,8 @@ const (
 	// and cleanup time after the capture itself finishes.
 	JobActiveDeadlineBufferSeconds int64 = 1800 // 30 minutes
 )
+
+var errCleanupRequiresRemoteStorage = errors.New("--cleanup-after-upload requires remote storage (--blob-upload, --s3-bucket, or --pvc)")
 
 // hasRemoteDestination returns true if the capture options specify a remote
 // storage output (blob upload or S3 upload).
@@ -133,7 +135,7 @@ func create(kubeClient kubernetes.Interface) error {
 
 	if opts.cleanUpAfterUpload {
 		if !hasRemoteDestination(&opts) {
-			return fmt.Errorf("--cleanup-after-upload requires remote storage (--blob-upload, --s3-bucket, or --pvc)")
+			return errCleanupRequiresRemoteStorage
 		}
 	}
 
@@ -145,8 +147,8 @@ func create(kubeClient kubernetes.Interface) error {
 
 	// Set owner references on secrets so they are garbage-collected when the
 	// jobs are removed (by TTL, explicit deletion, or manual kubectl delete).
-	if err := setSecretOwnerReferences(ctx, kubeClient, capture, jobsCreated); err != nil {
-		retinacmd.Logger.Error("Failed to set owner references on capture secrets", zap.Error(err))
+	if ownerRefErr := setSecretOwnerReferences(ctx, kubeClient, capture, jobsCreated); ownerRefErr != nil {
+		retinacmd.Logger.Error("Failed to set owner references on capture secrets", zap.Error(ownerRefErr))
 	}
 
 	if opts.nowait {
@@ -301,7 +303,8 @@ func NewCreateSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 	createCapture.Flags().BoolVar(&opts.includeMetadata, "include-metadata", DefaultIncludeMetadata, "If true, collect static network metadata into capture file")
 	createCapture.Flags().IntVar(&opts.jobNumLimit, "job-num-limit", DefaultJobNumLimit, "The maximum number of jobs can be created for each capture. 0 means no limit")
 	createCapture.Flags().BoolVar(&opts.nowait, "no-wait", DefaultNowait, "Do not wait for the long-running capture job to finish")
-	createCapture.Flags().BoolVar(&opts.cleanUpAfterUpload, "cleanup-after-upload", DefaultCleanUpAfterUpload, "Automatically clean up capture jobs and resources from the cluster after successful upload to remote storage (blob or S3)")
+	createCapture.Flags().BoolVar(&opts.cleanUpAfterUpload, "cleanup-after-upload", DefaultCleanUpAfterUpload,
+		"Automatically clean up capture jobs and resources after successful upload to remote storage")
 	createCapture.Flags().BoolVar(&opts.debug, "debug", DefaultDebug, "When debug is true, a customized retina-agent image, determined by the environment variable RETINA_AGENT_IMAGE, is set")
 
 	return createCapture

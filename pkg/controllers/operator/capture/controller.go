@@ -226,7 +226,7 @@ func (cr *CaptureReconciler) updateCaptureStatusFromJobs(ctx context.Context, ca
 		if hasRemoteStorage {
 			cr.logger.Info("All capture jobs completed successfully with remote storage upload, performing automatic cleanup",
 				zap.String("Capture", captureRef.String()))
-			if err := cr.Client.Delete(ctx, capture); err != nil {
+			if err := cr.Delete(ctx, capture); err != nil {
 				cr.logger.Error("Failed to auto-delete Capture after successful upload",
 					zap.Error(err), zap.String("Capture", captureRef.String()))
 				return ctrl.Result{}, fmt.Errorf("failed to auto-delete Capture after successful upload: %w", err)

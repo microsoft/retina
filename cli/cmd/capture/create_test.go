@@ -24,6 +24,8 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 )
 
+const testNamespace = "test-ns"
+
 type testcase struct {
 	name              string
 	inputName         string
@@ -719,9 +721,8 @@ func TestHasRemoteDestination(t *testing.T) {
 	}
 }
 
-
 func TestSetSecretOwnerReferences(t *testing.T) {
-	ns := "test-ns"
+	ns := testNamespace
 	secretName := "blob-secret-abc"
 
 	kubeClient := fake.NewClientset(
@@ -789,7 +790,7 @@ func TestSetSecretOwnerReferences_NoSecrets(t *testing.T) {
 }
 
 func TestSetSecretOwnerReferences_S3Secret(t *testing.T) {
-	ns := "test-ns"
+	ns := testNamespace
 	secretName := "s3-secret-xyz"
 
 	kubeClient := fake.NewClientset(
@@ -839,7 +840,7 @@ func TestSetSecretOwnerReferences_S3Secret(t *testing.T) {
 
 func TestDeleteSecret_NotFound(t *testing.T) {
 	// deleteSecret should return nil when the secret doesn't exist
-	ns := "test-ns"
+	ns := testNamespace
 	kubeClient := fake.NewClientset() // no secrets pre-created
 
 	origNs := opts.Namespace
@@ -852,7 +853,7 @@ func TestDeleteSecret_NotFound(t *testing.T) {
 }
 
 func TestDeleteSecret_NilName(t *testing.T) {
-	ns := "test-ns"
+	ns := testNamespace
 	kubeClient := fake.NewClientset()
 
 	origNs := opts.Namespace
@@ -865,7 +866,7 @@ func TestDeleteSecret_NilName(t *testing.T) {
 
 func TestDeleteSecret_ExistingSecret(t *testing.T) {
 	// deleteSecret should succeed when the secret exists
-	ns := "test-ns"
+	ns := testNamespace
 	secretName := "my-secret"
 	kubeClient := fake.NewClientset(
 		&corev1.Secret{
@@ -1008,4 +1009,3 @@ func TestWaitUntilJobsComplete_ShortDuration(t *testing.T) {
 	err := cmd.Execute()
 	require.NoError(t, err)
 }
-

@@ -190,7 +190,7 @@ func TestCleanupAfterUpload_RespectsNoWait(t *testing.T) {
 
 func TestCleanupAfterUpload_DefaultIsFalse(t *testing.T) {
 	// Without --cleanup-after-upload flag, the default should be false
-	assert.Equal(t, false, DefaultCleanUpAfterUpload)
+	assert.False(t, DefaultCleanUpAfterUpload)
 }
 
 func TestCleanupAfterUpload_FlagRegistered(t *testing.T) {

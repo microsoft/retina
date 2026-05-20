@@ -195,7 +195,7 @@ func TestDeleteCaptureJobs(t *testing.T) {
 func TestDeleteCaptureJobs_SecretAlreadyDeleted(t *testing.T) {
 	// When a secret referenced by a job's volume has already been deleted
 	// (e.g. via ownerRef GC), the delete command should still succeed.
-	captureName := "test-secret-gone"
+	deleteTestCapName := "test-secret-gone"
 	ns := "default"
 
 	kubeClient := newKubeclient()
@@ -204,10 +204,10 @@ func TestDeleteCaptureJobs_SecretAlreadyDeleted(t *testing.T) {
 	secretName := "already-deleted-secret"
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      captureName + "-node1-abcde",
+			Name:      deleteTestCapName + "-node1-abcde",
 			Namespace: ns,
 			Labels: map[string]string{
-				label.CaptureNameLabel: captureName,
+				label.CaptureNameLabel: deleteTestCapName,
 				label.AppLabel:         "capture",
 			},
 		},
@@ -238,7 +238,7 @@ func TestDeleteCaptureJobs_SecretAlreadyDeleted(t *testing.T) {
 
 	// Run delete — the secret doesn't exist, so the NotFound check is exercised
 	deleteCmd := NewCommand(kubeClient)
-	deleteCmd.SetArgs([]string{"delete", "--name", captureName, "--namespace", ns})
+	deleteCmd.SetArgs([]string{"delete", "--name", deleteTestCapName, "--namespace", ns})
 	buf := new(bytes.Buffer)
 	deleteCmd.SetOut(buf)
 
@@ -248,7 +248,7 @@ func TestDeleteCaptureJobs_SecretAlreadyDeleted(t *testing.T) {
 	}
 
 	// Verify job was deleted
-	if jobExists(t, kubeClient, captureName, ns) {
+	if jobExists(t, kubeClient, deleteTestCapName, ns) {
 		t.Error("Expected job to be deleted")
 	}
 }

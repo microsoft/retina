@@ -21,6 +21,8 @@ import (
 	"github.com/microsoft/retina/pkg/log"
 )
 
+const testSecretName = "test-secret"
+
 func newScheme() *runtime.Scheme {
 	s := runtime.NewScheme()
 	_ = retinav1alpha1.AddToScheme(s)
@@ -30,7 +32,7 @@ func newScheme() *runtime.Scheme {
 }
 
 func newTestReconciler(objects ...runtime.Object) *CaptureReconciler {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
 	scheme := newScheme()
 
 	clientObjects := make([]client.Object, 0, len(objects))
@@ -52,7 +54,7 @@ func newTestReconciler(objects ...runtime.Object) *CaptureReconciler {
 }
 
 func TestCleanUpAfterUpload_AllJobsSucceeded_WithBlobUpload(t *testing.T) {
-	secretName := "test-secret"
+	secretName := testSecretName
 	capture := &retinav1alpha1.Capture{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "test-capture",
@@ -103,7 +105,7 @@ func TestCleanUpAfterUpload_AllJobsSucceeded_WithBlobUpload(t *testing.T) {
 
 	// The capture should have been deleted (triggering the finalizer cleanup)
 	deletedCapture := &retinav1alpha1.Capture{}
-	err = reconciler.Client.Get(ctx, types.NamespacedName{Name: "test-capture", Namespace: "default"}, deletedCapture)
+	err = reconciler.Get(ctx, types.NamespacedName{Name: "test-capture", Namespace: "default"}, deletedCapture)
 	assert.True(t, err != nil || deletedCapture.DeletionTimestamp != nil,
 		"capture should be deleted or marked for deletion when CleanUpAfterUpload is true and all jobs succeeded")
 }
@@ -163,13 +165,13 @@ func TestCleanUpAfterUpload_AllJobsSucceeded_WithS3Upload(t *testing.T) {
 
 	// The capture should have been deleted
 	deletedCapture := &retinav1alpha1.Capture{}
-	err = reconciler.Client.Get(ctx, types.NamespacedName{Name: "test-capture-s3", Namespace: "default"}, deletedCapture)
+	err = reconciler.Get(ctx, types.NamespacedName{Name: "test-capture-s3", Namespace: "default"}, deletedCapture)
 	assert.True(t, err != nil || deletedCapture.DeletionTimestamp != nil,
 		"capture should be deleted when CleanUpAfterUpload is true with S3 upload and all jobs succeeded")
 }
 
 func TestCleanUpAfterUpload_NotTriggeredWhenFalse(t *testing.T) {
-	secretName := "test-secret"
+	secretName := testSecretName
 	capture := &retinav1alpha1.Capture{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "test-capture-no-cleanup",
@@ -220,13 +222,13 @@ func TestCleanUpAfterUpload_NotTriggeredWhenFalse(t *testing.T) {
 
 	// Capture should still exist since CleanUpAfterUpload is false
 	existingCapture := &retinav1alpha1.Capture{}
-	err = reconciler.Client.Get(ctx, types.NamespacedName{Name: "test-capture-no-cleanup", Namespace: "default"}, existingCapture)
+	err = reconciler.Get(ctx, types.NamespacedName{Name: "test-capture-no-cleanup", Namespace: "default"}, existingCapture)
 	require.NoError(t, err)
 	assert.Nil(t, existingCapture.DeletionTimestamp, "capture should NOT be deleted when CleanUpAfterUpload is false")
 }
 
 func TestCleanUpAfterUpload_NotTriggeredOnFailedJobs(t *testing.T) {
-	secretName := "test-secret"
+	secretName := testSecretName
 	capture := &retinav1alpha1.Capture{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "test-capture-failed",
@@ -275,7 +277,7 @@ func TestCleanUpAfterUpload_NotTriggeredOnFailedJobs(t *testing.T) {
 
 	// Capture should still exist since jobs failed
 	existingCapture := &retinav1alpha1.Capture{}
-	err = reconciler.Client.Get(ctx, types.NamespacedName{Name: "test-capture-failed", Namespace: "default"}, existingCapture)
+	err = reconciler.Get(ctx, types.NamespacedName{Name: "test-capture-failed", Namespace: "default"}, existingCapture)
 	require.NoError(t, err)
 	assert.Nil(t, existingCapture.DeletionTimestamp, "capture should NOT be deleted when jobs failed")
 }
@@ -332,7 +334,7 @@ func TestCleanUpAfterUpload_NotTriggeredWithoutRemoteStorage(t *testing.T) {
 
 	// Capture should still exist since there's no remote storage
 	existingCapture := &retinav1alpha1.Capture{}
-	err = reconciler.Client.Get(ctx, types.NamespacedName{Name: "test-capture-local", Namespace: "default"}, existingCapture)
+	err = reconciler.Get(ctx, types.NamespacedName{Name: "test-capture-local", Namespace: "default"}, existingCapture)
 	require.NoError(t, err)
 	assert.Nil(t, existingCapture.DeletionTimestamp, "capture should NOT be deleted when only local storage is used")
 }
@@ -389,7 +391,7 @@ func TestCleanUpAfterUpload_AllJobsSucceeded_WithPVC(t *testing.T) {
 
 	// The capture should have been deleted
 	deletedCapture := &retinav1alpha1.Capture{}
-	err = reconciler.Client.Get(ctx, types.NamespacedName{Name: "test-capture-pvc", Namespace: "default"}, deletedCapture)
+	err = reconciler.Get(ctx, types.NamespacedName{Name: "test-capture-pvc", Namespace: "default"}, deletedCapture)
 	assert.True(t, err != nil || deletedCapture.DeletionTimestamp != nil,
 		"capture should be deleted when CleanUpAfterUpload is true with PVC and all jobs succeeded")
 }
