@@ -650,3 +650,27 @@ func TestGetCLICaptureConfig(t *testing.T) {
 	require.Equal(t, 7, got.CaptureJobNumLimit)
 	require.Equal(t, "/mnt/captures", got.CaptureHostPathBaseDir)
 }
+
+func TestCreateCaptureCommand_AbsoluteHostPath_ShouldFail(t *testing.T) {
+	// --host-path must be a bare subpath; absolute paths are rejected by the
+	// shared validateHostPath helper used by both the operator and the CLI.
+	cmd := NewCommand(fake.NewClientset())
+
+	cmd.SetArgs([]string{
+		"create",
+		"--name=hp-absolute",
+		"--namespace=default",
+		"--node-selectors=kubernetes.io/os=linux",
+		"--duration=10s",
+		"--host-path=/tmp/foo",
+	})
+
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+
+	err := cmd.Execute()
+	require.Error(t, err, "command should fail when --host-path is absolute")
+	require.Contains(t, err.Error(), "OutputConfiguration.HostPath",
+		"error should reference the rejected HostPath field; got: %v", err)
+}
