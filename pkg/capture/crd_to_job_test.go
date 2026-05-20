@@ -651,7 +651,7 @@ func Test_CaptureToPodTranslator_ObtainCaptureJobPodEnv(t *testing.T) {
 			wantJobEnv: map[string]string{
 				string(captureConstants.CaptureOutputLocationEnvKeyPersistentVolumeClaim): "capture-pvc",
 				captureConstants.IncludeMetadataEnvKey:                                    "false",
-				captureConstants.TcpdumpFlagsEnvKey:                                       "-p -n -v -x -S -t",
+				captureConstants.TcpdumpFlagsEnvKey:                                       "-p -n -S -v -x -t",
 			},
 		},
 		{
