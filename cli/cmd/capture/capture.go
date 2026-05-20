@@ -108,7 +108,7 @@ type Opts struct {
 	s3Path             string
 	s3Region           string
 	s3SecretAccessKey  string
-	// tcpdumpFilter is Obsolete use captureOption.pcapFilter and captureOption boolean flags for display options.
+	// tcpdumpFilter is deprecated and will be removed. Use captureOption.pcapFilter and captureOption boolean flags for display options.
 	tcpdumpFilter      string
 	pcapFilter         string
 	noPromiscuous      bool

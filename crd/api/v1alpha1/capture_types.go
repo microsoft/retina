@@ -187,7 +187,8 @@ type CaptureConfiguration struct {
 
 	// TcpdumpFilter accepts BPF filter expressions only (no flags).
 	//
-	// Deprecated: Use captureOption.pcapFilter for BPF expressions and captureOption boolean flags for display options.
+	// DEPRECATED and will be removed: Currently functional but scheduled for removal.
+	// Use captureOption.pcapFilter for BPF expressions and captureOption boolean flags for tcpdump display options instead.
 	// +optional
 	// +kubebuilder:validation:MaxLength=1024
 	// +kubebuilder:validation:Pattern="^[^-]*$"

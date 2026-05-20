@@ -86,7 +86,7 @@ The network traffic will be uploaded to the specified output location.
 | `s3-secret-access-key`| string     | ""       | S3 access secret key to upload capture files.                                |       |
 | `interfaces`          | string     | ""       | Comma-separated list of network interfaces to capture on (e.g., "eth0,eth1"). By default, captures are performed on all network interfaces. |       |
 | `pcap-filter`         | string     | ""       | BPF filter expression for packet filtering (e.g., "host 10.0.0.1", "tcp port 443"). See [PCAP-FILTER](https://www.tcpdump.org/manpages/pcap-filter.7.html) for BPF syntax. Does NOT accept flags (arguments starting with '-'). |       |
-| `tcpdump-filter`      | string     | ""       | DEPRECATED: Use `--pcap-filter` instead. BPF filter expression for packet filtering. Does NOT accept flags (arguments starting with '-'). |       |
+| `tcpdump-filter`      | string     | ""       | **DEPRECATED and will be removed.** Use `--pcap-filter` instead. BPF filter expression for packet filtering. Does NOT accept flags (arguments starting with '-'). |       |
 | `no-promiscuous`      | bool       | false    | Disable promiscuous mode (equivalent to tcpdump -p flag). |       |
 | `packet-buffered`     | bool       | false    | Enable packet-buffered output (equivalent to tcpdump -U flag). |       |
 | `immediate-mode`      | bool       | false    | Enable immediate mode for packet capture (equivalent to tcpdump --immediate-mode). |       |

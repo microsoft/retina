@@ -231,7 +231,7 @@ func NewCreateSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 	createCapture.Flags().StringVar(&opts.s3AccessKeyID, "s3-access-key-id", "", "S3 access key id to upload capture files")
 	createCapture.Flags().StringVar(&opts.s3SecretAccessKey, "s3-secret-access-key", "", "S3 access secret key to upload capture files")
 	createCapture.Flags().StringVar(&opts.tcpdumpFilter, "tcpdump-filter", "",
-		"DEPRECATED: Use --pcap-filter for BPF expressions. BPF filter expression without flags (e.g., 'host 10.0.0.1', 'tcp port 443')")
+		"DEPRECATED and will be removed: Use --pcap-filter for BPF expressions. BPF filter expression without flags (e.g., 'host 10.0.0.1', 'tcp port 443')")
 	createCapture.Flags().StringVar(&opts.pcapFilter, "pcap-filter", "",
 		"BPF filter expression for packet filtering (e.g., 'host 10.0.0.1', 'tcp port 443'). See https://www.tcpdump.org/manpages/pcap-filter.7.html")
 	createCapture.Flags().StringVar(&opts.interfaces, "interfaces", "", "Comma-separated list of network interfaces to capture on (e.g., eth0,eth1)")

@@ -45,7 +45,7 @@ The `Capture` CRD is defined with the following specifications:
   - `captureTarget`: Defines the target on which the network packets will be captured. It includes namespace, node, and pod selectors, as well as specific pod names.
   - `filters`: Specifies filters for including or excluding network packets based on IP or port.
   - `includeMetadata`: Indicates whether networking metadata should be captured.
-  - `tcpdumpFilter`: DEPRECATED. Accepts BPF filter expressions only (no flags). Use `captureOption.pcapFilter` for BPF expressions and `captureOption` boolean flags for display/output options.
+  - `tcpdumpFilter`: **DEPRECATED and will be removed.** Currently accepts BPF filter expressions only (no flags). Migrate to `captureOption.pcapFilter` for BPF expressions and `captureOption` boolean flags for display/output options (e.g., `noResolveDNS`, `packetBuffered`, `verbosity`).
 
 - **spec.outputConfiguration:** Indicates where the captured data will be stored. It includes the following properties:
   - `blobUpload`: Specifies a secret containing the blob SAS URL for storing the capture data.

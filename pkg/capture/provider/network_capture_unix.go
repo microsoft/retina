@@ -133,13 +133,13 @@ func (ncp *NetworkCaptureProvider) obtainAndValidateUserFilter() (trimmedFilter,
 		filterSource = "pcapFilter"
 		ncp.l.Info("Using pcapFilter", zap.String("filter", trimmedFilter))
 		if tcpdumpRawFilter != "" {
-			ncp.l.Warn("Both pcapFilter and tcpdumpFilter provided; using pcapFilter (tcpdumpFilter is deprecated)",
+			ncp.l.Warn("Both pcapFilter and tcpdumpFilter provided; using pcapFilter (tcpdumpFilter is deprecated and will be removed)",
 				zap.String("ignored_tcpdumpFilter", tcpdumpRawFilter))
 		}
 	} else if tcpdumpRawFilter != "" {
 		trimmedFilter = strings.TrimSpace(tcpdumpRawFilter)
-		filterSource = "tcpdumpFilter (deprecated)"
-		ncp.l.Info("Using deprecated tcpdumpFilter; consider migrating to pcapFilter", zap.String("filter", trimmedFilter))
+		filterSource = "tcpdumpFilter (deprecated, will be removed)"
+		ncp.l.Info("Using deprecated tcpdumpFilter (will be removed); migrate to pcapFilter", zap.String("filter", trimmedFilter))
 	}
 
 	// Check for whitespace-only input

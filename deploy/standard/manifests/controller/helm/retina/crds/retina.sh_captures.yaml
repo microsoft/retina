@@ -360,7 +360,8 @@ spec:
                     description: |-
                       TcpdumpFilter accepts BPF filter expressions only (no flags).
 
-                      Deprecated: Use captureOption.pcapFilter for BPF expressions and captureOption boolean flags for display options.
+                      DEPRECATED and will be removed: Currently functional but scheduled for removal.
+                      Use captureOption.pcapFilter for BPF expressions and captureOption boolean flags for tcpdump display options instead.
                     maxLength: 1024
                     pattern: ^[^-]*$
                     type: string
