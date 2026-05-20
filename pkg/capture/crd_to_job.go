@@ -122,6 +122,21 @@ func (translator *CaptureToPodTranslator) initJobTemplate(ctx context.Context, c
 	// NOTE(mainred): We allow the capture pod to run for at most 30 minutes before being deleted to ensure the output is
 	// uploaded, and this happens when the user want to stop a capture on demand by deleting the capture.
 	captureTerminationGracePeriodSeconds := int64(1800)
+
+	// Resolve the user-supplied HostPath subpath against the operator-configured base
+	// directory up front so the resolved on-node path can be stamped onto the pod
+	// annotation (used by `kubectl retina capture download`) and reused for the
+	// volume mount below.
+	var resolvedHostPath string
+	if capture.Spec.OutputConfiguration.HostPath != nil && *capture.Spec.OutputConfiguration.HostPath != "" {
+		resolved, err := validateHostPath(*capture.Spec.OutputConfiguration.HostPath, translator.config.CaptureHostPathBaseDir)
+		if err != nil {
+			translator.l.Error("Rejected HostPath in Capture", zap.Error(err), zap.String("HostPath", *capture.Spec.OutputConfiguration.HostPath))
+			return fmt.Errorf("invalid OutputConfiguration.HostPath: %w", err)
+		}
+		resolvedHostPath = resolved
+	}
+
 	translator.jobTemplate = &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: fmt.Sprintf("%s-", capture.Name),
@@ -134,7 +149,7 @@ func (translator *CaptureToPodTranslator) initJobTemplate(ctx context.Context, c
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      captureUtils.GetContainerLabelsFromCaptureName(capture.Name),
 					Namespace:   capture.Namespace,
-					Annotations: captureUtils.GetPodAnnotationsFromCapture(capture),
+					Annotations: captureUtils.GetPodAnnotationsFromCapture(capture, resolvedHostPath),
 				},
 				Spec: corev1.PodSpec{
 					HostNetwork:                   true,
@@ -207,20 +222,15 @@ func (translator *CaptureToPodTranslator) initJobTemplate(ctx context.Context, c
 		},
 	}
 
-	if capture.Spec.OutputConfiguration.HostPath != nil && *capture.Spec.OutputConfiguration.HostPath != "" {
-		translator.l.Info("HostPath is not empty", zap.String("HostPath", *capture.Spec.OutputConfiguration.HostPath))
+	if resolvedHostPath != "" {
+		translator.l.Info("HostPath is not empty", zap.String("HostPath", *capture.Spec.OutputConfiguration.HostPath), zap.String("ResolvedHostPath", resolvedHostPath))
 
 		captureFolderHostPathType := corev1.HostPathDirectoryOrCreate
-		hostPath, err := validateHostPath(*capture.Spec.OutputConfiguration.HostPath, translator.config.CaptureHostPathBaseDir)
-		if err != nil {
-			translator.l.Error("Rejected HostPath in Capture", zap.Error(err), zap.String("HostPath", *capture.Spec.OutputConfiguration.HostPath))
-			return fmt.Errorf("invalid OutputConfiguration.HostPath: %w", err)
-		}
 		hostPathVolume := corev1.Volume{
 			Name: captureConstants.CaptureHostPathVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				HostPath: &corev1.HostPathVolumeSource{
-					Path: hostPath,
+					Path: resolvedHostPath,
 					Type: &captureFolderHostPathType,
 				},
 			},
@@ -229,7 +239,7 @@ func (translator *CaptureToPodTranslator) initJobTemplate(ctx context.Context, c
 
 		hostPathVolumeMount := corev1.VolumeMount{
 			Name:      captureConstants.CaptureHostPathVolumeName,
-			MountPath: hostPath,
+			MountPath: resolvedHostPath,
 		}
 		translator.jobTemplate.Spec.Template.Spec.Containers[0].VolumeMounts = append(translator.jobTemplate.Spec.Template.Spec.Containers[0].VolumeMounts, hostPathVolumeMount)
 	}

@@ -1859,7 +1859,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			}
 
 			if tt.capture.Spec.OutputConfiguration.HostPath != nil {
-				job.Spec.Template.Annotations[captureConstants.CaptureHostPathAnnotationKey] = hostPath
+				job.Spec.Template.Annotations[captureConstants.CaptureHostPathAnnotationKey] = resolvedHostPath
 			}
 
 			cmpOption := cmp.Options{
