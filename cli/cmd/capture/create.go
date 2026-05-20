@@ -190,7 +190,22 @@ func NewCreateSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 		Example: createExample,
 	}
 
+	var verbosityStr, timestampStr, printDataStr string
+
 	createCapture.RunE = func(*cobra.Command, []string) error {
+		// Validate enum flags
+		opts.verbosityLevel = VerbosityLevel(verbosityStr)
+		if err := opts.verbosityLevel.Validate(); err != nil {
+			return err
+		}
+		opts.timestampFormat = TimestampFormat(timestampStr)
+		if err := opts.timestampFormat.Validate(); err != nil {
+			return err
+		}
+		opts.printDataFormat = PrintDataFormat(printDataStr)
+		if err := opts.printDataFormat.Validate(); err != nil {
+			return err
+		}
 		return create(kubeClient)
 	}
 
@@ -227,27 +242,23 @@ func NewCreateSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 	createCapture.Flags().BoolVar(&opts.immediateMode, "immediate-mode", false, "Enable immediate mode for packet capture (tcpdump --immediate-mode)")
 	createCapture.Flags().BoolVar(&opts.noResolveDNS, "no-resolve-dns", false, "Don't resolve hostnames (tcpdump -n flag)")
 	createCapture.Flags().BoolVar(&opts.noResolvePort, "no-resolve-port", false, "Don't resolve hostnames or port names (tcpdump -nn flag)")
-	createCapture.Flags().BoolVar(&opts.verbose, "verbose", false, "Verbose output (tcpdump -v flag)")
-	createCapture.Flags().BoolVar(&opts.extraVerbose, "extra-verbose", false, "Extra verbose output (tcpdump -vv flag)")
-	createCapture.Flags().BoolVar(&opts.maxVerbose, "max-verbose", false, "Maximum verbose output (tcpdump -vvv flag)")
-	createCapture.Flags().BoolVar(&opts.printDataHex, "print-data-hex", false, "Print packet data in hex and ASCII (tcpdump -X flag)")
-	createCapture.Flags().BoolVar(&opts.printDataHexLink, "print-data-hex-link", false, "Print packet data with link-level header in hex and ASCII (tcpdump -XX flag)")
-	createCapture.Flags().BoolVar(&opts.printDataASCII, "print-data-ascii", false, "Print packet data in ASCII (tcpdump -A flag)")
-	createCapture.Flags().BoolVar(&opts.printDataASCIILink, "print-data-ascii-link", false, "Print packet data with link-level header in ASCII (tcpdump -AA flag)")
 	createCapture.Flags().BoolVar(&opts.printLinkHeader, "print-link-header", false, "Print link-level headers (tcpdump -e flag)")
 	createCapture.Flags().BoolVar(&opts.quietOutput, "quiet-output", false, "Quick/quiet output mode (tcpdump -q flag)")
 	createCapture.Flags().BoolVar(&opts.absoluteSeq, "absolute-seq", false, "Print absolute TCP sequence numbers (tcpdump -S flag)")
-	createCapture.Flags().BoolVar(&opts.noTimestamp, "no-timestamp", false, "Don't print timestamps (tcpdump -t flag)")
-	createCapture.Flags().BoolVar(&opts.unformattedTimestamp, "unformatted-timestamp", false, "Print unformatted timestamps (tcpdump -tt flag)")
-	createCapture.Flags().BoolVar(&opts.deltaTimestamp, "delta-timestamp", false, "Print time delta between packets (tcpdump -ttt flag)")
-	createCapture.Flags().BoolVar(&opts.dateTimestamp, "date-timestamp", false, "Print timestamp with date (tcpdump -tttt flag)")
-	createCapture.Flags().BoolVar(&opts.deltaSinceFirst, "delta-since-first", false, "Print time delta since first packet (tcpdump -ttttt flag)")
 	createCapture.Flags().BoolVar(&opts.dontVerifyChecksum, "dont-verify-checksum", false, "Don't verify TCP checksums (tcpdump -K flag)")
 
+	// Enum-based flags for mutually exclusive options
+	createCapture.Flags().StringVar(&verbosityStr, "verbosity", "", "Verbosity level: verbose, extra, max (tcpdump -v/-vv/-vvv)")
+	createCapture.Flags().StringVar(&timestampStr, "timestamp-format", "", "Timestamp format: none, unformatted, delta, date, delta-since-first (tcpdump -t/-tt/-ttt/-tttt/-ttttt)")
+	createCapture.Flags().StringVar(&printDataStr, "print-data", "", "Print packet data: hex, hex-with-link, ascii, ascii-with-link (tcpdump -X/-XX/-A/-AA)")
+
+	// Filters
 	createCapture.Flags().StringVar(&opts.excludeFilter, "exclude-filter", "", "A comma-separated list of IP:Port pairs that are "+
 		"excluded from capturing network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:*")
 	createCapture.Flags().StringVar(&opts.includeFilter, "include-filter", "", "A comma-separated list of IP:Port pairs that are "+
 		"used to filter capture network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:*")
+
+	// Capture options
 	createCapture.Flags().BoolVar(&opts.includeMetadata, "include-metadata", DefaultIncludeMetadata, "If true, collect static network metadata into capture file")
 	createCapture.Flags().IntVar(&opts.jobNumLimit, "job-num-limit", DefaultJobNumLimit, "The maximum number of jobs can be created for each capture. 0 means no limit")
 	createCapture.Flags().BoolVar(&opts.nowait, "no-wait", DefaultNowait, "Do not wait for the long-running capture job to finish")
@@ -440,30 +451,16 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 		capture.Spec.CaptureConfiguration.CaptureOption.NoResolvePort = &opts.noResolvePort
 	}
 
-	if opts.verbose {
-		capture.Spec.CaptureConfiguration.CaptureOption.Verbose = &opts.verbose
-	}
-	if opts.extraVerbose {
-		capture.Spec.CaptureConfiguration.CaptureOption.ExtraVerbose = &opts.extraVerbose
-	}
-
-	if opts.maxVerbose {
-		capture.Spec.CaptureConfiguration.CaptureOption.MaxVerbose = &opts.maxVerbose
-	}
-	if opts.printDataHex {
-		capture.Spec.CaptureConfiguration.CaptureOption.PrintDataHex = &opts.printDataHex
+	// Set verbosity level enum field based on CLI value
+	if opts.verbosityLevel != VerbosityNormal {
+		verbosityStr := string(opts.verbosityLevel)
+		capture.Spec.CaptureConfiguration.CaptureOption.Verbosity = &verbosityStr
 	}
 
-	if opts.printDataHexLink {
-		capture.Spec.CaptureConfiguration.CaptureOption.PrintDataHexLink = &opts.printDataHexLink
-	}
-
-	if opts.printDataASCII {
-		capture.Spec.CaptureConfiguration.CaptureOption.PrintDataASCII = &opts.printDataASCII
-	}
-
-	if opts.printDataASCIILink {
-		capture.Spec.CaptureConfiguration.CaptureOption.PrintDataASCIILink = &opts.printDataASCIILink
+	// Set print data format enum field based on CLI value
+	if opts.printDataFormat != PrintDataNone {
+		printDataStr := string(opts.printDataFormat)
+		capture.Spec.CaptureConfiguration.CaptureOption.PrintDataFormat = &printDataStr
 	}
 
 	if opts.printLinkHeader {
@@ -478,24 +475,10 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 		capture.Spec.CaptureConfiguration.CaptureOption.AbsoluteSeq = &opts.absoluteSeq
 	}
 
-	if opts.noTimestamp {
-		capture.Spec.CaptureConfiguration.CaptureOption.NoTimestamp = &opts.noTimestamp
-	}
-
-	if opts.unformattedTimestamp {
-		capture.Spec.CaptureConfiguration.CaptureOption.UnformattedTimestamp = &opts.unformattedTimestamp
-	}
-
-	if opts.deltaTimestamp {
-		capture.Spec.CaptureConfiguration.CaptureOption.DeltaTimestamp = &opts.deltaTimestamp
-	}
-
-	if opts.dateTimestamp {
-		capture.Spec.CaptureConfiguration.CaptureOption.DateTimestamp = &opts.dateTimestamp
-	}
-
-	if opts.deltaSinceFirst {
-		capture.Spec.CaptureConfiguration.CaptureOption.DeltaSinceFirst = &opts.deltaSinceFirst
+	// Set timestamp format enum field based on CLI value
+	if opts.timestampFormat != TimestampDefault {
+		timestampStr := string(opts.timestampFormat)
+		capture.Spec.CaptureConfiguration.CaptureOption.TimestampFormat = &timestampStr
 	}
 
 	if opts.dontVerifyChecksum {

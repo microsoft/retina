@@ -50,21 +50,9 @@ var tcpdumpFlagMappings = []struct {
 	{func(o *retinav1alpha1.CaptureOption) *bool { return o.ImmediateMode }, "--immediate-mode"},
 	{func(o *retinav1alpha1.CaptureOption) *bool { return o.NoResolveDNS }, "-n"},
 	{func(o *retinav1alpha1.CaptureOption) *bool { return o.NoResolvePort }, "-nn"},
-	{func(o *retinav1alpha1.CaptureOption) *bool { return o.Verbose }, "-v"},
-	{func(o *retinav1alpha1.CaptureOption) *bool { return o.ExtraVerbose }, "-vv"},
-	{func(o *retinav1alpha1.CaptureOption) *bool { return o.MaxVerbose }, "-vvv"},
-	{func(o *retinav1alpha1.CaptureOption) *bool { return o.PrintDataHex }, "-x"},
-	{func(o *retinav1alpha1.CaptureOption) *bool { return o.PrintDataHexLink }, "-xx"},
-	{func(o *retinav1alpha1.CaptureOption) *bool { return o.PrintDataASCII }, "-A"},
-	{func(o *retinav1alpha1.CaptureOption) *bool { return o.PrintDataASCIILink }, "-AA"},
 	{func(o *retinav1alpha1.CaptureOption) *bool { return o.PrintLinkHeader }, "-e"},
 	{func(o *retinav1alpha1.CaptureOption) *bool { return o.QuietOutput }, "-q"},
 	{func(o *retinav1alpha1.CaptureOption) *bool { return o.AbsoluteSeq }, "-S"},
-	{func(o *retinav1alpha1.CaptureOption) *bool { return o.NoTimestamp }, "-t"},
-	{func(o *retinav1alpha1.CaptureOption) *bool { return o.UnformattedTimestamp }, "-tt"},
-	{func(o *retinav1alpha1.CaptureOption) *bool { return o.DeltaTimestamp }, "-ttt"},
-	{func(o *retinav1alpha1.CaptureOption) *bool { return o.DateTimestamp }, "-tttt"},
-	{func(o *retinav1alpha1.CaptureOption) *bool { return o.DeltaSinceFirst }, "-ttttt"},
 	{func(o *retinav1alpha1.CaptureOption) *bool { return o.DontVerifyChecksum }, "-K"},
 }
 
@@ -1057,6 +1045,47 @@ func (translator *CaptureToPodTranslator) ObtainCaptureJobPodEnv(capture retinav
 			tcpdumpFlags = append(tcpdumpFlags, mapping.flag)
 		}
 	}
+
+	// Handle enum fields for verbosity, print data format, and timestamp format
+	if opt.Verbosity != nil && *opt.Verbosity != "" {
+		switch *opt.Verbosity {
+		case "verbose":
+			tcpdumpFlags = append(tcpdumpFlags, "-v")
+		case "extra":
+			tcpdumpFlags = append(tcpdumpFlags, "-vv")
+		case "max":
+			tcpdumpFlags = append(tcpdumpFlags, "-vvv")
+		}
+	}
+
+	if opt.PrintDataFormat != nil && *opt.PrintDataFormat != "" {
+		switch *opt.PrintDataFormat {
+		case "hex":
+			tcpdumpFlags = append(tcpdumpFlags, "-x")
+		case "hex-with-link":
+			tcpdumpFlags = append(tcpdumpFlags, "-xx")
+		case "ascii":
+			tcpdumpFlags = append(tcpdumpFlags, "-A")
+		case "ascii-with-link":
+			tcpdumpFlags = append(tcpdumpFlags, "-AA")
+		}
+	}
+
+	if opt.TimestampFormat != nil && *opt.TimestampFormat != "" {
+		switch *opt.TimestampFormat {
+		case "none":
+			tcpdumpFlags = append(tcpdumpFlags, "-t")
+		case "unformatted":
+			tcpdumpFlags = append(tcpdumpFlags, "-tt")
+		case "delta":
+			tcpdumpFlags = append(tcpdumpFlags, "-ttt")
+		case "date":
+			tcpdumpFlags = append(tcpdumpFlags, "-tttt")
+		case "delta-since-first":
+			tcpdumpFlags = append(tcpdumpFlags, "-ttttt")
+		}
+	}
+
 	if len(tcpdumpFlags) > 0 {
 		jobPodEnv[captureConstants.TcpdumpFlagsEnvKey] = strings.Join(tcpdumpFlags, " ")
 	}

@@ -618,7 +618,7 @@ func Test_CaptureToPodTranslator_ObtainCaptureJobPodEnv(t *testing.T) {
 					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
 						CaptureOption: retinav1alpha1.CaptureOption{
 							NoPromiscuous: pointerUtil.Bool(true),
-							Verbose:       pointerUtil.Bool(true),
+							Verbosity:     pointerUtil.String("verbose"),
 						},
 					},
 				},
@@ -638,12 +638,12 @@ func Test_CaptureToPodTranslator_ObtainCaptureJobPodEnv(t *testing.T) {
 					},
 					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
 						CaptureOption: retinav1alpha1.CaptureOption{
-							NoPromiscuous: pointerUtil.Bool(true),
-							NoResolveDNS:  pointerUtil.Bool(true),
-							Verbose:       pointerUtil.Bool(true),
-							PrintDataHex:  pointerUtil.Bool(true),
-							AbsoluteSeq:   pointerUtil.Bool(true),
-							NoTimestamp:   pointerUtil.Bool(true),
+							NoPromiscuous:   pointerUtil.Bool(true),
+							NoResolveDNS:    pointerUtil.Bool(true),
+							Verbosity:       pointerUtil.String("verbose"),
+							PrintDataFormat: pointerUtil.String("hex"),
+							AbsoluteSeq:     pointerUtil.Bool(true),
+							TimestampFormat: pointerUtil.String("none"),
 						},
 					},
 				},
@@ -665,7 +665,7 @@ func Test_CaptureToPodTranslator_ObtainCaptureJobPodEnv(t *testing.T) {
 						CaptureOption: retinav1alpha1.CaptureOption{
 							PcapFilter:    pointerUtil.String("tcp port 443"),
 							NoPromiscuous: pointerUtil.Bool(true),
-							Verbose:       pointerUtil.Bool(true),
+							Verbosity:     pointerUtil.String("verbose"),
 						},
 					},
 				},

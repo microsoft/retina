@@ -110,40 +110,19 @@ type CaptureOption struct {
 	// +optional
 	NoResolvePort *bool `json:"noResolvePort,omitempty"`
 
-	// Verbose enables verbose output for packet capture (equivalent to tcpdump -v flag).
-	// Provides additional protocol information in capture output.
+	// Verbosity controls the verbosity level of packet capture output.
+	// Valid values: "" (normal/default), "verbose" (tcpdump -v), "extra" (tcpdump -vv), "max" (tcpdump -vvv).
+	// Empty string means normal verbosity with no extra verbose flags.
 	// +optional
-	Verbose *bool `json:"verbose,omitempty"`
+	// +kubebuilder:validation:Enum="";verbose;extra;max
+	Verbosity *string `json:"verbosity,omitempty"`
 
-	// ExtraVerbose enables extra verbose output (equivalent to tcpdump -vv flag).
-	// Provides even more detailed protocol information than Verbose.
+	// PrintDataFormat controls how packet data is printed in the output.
+	// Valid values: "" (none), "hex" (tcpdump -x), "hex-with-link" (tcpdump -xx), "ascii" (tcpdump -A), "ascii-with-link" (tcpdump -AA).
+	// Empty string means no packet data printing.
 	// +optional
-	ExtraVerbose *bool `json:"extraVerbose,omitempty"`
-
-	// MaxVerbose enables maximum verbose output (equivalent to tcpdump -vvv flag).
-	// Provides the most detailed protocol information available.
-	// +optional
-	MaxVerbose *bool `json:"maxVerbose,omitempty"`
-
-	// PrintDataHex prints packet data in hex and ASCII (equivalent to tcpdump -X flag).
-	// Shows packet payload in both hexadecimal and ASCII format.
-	// +optional
-	PrintDataHex *bool `json:"printDataHex,omitempty"`
-
-	// PrintDataHexLink prints packet data including link-level header in hex and ASCII (equivalent to tcpdump -XX flag).
-	// Like PrintDataHex but also includes the link-layer (Ethernet) header.
-	// +optional
-	PrintDataHexLink *bool `json:"printDataHexLink,omitempty"`
-
-	// PrintDataASCII prints packet data in ASCII (equivalent to tcpdump -A flag).
-	// Useful for inspecting text protocols like HTTP.
-	// +optional
-	PrintDataASCII *bool `json:"printDataASCII,omitempty"`
-
-	// PrintDataASCIILink prints packet data including link-level header in ASCII (equivalent to tcpdump -AA flag).
-	// Like PrintDataASCII but also includes the link-layer (Ethernet) header.
-	// +optional
-	PrintDataASCIILink *bool `json:"printDataASCIILink,omitempty"`
+	// +kubebuilder:validation:Enum="";hex;hex-with-link;ascii;ascii-with-link
+	PrintDataFormat *string `json:"printDataFormat,omitempty"`
 
 	// PrintLinkHeader prints link-level (Ethernet) headers (equivalent to tcpdump -e flag).
 	// Shows MAC addresses and other link-layer information.
@@ -160,30 +139,12 @@ type CaptureOption struct {
 	// +optional
 	AbsoluteSeq *bool `json:"absoluteSeq,omitempty"`
 
-	// NoTimestamp disables printing timestamps (equivalent to tcpdump -t flag).
-	// Omits timestamp information from output.
+	// TimestampFormat controls the timestamp format in packet capture output.
+	// Valid values: "" (default), "none" (tcpdump -t), "unformatted" (tcpdump -tt), "delta" (tcpdump -ttt), "date" (tcpdump -tttt), "delta-since-first" (tcpdump -ttttt).
+	// Empty string means default timestamp format.
 	// +optional
-	NoTimestamp *bool `json:"noTimestamp,omitempty"`
-
-	// UnformattedTimestamp prints unformatted timestamp (equivalent to tcpdump -tt flag).
-	// Shows timestamps as seconds since epoch.
-	// +optional
-	UnformattedTimestamp *bool `json:"unformattedTimestamp,omitempty"`
-
-	// DeltaTimestamp prints time delta between packets (equivalent to tcpdump -ttt flag).
-	// Shows time elapsed since previous packet.
-	// +optional
-	DeltaTimestamp *bool `json:"deltaTimestamp,omitempty"`
-
-	// DateTimestamp prints timestamp with date (equivalent to tcpdump -tttt flag).
-	// Shows full date and time for each packet.
-	// +optional
-	DateTimestamp *bool `json:"dateTimestamp,omitempty"`
-
-	// DeltaSinceFirst prints time delta since first packet (equivalent to tcpdump -ttttt flag).
-	// Shows time elapsed since the first captured packet.
-	// +optional
-	DeltaSinceFirst *bool `json:"deltaSinceFirst,omitempty"`
+	// +kubebuilder:validation:Enum="";none;unformatted;delta;date;delta-since-first
+	TimestampFormat *string `json:"timestampFormat,omitempty"`
 
 	// DontVerifyChecksum disables TCP checksum verification (equivalent to tcpdump -K flag).
 	// Skips TCP checksum validation for captured packets.

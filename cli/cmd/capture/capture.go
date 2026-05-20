@@ -4,12 +4,80 @@
 package capture
 
 import (
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
 )
+
+var (
+	ErrInvalidVerbosityLevel  = errors.New("invalid verbosity level")
+	ErrInvalidTimestampFormat = errors.New("invalid timestamp format")
+	ErrInvalidPrintDataFormat = errors.New("invalid print data format")
+)
+
+// VerbosityLevel represents the verbosity level for packet capture output
+type VerbosityLevel string
+
+const (
+	VerbosityNormal  VerbosityLevel = ""        // Default, no extra verbosity
+	VerbosityVerbose VerbosityLevel = "verbose" // tcpdump -v
+	VerbosityExtra   VerbosityLevel = "extra"   // tcpdump -vv
+	VerbosityMax     VerbosityLevel = "max"     // tcpdump -vvv
+)
+
+func (v VerbosityLevel) Validate() error {
+	switch v {
+	case VerbosityNormal, VerbosityVerbose, VerbosityExtra, VerbosityMax:
+		return nil
+	default:
+		return fmt.Errorf("%w: %s (valid: verbose, extra, max)", ErrInvalidVerbosityLevel, v)
+	}
+}
+
+// TimestampFormat represents the timestamp format for packet capture output
+type TimestampFormat string
+
+const (
+	TimestampDefault         TimestampFormat = ""                  // Default formatted timestamp
+	TimestampNone            TimestampFormat = "none"              // tcpdump -t
+	TimestampUnformatted     TimestampFormat = "unformatted"       // tcpdump -tt (Unix epoch)
+	TimestampDelta           TimestampFormat = "delta"             // tcpdump -ttt (delta between packets)
+	TimestampDate            TimestampFormat = "date"              // tcpdump -tttt (with date)
+	TimestampDeltaSinceFirst TimestampFormat = "delta-since-first" // tcpdump -ttttt (delta since first)
+)
+
+func (t TimestampFormat) Validate() error {
+	switch t {
+	case TimestampDefault, TimestampNone, TimestampUnformatted, TimestampDelta, TimestampDate, TimestampDeltaSinceFirst:
+		return nil
+	default:
+		return fmt.Errorf("%w: %s (valid: none, unformatted, delta, date, delta-since-first)", ErrInvalidTimestampFormat, t)
+	}
+}
+
+// PrintDataFormat represents the format for printing packet data
+type PrintDataFormat string
+
+const (
+	PrintDataNone          PrintDataFormat = ""                // Default, no data printing
+	PrintDataHex           PrintDataFormat = "hex"             // tcpdump -x (hex only)
+	PrintDataHexWithLink   PrintDataFormat = "hex-with-link"   // tcpdump -xx (hex with link header)
+	PrintDataASCII         PrintDataFormat = "ascii"           // tcpdump -A (ASCII only)
+	PrintDataASCIIWithLink PrintDataFormat = "ascii-with-link" // tcpdump -AA (ASCII with link header)
+)
+
+func (p PrintDataFormat) Validate() error {
+	switch p {
+	case PrintDataNone, PrintDataHex, PrintDataHexWithLink, PrintDataASCII, PrintDataASCIIWithLink:
+		return nil
+	default:
+		return fmt.Errorf("%w: %s (valid: hex, hex-with-link, ascii, ascii-with-link)", ErrInvalidPrintDataFormat, p)
+	}
+}
 
 type Opts struct {
 	genericclioptions.ConfigFlags
@@ -39,29 +107,20 @@ type Opts struct {
 	s3Region           string
 	s3SecretAccessKey  string
 	// tcpdumpFilter is Obsolete use captureOption.pcapFilter and captureOption boolean flags for display options.
-	tcpdumpFilter        string
-	pcapFilter           string
-	noPromiscuous        bool
-	packetBuffered       bool
-	immediateMode        bool
-	noResolveDNS         bool
-	noResolvePort        bool
-	verbose              bool
-	extraVerbose         bool
-	maxVerbose           bool
-	printDataHex         bool
-	printDataHexLink     bool
-	printDataASCII       bool
-	printDataASCIILink   bool
-	printLinkHeader      bool
-	quietOutput          bool
-	absoluteSeq          bool
-	noTimestamp          bool
-	unformattedTimestamp bool
-	deltaTimestamp       bool
-	dateTimestamp        bool
-	deltaSinceFirst      bool
-	dontVerifyChecksum   bool
+	tcpdumpFilter      string
+	pcapFilter         string
+	noPromiscuous      bool
+	packetBuffered     bool
+	immediateMode      bool
+	noResolveDNS       bool
+	noResolvePort      bool
+	verbosityLevel     VerbosityLevel
+	timestampFormat    TimestampFormat
+	printDataFormat    PrintDataFormat
+	printLinkHeader    bool
+	quietOutput        bool
+	absoluteSeq        bool
+	dontVerifyChecksum bool
 }
 
 var opts = Opts{

@@ -173,39 +173,14 @@ func (in *CaptureOption) DeepCopyInto(out *CaptureOption) {
 		*out = new(bool)
 		**out = **in
 	}
-	if in.Verbose != nil {
-		in, out := &in.Verbose, &out.Verbose
-		*out = new(bool)
+	if in.Verbosity != nil {
+		in, out := &in.Verbosity, &out.Verbosity
+		*out = new(string)
 		**out = **in
 	}
-	if in.ExtraVerbose != nil {
-		in, out := &in.ExtraVerbose, &out.ExtraVerbose
-		*out = new(bool)
-		**out = **in
-	}
-	if in.MaxVerbose != nil {
-		in, out := &in.MaxVerbose, &out.MaxVerbose
-		*out = new(bool)
-		**out = **in
-	}
-	if in.PrintDataHex != nil {
-		in, out := &in.PrintDataHex, &out.PrintDataHex
-		*out = new(bool)
-		**out = **in
-	}
-	if in.PrintDataHexLink != nil {
-		in, out := &in.PrintDataHexLink, &out.PrintDataHexLink
-		*out = new(bool)
-		**out = **in
-	}
-	if in.PrintDataASCII != nil {
-		in, out := &in.PrintDataASCII, &out.PrintDataASCII
-		*out = new(bool)
-		**out = **in
-	}
-	if in.PrintDataASCIILink != nil {
-		in, out := &in.PrintDataASCIILink, &out.PrintDataASCIILink
-		*out = new(bool)
+	if in.PrintDataFormat != nil {
+		in, out := &in.PrintDataFormat, &out.PrintDataFormat
+		*out = new(string)
 		**out = **in
 	}
 	if in.PrintLinkHeader != nil {
@@ -223,29 +198,9 @@ func (in *CaptureOption) DeepCopyInto(out *CaptureOption) {
 		*out = new(bool)
 		**out = **in
 	}
-	if in.NoTimestamp != nil {
-		in, out := &in.NoTimestamp, &out.NoTimestamp
-		*out = new(bool)
-		**out = **in
-	}
-	if in.UnformattedTimestamp != nil {
-		in, out := &in.UnformattedTimestamp, &out.UnformattedTimestamp
-		*out = new(bool)
-		**out = **in
-	}
-	if in.DeltaTimestamp != nil {
-		in, out := &in.DeltaTimestamp, &out.DeltaTimestamp
-		*out = new(bool)
-		**out = **in
-	}
-	if in.DateTimestamp != nil {
-		in, out := &in.DateTimestamp, &out.DateTimestamp
-		*out = new(bool)
-		**out = **in
-	}
-	if in.DeltaSinceFirst != nil {
-		in, out := &in.DeltaSinceFirst, &out.DeltaSinceFirst
-		*out = new(bool)
+	if in.TimestampFormat != nil {
+		in, out := &in.TimestampFormat, &out.TimestampFormat
+		*out = new(string)
 		**out = **in
 	}
 	if in.DontVerifyChecksum != nil {

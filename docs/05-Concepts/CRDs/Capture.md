@@ -35,13 +35,12 @@ The `Capture` CRD is defined with the following specifications:
       - `immediateMode`: Enable immediate mode (tcpdump --immediate-mode)
       - `noResolveDNS`: Don't resolve hostnames (tcpdump -n)
       - `noResolvePort`: Don't resolve hostnames or port names (tcpdump -nn)
-      - `verbose`, `extraVerbose`, `maxVerbose`: Verbose output levels (tcpdump -v, -vv, -vvv)
-      - `printDataHex`, `printDataHexLink`: Show packet data in hex (tcpdump -x, -xx)
-      - `printDataASCII`, `printDataASCIILink`: Show packet data in ASCII (tcpdump -A, -AA)
+      - `verbose`, `extraVerbose`, `maxVerbose`: Verbose output levels (tcpdump -v, -vv, -vvv). **Mutually exclusive** - set only one.
+      - `printDataHex`, `printDataHexLink`, `printDataASCII`, `printDataASCIILink`: Print packet data in hex (tcpdump -x, -xx) or ASCII (tcpdump -A, -AA). **Mutually exclusive** - set only one print data format.
       - `printLinkHeader`: Print link-level headers (tcpdump -e)
       - `quietOutput`: Quick/quiet output (tcpdump -q)
       - `absoluteSeq`: Print absolute TCP sequence numbers (tcpdump -S)
-      - `noTimestamp`, `unformattedTimestamp`, `deltaTimestamp`, `dateTimestamp`, `deltaSinceFirst`: Timestamp options (tcpdump -t, -tt, -ttt, -tttt, -ttttt)
+      - `noTimestamp`, `unformattedTimestamp`, `deltaTimestamp`, `dateTimestamp`, `deltaSinceFirst`: Timestamp options (tcpdump -t, -tt, -ttt, -tttt, -ttttt). **Mutually exclusive** - set only one.
       - `dontVerifyChecksum`: Don't verify TCP checksums (tcpdump -K)
   - `captureTarget`: Defines the target on which the network packets will be captured. It includes namespace, node, and pod selectors, as well as specific pod names.
   - `filters`: Specifies filters for including or excluding network packets based on IP or port.
@@ -195,17 +194,31 @@ captureOption:
   dateTimestamp: true    # tcpdump -tttt
 ```
 
-**Available display option boolean flags:**
+**Available display option and boolean flags:**
 
 - `noResolveDNS`, `noResolvePort`: Don't resolve hostnames/port names (tcpdump -n, -nn)
-- `verbose`, `extraVerbose`, `maxVerbose`: Verbose output levels (tcpdump -v, -vv, -vvv)
-- `printDataHex`, `printDataHexLink`: Show packet data in hex (tcpdump -x, -xx)
-- `printDataASCII`, `printDataASCIILink`: Show packet data in ASCII (tcpdump -A, -AA)
-- `printLinkHeader`: Print link-level headers (tcpdump -e)
-- `quietOutput`: Quick/quiet output (tcpdump -q)
-- `absoluteSeq`: Print absolute TCP sequence numbers (tcpdump -S)
-- `noTimestamp`, `unformattedTimestamp`, `deltaTimestamp`, `dateTimestamp`, `deltaSinceFirst`: Timestamp options
-- `dontVerifyChecksum`: Don't verify TCP checksums (tcpdump -K)
+- **Verbosity** (mutually exclusive - choose one):
+  - `verbose`: Verbose output (tcpdump -v)
+  - `extraVerbose`: Extra verbose output (tcpdump -vv)
+  - `maxVerbose`: Maximum verbose output (tcpdump -vvv)
+- **Print data format** (mutually exclusive - choose one):
+  - `printDataHex`: Show packet data in hex (tcpdump -x)
+  - `printDataHexLink`: Show packet data in hex with link-level headers (tcpdump -xx)
+  - `printDataASCII`: Show packet data in ASCII (tcpdump -A)
+  - `printDataASCIILink`: Show packet data in ASCII with link-level headers (tcpdump -AA)
+- **Timestamp format** (mutually exclusive - choose one):
+  - `noTimestamp`: Don't print timestamps (tcpdump -t)
+  - `unformattedTimestamp`: Print timestamps as Unix epoch (tcpdump -tt)
+  - `deltaTimestamp`: Print time delta between packets (tcpdump -ttt)
+  - `dateTimestamp`: Print timestamps with date (tcpdump -tttt)
+  - `deltaSinceFirst`: Print time delta since first packet (tcpdump -ttttt)
+- Other options:
+  - `printLinkHeader`: Print link-level headers (tcpdump -e)
+  - `quietOutput`: Quick/quiet output (tcpdump -q)
+  - `absoluteSeq`: Print absolute TCP sequence numbers (tcpdump -S)
+  - `dontVerifyChecksum`: Don't verify TCP checksums (tcpdump -K)
+
+> **CLI Users**: When using the `kubectl retina capture create` command, use the enum-based flags (`--verbosity`, `--timestamp-format`, `--print-data`) instead of setting these boolean fields directly. See the [CLI documentation](../../04-Captures/02-cli.md) for details.
 
 **Capture behavior options:**
 
