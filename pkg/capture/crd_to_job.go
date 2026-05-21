@@ -117,11 +117,29 @@ func NewCaptureToPodTranslator(kubeClient kubernetes.Interface, logger *log.ZapL
 	return captureToPodTranslator
 }
 
-func (translator *CaptureToPodTranslator) initJobTemplate(ctx context.Context, capture *retinav1alpha1.Capture) error {
+// resolveHostPath validates the user-supplied HostPath subpath against the
+// operator-configured base directory and returns the resolved on-node path.
+// Returns ("", nil) when no HostPath is configured (HostPath is nil). An
+// explicit empty-string HostPath is rejected via validateHostPath so user
+// misconfiguration surfaces with a clear error instead of being silently
+// ignored.
+func (translator *CaptureToPodTranslator) resolveHostPath(oc retinav1alpha1.OutputConfiguration) (string, error) {
+	if oc.HostPath == nil {
+		return "", nil
+	}
+	resolved, err := validateHostPath(*oc.HostPath, translator.config.CaptureHostPathBaseDir)
+	if err != nil {
+		return "", fmt.Errorf("invalid OutputConfiguration.HostPath: %w", err)
+	}
+	return resolved, nil
+}
+
+func (translator *CaptureToPodTranslator) initJobTemplate(ctx context.Context, capture *retinav1alpha1.Capture, resolvedHostPath string) error {
 	backoffLimit := int32(0)
 	// NOTE(mainred): We allow the capture pod to run for at most 30 minutes before being deleted to ensure the output is
 	// uploaded, and this happens when the user want to stop a capture on demand by deleting the capture.
 	captureTerminationGracePeriodSeconds := int64(1800)
+
 	translator.jobTemplate = &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: fmt.Sprintf("%s-", capture.Name),
@@ -134,7 +152,7 @@ func (translator *CaptureToPodTranslator) initJobTemplate(ctx context.Context, c
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      captureUtils.GetContainerLabelsFromCaptureName(capture.Name),
 					Namespace:   capture.Namespace,
-					Annotations: captureUtils.GetPodAnnotationsFromCapture(capture),
+					Annotations: captureUtils.GetPodAnnotationsFromCapture(capture, resolvedHostPath),
 				},
 				Spec: corev1.PodSpec{
 					HostNetwork:                   true,
@@ -207,16 +225,15 @@ func (translator *CaptureToPodTranslator) initJobTemplate(ctx context.Context, c
 		},
 	}
 
-	if capture.Spec.OutputConfiguration.HostPath != nil && *capture.Spec.OutputConfiguration.HostPath != "" {
-		translator.l.Info("HostPath is not empty", zap.String("HostPath", *capture.Spec.OutputConfiguration.HostPath))
+	if resolvedHostPath != "" {
+		translator.l.Info("HostPath is not empty", zap.String("HostPath", *capture.Spec.OutputConfiguration.HostPath), zap.String("ResolvedHostPath", resolvedHostPath))
 
 		captureFolderHostPathType := corev1.HostPathDirectoryOrCreate
-		hostPath := *capture.Spec.OutputConfiguration.HostPath
 		hostPathVolume := corev1.Volume{
 			Name: captureConstants.CaptureHostPathVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				HostPath: &corev1.HostPathVolumeSource{
-					Path: hostPath,
+					Path: resolvedHostPath,
 					Type: &captureFolderHostPathType,
 				},
 			},
@@ -225,7 +242,7 @@ func (translator *CaptureToPodTranslator) initJobTemplate(ctx context.Context, c
 
 		hostPathVolumeMount := corev1.VolumeMount{
 			Name:      captureConstants.CaptureHostPathVolumeName,
-			MountPath: hostPath,
+			MountPath: resolvedHostPath,
 		}
 		translator.jobTemplate.Spec.Template.Spec.Containers[0].VolumeMounts = append(translator.jobTemplate.Spec.Template.Spec.Containers[0].VolumeMounts, hostPathVolumeMount)
 	}
@@ -363,7 +380,15 @@ func (translator *CaptureToPodTranslator) TranslateCaptureToJobs(ctx context.Con
 		return nil, err
 	}
 
-	if err := translator.initJobTemplate(ctx, capture); err != nil {
+	// Resolve the HostPath once and reuse it for both the job template (pod
+	// annotation + volume mount) and the capture workload env.
+	resolvedHostPath, hpErr := translator.resolveHostPath(capture.Spec.OutputConfiguration)
+	if hpErr != nil {
+		translator.l.Error("Rejected HostPath in Capture", zap.Error(hpErr), zap.String("HostPath", *capture.Spec.OutputConfiguration.HostPath))
+		return nil, hpErr
+	}
+
+	if err := translator.initJobTemplate(ctx, capture, resolvedHostPath); err != nil {
 		return nil, err
 	}
 	captureTargetOnNode, err := translator.CalculateCaptureTargetsOnNode(ctx, capture.Spec.CaptureConfiguration.CaptureTarget, capture.Namespace)
@@ -371,7 +396,7 @@ func (translator *CaptureToPodTranslator) TranslateCaptureToJobs(ctx context.Con
 		return nil, err
 	}
 
-	jobPodEnv, err := translator.ObtainCaptureJobPodEnv(*capture)
+	jobPodEnv, err := translator.obtainCaptureJobPodEnv(*capture, resolvedHostPath)
 	if err != nil {
 		return nil, err
 	}
@@ -578,6 +603,10 @@ func (translator *CaptureToPodTranslator) validateCapture(capture *retinav1alpha
 		capture.Spec.OutputConfiguration.PersistentVolumeClaim == nil &&
 		capture.Spec.OutputConfiguration.S3Upload == nil {
 		return fmt.Errorf("At least one output configuration should be set")
+	}
+
+	if _, err := translator.resolveHostPath(capture.Spec.OutputConfiguration); err != nil {
+		return err
 	}
 	return nil
 }
@@ -944,10 +973,15 @@ func (translator *CaptureToPodTranslator) obtainTcpdumpFilters(captureConfig ret
 	return tcpdumpFilter, nil
 }
 
-func (translator *CaptureToPodTranslator) obtainCaptureOutputEnv(outputConfiguration retinav1alpha1.OutputConfiguration) (map[captureConstants.CaptureOutputLocationEnvKey]string, error) {
+func (translator *CaptureToPodTranslator) obtainCaptureOutputEnv(
+	outputConfiguration retinav1alpha1.OutputConfiguration,
+	resolvedHostPath string,
+) (map[captureConstants.CaptureOutputLocationEnvKey]string, error) {
 	outputEnv := map[captureConstants.CaptureOutputLocationEnvKey]string{}
-	if outputConfiguration.HostPath != nil {
-		outputEnv[captureConstants.CaptureOutputLocationEnvKeyHostPath] = *outputConfiguration.HostPath
+	if resolvedHostPath != "" {
+		// Emit the resolved (joined, cleaned) path so the workload writes where
+		// the HostPath volume is actually mounted in the capture pod.
+		outputEnv[captureConstants.CaptureOutputLocationEnvKeyHostPath] = resolvedHostPath
 	}
 	if outputConfiguration.PersistentVolumeClaim != nil {
 		outputEnv[captureConstants.CaptureOutputLocationEnvKeyPersistentVolumeClaim] = *outputConfiguration.PersistentVolumeClaim
@@ -983,9 +1017,17 @@ func (translator *CaptureToPodTranslator) obtainCaptureOptionEnv(option retinav1
 
 // ObtainCaptureJobPodEnv translates Capture object to Environment variables to capture job Pod.
 func (translator *CaptureToPodTranslator) ObtainCaptureJobPodEnv(capture retinav1alpha1.Capture) (map[string]string, error) {
+	resolvedHostPath, err := translator.resolveHostPath(capture.Spec.OutputConfiguration)
+	if err != nil {
+		return nil, err
+	}
+	return translator.obtainCaptureJobPodEnv(capture, resolvedHostPath)
+}
+
+func (translator *CaptureToPodTranslator) obtainCaptureJobPodEnv(capture retinav1alpha1.Capture, resolvedHostPath string) (map[string]string, error) {
 	jobPodEnv := map[string]string{}
 
-	captureOutputEnv, err := translator.obtainCaptureOutputEnv(capture.Spec.OutputConfiguration)
+	captureOutputEnv, err := translator.obtainCaptureOutputEnv(capture.Spec.OutputConfiguration, resolvedHostPath)
 	if err != nil {
 		return nil, err
 	}

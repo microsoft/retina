@@ -226,7 +226,6 @@ func (cr *CaptureReconciler) createJobsFromCapture(ctx context.Context, capture 
 
 	jobs, err := cr.captureToPodTranslator.TranslateCaptureToJobs(ctx, capture)
 	if err != nil {
-		cr.logger.Error("Failed to translate Capture to jobs", zap.Error(err), zap.String("Capture", captureRef.String()))
 		var errorReason string
 		switch err.(type) {
 		case pkgcapture.CaptureJobNumExceedLimitError:

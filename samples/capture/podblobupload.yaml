@@ -16,5 +16,5 @@ spec:
   outputConfiguration:
     # the artifact will be copied to hostpath
     # and uploaded to azure storage account
-    hostPath: "/tmp/retina"
+    hostPath: "retina"
     blobUpload: blobsassecret

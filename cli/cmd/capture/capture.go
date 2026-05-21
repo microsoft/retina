@@ -19,6 +19,7 @@ type Opts struct {
 	duration           time.Duration
 	excludeFilter      string
 	hostPath           string
+	hostPathBaseDir    string
 	includeFilter      string
 	includeMetadata    bool
 	interfaces         string

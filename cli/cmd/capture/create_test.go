@@ -12,6 +12,8 @@ import (
 	"testing"
 
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
+	"github.com/microsoft/retina/internal/buildinfo"
+	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	"github.com/microsoft/retina/pkg/label"
 	"github.com/stretchr/testify/require"
 	batchv1 "k8s.io/api/batch/v1"
@@ -340,28 +342,33 @@ func JobsCreatedCorrectly(t *testing.T, kubeClient *fake.Clientset, tc testcase)
 
 // Pod Names Tests - Tests for CLI pod name selection functionality
 
-func TestCreateCaptureCommand_PodNamesWithNodeSelector_ShouldFail(t *testing.T) {
-	// Test that when pod-names is specified with node-selectors, the node selector is overridden
-	// and the command attempts to use pod names. Since the pod doesn't exist, this will fail.
-	// This verifies that pod names take precedence over default node selectors.
-	cmd := NewCommand(fake.NewClientset())
-
-	cmd.SetArgs([]string{
-		"create",
-		"--name=test-capture",
-		"--namespace=default",
-		"--pod-names=nonexistent-pod",
-		"--node-selectors=kubernetes.io/os=linux",
-		"--duration=10s",
-		"--host-path=/tmp/capture",
+func TestCreateCaptureCommand_PodNamesClearsDefaultNodeSelector(t *testing.T) {
+	// When --pod-names is set together with the default --node-selectors,
+	// the default selector must be cleared so pod names take precedence.
+	savedNodeSelectors := opts.nodeSelectors
+	savedPodNames := opts.podNames
+	savedNamespace := opts.Namespace
+	savedName := opts.Name
+	t.Cleanup(func() {
+		opts.nodeSelectors = savedNodeSelectors
+		opts.podNames = savedPodNames
+		opts.Namespace = savedNamespace
+		opts.Name = savedName
 	})
 
-	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
+	name := "test-capture"
+	namespace := "default"
 
-	err := cmd.Execute()
-	require.Error(t, err, "command should fail when pod-names specifies a nonexistent pod")
-	require.Contains(t, err.Error(), "not found", "error should indicate the pod was not found")
+	opts.nodeSelectors = DefaultNodeSelectors
+	opts.podNames = "nonexistent-pod"
+	opts.Namespace = &namespace
+	opts.Name = &name
+
+	capture, err := createCaptureF(context.Background(), fake.NewClientset())
+	require.NoError(t, err)
+
+	require.Equal(t, []string{"nonexistent-pod"}, capture.Spec.CaptureConfiguration.CaptureTarget.PodNames)
+	require.Nil(t, capture.Spec.CaptureConfiguration.CaptureTarget.NodeSelector)
 }
 
 func TestCreateCaptureWithPodNames_CRDStructure(t *testing.T) {
@@ -546,7 +553,7 @@ func TestNodeNamesClearsDefaultNodeSelector(t *testing.T) {
 				"--namespace=default",
 				"--node-names=win-node-1",
 				"--duration=10s",
-				"--host-path=/tmp/capture",
+				"--host-path=capture",
 			},
 			wantNodes: []string{"win-node-1"},
 			wantErr:   false,
@@ -559,7 +566,7 @@ func TestNodeNamesClearsDefaultNodeSelector(t *testing.T) {
 				"--namespace=default",
 				"--node-names=lin-node-1",
 				"--duration=10s",
-				"--host-path=/tmp/capture",
+				"--host-path=capture",
 			},
 			wantNodes: []string{"lin-node-1"},
 			wantErr:   false,
@@ -572,7 +579,7 @@ func TestNodeNamesClearsDefaultNodeSelector(t *testing.T) {
 				"--namespace=default",
 				"--node-names=lin-node-1,win-node-1",
 				"--duration=10s",
-				"--host-path=/tmp/capture",
+				"--host-path=capture",
 			},
 			wantNodes: []string{"lin-node-1", "win-node-1"},
 			wantErr:   false,
@@ -621,4 +628,49 @@ func TestNodeNamesClearsDefaultNodeSelector(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetCLICaptureConfig(t *testing.T) {
+	savedDebug, savedJobNumLimit, savedHostPathBaseDir := opts.debug, opts.jobNumLimit, opts.hostPathBaseDir
+	t.Cleanup(func() {
+		opts.debug = savedDebug
+		opts.jobNumLimit = savedJobNumLimit
+		opts.hostPathBaseDir = savedHostPathBaseDir
+	})
+
+	opts.debug = true
+	opts.jobNumLimit = 7
+	opts.hostPathBaseDir = "/mnt/captures"
+
+	got := getCLICaptureConfig()
+
+	require.Equal(t, buildinfo.Version, got.CaptureImageVersion)
+	require.Equal(t, captureUtils.VersionSourceCLIVersion, got.CaptureImageVersionSource)
+	require.True(t, got.CaptureDebug)
+	require.Equal(t, 7, got.CaptureJobNumLimit)
+	require.Equal(t, "/mnt/captures", got.CaptureHostPathBaseDir)
+}
+
+func TestCreateCaptureCommand_AbsoluteHostPath_ShouldFail(t *testing.T) {
+	// --host-path must be a bare subpath; absolute paths are rejected by the
+	// shared validateHostPath helper used by both the operator and the CLI.
+	cmd := NewCommand(fake.NewClientset())
+
+	cmd.SetArgs([]string{
+		"create",
+		"--name=hp-absolute",
+		"--namespace=default",
+		"--node-selectors=kubernetes.io/os=linux",
+		"--duration=10s",
+		"--host-path=/tmp/foo",
+	})
+
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+
+	err := cmd.Execute()
+	require.Error(t, err, "command should fail when --host-path is absolute")
+	require.Contains(t, err.Error(), "OutputConfiguration.HostPath",
+		"error should reference the rejected HostPath field; got: %v", err)
 }

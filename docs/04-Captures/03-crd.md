@@ -77,7 +77,7 @@ spec:
         matchLabels:
           kubernetes.io/os: linux
   outputConfiguration:
-    hostPath: /captures
+    hostPath: example-capture
 ```
 
 Include / Exclude filters
@@ -105,7 +105,7 @@ spec:
         - 10.224.0.26:80
         - 10.224.0.34:8080
   outputConfiguration:
-    hostPath: /captures
+    hostPath: example-capture
 ```
 
 Single Pod by Name
@@ -125,7 +125,7 @@ spec:
       podNames:
         - my-app-pod-abc123
   outputConfiguration:
-    hostPath: /captures
+    hostPath: example-capture
 ```
 
 Multiple Pods by Name
@@ -146,7 +146,7 @@ spec:
         - my-app-pod-abc123
         - my-app-pod-def456
   outputConfiguration:
-    hostPath: /captures
+    hostPath: example-capture
 ```
 
 Additional examples can also be found in the [GitHub capture samples](https://github.com/microsoft/retina/tree/main/samples/capture).

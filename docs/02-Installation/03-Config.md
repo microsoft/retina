@@ -63,4 +63,5 @@ Apply to both Agent and Operator.
 * `operator.enableRetinaEndpoint`: Allows the operator to monitor and update the cache with Pod metadata.
 * `capture.captureDebug`: Toggles debug mode for captures. If true, the operator uses the image from the test container registry for the capture workload. Refer to [Capture Image file](../../pkg/capture/utils/capture_image.go) for details on how the debug capture image version is selected.
 * `capture.captureJobNumLimit`: Sets the maximum number of jobs that can be created for each Capture.
+* `capture.hostPathBaseDir`: Absolute directory on every node under which Capture CRs may write artifacts. The CR field `outputConfiguration.hostPath` is treated as a relative subpath name and joined under this directory; CR authors cannot influence the base. Defaults to `/var/log/retina/captures` when unset.
 * `capture.enableManagedStorageAccount`: Enables the use of a managed storage account for storing artifacts.
