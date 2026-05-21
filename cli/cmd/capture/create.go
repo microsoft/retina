@@ -16,8 +16,10 @@ import (
 	"go.uber.org/zap"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -34,8 +36,9 @@ import (
 )
 
 const (
-	DefaultDebug    bool          = false
-	DefaultDuration time.Duration = 1 * time.Minute
+	DefaultCleanUpAfterUpload bool          = false
+	DefaultDebug              bool          = false
+	DefaultDuration           time.Duration = 1 * time.Minute
 	// DefaultHostPath is the default subpath (joined under DefaultHostPathBaseDir on
 	// the node) where capture artifacts are stored. It is a bare name, not an
 	// absolute path: absolute paths are rejected by the operator.
@@ -52,7 +55,32 @@ const (
 	DefaultS3Path          string        = "retina/captures"
 	DefaultWaitPeriod      time.Duration = 1 * time.Minute
 	DefaultWaitTimeout     time.Duration = 5 * time.Minute
+
+	// JobTTLSecondsAfterFinished is how long completed/failed jobs and their
+	// pods are kept before Kubernetes garbage-collects them (no-wait mode).
+	JobTTLSecondsAfterFinished int32 = 300 // 5 minutes
+
+	// JobActiveDeadlineBufferSeconds is added to the capture duration to form
+	// the Job's activeDeadlineSeconds. This buffer accounts for output upload
+	// and cleanup time after the capture itself finishes.
+	JobActiveDeadlineBufferSeconds int64 = 1800 // 30 minutes
+
+	// WaitDeadlineBuffer is extra time added to the capture duration when
+	// computing the wait deadline, to account for upload and scheduling overhead.
+	WaitDeadlineBuffer time.Duration = 5 * time.Minute
+
+	// MinPollAttempts is the minimum number of polling iterations before the
+	// wait deadline expires. Used to compute a fallback poll period.
+	MinPollAttempts = 4
 )
+
+var errCleanupRequiresRemoteStorage = errors.New("--cleanup-after-upload requires remote storage (--blob-upload, --s3-bucket, or --pvc)")
+
+// hasRemoteDestination returns true if the capture options specify a remote
+// storage output (blob upload or S3 upload).
+func hasRemoteDestination(o *Opts) bool {
+	return o.blobUpload != "" || o.s3Bucket != "" || o.pvc != ""
+}
 
 var createExample = templates.Examples(i18n.T(`
 		# Select nodes by node name and copy the artifacts to the node host path
@@ -114,18 +142,29 @@ func create(kubeClient kubernetes.Interface) error {
 		return err
 	}
 
+	if opts.cleanUpAfterUpload {
+		if !hasRemoteDestination(&opts) {
+			return errCleanupRequiresRemoteStorage
+		}
+	}
+
 	jobsCreated, err := createJobs(ctx, kubeClient, capture)
 	if err != nil {
 		retinacmd.Logger.Error("Failed to create job", zap.Error(err))
 		return err
 	}
+
+	// Set owner references on secrets so they are garbage-collected when the
+	// jobs are removed (by TTL, explicit deletion, or manual kubectl delete).
+	if ownerRefErr := setSecretOwnerReferences(ctx, kubeClient, capture, jobsCreated); ownerRefErr != nil {
+		retinacmd.Logger.Error("Failed to set owner references on capture secrets", zap.Error(ownerRefErr))
+	}
+
 	if opts.nowait {
-		retinacmd.Logger.Info("Please manually delete all capture jobs")
-		if capture.Spec.OutputConfiguration.BlobUpload != nil {
-			retinacmd.Logger.Info("Please manually delete capture secret", zap.String("namespace", *opts.Namespace), zap.String("secret name", *capture.Spec.OutputConfiguration.BlobUpload))
-		}
-		if capture.Spec.OutputConfiguration.S3Upload != nil && capture.Spec.OutputConfiguration.S3Upload.SecretName != "" {
-			retinacmd.Logger.Info("Please manually delete capture secret", zap.String("namespace", *opts.Namespace), zap.String("secret name", capture.Spec.OutputConfiguration.S3Upload.SecretName))
+		if opts.cleanUpAfterUpload && hasRemoteDestination(&opts) {
+			retinacmd.Logger.Info("Capture jobs will be automatically cleaned up after upload (TTL-based)")
+		} else {
+			retinacmd.Logger.Info("Please manually delete all capture jobs (associated secrets will be garbage-collected automatically)")
 		}
 		printCaptureResult(jobsCreated)
 		return nil
@@ -271,6 +310,8 @@ func NewCreateSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 	createCapture.Flags().BoolVar(&opts.includeMetadata, "include-metadata", DefaultIncludeMetadata, "If true, collect static network metadata into capture file")
 	createCapture.Flags().IntVar(&opts.jobNumLimit, "job-num-limit", DefaultJobNumLimit, "The maximum number of jobs can be created for each capture. 0 means no limit")
 	createCapture.Flags().BoolVar(&opts.nowait, "no-wait", DefaultNowait, "Do not wait for the long-running capture job to finish")
+	createCapture.Flags().BoolVar(&opts.cleanUpAfterUpload, "cleanup-after-upload", DefaultCleanUpAfterUpload,
+		"Automatically clean up capture jobs and resources after successful upload to remote storage")
 	createCapture.Flags().BoolVar(&opts.debug, "debug", DefaultDebug, "When debug is true, a customized retina-agent image, determined by the environment variable RETINA_AGENT_IMAGE, is set")
 
 	return createCapture
@@ -322,7 +363,11 @@ func deleteSecret(ctx context.Context, kubeClient kubernetes.Interface, secretNa
 		return nil
 	}
 
-	return kubeClient.CoreV1().Secrets(*opts.Namespace).Delete(ctx, *secretName, metav1.DeleteOptions{}) //nolint:wrapcheck //internal return
+	err := kubeClient.CoreV1().Secrets(*opts.Namespace).Delete(ctx, *secretName, metav1.DeleteOptions{})
+	if k8serrors.IsNotFound(err) {
+		return nil
+	}
+	return err //nolint:wrapcheck //internal return
 }
 
 // validateBPFFilter checks that a BPF filter string doesn't contain flags (tokens starting with '-').
@@ -571,6 +616,8 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 		includeFilterSlice := strings.Split(opts.includeFilter, ",")
 		capture.Spec.CaptureConfiguration.Filters.Include = includeFilterSlice
 	}
+
+	capture.Spec.CleanUpAfterUpload = opts.cleanUpAfterUpload
 	return capture, nil
 }
 
@@ -593,6 +640,21 @@ func createJobs(ctx context.Context, kubeClient kubernetes.Interface, capture *r
 
 	jobsCreated := []batchv1.Job{}
 	for _, job := range jobs {
+		// In no-wait mode with a remote destination, set TTL so Kubernetes
+		// auto-deletes completed jobs and their pods. When host-path only,
+		// the job metadata is needed to locate the capture file.
+		if opts.nowait && opts.cleanUpAfterUpload && hasRemoteDestination(&opts) {
+			ttl := JobTTLSecondsAfterFinished
+			job.Spec.TTLSecondsAfterFinished = &ttl
+		}
+
+		// Set a hard deadline to prevent jobs from running indefinitely if the
+		// capture process hangs. Deadline = capture duration + upload buffer.
+		if opts.duration > 0 {
+			deadline := int64(opts.duration.Seconds()) + JobActiveDeadlineBufferSeconds
+			job.Spec.ActiveDeadlineSeconds = &deadline
+		}
+
 		jobCreated, err := kubeClient.BatchV1().Jobs(*opts.Namespace).Create(ctx, job, metav1.CreateOptions{})
 		if err != nil {
 			return nil, err
@@ -609,13 +671,22 @@ func waitUntilJobsComplete(ctx context.Context, kubeClient kubernetes.Interface,
 	// TODO: let's make the timeout and period to wait for all job to finish configurable.
 	deadline := DefaultWaitTimeout
 	if opts.duration != 0 {
-		deadline = opts.duration * 2
+		// Allow time for capture + upload + scheduling overhead (Windows
+		// nodes in particular need extra time for image pull and pod start).
+		deadline = opts.duration + WaitDeadlineBuffer
+		if deadline < DefaultWaitTimeout {
+			deadline = DefaultWaitTimeout
+		}
 	}
 
 	period := DefaultWaitPeriod
 	// To print less noisy messages, we rely on duration to decide the wait period.
 	if period < opts.duration/10 {
 		period = opts.duration / 10
+	}
+	// Ensure poll period is less than the deadline so we get multiple checks.
+	if period >= deadline {
+		period = deadline / MinPollAttempts
 	}
 	retinacmd.Logger.Info(fmt.Sprintf("Waiting timeout is set to %s", deadline))
 
@@ -671,4 +742,52 @@ func deleteJobs(ctx context.Context, kubeClient kubernetes.Interface, jobs []bat
 		}
 	}
 	return jobsFailedtoDelete
+}
+
+// setSecretOwnerReferences adds ownerReferences from the given jobs to the
+// secrets used by the capture (blob or S3). This ensures secrets are garbage-
+// collected when the owning jobs are deleted (by TTL or explicitly).
+func setSecretOwnerReferences(ctx context.Context, kubeClient kubernetes.Interface, capture *retinav1alpha1.Capture, jobs []batchv1.Job) error {
+	var secretNames []string
+	if capture.Spec.OutputConfiguration.BlobUpload != nil {
+		secretNames = append(secretNames, *capture.Spec.OutputConfiguration.BlobUpload)
+	}
+	if capture.Spec.OutputConfiguration.S3Upload != nil && capture.Spec.OutputConfiguration.S3Upload.SecretName != "" {
+		secretNames = append(secretNames, capture.Spec.OutputConfiguration.S3Upload.SecretName)
+	}
+
+	if len(secretNames) == 0 || len(jobs) == 0 {
+		return nil
+	}
+
+	ownerRefs := make([]metav1.OwnerReference, 0, len(jobs))
+	for i := range jobs {
+		ownerRefs = append(ownerRefs, metav1.OwnerReference{
+			APIVersion: batchv1.SchemeGroupVersion.String(),
+			Kind:       "Job",
+			Name:       jobs[i].Name,
+			UID:        jobs[i].UID,
+		})
+	}
+
+	for _, secretName := range secretNames {
+		secret, err := kubeClient.CoreV1().Secrets(*opts.Namespace).Get(ctx, secretName, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to get secret %s: %w", secretName, err)
+		}
+		// Deduplicate owner references to avoid appending the same refs on retries.
+		existing := make(map[types.UID]struct{}, len(secret.OwnerReferences))
+		for _, ref := range secret.OwnerReferences {
+			existing[ref.UID] = struct{}{}
+		}
+		for _, ref := range ownerRefs {
+			if _, found := existing[ref.UID]; !found {
+				secret.OwnerReferences = append(secret.OwnerReferences, ref)
+			}
+		}
+		if _, err := kubeClient.CoreV1().Secrets(*opts.Namespace).Update(ctx, secret, metav1.UpdateOptions{}); err != nil {
+			return fmt.Errorf("failed to update secret %s with owner references: %w", secretName, err)
+		}
+	}
+	return nil
 }
