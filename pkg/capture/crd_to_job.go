@@ -40,6 +40,22 @@ var (
 	errPodNamesIncompat     = errors.New("PodNames is not compatible with NamespaceSelector or PodSelector, please use one or the other")
 )
 
+// tcpdumpFlagMapping defines the mapping between CaptureOption boolean fields and their corresponding tcpdump flags.
+var tcpdumpFlagMappings = []struct {
+	getBool func(*retinav1alpha1.CaptureOption) *bool
+	flag    string
+}{
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.NoPromiscuous }, "-p"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.PacketBuffered }, "-U"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.ImmediateMode }, "--immediate-mode"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.NoResolveDNS }, "-n"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.NoResolvePort }, "-nn"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.PrintLinkHeader }, "-e"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.QuietOutput }, "-q"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.AbsoluteSeq }, "-S"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.DontVerifyChecksum }, "-K"},
+}
+
 // CaptureTarget indicates on which the network capture will be performed on a given node.
 type CaptureTarget struct {
 	// PodIpAddresses indicates the capture is performed on the Pods per their IP addresses.
@@ -1055,8 +1071,65 @@ func (translator *CaptureToPodTranslator) obtainCaptureJobPodEnv(capture retinav
 		jobPodEnv[captureConstants.PacketSizeEnvKey] = strconv.Itoa(*capture.Spec.CaptureConfiguration.CaptureOption.PacketSize)
 	}
 
+	if capture.Spec.CaptureConfiguration.CaptureOption.PcapFilter != nil {
+		jobPodEnv[captureConstants.PcapFilterEnvKey] = *capture.Spec.CaptureConfiguration.CaptureOption.PcapFilter
+	}
+
 	if capture.Spec.CaptureConfiguration.TcpdumpFilter != nil {
 		jobPodEnv[captureConstants.TcpdumpRawFilterEnvKey] = *capture.Spec.CaptureConfiguration.TcpdumpFilter
+	}
+
+	// Build tcpdump flags from CaptureOption boolean fields using the mapping table
+	var tcpdumpFlags []string
+	opt := &capture.Spec.CaptureConfiguration.CaptureOption
+	for _, mapping := range tcpdumpFlagMappings {
+		if boolVal := mapping.getBool(opt); boolVal != nil && *boolVal {
+			tcpdumpFlags = append(tcpdumpFlags, mapping.flag)
+		}
+	}
+
+	// Handle enum fields for verbosity, print data format, and timestamp format
+	if opt.Verbosity != nil && *opt.Verbosity != "" {
+		switch *opt.Verbosity {
+		case "verbose":
+			tcpdumpFlags = append(tcpdumpFlags, "-v")
+		case "extra":
+			tcpdumpFlags = append(tcpdumpFlags, "-vv")
+		case "max":
+			tcpdumpFlags = append(tcpdumpFlags, "-vvv")
+		}
+	}
+
+	if opt.PrintDataFormat != nil && *opt.PrintDataFormat != "" {
+		switch *opt.PrintDataFormat {
+		case "hex":
+			tcpdumpFlags = append(tcpdumpFlags, "-x")
+		case "hex-with-link":
+			tcpdumpFlags = append(tcpdumpFlags, "-xx")
+		case "ascii":
+			tcpdumpFlags = append(tcpdumpFlags, "-A")
+		case "ascii-with-link":
+			tcpdumpFlags = append(tcpdumpFlags, "-AA")
+		}
+	}
+
+	if opt.TimestampFormat != nil && *opt.TimestampFormat != "" {
+		switch *opt.TimestampFormat {
+		case "none":
+			tcpdumpFlags = append(tcpdumpFlags, "-t")
+		case "unformatted":
+			tcpdumpFlags = append(tcpdumpFlags, "-tt")
+		case "delta":
+			tcpdumpFlags = append(tcpdumpFlags, "-ttt")
+		case "date":
+			tcpdumpFlags = append(tcpdumpFlags, "-tttt")
+		case "delta-since-first":
+			tcpdumpFlags = append(tcpdumpFlags, "-ttttt")
+		}
+	}
+
+	if len(tcpdumpFlags) > 0 {
+		jobPodEnv[captureConstants.TcpdumpFlagsEnvKey] = strings.Join(tcpdumpFlags, " ")
 	}
 
 	if len(capture.Name) != 0 {
