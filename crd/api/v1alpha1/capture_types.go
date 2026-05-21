@@ -141,8 +141,16 @@ type CaptureConfigurationFilters struct {
 
 // OutputConfiguration indicates the location capture will be stored.
 type OutputConfiguration struct {
-	// HostPath stores the capture files into the specified host filesystem.
-	// If nothing exists at the given path of the host, an empty directory will be created there.
+	// HostPath is a relative subpath name (e.g. "my-capture") joined under the
+	// operator-configured host base directory (default /var/log/retina/captures)
+	// on every node that runs a capture pod. The capture files are written to
+	// that joined directory, and an empty directory is created there if it does
+	// not already exist.
+	//
+	// HostPath must be a relative subpath: absolute paths (e.g. "/tmp/foo",
+	// "C:\\foo") and any value containing ".." segments are rejected by the
+	// operator. CR authors cannot influence the base directory, which is
+	// controlled by the cluster operator via the operator config.
 	// +optional
 	HostPath *string `json:"hostPath,omitempty"`
 	// PersistentVolumeClaim mounts the supplied PVC into the pod on `/capture` and write the capture files there.
