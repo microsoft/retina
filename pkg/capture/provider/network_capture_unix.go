@@ -31,16 +31,27 @@ const (
 )
 
 var (
-	errTcpdumpCommandNotConstructed = errors.New("tcpdump command is not constructed with expected arguments")
-	errTcpdumpStopFailed            = errors.New("tcpdump stop failed")
-	errIptablesUnavilable           = errors.New("no iptables command is available")
-	errIptablesLegacySaveFailed     = errors.New("failed to run iptables-legacy-save")
-	errIptablesNftSaveFailed        = errors.New("failed to run iptables-nft-save")
+	errTcpdumpCommandNotConstructed   = errors.New("tcpdump command is not constructed with expected arguments")
+	errTcpdumpStopFailed              = errors.New("tcpdump stop failed")
+	errIptablesUnavilable             = errors.New("no iptables command is available")
+	errIptablesLegacySaveFailed       = errors.New("failed to run iptables-legacy-save")
+	errIptablesNftSaveFailed          = errors.New("failed to run iptables-nft-save")
+	errTcpdumpFilterEmptyOrWhitespace = errors.New("tcpdump filter cannot be empty or whitespace-only")
+	errTcpdumpFilterContainsFlag      = errors.New("filter contains flags which are not allowed")
 )
 
-// constructTcpdumpCommand creates a tcpdump command with the appropriate arguments
-// based on environment variables for raw filter, specific interfaces, or default behavior
-func constructTcpdumpCommand(captureFilePath string) *exec.Cmd {
+// constructTcpdumpCommand creates a tcpdump command with the appropriate arguments.
+//
+// Arguments are added in the following order (order matters for tcpdump):
+//  1. Capture control flags (-w, --relinquish-privileges, -s)
+//  2. Display/output flags from CaptureOption (read from TCPDUMP_FLAGS env var)
+//  3. Interface selection (-i)
+//  4. BPF filter expression (MUST BE LAST)
+//
+// Parameters:
+//   - captureFilePath: path where the capture file will be written
+//   - bpfFilter: combined BPF filter expression (user BPF filter + system filter)
+func constructTcpdumpCommand(captureFilePath, bpfFilter string) *exec.Cmd {
 	// NOTE(mainred): The tcpdump release of debian:bullseye image, which is for preparing clang and tools, runs as
 	// tcpdump user by default for savefiles for output, but when the binary and library are copied to the distroless
 	// base image, we lost tcpdump user, and the following error will be raised when running tcpdump in our capture pod.
@@ -60,23 +71,34 @@ func constructTcpdumpCommand(captureFilePath string) *exec.Cmd {
 		)
 	}
 
-	// If we set flag and value into the arg item of args, the space between flag and value will not treated as part of
-	// value, for example, "-i eth0" will be treated as "-i" and " eth0", thus brings a tcpdump unknown interface error.
-	if tcpdumpRawFilter := os.Getenv(captureConstants.TcpdumpRawFilterEnvKey); tcpdumpRawFilter != "" {
-		tcpdumpRawFilterSlice := strings.Split(tcpdumpRawFilter, " ")
-		captureStartCmd.Args = append(captureStartCmd.Args, tcpdumpRawFilterSlice...)
-	} else if specificInterfaces := os.Getenv(captureConstants.CaptureInterfacesEnvKey); specificInterfaces != "" {
+	// Append tcpdump flags from CaptureOption boolean fields
+	// These flags are constructed from a controlled mapping table in crd_to_job.go,
+	// so they're already validated and don't need sanitization here.
+	if tcpdumpFlags := os.Getenv(captureConstants.TcpdumpFlagsEnvKey); tcpdumpFlags != "" {
+		flags := strings.Fields(tcpdumpFlags)
+		captureStartCmd.Args = append(captureStartCmd.Args, flags...)
+	}
+
+	// Handle interface selection
+	if specificInterfaces := os.Getenv(captureConstants.CaptureInterfacesEnvKey); specificInterfaces != "" {
 		// Use specific interfaces if provided
-		interfaceList := strings.Split(specificInterfaces, ",")
-		for _, iface := range interfaceList {
+		interfaceList := strings.SplitSeq(specificInterfaces, ",")
+		for iface := range interfaceList {
 			iface = strings.TrimSpace(iface)
 			if iface != "" {
 				captureStartCmd.Args = append(captureStartCmd.Args, "-i", iface)
 			}
 		}
 	} else {
-		// Default to capturing on all interfaces if no raw tcpdump filter or specific interfaces are specified
+		// Default to capturing on all interfaces
 		captureStartCmd.Args = append(captureStartCmd.Args, "-i", "any")
+	}
+
+	// SECURITY: bpfFilter contains only BPF filter expressions.
+	// Any input containing flags (starting with '-') is rejected above.
+	// Passing bpfFilter as a single argument prevents shell interpretation of special characters.
+	if bpfFilter != "" {
+		captureStartCmd.Args = append(captureStartCmd.Args, bpfFilter)
 	}
 
 	return captureStartCmd
@@ -99,6 +121,77 @@ func NewNetworkCaptureProvider(logger *log.ZapLogger) NetworkCaptureProviderInte
 	}
 }
 
+// obtainAndValidateUserFilter retrieves the user-provided BPF filter from environment variables,
+// validates it (rejecting flags), and returns the trimmed filter and its source name.
+func (ncp *NetworkCaptureProvider) obtainAndValidateUserFilter() (trimmedFilter, filterSource string, err error) {
+	pcapFilter := os.Getenv(captureConstants.PcapFilterEnvKey)
+	tcpdumpRawFilter := os.Getenv(captureConstants.TcpdumpRawFilterEnvKey)
+
+	// PcapFilter takes precedence over TcpdumpFilter
+	if pcapFilter != "" {
+		trimmedFilter = strings.TrimSpace(pcapFilter)
+		filterSource = "pcapFilter"
+		ncp.l.Info("Using pcapFilter", zap.String("filter", trimmedFilter))
+		if tcpdumpRawFilter != "" {
+			ncp.l.Warn("Both pcapFilter and tcpdumpFilter provided; using pcapFilter (tcpdumpFilter is deprecated and will be removed)",
+				zap.String("ignored_tcpdumpFilter", tcpdumpRawFilter))
+		}
+	} else if tcpdumpRawFilter != "" {
+		trimmedFilter = strings.TrimSpace(tcpdumpRawFilter)
+		filterSource = "tcpdumpFilter (deprecated, will be removed)"
+		ncp.l.Info("Using deprecated tcpdumpFilter (will be removed); migrate to pcapFilter", zap.String("filter", trimmedFilter))
+	}
+
+	// Check for whitespace-only input
+	if trimmedFilter == "" && (pcapFilter != "" || tcpdumpRawFilter != "") {
+		return "", "", errTcpdumpFilterEmptyOrWhitespace
+	}
+
+	// SECURITY: Reject any input containing flags (starting with '-')
+	// This prevents dangerous flags like -w, -i, -c from being passed to tcpdump
+	if trimmedFilter != "" {
+		tokens := strings.FieldsSeq(trimmedFilter)
+		for token := range tokens {
+			if strings.HasPrefix(token, "-") {
+				return "", "", fmt.Errorf("%s contains flag %q: %w", filterSource, token, errTcpdumpFilterContainsFlag)
+			}
+		}
+	}
+
+	return trimmedFilter, filterSource, nil
+}
+
+// combineFilters combines the user filter with the system filter using proper BPF syntax.
+func combineFilters(userFilter, systemFilter string) string {
+	switch {
+	case userFilter != "" && systemFilter != "":
+		// Both filters: wrap each in parentheses to ensure correct operator precedence
+		return fmt.Sprintf("(%s) and (%s)", userFilter, systemFilter)
+	case userFilter != "":
+		return userFilter
+	case systemFilter != "":
+		return systemFilter
+	default:
+		return ""
+	}
+}
+
+// validateBPFFilterSyntax validates the BPF filter syntax using tcpdump -d.
+func (ncp *NetworkCaptureProvider) validateBPFFilterSyntax(ctx context.Context, filter string) error {
+	if filter == "" {
+		return nil
+	}
+
+	//nolint:gosec // G702: tcpdump -d is used for BPF syntax validation only, filter is constructed from validated input
+	validateCmd := exec.CommandContext(ctx, "tcpdump", "-d", filter)
+	if err := validateCmd.Run(); err != nil {
+		ncp.l.Error("BPF filter validation failed", zap.String("filter", filter), zap.Error(err))
+		return fmt.Errorf("invalid BPF filter syntax: %w (filter: %q)", err, filter)
+	}
+	ncp.l.Info("BPF filter syntax validated successfully", zap.String("filter", filter))
+	return nil
+}
+
 func (ncp *NetworkCaptureProvider) Setup(filename file.CaptureFilename) (string, error) {
 	captureFolderDir, err := ncp.NetworkCaptureProviderCommon.Setup(filename)
 	if err != nil {
@@ -112,7 +205,7 @@ func (ncp *NetworkCaptureProvider) Setup(filename file.CaptureFilename) (string,
 	return ncp.TmpCaptureDir, nil
 }
 
-func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, filter string, duration, maxSizeMB int) error {
+func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, includeExcludeFilter string, duration, maxSizeMB int) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(duration)*time.Second)
 	defer cancel()
 
@@ -122,20 +215,23 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, fil
 	// Remove the folder in case it already exists to mislead the file size check.
 	os.Remove(captureFilePath) //nolint:errcheck // File may not exist, ok to ignore error
 
-	// NOTE(mainred): The tcpdump release of debian:bullseye image, which is for preparing clang and tools, runs as
-	// tcpdump user by default for savefiles for output, but when the binary and library are copied to the distroless
-	// base image, we lost tcpdump user, and the following error will be raised when running tcpdump in our capture pod.
-	// tcpdump: Couldn't find user 'tcpdump'
-	// To disable this behavior, we use `--relinquish-privileges=root` same as `-Z root`.
-	// ref: https://manpages.debian.org/bullseye/tcpdump/tcpdump.8.en.html#Z
-	captureStartCmd := constructTcpdumpCommand(captureFilePath)
-
-	if filter != "" {
-		captureStartCmd.Args = append(
-			captureStartCmd.Args,
-			filter,
-		)
+	// Obtain and validate user-provided BPF filter
+	userFilter, _, err := ncp.obtainAndValidateUserFilter()
+	if err != nil {
+		return err
 	}
+
+	// Combine user filter with system filter (include/exclude Pod IPs)
+	combinedFilter := combineFilters(userFilter, includeExcludeFilter)
+
+	// Validate BPF filter syntax before starting capture
+	err = ncp.validateBPFFilterSyntax(ctx, combinedFilter)
+	if err != nil {
+		return err
+	}
+
+	// Construct tcpdump command with combined filter
+	captureStartCmd := constructTcpdumpCommand(captureFilePath, combinedFilter)
 
 	ncp.l.Info("Running tcpdump with args", zap.String("tcpdump command", captureStartCmd.String()), zap.Any("tcpdump args", captureStartCmd.Args))
 
