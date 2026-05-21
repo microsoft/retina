@@ -959,7 +959,7 @@ func TestCreateJobs_ActiveDeadlineSeconds(t *testing.T) {
 		"--name=test-deadline",
 		"--namespace=default",
 		"--node-names=node1",
-		"--host-path=/tmp/captures",
+		"--host-path=captures",
 		"--no-wait=true",
 		"--duration=60s",
 	})
@@ -1045,7 +1045,7 @@ func TestWaitUntilJobsComplete_ShortDuration(t *testing.T) {
 		"--name=test-wait-short",
 		"--namespace=default",
 		"--node-names=node1",
-		"--host-path=/tmp/captures",
+		"--host-path=captures",
 		"--no-wait=false",
 		"--duration=2s",
 	})

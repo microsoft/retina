@@ -36,9 +36,9 @@ import (
 )
 
 const (
-	DefaultCleanUpAfterUpload bool        = false
-	DefaultDebug    bool          = false
-	DefaultDuration time.Duration = 1 * time.Minute
+	DefaultCleanUpAfterUpload bool          = false
+	DefaultDebug              bool          = false
+	DefaultDuration           time.Duration = 1 * time.Minute
 	// DefaultHostPath is the default subpath (joined under DefaultHostPathBaseDir on
 	// the node) where capture artifacts are stored. It is a bare name, not an
 	// absolute path: absolute paths are rejected by the operator.
@@ -161,12 +161,10 @@ func create(kubeClient kubernetes.Interface) error {
 	}
 
 	if opts.nowait {
-		retinacmd.Logger.Info("Please manually delete all capture jobs")
-		if capture.Spec.OutputConfiguration.BlobUpload != nil {
-			retinacmd.Logger.Info("Please manually delete capture secret", zap.String("namespace", *opts.Namespace), zap.String("secret name", *capture.Spec.OutputConfiguration.BlobUpload))
-		}
-		if capture.Spec.OutputConfiguration.S3Upload != nil && capture.Spec.OutputConfiguration.S3Upload.SecretName != "" {
-			retinacmd.Logger.Info("Please manually delete capture secret", zap.String("namespace", *opts.Namespace), zap.String("secret name", capture.Spec.OutputConfiguration.S3Upload.SecretName))
+		if opts.cleanUpAfterUpload && hasRemoteDestination(&opts) {
+			retinacmd.Logger.Info("Capture jobs will be automatically cleaned up after upload (TTL-based)")
+		} else {
+			retinacmd.Logger.Info("Please manually delete all capture jobs (associated secrets will be garbage-collected automatically)")
 		}
 		printCaptureResult(jobsCreated)
 		return nil

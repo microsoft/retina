@@ -81,7 +81,7 @@ func TestCleanupAfterUpload_RequiresRemoteStorage(t *testing.T) {
 		"--name=test-cleanup",
 		"--namespace=default",
 		"--node-names=node1",
-		"--host-path=/tmp/captures",
+		"--host-path=captures",
 		"--cleanup-after-upload",
 		"--duration=5s",
 	})
@@ -276,7 +276,7 @@ func TestCleanupAfterUpload_NoTTLWhenHostPathOnly(t *testing.T) {
 		"--name=test-no-ttl",
 		"--namespace=default",
 		"--node-names=node1",
-		"--host-path=/tmp/captures",
+		"--host-path=captures",
 		"--no-wait=true",
 		"--duration=5s",
 	})

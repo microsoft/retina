@@ -395,3 +395,74 @@ func TestCleanUpAfterUpload_AllJobsSucceeded_WithPVC(t *testing.T) {
 	assert.True(t, err != nil || deletedCapture.DeletionTimestamp != nil,
 		"capture should be deleted when CleanUpAfterUpload is true with PVC and all jobs succeeded")
 }
+
+func TestCleanUpAfterUpload_MixedJobResults_NotTriggered(t *testing.T) {
+	secretName := testSecretName
+	capture := &retinav1alpha1.Capture{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "test-capture-mixed",
+			Namespace:  "default",
+			Finalizers: []string{captureFinalizer},
+		},
+		Spec: retinav1alpha1.CaptureSpec{
+			CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
+				CaptureTarget: retinav1alpha1.CaptureTarget{
+					NodeSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"kubernetes.io/role": "agent",
+						},
+					},
+				},
+			},
+			OutputConfiguration: retinav1alpha1.OutputConfiguration{
+				BlobUpload: &secretName,
+			},
+			CleanUpAfterUpload: true,
+		},
+	}
+
+	completionTime := metav1.Now()
+	jobs := []batchv1.Job{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-capture-mixed-job-1",
+				Namespace: "default",
+			},
+			Status: batchv1.JobStatus{
+				CompletionTime: &completionTime,
+				Conditions: []batchv1.JobCondition{
+					{
+						Type:   batchv1.JobComplete,
+						Status: corev1.ConditionTrue,
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-capture-mixed-job-2",
+				Namespace: "default",
+			},
+			Status: batchv1.JobStatus{
+				Conditions: []batchv1.JobCondition{
+					{
+						Type:   batchv1.JobFailed,
+						Status: corev1.ConditionTrue,
+					},
+				},
+			},
+		},
+	}
+
+	reconciler := newTestReconciler(capture)
+	ctx := context.Background()
+
+	_, err := reconciler.updateCaptureStatusFromJobs(ctx, capture, jobs)
+	require.NoError(t, err)
+
+	// Capture should still exist since one job failed
+	existingCapture := &retinav1alpha1.Capture{}
+	err = reconciler.Get(ctx, types.NamespacedName{Name: "test-capture-mixed", Namespace: "default"}, existingCapture)
+	require.NoError(t, err)
+	assert.Nil(t, existingCapture.DeletionTimestamp, "capture should NOT be deleted when some jobs failed even if others succeeded")
+}
