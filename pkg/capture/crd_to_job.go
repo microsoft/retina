@@ -382,10 +382,10 @@ func (translator *CaptureToPodTranslator) TranslateCaptureToJobs(ctx context.Con
 
 	// Resolve the HostPath once and reuse it for both the job template (pod
 	// annotation + volume mount) and the capture workload env.
-	resolvedHostPath, err := translator.resolveHostPath(capture.Spec.OutputConfiguration)
-	if err != nil {
-		translator.l.Error("Rejected HostPath in Capture", zap.Error(err), zap.String("HostPath", *capture.Spec.OutputConfiguration.HostPath))
-		return nil, err
+	resolvedHostPath, hpErr := translator.resolveHostPath(capture.Spec.OutputConfiguration)
+	if hpErr != nil {
+		translator.l.Error("Rejected HostPath in Capture", zap.Error(hpErr), zap.String("HostPath", *capture.Spec.OutputConfiguration.HostPath))
+		return nil, hpErr
 	}
 
 	if err := translator.initJobTemplate(ctx, capture, resolvedHostPath); err != nil {
@@ -973,7 +973,10 @@ func (translator *CaptureToPodTranslator) obtainTcpdumpFilters(captureConfig ret
 	return tcpdumpFilter, nil
 }
 
-func (translator *CaptureToPodTranslator) obtainCaptureOutputEnv(outputConfiguration retinav1alpha1.OutputConfiguration, resolvedHostPath string) (map[captureConstants.CaptureOutputLocationEnvKey]string, error) {
+func (translator *CaptureToPodTranslator) obtainCaptureOutputEnv(
+	outputConfiguration retinav1alpha1.OutputConfiguration,
+	resolvedHostPath string,
+) (map[captureConstants.CaptureOutputLocationEnvKey]string, error) {
 	outputEnv := map[captureConstants.CaptureOutputLocationEnvKey]string{}
 	if resolvedHostPath != "" {
 		// Emit the resolved (joined, cleaned) path so the workload writes where
