@@ -34,9 +34,15 @@ import (
 )
 
 const (
-	DefaultDebug           bool          = false
-	DefaultDuration        time.Duration = 1 * time.Minute
-	DefaultHostPath        string        = "/mnt/retina/captures"
+	DefaultDebug    bool          = false
+	DefaultDuration time.Duration = 1 * time.Minute
+	// DefaultHostPath is the default subpath (joined under DefaultHostPathBaseDir on
+	// the node) where capture artifacts are stored. It is a bare name, not an
+	// absolute path: absolute paths are rejected by the operator.
+	DefaultHostPath string = "retina"
+	// DefaultHostPathBaseDir is the default node-side parent directory for capture
+	// artifacts; the user-supplied --host-path subpath is joined under it.
+	DefaultHostPathBaseDir string        = "/var/log/retina/captures"
 	DefaultIncludeMetadata bool          = true
 	DefaultJobNumLimit     int           = 0
 	DefaultMaxSize         int           = 100
@@ -50,7 +56,8 @@ const (
 
 var createExample = templates.Examples(i18n.T(`
 		# Select nodes by node name and copy the artifacts to the node host path
-		kubectl retina capture create --host-path /mnt/retina/testcapture --node-names "<nodename1>,<nodename2>"
+		# (joined under the operator-configured base directory; default /var/log/retina/captures/testcapture)
+		kubectl retina capture create --host-path testcapture --node-names "<nodename1>,<nodename2>"
 
 		# Select pods determined by pod-selectors and namespace-selectors
 		kubectl retina capture create --namespace capture --pod-selectors="k8s-app=kube-dns" --namespace-selectors="kubernetes.io/metadata.name=kube-system"
@@ -190,7 +197,22 @@ func NewCreateSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 		Example: createExample,
 	}
 
+	var verbosityStr, timestampStr, printDataStr string
+
 	createCapture.RunE = func(*cobra.Command, []string) error {
+		// Validate enum flags
+		opts.verbosityLevel = VerbosityLevel(verbosityStr)
+		if err := opts.verbosityLevel.Validate(); err != nil {
+			return err
+		}
+		opts.timestampFormat = TimestampFormat(timestampStr)
+		if err := opts.timestampFormat.Validate(); err != nil {
+			return err
+		}
+		opts.printDataFormat = PrintDataFormat(printDataStr)
+		if err := opts.printDataFormat.Validate(); err != nil {
+			return err
+		}
 		return create(kubeClient)
 	}
 
@@ -205,7 +227,9 @@ func NewCreateSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 		"A comma-separated list of pod labels to select pods on which the network capture will be performed")
 	createCapture.Flags().StringVar(&opts.namespaceSelectors, "namespace-selectors", "",
 		"A comma-separated list of namespace labels to filter which namespaces will be targeted for packet capture (used with --pod-selectors)")
-	createCapture.Flags().StringVar(&opts.hostPath, "host-path", DefaultHostPath, "HostPath of the node to store the capture files")
+	createCapture.Flags().StringVar(&opts.hostPath, "host-path", DefaultHostPath,
+		"Subpath name (joined under --host-path-base-dir) for capture artifacts on the node. Must be a relative subpath and must not contain '..'.")
+	createCapture.Flags().StringVar(&opts.hostPathBaseDir, "host-path-base-dir", DefaultHostPathBaseDir, "Absolute base directory on the node under which --host-path is joined")
 	createCapture.Flags().StringVar(&opts.pvc, "pvc", "", "PersistentVolumeClaim under the specified or default namespace to store capture files")
 	createCapture.Flags().StringVar(&opts.blobUpload, "blob-upload", "", "Blob SAS URL with write permission to upload capture files")
 	createCapture.Flags().StringVar(&opts.s3Region, "s3-region", "", "Region where the S3 compatible bucket is located")
@@ -215,12 +239,35 @@ func NewCreateSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 	createCapture.Flags().StringVar(&opts.s3Path, "s3-path", DefaultS3Path, "Prefix path within the S3 bucket where captures will be stored")
 	createCapture.Flags().StringVar(&opts.s3AccessKeyID, "s3-access-key-id", "", "S3 access key id to upload capture files")
 	createCapture.Flags().StringVar(&opts.s3SecretAccessKey, "s3-secret-access-key", "", "S3 access secret key to upload capture files")
-	createCapture.Flags().StringVar(&opts.tcpdumpFilter, "tcpdump-filter", "", "Raw tcpdump flags which works only for Linux")
+	createCapture.Flags().StringVar(&opts.tcpdumpFilter, "tcpdump-filter", "",
+		"DEPRECATED and will be removed: Use --pcap-filter for BPF expressions. BPF filter expression without flags (e.g., 'host 10.0.0.1', 'tcp port 443')")
+	createCapture.Flags().StringVar(&opts.pcapFilter, "pcap-filter", "",
+		"BPF filter expression for packet filtering (e.g., 'host 10.0.0.1', 'tcp port 443'). See https://www.tcpdump.org/manpages/pcap-filter.7.html")
 	createCapture.Flags().StringVar(&opts.interfaces, "interfaces", "", "Comma-separated list of network interfaces to capture on (e.g., eth0,eth1)")
+
+	// Tcpdump boolean flags for capture behavior and display options
+	createCapture.Flags().BoolVar(&opts.noPromiscuous, "no-promiscuous", false, "Disable promiscuous mode (tcpdump -p flag)")
+	createCapture.Flags().BoolVar(&opts.packetBuffered, "packet-buffered", false, "Enable packet-buffered output (tcpdump -U flag)")
+	createCapture.Flags().BoolVar(&opts.immediateMode, "immediate-mode", false, "Enable immediate mode for packet capture (tcpdump --immediate-mode)")
+	createCapture.Flags().BoolVar(&opts.noResolveDNS, "no-resolve-dns", false, "Don't resolve hostnames (tcpdump -n flag)")
+	createCapture.Flags().BoolVar(&opts.noResolvePort, "no-resolve-port", false, "Don't resolve hostnames or port names (tcpdump -nn flag)")
+	createCapture.Flags().BoolVar(&opts.printLinkHeader, "print-link-header", false, "Print link-level headers (tcpdump -e flag)")
+	createCapture.Flags().BoolVar(&opts.quietOutput, "quiet-output", false, "Quick/quiet output mode (tcpdump -q flag)")
+	createCapture.Flags().BoolVar(&opts.absoluteSeq, "absolute-seq", false, "Print absolute TCP sequence numbers (tcpdump -S flag)")
+	createCapture.Flags().BoolVar(&opts.dontVerifyChecksum, "dont-verify-checksum", false, "Don't verify TCP checksums (tcpdump -K flag)")
+
+	// Enum-based flags for mutually exclusive options
+	createCapture.Flags().StringVar(&verbosityStr, "verbosity", "", "Verbosity level: verbose, extra, max (tcpdump -v/-vv/-vvv)")
+	createCapture.Flags().StringVar(&timestampStr, "timestamp-format", "", "Timestamp format: none, unformatted, delta, date, delta-since-first (tcpdump -t/-tt/-ttt/-tttt/-ttttt)")
+	createCapture.Flags().StringVar(&printDataStr, "print-data", "", "Print packet data: hex, hex-with-link, ascii, ascii-with-link (tcpdump -x/-xx/-A/-AA)")
+
+	// Filters
 	createCapture.Flags().StringVar(&opts.excludeFilter, "exclude-filter", "", "A comma-separated list of IP:Port pairs that are "+
 		"excluded from capturing network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:*")
 	createCapture.Flags().StringVar(&opts.includeFilter, "include-filter", "", "A comma-separated list of IP:Port pairs that are "+
 		"used to filter capture network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:*")
+
+	// Capture options
 	createCapture.Flags().BoolVar(&opts.includeMetadata, "include-metadata", DefaultIncludeMetadata, "If true, collect static network metadata into capture file")
 	createCapture.Flags().IntVar(&opts.jobNumLimit, "job-num-limit", DefaultJobNumLimit, "The maximum number of jobs can be created for each capture. 0 means no limit")
 	createCapture.Flags().BoolVar(&opts.nowait, "no-wait", DefaultNowait, "Do not wait for the long-running capture job to finish")
@@ -278,7 +325,38 @@ func deleteSecret(ctx context.Context, kubeClient kubernetes.Interface, secretNa
 	return kubeClient.CoreV1().Secrets(*opts.Namespace).Delete(ctx, *secretName, metav1.DeleteOptions{}) //nolint:wrapcheck //internal return
 }
 
+// validateBPFFilter checks that a BPF filter string doesn't contain flags (tokens starting with '-').
+// This prevents command injection attacks by ensuring only BPF expressions are provided.
+func validateBPFFilter(filter, filterName string) error {
+	if filter == "" {
+		return nil
+	}
+
+	trimmed := strings.TrimSpace(filter)
+	if trimmed == "" {
+		return fmt.Errorf("%s: %w", filterName, ErrBPFFilterEmpty)
+	}
+
+	// Check for flags (tokens starting with '-')
+	tokens := strings.Fields(trimmed)
+	for _, token := range tokens {
+		if strings.HasPrefix(token, "-") {
+			return fmt.Errorf("%s contains flag %q: %w", filterName, token, ErrBPFFilterContainsFlag)
+		}
+	}
+
+	return nil
+}
+
 func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*retinav1alpha1.Capture, error) {
+	// Validate filters early to provide immediate feedback
+	if err := validateBPFFilter(opts.tcpdumpFilter, "--tcpdump-filter"); err != nil {
+		return nil, err
+	}
+	if err := validateBPFFilter(opts.pcapFilter, "--pcap-filter"); err != nil {
+		return nil, err
+	}
+
 	timestamp := file.Now()
 
 	capture := &retinav1alpha1.Capture{
@@ -389,6 +467,65 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 		capture.Spec.CaptureConfiguration.CaptureOption.Interfaces = interfaceSlice
 	}
 
+	// Set pcap-filter if provided
+	if opts.pcapFilter != "" {
+		capture.Spec.CaptureConfiguration.CaptureOption.PcapFilter = &opts.pcapFilter
+	}
+
+	// Set boolean capture and display flags
+	if opts.noPromiscuous {
+		capture.Spec.CaptureConfiguration.CaptureOption.NoPromiscuous = &opts.noPromiscuous
+	}
+
+	if opts.packetBuffered {
+		capture.Spec.CaptureConfiguration.CaptureOption.PacketBuffered = &opts.packetBuffered
+	}
+
+	if opts.immediateMode {
+		capture.Spec.CaptureConfiguration.CaptureOption.ImmediateMode = &opts.immediateMode
+	}
+
+	if opts.noResolveDNS {
+		capture.Spec.CaptureConfiguration.CaptureOption.NoResolveDNS = &opts.noResolveDNS
+	}
+	if opts.noResolvePort {
+		capture.Spec.CaptureConfiguration.CaptureOption.NoResolvePort = &opts.noResolvePort
+	}
+
+	// Set verbosity level enum field based on CLI value
+	if opts.verbosityLevel != VerbosityNormal {
+		verbosityStr := string(opts.verbosityLevel)
+		capture.Spec.CaptureConfiguration.CaptureOption.Verbosity = &verbosityStr
+	}
+
+	// Set print data format enum field based on CLI value
+	if opts.printDataFormat != PrintDataNone {
+		printDataStr := string(opts.printDataFormat)
+		capture.Spec.CaptureConfiguration.CaptureOption.PrintDataFormat = &printDataStr
+	}
+
+	if opts.printLinkHeader {
+		capture.Spec.CaptureConfiguration.CaptureOption.PrintLinkHeader = &opts.printLinkHeader
+	}
+
+	if opts.quietOutput {
+		capture.Spec.CaptureConfiguration.CaptureOption.QuietOutput = &opts.quietOutput
+	}
+
+	if opts.absoluteSeq {
+		capture.Spec.CaptureConfiguration.CaptureOption.AbsoluteSeq = &opts.absoluteSeq
+	}
+
+	// Set timestamp format enum field based on CLI value
+	if opts.timestampFormat != TimestampDefault {
+		timestampStr := string(opts.timestampFormat)
+		capture.Spec.CaptureConfiguration.CaptureOption.TimestampFormat = &timestampStr
+	}
+
+	if opts.dontVerifyChecksum {
+		capture.Spec.CaptureConfiguration.CaptureOption.DontVerifyChecksum = &opts.dontVerifyChecksum
+	}
+
 	if opts.hostPath != "" {
 		capture.Spec.OutputConfiguration.HostPath = &opts.hostPath
 	}
@@ -443,6 +580,7 @@ func getCLICaptureConfig() config.CaptureConfig {
 		CaptureDebug:              opts.debug,
 		CaptureImageVersionSource: captureUtils.VersionSourceCLIVersion,
 		CaptureJobNumLimit:        opts.jobNumLimit,
+		CaptureHostPathBaseDir:    opts.hostPathBaseDir,
 	}
 }
 
