@@ -16,6 +16,7 @@ os:
 # FIXME: remove unnecessary pieces, etc.
 operator:
   enabled: true
+  replicas: 1
   repository: acndev.azurecr.io/retina-operator
   pullPolicy: Always
   tag: "latest"
@@ -32,6 +33,9 @@ operator:
   # -- Node tolerations for pod assignment on nodes with taints
   # ref: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
   tolerations: []
+  # Namespace used for operator leader election lease.
+  # Defaults to .Release.Namespace when empty.
+  leaderElectionNamespace: ""
 
 agent:
   leaderElection: false

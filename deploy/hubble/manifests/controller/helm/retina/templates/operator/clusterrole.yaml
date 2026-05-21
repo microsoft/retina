@@ -3,7 +3,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: retina-operator-role
+  name: retina-operator-clusterrole
 rules:
   - apiGroups:
       - "apiextensions.k8s.io"
@@ -100,19 +100,4 @@ rules:
     - get
     - list
     - watch
-  # For cilium-operator running in HA mode.
-  #
-  # Cilium operator running in HA mode requires the use of ResourceLock for Leader Election
-  # between multiple running instances.
-  # The preferred way of doing this is to use LeasesResourceLock as edits to Leases are less
-  # common and fewer objects in the cluster watch "all Leases".
-  - apiGroups:
-    - coordination.k8s.io
-    resources:
-    - leases
-    verbs:
-    - create
-    - get
-    - update
-
 {{- end -}}
