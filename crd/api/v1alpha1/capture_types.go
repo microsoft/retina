@@ -272,6 +272,14 @@ type CaptureSpec struct {
 	CaptureConfiguration CaptureConfiguration `json:"captureConfiguration"`
 	// +kubebuilder:validation:Required
 	OutputConfiguration OutputConfiguration `json:"outputConfiguration,omitempty"`
+	// CleanUpAfterUpload indicates whether the capture jobs and associated resources
+	// should be automatically cleaned up after a successful upload to remote storage
+	// (BlobUpload or S3Upload). When set to true, completed capture jobs, secrets,
+	// and the Capture resource itself will be deleted once all jobs have succeeded
+	// and uploads are confirmed.
+	// +optional
+	// +kubebuilder:default=false
+	CleanUpAfterUpload bool `json:"cleanUpAfterUpload,omitempty"`
 }
 
 // +kubebuilder:object:root=true

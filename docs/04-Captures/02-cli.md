@@ -59,6 +59,7 @@ The network traffic will be uploaded to the specified output location.
 | Flag                  | Type       | Default  | Description                                                                 | Notes |
 |-----------------------|------------|----------|-----------------------------------------------------------------------------|-------|
 | `blob-upload`         | string     | ""       | Blob SAS URL with write permission to upload capture files.                  |       |
+| `cleanup-after-upload` | bool       | false    | Automatically clean up capture files from the node's host path after successful upload to remote storage (blob or S3). Requires a remote storage destination. |       |
 | `debug`               | bool       | false    | When debug is true, a customized retina-agent image, determined by the environment variable RETINA_AGENT_IMAGE, is set. |       |
 | `duration`            | string     | 1m0s     | Maximum duration of the packet capture - in minutes / seconds.              |       |
 | `exclude-filter`      | string     | ""       | A comma-separated list of IP:Port pairs that are excluded from capturing network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:* | Only works on Linux.     |
@@ -547,3 +548,22 @@ kubectl retina capture create \
 When creating a capture, you can specify `--no-wait` to clean up the jobs after the Capture is completed.
 
 Otherwise, after creating a Capture, a random Capture name is returned, with which you can delete the jobs by running the `kubectl retina capture delete` command.
+
+### Automatic Cleanup After Upload
+
+When using `--cleanup-after-upload` with a remote storage destination (`--blob-upload`, `--s3-bucket`, or `--pvc`), Retina will automatically delete the capture files from the node's host path after the data has been successfully uploaded to remote storage.
+
+This flag works with both `--no-wait=true` (default) and `--no-wait=false`:
+
+- **`--no-wait=true`** (default): The CLI exits immediately. Jobs are assigned a TTL (5 minutes after completion) so Kubernetes automatically garbage-collects them along with their secrets.
+- **`--no-wait=false`**: The CLI waits for all jobs to complete, then deletes the jobs and secrets itself.
+
+In both modes, the capture agent removes the host-path files once the upload succeeds.
+
+```shell
+kubectl retina capture create --name my-capture --node-names "node1" \
+  --blob-upload "<Blob SAS URL>" \
+  --cleanup-after-upload
+```
+
+If any capture job fails, the host-path files are preserved for debugging.

@@ -150,3 +150,25 @@ spec:
 ```
 
 Additional examples can also be found in the [GitHub capture samples](https://github.com/microsoft/retina/tree/main/samples/capture).
+
+## Automatic Cleanup After Upload
+
+Set `cleanUpAfterUpload: true` in the Capture spec to have the controller automatically delete the Capture resource and all associated jobs once all capture jobs complete successfully and data has been uploaded to remote storage (Blob, S3, or PVC).
+
+```yaml
+apiVersion: retina.sh/v1alpha1
+kind: Capture
+metadata:
+  name: my-capture
+spec:
+  captureConfiguration:
+    captureTarget:
+      nodeSelector:
+        matchLabels:
+          kubernetes.io/os: linux
+  outputConfiguration:
+    blobUpload: "<secret-name>"
+  cleanUpAfterUpload: true
+```
+
+If any job fails, the Capture resource and jobs are preserved for debugging. This option requires a remote storage output (`blobUpload`, `s3Upload`, or `persistentVolumeClaim`).

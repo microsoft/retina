@@ -368,6 +368,15 @@ spec:
                 required:
                 - captureTarget
                 type: object
+              cleanUpAfterUpload:
+                default: false
+                description: |-
+                  CleanUpAfterUpload indicates whether the capture jobs and associated resources
+                  should be automatically cleaned up after a successful upload to remote storage
+                  (BlobUpload or S3Upload). When set to true, completed capture jobs, secrets,
+                  and the Capture resource itself will be deleted once all jobs have succeeded
+                  and uploads are confirmed.
+                type: boolean
               outputConfiguration:
                 description: OutputConfiguration indicates the location capture will
                   be stored.
@@ -378,8 +387,16 @@ spec:
                     type: string
                   hostPath:
                     description: |-
-                      HostPath stores the capture files into the specified host filesystem.
-                      If nothing exists at the given path of the host, an empty directory will be created there.
+                      HostPath is a relative subpath name (e.g. "my-capture") joined under the
+                      operator-configured host base directory (default /var/log/retina/captures)
+                      on every node that runs a capture pod. The capture files are written to
+                      that joined directory, and an empty directory is created there if it does
+                      not already exist.
+
+                      HostPath must be a relative subpath: absolute paths (e.g. "/tmp/foo",
+                      "C:\\foo") and any value containing ".." segments are rejected by the
+                      operator. CR authors cannot influence the base directory, which is
+                      controlled by the cluster operator via the operator config.
                     type: string
                   persistentVolumeClaim:
                     description: PersistentVolumeClaim mounts the supplied PVC into
