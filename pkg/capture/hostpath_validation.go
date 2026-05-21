@@ -89,8 +89,8 @@ func validateHostPath(raw, baseDir string) (string, error) {
 	}
 
 	joined := filepath.Clean(filepath.Join(cleanedBase, cleanedSub))
-	sep := string(filepath.Separator)
-	if joined != cleanedBase && !strings.HasPrefix(joined, cleanedBase+sep) {
+	rel, err := filepath.Rel(cleanedBase, joined)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return "", fmt.Errorf("%w: %q resolves to %q (base %q)", ErrHostPathEscapesBase, raw, joined, cleanedBase)
 	}
 

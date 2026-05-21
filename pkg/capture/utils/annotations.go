@@ -21,10 +21,9 @@ func GetPodAnnotationsFromCapture(capture *retinav1alpha1.Capture, resolvedHostP
 	if capture.Status.StartTime != nil {
 		annotations[captureConstants.CaptureTimestampAnnotationKey] = file.TimeToString(capture.Status.StartTime)
 	}
-	switch {
-	case resolvedHostPath != "":
+	if resolvedHostPath != "" {
 		annotations[captureConstants.CaptureHostPathAnnotationKey] = resolvedHostPath
-	case capture.Spec.OutputConfiguration.HostPath != nil:
+	} else if capture.Spec.OutputConfiguration.HostPath != nil {
 		annotations[captureConstants.CaptureHostPathAnnotationKey] = *capture.Spec.OutputConfiguration.HostPath
 	}
 	return annotations

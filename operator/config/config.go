@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/microsoft/retina/pkg/capture"
 	"github.com/microsoft/retina/pkg/config"
 	"github.com/spf13/viper"
 )
@@ -60,8 +61,8 @@ func GetConfig(cfgFileName string) (*OperatorConfig, error) {
 	// place artifacts arbitrarily on the node filesystem. The CR's HostPath is
 	// always joined under this directory.
 	if cfg.CaptureHostPathBaseDir == "" {
-		log.Printf("captureHostPathBaseDir is not set, defaulting to /var/log/retina/captures")
-		cfg.CaptureHostPathBaseDir = "/var/log/retina/captures"
+		log.Printf("captureHostPathBaseDir is not set, defaulting to %s", capture.DefaultHostPathBaseDir)
+		cfg.CaptureHostPathBaseDir = capture.DefaultHostPathBaseDir
 	}
 	cfg.CaptureHostPathBaseDir = filepath.Clean(cfg.CaptureHostPathBaseDir)
 	if !filepath.IsAbs(cfg.CaptureHostPathBaseDir) {

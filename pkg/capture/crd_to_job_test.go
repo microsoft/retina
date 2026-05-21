@@ -493,6 +493,17 @@ func Test_CaptureToPodTranslator_ObtainCaptureJobPodEnv(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "explicit empty hostpath is rejected",
+			capture: retinav1alpha1.Capture{
+				Spec: retinav1alpha1.CaptureSpec{
+					OutputConfiguration: retinav1alpha1.OutputConfiguration{
+						HostPath: pointerUtil.String(""),
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
 			name: "use hostpath",
 			capture: retinav1alpha1.Capture{
 				Spec: retinav1alpha1.CaptureSpec{
@@ -696,7 +707,7 @@ func Test_CaptureToPodTranslator_RenderJob_NodeSelected(t *testing.T) {
 				Status: retinav1alpha1.CaptureStatus{
 					StartTime: &metav1.Time{Time: startTime},
 				},
-			})
+			}, "/tmp/"+hostPath)
 			if err != nil {
 				t.Errorf("initJobTemplate() want no error, got error %s", err)
 			}

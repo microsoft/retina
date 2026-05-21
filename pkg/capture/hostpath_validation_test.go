@@ -37,6 +37,8 @@ func TestValidateHostPath(t *testing.T) {
 		{name: "nested subpath", raw: "job1/out", baseDir: base, want: base + "/job1/out"},
 		{name: "trailing slash cleaned", raw: "job/", baseDir: base, want: base + "/job"},
 		{name: "redundant separators cleaned", raw: "job//./out", baseDir: base, want: base + "/job/out"},
+		{name: "root base dir accepts subpath", raw: "captures", baseDir: "/", want: "/captures"},
+		{name: "root base dir accepts nested subpath", raw: "a/b", baseDir: "/", want: "/a/b"},
 
 		// defaulting
 		{name: "default base used when empty", raw: "x", baseDir: "", want: DefaultHostPathBaseDir + "/x"},
