@@ -11,8 +11,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var Logger *log.ZapLogger
-
 // RetinaClient for customer consume
 var RetinaClient *client.Retina
 
@@ -24,9 +22,9 @@ type Config struct {
 }
 
 var Retina = &cobra.Command{
-	Use: "kubectl-retina",
+	Use:   "kubectl-retina",
 	Short: "A kubectl plugin for Retina",
-	Long: "A kubectl plugin for Retina\nRetina is an eBPF distributed networking observability tool for Kubernetes.",
+	Long:  "A kubectl plugin for Retina\nRetina is an eBPF distributed networking observability tool for Kubernetes.",
 	PersistentPreRun: func(*cobra.Command, []string) {
 		var config Config
 		file, _ := os.ReadFile(ClientConfigPath)
@@ -37,5 +35,4 @@ var Retina = &cobra.Command{
 
 func init() {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
-	Logger = log.Logger().Named("retina-cli")
 }

@@ -3,15 +3,18 @@
 package log
 
 import (
+	"bytes"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	logfmt "github.com/jsternberg/zap-logfmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 func TestLogFileRotation(t *testing.T) {
@@ -116,4 +119,58 @@ func TestLogrLoggerFallback(t *testing.T) {
 
 	// Should not panic even without zap being setup
 	logrLogger.Info("fallback logr test message", "key", "value")
+}
+
+func TestNamedLoggerContext(t *testing.T) {
+	resetGlobalForTest()
+	defer resetGlobalForTest()
+
+	// Build a logfmt core that writes to a buffer so we can inspect the output.
+	// This mirrors how SetupZapLogger configures the stdout core, but directed
+	// to a bytes.Buffer instead of os.Stdout.
+	var buf bytes.Buffer
+	encoderCfg := EncoderConfig() // same encoder config as production (NameKey = "logger")
+	core := zapcore.NewCore(
+		logfmt.NewEncoder(encoderCfg),
+		zapcore.AddSync(&buf),
+		zapcore.InfoLevel,
+	)
+	global.Store(&ZapLogger{Logger: zap.New(core)})
+
+	// This is the exact call made in cli/cmd/capture/create.go RunE (line 194).
+	namedLogger := Logger().Named("retina-capture-create")
+	namedLogger.Info("packet capture started", zap.String("namespace", "kube-system"))
+
+	output := buf.String()
+	t.Logf("logfmt output: %s", output)
+
+	// The zap ProductionEncoderConfig sets NameKey = "logger", so Named() injects
+	// a logger= field into every logfmt line emitted by the child logger.
+	assert.Contains(t, output, "logger=retina-capture-create",
+		"Named logger context must appear as logger= field in logfmt output")
+	assert.Contains(t, output, `msg="packet capture started"`)
+	assert.Contains(t, output, "namespace=kube-system")
+}
+
+func TestNamedLoggerContextDeleteCmd(t *testing.T) {
+	resetGlobalForTest()
+	defer resetGlobalForTest()
+
+	var buf bytes.Buffer
+	encoderCfg := EncoderConfig()
+	core := zapcore.NewCore(
+		logfmt.NewEncoder(encoderCfg),
+		zapcore.AddSync(&buf),
+		zapcore.InfoLevel,
+	)
+	global.Store(&ZapLogger{Logger: zap.New(core)})
+
+	// Mirrors cli/cmd/capture/delete.go RunE.
+	namedLogger := Logger().Named("retina-capture-delete")
+	namedLogger.Info("deleting capture", zap.String("namespace", "default"), zap.String("name", "my-capture"))
+
+	output := buf.String()
+	t.Logf("logfmt output: %s", output)
+	assert.Contains(t, output, "logger=retina-capture-delete")
+	assert.Contains(t, output, `msg="deleting capture"`)
 }

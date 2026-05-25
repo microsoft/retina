@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	retinacmd "github.com/microsoft/retina/cli/cmd"
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/internal/buildinfo"
 	pkgcapture "github.com/microsoft/retina/pkg/capture"
@@ -33,6 +32,7 @@ import (
 	"github.com/microsoft/retina/pkg/capture/file"
 	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	"github.com/microsoft/retina/pkg/config"
+	"github.com/microsoft/retina/pkg/log"
 )
 
 const (
@@ -150,21 +150,21 @@ func create(kubeClient kubernetes.Interface) error {
 
 	jobsCreated, err := createJobs(ctx, kubeClient, capture)
 	if err != nil {
-		retinacmd.Logger.Error("Failed to create job", zap.Error(err))
+		opts.logger.Error("Failed to create job", zap.Error(err))
 		return err
 	}
 
 	// Set owner references on secrets so they are garbage-collected when the
 	// jobs are removed (by TTL, explicit deletion, or manual kubectl delete).
 	if ownerRefErr := setSecretOwnerReferences(ctx, kubeClient, capture, jobsCreated); ownerRefErr != nil {
-		retinacmd.Logger.Error("Failed to set owner references on capture secrets", zap.Error(ownerRefErr))
+		opts.logger.Error("Failed to set owner references on capture secrets", zap.Error(ownerRefErr))
 	}
 
 	if opts.nowait {
 		if opts.cleanUpAfterUpload && hasRemoteDestination(&opts) {
-			retinacmd.Logger.Info("Capture jobs will be automatically cleaned up after upload (TTL-based)")
+			opts.logger.Info("Capture jobs will be automatically cleaned up after upload (TTL-based)")
 		} else {
-			retinacmd.Logger.Info("Please manually delete all capture jobs (associated secrets will be garbage-collected automatically)")
+			opts.logger.Info("Please manually delete all capture jobs (associated secrets will be garbage-collected automatically)")
 		}
 		printCaptureResult(jobsCreated)
 		return nil
@@ -172,22 +172,22 @@ func create(kubeClient kubernetes.Interface) error {
 
 	// Wait until all jobs finish then delete the jobs before the timeout, otherwise print jobs created to
 	// let the customer recycle them.
-	retinacmd.Logger.Info("Waiting for capture jobs to finish")
+	opts.logger.Info("Waiting for capture jobs to finish")
 
 	allJobsCompleted := waitUntilJobsComplete(ctx, kubeClient, jobsCreated)
 
 	// Delete all jobs created only if they all completed, otherwise keep the jobs for debugging.
 	if allJobsCompleted {
-		retinacmd.Logger.Info("Deleting jobs as all jobs are completed")
+		opts.logger.Info("Deleting jobs as all jobs are completed")
 		jobsFailedToDelete := deleteJobs(ctx, kubeClient, jobsCreated)
 		if len(jobsFailedToDelete) != 0 {
-			retinacmd.Logger.Info("Please manually delete capture jobs failed to delete", zap.String("namespace", *opts.Namespace), zap.String("job list", strings.Join(jobsFailedToDelete, ",")))
+			opts.logger.Info("Please manually delete capture jobs failed to delete", zap.String("namespace", *opts.Namespace), zap.String("job list", strings.Join(jobsFailedToDelete, ",")))
 		}
 
 		if capture.Spec.OutputConfiguration.BlobUpload != nil {
 			err = deleteSecret(ctx, kubeClient, capture.Spec.OutputConfiguration.BlobUpload)
 			if err != nil {
-				retinacmd.Logger.Error("Failed to delete capture secret, please manually delete it",
+				opts.logger.Error("Failed to delete capture secret, please manually delete it",
 					zap.String("namespace", *opts.Namespace), zap.String("secret name", *capture.Spec.OutputConfiguration.BlobUpload), zap.Error(err))
 			}
 		}
@@ -195,7 +195,7 @@ func create(kubeClient kubernetes.Interface) error {
 		if capture.Spec.OutputConfiguration.S3Upload != nil && capture.Spec.OutputConfiguration.S3Upload.SecretName != "" {
 			err = deleteSecret(ctx, kubeClient, &capture.Spec.OutputConfiguration.S3Upload.SecretName)
 			if err != nil {
-				retinacmd.Logger.Error("Failed to delete capture secret, please manually delete it",
+				opts.logger.Error("Failed to delete capture secret, please manually delete it",
 					zap.String("namespace", *opts.Namespace),
 					zap.String("secret name", capture.Spec.OutputConfiguration.S3Upload.SecretName),
 					zap.Error(err),
@@ -204,13 +204,13 @@ func create(kubeClient kubernetes.Interface) error {
 		}
 
 		if len(jobsFailedToDelete) == 0 && err == nil {
-			retinacmd.Logger.Info("Done for deleting jobs")
+			opts.logger.Info("Done for deleting jobs")
 		}
 		return nil
 	}
 
-	retinacmd.Logger.Info("Not all job are completed in the given time")
-	retinacmd.Logger.Info("Please manually delete the Capture")
+	opts.logger.Info("Not all job are completed in the given time")
+	opts.logger.Info("Please manually delete the Capture")
 
 	return getCaptureAndPrintCaptureResult(ctx, kubeClient, capture.Name, *opts.Namespace)
 }
@@ -422,10 +422,10 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 		},
 	}
 
-	retinacmd.Logger.Info(fmt.Sprintf("Capture timestamp: %s", timestamp))
+	opts.logger.Info(fmt.Sprintf("Capture timestamp: %s", timestamp))
 
 	if opts.duration != 0 {
-		retinacmd.Logger.Info(fmt.Sprintf("The capture duration is set to %s", opts.duration))
+		opts.logger.Info(fmt.Sprintf("The capture duration is set to %s", opts.duration))
 		capture.Spec.CaptureConfiguration.CaptureOption.Duration = &metav1.Duration{Duration: opts.duration}
 	}
 
@@ -433,7 +433,7 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 		// if node selector is using the default value (aka hasn't been set by user), set it to nil to prevent clash
 		// with namespace/pod selectors, pod names, or explicit node names
 		if opts.nodeSelectors == DefaultNodeSelectors {
-			retinacmd.Logger.Info("Overriding default node selectors value and setting it to nil. Using namespace, pod selectors, pod names, or node names. " +
+			opts.logger.Info("Overriding default node selectors value and setting it to nil. Using namespace, pod selectors, pod names, or node names. " +
 				"To use node selector, please remove namespace and pod selectors.")
 			opts.nodeSelectors = ""
 		}
@@ -489,17 +489,17 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 		for i := range podNameSlice {
 			podNameSlice[i] = strings.TrimSpace(podNameSlice[i])
 		}
-		retinacmd.Logger.Info(fmt.Sprintf("Capturing on specific pods: %v", podNameSlice))
+		opts.logger.Info(fmt.Sprintf("Capturing on specific pods: %v", podNameSlice))
 		capture.Spec.CaptureConfiguration.CaptureTarget.PodNames = podNameSlice
 	}
 
 	if opts.maxSize != 0 {
-		retinacmd.Logger.Info(fmt.Sprintf("The capture file max size is set to %dMB", opts.maxSize))
+		opts.logger.Info(fmt.Sprintf("The capture file max size is set to %dMB", opts.maxSize))
 		capture.Spec.CaptureConfiguration.CaptureOption.MaxCaptureSize = &opts.maxSize
 	}
 
 	if opts.packetSize != 0 {
-		retinacmd.Logger.Info(fmt.Sprintf("The capture packet size is set to %d bytes", opts.packetSize))
+		opts.logger.Info(fmt.Sprintf("The capture packet size is set to %d bytes", opts.packetSize))
 		capture.Spec.CaptureConfiguration.CaptureOption.PacketSize = &opts.packetSize
 	}
 
@@ -508,7 +508,7 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 		for i := range interfaceSlice {
 			interfaceSlice[i] = strings.TrimSpace(interfaceSlice[i])
 		}
-		retinacmd.Logger.Info(fmt.Sprintf("Capturing on specific interfaces: %v", interfaceSlice))
+		opts.logger.Info(fmt.Sprintf("Capturing on specific interfaces: %v", interfaceSlice))
 		capture.Spec.CaptureConfiguration.CaptureOption.Interfaces = interfaceSlice
 	}
 
@@ -632,7 +632,7 @@ func getCLICaptureConfig() config.CaptureConfig {
 }
 
 func createJobs(ctx context.Context, kubeClient kubernetes.Interface, capture *retinav1alpha1.Capture) ([]batchv1.Job, error) {
-	translator := pkgcapture.NewCaptureToPodTranslator(kubeClient, retinacmd.Logger, getCLICaptureConfig())
+	translator := pkgcapture.NewCaptureToPodTranslator(kubeClient, opts.logger, getCLICaptureConfig())
 	jobs, err := translator.TranslateCaptureToJobs(ctx, capture)
 	if err != nil {
 		return nil, err
@@ -660,7 +660,7 @@ func createJobs(ctx context.Context, kubeClient kubernetes.Interface, capture *r
 			return nil, err
 		}
 		jobsCreated = append(jobsCreated, *jobCreated)
-		retinacmd.Logger.Info("Packet capture job is created", zap.String("namespace", *opts.Namespace), zap.String("capture job", jobCreated.Name))
+		opts.logger.Info("Packet capture job is created", zap.String("namespace", *opts.Namespace), zap.String("capture job", jobCreated.Name))
 	}
 	return jobsCreated, nil
 }
@@ -688,7 +688,7 @@ func waitUntilJobsComplete(ctx context.Context, kubeClient kubernetes.Interface,
 	if period >= deadline {
 		period = deadline / MinPollAttempts
 	}
-	retinacmd.Logger.Info(fmt.Sprintf("Waiting timeout is set to %s", deadline))
+	opts.logger.Info(fmt.Sprintf("Waiting timeout is set to %s", deadline))
 
 	ctx, cancel := context.WithTimeout(ctx, deadline)
 	defer cancel()
@@ -700,7 +700,7 @@ func waitUntilJobsComplete(ctx context.Context, kubeClient kubernetes.Interface,
 		for _, job := range jobs {
 			jobRet, err := kubeClient.BatchV1().Jobs(job.Namespace).Get(ctx, job.Name, metav1.GetOptions{})
 			if err != nil {
-				retinacmd.Logger.Error("Failed to get job", zap.String("namespace", job.Namespace), zap.String("job name", job.Name), zap.Error(err))
+				opts.logger.Error("Failed to get job", zap.String("namespace", job.Namespace), zap.String("job name", job.Name), zap.Error(err))
 				jobsIncompleted = append(jobsIncompleted, job.Name)
 				continue
 			}
@@ -712,7 +712,7 @@ func waitUntilJobsComplete(ctx context.Context, kubeClient kubernetes.Interface,
 		}
 
 		if len(jobsIncompleted) != 0 {
-			retinacmd.Logger.Info("Not all jobs are completed",
+			opts.logger.Info("Not all jobs are completed",
 				zap.String("namespace", *opts.Namespace),
 				zap.String("Completed jobs", strings.Join(jobsCompleted, ",")),
 				zap.String("Uncompleted packet capture jobs", strings.Join(jobsIncompleted, ",")),
@@ -738,7 +738,7 @@ func deleteJobs(ctx context.Context, kubeClient kubernetes.Interface, jobs []bat
 		})
 		if err != nil {
 			jobsFailedtoDelete = append(jobsFailedtoDelete, job.Name)
-			retinacmd.Logger.Error("Failed to delete job", zap.String("namespace", job.Namespace), zap.String("job name", job.Name), zap.Error(err))
+			opts.logger.Error("Failed to delete job", zap.String("namespace", job.Namespace), zap.String("job name", job.Name), zap.Error(err))
 		}
 	}
 	return jobsFailedtoDelete

@@ -9,9 +9,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	retinacmd "github.com/microsoft/retina/cli/cmd"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
 	"github.com/microsoft/retina/pkg/label"
+	"github.com/microsoft/retina/pkg/log"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -34,6 +34,7 @@ func NewDeleteSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 		Short:   "Delete a Retina capture",
 		Example: deleteExample,
 		RunE: func(*cobra.Command, []string) error {
+			opts.logger = log.Logger().Named("retina-capture-delete")
 			ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
 			defer cancel()
 
@@ -71,7 +72,7 @@ func NewDeleteSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 				if err := kubeClient.BatchV1().Jobs(jobList.Items[idx].Namespace).Delete(ctx, jobList.Items[idx].Name, metav1.DeleteOptions{
 					PropagationPolicy: &deletePropagationBackground,
 				}); err != nil {
-					retinacmd.Logger.Info("Failed to delete job", zap.String("job name", jobList.Items[idx].Name), zap.Error(err))
+					opts.logger.Info("Failed to delete job", zap.String("job name", jobList.Items[idx].Name), zap.Error(err))
 				}
 			}
 
@@ -85,7 +86,7 @@ func NewDeleteSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 					break
 				}
 			}
-			retinacmd.Logger.Info(fmt.Sprintf("Retina Capture %q delete", *opts.Name))
+			opts.logger.Info(fmt.Sprintf("Retina Capture %q delete", *opts.Name))
 
 			return nil
 		},

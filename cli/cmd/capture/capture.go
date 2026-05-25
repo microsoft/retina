@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/microsoft/retina/pkg/log"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
@@ -112,6 +113,7 @@ type Opts struct {
 	s3SecretAccessKey  string
 	// tcpdumpFilter is deprecated and will be removed. Use captureOption.pcapFilter and captureOption boolean flags for display options.
 	tcpdumpFilter      string
+	logger             *log.ZapLogger
 	pcapFilter         string
 	noPromiscuous      bool
 	packetBuffered     bool

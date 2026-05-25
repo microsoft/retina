@@ -258,7 +258,8 @@ func TestGetNodeOS(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := getNodeOS(tc.node)
+			service := NewDownloadService(nil, nil, "")
+			result, err := service.getNodeOS(tc.node)
 
 			if tc.wantErr && err == nil {
 				t.Errorf("Expected error for %s, but got none", tc.name)
@@ -374,7 +375,8 @@ func TestGetDownloadCmd(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := getDownloadCmd(tc.node, tc.hostPath, tc.fileName)
+			service := NewDownloadService(nil, nil, "")
+			result, err := service.getDownloadCmd(tc.node, tc.hostPath, tc.fileName)
 			tc.validate(t, result, err)
 		})
 	}
@@ -414,7 +416,8 @@ func TestGetWindowsContainerImage(t *testing.T) {
 				},
 			}
 
-			result := getWindowsContainerImage(node)
+			service := NewDownloadService(nil, nil, "")
+			result := service.getWindowsContainerImage(node)
 			expectedImage := "mcr.microsoft.com/windows/nanoserver:" + tc.expectedSuffix
 
 			if result != expectedImage {

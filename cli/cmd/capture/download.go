@@ -20,11 +20,11 @@ import (
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/storage"
-	retinacmd "github.com/microsoft/retina/cli/cmd"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
 	captureFile "github.com/microsoft/retina/pkg/capture/file"
 	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	captureLabels "github.com/microsoft/retina/pkg/label"
+	"github.com/microsoft/retina/pkg/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -104,6 +104,7 @@ type DownloadService struct {
 	kubeClient kubernetes.Interface
 	config     *rest.Config
 	namespace  string
+	logger     *log.ZapLogger
 }
 
 // Key represents a unique capture identifier
@@ -115,14 +116,15 @@ type Key struct {
 // NewDownloadService creates a new download service with shared dependencies
 func NewDownloadService(kubeClient kubernetes.Interface, config *rest.Config, namespace string) *DownloadService {
 	return &DownloadService{
+		logger: log.Logger().Named("retina-capture-download"),
 		kubeClient: kubeClient,
 		config:     config,
 		namespace:  namespace,
 	}
 }
 
-func getDownloadCmd(node *corev1.Node, hostPath, fileName string) (*DownloadCmd, error) {
-	nodeOS, err := getNodeOS(node)
+func (ds *DownloadService) getDownloadCmd(node *corev1.Node, hostPath, fileName string) (*DownloadCmd, error) {
+	nodeOS, err := ds.getNodeOS(node)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +138,7 @@ func getDownloadCmd(node *corev1.Node, hostPath, fileName string) (*DownloadCmd,
 		srcFilePath := "C:\\host" + strings.ReplaceAll(hostPath, "/", "\\") + "\\" + fileName + ".tar.gz"
 		mountPath := "C:\\host" + strings.ReplaceAll(hostPath, "/", "\\")
 		return &DownloadCmd{
-			ContainerImage:   getWindowsContainerImage(node),
+			ContainerImage:   ds.getWindowsContainerImage(node),
 			SrcFilePath:      srcFilePath,
 			MountPath:        mountPath,
 			KeepAliveCommand: []string{"cmd", "/c", "echo Download pod ready & ping -n 3601 127.0.0.1 > nul"},
@@ -159,16 +161,16 @@ func getDownloadCmd(node *corev1.Node, hostPath, fileName string) (*DownloadCmd,
 	}
 }
 
-func getNodeOS(node *corev1.Node) (NodeOS, error) {
+func (ds *DownloadService) getNodeOS(node *corev1.Node) (NodeOS, error) {
 	nodeOS := strings.ToLower(node.Status.NodeInfo.OperatingSystem)
 
 	if strings.Contains(nodeOS, "windows") {
-		retinacmd.Logger.Info("Detected node OS: Windows", zap.String("node", node.Name), zap.String("os", node.Status.NodeInfo.OperatingSystem))
+		ds.logger.Info("Detected node OS: Windows", zap.String("node", node.Name), zap.String("os", node.Status.NodeInfo.OperatingSystem))
 		return Windows, nil
 	}
 
 	if strings.Contains(nodeOS, "linux") {
-		retinacmd.Logger.Info("Detected node OS: Linux", zap.String("node", node.Name), zap.String("os", node.Status.NodeInfo.OperatingSystem))
+		ds.logger.Info("Detected node OS: Linux", zap.String("node", node.Name), zap.String("os", node.Status.NodeInfo.OperatingSystem))
 		return Linux, nil
 	}
 
@@ -176,7 +178,7 @@ func getNodeOS(node *corev1.Node) (NodeOS, error) {
 }
 
 // Detects the Windows LTSC version and returns the appropriate nanoserver image
-func getWindowsContainerImage(node *corev1.Node) string {
+func (ds *DownloadService) getWindowsContainerImage(node *corev1.Node) string {
 	osImage := strings.ToLower(node.Status.NodeInfo.OSImage)
 
 	var suffix string
@@ -188,14 +190,14 @@ func getWindowsContainerImage(node *corev1.Node) string {
 	case strings.Contains(osImage, "2016"):
 		suffix = "ltsc2016"
 	default:
-		retinacmd.Logger.Warn("Could not determine Windows LTSC version, defaulting to ltsc2022",
+		ds.logger.Warn("Could not determine Windows LTSC version, defaulting to ltsc2022",
 			zap.String("node", node.Name),
 			zap.String("osImage", osImage))
 		suffix = "ltsc2022"
 	}
 
 	containerImage := "mcr.microsoft.com/windows/nanoserver:" + suffix
-	retinacmd.Logger.Info("Selected Windows container image", zap.String("image", containerImage))
+	ds.logger.Info("Selected Windows container image", zap.String("image", containerImage))
 
 	return containerImage
 }
@@ -290,7 +292,7 @@ func (ds *DownloadService) DownloadFileContent(ctx context.Context, nodeName, ho
 		return nil, errors.Join(ErrGetNodeInfo, err)
 	}
 
-	downloadCmd, err := getDownloadCmd(node, hostPath, fileName)
+	downloadCmd, err := ds.getDownloadCmd(node, hostPath, fileName)
 	if err != nil {
 		return nil, err
 	}
@@ -305,7 +307,7 @@ func (ds *DownloadService) DownloadFileContent(ctx context.Context, nodeName, ho
 	defer func() {
 		cleanupErr := ds.kubeClient.CoreV1().Pods(ds.namespace).Delete(ctx, downloadPod.Name, metav1.DeleteOptions{})
 		if cleanupErr != nil {
-			retinacmd.Logger.Warn("Failed to clean up debug pod", zap.String("name", downloadPod.Name), zap.Error(cleanupErr))
+			ds.logger.Warn("Failed to clean up debug pod", zap.String("name", downloadPod.Name), zap.Error(cleanupErr))
 		}
 	}()
 
@@ -481,15 +483,16 @@ func (ds *DownloadService) createDownloadExec(ctx context.Context, pod *corev1.P
 }
 
 func downloadFromBlob() error {
+	l := log.Logger().Named("retina-capture-download")
 	u, err := url.Parse(blobURL)
 	if err != nil {
-		retinacmd.Logger.Error("err: ", zap.Error(err))
+		l.Error("err: ", zap.Error(err))
 		return fmt.Errorf("failed to parse SAS URL %s: %w", blobURL, err)
 	}
 
 	b, err := storage.NewAccountSASClientFromEndpointToken(u.String(), u.Query().Encode())
 	if err != nil {
-		retinacmd.Logger.Error("err: ", zap.Error(err))
+		l.Error("err: ", zap.Error(err))
 		return fmt.Errorf("failed to create storage account client: %w", err)
 	}
 
@@ -501,12 +504,12 @@ func downloadFromBlob() error {
 	params := storage.ListBlobsParameters{Prefix: *opts.Name}
 	blobList, err := blobService.GetContainerReference(containerName).ListBlobs(params)
 	if err != nil {
-		retinacmd.Logger.Error("err: ", zap.Error(err))
+		l.Error("err: ", zap.Error(err))
 		return fmt.Errorf("failed to list blobstore: %w", err)
 	}
 
 	if len(blobList.Blobs) == 0 {
-		retinacmd.Logger.Error("err: ", zap.Error(err))
+		l.Error("err: ", zap.Error(err))
 		return fmt.Errorf("%w: %s", ErrNoBlobsFound, *opts.Name)
 	}
 
@@ -520,21 +523,21 @@ func downloadFromBlob() error {
 		blobRef := blobService.GetContainerReference(containerName).GetBlobReference(blob.Name)
 		readCloser, err := blobRef.Get(&storage.GetBlobOptions{})
 		if err != nil {
-			retinacmd.Logger.Error("err: ", zap.Error(err))
+			l.Error("err: ", zap.Error(err))
 			return fmt.Errorf("failed to read from blobstore: %w", err)
 		}
 
 		blobData, err := io.ReadAll(readCloser)
 		readCloser.Close()
 		if err != nil {
-			retinacmd.Logger.Error("err: ", zap.Error(err))
+			l.Error("err: ", zap.Error(err))
 			return fmt.Errorf("failed to obtain blob from blobstore: %w", err)
 		}
 
 		outputFile := filepath.Join(outputPath, blob.Name)
 		err = os.WriteFile(outputFile, blobData, 0o600)
 		if err != nil {
-			retinacmd.Logger.Error("err: ", zap.Error(err))
+			l.Error("err: ", zap.Error(err))
 			return fmt.Errorf("failed to write file: %w", err)
 		}
 
