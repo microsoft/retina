@@ -1,13 +1,13 @@
 # pinned base images
 
-# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.2-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26.3-azurelinux3.0@sha256:6b48a8fb2ae39953f6a01a4077eae21c759635babb41ca458d364610af626666 AS golang
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.3-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26.3-1-azurelinux3.0@sha256:75a5c75f33e2238c6a5b93167cc4a7acd96d39e217d6e370ee7adcf5c29e2a6d AS golang
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/azurelinux/base/core:3.0@sha256:82e37ddcf271af1b720036697d8ab8c95f7001c3eaf7694a9ca17b35d84085de AS azurelinux-core
+FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260517@sha256:f5e224c47997aa4a5d3d8addfcc3866e175e7026368a71ce1be2c0eed1876f04 AS azurelinux-core
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/distroless/minimal:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0@sha256:5a66f9f16ac675db2a8229dac72d83811b73b502d6ad192d8b374c7f3be498af AS azurelinux-distroless
+FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20260517@sha256:0c64ab9cfc44d4f100c0590bd59ead9afedda6cc54f14bb7465b5f9c35ddc037 AS azurelinux-distroless
 
 # build stages
 
@@ -90,7 +90,7 @@ RUN cp $(which bpftool) /tmp/init-bin
 ARG GOARCH=amd64
 ENV HUBBLE_ARCH=${GOARCH}
 # ARG HUBBLE_VERSION may be modified via the update-hubble GitHub Action
-ARG HUBBLE_VERSION=v1.18.6
+ARG HUBBLE_VERSION=v1.19.3
 ENV HUBBLE_VERSION=${HUBBLE_VERSION}
 RUN echo "Hubble version: $HUBBLE_VERSION" && \
     wget --no-check-certificate https://github.com/cilium/hubble/releases/download/$HUBBLE_VERSION/hubble-linux-${HUBBLE_ARCH}.tar.gz && \

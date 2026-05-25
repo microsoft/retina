@@ -77,7 +77,7 @@ spec:
         matchLabels:
           kubernetes.io/os: linux
   outputConfiguration:
-    hostPath: /captures
+    hostPath: example-capture
 ```
 
 Include / Exclude filters
@@ -105,7 +105,7 @@ spec:
         - 10.224.0.26:80
         - 10.224.0.34:8080
   outputConfiguration:
-    hostPath: /captures
+    hostPath: example-capture
 ```
 
 Single Pod by Name
@@ -125,7 +125,7 @@ spec:
       podNames:
         - my-app-pod-abc123
   outputConfiguration:
-    hostPath: /captures
+    hostPath: example-capture
 ```
 
 Multiple Pods by Name
@@ -146,7 +146,29 @@ spec:
         - my-app-pod-abc123
         - my-app-pod-def456
   outputConfiguration:
-    hostPath: /captures
+    hostPath: example-capture
 ```
 
 Additional examples can also be found in the [GitHub capture samples](https://github.com/microsoft/retina/tree/main/samples/capture).
+
+## Automatic Cleanup After Upload
+
+Set `cleanUpAfterUpload: true` in the Capture spec to have the controller automatically delete the Capture resource and all associated jobs once all capture jobs complete successfully and data has been uploaded to remote storage (Blob, S3, or PVC).
+
+```yaml
+apiVersion: retina.sh/v1alpha1
+kind: Capture
+metadata:
+  name: my-capture
+spec:
+  captureConfiguration:
+    captureTarget:
+      nodeSelector:
+        matchLabels:
+          kubernetes.io/os: linux
+  outputConfiguration:
+    blobUpload: "<secret-name>"
+  cleanUpAfterUpload: true
+```
+
+If any job fails, the Capture resource and jobs are preserved for debugging. This option requires a remote storage output (`blobUpload`, `s3Upload`, or `persistentVolumeClaim`).

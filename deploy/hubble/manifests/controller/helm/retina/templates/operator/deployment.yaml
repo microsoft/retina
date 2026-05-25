@@ -17,7 +17,7 @@ spec:
   selector:
     matchLabels:
       control-plane: retina-operator
-  replicas: 1
+  replicas: {{ .Values.operator.replicas }}
   template:
     metadata:
       annotations:
@@ -56,16 +56,18 @@ spec:
           {{- end }}
           {{ else }}
           command:
-            - /retina-operator  
+            - /retina-operator
           {{- end }}
           {{- if .Values.operator.container.args}}
           args:
           {{- range $.Values.operator.container.args}}
           - {{ . | quote }}
           {{- end}}
-          {{ else }}
+          - --leader-election-namespace={{ $.Values.operator.leaderElectionNamespace | default $.Release.Namespace }}
+          {{- else }}
           args:
             - --config-dir=/retina
+            - --leader-election-namespace={{ .Values.operator.leaderElectionNamespace | default .Release.Namespace }}
           {{- end}}
           env:
           # this env var is used by retina OSS telemetry and zap

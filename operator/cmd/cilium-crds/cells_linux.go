@@ -42,8 +42,6 @@ import (
 	"github.com/cilium/statedb"
 )
 
-const operatorK8sNamespace = "kube-system"
-
 var (
 	Operator = cell.Module(
 		"operator",

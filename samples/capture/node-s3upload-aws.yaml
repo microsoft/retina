@@ -19,7 +19,7 @@ spec:
                 ],
             }
   outputConfiguration:
-    hostPath: "/tmp/retina"
+    hostPath: "retina"
     s3Upload:
       bucket: retina-bucket
       region: ap-northeast-2

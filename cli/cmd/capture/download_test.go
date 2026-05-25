@@ -52,6 +52,7 @@ func NewWindowsNode(name string) *corev1.Node {
 			Name: name,
 			Labels: map[string]string{
 				"kubernetes.io/hostname": name,
+				"kubernetes.io/os":       "windows",
 			},
 		},
 		Status: corev1.NodeStatus{
@@ -900,6 +901,8 @@ func TestDownloadCommandFlags(t *testing.T) {
 	// Test all cases with unified approach
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			resetDownloadGlobals(t)
+
 			cmd := NewDownloadSubCommand()
 
 			// Parse flags without executing the command
@@ -913,7 +916,36 @@ func TestDownloadCommandFlags(t *testing.T) {
 	}
 }
 
+// resetDownloadGlobals zeros the package-level globals bound to the download
+// command's flags and restores them on test cleanup. Cobra binds flag values
+// to these globals, so without resetting between subtests one subtest's flag
+// values leak into the next, making tests order-dependent.
+func resetDownloadGlobals(t *testing.T) {
+	t.Helper()
+	origCaptureName := captureName
+	origBlobURL := blobURL
+	origDownloadAll := downloadAll
+	origDownloadAllNamespaces := downloadAllNamespaces
+	origOutputPath := outputPath
+
+	captureName = ""
+	blobURL = ""
+	downloadAll = false
+	downloadAllNamespaces = false
+	outputPath = ""
+
+	t.Cleanup(func() {
+		captureName = origCaptureName
+		blobURL = origBlobURL
+		downloadAll = origDownloadAll
+		downloadAllNamespaces = origDownloadAllNamespaces
+		outputPath = origOutputPath
+	})
+}
+
 func TestDownloadAllCapturesGracefulErrorHandling(t *testing.T) {
+	resetDownloadGlobals(t)
+
 	// Test the graceful error handling by testing individual components
 	// that are used in downloadAllCaptures
 
