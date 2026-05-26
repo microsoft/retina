@@ -84,7 +84,7 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, fil
 	}
 	if stopTrace {
 		ncp.l.Info("Stopping netsh trace session before starting a new one")
-		_ = ncp.stopNetworkCapture()
+		_ = ncp.stopNetworkCapture() //nolint:contextcheck // stopNetworkCapture creates its own context
 	}
 
 	captureFileName := ncp.Filename.String() + ".etl"
@@ -164,7 +164,8 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, fil
 	}
 
 	ncp.l.Info("Stop netsh")
-	if err := ncp.stopNetworkCapture(); err != nil {
+	// stopNetworkCapture creates its own context; parent ctx is expired here
+	if err := ncp.stopNetworkCapture(); err != nil { //nolint:contextcheck // stopNetworkCapture creates its own context
 		ncp.l.Error("Failed to stop netsh trace by 'netsh trace stop', will kill the process", zap.Error(err))
 		_ = captureStartCmd.Process.Kill()
 		return fmt.Errorf("netsh stop failed: Output: %s", err)
