@@ -84,7 +84,7 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, fil
 	}
 	if stopTrace {
 		ncp.l.Info("Stopping netsh trace session before starting a new one")
-		_ = ncp.stopNetworkCapture(ctx)
+		_ = ncp.stopNetworkCapture()
 	}
 
 	captureFileName := ncp.Filename.String() + ".etl"
@@ -164,7 +164,7 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, fil
 	}
 
 	ncp.l.Info("Stop netsh")
-	if err := ncp.stopNetworkCapture(ctx); err != nil {
+	if err := ncp.stopNetworkCapture(); err != nil {
 		ncp.l.Error("Failed to stop netsh trace by 'netsh trace stop', will kill the process", zap.Error(err))
 		_ = captureStartCmd.Process.Kill()
 		return fmt.Errorf("netsh stop failed: Output: %s", err)
@@ -204,10 +204,15 @@ func (ncp *NetworkCaptureProvider) needToStopTraceSession(ctx context.Context) (
 	return false, fmt.Errorf("cannot stop trace session because it's not created by Retina capture")
 }
 
-func (ncp *NetworkCaptureProvider) stopNetworkCapture(ctx context.Context) error {
+func (ncp *NetworkCaptureProvider) stopNetworkCapture() error {
 	ncp.l.Info("Stopping netsh trace session")
 
-	command := exec.CommandContext(ctx, "netsh", "trace", "stop")
+	// Create independent context for cleanup.
+	// netsh trace stop completes in ~1s; 30s timeout provides ample safety margin.
+	stopCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	command := exec.CommandContext(stopCtx, "netsh", "trace", "stop")
 	output, err := command.CombinedOutput()
 	// ignore the error when stop the trace when no live trace session exists.
 	if strings.Contains(string(output), "There is no trace session currently in progress") {
