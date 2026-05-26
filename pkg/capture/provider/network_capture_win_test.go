@@ -6,7 +6,13 @@
 package provider
 
 import (
+	"context"
 	"testing"
+	"time"
+
+	"github.com/microsoft/retina/pkg/capture/file"
+	"github.com/microsoft/retina/pkg/log"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestValidateNetshFilter(t *testing.T) {
@@ -113,4 +119,38 @@ func TestValidateNetshFilter(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestStopNetworkCapture_ContextIndependence verifies stopNetworkCapture creates its own context
+func TestStopNetworkCapture_ContextIndependence(t *testing.T) {
+	now := metav1.Now()
+	ncp := &NetworkCaptureProvider{
+		NetworkCaptureProviderCommon: NetworkCaptureProviderCommon{
+			TmpCaptureDir: t.TempDir(),
+			l:             log.Logger().Named("test-capture"),
+		},
+		Filename: file.CaptureFilename{
+			CaptureName:    "test-capture",
+			NodeHostname:   "test-node",
+			StartTimestamp: &now,
+		},
+	}
+
+	// Create an expired context (simulating capture duration ending)
+	parentCtx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
+	time.Sleep(10 * time.Millisecond)
+	defer cancel()
+
+	if parentCtx.Err() == nil {
+		t.Fatal("Setup error: parent context should be expired")
+	}
+
+	// Call StopNetworkCapture - should NOT return "context deadline exceeded"
+	err := ncp.stopNetworkCapture()
+
+	if err != nil && err.Error() == "context deadline exceeded" {
+		t.Fatal("StopNetworkCapture returned 'context deadline exceeded' - bug reintroduced")
+	}
+
+	t.Logf("StopNetworkCapture uses independent context (netsh error expected: %v)", err)
 }
