@@ -80,13 +80,40 @@ func (r *NodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, nil
 	}
 
-	retinaNodeCommon := retinaCommon.NewRetinaNode(node.Name, net.ParseIP(node.Status.Addresses[0].Address), node.Labels[corev1.LabelTopologyZone])
+	nodeIP := parseNodeIP(node.Status.Addresses)
+	if nodeIP == nil {
+		r.l.Warn("Node has no IP addresses", zap.String("Node", req.NamespacedName.String()))
+		return ctrl.Result{}, nil
+	}
+
+	retinaNodeCommon := retinaCommon.NewRetinaNode(node.Name, nodeIP, node.Labels[corev1.LabelTopologyZone])
 	if err := r.cache.UpdateRetinaNode(retinaNodeCommon); err != nil {
 		r.l.Error("Failed to update RetinaNode in Cache", zap.Error(err), zap.String("Node", req.NamespacedName.String()))
 		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func parseNodeIP(addresses []corev1.NodeAddress) net.IP {
+	for _, addressType := range []corev1.NodeAddressType{corev1.NodeInternalIP, corev1.NodeExternalIP} {
+		for _, address := range addresses {
+			if address.Type != addressType {
+				continue
+			}
+			if ip := net.ParseIP(address.Address); ip != nil {
+				return ip
+			}
+		}
+	}
+
+	for _, address := range addresses {
+		if ip := net.ParseIP(address.Address); ip != nil {
+			return ip
+		}
+	}
+
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
