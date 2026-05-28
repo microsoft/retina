@@ -21,6 +21,7 @@ spec:
     k8s-app: hubble-relay
   ports:
   - protocol: TCP
+    name: grpc
   {{- if .Values.hubble.relay.servicePort }}
     port: {{ .Values.hubble.relay.servicePort }}
   {{- else }}
@@ -29,5 +30,8 @@ spec:
     targetPort: {{ .Values.hubble.relay.listenPort }}
     {{- if and (eq "NodePort" .Values.hubble.relay.service.type) .Values.hubble.relay.service.nodePort }}
     nodePort: {{ .Values.hubble.relay.service.nodePort }}
+    {{- end }}
+    {{- with .Values.hubble.relay.service.appProtocol }}
+    appProtocol: {{ . }}
     {{- end }}
 {{- end }}

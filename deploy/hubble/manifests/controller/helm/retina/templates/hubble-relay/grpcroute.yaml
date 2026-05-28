@@ -1,0 +1,39 @@
+{{- if and (or .Values.hubble.enabled .Values.hubble.relay.standalone.enabled) .Values.hubble.relay.enabled .Values.hubble.relay.grpcRoute.enabled }}
+{{- $port := .Values.hubble.relay.grpcRoute.port | default .Values.hubble.relay.servicePort | default (.Values.hubble.relay.tls.server.enabled | ternary 443 80) -}}
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: hubble-relay
+  namespace: {{ .Values.namespace }}
+  labels:
+    k8s-app: hubble-relay
+    app.kubernetes.io/name: hubble-relay
+    app.kubernetes.io/part-of: cilium
+  {{- with .Values.hubble.relay.grpcRoute.labels }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- if or .Values.hubble.relay.grpcRoute.annotations .Values.hubble.relay.annotations }}
+  annotations:
+    {{- with .Values.hubble.relay.annotations }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with .Values.hubble.relay.grpcRoute.annotations }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- end }}
+spec:
+  {{- if .Values.hubble.relay.grpcRoute.parentRefs }}
+  parentRefs:
+    {{- toYaml .Values.hubble.relay.grpcRoute.parentRefs | nindent 4 }}
+  {{- end }}
+  {{- if .Values.hubble.relay.grpcRoute.hostnames }}
+  hostnames:
+    {{- range .Values.hubble.relay.grpcRoute.hostnames }}
+    - {{ tpl . $ | quote }}
+    {{- end }}
+  {{- end }}
+  rules:
+    - backendRefs:
+        - name: hubble-relay
+          port: {{ $port }}
+{{- end }}
