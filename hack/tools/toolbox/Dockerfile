@@ -1,5 +1,5 @@
 # skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.3 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26.3-1@sha256:e6e1c95302de09c2f0f6ea1ada9cee207d6cac9b506df5d289a29b103b0a2539 AS build
+FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26.3-1@sha256:bd013a5e4c7f683d44627652060269bbd4d0949143c906f6deeeda0880e72d2c AS build
 ADD . .
 WORKDIR /go/toolbox/
 RUN GOOS=linux go build -o server .
