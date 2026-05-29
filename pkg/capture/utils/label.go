@@ -28,3 +28,10 @@ func GetContainerLabelsFromCaptureName(captureName string) map[string]string {
 		label.CaptureNameLabel: captureName,
 	}
 }
+
+func GetDownloadLabelsFromCaptureName(captureName string) map[string]string {
+	return map[string]string{
+		label.AppLabel:         captureConstants.DownloadAppname,
+		label.CaptureNameLabel: captureName,
+	}
+}

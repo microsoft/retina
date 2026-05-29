@@ -28,7 +28,9 @@ func TestGetConfig(t *testing.T) {
 		c.RemoteContext ||
 		c.EnableAnnotations ||
 		c.TelemetryInterval != 15*time.Minute ||
-		c.DataAggregationLevel != Low {
+		c.DataAggregationLevel != Low ||
+		c.DataSamplingRate != 1 ||
+		c.PacketParserRingBuffer != PacketParserRingBufferDisabled {
 		t.Errorf("Expeted config should be same as ./testwith/config.yaml; instead got %+v", c)
 	}
 }
@@ -65,6 +67,103 @@ func TestDecodeLevelHook(t *testing.T) {
 		result, err := decodeLevelHook(reflect.TypeOf(test.input), reflect.TypeOf(Level(0)), test.input)
 		require.NoError(t, err)
 		assert.Equal(t, test.expected, result)
+	}
+}
 
+func TestGetConfig_EnableTCX(t *testing.T) {
+	tests := []struct {
+		name          string
+		configFile    string
+		expected      TCXMode
+		expectedError error
+	}{
+		{
+			name:       "auto",
+			configFile: "./testwith/config-tcx-auto.yaml",
+			expected:   TCXModeAuto,
+		},
+		{
+			name:       "off",
+			configFile: "./testwith/config-tcx-off.yaml",
+			expected:   TCXModeOff,
+		},
+		{
+			name:       "empty defaults to auto",
+			configFile: "./testwith/config-tcx-empty.yaml",
+			expected:   TCXModeAuto,
+		},
+		{
+			name:          "invalid value rejected",
+			configFile:    "./testwith/config-tcx-invalid.yaml",
+			expectedError: ErrEnableTCXInvalid,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := GetConfig(tt.configFile)
+			if tt.expectedError != nil {
+				require.ErrorIs(t, err, tt.expectedError)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, cfg.EnableTCX)
+		})
+	}
+}
+
+func TestDecodePacketParserRingBufferModeHook(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         interface{}
+		expected      interface{}
+		expectErr     bool
+		expectedError error
+	}{
+		{
+			name:     "enabled",
+			input:    "enabled",
+			expected: PacketParserRingBufferEnabled,
+		},
+		{
+			name:     "disabled",
+			input:    "disabled",
+			expected: PacketParserRingBufferDisabled,
+		},
+		{
+			name:          "auto not supported",
+			input:         "auto",
+			expectErr:     true,
+			expectedError: ErrPacketParserRingBufferAutoNotSupported,
+		},
+		{
+			name:      "boolean rejected",
+			input:     true,
+			expectErr: true,
+		},
+		{
+			name:     "non-string passthrough",
+			input:    123,
+			expected: 123,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result, err := decodePacketParserRingBufferModeHook(
+				reflect.TypeOf(test.input),
+				reflect.TypeOf(PacketParserRingBufferMode("")),
+				test.input,
+			)
+			if test.expectErr {
+				require.Error(t, err)
+				if test.expectedError != nil {
+					require.ErrorIs(t, err, test.expectedError)
+				}
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, test.expected, result)
+		})
 	}
 }

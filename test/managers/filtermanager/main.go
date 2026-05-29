@@ -8,11 +8,13 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"strings"
 	"time"
 
+	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/managers/filtermanager"
 	"github.com/microsoft/retina/pkg/managers/watchermanager"
@@ -32,13 +34,13 @@ func main() {
 	log.SetupZapLogger(opts)
 	l := log.Logger().Named("test-packetparser")
 
-	metrics.InitializeMetrics()
+	metrics.InitializeMetrics(slog.Default())
 
 	ctx := context.Background()
 
 	// watcher manager
-	wm := watchermanager.NewWatcherManager()
-	wm.Watchers = []watchermanager.IWatcher{endpoint.Watcher(), apiserver.Watcher()}
+	wm := watchermanager.NewWatcherManager(kcfg.DefaultFilterMapMaxEntries)
+	wm.Watchers = []watchermanager.IWatcher{endpoint.Watcher(), apiserver.Watcher(kcfg.DefaultFilterMapMaxEntries)}
 
 	err := wm.Start(ctx)
 	if err != nil {
@@ -52,7 +54,7 @@ func main() {
 	}()
 
 	// Filtermanager.
-	f, err := filtermanager.Init(5)
+	f, err := filtermanager.Init(5, kcfg.DefaultFilterMapMaxEntries)
 	if err != nil {
 		l.Error("Failed to start Filtermanager", zap.Error(err))
 		panic(err)

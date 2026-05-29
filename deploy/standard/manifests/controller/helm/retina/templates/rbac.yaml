@@ -11,6 +11,9 @@ rules:
   - apiGroups: [""] # "" indicates the core API group
     resources: ["pods", "services", "replicationcontrollers", "nodes", "namespaces"]
     verbs: ["get", "watch", "list"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["get", "watch", "list"]
   - apiGroups: ["apps"]
     resources: ["deployments", "replicasets"]
     verbs: ["get", "watch", "list"]
@@ -26,14 +29,6 @@ rules:
       - list
       - watch
   {{- if .Values.operator.enabled }}
-  - apiGroups:
-    - ""
-    resources:
-      - namespaces
-    verbs:
-      - get
-      - list
-      - watch
   - apiGroups:
       - retina.sh
     resources:

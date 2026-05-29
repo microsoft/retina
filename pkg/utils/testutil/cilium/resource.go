@@ -4,9 +4,9 @@ package ciliumutil
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 
 	k8sRuntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
@@ -28,12 +28,12 @@ var (
 // i.e. Store() and GetByKey()
 // plus some helpers to add/remove items from the cache and error on the next call to Store()
 type MockResource[T k8sRuntime.Object] struct {
-	l                       logrus.FieldLogger
+	l                       *slog.Logger
 	cache                   map[resource.Key]T
 	shouldFailNextStoreCall bool
 }
 
-func NewMockResource[T k8sRuntime.Object](l logrus.FieldLogger) *MockResource[T] {
+func NewMockResource[T k8sRuntime.Object](l *slog.Logger) *MockResource[T] {
 	return &MockResource[T]{
 		l:     l,
 		cache: make(map[resource.Key]T),

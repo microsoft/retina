@@ -1,19 +1,39 @@
 # Development
 
+This document provides steps to set up your dev environment and start contributing to the Retina project. You can find the complete documentation on [retina.sh](https://retina.sh)
+
 ## Quick start
 
 Retina uses a forking workflow. To contribute, fork the repository and create a branch for your changes.
 
-The easiest way to set up your Development Environment is to use the provided GitHub Codespaces configuration.
+### Using a devcontainer (recommended)
+
+The easiest way to get started is to use the provided [devcontainer](https://github.com/microsoft/retina/blob/main/.devcontainer/devcontainer.json), which works with both [GitHub Codespaces](https://github.com/features/codespaces) and [VS Code Dev Containers](https://code.visualstudio.com/docs/devcontainers/containers).
+
+The devcontainer comes pre-configured with all required tools:
+
+- Go, clang/LLVM (for eBPF compilation), Docker, Helm, kubectl, Kind, Azure CLI, GitHub CLI, and jq
+- Go modules are pre-downloaded; run `make generate` to compile eBPF programs and generate mocks before building
+- A Kind cluster is created on startup for local testing
+- VS Code is configured with golangci-lint and gofumpt so editor feedback matches CI
+
+To launch in Codespaces, click **Code > Codespaces > New codespace** on the repository page. To use locally, open the repository in VS Code and select **Reopen in Container** from the command palette.
+
+### Manual setup
+
+If you prefer to set up your environment manually, see the requirements below.
 
 ## Environment Config
+
+Below is a list of required tools and dependencies you need to set up your local development environment for Retina.
 
 - [Go](https://go.dev/doc/install)
 - [Docker](https://docs.docker.com/engine/install/)
 - [Helm](https://helm.sh/docs/intro/install)
 - jq: `sudo apt install jq`
-- Fork the repository
-- If you want to use [ghcr.io](https://github.com/features/packages) as container registry, login following instructions [here](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-with-a-personal-access-token-classic)
+- If you want to use [ghcr.io](https://github.com/features/packages) as container registry, login following instructions on [authenticating with a personal access token](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-with-a-personal-access-token-classic)
+
+Once you have set up your environment fork the repository and create a branch for your changes.
 
 ### LLVM/Clang Installation
 
@@ -49,13 +69,6 @@ sudo ln -s /usr/bin/llvm-strip-16 /usr/bin/llvm-strip
 
 ## Building and Testing
 
-### Test
-
-```bash
-make test # run unit-test locally
-make test-image # run tests in docker container
-```
-
 ### Build
 
 Generate all mocks and BPF programs:
@@ -73,7 +86,7 @@ make retina
 To build a `retina-agent` container image with specific tag:
 
 ```bash
-make retina-image # also pushes to image registy
+make retina-image # also pushes to image registry
 make retina-operator-image
 ```
 
@@ -95,11 +108,18 @@ debug   packetforward   Received PacketForward data     {"Data": "IngressBytes:8
 ...
 ```
 
+### Test
+
+```bash
+make test # run unit-tests locally
+make test-image # run tests in docker container
+```
+
 ### Publishing Images and Charts
 
 To publish images to GHCR in your forked repository, simply push to `main`, or publish a tag. The `container-publish` action will run automatically and push images to your GitHub packages registry.
 
-These registries are private by default; to pull images from your registry anonymously, [navigate to "Package Settings" for each publish image repository and set the visibility to "Public"](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility#configuring-access-to-packages-for-your-personal-account).
+These registries are private by default; to pull images from your registry anonymously, [navigate to "Package Settings" for each published image repository and set the visibility to "Public"](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility#configuring-access-to-packages-for-your-personal-account).
 
 Alternatively, configure authenticated access to your registry using a [GitHub Personal Access Token](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-to-the-container-registry).
 
@@ -180,11 +200,38 @@ Uninstall `Retina`:
 make helm-uninstall
 ```
 
-## Updating Documentation
+## Dependency and Security Management
 
-The documentation available on [retina.sh](https://retina.sh) can be found within the [docs](https://github.com/microsoft/retina/tree/main/docs) folder in the repository.
+Retina uses automated dependency management and security scanning to maintain secure and up-to-date container images and dependencies.
 
-The diagrams used are created with [Excalidraw](https://excalidraw.com/). The source `.excalidraw` files are stored within the repository, alongside their `.png` equivalent.
+### Dependabot Configuration
+
+The repository uses [Dependabot](https://github.com/dependabot) to automatically track and update dependencies:
+
+- **Docker Base Images**: Automatically monitored for security updates and new versions
+- **Go Modules**: Tracked for dependency updates  
+- **GitHub Actions**: Workflow dependencies are kept current
+
+#### Docker Base Image Tracking
+
+Retina has Dockerfiles in multiple directories, and each is tracked separately by Dependabot:
+
+- `/controller` - Main retina controller images (daily checks)
+- `/shell` - Shell utility images (daily checks)  
+- `/cli` - CLI tool images (daily checks)
+- `/operator` - Operator images (daily checks)
+- `/test/image` - Test images (daily checks)
+- `/hack/tools/kapinger` - Kapinger tool images (weekly checks)
+- `/hack/tools/toolbox` - Toolbox utility images (weekly checks)
+
+When Dependabot detects a security vulnerability (CVE) in a base image, it will automatically create a pull request to update the image SHA to a patched version.
+
+### Adding New Dockerfiles
+
+When adding new Dockerfiles to the repository:
+
+1. Add the directory containing the Dockerfile to `.github/dependabot.yaml`
+2. Choose an appropriate schedule: daily for critical components, weekly for tools
 
 ## Opening a Pull Request
 
@@ -193,15 +240,26 @@ When you're ready to open a pull request, please ensure that your branch is up-t
 ### Cryptographic Signing of Commits
 
 In order to certify the provenance of commits and defend against impersonation, we require that all commits be cryptographically signed.
-Documentation for setting up Git and Github to sign your commits can be found [here](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits).
-Additional information about Git's use of GPG can be found [here](https://git-scm.com/book/en/v2/Git-Tools-Signing-Your-Work)
+Documentation for setting up Git and GitHub to sign your commits can be found in the [GitHub documentation on signing commits](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits).
+Additional information about Git's use of GPG can be found in the [Git documentation on signing your work](https://git-scm.com/book/en/v2/Git-Tools-Signing-Your-Work)
 
 > To configure your Git client to sign commits by default for a local repository, run `git config --add commit.gpgsign true`.
 
 For **GitHub Codespaces** users, please follow [this doc](https://docs.github.com/en/codespaces/managing-your-codespaces/managing-gpg-verification-for-github-codespaces) to configure GitHub to automatically use GPG to sign commits you make in your Codespaces.
 
-### Developers Certificate of Origin (DCO)
+### Developer Certificate of Origin (DCO)
 
-Contributions to Retina must contain a Developers Certificate of Origin within their constituent commits.
-This can be accomplished by providing a `-s` flag to `git commit` as documented [here](https://git-scm.com/docs/git-commit#Documentation/git-commit.txt--s).
+Contributions to Retina must contain a Developer Certificate of Origin within their constituent commits.
+This can be accomplished by providing a `-s` flag to `git commit` as documented in the [Git commit documentation](https://git-scm.com/docs/git-commit#Documentation/git-commit.txt--s).
 This will add a `Signed-off-by` trailer to your Git commit, affirming your acceptance of the Contributor License Agreement.
+
+### Updating Documentation
+
+The documentation available on [retina.sh](https://retina.sh) can be found within the [docs](https://github.com/microsoft/retina/tree/main/docs) folder in the repository.
+
+The diagrams used are created with [Excalidraw](https://excalidraw.com/). The source `.excalidraw` files are stored within the repository, alongside their `.png` equivalent.
+
+### GitHub issues and Good First Issue
+
+You can find the open issues on the repo's [GitHub issues board](https://github.com/microsoft/retina/issues)
+If you are a first-time contributor, you can find the issues that are suitable for newcomers by finding the [issues labeled as "good first issue"](https://github.com/microsoft/retina/labels/good%20first%20issue)

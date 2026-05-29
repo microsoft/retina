@@ -13,13 +13,9 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/blang/semver/v4"
 	"github.com/cilium/cilium/api/v1/flow"
 	hubblev1 "github.com/cilium/cilium/pkg/hubble/api/v1"
-	"github.com/cilium/cilium/pkg/version"
-	"github.com/cilium/cilium/pkg/versioncheck"
 	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
 	"github.com/microsoft/retina/internal/ktime"
 	kcfg "github.com/microsoft/retina/pkg/config"
@@ -121,8 +117,15 @@ func (dr *dropReason) Compile(ctx context.Context) error {
 	if arch == "arm64" {
 		targetArch = "-D__TARGET_ARCH_arm64"
 	}
+
+	runtimeIncludeDir := "-I" + loader.VmlinuxHeaderDir()
+
 	// Keep target as bpf, otherwise clang compilation yields bpf object that elf reader cannot load.
-	err = loader.CompileEbpf(ctx, "-target", "bpf", "-Wall", targetArch, "-g", "-O2", "-c", bpfSourceFile, "-o", bpfOutputFile, includeDir, libbpfDir, filterDir)
+	err = loader.CompileEbpf(
+		ctx,
+		"-target", "bpf", "-Wall", targetArch, "-g", "-O2", "-c", bpfSourceFile,
+		"-o", bpfOutputFile, runtimeIncludeDir, includeDir, libbpfDir, filterDir,
+	)
 	if err != nil {
 		return errors.Wrap(err, "unable to compile eBPF code")
 	}
@@ -131,7 +134,6 @@ func (dr *dropReason) Compile(ctx context.Context) error {
 }
 
 func (dr *dropReason) Init() error {
-	var err error
 	// Get the absolute path to this file during runtime.
 	dir, err := absPath()
 	if err != nil {
@@ -139,23 +141,19 @@ func (dr *dropReason) Init() error {
 	}
 
 	bpfOutputFile := fmt.Sprintf("%s/%s", dir, bpfObjectFileName)
-
-	var objs interface{}
-	maps := &kprobeMaps{}
-	isMariner := plugincommon.IsAzureLinux()
-
-	if !isMariner {
-		objs = &kprobeObjects{} //nolint:typecheck // this is a generated struct
-		maps = &objs.(*kprobeObjects).kprobeMaps
-	} else {
-		objs = &kprobeObjectsMariner{} //nolint:typecheck // needs to match a generated struct until we fix Mariner
-		maps = &objs.(*kprobeObjectsMariner).kprobeMaps
-		dr.l.Info("Detected Mariner distro")
-	}
-
 	spec, err := ebpf.LoadCollectionSpec(bpfOutputFile)
 	if err != nil {
+		return err //nolint:wrapcheck // no additional context needed
+	}
+
+	objs, maps, supportsFexit, err := dr.getEbpfPayload()
+	if err != nil {
 		return err
+	}
+
+	// Override filter map max entries to match the configured size from init container.
+	if mapSpec, ok := spec.Maps[plugincommon.FilterMapName]; ok && dr.cfg.FilterMapMaxEntries > 0 {
+		mapSpec.MaxEntries = dr.cfg.FilterMapMaxEntries
 	}
 
 	// TODO remove the opts
@@ -181,28 +179,10 @@ func (dr *dropReason) Init() error {
 	progsKprobe, progsKprobeRet := buildKprobePrograms(objs)
 	progsFexit := buildFexitPrograms(objs)
 
-	if dr.cfg.EnablePodLevel {
-		err = dr.attachKprobes(progsKprobe, progsKprobeRet)
+	if supportsFexit {
+		err = dr.attachFexitPrograms(progsFexit)
 	} else {
-		var kv semver.Version
-		kv, err = version.GetKernelVersion()
-		if err != nil {
-			dr.l.Warn("Failed to get kernel version", zap.Error(err))
-
-			kv, err = plugincommon.GetKernelVersionMajMin()
-			if err != nil {
-				return fmt.Errorf("Failed to get kernel version: %w", err) //nolint:goerr113 //wrapping error from external module
-			}
-		}
-		dr.l.Info("Detected kernel >= ", zap.String("version", kv.String()))
-
-		minVersionAmd64, _ := versioncheck.Version("5.5")
-		minVersionArm64, _ := versioncheck.Version("6.0")
-		if (runtime.GOARCH == "amd64" && kv.GTE(minVersionAmd64)) || runtime.GOARCH == "arm64" && kv.GTE(minVersionArm64) {
-			err = dr.attachFexitPrograms(progsFexit)
-		} else {
-			err = dr.attachKprobes(progsKprobe, progsKprobeRet)
-		}
+		err = dr.attachKprobes(progsKprobe, progsKprobeRet)
 	}
 
 	dr.metricsMapData = maps.RetinaDropreasonMetrics
@@ -350,16 +330,16 @@ func (dr *dropReason) processRecord(ctx context.Context, id int) {
 			// IsReply is not applicable for DROPPED verdicts.
 			fl.IsReply = nil
 
-			meta := &utils.RetinaMetadata{}
+			ext := utils.NewExtensions()
 
-			// Add drop reason to the flow's metadata.
-			utils.AddDropReason(fl, meta, bpfEvent.DropType)
+			// Add drop reason to the flow's extensions.
+			utils.AddDropReason(fl, ext, bpfEvent.DropType)
 
-			// Add packet size to the flow's metadata.
-			utils.AddPacketSize(meta, bpfEvent.SkbLen)
+			// Add packet size to the flow's extensions.
+			utils.AddPacketSize(ext, bpfEvent.SkbLen)
 
-			// Add metadata to the flow.
-			utils.AddRetinaMetadata(fl, meta)
+			// Set extensions on the flow.
+			utils.SetExtensions(fl, ext)
 
 			// This is only for development purposes.
 			// Removing this makes logs way too chatter-y.
@@ -427,44 +407,6 @@ func (dr *dropReason) processMapValue(dataKey dropMetricKey, dataValue dropMetri
 	dr.dropMetricAdd(dataKey.getType(), dataKey.getDirection(), pktCount, pktBytes)
 }
 
-func (dr *dropReason) attachKprobes(kprobes, kprobesRet map[string]*ebpf.Program) error {
-	for name := range kprobes {
-		progLink, err := link.Kprobe(name, kprobes[name], nil)
-		if err != nil {
-			dr.l.Error("Failed to attach kprobe", zap.String("program", name), zap.Error(err))
-			return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-		}
-		dr.hooks = append(dr.hooks, progLink)
-		dr.l.Info("Attached kprobe", zap.String("program", name))
-	}
-
-	for name := range kprobesRet {
-		progLink, err := link.Kretprobe(name, kprobesRet[name], nil)
-		if err != nil {
-			dr.l.Error("Failed to attach kretprobe", zap.String("program", name), zap.Error(err))
-			return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-		}
-		dr.hooks = append(dr.hooks, progLink)
-		dr.l.Info("Attached kretprobe", zap.String("program", name))
-	}
-
-	return nil
-}
-
-func (dr *dropReason) attachFexitPrograms(objs map[string]*ebpf.Program) error {
-	for name, prog := range objs {
-		progLink, err := link.AttachTracing(link.TracingOptions{Program: prog, AttachType: ebpf.AttachTraceFExit})
-		if err != nil {
-			dr.l.Error("Failed to attach", zap.String("program", name), zap.Error(err))
-			return fmt.Errorf("Failed to attach program: %w", err) //nolint:goerr113 //wrapping error from external module
-		}
-		dr.hooks = append(dr.hooks, progLink)
-		dr.l.Info("Attached program", zap.String("program", name))
-	}
-
-	return nil
-}
-
 func (dr *dropReason) Stop() error {
 	if !dr.isRunning {
 		return nil
@@ -515,53 +457,4 @@ func absPath() (string, error) {
 	}
 	dir := path.Dir(filename)
 	return dir, nil
-}
-
-func buildKprobePrograms(objs any) (progsKprobe, progsKprobeRet map[string]*ebpf.Program) {
-	progsKprobe = make(map[string]*ebpf.Program)
-	progsKprobeRet = make(map[string]*ebpf.Program)
-
-	switch o := objs.(type) {
-	case *kprobeObjects:
-		progsKprobe[inetCskAcceptFn] = o.InetCskAccept
-		progsKprobe[nfHookSlowFn] = o.NfHookSlow
-		progsKprobe[nfNatInetFn] = o.NfNatInetFn
-		progsKprobe[nfConntrackConfirmFn] = o.NfConntrackConfirm
-
-		progsKprobeRet[nfHookSlowFn] = o.NfHookSlowRet
-		progsKprobeRet[inetCskAcceptFn] = o.InetCskAcceptRet
-		progsKprobeRet[tcpConnectFn] = o.TcpV4ConnectRet
-		progsKprobeRet[nfNatInetFn] = o.NfNatInetFnRet
-		progsKprobeRet[nfConntrackConfirmFn] = o.NfConntrackConfirmRet
-
-	case *kprobeObjectsMariner:
-		progsKprobe[inetCskAcceptFn] = o.InetCskAccept
-		progsKprobe[nfHookSlowFn] = o.NfHookSlow
-
-		progsKprobeRet[nfHookSlowFn] = o.NfHookSlowRet
-		progsKprobeRet[inetCskAcceptFn] = o.InetCskAcceptRet
-		progsKprobeRet[tcpConnectFn] = o.TcpV4ConnectRet
-
-	}
-	return progsKprobe, progsKprobeRet
-}
-
-func buildFexitPrograms(objs any) map[string]*ebpf.Program {
-	progsFexit := make(map[string]*ebpf.Program)
-
-	switch o := objs.(type) {
-	case *kprobeObjects:
-		progsFexit[inetCskAcceptFnFexit] = o.InetCskAcceptFexit
-		progsFexit[nfHookSlowFnFexit] = o.NfHookSlowFexit
-		progsFexit[tcpV4ConnectFexit] = o.TcpV4ConnectFexit
-		progsFexit[nfNatInetFnFexit] = o.NfNatInetFnFexit
-		progsFexit[nfConntrackConfirmFnFexit] = o.NfConntrackConfirmFexit
-
-	case *kprobeObjectsMariner:
-		progsFexit[inetCskAcceptFnFexit] = o.InetCskAcceptFexit
-		progsFexit[nfHookSlowFnFexit] = o.NfHookSlowFexit
-		progsFexit[tcpV4ConnectFexit] = o.TcpV4ConnectFexit
-
-	}
-	return progsFexit
 }

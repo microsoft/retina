@@ -7,6 +7,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -24,13 +25,29 @@ import (
 	"github.com/microsoft/retina/pkg/log"
 )
 
+var (
+	// netshFilterPattern validates that the filter contains only characters allowed in netsh capture filters.
+	// Allowed: alphanumeric, dots, colons (for IPv6), parentheses, commas, equals, spaces.
+	// Rejected: shell metacharacters like &, |, ^, <, >, %, ", ', ;, $, `, \, newlines.
+	netshFilterPattern = regexp.MustCompile(`^[A-Za-z0-9.=():, ]+$`)
+
+	// ErrInvalidNetshFilter is returned when a netsh filter contains invalid characters.
+	ErrInvalidNetshFilter = errors.New("filter contains invalid characters; only alphanumeric, dots, colons, parentheses, commas, equals, and spaces are allowed")
+)
+
+// validateNetshFilter validates that a filter string is safe for use with netsh trace commands.
+// It rejects filters containing shell metacharacters that could enable command injection.
+func validateNetshFilter(filter string) error {
+	if !netshFilterPattern.MatchString(filter) {
+		return ErrInvalidNetshFilter
+	}
+	return nil
+}
+
 type NetworkCaptureProvider struct {
 	NetworkCaptureProviderCommon
-	TmpCaptureDir  string
-	CaptureName    string
-	NodeHostName   string
-	StartTimestamp *file.Timestamp
-	Filename       file.CaptureFilename
+	TmpCaptureDir string
+	Filename      file.CaptureFilename
 
 	l *log.ZapLogger
 }
@@ -52,10 +69,7 @@ func (ncp *NetworkCaptureProvider) Setup(filename file.CaptureFilename) (string,
 	ncp.l.Info("Created temporary folder for network capture", zap.String("capture temporary folder", captureFolderDir))
 
 	ncp.TmpCaptureDir = captureFolderDir
-	ncp.CaptureName = filename.CaptureName
-	ncp.NodeHostName = filename.NodeHostname
-	ncp.StartTimestamp = filename.StartTimestamp
-	ncp.Filename = file.CaptureFilename{CaptureName: ncp.CaptureName, NodeHostname: ncp.NodeHostName, StartTimestamp: ncp.StartTimestamp}
+	ncp.Filename = filename
 
 	return ncp.TmpCaptureDir, nil
 }
@@ -64,32 +78,48 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, fil
 	ctx, cancel := context.WithTimeout(ctx, time.Second*time.Duration(duration))
 	defer cancel()
 
-	stopTrace, err := ncp.needToStopTraceSession()
+	stopTrace, err := ncp.needToStopTraceSession(ctx)
 	if err != nil {
 		return err
 	}
 	if stopTrace {
 		ncp.l.Info("Stopping netsh trace session before starting a new one")
-		_ = ncp.stopNetworkCapture()
+		_ = ncp.stopNetworkCapture() //nolint:contextcheck // stopNetworkCapture creates its own context
 	}
 
 	captureFileName := ncp.Filename.String() + ".etl"
 	captureFilePath := filepath.Join(ncp.TmpCaptureDir, captureFileName)
 
+	// SECURITY: Invoke netsh.exe directly without cmd /C to prevent shell injection.
+	// Build the command args explicitly to avoid shell metacharacter interpretation.
 	captureStartCmd := exec.Command(
-		"cmd", "/C",
-		fmt.Sprintf("netsh trace start capture=yes report=disabled overwrite=yes"),
+		"netsh",
+		"trace",
+		"start",
+		"capture=yes",
+		"report=disabled",
+		"overwrite=yes",
 		fmt.Sprintf("tracefile=%s", captureFilePath),
 	)
 
-	// We should split arguments organized in a string delimited by spaces as
-	// separate ones, otherwise the whole string will be treated as one argument.
-	// For example, given the following filter, exec lib will treat IPv4.Address
-	// as the argument and the rest as the value of IPv4.Address.
-	// "IPv4.Address=(10.244.1.85,10.244.1.235) IPv6.Address=(fd5c:d9f1:79c5:fd83::1bc,fd5c:d9f1:79c5:fd83::11b)"
+	// Validate and add filter if provided.
+	// SECURITY: The filter is validated to contain only allowed characters for netsh capture filters.
+	// This prevents command injection via shell metacharacters like &, |, ^, <, >, etc.
 	if len(filter) != 0 {
-		netshFilterSlice := strings.Split(filter, " ")
-		captureStartCmd.Args = append(captureStartCmd.Args, netshFilterSlice...)
+		// Validate that the filter doesn't start with a hyphen (defense in depth)
+		if strings.HasPrefix(strings.TrimSpace(filter), "-") {
+			ncp.l.Warn("Filter starts with hyphen, ignoring to prevent flag injection", zap.String("filter", filter))
+		} else {
+			filterErr := validateNetshFilter(filter)
+			if filterErr != nil {
+				ncp.l.Error("Invalid filter for netsh, ignoring", zap.String("filter", filter), zap.Error(filterErr))
+			} else {
+				// Split the filter on spaces and add each token as a separate argument.
+				// This is safe now because we've validated the filter content.
+				netshFilterSlice := strings.Split(filter, " ")
+				captureStartCmd.Args = append(captureStartCmd.Args, netshFilterSlice...)
+			}
+		}
 	}
 
 	// NOTE: netsh cannot stop when the given max size of reach reaches, but we can use maxSizeMB to limit the size of
@@ -134,7 +164,8 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, fil
 	}
 
 	ncp.l.Info("Stop netsh")
-	if err := ncp.stopNetworkCapture(); err != nil {
+	// stopNetworkCapture creates its own context; parent ctx is expired here
+	if err := ncp.stopNetworkCapture(); err != nil { //nolint:contextcheck // stopNetworkCapture creates its own context
 		ncp.l.Error("Failed to stop netsh trace by 'netsh trace stop', will kill the process", zap.Error(err))
 		_ = captureStartCmd.Process.Kill()
 		return fmt.Errorf("netsh stop failed: Output: %s", err)
@@ -150,8 +181,8 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, fil
 // needToStopTraceSession returns true when a running trace session started by Retina capture exists, otherwise returns
 // false. Specially, when the trace session is not started by Retina capture, determined from the capture file path, an
 // error will be raised.
-func (ncp *NetworkCaptureProvider) needToStopTraceSession() (bool, error) {
-	command := exec.Command("cmd", "/C", "netsh trace show status")
+func (ncp *NetworkCaptureProvider) needToStopTraceSession(ctx context.Context) (bool, error) {
+	command := exec.CommandContext(ctx, "netsh", "trace", "show", "status")
 	output, err := command.CombinedOutput()
 
 	// When there's no running trace session, `netsh trace show status` will exist with error code 1, in which case we
@@ -177,7 +208,12 @@ func (ncp *NetworkCaptureProvider) needToStopTraceSession() (bool, error) {
 func (ncp *NetworkCaptureProvider) stopNetworkCapture() error {
 	ncp.l.Info("Stopping netsh trace session")
 
-	command := exec.Command("cmd", "/C", "netsh trace stop")
+	// Create independent context for cleanup.
+	// netsh trace stop completes in ~1s; 30s timeout provides ample safety margin.
+	stopCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	command := exec.CommandContext(stopCtx, "netsh", "trace", "stop")
 	output, err := command.CombinedOutput()
 	// ignore the error when stop the trace when no live trace session exists.
 	if strings.Contains(string(output), "There is no trace session currently in progress") {
@@ -301,7 +337,7 @@ func (ncp *NetworkCaptureProvider) CollectMetadata() error {
 }
 
 func (ncp *NetworkCaptureProvider) Cleanup() error {
-	ncp.l.Info("Cleanup network capture", zap.String("capture name", ncp.CaptureName), zap.String("temporary dir", ncp.TmpCaptureDir))
+	ncp.l.Info("Cleanup network capture", zap.String("capture name", ncp.Filename.CaptureName), zap.String("temporary dir", ncp.TmpCaptureDir))
 	ncp.NetworkCaptureProviderCommon.Cleanup()
 	return nil
 }

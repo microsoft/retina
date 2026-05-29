@@ -10,8 +10,9 @@ import (
 	"syscall"
 	"unsafe"
 
+	"errors"
+
 	"github.com/cilium/cilium/api/v1/flow"
-	"github.com/pkg/errors"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/exp/maps"
 )
@@ -113,6 +114,21 @@ func isDefaultRoute(route netlink.Route) bool {
 	}
 
 	return false
+}
+
+// GetDefaultIfaceIndex returns the ifindex of the default route interface.
+// Returns 0 (all interfaces) if the default route cannot be determined.
+var ErrNoDefaultLink = errors.New("no default outgoing link found")
+
+func GetDefaultIfaceIndex() (int, error) {
+	links, err := GetDefaultOutgoingLinks()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get default outgoing links: %w", err)
+	}
+	if len(links) == 0 {
+		return 0, ErrNoDefaultLink
+	}
+	return links[0].Attrs().Index, nil
 }
 
 func GetDropReasonDesc(dr DropReason) flow.DropReason {

@@ -11,6 +11,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"log/slog"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -19,42 +20,65 @@ import (
 	operatorOption "github.com/cilium/cilium/operator/option"
 	"github.com/cilium/cilium/pkg/hive"
 	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
-	k8sversion "github.com/cilium/cilium/pkg/k8s/version"
 	"github.com/cilium/cilium/pkg/logging"
 	"github.com/cilium/cilium/pkg/logging/logfields"
 	"github.com/cilium/cilium/pkg/metrics"
 	"github.com/cilium/cilium/pkg/option"
 	"github.com/cilium/hive/cell"
 	"github.com/microsoft/retina/internal/buildinfo"
+	"github.com/microsoft/retina/operator/cilium-crds/config"
+	"github.com/microsoft/retina/pkg/log"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 )
 
 var (
 	// set logger field: subsys=retina-operator
-	binaryName       = filepath.Base(os.Args[0])
-	logger           = logging.DefaultLogger.WithField(logfields.LogSubsys, binaryName)
-	operatorIDLength = 10
+	binaryName                         = filepath.Base(os.Args[0])
+	slogLoggerOnce                     sync.Once
+	cachedSlogLogger                   *slog.Logger
+	operatorIDLength                   = 10
+	errLeaderElectionNamespaceRequired = errors.New("--leader-election-namespace must be set")
 )
+
+// slogLogger returns a zap-backed slog logger. Resolved lazily so that
+// SetupZapLogger (run in initEnv) is the backing source — that way every
+// call here reaches Application Insights.
+func slogLogger() *slog.Logger {
+	slogLoggerOnce.Do(func() {
+		cachedSlogLogger = log.SlogLogger().With(logfields.LogSubsys, binaryName)
+	})
+	return cachedSlogLogger
+}
 
 func Execute(h *hive.Hive) {
 	initEnv(h.Viper())
 
-	if err := h.Run(logging.DefaultSlogLogger); err != nil {
-		logger.Fatal(err)
+	// Use zap-backed slog logger for hive (routes to stdout + Application Insights)
+	if err := h.Run(log.SlogLogger()); err != nil {
+		logging.Fatal(slogLogger(), err.Error())
 	}
 }
 
-func registerOperatorHooks(l logrus.FieldLogger, lc cell.Lifecycle, llc *LeaderLifecycle, clientset k8sClient.Clientset, shutdowner hive.Shutdowner) {
+func registerOperatorHooks(
+	l *slog.Logger, lc cell.Lifecycle, llc *LeaderLifecycle,
+	clientset k8sClient.Clientset, shutdowner hive.Shutdowner,
+	cfg config.Config,
+) error {
+	leaderElectionNamespace := cfg.LeaderElectionNamespace
+	if leaderElectionNamespace == "" {
+		return errLeaderElectionNamespaceRequired
+	}
+	l.Info("using namespace for leader election lease", "namespace", leaderElectionNamespace)
 	var wg sync.WaitGroup
 	lc.Append(cell.Hook{
 		OnStart: func(cell.HookContext) error {
 			wg.Add(1)
 			go func() {
-				runOperator(l, llc, clientset, shutdowner)
+				runOperator(l, llc, clientset, shutdowner, leaderElectionNamespace)
 				wg.Done()
 			}()
 			return nil
@@ -68,6 +92,7 @@ func registerOperatorHooks(l logrus.FieldLogger, lc cell.Lifecycle, llc *LeaderL
 			return nil
 		},
 	})
+	return nil
 }
 
 func initEnv(vp *viper.Viper) {
@@ -77,19 +102,34 @@ func initEnv(vp *viper.Viper) {
 	// the default values provided in option.Config or operatorOption.Config respectively.
 	// The values will be overridden to the "zero value".
 	// Maybe could create a cell.Config for these instead?
-	option.Config.Populate(vp)
-	operatorOption.Config.Populate(vp)
+	// slogloggercheck: using default logger for configuration initialization
+	option.Config.Populate(logging.DefaultSlogLogger, vp)
+	operatorOption.Config.Populate(logging.DefaultSlogLogger, vp)
 
-	// add hooks after setting up metrics in the option.Confog
-	logging.DefaultLogger.Hooks.Add(metrics.NewLoggingHook())
+	// Bring up Retina's zap logger (stdout + Application Insights). We redirect
+	// Go's stdlib slog default at it now; the Cilium-side tee has to wait until
+	// after logging.SetupLogging runs, because SetupLogging calls
+	// defaultMultiSlogHandler.SetHandler, which replaces all registered
+	// handlers.
+	_, _ = log.SetupZapLogger(&log.LogOpts{
+		Level:                 option.Config.LogOpt[logging.LevelOpt],
+		ApplicationInsightsID: buildinfo.ApplicationInsightsID,
+		EnableTelemetry:       buildinfo.ApplicationInsightsID != "",
+	}, zap.String("version", buildinfo.Version))
+	log.SetDefaultSlog()
 
 	// Logging should always be bootstrapped first. Do not add any code above this!
 	if err := logging.SetupLogging(option.Config.LogDriver, logging.LogOptions(option.Config.LogOpt), binaryName, option.Config.Debug); err != nil {
-		logger.Fatal(err)
+		logging.Fatal(slogLogger(), err.Error())
 	}
 
-	option.LogRegisteredOptions(vp, logger)
-	logger.Infof("retina operator version: %s", buildinfo.Version)
+	// Register zap + metrics hook AFTER SetupLogging so they survive the
+	// MultiSlogHandler replace. From here on every logging.DefaultSlogLogger
+	// emission fans out to zap → Application Insights.
+	logging.AddHandlers(log.SlogHandler(), metrics.NewLoggingHook())
+
+	option.LogRegisteredSlogOptions(vp, slogLogger())
+	slogLogger().Info("retina operator version", "version", buildinfo.Version)
 }
 
 func doCleanup() {
@@ -103,37 +143,25 @@ func doCleanup() {
 // runOperator implements the logic of leader election for cilium-operator using
 // built-in leader election capability in kubernetes.
 // See: https://github.com/kubernetes/client-go/blob/master/examples/leader-election/main.go
-func runOperator(l logrus.FieldLogger, lc *LeaderLifecycle, clientset k8sClient.Clientset, shutdowner hive.Shutdowner) {
+func runOperator(l *slog.Logger, lc *LeaderLifecycle, clientset k8sClient.Clientset, shutdowner hive.Shutdowner, leaderElectionNamespace string) {
 	isLeader.Store(false)
 
 	leaderElectionCtx, leaderElectionCtxCancel = context.WithCancel(context.Background())
-
-	// We only support Operator in HA mode for Kubernetes Versions having support for
-	// LeasesResourceLock.
-	// See docs on capabilities.LeasesResourceLock for more context.
-	if !k8sversion.Capabilities().LeasesResourceLock {
-		l.Info("Support for coordination.k8s.io/v1 not present, fallback to non HA mode")
-
-		if err := lc.Start(logging.DefaultSlogLogger, leaderElectionCtx); err != nil {
-			l.WithError(err).Fatal("Failed to start leading")
-		}
-		return
-	}
 
 	// Get hostname for identity name of the lease lock holder.
 	// We identify the leader of the operator cluster using hostname.
 	operatorID, err := os.Hostname()
 	if err != nil {
-		l.WithError(err).Fatal("Failed to get hostname when generating lease lock identity")
+		logging.Fatal(l, "Failed to get hostname when generating lease lock identity", logfields.Error, err)
 	}
 	operatorID, err = randomStringWithPrefix(operatorID+"-", operatorIDLength)
 	if err != nil {
-		l.WithError(err).Fatal("Failed to generate random string for lease lock identity")
+		logging.Fatal(l, "Failed to generate random string for lease lock identity", logfields.Error, err)
 	}
 
 	leResourceLock, err := resourcelock.NewFromKubeconfig(
 		resourcelock.LeasesResourceLock,
-		operatorK8sNamespace,
+		leaderElectionNamespace,
 		leaderElectionResourceLockName,
 		resourcelock.ResourceLockConfig{
 			// Identity name of the lock holder
@@ -142,7 +170,7 @@ func runOperator(l logrus.FieldLogger, lc *LeaderLifecycle, clientset k8sClient.
 		clientset.RestConfig(),
 		operatorOption.Config.LeaderElectionRenewDeadline)
 	if err != nil {
-		l.WithError(err).Fatal("Failed to create resource lock for leader election")
+		logging.Fatal(l, "Failed to create resource lock for leader election", logfields.Error, err)
 	}
 
 	// Start the leader election for running cilium-operators
@@ -160,12 +188,12 @@ func runOperator(l logrus.FieldLogger, lc *LeaderLifecycle, clientset k8sClient.
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {
 				if err := lc.Start(logging.DefaultSlogLogger, ctx); err != nil {
-					l.WithError(err).Error("Failed to start when elected leader, shutting down")
+					l.Error("Failed to start when elected leader, shutting down", logfields.Error, err)
 					shutdowner.Shutdown(hive.ShutdownWithError(err))
 				}
 			},
 			OnStoppedLeading: func() {
-				l.WithField("operator-id", operatorID).Info("Leader election lost")
+				l.Info("Leader election lost", "operator-id", operatorID)
 				// Cleanup everything here, and exit.
 				shutdowner.Shutdown(hive.ShutdownWithError(errors.New("Leader election lost")))
 			},
@@ -173,10 +201,7 @@ func runOperator(l logrus.FieldLogger, lc *LeaderLifecycle, clientset k8sClient.
 				if identity == operatorID {
 					l.Info("Leading the operator HA deployment")
 				} else {
-					l.WithFields(logrus.Fields{
-						"newLeader":  identity,
-						"operatorID": operatorID,
-					}).Info("Leader re-election complete")
+					l.Info("Leader re-election complete", "newLeader", identity, "operatorID", operatorID)
 				}
 			},
 		},

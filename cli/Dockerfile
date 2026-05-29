@@ -1,8 +1,9 @@
-# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.4-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.24.4-azurelinux3.0@sha256:250d01e55a37bd79d7014ae83f9f50aa6fa5570ca910e7f19faeff4bb0132ae1 AS builder
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.3-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26.3-1-azurelinux3.0@sha256:ef480755a4126131197d7311ab1e24d55600407194b45349c4975b7ed0d176e6 AS builder
 
 ARG VERSION
 ARG APP_INSIGHTS_ID
+ARG AGENT_IMAGE_NAME="ghcr.io/microsoft/retina/retina-agent"
 
 WORKDIR /workspace
 COPY . .
@@ -15,13 +16,33 @@ ARG GOARCH=amd64
 ENV GOARCH=${GOARCH}
 
 RUN --mount=type=cache,target="/root/.cache/go-build" \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    go build \
     -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" \
-    -X "github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID"="$APP_INSIGHTS_ID"" \
+    -X "github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID"="$APP_INSIGHTS_ID" \
+    -X "github.com/microsoft/retina/internal/buildinfo.RetinaAgentImageName"="$AGENT_IMAGE_NAME"" \
     -a -o kubectl-retina cli/main.go
 
+# minimal libs stage — provides only the system libraries needed by the CGO-enabled binary,
+# without the bloat of the full Go SDK image (python, gcc, systemd, etc.)
+# skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
+FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260517@sha256:f5e224c47997aa4a5d3d8addfcc3866e175e7026368a71ce1be2c0eed1876f04 AS libs
+
+# Target 1: Distroless (secure, minimal)
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/distroless/minimal:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/azurelinux/distroless/minimal:3.0@sha256:5a66f9f16ac675db2a8229dac72d83811b73b502d6ad192d8b374c7f3be498af
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20260517@sha256:0c64ab9cfc44d4f100c0590bd59ead9afedda6cc54f14bb7465b5f9c35ddc037 AS distroless-target
+COPY --from=libs /lib/ /lib
+COPY --from=libs /usr/lib/ /usr/lib
+COPY --from=libs /etc/pki/tls/ /etc/pki/tls/
 WORKDIR /
 COPY --from=builder /workspace/kubectl-retina .
+
+# Target 2: Shell-enabled (operational, init container support)
+# skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/azurelinux/base/core:3.0.20260517@sha256:f5e224c47997aa4a5d3d8addfcc3866e175e7026368a71ce1be2c0eed1876f04 AS shell-target
+WORKDIR /
+COPY --from=builder /workspace/kubectl-retina /bin/kubectl-retina
+RUN chmod +x /bin/kubectl-retina
+
+# Default target (distroless for backward compatibility)
+FROM distroless-target
 

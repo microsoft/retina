@@ -5,6 +5,7 @@ package capture
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"sort"
@@ -31,6 +32,29 @@ import (
 )
 
 const anyIPOrPort = ""
+
+var (
+	errNoTargetsSelected    = errors.New("no targets are selected by node selector, pod selector, or pod names")
+	errNoValidSelector      = errors.New("neither NodeSelector, NamespaceSelector&PodSelector, nor PodNames is set")
+	errNodeSelectorIncompat = errors.New("NodeSelector is not compatible with NamespaceSelector&PodSelector or PodNames, please use one or the other")
+	errPodNamesIncompat     = errors.New("PodNames is not compatible with NamespaceSelector or PodSelector, please use one or the other")
+)
+
+// tcpdumpFlagMapping defines the mapping between CaptureOption boolean fields and their corresponding tcpdump flags.
+var tcpdumpFlagMappings = []struct {
+	getBool func(*retinav1alpha1.CaptureOption) *bool
+	flag    string
+}{
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.NoPromiscuous }, "-p"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.PacketBuffered }, "-U"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.ImmediateMode }, "--immediate-mode"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.NoResolveDNS }, "-n"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.NoResolvePort }, "-nn"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.PrintLinkHeader }, "-e"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.QuietOutput }, "-q"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.AbsoluteSeq }, "-S"},
+	{func(o *retinav1alpha1.CaptureOption) *bool { return o.DontVerifyChecksum }, "-K"},
+}
 
 // CaptureTarget indicates on which the network capture will be performed on a given node.
 type CaptureTarget struct {
@@ -109,11 +133,29 @@ func NewCaptureToPodTranslator(kubeClient kubernetes.Interface, logger *log.ZapL
 	return captureToPodTranslator
 }
 
-func (translator *CaptureToPodTranslator) initJobTemplate(ctx context.Context, capture *retinav1alpha1.Capture) error {
+// resolveHostPath validates the user-supplied HostPath subpath against the
+// operator-configured base directory and returns the resolved on-node path.
+// Returns ("", nil) when no HostPath is configured (HostPath is nil). An
+// explicit empty-string HostPath is rejected via validateHostPath so user
+// misconfiguration surfaces with a clear error instead of being silently
+// ignored.
+func (translator *CaptureToPodTranslator) resolveHostPath(oc retinav1alpha1.OutputConfiguration) (string, error) {
+	if oc.HostPath == nil {
+		return "", nil
+	}
+	resolved, err := validateHostPath(*oc.HostPath, translator.config.CaptureHostPathBaseDir)
+	if err != nil {
+		return "", fmt.Errorf("invalid OutputConfiguration.HostPath: %w", err)
+	}
+	return resolved, nil
+}
+
+func (translator *CaptureToPodTranslator) initJobTemplate(ctx context.Context, capture *retinav1alpha1.Capture, resolvedHostPath string) error {
 	backoffLimit := int32(0)
 	// NOTE(mainred): We allow the capture pod to run for at most 30 minutes before being deleted to ensure the output is
 	// uploaded, and this happens when the user want to stop a capture on demand by deleting the capture.
 	captureTerminationGracePeriodSeconds := int64(1800)
+
 	translator.jobTemplate = &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: fmt.Sprintf("%s-", capture.Name),
@@ -124,8 +166,9 @@ func (translator *CaptureToPodTranslator) initJobTemplate(ctx context.Context, c
 			BackoffLimit: &backoffLimit,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:    captureUtils.GetContainerLabelsFromCaptureName(capture.Name),
-					Namespace: capture.Namespace,
+					Labels:      captureUtils.GetContainerLabelsFromCaptureName(capture.Name),
+					Namespace:   capture.Namespace,
+					Annotations: captureUtils.GetPodAnnotationsFromCapture(capture, resolvedHostPath),
 				},
 				Spec: corev1.PodSpec{
 					HostNetwork:                   true,
@@ -198,16 +241,15 @@ func (translator *CaptureToPodTranslator) initJobTemplate(ctx context.Context, c
 		},
 	}
 
-	if capture.Spec.OutputConfiguration.HostPath != nil && *capture.Spec.OutputConfiguration.HostPath != "" {
-		translator.l.Info("HostPath is not empty", zap.String("HostPath", *capture.Spec.OutputConfiguration.HostPath))
+	if resolvedHostPath != "" {
+		translator.l.Info("HostPath is not empty", zap.String("HostPath", *capture.Spec.OutputConfiguration.HostPath), zap.String("ResolvedHostPath", resolvedHostPath))
 
 		captureFolderHostPathType := corev1.HostPathDirectoryOrCreate
-		hostPath := *capture.Spec.OutputConfiguration.HostPath
 		hostPathVolume := corev1.Volume{
 			Name: captureConstants.CaptureHostPathVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				HostPath: &corev1.HostPathVolumeSource{
-					Path: hostPath,
+					Path: resolvedHostPath,
 					Type: &captureFolderHostPathType,
 				},
 			},
@@ -216,7 +258,7 @@ func (translator *CaptureToPodTranslator) initJobTemplate(ctx context.Context, c
 
 		hostPathVolumeMount := corev1.VolumeMount{
 			Name:      captureConstants.CaptureHostPathVolumeName,
-			MountPath: hostPath,
+			MountPath: resolvedHostPath,
 		}
 		translator.jobTemplate.Spec.Template.Spec.Containers[0].VolumeMounts = append(translator.jobTemplate.Spec.Template.Spec.Containers[0].VolumeMounts, hostPathVolumeMount)
 	}
@@ -354,15 +396,23 @@ func (translator *CaptureToPodTranslator) TranslateCaptureToJobs(ctx context.Con
 		return nil, err
 	}
 
-	if err := translator.initJobTemplate(ctx, capture); err != nil {
+	// Resolve the HostPath once and reuse it for both the job template (pod
+	// annotation + volume mount) and the capture workload env.
+	resolvedHostPath, hpErr := translator.resolveHostPath(capture.Spec.OutputConfiguration)
+	if hpErr != nil {
+		translator.l.Error("Rejected HostPath in Capture", zap.Error(hpErr), zap.String("HostPath", *capture.Spec.OutputConfiguration.HostPath))
+		return nil, hpErr
+	}
+
+	if err := translator.initJobTemplate(ctx, capture, resolvedHostPath); err != nil {
 		return nil, err
 	}
-	captureTargetOnNode, err := translator.CalculateCaptureTargetsOnNode(ctx, capture.Spec.CaptureConfiguration.CaptureTarget)
+	captureTargetOnNode, err := translator.CalculateCaptureTargetsOnNode(ctx, capture.Spec.CaptureConfiguration.CaptureTarget, capture.Namespace)
 	if err != nil {
 		return nil, err
 	}
 
-	jobPodEnv, err := translator.ObtainCaptureJobPodEnv(*capture)
+	jobPodEnv, err := translator.obtainCaptureJobPodEnv(*capture, resolvedHostPath)
 	if err != nil {
 		return nil, err
 	}
@@ -384,9 +434,15 @@ func (translator *CaptureToPodTranslator) renderJob(captureTargetOnNode *Capture
 		return nil, fmt.Errorf("no nodes are selected")
 	}
 
-	captureStartTimestamp := file.Now()
+	stringTimestamp := translator.jobTemplate.Spec.Template.ObjectMeta.Annotations[captureConstants.CaptureTimestampAnnotationKey]
+	captureTimestamp, err := file.StringToTime(stringTimestamp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse capture start timestamp: %w", err)
+	}
 
-	printOutputFileNames(captureTargetOnNode, envCommon, &captureStartTimestamp)
+	fmt.Println("#########################")
+	fmt.Println("Expected Capture Files")
+	fmt.Println("#########################")
 
 	jobs := make([]*batchv1.Job, 0, len(*captureTargetOnNode))
 	for nodeName, target := range *captureTargetOnNode {
@@ -395,6 +451,14 @@ func (translator *CaptureToPodTranslator) renderJob(captureTargetOnNode *Capture
 			jobEnv[k] = v
 		}
 		job := translator.jobTemplate.DeepCopy()
+		captureFilename := &file.CaptureFilename{
+			CaptureName:    envCommon[captureConstants.CaptureNameEnvKey],
+			NodeHostname:   nodeName,
+			StartTimestamp: captureTimestamp,
+		}
+		job.Spec.Template.ObjectMeta.Annotations[captureConstants.CaptureFilenameAnnotationKey] = captureFilename.String()
+
+		fmt.Printf("%s.tar.gz\n", captureFilename.String())
 
 		job.Spec.Template.Spec.Affinity = &corev1.Affinity{
 			NodeAffinity: &corev1.NodeAffinity{
@@ -454,30 +518,15 @@ func (translator *CaptureToPodTranslator) renderJob(captureTargetOnNode *Capture
 			job.Spec.Template.Spec.Containers[0].Env = append(job.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{Name: k, Value: v})
 		}
 		job.Spec.Template.Spec.Containers[0].Env = append(job.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{Name: captureConstants.NodeHostNameEnvKey, Value: nodeName})
-		job.Spec.Template.Spec.Containers[0].Env = append(job.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{Name: captureConstants.CaptureStartTimestampEnvKey, Value: captureStartTimestamp.String()})
+		job.Spec.Template.Spec.Containers[0].Env = append(job.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{Name: captureConstants.CaptureStartTimestampEnvKey, Value: stringTimestamp})
 
 		jobs = append(jobs, job)
 	}
 
-	return jobs, nil
-}
-
-func printOutputFileNames(captureTargetOnNode *CaptureTargetsOnNode, envCommon map[string]string, timestamp *file.Timestamp) {
-	captureFileNames := []string{}
-	for k := range *captureTargetOnNode {
-		capture := file.CaptureFilename{CaptureName: envCommon[captureConstants.CaptureNameEnvKey], NodeHostname: k, StartTimestamp: timestamp}
-		captureFileNames = append(captureFileNames, capture.String())
-	}
-	fmt.Println("#########################")
-	fmt.Println("Expected Capture Files")
-	fmt.Println("#########################")
-
-	for _, v := range captureFileNames {
-		fmt.Printf("%s.tar.gz\n", v)
-	}
-
 	fmt.Println("\nNote: The file(s) may not be created if the capture job(s) fail prematurely.")
 	fmt.Println("#########################")
+
+	return jobs, nil
 }
 
 func updateTcpdumpFilterWithPodIPAddress(podIPAddresses []string, tcpdumpFilter string) string {
@@ -540,12 +589,16 @@ func getNetshFilterWithPodIPAddress(podIPAddresses []string) string {
 // validateTargetSelector validate target selectors defined in the capture.
 func (translator *CaptureToPodTranslator) validateTargetSelector(captureTarget retinav1alpha1.CaptureTarget) error {
 	// When NamespaceSelector is nil while PodSelector is specified, the namespace will be determined by capture.Namespace.
-	if captureTarget.NodeSelector == nil && captureTarget.PodSelector == nil {
-		return fmt.Errorf("Neither NodeSelector nor NamespaceSelector&PodSelector is set.")
+	if captureTarget.NodeSelector == nil && captureTarget.PodSelector == nil && len(captureTarget.PodNames) == 0 {
+		return errNoValidSelector
 	}
 
-	if captureTarget.NodeSelector != nil && (captureTarget.NamespaceSelector != nil || captureTarget.PodSelector != nil) {
-		return fmt.Errorf("NodeSelector is not compatible with NamespaceSelector&PodSelector. Please use one or the other.")
+	if captureTarget.NodeSelector != nil && (captureTarget.NamespaceSelector != nil || captureTarget.PodSelector != nil || len(captureTarget.PodNames) > 0) {
+		return errNodeSelectorIncompat
+	}
+
+	if len(captureTarget.PodNames) > 0 && (captureTarget.NamespaceSelector != nil || captureTarget.PodSelector != nil) {
+		return errPodNamesIncompat
 	}
 
 	return nil
@@ -567,10 +620,14 @@ func (translator *CaptureToPodTranslator) validateCapture(capture *retinav1alpha
 		capture.Spec.OutputConfiguration.S3Upload == nil {
 		return fmt.Errorf("At least one output configuration should be set")
 	}
+
+	if _, err := translator.resolveHostPath(capture.Spec.OutputConfiguration); err != nil {
+		return err
+	}
 	return nil
 }
 
-func (translator *CaptureToPodTranslator) getCaptureTargetsOnNode(ctx context.Context, captureTarget retinav1alpha1.CaptureTarget) (*CaptureTargetsOnNode, error) {
+func (translator *CaptureToPodTranslator) getCaptureTargetsOnNode(ctx context.Context, captureTarget retinav1alpha1.CaptureTarget, namespace string) (*CaptureTargetsOnNode, error) {
 	var err error
 	captureTargetsOnNode := &CaptureTargetsOnNode{}
 	if captureTarget.NodeSelector != nil {
@@ -583,9 +640,14 @@ func (translator *CaptureToPodTranslator) getCaptureTargetsOnNode(ctx context.Co
 			return nil, err
 		}
 	}
+	if len(captureTarget.PodNames) > 0 {
+		if captureTargetsOnNode, err = translator.calculateCaptureTargetsByPodNames(ctx, captureTarget, namespace); err != nil {
+			return nil, err
+		}
+	}
 
 	if len(*captureTargetsOnNode) == 0 {
-		return nil, fmt.Errorf("no targets are selected by node selector or pod selector")
+		return nil, errNoTargetsSelected
 	}
 	return captureTargetsOnNode, nil
 }
@@ -619,12 +681,12 @@ func (translator *CaptureToPodTranslator) updateCaptureTargetsOSOnNode(ctx conte
 }
 
 // CalculateCaptureTargetsOnNode returns capture target on each node.
-func (translator *CaptureToPodTranslator) CalculateCaptureTargetsOnNode(ctx context.Context, captureTarget retinav1alpha1.CaptureTarget) (*CaptureTargetsOnNode, error) {
+func (translator *CaptureToPodTranslator) CalculateCaptureTargetsOnNode(ctx context.Context, captureTarget retinav1alpha1.CaptureTarget, namespace string) (*CaptureTargetsOnNode, error) {
 	if err := translator.validateTargetSelector(captureTarget); err != nil {
 		return nil, err
 	}
 
-	captureTargetsOnNode, err := translator.getCaptureTargetsOnNode(ctx, captureTarget)
+	captureTargetsOnNode, err := translator.getCaptureTargetsOnNode(ctx, captureTarget, namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -708,6 +770,30 @@ func (translator *CaptureToPodTranslator) calculateCaptureTargetsByPodSelector(c
 			}
 			captureTargetOnNode.AddPod(pod.Spec.NodeName, podIPs)
 		}
+	}
+
+	return captureTargetOnNode, nil
+}
+
+func (translator *CaptureToPodTranslator) calculateCaptureTargetsByPodNames(ctx context.Context, captureTarget retinav1alpha1.CaptureTarget, namespace string) (*CaptureTargetsOnNode, error) {
+	captureTargetOnNode := &CaptureTargetsOnNode{}
+
+	// Get the pods by their names from the specified namespace
+	for _, podName := range captureTarget.PodNames {
+		pod, err := translator.kubeClient.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+		if err != nil {
+			translator.l.Error("Failed to get Pod by name", zap.String("podName", podName), zap.String("namespace", namespace), zap.Error(err))
+			return nil, fmt.Errorf("failed to get pod %s in namespace %s: %w", podName, namespace, err)
+		}
+
+		// We want to include all the ip addresses assigned to the Pod in case the Pod is selected.
+		// This may happen when a pod is allocated with IPv4 and IPv6 addresses.
+		// And Pod.Status.PodIPs must include pod.Status.PodIP.
+		podIPs := []string{}
+		for _, podIP := range pod.Status.PodIPs {
+			podIPs = append(podIPs, podIP.IP)
+		}
+		captureTargetOnNode.AddPod(pod.Spec.NodeName, podIPs)
 	}
 
 	return captureTargetOnNode, nil
@@ -903,10 +989,15 @@ func (translator *CaptureToPodTranslator) obtainTcpdumpFilters(captureConfig ret
 	return tcpdumpFilter, nil
 }
 
-func (translator *CaptureToPodTranslator) obtainCaptureOutputEnv(outputConfiguration retinav1alpha1.OutputConfiguration) (map[captureConstants.CaptureOutputLocationEnvKey]string, error) {
+func (translator *CaptureToPodTranslator) obtainCaptureOutputEnv(
+	outputConfiguration retinav1alpha1.OutputConfiguration,
+	resolvedHostPath string,
+) (map[captureConstants.CaptureOutputLocationEnvKey]string, error) {
 	outputEnv := map[captureConstants.CaptureOutputLocationEnvKey]string{}
-	if outputConfiguration.HostPath != nil {
-		outputEnv[captureConstants.CaptureOutputLocationEnvKeyHostPath] = *outputConfiguration.HostPath
+	if resolvedHostPath != "" {
+		// Emit the resolved (joined, cleaned) path so the workload writes where
+		// the HostPath volume is actually mounted in the capture pod.
+		outputEnv[captureConstants.CaptureOutputLocationEnvKeyHostPath] = resolvedHostPath
 	}
 	if outputConfiguration.PersistentVolumeClaim != nil {
 		outputEnv[captureConstants.CaptureOutputLocationEnvKeyPersistentVolumeClaim] = *outputConfiguration.PersistentVolumeClaim
@@ -934,14 +1025,25 @@ func (translator *CaptureToPodTranslator) obtainCaptureOptionEnv(option retinav1
 	if option.MaxCaptureSize != nil {
 		outputEnv[captureConstants.CaptureMaxSizeEnvKey] = strconv.Itoa(*option.MaxCaptureSize)
 	}
+	if len(option.Interfaces) > 0 {
+		outputEnv[captureConstants.CaptureInterfacesEnvKey] = strings.Join(option.Interfaces, ",")
+	}
 	return outputEnv, nil
 }
 
 // ObtainCaptureJobPodEnv translates Capture object to Environment variables to capture job Pod.
 func (translator *CaptureToPodTranslator) ObtainCaptureJobPodEnv(capture retinav1alpha1.Capture) (map[string]string, error) {
+	resolvedHostPath, err := translator.resolveHostPath(capture.Spec.OutputConfiguration)
+	if err != nil {
+		return nil, err
+	}
+	return translator.obtainCaptureJobPodEnv(capture, resolvedHostPath)
+}
+
+func (translator *CaptureToPodTranslator) obtainCaptureJobPodEnv(capture retinav1alpha1.Capture, resolvedHostPath string) (map[string]string, error) {
 	jobPodEnv := map[string]string{}
 
-	captureOutputEnv, err := translator.obtainCaptureOutputEnv(capture.Spec.OutputConfiguration)
+	captureOutputEnv, err := translator.obtainCaptureOutputEnv(capture.Spec.OutputConfiguration, resolvedHostPath)
 	if err != nil {
 		return nil, err
 	}
@@ -969,8 +1071,65 @@ func (translator *CaptureToPodTranslator) ObtainCaptureJobPodEnv(capture retinav
 		jobPodEnv[captureConstants.PacketSizeEnvKey] = strconv.Itoa(*capture.Spec.CaptureConfiguration.CaptureOption.PacketSize)
 	}
 
+	if capture.Spec.CaptureConfiguration.CaptureOption.PcapFilter != nil {
+		jobPodEnv[captureConstants.PcapFilterEnvKey] = *capture.Spec.CaptureConfiguration.CaptureOption.PcapFilter
+	}
+
 	if capture.Spec.CaptureConfiguration.TcpdumpFilter != nil {
 		jobPodEnv[captureConstants.TcpdumpRawFilterEnvKey] = *capture.Spec.CaptureConfiguration.TcpdumpFilter
+	}
+
+	// Build tcpdump flags from CaptureOption boolean fields using the mapping table
+	var tcpdumpFlags []string
+	opt := &capture.Spec.CaptureConfiguration.CaptureOption
+	for _, mapping := range tcpdumpFlagMappings {
+		if boolVal := mapping.getBool(opt); boolVal != nil && *boolVal {
+			tcpdumpFlags = append(tcpdumpFlags, mapping.flag)
+		}
+	}
+
+	// Handle enum fields for verbosity, print data format, and timestamp format
+	if opt.Verbosity != nil && *opt.Verbosity != "" {
+		switch *opt.Verbosity {
+		case "verbose":
+			tcpdumpFlags = append(tcpdumpFlags, "-v")
+		case "extra":
+			tcpdumpFlags = append(tcpdumpFlags, "-vv")
+		case "max":
+			tcpdumpFlags = append(tcpdumpFlags, "-vvv")
+		}
+	}
+
+	if opt.PrintDataFormat != nil && *opt.PrintDataFormat != "" {
+		switch *opt.PrintDataFormat {
+		case "hex":
+			tcpdumpFlags = append(tcpdumpFlags, "-x")
+		case "hex-with-link":
+			tcpdumpFlags = append(tcpdumpFlags, "-xx")
+		case "ascii":
+			tcpdumpFlags = append(tcpdumpFlags, "-A")
+		case "ascii-with-link":
+			tcpdumpFlags = append(tcpdumpFlags, "-AA")
+		}
+	}
+
+	if opt.TimestampFormat != nil && *opt.TimestampFormat != "" {
+		switch *opt.TimestampFormat {
+		case "none":
+			tcpdumpFlags = append(tcpdumpFlags, "-t")
+		case "unformatted":
+			tcpdumpFlags = append(tcpdumpFlags, "-tt")
+		case "delta":
+			tcpdumpFlags = append(tcpdumpFlags, "-ttt")
+		case "date":
+			tcpdumpFlags = append(tcpdumpFlags, "-tttt")
+		case "delta-since-first":
+			tcpdumpFlags = append(tcpdumpFlags, "-ttttt")
+		}
+	}
+
+	if len(tcpdumpFlags) > 0 {
+		jobPodEnv[captureConstants.TcpdumpFlagsEnvKey] = strings.Join(tcpdumpFlags, " ")
 	}
 
 	if len(capture.Name) != 0 {

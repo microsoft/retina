@@ -3,12 +3,12 @@ package servermanager
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 
 	"github.com/cilium/hive/cell"
 	"github.com/microsoft/retina/pkg/config"
 	sm "github.com/microsoft/retina/pkg/managers/servermanager"
-	"github.com/sirupsen/logrus"
 )
 
 var Cell = cell.Module(
@@ -20,18 +20,18 @@ var Cell = cell.Module(
 type serverParams struct {
 	cell.In
 
-	Log       logrus.FieldLogger
+	Log       *slog.Logger
 	Lifecycle cell.Lifecycle
 	Config    config.Config
 }
 
 func newServerManager(params serverParams) (*sm.HTTPServer, error) {
-	logger := params.Log.WithField("module", "servermanager")
+	logger := params.Log.With("module", "servermanager")
 
 	serverCtx, cancelCtx := context.WithCancel(context.Background())
 	serverManager := sm.NewHTTPServer(params.Config.APIServer.Host, params.Config.APIServer.Port)
 	if err := serverManager.Init(); err != nil {
-		logger.WithError(err).Error("Unable to initialize Http server")
+		logger.Error("Unable to initialize Http server", "error", err)
 		cancelCtx()
 		return nil, fmt.Errorf("unable to initialize Http server: %w", err)
 	}
@@ -43,7 +43,7 @@ func newServerManager(params serverParams) (*sm.HTTPServer, error) {
 			go func() {
 				defer wg.Done()
 				if err := serverManager.Start(serverCtx); err != nil {
-					logger.WithError(err).Error("Unable to start server")
+					logger.Error("Unable to start server", "error", err)
 				}
 			}()
 

@@ -6,6 +6,7 @@ package metrics
 
 import (
 	"testing"
+	"time"
 
 	"github.com/cilium/cilium/api/v1/flow"
 	"github.com/microsoft/retina/crd/api/v1alpha1"
@@ -15,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
+	"log/slog"
 )
 
 func TestNewDrop(t *testing.T) {
@@ -64,6 +66,7 @@ func TestNewDrop(t *testing.T) {
 			},
 			exepectedLabels: []string{"reason", "direction"},
 			metricCall:      1,
+			trackedMetrics:  1,
 		},
 		{
 			name: "plain opts dropped verdict nil flow",
@@ -87,8 +90,9 @@ func TestNewDrop(t *testing.T) {
 				"reason",
 				"direction",
 			},
-			metricCall: 1,
-			nilObj:     true,
+			metricCall:     1,
+			trackedMetrics: 1,
+			nilObj:         true,
 		},
 		{
 			name: "source opts 1",
@@ -111,7 +115,8 @@ func TestNewDrop(t *testing.T) {
 				"source_service",
 				"source_port",
 			},
-			metricCall: 1,
+			metricCall:     1,
+			trackedMetrics: 1,
 		},
 		{
 			name: "dest opts 1",
@@ -134,7 +139,8 @@ func TestNewDrop(t *testing.T) {
 				"destination_service",
 				"destination_port",
 			},
-			metricCall: 1,
+			metricCall:     1,
+			trackedMetrics: 1,
 		},
 		{
 			name: "source opts with flow",
@@ -158,7 +164,8 @@ func TestNewDrop(t *testing.T) {
 				"source_service",
 				"source_port",
 			},
-			metricCall: 1,
+			metricCall:     1,
+			trackedMetrics: 1,
 		},
 		{
 			name: "forward source opts with flow",
@@ -182,8 +189,9 @@ func TestNewDrop(t *testing.T) {
 				"source_service",
 				"source_port",
 			},
-			metricCall: 1,
-			nilObj:     true,
+			metricCall:     1,
+			trackedMetrics: 1,
+			nilObj:         true,
 		},
 		{
 			name: "drop source opts with flow in localcontext",
@@ -207,9 +215,10 @@ func TestNewDrop(t *testing.T) {
 				"service",
 				"port",
 			},
-			metricCall:   1,
-			nilObj:       false,
-			localContext: localContext,
+			metricCall:     1,
+			trackedMetrics: 1,
+			nilObj:         false,
+			localContext:   localContext,
 		},
 		{
 			name: "drop source opts with destination flow in localcontext",
@@ -233,9 +242,10 @@ func TestNewDrop(t *testing.T) {
 				"service",
 				"port",
 			},
-			metricCall:   1,
-			nilObj:       false,
-			localContext: localContext,
+			metricCall:     1,
+			trackedMetrics: 1,
+			nilObj:         false,
+			localContext:   localContext,
 		},
 		{
 			name: "drop source opts with source and destination flow in localcontext",
@@ -260,9 +270,10 @@ func TestNewDrop(t *testing.T) {
 				"service",
 				"port",
 			},
-			metricCall:   2,
-			nilObj:       false,
-			localContext: localContext,
+			metricCall:     2,
+			trackedMetrics: 2,
+			nilObj:         false,
+			localContext:   localContext,
 		},
 	}
 
@@ -270,7 +281,7 @@ func TestNewDrop(t *testing.T) {
 		for _, metricName := range []string{"drop_count", "drop_bytes"} {
 			log.Logger().Info("Running test name", zap.String("name", tc.name), zap.String("metricName", metricName))
 			ctrl := gomock.NewController(t)
-			f := NewDropCountMetrics(tc.opts, log.Logger(), tc.localContext)
+			f := NewDropCountMetrics(tc.opts, log.Logger(), tc.localContext, time.Duration(0))
 			if tc.nilObj {
 				assert.Nil(t, f, "drop metrics should be nil Test Name: %s", tc.name)
 				continue
@@ -288,11 +299,40 @@ func TestNewDrop(t *testing.T) {
 
 			dropMock.EXPECT().WithLabelValues(gomock.Any()).Return(testmetric).Times(tc.metricCall)
 
-			assert.Equal(t, f.advEnable, tc.checkIsAdvance, "advance metrics options should be equal Test Name: %s", tc.name)
+			assert.Equal(t, f.isAdvanced(), tc.checkIsAdvance, "advance metrics options should be equal Test Name: %s", tc.name)
 			assert.Equal(t, tc.exepectedLabels, f.getLabels(), "labels should be equal Test Name: %s", tc.name)
 
 			f.metricName = metricName
 			f.ProcessFlow(tc.f)
+
+			// There should be no tracked metrics when TTL is infinite
+			assert.Equal(t, 0, len(f.trackedMetricLabels()), "there should be no tracked metrics when TTL is infinite Test Name: %s", tc.name)
+
+			// Test TTL based expiration
+			metricsinit.InitializeMetrics(slog.Default())
+
+			// Set the TTL to something high to ensure that our call to expire is the only one that expires the metrics
+			f = NewDropCountMetrics(tc.opts, log.Logger(), tc.localContext, time.Minute)
+			f.dropMetric = dropMock
+
+			dropMock.EXPECT().WithLabelValues(gomock.Any()).Return(testmetric).Times(tc.metricCall)
+
+			f.metricName = metricName
+			f.ProcessFlow(tc.f)
+
+			dropMock.EXPECT().DeleteLabelValues(gomock.Any()).Return(true).Times(tc.trackedMetrics)
+
+			for _, ls := range f.trackedMetricLabels() {
+				assert.True(t, f.expire(ls), "metric should expire successfully Test Name: %s", tc.name)
+			}
+
+			// Test that clean calls the base object
+			baseMetricObjectMock := NewMockbaseMetricInterface(ctrl)
+			f.baseMetricInterface = baseMetricObjectMock
+
+			baseMetricObjectMock.EXPECT().clean().Times(1)
+
+			f.Clean()
 			ctrl.Finish()
 		}
 	}

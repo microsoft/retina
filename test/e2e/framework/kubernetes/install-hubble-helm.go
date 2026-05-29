@@ -23,7 +23,7 @@ const (
 	HubbleRelayApp  = "hubble-relay"
 )
 
-type ValidateHubbleStep struct {
+type InstallHubbleHelmChart struct {
 	Namespace          string
 	ReleaseName        string
 	KubeConfigFilePath string
@@ -31,7 +31,7 @@ type ValidateHubbleStep struct {
 	TagEnv             string
 }
 
-func (v *ValidateHubbleStep) Run() error {
+func (v *InstallHubbleHelmChart) Run() error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeoutSeconds*time.Second)
 	defer cancel()
 
@@ -146,10 +146,10 @@ func (v *ValidateHubbleStep) Run() error {
 	return nil
 }
 
-func (v *ValidateHubbleStep) Prevalidate() error {
+func (v *InstallHubbleHelmChart) Prevalidate() error {
 	return nil
 }
 
-func (v *ValidateHubbleStep) Stop() error {
+func (v *InstallHubbleHelmChart) Stop() error {
 	return nil
 }

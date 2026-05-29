@@ -25,35 +25,35 @@ var listExample = templates.Examples(i18n.T(`
 		kubectl retina capture list --all-namespaces
 	`))
 
-var listCaptures = &cobra.Command{
-	Use:     "list",
-	Short:   "List Retina Captures",
-	Example: listExample,
-	RunE: func(*cobra.Command, []string) error {
-		kubeConfig, err := opts.ToRESTConfig()
-		if err != nil {
-			return errors.Wrap(err, "failed to compose k8s rest config")
-		}
+func NewListSubCommand() *cobra.Command {
+	listCaptures := &cobra.Command{
+		Use:     "list",
+		Short:   "List Retina Captures",
+		Example: listExample,
+		RunE: func(*cobra.Command, []string) error {
+			kubeConfig, err := opts.ToRESTConfig()
+			if err != nil {
+				return errors.Wrap(err, "failed to compose k8s rest config")
+			}
 
-		kubeClient, err := kubernetes.NewForConfig(kubeConfig)
-		if err != nil {
-			return errors.Wrap(err, "failed to initialize kubernetes client")
-		}
+			kubeClient, err := kubernetes.NewForConfig(kubeConfig)
+			if err != nil {
+				return errors.Wrap(err, "failed to initialize kubernetes client")
+			}
 
-		// Create a context that is canceled when a termination signal is received
-		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
-		defer cancel()
+			// Create a context that is canceled when a termination signal is received
+			ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
+			defer cancel()
 
-		captureNamespace := *opts.Namespace
-		if allNamespaces {
-			captureNamespace = ""
-		}
-		return listCapturesInNamespaceAndPrintCaptureResults(ctx, kubeClient, captureNamespace)
-	},
-}
+			captureNamespace := *opts.Namespace
+			if allNamespaces {
+				captureNamespace = ""
+			}
+			return listCapturesInNamespaceAndPrintCaptureResults(ctx, kubeClient, captureNamespace)
+		},
+	}
 
-func init() {
-	capture.AddCommand(listCaptures)
 	listCaptures.Flags().BoolVarP(&allNamespaces, "all-namespaces", "A", allNamespaces,
 		"If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+	return listCaptures
 }

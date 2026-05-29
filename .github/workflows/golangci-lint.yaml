@@ -6,6 +6,14 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   golangci:
     strategy:
@@ -15,24 +23,19 @@ jobs:
         goarch: ["amd64", "arm64"]
     name: Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
-      IS_NOT_MERGE_GROUP: ${{ github.event_name != 'merge_group' }}
       GOOS: ${{ matrix.goos }}
       GOARCH: ${{ matrix.goarch }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        if: env.IS_NOT_MERGE_GROUP
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
-        if: env.IS_NOT_MERGE_GROUP
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
           go-version-file: go.mod
+      - name: Build golangci-lint
+        run: GOOS=linux GOARCH=amd64 go build -o "$RUNNER_TEMP/golangci-lint" github.com/golangci/golangci-lint/v2/cmd/golangci-lint
       - name: golangci-lint
-        if: env.IS_NOT_MERGE_GROUP
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: latest
-          args: --concurrency 4 --verbose --config=.golangci.yaml --timeout=25m
-          only-new-issues: true
-          skip-cache: true
+        run: |
+          "$RUNNER_TEMP/golangci-lint" run --new-from-rev=${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'HEAD~1' }} --concurrency 4 --verbose --config=.golangci.yaml --timeout=25m

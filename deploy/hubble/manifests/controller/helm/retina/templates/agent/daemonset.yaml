@@ -54,6 +54,8 @@ spec:
             mountPath: /var/run/cilium
           - name: config
             mountPath: /retina/config
+          - name: tmp
+            mountPath: /tmp
       containers:
         - name: {{ include "retina.name" . }} 
           image: {{ .Values.agent.repository }}:{{ .Values.agent.tag }}
@@ -75,6 +77,9 @@ spec:
           ports:
           - containerPort: {{ .Values.agent.container.retina.ports.containerPort }}
           resources:
+            requests:
+              memory: {{ .Values.resources.requests.memory | quote }}
+              cpu: {{ .Values.resources.requests.cpu | quote }}
             limits:
               memory: {{ .Values.resources.limits.memory | quote }}
               cpu: {{ .Values.resources.limits.cpu | quote }}
@@ -120,6 +125,10 @@ spec:
               mountPath: /sys/kernel/tracing
             - name: cilium
               mountPath: /var/run/cilium
+            - name: host-os-release
+              mountPath: /etc/os-release
+            - name: tmp
+              mountPath: /tmp
           {{- if .Values.hubble.tls.enabled }}
             - name: tls
               mountPath: /var/lib/cilium/tls/hubble
@@ -146,6 +155,12 @@ spec:
         hostPath:
           path: /var/run/cilium
           type: DirectoryOrCreate
+      - name: host-os-release
+        hostPath:
+          path: /etc/os-release
+          type: FileOrCreate
+      - name: tmp
+        emptyDir: {}
       {{- if .Values.hubble.tls.enabled }}
       - name: tls
         projected:

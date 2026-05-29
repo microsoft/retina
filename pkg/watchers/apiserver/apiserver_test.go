@@ -12,13 +12,20 @@ import (
 	"testing"
 	"time"
 
+	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/log"
 	filtermanagermocks "github.com/microsoft/retina/pkg/managers/filtermanager"
 	"github.com/microsoft/retina/pkg/watchers/apiserver/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 var errDNS = errors.New("DNS error")
@@ -26,11 +33,11 @@ var errDNS = errors.New("DNS error")
 func TestGetWatcher(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 
-	a := Watcher()
+	a := Watcher(kcfg.DefaultFilterMapMaxEntries)
 	assert.NotNil(t, a)
 
-	a_again := Watcher()
-	assert.Equal(t, a, a_again, "Expected the same veth watcher instance")
+	aAgain := Watcher(kcfg.DefaultFilterMapMaxEntries)
+	assert.Equal(t, a, aAgain, "Expected the same veth watcher instance")
 }
 
 func TestAPIServerWatcherStop(t *testing.T) {
@@ -78,6 +85,7 @@ func TestRefresh(t *testing.T) {
 		l:             log.Logger().Named("apiserver-watcher"),
 		hostResolver:  mockedResolver,
 		filterManager: mockedFilterManager,
+		client:        getMockKubeClient(),
 	}
 
 	// Return 2 random IPs for the host everytime LookupHost is called.
@@ -132,6 +140,7 @@ func TestRefreshLookUpAlwaysFail(t *testing.T) {
 	a := &ApiServerWatcher{
 		l:            log.Logger().Named("apiserver-watcher"),
 		hostResolver: mockedResolver,
+		client:       getMockKubeClient(),
 	}
 
 	mockedResolver.EXPECT().LookupHost(gomock.Any(), gomock.Any()).Return(nil, errors.New("Error")).AnyTimes()
@@ -155,6 +164,7 @@ func TestInitWithIncorrectURL(t *testing.T) {
 		l:             log.Logger().Named("apiserver-watcher"),
 		hostResolver:  mockedResolver,
 		restConfig:    getMockConfig(false),
+		client:        getMockKubeClient(),
 		filterManager: mockedFilterManager,
 	}
 
@@ -178,6 +188,34 @@ func getMockConfig(isCorrect bool) *rest.Config {
 	}
 }
 
+func getMockKubeClient() client.Client {
+	kubernetesSvc := corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "kubernetes",
+			Namespace: "default",
+		},
+		Spec: corev1.ServiceSpec{
+			ClusterIPs: []string{"172.0.16.1"},
+		},
+	}
+
+	slice := discoveryv1.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "kubernetes",
+			Namespace: "default",
+			Labels: map[string]string{
+				discoveryv1.LabelServiceName: "kubernetes",
+			},
+		},
+		AddressType: discoveryv1.AddressTypeIPv4,
+		Endpoints: []discoveryv1.Endpoint{
+			{Addresses: []string{"100.64.83.200"}},
+			{Addresses: []string{"100.64.83.201"}},
+		},
+	}
+	return fake.NewFakeClient(&slice, &kubernetesSvc)
+}
+
 func TestRefreshFailsFirstFourAttemptsSucceedsOnFifth(t *testing.T) {
 	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
 	require.NoError(t, err)
@@ -194,6 +232,7 @@ func TestRefreshFailsFirstFourAttemptsSucceedsOnFifth(t *testing.T) {
 		l:             log.Logger().Named("apiserver-watcher"),
 		hostResolver:  mockedResolver,
 		filterManager: mockedFilterManager,
+		client:        getMockKubeClient(),
 	}
 
 	// Simulate LookupHost failing the first four times and succeeding on the fifth.

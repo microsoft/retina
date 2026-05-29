@@ -7,13 +7,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path"
+	"reflect"
 	"runtime"
 	"testing"
 	"time"
 	"unsafe"
 
+	"github.com/blang/semver/v4"
 	"github.com/cilium/ebpf/perf"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
@@ -119,7 +122,7 @@ func TestCompile(t *testing.T) {
 
 func TestProcessMapValue(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
-	metrics.InitializeMetrics()
+	metrics.InitializeMetrics(slog.Default())
 	dr := &dropReason{
 		cfg: cfgPodLevelEnabled,
 		l:   log.Logger().Named(name),
@@ -177,11 +180,10 @@ func TestDropReasonRun_Error(t *testing.T) {
 	// Create a context with a short timeout for testing purposes
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 
+	errCh := make(chan error, 1)
 	// Start the drop reason routine in a goroutine
 	go func() {
-		if err := dr.run(ctx); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		errCh <- dr.run(ctx)
 	}()
 
 	// Wait for a short period of time for the routine to start
@@ -189,6 +191,9 @@ func TestDropReasonRun_Error(t *testing.T) {
 
 	cancel()
 	ticker.Stop()
+	if err := <-errCh; err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }
 
 func TestDropReasonRun(t *testing.T) {
@@ -239,11 +244,10 @@ func TestDropReasonRun(t *testing.T) {
 	// create a ticker with a short interval for testing purposes
 	ticker := time.NewTicker(2 * time.Second)
 
+	errCh := make(chan error, 1)
 	// Start the drop reason routine in a goroutine
 	go func() {
-		if err := dr.run(ctx); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		errCh <- dr.run(ctx)
 	}()
 
 	// Wait for a short period of time for the routine to start
@@ -251,6 +255,9 @@ func TestDropReasonRun(t *testing.T) {
 
 	cancel()
 	ticker.Stop()
+	if err := <-errCh; err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }
 
 func TestDropReasonReadDataPodLevelEnabled(t *testing.T) {
@@ -296,8 +303,8 @@ func TestDropReasonReadDataPodLevelEnabled(t *testing.T) {
 		dr.readEventArrayData()
 	}()
 
+	dr.wg.Add(1)
 	go func() {
-		dr.wg.Add(1)
 		dr.processRecord(ctx, 0)
 	}()
 
@@ -464,6 +471,122 @@ func TestDropReasonGenerate(t *testing.T) {
 	}
 	if string(actualContents) != expectedContents {
 		t.Errorf("unexpected dynamic header file contents: got %q, want %q", string(actualContents), expectedContents)
+	}
+}
+
+func mustVersion(v string) semver.Version {
+	ver, err := semver.Parse(v)
+	if err != nil {
+		panic(err)
+	}
+	return ver
+}
+
+func TestResolveEbpfPayload(t *testing.T) {
+	tests := []struct {
+		name              string
+		arch              string
+		kv                semver.Version
+		isMariner         bool
+		isPodLevel        bool
+		ftraceEnabled     bool
+		wantType          string
+		wantSupportsFexit bool
+	}{
+		{
+			name:              "old kernel - fallback to allKprobeObjects",
+			arch:              "amd64",
+			kv:                mustVersion("5.4.0"),
+			isMariner:         false,
+			isPodLevel:        false,
+			ftraceEnabled:     true,
+			wantType:          "*dropreason.allKprobeObjects",
+			wantSupportsFexit: false,
+		},
+		{
+			name:              "new kernel - fexitObjects for Ubuntu",
+			arch:              "amd64",
+			kv:                mustVersion("5.10.0"),
+			isMariner:         false,
+			isPodLevel:        false,
+			ftraceEnabled:     true,
+			wantType:          "*dropreason.allFexitObjects",
+			wantSupportsFexit: true,
+		},
+		{
+			name:              "new kernel - marinerObjects for Mariner",
+			arch:              "amd64",
+			kv:                mustVersion("5.10.0"),
+			isMariner:         true,
+			isPodLevel:        false,
+			ftraceEnabled:     true,
+			wantType:          "*dropreason.marinerObjects",
+			wantSupportsFexit: true,
+		},
+		{
+			name:              "arm64 old kernel - fallback to allKprobeObjects",
+			arch:              "arm64",
+			kv:                mustVersion("5.8.0"),
+			isMariner:         true,
+			isPodLevel:        false,
+			ftraceEnabled:     true,
+			wantType:          "*dropreason.allKprobeObjects",
+			wantSupportsFexit: false,
+		},
+		{
+			name:              "arm64 new kernel - marinerObjects",
+			arch:              "arm64",
+			kv:                mustVersion("6.1.0"),
+			isMariner:         true,
+			isPodLevel:        false,
+			ftraceEnabled:     true,
+			wantType:          "*dropreason.marinerObjects",
+			wantSupportsFexit: true,
+		},
+		{
+			name:              "pod level - use allKprobeObjects",
+			arch:              "amd64",
+			kv:                mustVersion("5.15.0"),
+			isMariner:         false,
+			isPodLevel:        true,
+			ftraceEnabled:     true,
+			wantType:          "*dropreason.allKprobeObjects",
+			wantSupportsFexit: false,
+		},
+		{
+			name:              "mariner with ftrace disabled - fallback to kprobes",
+			arch:              "amd64",
+			kv:                mustVersion("5.15.0"),
+			isMariner:         true,
+			isPodLevel:        false,
+			ftraceEnabled:     false,
+			wantType:          "*dropreason.allKprobeObjects",
+			wantSupportsFexit: false,
+		},
+		{
+			name:              "ubuntu with ftrace disabled - fallback to kprobes",
+			arch:              "amd64",
+			kv:                mustVersion("6.6.0"),
+			isMariner:         false,
+			isPodLevel:        false,
+			ftraceEnabled:     false,
+			wantType:          "*dropreason.allKprobeObjects",
+			wantSupportsFexit: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			objs, _, isFexit := resolvePayload(tt.arch, tt.kv, tt.isMariner, tt.isPodLevel, tt.ftraceEnabled)
+
+			if isFexit != tt.wantSupportsFexit {
+				t.Errorf("isFexit = %v, want %v", isFexit, tt.wantSupportsFexit)
+			}
+
+			if gotType := reflect.TypeOf(objs).String(); gotType != tt.wantType {
+				t.Errorf("object type = %v, want %v", gotType, tt.wantType)
+			}
+		})
 	}
 }
 

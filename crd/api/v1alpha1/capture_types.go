@@ -65,6 +65,91 @@ type CaptureOption struct {
 	// +kubebuilder:default=100
 	// +optional
 	MaxCaptureSize *int `json:"maxCaptureSize,omitempty"`
+
+	// Interfaces specifies the network interfaces on which to capture packets.
+	// If specified, captures only on the listed interfaces (e.g., ["eth0", "eth1"]).
+	// If empty, captures on all interfaces by default.
+	// Use this field to select specific interfaces, NOT the tcpdumpFilter field.
+	// +optional
+	Interfaces []string `json:"interfaces,omitempty"`
+
+	// PcapFilter specifies a BPF filter expression for packet filtering (e.g., "tcp port 443", "host 10.0.0.1").
+	// Only BPF expressions are allowed, no flags. See https://www.tcpdump.org/manpages/pcap-filter.7.html
+	// +optional
+	// +kubebuilder:validation:MaxLength=1024
+	// +kubebuilder:validation:Pattern="^[^-]*$"
+	PcapFilter *string `json:"pcapFilter,omitempty"`
+
+	// NoPromiscuous disables promiscuous mode for packet capture.
+	// When true, only packets destined for this host are captured (equivalent to tcpdump -p flag).
+	// When false or unset, captures all packets on the network segment (default behavior).
+	// +optional
+	NoPromiscuous *bool `json:"noPromiscuous,omitempty"`
+
+	// PacketBuffered enables packet-buffered output mode (equivalent to tcpdump -U flag).
+	// When true, packets are written to output as soon as they're captured rather than being buffered.
+	// Useful for real-time monitoring but may impact performance.
+	// +optional
+	PacketBuffered *bool `json:"packetBuffered,omitempty"`
+
+	// ImmediateMode enables immediate mode for packet capture (equivalent to tcpdump --immediate-mode).
+	// When true, packets are delivered to the application immediately rather than being buffered.
+	// This can reduce latency but may increase CPU usage.
+	// +optional
+	ImmediateMode *bool `json:"immediateMode,omitempty"`
+
+	// NoResolveDNS disables DNS resolution for captured addresses (equivalent to tcpdump -n flag).
+	// When true, IP addresses are displayed numerically without resolving hostnames.
+	// This speeds up capture processing and avoids DNS lookup overhead.
+	// +optional
+	NoResolveDNS *bool `json:"noResolveDNS,omitempty"`
+
+	// NoResolvePort disables port name resolution (equivalent to tcpdump -nn flag).
+	// When true, both IP addresses and port numbers are displayed numerically.
+	// This prevents service name lookups for port numbers.
+	// +optional
+	NoResolvePort *bool `json:"noResolvePort,omitempty"`
+
+	// Verbosity controls the verbosity level of packet capture output.
+	// Valid values: "" (normal/default), "verbose" (tcpdump -v), "extra" (tcpdump -vv), "max" (tcpdump -vvv).
+	// Empty string means normal verbosity with no extra verbose flags.
+	// +optional
+	// +kubebuilder:validation:Enum="";verbose;extra;max
+	Verbosity *string `json:"verbosity,omitempty"`
+
+	// PrintDataFormat controls how packet data is printed in the output.
+	// Valid values: "" (none), "hex" (tcpdump -x), "hex-with-link" (tcpdump -xx), "ascii" (tcpdump -A), "ascii-with-link" (tcpdump -AA).
+	// Empty string means no packet data printing.
+	// +optional
+	// +kubebuilder:validation:Enum="";hex;hex-with-link;ascii;ascii-with-link
+	PrintDataFormat *string `json:"printDataFormat,omitempty"`
+
+	// PrintLinkHeader prints link-level (Ethernet) headers (equivalent to tcpdump -e flag).
+	// Shows MAC addresses and other link-layer information.
+	// +optional
+	PrintLinkHeader *bool `json:"printLinkHeader,omitempty"`
+
+	// QuietOutput enables quiet/quick output mode (equivalent to tcpdump -q flag).
+	// Prints less protocol information for shorter output lines.
+	// +optional
+	QuietOutput *bool `json:"quietOutput,omitempty"`
+
+	// AbsoluteSeq prints absolute TCP sequence numbers (equivalent to tcpdump -S flag).
+	// Shows actual sequence numbers instead of relative numbers.
+	// +optional
+	AbsoluteSeq *bool `json:"absoluteSeq,omitempty"`
+
+	// TimestampFormat controls the timestamp format in packet capture output.
+	// Valid values: "" (default), "none" (tcpdump -t), "unformatted" (tcpdump -tt), "delta" (tcpdump -ttt), "date" (tcpdump -tttt), "delta-since-first" (tcpdump -ttttt).
+	// Empty string means default timestamp format.
+	// +optional
+	// +kubebuilder:validation:Enum="";none;unformatted;delta;date;delta-since-first
+	TimestampFormat *string `json:"timestampFormat,omitempty"`
+
+	// DontVerifyChecksum disables TCP checksum verification (equivalent to tcpdump -K flag).
+	// Skips TCP checksum validation for captured packets.
+	// +optional
+	DontVerifyChecksum *bool `json:"dontVerifyChecksum,omitempty"`
 }
 
 // CaptureTarget indicates the target on which the network packets capture will be performed.
@@ -85,6 +170,12 @@ type CaptureTarget struct {
 	// selector semantics.
 	// +optional
 	PodSelector *metav1.LabelSelector `json:"podSelector,omitempty"`
+
+	// PodNames allows selecting specific pods by their names.
+	// If specified, the capture will be performed on the pods with matching names in the specified namespace.
+	// PodNames is incompatible with NodeSelector, NamespaceSelector, and PodSelector.
+	// +optional
+	PodNames []string `json:"podNames,omitempty"`
 }
 
 // CaptureConfiguration indicates the configurations of the network capture.
@@ -94,8 +185,13 @@ type CaptureConfiguration struct {
 	// +optional
 	Filters *CaptureConfigurationFilters `json:"filters,omitempty"`
 
-	// TcpdumpFilter is a raw tcpdump filter string.
+	// TcpdumpFilter accepts BPF filter expressions only (no flags).
+	//
+	// DEPRECATED and will be removed: Currently functional but scheduled for removal.
+	// Use captureOption.pcapFilter for BPF expressions and captureOption boolean flags for tcpdump display options instead.
 	// +optional
+	// +kubebuilder:validation:MaxLength=1024
+	// +kubebuilder:validation:Pattern="^[^-]*$"
 	TcpdumpFilter *string `json:"tcpdumpFilter,omitempty"`
 
 	// IncludeMetadata represents whether or not networking metadata should be captured.
@@ -129,8 +225,16 @@ type CaptureConfigurationFilters struct {
 
 // OutputConfiguration indicates the location capture will be stored.
 type OutputConfiguration struct {
-	// HostPath stores the capture files into the specified host filesystem.
-	// If nothing exists at the given path of the host, an empty directory will be created there.
+	// HostPath is a relative subpath name (e.g. "my-capture") joined under the
+	// operator-configured host base directory (default /var/log/retina/captures)
+	// on every node that runs a capture pod. The capture files are written to
+	// that joined directory, and an empty directory is created there if it does
+	// not already exist.
+	//
+	// HostPath must be a relative subpath: absolute paths (e.g. "/tmp/foo",
+	// "C:\\foo") and any value containing ".." segments are rejected by the
+	// operator. CR authors cannot influence the base directory, which is
+	// controlled by the cluster operator via the operator config.
 	// +optional
 	HostPath *string `json:"hostPath,omitempty"`
 	// PersistentVolumeClaim mounts the supplied PVC into the pod on `/capture` and write the capture files there.
@@ -168,6 +272,14 @@ type CaptureSpec struct {
 	CaptureConfiguration CaptureConfiguration `json:"captureConfiguration"`
 	// +kubebuilder:validation:Required
 	OutputConfiguration OutputConfiguration `json:"outputConfiguration,omitempty"`
+	// CleanUpAfterUpload indicates whether the capture jobs and associated resources
+	// should be automatically cleaned up after a successful upload to remote storage
+	// (BlobUpload or S3Upload). When set to true, completed capture jobs, secrets,
+	// and the Capture resource itself will be deleted once all jobs have succeeded
+	// and uploads are confirmed.
+	// +optional
+	// +kubebuilder:default=false
+	CleanUpAfterUpload bool `json:"cleanUpAfterUpload,omitempty"`
 }
 
 // +kubebuilder:object:root=true

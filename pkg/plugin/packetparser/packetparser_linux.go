@@ -20,7 +20,10 @@ import (
 	"github.com/cilium/cilium/api/v1/flow"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/asm"
+	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
+	"github.com/cilium/ebpf/ringbuf"
 	tc "github.com/florianl/go-tc"
 	helper "github.com/florianl/go-tc/core"
 	nl "github.com/mdlayher/netlink"
@@ -51,7 +54,14 @@ import (
 )
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type packet packetparser ./_cprog/packetparser.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../lib/common/libbpf/_include/linux -I../lib/common/libbpf/_include/uapi/linux -I../lib/common/libbpf/_include/asm -I../filter/_cprog/ -I../conntrack/_cprog/
-var errNoOutgoingLinks = errors.New("could not determine any outgoing links")
+var (
+	errNoOutgoingLinks          = errors.New("could not determine any outgoing links")
+	errRingBufKernelTooOld      = errors.New("ring buffer requires newer kernel")
+	errRingBufSizeUnset         = errors.New("ring buffer size must be set when ring buffers are enabled")
+	errRingBufSizeTooSmall      = errors.New("ring buffer size is smaller than the kernel page size")
+	errRingBufSizeTooLarge      = errors.New("ring buffer size is larger than the allowed maximum")
+	errRingBufSizeNotPowerOfTwo = errors.New("ring buffer size is not a power of 2")
+)
 
 func init() {
 	registry.Add(name, New)
@@ -93,8 +103,8 @@ func (p *packetParser) Generate(ctx context.Context) error {
 	if p.cfg.BypassLookupIPOfInterest {
 		p.l.Info("bypassing lookup IP of interest")
 		bypassLookupIPOfInterest = 1
-		st = fmt.Sprintf("#define BYPASS_LOOKUP_IP_OF_INTEREST %d\n", bypassLookupIPOfInterest)
 	}
+	st = fmt.Sprintf("#define BYPASS_LOOKUP_IP_OF_INTEREST %d\n", bypassLookupIPOfInterest)
 
 	conntrackMetrics := 0
 	// Check if packetparser has Conntrack metrics enabled.
@@ -117,12 +127,46 @@ func (p *packetParser) Generate(ctx context.Context) error {
 	p.l.Info("data aggregation level", zap.String("level", p.cfg.DataAggregationLevel.String()))
 	st += fmt.Sprintf("#define DATA_AGGREGATION_LEVEL %d\n", p.cfg.DataAggregationLevel)
 
+	// Process packetparser sampling rate.
+	p.l.Info("sampling rate", zap.Uint32("rate", p.cfg.DataSamplingRate))
+	st += fmt.Sprintf("#define DATA_SAMPLING_RATE %d\n", p.cfg.DataSamplingRate)
+
 	// Generate dynamic header for packetparser.
 	err = loader.WriteFile(ctx, dynamicHeaderPath, st)
 	if err != nil {
 		return errors.Wrap(err, "failed to write dynamic header")
 	}
 	p.l.Info("PacketParser header generated at", zap.String("path", dynamicHeaderPath))
+	return nil
+}
+
+// validateRingBufferSize validates the ring buffer size and returns an error for invalid values.
+func validateRingBufferSize(size uint32) error {
+	const maxSize = 1 * 1024 * 1024 * 1024 // 1GB
+	intPageSize := os.Getpagesize()
+	if intPageSize <= 0 {
+		intPageSize = 4096
+	}
+	if intPageSize > int(^uint32(0)) {
+		intPageSize = int(^uint32(0))
+	}
+	//nolint:gosec // bounded to uint32
+	pageSize := uint32(intPageSize)
+
+	if size == 0 {
+		return errRingBufSizeUnset
+	}
+	if size < pageSize {
+		return fmt.Errorf("%w: size=%d page_size=%d", errRingBufSizeTooSmall, size, pageSize)
+	}
+	if size > maxSize {
+		return fmt.Errorf("%w: size=%d max_size=%d", errRingBufSizeTooLarge, size, maxSize)
+	}
+	// Check if size is a power of 2.
+	if (size & (size - 1)) != 0 {
+		return fmt.Errorf("%w: size=%d", errRingBufSizeNotPowerOfTwo, size)
+	}
+
 	return nil
 }
 
@@ -147,8 +191,13 @@ func (p *packetParser) Compile(ctx context.Context) error {
 	if arch == "arm64" {
 		targetArch = "-D__TARGET_ARCH_arm64"
 	}
+
+	runtimeIncludeDir := "-I" + loader.VmlinuxHeaderDir()
+
 	// Keep target as bpf, otherwise clang compilation yields bpf object that elf reader cannot load.
-	err = loader.CompileEbpf(ctx, "-target", "bpf", "-Wall", targetArch, "-g", "-O2", "-c", bpfSourceFile, "-o", bpfOutputFile,
+	cflags := []string{
+		"-target", "bpf", "-Wall", targetArch, "-g", "-O2", "-c", bpfSourceFile, "-o", bpfOutputFile,
+		runtimeIncludeDir,
 		archLibDir,
 		libbpfSrcDir,
 		libbpfIncludeAsmDir,
@@ -156,7 +205,21 @@ func (p *packetParser) Compile(ctx context.Context) error {
 		libbpfIncludeUapiLinuxDir,
 		filterDir,
 		conntrackDir,
-	)
+	}
+
+	if p.cfg.PacketParserRingBuffer.IsEnabled() {
+		if validateErr := validateRingBufferSize(p.cfg.PacketParserRingBufferSize); validateErr != nil {
+			return validateErr
+		}
+
+		p.l.Info("Compiling with Ring Buffer enabled", zap.Uint32("size", p.cfg.PacketParserRingBufferSize))
+		cflags = append(cflags,
+			"-DUSE_RING_BUFFER",
+			fmt.Sprintf("-DRING_BUFFER_SIZE=%d", p.cfg.PacketParserRingBufferSize),
+		)
+	}
+
+	err = loader.CompileEbpf(ctx, cflags...)
 	if err != nil {
 		return err
 	}
@@ -169,6 +232,11 @@ func (p *packetParser) Init() error {
 	if !p.cfg.EnablePodLevel {
 		p.l.Warn("packet parser and latency plugin will not init because pod level is disabled")
 		return nil
+	}
+	if p.cfg.PacketParserRingBuffer.IsEnabled() {
+		if ringBufErr := ensureRingBufKernelSupported(); ringBufErr != nil {
+			return ringBufErr
+		}
 	}
 	// Get the absolute path to this file during runtime.
 	dir, err := absPath()
@@ -183,6 +251,12 @@ func (p *packetParser) Init() error {
 	if err != nil {
 		return err
 	}
+
+	// Override filter map max entries to match the configured size from init container.
+	if mapSpec, ok := spec.Maps[plugincommon.FilterMapName]; ok && p.cfg.FilterMapMaxEntries > 0 {
+		mapSpec.MaxEntries = p.cfg.FilterMapMaxEntries
+	}
+
 	//nolint:typecheck
 	if err := spec.LoadAndAssign(objs, &ebpf.CollectionOptions{ //nolint:typecheck
 		Maps: ebpf.MapOptions{
@@ -218,14 +292,44 @@ func (p *packetParser) Init() error {
 		return err
 	}
 
-	p.reader, err = plugincommon.NewPerfReader(p.l, objs.RetinaPacketparserEvents, perCPUBuffer, 1)
-	if err != nil {
-		p.l.Error("Error NewReader", zap.Error(err))
-		return err
+	if p.cfg.PacketParserRingBuffer.IsEnabled() {
+		p.l.Info("Initializing Ring Buffer reader")
+		var rb *ringbuf.Reader
+		rb, err = ringbuf.NewReader(objs.RetinaPacketparserEvents)
+		if err != nil {
+			p.l.Error("Error NewReader ringbuf", zap.Error(err))
+			return fmt.Errorf("failed to create ringbuf reader: %w", err)
+		}
+		p.reader = &ringBufReaderWrapper{reader: rb}
+	} else {
+		p.l.Info("Initializing Perf Reader")
+		var pr *perf.Reader
+		pr, err = plugincommon.NewPerfReader(p.l, objs.RetinaPacketparserEvents, perCPUBuffer, 1)
+		if err != nil {
+			p.l.Error("Error NewReader", zap.Error(err))
+			return fmt.Errorf("failed to create perf reader: %w", err)
+		}
+		p.reader = &perfReaderWrapper{reader: pr}
 	}
 
-	p.tcMap = &sync.Map{}
+	p.attachmentMap = &sync.Map{}
 	p.interfaceLockMap = &sync.Map{}
+
+	// Resolve TCX support based on config.
+	switch p.cfg.EnableTCX {
+	case kcfg.TCXModeOff:
+		p.tcxSupported = false
+		p.l.Info("EnableTCX=off: will use traditional TC attachment")
+	case kcfg.TCXModeAuto:
+		p.tcxSupported = isTCXSupported()
+		if p.tcxSupported {
+			p.l.Info("EnableTCX=auto: TCX supported, will use TCX attachment")
+		} else {
+			p.l.Info("EnableTCX=auto: TCX not supported, will use traditional TC attachment")
+		}
+	default:
+		p.l.Warn("Unknown EnableTCX value, defaulting to traditional TC attachment", zap.String("enableTCX", string(p.cfg.EnableTCX)))
+	}
 
 	return nil
 }
@@ -280,7 +384,7 @@ func (p *packetParser) Start(ctx context.Context) error {
 	}
 
 	// Create the channel.
-	p.recordsChannel = make(chan perf.Record, buffer)
+	p.recordsChannel = make(chan perfRecord, buffer)
 	p.l.Debug("Created records channel")
 
 	return p.run(ctx)
@@ -341,14 +445,17 @@ func (p *packetParser) SetupChannel(ch chan *v1.Event) error {
 // cleanAll is NOT thread safe.
 // Not required for now.
 func (p *packetParser) cleanAll() error {
-	// Delete tunnel and qdiscs.
-	if p.tcMap == nil {
+	if p.attachmentMap == nil {
 		return nil
 	}
 
-	p.tcMap.Range(func(key, value interface{}) bool {
-		v := value.(*tcValue)
-		p.clean(v.tc, v.qdisc)
+	p.attachmentMap.Range(func(_, value interface{}) bool {
+		v := value.(*attachmentValue)
+		if v.attachmentType == attachmentTypeTCX {
+			p.cleanTCX(v.tcxIngressLink, v.tcxEgressLink)
+		} else {
+			p.clean(v.tc, v.qdisc)
+		}
 		return true
 	})
 
@@ -356,7 +463,7 @@ func (p *packetParser) cleanAll() error {
 	// It is OK to do this without a lock because
 	// cleanAll is only invoked from Stop(), and Stop can
 	// only be called from PluginManager (which is single threaded).
-	p.tcMap = &sync.Map{}
+	p.attachmentMap = &sync.Map{}
 	return nil
 }
 
@@ -370,6 +477,55 @@ func (p *packetParser) clean(rtnl nltc, qdisc *tc.Object) {
 			p.l.Warn("could not close rtnetlink socket", zap.Error(err))
 		}
 	}
+}
+
+// cleanTCX closes TCX links. This is best effort.
+func (p *packetParser) cleanTCX(ingressLink, egressLink link.Link) {
+	if ingressLink != nil {
+		if err := ingressLink.Close(); err != nil {
+			p.l.Debug("could not close ingress TCX link", zap.Error(err))
+		}
+	}
+	if egressLink != nil {
+		if err := egressLink.Close(); err != nil {
+			p.l.Debug("could not close egress TCX link", zap.Error(err))
+		}
+	}
+}
+
+// isTCXSupported probes whether the running kernel supports TCX attachment (kernel 6.6+)
+// by creating a minimal BPF program and attempting to attach it to the loopback interface.
+func isTCXSupported() bool {
+	loopback, err := netlink.LinkByName("lo")
+	if err != nil {
+		return false
+	}
+
+	progSpec := &ebpf.ProgramSpec{
+		Type:       ebpf.SchedCLS,
+		AttachType: ebpf.AttachTCXIngress,
+		License:    "Dual MIT/GPL",
+		Instructions: asm.Instructions{
+			asm.Mov.Imm(asm.R0, -1),
+			asm.Return(),
+		},
+	}
+	prog, err := ebpf.NewProgram(progSpec)
+	if err != nil {
+		return false
+	}
+	defer prog.Close()
+
+	testLink, err := link.AttachTCX(link.TCXOptions{
+		Program:   prog,
+		Attach:    ebpf.AttachTCXIngress,
+		Interface: loopback.Attrs().Index,
+	})
+	if err != nil {
+		return false
+	}
+	testLink.Close() //nolint:errcheck // probe cleanup
+	return true
 }
 
 func (p *packetParser) endpointWatcherCallbackFn(obj interface{}) {
@@ -394,11 +550,15 @@ func (p *packetParser) endpointWatcherCallbackFn(obj interface{}) {
 	case endpoint.EndpointDeleted:
 		p.l.Debug("Endpoint deleted", zap.String("name", iface.Name))
 		// Clean.
-		if value, ok := p.tcMap.Load(ifaceKey); ok {
-			v := value.(*tcValue)
-			p.clean(v.tc, v.qdisc)
+		if value, ok := p.attachmentMap.Load(ifaceKey); ok {
+			v := value.(*attachmentValue)
+			if v.attachmentType == attachmentTypeTCX {
+				p.cleanTCX(v.tcxIngressLink, v.tcxEgressLink)
+			} else {
+				p.clean(v.tc, v.qdisc)
+			}
 			// Delete from map.
-			p.tcMap.Delete(ifaceKey)
+			p.attachmentMap.Delete(ifaceKey)
 		}
 		// Delete from lock map.
 		p.interfaceLockMap.Delete(ifaceKey)
@@ -408,9 +568,75 @@ func (p *packetParser) endpointWatcherCallbackFn(obj interface{}) {
 	}
 }
 
-// createQdiscAndAttach creates a qdisc of type clsact on the interface and attaches the ingress and egress bpf filter programs to it.
+// createQdiscAndAttach attaches BPF ingress/egress programs to the interface using TCX or TC
+// depending on kernel support and configuration.
 // Only support interfaces of type veth and device.
 func (p *packetParser) createQdiscAndAttach(iface netlink.LinkAttrs, ifaceType interfaceType) {
+	p.l.Debug("Starting attachment", zap.String("interface", iface.Name))
+
+	if p.tcxSupported {
+		p.attachViaTCX(iface, ifaceType)
+		return
+	}
+
+	p.attachViaTC(iface, ifaceType)
+}
+
+// attachViaTCX attaches BPF programs using TCX (TC eXpress, kernel 6.6+).
+func (p *packetParser) attachViaTCX(iface netlink.LinkAttrs, ifaceType interfaceType) {
+	var ingressProgram, egressProgram *ebpf.Program
+
+	switch ifaceType {
+	case Device:
+		ingressProgram = p.objs.HostIngressFilter
+		egressProgram = p.objs.HostEgressFilter
+	case Veth:
+		ingressProgram = p.objs.EndpointIngressFilter
+		egressProgram = p.objs.EndpointEgressFilter
+	default:
+		p.l.Error("Unknown interface type for TCX", zap.String("interface type", string(ifaceType)))
+		return
+	}
+
+	// Attach at the head of the TCX chain so Retina sees every packet before
+	// any policy-enforcing program (e.g. Cilium) can drop it. This is safe
+	// because Retina's programs always return TC_ACT_UNSPEC, which passes
+	// control to the next program in the chain without making any forwarding
+	// decision.
+	ingressLink, err := link.AttachTCX(link.TCXOptions{
+		Program:   ingressProgram,
+		Attach:    ebpf.AttachTCXIngress,
+		Interface: iface.Index,
+		Anchor:    link.Head(),
+	})
+	if err != nil {
+		p.l.Error("could not attach TCX ingress program", zap.String("interface", iface.Name), zap.Error(err))
+		return
+	}
+
+	egressLink, err := link.AttachTCX(link.TCXOptions{
+		Program:   egressProgram,
+		Attach:    ebpf.AttachTCXEgress,
+		Interface: iface.Index,
+		Anchor:    link.Head(),
+	})
+	if err != nil {
+		p.l.Error("could not attach TCX egress program", zap.String("interface", iface.Name), zap.Error(err))
+		ingressLink.Close() //nolint:errcheck // best effort
+		return
+	}
+
+	ifaceKey := ifaceToKey(iface)
+	p.attachmentMap.Store(ifaceKey, &attachmentValue{
+		attachmentType: attachmentTypeTCX,
+		tcxIngressLink: ingressLink,
+		tcxEgressLink:  egressLink,
+	})
+	p.l.Debug("Successfully attached BPF programs using TCX", zap.String("interface", iface.Name))
+}
+
+// attachViaTC attaches BPF programs using traditional TC with a clsact qdisc.
+func (p *packetParser) attachViaTC(iface netlink.LinkAttrs, ifaceType interfaceType) {
 	p.l.Debug("Starting qdisc attachment", zap.String("interface", iface.Name))
 
 	var (
@@ -431,7 +657,7 @@ func (p *packetParser) createQdiscAndAttach(iface netlink.LinkAttrs, ifaceType i
 		ingressInfo = p.endpointIngressInfo
 		egressInfo = p.endpointEgressInfo
 	default:
-		p.l.Error("Unknown interface type", zap.String("interface type", string(ifaceType)))
+		p.l.Error("Unknown interface type for TC", zap.String("interface type", string(ifaceType)))
 		return
 	}
 
@@ -519,13 +745,13 @@ func (p *packetParser) createQdiscAndAttach(iface netlink.LinkAttrs, ifaceType i
 
 	// Cache.
 	ifaceKey := ifaceToKey(iface)
-	tcValue := &tcValue{
-		tc:    rtnl,
-		qdisc: clsactQdisc,
-	}
-	p.tcMap.Store(ifaceKey, tcValue)
+	p.attachmentMap.Store(ifaceKey, &attachmentValue{
+		attachmentType: attachmentTypeTC,
+		tc:             rtnl,
+		qdisc:          clsactQdisc,
+	})
 
-	p.l.Debug("Successfully added bpf", zap.String("interface", iface.Name))
+	p.l.Debug("Successfully attached BPF programs using traditional TC", zap.String("interface", iface.Name))
 }
 
 func (p *packetParser) run(ctx context.Context) error {
@@ -568,6 +794,8 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 				zap.Int("worker_id", id),
 			)
 
+			metrics.ParsedPacketsCounter.WithLabelValues().Inc()
+
 			var bpfEvent packetparserPacket
 			err := binary.Read(bytes.NewReader(record.RawSample), binary.LittleEndian, &bpfEvent)
 			if err != nil {
@@ -602,10 +830,14 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 			// Add the traffic direction to the flow.
 			fl.TrafficDirection = flow.TrafficDirection(bpfEvent.TrafficDirection)
 
-			meta := &utils.RetinaMetadata{}
+			ext := utils.NewExtensions()
 
-			// Add packet size to the flow's metadata.
-			utils.AddPacketSize(meta, bpfEvent.Bytes)
+			// Add packet size to the flow's extensions.
+			utils.AddPacketSize(ext, bpfEvent.Bytes)
+
+			// Add previously observed byte and packet counts to the flow's extensions
+			utils.AddPreviouslyObservedBytes(ext, bpfEvent.PreviouslyObservedBytes)
+			utils.AddPreviouslyObservedPackets(ext, bpfEvent.PreviouslyObservedPackets)
 
 			// Add the TCP metadata to the flow.
 			tcpMetadata := bpfEvent.TcpMetadata
@@ -617,18 +849,33 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 				uint16((bpfEvent.Flags&TCPFlagRST)>>2), // nolint:gomnd // 2 is the offset for RST.
 				uint16((bpfEvent.Flags&TCPFlagPSH)>>3), // nolint:gomnd // 3 is the offset for PSH.
 				uint16((bpfEvent.Flags&TCPFlagURG)>>5), // nolint:gomnd // 5 is the offset for URG.
+				uint16((bpfEvent.Flags&TCPFlagECE)>>6), // nolint:gomnd // 6 is the offset for ECE.
+				uint16((bpfEvent.Flags&TCPFlagCWR)>>7), // nolint:gomnd // 7 is the offset for CWR.
+				uint16((bpfEvent.Flags&TCPFlagNS)>>8),  // nolint:gomnd // 8 is the offset for NS.
+			)
+			utils.AddPreviouslyObservedTCPFlags(
+				ext,
+				bpfEvent.PreviouslyObservedFlags.Syn,
+				bpfEvent.PreviouslyObservedFlags.Ack,
+				bpfEvent.PreviouslyObservedFlags.Fin,
+				bpfEvent.PreviouslyObservedFlags.Rst,
+				bpfEvent.PreviouslyObservedFlags.Psh,
+				bpfEvent.PreviouslyObservedFlags.Urg,
+				bpfEvent.PreviouslyObservedFlags.Ece,
+				bpfEvent.PreviouslyObservedFlags.Cwr,
+				bpfEvent.PreviouslyObservedFlags.Ns,
 			)
 
 			// For packets originating from node, we use tsval as the tcpID.
 			// Packets coming back has the tsval echoed in tsecr.
 			if fl.GetTraceObservationPoint() == flow.TraceObservationPoint_TO_NETWORK {
-				utils.AddTCPID(meta, uint64(tcpMetadata.Tsval))
+				utils.AddTCPID(ext, uint64(tcpMetadata.Tsval))
 			} else if fl.GetTraceObservationPoint() == flow.TraceObservationPoint_FROM_NETWORK {
-				utils.AddTCPID(meta, uint64(tcpMetadata.Tsecr))
+				utils.AddTCPID(ext, uint64(tcpMetadata.Tsecr))
 			}
 
-			// Add metadata to the flow.
-			utils.AddRetinaMetadata(fl, meta)
+			// Set extensions on the flow.
+			utils.SetExtensions(fl, ext)
 
 			// Write the event to the enricher.
 			ev := &v1.Event{
@@ -671,7 +918,7 @@ func (p *packetParser) readData() {
 	// This is unblocked by the close call.
 	record, err := p.reader.Read()
 	if err != nil {
-		if errors.Is(err, perf.ErrClosed) {
+		if errors.Is(err, perf.ErrClosed) || errors.Is(err, ringbuf.ErrClosed) {
 			p.l.Error("Perf array is empty")
 			// nothing to do, we're done
 		} else {
@@ -705,4 +952,68 @@ func absPath() (string, error) {
 	}
 	dir := path.Dir(filename)
 	return dir, nil
+}
+
+type ringBufReaderWrapper struct {
+	reader *ringbuf.Reader
+}
+
+func (r *ringBufReaderWrapper) Read() (perfRecord, error) {
+	rec, err := r.reader.Read()
+	if err != nil {
+		return perfRecord{}, fmt.Errorf("failed to read from ringbuf: %w", err)
+	}
+	return perfRecord{
+		RawSample: rec.RawSample,
+		Remaining: rec.Remaining,
+	}, nil
+}
+
+func (r *ringBufReaderWrapper) Close() error {
+	if err := r.reader.Close(); err != nil {
+		return fmt.Errorf("failed to close ringbuf reader: %w", err)
+	}
+	return nil
+}
+
+type perfReaderWrapper struct {
+	reader *perf.Reader
+}
+
+func (r *perfReaderWrapper) Read() (perfRecord, error) {
+	rec, err := r.reader.Read()
+	if err != nil {
+		return perfRecord{}, fmt.Errorf("failed to read perf record: %w", err)
+	}
+	return perfRecord{
+		CPU:         rec.CPU,
+		LostSamples: rec.LostSamples,
+		RawSample:   rec.RawSample,
+	}, nil
+}
+
+func (r *perfReaderWrapper) Close() error {
+	if err := r.reader.Close(); err != nil {
+		return fmt.Errorf("failed to close perf reader: %w", err)
+	}
+	return nil
+}
+
+var getKernelVersion = utils.LinuxKernelVersion
+
+func ensureRingBufKernelSupported() error {
+	kv, err := getKernelVersion()
+	if err != nil {
+		return fmt.Errorf("failed to detect kernel version for ring buffer support: %w", err)
+	}
+
+	if !kv.AtLeast(ringBufMinKernelMajor, ringBufMinKernelMinor, ringBufMinKernelPatch) {
+		return fmt.Errorf(
+			"%w: requires >= %d.%d.%d, current: %s",
+			errRingBufKernelTooOld,
+			ringBufMinKernelMajor, ringBufMinKernelMinor, ringBufMinKernelPatch, kv.Release,
+		)
+	}
+
+	return nil
 }

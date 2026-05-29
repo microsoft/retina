@@ -87,6 +87,7 @@ func TestRetinaEndpointCommonFromAPI(t *testing.T) {
 				annotations: map[string]string{
 					RetinaPodAnnotation: RetinaPodAnnotationValue,
 				},
+				nodeIP: hostIP,
 			},
 		},
 		{
@@ -140,6 +141,7 @@ func TestRetinaEndpointCommonFromAPI(t *testing.T) {
 				annotations: map[string]string{
 					RetinaPodAnnotation: RetinaPodAnnotationValue,
 				},
+				nodeIP: hostIP,
 			},
 		},
 	}

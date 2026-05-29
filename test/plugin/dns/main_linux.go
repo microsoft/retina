@@ -17,6 +17,7 @@ package main
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/microsoft/retina/pkg/config"
@@ -35,7 +36,7 @@ func main() {
 	log.SetupZapLogger(opts)
 	l := log.Logger().Named("test-dns")
 
-	metrics.InitializeMetrics()
+	metrics.InitializeMetrics(slog.Default())
 	ctx := context.Background()
 
 	tt := dns.New(&config.Config{

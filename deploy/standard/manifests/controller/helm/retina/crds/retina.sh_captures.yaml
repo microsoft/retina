@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.15.0
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: captures.retina.sh
 spec:
   group: retina.sh
@@ -48,20 +48,122 @@ spec:
                   captureOption:
                     description: CaptureOption lists the options of the capture.
                     properties:
+                      absoluteSeq:
+                        description: |-
+                          AbsoluteSeq prints absolute TCP sequence numbers (equivalent to tcpdump -S flag).
+                          Shows actual sequence numbers instead of relative numbers.
+                        type: boolean
+                      dontVerifyChecksum:
+                        description: |-
+                          DontVerifyChecksum disables TCP checksum verification (equivalent to tcpdump -K flag).
+                          Skips TCP checksum validation for captured packets.
+                        type: boolean
                       duration:
                         description: Duration indicates length of time that the capture
                           should continue for.
                         pattern: ^([0-9]+(\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$
                         type: string
+                      immediateMode:
+                        description: |-
+                          ImmediateMode enables immediate mode for packet capture (equivalent to tcpdump --immediate-mode).
+                          When true, packets are delivered to the application immediately rather than being buffered.
+                          This can reduce latency but may increase CPU usage.
+                        type: boolean
+                      interfaces:
+                        description: |-
+                          Interfaces specifies the network interfaces on which to capture packets.
+                          If specified, captures only on the listed interfaces (e.g., ["eth0", "eth1"]).
+                          If empty, captures on all interfaces by default.
+                          Use this field to select specific interfaces, NOT the tcpdumpFilter field.
+                        items:
+                          type: string
+                        type: array
                       maxCaptureSize:
                         default: 100
                         description: MaxCaptureSize limits the capture file to MB
                           in size.
                         type: integer
+                      noPromiscuous:
+                        description: |-
+                          NoPromiscuous disables promiscuous mode for packet capture.
+                          When true, only packets destined for this host are captured (equivalent to tcpdump -p flag).
+                          When false or unset, captures all packets on the network segment (default behavior).
+                        type: boolean
+                      noResolveDNS:
+                        description: |-
+                          NoResolveDNS disables DNS resolution for captured addresses (equivalent to tcpdump -n flag).
+                          When true, IP addresses are displayed numerically without resolving hostnames.
+                          This speeds up capture processing and avoids DNS lookup overhead.
+                        type: boolean
+                      noResolvePort:
+                        description: |-
+                          NoResolvePort disables port name resolution (equivalent to tcpdump -nn flag).
+                          When true, both IP addresses and port numbers are displayed numerically.
+                          This prevents service name lookups for port numbers.
+                        type: boolean
+                      packetBuffered:
+                        description: |-
+                          PacketBuffered enables packet-buffered output mode (equivalent to tcpdump -U flag).
+                          When true, packets are written to output as soon as they're captured rather than being buffered.
+                          Useful for real-time monitoring but may impact performance.
+                        type: boolean
                       packetSize:
                         description: PacketSize limits the each packet to bytes in
                           size and packets longer than PacketSize will be truncated.
                         type: integer
+                      pcapFilter:
+                        description: |-
+                          PcapFilter specifies a BPF filter expression for packet filtering (e.g., "tcp port 443", "host 10.0.0.1").
+                          Only BPF expressions are allowed, no flags. See https://www.tcpdump.org/manpages/pcap-filter.7.html
+                        maxLength: 1024
+                        pattern: ^[^-]*$
+                        type: string
+                      printDataFormat:
+                        description: |-
+                          PrintDataFormat controls how packet data is printed in the output.
+                          Valid values: "" (none), "hex" (tcpdump -x), "hex-with-link" (tcpdump -xx), "ascii" (tcpdump -A), "ascii-with-link" (tcpdump -AA).
+                          Empty string means no packet data printing.
+                        enum:
+                        - ""
+                        - hex
+                        - hex-with-link
+                        - ascii
+                        - ascii-with-link
+                        type: string
+                      printLinkHeader:
+                        description: |-
+                          PrintLinkHeader prints link-level (Ethernet) headers (equivalent to tcpdump -e flag).
+                          Shows MAC addresses and other link-layer information.
+                        type: boolean
+                      quietOutput:
+                        description: |-
+                          QuietOutput enables quiet/quick output mode (equivalent to tcpdump -q flag).
+                          Prints less protocol information for shorter output lines.
+                        type: boolean
+                      timestampFormat:
+                        description: |-
+                          TimestampFormat controls the timestamp format in packet capture output.
+                          Valid values: "" (default), "none" (tcpdump -t), "unformatted" (tcpdump -tt), "delta" (tcpdump -ttt), "date" (tcpdump -tttt), "delta-since-first" (tcpdump -ttttt).
+                          Empty string means default timestamp format.
+                        enum:
+                        - ""
+                        - none
+                        - unformatted
+                        - delta
+                        - date
+                        - delta-since-first
+                        type: string
+                      verbosity:
+                        description: |-
+                          Verbosity controls the verbosity level of packet capture output.
+                          Valid values: "" (normal/default), "verbose" (tcpdump -v), "extra" (tcpdump -vv), "max" (tcpdump -vvv).
+                          Empty string means normal verbosity with no extra verbose flags.
+                        enum:
+                        - ""
+                        - verbose
+                        - extra
+                        - max
+                        type: string
                     type: object
                   captureTarget:
                     description: CaptureTarget indicates the target on which the network
@@ -165,6 +267,14 @@ spec:
                             type: object
                         type: object
                         x-kubernetes-map-type: atomic
+                      podNames:
+                        description: |-
+                          PodNames allows selecting specific pods by their names.
+                          If specified, the capture will be performed on the pods with matching names in the specified namespace.
+                          PodNames is incompatible with NodeSelector, NamespaceSelector, and PodSelector.
+                        items:
+                          type: string
+                        type: array
                       podSelector:
                         description: |-
                           This is a label selector which selects Pods. This field follows standard label
@@ -247,11 +357,26 @@ spec:
                       - Network statistics information
                     type: boolean
                   tcpdumpFilter:
-                    description: TcpdumpFilter is a raw tcpdump filter string.
+                    description: |-
+                      TcpdumpFilter accepts BPF filter expressions only (no flags).
+
+                      DEPRECATED and will be removed: Currently functional but scheduled for removal.
+                      Use captureOption.pcapFilter for BPF expressions and captureOption boolean flags for tcpdump display options instead.
+                    maxLength: 1024
+                    pattern: ^[^-]*$
                     type: string
                 required:
                 - captureTarget
                 type: object
+              cleanUpAfterUpload:
+                default: false
+                description: |-
+                  CleanUpAfterUpload indicates whether the capture jobs and associated resources
+                  should be automatically cleaned up after a successful upload to remote storage
+                  (BlobUpload or S3Upload). When set to true, completed capture jobs, secrets,
+                  and the Capture resource itself will be deleted once all jobs have succeeded
+                  and uploads are confirmed.
+                type: boolean
               outputConfiguration:
                 description: OutputConfiguration indicates the location capture will
                   be stored.
@@ -262,8 +387,16 @@ spec:
                     type: string
                   hostPath:
                     description: |-
-                      HostPath stores the capture files into the specified host filesystem.
-                      If nothing exists at the given path of the host, an empty directory will be created there.
+                      HostPath is a relative subpath name (e.g. "my-capture") joined under the
+                      operator-configured host base directory (default /var/log/retina/captures)
+                      on every node that runs a capture pod. The capture files are written to
+                      that joined directory, and an empty directory is created there if it does
+                      not already exist.
+
+                      HostPath must be a relative subpath: absolute paths (e.g. "/tmp/foo",
+                      "C:\\foo") and any value containing ".." segments are rejected by the
+                      operator. CR authors cannot influence the base directory, which is
+                      controlled by the cluster operator via the operator config.
                     type: string
                   persistentVolumeClaim:
                     description: PersistentVolumeClaim mounts the supplied PVC into
@@ -290,10 +423,14 @@ spec:
                         description: SecretName is the name of secret which stores
                           S3 compliant storage access key and secret key.
                         type: string
+                    required:
+                    - bucket
+                    - secretName
                     type: object
                 type: object
             required:
             - captureConfiguration
+            - outputConfiguration
             type: object
           status:
             description: CaptureStatus describes the status of the capture.
@@ -310,16 +447,8 @@ spec:
                 type: string
               conditions:
                 items:
-                  description: "Condition contains details for one aspect of the current
-                    state of this API Resource.\n---\nThis struct is intended for
-                    direct use as an array at the field path .status.conditions.  For
-                    example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the
-                    observations of a foo's current state.\n\t    // Known .status.conditions.type
-                    are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    //
-                    +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t
-                    \   // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\"
-                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
-                    \   // other fields\n\t}"
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
                   properties:
                     lastTransitionTime:
                       description: |-
@@ -360,12 +489,7 @@ spec:
                       - Unknown
                       type: string
                     type:
-                      description: |-
-                        type of condition in CamelCase or in foo.example.com/CamelCase.
-                        ---
-                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
-                        useful (see .node.status.conditions), the ability to deconflict is important.
-                        The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
                       maxLength: 316
                       pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                       type: string

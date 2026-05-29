@@ -17,6 +17,7 @@ data:
     enabledPlugin: {{ .Values.enabledPlugin_linux }}
     metricsInterval: {{ .Values.metricsInterval }}
     metricsIntervalDuration: {{ .Values.metricsIntervalDuration }}
+    enableTCX: {{ .Values.enableTCX }}
     enableTelemetry: {{ .Values.enableTelemetry }}
     enablePodLevel: {{ .Values.enablePodLevel }}
     enableConntrackMetrics: {{ .Values.enableConntrackMetrics }}
@@ -25,6 +26,10 @@ data:
     bypassLookupIPOfInterest: {{ .Values.bypassLookupIPOfInterest }}
     dataAggregationLevel: {{ .Values.dataAggregationLevel }}
     telemetryInterval: {{ .Values.daemonset.telemetryInterval }}
+    dataSamplingRate: {{ .Values.dataSamplingRate }}
+    packetParserRingBuffer: {{ .Values.packetParserRingBuffer }}
+    packetParserRingBufferSize: {{ .Values.packetParserRingBufferSize }}
+    filterMapMaxEntries: {{ .Values.filterMapMaxEntries }}
 {{- end}}
 ---
 {{- if .Values.os.windows}}
@@ -50,6 +55,7 @@ data:
     enableAnnotations: {{ .Values.enableAnnotations }}
     enablePodLevel: {{ .Values.enablePodLevel }}
     remoteContext: {{ .Values.remoteContext }}
+    enableAnnotations: {{ .Values.enableAnnotations }}
     telemetryInterval: {{ .Values.daemonset.telemetryInterval }}
 {{- end}}
 

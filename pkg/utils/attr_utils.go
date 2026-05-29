@@ -33,6 +33,7 @@ var (
 	Type                  = "type"
 	Reason                = "reason"
 	Direction             = "direction"
+	IsReply               = "is_reply"
 	SourceNodeName        = "source_node_name"
 	TargetNodeName        = "target_node_name"
 	State                 = "state"
@@ -46,6 +47,7 @@ var (
 	AclRule               = "aclrule"
 	Active                = "ACTIVE"
 	Device                = "device"
+	Metric                = "metric"
 
 	// TCP Connection Statistic Names
 	ResetCount           = "ResetCount"

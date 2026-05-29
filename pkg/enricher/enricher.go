@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/retina/pkg/common"
 	"github.com/microsoft/retina/pkg/controllers/cache"
 	"github.com/microsoft/retina/pkg/log"
+	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
 )
 
@@ -40,21 +41,26 @@ type Enricher struct {
 	outputRing *container.Ring
 }
 
-func New(ctx context.Context, cache cache.CacheInterface) *Enricher {
+func New(ctx context.Context, c cache.CacheInterface) *Enricher {
 	once.Do(func() {
-		ir := container.NewRing(container.Capacity1023)
-		e = &Enricher{
-			ctx:        ctx,
-			l:          log.Logger().Named("enricher"),
-			cache:      cache,
-			inputRing:  ir,
-			Reader:     container.NewRingReader(ir, ir.OldestWrite()),
-			outputRing: container.NewRing(container.Capacity1023),
-		}
-		initialized = true
+		e = newEnricher(ctx, c)
 	})
 
 	return e
+}
+
+func newEnricher(ctx context.Context, c cache.CacheInterface) *Enricher {
+	ir := container.NewRing(container.Capacity1023)
+	enricher := &Enricher{
+		ctx:        ctx,
+		l:          log.Logger().Named("enricher"),
+		cache:      c,
+		inputRing:  ir,
+		Reader:     container.NewRingReader(ir, ir.OldestWrite()),
+		outputRing: container.NewRing(container.Capacity1023),
+	}
+	initialized = true
+	return enricher
 }
 
 func Instance() *Enricher {
@@ -100,7 +106,21 @@ func (e *Enricher) Run() {
 
 // enrich takes the flow and enriches it with the information from the cache
 func (e *Enricher) enrich(ev *v1.Event) {
+	if ev == nil {
+		e.l.Debug("received nil event to enrich")
+		return
+	}
+
 	flow := ev.Event.(*flow.Flow)
+	if flow == nil {
+		e.l.Debug("received nil flow to enrich", zap.Any("event", ev))
+		return
+	}
+
+	if flow.GetIP() == nil {
+		e.l.Debug("flow IP is nil", zap.Any("flow", flow))
+		return
+	}
 
 	// IPversion is a enum in the flow proto
 	// 0: IPVersion_IP_NOT_USED
@@ -128,6 +148,17 @@ func (e *Enricher) enrich(ev *v1.Event) {
 	if dstObj != nil {
 		flow.Destination = e.getEndpoint(dstObj)
 	}
+
+	// Resolve zones lazily from the node cache using the pod's nodeIP.
+	srcZone := e.zoneFromObj(srcObj)
+	dstZone := e.zoneFromObj(dstObj)
+
+	ext := utils.GetExtensionsStruct(flow)
+	if ext == nil {
+		ext = utils.NewExtensions()
+	}
+	utils.AddZones(ext, srcZone, dstZone)
+	utils.SetExtensions(flow, ext)
 
 	ev.Event = flow
 	e.l.Debug("enriched flow", zap.Any("flow", flow))
@@ -188,4 +219,23 @@ func (e *Enricher) Write(ev *v1.Event) {
 
 func (e *Enricher) ExportReader() *container.RingReader {
 	return container.NewRingReader(e.outputRing, e.outputRing.OldestWrite())
+}
+
+// zoneFromObj resolves the availability zone for a cached object by looking up
+// the node from the cache at flow time, avoiding startup race conditions.
+func (e *Enricher) zoneFromObj(obj interface{}) string {
+	if obj == nil {
+		return "unknown"
+	}
+	if o, ok := obj.(*common.RetinaEndpoint); ok {
+		if nodeIP := o.NodeIP(); nodeIP != "" {
+			node := e.cache.GetNodeByIP(nodeIP)
+			if node != nil {
+				if z := node.Zone(); z != "" {
+					return z
+				}
+			}
+		}
+	}
+	return "unknown"
 }

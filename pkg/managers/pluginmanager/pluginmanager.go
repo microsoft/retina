@@ -5,55 +5,59 @@ package pluginmanager
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	kcfg "github.com/microsoft/retina/pkg/config"
-	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/managers/watchermanager"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin"
 	"github.com/microsoft/retina/pkg/plugin/conntrack"
 	"github.com/microsoft/retina/pkg/telemetry"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
 
 const (
+	// DefaultMetricsInterval is used when MetricsInterval is zero or negative.
+	DefaultMetricsInterval = 10 * time.Second
 
 	// In any run I haven't seen reconcile take longer than 5 seconds,
 	// and 10 seconds seems like a reasonable SLA for reconciliation to be completed
 	MAX_RECONCILE_TIME = 10 * time.Second
+
+	// plugin name used for conntrack GC check
+	pluginNamePacketparser = "packetparser"
 )
 
 var (
-	ErrNilCfg       = errors.New("pluginmanager requires a non-nil config")
-	ErrZeroInterval = errors.New("pluginmanager requires a positive MetricsInterval in its config")
+	ErrNilCfg         = errors.New("pluginmanager requires a non-nil config")
+	ErrZeroInterval   = errors.New("pluginmanager requires a positive MetricsInterval in its config")
+	ErrPluginNotFound = errors.New("plugin not found in registry")
 )
 
 type PluginManager struct {
 	cfg     *kcfg.Config
-	l       *log.ZapLogger
+	l       *slog.Logger
 	plugins map[string]plugin.Plugin
 	tel     telemetry.Telemetry
 
 	watcherManager watchermanager.IWatcherManager
 }
 
-func NewPluginManager(cfg *kcfg.Config, tel telemetry.Telemetry) (*PluginManager, error) {
-	logger := log.Logger().Named("plugin-manager")
+func NewPluginManager(cfg *kcfg.Config, tel telemetry.Telemetry, logger *slog.Logger) (*PluginManager, error) {
 	mgr := &PluginManager{
 		cfg:     cfg,
-		l:       logger,
+		l:       logger.With("module", "plugin-manager"),
 		tel:     tel,
 		plugins: map[string]plugin.Plugin{},
 	}
 
 	if mgr.cfg.EnablePodLevel {
 		mgr.l.Info("plugin manager has pod level enabled")
-		mgr.watcherManager = watchermanager.NewWatcherManager()
+		mgr.watcherManager = watchermanager.NewWatcherManager(mgr.cfg.FilterMapMaxEntries)
 	} else {
 		mgr.l.Info("plugin manager has pod level disabled")
 	}
@@ -61,7 +65,7 @@ func NewPluginManager(cfg *kcfg.Config, tel telemetry.Telemetry) (*PluginManager
 	for _, name := range cfg.EnabledPlugin {
 		newPluginFn, ok := plugin.Get(name)
 		if !ok {
-			return nil, fmt.Errorf("plugin %s not found in registry", name)
+			return nil, errors.Wrapf(ErrPluginNotFound, "%s", name)
 		}
 		mgr.plugins[name] = newPluginFn(mgr.cfg)
 	}
@@ -76,12 +80,12 @@ func (p *PluginManager) Stop() {
 		go func(plugin plugin.Plugin) {
 			defer wg.Done()
 			if err := plugin.Stop(); err != nil {
-				p.l.Error("failed to stop plugin", zap.Error(err))
+				p.l.Error("failed to stop plugin", "error", err)
 				// Continue stopping other plugins.
 				// This allows us to stop as many plugins as possible,
 				// even if some plugins fail to stop.
 			}
-			p.l.Info("Cleaned up resource for plugin", zap.String("name", plugin.Name()))
+			p.l.Info("Cleaned up resource for plugin", "name", plugin.Name())
 		}(pl)
 	}
 	wg.Wait()
@@ -107,7 +111,7 @@ func (p *PluginManager) Reconcile(ctx context.Context, pl plugin.Plugin) error {
 		return errors.Wrap(err, "failed to init plugin")
 	}
 
-	p.l.Info("Reconciled plugin", zap.String("name", pl.Name()))
+	p.l.Info("Reconciled plugin", "name", pl.Name())
 	return nil
 }
 
@@ -122,8 +126,9 @@ func (p *PluginManager) Start(ctx context.Context) error {
 		return ErrNilCfg
 	}
 
-	if p.cfg.MetricsInterval == 0 {
-		return ErrZeroInterval
+	if p.cfg.MetricsInterval <= 0 {
+		p.l.Warn("MetricsInterval is invalid or unset; defaulting to 10s", slog.Duration("interval", p.cfg.MetricsInterval))
+		p.cfg.MetricsInterval = DefaultMetricsInterval
 	}
 
 	if p.cfg.EnablePodLevel {
@@ -136,7 +141,7 @@ func (p *PluginManager) Start(ctx context.Context) error {
 	}
 
 	g, ctx := errgroup.WithContext(ctx)
-	_, isPacketParserEnabled := p.plugins["packetparser"]
+	_, isPacketParserEnabled := p.plugins[pluginNamePacketparser]
 	// run conntrack GC only if packetparser is enabled
 	if isPacketParserEnabled {
 		ct, connErr := conntrack.New()
@@ -174,7 +179,7 @@ func (p *PluginManager) Start(ctx context.Context) error {
 	// on cancel context wait for all plugins to exit
 	err = g.Wait()
 	if err != nil {
-		p.l.Error("plugin manager exited with error", zap.Error(err))
+		p.l.Error("plugin manager exited with error", "error", err)
 		return errors.Wrapf(err, "failed to start plugin manager, plugin exited")
 	}
 
@@ -203,10 +208,13 @@ func (p *PluginManager) SetPlugin(name string, pl plugin.Plugin) {
 }
 
 func (p *PluginManager) SetupChannel(c chan *v1.Event) {
+	p.l.Info("Setting up external event channel for plugins", "channelCap", cap(c), "pluginCount", len(p.plugins))
 	for name, plugin := range p.plugins {
 		err := plugin.SetupChannel(c)
 		if err != nil {
-			p.l.Error("failed to setup channel for plugin", zap.String("plugin name", name), zap.Error(err))
+			p.l.Error("failed to setup channel for plugin", "plugin name", name, "error", err)
+		} else {
+			p.l.Info("Setup channel for plugin", "plugin", name)
 		}
 	}
 }
