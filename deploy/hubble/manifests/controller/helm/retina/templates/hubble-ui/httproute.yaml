@@ -30,7 +30,7 @@ spec:
   {{- if .Values.hubble.ui.httpRoute.hostnames }}
   hostnames:
     {{- range .Values.hubble.ui.httpRoute.hostnames }}
-    - {{ . }}
+    - {{ tpl (. | toString) $ }}
     {{- end }}
   {{- end }}
   rules:
