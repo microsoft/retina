@@ -25,6 +25,7 @@ import (
 	"github.com/cilium/cilium/pkg/k8s/watchers"
 	monitoragent "github.com/cilium/cilium/pkg/monitor/agent"
 	"github.com/cilium/cilium/pkg/node"
+	"github.com/cilium/hive"
 	"github.com/cilium/hive/cell"
 	"github.com/cilium/workerpool"
 
@@ -72,14 +73,40 @@ var (
 		}),
 
 		// Start the controller manager
-		cell.Invoke(func(l *slog.Logger, lifecycle cell.Lifecycle, ctrlManager ctrl.Manager) {
+		cell.Invoke(func(l *slog.Logger, lifecycle cell.Lifecycle, shutdowner hive.Shutdowner, ctrlManager ctrl.Manager) {
 			var wp *workerpool.WorkerPool
 			lifecycle.Append(
 				cell.Hook{
 					OnStart: func(cell.HookContext) error {
 						wp = workerpool.New(1)
 						l.Info("starting controller-runtime manager")
-						if err := wp.Submit("controller-runtime manager", ctrlManager.Start); err != nil {
+						if err := wp.Submit("controller-runtime manager", func(ctx context.Context) error {
+							// controller-runtime's manager.Start blocks until the context is
+							// cancelled or one of its runnables returns an error. The
+							// workerpool result is never drained, so an error returned here
+							// would otherwise be silently discarded. A silent exit leaves the
+							// node reconciler (and therefore Hubble peer discovery) dead while
+							// the agent keeps running, which surfaces downstream as
+							// hubble-relay never receiving any peers and failing its health
+							// check. Surface the failure and trigger a hive shutdown so the
+							// agent fails loudly (and is restarted) instead of running in a
+							// silently degraded state.
+							if err := ctrlManager.Start(ctx); err != nil {
+								l.Error("controller-runtime manager exited with error; node reconciler is no longer running", "error", err)
+								shutdowner.Shutdown(hive.ShutdownWithError(err))
+								return errors.Wrap(err, "running controller-runtime manager")
+							}
+							if ctx.Err() == nil {
+								// Start returned without error while the context is still
+								// active: the manager stopped unexpectedly even though the
+								// agent should still be running.
+								err := errors.New("controller-runtime manager stopped unexpectedly")
+								l.Error("controller-runtime manager stopped unexpectedly; node reconciler is no longer running")
+								shutdowner.Shutdown(hive.ShutdownWithError(err))
+								return err
+							}
+							return nil
+						}); err != nil {
 							return errors.Wrap(err, "failed to submit controller-runtime manager to workerpool")
 						}
 						return nil
