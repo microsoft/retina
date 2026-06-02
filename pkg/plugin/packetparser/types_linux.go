@@ -10,7 +10,6 @@ import (
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/perf"
 	tc "github.com/florianl/go-tc"
 	nl "github.com/mdlayher/netlink"
 	"github.com/vishvananda/netlink"
@@ -28,6 +27,7 @@ const (
 	TCPFlagURG
 	TCPFlagECE
 	TCPFlagCWR
+	TCPFlagNS
 )
 
 const (
@@ -48,6 +48,12 @@ type interfaceType string
 const (
 	Veth   interfaceType = "veth"
 	Device interfaceType = "device"
+)
+
+const (
+	ringBufMinKernelMajor = 5
+	ringBufMinKernelMinor = 8
+	ringBufMinKernelPatch = 0
 )
 
 var (
@@ -79,7 +85,7 @@ type tcValue struct {
 	qdisc *tc.Object
 }
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=types_linux.go -destination=mocks/mock_types.go -package=mocks
+//go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=types_linux.go -destination=mocks/mock_types_linux.go -package=mocks
 
 // tc qdisc interface
 type qdisc interface {
@@ -101,8 +107,15 @@ type nltc interface {
 }
 
 type perfReader interface {
-	Read() (perf.Record, error)
+	Read() (perfRecord, error)
 	Close() error
+}
+
+type perfRecord struct {
+	CPU         int
+	LostSamples uint64
+	RawSample   []byte
+	Remaining   int
 }
 
 type packetParser struct {
@@ -121,7 +134,7 @@ type packetParser struct {
 	hostIngressInfo     *ebpf.ProgramInfo
 	hostEgressInfo      *ebpf.ProgramInfo
 	wg                  sync.WaitGroup
-	recordsChannel      chan perf.Record
+	recordsChannel      chan perfRecord
 	externalChannel     chan *v1.Event
 }
 

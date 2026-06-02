@@ -68,7 +68,8 @@ func TestHeartbeat(t *testing.T) {
 		properties map[string]string
 	}
 	type args struct {
-		ctx context.Context
+		ctx   context.Context
+		funcs []func() map[string]string
 	}
 	tests := []struct {
 		name   string
@@ -84,6 +85,26 @@ func TestHeartbeat(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
+				funcs: []func() map[string]string{
+					func() map[string]string {
+						return map[string]string{
+							"customLabel1": "value1",
+							"customLabel2": "value2",
+						}
+					},
+				},
+			},
+		},
+		{
+			name: "test heartbeat with labels",
+			fields: fields{
+				properties: map[string]string{
+					"test": "test",
+				},
+			},
+			args: args{
+				ctx:   context.Background(),
+				funcs: []func() map[string]string{},
 			},
 		},
 	}
@@ -94,7 +115,7 @@ func TestHeartbeat(t *testing.T) {
 				properties: tt.fields.properties,
 				profile:    NewNoopPerfProfile(),
 			}
-			tr.heartbeat(tt.args.ctx)
+			tr.heartbeat(tt.args.ctx, tt.args.funcs...)
 		})
 	}
 }

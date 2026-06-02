@@ -1,5 +1,5 @@
-# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.2-2-cbl-mariner2.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:5341a0010ecff114ee2f11f5eaa4f73b721b54142954041523f3e785d5c4b978 AS builder
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.11-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:531bd02db17b0c2ec919f10fc203a6a8c825e8ca01f40c3a1e32e1cf7119c6d8 AS builder
 
 # Build args
 ARG VERSION
@@ -15,7 +15,8 @@ COPY . .
 RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X "github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID"="$APP_INSIGHTS_ID"" -o -o /usr/bin/retina-operator.exe retina-operator operator/main.go
 
 # Copy into final image
-FROM  mcr.microsoft.com/windows/nanoserver:ltsc2022
+# skopeo inspect docker://mcr.microsoft.com/windows/nanoserver:ltsc2022 --override-os windows --format "{{.Name}}@{{.Digest}}"
+FROM  mcr.microsoft.com/windows/nanoserver@sha256:643adf84ee2338ee4811fd891adb9e912917dc6c0ca85399982e1bebda4f2295
 COPY --from=builder /usr/src/retina/windows/kubeconfigtemplate.yaml kubeconfigtemplate.yaml
 COPY --from=builder /usr/src/retina/windows/setkubeconfigpath.ps1 setkubeconfigpath.ps1
 

@@ -21,6 +21,7 @@ import (
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/perf"
+	"github.com/cilium/ebpf/ringbuf"
 	tc "github.com/florianl/go-tc"
 	helper "github.com/florianl/go-tc/core"
 	nl "github.com/mdlayher/netlink"
@@ -51,7 +52,14 @@ import (
 )
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type packet packetparser ./_cprog/packetparser.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../lib/common/libbpf/_include/linux -I../lib/common/libbpf/_include/uapi/linux -I../lib/common/libbpf/_include/asm -I../filter/_cprog/ -I../conntrack/_cprog/
-var errNoOutgoingLinks = errors.New("could not determine any outgoing links")
+var (
+	errNoOutgoingLinks          = errors.New("could not determine any outgoing links")
+	errRingBufKernelTooOld      = errors.New("ring buffer requires newer kernel")
+	errRingBufSizeUnset         = errors.New("ring buffer size must be set when ring buffers are enabled")
+	errRingBufSizeTooSmall      = errors.New("ring buffer size is smaller than the kernel page size")
+	errRingBufSizeTooLarge      = errors.New("ring buffer size is larger than the allowed maximum")
+	errRingBufSizeNotPowerOfTwo = errors.New("ring buffer size is not a power of 2")
+)
 
 func init() {
 	registry.Add(name, New)
@@ -93,8 +101,8 @@ func (p *packetParser) Generate(ctx context.Context) error {
 	if p.cfg.BypassLookupIPOfInterest {
 		p.l.Info("bypassing lookup IP of interest")
 		bypassLookupIPOfInterest = 1
-		st = fmt.Sprintf("#define BYPASS_LOOKUP_IP_OF_INTEREST %d\n", bypassLookupIPOfInterest)
 	}
+	st = fmt.Sprintf("#define BYPASS_LOOKUP_IP_OF_INTEREST %d\n", bypassLookupIPOfInterest)
 
 	conntrackMetrics := 0
 	// Check if packetparser has Conntrack metrics enabled.
@@ -117,12 +125,46 @@ func (p *packetParser) Generate(ctx context.Context) error {
 	p.l.Info("data aggregation level", zap.String("level", p.cfg.DataAggregationLevel.String()))
 	st += fmt.Sprintf("#define DATA_AGGREGATION_LEVEL %d\n", p.cfg.DataAggregationLevel)
 
+	// Process packetparser sampling rate.
+	p.l.Info("sampling rate", zap.Uint32("rate", p.cfg.DataSamplingRate))
+	st += fmt.Sprintf("#define DATA_SAMPLING_RATE %d\n", p.cfg.DataSamplingRate)
+
 	// Generate dynamic header for packetparser.
 	err = loader.WriteFile(ctx, dynamicHeaderPath, st)
 	if err != nil {
 		return errors.Wrap(err, "failed to write dynamic header")
 	}
 	p.l.Info("PacketParser header generated at", zap.String("path", dynamicHeaderPath))
+	return nil
+}
+
+// validateRingBufferSize validates the ring buffer size and returns an error for invalid values.
+func validateRingBufferSize(size uint32) error {
+	const maxSize = 1 * 1024 * 1024 * 1024 // 1GB
+	intPageSize := os.Getpagesize()
+	if intPageSize <= 0 {
+		intPageSize = 4096
+	}
+	if intPageSize > int(^uint32(0)) {
+		intPageSize = int(^uint32(0))
+	}
+	//nolint:gosec // bounded to uint32
+	pageSize := uint32(intPageSize)
+
+	if size == 0 {
+		return errRingBufSizeUnset
+	}
+	if size < pageSize {
+		return fmt.Errorf("%w: size=%d page_size=%d", errRingBufSizeTooSmall, size, pageSize)
+	}
+	if size > maxSize {
+		return fmt.Errorf("%w: size=%d max_size=%d", errRingBufSizeTooLarge, size, maxSize)
+	}
+	// Check if size is a power of 2.
+	if (size & (size - 1)) != 0 {
+		return fmt.Errorf("%w: size=%d", errRingBufSizeNotPowerOfTwo, size)
+	}
+
 	return nil
 }
 
@@ -148,7 +190,8 @@ func (p *packetParser) Compile(ctx context.Context) error {
 		targetArch = "-D__TARGET_ARCH_arm64"
 	}
 	// Keep target as bpf, otherwise clang compilation yields bpf object that elf reader cannot load.
-	err = loader.CompileEbpf(ctx, "-target", "bpf", "-Wall", targetArch, "-g", "-O2", "-c", bpfSourceFile, "-o", bpfOutputFile,
+	cflags := []string{
+		"-target", "bpf", "-Wall", targetArch, "-g", "-O2", "-c", bpfSourceFile, "-o", bpfOutputFile,
 		archLibDir,
 		libbpfSrcDir,
 		libbpfIncludeAsmDir,
@@ -156,7 +199,21 @@ func (p *packetParser) Compile(ctx context.Context) error {
 		libbpfIncludeUapiLinuxDir,
 		filterDir,
 		conntrackDir,
-	)
+	}
+
+	if p.cfg.PacketParserRingBuffer.IsEnabled() {
+		if validateErr := validateRingBufferSize(p.cfg.PacketParserRingBufferSize); validateErr != nil {
+			return validateErr
+		}
+
+		p.l.Info("Compiling with Ring Buffer enabled", zap.Uint32("size", p.cfg.PacketParserRingBufferSize))
+		cflags = append(cflags,
+			"-DUSE_RING_BUFFER",
+			fmt.Sprintf("-DRING_BUFFER_SIZE=%d", p.cfg.PacketParserRingBufferSize),
+		)
+	}
+
+	err = loader.CompileEbpf(ctx, cflags...)
 	if err != nil {
 		return err
 	}
@@ -169,6 +226,11 @@ func (p *packetParser) Init() error {
 	if !p.cfg.EnablePodLevel {
 		p.l.Warn("packet parser and latency plugin will not init because pod level is disabled")
 		return nil
+	}
+	if p.cfg.PacketParserRingBuffer.IsEnabled() {
+		if ringBufErr := ensureRingBufKernelSupported(); ringBufErr != nil {
+			return ringBufErr
+		}
 	}
 	// Get the absolute path to this file during runtime.
 	dir, err := absPath()
@@ -218,10 +280,24 @@ func (p *packetParser) Init() error {
 		return err
 	}
 
-	p.reader, err = plugincommon.NewPerfReader(p.l, objs.RetinaPacketparserEvents, perCPUBuffer, 1)
-	if err != nil {
-		p.l.Error("Error NewReader", zap.Error(err))
-		return err
+	if p.cfg.PacketParserRingBuffer.IsEnabled() {
+		p.l.Info("Initializing Ring Buffer reader")
+		var rb *ringbuf.Reader
+		rb, err = ringbuf.NewReader(objs.RetinaPacketparserEvents)
+		if err != nil {
+			p.l.Error("Error NewReader ringbuf", zap.Error(err))
+			return fmt.Errorf("failed to create ringbuf reader: %w", err)
+		}
+		p.reader = &ringBufReaderWrapper{reader: rb}
+	} else {
+		p.l.Info("Initializing Perf Reader")
+		var pr *perf.Reader
+		pr, err = plugincommon.NewPerfReader(p.l, objs.RetinaPacketparserEvents, perCPUBuffer, 1)
+		if err != nil {
+			p.l.Error("Error NewReader", zap.Error(err))
+			return fmt.Errorf("failed to create perf reader: %w", err)
+		}
+		p.reader = &perfReaderWrapper{reader: pr}
 	}
 
 	p.tcMap = &sync.Map{}
@@ -280,7 +356,7 @@ func (p *packetParser) Start(ctx context.Context) error {
 	}
 
 	// Create the channel.
-	p.recordsChannel = make(chan perf.Record, buffer)
+	p.recordsChannel = make(chan perfRecord, buffer)
 	p.l.Debug("Created records channel")
 
 	return p.run(ctx)
@@ -568,6 +644,8 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 				zap.Int("worker_id", id),
 			)
 
+			metrics.ParsedPacketsCounter.WithLabelValues().Inc()
+
 			var bpfEvent packetparserPacket
 			err := binary.Read(bytes.NewReader(record.RawSample), binary.LittleEndian, &bpfEvent)
 			if err != nil {
@@ -602,10 +680,14 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 			// Add the traffic direction to the flow.
 			fl.TrafficDirection = flow.TrafficDirection(bpfEvent.TrafficDirection)
 
-			meta := &utils.RetinaMetadata{}
+			ext := utils.NewExtensions()
 
-			// Add packet size to the flow's metadata.
-			utils.AddPacketSize(meta, bpfEvent.Bytes)
+			// Add packet size to the flow's extensions.
+			utils.AddPacketSize(ext, bpfEvent.Bytes)
+
+			// Add previously observed byte and packet counts to the flow's extensions
+			utils.AddPreviouslyObservedBytes(ext, bpfEvent.PreviouslyObservedBytes)
+			utils.AddPreviouslyObservedPackets(ext, bpfEvent.PreviouslyObservedPackets)
 
 			// Add the TCP metadata to the flow.
 			tcpMetadata := bpfEvent.TcpMetadata
@@ -617,18 +699,33 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 				uint16((bpfEvent.Flags&TCPFlagRST)>>2), // nolint:gomnd // 2 is the offset for RST.
 				uint16((bpfEvent.Flags&TCPFlagPSH)>>3), // nolint:gomnd // 3 is the offset for PSH.
 				uint16((bpfEvent.Flags&TCPFlagURG)>>5), // nolint:gomnd // 5 is the offset for URG.
+				uint16((bpfEvent.Flags&TCPFlagECE)>>6), // nolint:gomnd // 6 is the offset for ECE.
+				uint16((bpfEvent.Flags&TCPFlagCWR)>>7), // nolint:gomnd // 7 is the offset for CWR.
+				uint16((bpfEvent.Flags&TCPFlagNS)>>8),  // nolint:gomnd // 8 is the offset for NS.
+			)
+			utils.AddPreviouslyObservedTCPFlags(
+				ext,
+				bpfEvent.PreviouslyObservedFlags.Syn,
+				bpfEvent.PreviouslyObservedFlags.Ack,
+				bpfEvent.PreviouslyObservedFlags.Fin,
+				bpfEvent.PreviouslyObservedFlags.Rst,
+				bpfEvent.PreviouslyObservedFlags.Psh,
+				bpfEvent.PreviouslyObservedFlags.Urg,
+				bpfEvent.PreviouslyObservedFlags.Ece,
+				bpfEvent.PreviouslyObservedFlags.Cwr,
+				bpfEvent.PreviouslyObservedFlags.Ns,
 			)
 
 			// For packets originating from node, we use tsval as the tcpID.
 			// Packets coming back has the tsval echoed in tsecr.
 			if fl.GetTraceObservationPoint() == flow.TraceObservationPoint_TO_NETWORK {
-				utils.AddTCPID(meta, uint64(tcpMetadata.Tsval))
+				utils.AddTCPID(ext, uint64(tcpMetadata.Tsval))
 			} else if fl.GetTraceObservationPoint() == flow.TraceObservationPoint_FROM_NETWORK {
-				utils.AddTCPID(meta, uint64(tcpMetadata.Tsecr))
+				utils.AddTCPID(ext, uint64(tcpMetadata.Tsecr))
 			}
 
-			// Add metadata to the flow.
-			utils.AddRetinaMetadata(fl, meta)
+			// Set extensions on the flow.
+			utils.SetExtensions(fl, ext)
 
 			// Write the event to the enricher.
 			ev := &v1.Event{
@@ -671,7 +768,7 @@ func (p *packetParser) readData() {
 	// This is unblocked by the close call.
 	record, err := p.reader.Read()
 	if err != nil {
-		if errors.Is(err, perf.ErrClosed) {
+		if errors.Is(err, perf.ErrClosed) || errors.Is(err, ringbuf.ErrClosed) {
 			p.l.Error("Perf array is empty")
 			// nothing to do, we're done
 		} else {
@@ -705,4 +802,66 @@ func absPath() (string, error) {
 	}
 	dir := path.Dir(filename)
 	return dir, nil
+}
+
+type ringBufReaderWrapper struct {
+	reader *ringbuf.Reader
+}
+
+func (r *ringBufReaderWrapper) Read() (perfRecord, error) {
+	rec, err := r.reader.Read()
+	if err != nil {
+		return perfRecord{}, fmt.Errorf("failed to read from ringbuf: %w", err)
+	}
+	return perfRecord{
+		RawSample: rec.RawSample,
+		Remaining: rec.Remaining,
+	}, nil
+}
+
+func (r *ringBufReaderWrapper) Close() error {
+	if err := r.reader.Close(); err != nil {
+		return fmt.Errorf("failed to close ringbuf reader: %w", err)
+	}
+	return nil
+}
+
+type perfReaderWrapper struct {
+	reader *perf.Reader
+}
+
+func (r *perfReaderWrapper) Read() (perfRecord, error) {
+	rec, err := r.reader.Read()
+	if err != nil {
+		return perfRecord{}, fmt.Errorf("failed to read perf record: %w", err)
+	}
+	return perfRecord{
+		CPU:         rec.CPU,
+		LostSamples: rec.LostSamples,
+		RawSample:   rec.RawSample,
+	}, nil
+}
+
+func (r *perfReaderWrapper) Close() error {
+	if err := r.reader.Close(); err != nil {
+		return fmt.Errorf("failed to close perf reader: %w", err)
+	}
+	return nil
+}
+
+func ensureRingBufKernelSupported() error {
+	kv, err := utils.LinuxKernelVersion()
+	if err != nil {
+		return fmt.Errorf("failed to detect kernel version for ring buffer support: %w", err)
+	}
+
+	if !kv.AtLeast(ringBufMinKernelMajor, ringBufMinKernelMinor, ringBufMinKernelPatch) {
+		return fmt.Errorf(
+			"%w: requires >= %d.%d.%d, current: %s",
+			errRingBufKernelTooOld,
+			ringBufMinKernelMajor, ringBufMinKernelMinor, ringBufMinKernelPatch, kv.Release,
+		)
+	}
+
+	return nil
 }

@@ -5,6 +5,7 @@ package metrics
 
 import (
 	"strings"
+	"time"
 
 	v1 "github.com/cilium/cilium/api/v1/flow"
 	api "github.com/microsoft/retina/crd/api/v1alpha1"
@@ -24,20 +25,20 @@ const (
 )
 
 type TCPRetransMetrics struct {
-	baseMetricObject
+	baseMetricInterface
 	tcpRetransMetrics metricsinit.GaugeVec
 }
 
-func NewTCPRetransMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext) *TCPRetransMetrics {
+func NewTCPRetransMetrics(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogger, isLocalContext enrichmentContext, ttl time.Duration) *TCPRetransMetrics {
 	if ctxOptions == nil || !strings.Contains(strings.ToLower(ctxOptions.MetricName), "retrans") {
 		return nil
 	}
 
 	fl = fl.Named("tcpretrans-metricsmodule")
 	fl.Info("Creating TCP retransmit count metrics", zap.Any("options", ctxOptions))
-	return &TCPRetransMetrics{
-		baseMetricObject: newBaseMetricsObject(ctxOptions, fl, isLocalContext),
-	}
+	t := &TCPRetransMetrics{}
+	t.baseMetricInterface = newBaseMetricsObject(ctxOptions, fl, isLocalContext, t.expire, ttl)
+	return t
 }
 
 func (t *TCPRetransMetrics) Init(metricName string) {
@@ -52,14 +53,14 @@ func (t *TCPRetransMetrics) Init(metricName string) {
 
 func (t *TCPRetransMetrics) getLabels() []string {
 	labels := []string{utils.Direction}
-	if t.srcCtx != nil {
-		labels = append(labels, t.srcCtx.getLabels()...)
-		t.l.Info("src labels", zap.Any("labels", labels))
+	if t.sourceCtx() != nil {
+		labels = append(labels, t.sourceCtx().getLabels()...)
+		t.getLogger().Info("src labels", zap.Any("labels", labels))
 	}
 
-	if t.dstCtx != nil {
-		labels = append(labels, t.dstCtx.getLabels()...)
-		t.l.Info("dst labels", zap.Any("labels", labels))
+	if t.destinationCtx() != nil {
+		labels = append(labels, t.destinationCtx().getLabels()...)
+		t.getLogger().Info("dst labels", zap.Any("labels", labels))
 	}
 
 	return labels
@@ -82,42 +83,59 @@ func (t *TCPRetransMetrics) ProcessFlow(flow *v1.Flow) {
 	}
 
 	labels := []string{flow.TrafficDirection.String()}
-	if t.srcCtx != nil {
-		srcLabels := t.srcCtx.getValues(flow)
+	if t.sourceCtx() != nil {
+		srcLabels := t.sourceCtx().getValues(flow)
 		if len(srcLabels) > 0 {
 			labels = append(labels, srcLabels...)
 		}
 	}
 
-	if t.dstCtx != nil {
-		dstLabels := t.dstCtx.getValues(flow)
+	if t.destinationCtx() != nil {
+		dstLabels := t.destinationCtx().getValues(flow)
 		if len(dstLabels) > 0 {
 			labels = append(labels, dstLabels...)
 		}
 	}
 
-	t.tcpRetransMetrics.WithLabelValues(labels...).Inc()
+	t.update(labels)
 }
 
 func (t *TCPRetransMetrics) processLocalCtxFlow(flow *v1.Flow) {
-	labelValuesMap := t.srcCtx.getLocalCtxValues(flow)
+	labelValuesMap := t.sourceCtx().getLocalCtxValues(flow)
 	if labelValuesMap == nil {
 		return
 	}
 
 	if len(labelValuesMap[ingress]) > 0 {
 		labels := append([]string{ingress}, labelValuesMap[ingress]...)
-		t.tcpRetransMetrics.WithLabelValues(labels...).Inc()
-		t.l.Debug("tcp retransmission count metric in INGRESS in local ctx", zap.Any("labels", labels))
+		t.update(labels)
+		t.getLogger().Debug("tcp retransmission count metric in INGRESS in local ctx", zap.Any("labels", labels))
 	}
 
 	if len(labelValuesMap[egress]) > 0 {
 		labels := append([]string{egress}, labelValuesMap[egress]...)
-		t.tcpRetransMetrics.WithLabelValues(labels...).Inc()
-		t.l.Debug("tcp retransmission count metric in EGRESS in local ctx", zap.Any("labels", labels))
+		t.update(labels)
+		t.getLogger().Debug("tcp retransmission count metric in EGRESS in local ctx", zap.Any("labels", labels))
 	}
+}
+
+func (t *TCPRetransMetrics) expire(labels []string) bool {
+	var d bool
+	if t.tcpRetransMetrics != nil {
+		d = t.tcpRetransMetrics.DeleteLabelValues(labels...)
+		if d {
+			metricsinit.MetricsExpiredCounter.WithLabelValues(TCPRetransCountName).Inc()
+		}
+	}
+	return d
+}
+
+func (t *TCPRetransMetrics) update(labels []string) {
+	t.tcpRetransMetrics.WithLabelValues(labels...).Inc()
+	t.updated(labels)
 }
 
 func (t *TCPRetransMetrics) Clean() {
 	exporter.UnregisterMetric(exporter.AdvancedRegistry, metricsinit.ToPrometheusType(t.tcpRetransMetrics))
+	t.clean()
 }

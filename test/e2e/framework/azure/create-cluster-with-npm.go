@@ -18,11 +18,12 @@ var (
 )
 
 const (
-	clusterTimeout      = 15 * time.Minute
-	clusterCreateTicker = 30 * time.Second
-	pollFrequency       = 5 * time.Second
-	AgentARMSKU         = "Standard_D4pls_v5"
-	AuxilaryNodeCount   = 1
+	clusterTimeout       = 15 * time.Minute
+	clusterCreateTicker  = 30 * time.Second
+	pollFrequency        = 5 * time.Second
+	AgentARMSKU          = "Standard_D4pls_v5"
+	AuxilaryNodeCount    = 1
+	AuxilaryARMNodeCount = 2
 )
 
 type CreateNPMCluster struct {
@@ -35,6 +36,7 @@ type CreateNPMCluster struct {
 	PodCidr           string
 	DNSServiceIP      string
 	ServiceCidr       string
+	PublicIPs         []string
 }
 
 func (c *CreateNPMCluster) Prevalidate() error {
@@ -72,6 +74,7 @@ func (c *CreateNPMCluster) Run() error {
 		AvailabilityZones:  []*string{to.Ptr("1")},
 		Count:              to.Ptr[int32](AuxilaryNodeCount),
 		EnableNodePublicIP: to.Ptr(false),
+		EnableFIPS:         to.Ptr(true),
 		Mode:               to.Ptr(armcontainerservice.AgentPoolModeUser),
 		OSType:             to.Ptr(armcontainerservice.OSTypeLinux),
 		OSSKU:              to.Ptr(armcontainerservice.OSSKUAzureLinux),
@@ -85,7 +88,7 @@ func (c *CreateNPMCluster) Run() error {
 	npmCluster.Properties.AgentPoolProfiles = append(npmCluster.Properties.AgentPoolProfiles, &armcontainerservice.ManagedClusterAgentPoolProfile{ //nolint:all
 		Type: to.Ptr(armcontainerservice.AgentPoolTypeVirtualMachineScaleSets),
 		// AvailabilityZones:  []*string{to.Ptr("1")},
-		Count:              to.Ptr[int32](AuxilaryNodeCount),
+		Count:              to.Ptr[int32](AuxilaryARMNodeCount),
 		EnableNodePublicIP: to.Ptr(false),
 		Mode:               to.Ptr(armcontainerservice.AgentPoolModeUser),
 		OSType:             to.Ptr(armcontainerservice.OSTypeLinux),
@@ -97,6 +100,29 @@ func (c *CreateNPMCluster) Run() error {
 
 	npmCluster.Properties.AutoUpgradeProfile = &armcontainerservice.ManagedClusterAutoUpgradeProfile{
 		NodeOSUpgradeChannel: to.Ptr(armcontainerservice.NodeOSUpgradeChannelNodeImage),
+	}
+
+	if len(c.PublicIPs) > 0 {
+		publicIPIDs := make([]*armcontainerservice.ResourceReference, 0, len(c.PublicIPs))
+
+		for _, ipID := range c.PublicIPs {
+			fmt.Printf("Adding Public IP ID: %s\n", ipID)
+			publicIPIDs = append(publicIPIDs, &armcontainerservice.ResourceReference{
+				ID: to.Ptr(ipID),
+			})
+		}
+
+		for _, ip := range c.PublicIPs {
+			fmt.Printf("Public IP ID: %s\n", ip)
+		}
+
+		if npmCluster.Properties.NetworkProfile.LoadBalancerProfile == nil {
+			npmCluster.Properties.NetworkProfile.LoadBalancerProfile = &armcontainerservice.ManagedClusterLoadBalancerProfile{
+				OutboundIPs: &armcontainerservice.ManagedClusterLoadBalancerProfileOutboundIPs{
+					PublicIPs: publicIPIDs,
+				},
+			}
+		}
 	}
 
 	// Deploy cluster

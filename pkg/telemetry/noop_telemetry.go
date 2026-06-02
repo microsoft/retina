@@ -23,7 +23,7 @@ func (m NoopTelemetry) StartPerf(functionName string) *PerformanceCounter {
 func (m NoopTelemetry) StopPerf(counter *PerformanceCounter) {
 }
 
-func (m NoopTelemetry) Heartbeat(ctx context.Context, heartbeatInterval time.Duration) {
+func (m NoopTelemetry) Heartbeat(_ context.Context, _ time.Duration, _ ...func() map[string]string) {
 }
 
 func (m NoopTelemetry) TrackEvent(name string, properties map[string]string) {

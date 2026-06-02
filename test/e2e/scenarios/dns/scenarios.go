@@ -5,10 +5,10 @@ package dns
 import (
 	"fmt"
 	"math/rand"
-	"strconv"
 	"time"
 
 	"github.com/microsoft/retina/test/e2e/common"
+	"github.com/microsoft/retina/test/e2e/framework/constants"
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/types"
 )
@@ -95,8 +95,8 @@ func ValidateBasicDNSMetrics(scenarioName string, req *RequestValidationParams, 
 			Step: &kubernetes.PortForward{
 				Namespace:             common.KubeSystemNamespace,
 				LabelSelector:         "k8s-app=retina",
-				LocalPort:             strconv.Itoa(common.RetinaPort),
-				RemotePort:            strconv.Itoa(common.RetinaPort),
+				LocalPort:             constants.RetinaMetricsPort,
+				RemotePort:            constants.RetinaMetricsPort,
 				Endpoint:              "metrics",
 				OptionalLabelAffinity: "app=" + agnhostName, // port forward to a pod on a node that also has this pod with this label, assuming same namespace
 			},
@@ -209,8 +209,8 @@ func ValidateAdvancedDNSMetrics(scenarioName string, req *RequestValidationParam
 			Step: &kubernetes.PortForward{
 				Namespace:             common.KubeSystemNamespace,
 				LabelSelector:         "k8s-app=retina",
-				LocalPort:             strconv.Itoa(common.RetinaPort),
-				RemotePort:            strconv.Itoa(common.RetinaPort),
+				LocalPort:             constants.RetinaMetricsPort,
+				RemotePort:            constants.RetinaMetricsPort,
 				Endpoint:              "metrics",
 				OptionalLabelAffinity: "app=" + agnhostName, // port forward to a pod on a node that also has this pod with this label, assuming same namespace
 			},

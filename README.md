@@ -33,6 +33,12 @@ Retina lets you **investigate network issues on-demand** and **continuously moni
 
 See [retina.sh](http://retina.sh) for documentation and examples.
 
+## Known Limitations
+
+⚠️ **Performance on High-Core-Count Systems**: Community users have reported performance considerations when using Advanced metrics (with `packetparser` plugin) on nodes with 32+ CPU cores under high network load. Consider starting with Basic metrics mode on large node types. See [Known Limitations](https://retina.sh/docs/Introduction/intro#known-limitations) for details.
+
+⚠️ **Windows Server 2019**: Retina no longer supports Windows Server 2019 nodes. Use Windows Server 2022 for Windows workloads.
+
 ## Capabilities
 
 Retina has two major features:

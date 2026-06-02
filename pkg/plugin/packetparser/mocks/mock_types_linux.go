@@ -22,7 +22,6 @@ import (
 type Mockqdisc struct {
 	ctrl     *gomock.Controller
 	recorder *MockqdiscMockRecorder
-	isgomock struct{}
 }
 
 // MockqdiscMockRecorder is the mock recorder for Mockqdisc.
@@ -74,7 +73,6 @@ func (mr *MockqdiscMockRecorder) Delete(info any) *gomock.Call {
 type Mockfilter struct {
 	ctrl     *gomock.Controller
 	recorder *MockfilterMockRecorder
-	isgomock struct{}
 }
 
 // MockfilterMockRecorder is the mock recorder for Mockfilter.
@@ -112,7 +110,6 @@ func (mr *MockfilterMockRecorder) Add(info any) *gomock.Call {
 type Mocknltc struct {
 	ctrl     *gomock.Controller
 	recorder *MocknltcMockRecorder
-	isgomock struct{}
 }
 
 // MocknltcMockRecorder is the mock recorder for Mocknltc.
@@ -192,7 +189,6 @@ func (mr *MocknltcMockRecorder) SetOption(arg0, arg1 any) *gomock.Call {
 type MockperfReader struct {
 	ctrl     *gomock.Controller
 	recorder *MockperfReaderMockRecorder
-	isgomock struct{}
 }
 
 // MockperfReaderMockRecorder is the mock recorder for MockperfReader.

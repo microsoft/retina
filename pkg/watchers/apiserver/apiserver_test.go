@@ -18,7 +18,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 var errDNS = errors.New("DNS error")
@@ -78,6 +83,7 @@ func TestRefresh(t *testing.T) {
 		l:             log.Logger().Named("apiserver-watcher"),
 		hostResolver:  mockedResolver,
 		filterManager: mockedFilterManager,
+		client:        getMockKubeClient(),
 	}
 
 	// Return 2 random IPs for the host everytime LookupHost is called.
@@ -132,6 +138,7 @@ func TestRefreshLookUpAlwaysFail(t *testing.T) {
 	a := &ApiServerWatcher{
 		l:            log.Logger().Named("apiserver-watcher"),
 		hostResolver: mockedResolver,
+		client:       getMockKubeClient(),
 	}
 
 	mockedResolver.EXPECT().LookupHost(gomock.Any(), gomock.Any()).Return(nil, errors.New("Error")).AnyTimes()
@@ -155,6 +162,7 @@ func TestInitWithIncorrectURL(t *testing.T) {
 		l:             log.Logger().Named("apiserver-watcher"),
 		hostResolver:  mockedResolver,
 		restConfig:    getMockConfig(false),
+		client:        getMockKubeClient(),
 		filterManager: mockedFilterManager,
 	}
 
@@ -178,6 +186,34 @@ func getMockConfig(isCorrect bool) *rest.Config {
 	}
 }
 
+func getMockKubeClient() client.Client {
+	kubernetesSvc := corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "kubernetes",
+			Namespace: "default",
+		},
+		Spec: corev1.ServiceSpec{
+			ClusterIPs: []string{"172.0.16.1"},
+		},
+	}
+
+	ep := corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "kubernetes",
+			Namespace: "default",
+		},
+		Subsets: []corev1.EndpointSubset{
+			{
+				Addresses: []corev1.EndpointAddress{
+					{IP: "100.64.83.200"},
+					{IP: "100.64.83.201"},
+				},
+			},
+		},
+	}
+	return fake.NewFakeClient(&ep, &kubernetesSvc)
+}
+
 func TestRefreshFailsFirstFourAttemptsSucceedsOnFifth(t *testing.T) {
 	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
 	require.NoError(t, err)
@@ -194,6 +230,7 @@ func TestRefreshFailsFirstFourAttemptsSucceedsOnFifth(t *testing.T) {
 		l:             log.Logger().Named("apiserver-watcher"),
 		hostResolver:  mockedResolver,
 		filterManager: mockedFilterManager,
+		client:        getMockKubeClient(),
 	}
 
 	// Simulate LookupHost failing the first four times and succeeding on the fifth.

@@ -1,5 +1,39 @@
 # Managed Storage Account
 
+To simplify the user experience, a managed storage account can be configured when setting up Retina.
+
+## Example
+
+This example creates a Capture and stores the Capture artifacts into a storage account specified by Blob SAS URL.
+
+- Create a secret to store blob SAS URL (and store it in blob-upload-url.txt):
+
+```bash
+kubectl create secret generic blob-sas-url --from-file=blob-upload-url=./blob-upload-url.txt
+```
+
+- Create a Capture YAML configuration specifying the secret created as blobUpload, this example will also store the artifact on the node host path.
+
+```yaml
+apiVersion: retina.sh/v1alpha1
+kind: Capture
+metadata:
+  name: capture-test
+spec:
+  captureConfiguration:
+    captureOption:
+      duration: 30s
+    captureTarget:
+      nodeSelector:
+        matchLabels:
+          kubernetes.io/hostname: aks-nodepool1-11396069-vmss000000
+  outputConfiguration:
+    hostPath: "/tmp/retina"
+    blobUpload: blob-sas-url
+```
+
+More Retina Capture samples can be found [here](https://github.com/microsoft/retina/tree/main/samples/capture).
+
 ## Motivation
 
 Retina Capture helps customers capture network packets on Kuberentes cluster to debug network issues. Before Retina Capture can debug the packets, Retina Capture can store the network packets and the customers need to download the packets from Retina Capture supported locations with tools like Wireshark.

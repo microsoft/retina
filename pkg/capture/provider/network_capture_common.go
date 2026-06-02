@@ -43,7 +43,7 @@ func (ncpc *NetworkCaptureProviderCommon) networkCaptureCommandLog(logFileName s
 		return nil, err
 	}
 
-	if _, err := captureCommandLogFile.WriteString(fmt.Sprintf("%s\n\n", captureCommand.String())); err != nil {
+	if _, err := fmt.Fprintf(captureCommandLogFile, "%s\n\n", captureCommand.String()); err != nil {
 		ncpc.l.Error("Failed to write capture command to file", zap.String("file", captureCommandLogFile.Name()), zap.Error(err))
 	}
 

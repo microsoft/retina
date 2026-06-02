@@ -3,6 +3,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"reflect"
@@ -23,9 +24,29 @@ const (
 	High
 )
 
+type PacketParserRingBufferMode string
+
+const (
+	PacketParserRingBufferDisabled PacketParserRingBufferMode = "disabled"
+	PacketParserRingBufferEnabled  PacketParserRingBufferMode = "enabled"
+	PacketParserRingBufferAuto     PacketParserRingBufferMode = "auto"
+)
+
 var (
-	ErrorTelemetryIntervalTooSmall = fmt.Errorf("telemetryInterval smaller than %v is not allowed", MinTelemetryInterval)
-	DefaultTelemetryInterval       = 15 * time.Minute
+	ErrPacketParserRingBufferAutoNotSupported = errors.New("packetParserRingBuffer mode auto is not supported yet")
+	ErrPacketParserRingBufferInvalid          = errors.New("packetParserRingBuffer must be set to enabled or disabled")
+	ErrPacketParserRingBufferInvalidBool      = errors.New(
+		"packetParserRingBuffer must be enabled or disabled, got boolean",
+	)
+)
+
+var (
+	ErrorTelemetryIntervalTooSmall = fmt.Errorf(
+		"telemetryInterval smaller than %v is not allowed",
+		MinTelemetryInterval,
+	)
+	DefaultTelemetryInterval              = 15 * time.Minute
+	DefaultSamplingRate            uint32 = 1
 )
 
 func (l *Level) UnmarshalText(text []byte) error {
@@ -53,6 +74,28 @@ func (l *Level) String() string {
 	}
 }
 
+func (m *PacketParserRingBufferMode) UnmarshalText(text []byte) error {
+	s := strings.ToLower(strings.TrimSpace(string(text)))
+	switch s {
+	case string(PacketParserRingBufferEnabled):
+		*m = PacketParserRingBufferEnabled
+		return nil
+	case string(PacketParserRingBufferDisabled):
+		*m = PacketParserRingBufferDisabled
+		return nil
+	case string(PacketParserRingBufferAuto):
+		return ErrPacketParserRingBufferAutoNotSupported
+	case "":
+		return ErrPacketParserRingBufferInvalid
+	default:
+		return fmt.Errorf("invalid packetParserRingBuffer %q: %w", s, ErrPacketParserRingBufferInvalid)
+	}
+}
+
+func (m *PacketParserRingBufferMode) IsEnabled() bool {
+	return *m == PacketParserRingBufferEnabled
+}
+
 type Server struct {
 	Host string `yaml:"host"`
 	Port int    `yaml:"port"`
@@ -64,17 +107,20 @@ type Config struct {
 	EnabledPlugin   []string      `yaml:"enabledPlugin"`
 	MetricsInterval time.Duration `yaml:"metricsInterval"`
 	// Deprecated: Use only MetricsInterval instead in the go code.
-	MetricsIntervalDuration  time.Duration `yaml:"metricsIntervalDuration"`
-	EnableTelemetry          bool          `yaml:"enableTelemetry"`
-	EnableRetinaEndpoint     bool          `yaml:"enableRetinaEndpoint"`
-	EnablePodLevel           bool          `yaml:"enablePodLevel"`
-	EnableConntrackMetrics   bool          `yaml:"enableConntrackMetrics"`
-	RemoteContext            bool          `yaml:"remoteContext"`
-	EnableAnnotations        bool          `yaml:"enableAnnotations"`
-	BypassLookupIPOfInterest bool          `yaml:"bypassLookupIPOfInterest"`
-	DataAggregationLevel     Level         `yaml:"dataAggregationLevel"`
-	MonitorSockPath          string        `yaml:"monitorSockPath"`
-	TelemetryInterval        time.Duration `yaml:"telemetryInterval"`
+	MetricsIntervalDuration    time.Duration              `yaml:"metricsIntervalDuration"`
+	EnableTelemetry            bool                       `yaml:"enableTelemetry"`
+	EnableRetinaEndpoint       bool                       `yaml:"enableRetinaEndpoint"`
+	EnablePodLevel             bool                       `yaml:"enablePodLevel"`
+	EnableConntrackMetrics     bool                       `yaml:"enableConntrackMetrics"`
+	RemoteContext              bool                       `yaml:"remoteContext"`
+	EnableAnnotations          bool                       `yaml:"enableAnnotations"`
+	BypassLookupIPOfInterest   bool                       `yaml:"bypassLookupIPOfInterest"`
+	DataAggregationLevel       Level                      `yaml:"dataAggregationLevel"`
+	MonitorSockPath            string                     `yaml:"monitorSockPath"`
+	TelemetryInterval          time.Duration              `yaml:"telemetryInterval"`
+	DataSamplingRate           uint32                     `yaml:"dataSamplingRate"`
+	PacketParserRingBuffer     PacketParserRingBufferMode `yaml:"packetParserRingBuffer"`
+	PacketParserRingBufferSize uint32                     `yaml:"packetParserRingBufferSize"`
 }
 
 func GetConfig(cfgFilename string) (*Config, error) {
@@ -100,6 +146,7 @@ func GetConfig(cfgFilename string) (*Config, error) {
 		mapstructure.StringToTimeDurationHookFunc(), // default hook.
 		mapstructure.StringToSliceHookFunc(","),     // default hook.
 		decodeLevelHook,
+		decodePacketParserRingBufferModeHook,
 	))
 
 	err = viper.Unmarshal(&config, decoderConfigOption)
@@ -122,6 +169,19 @@ func GetConfig(cfgFilename string) (*Config, error) {
 		return nil, ErrorTelemetryIntervalTooSmall
 	}
 
+	// If unset, default sampling rate to 1
+	if config.DataSamplingRate == 0 {
+		log.Printf("dataSamplingRate is not set, defaulting to %v", DefaultSamplingRate)
+		config.DataSamplingRate = DefaultSamplingRate
+	}
+
+	switch config.PacketParserRingBuffer { //nolint:exhaustive // we only care about Auto and empty (default) here
+	case "":
+		config.PacketParserRingBuffer = PacketParserRingBufferDisabled
+	case PacketParserRingBufferAuto:
+		return nil, ErrPacketParserRingBufferAutoNotSupported
+	}
+
 	return &config, nil
 }
 
@@ -140,4 +200,23 @@ func decodeLevelHook(field, target reflect.Type, data interface{}) (interface{},
 		return nil, err
 	}
 	return level, nil
+}
+
+func decodePacketParserRingBufferModeHook(field, target reflect.Type, data interface{}) (interface{}, error) {
+	if target != reflect.TypeOf(PacketParserRingBufferMode("")) {
+		return data, nil
+	}
+
+	switch field.Kind() { //nolint:exhaustive // we only care about String and Bool
+	case reflect.String:
+		var mode PacketParserRingBufferMode
+		if err := mode.UnmarshalText([]byte(data.(string))); err != nil {
+			return nil, err
+		}
+		return mode, nil
+	case reflect.Bool:
+		return nil, ErrPacketParserRingBufferInvalidBool
+	default:
+		return data, nil
+	}
 }

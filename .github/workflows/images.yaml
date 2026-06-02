@@ -13,30 +13,50 @@ permissions:
   contents: read
   id-token: write
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  retina-images:
-    name: Build Images and Run E2E
+  get-tag:
+    name: Get Image Tag
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.get_tag.outputs.tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Get tag
+        id: get_tag
+        run: echo "tag=$(make version)" >> $GITHUB_OUTPUT
+
+  retina-images:
+    name: Build Agent Images - Linux
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
 
     strategy:
       matrix:
         platform: ["linux"]
         arch: ["amd64", "arm64"]
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+      - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
           go-version-file: go.mod
       - run: go version
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Az CLI login
-        uses: azure/login@v2
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         if: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -64,30 +84,64 @@ jobs:
         env:
           SHOULD_PUSH_IMAGE: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
 
-  retina-win-images:
-    name: Build Agent Windows Images
+  build-windows-binaries:
+    name: Build Windows Binaries
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        platform: ["windows"]
-        arch: ["amd64"]
-        year: ["2019", "2022"]
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+      - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
           go-version-file: go.mod
       - run: go version
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - name: Build Windows Binaries
+        shell: bash
+        run: |
+          TAG=$(make version)
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          make build-windows-binaries \
+            GOOS=windows \
+            GOARCH=amd64 \
+            TAG=$TAG \
+            APP_INSIGHTS_ID=${{ secrets.AZURE_APP_INSIGHTS_KEY }}
+        env:
+          APP_INSIGHTS_ID: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
+
+      - name: Upload Windows Binaries
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: windows-binaries
+          path: output/windows_amd64/
+          retention-days: 1
+
+  retina-image-win:
+    name: Build Agent Image - Windows ${{ matrix.year }}
+    needs: build-windows-binaries
+    runs-on: windows-${{ matrix.year }}
+    timeout-minutes: 60
+
+    strategy:
+      matrix:
+        year: ["2022"]
+        platform: ["windows"]
+        arch: ["amd64"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Download Windows Binaries
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: windows-binaries
+          path: output/windows_amd64/
 
       - name: Az CLI login
-        uses: azure/login@v2
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         if: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -106,48 +160,56 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "TAG=$(make version)" >> $GITHUB_ENV
+          TAG=$(make version)
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
           if [ "$SHOULD_PUSH_IMAGE" == "true" ]; then
             az acr login -n ${{ vars.ACR_NAME }} 
             make retina-image-win \
               IMAGE_NAMESPACE=${{ github.repository }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
+              WINDOWS_YEARS=${{ matrix.year }} \
               IMAGE_REGISTRY=${{ vars.ACR_NAME }}  \
               APP_INSIGHTS_ID=${{ secrets.AZURE_APP_INSIGHTS_KEY }} \
-              WINDOWS_YEARS=${{ matrix.year }} \
-              BUILDX_ACTION=--push
+              BINARIES_PATH=output/windows_${{ matrix.arch }} \
+              REPO_PATH=.
+            docker push ${{ vars.ACR_NAME }}/${{ github.repository }}/retina-agent:${TAG}-windows-ltsc${{ matrix.year }}-${{ matrix.arch }}
           else
             make retina-image-win \
               IMAGE_NAMESPACE=${{ github.repository }} \
               PLATFORM=${{ matrix.platform }}/${{ matrix.arch }} \
-              WINDOWS_YEARS=${{ matrix.year }} 
+              WINDOWS_YEARS=${{ matrix.year }} \
+              BINARIES_PATH=output/windows_${{ matrix.arch }} \
+              REPO_PATH=.
           fi
         env:
           SHOULD_PUSH_IMAGE: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
 
   operator-images:
     name: Build Operator Images
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
 
     strategy:
       matrix:
         platform: ["linux"]
         arch: ["amd64", "arm64"]
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+      - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
           go-version-file: go.mod
       - run: go version
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Az CLI login
-        uses: azure/login@v2
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         if: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -176,28 +238,31 @@ jobs:
           SHOULD_PUSH_IMAGE: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
 
   retina-shell-images:
-    name: Build Retina Shell Images
-    runs-on: ubuntu-latest
+    name: Build Retina Shell Images (${{ matrix.platform }}, ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
 
     strategy:
       matrix:
-        platform: ["linux"]
-        arch: ["amd64", "arm64"]
+        include:
+          - platform: linux
+            arch: amd64
+            runner: ubuntu-latest
+          - platform: linux
+            arch: arm64
+            runner: ubuntu-24.04-arm
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+      - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
           go-version-file: go.mod
       - run: go version
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Az CLI login
-        uses: azure/login@v2
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         if: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -226,27 +291,30 @@ jobs:
 
   kubectl-retina-images:
     name: Build Kubectl Retina Images
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
 
     strategy:
       matrix:
         platform: ["linux"]
         arch: ["amd64", "arm64"]
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+      - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
           go-version-file: go.mod
       - run: go version
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Az CLI login
-        uses: azure/login@v2
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         if: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -277,10 +345,11 @@ jobs:
     name: Generate Manifests
     if: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs:
       [
         retina-images,
-        retina-win-images,
+        retina-image-win,
         operator-images,
         retina-shell-images,
         kubectl-retina-images,
@@ -292,13 +361,13 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Setup QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
 
       - name: Azure CLI login
-        uses: azure/login@v2
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -317,19 +386,20 @@ jobs:
     if: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
     needs: [manifests]
     runs-on: ubuntu-latest
+    timeout-minutes: 90
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Setup go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
           go-version-file: go.mod
       - run: go version
 
       - name: Az CLI login
-        uses: azure/login@v2
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         if: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -347,11 +417,11 @@ jobs:
 
   perf-test-basic:
     if: ${{ github.event_name == 'merge_group'}}
-    needs: [manifests]
+    needs: [manifests, get-tag]
     uses: ./.github/workflows/perf-template.yaml
     with:
       image-registry: ${{ vars.ACR_NAME }}
-      tag: $(make version)
+      tag: ${{ needs.get-tag.outputs.tag }}
       image-namespace: ${{ github.repository }}
       retina-mode: basic
       azure-location: ${{ vars.AZURE_LOCATION }}
@@ -360,14 +430,14 @@ jobs:
       azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
       azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
       azure-app-insights-key: ${{ secrets.AZURE_APP_INSIGHTS_KEY }}
-  
+
   perf-test-advanced:
     if: ${{ github.event_name == 'merge_group'}}
-    needs: [manifests]
+    needs: [manifests, get-tag]
     uses: ./.github/workflows/perf-template.yaml
     with:
       image-registry: ${{ vars.ACR_NAME }}
-      tag: $(make version)
+      tag: ${{ needs.get-tag.outputs.tag }}
       image-namespace: ${{ github.repository }}
       retina-mode: advanced
       azure-location: ${{ vars.AZURE_LOCATION }}

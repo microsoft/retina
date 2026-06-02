@@ -94,3 +94,18 @@ Check out our talk from KubeCon 2024 which goes into this topic even further - [
 The following are known system requirements for installing Retina:
 
 - Minimum Linux Kernel Version: v5.4.0
+
+## Known Limitations
+
+### Performance Considerations for High-Core-Count Systems
+
+Community users have reported performance considerations when using **Advanced metrics with the `packetparser` plugin** on nodes with high CPU core counts (32+ cores) under sustained, high-volume network load.
+
+If you plan to deploy Retina in Advanced mode on large node types with network-intensive workloads, consider:
+
+1. **Start with Basic metrics mode** (does not use `packetparser`)
+2. Enable `dataSamplingRate` if you need Advanced metrics
+3. Monitor CPU usage and network throughput after deployment
+4. See [`packetparser` performance considerations](../03-Metrics/plugins/Linux/packetparser.md#performance-considerations) for more information
+
+The Retina team is evaluating options to address these reported concerns in future releases.

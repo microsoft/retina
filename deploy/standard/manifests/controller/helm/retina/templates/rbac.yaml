@@ -9,7 +9,7 @@ metadata:
   name: retina-cluster-reader
 rules:
   - apiGroups: [""] # "" indicates the core API group
-    resources: ["pods", "services", "replicationcontrollers", "nodes", "namespaces"]
+    resources: ["endpoints", "pods", "services", "replicationcontrollers", "nodes", "namespaces"]
     verbs: ["get", "watch", "list"]
   - apiGroups: ["apps"]
     resources: ["deployments", "replicasets"]
@@ -30,6 +30,7 @@ rules:
     - ""
     resources:
       - namespaces
+      - endpoints
     verbs:
       - get
       - list

@@ -65,16 +65,6 @@ az aks nodepool add \
     --os-sku Windows2022 \
     --node-count 1
 
-# Set variables for Windows 2019 node pool
-myWindowsNodePool="nwin19" # Length <= 6
-az aks nodepool add \
-    --resource-group $RESOURCE_GROUP \
-    --cluster-name $NAME \
-    --name $myWindowsNodePool \
-    --os-type Windows \
-    --os-sku Windows2019 \
-    --node-count 1
-
 az aks get-credentials -g $RESOURCE_GROUP -n $NAME --overwrite-existing
 
 kubectl apply -f ama-metrics-settings-configmap.yaml

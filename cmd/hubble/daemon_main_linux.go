@@ -60,6 +60,9 @@ func InitGlobalFlags(cmd *cobra.Command, vp *viper.Viper) {
 	flags.String(option.ConfigDir, "/retina/config", `Configuration directory that contains a file for each option`)
 	option.BindEnv(vp, option.ConfigDir)
 
+	// Set the default value for the endpoint GC interval to 0, which disables it.
+	vp.Set(option.EndpointGCInterval, 0)
+
 	if err := vp.BindPFlags(flags); err != nil {
 		logger.Fatalf("BindPFlags failed: %s", err)
 	}

@@ -65,6 +65,12 @@ type CaptureOption struct {
 	// +kubebuilder:default=100
 	// +optional
 	MaxCaptureSize *int `json:"maxCaptureSize,omitempty"`
+
+	// Interfaces specifies the network interfaces on which to capture packets.
+	// If specified, captures only on the listed interfaces.
+	// If empty, captures on all interfaces by default.
+	// +optional
+	Interfaces []string `json:"interfaces,omitempty"`
 }
 
 // CaptureTarget indicates the target on which the network packets capture will be performed.
@@ -85,6 +91,12 @@ type CaptureTarget struct {
 	// selector semantics.
 	// +optional
 	PodSelector *metav1.LabelSelector `json:"podSelector,omitempty"`
+
+	// PodNames allows selecting specific pods by their names.
+	// If specified, the capture will be performed on the pods with matching names in the specified namespace.
+	// PodNames is incompatible with NodeSelector, NamespaceSelector, and PodSelector.
+	// +optional
+	PodNames []string `json:"podNames,omitempty"`
 }
 
 // CaptureConfiguration indicates the configurations of the network capture.

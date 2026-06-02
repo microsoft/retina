@@ -6,7 +6,6 @@ import (
 
 	"github.com/cilium/cilium/api/v1/flow"
 	ipc "github.com/cilium/cilium/pkg/ipcache"
-	"github.com/cilium/cilium/pkg/k8s"
 
 	"github.com/microsoft/retina/pkg/hubble/common"
 	"github.com/microsoft/retina/pkg/utils"
@@ -20,11 +19,11 @@ type Parser struct {
 	epd common.EpDecoder
 }
 
-func New(l *logrus.Entry, svc k8s.ServiceCache, c *ipc.IPCache) *Parser {
+func New(l *logrus.Entry, svc common.SvcDecoder, c *ipc.IPCache, labelCache common.LabelCache) *Parser {
 	p := &Parser{
 		l:   l.WithField("subsys", "layer34"),
-		svd: common.NewSvcDecoder(svc),
-		epd: common.NewEpDecoder(c),
+		svd: svc,
+		epd: common.NewEpDecoder(c, labelCache),
 	}
 	// Log the localHostIP for debugging purposes.
 	return p

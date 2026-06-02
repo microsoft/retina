@@ -54,14 +54,12 @@ func (a *APIServerEventHandler) handleAPIServerEvent(event interface{}) {
 			_, err := a.c.Upsert(ip.String(), nil, 0, nil, ipcache.Identity{ID: identity.ReservedIdentityKubeAPIServer, Source: source.Kubernetes})
 			if err != nil {
 				a.l.WithError(err).WithFields(logrus.Fields{
-					"IP": ips[0].String(),
+					"IP": ip.String(),
 				}).Error("Failed to add API server IPs to ipcache")
 				return
 			}
 		}
-		a.l.WithFields(logrus.Fields{
-			"IP": ips[0].String(),
-		}).Info("Added API server IPs to ipcache")
+		a.l.Infof("Added API server IPs %v to ipcache", ips)
 	case cc.EventTypeDeleteAPIServerIPs:
 		apiserverObj, ok := cacheEvent.Obj.(*common.APIServerObject)
 		if !ok {
@@ -77,9 +75,7 @@ func (a *APIServerEventHandler) handleAPIServerEvent(event interface{}) {
 			//nolint:staticcheck // TODO(timraymond): unclear how to migrate this
 			a.c.Delete(ip.String(), source.Kubernetes)
 		}
-		a.l.WithFields(logrus.Fields{
-			"IP": ips[0].String(),
-		}).Info("Deleted API server IPs from ipcache")
+		a.l.Infof("Deleted API server IPs %v from ipcache", ips)
 	default:
 		a.l.WithFields(logrus.Fields{
 			"Cache Event": cacheEvent,

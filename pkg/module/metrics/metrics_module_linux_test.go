@@ -373,7 +373,7 @@ func TestModule_Reconcile(t *testing.T) {
 	l := log.Logger().Named("test")
 
 	testDropMetric := &DropCountMetrics{
-		baseMetricObject: baseMetricObject{
+		baseMetricInterface: &baseMetricObject{
 			advEnable: true,
 			ctxOptions: &api.MetricsContextOptions{
 				MetricName:        "drop_count",
@@ -385,7 +385,7 @@ func TestModule_Reconcile(t *testing.T) {
 	}
 	testDropMetric.Init("drop_count")
 	testDropMetricBytes := &DropCountMetrics{
-		baseMetricObject: baseMetricObject{
+		baseMetricInterface: &baseMetricObject{
 			advEnable: true,
 			ctxOptions: &api.MetricsContextOptions{
 				MetricName:   "drop_bytes",
@@ -395,7 +395,7 @@ func TestModule_Reconcile(t *testing.T) {
 	}
 	testDropMetricBytes.Init("drop_bytes")
 	testForwardMetric := &ForwardMetrics{
-		baseMetricObject: baseMetricObject{
+		baseMetricInterface: &baseMetricObject{
 			advEnable: true,
 			ctxOptions: &api.MetricsContextOptions{
 				MetricName:        "forward_count",
@@ -407,7 +407,7 @@ func TestModule_Reconcile(t *testing.T) {
 	}
 	testForwardMetric.Init("forward_count")
 	testForwardMetricBytes := &ForwardMetrics{
-		baseMetricObject: baseMetricObject{
+		baseMetricInterface: &baseMetricObject{
 			advEnable: true,
 			ctxOptions: &api.MetricsContextOptions{
 				MetricName:   "forward_bytes",
