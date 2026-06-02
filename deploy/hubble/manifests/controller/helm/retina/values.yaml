@@ -150,6 +150,8 @@ service:
 serviceAccount:
   annotations: {}
   name: "retina-agent"
+  create: true
+  automount: true
 
 resources:
   requests:
