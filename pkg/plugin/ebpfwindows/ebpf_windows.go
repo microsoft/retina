@@ -285,8 +285,8 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 		if err != nil {
 			return fmt.Errorf("could not convert dropnotify event to flow: %w", err)
 		}
-		meta := &utils.RetinaMetadata{}
-		utils.AddPacketSize(meta, size-uint32(unsafe.Sizeof(DropNotify{})))
+		s := utils.NewExtensions()
+		utils.AddPacketSize(s, size-uint32(unsafe.Sizeof(DropNotify{})))
 		fl := e.GetFlow()
 		if fl == nil {
 			return fmt.Errorf("%w", errNilDropNotifyFlow)
@@ -299,8 +299,8 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 		}
 		// Set the drop reason.
 		eventType := fl.GetEventType().GetSubType()
-		meta.DropReason = utils.DropReason(eventType)
-		utils.AddRetinaMetadata(fl, meta)
+		utils.AddDropReason(fl, s, uint16(eventType))
+		utils.SetExtensions(fl, s)
 		p.enricher.Write(e)
 	case monitorAPI.MessageTypeTrace:
 		e := &v1.Event{}
@@ -315,8 +315,8 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 		if err != nil {
 			return fmt.Errorf("could not convert tracenotify event to flow: %w", err)
 		}
-		meta := &utils.RetinaMetadata{}
-		utils.AddPacketSize(meta, size-uint32(unsafe.Sizeof(TraceNotify{})))
+		s := utils.NewExtensions()
+		utils.AddPacketSize(s, size-uint32(unsafe.Sizeof(TraceNotify{})))
 		fl := e.GetFlow()
 		if fl == nil {
 			return fmt.Errorf("%w", errNilTraceNotifyFlow)
@@ -324,7 +324,7 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 		if fl.GetIP() == nil {
 			return fmt.Errorf("%w; perfdata: %v;", errNilDropNotifyEvent, perfData)
 		}
-		utils.AddRetinaMetadata(fl, meta)
+		utils.SetExtensions(fl, s)
 		p.enricher.Write(e)
 
 	case MessageTypePktmonDrop:
@@ -340,8 +340,8 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 		if err != nil {
 			return fmt.Errorf("could not convert pktmon dropnotify event to flow: %w", err)
 		}
-		meta := &utils.RetinaMetadata{}
-		utils.AddPacketSize(meta, size-uint32(unsafe.Sizeof(DropNotify{})))
+		s := utils.NewExtensions()
+		utils.AddPacketSize(s, size-uint32(unsafe.Sizeof(DropNotify{})))
 		fl := e.GetFlow()
 		if fl == nil {
 			return fmt.Errorf("%w", errNilDropNotifyFlow)
@@ -354,8 +354,8 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 		}
 		// Set the drop reason.
 		eventType := fl.GetEventType().GetSubType()
-		meta.DropReason = utils.DropReason(eventType)
-		utils.AddRetinaMetadata(fl, meta)
+		utils.AddDropReason(fl, s, uint16(eventType))
+		utils.SetExtensions(fl, s)
 		p.enricher.Write(e)
 	}
 	return nil
