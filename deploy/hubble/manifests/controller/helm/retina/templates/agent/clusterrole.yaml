@@ -1,8 +1,7 @@
-{{- if .Values.agent.enabled -}}
+{{- if and .Values.agent.enabled .Values.serviceAccount.create -}}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  namespace: {{ .Values.namespace }}
   name: retina-cluster-reader
 rules:
   - apiGroups: [""] # "" indicates the core API group
