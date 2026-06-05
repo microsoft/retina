@@ -8,6 +8,8 @@ metadata:
   namespace: {{ .Values.namespace }}
   labels:
     k8s-app: {{ include "retina.name" . }}
+    app.kubernetes.io/name: {{ include "retina.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
   selector:
     matchLabels:
@@ -17,6 +19,8 @@ spec:
       labels:
         app: {{ include "retina.name" . }}
         k8s-app: {{ include "retina.name" . }}
+        app.kubernetes.io/name: {{ include "retina.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
       annotations:
         prometheus.io/port: "{{ .Values.retinaPort }}"
         prometheus.io/scrape: "true"

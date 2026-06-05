@@ -25,6 +25,8 @@ spec:
       labels:
         app: retina-operator
         control-plane: retina-operator
+        app.kubernetes.io/name: retina-operator
+        app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
