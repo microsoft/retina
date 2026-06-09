@@ -27,3 +27,8 @@ func StringToTimestamp(timestamp string) (*Timestamp, error) {
 	}
 	return &Timestamp{parsedTime}, nil
 }
+
+// TimeToString converts a Timestamp to a string in the capture file name format.
+func TimeToString(t Timestamp) string {
+	return t.Time.UTC().Format(captureFileNameTimestampFormat)
+}

@@ -21,7 +21,6 @@ CAPTURE_WORKLOAD_DIR = $(REPO_ROOT)/captureworkload
 KIND = /usr/local/bin/kind
 KIND_CLUSTER = retina-cluster
 WINVER2022   ?= "10.0.20348.1906"
-WINVER2019   ?= "10.0.17763.4737"
 APP_INSIGHTS_ID ?= ""
 GENERATE_TARGET_DIRS = \
 	./pkg/plugin/linuxutil
@@ -33,7 +32,7 @@ OS				?= $(GOOS)
 ARCH			?= $(GOARCH)
 PLATFORM		?= $(OS)/$(ARCH)
 PLATFORMS		?= linux/amd64 linux/arm64 windows/amd64
-OS_VERSION		?= ltsc2019
+OS_VERSION		?= ltsc2022
 
 HUBBLE_VERSION ?= v1.17.3
 
@@ -61,7 +60,7 @@ RETINA_PLATFORM_TAG        ?= $(TAG)-$(subst /,-,$(PLATFORM))
 # used for looping through components in container build
 AGENT_TARGETS ?= init agent
 
-WINDOWS_YEARS ?= "2019 2022"
+WINDOWS_YEARS ?= 2022
 
 # for windows os, add year to the platform tag
 ifeq ($(OS),windows)
@@ -166,6 +165,7 @@ RETINA_INIT_IMAGE				= $(IMAGE_NAMESPACE)/retina-init
 RETINA_OPERATOR_IMAGE			= $(IMAGE_NAMESPACE)/retina-operator
 RETINA_SHELL_IMAGE				= $(IMAGE_NAMESPACE)/retina-shell
 KUBECTL_RETINA_IMAGE			= $(IMAGE_NAMESPACE)/kubectl-retina
+KUBECTL_RETINA_SHELL_IMAGE		= $(IMAGE_NAMESPACE)/kubectl-retina-shell
 RETINA_INTEGRATION_TEST_IMAGE	= $(IMAGE_NAMESPACE)/retina-integration-test
 RETINA_PROTO_IMAGE				= $(IMAGE_NAMESPACE)/retina-proto-gen
 RETINA_GO_GEN_IMAGE				= $(IMAGE_NAMESPACE)/retina-go-gen
@@ -207,7 +207,6 @@ buildx:
 	fi;
 
 
-
 container-docker: buildx # util target to build container images using docker buildx. do not invoke directly.
 	os=$$(echo $(PLATFORM) | cut -d'/' -f1); \
 	arch=$$(echo $(PLATFORM) | cut -d'/' -f2); \
@@ -232,6 +231,27 @@ container-docker: buildx # util target to build container images using docker bu
 		$(BUILDX_ACTION) \
 		$(CONTEXT_DIR) 
 
+container-docker-windows: # util target to build Windows container images without buildx. do not invoke directly.
+	os=$$(echo $(PLATFORM) | cut -d'/' -f1); \
+	arch=$$(echo $(PLATFORM) | cut -d'/' -f2); \
+	image_name=$$(basename $(IMAGE)); \
+	echo "Building $$image_name for $$os/$$arch "; \
+	docker build \
+		--platform $(PLATFORM) \
+		-f $(DOCKERFILE) \
+		--build-arg BUILDPLATFORM=$(PLATFORM) \
+		--build-arg APP_INSIGHTS_ID=$(APP_INSIGHTS_ID) \
+		--build-arg GOARCH=$$arch \
+		--build-arg GOOS=$$os \
+		--build-arg OS_VERSION=$(OS_VERSION) \
+		--build-arg HUBBLE_VERSION=$(HUBBLE_VERSION) \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg REPO_PATH=$(REPO_PATH) \
+		--build-arg BINARIES_PATH=$(BINARIES_PATH) \
+		$(EXTRA_BUILD_ARGS) \
+		--target=$(TARGET) \
+		-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
+		$(CONTEXT_DIR)
 
 retina-image: ## build the retina linux container image.
 	echo "Building for $(PLATFORM)"
@@ -254,20 +274,24 @@ retina-image: ## build the retina linux container image.
 				TARGET=$$target; \
 	done
 
-retina-image-win: ## build the retina Windows container image.
+retina-image-win: build-windows-binaries ## build the retina Windows container image.
+# The Windows images are built on a corresponding Windows host without buildx.
+# This is done to mitigate CVE-2013-3900.
 	for year in $(WINDOWS_YEARS); do \
 		tag=$(TAG)-windows-ltsc$$year-amd64; \
-		echo "Building $(RETINA_PLATFORM_TAG)"; \
+		echo "Building $$tag"; \
 		set -e ; \
-		$(MAKE) container-$(CONTAINER_BUILDER) \
+		$(MAKE) container-docker-windows \
 				PLATFORM=windows/amd64 \
-				DOCKERFILE=controller/Dockerfile \
+				DOCKERFILE=controller/Dockerfile.windows-$$year \
 				REGISTRY=$(IMAGE_REGISTRY) \
 				IMAGE=$(RETINA_IMAGE) \
 				OS_VERSION=ltsc$$year \
 				VERSION=$(TAG) \
 				TAG=$$tag \
 				TARGET=agent-win \
+				REPO_PATH=$(REPO_PATH) \
+				BINARIES_PATH=$(BINARIES_PATH) \
 				CONTEXT_DIR=$(REPO_ROOT); \
 	done
 
@@ -308,6 +332,20 @@ kubectl-retina-image:
 			TAG=$(RETINA_PLATFORM_TAG) \
 			CONTEXT_DIR=$(REPO_ROOT)
 
+kubectl-retina-shell-image:
+	echo "Building shell-enabled kubectl-retina for $(PLATFORM)"
+	set -e ; \
+	$(MAKE) container-$(CONTAINER_BUILDER) \
+			PLATFORM=$(PLATFORM) \
+			DOCKERFILE=cli/Dockerfile \
+			REGISTRY=$(IMAGE_REGISTRY) \
+			IMAGE=$(KUBECTL_RETINA_SHELL_IMAGE) \
+			VERSION=$(TAG) \
+			TAG=$(RETINA_PLATFORM_TAG) \
+		CONTEXT_DIR=$(REPO_ROOT) \
+		TARGET=shell-target \
+		EXTRA_BUILD_ARGS=$(EXTRA_BUILD_ARGS)
+
 kapinger-image: 
 	docker buildx build --builder retina --platform windows/amd64 --target windows-amd64 -t $(IMAGE_REGISTRY)/$(KAPINGER_IMAGE):$(TAG)-windows-amd64  ./hack/tools/kapinger/ --push
 	docker buildx build --builder retina --platform linux/amd64 --target linux-amd64 -t $(IMAGE_REGISTRY)/$(KAPINGER_IMAGE):$(TAG)-linux-amd64  ./hack/tools/kapinger/ --push
@@ -339,16 +377,27 @@ all-gen: ## generate all code
 	$(MAKE) proto-gen
 	$(MAKE) go-gen
 
-build-windows-binaries:
-	GOOS=windows GOARCH=$(GOARCH) go build -v -o /go/bin/retina/captureworkload -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version=$(TAG) -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=$(APP_INSIGHTS_ID)" captureworkload/main.go
-	GOOS=windows GOARCH=$(GOARCH) go build -x -v -o /go/bin/retina/controller -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version=$(TAG) -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=$(APP_INSIGHTS_ID)" controller/main.go
-	
+build-windows-binaries: ## Build Windows binaries
+	@echo "Building Windows binaries for $(GOARCH)..."
+	@mkdir -p $(BUILD_DIR)
+	CGO_ENABLED=0 GOOS=windows GOARCH=$(GOARCH) go build -v \
+		-o $(BUILD_DIR)/captureworkload.exe \
+		-ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version=$(TAG) \
+		-X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=$(APP_INSIGHTS_ID)" \
+		$(CAPTURE_WORKLOAD_DIR)/main.go
+	CGO_ENABLED=0 GOOS=windows GOARCH=$(GOARCH) go build -v \
+		-o $(BUILD_DIR)/controller.exe \
+		-ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version=$(TAG) \
+		-X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID=$(APP_INSIGHTS_ID)" \
+		$(RETINA_DIR)/main.go
+	@echo "Windows binaries built successfully in $(BUILD_DIR)"
+
 ##@ Multiplatform
 
 manifest-retina-image: ## create a multiplatform manifest for the retina image
 	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_IMAGE):$(TAG))
 	$(eval FULL_INIT_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE):$(TAG))
-	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64 windows-ltsc2019-amd64 windows-ltsc2022-amd64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64 windows-ltsc2022-amd64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
 	docker buildx imagetools create -t $(FULL_INIT_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_INIT_IMAGE_NAME)-$(subst /,-,$(platform)))
 
 manifest-operator-image: ## create a multiplatform manifest for the operator image
@@ -363,6 +412,10 @@ manifest-kubectl-retina-image:
 	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(KUBECTL_RETINA_IMAGE):$(TAG))
 	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
 
+manifest-kubectl-retina-shell-image:
+	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(KUBECTL_RETINA_SHELL_IMAGE):$(TAG))
+	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+
 manifest:
 	echo "Building for $(COMPONENT)"
 	if [ "$(COMPONENT)" = "retina" ]; then \
@@ -373,6 +426,8 @@ manifest:
 		$(MAKE) manifest-shell-image; \
 	elif [ "$(COMPONENT)" = "kubectl-retina" ]; then \
 		$(MAKE) manifest-kubectl-retina-image; \
+	elif [ "$(COMPONENT)" = "kubectl-retina-shell" ]; then \
+		$(MAKE) manifest-kubectl-retina-shell-image; \
 	fi
 
 ##@ Tests

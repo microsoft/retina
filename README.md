@@ -33,6 +33,10 @@ Retina lets you **investigate network issues on-demand** and **continuously moni
 
 See [retina.sh](http://retina.sh) for documentation and examples.
 
+## Known Limitations
+
+⚠️ **Windows Server 2019**: Retina no longer supports Windows Server 2019 nodes. Use Windows Server 2022 for Windows workloads.
+
 ## Capabilities
 
 Retina has two major features:
