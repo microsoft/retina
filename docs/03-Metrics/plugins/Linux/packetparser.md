@@ -17,38 +17,109 @@ The `packetparser` plugin requires the `CAP_NET_ADMIN` and `CAP_SYS_ADMIN` capab
 
 ## Performance Considerations
 
-### Reported Performance Impact on High-Core-Count Systems
+### Performance Impact on High-Core-Count Systems
 
-Community users have reported performance considerations when running the `packetparser` plugin on systems with high CPU core counts (32+ cores) under sustained network load. While these reports have not been independently verified by the Retina maintainers, we document them here for awareness.
+The `packetparser` eBPF data path has measurable overhead that varies by CPU core count, packet event rate, payload profile, and NUMA topology.
 
-**User-Reported Observations:**
+External analysis was published in [this blog post](https://blog.zmalik.dev/p/who-will-observe-the-observability) and presented at [KubeCon 2025](https://www.youtube.com/watch?v=J-Zx64mJzVk). Retina maintainers also ran internal benchmarking to compare `perf_event_array` and ring buffer transport.
 
-A detailed analysis by a Retina user (see [this blog post](https://blog.zmalik.dev/p/who-will-observe-the-observability)) and [KubeCon 2025 talk](https://www.youtube.com/watch?v=J-Zx64mJzVk) documented performance degradation that scaled non-linearly with CPU core count on nodes running network-intensive, multi-threaded workloads.
+**Scope note:** Results below are directional, not universal. Validate with your own workload.
 
-**Current Implementation:**
+#### Default Implementation: `perf_event_array`
 
-By default, `packetparser` uses **BPF_MAP_TYPE_PERF_EVENT_ARRAY** for kernel-to-userspace data transfer. This architecture creates per-CPU buffers that must be polled by a single reader thread. On systems with many CPU cores, this can lead to:
+By default, `packetparser` uses **BPF_MAP_TYPE_PERF_EVENT_ARRAY** for kernel-to-userspace transfer. This creates per-CPU buffers drained by userspace.
 
-- Increased context switching overhead
-- Memory access patterns that may not scale linearly
-- Potential NUMA-related penalties on multi-socket systems
+Observed overhead characteristics:
 
-**Alternative Approaches:**
+- CPU cost generally tracks packet event rate
+- Cross-NUMA polling can add latency and CPU overhead on multi-socket systems
+- Context-switch overhead often grows with core count under sustained high packet rates
 
-Alternative data transfer mechanisms like BPF ring buffers (BPF_MAP_TYPE_RINGBUF, available in Linux kernel 5.8+) use a shared buffer architecture that may perform better on high-core-count systems. Retina supports ring buffers for `packetparser` via `packetParserRingBuffer=enabled` and `packetParserRingBufferSize`.
+#### Ring Buffer Alternative: `BPF_MAP_TYPE_RINGBUF`
 
-**Note:** Ring buffer mode requires Linux kernel 5.8 or newer.
+`packetparser` also supports **BPF_MAP_TYPE_RINGBUF** (Linux kernel 5.8+):
+
+```yaml
+# In Retina agent ConfigMap
+packetParserRingBuffer: enabled
+packetParserRingBufferSize: 8388608  # 8 MiB default
+```
+
+Compared with per-CPU perf buffers, ring buffer mode uses a shared buffer model and often reduces CPU overhead for packet-heavy workloads. In many tests it also improves throughput stability.
+
+#### Benchmark Results
+
+All tests used Retina `v1.2.0` on AKS with Azure overlay CNI, `dataAggregationLevel: low`, `enablePodLevel: true`, and plugins `linuxutil, packetforward, packetparser, dns, dropreason`.
+
+Rather than listing each run in detail, the key customer-facing observations are:
+
+| Observation | What we saw | Decision impact |
+|-------------|-------------|-----------------|
+| CPU scaling at high packet rates | Ring buffer reduced Retina CPU by ~1.5x to 6.0x versus perf array as event rate increased (~2M to ~7.5M events/s) | Prefer ring buffer for packet-heavy and bursty workloads |
+| Throughput stability | Under stress, perf array showed larger throughput variance while ring buffer was more stable in tested profiles | Prefer ring buffer when stability is as important as peak throughput |
+| Workload sensitivity | Ring buffer was not always better (for example, one `grpc-streaming` profile favored perf array) | Benchmark both modes when traffic is medium-rate or protocol-specific |
+| Low-rate / large-payload traffic | Differences were often negligible near NIC-saturation or low event rates | Either mode can be acceptable; choose simpler operationally |
+| Topology effects | Multi-socket / high-core environments are more exposed to perf-array polling costs | Ring buffer is generally the safer default on 64+ vCPU or multi-NUMA nodes |
+
+Summary: ring buffer is usually the best default for high event-rate production workloads, but final selection should be validated against your own SLO and traffic profile.
+
+#### Practical Guidance
+
+| Workload profile | Preferred mode | Why |
+|------------------|----------------|-----|
+| High packet rate (>2M events/s), bursty services, service mesh traffic | Ring buffer | Often lower Retina CPU and better stability |
+| Multi-socket or large-core systems (64+ vCPU) | Ring buffer | Avoids per-CPU cross-NUMA polling |
+| Low packet rate / large payload throughput | Either | Differences are usually small |
+| Workload where ring buffer underperforms in your tests | Perf array | Use workload-specific validation |
+
+#### Quick Decision Framework
+
+Use these three inputs from production-like traffic:
+
+- Packet event rate at peak (p95)
+- Node topology (single NUMA vs multi-NUMA / 64+ vCPU)
+- Observability budget (`retina-agent` CPU and tolerated telemetry sample drops)
+
+Quick estimator:
+
+$$pps \approx \frac{throughput\ (bytes/s)}{avg\ packet\ size\ (bytes)}$$
+
+| Condition | Choose |
+|-----------|--------|
+| Linux kernel < 5.8 | Perf array |
+| p95 event rate > 2M/s, bursty traffic, or 64+ vCPU / multi-socket | Ring buffer |
+| < 1M events/s with large payloads and stable throughput | Either (benchmark) |
+| Ring buffer shows higher CPU or worse throughput in your workload | Perf array |
+
+Minimal validation (recommended):
+
+1. Run 10 minutes with perf array and 10 minutes with ring buffer on the same node pool.
+2. Compare throughput median/p95, throughput variance, and `retina-agent` CPU peak.
+3. Pick the mode that meets SLO with lower observability CPU; if ring buffer drops samples, increase `packetParserRingBufferSize` to `16777216` and retest.
+
+#### Recommended Starting Configuration
+
+| Environment | `packetParserRingBuffer` | `packetParserRingBufferSize` |
+|-------------|--------------------------|------------------------------|
+| Standard (<=32 vCPU, moderate load) | `enabled` | `8388608` (8 MiB) |
+| High-core-count (64+ vCPU) | `enabled` | `8388608` (8 MiB) |
+| Extreme packet rate with sustained bursts | `enabled` | `16777216` (16 MiB) |
+
+Note on ring buffer drops: under extreme sustained observability load, ring buffer may drop telemetry samples (not network packets). If this occurs, increase `packetParserRingBufferSize` and re-measure.
 
 #### If You Experience Performance Issues
 
-If you observe performance degradation on high-core-count nodes:
+1. Enable ring buffer first:
 
-1. **Disable `packetparser`**: Use Basic metrics mode which doesn't require this plugin
-2. **Enable Sampling**: Use the `dataSamplingRate` configuration option (see [Sampling](#sampling) section)
-3. **Use High Data Aggregation**: Configure `high` [data aggregation](../../../05-Concepts/data-aggregation.md)
-4. **Monitor Impact**: Watch for elevated CPU usage, context switches, or throughput changes
+	```yaml
+	packetParserRingBuffer: enabled
+	packetParserRingBufferSize: 8388608
+	```
 
-**Note:** The Retina team is evaluating options for addressing reported performance concerns, including potential support for alternative data transfer mechanisms. Community feedback and contributions are welcome.
+2. Enable sampling: set `dataSamplingRate` (see [Sampling](#sampling))
+3. Use high data aggregation: configure `high` [data aggregation](../../../05-Concepts/data-aggregation.md)
+4. Disable `packetparser` if needed: use Basic metrics mode
+5. Monitor impact: track `retina-agent` CPU, throughput stability, and sample-drop behavior
 
 ## Sampling
 
