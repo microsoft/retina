@@ -2,6 +2,7 @@
 ARG OS_VERSION=ltsc2022
 # pinned base images
 
+
 # mcr.microsoft.com/windows/servercore:ltsc2019
 FROM mcr.microsoft.com/windows/servercore@sha256:cd96c9b4873aba2f63716934ed5e535ec21c8d3dc32d29d9bc778be28f19cbfa AS ltsc2019
 
