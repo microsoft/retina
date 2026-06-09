@@ -54,10 +54,8 @@ data:
     metricsIntervalDuration: {{ .Values.metricsIntervalDuration }}
     enableTelemetry: {{ .Values.enableTelemetry }}
     enableAnnotations: {{ .Values.enableAnnotations }}
-    enablePodLevel: {{ .Values.enablePodLevel }}
+    enablePodLevel: {{ .Values.enablePodLevel_win }}
     remoteContext: {{ .Values.remoteContext }}
+    enableAnnotations: {{ .Values.enableAnnotations }}
     telemetryInterval: {{ .Values.daemonset.telemetryInterval }}
 {{- end}}
-
-
-
