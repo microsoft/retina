@@ -8,7 +8,6 @@
       "version": "1.24.11"
     },
     "ghcr.io/devcontainers/features/kubectl-helm-minikube:1.3.1": {},
-    "ghcr.io/devcontainers-extra/features/kind:1.0.15": {},
     "ghcr.io/devcontainers/features/azure-cli:1.2.9": {},
     // LLVM 17 is the minimum version available for Ubuntu Noble on apt.llvm.org.
     // Provides clang and llvm-strip needed for eBPF compilation.
@@ -40,8 +39,9 @@
     // Create unversioned symlinks so the build system can find them.
     "symlinks": "sudo ln -sf /usr/bin/clang-17 /usr/bin/clang && sudo ln -sf /usr/bin/llvm-strip-17 /usr/bin/llvm-strip",
     // Fix ownership of volume mounts (created as root) and cache dirs,
-    // then download Go modules.
-    "go-setup": "sudo chown -R vscode:vscode /go /home/vscode/.cache && go mod download",
+    // then download Go modules and install kind (go install uses the Go module
+    // proxy, which is more reliable than downloading from GitHub Releases).
+    "go-setup": "sudo chown -R vscode:vscode /go /home/vscode/.cache && go mod download && go install sigs.k8s.io/kind@v0.32.0",
     // Install jq (needed by some Makefile targets and scripts).
     "apt-deps": "sudo apt-get update && sudo apt-get install -y --no-install-recommends jq && sudo rm -rf /var/lib/apt/lists/*"
   },
