@@ -28,11 +28,7 @@ server {
             {{- if not (eq .Values.hubble.ui.baseUrl "/") }}
             rewrite ^{{ (trimSuffix "/" .Values.hubble.ui.baseUrl) }}(/.*)$ $1 break;
             {{- end }}
-            {{- if eq .Values.hubble.ui.baseUrl "/" }}
             grpc_pass grpc://127.0.0.1:8090;
-            {{- else }}
-            grpc_pass grpc://127.0.0.1:8090/;
-            {{- end }}
         }
 
         {{- if not (eq .Values.hubble.ui.baseUrl "/") }}
