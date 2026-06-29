@@ -3,6 +3,7 @@
 package utils
 
 import (
+	"github.com/cilium/cilium/api/v1/flow"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -84,6 +85,12 @@ var (
 	DNSRequestLabels  = []string{"query_type", "query"}
 	DNSResponseLabels = []string{"return_code", "query_type", "query", "response", "num_response"}
 )
+
+type LabelsInfo struct {
+	Namespace string
+	PodName   string
+	Workload  *flow.Workload
+}
 
 func GetPluginEventAttributes(attrs []attribute.KeyValue, pluginName, eventName, timestamp string) []attribute.KeyValue {
 	return append(attrs,
