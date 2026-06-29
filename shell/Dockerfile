@@ -74,4 +74,24 @@ RUN set -eux; \
     rm /tmp/pwru.tar.gz; \
     file /usr/local/bin/pwru | grep -q 'ELF'
 
+# https://github.com/SRodi/hotspot-bpf/releases
+ARG HOTSPOT_TAG="v0.1.1"
+ENV HOTSPOT_TAG=${HOTSPOT_TAG}
+
+# Download and extract hotspot-bpf release (amd64 only for now)
+RUN set -eux; \
+    case "$ARCH" in \
+        amd64|x86_64) HOTSPOT_ARCH="amd64" ;; \
+        *) echo "Skipping hotspot-bpf: unsupported arch $ARCH" && exit 0 ;; \
+    esac; \
+    HOTSPOT_TAR="hotspot-bpf-linux-${HOTSPOT_ARCH}.tar.gz"; \
+    curl -fL -o "/tmp/${HOTSPOT_TAR}" "https://github.com/SRodi/hotspot-bpf/releases/download/${HOTSPOT_TAG}/${HOTSPOT_TAR}"; \
+    curl -fL -o "/tmp/${HOTSPOT_TAR}.sha256" "https://github.com/SRodi/hotspot-bpf/releases/download/${HOTSPOT_TAG}/${HOTSPOT_TAR}.sha256"; \
+    cd /tmp && sha256sum -c "${HOTSPOT_TAR}.sha256"; \
+    tar -xz -C /usr/local/bin -f "/tmp/${HOTSPOT_TAR}" "hotspot-bpf-linux-${HOTSPOT_ARCH}"; \
+    mv "/usr/local/bin/hotspot-bpf-linux-${HOTSPOT_ARCH}" /usr/local/bin/hotspot; \
+    chmod +x /usr/local/bin/hotspot; \
+    rm "/tmp/${HOTSPOT_TAR}" "/tmp/${HOTSPOT_TAR}.sha256"; \
+    file /usr/local/bin/hotspot | grep -q 'ELF'
+
 CMD ["/bin/bash", "-l"]
