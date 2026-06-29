@@ -9,6 +9,18 @@ Each mode is **fully customizable** (only create the metrics/labels you need).
 Note that below, "metric cardinality" refers to the number of time series (metric values with a unique set of labels).
 The larger the cardinality, the more load induced on a Prometheus server for instance.
 
+## Quick Comparison
+
+| Feature | Basic Mode | Advanced Mode | Hubble Control Plane |
+|---------|:----------:|:-------------:|:--------------------:|
+| Drop metrics (`drop_count`, `drop_bytes`) | ✅ | ✅ | ❌ |
+| Pod-level attribution | ❌ | ✅ (`adv_*` metrics) | ✅ (`hubble_*` metrics) |
+| API server latency metrics | ❌ | ✅ | ❌ |
+| Flow processing metrics | ❌ | ❌ | ✅ |
+| Operator required | ❌ | ✅ | ✅ |
+
+## Mode Details
+
 | Mode                                     | Description                                                                                                                                                                                                                        | Scale                                                                                                                                 | Metrics                          | Configuration                                                                                                |
 | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | *Basic*                                  | Metrics aggregated by Node.                                                                                                                                                                                                        | Metric cardinality proportional to number of nodes.                                                                                   | [Link to Metrics](./basic.md)    | [Link to Installation](../../02-Installation/01-Setup.md#basic-mode)                                                  |
