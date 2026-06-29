@@ -1,13 +1,57 @@
-//go:build ignore
-
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
+
+#pragma once
 
 #include "vmlinux.h"
 #include "compiler.h"
 #include "bpf_helpers.h"
-#include "conntrack.h"
-#include "dynamic.h"
+
+// Helper functions to get the current time
+// Ref: https://github.com/cilium/cilium/blob/6186d579ed60f334c7a4daaf81060797b02cc6bd/bpf/lib/time.h
+#define NSEC_PER_SEC	(1000ULL * 1000ULL * 1000UL)
+#define bpf_ktime_get_sec()	\
+	({ __u64 __x = bpf_ktime_get_boot_ns() / NSEC_PER_SEC; __x; })
+# define bpf_mono_now()		bpf_ktime_get_sec()
+
+#define UINT32_MAX 4294967295U
+
+// Time units in seconds
+
+// Define how long a TCP connection should be kept in the table
+#define CT_CONNECTION_LIFETIME_TCP 360
+// Define how long a TCP connection should be kept in the TIME_WAIT state
+#define CT_TIME_WAIT_TIMEOUT_TCP 30
+// Define how long a non-TCP connection should be kept in the table
+#define CT_CONNECTION_LIFETIME_NONTCP 60
+// Define how long a TCP connection should be kept alive after receiving the first SYN
+#define CT_SYN_TIMEOUT 60
+// Define the interval at which a packet should be sent to the userspace
+#define CT_REPORT_INTERVAL 30
+// Define the maximum number of connections that can be stored in the conntrack table
+#define CT_MAP_SIZE 262144
+
+#define TCP_FIN 0x01
+#define TCP_SYN 0x02
+#define TCP_RST 0x04
+#define TCP_PSH 0x08
+#define TCP_ACK 0x10
+#define TCP_URG 0x20
+#define TCP_ECE 0x40
+#define TCP_CWR 0x80
+#define TCP_NS 0x100
+
+#define CT_PACKET_DIR_TX 0x00
+#define CT_PACKET_DIR_RX 0x01
+
+#define TRAFFIC_DIRECTION_UNKNOWN 0x00
+#define TRAFFIC_DIRECTION_INGRESS 0x01
+#define TRAFFIC_DIRECTION_EGRESS 0x02
+
+#define OBSERVATION_POINT_FROM_ENDPOINT 0x00
+#define OBSERVATION_POINT_TO_ENDPOINT 0x01
+#define OBSERVATION_POINT_FROM_NETWORK 0x02
+#define OBSERVATION_POINT_TO_NETWORK 0x03
 
 struct tcpmetadata {
 	__u32 seq; // TCP sequence number
@@ -116,7 +160,7 @@ struct ct_entry {
     struct tcpflagscount flags_seen_since_last_report_tx_dir;
     struct tcpflagscount flags_seen_since_last_report_rx_dir;
     /**
-     * traffic_direction indicates the direction of the connection in relation to the host. 
+     * traffic_direction indicates the direction of the connection in relation to the host.
      * If the connection is initiated from within the host, the traffic_direction is egress. Otherwise, the traffic_direction is ingress.
      */
     __u8 traffic_direction;
@@ -288,7 +332,7 @@ static __always_inline bool _ct_create_new_tcp_connection(struct packet *p, stru
  * @arg *p pointer to the packet to be processed.
  * @arg key The key to be used to create the new connection.
  * @arg observation_point The point in the network stack where the packet is observed.
- * @arg sampled Whether or not the packet was sampled for reporting. 
+ * @arg sampled Whether or not the packet was sampled for reporting.
  */
 static __always_inline bool _ct_handle_udp_connection(struct packet *p, struct ct_v4_key *key, __u8 observation_point, bool sampled) {
     if (!p || !key) {
@@ -312,7 +356,7 @@ static __always_inline bool _ct_handle_udp_connection(struct packet *p, struct c
         new_value.conntrack_metadata.bytes_tx_count = p->bytes;
         // Update packet's conntrack metadata.
         __builtin_memcpy(&p->conntrack_metadata, &new_value.conntrack_metadata, sizeof(struct conntrackmetadata));;
-    #endif // ENABLE_CONNTRACK_METRICS    
+    #endif // ENABLE_CONNTRACK_METRICS
 
     // Update packet
     p->is_reply = false;
@@ -438,7 +482,7 @@ static __always_inline struct packetreport _ct_should_report_packet(struct ct_v4
     if (!entry || !key) {
         return report;
     }
-    
+
     // Get direction-specific data
     __u8 seen_flags;
     __u32 last_report;
@@ -492,12 +536,12 @@ static __always_inline struct packetreport _ct_should_report_packet(struct ct_v4
     // TCP-specific state management
     if (protocol == IPPROTO_TCP) {
         // Handle TCP connection termination states
-        
+
         // Check if this is the final ACK in TCP connection teardown
         // (Both directions have seen FIN, and this is just an ACK without other control flags)
-        if ((flags & TCP_ACK) && 
-            !(flags & (TCP_FIN | TCP_SYN | TCP_RST)) && 
-            (entry->flags_seen_tx_dir & TCP_FIN) && 
+        if ((flags & TCP_ACK) &&
+            !(flags & (TCP_FIN | TCP_SYN | TCP_RST)) &&
+            (entry->flags_seen_tx_dir & TCP_FIN) &&
             (entry->flags_seen_rx_dir & TCP_FIN)) {
             bpf_map_delete_elem(&retina_conntrack, key);
             report.report = true;
@@ -627,7 +671,7 @@ static __always_inline __attribute__((unused)) struct packetreport ct_process_pa
         #endif // ENABLE_CONNTRACK_METRICS
         return _ct_should_report_packet(&key, entry, p->flags, CT_PACKET_DIR_TX, p->bytes, sampled);
     }
-    
+
     // The connection is not found in the send direction. Check the reply direction by reversing the key.
     struct ct_v4_key reverse_key;
     __builtin_memset(&reverse_key, 0, sizeof(struct ct_v4_key));

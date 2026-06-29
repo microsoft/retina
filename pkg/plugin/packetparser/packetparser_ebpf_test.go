@@ -647,16 +647,6 @@ func compileAndLoadVariantBase(t *testing.T, opts compileOpts) (*packetparserObj
 	st += fmt.Sprintf("#define DATA_SAMPLING_RATE %d\n", opts.samplingRate)
 	require.NoError(t, os.WriteFile(ppDynamic, []byte(st), 0o644))
 
-	// Write conntrack dynamic.h if conntrack metrics enabled.
-	ctDynamic := fmt.Sprintf("%s/../conntrack/%s/%s", dir, bpfSourceDir, dynamicHeaderFileName)
-	origCT, err := os.ReadFile(ctDynamic)
-	require.NoError(t, err)
-	t.Cleanup(func() { os.WriteFile(ctDynamic, origCT, 0o644) }) //nolint:errcheck
-
-	if opts.enableConntrack {
-		require.NoError(t, os.WriteFile(ctDynamic, []byte("#define ENABLE_CONNTRACK_METRICS 1\n"), 0o644))
-	}
-
 	// Compile the eBPF program.
 	bpfSourceFile := fmt.Sprintf("%s/%s/%s", dir, bpfSourceDir, bpfSourceFileName)
 	outputFile := fmt.Sprintf("%s/packetparser_test.o", t.TempDir())
@@ -678,7 +668,6 @@ func compileAndLoadVariantBase(t *testing.T, opts compileOpts) (*packetparserObj
 		fmt.Sprintf("-I%s/../lib/common/libbpf/_include/uapi/linux", dir),
 		fmt.Sprintf("-I%s/../lib/common/libbpf/_include/asm", dir),
 		fmt.Sprintf("-I%s/../filter/_cprog/", dir),
-		fmt.Sprintf("-I%s/../conntrack/_cprog/", dir),
 	}
 	if opts.enableRingBuf {
 		cflags = append(cflags, "-DUSE_RING_BUFFER", "-DRING_BUFFER_SIZE=4096")

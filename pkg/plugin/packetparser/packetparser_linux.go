@@ -35,7 +35,6 @@ import (
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
-	"github.com/microsoft/retina/pkg/plugin/conntrack"
 	_ "github.com/microsoft/retina/pkg/plugin/lib/_amd64"                            // nolint
 	_ "github.com/microsoft/retina/pkg/plugin/lib/_arm64"                            // nolint
 	_ "github.com/microsoft/retina/pkg/plugin/lib/common/libbpf/_include/asm"        // nolint
@@ -53,7 +52,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type packet packetparser ./_cprog/packetparser.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../lib/common/libbpf/_include/linux -I../lib/common/libbpf/_include/uapi/linux -I../lib/common/libbpf/_include/asm -I../filter/_cprog/ -I../conntrack/_cprog/
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type packet -type ct_v4_key -type ct_entry packetparser ./_cprog/packetparser.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../lib/common/libbpf/_include/linux -I../lib/common/libbpf/_include/uapi/linux -I../lib/common/libbpf/_include/asm -I../filter/_cprog/
 var (
 	errNoOutgoingLinks          = errors.New("could not determine any outgoing links")
 	errRingBufKernelTooOld      = errors.New("ring buffer requires newer kernel")
@@ -106,21 +105,10 @@ func (p *packetParser) Generate(ctx context.Context) error {
 	}
 	st = fmt.Sprintf("#define BYPASS_LOOKUP_IP_OF_INTEREST %d\n", bypassLookupIPOfInterest)
 
-	conntrackMetrics := 0
 	// Check if packetparser has Conntrack metrics enabled.
 	if p.cfg.EnableConntrackMetrics {
 		p.l.Info("conntrack metrics enabled")
-		conntrackMetrics = 1
-
-		// Generate dynamic header for conntrack.
-		ctDynamicHeaderPath := conntrack.BuildDynamicHeaderPath()
-		err = conntrack.GenerateDynamic(ctx, ctDynamicHeaderPath, conntrackMetrics)
-		if err != nil {
-			return errors.Wrap(err, "failed to generate dynamic header for conntrack")
-		}
-
-		// Process packetparser dynamic.h conntrack metrics definition.
-		st += fmt.Sprintf("#define ENABLE_CONNTRACK_METRICS %d\n", conntrackMetrics)
+		st += "#define ENABLE_CONNTRACK_METRICS 1\n"
 	}
 
 	// Process packetparser data aggregation level.
@@ -182,7 +170,6 @@ func (p *packetParser) Compile(ctx context.Context) error {
 	arch := runtime.GOARCH
 	archLibDir := fmt.Sprintf("-I%s/../lib/_%s", dir, arch)
 	filterDir := fmt.Sprintf("-I%s/../filter/_cprog/", dir)
-	conntrackDir := fmt.Sprintf("-I%s/../conntrack/_cprog/", dir)
 	libbpfSrcDir := fmt.Sprintf("-I%s/../lib/common/libbpf/_src", dir)
 	libbpfIncludeLinuxDir := fmt.Sprintf("-I%s/../lib/common/libbpf/_include/linux", dir)
 	libbpfIncludeUapiLinuxDir := fmt.Sprintf("-I%s/../lib/common/libbpf/_include/uapi/linux", dir)
@@ -204,7 +191,6 @@ func (p *packetParser) Compile(ctx context.Context) error {
 		libbpfIncludeLinuxDir,
 		libbpfIncludeUapiLinuxDir,
 		filterDir,
-		conntrackDir,
 	}
 
 	if p.cfg.PacketParserRingBuffer.IsEnabled() {
@@ -341,6 +327,8 @@ func (p *packetParser) Start(ctx context.Context) error {
 	}
 
 	p.l.Info("Starting packet parser")
+
+	go runConntrackGC(ctx, p.l, p.objs.RetinaConntrack, p.cfg.EnableConntrackMetrics)
 
 	p.l.Info("setting up enricher since pod level is enabled")
 	// Set up enricher.
@@ -756,7 +744,7 @@ func (p *packetParser) attachViaTC(iface netlink.LinkAttrs, ifaceType interfaceT
 
 func (p *packetParser) run(ctx context.Context) error {
 	// Start perf record handlers (consumers).
-	for i := 0; i < workers; i++ {
+	for i := range workers {
 		p.wg.Add(1)
 		go p.processRecord(ctx, i)
 	}

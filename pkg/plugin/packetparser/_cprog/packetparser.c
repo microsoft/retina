@@ -7,10 +7,9 @@
 #include "bpf_helpers.h"
 #include "bpf_endian.h"
 #include "packetparser.h"
-#include "conntrack.c"
+#include "dynamic.h"
 #include "conntrack.h"
 #include "retina_filter.c"
-#include "dynamic.h"
 
 char __license[] SEC("license") = "Dual MIT/GPL";
 
