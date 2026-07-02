@@ -28,14 +28,7 @@ server {
             {{- if not (eq .Values.hubble.ui.baseUrl "/") }}
             rewrite ^{{ (trimSuffix "/" .Values.hubble.ui.baseUrl) }}(/.*)$ $1 break;
             {{- end }}
-            proxy_http_version 1.1;
-            proxy_pass_request_headers on;
-            proxy_hide_header Access-Control-Allow-Origin;
-            {{- if eq .Values.hubble.ui.baseUrl "/" }}
-            proxy_pass http://127.0.0.1:8090;
-            {{- else }}
-            proxy_pass http://127.0.0.1:8090/;
-            {{- end }}
+            grpc_pass grpc://127.0.0.1:8090;
         }
 
         {{- if not (eq .Values.hubble.ui.baseUrl "/") }}
