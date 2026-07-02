@@ -431,8 +431,8 @@ hubble:
     image:
       override: ~
       repository: "mcr.microsoft.com/oss/cilium/hubble-relay"
-      tag: "v1.15.0"
-      digest: "sha256:19cd56e7618832257bf88b2f281287cb57f9f7fcb9e04775a6198d4bc4daffae"
+      tag: "1.16.1"
+      digest: "sha256:641b13bbe9038d7b0bedd6480e3d704174432e1fd05a25728a4eb27ec47df89a"
       useDigest: false
       pullPolicy: "Always"
 
