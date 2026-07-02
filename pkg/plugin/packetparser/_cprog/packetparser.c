@@ -122,7 +122,25 @@ static int parse_tcp_ts(struct tcphdr *tcph, void *data_end, __u32 *tsval, __u32
 	return -1;
 }
 
-// Function to parse the packet and send it to the perf buffer.
+// Emit a packet to the configured userspace transport.
+static __always_inline void emit_packet(struct __sk_buff *skb, struct packet *p)
+{
+#ifdef USE_RING_BUFFER
+	struct packet *event;
+
+	event = bpf_ringbuf_reserve(&retina_packetparser_events, sizeof(*event), 0);
+	if (!event) {
+		return;
+	}
+
+	__builtin_memcpy(event, p, sizeof(*event));
+	bpf_ringbuf_submit(event, 0);
+#else
+	bpf_perf_event_output(skb, &retina_packetparser_events, BPF_F_CURRENT_CPU, p, sizeof(*p));
+#endif
+}
+
+// Function to parse the packet and send it to the configured userspace buffer.
 static void parse(struct __sk_buff *skb, __u8 obs)
 {
 	struct packet p;
@@ -216,20 +234,23 @@ static void parse(struct __sk_buff *skb, __u8 obs)
 		p.conntrack_metadata = conntrack_metadata;
 	#endif // ENABLE_CONNTRACK_METRICS
 
-    #ifdef DATA_AGGREGATION_LEVEL
+	#ifdef DATA_AGGREGATION_LEVEL
 
 	// Calculate sampling
 	bool sampled __attribute__((unused));
 	sampled = true;
-	
-	#ifdef DATA_SAMPLING_RATE
-	    u32 rand __attribute__((unused));
+
+	#if defined(TEST_FORCE_UNSAMPLED) && !defined(USE_RING_BUFFER)
+		// Allow eBPF tests to exercise perf-buffer suppression deterministically.
+		sampled = false;
+	#elif defined(DATA_SAMPLING_RATE) && DATA_SAMPLING_RATE > 1 && !defined(USE_RING_BUFFER)
+		u32 rand __attribute__((unused));
 		rand = bpf_get_prandom_u32();
 		if (rand >= UINT32_MAX / DATA_SAMPLING_RATE) {
 			sampled = false;
 		}
 	#endif
-	
+
 	// Process the packet in ct
 	struct packetreport report __attribute__((unused));
 	report = ct_process_packet(&p, obs, sampled);
@@ -239,11 +260,7 @@ static void parse(struct __sk_buff *skb, __u8 obs)
 		p.previously_observed_packets = 0;
 		p.previously_observed_bytes = 0;
 		__builtin_memset(&p.previously_observed_flags, 0, sizeof(struct tcpflagscount));
-#ifdef USE_RING_BUFFER
-		bpf_ringbuf_output(&retina_packetparser_events, &p, sizeof(p), 0);
-#else
-		bpf_perf_event_output(skb, &retina_packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
-#endif
+		emit_packet(skb, &p);
 		return;
 	// If the data aggregation level is high, only send the packet to the perf buffer if it needs to be reported.
 	#elif DATA_AGGREGATION_LEVEL == DATA_AGGREGATION_LEVEL_HIGH
@@ -251,11 +268,7 @@ static void parse(struct __sk_buff *skb, __u8 obs)
 			p.previously_observed_packets = report.previously_observed_packets;
 			p.previously_observed_bytes = report.previously_observed_bytes;
 			p.previously_observed_flags = report.previously_observed_flags;
-#ifdef USE_RING_BUFFER
-			bpf_ringbuf_output(&retina_packetparser_events, &p, sizeof(p), 0);
-#else
-			bpf_perf_event_output(skb, &retina_packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
-#endif
+			emit_packet(skb, &p);
 		}
 	#endif
 	#endif

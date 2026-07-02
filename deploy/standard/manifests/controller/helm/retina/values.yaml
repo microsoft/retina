@@ -56,6 +56,9 @@ remoteContext: false
 enableAnnotations: false
 bypassLookupIPOfInterest: false
 dataAggregationLevel: "low"
+# Static packet sampling for packetparser when using perf event arrays.
+# Ignored when packetParserRingBuffer="enabled", because ring buffer back-pressure
+# becomes the adaptation mechanism.
 dataSamplingRate: 1
 # Use BPF ring buffers (BPF_MAP_TYPE_RINGBUF) instead of BPF_PERF_EVENT_ARRAY.
 # Pros: lower per-event overhead at high event rates, simpler variable-sized records, more consistent latency.

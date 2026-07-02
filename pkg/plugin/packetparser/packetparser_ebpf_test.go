@@ -614,6 +614,7 @@ type compileOpts struct {
 	aggregationLevel int
 	samplingRate     int
 	enableRingBuf    bool
+	forceUnsampled   bool
 }
 
 // compileAndLoadVariantBase compiles the packetparser eBPF program with custom
@@ -644,7 +645,12 @@ func compileAndLoadVariantBase(t *testing.T, opts compileOpts) (*packetparserObj
 		st += "#define ENABLE_CONNTRACK_METRICS 1\n"
 	}
 	st += fmt.Sprintf("#define DATA_AGGREGATION_LEVEL %d\n", opts.aggregationLevel)
-	st += fmt.Sprintf("#define DATA_SAMPLING_RATE %d\n", opts.samplingRate)
+	if !opts.enableRingBuf {
+		st += fmt.Sprintf("#define DATA_SAMPLING_RATE %d\n", opts.samplingRate)
+		if opts.forceUnsampled {
+			st += "#define TEST_FORCE_UNSAMPLED 1\n"
+		}
+	}
 	require.NoError(t, os.WriteFile(ppDynamic, []byte(st), 0o644))
 
 	// Write conntrack dynamic.h if conntrack metrics enabled.
@@ -861,6 +867,67 @@ func TestHighAggregationPreviouslyObserved(t *testing.T) {
 		event.PreviouslyObservedPackets, event.PreviouslyObservedBytes)
 	assert.True(t, event.PreviouslyObservedPackets > 0,
 		"expected previously_observed_packets > 0 at HIGH aggregation")
+}
+
+func TestHighAggregationSamplingSuppressesRepeatedPerfBufferEvents(t *testing.T) {
+	objs, reader := compileAndLoadVariant(t, compileOpts{
+		bypassFilter:     1,
+		enableConntrack:  false,
+		aggregationLevel: 1,          // HIGH
+		samplingRate:     2147483647, // effectively never sampled
+		forceUnsampled:   true,       // keep the test deterministic
+	})
+
+	srcIP := net.ParseIP("10.0.16.1")
+	dstIP := net.ParseIP("10.0.16.2")
+
+	synPkt := ebpftest.BuildTCPPacket(ebpftest.TCPPacketOpts{
+		SrcIP: srcIP, DstIP: dstIP, SrcPort: 61000, DstPort: 80, SYN: true,
+	})
+	ebpftest.RunProgram(t, objs.EndpointIngressFilter, synPkt)
+	ebpftest.AssertNoPerfEvent(t, reader, 100*time.Millisecond)
+
+	ackPkt := ebpftest.BuildTCPPacket(ebpftest.TCPPacketOpts{
+		SrcIP: srcIP, DstIP: dstIP, SrcPort: 61000, DstPort: 80, ACK: true,
+	})
+	ebpftest.RunProgram(t, objs.EndpointIngressFilter, ackPkt)
+	_, ok := ebpftest.ReadPerfEvent[packetparserPacket](t, reader, perfReaderTimeout)
+	require.True(t, ok, "first ACK should still be reported when the connection has not emitted a prior sample")
+
+	// Once the ACK has established last_report for the connection, repeated
+	// ACKs should stay suppressed while sampling is forced off.
+	ebpftest.RunProgram(t, objs.EndpointIngressFilter, ackPkt)
+	ebpftest.AssertNoPerfEvent(t, reader, 100*time.Millisecond)
+}
+
+func TestHighAggregationRingBufferIgnoresSamplingRate(t *testing.T) {
+	if err := ensureRingBufKernelSupported(); err != nil {
+		t.Skipf("ring buffer not supported: %v", err)
+	}
+
+	objs, reader := compileAndLoadRingBufVariant(t, compileOpts{
+		bypassFilter:     1,
+		enableConntrack:  false,
+		aggregationLevel: 1,          // HIGH
+		samplingRate:     2147483647, // ignored in ring-buffer mode
+	})
+
+	srcIP := net.ParseIP("10.0.16.3")
+	dstIP := net.ParseIP("10.0.16.4")
+
+	synPkt := ebpftest.BuildTCPPacket(ebpftest.TCPPacketOpts{
+		SrcIP: srcIP, DstIP: dstIP, SrcPort: 62000, DstPort: 80, SYN: true,
+	})
+	ebpftest.RunProgram(t, objs.EndpointIngressFilter, synPkt)
+	_, ok := ebpftest.ReadRingBufEvent[packetparserPacket](t, reader, perfReaderTimeout)
+	require.True(t, ok, "SYN should still be reported at HIGH aggregation")
+
+	ackPkt := ebpftest.BuildTCPPacket(ebpftest.TCPPacketOpts{
+		SrcIP: srcIP, DstIP: dstIP, SrcPort: 62000, DstPort: 80, ACK: true,
+	})
+	ebpftest.RunProgram(t, objs.EndpointIngressFilter, ackPkt)
+	_, ok = ebpftest.ReadRingBufEvent[packetparserPacket](t, reader, perfReaderTimeout)
+	require.True(t, ok, "ring-buffer mode should ignore dataSamplingRate and report the ACK event")
 }
 
 // =============================================================================
