@@ -534,6 +534,24 @@ hubble:
       # by being built into the Service API and offering more predictable routing behavior.
       # See https://kubernetes.io/docs/concepts/services-networking/service/#traffic-distribution
       trafficDistribution: ""
+      appProtocol: "grpc"
+
+    # -- hubble-relay GRPCRoute configuration (Gateway API).
+    # Requires Kubernetes 1.26+ or Gateway API CRDs to be pre-installed.
+    grpcRoute:
+      enabled: false
+      annotations: {}
+      labels: {}
+      # -- Parent Gateways that this route is attached to.
+      parentRefs:
+        - name: example-gateway
+          namespace: default
+          sectionName: example-listener
+      # -- Hostnames for this GRPCRoute.
+      hostnames:
+        - chart-example.local
+      # -- Backend port number. Defaults to the service port (80 for plain, 443 for TLS).
+      port: ~
 
     # -- Host to listen to. Specify an empty string to bind to all the interfaces.
     listenHost: ""
