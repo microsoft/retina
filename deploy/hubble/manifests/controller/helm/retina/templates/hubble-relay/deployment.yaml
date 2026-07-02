@@ -193,24 +193,15 @@ spec:
 {{- end }}
 
 {{- define "hubble-relay.probe" }}
-{{- /* This distinction can be removed once we drop support for k8s 1.23 */}}
-{{- if and (semverCompare ">=1.24-0" .Capabilities.KubeVersion.Version) (not .Values.hubble.tls.enabled) -}}
+{{- /*
+Probe the relay's dedicated gRPC health server on :4222. It is always plaintext
+regardless of hubble.tls.enabled (the TLS-enabled listener is the main API on
+listenPort), so the kubelet's native gRPC probe works in both TLS and non-TLS
+deployments. Upstream Cilium removed the grpc_health_probe binary from the
+hubble-relay image (cilium/cilium#37806), so the prior exec-based probe is no
+longer viable on v1.16+ images.
+*/}}
 grpc:
-  port: {{ .Values.hubble.relay.listenPort }}
-{{- else }}
-exec:
-  command:
-  - grpc_health_probe
-  - -addr=localhost:{{ .Values.hubble.relay.listenPort }}
-{{- if .Values.hubble.tls.enabled }}
-  - -tls
-  - -tls-ca-cert=/var/lib/hubble-relay/tls/hubble-server-ca.crt
-  - -tls-client-cert=/var/lib/hubble-relay/tls/client.crt
-  - -tls-client-key=/var/lib/hubble-relay/tls/client.key
-  - -tls-server-name=instance.hubble-relay.cilium.io
-  - -connect-timeout=5s
-  - -rpc-timeout=5s
-{{- end }}
-{{- end }}
+  port: 4222
 timeoutSeconds: 3
 {{- end }}
