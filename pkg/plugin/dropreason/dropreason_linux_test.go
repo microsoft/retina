@@ -152,6 +152,89 @@ func TestProcessMapValue(t *testing.T) {
 	require.Equal(t, float64(testMetricValues[0].Bytes), dropBytesValue, "Expected drop bytes to be %d but got %d", float64(testMetricValues[0].Bytes), dropBytesValue)
 }
 
+// TestProcessMapValue_TCPAcceptBasicWithError verifies that TCP_ACCEPT_BASIC
+// entries with a real error code (not EAGAIN) are correctly reported.
+// After the fix, the eBPF program filters out EAGAIN (-11) and only writes
+// genuine errors to the map with their error code in ReturnVal.
+func TestProcessMapValue_TCPAcceptBasicWithError(t *testing.T) {
+	log.SetupZapLogger(log.GetDefaultLogOpts())
+	metrics.InitializeMetrics(slog.Default())
+	dr := &dropReason{
+		cfg: cfgPodLevelEnabled,
+		l:   log.Logger().Named(name),
+	}
+
+	// TCP_ACCEPT_BASIC = 3, with a real error like -ENOMEM (-12).
+	testMetricKey := dropMetricKey{DropType: 3, ReturnVal: -12}
+	testMetricValues := dropMetricValues{{Count: 5, Bytes: 0}}
+
+	dr.processMapValue(testMetricKey, testMetricValues)
+
+	reason := testMetricKey.getType()
+	direction := testMetricKey.getDirection()
+	require.Equal(t, "TCP_ACCEPT_BASIC", reason)
+	require.Equal(t, "ingress", direction)
+
+	dropCount := &dto.Metric{}
+	err := metrics.DropPacketsGauge.WithLabelValues(reason, direction).Write(dropCount)
+	require.NoError(t, err)
+	require.Equal(t, float64(5), *dropCount.Gauge.Value)
+}
+
+// TestProcessMapValue_TCPAcceptBasicEAGAINNotInMap documents that after the
+// eBPF fix, EAGAIN errors are filtered in-kernel and never appear in the map.
+// This test verifies that if somehow an EAGAIN entry did appear (e.g. race
+// during upgrade), it would still be processed — the filtering is in eBPF.
+func TestProcessMapValue_TCPAcceptBasicEAGAINNotInMap(t *testing.T) {
+	log.SetupZapLogger(log.GetDefaultLogOpts())
+	metrics.InitializeMetrics(slog.Default())
+	dr := &dropReason{
+		cfg: cfgPodLevelEnabled,
+		l:   log.Logger().Named(name),
+	}
+
+	// Simulate what the OLD buggy code would produce: TCP_ACCEPT_BASIC with
+	// ReturnVal=0 (the old fexit didn't pass any error code).
+	testMetricKey := dropMetricKey{DropType: 3, ReturnVal: 0}
+	testMetricValues := dropMetricValues{{Count: 942303, Bytes: 0}}
+
+	dr.processMapValue(testMetricKey, testMetricValues)
+
+	reason := testMetricKey.getType()
+	direction := testMetricKey.getDirection()
+	require.Equal(t, "TCP_ACCEPT_BASIC", reason)
+	require.Equal(t, "ingress", direction)
+
+	// The Go side still processes whatever the map contains; the fix is that
+	// the eBPF program no longer writes these entries for EAGAIN.
+	dropCount := &dto.Metric{}
+	err := metrics.DropPacketsGauge.WithLabelValues(reason, direction).Write(dropCount)
+	require.NoError(t, err)
+	require.Equal(t, float64(942303), *dropCount.Gauge.Value)
+}
+
+// TestDropMetricKey_GetDirection verifies direction mapping for all drop types.
+func TestDropMetricKey_GetDirection(t *testing.T) {
+	tests := []struct {
+		dropType  uint16
+		wantDir   string
+		wantType  string
+	}{
+		{dropType: 0, wantDir: "unknown", wantType: "IPTABLE_RULE_DROP"},
+		{dropType: 1, wantDir: "unknown", wantType: "IPTABLE_NAT_DROP"},
+		{dropType: 2, wantDir: "egress", wantType: "TCP_CONNECT_BASIC"},
+		{dropType: 3, wantDir: "ingress", wantType: "TCP_ACCEPT_BASIC"},
+		{dropType: 5, wantDir: "unknown", wantType: "CONNTRACK_ADD_DROP"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.wantType, func(t *testing.T) {
+			dk := &dropMetricKey{DropType: tt.dropType}
+			require.Equal(t, tt.wantDir, dk.getDirection())
+			require.Equal(t, tt.wantType, dk.getType())
+		})
+	}
+}
+
 func TestDropReasonRun_Error(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	ctrl := gomock.NewController(t)

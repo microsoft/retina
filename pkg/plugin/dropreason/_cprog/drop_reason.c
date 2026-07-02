@@ -421,7 +421,8 @@ int BPF_KRETPROBE(inet_csk_accept_ret, struct sock *sk)
         return 0;
 
     int err = (int)*err_ptr;
-    if (err >= 0)
+    // err >= 0 means no error; -EAGAIN (-11) is normal for non-blocking accept.
+    if (err >= 0 || err == -11)
         return 0;
 
     struct packet p;
@@ -451,11 +452,26 @@ int BPF_PROG(inet_csk_accept_fexit)
     // Linux 6.10+: 2 params (sk, arg) -> retsk at ctx[2]
     // Pre-6.10:    4 params (sk, flags, err, kern) -> retsk at ctx[4]
     if (bpf_core_type_exists(struct proto_accept_arg___new)) {
-        if ((struct sock *)ctx[2] == NULL)
-            update_metrics_map_basic(TCP_ACCEPT_BASIC, 0, 0);
+        // 6.10+: ctx = [sk, arg, retsk]
+        if ((struct sock *)ctx[2] == NULL) {
+            // Read err from proto_accept_arg (ctx[1] is the arg pointer).
+            int err = 0;
+            bpf_probe_read_kernel(&err, sizeof(err),
+                &((struct proto_accept_arg___new *)ctx[1])->err);
+            // EAGAIN (-11) is normal for non-blocking accept; not a real drop.
+            if (err != 0 && err != -11)
+                update_metrics_map_basic(TCP_ACCEPT_BASIC, err, 0);
+        }
     } else {
-        if ((struct sock *)ctx[4] == NULL)
-            update_metrics_map_basic(TCP_ACCEPT_BASIC, 0, 0);
+        // Pre-6.10: ctx = [sk, flags, err_ptr, kern, retsk]
+        if ((struct sock *)ctx[4] == NULL) {
+            // ctx[2] is int *err — dereference to check error value.
+            int err = 0;
+            bpf_probe_read_kernel(&err, sizeof(err), (void *)ctx[2]);
+            // EAGAIN (-11) is normal for non-blocking accept; not a real drop.
+            if (err != 0 && err != -11)
+                update_metrics_map_basic(TCP_ACCEPT_BASIC, err, 0);
+        }
     }
 
     return 0;
