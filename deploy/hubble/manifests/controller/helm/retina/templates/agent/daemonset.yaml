@@ -110,6 +110,9 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: status.hostIP
+          {{- with .Values.agent.container.retina.extraEnv }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
           securityContext:
             capabilities:
               add:

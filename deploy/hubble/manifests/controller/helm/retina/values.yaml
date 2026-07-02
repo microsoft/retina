@@ -62,6 +62,8 @@ agent:
       metricsBindAddress: ":18080"
       ports:
         containerPort: 10093
+      # -- Additional environment variables for the retina agent container.
+      extraEnv: []
   # -- Node tolerations for pod assignment on nodes with taints
   # ref: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
   tolerations: []
