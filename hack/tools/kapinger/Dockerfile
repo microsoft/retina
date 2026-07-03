@@ -1,6 +1,6 @@
 # Linux builder - runs natively on the target platform (amd64 or arm64)
 # skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.3 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26.4-1@sha256:e1475da3b0412109e79396c15381dd7fd621198161c8ef426b21ae0ea65db838 AS builder
+FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26.4-1@sha256:7e9339662bf964ba4bfa6ca572c391239d18ca22b37c11d15cf92adbc9082cd8 AS builder
 
 WORKDIR /build
 ADD . .
@@ -17,7 +17,7 @@ CMD ["./kapinger"]
 
 # Windows builder - cross-compiles from Linux amd64 (GOOS=windows is not affected by systemcrypto)
 # skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.3 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26.4-1@sha256:e1475da3b0412109e79396c15381dd7fd621198161c8ef426b21ae0ea65db838 AS windows-builder
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26.4-1@sha256:7e9339662bf964ba4bfa6ca572c391239d18ca22b37c11d15cf92adbc9082cd8 AS windows-builder
 
 WORKDIR /build
 ADD . .
@@ -25,7 +25,7 @@ RUN go mod download
 RUN GOOS=windows go build -o kapinger.exe .
 
 # skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2022 --override-os windows --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/windows/servercore:ltsc2022@sha256:86da395cfd2b35dbfc2e9d08719550c51b0570c394bff8f92622a19234766185 AS windows
+FROM mcr.microsoft.com/windows/servercore:ltsc2022@sha256:a23b350061d76236e2c427e32175a2decfe3214200eee4ae9ee9cd9e98f26bf0 AS windows
 WORKDIR /app
 COPY --from=windows-builder /build/kapinger.exe .
 ENTRYPOINT [ "cmd.exe" ]
