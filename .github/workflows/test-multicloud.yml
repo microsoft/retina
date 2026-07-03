@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-    - uses: opentofu/setup-opentofu@847eaa4afeb791b06daa46e8eafa8b1b68d7cfb4 # v2.0.1
+    - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
       with:
         tofu_version: 1.8.3
 
