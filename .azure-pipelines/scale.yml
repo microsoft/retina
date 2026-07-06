@@ -99,7 +99,9 @@ jobs:
             TAG="${TAG// /}"
             AZURE_RESOURCE_GROUP="${AZURE_RESOURCE_GROUP// /}"
             CLUSTER_NAME="${CLUSTER_NAME// /}"
-            [[ $TAG == "" ]] && TAG=$(curl -s https://api.github.com/repos/microsoft/retina/commits | jq -r '.[0].sha' | cut -c1-7)
+            # Default TAG to the value make version would produce for this commit,
+            # keeping it consistent with the tag used by all image-build targets.
+            [[ -z "$TAG" ]] && TAG="$(make version)"
             # Scheduled runs create infra; manual runs with a provided cluster reuse it.
             if [[ "$(Build.Reason)" == "Manual" && -n "$CLUSTER_NAME" ]]; then
               CREATE_INFRA=false
