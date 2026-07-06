@@ -36,14 +36,14 @@ jobs:
       matrix:
         amd64:
           arch: amd64
-          agentImage: ubuntu-latest
         arm64:
           arch: arm64
-          agentImage: ubuntu-22.04-arm64
     pool:
-      vmImage: $(agentImage)
+      vmImage: ubuntu-latest
     steps:
       - checkout: self
+      - bash: make qemu-user-static
+        displayName: Set up QEMU
       - template: steps/setup-go.yml
       - task: AzureCLI@2
         displayName: Build and push retina image
@@ -151,14 +151,14 @@ jobs:
       matrix:
         amd64:
           arch: amd64
-          agentImage: ubuntu-latest
         arm64:
           arch: arm64
-          agentImage: ubuntu-22.04-arm64
     pool:
-      vmImage: $(agentImage)
+      vmImage: ubuntu-latest
     steps:
       - checkout: self
+      - bash: make qemu-user-static
+        displayName: Set up QEMU
       - template: steps/setup-go.yml
       - task: AzureCLI@2
         displayName: Build and push operator image
@@ -185,14 +185,14 @@ jobs:
       matrix:
         amd64:
           arch: amd64
-          agentImage: ubuntu-latest
         arm64:
           arch: arm64
-          agentImage: ubuntu-22.04-arm64
     pool:
-      vmImage: $(agentImage)
+      vmImage: ubuntu-latest
     steps:
       - checkout: self
+      - bash: make qemu-user-static
+        displayName: Set up QEMU
       - template: steps/setup-go.yml
       - task: AzureCLI@2
         displayName: Build and push retina-shell image
@@ -216,14 +216,14 @@ jobs:
       matrix:
         amd64:
           arch: amd64
-          agentImage: ubuntu-latest
         arm64:
           arch: arm64
-          agentImage: ubuntu-22.04-arm64
     pool:
-      vmImage: $(agentImage)
+      vmImage: ubuntu-latest
     steps:
       - checkout: self
+      - bash: make qemu-user-static
+        displayName: Set up QEMU
       - template: steps/setup-go.yml
       - task: AzureCLI@2
         displayName: Build and push kubectl-retina image
@@ -263,9 +263,8 @@ jobs:
           component: kubectl-retina
     steps:
       - checkout: self
-      - bash: |
-          docker run --privileged --rm tonistiigi/binfmt --install all
-        displayName: Setup QEMU
+      - bash: make qemu-user-static
+        displayName: Set up QEMU
       - task: AzureCLI@2
         displayName: make manifest
         inputs:
