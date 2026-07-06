@@ -73,9 +73,7 @@ jobs:
       vmImage: ubuntu-latest
     steps:
       - checkout: self
-      - task: GoTool@0
-        inputs:
-          version: 'from go.mod'
+      - template: steps/setup-go.yml
       - task: AzureCLI@2
         displayName: Run Scale Test
         env:

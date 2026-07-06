@@ -44,9 +44,7 @@ jobs:
       vmImage: $(agentImage)
     steps:
       - checkout: self
-      - task: GoTool@0
-        inputs:
-          version: 'from go.mod'
+      - template: steps/setup-go.yml
       - task: AzureCLI@2
         displayName: Build and push retina image
         env:
@@ -73,9 +71,7 @@ jobs:
       vmImage: ubuntu-latest
     steps:
       - checkout: self
-      - task: GoTool@0
-        inputs:
-          version: 'from go.mod'
+      - template: steps/setup-go.yml
       - bash: |
           set -euo pipefail
           TAG=$(make version)
@@ -163,9 +159,7 @@ jobs:
       vmImage: $(agentImage)
     steps:
       - checkout: self
-      - task: GoTool@0
-        inputs:
-          version: 'from go.mod'
+      - template: steps/setup-go.yml
       - task: AzureCLI@2
         displayName: Build and push operator image
         env:
@@ -199,9 +193,7 @@ jobs:
       vmImage: $(agentImage)
     steps:
       - checkout: self
-      - task: GoTool@0
-        inputs:
-          version: 'from go.mod'
+      - template: steps/setup-go.yml
       - task: AzureCLI@2
         displayName: Build and push retina-shell image
         inputs:
@@ -232,9 +224,7 @@ jobs:
       vmImage: $(agentImage)
     steps:
       - checkout: self
-      - task: GoTool@0
-        inputs:
-          version: 'from go.mod'
+      - template: steps/setup-go.yml
       - task: AzureCLI@2
         displayName: Build and push kubectl-retina image
         inputs:
@@ -297,9 +287,7 @@ jobs:
       CLUSTER_NAME: retina-e2e-$(Build.BuildId)-$(System.JobAttempt)
     steps:
       - checkout: self
-      - task: GoTool@0
-        inputs:
-          version: 'from go.mod'
+      - template: steps/setup-go.yml
       - task: AzureCLI@2
         displayName: Run E2E Tests
         env:
@@ -344,9 +332,7 @@ jobs:
       MODE: basic
     steps:
       - checkout: self
-      - task: GoTool@0
-        inputs:
-          version: 'from go.mod'
+      - template: steps/setup-go.yml
       - task: AzureCLI@2
         displayName: Run perf test
         env:
@@ -395,9 +381,7 @@ jobs:
       MODE: advanced
     steps:
       - checkout: self
-      - task: GoTool@0
-        inputs:
-          version: 'from go.mod'
+      - template: steps/setup-go.yml
       - task: AzureCLI@2
         displayName: Run perf test
         env:
