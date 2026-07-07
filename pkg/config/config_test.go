@@ -52,6 +52,12 @@ func TestGetConfig_DefaultTelemetryInterval(t *testing.T) {
 	}
 }
 
+func TestGetConfig_DefaultConntrackMaxEntries(t *testing.T) {
+	c, err := GetConfig("./testwith/config.yaml")
+	require.NoError(t, err)
+	require.Equal(t, DefaultConntrackMaxEntries, c.ConntrackMaxEntries)
+}
+
 func TestDecodeLevelHook(t *testing.T) {
 	tests := []struct {
 		input    interface{}

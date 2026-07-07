@@ -116,6 +116,7 @@ data:
     monitorSockPath: {{ .Values.monitorSockPath }}
     packetParserRingBuffer: {{ .Values.packetParserRingBuffer }}
     packetParserRingBufferSize: {{ .Values.packetParserRingBufferSize }}
+    conntrackMaxEntries: {{ .Values.conntrackMaxEntries }}
 {{- end}}
 ---
 {{- if .Values.os.windows}}

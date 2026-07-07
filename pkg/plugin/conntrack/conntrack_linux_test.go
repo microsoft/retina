@@ -7,6 +7,8 @@ import (
 	"path"
 	"runtime"
 	"testing"
+
+	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
 )
 
 func TestBuildDynamicHeaderPath(t *testing.T) {
@@ -89,4 +91,29 @@ func getCurrentFilePath(t *testing.T) string {
 		t.Fatal("failed to determine test file path")
 	}
 	return filename
+}
+
+func TestSetConntrackMapMaxEntries(t *testing.T) {
+	spec, err := loadConntrack()
+	if err != nil {
+		t.Fatalf("failed to load conntrack spec: %v", err)
+	}
+	ms, ok := spec.Maps[plugincommon.ConntrackMapName]
+	if !ok {
+		t.Fatalf("conntrack map %q not found in spec", plugincommon.ConntrackMapName)
+	}
+	original := ms.MaxEntries
+
+	// Zero leaves the compiled default unchanged.
+	setConntrackMapMaxEntries(spec, 0)
+	if ms.MaxEntries != original {
+		t.Errorf("expected max entries unchanged at %d, got %d", original, ms.MaxEntries)
+	}
+
+	// Non-zero overrides the map size.
+	const want uint32 = 500000
+	setConntrackMapMaxEntries(spec, want)
+	if ms.MaxEntries != want {
+		t.Errorf("expected max entries %d, got %d", want, ms.MaxEntries)
+	}
 }

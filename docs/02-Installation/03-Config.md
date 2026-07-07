@@ -56,6 +56,7 @@ Apply to both Agent and Operator.
 * `dataSamplingRate`: Defines the data sampling rate for `packetparser`.  See [Sampling](../03-Metrics/plugins/Linux/packetparser.md#sampling) for more details.
 * `packetParserRingBuffer`: Selects the kernel-to-userspace transport for `packetparser`. Accepted values: `enabled` (ring buffer) or `disabled` (perf event array). `auto` is reserved for future use.
 * `packetParserRingBufferSize`: Ring buffer size in bytes when `packetParserRingBuffer=enabled`. Must be a power of two between the kernel page size and 1GiB (inclusive); invalid values cause startup to fail.
+* `conntrackMaxEntries`: Maximum number of entries in the conntrack map (default `262144`). Raise it for clusters tracking many concurrent connections to avoid premature LRU eviction. Applied to the pinned map at init; changing it takes effect on init-container restart.
 
 ## Operator Configuration
 

@@ -72,6 +72,7 @@ packetParserRingBufferSize: 8388608
 # This map tracks IP addresses of pods of interest for network observability.
 # Default: 255. Increase for large clusters with many tracked pods.
 filterMapMaxEntries: 255
+conntrackMaxEntries: 262144
 
 imagePullSecrets: []
 nameOverride: "retina"

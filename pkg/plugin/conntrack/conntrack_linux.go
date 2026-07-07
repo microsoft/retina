@@ -31,37 +31,59 @@ var conntrackMetricsEnabled = false // conntrack metrics global variable
 // Init initializes the conntrack eBPF map in the kernel for the first time.
 // This function should be called in the init container since
 // it requires securityContext.privileged to be true.
-func Init() error {
+func Init(maxEntries uint32) error {
 	// Allow the current process to lock memory for eBPF resources.
 	if err := rlimit.RemoveMemlock(); err != nil {
 		return errors.Wrapf(err, "failed to remove memlock limit")
 	}
 
 	objs := &conntrackObjects{}
-	err := loadConntrackObjects(objs, &ebpf.CollectionOptions{
+	err := loadConntrackObjectsWithMaxEntries(objs, &ebpf.CollectionOptions{
 		Maps: ebpf.MapOptions{
 			PinPath: plugincommon.MapPath,
 		},
-	})
+	}, maxEntries)
 	if err != nil {
 		return errors.Wrap(err, "failed to load conntrack objects")
 	}
 	return nil
 }
 
+// loadConntrackObjectsWithMaxEntries loads the conntrack objects, overriding the
+// conntrack map's max entries when a non-zero value is provided.
+func loadConntrackObjectsWithMaxEntries(objs *conntrackObjects, opts *ebpf.CollectionOptions, maxEntries uint32) error {
+	spec, err := loadConntrack()
+	if err != nil {
+		return err
+	}
+	setConntrackMapMaxEntries(spec, maxEntries)
+	return errors.Wrap(spec.LoadAndAssign(objs, opts), "failed to load and assign conntrack objects")
+}
+
+// setConntrackMapMaxEntries overrides the conntrack map's max entries when a
+// non-zero value is provided.
+func setConntrackMapMaxEntries(spec *ebpf.CollectionSpec, maxEntries uint32) {
+	if maxEntries == 0 {
+		return
+	}
+	if ms, ok := spec.Maps[plugincommon.ConntrackMapName]; ok {
+		ms.MaxEntries = maxEntries
+	}
+}
+
 // New returns a new Conntrack instance.
-func New() (*Conntrack, error) {
+func New(maxEntries uint32) (*Conntrack, error) {
 	ct := &Conntrack{
 		l:           log.Logger().Named("conntrack"),
 		gcFrequency: defaultGCFrequency,
 	}
 
 	objs := &conntrackObjects{}
-	err := loadConntrackObjects(objs, &ebpf.CollectionOptions{
+	err := loadConntrackObjectsWithMaxEntries(objs, &ebpf.CollectionOptions{
 		Maps: ebpf.MapOptions{
 			PinPath: plugincommon.MapPath,
 		},
-	})
+	}, maxEntries)
 	if err != nil {
 		ct.l.Error("loadConntrackObjects failed", zap.Error(err))
 		return nil, errors.Wrap(err, "failed to load conntrack objects")

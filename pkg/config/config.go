@@ -59,6 +59,7 @@ var (
 	DefaultTelemetryInterval          = 15 * time.Minute
 	DefaultSamplingRate        uint32 = 1
 	DefaultFilterMapMaxEntries uint32 = 255
+	DefaultConntrackMaxEntries uint32 = 262144
 )
 
 func (l *Level) UnmarshalText(text []byte) error {
@@ -134,6 +135,7 @@ type Config struct {
 	PacketParserRingBuffer     PacketParserRingBufferMode `yaml:"packetParserRingBuffer"`
 	PacketParserRingBufferSize uint32                     `yaml:"packetParserRingBufferSize"`
 	FilterMapMaxEntries        uint32                     `yaml:"filterMapMaxEntries"`
+	ConntrackMaxEntries        uint32                     `yaml:"conntrackMaxEntries"`
 	EnableTCX                  TCXMode                    `yaml:"enableTCX"`
 }
 
@@ -192,6 +194,11 @@ func GetConfig(cfgFilename string) (*Config, error) {
 	// Default filter map max entries to 255 if not set.
 	if config.FilterMapMaxEntries == 0 {
 		config.FilterMapMaxEntries = DefaultFilterMapMaxEntries
+	}
+
+	// Default conntrack max entries if not set.
+	if config.ConntrackMaxEntries == 0 {
+		config.ConntrackMaxEntries = DefaultConntrackMaxEntries
 	}
 
 	// Default EnableTCX to "auto" if unset, reject unknown values.

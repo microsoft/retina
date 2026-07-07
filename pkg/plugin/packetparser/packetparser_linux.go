@@ -257,6 +257,11 @@ func (p *packetParser) Init() error {
 		mapSpec.MaxEntries = p.cfg.FilterMapMaxEntries
 	}
 
+	// Override conntrack map max entries to match the configured size from init container.
+	if mapSpec, ok := spec.Maps[plugincommon.ConntrackMapName]; ok && p.cfg.ConntrackMaxEntries > 0 {
+		mapSpec.MaxEntries = p.cfg.ConntrackMaxEntries
+	}
+
 	//nolint:typecheck
 	if err := spec.LoadAndAssign(objs, &ebpf.CollectionOptions{ //nolint:typecheck
 		Maps: ebpf.MapOptions{
