@@ -30,15 +30,29 @@ pr:
     include:
       - main
 
+parameters:
+  # TEMPORARY (revert this parameter and the isMergeGroup if/else below after
+  # dark-launch validation): when true, forces full merge-group behavior on any
+  # trigger (push to ACR, embed APP_INSIGHTS_ID, run manifests + e2e + perf).
+  # Use it to validate the full pipeline from a manual queue against any branch.
+  - name: forceMergeGroup
+    displayName: Force merge-group behavior (push + telemetry + tests)
+    type: boolean
+    default: false
+
 variables:
   - name: azureServiceConnection
     value: r2d
   - name: imageNamespace
     value: microsoft/retina
-  # True only when the build was triggered by a push to a merge-queue temp branch.
-  # PR builds and manual queues evaluate to False -> dry-run behavior.
+  # True only when the build was triggered by a push to a merge-queue temp branch,
+  # OR when the forceMergeGroup parameter is checked at queue time.
+  # PR builds and manual queues with the checkbox off evaluate to False -> dry-run.
   - name: isMergeGroup
-    value: $[ startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/') ]
+    ${{ if eq(parameters.forceMergeGroup, true) }}:
+      value: 'True'
+    ${{ else }}:
+      value: $[ startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/') ]
 
 jobs:
   - job: retina_images
