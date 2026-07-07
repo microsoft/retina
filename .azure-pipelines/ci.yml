@@ -54,6 +54,7 @@ jobs:
       vmImage: ubuntu-latest
     steps:
       - checkout: self
+      - template: steps/free-disk-space.yml
       - bash: make qemu-user-static
         displayName: Set up QEMU
       - template: steps/setup-go.yml
@@ -190,6 +191,7 @@ jobs:
       vmImage: ubuntu-latest
     steps:
       - checkout: self
+      - template: steps/free-disk-space.yml
       - bash: make qemu-user-static
         displayName: Set up QEMU
       - template: steps/setup-go.yml
@@ -234,6 +236,7 @@ jobs:
       vmImage: ubuntu-latest
     steps:
       - checkout: self
+      - template: steps/free-disk-space.yml
       - bash: make qemu-user-static
         displayName: Set up QEMU
       - template: steps/setup-go.yml
@@ -276,6 +279,7 @@ jobs:
       vmImage: ubuntu-latest
     steps:
       - checkout: self
+      - template: steps/free-disk-space.yml
       - bash: make qemu-user-static
         displayName: Set up QEMU
       - template: steps/setup-go.yml
