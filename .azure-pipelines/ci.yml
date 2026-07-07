@@ -55,13 +55,14 @@ jobs:
           scriptLocation: inlineScript
           inlineScript: |
             set -euo pipefail
-            echo "TAG=$(make version)" >> tag.env
+            TAG=$(make version)
             az acr login -n $(ACR_NAME)
             make retina-image \
               IMAGE_NAMESPACE=$(imageNamespace) \
               PLATFORM=linux/$(arch) \
               IMAGE_REGISTRY=$(ACR_NAME) \
               APP_INSIGHTS_ID=$APP_INSIGHTS_ID \
+              TAG=$TAG \
               BUILDX_ACTION=--push
 
   - job: build_windows_binaries
@@ -141,7 +142,8 @@ jobs:
               IMAGE_REGISTRY=$(ACR_NAME) \
               APP_INSIGHTS_ID=$APP_INSIGHTS_ID \
               BINARIES_PATH=output/windows_$(arch) \
-              REPO_PATH=.
+              REPO_PATH=. \
+              TAG=$TAG
             docker push $(ACR_NAME)/$(imageNamespace)/retina-agent:${TAG}-windows-ltsc$(year)-$(arch)
 
   - job: operator_images
@@ -170,12 +172,14 @@ jobs:
           scriptLocation: inlineScript
           inlineScript: |
             set -euo pipefail
+            TAG=$(make version)
             az acr login -n $(ACR_NAME)
             make retina-operator-image \
               IMAGE_NAMESPACE=$(imageNamespace) \
               PLATFORM=linux/$(arch) \
               IMAGE_REGISTRY=$(ACR_NAME) \
               APP_INSIGHTS_ID=$APP_INSIGHTS_ID \
+              TAG=$TAG \
               BUILDX_ACTION=--push
 
   - job: retina_shell_images
@@ -202,11 +206,13 @@ jobs:
           scriptLocation: inlineScript
           inlineScript: |
             set -euo pipefail
+            TAG=$(make version)
             az acr login -n $(ACR_NAME)
             make retina-shell-image \
               IMAGE_NAMESPACE=$(imageNamespace) \
               PLATFORM=linux/$(arch) \
               IMAGE_REGISTRY=$(ACR_NAME) \
+              TAG=$TAG \
               BUILDX_ACTION=--push
 
   - job: kubectl_retina_images
@@ -233,11 +239,13 @@ jobs:
           scriptLocation: inlineScript
           inlineScript: |
             set -euo pipefail
+            TAG=$(make version)
             az acr login -n $(ACR_NAME)
             make kubectl-retina-image \
               IMAGE_NAMESPACE=$(imageNamespace) \
               PLATFORM=linux/$(arch) \
               IMAGE_REGISTRY=$(ACR_NAME) \
+              TAG=$TAG \
               BUILDX_ACTION=--push
 
   - job: manifests
@@ -273,8 +281,9 @@ jobs:
           scriptLocation: inlineScript
           inlineScript: |
             set -euo pipefail
+            TAG=$(make version)
             az acr login -n $(ACR_NAME)
-            make manifest COMPONENT=$(component) IMAGE_REGISTRY=$(ACR_NAME)
+            make manifest COMPONENT=$(component) IMAGE_REGISTRY=$(ACR_NAME) TAG=$TAG
 
   - job: e2e
     displayName: Run E2E Tests
