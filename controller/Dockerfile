@@ -13,6 +13,10 @@ FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20260706@sha256:576d976
 
 # intermediate go generate stage
 FROM golang AS intermediate 
+# systemcrypto without cgo — required for arm64 cross-compile from amd64 host
+# (Go auto-disables cgo when cross-compiling, and systemcrypto in Go <=1.26
+# requires cgo unless this experiment is set). Becomes redundant with Go 1.27+.
+ENV GOEXPERIMENT=ms_nocgo_opensslcrypto
 ARG APP_INSIGHTS_ID # set to enable AI telemetry
 ARG GOARCH=amd64 # default to amd64
 ARG GOOS=linux # default to linux

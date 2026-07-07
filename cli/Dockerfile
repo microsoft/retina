@@ -1,6 +1,10 @@
 # skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.3-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26.4-1-azurelinux3.0@sha256:877a4c2aed044ce1b36c043c1af0c939c3129a7a854453117e5e2b9d574d4b52 AS builder
 
+# systemcrypto without cgo — required for arm64 cross-compile from amd64 host.
+# Becomes redundant with Go 1.27+ (auto-selected when CGO_ENABLED=0).
+ENV GOEXPERIMENT=ms_nocgo_opensslcrypto
+
 ARG VERSION
 ARG APP_INSIGHTS_ID
 ARG AGENT_IMAGE_NAME="ghcr.io/microsoft/retina/retina-agent"
@@ -29,7 +33,10 @@ FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260706@sha256:0cdd0c6a200fc2b5
 
 # Target 1: Distroless (secure, minimal)
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/distroless/minimal:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20260706@sha256:576d9769c0146cbf0cf7946bacf536c5758464c29eadfa03ef5090ae708e641f AS distroless-target
+# Final image must be $TARGETPLATFORM (default), not $BUILDPLATFORM — the
+# kubectl-retina binary is cross-compiled for the target arch and would fail
+# to run inside a wrong-arch base image.
+FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20260706@sha256:576d9769c0146cbf0cf7946bacf536c5758464c29eadfa03ef5090ae708e641f AS distroless-target
 COPY --from=libs /lib/ /lib
 COPY --from=libs /usr/lib/ /usr/lib
 COPY --from=libs /etc/pki/tls/ /etc/pki/tls/
@@ -38,7 +45,10 @@ COPY --from=builder /workspace/kubectl-retina .
 
 # Target 2: Shell-enabled (operational, init container support)
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/azurelinux/base/core:3.0.20260706@sha256:0cdd0c6a200fc2b5d6da711c34228126034bd428650b43dfb7e378214e6f2d32 AS shell-target
+# Final image must be $TARGETPLATFORM (default), not $BUILDPLATFORM — the
+# kubectl-retina binary is cross-compiled for the target arch and would fail
+# to run inside a wrong-arch base image.
+FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260706@sha256:0cdd0c6a200fc2b5d6da711c34228126034bd428650b43dfb7e378214e6f2d32 AS shell-target
 WORKDIR /
 COPY --from=builder /workspace/kubectl-retina /bin/kubectl-retina
 RUN chmod +x /bin/kubectl-retina
