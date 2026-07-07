@@ -20,7 +20,11 @@ ENV GOOS=${GOOS}
 ARG GOARCH=amd64
 ENV GOARCH=${GOARCH}
 
-RUN make manifests
+# make manifests runs controller-gen, a build-time host tool that must be
+# compiled for and executed on the build host, not the target arch. Unset the
+# cross-compile env for this step so `go tool` doesn't produce an arm64 binary
+# and then fail to exec it on the amd64 builder.
+RUN env -u GOOS -u GOARCH make manifests
 RUN --mount=type=cache,target="/root/.cache/go-build" \
 	GOOS=$GOOS GOARCH=$GOARCH go build \
 	-ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" \
