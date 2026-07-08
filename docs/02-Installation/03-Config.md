@@ -56,6 +56,7 @@ Apply to both Agent and Operator.
 * `dataSamplingRate`: Defines the data sampling rate for `packetparser`.  See [Sampling](../03-Metrics/plugins/Linux/packetparser.md#sampling) for more details.
 * `packetParserRingBuffer`: Selects the kernel-to-userspace transport for `packetparser`. Accepted values: `enabled` (ring buffer) or `disabled` (perf event array). `auto` is reserved for future use.
 * `packetParserRingBufferSize`: Ring buffer size in bytes when `packetParserRingBuffer=enabled`. Must be a power of two between the kernel page size and 1GiB (inclusive); invalid values cause startup to fail.
+* `enricherRingCapacity`: Capacity of the enricher flow ring buffer (default `1023`). Must be one less than a power of two (e.g. `1023`, `4095`, `65535`); invalid values cause startup to fail. Increase to absorb bursts and reduce `enricher_ring` lost events. Takes effect on agent restart.
 
 ## Operator Configuration
 
