@@ -15,6 +15,9 @@ const (
 	parsedPacketsCounterName                  = "parsed_packets_counter"
 	expiredMetricsCounterName                 = "expired_metrics_counter"
 
+	// reasonLabel labels parsed-packet reports by the trigger that produced them.
+	reasonLabel = "reason"
+
 	// Windows
 	hnsStats            = "windows_hns_stats"
 	hnsStatsDescription = "Include many different metrics from packets sent/received to closed connections"

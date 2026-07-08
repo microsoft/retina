@@ -196,6 +196,7 @@ func InitializeMetrics(logger *slog.Logger) {
 		exporter.DefaultRegistry,
 		parsedPacketsCounterName,
 		parsedPacketsCounterDescription,
+		reasonLabel,
 	)
 
 	MetricsExpiredCounter = exporter.CreatePrometheusCounterVecForControlPlaneMetric(

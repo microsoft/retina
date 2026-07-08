@@ -777,6 +777,38 @@ func (p *packetParser) run(ctx context.Context) error {
 	return nil
 }
 
+// Report reasons, matching REPORT_REASON_* in conntrack.h.
+const (
+	reportReasonNewConnection uint8 = iota
+	reportReasonInterval
+	reportReasonFlagChange
+	reportReasonTCPFlags
+	reportReasonFinalACK
+	reportReasonRST
+	reportReasonTimeout
+)
+
+func reportReasonString(r uint8) string {
+	switch r {
+	case reportReasonNewConnection:
+		return "new_connection"
+	case reportReasonInterval:
+		return "interval"
+	case reportReasonFlagChange:
+		return "flag_change"
+	case reportReasonTCPFlags:
+		return "tcp_flags"
+	case reportReasonFinalACK:
+		return "final_ack"
+	case reportReasonRST:
+		return "rst"
+	case reportReasonTimeout:
+		return "timeout"
+	default:
+		return "unknown"
+	}
+}
+
 // This is the data consumer.
 // There will more than one of these.
 func (p *packetParser) processRecord(ctx context.Context, id int) {
@@ -794,14 +826,14 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 				zap.Int("worker_id", id),
 			)
 
-			metrics.ParsedPacketsCounter.WithLabelValues().Inc()
-
 			var bpfEvent packetparserPacket
 			err := binary.Read(bytes.NewReader(record.RawSample), binary.LittleEndian, &bpfEvent)
 			if err != nil {
 				p.l.Error("Error reading bpfEvent", zap.Error(err))
 				continue
 			}
+
+			metrics.ParsedPacketsCounter.WithLabelValues(reportReasonString(bpfEvent.ReportReason)).Inc()
 
 			// Post processing of the bpfEvent.
 			// Anything after this is required only for Pod level metrics.

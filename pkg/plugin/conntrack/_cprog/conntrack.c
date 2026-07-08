@@ -62,6 +62,7 @@ struct packet
     __u8 proto;
     __u16 flags; // For TCP packets, this is the TCP flags. For UDP packets, this is will always be 1 for conntrack purposes.
     bool is_reply;
+    __u8 report_reason; // Why this packet was reported to userspace. One of REPORT_REASON_*.
     __u32 previously_observed_packets; // When sampling, this is the number of observed packets since the last report.
     __u32 previously_observed_bytes; // When sampling, this is the number of observed bytes since the last report.
     struct tcpflagscount previously_observed_flags; // When sampling, this is the previously observed TCP flags since the last report.
@@ -77,6 +78,7 @@ struct packetreport
     __u32 previously_observed_bytes;
     struct tcpflagscount previously_observed_flags;
     bool report;
+    __u8 report_reason; // One of REPORT_REASON_*; valid when report is true.
 };
 
 /**
@@ -477,6 +479,7 @@ static __always_inline struct packetreport _ct_should_report_packet(struct ct_v4
     if (now >= eviction_time) {
         bpf_map_delete_elem(&retina_conntrack, key);
         report.report = true;
+        report.report_reason = REPORT_REASON_TIMEOUT;
         return report; // Report the last packet received before deletion
     }
 
@@ -495,12 +498,13 @@ static __always_inline struct packetreport _ct_should_report_packet(struct ct_v4
         
         // Check if this is the final ACK in TCP connection teardown
         // (Both directions have seen FIN, and this is just an ACK without other control flags)
-        if ((flags & TCP_ACK) && 
-            !(flags & (TCP_FIN | TCP_SYN | TCP_RST)) && 
-            (entry->flags_seen_tx_dir & TCP_FIN) && 
+        if ((flags & TCP_ACK) &&
+            !(flags & (TCP_FIN | TCP_SYN | TCP_RST)) &&
+            (entry->flags_seen_tx_dir & TCP_FIN) &&
             (entry->flags_seen_rx_dir & TCP_FIN)) {
             bpf_map_delete_elem(&retina_conntrack, key);
             report.report = true;
+            report.report_reason = REPORT_REASON_FINAL_ACK;
             return report; // Report final ACK before connection removal
         }
 
@@ -508,6 +512,7 @@ static __always_inline struct packetreport _ct_should_report_packet(struct ct_v4
         if (flags & TCP_RST) {
             bpf_map_delete_elem(&retina_conntrack, key);
             report.report = true;
+            report.report_reason = REPORT_REASON_RST;
             return report; // Report RST before connection removal
         }
 
@@ -553,6 +558,13 @@ static __always_inline struct packetreport _ct_should_report_packet(struct ct_v4
     // 3. Reporting interval has elapsed
     if (should_report || (sampled && flags != seen_flags) || now - last_report >= CT_REPORT_INTERVAL) {
         report.report = true;
+        if (should_report) {
+            report.report_reason = REPORT_REASON_TCP_FLAGS;
+        } else if (sampled && flags != seen_flags) {
+            report.report_reason = REPORT_REASON_FLAG_CHANGE;
+        } else {
+            report.report_reason = REPORT_REASON_INTERVAL;
+        }
         // Update the connection's state
         if (direction == CT_PACKET_DIR_TX) {
             WRITE_ONCE(entry->last_report_tx_dir, now);
