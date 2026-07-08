@@ -497,9 +497,11 @@ static __always_inline struct packetreport _ct_should_report_packet(struct ct_v4
         // Handle TCP connection termination states
         
         // Check if this is the final ACK in TCP connection teardown
-        // (Both directions have seen FIN, and this is just an ACK without other control flags)
-        if ((flags & TCP_ACK) &&
-            !(flags & (TCP_FIN | TCP_SYN | TCP_RST)) &&
+        // (Both directions have seen FIN, and the current packet is just an ACK without other
+        // control flags). Test packet_flags, not the seen-flags-OR'd flags, since this direction
+        // has already recorded its FIN and would otherwise always fail the FIN check.
+        if ((packet_flags & TCP_ACK) &&
+            !(packet_flags & (TCP_FIN | TCP_SYN | TCP_RST)) &&
             (entry->flags_seen_tx_dir & TCP_FIN) &&
             (entry->flags_seen_rx_dir & TCP_FIN)) {
             bpf_map_delete_elem(&retina_conntrack, key);
