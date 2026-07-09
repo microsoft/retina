@@ -60,6 +60,9 @@ const (
 	ConntrackBytesRxDescription          = "Number of rx bytes"
 	ConntrackTotalConnectionsDescription = "Total number of connections"
 	conntrackGCEntriesCounterDescription = "Number of conntrack entries removed by garbage collection, by connection state"
+
+	ConntrackUnknownDirectionConnectionsDescription = "Number of live connections whose direction is unknown (SYN not observed, e.g. established before tracking or after LRU eviction)"
+	ConntrackUnknownDirectionBytesDescription       = "Cumulative bytes of live unknown-direction connections"
 )
 
 // Metric Counters
@@ -117,6 +120,9 @@ var (
 	ConntrackBytesTx          GaugeVec
 	ConntrackBytesRx          GaugeVec
 	ConntrackTotalConnections GaugeVec
+
+	ConntrackUnknownDirectionConnections GaugeVec
+	ConntrackUnknownDirectionBytes       GaugeVec
 )
 
 func ToPrometheusType(metric interface{}) prometheus.Collector {

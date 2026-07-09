@@ -156,6 +156,10 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			// metrics counters
 			var packetsCountTx, packetsCountRx, totConnections uint32
 			var bytesCountTx, bytesCountRx uint64
+			// Live unknown-direction population (SYN never observed), e.g. connections
+			// established before tracking or recreated after LRU eviction.
+			var unknownDirectionEntries uint32
+			var unknownDirectionBytes uint64
 
 			iter := ct.ctMap.Iterate()
 			for iter.Next(&key, &value) {
@@ -182,6 +186,10 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 					bytesCountRx += ctMeta.BytesRxCount
 					packetsCountTx += ctMeta.PacketsTxCount
 					packetsCountRx += ctMeta.PacketsRxCount
+					if value.IsDirectionUnknown {
+						unknownDirectionEntries++
+						unknownDirectionBytes += ctMeta.BytesTxCount + ctMeta.BytesRxCount
+					}
 				}
 
 				ct.l.Debug("conntrack entry",
@@ -210,6 +218,8 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 				metrics.ConntrackPacketsRx.WithLabelValues().Set(float64(packetsCountRx))
 				metrics.ConntrackBytesRx.WithLabelValues().Set(float64(bytesCountRx))
 				metrics.ConntrackTotalConnections.WithLabelValues().Set(float64(totConnections))
+				metrics.ConntrackUnknownDirectionConnections.WithLabelValues().Set(float64(unknownDirectionEntries))
+				metrics.ConntrackUnknownDirectionBytes.WithLabelValues().Set(float64(unknownDirectionBytes))
 			}
 
 			// Delete the conntrack entries
