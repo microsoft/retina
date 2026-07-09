@@ -112,37 +112,49 @@ func (c *Cache) getObjByIPType(ip string, t objectType) interface{} {
 	case TypeEndpoint:
 		podKey, ok := c.ipToEpKey[ip]
 		if !ok {
-			c.l.Debug("pod not found for IP", zap.String("ip", ip))
+			if ce := c.l.Check(zap.DebugLevel, "pod not found for IP"); ce != nil {
+				ce.Write(zap.String("ip", ip))
+			}
 			return nil
 		}
 
 		ep, ok := c.epMap[podKey]
 		if ok {
-			c.l.Debug("pod found for IP", zap.String("ip", ip), zap.String("pod", podKey))
+			if ce := c.l.Check(zap.DebugLevel, "pod found for IP"); ce != nil {
+				ce.Write(zap.String("ip", ip), zap.String("pod", podKey))
+			}
 			return ep
 		}
 	case TypeSvc:
 		svcKey, ok := c.ipToSvcKey[ip]
 		if !ok {
-			c.l.Debug("service not found for IP", zap.String("ip", ip))
+			if ce := c.l.Check(zap.DebugLevel, "service not found for IP"); ce != nil {
+				ce.Write(zap.String("ip", ip))
+			}
 			return nil
 		}
 
 		svc, ok := c.svcMap[svcKey]
 		if ok {
-			c.l.Debug("service found for IP", zap.String("ip", ip), zap.String("svc", svcKey))
+			if ce := c.l.Check(zap.DebugLevel, "service found for IP"); ce != nil {
+				ce.Write(zap.String("ip", ip), zap.String("svc", svcKey))
+			}
 			return svc
 		}
 	case TypeNode:
 		nodeName, ok := c.ipToNodeName[ip]
 		if !ok {
-			c.l.Debug("node not found for IP", zap.String("ip", ip))
+			if ce := c.l.Check(zap.DebugLevel, "node not found for IP"); ce != nil {
+				ce.Write(zap.String("ip", ip))
+			}
 			return nil
 		}
 
 		node, ok := c.nodeMap[nodeName]
 		if ok {
-			c.l.Debug("node found for IP", zap.String("ip", ip), zap.String("node", nodeName))
+			if ce := c.l.Check(zap.DebugLevel, "node found for IP"); ce != nil {
+				ce.Write(zap.String("ip", ip), zap.String("node", nodeName))
+			}
 			return node
 		}
 	}

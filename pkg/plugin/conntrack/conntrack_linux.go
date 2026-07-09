@@ -139,12 +139,6 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 					keyCopy := key // Copy the key to avoid using the same key in the next iteration
 					keysToDelete = append(keysToDelete, keyCopy)
 				}
-				// Log the conntrack entry
-				srcIP := utils.Int2ip(key.SrcIp).To4()
-				dstIP := utils.Int2ip(key.DstIp).To4()
-				sourcePortShort := uint32(utils.HostToNetShort(key.SrcPort))
-				destinationPortShort := uint32(utils.HostToNetShort(key.DstPort))
-
 				// Add conntrack metrics.
 				if conntrackMetricsEnabled {
 					// Basic metrics, node-level
@@ -156,20 +150,27 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 					packetsCountRx += ctMeta.PacketsRxCount
 				}
 
-				ct.l.Debug("conntrack entry",
-					zap.String("src_ip", srcIP.String()),
-					zap.Uint32("src_port", sourcePortShort),
-					zap.String("dst_ip", dstIP.String()),
-					zap.Uint32("dst_port", destinationPortShort),
-					zap.String("proto", decodeProto(key.Proto)),
-					zap.Uint32("eviction_time", value.EvictionTime),
-					zap.Uint8("traffic_direction", value.TrafficDirection),
-					zap.String("flags_seen_tx_dir", decodeFlags(value.FlagsSeenTxDir)),
-					zap.String("flags_seen_rx_dir", decodeFlags(value.FlagsSeenRxDir)),
-					zap.Uint32("last_reported_tx_dir", value.LastReportTxDir),
-					zap.Uint32("last_reported_rx_dir", value.LastReportRxDir),
-					zap.Bool("is_direction_unknown", value.IsDirectionUnknown),
-				)
+				// Gate the per-entry log behind a level check so the IP/string
+				// formatting and field allocation are skipped in this hot loop
+				// when debug logging is disabled.
+				if ce := ct.l.Check(zap.DebugLevel, "conntrack entry"); ce != nil {
+					srcIP := utils.Int2ip(key.SrcIp).To4()
+					dstIP := utils.Int2ip(key.DstIp).To4()
+					ce.Write(
+						zap.String("src_ip", srcIP.String()),
+						zap.Uint32("src_port", uint32(utils.HostToNetShort(key.SrcPort))),
+						zap.String("dst_ip", dstIP.String()),
+						zap.Uint32("dst_port", uint32(utils.HostToNetShort(key.DstPort))),
+						zap.String("proto", decodeProto(key.Proto)),
+						zap.Uint32("eviction_time", value.EvictionTime),
+						zap.Uint8("traffic_direction", value.TrafficDirection),
+						zap.String("flags_seen_tx_dir", decodeFlags(value.FlagsSeenTxDir)),
+						zap.String("flags_seen_rx_dir", decodeFlags(value.FlagsSeenRxDir)),
+						zap.Uint32("last_reported_tx_dir", value.LastReportTxDir),
+						zap.Uint32("last_reported_rx_dir", value.LastReportRxDir),
+						zap.Bool("is_direction_unknown", value.IsDirectionUnknown),
+					)
+				}
 			}
 			if err := iter.Err(); err != nil {
 				ct.l.Error("Iterate failed", zap.Error(err))
