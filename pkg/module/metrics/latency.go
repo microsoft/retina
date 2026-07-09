@@ -22,6 +22,7 @@ import (
 	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 const (
@@ -186,8 +187,12 @@ func (lm *LatencyMetrics) Clean() {
 	}
 }
 
-func (lm *LatencyMetrics) ProcessFlow(f *flow.Flow) {
-	if f == nil || f.GetL4() == nil || f.GetL4().GetTCP() == nil || utils.GetTCPID(f) == 0 || f.GetIP() == nil {
+func (lm *LatencyMetrics) ProcessFlow(f *flow.Flow, ext *structpb.Struct) {
+	if f == nil || f.GetL4() == nil || f.GetL4().GetTCP() == nil || f.GetIP() == nil {
+		return
+	}
+	tcpID := utils.TCPIDFromStruct(ext)
+	if tcpID == 0 {
 		return
 	}
 
@@ -206,7 +211,7 @@ func (lm *LatencyMetrics) ProcessFlow(f *flow.Flow) {
 		_, ipInDestination := apiServerIps[destinationIP]
 
 		if ipInSource || ipInDestination {
-			lm.calculateLatency(f)
+			lm.calculateLatency(f, tcpID)
 		}
 	}
 }
@@ -263,7 +268,7 @@ func (lm *LatencyMetrics) ProcessFlow(f *flow.Flow) {
 |                                                 |
 +-------------------------------------------------+
 */
-func (lm *LatencyMetrics) calculateLatency(f *flow.Flow) {
+func (lm *LatencyMetrics) calculateLatency(f *flow.Flow, tcpID uint64) {
 	// Ignore all packets observed at endpoint.
 	// We only care about node-apiserver packets observed at eth0.
 	// TO_NETWORK: Packets leaving node via eth0.
@@ -274,7 +279,7 @@ func (lm *LatencyMetrics) calculateLatency(f *flow.Flow) {
 			dstIP: f.IP.Destination,
 			srcP:  f.GetL4().GetTCP().GetSourcePort(),
 			dstP:  f.GetL4().GetTCP().GetDestinationPort(),
-			id:    utils.GetTCPID(f),
+			id:    tcpID,
 		}
 		// There will be multiple identical packets with same ID. Store only the first one.
 		if item := lm.cache.Get(k); item == nil {
@@ -289,7 +294,7 @@ func (lm *LatencyMetrics) calculateLatency(f *flow.Flow) {
 			dstIP: f.IP.Source,
 			srcP:  f.GetL4().GetTCP().GetDestinationPort(),
 			dstP:  f.GetL4().GetTCP().GetSourcePort(),
-			id:    utils.GetTCPID(f),
+			id:    tcpID,
 		}
 		if item := lm.cache.Get(k); item != nil {
 			// Calculate latency in milliseconds.

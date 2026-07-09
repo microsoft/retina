@@ -14,6 +14,7 @@ import (
 	metricsinit "github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 const (
@@ -66,7 +67,7 @@ func (t *TCPRetransMetrics) getLabels() []string {
 	return labels
 }
 
-func (t *TCPRetransMetrics) ProcessFlow(flow *v1.Flow) {
+func (t *TCPRetransMetrics) ProcessFlow(flow *v1.Flow, _ *structpb.Struct) {
 	if flow == nil {
 		return
 	}

@@ -8,15 +8,17 @@ import (
 	"testing"
 	"time"
 
+	"log/slog"
+
 	"github.com/cilium/cilium/api/v1/flow"
 	"github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/pkg/log"
 	metricsinit "github.com/microsoft/retina/pkg/metrics"
+	"github.com/microsoft/retina/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
-	"log/slog"
 )
 
 func TestNewDrop(t *testing.T) {
@@ -303,7 +305,7 @@ func TestNewDrop(t *testing.T) {
 			assert.Equal(t, tc.exepectedLabels, f.getLabels(), "labels should be equal Test Name: %s", tc.name)
 
 			f.metricName = metricName
-			f.ProcessFlow(tc.f)
+			f.ProcessFlow(tc.f, utils.GetExtensionsStruct(tc.f))
 
 			// There should be no tracked metrics when TTL is infinite
 			assert.Equal(t, 0, len(f.trackedMetricLabels()), "there should be no tracked metrics when TTL is infinite Test Name: %s", tc.name)
@@ -318,7 +320,7 @@ func TestNewDrop(t *testing.T) {
 			dropMock.EXPECT().WithLabelValues(gomock.Any()).Return(testmetric).Times(tc.metricCall)
 
 			f.metricName = metricName
-			f.ProcessFlow(tc.f)
+			f.ProcessFlow(tc.f, utils.GetExtensionsStruct(tc.f))
 
 			dropMock.EXPECT().DeleteLabelValues(gomock.Any()).Return(true).Times(tc.trackedMetrics)
 
