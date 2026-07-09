@@ -14,8 +14,10 @@ const (
 	lostEventsCounterName                     = "lost_events_counter"
 	parsedPacketsCounterName                  = "parsed_packets_counter"
 	expiredMetricsCounterName                 = "expired_metrics_counter"
+	conntrackGCEntriesCounterName             = "conntrack_gc_entries_counter"
 
-	// reasonLabel labels parsed-packet reports by the trigger that produced them.
+	// reasonLabel labels parsed-packet reports by the trigger that produced them,
+	// and conntrack GC entries by the connection state at eviction.
 	reasonLabel = "reason"
 
 	// Windows
@@ -57,6 +59,7 @@ const (
 	ConntrackBytesTxDescription          = "Number of tx bytes"
 	ConntrackBytesRxDescription          = "Number of rx bytes"
 	ConntrackTotalConnectionsDescription = "Total number of connections"
+	conntrackGCEntriesCounterDescription = "Number of conntrack entries removed by garbage collection, by connection state"
 )
 
 // Metric Counters
@@ -99,6 +102,7 @@ var (
 	LostEventsCounter                     CounterVec
 	ParsedPacketsCounter                  CounterVec
 	MetricsExpiredCounter                 CounterVec
+	ConntrackGCEntriesCounter             CounterVec
 
 	// DNS Metrics.
 	DNSRequestCounter  CounterVec
