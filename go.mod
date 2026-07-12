@@ -236,7 +236,7 @@ require (
 	github.com/florianl/go-tc v0.4.8
 	github.com/go-logr/zapr v1.3.0
 	github.com/google/gopacket v1.1.19
-	github.com/gopacket/gopacket v1.6.1
+	github.com/gopacket/gopacket v1.7.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jellydator/ttlcache/v3 v3.4.1
 	github.com/jsternberg/zap-logfmt v1.3.0
