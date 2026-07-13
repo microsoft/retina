@@ -257,7 +257,7 @@ require (
 	go.uber.org/mock v0.6.0
 	go.uber.org/zap/exp v0.3.0
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f
-	google.golang.org/grpc v1.81.1
+	google.golang.org/grpc v1.82.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gotest.tools v2.2.0+incompatible
 	gotest.tools/v3 v3.5.2
@@ -318,7 +318,7 @@ require (
 	github.com/Azure/go-autorest/autorest/to v0.4.1 // indirect
 	github.com/Azure/msi-dataplane v0.4.3 // indirect
 	github.com/Djarvur/go-err113 v0.1.1 // indirect
-	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.31.0 // indirect
+	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.32.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.55.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.55.0 // indirect
 	github.com/MirrexOne/unqueryvet v1.5.4 // indirect
@@ -647,7 +647,7 @@ require (
 	go.augendre.info/arangolint v0.4.0 // indirect
 	go.augendre.info/fatcontext v0.9.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
-	go.opentelemetry.io/contrib/detectors/gcp v1.42.0 // indirect
+	go.opentelemetry.io/contrib/detectors/gcp v1.43.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.68.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.44.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.44.0 // indirect
