@@ -100,7 +100,6 @@ data:
 
 To capture packets only on specific network interfaces, use the `captureOption.interfaces` field:
 
-
 ```yaml
 apiVersion: retina.sh/v1alpha1
 kind: Capture

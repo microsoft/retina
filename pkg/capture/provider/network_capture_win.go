@@ -74,7 +74,7 @@ func (ncp *NetworkCaptureProvider) Setup(filename file.CaptureFilename) (string,
 	return ncp.TmpCaptureDir, nil
 }
 
-func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, includeExcludeFilter string, duration, maxSizeMB, fileCount int) error {
+func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, filter string, duration, maxSizeMB, _ int) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*time.Duration(duration))
 	defer cancel()
 
@@ -105,18 +105,18 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, inc
 	// Validate and add filter if provided.
 	// SECURITY: The filter is validated to contain only allowed characters for netsh capture filters.
 	// This prevents command injection via shell metacharacters like &, |, ^, <, >, etc.
-	if len(includeExcludeFilter) != 0 {
+	if filter != "" {
 		// Validate that the filter doesn't start with a hyphen (defense in depth)
-		if strings.HasPrefix(strings.TrimSpace(includeExcludeFilter), "-") {
-			ncp.l.Warn("Filter starts with hyphen, ignoring to prevent flag injection", zap.String("filter", includeExcludeFilter))
+		if strings.HasPrefix(strings.TrimSpace(filter), "-") {
+			ncp.l.Warn("Filter starts with hyphen, ignoring to prevent flag injection", zap.String("filter", filter))
 		} else {
-			filterErr := validateNetshFilter(includeExcludeFilter)
+			filterErr := validateNetshFilter(filter)
 			if filterErr != nil {
-				ncp.l.Error("Invalid filter for netsh, ignoring", zap.String("filter", includeExcludeFilter), zap.Error(filterErr))
+				ncp.l.Error("Invalid filter for netsh, ignoring", zap.String("filter", filter), zap.Error(filterErr))
 			} else {
 				// Split the filter on spaces and add each token as a separate argument.
 				// This is safe now because we've validated the filter content.
-				netshFilterSlice := strings.Split(includeExcludeFilter, " ")
+				netshFilterSlice := strings.Split(filter, " ")
 				captureStartCmd.Args = append(captureStartCmd.Args, netshFilterSlice...)
 			}
 		}

@@ -129,7 +129,7 @@ func (cm *CaptureManager) captureFilter() string {
 
 func (cm *CaptureManager) captureDuration() (int, error) {
 	captureDurationStr := os.Getenv(captureConstants.CaptureDurationEnvKey)
-	if len(captureDurationStr) == 0 {
+	if captureDurationStr == "" {
 		return 0, nil
 	}
 	duration, err := time.ParseDuration(captureDurationStr)
@@ -165,10 +165,14 @@ func (cm *CaptureManager) captureMaxSizeMB() (int, error) {
 
 func (cm *CaptureManager) captureFileCount() (int, error) {
 	captureFileCountStr := os.Getenv(captureConstants.CaptureFileCountEnvKey)
-	if len(captureFileCountStr) == 0 {
+	if captureFileCountStr == "" {
 		return 0, nil
 	}
-	return strconv.Atoi(captureFileCountStr)
+	count, err := strconv.Atoi(captureFileCountStr)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse file count %q: %w", captureFileCountStr, err)
+	}
+	return count, nil
 }
 
 func (cm *CaptureManager) OutputCapture(ctx context.Context, srcDir string) error {
