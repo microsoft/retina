@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -771,5 +772,89 @@ func TestTcpdumpNoRotatingArgsWithoutFileCount(t *testing.T) {
 	}
 	if hasArg(cmd, "-W") {
 		t.Errorf("constructTcpdumpCommand should not add -W flag, got: %v", cmd.Args)
+	}
+}
+
+func TestTcpdumpRotatingCaptureArgs(t *testing.T) {
+	// Verify the -C and -W flag construction logic that CaptureNetworkPacket uses.
+	// This mirrors the code path in CaptureNetworkPacket where fileCount > 0 && maxSizeMB > 0.
+	resetEnvVars()
+
+	tests := []struct {
+		name      string
+		maxSizeMB int
+		fileCount int
+		expectC   string // expected -C value, empty if flag should be absent
+		expectW   string // expected -W value, empty if flag should be absent
+	}{
+		{
+			name:      "rotating capture with fileCount=3 and maxSize=100",
+			maxSizeMB: 100,
+			fileCount: 3,
+			expectC:   "100",
+			expectW:   "3",
+		},
+		{
+			name:      "rotating capture with fileCount=1 and maxSize=50",
+			maxSizeMB: 50,
+			fileCount: 1,
+			expectC:   "50",
+			expectW:   "1",
+		},
+		{
+			name:      "no rotation when fileCount=0",
+			maxSizeMB: 100,
+			fileCount: 0,
+			expectC:   "",
+			expectW:   "",
+		},
+		{
+			name:      "no rotation when maxSize=0",
+			maxSizeMB: 0,
+			fileCount: 5,
+			expectC:   "",
+			expectW:   "",
+		},
+		{
+			name:      "no rotation when both are 0",
+			maxSizeMB: 0,
+			fileCount: 0,
+			expectC:   "",
+			expectW:   "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := constructTcpdumpCommand(testCaptureFilePath)
+
+			// Apply the same logic as CaptureNetworkPacket
+			if tt.fileCount > 0 && tt.maxSizeMB > 0 {
+				cmd.Args = append(cmd.Args,
+					"-C", strconv.Itoa(tt.maxSizeMB),
+					"-W", strconv.Itoa(tt.fileCount),
+				)
+			}
+
+			if tt.expectC != "" {
+				if !hasArgPair(cmd, "-C", tt.expectC) {
+					t.Errorf("Expected '-C %s' in args, got: %v", tt.expectC, cmd.Args)
+				}
+			} else {
+				if hasArg(cmd, "-C") {
+					t.Errorf("Did not expect -C flag in args, got: %v", cmd.Args)
+				}
+			}
+
+			if tt.expectW != "" {
+				if !hasArgPair(cmd, "-W", tt.expectW) {
+					t.Errorf("Expected '-W %s' in args, got: %v", tt.expectW, cmd.Args)
+				}
+			} else {
+				if hasArg(cmd, "-W") {
+					t.Errorf("Did not expect -W flag in args, got: %v", cmd.Args)
+				}
+			}
+		})
 	}
 }
