@@ -105,18 +105,18 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, inc
 	// Validate and add filter if provided.
 	// SECURITY: The filter is validated to contain only allowed characters for netsh capture filters.
 	// This prevents command injection via shell metacharacters like &, |, ^, <, >, etc.
-	if len(filter) != 0 {
+	if len(includeExcludeFilter) != 0 {
 		// Validate that the filter doesn't start with a hyphen (defense in depth)
-		if strings.HasPrefix(strings.TrimSpace(filter), "-") {
-			ncp.l.Warn("Filter starts with hyphen, ignoring to prevent flag injection", zap.String("filter", filter))
+		if strings.HasPrefix(strings.TrimSpace(includeExcludeFilter), "-") {
+			ncp.l.Warn("Filter starts with hyphen, ignoring to prevent flag injection", zap.String("filter", includeExcludeFilter))
 		} else {
-			filterErr := validateNetshFilter(filter)
+			filterErr := validateNetshFilter(includeExcludeFilter)
 			if filterErr != nil {
-				ncp.l.Error("Invalid filter for netsh, ignoring", zap.String("filter", filter), zap.Error(filterErr))
+				ncp.l.Error("Invalid filter for netsh, ignoring", zap.String("filter", includeExcludeFilter), zap.Error(filterErr))
 			} else {
 				// Split the filter on spaces and add each token as a separate argument.
 				// This is safe now because we've validated the filter content.
-				netshFilterSlice := strings.Split(filter, " ")
+				netshFilterSlice := strings.Split(includeExcludeFilter, " ")
 				captureStartCmd.Args = append(captureStartCmd.Args, netshFilterSlice...)
 			}
 		}

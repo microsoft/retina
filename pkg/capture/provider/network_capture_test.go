@@ -468,7 +468,7 @@ func TestFilterValidation(t *testing.T) {
 			tt.setupEnv()
 			defer resetEnvVars()
 
-			err := ncp.CaptureNetworkPacket(context.Background(), "", 1, 0)
+			err := ncp.CaptureNetworkPacket(context.Background(), "", 1, 0, 0)
 
 			if tt.shouldError {
 				if err == nil {
@@ -543,7 +543,7 @@ func TestFilterWhitespaceValidation(t *testing.T) {
 			tt.setupEnv()
 			defer resetEnvVars()
 
-			err := ncp.CaptureNetworkPacket(context.Background(), "", 1, 0)
+			err := ncp.CaptureNetworkPacket(context.Background(), "", 1, 0, 0)
 
 			if err == nil {
 				t.Errorf("Expected error for whitespace-only filter, but got no error")
@@ -612,7 +612,7 @@ func TestFilterPrecedence(t *testing.T) {
 			}
 			defer resetEnvVars()
 
-			err := ncp.CaptureNetworkPacket(context.Background(), "", 1, 0)
+			err := ncp.CaptureNetworkPacket(context.Background(), "", 1, 0, 0)
 
 			if tt.expectValidationErr {
 				if err == nil || !strings.Contains(err.Error(), "contains flag") {
@@ -734,7 +734,7 @@ func hasArgPair(cmd *exec.Cmd, flag, value string) bool {
 func TestTcpdumpCommandBaseArgs(t *testing.T) {
 	resetEnvVars()
 
-	cmd := constructTcpdumpCommand(testCaptureFilePath)
+	cmd := constructTcpdumpCommand(testCaptureFilePath, "")
 
 	// Verify base args are always present
 	if cmd.Args[0] != "tcpdump" {
@@ -753,7 +753,7 @@ func TestTcpdumpPacketSizeArg(t *testing.T) {
 	os.Setenv(captureConstants.PacketSizeEnvKey, "96")
 	defer os.Unsetenv(captureConstants.PacketSizeEnvKey)
 
-	cmd := constructTcpdumpCommand(testCaptureFilePath)
+	cmd := constructTcpdumpCommand(testCaptureFilePath, "")
 
 	if !hasArgPair(cmd, "-s", "96") {
 		t.Errorf("Expected '-s 96' in args, got: %v", cmd.Args)
@@ -765,7 +765,7 @@ func TestTcpdumpNoRotatingArgsWithoutFileCount(t *testing.T) {
 	// (those are added at CaptureNetworkPacket level, not constructTcpdumpCommand)
 	resetEnvVars()
 
-	cmd := constructTcpdumpCommand(testCaptureFilePath)
+	cmd := constructTcpdumpCommand(testCaptureFilePath, "")
 
 	if hasArg(cmd, "-C") {
 		t.Errorf("constructTcpdumpCommand should not add -C flag, got: %v", cmd.Args)
@@ -826,7 +826,7 @@ func TestTcpdumpRotatingCaptureArgs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := constructTcpdumpCommand(testCaptureFilePath)
+			cmd := constructTcpdumpCommand(testCaptureFilePath, "")
 
 			// Apply the same logic as CaptureNetworkPacket
 			if tt.fileCount > 0 && tt.maxSizeMB > 0 {
