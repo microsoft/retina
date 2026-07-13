@@ -73,7 +73,7 @@ type CaptureOption struct {
 	// where only the most recent traffic is needed (e.g., capturing the last N hours of traffic).
 	// Must be used together with MaxCaptureSize which defines the per-file size limit.
 	// Equivalent to tcpdump's -W flag.
-	// +kubebuilder:validation:Minimum=2
+	// +kubebuilder:validation:Minimum=1
 	// +optional
 	FileCount *int `json:"fileCount,omitempty"`
 

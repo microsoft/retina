@@ -241,6 +241,69 @@ func TestCleanup(t *testing.T) {
 	}
 }
 
+func TestCaptureDuration(t *testing.T) {
+	cm := &CaptureManager{}
+
+	tests := []struct {
+		name     string
+		envValue string
+		want     int
+		wantErr  bool
+	}{
+		{name: "empty string returns 0", envValue: "", want: 0, wantErr: false},
+		{name: "valid duration 10s", envValue: "10s", want: 10, wantErr: false},
+		{name: "valid duration 1h", envValue: "1h", want: 3600, wantErr: false},
+		{name: "invalid duration", envValue: "notaduration", want: 0, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			os.Setenv(captureConstants.CaptureDurationEnvKey, tt.envValue)
+			defer os.Unsetenv(captureConstants.CaptureDurationEnvKey)
+
+			got, err := cm.captureDuration()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("captureDuration() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("captureDuration() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCaptureFileCount(t *testing.T) {
+	cm := &CaptureManager{}
+
+	tests := []struct {
+		name     string
+		envValue string
+		want     int
+		wantErr  bool
+	}{
+		{name: "empty string returns 0", envValue: "", want: 0, wantErr: false},
+		{name: "valid count", envValue: "5", want: 5, wantErr: false},
+		{name: "invalid value", envValue: "abc", want: 0, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			os.Setenv(captureConstants.CaptureFileCountEnvKey, tt.envValue)
+			defer os.Unsetenv(captureConstants.CaptureFileCountEnvKey)
+
+			got, err := cm.captureFileCount()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("captureFileCount() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("captureFileCount() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCompressFolderToTarGzIncludesRotatedFiles(t *testing.T) {
 	// Simulate rotating capture output: tcpdump with -C and -W creates
 	// files like capture.pcap0, capture.pcap1, capture.pcap2, etc.

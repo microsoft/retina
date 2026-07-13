@@ -257,7 +257,7 @@ func NewCreateSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 
 	createCapture.Flags().DurationVar(&opts.duration, "duration", DefaultDuration, "Duration of capturing packets")
 	createCapture.Flags().IntVar(&opts.maxSize, "max-size", DefaultMaxSize, "Limit the capture file to MB in size (per-file size when used with --file-count) which works only for Linux") //nolint:gomnd // default
-	createCapture.Flags().IntVar(&opts.fileCount, "file-count", 0, "Number of capture files to use in a rotating buffer (requires --max-size, min 2). When set, creates a rolling capture that overwrites the oldest file, useful for long-running captures")
+	createCapture.Flags().IntVar(&opts.fileCount, "file-count", 0, "Number of capture files to use in a rotating buffer (requires --max-size, min 1). When set, creates a rolling capture that overwrites the oldest file, useful for long-running captures")
 	createCapture.Flags().IntVar(&opts.packetSize, "packet-size", DefaultPacketSize, "Limits the each packet to bytes in size which works only for Linux")
 	createCapture.Flags().StringVar(&opts.nodeNames, "node-names", "", "A comma-separated list of node names to select nodes on which the network capture will be performed")
 	createCapture.Flags().StringVar(&opts.nodeSelectors, "node-selectors", DefaultNodeSelectors, "A comma-separated list of node labels to select nodes on which the network capture will be performed")
@@ -500,6 +500,12 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 	}
 
 	if opts.fileCount != 0 {
+		if opts.fileCount < 1 {
+			return nil, fmt.Errorf("--file-count must be at least 1, got %d", opts.fileCount)
+		}
+		if opts.maxSize == 0 {
+			return nil, fmt.Errorf("--file-count requires --max-size to be set as per-file size limit")
+		}
 		retinacmd.Logger.Info(fmt.Sprintf("The capture file count is set to %d (rotating buffer)", opts.fileCount))
 		capture.Spec.CaptureConfiguration.CaptureOption.FileCount = &opts.fileCount
 	}
