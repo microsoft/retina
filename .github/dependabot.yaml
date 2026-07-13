@@ -89,7 +89,7 @@ updates:
           - "sigs.k8s.io/*"
         exclude-patterns:
           - "sigs.k8s.io/cloud-provider-azure/*"
-        update-types: ["patch"]
+        update-types: ["patch", "minor"]
       cilium:
         patterns:
           - "github.com/cilium/*"
