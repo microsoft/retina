@@ -49,6 +49,7 @@ const (
 	DefaultIncludeMetadata bool          = true
 	DefaultJobNumLimit     int           = 0
 	DefaultMaxSize         int           = 100
+	DefaultFileCount       int           = 0
 	DefaultNodeSelectors   string        = "kubernetes.io/os=linux"
 	DefaultNowait          bool          = true
 	DefaultPacketSize      int           = 0
@@ -262,7 +263,7 @@ func NewCreateSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 	createCapture.Flags().DurationVar(&opts.duration, "duration", DefaultDuration, "Duration of capturing packets")
 	createCapture.Flags().IntVar(&opts.maxSize, "max-size", DefaultMaxSize,
 		"Limit the capture file to MB in size (per-file size when used with --file-count). Linux only") //nolint:gomnd // default
-	createCapture.Flags().IntVar(&opts.fileCount, "file-count", 0,
+	createCapture.Flags().IntVar(&opts.fileCount, "file-count", DefaultFileCount,
 		"Number of files in a rotating buffer (requires --max-size, min 1). Overwrites oldest file when full")
 	createCapture.Flags().IntVar(&opts.packetSize, "packet-size", DefaultPacketSize, "Limits the each packet to bytes in size which works only for Linux")
 	createCapture.Flags().StringVar(&opts.nodeNames, "node-names", "", "A comma-separated list of node names to select nodes on which the network capture will be performed")
