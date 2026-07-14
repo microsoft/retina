@@ -7,6 +7,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -182,7 +183,7 @@ func TestCaptureNetworkPacketZeroDurationDoesNotCancelContext(t *testing.T) {
 	// but the error should NOT be "context deadline exceeded".
 	err := ncp.CaptureNetworkPacket(ctx, "", 0, 100, 0)
 
-	if err != nil && ctx.Err() == context.DeadlineExceeded {
+	if err != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		t.Fatal("duration=0 caused immediate context cancellation — the zero-timeout bug is present")
 	}
 
