@@ -89,6 +89,7 @@ type Opts struct {
 	debug              bool
 	duration           time.Duration
 	excludeFilter      string
+	fileCount          int
 	hostPath           string
 	hostPathBaseDir    string
 	includeFilter      string
