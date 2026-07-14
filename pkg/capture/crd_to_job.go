@@ -34,10 +34,10 @@ import (
 const anyIPOrPort = ""
 
 var (
-	errNoTargetsSelected       = errors.New("no targets are selected by node selector, pod selector, or pod names")
-	errNoValidSelector         = errors.New("neither NodeSelector, NamespaceSelector&PodSelector, nor PodNames is set")
-	errNodeSelectorIncompat    = errors.New("NodeSelector is not compatible with NamespaceSelector&PodSelector or PodNames, please use one or the other")
-	errPodNamesIncompat        = errors.New("PodNames is not compatible with NamespaceSelector or PodSelector, please use one or the other")
+	errNoTargetsSelected        = errors.New("no targets are selected by node selector, pod selector, or pod names")
+	errNoValidSelector          = errors.New("neither NodeSelector, NamespaceSelector&PodSelector, nor PodNames is set")
+	errNodeSelectorIncompat     = errors.New("NodeSelector is not compatible with NamespaceSelector&PodSelector or PodNames, please use one or the other")
+	errPodNamesIncompat         = errors.New("PodNames is not compatible with NamespaceSelector or PodSelector, please use one or the other")
 	errFileCountRequiresMaxSize = errors.New("fileCount requires maxCaptureSize to be set as per-file size limit")
 )
 
