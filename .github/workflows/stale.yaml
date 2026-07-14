@@ -32,4 +32,6 @@ jobs:
           stale-issue-message: "This issue will be closed in 7 days due to inactivity."
           stale-pr-message: "This PR will be closed in 7 days due to inactivity."
       - name: Print outputs
-        run: echo "${{ join(steps.stale.outputs.*, ',') }}"
+        env:
+          STALE_OUTPUTS: ${{ join(steps.stale.outputs.*, ',') }}
+        run: echo "$STALE_OUTPUTS"
