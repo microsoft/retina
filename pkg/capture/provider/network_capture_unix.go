@@ -242,6 +242,9 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, inc
 	// When fileCount is set, use tcpdump's native rotating buffer feature:
 	// -C <size_MB>: rotate file when it reaches this size (in millions of bytes)
 	// -W <count>: limit the number of files, overwriting oldest when limit is reached
+	// NOTE: tcpdump's -C uses millions of bytes (1,000,000), not MiB (1,048,576),
+	// so the per-file rotation threshold is ~5% smaller than the maxSizeMB check
+	// used for non-rotating captures below.
 	if fileCount > 0 && maxSizeMB > 0 {
 		rotationArgs := []string{
 			"-C", strconv.Itoa(maxSizeMB),

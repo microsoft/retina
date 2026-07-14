@@ -29,13 +29,13 @@ import (
 
 // CaptureManager captures network packets and metadata into tar ball, then send the tar ball to the location(s)
 // specified by users.
-
-var errNegativeFileCount = errors.New("file count must be >= 0")
 type CaptureManager struct {
 	l                      *log.ZapLogger
 	networkCaptureProvider captureProvider.NetworkCaptureProviderInterface
 	tel                    telemetry.Telemetry
 }
+
+var errNegativeFileCount = errors.New("file count must be >= 0")
 
 func NewCaptureManager(logger *log.ZapLogger, tel telemetry.Telemetry) *CaptureManager {
 	return &CaptureManager{
