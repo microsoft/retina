@@ -243,10 +243,20 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, inc
 	// -C <size_MB>: rotate file when it reaches this size (in millions of bytes)
 	// -W <count>: limit the number of files, overwriting oldest when limit is reached
 	if fileCount > 0 && maxSizeMB > 0 {
-		captureStartCmd.Args = append(captureStartCmd.Args,
+		rotationArgs := []string{
 			"-C", strconv.Itoa(maxSizeMB),
 			"-W", strconv.Itoa(fileCount),
-		)
+		}
+
+		// tcpdump requires the BPF filter expression to be the final argument.
+		// constructTcpdumpCommand places the filter last, so we must insert
+		// rotation flags before it when a filter is present.
+		if combinedFilter != "" {
+			last := captureStartCmd.Args[len(captureStartCmd.Args)-1]
+			captureStartCmd.Args = append(captureStartCmd.Args[:len(captureStartCmd.Args)-1], append(rotationArgs, last)...)
+		} else {
+			captureStartCmd.Args = append(captureStartCmd.Args, rotationArgs...)
+		}
 	}
 
 	ncp.l.Info("Running tcpdump with args", zap.String("tcpdump command", captureStartCmd.String()), zap.Any("tcpdump args", captureStartCmd.Args))

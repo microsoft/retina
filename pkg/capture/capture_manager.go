@@ -172,6 +172,9 @@ func (cm *CaptureManager) captureFileCount() (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse file count %q: %w", captureFileCountStr, err)
 	}
+	if count < 0 {
+		return 0, fmt.Errorf("file count must be >= 0, got %d", count)
+	}
 	return count, nil
 }
 

@@ -828,12 +828,10 @@ func TestTcpdumpRotatingCaptureArgs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := constructTcpdumpCommand(testCaptureFilePath, "")
 
-			// Apply the same logic as CaptureNetworkPacket
+			// Apply the same logic as CaptureNetworkPacket (no filter case)
 			if tt.fileCount > 0 && tt.maxSizeMB > 0 {
-				cmd.Args = append(cmd.Args,
-					"-C", strconv.Itoa(tt.maxSizeMB),
-					"-W", strconv.Itoa(tt.fileCount),
-				)
+				rotationArgs := []string{"-C", strconv.Itoa(tt.maxSizeMB), "-W", strconv.Itoa(tt.fileCount)}
+				cmd.Args = append(cmd.Args, rotationArgs...)
 			}
 
 			if tt.expectC != "" {
@@ -853,6 +851,98 @@ func TestTcpdumpRotatingCaptureArgs(t *testing.T) {
 			} else {
 				if hasArg(cmd, "-W") {
 					t.Errorf("Did not expect -W flag in args, got: %v", cmd.Args)
+				}
+			}
+		})
+	}
+}
+
+func TestTcpdumpRotatingCaptureArgsWithFilter(t *testing.T) {
+	// Verify that rotation flags (-C/-W) are inserted BEFORE the BPF filter,
+	// since tcpdump requires the filter expression to be the last argument.
+	resetEnvVars()
+
+	tests := []struct {
+		name      string
+		filter    string
+		maxSizeMB int
+		fileCount int
+		wantLast  string // expected last argument
+	}{
+		{
+			name:      "rotation with filter: filter must be last",
+			filter:    "tcp port 80",
+			maxSizeMB: 100,
+			fileCount: 3,
+			wantLast:  "tcp port 80",
+		},
+		{
+			name:      "rotation without filter: -W value is last",
+			filter:    "",
+			maxSizeMB: 50,
+			fileCount: 5,
+			wantLast:  "5",
+		},
+		{
+			name:      "no rotation with filter: filter is last",
+			filter:    "udp port 53",
+			maxSizeMB: 0,
+			fileCount: 0,
+			wantLast:  "udp port 53",
+		},
+		{
+			name:      "complex filter with rotation: filter still last",
+			filter:    "(host 10.0.0.1) and (tcp port 443)",
+			maxSizeMB: 200,
+			fileCount: 10,
+			wantLast:  "(host 10.0.0.1) and (tcp port 443)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := constructTcpdumpCommand(testCaptureFilePath, tt.filter)
+
+			// Apply the same insertion logic as CaptureNetworkPacket
+			if tt.fileCount > 0 && tt.maxSizeMB > 0 {
+				rotationArgs := []string{
+					"-C", strconv.Itoa(tt.maxSizeMB),
+					"-W", strconv.Itoa(tt.fileCount),
+				}
+				if tt.filter != "" {
+					last := cmd.Args[len(cmd.Args)-1]
+					cmd.Args = append(cmd.Args[:len(cmd.Args)-1], append(rotationArgs, last)...)
+				} else {
+					cmd.Args = append(cmd.Args, rotationArgs...)
+				}
+			}
+
+			lastArg := cmd.Args[len(cmd.Args)-1]
+			if lastArg != tt.wantLast {
+				t.Errorf("Expected last arg to be %q, got %q\nFull args: %v", tt.wantLast, lastArg, cmd.Args)
+			}
+
+			// When both filter and rotation are set, verify -C/-W appear before filter
+			if tt.filter != "" && tt.fileCount > 0 {
+				filterIdx := -1
+				cIdx := -1
+				wIdx := -1
+				for i, arg := range cmd.Args {
+					if arg == tt.filter {
+						filterIdx = i
+					}
+					if arg == "-C" {
+						cIdx = i
+					}
+					if arg == "-W" {
+						wIdx = i
+					}
+				}
+				if cIdx >= filterIdx {
+					t.Errorf("-C flag (idx %d) should come before filter (idx %d), args: %v", cIdx, filterIdx, cmd.Args)
+				}
+				if wIdx >= filterIdx {
+					t.Errorf("-W flag (idx %d) should come before filter (idx %d), args: %v", wIdx, filterIdx, cmd.Args)
 				}
 			}
 		})

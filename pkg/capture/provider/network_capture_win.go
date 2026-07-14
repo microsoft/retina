@@ -75,8 +75,11 @@ func (ncp *NetworkCaptureProvider) Setup(filename file.CaptureFilename) (string,
 }
 
 func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, filter string, duration, maxSizeMB, _ int) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Second*time.Duration(duration))
-	defer cancel()
+	if duration != 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Second*time.Duration(duration))
+		defer cancel()
+	}
 
 	stopTrace, err := ncp.needToStopTraceSession(ctx)
 	if err != nil {

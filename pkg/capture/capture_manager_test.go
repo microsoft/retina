@@ -285,6 +285,8 @@ func TestCaptureFileCount(t *testing.T) {
 		{name: "empty string returns 0", envValue: "", want: 0, wantErr: false},
 		{name: "valid count", envValue: "5", want: 5, wantErr: false},
 		{name: "invalid value", envValue: "abc", want: 0, wantErr: true},
+		{name: "negative value rejected", envValue: "-1", want: 0, wantErr: true},
+		{name: "zero is valid", envValue: "0", want: 0, wantErr: false},
 	}
 
 	for _, tt := range tests {

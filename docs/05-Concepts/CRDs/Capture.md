@@ -231,6 +231,9 @@ captureOption:
 A rotating capture maintains a fixed number of capture files, overwriting the oldest when the limit is reached. This is useful for long-running captures of intermittent issues where you need to retain only recent traffic.
 
 ```yaml
+apiVersion: retina.sh/v1alpha1
+kind: Capture
+metadata:
   name: rotating-capture
 spec:
   captureConfiguration:
