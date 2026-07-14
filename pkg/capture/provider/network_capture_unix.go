@@ -320,7 +320,7 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, inc
 					continue
 				}
 				fileSizeBytes := fileStat.Size()
-				if int(fileSizeBytes) > maxSizeMB*1024*1224 {
+				if fileSizeBytes > int64(maxSizeMB)*1024*1024 {
 					break
 				}
 

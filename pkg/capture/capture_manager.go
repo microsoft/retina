@@ -7,6 +7,7 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -28,6 +29,8 @@ import (
 
 // CaptureManager captures network packets and metadata into tar ball, then send the tar ball to the location(s)
 // specified by users.
+
+var errNegativeFileCount = errors.New("file count must be >= 0")
 type CaptureManager struct {
 	l                      *log.ZapLogger
 	networkCaptureProvider captureProvider.NetworkCaptureProviderInterface
@@ -173,7 +176,7 @@ func (cm *CaptureManager) captureFileCount() (int, error) {
 		return 0, fmt.Errorf("failed to parse file count %q: %w", captureFileCountStr, err)
 	}
 	if count < 0 {
-		return 0, fmt.Errorf("file count must be >= 0, got %d", count)
+		return 0, errNegativeFileCount
 	}
 	return count, nil
 }
