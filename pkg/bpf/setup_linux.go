@@ -9,8 +9,8 @@ import (
 
 	"github.com/cilium/cilium/pkg/mountinfo"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
-	"github.com/microsoft/retina/pkg/plugin/conntrack"
 	"github.com/microsoft/retina/pkg/plugin/filter"
+	"github.com/microsoft/retina/pkg/plugin/packetparser"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
@@ -77,16 +77,18 @@ func Setup(l *zap.Logger, filterMapMaxEntries uint32) error {
 	}
 	l.Info("Filter map initialized successfully", zap.String("path", plugincommon.MapPath), zap.String("Map name", plugincommon.FilterMapName))
 
-	// Delete existing conntrack map file.
+	// Delete any existing pinned conntrack map so a stale layout from a prior
+	// deployment doesn't collide with the one we pin below.
 	err = os.Remove(plugincommon.MapPath + "/" + plugincommon.ConntrackMapName)
 	if err != nil && !os.IsNotExist(err) {
 		return errors.Wrap(err, "failed to delete existing conntrack map file")
 	}
 	l.Info("Deleted existing conntrack map file", zap.String("path", plugincommon.MapPath), zap.String("Map name", plugincommon.ConntrackMapName))
-	// Initialize the conntrack map.
-	// This will create the conntrack map in kernel and pin it to /sys/fs/bpf.
-	err = conntrack.Init()
-	if err != nil {
+
+	// Pre-create and pin the conntrack map. Required because the agent
+	// container is not privileged enough to pin new maps — it can only attach
+	// to pins that already exist.
+	if err := packetparser.InitConntrackMap(); err != nil {
 		return errors.Wrap(err, "failed to initialize conntrack map")
 	}
 	l.Info("Conntrack map initialized successfully", zap.String("path", plugincommon.MapPath), zap.String("Map name", plugincommon.ConntrackMapName))
