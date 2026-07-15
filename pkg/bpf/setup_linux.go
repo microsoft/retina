@@ -55,7 +55,7 @@ func mountBpfFs() error {
 	return nil
 }
 
-func Setup(l *zap.Logger, filterMapMaxEntries uint32) error {
+func Setup(l *zap.Logger, filterMapMaxEntries, conntrackMaxEntries uint32) error {
 	err := mountBpfFs()
 	if err != nil {
 		return errors.Wrap(err, "failed to mount BPF filesystem")
@@ -85,7 +85,7 @@ func Setup(l *zap.Logger, filterMapMaxEntries uint32) error {
 	l.Info("Deleted existing conntrack map file", zap.String("path", plugincommon.MapPath), zap.String("Map name", plugincommon.ConntrackMapName))
 	// Initialize the conntrack map.
 	// This will create the conntrack map in kernel and pin it to /sys/fs/bpf.
-	err = conntrack.Init()
+	err = conntrack.Init(conntrackMaxEntries)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize conntrack map")
 	}

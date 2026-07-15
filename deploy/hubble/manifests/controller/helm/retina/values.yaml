@@ -83,6 +83,7 @@ packetParserRingBuffer: "disabled"
 # Invalid values cause startup to fail with a validation error.
 # This value is not applied when ring buffers are disabled.
 packetParserRingBufferSize: 8388608
+conntrackMaxEntries: 262144
 
 imagePullSecrets: []
 nameOverride: "retina"

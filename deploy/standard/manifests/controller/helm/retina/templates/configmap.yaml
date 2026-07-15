@@ -30,6 +30,7 @@ data:
     packetParserRingBuffer: {{ .Values.packetParserRingBuffer }}
     packetParserRingBufferSize: {{ .Values.packetParserRingBufferSize }}
     filterMapMaxEntries: {{ .Values.filterMapMaxEntries }}
+    conntrackMaxEntries: {{ .Values.conntrackMaxEntries }}
 {{- end}}
 ---
 {{- if .Values.os.windows}}
