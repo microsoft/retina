@@ -109,6 +109,7 @@ data:
     enableTelemetry: {{ .Values.enableTelemetry }}
     enablePodLevel: {{ .Values.enablePodLevel }}
     enableConntrackMetrics: {{ .Values.enableConntrackMetrics }}
+    conntrackReportInterval: {{ .Values.conntrackReportInterval }}
     remoteContext: {{ .Values.remoteContext }}
     enableAnnotations: {{ .Values.enableAnnotations }}
     bypassLookupIPOfInterest: {{ .Values.bypassLookupIPOfInterest }}
