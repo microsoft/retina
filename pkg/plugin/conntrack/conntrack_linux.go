@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/cilium/cilium/api/v1/flow"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/rlimit"
 	"github.com/microsoft/retina/internal/ktime"
@@ -103,6 +104,15 @@ func GenerateDynamic(ctx context.Context, dynamicHeaderPath string, conntrackMet
 type gcDeletion struct {
 	key    conntrackCtV4Key
 	reason string
+	// Bytes/packets observed since the last report, captured while the entry's
+	// value is available. These are dropped (never reported) when the entry is
+	// reaped, so they are summed into the GC-unreported counters to quantify the
+	// undercount without emitting per-flow reap events.
+	bytesTxDir, bytesRxDir     uint32
+	packetsTxDir, packetsRxDir uint32
+	// trafficDir is the entry's host-relative direction, used to attribute the
+	// tx/rx residual to ingress/egress: tx is the entry's direction, rx the opposite.
+	trafficDir flow.TrafficDirection
 }
 
 // gcEntryReason classifies a conntrack entry removed by garbage collection, from its
@@ -152,6 +162,11 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			var noOfCtEntries, entriesDeleted int
 			// List of entries to be deleted, with the reason captured while the value is available.
 			var keysToDelete []gcDeletion
+			// Bytes/packets observed since the last report that are dropped when
+			// reaped entries are deleted below, summed per host-relative direction
+			// (ingress/egress/unknown).
+			unreportedBytes := map[flow.TrafficDirection]uint64{}
+			unreportedPackets := map[flow.TrafficDirection]uint64{}
 
 			// metrics counters
 			var packetsCountTx, packetsCountRx, totConnections uint32
@@ -169,7 +184,15 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 					// Iterating a hash map from which keys are being deleted is not safe.
 					// So, we store the keys to be deleted in a list and delete them after the iteration.
 					keyCopy := key // Copy the key to avoid using the same key in the next iteration
-					keysToDelete = append(keysToDelete, gcDeletion{key: keyCopy, reason: gcEntryReason(key.Proto, &value)})
+					keysToDelete = append(keysToDelete, gcDeletion{
+						key:          keyCopy,
+						reason:       gcEntryReason(key.Proto, &value),
+						bytesTxDir:   value.BytesSeenSinceLastReportTxDir,
+						bytesRxDir:   value.BytesSeenSinceLastReportRxDir,
+						packetsTxDir: value.PacketsSeenSinceLastReportTxDir,
+						packetsRxDir: value.PacketsSeenSinceLastReportRxDir,
+						trafficDir:   flow.TrafficDirection(value.TrafficDirection),
+					})
 				}
 				// Log the conntrack entry
 				srcIP := utils.Int2ip(key.SrcIp).To4()
@@ -231,7 +254,20 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 				} else {
 					entriesDeleted++
 					metrics.ConntrackGCEntriesCounter.WithLabelValues(d.reason).Inc()
+					// The reaped entry's since-last-report residual is now lost. tx is
+					// the entry's host-relative direction, rx the opposite; unknown stays
+					// unknown in both.
+					rxDir := utils.OppositeTrafficDirection(d.trafficDir)
+					unreportedBytes[d.trafficDir] += uint64(d.bytesTxDir)
+					unreportedBytes[rxDir] += uint64(d.bytesRxDir)
+					unreportedPackets[d.trafficDir] += uint64(d.packetsTxDir)
+					unreportedPackets[rxDir] += uint64(d.packetsRxDir)
 				}
+			}
+			for _, dir := range []flow.TrafficDirection{flow.TrafficDirection_INGRESS, flow.TrafficDirection_EGRESS, flow.TrafficDirection_TRAFFIC_DIRECTION_UNKNOWN} {
+				label := utils.TrafficDirectionString(dir)
+				metrics.ConntrackGCUnreportedBytesCounter.WithLabelValues(label).Add(float64(unreportedBytes[dir]))
+				metrics.ConntrackGCUnreportedPacketsCounter.WithLabelValues(label).Add(float64(unreportedPackets[dir]))
 			}
 			ct.l.Debug("conntrack GC completed", zap.Int("number_of_entries", noOfCtEntries), zap.Int("entries_deleted", entriesDeleted))
 		}

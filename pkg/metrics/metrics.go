@@ -218,6 +218,20 @@ func InitializeMetrics(logger *slog.Logger) {
 		reasonLabel,
 	)
 
+	ConntrackGCUnreportedBytesCounter = exporter.CreatePrometheusCounterVecForControlPlaneMetric(
+		exporter.DefaultRegistry,
+		conntrackGCUnreportedBytesCounterName,
+		conntrackGCUnreportedBytesCounterDescription,
+		utils.Direction,
+	)
+
+	ConntrackGCUnreportedPacketsCounter = exporter.CreatePrometheusCounterVecForControlPlaneMetric(
+		exporter.DefaultRegistry,
+		conntrackGCUnreportedPacketsCounterName,
+		conntrackGCUnreportedPacketsCounterDescription,
+		utils.Direction,
+	)
+
 	MetricsExpiredCounter = exporter.CreatePrometheusCounterVecForControlPlaneMetric(
 		exporter.DefaultRegistry,
 		expiredMetricsCounterName,
