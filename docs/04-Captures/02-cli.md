@@ -52,6 +52,8 @@ The Capture can be stopped in a number of ways:
   - When both are specified, the capture will stop whenever **either condition is first met**.
 - On demand by [deleting the capture](#capture-delete) before the specified conditions meets.
 
+When using `--file-count` (rotating capture mode), the capture runs indefinitely (or until `duration` expires if set), rotating through a fixed number of files. Delete the capture to stop it.
+
 The network traffic will be uploaded to the specified output location.
 
 #### Flags
@@ -63,12 +65,13 @@ The network traffic will be uploaded to the specified output location.
 | `debug`               | bool       | false    | When debug is true, a customized retina-agent image, determined by the environment variable RETINA_AGENT_IMAGE, is set. |       |
 | `duration`            | string     | 1m0s     | Maximum duration of the packet capture - in minutes / seconds.              |       |
 | `exclude-filter`      | string     | ""       | A comma-separated list of IP:Port pairs that are excluded from capturing network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:* | Only works on Linux.     |
+| `file-count`          | int        | 0        | Number of capture files in a rotating buffer. When set (minimum 1), creates a rolling capture where the oldest file is overwritten once the limit is reached. Requires `--max-size` to define per-file size. Useful for long-running captures of intermittent issues. | Only works on Linux. |
 | `help`                |            |          | Help for create command.                                                     |       |
 | `host-path`           | string     | /mnt/retina/captures | Store the capture file in the node's specified host path.                   |       |
 | `include-filter`      | string     | ""       | A comma-separated list of IP:Port pairs that are included from capturing network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:* | Only works on Linux.      |
 | `include-metadata`    | bool       | true     | Collect static network metadata into the capture file if true.              |       |
 | `job-num-limit`       | int        | 0        | The maximum number of jobs which can be created for each capture. The default value 0 indicates no limit. This can be configured by CLI flags for each CLI command, or by a config map consumed by the retina-operator. When creating a job requires job number exceeds this limit, it will fail with prompt like `Error: the number of capture jobs 3 exceeds the limit 2`. |       |
-| `max-size`            | int        | 100      | Maximum size of the capture file - in MB               | Only works on Linux.      |
+| `max-size`            | int        | 100      | Maximum size of the capture file in MB. When used with `--file-count`, this becomes the per-file size limit for rotating captures. | Only works on Linux.      |
 | `name`                | string     | retina-capture | A name for the Retina Capture.                                              |       |
 | `namespace`           | string     | default  | Sets the namespace which hosts the capture job and the other Kubernetes resources for a network capture. | Ensure the namespace exists.      |
 | `namespace-selectors` | string     | ""       | Capture network captures on pods filtered by the provided namespace selectors. | Pair with `pod-selectors`.      |
@@ -169,6 +172,43 @@ kubectl retina capture create \
   --node-selectors "kubernetes.io/os=linux" \
   --interfaces "eth0,eth1"
 ```
+
+##### Rotating Capture (Long-Running)
+
+Rotating captures are useful for debugging intermittent issues where you don't know when the problem will occur. The capture runs continuously, keeping only the most recent traffic in a fixed number of files.
+
+Basic rotating capture (10 files × 100MB = 1GB rolling buffer):
+
+```sh
+kubectl retina capture create \
+  --name example-rotating \
+  --node-selectors "kubernetes.io/os=linux" \
+  --max-size 100 \
+  --file-count 10 \
+  --no-wait \
+  --host-path /mnt/retina/captures
+```
+
+Rotating capture with a time limit (stop after 4 hours):
+
+```sh
+kubectl retina capture create \
+  --name example-rotating-timed \
+  --node-selectors "kubernetes.io/os=linux" \
+  --max-size 50 \
+  --file-count 20 \
+  --duration 4h \
+  --no-wait \
+  --host-path /mnt/retina/captures
+```
+
+Once the issue is reproduced, stop the capture by deleting it:
+
+```sh
+kubectl retina capture delete --name example-rotating
+```
+
+The captured files on the host path will contain the most recent network traffic (up to `file-count × max-size` MB total).
 
 ##### Output Configuration
 

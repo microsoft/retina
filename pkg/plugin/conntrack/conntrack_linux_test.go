@@ -34,17 +34,20 @@ func TestGenerateDynamic(t *testing.T) {
 	tests := []struct {
 		name             string
 		conntrackMetrics int
+		reportInterval   uint32
 		expectedContents string
 	}{
 		{
 			name:             "ConntrackMetricsEnabled",
 			conntrackMetrics: 1,
-			expectedContents: "#define ENABLE_CONNTRACK_METRICS 1\n",
+			reportInterval:   30,
+			expectedContents: "#define ENABLE_CONNTRACK_METRICS 1\n#define CT_REPORT_INTERVAL 30\n",
 		},
 		{
 			name:             "ConntrackMetricsDisabled",
 			conntrackMetrics: 0,
-			expectedContents: "#define ENABLE_CONNTRACK_METRICS 0\n",
+			reportInterval:   60,
+			expectedContents: "#define ENABLE_CONNTRACK_METRICS 0\n#define CT_REPORT_INTERVAL 60\n",
 		},
 	}
 
@@ -63,7 +66,7 @@ func TestGenerateDynamic(t *testing.T) {
 
 			// Call the GenerateDynamic function and check if it returns an error.
 			ctx := context.Background()
-			if err = GenerateDynamic(ctx, dynamicHeaderPath, tt.conntrackMetrics); err != nil {
+			if err = GenerateDynamic(ctx, dynamicHeaderPath, tt.conntrackMetrics, tt.reportInterval); err != nil {
 				t.Fatalf("failed to generate dynamic header: %v", err)
 			}
 

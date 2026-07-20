@@ -149,6 +149,37 @@ spec:
     hostPath: example-capture
 ```
 
+Rotating Capture (Long-Running)
+
+Use `fileCount` with `maxCaptureSize` to create a rotating buffer of capture files. This is useful for debugging intermittent issues — the capture runs continuously, retaining only the most recent traffic.
+
+```yaml
+apiVersion: retina.sh/v1alpha1
+kind: Capture
+metadata:
+  name: example-rotating-capture
+spec:
+  captureConfiguration:
+    captureOption:
+      # Per-file size limit in MB
+      maxCaptureSize: 100
+      # Number of rotating files (oldest overwritten when limit reached)
+      # Total buffer: 100MB × 10 = 1GB of recent traffic
+      fileCount: 10
+    captureTarget:
+      nodeSelector:
+        matchLabels:
+          kubernetes.io/os: linux
+  outputConfiguration:
+    hostPath: /mnt/retina/captures
+```
+
+To stop the rotating capture once the issue is reproduced:
+
+```shell
+kubectl delete capture example-rotating-capture
+```
+
 Additional examples can also be found in the [GitHub capture samples](https://github.com/microsoft/retina/tree/main/samples/capture).
 
 ## Automatic Cleanup After Upload

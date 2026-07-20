@@ -51,6 +51,7 @@ image:
   tag: "v0.0.2"
 
 enableConntrackMetrics: false
+conntrackReportInterval: 30s
 enablePodLevel: false
 remoteContext: false
 enableAnnotations: false

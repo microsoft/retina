@@ -67,6 +67,7 @@ agent:
   tolerations: []
 
 enablePodLevel: true
+conntrackReportInterval: 30s
 remoteContext: false
 enableAnnotations: false
 bypassLookupIPOfInterest: true
