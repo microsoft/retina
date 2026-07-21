@@ -7,11 +7,12 @@
 package utils
 
 import (
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
+
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -1674,7 +1675,6 @@ func (x *RetinaMetadata) GetPreviouslyObservedPackets() uint32 {
 	return 0
 }
 
-<<<<<<< HEAD
 func (x *RetinaMetadata) GetPreviouslyObservedBytes() uint32 {
 	if x != nil {
 		return x.PreviouslyObservedBytes
@@ -2590,6 +2590,10 @@ var (
 func file_pkg_utils_metadata_windows_proto_rawDescGZIP() []byte {
 	file_pkg_utils_metadata_windows_proto_rawDescOnce.Do(func() {
 		file_pkg_utils_metadata_windows_proto_rawDescData = protoimpl.X.CompressGZIP(file_pkg_utils_metadata_windows_proto_rawDescData)
+	})
+	return file_pkg_utils_metadata_windows_proto_rawDescData
+}
+
 const file_metadata_windows_proto_rawDesc = "" +
 	"\n" +
 	"\x16metadata_windows.proto\x12\x05utils\"\xc1\x01\n" +
@@ -3132,20 +3136,6 @@ func init() { file_pkg_utils_metadata_windows_proto_init() }
 func file_pkg_utils_metadata_windows_proto_init() {
 	if File_pkg_utils_metadata_windows_proto != nil {
 		return
-	}
-	if !protoimpl.UnsafeEnabled {
-		file_pkg_utils_metadata_windows_proto_msgTypes[0].Exporter = func(v any, i int) any {
-			switch v := v.(*RetinaMetadata); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
