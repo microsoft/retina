@@ -10,7 +10,6 @@ import (
 	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/types"
 	"github.com/microsoft/retina/test/e2e/scenarios/capture"
-	"github.com/microsoft/retina/test/e2e/hubble"
 	"github.com/microsoft/retina/test/e2e/scenarios/dns"
 	"github.com/microsoft/retina/test/e2e/scenarios/drop"
 	hubble_dns "github.com/microsoft/retina/test/e2e/scenarios/hubble/dns"
