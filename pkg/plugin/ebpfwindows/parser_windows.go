@@ -15,7 +15,6 @@ import (
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	observerTypes "github.com/cilium/cilium/pkg/hubble/observer/types"
 	"github.com/cilium/cilium/pkg/hubble/parser/errors"
-	"github.com/cilium/cilium/pkg/hubble/parser/options"
 	"github.com/cilium/cilium/pkg/lock"
 	monitorAPI "github.com/cilium/cilium/pkg/monitor/api"
 	"github.com/gopacket/gopacket"
@@ -48,10 +47,9 @@ const (
 
 // Parser is a parser for L3/L4 payloads
 type Parser struct {
-	log                 *slog.Logger
-	epResolver          *EndpointResolver
-	correlateL3L4Policy bool
-	packet              *packet
+	log        *slog.Logger
+	epResolver *EndpointResolver
+	packet     *packet
 }
 
 var (
@@ -83,7 +81,6 @@ type packet struct {
 // New returns a new L3/L4 parser
 func NewParser(
 	log *slog.Logger,
-	opts ...options.Option,
 ) (*Parser, error) {
 	packet := &packet{}
 	decoders := []gopacket.DecodingLayer{
@@ -102,19 +99,10 @@ func NewParser(
 	packet.decLayerL3Dev.IPv4.IgnoreUnsupported = true
 	packet.decLayerL3Dev.IPv6.IgnoreUnsupported = true
 
-	args := &options.Options{
-		EnableNetworkPolicyCorrelation: true,
-	}
-
-	for _, opt := range opts {
-		opt(args)
-	}
-
 	return &Parser{
-		log:                 log,
-		epResolver:          NewEndpointResolver(log),
-		packet:              packet,
-		correlateL3L4Policy: args.EnableNetworkPolicyCorrelation,
+		log:        log,
+		epResolver: NewEndpointResolver(log),
+		packet:     packet,
 	}, nil
 }
 
