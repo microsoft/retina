@@ -52,10 +52,7 @@ func NewWindowsNode(name string) *corev1.Node {
 			Name: name,
 			Labels: map[string]string{
 				"kubernetes.io/hostname": name,
-<<<<<<< HEAD
 				"kubernetes.io/os":       "windows",
-=======
->>>>>>> dc127f0e (Laksh/cherry pick specific (#2425))
 			},
 		},
 		Status: corev1.NodeStatus{
@@ -904,11 +901,8 @@ func TestDownloadCommandFlags(t *testing.T) {
 	// Test all cases with unified approach
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-<<<<<<< HEAD
 			resetDownloadGlobals(t)
 
-=======
->>>>>>> dc127f0e (Laksh/cherry pick specific (#2425))
 			cmd := NewDownloadSubCommand()
 
 			// Parse flags without executing the command
@@ -922,7 +916,6 @@ func TestDownloadCommandFlags(t *testing.T) {
 	}
 }
 
-<<<<<<< HEAD
 // resetDownloadGlobals zeros the package-level globals bound to the download
 // command's flags and restores them on test cleanup. Cobra binds flag values
 // to these globals, so without resetting between subtests one subtest's flag
@@ -952,10 +945,6 @@ func resetDownloadGlobals(t *testing.T) {
 
 func TestDownloadAllCapturesGracefulErrorHandling(t *testing.T) {
 	resetDownloadGlobals(t)
-
-=======
-func TestDownloadAllCapturesGracefulErrorHandling(t *testing.T) {
->>>>>>> dc127f0e (Laksh/cherry pick specific (#2425))
 	// Test the graceful error handling by testing individual components
 	// that are used in downloadAllCaptures
 
