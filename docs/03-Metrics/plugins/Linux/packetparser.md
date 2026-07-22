@@ -15,6 +15,56 @@ The `packetparser` plugin requires the `CAP_NET_ADMIN` and `CAP_SYS_ADMIN` capab
 
 `packetparser` does not produce Basic metrics. In Advanced mode (refer to [Metric Modes](../../modes/modes.md)), the plugin transforms an eBPF result into an enriched `Flow` by adding Pod information based on IP. It then sends the `Flow` to an external channel, enabling *several modules* to generate Pod-Level metrics.
 
+## Performance Considerations
+
+### Reported Performance Impact on High-Core-Count Systems
+
+Community users have reported performance considerations when running the `packetparser` plugin on systems with high CPU core counts (32+ cores) under sustained network load. While these reports have not been independently verified by the Retina maintainers, we document them here for awareness.
+
+**User-Reported Observations:**
+
+A detailed analysis by a Retina user (see [this blog post](https://blog.zmalik.dev/p/who-will-observe-the-observability)) and [KubeCon 2025 talk](https://www.youtube.com/watch?v=J-Zx64mJzVk) documented performance degradation that scaled non-linearly with CPU core count on nodes running network-intensive, multi-threaded workloads.
+
+**Current Implementation:**
+
+By default, `packetparser` uses **BPF_MAP_TYPE_PERF_EVENT_ARRAY** for kernel-to-userspace data transfer. This architecture creates per-CPU buffers that must be polled by a single reader thread. On systems with many CPU cores, this can lead to:
+
+- Increased context switching overhead
+- Memory access patterns that may not scale linearly
+- Potential NUMA-related penalties on multi-socket systems
+
+**Alternative Approaches:**
+
+Alternative data transfer mechanisms like BPF ring buffers (BPF_MAP_TYPE_RINGBUF, available in Linux kernel 5.8+) use a shared buffer architecture that may perform better on high-core-count systems. Retina supports ring buffers for `packetparser` via `packetParserRingBuffer=enabled` and `packetParserRingBufferSize`.
+
+**Note:** Ring buffer mode requires Linux kernel 5.8 or newer.
+
+#### If You Experience Performance Issues
+
+If you observe performance degradation on high-core-count nodes:
+
+1. **Disable `packetparser`**: Use Basic metrics mode which doesn't require this plugin
+2. **Enable Sampling**: Use the `dataSamplingRate` configuration option (see [Sampling](#sampling) section)
+3. **Use High Data Aggregation**: Configure `high` [data aggregation](../../../05-Concepts/data-aggregation.md)
+4. **Increase the Conntrack Report Interval**: Raise `conntrackReportInterval` to lower the event rate for connection-heavy workloads (see [Report interval](#report-interval))
+5. **Monitor Impact**: Watch for elevated CPU usage, context switches, or throughput changes
+
+**Note:** The Retina team is evaluating options for addressing reported performance concerns, including potential support for alternative data transfer mechanisms. Community feedback and contributions are welcome.
+
+## Sampling
+
+Since `packetparser` produces many enriched `Flow` objects it can be quite expensive for user space to process.  Thus, when operating in `high` [data aggregation](../../../05-Concepts/data-aggregation.md) level optional sampling for reported packets is available via the `dataSamplingRate` configuration option.
+
+`dataSamplingRate` is expressed in 1 out of N terms, where N is the `dataSamplingRate` value.  For example, if `dataSamplingRate` is 3 1/3rd of packets will be sampled for reporting.
+
+Sampling only affects routine per-packet reporting. To preserve metric accuracy, a report is always emitted regardless of the sampling rate for TCP control and teardown packets (SYN/FIN/RST, etc.), for connection eviction, and once the [report interval](#report-interval) has elapsed for an active connection. Sampling therefore helps most when routine packet reports dominate the event rate; when the rate is instead dominated by per-connection periodic reports (for example, many concurrently-active or long-lived connections), raise `conntrackReportInterval` instead.
+
+### Report interval
+
+In `high` data aggregation, `conntrackReportInterval` (default `30s`) sets how often the periodic report fires for an active connection: once the interval has elapsed since the connection's last report (per direction), its next packet is reported. Other triggers — TCP control flags (SYN/FIN/RST, etc.), teardown, and eviction — are reported regardless of the interval to preserve accuracy, so a connection may be reported more than once per interval.
+
+Raising the interval thins out these periodic reports, which dominate the event rate for steady, connection-heavy workloads. This is often more effective than sampling, which does not reduce periodic or lifecycle reports. Byte and packet totals stay accurate because they are aggregated in the kernel and carried on the next reported event.
+
 ### Code locations
 
 - Plugin and eBPF code: *pkg/plugin/packetparser/*

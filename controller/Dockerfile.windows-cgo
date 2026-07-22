@@ -1,5 +1,5 @@
-# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.2-2-windowsservercore-ltsc2022 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=windows/amd64 mcr.microsoft.com/oss/go/microsoft/golang@sha256:0fb2afcf9c877c90ca609984303da41846c447ca62c0f9e42046be113cae117e AS cgo
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.3-windowsservercore-ltsc2022 --override-os windows --format "{{.Name}}@{{.Digest}}"
+FROM --platform=windows/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.26.5-2-windowsservercore-ltsc2022@sha256:c966eab9f4c60e407706c35c487c73de0d6928f6e7b0d225e7a070fc19ad62a4 AS cgo
 
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 

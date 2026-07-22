@@ -47,7 +47,6 @@ func TestToFlow(t *testing.T) {
 	assert.EqualValues(t, f.GetL4().Protocol.(*flow.Layer4_TCP).TCP.SourcePort, uint32(443))
 	assert.EqualValues(t, f.GetL4().Protocol.(*flow.Layer4_TCP).TCP.DestinationPort, uint32(80))
 	assert.NotNil(t, f.Time)
-	assert.NotNil(t, f.Extensions)
 	assert.Equal(t, f.Type, flow.FlowType_L3_L4)
 
 	if !f.GetTime().IsValid() {
@@ -87,9 +86,9 @@ func TestAddPacketSize(t *testing.T) {
 		uint8(1),
 		flow.Verdict_FORWARDED,
 	)
-	meta := &RetinaMetadata{}
-	AddPacketSize(meta, uint32(100))
-	AddRetinaMetadata(fl, meta)
+	ext := NewExtensions()
+	AddPacketSize(ext, uint32(100))
+	SetExtensions(fl, ext)
 
 	res := PacketSize(fl)
 	assert.EqualValues(t, res, uint32(100))
@@ -111,9 +110,9 @@ func TestTcpID(t *testing.T) {
 		flow.Verdict_FORWARDED,
 	)
 
-	meta := &RetinaMetadata{}
-	AddTCPID(meta, uint64(1234))
-	AddRetinaMetadata(fl, meta)
+	ext := NewExtensions()
+	AddTCPID(ext, uint64(1234))
+	SetExtensions(fl, ext)
 	assert.EqualValues(t, GetTCPID(fl), uint64(1234))
 }
 
@@ -154,9 +153,9 @@ func TestAddDropReason(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			f := &flow.Flow{}
-			meta := &RetinaMetadata{}
-			AddDropReason(f, meta, tc.dropReason)
-			AddRetinaMetadata(f, meta)
+			ext := NewExtensions()
+			AddDropReason(f, ext, tc.dropReason)
+			SetExtensions(f, ext)
 			assert.Equal(t, f.DropReasonDesc, tc.expectedDesc)
 			assert.Equal(t, f.Verdict, flow.Verdict_DROPPED)
 			assert.NotNil(t, f.EventType.Type, 1)
@@ -164,6 +163,54 @@ func TestAddDropReason(t *testing.T) {
 			assert.NotNil(t, DropReasonDescription(f), DropReason_name[int32(tc.dropReason)])
 		})
 	}
+}
+
+func TestZoneHelpers(t *testing.T) {
+	tests := []struct {
+		name            string
+		srcZone         string
+		dstZone         string
+		expectedSrcZone string
+		expectedDstZone string
+	}{
+		{
+			name:            "both zones set",
+			srcZone:         "zone-1",
+			dstZone:         "zone-2",
+			expectedSrcZone: "zone-1",
+			expectedDstZone: "zone-2",
+		},
+		{
+			name:            "empty zones stored as empty strings",
+			srcZone:         "",
+			dstZone:         "",
+			expectedSrcZone: "",
+			expectedDstZone: "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			f := &flow.Flow{}
+			ext := NewExtensions()
+			AddZones(ext, tc.srcZone, tc.dstZone)
+			SetExtensions(f, ext)
+
+			assert.Equal(t, tc.expectedSrcZone, SourceZone(f))
+			assert.Equal(t, tc.expectedDstZone, DestinationZone(f))
+		})
+	}
+}
+
+func TestZoneHelpers_NilExtensions(t *testing.T) {
+	f := &flow.Flow{}
+	assert.Equal(t, "unknown", SourceZone(f))
+	assert.Equal(t, "unknown", DestinationZone(f))
+}
+
+func TestAddZones_NilStruct(t *testing.T) {
+	// Should not panic.
+	AddZones(nil, "zone-1", "zone-2")
 }
 
 func TestIsDefaultRoute(t *testing.T) {

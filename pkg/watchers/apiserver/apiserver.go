@@ -17,7 +17,11 @@ import (
 	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
+	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
+	kclient "sigs.k8s.io/controller-runtime/pkg/client"
 	kcfg "sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
@@ -27,26 +31,29 @@ const (
 )
 
 type ApiServerWatcher struct {
-	isRunning         bool
-	l                 *log.ZapLogger
-	current           cache
-	new               cache
-	apiServerHostName string
-	hostResolver      IHostResolver
-	filterManager     fm.IFilterManager
-	restConfig        *rest.Config
+	isRunning           bool
+	l                   *log.ZapLogger
+	current             cache
+	new                 cache
+	apiServerHostName   string
+	hostResolver        IHostResolver
+	filterManager       fm.IFilterManager
+	restConfig          *rest.Config
+	client              kclient.Client
+	filterMapMaxEntries uint32
 }
 
 var a *ApiServerWatcher
 
 // Watcher creates a new ApiServerWatcher instance.
-func Watcher() *ApiServerWatcher {
+func Watcher(filterMapMaxEntries uint32) *ApiServerWatcher {
 	if a == nil {
 		a = &ApiServerWatcher{
-			isRunning:    false,
-			l:            log.Logger().Named("apiserver-watcher"),
-			current:      make(cache),
-			hostResolver: net.DefaultResolver,
+			isRunning:           false,
+			l:                   log.Logger().Named("apiserver-watcher"),
+			current:             make(cache),
+			hostResolver:        net.DefaultResolver,
+			filterMapMaxEntries: filterMapMaxEntries,
 		}
 	}
 
@@ -62,7 +69,7 @@ func (a *ApiServerWatcher) Init(ctx context.Context) error {
 	// Get filter manager.
 	if a.filterManager == nil {
 		var err error
-		a.filterManager, err = fm.Init(filterManagerRetries)
+		a.filterManager, err = fm.Init(filterManagerRetries, a.filterMapMaxEntries)
 		if err != nil {
 			a.l.Error("failed to init filter manager", zap.Error(err))
 			return fmt.Errorf("failed to init filter manager: %w", err)
@@ -77,6 +84,15 @@ func (a *ApiServerWatcher) Init(ctx context.Context) error {
 			return fmt.Errorf("failed to get kubeconfig: %w", err)
 		}
 		a.restConfig = config
+	}
+
+	if a.client == nil {
+		c, err := kclient.New(a.restConfig, kclient.Options{})
+		if err != nil {
+			a.l.Error("failed to create kubernetes client", zap.Error(err))
+			return fmt.Errorf("failed to create kubernetes client: %w", err)
+		}
+		a.client = c
 	}
 
 	hostName, err := a.getHostName()
@@ -149,10 +165,23 @@ func (a *ApiServerWatcher) Refresh(ctx context.Context) error {
 }
 
 func (a *ApiServerWatcher) initNewCache(ctx context.Context) error {
+	svcIPs, err := a.ipsFromService(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve ips from kubernetes service: %w", err)
+	}
+
+	endpointIPs, err := a.ipsFromEndpointSlice(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve ips from kubernetes endpointslices: %w", err)
+	}
+
 	ips, err := a.resolveIPs(ctx, a.apiServerHostName)
 	if err != nil {
 		return fmt.Errorf("failed to resolve IPs: %w", err)
 	}
+
+	ips = append(ips, endpointIPs...)
+	ips = append(ips, svcIPs...)
 
 	// Reset new cache.
 	a.new = make(cache)
@@ -208,6 +237,41 @@ func (a *ApiServerWatcher) resolveIPs(ctx context.Context, host string) ([]strin
 	}
 
 	return hostIPs, nil
+}
+
+// ipsFromService retrieves IP addresses from the master service "kubernetes" in the default namespace.
+// These IPs are used as a virtual-ip to the kube-apiserver.
+func (a *ApiServerWatcher) ipsFromService(ctx context.Context) ([]string, error) {
+	svc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "kubernetes",
+			Namespace: "default",
+		},
+	}
+	if err := a.client.Get(ctx, kclient.ObjectKeyFromObject(svc), svc); err != nil {
+		return nil, fmt.Errorf("retrieving kubernetes service: %w", err)
+	}
+	return svc.Spec.ClusterIPs, nil
+}
+
+// ipsFromEndpointSlice retrieves IP addresses from the EndpointSlices that
+// back the "kubernetes" service in the default namespace. These IPs are the
+// addresses for the kube-apiserver.
+func (a *ApiServerWatcher) ipsFromEndpointSlice(ctx context.Context) ([]string, error) {
+	var sliceList discoveryv1.EndpointSliceList
+	if err := a.client.List(ctx, &sliceList,
+		kclient.InNamespace("default"),
+		kclient.MatchingLabels{discoveryv1.LabelServiceName: "kubernetes"},
+	); err != nil {
+		return nil, fmt.Errorf("retrieving kubernetes endpointslices: %w", err)
+	}
+	ips := []string{}
+	for i := range sliceList.Items {
+		for _, ep := range sliceList.Items[i].Endpoints {
+			ips = append(ips, ep.Addresses...)
+		}
+	}
+	return ips, nil
 }
 
 func (a *ApiServerWatcher) publish(netIPs []net.IP, eventType cc.EventType) {

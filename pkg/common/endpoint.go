@@ -19,12 +19,17 @@ func NewRetinaEndpoint(name, namespace string, ips *IPAddresses) *RetinaEndpoint
 	}
 }
 
+func (ep *RetinaEndpoint) String() string {
+	return ep.NamespacedName()
+}
+
 func (ep *RetinaEndpoint) DeepCopy() interface{} {
 	ep.RLock()
 	defer ep.RUnlock()
 
 	newEp := &RetinaEndpoint{
 		BaseObject: ep.BaseObject.DeepCopy(),
+		nodeIP:     ep.nodeIP,
 	}
 
 	if ep.ownerRefs != nil {
@@ -160,7 +165,7 @@ func (ep *RetinaEndpoint) PrimaryIP() (string, error) {
 		}
 	}
 
-	return "", errors.Wrapf(ErrNoPrimaryIPFoundEndpoint, ep.Key())
+	return "", errors.Wrapf(ErrNoPrimaryIPFoundEndpoint, "endpoint: %s", ep.Key())
 }
 
 func (ep *RetinaEndpoint) PrimaryNetIP() (net.IP, error) {
@@ -174,7 +179,13 @@ func (ep *RetinaEndpoint) PrimaryNetIP() (net.IP, error) {
 		}
 	}
 
-	return nil, errors.Wrapf(ErrNoPrimaryIPFoundEndpoint, ep.Key())
+	return nil, errors.Wrapf(ErrNoPrimaryIPFoundEndpoint, "endpoint: %s", ep.Key())
+}
+
+func (ep *RetinaEndpoint) NodeIP() string {
+	ep.RLock()
+	defer ep.RUnlock()
+	return ep.nodeIP
 }
 
 func (o *OwnerReference) DeepCopy() *OwnerReference {

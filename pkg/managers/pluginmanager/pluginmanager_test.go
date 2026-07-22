@@ -5,6 +5,7 @@ package pluginmanager
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -24,7 +25,8 @@ import (
 )
 
 const (
-	timeInter = time.Second * 10
+	timeInter      = time.Second * 10
+	mockPluginName = "mockplugin"
 )
 
 var (
@@ -82,7 +84,7 @@ func TestNewManager(t *testing.T) {
 
 	for _, tt := range tests {
 		tt.cfg.EnabledPlugin = append(tt.cfg.EnabledPlugin, tt.pluginName)
-		mgr, err := NewPluginManager(&tt.cfg, tel)
+		mgr, err := NewPluginManager(&tt.cfg, tel, slog.Default())
 		if tt.wantErr {
 			require.NotNil(t, err, "Expected error but got nil")
 			require.Nil(t, mgr, "Expected mgr to be nil but it isn't")
@@ -122,7 +124,7 @@ func TestNewManagerStart(t *testing.T) {
 
 	for _, tt := range tests {
 		tt.cfg.EnabledPlugin = append(tt.cfg.EnabledPlugin, tt.pluginName)
-		mgr, err := NewPluginManager(&tt.cfg, tel)
+		mgr, err := NewPluginManager(&tt.cfg, tel, slog.Default())
 		require.NoError(t, err)
 		mgr.watcherManager = setupWatcherManagerMock(gomock.NewController(t))
 		require.Nil(t, err, "Expected nil but got error:%w", err)
@@ -151,6 +153,65 @@ func TestNewManagerStart(t *testing.T) {
 	}
 }
 
+func TestStart_InvalidMetricsIntervalDefaultsTo10s(t *testing.T) {
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	require.NoError(t, err)
+
+	tests := []struct {
+		name     string
+		interval time.Duration
+	}{
+		{"zero interval", 0},
+		{"negative interval", -1 * time.Second},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctl := gomock.NewController(t)
+			defer ctl.Finish()
+
+			cfg := cfgPodLevelDisabled
+			cfg.MetricsInterval = tt.interval
+			cfg.EnabledPlugin = append(cfg.EnabledPlugin, mockPluginName)
+
+			mgr, err := NewPluginManager(&cfg, telemetry.NewNoopTelemetry(), slog.Default())
+			require.NoError(t, err)
+			require.NotNil(t, mgr)
+			mgr.watcherManager = setupWatcherManagerMock(ctl)
+
+			mockPlugin := pluginmock.NewMockPlugin(ctl)
+			mockPlugin.EXPECT().Generate(gomock.Any()).Return(nil).AnyTimes()
+			mockPlugin.EXPECT().Compile(gomock.Any()).Return(nil).AnyTimes()
+			mockPlugin.EXPECT().Stop().Return(nil).AnyTimes()
+			mockPlugin.EXPECT().Init().Return(nil).AnyTimes()
+			mockPlugin.EXPECT().Start(gomock.Any()).Return(nil).AnyTimes()
+			mockPlugin.EXPECT().Name().Return(mockPluginName).AnyTimes()
+			mgr.plugins[mockPluginName] = mockPlugin
+
+			ctx, cancel := context.WithCancel(context.Background())
+			done := make(chan error, 1)
+			go func() {
+				done <- mgr.Start(ctx)
+			}()
+
+			// Give Start() time to apply the default
+			time.Sleep(100 * time.Millisecond)
+			require.Equal(t, DefaultMetricsInterval, mgr.cfg.MetricsInterval,
+				"MetricsInterval should be defaulted to DefaultMetricsInterval")
+
+			cancel()
+			// Start returns when context is cancelled (plugins exit)
+			err = <-done
+			if err != nil {
+				// Ignore conntrack-related errors in this test
+				if !strings.Contains(err.Error(), "failed to get conntrack instance") &&
+					!strings.Contains(err.Error(), "failed to run conntrack GC") {
+					require.NoError(t, err)
+				}
+			}
+		})
+	}
+}
+
 func TestNewManagerWithPluginStartFailure(t *testing.T) {
 	ctl := gomock.NewController(t)
 	defer ctl.Finish()
@@ -161,7 +222,7 @@ func TestNewManagerWithPluginStartFailure(t *testing.T) {
 	cfg := cfgPodLevelEnabled
 	mgr := &PluginManager{
 		cfg:            &cfg,
-		l:              log.Logger().Named("plugin-manager"),
+		l:              slog.Default().With("module", "plugin-manager"),
 		plugins:        make(map[string]plugin.Plugin),
 		tel:            telemetry.NewNoopTelemetry(),
 		watcherManager: setupWatcherManagerMock(ctl),
@@ -193,14 +254,14 @@ func TestNewManagerWithPluginReconcileFailure(t *testing.T) {
 	ctl := gomock.NewController(t)
 	defer ctl.Finish()
 	log.SetupZapLogger(log.GetDefaultLogOpts())
-	metrics.InitializeMetrics()
+	metrics.InitializeMetrics(slog.Default())
 
 	pluginName := "mockplugin"
 
 	cfg := cfgPodLevelEnabled
 	mgr := &PluginManager{
 		cfg:            &cfg,
-		l:              log.Logger().Named("plugin-manager"),
+		l:              slog.Default().With("module", "plugin-manager"),
 		plugins:        make(map[string]plugin.Plugin),
 		tel:            telemetry.NewNoopTelemetry(),
 		watcherManager: setupWatcherManagerMock(ctl),
@@ -257,7 +318,7 @@ func TestPluginInit(t *testing.T) {
 	}
 	for _, tt := range tests {
 		tt.cfg.EnabledPlugin = append(tt.cfg.EnabledPlugin, tt.pluginName)
-		mgr, err := NewPluginManager(&tt.cfg, tel)
+		mgr, err := NewPluginManager(&tt.cfg, tel, slog.Default())
 		require.Nil(t, err, "Expected nil but got error:%w", err)
 		for _, plugin := range mgr.plugins {
 			if tt.wantErr {
@@ -299,7 +360,7 @@ func TestPluginStartWithoutInit(t *testing.T) {
 	}
 	for _, tt := range tests {
 		tt.cfg.EnabledPlugin = append(tt.cfg.EnabledPlugin, tt.pluginName)
-		mgr, err := NewPluginManager(&tt.cfg, tel)
+		mgr, err := NewPluginManager(&tt.cfg, tel, slog.Default())
 		require.Nil(t, err, "Expected nil but got error:%w", err)
 		for _, plugin := range mgr.plugins {
 			if tt.initPlugin {
@@ -387,7 +448,7 @@ func TestPluginStop(t *testing.T) {
 	}
 	for _, tt := range tests {
 		tt.cfg.EnabledPlugin = append(tt.cfg.EnabledPlugin, tt.pluginName)
-		mgr, err := NewPluginManager(&tt.cfg, tel)
+		mgr, err := NewPluginManager(&tt.cfg, tel, slog.Default())
 		require.Nil(t, err, "Expected nil but got error:%w", err)
 		for _, plugin := range mgr.plugins {
 			if tt.initPlugin {
@@ -422,7 +483,7 @@ func TestStopPluginManagerGracefully(t *testing.T) {
 	cfg := cfgPodLevelEnabled
 	mgr := &PluginManager{
 		cfg:            &cfg,
-		l:              log.Logger().Named("plugin-manager"),
+		l:              slog.Default().With("module", "plugin-manager"),
 		plugins:        make(map[string]plugin.Plugin),
 		tel:            telemetry.NewNoopTelemetry(),
 		watcherManager: setupWatcherManagerMock(ctl),
@@ -462,7 +523,7 @@ func TestWatcherManagerFailure(t *testing.T) {
 	cfg := cfgPodLevelEnabled
 	mgr := &PluginManager{
 		cfg:            &cfg,
-		l:              log.Logger().Named("plugin-manager"),
+		l:              slog.Default().With("module", "plugin-manager"),
 		plugins:        make(map[string]plugin.Plugin),
 		tel:            telemetry.NewNoopTelemetry(),
 		watcherManager: m,

@@ -2,23 +2,26 @@ package endpointcontroller
 
 import (
 	"context"
+	"log/slog"
+	"time"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 
 	"github.com/cilium/cilium/pkg/identity"
 	"github.com/cilium/cilium/pkg/identity/cache"
 	"github.com/cilium/cilium/pkg/k8s/client/clientset/versioned"
 	"github.com/cilium/cilium/pkg/labels"
-	"github.com/cilium/cilium/pkg/option"
 )
+
+// Default timeout for identity allocation operations
+const identityAllocatorTimeout = 2 * time.Minute
 
 // IdentityManager is analogous to Cilium Daemon's identity allocation.
 // Cilium has an IPCacche holding IP to Identity mapping.
 // In IPCache.InjectLabels(), IPCacche is told of IPs which have been updated.
 // Within this function, identities are allocated/released via CachingIdentityAllocator.
 type IdentityManager struct {
-	l logrus.FieldLogger
+	l *slog.Logger
 	// alloc is the CachingIdentityAllocator which helps in:
 	// - allocating/releasing identities (maintaining reference counts and creating CRDs)
 	// - syncing identity "keys", preventing them from being garbage collected
@@ -34,8 +37,10 @@ type IdentityManager struct {
 type owner struct{}
 
 // UpdateIdentities is a callback when identities are updated
-func (o *owner) UpdateIdentities(_, _ identity.IdentityMap) {
-	// no-op
+func (o *owner) UpdateIdentities(_, _ identity.IdentityMap) <-chan struct{} {
+	ch := make(chan struct{})
+	close(ch)
+	return ch
 }
 
 // GetNodeSuffix() is only used for KVStoreBackend (we use CRDBackend)
@@ -43,15 +48,31 @@ func (o *owner) GetNodeSuffix() string {
 	return ""
 }
 
-func NewIdentityManager(l logrus.FieldLogger, client versioned.Interface) (*IdentityManager, error) {
+func NewIdentityManager(ctx context.Context, l *slog.Logger, client versioned.Interface) (*IdentityManager, error) {
+	// Configure the allocator with a reasonable timeout for identity operations
+	allocConfig := cache.AllocatorConfig{
+		Timeout:      identityAllocatorTimeout,
+		SyncInterval: 1 * time.Hour,
+	}
+
 	im := &IdentityManager{
-		l:               l.WithField("component", "identitymanager"),
-		alloc:           cache.NewCachingIdentityAllocator(&owner{}, cache.AllocatorConfig{}),
+		l:               l.With("component", "identitymanager"),
+		alloc:           cache.NewCachingIdentityAllocator(l, &owner{}, allocConfig),
 		labelIdentities: make(map[string]identity.NumericIdentity),
 	}
 
 	im.l.Info("initializing identity allocator")
-	_ = im.alloc.InitIdentityAllocator(client)
+	initCh := im.alloc.InitIdentityAllocator(client, nil)
+
+	// Wait for the identity allocator to be initialized (backend is created)
+	// Note: This doesn't wait for the full cache sync - that happens on first allocation
+	select {
+	case <-initCh:
+		im.l.Info("identity allocator initialized successfully")
+	case <-ctx.Done():
+		return nil, errors.Wrap(ctx.Err(), "context cancelled while waiting for identity allocator initialization")
+	}
+
 	return im, nil
 }
 
@@ -62,13 +83,13 @@ func (im *IdentityManager) DecrementReference(ctx context.Context, lbls labels.L
 	sortedLabels := lbls.String()
 	id, ok := im.labelIdentities[sortedLabels]
 	if !ok {
-		im.l.WithField("labels", sortedLabels).Warn("expected identity for labels")
+		im.l.Warn("expected identity for labels", "labels", sortedLabels)
 		return
 	}
 
 	idObj := im.alloc.LookupIdentityByID(ctx, id)
 	if idObj == nil {
-		im.l.WithField("identity", id).Warn("expected identity for id")
+		im.l.Warn("expected identity for id", "identity", id)
 		return
 	}
 
@@ -83,11 +104,10 @@ func (im *IdentityManager) DecrementReference(ctx context.Context, lbls labels.L
 		// possible errors are
 		// 1. ctx cancelled (in which case, hive is shutting down)
 		// 2. identity not found in localKeys cache (nothing to worry about, and GC on CiliumIdentities will work as expected)
-		im.l.WithError(err).WithFields(logrus.Fields{
-			"identity":       idObj,
-			"identityLabels": idObj.Labels,
-		}).Warning(
-			"error while releasing previously allocated identity",
+		im.l.Warn("error while releasing previously allocated identity",
+			"error", err,
+			"identity", idObj,
+			"identityLabels", idObj.Labels,
 		)
 	}
 
@@ -95,11 +115,9 @@ func (im *IdentityManager) DecrementReference(ctx context.Context, lbls labels.L
 		return
 	}
 
-	im.l.WithFields(logrus.Fields{
-		"identity":       idObj,
-		"identityLabels": idObj.Labels,
-	}).Info(
-		"released identity due to no more references",
+	im.l.Info("released identity due to no more references",
+		"identity", idObj,
+		"identityLabels", idObj.Labels,
 	)
 
 	delete(im.labelIdentities, sortedLabels)
@@ -112,8 +130,8 @@ func (im *IdentityManager) GetIdentityAndIncrementReference(ctx context.Context,
 	// notifyOwner=false because no need to notify owner (via UpdateIdentities callback).
 	// oldNID=identity.InvalidIdentity would only be used for local identities (e.g. node-local CIDR identity), which we don't use.
 	// Since this operation will create the CiliumIdentity if needed,
-	// pass in a context that completes either once ctx is done or kvstore timeout is reached.
-	allocateCtx, cancel := context.WithTimeout(ctx, option.Config.KVstoreConnectivityTimeout)
+	// pass in a context that completes either once ctx is done or identity allocator timeout is reached.
+	allocateCtx, cancel := context.WithTimeout(ctx, identityAllocatorTimeout)
 	defer cancel()
 	idObj, _, err := im.alloc.AllocateIdentity(allocateCtx, lbls, false, identity.InvalidIdentity)
 	if err != nil {

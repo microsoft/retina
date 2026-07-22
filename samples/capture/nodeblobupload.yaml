@@ -19,5 +19,5 @@ spec:
                 ],
             }
   outputConfiguration:
-    hostPath: "/tmp/retina"
+    hostPath: "retina"
     blobUpload: blobsassecret

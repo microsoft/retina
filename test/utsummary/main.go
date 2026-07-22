@@ -68,6 +68,10 @@ func run(r io.Reader) (msg string, failures bool, err error) {
 	// Stores output produced by each test.
 	testOutputs := map[string][]string{}
 
+	// Tracks packages that had at least one test-level event,
+	// used to distinguish build failures from normal test failures.
+	pkgHasTests := map[string]bool{}
+
 	start := time.Now()
 	for scanner.Scan() {
 		// When the build fails, go test -json doesn't emit a valid JSON value, only
@@ -86,8 +90,21 @@ func run(r io.Reader) (msg string, failures bool, err error) {
 		// The Test field, if non-empty, specifies the test, example, or benchmark
 		// function that caused the event. Events for the overall package test do
 		// not set Test.
+		if event.Test != "" {
+			pkgHasTests[event.Package] = true
+		}
 		if event.Action == "fail" && event.Test != "" {
 			failedTests = append(failedTests, testpath)
+		}
+
+		// A package-level fail with no Test field and no test-level events
+		// indicates a build failure (e.g. [build failed]). These must be
+		// tracked as failures so that broken packages are not silently ignored.
+		// If the package had test-level events, the package fail is just a
+		// summary of individual test failures (already counted above).
+		if event.Action == "fail" && event.Test == "" && !pkgHasTests[event.Package] {
+			failedTests = append(failedTests, event.Package+" [build failed]")
+			counts["fail"]++
 		}
 
 		if event.Action == "output" {
@@ -97,9 +114,9 @@ func run(r io.Reader) (msg string, failures bool, err error) {
 			testOutputs[testpath] = append(testOutputs[testpath], event.Output)
 		}
 
-		// We don't want to count package passes/fails because these don't
-		// represent specific tests being run. However, skips of an entire package
-		// are not duplicated with individual test skips.
+		// We don't want to count package passes because these don't represent
+		// specific tests being run. However, skips of an entire package are not
+		// duplicated with individual test skips.
 		if event.Test != "" || event.Action == "skip" {
 			counts[event.Action]++
 		}

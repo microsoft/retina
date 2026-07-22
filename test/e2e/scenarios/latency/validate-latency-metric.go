@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/microsoft/retina/test/e2e/common"
+	"github.com/microsoft/retina/test/e2e/framework/constants"
 	prom "github.com/microsoft/retina/test/e2e/framework/prometheus"
 	"github.com/pkg/errors"
 )
@@ -18,7 +18,7 @@ func (v *ValidateAPIServerLatencyMetric) Prevalidate() error {
 }
 
 func (v *ValidateAPIServerLatencyMetric) Run() error {
-	promAddress := fmt.Sprintf("http://localhost:%d/metrics", common.RetinaPort)
+	promAddress := fmt.Sprintf("http://localhost:%s/metrics", constants.RetinaMetricsPort)
 
 	metric := map[string]string{}
 	err := prom.CheckMetric(promAddress, latencyBucketMetricName, metric)

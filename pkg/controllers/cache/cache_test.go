@@ -4,18 +4,15 @@ package cache
 
 import (
 	"net"
+	"sync"
 	"testing"
-	"time"
 
 	"github.com/microsoft/retina/pkg/common"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/pubsub"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	gomock "go.uber.org/mock/gomock"
-)
-
-const (
-	until = 1 * time.Millisecond
 )
 
 func TestNewCache(t *testing.T) {
@@ -33,7 +30,11 @@ func TestCacheEndpoints(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	p := pubsub.NewMockPubSubInterface(ctrl)
-	p.EXPECT().Publish(common.PubSubPods, gomock.Any()).Times(2)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	p.EXPECT().Publish(common.PubSubPods, gomock.Any()).Times(2).Do(func(pubsub.PubSubTopic, interface{}) {
+		wg.Done()
+	})
 	p.EXPECT().Subscribe(common.PubSubAPIServer, gomock.Any()).Times(1)
 	c := New(p)
 	assert.NotNil(t, c)
@@ -92,7 +93,7 @@ func TestCacheEndpoints(t *testing.T) {
 	err = c.DeleteRetinaEndpoint(addEndpoints.Key())
 	assert.NoError(t, err)
 
-	time.Sleep(until)
+	wg.Wait()
 }
 
 func TestCacheServices(t *testing.T) {
@@ -106,7 +107,11 @@ func TestCacheServices(t *testing.T) {
 
 	addSvc := common.NewRetinaSvc("svc1", "ns1", nil, nil, nil)
 
-	p.EXPECT().Publish(gomock.Any(), gomock.Any()).Times(2)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	p.EXPECT().Publish(gomock.Any(), gomock.Any()).Times(2).Do(func(pubsub.PubSubTopic, interface{}) {
+		wg.Done()
+	})
 	err := c.UpdateRetinaSvc(addSvc)
 	assert.Error(t, err)
 
@@ -136,7 +141,7 @@ func TestCacheServices(t *testing.T) {
 	err = c.DeleteRetinaSvc(addSvc.Key())
 	assert.NoError(t, err)
 
-	time.Sleep(until)
+	wg.Wait()
 }
 
 func TestCacheNodes(t *testing.T) {
@@ -148,9 +153,13 @@ func TestCacheNodes(t *testing.T) {
 	c := New(p)
 	assert.NotNil(t, c)
 
-	addNode := common.NewRetinaNode("node1", net.IPv4(1, 2, 3, 4))
+	addNode := common.NewRetinaNode("node1", net.IPv4(1, 2, 3, 4), "zone-1")
 
-	p.EXPECT().Publish(gomock.Any(), gomock.Any()).Times(2)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	p.EXPECT().Publish(gomock.Any(), gomock.Any()).Times(2).Do(func(pubsub.PubSubTopic, interface{}) {
+		wg.Done()
+	})
 	err := c.UpdateRetinaNode(addNode)
 	assert.NoError(t, err)
 
@@ -169,7 +178,7 @@ func TestCacheNodes(t *testing.T) {
 	err = c.DeleteRetinaNode(addNode.Name())
 	assert.NoError(t, err)
 
-	time.Sleep(until)
+	wg.Wait()
 }
 
 func TestAddPodSvcNodeSameIP(t *testing.T) {
@@ -177,9 +186,12 @@ func TestAddPodSvcNodeSameIP(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	p := pubsub.NewMockPubSubInterface(ctrl)
-	p.EXPECT().Publish(common.PubSubPods, gomock.Any()).Times(2)
-	p.EXPECT().Publish(common.PubSubSvc, gomock.Any()).Times(2)
-	p.EXPECT().Publish(common.PubSubNode, gomock.Any()).Times(1)
+	var wg sync.WaitGroup
+	wg.Add(5) // 2 pod + 2 svc + 1 node publishes
+	doFn := func(pubsub.PubSubTopic, interface{}) { wg.Done() }
+	p.EXPECT().Publish(common.PubSubPods, gomock.Any()).Times(2).Do(doFn)
+	p.EXPECT().Publish(common.PubSubSvc, gomock.Any()).Times(2).Do(doFn)
+	p.EXPECT().Publish(common.PubSubNode, gomock.Any()).Times(1).Do(doFn)
 	p.EXPECT().Subscribe(common.PubSubAPIServer, gomock.Any()).Times(1)
 	c := New(p)
 	assert.NotNil(t, c)
@@ -210,7 +222,7 @@ func TestAddPodSvcNodeSameIP(t *testing.T) {
 	assert.Equal(t, addSvc.Name(), svc.Name())
 	assert.Equal(t, addSvc.Namespace(), svc.Namespace())
 
-	addNode := common.NewRetinaNode("node1", net.IPv4(1, 2, 3, 4))
+	addNode := common.NewRetinaNode("node1", net.IPv4(1, 2, 3, 4), "zone-1")
 
 	err = c.UpdateRetinaNode(addNode)
 	assert.NoError(t, err)
@@ -221,7 +233,7 @@ func TestAddPodSvcNodeSameIP(t *testing.T) {
 	assert.Equal(t, addNode.Name(), node.Name())
 	assert.Equal(t, addNode.IPString(), node.IPString())
 
-	time.Sleep(until)
+	wg.Wait()
 }
 
 func TestAddPodSvcNodeSameIPDiffNS(t *testing.T) {
@@ -229,9 +241,12 @@ func TestAddPodSvcNodeSameIPDiffNS(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	p := pubsub.NewMockPubSubInterface(ctrl)
-	p.EXPECT().Publish(common.PubSubPods, gomock.Any()).Times(2)
-	p.EXPECT().Publish(common.PubSubSvc, gomock.Any()).Times(2)
-	p.EXPECT().Publish(common.PubSubNode, gomock.Any()).Times(1)
+	var wg sync.WaitGroup
+	wg.Add(5) // 2 pod + 2 svc + 1 node publishes
+	doFn := func(pubsub.PubSubTopic, interface{}) { wg.Done() }
+	p.EXPECT().Publish(common.PubSubPods, gomock.Any()).Times(2).Do(doFn)
+	p.EXPECT().Publish(common.PubSubSvc, gomock.Any()).Times(2).Do(doFn)
+	p.EXPECT().Publish(common.PubSubNode, gomock.Any()).Times(1).Do(doFn)
 	p.EXPECT().Subscribe(common.PubSubAPIServer, gomock.Any()).Times(1)
 	c := New(p)
 	assert.NotNil(t, c)
@@ -262,7 +277,7 @@ func TestAddPodSvcNodeSameIPDiffNS(t *testing.T) {
 	assert.Equal(t, addSvc.Name(), svc.Name())
 	assert.Equal(t, addSvc.Namespace(), svc.Namespace())
 
-	addNode := common.NewRetinaNode("node1", net.IPv4(1, 2, 3, 4))
+	addNode := common.NewRetinaNode("node1", net.IPv4(1, 2, 3, 4), "zone-1")
 
 	err = c.UpdateRetinaNode(addNode)
 	assert.NoError(t, err)
@@ -274,7 +289,7 @@ func TestAddPodSvcNodeSameIPDiffNS(t *testing.T) {
 	assert.Equal(t, addNode.Name(), node.Name())
 	assert.Equal(t, addNode.IPString(), node.IPString())
 
-	time.Sleep(until)
+	wg.Wait()
 }
 
 func TestAddPodDiffNs(t *testing.T) {
@@ -282,7 +297,11 @@ func TestAddPodDiffNs(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	p := pubsub.NewMockPubSubInterface(ctrl)
-	p.EXPECT().Publish(common.PubSubPods, gomock.Any()).Times(3)
+	var wg sync.WaitGroup
+	wg.Add(3)
+	p.EXPECT().Publish(common.PubSubPods, gomock.Any()).Times(3).Do(func(pubsub.PubSubTopic, interface{}) {
+		wg.Done()
+	})
 	p.EXPECT().Subscribe(common.PubSubAPIServer, gomock.Any()).Times(1)
 	c := New(p)
 	assert.NotNil(t, c)
@@ -318,7 +337,7 @@ func TestAddPodDiffNs(t *testing.T) {
 	assert.Equal(t, addEndpoints.Name(), ep.Name())
 	assert.Equal(t, addEndpoints.Namespace(), ep.Namespace())
 
-	time.Sleep(until)
+	wg.Wait()
 }
 
 func TestFailDelete(t *testing.T) {
@@ -340,12 +359,10 @@ func TestFailDelete(t *testing.T) {
 	err = c.DeleteRetinaSvc(svc.Key())
 	assert.Error(t, err)
 
-	node := common.NewRetinaNode("node1", net.IPv4(1, 2, 3, 4))
+	node := common.NewRetinaNode("node1", net.IPv4(1, 2, 3, 4), "zone-1")
 
 	err = c.DeleteRetinaNode(node.Name())
 	assert.Error(t, err)
-
-	time.Sleep(until)
 }
 
 func TestCachingNamespace(t *testing.T) {
@@ -364,4 +381,33 @@ func TestCachingNamespace(t *testing.T) {
 	c.DeleteAnnotatedNamespace(ns)
 	namespaces = c.GetAnnotatedNamespaces()
 	assert.Equal(t, 0, len(namespaces))
+}
+
+func TestGetAllNamespaces(t *testing.T) {
+	_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	p := pubsub.NewMockPubSubInterface(ctrl)
+	p.EXPECT().Subscribe(common.PubSubAPIServer, gomock.Any()).Times(1)
+	p.EXPECT().Publish(gomock.Any(), gomock.Any()).AnyTimes()
+	c := New(p)
+
+	// Empty cache should return empty list
+	namespaces := c.GetAllNamespaces()
+	assert.Empty(t, namespaces)
+
+	// Add endpoints in different namespaces
+	ep1 := common.NewRetinaEndpoint("pod1", "ns1", &common.IPAddresses{IPv4: net.IPv4(10, 0, 0, 1)})
+	ep2 := common.NewRetinaEndpoint("pod2", "ns2", &common.IPAddresses{IPv4: net.IPv4(10, 0, 0, 2)})
+	ep3 := common.NewRetinaEndpoint("pod3", "ns1", &common.IPAddresses{IPv4: net.IPv4(10, 0, 0, 3)})
+	err := c.UpdateRetinaEndpoint(ep1)
+	require.NoError(t, err)
+	err = c.UpdateRetinaEndpoint(ep2)
+	require.NoError(t, err)
+	err = c.UpdateRetinaEndpoint(ep3)
+	require.NoError(t, err)
+
+	namespaces = c.GetAllNamespaces()
+	assert.Len(t, namespaces, 2)
+	assert.ElementsMatch(t, []string{"ns1", "ns2"}, namespaces)
 }

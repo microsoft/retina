@@ -69,6 +69,9 @@ func (lu *linuxUtil) run(ctx context.Context) error {
 		return err
 	}
 
+	gstrings := new(ethtool.EthtoolGStrings)
+	stats := new(ethtool.EthtoolStats)
+
 	ticker := time.NewTicker(lu.cfg.MetricsInterval)
 	defer ticker.Stop()
 
@@ -79,10 +82,9 @@ func (lu *linuxUtil) run(ctx context.Context) error {
 			return nil
 		case <-ticker.C:
 			opts := &NetstatOpts{
-				CuratedKeys:      true,
-				AddZeroVal:       false,
-				ListenSock:       false,
-				PrevTCPSockStats: lu.prevTCPSockStats,
+				CuratedKeys: true,
+				AddZeroVal:  false,
+				ListenSock:  false,
 			}
 			var wg sync.WaitGroup
 
@@ -91,11 +93,10 @@ func (lu *linuxUtil) run(ctx context.Context) error {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				tcpSocketStats, err := nsReader.readAndUpdate()
+				_, err := nsReader.readAndUpdate()
 				if err != nil {
 					lu.l.Error("Reading netstat failed", zap.Error(err))
 				}
-				lu.prevTCPSockStats = tcpSocketStats
 			}()
 
 			ethtoolOpts := &EthtoolOpts{
@@ -109,7 +110,7 @@ func (lu *linuxUtil) run(ctx context.Context) error {
 				return fmt.Errorf("failed to create ethHandle: %w", err)
 			}
 
-			ethReader := NewEthtoolReader(ethtoolOpts, ethHandle, unsupportedInterfacesCache)
+			ethReader := NewEthtoolReader(ethtoolOpts, ethHandle, unsupportedInterfacesCache, gstrings, stats)
 			if ethReader == nil {
 				lu.l.Error("Error while creating ethReader")
 				return errors.New("error while creating ethReader")

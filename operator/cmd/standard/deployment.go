@@ -6,14 +6,11 @@ package standard
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"net/http/pprof"
-
-	"go.uber.org/zap/zapcore"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 
+	"github.com/cilium/cilium/pkg/logging"
 	"go.uber.org/zap"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
@@ -23,7 +20,6 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	crzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
@@ -98,6 +94,10 @@ func (o *Operator) Start() error {
 	}
 
 	defer zl.Close()
+	// Tee Cilium's MultiSlogHandler into zap so any DefaultSlogLogger call
+	// (including package-var captures) reaches Application Insights.
+	logging.AddHandlers(log.SlogHandler())
+	log.SetDefaultSlog() // Set Go's global slog to use zap-backed handler
 	mainLogger := zl.Named("main").Sugar()
 
 	mainLogger.Info("Operator configuration", zap.Any("configuration", oconfig))
@@ -106,11 +106,8 @@ func (o *Operator) Start() error {
 	oconfig.CaptureConfig.CaptureImageVersion = buildinfo.Version
 	oconfig.CaptureConfig.CaptureImageVersionSource = captureUtils.VersionSourceOperatorImageVersion
 
-	opts := &crzap.Options{
-		Development: false,
-	}
-
-	ctrl.SetLogger(crzap.New(crzap.UseFlagOptions(opts), crzap.Encoder(zapcore.NewConsoleEncoder(log.EncoderConfig()))))
+	// Route controller-runtime logs through Retina's zap core so they also reach AI.
+	ctrl.SetLogger(log.LogrLogger())
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
@@ -242,20 +239,6 @@ func (o *Operator) Start() error {
 	}
 
 	return nil
-}
-
-func EnablePProf() {
-	pprofmux := http.NewServeMux()
-	pprofmux.HandleFunc("/debug/pprof/", pprof.Index)
-	pprofmux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	pprofmux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	pprofmux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	pprofmux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-	pprofmux.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
-
-	if err := http.ListenAndServe(":8082", pprofmux); err != nil { //nolint:gosec // TODO replace with secure server that supports timeout
-		panic(err)
-	}
 }
 
 func initLogging(cfg *config.OperatorConfig, applicationInsightsID string) (*log.ZapLogger, error) {

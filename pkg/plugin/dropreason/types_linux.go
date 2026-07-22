@@ -42,20 +42,45 @@ type dropReason struct {
 	externalChannel chan *hubblev1.Event
 }
 
-type kprobeObjectsMariner struct {
-	kprobeProgramsMariner
+type allFexitObjects struct {
+	allFexitPrograms
 	kprobeMaps
 }
 
-type kprobeProgramsMariner struct {
-	InetCskAccept      *ebpf.Program `ebpf:"inet_csk_accept"`
-	InetCskAcceptRet   *ebpf.Program `ebpf:"inet_csk_accept_ret"`
+type allFexitPrograms struct {
+	InetCskAcceptFexit      *ebpf.Program `ebpf:"inet_csk_accept_fexit"`
+	NfConntrackConfirmFexit *ebpf.Program `ebpf:"nf_conntrack_confirm_fexit"`
+	NfHookSlowFexit         *ebpf.Program `ebpf:"nf_hook_slow_fexit"`
+	NfNatInetFnFexit        *ebpf.Program `ebpf:"nf_nat_inet_fn_fexit"`
+	TcpV4ConnectFexit       *ebpf.Program `ebpf:"tcp_v4_connect_fexit"` // nolint:revive // needs to match generated code
+}
+
+type marinerObjects struct {
+	marinerPrograms
+	kprobeMaps
+}
+
+type marinerPrograms struct {
 	InetCskAcceptFexit *ebpf.Program `ebpf:"inet_csk_accept_fexit"`
-	NfHookSlow         *ebpf.Program `ebpf:"nf_hook_slow"`
-	NfHookSlowRet      *ebpf.Program `ebpf:"nf_hook_slow_ret"`
 	NfHookSlowFexit    *ebpf.Program `ebpf:"nf_hook_slow_fexit"`
-	TcpV4ConnectRet    *ebpf.Program `ebpf:"tcp_v4_connect_ret"`   // nolint:revive // needs to match generated code
 	TcpV4ConnectFexit  *ebpf.Program `ebpf:"tcp_v4_connect_fexit"` // nolint:revive // needs to match generated code
+}
+
+type allKprobeObjects struct {
+	allKprobePrograms
+	kprobeMaps
+}
+
+type allKprobePrograms struct {
+	InetCskAccept         *ebpf.Program `ebpf:"inet_csk_accept"`
+	InetCskAcceptRet      *ebpf.Program `ebpf:"inet_csk_accept_ret"`
+	NfConntrackConfirm    *ebpf.Program `ebpf:"nf_conntrack_confirm"`
+	NfConntrackConfirmRet *ebpf.Program `ebpf:"nf_conntrack_confirm_ret"`
+	NfHookSlow            *ebpf.Program `ebpf:"nf_hook_slow"`
+	NfHookSlowRet         *ebpf.Program `ebpf:"nf_hook_slow_ret"`
+	NfNatInetFn           *ebpf.Program `ebpf:"nf_nat_inet_fn"`
+	NfNatInetFnRet        *ebpf.Program `ebpf:"nf_nat_inet_fn_ret"`
+	TcpV4ConnectRet       *ebpf.Program `ebpf:"tcp_v4_connect_ret"` // nolint:revive // needs to match generated code
 }
 
 type (
@@ -65,7 +90,7 @@ type (
 // Interface to https://pkg.go.dev/github.com/cilium/ebpf#Map.
 // Added for unit tests.
 //
-//go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=types_linux.go -destination=mocks/mock_types.go -package=dropreason . IMap IMapIterator IPerfReader
+//go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=types_linux.go -destination=mocks/mock_types_linux.go -package=dropreason . IMap IMapIterator IPerfReader
 type IMapIterator interface {
 	Next(keyOut interface{}, valueOut interface{}) bool
 	Err() error

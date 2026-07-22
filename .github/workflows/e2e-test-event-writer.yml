@@ -24,6 +24,7 @@ jobs:
   retina-win-e2e-bpf-images:
     name: Build E2E Test Event Writer
     runs-on: windows-2022
+    timeout-minutes: 30
 
     env:
       IS_MERGE_GROUP: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
@@ -35,7 +36,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Azure Login
         uses: azure/login@v2

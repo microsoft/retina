@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/microsoft/retina/test/e2e/common"
+	"github.com/microsoft/retina/test/e2e/framework/constants"
 	prom "github.com/microsoft/retina/test/e2e/framework/prometheus"
 	"github.com/pkg/errors"
 )
@@ -22,7 +22,7 @@ type validateBasicDNSRequestMetrics struct {
 }
 
 func (v *validateBasicDNSRequestMetrics) Run() error {
-	metricsEndpoint := fmt.Sprintf("http://localhost:%d/metrics", common.RetinaPort)
+	metricsEndpoint := fmt.Sprintf("http://localhost:%s/metrics", constants.RetinaMetricsPort)
 
 	validBasicDNSRequestMetricLabels := map[string]string{}
 
@@ -52,7 +52,7 @@ type validateBasicDNSResponseMetrics struct {
 }
 
 func (v *validateBasicDNSResponseMetrics) Run() error {
-	metricsEndpoint := fmt.Sprintf("http://localhost:%d/metrics", common.RetinaPort)
+	metricsEndpoint := fmt.Sprintf("http://localhost:%s/metrics", constants.RetinaMetricsPort)
 
 	if v.Response == EmptyResponse {
 		v.Response = ""

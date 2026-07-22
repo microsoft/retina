@@ -153,7 +153,7 @@ func (c *Cache) getObjByIPType(ip string, t objectType) interface{} {
 // GetObjByIP returns the retina object for the given IP.
 func (c *Cache) GetObjByIP(ip string) interface{} {
 	if ep := c.GetPodByIP(ip); ep != nil {
-		c.l.Debug("pod found for IP", zap.String("ip", ip), zap.String("pod Name", ep.Key()))
+		c.l.Debug("pod found for IP", zap.String("ip", ip), zap.Stringer("pod", ep))
 		return ep
 	}
 
@@ -166,6 +166,22 @@ func (c *Cache) GetObjByIP(ip string) interface{} {
 	}
 
 	return nil
+}
+
+func (c *Cache) GetAllNamespaces() []string {
+	c.RLock()
+	defer c.RUnlock()
+
+	unique := make(map[string]struct{})
+	for _, ep := range c.epMap {
+		unique[ep.Namespace()] = struct{}{}
+	}
+
+	namespaces := make([]string, 0, len(unique))
+	for ns := range unique {
+		namespaces = append(namespaces, ns)
+	}
+	return namespaces
 }
 
 func (c *Cache) GetIPsByNamespace(ns string) []net.IP {
