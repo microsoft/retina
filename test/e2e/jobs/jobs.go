@@ -307,10 +307,11 @@ func InstallAndTestHubbleMetrics(kubeConfigFilePath, chartPath string) *types.Jo
 		TagEnv:             generic.DefaultTagEnv,
 	}, nil)
 
-	hubbleScenarios := []*types.Scenario{
+	hubbleScenarios := make([]*types.Scenario, 0, 2+6*len(common.Architectures))
+	hubbleScenarios = append(hubbleScenarios,
 		hubble_service.ValidateHubbleRelayService(),
 		hubble_service.ValidateHubbleUIService(kubeConfigFilePath),
-	}
+	)
 
 	for _, arch := range common.Architectures {
 		hubbleScenarios = append(hubbleScenarios,

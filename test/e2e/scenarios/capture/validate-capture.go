@@ -49,7 +49,7 @@ func (v *validateCapture) Run() error {
 	imageTag := os.Getenv(generic.DefaultTagEnv)
 
 	os.Setenv("KUBECONFIG", v.KubeConfigPath)
-	log.Printf("KUBECONFIG: %s\n", os.Getenv("KUBECONFIG"))
+	log.Printf("KUBECONFIG: %s\n", v.KubeConfigPath) //nolint:gosec // intentional logging of non-secret config path
 
 	cmd := exec.CommandContext(ctx, "kubectl", "retina", "capture", "create", "--namespace", v.CaptureNamespace, "--name", v.CaptureName, "--duration", v.Duration, "--debug") //#nosec
 	cmd.Env = append(os.Environ(), "RETINA_AGENT_IMAGE="+filepath.Join(imageRegistry, imageNamespace, "retina-agent:"+imageTag))

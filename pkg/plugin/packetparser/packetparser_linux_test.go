@@ -339,7 +339,7 @@ func TestReadData_Error(t *testing.T) {
 	mperf := newMockPerfReader(ctrl)
 	mperf.EXPECT().Read().Return(perfRecord{}, errTestRead).AnyTimes()
 
-	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
+	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck // mock generated code causes false positive
 	menricher.EXPECT().Write(gomock.Any()).Times(0)
 
 	p := &packetParser{
@@ -364,7 +364,7 @@ func TestReadData_RingBufClosed(t *testing.T) {
 	mperf := newMockPerfReader(ctrl)
 	mperf.EXPECT().Read().Return(perfRecord{}, ringbuf.ErrClosed).AnyTimes()
 
-	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
+	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck // mock generated code causes false positive
 	menricher.EXPECT().Write(gomock.Any()).Times(0)
 
 	p := &packetParser{

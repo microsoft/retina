@@ -435,7 +435,7 @@ func (translator *CaptureToPodTranslator) renderJob(captureTargetOnNode *Capture
 		return nil, fmt.Errorf("no nodes are selected")
 	}
 
-	stringTimestamp := translator.jobTemplate.Spec.Template.ObjectMeta.Annotations[captureConstants.CaptureTimestampAnnotationKey]
+	stringTimestamp := translator.jobTemplate.Spec.Template.Annotations[captureConstants.CaptureTimestampAnnotationKey]
 	captureTimestamp, err := file.StringToTime(stringTimestamp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse capture start timestamp: %w", err)
@@ -457,7 +457,7 @@ func (translator *CaptureToPodTranslator) renderJob(captureTargetOnNode *Capture
 			NodeHostname:   nodeName,
 			StartTimestamp: captureTimestamp,
 		}
-		job.Spec.Template.ObjectMeta.Annotations[captureConstants.CaptureFilenameAnnotationKey] = captureFilename.String()
+		job.Spec.Template.Annotations[captureConstants.CaptureFilenameAnnotationKey] = captureFilename.String()
 
 		fmt.Printf("%s.tar.gz\n", captureFilename.String())
 
@@ -1049,7 +1049,9 @@ func (translator *CaptureToPodTranslator) ObtainCaptureJobPodEnv(capture retinav
 	return translator.obtainCaptureJobPodEnv(capture, resolvedHostPath)
 }
 
-func (translator *CaptureToPodTranslator) obtainCaptureJobPodEnv(capture retinav1alpha1.Capture, resolvedHostPath string) (map[string]string, error) {
+func (translator *CaptureToPodTranslator) obtainCaptureJobPodEnv( //nolint:gocyclo // complexity is inherent to env var mapping logic
+	capture retinav1alpha1.Capture, resolvedHostPath string,
+) (map[string]string, error) {
 	jobPodEnv := map[string]string{}
 
 	captureOutputEnv, err := translator.obtainCaptureOutputEnv(capture.Spec.OutputConfiguration, resolvedHostPath)
