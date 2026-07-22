@@ -59,7 +59,7 @@ func constructTcpdumpCommand(captureFilePath, bpfFilter string) *exec.Cmd {
 	// tcpdump: Couldn't find user 'tcpdump'
 	// To disable this behavior, we use `--relinquish-privileges=root` same as `-Z root`.
 	// ref: https://manpages.debian.org/bullseye/tcpdump/tcpdump.8.en.html#Z
-	captureStartCmd := exec.Command(
+	captureStartCmd := exec.Command( //nolint:noctx // tcpdump is managed via process signals, not context cancellation
 		"tcpdump",
 		"-w", captureFilePath,
 		"--relinquish-privileges=root",

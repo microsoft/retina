@@ -299,7 +299,7 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 		}
 		// Set the drop reason.
 		eventType := fl.GetEventType().GetSubType()
-		utils.AddDropReason(fl, ext, uint16(eventType))
+		utils.AddDropReason(fl, ext, uint16(eventType)) //nolint:gosec // eventType values are bounded drop reason codes that fit in uint16
 		utils.SetExtensions(fl, ext)
 		p.enricher.Write(e)
 	case monitorAPI.MessageTypeTrace:
@@ -354,7 +354,7 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 		}
 		// Set the drop reason.
 		eventType := fl.GetEventType().GetSubType()
-		utils.AddDropReason(fl, ext, uint16(eventType))
+		utils.AddDropReason(fl, ext, uint16(eventType)) //nolint:gosec // eventType values are bounded drop reason codes that fit in uint16
 		utils.SetExtensions(fl, ext)
 		p.enricher.Write(e)
 	}

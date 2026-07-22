@@ -17,7 +17,7 @@ func TestNow(t *testing.T) {
 	require.NotNil(t, result)
 	assert.GreaterOrEqual(t, result.Time, before)
 	assert.LessOrEqual(t, result.Time, after)
-	assert.Equal(t, 0, result.Time.Nanosecond()) // ensure timestamp is truncated
+	assert.Equal(t, 0, result.Nanosecond()) // ensure timestamp is truncated
 }
 
 func TestStringToTime(t *testing.T) {

@@ -25,6 +25,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const logLevelDebug = "debug"
+
 var (
 	// number of events
 	eventsGeneratedCount = 5
@@ -90,7 +92,7 @@ func writeEventToEnricher(t *testing.T, e *Enricher, ev *v1.Event) {
 
 func TestEnricher(t *testing.T) {
 	opts := log.GetDefaultLogOpts()
-	opts.Level = "debug"
+	opts.Level = logLevelDebug
 	_, err := log.SetupZapLogger(opts)
 	require.NoError(t, err)
 
@@ -145,7 +147,7 @@ func TestEnricherSecondaryIPs(t *testing.T) {
 	expectedOutputCount := 18
 
 	opts := log.GetDefaultLogOpts()
-	opts.Level = "debug"
+	opts.Level = logLevelDebug
 	log.SetupZapLogger(opts)
 	l := log.Logger().Named("test-enricher")
 
@@ -245,7 +247,7 @@ func assertEqualEndpoint(t *testing.T, expected *common.RetinaEndpoint, actual *
 
 func TestEnricherZoneResolution(t *testing.T) {
 	opts := log.GetDefaultLogOpts()
-	opts.Level = "debug"
+	opts.Level = logLevelDebug
 	_, err := log.SetupZapLogger(opts)
 	require.NoError(t, err)
 
@@ -310,7 +312,7 @@ func TestEnricherZoneResolution(t *testing.T) {
 
 func TestEnricherZoneResolution_NoNode(t *testing.T) {
 	opts := log.GetDefaultLogOpts()
-	opts.Level = "debug"
+	opts.Level = logLevelDebug
 	_, err := log.SetupZapLogger(opts)
 	require.NoError(t, err)
 

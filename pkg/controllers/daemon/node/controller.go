@@ -76,13 +76,13 @@ func (r *NodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 
 	if len(node.Status.Addresses) == 0 {
-		r.l.Warn("Node has no addresses", zap.String("Node", req.NamespacedName.String()))
+		r.l.Warn("Node has no addresses", zap.String("Node", req.Name))
 		return ctrl.Result{}, nil
 	}
 
 	retinaNodeCommon := retinaCommon.NewRetinaNode(node.Name, net.ParseIP(node.Status.Addresses[0].Address), node.Labels[corev1.LabelTopologyZone])
 	if err := r.cache.UpdateRetinaNode(retinaNodeCommon); err != nil {
-		r.l.Error("Failed to update RetinaNode in Cache", zap.Error(err), zap.String("Node", req.NamespacedName.String()))
+		r.l.Error("Failed to update RetinaNode in Cache", zap.Error(err), zap.String("Node", req.String()))
 		return ctrl.Result{}, err
 	}
 

@@ -35,7 +35,7 @@ type deleteTestCase struct {
 
 // newKubeclient creates a consistent fake Kubernetes client for all tests
 func newKubeclient() *fake.Clientset {
-	objects := []runtime.Object{
+	objects := []runtime.Object{ //nolint:prealloc // slice grows dynamically with pods added below
 		NewNode("A1"),
 		NewNode("A2"),
 		NewNode("B1"),
