@@ -69,6 +69,16 @@ spec:
                           When true, packets are delivered to the application immediately rather than being buffered.
                           This can reduce latency but may increase CPU usage.
                         type: boolean
+                      fileCount:
+                        description: |-
+                          FileCount sets the maximum number of capture files to use in a rotating buffer.
+                          When the number of files reaches this limit, the oldest file is overwritten,
+                          creating a circular buffer of capture files. This is useful for long-running captures
+                          where only the most recent traffic is needed (e.g., capturing the last N hours of traffic).
+                          Must be used together with MaxCaptureSize which defines the per-file size limit.
+                          Equivalent to tcpdump's -W flag.
+                        minimum: 1
+                        type: integer
                       interfaces:
                         description: |-
                           Interfaces specifies the network interfaces on which to capture packets.
@@ -80,8 +90,9 @@ spec:
                         type: array
                       maxCaptureSize:
                         default: 100
-                        description: MaxCaptureSize limits the capture file to MB
-                          in size.
+                        description: |-
+                          MaxCaptureSize limits the capture file to MB in size.
+                          When used with FileCount, this becomes the per-file size limit for rotating captures.
                         type: integer
                       noPromiscuous:
                         description: |-

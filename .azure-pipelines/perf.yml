@@ -1,0 +1,117 @@
+# retina Performance Test pipeline (Azure DevOps).
+#
+# Mirrors .github/workflows/perf-schedule.yaml + perf-manual.yaml + perf-template.yaml.
+# Scheduled: twice-daily at 00:17 and 12:17 UTC (both basic and advanced).
+# Manual: single mode chosen at queue time.
+#
+# Required ADO pipeline configuration (set in the ADO UI):
+#   Variables (plain):
+#     AZURE_LOCATION
+#     AZURE_AGENT_LINUX_SKU
+#     AZURE_AGENT_WINDOWS_SKU
+#     AZURE_AGENT_LINUX_ARM_SKU
+#   Variables (secret):
+#     AZURE_APP_INSIGHTS_KEY
+#   Service connection (Azure RM, WIF): r2d
+#   Settings: "Limit building pull requests from forked GitHub repositories" = Disable
+
+trigger: none
+pr: none
+
+schedules:
+  - cron: '17 0,12 * * *'
+    displayName: Twice-daily perf test (00:17 and 12:17 UTC)
+    branches:
+      include:
+        - main
+    always: true
+
+parameters:
+  - name: image_registry
+    displayName: Image Registry
+    type: string
+    default: ghcr.io
+  - name: image_namespace
+    displayName: Image Namespace
+    type: string
+    default: microsoft/retina
+  - name: tag
+    displayName: Image Tag (blank = latest GitHub release tag)
+    type: string
+    default: ' '
+  - name: modes
+    displayName: Retina modes to run
+    type: object
+    default:
+      - basic
+      - advanced
+
+variables:
+  - name: azureServiceConnection
+    value: r2d
+
+jobs:
+  - ${{ each mode in parameters.modes }}:
+      - job: perf_${{ mode }}
+        displayName: Retina ${{ mode }} Performance Test
+        timeoutInMinutes: 150
+        pool:
+          vmImage: ubuntu-latest
+        variables:
+          CLUSTER_NAME: retina-perf-${{ mode }}-$(Build.BuildId)-$(System.JobAttempt)
+          MODE: ${{ mode }}
+        steps:
+          - checkout: self
+          - template: steps/setup-go.yml
+          - task: AzureCLI@2
+            displayName: Resolve image tag
+            name: resolve_tag
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+                TAG="${{ parameters.tag }}"
+                TAG="${TAG// /}"
+                if [[ -z "$TAG" ]]; then
+                  TAG=$(curl -s https://api.github.com/repos/microsoft/retina/releases/latest | jq -r .tag_name)
+                fi
+                echo "##vso[task.setvariable variable=RESOLVED_TAG]$TAG"
+                echo "Resolved tag: $TAG"
+          - task: AzureCLI@2
+            displayName: Run performance measurement for Retina
+            env:
+              AZURE_APP_INSIGHTS_KEY: $(AZURE_APP_INSIGHTS_KEY)
+              AZURE_LOCATION: $(AZURE_LOCATION)
+              AZURE_AGENT_LINUX_SKU: $(AZURE_AGENT_LINUX_SKU)
+              AZURE_AGENT_WINDOWS_SKU: $(AZURE_AGENT_WINDOWS_SKU)
+              AZURE_AGENT_LINUX_ARM_SKU: $(AZURE_AGENT_LINUX_ARM_SKU)
+              TAG: $(RESOLVED_TAG)
+              REGISTRY: ${{ parameters.image_registry }}
+              NAMESPACE: ${{ parameters.image_namespace }}
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+                export AZURE_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+                echo "Running in $MODE mode with tag $TAG..."
+                go test -v ./test/e2e/. -timeout 2h -tags=perf -count=1 -args \
+                  -image-tag="$TAG" \
+                  -image-registry="$REGISTRY" \
+                  -image-namespace="$NAMESPACE" \
+                  -retina-mode="$MODE"
+          - task: AzureCLI@2
+            displayName: Cleanup resource group
+            condition: always()
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                if az group exists --name "$(CLUSTER_NAME)" 2>/dev/null | grep -q true; then
+                  echo "Deleting resource group $(CLUSTER_NAME)..."
+                  az group delete --name "$(CLUSTER_NAME)" --yes --no-wait || true
+                fi
