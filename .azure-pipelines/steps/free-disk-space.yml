@@ -1,0 +1,31 @@
+# Free ~30-35 GB on Microsoft-hosted Ubuntu agents by removing pre-installed
+# toolchains. Needed for large image builds (retina-agent especially) where
+# the go build cache in /tmp overflows the root partition's ~14 GB free space.
+#
+# Notes on what is / isn't removed:
+#   Removed:      .NET SDK, Android SDK, Haskell (GHC), Boost, PowerShell,
+#                 Swift, node_modules — none of which retina builds use.
+#   Kept:         CodeQL toolcache (used by other pipelines in the repo),
+#                 hostedtoolcache/go (used by GoTool@0 to install Go).
+#   Docker prune: clears any preloaded images / build cache from the agent.
+#
+# Runs on every architecture — even native amd64 image builds need the space
+# once the go build cache grows to include every retina + plugin dependency.
+steps:
+  - bash: |
+      set -e
+      echo "=== Before cleanup ==="
+      df -h /
+      sudo rm -rf \
+        /usr/share/dotnet \
+        /usr/local/lib/android \
+        /opt/ghc \
+        /usr/local/share/boost \
+        /usr/local/share/powershell \
+        /opt/microsoft/powershell \
+        /usr/share/swift \
+        /usr/local/lib/node_modules
+      sudo docker system prune -af --volumes || true
+      echo "=== After cleanup ==="
+      df -h /
+    displayName: Free disk space

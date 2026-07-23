@@ -34,10 +34,11 @@ import (
 const anyIPOrPort = ""
 
 var (
-	errNoTargetsSelected    = errors.New("no targets are selected by node selector, pod selector, or pod names")
-	errNoValidSelector      = errors.New("neither NodeSelector, NamespaceSelector&PodSelector, nor PodNames is set")
-	errNodeSelectorIncompat = errors.New("NodeSelector is not compatible with NamespaceSelector&PodSelector or PodNames, please use one or the other")
-	errPodNamesIncompat     = errors.New("PodNames is not compatible with NamespaceSelector or PodSelector, please use one or the other")
+	errNoTargetsSelected        = errors.New("no targets are selected by node selector, pod selector, or pod names")
+	errNoValidSelector          = errors.New("neither NodeSelector, NamespaceSelector&PodSelector, nor PodNames is set")
+	errNodeSelectorIncompat     = errors.New("NodeSelector is not compatible with NamespaceSelector&PodSelector or PodNames, please use one or the other")
+	errPodNamesIncompat         = errors.New("PodNames is not compatible with NamespaceSelector or PodSelector, please use one or the other")
+	errFileCountRequiresMaxSize = errors.New("fileCount requires maxCaptureSize to be set as per-file size limit")
 )
 
 // tcpdumpFlagMapping defines the mapping between CaptureOption boolean fields and their corresponding tcpdump flags.
@@ -614,6 +615,11 @@ func (translator *CaptureToPodTranslator) validateCapture(capture *retinav1alpha
 		return fmt.Errorf("Neither duration nor maxCaptureSize is set to stop the capture")
 	}
 
+	// FileCount requires MaxCaptureSize to define the per-file size limit.
+	if capture.Spec.CaptureConfiguration.CaptureOption.FileCount != nil && capture.Spec.CaptureConfiguration.CaptureOption.MaxCaptureSize == nil {
+		return errFileCountRequiresMaxSize
+	}
+
 	if capture.Spec.OutputConfiguration.BlobUpload == nil &&
 		capture.Spec.OutputConfiguration.HostPath == nil &&
 		capture.Spec.OutputConfiguration.PersistentVolumeClaim == nil &&
@@ -1024,6 +1030,9 @@ func (translator *CaptureToPodTranslator) obtainCaptureOptionEnv(option retinav1
 	}
 	if option.MaxCaptureSize != nil {
 		outputEnv[captureConstants.CaptureMaxSizeEnvKey] = strconv.Itoa(*option.MaxCaptureSize)
+	}
+	if option.FileCount != nil {
+		outputEnv[captureConstants.CaptureFileCountEnvKey] = strconv.Itoa(*option.FileCount)
 	}
 	if len(option.Interfaces) > 0 {
 		outputEnv[captureConstants.CaptureInterfacesEnvKey] = strings.Join(option.Interfaces, ",")

@@ -36,6 +36,8 @@ const (
 	TcpdumpFlagsEnvKey     string = "TCPDUMP_FLAGS"
 	NetshFilterEnvKey      string = "NETSH_FILTER"
 
+	CaptureFileCountEnvKey string = "CAPTURE_FILE_COUNT"
+
 	// Interface selection environment variables
 	CaptureInterfacesEnvKey string = "CAPTURE_INTERFACES"
 

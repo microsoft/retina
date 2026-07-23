@@ -1,5 +1,5 @@
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260616@sha256:1c56f09437dfc2910faad39abaaed336265d246cf183e2adb362d4cb3b881ab6
+FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260711@sha256:4d0522bb656cfe2bc567c254bb87c2b086a002db6cba51f71870eb5c6630195c
 
 RUN tdnf install -y \
 	bind-utils \
@@ -57,7 +57,7 @@ ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 ARG GOARCH=amd64
 ENV ARCH=${GOARCH}
 # https://github.com/cilium/pwru/releases
-ARG PWRU_TAG="v1.0.11"
+ARG PWRU_TAG="v1.0.12"
 ENV PWRU_TAG=${PWRU_TAG}
 
 # Download and extract latest pwru release for the correct architecture (amd64 or arm64)

@@ -1,0 +1,505 @@
+# retina CI pipeline (Azure DevOps).
+#
+# Mirrors .github/workflows/images.yaml. Triggered by:
+#   - GitHub merge-queue events (push to gh-readonly-queue/main/*) via the
+#     Azure Pipelines GitHub App -> full run: builds, pushes to ACR, embeds
+#     APP_INSIGHTS_ID, runs manifests + e2e + perf tests.
+#   - Pull requests targeting main -> build only (no push, no telemetry key
+#     embedded, manifests/e2e/perf skipped) - same as GH pull_request behavior.
+#   - Manual queue from ADO UI -> same behavior as PR (dry-run build only).
+#
+# Required ADO pipeline configuration (set in the ADO UI before first run):
+#   Variables (plain):
+#     ACR_NAME                    e.g. retinaacr (or full FQDN, matches current vars.ACR_NAME)
+#     AZURE_LOCATION              e.g. eastus2
+#     AZURE_AGENT_LINUX_SKU
+#     AZURE_AGENT_WINDOWS_SKU
+#     AZURE_AGENT_LINUX_ARM_SKU
+#   Variables (secret):
+#     AZURE_APP_INSIGHTS_KEY
+#   Service connection (Azure RM, WIF): r2d
+#   Settings: "Limit building pull requests from forked GitHub repositories" = Disable
+
+trigger:
+  branches:
+    include:
+      - gh-readonly-queue/main/*
+
+pr:
+  branches:
+    include:
+      - main
+
+parameters:
+  # TEMPORARY (revert this parameter and the isMergeGroup if/else below after
+  # dark-launch validation): when true, forces full merge-group behavior on any
+  # trigger (push to ACR, embed APP_INSIGHTS_ID, run manifests + e2e + perf).
+  # Use it to validate the full pipeline from a manual queue against any branch.
+  - name: forceMergeGroup
+    displayName: Force merge-group behavior (push + telemetry + tests)
+    type: boolean
+    default: false
+
+variables:
+  - name: azureServiceConnection
+    value: r2d
+  - name: imageNamespace
+    value: microsoft/retina
+  # True only when the build was triggered by a push to a merge-queue temp branch,
+  # OR when the forceMergeGroup parameter is checked at queue time.
+  # PR builds and manual queues with the checkbox off evaluate to False -> dry-run.
+  - name: isMergeGroup
+    ${{ if eq(parameters.forceMergeGroup, true) }}:
+      value: 'True'
+    ${{ else }}:
+      value: $[ startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/') ]
+
+jobs:
+  - job: retina_images
+    displayName: Build Agent Images - Linux
+    timeoutInMinutes: 60
+    strategy:
+      matrix:
+        amd64:
+          arch: amd64
+        arm64:
+          arch: arm64
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+      - checkout: self
+      - template: steps/free-disk-space.yml
+      - bash: make qemu-user-static
+        displayName: Set up QEMU
+      - template: steps/setup-go.yml
+      - task: AzureCLI@2
+        displayName: Build and push retina image
+        env:
+          IS_MERGE_GROUP: $(isMergeGroup)
+          APP_INSIGHTS_ID: $(AZURE_APP_INSIGHTS_KEY)
+        inputs:
+          azureSubscription: $(azureServiceConnection)
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            set -euo pipefail
+            TAG=$(make version)
+            if [ "$IS_MERGE_GROUP" == "True" ]; then
+              az acr login -n $(ACR_NAME)
+              make retina-image \
+                IMAGE_NAMESPACE=$(imageNamespace) \
+                PLATFORM=linux/$(arch) \
+                IMAGE_REGISTRY=$(ACR_NAME) \
+                APP_INSIGHTS_ID=$APP_INSIGHTS_ID \
+                TAG=$TAG \
+                BUILDX_ACTION=--push
+            else
+              make retina-image \
+                IMAGE_NAMESPACE=$(imageNamespace) \
+                PLATFORM=linux/$(arch) \
+                TAG=$TAG
+            fi
+
+  - job: build_windows_binaries
+    displayName: Build Windows Binaries
+    timeoutInMinutes: 30
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+      - checkout: self
+      - template: steps/setup-go.yml
+      - bash: |
+          set -euo pipefail
+          TAG=$(make version)
+          make build-windows-binaries \
+            GOOS=windows \
+            GOARCH=amd64 \
+            TAG=$TAG \
+            APP_INSIGHTS_ID=$APP_INSIGHTS_ID
+        displayName: make build-windows-binaries
+        env:
+          APP_INSIGHTS_ID: $(AZURE_APP_INSIGHTS_KEY)
+      - task: PublishPipelineArtifact@1
+        inputs:
+          targetPath: output/windows_amd64/
+          artifactName: windows-binaries
+
+  - job: retina_image_win
+    displayName: Build Agent Image - Windows 2022
+    dependsOn: build_windows_binaries
+    timeoutInMinutes: 60
+    pool:
+      vmImage: windows-2022
+    variables:
+      year: '2022'
+      arch: amd64
+      platform: windows
+    steps:
+      - checkout: self
+      - task: DownloadPipelineArtifact@2
+        inputs:
+          artifactName: windows-binaries
+          targetPath: output/windows_amd64/
+      - powershell: |
+          $timeout = 120
+          $timer = [Diagnostics.Stopwatch]::StartNew()
+          while ($timer.Elapsed.TotalSeconds -lt $timeout) {
+            $svc = Get-Service docker -ErrorAction SilentlyContinue
+            if ($svc -and $svc.Status -ne 'Running') {
+              Start-Service docker -ErrorAction SilentlyContinue
+            }
+            $result = docker info 2>&1
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "Docker daemon is ready"
+              return
+            }
+            Write-Host "Waiting for Docker daemon to start..."
+            Start-Sleep -Seconds 5
+          }
+          throw "Docker daemon failed to start within $timeout seconds"
+        displayName: Ensure Docker daemon is running
+      - task: AzureCLI@2
+        displayName: Build and push retina Windows image
+        env:
+          IS_MERGE_GROUP: $(isMergeGroup)
+          APP_INSIGHTS_ID: $(AZURE_APP_INSIGHTS_KEY)
+        inputs:
+          azureSubscription: $(azureServiceConnection)
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            set -euo pipefail
+            TAG=$(make version)
+            if [ "$IS_MERGE_GROUP" == "True" ]; then
+              az acr login -n $(ACR_NAME)
+              make retina-image-win \
+                IMAGE_NAMESPACE=$(imageNamespace) \
+                PLATFORM=$(platform)/$(arch) \
+                WINDOWS_YEARS=$(year) \
+                IMAGE_REGISTRY=$(ACR_NAME) \
+                APP_INSIGHTS_ID=$APP_INSIGHTS_ID \
+                BINARIES_PATH=output/windows_$(arch) \
+                REPO_PATH=. \
+                TAG=$TAG
+              docker push $(ACR_NAME)/$(imageNamespace)/retina-agent:${TAG}-windows-ltsc$(year)-$(arch)
+            else
+              make retina-image-win \
+                IMAGE_NAMESPACE=$(imageNamespace) \
+                PLATFORM=$(platform)/$(arch) \
+                WINDOWS_YEARS=$(year) \
+                BINARIES_PATH=output/windows_$(arch) \
+                REPO_PATH=. \
+                TAG=$TAG
+            fi
+
+  - job: operator_images
+    displayName: Build Operator Images
+    timeoutInMinutes: 60
+    strategy:
+      matrix:
+        amd64:
+          arch: amd64
+        arm64:
+          arch: arm64
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+      - checkout: self
+      - template: steps/free-disk-space.yml
+      - bash: make qemu-user-static
+        displayName: Set up QEMU
+      - template: steps/setup-go.yml
+      - task: AzureCLI@2
+        displayName: Build and push operator image
+        env:
+          IS_MERGE_GROUP: $(isMergeGroup)
+          APP_INSIGHTS_ID: $(AZURE_APP_INSIGHTS_KEY)
+        inputs:
+          azureSubscription: $(azureServiceConnection)
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            set -euo pipefail
+            TAG=$(make version)
+            if [ "$IS_MERGE_GROUP" == "True" ]; then
+              az acr login -n $(ACR_NAME)
+              make retina-operator-image \
+                IMAGE_NAMESPACE=$(imageNamespace) \
+                PLATFORM=linux/$(arch) \
+                IMAGE_REGISTRY=$(ACR_NAME) \
+                APP_INSIGHTS_ID=$APP_INSIGHTS_ID \
+                TAG=$TAG \
+                BUILDX_ACTION=--push
+            else
+              make retina-operator-image \
+                IMAGE_NAMESPACE=$(imageNamespace) \
+                PLATFORM=linux/$(arch) \
+                TAG=$TAG
+            fi
+
+  - job: retina_shell_images
+    displayName: Build Retina Shell Images
+    timeoutInMinutes: 60
+    strategy:
+      matrix:
+        amd64:
+          arch: amd64
+        arm64:
+          arch: arm64
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+      - checkout: self
+      - template: steps/free-disk-space.yml
+      - bash: make qemu-user-static
+        displayName: Set up QEMU
+      - template: steps/setup-go.yml
+      - task: AzureCLI@2
+        displayName: Build and push retina-shell image
+        env:
+          IS_MERGE_GROUP: $(isMergeGroup)
+        inputs:
+          azureSubscription: $(azureServiceConnection)
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            set -euo pipefail
+            TAG=$(make version)
+            if [ "$IS_MERGE_GROUP" == "True" ]; then
+              az acr login -n $(ACR_NAME)
+              make retina-shell-image \
+                IMAGE_NAMESPACE=$(imageNamespace) \
+                PLATFORM=linux/$(arch) \
+                IMAGE_REGISTRY=$(ACR_NAME) \
+                TAG=$TAG \
+                BUILDX_ACTION=--push
+            else
+              make retina-shell-image \
+                IMAGE_NAMESPACE=$(imageNamespace) \
+                PLATFORM=linux/$(arch) \
+                TAG=$TAG
+            fi
+
+  - job: kubectl_retina_images
+    displayName: Build Kubectl Retina Images
+    timeoutInMinutes: 60
+    strategy:
+      matrix:
+        amd64:
+          arch: amd64
+        arm64:
+          arch: arm64
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+      - checkout: self
+      - template: steps/free-disk-space.yml
+      - bash: make qemu-user-static
+        displayName: Set up QEMU
+      - template: steps/setup-go.yml
+      - task: AzureCLI@2
+        displayName: Build and push kubectl-retina image
+        env:
+          IS_MERGE_GROUP: $(isMergeGroup)
+        inputs:
+          azureSubscription: $(azureServiceConnection)
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            set -euo pipefail
+            TAG=$(make version)
+            if [ "$IS_MERGE_GROUP" == "True" ]; then
+              az acr login -n $(ACR_NAME)
+              make kubectl-retina-image \
+                IMAGE_NAMESPACE=$(imageNamespace) \
+                PLATFORM=linux/$(arch) \
+                IMAGE_REGISTRY=$(ACR_NAME) \
+                TAG=$TAG \
+                BUILDX_ACTION=--push
+            else
+              make kubectl-retina-image \
+                IMAGE_NAMESPACE=$(imageNamespace) \
+                PLATFORM=linux/$(arch) \
+                TAG=$TAG
+            fi
+
+  - job: manifests
+    displayName: Generate Manifests
+    condition: eq(variables['isMergeGroup'], 'True')
+    dependsOn:
+      - retina_images
+      - retina_image_win
+      - operator_images
+      - retina_shell_images
+      - kubectl_retina_images
+    timeoutInMinutes: 30
+    pool:
+      vmImage: ubuntu-latest
+    strategy:
+      matrix:
+        retina:
+          component: retina
+        operator:
+          component: operator
+        shell:
+          component: shell
+        kubectl-retina:
+          component: kubectl-retina
+    steps:
+      - checkout: self
+      - bash: make qemu-user-static
+        displayName: Set up QEMU
+      - task: AzureCLI@2
+        displayName: make manifest
+        inputs:
+          azureSubscription: $(azureServiceConnection)
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            set -euo pipefail
+            TAG=$(make version)
+            az acr login -n $(ACR_NAME)
+            make manifest COMPONENT=$(component) IMAGE_REGISTRY=$(ACR_NAME) TAG=$TAG
+
+  - job: e2e
+    displayName: Run E2E Tests
+    condition: eq(variables['isMergeGroup'], 'True')
+    dependsOn: manifests
+    timeoutInMinutes: 90
+    pool:
+      vmImage: ubuntu-latest
+    variables:
+      CLUSTER_NAME: retina-e2e-$(Build.BuildId)-$(System.JobAttempt)
+    steps:
+      - checkout: self
+      - template: steps/setup-go.yml
+      - task: AzureCLI@2
+        displayName: Run E2E Tests
+        env:
+          AZURE_LOCATION: $(AZURE_LOCATION)
+          AZURE_AGENT_LINUX_SKU: $(AZURE_AGENT_LINUX_SKU)
+          AZURE_AGENT_WINDOWS_SKU: $(AZURE_AGENT_WINDOWS_SKU)
+          AZURE_AGENT_LINUX_ARM_SKU: $(AZURE_AGENT_LINUX_ARM_SKU)
+        inputs:
+          azureSubscription: $(azureServiceConnection)
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            set -euo pipefail
+            export AZURE_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+            go test -v ./test/e2e/. -timeout 60m -tags=e2e -count=1 -args \
+              -image-tag=$(make version) \
+              -image-registry=$(ACR_NAME) \
+              -image-namespace=$(imageNamespace)
+      - task: AzureCLI@2
+        displayName: Cleanup resource group
+        condition: always()
+        inputs:
+          azureSubscription: $(azureServiceConnection)
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            if az group exists --name "$(CLUSTER_NAME)" 2>/dev/null | grep -q true; then
+              echo "Deleting resource group $(CLUSTER_NAME)..."
+              az group delete --name "$(CLUSTER_NAME)" --yes --no-wait || true
+            fi
+
+  - job: perf_basic
+    displayName: Retina basic Performance Test
+    condition: eq(variables['isMergeGroup'], 'True')
+    dependsOn:
+      - manifests
+      - e2e
+    timeoutInMinutes: 150
+    pool:
+      vmImage: ubuntu-latest
+    variables:
+      CLUSTER_NAME: retina-perf-basic-$(Build.BuildId)-$(System.JobAttempt)
+      MODE: basic
+    steps:
+      - checkout: self
+      - template: steps/setup-go.yml
+      - task: AzureCLI@2
+        displayName: Run perf test
+        env:
+          AZURE_APP_INSIGHTS_KEY: $(AZURE_APP_INSIGHTS_KEY)
+          AZURE_LOCATION: $(AZURE_LOCATION)
+          AZURE_AGENT_LINUX_SKU: $(AZURE_AGENT_LINUX_SKU)
+          AZURE_AGENT_WINDOWS_SKU: $(AZURE_AGENT_WINDOWS_SKU)
+          AZURE_AGENT_LINUX_ARM_SKU: $(AZURE_AGENT_LINUX_ARM_SKU)
+        inputs:
+          azureSubscription: $(azureServiceConnection)
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            set -euo pipefail
+            export AZURE_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+            TAG=$(make version)
+            echo "Running in $MODE mode..."
+            go test -v ./test/e2e/. -timeout 2h -tags=perf -count=1 -args \
+              -image-tag="$TAG" \
+              -image-registry="$(ACR_NAME)" \
+              -image-namespace="$(imageNamespace)" \
+              -retina-mode="$MODE"
+      - task: AzureCLI@2
+        displayName: Cleanup resource group
+        condition: always()
+        inputs:
+          azureSubscription: $(azureServiceConnection)
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            if az group exists --name "$(CLUSTER_NAME)" 2>/dev/null | grep -q true; then
+              echo "Deleting resource group $(CLUSTER_NAME)..."
+              az group delete --name "$(CLUSTER_NAME)" --yes --no-wait || true
+            fi
+
+  - job: perf_advanced
+    displayName: Retina advanced Performance Test
+    condition: eq(variables['isMergeGroup'], 'True')
+    dependsOn:
+      - manifests
+      - e2e
+    timeoutInMinutes: 150
+    pool:
+      vmImage: ubuntu-latest
+    variables:
+      CLUSTER_NAME: retina-perf-advanced-$(Build.BuildId)-$(System.JobAttempt)
+      MODE: advanced
+    steps:
+      - checkout: self
+      - template: steps/setup-go.yml
+      - task: AzureCLI@2
+        displayName: Run perf test
+        env:
+          AZURE_APP_INSIGHTS_KEY: $(AZURE_APP_INSIGHTS_KEY)
+          AZURE_LOCATION: $(AZURE_LOCATION)
+          AZURE_AGENT_LINUX_SKU: $(AZURE_AGENT_LINUX_SKU)
+          AZURE_AGENT_WINDOWS_SKU: $(AZURE_AGENT_WINDOWS_SKU)
+          AZURE_AGENT_LINUX_ARM_SKU: $(AZURE_AGENT_LINUX_ARM_SKU)
+        inputs:
+          azureSubscription: $(azureServiceConnection)
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            set -euo pipefail
+            export AZURE_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+            TAG=$(make version)
+            echo "Running in $MODE mode..."
+            go test -v ./test/e2e/. -timeout 2h -tags=perf -count=1 -args \
+              -image-tag="$TAG" \
+              -image-registry="$(ACR_NAME)" \
+              -image-namespace="$(imageNamespace)" \
+              -retina-mode="$MODE"
+      - task: AzureCLI@2
+        displayName: Cleanup resource group
+        condition: always()
+        inputs:
+          azureSubscription: $(azureServiceConnection)
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            if az group exists --name "$(CLUSTER_NAME)" 2>/dev/null | grep -q true; then
+              echo "Deleting resource group $(CLUSTER_NAME)..."
+              az group delete --name "$(CLUSTER_NAME)" --yes --no-wait || true
+            fi
