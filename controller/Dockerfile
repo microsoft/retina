@@ -13,6 +13,8 @@ FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0@sha256:5a66f9f16ac675db
 
 # intermediate go generate stage
 FROM golang AS intermediate
+# enable no-cgo OpenSSL crypto for arm64 cross-compile (Go <=1.26)
+ENV GOEXPERIMENT=ms_nocgo_opensslcrypto
 ARG APP_INSIGHTS_ID # set to enable AI telemetry
 ARG GOARCH=amd64 # default to amd64
 ARG GOOS=linux # default to linux
