@@ -21,6 +21,7 @@ import (
 	"github.com/microsoft/retina/pkg/metrics"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
 	"github.com/microsoft/retina/pkg/plugin/registry"
+	_ "github.com/microsoft/retina/pkg/plugin/tcpretrans/_cprog" // nolint // This is needed so cprog is included when vendoring
 	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
 	"golang.org/x/sys/unix"

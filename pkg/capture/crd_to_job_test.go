@@ -583,6 +583,29 @@ func Test_CaptureToPodTranslator_ObtainCaptureJobPodEnv(t *testing.T) {
 			},
 		},
 		{
+			name: "file count for rotating capture",
+			capture: retinav1alpha1.Capture{
+				Spec: retinav1alpha1.CaptureSpec{
+					OutputConfiguration: retinav1alpha1.OutputConfiguration{
+						PersistentVolumeClaim: pointerUtil.String("capture-pvc"),
+					},
+					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
+						IncludeMetadata: true,
+						CaptureOption: retinav1alpha1.CaptureOption{
+							MaxCaptureSize: pointerUtil.Int(50),
+							FileCount:      pointerUtil.Int(10),
+						},
+					},
+				},
+			},
+			wantJobEnv: map[string]string{
+				captureConstants.IncludeMetadataEnvKey:                                    "true",
+				string(captureConstants.CaptureOutputLocationEnvKeyPersistentVolumeClaim): "capture-pvc",
+				captureConstants.CaptureMaxSizeEnvKey:                                     "50",
+				captureConstants.CaptureFileCountEnvKey:                                   "10",
+			},
+		},
+		{
 			name: "pcapFilter",
 			capture: retinav1alpha1.Capture{
 				Spec: retinav1alpha1.CaptureSpec{
@@ -934,6 +957,86 @@ func Test_CaptureToPodTranslator_ValidateCapture(t *testing.T) {
 						},
 						CaptureOption: retinav1alpha1.CaptureOption{
 							Duration: &metav1.Duration{Duration: 10 * time.Second},
+						},
+					},
+					OutputConfiguration: retinav1alpha1.OutputConfiguration{
+						HostPath: &hostPath,
+					},
+				},
+			},
+		},
+		{
+			name: "raise error when fileCount is set without maxCaptureSize",
+			capture: retinav1alpha1.Capture{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: captureName,
+				},
+				Spec: retinav1alpha1.CaptureSpec{
+					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
+						CaptureTarget: retinav1alpha1.CaptureTarget{
+							NodeSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"nodename": nodeName,
+								},
+							},
+						},
+						CaptureOption: retinav1alpha1.CaptureOption{
+							Duration:  &metav1.Duration{Duration: 10 * time.Second},
+							FileCount: pointerUtil.Int(10),
+						},
+					},
+					OutputConfiguration: retinav1alpha1.OutputConfiguration{
+						HostPath: &hostPath,
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "validation is ok with rotating capture (fileCount and maxCaptureSize)",
+			capture: retinav1alpha1.Capture{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: captureName,
+				},
+				Spec: retinav1alpha1.CaptureSpec{
+					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
+						CaptureTarget: retinav1alpha1.CaptureTarget{
+							NodeSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"nodename": nodeName,
+								},
+							},
+						},
+						CaptureOption: retinav1alpha1.CaptureOption{
+							MaxCaptureSize: pointerUtil.Int(100),
+							FileCount:      pointerUtil.Int(10),
+						},
+					},
+					OutputConfiguration: retinav1alpha1.OutputConfiguration{
+						HostPath: &hostPath,
+					},
+				},
+			},
+		},
+		{
+			name: "validation is ok with rotating capture and duration",
+			capture: retinav1alpha1.Capture{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: captureName,
+				},
+				Spec: retinav1alpha1.CaptureSpec{
+					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
+						CaptureTarget: retinav1alpha1.CaptureTarget{
+							NodeSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"nodename": nodeName,
+								},
+							},
+						},
+						CaptureOption: retinav1alpha1.CaptureOption{
+							Duration:       &metav1.Duration{Duration: 4 * time.Hour},
+							MaxCaptureSize: pointerUtil.Int(50),
+							FileCount:      pointerUtil.Int(5),
 						},
 					},
 					OutputConfiguration: retinav1alpha1.OutputConfiguration{

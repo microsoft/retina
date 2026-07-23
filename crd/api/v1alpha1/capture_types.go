@@ -62,9 +62,20 @@ type CaptureOption struct {
 	PacketSize *int `json:"packetSize,omitempty"`
 
 	// MaxCaptureSize limits the capture file to MB in size.
+	// When used with FileCount, this becomes the per-file size limit for rotating captures.
 	// +kubebuilder:default=100
 	// +optional
 	MaxCaptureSize *int `json:"maxCaptureSize,omitempty"`
+
+	// FileCount sets the maximum number of capture files to use in a rotating buffer.
+	// When the number of files reaches this limit, the oldest file is overwritten,
+	// creating a circular buffer of capture files. This is useful for long-running captures
+	// where only the most recent traffic is needed (e.g., capturing the last N hours of traffic).
+	// Must be used together with MaxCaptureSize which defines the per-file size limit.
+	// Equivalent to tcpdump's -W flag.
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	FileCount *int `json:"fileCount,omitempty"`
 
 	// Interfaces specifies the network interfaces on which to capture packets.
 	// If specified, captures only on the listed interfaces (e.g., ["eth0", "eth1"]).

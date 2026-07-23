@@ -112,15 +112,17 @@ func (p *packetParser) Generate(ctx context.Context) error {
 		p.l.Info("conntrack metrics enabled")
 		conntrackMetrics = 1
 
-		// Generate dynamic header for conntrack.
-		ctDynamicHeaderPath := conntrack.BuildDynamicHeaderPath()
-		err = conntrack.GenerateDynamic(ctx, ctDynamicHeaderPath, conntrackMetrics)
-		if err != nil {
-			return errors.Wrap(err, "failed to generate dynamic header for conntrack")
-		}
-
 		// Process packetparser dynamic.h conntrack metrics definition.
 		st += fmt.Sprintf("#define ENABLE_CONNTRACK_METRICS %d\n", conntrackMetrics)
+	}
+
+	// Generate the conntrack dynamic header unconditionally: it defines
+	// CT_REPORT_INTERVAL, which conntrack.c always requires.
+	reportInterval := uint32(p.cfg.ConntrackReportInterval.Seconds())
+	p.l.Info("conntrack report interval", zap.Uint32("seconds", reportInterval))
+	ctDynamicHeaderPath := conntrack.BuildDynamicHeaderPath()
+	if err = conntrack.GenerateDynamic(ctx, ctDynamicHeaderPath, conntrackMetrics, reportInterval); err != nil {
+		return errors.Wrap(err, "failed to generate dynamic header for conntrack")
 	}
 
 	// Process packetparser data aggregation level.
