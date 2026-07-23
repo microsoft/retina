@@ -137,7 +137,8 @@ func InstallEbpfXdp(kubeConfigFilePath string) *types.Job {
 	job := types.NewJob("Install EBPF and XDP")
 	job.AddStep(&kubernetes.CreateNamespace{
 		KubeConfigFilePath: kubeConfigFilePath,
-		Namespace:          "install-ebpf-xdp"}, nil)
+		Namespace:          "install-ebpf-xdp",
+	}, nil)
 
 	job.AddStep(&kubernetes.ApplyYamlConfig{
 		YamlFilePath: "yaml/windows/install-ebpf-xdp.yaml",

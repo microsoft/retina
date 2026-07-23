@@ -1,6 +1,7 @@
 package ebpfwindows
 
 import (
+	"errors"
 	"fmt"
 	"syscall"
 	"unsafe"
@@ -70,7 +71,7 @@ var enumCallBack enumMetricsCallback
 // This function will be passed to the Windows API
 func enumMetricsSysCallCallback(key, value unsafe.Pointer) uintptr {
 	if enumCallBack != nil {
-		return uintptr(enumCallBack(key, value))
+		return uintptr(enumCallBack(key, value)) //nolint:gosec // callback return is a bounded status code
 	}
 
 	return 0
@@ -87,7 +88,7 @@ var callEnumMetricsMap = func(callback uintptr) (uintptr, uintptr, error) {
 
 var loadRetinaEbpfAPI = func() error {
 	if err := retinaEbpfAPI.Load(); err != nil {
-		return err
+		return fmt.Errorf("loading retinaEbpfAPI: %w", err)
 	}
 
 	for _, proc := range []*windows.LazyProc{
@@ -97,7 +98,7 @@ var loadRetinaEbpfAPI = func() error {
 		unregisterEventsMapCallback,
 	} {
 		if err := proc.Find(); err != nil {
-			return err
+			return fmt.Errorf("finding proc %s: %w", proc.Name, err)
 		}
 	}
 
@@ -195,7 +196,7 @@ func (k *MetricsKey) IsEgress() bool {
 
 func GetLostEventsCount() (uint64, error) {
 	ret, _, err := lostEventCount.Call()
-	if err != nil && err != syscall.Errno(0) {
+	if err != nil && !errors.Is(err, syscall.Errno(0)) {
 		return 0, fmt.Errorf("RetinaGetLostEventsCount call failed: %w", err)
 	}
 	return uint64(ret), nil

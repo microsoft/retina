@@ -81,14 +81,14 @@ func GetMetricGuageValueFromBuffer(prometheusMetricData []byte, metricName strin
 					metricLabels[label.GetName()] = label.GetValue()
 				}
 				if reflect.DeepEqual(metricLabels, expectedLabels) {
-					return *metric.GetGauge().Value, nil
+					return metric.GetGauge().GetValue(), nil
 				}
 
 			}
 		}
 	}
 
-	return 0, fmt.Errorf("metric not found %s", metricName)
+	return 0, fmt.Errorf("%w: %s", ErrNoMetricFound, metricName)
 }
 
 func CheckMetricFromBuffer(prometheusMetricData []byte, metricName string, validMetric map[string]string) error {
