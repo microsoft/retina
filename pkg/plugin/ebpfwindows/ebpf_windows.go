@@ -85,10 +85,9 @@ func (p *Plugin) Start(ctx context.Context) error {
 	p.l.Info("Start ebpfWindows plugin...")
 
 	ciliumEnabled, err := isCiliumOnWindowsEnabled()
-
 	if err != nil {
 		p.l.Error("Error while checking if Cilium is enabled on Windows", zap.Error(err))
-		return fmt.Errorf("Failed to check if Cilium is enabled on Windows: %w", err)
+		return fmt.Errorf("failed to check if Cilium is enabled on Windows: %w", err)
 	}
 
 	if !ciliumEnabled {
@@ -131,24 +130,26 @@ func (p *Plugin) metricsMapIterateCallback(key *MetricsKey, value *MetricsValue)
 	}
 	if key.IsDrop() {
 		p.l.Debug("MetricsMapIterateCallback Drop", zap.String("key", key.String()))
-		if key.IsEgress() {
+		switch {
+		case key.IsEgress():
 			metrics.DropBytesGauge.WithLabelValues(key.DropForwardReason(), egressLabel).Set(float64(value.Bytes))
 			metrics.DropPacketsGauge.WithLabelValues(key.DropForwardReason(), egressLabel).Set(float64(value.Count))
-		} else if key.IsIngress() {
+		case key.IsIngress():
 			metrics.DropBytesGauge.WithLabelValues(key.DropForwardReason(), ingressLabel).Set(float64(value.Bytes))
 			metrics.DropPacketsGauge.WithLabelValues(key.DropForwardReason(), ingressLabel).Set(float64(value.Count))
-		} else {
+		default:
 			p.l.Error("MetricsMapIterateCallback drop key is neither ingress nor egress", zap.String("key", key.String()))
 		}
 	} else {
 		p.l.Debug("MetricsMapIterateCallback Forward", zap.String("key", key.String()))
-		if key.IsEgress() {
+		switch {
+		case key.IsEgress():
 			metrics.ForwardPacketsGauge.WithLabelValues(egressLabel).Set(float64(value.Count))
 			metrics.ForwardBytesGauge.WithLabelValues(egressLabel).Set(float64(value.Bytes))
-		} else if key.IsIngress() {
+		case key.IsIngress():
 			metrics.ForwardPacketsGauge.WithLabelValues(ingressLabel).Set(float64(value.Count))
 			metrics.ForwardBytesGauge.WithLabelValues(ingressLabel).Set(float64(value.Bytes))
-		} else {
+		default:
 			p.l.Error("MetricsMapIterateCallback forward key is neither ingress nor egress", zap.String("key", key.String()))
 		}
 	}
@@ -216,16 +217,13 @@ func (p *Plugin) pullMetricsAndEvents(ctx context.Context) {
 			}
 
 			lostEventsCount, err := GetLostEventsCount()
-
 			if err != nil {
 				p.l.Error("Error getting lost events count", zap.Error(err))
-			} else {
+			} else if lostEventsCount > prevLostEventsCount {
 				// The lost events count is cumulative, so we need to calculate the difference
-				if lostEventsCount > prevLostEventsCount {
-					counterToAdd := lostEventsCount - prevLostEventsCount
-					metrics.LostEventsCounter.WithLabelValues(utils.Kernel, name).Add(float64(counterToAdd))
-					prevLostEventsCount = lostEventsCount
-				}
+				counterToAdd := lostEventsCount - prevLostEventsCount
+				metrics.LostEventsCounter.WithLabelValues(utils.Kernel, name).Add(float64(counterToAdd))
+				prevLostEventsCount = lostEventsCount
 			}
 
 		case <-ctx.Done():

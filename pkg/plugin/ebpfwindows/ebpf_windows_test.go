@@ -33,7 +33,10 @@ const (
 	pktSizeBytes = 100
 )
 
-var errTestFailure = errors.New("test failure")
+var (
+	errTestFailure    = errors.New("test failure")
+	errModuleNotFound = errors.New("module not found")
+)
 
 func makeMockEthernetIPv4TCPPacket() []byte {
 	eth := &layers.Ethernet{
@@ -762,7 +765,7 @@ func TestStart_GracefullySkipsWhenRetinaEbpfAPIMissing(t *testing.T) {
 		return true, nil
 	}
 	loadRetinaEbpfAPI = func() error {
-		return fmt.Errorf("module not found")
+		return errModuleNotFound
 	}
 	defer func() {
 		isCiliumOnWindowsEnabled = origIsCiliumOnWindowsEnabled

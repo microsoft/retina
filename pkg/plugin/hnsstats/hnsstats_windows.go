@@ -216,10 +216,9 @@ func (h *hnsstats) Start(ctx context.Context) error {
 	h.state = start
 
 	ciliumEnabled, err := plugincommon.IsCiliumOnWindowsEnabled()
-
 	if err != nil {
 		h.l.Error("Error while checking if Cilium is enabled on Windows", zap.Error(err))
-		return fmt.Errorf("Failed to check if Cilium is enabled on Windows: %w", err)
+		return fmt.Errorf("failed to check if Cilium is enabled on Windows: %w", err)
 	}
 
 	if ciliumEnabled {
