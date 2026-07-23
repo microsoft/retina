@@ -27,7 +27,7 @@ A detailed analysis by a Retina user (see [this blog post](https://blog.zmalik.d
 
 **Current Implementation:**
 
-The `packetparser` plugin currently uses **BPF_MAP_TYPE_PERF_EVENT_ARRAY** for kernel-to-userspace data transfer. This architecture creates per-CPU buffers that must be polled by a single reader thread. On systems with many CPU cores, this can lead to:
+By default, `packetparser` uses **BPF_MAP_TYPE_PERF_EVENT_ARRAY** for kernel-to-userspace data transfer. This architecture creates per-CPU buffers that must be polled by a single reader thread. On systems with many CPU cores, this can lead to:
 
 - Increased context switching overhead
 - Memory access patterns that may not scale linearly
@@ -35,7 +35,9 @@ The `packetparser` plugin currently uses **BPF_MAP_TYPE_PERF_EVENT_ARRAY** for k
 
 **Alternative Approaches:**
 
-Alternative data transfer mechanisms like BPF ring buffers (BPF_MAP_TYPE_RINGBUF, available in Linux kernel 5.8+) use a shared buffer architecture that may perform better on high-core-count systems. However, **Retina does not currently support ring buffers for packetparser**. Future versions may provide configurable data transfer mechanisms.
+Alternative data transfer mechanisms like BPF ring buffers (BPF_MAP_TYPE_RINGBUF, available in Linux kernel 5.8+) use a shared buffer architecture that may perform better on high-core-count systems. Retina supports ring buffers for `packetparser` via `packetParserRingBuffer=enabled` and `packetParserRingBufferSize`.
+
+**Note:** Ring buffer mode requires Linux kernel 5.8 or newer.
 
 #### If You Experience Performance Issues
 
@@ -44,7 +46,8 @@ If you observe performance degradation on high-core-count nodes:
 1. **Disable `packetparser`**: Use Basic metrics mode which doesn't require this plugin
 2. **Enable Sampling**: Use the `dataSamplingRate` configuration option (see [Sampling](#sampling) section)
 3. **Use High Data Aggregation**: Configure `high` [data aggregation](../../../05-Concepts/data-aggregation.md)
-4. **Monitor Impact**: Watch for elevated CPU usage, context switches, or throughput changes
+4. **Increase the Conntrack Report Interval**: Raise `conntrackReportInterval` to lower the event rate for connection-heavy workloads (see [Report interval](#report-interval))
+5. **Monitor Impact**: Watch for elevated CPU usage, context switches, or throughput changes
 
 **Note:** The Retina team is evaluating options for addressing reported performance concerns, including potential support for alternative data transfer mechanisms. Community feedback and contributions are welcome.
 
@@ -54,7 +57,13 @@ Since `packetparser` produces many enriched `Flow` objects it can be quite expen
 
 `dataSamplingRate` is expressed in 1 out of N terms, where N is the `dataSamplingRate` value.  For example, if `dataSamplingRate` is 3 1/3rd of packets will be sampled for reporting.
 
-Keep in mind that there are cases where reporting will happen anyways as to ensure metric accuracy.
+Sampling only affects routine per-packet reporting. To preserve metric accuracy, a report is always emitted regardless of the sampling rate for TCP control and teardown packets (SYN/FIN/RST, etc.), for connection eviction, and once the [report interval](#report-interval) has elapsed for an active connection. Sampling therefore helps most when routine packet reports dominate the event rate; when the rate is instead dominated by per-connection periodic reports (for example, many concurrently-active or long-lived connections), raise `conntrackReportInterval` instead.
+
+### Report interval
+
+In `high` data aggregation, `conntrackReportInterval` (default `30s`) sets how often the periodic report fires for an active connection: once the interval has elapsed since the connection's last report (per direction), its next packet is reported. Other triggers — TCP control flags (SYN/FIN/RST, etc.), teardown, and eviction — are reported regardless of the interval to preserve accuracy, so a connection may be reported more than once per interval.
+
+Raising the interval thins out these periodic reports, which dominate the event rate for steady, connection-heavy workloads. This is often more effective than sampling, which does not reduce periodic or lifecycle reports. Byte and packet totals stay accurate because they are aggregated in the kernel and carried on the next reported event.
 
 ### Code locations
 

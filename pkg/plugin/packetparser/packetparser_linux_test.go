@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"reflect"
 	"runtime"
 	"sync"
 	"testing"
@@ -17,7 +18,7 @@ import (
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/perf"
+	"github.com/cilium/ebpf/ringbuf"
 	tc "github.com/florianl/go-tc"
 	nl "github.com/mdlayher/netlink"
 	kcfg "github.com/microsoft/retina/pkg/config"
@@ -25,6 +26,7 @@ import (
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/packetparser/mocks"
+	"github.com/microsoft/retina/pkg/utils"
 	"github.com/microsoft/retina/pkg/watchers/endpoint"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
@@ -32,6 +34,50 @@ import (
 	"github.com/vishvananda/netlink"
 	"go.uber.org/mock/gomock"
 )
+
+// mockPerfReader is a gomock-based mock for the perfReader interface.
+// Defined here (not in mocks/) because perfReader uses the unexported perfRecord type.
+type mockPerfReader struct {
+	ctrl     *gomock.Controller
+	recorder *mockPerfReaderRecorder
+}
+
+type mockPerfReaderRecorder struct {
+	mock *mockPerfReader
+}
+
+func newMockPerfReader(ctrl *gomock.Controller) *mockPerfReader {
+	m := &mockPerfReader{ctrl: ctrl}
+	m.recorder = &mockPerfReaderRecorder{m}
+	return m
+}
+
+func (m *mockPerfReader) EXPECT() *mockPerfReaderRecorder { return m.recorder }
+
+func (m *mockPerfReader) Read() (perfRecord, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Read")
+	rec, _ := ret[0].(perfRecord)
+	err, _ := ret[1].(error)
+	return rec, err
+}
+
+func (mr *mockPerfReaderRecorder) Read() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Read", reflect.TypeOf((*mockPerfReader)(nil).Read))
+}
+
+func (m *mockPerfReader) Close() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Close")
+	err, _ := ret[0].(error)
+	return err
+}
+
+func (mr *mockPerfReaderRecorder) Close() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*mockPerfReader)(nil).Close))
+}
+
+var errTestRead = errors.New("error")
 
 var (
 	cfgPodLevelEnabled = &kcfg.Config{
@@ -56,6 +102,11 @@ var (
 		BypassLookupIPOfInterest: true,
 		EnableConntrackMetrics:   true,
 	}
+	cfgRingBufferEnabled = &kcfg.Config{
+		EnablePodLevel:             true,
+		PacketParserRingBuffer:     kcfg.PacketParserRingBufferEnabled,
+		PacketParserRingBufferSize: 4096,
+	}
 )
 
 func TestCleanAll(t *testing.T) {
@@ -68,7 +119,7 @@ func TestCleanAll(t *testing.T) {
 	}
 	assert.Nil(t, p.cleanAll())
 
-	p.tcMap = &sync.Map{}
+	p.attachmentMap = &sync.Map{}
 	assert.Nil(t, p.cleanAll())
 
 	ctrl := gomock.NewController(t)
@@ -85,13 +136,13 @@ func TestCleanAll(t *testing.T) {
 		return mq
 	}
 
-	p.tcMap.Store(tcKey{"test", "test", 1}, &tcValue{mrtnl, &tc.Object{}})
-	p.tcMap.Store(tcKey{"test2", "test2", 2}, &tcValue{mrtnl, &tc.Object{}})
+	p.attachmentMap.Store(attachmentKey{"test", "test", 1}, &attachmentValue{tc: mrtnl, qdisc: &tc.Object{}})
+	p.attachmentMap.Store(attachmentKey{"test2", "test2", 2}, &attachmentValue{tc: mrtnl, qdisc: &tc.Object{}})
 
 	assert.Nil(t, p.cleanAll())
 
 	keyCount := 0
-	p.tcMap.Range(func(k, v interface{}) bool {
+	p.attachmentMap.Range(func(_ interface{}, _ interface{}) bool {
 		keyCount++
 		return true
 	})
@@ -167,7 +218,7 @@ func TestEndpointWatcherCallbackFn_EndpointDeleted(t *testing.T) {
 		cfg:              cfgPodLevelEnabled,
 		l:                log.Logger().Named("test"),
 		interfaceLockMap: &sync.Map{},
-		tcMap:            &sync.Map{},
+		attachmentMap:    &sync.Map{},
 	}
 
 	// Create test interface attributes.
@@ -180,7 +231,7 @@ func TestEndpointWatcherCallbackFn_EndpointDeleted(t *testing.T) {
 
 	// Pre-populate both maps to simulate existing interface
 	p.interfaceLockMap.Store(key, &sync.Mutex{})
-	p.tcMap.Store(key, &tcValue{nil, &tc.Object{}})
+	p.attachmentMap.Store(key, &attachmentValue{tc: nil, qdisc: &tc.Object{}})
 
 	// Create EndpointDeleted event.
 	e := &endpoint.EndpointEvent{
@@ -192,11 +243,10 @@ func TestEndpointWatcherCallbackFn_EndpointDeleted(t *testing.T) {
 	p.endpointWatcherCallbackFn(e)
 
 	// Verify both maps are cleaned up.
-	_, tcMapExists := p.tcMap.Load(key)
+	_, attachmentMapExists := p.attachmentMap.Load(key)
 	_, lockMapExists := p.interfaceLockMap.Load(key)
 
-	// Assert both maps are cleaned up
-	assert.False(t, tcMapExists, "tcMap entry should be deleted")
+	assert.False(t, attachmentMapExists, "attachmentMap entry should be deleted")
 	assert.False(t, lockMapExists, "interfaceLockMap entry should be deleted")
 }
 
@@ -227,7 +277,7 @@ func TestCreateQdiscAndAttach(t *testing.T) {
 		return mrtnl, nil
 	}
 
-	getFD = func(e *ebpf.Program) int {
+	getFD = func(_ *ebpf.Program) int {
 		return 1
 	}
 
@@ -252,7 +302,7 @@ func TestCreateQdiscAndAttach(t *testing.T) {
 		hostEgressInfo: &ebpf.ProgramInfo{
 			Name: "egress",
 		},
-		tcMap: &sync.Map{},
+		attachmentMap: &sync.Map{},
 	}
 	linkAttr := netlink.LinkAttrs{
 		Name:         "test",
@@ -263,7 +313,7 @@ func TestCreateQdiscAndAttach(t *testing.T) {
 	p.createQdiscAndAttach(linkAttr, Veth)
 
 	key := ifaceToKey(linkAttr)
-	_, ok := p.tcMap.Load(key)
+	_, ok := p.attachmentMap.Load(key)
 	assert.True(t, ok)
 
 	pObj.HostIngressFilter = &ebpf.Program{}
@@ -277,7 +327,7 @@ func TestCreateQdiscAndAttach(t *testing.T) {
 	p.createQdiscAndAttach(linkAttr2, Device)
 
 	key = ifaceToKey(linkAttr2)
-	_, ok = p.tcMap.Load(key)
+	_, ok = p.attachmentMap.Load(key)
 	assert.True(t, ok)
 }
 
@@ -286,8 +336,8 @@ func TestReadData_Error(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mperf := mocks.NewMockperfReader(ctrl)
-	mperf.EXPECT().Read().Return(perf.Record{}, errors.New("error")).AnyTimes()
+	mperf := newMockPerfReader(ctrl)
+	mperf.EXPECT().Read().Return(perfRecord{}, errTestRead).AnyTimes()
 
 	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
 	menricher.EXPECT().Write(gomock.Any()).Times(0)
@@ -300,9 +350,28 @@ func TestReadData_Error(t *testing.T) {
 	p.readData()
 
 	// Lost samples.
-	mperf.EXPECT().Read().Return(perf.Record{
+	mperf.EXPECT().Read().Return(perfRecord{
 		LostSamples: 1,
 	}, nil).AnyTimes()
+	p.readData()
+}
+
+func TestReadData_RingBufClosed(t *testing.T) {
+	log.SetupZapLogger(log.GetDefaultLogOpts()) //nolint:errcheck // ignore
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mperf := newMockPerfReader(ctrl)
+	mperf.EXPECT().Read().Return(perfRecord{}, ringbuf.ErrClosed).AnyTimes()
+
+	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
+	menricher.EXPECT().Write(gomock.Any()).Times(0)
+
+	p := &packetParser{
+		cfg:    cfgRingBufferEnabled,
+		l:      log.Logger().Named("test"),
+		reader: mperf,
+	}
 	p.readData()
 }
 
@@ -320,12 +389,12 @@ func TestReadDataPodLevelEnabled(t *testing.T) {
 		DstPort:          uint16(443),
 	}
 	bytes, _ := json.Marshal(bpfEvent)
-	record := perf.Record{
+	record := perfRecord{
 		LostSamples: 0,
 		RawSample:   bytes,
 	}
 
-	mperf := mocks.NewMockperfReader(ctrl)
+	mperf := newMockPerfReader(ctrl)
 	mperf.EXPECT().Read().Return(record, nil).MinTimes(1)
 
 	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
@@ -336,7 +405,7 @@ func TestReadDataPodLevelEnabled(t *testing.T) {
 		l:              log.Logger().Named("test"),
 		reader:         mperf,
 		enricher:       menricher,
-		recordsChannel: make(chan perf.Record, buffer),
+		recordsChannel: make(chan perfRecord, buffer),
 	}
 
 	mICounterVec := metrics.NewMockCounterVec(ctrl)
@@ -345,7 +414,8 @@ func TestReadDataPodLevelEnabled(t *testing.T) {
 	metrics.LostEventsCounter = mICounterVec
 
 	mParsedPacketsCounter := metrics.NewMockCounterVec(ctrl)
-	mParsedPacketsCounter.EXPECT().WithLabelValues(gomock.Any()).Return(prometheus.NewCounter(prometheus.CounterOpts{})).AnyTimes()
+	mParsedPacketsCounter.EXPECT().WithLabelValues(gomock.Any()).
+		Return(prometheus.NewCounter(prometheus.CounterOpts{})).AnyTimes()
 	metrics.ParsedPacketsCounter = mParsedPacketsCounter
 
 	exCh := make(chan *v1.Event, 10)
@@ -399,12 +469,12 @@ func TestStartWithDataAggregationLevelLow(t *testing.T) {
 	}
 	bytes, err := json.Marshal(bpfEvent) // nolint:musttag // ignore
 	require.NoError(t, err)
-	record := perf.Record{
+	record := perfRecord{
 		LostSamples: 0,
 		RawSample:   bytes,
 	}
 
-	mockReader := mocks.NewMockperfReader(ctrl)
+	mockReader := newMockPerfReader(ctrl)
 	mockReader.EXPECT().Read().Return(record, nil).MinTimes(1)
 
 	getQdisc = func(_ nltc) qdisc {
@@ -432,7 +502,7 @@ func TestStartWithDataAggregationLevelLow(t *testing.T) {
 		l:                log.Logger().Named("test"),
 		objs:             pObj,
 		reader:           mockReader,
-		recordsChannel:   make(chan perf.Record, buffer),
+		recordsChannel:   make(chan perfRecord, buffer),
 		interfaceLockMap: &sync.Map{},
 		endpointIngressInfo: &ebpf.ProgramInfo{
 			Name: "ingress",
@@ -446,7 +516,7 @@ func TestStartWithDataAggregationLevelLow(t *testing.T) {
 		hostEgressInfo: &ebpf.ProgramInfo{
 			Name: "egress",
 		},
-		tcMap: &sync.Map{},
+		attachmentMap: &sync.Map{},
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
@@ -478,12 +548,12 @@ func TestStartWithDataAggregationLevelHigh(t *testing.T) {
 	}
 	bytes, err := json.Marshal(bpfEvent) // nolint:musttag // ignore
 	require.NoError(t, err)
-	record := perf.Record{
+	record := perfRecord{
 		LostSamples: 0,
 		RawSample:   bytes,
 	}
 
-	mockReader := mocks.NewMockperfReader(ctrl)
+	mockReader := newMockPerfReader(ctrl)
 	mockReader.EXPECT().Read().Return(record, nil).MinTimes(1)
 
 	getQdisc = func(_ nltc) qdisc {
@@ -511,7 +581,7 @@ func TestStartWithDataAggregationLevelHigh(t *testing.T) {
 		l:                log.Logger().Named("test"),
 		objs:             pObj,
 		reader:           mockReader,
-		recordsChannel:   make(chan perf.Record, buffer),
+		recordsChannel:   make(chan perfRecord, buffer),
 		interfaceLockMap: &sync.Map{},
 		endpointIngressInfo: &ebpf.ProgramInfo{
 			Name: "ingress",
@@ -525,7 +595,7 @@ func TestStartWithDataAggregationLevelHigh(t *testing.T) {
 		hostEgressInfo: &ebpf.ProgramInfo{
 			Name: "egress",
 		},
-		tcMap: &sync.Map{},
+		attachmentMap: &sync.Map{},
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
@@ -562,24 +632,33 @@ func TestPacketParseGenerate(t *testing.T) {
 		expectedContents string
 	}{
 		{
-			name:             "PodLevelEnabled",
-			cfg:              cfgPodLevelEnabled,
-			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n#define DATA_AGGREGATION_LEVEL 0\n#define DATA_SAMPLING_RATE 0\n",
+			name: "PodLevelEnabled",
+			cfg:  cfgPodLevelEnabled,
+			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n" +
+				"#define DATA_AGGREGATION_LEVEL 0\n" +
+				"#define DATA_SAMPLING_RATE 0\n",
 		},
 		{
-			name:             "ConntrackMetricsEnabled",
-			cfg:              cfgConntrackMetricsEnabled,
-			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n#define ENABLE_CONNTRACK_METRICS 1\n#define DATA_AGGREGATION_LEVEL 1\n#define DATA_SAMPLING_RATE 0\n",
+			name: "ConntrackMetricsEnabled",
+			cfg:  cfgConntrackMetricsEnabled,
+			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n" +
+				"#define ENABLE_CONNTRACK_METRICS 1\n" +
+				"#define DATA_AGGREGATION_LEVEL 1\n" +
+				"#define DATA_SAMPLING_RATE 0\n",
 		},
 		{
-			name:             "DataAggregationLevelLow",
-			cfg:              cfgDataAggregationLevelLow,
-			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 0\n#define DATA_AGGREGATION_LEVEL 0\n#define DATA_SAMPLING_RATE 0\n",
+			name: "DataAggregationLevelLow",
+			cfg:  cfgDataAggregationLevelLow,
+			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 0\n" +
+				"#define DATA_AGGREGATION_LEVEL 0\n" +
+				"#define DATA_SAMPLING_RATE 0\n",
 		},
 		{
-			name:             "DataAggregationLevelHigh",
-			cfg:              cfgDataAggregationLevelHigh,
-			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 0\n#define DATA_AGGREGATION_LEVEL 1\n#define DATA_SAMPLING_RATE 0\n",
+			name: "DataAggregationLevelHigh",
+			cfg:  cfgDataAggregationLevelHigh,
+			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 0\n" +
+				"#define DATA_AGGREGATION_LEVEL 1\n" +
+				"#define DATA_SAMPLING_RATE 0\n",
 		},
 	}
 
@@ -642,6 +721,81 @@ func TestCompile(t *testing.T) {
 	if _, err := os.Stat(expectedOutputFile); errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("File %+v doesn't exist", expectedOutputFile)
 	}
+}
+
+func TestCompileRingBuffer(t *testing.T) {
+	takeBackup()
+	defer restoreBackup()
+
+	log.SetupZapLogger(log.GetDefaultLogOpts()) //nolint:errcheck // ignore
+	p := &packetParser{
+		cfg: cfgRingBufferEnabled,
+		l:   log.Logger().Named(name),
+	}
+	dir, _ := absPath()
+	expectedOutputFile := fmt.Sprintf("%s/%s", dir, bpfObjectFileName)
+
+	err := os.Remove(expectedOutputFile)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("Expected no error. Error: %+v", err)
+	}
+
+	err = p.Generate(context.Background())
+	if err != nil {
+		t.Fatalf("Expected no error. Error: %+v", err)
+	}
+
+	err = p.Compile(context.Background())
+	if err != nil {
+		t.Fatalf("Expected no error. Error: %+v", err)
+	}
+	if _, err := os.Stat(expectedOutputFile); errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("File %+v doesn't exist", expectedOutputFile)
+	}
+}
+
+func TestEnsureRingBufKernelSupported(t *testing.T) {
+	orig := getKernelVersion
+	defer func() { getKernelVersion = orig }()
+
+	tests := []struct {
+		name      string
+		major     int
+		minor     int
+		patch     int
+		errExists bool
+	}{
+		{"Supported", 5, 8, 0, false},
+		{"Supported newer", 6, 1, 0, false},
+		{"Not supported old major", 4, 15, 0, true},
+		{"Not supported old minor", 5, 7, 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			getKernelVersion = func() (utils.KernelVersion, error) {
+				return utils.KernelVersion{
+					Major: tt.major,
+					Minor: tt.minor,
+					Patch: tt.patch,
+				}, nil
+			}
+			err := ensureRingBufKernelSupported()
+			if tt.errExists {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+
+	t.Run("Kernel version error", func(t *testing.T) {
+		getKernelVersion = func() (utils.KernelVersion, error) {
+			return utils.KernelVersion{}, errors.New("failed to get kernel version") //nolint:err113 // ignore
+		}
+		err := ensureRingBufKernelSupported()
+		assert.Error(t, err)
+	})
 }
 
 // Helpers.

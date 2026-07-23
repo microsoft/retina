@@ -8,8 +8,7 @@ import (
 	"github.com/cilium/cilium/pkg/k8s/resource"
 )
 
-type fakeresource[T k8sRuntime.Object] struct {
-}
+type fakeresource[T k8sRuntime.Object] struct{}
 
 func (f *fakeresource[T]) Events(ctx context.Context, opts ...resource.EventsOpt) <-chan resource.Event[T] {
 	return make(<-chan resource.Event[T])

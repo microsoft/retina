@@ -6,7 +6,22 @@ This document provides steps to set up your dev environment and start contributi
 
 Retina uses a forking workflow. To contribute, fork the repository and create a branch for your changes.
 
-The easiest way to set up your Development Environment is to use the provided GitHub Codespaces configuration.
+### Using a devcontainer (recommended)
+
+The easiest way to get started is to use the provided [devcontainer](https://github.com/microsoft/retina/blob/main/.devcontainer/devcontainer.json), which works with both [GitHub Codespaces](https://github.com/features/codespaces) and [VS Code Dev Containers](https://code.visualstudio.com/docs/devcontainers/containers).
+
+The devcontainer comes pre-configured with all required tools:
+
+- Go, clang/LLVM (for eBPF compilation), Docker, Helm, kubectl, Kind, Azure CLI, GitHub CLI, and jq
+- Go modules are pre-downloaded; run `make generate` to compile eBPF programs and generate mocks before building
+- A Kind cluster is created on startup for local testing
+- VS Code is configured with golangci-lint and gofumpt so editor feedback matches CI
+
+To launch in Codespaces, click **Code > Codespaces > New codespace** on the repository page. To use locally, open the repository in VS Code and select **Reopen in Container** from the command palette.
+
+### Manual setup
+
+If you prefer to set up your environment manually, see the requirements below.
 
 ## Environment Config
 
@@ -184,6 +199,39 @@ Uninstall `Retina`:
 ```bash
 make helm-uninstall
 ```
+
+## Dependency and Security Management
+
+Retina uses automated dependency management and security scanning to maintain secure and up-to-date container images and dependencies.
+
+### Dependabot Configuration
+
+The repository uses [Dependabot](https://github.com/dependabot) to automatically track and update dependencies:
+
+- **Docker Base Images**: Automatically monitored for security updates and new versions
+- **Go Modules**: Tracked for dependency updates  
+- **GitHub Actions**: Workflow dependencies are kept current
+
+#### Docker Base Image Tracking
+
+Retina has Dockerfiles in multiple directories, and each is tracked separately by Dependabot:
+
+- `/controller` - Main retina controller images (daily checks)
+- `/shell` - Shell utility images (daily checks)  
+- `/cli` - CLI tool images (daily checks)
+- `/operator` - Operator images (daily checks)
+- `/test/image` - Test images (daily checks)
+- `/hack/tools/kapinger` - Kapinger tool images (weekly checks)
+- `/hack/tools/toolbox` - Toolbox utility images (weekly checks)
+
+When Dependabot detects a security vulnerability (CVE) in a base image, it will automatically create a pull request to update the image SHA to a patched version.
+
+### Adding New Dockerfiles
+
+When adding new Dockerfiles to the repository:
+
+1. Add the directory containing the Dockerfile to `.github/dependabot.yaml`
+2. Choose an appropriate schedule: daily for critical components, weekly for tools
 
 ## Opening a Pull Request
 

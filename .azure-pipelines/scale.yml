@@ -1,0 +1,114 @@
+# retina Scale Test pipeline (Azure DevOps).
+#
+# Mirrors .github/workflows/scale-test.yaml + daily-scale-test.yaml.
+# Daily scheduled run (00:00 UTC) + manual runs from ADO UI.
+#
+# Required ADO pipeline configuration (set in the ADO UI):
+#   Variables (plain):
+#     ACR_NAME
+#   Variables (secret):
+#     AZURE_APP_INSIGHTS_KEY
+#   Service connection (Azure RM, WIF): r2d
+#   Settings: "Limit building pull requests from forked GitHub repositories" = Disable
+
+trigger: none
+pr: none
+
+schedules:
+  - cron: '0 0 * * *'
+    displayName: Daily scale test (00:00 UTC)
+    branches:
+      include:
+        - main
+    always: true
+
+parameters:
+  # For manual runs from the ADO UI. Defaults match .github/workflows/daily-scale-test.yaml.
+  - name: resource_group
+    displayName: Azure Resource Group (leave blank to auto-create)
+    type: string
+    default: ' '
+  - name: cluster_name
+    displayName: AKS Cluster Name (leave blank to auto-create)
+    type: string
+    default: ' '
+  - name: image_namespace
+    displayName: Image Namespace
+    type: string
+    default: microsoft/retina
+  - name: image_tag
+    displayName: Image Tag (blank = latest commit from main)
+    type: string
+    default: ' '
+  - name: num_deployments
+    displayName: Number of Traffic Deployments
+    type: number
+    default: 1000
+  - name: num_replicas
+    displayName: Number of Traffic Replicas per Deployment
+    type: number
+    default: 20
+  - name: num_netpol
+    displayName: Number of Network Policies
+    type: number
+    default: 0
+  - name: num_nodes
+    displayName: Number of nodes
+    type: number
+    default: 1000
+  - name: cleanup
+    displayName: Clean up environment after test
+    type: boolean
+    default: true
+
+variables:
+  - name: azureServiceConnection
+    value: r2d
+
+jobs:
+  - job: scale_test
+    displayName: Scale Test
+    timeoutInMinutes: 360
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+      - checkout: self
+      - template: steps/setup-go.yml
+      - task: AzureCLI@2
+        displayName: Run Scale Test
+        env:
+          AZURE_RESOURCE_GROUP: ${{ parameters.resource_group }}
+          CLUSTER_NAME: ${{ parameters.cluster_name }}
+          NUM_DEPLOYMENTS: ${{ parameters.num_deployments }}
+          NUM_REPLICAS: ${{ parameters.num_replicas }}
+          NUM_NETPOLS: ${{ parameters.num_netpol }}
+          CLEANUP: ${{ parameters.cleanup }}
+          IMAGE_NAMESPACE: ${{ parameters.image_namespace }}
+          TAG: ${{ parameters.image_tag }}
+          NODES: ${{ parameters.num_nodes }}
+          AZURE_APP_INSIGHTS_KEY: $(AZURE_APP_INSIGHTS_KEY)
+        inputs:
+          azureSubscription: $(azureServiceConnection)
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            set -euo pipefail
+            export AZURE_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+            export IMAGE_REGISTRY=$(ACR_NAME)
+            # Trim placeholder whitespace defaults (ADO string params cannot be truly empty).
+            TAG="${TAG// /}"
+            AZURE_RESOURCE_GROUP="${AZURE_RESOURCE_GROUP// /}"
+            CLUSTER_NAME="${CLUSTER_NAME// /}"
+            # Default TAG to the value make version would produce for this commit,
+            # keeping it consistent with the tag used by all image-build targets.
+            [[ -z "$TAG" ]] && TAG="$(make version)"
+            # Scheduled runs create infra; manual runs with a provided cluster reuse it.
+            if [[ "$(Build.Reason)" == "Manual" && -n "$CLUSTER_NAME" ]]; then
+              CREATE_INFRA=false
+            else
+              CREATE_INFRA=true
+            fi
+            export TAG AZURE_RESOURCE_GROUP CLUSTER_NAME
+            exec go test -v ./test/e2e/. -timeout 300m -tags=scale -count=1 -args \
+              -create-infra=$CREATE_INFRA \
+              -delete-infra=$CLEANUP

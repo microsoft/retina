@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"log/slog"
 	"net"
 	"time"
 
@@ -23,7 +24,7 @@ func main() {
 	log.SetupZapLogger(opts)
 	l := log.Logger().Named("test-dropreason")
 
-	metrics.InitializeMetrics()
+	metrics.InitializeMetrics(slog.Default())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -34,7 +35,7 @@ func main() {
 	}
 
 	// Filtermanager.
-	f, err := filtermanager.Init(3)
+	f, err := filtermanager.Init(3, kcfg.DefaultFilterMapMaxEntries)
 	if err != nil {
 		l.Error("Start filtermanager failed", zap.Error(err))
 		return

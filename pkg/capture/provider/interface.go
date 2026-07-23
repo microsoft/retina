@@ -14,7 +14,8 @@ type NetworkCaptureProviderInterface interface {
 	// Setup prepares the provider with folder to store network capture for temporary.
 	Setup(filename file.CaptureFilename) (string, error)
 	// CaptureNetworkPacket capture network traffic per user input and store the captured network packets in local directory.
-	CaptureNetworkPacket(ctx context.Context, filter string, duration, maxSize int) error
+	// When fileCount > 0, tcpdump uses rotating capture files (-W and -C flags).
+	CaptureNetworkPacket(ctx context.Context, includeExcludeFilter string, duration, maxSize, fileCount int) error
 	// CollectMetadata collects network metadata and store network metadata info in local directory.
 	CollectMetadata() error
 	// Cleanup removes created resources.

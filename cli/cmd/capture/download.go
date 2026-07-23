@@ -185,8 +185,6 @@ func getWindowsContainerImage(node *corev1.Node) string {
 		suffix = "ltsc2025"
 	case strings.Contains(osImage, "2022"):
 		suffix = "ltsc2022"
-	case strings.Contains(osImage, "2019"):
-		suffix = "ltsc2019"
 	case strings.Contains(osImage, "2016"):
 		suffix = "ltsc2016"
 	default:

@@ -7,6 +7,7 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -33,6 +34,8 @@ type CaptureManager struct {
 	networkCaptureProvider captureProvider.NetworkCaptureProviderInterface
 	tel                    telemetry.Telemetry
 }
+
+var errNegativeFileCount = errors.New("file count must be >= 0")
 
 func NewCaptureManager(logger *log.ZapLogger, tel telemetry.Telemetry) *CaptureManager {
 	return &CaptureManager{
@@ -66,7 +69,12 @@ func (cm *CaptureManager) CaptureNetwork(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	if err := cm.networkCaptureProvider.CaptureNetworkPacket(ctx, captureFilter, captureDuration, captureMaxSizeMB); err != nil {
+	captureFileCount, err := cm.captureFileCount()
+	if err != nil {
+		return "", err
+	}
+
+	if err := cm.networkCaptureProvider.CaptureNetworkPacket(ctx, captureFilter, captureDuration, captureMaxSizeMB, captureFileCount); err != nil {
 		return "", err
 	}
 
@@ -83,6 +91,7 @@ func (cm *CaptureManager) CaptureNetwork(ctx context.Context) (string, error) {
 		"filter":      captureFilter,
 		"duration":    strconv.Itoa(captureDuration),
 		"maxSizeMB":   strconv.Itoa(captureMaxSizeMB),
+		"fileCount":   strconv.Itoa(captureFileCount),
 	})
 
 	return tmpLocation, nil
@@ -123,6 +132,9 @@ func (cm *CaptureManager) captureFilter() string {
 
 func (cm *CaptureManager) captureDuration() (int, error) {
 	captureDurationStr := os.Getenv(captureConstants.CaptureDurationEnvKey)
+	if captureDurationStr == "" {
+		return 0, nil
+	}
 	duration, err := time.ParseDuration(captureDurationStr)
 	if err != nil {
 		return 0, err
@@ -152,6 +164,21 @@ func (cm *CaptureManager) captureMaxSizeMB() (int, error) {
 		return 0, nil
 	}
 	return strconv.Atoi(captureMaxSizeMBStr)
+}
+
+func (cm *CaptureManager) captureFileCount() (int, error) {
+	captureFileCountStr := os.Getenv(captureConstants.CaptureFileCountEnvKey)
+	if captureFileCountStr == "" {
+		return 0, nil
+	}
+	count, err := strconv.Atoi(captureFileCountStr)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse file count %q: %w", captureFileCountStr, err)
+	}
+	if count < 0 {
+		return 0, errNegativeFileCount
+	}
+	return count, nil
 }
 
 func (cm *CaptureManager) OutputCapture(ctx context.Context, srcDir string) error {

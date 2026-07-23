@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path"
 	"reflect"
@@ -121,7 +122,7 @@ func TestCompile(t *testing.T) {
 
 func TestProcessMapValue(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
-	metrics.InitializeMetrics()
+	metrics.InitializeMetrics(slog.Default())
 	dr := &dropReason{
 		cfg: cfgPodLevelEnabled,
 		l:   log.Logger().Named(name),
@@ -179,11 +180,10 @@ func TestDropReasonRun_Error(t *testing.T) {
 	// Create a context with a short timeout for testing purposes
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 
+	errCh := make(chan error, 1)
 	// Start the drop reason routine in a goroutine
 	go func() {
-		if err := dr.run(ctx); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		errCh <- dr.run(ctx)
 	}()
 
 	// Wait for a short period of time for the routine to start
@@ -191,6 +191,9 @@ func TestDropReasonRun_Error(t *testing.T) {
 
 	cancel()
 	ticker.Stop()
+	if err := <-errCh; err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }
 
 func TestDropReasonRun(t *testing.T) {
@@ -241,11 +244,10 @@ func TestDropReasonRun(t *testing.T) {
 	// create a ticker with a short interval for testing purposes
 	ticker := time.NewTicker(2 * time.Second)
 
+	errCh := make(chan error, 1)
 	// Start the drop reason routine in a goroutine
 	go func() {
-		if err := dr.run(ctx); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		errCh <- dr.run(ctx)
 	}()
 
 	// Wait for a short period of time for the routine to start
@@ -253,6 +255,9 @@ func TestDropReasonRun(t *testing.T) {
 
 	cancel()
 	ticker.Stop()
+	if err := <-errCh; err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }
 
 func TestDropReasonReadDataPodLevelEnabled(t *testing.T) {
@@ -298,8 +303,8 @@ func TestDropReasonReadDataPodLevelEnabled(t *testing.T) {
 		dr.readEventArrayData()
 	}()
 
+	dr.wg.Add(1)
 	go func() {
-		dr.wg.Add(1)
 		dr.processRecord(ctx, 0)
 	}()
 

@@ -7,7 +7,7 @@ import "net"
 
 type FilterMap struct{}
 
-func Init() (*FilterMap, error) {
+func Init(_ uint32) (*FilterMap, error) {
 	return &FilterMap{}, nil
 }
 

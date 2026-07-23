@@ -3,9 +3,9 @@
 package metrics
 
 import (
-	"github.com/microsoft/retina/pkg/log"
+	"log/slog"
+
 	"github.com/prometheus/client_golang/prometheus"
-	"go.uber.org/zap"
 )
 
 const (
@@ -13,6 +13,7 @@ const (
 	pluginManagerFailedToReconcileCounterName = "plugin_manager_failed_to_reconcile"
 	lostEventsCounterName                     = "lost_events_counter"
 	parsedPacketsCounterName                  = "parsed_packets_counter"
+	expiredMetricsCounterName                 = "expired_metrics_counter"
 
 	// Windows
 	hnsStats            = "windows_hns_stats"
@@ -45,6 +46,7 @@ const (
 	pluginManagerFailedToReconcileCounterDescription = "Number of times the plugin manager failed to reconcile the plugins"
 	lostEventsCounterDescription                     = "Number of events lost in control plane"
 	parsedPacketsCounterDescription                  = "Number of packets parsed by the packetparser plugin"
+	expiredMetricsCounterDescription                 = "Number of metrics expired due to lack of updates and no longer exported"
 
 	// Conntrack metrics
 	ConntrackPacketTxDescription         = "Number of tx packets"
@@ -87,12 +89,13 @@ var (
 	// Interface Stats
 	InterfaceStatsGauge GaugeVec
 
-	metricsLogger *log.ZapLogger
+	metricsLogger *slog.Logger
 
 	// Control Plane Metrics
 	PluginManagerFailedToReconcileCounter CounterVec
 	LostEventsCounter                     CounterVec
 	ParsedPacketsCounter                  CounterVec
+	MetricsExpiredCounter                 CounterVec
 
 	// DNS Metrics.
 	DNSRequestCounter  CounterVec
@@ -119,7 +122,9 @@ func ToPrometheusType(metric interface{}) prometheus.Collector {
 	case CounterVec:
 		return m.(*prometheus.CounterVec)
 	default:
-		metricsLogger.Error("error converting unknown metric type", zap.Any("metric", m))
+		if metricsLogger != nil {
+			metricsLogger.Error("error converting unknown metric type", slog.Any("metric", m))
+		}
 		return nil
 	}
 }

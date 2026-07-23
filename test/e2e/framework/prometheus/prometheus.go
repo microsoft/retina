@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/retina/test/retry"
 	promclient "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
+	"github.com/prometheus/common/model"
 )
 
 var (
@@ -164,13 +165,13 @@ func verifyValidMetricPresentPartial(metricName string, data map[string]*promcli
 }
 
 func getAllPrometheusMetricsFromBuffer(buf []byte) (map[string]*promclient.MetricFamily, error) {
-	var parser expfmt.TextParser
+	parser := expfmt.NewTextParser(model.LegacyValidation)
 	reader := strings.NewReader(string(buf))
 	return parser.TextToMetricFamilies(reader) //nolint
 }
 
 func ParseReaderPrometheusMetrics(input io.Reader) (map[string]*promclient.MetricFamily, error) {
-	var parser expfmt.TextParser
+	parser := expfmt.NewTextParser(model.LegacyValidation)
 	return parser.TextToMetricFamilies(input) //nolint
 }
 

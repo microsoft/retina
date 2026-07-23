@@ -1,5 +1,9 @@
-# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.24.11-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:531bd02db17b0c2ec919f10fc203a6a8c825e8ca01f40c3a1e32e1cf7119c6d8 AS builder
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.3-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26.5-2-azurelinux3.0@sha256:1c77c1cbb5de52db3f119fe2efe7a938e734c08196bbe3ad94b3bdadbab926f9 AS builder
+
+# systemcrypto without cgo — required for arm64 cross-compile from amd64 host.
+# Becomes redundant with Go 1.27+ (auto-selected when CGO_ENABLED=0).
+ENV GOEXPERIMENT=ms_nocgo_opensslcrypto
 
 ARG VERSION
 ARG APP_INSIGHTS_ID
@@ -16,7 +20,11 @@ ENV GOOS=${GOOS}
 ARG GOARCH=amd64
 ENV GOARCH=${GOARCH}
 
-RUN make manifests
+# make manifests runs controller-gen, a build-time host tool that must be
+# compiled for and executed on the build host, not the target arch. Unset the
+# cross-compile env for this step so `go tool` doesn't produce an arm64 binary
+# and then fail to exec it on the amd64 builder.
+RUN env -u GOOS -u GOARCH make manifests
 RUN --mount=type=cache,target="/root/.cache/go-build" \
 	GOOS=$GOOS GOARCH=$GOARCH go build \
 	-ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" \
@@ -25,10 +33,14 @@ RUN --mount=type=cache,target="/root/.cache/go-build" \
 
 ##################### controller #######################
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/distroless/minimal:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/azurelinux/distroless/minimal@sha256:0801b80a0927309572b9adc99bd1813bc680473175f6e8175cd4124d95dbd50c
+# Final image must be $TARGETPLATFORM (default), not $BUILDPLATFORM — the
+# retina-operator binary is cross-compiled for the target arch and would fail
+# to run inside a wrong-arch base image.
+FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20260706@sha256:576d9769c0146cbf0cf7946bacf536c5758464c29eadfa03ef5090ae708e641f
 WORKDIR /
 COPY --from=builder /lib /lib
 COPY --from=builder /usr/lib/ /usr/lib
+COPY --from=builder /etc/pki/tls/ /etc/pki/tls/
 COPY --from=builder /workspace/retina-operator .
 USER 65532:65532
 
