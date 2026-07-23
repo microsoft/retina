@@ -11,8 +11,8 @@ The Hubble control plane exposes metrics on two separate ports:
 
 ## Metrics
 
-* Node-Level Metrics: These metrics provide insights into traffic volume, number of connections, etc. by node. Available on port 10093.
-* Hubble Metrics (DNS and Pod-Level Metrics): These metrics include source and destination pod information allowing to pinpoint network-related issues at a granular level. Metrics cover DNS queries/responses, L4/L7 packet flows, and TCP flags. Available on port 9965.
+* Node-Level Metrics: These metrics provide insights into traffic volume, dropped packets, number of connections, etc. by node. Available on port 10093.
+* Hubble Metrics (DNS and Pod-Level Metrics): These metrics include source and destination pod information allowing to pinpoint network-related issues at a granular level. Metrics cover DNS queries/responses, L4/L7 packet flows, dropped packets, and TCP flags. Available on port 9965.
 
 ### Node-Level Metrics
 
@@ -24,12 +24,12 @@ The following metrics are aggregated per node and available on port **10093**. A
 Retina provides metrics for both Linux and Windows operating systems.
 The table below outlines the different metrics generated.
 
-> **Note:** Drop metrics (`drop_count`, `drop_bytes`) are not available with the Hubble control plane. For drop metrics, use the [Standard control plane with Basic or Advanced mode](./modes/modes.md).
-
 | Metric Name                                    | Description | Extra Labels | Linux | Windows |
 |------------------------------------------------|-------------|--------------|-------|---------|
 | **networkobservability_forward_count**         | Total forwarded packet count | `direction` | ✅ | ✅ |
 | **networkobservability_forward_bytes**         | Total forwarded byte count | `direction` | ✅ | ✅ |
+| **networkobservability_drop_count**            | Total dropped packet count | `direction`, `reason` | ✅ | ✅ |
+| **networkobservability_drop_bytes**            | Total dropped byte count | `direction`, `reason` | ✅ | ❌ |
 | **networkobservability_tcp_state**             | TCP currently active socket count by TCP state. | `state` | ✅ | ❌ |
 | **networkobservability_tcp_connection_remote** | TCP currently active socket count by remote IP/port. | `address` (IP), `port` | ✅ | ❌ |
 | **networkobservability_tcp_connection_stats**  | TCP connection statistics. (ex: Delayed ACKs, TCPKeepAlive, TCPSackFailures) | `statistic` | ✅ | ✅ |
@@ -59,8 +59,7 @@ For *incoming traffic*, there will be a `destination` label with destination pod
 |----------------------------------|------------------------------|-----------------------|-------|---------|
 | **hubble_dns_queries_total**     | Total DNS requests by query  | `source` or `destination`, `query`, `qtypes` (query type), `ips_returned`, `rcode` | ✅ | ❌ |
 | **hubble_dns_responses_total**   | Total DNS responses by query/response | `source` or `destination`, `query`, `qtypes` (query type), `rcode` (return code), `ips_returned` (number of IPs) | ✅ | ❌ |
+| **hubble_drop_total**            | Total dropped packet count | `source` or `destination`, `protocol`, `reason` | ✅ | ❌ |
 | **hubble_flows_processed_total** | Total network flows processed (L4/L7 traffic) | `source` or `destination`, `protocol`, `verdict`, `type`, `subtype` | ✅ | ❌ |
 | **hubble_tcp_flags_total**       | Total TCP packets count by flag. | `source` or `destination`, `flag` | ✅ | ❌ |
 | **hubble_lost_events_total**     | Total number of lost Hubble events | | ✅ | ❌ |
-
-> **Note:** The `hubble_drop_total` metric for dropped packets is not currently available in the Hubble control plane. For drop metrics with pod-level context, use the [Standard control plane with Advanced mode](./modes/advanced.md).

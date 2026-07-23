@@ -13,7 +13,7 @@ The larger the cardinality, the more load induced on a Prometheus server for ins
 
 | Feature | Basic Mode | Advanced Mode | Hubble Control Plane |
 |---------|:----------:|:-------------:|:--------------------:|
-| Drop metrics (`drop_count`, `drop_bytes`) | ✅ | ✅ | ❌ |
+| Drop metrics (`drop_count`, `drop_bytes`) | ✅ | ✅ | ✅ |
 | Pod-level attribution | ❌ | ✅ (`adv_*` metrics) | ✅ (`hubble_*` metrics) |
 | API server latency metrics | ❌ | ✅ | ❌ |
 | Flow processing metrics | ❌ | ❌ | ✅ |
