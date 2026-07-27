@@ -276,8 +276,7 @@ require (
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/containerd/platforms v1.0.0-rc.1 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
-	github.com/google/cel-go v0.26.1 // indirect
-	github.com/stoewer/go-strcase v1.3.0 // indirect
+	github.com/google/cel-go v0.29.0 // indirect
 )
 
 require (
