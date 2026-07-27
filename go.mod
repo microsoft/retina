@@ -697,3 +697,5 @@ tool (
 )
 
 replace k8s.io/perf-tests/network/benchmarks/netperf => github.com/Azure/perf-tests/network/benchmarks/netperf v0.0.0-20241008140716-395a79947d2c
+
+replace github.com/caarlos0/go-shellwords v1.0.12 => github.com/goreleaser/go-shellwords v1.0.13
