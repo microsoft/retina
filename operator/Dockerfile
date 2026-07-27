@@ -19,7 +19,8 @@ ENV GOOS=${GOOS}
 ARG GOARCH=amd64
 ENV GOARCH=${GOARCH}
 
-RUN make manifests
+# controller-gen is a host tool; run it natively (unset cross-compile env) so it isn't built for arm64 then exec-failed on the amd64 builder
+RUN env -u GOOS -u GOARCH make manifests
 RUN --mount=type=cache,target="/root/.cache/go-build" \
 	GOOS=$GOOS GOARCH=$GOARCH go build \
 	-ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" \
