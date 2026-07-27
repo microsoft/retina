@@ -31,15 +31,15 @@ The table below outlines the different metrics generated.
 | **networkobservability_drop_count**            | Total dropped packet count | `direction`, `reason` | ✅ | ✅ |
 | **networkobservability_drop_bytes**            | Total dropped byte count | `direction`, `reason` | ✅ | ❌ |
 | **networkobservability_tcp_state**             | TCP currently active socket count by TCP state. | `state` | ✅ | ❌ |
-| **networkobservability_tcp_connection_remote** | TCP currently active socket count by remote IP/port. | `address` (IP), `port` | ✅ | ❌ |
-| **networkobservability_tcp_connection_stats**  | TCP connection statistics. (ex: Delayed ACKs, TCPKeepAlive, TCPSackFailures) | `statistic` | ✅ | ✅ |
+| **networkobservability_tcp_connection_remote** | TCP currently active socket count by remote address. | `address` (IP:port) | ✅ | ❌ |
+| **networkobservability_tcp_connection_stats**  | TCP connection statistics. (ex: Delayed ACKs, TCPKeepAlive, TCPSackFailures) | `statistic_name` | ✅ | ✅ |
 | **networkobservability_tcp_flag_gauges**       | TCP packets count by flag. | `direction`, `flag` | ❌ | ✅ |
-| **networkobservability_ip_connection_stats**   | IP connection statistics. | `statistic` | ✅ | ❌ |
+| **networkobservability_ip_connection_stats**   | IP connection statistics. | `statistic_name` | ✅ | ❌ |
 | **networkobservability_udp_connection_stats**  | UDP connection statistics. Includes active socket count with `statistic_name="ACTIVE"`. | `statistic_name` | ✅ | ❌ |
 | **networkobservability_interface_stats**       | Interface statistics. | `interface_name`, `statistic_name` | ✅ | ❌ |
 | **networkobservability_dns_request_count**     | Total DNS request count | | ✅ | ❌ |
 | **networkobservability_dns_response_count**    | Total DNS response count | | ✅ | ❌ |
-| **networkobservability_windows_hns_stats**     | Windows HNS statistics (packets sent/received) | `statistic` | ❌ | ✅ |
+| **networkobservability_windows_hns_stats**     | Windows HNS statistics (packets sent/received) | `direction` | ❌ | ✅ |
 | **networkobservability_node_connectivity_status** | Connectivity status between nodes (1=connected, 0=not) | `source_node_name`, `target_node_name` | ✅ | ✅ |
 | **networkobservability_node_connectivity_latency_seconds** | Latency in seconds between nodes | `source_node_name`, `target_node_name` | ✅ | ✅ |
 

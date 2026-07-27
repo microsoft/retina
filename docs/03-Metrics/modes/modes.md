@@ -19,6 +19,8 @@ The larger the cardinality, the more load induced on a Prometheus server for ins
 | Flow processing metrics | ❌ | ❌ | ✅ |
 | Operator required | ❌ | ✅ | ✅ |
 
+> **Note:** `drop_bytes` is only emitted on Linux (Windows supports `drop_count` only).
+
 ## Mode Details
 
 | Mode                                     | Description                                                                                                                                                                                                                        | Scale                                                                                                                                 | Metrics                          | Configuration                                                                                                |

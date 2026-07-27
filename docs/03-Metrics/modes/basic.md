@@ -67,13 +67,11 @@ Metrics enabled when `linuxutil` plugin is enabled (see [Metrics Configuration](
 | Metric Name             | Description                                                                     | Extra Labels                       |
 | ----------------------- | ------------------------------------------------------------------------------- | ---------------------------------- |
 | `tcp_state`             | TCP currently active socket count by TCP state (from `netstats` utility)        | `state`                            |
-| `tcp_connection_remote` | TCP currently active socket count by remote IP/port  (from `netstats` utility)  | `address` (IP), `port`             |
+| `tcp_connection_remote` | TCP currently active socket count by remote address  (from `netstats` utility)  | `address` (IP:port)             |
 | `tcp_connection_stats`  | TCP connection statistics  (from `netstats` utility)                            | `statistic_name`                   |
 | `ip_connection_stats`   | IP connection statistics  (from `netstats` utility)                             | `statistic_name`                   |
 | `udp_connection_stats`  | UDP connection statistics (from `netstats` utility)                             | `statistic_name`                   |
 | `interface_stats`       | interface statistics (from `ethtool` utility)                                   | `interface_name`, `statistic_name` |
-
-> **Note:** `interface_stats` only reports error and drop statistics (stats with "err" or "drop" in the name) and requires `ethtool` support from the network interface. Some cloud/virtual network interfaces may not support ethtool queries. Both `ip_connection_stats` and `interface_stats` omit zero values, so metrics only appear when there is activity to report.
 
 #### Label Values
 
