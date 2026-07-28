@@ -99,12 +99,7 @@ spec:
           #   initialDelaySeconds: 5
           #   periodSeconds: 10
           resources:
-            limits:
-              cpu: 500m
-              memory: 500Mi
-            requests:
-              cpu: 250m
-              memory: 250Mi
+            {{- toYaml .Values.operator.resources | nindent 12 }}
       serviceAccountName: retina-operator
       {{- if .Values.operator.priorityClassName }}
       priorityClassName: {{ .Values.operator.priorityClassName }}
