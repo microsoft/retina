@@ -945,7 +945,6 @@ func resetDownloadGlobals(t *testing.T) {
 
 func TestDownloadAllCapturesGracefulErrorHandling(t *testing.T) {
 	resetDownloadGlobals(t)
-
 	// Test the graceful error handling by testing individual components
 	// that are used in downloadAllCaptures
 

@@ -44,6 +44,7 @@ WORKDIR /
 COPY --from=builder /workspace/kubectl-retina .
 
 # Target 2: Shell-enabled (operational, init container support)
+
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
 # Final image must be $TARGETPLATFORM (default), not $BUILDPLATFORM — the
 # kubectl-retina binary is cross-compiled for the target arch and would fail

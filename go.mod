@@ -1,5 +1,6 @@
 module github.com/microsoft/retina
 
+
 go 1.26.0
 
 require (
