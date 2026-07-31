@@ -553,6 +553,11 @@ hubble:
       # -- Backend port number. Defaults to the service port (80 for plain, 443 for TLS).
       port: ~
 
+    # -- Backend traffic policy for the Hubble Relay GRPCRoute.
+    backendTrafficPolicy:
+      enabled: false
+      spec: {}
+
     # -- Host to listen to. Specify an empty string to bind to all the interfaces.
     listenHost: ""
 
