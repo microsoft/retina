@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-# Default platform commands
+# Default platform commands 
 RMDIR := rm -rf
 
 ## Globals
@@ -346,6 +346,20 @@ kubectl-retina-image:
 			TAG=$(RETINA_PLATFORM_TAG) \
 			CONTEXT_DIR=$(REPO_ROOT) \
 			EXTRA_BUILD_ARGS=$(EXTRA_BUILD_ARGS)
+
+kubectl-retina-shell-image:
+	echo "Building shell-enabled kubectl-retina for $(PLATFORM)"
+	set -e ; \
+	$(MAKE) container-$(CONTAINER_BUILDER) \
+			PLATFORM=$(PLATFORM) \
+			DOCKERFILE=cli/Dockerfile \
+			REGISTRY=$(IMAGE_REGISTRY) \
+			IMAGE=$(KUBECTL_RETINA_SHELL_IMAGE) \
+			VERSION=$(TAG) \
+			TAG=$(RETINA_PLATFORM_TAG) \
+		CONTEXT_DIR=$(REPO_ROOT) \
+		TARGET=shell-target \
+		EXTRA_BUILD_ARGS=$(EXTRA_BUILD_ARGS)
 
 kubectl-retina-shell-image:
 	echo "Building shell-enabled kubectl-retina for $(PLATFORM)"

@@ -208,7 +208,7 @@ func TestParseDNSPayload_Malformed(t *testing.T) {
 func TestHandleDNSEvent_WithPacketData(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
+	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck // mock generated code causes false positive
 	menricher.EXPECT().Write(gomock.Any()).MinTimes(1)
 
 	ch := make(chan *v1.Event, 10)

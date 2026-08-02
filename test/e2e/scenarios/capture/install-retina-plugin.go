@@ -34,7 +34,7 @@ func (i *InstallRetinaPlugin) Run() error {
 	binaryName := "kubectl-retina"
 
 	// Run git rev-parse to find the repository root
-	cmd := exec.Command("git", "rev-parse", "--show-toplevel") // #nosec
+	cmd := exec.Command("git", "rev-parse", "--show-toplevel") //nolint:noctx // #nosec - no context available at this call site
 	output, err := cmd.Output()
 	if err != nil {
 		return errors.Wrap(err, "failed to detect git repository root. Make sure you're running inside a git repository")
@@ -54,7 +54,7 @@ func (i *InstallRetinaPlugin) Run() error {
 	}
 
 	// Build the kubectl-retina binary
-	buildCmd := exec.Command("go", "build", "-o",
+	buildCmd := exec.Command("go", "build", "-o", //nolint:noctx // #nosec - no context available at this call site
 		filepath.Join(InstallRetinaBinaryDir, binaryName),
 		filepath.Join(retinaRepoRoot, "cli", "main.go")) // #nosec
 
@@ -80,7 +80,7 @@ func (i *InstallRetinaPlugin) Run() error {
 	}
 
 	// Verify the plugin is accessible via kubectl
-	verifyCmd := exec.Command("kubectl", "plugin", "list") // #nosec
+	verifyCmd := exec.Command("kubectl", "plugin", "list") //nolint:noctx // #nosec - no context available at this call site
 	verifyOutput, err := verifyCmd.CombinedOutput()
 	if err != nil {
 		log.Printf("Warning: kubectl plugin list command failed: %v. Output: %s", err, verifyOutput)

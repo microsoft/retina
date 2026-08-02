@@ -39,7 +39,7 @@ type testcase struct {
 	wantErr           bool
 }
 
-func randomString(length int) string {
+func randomString(length int) string { //nolint:unparam // length is always 5 but keeping the param for readability
 	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
 	result := make([]byte, length)
 	for i := range result {
@@ -120,7 +120,7 @@ func NewClientServerPods(service, namespace string) []*corev1.Pod {
 func TestCreateJobsWithNamespace(t *testing.T) {
 	// Create a fake Kubernetes client with workload and capture namespaces
 	newKubeclient := func() *fake.Clientset {
-		objects := []runtime.Object{
+		objects := []runtime.Object{ //nolint:prealloc // slice grows dynamically with pods added below
 			NewNode("A1"),
 			NewNode("A2"),
 			NewNode("B1"),
@@ -676,6 +676,7 @@ func TestCreateCaptureCommand_AbsoluteHostPath_ShouldFail(t *testing.T) {
 	require.Contains(t, err.Error(), "OutputConfiguration.HostPath",
 		"error should reference the rejected HostPath field; got: %v", err)
 }
+
 func TestHasRemoteDestination(t *testing.T) {
 	tests := []struct {
 		name string

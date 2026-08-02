@@ -27,6 +27,7 @@ const (
 	interfaceEth0       = "eth0"
 	interfaceEth1       = "eth1"
 	interfaceAny        = "any"
+	tcpdumpBinary       = "tcpdump"
 )
 
 func TestSetupAndCleanup(t *testing.T) {
@@ -108,7 +109,7 @@ func TestTcpdumpEmptyFilter(t *testing.T) {
 
 	// Verify only expected args are present and no malicious content
 	for _, arg := range cmd.Args {
-		if arg != "tcpdump" && arg != "-w" && arg != testCaptureFilePath &&
+		if arg != tcpdumpBinary && arg != "-w" && arg != testCaptureFilePath &&
 			arg != "--relinquish-privileges=root" && arg != "-i" && arg != interfaceAny {
 			t.Errorf("Unexpected argument '%s' found in empty filter command: %v", arg, cmd.Args)
 		}
@@ -308,7 +309,7 @@ func TestTcpdumpBPFFilterOnly(t *testing.T) {
 	}
 
 	// Should have basic structure (tcpdump, -w, path, -i, etc.)
-	if !slices.Contains(cmd.Args, "tcpdump") {
+	if !slices.Contains(cmd.Args, tcpdumpBinary) {
 		t.Errorf("Expected 'tcpdump' in command args, but got: %v", cmd.Args)
 	}
 	if !slices.Contains(cmd.Args, "-w") {
@@ -319,7 +320,7 @@ func TestTcpdumpBPFFilterOnly(t *testing.T) {
 	for _, arg := range cmd.Args {
 		// Skip our internal flags and the BPF filter
 		if arg == "-w" || arg == "-i" || arg == "-s" || arg == "--relinquish-privileges=root" ||
-			arg == testCaptureFilePath || arg == "tcpdump" || arg == "any" || arg == bpfFilter {
+			arg == testCaptureFilePath || arg == tcpdumpBinary || arg == "any" || arg == bpfFilter {
 			continue
 		}
 		// Any other argument starting with '-' is suspicious
@@ -737,7 +738,7 @@ func TestTcpdumpCommandBaseArgs(t *testing.T) {
 	cmd := constructTcpdumpCommand(testCaptureFilePath, "")
 
 	// Verify base args are always present
-	if cmd.Args[0] != "tcpdump" {
+	if cmd.Args[0] != tcpdumpBinary {
 		t.Errorf("Expected first arg to be 'tcpdump', got %s", cmd.Args[0])
 	}
 	if !hasArgPair(cmd, "-w", testCaptureFilePath) {

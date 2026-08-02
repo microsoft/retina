@@ -56,10 +56,10 @@ var (
 		"telemetryInterval smaller than %v is not allowed",
 		MinTelemetryInterval,
 	)
-	DefaultTelemetryInterval          = 15 * time.Minute
-	DefaultSamplingRate        uint32 = 1
-	DefaultFilterMapMaxEntries uint32 = 255
-	DefaultConntrackReportInterval    = 30 * time.Second
+	DefaultTelemetryInterval              = 15 * time.Minute
+	DefaultSamplingRate            uint32 = 1
+	DefaultFilterMapMaxEntries     uint32 = 255
+	DefaultConntrackReportInterval        = 30 * time.Second
 )
 
 func (l *Level) UnmarshalText(text []byte) error {

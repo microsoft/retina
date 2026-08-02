@@ -4,13 +4,12 @@ package utils
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
 	"syscall"
 	"unsafe"
-
-	"errors"
 
 	"github.com/cilium/cilium/api/v1/flow"
 	"github.com/vishvananda/netlink"
