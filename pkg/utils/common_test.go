@@ -8,15 +8,14 @@ import (
 	"time"
 )
 
-func TestBackoffWithJitterStaysWithinBounds(t *testing.T) {
+func TestBackoffWithJitterNeverShorterThanSchedule(t *testing.T) {
 	for attempt := 0; attempt < 6; attempt++ {
 		base := time.Duration(1<<attempt) * time.Second
-		floor := base / 2
 
 		for i := 0; i < 500; i++ {
 			got := backoffWithJitter(attempt)
-			if got < floor || got > base {
-				t.Fatalf("attempt %d: got %v, want within [%v, %v]", attempt, got, floor, base)
+			if got < base || got > 2*base {
+				t.Fatalf("attempt %d: got %v, want within [%v, %v]", attempt, got, base, 2*base)
 			}
 		}
 	}

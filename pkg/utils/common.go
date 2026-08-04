@@ -45,14 +45,16 @@ func StringPtr(v string) *string {
 
 // Exponential backoff retry logic.
 //
-// The delay carries equal jitter: half the computed interval is retained as a
-// floor and the remainder is randomised. Retina runs as a DaemonSet, so an agent
-// on every node executes this loop. The conditions that make a call fail —
-// apiserver or DNS degradation — are typically cluster-wide, meaning every agent
-// enters the loop at once. Without jitter each of them would sleep for exactly
-// 1s, 2s, 4s and so on, so their retries would arrive at the dependency in
-// synchronised waves whose size scales with the node count, which is the load
-// pattern backoff exists to avoid.
+// The delay carries jitter. Retina runs as a DaemonSet, so an agent on every node
+// executes this loop, and the conditions that make a call fail — apiserver or DNS
+// degradation — are typically cluster-wide, meaning every agent enters the loop at
+// once. Without jitter each of them would sleep for exactly 1s, 2s, 4s and so on,
+// so their retries would arrive at the dependency in synchronised waves whose size
+// scales with the node count, which is the load pattern backoff exists to avoid.
+//
+// The jitter is added to the interval rather than centred on it, so a caller never
+// gives up sooner than the deterministic schedule would have. Callers that document
+// a total duration should note that it becomes a lower bound.
 func Retry(f func() error, retry int) (err error) {
 	for i := 0; i < retry; i++ {
 		err = f()
@@ -65,12 +67,11 @@ func Retry(f func() error, retry int) (err error) {
 }
 
 // backoffWithJitter returns the delay for the given zero-based attempt: an
-// exponential interval of 2^attempt seconds with the upper half randomised.
+// exponential interval of 2^attempt seconds, plus up to one further interval.
 func backoffWithJitter(attempt int) time.Duration {
 	base := time.Duration(int64(math.Pow(2, float64(attempt)))) * time.Second
-	half := base / 2
 
-	return half + time.Duration(rand.Int63n(int64(base-half)+1)) //nolint:gosec // spreading load, not a security boundary
+	return base + time.Duration(rand.Int63n(int64(base)+1)) //nolint:gosec // spreading load, not a security boundary
 }
 
 func CompareStringSlice(a, b []string) bool {

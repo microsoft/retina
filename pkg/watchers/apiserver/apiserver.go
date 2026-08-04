@@ -27,7 +27,7 @@ import (
 
 const (
 	filterManagerRetries = 3
-	hostLookupRetries    = 6 // 6 retries for a total of 63 seconds.
+	hostLookupRetries    = 6 // 6 retries, waiting at least 63 seconds in total (jittered, so up to ~126s).
 )
 
 type ApiServerWatcher struct {
