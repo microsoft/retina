@@ -4,6 +4,7 @@ package metrics
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"strings"
 	"sync"
@@ -177,28 +178,20 @@ func (m *Module) Reconcile(spec *api.MetricsSpec) error {
 func (m *Module) updateNamespaceLists(spec *api.MetricsSpec) {
 	if len(spec.Namespaces.Include) > 0 && len(spec.Namespaces.Exclude) > 0 {
 		m.l.Error("Both included and excluded namespaces are specified. Cannot reconcile.")
-	}
-
-	if len(spec.Namespaces.Include) == 0 {
-		m.appendIncludeList([]string{})
-		m.appendExcludeList([]string{})
-	}
-
-	if len(spec.Namespaces.Exclude) == 0 {
-		m.appendIncludeList([]string{})
-		m.appendExcludeList([]string{})
+		return
 	}
 
 	if len(spec.Namespaces.Include) > 0 {
 		m.l.Info("Including namespaces", zap.Strings("namespaces", spec.Namespaces.Include))
-		m.appendIncludeList(spec.Namespaces.Include)
 		m.appendExcludeList([]string{})
-	}
-
-	if len(spec.Namespaces.Exclude) > 0 {
+		m.appendIncludeList(spec.Namespaces.Include)
+	} else if len(spec.Namespaces.Exclude) > 0 {
 		m.l.Info("Excluding namespaces", zap.Strings("namespaces", spec.Namespaces.Exclude))
-		m.appendExcludeList(spec.Namespaces.Exclude)
 		m.appendIncludeList([]string{})
+		m.appendExcludeList(spec.Namespaces.Exclude)
+	} else {
+		m.appendIncludeList([]string{})
+		m.appendExcludeList([]string{})
 	}
 }
 
@@ -221,23 +214,33 @@ func (m *Module) updateMetricsContexts(spec *api.MetricsSpec) {
 	}
 
 	for _, ctxOption := range spec.ContextOptions {
+		var ttl time.Duration
+		var err error
+		if ctxOption.TTL != "" {
+			ttl, err = time.ParseDuration(ctxOption.TTL)
+			// this shouldn't happen since we've already validated the CRD, but put some safety here just in case
+			if err != nil {
+				m.l.Error("Invalid TTL format", zap.String("metricName", ctxOption.MetricName), zap.Error(err))
+				continue
+			}
+		}
 		switch {
 		case strings.Contains(ctxOption.MetricName, forward):
-			fm := NewForwardCountMetrics(&ctxOption, m.l, ctxType)
+			fm := NewForwardCountMetrics(&ctxOption, m.l, ctxType, ttl)
 			if fm != nil {
 				m.registry[ctxOption.MetricName] = fm
 			}
 		case strings.Contains(ctxOption.MetricName, drop):
-			dm := NewDropCountMetrics(&ctxOption, m.l, ctxType)
+			dm := NewDropCountMetrics(&ctxOption, m.l, ctxType, ttl)
 			if dm != nil {
 				m.registry[ctxOption.MetricName] = dm
 			}
 		case strings.Contains(ctxOption.MetricName, tcp):
-			tm := NewTCPMetrics(&ctxOption, m.l, ctxType)
+			tm := NewTCPMetrics(&ctxOption, m.l, ctxType, ttl)
 			if tm != nil {
 				m.registry[ctxOption.MetricName] = tm
 			}
-			tr := NewTCPRetransMetrics(&ctxOption, m.l, ctxType)
+			tr := NewTCPRetransMetrics(&ctxOption, m.l, ctxType, ttl)
 			if tr != nil {
 				m.registry[ctxOption.MetricName] = tr
 			}
@@ -249,7 +252,7 @@ func (m *Module) updateMetricsContexts(spec *api.MetricsSpec) {
 				m.registry[nodeApiserver] = lm
 			}
 		case strings.Contains(ctxOption.MetricName, dns) || strings.Contains(ctxOption.MetricName, pktmon):
-			dm := NewDNSMetrics(&ctxOption, m.l, ctxType)
+			dm := NewDNSMetrics(&ctxOption, m.l, ctxType, ttl)
 			if dm != nil {
 				m.registry[ctxOption.MetricName] = dm
 			}
@@ -383,7 +386,7 @@ func (m *Module) appendIncludeList(namespaces []string) {
 	// toAdd namespace IPs to filter manager
 	for _, ns := range toAdd {
 		ips := m.daemonCache.GetIPsByNamespace(ns)
-		m.l.Info("Adding IPs to filter manager", zap.String("namespace", ns), zap.Any("ips", ips))
+		m.l.Info("Adding IPs to filter manager", zap.String("namespace", ns), zap.String("ips", fmt.Sprint(ips)))
 
 		err := m.filterManager.AddIPs(ips, metricModuleReq, moduleReqMetadata)
 		if err != nil {
@@ -394,7 +397,7 @@ func (m *Module) appendIncludeList(namespaces []string) {
 	// toRemove namespace IPs from filter manager
 	for _, ns := range toRemove {
 		ips := m.daemonCache.GetIPsByNamespace(ns)
-		m.l.Info("Removing IPs from filter manager", zap.String("namespace", ns), zap.Any("ips", ips))
+		m.l.Info("Removing IPs from filter manager", zap.String("namespace", ns), zap.String("ips", fmt.Sprint(ips)))
 
 		err := m.filterManager.DeleteIPs(ips, metricModuleReq, moduleReqMetadata)
 		if err != nil {
@@ -408,8 +411,72 @@ func (m *Module) appendExcludeList(ns []string) {
 		m.excludedNamespaces = make(map[string]struct{})
 	}
 
-	// TODO here we will need to check for IP which
-	// needs to be added to filter manager and which needs to be removed
+	m.l.Info("Appending namespaces to exclude list", zap.Strings("namespaces", ns))
+
+	tempNewNs := make(map[string]struct{})
+	for _, n := range ns {
+		tempNewNs[n] = struct{}{}
+	}
+
+	m.l.Info("Current excluded namespaces", zap.Any("namespaces", m.excludedNamespaces))
+	newlyExcluded, newlyUnexcluded := make([]string, 0), make([]string, 0)
+
+	// Namespaces that are in the new list but not in the old list
+	for _, n := range ns {
+		if _, ok := m.excludedNamespaces[n]; !ok {
+			newlyExcluded = append(newlyExcluded, n)
+		}
+	}
+
+	// Namespaces that were in the old list but not in the new list
+	for n := range m.excludedNamespaces {
+		if _, ok := tempNewNs[n]; !ok {
+			newlyUnexcluded = append(newlyUnexcluded, n)
+		}
+	}
+
+	m.excludedNamespaces = tempNewNs
+
+	m.l.Info("Namespaces newly excluded", zap.Strings("namespaces", newlyExcluded))
+	m.l.Info("Namespaces newly un-excluded", zap.Strings("namespaces", newlyUnexcluded))
+
+	// For newly excluded namespaces: remove their IPs from filtermanager
+	for _, n := range newlyExcluded {
+		ips := m.daemonCache.GetIPsByNamespace(n)
+		m.l.Info("Removing IPs from filter manager (excluded)", zap.String("namespace", n), zap.Any("ips", ips))
+
+		err := m.filterManager.DeleteIPs(ips, metricModuleReq, moduleReqMetadata)
+		if err != nil {
+			m.l.Error("Error removing IPs from filter manager", zap.Error(err))
+		}
+	}
+
+	// For newly un-excluded namespaces: add their IPs to filtermanager
+	for _, n := range newlyUnexcluded {
+		ips := m.daemonCache.GetIPsByNamespace(n)
+		m.l.Info("Adding IPs to filter manager (un-excluded)", zap.String("namespace", n), zap.Any("ips", ips))
+
+		err := m.filterManager.AddIPs(ips, metricModuleReq, moduleReqMetadata)
+		if err != nil {
+			m.l.Error("Error adding IPs to filter manager", zap.Error(err))
+		}
+	}
+
+	// When transitioning to exclude mode, add IPs for all non-excluded namespaces
+	if len(newlyExcluded) > 0 && len(newlyUnexcluded) == 0 && len(newlyExcluded) == len(ns) {
+		allNs := m.daemonCache.GetAllNamespaces()
+		for _, n := range allNs {
+			if _, excluded := m.excludedNamespaces[n]; !excluded {
+				ips := m.daemonCache.GetIPsByNamespace(n)
+				m.l.Info("Adding IPs to filter manager (non-excluded)", zap.String("namespace", n), zap.Any("ips", ips))
+
+				err := m.filterManager.AddIPs(ips, metricModuleReq, moduleReqMetadata)
+				if err != nil {
+					m.l.Error("Error adding IPs to filter manager", zap.Error(err))
+				}
+			}
+		}
+	}
 }
 
 func (m *Module) PodCallBackFn(obj interface{}) {
@@ -429,25 +496,32 @@ func (m *Module) PodCallBackFn(obj interface{}) {
 		return
 	}
 
-	m.Lock()
-	if !m.nsOfInterest(pod.Namespace()) && !m.podOfInterest(ip, pod.Annotations()) {
-		m.Unlock()
+	// Compute interest flags under RLock so we don't race with Reconcile/appendIncludeList
+	// which mutate the namespace maps under Lock.
+	m.RLock()
+	annotated := m.podAnnotated(pod.Annotations())
+	namespaced := m.nsOfInterest(pod.Namespace())
+	m.RUnlock()
+
+	if event.Type != cache.EventTypePodDeleted && !namespaced && !m.filterManager.HasIP(ip) && !annotated {
 		return
 	}
-	m.Unlock()
 
-	handlePodEvent(event, m, pod, ip)
+	handlePodEvent(event, m, pod, ip, annotated, namespaced)
 }
 
-func handlePodEvent(event *cache.CacheEvent, m *Module, pod *common.RetinaEndpoint, ip net.IP) {
+func handlePodEvent(
+	event *cache.CacheEvent, m *Module, pod *common.RetinaEndpoint,
+	ip net.IP, annotated, namespaced bool,
+) {
 	if pod.Name() == common.APIServerEndpointName && pod.Namespace() == common.APIServerEndpointName {
 		m.l.Debug("Ignoring apiserver endpoint")
 		return
 	}
 	podCacheEntry := DirtyCachePod{
 		IP:         ip,
-		Annotated:  m.podAnnotated(pod.Annotations()),
-		Namespaced: m.nsOfInterest(pod.Namespace()),
+		Annotated:  annotated,
+		Namespaced: namespaced,
 	}
 	switch event.Type {
 	case cache.EventTypePodAdded:
@@ -456,13 +530,24 @@ func handlePodEvent(event *cache.CacheEvent, m *Module, pod *common.RetinaEndpoi
 		// This case should only occur when the pod annotation is removed since this is an EventTypePodAdded (also accounts for pod update)
 		if !podCacheEntry.Annotated && !podCacheEntry.Namespaced {
 			m.l.Info("Adding pod IP to DELETE dirty pods cache. Pod not annotated or in namespace of interest.", zap.String("pod name", pod.NamespacedName()))
-			podCacheEntry.Annotated = true
 			m.dirtyPods.ToDelete(ip.String(), podCacheEntry)
 			return
 		}
 		m.l.Info("Adding pod IP to ADD dirty pods cache", zap.String("pod name", pod.NamespacedName()))
 		m.dirtyPods.ToAdd(podCacheEntry.IP.String(), podCacheEntry)
 	case cache.EventTypePodDeleted:
+		// Guard against spurious DELETE events during pod churn / IP reuse.
+		// The cache (pkg/controllers/cache/cache.go) updates its maps synchronously
+		// (epMap/ipToEpKey) and then publishes events asynchronously via a goroutine.
+		// So when we process this DELETE, if a new pod already reused the IP, the
+		// cache will still contain a valid entry. Deleting would incorrectly remove it.
+		if endpoint := m.daemonCache.GetPodByIP(ip.String()); endpoint != nil {
+			m.l.Debug("Ignoring DELETE for reused IP — pod still exists in cache",
+				zap.String("deleted pod", pod.NamespacedName()),
+				zap.String("ip", ip.String()),
+				zap.String("cached pod", endpoint.NamespacedName()))
+			return
+		}
 		m.l.Info("Adding pod IP to DELETE dirty pods cache", zap.String("pod name", pod.NamespacedName()))
 		m.dirtyPods.ToDelete(ip.String(), podCacheEntry)
 	default:
@@ -500,14 +585,14 @@ func (m *Module) applyDirtyPodsAdd() {
 			}
 		}
 		if len(podsToAdd) > 0 {
-			m.l.Debug("Adding annotated pod IPs to filtermap", zap.Any("IPs", podsToAdd))
+			m.l.Debug("Adding annotated pod IPs to filtermap", zap.String("IPs", fmt.Sprint(podsToAdd)))
 			err := m.filterManager.AddIPs(podsToAdd, metricModuleReq, modulePodReqMetadata)
 			if err != nil {
 				m.l.Error("Error adding pod IP to filter manager", zap.Error(err))
 			}
 		}
 		if len(podsToAddNamespaced) > 0 {
-			m.l.Debug("Adding namespaced pod IPs to filtermap", zap.Any("IPs", podsToAddNamespaced))
+			m.l.Debug("Adding namespaced pod IPs to filtermap", zap.String("IPs", fmt.Sprint(podsToAddNamespaced)))
 			err := m.filterManager.AddIPs(podsToAddNamespaced, metricModuleReq, moduleReqMetadata)
 			if err != nil {
 				m.l.Error("Error adding pod IP to filter manager", zap.Error(err))
@@ -517,43 +602,36 @@ func (m *Module) applyDirtyPodsAdd() {
 	m.dirtyPods.ClearAdd()
 }
 
-// applyDirtyPodsDelete deletes pod ips from filtermanager
+// applyDirtyPodsDelete deletes pod ips from filtermanager.
+// Always attempts deletion with both metadata types (pod and namespace).
+// The filtermanager cache makes extra deletes a safe no-op when the metadata doesn't exist.
 func (m *Module) applyDirtyPodsDelete() {
 	deletes := m.dirtyPods.GetDeleteList()
 	if len(deletes) > 0 {
-		podOfInterestDeleteList := make([]net.IP, 0)
-		namespaceOfInterestDeleteList := make([]net.IP, 0)
+		ipsToDelete := make([]net.IP, 0, len(deletes))
 		for _, entry := range deletes {
 			podEntry := entry.(DirtyCachePod)
-			if podEntry.Annotated {
-				podOfInterestDeleteList = append(podOfInterestDeleteList, podEntry.IP)
-			}
-			if podEntry.Namespaced {
-				namespaceOfInterestDeleteList = append(namespaceOfInterestDeleteList, podEntry.IP)
-			}
+			ipsToDelete = append(ipsToDelete, podEntry.IP)
 		}
 
-		if len(podOfInterestDeleteList) > 0 {
-			m.l.Debug("Deleting Ips in dirty pods from filtermap", zap.Any("IPs", podOfInterestDeleteList))
-			err := m.filterManager.DeleteIPs(podOfInterestDeleteList, metricModuleReq, modulePodReqMetadata)
-			if err != nil {
-				m.l.Error("Error deleting pod IP from filter manager", zap.Error(err))
-			}
+		m.l.Debug("Deleting Ips in dirty pods from filtermap", zap.String("IPs", fmt.Sprint(ipsToDelete)))
+		err := m.filterManager.DeleteIPs(ipsToDelete, metricModuleReq, modulePodReqMetadata)
+		if err != nil {
+			m.l.Error("Error deleting pod IP from filter manager", zap.Error(err))
 		}
-		if len(namespaceOfInterestDeleteList) > 0 {
-			m.l.Debug("Deleting Ips in dirty pods from filtermap", zap.Any("IPs", namespaceOfInterestDeleteList))
-			err := m.filterManager.DeleteIPs(namespaceOfInterestDeleteList, metricModuleReq, moduleReqMetadata)
-			if err != nil {
-				m.l.Error("Error deleting pod IP from filter manager", zap.Error(err))
-			}
+		err = m.filterManager.DeleteIPs(ipsToDelete, metricModuleReq, moduleReqMetadata)
+		if err != nil {
+			m.l.Error("Error deleting pod IP from filter manager", zap.Error(err))
 		}
 	}
 
 	m.dirtyPods.ClearDelete()
 }
 
-// nsOfInterest checks if the namespace is in the included or excluded list
-// included namespaces can be defined by crd or automatically applied by annotated namespaces.
+// nsOfInterest checks if the namespace is in the included or excluded list.
+// Included namespaces can be defined by CRD or automatically applied by annotated namespaces.
+// When no namespace filters are configured (both lists empty), returns false — pods must be
+// individually annotated or already present in the filtermap to be tracked.
 func (m *Module) nsOfInterest(ns string) bool {
 	if len(m.includedNamespaces) > 0 {
 		if _, ok := m.includedNamespaces[ns]; ok {

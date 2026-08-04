@@ -3,16 +3,20 @@
 package metrics
 
 import (
+	"log/slog"
+
 	"github.com/microsoft/retina/pkg/exporter"
-	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 )
 
 // Initiates and creates the common metrics
-func InitializeMetrics() {
-	metricsLogger = log.Logger().Named("metrics")
+func InitializeMetrics(logger *slog.Logger) {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	metricsLogger = logger.With("module", "metrics")
 
 	if isInitialized {
 		metricsLogger.Warn("Metrics already initialized. Exiting.")
@@ -156,6 +160,49 @@ func InitializeMetrics() {
 		infinibandStatusParamsGaugeDescription,
 		utils.StatName,
 		utils.InterfaceName,
+	)
+
+	ConntrackPacketsTx = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.DefaultRegistry,
+		utils.ConntrackPacketsTxGaugeName,
+		ConntrackPacketTxDescription,
+	)
+
+	ConntrackPacketsRx = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.DefaultRegistry,
+		utils.ConntrackPacketsRxGaugeName,
+		ConntrackPacketRxDescription,
+	)
+
+	ConntrackBytesTx = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.DefaultRegistry,
+		utils.ConntrackBytesTxGaugeName,
+		ConntrackBytesTxDescription,
+	)
+
+	ConntrackBytesRx = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.DefaultRegistry,
+		utils.ConntrackBytesRxGaugeName,
+		ConntrackBytesRxDescription,
+	)
+
+	ConntrackTotalConnections = exporter.CreatePrometheusGaugeVecForMetric(
+		exporter.DefaultRegistry,
+		utils.ConntrackTotalConnectionsName,
+		ConntrackTotalConnectionsDescription,
+	)
+
+	ParsedPacketsCounter = exporter.CreatePrometheusCounterVecForControlPlaneMetric(
+		exporter.DefaultRegistry,
+		parsedPacketsCounterName,
+		parsedPacketsCounterDescription,
+	)
+
+	MetricsExpiredCounter = exporter.CreatePrometheusCounterVecForControlPlaneMetric(
+		exporter.DefaultRegistry,
+		expiredMetricsCounterName,
+		expiredMetricsCounterDescription,
+		utils.Metric,
 	)
 
 	isInitialized = true

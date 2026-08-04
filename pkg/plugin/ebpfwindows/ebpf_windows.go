@@ -85,10 +85,9 @@ func (p *Plugin) Start(ctx context.Context) error {
 	p.l.Info("Start ebpfWindows plugin...")
 
 	ciliumEnabled, err := isCiliumOnWindowsEnabled()
-
 	if err != nil {
 		p.l.Error("Error while checking if Cilium is enabled on Windows", zap.Error(err))
-		return fmt.Errorf("Failed to check if Cilium is enabled on Windows: %w", err)
+		return fmt.Errorf("failed to check if Cilium is enabled on Windows: %w", err)
 	}
 
 	if !ciliumEnabled {
@@ -131,24 +130,26 @@ func (p *Plugin) metricsMapIterateCallback(key *MetricsKey, value *MetricsValue)
 	}
 	if key.IsDrop() {
 		p.l.Debug("MetricsMapIterateCallback Drop", zap.String("key", key.String()))
-		if key.IsEgress() {
+		switch {
+		case key.IsEgress():
 			metrics.DropBytesGauge.WithLabelValues(key.DropForwardReason(), egressLabel).Set(float64(value.Bytes))
 			metrics.DropPacketsGauge.WithLabelValues(key.DropForwardReason(), egressLabel).Set(float64(value.Count))
-		} else if key.IsIngress() {
+		case key.IsIngress():
 			metrics.DropBytesGauge.WithLabelValues(key.DropForwardReason(), ingressLabel).Set(float64(value.Bytes))
 			metrics.DropPacketsGauge.WithLabelValues(key.DropForwardReason(), ingressLabel).Set(float64(value.Count))
-		} else {
+		default:
 			p.l.Error("MetricsMapIterateCallback drop key is neither ingress nor egress", zap.String("key", key.String()))
 		}
 	} else {
 		p.l.Debug("MetricsMapIterateCallback Forward", zap.String("key", key.String()))
-		if key.IsEgress() {
+		switch {
+		case key.IsEgress():
 			metrics.ForwardPacketsGauge.WithLabelValues(egressLabel).Set(float64(value.Count))
 			metrics.ForwardBytesGauge.WithLabelValues(egressLabel).Set(float64(value.Bytes))
-		} else if key.IsIngress() {
+		case key.IsIngress():
 			metrics.ForwardPacketsGauge.WithLabelValues(ingressLabel).Set(float64(value.Count))
 			metrics.ForwardBytesGauge.WithLabelValues(ingressLabel).Set(float64(value.Bytes))
-		} else {
+		default:
 			p.l.Error("MetricsMapIterateCallback forward key is neither ingress nor egress", zap.String("key", key.String()))
 		}
 	}
@@ -216,16 +217,13 @@ func (p *Plugin) pullMetricsAndEvents(ctx context.Context) {
 			}
 
 			lostEventsCount, err := GetLostEventsCount()
-
 			if err != nil {
 				p.l.Error("Error getting lost events count", zap.Error(err))
-			} else {
+			} else if lostEventsCount > prevLostEventsCount {
 				// The lost events count is cumulative, so we need to calculate the difference
-				if lostEventsCount > prevLostEventsCount {
-					counterToAdd := lostEventsCount - prevLostEventsCount
-					metrics.LostEventsCounter.WithLabelValues(utils.Kernel, name).Add(float64(counterToAdd))
-					prevLostEventsCount = lostEventsCount
-				}
+				counterToAdd := lostEventsCount - prevLostEventsCount
+				metrics.LostEventsCounter.WithLabelValues(utils.Kernel, name).Add(float64(counterToAdd))
+				prevLostEventsCount = lostEventsCount
 			}
 
 		case <-ctx.Done():
@@ -285,8 +283,8 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 		if err != nil {
 			return fmt.Errorf("could not convert dropnotify event to flow: %w", err)
 		}
-		meta := &utils.RetinaMetadata{}
-		utils.AddPacketSize(meta, size-uint32(unsafe.Sizeof(DropNotify{})))
+		ext := utils.NewExtensions()
+		utils.AddPacketSize(ext, size-uint32(unsafe.Sizeof(DropNotify{})))
 		fl := e.GetFlow()
 		if fl == nil {
 			return fmt.Errorf("%w", errNilDropNotifyFlow)
@@ -299,8 +297,8 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 		}
 		// Set the drop reason.
 		eventType := fl.GetEventType().GetSubType()
-		meta.DropReason = utils.DropReason(eventType)
-		utils.AddRetinaMetadata(fl, meta)
+		utils.AddDropReason(fl, ext, uint16(eventType)) //nolint:gosec // eventType values are bounded drop reason codes that fit in uint16
+		utils.SetExtensions(fl, ext)
 		p.enricher.Write(e)
 	case monitorAPI.MessageTypeTrace:
 		e := &v1.Event{}
@@ -315,8 +313,8 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 		if err != nil {
 			return fmt.Errorf("could not convert tracenotify event to flow: %w", err)
 		}
-		meta := &utils.RetinaMetadata{}
-		utils.AddPacketSize(meta, size-uint32(unsafe.Sizeof(TraceNotify{})))
+		ext := utils.NewExtensions()
+		utils.AddPacketSize(ext, size-uint32(unsafe.Sizeof(TraceNotify{})))
 		fl := e.GetFlow()
 		if fl == nil {
 			return fmt.Errorf("%w", errNilTraceNotifyFlow)
@@ -324,7 +322,7 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 		if fl.GetIP() == nil {
 			return fmt.Errorf("%w; perfdata: %v;", errNilDropNotifyEvent, perfData)
 		}
-		utils.AddRetinaMetadata(fl, meta)
+		utils.SetExtensions(fl, ext)
 		p.enricher.Write(e)
 
 	case MessageTypePktmonDrop:
@@ -340,8 +338,8 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 		if err != nil {
 			return fmt.Errorf("could not convert pktmon dropnotify event to flow: %w", err)
 		}
-		meta := &utils.RetinaMetadata{}
-		utils.AddPacketSize(meta, size-uint32(unsafe.Sizeof(DropNotify{})))
+		ext := utils.NewExtensions()
+		utils.AddPacketSize(ext, size-uint32(unsafe.Sizeof(DropNotify{})))
 		fl := e.GetFlow()
 		if fl == nil {
 			return fmt.Errorf("%w", errNilDropNotifyFlow)
@@ -354,8 +352,8 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 		}
 		// Set the drop reason.
 		eventType := fl.GetEventType().GetSubType()
-		meta.DropReason = utils.DropReason(eventType)
-		utils.AddRetinaMetadata(fl, meta)
+		utils.AddDropReason(fl, ext, uint16(eventType)) //nolint:gosec // eventType values are bounded drop reason codes that fit in uint16
+		utils.SetExtensions(fl, ext)
 		p.enricher.Write(e)
 	}
 	return nil

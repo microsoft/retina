@@ -10,6 +10,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"testing"
 	"time"
@@ -32,7 +33,10 @@ const (
 	pktSizeBytes = 100
 )
 
-var errTestFailure = errors.New("test failure")
+var (
+	errTestFailure    = errors.New("test failure")
+	errModuleNotFound = errors.New("module not found")
+)
 
 func makeMockEthernetIPv4TCPPacket() []byte {
 	eth := &layers.Ethernet{
@@ -396,7 +400,7 @@ func TestHandleTraceEvent_InvalidSizeZero(t *testing.T) {
 // TestMetricsMapIterateCallback_DropEgress tests the behavior of the metricsMapIterateCallback function
 // when a drop event is received for egress traffic.
 func TestMetricsMapIterateCallback_DropEgress(t *testing.T) {
-	metrics.InitializeMetrics()
+	metrics.InitializeMetrics(slog.Default())
 	p := &Plugin{
 		cfg: &kcfg.Config{
 			MetricsInterval: 100 * time.Second,
@@ -425,7 +429,7 @@ func TestMetricsMapIterateCallback_DropEgress(t *testing.T) {
 // TestMetricsMapIterateCallback_DropIngress tests the behavior of the metricsMapIterateCallback function
 // when a drop event is received for ingress traffic.
 func TestMetricsMapIterateCallback_DropIngress(t *testing.T) {
-	metrics.InitializeMetrics()
+	metrics.InitializeMetrics(slog.Default())
 	p := &Plugin{
 		cfg: &kcfg.Config{
 			MetricsInterval: 100 * time.Second,
@@ -454,7 +458,7 @@ func TestMetricsMapIterateCallback_DropIngress(t *testing.T) {
 // TestMetricsMapIterateCallback_ForwardEgress tests the behavior of the metricsMapIterateCallback function
 // when a forward event is received for egress traffic.
 func TestMetricsMapIterateCallback_ForwardEgress(t *testing.T) {
-	metrics.InitializeMetrics()
+	metrics.InitializeMetrics(slog.Default())
 	p := &Plugin{
 		cfg: &kcfg.Config{
 			MetricsInterval: 100 * time.Second,
@@ -483,7 +487,7 @@ func TestMetricsMapIterateCallback_ForwardEgress(t *testing.T) {
 // TestMetricsMapIterateCallback_ForwardIngress tests the behavior of the metricsMapIterateCallback function
 // when a forward event is received for ingress traffic.
 func TestMetricsMapIterateCallback_ForwardIngress(t *testing.T) {
-	metrics.InitializeMetrics()
+	metrics.InitializeMetrics(slog.Default())
 	p := &Plugin{
 		cfg: &kcfg.Config{
 			MetricsInterval: 100 * time.Second,
@@ -519,7 +523,7 @@ func TestMetricsMapIterateCallback_NilKey(t *testing.T) {
 		}
 	}()
 
-	metrics.InitializeMetrics()
+	metrics.InitializeMetrics(slog.Default())
 	p := &Plugin{
 		cfg: &kcfg.Config{
 			MetricsInterval: 100 * time.Second,
@@ -541,7 +545,7 @@ func TestMetricsMapIterateCallback_NilValue(t *testing.T) {
 		}
 	}()
 
-	metrics.InitializeMetrics()
+	metrics.InitializeMetrics(slog.Default())
 	p := &Plugin{
 		cfg: &kcfg.Config{
 			MetricsInterval: 100 * time.Second,
@@ -761,7 +765,7 @@ func TestStart_GracefullySkipsWhenRetinaEbpfAPIMissing(t *testing.T) {
 		return true, nil
 	}
 	loadRetinaEbpfAPI = func() error {
-		return fmt.Errorf("module not found")
+		return errModuleNotFound
 	}
 	defer func() {
 		isCiliumOnWindowsEnabled = origIsCiliumOnWindowsEnabled

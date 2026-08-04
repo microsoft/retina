@@ -10,7 +10,7 @@ import (
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/perf"
+	"github.com/cilium/ebpf/link"
 	tc "github.com/florianl/go-tc"
 	nl "github.com/mdlayher/netlink"
 	"github.com/vishvananda/netlink"
@@ -28,6 +28,7 @@ const (
 	TCPFlagURG
 	TCPFlagECE
 	TCPFlagCWR
+	TCPFlagNS
 )
 
 const (
@@ -50,6 +51,12 @@ const (
 	Device interfaceType = "device"
 )
 
+const (
+	ringBufMinKernelMajor = 5
+	ringBufMinKernelMinor = 8
+	ringBufMinKernelPatch = 0
+)
+
 var (
 	getQdisc = func(tcnl nltc) qdisc {
 		return tcnl.Qdisc()
@@ -68,18 +75,33 @@ var (
 	perCPUBuffer = 32
 )
 
-type tcKey struct {
+// attachmentKey uniquely identifies a network interface for BPF program attachment.
+type attachmentKey struct {
 	name         string
 	hardwareAddr string
 	netNs        int
 }
 
-type tcValue struct {
+// attachmentType represents the method used to attach BPF programs.
+type attachmentType int
+
+const (
+	attachmentTypeTC  attachmentType = iota // Traditional TC with clsact qdisc
+	attachmentTypeTCX                       // TCX (TC eXpress) - kernel 6.6+
+)
+
+// attachmentValue stores the attachment details for a network interface.
+type attachmentValue struct {
+	// TC-specific fields
 	tc    nltc
 	qdisc *tc.Object
+	// TCX-specific fields
+	attachmentType attachmentType
+	tcxIngressLink link.Link
+	tcxEgressLink  link.Link
 }
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=types_linux.go -destination=mocks/mock_types.go -package=mocks
+//go:generate go run go.uber.org/mock/mockgen@v0.4.0 -source=types_linux.go -destination=mocks/mock_types_linux.go -package=mocks -exclude_interfaces=perfReader
 
 // tc qdisc interface
 type qdisc interface {
@@ -101,8 +123,15 @@ type nltc interface {
 }
 
 type perfReader interface {
-	Read() (perf.Record, error)
+	Read() (perfRecord, error)
 	Close() error
+}
+
+type perfRecord struct {
+	CPU         int
+	LostSamples uint64
+	RawSample   []byte
+	Remaining   int
 }
 
 type packetParser struct {
@@ -110,10 +139,10 @@ type packetParser struct {
 	l          *log.ZapLogger
 	callbackID string
 	objs       *packetparserObjects //nolint:typecheck
-	// tcMap is a map of key to *val.
-	tcMap    *sync.Map
-	reader   perfReader
-	enricher enricher.EnricherInterface
+	// attachmentMap is a map of interface key to attachment details (TC or TCX).
+	attachmentMap *sync.Map
+	reader        perfReader
+	enricher      enricher.EnricherInterface
 	// interfaceLockMap is a map of key to *sync.Mutex.
 	interfaceLockMap    *sync.Map
 	endpointIngressInfo *ebpf.ProgramInfo
@@ -121,12 +150,13 @@ type packetParser struct {
 	hostIngressInfo     *ebpf.ProgramInfo
 	hostEgressInfo      *ebpf.ProgramInfo
 	wg                  sync.WaitGroup
-	recordsChannel      chan perf.Record
+	recordsChannel      chan perfRecord
 	externalChannel     chan *v1.Event
+	tcxSupported        bool // Whether TCX is supported on this system
 }
 
-func ifaceToKey(iface netlink.LinkAttrs) tcKey {
-	return tcKey{
+func ifaceToKey(iface netlink.LinkAttrs) attachmentKey {
+	return attachmentKey{
 		name:         iface.Name,
 		hardwareAddr: iface.HardwareAddr.String(),
 		netNs:        iface.NetNsID,

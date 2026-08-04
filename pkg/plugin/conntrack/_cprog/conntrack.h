@@ -25,8 +25,6 @@
 #define CT_CONNECTION_LIFETIME_NONTCP 60
 // Define how long a TCP connection should be kept alive after receiving the first SYN
 #define CT_SYN_TIMEOUT 60
-// Define the interval at which a packet should be sent to the userspace
-#define CT_REPORT_INTERVAL 30
 // Define the maximum number of connections that can be stored in the conntrack table
 #define CT_MAP_SIZE 262144
 
@@ -38,6 +36,7 @@
 #define TCP_URG 0x20
 #define TCP_ECE 0x40
 #define TCP_CWR 0x80
+#define TCP_NS 0x100
 
 #define CT_PACKET_DIR_TX 0x00
 #define CT_PACKET_DIR_RX 0x01

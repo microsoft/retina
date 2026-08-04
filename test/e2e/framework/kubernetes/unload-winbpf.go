@@ -12,7 +12,7 @@ type UnLoadAndPinWinBPF struct {
 }
 
 func (a *UnLoadAndPinWinBPF) Run() error {
-	UnLoadAndPinWinBPFDLabelSelector := fmt.Sprintf("name=%s", a.UnLoadAndPinWinBPFDeamonSetName)
+	UnLoadAndPinWinBPFDLabelSelector := "name=" + a.UnLoadAndPinWinBPFDeamonSetName
 	output, err := ExecCommandInWinPod(a.KubeConfigFilePath, "C:\\event-writer-helper.bat EventWriter-UnPinPrgAndMaps", a.UnLoadAndPinWinBPFDeamonSetNamespace, UnLoadAndPinWinBPFDLabelSelector, false)
 	if err != nil {
 		return err

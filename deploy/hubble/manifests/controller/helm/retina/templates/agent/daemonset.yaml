@@ -8,6 +8,8 @@ metadata:
   namespace: {{ .Values.namespace }}
   labels:
     k8s-app: {{ include "retina.name" . }}
+    app.kubernetes.io/name: {{ include "retina.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
   selector:
     matchLabels:
@@ -17,6 +19,8 @@ spec:
       labels:
         app: {{ include "retina.name" . }}
         k8s-app: {{ include "retina.name" . }}
+        app.kubernetes.io/name: {{ include "retina.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
       annotations:
         prometheus.io/port: "{{ .Values.retinaPort }}"
         prometheus.io/scrape: "true"
@@ -24,6 +28,7 @@ spec:
     spec:
       hostNetwork: true
       serviceAccountName: {{ .Values.serviceAccount.name }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
       {{- if .Values.priorityClassName }}
       priorityClassName: {{ .Values.priorityClassName }}
       {{- end }}
@@ -54,8 +59,10 @@ spec:
             mountPath: /var/run/cilium
           - name: config
             mountPath: /retina/config
+          - name: tmp
+            mountPath: /tmp
       containers:
-        - name: {{ include "retina.name" . }} 
+        - name: {{ include "retina.name" . }}
           image: {{ .Values.agent.repository }}:{{ .Values.agent.tag }}
           imagePullPolicy: {{ .Values.agent.pullPolicy }}
           {{- if .Values.agent.container.retina.command }}
@@ -75,6 +82,9 @@ spec:
           ports:
           - containerPort: {{ .Values.agent.container.retina.ports.containerPort }}
           resources:
+            requests:
+              memory: {{ .Values.resources.requests.memory | quote }}
+              cpu: {{ .Values.resources.requests.cpu | quote }}
             limits:
               memory: {{ .Values.resources.limits.memory | quote }}
               cpu: {{ .Values.resources.limits.cpu | quote }}
@@ -120,6 +130,10 @@ spec:
               mountPath: /sys/kernel/tracing
             - name: cilium
               mountPath: /var/run/cilium
+            - name: host-os-release
+              mountPath: /etc/os-release
+            - name: tmp
+              mountPath: /tmp
           {{- if .Values.hubble.tls.enabled }}
             - name: tls
               mountPath: /var/lib/cilium/tls/hubble
@@ -146,6 +160,12 @@ spec:
         hostPath:
           path: /var/run/cilium
           type: DirectoryOrCreate
+      - name: host-os-release
+        hostPath:
+          path: /etc/os-release
+          type: FileOrCreate
+      - name: tmp
+        emptyDir: {}
       {{- if .Values.hubble.tls.enabled }}
       - name: tls
         projected:
@@ -188,13 +208,14 @@ spec:
       namespace: {{ .Values.namespace }}
     spec:
       serviceAccountName: {{ .Values.serviceAccount.name }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
       {{- with .Values.imagePullSecrets }}
       {{- if .Values.priorityClassName }}
       priorityClassName: {{ .Values.priorityClassName }}
       {{- end }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
-      {{- end }}      
+      {{- end }}
       securityContext:
         windowsOptions:
           hostProcess: true

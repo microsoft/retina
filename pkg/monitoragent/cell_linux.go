@@ -2,16 +2,17 @@ package monitoragent
 
 import (
 	"context"
+	"log/slog"
+	"sync"
 
 	"github.com/cilium/cilium/pkg/defaults"
-	"github.com/cilium/cilium/pkg/logging"
 	"github.com/cilium/cilium/pkg/logging/logfields"
 	ciliumagent "github.com/cilium/cilium/pkg/monitor/agent"
 	"github.com/cilium/cilium/pkg/monitor/agent/consumer"
 	"github.com/cilium/cilium/pkg/monitor/agent/listener"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/hive/cell"
-	"github.com/sirupsen/logrus"
+	retinalog "github.com/microsoft/retina/pkg/log"
 	"github.com/spf13/pflag"
 )
 
@@ -24,8 +25,18 @@ var (
 		cell.Config(defaultConfig),
 	)
 
-	log = logging.DefaultLogger.WithField(logfields.LogSubsys, "monitor-agent")
+	logOnce   sync.Once
+	cachedLog *slog.Logger
 )
+
+// log returns a zap-backed slog logger. Resolved lazily so that SetupZapLogger
+// (run at program startup, after package init) is the source.
+func log() *slog.Logger {
+	logOnce.Do(func() {
+		cachedLog = retinalog.SlogLogger().With(logfields.LogSubsys, "monitor-agent")
+	})
+	return cachedLog
+}
 
 type AgentConfig struct {
 	// EnableMonitor enables the monitor unix domain socket server
@@ -48,7 +59,6 @@ type agentParams struct {
 	cell.In
 
 	Lifecycle cell.Lifecycle
-	Log       logrus.FieldLogger
 	Config    AgentConfig
 }
 

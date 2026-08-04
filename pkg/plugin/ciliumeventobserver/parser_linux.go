@@ -17,8 +17,7 @@ import (
 )
 
 var (
-	ErrNotImplemented = errors.New("Error, not implemented")
-	ErrEmptyData      = errors.New("empty data")
+	ErrEmptyData = errors.New("empty data")
 )
 
 func (p *parser) Init() error {
@@ -31,7 +30,6 @@ func (p *parser) Init() error {
 		&hptestutils.NoopServiceGetter,
 		&hptestutils.NoopLinkGetter,
 		&hptestutils.NoopPodMetadataGetter,
-		true,
 	)
 	if err != nil {
 		p.l.Fatal("Failed to create parser", zap.Error(err))
@@ -75,7 +73,7 @@ func (p *parser) Decode(pl *payload.Payload) (*v1.Event, error) {
 			// Log Records can be DNS traces for CNP related pods
 			// AccessLogs can also reflect kafka related metrics
 			monEvent.Payload = &observerTypes.AgentEvent{}
-			return nil, ErrNotImplemented //nolint:goerr113 //no specific handling expected
+			return nil, nil //nolint:goerr113 //no specific handling expected
 		// MessageTypeTraceSock and MessageTypeDebug are also perf events but have their own dedicated decoders in cilium.
 		case monitorAPI.MessageTypeDrop, monitorAPI.MessageTypeTrace, monitorAPI.MessageTypePolicyVerdict, monitorAPI.MessageTypeCapture:
 			perfEvent := &observerTypes.PerfEvent{}

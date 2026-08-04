@@ -12,6 +12,7 @@ metadata:
     k8s-app: hubble-ui
     app.kubernetes.io/name: hubble-ui
     app.kubernetes.io/part-of: cilium
+    app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
   replicas: {{ .Values.hubble.ui.replicas }}
   selector:
@@ -35,6 +36,7 @@ spec:
         k8s-app: hubble-ui
         app.kubernetes.io/name: hubble-ui
         app.kubernetes.io/part-of: cilium
+        app.kubernetes.io/instance: {{ .Release.Name }}
         {{- with .Values.hubble.ui.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

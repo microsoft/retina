@@ -60,8 +60,8 @@ func (a *ApplyYamlConfig) Run() error {
 	reader := bytes.NewReader(yamlFile)
 	decoder := yaml.NewYAMLOrJSONDecoder(reader, 100)
 	var rawObj unstructured.Unstructured
-	if err := decoder.Decode(&rawObj); err != nil {
-		return fmt.Errorf("error decoding YAML file: %w", err)
+	if decodeErr := decoder.Decode(&rawObj); decodeErr != nil {
+		return fmt.Errorf("error decoding YAML file: %w", decodeErr)
 	}
 
 	// Get GroupVersionResource to invoke the dynamic client
@@ -74,7 +74,7 @@ func (a *ApplyYamlConfig) Run() error {
 
 	// Apply the YAML document
 	namespace := rawObj.GetNamespace()
-	if len(namespace) == 0 {
+	if namespace == "" {
 		namespace = "default"
 	}
 	applyOpts := metav1.ApplyOptions{FieldManager: "kube-apply"}

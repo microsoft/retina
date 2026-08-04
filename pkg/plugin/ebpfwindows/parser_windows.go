@@ -15,7 +15,6 @@ import (
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	observerTypes "github.com/cilium/cilium/pkg/hubble/observer/types"
 	"github.com/cilium/cilium/pkg/hubble/parser/errors"
-	"github.com/cilium/cilium/pkg/hubble/parser/options"
 	"github.com/cilium/cilium/pkg/lock"
 	monitorAPI "github.com/cilium/cilium/pkg/monitor/api"
 	"github.com/gopacket/gopacket"
@@ -25,8 +24,10 @@ import (
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
-const MaxInt = int(^uint(0) >> 1)
-const MessageTypePktmonDrop = 100
+const (
+	MaxInt                = int(^uint(0) >> 1)
+	MessageTypePktmonDrop = 100
+)
 
 type PktmonPacketType uint8
 
@@ -48,16 +49,17 @@ const (
 
 // Parser is a parser for L3/L4 payloads
 type Parser struct {
-	log                 *slog.Logger
-	epResolver          *EndpointResolver
-	correlateL3L4Policy bool
-	packet              *packet
+	log        *slog.Logger
+	epResolver *EndpointResolver
+	packet     *packet
 }
 
 var (
-	errDataOffsetTooLarge = errorTypes.New("data offset too large")
-	errNotEnoughBytes     = errorTypes.New("not enough bytes to decode")
-	errDropReasonOverflow = errorTypes.New("drop reason exceeds int32 range")
+	errDataOffsetTooLarge          = errorTypes.New("data offset too large")
+	errNotEnoughBytes              = errorTypes.New("not enough bytes to decode")
+	errDropReasonOverflow          = errorTypes.New("drop reason exceeds int32 range")
+	errUnsupportedIPPacketType     = errorTypes.New("decode layers failed for unsupported IP packet type")
+	errUnsupportedPktmonPacketType = errorTypes.New("decode layers failed for unsupported packet type")
 )
 
 // re-usable packet to avoid reallocating gopacket datastructures
@@ -83,7 +85,6 @@ type packet struct {
 // New returns a new L3/L4 parser
 func NewParser(
 	log *slog.Logger,
-	opts ...options.Option,
 ) (*Parser, error) {
 	packet := &packet{}
 	decoders := []gopacket.DecodingLayer{
@@ -102,19 +103,10 @@ func NewParser(
 	packet.decLayerL3Dev.IPv4.IgnoreUnsupported = true
 	packet.decLayerL3Dev.IPv6.IgnoreUnsupported = true
 
-	args := &options.Options{
-		EnableNetworkPolicyCorrelation: true,
-	}
-
-	for _, opt := range opts {
-		opt(args)
-	}
-
 	return &Parser{
-		log:                 log,
-		epResolver:          NewEndpointResolver(log),
-		packet:              packet,
-		correlateL3L4Policy: args.EnableNetworkPolicyCorrelation,
+		log:        log,
+		epResolver: NewEndpointResolver(log),
+		packet:     packet,
 	}, nil
 }
 
@@ -163,7 +155,7 @@ func (p *Parser) Decode(monitorEvent *observerTypes.MonitorEvent) (*v1.Event, er
 }
 
 // Decode decodes the data from 'data' into 'decoded'
-func (p *Parser) decode(data []byte, decoded *pb.Flow) error {
+func (p *Parser) decode(data []byte, decoded *pb.Flow) error { //nolint:gocyclo // complexity is inherent to protocol decoding logic
 	if len(data) == 0 {
 		return errors.ErrEmptyData
 	}
@@ -256,10 +248,10 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error {
 				case 0x6:
 					err = p.packet.decLayerL3Dev.IPv6.DecodeLayers(data[packetOffset:], &p.packet.Layers)
 				default:
-					return fmt.Errorf("decode layers failed for unsupported IP packet type starting with %d, data: %v", data[packetOffset], data[packetOffset:])
+					return fmt.Errorf("%w: starting with %d, data: %v", errUnsupportedIPPacketType, data[packetOffset], data[packetOffset:])
 				}
 			default:
-				return fmt.Errorf("decode layers failed for unsupported packet type %d, data: %v", pdn.PktmonHeader.Metadata.PacketType, data[packetOffset:])
+				return fmt.Errorf("%w: %d, data: %v", errUnsupportedPktmonPacketType, pdn.PktmonHeader.Metadata.PacketType, data[packetOffset:])
 			}
 		} else {
 			var isL3Device, isIPv6 bool
@@ -548,7 +540,7 @@ func decodeIsReply(tn *TraceNotify) *wrapperspb.BoolValue {
 func decodeCiliumEventType(eventType uint8, eventSubType uint32) *pb.CiliumEventType {
 	return &pb.CiliumEventType{
 		Type:    int32(eventType),
-		SubType: int32(eventSubType),
+		SubType: int32(eventSubType), //nolint:gosec // eventSubType is a bounded event code that fits in int32
 	}
 }
 
