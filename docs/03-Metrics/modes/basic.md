@@ -67,13 +67,15 @@ Metrics enabled when `linuxutil` plugin is enabled (see [Metrics Configuration](
 | Metric Name             | Description                                                                     | Extra Labels                       |
 | ----------------------- | ------------------------------------------------------------------------------- | ---------------------------------- |
 | `tcp_state`             | TCP currently active socket count by TCP state (from `netstats` utility)        | `state`                            |
-| `tcp_connection_remote` | TCP currently active socket count by remote address  (from `netstats` utility)  | `address` (IP:port)             |
+| `tcp_connection_remote` | TCP currently active socket count against remote addresses, aggregated (from `netstats` utility)  | `address` (always `AllIPs`)             |
 | `tcp_connection_stats`  | TCP connection statistics  (from `netstats` utility)                            | `statistic_name`                   |
 | `ip_connection_stats`   | IP connection statistics  (from `netstats` utility)                             | `statistic_name`                   |
 | `udp_connection_stats`  | UDP connection statistics (from `netstats` utility)                             | `statistic_name`                   |
 | `interface_stats`       | interface statistics (from `ethtool` utility)                                   | `interface_name`, `statistic_name` |
 
 #### Label Values
+
+The `address` label of `tcp_connection_remote` is always `AllIPs`. Individual remote IP/port pairs are not exported, since that would make the metric's cardinality grow with the number of remote endpoints a node talks to.
 
 Possible values for TCP `state`:
 

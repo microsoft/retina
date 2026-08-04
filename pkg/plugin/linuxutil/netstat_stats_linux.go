@@ -17,8 +17,10 @@ import (
 )
 
 const (
-	pathNetNetstat       = "/proc/net/netstat"
-	pathNetSnmp          = "/proc/net/snmp"
+	pathNetNetstat = "/proc/net/netstat"
+	pathNetSnmp    = "/proc/net/snmp"
+	// Remote sockets are aggregated under a single label value on purpose - exporting one
+	// series per remote IP/port makes the cardinality of this metric unbounded.
 	addrDefaultTCPRemote = "AllIPs"
 )
 
