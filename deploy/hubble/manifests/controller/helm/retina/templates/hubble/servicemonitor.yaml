@@ -3,9 +3,9 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: hubble
-  namespace: {{ .Values.prometheus.serviceMonitor.namespace | default .Release.Namespace }}
+  namespace: {{ .Release.Namespace }}
   labels:
-    app.kubernetes.io/part-of: cilium
+    app.kubernetes.io/part-of: retina
     {{- with .Values.hubble.metrics.serviceMonitor.labels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
@@ -21,12 +21,12 @@ metadata:
 spec:
   selector:
     matchLabels:
-      k8s-app: hubble
+      k8s-app: networkobservability
   namespaceSelector:
     matchNames:
     - {{ .Release.Namespace }}
   endpoints:
-  - port: hubble-metrics
+  - port: hubble
     interval: {{ .Values.hubble.metrics.serviceMonitor.interval | quote }}
     honorLabels: true
     path: /metrics
