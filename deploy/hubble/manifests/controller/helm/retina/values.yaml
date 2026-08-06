@@ -257,9 +257,9 @@ hubble:
       jobLabel: ""
       # -- Labels used to select the Service that exposes Hubble metrics.
       selectorLabels:
-        k8s-app: networkobservability
+        k8s-app: hubble
       # -- Name of the Hubble metrics port on the selected Service.
-      port: hubble
+      port: hubble-metrics
       # -- Interval for scrape metrics.
       interval: "10s"
       # -- Relabeling configs for the ServiceMonitor hubble
