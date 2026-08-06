@@ -223,7 +223,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage v1.8.1
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.8.0
 	github.com/Microsoft/hcsshim v0.14.1
-	github.com/aws/aws-sdk-go-v2 v1.43.1
+	github.com/aws/aws-sdk-go-v2 v1.43.2
 	github.com/aws/aws-sdk-go-v2/config v1.32.32
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.31
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.106.1
