@@ -436,12 +436,14 @@ hubble:
     rollOutPods: false
 
     # -- Hubble-relay container image.
+    # Official Cilium registry. Pick the latest patch of a maintained Cilium
+    # minor: https://quay.io/repository/cilium/hubble-relay?tab=tags
     image:
       override: ~
-      repository: "mcr.microsoft.com/oss/cilium/hubble-relay"
-      tag: "v1.15.0"
-      digest: "sha256:19cd56e7618832257bf88b2f281287cb57f9f7fcb9e04775a6198d4bc4daffae"
-      useDigest: false
+      repository: "quay.io/cilium/hubble-relay"
+      tag: "v1.19.5"
+      digest: "sha256:24409bfa1bca075c92acb26ba4b49cd573d99d68d5370f7cc825078185222a0c"
+      useDigest: true
       pullPolicy: "Always"
 
     # -- Specifies the resources for the hubble-relay pods
@@ -548,6 +550,9 @@ hubble:
 
     # -- Port to listen to.
     listenPort: "4245"
+
+    # -- Port for the relay's dedicated gRPC health server
+    grpcHealthPort: "4222"
 
     # -- TLS configuration for Hubble Relay
     tls:
@@ -682,9 +687,9 @@ hubble:
       # -- Hubble-ui backend image.
       image:
         override: ~
-        repository: "mcr.microsoft.com/oss/cilium/hubble-ui-backend"
-        tag: "v0.12.2"
-        digest: "sha256:b73dd1ac1b7159d42cdba31433964313e756daafefffad5e91c3b61b47c3782f"
+        repository: "quay.io/cilium/hubble-ui-backend"
+        tag: "v0.13.5"
+        digest: "sha256:fac0c300ae119274edca11fd89b1ad23c788792d8bc4ea2ba631c709e8d3c688"
         useDigest: true
         pullPolicy: "Always"
 
@@ -721,9 +726,9 @@ hubble:
       # -- Hubble-ui frontend image.
       image:
         override: ~
-        repository: "mcr.microsoft.com/oss/cilium/hubble-ui"
-        tag: "v0.12.2"
-        digest: "sha256:8c53cdaebb4ae863ad061387a68ea06e38777d2911e6c0e570be1932bb4ba526"
+        repository: "quay.io/cilium/hubble-ui"
+        tag: "v0.13.5"
+        digest: "sha256:f7d514fc54d784ed6df9d58cf0e97648b143f92b766dd1780ed3fc845bd4c516"
         useDigest: true
         pullPolicy: "Always"
 

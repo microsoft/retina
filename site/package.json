@@ -25,7 +25,7 @@
     "micromatch": "^4.0.8",
     "prism-react-renderer": "^2.4.1",
     "react": "^19.2.5",
-    "react-dom": "^19.2.7",
+    "react-dom": "^19.2.8",
     "sharp": "^0.35.3"
   },
   "devDependencies": {
@@ -52,6 +52,8 @@
     "node": ">=18.0.0"
   },
   "overrides": {
-    "serialize-javascript": ">=7.0.5"
+    "serialize-javascript": ">=7.0.5",
+    "sharp": "^0.35.3",
+    "uuid": "^11.1.1"
   }
 }
