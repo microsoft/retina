@@ -247,12 +247,19 @@ hubble:
       # This requires the prometheus CRDs to be available.
       # ref: https://github.com/prometheus-operator/prometheus-operator/blob/main/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml)
       enabled: false
+      # -- Namespace in which to create the ServiceMonitor. Defaults to the release namespace.
+      namespace: ""
       # -- Labels to add to ServiceMonitor hubble
       labels: {}
       # -- Annotations to add to ServiceMonitor hubble
       annotations: {}
       # -- jobLabel to add for ServiceMonitor hubble
       jobLabel: ""
+      # -- Labels used to select the Service that exposes Hubble metrics.
+      selectorLabels:
+        k8s-app: networkobservability
+      # -- Name of the Hubble metrics port on the selected Service.
+      port: hubble
       # -- Interval for scrape metrics.
       interval: "10s"
       # -- Relabeling configs for the ServiceMonitor hubble
