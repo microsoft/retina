@@ -43,7 +43,7 @@ spec:
       {{- end }}
       initContainers:
         - name: retina-agent-init
-          image: {{ .Values.agent.init.repository }}:{{ .Values.agent.init.tag }}
+          image: {{ .Values.agent.init.repository }}:{{ .Values.agent.init.tag | default .Chart.Version }}
           imagePullPolicy: {{ .Values.agent.pullPolicy }}
           args:
             - --config
@@ -63,7 +63,7 @@ spec:
             mountPath: /tmp
       containers:
         - name: {{ include "retina.name" . }}
-          image: {{ .Values.agent.repository }}:{{ .Values.agent.tag }}
+          image: {{ .Values.agent.repository }}:{{ .Values.agent.tag | default .Chart.Version }}
           imagePullPolicy: {{ .Values.agent.pullPolicy }}
           {{- if .Values.agent.container.retina.command }}
           command:
@@ -224,7 +224,7 @@ spec:
       hostNetwork: true
       containers:
         - name: retinawin
-          image: {{ .Values.agent.repository }}:{{ .Values.agent.tag }}
+          image: {{ .Values.agent.repository }}:{{ .Values.agent.tag | default .Chart.Version }}
           ports:
             - containerPort: {{ .Values.agent.container.retina.ports.containerPort }}
           command:
