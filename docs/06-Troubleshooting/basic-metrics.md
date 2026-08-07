@@ -101,11 +101,9 @@ retina_ip_connection_stats{statistic_name="InECT0Pkts"} 34713
 retina_ip_connection_stats{statistic_name="InNoECTPkts"} 3.8893357e+07
 retina_ip_connection_stats{statistic_name="InOctets"} 1.6718610902e+10
 retina_ip_connection_stats{statistic_name="OutOctets"} 2.7768258214e+10
-# HELP retina_tcp_connection_remote number of active TCP connections by remote address
+# HELP retina_tcp_connection_remote number of active TCP connections against remote addresses
 # TYPE retina_tcp_connection_remote gauge
-retina_tcp_connection_remote{address="0.0.0.0",port="0"} 8
-retina_tcp_connection_remote{address="10.0.0.1",port="443"} 1
-retina_tcp_connection_remote{address="10.224.0.105",port="7070"} 1
+retina_tcp_connection_remote{address="AllIPs"} 10
 # HELP retina_tcp_connection_stats TCP connections Statistics
 # TYPE retina_tcp_connection_stats gauge
 retina_tcp_connection_stats{statistic_name="DelayedACKLocked"} 107
