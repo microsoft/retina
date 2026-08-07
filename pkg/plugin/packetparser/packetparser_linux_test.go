@@ -835,3 +835,22 @@ func restoreBackup() {
 		}
 	}
 }
+
+func TestReportReasonString(t *testing.T) {
+	cases := []struct {
+		r    uint8
+		want string
+	}{
+		{reportReasonNewConnection, "new_connection"},
+		{reportReasonInterval, "interval"},
+		{reportReasonFlagChange, "flag_change"},
+		{reportReasonTCPFlags, "tcp_flags"},
+		{reportReasonFinalACK, "final_ack"},
+		{reportReasonRST, "rst"},
+		{reportReasonTimeout, "timeout"},
+		{99, "unknown"},
+	}
+	for _, tt := range cases {
+		assert.Equal(t, tt.want, reportReasonString(tt.r))
+	}
+}
