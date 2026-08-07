@@ -4,11 +4,11 @@
 package ebpfwindows
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"net"
 
-	"github.com/cilium/cilium/pkg/byteorder"
 	"github.com/cilium/cilium/pkg/identity"
 	"github.com/cilium/cilium/pkg/types"
 )
@@ -64,7 +64,7 @@ func (tn *TraceNotify) decodeTraceNotify(data []byte) error {
 		return fmt.Errorf("%w: expected at least %d but got %d", errTraceNotifyLength, traceNotifyV0Len, l)
 	}
 
-	version := byteorder.Native.Uint16(data[14:16])
+	version := binary.NativeEndian.Uint16(data[14:16])
 
 	// Check against max version.
 	if version > TraceNotifyVersion1 {
@@ -82,17 +82,17 @@ func (tn *TraceNotify) decodeTraceNotify(data []byte) error {
 	// Decode logic for version >= v0.
 	tn.Type = data[0]
 	tn.ObsPoint = data[1]
-	tn.Source = byteorder.Native.Uint16(data[2:4])
-	tn.Hash = byteorder.Native.Uint32(data[4:8])
-	tn.OrigLen = byteorder.Native.Uint32(data[8:12])
-	tn.CapLen = byteorder.Native.Uint16(data[12:14])
+	tn.Source = binary.NativeEndian.Uint16(data[2:4])
+	tn.Hash = binary.NativeEndian.Uint32(data[4:8])
+	tn.OrigLen = binary.NativeEndian.Uint32(data[8:12])
+	tn.CapLen = binary.NativeEndian.Uint16(data[12:14])
 	tn.Version = version
-	tn.SrcLabel = identity.NumericIdentity(byteorder.Native.Uint32(data[16:20]))
-	tn.DstLabel = identity.NumericIdentity(byteorder.Native.Uint32(data[20:24]))
-	tn.DstID = byteorder.Native.Uint16(data[24:26])
+	tn.SrcLabel = identity.NumericIdentity(binary.NativeEndian.Uint32(data[16:20]))
+	tn.DstLabel = identity.NumericIdentity(binary.NativeEndian.Uint32(data[20:24]))
+	tn.DstID = binary.NativeEndian.Uint16(data[24:26])
 	tn.Reason = data[26]
 	tn.Flags = data[27]
-	tn.Ifindex = byteorder.Native.Uint32(data[28:32])
+	tn.Ifindex = binary.NativeEndian.Uint32(data[28:32])
 
 	return nil
 }

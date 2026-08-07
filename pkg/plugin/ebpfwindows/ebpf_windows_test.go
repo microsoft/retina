@@ -18,7 +18,6 @@ import (
 	"unsafe"
 
 	"github.com/cilium/cilium/api/v1/flow"
-	"github.com/cilium/cilium/pkg/byteorder"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	observerTypes "github.com/cilium/cilium/pkg/hubble/observer/types"
 	hubbleerrors "github.com/cilium/cilium/pkg/hubble/parser/errors"
@@ -1521,9 +1520,9 @@ func TestHandleTraceEventWithUDPPacket_PktmonDropNotify(t *testing.T) {
 func makePktmonDropHeader(version, packetType uint16) []byte {
 	header := make([]byte, dropPktmonNotifyV1Len)
 	header[0] = MessageTypePktmonDrop
-	byteorder.Native.PutUint16(header[2:4], version)
-	byteorder.Native.PutUint16(header[31:33], packetType)
-	byteorder.Native.PutUint32(header[39:43], 2)
+	binary.NativeEndian.PutUint16(header[2:4], version)
+	binary.NativeEndian.PutUint16(header[31:33], packetType)
+	binary.NativeEndian.PutUint32(header[39:43], 2)
 	return header
 }
 
@@ -1531,7 +1530,7 @@ func makePktmonDropHeader(version, packetType uint16) []byte {
 func makeDropNotifyHeader(version uint16) []byte {
 	header := make([]byte, dropNotifyV1Len)
 	header[0] = monitorapi.MessageTypeDrop
-	byteorder.Native.PutUint16(header[14:16], version)
+	binary.NativeEndian.PutUint16(header[14:16], version)
 	return header
 }
 
@@ -1539,7 +1538,7 @@ func makeDropNotifyHeader(version uint16) []byte {
 func makeTraceNotifyHeader(version uint16, length int) []byte {
 	header := make([]byte, length)
 	header[0] = monitorapi.MessageTypeTrace
-	byteorder.Native.PutUint16(header[14:16], version)
+	binary.NativeEndian.PutUint16(header[14:16], version)
 	return header
 }
 
