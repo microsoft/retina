@@ -36,6 +36,16 @@ operator:
   # Namespace used for operator leader election lease.
   # Defaults to .Release.Namespace when empty.
   leaderElectionNamespace: ""
+  # -- retina-operator pod-level security context.
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+  # -- retina-operator container-level security context.
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
 
 agent:
   leaderElection: false
