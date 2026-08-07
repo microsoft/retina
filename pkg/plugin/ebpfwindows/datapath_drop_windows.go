@@ -170,7 +170,7 @@ func (n *DropNotify) decodeDropNotify(data []byte) error {
 	n.DstID = byteorder.Native.Uint32(data[24:28])
 	n.Line = byteorder.Native.Uint16(data[28:30])
 	n.File = data[30]
-	n.ExtError = int8(data[31])
+	n.ExtError = int8(data[31]) //nolint:gosec // data[31] is a bounded error code field that fits in int8
 	n.Ifindex = byteorder.Native.Uint32(data[32:36])
 
 	return nil
