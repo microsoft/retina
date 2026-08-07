@@ -32,6 +32,7 @@ char __license[] SEC("license") = "Dual MIT/GPL";
 #define ETH_P_8021Q 0x8100
 #define ETH_P_ARP 0x0806
 #define TASK_COMM_LEN 16
+#define EAGAIN_ERRNO 11
 // TODO (Vamsi): Add top 100 dropped connections with LRU map
 
 // Ref: https://elixir.bootlin.com/linux/latest/source/include/uapi/linux/if_packet.h#L26
@@ -420,12 +421,14 @@ int BPF_KRETPROBE(inet_csk_accept_ret, struct sock *sk)
     if (sk != NULL)
         return 0;
 
-    // *err_ptr holds the ADDRESS of the callee's errno output (the int *err
-    // parameter pre-6.10, &arg->err on 6.10+); the errno must be read through it.
+    // *err_ptr is the kernel pointer saved by the kprobe (not the error value).
+    // We must use bpf_probe_read_kernel to dereference it and get the actual error.
     int err = 0;
     if (bpf_probe_read_kernel(&err, sizeof(err), (void *)(unsigned long)*err_ptr) < 0)
         return 0;
-    if (err >= 0)
+
+    // err >= 0 means no error; -EAGAIN is normal for non-blocking accept.
+    if (err >= 0 || err == -EAGAIN_ERRNO)
         return 0;
 
     struct packet p;
@@ -455,11 +458,25 @@ int BPF_PROG(inet_csk_accept_fexit)
     // Linux 6.10+: 2 params (sk, arg) -> retsk at ctx[2]
     // Pre-6.10:    4 params (sk, flags, err, kern) -> retsk at ctx[4]
     if (bpf_core_type_exists(struct proto_accept_arg___new)) {
-        if ((struct sock *)ctx[2] == NULL)
-            update_metrics_map_basic(TCP_ACCEPT_BASIC, 0, 0);
+        // 6.10+: ctx = [sk, arg, retsk]
+        if ((struct sock *)ctx[2] == NULL) {
+            // Read err from proto_accept_arg (ctx[1] is the arg pointer).
+            int err = 0;
+            if (bpf_probe_read_kernel(&err, sizeof(err),
+                &((struct proto_accept_arg___new *)ctx[1])->err) < 0)
+                return 0;
+            // EAGAIN is normal for non-blocking accept; not a real drop.
+            if (err != 0 && err != -EAGAIN_ERRNO)
+                update_metrics_map_basic(TCP_ACCEPT_BASIC, err, 0);
+        }
     } else {
-        if ((struct sock *)ctx[4] == NULL)
-            update_metrics_map_basic(TCP_ACCEPT_BASIC, 0, 0);
+        // Pre-6.10: ctx = [sk, flags, err_ptr, kern, retsk]
+        // On older kernels (e.g. 5.15), the BPF verifier rejects reading ctx[2]
+        // because the BTF encodes the int* parameter as scalar type INT.
+        // Since we cannot read the error code, we skip counting entirely.
+        // This eliminates the false-positive EAGAIN drops (the customer issue)
+        // at the cost of not reporting real accept errors on these kernels.
+        // The kprobe/kretprobe path (attached by the Go loader) handles this correctly.
     }
 
     return 0;

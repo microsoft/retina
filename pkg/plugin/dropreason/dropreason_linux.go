@@ -16,6 +16,7 @@ import (
 	"github.com/cilium/cilium/api/v1/flow"
 	hubblev1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
 	"github.com/microsoft/retina/internal/ktime"
 	kcfg "github.com/microsoft/retina/pkg/config"
@@ -177,10 +178,40 @@ func (dr *dropReason) Init() error {
 	}
 
 	progsKprobe, progsKprobeRet := buildKprobePrograms(objs)
-	progsFexit := buildFexitPrograms(objs)
+	progsFexit, acceptKprobe, acceptKretprobe := buildFexitPrograms(objs)
 
 	if supportsFexit {
 		err = dr.attachFexitPrograms(progsFexit)
+		if err != nil {
+			return err
+		}
+		// Attach kprobe/kretprobe for inet_csk_accept alongside fexit programs.
+		// inet_csk_accept_fexit is not attached (pre-6.10 verifier limitation), so
+		// accept metrics depend on this kprobe/kretprobe pair being attached.
+		// If attachment fails, log a warning and continue — other drop metrics
+		// (IPTABLE_RULE_DROP, TCP_CONNECT_BASIC, etc.) remain functional.
+		if acceptKprobe == nil || acceptKretprobe == nil {
+			dr.l.Warn("inet_csk_accept kprobe programs not found in BPF object; TCP_ACCEPT_BASIC metrics will be unavailable")
+		} else {
+			kLink, kErr := link.Kprobe(inetCskAcceptFn, acceptKprobe, nil)
+			if kErr != nil {
+				dr.l.Error("Failed to attach kprobe for inet_csk_accept; TCP_ACCEPT_BASIC metrics will be unavailable",
+					zap.Error(kErr))
+			} else {
+				krLink, krErr := link.Kretprobe(inetCskAcceptFn, acceptKretprobe, nil)
+				if krErr != nil {
+					_ = kLink.Close()
+					dr.l.Error("Failed to attach kretprobe for inet_csk_accept; TCP_ACCEPT_BASIC metrics will be unavailable",
+						zap.Error(krErr))
+				} else {
+					dr.hooks = append(dr.hooks, kLink, krLink)
+					dr.l.Info("Attached kprobe", zap.String("program", inetCskAcceptFn))
+					dr.l.Info("Attached kretprobe", zap.String("program", inetCskAcceptFn))
+				}
+			}
+		}
+		dr.l.Warn("inet_csk_accept_fexit is not attached (pre-6.10 BPF verifier limitation); " +
+			"using kprobe/kretprobe fallback for TCP accept error metrics")
 	} else {
 		err = dr.attachKprobes(progsKprobe, progsKprobeRet)
 	}

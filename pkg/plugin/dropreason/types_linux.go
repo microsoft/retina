@@ -49,6 +49,8 @@ type allFexitObjects struct {
 
 type allFexitPrograms struct {
 	InetCskAcceptFexit      *ebpf.Program `ebpf:"inet_csk_accept_fexit"`
+	InetCskAccept           *ebpf.Program `ebpf:"inet_csk_accept"`
+	InetCskAcceptRet        *ebpf.Program `ebpf:"inet_csk_accept_ret"`
 	NfConntrackConfirmFexit *ebpf.Program `ebpf:"nf_conntrack_confirm_fexit"`
 	NfHookSlowFexit         *ebpf.Program `ebpf:"nf_hook_slow_fexit"`
 	NfNatInetFnFexit        *ebpf.Program `ebpf:"nf_nat_inet_fn_fexit"`
@@ -62,6 +64,8 @@ type marinerObjects struct {
 
 type marinerPrograms struct {
 	InetCskAcceptFexit *ebpf.Program `ebpf:"inet_csk_accept_fexit"`
+	InetCskAccept      *ebpf.Program `ebpf:"inet_csk_accept"`
+	InetCskAcceptRet   *ebpf.Program `ebpf:"inet_csk_accept_ret"`
 	NfHookSlowFexit    *ebpf.Program `ebpf:"nf_hook_slow_fexit"`
 	TcpV4ConnectFexit  *ebpf.Program `ebpf:"tcp_v4_connect_fexit"` // nolint:revive // needs to match generated code
 }
