@@ -11,6 +11,7 @@ package ciliumcrds
 
 import (
 	"github.com/cilium/hive/cell"
+	"github.com/cilium/hive/job"
 )
 
 // LeaderLifecycle is the inner lifecycle of the operator that is started when this
@@ -29,8 +30,8 @@ func WithLeaderLifecycle(cells ...cell.Cell) cell.Cell {
 			func() *LeaderLifecycle { return &LeaderLifecycle{} },
 		),
 		cell.Decorate(
-			func(lc *LeaderLifecycle) cell.Lifecycle {
-				return lc
+			func(lc *LeaderLifecycle, r job.Registry) (cell.Lifecycle, job.Registry) {
+				return lc, r.WithLifecycle(lc)
 			},
 			cells...,
 		),

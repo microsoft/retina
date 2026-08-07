@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.19.0
+    controller-gen.kubebuilder.io/version: v0.20.1
   name: captures.retina.sh
 spec:
   group: retina.sh
@@ -63,12 +63,6 @@ spec:
                           should continue for.
                         pattern: ^([0-9]+(\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$
                         type: string
-                      immediateMode:
-                        description: |-
-                          ImmediateMode enables immediate mode for packet capture (equivalent to tcpdump --immediate-mode).
-                          When true, packets are delivered to the application immediately rather than being buffered.
-                          This can reduce latency but may increase CPU usage.
-                        type: boolean
                       fileCount:
                         description: |-
                           FileCount sets the maximum number of capture files to use in a rotating buffer.
@@ -79,6 +73,12 @@ spec:
                           Equivalent to tcpdump's -W flag.
                         minimum: 1
                         type: integer
+                      immediateMode:
+                        description: |-
+                          ImmediateMode enables immediate mode for packet capture (equivalent to tcpdump --immediate-mode).
+                          When true, packets are delivered to the application immediately rather than being buffered.
+                          This can reduce latency but may increase CPU usage.
+                        type: boolean
                       interfaces:
                         description: |-
                           Interfaces specifies the network interfaces on which to capture packets.
