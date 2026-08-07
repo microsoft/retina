@@ -1,0 +1,5 @@
+[alias]
+xtask = "run --package xtask --"
+
+[target.bpfel-unknown-none]
+rustflags = ["-C", "link-arg=--btf"]
