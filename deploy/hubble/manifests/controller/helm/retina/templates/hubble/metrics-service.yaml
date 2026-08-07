@@ -30,7 +30,7 @@ spec:
   - name: retina
     port: {{ .Values.retinaPort }}
     protocol: TCP
-    targetPort: {{ .Values.retinaPort }}
+    targetPort: {{ .Values.agent.container.retina.ports.containerPort }}
   selector:
     k8s-app: retina
 {{- end }}

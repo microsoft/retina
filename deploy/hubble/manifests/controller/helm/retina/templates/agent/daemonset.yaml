@@ -81,6 +81,11 @@ spec:
           {{- end}}
           ports:
           - containerPort: {{ .Values.agent.container.retina.ports.containerPort }}
+            name: retina
+            protocol: TCP
+          - containerPort: {{ .Values.hubble.metrics.port }}
+            name: hubble
+            protocol: TCP
           resources:
             requests:
               memory: {{ .Values.resources.requests.memory | quote }}
@@ -227,6 +232,11 @@ spec:
           image: {{ .Values.agent.repository }}:{{ .Values.agent.tag }}
           ports:
             - containerPort: {{ .Values.agent.container.retina.ports.containerPort }}
+              name: retina
+              protocol: TCP
+            - containerPort: {{ .Values.hubble.metrics.port }}
+              name: hubble
+              protocol: TCP
           command:
             - powershell.exe
             - -command
