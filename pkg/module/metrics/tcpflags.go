@@ -14,6 +14,7 @@ import (
 	metricsinit "github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 const (
@@ -66,10 +67,10 @@ func (t *TCPMetrics) getLabels() []string {
 	return labels
 }
 
-func combineFlagsWithPrevious(flags []string, flow *v1.Flow) map[string]uint32 {
+func combineFlagsWithPrevious(flags []string, ext *structpb.Struct) map[string]uint32 {
 	var combinedFlags map[string]uint32
 
-	previous := utils.PreviouslyObservedTCPFlags(flow)
+	previous := utils.PreviouslyObservedTCPFlagsFromStruct(ext)
 	if previous != nil {
 		combinedFlags = previous
 	} else {
@@ -87,7 +88,7 @@ func combineFlagsWithPrevious(flags []string, flow *v1.Flow) map[string]uint32 {
 	return combinedFlags
 }
 
-func (t *TCPMetrics) ProcessFlow(flow *v1.Flow) {
+func (t *TCPMetrics) ProcessFlow(flow *v1.Flow, ext *structpb.Struct) {
 	if flow == nil {
 		return
 	}
@@ -109,7 +110,7 @@ func (t *TCPMetrics) ProcessFlow(flow *v1.Flow) {
 	if t.isLocalContext() {
 		// when localcontext is enabled, we do not need the context options for both src and dst
 		// metrics aggregation will be on a single pod basis and not the src/dst pod combination basis.
-		t.processLocalCtxFlow(flow, flags)
+		t.processLocalCtxFlow(flow, flags, ext)
 		return
 	}
 
@@ -122,7 +123,7 @@ func (t *TCPMetrics) ProcessFlow(flow *v1.Flow) {
 		dstLabels = t.destinationCtx().getValues(flow)
 	}
 
-	for flag, count := range combineFlagsWithPrevious(flags, flow) {
+	for flag, count := range combineFlagsWithPrevious(flags, ext) {
 		labels := append([]string{flag}, srcLabels...)
 		labels = append(labels, dstLabels...)
 		t.update(labels, count)
@@ -130,13 +131,13 @@ func (t *TCPMetrics) ProcessFlow(flow *v1.Flow) {
 	}
 }
 
-func (t *TCPMetrics) processLocalCtxFlow(flow *v1.Flow, flags []string) {
+func (t *TCPMetrics) processLocalCtxFlow(flow *v1.Flow, flags []string, ext *structpb.Struct) {
 	labelValuesMap := t.sourceCtx().getLocalCtxValues(flow)
 	if labelValuesMap == nil {
 		return
 	}
 
-	combinedFlags := combineFlagsWithPrevious(flags, flow)
+	combinedFlags := combineFlagsWithPrevious(flags, ext)
 
 	// Ingress values
 	if l := len(labelValuesMap[ingress]); l > 0 {

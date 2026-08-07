@@ -90,7 +90,7 @@ func TestAddPacketSize(t *testing.T) {
 	AddPacketSize(ext, uint32(100))
 	SetExtensions(fl, ext)
 
-	res := PacketSize(fl)
+	res := PacketSizeFromStruct(GetExtensionsStruct(fl))
 	assert.EqualValues(t, res, uint32(100))
 }
 
@@ -113,7 +113,7 @@ func TestTcpID(t *testing.T) {
 	ext := NewExtensions()
 	AddTCPID(ext, uint64(1234))
 	SetExtensions(fl, ext)
-	assert.EqualValues(t, GetTCPID(fl), uint64(1234))
+	assert.EqualValues(t, TCPIDFromStruct(GetExtensionsStruct(fl)), uint64(1234))
 }
 
 func TestAddDropReason(t *testing.T) {

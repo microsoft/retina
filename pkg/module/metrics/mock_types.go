@@ -15,6 +15,7 @@ import (
 	flow "github.com/cilium/cilium/api/v1/flow"
 	v1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
 	gomock "go.uber.org/mock/gomock"
+	structpb "google.golang.org/protobuf/types/known/structpb"
 )
 
 // MockIModule is a mock of IModule interface.
@@ -102,15 +103,15 @@ func (mr *MockAdvMetricsInterfaceMockRecorder) Init(metricName any) *gomock.Call
 }
 
 // ProcessFlow mocks base method.
-func (m *MockAdvMetricsInterface) ProcessFlow(f *flow.Flow) {
+func (m *MockAdvMetricsInterface) ProcessFlow(f *flow.Flow, ext *structpb.Struct) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "ProcessFlow", f)
+	m.ctrl.Call(m, "ProcessFlow", f, ext)
 }
 
 // ProcessFlow indicates an expected call of ProcessFlow.
-func (mr *MockAdvMetricsInterfaceMockRecorder) ProcessFlow(f any) *gomock.Call {
+func (mr *MockAdvMetricsInterfaceMockRecorder) ProcessFlow(f, ext any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessFlow", reflect.TypeOf((*MockAdvMetricsInterface)(nil).ProcessFlow), f)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessFlow", reflect.TypeOf((*MockAdvMetricsInterface)(nil).ProcessFlow), f, ext)
 }
 
 // MockContextOptionsInterface is a mock of ContextOptionsInterface interface.

@@ -215,8 +215,9 @@ func AddPreviouslyObservedTCPFlags(s *structpb.Struct, syn, ack, fin, rst, psh, 
 	s.GetFields()[ExtKeyPrevObservedTCPFlags] = structpb.NewStructValue(tcpFlags)
 }
 
-func PreviouslyObservedTCPFlags(f *flow.Flow) map[string]uint32 {
-	s := GetExtensionsStruct(f)
+// PreviouslyObservedTCPFlagsFromStruct reads the field from an already-decoded
+// extensions struct, avoiding a repeat unmarshal when several fields are read.
+func PreviouslyObservedTCPFlagsFromStruct(s *structpb.Struct) map[string]uint32 {
 	if s == nil {
 		return nil
 	}
@@ -239,8 +240,9 @@ func AddPreviouslyObservedBytes(s *structpb.Struct, bytes uint32) {
 	s.GetFields()[ExtKeyPrevObservedBytes] = structpb.NewNumberValue(float64(bytes))
 }
 
-func PreviouslyObservedBytes(f *flow.Flow) uint32 {
-	s := GetExtensionsStruct(f)
+// PreviouslyObservedBytesFromStruct reads the field from an already-decoded
+// extensions struct, avoiding a repeat unmarshal when several fields are read.
+func PreviouslyObservedBytesFromStruct(s *structpb.Struct) uint32 {
 	if s == nil {
 		return 0
 	}
@@ -259,8 +261,9 @@ func AddPreviouslyObservedPackets(s *structpb.Struct, packets uint32) {
 	s.GetFields()[ExtKeyPrevObservedPackets] = structpb.NewNumberValue(float64(packets))
 }
 
-func PreviouslyObservedPackets(f *flow.Flow) uint32 {
-	s := GetExtensionsStruct(f)
+// PreviouslyObservedPacketsFromStruct reads the field from an already-decoded
+// extensions struct, avoiding a repeat unmarshal when several fields are read.
+func PreviouslyObservedPacketsFromStruct(s *structpb.Struct) uint32 {
 	if s == nil {
 		return 0
 	}
@@ -296,11 +299,9 @@ func AddTCPID(s *structpb.Struct, id uint64) {
 	s.GetFields()[ExtKeyTCPID] = structpb.NewNumberValue(float64(id))
 }
 
-func GetTCPID(f *flow.Flow) uint64 {
-	if f.GetL4() == nil || f.GetL4().GetTCP() == nil {
-		return 0
-	}
-	s := GetExtensionsStruct(f)
+// TCPIDFromStruct reads the field from an already-decoded extensions struct,
+// avoiding a repeat unmarshal when it is read alongside other fields.
+func TCPIDFromStruct(s *structpb.Struct) uint64 {
 	if s == nil {
 		return 0
 	}
@@ -352,12 +353,13 @@ func AddDNSInfo(
 	}
 }
 
-func GetDNS(f *flow.Flow) (*flow.DNS, DNSType, uint32) {
+// GetDNSFromStruct reads the DNS type and answer count from an already-decoded
+// extensions struct, avoiding a repeat unmarshal when several fields are read.
+func GetDNSFromStruct(f *flow.Flow, s *structpb.Struct) (*flow.DNS, DNSType, uint32) {
 	if f == nil || f.L7 == nil || f.L7.GetDns() == nil {
 		return nil, DNSType_UNKNOWN, 0
 	}
 	dns := f.L7.GetDns()
-	s := GetExtensionsStruct(f)
 	if s == nil {
 		return dns, DNSType_UNKNOWN, 0
 	}
@@ -411,8 +413,9 @@ func AddPacketSize(s *structpb.Struct, packetSize uint32) {
 	s.GetFields()[ExtKeyBytes] = structpb.NewNumberValue(float64(packetSize))
 }
 
-func PacketSize(f *flow.Flow) uint32 {
-	s := GetExtensionsStruct(f)
+// PacketSizeFromStruct reads the field from an already-decoded extensions
+// struct, avoiding a repeat unmarshal when several fields are read.
+func PacketSizeFromStruct(s *structpb.Struct) uint32 {
 	if s == nil {
 		return 0
 	}
@@ -446,11 +449,9 @@ func AddDropReason(f *flow.Flow, s *structpb.Struct, dropReason uint16) {
 	}
 }
 
-func DropReasonDescription(f *flow.Flow) string {
-	if f == nil {
-		return ""
-	}
-	s := GetExtensionsStruct(f)
+// DropReasonDescriptionFromStruct reads the field from an already-decoded
+// extensions struct, avoiding a repeat unmarshal when several fields are read.
+func DropReasonDescriptionFromStruct(s *structpb.Struct) string {
 	if s == nil {
 		return ""
 	}
@@ -459,6 +460,13 @@ func DropReasonDescription(f *flow.Flow) string {
 		return ""
 	}
 	return v.GetStringValue()
+}
+
+func DropReasonDescription(f *flow.Flow) string {
+	if f == nil {
+		return ""
+	}
+	return DropReasonDescriptionFromStruct(GetExtensionsStruct(f))
 }
 
 func decodeTime(nanoseconds int64) (pbTime *timestamppb.Timestamp, err error) {

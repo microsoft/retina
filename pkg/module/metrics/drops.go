@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 const (
@@ -90,7 +91,7 @@ func (d *DropCountMetrics) Clean() {
 
 // TODO: update ProcessFlow with bytes metrics. We are only accounting for count.
 // bytes metrics needs some additional work in ebpf and in this func to get the skb length
-func (d *DropCountMetrics) ProcessFlow(flow *v1.Flow) {
+func (d *DropCountMetrics) ProcessFlow(flow *v1.Flow, ext *structpb.Struct) {
 	// Flow does not have bytes section at the moment,
 	// so we will update only packet count
 	if flow == nil {
@@ -104,17 +105,17 @@ func (d *DropCountMetrics) ProcessFlow(flow *v1.Flow) {
 	if d.isLocalContext() {
 		// when localcontext is enabled, we do not need the context options for both src and dst
 		// metrics aggregation will be on a single pod basis and not the src/dst pod combination basis.
-		d.processLocalCtxFlow(flow)
+		d.processLocalCtxFlow(flow, ext)
 		return
 	}
 
 	labels := []string{
-		utils.DropReasonDescription(flow),
+		utils.DropReasonDescriptionFromStruct(ext),
 		flow.TrafficDirection.String(),
 	}
 
 	if !d.isAdvanced() {
-		d.update(flow, labels)
+		d.update(ext, labels)
 		return
 	}
 
@@ -134,23 +135,23 @@ func (d *DropCountMetrics) ProcessFlow(flow *v1.Flow) {
 
 	// No additional context options
 
-	d.update(flow, labels)
+	d.update(ext, labels)
 	d.getLogger().Debug("drop count metric is added", zap.Any("labels", labels))
 }
 
-func (d *DropCountMetrics) processLocalCtxFlow(flow *v1.Flow) {
+func (d *DropCountMetrics) processLocalCtxFlow(flow *v1.Flow, ext *structpb.Struct) {
 	labelValuesMap := d.sourceCtx().getLocalCtxValues(flow)
 	if labelValuesMap == nil {
 		return
 	}
-	dropReason := utils.DropReasonDescription(flow)
+	dropReason := utils.DropReasonDescriptionFromStruct(ext)
 
 	// Ingress values
 	if l := len(labelValuesMap[ingress]); l > 0 {
 		labels := make([]string, 0, l+2)
 		labels = append(labels, dropReason, ingress)
 		labels = append(labels, labelValuesMap[ingress]...)
-		d.update(flow, labels)
+		d.update(ext, labels)
 		d.getLogger().Debug("drop count metric is added in INGRESS in local ctx", zap.Any("labels", labels))
 	}
 
@@ -158,7 +159,7 @@ func (d *DropCountMetrics) processLocalCtxFlow(flow *v1.Flow) {
 		labels := make([]string, 0, l+2)
 		labels = append(labels, dropReason, egress)
 		labels = append(labels, labelValuesMap[egress]...)
-		d.update(flow, labels)
+		d.update(ext, labels)
 		d.getLogger().Debug("drop count metric is added in EGRESS in local ctx", zap.Any("labels", labels))
 	}
 }
@@ -174,7 +175,7 @@ func (d *DropCountMetrics) expire(labels []string) bool {
 	return del
 }
 
-func (d *DropCountMetrics) update(fl *v1.Flow, labels []string) {
+func (d *DropCountMetrics) update(ext *structpb.Struct, labels []string) {
 	var updated bool
 	switch d.metricName {
 	case utils.DroppedPacketsGaugeName:
@@ -182,7 +183,7 @@ func (d *DropCountMetrics) update(fl *v1.Flow, labels []string) {
 		d.dropMetric.WithLabelValues(labels...).Inc()
 	case utils.DropBytesGaugeName:
 		updated = true
-		d.dropMetric.WithLabelValues(labels...).Add(float64(utils.PacketSize(fl)))
+		d.dropMetric.WithLabelValues(labels...).Add(float64(utils.PacketSizeFromStruct(ext)))
 	}
 	if updated {
 		d.updated(labels)
