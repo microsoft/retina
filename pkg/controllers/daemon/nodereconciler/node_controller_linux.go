@@ -21,9 +21,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	cmtypes "github.com/cilium/cilium/pkg/clustermesh/types"
-	datapath "github.com/cilium/cilium/pkg/datapath/types"
 	"github.com/cilium/cilium/pkg/identity"
 	ipc "github.com/cilium/cilium/pkg/ipcache"
+	"github.com/cilium/cilium/pkg/node"
 	"github.com/cilium/cilium/pkg/node/addressing"
 	"github.com/cilium/cilium/pkg/node/types"
 	"github.com/cilium/cilium/pkg/source"
@@ -38,7 +38,7 @@ type NodeReconciler struct {
 	clusterName string
 
 	l           *log.ZapLogger
-	handlers    map[string]datapath.NodeHandler
+	handlers    map[node.Handler]struct{}
 	nodes       map[string]types.Node
 	c           *ipc.IPCache
 	localNodeIP string
@@ -83,7 +83,7 @@ func (r *NodeReconciler) addNode(node *corev1.Node) {
 
 	r.nodes[node.Name] = nd
 
-	for _, handler := range r.handlers {
+	for handler := range r.handlers {
 		err := handler.NodeAdd(nd)
 		if err != nil {
 			r.l.Error("Failed to add Node to datapath handler", zap.Error(err), zap.String("handler", handler.Name()), zap.String("Node", node.Name))
@@ -118,7 +118,7 @@ func (r *NodeReconciler) deleteNode(node *corev1.Node) {
 	}
 	delete(r.nodes, node.Name)
 
-	for _, handler := range r.handlers {
+	for handler := range r.handlers {
 		err := handler.NodeDelete(nd)
 		if err != nil {
 			r.l.Error("Failed to delete Node from datapath handler", zap.Error(err), zap.String("handler", handler.Name()), zap.String("Node", node.Name))
@@ -132,12 +132,14 @@ func (r *NodeReconciler) deleteNode(node *corev1.Node) {
 	r.l.Debug("Deleted Node", zap.String("Node", node.Name))
 }
 
-func (r *NodeReconciler) Subscribe(nh datapath.NodeHandler) {
+// Subscribe registers by handler identity and replays known nodes. Hubble uses
+// the same Name() for every peer stream, so names are not unique keys.
+func (r *NodeReconciler) Subscribe(nh node.Handler) {
 	r.l.Debug("Subscribing to datapath handler")
-	r.m.RLock()
-	defer r.m.RUnlock()
+	r.m.Lock()
+	defer r.m.Unlock()
 
-	r.handlers[nh.Name()] = nh
+	r.handlers[nh] = struct{}{}
 	for i := range r.nodes {
 		node := r.nodes[i]
 		if err := nh.NodeAdd(node); err != nil {
@@ -146,11 +148,11 @@ func (r *NodeReconciler) Subscribe(nh datapath.NodeHandler) {
 	}
 }
 
-func (r *NodeReconciler) Unsubscribe(nh datapath.NodeHandler) {
+func (r *NodeReconciler) Unsubscribe(nh node.Handler) {
 	r.l.Debug("Unsubscribing from datapath handler")
 	r.m.Lock()
 	defer r.m.Unlock()
-	delete(r.handlers, nh.Name())
+	delete(r.handlers, nh)
 }
 
 // +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list
