@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-# Default platform commands 
+# Default platform commands
 RMDIR := rm -rf
 
 ## Globals
@@ -12,6 +12,7 @@ ifndef TAG
 endif
 OUTPUT_DIR = $(REPO_ROOT)/output
 ARTIFACTS_DIR = $(REPO_ROOT)/artifacts
+OUTPUT_LOCAL ?= --output type=local,dest=$(ARTIFACTS_DIR)
 BUILD_DIR = $(OUTPUT_DIR)/$(GOOS)_$(GOARCH)
 RETINA_BUILD_DIR = $(BUILD_DIR)/retina
 RETINA_DIR = $(REPO_ROOT)/controller
@@ -22,8 +23,14 @@ KIND = /usr/local/bin/kind
 KIND_CLUSTER = retina-cluster
 WINVER2022   ?= "10.0.20348.1906"
 APP_INSIGHTS_ID ?= ""
+AGENT_IMAGE_NAME ?= ""
 GENERATE_TARGET_DIRS = \
 	./pkg/plugin/linuxutil
+
+# Set agent registry to get image from when using retina-kubectl
+ifneq ($(AGENT_IMAGE_NAME), "")
+	EXTRA_BUILD_ARGS := "--build-arg AGENT_IMAGE_NAME=$(AGENT_IMAGE_NAME)"
+endif
 
 # Default platform is linux/amd64
 GOOS			?= linux
@@ -124,6 +131,9 @@ generate-bpf-go: ## generate ebpf wrappers for plugins for all archs
 FMT_PKG  ?= .
 LINT_PKG ?= .
 
+empty-bpf-objects: ## truncate all tracked .o files to 0 bytes
+	git ls-files '*.o' | xargs truncate -s 0
+
 fmt: ## run gofumpt on $FMT_PKG (default "retina").
 	$(GOFUMPT) -w $(FMT_PKG)
 
@@ -135,6 +145,9 @@ lint-existing: ## Lint the current branch in entirety.
 
 clean: ## clean build artifacts
 	$(RMDIR) $(OUTPUT_DIR)
+
+bump-images: ## update all Dockerfile base image digests to latest
+	@./scripts/bump-images.sh
 
 ##@ Build Binaries
 
@@ -221,7 +234,7 @@ container-docker: buildx # util target to build container images using docker bu
 		--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
 		--target=$(TARGET) \
 		-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
-		--output type=local,dest=$(ARTIFACTS_DIR) \
+		$(OUTPUT_LOCAL) \
 		$(BUILDX_ACTION) \
 		$(CONTEXT_DIR) 
 
@@ -311,6 +324,7 @@ retina-shell-image:
 			IMAGE=$(RETINA_SHELL_IMAGE) \
 			VERSION=$(TAG) \
 			TAG=$(RETINA_PLATFORM_TAG) \
+			OUTPUT_LOCAL= \
 			CONTEXT_DIR=$(REPO_ROOT)
 
 kubectl-retina-image:
@@ -323,7 +337,8 @@ kubectl-retina-image:
 			IMAGE=$(KUBECTL_RETINA_IMAGE) \
 			VERSION=$(TAG) \
 			TAG=$(RETINA_PLATFORM_TAG) \
-			CONTEXT_DIR=$(REPO_ROOT)
+			CONTEXT_DIR=$(REPO_ROOT) \
+			EXTRA_BUILD_ARGS=$(EXTRA_BUILD_ARGS)
 
 kubectl-retina-shell-image:
 	echo "Building shell-enabled kubectl-retina for $(PLATFORM)"
@@ -395,7 +410,7 @@ manifest-retina-image: ## create a multiplatform manifest for the retina image
 
 manifest-operator-image: ## create a multiplatform manifest for the operator image
 	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE):$(TAG))
-	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
 
 manifest-shell-image:
 	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_SHELL_IMAGE):$(TAG))
@@ -441,11 +456,15 @@ COVER_PKG ?= .
 .PHONY: test
 test: # Run unit tests.
 	go build -o test-summary ./test/utsummary/main.go
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit,dashboard -skip=TestE2E* -coverprofile=coverage.out -v -json ./... | ./test-summary --progress --verbose
+	bash -o pipefail -c 'KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit,dashboard -skip=TestE2E* -coverprofile=coverage.out -v -json ./... | ./test-summary --progress --verbose'
+
+.PHONY: test-ebpf
+test-ebpf: # Run eBPF program tests (requires root/CAP_BPF).
+	sudo $$(which go) test -tags=ebpf -v -count=1 ./pkg/plugin/...
 
 coverage: # Code coverage.
 #	go generate ./... && go test -tags=unit -coverprofile=coverage.out.tmp ./...
-	cat coverage.out | grep -v "_bpf.go\|_bpfel_x86.go\|_bpfel_arm64.go|_generated.go|mock_" | grep -v mock > coveragenew.out
+	cat coverage.out | grep -Ev '_bpf\.go|_bpfel_x86\.go|_bpfel_arm64\.go|_generated\.go|mock_' > coveragenew.out
 	go tool cover -html coveragenew.out -o coverage.html
 	go tool cover -func=coveragenew.out -o coverageexpanded.out
 	ls -al
@@ -464,7 +483,7 @@ manifests:
 	cd crd && make manifests && make generate
 
 # Fetch the latest tag from the GitHub
-LATEST_TAG := $(shell curl -s https://api.github.com/repos/microsoft/retina/releases | jq -r '.[0].name')
+LATEST_TAG := $(shell curl -s https://api.github.com/repos/microsoft/retina/releases/latest | jq -r '.name')
 
 HELM_IMAGE_TAG ?= $(LATEST_TAG)
 

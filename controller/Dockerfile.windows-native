@@ -3,8 +3,8 @@
 # buildx targets, and this one requires legacy build.
 # Maybe one day: https://github.com/moby/buildkit/issues/616
 ARG BUILDER_IMAGE
-# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.5-2-windowsservercore-ltsc2022 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=windows/amd64 mcr.microsoft.com/oss/go/microsoft/golang@sha256:c966eab9f4c60e407706c35c487c73de0d6928f6e7b0d225e7a070fc19ad62a4 AS builder
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.3-windowsservercore-ltsc2022 --override-os windows --format "{{.Name}}@{{.Digest}}"
+FROM --platform=windows/amd64 mcr.microsoft.com/oss/go/microsoft/golang:1.26.5-2-windowsservercore-ltsc2022@sha256:c966eab9f4c60e407706c35c487c73de0d6928f6e7b0d225e7a070fc19ad62a4 AS builder
 WORKDIR C:\\retina
 COPY go.mod .
 COPY go.sum .

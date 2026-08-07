@@ -718,7 +718,7 @@ Function Install-EbpfXdp
          Write-Host 'eBPF and XDP for Windows is installed successfully'
          write-Host 'Create the probe ready file'
          # Create the probe ready file
-         New-Item -Path "C:\install-ebpf-xdp-probe-ready" -ItemType File -Force 
+         New-Item -Path "C:\install-ebpf-xdp-probe-ready" -ItemType File -Force
          return
       }
 
@@ -726,7 +726,7 @@ Function Install-EbpfXdp
       {
          If(-Not (Enable-TestSigning -Reboot)) {Throw}
       }
-      
+
       $hnsPath = "HKLM:\SYSTEM\CurrentControlSet\Services\hns\State"
       $valueName = "CiliumOnWindows"
 
@@ -738,14 +738,14 @@ Function Install-EbpfXdp
    
       If ($null -eq $existing) {
          Write-Host "CiliumOnWindows not found, creating it"
-         New-ItemProperty -Path $hnsPath -Name $valueName -PropertyType DWORD -Value 1 -Force 
+         New-ItemProperty -Path $hnsPath -Name $valueName -PropertyType DWORD -Value 1 -Force
       } else {
          If ($existing.CiliumOnWindows -ne 1) {
             Write-Host "Setting CiliumOnWindows to 1"
-            Set-ItemProperty -Path $hnsPath -Name $valueName -PropertyType DWORD -Value 1 -Force 
+            Set-ItemProperty -Path $hnsPath -Name $valueName -PropertyType DWORD -Value 1 -Force
          }
       }
-     
+
       If(-Not (Install-eBPF)) {Throw}
 
       If(-Not (Install-XDP)) {Throw}

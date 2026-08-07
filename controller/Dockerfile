@@ -1,7 +1,11 @@
 # pinned base images
 
-# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.5-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26.5-azurelinux3.0@sha256:1c77c1cbb5de52db3f119fe2efe7a938e734c08196bbe3ad94b3bdadbab926f9 AS golang
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.3-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
+# Pinned to $BUILDPLATFORM so the Go builds cross-compile natively from the
+# host arch (fast). The eBPF .o files, which cannot be cleanly cross-compiled
+# by bpf2go, are produced in the separate `bpf-gen` stage below (which runs
+# at $TARGETPLATFORM — native on same-arch, emulated under QEMU otherwise).
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26.5-2-azurelinux3.0@sha256:1c77c1cbb5de52db3f119fe2efe7a938e734c08196bbe3ad94b3bdadbab926f9 AS golang
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
 FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260809@sha256:8bb51342bd5eba915990ab608f91060d502bb7891a2d3d909e0419b932533029 AS azurelinux-core
@@ -11,33 +15,52 @@ FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20260809@sha256:4435f90
 
 # build stages
 
+# bpf-gen stage: runs at $TARGETPLATFORM (native for same-arch builds, emulated
+# via QEMU for cross-arch builds). Only responsible for producing correct eBPF
+# .o files via bpf2go/clang — those require native target-arch execution and
+# cannot be cross-compiled from an amd64 host cleanly. Isolating this work in a
+# small dedicated stage keeps the rest of the build fast at $BUILDPLATFORM.
+FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26.5-2-azurelinux3.0@sha256:1c77c1cbb5de52db3f119fe2efe7a938e734c08196bbe3ad94b3bdadbab926f9 AS bpf-gen
+ARG GOOS=linux
+ARG GOARCH=amd64
+ENV GOOS=${GOOS}
+ENV GOARCH=${GOARCH}
+RUN if [ "$GOOS" = "linux" ] ; then \
+    tdnf install -y clang lld bpftool libbpf-devel; \
+    fi
+COPY ./pkg/plugin /go/src/github.com/microsoft/retina/pkg/plugin
+WORKDIR /go/src/github.com/microsoft/retina
+RUN if [ "$GOOS" = "linux" ] ; then \
+    go mod init github.com/microsoft/retina; \
+    go generate -skip "mockgen" -x /go/src/github.com/microsoft/retina/pkg/plugin/...; \
+    tar czf /gen.tar.gz ./pkg/plugin; \
+    rm go.mod; \
+    else \
+    tar czf /gen.tar.gz --files-from /dev/null; \
+    fi
+
 # intermediate go generate stage
-FROM golang AS intermediate
-# enable no-cgo OpenSSL crypto for arm64 cross-compile (Go <=1.26)
+FROM golang AS intermediate 
+# systemcrypto without cgo — required for arm64 cross-compile from amd64 host
+# (Go auto-disables cgo when cross-compiling, and systemcrypto in Go <=1.26
+# requires cgo unless this experiment is set). Becomes redundant with Go 1.27+.
 ENV GOEXPERIMENT=ms_nocgo_opensslcrypto
 ARG APP_INSIGHTS_ID # set to enable AI telemetry
 ARG GOARCH=amd64 # default to amd64
 ARG GOOS=linux # default to linux
 ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
-RUN if [ "$GOOS" = "linux" ] ; then \
-      tdnf install -y clang lld bpftool libbpf-devel; \
-    fi
-COPY ./pkg/plugin /go/src/github.com/microsoft/retina/pkg/plugin
 WORKDIR /go/src/github.com/microsoft/retina
-RUN if [ "$GOOS" = "linux" ] ; then \
-      go mod init github.com/microsoft/retina; \
-      go generate -skip "mockgen" -x /go/src/github.com/microsoft/retina/pkg/plugin/...; \
-      tar czf /gen.tar.gz ./pkg/plugin; \
-      rm go.mod; \
-    fi
+# eBPF .o files were built in the bpf-gen stage (at $TARGETPLATFORM). Import
+# the tarball here and extract after `COPY . .` so bpf-gen's outputs replace
+# the zero-byte placeholders checked into the repo.
+COPY --from=bpf-gen /gen.tar.gz /gen.tar.gz
 COPY ./go.mod ./go.sum ./
 RUN go mod download
 COPY . .
 RUN if [ "$GOOS" = "linux" ] ; then \
-      rm -rf ./pkg/plugin && tar xvf /gen.tar.gz ./pkg/plugin; \
+    rm -rf ./pkg/plugin && tar xvf /gen.tar.gz ./pkg/plugin; \
     fi
-
 
 # capture binary
 FROM intermediate AS capture-bin
@@ -57,7 +80,7 @@ ARG GOOS=linux # default to linux
 ARG VERSION
 ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
-RUN --mount=type=cache,target="/root/.cache/go-build" go build -x -v -o /go/bin/retina/controller -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID="$APP_INSIGHTS_ID"" controller/main.go
+RUN --mount=type=cache,target="/root/.cache/go-build" go build -x -v -o /go/bin/retina/controller -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" -X github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID="$APP_INSIGHTS_ID"" controller/main.go 
 
 # init binary
 FROM intermediate AS init-bin
@@ -73,6 +96,7 @@ RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/ret
 FROM azurelinux-core AS tools
 RUN tdnf install -y \
     clang \
+    bpftool \
     iproute \
     iptables \
     tcpdump \
@@ -91,14 +115,17 @@ FROM azurelinux-distroless AS init
 COPY --from=init-bin /go/bin/retina/initretina /retina/initretina
 COPY --from=tools /lib/ /lib
 COPY --from=tools /usr/lib/ /usr/lib
+COPY --from=tools /etc/pki/tls/ /etc/pki/tls/
+COPY --from=tools /tmp/init-bin/ /bin/
 ENTRYPOINT ["./retina/initretina"]
 
 # agent final image
 # mcr.microsoft.com/azurelinux/distroless/minimal:3.0
-# mcr.microsoft.com/azurelinux/distroless/minimal@sha256:0801b80a0927309572b9adc99bd1813bc680473175f6e8175cd4124d95dbd50c
+# mcr.microsoft.com/azurelinux/distroless/minimal@sha256:5a66f9f16ac675db2a8229dac72d83811b73b502d6ad192d8b374c7f3be498af
 FROM azurelinux-distroless AS agent
 COPY --from=tools /lib/ /lib
 COPY --from=tools /usr/lib/ /usr/lib
+COPY --from=tools /etc/pki/tls/ /etc/pki/tls/
 COPY --from=tools /tmp/bin/ /bin
 COPY --from=controller-bin /go/bin/retina/controller /retina/controller
 COPY --from=controller-bin /go/src/github.com/microsoft/retina/pkg/plugin /go/src/github.com/microsoft/retina/pkg/plugin

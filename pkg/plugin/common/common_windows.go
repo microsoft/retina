@@ -5,6 +5,9 @@
 package common
 
 import (
+	"errors"
+	"fmt"
+
 	"golang.org/x/sys/windows/registry"
 )
 
@@ -22,19 +25,19 @@ const (
 func IsCiliumOnWindowsEnabled() (bool, error) {
 	k, err := registry.OpenKey(registry.LOCAL_MACHINE, KeyPath, registry.QUERY_VALUE)
 	if err != nil {
-		if err == registry.ErrNotExist {
+		if errors.Is(err, registry.ErrNotExist) {
 			return false, nil
 		}
-		return false, err
+		return false, fmt.Errorf("opening registry key: %w", err)
 	}
 	defer k.Close()
 
 	val, _, err := k.GetIntegerValue(ValueName)
 	if err != nil {
-		if err == registry.ErrNotExist {
+		if errors.Is(err, registry.ErrNotExist) {
 			return false, nil
 		}
-		return false, err
+		return false, fmt.Errorf("reading registry value: %w", err)
 	}
 	return val == 1, nil
 }

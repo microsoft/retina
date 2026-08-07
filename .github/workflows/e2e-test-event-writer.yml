@@ -120,7 +120,7 @@ jobs:
             $TAG = $(git rev-parse --short HEAD)
           }
           echo "tag=$TAG" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-    
+
       - name: Build and push images
         shell: pwsh
         working-directory: ${{ env.EVENT_WRITER_PATH }}
@@ -135,9 +135,9 @@ jobs:
           $tag = "${{ steps.tag.outputs.tag }}"
           docker build -f "./Dockerfile" -t "${image}:${tag}" -t "${image}:latest" .
 
-          if ("${{ github.event_name }}" -ne "pull_request") {                                             
-              docker push "${image}:${tag}"                                                                  
-              docker push "${image}:latest"                                                                  
-          } else {                                                                                         
-              Write-Host "Skipping image push for pull_request runs"                                         
-          }  
+          if ("${{ github.event_name }}" -ne "pull_request") {
+              docker push "${image}:${tag}"
+              docker push "${image}:latest"
+          } else {
+              Write-Host "Skipping image push for pull_request runs"
+          }

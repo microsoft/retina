@@ -25,16 +25,21 @@ var (
 	ErrWindowsDropBytesZero = errors.New("windows drop bytes metric is zero, expected non-zero value")
 	// ErrWindowsDropCountZero indicates windows drop count metric is zero
 	ErrWindowsDropCountZero = errors.New("windows drop count metric is zero, expected non-zero value")
+	ErrGetNonHpcIPAddr      = errors.New("failed to get nonHpcIPAddr")
+	ErrGetNonHpcIfIndex     = errors.New("failed to get nonHpcIfIndex")
+	ErrAttachInterface      = errors.New("failed to attach to non HPC pod interface")
+	ErrSetFilterEventWriter = errors.New("failed to set filter for event writer")
+	ErrStartEventWriter     = errors.New("failed to start event writer")
 )
 
 const (
-	// TestExternalIpAddress is the IP address used for testing purposes.
+	// TestExternalIPAddress is the IP address used for testing purposes.
 	// It should be a valid external IP address that can be used for testing
 	// network observability metrics.
 	// This IP address is used in the EventWriter-SetFilter command to generate trace and
 	// drop events.
 	// Example.com - 23.192.228.84
-	TestExternalIpAddress = "23.192.228.84"
+	TestExternalIPAddress = "23.192.228.84"
 )
 
 type ValidateWinBpfMetric struct {
@@ -60,7 +65,8 @@ func (v *ValidateWinBpfMetric) GetPromMetrics() (string, error) {
 			"C:\\event-writer-helper.bat EventWriter-GetRetinaPromMetrics",
 			v.RetinaDaemonSetNamespace,
 			retinaLabelSelector,
-			false)
+			false,
+		)
 
 		promOutput = prom.StripExecGarbage(promOutput)
 		if err == nil && promOutput != "" {
@@ -70,55 +76,52 @@ func (v *ValidateWinBpfMetric) GetPromMetrics() (string, error) {
 	}
 
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("executing EventWriter command: %w", err)
 	}
 	return promOutput, nil
 }
 
-func (v *ValidateWinBpfMetric) getNonHpcPodIpAddress() (string, error) {
-
+func (v *ValidateWinBpfMetric) getNonHpcPodIPAddress() (string, error) {
 	slog.Info("Executing EventWriter-GetPodIpAddress")
-	nonHpcLabelSelector := fmt.Sprintf("app=%s", v.NonHpcAppName)
+	nonHpcLabelSelector := "app=" + v.NonHpcAppName
 
-	slog.Info("Executing  EventWriter-GetPodIpAddress")
-	nonHpcIpAddr, err := kubernetes.ExecCommandInWinPod(
+	nonHpcIPAddr, err := kubernetes.ExecCommandInWinPod(
 		v.KubeConfigFilePath,
 		"C:\\event-writer-helper.bat EventWriter-GetPodIpAddress",
 		v.NonHpcAppNamespace,
 		nonHpcLabelSelector,
-		true)
-
+		true,
+	)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("executing EventWriter command: %w", err)
 	}
+	nonHpcIPAddr = strings.TrimSpace(nonHpcIPAddr)
 
-	nonHpcIpAddr = strings.TrimSpace(nonHpcIpAddr)
-
-	if strings.Contains(nonHpcIpAddr, "failed") || strings.Contains(nonHpcIpAddr, "error") {
-		return "", fmt.Errorf("failed to get nonHpcIpAddr")
+	if strings.Contains(nonHpcIPAddr, "failed") || strings.Contains(nonHpcIPAddr, "error") {
+		return "", ErrGetNonHpcIPAddr
 	}
-	slog.Info("Non HPC IP Addr", "ip", nonHpcIpAddr)
+	slog.Info("Non HPC IP Addr", "ip", nonHpcIPAddr)
 
-	return nonHpcIpAddr, nil
+	return nonHpcIPAddr, nil
 }
 
 func (v *ValidateWinBpfMetric) getNonHpcPodIfIndex() (string, error) {
 	slog.Info("Executing EventWriter-GetPodIfIndex")
-	nonHpcLabelSelector := fmt.Sprintf("app=%s", v.NonHpcAppName)
+	nonHpcLabelSelector := "app=" + v.NonHpcAppName
 
 	nonHpcIfIndex, err := kubernetes.ExecCommandInWinPod(
 		v.KubeConfigFilePath,
 		"C:\\event-writer-helper.bat EventWriter-GetPodIfIndex",
 		v.NonHpcAppNamespace,
 		nonHpcLabelSelector,
-		true)
-
+		true,
+	)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("executing EventWriter command: %w", err)
 	}
 
 	if strings.Contains(nonHpcIfIndex, "failed") || strings.Contains(nonHpcIfIndex, "error") {
-		return "", fmt.Errorf("failed to get nonHpcIfIndex")
+		return "", ErrGetNonHpcIfIndex
 	}
 	slog.Info("Non HPC Interface Index", "InterfaceIndex", nonHpcIfIndex)
 
@@ -127,59 +130,59 @@ func (v *ValidateWinBpfMetric) getNonHpcPodIfIndex() (string, error) {
 
 func (v *ValidateWinBpfMetric) attachEventWriter(nonHpcIfIndex string) (string, error) {
 	slog.Info("Attaching Event Writer to Non HPC Pod")
-	ebpfLabelSelector := fmt.Sprintf("name=%s", v.EbpfXdpDeamonSetName)
+	ebpfLabelSelector := "name=" + v.EbpfXdpDeamonSetName
 
 	// Attach to the non HPC pod
 	output, err := kubernetes.ExecCommandInWinPod(
 		v.KubeConfigFilePath,
-		fmt.Sprintf("C:\\event-writer-helper.bat EventWriter-Attach %s", nonHpcIfIndex),
+		"C:\\event-writer-helper.bat EventWriter-Attach "+nonHpcIfIndex,
 		v.EbpfXdpDeamonSetNamespace,
 		ebpfLabelSelector,
-		true)
-
+		true,
+	)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("executing EventWriter command: %w", err)
 	}
 
 	if strings.Contains(output, "failed") || strings.Contains(output, "error") || strings.Contains(output, "exiting") {
-		return "", fmt.Errorf("failed to attach to non HPC pod interface %s", output)
+		return "", fmt.Errorf("%w: %s", ErrAttachInterface, output)
 	}
 
 	return output, nil
 }
 
 func (v *ValidateWinBpfMetric) generateTraceEvents() error {
-
 	slog.Info("Generating Trace Events")
-	nonHpcLabelSelector := fmt.Sprintf("app=%s", v.NonHpcAppName)
-	ebpfLabelSelector := fmt.Sprintf("name=%s", v.EbpfXdpDeamonSetName)
+	nonHpcLabelSelector := "app=" + v.NonHpcAppName
+	ebpfLabelSelector := "name=" + v.EbpfXdpDeamonSetName
 
 	// TRACE
 	output, err := kubernetes.ExecCommandInWinPod(
 		v.KubeConfigFilePath,
-		fmt.Sprintf("C:\\event-writer-helper.bat EventWriter-SetFilter -event 4 -srcIP %s", TestExternalIpAddress),
+		"C:\\event-writer-helper.bat EventWriter-SetFilter -event 4 -srcIP "+TestExternalIPAddress,
 		v.EbpfXdpDeamonSetNamespace,
 		ebpfLabelSelector,
-		true)
-
+		true,
+	)
 	if err != nil {
-		return err
+		return fmt.Errorf("executing EventWriter command: %w", err)
 	}
 
 	if strings.Contains(output, "failed") || strings.Contains(output, "error") || strings.Contains(output, "exiting") {
-		return fmt.Errorf("failed to set filter for event writer")
+		return ErrSetFilterEventWriter
 	}
 
 	numcurls := 10
 	for numcurls > 0 {
 		_, err = kubernetes.ExecCommandInWinPod(
 			v.KubeConfigFilePath,
-			fmt.Sprintf("C:\\event-writer-helper.bat EventWriter-Curl %s", TestExternalIpAddress),
+			"C:\\event-writer-helper.bat EventWriter-Curl "+TestExternalIPAddress,
 			v.NonHpcAppNamespace,
 			nonHpcLabelSelector,
-			false)
+			false,
+		)
 		if err != nil {
-			return err
+			return fmt.Errorf("executing EventWriter command: %w", err)
 		}
 		numcurls--
 	}
@@ -189,34 +192,35 @@ func (v *ValidateWinBpfMetric) generateTraceEvents() error {
 
 func (v *ValidateWinBpfMetric) generateDropEvents() error {
 	slog.Info("Generating Drop Events")
-	nonHpcLabelSelector := fmt.Sprintf("app=%s", v.NonHpcAppName)
-	ebpfLabelSelector := fmt.Sprintf("name=%s", v.EbpfXdpDeamonSetName)
+	nonHpcLabelSelector := "app=" + v.NonHpcAppName
+	ebpfLabelSelector := "name=" + v.EbpfXdpDeamonSetName
 
 	output, err := kubernetes.ExecCommandInWinPod(
 		v.KubeConfigFilePath,
-		fmt.Sprintf("C:\\event-writer-helper.bat EventWriter-SetFilter -event 1 -srcIP %s", TestExternalIpAddress),
+		"C:\\event-writer-helper.bat EventWriter-SetFilter -event 1 -srcIP "+TestExternalIPAddress,
 		v.EbpfXdpDeamonSetNamespace,
 		ebpfLabelSelector,
-		true)
-
+		true,
+	)
 	if err != nil {
-		return err
+		return fmt.Errorf("executing EventWriter command: %w", err)
 	}
 
 	if strings.Contains(output, "failed") || strings.Contains(output, "error") || strings.Contains(output, "exiting") {
-		return fmt.Errorf("failed to start event writer")
+		return ErrStartEventWriter
 	}
 
 	numcurls := 10
 	for numcurls > 0 {
 		_, err = kubernetes.ExecCommandInWinPod(
 			v.KubeConfigFilePath,
-			fmt.Sprintf("C:\\event-writer-helper.bat EventWriter-Curl %s", TestExternalIpAddress),
+			"C:\\event-writer-helper.bat EventWriter-Curl "+TestExternalIPAddress,
 			v.NonHpcAppNamespace,
 			nonHpcLabelSelector,
-			false)
+			false,
+		)
 		if err != nil {
-			return err
+			return fmt.Errorf("executing EventWriter command: %w", err)
 		}
 		numcurls--
 	}
@@ -226,34 +230,35 @@ func (v *ValidateWinBpfMetric) generateDropEvents() error {
 
 func (v *ValidateWinBpfMetric) generatePktmonDropEvents() error {
 	slog.Info("Generating Drop Events")
-	nonHpcLabelSelector := fmt.Sprintf("app=%s", v.NonHpcAppName)
-	ebpfLabelSelector := fmt.Sprintf("name=%s", v.EbpfXdpDeamonSetName)
+	nonHpcLabelSelector := "app=" + v.NonHpcAppName
+	ebpfLabelSelector := "name=" + v.EbpfXdpDeamonSetName
 
 	output, err := kubernetes.ExecCommandInWinPod(
 		v.KubeConfigFilePath,
-		fmt.Sprintf("C:\\event-writer-helper.bat EventWriter-SetFilter -event 100 -srcIP %s", TestExternalIpAddress),
+		"C:\\event-writer-helper.bat EventWriter-SetFilter -event 100 -srcIP "+TestExternalIPAddress,
 		v.EbpfXdpDeamonSetNamespace,
 		ebpfLabelSelector,
-		true)
-
+		true,
+	)
 	if err != nil {
-		return err
+		return fmt.Errorf("executing EventWriter command: %w", err)
 	}
 
 	if strings.Contains(output, "failed") || strings.Contains(output, "error") || strings.Contains(output, "exiting") {
-		return fmt.Errorf("failed to start event writer")
+		return ErrStartEventWriter
 	}
 
 	numcurls := 10
 	for numcurls > 0 {
 		_, err = kubernetes.ExecCommandInWinPod(
 			v.KubeConfigFilePath,
-			fmt.Sprintf("C:\\event-writer-helper.bat EventWriter-Curl %s", TestExternalIpAddress),
+			"C:\\event-writer-helper.bat EventWriter-Curl "+TestExternalIPAddress,
 			v.NonHpcAppNamespace,
 			nonHpcLabelSelector,
-			false)
+			false,
+		)
 		if err != nil {
-			return err
+			return fmt.Errorf("executing EventWriter command: %w", err)
 		}
 		numcurls--
 	}
@@ -262,7 +267,6 @@ func (v *ValidateWinBpfMetric) generatePktmonDropEvents() error {
 }
 
 func (v *ValidateWinBpfMetric) verifyBasicMetrics(promOutput string) error {
-
 	var fwdBytes float64
 	var drpBytes float64
 	var windowsDrpBytes float64
@@ -351,13 +355,11 @@ func (v *ValidateWinBpfMetric) verifyBasicMetrics(promOutput string) error {
 	}
 
 	return nil
-
 }
 
-func (v *ValidateWinBpfMetric) verifyAdvancedMetrics(nonHpcIpAddr, promOutput string) error {
-
+func (v *ValidateWinBpfMetric) verifyAdvancedMetrics(nonHpcIPAddr, promOutput string) error {
 	// Advanced Metrics
-	adv_fwd_count_labels := map[string]string{
+	advFwdCountLabels := map[string]string{
 		"direction":     "egress",
 		"ip":            "23.192.228.84",
 		"namespace":     "",
@@ -365,9 +367,9 @@ func (v *ValidateWinBpfMetric) verifyAdvancedMetrics(nonHpcIpAddr, promOutput st
 		"workload_kind": "unknown",
 		"workload_name": "unknown",
 	}
-	err := prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_adv_forward_count", adv_fwd_count_labels)
+	err := prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_adv_forward_count", advFwdCountLabels)
 	if err != nil {
-		return fmt.Errorf("failed to find networkobservability_adv_forward_count")
+		return fmt.Errorf("failed to find networkobservability_adv_forward_count: %w", err)
 	}
 
 	tcpFlags := []string{"ACK", "FIN", "PSH"}
@@ -388,7 +390,7 @@ func (v *ValidateWinBpfMetric) verifyAdvancedMetrics(nonHpcIpAddr, promOutput st
 		slog.Info("Found TCP flag metric", "flag", flag)
 	}
 
-	adv_drop_byte_labels := map[string]string{
+	advDropByteLabels := map[string]string{
 		"direction":     "egress",
 		"ip":            "23.192.228.84",
 		"namespace":     "",
@@ -397,12 +399,12 @@ func (v *ValidateWinBpfMetric) verifyAdvancedMetrics(nonHpcIpAddr, promOutput st
 		"workload_kind": "unknown",
 		"workload_name": "unknown",
 	}
-	err = prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_adv_drop_bytes", adv_drop_byte_labels)
+	err = prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_adv_drop_bytes", advDropByteLabels)
 	if err != nil {
-		return fmt.Errorf("failed to find networkobservability_adv_drop_bytes")
+		return fmt.Errorf("failed to find networkobservability_adv_drop_bytes: %w", err)
 	}
 
-	adv_drop_count_labels := map[string]string{
+	advDropCountLabels := map[string]string{
 		"direction":     "egress",
 		"ip":            "23.192.228.84",
 		"namespace":     "",
@@ -411,12 +413,12 @@ func (v *ValidateWinBpfMetric) verifyAdvancedMetrics(nonHpcIpAddr, promOutput st
 		"workload_kind": "unknown",
 		"workload_name": "unknown",
 	}
-	err = prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_adv_drop_count", adv_drop_count_labels)
+	err = prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_adv_drop_count", advDropCountLabels)
 	if err != nil {
-		return fmt.Errorf("failed to find networkobservability_adv_drop_count")
+		return fmt.Errorf("failed to find networkobservability_adv_drop_count: %w", err)
 	}
 
-	adv_pktmon_drop_count_labels := map[string]string{
+	advPktmonDropCountLabels := map[string]string{
 		"direction":     "egress",
 		"ip":            "23.192.228.84",
 		"namespace":     "",
@@ -426,28 +428,28 @@ func (v *ValidateWinBpfMetric) verifyAdvancedMetrics(nonHpcIpAddr, promOutput st
 		"workload_name": "unknown",
 	}
 
-	err = prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_adv_drop_count", adv_pktmon_drop_count_labels)
+	err = prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_adv_drop_count", advPktmonDropCountLabels)
 	if err != nil {
-		return fmt.Errorf("failed to find networkobservability_adv_drop_count")
+		return fmt.Errorf("failed to find networkobservability_adv_drop_count: %w", err)
 	}
 
-	adv_fwd_count_labels = map[string]string{
+	advFwdCountLabels = map[string]string{
 		"direction":     "ingress",
-		"ip":            nonHpcIpAddr,
+		"ip":            nonHpcIPAddr,
 		"namespace":     v.NonHpcAppNamespace,
 		"podname":       v.NonHpcPodName,
 		"workload_kind": "unknown",
 		"workload_name": "unknown",
 	}
-	err = prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_adv_forward_count", adv_fwd_count_labels)
+	err = prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_adv_forward_count", advFwdCountLabels)
 	if err != nil {
-		return fmt.Errorf("failed to find networkobservability_adv_forward_count")
+		return fmt.Errorf("failed to find networkobservability_adv_forward_count: %w", err)
 	}
 
 	for _, flag := range tcpFlags {
 		tcpFlagLabels := map[string]string{
 			"flag":          flag,
-			"ip":            nonHpcIpAddr,
+			"ip":            nonHpcIPAddr,
 			"namespace":     v.NonHpcAppNamespace,
 			"podname":       v.NonHpcPodName,
 			"workload_kind": "unknown",
@@ -461,80 +463,75 @@ func (v *ValidateWinBpfMetric) verifyAdvancedMetrics(nonHpcIpAddr, promOutput st
 		slog.Info("Found TCP flag metric", "flag", flag)
 	}
 
-	adv_drop_byte_labels = map[string]string{
+	advDropByteLabels = map[string]string{
 		"direction":     "ingress",
-		"ip":            nonHpcIpAddr,
+		"ip":            nonHpcIPAddr,
 		"namespace":     v.NonHpcAppNamespace,
 		"podname":       v.NonHpcPodName,
 		"reason":        "Reason_LbNoBackend",
 		"workload_kind": "unknown",
 		"workload_name": "unknown",
 	}
-	err = prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_adv_drop_bytes", adv_drop_byte_labels)
+	err = prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_adv_drop_bytes", advDropByteLabels)
 	if err != nil {
-		return fmt.Errorf("failed to find networkobservability_adv_drop_bytes with ingress label")
+		return fmt.Errorf("failed to find networkobservability_adv_drop_bytes with ingress label: %w", err)
 	}
 
-	adv_drop_count_labels = map[string]string{
+	advDropCountLabels = map[string]string{
 		"direction":     "ingress",
-		"ip":            nonHpcIpAddr,
+		"ip":            nonHpcIPAddr,
 		"namespace":     v.NonHpcAppNamespace,
 		"podname":       v.NonHpcPodName,
 		"reason":        "Reason_LbNoBackend",
 		"workload_kind": "unknown",
 		"workload_name": "unknown",
 	}
-	err = prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_adv_drop_count", adv_drop_count_labels)
+	err = prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_adv_drop_count", advDropCountLabels)
 	if err != nil {
-		return fmt.Errorf("failed to find networkobservability_adv_drop_count with ingress label")
+		return fmt.Errorf("failed to find networkobservability_adv_drop_count with ingress label: %w", err)
 	}
 	return nil
 }
 
 func (v *ValidateWinBpfMetric) Run() error {
-
-	nonHpcLabelSelector := fmt.Sprintf("app=%s", v.NonHpcAppName)
+	nonHpcLabelSelector := "app=" + v.NonHpcAppName
 	slog.Info("Waiting for Non HPC Pod to come up")
 	// Wait for the non HPC pod to be ready. Maximum wait time is 15 minutes in case the Pods are very slow to come up.
-	kubernetes.WaitForPodReadyWithTimeOut(context.TODO(), v.KubeConfigFilePath, v.NonHpcAppNamespace, nonHpcLabelSelector, 15*time.Minute)
+	if err := kubernetes.WaitForPodReadyWithTimeOut(context.TODO(), v.KubeConfigFilePath, v.NonHpcAppNamespace, nonHpcLabelSelector, 15*time.Minute); err != nil {
+		slog.Warn("waiting for Non HPC Pod ready timed out", "error", err)
+	}
 	slog.Info("Non HPC Pod is ready")
 
-	nonHpcIpAddr, err := v.getNonHpcPodIpAddress()
-
+	nonHpcIPAddr, err := v.getNonHpcPodIPAddress()
 	if err != nil {
 		return err
 	}
 
 	nonHpcIfIndex, err := v.getNonHpcPodIfIndex()
-
 	if err != nil {
 		return err
 	}
 
 	// Attach to the non HPC pod
 	_, err = v.attachEventWriter(nonHpcIfIndex)
-
 	if err != nil {
 		return err
 	}
 
 	// Generate trace events
 	err = v.generateTraceEvents()
-
 	if err != nil {
 		return err
 	}
 
 	// generate drop events
 	err = v.generateDropEvents()
-
 	if err != nil {
 		return err
 	}
 
 	// generate pktmon drop events
 	err = v.generatePktmonDropEvents()
-
 	if err != nil {
 		return err
 	}
@@ -542,7 +539,6 @@ func (v *ValidateWinBpfMetric) Run() error {
 	slog.Info("Waiting for basic metrics to be updated as part of next polling cycle")
 	time.Sleep(12 * time.Second)
 	promOutput, err := v.GetPromMetrics()
-
 	if err != nil {
 		return err
 	}
@@ -551,12 +547,11 @@ func (v *ValidateWinBpfMetric) Run() error {
 
 	err = v.verifyBasicMetrics(promOutput)
 	if err != nil {
-
 		return fmt.Errorf("failed to verify basic metrics: %w", err)
 	}
 	slog.Info("Basic metrics verified successfully")
 
-	err = v.verifyAdvancedMetrics(nonHpcIpAddr, promOutput)
+	err = v.verifyAdvancedMetrics(nonHpcIPAddr, promOutput)
 	if err != nil {
 		return fmt.Errorf("failed to verify advanced metrics: %w", err)
 	}

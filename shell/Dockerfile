@@ -28,15 +28,19 @@ RUN tdnf install -y \
 	tar \
 	file \
 	bpftool \
+	bpftrace \
 	ig \
 	&& tdnf clean all
 
-# Create the entrypoint script to mount debugfs
+# Create the entrypoint script to mount debugfs and tracefs
 SHELL ["/bin/bash", "-c"]
 
 RUN echo $'#!/bin/bash\n\
 if ! mountpoint -q /sys/kernel/debug; then\n\
 mount -t debugfs none /sys/kernel/debug\n\
+fi\n\
+if ! mountpoint -q /sys/kernel/tracing; then\n\
+mount -t tracefs tracefs /sys/kernel/tracing\n\
 fi\n\
 exec "$@"' > /usr/local/bin/entrypoint.sh;
 
@@ -53,7 +57,7 @@ ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 ARG GOARCH=amd64
 ENV ARCH=${GOARCH}
 # https://github.com/cilium/pwru/releases
-ARG PWRU_TAG="v1.0.9"
+ARG PWRU_TAG="v1.0.12"
 ENV PWRU_TAG=${PWRU_TAG}
 
 # Download and extract latest pwru release for the correct architecture (amd64 or arm64)

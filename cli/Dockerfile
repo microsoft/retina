@@ -1,11 +1,13 @@
-# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.5-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26.5-azurelinux3.0@sha256:1c77c1cbb5de52db3f119fe2efe7a938e734c08196bbe3ad94b3bdadbab926f9 AS builder
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.3-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26.5-2-azurelinux3.0@sha256:1c77c1cbb5de52db3f119fe2efe7a938e734c08196bbe3ad94b3bdadbab926f9 AS builder
 
-# enable no-cgo OpenSSL crypto for arm64 cross-compile (Go <=1.26)
+# systemcrypto without cgo — required for arm64 cross-compile from amd64 host.
+# Becomes redundant with Go 1.27+ (auto-selected when CGO_ENABLED=0).
 ENV GOEXPERIMENT=ms_nocgo_opensslcrypto
 
 ARG VERSION
 ARG APP_INSIGHTS_ID
+ARG AGENT_IMAGE_NAME="ghcr.io/microsoft/retina/retina-agent"
 
 WORKDIR /workspace
 COPY . .
@@ -18,9 +20,10 @@ ARG GOARCH=amd64
 ENV GOARCH=${GOARCH}
 
 RUN --mount=type=cache,target="/root/.cache/go-build" \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    go build \
     -ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" \
-    -X "github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID"="$APP_INSIGHTS_ID"" \
+    -X "github.com/microsoft/retina/internal/buildinfo.ApplicationInsightsID"="$APP_INSIGHTS_ID" \
+    -X "github.com/microsoft/retina/internal/buildinfo.RetinaAgentImageName"="$AGENT_IMAGE_NAME"" \
     -a -o kubectl-retina cli/main.go
 
 # minimal libs stage — provides only the system libraries needed by the CGO-enabled binary,
