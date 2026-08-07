@@ -30,7 +30,6 @@ import (
 	"github.com/cilium/cilium/operator/endpointgc"
 	"github.com/cilium/cilium/operator/identitygc"
 	operatorMetrics "github.com/cilium/cilium/operator/metrics"
-	operatorOption "github.com/cilium/cilium/operator/option"
 	"github.com/cilium/cilium/operator/pkg/ztunnel"
 	cmtypes "github.com/cilium/cilium/pkg/clustermesh/types"
 	"github.com/cilium/cilium/pkg/controller"
@@ -62,6 +61,10 @@ var (
 		}),
 		Infrastructure,
 		ControlPlane,
+
+		// Keep this last: registerOperatorHooks does not depend on every
+		// leader-only cell, so its hook could otherwise start them too early.
+		cell.Invoke(registerOperatorHooks),
 	)
 
 	Infrastructure = cell.Module(
@@ -104,20 +107,9 @@ var (
 			return kvstore.NewInMemoryClient(db, "default")
 		}),
 
-		// Provides the modular metrics registry, metric HTTP server and standard metrics cell.
-		// NOTE: no server/metrics are created when --enable-metrics=false (default)
+		// The server runs when --operator-prometheus-serve-addr (default ":9963")
+		// is non-empty; Cilium still parses --enable-metrics but never reads it.
 		operatorMetrics.Cell,
-		cell.Provide(func(
-			operatorCfg *operatorOption.OperatorConfig,
-		) operatorMetrics.SharedConfig {
-			return operatorMetrics.SharedConfig{
-				// Cloud provider specific allocators needs to read operatorCfg.EnableMetrics
-				// to add their metrics when it's set to true. Therefore, we leave the flag as global
-				// instead of declaring it as part of the metrics cell.
-				// This should be changed once the IPAM allocator is modularized.
-				EnableMetrics: operatorCfg.EnableMetrics,
-			}
-		}),
 		cell.Provide(func() *k8sruntime.Scheme {
 			scheme := k8sruntime.NewScheme()
 
@@ -128,7 +120,7 @@ var (
 		}),
 	)
 
-	// ControlPlane implements the control functions.
+	// ControlPlane contains always-on wiring; only WithLeaderLifecycle starts after election.
 	ControlPlane = cell.Module(
 		"operator-controlplane",
 		"Operator Control Plane",
@@ -142,21 +134,12 @@ var (
 			return nil
 		}),
 
-		cell.Invoke(
-			registerOperatorHooks,
-		),
-
 		cell.Provide(func() *option.DaemonConfig {
 			return option.Config
 		}),
 
-		cell.Provide(func() *operatorOption.OperatorConfig {
-			return operatorOption.Config
-		}),
-
 		cell.Provide(func(
 			daemonCfg *option.DaemonConfig,
-			_ *operatorOption.OperatorConfig,
 		) identitygc.SharedConfig {
 			return identitygc.SharedConfig{
 				IdentityAllocationMode: daemonCfg.IdentityAllocationMode,
@@ -173,11 +156,9 @@ var (
 		// }),
 
 		cell.Provide(func(
-			operatorCfg *operatorOption.OperatorConfig,
 			daemonCfg *option.DaemonConfig,
 		) endpointgc.SharedConfig {
 			return endpointgc.SharedConfig{
-				Interval:                 operatorCfg.EndpointGCInterval,
 				DisableCiliumEndpointCRD: daemonCfg.DisableCiliumEndpointCRD,
 			}
 		}),
