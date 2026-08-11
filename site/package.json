@@ -34,7 +34,7 @@
     "@docusaurus/types": "^3.10.1",
     "css-loader": "^7.1.4",
     "style-loader": "^4.0.0",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   },
   "browserslist": {
     "production": [
