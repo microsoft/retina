@@ -96,7 +96,6 @@ help: ## Display this help
 
 GOFUMPT			= go tool mvdan.cc/gofumpt
 GOLANGCI_LINT	= go tool github.com/golangci/golangci-lint/v2/cmd/golangci-lint
-GORELEASER		= go tool github.com/goreleaser/goreleaser
 CONTROLLER_GEN	= go tool sigs.k8s.io/controller-tools/cmd/controller-gen
 GINKGO			= go tool github.com/onsi/ginkgo
 MOCKGEN			= go tool go.uber.org/mock/mockgen
@@ -105,8 +104,6 @@ ENVTEST			= go tool sigs.k8s.io/controller-runtime/tools/setup-envtest
 gofumpt: $(GOFUMPT) ## Build gofumpt
 
 golangci-lint: $(GOLANGCI_LINT) ## Build golangci-lint
-
-goreleaser: $(GORELEASER) ## Build goreleaser
 
 controller-gen: $(CONTROLLER_GEN) ## Build controller-gen
 
