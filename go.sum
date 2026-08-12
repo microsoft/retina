@@ -261,8 +261,8 @@ github.com/charmbracelet/x/cellbuf v0.0.14 h1:iUEMryGyFTelKW3THW4+FfPgi4fkmKnnaL
 github.com/charmbracelet/x/cellbuf v0.0.14/go.mod h1:P447lJl49ywBbil/KjCk2HexGh4tEY9LH0/1QrZZ9rA=
 github.com/charmbracelet/x/term v0.2.2 h1:xVRT/S2ZcKdhhOuSP4t5cLi5o+JxklsoEObBSgfgZRk=
 github.com/charmbracelet/x/term v0.2.2/go.mod h1:kF8CY5RddLWrsgVwpw4kAa6TESp6EB5y3uxGLeCqzAI=
-github.com/cilium/cilium v1.19.3 h1:foJrHPk45HwshOd8Qf/kptf9JxPfNySkIDKsetZa9+Y=
-github.com/cilium/cilium v1.19.3/go.mod h1:cd4P5LHAg4hyyZexrM4D055t5JwyudeAcZ/Jub9VxJY=
+github.com/cilium/cilium v1.19.4 h1:TxDZW+27NqLbuenPlWd8y8cnAmDNFga/FCMM8zP1qLQ=
+github.com/cilium/cilium v1.19.4/go.mod h1:9j8LLVACyWe8bbtlUPCjPSARbmOS+tqo9GRNh5SHjJc=
 github.com/cilium/dns v1.1.51-0.20240603182237-af788769786a h1:PRGN7B+72mj3OtLL2DM3F/9jp+ItgqgNS7mecgCmwsQ=
 github.com/cilium/dns v1.1.51-0.20240603182237-af788769786a/go.mod h1:/7LC2GOgyXJ7maupZlaVIumYQiGPIgllSf6mA9sg6RU=
 github.com/cilium/ebpf v0.5.0/go.mod h1:4tRaxcgiL706VnOzHOdBlY8IEAIdxINsQBcU4xJJXRs=
