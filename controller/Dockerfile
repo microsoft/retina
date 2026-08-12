@@ -101,10 +101,7 @@ RUN tdnf install -y \
     iptables \
     tcpdump \
     which \
-    wget \
-    gnupg2 \
-    ca-certificates \
-    tar
+    ca-certificates
 RUN mkdir -p /tmp/bin
 RUN arr="clang tcpdump ip ss iptables-legacy iptables-legacy-save iptables-nft iptables-nft-save cp uname" ;\
     for i in $arr; do    \
@@ -112,18 +109,6 @@ RUN arr="clang tcpdump ip ss iptables-legacy iptables-legacy-save iptables-nft i
     done
 RUN mkdir -p /tmp/init-bin
 RUN cp $(which bpftool) /tmp/init-bin
-# Download Hubble
-ARG GOARCH=amd64
-ENV HUBBLE_ARCH=${GOARCH}
-# ARG HUBBLE_VERSION may be modified via the update-hubble GitHub Action
-ARG HUBBLE_VERSION=v1.19.4
-ENV HUBBLE_VERSION=${HUBBLE_VERSION}
-RUN echo "Hubble version: $HUBBLE_VERSION" && \
-    wget --no-check-certificate https://github.com/cilium/hubble/releases/download/$HUBBLE_VERSION/hubble-linux-${HUBBLE_ARCH}.tar.gz && \
-    wget --no-check-certificate https://github.com/cilium/hubble/releases/download/$HUBBLE_VERSION/hubble-linux-${HUBBLE_ARCH}.tar.gz.sha256sum && \
-    sha256sum --check hubble-linux-${HUBBLE_ARCH}.tar.gz.sha256sum && \
-    tar xzvfC hubble-linux-${HUBBLE_ARCH}.tar.gz /usr/local && \
-    rm hubble-linux-${HUBBLE_ARCH}.tar.gz && rm hubble-linux-${HUBBLE_ARCH}.tar.gz.sha256sum
 
 # init final image
 FROM azurelinux-distroless AS init
@@ -145,8 +130,4 @@ COPY --from=tools /tmp/bin/ /bin
 COPY --from=controller-bin /go/bin/retina/controller /retina/controller
 COPY --from=controller-bin /go/src/github.com/microsoft/retina/pkg/plugin /go/src/github.com/microsoft/retina/pkg/plugin
 COPY --from=capture-bin /go/bin/retina/captureworkload /retina/captureworkload
-# Copy Hubble.
-COPY --from=tools /usr/local/hubble /bin/hubble
-# Set Hubble server.
-ENV HUBBLE_SERVER=unix:///var/run/cilium/hubble.sock
 ENTRYPOINT ["./retina/controller"]

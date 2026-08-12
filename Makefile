@@ -41,8 +41,6 @@ PLATFORM		?= $(OS)/$(ARCH)
 PLATFORMS		?= linux/amd64 linux/arm64 windows/amd64
 OS_VERSION		?= ltsc2022
 
-HUBBLE_VERSION ?= v1.19.4
-
 CONTAINER_BUILDER ?= docker
 CONTAINER_RUNTIME ?= docker
 YEAR 			  ?= 2022
@@ -233,7 +231,6 @@ container-docker: buildx # util target to build container images using docker bu
 		--build-arg GOARCH=$$arch \
 		--build-arg GOOS=$$os \
 		--build-arg OS_VERSION=$(OS_VERSION) \
-		--build-arg HUBBLE_VERSION=$(HUBBLE_VERSION) \
 		--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
 		--target=$(TARGET) \
 		-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
@@ -254,7 +251,6 @@ container-docker-windows: # util target to build Windows container images withou
 		--build-arg GOARCH=$$arch \
 		--build-arg GOOS=$$os \
 		--build-arg OS_VERSION=$(OS_VERSION) \
-		--build-arg HUBBLE_VERSION=$(HUBBLE_VERSION) \
 		--build-arg VERSION=$(VERSION) \
 		--build-arg REPO_PATH=$(REPO_PATH) \
 		--build-arg BINARIES_PATH=$(BINARIES_PATH) \
@@ -646,25 +642,3 @@ run-perf-test:
 
 run-e2e-test:
 	go test -v ./test/e2e/ -timeout 1h -tags=e2e -count=1  -args -image-tag=${TAG} -image-registry=${IMAGE_REGISTRY} -image-namespace=${IMAGE_NAMESPACE}
-
-.PHONY: update-hubble
-update-hubble:
-	@echo "Checking for Hubble updates..."
-	@latest_version=$$(curl -s https://api.github.com/repos/cilium/hubble/releases/latest | jq -r .tag_name); \
-    echo "Latest Hubble version: $$latest_version"; \
-    current_version=$$(grep -oP '(?<=ARG HUBBLE_VERSION=).*' controller/Dockerfile); \
-    echo "Current Hubble version: $$current_version"; \
-    if [ "$$latest_version" = "$$current_version" ]; then \
-        echo "Hubble version is up to date. No update needed."; \
-    else \
-        echo "Updating Hubble version from $$current_version to $$latest_version"; \
-        sed -i "s/^ARG HUBBLE_VERSION=.*/ARG HUBBLE_VERSION=$$latest_version/" controller/Dockerfile; \
-        sed -i "s/^HUBBLE_VERSION ?=.*/HUBBLE_VERSION ?= $$latest_version/" Makefile; \
-        echo ""; \
-        echo "Updated Hubble version in controller/Dockerfile and Makefile."; \
-        echo "Please create a branch and commit these changes:"; \
-        echo "  git checkout -b deps/update-hubble-to-$$latest_version"; \
-        echo "  git commit -am \"deps: bump Hubble version from $$current_version to $$latest_version\""; \
-        echo "  git push origin deps/update-hubble-to-$$latest_version"; \
-        echo "Then create a pull request on GitHub."; \
-    fi
