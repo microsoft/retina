@@ -6,6 +6,7 @@ package capture
 import (
 	"context"
 	"fmt"
+	"net"
 	"os/signal"
 	"strings"
 	"syscall"
@@ -290,6 +291,10 @@ func NewCreateSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 		"DEPRECATED and will be removed: Use --pcap-filter for BPF expressions. BPF filter expression without flags (e.g., 'host 10.0.0.1', 'tcp port 443')")
 	createCapture.Flags().StringVar(&opts.pcapFilter, "pcap-filter", "",
 		"BPF filter expression for packet filtering (e.g., 'host 10.0.0.1', 'tcp port 443'). See https://www.tcpdump.org/manpages/pcap-filter.7.html")
+	createCapture.Flags().StringVar(&opts.sourceIPs, "source-ip", "",
+		"A comma-separated list of source IP addresses to filter captured packets by. Combine with --destination-ip to match both.")
+	createCapture.Flags().StringVar(&opts.destinationIPs, "destination-ip", "",
+		"A comma-separated list of destination IP addresses to filter captured packets by. Combine with --source-ip to match both.")
 	createCapture.Flags().StringVar(&opts.interfaces, "interfaces", "", "Comma-separated list of network interfaces to capture on (e.g., eth0,eth1)")
 
 	// Tcpdump boolean flags for capture behavior and display options
@@ -401,12 +406,47 @@ func validateBPFFilter(filter, filterName string) error {
 	return nil
 }
 
+// parseIPList splits a comma-separated list of IP addresses and validates that each entry
+// is a well-formed IP address. This ensures only IP literals (not BPF expressions or flags)
+// are accepted by --source-ip/--destination-ip, preventing filter/command injection.
+func parseIPList(ipList, flagName string) ([]string, error) {
+	if ipList == "" {
+		return nil, nil
+	}
+
+	entries := strings.Split(ipList, ",")
+	ips := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		trimmed := strings.TrimSpace(entry)
+		if trimmed == "" {
+			continue
+		}
+		if net.ParseIP(trimmed) == nil {
+			return nil, fmt.Errorf("%s: %q is not a valid IP address: %w", flagName, trimmed, ErrInvalidIPAddress)
+		}
+		ips = append(ips, trimmed)
+	}
+
+	return ips, nil
+}
+
 func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*retinav1alpha1.Capture, error) {
 	// Validate filters early to provide immediate feedback
 	if err := validateBPFFilter(opts.tcpdumpFilter, "--tcpdump-filter"); err != nil {
 		return nil, err
 	}
 	if err := validateBPFFilter(opts.pcapFilter, "--pcap-filter"); err != nil {
+		return nil, err
+	}
+	if opts.tcpdumpFilter != "" && (opts.sourceIPs != "" || opts.destinationIPs != "") {
+		return nil, ErrTcpdumpFilterIncompatibleWithSourceDestIPs
+	}
+	sourceIPs, err := parseIPList(opts.sourceIPs, "--source-ip")
+	if err != nil {
+		return nil, err
+	}
+	destinationIPs, err := parseIPList(opts.destinationIPs, "--destination-ip")
+	if err != nil {
 		return nil, err
 	}
 
@@ -534,6 +574,16 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 	// Set pcap-filter if provided
 	if opts.pcapFilter != "" {
 		capture.Spec.CaptureConfiguration.CaptureOption.PcapFilter = &opts.pcapFilter
+	}
+
+	// Set source/destination IP filters if provided
+	if len(sourceIPs) > 0 {
+		retinacmd.Logger.Info(fmt.Sprintf("Capturing packets with source IP in: %v", sourceIPs))
+		capture.Spec.CaptureConfiguration.CaptureOption.SourceIPs = sourceIPs
+	}
+	if len(destinationIPs) > 0 {
+		retinacmd.Logger.Info(fmt.Sprintf("Capturing packets with destination IP in: %v", destinationIPs))
+		capture.Spec.CaptureConfiguration.CaptureOption.DestinationIPs = destinationIPs
 	}
 
 	// Set boolean capture and display flags

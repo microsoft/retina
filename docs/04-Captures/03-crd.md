@@ -108,6 +108,33 @@ spec:
     hostPath: example-capture
 ```
 
+Source / Destination IP filters
+
+```yaml
+apiVersion: retina.sh/v1alpha1
+kind: Capture
+metadata:
+  name: example-source-destination-ip
+spec:
+  captureConfiguration:
+    captureOption:
+      duration: "5s"
+      maxCaptureSize: 100
+      sourceIPs:
+        - 10.224.0.42
+      destinationIPs:
+        - 10.224.0.33
+        - 10.224.0.34
+    captureTarget:
+      nodeSelector:
+        matchLabels:
+          kubernetes.io/os: linux
+  outputConfiguration:
+    hostPath: example-capture
+```
+
+This captures only packets whose source IP is `10.224.0.42` **and** whose destination IP is either `10.224.0.33` or `10.224.0.34`. `sourceIPs` and `destinationIPs` can each be used on their own, and work on both Linux and Windows nodes.
+
 Single Pod by Name
 
 ```yaml

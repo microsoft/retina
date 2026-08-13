@@ -14,11 +14,13 @@ import (
 )
 
 var (
-	ErrInvalidVerbosityLevel  = errors.New("invalid verbosity level")
-	ErrInvalidTimestampFormat = errors.New("invalid timestamp format")
-	ErrInvalidPrintDataFormat = errors.New("invalid print data format")
-	ErrBPFFilterEmpty         = errors.New("BPF filter cannot be empty or whitespace-only")
-	ErrBPFFilterContainsFlag  = errors.New("BPF filter contains flag which is not allowed")
+	ErrInvalidVerbosityLevel                      = errors.New("invalid verbosity level")
+	ErrInvalidTimestampFormat                     = errors.New("invalid timestamp format")
+	ErrInvalidPrintDataFormat                     = errors.New("invalid print data format")
+	ErrBPFFilterEmpty                             = errors.New("BPF filter cannot be empty or whitespace-only")
+	ErrBPFFilterContainsFlag                      = errors.New("BPF filter contains flag which is not allowed")
+	ErrInvalidIPAddress                           = errors.New("invalid IP address")
+	ErrTcpdumpFilterIncompatibleWithSourceDestIPs = errors.New("--tcpdump-filter (deprecated) cannot be combined with --source-ip/--destination-ip; use --pcap-filter instead")
 )
 
 // VerbosityLevel represents the verbosity level for packet capture output
@@ -114,6 +116,8 @@ type Opts struct {
 	// tcpdumpFilter is deprecated and will be removed. Use captureOption.pcapFilter and captureOption boolean flags for display options.
 	tcpdumpFilter      string
 	pcapFilter         string
+	sourceIPs          string
+	destinationIPs     string
 	noPromiscuous      bool
 	packetBuffered     bool
 	immediateMode      bool
