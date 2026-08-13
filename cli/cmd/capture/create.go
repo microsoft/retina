@@ -419,7 +419,7 @@ func parseIPList(ipList, flagName string) ([]string, error) {
 	for _, entry := range entries {
 		trimmed := strings.TrimSpace(entry)
 		if trimmed == "" {
-			continue
+			return nil, fmt.Errorf("%s: empty entry is not a valid IP address: %w", flagName, ErrInvalidIPAddress)
 		}
 		if net.ParseIP(trimmed) == nil {
 			return nil, fmt.Errorf("%s: %q is not a valid IP address: %w", flagName, trimmed, ErrInvalidIPAddress)

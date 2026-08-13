@@ -43,6 +43,10 @@ var (
 	errNodeSelectorIncompat     = errors.New("NodeSelector is not compatible with NamespaceSelector&PodSelector or PodNames, please use one or the other")
 	errPodNamesIncompat         = errors.New("PodNames is not compatible with NamespaceSelector or PodSelector, please use one or the other")
 	errFileCountRequiresMaxSize = errors.New("fileCount requires maxCaptureSize to be set as per-file size limit")
+	errInvalidIPAddress         = errors.New("is not a valid IP address")
+	// errTcpdumpFilterIncompatibleWithSourceDestIPs: obtainAndValidateUserFilter gives the generated pcapFilter
+	// precedence over the deprecated tcpdumpFilter, so combining them would silently drop the tcpdumpFilter.
+	errTcpdumpFilterIncompatibleWithSourceDestIPs = errors.New("tcpdumpFilter (deprecated) cannot be combined with sourceIPs/destinationIPs; use pcapFilter instead")
 )
 
 // tcpdumpFlagMapping defines the mapping between CaptureOption boolean fields and their corresponding tcpdump flags.
@@ -693,6 +697,30 @@ func (translator *CaptureToPodTranslator) validateCapture(capture *retinav1alpha
 
 	if _, err := translator.resolveHostPath(capture.Spec.OutputConfiguration); err != nil {
 		return err
+	}
+
+	if capture.Spec.CaptureConfiguration.TcpdumpFilter != nil && *capture.Spec.CaptureConfiguration.TcpdumpFilter != "" &&
+		(len(capture.Spec.CaptureConfiguration.CaptureOption.SourceIPs) > 0 || len(capture.Spec.CaptureConfiguration.CaptureOption.DestinationIPs) > 0) {
+		return errTcpdumpFilterIncompatibleWithSourceDestIPs
+	}
+
+	if err := validateIPAddresses(capture.Spec.CaptureConfiguration.CaptureOption.SourceIPs, "sourceIPs"); err != nil {
+		return err
+	}
+	if err := validateIPAddresses(capture.Spec.CaptureConfiguration.CaptureOption.DestinationIPs, "destinationIPs"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateIPAddresses rejects the Capture outright if any entry isn't a well-formed IP address, rather than
+// letting downstream filter-building silently drop malformed entries and broaden the capture's scope.
+func validateIPAddresses(ips []string, fieldName string) error {
+	for _, ip := range ips {
+		if net.ParseIP(ip) == nil {
+			return fmt.Errorf("%s: %q %w", fieldName, ip, errInvalidIPAddress)
+		}
 	}
 	return nil
 }

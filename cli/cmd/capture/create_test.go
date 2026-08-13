@@ -24,7 +24,11 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 )
 
-const testNamespace = "test-ns"
+const (
+	testNamespace         = "test-ns"
+	testPodSelector       = "k8s-app=my-app"
+	testTcpdumpHostFilter = "host 10.0.0.1"
+)
 
 type testcase struct {
 	name              string
@@ -420,6 +424,26 @@ func TestParseIPList(t *testing.T) {
 			ipList:  "-somtehing",
 			wantErr: true,
 		},
+		{
+			name:    "trailing comma yields an empty entry and is rejected",
+			ipList:  "10.0.0.1,",
+			wantErr: true,
+		},
+		{
+			name:    "empty entry between commas is rejected",
+			ipList:  "10.0.0.1,,10.0.0.2",
+			wantErr: true,
+		},
+		{
+			name:    "whitespace-only entry is rejected",
+			ipList:  "   ",
+			wantErr: true,
+		},
+		{
+			name:    "comma-only list is rejected",
+			ipList:  ",",
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range cases {
@@ -453,7 +477,7 @@ func TestCreateCaptureCommand_SourceDestinationIPs(t *testing.T) {
 	name := "test-capture"
 	namespace := "default"
 
-	opts.podSelectors = "k8s-app=my-app"
+	opts.podSelectors = testPodSelector
 	opts.Namespace = &namespace
 	opts.Name = &name
 	opts.sourceIPs = "10.0.0.1,10.0.0.2"
@@ -481,7 +505,7 @@ func TestCreateCaptureCommand_InvalidSourceIPReturnsError(t *testing.T) {
 	name := "test-capture"
 	namespace := "default"
 
-	opts.podSelectors = "k8s-app=my-app"
+	opts.podSelectors = testPodSelector
 	opts.Namespace = &namespace
 	opts.Name = &name
 	opts.sourceIPs = "not-an-ip"
@@ -510,10 +534,10 @@ func TestCreateCaptureCommand_TcpdumpFilterWithSourceIPReturnsError(t *testing.T
 	name := "test-capture"
 	namespace := "default"
 
-	opts.podSelectors = "k8s-app=my-app"
+	opts.podSelectors = testPodSelector
 	opts.Namespace = &namespace
 	opts.Name = &name
-	opts.tcpdumpFilter = "host 10.0.0.1"
+	opts.tcpdumpFilter = testTcpdumpHostFilter
 	opts.sourceIPs = "10.0.0.1"
 
 	_, err := createCaptureF(context.Background(), fake.NewClientset())
@@ -540,10 +564,10 @@ func TestCreateCaptureCommand_TcpdumpFilterWithDestinationIPReturnsError(t *test
 	name := "test-capture"
 	namespace := "default"
 
-	opts.podSelectors = "k8s-app=my-app"
+	opts.podSelectors = testPodSelector
 	opts.Namespace = &namespace
 	opts.Name = &name
-	opts.tcpdumpFilter = "host 10.0.0.1"
+	opts.tcpdumpFilter = testTcpdumpHostFilter
 	opts.destinationIPs = "10.0.0.2"
 
 	_, err := createCaptureF(context.Background(), fake.NewClientset())
@@ -566,14 +590,14 @@ func TestCreateCaptureCommand_TcpdumpFilterAloneSucceeds(t *testing.T) {
 	name := "test-capture"
 	namespace := "default"
 
-	opts.podSelectors = "k8s-app=my-app"
+	opts.podSelectors = testPodSelector
 	opts.Namespace = &namespace
 	opts.Name = &name
-	opts.tcpdumpFilter = "host 10.0.0.1"
+	opts.tcpdumpFilter = testTcpdumpHostFilter
 
 	capture, err := createCaptureF(context.Background(), fake.NewClientset())
 	require.NoError(t, err)
-	require.Equal(t, "host 10.0.0.1", *capture.Spec.CaptureConfiguration.TcpdumpFilter)
+	require.Equal(t, testTcpdumpHostFilter, *capture.Spec.CaptureConfiguration.TcpdumpFilter)
 }
 
 func TestCreateCaptureWithPodNames_CRDStructure(t *testing.T) {

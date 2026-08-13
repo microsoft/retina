@@ -39,7 +39,7 @@ const (
 )
 
 func NewCaptureToPodTranslatorForTest(kubeClient kubernetes.Interface) *CaptureToPodTranslator {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
 	config := config.CaptureConfig{
 		CaptureDebug:              true,
 		CaptureImageVersion:       "v0.0.1-pre",
@@ -824,7 +824,7 @@ func Test_CaptureToPodTranslator_ObtainCaptureJobPodEnv(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			k8sClient := fakeclientset.NewSimpleClientset()
-			log.SetupZapLogger(log.GetDefaultLogOpts())
+			_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
 			captureToPodTranslator := NewCaptureToPodTranslatorForTest(k8sClient)
 			jobEnv, err := captureToPodTranslator.ObtainCaptureJobPodEnv(tt.capture)
 
@@ -927,7 +927,7 @@ func Test_CaptureToPodTranslator_RenderJob_NodeSelected(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			k8sClient := fakeclientset.NewSimpleClientset()
-			log.SetupZapLogger(log.GetDefaultLogOpts())
+			_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
 			captureToPodTranslator := NewCaptureToPodTranslatorForTest(k8sClient)
 
 			startTime := time.Now()
@@ -1200,6 +1200,109 @@ func Test_CaptureToPodTranslator_ValidateCapture(t *testing.T) {
 			name:    "raise error when HostPath uses parent segment",
 			capture: captureSpecWithHostPath("../etc"),
 			wantErr: true,
+		},
+	)
+
+	// Additional cases for SourceIPs/DestinationIPs validation; share the rest of the spec.
+	captureSpecWithSourceDestIPs := func(sourceIPs, destinationIPs []string) retinav1alpha1.Capture {
+		return retinav1alpha1.Capture{
+			ObjectMeta: metav1.ObjectMeta{Name: captureName},
+			Spec: retinav1alpha1.CaptureSpec{
+				CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
+					CaptureTarget: retinav1alpha1.CaptureTarget{
+						NodeSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"nodename": nodeName},
+						},
+					},
+					CaptureOption: retinav1alpha1.CaptureOption{
+						Duration:       &metav1.Duration{Duration: 10 * time.Second},
+						SourceIPs:      sourceIPs,
+						DestinationIPs: destinationIPs,
+					},
+				},
+				OutputConfiguration: retinav1alpha1.OutputConfiguration{HostPath: &hostPath},
+			},
+		}
+	}
+	cases = append(cases,
+		struct {
+			name    string
+			capture retinav1alpha1.Capture
+			wantErr bool
+		}{
+			name:    "raise error when SourceIPs contains a malformed IP",
+			capture: captureSpecWithSourceDestIPs([]string{"not-an-ip"}, nil),
+			wantErr: true,
+		},
+		struct {
+			name    string
+			capture retinav1alpha1.Capture
+			wantErr bool
+		}{
+			name:    "raise error when DestinationIPs contains a malformed IP",
+			capture: captureSpecWithSourceDestIPs(nil, []string{"10.0.0.1", "not-an-ip"}),
+			wantErr: true,
+		},
+		struct {
+			name    string
+			capture retinav1alpha1.Capture
+			wantErr bool
+		}{
+			name:    "validation is ok when SourceIPs and DestinationIPs are well-formed",
+			capture: captureSpecWithSourceDestIPs([]string{"10.0.0.1", "2001:1234:5678:9abc::1"}, []string{"10.0.0.2"}),
+			wantErr: false,
+		},
+	)
+
+	// Additional cases for the deprecated TcpdumpFilter/SourceIPs/DestinationIPs incompatibility check.
+	captureSpecWithTcpdumpFilterAndSourceDestIPs := func(tcpdumpFilter string, sourceIPs, destinationIPs []string) retinav1alpha1.Capture {
+		return retinav1alpha1.Capture{
+			ObjectMeta: metav1.ObjectMeta{Name: captureName},
+			Spec: retinav1alpha1.CaptureSpec{
+				CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
+					CaptureTarget: retinav1alpha1.CaptureTarget{
+						NodeSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"nodename": nodeName},
+						},
+					},
+					TcpdumpFilter: &tcpdumpFilter,
+					CaptureOption: retinav1alpha1.CaptureOption{
+						Duration:       &metav1.Duration{Duration: 10 * time.Second},
+						SourceIPs:      sourceIPs,
+						DestinationIPs: destinationIPs,
+					},
+				},
+				OutputConfiguration: retinav1alpha1.OutputConfiguration{HostPath: &hostPath},
+			},
+		}
+	}
+	cases = append(cases,
+		struct {
+			name    string
+			capture retinav1alpha1.Capture
+			wantErr bool
+		}{
+			name:    "raise error when TcpdumpFilter is combined with SourceIPs",
+			capture: captureSpecWithTcpdumpFilterAndSourceDestIPs("tcp port 443", []string{"10.0.0.1"}, nil),
+			wantErr: true,
+		},
+		struct {
+			name    string
+			capture retinav1alpha1.Capture
+			wantErr bool
+		}{
+			name:    "raise error when TcpdumpFilter is combined with DestinationIPs",
+			capture: captureSpecWithTcpdumpFilterAndSourceDestIPs("tcp port 443", nil, []string{"10.0.0.1"}),
+			wantErr: true,
+		},
+		struct {
+			name    string
+			capture retinav1alpha1.Capture
+			wantErr bool
+		}{
+			name:    "validation is ok when TcpdumpFilter is set without SourceIPs or DestinationIPs",
+			capture: captureSpecWithTcpdumpFilterAndSourceDestIPs("tcp port 443", nil, nil),
+			wantErr: false,
 		},
 	)
 
@@ -2600,6 +2703,52 @@ func TestUpdateTcpdumpFilterWithPodIPAddress(t *testing.T) {
 	}
 }
 
+func TestValidateIPAddresses(t *testing.T) {
+	cases := []struct {
+		name    string
+		ips     []string
+		wantErr bool
+	}{
+		{
+			name: "empty list",
+			ips:  nil,
+		},
+		{
+			name: "single valid ipv4",
+			ips:  []string{"10.0.0.1"},
+		},
+		{
+			name: "single valid ipv6",
+			ips:  []string{"2001:1234:5678:9abc::1"},
+		},
+		{
+			name: "multiple valid IPs",
+			ips:  []string{"10.0.0.1", "10.0.0.2"},
+		},
+		{
+			name:    "malformed IP is rejected",
+			ips:     []string{"not-an-ip"},
+			wantErr: true,
+		},
+		{
+			name:    "one malformed IP among valid ones is rejected",
+			ips:     []string{"10.0.0.1", "not-an-ip"},
+			wantErr: true,
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateIPAddresses(tt.ips, "sourceIPs")
+			if tt.wantErr != (err != nil) {
+				t.Errorf("validateIPAddresses() want(%t) error, got error %s", tt.wantErr, err)
+			}
+			if tt.wantErr {
+				require.ErrorIs(t, err, errInvalidIPAddress)
+			}
+		})
+	}
+}
+
 func TestBpfDirectionalHostClause(t *testing.T) {
 	cases := []struct {
 		name       string
@@ -2972,7 +3121,7 @@ func Test_CaptureToPodTranslator_RenderJob_NetshFilterCombination(t *testing.T) 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			k8sClient := fakeclientset.NewSimpleClientset()
-			log.SetupZapLogger(log.GetDefaultLogOpts())
+			_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
 			captureToPodTranslator := NewCaptureToPodTranslatorForTest(k8sClient)
 
 			hostPath := "capture" // nolint:goconst // Test case needs a var
