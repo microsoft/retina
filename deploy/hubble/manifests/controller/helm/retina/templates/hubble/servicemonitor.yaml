@@ -1,9 +1,10 @@
 {{- if and .Values.hubble.enabled .Values.hubble.metrics.enabled .Values.hubble.metrics.serviceMonitor.enabled }}
+{{- $legacyServiceMonitorNamespace := dig "serviceMonitor" "namespace" "" (.Values.prometheus | default dict) }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: hubble
-  namespace: {{ .Values.hubble.metrics.serviceMonitor.namespace | default .Release.Namespace }}
+  namespace: {{ .Values.hubble.metrics.serviceMonitor.namespace | default $legacyServiceMonitorNamespace | default .Release.Namespace }}
   labels:
     app.kubernetes.io/part-of: cilium
     {{- with .Values.hubble.metrics.serviceMonitor.labels }}
@@ -26,7 +27,7 @@ spec:
     matchNames:
     - {{ .Release.Namespace }}
   endpoints:
-  - port: {{ .Values.hubble.metrics.serviceMonitor.port }}
+  - port: {{ .Values.hubble.metrics.serviceMonitor.port | quote }}
     interval: {{ .Values.hubble.metrics.serviceMonitor.interval | quote }}
     honorLabels: true
     path: /metrics
