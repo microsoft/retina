@@ -96,7 +96,7 @@ updates:
         patterns:
           - "k8s.io/*"
           - "sigs.k8s.io/*"
-          - "helm.sh/helm/v3"
+          - "helm.sh/helm/v4"
           - "sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader"
         exclude-patterns:
           - "sigs.k8s.io/cloud-provider-azure/pkg/azclient"
