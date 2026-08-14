@@ -170,7 +170,7 @@ require (
 	golang.org/x/mod v0.38.0
 	golang.org/x/text v0.40.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
-	golang.org/x/tools v0.47.0 // indirect
+	golang.org/x/tools v0.48.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
@@ -225,7 +225,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.43.4
 	github.com/aws/aws-sdk-go-v2/config v1.32.35
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.34
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.106.5
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.107.0
 	github.com/cakturk/go-netstat v0.0.0-20200220111822-e5b49efee7a5
 	github.com/cilium/cilium v1.19.4
 	github.com/cilium/ebpf v0.21.0
@@ -483,6 +483,8 @@ require (
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/exp/typeparams v0.0.0-20260209203927-2842357ff358 // indirect
+	golang.org/x/telemetry v0.0.0-20260708182218-49f421fb7959 // indirect
+	golang.org/x/vuln v1.6.0 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
@@ -507,6 +509,7 @@ tool (
 	github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 	github.com/onsi/ginkgo
 	go.uber.org/mock/mockgen
+	golang.org/x/vuln/cmd/govulncheck
 	mvdan.cc/gofumpt
 	sigs.k8s.io/controller-runtime/tools/setup-envtest
 	sigs.k8s.io/controller-tools/cmd/controller-gen

@@ -153,6 +153,16 @@ func (in *CaptureOption) DeepCopyInto(out *CaptureOption) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.SourceIPs != nil {
+		in, out := &in.SourceIPs, &out.SourceIPs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.DestinationIPs != nil {
+		in, out := &in.DestinationIPs, &out.DestinationIPs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.NoPromiscuous != nil {
 		in, out := &in.NoPromiscuous, &out.NoPromiscuous
 		*out = new(bool)
