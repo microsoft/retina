@@ -31,10 +31,15 @@ type validateCapture struct {
 	Duration         string
 	KubeConfigPath   string
 	// SourceIPs and DestinationIPs are optional comma-separated IP lists passed through
-	// to --source-ips/--destination-ips; leave empty to capture without IP filtering.
+	// to --source-ips/--destination-ips. Set to noIPFilter to capture without IP filtering:
+	// the e2e job framework's parameter validation errors on empty exported string fields,
+	// so the Go zero value ("") can't be used to mean "unset" here.
 	SourceIPs      string
 	DestinationIPs string
 }
+
+// noIPFilter is a sentinel value for SourceIPs/DestinationIPs meaning "no IP filtering".
+const noIPFilter = "none"
 
 var (
 	ErrInvalidCaptureName       = errors.New("invalid capture name")
@@ -56,10 +61,10 @@ func (v *validateCapture) Run() error {
 	log.Printf("KUBECONFIG: %s\n", os.Getenv("KUBECONFIG"))
 
 	args := []string{"retina", "capture", "create", "--namespace", v.CaptureNamespace, "--name", v.CaptureName, "--duration", v.Duration, "--debug"}
-	if v.SourceIPs != "" {
+	if v.SourceIPs != "" && v.SourceIPs != noIPFilter {
 		args = append(args, "--source-ips", v.SourceIPs)
 	}
-	if v.DestinationIPs != "" {
+	if v.DestinationIPs != "" && v.DestinationIPs != noIPFilter {
 		args = append(args, "--destination-ips", v.DestinationIPs)
 	}
 	cmd := exec.CommandContext(ctx, "kubectl", args...) //#nosec

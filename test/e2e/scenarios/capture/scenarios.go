@@ -21,6 +21,8 @@ func ValidateCapture(kubeConfigPath, namespace string) *types.Scenario {
 				CaptureNamespace: namespace,
 				Duration:         "5s",
 				KubeConfigPath:   kubeConfigPath,
+				SourceIPs:        noIPFilter,
+				DestinationIPs:   noIPFilter,
 			}, Opts: &types.StepOptions{
 				SkipSavingParametersToJob: true,
 			},
