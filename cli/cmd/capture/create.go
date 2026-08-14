@@ -291,10 +291,12 @@ func NewCreateSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 		"DEPRECATED and will be removed: Use --pcap-filter for BPF expressions. BPF filter expression without flags (e.g., 'host 10.0.0.1', 'tcp port 443')")
 	createCapture.Flags().StringVar(&opts.pcapFilter, "pcap-filter", "",
 		"BPF filter expression for packet filtering (e.g., 'host 10.0.0.1', 'tcp port 443'). See https://www.tcpdump.org/manpages/pcap-filter.7.html")
-	createCapture.Flags().StringVar(&opts.sourceIPs, "source-ip", "",
-		"A comma-separated list of source IP addresses to filter captured packets by. Combine with --destination-ip to match both.")
-	createCapture.Flags().StringVar(&opts.destinationIPs, "destination-ip", "",
-		"A comma-separated list of destination IP addresses to filter captured packets by. Combine with --source-ip to match both.")
+	createCapture.Flags().StringVar(&opts.sourceIPs, "source-ips", "",
+		"A comma-separated list of source IP addresses to filter captured packets by; a packet is captured if it matches any of these IPs. "+
+			"When combined with --destination-ips, a packet must match at least one source IP AND at least one destination IP to be captured.")
+	createCapture.Flags().StringVar(&opts.destinationIPs, "destination-ips", "",
+		"A comma-separated list of destination IP addresses to filter captured packets by; a packet is captured if it matches any of these IPs. "+
+			"When combined with --source-ips, a packet must match at least one source IP AND at least one destination IP to be captured.")
 	createCapture.Flags().StringVar(&opts.interfaces, "interfaces", "", "Comma-separated list of network interfaces to capture on (e.g., eth0,eth1)")
 
 	// Tcpdump boolean flags for capture behavior and display options
@@ -408,7 +410,7 @@ func validateBPFFilter(filter, filterName string) error {
 
 // parseIPList splits a comma-separated list of IP addresses and validates that each entry
 // is a well-formed IP address. This ensures only IP literals (not BPF expressions or flags)
-// are accepted by --source-ip/--destination-ip, preventing filter/command injection.
+// are accepted by --source-ips/--destination-ips, preventing filter/command injection.
 func parseIPList(ipList, flagName string) ([]string, error) {
 	if ipList == "" {
 		return nil, nil
@@ -441,11 +443,11 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 	if opts.tcpdumpFilter != "" && (opts.sourceIPs != "" || opts.destinationIPs != "") {
 		return nil, ErrTcpdumpFilterIncompatibleWithSourceDestIPs
 	}
-	sourceIPs, err := parseIPList(opts.sourceIPs, "--source-ip")
+	sourceIPs, err := parseIPList(opts.sourceIPs, "--source-ips")
 	if err != nil {
 		return nil, err
 	}
-	destinationIPs, err := parseIPList(opts.destinationIPs, "--destination-ip")
+	destinationIPs, err := parseIPList(opts.destinationIPs, "--destination-ips")
 	if err != nil {
 		return nil, err
 	}

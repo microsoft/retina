@@ -30,6 +30,10 @@ type validateCapture struct {
 	CaptureNamespace string
 	Duration         string
 	KubeConfigPath   string
+	// SourceIPs and DestinationIPs are optional comma-separated IP lists passed through
+	// to --source-ips/--destination-ips; leave empty to capture without IP filtering.
+	SourceIPs      string
+	DestinationIPs string
 }
 
 var (
@@ -51,7 +55,14 @@ func (v *validateCapture) Run() error {
 	os.Setenv("KUBECONFIG", v.KubeConfigPath)
 	log.Printf("KUBECONFIG: %s\n", os.Getenv("KUBECONFIG"))
 
-	cmd := exec.CommandContext(ctx, "kubectl", "retina", "capture", "create", "--namespace", v.CaptureNamespace, "--name", v.CaptureName, "--duration", v.Duration, "--debug") //#nosec
+	args := []string{"retina", "capture", "create", "--namespace", v.CaptureNamespace, "--name", v.CaptureName, "--duration", v.Duration, "--debug"}
+	if v.SourceIPs != "" {
+		args = append(args, "--source-ips", v.SourceIPs)
+	}
+	if v.DestinationIPs != "" {
+		args = append(args, "--destination-ips", v.DestinationIPs)
+	}
+	cmd := exec.CommandContext(ctx, "kubectl", args...) //#nosec
 	cmd.Env = append(os.Environ(), "RETINA_AGENT_IMAGE="+filepath.Join(imageRegistry, imageNamespace, "retina-agent:"+imageTag))
 
 	output, err := cmd.CombinedOutput()

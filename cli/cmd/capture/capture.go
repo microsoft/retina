@@ -20,7 +20,7 @@ var (
 	ErrBPFFilterEmpty                             = errors.New("BPF filter cannot be empty or whitespace-only")
 	ErrBPFFilterContainsFlag                      = errors.New("BPF filter contains flag which is not allowed")
 	ErrInvalidIPAddress                           = errors.New("invalid IP address")
-	ErrTcpdumpFilterIncompatibleWithSourceDestIPs = errors.New("--tcpdump-filter (deprecated) cannot be combined with --source-ip/--destination-ip; use --pcap-filter instead")
+	ErrTcpdumpFilterIncompatibleWithSourceDestIPs = errors.New("--tcpdump-filter (deprecated) cannot be combined with --source-ips/--destination-ips; use --pcap-filter instead")
 )
 
 // VerbosityLevel represents the verbosity level for packet capture output

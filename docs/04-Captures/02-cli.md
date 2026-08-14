@@ -88,8 +88,8 @@ The network traffic will be uploaded to the specified output location.
 | `s3-path`             | string     | retina/captures | Prefix path within the S3 bucket where captures will be stored.              |       |
 | `s3-region`           | string     | ""       | Region where the S3 compatible bucket is located.                            |       |
 | `s3-secret-access-key`| string     | ""       | S3 access secret key to upload capture files.                                |       |
-| `source-ip`           | string     | ""       | A comma-separated list of source IP addresses to filter captured packets by. Combine with `--destination-ip` to match both. |       |
-| `destination-ip`      | string     | ""       | A comma-separated list of destination IP addresses to filter captured packets by. Combine with `--source-ip` to match both. |       |
+| `source-ips`          | string     | ""       | A comma-separated list of source IP addresses to filter captured packets by; a packet is captured if it matches any of these IPs. When combined with `--destination-ips`, a packet must match at least one source IP **and** at least one destination IP to be captured. |       |
+| `destination-ips`     | string     | ""       | A comma-separated list of destination IP addresses to filter captured packets by; a packet is captured if it matches any of these IPs. When combined with `--source-ips`, a packet must match at least one source IP **and** at least one destination IP to be captured. |       |
 | `interfaces`          | string     | ""       | Comma-separated list of network interfaces to capture on (e.g., "eth0,eth1"). By default, captures are performed on all network interfaces. |       |
 | `pcap-filter`         | string     | ""       | BPF filter expression for packet filtering (e.g., "host 10.0.0.1", "tcp port 443"). See [PCAP-FILTER](https://www.tcpdump.org/manpages/pcap-filter.7.html) for BPF syntax. Does NOT accept flags (arguments starting with '-'). |       |
 | `tcpdump-filter`      | string     | ""       | **DEPRECATED and will be removed.** Use `--pcap-filter` instead. BPF filter expression for packet filtering. Does NOT accept flags (arguments starting with '-'). |       |
@@ -284,11 +284,11 @@ Source / Destination IP Filters
 ```sh
 kubectl retina capture create \
   --name example-source-destination-ip \
-  --source-ip="10.224.0.42" \
-  --destination-ip="10.224.0.33,10.224.0.34"
+  --source-ips="10.224.0.42" \
+  --destination-ips="10.224.0.33,10.224.0.34"
 ```
 
-This captures only packets whose source IP is `10.224.0.42` **and** whose destination IP is either `10.224.0.33` or `10.224.0.34`. `--source-ip` and `--destination-ip` can each be used on their own, and work on both Linux and Windows nodes.
+This captures only packets whose source IP is `10.224.0.42` **and** whose destination IP is either `10.224.0.33` or `10.224.0.34`. `--source-ips` and `--destination-ips` can each be used on their own, and work on both Linux and Windows nodes.
 
 Capture with Display Options
 

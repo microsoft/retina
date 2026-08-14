@@ -448,7 +448,7 @@ func TestParseIPList(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			ips, err := parseIPList(tt.ipList, "--source-ip")
+			ips, err := parseIPList(tt.ipList, "--source-ips")
 			if tt.wantErr {
 				require.Error(t, err)
 				require.ErrorIs(t, err, ErrInvalidIPAddress)

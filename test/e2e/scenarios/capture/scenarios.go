@@ -10,6 +10,7 @@ import (
 func ValidateCapture(kubeConfigPath, namespace string) *types.Scenario {
 	scenarioName := "Retina Capture"
 	captureName := "retina-capture-e2e-" + rand.String(5)
+	sourceDestIPsCaptureName := "retina-capture-e2e-src-dst-ip-" + rand.String(5)
 	steps := []*types.StepWrapper{
 		{
 			Step: &InstallRetinaPlugin{},
@@ -20,6 +21,20 @@ func ValidateCapture(kubeConfigPath, namespace string) *types.Scenario {
 				CaptureNamespace: namespace,
 				Duration:         "5s",
 				KubeConfigPath:   kubeConfigPath,
+			}, Opts: &types.StepOptions{
+				SkipSavingParametersToJob: true,
+			},
+		},
+		{
+			// Exercises --source-ips/--destination-ips end-to-end (CLI parsing, CRD validation,
+			// BPF filter generation, job execution); doesn't assert on captured packet content.
+			Step: &validateCapture{
+				CaptureName:      sourceDestIPsCaptureName,
+				CaptureNamespace: namespace,
+				Duration:         "5s",
+				KubeConfigPath:   kubeConfigPath,
+				SourceIPs:        "127.0.0.1",
+				DestinationIPs:   "127.0.0.1",
 			}, Opts: &types.StepOptions{
 				SkipSavingParametersToJob: true,
 			},
