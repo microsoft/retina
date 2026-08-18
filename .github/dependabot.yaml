@@ -18,8 +18,11 @@ updates:
       prefix: "deps"
     labels: ["area/infra", "area/dependencies"]
     open-pull-requests-limit: 10
+    # MCR rebuilds these base images to ship CVE fixes, so a long window
+    # delays the patches. A tag that is rebuilt more often than the window
+    # never becomes eligible.
     cooldown:
-      default-days: 7
+      default-days: 2
     groups:
       golang-base:
         patterns: ["*golang*"]
