@@ -91,6 +91,20 @@ type CaptureOption struct {
 	// +kubebuilder:validation:Pattern="^[^-]*$"
 	PcapFilter *string `json:"pcapFilter,omitempty"`
 
+	// SourceIPs specifies a list of source IP addresses to filter captured packets by.
+	// Only packets originating from one of these IP addresses are captured.
+	// When combined with DestinationIPs, a packet must match both a source IP and a destination IP to be captured.
+	// +optional
+	// +kubebuilder:validation:MaxItems=100
+	SourceIPs []string `json:"sourceIPs,omitempty"`
+
+	// DestinationIPs specifies a list of destination IP addresses to filter captured packets by.
+	// Only packets destined for one of these IP addresses are captured.
+	// When combined with SourceIPs, a packet must match both a source IP and a destination IP to be captured.
+	// +optional
+	// +kubebuilder:validation:MaxItems=100
+	DestinationIPs []string `json:"destinationIPs,omitempty"`
+
 	// NoPromiscuous disables promiscuous mode for packet capture.
 	// When true, only packets destined for this host are captured (equivalent to tcpdump -p flag).
 	// When false or unset, captures all packets on the network segment (default behavior).

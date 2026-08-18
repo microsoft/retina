@@ -17,7 +17,7 @@
 #     AZURE_AGENT_LINUX_ARM_SKU
 #   Variables (secret):
 #     AZURE_APP_INSIGHTS_KEY
-#   Service connection (Azure RM, WIF): r2d
+#   Service connection (Azure RM, WIF): Azure Container Networking - Build Validations - Federated
 #   Settings: "Limit building pull requests from forked GitHub repositories" = Disable
 
 trigger:
@@ -42,7 +42,7 @@ parameters:
 
 variables:
   - name: azureServiceConnection
-    value: r2d
+    value: Azure Container Networking - Build Validations - Federated
   - name: imageNamespace
     value: microsoft/retina
   # True only when the build was triggered by a push to a merge-queue temp branch,

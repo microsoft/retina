@@ -2,11 +2,11 @@ package kubernetes
 
 import (
 	"fmt"
-	"log"
 	"os"
 
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/cli"
+	"helm.sh/helm/v4/pkg/action"
+	"helm.sh/helm/v4/pkg/cli"
+	"helm.sh/helm/v4/pkg/kube"
 )
 
 type UninstallHelmChart struct {
@@ -20,13 +20,13 @@ func (i *UninstallHelmChart) Run() error {
 	settings.KubeConfig = i.KubeConfigFilePath
 	actionConfig := new(action.Configuration)
 
-	err := actionConfig.Init(settings.RESTClientGetter(), i.Namespace, os.Getenv("HELM_DRIVER"), log.Printf)
+	err := actionConfig.Init(settings.RESTClientGetter(), i.Namespace, os.Getenv("HELM_DRIVER"))
 	if err != nil {
 		return fmt.Errorf("failed to initialize helm action config: %w", err)
 	}
 
 	delclient := action.NewUninstall(actionConfig)
-	delclient.Wait = true
+	delclient.WaitStrategy = kube.StatusWatcherStrategy
 	delclient.Timeout = deleteTimeout
 	_, err = delclient.Run(i.ReleaseName)
 	if err != nil {
