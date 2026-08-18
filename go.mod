@@ -182,7 +182,6 @@ require (
 )
 
 require (
-	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/go-logr/logr v1.4.4
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
