@@ -39,7 +39,7 @@ enum DropReason {
     Reason_LbNoBackendSlot            = 5;
     Reason_LbNoBackend                = 6;
     Reason_LbReverseNatUpdate         = 7;
-    Resaon_LbReverseNatStale          = 8;
+    Reason_LbReverseNatStale          = 8;
     Reason_FragmentedPacket           = 9;
     Reason_FragmentedPacketUpdated    = 10;
     Reason_MissedCustomCall           = 11;

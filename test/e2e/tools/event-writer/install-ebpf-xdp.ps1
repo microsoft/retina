@@ -67,9 +67,10 @@ Function Assert-SoftwareInstalled
            $isInstalled = $true
 
            If($ServiceState -And
-              -Not ($state.Status -INE $ServiceState))
+              $state.Status -INE $ServiceState)
            {
-              Write-Warning -Message:"`t$ServiceName is $$(state.Status)"
+              $isInstalled = $false
+              Write-Warning -Message:"`t$ServiceName is $($state.Status), expected $ServiceState"
            }
         }
       }
@@ -718,8 +719,8 @@ Function Install-EbpfXdp
          Write-Host 'eBPF and XDP for Windows is installed successfully'
          write-Host 'Create the probe ready file'
          # Create the probe ready file
-         New-Item -Path "C:\install-ebpf-xdp-probe-ready" -ItemType File -Force
-         return
+         New-Item -Path "C:\install-ebpf-xdp-probe-ready" -ItemType File -Force | Out-Null
+         return $true
       }
 
       If(-Not (Assert-TestSigningIsEnabled -Silent))
@@ -742,7 +743,7 @@ Function Install-EbpfXdp
       } else {
          If ($existing.CiliumOnWindows -ne 1) {
             Write-Host "Setting CiliumOnWindows to 1"
-            Set-ItemProperty -Path $hnsPath -Name $valueName -PropertyType DWORD -Value 1 -Force
+            Set-ItemProperty -Path $hnsPath -Name $valueName -Value 1 -Force
          }
       }
 
@@ -757,14 +758,14 @@ Function Install-EbpfXdp
       Write-Host 'eBPF and XDP for Windows is installed successfully'
       write-Host 'Create the probe ready file'
       # Create the probe ready file
-      New-Item -Path "C:\install-ebpf-xdp-probe-ready" -ItemType File -Force
+      New-Item -Path "C:\install-ebpf-xdp-probe-ready" -ItemType File -Force | Out-Null
+      return $true
    }
    Catch
    {
-      $isSuccess = $false
+      Write-Error -Message:"Failed to install eBPF and XDP for Windows: $_"
+      return $false
    }
-
-   return $isSuccess
 }
 
 <#
@@ -954,4 +955,7 @@ Function Uninstall-XDP
 
 
 #Script Start
-exit $(Install-EbpfXdp)
+If(-Not (Install-EbpfXdp))
+{
+   Throw 'eBPF and XDP for Windows installation failed'
+}

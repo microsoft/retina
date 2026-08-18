@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -18,12 +19,16 @@ import (
 )
 
 const (
-	applyTimeout = 10 * time.Minute
+	applyTimeout              = 10 * time.Minute
+	containerImagePlaceholder = "{{CONTAINER_IMAGE}}"
 )
+
+var errContainerImagePlaceholderNotFound = errors.New("container image placeholder not found in YAML file")
 
 type ApplyYamlConfig struct {
 	KubeConfigFilePath string
 	YamlFilePath       string
+	ContainerImage     string
 }
 
 func (a *ApplyYamlConfig) Run() error {
@@ -55,6 +60,12 @@ func (a *ApplyYamlConfig) Run() error {
 	yamlFile, err := os.ReadFile(a.YamlFilePath)
 	if err != nil {
 		return fmt.Errorf("error reading YAML file: %w", err)
+	}
+	if a.ContainerImage != "" {
+		if !bytes.Contains(yamlFile, []byte(containerImagePlaceholder)) {
+			return fmt.Errorf("%w: %s", errContainerImagePlaceholderNotFound, a.YamlFilePath)
+		}
+		yamlFile = bytes.ReplaceAll(yamlFile, []byte(containerImagePlaceholder), []byte(a.ContainerImage))
 	}
 
 	reader := bytes.NewReader(yamlFile)

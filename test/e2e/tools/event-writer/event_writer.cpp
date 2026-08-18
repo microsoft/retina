@@ -11,6 +11,54 @@ bpf_object *obj = NULL;
 bpf_link* link = NULL;
 
 int
+save_attached_interface(int ifindx) {
+    FILE* file = NULL;
+    if (fopen_s(&file, EVENT_WRITER_INTERFACE_PATH, "w") != 0 || file == NULL) {
+        fprintf(stderr, "%s - failed to open %s\n", __FUNCTION__, EVENT_WRITER_INTERFACE_PATH);
+        return 1;
+    }
+
+    if (fprintf(file, "%d", ifindx) < 0) {
+        fprintf(stderr, "%s - failed to write interface index to %s\n", __FUNCTION__, EVENT_WRITER_INTERFACE_PATH);
+        fclose(file);
+        return 1;
+    }
+
+    fclose(file);
+    return 0;
+}
+
+int
+detach_program_from_interface(void) {
+    FILE* file = NULL;
+    if (fopen_s(&file, EVENT_WRITER_INTERFACE_PATH, "r") != 0 || file == NULL) {
+        fprintf(stderr, "%s - failed to open %s\n", __FUNCTION__, EVENT_WRITER_INTERFACE_PATH);
+        return 1;
+    }
+
+    int ifindx = 0;
+    if (fscanf_s(file, "%d", &ifindx) != 1 || ifindx <= 0) {
+        fprintf(stderr, "%s - invalid interface index in %s\n", __FUNCTION__, EVENT_WRITER_INTERFACE_PATH);
+        fclose(file);
+        return 1;
+    }
+    fclose(file);
+
+    if (bpf_xdp_detach(ifindx, 0, nullptr) != 0) {
+        fprintf(stderr, "%s - failed to detach from interface with ifindex %d\n", __FUNCTION__, ifindx);
+        return 1;
+    }
+
+    if (remove(EVENT_WRITER_INTERFACE_PATH) != 0) {
+        fprintf(stderr, "%s - failed to remove %s\n", __FUNCTION__, EVENT_WRITER_INTERFACE_PATH);
+        return 1;
+    }
+
+    printf("%s - Detached program from interface with ifindex %d\n", __FUNCTION__, ifindx);
+    return 0;
+}
+
+int
 set_filter(struct filter* flt) {
     uint8_t key = 0;
     int map_flt_fd = 0;
@@ -56,23 +104,20 @@ attach_program_to_interface(int ifindx) {
         return 1;
     }
 
-    // Verify there's no program attached to the specified ifindex.
-    uint32_t program_id;
+    uint32_t program_id = 0;
     if (bpf_xdp_query_id(ifindx, 0, &program_id) < 0) {
-        if (bpf_xdp_attach(ifindx, evt_wrt_fd, 0, nullptr) != 0) {
-            fprintf(stderr, "%s - failed to attach to interface with ifindex %d\n", __FUNCTION__, ifindx);
-            return 1;
-        }
-        printf("%s - Attached program %s to interface with ifindex %d\n", __FUNCTION__, EVENT_WRITER_PIN_PATH, ifindx);
-    } else {
-        if (program_id == evt_wrt_fd) {
-            printf("%s - program alteady attached %s to interface with ifindex %d\n", __FUNCTION__, EVENT_WRITER_PIN_PATH, ifindx);
-        } else {
-            if (bpf_xdp_attach(ifindx, evt_wrt_fd, XDP_FLAGS_REPLACE, nullptr) != 0) {
-                fprintf(stderr, "%s - failed to attach to interface with ifindex %d\n", __FUNCTION__, ifindx);
-                return 1;
-            }
-        }
+        fprintf(stderr, "%s - failed to query interface with ifindex %d\n", __FUNCTION__, ifindx);
+        return 1;
+    }
+
+    uint32_t attach_flags = program_id == 0 ? 0 : XDP_FLAGS_REPLACE;
+    if (bpf_xdp_attach(ifindx, evt_wrt_fd, attach_flags, nullptr) != 0) {
+        fprintf(stderr, "%s - failed to attach to interface with ifindex %d\n", __FUNCTION__, ifindx);
+        return 1;
+    }
+    if (save_attached_interface(ifindx) != 0) {
+        bpf_xdp_detach(ifindx, 0, nullptr);
+        return 1;
     }
 
     printf("%s - Attached program %s to interface with ifindex %d\n", __FUNCTION__, EVENT_WRITER_PIN_PATH, ifindx);
@@ -200,6 +245,10 @@ fail:
 
 int
 unpin(void) {
+    if (detach_program_from_interface() != 0) {
+        return 1;
+    }
+
     if (bpf_obj_get(EVENT_WRITER_PIN_PATH) < 0) {
         fprintf(stderr, "%s - failed to lookup event_writer at %s\n", __FUNCTION__, EVENT_WRITER_PIN_PATH);
     } else {

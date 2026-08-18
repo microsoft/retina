@@ -225,7 +225,7 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error { //nolint:gocyclo 
 	}
 
 	if len(data) < packetOffset {
-		return fmt.Errorf("%w: %d", errNotEnoughBytes, data)
+		return fmt.Errorf("%w: need at least %d bytes but got %d", errNotEnoughBytes, packetOffset, len(data))
 	}
 
 	p.packet.Lock()

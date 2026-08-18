@@ -35,15 +35,15 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Azure Login
-        uses: azure/login@v2
+        uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
         if: ${{ env.IS_MERGE_GROUP == 'true' }}
         with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION }}
 
       - name: Ensure Docker daemon is running
         shell: pwsh
@@ -65,8 +65,13 @@ jobs:
           }
           throw "Docker daemon failed to start within $timeout seconds"
 
+      - name: Docker Login to ACR
+        if: ${{ env.IS_MERGE_GROUP == 'true' }}
+        shell: pwsh
+        run: az acr login --name "${{ vars.ACR_NAME }}"
+
       - name: Docker Login to ghcr.io
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         if: ${{ env.IS_MERGE_GROUP != 'true' }}
         with:
           registry: ghcr.io

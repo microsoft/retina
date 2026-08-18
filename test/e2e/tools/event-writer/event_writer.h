@@ -23,6 +23,9 @@
 #define EVENT_WRITER_PIN_PATH \
     "/ebpf/global/event_writer"
 
+#define EVENT_WRITER_INTERFACE_PATH \
+    "C:\\event-writer-interface.txt"
+
 #define DROP_PKTMON -220
 #define Drop_FL_InterfaceNotReady 607
 

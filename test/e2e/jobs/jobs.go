@@ -2,6 +2,8 @@ package retina
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	armnetwork "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v5"
 	"github.com/microsoft/retina/test/e2e/common"
@@ -23,6 +25,15 @@ import (
 )
 
 const IPPrefix = "serviceTaggedIp"
+
+func eventWriterImage() string {
+	return fmt.Sprintf(
+		"%s/%s/test/e2e-test-event-writer:%s",
+		strings.TrimSpace(os.Getenv(generic.DefaultImageRegistry)),
+		strings.TrimSpace(os.Getenv(generic.DefaultImageNamespace)),
+		strings.TrimSpace(os.Getenv(generic.DefaultTagEnv)),
+	)
+}
 
 func CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath string, createInfra bool) *types.Job {
 	job := types.NewJob("Create e2e test infrastructure")
@@ -141,8 +152,12 @@ func InstallEbpfXdp(kubeConfigFilePath string) *types.Job {
 	}, nil)
 
 	job.AddStep(&kubernetes.ApplyYamlConfig{
-		YamlFilePath: "yaml/windows/install-ebpf-xdp.yaml",
-	}, nil)
+		KubeConfigFilePath: kubeConfigFilePath,
+		YamlFilePath:       "yaml/windows/install-ebpf-xdp.yaml",
+		ContainerImage:     eventWriterImage(),
+	}, &types.StepOptions{
+		SkipSavingParametersToJob: true,
+	})
 	return job
 }
 
@@ -275,8 +290,12 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 
 	// Validate Windows BPF Metrics
 	job.AddStep(&kubernetes.ApplyYamlConfig{
-		YamlFilePath: "yaml/windows/non-hpc-pod.yaml",
-	}, nil)
+		KubeConfigFilePath: kubeConfigFilePath,
+		YamlFilePath:       "yaml/windows/non-hpc-pod.yaml",
+		ContainerImage:     eventWriterImage(),
+	}, &types.StepOptions{
+		SkipSavingParametersToJob: true,
+	})
 
 	for _, arch := range common.Architectures {
 		for _, scenario := range dnsScenarios {

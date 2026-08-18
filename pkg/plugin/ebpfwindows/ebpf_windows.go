@@ -198,7 +198,6 @@ func (p *Plugin) pullMetricsAndEvents(ctx context.Context) {
 		}
 
 		defer func() {
-			p.l.Error("ebpfwindows plugin canceling", zap.Error(ctx.Err()))
 			err := eventsMap.UnregisterForCallback()
 			if err != nil {
 				p.l.Error("Error unregistering events map callback", zap.Error(err))
@@ -228,10 +227,6 @@ func (p *Plugin) pullMetricsAndEvents(ctx context.Context) {
 
 		case <-ctx.Done():
 			p.l.Error("ebpfwindows plugin canceling", zap.Error(ctx.Err()))
-			err := eventsMap.UnregisterForCallback()
-			if err != nil {
-				p.l.Error("Error Unregistering Events Map callback", zap.Error(err))
-			}
 			return
 		}
 	}
@@ -284,7 +279,7 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 			return fmt.Errorf("could not convert dropnotify event to flow: %w", err)
 		}
 		ext := utils.NewExtensions()
-		utils.AddPacketSize(ext, size-uint32(unsafe.Sizeof(DropNotify{})))
+		utils.AddPacketSize(ext, size-dropPktmonNotifyV1Len)
 		fl := e.GetFlow()
 		if fl == nil {
 			return fmt.Errorf("%w", errNilDropNotifyFlow)
@@ -326,7 +321,7 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 		p.enricher.Write(e)
 
 	case MessageTypePktmonDrop:
-		if size <= uint32(unsafe.Sizeof(PktmonDropNotify{})) {
+		if size <= dropPktmonNotifyV1Len {
 			return fmt.Errorf("%w: %d", errInvalidDropNotifySize, size)
 		}
 

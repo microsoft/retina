@@ -113,8 +113,7 @@ func (n *PktmonDropNotify) decodePktmonDrop(data []byte) error {
 	}
 	version := byteorder.Native.Uint16(data[2:4])
 
-	// Check against max version.
-	if version > DropNotifyVersion1 {
+	if version != DropNotifyVersion1 {
 		return fmt.Errorf("%w: Unrecognized drop event version %d", errInvalidPktmonDropNotifyVersion, version)
 	}
 

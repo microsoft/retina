@@ -72,9 +72,7 @@ func (DNSType) EnumDescriptor() ([]byte, []int) {
 type DropReason int32
 
 const (
-	//
 	// Cilium drop reasons
-	//
 	DropReason_Reason_Success                    DropReason = 0
 	DropReason_Reason_InvalidPacket              DropReason = 2
 	DropReason_Reason_PlainText                  DropReason = 3
@@ -82,7 +80,7 @@ const (
 	DropReason_Reason_LbNoBackendSlot            DropReason = 5
 	DropReason_Reason_LbNoBackend                DropReason = 6
 	DropReason_Reason_LbReverseNatUpdate         DropReason = 7
-	DropReason_Resaon_LbReverseNatStale          DropReason = 8
+	DropReason_Reason_LbReverseNatStale          DropReason = 8
 	DropReason_Reason_FragmentedPacket           DropReason = 9
 	DropReason_Reason_FragmentedPacketUpdated    DropReason = 10
 	DropReason_Reason_MissedCustomCall           DropReason = 11
@@ -159,9 +157,7 @@ const (
 	DropReason_DropReason_HostNotReady           DropReason = 202
 	DropReason_DropReason_EpNotReady             DropReason = 203
 	DropReason_DropReason_PacketMonitor          DropReason = 220
-	//
 	// Matching VMS_PACKET_DROP_REASON
-	//
 	DropReason_Drop_InvalidData                 DropReason = 1073741825
 	DropReason_Drop_InvalidPacket               DropReason = 1073741826
 	DropReason_Drop_Resources                   DropReason = 1073741827
@@ -200,9 +196,7 @@ const (
 	DropReason_Drop_FilteredIsolationUntagged   DropReason = 1073741860
 	DropReason_Drop_InvalidPDQueue              DropReason = 1073741861
 	DropReason_Drop_LowPower                    DropReason = 1073741862
-	//
 	// General errors
-	//
 	DropReason_Drop_Pause              DropReason = 1073742025
 	DropReason_Drop_Reset              DropReason = 1073742026
 	DropReason_Drop_SendAborted        DropReason = 1073742027
@@ -230,16 +224,12 @@ const (
 	DropReason_Drop_UnallowedEtherType DropReason = 1073742050
 	DropReason_Drop_VportDown          DropReason = 1073742051
 	DropReason_Drop_SteeringMismatch   DropReason = 1073742052
-	//
 	// NetVsc errors
-	//
 	DropReason_Drop_MicroportError    DropReason = 1073742225
 	DropReason_Drop_VfNotReady        DropReason = 1073742226
 	DropReason_Drop_MicroportNotReady DropReason = 1073742227
 	DropReason_Drop_VMBusError        DropReason = 1073742228
-	//
 	// Tcpip FL errors
-	//
 	DropReason_Drop_FL_LoopbackPacket         DropReason = 1073742425
 	DropReason_Drop_FL_InvalidSnapHeader      DropReason = 1073742426
 	DropReason_Drop_FL_InvalidEthernetType    DropReason = 1073742427
@@ -255,9 +245,7 @@ const (
 	DropReason_Drop_FL_NoClientInterface      DropReason = 1073742437
 	DropReason_Drop_FL_TooManyNetBuffers      DropReason = 1073742438
 	DropReason_Drop_FL_FlsNpiClientDrop       DropReason = 1073742439
-	//
 	// VFP errors
-	//
 	DropReason_Drop_ArpGuard                DropReason = 1073742525
 	DropReason_Drop_ArpLimiter              DropReason = 1073742526
 	DropReason_Drop_DhcpLimiter             DropReason = 1073742527
@@ -277,9 +265,7 @@ const (
 	DropReason_Drop_NDPGuard                DropReason = 1073742541
 	DropReason_Drop_PortBlocked             DropReason = 1073742542
 	DropReason_Drop_NicSuspended            DropReason = 1073742543
-	//
 	// Tcpip NL errors
-	//
 	DropReason_Drop_NL_BadSourceAddress                       DropReason = 1073742725
 	DropReason_Drop_NL_NotLocallyDestined                     DropReason = 1073742726
 	DropReason_Drop_NL_ProtocolUnreachable                    DropReason = 1073742727
@@ -382,9 +368,7 @@ const (
 	DropReason_Drop_NL_SourceViolation                        DropReason = 1073742824
 	DropReason_Drop_NL_IcmpJumbogram                          DropReason = 1073742825
 	DropReason_Drop_NL_SwUsoFailure                           DropReason = 1073742826
-	//
 	// INET discard reasons
-	//
 	DropReason_Drop_INET_SourceUnspecified                   DropReason = 1073743024
 	DropReason_Drop_INET_DestinationMulticast                DropReason = 1073743025
 	DropReason_Drop_INET_HeaderInvalid                       DropReason = 1073743026
@@ -418,9 +402,7 @@ const (
 	DropReason_Drop_INET_SynAttack                           DropReason = 1073743054
 	DropReason_Drop_INET_AcceptInspection                    DropReason = 1073743055
 	DropReason_Drop_INET_AcceptRedirection                   DropReason = 1073743056
-	//
 	// Slbmux Error
-	//
 	DropReason_Drop_SlbMux_ParsingFailure                            DropReason = 1073743125
 	DropReason_Drop_SlbMux_FirstFragmentMiss                         DropReason = 1073743126
 	DropReason_Drop_SlbMux_ICMPErrorPayloadValidationFailure         DropReason = 1073743127
@@ -448,9 +430,7 @@ const (
 	DropReason_Drop_SlbMux_InvalidDiagPacketEncapType                DropReason = 1073743149
 	DropReason_Drop_SlbMux_DiagPacketIsRedirect                      DropReason = 1073743150
 	DropReason_Drop_SlbMux_UnableToHandleRedirect                    DropReason = 1073743151
-	//
 	// Ipsec Errors
-	//
 	DropReason_Drop_Ipsec_BadSpi                       DropReason = 1073743225
 	DropReason_Drop_Ipsec_SALifetimeExpired            DropReason = 1073743226
 	DropReason_Drop_Ipsec_WrongSA                      DropReason = 1073743227
@@ -469,9 +449,7 @@ const (
 	DropReason_Drop_Ipsec_Dosp_MaxPerIpRateLimitQueues DropReason = 1073743240
 	DropReason_Drop_Ipsec_NoMemory                     DropReason = 1073743241
 	DropReason_Drop_Ipsec_Unsuccessful                 DropReason = 1073743242
-	//
 	// NetCx Drop Reasons
-	//
 	DropReason_Drop_NetCx_NetPacketLayoutParseFailure        DropReason = 1073743325
 	DropReason_Drop_NetCx_SoftwareChecksumFailure            DropReason = 1073743326
 	DropReason_Drop_NetCx_NicQueueStop                       DropReason = 1073743327
@@ -479,14 +457,10 @@ const (
 	DropReason_Drop_NetCx_LSOFailure                         DropReason = 1073743329
 	DropReason_Drop_NetCx_USOFailure                         DropReason = 1073743330
 	DropReason_Drop_NetCx_BufferBounceFailureAndPacketIgnore DropReason = 1073743331
-	//
 	// Http errors  3000 - 4000.
 	// These must be in sync with cmd\resource.h
-	//
 	DropReason_Drop_Http_Begin DropReason = 1073744824
-	//
 	// UlErrors
-	//
 	DropReason_Drop_Http_UlError_Begin                        DropReason = 1073744825
 	DropReason_Drop_Http_UlError                              DropReason = 1073744826
 	DropReason_Drop_Http_UlErrorVerb                          DropReason = 1073744827
@@ -581,13 +555,9 @@ const (
 	DropReason_Drop_Http_UxDuoFaultContentLengthDisallowed    DropReason = 1073745285
 	DropReason_Drop_Http_UxDuoFaultTrailerDisallowed          DropReason = 1073745286
 	DropReason_Drop_Http_UxDuoFaultEnd                        DropReason = 1073745287
-	//
-	//  WSK layer drops
-	//
+	// WSK layer drops
 	DropReason_Drop_Http_ReceiveSuppressed DropReason = 1073745424
-	//
-	//  Http/SSL layer drops
-	//
+	// Http/SSL layer drops
 	DropReason_Drop_Http_Generic               DropReason = 1073745624
 	DropReason_Drop_Http_InvalidParameter      DropReason = 1073745625
 	DropReason_Drop_Http_InsufficientResources DropReason = 1073745626
@@ -616,7 +586,7 @@ var (
 		5:          "Reason_LbNoBackendSlot",
 		6:          "Reason_LbNoBackend",
 		7:          "Reason_LbReverseNatUpdate",
-		8:          "Resaon_LbReverseNatStale",
+		8:          "Reason_LbReverseNatStale",
 		9:          "Reason_FragmentedPacket",
 		10:         "Reason_FragmentedPacketUpdated",
 		11:         "Reason_MissedCustomCall",
@@ -1104,7 +1074,7 @@ var (
 		"Reason_LbNoBackendSlot":                                5,
 		"Reason_LbNoBackend":                                    6,
 		"Reason_LbReverseNatUpdate":                             7,
-		"Resaon_LbReverseNatStale":                              8,
+		"Reason_LbReverseNatStale":                              8,
 		"Reason_FragmentedPacket":                               9,
 		"Reason_FragmentedPacketUpdated":                        10,
 		"Reason_MissedCustomCall":                               11,
@@ -1773,8 +1743,8 @@ var file_pkg_utils_metadata_windows_proto_rawDesc = []byte{
 	0x10, 0x05, 0x12, 0x16, 0x0a, 0x12, 0x52, 0x65, 0x61, 0x73, 0x6f, 0x6e, 0x5f, 0x4c, 0x62, 0x4e,
 	0x6f, 0x42, 0x61, 0x63, 0x6b, 0x65, 0x6e, 0x64, 0x10, 0x06, 0x12, 0x1d, 0x0a, 0x19, 0x52, 0x65,
 	0x61, 0x73, 0x6f, 0x6e, 0x5f, 0x4c, 0x62, 0x52, 0x65, 0x76, 0x65, 0x72, 0x73, 0x65, 0x4e, 0x61,
-	0x74, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x10, 0x07, 0x12, 0x1c, 0x0a, 0x18, 0x52, 0x65, 0x73,
-	0x61, 0x6f, 0x6e, 0x5f, 0x4c, 0x62, 0x52, 0x65, 0x76, 0x65, 0x72, 0x73, 0x65, 0x4e, 0x61, 0x74,
+	0x74, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x10, 0x07, 0x12, 0x1c, 0x0a, 0x18, 0x52, 0x65, 0x61,
+	0x73, 0x6f, 0x6e, 0x5f, 0x4c, 0x62, 0x52, 0x65, 0x76, 0x65, 0x72, 0x73, 0x65, 0x4e, 0x61, 0x74,
 	0x53, 0x74, 0x61, 0x6c, 0x65, 0x10, 0x08, 0x12, 0x1b, 0x0a, 0x17, 0x52, 0x65, 0x61, 0x73, 0x6f,
 	0x6e, 0x5f, 0x46, 0x72, 0x61, 0x67, 0x6d, 0x65, 0x6e, 0x74, 0x65, 0x64, 0x50, 0x61, 0x63, 0x6b,
 	0x65, 0x74, 0x10, 0x09, 0x12, 0x22, 0x0a, 0x1e, 0x52, 0x65, 0x61, 0x73, 0x6f, 0x6e, 0x5f, 0x46,

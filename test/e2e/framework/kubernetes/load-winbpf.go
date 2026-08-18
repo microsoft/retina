@@ -28,8 +28,15 @@ type LoadAndPinWinBPF struct {
 }
 
 func WaitForPodReadyWithTimeOut(ctx context.Context, kubeConfigFilePath, namespace, labelSelector string, timeout time.Duration) error {
-	config, _ := clientcmd.BuildConfigFromFlags("", kubeConfigFilePath)
-	clientset, _ := kubernetes.NewForConfig(config)
+	config, err := clientcmd.BuildConfigFromFlags("", kubeConfigFilePath)
+	if err != nil {
+		return fmt.Errorf("error building kubeconfig: %w", err)
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("error creating Kubernetes client: %w", err)
+	}
 
 	timeoutCtx, cancelFunc := context.WithTimeout(ctx, timeout)
 	defer cancelFunc()

@@ -498,7 +498,7 @@ func (v *ValidateWinBpfMetric) Run() error {
 	slog.Info("Waiting for Non HPC Pod to come up")
 	// Wait for the non HPC pod to be ready. Maximum wait time is 15 minutes in case the Pods are very slow to come up.
 	if err := kubernetes.WaitForPodReadyWithTimeOut(context.TODO(), v.KubeConfigFilePath, v.NonHpcAppNamespace, nonHpcLabelSelector, 15*time.Minute); err != nil {
-		slog.Warn("waiting for Non HPC Pod ready timed out", "error", err)
+		return fmt.Errorf("waiting for Non HPC Pod to become ready: %w", err)
 	}
 	slog.Info("Non HPC Pod is ready")
 

@@ -24,7 +24,7 @@ var dropErrors = map[uint8]string{
 	5:   "Reason_LbNoBackendSlot",
 	6:   "Reason_LbNoBackend",
 	7:   "Reason_LbReverseNatUpdate",
-	8:   "Resaon_LbReverseNatStale",
+	8:   "Reason_LbReverseNatStale",
 	9:   "Reason_FragmentedPacket",
 	10:  "Reason_FragmentedPacketUpdated",
 	11:  "Reason_MissedCustomCall",
