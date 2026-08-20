@@ -108,6 +108,33 @@ spec:
     hostPath: example-capture
 ```
 
+Source / Destination IP filters
+
+```yaml
+apiVersion: retina.sh/v1alpha1
+kind: Capture
+metadata:
+  name: example-source-destination-ip
+spec:
+  captureConfiguration:
+    captureOption:
+      duration: "5s"
+      maxCaptureSize: 100
+      sourceIPs:
+        - 10.224.0.42
+      destinationIPs:
+        - 10.224.0.33
+        - 10.224.0.34
+    captureTarget:
+      nodeSelector:
+        matchLabels:
+          kubernetes.io/os: linux
+  outputConfiguration:
+    hostPath: example-capture
+```
+
+This captures only packets whose source IP is `10.224.0.42` **and** whose destination IP is either `10.224.0.33` or `10.224.0.34`. `sourceIPs` and `destinationIPs` can each be used on their own, and work on both Linux and Windows nodes.
+
 Single Pod by Name
 
 ```yaml
@@ -147,6 +174,37 @@ spec:
         - my-app-pod-def456
   outputConfiguration:
     hostPath: example-capture
+```
+
+Rotating Capture (Long-Running)
+
+Use `fileCount` with `maxCaptureSize` to create a rotating buffer of capture files. This is useful for debugging intermittent issues — the capture runs continuously, retaining only the most recent traffic.
+
+```yaml
+apiVersion: retina.sh/v1alpha1
+kind: Capture
+metadata:
+  name: example-rotating-capture
+spec:
+  captureConfiguration:
+    captureOption:
+      # Per-file size limit in MB
+      maxCaptureSize: 100
+      # Number of rotating files (oldest overwritten when limit reached)
+      # Total buffer: 100MB × 10 = 1GB of recent traffic
+      fileCount: 10
+    captureTarget:
+      nodeSelector:
+        matchLabels:
+          kubernetes.io/os: linux
+  outputConfiguration:
+    hostPath: /mnt/retina/captures
+```
+
+To stop the rotating capture once the issue is reproduced:
+
+```shell
+kubectl delete capture example-rotating-capture
 ```
 
 Additional examples can also be found in the [GitHub capture samples](https://github.com/microsoft/retina/tree/main/samples/capture).

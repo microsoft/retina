@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -467,7 +468,7 @@ func TestFilterValidation(t *testing.T) {
 			tt.setupEnv()
 			defer resetEnvVars()
 
-			err := ncp.CaptureNetworkPacket(context.Background(), "", 1, 0)
+			err := ncp.CaptureNetworkPacket(context.Background(), "", 1, 0, 0)
 
 			if tt.shouldError {
 				if err == nil {
@@ -542,7 +543,7 @@ func TestFilterWhitespaceValidation(t *testing.T) {
 			tt.setupEnv()
 			defer resetEnvVars()
 
-			err := ncp.CaptureNetworkPacket(context.Background(), "", 1, 0)
+			err := ncp.CaptureNetworkPacket(context.Background(), "", 1, 0, 0)
 
 			if err == nil {
 				t.Errorf("Expected error for whitespace-only filter, but got no error")
@@ -611,7 +612,7 @@ func TestFilterPrecedence(t *testing.T) {
 			}
 			defer resetEnvVars()
 
-			err := ncp.CaptureNetworkPacket(context.Background(), "", 1, 0)
+			err := ncp.CaptureNetworkPacket(context.Background(), "", 1, 0, 0)
 
 			if tt.expectValidationErr {
 				if err == nil || !strings.Contains(err.Error(), "contains flag") {
@@ -704,6 +705,244 @@ func TestFilterPrecedenceValue(t *testing.T) {
 				}
 				if pcapEnv != tt.expectedFilterUsed {
 					t.Errorf("When both filters set, expected to use pcapFilter '%s', but would use '%s'", tt.pcapFilter, tt.expectedFilterUsed)
+				}
+			}
+		})
+	}
+}
+
+// hasArg checks if the command contains a specific argument
+func hasArg(cmd *exec.Cmd, arg string) bool {
+	for _, a := range cmd.Args {
+		if a == arg {
+			return true
+		}
+	}
+	return false
+}
+
+// hasArgPair checks if the command contains a flag followed by a specific value
+func hasArgPair(cmd *exec.Cmd, flag, value string) bool {
+	for i, arg := range cmd.Args {
+		if arg == flag && i+1 < len(cmd.Args) && cmd.Args[i+1] == value {
+			return true
+		}
+	}
+	return false
+}
+
+func TestTcpdumpCommandBaseArgs(t *testing.T) {
+	resetEnvVars()
+
+	cmd := constructTcpdumpCommand(testCaptureFilePath, "")
+
+	// Verify base args are always present
+	if cmd.Args[0] != "tcpdump" {
+		t.Errorf("Expected first arg to be 'tcpdump', got %s", cmd.Args[0])
+	}
+	if !hasArgPair(cmd, "-w", testCaptureFilePath) {
+		t.Errorf("Expected '-w %s' in args, got: %v", testCaptureFilePath, cmd.Args)
+	}
+	if !hasArg(cmd, "--relinquish-privileges=root") {
+		t.Errorf("Expected '--relinquish-privileges=root' in args, got: %v", cmd.Args)
+	}
+}
+
+func TestTcpdumpPacketSizeArg(t *testing.T) {
+	resetEnvVars()
+	os.Setenv(captureConstants.PacketSizeEnvKey, "96")
+	defer os.Unsetenv(captureConstants.PacketSizeEnvKey)
+
+	cmd := constructTcpdumpCommand(testCaptureFilePath, "")
+
+	if !hasArgPair(cmd, "-s", "96") {
+		t.Errorf("Expected '-s 96' in args, got: %v", cmd.Args)
+	}
+}
+
+func TestTcpdumpNoRotatingArgsWithoutFileCount(t *testing.T) {
+	// Verify that constructTcpdumpCommand does NOT add -C/-W flags
+	// (those are added at CaptureNetworkPacket level, not constructTcpdumpCommand)
+	resetEnvVars()
+
+	cmd := constructTcpdumpCommand(testCaptureFilePath, "")
+
+	if hasArg(cmd, "-C") {
+		t.Errorf("constructTcpdumpCommand should not add -C flag, got: %v", cmd.Args)
+	}
+	if hasArg(cmd, "-W") {
+		t.Errorf("constructTcpdumpCommand should not add -W flag, got: %v", cmd.Args)
+	}
+}
+
+func TestTcpdumpRotatingCaptureArgs(t *testing.T) {
+	// Verify the -C and -W flag construction logic that CaptureNetworkPacket uses.
+	// This mirrors the code path in CaptureNetworkPacket where fileCount > 0 && maxSizeMB > 0.
+	resetEnvVars()
+
+	tests := []struct {
+		name      string
+		maxSizeMB int
+		fileCount int
+		expectC   string // expected -C value, empty if flag should be absent
+		expectW   string // expected -W value, empty if flag should be absent
+	}{
+		{
+			name:      "rotating capture with fileCount=3 and maxSize=100",
+			maxSizeMB: 100,
+			fileCount: 3,
+			expectC:   "100",
+			expectW:   "3",
+		},
+		{
+			name:      "rotating capture with fileCount=1 and maxSize=50",
+			maxSizeMB: 50,
+			fileCount: 1,
+			expectC:   "50",
+			expectW:   "1",
+		},
+		{
+			name:      "no rotation when fileCount=0",
+			maxSizeMB: 100,
+			fileCount: 0,
+			expectC:   "",
+			expectW:   "",
+		},
+		{
+			name:      "no rotation when maxSize=0",
+			maxSizeMB: 0,
+			fileCount: 5,
+			expectC:   "",
+			expectW:   "",
+		},
+		{
+			name:      "no rotation when both are 0",
+			maxSizeMB: 0,
+			fileCount: 0,
+			expectC:   "",
+			expectW:   "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := constructTcpdumpCommand(testCaptureFilePath, "")
+
+			// Apply the same logic as CaptureNetworkPacket (no filter case)
+			if tt.fileCount > 0 && tt.maxSizeMB > 0 {
+				rotationArgs := []string{"-C", strconv.Itoa(tt.maxSizeMB), "-W", strconv.Itoa(tt.fileCount)}
+				cmd.Args = append(cmd.Args, rotationArgs...)
+			}
+
+			if tt.expectC != "" {
+				if !hasArgPair(cmd, "-C", tt.expectC) {
+					t.Errorf("Expected '-C %s' in args, got: %v", tt.expectC, cmd.Args)
+				}
+			} else {
+				if hasArg(cmd, "-C") {
+					t.Errorf("Did not expect -C flag in args, got: %v", cmd.Args)
+				}
+			}
+
+			if tt.expectW != "" {
+				if !hasArgPair(cmd, "-W", tt.expectW) {
+					t.Errorf("Expected '-W %s' in args, got: %v", tt.expectW, cmd.Args)
+				}
+			} else {
+				if hasArg(cmd, "-W") {
+					t.Errorf("Did not expect -W flag in args, got: %v", cmd.Args)
+				}
+			}
+		})
+	}
+}
+
+func TestTcpdumpRotatingCaptureArgsWithFilter(t *testing.T) {
+	// Verify that rotation flags (-C/-W) are inserted BEFORE the BPF filter,
+	// since tcpdump requires the filter expression to be the last argument.
+	resetEnvVars()
+
+	tests := []struct {
+		name      string
+		filter    string
+		maxSizeMB int
+		fileCount int
+		wantLast  string // expected last argument
+	}{
+		{
+			name:      "rotation with filter: filter must be last",
+			filter:    "tcp port 80",
+			maxSizeMB: 100,
+			fileCount: 3,
+			wantLast:  "tcp port 80",
+		},
+		{
+			name:      "rotation without filter: -W value is last",
+			filter:    "",
+			maxSizeMB: 50,
+			fileCount: 5,
+			wantLast:  "5",
+		},
+		{
+			name:      "no rotation with filter: filter is last",
+			filter:    "udp port 53",
+			maxSizeMB: 0,
+			fileCount: 0,
+			wantLast:  "udp port 53",
+		},
+		{
+			name:      "complex filter with rotation: filter still last",
+			filter:    "(host 10.0.0.1) and (tcp port 443)",
+			maxSizeMB: 200,
+			fileCount: 10,
+			wantLast:  "(host 10.0.0.1) and (tcp port 443)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := constructTcpdumpCommand(testCaptureFilePath, tt.filter)
+
+			// Apply the same insertion logic as CaptureNetworkPacket
+			if tt.fileCount > 0 && tt.maxSizeMB > 0 {
+				rotationArgs := []string{
+					"-C", strconv.Itoa(tt.maxSizeMB),
+					"-W", strconv.Itoa(tt.fileCount),
+				}
+				if tt.filter != "" {
+					last := cmd.Args[len(cmd.Args)-1]
+					cmd.Args = append(cmd.Args[:len(cmd.Args)-1], append(rotationArgs, last)...)
+				} else {
+					cmd.Args = append(cmd.Args, rotationArgs...)
+				}
+			}
+
+			lastArg := cmd.Args[len(cmd.Args)-1]
+			if lastArg != tt.wantLast {
+				t.Errorf("Expected last arg to be %q, got %q\nFull args: %v", tt.wantLast, lastArg, cmd.Args)
+			}
+
+			// When both filter and rotation are set, verify -C/-W appear before filter
+			if tt.filter != "" && tt.fileCount > 0 {
+				filterIdx := -1
+				cIdx := -1
+				wIdx := -1
+				for i, arg := range cmd.Args {
+					if arg == tt.filter {
+						filterIdx = i
+					}
+					if arg == "-C" {
+						cIdx = i
+					}
+					if arg == "-W" {
+						wIdx = i
+					}
+				}
+				if cIdx >= filterIdx {
+					t.Errorf("-C flag (idx %d) should come before filter (idx %d), args: %v", cIdx, filterIdx, cmd.Args)
+				}
+				if wIdx >= filterIdx {
+					t.Errorf("-W flag (idx %d) should come before filter (idx %d), args: %v", wIdx, filterIdx, cmd.Args)
 				}
 			}
 		})

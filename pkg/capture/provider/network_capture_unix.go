@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -205,9 +206,14 @@ func (ncp *NetworkCaptureProvider) Setup(filename file.CaptureFilename) (string,
 	return ncp.TmpCaptureDir, nil
 }
 
-func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, includeExcludeFilter string, duration, maxSizeMB int) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(duration)*time.Second)
-	defer cancel()
+func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, includeExcludeFilter string, duration, maxSizeMB, fileCount int) error {
+	// For rotating captures, we don't use context timeout based on duration alone;
+	// the capture runs until explicitly stopped (or until duration expires if set).
+	if duration != 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(duration)*time.Second)
+		defer cancel()
+	}
 
 	captureFileName := ncp.Filename.String() + ".pcap"
 	captureFilePath := filepath.Join(ncp.TmpCaptureDir, captureFileName)
@@ -232,6 +238,29 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, inc
 
 	// Construct tcpdump command with combined filter
 	captureStartCmd := constructTcpdumpCommand(captureFilePath, combinedFilter)
+
+	// When fileCount is set, use tcpdump's native rotating buffer feature:
+	// -C <size_MB>: rotate file when it reaches this size (in millions of bytes)
+	// -W <count>: limit the number of files, overwriting oldest when limit is reached
+	// NOTE: tcpdump's -C uses millions of bytes (1,000,000), not MiB (1,048,576),
+	// so the per-file rotation threshold is ~5% smaller than the maxSizeMB check
+	// used for non-rotating captures below.
+	if fileCount > 0 && maxSizeMB > 0 {
+		rotationArgs := []string{
+			"-C", strconv.Itoa(maxSizeMB),
+			"-W", strconv.Itoa(fileCount),
+		}
+
+		// tcpdump requires the BPF filter expression to be the final argument.
+		// constructTcpdumpCommand places the filter last, so we must insert
+		// rotation flags before it when a filter is present.
+		if combinedFilter != "" {
+			last := captureStartCmd.Args[len(captureStartCmd.Args)-1]
+			captureStartCmd.Args = append(captureStartCmd.Args[:len(captureStartCmd.Args)-1], append(rotationArgs, last)...)
+		} else {
+			captureStartCmd.Args = append(captureStartCmd.Args, rotationArgs...)
+		}
+	}
 
 	ncp.l.Info("Running tcpdump with args", zap.String("tcpdump command", captureStartCmd.String()), zap.Any("tcpdump args", captureStartCmd.Args))
 
@@ -269,11 +298,12 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, inc
 		}()
 	}
 
-	// TODO(mainred): make check interval configurable.
-	fileSizeCheckIntervalInSecond := 5
-	// Tcpdump cannot stop when a specified size reaches, so we check the capture file size with a const time interval,
-	// and stop tcpdump process when the file size meets the requirement.
-	if maxSizeMB != 0 {
+	// For non-rotating captures, check file size by polling and stop when limit is reached.
+	// For rotating captures (fileCount > 0), tcpdump handles rotation natively via -C and -W flags,
+	// so we skip manual file size checking.
+	if maxSizeMB != 0 && fileCount == 0 {
+		// TODO(mainred): make check interval configurable.
+		fileSizeCheckIntervalInSecond := 5
 		ncp.l.Info(fmt.Sprintf("Tcpdump will stop when the capture file size reaches %dMB.", maxSizeMB))
 		go func() {
 			// Chances are that the capture file is not created when we check the file size.
@@ -293,7 +323,7 @@ func (ncp *NetworkCaptureProvider) CaptureNetworkPacket(ctx context.Context, inc
 					continue
 				}
 				fileSizeBytes := fileStat.Size()
-				if int(fileSizeBytes) > maxSizeMB*1024*1224 {
+				if fileSizeBytes > int64(maxSizeMB)*1024*1024 {
 					break
 				}
 

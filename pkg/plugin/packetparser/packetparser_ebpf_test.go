@@ -654,7 +654,7 @@ func compileAndLoadVariantBase(t *testing.T, opts compileOpts) (*packetparserObj
 	t.Cleanup(func() { os.WriteFile(ctDynamic, origCT, 0o644) }) //nolint:errcheck
 
 	if opts.enableConntrack {
-		require.NoError(t, os.WriteFile(ctDynamic, []byte("#define ENABLE_CONNTRACK_METRICS 1\n"), 0o644))
+		require.NoError(t, os.WriteFile(ctDynamic, []byte("#define ENABLE_CONNTRACK_METRICS 1\n#define CT_REPORT_INTERVAL 30\n"), 0o644))
 	}
 
 	// Compile the eBPF program.

@@ -33,11 +33,20 @@ import (
 
 const anyIPOrPort = ""
 
+// netshSourceDestFilterHandoffKey is an internal jobEnv key used to pass the netsh source/destination IP filter
+// clause from obtainCaptureJobPodEnv to renderJob. It is never emitted as a container environment variable.
+const netshSourceDestFilterHandoffKey = "__netsh_source_dest_filter__"
+
 var (
-	errNoTargetsSelected    = errors.New("no targets are selected by node selector, pod selector, or pod names")
-	errNoValidSelector      = errors.New("neither NodeSelector, NamespaceSelector&PodSelector, nor PodNames is set")
-	errNodeSelectorIncompat = errors.New("NodeSelector is not compatible with NamespaceSelector&PodSelector or PodNames, please use one or the other")
-	errPodNamesIncompat     = errors.New("PodNames is not compatible with NamespaceSelector or PodSelector, please use one or the other")
+	errNoTargetsSelected        = errors.New("no targets are selected by node selector, pod selector, or pod names")
+	errNoValidSelector          = errors.New("neither NodeSelector, NamespaceSelector&PodSelector, nor PodNames is set")
+	errNodeSelectorIncompat     = errors.New("NodeSelector is not compatible with NamespaceSelector&PodSelector or PodNames, please use one or the other")
+	errPodNamesIncompat         = errors.New("PodNames is not compatible with NamespaceSelector or PodSelector, please use one or the other")
+	errFileCountRequiresMaxSize = errors.New("fileCount requires maxCaptureSize to be set as per-file size limit")
+	errInvalidIPAddress         = errors.New("is not a valid IP address")
+	// errTcpdumpFilterIncompatibleWithSourceDestIPs: obtainAndValidateUserFilter gives the generated pcapFilter
+	// precedence over the deprecated tcpdumpFilter, so combining them would silently drop the tcpdumpFilter.
+	errTcpdumpFilterIncompatibleWithSourceDestIPs = errors.New("tcpdumpFilter (deprecated) cannot be combined with sourceIPs/destinationIPs; use pcapFilter instead")
 )
 
 // tcpdumpFlagMapping defines the mapping between CaptureOption boolean fields and their corresponding tcpdump flags.
@@ -487,6 +496,7 @@ func (translator *CaptureToPodTranslator) renderJob(captureTargetOnNode *Capture
 			job.Spec.Template.Spec.Containers[0].Command = []string{captureConstants.CaptureContainerEntrypoint}
 
 			delete(jobEnv, captureConstants.NetshFilterEnvKey)
+			delete(jobEnv, netshSourceDestFilterHandoffKey)
 			// Update tcpdumpfilter to include target POD IP address.
 			if updatedTcpdumpFilter := updateTcpdumpFilterWithPodIPAddress(target.PodIpAddresses, jobEnv[captureConstants.TcpdumpFilterEnvKey]); len(updatedTcpdumpFilter) != 0 {
 				jobEnv[captureConstants.TcpdumpFilterEnvKey] = updatedTcpdumpFilter
@@ -509,7 +519,15 @@ func (translator *CaptureToPodTranslator) renderJob(captureTargetOnNode *Capture
 			}
 
 			delete(jobEnv, captureConstants.TcpdumpFilterEnvKey)
-			if netshFilter := getNetshFilterWithPodIPAddress(target.PodIpAddresses); len(netshFilter) != 0 {
+			netshFilterGroups := make([]string, 0, 2)
+			if podIPFilter := getNetshFilterWithPodIPAddress(target.PodIpAddresses); podIPFilter != "" {
+				netshFilterGroups = append(netshFilterGroups, podIPFilter)
+			}
+			if sourceDestFilter := jobEnv[netshSourceDestFilterHandoffKey]; sourceDestFilter != "" {
+				netshFilterGroups = append(netshFilterGroups, sourceDestFilter)
+			}
+			delete(jobEnv, netshSourceDestFilterHandoffKey)
+			if netshFilter := strings.Join(netshFilterGroups, " "); netshFilter != "" {
 				jobEnv[captureConstants.NetshFilterEnvKey] = netshFilter
 			}
 		}
@@ -527,6 +545,46 @@ func (translator *CaptureToPodTranslator) renderJob(captureTargetOnNode *Capture
 	fmt.Println("#########################")
 
 	return jobs, nil
+}
+
+// buildSourceDestinationIPFilter constructs a BPF filter clause restricting captured packets to the
+// given source and/or destination IP addresses. When both are provided, a packet must match at least
+// one source IP AND at least one destination IP to be captured (Linux/tcpdump only).
+func buildSourceDestinationIPFilter(sourceIPs, destinationIPs []string) string {
+	sourceClause := bpfDirectionalHostClause("src", sourceIPs)
+	destClause := bpfDirectionalHostClause("dst", destinationIPs)
+	return combineBPFFilterExpressions(sourceClause, destClause)
+}
+
+// bpfDirectionalHostClause builds a BPF clause like "src host ip1 or src host ip2" for the given
+// direction ("src" or "dst") and list of IP addresses. Entries that aren't valid IP addresses are
+// skipped, mirroring netshAddressFilterGroup's handling on the Windows side. Multiple IPs are OR'd
+// together unwrapped; combineBPFFilterExpressions is responsible for parenthesizing the clause when
+// it's combined with another expression, so callers must not add their own parentheses here too.
+func bpfDirectionalHostClause(direction string, ips []string) string {
+	clauses := make([]string, 0, len(ips))
+	for _, ip := range ips {
+		if net.ParseIP(ip) == nil {
+			continue
+		}
+		clauses = append(clauses, fmt.Sprintf("%s host %s", direction, ip))
+	}
+	return strings.Join(clauses, " or ")
+}
+
+// combineBPFFilterExpressions combines two optional BPF filter expressions using AND, wrapping each in
+// parentheses when both are present to guarantee correct operator precedence.
+func combineBPFFilterExpressions(a, b string) string {
+	switch {
+	case a != "" && b != "":
+		return fmt.Sprintf("(%s) and (%s)", a, b)
+	case a != "":
+		return a
+	case b != "":
+		return b
+	default:
+		return ""
+	}
 }
 
 func updateTcpdumpFilterWithPodIPAddress(podIPAddresses []string, tcpdumpFilter string) string {
@@ -548,42 +606,53 @@ func updateTcpdumpFilterWithPodIPAddress(podIPAddresses []string, tcpdumpFilter 
 }
 
 func getNetshFilterWithPodIPAddress(podIPAddresses []string) string {
-	if len(podIPAddresses) == 0 {
+	return netshAddressFilterGroup("Address", podIPAddresses)
+}
+
+// buildNetshSourceDestinationIPFilter constructs a netsh trace capture filter clause restricting captured packets
+// to the given source and/or destination IP addresses. netsh ANDs together filter groups for distinct keywords, so
+// specifying both a SourceAddress and a DestinationAddress group already requires a packet to match both.
+func buildNetshSourceDestinationIPFilter(sourceIPs, destinationIPs []string) string {
+	groups := make([]string, 0, 2)
+	if sourceGroup := netshAddressFilterGroup("SourceAddress", sourceIPs); sourceGroup != "" {
+		groups = append(groups, sourceGroup)
+	}
+	if destGroup := netshAddressFilterGroup("DestinationAddress", destinationIPs); destGroup != "" {
+		groups = append(groups, destGroup)
+	}
+	return strings.Join(groups, " ")
+}
+
+// netshAddressFilterGroup builds a netsh trace capture filter clause like "IPv4.<keyword>=(ip1,ip2) IPv6.<keyword>=(ip3)"
+// for the given base keyword (e.g. "Address", "SourceAddress", "DestinationAddress"), splitting the given IPs into
+// their IPv4/IPv6 filter groups. Please check `netsh trace show capturefilterhelp` for the filter syntax.
+func netshAddressFilterGroup(keyword string, ips []string) string {
+	if len(ips) == 0 {
 		return ""
 	}
 
-	// netsh accepts multiple IP address as filters for the trace capture.
-	// Example: IPv4.Address=(157.59.136.1,157.59.136.11)
-	// Please check `netsh trace show capturefilterhelp` for the detail.
-	podIPv4Addresses := []string{}
-	podIPv6Addresses := []string{}
-	for _, podIPAddress := range podIPAddresses {
-		// check ipv4 or ipv6
-		parsedIP := net.ParseIP(podIPAddress)
+	ipv4Addresses := []string{}
+	ipv6Addresses := []string{}
+	for _, ip := range ips {
+		parsedIP := net.ParseIP(ip)
 		if parsedIP == nil {
 			continue
 		}
 		if parsedIP.To4() != nil {
-			podIPv4Addresses = append(podIPv4Addresses, podIPAddress)
+			ipv4Addresses = append(ipv4Addresses, ip)
 		} else {
-			podIPv6Addresses = append(podIPv6Addresses, podIPAddress)
+			ipv6Addresses = append(ipv6Addresses, ip)
 		}
 	}
 
-	var podIPv4FilterGroup string
-	if len(podIPv4Addresses) != 0 {
-		podIPv4FilterArray := strings.Join(podIPv4Addresses, ",")
-		podIPv4FilterGroup = fmt.Sprintf("IPv4.Address=(%s)", podIPv4FilterArray)
+	groups := make([]string, 0, 2)
+	if len(ipv4Addresses) != 0 {
+		groups = append(groups, fmt.Sprintf("IPv4.%s=(%s)", keyword, strings.Join(ipv4Addresses, ",")))
 	}
-
-	var podIPv6FilterGroup string
-	if len(podIPv6Addresses) != 0 {
-		podIPv6FilterArray := strings.Join(podIPv6Addresses, ",")
-		podIPv6FilterGroup = fmt.Sprintf("IPv6.Address=(%s)", podIPv6FilterArray)
+	if len(ipv6Addresses) != 0 {
+		groups = append(groups, fmt.Sprintf("IPv6.%s=(%s)", keyword, strings.Join(ipv6Addresses, ",")))
 	}
-
-	JoinedFilterGroups := strings.Join([]string{podIPv4FilterGroup, podIPv6FilterGroup}, " ")
-	return strings.Trim(JoinedFilterGroups, " ")
+	return strings.Join(groups, " ")
 }
 
 // validateTargetSelector validate target selectors defined in the capture.
@@ -614,6 +683,11 @@ func (translator *CaptureToPodTranslator) validateCapture(capture *retinav1alpha
 		return fmt.Errorf("Neither duration nor maxCaptureSize is set to stop the capture")
 	}
 
+	// FileCount requires MaxCaptureSize to define the per-file size limit.
+	if capture.Spec.CaptureConfiguration.CaptureOption.FileCount != nil && capture.Spec.CaptureConfiguration.CaptureOption.MaxCaptureSize == nil {
+		return errFileCountRequiresMaxSize
+	}
+
 	if capture.Spec.OutputConfiguration.BlobUpload == nil &&
 		capture.Spec.OutputConfiguration.HostPath == nil &&
 		capture.Spec.OutputConfiguration.PersistentVolumeClaim == nil &&
@@ -623,6 +697,30 @@ func (translator *CaptureToPodTranslator) validateCapture(capture *retinav1alpha
 
 	if _, err := translator.resolveHostPath(capture.Spec.OutputConfiguration); err != nil {
 		return err
+	}
+
+	if capture.Spec.CaptureConfiguration.TcpdumpFilter != nil && *capture.Spec.CaptureConfiguration.TcpdumpFilter != "" &&
+		(len(capture.Spec.CaptureConfiguration.CaptureOption.SourceIPs) > 0 || len(capture.Spec.CaptureConfiguration.CaptureOption.DestinationIPs) > 0) {
+		return errTcpdumpFilterIncompatibleWithSourceDestIPs
+	}
+
+	if err := validateIPAddresses(capture.Spec.CaptureConfiguration.CaptureOption.SourceIPs, "sourceIPs"); err != nil {
+		return err
+	}
+	if err := validateIPAddresses(capture.Spec.CaptureConfiguration.CaptureOption.DestinationIPs, "destinationIPs"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateIPAddresses rejects the Capture outright if any entry isn't a well-formed IP address, rather than
+// letting downstream filter-building silently drop malformed entries and broaden the capture's scope.
+func validateIPAddresses(ips []string, fieldName string) error {
+	for _, ip := range ips {
+		if net.ParseIP(ip) == nil {
+			return fmt.Errorf("%s: %q %w", fieldName, ip, errInvalidIPAddress)
+		}
 	}
 	return nil
 }
@@ -1025,6 +1123,9 @@ func (translator *CaptureToPodTranslator) obtainCaptureOptionEnv(option retinav1
 	if option.MaxCaptureSize != nil {
 		outputEnv[captureConstants.CaptureMaxSizeEnvKey] = strconv.Itoa(*option.MaxCaptureSize)
 	}
+	if option.FileCount != nil {
+		outputEnv[captureConstants.CaptureFileCountEnvKey] = strconv.Itoa(*option.FileCount)
+	}
 	if len(option.Interfaces) > 0 {
 		outputEnv[captureConstants.CaptureInterfacesEnvKey] = strings.Join(option.Interfaces, ",")
 	}
@@ -1071,8 +1172,25 @@ func (translator *CaptureToPodTranslator) obtainCaptureJobPodEnv(capture retinav
 		jobPodEnv[captureConstants.PacketSizeEnvKey] = strconv.Itoa(*capture.Spec.CaptureConfiguration.CaptureOption.PacketSize)
 	}
 
+	pcapFilter := ""
 	if capture.Spec.CaptureConfiguration.CaptureOption.PcapFilter != nil {
-		jobPodEnv[captureConstants.PcapFilterEnvKey] = *capture.Spec.CaptureConfiguration.CaptureOption.PcapFilter
+		pcapFilter = *capture.Spec.CaptureConfiguration.CaptureOption.PcapFilter
+	}
+	sourceDestFilter := buildSourceDestinationIPFilter(
+		capture.Spec.CaptureConfiguration.CaptureOption.SourceIPs,
+		capture.Spec.CaptureConfiguration.CaptureOption.DestinationIPs,
+	)
+	if combinedPcapFilter := combineBPFFilterExpressions(pcapFilter, sourceDestFilter); combinedPcapFilter != "" {
+		jobPodEnv[captureConstants.PcapFilterEnvKey] = combinedPcapFilter
+	}
+
+	// Windows equivalent of the BPF source/destination clause above, handed off to renderJob where the
+	// per-node NETSH_FILTER value (combined with pod IP addresses) is finalized.
+	if netshSourceDestFilter := buildNetshSourceDestinationIPFilter(
+		capture.Spec.CaptureConfiguration.CaptureOption.SourceIPs,
+		capture.Spec.CaptureConfiguration.CaptureOption.DestinationIPs,
+	); netshSourceDestFilter != "" {
+		jobPodEnv[netshSourceDestFilterHandoffKey] = netshSourceDestFilter
 	}
 
 	if capture.Spec.CaptureConfiguration.TcpdumpFilter != nil {

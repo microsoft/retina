@@ -24,7 +24,11 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 )
 
-const testNamespace = "test-ns"
+const (
+	testNamespace         = "test-ns"
+	testPodSelector       = "k8s-app=my-app"
+	testTcpdumpHostFilter = "host 10.0.0.1"
+)
 
 type testcase struct {
 	name              string
@@ -371,6 +375,229 @@ func TestCreateCaptureCommand_PodNamesClearsDefaultNodeSelector(t *testing.T) {
 
 	require.Equal(t, []string{"nonexistent-pod"}, capture.Spec.CaptureConfiguration.CaptureTarget.PodNames)
 	require.Nil(t, capture.Spec.CaptureConfiguration.CaptureTarget.NodeSelector)
+}
+
+func TestParseIPList(t *testing.T) {
+	cases := []struct {
+		name    string
+		ipList  string
+		wantIPs []string
+		wantErr bool
+	}{
+		{
+			name:    "empty string",
+			ipList:  "",
+			wantIPs: nil,
+		},
+		{
+			name:    "single valid IPv4 address",
+			ipList:  "10.0.0.1",
+			wantIPs: []string{"10.0.0.1"},
+		},
+		{
+			name:    "multiple valid IPv4 addresses",
+			ipList:  "10.0.0.1,10.0.0.2",
+			wantIPs: []string{"10.0.0.1", "10.0.0.2"},
+		},
+		{
+			name:    "addresses with surrounding whitespace are trimmed",
+			ipList:  " 10.0.0.1 , 10.0.0.2 ",
+			wantIPs: []string{"10.0.0.1", "10.0.0.2"},
+		},
+		{
+			name:    "valid IPv6 address",
+			ipList:  "2001:db8::1",
+			wantIPs: []string{"2001:db8::1"},
+		},
+		{
+			name:    "invalid IP address returns error",
+			ipList:  "not-an-ip",
+			wantErr: true,
+		},
+		{
+			name:    "one invalid IP among valid ones returns error",
+			ipList:  "10.0.0.1,not-an-ip",
+			wantErr: true,
+		},
+		{
+			name:    "flag-like token is rejected as invalid IP",
+			ipList:  "-somtehing",
+			wantErr: true,
+		},
+		{
+			name:    "trailing comma yields an empty entry and is rejected",
+			ipList:  "10.0.0.1,",
+			wantErr: true,
+		},
+		{
+			name:    "empty entry between commas is rejected",
+			ipList:  "10.0.0.1,,10.0.0.2",
+			wantErr: true,
+		},
+		{
+			name:    "whitespace-only entry is rejected",
+			ipList:  "   ",
+			wantErr: true,
+		},
+		{
+			name:    "comma-only list is rejected",
+			ipList:  ",",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			ips, err := parseIPList(tt.ipList, "--source-ips")
+			if tt.wantErr {
+				require.Error(t, err)
+				require.ErrorIs(t, err, ErrInvalidIPAddress)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.wantIPs, ips)
+		})
+	}
+}
+
+func TestCreateCaptureCommand_SourceDestinationIPs(t *testing.T) {
+	savedSourceIPs := opts.sourceIPs
+	savedDestinationIPs := opts.destinationIPs
+	savedPodSelectors := opts.podSelectors
+	savedNamespace := opts.Namespace
+	savedName := opts.Name
+	t.Cleanup(func() {
+		opts.sourceIPs = savedSourceIPs
+		opts.destinationIPs = savedDestinationIPs
+		opts.podSelectors = savedPodSelectors
+		opts.Namespace = savedNamespace
+		opts.Name = savedName
+	})
+
+	name := "test-capture"
+	namespace := "default"
+
+	opts.podSelectors = testPodSelector
+	opts.Namespace = &namespace
+	opts.Name = &name
+	opts.sourceIPs = "10.0.0.1,10.0.0.2"
+	opts.destinationIPs = "10.0.0.3"
+
+	capture, err := createCaptureF(context.Background(), fake.NewClientset())
+	require.NoError(t, err)
+
+	require.Equal(t, []string{"10.0.0.1", "10.0.0.2"}, capture.Spec.CaptureConfiguration.CaptureOption.SourceIPs)
+	require.Equal(t, []string{"10.0.0.3"}, capture.Spec.CaptureConfiguration.CaptureOption.DestinationIPs)
+}
+
+func TestCreateCaptureCommand_InvalidSourceIPReturnsError(t *testing.T) {
+	savedSourceIPs := opts.sourceIPs
+	savedPodSelectors := opts.podSelectors
+	savedNamespace := opts.Namespace
+	savedName := opts.Name
+	t.Cleanup(func() {
+		opts.sourceIPs = savedSourceIPs
+		opts.podSelectors = savedPodSelectors
+		opts.Namespace = savedNamespace
+		opts.Name = savedName
+	})
+
+	name := "test-capture"
+	namespace := "default"
+
+	opts.podSelectors = testPodSelector
+	opts.Namespace = &namespace
+	opts.Name = &name
+	opts.sourceIPs = "not-an-ip"
+
+	_, err := createCaptureF(context.Background(), fake.NewClientset())
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrInvalidIPAddress)
+}
+
+func TestCreateCaptureCommand_TcpdumpFilterWithSourceIPReturnsError(t *testing.T) {
+	savedTcpdumpFilter := opts.tcpdumpFilter
+	savedSourceIPs := opts.sourceIPs
+	savedDestinationIPs := opts.destinationIPs
+	savedPodSelectors := opts.podSelectors
+	savedNamespace := opts.Namespace
+	savedName := opts.Name
+	t.Cleanup(func() {
+		opts.tcpdumpFilter = savedTcpdumpFilter
+		opts.sourceIPs = savedSourceIPs
+		opts.destinationIPs = savedDestinationIPs
+		opts.podSelectors = savedPodSelectors
+		opts.Namespace = savedNamespace
+		opts.Name = savedName
+	})
+
+	name := "test-capture"
+	namespace := "default"
+
+	opts.podSelectors = testPodSelector
+	opts.Namespace = &namespace
+	opts.Name = &name
+	opts.tcpdumpFilter = testTcpdumpHostFilter
+	opts.sourceIPs = "10.0.0.1"
+
+	_, err := createCaptureF(context.Background(), fake.NewClientset())
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrTcpdumpFilterIncompatibleWithSourceDestIPs)
+}
+
+func TestCreateCaptureCommand_TcpdumpFilterWithDestinationIPReturnsError(t *testing.T) {
+	savedTcpdumpFilter := opts.tcpdumpFilter
+	savedSourceIPs := opts.sourceIPs
+	savedDestinationIPs := opts.destinationIPs
+	savedPodSelectors := opts.podSelectors
+	savedNamespace := opts.Namespace
+	savedName := opts.Name
+	t.Cleanup(func() {
+		opts.tcpdumpFilter = savedTcpdumpFilter
+		opts.sourceIPs = savedSourceIPs
+		opts.destinationIPs = savedDestinationIPs
+		opts.podSelectors = savedPodSelectors
+		opts.Namespace = savedNamespace
+		opts.Name = savedName
+	})
+
+	name := "test-capture"
+	namespace := "default"
+
+	opts.podSelectors = testPodSelector
+	opts.Namespace = &namespace
+	opts.Name = &name
+	opts.tcpdumpFilter = testTcpdumpHostFilter
+	opts.destinationIPs = "10.0.0.2"
+
+	_, err := createCaptureF(context.Background(), fake.NewClientset())
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrTcpdumpFilterIncompatibleWithSourceDestIPs)
+}
+
+func TestCreateCaptureCommand_TcpdumpFilterAloneSucceeds(t *testing.T) {
+	savedTcpdumpFilter := opts.tcpdumpFilter
+	savedPodSelectors := opts.podSelectors
+	savedNamespace := opts.Namespace
+	savedName := opts.Name
+	t.Cleanup(func() {
+		opts.tcpdumpFilter = savedTcpdumpFilter
+		opts.podSelectors = savedPodSelectors
+		opts.Namespace = savedNamespace
+		opts.Name = savedName
+	})
+
+	name := "test-capture"
+	namespace := "default"
+
+	opts.podSelectors = testPodSelector
+	opts.Namespace = &namespace
+	opts.Name = &name
+	opts.tcpdumpFilter = testTcpdumpHostFilter
+
+	capture, err := createCaptureF(context.Background(), fake.NewClientset())
+	require.NoError(t, err)
+	require.Equal(t, testTcpdumpHostFilter, *capture.Spec.CaptureConfiguration.TcpdumpFilter)
 }
 
 func TestCreateCaptureWithPodNames_CRDStructure(t *testing.T) {

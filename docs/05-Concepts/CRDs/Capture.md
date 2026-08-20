@@ -226,6 +226,32 @@ captureOption:
 - `packetBuffered`: Enable packet-buffered output (tcpdump -U)
 - `immediateMode`: Enable immediate mode (tcpdump --immediate-mode)
 
+### Creating a Rotating Capture
+
+A rotating capture maintains a fixed number of capture files, overwriting the oldest when the limit is reached. This is useful for long-running captures of intermittent issues where you need to retain only recent traffic.
+
+```yaml
+apiVersion: retina.sh/v1alpha1
+kind: Capture
+metadata:
+  name: rotating-capture
+spec:
+  captureConfiguration:
+    captureOption:
+      maxCaptureSize: 100   # 100MB per file
+      fileCount: 10         # Keep 10 files (1GB total rolling buffer)
+    captureTarget:
+      nodeSelector:
+        matchLabels:
+          kubernetes.io/os: linux
+  outputConfiguration:
+    hostPath: /mnt/retina/captures
+```
+
+The `fileCount` field sets the maximum number of capture files. When combined with `maxCaptureSize` (per-file size limit), this creates a circular buffer of capture data. For example, `fileCount: 10` with `maxCaptureSize: 100` retains approximately the last 1GB of network traffic.
+
+You can also set `duration` to automatically stop the capture after a time limit. Without `duration`, the capture runs until manually deleted.
+
 ### Capture Lifecycle
 
 Once a Capture is created, the capture controller inside retina-operator is responsible for managing the lifecycle of the Capture.

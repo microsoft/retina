@@ -59,6 +59,7 @@ var (
 	DefaultTelemetryInterval          = 15 * time.Minute
 	DefaultSamplingRate        uint32 = 1
 	DefaultFilterMapMaxEntries uint32 = 255
+	DefaultConntrackReportInterval    = 30 * time.Second
 )
 
 func (l *Level) UnmarshalText(text []byte) error {
@@ -131,6 +132,7 @@ type Config struct {
 	MonitorSockPath            string                     `yaml:"monitorSockPath"`
 	TelemetryInterval          time.Duration              `yaml:"telemetryInterval"`
 	DataSamplingRate           uint32                     `yaml:"dataSamplingRate"`
+	ConntrackReportInterval    time.Duration              `yaml:"conntrackReportInterval"`
 	PacketParserRingBuffer     PacketParserRingBufferMode `yaml:"packetParserRingBuffer"`
 	PacketParserRingBufferSize uint32                     `yaml:"packetParserRingBufferSize"`
 	FilterMapMaxEntries        uint32                     `yaml:"filterMapMaxEntries"`
@@ -187,6 +189,13 @@ func GetConfig(cfgFilename string) (*Config, error) {
 	if config.DataSamplingRate == 0 {
 		log.Printf("dataSamplingRate is not set, defaulting to %v", DefaultSamplingRate)
 		config.DataSamplingRate = DefaultSamplingRate
+	}
+
+	// The eBPF program works in whole seconds. Anything below 1s (including
+	// unset) would truncate to 0 and report every packet, so fall back to the default.
+	if config.ConntrackReportInterval < time.Second {
+		log.Printf("conntrackReportInterval %v is unset or below the 1s minimum, defaulting to %v", config.ConntrackReportInterval, DefaultConntrackReportInterval)
+		config.ConntrackReportInterval = DefaultConntrackReportInterval
 	}
 
 	// Default filter map max entries to 255 if not set.

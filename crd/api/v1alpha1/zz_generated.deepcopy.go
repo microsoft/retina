@@ -138,6 +138,11 @@ func (in *CaptureOption) DeepCopyInto(out *CaptureOption) {
 		*out = new(int)
 		**out = **in
 	}
+	if in.FileCount != nil {
+		in, out := &in.FileCount, &out.FileCount
+		*out = new(int)
+		**out = **in
+	}
 	if in.Interfaces != nil {
 		in, out := &in.Interfaces, &out.Interfaces
 		*out = make([]string, len(*in))
@@ -147,6 +152,16 @@ func (in *CaptureOption) DeepCopyInto(out *CaptureOption) {
 		in, out := &in.PcapFilter, &out.PcapFilter
 		*out = new(string)
 		**out = **in
+	}
+	if in.SourceIPs != nil {
+		in, out := &in.SourceIPs, &out.SourceIPs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.DestinationIPs != nil {
+		in, out := &in.DestinationIPs, &out.DestinationIPs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
 	}
 	if in.NoPromiscuous != nil {
 		in, out := &in.NoPromiscuous, &out.NoPromiscuous

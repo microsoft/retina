@@ -2,17 +2,20 @@ package kubernetes
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/microsoft/retina/test/e2e/common"
 	generic "github.com/microsoft/retina/test/e2e/framework/generic"
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart/loader"
-	"helm.sh/helm/v3/pkg/cli"
+	"helm.sh/helm/v4/pkg/action"
+	"helm.sh/helm/v4/pkg/chart/loader"
+	"helm.sh/helm/v4/pkg/cli"
+	"helm.sh/helm/v4/pkg/kube"
+	releasev1 "helm.sh/helm/v4/pkg/release/v1"
+	"helm.sh/helm/v4/pkg/storage/driver"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -39,7 +42,7 @@ func (v *InstallHubbleHelmChart) Run() error {
 	settings.KubeConfig = v.KubeConfigFilePath
 	actionConfig := new(action.Configuration)
 
-	err := actionConfig.Init(settings.RESTClientGetter(), v.Namespace, os.Getenv("HELM_DRIVER"), log.Printf)
+	err := actionConfig.Init(settings.RESTClientGetter(), v.Namespace, os.Getenv("HELM_DRIVER"))
 	if err != nil {
 		return fmt.Errorf("failed to initialize helm action config: %w", err)
 	}
@@ -70,36 +73,56 @@ func (v *InstallHubbleHelmChart) Run() error {
 		return fmt.Errorf("failed to load chart from path %s: %w", v.ChartPath, err)
 	}
 
-	chart.Values["imagePullSecrets"] = []map[string]interface{}{
-		{
-			"name": "acr-credentials",
+	// value overrides; helm merges these onto the chart defaults
+	overrides := map[string]any{
+		"imagePullSecrets": []map[string]any{
+			{"name": "acr-credentials"},
+		},
+		"operator": map[string]any{
+			"enabled":    true,
+			"repository": imageRegistry + "/" + imageNamespace + "/retina-operator",
+			"tag":        tag,
+		},
+		"agent": map[string]any{
+			"enabled":    true,
+			"repository": imageRegistry + "/" + imageNamespace + "/retina-agent",
+			"tag":        tag,
+			"init": map[string]any{
+				"enabled":    true,
+				"repository": imageRegistry + "/" + imageNamespace + "/retina-init",
+				"tag":        tag,
+			},
+		},
+		"hubble": map[string]any{
+			"tls": map[string]any{
+				"enabled": false,
+				"auto": map[string]any{
+					"enabled": false,
+				},
+			},
+			"relay": map[string]any{
+				"tls": map[string]any{
+					"server": map[string]any{
+						"enabled": false,
+					},
+				},
+			},
 		},
 	}
-	chart.Values["operator"].(map[string]interface{})["enabled"] = true
-	chart.Values["operator"].(map[string]interface{})["repository"] = imageRegistry + "/" + imageNamespace + "/retina-operator"
-	chart.Values["operator"].(map[string]interface{})["tag"] = tag
-	chart.Values["agent"].(map[string]interface{})["enabled"] = true
-	chart.Values["agent"].(map[string]interface{})["repository"] = imageRegistry + "/" + imageNamespace + "/retina-agent"
-	chart.Values["agent"].(map[string]interface{})["tag"] = tag
-	chart.Values["agent"].(map[string]interface{})["init"].(map[string]interface{})["enabled"] = true
-	chart.Values["agent"].(map[string]interface{})["init"].(map[string]interface{})["repository"] = imageRegistry + "/" + imageNamespace + "/retina-init"
-	chart.Values["agent"].(map[string]interface{})["init"].(map[string]interface{})["tag"] = tag
-	chart.Values["hubble"].(map[string]interface{})["tls"].(map[string]interface{})["enabled"] = false
-	chart.Values["hubble"].(map[string]interface{})["relay"].(map[string]interface{})["tls"].(map[string]interface{})["server"].(map[string]interface{})["enabled"] = false
-	chart.Values["hubble"].(map[string]interface{})["tls"].(map[string]interface{})["auto"].(map[string]interface{})["enabled"] = false
 
 	getclient := action.NewGet(actionConfig)
-	release, err := getclient.Run(v.ReleaseName)
-	if err == nil && release != nil {
-		log.Printf("found existing release by same name, removing before installing %s", release.Name)
+	_, err = getclient.Run(v.ReleaseName)
+	switch {
+	case err == nil:
+		log.Printf("found existing release by same name, removing before installing %s", v.ReleaseName)
 		delclient := action.NewUninstall(actionConfig)
-		delclient.Wait = true
+		delclient.WaitStrategy = kube.StatusWatcherStrategy
 		delclient.Timeout = deleteTimeout
 		_, err = delclient.Run(v.ReleaseName)
 		if err != nil {
 			return fmt.Errorf("failed to delete existing release %s: %w", v.ReleaseName, err)
 		}
-	} else if err != nil && !strings.Contains(err.Error(), "not found") {
+	case !errors.Is(err, driver.ErrReleaseNotFound):
 		return fmt.Errorf("failed to get release %s: %w", v.ReleaseName, err)
 	}
 
@@ -107,18 +130,22 @@ func (v *InstallHubbleHelmChart) Run() error {
 	client.Namespace = v.Namespace
 	client.ReleaseName = v.ReleaseName
 	client.Timeout = createTimeout
-	client.Wait = true
+	client.WaitStrategy = kube.StatusWatcherStrategy
 	client.WaitForJobs = true
 
 	// install the chart here
-	rel, err := client.RunWithContext(ctx, chart, chart.Values)
+	rel, err := client.RunWithContext(ctx, chart, overrides)
 	if err != nil {
 		return fmt.Errorf("failed to install chart: %w", err)
 	}
+	release, ok := rel.(*releasev1.Release)
+	if !ok {
+		return fmt.Errorf("%w: %T", errUnexpectedReleaseType, rel)
+	}
 
-	log.Printf("installed chart from path: %s in namespace: %s\n", rel.Name, rel.Namespace)
+	log.Printf("installed chart from path: %s in namespace: %s\n", release.Name, release.Namespace)
 	// this will confirm the values set during installation
-	log.Printf("chart values: %v\n", rel.Config)
+	log.Printf("chart values: %v\n", release.Config)
 
 	// ensure all pods are running, since helm doesn't care about windows
 	config, err := clientcmd.BuildConfigFromFlags("", v.KubeConfigFilePath)

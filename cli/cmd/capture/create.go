@@ -6,6 +6,7 @@ package capture
 import (
 	"context"
 	"fmt"
+	"net"
 	"os/signal"
 	"strings"
 	"syscall"
@@ -49,6 +50,7 @@ const (
 	DefaultIncludeMetadata bool          = true
 	DefaultJobNumLimit     int           = 0
 	DefaultMaxSize         int           = 100
+	DefaultFileCount       int           = 0
 	DefaultNodeSelectors   string        = "kubernetes.io/os=linux"
 	DefaultNowait          bool          = true
 	DefaultPacketSize      int           = 0
@@ -74,7 +76,11 @@ const (
 	MinPollAttempts = 4
 )
 
-var errCleanupRequiresRemoteStorage = errors.New("--cleanup-after-upload requires remote storage (--blob-upload, --s3-bucket, or --pvc)")
+var (
+	errCleanupRequiresRemoteStorage = errors.New("--cleanup-after-upload requires remote storage (--blob-upload, --s3-bucket, or --pvc)")
+	errFileCountTooSmall            = errors.New("--file-count must be at least 1")
+	errFileCountRequiresMaxSize     = errors.New("--file-count requires --max-size to be set as per-file size limit")
+)
 
 // hasRemoteDestination returns true if the capture options specify a remote
 // storage output (blob upload or S3 upload).
@@ -256,7 +262,10 @@ func NewCreateSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 	}
 
 	createCapture.Flags().DurationVar(&opts.duration, "duration", DefaultDuration, "Duration of capturing packets")
-	createCapture.Flags().IntVar(&opts.maxSize, "max-size", DefaultMaxSize, "Limit the capture file to MB in size which works only for Linux") //nolint:gomnd // default
+	createCapture.Flags().IntVar(&opts.maxSize, "max-size", DefaultMaxSize,
+		"Limit the capture file to MB in size (per-file size when used with --file-count). Linux only") //nolint:gomnd // default
+	createCapture.Flags().IntVar(&opts.fileCount, "file-count", DefaultFileCount,
+		"Number of files in a rotating buffer (requires --max-size, min 1). Overwrites oldest file when full")
 	createCapture.Flags().IntVar(&opts.packetSize, "packet-size", DefaultPacketSize, "Limits the each packet to bytes in size which works only for Linux")
 	createCapture.Flags().StringVar(&opts.nodeNames, "node-names", "", "A comma-separated list of node names to select nodes on which the network capture will be performed")
 	createCapture.Flags().StringVar(&opts.nodeSelectors, "node-selectors", DefaultNodeSelectors, "A comma-separated list of node labels to select nodes on which the network capture will be performed")
@@ -282,6 +291,12 @@ func NewCreateSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 		"DEPRECATED and will be removed: Use --pcap-filter for BPF expressions. BPF filter expression without flags (e.g., 'host 10.0.0.1', 'tcp port 443')")
 	createCapture.Flags().StringVar(&opts.pcapFilter, "pcap-filter", "",
 		"BPF filter expression for packet filtering (e.g., 'host 10.0.0.1', 'tcp port 443'). See https://www.tcpdump.org/manpages/pcap-filter.7.html")
+	createCapture.Flags().StringVar(&opts.sourceIPs, "source-ips", "",
+		"A comma-separated list of source IP addresses to filter captured packets by; a packet is captured if it matches any of these IPs. "+
+			"When combined with --destination-ips, a packet must match at least one source IP AND at least one destination IP to be captured.")
+	createCapture.Flags().StringVar(&opts.destinationIPs, "destination-ips", "",
+		"A comma-separated list of destination IP addresses to filter captured packets by; a packet is captured if it matches any of these IPs. "+
+			"When combined with --source-ips, a packet must match at least one source IP AND at least one destination IP to be captured.")
 	createCapture.Flags().StringVar(&opts.interfaces, "interfaces", "", "Comma-separated list of network interfaces to capture on (e.g., eth0,eth1)")
 
 	// Tcpdump boolean flags for capture behavior and display options
@@ -393,12 +408,47 @@ func validateBPFFilter(filter, filterName string) error {
 	return nil
 }
 
+// parseIPList splits a comma-separated list of IP addresses and validates that each entry
+// is a well-formed IP address. This ensures only IP literals (not BPF expressions or flags)
+// are accepted by --source-ips/--destination-ips, preventing filter/command injection.
+func parseIPList(ipList, flagName string) ([]string, error) {
+	if ipList == "" {
+		return nil, nil
+	}
+
+	entries := strings.Split(ipList, ",")
+	ips := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		trimmed := strings.TrimSpace(entry)
+		if trimmed == "" {
+			return nil, fmt.Errorf("%s: empty entry is not a valid IP address: %w", flagName, ErrInvalidIPAddress)
+		}
+		if net.ParseIP(trimmed) == nil {
+			return nil, fmt.Errorf("%s: %q is not a valid IP address: %w", flagName, trimmed, ErrInvalidIPAddress)
+		}
+		ips = append(ips, trimmed)
+	}
+
+	return ips, nil
+}
+
 func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*retinav1alpha1.Capture, error) {
 	// Validate filters early to provide immediate feedback
 	if err := validateBPFFilter(opts.tcpdumpFilter, "--tcpdump-filter"); err != nil {
 		return nil, err
 	}
 	if err := validateBPFFilter(opts.pcapFilter, "--pcap-filter"); err != nil {
+		return nil, err
+	}
+	if opts.tcpdumpFilter != "" && (opts.sourceIPs != "" || opts.destinationIPs != "") {
+		return nil, ErrTcpdumpFilterIncompatibleWithSourceDestIPs
+	}
+	sourceIPs, err := parseIPList(opts.sourceIPs, "--source-ips")
+	if err != nil {
+		return nil, err
+	}
+	destinationIPs, err := parseIPList(opts.destinationIPs, "--destination-ips")
+	if err != nil {
 		return nil, err
 	}
 
@@ -498,6 +548,17 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 		capture.Spec.CaptureConfiguration.CaptureOption.MaxCaptureSize = &opts.maxSize
 	}
 
+	if opts.fileCount != 0 {
+		if opts.fileCount < 1 {
+			return nil, errFileCountTooSmall
+		}
+		if opts.maxSize == 0 {
+			return nil, errFileCountRequiresMaxSize
+		}
+		retinacmd.Logger.Info(fmt.Sprintf("The capture file count is set to %d (rotating buffer)", opts.fileCount))
+		capture.Spec.CaptureConfiguration.CaptureOption.FileCount = &opts.fileCount
+	}
+
 	if opts.packetSize != 0 {
 		retinacmd.Logger.Info(fmt.Sprintf("The capture packet size is set to %d bytes", opts.packetSize))
 		capture.Spec.CaptureConfiguration.CaptureOption.PacketSize = &opts.packetSize
@@ -515,6 +576,16 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 	// Set pcap-filter if provided
 	if opts.pcapFilter != "" {
 		capture.Spec.CaptureConfiguration.CaptureOption.PcapFilter = &opts.pcapFilter
+	}
+
+	// Set source/destination IP filters if provided
+	if len(sourceIPs) > 0 {
+		retinacmd.Logger.Info(fmt.Sprintf("Capturing packets with source IP in: %v", sourceIPs))
+		capture.Spec.CaptureConfiguration.CaptureOption.SourceIPs = sourceIPs
+	}
+	if len(destinationIPs) > 0 {
+		retinacmd.Logger.Info(fmt.Sprintf("Capturing packets with destination IP in: %v", destinationIPs))
+		capture.Spec.CaptureConfiguration.CaptureOption.DestinationIPs = destinationIPs
 	}
 
 	// Set boolean capture and display flags

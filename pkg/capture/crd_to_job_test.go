@@ -39,7 +39,7 @@ const (
 )
 
 func NewCaptureToPodTranslatorForTest(kubeClient kubernetes.Interface) *CaptureToPodTranslator {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
 	config := config.CaptureConfig{
 		CaptureDebug:              true,
 		CaptureImageVersion:       "v0.0.1-pre",
@@ -583,6 +583,29 @@ func Test_CaptureToPodTranslator_ObtainCaptureJobPodEnv(t *testing.T) {
 			},
 		},
 		{
+			name: "file count for rotating capture",
+			capture: retinav1alpha1.Capture{
+				Spec: retinav1alpha1.CaptureSpec{
+					OutputConfiguration: retinav1alpha1.OutputConfiguration{
+						PersistentVolumeClaim: pointerUtil.String("capture-pvc"),
+					},
+					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
+						IncludeMetadata: true,
+						CaptureOption: retinav1alpha1.CaptureOption{
+							MaxCaptureSize: pointerUtil.Int(50),
+							FileCount:      pointerUtil.Int(10),
+						},
+					},
+				},
+			},
+			wantJobEnv: map[string]string{
+				captureConstants.IncludeMetadataEnvKey:                                    "true",
+				string(captureConstants.CaptureOutputLocationEnvKeyPersistentVolumeClaim): "capture-pvc",
+				captureConstants.CaptureMaxSizeEnvKey:                                     "50",
+				captureConstants.CaptureFileCountEnvKey:                                   "10",
+			},
+		},
+		{
 			name: "pcapFilter",
 			capture: retinav1alpha1.Capture{
 				Spec: retinav1alpha1.CaptureSpec{
@@ -689,12 +712,119 @@ func Test_CaptureToPodTranslator_ObtainCaptureJobPodEnv(t *testing.T) {
 				captureConstants.TcpdumpFlagsEnvKey:                                       "-p -v",
 			},
 		},
+		{
+			name: "source IP only",
+			capture: retinav1alpha1.Capture{
+				Spec: retinav1alpha1.CaptureSpec{
+					OutputConfiguration: retinav1alpha1.OutputConfiguration{
+						PersistentVolumeClaim: pointerUtil.String("capture-pvc"),
+					},
+					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
+						CaptureOption: retinav1alpha1.CaptureOption{
+							SourceIPs: []string{"10.0.0.1"},
+						},
+					},
+				},
+			},
+			wantJobEnv: map[string]string{
+				string(captureConstants.CaptureOutputLocationEnvKeyPersistentVolumeClaim): "capture-pvc",
+				captureConstants.IncludeMetadataEnvKey:                                    "false",
+				captureConstants.PcapFilterEnvKey:                                         "src host 10.0.0.1",
+				netshSourceDestFilterHandoffKey:                                           "IPv4.SourceAddress=(10.0.0.1)",
+			},
+		},
+		{
+			name: "multiple source IPs",
+			capture: retinav1alpha1.Capture{
+				Spec: retinav1alpha1.CaptureSpec{
+					OutputConfiguration: retinav1alpha1.OutputConfiguration{
+						PersistentVolumeClaim: pointerUtil.String("capture-pvc"),
+					},
+					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
+						CaptureOption: retinav1alpha1.CaptureOption{
+							SourceIPs: []string{"10.0.0.1", "10.0.0.2"},
+						},
+					},
+				},
+			},
+			wantJobEnv: map[string]string{
+				string(captureConstants.CaptureOutputLocationEnvKeyPersistentVolumeClaim): "capture-pvc",
+				captureConstants.IncludeMetadataEnvKey:                                    "false",
+				captureConstants.PcapFilterEnvKey:                                         "src host 10.0.0.1 or src host 10.0.0.2",
+				netshSourceDestFilterHandoffKey:                                           "IPv4.SourceAddress=(10.0.0.1,10.0.0.2)",
+			},
+		},
+		{
+			name: "destination IP only",
+			capture: retinav1alpha1.Capture{
+				Spec: retinav1alpha1.CaptureSpec{
+					OutputConfiguration: retinav1alpha1.OutputConfiguration{
+						PersistentVolumeClaim: pointerUtil.String("capture-pvc"),
+					},
+					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
+						CaptureOption: retinav1alpha1.CaptureOption{
+							DestinationIPs: []string{"10.0.0.2"},
+						},
+					},
+				},
+			},
+			wantJobEnv: map[string]string{
+				string(captureConstants.CaptureOutputLocationEnvKeyPersistentVolumeClaim): "capture-pvc",
+				captureConstants.IncludeMetadataEnvKey:                                    "false",
+				captureConstants.PcapFilterEnvKey:                                         "dst host 10.0.0.2",
+				netshSourceDestFilterHandoffKey:                                           "IPv4.DestinationAddress=(10.0.0.2)",
+			},
+		},
+		{
+			name: "source and destination IPs combined",
+			capture: retinav1alpha1.Capture{
+				Spec: retinav1alpha1.CaptureSpec{
+					OutputConfiguration: retinav1alpha1.OutputConfiguration{
+						PersistentVolumeClaim: pointerUtil.String("capture-pvc"),
+					},
+					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
+						CaptureOption: retinav1alpha1.CaptureOption{
+							SourceIPs:      []string{"10.0.0.1"},
+							DestinationIPs: []string{"10.0.0.2"},
+						},
+					},
+				},
+			},
+			wantJobEnv: map[string]string{
+				string(captureConstants.CaptureOutputLocationEnvKeyPersistentVolumeClaim): "capture-pvc",
+				captureConstants.IncludeMetadataEnvKey:                                    "false",
+				captureConstants.PcapFilterEnvKey:                                         "(src host 10.0.0.1) and (dst host 10.0.0.2)",
+				netshSourceDestFilterHandoffKey:                                           "IPv4.SourceAddress=(10.0.0.1) IPv4.DestinationAddress=(10.0.0.2)",
+			},
+		},
+		{
+			name: "source/destination IPs combined with pcapFilter",
+			capture: retinav1alpha1.Capture{
+				Spec: retinav1alpha1.CaptureSpec{
+					OutputConfiguration: retinav1alpha1.OutputConfiguration{
+						PersistentVolumeClaim: pointerUtil.String("capture-pvc"),
+					},
+					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
+						CaptureOption: retinav1alpha1.CaptureOption{
+							PcapFilter: pointerUtil.String("tcp port 80"),
+							SourceIPs:  []string{"10.0.0.1"},
+						},
+					},
+				},
+			},
+			wantJobEnv: map[string]string{
+				string(captureConstants.CaptureOutputLocationEnvKeyPersistentVolumeClaim): "capture-pvc",
+				captureConstants.IncludeMetadataEnvKey:                                    "false",
+				captureConstants.PcapFilterEnvKey:                                         "(tcp port 80) and (src host 10.0.0.1)",
+				netshSourceDestFilterHandoffKey:                                           "IPv4.SourceAddress=(10.0.0.1)",
+			},
+		},
 	}
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			k8sClient := fakeclientset.NewSimpleClientset()
-			log.SetupZapLogger(log.GetDefaultLogOpts())
+			_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
 			captureToPodTranslator := NewCaptureToPodTranslatorForTest(k8sClient)
 			jobEnv, err := captureToPodTranslator.ObtainCaptureJobPodEnv(tt.capture)
 
@@ -797,7 +927,7 @@ func Test_CaptureToPodTranslator_RenderJob_NodeSelected(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			k8sClient := fakeclientset.NewSimpleClientset()
-			log.SetupZapLogger(log.GetDefaultLogOpts())
+			_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
 			captureToPodTranslator := NewCaptureToPodTranslatorForTest(k8sClient)
 
 			startTime := time.Now()
@@ -942,6 +1072,86 @@ func Test_CaptureToPodTranslator_ValidateCapture(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "raise error when fileCount is set without maxCaptureSize",
+			capture: retinav1alpha1.Capture{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: captureName,
+				},
+				Spec: retinav1alpha1.CaptureSpec{
+					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
+						CaptureTarget: retinav1alpha1.CaptureTarget{
+							NodeSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"nodename": nodeName,
+								},
+							},
+						},
+						CaptureOption: retinav1alpha1.CaptureOption{
+							Duration:  &metav1.Duration{Duration: 10 * time.Second},
+							FileCount: pointerUtil.Int(10),
+						},
+					},
+					OutputConfiguration: retinav1alpha1.OutputConfiguration{
+						HostPath: &hostPath,
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "validation is ok with rotating capture (fileCount and maxCaptureSize)",
+			capture: retinav1alpha1.Capture{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: captureName,
+				},
+				Spec: retinav1alpha1.CaptureSpec{
+					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
+						CaptureTarget: retinav1alpha1.CaptureTarget{
+							NodeSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"nodename": nodeName,
+								},
+							},
+						},
+						CaptureOption: retinav1alpha1.CaptureOption{
+							MaxCaptureSize: pointerUtil.Int(100),
+							FileCount:      pointerUtil.Int(10),
+						},
+					},
+					OutputConfiguration: retinav1alpha1.OutputConfiguration{
+						HostPath: &hostPath,
+					},
+				},
+			},
+		},
+		{
+			name: "validation is ok with rotating capture and duration",
+			capture: retinav1alpha1.Capture{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: captureName,
+				},
+				Spec: retinav1alpha1.CaptureSpec{
+					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
+						CaptureTarget: retinav1alpha1.CaptureTarget{
+							NodeSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"nodename": nodeName,
+								},
+							},
+						},
+						CaptureOption: retinav1alpha1.CaptureOption{
+							Duration:       &metav1.Duration{Duration: 4 * time.Hour},
+							MaxCaptureSize: pointerUtil.Int(50),
+							FileCount:      pointerUtil.Int(5),
+						},
+					},
+					OutputConfiguration: retinav1alpha1.OutputConfiguration{
+						HostPath: &hostPath,
+					},
+				},
+			},
+		},
 	}
 
 	// Additional negative cases for HostPath validation; share the rest of the spec.
@@ -990,6 +1200,109 @@ func Test_CaptureToPodTranslator_ValidateCapture(t *testing.T) {
 			name:    "raise error when HostPath uses parent segment",
 			capture: captureSpecWithHostPath("../etc"),
 			wantErr: true,
+		},
+	)
+
+	// Additional cases for SourceIPs/DestinationIPs validation; share the rest of the spec.
+	captureSpecWithSourceDestIPs := func(sourceIPs, destinationIPs []string) retinav1alpha1.Capture {
+		return retinav1alpha1.Capture{
+			ObjectMeta: metav1.ObjectMeta{Name: captureName},
+			Spec: retinav1alpha1.CaptureSpec{
+				CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
+					CaptureTarget: retinav1alpha1.CaptureTarget{
+						NodeSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"nodename": nodeName},
+						},
+					},
+					CaptureOption: retinav1alpha1.CaptureOption{
+						Duration:       &metav1.Duration{Duration: 10 * time.Second},
+						SourceIPs:      sourceIPs,
+						DestinationIPs: destinationIPs,
+					},
+				},
+				OutputConfiguration: retinav1alpha1.OutputConfiguration{HostPath: &hostPath},
+			},
+		}
+	}
+	cases = append(cases,
+		struct {
+			name    string
+			capture retinav1alpha1.Capture
+			wantErr bool
+		}{
+			name:    "raise error when SourceIPs contains a malformed IP",
+			capture: captureSpecWithSourceDestIPs([]string{"not-an-ip"}, nil),
+			wantErr: true,
+		},
+		struct {
+			name    string
+			capture retinav1alpha1.Capture
+			wantErr bool
+		}{
+			name:    "raise error when DestinationIPs contains a malformed IP",
+			capture: captureSpecWithSourceDestIPs(nil, []string{"10.0.0.1", "not-an-ip"}),
+			wantErr: true,
+		},
+		struct {
+			name    string
+			capture retinav1alpha1.Capture
+			wantErr bool
+		}{
+			name:    "validation is ok when SourceIPs and DestinationIPs are well-formed",
+			capture: captureSpecWithSourceDestIPs([]string{"10.0.0.1", "2001:1234:5678:9abc::1"}, []string{"10.0.0.2"}),
+			wantErr: false,
+		},
+	)
+
+	// Additional cases for the deprecated TcpdumpFilter/SourceIPs/DestinationIPs incompatibility check.
+	captureSpecWithTcpdumpFilterAndSourceDestIPs := func(tcpdumpFilter string, sourceIPs, destinationIPs []string) retinav1alpha1.Capture {
+		return retinav1alpha1.Capture{
+			ObjectMeta: metav1.ObjectMeta{Name: captureName},
+			Spec: retinav1alpha1.CaptureSpec{
+				CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
+					CaptureTarget: retinav1alpha1.CaptureTarget{
+						NodeSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"nodename": nodeName},
+						},
+					},
+					TcpdumpFilter: &tcpdumpFilter,
+					CaptureOption: retinav1alpha1.CaptureOption{
+						Duration:       &metav1.Duration{Duration: 10 * time.Second},
+						SourceIPs:      sourceIPs,
+						DestinationIPs: destinationIPs,
+					},
+				},
+				OutputConfiguration: retinav1alpha1.OutputConfiguration{HostPath: &hostPath},
+			},
+		}
+	}
+	cases = append(cases,
+		struct {
+			name    string
+			capture retinav1alpha1.Capture
+			wantErr bool
+		}{
+			name:    "raise error when TcpdumpFilter is combined with SourceIPs",
+			capture: captureSpecWithTcpdumpFilterAndSourceDestIPs("tcp port 443", []string{"10.0.0.1"}, nil),
+			wantErr: true,
+		},
+		struct {
+			name    string
+			capture retinav1alpha1.Capture
+			wantErr bool
+		}{
+			name:    "raise error when TcpdumpFilter is combined with DestinationIPs",
+			capture: captureSpecWithTcpdumpFilterAndSourceDestIPs("tcp port 443", nil, []string{"10.0.0.1"}),
+			wantErr: true,
+		},
+		struct {
+			name    string
+			capture retinav1alpha1.Capture
+			wantErr bool
+		}{
+			name:    "validation is ok when TcpdumpFilter is set without SourceIPs or DestinationIPs",
+			capture: captureSpecWithTcpdumpFilterAndSourceDestIPs("tcp port 443", nil, nil),
+			wantErr: false,
 		},
 	)
 
@@ -2390,6 +2703,202 @@ func TestUpdateTcpdumpFilterWithPodIPAddress(t *testing.T) {
 	}
 }
 
+func TestValidateIPAddresses(t *testing.T) {
+	cases := []struct {
+		name    string
+		ips     []string
+		wantErr bool
+	}{
+		{
+			name: "empty list",
+			ips:  nil,
+		},
+		{
+			name: "single valid ipv4",
+			ips:  []string{"10.0.0.1"},
+		},
+		{
+			name: "single valid ipv6",
+			ips:  []string{"2001:1234:5678:9abc::1"},
+		},
+		{
+			name: "multiple valid IPs",
+			ips:  []string{"10.0.0.1", "10.0.0.2"},
+		},
+		{
+			name:    "malformed IP is rejected",
+			ips:     []string{"not-an-ip"},
+			wantErr: true,
+		},
+		{
+			name:    "one malformed IP among valid ones is rejected",
+			ips:     []string{"10.0.0.1", "not-an-ip"},
+			wantErr: true,
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateIPAddresses(tt.ips, "sourceIPs")
+			if tt.wantErr != (err != nil) {
+				t.Errorf("validateIPAddresses() want(%t) error, got error %s", tt.wantErr, err)
+			}
+			if tt.wantErr {
+				require.ErrorIs(t, err, errInvalidIPAddress)
+			}
+		})
+	}
+}
+
+func TestBpfDirectionalHostClause(t *testing.T) {
+	cases := []struct {
+		name       string
+		direction  string
+		ips        []string
+		wantFilter string
+	}{
+		{
+			name:       "no ips",
+			direction:  "src",
+			wantFilter: "",
+		},
+		{
+			name:       "single valid ip",
+			direction:  "src",
+			ips:        []string{"10.0.0.1"},
+			wantFilter: "src host 10.0.0.1",
+		},
+		{
+			name:       "multiple valid ips are ORed without outer parens",
+			direction:  "dst",
+			ips:        []string{"10.0.0.1", "10.0.0.2"},
+			wantFilter: "dst host 10.0.0.1 or dst host 10.0.0.2",
+		},
+		{
+			name:       "invalid ip is skipped",
+			direction:  "src",
+			ips:        []string{"not-an-ip", "10.0.0.1"},
+			wantFilter: "src host 10.0.0.1",
+		},
+		{
+			name:       "all invalid ips result in empty clause",
+			direction:  "src",
+			ips:        []string{"not-an-ip", "also-not-an-ip"},
+			wantFilter: "",
+		},
+		{
+			name:       "ipv6 address",
+			direction:  "dst",
+			ips:        []string{"2001:db8::1"},
+			wantFilter: "dst host 2001:db8::1",
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			gotFilter := bpfDirectionalHostClause(tt.direction, tt.ips)
+			if diff := cmp.Diff(tt.wantFilter, gotFilter); diff != "" {
+				t.Errorf("bpfDirectionalHostClause() mismatch (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestBuildSourceDestinationIPFilter(t *testing.T) {
+	cases := []struct {
+		name           string
+		sourceIPs      []string
+		destinationIPs []string
+		wantFilter     string
+	}{
+		{
+			name:       "no source or destination IPs",
+			wantFilter: "",
+		},
+		{
+			name:       "single source IP only",
+			sourceIPs:  []string{"10.0.0.1"},
+			wantFilter: "src host 10.0.0.1",
+		},
+		{
+			name:       "multiple source IPs only",
+			sourceIPs:  []string{"10.0.0.1", "10.0.0.2"},
+			wantFilter: "src host 10.0.0.1 or src host 10.0.0.2",
+		},
+		{
+			name:           "single destination IP only",
+			destinationIPs: []string{"10.0.0.2"},
+			wantFilter:     "dst host 10.0.0.2",
+		},
+		{
+			name:           "multiple destination IPs only",
+			destinationIPs: []string{"10.0.0.2", "10.0.0.3"},
+			wantFilter:     "dst host 10.0.0.2 or dst host 10.0.0.3",
+		},
+		{
+			name:           "single source and single destination IP",
+			sourceIPs:      []string{"10.0.0.1"},
+			destinationIPs: []string{"10.0.0.2"},
+			wantFilter:     "(src host 10.0.0.1) and (dst host 10.0.0.2)",
+		},
+		{
+			name:           "multiple source and destination IPs",
+			sourceIPs:      []string{"10.0.0.1", "10.0.0.2"},
+			destinationIPs: []string{"10.0.0.3", "10.0.0.4"},
+			wantFilter:     "(src host 10.0.0.1 or src host 10.0.0.2) and (dst host 10.0.0.3 or dst host 10.0.0.4)",
+		},
+		{
+			name:       "invalid IP entries are skipped",
+			sourceIPs:  []string{"not-an-ip", "10.0.0.1"},
+			wantFilter: "src host 10.0.0.1",
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			gotFilter := buildSourceDestinationIPFilter(tt.sourceIPs, tt.destinationIPs)
+			if diff := cmp.Diff(tt.wantFilter, gotFilter); diff != "" {
+				t.Errorf("buildSourceDestinationIPFilter() mismatch (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestCombineBPFFilterExpressions(t *testing.T) {
+	cases := []struct {
+		name       string
+		a          string
+		b          string
+		wantFilter string
+	}{
+		{
+			name:       "both empty",
+			wantFilter: "",
+		},
+		{
+			name:       "only a set",
+			a:          "tcp port 80",
+			wantFilter: "tcp port 80",
+		},
+		{
+			name:       "only b set",
+			b:          "tcp port 80",
+			wantFilter: "tcp port 80",
+		},
+		{
+			name:       "both set",
+			a:          "tcp port 80",
+			b:          "src host 10.0.0.1",
+			wantFilter: "(tcp port 80) and (src host 10.0.0.1)",
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			gotFilter := combineBPFFilterExpressions(tt.a, tt.b)
+			if diff := cmp.Diff(tt.wantFilter, gotFilter); diff != "" {
+				t.Errorf("combineBPFFilterExpressions() mismatch (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestGetNetshFilterWithPodIPAddress(t *testing.T) {
 	cases := []struct {
 		name              string
@@ -2427,6 +2936,231 @@ func TestGetNetshFilterWithPodIPAddress(t *testing.T) {
 			gotNetshFilter := getNetshFilterWithPodIPAddress(tt.podIPAddresses)
 			if diff := cmp.Diff(tt.wantedNetshFilter, gotNetshFilter); diff != "" {
 				t.Errorf("getNetshFilterWithPodIPAddress() mismatch (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestNetshAddressFilterGroup(t *testing.T) {
+	cases := []struct {
+		name       string
+		keyword    string
+		ips        []string
+		wantFilter string
+	}{
+		{
+			name:       "empty ips",
+			keyword:    "SourceAddress",
+			ips:        []string{},
+			wantFilter: "",
+		},
+		{
+			name:       "single ipv4",
+			keyword:    "SourceAddress",
+			ips:        []string{"10.0.0.1"},
+			wantFilter: "IPv4.SourceAddress=(10.0.0.1)",
+		},
+		{
+			name:       "multiple ipv4",
+			keyword:    "DestinationAddress",
+			ips:        []string{"10.0.0.1", "10.0.0.2"},
+			wantFilter: "IPv4.DestinationAddress=(10.0.0.1,10.0.0.2)",
+		},
+		{
+			name:       "single ipv6",
+			keyword:    "SourceAddress",
+			ips:        []string{"2001:1234:5678:9abc::5"},
+			wantFilter: "IPv6.SourceAddress=(2001:1234:5678:9abc::5)",
+		},
+		{
+			name:       "mixed ipv4 and ipv6",
+			keyword:    "DestinationAddress",
+			ips:        []string{"10.0.0.1", "2001:1234:5678:9abc::5"},
+			wantFilter: "IPv4.DestinationAddress=(10.0.0.1) IPv6.DestinationAddress=(2001:1234:5678:9abc::5)",
+		},
+		{
+			name:       "invalid ip is skipped",
+			keyword:    "SourceAddress",
+			ips:        []string{"not-an-ip", "10.0.0.1"},
+			wantFilter: "IPv4.SourceAddress=(10.0.0.1)",
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			gotFilter := netshAddressFilterGroup(tt.keyword, tt.ips)
+			if diff := cmp.Diff(tt.wantFilter, gotFilter); diff != "" {
+				t.Errorf("netshAddressFilterGroup() mismatch (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestBuildNetshSourceDestinationIPFilter(t *testing.T) {
+	cases := []struct {
+		name           string
+		sourceIPs      []string
+		destinationIPs []string
+		wantFilter     string
+	}{
+		{
+			name:       "no source or destination IPs",
+			wantFilter: "",
+		},
+		{
+			name:       "single source IP only",
+			sourceIPs:  []string{"10.0.0.1"},
+			wantFilter: "IPv4.SourceAddress=(10.0.0.1)",
+		},
+		{
+			name:       "multiple source IPs only",
+			sourceIPs:  []string{"10.0.0.1", "10.0.0.2"},
+			wantFilter: "IPv4.SourceAddress=(10.0.0.1,10.0.0.2)",
+		},
+		{
+			name:           "single destination IP only",
+			destinationIPs: []string{"10.0.0.2"},
+			wantFilter:     "IPv4.DestinationAddress=(10.0.0.2)",
+		},
+		{
+			name:           "multiple destination IPs only",
+			destinationIPs: []string{"10.0.0.2", "10.0.0.3"},
+			wantFilter:     "IPv4.DestinationAddress=(10.0.0.2,10.0.0.3)",
+		},
+		{
+			name:           "single source and single destination IP",
+			sourceIPs:      []string{"10.0.0.1"},
+			destinationIPs: []string{"10.0.0.2"},
+			wantFilter:     "IPv4.SourceAddress=(10.0.0.1) IPv4.DestinationAddress=(10.0.0.2)",
+		},
+		{
+			name:           "ipv6 source and destination",
+			sourceIPs:      []string{"2001:1234:5678:9abc::1"},
+			destinationIPs: []string{"2001:1234:5678:9abc::2"},
+			wantFilter:     "IPv6.SourceAddress=(2001:1234:5678:9abc::1) IPv6.DestinationAddress=(2001:1234:5678:9abc::2)",
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			gotFilter := buildNetshSourceDestinationIPFilter(tt.sourceIPs, tt.destinationIPs)
+			if diff := cmp.Diff(tt.wantFilter, gotFilter); diff != "" {
+				t.Errorf("buildNetshSourceDestinationIPFilter() mismatch (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// Test_CaptureToPodTranslator_RenderJob_NetshFilterCombination verifies that renderJob correctly combines the
+// pod-IP-based netsh filter with the source/destination IP netsh filter handed off via netshSourceDestFilterHandoffKey,
+// and that the internal handoff key is never emitted as a literal container environment variable.
+func Test_CaptureToPodTranslator_RenderJob_NetshFilterCombination(t *testing.T) {
+	ctx, cancel := TestContext(t)
+	defer cancel()
+
+	cases := []struct {
+		name                string
+		captureTargetOnNode *CaptureTargetsOnNode
+		env                 map[string]string
+		wantEnv             map[string]string
+	}{
+		{
+			name: "windows target combines pod IP filter and source/destination filter",
+			captureTargetOnNode: &CaptureTargetsOnNode{
+				"winnode1": {
+					OS:             "windows",
+					PodIpAddresses: []string{"192.168.1.1"},
+				},
+			},
+			env: map[string]string{
+				netshSourceDestFilterHandoffKey: "IPv4.SourceAddress=(10.0.0.1)",
+			},
+			wantEnv: map[string]string{
+				captureConstants.NetshFilterEnvKey: "IPv4.Address=(192.168.1.1) IPv4.SourceAddress=(10.0.0.1)",
+			},
+		},
+		{
+			name: "windows target with only source/destination filter, no pod IPs",
+			captureTargetOnNode: &CaptureTargetsOnNode{
+				"winnode1": {
+					OS: "windows",
+				},
+			},
+			env: map[string]string{
+				netshSourceDestFilterHandoffKey: "IPv4.SourceAddress=(10.0.0.1) IPv4.DestinationAddress=(10.0.0.2)",
+			},
+			wantEnv: map[string]string{
+				captureConstants.NetshFilterEnvKey: "IPv4.SourceAddress=(10.0.0.1) IPv4.DestinationAddress=(10.0.0.2)",
+			},
+		},
+		{
+			name: "windows target with only pod IPs, no source/destination filter",
+			captureTargetOnNode: &CaptureTargetsOnNode{
+				"winnode1": {
+					OS:             "windows",
+					PodIpAddresses: []string{"192.168.1.1"},
+				},
+			},
+			env: map[string]string{},
+			wantEnv: map[string]string{
+				captureConstants.NetshFilterEnvKey: "IPv4.Address=(192.168.1.1)",
+			},
+		},
+		{
+			name: "linux target never receives netsh filter or the handoff key",
+			captureTargetOnNode: &CaptureTargetsOnNode{
+				"linuxnode1": {
+					OS: "linux",
+				},
+			},
+			env: map[string]string{
+				netshSourceDestFilterHandoffKey: "IPv4.SourceAddress=(10.0.0.1)",
+			},
+			wantEnv: map[string]string{},
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			k8sClient := fakeclientset.NewSimpleClientset()
+			_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
+			captureToPodTranslator := NewCaptureToPodTranslatorForTest(k8sClient)
+
+			hostPath := "capture" // nolint:goconst // Test case needs a var
+			err := captureToPodTranslator.initJobTemplate(ctx, &retinav1alpha1.Capture{
+				Spec: retinav1alpha1.CaptureSpec{
+					CaptureConfiguration: retinav1alpha1.CaptureConfiguration{},
+					OutputConfiguration: retinav1alpha1.OutputConfiguration{
+						HostPath: &hostPath,
+					},
+				},
+				Status: retinav1alpha1.CaptureStatus{
+					StartTime: &metav1.Time{Time: time.Now()},
+				},
+			}, "/tmp/"+hostPath)
+			if err != nil {
+				t.Fatalf("initJobTemplate() want no error, got error %s", err)
+			}
+
+			jobs, err := captureToPodTranslator.renderJob(tt.captureTargetOnNode, tt.env)
+			if err != nil {
+				t.Fatalf("renderJob() want no error, got error %s", err)
+			}
+			if len(jobs) != 1 {
+				t.Fatalf("renderJob() want 1 job, got %d", len(jobs))
+			}
+
+			gotEnv := map[string]string{}
+			for _, envVar := range jobs[0].Spec.Template.Spec.Containers[0].Env {
+				gotEnv[envVar.Name] = envVar.Value
+			}
+
+			if _, ok := gotEnv[netshSourceDestFilterHandoffKey]; ok {
+				t.Errorf("renderJob() must not emit the internal handoff key %q as a container env var", netshSourceDestFilterHandoffKey)
+			}
+
+			for wantKey, wantValue := range tt.wantEnv {
+				if gotEnv[wantKey] != wantValue {
+					t.Errorf("renderJob() env[%q] = %q, want %q", wantKey, gotEnv[wantKey], wantValue)
+				}
 			}
 		})
 	}
