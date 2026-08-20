@@ -1,0 +1,12 @@
+# Fast local build: copies pre-built binary (requires `cargo build --release --package retina-operator`)
+# Uses distroless base with Ubuntu libs for glibc compatibility with host-built binary.
+
+FROM ubuntu:24.04 AS libs
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+
+FROM mcr.microsoft.com/azurelinux/distroless/minimal@sha256:0801b80a0927309572b9adc99bd1813bc680473175f6e8175cd4124d95dbd50c
+COPY --from=libs /lib/x86_64-linux-gnu/ /lib/x86_64-linux-gnu/
+COPY --from=libs /lib64/ /lib64/
+COPY --from=libs /etc/ssl/certs/ /etc/ssl/certs/
+COPY target/release/retina-operator /usr/local/bin/
+ENTRYPOINT ["retina-operator"]

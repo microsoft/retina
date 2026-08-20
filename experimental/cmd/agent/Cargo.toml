@@ -1,0 +1,33 @@
+[package]
+name = "retina-agent"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+dropreason.workspace = true
+packetparser.workspace = true
+retina-core.workspace = true
+retina-proto.workspace = true
+
+anyhow.workspace = true
+backon.workspace = true
+axum.workspace = true
+hostname.workspace = true
+clap.workspace = true
+pprof.workspace = true
+prometheus-client.workspace = true
+prost-pprof = { package = "prost", version = "0.12" }
+prost-types.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+tonic.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[lints]
+workspace = true
