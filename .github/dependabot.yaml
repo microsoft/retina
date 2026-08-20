@@ -18,8 +18,11 @@ updates:
       prefix: "deps"
     labels: ["area/infra", "area/dependencies"]
     open-pull-requests-limit: 10
+    # MCR rebuilds these base images to ship CVE fixes, so a long window
+    # delays the patches. A tag that is rebuilt more often than the window
+    # never becomes eligible.
     cooldown:
-      default-days: 7
+      default-days: 2
     groups:
       golang-base:
         patterns: ["*golang*"]
@@ -44,7 +47,10 @@ updates:
     cooldown:
       default-days: 3
     groups:
+      codeql-action:
+        patterns: ["github/codeql-action*"]
       actions-patch:
+        exclude-patterns: ["github/codeql-action*"]
         update-types: ["patch"]
 
   # npm (Docusaurus site)
@@ -82,13 +88,21 @@ updates:
     cooldown:
       default-days: 7
       semver-major-days: 30
+    ignore:
+      # hive/statedb/stream versions are pinned by cilium/cilium's go.mod;
+      # they can only move when cilium/cilium moves.
+      - dependency-name: "github.com/cilium/hive"
+      - dependency-name: "github.com/cilium/statedb"
+      - dependency-name: "github.com/cilium/stream"
     groups:
       k8s:
         patterns:
           - "k8s.io/*"
           - "sigs.k8s.io/*"
+          - "helm.sh/helm/v4"
+          - "sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader"
         exclude-patterns:
-          - "sigs.k8s.io/cloud-provider-azure/*"
+          - "sigs.k8s.io/cloud-provider-azure/pkg/azclient"
         update-types: ["patch", "minor"]
       cilium:
         patterns:
@@ -106,4 +120,4 @@ updates:
       otel:
         patterns:
           - "go.opentelemetry.io/*"
-        update-types: ["patch"]
+        update-types: ["patch", "minor"]
