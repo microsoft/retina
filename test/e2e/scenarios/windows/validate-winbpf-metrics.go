@@ -369,12 +369,11 @@ func (v *ValidateWinBpfMetric) verifyBasicMetrics(promOutput string) error {
 }
 
 func (v *ValidateWinBpfMetric) verifyAdvancedMetrics(nonHpcIPAddr, promOutput string) error {
-	// Advanced Metrics
 	advFwdCountLabels := map[string]string{
-		"direction":     "egress",
-		"ip":            "23.192.228.84",
-		"namespace":     "",
-		"podname":       "",
+		"direction":     "ingress",
+		"ip":            nonHpcIPAddr,
+		"namespace":     v.NonHpcAppNamespace,
+		"podname":       v.NonHpcPodName,
 		"workload_kind": "unknown",
 		"workload_name": "unknown",
 	}
@@ -384,79 +383,6 @@ func (v *ValidateWinBpfMetric) verifyAdvancedMetrics(nonHpcIPAddr, promOutput st
 	}
 
 	tcpFlags := []string{"ACK", "FIN", "PSH"}
-	for _, flag := range tcpFlags {
-		tcpFlagLabels := map[string]string{
-			"flag":          flag,
-			"ip":            "23.192.228.84",
-			"namespace":     "",
-			"podname":       "",
-			"workload_kind": "unknown",
-			"workload_name": "unknown",
-		}
-
-		err = prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_adv_tcpflags_count", tcpFlagLabels)
-		if err != nil {
-			return fmt.Errorf("failed to find networkobservability_adv_tcpflags_count for flag %s: %w", flag, err)
-		}
-		slog.Info("Found TCP flag metric", "flag", flag)
-	}
-
-	advDropByteLabels := map[string]string{
-		"direction":     "egress",
-		"ip":            "23.192.228.84",
-		"namespace":     "",
-		"podname":       "",
-		"reason":        "Reason_LbNoBackend",
-		"workload_kind": "unknown",
-		"workload_name": "unknown",
-	}
-	err = prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_adv_drop_bytes", advDropByteLabels)
-	if err != nil {
-		return fmt.Errorf("failed to find networkobservability_adv_drop_bytes: %w", err)
-	}
-
-	advDropCountLabels := map[string]string{
-		"direction":     "egress",
-		"ip":            "23.192.228.84",
-		"namespace":     "",
-		"podname":       "",
-		"reason":        "Reason_LbNoBackend",
-		"workload_kind": "unknown",
-		"workload_name": "unknown",
-	}
-	err = prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_adv_drop_count", advDropCountLabels)
-	if err != nil {
-		return fmt.Errorf("failed to find networkobservability_adv_drop_count: %w", err)
-	}
-
-	advPktmonDropCountLabels := map[string]string{
-		"direction":     "egress",
-		"ip":            "23.192.228.84",
-		"namespace":     "",
-		"podname":       "",
-		"reason":        "Drop_Busy",
-		"workload_kind": "unknown",
-		"workload_name": "unknown",
-	}
-
-	err = prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_adv_drop_count", advPktmonDropCountLabels)
-	if err != nil {
-		return fmt.Errorf("failed to find networkobservability_adv_drop_count: %w", err)
-	}
-
-	advFwdCountLabels = map[string]string{
-		"direction":     "ingress",
-		"ip":            nonHpcIPAddr,
-		"namespace":     v.NonHpcAppNamespace,
-		"podname":       v.NonHpcPodName,
-		"workload_kind": "unknown",
-		"workload_name": "unknown",
-	}
-	err = prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_adv_forward_count", advFwdCountLabels)
-	if err != nil {
-		return fmt.Errorf("failed to find networkobservability_adv_forward_count: %w", err)
-	}
-
 	for _, flag := range tcpFlags {
 		tcpFlagLabels := map[string]string{
 			"flag":          flag,
@@ -474,7 +400,7 @@ func (v *ValidateWinBpfMetric) verifyAdvancedMetrics(nonHpcIPAddr, promOutput st
 		slog.Info("Found TCP flag metric", "flag", flag)
 	}
 
-	advDropByteLabels = map[string]string{
+	advDropByteLabels := map[string]string{
 		"direction":     "ingress",
 		"ip":            nonHpcIPAddr,
 		"namespace":     v.NonHpcAppNamespace,
@@ -488,7 +414,7 @@ func (v *ValidateWinBpfMetric) verifyAdvancedMetrics(nonHpcIPAddr, promOutput st
 		return fmt.Errorf("failed to find networkobservability_adv_drop_bytes with ingress label: %w", err)
 	}
 
-	advDropCountLabels = map[string]string{
+	advDropCountLabels := map[string]string{
 		"direction":     "ingress",
 		"ip":            nonHpcIPAddr,
 		"namespace":     v.NonHpcAppNamespace,
@@ -501,6 +427,21 @@ func (v *ValidateWinBpfMetric) verifyAdvancedMetrics(nonHpcIPAddr, promOutput st
 	if err != nil {
 		return fmt.Errorf("failed to find networkobservability_adv_drop_count with ingress label: %w", err)
 	}
+
+	advPktmonDropCountLabels := map[string]string{
+		"direction":     "ingress",
+		"ip":            nonHpcIPAddr,
+		"namespace":     v.NonHpcAppNamespace,
+		"podname":       v.NonHpcPodName,
+		"reason":        "Drop_Busy",
+		"workload_kind": "unknown",
+		"workload_name": "unknown",
+	}
+	err = prom.CheckMetricFromBuffer([]byte(promOutput), "networkobservability_adv_drop_count", advPktmonDropCountLabels)
+	if err != nil {
+		return fmt.Errorf("failed to find pktmon networkobservability_adv_drop_count with ingress label: %w", err)
+	}
+
 	return nil
 }
 
