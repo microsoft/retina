@@ -554,7 +554,7 @@ hubble:
       # -- Hostnames for this GRPCRoute.
       hostnames:
         - chart-example.local
-      # -- Backend port number. Defaults to the service port (80 for plain, 443 for TLS).
+      # -- Backend port number. Defaults to hubble.relay.servicePort, or 80 when unset.
       port: ~
 
     # -- Backend traffic policy for the Hubble Relay GRPCRoute.
