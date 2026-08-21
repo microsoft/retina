@@ -27,6 +27,9 @@ spec:
         control-plane: retina-operator
         app.kubernetes.io/name: retina-operator
         app.kubernetes.io/instance: {{ .Release.Name }}
+        {{- with .Values.operator.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
