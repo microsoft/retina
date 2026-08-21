@@ -1,9 +1,9 @@
-{{- if and (or .Values.hubble.enabled .Values.hubble.relay.standalone.enabled) .Values.hubble.relay.enabled .Values.hubble.relay.grpcRoute.enabled .Values.hubble.relay.backendTrafficPolicy.enabled }}
+{{- if and .Values.hubble.enabled .Values.hubble.relay.enabled .Values.hubble.relay.grpcRoute.enabled .Values.hubble.relay.backendTrafficPolicy.enabled }}
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: BackendTrafficPolicy
 metadata:
   name: hubble-relay
-  namespace: {{ .Values.namespace }}
+  namespace: {{ .Release.Namespace }}
 spec:
   targetRefs:
     - group: gateway.networking.k8s.io

@@ -540,7 +540,7 @@ hubble:
       appProtocol: "grpc"
 
     # -- hubble-relay GRPCRoute configuration (Gateway API).
-    # Requires Kubernetes 1.26+ or Gateway API CRDs to be pre-installed.
+    # Requires compatible Gateway API CRDs with GRPCRoute v1 support to be pre-installed.
     grpcRoute:
       enabled: false
       annotations: {}
