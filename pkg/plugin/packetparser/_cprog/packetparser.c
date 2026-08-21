@@ -28,6 +28,31 @@ struct
 #endif
 } retina_packetparser_events SEC(".maps");
 
+// Counts events dropped in the kernel when the event buffer write fails.
+struct
+{
+	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+	__uint(max_entries, 1);
+	__type(key, __u32);
+	__type(value, __u64);
+} retina_packetparser_metrics SEC(".maps");
+
+static __always_inline void submit_packetparser_event(struct __sk_buff *skb, struct packet *p)
+{
+	long ret;
+#ifdef USE_RING_BUFFER
+	ret = bpf_ringbuf_output(&retina_packetparser_events, p, sizeof(*p), 0);
+#else
+	ret = bpf_perf_event_output(skb, &retina_packetparser_events, BPF_F_CURRENT_CPU, p, sizeof(*p));
+#endif
+	if (ret < 0) {
+		__u32 zero = 0;
+		__u64 *dropped = bpf_map_lookup_elem(&retina_packetparser_metrics, &zero);
+		if (dropped)
+			*dropped += 1;
+	}
+}
+
 // Define const variables to avoid warnings.
 const struct packet *unused __attribute__((unused));
 
@@ -239,11 +264,7 @@ static void parse(struct __sk_buff *skb, __u8 obs)
 		p.previously_observed_packets = 0;
 		p.previously_observed_bytes = 0;
 		__builtin_memset(&p.previously_observed_flags, 0, sizeof(struct tcpflagscount));
-#ifdef USE_RING_BUFFER
-		bpf_ringbuf_output(&retina_packetparser_events, &p, sizeof(p), 0);
-#else
-		bpf_perf_event_output(skb, &retina_packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
-#endif
+		submit_packetparser_event(skb, &p);
 		return;
 	// If the data aggregation level is high, only send the packet to the perf buffer if it needs to be reported.
 	#elif DATA_AGGREGATION_LEVEL == DATA_AGGREGATION_LEVEL_HIGH
@@ -251,11 +272,7 @@ static void parse(struct __sk_buff *skb, __u8 obs)
 			p.previously_observed_packets = report.previously_observed_packets;
 			p.previously_observed_bytes = report.previously_observed_bytes;
 			p.previously_observed_flags = report.previously_observed_flags;
-#ifdef USE_RING_BUFFER
-			bpf_ringbuf_output(&retina_packetparser_events, &p, sizeof(p), 0);
-#else
-			bpf_perf_event_output(skb, &retina_packetparser_events, BPF_F_CURRENT_CPU, &p, sizeof(p));
-#endif
+			submit_packetparser_event(skb, &p);
 		}
 	#endif
 	#endif
