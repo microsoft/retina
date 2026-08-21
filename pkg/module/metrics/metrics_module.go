@@ -294,8 +294,9 @@ func (m *Module) run(newCtx context.Context) {
 				m.RLock()
 				f := ev.Event.(*flow.Flow)
 				m.l.Debug("converted flow object", zap.Any("flow l4", f.IP))
+				ext := utils.GetExtensionsStruct(f)
 				for _, metricObj := range m.registry {
-					metricObj.ProcessFlow(f)
+					metricObj.ProcessFlow(f, ext)
 				}
 				m.RUnlock()
 			case *flow.LostEvent:

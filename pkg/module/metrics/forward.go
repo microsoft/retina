@@ -16,6 +16,7 @@ import (
 	metricsinit "github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/utils"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 const (
@@ -100,7 +101,7 @@ func (f *ForwardMetrics) Clean() {
 
 // TODO: update ProcessFlow with bytes metrics. We are only accounting for count.
 // bytes metrics needs some additional work in ebpf and in this func to get the skb length
-func (f *ForwardMetrics) ProcessFlow(flow *v1.Flow) {
+func (f *ForwardMetrics) ProcessFlow(flow *v1.Flow, ext *structpb.Struct) {
 	// Flow does not have bytes section at the moment,
 	// so we will update only packet count
 	if flow == nil {
@@ -114,7 +115,7 @@ func (f *ForwardMetrics) ProcessFlow(flow *v1.Flow) {
 	if f.isLocalContext() {
 		// when localcontext is enabled, we do not need the context options for both src and dst
 		// metrics aggregation will be on a single pod basis and not the src/dst pod combination basis.
-		f.processLocalCtxFlow(flow)
+		f.processLocalCtxFlow(flow, ext)
 		return
 	}
 
@@ -123,7 +124,7 @@ func (f *ForwardMetrics) ProcessFlow(flow *v1.Flow) {
 	}
 
 	if !f.isAdvanced() {
-		f.update(flow, labels)
+		f.update(ext, labels)
 		return
 	}
 
@@ -145,11 +146,11 @@ func (f *ForwardMetrics) ProcessFlow(flow *v1.Flow) {
 		labels = append(labels, strconv.FormatBool(flow.GetIsReply().GetValue()))
 	}
 
-	f.update(flow, labels)
+	f.update(ext, labels)
 	f.getLogger().Debug("forward count metric is added", zap.Any("labels", labels))
 }
 
-func (f *ForwardMetrics) processLocalCtxFlow(flow *v1.Flow) {
+func (f *ForwardMetrics) processLocalCtxFlow(flow *v1.Flow, ext *structpb.Struct) {
 	labelValuesMap := f.sourceCtx().getLocalCtxValues(flow)
 	if labelValuesMap == nil {
 		return
@@ -157,14 +158,14 @@ func (f *ForwardMetrics) processLocalCtxFlow(flow *v1.Flow) {
 	// Ingress values.
 	if len(labelValuesMap[ingress]) > 0 {
 		labels := append([]string{ingress}, labelValuesMap[ingress]...)
-		f.update(flow, labels)
+		f.update(ext, labels)
 		f.getLogger().Debug("forward count metric in INGRESS in local ctx", zap.Any("labels", labels))
 	}
 
 	// Egress values.
 	if len(labelValuesMap[egress]) > 0 {
 		labels := append([]string{egress}, labelValuesMap[egress]...)
-		f.update(flow, labels)
+		f.update(ext, labels)
 		f.getLogger().Debug("forward count metric in EGRESS in local ctx", zap.Any("labels", labels))
 	}
 }
@@ -180,15 +181,15 @@ func (f *ForwardMetrics) expire(labels []string) bool {
 	return d
 }
 
-func (f *ForwardMetrics) update(fl *v1.Flow, labels []string) {
+func (f *ForwardMetrics) update(ext *structpb.Struct, labels []string) {
 	var updated bool
 	switch f.metricName {
 	case utils.ForwardPacketsGaugeName:
 		updated = true
-		f.forwardMetric.WithLabelValues(labels...).Add(float64(utils.PreviouslyObservedPackets(fl) + 1))
+		f.forwardMetric.WithLabelValues(labels...).Add(float64(utils.PreviouslyObservedPacketsFromStruct(ext) + 1))
 	case utils.ForwardBytesGaugeName:
 		updated = true
-		f.forwardMetric.WithLabelValues(labels...).Add(float64(utils.PacketSize(fl) + utils.PreviouslyObservedBytes(fl)))
+		f.forwardMetric.WithLabelValues(labels...).Add(float64(utils.PacketSizeFromStruct(ext) + utils.PreviouslyObservedBytesFromStruct(ext)))
 	}
 	if updated {
 		f.updated(labels)

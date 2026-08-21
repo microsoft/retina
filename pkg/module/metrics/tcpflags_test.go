@@ -8,15 +8,17 @@ import (
 	"testing"
 	"time"
 
+	"log/slog"
+
 	"github.com/cilium/cilium/api/v1/flow"
 	"github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/pkg/log"
 	metricsinit "github.com/microsoft/retina/pkg/metrics"
+	"github.com/microsoft/retina/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
-	"log/slog"
 )
 
 func TestNewTCPMetrics(t *testing.T) {
@@ -499,7 +501,7 @@ func TestNewTCPMetrics(t *testing.T) {
 		assert.Equal(t, tc.checkIsAdvance, tcp.isAdvanced(), "IsAdvance should be %v Test Name: %s", tc.checkIsAdvance, tc.name)
 		assert.Equal(t, tc.exepectedLabels, tcp.getLabels(), "labels should be %v Test Name: %s", tc.exepectedLabels, tc.name)
 
-		tcp.ProcessFlow(tc.f)
+		tcp.ProcessFlow(tc.f, utils.GetExtensionsStruct(tc.f))
 
 		assert.Equal(t, 0, len(tcp.trackedMetricLabels()), "there should be no tracked metrics when TTL is infinite Test Name: %s", tc.name)
 
@@ -512,7 +514,7 @@ func TestNewTCPMetrics(t *testing.T) {
 
 		tcpFlagMockMetrics.EXPECT().WithLabelValues(gomock.Any()).Return(testmetric).Times(tc.metricCall)
 
-		tcp.ProcessFlow(tc.f)
+		tcp.ProcessFlow(tc.f, utils.GetExtensionsStruct(tc.f))
 
 		tcpFlagMockMetrics.EXPECT().DeleteLabelValues(gomock.Any()).Return(true).Times(tc.trackedMetrics)
 

@@ -140,8 +140,8 @@ func TestProcessFlow(t *testing.T) {
 		PodName: "kubernetes-apiserver",
 	}
 	// Process flow.
-	lm.ProcessFlow(f1)
-	lm.ProcessFlow(f2)
+	lm.ProcessFlow(f1, utils.GetExtensionsStruct(f1))
+	lm.ProcessFlow(f2, utils.GetExtensionsStruct(f2))
 
 	/*
 	 * Test case 2: Existing TCP connection.
@@ -151,13 +151,13 @@ func TestProcessFlow(t *testing.T) {
 	// Api server -> Node.
 	utils.AddTCPFlags(f2, 0, 1, 0, 0, 0, 0, 0, 0, 0)
 	// Process flow.
-	lm.ProcessFlow(f1)
-	lm.ProcessFlow(f2)
+	lm.ProcessFlow(f1, utils.GetExtensionsStruct(f1))
+	lm.ProcessFlow(f2, utils.GetExtensionsStruct(f2))
 
 	/*
 	 * Test case 3: No reply from apiserver.
 	 */
-	lm.ProcessFlow(f1)
+	lm.ProcessFlow(f1, utils.GetExtensionsStruct(f1))
 	// Sleep for TTL.
 	time.Sleep(1 * time.Second)
 	// Check dropped packet.
