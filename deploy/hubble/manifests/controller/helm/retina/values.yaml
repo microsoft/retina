@@ -537,7 +537,11 @@ hubble:
       # by being built into the Service API and offering more predictable routing behavior.
       # See https://kubernetes.io/docs/concepts/services-networking/service/#traffic-distribution
       trafficDistribution: ""
-      appProtocol: "grpc"
+      # -- Override the Service port's appProtocol. When hubble.relay.tls.server.enabled is false,
+      # this defaults to the Gateway API standard "kubernetes.io/h2c" (cleartext HTTP/2) regardless
+      # of this value. When TLS is enabled, there is no standardized appProtocol for HTTP/2-over-TLS,
+      # so this value (if set) is used as-is; otherwise appProtocol is left unset.
+      appProtocol: ""
 
     # -- hubble-relay GRPCRoute configuration (Gateway API).
     # Requires compatible Gateway API CRDs with GRPCRoute v1 support to be pre-installed.

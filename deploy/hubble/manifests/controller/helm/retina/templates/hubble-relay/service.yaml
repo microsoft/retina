@@ -31,7 +31,9 @@ spec:
     {{- if and (eq "NodePort" .Values.hubble.relay.service.type) .Values.hubble.relay.service.nodePort }}
     nodePort: {{ .Values.hubble.relay.service.nodePort }}
     {{- end }}
-    {{- with .Values.hubble.relay.service.appProtocol }}
-    appProtocol: {{ . }}
+    {{- if not .Values.hubble.relay.tls.server.enabled }}
+    appProtocol: kubernetes.io/h2c
+    {{- else if .Values.hubble.relay.service.appProtocol }}
+    appProtocol: {{ .Values.hubble.relay.service.appProtocol }}
     {{- end }}
 {{- end }}
