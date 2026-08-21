@@ -537,6 +537,37 @@ hubble:
       # by being built into the Service API and offering more predictable routing behavior.
       # See https://kubernetes.io/docs/concepts/services-networking/service/#traffic-distribution
       trafficDistribution: ""
+      # -- Override the Service port's appProtocol. When hubble.relay.tls.server.enabled is false,
+      # this defaults to the Gateway API standard "kubernetes.io/h2c" (cleartext HTTP/2) regardless
+      # of this value. When TLS is enabled, there is no standardized appProtocol for HTTP/2-over-TLS,
+      # so this value (if set) is used as-is; otherwise appProtocol is left unset.
+      appProtocol: ""
+
+    # -- hubble-relay GRPCRoute configuration (Gateway API).
+    # Requires compatible Gateway API CRDs with GRPCRoute v1 support to be pre-installed.
+    # Note: grpcRoute does not currently support TLS/mTLS backends; hubble.relay.tls.server.enabled must be false to enable grpcRoute.
+    grpcRoute:
+      enabled: false
+      annotations: {}
+      labels: {}
+      # -- Parent Gateways that this route is attached to.
+      parentRefs:
+        - name: example-gateway
+          namespace: default
+          sectionName: example-listener
+      # -- Hostnames for this GRPCRoute.
+      hostnames:
+        - chart-example.local
+      # -- Backend port number. Defaults to hubble.relay.servicePort, or 80 when unset.
+      port: ~
+
+    # -- Backend traffic policy for the Hubble Relay GRPCRoute.
+    # Renders an Envoy Gateway gateway.envoyproxy.io/v1alpha1 BackendTrafficPolicy, so this requires
+    # the Envoy Gateway BackendTrafficPolicy CRD to be installed; standard Gateway API CRDs alone
+    # are not sufficient and enabling this on other implementations will fail.
+    backendTrafficPolicy:
+      enabled: false
+      spec: {}
 
     # -- Host to listen to. Specify an empty string to bind to all the interfaces.
     listenHost: ""
