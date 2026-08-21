@@ -41,6 +41,7 @@ var (
 	errInvalidTraceNotifySize  = errors.New("invalid size for TraceNotify")
 	errNilTraceNotifyFlow      = errors.New("tracenotify flow object is nil")
 	isCiliumOnWindowsEnabled   = plugincommon.IsCiliumOnWindowsEnabled
+	pullMetricsAndEventsFn     = (*Plugin).pullMetricsAndEvents
 )
 
 // Plugin is the ebpfwindows plugin
@@ -101,7 +102,7 @@ func (p *Plugin) Start(ctx context.Context) error {
 	}
 
 	p.l.Info("Cilium is enabled on Windows, proceeding with ebpfWindows plugin initialization")
-	p.pullMetricsAndEvents(ctx)
+	pullMetricsAndEventsFn(p, ctx)
 	p.l.Info("Complete ebpfWindows plugin...")
 	return nil
 }

@@ -49,6 +49,10 @@ func init() {
 	registry.Add(name, New)
 }
 
+// isCiliumOnWindowsEnabled is an injection seam for tests: hnsstats only collects stats
+// when Cilium on Windows is disabled.
+var isCiliumOnWindowsEnabled = plugincommon.IsCiliumOnWindowsEnabled
+
 func New(cfg *kcfg.Config) registry.Plugin {
 	return &hnsstats{
 		cfg: cfg,
@@ -215,7 +219,7 @@ func (h *hnsstats) Start(ctx context.Context) error {
 
 	h.state = start
 
-	ciliumEnabled, err := plugincommon.IsCiliumOnWindowsEnabled()
+	ciliumEnabled, err := isCiliumOnWindowsEnabled()
 	if err != nil {
 		h.l.Error("Error while checking if Cilium is enabled on Windows", zap.Error(err))
 		return fmt.Errorf("failed to check if Cilium is enabled on Windows: %w", err)
