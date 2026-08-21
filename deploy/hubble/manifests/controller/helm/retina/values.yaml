@@ -541,6 +541,7 @@ hubble:
 
     # -- hubble-relay GRPCRoute configuration (Gateway API).
     # Requires compatible Gateway API CRDs with GRPCRoute v1 support to be pre-installed.
+    # Note: grpcRoute does not currently support TLS/mTLS backends; hubble.relay.tls.server.enabled must be false to enable grpcRoute.
     grpcRoute:
       enabled: false
       annotations: {}

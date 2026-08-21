@@ -1,4 +1,7 @@
 {{- if and .Values.hubble.enabled .Values.hubble.relay.enabled .Values.hubble.relay.grpcRoute.enabled }}
+{{- if .Values.hubble.relay.tls.server.enabled }}
+{{- fail "hubble.relay.grpcRoute does not support TLS/mTLS backends yet; set hubble.relay.tls.server.enabled=false to use grpcRoute, or disable grpcRoute.enabled" }}
+{{- end }}
 {{- $port := .Values.hubble.relay.grpcRoute.port | default .Values.hubble.relay.servicePort | default (.Values.hubble.relay.tls.server.enabled | ternary 443 80) -}}
 apiVersion: gateway.networking.k8s.io/v1
 kind: GRPCRoute
