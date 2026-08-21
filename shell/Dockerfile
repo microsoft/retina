@@ -18,7 +18,9 @@ RUN set -eux; \
     # GOEXPERIMENT=none disables the Microsoft Go OpenSSL crypto backend,
     # which dlopens libcrypto at startup and crashes inside a statically
     # linked binary. pwru does not need FIPS crypto.
-    GOEXPERIMENT=none make TARGET_GOARCH="$GOARCH" LIBPCAP_ARCH="$LIBPCAP_ARCH"; \
+    # CC=clang: the ADO pipeline builds arm64 under QEMU, and gcc cc1
+    # crashes there with an internal compiler error. clang does not.
+    GOEXPERIMENT=none CC=clang make TARGET_GOARCH="$GOARCH" LIBPCAP_ARCH="$LIBPCAP_ARCH"; \
     file pwru | grep -q 'ELF'; \
     # the binary must start; a broken crypto backend or link crashes here
     ./pwru --version
