@@ -17,9 +17,10 @@ os:
 operator:
   enabled: true
   replicas: 1
-  repository: acndev.azurecr.io/retina-operator
+  repository: ghcr.io/microsoft/retina/retina-operator
   pullPolicy: Always
-  tag: "latest"
+  # -- Image tag; when empty, defaults to the chart version (the released version).
+  tag: ""
   leaderElection: true
   identityGCInterval: 15m # cilium default
   endpointGCInterval: 5m  # cilium default
@@ -41,14 +42,14 @@ agent:
   leaderElection: false
   enabled: true
   name: retina-agent
-  repository: acndev.azurecr.io/retina-agent
-  tag: "latest"
+  repository: ghcr.io/microsoft/retina/retina-agent
+  tag: ""
   init:
     enabled: true
     name: retina-agent-init
     repository: ghcr.io/microsoft/retina/retina-init
 
-    tag: "latest"
+    tag: ""
   pullPolicy: Always
   container:
     retina:
