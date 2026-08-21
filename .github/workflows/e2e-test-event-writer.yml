@@ -25,7 +25,7 @@ jobs:
     runs-on: windows-2022
 
     env:
-      IS_MERGE_GROUP: ${{ (github.event_name == 'merge_group') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev/v0.0.33-windows' && github.repository == 'microsoft/retina') }}
+      PUBLISH_TO_ACR: ${{ github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' }}
 
     strategy:
       matrix:
@@ -38,7 +38,7 @@ jobs:
 
       - name: Azure Login
         uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
-        if: ${{ env.IS_MERGE_GROUP == 'true' }}
+        if: ${{ env.PUBLISH_TO_ACR == 'true' }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -65,13 +65,13 @@ jobs:
           throw "Docker daemon failed to start within $timeout seconds"
 
       - name: Docker Login to ACR
-        if: ${{ env.IS_MERGE_GROUP == 'true' }}
+        if: ${{ env.PUBLISH_TO_ACR == 'true' }}
         shell: pwsh
         run: az acr login --name "${{ vars.ACR_NAME }}"
 
       - name: Docker Login to ghcr.io
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
-        if: ${{ env.IS_MERGE_GROUP != 'true' }}
+        if: ${{ env.PUBLISH_TO_ACR != 'true' }}
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -129,8 +129,8 @@ jobs:
         shell: pwsh
         working-directory: ${{ env.EVENT_WRITER_PATH }}
         run: |
-          $isMergeGroup = "${{ env.IS_MERGE_GROUP }}" -eq "true"
-          if (-not $isMergeGroup) {
+          $publishToAcr = "${{ env.PUBLISH_TO_ACR }}" -eq "true"
+          if (-not $publishToAcr) {
               $image = "ghcr.io/${{ github.repository }}/test/e2e-test-event-writer".ToLower()
           } else {
               $image = "${{ vars.ACR_NAME }}/${{ github.repository }}/test/e2e-test-event-writer".ToLower()
