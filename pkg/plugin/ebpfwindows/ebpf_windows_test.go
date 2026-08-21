@@ -29,6 +29,7 @@ import (
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
+	"github.com/microsoft/retina/pkg/managers/filtermanager"
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus/testutil"
@@ -285,12 +286,10 @@ type flowExpectations struct {
 	traceReason      flow.TraceReason
 	isReply          *bool // nil means the flow must not report reply information
 	packetSize       uint32
-	srcIdentity      uint32
-	dstIdentity      uint32
 }
 
 // CheckFlowSemantics asserts the verdict, event type/subtype, drop reason, observation point,
-// traffic direction, packet size extension and endpoint metadata of a decoded flow.
+// traffic direction, packet size extension and endpoint ownership of a decoded flow.
 func CheckFlowSemantics(fl *flow.Flow, t *testing.T, exp flowExpectations) {
 	t.Helper()
 
@@ -339,15 +338,81 @@ func CheckFlowSemantics(fl *flow.Flow, t *testing.T, exp flowExpectations) {
 		t.Errorf("expected packet size %d, got %d", exp.packetSize, got)
 	}
 
-	if fl.GetSource() == nil {
-		t.Error("expected a source endpoint, got nil")
-	} else if got := fl.GetSource().GetIdentity(); got != exp.srcIdentity {
-		t.Errorf("expected source identity %d, got %d", exp.srcIdentity, got)
+	if fl.GetSource() != nil {
+		t.Errorf("expected source endpoint to remain nil before enrichment, got %v", fl.GetSource())
 	}
-	if fl.GetDestination() == nil {
-		t.Error("expected a destination endpoint, got nil")
-	} else if got := fl.GetDestination().GetIdentity(); got != exp.dstIdentity {
-		t.Errorf("expected destination identity %d, got %d", exp.dstIdentity, got)
+	if fl.GetDestination() != nil {
+		t.Errorf("expected destination endpoint to remain nil before enrichment, got %v", fl.GetDestination())
+	}
+}
+
+func TestEmitAdvancedEvent(t *testing.T) {
+	const (
+		sourceIP      = "10.0.0.1"
+		destinationIP = "10.0.0.2"
+	)
+
+	tests := []struct {
+		name                string
+		remoteContext       bool
+		sourceSelected      bool
+		destinationSelected bool
+		wantWrite           bool
+	}{
+		{
+			name:           "local selected source",
+			sourceSelected: true,
+			wantWrite:      true,
+		},
+		{
+			name:                "local selected destination",
+			destinationSelected: true,
+			wantWrite:           true,
+		},
+		{
+			name: "local neither selected",
+		},
+		{
+			name:          "remote neither selected",
+			remoteContext: true,
+			wantWrite:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			mockFilterManager := filtermanager.NewMockIFilterManager(ctrl)
+			mockEnricher := enricher.NewMockEnricherInterface(ctrl)
+			event := &v1.Event{
+				Event: &flow.Flow{
+					IP: &flow.IP{
+						Source:      sourceIP,
+						Destination: destinationIP,
+					},
+				},
+			}
+
+			if !tt.remoteContext {
+				mockFilterManager.EXPECT().HasIP(net.ParseIP(sourceIP)).Return(tt.sourceSelected)
+				if !tt.sourceSelected {
+					mockFilterManager.EXPECT().HasIP(net.ParseIP(destinationIP)).Return(tt.destinationSelected)
+				}
+			}
+			if tt.wantWrite {
+				mockEnricher.EXPECT().Write(event).Return(nil)
+			}
+
+			p := &Plugin{
+				cfg: &kcfg.Config{
+					RemoteContext: tt.remoteContext,
+				},
+				enricher:      mockEnricher,
+				filterManager: mockFilterManager,
+			}
+
+			p.emitAdvancedEvent(event)
+		})
 	}
 }
 
@@ -382,9 +447,7 @@ func TestHandleTraceEvent_TraceNotify(t *testing.T) {
 				traceReason:      flow.TraceReason_REPLY,
 				isReply:          &testIsReplyTrue,
 				//nolint:gosec // ignore G115 -- packet length is within uint32 bounds in test context
-				packetSize:  uint32(len(packet)),
-				srcIdentity: testSrcIdentity,
-				dstIdentity: testDstIdentity,
+				packetSize: uint32(len(packet)),
 			})
 			return nil
 		})
@@ -397,6 +460,7 @@ func TestHandleTraceEvent_TraceNotify(t *testing.T) {
 		cfg: &kcfg.Config{
 			MetricsInterval: 100 * time.Second,
 			EnablePodLevel:  true,
+			RemoteContext:   true,
 		},
 		l: log.Logger().Named("test-ebpf"),
 	}
@@ -463,9 +527,7 @@ func TestHandleTraceEvent_DropNotify(t *testing.T) {
 				trafficDirection: flow.TrafficDirection_TRAFFIC_DIRECTION_UNKNOWN,
 				traceReason:      flow.TraceReason_TRACE_REASON_UNKNOWN,
 				//nolint:gosec // ignore G115 -- packet length is within uint32 bounds in test context
-				packetSize:  uint32(len(packet)),
-				srcIdentity: testSrcIdentity,
-				dstIdentity: testDstIdentity,
+				packetSize: uint32(len(packet)),
 			})
 			return nil
 		})
@@ -479,6 +541,7 @@ func TestHandleTraceEvent_DropNotify(t *testing.T) {
 		cfg: &kcfg.Config{
 			MetricsInterval: 100 * time.Second,
 			EnablePodLevel:  true,
+			RemoteContext:   true,
 		},
 		l: log.Logger().Named("test-ebpf"),
 	}
@@ -1114,6 +1177,7 @@ func TestHandleTraceEventWithEthPacket_PktmonDropNotify(t *testing.T) {
 		cfg: &kcfg.Config{
 			MetricsInterval: 100 * time.Second,
 			EnablePodLevel:  true,
+			RemoteContext:   true,
 		},
 		l: log.Logger().Named("test-ebpf"),
 	}
@@ -1202,6 +1266,7 @@ func TestHandleTraceEventWithIpPacket_PktmonDropNotify(t *testing.T) {
 		cfg: &kcfg.Config{
 			MetricsInterval: 100 * time.Second,
 			EnablePodLevel:  true,
+			RemoteContext:   true,
 		},
 		l: log.Logger().Named("test-ebpf"),
 	}
@@ -1292,6 +1357,7 @@ func TestHandleTraceEventWithIPv6Packet_PktmonDropNotify(t *testing.T) {
 		cfg: &kcfg.Config{
 			MetricsInterval: 100 * time.Second,
 			EnablePodLevel:  true,
+			RemoteContext:   true,
 		},
 		l: log.Logger().Named("test-ebpf"),
 	}
@@ -1382,6 +1448,7 @@ func TestHandleTraceEventWithUDPPacket_PktmonDropNotify(t *testing.T) {
 		cfg: &kcfg.Config{
 			MetricsInterval: 100 * time.Second,
 			EnablePodLevel:  true,
+			RemoteContext:   true,
 		},
 		l: log.Logger().Named("test-ebpf"),
 	}

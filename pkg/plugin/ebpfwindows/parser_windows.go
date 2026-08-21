@@ -49,9 +49,8 @@ const (
 
 // Parser is a parser for L3/L4 payloads
 type Parser struct {
-	log        *slog.Logger
-	epResolver *EndpointResolver
-	packet     *packet
+	log    *slog.Logger
+	packet *packet
 }
 
 var (
@@ -104,9 +103,8 @@ func NewParser(
 	packet.decLayerL3Dev.IPv6.IgnoreUnsupported = true
 
 	return &Parser{
-		log:        log,
-		epResolver: NewEndpointResolver(log),
-		packet:     packet,
+		log:    log,
+		packet: packet,
 	}, nil
 }
 
@@ -280,13 +278,12 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error { //nolint:gocyclo 
 	}
 
 	decodedpacket := decodeLayers(p.packet)
-	srcIP := decodedpacket.SourceIP
 	ip := decodedpacket.IP
 
 	if tn != nil && decodedpacket.IP != nil {
 		if !tn.OriginalIP().IsUnspecified() {
 			// Ignore invalid IP - getters will handle invalid value.
-			srcIP, _ = netipx.FromStdIP(tn.OriginalIP())
+			srcIP, _ := netipx.FromStdIP(tn.OriginalIP())
 			// On SNAT the trace notification has OrigIP set to the pre
 			// translation IP and the source IP parsed from the header is the
 			// post translation IP. The check is here because sometimes we get
@@ -300,17 +297,6 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error { //nolint:gocyclo 
 
 		ip.Encrypted = tn.IsEncrypted()
 	}
-
-	srcLabelID, dstLabelID := decodeSecurityIdentities(dn, tn)
-	datapathContext := DatapathContext{
-		SrcIP:                 srcIP,
-		SrcLabelID:            srcLabelID,
-		DstIP:                 decodedpacket.DestinationIP,
-		DstLabelID:            dstLabelID,
-		TraceObservationPoint: decoded.GetTraceObservationPoint(),
-	}
-	srcEndpoint := p.epResolver.ResolveEndpoint(srcIP, srcLabelID, datapathContext)
-	dstEndpoint := p.epResolver.ResolveEndpoint(decodedpacket.DestinationIP, dstLabelID, datapathContext)
 
 	decoded.Verdict = decodeVerdict(dn, tn, pdn)
 	decoded.AuthType = authType
@@ -326,8 +312,6 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error { //nolint:gocyclo 
 	decoded.Ethernet = decodedpacket.Ethernet
 	decoded.IP = decodedpacket.IP
 	decoded.L4 = decodedpacket.L4
-	decoded.Source = srcEndpoint
-	decoded.Destination = dstEndpoint
 	decoded.Type = pb.FlowType_L3_L4
 	decoded.L7 = nil
 	decoded.IsReply = decodeIsReply(tn)
@@ -565,21 +549,6 @@ func decodeTraceReason(tn *TraceNotify) pb.TraceReason {
 	default:
 		return pb.TraceReason(tn.TraceReason())
 	}
-}
-
-func decodeSecurityIdentities(dn *DropNotify, tn *TraceNotify) (
-	sourceSecurityIdentiy, destinationSecurityIdentity uint32,
-) {
-	switch {
-	case dn != nil:
-		sourceSecurityIdentiy = uint32(dn.SrcLabel)
-		destinationSecurityIdentity = uint32(dn.DstLabel)
-	case tn != nil:
-		sourceSecurityIdentiy = uint32(tn.SrcLabel)
-		destinationSecurityIdentity = uint32(tn.DstLabel)
-	}
-
-	return
 }
 
 func getTCPFlags(tcp layers.TCP) string {

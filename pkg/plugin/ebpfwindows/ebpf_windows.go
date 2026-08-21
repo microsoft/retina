@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"strings"
 	"time"
@@ -18,6 +19,7 @@ import (
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
+	"github.com/microsoft/retina/pkg/managers/filtermanager"
 	metrics "github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin/registry"
 	"github.com/microsoft/retina/pkg/utils"
@@ -49,6 +51,7 @@ type Plugin struct {
 	l               *log.ZapLogger
 	cfg             *kcfg.Config
 	enricher        enricher.EnricherInterface
+	filterManager   filtermanager.IFilterManager
 	externalChannel chan *v1.Event
 	parser          *Parser
 }
@@ -64,7 +67,7 @@ func New(cfg *kcfg.Config) registry.Plugin {
 	}
 }
 
-// Init is a no-op for the ebpfwindows plugin
+// Init initializes the parser and filter manager.
 func (p *Plugin) Init() error {
 	parser, err := NewParser(slog.Default().With("WindowsEbpf", "parser"))
 	if err != nil {
@@ -73,6 +76,13 @@ func (p *Plugin) Init() error {
 	}
 
 	p.parser = parser
+
+	if p.filterManager == nil {
+		p.filterManager, err = filtermanager.Init(5, p.cfg.FilterMapMaxEntries) //nolint:gomnd // matches the daemon default
+		if err != nil {
+			return fmt.Errorf("failed to initialize filter manager: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -162,6 +172,19 @@ func (p *Plugin) eventsMapCallback(data unsafe.Pointer, size uint32) {
 	if err != nil {
 		p.l.Error("Error handling trace event", zap.Error(err))
 	}
+}
+
+func (p *Plugin) emitAdvancedEvent(e *v1.Event) {
+	if !p.cfg.RemoteContext {
+		fl := e.GetFlow()
+		srcIP := net.ParseIP(fl.GetIP().GetSource())
+		dstIP := net.ParseIP(fl.GetIP().GetDestination())
+		if !p.filterManager.HasIP(srcIP) && !p.filterManager.HasIP(dstIP) {
+			return
+		}
+	}
+
+	p.enricher.Write(e)
 }
 
 func (p *Plugin) addEbpfToPath() error {
@@ -295,7 +318,7 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 		eventType := fl.GetEventType().GetSubType()
 		utils.AddDropReason(fl, ext, uint16(eventType)) //nolint:gosec // eventType values are bounded drop reason codes that fit in uint16
 		utils.SetExtensions(fl, ext)
-		p.enricher.Write(e)
+		p.emitAdvancedEvent(e)
 	case monitorAPI.MessageTypeTrace:
 		e := &v1.Event{}
 		if size <= uint32(unsafe.Sizeof(TraceNotify{})) {
@@ -319,7 +342,7 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 			return fmt.Errorf("%w; perfdata: %v;", errNilDropNotifyEvent, perfData)
 		}
 		utils.SetExtensions(fl, ext)
-		p.enricher.Write(e)
+		p.emitAdvancedEvent(e)
 
 	case MessageTypePktmonDrop:
 		if size <= dropPktmonNotifyV1Len {
@@ -350,7 +373,7 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 		eventType := fl.GetEventType().GetSubType()
 		utils.AddDropReasonDescription(ext, utils.DropReason(eventType))
 		utils.SetExtensions(fl, ext)
-		p.enricher.Write(e)
+		p.emitAdvancedEvent(e)
 	}
 	return nil
 }
