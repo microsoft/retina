@@ -562,6 +562,9 @@ hubble:
       port: ~
 
     # -- Backend traffic policy for the Hubble Relay GRPCRoute.
+    # Renders an Envoy Gateway gateway.envoyproxy.io/v1alpha1 BackendTrafficPolicy, so this requires
+    # the Envoy Gateway BackendTrafficPolicy CRD to be installed; standard Gateway API CRDs alone
+    # are not sufficient and enabling this on other implementations will fail.
     backendTrafficPolicy:
       enabled: false
       spec: {}

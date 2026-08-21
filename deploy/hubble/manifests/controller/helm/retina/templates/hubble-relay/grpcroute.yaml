@@ -32,7 +32,7 @@ spec:
   {{- if .Values.hubble.relay.grpcRoute.hostnames }}
   hostnames:
     {{- range .Values.hubble.relay.grpcRoute.hostnames }}
-    - {{ tpl . $ | quote }}
+    - {{ tpl (. | toString) $ | quote }}
     {{- end }}
   {{- end }}
   rules:
