@@ -12,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -27,15 +28,65 @@ type LoadAndPinWinBPF struct {
 	LoadAndPinWinBPFDeamonSetName      string
 }
 
-func WaitForPodReadyWithTimeOut(ctx context.Context, kubeConfigFilePath, namespace, labelSelector string, timeout time.Duration) error {
+func isRunningWindowsPodOnNode(pod *v1.Pod, targetNodeName string) bool {
+	return pod.Spec.NodeSelector["kubernetes.io/os"] == "windows" &&
+		pod.Status.Phase == v1.PodRunning &&
+		(targetNodeName == "" || pod.Spec.NodeName == targetNodeName)
+}
+
+func kubernetesClient(kubeConfigFilePath string) (*rest.Config, *kubernetes.Clientset, error) {
 	config, err := clientcmd.BuildConfigFromFlags("", kubeConfigFilePath)
 	if err != nil {
-		return fmt.Errorf("error building kubeconfig: %w", err)
+		return nil, nil, fmt.Errorf("error building kubeconfig: %w", err)
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return fmt.Errorf("error creating Kubernetes client: %w", err)
+		return nil, nil, fmt.Errorf("error creating Kubernetes client: %w", err)
+	}
+
+	return config, clientset, nil
+}
+
+func runningWindowsPods(ctx context.Context, clientset kubernetes.Interface, namespace, labelSelector string) ([]v1.Pod, error) {
+	podList, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error listing pods: %w", err)
+	}
+
+	pods := make([]v1.Pod, 0, len(podList.Items))
+	for i := range podList.Items {
+		if isRunningWindowsPodOnNode(&podList.Items[i], "") {
+			pods = append(pods, podList.Items[i])
+		}
+	}
+
+	return pods, nil
+}
+
+func GetPodNodeName(kubeConfigFilePath, namespace, podName string) (string, error) {
+	_, clientset, err := kubernetesClient(kubeConfigFilePath)
+	if err != nil {
+		return "", err
+	}
+
+	pod, err := clientset.CoreV1().Pods(namespace).Get(context.Background(), podName, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("error getting pod %s in namespace %s: %w", podName, namespace, err)
+	}
+	if pod.Spec.NodeName == "" {
+		return "", fmt.Errorf("pod %s in namespace %s is not assigned to a node", podName, namespace)
+	}
+
+	return pod.Spec.NodeName, nil
+}
+
+func WaitForPodReadyWithTimeOut(ctx context.Context, kubeConfigFilePath, namespace, labelSelector string, timeout time.Duration) error {
+	_, clientset, err := kubernetesClient(kubeConfigFilePath)
+	if err != nil {
+		return err
 	}
 
 	timeoutCtx, cancelFunc := context.WithTimeout(ctx, timeout)
@@ -44,33 +95,26 @@ func WaitForPodReadyWithTimeOut(ctx context.Context, kubeConfigFilePath, namespa
 	return WaitForPodReady(timeoutCtx, clientset, namespace, labelSelector)
 }
 
-func ExecCommandInWinPod(kubeConfigFilePath, cmd, namespace, labelSelector string, expecNonEmptyOutput bool) (string, error) {
+func ExecCommandInWinPod(kubeConfigFilePath, cmd, namespace, labelSelector, targetNodeName string, expecNonEmptyOutput bool) (string, error) {
 	defaultRetrier = retry.Retrier{Attempts: 15, Delay: 5 * time.Second}
 	// Create a context with a timeout (e.g., 120 seconds)
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
-	config, err := clientcmd.BuildConfigFromFlags("", kubeConfigFilePath)
+
+	config, clientset, err := kubernetesClient(kubeConfigFilePath)
 	if err != nil {
-		return "", fmt.Errorf("error building kubeconfig: %w", err)
+		return "", err
 	}
 
-	clientset, err := kubernetes.NewForConfig(config)
+	pods, err := runningWindowsPods(ctx, clientset, namespace, labelSelector)
 	if err != nil {
-		return "", fmt.Errorf("error creating Kubernetes client: %w", err)
-	}
-
-	pods, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: labelSelector,
-	})
-	if err != nil {
-		return "", fmt.Errorf("error listing pods: %w", err)
+		return "", err
 	}
 
 	var windowsPod *v1.Pod
-	for i := range pods.Items {
-		pod := &pods.Items[i]
-		if pod.Spec.NodeSelector["kubernetes.io/os"] == "windows" &&
-			pod.Status.Phase == v1.PodRunning {
+	for i := range pods {
+		pod := &pods[i]
+		if isRunningWindowsPodOnNode(pod, targetNodeName) {
 			// Optionally, check for Ready condition here
 			windowsPod = pod
 			break
@@ -78,7 +122,7 @@ func ExecCommandInWinPod(kubeConfigFilePath, cmd, namespace, labelSelector strin
 	}
 
 	if windowsPod == nil {
-		return "", fmt.Errorf("%w: %s", ErrNoWindowsPodFound, labelSelector)
+		return "", fmt.Errorf("%w: label %q on node %q", ErrNoWindowsPodFound, labelSelector, targetNodeName)
 	}
 
 	var outputBytes []byte
@@ -102,29 +146,65 @@ func ExecCommandInWinPod(kubeConfigFilePath, cmd, namespace, labelSelector strin
 	return string(outputBytes), nil
 }
 
+func runningWindowsPodNodeNames(kubeConfigFilePath, namespace, labelSelector string) ([]string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+
+	_, clientset, err := kubernetesClient(kubeConfigFilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	pods, err := runningWindowsPods(ctx, clientset, namespace, labelSelector)
+	if err != nil {
+		return nil, err
+	}
+
+	nodeNames := make([]string, 0, len(pods))
+	for i := range pods {
+		pod := &pods[i]
+		if pod.Spec.NodeName != "" {
+			nodeNames = append(nodeNames, pod.Spec.NodeName)
+		}
+	}
+	if len(nodeNames) == 0 {
+		return nil, fmt.Errorf("%w: label %q", ErrNoWindowsPodFound, labelSelector)
+	}
+
+	return nodeNames, nil
+}
+
 func (a *LoadAndPinWinBPF) Run() error {
 	// Copy Event Writer into Node
 	LoadAndPinWinBPFDLabelSelector := "name=" + a.LoadAndPinWinBPFDeamonSetName
-	_, err := ExecCommandInWinPod(a.KubeConfigFilePath, "copy /Y .\\event-writer-helper.bat C:\\event-writer-helper.bat", a.LoadAndPinWinBPFDeamonSetNamespace, LoadAndPinWinBPFDLabelSelector, true)
+	nodeNames, err := runningWindowsPodNodeNames(a.KubeConfigFilePath, a.LoadAndPinWinBPFDeamonSetNamespace, LoadAndPinWinBPFDLabelSelector)
 	if err != nil {
 		return err
 	}
 
-	_, err = ExecCommandInWinPod(a.KubeConfigFilePath, "C:\\event-writer-helper.bat EventWriter-Setup", a.LoadAndPinWinBPFDeamonSetNamespace, LoadAndPinWinBPFDLabelSelector, true)
-	if err != nil {
-		return err
+	for _, nodeName := range nodeNames {
+		_, err = ExecCommandInWinPod(a.KubeConfigFilePath, "copy /Y .\\event-writer-helper.bat C:\\event-writer-helper.bat", a.LoadAndPinWinBPFDeamonSetNamespace, LoadAndPinWinBPFDLabelSelector, nodeName, true)
+		if err != nil {
+			return err
+		}
+
+		_, err = ExecCommandInWinPod(a.KubeConfigFilePath, "C:\\event-writer-helper.bat EventWriter-Setup", a.LoadAndPinWinBPFDeamonSetNamespace, LoadAndPinWinBPFDLabelSelector, nodeName, true)
+		if err != nil {
+			return err
+		}
+
+		// pin maps
+		output, execErr := ExecCommandInWinPod(a.KubeConfigFilePath, "C:\\event-writer-helper.bat EventWriter-LoadAndPinPrgAndMaps", a.LoadAndPinWinBPFDeamonSetNamespace, LoadAndPinWinBPFDLabelSelector, nodeName, false)
+		if execErr != nil {
+			return execErr
+		}
+
+		fmt.Println(output)
+		if strings.Contains(output, "error") || strings.Contains(output, "failed") || strings.Contains(output, "existing") {
+			return fmt.Errorf("%w on node %s: %s", ErrLoadPinBPFFailed, nodeName, output)
+		}
 	}
 
-	// pin maps
-	output, err := ExecCommandInWinPod(a.KubeConfigFilePath, "C:\\event-writer-helper.bat EventWriter-LoadAndPinPrgAndMaps", a.LoadAndPinWinBPFDeamonSetNamespace, LoadAndPinWinBPFDLabelSelector, false)
-	if err != nil {
-		return err
-	}
-
-	fmt.Println(output)
-	if strings.Contains(output, "error") || strings.Contains(output, "failed") || strings.Contains(output, "existing") {
-		return fmt.Errorf("%w: %s", ErrLoadPinBPFFailed, output)
-	}
 	return nil
 }
 

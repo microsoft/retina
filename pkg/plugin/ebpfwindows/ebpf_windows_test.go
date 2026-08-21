@@ -207,6 +207,7 @@ func TestHandleTraceEvent_TraceNotify(t *testing.T) {
 func TestHandleTraceEvent_DropNotify(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
+	packet := makeMockEthernetIPv4TCPPacket()
 
 	mockEnricher := enricher.NewMockEnricherInterface(ctrl)
 	mockEnricher.EXPECT().
@@ -226,7 +227,9 @@ func TestHandleTraceEvent_DropNotify(t *testing.T) {
 			}
 
 			CheckPacketFields(fl, t, true)
-			// Add more assertions as needed
+			if got := utils.PacketSize(fl); got != uint32(len(packet)) {
+				t.Errorf("expected packet size %d, got %d", len(packet), got)
+			}
 			return nil
 		})
 
@@ -260,7 +263,6 @@ func TestHandleTraceEvent_DropNotify(t *testing.T) {
 	}
 
 	// Append mock TCP packet as payload
-	packet := makeMockEthernetIPv4TCPPacket()
 	buf.Write(packet)
 
 	data := buf.Bytes()
@@ -791,6 +793,7 @@ func TestStart_GracefullySkipsWhenRetinaEbpfAPIMissing(t *testing.T) {
 func TestHandleTraceEventWithEthPacket_PktmonDropNotify(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
+	packet := makeMockEthernetIPv4TCPPacket()
 
 	mockEnricher := enricher.NewMockEnricherInterface(ctrl)
 	mockEnricher.EXPECT().
@@ -820,7 +823,9 @@ func TestHandleTraceEventWithEthPacket_PktmonDropNotify(t *testing.T) {
 			}
 
 			CheckPacketFields(fl, t, true)
-			// Add more assertions as needed
+			if got := utils.PacketSize(fl); got != uint32(len(packet)) {
+				t.Errorf("expected packet size %d, got %d", len(packet), got)
+			}
 			return nil
 		})
 
@@ -865,7 +870,6 @@ func TestHandleTraceEventWithEthPacket_PktmonDropNotify(t *testing.T) {
 	}
 
 	// Append mock TCP packet as payload
-	packet := makeMockEthernetIPv4TCPPacket()
 	buf.Write(packet)
 
 	data := buf.Bytes()

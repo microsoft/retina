@@ -279,7 +279,7 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 			return fmt.Errorf("could not convert dropnotify event to flow: %w", err)
 		}
 		ext := utils.NewExtensions()
-		utils.AddPacketSize(ext, size-dropPktmonNotifyV1Len)
+		utils.AddPacketSize(ext, size-dropNotifyV1Len)
 		fl := e.GetFlow()
 		if fl == nil {
 			return fmt.Errorf("%w", errNilDropNotifyFlow)
@@ -334,7 +334,7 @@ func (p *Plugin) handleTraceEvent(data unsafe.Pointer, size uint32) error {
 			return fmt.Errorf("could not convert pktmon dropnotify event to flow: %w", err)
 		}
 		ext := utils.NewExtensions()
-		utils.AddPacketSize(ext, size-uint32(unsafe.Sizeof(DropNotify{})))
+		utils.AddPacketSize(ext, size-dropPktmonNotifyV1Len)
 		fl := e.GetFlow()
 		if fl == nil {
 			return fmt.Errorf("%w", errNilDropNotifyFlow)

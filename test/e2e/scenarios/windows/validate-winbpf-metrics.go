@@ -51,6 +51,7 @@ type ValidateWinBpfMetric struct {
 	NonHpcAppNamespace        string
 	NonHpcAppName             string
 	NonHpcPodName             string
+	targetNodeName            string
 }
 
 func (v *ValidateWinBpfMetric) GetPromMetrics() (string, error) {
@@ -65,6 +66,7 @@ func (v *ValidateWinBpfMetric) GetPromMetrics() (string, error) {
 			"C:\\event-writer-helper.bat EventWriter-GetRetinaPromMetrics",
 			v.RetinaDaemonSetNamespace,
 			retinaLabelSelector,
+			v.targetNodeName,
 			false,
 		)
 
@@ -90,6 +92,7 @@ func (v *ValidateWinBpfMetric) getNonHpcPodIPAddress() (string, error) {
 		"C:\\event-writer-helper.bat EventWriter-GetPodIpAddress",
 		v.NonHpcAppNamespace,
 		nonHpcLabelSelector,
+		v.targetNodeName,
 		true,
 	)
 	if err != nil {
@@ -114,6 +117,7 @@ func (v *ValidateWinBpfMetric) getNonHpcPodIfIndex() (string, error) {
 		"C:\\event-writer-helper.bat EventWriter-GetPodIfIndex",
 		v.NonHpcAppNamespace,
 		nonHpcLabelSelector,
+		v.targetNodeName,
 		true,
 	)
 	if err != nil {
@@ -138,6 +142,7 @@ func (v *ValidateWinBpfMetric) attachEventWriter(nonHpcIfIndex string) (string, 
 		"C:\\event-writer-helper.bat EventWriter-Attach "+nonHpcIfIndex,
 		v.EbpfXdpDeamonSetNamespace,
 		ebpfLabelSelector,
+		v.targetNodeName,
 		true,
 	)
 	if err != nil {
@@ -162,6 +167,7 @@ func (v *ValidateWinBpfMetric) generateTraceEvents() error {
 		"C:\\event-writer-helper.bat EventWriter-SetFilter -event 4 -srcIP "+TestExternalIPAddress,
 		v.EbpfXdpDeamonSetNamespace,
 		ebpfLabelSelector,
+		v.targetNodeName,
 		true,
 	)
 	if err != nil {
@@ -179,6 +185,7 @@ func (v *ValidateWinBpfMetric) generateTraceEvents() error {
 			"C:\\event-writer-helper.bat EventWriter-Curl "+TestExternalIPAddress,
 			v.NonHpcAppNamespace,
 			nonHpcLabelSelector,
+			v.targetNodeName,
 			false,
 		)
 		if err != nil {
@@ -200,6 +207,7 @@ func (v *ValidateWinBpfMetric) generateDropEvents() error {
 		"C:\\event-writer-helper.bat EventWriter-SetFilter -event 1 -srcIP "+TestExternalIPAddress,
 		v.EbpfXdpDeamonSetNamespace,
 		ebpfLabelSelector,
+		v.targetNodeName,
 		true,
 	)
 	if err != nil {
@@ -217,6 +225,7 @@ func (v *ValidateWinBpfMetric) generateDropEvents() error {
 			"C:\\event-writer-helper.bat EventWriter-Curl "+TestExternalIPAddress,
 			v.NonHpcAppNamespace,
 			nonHpcLabelSelector,
+			v.targetNodeName,
 			false,
 		)
 		if err != nil {
@@ -238,6 +247,7 @@ func (v *ValidateWinBpfMetric) generatePktmonDropEvents() error {
 		"C:\\event-writer-helper.bat EventWriter-SetFilter -event 100 -srcIP "+TestExternalIPAddress,
 		v.EbpfXdpDeamonSetNamespace,
 		ebpfLabelSelector,
+		v.targetNodeName,
 		true,
 	)
 	if err != nil {
@@ -255,6 +265,7 @@ func (v *ValidateWinBpfMetric) generatePktmonDropEvents() error {
 			"C:\\event-writer-helper.bat EventWriter-Curl "+TestExternalIPAddress,
 			v.NonHpcAppNamespace,
 			nonHpcLabelSelector,
+			v.targetNodeName,
 			false,
 		)
 		if err != nil {
@@ -501,6 +512,13 @@ func (v *ValidateWinBpfMetric) Run() error {
 		return fmt.Errorf("waiting for Non HPC Pod to become ready: %w", err)
 	}
 	slog.Info("Non HPC Pod is ready")
+
+	targetNodeName, err := kubernetes.GetPodNodeName(v.KubeConfigFilePath, v.NonHpcAppNamespace, v.NonHpcPodName)
+	if err != nil {
+		return fmt.Errorf("getting Non HPC Pod node: %w", err)
+	}
+	v.targetNodeName = targetNodeName
+	slog.Info("Using Windows node for WinBPF validation", "node", v.targetNodeName)
 
 	nonHpcIPAddr, err := v.getNonHpcPodIPAddress()
 	if err != nil {
