@@ -30,7 +30,7 @@ const (
 	nodeConnectivityStatusGaugeDescription         = "The last observed status of both ICMP and HTTP connectivity between the current Cilium agent and other Cilium nodes"
 	nodeConnectivityLatencySecondsGaugeDescription = "The last observed latency between the current Cilium agent and other Cilium nodes in seconds"
 	tcpStateGaugeDescription                       = "Number of active TCP connections by state"
-	tcpConnectionRemoteGaugeDescription            = "Number of active TCP connections by remote address"
+	tcpConnectionRemoteGaugeDescription            = "Number of active TCP connections against remote addresses, aggregated across all of them"
 	tcpConnectionStatsGaugeDescription             = "TCP connections statistics"
 	tcpFlagGaugeDescription                        = "TCP gauges by flag"
 	ipConnectionStatsGaugeDescription              = "IP connections statistics"
