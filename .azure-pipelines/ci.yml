@@ -6,7 +6,8 @@
 #     APP_INSIGHTS_ID, runs manifests + e2e + perf tests.
 #   - Pull requests targeting main -> build only (no push, no telemetry key
 #     embedded, manifests/e2e/perf skipped) - same as GH pull_request behavior.
-#   - Manual queue from ADO UI -> same behavior as PR (dry-run build only).
+#   - Manual queue from ADO UI -> build only by default. Set runE2EValidation
+#     to publish branch images, generate manifests, and run e2e.
 #
 # Required ADO pipeline configuration (set in the ADO UI before first run):
 #   Variables (plain):
@@ -31,12 +32,8 @@ pr:
       - main
 
 parameters:
-  # TEMPORARY (revert this parameter and the isMergeGroup if/else below after
-  # dark-launch validation): when true, forces full merge-group behavior on any
-  # trigger (push to ACR, embed APP_INSIGHTS_ID, run manifests + e2e + perf).
-  # Use it to validate the full pipeline from a manual queue against any branch.
-  - name: forceMergeGroup
-    displayName: Force merge-group behavior (push + telemetry + tests)
+  - name: runE2EValidation
+    displayName: Publish branch images and run E2E
     type: boolean
     default: false
 
@@ -45,11 +42,12 @@ variables:
     value: Azure Container Networking - Build Validations - Federated
   - name: imageNamespace
     value: microsoft/retina
-  # True only when the build was triggered by a push to a merge-queue temp branch,
-  # OR when the forceMergeGroup parameter is checked at queue time.
-  # PR builds and manual queues with the checkbox off evaluate to False -> dry-run.
-  - name: isMergeGroup
-    ${{ if eq(parameters.forceMergeGroup, true) }}:
+  - name: isMergeQueue
+    value: $[ startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/') ]
+  # Merge-queue runs and opted-in manual runs publish branch images and run E2E.
+  # PR builds and manual queues with the checkbox off remain dry-run builds.
+  - name: publishImagesAndRunE2E
+    ${{ if eq(parameters.runE2EValidation, true) }}:
       value: 'True'
     ${{ else }}:
       value: $[ startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/') ]
@@ -75,7 +73,7 @@ jobs:
       - task: AzureCLI@2
         displayName: Build and push retina image
         env:
-          IS_MERGE_GROUP: $(isMergeGroup)
+          PUBLISH_IMAGES: $(publishImagesAndRunE2E)
           APP_INSIGHTS_ID: $(AZURE_APP_INSIGHTS_KEY)
         inputs:
           azureSubscription: $(azureServiceConnection)
@@ -84,7 +82,7 @@ jobs:
           inlineScript: |
             set -euo pipefail
             TAG=$(make version)
-            if [ "$IS_MERGE_GROUP" == "True" ]; then
+            if [ "$PUBLISH_IMAGES" == "True" ]; then
               az acr login -n $(ACR_NAME)
               make retina-image \
                 IMAGE_NAMESPACE=$(imageNamespace) \
@@ -161,7 +159,7 @@ jobs:
       - task: AzureCLI@2
         displayName: Build and push retina Windows image
         env:
-          IS_MERGE_GROUP: $(isMergeGroup)
+          PUBLISH_IMAGES: $(publishImagesAndRunE2E)
           APP_INSIGHTS_ID: $(AZURE_APP_INSIGHTS_KEY)
         inputs:
           azureSubscription: $(azureServiceConnection)
@@ -170,7 +168,7 @@ jobs:
           inlineScript: |
             set -euo pipefail
             TAG=$(make version)
-            if [ "$IS_MERGE_GROUP" == "True" ]; then
+            if [ "$PUBLISH_IMAGES" == "True" ]; then
               az acr login -n $(ACR_NAME)
               make retina-image-win \
                 IMAGE_NAMESPACE=$(imageNamespace) \
@@ -212,7 +210,7 @@ jobs:
       - task: AzureCLI@2
         displayName: Build and push operator image
         env:
-          IS_MERGE_GROUP: $(isMergeGroup)
+          PUBLISH_IMAGES: $(publishImagesAndRunE2E)
           APP_INSIGHTS_ID: $(AZURE_APP_INSIGHTS_KEY)
         inputs:
           azureSubscription: $(azureServiceConnection)
@@ -221,7 +219,7 @@ jobs:
           inlineScript: |
             set -euo pipefail
             TAG=$(make version)
-            if [ "$IS_MERGE_GROUP" == "True" ]; then
+            if [ "$PUBLISH_IMAGES" == "True" ]; then
               az acr login -n $(ACR_NAME)
               make retina-operator-image \
                 IMAGE_NAMESPACE=$(imageNamespace) \
@@ -257,7 +255,7 @@ jobs:
       - task: AzureCLI@2
         displayName: Build and push retina-shell image
         env:
-          IS_MERGE_GROUP: $(isMergeGroup)
+          PUBLISH_IMAGES: $(publishImagesAndRunE2E)
         inputs:
           azureSubscription: $(azureServiceConnection)
           scriptType: bash
@@ -265,7 +263,7 @@ jobs:
           inlineScript: |
             set -euo pipefail
             TAG=$(make version)
-            if [ "$IS_MERGE_GROUP" == "True" ]; then
+            if [ "$PUBLISH_IMAGES" == "True" ]; then
               az acr login -n $(ACR_NAME)
               make retina-shell-image \
                 IMAGE_NAMESPACE=$(imageNamespace) \
@@ -300,7 +298,7 @@ jobs:
       - task: AzureCLI@2
         displayName: Build and push kubectl-retina image
         env:
-          IS_MERGE_GROUP: $(isMergeGroup)
+          PUBLISH_IMAGES: $(publishImagesAndRunE2E)
         inputs:
           azureSubscription: $(azureServiceConnection)
           scriptType: bash
@@ -308,7 +306,7 @@ jobs:
           inlineScript: |
             set -euo pipefail
             TAG=$(make version)
-            if [ "$IS_MERGE_GROUP" == "True" ]; then
+            if [ "$PUBLISH_IMAGES" == "True" ]; then
               az acr login -n $(ACR_NAME)
               make kubectl-retina-image \
                 IMAGE_NAMESPACE=$(imageNamespace) \
@@ -325,7 +323,7 @@ jobs:
 
   - job: manifests
     displayName: Generate Manifests
-    condition: eq(variables['isMergeGroup'], 'True')
+    condition: eq(variables['publishImagesAndRunE2E'], 'True')
     dependsOn:
       - retina_images
       - retina_image_win
@@ -363,7 +361,7 @@ jobs:
 
   - job: e2e
     displayName: Run E2E Tests
-    condition: eq(variables['isMergeGroup'], 'True')
+    condition: eq(variables['publishImagesAndRunE2E'], 'True')
     dependsOn: manifests
     timeoutInMinutes: 90
     pool:
@@ -406,7 +404,7 @@ jobs:
 
   - job: perf_basic
     displayName: Retina basic Performance Test
-    condition: eq(variables['isMergeGroup'], 'True')
+    condition: eq(variables['isMergeQueue'], 'True')
     dependsOn:
       - manifests
       - e2e
@@ -456,7 +454,7 @@ jobs:
 
   - job: perf_advanced
     displayName: Retina advanced Performance Test
-    condition: eq(variables['isMergeGroup'], 'True')
+    condition: eq(variables['isMergeQueue'], 'True')
     dependsOn:
       - manifests
       - e2e
