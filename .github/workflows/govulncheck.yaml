@@ -36,10 +36,21 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Scan with the toolchain the shipped images build with, so stdlib
       # findings track the builder image rather than the go.mod minimum.
+      # The tag pins a minor version, so read the patch version from the
+      # image config rather than from the tag.
       - name: Read builder Go version
         id: goversion
         run: |
-          version="$(grep -m1 -oP '^FROM .*golang:\K[0-9]+\.[0-9]+\.[0-9]+' controller/Dockerfile)"
+          image="$(grep -m1 -oP '^FROM .*\Kmcr\.microsoft\.com/oss/go/microsoft/golang:\S+' controller/Dockerfile)"
+          version="$(docker buildx imagetools inspect "${image}" --format '{{ json .Image }}' \
+            | jq -r 'first(.. | objects | select(has("Env")) | .Env[] | select(startswith("GOLANG_VERSION=")))' \
+            | cut -d= -f2)"
+          # An empty version silently installs the wrong toolchain, so stop here.
+          if [ -z "${version}" ]; then
+            echo "::error::could not read GOLANG_VERSION from ${image}"
+            exit 1
+          fi
+          echo "builder image ${image} provides Go ${version}"
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
       - name: Setup go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
