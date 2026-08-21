@@ -34,6 +34,6 @@ spec:
     {{- if not .Values.hubble.relay.tls.server.enabled }}
     appProtocol: kubernetes.io/h2c
     {{- else if .Values.hubble.relay.service.appProtocol }}
-    appProtocol: {{ .Values.hubble.relay.service.appProtocol }}
+    appProtocol: {{ .Values.hubble.relay.service.appProtocol | quote }}
     {{- end }}
 {{- end }}
