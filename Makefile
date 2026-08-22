@@ -73,7 +73,7 @@ RETINA_PLATFORM_TAG        = $(TAG)-windows-ltsc$(YEAR)-amd64
 endif
 
 qemu-user-static: ## Set up the host to run qemu multiplatform container builds.
-	sudo $(CONTAINER_RUNTIME) run --rm --privileged multiarch/qemu-user-static --reset -p yes
+	sudo $(CONTAINER_RUNTIME) run --rm --privileged tonistiigi/binfmt --install arm64
 
 .PHONY: version
 version: ## prints the root version
