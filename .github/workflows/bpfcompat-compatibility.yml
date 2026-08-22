@@ -1,0 +1,144 @@
+name: eBPF kernel compatibility
+
+# Runs Retina's own eBPF tests (`make test-ebpf`, build tag `ebpf`) on kernels
+# other than the GitHub runner's, using bpfcompat to boot each kernel in a
+# disposable QEMU/KVM VM on the hosted runner's /dev/kvm.
+#
+# The lane deliberately adds no new test logic. It compiles the existing
+# per-plugin test binaries with `go test -c -tags=ebpf` and runs each one as
+# root inside each guest, so a verdict reflects Retina's own loader
+# (github.com/cilium/ebpf) and Retina's own assertions -- not a third-party
+# loader's opinion of the object files. The per-kernel verdict is the test
+# binary's exit code.
+#
+# Scope: plugins whose eBPF tests are self-contained. `packetparser` is
+# excluded because it compiles its BPF program at run time
+# (loader.CompileEbpf), which would need clang and the source tree inside each
+# guest rather than an embedded object.
+#
+# This workflow is scheduled and advisory: it never runs on pull requests and
+# cannot block a merge. Evidence is uploaded on every run, including failures.
+#
+# Security note: the only ${{ }} interpolation reaching a run: block is
+# matrix.plugin, which comes from the hardcoded list below rather than from
+# any github.event.* field, and it is passed through env: regardless.
+
+on:
+  schedule:
+    # Mondays, 05:30 UTC.
+    - cron: "30 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ebpf-kernel-matrix:
+    name: ${{ matrix.plugin }} on kernel matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        plugin:
+          - dns
+          - tcpretrans
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install host dependencies
+        # clang/llvm/libbpf-dev build the eBPF objects; qemu-system-x86 and
+        # qemu-utils boot the guest kernels; cloud-image-utils provides
+        # cloud-localds, which the RHEL-family guests (centos-stream,
+        # almalinux) need for their cloud-init CIDATA seed.
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            qemu-system-x86 qemu-utils cloud-image-utils \
+            clang llvm libbpf-dev jq
+
+      - name: Generate eBPF objects
+        # The .o files are committed as empty placeholders, so they must be
+        # generated before a test binary can embed them.
+        run: GOARCH=amd64 go generate ./pkg/plugin/...
+
+      - name: Build the plugin's eBPF test binary
+        # Statically linked and stripped so it can be copied into each guest and
+        # run there without a Go toolchain.
+        env:
+          PLUGIN: ${{ matrix.plugin }}
+        run: |
+          set -euo pipefail
+          mkdir -p build/bpfcompat
+          CGO_ENABLED=0 go test -c -tags=ebpf -ldflags="-s -w" \
+            -o "build/bpfcompat/${PLUGIN}.test" "./pkg/plugin/${PLUGIN}"
+          ls -l "build/bpfcompat/${PLUGIN}.test"
+
+      - name: Run the tests across the kernel matrix
+        id: bpfcompat
+        continue-on-error: true
+        uses: Kernel-Guard/bpfcompat@3701b08ac3cd6c7d30e6f20445fb7c6b7f290c0f # v0.3.6
+        with:
+          command-binary: build/bpfcompat/${{ matrix.plugin }}.test
+          command: $BPFCOMPAT_BIN -test.count=1
+          matrix: test/bpfcompat/kernel-matrix.yaml
+          out: reports/bpfcompat-${{ matrix.plugin }}.json
+
+      - name: Summarise
+        if: always()
+        env:
+          PLUGIN: ${{ matrix.plugin }}
+        run: |
+          set -euo pipefail
+          report="reports/bpfcompat-${PLUGIN}.json"
+          if [[ ! -f "$report" ]]; then
+            echo "No report was produced for ${PLUGIN}." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          {
+            echo "### ${PLUGIN}"
+            echo
+            echo "| Kernel profile | Required | Result |"
+            echo "|---|---|---|"
+            jq -r '.targets[]
+              | "| \(.profile_id) | \(if .required then "yes" else "no" end) | \(.status) |"' \
+              "$report"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # A kernel result of "fail" is a finding and is allowed to stand: the
+          # lane is advisory and non-required profiles are expected to fail.
+          # "infra_error" is different -- it means the VM never ran the tests,
+          # so the lane proved nothing. Fail the job in that case rather than
+          # reporting a green run that silently tested nothing.
+          total="$(jq '.targets | length' "$report")"
+          infra="$(jq '[.targets[] | select(.status == "infra_error")] | length' "$report")"
+          if [[ "$total" -gt 0 && "$infra" -eq "$total" ]]; then
+            {
+              echo
+              echo "**Every kernel returned \`infra_error\`: the lane did not run"
+              echo "the tests and proved nothing. Failing so this is not mistaken"
+              echo "for a passing run.**"
+            } >> "$GITHUB_STEP_SUMMARY"
+            jq -r '.targets[0].infra_error // "no detail"' "$report" >&2
+            exit 1
+          fi
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bpfcompat-${{ matrix.plugin }}
+          path: reports/
+          if-no-files-found: warn
