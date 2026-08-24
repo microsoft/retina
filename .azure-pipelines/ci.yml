@@ -3,7 +3,8 @@
 # Mirrors .github/workflows/images.yaml. Triggered by:
 #   - GitHub merge-queue events (push to gh-readonly-queue/main/*) via the
 #     Azure Pipelines GitHub App -> full run: builds, pushes to ACR, embeds
-#     APP_INSIGHTS_ID, runs manifests + e2e + perf tests.
+#     APP_INSIGHTS_ID, builds the E2E event writer, and runs manifests + e2e +
+#     perf tests.
 #   - Pull requests targeting main -> build only (no push, no telemetry key
 #     embedded, manifests/e2e/perf skipped) - same as GH pull_request behavior.
 #   - Manual queue from ADO UI -> build only by default. Set runE2EValidation
@@ -66,6 +67,7 @@ jobs:
       vmImage: ubuntu-latest
     steps:
       - checkout: self
+        fetchDepth: 0
       - template: steps/free-disk-space.yml
       - bash: make qemu-user-static
         displayName: Set up QEMU
@@ -105,6 +107,7 @@ jobs:
       vmImage: ubuntu-latest
     steps:
       - checkout: self
+        fetchDepth: 0
       - template: steps/setup-go.yml
       - bash: |
           set -euo pipefail
@@ -134,6 +137,7 @@ jobs:
       platform: windows
     steps:
       - checkout: self
+        fetchDepth: 0
       - task: DownloadPipelineArtifact@2
         inputs:
           artifactName: windows-binaries
@@ -190,6 +194,95 @@ jobs:
                 TAG=$TAG
             fi
 
+  - job: event_writer_image
+    displayName: Build E2E Test Event Writer Image
+    condition: and(succeeded(), eq(variables['publishImagesAndRunE2E'], 'True'))
+    timeoutInMinutes: 60
+    pool:
+      vmImage: windows-2022
+    variables:
+      eventWriterPath: $(Build.SourcesDirectory)\test\e2e\tools\event-writer
+      ebpfVersion: '1.1.0'
+    steps:
+      - checkout: self
+        fetchDepth: 0
+      - powershell: |
+          $timeout = 120
+          $timer = [Diagnostics.Stopwatch]::StartNew()
+          while ($timer.Elapsed.TotalSeconds -lt $timeout) {
+            $svc = Get-Service docker -ErrorAction SilentlyContinue
+            if ($svc -and $svc.Status -ne 'Running') {
+                Start-Service docker -ErrorAction SilentlyContinue
+            }
+            $result = docker info 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "Docker daemon is ready"
+                return
+            }
+            Write-Host "Waiting for Docker daemon to start..."
+            Start-Sleep -Seconds 5
+          }
+          throw "Docker daemon failed to start within $timeout seconds"
+        displayName: Ensure Docker daemon is running
+      - powershell: |
+          choco install llvm --version=18.1.8 --allow-downgrade -y --force
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to install LLVM 18.1.8"
+          }
+          Write-Host "##vso[task.prependpath]C:\Program Files\LLVM\bin"
+          Write-Host "##vso[task.prependpath]C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\bin"
+        displayName: Install LLVM and configure build tools
+      - powershell: nuget restore .\event_writer.sln
+        displayName: NuGet restore
+        workingDirectory: $(eventWriterPath)
+      - powershell: |
+          .\export_program_info.exe --clear
+          .\export_program_info.exe
+        displayName: Configure eBPF store
+        workingDirectory: $(eventWriterPath)\packages\eBPF-for-Windows.x64.$(ebpfVersion)\build\native\bin
+      - powershell: |
+          msbuild /m /t:Clean /p:Configuration=Release /p:Platform=x64 /restore event_writer.sln
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to clean event-writer solution"
+          }
+          msbuild /m /p:Configuration=Release /p:Platform=x64 /restore /v:detailed event_writer.sln
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to build event-writer solution"
+          }
+        displayName: Build event writer
+        workingDirectory: $(eventWriterPath)
+      - task: AzureCLI@2
+        displayName: Build and push event-writer image
+        inputs:
+          azureSubscription: $(azureServiceConnection)
+          scriptType: ps
+          scriptLocation: inlineScript
+          workingDirectory: $(eventWriterPath)
+          inlineScript: |
+            $tag = git tag --points-at HEAD
+            if (-not $tag) {
+              $tag = git rev-parse --short HEAD
+            }
+            $image = "$(ACR_NAME)/$(imageNamespace)/test/e2e-test-event-writer".ToLower()
+
+            az acr login --name "$(ACR_NAME)"
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to log in to ACR"
+            }
+
+            docker build -f .\Dockerfile -t "${image}:${tag}" -t "${image}:latest" .
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to build event-writer image"
+            }
+            docker push "${image}:${tag}"
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to push event-writer image tag ${tag}"
+            }
+            docker push "${image}:latest"
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to push latest event-writer image"
+            }
+
   - job: operator_images
     displayName: Build Operator Images
     timeoutInMinutes: 60
@@ -203,6 +296,7 @@ jobs:
       vmImage: ubuntu-latest
     steps:
       - checkout: self
+        fetchDepth: 0
       - template: steps/free-disk-space.yml
       - bash: make qemu-user-static
         displayName: Set up QEMU
@@ -248,6 +342,7 @@ jobs:
       vmImage: ubuntu-latest
     steps:
       - checkout: self
+        fetchDepth: 0
       - template: steps/free-disk-space.yml
       - bash: make qemu-user-static
         displayName: Set up QEMU
@@ -291,6 +386,7 @@ jobs:
       vmImage: ubuntu-latest
     steps:
       - checkout: self
+        fetchDepth: 0
       - template: steps/free-disk-space.yml
       - bash: make qemu-user-static
         displayName: Set up QEMU
@@ -323,7 +419,7 @@ jobs:
 
   - job: manifests
     displayName: Generate Manifests
-    condition: eq(variables['publishImagesAndRunE2E'], 'True')
+    condition: and(succeeded(), eq(variables['publishImagesAndRunE2E'], 'True'))
     dependsOn:
       - retina_images
       - retina_image_win
@@ -345,6 +441,7 @@ jobs:
           component: kubectl-retina
     steps:
       - checkout: self
+        fetchDepth: 0
       - bash: make qemu-user-static
         displayName: Set up QEMU
       - task: AzureCLI@2
@@ -361,8 +458,10 @@ jobs:
 
   - job: e2e
     displayName: Run E2E Tests
-    condition: eq(variables['publishImagesAndRunE2E'], 'True')
-    dependsOn: manifests
+    condition: and(succeeded(), eq(variables['publishImagesAndRunE2E'], 'True'))
+    dependsOn:
+      - manifests
+      - event_writer_image
     timeoutInMinutes: 90
     pool:
       vmImage: ubuntu-latest
@@ -370,6 +469,7 @@ jobs:
       CLUSTER_NAME: retina-e2e-$(Build.BuildId)-$(System.JobAttempt)
     steps:
       - checkout: self
+        fetchDepth: 0
       - template: steps/setup-go.yml
       - task: AzureCLI@2
         displayName: Run E2E Tests
@@ -404,7 +504,7 @@ jobs:
 
   - job: perf_basic
     displayName: Retina basic Performance Test
-    condition: eq(variables['isMergeQueue'], 'True')
+    condition: and(succeeded(), eq(variables['isMergeQueue'], 'True'))
     dependsOn:
       - manifests
       - e2e
@@ -416,6 +516,7 @@ jobs:
       MODE: basic
     steps:
       - checkout: self
+        fetchDepth: 0
       - template: steps/setup-go.yml
       - task: AzureCLI@2
         displayName: Run perf test
@@ -454,7 +555,7 @@ jobs:
 
   - job: perf_advanced
     displayName: Retina advanced Performance Test
-    condition: eq(variables['isMergeQueue'], 'True')
+    condition: and(succeeded(), eq(variables['isMergeQueue'], 'True'))
     dependsOn:
       - manifests
       - e2e
@@ -466,6 +567,7 @@ jobs:
       MODE: advanced
     steps:
       - checkout: self
+        fetchDepth: 0
       - template: steps/setup-go.yml
       - task: AzureCLI@2
         displayName: Run perf test
