@@ -67,7 +67,7 @@ Metrics enabled when `linuxutil` plugin is enabled (see [Metrics Configuration](
 | Metric Name             | Description                                                                     | Extra Labels                       |
 | ----------------------- | ------------------------------------------------------------------------------- | ---------------------------------- |
 | `tcp_state`             | TCP currently active socket count by TCP state (from `netstats` utility)        | `state`                            |
-| `tcp_connection_remote` | TCP currently active socket count by remote IP/port  (from `netstats` utility)  | `address` (IP), `port`             |
+| `tcp_connection_remote` | TCP currently active socket count by remote address  (from `netstats` utility)  | `address` (IP:port)             |
 | `tcp_connection_stats`  | TCP connection statistics  (from `netstats` utility)                            | `statistic_name`                   |
 | `ip_connection_stats`   | IP connection statistics  (from `netstats` utility)                             | `statistic_name`                   |
 | `udp_connection_stats`  | UDP connection statistics (from `netstats` utility)                             | `statistic_name`                   |
@@ -129,6 +129,27 @@ Metrics enabled when `dns` plugin is enabled (see [Metrics Configuration](../con
 | `dns_request_count`          | number of DNS requests by query                                  | `query_type`, `query`                                            |
 | `dns_response_count`         | number of DNS responses by query, error code, and response value | `query_type`, `query`, `return_code`, `response`, `num_response` |
 
+### Plugin: `conntrack` (Linux)
+
+Metrics enabled when `conntrack` plugin is enabled and `enableConntrackMetrics` is set to `true` (see [Configuration](../../02-Installation/03-Config.md)).
+
+| Metric Name                  | Description                                      | Extra Labels |
+| ---------------------------- | ------------------------------------------------ | ------------ |
+| `conntrack_packets_tx`       | Total packets transmitted tracked by conntrack   |              |
+| `conntrack_packets_rx`       | Total packets received tracked by conntrack      |              |
+| `conntrack_bytes_tx`         | Total bytes transmitted tracked by conntrack     |              |
+| `conntrack_bytes_rx`         | Total bytes received tracked by conntrack        |              |
+| `conntrack_total_connections`| Total number of tracked connections              |              |
+
+### Node Connectivity Metrics (Linux/Windows)
+
+These metrics are available when node connectivity monitoring is enabled.
+
+| Metric Name                          | Description                                           | Extra Labels                         |
+| ------------------------------------ | ----------------------------------------------------- | ------------------------------------ |
+| `node_connectivity_status`           | Connectivity status between nodes (1=connected, 0=not)| `source_node_name`, `target_node_name` |
+| `node_connectivity_latency_seconds`  | Latency in seconds between nodes                      | `source_node_name`, `target_node_name` |
+
 ### Plugin: `hnsstats` (Windows)
 
 Metrics enabled when `hnsstats` plugin is enabled (see [Metrics Configuration](../configuration.md)).
@@ -138,9 +159,11 @@ Metrics enabled when `hnsstats` plugin is enabled (see [Metrics Configuration](.
 | `forward_count`         | forwarded packet count (from HNS)             | `direction`           |
 | `forward_bytes`         | forwarded byte count (from HNS)               | `direction`           |
 | `drop_count`            | dropped packet count (from HNS or VFP)        | `direction`, `reason` |
-| `drop_bytes`            | dropped byte count (from HNS or VFP)          | `direction`, `reason` |
 | `tcp_connection_stats`  | several TCP connection statistics (from VFP)  | `statistic_name`      |
-| `tcp_flag_counters`     | TCP packet count by flag (from VFP)           | `direction`, `flag`   |
+| `tcp_flag_gauges`       | TCP packet count by flag (from VFP)           | `direction`, `flag`   |
+| `windows_hns_stats`     | HNS statistics (packets sent/received)        | `direction`           |
+
+> **Note:** `drop_bytes` is not available on Windows. Only `drop_count` is supported.
 
 #### Label Values
 

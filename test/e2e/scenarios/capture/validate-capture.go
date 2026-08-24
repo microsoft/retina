@@ -30,7 +30,16 @@ type validateCapture struct {
 	CaptureNamespace string
 	Duration         string
 	KubeConfigPath   string
+	// SourceIPs and DestinationIPs are optional comma-separated IP lists passed through
+	// to --source-ips/--destination-ips. Set to noIPFilter to capture without IP filtering:
+	// the e2e job framework's parameter validation errors on empty exported string fields,
+	// so the Go zero value ("") can't be used to mean "unset" here.
+	SourceIPs      string
+	DestinationIPs string
 }
+
+// noIPFilter is a sentinel value for SourceIPs/DestinationIPs meaning "no IP filtering".
+const noIPFilter = "none"
 
 var (
 	ErrInvalidCaptureName       = errors.New("invalid capture name")
@@ -51,7 +60,14 @@ func (v *validateCapture) Run() error {
 	os.Setenv("KUBECONFIG", v.KubeConfigPath)
 	log.Printf("KUBECONFIG: %s\n", os.Getenv("KUBECONFIG"))
 
-	cmd := exec.CommandContext(ctx, "kubectl", "retina", "capture", "create", "--namespace", v.CaptureNamespace, "--name", v.CaptureName, "--duration", v.Duration, "--debug") //#nosec
+	args := []string{"retina", "capture", "create", "--namespace", v.CaptureNamespace, "--name", v.CaptureName, "--duration", v.Duration, "--debug"}
+	if v.SourceIPs != "" && v.SourceIPs != noIPFilter {
+		args = append(args, "--source-ips", v.SourceIPs)
+	}
+	if v.DestinationIPs != "" && v.DestinationIPs != noIPFilter {
+		args = append(args, "--destination-ips", v.DestinationIPs)
+	}
+	cmd := exec.CommandContext(ctx, "kubectl", args...) //#nosec
 	cmd.Env = append(os.Environ(), "RETINA_AGENT_IMAGE="+filepath.Join(imageRegistry, imageNamespace, "retina-agent:"+imageTag))
 
 	output, err := cmd.CombinedOutput()
