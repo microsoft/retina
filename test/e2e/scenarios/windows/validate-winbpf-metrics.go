@@ -123,6 +123,7 @@ func (v *ValidateWinBpfMetric) getNonHpcPodIfIndex() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("executing EventWriter command: %w", err)
 	}
+	nonHpcIfIndex = strings.TrimSpace(nonHpcIfIndex)
 
 	if strings.Contains(nonHpcIfIndex, "failed") || strings.Contains(nonHpcIfIndex, "error") {
 		return "", ErrGetNonHpcIfIndex

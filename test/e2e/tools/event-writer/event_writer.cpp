@@ -3,6 +3,7 @@
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
 
+#include <cerrno>
 #include <vector>
 #include "event_writer.h"
 #include <ebpf_api.h>
@@ -105,7 +106,7 @@ attach_program_to_interface(int ifindx) {
     }
 
     uint32_t program_id = 0;
-    if (bpf_xdp_query_id(ifindx, 0, &program_id) < 0) {
+    if (bpf_xdp_query_id(ifindx, 0, &program_id) < 0 && errno != ENOENT) {
         fprintf(stderr, "%s - failed to query interface with ifindex %d\n", __FUNCTION__, ifindx);
         return 1;
     }
