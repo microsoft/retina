@@ -30,9 +30,12 @@ RUN if [ "$GOOS" = "linux" ] ; then \
     fi
 COPY ./pkg/plugin /go/src/github.com/microsoft/retina/pkg/plugin
 WORKDIR /go/src/github.com/microsoft/retina
-RUN if [ "$GOOS" = "linux" ] ; then \
+RUN set -eu; \
+    if [ "$GOOS" = "linux" ] ; then \
     go mod init github.com/microsoft/retina; \
     go generate -skip "mockgen" -x /go/src/github.com/microsoft/retina/pkg/plugin/...; \
+    if [ "$GOARCH" = "amd64" ]; then bpf_arch=x86; else bpf_arch="$GOARCH"; fi; \
+    test -s "./pkg/plugin/conntrack/conntrack_bpfel_${bpf_arch}.o"; \
     tar czf /gen.tar.gz ./pkg/plugin; \
     rm go.mod; \
     else \
