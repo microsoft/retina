@@ -72,7 +72,7 @@ func (s ScaleTestInfraHandler) GetSubscriptionID() string {
 
 func (s ScaleTestInfraHandler) GetLocation() string {
 	if s.location == "" {
-		return "westus2"
+		return "westcentralus"
 	}
 	return s.location
 }

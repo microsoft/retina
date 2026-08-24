@@ -53,6 +53,15 @@ spec:
                           AbsoluteSeq prints absolute TCP sequence numbers (equivalent to tcpdump -S flag).
                           Shows actual sequence numbers instead of relative numbers.
                         type: boolean
+                      destinationIPs:
+                        description: |-
+                          DestinationIPs specifies a list of destination IP addresses to filter captured packets by.
+                          Only packets destined for one of these IP addresses are captured.
+                          When combined with SourceIPs, a packet must match both a source IP and a destination IP to be captured.
+                        items:
+                          type: string
+                        maxItems: 100
+                        type: array
                       dontVerifyChecksum:
                         description: |-
                           DontVerifyChecksum disables TCP checksum verification (equivalent to tcpdump -K flag).
@@ -63,12 +72,6 @@ spec:
                           should continue for.
                         pattern: ^([0-9]+(\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$
                         type: string
-                      immediateMode:
-                        description: |-
-                          ImmediateMode enables immediate mode for packet capture (equivalent to tcpdump --immediate-mode).
-                          When true, packets are delivered to the application immediately rather than being buffered.
-                          This can reduce latency but may increase CPU usage.
-                        type: boolean
                       fileCount:
                         description: |-
                           FileCount sets the maximum number of capture files to use in a rotating buffer.
@@ -79,6 +82,12 @@ spec:
                           Equivalent to tcpdump's -W flag.
                         minimum: 1
                         type: integer
+                      immediateMode:
+                        description: |-
+                          ImmediateMode enables immediate mode for packet capture (equivalent to tcpdump --immediate-mode).
+                          When true, packets are delivered to the application immediately rather than being buffered.
+                          This can reduce latency but may increase CPU usage.
+                        type: boolean
                       interfaces:
                         description: |-
                           Interfaces specifies the network interfaces on which to capture packets.
@@ -151,6 +160,15 @@ spec:
                           QuietOutput enables quiet/quick output mode (equivalent to tcpdump -q flag).
                           Prints less protocol information for shorter output lines.
                         type: boolean
+                      sourceIPs:
+                        description: |-
+                          SourceIPs specifies a list of source IP addresses to filter captured packets by.
+                          Only packets originating from one of these IP addresses are captured.
+                          When combined with DestinationIPs, a packet must match both a source IP and a destination IP to be captured.
+                        items:
+                          type: string
+                        maxItems: 100
+                        type: array
                       timestampFormat:
                         description: |-
                           TimestampFormat controls the timestamp format in packet capture output.

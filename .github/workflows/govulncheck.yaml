@@ -1,0 +1,117 @@
+name: govulncheck
+on:
+  merge_group:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Scheduled runs catch new vulnerability reports published against
+    # existing code. PR runs catch new code and dependencies.
+    - cron: "22 10 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  govulncheck:
+    name: govulncheck (${{ matrix.goos }})
+    strategy:
+      fail-fast: false
+      matrix:
+        goos: [linux, windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Scan with the toolchain the shipped images build with, so stdlib
+      # findings track the builder image rather than the go.mod minimum.
+      # The tag pins a minor version, so read the patch version from the
+      # image config rather than from the tag.
+      - name: Read builder Go version
+        id: goversion
+        run: |
+          image="$(grep -m1 -oP '^FROM .*\Kmcr\.microsoft\.com/oss/go/microsoft/golang:\S+' controller/Dockerfile)"
+          version="$(docker buildx imagetools inspect "${image}" --format '{{ json .Image }}' \
+            | jq -r 'first(.. | objects | select(has("Env")) | .Env[] | select(startswith("GOLANG_VERSION=")))' \
+            | cut -d= -f2)"
+          # An empty version silently installs the wrong toolchain, so stop here.
+          if [ -z "${version}" ]; then
+            echo "::error::could not read GOLANG_VERSION from ${image}"
+            exit 1
+          fi
+          echo "builder image ${image} provides Go ${version}"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+      - name: Setup go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ steps.goversion.outputs.version }}
+      # The tool version is pinned by the go.mod tool block; the scanner
+      # fetches the vulnerability database from vuln.go.dev at run time.
+      - name: Build govulncheck
+        run: go build -o "${RUNNER_TEMP}/govulncheck" golang.org/x/vuln/cmd/govulncheck
+      - name: Run govulncheck
+        id: scan
+        env:
+          GOOS: ${{ matrix.goos }}
+        run: |
+          "${RUNNER_TEMP}/govulncheck" -version
+          set -o pipefail
+          rc=0
+          "${RUNNER_TEMP}/govulncheck" ./... | tee govulncheck.txt || rc=$?
+          # Exit status 3 means reachable findings; anything else non-zero
+          # is an operational failure and must not read as a CVE signal.
+          case "${rc}" in
+            0) result=clean ;;
+            3) result=findings ;;
+            *) result=error ;;
+          esac
+          echo "result=${result}" >> "${GITHUB_OUTPUT}"
+          exit "${rc}"
+      - name: Report results
+        if: always()
+        env:
+          GOOS: ${{ matrix.goos }}
+          OUTCOME: ${{ steps.scan.outcome }}
+          RESULT: ${{ steps.scan.outputs.result }}
+        run: |
+          {
+            echo "## govulncheck (${GOOS})"
+            if [ "${RESULT}" = "findings" ]; then
+              echo '```'
+              cat govulncheck.txt 2>/dev/null || echo "The scan produced no output; see the run log."
+              echo '```'
+            elif [ "${OUTCOME}" = "success" ]; then
+              echo "No reachable vulnerabilities."
+            else
+              echo "The scan did not complete; see the run log."
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
+          if [ "${RESULT}" = "findings" ]; then
+            echo "::error::govulncheck found reachable vulnerabilities (GOOS=${GOOS}); see the job summary"
+          elif [ "${OUTCOME}" = "failure" ]; then
+            echo "::error::the govulncheck scan failed without reporting findings (GOOS=${GOOS}); see the run log"
+          fi
+      # Code-scanning alerts track main. PR and merge-queue runs skip the
+      # SARIF steps; fork PR tokens also lack security-events write.
+      - name: Generate SARIF
+        if: always() && github.ref == 'refs/heads/main'
+        env:
+          GOOS: ${{ matrix.goos }}
+        run: '"${RUNNER_TEMP}/govulncheck" -format sarif ./... > govulncheck.sarif'
+      - name: Upload SARIF to code scanning
+        if: always() && github.ref == 'refs/heads/main'
+        uses: github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
+        with:
+          sarif_file: govulncheck.sarif
+          category: govulncheck-${{ matrix.goos }}
