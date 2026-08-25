@@ -179,10 +179,6 @@ metadata:
     k8s-app: {{ include "retina.name" . }}
   name: {{ .Values.agent_win.name }}
   namespace: {{ .Values.namespace }}
-  annotations:
-    prometheus.io/port: "{{ .Values.retinaPort }}"
-    prometheus.io/scrape: "true"
-    checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
 spec:
   selector:
     matchLabels:
@@ -190,6 +186,10 @@ spec:
       app.kubernetes.io/component: workload
   template:
     metadata:
+      annotations:
+        prometheus.io/port: "{{ .Values.retinaPort }}"
+        prometheus.io/scrape: "true"
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
       labels:
         {{- include "retina.labels" . | nindent 8 }}
         app.kubernetes.io/component: workload
