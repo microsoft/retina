@@ -32,12 +32,16 @@ RUN if [ "$GOOS" = "linux" ] ; then \
     fi
 COPY ./pkg/plugin /go/src/github.com/microsoft/retina/pkg/plugin
 WORKDIR /go/src/github.com/microsoft/retina
+# Sanity-check every arch-specific BPF object bpf2go produced is non-empty.
 RUN set -eu; \
     if [ "$GOOS" = "linux" ] ; then \
     go mod init github.com/microsoft/retina; \
     go generate -skip "mockgen" -x /go/src/github.com/microsoft/retina/pkg/plugin/...; \
     if [ "$GOARCH" = "amd64" ]; then bpf_arch=x86; else bpf_arch="$GOARCH"; fi; \
-    test -s "./pkg/plugin/conntrack/conntrack_bpfel_${bpf_arch}.o"; \
+    objects="$(find ./pkg/plugin -type f -name "*_bpfel_${bpf_arch}.o" -print)"; \
+    test -n "$objects" || { echo "no BPF objects generated for ${bpf_arch}" >&2; exit 1; }; \
+    empty_objects="$(find ./pkg/plugin -type f -name "*_bpfel_${bpf_arch}.o" ! -size +0c -print)"; \
+    test -z "$empty_objects" || { printf 'empty BPF objects:\n%s\n' "$empty_objects" >&2; exit 1; }; \
     tar czf /gen.tar.gz ./pkg/plugin; \
     rm go.mod; \
     else \
