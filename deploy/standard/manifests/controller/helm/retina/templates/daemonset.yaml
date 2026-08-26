@@ -31,7 +31,7 @@ spec:
       {{- end }}
       initContainers:
         - name: init-retina
-          image: {{ .Values.image.initRepository }}:{{ .Values.image.tag }}
+          image: {{ .Values.image.initRepository }}:{{ .Values.image.tag | default .Chart.Version }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
             - --config
@@ -67,7 +67,7 @@ spec:
             timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds | default "1" }}
             failureThreshold: {{ .Values.livenessProbe.failureThreshold | default "3" }}
             successThreshold: {{ .Values.livenessProbe.successThreshold | default "1" }}
-          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.Version }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- if .Values.daemonset.container.retina.command }}
           command:
@@ -209,7 +209,7 @@ spec:
       hostNetwork: true
       containers:
         - name: retinawin
-          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.Version }}
           ports:
           - name: retina
             containerPort: {{ .Values.retinaPort }}
