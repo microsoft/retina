@@ -56,7 +56,7 @@ variables:
 jobs:
   - job: retina_images
     displayName: Build Agent Images - Linux
-    timeoutInMinutes: 60
+    timeoutInMinutes: 90
     strategy:
       matrix:
         amd64:
