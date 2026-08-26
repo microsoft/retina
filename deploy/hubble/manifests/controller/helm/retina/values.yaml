@@ -19,7 +19,7 @@ operator:
   replicas: 1
   repository: ghcr.io/microsoft/retina/retina-operator
   pullPolicy: Always
-  # -- Image tag; when empty, defaults to the chart version (the released version).
+  # -- Image tag; when empty, defaults to the chart version.
   tag: ""
   leaderElection: true
   identityGCInterval: 15m # cilium default
@@ -43,12 +43,13 @@ agent:
   enabled: true
   name: retina-agent
   repository: ghcr.io/microsoft/retina/retina-agent
+  # -- Image tag; when empty, defaults to the chart version.
   tag: ""
   init:
     enabled: true
     name: retina-agent-init
     repository: ghcr.io/microsoft/retina/retina-init
-
+    # -- Image tag; when empty, defaults to the chart version.
     tag: ""
   pullPolicy: Always
   container:
