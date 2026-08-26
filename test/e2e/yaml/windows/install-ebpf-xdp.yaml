@@ -23,10 +23,11 @@ spec:
         readinessProbe:
           exec:
             command:
-              - powershell.exe
-              - -command
-              - if (!(Test-Path C:\install-ebpf-xdp-probe-ready)) { exit 1 }
+              - cmd.exe
+              - /c
+              - if exist C:\install-ebpf-xdp-probe-ready (exit /b 0) else (exit /b 1)
           initialDelaySeconds: 10
+          timeoutSeconds: 10
           periodSeconds: 5
       hostNetwork: true
       nodeSelector:
