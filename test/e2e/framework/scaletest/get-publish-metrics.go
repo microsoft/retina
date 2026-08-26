@@ -28,6 +28,7 @@ const (
 	defaultRetryAttempts = 10
 	defaultRetryDelay    = 3 * time.Second
 	defaultInterval      = 2 * time.Minute
+	agentPoolLabel       = "kubernetes.azure.com/agentpool"
 )
 
 type GetAndPublishMetrics struct {
@@ -140,13 +141,19 @@ func (g *GetAndPublishMetrics) getAndPublishMetrics() error {
 
 	labelSelector := labels.Set(g.Labels).String()
 
-	agentsMetrics, err := g.getPodsMetrics(ctx, labelSelector)
+	nodePlatforms, err := g.getNodePlatforms(ctx)
+	if err != nil {
+		log.Println("Error getting node platforms, will try again later:", err)
+		return nil
+	}
+
+	agentsMetrics, err := g.getPodsMetrics(ctx, labelSelector, nodePlatforms)
 	if err != nil {
 		log.Println("Error getting agents' metrics, will try again later:", err)
 		return nil
 	}
 
-	operatorMetrics, err := g.getPodsMetrics(ctx, "app=retina-operator")
+	operatorMetrics, err := g.getPodsMetrics(ctx, "app=retina-operator", nodePlatforms)
 	if err != nil {
 		log.Println("Error getting operator's metrics, will try again later:", err)
 		return nil
@@ -191,7 +198,30 @@ func (g *GetAndPublishMetrics) getAndPublishMetrics() error {
 
 type metric map[string]string
 
-func (g *GetAndPublishMetrics) getPodsMetrics(ctx context.Context, labelSelector string) ([]metric, error) {
+type nodePlatform struct {
+	os        string
+	arch      string
+	agentPool string
+}
+
+func (g *GetAndPublishMetrics) getNodePlatforms(ctx context.Context) (map[string]nodePlatform, error) {
+	nodes, err := g.k8sClient.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("error listing nodes: %w", err)
+	}
+
+	platforms := make(map[string]nodePlatform, len(nodes.Items))
+	for i := range nodes.Items {
+		platforms[nodes.Items[i].Name] = nodePlatform{
+			os:        nodes.Items[i].Labels[v1.LabelOSStable],
+			arch:      nodes.Items[i].Labels[v1.LabelArchStable],
+			agentPool: nodes.Items[i].Labels[agentPoolLabel],
+		}
+	}
+	return platforms, nil
+}
+
+func (g *GetAndPublishMetrics) getPodsMetrics(ctx context.Context, labelSelector string, nodePlatforms map[string]nodePlatform) ([]metric, error) {
 
 	var pods *v1.PodList
 
@@ -281,6 +311,9 @@ func (g *GetAndPublishMetrics) getPodsMetrics(ctx context.Context, labelSelector
 		podHealth["podMemoryInMB"] = strconv.FormatInt(podMem.Value()/(1048576), 10)
 		podHealth["podRestarts"] = strconv.FormatInt(int64(restarts), 10)
 		podHealth["retinaNode"] = pod.Spec.NodeName
+		podHealth["nodeOS"] = nodePlatforms[pod.Spec.NodeName].os
+		podHealth["nodeArch"] = nodePlatforms[pod.Spec.NodeName].arch
+		podHealth["agentPool"] = nodePlatforms[pod.Spec.NodeName].agentPool
 		podHealth["nodeCpuInMilliCore"] = strconv.FormatInt(nodeCPU.MilliValue(), 10)
 		podHealth["nodeMemoryInMB"] = strconv.FormatInt(nodeMem.Value()/(1048576), 10)
 

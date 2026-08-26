@@ -26,7 +26,9 @@ type CreateCluster struct {
 	podCidr           string
 	vmSize            string
 	networkPluginMode string
+	nodeLabels        map[string]*string
 	Nodes             int32
+	WindowsNodes      int32
 }
 
 func (c *CreateCluster) SetPodCidr(podCidr string) *CreateCluster {
@@ -41,6 +43,19 @@ func (c *CreateCluster) SetVMSize(vmSize string) *CreateCluster {
 
 func (c *CreateCluster) SetNetworkPluginMode(networkPluginMode string) *CreateCluster {
 	c.networkPluginMode = networkPluginMode
+	return c
+}
+
+func (c *CreateCluster) SetWindowsNodes(nodes int32) *CreateCluster {
+	c.WindowsNodes = nodes
+	return c
+}
+
+func (c *CreateCluster) SetNodeLabels(labels map[string]string) *CreateCluster {
+	c.nodeLabels = make(map[string]*string, len(labels))
+	for key, value := range labels {
+		c.nodeLabels[key] = to.Ptr(value)
+	}
 	return c
 }
 
@@ -63,6 +78,11 @@ func (c *CreateCluster) Run() error {
 	if c.Nodes > 0 {
 		template.Properties.AgentPoolProfiles[0].Count = to.Ptr(c.Nodes)
 	}
+
+	if c.WindowsNodes > 0 {
+		template.Properties.AgentPoolProfiles = append(template.Properties.AgentPoolProfiles, windowsAgentPool(c.WindowsNodes))
+	}
+	setAgentPoolNodeLabels(template.Properties.AgentPoolProfiles, c.nodeLabels)
 
 	if c.podCidr != "" {
 		template.Properties.NetworkProfile.PodCidr = to.Ptr(c.podCidr)
@@ -88,6 +108,33 @@ func (c *CreateCluster) Run() error {
 	log.Printf("cluster created %s in location %s...", c.ClusterName, c.Location)
 
 	return nil
+}
+
+func windowsAgentPool(nodes int32) *armcontainerservice.ManagedClusterAgentPoolProfile {
+	return &armcontainerservice.ManagedClusterAgentPoolProfile{
+		Type:               to.Ptr(armcontainerservice.AgentPoolTypeVirtualMachineScaleSets),
+		Count:              to.Ptr(nodes),
+		EnableNodePublicIP: to.Ptr(false),
+		Mode:               to.Ptr(armcontainerservice.AgentPoolModeUser),
+		OSType:             to.Ptr(armcontainerservice.OSTypeWindows),
+		OSSKU:              to.Ptr(armcontainerservice.OSSKUWindows2022),
+		ScaleDownMode:      to.Ptr(armcontainerservice.ScaleDownModeDelete),
+		VMSize:             to.Ptr(AgentWindowsSKU),
+		Name:               to.Ptr("ws22"),
+		MaxPods:            to.Ptr(int32(MaxPodsPerNode)),
+	}
+}
+
+func setAgentPoolNodeLabels(pools []*armcontainerservice.ManagedClusterAgentPoolProfile, labels map[string]*string) {
+	if len(labels) == 0 {
+		return
+	}
+	for _, pool := range pools {
+		pool.NodeLabels = make(map[string]*string, len(labels))
+		for key, value := range labels {
+			pool.NodeLabels[key] = value
+		}
+	}
 }
 
 func GetStarterClusterTemplate(location string) armcontainerservice.ManagedCluster {

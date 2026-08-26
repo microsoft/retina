@@ -47,7 +47,7 @@ func DefaultScaleTestOptions() scaletest.Options {
 	}
 }
 
-func GetScaleTestInfra(subID, rg, clusterName, location, kubeConfigFilePath string, nodes int32, createInfra bool) *types.Job {
+func GetScaleTestInfra(subID, rg, clusterName, location, kubeConfigFilePath string, linuxNodes, windowsNodes int32, createInfra bool) *types.Job {
 	job := types.NewJob("Get scale test infrastructure")
 
 	if createInfra {
@@ -59,10 +59,12 @@ func GetScaleTestInfra(subID, rg, clusterName, location, kubeConfigFilePath stri
 
 		job.AddStep((&azure.CreateCluster{
 			ClusterName: clusterName,
-			Nodes:       nodes,
+			Nodes:       linuxNodes,
 		}).
 			SetPodCidr("100.64.0.0/10").
 			SetVMSize(azure.AgentLinuxSKU).
+			SetWindowsNodes(windowsNodes).
+			SetNodeLabels(map[string]string{"scale-test": "true"}).
 			SetNetworkPluginMode("overlay"), nil)
 
 		job.AddStep(&azure.GetAKSKubeConfig{
@@ -79,9 +81,29 @@ func GetScaleTestInfra(subID, rg, clusterName, location, kubeConfigFilePath stri
 		}, nil)
 	}
 
-	job.AddStep(&kubernetes.LabelNodes{
-		Labels: map[string]string{"scale-test": "true"},
-	}, nil)
+	if createInfra {
+		job.AddStep(&scaletest.ValidateNumOfNodes{
+			Label: map[string]string{
+				"scale-test":         "true",
+				"kubernetes.io/os":   "linux",
+				"kubernetes.io/arch": "amd64",
+			},
+			NumNodesRequired: int(linuxNodes),
+		}, nil)
+
+		job.AddStep(&scaletest.ValidateNumOfNodes{
+			Label: map[string]string{
+				"scale-test":         "true",
+				"kubernetes.io/os":   "windows",
+				"kubernetes.io/arch": "amd64",
+			},
+			NumNodesRequired: int(windowsNodes),
+		}, nil)
+	} else {
+		job.AddStep(&kubernetes.LabelNodes{
+			Labels: map[string]string{"scale-test": "true"},
+		}, nil)
+	}
 
 	job.AddStep(&generic.LoadFlags{
 		TagEnv:            generic.DefaultTagEnv,
@@ -99,15 +121,15 @@ func ScaleTest(opt *scaletest.Options) *types.Job {
 		Options: opt,
 	}, nil)
 
-	job.AddStep(&scaletest.ValidateNumOfNodes{
-		KubeConfigFilePath: opt.KubeconfigPath,
-		Label:              map[string]string{"scale-test": "true"},
-		NumNodesRequired: (opt.NumRealDeployments*opt.NumRealReplicas +
-			opt.MaxRealPodsPerNode - 1) / opt.MaxRealPodsPerNode,
-	}, nil)
+	validateRetinaPods := scaletest.NewValidatePlatformPods(opt.KubeconfigPath, common.KubeSystemNamespace, "k8s-app=retina")
+	validateRetinaPods.ExpectedLinuxPods = opt.NumLinuxNodes
+	validateRetinaPods.ExpectedWindowsPods = opt.NumWindowsNodes
+	validateRetinaPods.RequireNoRestarts = true
+	job.AddStep(validateRetinaPods, nil)
 
 	job.AddStep(&kubernetes.DeleteNamespace{
-		Namespace: opt.Namespace,
+		Namespace:          opt.Namespace,
+		KubeConfigFilePath: opt.KubeconfigPath,
 	}, nil)
 
 	job.AddStep(&kubernetes.CreateNamespace{}, nil)
@@ -129,9 +151,11 @@ func ScaleTest(opt *scaletest.Options) *types.Job {
 		NumKwokDeployments:           opt.NumKwokDeployments,
 		NumKwokReplicas:              opt.NumKwokReplicas,
 		RealPodType:                  opt.RealPodType,
-		NumRealDeployments:           opt.NumRealDeployments,
+		NumLinuxDeployments:          opt.NumLinuxDeployments,
+		NumWindowsDeployments:        opt.NumWindowsDeployments,
 		NumRealReplicas:              opt.NumRealReplicas,
-		NumRealServices:              opt.NumRealServices,
+		NumLinuxServices:             opt.NumLinuxServices,
+		NumWindowsServices:           opt.NumWindowsServices,
 		NumUniqueLabelsPerDeployment: opt.NumUniqueLabelsPerDeployment,
 	}, nil)
 
@@ -153,12 +177,27 @@ func ScaleTest(opt *scaletest.Options) *types.Job {
 		LabelSelector: "is-real=true",
 	}, nil)
 
+	validateWorkloadPods := scaletest.NewValidatePlatformPods(opt.KubeconfigPath, opt.Namespace, "is-real=true")
+	validateWorkloadPods.ExpectedLinuxPods = opt.NumLinuxDeployments * opt.NumRealReplicas
+	validateWorkloadPods.ExpectedWindowsPods = opt.NumWindowsDeployments * opt.NumRealReplicas
+	job.AddStep(validateWorkloadPods, nil)
+
 	job.AddStep(&scaletest.DeleteAndReAddLabels{
 		DeleteLabels:          opt.DeleteLabels,
 		DeleteLabelsInterval:  opt.DeleteLabelsInterval,
 		DeleteLabelsTimes:     opt.DeleteLabelsTimes,
 		NumSharedLabelsPerPod: opt.NumSharedLabelsPerPod,
 	}, nil)
+
+	if opt.NumWindowsNodes > 0 {
+		job.AddStep(scaletest.NewValidatePlatformTraffic(opt.KubeconfigPath, opt.Namespace, "app=kapinger"), nil)
+	}
+
+	validateRetinaPods = scaletest.NewValidatePlatformPods(opt.KubeconfigPath, common.KubeSystemNamespace, "k8s-app=retina")
+	validateRetinaPods.ExpectedLinuxPods = opt.NumLinuxNodes
+	validateRetinaPods.ExpectedWindowsPods = opt.NumWindowsNodes
+	validateRetinaPods.RequireNoRestarts = true
+	job.AddStep(validateRetinaPods, nil)
 
 	job.AddStep(&types.Stop{
 		BackgroundID: "get-metrics",

@@ -10,6 +10,8 @@ var (
 	ResourceGroup      = os.Getenv("AZURE_RESOURCE_GROUP")
 	ClusterName        = os.Getenv("CLUSTER_NAME")
 	Nodes              = os.Getenv("NODES")
+	LinuxNodes         = os.Getenv("LINUX_NODES")
+	WindowsNodes       = os.Getenv("WINDOWS_NODES")
 	NumDeployments     = os.Getenv("NUM_DEPLOYMENTS")
 	NumReplicas        = os.Getenv("NUM_REPLICAS")
 	NumNetworkPolicies = os.Getenv("NUM_NET_POL")

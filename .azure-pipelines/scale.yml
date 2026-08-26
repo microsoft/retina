@@ -52,10 +52,14 @@ parameters:
     displayName: Number of Network Policies
     type: number
     default: 0
-  - name: num_nodes
-    displayName: Number of nodes
+  - name: num_linux_nodes
+    displayName: Number of Linux nodes
     type: number
-    default: 1000
+    default: 800
+  - name: num_windows_nodes
+    displayName: Number of Windows nodes
+    type: number
+    default: 200
   - name: cleanup
     displayName: Clean up environment after test
     type: boolean
@@ -85,7 +89,8 @@ jobs:
           CLEANUP: ${{ parameters.cleanup }}
           IMAGE_NAMESPACE: ${{ parameters.image_namespace }}
           TAG: ${{ parameters.image_tag }}
-          NODES: ${{ parameters.num_nodes }}
+          LINUX_NODES: ${{ parameters.num_linux_nodes }}
+          WINDOWS_NODES: ${{ parameters.num_windows_nodes }}
           AZURE_APP_INSIGHTS_KEY: $(AZURE_APP_INSIGHTS_KEY)
         inputs:
           azureSubscription: $(azureServiceConnection)

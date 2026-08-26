@@ -18,9 +18,11 @@ type CreateResources struct {
 	NumKwokDeployments           int
 	NumKwokReplicas              int
 	RealPodType                  string
-	NumRealDeployments           int
+	NumLinuxDeployments          int
+	NumWindowsDeployments        int
 	NumRealReplicas              int
-	NumRealServices              int
+	NumLinuxServices             int
+	NumWindowsServices           int
 	NumUniqueLabelsPerDeployment int
 }
 
@@ -89,18 +91,20 @@ func (c *CreateResources) getResources() []runtime.Object {
 
 	objs = append(objs, kapingerClusterRole, kapingerClusterRoleBinding, kapingerSA)
 
-	realDeployments := c.generateDeployments()
-	objs = append(objs, realDeployments...)
-
-	services := c.generateServices()
+	services := c.generateServices("linux", c.NumLinuxServices)
+	services = append(services, c.generateServices("windows", c.NumWindowsServices)...)
 	objs = append(objs, services...)
+
+	realDeployments := c.generateDeployments("linux", c.NumLinuxDeployments)
+	realDeployments = append(realDeployments, c.generateDeployments("windows", c.NumWindowsDeployments)...)
+	objs = append(objs, realDeployments...)
 
 	// c.generateKwokNodes()
 	log.Println("Finished generating YAMLs")
 	return objs
 }
 
-func (c *CreateResources) generateDeployments() []runtime.Object {
+func (c *CreateResources) generateDeployments(os string, count int) []runtime.Object {
 	objs := []runtime.Object{}
 
 	kapinger := e2ekubernetes.CreateKapingerDeployment{
@@ -114,14 +118,17 @@ func (c *CreateResources) generateDeployments() []runtime.Object {
 		template.Labels = make(map[string]string)
 	}
 	template.Labels["is-real"] = "true"
+	template.Labels[TrafficOSLabel] = os
 	template.Spec.Template.Labels["is-real"] = "true"
+	template.Spec.Template.Labels[TrafficOSLabel] = os
 	template.Spec.Template.Spec.NodeSelector["scale-test"] = "true"
 	template.Spec.Template.Spec.NodeSelector["kubernetes.io/arch"] = "amd64"
+	template.Spec.Template.Spec.NodeSelector["kubernetes.io/os"] = os
 
-	for i := 0; i < c.NumRealDeployments; i++ {
+	for i := 0; i < count; i++ {
 		deployment := template.DeepCopy()
 
-		name := fmt.Sprintf("%s-dep-%05d", c.RealPodType, i)
+		name := fmt.Sprintf("%s-%s-dep-%05d", c.RealPodType, os, i)
 		labelPrefix := fmt.Sprintf("%s-dep-lab", name)
 
 		deployment.Name = name
@@ -144,7 +151,7 @@ func (c *CreateResources) generateDeployments() []runtime.Object {
 	return objs
 }
 
-func (c *CreateResources) generateServices() []runtime.Object {
+func (c *CreateResources) generateServices(os string, count int) []runtime.Object {
 	objs := []runtime.Object{}
 
 	kapingerSvc := e2ekubernetes.CreateKapingerDeployment{
@@ -152,13 +159,14 @@ func (c *CreateResources) generateServices() []runtime.Object {
 		KubeConfigFilePath: c.KubeConfigFilePath,
 	}
 
-	for i := 0; i < c.NumRealServices; i++ {
+	for i := 0; i < count; i++ {
 		template := kapingerSvc.GetKapingerService()
 
-		name := fmt.Sprintf("%s-svc-%05d", c.RealPodType, i)
+		name := fmt.Sprintf("%s-%s-svc-%05d", c.RealPodType, os, i)
 		template.Name = name
+		template.Labels[TrafficOSLabel] = os
 
-		template.Spec.Selector["name"] = fmt.Sprintf("%s-dep-%05d", c.RealPodType, i)
+		template.Spec.Selector["name"] = fmt.Sprintf("%s-%s-dep-%05d", c.RealPodType, os, i)
 
 		objs = append(objs, template)
 	}

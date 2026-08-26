@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/retina/test/e2e/framework/generic"
 	"github.com/microsoft/retina/test/e2e/framework/helpers"
 	"github.com/microsoft/retina/test/e2e/framework/params"
+	"github.com/microsoft/retina/test/e2e/framework/scaletest"
 	"github.com/microsoft/retina/test/e2e/framework/types"
 	jobs "github.com/microsoft/retina/test/e2e/jobs"
 	"github.com/stretchr/testify/require"
@@ -27,8 +28,10 @@ func TestE2ERetina_Scale(t *testing.T) {
 	require.NotEmpty(t, subID)
 	location := common.ScaleTestInfra.GetLocation()
 	rg := common.ScaleTestInfra.GetResourceGroup()
-	nodes, err := strconv.ParseInt(common.ScaleTestInfra.GetNodes(), 10, 32)
-	require.NoError(t, err, "NODES must be an integer within int32 range")
+	linuxNodes, err := strconv.ParseInt(common.ScaleTestInfra.GetLinuxNodes(), 10, 32)
+	require.NoError(t, err, "LINUX_NODES must be an integer within int32 range")
+	windowsNodes, err := strconv.ParseInt(common.ScaleTestInfra.GetWindowsNodes(), 10, 32)
+	require.NoError(t, err, "WINDOWS_NODES must be an integer within int32 range")
 
 	cwd, err := os.Getwd()
 	require.NoError(t, err)
@@ -66,6 +69,13 @@ func TestE2ERetina_Scale(t *testing.T) {
 		require.NoError(t, err)
 	}
 
+	opt.NumLinuxNodes = int(linuxNodes)
+	opt.NumWindowsNodes = int(windowsNodes)
+	opt.NumLinuxDeployments, opt.NumWindowsDeployments, err = scaletest.SplitCountByNodes(opt.NumRealDeployments, opt.NumLinuxNodes, opt.NumWindowsNodes)
+	require.NoError(t, err)
+	opt.NumLinuxServices, opt.NumWindowsServices, err = scaletest.SplitCountByNodes(opt.NumRealServices, opt.NumLinuxNodes, opt.NumWindowsNodes)
+	require.NoError(t, err)
+
 	RetinaVersion := os.Getenv(generic.DefaultTagEnv)
 	require.NotEmpty(t, RetinaVersion)
 	opt.AdditionalTelemetryProperty["retinaVersion"] = RetinaVersion
@@ -77,7 +87,7 @@ func TestE2ERetina_Scale(t *testing.T) {
 	opt.LabelsToGetMetrics = map[string]string{"k8s-app": "retina"}
 
 	// CreateTestInfra
-	infra := types.NewRunner(t, jobs.GetScaleTestInfra(subID, rg, clusterName, location, common.KubeConfigFilePath(rootDir), int32(nodes), *common.CreateInfra))
+	infra := types.NewRunner(t, jobs.GetScaleTestInfra(subID, rg, clusterName, location, common.KubeConfigFilePath(rootDir), int32(linuxNodes), int32(windowsNodes), *common.CreateInfra))
 
 	t.Cleanup(func() {
 		_ = jobs.DeleteTestInfra(subID, rg, location, *common.DeleteInfra).Run()

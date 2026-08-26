@@ -35,7 +35,9 @@ var (
 		subscriptionID: params.SubscriptionID,
 		resourceGroup:  params.ResourceGroup,
 		clusterName:    params.ClusterName,
-		nodes:          params.Nodes,
+		linuxNodes:     params.LinuxNodes,
+		windowsNodes:   params.WindowsNodes,
+		legacyNodes:    params.Nodes,
 	}
 
 	// kubeconfig: path to kubeconfig file, in not provided,
@@ -63,7 +65,9 @@ type ScaleTestInfraHandler struct {
 	subscriptionID string
 	resourceGroup  string
 	clusterName    string
-	nodes          string
+	linuxNodes     string
+	windowsNodes   string
+	legacyNodes    string
 }
 
 func (s ScaleTestInfraHandler) GetSubscriptionID() string {
@@ -85,12 +89,21 @@ func (s ScaleTestInfraHandler) GetResourceGroup() string {
 	return s.GetClusterName()
 }
 
-func (s ScaleTestInfraHandler) GetNodes() string {
-	if s.nodes == "" {
-		// Default to 100 nodes per pool
-		return "100"
+func (s ScaleTestInfraHandler) GetLinuxNodes() string {
+	if s.linuxNodes != "" {
+		return s.linuxNodes
 	}
-	return s.nodes
+	if s.legacyNodes != "" {
+		return s.legacyNodes
+	}
+	return "100"
+}
+
+func (s ScaleTestInfraHandler) GetWindowsNodes() string {
+	if s.windowsNodes == "" {
+		return "0"
+	}
+	return s.windowsNodes
 }
 
 func (s ScaleTestInfraHandler) GetClusterName() string {

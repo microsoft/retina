@@ -10,9 +10,15 @@ type Options struct {
 	NumKwokReplicas               int
 	MaxRealPodsPerNode            int
 	NumRealDeployments            int
+	NumLinuxDeployments           int
+	NumWindowsDeployments         int
 	RealPodType                   string
 	NumRealReplicas               int
 	NumRealServices               int
+	NumLinuxServices              int
+	NumWindowsServices            int
+	NumLinuxNodes                 int
+	NumWindowsNodes               int
 	NumNetworkPolicies            int
 	NumUnapliedNetworkPolicies    int
 	NumUniqueLabelsPerPod         int

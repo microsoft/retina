@@ -19,13 +19,30 @@ func (po *ValidateAndPrintOptions) Prevalidate() error {
 		po.Options.NumKwokReplicas < 0 ||
 		po.Options.MaxRealPodsPerNode < 0 ||
 		po.Options.NumRealDeployments < 0 ||
+		po.Options.NumLinuxDeployments < 0 ||
+		po.Options.NumWindowsDeployments < 0 ||
 		po.Options.NumRealReplicas < 0 ||
+		po.Options.NumRealServices < 0 ||
+		po.Options.NumLinuxServices < 0 ||
+		po.Options.NumWindowsServices < 0 ||
+		po.Options.NumLinuxNodes < 0 ||
+		po.Options.NumWindowsNodes < 0 ||
 		po.Options.NumNetworkPolicies < 0 ||
 		po.Options.NumUnapliedNetworkPolicies < 0 ||
 		po.Options.NumUniqueLabelsPerPod < 0 ||
 		po.Options.NumUniqueLabelsPerDeployment < 0 ||
 		po.Options.NumSharedLabelsPerPod < 0 {
 		return errors.New("invalid negative value option for Scale step")
+	}
+
+	if po.Options.NumLinuxDeployments+po.Options.NumWindowsDeployments != po.Options.NumRealDeployments {
+		return errors.New("Linux and Windows deployments must add up to NumRealDeployments")
+	}
+	if po.Options.NumLinuxServices+po.Options.NumWindowsServices != po.Options.NumRealServices {
+		return errors.New("Linux and Windows services must add up to NumRealServices")
+	}
+	if po.Options.NumWindowsNodes > 0 && (po.Options.NumWindowsDeployments == 0 || po.Options.NumWindowsServices == 0) {
+		return errors.New("Windows nodes require Windows deployments and services")
 	}
 
 	if po.Options.NumNetworkPolicies > 0 && po.Options.NumSharedLabelsPerPod < 3 {
