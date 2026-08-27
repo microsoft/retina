@@ -158,6 +158,10 @@ Metrics enabled when `tcpretrans` plugin is enabled (see [Metrics Configuration]
 | ---------------------- | -------------------------------------------------------- | -------------- |
 | `adv_tcpretrans_count` | ***Advanced/Pod-Level***: TCP retransmitted packet count | context labels |
 
+> **Note:** This differs from
+> node-wide `linuxutil` counters such as
+> `tcp_connection_stats{statistic_name="TCPLostRetransmit"}`.
+
 #### Label Values
 
 See [Context Labels](#context-labels).
