@@ -117,16 +117,17 @@ func DeleteTestInfra(subID, rg, location string, deleteInfra bool) *types.Job {
 	return job
 }
 
-func InstallRetina(kubeConfigFilePath, chartPath string, enableHeartBeat bool) *types.Job {
-	job := types.NewJob("Install and test Retina with basic metrics")
+func InstallRetinaForScale(kubeConfigFilePath, chartPath string, enableHeartBeat bool) *types.Job {
+	job := types.NewJob("Install Retina with advanced local-context metrics")
 
 	job.AddStep(&kubernetes.InstallHelmChart{
-		Namespace:          common.KubeSystemNamespace,
-		ReleaseName:        "retina",
-		KubeConfigFilePath: kubeConfigFilePath,
-		ChartPath:          chartPath,
-		TagEnv:             generic.DefaultTagEnv,
-		EnableHeartbeat:    enableHeartBeat,
+		Namespace:                  common.KubeSystemNamespace,
+		ReleaseName:                "retina",
+		KubeConfigFilePath:         kubeConfigFilePath,
+		ChartPath:                  chartPath,
+		TagEnv:                     generic.DefaultTagEnv,
+		EnableHeartbeat:            enableHeartBeat,
+		EnableAdvancedLocalContext: true,
 	}, nil)
 
 	return job

@@ -14,10 +14,11 @@ import (
 type CreateNamespace struct {
 	Namespace          string
 	KubeConfigFilePath string
+	Annotations        map[string]string
 }
 
 func (c *CreateNamespace) Run() error {
-	return CreateNamespaceFn(c.KubeConfigFilePath, c.Namespace)
+	return createNamespace(c.KubeConfigFilePath, c.getNamespace())
 }
 
 func (c *CreateNamespace) Stop() error {
@@ -35,12 +36,21 @@ func (c *CreateNamespace) getNamespace() *v1.Namespace {
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: c.Namespace,
+			Name:        c.Namespace,
+			Annotations: c.Annotations,
 		},
 	}
 }
 
 func CreateNamespaceFn(kubeconfigpath, namespace string) error {
+	return createNamespace(kubeconfigpath, &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespace,
+		},
+	})
+}
+
+func createNamespace(kubeconfigpath string, namespace *v1.Namespace) error {
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfigpath)
 	if err != nil {
 		return fmt.Errorf("error building kubeconfig: %w", err)
@@ -53,16 +63,12 @@ func CreateNamespaceFn(kubeconfigpath, namespace string) error {
 
 	ctx := context.TODO()
 
-	_, err = clientset.CoreV1().Namespaces().Create(ctx, &v1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: namespace,
-		},
-	}, metav1.CreateOptions{})
+	_, err = clientset.CoreV1().Namespaces().Create(ctx, namespace, metav1.CreateOptions{})
 	if err != nil && !errors.IsAlreadyExists(err) {
-		return fmt.Errorf("failed to create namespace \"%s\": %w", namespace, err)
+		return fmt.Errorf("failed to create namespace \"%s\": %w", namespace.Name, err)
 	}
 
-	fmt.Printf("Namespace \"%s\" created.\n", namespace)
+	fmt.Printf("Namespace \"%s\" created.\n", namespace.Name)
 
 	return nil
 }

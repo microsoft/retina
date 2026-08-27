@@ -4,6 +4,7 @@ import (
 	"os"
 	"time"
 
+	retinacommon "github.com/microsoft/retina/pkg/common"
 	"github.com/microsoft/retina/test/e2e/common"
 	"github.com/microsoft/retina/test/e2e/framework/azure"
 	"github.com/microsoft/retina/test/e2e/framework/generic"
@@ -132,7 +133,11 @@ func ScaleTest(opt *scaletest.Options) *types.Job {
 		KubeConfigFilePath: opt.KubeconfigPath,
 	}, nil)
 
-	job.AddStep(&kubernetes.CreateNamespace{}, nil)
+	job.AddStep(&kubernetes.CreateNamespace{
+		Annotations: map[string]string{
+			retinacommon.RetinaPodAnnotation: retinacommon.RetinaPodAnnotationValue,
+		},
+	}, nil)
 
 	// There's a known limitation on leaving empty fields in Steps.
 	// Set methods are used to set private fields and keep environment variables accessed within jobs, rather then spread through steps.

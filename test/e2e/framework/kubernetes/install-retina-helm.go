@@ -32,12 +32,13 @@ var (
 )
 
 type InstallHelmChart struct {
-	Namespace          string
-	ReleaseName        string
-	KubeConfigFilePath string
-	ChartPath          string
-	TagEnv             string
-	EnableHeartbeat    bool
+	Namespace                  string
+	ReleaseName                string
+	KubeConfigFilePath         string
+	ChartPath                  string
+	TagEnv                     string
+	EnableHeartbeat            bool
+	EnableAdvancedLocalContext bool
 }
 
 func (i *InstallHelmChart) Run() error {
@@ -96,10 +97,20 @@ func (i *InstallHelmChart) Run() error {
 			"pullPolicy":     "Always",
 		},
 		"operator": map[string]any{
-			"enabled":    true,
-			"repository": imageRegistry + "/" + imageNamespace + "/retina-operator",
-			"tag":        tag,
+			"enabled":              true,
+			"enableRetinaEndpoint": i.EnableAdvancedLocalContext,
+			"repository":           imageRegistry + "/" + imageNamespace + "/retina-operator",
+			"tag":                  tag,
 		},
+	}
+
+	if i.EnableAdvancedLocalContext {
+		overrides["enablePodLevel"] = true
+		overrides["enablePodLevelWin"] = true
+		overrides["enableAnnotations"] = true
+		overrides["remoteContext"] = false
+		overrides["packetParserRingBuffer"] = "enabled"
+		overrides["enabledPlugin_linux"] = `["dropreason","packetforward","packetparser", "dns"]`
 	}
 
 	if i.EnableHeartbeat {
