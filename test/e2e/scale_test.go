@@ -7,11 +7,13 @@ import (
 	"path/filepath"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/microsoft/retina/test/e2e/common"
 	"github.com/microsoft/retina/test/e2e/framework/azure"
 	"github.com/microsoft/retina/test/e2e/framework/generic"
 	"github.com/microsoft/retina/test/e2e/framework/helpers"
+	"github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	"github.com/microsoft/retina/test/e2e/framework/params"
 	"github.com/microsoft/retina/test/e2e/framework/scaletest"
 	"github.com/microsoft/retina/test/e2e/framework/types"
@@ -98,6 +100,30 @@ func TestE2ERetina_Scale(t *testing.T) {
 	fqdn, err := azure.GetFqdnFn(subID, rg, clusterName)
 	require.NoError(t, err)
 	opt.AdditionalTelemetryProperty["clusterFqdn"] = fqdn
+
+	if windowsNodes > 0 {
+		installEbpfAndXDP := types.NewRunner(t, jobs.InstallEbpfXdpForScale(common.KubeConfigFilePath(rootDir)))
+		installEbpfAndXDP.Run(ctx)
+
+		validateSetupPods := scaletest.NewValidatePlatformPods(
+			common.KubeConfigFilePath(rootDir),
+			"install-ebpf-xdp",
+			"name=install-ebpf-xdp-scale",
+		)
+		validateSetupPods.ExpectedWindowsPods = int(windowsNodes)
+		validateSetupJob := types.NewJob("Validate Windows EBPF setup pods")
+		validateSetupJob.AddStep(validateSetupPods, nil)
+		types.NewRunner(t, validateSetupJob).Run(ctx)
+
+		err = kubernetes.WaitForPodReadyWithTimeOut(
+			ctx,
+			common.KubeConfigFilePath(rootDir),
+			"install-ebpf-xdp",
+			"name=install-ebpf-xdp-scale",
+			30*time.Minute,
+		)
+		require.NoError(t, err, "Windows EBPF setup did not complete on every Windows node")
+	}
 
 	// Install Retina
 	installRetina := types.NewRunner(t, jobs.InstallRetinaForScale(common.KubeConfigFilePath(rootDir), common.RetinaChartPath(rootDir), true))
