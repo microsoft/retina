@@ -400,7 +400,7 @@ func TestEmitAdvancedEvent(t *testing.T) {
 				}
 			}
 			if tt.wantWrite {
-				mockEnricher.EXPECT().Write(event).Return(nil)
+				mockEnricher.EXPECT().Write(event)
 			}
 
 			p := &Plugin{
