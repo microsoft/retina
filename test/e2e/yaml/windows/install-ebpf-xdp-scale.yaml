@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: install-ebpf-xdp-scale
+  namespace: install-ebpf-xdp
+spec:
+  selector:
+    matchLabels:
+      name: install-ebpf-xdp-scale
+  template:
+    metadata:
+      labels:
+        name: install-ebpf-xdp-scale
+    spec:
+      containers:
+      - name: install-ebpf-xdp-scale
+        image: "{{CONTAINER_IMAGE}}"
+        imagePullPolicy: Always
+        command:
+          - powershell.exe
+          - -command
+          - '& .\setup-scale-ebpf.ps1; while ($true) { Start-Sleep -Seconds 300; }'
+        readinessProbe:
+          exec:
+            command:
+              - cmd.exe
+              - /c
+              - if exist C:\install-ebpf-xdp-scale-probe-ready (exit /b 0) else (exit /b 1)
+          initialDelaySeconds: 10
+          timeoutSeconds: 10
+          periodSeconds: 5
+      hostNetwork: true
+      nodeSelector:
+        kubernetes.io/os: windows
+      securityContext:
+        windowsOptions:
+          hostProcess: true
+          runAsUserName: "NT AUTHORITY\\SYSTEM"

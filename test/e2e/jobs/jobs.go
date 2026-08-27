@@ -162,6 +162,24 @@ func InstallEbpfXdp(kubeConfigFilePath string) *types.Job {
 	return job
 }
 
+func InstallEbpfXdpForScale(kubeConfigFilePath string) *types.Job {
+	job := types.NewJob("Install EBPF and XDP for scale test")
+	job.AddStep(&kubernetes.CreateNamespace{
+		KubeConfigFilePath: kubeConfigFilePath,
+		Namespace:          "install-ebpf-xdp",
+	}, nil)
+
+	job.AddStep(&kubernetes.ApplyYamlConfig{
+		KubeConfigFilePath: kubeConfigFilePath,
+		YamlFilePath:       "yaml/windows/install-ebpf-xdp-scale.yaml",
+		ContainerImage:     eventWriterImage(),
+	}, &types.StepOptions{
+		SkipSavingParametersToJob: true,
+	})
+
+	return job
+}
+
 func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, testPodNamespace string) *types.Job {
 	job := types.NewJob("Install and test Retina with basic metrics")
 
