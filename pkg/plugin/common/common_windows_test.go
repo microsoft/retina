@@ -19,7 +19,7 @@ type fakeRegistryKey struct {
 	closed   bool
 }
 
-func (f *fakeRegistryKey) GetIntegerValue(string) (uint64, uint32, error) {
+func (f *fakeRegistryKey) GetIntegerValue(string) (value uint64, valueType uint32, err error) {
 	if f.valueErr != nil {
 		return 0, 0, f.valueErr
 	}

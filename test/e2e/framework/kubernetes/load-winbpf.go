@@ -20,6 +20,7 @@ var (
 	ErrNoWindowsPodFound = errors.New("no Windows Pod found in label")
 	ErrNoCommandOutput   = errors.New("no output from command")
 	ErrLoadPinBPFFailed  = errors.New("error in loading and pinning BPF maps and program")
+	ErrPodNotAssigned    = errors.New("pod is not assigned to a node")
 )
 
 type LoadAndPinWinBPF struct {
@@ -77,7 +78,7 @@ func GetPodNodeName(kubeConfigFilePath, namespace, podName string) (string, erro
 		return "", fmt.Errorf("error getting pod %s in namespace %s: %w", podName, namespace, err)
 	}
 	if pod.Spec.NodeName == "" {
-		return "", fmt.Errorf("pod %s in namespace %s is not assigned to a node", podName, namespace)
+		return "", fmt.Errorf("%w: pod %s in namespace %s", ErrPodNotAssigned, podName, namespace)
 	}
 
 	return pod.Spec.NodeName, nil
@@ -183,18 +184,39 @@ func (a *LoadAndPinWinBPF) Run() error {
 	}
 
 	for _, nodeName := range nodeNames {
-		_, err = ExecCommandInWinPod(a.KubeConfigFilePath, "copy /Y .\\event-writer-helper.bat C:\\event-writer-helper.bat", a.LoadAndPinWinBPFDeamonSetNamespace, LoadAndPinWinBPFDLabelSelector, nodeName, true)
+		_, err = ExecCommandInWinPod(
+			a.KubeConfigFilePath,
+			"copy /Y .\\event-writer-helper.bat C:\\event-writer-helper.bat",
+			a.LoadAndPinWinBPFDeamonSetNamespace,
+			LoadAndPinWinBPFDLabelSelector,
+			nodeName,
+			true,
+		)
 		if err != nil {
 			return err
 		}
 
-		_, err = ExecCommandInWinPod(a.KubeConfigFilePath, "C:\\event-writer-helper.bat EventWriter-Setup", a.LoadAndPinWinBPFDeamonSetNamespace, LoadAndPinWinBPFDLabelSelector, nodeName, true)
+		_, err = ExecCommandInWinPod(
+			a.KubeConfigFilePath,
+			"C:\\event-writer-helper.bat EventWriter-Setup",
+			a.LoadAndPinWinBPFDeamonSetNamespace,
+			LoadAndPinWinBPFDLabelSelector,
+			nodeName,
+			true,
+		)
 		if err != nil {
 			return err
 		}
 
 		// pin maps
-		output, execErr := ExecCommandInWinPod(a.KubeConfigFilePath, "C:\\event-writer-helper.bat EventWriter-LoadAndPinPrgAndMaps", a.LoadAndPinWinBPFDeamonSetNamespace, LoadAndPinWinBPFDLabelSelector, nodeName, false)
+		output, execErr := ExecCommandInWinPod(
+			a.KubeConfigFilePath,
+			"C:\\event-writer-helper.bat EventWriter-LoadAndPinPrgAndMaps",
+			a.LoadAndPinWinBPFDeamonSetNamespace,
+			LoadAndPinWinBPFDLabelSelector,
+			nodeName,
+			false,
+		)
 		if execErr != nil {
 			return execErr
 		}

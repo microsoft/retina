@@ -47,7 +47,8 @@ var errRegistryFailure = errors.New("registry failure")
 // immediately via Stop() (leaving state == stop) without querying HNS or VFP. A skipped
 // plugin never reaches pullHnsStats, so its state stays at start.
 func TestStart_CiliumRegistryMatrix(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	require.NoError(t, err)
 
 	tests := []struct {
 		name          string

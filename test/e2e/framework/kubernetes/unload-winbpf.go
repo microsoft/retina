@@ -19,7 +19,14 @@ func (a *UnLoadAndPinWinBPF) Run() error {
 	}
 
 	for _, nodeName := range nodeNames {
-		output, execErr := ExecCommandInWinPod(a.KubeConfigFilePath, "C:\\event-writer-helper.bat EventWriter-UnPinPrgAndMaps", a.UnLoadAndPinWinBPFDeamonSetNamespace, UnLoadAndPinWinBPFDLabelSelector, nodeName, false)
+		output, execErr := ExecCommandInWinPod(
+			a.KubeConfigFilePath,
+			"C:\\event-writer-helper.bat EventWriter-UnPinPrgAndMaps",
+			a.UnLoadAndPinWinBPFDeamonSetNamespace,
+			UnLoadAndPinWinBPFDLabelSelector,
+			nodeName,
+			false,
+		)
 		if execErr != nil {
 			return execErr
 		}
