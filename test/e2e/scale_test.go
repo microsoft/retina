@@ -108,7 +108,7 @@ func TestE2ERetina_Scale(t *testing.T) {
 		validateSetupPods := scaletest.NewValidatePlatformPods(
 			common.KubeConfigFilePath(rootDir),
 			"install-ebpf-xdp",
-			"name=install-ebpf-xdp-scale",
+			"name=install-ebpf-xdp",
 		)
 		validateSetupPods.ExpectedWindowsPods = int(windowsNodes)
 		validateSetupJob := types.NewJob("Validate Windows EBPF setup pods")
@@ -119,7 +119,7 @@ func TestE2ERetina_Scale(t *testing.T) {
 			ctx,
 			common.KubeConfigFilePath(rootDir),
 			"install-ebpf-xdp",
-			"name=install-ebpf-xdp-scale",
+			"name=install-ebpf-xdp",
 			30*time.Minute,
 		)
 		require.NoError(t, err, "Windows EBPF setup did not complete on every Windows node")

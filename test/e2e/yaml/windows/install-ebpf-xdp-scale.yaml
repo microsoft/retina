@@ -1,25 +1,37 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: install-ebpf-xdp-scale
+  name: install-ebpf-xdp
   namespace: install-ebpf-xdp
 spec:
   selector:
     matchLabels:
-      name: install-ebpf-xdp-scale
+      name: install-ebpf-xdp
   template:
     metadata:
       labels:
-        name: install-ebpf-xdp-scale
+        name: install-ebpf-xdp
     spec:
       containers:
-      - name: install-ebpf-xdp-scale
+      - name: install-ebpf-xdp-container
         image: "{{CONTAINER_IMAGE}}"
         imagePullPolicy: Always
         command:
           - powershell.exe
           - -command
-          - '& .\setup-scale-ebpf.ps1; while ($true) { Start-Sleep -Seconds 300; }'
+          - >-
+            $ErrorActionPreference = 'Stop';
+            $readyPath = 'C:\install-ebpf-xdp-scale-probe-ready';
+            Remove-Item -Path $readyPath -Force -ErrorAction SilentlyContinue;
+            & .\install-ebpf-xdp.ps1;
+            & cmd.exe /c 'copy /Y .\event-writer-helper.bat C:\event-writer-helper.bat';
+            if ($LASTEXITCODE -ne 0) { throw "Copying event-writer-helper.bat failed with exit code $LASTEXITCODE" };
+            & cmd.exe /c '.\event-writer-helper.bat EventWriter-Setup';
+            if ($LASTEXITCODE -ne 0) { throw "EventWriter-Setup failed with exit code $LASTEXITCODE" };
+            & cmd.exe /c 'C:\event-writer-helper.bat EventWriter-LoadAndPinPrgAndMaps';
+            if ($LASTEXITCODE -ne 0) { throw "EventWriter-LoadAndPinPrgAndMaps failed with exit code $LASTEXITCODE" };
+            New-Item -Path $readyPath -ItemType File -Force | Out-Null;
+            while ($true) { Start-Sleep -Seconds 300 }
         readinessProbe:
           exec:
             command:
