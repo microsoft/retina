@@ -25,6 +25,9 @@ ARG GOOS=linux
 ARG GOARCH=amd64
 ENV GOOS=${GOOS}
 ENV GOARCH=${GOARCH}
+ENV CGO_ENABLED=0
+# systemcrypto without cgo is required by Microsoft Go 1.26.
+ENV GOEXPERIMENT=ms_nocgo_opensslcrypto
 RUN if [ "$GOOS" = "linux" ] ; then \
     tdnf install -y clang lld bpftool libbpf-devel; \
     fi
@@ -44,9 +47,8 @@ RUN set -eu; \
 
 # intermediate go generate stage
 FROM golang AS intermediate 
-# systemcrypto without cgo — required for arm64 cross-compile from amd64 host
-# (Go auto-disables cgo when cross-compiling, and systemcrypto in Go <=1.26
-# requires cgo unless this experiment is set). Becomes redundant with Go 1.27+.
+# Microsoft Go 1.26 needs the no-cgo OpenSSL backend when cross-compiling
+# application binaries, because Go automatically disables cgo.
 ENV GOEXPERIMENT=ms_nocgo_opensslcrypto
 ARG APP_INSIGHTS_ID # set to enable AI telemetry
 ARG GOARCH=amd64 # default to amd64
