@@ -10,6 +10,7 @@ spec:
   ports:
     - name: api
       port: {{ .Values.service.port }}
+      protocol: TCP
       targetPort: {{ .Values.retinaPort }}
   selector:
     app: {{ include "retina.name" . }}
