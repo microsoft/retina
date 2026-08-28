@@ -325,7 +325,7 @@ jobs:
 
   - job: manifests
     displayName: Generate Manifests
-    condition: eq(variables['isMergeGroup'], 'True')
+    condition: and(succeeded(), eq(variables['isMergeGroup'], 'True'))
     dependsOn:
       - retina_images
       - retina_image_win
@@ -363,7 +363,7 @@ jobs:
 
   - job: e2e
     displayName: Run E2E Tests
-    condition: eq(variables['isMergeGroup'], 'True')
+    condition: and(succeeded(), eq(variables['isMergeGroup'], 'True'))
     dependsOn: manifests
     timeoutInMinutes: 90
     pool:
@@ -406,7 +406,7 @@ jobs:
 
   - job: perf_basic
     displayName: Retina basic Performance Test
-    condition: eq(variables['isMergeGroup'], 'True')
+    condition: and(succeeded(), eq(variables['isMergeGroup'], 'True'))
     dependsOn:
       - manifests
       - e2e
@@ -456,7 +456,7 @@ jobs:
 
   - job: perf_advanced
     displayName: Retina advanced Performance Test
-    condition: eq(variables['isMergeGroup'], 'True')
+    condition: and(succeeded(), eq(variables['isMergeGroup'], 'True'))
     dependsOn:
       - manifests
       - e2e
