@@ -8,7 +8,7 @@ metadata:
     app: {{ include "retina.name" . }}
 spec:
   ports:
-    - name: api
+    - name: {{ .Values.service.name }}
       port: {{ .Values.service.port }}
       protocol: TCP
       targetPort: {{ .Values.retinaPort }}
