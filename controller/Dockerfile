@@ -25,14 +25,23 @@ ARG GOOS=linux
 ARG GOARCH=amd64
 ENV GOOS=${GOOS}
 ENV GOARCH=${GOARCH}
+ENV CGO_ENABLED=0
+ENV GOEXPERIMENT=ms_nocgo_opensslcrypto
 RUN if [ "$GOOS" = "linux" ] ; then \
     tdnf install -y clang lld bpftool libbpf-devel; \
     fi
 COPY ./pkg/plugin /go/src/github.com/microsoft/retina/pkg/plugin
 WORKDIR /go/src/github.com/microsoft/retina
-RUN if [ "$GOOS" = "linux" ] ; then \
+# Sanity-check every arch-specific BPF object bpf2go produced is non-empty.
+RUN set -eu; \
+    if [ "$GOOS" = "linux" ] ; then \
     go mod init github.com/microsoft/retina; \
     go generate -skip "mockgen" -x /go/src/github.com/microsoft/retina/pkg/plugin/...; \
+    if [ "$GOARCH" = "amd64" ]; then bpf_arch=x86; else bpf_arch="$GOARCH"; fi; \
+    objects="$(find ./pkg/plugin -type f -name "*_bpfel_${bpf_arch}.o" -print)"; \
+    test -n "$objects" || { echo "no BPF objects generated for ${bpf_arch}" >&2; exit 1; }; \
+    empty_objects="$(find ./pkg/plugin -type f -name "*_bpfel_${bpf_arch}.o" ! -size +0c -print)"; \
+    test -z "$empty_objects" || { printf 'empty BPF objects:\n%s\n' "$empty_objects" >&2; exit 1; }; \
     tar czf /gen.tar.gz ./pkg/plugin; \
     rm go.mod; \
     else \

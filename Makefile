@@ -73,7 +73,7 @@ RETINA_PLATFORM_TAG        = $(TAG)-windows-ltsc$(YEAR)-amd64
 endif
 
 qemu-user-static: ## Set up the host to run qemu multiplatform container builds.
-	sudo $(CONTAINER_RUNTIME) run --rm --privileged multiarch/qemu-user-static --reset -p yes
+	sudo $(CONTAINER_RUNTIME) run --rm --privileged tonistiigi/binfmt --install arm64
 
 .PHONY: version
 version: ## prints the root version
@@ -261,6 +261,7 @@ container-docker-windows: # util target to build Windows container images withou
 
 retina-image: ## build the retina linux container image.
 	echo "Building for $(PLATFORM)"
+	set -e; \
 	for target in $(AGENT_TARGETS); do \
 		echo "Building for $$target"; \
 		if [ "$$target" = "init" ]; then \
@@ -455,8 +456,7 @@ COVER_PKG ?= .
 
 .PHONY: test
 test: # Run unit tests.
-	go build -o test-summary ./test/utsummary/main.go
-	bash -o pipefail -c 'KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit,dashboard -skip=TestE2E* -coverprofile=coverage.out -v -json ./... | ./test-summary --progress --verbose'
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit,dashboard -skip=TestE2E* -coverprofile=coverage.out -v ./...
 
 .PHONY: test-ebpf
 test-ebpf: # Run eBPF program tests (requires root/CAP_BPF).
