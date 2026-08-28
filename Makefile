@@ -261,6 +261,7 @@ container-docker-windows: # util target to build Windows container images withou
 
 retina-image: ## build the retina linux container image.
 	echo "Building for $(PLATFORM)"
+	set -e; \
 	for target in $(AGENT_TARGETS); do \
 		echo "Building for $$target"; \
 		if [ "$$target" = "init" ]; then \
