@@ -456,8 +456,7 @@ COVER_PKG ?= .
 
 .PHONY: test
 test: # Run unit tests.
-	go build -o test-summary ./test/utsummary/main.go
-	bash -o pipefail -c 'KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit,dashboard -skip=TestE2E* -coverprofile=coverage.out -v -json ./... | ./test-summary --progress --verbose'
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit,dashboard -skip=TestE2E* -coverprofile=coverage.out -v ./...
 
 .PHONY: test-ebpf
 test-ebpf: # Run eBPF program tests (requires root/CAP_BPF).
