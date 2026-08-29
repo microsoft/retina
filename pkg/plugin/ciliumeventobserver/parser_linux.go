@@ -2,6 +2,7 @@ package ciliumeventobserver
 
 import (
 	"errors"
+	"log/slog"
 	"time"
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
@@ -12,7 +13,6 @@ import (
 	monitorAPI "github.com/cilium/cilium/pkg/monitor/api"
 	"github.com/cilium/cilium/pkg/monitor/payload"
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 	"go.uber.org/zap"
 )
 
@@ -22,7 +22,7 @@ var (
 )
 
 func (p *parser) Init() error {
-	parser, err := hp.New(logrus.WithField("cilium", "parser"),
+	parser, err := hp.New(slog.Default().With("cilium", "parser"),
 		// We use noOp getters here since we will use our own custom parser in hubble
 		&hptestutils.NoopEndpointGetter,
 		&hptestutils.NoopIdentityGetter,
@@ -31,6 +31,7 @@ func (p *parser) Init() error {
 		&hptestutils.NoopServiceGetter,
 		&hptestutils.NoopLinkGetter,
 		&hptestutils.NoopPodMetadataGetter,
+		true,
 	)
 	if err != nil {
 		p.l.Fatal("Failed to create parser", zap.Error(err))

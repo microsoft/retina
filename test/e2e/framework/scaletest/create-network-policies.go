@@ -3,7 +3,6 @@ package scaletest
 import (
 	"context"
 	"fmt"
-	"time"
 
 	e2ekubernetes "github.com/microsoft/retina/test/e2e/framework/kubernetes"
 
@@ -45,8 +44,7 @@ func (c *CreateNetworkPolicies) Run() error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeoutSeconds*time.Second)
-	defer cancel()
+	ctx := context.TODO()
 
 	networkPolicies := c.generateNetworkPolicies(c.NumNetworkPolicies)
 

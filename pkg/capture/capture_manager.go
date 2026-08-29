@@ -6,6 +6,7 @@ package capture
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -41,7 +42,7 @@ func NewCaptureManager(logger *log.ZapLogger, tel telemetry.Telemetry) *CaptureM
 	}
 }
 
-func (cm *CaptureManager) CaptureNetwork(sigChan <-chan os.Signal) (string, error) {
+func (cm *CaptureManager) CaptureNetwork(ctx context.Context) (string, error) {
 	startTimestamp, err := cm.captureStartTimestamp()
 	if err != nil {
 		return "", err
@@ -65,7 +66,7 @@ func (cm *CaptureManager) CaptureNetwork(sigChan <-chan os.Signal) (string, erro
 		return "", err
 	}
 
-	if err := cm.networkCaptureProvider.CaptureNetworkPacket(captureFilter, captureDuration, captureMaxSizeMB, sigChan); err != nil {
+	if err := cm.networkCaptureProvider.CaptureNetworkPacket(ctx, captureFilter, captureDuration, captureMaxSizeMB); err != nil {
 		return "", err
 	}
 
@@ -153,7 +154,7 @@ func (cm *CaptureManager) captureMaxSizeMB() (int, error) {
 	return strconv.Atoi(captureMaxSizeMBStr)
 }
 
-func (cm *CaptureManager) OutputCapture(srcDir string) error {
+func (cm *CaptureManager) OutputCapture(ctx context.Context, srcDir string) error {
 	var errStr string
 
 	if _, err := os.Stat(srcDir); os.IsNotExist(err) {
@@ -166,7 +167,7 @@ func (cm *CaptureManager) OutputCapture(srcDir string) error {
 	}
 
 	for _, location := range cm.enabledOutputLocations() {
-		if err := location.Output(dstTarGz); err != nil {
+		if err := location.Output(ctx, dstTarGz); err != nil {
 			errStr = errStr + fmt.Sprintf("location %q output error: %s\n", location.Name(), err)
 		}
 	}

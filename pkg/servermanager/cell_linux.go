@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/cilium/cilium/pkg/hive/cell"
+	"github.com/cilium/hive/cell"
 	"github.com/microsoft/retina/pkg/config"
 	sm "github.com/microsoft/retina/pkg/managers/servermanager"
 	"github.com/sirupsen/logrus"

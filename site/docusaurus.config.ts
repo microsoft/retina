@@ -6,7 +6,7 @@ import { githubA11yLight } from "./src/prismColorTheme";
 const config = {
   title: 'Retina',
   tagline: 'kubernetes network observability platform',
-  favicon: 'img/Retina-logo-white.png',
+  favicon: 'img/Retina-logo.png',
   url: 'https://retina.sh',
   baseUrl: '/',
   organizationName: 'Azure',
@@ -98,6 +98,7 @@ const config = {
       { name: "og:site_name", content: "Retina" },
       { name: "og:image:width", content: "1200" },
       { name: "og:image:height", content: "600" },
+      { name: "og:description", content: "Retina is a cloud-agnostic, open-source eBPF-based Kubernetes network observability platform that provides a centralized hub for monitoring application health, network health, and security." },
     ],
     navbar: {
       logo: {
@@ -142,7 +143,7 @@ const config = {
           items: [
             {
               label: "Contribute",
-              href: "https://github.com/microsoft/retina/tree/main/docs/07-Contributing",
+              href: "https://github.com/microsoft/retina/tree/main/docs/08-Contributing",
             },
             {
               label: "Github",

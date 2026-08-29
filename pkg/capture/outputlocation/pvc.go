@@ -4,6 +4,7 @@
 package outputlocation
 
 import (
+	"context"
 	"io"
 	"os"
 	"path/filepath"
@@ -37,7 +38,7 @@ func (pvc *PersistentVolumeClaim) Enabled() bool {
 	return true
 }
 
-func (pvc *PersistentVolumeClaim) Output(srcFilePath string) error {
+func (pvc *PersistentVolumeClaim) Output(_ context.Context, srcFilePath string) error {
 	dstDir := captureConstants.PersistentVolumeClaimVolumeMountPathLinux
 	pvc.l.Info("Copy file",
 		zap.String("location", pvc.Name()),

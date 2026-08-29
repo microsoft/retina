@@ -62,7 +62,7 @@ func (v *ValidateResource) Run() error {
 	return nil
 }
 
-func serviceExists(ctx context.Context, clientset *kubernetes.Clientset, namespace, serviceName, labels string) (bool, error) {
+func serviceExists(ctx context.Context, clientset *kubernetes.Clientset, namespace, _, labels string) (bool, error) {
 	var serviceList *corev1.ServiceList
 	serviceList, err := clientset.CoreV1().Services(namespace).List(ctx, metav1.ListOptions{LabelSelector: labels})
 	if err != nil {

@@ -8,9 +8,9 @@ import (
 	"io"
 
 	zaphook "github.com/Sytten/logrus-zap-hook"
-	"github.com/cilium/cilium/pkg/hive/cell"
 	"github.com/cilium/cilium/pkg/logging"
 	"github.com/cilium/cilium/pkg/option"
+	"github.com/cilium/hive/cell"
 	"github.com/microsoft/retina/internal/buildinfo"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/sirupsen/logrus"
@@ -46,6 +46,13 @@ func setupZapHook(p params) {
 	// discard default logger output in favor of zap
 	logging.DefaultLogger.SetOutput(io.Discard)
 
+	level, err := logrus.ParseLevel(p.DaemonCfg.LogOpt[logging.LevelOpt])
+	if err != nil {
+		p.Logger.WithError(err).Error("failed to parse log level")
+	} else {
+		logging.DefaultLogger.SetLevel(level)
+	}
+
 	lOpts := &log.LogOpts{
 		Level:                 p.DaemonCfg.LogOpt[logging.LevelOpt],
 		File:                  false,
@@ -62,7 +69,7 @@ func setupZapHook(p params) {
 		zap.String("apiserver", p.K8sCfg.Host),
 	}
 
-	_, err := log.SetupZapLogger(lOpts, persistentFields...)
+	_, err = log.SetupZapLogger(lOpts, persistentFields...)
 	if err != nil {
 		fmt.Printf("failed to setup zap logger: %v", err)
 	}

@@ -72,7 +72,7 @@ prometheus:
           - role: pod
         relabel_configs:
           - target_label: cluster
-            replacement: myAKSCluster
+            replacement: myCluster
             action: replace
           - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_pod_label_k8s_app]
             regex: kube-system;(retina)

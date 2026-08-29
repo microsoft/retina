@@ -224,7 +224,7 @@ func (cr *CaptureReconciler) createJobsFromCapture(ctx context.Context, capture 
 		Name:      capture.Name,
 	}
 
-	jobs, err := cr.captureToPodTranslator.TranslateCaptureToJobs(capture)
+	jobs, err := cr.captureToPodTranslator.TranslateCaptureToJobs(ctx, capture)
 	if err != nil {
 		cr.logger.Error("Failed to translate Capture to jobs", zap.Error(err), zap.String("Capture", captureRef.String()))
 		var errorReason string

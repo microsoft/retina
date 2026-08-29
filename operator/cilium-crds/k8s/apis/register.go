@@ -9,6 +9,7 @@ package apis
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"golang.org/x/sync/errgroup"
 
@@ -93,9 +94,10 @@ func customResourceDefinitionList() (map[string]*apisclient.CRDList, error) {
 // It should be called on agent startup but is idempotent and safe to call again.
 func createCRD(crdVersionedName, crdMetaName string) func(clientset apiextensionsclient.Interface) error {
 	return func(clientset apiextensionsclient.Interface) error {
-		ciliumCRD := apisclient.GetPregeneratedCRD(crdVersionedName)
+		ciliumCRD := apisclient.GetPregeneratedCRD(slog.Default(), crdVersionedName)
 
 		err := crdhelpers.CreateUpdateCRD(
+			slog.Default(),
 			clientset,
 			constructV1CRD(crdMetaName, ciliumCRD),
 			crdhelpers.NewDefaultPoller(),

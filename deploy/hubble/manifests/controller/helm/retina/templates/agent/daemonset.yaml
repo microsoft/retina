@@ -1,5 +1,6 @@
 {{- if .Values.agent.enabled -}}
 {{- if .Values.os.linux -}}
+
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -49,9 +50,8 @@ spec:
           - name: bpf
             mountPath: /sys/fs/bpf
             mountPropagation: Bidirectional
-          - name: varrun
-            mountPath: /var/run
-            mountPropagation: Bidirectional
+          - name: cilium
+            mountPath: /var/run/cilium
           - name: config
             mountPath: /retina/config
       containers:
@@ -107,32 +107,45 @@ spec:
               - {{ . }}
               {{- end }}
             privileged: {{ .Values.securityContext.privileged }}
-        {{- if .Values.volumeMounts }}
           volumeMounts:
-          {{- range $name, $mountPath := .Values.volumeMounts }}
-            - name: {{ $name }}
-              mountPath: {{ $mountPath }}
-          {{- end }}
+            - name: bpf
+              mountPath: /sys/fs/bpf
+            - name: cgroup
+              mountPath: /sys/fs/cgroup
+            - name: config
+              mountPath: /retina/config
+            - name: debug
+              mountPath: /sys/kernel/debug
+            - name: trace
+              mountPath: /sys/kernel/tracing
+            - name: cilium
+              mountPath: /var/run/cilium
           {{- if .Values.hubble.tls.enabled }}
             - name: tls
               mountPath: /var/lib/cilium/tls/hubble
               readOnly: true
           {{- end }}
-        {{- end }}
       terminationGracePeriodSeconds: 90 # Allow for retina to cleanup plugin resources.
       volumes:
-      {{- range $name, $hostPath := .Values.volumeMounts}}
-      - name: {{ $name }}
-      {{ if eq $name "config" }}
+      - name: bpf # Stores bpf maps
+        hostPath:
+          path: /sys/fs/bpf
+      - name: cgroup # Mount point for cgroups
+        hostPath:
+          path: /sys/fs/cgroup
+      - name: config # Stores retina configuration
         configMap:
           name: {{ $.Values.nameOverride }}-config
-      {{ else if eq $name "tmp"}}
-        emptyDir: {}
-      {{ else }}
+      - name: debug # Stores data to trace kernel events
         hostPath:
-          path: {{ $hostPath }}
-      {{ end }}
-      {{- end }}
+          path: /sys/kernel/debug
+      - name: trace # Stores data to trace kernel events
+        hostPath:
+          path: /sys/kernel/tracing
+      - name: cilium # Stores hubble's socket path to listen for connections
+        hostPath:
+          path: /var/run/cilium
+          type: DirectoryOrCreate
       {{- if .Values.hubble.tls.enabled }}
       - name: tls
         projected:

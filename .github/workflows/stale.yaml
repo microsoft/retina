@@ -23,6 +23,8 @@ jobs:
           days-before-pr-close: 7
           days-before-pr-stale: 30
           delete-branch: true
+          exempt-draft-pr: true
+          exempt-pr-labels: "meta/preserve"
           stale-issue-label: "meta/waiting-for-author"
           stale-pr-label: "meta/waiting-for-author"
           operations-per-run: 100

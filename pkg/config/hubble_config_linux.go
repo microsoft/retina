@@ -5,8 +5,8 @@ package config
 import (
 	"path/filepath"
 
-	"github.com/cilium/cilium/pkg/hive/cell"
 	"github.com/cilium/cilium/pkg/option"
+	"github.com/cilium/hive/cell"
 	sharedconfig "github.com/microsoft/retina/pkg/shared/config"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"

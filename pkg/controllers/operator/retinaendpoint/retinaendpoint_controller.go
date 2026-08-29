@@ -35,12 +35,6 @@ type RetinaEndpointReconciler struct {
 	retries    map[types.NamespacedName]int
 }
 
-func init() {
-	log.SetupZapLogger(&log.LogOpts{
-		File: false,
-	})
-}
-
 func New(client client.Client, podchannel chan cache.PodCacheObject) *RetinaEndpointReconciler {
 	return &RetinaEndpointReconciler{
 		Client:     client,

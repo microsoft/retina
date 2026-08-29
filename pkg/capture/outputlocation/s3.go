@@ -77,7 +77,7 @@ func (su *S3Upload) Enabled() bool {
 	return true
 }
 
-func (su *S3Upload) Output(srcFilePath string) error {
+func (su *S3Upload) Output(ctx context.Context, srcFilePath string) error {
 	objectKey := path.Join(su.path, srcFilePath)
 
 	su.l.Info("Upload capture file to s3",
@@ -87,7 +87,7 @@ func (su *S3Upload) Output(srcFilePath string) error {
 		zap.String("objectKey", objectKey),
 	)
 
-	s3Client, err := su.getClient()
+	s3Client, err := su.getClient(ctx)
 	if err != nil {
 		su.l.Error("Failed to get AWS client", zap.Error(err))
 		return err
@@ -101,7 +101,7 @@ func (su *S3Upload) Output(srcFilePath string) error {
 	}
 	defer s3File.Close()
 
-	_, err = s3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+	_, err = s3Client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(su.bucket),
 		Key:    aws.String(objectKey),
 		Body:   s3File,
@@ -117,7 +117,7 @@ func (su *S3Upload) Output(srcFilePath string) error {
 	return nil
 }
 
-func (su *S3Upload) getClient() (*s3.Client, error) {
+func (su *S3Upload) getClient(ctx context.Context) (*s3.Client, error) {
 	var opts []func(options *config.LoadOptions) error
 
 	if su.endpoint != "" {
@@ -147,7 +147,7 @@ func (su *S3Upload) getClient() (*s3.Client, error) {
 		)))
 	}
 
-	cfg, err := config.LoadDefaultConfig(context.TODO(),
+	cfg, err := config.LoadDefaultConfig(ctx,
 		opts...,
 	)
 	if err != nil {
