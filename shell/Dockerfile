@@ -26,7 +26,7 @@ RUN set -eux; \
     ./pwru --version
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260820@sha256:76325dbdd581f039ac2edffca3ff40aef88951da7aa24cf0c07b40992e6d6bd2
+FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260825@sha256:daa1142fc6b44e27c8112ec6b4c2d579ddb9bc6b3747504e666010a45a51faa4
 
 RUN tdnf install -y \
 	bind-utils \
