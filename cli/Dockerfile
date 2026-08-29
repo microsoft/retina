@@ -29,7 +29,7 @@ RUN --mount=type=cache,target="/root/.cache/go-build" \
 # minimal libs stage — provides only the system libraries needed by the CGO-enabled binary,
 # without the bloat of the full Go SDK image (python, gcc, systemd, etc.)
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260820@sha256:76325dbdd581f039ac2edffca3ff40aef88951da7aa24cf0c07b40992e6d6bd2 AS libs
+FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260825@sha256:daa1142fc6b44e27c8112ec6b4c2d579ddb9bc6b3747504e666010a45a51faa4 AS libs
 
 # Target 1: Distroless (secure, minimal)
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/distroless/minimal:3.0 --format "{{.Name}}@{{.Digest}}"
@@ -48,7 +48,7 @@ COPY --from=builder /workspace/kubectl-retina .
 # Final image must be $TARGETPLATFORM (default), not $BUILDPLATFORM — the
 # kubectl-retina binary is cross-compiled for the target arch and would fail
 # to run inside a wrong-arch base image.
-FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260820@sha256:76325dbdd581f039ac2edffca3ff40aef88951da7aa24cf0c07b40992e6d6bd2 AS shell-target
+FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260825@sha256:daa1142fc6b44e27c8112ec6b4c2d579ddb9bc6b3747504e666010a45a51faa4 AS shell-target
 WORKDIR /
 COPY --from=builder /workspace/kubectl-retina /bin/kubectl-retina
 RUN chmod +x /bin/kubectl-retina
