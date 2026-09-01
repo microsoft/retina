@@ -31,6 +31,7 @@ FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260825@sha256:daa1142fc6b44e27
 RUN tdnf install -y \
 	bind-utils \
 	conntrack \
+	cri-tools \
 	curl \
 	ebtables-legacy \
 	ethtool \
@@ -42,6 +43,7 @@ RUN tdnf install -y \
 	jq \
 	ldns-utils \
 	less \
+	nano \
 	net-tools \
 	nftables \
 	nmap \
@@ -75,6 +77,13 @@ exec "$@"' > /usr/local/bin/entrypoint.sh;
 ENV HOST_ROOT=/host
 
 RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# Point crictl at the containerd socket, which is exposed under /run when the
+# shell is started with --mount-host-filesystem. Override with
+# `crictl --runtime-endpoint` on clusters running a different CRI implementation.
+RUN echo $'runtime-endpoint: unix:///run/containerd/containerd.sock\n\
+image-endpoint: unix:///run/containerd/containerd.sock\n\
+timeout: 10' > /etc/crictl.yaml
 
 # Set the entrypoint
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
