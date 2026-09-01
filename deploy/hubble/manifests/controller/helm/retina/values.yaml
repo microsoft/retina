@@ -36,6 +36,14 @@ operator:
   # Namespace used for operator leader election lease.
   # Defaults to .Release.Namespace when empty.
   leaderElectionNamespace: ""
+  # -- Resource requests and limits for the retina-operator container.
+  resources:
+    limits:
+      cpu: 500m
+      memory: 500Mi
+    requests:
+      cpu: 250m
+      memory: 250Mi
 
 agent:
   leaderElection: false
