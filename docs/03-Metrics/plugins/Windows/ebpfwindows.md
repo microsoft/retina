@@ -23,12 +23,19 @@ eBPF-for-Windows maps / ring buffers -> wcnagent / Microsoft.Wcn.Observability.e
 - Plugin code: pkg/plugin/ebpfwindows
 - Registration: pkg/plugin/include_windows.go
 
-## Status / Open items
+## Status
 
-- Implement the eBPF-for-Windows/WCN event consumer in Start.
-- Convert raw events to cilium v1.Event flows (5-tuple, direction, verdict, duration).
-- Wire the downstream channel (SetupChannel) to metrics and the Hubble observer.
-- Validate against Windows Server 2025 with Cilium-on-Windows enabled.
+Implemented: the `ebpfwindows` plugin consumes flows from the WCN/eBPF-for-Windows
+observability producer via a gRPC Observer stream over a node-local socket
+(`ObserverSource` in `source.go`), the same mechanism the `pktmon` plugin uses.
+Unit tests run an in-process Observer server over a local socket (no WCN runtime
+required) and exercise the full lifecycle, forwarding, drop, and nil-event paths.
+
+## Open items
+
+- Validate end-to-end against a real Windows Server 2025 + Cilium-on-Windows
+  node where the WCN observability producer runs (not available in dev).
+- Confirm/align the default socket path with the WCN deployable.
 - Fidelity/parity review against the Linux dropreason / flow path.
 
 ## Metrics

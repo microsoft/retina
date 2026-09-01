@@ -60,19 +60,14 @@ type EventSource interface {
 	Stop() error
 }
 
-// defaultSource is the production placeholder for a WCN/eBPF-for-Windows reader.
-// Implementing this is the remaining integration work (see source.go).
-type defaultSource struct{}
-
-func newDefaultSource() EventSource { return &defaultSource{} }
-
-func (s *defaultSource) Start(_ context.Context) (<-chan *v1.Event, error) {
-	ch := make(chan *v1.Event)
-	close(ch)
-	return ch, nil
+// newDefaultSource returns the production WCN/eBPF-for-Windows flow source.
+// It consumes flows from the WCN observability gRPC server over a node-local
+// socket (see source.go). The socket path can be overridden via config.
+func newDefaultSource() EventSource {
+	return newObserverSource(defaultObserverPath())
 }
 
-func (s *defaultSource) Stop() error { return nil }
+func defaultObserverPath() string { return defaultSocketPath }
 
 // Plugin consumes events from a WCN/eBPF source and feeds them into Retina.
 type Plugin struct {
