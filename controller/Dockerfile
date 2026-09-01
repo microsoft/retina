@@ -1,14 +1,14 @@
 # pinned base images
 
-# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.3-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
 # Pinned to $BUILDPLATFORM so the Go builds cross-compile natively from the
 # host arch (fast). The eBPF .o files, which cannot be cleanly cross-compiled
 # by bpf2go, are produced in the separate `bpf-gen` stage below (which runs
 # at $TARGETPLATFORM — native on same-arch, emulated under QEMU otherwise).
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26.5-2-azurelinux3.0@sha256:1c77c1cbb5de52db3f119fe2efe7a938e734c08196bbe3ad94b3bdadbab926f9 AS golang
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:f71abd962461be0412f9b9f9659061f1a45c1767e55ce9a51a457097bf2335e9 AS golang
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260809@sha256:8bb51342bd5eba915990ab608f91060d502bb7891a2d3d909e0419b932533029 AS azurelinux-core
+FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260825@sha256:daa1142fc6b44e27c8112ec6b4c2d579ddb9bc6b3747504e666010a45a51faa4 AS azurelinux-core
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/distroless/minimal:3.0 --format "{{.Name}}@{{.Digest}}"
 FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20260809@sha256:4435f90009c17fb750e5518a3f43a24a629ac4c4f8c222b50f6adfe5e0d0bf2d AS azurelinux-distroless
@@ -20,22 +20,28 @@ FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20260809@sha256:4435f90
 # .o files via bpf2go/clang — those require native target-arch execution and
 # cannot be cross-compiled from an amd64 host cleanly. Isolating this work in a
 # small dedicated stage keeps the rest of the build fast at $BUILDPLATFORM.
-FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26.5-2-azurelinux3.0@sha256:1c77c1cbb5de52db3f119fe2efe7a938e734c08196bbe3ad94b3bdadbab926f9 AS bpf-gen
+FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:f71abd962461be0412f9b9f9659061f1a45c1767e55ce9a51a457097bf2335e9 AS bpf-gen
 ARG GOOS=linux
 ARG GOARCH=amd64
 ENV GOOS=${GOOS}
 ENV GOARCH=${GOARCH}
+ENV CGO_ENABLED=0
+ENV GOEXPERIMENT=ms_nocgo_opensslcrypto
 RUN if [ "$GOOS" = "linux" ] ; then \
     tdnf install -y clang lld bpftool libbpf-devel; \
     fi
 COPY ./pkg/plugin /go/src/github.com/microsoft/retina/pkg/plugin
 WORKDIR /go/src/github.com/microsoft/retina
+# Sanity-check every arch-specific BPF object bpf2go produced is non-empty.
 RUN set -eu; \
     if [ "$GOOS" = "linux" ] ; then \
     go mod init github.com/microsoft/retina; \
     go generate -skip "mockgen" -x /go/src/github.com/microsoft/retina/pkg/plugin/...; \
     if [ "$GOARCH" = "amd64" ]; then bpf_arch=x86; else bpf_arch="$GOARCH"; fi; \
-    test -s "./pkg/plugin/conntrack/conntrack_bpfel_${bpf_arch}.o"; \
+    objects="$(find ./pkg/plugin -type f -name "*_bpfel_${bpf_arch}.o" -print)"; \
+    test -n "$objects" || { echo "no BPF objects generated for ${bpf_arch}" >&2; exit 1; }; \
+    empty_objects="$(find ./pkg/plugin -type f -name "*_bpfel_${bpf_arch}.o" ! -size +0c -print)"; \
+    test -z "$empty_objects" || { printf 'empty BPF objects:\n%s\n' "$empty_objects" >&2; exit 1; }; \
     tar czf /gen.tar.gz ./pkg/plugin; \
     rm go.mod; \
     else \
@@ -124,7 +130,7 @@ ENTRYPOINT ["./retina/initretina"]
 
 # agent final image
 # mcr.microsoft.com/azurelinux/distroless/minimal:3.0
-# mcr.microsoft.com/azurelinux/distroless/minimal@sha256:5a66f9f16ac675db2a8229dac72d83811b73b502d6ad192d8b374c7f3be498af
+# mcr.microsoft.com/azurelinux/distroless/minimal@sha256:4435f90009c17fb750e5518a3f43a24a629ac4c4f8c222b50f6adfe5e0d0bf2d
 FROM azurelinux-distroless AS agent
 COPY --from=tools /lib/ /lib
 COPY --from=tools /usr/lib/ /usr/lib

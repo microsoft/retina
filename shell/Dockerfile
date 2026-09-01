@@ -1,5 +1,32 @@
+# pwru is built from a pinned source commit with this repo's Go builder, so
+# its standard library tracks the golang base image instead of the upstream
+# release cadence. Upstream publishes binaries only on tags.
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
+FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:f71abd962461be0412f9b9f9659061f1a45c1767e55ce9a51a457097bf2335e9 AS pwru-build
+RUN tdnf install -y make git clang llvm gcc glibc-static gawk file flex bison tar diffutils
+# https://github.com/cilium/pwru/releases/tag/v1.0.12
+ARG PWRU_COMMIT=f1d6cf8898953ac1560401e181f3ac5f0e33b486
+RUN git clone https://github.com/cilium/pwru /pwru && git -C /pwru checkout "$PWRU_COMMIT"
+WORKDIR /pwru
+ARG GOARCH=amd64
+RUN set -eux; \
+    case "$GOARCH" in \
+        amd64) LIBPCAP_ARCH="x86_64-unknown-linux-gnu" ;; \
+        arm64) LIBPCAP_ARCH="aarch64-unknown-linux-gnu" ;; \
+        *) echo "Unsupported arch: $GOARCH" && exit 1 ;; \
+    esac; \
+    # GOEXPERIMENT=none disables the Microsoft Go OpenSSL crypto backend,
+    # which dlopens libcrypto at startup and crashes inside a statically
+    # linked binary. pwru does not need FIPS crypto.
+    # CC=clang: the ADO pipeline builds arm64 under QEMU, and gcc cc1
+    # crashes there with an internal compiler error. clang does not.
+    GOEXPERIMENT=none CC=clang make TARGET_GOARCH="$GOARCH" LIBPCAP_ARCH="$LIBPCAP_ARCH"; \
+    file pwru | grep -q 'ELF'; \
+    # the binary must start; a broken crypto backend or link crashes here
+    ./pwru --version
+
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260809@sha256:8bb51342bd5eba915990ab608f91060d502bb7891a2d3d909e0419b932533029
+FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260825@sha256:daa1142fc6b44e27c8112ec6b4c2d579ddb9bc6b3747504e666010a45a51faa4
 
 RUN tdnf install -y \
 	bind-utils \
@@ -52,26 +79,7 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 # Set the entrypoint
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
-# Re-use existing arg from Makefile target "container-docker"
-# https://github.com/microsoft/retina/blob/main/Makefile#L224
-ARG GOARCH=amd64
-ENV ARCH=${GOARCH}
-# https://github.com/cilium/pwru/releases
-ARG PWRU_TAG="v1.0.12"
-ENV PWRU_TAG=${PWRU_TAG}
-
-# Download and extract latest pwru release for the correct architecture (amd64 or arm64)
-RUN set -eux; \
-    case "$ARCH" in \
-        amd64|x86_64) PWRU_ARCH="amd64" ;; \
-        arm64|aarch64) PWRU_ARCH="arm64" ;; \
-        *) echo "Unsupported arch: $ARCH" && exit 1 ;; \
-    esac; \
-    PWRU_TAR="pwru-linux-${PWRU_ARCH}.tar.gz"; \
-    curl -fL -o /tmp/pwru.tar.gz "https://github.com/cilium/pwru/releases/download/${PWRU_TAG}/${PWRU_TAR}"; \
-    tar -xz -C /usr/local/bin -f /tmp/pwru.tar.gz pwru; \
-    chmod +x /usr/local/bin/pwru; \
-    rm /tmp/pwru.tar.gz; \
-    file /usr/local/bin/pwru | grep -q 'ELF'
+COPY --from=pwru-build /pwru/pwru /usr/local/bin/pwru
+RUN file /usr/local/bin/pwru | grep -q 'ELF' && /usr/local/bin/pwru --version
 
 CMD ["/bin/bash", "-l"]
