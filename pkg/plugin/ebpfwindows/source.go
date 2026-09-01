@@ -91,6 +91,9 @@ func (s *ObserverSource) consume(ctx context.Context, stream observerv1.Observer
 		if fl == nil {
 			continue
 		}
+		// Normalize verdict/drop-reason/direction so Retina's flow metrics
+		// (pkg/module/metrics drops/forward) can consume WCN flows.
+		fl = normalizeFlow(fl)
 		ev := &v1.Event{Event: fl, Timestamp: fl.GetTime()}
 		select {
 		case ch <- ev:

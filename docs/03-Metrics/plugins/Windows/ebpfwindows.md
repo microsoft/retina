@@ -28,8 +28,11 @@ eBPF-for-Windows maps / ring buffers -> wcnagent / Microsoft.Wcn.Observability.e
 Implemented: the `ebpfwindows` plugin consumes flows from the WCN/eBPF-for-Windows
 observability producer via a gRPC Observer stream over a node-local socket
 (`ObserverSource` in `source.go`), the same mechanism the `pktmon` plugin uses.
-Unit tests run an in-process Observer server over a local socket (no WCN runtime
-required) and exercise the full lifecycle, forwarding, drop, and nil-event paths.
+Each incoming flow is normalized (`normalizeFlow` in `normalize.go`) so that the
+WCN flows carry the verdict, traffic direction, and a drop reason extension that
+Retina's advanced flow metrics read. Unit tests run an in-process Observer
+server over a local socket (no WCN runtime required) and exercise the full
+lifecycle, forwarding, drop, and nil-event paths.
 
 ## Open items
 
@@ -40,4 +43,8 @@ required) and exercise the full lifecycle, forwarding, drop, and nil-event paths
 
 ## Metrics
 
-TBD until the consumer is implemented; intended to mirror the Linux l4/flow metrics.
+Flows are mapped onto Retina's advanced flow metric model. `Verdict` (DROPPED /
+FORWARDED) drives whether a flow is counted by the drop or forward metric
+(`adv_drop_count` / `adv_forward_count`), `TrafficDirection` is the metric
+`direction` label, and a DROPPED flow carries a `drop_reason` extension used for
+the drop metric's `reason` label.
