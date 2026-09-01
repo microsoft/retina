@@ -15,6 +15,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/operator/cache"
@@ -72,6 +73,26 @@ func (r *RetinaEndpointReconciler) ReconcilePod(pctx context.Context) {
 			return
 		}
 	}
+}
+
+// setPodOwner adds an owner reference to pod so the API server garbage collects the
+// RetinaEndpoint when the Pod is deleted. Cleanup then no longer depends on the operator
+// observing the Pod's delete event, which is lost across restarts and when the pod channel
+// drops events.
+//
+// A plain owner reference is enough for garbage collection. The controller reference is
+// deliberately not claimed, which would also block Pod deletion on this RetinaEndpoint.
+// A reference to a previous Pod of the same name is replaced in place, since owner
+// references are matched on group, kind and name.
+//
+// Note this is metadata.ownerReferences, distinct from the RetinaEndpoint's informational
+// spec.ownerReferences, which mirrors the Pod's own owners (ReplicaSet, DaemonSet, ...)
+// and is not consulted by garbage collection.
+func (r *RetinaEndpointReconciler) setPodOwner(endpoint *retinav1alpha1.RetinaEndpoint, pod *corev1.Pod) error {
+	if err := controllerutil.SetOwnerReference(pod, endpoint, r.Scheme()); err != nil {
+		return fmt.Errorf("setting Pod owner reference: %w", err)
+	}
+	return nil
 }
 
 // requeuePodToRetinaEndpoint is called when a pod is received from the pod channel, and it will writeback to the
@@ -191,6 +212,11 @@ func (r *RetinaEndpointReconciler) reconcileRetinaEndpointFromPod(ctx context.Co
 			},
 		}
 
+		if err = r.setPodOwner(new, pod.Pod); err != nil {
+			r.l.Error("failed to set Pod owner reference", zap.Error(err), zap.String("name", pod.Key.String()))
+			return err
+		}
+
 		r.l.Info("creating RetinaEndpoint", zap.String("name", pod.Key.String()))
 		if err := r.Client.Create(ctx, new); err != nil {
 			r.l.Error(err.Error(), zap.String("name", pod.Key.String()))
@@ -211,6 +237,12 @@ func (r *RetinaEndpointReconciler) reconcileRetinaEndpointFromPod(ctx context.Co
 		Labels:          pod.Pod.Labels,
 		Annotations:     pod.Pod.Annotations,
 		OwnerReferences: refs,
+	}
+	// Adopt RetinaEndpoints created before the owner reference was set, so they become
+	// garbage collectable without waiting for their Pod to be recreated.
+	if err = r.setPodOwner(new, pod.Pod); err != nil {
+		r.l.Error("failed to set Pod owner reference", zap.Error(err), zap.String("name", pod.Key.String()))
+		return err
 	}
 
 	r.l.Info("updating RetinaEndpoint", zap.String("name", pod.Key.String()))
