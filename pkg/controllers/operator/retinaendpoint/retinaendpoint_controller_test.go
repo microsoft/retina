@@ -247,6 +247,152 @@ func TestRetinaEndpointReconciler_ReconcilePod(t *testing.T) {
 	}
 }
 
+// podUID is the owning Pod's UID in the owner reference tests.
+const (
+	podUID     = types.UID("pod-uid-1")
+	orphanName = "orphan"
+	podKind    = "Pod"
+)
+
+func newOwnerRefTestReconciler(t *testing.T, objects ...client.Object) (*RetinaEndpointReconciler, client.Client) {
+	t.Helper()
+	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
+		t.Fatalf("Error setting up logger: %s", err)
+	}
+	utilruntime.Must(clientgoscheme.AddToScheme(fakescheme))
+	utilruntime.Must(retinav1alpha1.AddToScheme(fakescheme))
+
+	c := fake.NewClientBuilder().WithScheme(fakescheme).WithObjects(objects...).Build()
+	return New(c, make(chan cache.PodCacheObject, 10)), c
+}
+
+func runningPodWithUID(name, namespace, podIP string) *corev1.Pod {
+	return &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace, UID: podUID},
+		Status: corev1.PodStatus{
+			Phase:  corev1.PodRunning,
+			PodIP:  podIP,
+			PodIPs: []corev1.PodIP{{IP: podIP}},
+			HostIP: "10.10.10.10",
+		},
+	}
+}
+
+// requireOwnedByPod asserts the endpoint is garbage collectable via exactly one owner
+// reference to the given Pod, without claiming the controller slot or blocking Pod
+// deletion. Exactly one guards against references accumulating across reconciles.
+func requireOwnedByPod(t *testing.T, endpoint *retinav1alpha1.RetinaEndpoint, name string, uid types.UID) {
+	t.Helper()
+	podRefs := []metav1.OwnerReference{}
+	for _, ref := range endpoint.OwnerReferences {
+		if ref.Kind == podKind {
+			podRefs = append(podRefs, ref)
+		}
+	}
+	require.Len(t, podRefs, 1, "expected exactly one Pod owner reference, got %v", endpoint.OwnerReferences)
+
+	require.Equal(t, "v1", podRefs[0].APIVersion)
+	require.Equal(t, name, podRefs[0].Name)
+	require.Equal(t, uid, podRefs[0].UID)
+	require.Nil(t, podRefs[0].Controller, "should not claim the controller reference")
+	require.Nil(t, podRefs[0].BlockOwnerDeletion, "should not block Pod deletion")
+}
+
+func TestRetinaEndpointReconciler_CreateSetsPodOwnerReference(t *testing.T) {
+	key := types.NamespacedName{Namespace: "default", Name: "pod"}
+	pod := runningPodWithUID(key.Name, key.Namespace, "10.0.0.1")
+	r, c := newOwnerRefTestReconciler(t, pod)
+
+	require.NoError(t, r.reconcileRetinaEndpointFromPod(context.Background(), cache.PodCacheObject{Key: key, Pod: pod}))
+
+	got := &retinav1alpha1.RetinaEndpoint{}
+	require.NoError(t, c.Get(context.Background(), key, got))
+	requireOwnedByPod(t, got, key.Name, podUID)
+
+	// The informational spec field still mirrors the Pod's own owners, not the Pod.
+	require.Empty(t, got.Spec.OwnerReferences)
+}
+
+func TestRetinaEndpointReconciler_UpdateAdoptsExistingEndpoint(t *testing.T) {
+	key := types.NamespacedName{Namespace: "default", Name: "pod"}
+	// An endpoint created before owner references were set carries none.
+	existing := &retinav1alpha1.RetinaEndpoint{
+		ObjectMeta: metav1.ObjectMeta{Name: key.Name, Namespace: key.Namespace},
+		Spec:       retinav1alpha1.RetinaEndpointSpec{PodIP: "10.0.0.1"},
+	}
+	pod := runningPodWithUID(key.Name, key.Namespace, "10.0.0.2")
+	r, c := newOwnerRefTestReconciler(t, existing, pod)
+
+	require.NoError(t, r.reconcileRetinaEndpointFromPod(context.Background(), cache.PodCacheObject{Key: key, Pod: pod}))
+
+	got := &retinav1alpha1.RetinaEndpoint{}
+	require.NoError(t, c.Get(context.Background(), key, got))
+	requireOwnedByPod(t, got, key.Name, podUID)
+	require.Equal(t, "10.0.0.2", got.Spec.PodIP, "spec should still be updated")
+}
+
+func TestRetinaEndpointReconciler_UpdateReplacesStalePodOwnerReference(t *testing.T) {
+	key := types.NamespacedName{Namespace: "default", Name: "pod"}
+	// A Pod of the same name was recreated, so the endpoint points at a dead UID.
+	staleUID := types.UID("pod-uid-old")
+	existing := &retinav1alpha1.RetinaEndpoint{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      key.Name,
+			Namespace: key.Namespace,
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: "v1",
+				Kind:       podKind,
+				Name:       key.Name,
+				UID:        staleUID,
+			}},
+		},
+	}
+	pod := runningPodWithUID(key.Name, key.Namespace, "10.0.0.3")
+	r, c := newOwnerRefTestReconciler(t, existing, pod)
+
+	require.NoError(t, r.reconcileRetinaEndpointFromPod(context.Background(), cache.PodCacheObject{Key: key, Pod: pod}))
+
+	got := &retinav1alpha1.RetinaEndpoint{}
+	require.NoError(t, c.Get(context.Background(), key, got))
+	// requireOwnedByPod asserts exactly one Pod reference, so the stale UID is gone.
+	requireOwnedByPod(t, got, key.Name, podUID)
+}
+
+func TestRetinaEndpointReconciler_StartDeletesOrphans(t *testing.T) {
+	endpoint := func(name string, refs []metav1.OwnerReference) *retinav1alpha1.RetinaEndpoint {
+		return &retinav1alpha1.RetinaEndpoint{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default", OwnerReferences: refs},
+		}
+	}
+	podRef := []metav1.OwnerReference{{APIVersion: "v1", Kind: podKind, Name: "owned", UID: podUID}}
+
+	r, c := newOwnerRefTestReconciler(t,
+		// No owner reference and no Pod: orphaned before this shipped, so delete it.
+		endpoint(orphanName, nil),
+		// No owner reference but the Pod exists: its next event adopts it.
+		endpoint("live", nil),
+		runningPodWithUID("live", "default", "10.0.0.1"),
+		// Already has an owner reference: garbage collection handles it.
+		endpoint("owned", podRef),
+	)
+
+	require.NoError(t, r.Start(context.Background()))
+
+	got := &retinav1alpha1.RetinaEndpoint{}
+	err := c.Get(context.Background(), types.NamespacedName{Namespace: "default", Name: orphanName}, got)
+	require.True(t, apierrors.IsNotFound(err), "orphaned RetinaEndpoint should be deleted, got %v", err)
+
+	for _, name := range []string{"live", "owned"} {
+		require.NoErrorf(t, c.Get(context.Background(),
+			types.NamespacedName{Namespace: "default", Name: name}, got), "%s should be kept", name)
+	}
+}
+
+func TestRetinaEndpointReconciler_StartNoEndpoints(t *testing.T) {
+	r, _ := newOwnerRefTestReconciler(t)
+	require.NoError(t, r.Start(context.Background()))
+}
+
 func TestRetinaEndpointReconciler_reqeuePodToRetinaEndpoint(t *testing.T) {
 	type args struct {
 		pod cache.PodCacheObject
