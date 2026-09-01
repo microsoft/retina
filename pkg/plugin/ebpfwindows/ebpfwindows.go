@@ -17,6 +17,7 @@ package ebpfwindows
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
@@ -43,7 +44,7 @@ func New(cfg *config.Config) registry.Plugin {
 }
 
 // newPlugin wires an explicit source (test injection point).
-func newPlugin(cfg *config.Config, src EventSource) registry.Plugin {
+func newPlugin(_ *config.Config, src EventSource) registry.Plugin {
 	return &Plugin{
 		l:   log.Logger().Named(name),
 		src: src,
@@ -157,7 +158,7 @@ func (p *Plugin) Stop() error {
 func (p *Plugin) run(ctx context.Context) error {
 	ch, err := p.src.Start(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("starting event source: %w", err)
 	}
 
 	for {

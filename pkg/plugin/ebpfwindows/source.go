@@ -6,6 +6,7 @@ package ebpfwindows
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	observerv1 "github.com/cilium/cilium/api/v1/observer"
@@ -48,12 +49,12 @@ func (s *ObserverSource) Start(ctx context.Context) (<-chan *v1.Event, error) {
 	s.cancel = cancel
 	s.mu.Unlock()
 
-	conn, err := grpc.Dial(
+	conn, err := grpc.NewClient(
 		"unix:"+s.sockPath,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("creating gRPC client: %w", err)
 	}
 	s.conn = conn
 
@@ -61,7 +62,7 @@ func (s *ObserverSource) Start(ctx context.Context) (<-chan *v1.Event, error) {
 	stream, err := client.GetFlows(ctx, &observerv1.GetFlowsRequest{})
 	if err != nil {
 		_ = conn.Close()
-		return nil, err
+		return nil, fmt.Errorf("opening flows stream: %w", err)
 	}
 
 	ch := make(chan *v1.Event, 1024)

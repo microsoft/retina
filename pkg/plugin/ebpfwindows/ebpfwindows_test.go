@@ -32,6 +32,10 @@ type fakeSource struct {
 	started  chan struct{}
 }
 
+// errSourceBoom is a package-level sentinel error used to simulate a failing
+// EventSource without defining a dynamic error.
+var errSourceBoom = errors.New("boom")
+
 func newFakeSource() *fakeSource {
 	return &fakeSource{ch: make(chan *v1.Event, 64), started: make(chan struct{}, 1)}
 }
@@ -67,7 +71,9 @@ func newFlowEvent() *v1.Event {
 
 func setupLoggingAndMetrics(t *testing.T) {
 	t.Helper()
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
+		t.Fatal(err)
+	}
 	metrics.InitializeMetrics(slog.Default())
 }
 
@@ -96,7 +102,7 @@ func TestPluginStartStopIdempotent(t *testing.T) {
 	setupLoggingAndMetrics(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
+	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck // mock enricher is generated into this package
 	menricher.EXPECT().Write(gomock.Any()).AnyTimes()
 
 	p := &Plugin{
@@ -118,7 +124,7 @@ func TestPluginForwardsEventAndWritesEnricher(t *testing.T) {
 	setupLoggingAndMetrics(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
+	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck // mock enricher is generated into this package
 	menricher.EXPECT().Write(gomock.Any()).Times(1)
 
 	src := newFakeSource()
@@ -145,7 +151,7 @@ func TestPluginSkipsNilEvents(t *testing.T) {
 	setupLoggingAndMetrics(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
+	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck // mock enricher is generated into this package
 	menricher.EXPECT().Write(gomock.Any()).Times(0)
 
 	src := newFakeSource()
@@ -172,7 +178,7 @@ func TestPluginSkipsNilEvents(t *testing.T) {
 func TestPluginSourceErrorStopsLoop(t *testing.T) {
 	setupLoggingAndMetrics(t)
 	src := newFakeSource()
-	src.startErr = errors.New("boom")
+	src.startErr = errSourceBoom
 	p := &Plugin{
 		l:   log.Logger().Named(name),
 		src: src,
@@ -188,7 +194,7 @@ func TestPluginDropsWhenChannelFull(t *testing.T) {
 	setupLoggingAndMetrics(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck
+	menricher := enricher.NewMockEnricherInterface(ctrl) //nolint:typecheck // mock enricher is generated into this package
 	menricher.EXPECT().Write(gomock.Any()).AnyTimes()
 	src := newFakeSource()
 	// A zero-capacity downstream channel forces the loop to drop after enricher write.

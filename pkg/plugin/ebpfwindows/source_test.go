@@ -7,6 +7,7 @@ package ebpfwindows
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"path/filepath"
 	"testing"
@@ -31,7 +32,7 @@ type fakeObserver struct {
 func (f *fakeObserver) GetFlows(_ *observerv1.GetFlowsRequest, srv observerv1.Observer_GetFlowsServer) error {
 	for _, fl := range f.flows {
 		if err := srv.Send(&observerv1.GetFlowsResponse{ResponseTypes: &observerv1.GetFlowsResponse_Flow{Flow: fl}}); err != nil {
-			return err
+			return fmt.Errorf("sending flow: %w", err)
 		}
 	}
 	// Keep the stream open until the client disconnects.
@@ -41,19 +42,22 @@ func (f *fakeObserver) GetFlows(_ *observerv1.GetFlowsRequest, srv observerv1.Ob
 
 // startFakeObserver serves a fake WCN observer on a temp Unix socket returning
 // a cleanup function and the socket address.
-func startFakeObserver(t *testing.T, flows []*flowpb.Flow) (string, func()) {
+func startFakeObserver(t *testing.T, flows []*flowpb.Flow) (sock string, cleanup func()) {
 	t.Helper()
-	sock := filepath.Join(t.TempDir(), "obs.sock")
-	lst, err := net.Listen("unix", sock)
+	sock = filepath.Join(t.TempDir(), "obs.sock")
+	lst, err := (&net.ListenConfig{}).Listen(context.Background(), "unix", sock)
 	require.NoError(t, err)
 	s := grpc.NewServer()
 	observerv1.RegisterObserverServer(s, &fakeObserver{flows: flows})
 	go func() { _ = s.Serve(lst) }()
-	return sock, func() { s.Stop() }
+	cleanup = func() { s.Stop() }
+	return sock, cleanup
 }
 
 func TestObserverSourceStreamsFlows(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
+		t.Fatal(err)
+	}
 	fls := []*flowpb.Flow{
 		{
 			Time:    timestamppb.Now(),
@@ -80,7 +84,9 @@ func TestObserverSourceStreamsFlows(t *testing.T) {
 }
 
 func TestObserverSourceStartFailure(t *testing.T) {
-	log.SetupZapLogger(log.GetDefaultLogOpts())
+	if _, err := log.SetupZapLogger(log.GetDefaultLogOpts()); err != nil {
+		t.Fatal(err)
+	}
 	// A path with no listener should cause Start to fail to connect.
 	src := newObserverSource(filepath.Join(t.TempDir(), "missing.sock"))
 	ctx, cancel := context.WithCancel(context.Background())
