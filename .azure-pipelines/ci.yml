@@ -19,7 +19,8 @@
 #     AZURE_AGENT_LINUX_ARM_SKU
 #   Variables (secret):
 #     AZURE_APP_INSIGHTS_KEY
-#   Service connection (Azure RM, WIF): Azure Container Networking - Build Validations - Federated
+#   Service connection for publishing runs (Azure RM, WIF):
+#     Azure Container Networking - Build Validations - Federated
 #   Settings: "Limit building pull requests from forked GitHub repositories" = Disable
 
 trigger:
@@ -72,19 +73,18 @@ jobs:
       - bash: make qemu-user-static
         displayName: Set up QEMU
       - template: steps/setup-go.yml
-      - task: AzureCLI@2
-        displayName: Build and push retina image
-        env:
-          PUBLISH_IMAGES: $(publishImagesAndRunE2E)
-          APP_INSIGHTS_ID: $(AZURE_APP_INSIGHTS_KEY)
-        inputs:
-          azureSubscription: $(azureServiceConnection)
-          scriptType: bash
-          scriptLocation: inlineScript
-          inlineScript: |
-            set -euo pipefail
-            TAG=$(make version)
-            if [ "$PUBLISH_IMAGES" == "True" ]; then
+      - ${{ if or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}:
+        - task: AzureCLI@2
+          displayName: Build and push retina image
+          env:
+            APP_INSIGHTS_ID: $(AZURE_APP_INSIGHTS_KEY)
+          inputs:
+            azureSubscription: $(azureServiceConnection)
+            scriptType: bash
+            scriptLocation: inlineScript
+            inlineScript: |
+              set -euo pipefail
+              TAG=$(make version)
               az acr login -n $(ACR_NAME)
               make retina-image \
                 IMAGE_NAMESPACE=$(imageNamespace) \
@@ -93,12 +93,15 @@ jobs:
                 APP_INSIGHTS_ID=$APP_INSIGHTS_ID \
                 TAG=$TAG \
                 BUILDX_ACTION=--push
-            else
-              make retina-image \
-                IMAGE_NAMESPACE=$(imageNamespace) \
-                PLATFORM=linux/$(arch) \
-                TAG=$TAG
-            fi
+      - ${{ else }}:
+        - bash: |
+            set -euo pipefail
+            TAG=$(make version)
+            make retina-image \
+              IMAGE_NAMESPACE=$(imageNamespace) \
+              PLATFORM=linux/$(arch) \
+              TAG=$TAG
+          displayName: Build retina image
 
   - job: build_windows_binaries
     displayName: Build Windows Binaries
@@ -160,19 +163,18 @@ jobs:
           }
           throw "Docker daemon failed to start within $timeout seconds"
         displayName: Ensure Docker daemon is running
-      - task: AzureCLI@2
-        displayName: Build and push retina Windows image
-        env:
-          PUBLISH_IMAGES: $(publishImagesAndRunE2E)
-          APP_INSIGHTS_ID: $(AZURE_APP_INSIGHTS_KEY)
-        inputs:
-          azureSubscription: $(azureServiceConnection)
-          scriptType: bash
-          scriptLocation: inlineScript
-          inlineScript: |
-            set -euo pipefail
-            TAG=$(make version)
-            if [ "$PUBLISH_IMAGES" == "True" ]; then
+      - ${{ if or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}:
+        - task: AzureCLI@2
+          displayName: Build and push retina Windows image
+          env:
+            APP_INSIGHTS_ID: $(AZURE_APP_INSIGHTS_KEY)
+          inputs:
+            azureSubscription: $(azureServiceConnection)
+            scriptType: bash
+            scriptLocation: inlineScript
+            inlineScript: |
+              set -euo pipefail
+              TAG=$(make version)
               az acr login -n $(ACR_NAME)
               make retina-image-win \
                 IMAGE_NAMESPACE=$(imageNamespace) \
@@ -184,15 +186,18 @@ jobs:
                 REPO_PATH=. \
                 TAG=$TAG
               docker push $(ACR_NAME)/$(imageNamespace)/retina-agent:${TAG}-windows-ltsc$(year)-$(arch)
-            else
-              make retina-image-win \
-                IMAGE_NAMESPACE=$(imageNamespace) \
-                PLATFORM=$(platform)/$(arch) \
-                WINDOWS_YEARS=$(year) \
-                BINARIES_PATH=output/windows_$(arch) \
-                REPO_PATH=. \
-                TAG=$TAG
-            fi
+      - ${{ else }}:
+        - bash: |
+            set -euo pipefail
+            TAG=$(make version)
+            make retina-image-win \
+              IMAGE_NAMESPACE=$(imageNamespace) \
+              PLATFORM=$(platform)/$(arch) \
+              WINDOWS_YEARS=$(year) \
+              BINARIES_PATH=output/windows_$(arch) \
+              REPO_PATH=. \
+              TAG=$TAG
+          displayName: Build retina Windows image
 
   - job: event_writer_image
     displayName: Build E2E Test Event Writer Image
@@ -301,19 +306,18 @@ jobs:
       - bash: make qemu-user-static
         displayName: Set up QEMU
       - template: steps/setup-go.yml
-      - task: AzureCLI@2
-        displayName: Build and push operator image
-        env:
-          PUBLISH_IMAGES: $(publishImagesAndRunE2E)
-          APP_INSIGHTS_ID: $(AZURE_APP_INSIGHTS_KEY)
-        inputs:
-          azureSubscription: $(azureServiceConnection)
-          scriptType: bash
-          scriptLocation: inlineScript
-          inlineScript: |
-            set -euo pipefail
-            TAG=$(make version)
-            if [ "$PUBLISH_IMAGES" == "True" ]; then
+      - ${{ if or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}:
+        - task: AzureCLI@2
+          displayName: Build and push operator image
+          env:
+            APP_INSIGHTS_ID: $(AZURE_APP_INSIGHTS_KEY)
+          inputs:
+            azureSubscription: $(azureServiceConnection)
+            scriptType: bash
+            scriptLocation: inlineScript
+            inlineScript: |
+              set -euo pipefail
+              TAG=$(make version)
               az acr login -n $(ACR_NAME)
               make retina-operator-image \
                 IMAGE_NAMESPACE=$(imageNamespace) \
@@ -322,12 +326,15 @@ jobs:
                 APP_INSIGHTS_ID=$APP_INSIGHTS_ID \
                 TAG=$TAG \
                 BUILDX_ACTION=--push
-            else
-              make retina-operator-image \
-                IMAGE_NAMESPACE=$(imageNamespace) \
-                PLATFORM=linux/$(arch) \
-                TAG=$TAG
-            fi
+      - ${{ else }}:
+        - bash: |
+            set -euo pipefail
+            TAG=$(make version)
+            make retina-operator-image \
+              IMAGE_NAMESPACE=$(imageNamespace) \
+              PLATFORM=linux/$(arch) \
+              TAG=$TAG
+          displayName: Build operator image
 
   - job: retina_shell_images
     displayName: Build Retina Shell Images
@@ -347,18 +354,16 @@ jobs:
       - bash: make qemu-user-static
         displayName: Set up QEMU
       - template: steps/setup-go.yml
-      - task: AzureCLI@2
-        displayName: Build and push retina-shell image
-        env:
-          PUBLISH_IMAGES: $(publishImagesAndRunE2E)
-        inputs:
-          azureSubscription: $(azureServiceConnection)
-          scriptType: bash
-          scriptLocation: inlineScript
-          inlineScript: |
-            set -euo pipefail
-            TAG=$(make version)
-            if [ "$PUBLISH_IMAGES" == "True" ]; then
+      - ${{ if or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}:
+        - task: AzureCLI@2
+          displayName: Build and push retina-shell image
+          inputs:
+            azureSubscription: $(azureServiceConnection)
+            scriptType: bash
+            scriptLocation: inlineScript
+            inlineScript: |
+              set -euo pipefail
+              TAG=$(make version)
               az acr login -n $(ACR_NAME)
               make retina-shell-image \
                 IMAGE_NAMESPACE=$(imageNamespace) \
@@ -366,12 +371,15 @@ jobs:
                 IMAGE_REGISTRY=$(ACR_NAME) \
                 TAG=$TAG \
                 BUILDX_ACTION=--push
-            else
-              make retina-shell-image \
-                IMAGE_NAMESPACE=$(imageNamespace) \
-                PLATFORM=linux/$(arch) \
-                TAG=$TAG
-            fi
+      - ${{ else }}:
+        - bash: |
+            set -euo pipefail
+            TAG=$(make version)
+            make retina-shell-image \
+              IMAGE_NAMESPACE=$(imageNamespace) \
+              PLATFORM=linux/$(arch) \
+              TAG=$TAG
+          displayName: Build retina-shell image
 
   - job: kubectl_retina_images
     displayName: Build Kubectl Retina Images
@@ -391,18 +399,16 @@ jobs:
       - bash: make qemu-user-static
         displayName: Set up QEMU
       - template: steps/setup-go.yml
-      - task: AzureCLI@2
-        displayName: Build and push kubectl-retina image
-        env:
-          PUBLISH_IMAGES: $(publishImagesAndRunE2E)
-        inputs:
-          azureSubscription: $(azureServiceConnection)
-          scriptType: bash
-          scriptLocation: inlineScript
-          inlineScript: |
-            set -euo pipefail
-            TAG=$(make version)
-            if [ "$PUBLISH_IMAGES" == "True" ]; then
+      - ${{ if or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}:
+        - task: AzureCLI@2
+          displayName: Build and push kubectl-retina image
+          inputs:
+            azureSubscription: $(azureServiceConnection)
+            scriptType: bash
+            scriptLocation: inlineScript
+            inlineScript: |
+              set -euo pipefail
+              TAG=$(make version)
               az acr login -n $(ACR_NAME)
               make kubectl-retina-image \
                 IMAGE_NAMESPACE=$(imageNamespace) \
@@ -410,12 +416,15 @@ jobs:
                 IMAGE_REGISTRY=$(ACR_NAME) \
                 TAG=$TAG \
                 BUILDX_ACTION=--push
-            else
-              make kubectl-retina-image \
-                IMAGE_NAMESPACE=$(imageNamespace) \
-                PLATFORM=linux/$(arch) \
-                TAG=$TAG
-            fi
+      - ${{ else }}:
+        - bash: |
+            set -euo pipefail
+            TAG=$(make version)
+            make kubectl-retina-image \
+              IMAGE_NAMESPACE=$(imageNamespace) \
+              PLATFORM=linux/$(arch) \
+              TAG=$TAG
+          displayName: Build kubectl-retina image
 
   - job: manifests
     displayName: Generate Manifests
