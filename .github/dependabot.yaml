@@ -16,6 +16,7 @@ updates:
       interval: "daily"
     reviewers:
       - "microsoft/retina"
+      // Depedencies are clear at the Commit
     commit-message:
       prefix: "deps"
     labels: ["area/infra", "area/dependencies"]
