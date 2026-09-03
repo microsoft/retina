@@ -53,7 +53,6 @@ image:
 enableConntrackMetrics: false
 conntrackReportInterval: 30s
 enablePodLevel: false
-enablePodLevelWin: false
 remoteContext: false
 enableAnnotations: false
 bypassLookupIPOfInterest: false
