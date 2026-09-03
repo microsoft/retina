@@ -172,15 +172,15 @@ func TestValues(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			switch tt.l7Type {
 			case flow.L7FlowType_REQUEST:
-				if got := tt.d.requestValues(tt.input); !reflect.DeepEqual(got, tt.want) {
+				if got := tt.d.requestValues(tt.input, utils.GetExtensionsStruct(tt.input)); !reflect.DeepEqual(got, tt.want) {
 					t.Errorf("RequestValues() = %v, want %v", got, tt.want)
 				}
 			case flow.L7FlowType_RESPONSE:
-				if got := tt.d.responseValues(tt.input); !reflect.DeepEqual(got, tt.want) {
+				if got := tt.d.responseValues(tt.input, utils.GetExtensionsStruct(tt.input)); !reflect.DeepEqual(got, tt.want) {
 					t.Errorf("ResponseValues() = %v, want %v", got, tt.want)
 				}
 			case flow.L7FlowType_UNKNOWN_L7_TYPE:
-				if got := tt.d.responseValues(tt.input); !reflect.DeepEqual(got, tt.want) {
+				if got := tt.d.responseValues(tt.input, utils.GetExtensionsStruct(tt.input)); !reflect.DeepEqual(got, tt.want) {
 					t.Errorf("ResponseValues() = %v, want %v", got, tt.want)
 				}
 			case flow.L7FlowType_SAMPLE:
@@ -300,7 +300,7 @@ func TestProcessLocalCtx(t *testing.T) {
 			d := NewDNSMetrics(ctxOptions, l, localContext, 0)
 			d.dnsMetrics = mockCV
 
-			d.ProcessFlow(tt.input)
+			d.ProcessFlow(tt.input, utils.GetExtensionsStruct(tt.input))
 
 			// There should be no tracked metrics when TTL is infinite
 			assert.Equal(t, 0, len(d.trackedMetricLabels()), "there should be no tracked metrics when TTL is infinite")
@@ -316,7 +316,7 @@ func TestProcessLocalCtx(t *testing.T) {
 				mockCV.EXPECT().WithLabelValues(tt.expectedLabels).Return(c).Times(1)
 			}
 
-			d.ProcessFlow(tt.input)
+			d.ProcessFlow(tt.input, utils.GetExtensionsStruct(tt.input))
 
 			if tt.metricsUpdate {
 				mockCV.EXPECT().DeleteLabelValues(tt.expectedLabels).Return(true).Times(1)

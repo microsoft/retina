@@ -17,6 +17,7 @@ import (
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 const (
@@ -100,8 +101,8 @@ func (d *DNSMetrics) getResponseLabels() []string {
 	return labels
 }
 
-func (d *DNSMetrics) requestValues(flow *v1.Flow) []string {
-	flowDNS, dnsType, _ := utils.GetDNS(flow)
+func (d *DNSMetrics) requestValues(flow *v1.Flow, ext *structpb.Struct) []string {
+	flowDNS, dnsType, _ := utils.GetDNSFromStruct(flow, ext)
 	if flowDNS == nil {
 		return nil
 	}
@@ -118,8 +119,8 @@ func (d *DNSMetrics) requestValues(flow *v1.Flow) []string {
 	return labels
 }
 
-func (d *DNSMetrics) responseValues(flow *v1.Flow) []string {
-	flowDNS, dnsType, numResponses := utils.GetDNS(flow)
+func (d *DNSMetrics) responseValues(flow *v1.Flow, ext *structpb.Struct) []string {
+	flowDNS, dnsType, numResponses := utils.GetDNSFromStruct(flow, ext)
 	if flowDNS == nil {
 		return nil
 	}
@@ -139,15 +140,15 @@ func (d *DNSMetrics) responseValues(flow *v1.Flow) []string {
 	return labels
 }
 
-func (d *DNSMetrics) getLabelsForProcessFlow(flow *v1.Flow) ([]string, error) {
+func (d *DNSMetrics) getLabelsForProcessFlow(flow *v1.Flow, ext *structpb.Struct) ([]string, error) {
 	var labels []string
 	// Get the DNS query type
-	_, dnsType, _ := utils.GetDNS(flow)
+	_, dnsType, _ := utils.GetDNSFromStruct(flow, ext)
 	switch dnsType {
 	case utils.DNSType_QUERY:
-		labels = d.requestValues(flow)
+		labels = d.requestValues(flow, ext)
 	case utils.DNSType_RESPONSE:
-		labels = d.responseValues(flow)
+		labels = d.responseValues(flow, ext)
 	case utils.DNSType_UNKNOWN:
 	default:
 		return labels, errors.Errorf("invalid DNS type %d", int32(dnsType))
@@ -155,7 +156,7 @@ func (d *DNSMetrics) getLabelsForProcessFlow(flow *v1.Flow) ([]string, error) {
 	return labels, nil
 }
 
-func (d *DNSMetrics) ProcessFlow(flow *v1.Flow) {
+func (d *DNSMetrics) ProcessFlow(flow *v1.Flow, ext *structpb.Struct) {
 	if flow == nil {
 		return
 	}
@@ -167,11 +168,11 @@ func (d *DNSMetrics) ProcessFlow(flow *v1.Flow) {
 	if d.isLocalContext() {
 		// when localcontext is enabled, we do not need the context options for both src and dst
 		// metrics aggregation will be on a single pod basis and not the src/dst pod combination basis.
-		d.processLocalCtxFlow(flow)
+		d.processLocalCtxFlow(flow, ext)
 		return
 	}
 
-	labels, err := d.getLabelsForProcessFlow(flow)
+	labels, err := d.getLabelsForProcessFlow(flow, ext)
 	if err != nil {
 		d.getLogger().Error("Failed to get labels for process flow", zap.Error(err))
 		return
@@ -199,13 +200,13 @@ func (d *DNSMetrics) ProcessFlow(flow *v1.Flow) {
 	d.getLogger().Debug("Update dns metric in remote ctx", zap.Any("metric", d.dnsMetrics), zap.Any("labels", labels))
 }
 
-func (d *DNSMetrics) processLocalCtxFlow(flow *v1.Flow) {
+func (d *DNSMetrics) processLocalCtxFlow(flow *v1.Flow, ext *structpb.Struct) {
 	labelValuesMap := d.sourceCtx().getLocalCtxValues(flow)
 	if labelValuesMap == nil {
 		return
 	}
 
-	labels, err := d.getLabelsForProcessFlow(flow)
+	labels, err := d.getLabelsForProcessFlow(flow, ext)
 	if err != nil {
 		d.getLogger().Error("Failed to get labels for process flow", zap.Error(err))
 		return

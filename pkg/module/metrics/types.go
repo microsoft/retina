@@ -11,6 +11,7 @@ import (
 	api "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/pkg/common"
 	"github.com/microsoft/retina/pkg/utils"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 const (
@@ -81,7 +82,9 @@ type AdvMetricsInterface interface {
 	Init(metricName string)
 	// This func is used to clean up old metrics on reconcile.
 	Clean()
-	ProcessFlow(f *flow.Flow)
+	// ext is the flow's extensions decoded once by the caller so modules can
+	// read fields via utils.*FromStruct without re-unmarshaling per flow.
+	ProcessFlow(f *flow.Flow, ext *structpb.Struct)
 }
 
 type ContextOptionsInterface interface {
