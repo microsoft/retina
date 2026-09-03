@@ -4,8 +4,10 @@ package server
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"net/http/pprof"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -18,6 +20,9 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// pprofPathPrefix is the URL prefix used by net/http/pprof handlers.
+const pprofPathPrefix = "/debug/pprof/"
+
 type Server struct {
 	l   *log.ZapLogger
 	mux *chi.Mux
@@ -26,6 +31,10 @@ type Server struct {
 func New(logger *log.ZapLogger) *Server {
 	r := chi.NewRouter()
 	r.Use(
+		// pprofLoopbackOnly MUST run before middleware.RealIP so it inspects
+		// the raw TCP peer address rather than a value derived from
+		// X-Forwarded-For / X-Real-IP headers (which are attacker-controlled).
+		pprofLoopbackOnly,
 		middleware.RequestID,
 		middleware.RealIP,
 		middleware.Recoverer,
@@ -36,6 +45,46 @@ func New(logger *log.ZapLogger) *Server {
 		l:   logger,
 		mux: r,
 	}
+}
+
+// pprofLoopbackOnly restricts /debug/pprof/* endpoints so they only respond
+// to requests arriving on the loopback interface. Any request whose raw TCP
+// remote address is not loopback (127.0.0.0/8 or ::1) receives a 404 — the
+// same status an unregistered path would return, so external scanners cannot
+// fingerprint the presence of pprof.
+//
+// This preserves the existing profiling workflow (`kubectl exec <pod> --
+// curl localhost:10093/debug/pprof/...` and `kubectl port-forward`), both of
+// which terminate on the pod's loopback interface, while blocking access
+// from other pods, other nodes, and off-cluster peers.
+//
+// IMPORTANT: this middleware must be registered before middleware.RealIP;
+// otherwise r.RemoteAddr would be rewritten from X-Forwarded-For and the
+// loopback check would be trivially bypassable via a spoofed header.
+func pprofLoopbackOnly(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, pprofPathPrefix) && !isLoopbackRemoteAddr(r.RemoteAddr) {
+			http.NotFound(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// isLoopbackRemoteAddr returns true iff addr (in host:port form as provided
+// by http.Request.RemoteAddr) is on the loopback interface.
+func isLoopbackRemoteAddr(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		// Fall back to treating the whole string as the host — some transports
+		// (e.g. unix sockets) leave RemoteAddr without a port.
+		host = addr
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	return ip.IsLoopback()
 }
 
 func (rt *Server) SetupHandlers() {
