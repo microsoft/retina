@@ -430,7 +430,7 @@ func AddDropReason(f *flow.Flow, s *structpb.Struct, dropReason uint16) {
 	}
 
 	dr := DropReason(dropReason)
-	s.GetFields()[ExtKeyDropReason] = structpb.NewStringValue(dr.String())
+	AddDropReasonDescription(s, dr)
 
 	f.Verdict = flow.Verdict_DROPPED
 
@@ -444,6 +444,15 @@ func AddDropReason(f *flow.Flow, s *structpb.Struct, dropReason uint16) {
 		Type:    int32(api.MessageTypeDrop),
 		SubType: int32(f.GetDropReasonDesc()), // This is the drop reason.
 	}
+}
+
+// AddDropReasonDescription adds a Retina drop reason to flow extensions
+// without changing the flow's event type.
+func AddDropReasonDescription(s *structpb.Struct, dropReason DropReason) {
+	if s == nil {
+		return
+	}
+	s.GetFields()[ExtKeyDropReason] = structpb.NewStringValue(dropReason.String())
 }
 
 func DropReasonDescription(f *flow.Flow) string {
