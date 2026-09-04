@@ -29,13 +29,16 @@ func TestValidateHostPath(t *testing.T) {
 		{name: "absolute windows drive letter forward", raw: "c:/evil", baseDir: base, wantErr: ErrHostPathAbsolute},
 		{name: "traversal raw", raw: "../etc", baseDir: base, wantErr: ErrHostPathTraversal},
 		{name: "traversal mid", raw: "foo/../bar", baseDir: base, wantErr: ErrHostPathTraversal},
-		{name: "traversal backslash", raw: `foo\..\bar`, baseDir: base, wantErr: ErrHostPathTraversal},
+		{name: "traversal backslash", raw: `foo\..\bar`, baseDir: base, wantErr: ErrHostPathInvalidChars},
 		{name: "traversal escaping base", raw: "../../etc", baseDir: base, wantErr: ErrHostPathTraversal},
 		{name: "embedded double quote", raw: `pwn"whoami`, baseDir: base, wantErr: ErrHostPathInvalidChars},
 		{name: "embedded angle bracket", raw: "job<name", baseDir: base, wantErr: ErrHostPathInvalidChars},
 		{name: "embedded pipe", raw: "job|name", baseDir: base, wantErr: ErrHostPathInvalidChars},
 		{name: "embedded wildcard", raw: "job*name", baseDir: base, wantErr: ErrHostPathInvalidChars},
 		{name: "embedded colon", raw: "job:name", baseDir: base, wantErr: ErrHostPathInvalidChars},
+		{name: "embedded ampersand", raw: "pwn&whoami", baseDir: base, wantErr: ErrHostPathInvalidChars},
+		{name: "embedded dollar and parens", raw: "pwn$(id)", baseDir: base, wantErr: ErrHostPathInvalidChars},
+		{name: "embedded space", raw: "job name", baseDir: base, wantErr: ErrHostPathInvalidChars},
 
 		// acceptance cases
 		{name: "bare name", raw: "retina", baseDir: base, want: base + "/retina"},

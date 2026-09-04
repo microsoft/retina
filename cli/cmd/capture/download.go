@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -66,6 +67,17 @@ const (
 	// can't be re-parsed as shell syntax.
 	linuxFileCheckScript = `if [ -r "$1" ]; then echo ` + fileExistsMarker + `; fi`
 )
+
+// safeDownloadPathSegment allow-lists the characters permitted in hostPath and
+// fileName before either is used to build a download-helper command. Both
+// values come from pod annotations, which are not guaranteed to have gone
+// through Capture-creation-time validation (an attacker with pod-create
+// permission can set them directly), and cmd.exe has no quoting that
+// neutralizes its own operators once they reach the command line, so
+// anything outside this set is rejected outright rather than passed through.
+var safeDownloadPathSegment = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
+
+var ErrUnsafeDownloadPath = errors.New("hostPath or file name contains characters that are not allowed")
 
 var (
 	blobURL               string
@@ -132,6 +144,10 @@ func NewDownloadService(kubeClient kubernetes.Interface, config *rest.Config, na
 }
 
 func getDownloadCmd(node *corev1.Node, hostPath, fileName string) (*DownloadCmd, error) {
+	if !safeDownloadPathSegment.MatchString(hostPath) || !safeDownloadPathSegment.MatchString(fileName) {
+		return nil, fmt.Errorf("%w: hostPath=%q fileName=%q", ErrUnsafeDownloadPath, hostPath, fileName)
+	}
+
 	nodeOS, err := getNodeOS(node)
 	if err != nil {
 		return nil, err

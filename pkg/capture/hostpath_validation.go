@@ -30,19 +30,20 @@ var (
 	// ErrHostPathBaseDir is returned when the operator-provided base directory is not usable.
 	ErrHostPathBaseDir = errors.New("invalid hostPath base directory")
 	// ErrHostPathInvalidChars is returned when the supplied HostPath contains a
-	// character that is illegal in an NTFS path segment.
+	// character outside safeHostPathChars.
 	ErrHostPathInvalidChars = errors.New("hostPath contains characters that are not valid in a path segment")
 )
 
 // winDriveLetter matches a Windows drive-letter prefix such as "C:\" or "c:/".
 var winDriveLetter = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
 
-// reservedPathChars are illegal in an NTFS path segment ('/' and '\' are the
-// separators and are handled separately). A capture's HostPath may target a
-// Windows node, so these are rejected regardless of the node OS actually
-// selected; this also closes the only way to break out of the cmd.exe
-// argument quoting used by the Windows download-helper's existence check.
-var reservedPathChars = regexp.MustCompile(`[<>:"|?*\x00-\x1f]`)
+// safeHostPathChars allow-lists characters that are always safe in a path
+// segment on both POSIX and Windows, and safe to embed in the download
+// helper's cmd.exe-based existence/read commands, which have no way to
+// neutralize shell operators such as & | < > ^ % once they reach the command
+// line. '/' is the portable path separator and is allowed; anything else,
+// including '\', is rejected rather than denylisted character-by-character.
+var safeHostPathChars = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
 
 // validateHostPath ensures that the user-supplied HostPath from a Capture CR is safe
 // to mount into the privileged capture pod and returns the absolute, cleaned path the
@@ -55,7 +56,8 @@ var reservedPathChars = regexp.MustCompile(`[<>:"|?*\x00-\x1f]`)
 //   - The path must not be absolute (no leading "/" or "\\", no Windows drive letter).
 //   - The path must not contain any ".." segment, checked both on the raw input and
 //     after filepath.Clean.
-//   - The path must not contain NTFS-reserved characters (illegal on Windows anyway).
+//   - The path must consist only of safeHostPathChars (letters, digits, '.', '_',
+//     '-', and '/' as the separator).
 //   - As defense in depth, the joined path must still resolve under baseDir.
 //
 // If baseDir is empty, DefaultHostPathBaseDir is used.
@@ -82,7 +84,7 @@ func validateHostPath(raw, baseDir string) (string, error) {
 		return "", fmt.Errorf("%w: %q", ErrHostPathAbsolute, raw)
 	}
 
-	if reservedPathChars.MatchString(raw) {
+	if !safeHostPathChars.MatchString(raw) {
 		return "", fmt.Errorf("%w: %q", ErrHostPathInvalidChars, raw)
 	}
 

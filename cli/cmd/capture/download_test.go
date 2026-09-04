@@ -355,40 +355,47 @@ func TestGetDownloadCmd(t *testing.T) {
 			},
 		},
 		{
-			name:     "Linux node download cmd with shell metacharacter payload",
+			name:     "hostPath with shell metacharacters is rejected",
 			node:     NewLinuxNode("linux-test"),
 			hostPath: "pwn$(id>proof.txt)",
 			fileName: testCapture,
-			wantErr:  false,
+			wantErr:  true,
 			validate: func(t *testing.T, cmd *DownloadCmd, err error) {
-				if err != nil {
-					t.Fatalf("Expected no error, got: %v", err)
+				if !errors.Is(err, ErrUnsafeDownloadPath) {
+					t.Errorf("Expected ErrUnsafeDownloadPath, got: %v", err)
 				}
-				wantCheckCmd := []string{"sh", "-c", linuxFileCheckScript, "sh", cmd.SrcFilePath}
-				if !slices.Equal(cmd.FileCheckCommand, wantCheckCmd) {
-					t.Errorf("Expected file check command %v, got %v", wantCheckCmd, cmd.FileCheckCommand)
-				}
-				if !strings.Contains(cmd.SrcFilePath, "pwn$(id>proof.txt)") {
-					t.Errorf("Expected payload to survive verbatim in SrcFilePath, got %s", cmd.SrcFilePath)
+				if cmd != nil {
+					t.Errorf("Expected nil DownloadCmd, got %v", cmd)
 				}
 			},
 		},
 		{
-			name:     "Windows node download cmd with shell metacharacter payload",
+			name:     "hostPath with cmd.exe operators is rejected regardless of node OS",
 			node:     NewWindowsNode("windows-test"),
 			hostPath: "pwn&whoami>proof.txt",
 			fileName: testCapture,
-			wantErr:  false,
+			wantErr:  true,
 			validate: func(t *testing.T, cmd *DownloadCmd, err error) {
-				if err != nil {
-					t.Fatalf("Expected no error, got: %v", err)
+				if !errors.Is(err, ErrUnsafeDownloadPath) {
+					t.Errorf("Expected ErrUnsafeDownloadPath, got: %v", err)
 				}
-				wantCheckCmd := []string{"cmd", "/c", "if", "exist", cmd.SrcFilePath, "echo", fileExistsMarker}
-				if !slices.Equal(cmd.FileCheckCommand, wantCheckCmd) {
-					t.Errorf("Expected 7-element argv file check command %v, got %v", wantCheckCmd, cmd.FileCheckCommand)
+				if cmd != nil {
+					t.Errorf("Expected nil DownloadCmd, got %v", cmd)
 				}
-				if !strings.Contains(cmd.SrcFilePath, "pwn&whoami>proof.txt") {
-					t.Errorf("Expected payload to survive verbatim in SrcFilePath, got %s", cmd.SrcFilePath)
+			},
+		},
+		{
+			name:     "fileName with shell metacharacters is rejected",
+			node:     NewWindowsNode("windows-test"),
+			hostPath: "/tmp/captures",
+			fileName: "pwn&whoami",
+			wantErr:  true,
+			validate: func(t *testing.T, cmd *DownloadCmd, err error) {
+				if !errors.Is(err, ErrUnsafeDownloadPath) {
+					t.Errorf("Expected ErrUnsafeDownloadPath, got: %v", err)
+				}
+				if cmd != nil {
+					t.Errorf("Expected nil DownloadCmd, got %v", cmd)
 				}
 			},
 		},
