@@ -31,7 +31,7 @@ The table below outlines the different metrics generated.
 | **networkobservability_drop_count**            | Total dropped packet count | `direction`, `reason` | ✅ | ✅ |
 | **networkobservability_drop_bytes**            | Total dropped byte count | `direction`, `reason` | ✅ | ❌ |
 | **networkobservability_tcp_state**             | TCP currently active socket count by TCP state. | `state` | ✅ | ❌ |
-| **networkobservability_tcp_connection_remote** | TCP currently active socket count by remote address. | `address` (IP:port) | ✅ | ❌ |
+| **networkobservability_tcp_connection_remote** | TCP currently active socket count against remote addresses, aggregated across all of them. | `address` (always `AllIPs`) | ✅ | ❌ |
 | **networkobservability_tcp_connection_stats**  | TCP connection statistics. (ex: Delayed ACKs, TCPKeepAlive, TCPSackFailures) | `statistic_name` | ✅ | ✅ |
 | **networkobservability_tcp_flag_gauges**       | TCP packets count by flag. | `direction`, `flag` | ❌ | ✅ |
 | **networkobservability_ip_connection_stats**   | IP connection statistics. | `statistic_name` | ✅ | ❌ |
