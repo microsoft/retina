@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -56,6 +57,27 @@ var (
 const (
 	DefaultOutputPath = "./"
 )
+
+const (
+	// fileExistsMarker is the stdout sentinel FileCheckCommand prints when the
+	// file check passes, shared by both the Linux and Windows commands.
+	fileExistsMarker = "FILE_EXISTS"
+	// linuxFileCheckScript is run via sh -c with the untrusted path bound to
+	// $1 (a positional parameter), never spliced into the script text, so it
+	// can't be re-parsed as shell syntax.
+	linuxFileCheckScript = `if [ -r "$1" ]; then echo ` + fileExistsMarker + `; fi`
+)
+
+// safeDownloadPathSegment allow-lists the characters permitted in hostPath and
+// fileName before either is used to build a download-helper command. Both
+// values come from pod annotations, which are not guaranteed to have gone
+// through Capture-creation-time validation (an attacker with pod-create
+// permission can set them directly), and cmd.exe has no quoting that
+// neutralizes its own operators once they reach the command line, so
+// anything outside this set is rejected outright rather than passed through.
+var safeDownloadPathSegment = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
+
+var ErrUnsafeDownloadPath = errors.New("hostPath or file name contains characters that are not allowed")
 
 var (
 	blobURL               string
@@ -122,6 +144,10 @@ func NewDownloadService(kubeClient kubernetes.Interface, config *rest.Config, na
 }
 
 func getDownloadCmd(node *corev1.Node, hostPath, fileName string) (*DownloadCmd, error) {
+	if !safeDownloadPathSegment.MatchString(hostPath) || !safeDownloadPathSegment.MatchString(fileName) {
+		return nil, fmt.Errorf("%w: hostPath=%q fileName=%q", ErrUnsafeDownloadPath, hostPath, fileName)
+	}
+
 	nodeOS, err := getNodeOS(node)
 	if err != nil {
 		return nil, err
@@ -140,7 +166,7 @@ func getDownloadCmd(node *corev1.Node, hostPath, fileName string) (*DownloadCmd,
 			SrcFilePath:      srcFilePath,
 			MountPath:        mountPath,
 			KeepAliveCommand: []string{"cmd", "/c", "echo Download pod ready & ping -n 3601 127.0.0.1 > nul"},
-			FileCheckCommand: []string{"cmd", "/c", fmt.Sprintf("if exist %s echo FILE_EXISTS", srcFilePath)},
+			FileCheckCommand: []string{"cmd", "/c", "if", "exist", srcFilePath, "echo", fileExistsMarker},
 			FileReadCommand:  []string{"cmd", "/c", "type", srcFilePath},
 		}, nil
 	case LinuxOS:
@@ -151,7 +177,7 @@ func getDownloadCmd(node *corev1.Node, hostPath, fileName string) (*DownloadCmd,
 			SrcFilePath:      srcFilePath,
 			MountPath:        mountPath,
 			KeepAliveCommand: []string{"sh", "-c", "echo 'Download pod ready'; sleep 3600"},
-			FileCheckCommand: []string{"sh", "-c", fmt.Sprintf("if [ -r %q ]; then echo 'FILE_EXISTS'; fi", srcFilePath)},
+			FileCheckCommand: []string{"sh", "-c", linuxFileCheckScript, "sh", srcFilePath},
 			FileReadCommand:  []string{"cat", srcFilePath},
 		}, nil
 	default:
@@ -434,11 +460,7 @@ func (ds *DownloadService) verifyFileExists(ctx context.Context, pod *corev1.Pod
 			if attempt == maxAttempts {
 				return false, fmt.Errorf("failed to check file existence after %d attempts: %w", attempt, err)
 			}
-			time.Sleep(time.Duration(attempt*2) * time.Second)
-			continue
-		}
-
-		if strings.Contains(checkOutput, "FILE_EXISTS") {
+		} else if strings.Contains(checkOutput, fileExistsMarker) {
 			return true, nil
 		}
 

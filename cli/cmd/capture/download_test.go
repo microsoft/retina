@@ -7,6 +7,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -307,8 +311,9 @@ func TestGetDownloadCmd(t *testing.T) {
 				if len(cmd.KeepAliveCommand) == 0 || cmd.KeepAliveCommand[0] != shellCommand {
 					t.Errorf("Expected Linux keep alive command to start with 'sh', got %v", cmd.KeepAliveCommand)
 				}
-				if len(cmd.FileCheckCommand) == 0 || cmd.FileCheckCommand[0] != shellCommand {
-					t.Errorf("Expected Linux file check command to start with 'sh', got %v", cmd.FileCheckCommand)
+				wantCheckCmd := []string{"sh", "-c", linuxFileCheckScript, "sh", cmd.SrcFilePath}
+				if !slices.Equal(cmd.FileCheckCommand, wantCheckCmd) {
+					t.Errorf("Expected Linux file check command %v, got %v", wantCheckCmd, cmd.FileCheckCommand)
 				}
 				if len(cmd.FileReadCommand) == 0 || cmd.FileReadCommand[0] != "cat" {
 					t.Errorf("Expected Linux file read command to start with 'cat', got %v", cmd.FileReadCommand)
@@ -340,11 +345,57 @@ func TestGetDownloadCmd(t *testing.T) {
 				if len(cmd.KeepAliveCommand) == 0 || cmd.KeepAliveCommand[0] != cmdCommand {
 					t.Errorf("Expected Windows keep alive command to start with 'cmd', got %v", cmd.KeepAliveCommand)
 				}
-				if len(cmd.FileCheckCommand) == 0 || cmd.FileCheckCommand[0] != cmdCommand {
-					t.Errorf("Expected Windows file check command to start with 'cmd', got %v", cmd.FileCheckCommand)
+				wantCheckCmd := []string{"cmd", "/c", "if", "exist", cmd.SrcFilePath, "echo", fileExistsMarker}
+				if !slices.Equal(cmd.FileCheckCommand, wantCheckCmd) {
+					t.Errorf("Expected Windows file check command %v, got %v", wantCheckCmd, cmd.FileCheckCommand)
 				}
 				if len(cmd.FileReadCommand) == 0 || cmd.FileReadCommand[0] != cmdCommand {
 					t.Errorf("Expected Windows file read command to start with 'cmd', got %v", cmd.FileReadCommand)
+				}
+			},
+		},
+		{
+			name:     "hostPath with shell metacharacters is rejected",
+			node:     NewLinuxNode("linux-test"),
+			hostPath: "pwn$(id>proof.txt)",
+			fileName: testCapture,
+			wantErr:  true,
+			validate: func(t *testing.T, cmd *DownloadCmd, err error) {
+				if !errors.Is(err, ErrUnsafeDownloadPath) {
+					t.Errorf("Expected ErrUnsafeDownloadPath, got: %v", err)
+				}
+				if cmd != nil {
+					t.Errorf("Expected nil DownloadCmd, got %v", cmd)
+				}
+			},
+		},
+		{
+			name:     "hostPath with cmd.exe operators is rejected regardless of node OS",
+			node:     NewWindowsNode("windows-test"),
+			hostPath: "pwn&whoami>proof.txt",
+			fileName: testCapture,
+			wantErr:  true,
+			validate: func(t *testing.T, cmd *DownloadCmd, err error) {
+				if !errors.Is(err, ErrUnsafeDownloadPath) {
+					t.Errorf("Expected ErrUnsafeDownloadPath, got: %v", err)
+				}
+				if cmd != nil {
+					t.Errorf("Expected nil DownloadCmd, got %v", cmd)
+				}
+			},
+		},
+		{
+			name:     "fileName with shell metacharacters is rejected",
+			node:     NewWindowsNode("windows-test"),
+			hostPath: "/tmp/captures",
+			fileName: "pwn&whoami",
+			wantErr:  true,
+			validate: func(t *testing.T, cmd *DownloadCmd, err error) {
+				if !errors.Is(err, ErrUnsafeDownloadPath) {
+					t.Errorf("Expected ErrUnsafeDownloadPath, got: %v", err)
+				}
+				if cmd != nil {
+					t.Errorf("Expected nil DownloadCmd, got %v", cmd)
 				}
 			},
 		},
@@ -377,6 +428,67 @@ func TestGetDownloadCmd(t *testing.T) {
 			result, err := getDownloadCmd(tc.node, tc.hostPath, tc.fileName)
 			tc.validate(t, result, err)
 		})
+	}
+}
+
+// TestLinuxFileCheckScriptResistsInjection runs the actual linuxFileCheckScript
+// via sh -c against real files, verifying the $1 positional-parameter pattern
+// (RETINA-002) is immune to shell injection at runtime, not just that its
+// argv shape looks right.
+func TestLinuxFileCheckScriptResistsInjection(t *testing.T) {
+	shPath, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("sh not available on this system")
+	}
+
+	dir := t.TempDir()
+	existingFile := filepath.Join(dir, "exists.txt")
+	if err := os.WriteFile(existingFile, []byte("data"), 0o600); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+	proofFile := filepath.Join(dir, "pwned")
+
+	testCases := []struct {
+		name       string
+		srcPath    string
+		wantMarker bool
+	}{
+		{
+			name:       "existing readable file reports found",
+			srcPath:    existingFile,
+			wantMarker: true,
+		},
+		{
+			name:       "missing file reports not found",
+			srcPath:    filepath.Join(dir, "missing.txt"),
+			wantMarker: false,
+		},
+		{
+			name:       "shell metacharacter payload is treated as a literal filename",
+			srcPath:    filepath.Join(dir, "pwn$(touch "+proofFile+")"),
+			wantMarker: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// tc.srcPath is a fixed, test-controlled value (never user input); the
+			// point of this test is to exec it and prove it can't inject shell syntax.
+			cmd := exec.Command(shPath, "-c", linuxFileCheckScript, "sh", tc.srcPath) // #nosec G204
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Fatalf("script execution failed: %v (output: %s)", err, output)
+			}
+
+			gotMarker := strings.Contains(string(output), fileExistsMarker)
+			if gotMarker != tc.wantMarker {
+				t.Errorf("expected marker=%v, got output %q", tc.wantMarker, output)
+			}
+		})
+	}
+
+	if _, err := os.Stat(proofFile); err == nil {
+		t.Fatal("payload was executed: proof file was created, injection succeeded")
 	}
 }
 

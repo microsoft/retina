@@ -29,10 +29,21 @@ var (
 	ErrHostPathEscapesBase = errors.New("hostPath resolves outside the configured base directory")
 	// ErrHostPathBaseDir is returned when the operator-provided base directory is not usable.
 	ErrHostPathBaseDir = errors.New("invalid hostPath base directory")
+	// ErrHostPathInvalidChars is returned when the supplied HostPath contains a
+	// character outside safeHostPathChars.
+	ErrHostPathInvalidChars = errors.New("hostPath contains characters that are not valid in a path segment")
 )
 
 // winDriveLetter matches a Windows drive-letter prefix such as "C:\" or "c:/".
 var winDriveLetter = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
+
+// safeHostPathChars allow-lists characters that are always safe in a path
+// segment on both POSIX and Windows, and safe to embed in the download
+// helper's cmd.exe-based existence/read commands, which have no way to
+// neutralize shell operators such as & | < > ^ % once they reach the command
+// line. '/' is the portable path separator and is allowed; anything else,
+// including '\', is rejected rather than denylisted character-by-character.
+var safeHostPathChars = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
 
 // validateHostPath ensures that the user-supplied HostPath from a Capture CR is safe
 // to mount into the privileged capture pod and returns the absolute, cleaned path the
@@ -45,6 +56,8 @@ var winDriveLetter = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
 //   - The path must not be absolute (no leading "/" or "\\", no Windows drive letter).
 //   - The path must not contain any ".." segment, checked both on the raw input and
 //     after filepath.Clean.
+//   - The path must consist only of safeHostPathChars (letters, digits, '.', '_',
+//     '-', and '/' as the separator).
 //   - As defense in depth, the joined path must still resolve under baseDir.
 //
 // If baseDir is empty, DefaultHostPathBaseDir is used.
@@ -69,6 +82,10 @@ func validateHostPath(raw, baseDir string) (string, error) {
 		strings.HasPrefix(raw, `\`) ||
 		winDriveLetter.MatchString(raw) {
 		return "", fmt.Errorf("%w: %q", ErrHostPathAbsolute, raw)
+	}
+
+	if !safeHostPathChars.MatchString(raw) {
+		return "", fmt.Errorf("%w: %q", ErrHostPathInvalidChars, raw)
 	}
 
 	// Reject literal ".." segments before cleaning so traversal attempts are
