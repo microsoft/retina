@@ -1,5 +1,6 @@
 enablePodLevel: true
 enableAnnotations: true
+enabledPlugin_win: '["hnsstats", "ebpfwindows"]'
 packetParserRingBuffer: "enabled"
 operator:
   enabled: true
