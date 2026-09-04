@@ -4,6 +4,8 @@ apiServer:
 # Supported - debug, info, error, warn, panic, fatal.
 logLevel: info
 enabledPlugin: ["hnsstats"]
+# Experimental: source telemetry from eBPF-for-Windows / WCN instead of HNS/VFP.
+# enabledPlugin: ["ebpfwindows"]
 # Interval, in seconds, to scrape/publish metrics.
 metricsIntervalDuration: "10s"
 # used to export telemetry to AppInsights
