@@ -57,6 +57,16 @@ const (
 	DefaultOutputPath = "./"
 )
 
+const (
+	// fileExistsMarker is the stdout sentinel FileCheckCommand prints when the
+	// file check passes, shared by both the Linux and Windows commands.
+	fileExistsMarker = "FILE_EXISTS"
+	// linuxFileCheckScript is run via sh -c with the untrusted path bound to
+	// $1 (a positional parameter), never spliced into the script text, so it
+	// can't be re-parsed as shell syntax.
+	linuxFileCheckScript = `if [ -r "$1" ]; then echo ` + fileExistsMarker + `; fi`
+)
+
 var (
 	blobURL               string
 	ErrCreateDirectory    = errors.New("failed to create directory")
@@ -140,7 +150,7 @@ func getDownloadCmd(node *corev1.Node, hostPath, fileName string) (*DownloadCmd,
 			SrcFilePath:      srcFilePath,
 			MountPath:        mountPath,
 			KeepAliveCommand: []string{"cmd", "/c", "echo Download pod ready & ping -n 3601 127.0.0.1 > nul"},
-			FileCheckCommand: []string{"cmd", "/c", fmt.Sprintf("if exist %s echo FILE_EXISTS", srcFilePath)},
+			FileCheckCommand: []string{"cmd", "/c", "if", "exist", srcFilePath, "echo", fileExistsMarker},
 			FileReadCommand:  []string{"cmd", "/c", "type", srcFilePath},
 		}, nil
 	case LinuxOS:
@@ -151,7 +161,7 @@ func getDownloadCmd(node *corev1.Node, hostPath, fileName string) (*DownloadCmd,
 			SrcFilePath:      srcFilePath,
 			MountPath:        mountPath,
 			KeepAliveCommand: []string{"sh", "-c", "echo 'Download pod ready'; sleep 3600"},
-			FileCheckCommand: []string{"sh", "-c", fmt.Sprintf("if [ -r %q ]; then echo 'FILE_EXISTS'; fi", srcFilePath)},
+			FileCheckCommand: []string{"sh", "-c", linuxFileCheckScript, "sh", srcFilePath},
 			FileReadCommand:  []string{"cat", srcFilePath},
 		}, nil
 	default:
@@ -434,11 +444,7 @@ func (ds *DownloadService) verifyFileExists(ctx context.Context, pod *corev1.Pod
 			if attempt == maxAttempts {
 				return false, fmt.Errorf("failed to check file existence after %d attempts: %w", attempt, err)
 			}
-			time.Sleep(time.Duration(attempt*2) * time.Second)
-			continue
-		}
-
-		if strings.Contains(checkOutput, "FILE_EXISTS") {
+		} else if strings.Contains(checkOutput, fileExistsMarker) {
 			return true, nil
 		}
 
