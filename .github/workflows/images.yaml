@@ -29,6 +29,12 @@ jobs:
         id: get_tag
         run: echo "tag=$(make version)" >> $GITHUB_OUTPUT
 
+  event-writer-image:
+    name: Build E2E Event Writer Image
+    if: ${{ github.event_name == 'merge_group' }}
+    uses: ./.github/workflows/e2e-test-event-writer.yml
+    secrets: inherit
+
   retina-images:
     name: Build Agent Images - Linux
     runs-on: ${{ matrix.runner }}
@@ -54,7 +60,7 @@ jobs:
       - run: go version
 
       - name: Az CLI login
-        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
+        uses: azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c # v3.0.2
         if: ${{ github.event_name == 'merge_group' }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -159,7 +165,7 @@ jobs:
           throw "Docker daemon failed to start within $timeout seconds"
 
       - name: Az CLI login
-        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
+        uses: azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c # v3.0.2
         if: ${{ github.event_name == 'merge_group' }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -219,7 +225,7 @@ jobs:
       - run: go version
 
       - name: Az CLI login
-        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
+        uses: azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c # v3.0.2
         if: ${{ github.event_name == 'merge_group' }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -272,7 +278,7 @@ jobs:
       - run: go version
 
       - name: Az CLI login
-        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
+        uses: azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c # v3.0.2
         if: ${{ github.event_name == 'merge_group' }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -324,7 +330,7 @@ jobs:
       - run: go version
 
       - name: Az CLI login
-        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
+        uses: azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c # v3.0.2
         if: ${{ github.event_name == 'merge_group' }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -377,7 +383,7 @@ jobs:
         uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
 
       - name: Azure CLI login
-        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
+        uses: azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c # v3.0.2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -394,7 +400,7 @@ jobs:
   e2e:
     name: Run E2E Tests
     if: ${{ github.event_name == 'merge_group' }}
-    needs: [manifests]
+    needs: [manifests, event-writer-image]
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
@@ -411,7 +417,7 @@ jobs:
       - run: go version
 
       - name: Az CLI login
-        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
+        uses: azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c # v3.0.2
         if: ${{ github.event_name == 'merge_group' }}
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}

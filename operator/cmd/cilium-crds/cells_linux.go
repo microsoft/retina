@@ -31,6 +31,7 @@ import (
 	"github.com/cilium/cilium/operator/identitygc"
 	operatorMetrics "github.com/cilium/cilium/operator/metrics"
 	operatorOption "github.com/cilium/cilium/operator/option"
+	"github.com/cilium/cilium/operator/pkg/ztunnel"
 	cmtypes "github.com/cilium/cilium/pkg/clustermesh/types"
 	"github.com/cilium/cilium/pkg/controller"
 	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
@@ -43,6 +44,13 @@ import (
 )
 
 var (
+	authenticationCell = cell.Module(
+		"operator-auth",
+		"Operator Authentication",
+		ztunnel.Cell,
+		auth.Cell,
+	)
+
 	Operator = cell.Module(
 		"operator",
 		"Retina Operator",
@@ -219,7 +227,7 @@ var (
 
 			// NOTE: gc cells require this auth cell
 			// this cell will do nothing since --mesh-auth-mutual-enabled=false
-			auth.Cell,
+			authenticationCell,
 
 			store.Cell,
 

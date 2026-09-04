@@ -8,7 +8,7 @@
 #     ACR_NAME
 #   Variables (secret):
 #     AZURE_APP_INSIGHTS_KEY
-#   Service connection (Azure RM, WIF): r2d
+#   Service connection (Azure RM, WIF): Azure Container Networking - Build Validations - Federated
 #   Settings: "Limit building pull requests from forked GitHub repositories" = Disable
 
 trigger: none
@@ -37,7 +37,7 @@ parameters:
     type: string
     default: microsoft/retina
   - name: image_tag
-    displayName: Image Tag (blank = latest commit from main)
+    displayName: Image Tag (blank = selected branch version)
     type: string
     default: ' '
   - name: num_deployments
@@ -63,7 +63,7 @@ parameters:
 
 variables:
   - name: azureServiceConnection
-    value: r2d
+    value: Azure Container Networking - Build Validations - Federated
 
 jobs:
   - job: scale_test
