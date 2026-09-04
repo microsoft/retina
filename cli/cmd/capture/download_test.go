@@ -472,7 +472,9 @@ func TestLinuxFileCheckScriptResistsInjection(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			cmd := exec.Command(shPath, "-c", linuxFileCheckScript, "sh", tc.srcPath)
+			// tc.srcPath is a fixed, test-controlled value (never user input); the
+			// point of this test is to exec it and prove it can't inject shell syntax.
+			cmd := exec.Command(shPath, "-c", linuxFileCheckScript, "sh", tc.srcPath) // #nosec G204
 			output, err := cmd.CombinedOutput()
 			if err != nil {
 				t.Fatalf("script execution failed: %v (output: %s)", err, output)
