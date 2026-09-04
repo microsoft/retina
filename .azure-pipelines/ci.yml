@@ -467,7 +467,7 @@ jobs:
 
   - job: e2e
     displayName: Run E2E Tests
-    condition: and(succeeded(), eq(variables['publishImagesAndRunE2E'], 'True'))
+    condition: succeeded()
     dependsOn:
       - manifests
       - event_writer_image
@@ -479,9 +479,13 @@ jobs:
     steps:
       - checkout: self
         fetchDepth: 0
+      - bash: echo "Skipping E2E - not a merge-queue run (publishImagesAndRunE2E=$(publishImagesAndRunE2E))."
+        displayName: Skip E2E (PR build)
+        condition: ne(variables['publishImagesAndRunE2E'], 'True')
       - template: steps/setup-go.yml
       - task: AzureCLI@2
         displayName: Run E2E Tests
+        condition: eq(variables['publishImagesAndRunE2E'], 'True')
         env:
           AZURE_LOCATION: $(AZURE_LOCATION)
           AZURE_AGENT_LINUX_SKU: $(AZURE_AGENT_LINUX_SKU)
