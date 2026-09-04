@@ -13,6 +13,7 @@ import (
 	"path"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/wrapperspb"
@@ -413,6 +414,15 @@ func (p *packetParser) Stop() error {
 		p.l.Debug("Closed records channel")
 	}
 
+	// Stop the drop reporter and wait for it to exit before closing the objects, since it
+	// reads a map from them. Cancelling here rather than relying on the context passed to
+	// Start keeps Stop from depending on the caller, and bounds the wait to one map read.
+	if p.stopReporter != nil {
+		p.stopReporter()
+		p.reporterWg.Wait()
+		p.l.Debug("Stopped lost event reporter")
+	}
+
 	// Stop map and progs.
 	if p.objs != nil {
 		if err := p.objs.Close(); err != nil {
@@ -768,6 +778,14 @@ func (p *packetParser) run(ctx context.Context) error {
 	// That call is unblocked when Reader is closed.
 	go p.handleEvents(ctx)
 
+	// Report kernel-side event drops (buffer write failures) from the eBPF metrics map.
+	// Tracked separately from wg so Stop can cancel and wait for just this goroutine
+	// before closing the objects whose map it reads.
+	reporterCtx, stopReporter := context.WithCancel(ctx)
+	p.stopReporter = stopReporter
+	p.reporterWg.Add(1)
+	go p.reportLostEvents(reporterCtx)
+
 	p.l.Info("Started packet parser")
 
 	// Wait for the context to be done.
@@ -929,9 +947,9 @@ func (p *packetParser) readData() {
 		return
 	}
 
+	// Kernel-side drops are counted in the eBPF program (retina_packetparser_metrics)
+	// and reported by reportLostEvents. Lost-sample records carry no event, so skip them.
 	if record.LostSamples > 0 {
-		// p.l.Warn("Lostsamples", zap.Uint64("lost samples", record.LostSamples))
-		metrics.LostEventsCounter.WithLabelValues(utils.Kernel, name).Add(float64(record.LostSamples))
 		return
 	}
 
@@ -942,6 +960,75 @@ func (p *packetParser) readData() {
 		// We shouldn't slow down the perf array reader.
 		metrics.LostEventsCounter.WithLabelValues(utils.BufferedChannel, name).Inc()
 	}
+}
+
+// reportLostEvents reports kernel-side event drops (recorded in eBPF because ring
+// buffers surface no lost-sample signal to userspace) on the metrics interval.
+func (p *packetParser) reportLostEvents(ctx context.Context) {
+	defer p.reporterWg.Done()
+
+	if p.objs == nil || p.objs.RetinaPacketparserMetrics == nil {
+		p.l.Warn("Kernel drop counter map is unavailable, not reporting kernel event drops")
+		return
+	}
+	ticker := time.NewTicker(p.cfg.MetricsInterval)
+	defer ticker.Stop()
+
+	var last uint64
+	for {
+		select {
+		case <-ctx.Done():
+			// Sample once more before exiting. Stop keeps the map open until this returns,
+			// so this is the only chance to report drops since the previous tick.
+			p.reportDroppedEventsDelta(&last)
+			return
+		case <-ticker.C:
+			p.reportDroppedEventsDelta(&last)
+		}
+	}
+}
+
+// reportDroppedEventsDelta reads the kernel drop counter and reports what is new since
+// last, advancing last to the value just read.
+func (p *packetParser) reportDroppedEventsDelta(last *uint64) {
+	total, err := p.readDroppedEvents()
+	if err != nil {
+		p.l.Error("Error reading kernel drop counter", zap.Error(err))
+		return
+	}
+	add, newLast := lostEventsDelta(total, *last)
+	*last = newLast
+	if add > 0 {
+		metrics.LostEventsCounter.WithLabelValues(utils.Kernel, name).Add(float64(add))
+	}
+}
+
+// readDroppedEvents sums the per-CPU kernel drop counter.
+func (p *packetParser) readDroppedEvents() (uint64, error) {
+	var perCPU []uint64
+	if err := p.objs.RetinaPacketparserMetrics.Lookup(uint32(0), &perCPU); err != nil {
+		return 0, errors.Wrap(err, "failed to lookup packetparser metrics map")
+	}
+	return sumPerCPUCounters(perCPU), nil
+}
+
+// sumPerCPUCounters totals a per-CPU counter array.
+func sumPerCPUCounters(perCPU []uint64) uint64 {
+	var total uint64
+	for _, v := range perCPU {
+		total += v
+	}
+	return total
+}
+
+// lostEventsDelta returns how many newly-dropped events to report given the current
+// cumulative counter value and the last-seen value, along with the new last-seen value.
+// A decrease is treated as a counter reset (report nothing, adopt the new value).
+func lostEventsDelta(total, last uint64) (add, newLast uint64) {
+	if total <= last {
+		return 0, total
+	}
+	return total - last, total
 }
 
 // Helper functions.
