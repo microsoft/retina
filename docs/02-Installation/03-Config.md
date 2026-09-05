@@ -45,7 +45,7 @@ Apply to both Agent and Operator.
 ## Agent Configuration
 
 * `logLevel`: Define the level of logs to store.
-* `enabledPlugin_linux`: List of enabled plugins.
+* `enabledPlugin_linux`: List of enabled plugins. See the [plugin list](../03-Metrics/plugins/readme.md) for valid names and operating-system availability.
 * `metricsInterval`: Interval for gathering metrics (in seconds). (@deprecated, use `metricsIntervalDuration` instead)
 * `metricsIntervalDuration`: Interval for gathering metrics (in `time.Duration`).
 * `enablePodLevel`: Enables gathering of advanced pod-level metrics, attaching pods' metadata to Retina's metrics.
