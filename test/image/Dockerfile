@@ -1,6 +1,6 @@
 # build stage
 # skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:f71abd962461be0412f9b9f9659061f1a45c1767e55ce9a51a457097bf2335e9 AS builder
+FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:0fd0eb0f8786e0b8c9fff71b12a48d112e6392ce35c84f72650f185f6722977d AS builder
 ENV CGO_ENABLED=1
 COPY . /go/src/github.com/microsoft/retina 
 WORKDIR /go/src/github.com/microsoft/retina

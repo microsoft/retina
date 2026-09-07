@@ -29,6 +29,12 @@ jobs:
         id: get_tag
         run: echo "tag=$(make version)" >> $GITHUB_OUTPUT
 
+  event-writer-image:
+    name: Build E2E Event Writer Image
+    if: ${{ github.event_name == 'merge_group' }}
+    uses: ./.github/workflows/e2e-test-event-writer.yml
+    secrets: inherit
+
   retina-images:
     name: Build Agent Images - Linux
     runs-on: ${{ matrix.runner }}
@@ -394,7 +400,7 @@ jobs:
   e2e:
     name: Run E2E Tests
     if: ${{ github.event_name == 'merge_group' }}
-    needs: [manifests]
+    needs: [manifests, event-writer-image]
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
