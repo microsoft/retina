@@ -18,6 +18,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  test-ebpfwindows:
+    name: Test Windows eBPF Plugin
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Run Windows eBPF plugin tests
+        run: go test -v ./pkg/plugin/ebpfwindows ./pkg/plugin/common -count=1
+
+      # Scoped to the registry gating tests.
+      - name: Run Windows hnsstats gating tests
+        run: go test -v ./pkg/plugin/hnsstats -run TestStart_CiliumRegistryMatrix -count=1
+
   test-image:
     runs-on: ubuntu-latest
     timeout-minutes: 30

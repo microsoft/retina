@@ -3,10 +3,12 @@
 package retina
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/microsoft/retina/test/e2e/common"
 	"github.com/microsoft/retina/test/e2e/framework/azure"
@@ -70,6 +72,12 @@ func TestE2ERetina_Scale(t *testing.T) {
 	require.NotEmpty(t, RetinaVersion)
 	opt.AdditionalTelemetryProperty["retinaVersion"] = RetinaVersion
 	opt.AdditionalTelemetryProperty["clusterName"] = clusterName
+
+	runID := os.Getenv("RUN_ID")
+	if runID == "" {
+		runID = fmt.Sprintf("local-%d", time.Now().UnixNano())
+	}
+	opt.AdditionalTelemetryProperty["runId"] = runID
 
 	// AppInsightsKey is required for telemetry
 	require.NotEmpty(t, os.Getenv(common.AzureAppInsightsKeyEnv))
