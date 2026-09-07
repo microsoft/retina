@@ -87,6 +87,7 @@ jobs:
           TAG: ${{ parameters.image_tag }}
           NODES: ${{ parameters.num_nodes }}
           AZURE_APP_INSIGHTS_KEY: $(AZURE_APP_INSIGHTS_KEY)
+          RUN_ID: $(Build.BuildId)
         inputs:
           azureSubscription: $(azureServiceConnection)
           scriptType: bash
