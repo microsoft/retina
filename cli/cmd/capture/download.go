@@ -146,6 +146,10 @@ func getDownloadCmd(node *corev1.Node, hostPath, fileName string) (*DownloadCmd,
 	if pkgcapture.UnsafePathChars.MatchString(hostPath) ||
 		pkgcapture.UnsafePathChars.MatchString(fileName) ||
 		strings.ContainsAny(fileName, `/\`) {
+		// Only reachable via a pod annotation that bypassed Capture-creation-time
+		// validation, so surface it as a warning for tampering detection.
+		retinacmd.Logger.Warn("Rejected unsafe download path from pod annotations",
+			zap.String("node", node.Name), zap.String("hostPath", hostPath), zap.String("fileName", fileName))
 		return nil, fmt.Errorf("%w: hostPath=%q fileName=%q", ErrUnsafeDownloadPath, hostPath, fileName)
 	}
 
@@ -465,7 +469,10 @@ func (ds *DownloadService) verifyFileExists(ctx context.Context, pod *corev1.Pod
 			return true, nil
 		}
 
-		time.Sleep(time.Duration(attempt*2) * time.Second)
+		// no retry follows the final attempt, so don't sleep before returning below
+		if attempt < maxAttempts {
+			time.Sleep(time.Duration(attempt*2) * time.Second)
+		}
 	}
 
 	return false, fmt.Errorf("%s: %w", downloadCmd.SrcFilePath, ErrFileNotAccessible)

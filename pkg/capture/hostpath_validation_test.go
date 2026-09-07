@@ -57,6 +57,7 @@ func TestValidateHostPath(t *testing.T) {
 
 		// invalid base
 		{name: "relative base rejected", raw: "x", baseDir: "captures", wantErr: ErrHostPathBaseDir},
+		{name: "base dir with unsafe chars rejected", raw: "x", baseDir: base + "&evil", wantErr: ErrHostPathInvalidChars},
 	}
 
 	for _, tt := range tests {

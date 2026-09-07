@@ -48,3 +48,10 @@ func TestGetConfig_InvalidHostPathBaseDirChars(t *testing.T) {
 		t.Errorf("Expected error %s, instead got %s", config.ErrCaptureHostPathBaseDirInvalid, err)
 	}
 }
+
+func TestGetConfig_InvalidHostPathBaseDirControlChar(t *testing.T) {
+	_, err := config.GetConfig("./testwith/config-invalid-hostpath-basedir-control-char.yaml")
+	if !errors.Is(err, config.ErrCaptureHostPathBaseDirInvalid) {
+		t.Errorf("Expected error %s, instead got %s", config.ErrCaptureHostPathBaseDirInvalid, err)
+	}
+}

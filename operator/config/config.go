@@ -16,7 +16,7 @@ const MinTelemetryInterval time.Duration = 2 * time.Minute
 var (
 	DefaultTelemetryInterval         = 5 * time.Minute
 	ErrorTelemetryIntervalTooSmall   = fmt.Errorf("telemetryInterval smaller than %v is not allowed", MinTelemetryInterval)
-	ErrCaptureHostPathBaseDirInvalid = errors.New("captureHostPathBaseDir must be an absolute path containing only letters, digits, '.', '_', '-', and '/'")
+	ErrCaptureHostPathBaseDirInvalid = errors.New("captureHostPathBaseDir must be an absolute path free of NTFS-reserved characters, control characters, and cmd.exe operators")
 )
 
 type OperatorConfig struct {

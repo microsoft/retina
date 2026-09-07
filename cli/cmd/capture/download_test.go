@@ -415,6 +415,21 @@ func TestGetDownloadCmd(t *testing.T) {
 			},
 		},
 		{
+			name:     "fileName with backslash path traversal is rejected on Windows node",
+			node:     NewWindowsNode("windows-test"),
+			hostPath: "/tmp/captures",
+			fileName: `..\..\escape`,
+			wantErr:  true,
+			validate: func(t *testing.T, cmd *DownloadCmd, err error) {
+				if !errors.Is(err, ErrUnsafeDownloadPath) {
+					t.Errorf("Expected ErrUnsafeDownloadPath, got: %v", err)
+				}
+				if cmd != nil {
+					t.Errorf("Expected nil DownloadCmd, got %v", cmd)
+				}
+			},
+		},
+		{
 			name: "Unsupported node OS",
 			node: &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "unsupported-test"},
@@ -461,6 +476,14 @@ func TestLinuxFileCheckScriptResistsInjection(t *testing.T) {
 	if err := os.WriteFile(existingFile, []byte("data"), 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
+	spaceFile := filepath.Join(dir, "job name.txt")
+	if err := os.WriteFile(spaceFile, []byte("data"), 0o600); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+	unicodeFile := filepath.Join(dir, "captüre.txt")
+	if err := os.WriteFile(unicodeFile, []byte("data"), 0o600); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
 	proofFile := filepath.Join(dir, "pwned")
 
 	testCases := []struct {
@@ -477,6 +500,16 @@ func TestLinuxFileCheckScriptResistsInjection(t *testing.T) {
 			name:       "missing file reports not found",
 			srcPath:    filepath.Join(dir, "missing.txt"),
 			wantMarker: false,
+		},
+		{
+			name:       "path with embedded space is found",
+			srcPath:    spaceFile,
+			wantMarker: true,
+		},
+		{
+			name:       "path with unicode is found",
+			srcPath:    unicodeFile,
+			wantMarker: true,
 		},
 		{
 			name:       "shell metacharacter payload is treated as a literal filename",
