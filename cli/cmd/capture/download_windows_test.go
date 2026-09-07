@@ -67,8 +67,12 @@ func TestWindowsFileCheckCommandResistsInjection(t *testing.T) {
 	// script, cmd.exe has no mechanism that would neutralize it here.
 	proofFile := filepath.Join(dir, "pwned")
 	injected := filepath.Join(dir, "pwn&(echo hi>"+proofFile+")")
-	cmd := exec.CommandContext(t.Context(), cmdPath, "/c", "if", "exist", injected, "echo", fileExistsMarker) // #nosec G204 -- proves why UnsafePathChars rejects '&' upstream, not a reachable download path
-	cmd.CombinedOutput()                                                                                      //nolint:errcheck // exit status is irrelevant; only proofFile's existence matters
+	cmd := exec.CommandContext(t.Context(), cmdPath, "/c", "if", "exist", injected,
+		"echo", fileExistsMarker) // #nosec G204 -- shows why '&' must be denied upstream, not a reachable download path
+	if output, err := cmd.CombinedOutput(); err != nil {
+		// Non-zero exit is fine here; only proofFile's existence matters.
+		t.Logf("cmd exited non-zero: %v (output: %s)", err, output)
+	}
 
 	if _, statErr := os.Stat(proofFile); statErr != nil {
 		t.Fatal("expected the '&' payload to execute via cmd.exe, proving UnsafePathChars must reject it before this command is built")
