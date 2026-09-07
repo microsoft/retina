@@ -400,6 +400,21 @@ func TestGetDownloadCmd(t *testing.T) {
 			},
 		},
 		{
+			name:     "fileName with path traversal is rejected",
+			node:     NewLinuxNode("linux-test"),
+			hostPath: "/tmp/captures",
+			fileName: "../../escape",
+			wantErr:  true,
+			validate: func(t *testing.T, cmd *DownloadCmd, err error) {
+				if !errors.Is(err, ErrUnsafeDownloadPath) {
+					t.Errorf("Expected ErrUnsafeDownloadPath, got: %v", err)
+				}
+				if cmd != nil {
+					t.Errorf("Expected nil DownloadCmd, got %v", cmd)
+				}
+			},
+		},
+		{
 			name: "Unsupported node OS",
 			node: &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "unsupported-test"},
@@ -474,7 +489,7 @@ func TestLinuxFileCheckScriptResistsInjection(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// tc.srcPath is a fixed, test-controlled value (never user input); the
 			// point of this test is to exec it and prove it can't inject shell syntax.
-			cmd := exec.Command(shPath, "-c", linuxFileCheckScript, "sh", tc.srcPath) // #nosec G204
+			cmd := exec.CommandContext(t.Context(), shPath, "-c", linuxFileCheckScript, "sh", tc.srcPath) // #nosec G204
 			output, err := cmd.CombinedOutput()
 			if err != nil {
 				t.Fatalf("script execution failed: %v (output: %s)", err, output)

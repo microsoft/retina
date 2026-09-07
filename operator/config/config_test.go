@@ -41,3 +41,10 @@ func TestGetConfig_SmallTelemetryInterval(t *testing.T) {
 		t.Errorf("Expected error %s, instead got %s", config.ErrorTelemetryIntervalTooSmall, err)
 	}
 }
+
+func TestGetConfig_InvalidHostPathBaseDirChars(t *testing.T) {
+	_, err := config.GetConfig("./testwith/config-invalid-hostpath-basedir.yaml")
+	if !errors.Is(err, config.ErrCaptureHostPathBaseDirInvalid) {
+		t.Errorf("Expected error %s, instead got %s", config.ErrCaptureHostPathBaseDirInvalid, err)
+	}
+}

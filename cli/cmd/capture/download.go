@@ -15,13 +15,13 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/storage"
 	retinacmd "github.com/microsoft/retina/cli/cmd"
+	pkgcapture "github.com/microsoft/retina/pkg/capture"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
 	captureFile "github.com/microsoft/retina/pkg/capture/file"
 	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
@@ -68,15 +68,14 @@ const (
 	linuxFileCheckScript = `if [ -r "$1" ]; then echo ` + fileExistsMarker + `; fi`
 )
 
-// safeDownloadPathSegment allow-lists the characters permitted in hostPath and
-// fileName before either is used to build a download-helper command. Both
-// values come from pod annotations, which are not guaranteed to have gone
-// through Capture-creation-time validation (an attacker with pod-create
-// permission can set them directly), and cmd.exe has no quoting that
-// neutralizes its own operators once they reach the command line, so
-// anything outside this set is rejected outright rather than passed through.
-var safeDownloadPathSegment = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
-
+// hostPath and fileName come from pod annotations, which are not guaranteed
+// to have gone through Capture-creation-time validation (an attacker with
+// pod-create permission can set them directly), so both are rejected here if
+// they contain any pkgcapture.UnsafePathChars before being used to build a
+// download-helper command. fileName is additionally used as a bare basename
+// (e.g. joined with an output directory or written as a tar entry name), so
+// unlike hostPath it must not contain a path separator at all, or a value
+// like "../../escape" would still traverse out of the intended directory.
 var ErrUnsafeDownloadPath = errors.New("hostPath or file name contains characters that are not allowed")
 
 var (
@@ -144,7 +143,9 @@ func NewDownloadService(kubeClient kubernetes.Interface, config *rest.Config, na
 }
 
 func getDownloadCmd(node *corev1.Node, hostPath, fileName string) (*DownloadCmd, error) {
-	if !safeDownloadPathSegment.MatchString(hostPath) || !safeDownloadPathSegment.MatchString(fileName) {
+	if pkgcapture.UnsafePathChars.MatchString(hostPath) ||
+		pkgcapture.UnsafePathChars.MatchString(fileName) ||
+		strings.ContainsAny(fileName, `/\`) {
 		return nil, fmt.Errorf("%w: hostPath=%q fileName=%q", ErrUnsafeDownloadPath, hostPath, fileName)
 	}
 
