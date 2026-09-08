@@ -51,12 +51,18 @@ Function Assert-SoftwareInstalled
    {
       If($SoftwareName)
       {
-         $software = Get-WmiObject -Class:'Win32_Product' | Where-Object -Property:'Name' -like "*$($SoftwareName)*"
+         $uninstallKeyPaths = @(
+            'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
+            'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
+         )
+
+         $software = Get-ItemProperty -Path:$uninstallKeyPaths -ErrorAction:'SilentlyContinue' |
+            Where-Object -Property:'DisplayName' -like "*$($SoftwareName)*"
 
          If($software -And
             (-Not [String]::IsNullOrWhiteSpace($SoftwareVersion)))
          {
-            $software = $software | Where-Object -Property:'Version' -like "*$($SoftwareVersion)*"
+            $software = $software | Where-Object -Property:'DisplayVersion' -like "*$($SoftwareVersion)*"
          }
 
          If($software)
