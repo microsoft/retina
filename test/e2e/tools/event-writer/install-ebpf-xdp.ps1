@@ -3,9 +3,14 @@
 # This script performs Windows node setup required for Retina e2e tests.
 
 # Version configuration
+# These must match the ARG defaults in ./Dockerfile.
 $Script:eBPFVersion = "1.1.0"
 $Script:RetinaEbpfAPIVersion = "1.6.0"
 $Script:XDPRuntimeVersion = "1.3.0"
+
+# Directory where the Dockerfile places install artifacts (eBPF MSI, VC++ redist,
+# retinaebpfapi and XDP runtime packages).
+$Script:InstallArtifactsPath = "C:\install-artifacts"
 
 Function Assert-SoftwareInstalled
 {
@@ -438,11 +443,14 @@ Function Install-eBPF
       }
 
       Write-Host 'Installing extended Berkley Packet Filter for Windows'
-      # Download eBPF-for-Windows.
-      $packageEbpfUrl  = "https://github.com/microsoft/ebpf-for-windows/releases/download/Release-v$Script:eBPFVersion/ebpf-for-windows.x64.$Script:eBPFVersion.msi"
-      Invoke-WebRequest -Uri $packageEbpfUrl -OutFile "$LocalPath\ebpf-for-windows.x64.$Script:eBPFVersion.msi"
+      $ebpfMsiPath = "$Script:InstallArtifactsPath\ebpf-for-windows.x64.msi"
+      If(-Not (Test-Path $ebpfMsiPath))
+      {
+         Write-Error -Message:"eBPF MSI not found at $ebpfMsiPath"
+         Throw
+      }
 
-      Start-Process -FilePath "$($env:WinDir)\System32\MSIExec.exe" -ArgumentList @("/i", "$LocalPath\ebpf-for-windows.x64.$Script:eBPFVersion.msi", "/qn", "INSTALLFOLDER=`"$($env:ProgramFiles)\ebpf-for-windows`"", "ADDLOCAL=eBPF_Runtime_Components") -PassThru | Wait-Process
+      Start-Process -FilePath "$($env:WinDir)\System32\MSIExec.exe" -ArgumentList @("/i", "$ebpfMsiPath", "/qn", "INSTALLFOLDER=`"$($env:ProgramFiles)\ebpf-for-windows`"", "ADDLOCAL=eBPF_Runtime_Components") -PassThru | Wait-Process
       If(-Not (Assert-SoftwareInstalled -ServiceName:'eBPFCore' -Silent) -Or
          -Not (Assert-SoftwareInstalled -ServiceName:'NetEbpfExt' -Silent))
       {
@@ -510,10 +518,13 @@ Function Install-VCRuntime
 
       Write-Host 'Installing Visual C++ Redistributable (x64)'
 
-      $vcRedistUrl = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
-      $vcRedistPath = "$env:TEMP\vc_redist.x64.exe"
+      $vcRedistPath = "$Script:InstallArtifactsPath\vc_redist.x64.exe"
+      If(-Not (Test-Path $vcRedistPath))
+      {
+         Write-Error "VC++ Redistributable installer not found at $vcRedistPath"
+         Throw
+      }
 
-      Invoke-WebRequest -Uri $vcRedistUrl -OutFile $vcRedistPath
       Start-Process -FilePath $vcRedistPath -ArgumentList @("/install", "/quiet", "/norestart") -Wait
 
       # Verify installation
@@ -532,10 +543,6 @@ Function Install-VCRuntime
    {
       $isSuccess = $false
       Write-Host "Visual C++ Runtime install failed: $_"
-   }
-   Finally
-   {
-      Remove-Item -Path "$env:TEMP\vc_redist.x64.exe" -Force -ErrorAction SilentlyContinue
    }
 
    Return $isSuccess
@@ -567,13 +574,17 @@ Function Install-RetinaEbpfAPI
          return $isSuccess
       }
 
-      Write-Host 'Installing retinaebpfapi.dll from NuGet'
+      Write-Host 'Installing retinaebpfapi.dll'
 
-      $nugetUrl = "https://www.nuget.org/api/v2/package/Microsoft.Wcn.Observability.eBPF.Retina.x64/$Script:RetinaEbpfAPIVersion"
-      $zipPath = "$env:TEMP\eBPFRetina.zip"
+      $zipPath = "$Script:InstallArtifactsPath\retinaebpfapi.zip"
       $extractPath = "$env:TEMP\eBPFRetina"
 
-      Invoke-WebRequest -Uri $nugetUrl -OutFile $zipPath
+      If(-Not (Test-Path $zipPath))
+      {
+         Write-Error "retinaebpfapi NuGet package not found at $zipPath"
+         Throw
+      }
+
       Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
 
       $dllSource = "$extractPath\build\native\bin\retinaebpfapi.dll"
@@ -593,8 +604,7 @@ Function Install-RetinaEbpfAPI
    }
    Finally
    {
-      # Cleanup
-      Remove-Item -Path "$env:TEMP\eBPFRetina.zip" -Force -ErrorAction SilentlyContinue
+      # Cleanup extracted contents; the source zip stays in $Script:InstallArtifactsPath.
       Remove-Item -Path "$env:TEMP\eBPFRetina" -Recurse -Force -ErrorAction SilentlyContinue
    }
 
@@ -640,16 +650,17 @@ Function Install-XDP
          return $isSuccess
       }
 
-      # Download and extract the XDP runtime NuGet package.
       Write-Host 'Installing eXpress Data Path for Windows'
-      $xdpRuntimeVersion = $Script:XDPRuntimeVersion
-      $xdpNupkgUrl = "https://www.nuget.org/api/v2/package/Microsoft.XDP-for-Windows.Runtime.x64/$xdpRuntimeVersion"
-      $xdpZipPath = "$LocalPath\Microsoft.XDP-for-Windows.Runtime.x64.$xdpRuntimeVersion.zip"
+      $xdpZipPath = "$Script:InstallArtifactsPath\xdp-runtime.zip"
       $xdpExtractPath = "$LocalPath\xdp-runtime"
 
-      Invoke-WebRequest -Uri $xdpNupkgUrl -OutFile $xdpZipPath
+      If(-Not (Test-Path $xdpZipPath))
+      {
+         Write-Error -Message:"XDP runtime NuGet package not found at $xdpZipPath"
+         Throw
+      }
+
       Expand-Archive -Path $xdpZipPath -DestinationPath $xdpExtractPath -Force
-      Remove-Item -Path $xdpZipPath -Force
 
       # Install XDP using xdp-setup.ps1 from the runtime package
       $xdpSetupScript = Get-ChildItem -Path $xdpExtractPath -Recurse -Filter "xdp-setup.ps1" | Select-Object -First 1
@@ -842,7 +853,7 @@ Function Uninstall-eBPF
             }
          }
 
-         Start-Process -FilePath:"$($env:WinDir)\System32\MSIExec.exe" -ArgumentList @("/x $($LocalPath)\ebpf-for-windows.x64.$Script:eBPFVersion.msi", '/qn') -PassThru | Wait-Process
+         Start-Process -FilePath:"$($env:WinDir)\System32\MSIExec.exe" -ArgumentList @("/x $($Script:InstallArtifactsPath)\ebpf-for-windows.x64.msi", '/qn') -PassThru | Wait-Process
       }
 
       If((Assert-SoftwareInstalled -ServiceName:'eBPFCore' -Silent) -or

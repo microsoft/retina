@@ -18,6 +18,8 @@ env:
   EVENT_WRITER_PATH: "${{ github.workspace }}/test/e2e/tools/event-writer/"
   EBPF_VERSION: "1.1.0"
   XDP_SDK_VERSION: "1.3.0"
+  XDP_RUNTIME_VERSION: "1.3.0"
+  RETINA_EBPF_API_VERSION: "1.6.0"
 
 jobs:
   retina-win-e2e-bpf-images:
@@ -139,7 +141,7 @@ jobs:
           }
 
           $tag = "${{ steps.tag.outputs.tag }}"
-          docker build -f "./Dockerfile" -t "${image}:${tag}" -t "${image}:latest" .
+          docker build -f "./Dockerfile" --build-arg EBPF_VERSION="${{ env.EBPF_VERSION }}" --build-arg XDP_RUNTIME_VERSION="${{ env.XDP_RUNTIME_VERSION }}" --build-arg RETINA_EBPF_API_VERSION="${{ env.RETINA_EBPF_API_VERSION }}" -t "${image}:${tag}" -t "${image}:latest" .
 
           if ("${{ github.event_name }}" -ne "pull_request") {
               docker push "${image}:${tag}"
