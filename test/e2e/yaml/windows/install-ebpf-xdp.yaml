@@ -15,7 +15,7 @@ spec:
       containers:
       - name: install-ebpf-xdp-container
         image: "{{CONTAINER_IMAGE}}"
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         command:
           - powershell.exe
           - -command
