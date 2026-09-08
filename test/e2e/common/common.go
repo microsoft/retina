@@ -53,6 +53,9 @@ var (
 	RetinaAdvancedProfilePath = func(rootDir string) string {
 		return filepath.Join(rootDir, "test", "profiles", "advanced", "values.yaml")
 	}
+	RetinaAdvancedWithEbpfWindowsProfilePath = func(rootDir string) string {
+		return filepath.Join(rootDir, "test", "profiles", "advanced", "ebpfwindows-values.yaml")
+	}
 	KubeConfigFilePath = func(rootDir string) string {
 		return filepath.Join(rootDir, "test", "e2e", "test.pem")
 	}
