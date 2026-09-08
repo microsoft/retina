@@ -45,8 +45,7 @@ spec:
       tolerations: {{- toYaml .Values.operator.tolerations | nindent 8 }}
       {{- end }}
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
+        {{- toYaml .Values.operator.podSecurityContext | nindent 8 }}
       containers:
         - image: {{ .Values.operator.repository }}:{{ .Values.operator.tag }}
           imagePullPolicy: {{ .Values.operator.pullPolicy }}
@@ -82,10 +81,7 @@ spec:
             - name: retina-operator-config
               mountPath: /retina/
           securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - "ALL"
+            {{- toYaml .Values.operator.securityContext | nindent 12 }}
           # livenessProbe:
           #   httpGet:
           #     path: /healthz
