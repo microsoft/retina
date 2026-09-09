@@ -39,6 +39,36 @@ const (
 	TypeUrl                string       = "retina.sh" //nolint:revive,stylecheck // existing API, renaming would break callers
 )
 
+// OppositeTrafficDirection returns the reply-side host-relative direction: the
+// reply of an egress connection is ingress and vice versa; unknown has no defined
+// opposite and maps to itself.
+func OppositeTrafficDirection(d flow.TrafficDirection) flow.TrafficDirection {
+	switch d {
+	case flow.TrafficDirection_INGRESS:
+		return flow.TrafficDirection_EGRESS
+	case flow.TrafficDirection_EGRESS:
+		return flow.TrafficDirection_INGRESS
+	case flow.TrafficDirection_TRAFFIC_DIRECTION_UNKNOWN:
+		return flow.TrafficDirection_TRAFFIC_DIRECTION_UNKNOWN
+	}
+	return flow.TrafficDirection_TRAFFIC_DIRECTION_UNKNOWN
+}
+
+// TrafficDirectionString maps a flow.TrafficDirection to its lowercase metric
+// label ("ingress"/"egress"/"unknown"), so callers reporting direction-labelled
+// metrics share one vocabulary.
+func TrafficDirectionString(d flow.TrafficDirection) string {
+	switch d {
+	case flow.TrafficDirection_INGRESS:
+		return "ingress"
+	case flow.TrafficDirection_EGRESS:
+		return "egress"
+	case flow.TrafficDirection_TRAFFIC_DIRECTION_UNKNOWN:
+		return "unknown"
+	}
+	return "unknown"
+}
+
 // ToFlow returns a flow.Flow object.
 // This sets up a L3/L4 flow object.
 // sourceIP, destIP are IPv4 or IPv6 addresses; IpVersion is derived from the

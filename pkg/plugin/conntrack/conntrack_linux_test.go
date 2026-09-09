@@ -93,3 +93,28 @@ func getCurrentFilePath(t *testing.T) string {
 	}
 	return filename
 }
+
+func TestGCEntryReason(t *testing.T) {
+	tests := []struct {
+		name             string
+		proto            uint8
+		txFlags, rxFlags uint8
+		want             string
+	}{
+		{"udp idle", 17, 0, 0, "udp_idle"},
+		{"tcp rst", 6, TCP_RST, 0, "tcp_rst"},
+		{"tcp fin tx", 6, TCP_FIN, 0, "tcp_fin"},
+		{"tcp fin rx", 6, 0, TCP_FIN, "tcp_fin"},
+		{"tcp idle", 6, TCP_ACK, TCP_ACK, "tcp_idle"},
+		{"tcp rst takes precedence over fin", 6, TCP_FIN | TCP_RST, 0, "tcp_rst"},
+		{"other proto", 1, 0, 0, "other"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := conntrackCtEntry{FlagsSeenTxDir: tt.txFlags, FlagsSeenRxDir: tt.rxFlags}
+			if got := gcEntryReason(tt.proto, &v); got != tt.want {
+				t.Errorf("gcEntryReason(%d, tx=%#x, rx=%#x) = %q, want %q", tt.proto, tt.txFlags, tt.rxFlags, got, tt.want)
+			}
+		})
+	}
+}
