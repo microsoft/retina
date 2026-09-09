@@ -1,0 +1,71 @@
+# OneBranch docker job: builds one or more images from a single Dockerfile for
+# one Linux architecture. arm64 images build on native arm64 hosts, so no QEMU
+# is needed. When publish is true the images are pushed to $(ACR_NAME) through
+# the ACR docker-registry service connection; otherwise they are built only.
+#
+# The image tag comes from the pipeline variable TAG.
+parameters:
+  - name: name
+    type: string
+  - name: displayName
+    type: string
+  - name: arch
+    type: string
+    values:
+      - amd64
+      - arm64
+  - name: dockerfile
+    type: string
+  # List of { repository: <image name under $(imageNamespace)>, target: <Dockerfile stage or ''> }.
+  - name: images
+    type: object
+  - name: publish
+    type: boolean
+
+jobs:
+  - job: ${{ parameters.name }}
+    displayName: ${{ parameters.displayName }}
+    timeoutInMinutes: 60
+    pool:
+      type: docker
+      os: linux
+      ${{ if eq(parameters.arch, 'arm64') }}:
+        hostArchitecture: arm64
+    variables:
+      ob_outputDirectory: $(Build.SourcesDirectory)/out
+      ob_git_checkout: true
+      # The telemetry key is embedded only in published images, as in the
+      # GitHub images workflow.
+      ${{ if parameters.publish }}:
+        appInsightsArg: --build-arg APP_INSIGHTS_ID=$(AZURE_APP_INSIGHTS_KEY)
+      ${{ else }}:
+        appInsightsArg: ''
+    steps:
+      - ${{ if parameters.publish }}:
+        - task: onebranch.pipeline.containercontrol@1
+          displayName: Login to ACR
+          inputs:
+            command: login
+            endpoint: Azure Container Networking - ACR Public Service Connection
+      - ${{ each image in parameters.images }}:
+        - task: onebranch.pipeline.imagebuildinfo@1
+          displayName: Build ${{ image.repository }} linux/${{ parameters.arch }}
+          inputs:
+            buildkit: 1
+            dockerFileRelPath: ${{ parameters.dockerfile }}
+            dockerFileContextPath: .
+            registry: $(ACR_NAME)
+            repositoryName: $(imageNamespace)/${{ image.repository }}
+            build_tag: $(TAG)-linux-${{ parameters.arch }}
+            ${{ if ne(image.target, '') }}:
+              arguments: --platform linux/${{ parameters.arch }} --target ${{ image.target }} --build-arg GOOS=linux --build-arg GOARCH=${{ parameters.arch }} --build-arg VERSION=$(TAG) $(appInsightsArg)
+            ${{ else }}:
+              arguments: --platform linux/${{ parameters.arch }} --build-arg GOOS=linux --build-arg GOARCH=${{ parameters.arch }} --build-arg VERSION=$(TAG) $(appInsightsArg)
+            enable_network: true
+            enable_service_tree_acr_path: false
+            ${{ if parameters.publish }}:
+              enable_acr_push: true
+              endpoint: Azure Container Networking - ACR Public Service Connection
+              # The template requires a saved image archive for every push.
+              compress: true
+              saveImageToPath: ${{ image.repository }}-$(TAG)-linux-${{ parameters.arch }}.tar.gz

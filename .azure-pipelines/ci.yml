@@ -1,4 +1,4 @@
-# retina CI pipeline (Azure DevOps).
+# retina CI pipeline (Azure DevOps, OneBranch).
 #
 # Mirrors .github/workflows/images.yaml. Triggered by:
 #   - GitHub merge-queue events (push to gh-readonly-queue/main/*) via the
@@ -8,19 +8,30 @@
 #   - Pull requests targeting main -> build only (no push, no telemetry key
 #     embedded, manifests/e2e/perf skipped) - same as GH pull_request behavior.
 #   - Manual queue from ADO UI -> build only by default. Set runE2EValidation
-#     to publish branch images, generate manifests, and run e2e.
+#     to publish branch images, generate manifests, and run e2e. Set
+#     runPerfTests as well to run the perf tests after e2e.
+#
+# The pipeline extends the OneBranch NonOfficial template, so jobs run on the
+# OneBranch-managed pool instead of the Microsoft-hosted "Azure Pipelines"
+# pool. Jobs declare a OneBranch pool type, not a pool name:
+#   - type: linux   Azure Linux build container (Go, az, make, oras, helm).
+#   - type: windows Windows Server 2022 container with Visual Studio 2022.
+#                   Used for the event-writer MSBuild build.
+#   - type: docker  Docker host, Linux or Windows. One image per task. arm64
+#                   images build on native arm64 hosts, so no QEMU is needed.
 #
 # Required ADO pipeline configuration (set in the ADO UI before first run):
 #   Variables (plain):
-#     ACR_NAME                    e.g. retinaacr (or full FQDN, matches current vars.ACR_NAME)
+#     ACR_NAME                    registry FQDN, e.g. acnpublic.azurecr.io
 #     AZURE_LOCATION              e.g. eastus2
 #     AZURE_AGENT_LINUX_SKU
 #     AZURE_AGENT_WINDOWS_SKU
 #     AZURE_AGENT_LINUX_ARM_SKU
-#   Variables (secret):
 #     AZURE_APP_INSIGHTS_KEY
-#   Service connection for publishing runs (Azure RM, WIF):
+#   Service connections (Azure RM, WIF):
 #     Azure Container Networking - Build Validations - Federated
+#   Service connections (Docker registry, WIF), used by the image push:
+#     Azure Container Networking - ACR Public Service Connection
 #   Settings: "Limit building pull requests from forked GitHub repositories" = Disable
 
 trigger:
@@ -38,14 +49,28 @@ parameters:
     displayName: Publish branch images and run E2E
     type: boolean
     default: false
+  - name: runPerfTests
+    displayName: Also run the perf tests after E2E (needs runE2EValidation)
+    type: boolean
+    default: false
 
 variables:
+  - name: LinuxContainerImage
+    value: mcr.microsoft.com/onebranch/azurelinux/build:3.0
+  - name: WindowsContainerImage
+    value: onebranch.azurecr.io/windows/ltsc2022/vse2022:latest
   - name: azureServiceConnection
     value: Azure Container Networking - Build Validations - Federated
   - name: imageNamespace
     value: microsoft/retina
-  - name: isMergeQueue
-    value: $[ startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/') ]
+  # Image tag: short commit SHA plus the build id. The SHA is resolved at
+  # compile time so that docker jobs can use it without a script step
+  # (OneBranch docker jobs accept only the image tasks). The build id keeps
+  # tags unique per run: OneBranch refuses to push a tag that already exists
+  # in the registry, so a rerun of the same commit, or the GitHub workflow
+  # pushing the same commit, must not share a tag with this run.
+  - name: TAG
+    value: ${{ substring(variables['Build.SourceVersion'], 0, 8) }}-$(Build.BuildId)
   # Merge-queue runs and opted-in manual runs publish branch images and run E2E.
   # PR builds and manual queues with the checkbox off remain dry-run builds.
   - name: publishImagesAndRunE2E
@@ -53,566 +78,417 @@ variables:
       value: 'True'
     ${{ else }}:
       value: $[ startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/') ]
+  # Perf tests run on merge-queue runs, and on manual runs that opt in.
+  - name: runPerf
+    ${{ if eq(parameters.runPerfTests, true) }}:
+      value: 'True'
+    ${{ else }}:
+      value: $[ startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/') ]
 
-jobs:
-  - job: retina_images
-    displayName: Build Agent Images - Linux
-    timeoutInMinutes: 60
-    strategy:
-      matrix:
-        amd64:
-          arch: amd64
-        arm64:
-          arch: arm64
-    pool:
-      vmImage: ubuntu-latest
-    steps:
-      - checkout: self
-        fetchDepth: 0
-      - template: steps/free-disk-space.yml
-      - bash: make qemu-user-static
-        displayName: Set up QEMU
-      - template: steps/setup-go.yml
-      - ${{ if or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}:
-        - task: AzureCLI@2
-          displayName: Build and push retina image
-          env:
-            APP_INSIGHTS_ID: $(AZURE_APP_INSIGHTS_KEY)
-          inputs:
-            azureSubscription: $(azureServiceConnection)
-            scriptType: bash
-            scriptLocation: inlineScript
-            inlineScript: |
-              set -euo pipefail
-              TAG=$(make version)
-              az acr login -n $(ACR_NAME)
-              make retina-image \
-                IMAGE_NAMESPACE=$(imageNamespace) \
-                PLATFORM=linux/$(arch) \
-                IMAGE_REGISTRY=$(ACR_NAME) \
-                APP_INSIGHTS_ID=$APP_INSIGHTS_ID \
-                TAG=$TAG \
-                BUILDX_ACTION=--push
-      - ${{ else }}:
-        - bash: |
-            set -euo pipefail
-            TAG=$(make version)
-            make retina-image \
-              IMAGE_NAMESPACE=$(imageNamespace) \
-              PLATFORM=linux/$(arch) \
-              TAG=$TAG
-          displayName: Build retina image
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: OneBranch.Pipelines/GovernedTemplates
+      ref: refs/heads/main
 
-  - job: build_windows_binaries
-    displayName: Build Windows Binaries
-    timeoutInMinutes: 30
-    pool:
-      vmImage: ubuntu-latest
-    steps:
-      - checkout: self
-        fetchDepth: 0
-      - template: steps/setup-go.yml
-      - bash: |
-          set -euo pipefail
-          TAG=$(make version)
-          make build-windows-binaries \
-            GOOS=windows \
-            GOARCH=amd64 \
-            TAG=$TAG \
-            APP_INSIGHTS_ID=$APP_INSIGHTS_ID
-        displayName: make build-windows-binaries
-        env:
-          APP_INSIGHTS_ID: $(AZURE_APP_INSIGHTS_KEY)
-      - task: PublishPipelineArtifact@1
-        inputs:
-          targetPath: output/windows_amd64/
-          artifactName: windows-binaries
+extends:
+  template: v2/OneBranch.NonOfficial.CrossPlat.yml@templates
+  parameters:
+    featureFlags:
+      golang:
+        internalModuleProxy:
+          enabled: true
+    globalSdl:
+      policheck:
+        break: false
+      binskim:
+        break: false
 
-  - job: retina_image_win
-    displayName: Build Agent Image - Windows 2022
-    dependsOn: build_windows_binaries
-    timeoutInMinutes: 60
-    pool:
-      vmImage: windows-2022
-    variables:
-      year: '2022'
-      arch: amd64
-      platform: windows
-    steps:
-      - checkout: self
-        fetchDepth: 0
-      - task: DownloadPipelineArtifact@2
-        inputs:
-          artifactName: windows-binaries
-          targetPath: output/windows_amd64/
-      - powershell: |
-          $timeout = 120
-          $timer = [Diagnostics.Stopwatch]::StartNew()
-          while ($timer.Elapsed.TotalSeconds -lt $timeout) {
-            $svc = Get-Service docker -ErrorAction SilentlyContinue
-            if ($svc -and $svc.Status -ne 'Running') {
-              Start-Service docker -ErrorAction SilentlyContinue
-            }
-            $result = docker info 2>&1
-            if ($LASTEXITCODE -eq 0) {
-              Write-Host "Docker daemon is ready"
-              return
-            }
-            Write-Host "Waiting for Docker daemon to start..."
-            Start-Sleep -Seconds 5
-          }
-          throw "Docker daemon failed to start within $timeout seconds"
-        displayName: Ensure Docker daemon is running
-      - ${{ if or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}:
-        - task: AzureCLI@2
-          displayName: Build and push retina Windows image
-          env:
-            APP_INSIGHTS_ID: $(AZURE_APP_INSIGHTS_KEY)
-          inputs:
-            azureSubscription: $(azureServiceConnection)
-            scriptType: bash
-            scriptLocation: inlineScript
-            inlineScript: |
-              set -euo pipefail
-              TAG=$(make version)
-              az acr login -n $(ACR_NAME)
-              make retina-image-win \
-                IMAGE_NAMESPACE=$(imageNamespace) \
-                PLATFORM=$(platform)/$(arch) \
-                WINDOWS_YEARS=$(year) \
-                IMAGE_REGISTRY=$(ACR_NAME) \
-                APP_INSIGHTS_ID=$APP_INSIGHTS_ID \
-                BINARIES_PATH=output/windows_$(arch) \
-                REPO_PATH=. \
-                TAG=$TAG
-              docker push $(ACR_NAME)/$(imageNamespace)/retina-agent:${TAG}-windows-ltsc$(year)-$(arch)
-      - ${{ else }}:
-        - bash: |
-            set -euo pipefail
-            TAG=$(make version)
-            make retina-image-win \
-              IMAGE_NAMESPACE=$(imageNamespace) \
-              PLATFORM=$(platform)/$(arch) \
-              WINDOWS_YEARS=$(year) \
-              BINARIES_PATH=output/windows_$(arch) \
-              REPO_PATH=. \
-              TAG=$TAG
-          displayName: Build retina Windows image
+    # GitHub names an ADO check "<pipeline> (<stage displayName> <job displayName>)".
+    # The required checks on main carry the names of the previous single-stage
+    # pipeline, for example "CI (Build Images) (Build Agent Images - Linux amd64)".
+    # The stage and job display names below compose to exactly those names.
+    stages:
+      - stage: build
+        displayName: Build
+        jobs:
+          - ${{ each arch in split('amd64,arm64', ',') }}:
+            - template: /.azure-pipelines/jobs/onebranch-linux-image.yml@self
+              parameters:
+                name: retina_linux_${{ arch }}
+                displayName: Agent Images - Linux ${{ arch }}
+                arch: ${{ arch }}
+                dockerfile: controller/Dockerfile
+                publish: ${{ or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}
+                images:
+                  - repository: retina-init
+                    target: init
+                  - repository: retina-agent
+                    target: agent
 
-  - job: event_writer_image
-    displayName: Build E2E Test Event Writer Image
-    condition: and(succeeded(), eq(variables['publishImagesAndRunE2E'], 'True'))
-    timeoutInMinutes: 60
-    pool:
-      vmImage: windows-2022
-    variables:
-      eventWriterPath: $(Build.SourcesDirectory)\test\e2e\tools\event-writer
-      ebpfVersion: '1.1.0'
-    steps:
-      - checkout: self
-        fetchDepth: 0
-      - powershell: |
-          $timeout = 120
-          $timer = [Diagnostics.Stopwatch]::StartNew()
-          while ($timer.Elapsed.TotalSeconds -lt $timeout) {
-            $svc = Get-Service docker -ErrorAction SilentlyContinue
-            if ($svc -and $svc.Status -ne 'Running') {
-                Start-Service docker -ErrorAction SilentlyContinue
-            }
-            $result = docker info 2>&1
-            if ($LASTEXITCODE -eq 0) {
-                Write-Host "Docker daemon is ready"
-                return
-            }
-            Write-Host "Waiting for Docker daemon to start..."
-            Start-Sleep -Seconds 5
-          }
-          throw "Docker daemon failed to start within $timeout seconds"
-        displayName: Ensure Docker daemon is running
-      - powershell: |
-          choco install llvm --version=18.1.8 --allow-downgrade -y --force
-          if ($LASTEXITCODE -ne 0) {
-            throw "Failed to install LLVM 18.1.8"
-          }
-          Write-Host "##vso[task.prependpath]C:\Program Files\LLVM\bin"
-          Write-Host "##vso[task.prependpath]C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\bin"
-        displayName: Install LLVM and configure build tools
-      - powershell: nuget restore .\event_writer.sln
-        displayName: NuGet restore
-        workingDirectory: $(eventWriterPath)
-      - powershell: |
-          .\export_program_info.exe --clear
-          .\export_program_info.exe
-        displayName: Configure eBPF store
-        workingDirectory: $(eventWriterPath)\packages\eBPF-for-Windows.x64.$(ebpfVersion)\build\native\bin
-      - powershell: |
-          msbuild /m /t:Clean /p:Configuration=Release /p:Platform=x64 /restore event_writer.sln
-          if ($LASTEXITCODE -ne 0) {
-            throw "Failed to clean event-writer solution"
-          }
-          msbuild /m /p:Configuration=Release /p:Platform=x64 /restore /v:detailed event_writer.sln
-          if ($LASTEXITCODE -ne 0) {
-            throw "Failed to build event-writer solution"
-          }
-        displayName: Build event writer
-        workingDirectory: $(eventWriterPath)
-      - task: AzureCLI@2
-        displayName: Build and push event-writer image
-        inputs:
-          azureSubscription: $(azureServiceConnection)
-          scriptType: ps
-          scriptLocation: inlineScript
-          workingDirectory: $(eventWriterPath)
-          inlineScript: |
-            $tag = git tag --points-at HEAD
-            if (-not $tag) {
-              $tag = git rev-parse --short HEAD
-            }
-            $image = "$(ACR_NAME)/$(imageNamespace)/test/e2e-test-event-writer".ToLower()
+            - template: /.azure-pipelines/jobs/onebranch-linux-image.yml@self
+              parameters:
+                name: operator_linux_${{ arch }}
+                displayName: Operator Images ${{ arch }}
+                arch: ${{ arch }}
+                dockerfile: operator/Dockerfile
+                publish: ${{ or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}
+                images:
+                  - repository: retina-operator
+                    target: ''
 
-            az acr login --name "$(ACR_NAME)"
-            if ($LASTEXITCODE -ne 0) {
-              throw "Failed to log in to ACR"
-            }
+            - template: /.azure-pipelines/jobs/onebranch-linux-image.yml@self
+              parameters:
+                name: shell_linux_${{ arch }}
+                displayName: Retina Shell Images ${{ arch }}
+                arch: ${{ arch }}
+                dockerfile: shell/Dockerfile
+                publish: ${{ or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}
+                images:
+                  - repository: retina-shell
+                    target: ''
 
-            docker build -f .\Dockerfile -t "${image}:${tag}" -t "${image}:latest" .
-            if ($LASTEXITCODE -ne 0) {
-              throw "Failed to build event-writer image"
-            }
-            docker push "${image}:${tag}"
-            if ($LASTEXITCODE -ne 0) {
-              throw "Failed to push event-writer image tag ${tag}"
-            }
-            docker push "${image}:latest"
-            if ($LASTEXITCODE -ne 0) {
-              throw "Failed to push latest event-writer image"
-            }
+            - template: /.azure-pipelines/jobs/onebranch-linux-image.yml@self
+              parameters:
+                name: kubectl_linux_${{ arch }}
+                displayName: Kubectl Retina Images ${{ arch }}
+                arch: ${{ arch }}
+                dockerfile: cli/Dockerfile
+                publish: ${{ or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}
+                images:
+                  - repository: kubectl-retina
+                    target: ''
 
-  - job: operator_images
-    displayName: Build Operator Images
-    timeoutInMinutes: 60
-    strategy:
-      matrix:
-        amd64:
-          arch: amd64
-        arm64:
-          arch: arm64
-    pool:
-      vmImage: ubuntu-latest
-    steps:
-      - checkout: self
-        fetchDepth: 0
-      - template: steps/free-disk-space.yml
-      - bash: make qemu-user-static
-        displayName: Set up QEMU
-      - template: steps/setup-go.yml
-      - ${{ if or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}:
-        - task: AzureCLI@2
-          displayName: Build and push operator image
-          env:
-            APP_INSIGHTS_ID: $(AZURE_APP_INSIGHTS_KEY)
-          inputs:
-            azureSubscription: $(azureServiceConnection)
-            scriptType: bash
-            scriptLocation: inlineScript
-            inlineScript: |
-              set -euo pipefail
-              TAG=$(make version)
-              az acr login -n $(ACR_NAME)
-              make retina-operator-image \
-                IMAGE_NAMESPACE=$(imageNamespace) \
-                PLATFORM=linux/$(arch) \
-                IMAGE_REGISTRY=$(ACR_NAME) \
-                APP_INSIGHTS_ID=$APP_INSIGHTS_ID \
-                TAG=$TAG \
-                BUILDX_ACTION=--push
-      - ${{ else }}:
-        - bash: |
-            set -euo pipefail
-            TAG=$(make version)
-            make retina-operator-image \
-              IMAGE_NAMESPACE=$(imageNamespace) \
-              PLATFORM=linux/$(arch) \
-              TAG=$TAG
-          displayName: Build operator image
+          - job: windows_binaries
+            displayName: Windows Binaries
+            timeoutInMinutes: 30
+            pool:
+              type: linux
+            variables:
+              ob_outputDirectory: $(Build.SourcesDirectory)/out
+            steps:
+              - bash: |
+                  set -euo pipefail
+                  make build-windows-binaries \
+                    GOOS=windows \
+                    GOARCH=amd64 \
+                    TAG=$(TAG) \
+                    APP_INSIGHTS_ID=$APP_INSIGHTS_ID
+                  mkdir -p "$(ob_outputDirectory)/windows_amd64"
+                  cp output/windows_amd64/*.exe "$(ob_outputDirectory)/windows_amd64/"
+                displayName: make build-windows-binaries
+                env:
+                  APP_INSIGHTS_ID: $(AZURE_APP_INSIGHTS_KEY)
 
-  - job: retina_shell_images
-    displayName: Build Retina Shell Images
-    timeoutInMinutes: 60
-    strategy:
-      matrix:
-        amd64:
-          arch: amd64
-        arm64:
-          arch: arm64
-    pool:
-      vmImage: ubuntu-latest
-    steps:
-      - checkout: self
-        fetchDepth: 0
-      - template: steps/free-disk-space.yml
-      - bash: make qemu-user-static
-        displayName: Set up QEMU
-      - template: steps/setup-go.yml
-      - ${{ if or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}:
-        - task: AzureCLI@2
-          displayName: Build and push retina-shell image
-          inputs:
-            azureSubscription: $(azureServiceConnection)
-            scriptType: bash
-            scriptLocation: inlineScript
-            inlineScript: |
-              set -euo pipefail
-              TAG=$(make version)
-              az acr login -n $(ACR_NAME)
-              make retina-shell-image \
-                IMAGE_NAMESPACE=$(imageNamespace) \
-                PLATFORM=linux/$(arch) \
-                IMAGE_REGISTRY=$(ACR_NAME) \
-                TAG=$TAG \
-                BUILDX_ACTION=--push
-      - ${{ else }}:
-        - bash: |
-            set -euo pipefail
-            TAG=$(make version)
-            make retina-shell-image \
-              IMAGE_NAMESPACE=$(imageNamespace) \
-              PLATFORM=linux/$(arch) \
-              TAG=$TAG
-          displayName: Build retina-shell image
+          - job: retina_windows
+            displayName: Agent Image - Windows 2022
+            dependsOn: windows_binaries
+            timeoutInMinutes: 60
+            pool:
+              type: docker
+              os: windows
+            variables:
+              ob_outputDirectory: $(Build.SourcesDirectory)/out
+              ob_git_checkout: true
+            steps:
+              # The drop of the windows_binaries job holds windows_amd64/*.exe.
+              # OneBranch docker jobs check the repo out to s/dst, and that
+              # directory is the docker build context.
+              - task: DownloadPipelineArtifact@2
+                displayName: Download Windows binaries
+                inputs:
+                  artifact: drop_build_windows_binaries
+                  targetPath: $(Build.SourcesDirectory)/dst/output
+              - ${{ if or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}:
+                - task: onebranch.pipeline.containercontrol@1
+                  displayName: Login to ACR
+                  inputs:
+                    command: login
+                    endpoint: Azure Container Networking - ACR Public Service Connection
+              - task: onebranch.pipeline.imagebuildinfo@1
+                displayName: Build retina-agent windows/amd64
+                inputs:
+                  dockerFileRelPath: controller/Dockerfile.windows-2022
+                  dockerFileContextPath: .
+                  registry: $(ACR_NAME)
+                  repositoryName: $(imageNamespace)/retina-agent
+                  build_tag: $(TAG)-windows-ltsc2022-amd64
+                  arguments: --platform windows/amd64 --target agent-win --build-arg GOOS=windows --build-arg GOARCH=amd64 --build-arg OS_VERSION=ltsc2022 --build-arg REPO_PATH=. --build-arg BINARIES_PATH=output/windows_amd64
+                  enable_network: true
+                  enable_service_tree_acr_path: false
+                  ${{ if or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}:
+                    enable_acr_push: true
+                    endpoint: Azure Container Networking - ACR Public Service Connection
+                    # The template saves every pushed image with `docker save`.
+                    # The Windows image is 5 GB, so skip the gzip pass.
+                    compress: false
+                    saveImageToPath: retina-agent-$(TAG)-windows-ltsc2022-amd64.tar
 
-  - job: kubectl_retina_images
-    displayName: Build Kubectl Retina Images
-    timeoutInMinutes: 60
-    strategy:
-      matrix:
-        amd64:
-          arch: amd64
-        arm64:
-          arch: arm64
-    pool:
-      vmImage: ubuntu-latest
-    steps:
-      - checkout: self
-        fetchDepth: 0
-      - template: steps/free-disk-space.yml
-      - bash: make qemu-user-static
-        displayName: Set up QEMU
-      - template: steps/setup-go.yml
-      - ${{ if or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}:
-        - task: AzureCLI@2
-          displayName: Build and push kubectl-retina image
-          inputs:
-            azureSubscription: $(azureServiceConnection)
-            scriptType: bash
-            scriptLocation: inlineScript
-            inlineScript: |
-              set -euo pipefail
-              TAG=$(make version)
-              az acr login -n $(ACR_NAME)
-              make kubectl-retina-image \
-                IMAGE_NAMESPACE=$(imageNamespace) \
-                PLATFORM=linux/$(arch) \
-                IMAGE_REGISTRY=$(ACR_NAME) \
-                TAG=$TAG \
-                BUILDX_ACTION=--push
-      - ${{ else }}:
-        - bash: |
-            set -euo pipefail
-            TAG=$(make version)
-            make kubectl-retina-image \
-              IMAGE_NAMESPACE=$(imageNamespace) \
-              PLATFORM=linux/$(arch) \
-              TAG=$TAG
-          displayName: Build kubectl-retina image
+          # The event writer is a native Windows build. The WDK and the Windows
+          # SDK come from NuGet packages, so the Visual Studio 2022 container
+          # only needs nuget.exe and LLVM 18.1.8 (clang compiles the eBPF
+          # program) on top of MSBuild. OneBranch network isolation blocks
+          # nuget.org inside the container, so the restore goes through the
+          # project's Azure Artifacts feed, which proxies the NuGet Gallery.
+          - job: event_writer_build
+            displayName: E2E Test Event Writer
+            condition: and(succeeded(), eq(variables['publishImagesAndRunE2E'], 'True'))
+            timeoutInMinutes: 60
+            pool:
+              type: windows
+              hostVersion:
+                Version: 2022
+            variables:
+              ob_outputDirectory: $(Build.SourcesDirectory)\out
+              eventWriterPath: $(Build.SourcesDirectory)\test\e2e\tools\event-writer
+              ebpfVersion: '1.1.0'
+              nugetFeed: https://pkgs.dev.azure.com/github-private/microsoft/_packaging/microsoft_PublicPackages/nuget/v3/index.json
+            steps:
+              - task: NuGetToolInstaller@1
+                displayName: Install nuget.exe
+              - task: NuGetAuthenticate@1
+                displayName: Authenticate to Azure Artifacts
+              - powershell: |
+                  $ProgressPreference = 'SilentlyContinue'
+                  $llvmBin = 'C:\Program Files\LLVM\bin'
+                  $installer = Join-Path $env:TEMP 'LLVM-18.1.8-win64.exe'
+                  Invoke-WebRequest -Uri 'https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.exe' -OutFile $installer
+                  Start-Process -FilePath $installer -ArgumentList '/S' -Wait -NoNewWindow
+                  if (-not (Test-Path "$llvmBin\clang.exe")) {
+                    throw "clang.exe not found in $llvmBin"
+                  }
+                  Write-Host "##vso[task.prependpath]$llvmBin"
+                  Write-Host "##vso[task.prependpath]C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\bin"
+                displayName: Install LLVM and configure build tools
+              # A NuGet.Config next to the solution replaces nuget.org with the
+              # internal feed for every restore below this directory. The eBPF
+              # custom build step spawns a nested MSBuild for the generated
+              # driver project, and that restore does not inherit command-line
+              # sources.
+              - powershell: |
+                  $config = @"
+                  <?xml version="1.0" encoding="utf-8"?>
+                  <configuration>
+                    <packageSources>
+                      <clear />
+                      <add key="microsoft_PublicPackages" value="$(nugetFeed)" />
+                    </packageSources>
+                  </configuration>
+                  "@
+                  Set-Content -Path NuGet.Config -Value $config -Encoding utf8
+                  nuget restore .\event_writer.sln
+                  if ($LASTEXITCODE -ne 0) {
+                    throw "Failed to restore event-writer packages"
+                  }
+                displayName: NuGet restore
+                workingDirectory: $(eventWriterPath)
+              - powershell: |
+                  .\export_program_info.exe --clear
+                  .\export_program_info.exe
+                displayName: Configure eBPF store
+                workingDirectory: $(eventWriterPath)\packages\eBPF-for-Windows.x64.$(ebpfVersion)\build\native\bin
+              - powershell: |
+                  msbuild /m /t:Clean /p:Configuration=Release /p:Platform=x64 /restore event_writer.sln
+                  if ($LASTEXITCODE -ne 0) {
+                    throw "Failed to clean event-writer solution"
+                  }
+                  msbuild /m /p:Configuration=Release /p:Platform=x64 /restore /v:detailed event_writer.sln
+                  if ($LASTEXITCODE -ne 0) {
+                    throw "Failed to build event-writer solution"
+                  }
+                displayName: Build event writer
+                workingDirectory: $(eventWriterPath)
+              # The image job downloads this drop into the Dockerfile context,
+              # so the layout below matches the COPY paths in the Dockerfile.
+              - task: CopyFiles@2
+                displayName: Copy build output to drop
+                inputs:
+                  SourceFolder: $(eventWriterPath)\x64\Release
+                  Contents: |
+                    bpf_event_writer.sys
+                    event_writer.exe
+                  TargetFolder: $(ob_outputDirectory)\x64\Release
 
-  - job: manifests
-    displayName: Generate Manifests
-    condition: and(succeeded(), eq(variables['publishImagesAndRunE2E'], 'True'))
-    dependsOn:
-      - retina_images
-      - retina_image_win
-      - operator_images
-      - retina_shell_images
-      - kubectl_retina_images
-    timeoutInMinutes: 30
-    pool:
-      vmImage: ubuntu-latest
-    strategy:
-      matrix:
-        retina:
-          component: retina
-        operator:
-          component: operator
-        shell:
-          component: shell
-        kubectl-retina:
-          component: kubectl-retina
-    steps:
-      - checkout: self
-        fetchDepth: 0
-      - bash: make qemu-user-static
-        displayName: Set up QEMU
-      - task: AzureCLI@2
-        displayName: make manifest
-        inputs:
-          azureSubscription: $(azureServiceConnection)
-          scriptType: bash
-          scriptLocation: inlineScript
-          inlineScript: |
-            set -euo pipefail
-            TAG=$(make version)
-            az acr login -n $(ACR_NAME)
-            make manifest COMPONENT=$(component) IMAGE_REGISTRY=$(ACR_NAME) TAG=$TAG
+          - job: event_writer_image
+            displayName: E2E Test Event Writer Image
+            condition: and(succeeded(), eq(variables['publishImagesAndRunE2E'], 'True'))
+            dependsOn: event_writer_build
+            timeoutInMinutes: 60
+            pool:
+              type: docker
+              os: windows
+            variables:
+              ob_outputDirectory: $(Build.SourcesDirectory)/out
+              ob_git_checkout: true
+            steps:
+              - task: DownloadPipelineArtifact@2
+                displayName: Download event-writer build output
+                inputs:
+                  artifact: drop_build_event_writer_build
+                  targetPath: $(Build.SourcesDirectory)/dst/test/e2e/tools/event-writer
+              - task: onebranch.pipeline.containercontrol@1
+                displayName: Login to ACR
+                inputs:
+                  command: login
+                  endpoint: Azure Container Networking - ACR Public Service Connection
+              - task: onebranch.pipeline.imagebuildinfo@1
+                displayName: Build e2e-test-event-writer windows/amd64
+                inputs:
+                  dockerFileRelPath: test/e2e/tools/event-writer/Dockerfile
+                  dockerFileContextPath: test/e2e/tools/event-writer
+                  registry: $(ACR_NAME)
+                  repositoryName: $(imageNamespace)/test/e2e-test-event-writer
+                  build_tag: $(TAG)
+                  arguments: --platform windows/amd64
+                  enable_network: true
+                  enable_service_tree_acr_path: false
+                  enable_acr_push: true
+                  endpoint: Azure Container Networking - ACR Public Service Connection
+                  compress: false
+                  saveImageToPath: e2e-test-event-writer-$(TAG).tar
 
-  - job: e2e
-    displayName: Run E2E Tests
-    condition: succeeded()
-    dependsOn:
-      - manifests
-      - event_writer_image
-    timeoutInMinutes: 90
-    pool:
-      vmImage: ubuntu-latest
-    variables:
-      CLUSTER_NAME: retina-e2e-$(Build.BuildId)-$(System.JobAttempt)
-    steps:
-      - checkout: self
-        fetchDepth: 0
-      - bash: echo "Skipping E2E - not a merge-queue run (publishImagesAndRunE2E=$(publishImagesAndRunE2E))."
-        displayName: Skip E2E (PR build)
-        condition: ne(variables['publishImagesAndRunE2E'], 'True')
-      - template: steps/setup-go.yml
-      - task: AzureCLI@2
-        displayName: Run E2E Tests
-        condition: eq(variables['publishImagesAndRunE2E'], 'True')
-        env:
-          AZURE_LOCATION: $(AZURE_LOCATION)
-          AZURE_AGENT_LINUX_SKU: $(AZURE_AGENT_LINUX_SKU)
-          AZURE_AGENT_WINDOWS_SKU: $(AZURE_AGENT_WINDOWS_SKU)
-          AZURE_AGENT_LINUX_ARM_SKU: $(AZURE_AGENT_LINUX_ARM_SKU)
-        inputs:
-          azureSubscription: $(azureServiceConnection)
-          scriptType: bash
-          scriptLocation: inlineScript
-          inlineScript: |
-            set -euo pipefail
-            export AZURE_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
-            go test -v ./test/e2e/. -timeout 60m -tags=e2e -count=1 -args \
-              -image-tag=$(make version) \
-              -image-registry=$(ACR_NAME) \
-              -image-namespace=$(imageNamespace)
-      - task: AzureCLI@2
-        displayName: Cleanup resource group
-        condition: always()
-        inputs:
-          azureSubscription: $(azureServiceConnection)
-          scriptType: bash
-          scriptLocation: inlineScript
-          inlineScript: |
-            if az group exists --name "$(CLUSTER_NAME)" 2>/dev/null | grep -q true; then
-              echo "Deleting resource group $(CLUSTER_NAME)..."
-              az group delete --name "$(CLUSTER_NAME)" --yes --no-wait || true
-            fi
+      - stage: test
+        displayName: Run
+        dependsOn: build
+        jobs:
+          # The multi-arch manifests are created at the start of the e2e job.
+          # A separate job would add several minutes of OneBranch job setup
+          # and scans to the critical path.
+          - job: e2e
+            displayName: E2E Tests
+            condition: and(succeeded(), eq(variables['publishImagesAndRunE2E'], 'True'))
+            timeoutInMinutes: 90
+            pool:
+              type: linux
+            variables:
+              ob_outputDirectory: $(Build.SourcesDirectory)/out
+              CLUSTER_NAME: retina-e2e-$(Build.BuildId)-$(System.JobAttempt)
+            steps:
+              # oras creates the multi-arch indexes from the per-platform tags
+              # that the image jobs pushed. The OneBranch Linux container has no
+              # docker CLI, so `make manifest` (docker buildx imagetools) is not
+              # usable here.
+              - task: AzureCLI@2
+                displayName: Create multi-arch manifests
+                inputs:
+                  azureSubscription: $(azureServiceConnection)
+                  scriptType: bash
+                  scriptLocation: inlineScript
+                  inlineScript: |
+                    set -euo pipefail
+                    # set -e does not apply inside $(...) unless inherit_errexit is on.
+                    shopt -s inherit_errexit
+                    registry="$(ACR_NAME)"
+                    ns="$(imageNamespace)"
+                    tag="$(TAG)"
+                    az acr login --name "$registry" --expose-token --query accessToken -o tsv \
+                      | oras login "$registry" --username 00000000-0000-0000-0000-000000000000 --password-stdin
 
-  - job: perf_basic
-    displayName: Retina basic Performance Test
-    condition: and(succeeded(), eq(variables['isMergeQueue'], 'True'))
-    dependsOn:
-      - manifests
-      - e2e
-    timeoutInMinutes: 150
-    pool:
-      vmImage: ubuntu-latest
-    variables:
-      CLUSTER_NAME: retina-perf-basic-$(Build.BuildId)-$(System.JobAttempt)
-      MODE: basic
-    steps:
-      - checkout: self
-        fetchDepth: 0
-      - template: steps/setup-go.yml
-      - task: AzureCLI@2
-        displayName: Run perf test
-        env:
-          AZURE_APP_INSIGHTS_KEY: $(AZURE_APP_INSIGHTS_KEY)
-          AZURE_LOCATION: $(AZURE_LOCATION)
-          AZURE_AGENT_LINUX_SKU: $(AZURE_AGENT_LINUX_SKU)
-          AZURE_AGENT_WINDOWS_SKU: $(AZURE_AGENT_WINDOWS_SKU)
-          AZURE_AGENT_LINUX_ARM_SKU: $(AZURE_AGENT_LINUX_ARM_SKU)
-        inputs:
-          azureSubscription: $(azureServiceConnection)
-          scriptType: bash
-          scriptLocation: inlineScript
-          inlineScript: |
-            set -euo pipefail
-            export AZURE_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
-            TAG=$(make version)
-            echo "Running in $MODE mode..."
-            go test -v ./test/e2e/. -timeout 2h -tags=perf -count=1 -args \
-              -image-tag="$TAG" \
-              -image-registry="$(ACR_NAME)" \
-              -image-namespace="$(imageNamespace)" \
-              -retina-mode="$MODE"
-      - task: AzureCLI@2
-        displayName: Cleanup resource group
-        condition: always()
-        inputs:
-          azureSubscription: $(azureServiceConnection)
-          scriptType: bash
-          scriptLocation: inlineScript
-          inlineScript: |
-            if az group exists --name "$(CLUSTER_NAME)" 2>/dev/null | grep -q true; then
-              echo "Deleting resource group $(CLUSTER_NAME)..."
-              az group delete --name "$(CLUSTER_NAME)" --yes --no-wait || true
-            fi
+                    # BuildKit pushes each per-arch tag as an OCI index that holds
+                    # the image manifest plus an attestation manifest. oras does
+                    # not flatten nested indexes, so resolve each tag to the digest
+                    # of its platform image manifest before building the index.
+                    resolve() {
+                      local ref="$1" m mt
+                      m=$(oras manifest fetch "$ref") || return 1
+                      mt=$(jq -er '.mediaType' <<<"$m") || return 1
+                      if [ "$mt" = "application/vnd.oci.image.index.v1+json" ]; then
+                        jq -er '[.manifests[] | select(.platform.os != "unknown")][0].digest' <<<"$m"
+                      else
+                        oras manifest fetch --descriptor "$ref" | jq -er '.digest'
+                      fi
+                    }
+                    index() {
+                      local image="$1"; shift
+                      local digests=()
+                      for platform in "$@"; do
+                        digests+=("$(resolve "$registry/$ns/$image:$tag-$platform")")
+                      done
+                      oras manifest index create "$registry/$ns/$image:$tag" "${digests[@]}"
+                    }
+                    index retina-agent linux-amd64 linux-arm64 windows-ltsc2022-amd64
+                    for image in retina-init retina-operator retina-shell kubectl-retina; do
+                      index "$image" linux-amd64 linux-arm64
+                    done
+              # The capture scenario shells out to kubectl, which the OneBranch
+              # Linux container does not ship.
+              - bash: tdnf install -y kubernetes-client && kubectl version --client
+                displayName: Install kubectl
+              - task: AzureCLI@2
+                displayName: Run E2E Tests
+                env:
+                  AZURE_LOCATION: $(AZURE_LOCATION)
+                  AZURE_AGENT_LINUX_SKU: $(AZURE_AGENT_LINUX_SKU)
+                  AZURE_AGENT_WINDOWS_SKU: $(AZURE_AGENT_WINDOWS_SKU)
+                  AZURE_AGENT_LINUX_ARM_SKU: $(AZURE_AGENT_LINUX_ARM_SKU)
+                inputs:
+                  azureSubscription: $(azureServiceConnection)
+                  scriptType: bash
+                  scriptLocation: inlineScript
+                  inlineScript: |
+                    set -euo pipefail
+                    export AZURE_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+                    go test -v ./test/e2e/. -timeout 60m -tags=e2e -count=1 -args \
+                      -image-tag=$(TAG) \
+                      -image-registry=$(ACR_NAME) \
+                      -image-namespace=$(imageNamespace)
+              - task: AzureCLI@2
+                displayName: Cleanup resource group
+                condition: always()
+                inputs:
+                  azureSubscription: $(azureServiceConnection)
+                  scriptType: bash
+                  scriptLocation: inlineScript
+                  inlineScript: |
+                    if az group exists --name "$(CLUSTER_NAME)" 2>/dev/null | grep -q true; then
+                      echo "Deleting resource group $(CLUSTER_NAME)..."
+                      az group delete --name "$(CLUSTER_NAME)" --yes --no-wait || true
+                    fi
 
-  - job: perf_advanced
-    displayName: Retina advanced Performance Test
-    condition: and(succeeded(), eq(variables['isMergeQueue'], 'True'))
-    dependsOn:
-      - manifests
-      - e2e
-    timeoutInMinutes: 150
-    pool:
-      vmImage: ubuntu-latest
-    variables:
-      CLUSTER_NAME: retina-perf-advanced-$(Build.BuildId)-$(System.JobAttempt)
-      MODE: advanced
-    steps:
-      - checkout: self
-        fetchDepth: 0
-      - template: steps/setup-go.yml
-      - task: AzureCLI@2
-        displayName: Run perf test
-        env:
-          AZURE_APP_INSIGHTS_KEY: $(AZURE_APP_INSIGHTS_KEY)
-          AZURE_LOCATION: $(AZURE_LOCATION)
-          AZURE_AGENT_LINUX_SKU: $(AZURE_AGENT_LINUX_SKU)
-          AZURE_AGENT_WINDOWS_SKU: $(AZURE_AGENT_WINDOWS_SKU)
-          AZURE_AGENT_LINUX_ARM_SKU: $(AZURE_AGENT_LINUX_ARM_SKU)
-        inputs:
-          azureSubscription: $(azureServiceConnection)
-          scriptType: bash
-          scriptLocation: inlineScript
-          inlineScript: |
-            set -euo pipefail
-            export AZURE_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
-            TAG=$(make version)
-            echo "Running in $MODE mode..."
-            go test -v ./test/e2e/. -timeout 2h -tags=perf -count=1 -args \
-              -image-tag="$TAG" \
-              -image-registry="$(ACR_NAME)" \
-              -image-namespace="$(imageNamespace)" \
-              -retina-mode="$MODE"
-      - task: AzureCLI@2
-        displayName: Cleanup resource group
-        condition: always()
-        inputs:
-          azureSubscription: $(azureServiceConnection)
-          scriptType: bash
-          scriptLocation: inlineScript
-          inlineScript: |
-            if az group exists --name "$(CLUSTER_NAME)" 2>/dev/null | grep -q true; then
-              echo "Deleting resource group $(CLUSTER_NAME)..."
-              az group delete --name "$(CLUSTER_NAME)" --yes --no-wait || true
-            fi
+          - ${{ each mode in split('basic,advanced', ',') }}:
+            - job: perf_${{ mode }}
+              displayName: Retina ${{ mode }} Performance Test
+              condition: and(succeeded(), eq(variables['runPerf'], 'True'), eq(variables['publishImagesAndRunE2E'], 'True'))
+              dependsOn: e2e
+              timeoutInMinutes: 150
+              pool:
+                type: linux
+              variables:
+                ob_outputDirectory: $(Build.SourcesDirectory)/out
+                CLUSTER_NAME: retina-perf-${{ mode }}-$(Build.BuildId)-$(System.JobAttempt)
+                MODE: ${{ mode }}
+              steps:
+                - task: AzureCLI@2
+                  displayName: Run perf test
+                  env:
+                    AZURE_APP_INSIGHTS_KEY: $(AZURE_APP_INSIGHTS_KEY)
+                    AZURE_LOCATION: $(AZURE_LOCATION)
+                    AZURE_AGENT_LINUX_SKU: $(AZURE_AGENT_LINUX_SKU)
+                    AZURE_AGENT_WINDOWS_SKU: $(AZURE_AGENT_WINDOWS_SKU)
+                    AZURE_AGENT_LINUX_ARM_SKU: $(AZURE_AGENT_LINUX_ARM_SKU)
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -euo pipefail
+                      export AZURE_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+                      echo "Running in $MODE mode..."
+                      go test -v ./test/e2e/. -timeout 2h -tags=perf -count=1 -args \
+                        -image-tag="$(TAG)" \
+                        -image-registry="$(ACR_NAME)" \
+                        -image-namespace="$(imageNamespace)" \
+                        -retina-mode="$MODE"
+                - task: AzureCLI@2
+                  displayName: Cleanup resource group
+                  condition: always()
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      if az group exists --name "$(CLUSTER_NAME)" 2>/dev/null | grep -q true; then
+                        echo "Deleting resource group $(CLUSTER_NAME)..."
+                        az group delete --name "$(CLUSTER_NAME)" --yes --no-wait || true
+                      fi
