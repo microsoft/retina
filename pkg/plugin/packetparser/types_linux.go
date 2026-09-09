@@ -4,6 +4,7 @@
 package packetparser
 
 import (
+	"context"
 	"sync"
 
 	kcfg "github.com/microsoft/retina/pkg/config"
@@ -151,8 +152,12 @@ type packetParser struct {
 	hostEgressInfo      *ebpf.ProgramInfo
 	wg                  sync.WaitGroup
 	recordsChannel      chan perfRecord
-	externalChannel     chan *v1.Event
-	tcxSupported        bool // Whether TCX is supported on this system
+	// stopReporter cancels reportLostEvents and reporterWg waits for it to exit. Stop uses
+	// both before closing objs, since the reporter reads a map from objs.
+	stopReporter    context.CancelFunc
+	reporterWg      sync.WaitGroup
+	externalChannel chan *v1.Event
+	tcxSupported    bool // Whether TCX is supported on this system
 }
 
 func ifaceToKey(iface netlink.LinkAttrs) attachmentKey {

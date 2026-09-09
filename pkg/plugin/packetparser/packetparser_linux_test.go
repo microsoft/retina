@@ -835,3 +835,41 @@ func restoreBackup() {
 		}
 	}
 }
+
+func TestSumPerCPUCounters(t *testing.T) {
+	tests := []struct {
+		name string
+		in   []uint64
+		want uint64
+	}{
+		{"nil", nil, 0},
+		{"single", []uint64{5}, 5},
+		{"multi", []uint64{1, 2, 3, 4}, 10},
+		{"zeros", []uint64{0, 0, 0}, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, sumPerCPUCounters(tt.in))
+		})
+	}
+}
+
+func TestLostEventsDelta(t *testing.T) {
+	tests := []struct {
+		name              string
+		total, last       uint64
+		wantAdd, wantLast uint64
+	}{
+		{"first read", 10, 0, 10, 10},
+		{"increase", 25, 10, 15, 25},
+		{"no change", 10, 10, 0, 10},
+		{"counter reset", 3, 100, 0, 3}, // map recreated: adopt new value, report nothing
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			add, newLast := lostEventsDelta(tt.total, tt.last)
+			assert.Equal(t, tt.wantAdd, add, "add")
+			assert.Equal(t, tt.wantLast, newLast, "newLast")
+		})
+	}
+}

@@ -161,9 +161,10 @@ type packetparserProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type packetparserMapSpecs struct {
-	RetinaConntrack          *ebpf.MapSpec `ebpf:"retina_conntrack"`
-	RetinaFilter             *ebpf.MapSpec `ebpf:"retina_filter"`
-	RetinaPacketparserEvents *ebpf.MapSpec `ebpf:"retina_packetparser_events"`
+	RetinaConntrack           *ebpf.MapSpec `ebpf:"retina_conntrack"`
+	RetinaFilter              *ebpf.MapSpec `ebpf:"retina_filter"`
+	RetinaPacketparserEvents  *ebpf.MapSpec `ebpf:"retina_packetparser_events"`
+	RetinaPacketparserMetrics *ebpf.MapSpec `ebpf:"retina_packetparser_metrics"`
 }
 
 // packetparserObjects contains all objects after they have been loaded into the kernel.
@@ -185,9 +186,10 @@ func (o *packetparserObjects) Close() error {
 //
 // It can be passed to loadPacketparserObjects or ebpf.CollectionSpec.LoadAndAssign.
 type packetparserMaps struct {
-	RetinaConntrack          *ebpf.Map `ebpf:"retina_conntrack"`
-	RetinaFilter             *ebpf.Map `ebpf:"retina_filter"`
-	RetinaPacketparserEvents *ebpf.Map `ebpf:"retina_packetparser_events"`
+	RetinaConntrack           *ebpf.Map `ebpf:"retina_conntrack"`
+	RetinaFilter              *ebpf.Map `ebpf:"retina_filter"`
+	RetinaPacketparserEvents  *ebpf.Map `ebpf:"retina_packetparser_events"`
+	RetinaPacketparserMetrics *ebpf.Map `ebpf:"retina_packetparser_metrics"`
 }
 
 func (m *packetparserMaps) Close() error {
@@ -195,6 +197,7 @@ func (m *packetparserMaps) Close() error {
 		m.RetinaConntrack,
 		m.RetinaFilter,
 		m.RetinaPacketparserEvents,
+		m.RetinaPacketparserMetrics,
 	)
 }
 
