@@ -1,0 +1,37 @@
+syntax = "proto3";
+package ipcache;
+
+service IpCache {
+    rpc StreamUpdates(IpCacheRequest) returns (stream IpCacheBatch) {}
+}
+
+message IpCacheRequest {
+    string node_name = 1;
+}
+
+message IpCacheBatch {
+    repeated IpCacheUpdate updates = 1;
+}
+
+message IpCacheUpdate {
+    UpdateType update_type = 1;
+    string ip = 2;
+    string namespace = 3;
+    string pod_name = 4;
+    string service_name = 5;
+    string node_name = 6;
+    repeated string labels = 7;
+    repeated Workload workloads = 8;
+
+    enum UpdateType {
+        UPSERT = 0;
+        DELETE = 1;
+        SYNC_COMPLETE = 2;
+        SHUTDOWN = 3;
+    }
+}
+
+message Workload {
+    string name = 1;
+    string kind = 2;
+}
