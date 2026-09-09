@@ -28,6 +28,7 @@ spec:
               - if (!(Test-Path C:\install-ebpf-xdp-probe-ready)) { exit 1 }
           initialDelaySeconds: 10
           periodSeconds: 5
+          timeoutSeconds: 10
       hostNetwork: true
       nodeSelector:
         kubernetes.io/os: windows

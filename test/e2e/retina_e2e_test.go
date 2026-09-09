@@ -41,7 +41,7 @@ func TestE2ERetina(t *testing.T) {
 	installEbpfAndXDP.Run(ctx)
 
 	// Wait for the HPC pod to be ready. Maximum wait time is 15 minutes in case the Pods are very slow to come up.
-	err = kubernetes.WaitForPodReadyWithTimeOut(context.TODO(), common.KubeConfigFilePath(rootDir), "install-ebpf-xdp", "name=install-ebpf-xdp", 20*time.Minute)
+	err = kubernetes.WaitForPodReadyWithTimeOut(context.TODO(), common.KubeConfigFilePath(rootDir), "install-ebpf-xdp", "name=install-ebpf-xdp", 15*time.Minute)
 	require.NoError(t, err)
 
 	// Load and pin BPF Maps
