@@ -141,7 +141,9 @@ func Test_CaptureToPodTranslator_GetCaptureTargetsOnNode(t *testing.T) {
 	defer cancel()
 
 	cases := []struct {
-		name                     string
+		name string
+		// namespace is the Capture's own namespace passed to getCaptureTargetsOnNode. Defaults to "default" when empty.
+		namespace                string
 		captureTarget            retinav1alpha1.CaptureTarget
 		nodeList                 *corev1.NodeList
 		namespaceList            *corev1.NamespaceList
@@ -381,6 +383,43 @@ func Test_CaptureToPodTranslator_GetCaptureTargetsOnNode(t *testing.T) {
 			wantCaptureTargetsOnNode: nil,
 			wantErr:                  true,
 		},
+		{
+			// Regression test for RETINA-001: a PodSelector-only CaptureTarget (no NamespaceSelector) must be
+			// scoped to the Capture's own namespace, not fall back to a hardcoded "default" namespace.
+			name:      "PodSelector without NamespaceSelector is scoped to the Capture's own namespace",
+			namespace: "tenant-a",
+			captureTarget: retinav1alpha1.CaptureTarget{
+				PodSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"app": "target"},
+				},
+			},
+			podList: &corev1.PodList{
+				Items: []corev1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "target-default", Namespace: "default", Labels: map[string]string{"app": "target"}},
+						Spec:       corev1.PodSpec{NodeName: "node1"},
+						Status: corev1.PodStatus{
+							PodIP:  "10.244.0.7",
+							PodIPs: []corev1.PodIP{{IP: "10.244.0.7"}},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "target-tenant", Namespace: "tenant-a", Labels: map[string]string{"app": "target"}},
+						Spec:       corev1.PodSpec{NodeName: "node1"},
+						Status: corev1.PodStatus{
+							PodIP:  "10.244.0.8",
+							PodIPs: []corev1.PodIP{{IP: "10.244.0.8"}},
+						},
+					},
+				},
+			},
+			wantCaptureTargetsOnNode: &CaptureTargetsOnNode{
+				"node1": CaptureTarget{
+					PodIpAddresses: []string{"10.244.0.8"},
+				},
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range cases {
@@ -398,7 +437,11 @@ func Test_CaptureToPodTranslator_GetCaptureTargetsOnNode(t *testing.T) {
 
 			k8sClient := fakeclientset.NewSimpleClientset(objects...)
 			captureToPodTranslator := NewCaptureToPodTranslatorForTest(k8sClient)
-			gotCaptureTargetsOnNode, err := captureToPodTranslator.getCaptureTargetsOnNode(ctx, tt.captureTarget, "default")
+			ns := tt.namespace
+			if ns == "" {
+				ns = "default"
+			}
+			gotCaptureTargetsOnNode, err := captureToPodTranslator.getCaptureTargetsOnNode(ctx, tt.captureTarget, ns)
 			if tt.wantErr != (err != nil) {
 				t.Errorf("getCaptureTargetsOnNode() want(%t) error, got error %s", tt.wantErr, err)
 			}

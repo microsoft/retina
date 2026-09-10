@@ -734,7 +734,7 @@ func (translator *CaptureToPodTranslator) getCaptureTargetsOnNode(ctx context.Co
 		}
 	}
 	if captureTarget.PodSelector != nil {
-		if captureTargetsOnNode, err = translator.calculateCaptureTargetsByPodSelector(ctx, captureTarget); err != nil {
+		if captureTargetsOnNode, err = translator.calculateCaptureTargetsByPodSelector(ctx, captureTarget, namespace); err != nil {
 			return nil, err
 		}
 	}
@@ -820,12 +820,13 @@ func (translator *CaptureToPodTranslator) calculateCaptureTargetsByNodeSelector(
 	return captureTargetOnNode, nil
 }
 
-func (translator *CaptureToPodTranslator) calculateCaptureTargetsByPodSelector(ctx context.Context, captureTarget retinav1alpha1.CaptureTarget) (*CaptureTargetsOnNode, error) {
+func (translator *CaptureToPodTranslator) calculateCaptureTargetsByPodSelector(ctx context.Context, captureTarget retinav1alpha1.CaptureTarget, namespace string) (*CaptureTargetsOnNode, error) {
 	captureTargetOnNode := &CaptureTargetsOnNode{}
+	// Without an explicit NamespaceSelector, the lookup is scoped to the Capture's own namespace only.
 	nsList := &corev1.NamespaceList{Items: []corev1.Namespace{
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: corev1.NamespaceDefault,
+				Name: namespace,
 			},
 		},
 	}}
