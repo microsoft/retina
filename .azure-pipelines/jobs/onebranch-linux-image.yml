@@ -56,7 +56,9 @@ jobs:
             dockerFileContextPath: .
             registry: $(ACR_NAME)
             repositoryName: $(imageNamespace)/${{ image.repository }}
-            build_tag: $(TAG)-linux-${{ parameters.arch }}
+            # The job attempt keeps a retried job from colliding with the tag
+            # its earlier attempt pushed.
+            build_tag: $(TAG)-linux-${{ parameters.arch }}-$(System.JobAttempt)
             ${{ if ne(image.target, '') }}:
               arguments: --platform linux/${{ parameters.arch }} --target ${{ image.target }} --build-arg GOOS=linux --build-arg GOARCH=${{ parameters.arch }} --build-arg VERSION=$(TAG) $(appInsightsArg)
             ${{ else }}:

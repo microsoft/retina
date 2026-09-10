@@ -65,10 +65,13 @@ variables:
     value: microsoft/retina
   # Image tag: short commit SHA plus the build id. The SHA is resolved at
   # compile time so that docker jobs can use it without a script step
-  # (OneBranch docker jobs accept only the image tasks). The build id keeps
-  # tags unique per run: OneBranch refuses to push a tag that already exists
-  # in the registry, so a rerun of the same commit, or the GitHub workflow
-  # pushing the same commit, must not share a tag with this run.
+  # (OneBranch docker jobs accept only the image tasks). OneBranch refuses
+  # to push a tag that already exists in the registry. The build id keeps
+  # tags unique per run, so a rerun of the same commit, or the GitHub
+  # workflow pushing the same commit, does not collide with this run. The
+  # image jobs also append $(System.JobAttempt) to the tags they push, so a
+  # retried job does not collide with its own earlier attempt. The e2e job
+  # resolves the newest attempt when it creates the multi-arch indexes.
   - name: TAG
     value: ${{ substring(variables['Build.SourceVersion'], 0, 8) }}-$(Build.BuildId)
   # Merge-queue runs and opted-in manual runs publish branch images and run E2E.
@@ -213,7 +216,7 @@ extends:
                   dockerFileContextPath: .
                   registry: $(ACR_NAME)
                   repositoryName: $(imageNamespace)/retina-agent
-                  build_tag: $(TAG)-windows-ltsc2022-amd64
+                  build_tag: $(TAG)-windows-ltsc2022-amd64-$(System.JobAttempt)
                   arguments: --platform windows/amd64 --target agent-win --build-arg GOOS=windows --build-arg GOARCH=amd64 --build-arg OS_VERSION=ltsc2022 --build-arg REPO_PATH=. --build-arg BINARIES_PATH=output/windows_amd64
                   enable_network: true
                   enable_service_tree_acr_path: false
@@ -339,7 +342,7 @@ extends:
                   dockerFileContextPath: test/e2e/tools/event-writer
                   registry: $(ACR_NAME)
                   repositoryName: $(imageNamespace)/test/e2e-test-event-writer
-                  build_tag: $(TAG)
+                  build_tag: $(TAG)-$(System.JobAttempt)
                   arguments: --platform windows/amd64
                   enable_network: true
                   enable_service_tree_acr_path: false
@@ -365,10 +368,10 @@ extends:
               ob_outputDirectory: $(Build.SourcesDirectory)/out
               CLUSTER_NAME: retina-e2e-$(Build.BuildId)-$(System.JobAttempt)
             steps:
-              # oras creates the multi-arch indexes from the per-platform tags
-              # that the image jobs pushed. The OneBranch Linux container has no
-              # docker CLI, so `make manifest` (docker buildx imagetools) is not
-              # usable here.
+              # `make manifest` creates the multi-arch indexes from the
+              # per-platform tags that the image jobs pushed. The OneBranch
+              # Linux container has no docker CLI, so the oras script replaces
+              # `docker buildx imagetools create` as the backend.
               - task: AzureCLI@2
                 displayName: Create multi-arch manifests
                 inputs:
@@ -377,40 +380,20 @@ extends:
                   scriptLocation: inlineScript
                   inlineScript: |
                     set -euo pipefail
-                    # set -e does not apply inside $(...) unless inherit_errexit is on.
-                    shopt -s inherit_errexit
                     registry="$(ACR_NAME)"
                     ns="$(imageNamespace)"
                     tag="$(TAG)"
                     az acr login --name "$registry" --expose-token --query accessToken -o tsv \
                       | oras login "$registry" --username 00000000-0000-0000-0000-000000000000 --password-stdin
-
-                    # BuildKit pushes each per-arch tag as an OCI index that holds
-                    # the image manifest plus an attestation manifest. oras does
-                    # not flatten nested indexes, so resolve each tag to the digest
-                    # of its platform image manifest before building the index.
-                    resolve() {
-                      local ref="$1" m mt
-                      m=$(oras manifest fetch "$ref") || return 1
-                      mt=$(jq -er '.mediaType' <<<"$m") || return 1
-                      if [ "$mt" = "application/vnd.oci.image.index.v1+json" ]; then
-                        jq -er '[.manifests[] | select(.platform.os != "unknown")][0].digest' <<<"$m"
-                      else
-                        oras manifest fetch --descriptor "$ref" | jq -er '.digest'
-                      fi
-                    }
-                    index() {
-                      local image="$1"; shift
-                      local digests=()
-                      for platform in "$@"; do
-                        digests+=("$(resolve "$registry/$ns/$image:$tag-$platform")")
-                      done
-                      oras manifest index create "$registry/$ns/$image:$tag" "${digests[@]}"
-                    }
-                    index retina-agent linux-amd64 linux-arm64 windows-ltsc2022-amd64
-                    for image in retina-init retina-operator retina-shell kubectl-retina; do
-                      index "$image" linux-amd64 linux-arm64
+                    for component in retina operator shell kubectl-retina; do
+                      make manifest COMPONENT="$component" IMAGE_REGISTRY="$registry" \
+                        IMAGE_NAMESPACE="$ns" TAG="$tag" MANIFEST_CREATE=hack/scripts/oras-index.sh
                     done
+                    # The e2e tests pull the event writer at the run tag. Its image
+                    # job tags by attempt, so publish the newest attempt under the
+                    # run tag as a one-entry index.
+                    hack/scripts/oras-index.sh "$registry/$ns/test/e2e-test-event-writer:$tag" \
+                      "$registry/$ns/test/e2e-test-event-writer:$tag"
               # The capture scenario shells out to kubectl, which the OneBranch
               # Linux container does not ship.
               - bash: tdnf install -y kubernetes-client && kubectl version --client
