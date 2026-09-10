@@ -6,10 +6,11 @@
 # A drop-in for `docker buildx imagetools create -t <index> <ref>...` on hosts
 # without a docker CLI. The caller must be logged in to the registry with oras.
 #
-# Each platform reference resolves to the newest existing tag among <ref>-1,
-# <ref>-2, ... and falls back to <ref> itself. The Azure DevOps pipeline appends
-# the job attempt to the tags it pushes, because a retried job cannot push a
-# tag that already exists in the registry.
+# Each platform reference resolves to the existing tag with the highest attempt
+# suffix among <ref>-1 ... <ref>-10, and falls back to <ref> itself. The Azure
+# DevOps pipeline appends the job attempt to the tags it pushes, because a
+# retried job cannot push a tag that already exists in the registry. Attempts
+# are not contiguous: an attempt that failed before its push leaves no tag.
 set -euo pipefail
 # set -e does not apply inside $(...) unless inherit_errexit is on.
 shopt -s inherit_errexit
@@ -23,12 +24,14 @@ index_ref="$1"
 shift
 
 # newest_ref <ref>: the reference with the highest existing attempt suffix,
-# or <ref> itself when no attempt tag exists.
+# or <ref> itself when no attempt tag exists. Ten attempts of one job in one
+# run is the bound; every retry is a manual action.
 newest_ref() {
-  local ref="$1" n=1 found=""
-  while oras manifest fetch --descriptor "$ref-$n" >/dev/null 2>&1; do
-    found="$ref-$n"
-    n=$((n + 1))
+  local ref="$1" n found=""
+  for n in 1 2 3 4 5 6 7 8 9 10; do
+    if oras manifest fetch --descriptor "$ref-$n" >/dev/null 2>&1; then
+      found="$ref-$n"
+    fi
   done
   printf '%s\n' "${found:-$ref}"
 }
