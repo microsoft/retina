@@ -71,6 +71,24 @@ RUN if [ "$GOOS" = "linux" ] ; then \
     rm -rf ./pkg/plugin && tar xvf /gen.tar.gz ./pkg/plugin; \
     fi
 
+# Hubble CLI binary built from the Cilium source pinned in go.mod.
+FROM golang AS hubble-bin
+ARG GOARCH=amd64
+ENV GOARCH=${GOARCH}
+ENV GOEXPERIMENT=ms_nocgo_opensslcrypto
+WORKDIR /go/src/github.com/microsoft/retina
+COPY ./go.mod ./go.sum ./
+RUN go mod download
+COPY ./cmd/hubble-cli ./cmd/hubble-cli
+RUN CILIUM_VERSION="$(go list -m -f '{{.Version}}' github.com/cilium/cilium)" && \
+    test -n "$CILIUM_VERSION" && \
+    CGO_ENABLED=0 go build \
+    -trimpath \
+    -tags=osusergo \
+    -ldflags="-s -w -X github.com/cilium/cilium/hubble/pkg.Version=${CILIUM_VERSION}" \
+    -o /go/bin/hubble \
+    ./cmd/hubble-cli
+
 # capture binary
 FROM intermediate AS capture-bin
 ARG APP_INSIGHTS_ID # set to enable AI telemetry
@@ -132,10 +150,12 @@ ENTRYPOINT ["./retina/initretina"]
 # mcr.microsoft.com/azurelinux/distroless/minimal:3.0
 # mcr.microsoft.com/azurelinux/distroless/minimal@sha256:4435f90009c17fb750e5518a3f43a24a629ac4c4f8c222b50f6adfe5e0d0bf2d
 FROM azurelinux-distroless AS agent
+ENV HUBBLE_SERVER=unix:///var/run/cilium/hubble.sock
 COPY --from=tools /lib/ /lib
 COPY --from=tools /usr/lib/ /usr/lib
 COPY --from=tools /etc/pki/tls/ /etc/pki/tls/
 COPY --from=tools /tmp/bin/ /bin
+COPY --from=hubble-bin /go/bin/hubble /bin/hubble
 COPY --from=controller-bin /go/bin/retina/controller /retina/controller
 COPY --from=controller-bin /go/src/github.com/microsoft/retina/pkg/plugin /go/src/github.com/microsoft/retina/pkg/plugin
 COPY --from=capture-bin /go/bin/retina/captureworkload /retina/captureworkload
