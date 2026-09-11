@@ -142,8 +142,10 @@ func Test_CaptureToPodTranslator_GetCaptureTargetsOnNode(t *testing.T) {
 
 	cases := []struct {
 		name string
-		// namespace is the Capture's own namespace passed to getCaptureTargetsOnNode. Defaults to "default" when empty.
-		namespace                string
+		// namespace is the Capture's own namespace passed to getCaptureTargetsOnNode. Defaults to "default" when empty, unless emptyNamespace is set.
+		namespace string
+		// emptyNamespace passes namespace as-is (skipping the "default" fallback above) to test the empty-namespace guard.
+		emptyNamespace           bool
 		captureTarget            retinav1alpha1.CaptureTarget
 		nodeList                 *corev1.NodeList
 		namespaceList            *corev1.NamespaceList
@@ -420,6 +422,62 @@ func Test_CaptureToPodTranslator_GetCaptureTargetsOnNode(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			// NamespaceSelector must take precedence over the Capture's own namespace, not be merged/OR'd with it.
+			name:      "NamespaceSelector takes precedence over the Capture's own namespace",
+			namespace: "tenant-a",
+			captureTarget: retinav1alpha1.CaptureTarget{
+				NamespaceSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"name": "other-ns"},
+				},
+				PodSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"app": "target"},
+				},
+			},
+			namespaceList: &corev1.NamespaceList{
+				Items: []corev1.Namespace{{ObjectMeta: metav1.ObjectMeta{Name: "other-ns", Labels: map[string]string{"name": "other-ns"}}}},
+			},
+			podList: &corev1.PodList{
+				Items: []corev1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "target-tenant", Namespace: "tenant-a", Labels: map[string]string{"app": "target"}},
+						Spec:       corev1.PodSpec{NodeName: "node1"},
+						Status: corev1.PodStatus{
+							PodIP:  "10.244.0.9",
+							PodIPs: []corev1.PodIP{{IP: "10.244.0.9"}},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "target-other", Namespace: "other-ns", Labels: map[string]string{"app": "target"}},
+						Spec:       corev1.PodSpec{NodeName: "node1"},
+						Status: corev1.PodStatus{
+							PodIP:  "10.244.0.10",
+							PodIPs: []corev1.PodIP{{IP: "10.244.0.10"}},
+						},
+					},
+				},
+			},
+			wantCaptureTargetsOnNode: &CaptureTargetsOnNode{
+				"node1": CaptureTarget{
+					PodIpAddresses: []string{"10.244.0.10"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			// Guards against the self-namespace fallback silently becoming an all-namespaces list, since
+			// client-go treats Pods("").List(...) as "all namespaces".
+			name:           "PodSelector without NamespaceSelector and an empty namespace is rejected",
+			namespace:      "",
+			emptyNamespace: true,
+			captureTarget: retinav1alpha1.CaptureTarget{
+				PodSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"app": "target"},
+				},
+			},
+			wantCaptureTargetsOnNode: nil,
+			wantErr:                  true,
+		},
 	}
 
 	for _, tt := range cases {
@@ -438,7 +496,7 @@ func Test_CaptureToPodTranslator_GetCaptureTargetsOnNode(t *testing.T) {
 			k8sClient := fakeclientset.NewSimpleClientset(objects...)
 			captureToPodTranslator := NewCaptureToPodTranslatorForTest(k8sClient)
 			ns := tt.namespace
-			if ns == "" {
+			if ns == "" && !tt.emptyNamespace {
 				ns = "default"
 			}
 			gotCaptureTargetsOnNode, err := captureToPodTranslator.getCaptureTargetsOnNode(ctx, tt.captureTarget, ns)
@@ -1875,7 +1933,8 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			name: "tcpdumpfilter: pod ip address and tcpdumpfilter coexist",
 			capture: retinav1alpha1.Capture{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: captureName,
+					Name:      captureName,
+					Namespace: "default",
 				},
 				Status: retinav1alpha1.CaptureStatus{
 					StartTime: timestamp,
@@ -1956,7 +2015,8 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			name: "tcpdumpfilter: pod ip adddress exits",
 			capture: retinav1alpha1.Capture{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: captureName,
+					Name:      captureName,
+					Namespace: "default",
 				},
 				Status: retinav1alpha1.CaptureStatus{
 					StartTime: timestamp,
@@ -2035,7 +2095,8 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			name: "tcpdumpfilter: dual-stack Pod",
 			capture: retinav1alpha1.Capture{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: captureName,
+					Name:      captureName,
+					Namespace: "default",
 				},
 				Status: retinav1alpha1.CaptureStatus{
 					StartTime: timestamp,
@@ -2117,7 +2178,8 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			name: "netshfilter: dual-stack Pod",
 			capture: retinav1alpha1.Capture{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: captureName,
+					Name:      captureName,
+					Namespace: "default",
 				},
 				Status: retinav1alpha1.CaptureStatus{
 					StartTime: timestamp,
@@ -2200,7 +2262,8 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 			name: "netshfilter: pod ip address and tcpdumpfilter coexist",
 			capture: retinav1alpha1.Capture{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: captureName,
+					Name:      captureName,
+					Namespace: "default",
 				},
 				Status: retinav1alpha1.CaptureStatus{
 					StartTime: timestamp,
@@ -2302,6 +2365,8 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 				return
 			}
 			job := commonJob.DeepCopy()
+			job.Namespace = tt.capture.Namespace
+			job.Spec.Template.Namespace = tt.capture.Namespace
 			job.Spec.Template.Spec.Containers[0].Env = tt.podEnv
 			job.Spec.Template.Spec.Containers[0].VolumeMounts = tt.volumeMounts
 			job.Spec.Template.Spec.Volumes = tt.volumes
@@ -3574,6 +3639,29 @@ func TestGetCaptureTargetsOnNode_WithPodNames(t *testing.T) {
 			},
 			wantErr:     false,
 			wantNodeLen: 1,
+		},
+		{
+			name:      "empty namespace is rejected",
+			podNames:  []string{"test-pod-1"},
+			namespace: "",
+			pods: []*corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod-1",
+						Namespace: "default",
+					},
+					Spec: corev1.PodSpec{
+						NodeName: "node1",
+					},
+					Status: corev1.PodStatus{
+						PodIPs: []corev1.PodIP{
+							{IP: "10.0.0.1"},
+						},
+					},
+				},
+			},
+			wantErr:     true,
+			wantNodeLen: 0,
 		},
 		{
 			name:        "empty pod names list",
