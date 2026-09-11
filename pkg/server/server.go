@@ -55,8 +55,10 @@ func New(logger *log.ZapLogger) *Server {
 //
 // This preserves the existing profiling workflow (`kubectl exec <pod> --
 // curl localhost:10093/debug/pprof/...` and `kubectl port-forward`), both of
-// which terminate on the pod's loopback interface, while blocking access
-// from other pods, other nodes, and off-cluster peers.
+// which terminate on the pod's loopback interface, while blocking requests
+// whose TCP peer address is not loopback. Since Retina runs with
+// `hostNetwork: true`, node-local processes and other host-networked pods on
+// the same node can still access these endpoints through loopback.
 //
 // IMPORTANT: this middleware must be registered before middleware.RealIP;
 // otherwise r.RemoteAddr would be rewritten from X-Forwarded-For and the
