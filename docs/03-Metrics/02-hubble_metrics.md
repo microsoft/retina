@@ -40,8 +40,13 @@ The table below outlines the different metrics generated.
 | **networkobservability_dns_request_count**     | Total DNS request count | | ✅ | ❌ |
 | **networkobservability_dns_response_count**    | Total DNS response count | | ✅ | ❌ |
 | **networkobservability_windows_hns_stats**     | Windows HNS statistics (packets sent/received) | `direction` | ❌ | ✅ |
-| **networkobservability_node_connectivity_status** | Connectivity status between nodes (1=connected, 0=not) | `source_node_name`, `target_node_name` | ✅ | ✅ |
-| **networkobservability_node_connectivity_latency_seconds** | Latency in seconds between nodes | `source_node_name`, `target_node_name` | ✅ | ✅ |
+| **networkobservability_node_connectivity_status** | Deprecated; registered but not populated | `source_node_name`, `target_node_name` | ❌ | ❌ |
+| **networkobservability_node_connectivity_latency_seconds** | Deprecated; registered but not populated | `source_node_name`, `target_node_name` | ❌ | ❌ |
+
+> **Note:** Linux `interface_stats` may expose no samples because it includes
+> only non-zero `ethtool -S` counters containing `err` or `drop`.
+> The deprecated node-connectivity collectors remain registered for
+> compatibility but expose no metric series.
 
 ### Pod-Level Metrics (Hubble Metrics)
 

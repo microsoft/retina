@@ -13,6 +13,10 @@ The plugin uses a native eBPF tracepoint (`tracepoint/tcp/tcp_retransmit_skb`) t
 The plugin does not generate Basic metrics.
 In Advanced mode (see [Metric Modes](../../modes/modes.md)), the plugin turns an eBPF result into an enriched `Flow` (adding Pod information based on IP), then sends the `Flow` to an external channel so that a tcpretrans module can create Pod-Level metrics.
 
+> **Note:** This plugin must be present in `enabledPlugin` and Pod-Level metrics
+> must be enabled. It emits `networkobservability_adv_tcpretrans_count` and is
+> separate from node-wide retransmission-related statistics from `linuxutil`.
+
 ### Code locations
 
 - Plugin and eBPF code: *pkg/plugin/tcpretrans/*
