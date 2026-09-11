@@ -44,6 +44,7 @@ var (
 	errPodNamesIncompat         = errors.New("PodNames is not compatible with NamespaceSelector or PodSelector, please use one or the other")
 	errFileCountRequiresMaxSize = errors.New("fileCount requires maxCaptureSize to be set as per-file size limit")
 	errInvalidIPAddress         = errors.New("is not a valid IP address")
+	errEmptyCaptureNamespace    = errors.New("capture namespace must not be empty when resolving pod selector or pod names targets")
 	// errTcpdumpFilterIncompatibleWithSourceDestIPs: obtainAndValidateUserFilter gives the generated pcapFilter
 	// precedence over the deprecated tcpdumpFilter, so combining them would silently drop the tcpdumpFilter.
 	errTcpdumpFilterIncompatibleWithSourceDestIPs = errors.New("tcpdumpFilter (deprecated) cannot be combined with sourceIPs/destinationIPs; use pcapFilter instead")
@@ -734,7 +735,7 @@ func (translator *CaptureToPodTranslator) getCaptureTargetsOnNode(ctx context.Co
 		}
 	}
 	if captureTarget.PodSelector != nil {
-		if captureTargetsOnNode, err = translator.calculateCaptureTargetsByPodSelector(ctx, captureTarget); err != nil {
+		if captureTargetsOnNode, err = translator.calculateCaptureTargetsByPodSelector(ctx, captureTarget, namespace); err != nil {
 			return nil, err
 		}
 	}
@@ -820,12 +821,17 @@ func (translator *CaptureToPodTranslator) calculateCaptureTargetsByNodeSelector(
 	return captureTargetOnNode, nil
 }
 
-func (translator *CaptureToPodTranslator) calculateCaptureTargetsByPodSelector(ctx context.Context, captureTarget retinav1alpha1.CaptureTarget) (*CaptureTargetsOnNode, error) {
+func (translator *CaptureToPodTranslator) calculateCaptureTargetsByPodSelector(ctx context.Context, captureTarget retinav1alpha1.CaptureTarget, namespace string) (*CaptureTargetsOnNode, error) {
 	captureTargetOnNode := &CaptureTargetsOnNode{}
+
+	if captureTarget.NamespaceSelector == nil && namespace == "" {
+		return nil, errEmptyCaptureNamespace
+	}
+	// Without an explicit NamespaceSelector, the lookup is scoped to the Capture's own namespace only.
 	nsList := &corev1.NamespaceList{Items: []corev1.Namespace{
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: corev1.NamespaceDefault,
+				Name: namespace,
 			},
 		},
 	}}
@@ -834,7 +840,7 @@ func (translator *CaptureToPodTranslator) calculateCaptureTargetsByPodSelector(c
 		var err error
 		labelSelector, err := labels.Parse(metav1.FormatLabelSelector(captureTarget.NamespaceSelector))
 		if err != nil {
-			translator.l.Error("PersistentVolumeClaim is not empty", zap.String("namespaceSelector", captureTarget.NamespaceSelector.String()), zap.Error(err))
+			translator.l.Error("Failed to parse namespace selector to label", zap.String("namespaceSelector", captureTarget.NamespaceSelector.String()), zap.Error(err))
 			return nil, err
 		}
 		nsListOpt := metav1.ListOptions{
@@ -875,6 +881,10 @@ func (translator *CaptureToPodTranslator) calculateCaptureTargetsByPodSelector(c
 
 func (translator *CaptureToPodTranslator) calculateCaptureTargetsByPodNames(ctx context.Context, captureTarget retinav1alpha1.CaptureTarget, namespace string) (*CaptureTargetsOnNode, error) {
 	captureTargetOnNode := &CaptureTargetsOnNode{}
+
+	if namespace == "" {
+		return nil, errEmptyCaptureNamespace
+	}
 
 	// Get the pods by their names from the specified namespace
 	for _, podName := range captureTarget.PodNames {
