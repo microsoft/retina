@@ -72,7 +72,7 @@ jobs:
         run: az acr login --name "${{ vars.ACR_NAME }}"
 
       - name: Docker Login to ghcr.io
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         if: ${{ env.PUBLISH_TO_ACR != 'true' }}
         with:
           registry: ghcr.io
