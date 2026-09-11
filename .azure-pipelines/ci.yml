@@ -355,79 +355,93 @@ extends:
         displayName: Run
         dependsOn: build
         jobs:
-          # The multi-arch manifests are created at the start of the e2e job.
-          # A separate job would add several minutes of OneBranch job setup
-          # and scans to the critical path.
-          - job: e2e
-            displayName: E2E Tests
-            condition: and(succeeded(), eq(variables['publishImagesAndRunE2E'], 'True'))
-            timeoutInMinutes: 90
-            pool:
-              type: linux
-            variables:
-              ob_outputDirectory: $(Build.SourcesDirectory)/out
-              CLUSTER_NAME: retina-e2e-$(Build.BuildId)-$(System.JobAttempt)
-            steps:
-              # `make manifest` creates the multi-arch indexes from the
-              # per-platform tags that the image jobs pushed. The OneBranch
-              # Linux container has no docker CLI, so the oras script replaces
-              # `docker buildx imagetools create` as the backend.
-              - task: AzureCLI@2
-                displayName: Create multi-arch manifests
-                inputs:
-                  azureSubscription: $(azureServiceConnection)
-                  scriptType: bash
-                  scriptLocation: inlineScript
-                  inlineScript: |
-                    set -euo pipefail
-                    registry="$(ACR_NAME)"
-                    ns="$(imageNamespace)"
-                    tag="$(TAG)"
-                    az acr login --name "$registry" --expose-token --query accessToken -o tsv \
-                      | oras login "$registry" --username 00000000-0000-0000-0000-000000000000 --password-stdin
-                    for component in retina operator shell kubectl-retina; do
-                      make manifest COMPONENT="$component" IMAGE_REGISTRY="$registry" \
-                        IMAGE_NAMESPACE="$ns" TAG="$tag" MANIFEST_CREATE=hack/scripts/oras-index.sh
-                    done
-                    # The e2e tests pull the event writer at the run tag. Its image
-                    # job tags by attempt, so publish the newest attempt under the
-                    # run tag as a one-entry index.
-                    hack/scripts/oras-index.sh "$registry/$ns/test/e2e-test-event-writer:$tag" \
-                      "$registry/$ns/test/e2e-test-event-writer:$tag"
-              # The capture scenario shells out to kubectl, which the OneBranch
-              # Linux container does not ship.
-              - bash: tdnf install -y kubernetes-client && kubectl version --client
-                displayName: Install kubectl
-              - task: AzureCLI@2
-                displayName: Run E2E Tests
-                env:
-                  AZURE_LOCATION: $(AZURE_LOCATION)
-                  AZURE_AGENT_LINUX_SKU: $(AZURE_AGENT_LINUX_SKU)
-                  AZURE_AGENT_WINDOWS_SKU: $(AZURE_AGENT_WINDOWS_SKU)
-                  AZURE_AGENT_LINUX_ARM_SKU: $(AZURE_AGENT_LINUX_ARM_SKU)
-                inputs:
-                  azureSubscription: $(azureServiceConnection)
-                  scriptType: bash
-                  scriptLocation: inlineScript
-                  inlineScript: |
-                    set -euo pipefail
-                    export AZURE_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
-                    go test -v ./test/e2e/. -timeout 60m -tags=e2e -count=1 -args \
-                      -image-tag=$(TAG) \
-                      -image-registry=$(ACR_NAME) \
-                      -image-namespace=$(imageNamespace)
-              - task: AzureCLI@2
-                displayName: Cleanup resource group
-                condition: always()
-                inputs:
-                  azureSubscription: $(azureServiceConnection)
-                  scriptType: bash
-                  scriptLocation: inlineScript
-                  inlineScript: |
-                    if az group exists --name "$(CLUSTER_NAME)" 2>/dev/null | grep -q true; then
-                      echo "Deleting resource group $(CLUSTER_NAME)..."
-                      az group delete --name "$(CLUSTER_NAME)" --yes --no-wait || true
-                    fi
+          # PR builds publish no images, so there is nothing to test. Main
+          # requires the check "CI (Build Images) (Run E2E Tests)" on every
+          # pull request, and Azure DevOps posts no check for a skipped job.
+          # A server job with the same name posts the check in seconds.
+          - ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+            - job: e2e
+              displayName: E2E Tests
+              pool:
+                type: agentless
+              steps:
+                - task: Delay@1
+                  inputs:
+                    delayForMinutes: '0'
+          - ${{ else }}:
+            # The multi-arch manifests are created at the start of the e2e job.
+            # A separate job would add several minutes of OneBranch job setup
+            # and scans to the critical path.
+            - job: e2e
+              displayName: E2E Tests
+              condition: and(succeeded(), eq(variables['publishImagesAndRunE2E'], 'True'))
+              timeoutInMinutes: 90
+              pool:
+                type: linux
+              variables:
+                ob_outputDirectory: $(Build.SourcesDirectory)/out
+                CLUSTER_NAME: retina-e2e-$(Build.BuildId)-$(System.JobAttempt)
+              steps:
+                # `make manifest` creates the multi-arch indexes from the
+                # per-platform tags that the image jobs pushed. The OneBranch
+                # Linux container has no docker CLI, so the oras script replaces
+                # `docker buildx imagetools create` as the backend.
+                - task: AzureCLI@2
+                  displayName: Create multi-arch manifests
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -euo pipefail
+                      registry="$(ACR_NAME)"
+                      ns="$(imageNamespace)"
+                      tag="$(TAG)"
+                      az acr login --name "$registry" --expose-token --query accessToken -o tsv \
+                        | oras login "$registry" --username 00000000-0000-0000-0000-000000000000 --password-stdin
+                      for component in retina operator shell kubectl-retina; do
+                        make manifest COMPONENT="$component" IMAGE_REGISTRY="$registry" \
+                          IMAGE_NAMESPACE="$ns" TAG="$tag" MANIFEST_CREATE=hack/scripts/oras-index.sh
+                      done
+                      # The e2e tests pull the event writer at the run tag. Its image
+                      # job tags by attempt, so publish the newest attempt under the
+                      # run tag as a one-entry index.
+                      hack/scripts/oras-index.sh "$registry/$ns/test/e2e-test-event-writer:$tag" \
+                        "$registry/$ns/test/e2e-test-event-writer:$tag"
+                # The capture scenario shells out to kubectl, which the OneBranch
+                # Linux container does not ship.
+                - bash: tdnf install -y kubernetes-client && kubectl version --client
+                  displayName: Install kubectl
+                - task: AzureCLI@2
+                  displayName: Run E2E Tests
+                  env:
+                    AZURE_LOCATION: $(AZURE_LOCATION)
+                    AZURE_AGENT_LINUX_SKU: $(AZURE_AGENT_LINUX_SKU)
+                    AZURE_AGENT_WINDOWS_SKU: $(AZURE_AGENT_WINDOWS_SKU)
+                    AZURE_AGENT_LINUX_ARM_SKU: $(AZURE_AGENT_LINUX_ARM_SKU)
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -euo pipefail
+                      export AZURE_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+                      go test -v ./test/e2e/. -timeout 60m -tags=e2e -count=1 -args \
+                        -image-tag=$(TAG) \
+                        -image-registry=$(ACR_NAME) \
+                        -image-namespace=$(imageNamespace)
+                - task: AzureCLI@2
+                  displayName: Cleanup resource group
+                  condition: always()
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      if az group exists --name "$(CLUSTER_NAME)" 2>/dev/null | grep -q true; then
+                        echo "Deleting resource group $(CLUSTER_NAME)..."
+                        az group delete --name "$(CLUSTER_NAME)" --yes --no-wait || true
+                      fi
 
           - ${{ each mode in split('basic,advanced', ',') }}:
             - job: perf_${{ mode }}
