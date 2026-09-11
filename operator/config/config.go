@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"path/filepath"
 	"time"
 
 	"github.com/microsoft/retina/pkg/capture"
@@ -15,9 +14,9 @@ import (
 const MinTelemetryInterval time.Duration = 2 * time.Minute
 
 var (
-	DefaultTelemetryInterval             = 5 * time.Minute
-	ErrorTelemetryIntervalTooSmall       = fmt.Errorf("telemetryInterval smaller than %v is not allowed", MinTelemetryInterval)
-	ErrCaptureHostPathBaseDirNotAbsolute = errors.New("captureHostPathBaseDir must be an absolute path")
+	DefaultTelemetryInterval         = 5 * time.Minute
+	ErrorTelemetryIntervalTooSmall   = fmt.Errorf("telemetryInterval smaller than %v is not allowed", MinTelemetryInterval)
+	ErrCaptureHostPathBaseDirInvalid = errors.New("captureHostPathBaseDir must be an absolute path free of NTFS-reserved characters, control characters, and cmd.exe operators")
 )
 
 type OperatorConfig struct {
@@ -64,10 +63,11 @@ func GetConfig(cfgFileName string) (*OperatorConfig, error) {
 		log.Printf("captureHostPathBaseDir is not set, defaulting to %s", capture.DefaultHostPathBaseDir)
 		cfg.CaptureHostPathBaseDir = capture.DefaultHostPathBaseDir
 	}
-	cfg.CaptureHostPathBaseDir = filepath.Clean(cfg.CaptureHostPathBaseDir)
-	if !filepath.IsAbs(cfg.CaptureHostPathBaseDir) {
-		return nil, fmt.Errorf("%w: got %q", ErrCaptureHostPathBaseDirNotAbsolute, cfg.CaptureHostPathBaseDir)
+	cleanedBaseDir, err := capture.ValidateHostPathBaseDir(cfg.CaptureHostPathBaseDir)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrCaptureHostPathBaseDirInvalid, err)
 	}
+	cfg.CaptureHostPathBaseDir = cleanedBaseDir
 
 	return &cfg, nil
 }

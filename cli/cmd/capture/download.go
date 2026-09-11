@@ -21,6 +21,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/storage"
 	retinacmd "github.com/microsoft/retina/cli/cmd"
+	pkgcapture "github.com/microsoft/retina/pkg/capture"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
 	captureFile "github.com/microsoft/retina/pkg/capture/file"
 	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
@@ -56,6 +57,26 @@ var (
 const (
 	DefaultOutputPath = "./"
 )
+
+const (
+	// fileExistsMarker is the stdout sentinel FileCheckCommand prints when the
+	// file check passes, shared by both the Linux and Windows commands.
+	fileExistsMarker = "FILE_EXISTS"
+	// linuxFileCheckScript is run via sh -c with the untrusted path bound to
+	// $1 (a positional parameter), never spliced into the script text, so it
+	// can't be re-parsed as shell syntax.
+	linuxFileCheckScript = `if [ -r "$1" ]; then echo ` + fileExistsMarker + `; fi`
+)
+
+// hostPath and fileName come from pod annotations, which are not guaranteed
+// to have gone through Capture-creation-time validation (an attacker with
+// pod-create permission can set them directly), so both are rejected here if
+// they contain any pkgcapture.UnsafePathChars before being used to build a
+// download-helper command. fileName is additionally used as a bare basename
+// (e.g. joined with an output directory or written as a tar entry name), so
+// unlike hostPath it must not contain a path separator at all, or a value
+// like "../../escape" would still traverse out of the intended directory.
+var ErrUnsafeDownloadPath = errors.New("hostPath or file name contains characters that are not allowed")
 
 var (
 	blobURL               string
@@ -122,6 +143,16 @@ func NewDownloadService(kubeClient kubernetes.Interface, config *rest.Config, na
 }
 
 func getDownloadCmd(node *corev1.Node, hostPath, fileName string) (*DownloadCmd, error) {
+	if pkgcapture.UnsafePathChars.MatchString(hostPath) ||
+		pkgcapture.UnsafePathChars.MatchString(fileName) ||
+		strings.ContainsAny(fileName, `/\`) {
+		// Only reachable via a pod annotation that bypassed Capture-creation-time
+		// validation, so surface it as a warning for tampering detection.
+		retinacmd.Logger.Warn("Rejected unsafe download path from pod annotations",
+			zap.String("node", node.Name), zap.String("hostPath", hostPath), zap.String("fileName", fileName))
+		return nil, fmt.Errorf("%w: hostPath=%q fileName=%q", ErrUnsafeDownloadPath, hostPath, fileName)
+	}
+
 	nodeOS, err := getNodeOS(node)
 	if err != nil {
 		return nil, err
@@ -140,7 +171,7 @@ func getDownloadCmd(node *corev1.Node, hostPath, fileName string) (*DownloadCmd,
 			SrcFilePath:      srcFilePath,
 			MountPath:        mountPath,
 			KeepAliveCommand: []string{"cmd", "/c", "echo Download pod ready & ping -n 3601 127.0.0.1 > nul"},
-			FileCheckCommand: []string{"cmd", "/c", fmt.Sprintf("if exist %s echo FILE_EXISTS", srcFilePath)},
+			FileCheckCommand: []string{"cmd", "/c", "if", "exist", srcFilePath, "echo", fileExistsMarker},
 			FileReadCommand:  []string{"cmd", "/c", "type", srcFilePath},
 		}, nil
 	case LinuxOS:
@@ -151,7 +182,7 @@ func getDownloadCmd(node *corev1.Node, hostPath, fileName string) (*DownloadCmd,
 			SrcFilePath:      srcFilePath,
 			MountPath:        mountPath,
 			KeepAliveCommand: []string{"sh", "-c", "echo 'Download pod ready'; sleep 3600"},
-			FileCheckCommand: []string{"sh", "-c", fmt.Sprintf("if [ -r %q ]; then echo 'FILE_EXISTS'; fi", srcFilePath)},
+			FileCheckCommand: []string{"sh", "-c", linuxFileCheckScript, "sh", srcFilePath},
 			FileReadCommand:  []string{"cat", srcFilePath},
 		}, nil
 	default:
@@ -434,15 +465,14 @@ func (ds *DownloadService) verifyFileExists(ctx context.Context, pod *corev1.Pod
 			if attempt == maxAttempts {
 				return false, fmt.Errorf("failed to check file existence after %d attempts: %w", attempt, err)
 			}
-			time.Sleep(time.Duration(attempt*2) * time.Second)
-			continue
-		}
-
-		if strings.Contains(checkOutput, "FILE_EXISTS") {
+		} else if strings.Contains(checkOutput, fileExistsMarker) {
 			return true, nil
 		}
 
-		time.Sleep(time.Duration(attempt*2) * time.Second)
+		// no retry follows the final attempt, so don't sleep before returning below
+		if attempt < maxAttempts {
+			time.Sleep(time.Duration(attempt*2) * time.Second)
+		}
 	}
 
 	return false, fmt.Errorf("%s: %w", downloadCmd.SrcFilePath, ErrFileNotAccessible)
