@@ -11,7 +11,8 @@ operator:
   name: retina-operator
   enabled: false
   repository: ghcr.io/microsoft/retina/retina-operator
-  tag: "v0.0.2"
+  # -- Image tag; when empty, defaults to the chart version.
+  tag: ""
   installCRDs: true
   enableRetinaEndpoint: false
   resources:
@@ -47,8 +48,8 @@ image:
   repository: ghcr.io/microsoft/retina/retina-agent
   initRepository: ghcr.io/microsoft/retina/retina-init
   pullPolicy: Always
-  # Overrides the image tag whose default is the chart appVersion.
-  tag: "v0.0.2"
+  # -- Image tag; when empty, defaults to the chart version.
+  tag: ""
 
 enableConntrackMetrics: false
 conntrackReportInterval: 30s

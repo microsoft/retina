@@ -42,7 +42,9 @@ NAMESPACE: kube-system
 STATUS: deployed
 REVISION: 1
 NOTES:
-1. Installing retina service using helm: helm install retina ./deploy/standard/manifests/controller/helm/retina/ --namespace kube-system --dependency-update
+1. Installing retina service using helm:
+  VERSION=$( curl -sL https://api.github.com/repos/microsoft/retina/releases/latest | jq -r .name)
+  helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina --version $VERSION --namespace kube-system
 2. Cleaning up/uninstalling/deleting retina and dependencies related:
   helm uninstall retina -n kube-system
 
