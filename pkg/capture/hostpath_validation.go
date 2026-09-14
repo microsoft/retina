@@ -29,10 +29,42 @@ var (
 	ErrHostPathEscapesBase = errors.New("hostPath resolves outside the configured base directory")
 	// ErrHostPathBaseDir is returned when the operator-provided base directory is not usable.
 	ErrHostPathBaseDir = errors.New("invalid hostPath base directory")
+	// ErrHostPathInvalidChars is returned when the supplied HostPath contains a
+	// character matched by UnsafePathChars.
+	ErrHostPathInvalidChars = errors.New("hostPath contains characters that are not valid in a path segment")
 )
 
 // winDriveLetter matches a Windows drive-letter prefix such as "C:\" or "c:/".
 var winDriveLetter = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
+
+// UnsafePathChars denylists characters that are NTFS-reserved, ASCII control
+// characters, or cmd.exe operators (& | < > ^ % ! ( ) ") that the Windows
+// download helper's cmd.exe-based existence/read commands cannot escape.
+// Everything else, including Unicode, '@', '+', and space, is a valid path
+// character and is left alone, matching the HostPath contract documented on
+// OutputConfiguration.HostPath.
+var UnsafePathChars = regexp.MustCompile(`[<>:"|?*\x00-\x1f&^%!()]`)
+
+// ValidateHostPathBaseDir ensures a configured Capture host-path base directory
+// is absolute and free of UnsafePathChars, since it is prefixed onto every
+// resolved HostPath before that value is used as a pod annotation and checked
+// again by the download command's own boundary check; a base dir that passed
+// only an absolute-path check (e.g. containing '&') would make every later
+// download exploitable or fail. If baseDir is empty, DefaultHostPathBaseDir is
+// used.
+func ValidateHostPathBaseDir(baseDir string) (string, error) {
+	if baseDir == "" {
+		baseDir = DefaultHostPathBaseDir
+	}
+	cleaned := filepath.Clean(baseDir)
+	if !filepath.IsAbs(cleaned) {
+		return "", fmt.Errorf("%w: %q must be absolute", ErrHostPathBaseDir, baseDir)
+	}
+	if UnsafePathChars.MatchString(cleaned) {
+		return "", fmt.Errorf("%w: %q", ErrHostPathInvalidChars, cleaned)
+	}
+	return cleaned, nil
+}
 
 // validateHostPath ensures that the user-supplied HostPath from a Capture CR is safe
 // to mount into the privileged capture pod and returns the absolute, cleaned path the
@@ -45,6 +77,7 @@ var winDriveLetter = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
 //   - The path must not be absolute (no leading "/" or "\\", no Windows drive letter).
 //   - The path must not contain any ".." segment, checked both on the raw input and
 //     after filepath.Clean.
+//   - The path must not contain any UnsafePathChars.
 //   - As defense in depth, the joined path must still resolve under baseDir.
 //
 // If baseDir is empty, DefaultHostPathBaseDir is used.
@@ -53,12 +86,9 @@ func validateHostPath(raw, baseDir string) (string, error) {
 		return "", ErrHostPathEmpty
 	}
 
-	if baseDir == "" {
-		baseDir = DefaultHostPathBaseDir
-	}
-	cleanedBase := filepath.Clean(baseDir)
-	if !filepath.IsAbs(cleanedBase) {
-		return "", fmt.Errorf("%w: %q must be absolute", ErrHostPathBaseDir, baseDir)
+	cleanedBase, err := ValidateHostPathBaseDir(baseDir)
+	if err != nil {
+		return "", err
 	}
 
 	// Reject absolute paths up front, in both POSIX and Windows styles, so existing
@@ -69,6 +99,10 @@ func validateHostPath(raw, baseDir string) (string, error) {
 		strings.HasPrefix(raw, `\`) ||
 		winDriveLetter.MatchString(raw) {
 		return "", fmt.Errorf("%w: %q", ErrHostPathAbsolute, raw)
+	}
+
+	if UnsafePathChars.MatchString(raw) {
+		return "", fmt.Errorf("%w: %q", ErrHostPathInvalidChars, raw)
 	}
 
 	// Reject literal ".." segments before cleaning so traversal attempts are

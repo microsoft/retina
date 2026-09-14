@@ -5,7 +5,7 @@
 # host arch (fast). The eBPF .o files, which cannot be cleanly cross-compiled
 # by bpf2go, are produced in the separate `bpf-gen` stage below (which runs
 # at $TARGETPLATFORM — native on same-arch, emulated under QEMU otherwise).
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:0fd0eb0f8786e0b8c9fff71b12a48d112e6392ce35c84f72650f185f6722977d AS golang
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:9f6b5c480db643ca536db638fc0346b5a8424fd738c916db5db6443e68ad130e AS golang
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
 FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260825@sha256:daa1142fc6b44e27c8112ec6b4c2d579ddb9bc6b3747504e666010a45a51faa4 AS azurelinux-core
@@ -20,7 +20,7 @@ FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20260809@sha256:4435f90
 # .o files via bpf2go/clang — those require native target-arch execution and
 # cannot be cross-compiled from an amd64 host cleanly. Isolating this work in a
 # small dedicated stage keeps the rest of the build fast at $BUILDPLATFORM.
-FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:0fd0eb0f8786e0b8c9fff71b12a48d112e6392ce35c84f72650f185f6722977d AS bpf-gen
+FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:9f6b5c480db643ca536db638fc0346b5a8424fd738c916db5db6443e68ad130e AS bpf-gen
 ARG GOOS=linux
 ARG GOARCH=amd64
 ENV GOOS=${GOOS}
@@ -70,6 +70,24 @@ COPY . .
 RUN if [ "$GOOS" = "linux" ] ; then \
     rm -rf ./pkg/plugin && tar xvf /gen.tar.gz ./pkg/plugin; \
     fi
+
+# Hubble CLI binary built from the Cilium source pinned in go.mod.
+FROM golang AS hubble-bin
+ARG GOARCH=amd64
+ENV GOARCH=${GOARCH}
+ENV GOEXPERIMENT=ms_nocgo_opensslcrypto
+WORKDIR /go/src/github.com/microsoft/retina
+COPY ./go.mod ./go.sum ./
+RUN go mod download
+COPY ./cmd/hubble-cli ./cmd/hubble-cli
+RUN CILIUM_VERSION="$(go list -m -f '{{.Version}}' github.com/cilium/cilium)" && \
+    test -n "$CILIUM_VERSION" && \
+    CGO_ENABLED=0 go build \
+    -trimpath \
+    -tags=osusergo \
+    -ldflags="-s -w -X github.com/cilium/cilium/hubble/pkg.Version=${CILIUM_VERSION}" \
+    -o /go/bin/hubble \
+    ./cmd/hubble-cli
 
 # capture binary
 FROM intermediate AS capture-bin
@@ -132,10 +150,12 @@ ENTRYPOINT ["./retina/initretina"]
 # mcr.microsoft.com/azurelinux/distroless/minimal:3.0
 # mcr.microsoft.com/azurelinux/distroless/minimal@sha256:4435f90009c17fb750e5518a3f43a24a629ac4c4f8c222b50f6adfe5e0d0bf2d
 FROM azurelinux-distroless AS agent
+ENV HUBBLE_SERVER=unix:///var/run/cilium/hubble.sock
 COPY --from=tools /lib/ /lib
 COPY --from=tools /usr/lib/ /usr/lib
 COPY --from=tools /etc/pki/tls/ /etc/pki/tls/
 COPY --from=tools /tmp/bin/ /bin
+COPY --from=hubble-bin /go/bin/hubble /bin/hubble
 COPY --from=controller-bin /go/bin/retina/controller /retina/controller
 COPY --from=controller-bin /go/src/github.com/microsoft/retina/pkg/plugin /go/src/github.com/microsoft/retina/pkg/plugin
 COPY --from=capture-bin /go/bin/retina/captureworkload /retina/captureworkload
