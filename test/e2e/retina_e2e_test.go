@@ -63,7 +63,7 @@ func TestE2ERetina(t *testing.T) {
 		jobs.UpgradeAndTestRetinaAdvancedMetrics(
 			common.KubeConfigFilePath(rootDir),
 			common.RetinaChartPath(rootDir),
-			common.RetinaAdvancedProfilePath(rootDir),
+			common.RetinaAdvancedWithEbpfWindowsProfilePath(rootDir),
 			common.TestPodNamespace),
 	)
 	advanceMetricsE2E.Run(ctx)
