@@ -9,6 +9,7 @@ See the [overview](./01-overview.md#capture-jobs) for a description of how the c
 ## Prerequisites
 
 - [Install Retina](../02-Installation/01-Setup.md#capture-support) **with capture support**.
+- Sufficient node storage for capture files when using the default host-path output, unless a remote output location (blob, S3, or PVC) is configured instead.
 
 ### Cluster Access
 
@@ -27,11 +28,11 @@ The operator translates each `Capture` into the same underlying Job/Pod spec use
 - **`NET_ADMIN` and `SYS_ADMIN` Linux capabilities** - required to run the packet capture on the host's interfaces.
 - **The capture image's registry** - the default capture image is pulled from `ghcr.io/microsoft/retina/retina-agent`. If the cluster restricts pulls to an approved registry, allow-list this image/registry or mirror it into your approved registry.
 
-If your cluster denies any of these, the capture Job's pod will fail admission — check `kubectl get capture <capture-crd-name> -o yaml` for job status, and the pod events in the target namespace for the denial reason. Work with your cluster/policy administrator to add an exception before retrying.
+If your cluster denies any of these, the capture Job's pod will fail admission — check `kubectl get capture <capture-crd-name> -o yaml` for job status, and the pod events in the target namespace for the denial reason.
 
 ## Usage
 
-You must create a YAML manifest file with the desired specifications and apply it to the cluster using `kubectl apply`.
+You must create a YAML manifest file with the desired specifications and apply it to the cluster using `kubectl apply`. 
 
 - If successful, the capture job should spin up after you apply.
 - If not successful, no job will spin up. You can troubleshoot by checking the status of the CRD with `kubectl get capture <capture-crd-name> -o yaml`.

@@ -11,6 +11,7 @@ See the [overview](./01-overview.md#capture-jobs) for a description of how the c
 ## Prerequisites
 
 - [Install Retina CLI](../02-Installation/02-CLI.md)
+- Sufficient node storage for capture files when using the default `--host-path` output, unless a remote output location (blob, S3, or PVC) is configured instead.
 
 ### Cluster Access
 
@@ -24,20 +25,19 @@ The identity running `kubectl retina capture` commands needs Kubernetes RBAC per
 | `jobs` (batch/v1) | `create`, `get`, `list`, `delete` | namespace | Create/monitor/clean up the per-node capture Jobs |
 | `secrets` | `create`, `get`, `update`, `delete` | namespace | Stores the Blob SAS token mounted into capture pods |
 | `persistentvolumeclaims` | `get` | namespace | Only required when using `--pvc` (the PVC must already exist) |
-| `pods` `pods/exec` | `create`, `delete` / `create` | namespace | Only required for `kubectl retina capture download`, which uses a temporary pod to read files off the node |
+| `pods` | `create`, `delete` | namespace | Only required for `kubectl retina capture download`, which creates a temporary pod to read files off the node |
+| `pods/exec` | `create` | namespace | Only required for `kubectl retina capture download`, to stream file contents out of the temporary pod |
 
 ### Cluster Admission Policies
 
-Capture Jobs run their Pods with elevated settings in order to capture host traffic. If the cluster enforces restrictive admission policies, the capture namespace/workload must be allowed to use:
+Capture Jobs run their Pods with elevated settings in order to capture host traffic. If the cluster enforces restrictive admission policies (e.g. Azure Policy, Gatekeeper, Kyverno), the capture namespace/workload must be allowed to use:
 
 - **Host network** (`hostNetwork: true`) - required so the capture pod can see the node's network interfaces.
 - **Host IPC** (`hostIPC: true`) - required by the underlying capture tooling.
 - **`NET_ADMIN` and `SYS_ADMIN` Linux capabilities** - required to run the packet capture on the host's interfaces.
 - **The capture image's registry** - the default capture image is pulled from `ghcr.io/microsoft/retina/retina-agent`. If the cluster restricts pulls to an approved registry, either allow-list this image/registry, or mirror the image into your approved registry and override it via `RETINA_AGENT_IMAGE` (see [Debug mode](#debug-mode)).
 
-If your cluster denies any of these, the capture Job's pod will fail admission and the capture will not run. Work with your cluster/policy administrator to add an exception for the capture namespace or workload before retrying.
-
-- Sufficient node storage for capture files when using the default `--host-path` output, unless a remote output location (blob, S3, or PVC) is configured instead.
+If your cluster denies any of these, the capture Job's pod will fail admission and the capture will not run.
 
 ## Operations
 
