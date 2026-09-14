@@ -425,7 +425,10 @@ spec:
                       HostPath must be a relative subpath: absolute paths (e.g. "/tmp/foo",
                       "C:\\foo") and any value containing ".." segments are rejected by the
                       operator. CR authors cannot influence the base directory, which is
-                      controlled by the cluster operator via the operator config.
+                      controlled by the cluster operator via the operator config. HostPath must
+                      also not contain '<', '>', ':', '"', '|', '?', '*', '&', '^', '%', '!',
+                      '(', ')', or ASCII control characters.
+                    pattern: ^[^<>:"|?*\x00-\x1f&^%!()]*$
                     type: string
                   persistentVolumeClaim:
                     description: PersistentVolumeClaim mounts the supplied PVC into
