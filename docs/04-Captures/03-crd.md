@@ -32,7 +32,7 @@ If your cluster denies any of these, the capture Job's pod will fail admission â
 
 ## Usage
 
-You must create a YAML manifest file with the desired specifications and apply it to the cluster using `kubectl apply`. 
+You must create a YAML manifest file with the desired specifications and apply it to the cluster using `kubectl apply`.
 
 - If successful, the capture job should spin up after you apply.
 - If not successful, no job will spin up. You can troubleshoot by checking the status of the CRD with `kubectl get capture <capture-crd-name> -o yaml`.
