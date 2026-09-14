@@ -191,8 +191,8 @@ func TestCreateJobsWithNamespace(t *testing.T) {
 			wantNamespace:    "workload",
 			inputPodSelector: "service=A",
 			inputNsSelector:  "",
-			wantNodes:        []string{},
-			wantErr:          true,
+			wantNodes:        []string{"A1", "A2"},
+			wantErr:          false,
 		},
 		{
 			name:             "create --namespace=workload --namespace-selectors=name=workload",

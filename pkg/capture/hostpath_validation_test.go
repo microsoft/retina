@@ -31,6 +31,13 @@ func TestValidateHostPath(t *testing.T) {
 		{name: "traversal mid", raw: "foo/../bar", baseDir: base, wantErr: ErrHostPathTraversal},
 		{name: "traversal backslash", raw: `foo\..\bar`, baseDir: base, wantErr: ErrHostPathTraversal},
 		{name: "traversal escaping base", raw: "../../etc", baseDir: base, wantErr: ErrHostPathTraversal},
+		{name: "embedded double quote", raw: `pwn"whoami`, baseDir: base, wantErr: ErrHostPathInvalidChars},
+		{name: "embedded angle bracket", raw: "job<name", baseDir: base, wantErr: ErrHostPathInvalidChars},
+		{name: "embedded pipe", raw: "job|name", baseDir: base, wantErr: ErrHostPathInvalidChars},
+		{name: "embedded wildcard", raw: "job*name", baseDir: base, wantErr: ErrHostPathInvalidChars},
+		{name: "embedded colon", raw: "job:name", baseDir: base, wantErr: ErrHostPathInvalidChars},
+		{name: "embedded ampersand", raw: "pwn&whoami", baseDir: base, wantErr: ErrHostPathInvalidChars},
+		{name: "embedded dollar and parens", raw: "pwn$(id)", baseDir: base, wantErr: ErrHostPathInvalidChars},
 
 		// acceptance cases
 		{name: "bare name", raw: "retina", baseDir: base, want: base + "/retina"},
@@ -39,12 +46,18 @@ func TestValidateHostPath(t *testing.T) {
 		{name: "redundant separators cleaned", raw: "job//./out", baseDir: base, want: base + "/job/out"},
 		{name: "root base dir accepts subpath", raw: "captures", baseDir: "/", want: "/captures"},
 		{name: "root base dir accepts nested subpath", raw: "a/b", baseDir: "/", want: "/a/b"},
+		{name: "embedded space is valid", raw: "job name", baseDir: base, want: base + "/job name"},
+		{name: "embedded at sign is valid", raw: "job@name", baseDir: base, want: base + "/job@name"},
+		{name: "embedded plus is valid", raw: "job+name", baseDir: base, want: base + "/job+name"},
+		{name: "embedded dollar sign is valid", raw: "job$name", baseDir: base, want: base + "/job$name"},
+		{name: "unicode is valid", raw: "captüre", baseDir: base, want: base + "/captüre"},
 
 		// defaulting
 		{name: "default base used when empty", raw: "x", baseDir: "", want: DefaultHostPathBaseDir + "/x"},
 
 		// invalid base
 		{name: "relative base rejected", raw: "x", baseDir: "captures", wantErr: ErrHostPathBaseDir},
+		{name: "base dir with unsafe chars rejected", raw: "x", baseDir: base + "&evil", wantErr: ErrHostPathInvalidChars},
 	}
 
 	for _, tt := range tests {
