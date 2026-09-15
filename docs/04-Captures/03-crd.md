@@ -9,6 +9,26 @@ See the [overview](./01-overview.md#capture-jobs) for a description of how the c
 ## Prerequisites
 
 - [Install Retina](../02-Installation/01-Setup.md#capture-support) **with capture support**.
+- Sufficient node storage for capture files when using the default host-path output, unless a remote output location (blob, S3, or PVC) is configured instead.
+
+### Cluster Access
+
+Unlike the [CLI](./02-cli.md#cluster-access), the CRD flow doesn't require your own user/context to hold Job/Secret/Pod permissions — the Retina **operator's** ServiceAccount (granted via its Helm chart `ClusterRole`) creates and manages the underlying Jobs, Secrets, and Pods on your behalf. You only need permission to manage the CRD itself in the target namespace:
+
+| Resource | Verbs | Scope |
+|---|---|---|
+| `captures.retina.sh` | `create`, `get`, `list`, `delete` | namespace |
+
+### Cluster Admission Policies
+
+The operator translates each `Capture` into the same underlying Job/Pod spec used by the CLI, so the same elevated Pod settings are required. If the cluster enforces restrictive admission policies (e.g. Azure Policy, Gatekeeper, Kyverno), the capture namespace/workload must be allowed to use:
+
+- **Host network** (`hostNetwork: true`) - required so the capture pod can see the node's network interfaces.
+- **Host IPC** (`hostIPC: true`) - required by the underlying capture tooling.
+- **`NET_ADMIN` and `SYS_ADMIN` Linux capabilities** - required to run the packet capture on the host's interfaces.
+- **The capture image's registry** - the default capture image is pulled from `ghcr.io/microsoft/retina/retina-agent`. If the cluster restricts pulls to an approved registry, allow-list this image/registry or mirror it into your approved registry.
+
+If your cluster denies any of these, the capture Job's pod will fail admission — check `kubectl get capture <capture-crd-name> -o yaml` for job status, and the pod events in the target namespace for the denial reason.
 
 ## Usage
 
