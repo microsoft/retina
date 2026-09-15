@@ -5,7 +5,7 @@
 # host arch (fast). The eBPF .o files, which cannot be cleanly cross-compiled
 # by bpf2go, are produced in the separate `bpf-gen` stage below (which runs
 # at $TARGETPLATFORM — native on same-arch, emulated under QEMU otherwise).
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:9f6b5c480db643ca536db638fc0346b5a8424fd738c916db5db6443e68ad130e AS golang
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:3c78e9858004d1c43aea08829306c76c3bf870c26b98c8c07ea6ca74c54787cf AS golang
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
 FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260909@sha256:34a22db497ff34a0f35ca5fc54bd38711d04238a2c1b2f65d35dc9d45dd82584 AS azurelinux-core
@@ -20,7 +20,7 @@ FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20260909@sha256:f9aa243
 # .o files via bpf2go/clang — those require native target-arch execution and
 # cannot be cross-compiled from an amd64 host cleanly. Isolating this work in a
 # small dedicated stage keeps the rest of the build fast at $BUILDPLATFORM.
-FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:9f6b5c480db643ca536db638fc0346b5a8424fd738c916db5db6443e68ad130e AS bpf-gen
+FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:3c78e9858004d1c43aea08829306c76c3bf870c26b98c8c07ea6ca74c54787cf AS bpf-gen
 ARG GOOS=linux
 ARG GOARCH=amd64
 ENV GOOS=${GOOS}
