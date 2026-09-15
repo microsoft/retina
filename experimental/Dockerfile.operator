@@ -1,0 +1,24 @@
+# pinned base images
+
+# skopeo inspect docker://mcr.microsoft.com/azurelinux/base/rust:1.90 --format "{{.Name}}@{{.Digest}}"
+FROM mcr.microsoft.com/azurelinux/base/rust@sha256:23e2b2fff469b69ee755170d75b46053dff255250550679d3342d92bf33e3d8f AS rust
+
+# skopeo inspect docker://mcr.microsoft.com/azurelinux/distroless/minimal:3.0 --format "{{.Name}}@{{.Digest}}"
+FROM mcr.microsoft.com/azurelinux/distroless/minimal@sha256:0801b80a0927309572b9adc99bd1813bc680473175f6e8175cd4124d95dbd50c AS azurelinux-distroless
+
+# Build operator (stable Rust + protoc)
+FROM rust AS operator-builder
+RUN tdnf install -y \
+    protobuf-devel \
+    pkgconf-pkg-config \
+    && tdnf clean all
+WORKDIR /build
+COPY . .
+RUN cargo build --release --package retina-operator
+
+# Minimal runtime
+FROM azurelinux-distroless
+COPY --from=operator-builder /lib/ /lib
+COPY --from=operator-builder /usr/lib/ /usr/lib
+COPY --from=operator-builder /build/target/release/retina-operator /usr/local/bin/
+ENTRYPOINT ["retina-operator"]
