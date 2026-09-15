@@ -31,6 +31,7 @@ data:
     packetParserRingBuffer: {{ .Values.packetParserRingBuffer }}
     packetParserRingBufferSize: {{ .Values.packetParserRingBufferSize }}
     filterMapMaxEntries: {{ .Values.filterMapMaxEntries }}
+    enricherRingCapacity: {{ .Values.enricherRingCapacity }}
 {{- end}}
 ---
 {{- if .Values.os.windows}}

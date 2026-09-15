@@ -20,6 +20,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/cilium/cilium/pkg/hubble/container"
 	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/controllers/cache"
 	"github.com/microsoft/retina/pkg/enricher"
@@ -53,7 +54,7 @@ func main() {
 	defer cancel()
 
 	c := cache.New(pubsub.New())
-	e := enricher.New(ctx, c)
+	e := enricher.New(ctx, c, container.Capacity1023)
 	e.Run()
 
 	err = tt.Generate(ctxTimeout)

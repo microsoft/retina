@@ -10,6 +10,7 @@ import (
 	"time"
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
+	"github.com/cilium/cilium/pkg/hubble/container"
 	"github.com/cilium/cilium/pkg/hubble/testutils"
 	"github.com/cilium/cilium/pkg/monitor"
 	monitorAPI "github.com/cilium/cilium/pkg/monitor/api"
@@ -31,7 +32,7 @@ func TestStartError(t *testing.T) {
 	_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
 
 	c := cache.New(pubsub.New())
-	e := enricher.New(ctxTimeout, c)
+	e := enricher.New(ctxTimeout, c, container.Capacity1023)
 	e.Run()
 	defer e.Reader.Close()
 
