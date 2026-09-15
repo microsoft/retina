@@ -87,7 +87,7 @@ type packetparserPacket struct {
 	_                         [1]byte
 	Flags                     uint16
 	IsReply                   bool
-	_                         [1]byte
+	ReportReason              uint8
 	PreviouslyObservedPackets uint32
 	PreviouslyObservedBytes   uint32
 	PreviouslyObservedFlags   struct {

@@ -99,6 +99,34 @@ func GenerateDynamic(ctx context.Context, dynamicHeaderPath string, conntrackMet
 	return nil
 }
 
+// gcDeletion is an entry queued for garbage collection, carrying the reason classified
+// while its value was still available (the delete loop only has the key).
+type gcDeletion struct {
+	key    conntrackCtV4Key
+	reason string
+}
+
+// gcEntryReason classifies a conntrack entry removed by garbage collection, from its
+// protocol and the TCP flags seen across both directions.
+func gcEntryReason(proto uint8, value *conntrackCtEntry) string {
+	switch proto {
+	case 17: //nolint:gomnd // UDP
+		return "udp_idle"
+	case 6: //nolint:gomnd // TCP
+		flags := value.FlagsSeenTxDir | value.FlagsSeenRxDir
+		switch {
+		case flags&TCP_RST != 0:
+			return "tcp_rst"
+		case flags&TCP_FIN != 0:
+			return "tcp_fin"
+		default:
+			return "tcp_idle"
+		}
+	default:
+		return "other"
+	}
+}
+
 // Run starts the Conntrack garbage collection loop.
 func (ct *Conntrack) Run(ctx context.Context) error {
 	ticker := time.NewTicker(ct.gcFrequency)
@@ -123,12 +151,16 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 			var value conntrackCtEntry
 
 			var noOfCtEntries, entriesDeleted int
-			// List of keys to be deleted
-			var keysToDelete []conntrackCtV4Key
+			// List of entries to be deleted, with the reason captured while the value is available.
+			var keysToDelete []gcDeletion
 
 			// metrics counters
 			var packetsCountTx, packetsCountRx, totConnections uint32
 			var bytesCountTx, bytesCountRx uint64
+			// Live unknown-direction population (SYN never observed), e.g. connections
+			// established before tracking or recreated after LRU eviction.
+			var unknownDirectionEntries uint32
+			var unknownDirectionBytes uint64
 
 			iter := ct.ctMap.Iterate()
 			for iter.Next(&key, &value) {
@@ -138,7 +170,7 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 					// Iterating a hash map from which keys are being deleted is not safe.
 					// So, we store the keys to be deleted in a list and delete them after the iteration.
 					keyCopy := key // Copy the key to avoid using the same key in the next iteration
-					keysToDelete = append(keysToDelete, keyCopy)
+					keysToDelete = append(keysToDelete, gcDeletion{key: keyCopy, reason: gcEntryReason(key.Proto, &value)})
 				}
 				// Log the conntrack entry
 				srcIP := utils.Int2ip(key.SrcIp).To4()
@@ -155,6 +187,10 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 					bytesCountRx += ctMeta.BytesRxCount
 					packetsCountTx += ctMeta.PacketsTxCount
 					packetsCountRx += ctMeta.PacketsRxCount
+					if value.IsDirectionUnknown {
+						unknownDirectionEntries++
+						unknownDirectionBytes += ctMeta.BytesTxCount + ctMeta.BytesRxCount
+					}
 				}
 
 				ct.l.Debug("conntrack entry",
@@ -183,15 +219,19 @@ func (ct *Conntrack) Run(ctx context.Context) error {
 				metrics.ConntrackPacketsRx.WithLabelValues().Set(float64(packetsCountRx))
 				metrics.ConntrackBytesRx.WithLabelValues().Set(float64(bytesCountRx))
 				metrics.ConntrackTotalConnections.WithLabelValues().Set(float64(totConnections))
+				metrics.ConntrackUnknownDirectionConnections.WithLabelValues().Set(float64(unknownDirectionEntries))
+				metrics.ConntrackUnknownDirectionBytes.WithLabelValues().Set(float64(unknownDirectionBytes))
 			}
 
 			// Delete the conntrack entries
-			for _, key := range keysToDelete {
-				if err := ct.ctMap.Delete(key); err != nil {
-					// Should only happen in a high connection churn scenario
+			for _, d := range keysToDelete {
+				if err := ct.ctMap.Delete(d.key); err != nil {
+					// Should only happen in a high connection churn scenario, e.g. the entry was
+					// already deleted in-kernel on connection teardown between iteration and now.
 					ct.l.Debug("Delete failed", zap.Error(err))
 				} else {
 					entriesDeleted++
+					metrics.ConntrackGCEntriesCounter.WithLabelValues(d.reason).Inc()
 				}
 			}
 			ct.l.Debug("conntrack GC completed", zap.Int("number_of_entries", noOfCtEntries), zap.Int("entries_deleted", entriesDeleted))
