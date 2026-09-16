@@ -9,6 +9,7 @@ import (
 
 	"github.com/cilium/cilium/api/v1/flow"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
+	"github.com/cilium/cilium/pkg/hubble/container"
 	"github.com/microsoft/retina/pkg/controllers/cache"
 	"github.com/microsoft/retina/pkg/enricher"
 	"github.com/microsoft/retina/pkg/log"
@@ -26,7 +27,7 @@ func main() {
 	ctx := context.Background()
 	c := cache.New(pubsub.New())
 
-	e := enricher.New(ctx, c)
+	e := enricher.New(ctx, c, container.Capacity1023)
 
 	e.Run()
 

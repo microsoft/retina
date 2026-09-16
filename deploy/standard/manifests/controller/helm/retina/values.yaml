@@ -73,6 +73,9 @@ packetParserRingBufferSize: 8388608
 # This map tracks IP addresses of pods of interest for network observability.
 # Default: 255. Increase for large clusters with many tracked pods.
 filterMapMaxEntries: 255
+# Capacity of the enricher flow ring buffer. Must be one less than a power of two
+# (e.g. 1023, 4095, 65535). Default: 1023. Increase to absorb bursts and reduce enricher_ring drops.
+enricherRingCapacity: 1023
 
 imagePullSecrets: []
 nameOverride: "retina"
