@@ -1,0 +1,239 @@
+# retina CI pipeline for pull requests from forks (Azure DevOps).
+#
+# ci.yml extends the OneBranch template. OneBranch validates every run with
+# the pipeline access token, and Azure DevOps restricts that token for pull
+# requests from forks, so the OneBranch pipeline cannot build them. This file
+# is a second Azure DevOps pipeline with the same name, "CI (Build Images)".
+# It builds fork pull requests on the Microsoft-hosted pool, without a push
+# and without secrets, the same as a pull request dry run in ci.yml.
+#
+# Both pipelines trigger on every pull request to main. Every job here has
+# the condition System.PullRequest.IsFork == True:
+#   - Pull request from this repository -> every job is skipped. A skipped
+#     job posts no check, so only ci.yml posts the checks.
+#   - Pull request from a fork -> ci.yml does not run (its trigger excludes
+#     forks), and this pipeline posts the checks that main requires:
+#       CI (Build Images) (Build Agent Images - Linux amd64|arm64)
+#       CI (Build Images) (Build Agent Image - Windows 2022)
+#       CI (Build Images) (Build Operator Images amd64|arm64)
+#       CI (Build Images) (Build Retina Shell Images amd64|arm64)
+#       CI (Build Images) (Build Kubectl Retina Images amd64|arm64)
+#       CI (Build Images) (Run E2E Tests)
+#
+# Required ADO pipeline configuration:
+#   Name: CI (Build Images), in a different folder than the OneBranch pipeline.
+#     Azure DevOps names a GitHub check after the pipeline and the job, so the
+#     names must match the OneBranch pipeline.
+#   Triggers: pull requests only. Keep "Build pull requests from forks of this
+#     repository" on. The project policy requires a comment from a team member
+#     before a fork pull request builds.
+#   No variables and no service connections.
+
+trigger: none
+
+pr:
+  branches:
+    include:
+      - main
+
+variables:
+  - name: imageNamespace
+    value: microsoft/retina
+
+jobs:
+
+  - job: retina_images
+    displayName: Build Agent Images - Linux
+    condition: eq(variables['System.PullRequest.IsFork'], 'True')
+    timeoutInMinutes: 60
+    strategy:
+      matrix:
+        amd64:
+          arch: amd64
+        arm64:
+          arch: arm64
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+      - checkout: self
+        fetchDepth: 0
+      - template: steps/free-disk-space.yml
+      - bash: make qemu-user-static
+        displayName: Set up QEMU
+      - template: steps/setup-go.yml
+      - bash: |
+          set -euo pipefail
+          TAG=$(make version)
+          make retina-image \
+            IMAGE_NAMESPACE=$(imageNamespace) \
+            PLATFORM=linux/$(arch) \
+            TAG=$TAG
+        displayName: Build retina image
+
+  - job: build_windows_binaries
+    displayName: Build Windows Binaries
+    condition: eq(variables['System.PullRequest.IsFork'], 'True')
+    timeoutInMinutes: 30
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+      - checkout: self
+        fetchDepth: 0
+      - template: steps/setup-go.yml
+      - bash: |
+          set -euo pipefail
+          TAG=$(make version)
+          make build-windows-binaries \
+            GOOS=windows \
+            GOARCH=amd64 \
+            TAG=$TAG
+        displayName: make build-windows-binaries
+      - task: PublishPipelineArtifact@1
+        inputs:
+          targetPath: output/windows_amd64/
+          artifactName: windows-binaries
+
+  - job: retina_image_win
+    displayName: Build Agent Image - Windows 2022
+    condition: and(succeeded(), eq(variables['System.PullRequest.IsFork'], 'True'))
+    dependsOn: build_windows_binaries
+    timeoutInMinutes: 60
+    pool:
+      vmImage: windows-2022
+    variables:
+      year: '2022'
+      arch: amd64
+      platform: windows
+    steps:
+      - checkout: self
+        fetchDepth: 0
+      - task: DownloadPipelineArtifact@2
+        inputs:
+          artifactName: windows-binaries
+          targetPath: output/windows_amd64/
+      - powershell: |
+          $timeout = 120
+          $timer = [Diagnostics.Stopwatch]::StartNew()
+          while ($timer.Elapsed.TotalSeconds -lt $timeout) {
+            $svc = Get-Service docker -ErrorAction SilentlyContinue
+            if ($svc -and $svc.Status -ne 'Running') {
+              Start-Service docker -ErrorAction SilentlyContinue
+            }
+            $result = docker info 2>&1
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "Docker daemon is ready"
+              return
+            }
+            Write-Host "Waiting for Docker daemon to start..."
+            Start-Sleep -Seconds 5
+          }
+          throw "Docker daemon failed to start within $timeout seconds"
+        displayName: Ensure Docker daemon is running
+      - bash: |
+          set -euo pipefail
+          TAG=$(make version)
+          make retina-image-win \
+            IMAGE_NAMESPACE=$(imageNamespace) \
+            PLATFORM=$(platform)/$(arch) \
+            WINDOWS_YEARS=$(year) \
+            BINARIES_PATH=output/windows_$(arch) \
+            REPO_PATH=. \
+            TAG=$TAG
+        displayName: Build retina Windows image
+
+  - job: operator_images
+    displayName: Build Operator Images
+    condition: eq(variables['System.PullRequest.IsFork'], 'True')
+    timeoutInMinutes: 60
+    strategy:
+      matrix:
+        amd64:
+          arch: amd64
+        arm64:
+          arch: arm64
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+      - checkout: self
+        fetchDepth: 0
+      - template: steps/free-disk-space.yml
+      - bash: make qemu-user-static
+        displayName: Set up QEMU
+      - template: steps/setup-go.yml
+      - bash: |
+          set -euo pipefail
+          TAG=$(make version)
+          make retina-operator-image \
+            IMAGE_NAMESPACE=$(imageNamespace) \
+            PLATFORM=linux/$(arch) \
+            TAG=$TAG
+        displayName: Build operator image
+
+  - job: retina_shell_images
+    displayName: Build Retina Shell Images
+    condition: eq(variables['System.PullRequest.IsFork'], 'True')
+    timeoutInMinutes: 60
+    strategy:
+      matrix:
+        amd64:
+          arch: amd64
+        arm64:
+          arch: arm64
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+      - checkout: self
+        fetchDepth: 0
+      - template: steps/free-disk-space.yml
+      - bash: make qemu-user-static
+        displayName: Set up QEMU
+      - template: steps/setup-go.yml
+      - bash: |
+          set -euo pipefail
+          TAG=$(make version)
+          make retina-shell-image \
+            IMAGE_NAMESPACE=$(imageNamespace) \
+            PLATFORM=linux/$(arch) \
+            TAG=$TAG
+        displayName: Build retina-shell image
+
+  - job: kubectl_retina_images
+    displayName: Build Kubectl Retina Images
+    condition: eq(variables['System.PullRequest.IsFork'], 'True')
+    timeoutInMinutes: 60
+    strategy:
+      matrix:
+        amd64:
+          arch: amd64
+        arm64:
+          arch: arm64
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+      - checkout: self
+        fetchDepth: 0
+      - template: steps/free-disk-space.yml
+      - bash: make qemu-user-static
+        displayName: Set up QEMU
+      - template: steps/setup-go.yml
+      - bash: |
+          set -euo pipefail
+          TAG=$(make version)
+          make kubectl-retina-image \
+            IMAGE_NAMESPACE=$(imageNamespace) \
+            PLATFORM=linux/$(arch) \
+            TAG=$TAG
+        displayName: Build kubectl-retina image
+
+  # Fork pull requests publish no images, so there is nothing to test. Main
+  # requires the check "CI (Build Images) (Run E2E Tests)" on every pull
+  # request, and Azure DevOps posts no check for a skipped job. A server job
+  # with the same name posts the check in seconds.
+  - job: e2e
+    displayName: Run E2E Tests
+    condition: eq(variables['System.PullRequest.IsFork'], 'True')
+    pool: server
+    steps:
+      - task: Delay@1
+        inputs:
+          delayForMinutes: '0'
