@@ -93,9 +93,13 @@ Possible values for TCP `state`:
 Possible values for `statistic_name` (for metric `tcp_connection_stats`):
 
 - `TCPTimeouts`
-- `TCPTSReorder`
-- `ResetCount`
+- `TCPLossProbes`
+- `TCPLostRetransmit`
 - and many others (full list [here](../plugins/Linux/linuxutil.md#label-values-for-tcp_connection_stats))
+
+> **Note:** Linux emits only non-zero values from the current `linuxutil`
+> allowlist. For example, `TCPTSReorder` may exist in `/proc/net/netstat`, but
+> it is not currently emitted.
 
 Possible values for `statistic_name` (for metric `ip_connection_stats`):
 
@@ -120,6 +124,12 @@ Possible values for `statistic_name` (for metric `interface_stats`):
 - `tx_send_full`
 - and many others (as seen by running `ethtool -S <interface_name>` on the Node)
 
+> **Note:** For `interface_stats` only, Retina exports an `ethtool -S` counter
+> when its value is greater than zero and its name contains `err` or `drop`.
+> Retina adds matching values from all supported interfaces together and sets
+> `interface_name="all_interfaces"`. If no counter matches both conditions,
+> the metric has no series.
+
 ### Plugin: `dns` (Linux)
 
 Metrics enabled when `dns` plugin is enabled (see [Metrics Configuration](../configuration.md)).
@@ -141,14 +151,15 @@ Metrics enabled when `conntrack` plugin is enabled and `enableConntrackMetrics` 
 | `conntrack_bytes_rx`         | Total bytes received tracked by conntrack        |              |
 | `conntrack_total_connections`| Total number of tracked connections              |              |
 
-### Node Connectivity Metrics (Linux/Windows)
+### Node Connectivity Metrics (Deprecated)
 
-These metrics are available when node connectivity monitoring is enabled.
+| Metric Name                         | Description                                   | Extra Labels                           |
+| ----------------------------------- | --------------------------------------------- | -------------------------------------- |
+| `node_connectivity_status`          | Deprecated connectivity status between nodes | `source_node_name`, `target_node_name` |
+| `node_connectivity_latency_seconds` | Deprecated latency in seconds between nodes   | `source_node_name`, `target_node_name` |
 
-| Metric Name                          | Description                                           | Extra Labels                         |
-| ------------------------------------ | ----------------------------------------------------- | ------------------------------------ |
-| `node_connectivity_status`           | Connectivity status between nodes (1=connected, 0=not)| `source_node_name`, `target_node_name` |
-| `node_connectivity_latency_seconds`  | Latency in seconds between nodes                      | `source_node_name`, `target_node_name` |
+> **Note:** These collectors remain registered for compatibility, but the
+> current agent does not populate them, so they expose no metric series.
 
 ### Plugin: `hnsstats` (Windows)
 
@@ -186,6 +197,12 @@ Possible values for `statistic_name` (for metric `tcp_connection_stats`):
 - `Verified`
 - `TimedOutCount`
 - `TimeWaitExpiredCount`
+
+> **Note:** `ResetCount` appears as
+> `networkobservability_tcp_connection_stats{statistic_name="ResetCount"}`.
+> These connection statistics are inbound node-level gauges without a
+> `direction` label. `tcp_flag_gauges` is separate and includes both ingress
+> and egress VFP packet counters.
 
 Possible values for TCP `flag`:
 
