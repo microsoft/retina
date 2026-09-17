@@ -299,7 +299,8 @@ spec:
                       podNames:
                         description: |-
                           PodNames allows selecting specific pods by their names.
-                          If specified, the capture will be performed on the pods with matching names in the specified namespace.
+                          If specified, the capture will be performed on the pods with matching names in the
+                          Capture resource's own namespace.
                           PodNames is incompatible with NodeSelector, NamespaceSelector, and PodSelector.
                         items:
                           type: string
@@ -308,6 +309,8 @@ spec:
                         description: |-
                           This is a label selector which selects Pods. This field follows standard label
                           selector semantics.
+                          If NamespaceSelector is not set, the search for matching Pods is scoped to the
+                          Capture resource's own namespace.
                         properties:
                           matchExpressions:
                             description: matchExpressions is a list of label selector
