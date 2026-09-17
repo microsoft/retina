@@ -2,7 +2,7 @@
 # its standard library tracks the golang base image instead of the upstream
 # release cadence. Upstream publishes binaries only on tags.
 # skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:3c78e9858004d1c43aea08829306c76c3bf870c26b98c8c07ea6ca74c54787cf AS pwru-build
+FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:13a693fd5c7f7501ff91f3b941911de66dfabe1b36583ab2f711a907c1400731 AS pwru-build
 RUN tdnf install -y make git clang llvm gcc glibc-static gawk file flex bison tar diffutils
 # https://github.com/cilium/pwru/releases/tag/v1.0.12
 ARG PWRU_COMMIT=f1d6cf8898953ac1560401e181f3ac5f0e33b486
