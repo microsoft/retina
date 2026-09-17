@@ -31,6 +31,7 @@ FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260825@sha256:daa1142fc6b44e27
 RUN tdnf install -y \
 	bind-utils \
 	conntrack \
+	cri-tools \
 	curl \
 	ebtables-legacy \
 	ethtool \
@@ -42,6 +43,7 @@ RUN tdnf install -y \
 	jq \
 	ldns-utils \
 	less \
+	nano \
 	net-tools \
 	nftables \
 	nmap \
@@ -57,7 +59,11 @@ RUN tdnf install -y \
 	bpftool \
 	bpftrace \
 	ig \
-	&& tdnf clean all
+	&& tdnf clean all \
+	# cri-tools also installs critest, a CRI conformance suite binary as large
+	# as crictl itself and with no use in a debug shell. Remove it in the same
+	# layer so the image does not store it.
+	&& rm /usr/bin/critest
 
 # Create the entrypoint script to mount debugfs and tracefs
 SHELL ["/bin/bash", "-c"]
@@ -75,6 +81,19 @@ exec "$@"' > /usr/local/bin/entrypoint.sh;
 ENV HOST_ROOT=/host
 
 RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# Point crictl at the containerd socket, which is exposed under /run when the
+# shell is started with --mount-host-filesystem. Override with
+# `crictl --runtime-endpoint` on clusters running a different CRI implementation.
+RUN echo $'runtime-endpoint: unix:///run/containerd/containerd.sock\n\
+image-endpoint: unix:///run/containerd/containerd.sock\n\
+timeout: 10' > /etc/crictl.yaml
+
+# crictl logs opens the kubelet's log files at /var/log/pods itself; the CRI
+# API does not stream log content. The files exist only on the host, so
+# resolve the path through the read-only /host mount. The link dangles
+# harmlessly when --mount-host-filesystem is not set.
+RUN ln -s /host/var/log/pods /var/log/pods
 
 # Set the entrypoint
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
