@@ -6,4 +6,5 @@ import (
 	_ "github.com/microsoft/retina/pkg/plugin/ebpfwindows"
 	_ "github.com/microsoft/retina/pkg/plugin/hnsstats"
 	_ "github.com/microsoft/retina/pkg/plugin/pktmon"
+	_ "github.com/microsoft/retina/pkg/plugin/windowsebpf"
 )
