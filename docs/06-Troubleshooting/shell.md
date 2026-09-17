@@ -4,7 +4,7 @@
 
 The `retina shell` command allows you to start an interactive shell on a Kubernetes node or pod for adhoc debugging.
 
-This runs a container image built from the Dockerfile in the `/shell` directory, with many common networking tools installed (`ping`, `curl`, etc.), as well as specialized tools such as [bpftool](#bpftool), [bpftrace](#bpftrace) [pwru](#pwru) or [Inspektor Gadget](#inspektor-gadget-ig).
+This runs a container image built from the Dockerfile in the `/shell` directory, with many common networking tools installed (`ping`, `curl`, etc.), as well as specialized tools such as [bpftool](#bpftool), [bpftrace](#bpftrace), [pwru](#pwru), [hotspot-bpf](#hotspot-bpf), or [Inspektor Gadget](#inspektor-gadget-ig).
 
 Currently the Retina Shell only works in Linux environments. Windows support will be added in the future.
 
@@ -285,6 +285,44 @@ You can then run for example:
 ig -h
 ig run trace_dns:latest
 ```
+
+## [hotspot-bpf](https://github.com/SRodi/hotspot-bpf)
+
+eBPF performance lens for real-time root-cause diagnosis of Linux processes. hotspot-bpf correlates CPU time, scheduler contention, page-fault pressure, and RSS growth in a single terminal view, automatically classifying processes into diagnoses such as **CPU-bound**, **Starved**, **Noisy neighbor**, **Mem-thrashing**, or **OOM risk**.
+
+Requires the `SYS_ADMIN` and `PERFMON` capabilities (for eBPF program loading).
+
+```shell
+kubectl retina shell <node-name> --capabilities=SYS_ADMIN,PERFMON
+```
+
+You can then run for example:
+
+```shell
+# Run with default settings (5s sampling window, top 10 processes)
+hotspot -interval 5s -topk 5
+
+# Filter by cgroup (useful for targeting specific pods)
+hotspot -interval 5s -cgroup-filter <cgroup-substring>
+```
+
+### Custom thresholds
+
+All diagnosis thresholds are configurable via a YAML config file. To generate the default configuration as a starting point:
+
+```shell
+hotspot -generate-config > /tmp/thresholds.yaml
+```
+
+Edit the file to adjust thresholds for your environment, then pass it at runtime:
+
+```shell
+hotspot -config /tmp/thresholds.yaml -interval 5s
+```
+
+Any value not specified in the file retains its compiled-in default. This is especially useful on **multi-core machines** where single-threaded workloads produce low system-wide CPU percentages — lowering the thresholds helps avoid missed classifications.
+
+For detailed information on all configurable parameters, see the [hotspot-bpf documentation](https://github.com/SRodi/hotspot-bpf#custom-thresholds).
 
 ## [mpstat](https://www.man7.org/linux/man-pages/man1/mpstat.1.html)
 
