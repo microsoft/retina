@@ -1,0 +1,21 @@
+# Kernel profiles for the bpfcompat compatibility lane.
+#
+# Chosen to cover the kernels Retina realistically runs on plus one older
+# enterprise kernel that sits below the fexit threshold documented in
+# pkg/plugin/dropreason/ebpfsetup_linux.go (amd64 >= 5.5).
+#
+# required: false means a failure on that kernel is reported but does not fail
+# the lane. The lane is scheduled and advisory, so nothing here gates a merge.
+name: retina-ebpf-kernel-compatibility
+profiles:
+  - id: ubuntu-22.04-5.15
+    required: true
+  - id: ubuntu-24.04-6.8
+    required: true
+  - id: debian-12-6.1
+    required: true
+  - id: centos-stream-9-5.14
+    required: false
+  # RHEL-family 4.18: below the fexit threshold and a known CO-RE boundary.
+  - id: almalinux-8-4.18
+    required: false
