@@ -467,7 +467,13 @@ jobs:
 
   - job: e2e
     displayName: Run E2E Tests
-    condition: succeeded()
+    # Allow PR dry runs with skipped prerequisites to publish the required E2E check.
+    condition: |
+      and(
+        not(canceled()),
+        in(dependencies.manifests.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.event_writer_image.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')
+      )
     dependsOn:
       - manifests
       - event_writer_image
@@ -504,7 +510,7 @@ jobs:
               -image-namespace=$(imageNamespace)
       - task: AzureCLI@2
         displayName: Cleanup resource group
-        condition: always()
+        condition: and(always(), eq(variables['publishImagesAndRunE2E'], 'True'))
         inputs:
           azureSubscription: $(azureServiceConnection)
           scriptType: bash
