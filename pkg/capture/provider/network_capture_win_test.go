@@ -125,16 +125,12 @@ func TestValidateNetshFilter(t *testing.T) {
 // TestStopNetworkCapture_ContextIndependence verifies stopNetworkCapture creates its own context
 func TestStopNetworkCapture_ContextIndependence(t *testing.T) {
 	now := metav1.Now()
-	ncp := &NetworkCaptureProvider{
-		NetworkCaptureProviderCommon: NetworkCaptureProviderCommon{
-			TmpCaptureDir: t.TempDir(),
-			l:             log.Logger().Named("test-capture"),
-		},
-		Filename: file.CaptureFilename{
-			CaptureName:    "test-capture",
-			NodeHostname:   "test-node",
-			StartTimestamp: &now,
-		},
+	ncp := NewNetworkCaptureProvider(log.Logger().Named("test-capture")).(*NetworkCaptureProvider)
+	ncp.TmpCaptureDir = t.TempDir()
+	ncp.Filename = file.CaptureFilename{
+		CaptureName:    "test-capture",
+		NodeHostname:   "test-node",
+		StartTimestamp: &now,
 	}
 
 	// Create an expired context (simulating capture duration ending)
