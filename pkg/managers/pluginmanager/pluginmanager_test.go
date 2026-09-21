@@ -16,6 +16,7 @@ import (
 	"github.com/microsoft/retina/pkg/metrics"
 	"github.com/microsoft/retina/pkg/plugin"
 	pluginmock "github.com/microsoft/retina/pkg/plugin/mock"
+	_ "github.com/microsoft/retina/pkg/plugin/mockplugin"
 	"github.com/microsoft/retina/pkg/telemetry"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
