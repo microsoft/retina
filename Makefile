@@ -458,6 +458,11 @@ COVER_PKG ?= .
 test: # Run unit tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit,dashboard -skip=TestE2E* -coverprofile=coverage.out -v ./...
 
+.PHONY: test-windows
+test-windows: export KUBEBUILDER_ASSETS := $(shell $(ENVTEST) use -p path)
+test-windows: # Run unit tests on Windows.
+	go test -tags=unit,dashboard -skip=TestE2E* -count=1 -v ./...
+
 .PHONY: test-ebpf
 test-ebpf: # Run eBPF program tests (requires root/CAP_BPF).
 	sudo $$(which go) test -tags=ebpf -v -count=1 ./pkg/plugin/...
