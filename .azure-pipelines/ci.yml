@@ -177,6 +177,11 @@ extends:
               type: linux
             variables:
               ob_outputDirectory: $(Build.SourcesDirectory)/out
+              # Dry runs embed no telemetry key, the same as the Linux image jobs.
+              ${{ if or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}:
+                appInsightsId: $(AZURE_APP_INSIGHTS_KEY)
+              ${{ else }}:
+                appInsightsId: ''
             steps:
               - bash: |
                   set -euo pipefail
@@ -189,7 +194,7 @@ extends:
                   cp output/windows_amd64/*.exe "$(ob_outputDirectory)/windows_amd64/"
                 displayName: make build-windows-binaries
                 env:
-                  APP_INSIGHTS_ID: $(AZURE_APP_INSIGHTS_KEY)
+                  APP_INSIGHTS_ID: $(appInsightsId)
 
           - job: retina_windows
             displayName: Agent Image - Windows 2022
@@ -360,12 +365,18 @@ extends:
 
       - stage: test
         displayName: Run
-        dependsOn: build
+        # On pull requests the stage does not wait for the build stage, so
+        # the e2e check posts when the run starts. A failed build still
+        # blocks the merge through its own check.
+        ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+          dependsOn: []
+        ${{ else }}:
+          dependsOn: build
         jobs:
           # PR builds publish no images, so there is nothing to test. Main
           # requires the check "CI (Build Images) (Run E2E Tests)" on every
           # pull request, and Azure DevOps posts no check for a skipped job.
-          # A server job with the same name posts the check in seconds.
+          # A server job with the same name posts the check.
           - ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
             - job: e2e
               displayName: E2E Tests
