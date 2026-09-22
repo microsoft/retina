@@ -63,18 +63,19 @@ func TestWindowsFileCheckCommandResistsInjection(t *testing.T) {
 		})
 	}
 
-	// Demonstrates why '&' must stay in UnsafePathChars: unlike the Linux
-	// script, cmd.exe has no mechanism that would neutralize it here.
+	// Go must quote the path argument so cmd.exe treats metacharacters as part
+	// of the path rather than as command operators. UnsafePathChars remains a
+	// defense-in-depth check before this command is constructed.
 	proofFile := filepath.Join(dir, "pwned")
 	injected := filepath.Join(dir, "pwn&(echo hi>"+proofFile+")")
 	cmd := exec.CommandContext(t.Context(), cmdPath, "/c", "if", "exist", injected,
-		"echo", fileExistsMarker) // #nosec G204 -- shows why '&' must be denied upstream, not a reachable download path
+		"echo", fileExistsMarker) // #nosec G204 -- fixed test input verifies argument escaping
 	if output, err := cmd.CombinedOutput(); err != nil {
 		// Non-zero exit is fine here; only proofFile's existence matters.
 		t.Logf("cmd exited non-zero: %v (output: %s)", err, output)
 	}
 
-	if _, statErr := os.Stat(proofFile); statErr != nil {
-		t.Fatal("expected the '&' payload to execute via cmd.exe, proving UnsafePathChars must reject it before this command is built")
+	if _, statErr := os.Stat(proofFile); !os.IsNotExist(statErr) {
+		t.Fatalf("cmd.exe interpreted path metacharacters as commands; proof file stat error: %v", statErr)
 	}
 }
