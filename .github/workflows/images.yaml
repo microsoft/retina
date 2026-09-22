@@ -32,6 +32,12 @@ jobs:
   event-writer-image:
     name: Build E2E Event Writer Image
     if: ${{ github.event_name == 'merge_group' }}
+    # The called workflow declares packages: write. A called workflow cannot
+    # hold more permissions than the calling job, so the job has to grant it.
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
     uses: ./.github/workflows/e2e-test-event-writer.yml
     secrets: inherit
 
