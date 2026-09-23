@@ -9,4 +9,8 @@ There are two control planes used in the Retina project: Hubble and the Standard
 1. [Hubble metrics](./02-hubble_metrics.md)
 2. [Standard metrics](./modes/modes.md)
 
+## Additional Resources
+
+- [Drop Statistics Comparison](./drop-statistics-comparison.md) - Compare Retina's drop statistics with other OSS monitoring tools
+
 > Note: Hubble offers additional features and metrics that the Standard control plane does not support. The plan is to deprecate the Standard control plane in favor of Hubble. For further documentation on Hubble, check [Cilium/Hubble repository](https://github.com/cilium/hubble/?tab=readme-ov-file#features) and official [Hubble metrics documentation](https://docs.cilium.io/en/stable/observability/metrics/#hubble-metrics)
