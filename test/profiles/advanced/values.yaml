@@ -1,5 +1,6 @@
 enablePodLevel: true
 enableAnnotations: true
+enabledPlugin_win: '["hnsstats"]'
 packetParserRingBuffer: "enabled"
 operator:
   enabled: true

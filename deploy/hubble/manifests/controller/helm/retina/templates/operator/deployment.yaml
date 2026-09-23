@@ -48,8 +48,7 @@ spec:
       tolerations: {{- toYaml .Values.operator.tolerations | nindent 8 }}
       {{- end }}
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
+        {{- toYaml .Values.operator.podSecurityContext | nindent 8 }}
       containers:
         - image: {{ .Values.operator.repository }}:{{ .Values.operator.tag }}
           imagePullPolicy: {{ .Values.operator.pullPolicy }}
@@ -85,10 +84,7 @@ spec:
             - name: retina-operator-config
               mountPath: /retina/
           securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - "ALL"
+            {{- toYaml .Values.operator.securityContext | nindent 12 }}
           # livenessProbe:
           #   httpGet:
           #     path: /healthz
@@ -102,12 +98,7 @@ spec:
           #   initialDelaySeconds: 5
           #   periodSeconds: 10
           resources:
-            limits:
-              cpu: 500m
-              memory: 500Mi
-            requests:
-              cpu: 250m
-              memory: 250Mi
+            {{- toYaml .Values.operator.resources | nindent 12 }}
       serviceAccountName: retina-operator
       {{- if .Values.operator.priorityClassName }}
       priorityClassName: {{ .Values.operator.priorityClassName }}

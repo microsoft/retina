@@ -38,6 +38,24 @@ operator:
   leaderElectionNamespace: ""
   # -- Additional labels for retina-operator pods
   podLabels: {}
+  # -- Resource requests and limits for the retina-operator container.
+  resources:
+    limits:
+      cpu: 500m
+      memory: 500Mi
+    requests:
+      cpu: 250m
+      memory: 250Mi
+  # -- retina-operator pod-level security context.
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+  # -- retina-operator container-level security context.
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
 
 agent:
   leaderElection: false

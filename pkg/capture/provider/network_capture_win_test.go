@@ -7,7 +7,6 @@ package provider
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -125,16 +124,12 @@ func TestValidateNetshFilter(t *testing.T) {
 // TestStopNetworkCapture_ContextIndependence verifies stopNetworkCapture creates its own context
 func TestStopNetworkCapture_ContextIndependence(t *testing.T) {
 	now := metav1.Now()
-	ncp := &NetworkCaptureProvider{
-		NetworkCaptureProviderCommon: NetworkCaptureProviderCommon{
-			TmpCaptureDir: t.TempDir(),
-			l:             log.Logger().Named("test-capture"),
-		},
-		Filename: file.CaptureFilename{
-			CaptureName:    "test-capture",
-			NodeHostname:   "test-node",
-			StartTimestamp: &now,
-		},
+	ncp := NewNetworkCaptureProvider(log.Logger().Named("test-capture")).(*NetworkCaptureProvider)
+	ncp.TmpCaptureDir = t.TempDir()
+	ncp.Filename = file.CaptureFilename{
+		CaptureName:    "test-capture",
+		NodeHostname:   "test-node",
+		StartTimestamp: &now,
 	}
 
 	// Create an expired context (simulating capture duration ending)
@@ -156,41 +151,38 @@ func TestStopNetworkCapture_ContextIndependence(t *testing.T) {
 	t.Logf("StopNetworkCapture uses independent context (netsh error expected: %v)", err)
 }
 
-func TestCaptureNetworkPacketZeroDurationDoesNotCancelContext(t *testing.T) {
-	// When duration=0 (e.g., rotating captures without a time limit),
-	// CaptureNetworkPacket must NOT wrap the context with a zero timeout,
-	// which would cancel immediately and prevent any capture from running.
+func TestCaptureNetworkPacketZeroDurationWaitsForContextCancellation(t *testing.T) {
 	_, _ = log.SetupZapLogger(log.GetDefaultLogOpts())
 	now := metav1.Now()
-	ncp := &NetworkCaptureProvider{
-		NetworkCaptureProviderCommon: NetworkCaptureProviderCommon{
-			l: log.Logger().Named("test-capture"),
-		},
-		TmpCaptureDir: t.TempDir(),
-		Filename: file.CaptureFilename{
-			CaptureName:    "test-zero-duration",
-			NodeHostname:   "test-node",
-			StartTimestamp: &now,
-		},
-		l: log.Logger().Named("test-capture"),
+	ncp := NewNetworkCaptureProvider(log.Logger().Named("test-capture")).(*NetworkCaptureProvider)
+	ncp.TmpCaptureDir = t.TempDir()
+	ncp.Filename = file.CaptureFilename{
+		CaptureName:    "test-zero-duration",
+		NodeHostname:   "test-node",
+		StartTimestamp: &now,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	ctx, cancel := context.WithCancel(context.Background())
+	result := make(chan error, 1)
+	go func() {
+		result <- ncp.CaptureNetworkPacket(ctx, "", 0, 100, 0)
+	}()
 
-	// Call with duration=0 — this should NOT cancel the context immediately.
-	// It will fail because netsh isn't available in the test environment,
-	// but the error should NOT be "context deadline exceeded".
-	err := ncp.CaptureNetworkPacket(ctx, "", 0, 100, 0)
-
-	if err != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		t.Fatal("duration=0 caused immediate context cancellation — the zero-timeout bug is present")
+	select {
+	case err := <-result:
+		t.Fatalf("duration=0 capture stopped before its context was cancelled: %v", err)
+	case <-time.After(time.Second):
 	}
 
-	// The context should still be valid (not expired) after the call
 	if ctx.Err() != nil {
-		t.Fatalf("Parent context should not be cancelled, but got: %v", ctx.Err())
+		t.Fatalf("capture cancelled its parent context: %v", ctx.Err())
 	}
 
-	t.Logf("duration=0 correctly skips context timeout wrapping (netsh error expected: %v)", err)
+	cancel()
+	select {
+	case err := <-result:
+		t.Logf("capture stopped after explicit context cancellation: %v", err)
+	case <-time.After(35 * time.Second):
+		t.Fatal("capture did not stop after its context was cancelled")
+	}
 }

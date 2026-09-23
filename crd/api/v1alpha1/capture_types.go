@@ -193,11 +193,14 @@ type CaptureTarget struct {
 
 	// This is a label selector which selects Pods. This field follows standard label
 	// selector semantics.
+	// If NamespaceSelector is not set, the search for matching Pods is scoped to the
+	// Capture resource's own namespace.
 	// +optional
 	PodSelector *metav1.LabelSelector `json:"podSelector,omitempty"`
 
 	// PodNames allows selecting specific pods by their names.
-	// If specified, the capture will be performed on the pods with matching names in the specified namespace.
+	// If specified, the capture will be performed on the pods with matching names in the
+	// Capture resource's own namespace.
 	// PodNames is incompatible with NodeSelector, NamespaceSelector, and PodSelector.
 	// +optional
 	PodNames []string `json:"podNames,omitempty"`
@@ -259,8 +262,11 @@ type OutputConfiguration struct {
 	// HostPath must be a relative subpath: absolute paths (e.g. "/tmp/foo",
 	// "C:\\foo") and any value containing ".." segments are rejected by the
 	// operator. CR authors cannot influence the base directory, which is
-	// controlled by the cluster operator via the operator config.
+	// controlled by the cluster operator via the operator config. HostPath must
+	// also not contain '<', '>', ':', '"', '|', '?', '*', '&', '^', '%', '!',
+	// '(', ')', or ASCII control characters.
 	// +optional
+	// +kubebuilder:validation:Pattern="^[^<>:\"|?*\\x00-\\x1f&^%!()]*$"
 	HostPath *string `json:"hostPath,omitempty"`
 	// PersistentVolumeClaim mounts the supplied PVC into the pod on `/capture` and write the capture files there.
 	// +optional
