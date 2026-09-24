@@ -1,21 +1,18 @@
 # retina CI pipeline (Azure DevOps, OneBranch).
 #
-# Mirrors .github/workflows/images.yaml. Triggered by:
+# Triggered by:
 #   - GitHub merge-queue events (push to gh-readonly-queue/main/*) via the
 #     Azure Pipelines GitHub App -> full run: builds, pushes to ACR, embeds
-#     APP_INSIGHTS_ID, builds the E2E event writer, and runs manifests + e2e +
-#     perf tests.
+#     APP_INSIGHTS_ID, builds the E2E event writer, and runs manifests + e2e.
 #   - Pull requests targeting main from this repository -> build only (no
-#     push, no telemetry key embedded, manifests/e2e/perf skipped) - same as
-#     GH pull_request behavior. The e2e job is a server job that only posts
-#     the required check.
+#     push, no telemetry key embedded, manifests/e2e skipped). The e2e job is
+#     a server job that only posts the required check.
 #   - Pull requests from forks do not run here. OneBranch validates every run
 #     with the pipeline access token, and Azure DevOps restricts that token
 #     for forks, so the validation fails. ci-fork.yml builds fork pull
 #     requests on the Microsoft-hosted pool under the same pipeline name.
 #   - Manual queue from ADO UI -> build only by default. Set runE2EValidation
-#     to publish branch images, generate manifests, and run e2e. Set
-#     runPerfTests as well to run the perf tests after e2e.
+#     to publish branch images, generate manifests, and run e2e.
 #
 # The pipeline extends the OneBranch NonOfficial template, so jobs run on the
 # OneBranch-managed pool instead of the Microsoft-hosted "Azure Pipelines"
@@ -56,10 +53,6 @@ parameters:
     displayName: Publish branch images and run E2E
     type: boolean
     default: false
-  - name: runPerfTests
-    displayName: Also run the perf tests after E2E (needs runE2EValidation)
-    type: boolean
-    default: false
 
 variables:
   - name: LinuxContainerImage
@@ -85,12 +78,6 @@ variables:
   # PR builds and manual queues with the checkbox off remain dry-run builds.
   - name: publishImagesAndRunE2E
     ${{ if eq(parameters.runE2EValidation, true) }}:
-      value: 'True'
-    ${{ else }}:
-      value: $[ startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/') ]
-  # Perf tests run on merge-queue runs, and on manual runs that opt in.
-  - name: runPerf
-    ${{ if eq(parameters.runPerfTests, true) }}:
       value: 'True'
     ${{ else }}:
       value: $[ startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/') ]
@@ -448,53 +435,6 @@ extends:
                         -image-tag=$(TAG) \
                         -image-registry=$(ACR_NAME) \
                         -image-namespace=$(imageNamespace)
-                - task: AzureCLI@2
-                  displayName: Cleanup resource group
-                  condition: always()
-                  inputs:
-                    azureSubscription: $(azureServiceConnection)
-                    scriptType: bash
-                    scriptLocation: inlineScript
-                    inlineScript: |
-                      if az group exists --name "$(CLUSTER_NAME)" 2>/dev/null | grep -q true; then
-                        echo "Deleting resource group $(CLUSTER_NAME)..."
-                        az group delete --name "$(CLUSTER_NAME)" --yes --no-wait || true
-                      fi
-
-          - ${{ each mode in split('basic,advanced', ',') }}:
-            - job: perf_${{ mode }}
-              displayName: Retina ${{ mode }} Performance Test
-              condition: and(succeeded(), eq(variables['runPerf'], 'True'), eq(variables['publishImagesAndRunE2E'], 'True'))
-              dependsOn: e2e
-              timeoutInMinutes: 150
-              pool:
-                type: linux
-              variables:
-                ob_outputDirectory: $(Build.SourcesDirectory)/out
-                CLUSTER_NAME: retina-perf-${{ mode }}-$(Build.BuildId)-$(System.JobAttempt)
-                MODE: ${{ mode }}
-              steps:
-                - task: AzureCLI@2
-                  displayName: Run perf test
-                  env:
-                    AZURE_APP_INSIGHTS_KEY: $(AZURE_APP_INSIGHTS_KEY)
-                    AZURE_LOCATION: $(AZURE_LOCATION)
-                    AZURE_AGENT_LINUX_SKU: $(AZURE_AGENT_LINUX_SKU)
-                    AZURE_AGENT_WINDOWS_SKU: $(AZURE_AGENT_WINDOWS_SKU)
-                    AZURE_AGENT_LINUX_ARM_SKU: $(AZURE_AGENT_LINUX_ARM_SKU)
-                  inputs:
-                    azureSubscription: $(azureServiceConnection)
-                    scriptType: bash
-                    scriptLocation: inlineScript
-                    inlineScript: |
-                      set -euo pipefail
-                      export AZURE_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
-                      echo "Running in $MODE mode..."
-                      go test -v ./test/e2e/. -timeout 2h -tags=perf -count=1 -args \
-                        -image-tag="$(TAG)" \
-                        -image-registry="$(ACR_NAME)" \
-                        -image-namespace="$(imageNamespace)" \
-                        -retina-mode="$MODE"
                 - task: AzureCLI@2
                   displayName: Cleanup resource group
                   condition: always()
