@@ -55,7 +55,7 @@ parameters:
   - name: num_nodes
     displayName: Number of nodes
     type: number
-    default: 1000
+    default: 250
   - name: cleanup
     displayName: Clean up environment after test
     type: boolean
