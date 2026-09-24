@@ -52,11 +52,14 @@ func (d *DeleteResourceGroup) Run() error {
 				ForceDeletionTypes: to.Ptr(forceDeleteType),
 			})
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to begin deleting resource group %q: %w", resourceGroupName, err)
 			}
 			return func(ctx context.Context) error {
 				_, err := poller.PollUntilDone(ctx, nil)
-				return err
+				if err != nil {
+					return fmt.Errorf("failed to poll deletion of resource group %q: %w", resourceGroupName, err)
+				}
+				return nil
 			}, nil
 		},
 		resourceGroupExists: func(ctx context.Context, resourceGroupName string) (bool, error) {
@@ -64,7 +67,10 @@ func (d *DeleteResourceGroup) Run() error {
 			if isNotFound(err) {
 				return false, nil
 			}
-			return err == nil, err
+			if err != nil {
+				return false, fmt.Errorf("failed to get resource group %q: %w", resourceGroupName, err)
+			}
+			return true, nil
 		},
 		getNodeResourceGroup: func(ctx context.Context) (string, error) {
 			if d.ClusterName == "" {
@@ -75,7 +81,7 @@ func (d *DeleteResourceGroup) Run() error {
 				return "", nil
 			}
 			if err != nil {
-				return "", err
+				return "", fmt.Errorf("failed to get managed cluster %q: %w", d.ClusterName, err)
 			}
 			if cluster.Properties == nil || cluster.Properties.NodeResourceGroup == nil {
 				return "", nil
@@ -133,25 +139,27 @@ func deleteResourceGroupWithRetry(ctx context.Context, resourceGroupName string,
 
 	for attempt := 1; ; attempt++ {
 		exists, err := operations.resourceGroupExists(ctx, resourceGroupName)
-		if err != nil {
+		switch {
+		case err != nil:
 			lastErr = fmt.Errorf("failed to check whether resource group %q exists: %w", resourceGroupName, err)
-		} else if !exists {
+		case !exists:
 			log.Printf("resource group %q deleted successfully", resourceGroupName)
 			return nil
-		} else {
+		default:
 			log.Printf("requesting deletion of resource group %q (attempt %d)...", resourceGroupName, attempt)
 			poll, beginErr := operations.beginDelete(ctx, resourceGroupName)
 			if beginErr != nil {
-				lastErr = fmt.Errorf("Azure did not accept deletion of resource group %q: %w", resourceGroupName, beginErr)
-			} else {
-				log.Printf("Azure accepted deletion of resource group %q", resourceGroupName)
-				if pollErr := poll(ctx); pollErr == nil {
-					log.Printf("resource group %q deleted successfully", resourceGroupName)
-					return nil
-				} else {
-					lastErr = fmt.Errorf("Azure accepted deletion of resource group %q, but deletion did not complete: %w", resourceGroupName, pollErr)
-				}
+				lastErr = fmt.Errorf("azure did not accept deletion of resource group %q: %w", resourceGroupName, beginErr)
+				break
 			}
+
+			log.Printf("Azure accepted deletion of resource group %q", resourceGroupName)
+			pollErr := poll(ctx)
+			if pollErr == nil {
+				log.Printf("resource group %q deleted successfully", resourceGroupName)
+				return nil
+			}
+			lastErr = fmt.Errorf("azure accepted deletion of resource group %q, but deletion did not complete: %w", resourceGroupName, pollErr)
 		}
 
 		if ctx.Err() != nil {
@@ -188,7 +196,7 @@ func isTransientResourceGroupDeletionError(err error) bool {
 	}
 
 	var networkErr net.Error
-	return errors.As(err, &networkErr) && (networkErr.Timeout() || networkErr.Temporary())
+	return errors.As(err, &networkErr) && networkErr.Timeout()
 }
 
 func isNotFound(err error) bool {
@@ -202,7 +210,7 @@ func waitForResourceGroupDeletionRetry(ctx context.Context, delay time.Duration)
 
 	select {
 	case <-ctx.Done():
-		return ctx.Err()
+		return fmt.Errorf("retry wait canceled: %w", ctx.Err())
 	case <-timer.C:
 		return nil
 	}

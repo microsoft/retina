@@ -3,7 +3,7 @@ package azure
 import (
 	"bytes"
 	"context"
-	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -13,6 +13,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/stretchr/testify/require"
 )
+
+const transientDeletionBlockedErrorCode = "ResourceGroupDeletionBlocked"
 
 func TestDeleteResourceGroupsDeletesParentAndNodeResourceGroups(t *testing.T) {
 	deleted := map[string]bool{}
@@ -49,7 +51,7 @@ func TestDeleteResourceGroupRetriesTransientPollingFailure(t *testing.T) {
 			return func(context.Context) error {
 				if attempts == 1 {
 					return &azcore.ResponseError{
-						ErrorCode:  "ResourceGroupDeletionBlocked",
+						ErrorCode:  transientDeletionBlockedErrorCode,
 						StatusCode: http.StatusConflict,
 					}
 				}
@@ -114,7 +116,7 @@ func TestDeleteResourceGroupReturnsLastFailureWhenRetryDeadlineExpires(t *testin
 		resourceGroupExists: alwaysResourceGroupExists,
 		beginDelete: func(context.Context, string) (pollResourceGroupDeletion, error) {
 			return nil, &azcore.ResponseError{
-				ErrorCode:  "ResourceGroupDeletionBlocked",
+				ErrorCode:  transientDeletionBlockedErrorCode,
 				StatusCode: http.StatusConflict,
 			}
 		},
@@ -168,8 +170,8 @@ func TestIsTransientResourceGroupDeletionError(t *testing.T) {
 	}{
 		{
 			name: "wrapped deletion blocked",
-			err: errors.Join(errors.New("poll failed"), &azcore.ResponseError{
-				ErrorCode:  "ResourceGroupDeletionBlocked",
+			err: fmt.Errorf("poll failed: %w", &azcore.ResponseError{
+				ErrorCode:  transientDeletionBlockedErrorCode,
 				StatusCode: http.StatusConflict,
 			}),
 			transient: true,
