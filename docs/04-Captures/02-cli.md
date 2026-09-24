@@ -11,6 +11,33 @@ See the [overview](./01-overview.md#capture-jobs) for a description of how the c
 ## Prerequisites
 
 - [Install Retina CLI](../02-Installation/02-CLI.md)
+- Sufficient node storage for capture files when using the default `--host-path` output, unless a remote output location (blob, S3, or PVC) is configured instead.
+
+### Cluster Access
+
+The identity running `kubectl retina capture` commands needs Kubernetes RBAC permissions in the target cluster:
+
+| Resource | Verbs | Scope | Notes |
+|---|---|---|---|
+| `nodes` | `get`, `list` | cluster | Resolve `--node-selectors`/`--node-names` |
+| `namespaces` | `get`, `list` | cluster | Resolve `--namespace-selectors`; the target namespace must already exist |
+| `pods` | `get`, `list` | cluster | Resolve `--pod-selectors`/`--pod-names` and track capture job pods |
+| `jobs` (batch/v1) | `create`, `get`, `list`, `delete` | namespace | Create/monitor/clean up the per-node capture Jobs |
+| `secrets` | `create`, `get`, `update`, `delete` | namespace | Stores the Blob SAS token mounted into capture pods |
+| `persistentvolumeclaims` | `get` | namespace | Only required when using `--pvc` (the PVC must already exist) |
+| `pods` | `create`, `delete` | namespace | Only required for `kubectl retina capture download`, which creates a temporary pod to read files off the node |
+| `pods/exec` | `create` | namespace | Only required for `kubectl retina capture download`, to stream file contents out of the temporary pod |
+
+### Cluster Admission Policies
+
+Capture Jobs run their Pods with elevated settings in order to capture host traffic. If the cluster enforces restrictive admission policies (e.g. Azure Policy, Gatekeeper, Kyverno), the capture namespace/workload must be allowed to use:
+
+- **Host network** (`hostNetwork: true`) - required so the capture pod can see the node's network interfaces.
+- **Host IPC** (`hostIPC: true`) - required by the underlying capture tooling.
+- **`NET_ADMIN` and `SYS_ADMIN` Linux capabilities** - required to run the packet capture on the host's interfaces.
+- **The capture image's registry** - the default capture image is pulled from `ghcr.io/microsoft/retina/retina-agent`. If the cluster restricts pulls to an approved registry, either allow-list this image/registry, or mirror the image into your approved registry and override it via `RETINA_AGENT_IMAGE` (see [Debug mode](#debug-mode)).
+
+If your cluster denies any of these, the capture Job's pod will fail admission and the capture will not run.
 
 ## Operations
 
@@ -79,8 +106,8 @@ The network traffic will be uploaded to the specified output location.
 | `node-selectors`      | string     | kubernetes.io/os=linux | A comma-separated list of node labels to select nodes on which the network capture will be performed. | Cleared automatically when `node-names`, `pod-selectors`, `pod-names`, or `namespace-selectors` are specified. |
 | `no-wait`             | bool       | true     | By default, Retina capture CLI will exit before the jobs are completed. If false, the CLI will wait until the jobs are completed and clean up the Kubernetes resources created. |       |
 | `packet-size`         | int        | 0        | Limit the packet size in bytes. Packets longer than the defined maximum size will be truncated. The default value 0 indicates no limit. This is beneficial when the user wants to reduce the capture file size or hide customer data due to security concerns. | Only works on Linux.      |
-| `pod-names`           | string     | ""       | A comma-separated list of specific pod names to select pods on which the network capture will be performed. | Mutually exclusive with `node-selectors`, `pod-selectors`, and `namespace-selectors`.      |
-| `pod-selectors`       | string     | ""       | A comma-separated list of pod labels to select pods on which the network capture will be performed. | Pair with `namespace-selectors`.      |
+| `pod-names`           | string     | ""       | A comma-separated list of specific pod names to select pods on which the network capture will be performed. | Mutually exclusive with `node-selectors`, `pod-selectors`, and `namespace-selectors`. Pods are looked up in the namespace set by `--namespace`.      |
+| `pod-selectors`       | string     | ""       | A comma-separated list of pod labels to select pods on which the network capture will be performed. | Can be paired with `namespace-selectors` to match pods across namespaces. If `namespace-selectors` is omitted, matching pods are looked up in the namespace set by `--namespace` only.      |
 | `pvc`                 | string     | ""       | PersistentVolumeClaim under the specified or default namespace to store capture files. |       |
 | `s3-access-key-id`    | string     | ""       | S3 access key id to upload capture files.                                   |       |
 | `s3-bucket`           | string     | ""       | Bucket in which to store capture files.                                      |       |
@@ -135,6 +162,15 @@ kubectl retina capture create \
   --name example-pod-namespace-selectors \
   --pod-selectors="k8s-app=kube-dns" \
   --namespace-selectors="kubernetes.io/metadata.name=kube-system"
+```
+
+Pod Selectors without Namespace Selectors (scoped to `--namespace`)
+
+```sh
+kubectl retina capture create \
+  --name example-pod-selectors-own-namespace \
+  --namespace myapp \
+  --pod-selectors="k8s-app=my-app"
 ```
 
 Pod Names (Specific Pods)
