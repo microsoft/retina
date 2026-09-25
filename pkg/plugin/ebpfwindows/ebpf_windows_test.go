@@ -355,6 +355,7 @@ func TestEmitAdvancedEvent(t *testing.T) {
 	tests := []struct {
 		name                string
 		remoteContext       bool
+		bypassLookup        bool
 		sourceSelected      bool
 		destinationSelected bool
 		wantWrite           bool
@@ -373,8 +374,24 @@ func TestEmitAdvancedEvent(t *testing.T) {
 			name: "local neither selected",
 		},
 		{
+			name:           "remote selected source",
+			remoteContext:  true,
+			sourceSelected: true,
+			wantWrite:      true,
+		},
+		{
 			name:          "remote neither selected",
 			remoteContext: true,
+		},
+		{
+			name:         "local bypasses lookup",
+			bypassLookup: true,
+			wantWrite:    true,
+		},
+		{
+			name:          "remote bypasses lookup",
+			remoteContext: true,
+			bypassLookup:  true,
 			wantWrite:     true,
 		},
 	}
@@ -393,7 +410,7 @@ func TestEmitAdvancedEvent(t *testing.T) {
 				},
 			}
 
-			if !tt.remoteContext {
+			if !tt.bypassLookup {
 				mockFilterManager.EXPECT().HasIP(net.ParseIP(sourceIP)).Return(tt.sourceSelected)
 				if !tt.sourceSelected {
 					mockFilterManager.EXPECT().HasIP(net.ParseIP(destinationIP)).Return(tt.destinationSelected)
@@ -405,7 +422,8 @@ func TestEmitAdvancedEvent(t *testing.T) {
 
 			p := &Plugin{
 				cfg: &kcfg.Config{
-					RemoteContext: tt.remoteContext,
+					RemoteContext:            tt.remoteContext,
+					BypassLookupIPOfInterest: tt.bypassLookup,
 				},
 				enricher:      mockEnricher,
 				filterManager: mockFilterManager,
@@ -458,9 +476,10 @@ func TestHandleTraceEvent_TraceNotify(t *testing.T) {
 
 	p := &Plugin{
 		cfg: &kcfg.Config{
-			MetricsInterval: 100 * time.Second,
-			EnablePodLevel:  true,
-			RemoteContext:   true,
+			MetricsInterval:          100 * time.Second,
+			EnablePodLevel:           true,
+			RemoteContext:            true,
+			BypassLookupIPOfInterest: true,
 		},
 		l: log.Logger().Named("test-ebpf"),
 	}
@@ -539,9 +558,10 @@ func TestHandleTraceEvent_DropNotify(t *testing.T) {
 
 	p := &Plugin{
 		cfg: &kcfg.Config{
-			MetricsInterval: 100 * time.Second,
-			EnablePodLevel:  true,
-			RemoteContext:   true,
+			MetricsInterval:          100 * time.Second,
+			EnablePodLevel:           true,
+			RemoteContext:            true,
+			BypassLookupIPOfInterest: true,
 		},
 		l: log.Logger().Named("test-ebpf"),
 	}
@@ -1175,9 +1195,10 @@ func TestHandleTraceEventWithEthPacket_PktmonDropNotify(t *testing.T) {
 
 	p := &Plugin{
 		cfg: &kcfg.Config{
-			MetricsInterval: 100 * time.Second,
-			EnablePodLevel:  true,
-			RemoteContext:   true,
+			MetricsInterval:          100 * time.Second,
+			EnablePodLevel:           true,
+			RemoteContext:            true,
+			BypassLookupIPOfInterest: true,
 		},
 		l: log.Logger().Named("test-ebpf"),
 	}
@@ -1264,9 +1285,10 @@ func TestHandleTraceEventWithIpPacket_PktmonDropNotify(t *testing.T) {
 
 	p := &Plugin{
 		cfg: &kcfg.Config{
-			MetricsInterval: 100 * time.Second,
-			EnablePodLevel:  true,
-			RemoteContext:   true,
+			MetricsInterval:          100 * time.Second,
+			EnablePodLevel:           true,
+			RemoteContext:            true,
+			BypassLookupIPOfInterest: true,
 		},
 		l: log.Logger().Named("test-ebpf"),
 	}
@@ -1355,9 +1377,10 @@ func TestHandleTraceEventWithIPv6Packet_PktmonDropNotify(t *testing.T) {
 
 	p := &Plugin{
 		cfg: &kcfg.Config{
-			MetricsInterval: 100 * time.Second,
-			EnablePodLevel:  true,
-			RemoteContext:   true,
+			MetricsInterval:          100 * time.Second,
+			EnablePodLevel:           true,
+			RemoteContext:            true,
+			BypassLookupIPOfInterest: true,
 		},
 		l: log.Logger().Named("test-ebpf"),
 	}
@@ -1446,9 +1469,10 @@ func TestHandleTraceEventWithUDPPacket_PktmonDropNotify(t *testing.T) {
 
 	p := &Plugin{
 		cfg: &kcfg.Config{
-			MetricsInterval: 100 * time.Second,
-			EnablePodLevel:  true,
-			RemoteContext:   true,
+			MetricsInterval:          100 * time.Second,
+			EnablePodLevel:           true,
+			RemoteContext:            true,
+			BypassLookupIPOfInterest: true,
 		},
 		l: log.Logger().Named("test-ebpf"),
 	}
