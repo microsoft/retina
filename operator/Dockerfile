@@ -11,6 +11,7 @@ ARG APP_INSIGHTS_ID
 WORKDIR /workspace
 COPY . .
 
+# Keep this pin until the Azure Linux base includes pcre2 >= 10.48-1.azl3; verify both architectures before removing.
 RUN tdnf install -y \
 	jq \
 	libxml2-2.11.5-11.azl3 \

@@ -30,6 +30,7 @@ RUN --mount=type=cache,target="/root/.cache/go-build" \
 # without the bloat of the full Go SDK image (python, gcc, systemd, etc.)
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
 FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260909@sha256:34a22db497ff34a0f35ca5fc54bd38711d04238a2c1b2f65d35dc9d45dd82584 AS libs
+# Keep this pin until the Azure Linux base includes pcre2 >= 10.48-1.azl3; verify both architectures before removing.
 RUN tdnf install -y pcre2-10.48-1.azl3 && tdnf clean all
 
 # Target 1: Distroless (secure, minimal)
@@ -50,6 +51,7 @@ COPY --from=builder /workspace/kubectl-retina .
 # kubectl-retina binary is cross-compiled for the target arch and would fail
 # to run inside a wrong-arch base image.
 FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260909@sha256:34a22db497ff34a0f35ca5fc54bd38711d04238a2c1b2f65d35dc9d45dd82584 AS shell-target
+# Keep this pin until the Azure Linux base includes pcre2 >= 10.48-1.azl3; verify both architectures before removing.
 RUN tdnf install -y pcre2-10.48-1.azl3 && tdnf clean all
 WORKDIR /
 COPY --from=builder /workspace/kubectl-retina /bin/kubectl-retina
