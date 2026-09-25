@@ -19,6 +19,9 @@ spec:
         {{- include "retina.labels" . | nindent 8 }}
         app.kubernetes.io/component: workload
         k8s-app: {{ include "retina.name" . }}
+        {{- with .Values.agent.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       annotations:
         prometheus.io/port: "{{ .Values.retinaPort }}"
         prometheus.io/scrape: "true"
@@ -194,6 +197,9 @@ spec:
         {{- include "retina.labels" . | nindent 8 }}
         app.kubernetes.io/component: workload
         k8s-app: {{ include "retina.name" . }}
+        {{- with .Values.agent.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       name: {{ include "retina.name" . }}
       namespace: {{ .Values.namespace }}
     spec:
