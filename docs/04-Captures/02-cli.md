@@ -39,6 +39,15 @@ Capture Jobs run their Pods with elevated settings in order to capture host traf
 
 If your cluster denies any of these, the capture Job's pod will fail admission and the capture will not run.
 
+To surface asynchronous Pod admission failures when using `capture create --no-wait=true`, the caller must be able to `list` Events and `list` Jobs in the capture namespace. Check access with:
+
+```bash
+kubectl auth can-i list events --namespace <capture-namespace>
+kubectl auth can-i list jobs.batch --namespace <capture-namespace>
+```
+
+With these permissions, the CLI checks Job startup for up to five seconds. It returns a detected `FailedCreate` error only if the Job has not started by the end of that window. A successful command remains best-effort and does not guarantee that every capture Pod has started. If Event access is unavailable, capture creation remains backward compatible and returns after creating the Jobs with a warning that startup could not be checked.
+
 ## Operations
 
 ### Capture Create

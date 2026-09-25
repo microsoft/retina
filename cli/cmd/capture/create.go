@@ -19,6 +19,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -34,6 +35,7 @@ import (
 	"github.com/microsoft/retina/pkg/capture/file"
 	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	"github.com/microsoft/retina/pkg/config"
+	captureLabels "github.com/microsoft/retina/pkg/label"
 )
 
 const (
@@ -57,6 +59,12 @@ const (
 	DefaultS3Path          string        = "retina/captures"
 	DefaultWaitPeriod      time.Duration = 1 * time.Minute
 	DefaultWaitTimeout     time.Duration = 5 * time.Minute
+	// JobStartupTimeout is how long a no-wait capture checks whether its jobs'
+	// pods were admitted before giving up (best-effort).
+	JobStartupTimeout time.Duration = 5 * time.Second
+	// JobStartupPollPeriod is how often job status and events are polled
+	// while checking startup.
+	JobStartupPollPeriod time.Duration = 250 * time.Millisecond
 
 	// JobTTLSecondsAfterFinished is how long completed/failed jobs and their
 	// pods are kept before Kubernetes garbage-collects them (no-wait mode).
@@ -167,6 +175,9 @@ func create(kubeClient kubernetes.Interface) error {
 	}
 
 	if opts.nowait {
+		if startupErr := waitForJobsToStart(ctx, kubeClient, jobsCreated); startupErr != nil {
+			return startupErr
+		}
 		if opts.cleanUpAfterUpload && hasRemoteDestination(&opts) {
 			retinacmd.Logger.Info("Capture jobs will be automatically cleaned up after upload (TTL-based)")
 		} else {
@@ -734,6 +745,144 @@ func createJobs(ctx context.Context, kubeClient kubernetes.Interface, capture *r
 		retinacmd.Logger.Info("Packet capture job is created", zap.String("namespace", *opts.Namespace), zap.String("capture job", jobCreated.Name))
 	}
 	return jobsCreated, nil
+}
+
+func waitForJobsToStart(ctx context.Context, kubeClient kubernetes.Interface, jobs []batchv1.Job) error {
+	return waitForJobsToStartWithTimeout(ctx, kubeClient, jobs, JobStartupTimeout)
+}
+
+// waitForJobsToStartWithTimeout polls, for up to timeout, whether the capture jobs' pods
+// were admitted. Kubernetes accepts a Job even when its pod is rejected (e.g. by an
+// admission policy), so a successful Job creation does not guarantee the pod started; the
+// Job controller instead reports the rejection as a "FailedCreate" Job Event. This check is
+// best-effort: it returns nil without an error if the caller cannot list Job Events or Jobs
+// (a recorded failure can never be confirmed as final without Job status), and it only warns
+// (without failing) if a job's outcome is still unknown once timeout elapses.
+func waitForJobsToStartWithTimeout(ctx context.Context, kubeClient kubernetes.Interface, jobs []batchv1.Job, timeout time.Duration) error {
+	if len(jobs) == 0 {
+		return nil
+	}
+
+	pendingJobs := make(map[types.UID]batchv1.Job, len(jobs))
+	for i := range jobs {
+		pendingJobs[jobs[i].UID] = jobs[i]
+	}
+	failedCreates := map[types.UID]string{}
+
+	eventSelector := fields.AndSelectors(
+		fields.OneTermEqualSelector("involvedObject.kind", "Job"),
+		fields.OneTermEqualSelector("type", corev1.EventTypeWarning),
+		fields.OneTermEqualSelector("reason", "FailedCreate"),
+	).String()
+
+	startupCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(JobStartupPollPeriod)
+	defer ticker.Stop()
+
+	for {
+		if err := ctx.Err(); err != nil {
+			return err //nolint:wrapcheck //internal return
+		}
+
+		if err := removeStartedJobs(startupCtx, kubeClient, jobs, pendingJobs, failedCreates); err != nil {
+			if k8serrors.IsForbidden(err) || k8serrors.IsUnauthorized(err) {
+				// Without Job status we can never confirm whether a recorded FailedCreate
+				// later recovered, so a cached failure can no longer be trusted as final.
+				retinacmd.Logger.Warn("Cannot check capture job startup because jobs could not be listed", zap.Error(err))
+				if ctxErr := ctx.Err(); ctxErr != nil {
+					return ctxErr //nolint:wrapcheck //internal return
+				}
+				return nil
+			}
+			retinacmd.Logger.Warn("Failed to list jobs while checking capture job startup", zap.Error(err))
+		}
+
+		events, err := kubeClient.CoreV1().Events(jobs[0].Namespace).List(startupCtx, metav1.ListOptions{FieldSelector: eventSelector})
+		switch {
+		case err == nil:
+			recordFailedCreates(events.Items, pendingJobs, failedCreates)
+		case k8serrors.IsForbidden(err) || k8serrors.IsUnauthorized(err):
+			retinacmd.Logger.Warn("Cannot check capture job startup because events could not be listed", zap.Error(err))
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return ctxErr //nolint:wrapcheck //internal return
+			}
+			return jobStartupResult(jobs, failedCreates)
+		default:
+			retinacmd.Logger.Warn("Failed to list events while checking capture job startup", zap.Error(err))
+		}
+
+		if len(pendingJobs) == 0 {
+			return jobStartupResult(jobs, failedCreates)
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err() //nolint:wrapcheck //internal return
+		case <-startupCtx.Done():
+			return jobStartupTimeoutResult(jobs, pendingJobs, failedCreates)
+		case <-ticker.C:
+		}
+	}
+}
+
+// removeStartedJobs clears jobs whose pod has been admitted (Job status reports it as
+// Active or Succeeded) from pendingJobs and failedCreates, using a single batched List call.
+func removeStartedJobs(ctx context.Context, kubeClient kubernetes.Interface, jobs []batchv1.Job, pendingJobs map[types.UID]batchv1.Job, failedCreates map[types.UID]string) error {
+	listOptions := metav1.ListOptions{}
+	if captureName := jobs[0].Labels[captureLabels.CaptureNameLabel]; captureName != "" {
+		listOptions.LabelSelector = labels.Set{captureLabels.CaptureNameLabel: captureName}.String()
+	}
+	currentJobs, err := kubeClient.BatchV1().Jobs(jobs[0].Namespace).List(ctx, listOptions)
+	if err != nil {
+		return err //nolint:wrapcheck //internal return
+	}
+	for i := range currentJobs.Items {
+		currentJob := &currentJobs.Items[i]
+		uid := currentJob.UID
+		if _, ok := pendingJobs[uid]; ok && (currentJob.Status.Active > 0 || currentJob.Status.Succeeded > 0) {
+			delete(pendingJobs, uid)
+			delete(failedCreates, uid)
+		}
+	}
+	return nil
+}
+
+func recordFailedCreates(events []corev1.Event, pendingJobs map[types.UID]batchv1.Job, failedCreates map[types.UID]string) {
+	for i := range events {
+		event := &events[i]
+		if _, ok := pendingJobs[event.InvolvedObject.UID]; ok {
+			failedCreates[event.InvolvedObject.UID] = event.Message
+		}
+	}
+}
+
+func jobStartupResult(jobs []batchv1.Job, failedCreates map[types.UID]string) error {
+	for i := range jobs {
+		if message, ok := failedCreates[jobs[i].UID]; ok {
+			// Message is a Kubernetes Event message, not a static sentinel error.
+			return fmt.Errorf("capture job %s failed to create a pod: %s", jobs[i].Name, message) //nolint:err113 // dynamic Kubernetes Event message
+		}
+	}
+	return nil
+}
+
+func jobStartupTimeoutResult(jobs []batchv1.Job, pendingJobs map[types.UID]batchv1.Job, failedCreates map[types.UID]string) error {
+	if err := jobStartupResult(jobs, failedCreates); err != nil {
+		return err
+	}
+	if len(pendingJobs) == 0 {
+		return nil
+	}
+	pendingNames := make([]string, 0, len(pendingJobs))
+	for i := range jobs {
+		if _, ok := pendingJobs[jobs[i].UID]; ok {
+			pendingNames = append(pendingNames, jobs[i].Name)
+		}
+	}
+	retinacmd.Logger.Warn("Capture job startup could not be confirmed before timeout", zap.Strings("jobs", pendingNames))
+	return nil
 }
 
 func waitUntilJobsComplete(ctx context.Context, kubeClient kubernetes.Interface, jobs []batchv1.Job) bool {
