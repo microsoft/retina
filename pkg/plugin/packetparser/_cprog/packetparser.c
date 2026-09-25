@@ -233,6 +233,7 @@ static void parse(struct __sk_buff *skb, __u8 obs)
 	// Process the packet in ct
 	struct packetreport report __attribute__((unused));
 	report = ct_process_packet(&p, obs, sampled);
+	p.report_reason = report.report_reason;
 
 	// If the data aggregation level is low, always send the packet to the perf buffer.
 	#if DATA_AGGREGATION_LEVEL == DATA_AGGREGATION_LEVEL_LOW
