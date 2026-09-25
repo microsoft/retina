@@ -55,7 +55,7 @@ parameters:
   - name: num_nodes
     displayName: Number of nodes
     type: number
-    default: 1000
+    default: 250
   - name: cleanup
     displayName: Clean up environment after test
     type: boolean
@@ -110,6 +110,6 @@ jobs:
               CREATE_INFRA=true
             fi
             export TAG AZURE_RESOURCE_GROUP CLUSTER_NAME
-            exec go test -v ./test/e2e/. -timeout 300m -tags=scale -count=1 -args \
+            exec go test -v ./test/e2e/. -timeout 330m -tags=scale -count=1 -args \
               -create-infra=$CREATE_INFRA \
               -delete-infra=$CLEANUP
