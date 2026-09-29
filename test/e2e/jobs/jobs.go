@@ -103,13 +103,14 @@ func CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath string
 	return job
 }
 
-func DeleteTestInfra(subID, rg, location string, deleteInfra bool) *types.Job {
+func DeleteTestInfra(subID, rg, clusterName, location string, deleteInfra bool) *types.Job {
 	job := types.NewJob("Delete e2e test infrastructure")
 
 	if deleteInfra {
 		job.AddStep(&azure.DeleteResourceGroup{
 			SubscriptionID:    subID,
 			ResourceGroupName: rg,
+			ClusterName:       clusterName,
 			Location:          location,
 		}, nil)
 	}

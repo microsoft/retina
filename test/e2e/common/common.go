@@ -90,8 +90,8 @@ func (s ScaleTestInfraHandler) GetResourceGroup() string {
 
 func (s ScaleTestInfraHandler) GetNodes() string {
 	if s.nodes == "" {
-		// Default to 100 nodes per pool
-		return "100"
+		// Default to 250 nodes per pool
+		return "250"
 	}
 	return s.nodes
 }
