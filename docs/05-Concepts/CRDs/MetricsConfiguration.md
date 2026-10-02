@@ -21,10 +21,12 @@ The `MetricsConfiguration` CRD is defined with the following specifications:
 
 - **spec.contextOptions:** Specifies the configuration for retina plugin metrics context. It includes the following properties:
   - `additionalLabels`: Represents additional context labels to be collected, such as Direction (ingress/egress).
-  - `destinationLabels`: Represents the destination context labels, such as IP, Pod, port, workload (deployment/replicaset/statefulset/daemonset).
+  - `destinationLabels`: Represents the destination context labels, such as IP, Pod, port, workload (deployment/replicaset/statefulset/daemonset), and `zone`.
   - `metricName`: Indicates the name of the metric.
-  - `sourceLabels`: Represents the source context labels, such as IP, Pod, port.
+  - `sourceLabels`: Represents the source context labels, such as IP, Pod, port, and `zone`.
   - `ttl`: Represents the time-to-live for the metric.  If there are no metric updates for a particular set of context labels for this duration the metric will be removed from export.  The value of `ttl` must be a valid Golang `time.Duration` string and non-negative.  A zero `ttl` (the default) means that metrics are never removed from export.
+
+  When `zone` is included in `sourceLabels` or `destinationLabels`, Retina emits `source_zone` / `destination_zone` labels populated from the node's [`topology.kubernetes.io/zone`](https://kubernetes.io/docs/reference/labels-annotations-taints/#topologykubernetesiozone) label. Flows whose zone cannot be resolved are labelled `unknown`.
 
 - **spec.namespaces:** Specifies the namespaces to include or exclude in metric collection. It includes the following properties:
   - `exclude`: Specifies namespaces to be excluded from metric collection.
