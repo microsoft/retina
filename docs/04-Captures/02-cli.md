@@ -23,7 +23,7 @@ The identity running `kubectl retina capture` commands needs Kubernetes RBAC per
 | `namespaces` | `get`, `list` | cluster | Resolve `--namespace-selectors`; the target namespace must already exist |
 | `pods` | `get`, `list` | cluster | Resolve `--pod-selectors`/`--pod-names` and track capture job pods |
 | `jobs` (batch/v1) | `create`, `get`, `list`, `delete` | namespace | Create/monitor/clean up the per-node capture Jobs |
-| `secrets` | `create`, `get`, `update`, `delete` | namespace | Stores the Blob SAS token mounted into capture pods |
+| `secrets` | `create`, `get`, `update`, `delete` | namespace | Stores the Blob SAS token or S3 credentials mounted into capture pods |
 | `persistentvolumeclaims` | `get` | namespace | Only required when using `--pvc` (the PVC must already exist) |
 | `pods` | `create`, `delete` | namespace | Only required for `kubectl retina capture download`, which creates a temporary pod to read files off the node |
 | `pods/exec` | `create` | namespace | Only required for `kubectl retina capture download`, to stream file contents out of the temporary pod |
@@ -58,23 +58,34 @@ With these permissions, the CLI checks Job startup for up to five seconds. It re
 
 The target indicates where the packet capture will be performed. This can be set via the following flags:
 
-- `--node-selectors`
-- `--node-names`
-- `--pod-names` (for specific pods)
-- `--pod-selectors` and `--namespace-selectors` (pairs for label-based pod selection)
+- `--node-selectors` (label-based node selection)
+- `--node-names` (specific nodes, matched by hostname)
+- `--pod-names` (specific pods in the namespace set by `--namespace`)
+- `--pod-selectors` and `--namespace-selectors` (label-based pod selection)
 
-Note that the following combinations are not allowed:
+Exactly one of the following target types can be used per capture:
 
-- Node Selectors are not compatible with Pod Selectors & Namespace Selectors pairs
-- Pod Names are not compatible with Node Selectors, Pod Selectors, or Namespace Selectors
+| Target type | Flags | Notes |
+|-------------|-------|-------|
+| Nodes | `--node-selectors` and/or `--node-names` | When both are set, a node must match both. |
+| Pods by label | `--pod-selectors`, optionally with `--namespace-selectors` | `--namespace-selectors` alone is not a valid target. Without it, pods are looked up in the namespace set by `--namespace`. |
+| Pods by name | `--pod-names` | Pods are looked up in the namespace set by `--namespace`. |
 
-If nothing is set, `kubectl retina capture create` will use `--node-selectors` with the default value shown below in [Flags](#flags).
+The following combinations are not allowed and fail with an error:
+
+- Node targets (`--node-selectors`, `--node-names`) cannot be combined with `--pod-selectors`, `--namespace-selectors`, or `--pod-names`. Note that `--node-names` is a node target, so it conflicts with the pod flags as well.
+- `--pod-names` cannot be combined with `--pod-selectors` or `--namespace-selectors`.
+- `--namespace-selectors` requires `--pod-selectors`.
+
+If nothing is set, `kubectl retina capture create` will use `--node-selectors` with the default value shown below in [Flags](#flags). The default `--node-selectors` value is dropped automatically when any of `--node-names`, `--pod-selectors`, `--namespace-selectors`, or `--pod-names` is set (this also applies if you explicitly pass the default value `kubernetes.io/os=linux`). Passing any other `--node-selectors` value together with those flags is an error.
 
 You can find [target selection examples](#target-selection) below.
 
 #### Configuring the Output Location
 
-The output configuration indicates the location where the capture will be stored. At least one location needs to be specified. This can either be the host path on the node, or a remote storage option.
+The output configuration indicates the location where the capture will be stored. At least one location needs to be specified. This can either be the host path on the node, or a remote storage option. `--host-path` has a default value, so captures are stored on the node unless it is explicitly set to an empty string.
+
+`--host-path` is a relative subpath name (for example `my-captures`) that is created under the node directory set by `--host-path-base-dir` (default `/var/log/retina/captures`). Absolute paths, `..` segments, and characters that are not valid in a path segment are rejected. With the defaults, files are stored in `/var/log/retina/captures/retina` on the node.
 
 Blob-upload requires a Blob Shared Access Signature (SAS) with the write permission to the storage account container, to create SAS tokens in the Azure portal, please read: [Create SAS Tokens in the Azure Portal](https://learn.microsoft.com/en-us/azure/cognitive-services/translator/document-translation/how-to-guides/create-sas-tokens?tabs=Containers#create-sas-tokens-in-the-azure-portal).
 
@@ -88,7 +99,7 @@ The Capture can be stopped in a number of ways:
   - When both are specified, the capture will stop whenever **either condition is first met**.
 - On demand by [deleting the capture](#capture-delete) before the specified conditions meets.
 
-When using `--file-count` (rotating capture mode), the capture runs indefinitely (or until `duration` expires if set), rotating through a fixed number of files. Delete the capture to stop it.
+When using `--file-count` (rotating capture mode), `--max-size` does not stop the capture. Instead, the capture rotates through a fixed number of files of that size. Because `--duration` defaults to `1m0s`, set `--duration 0` for the capture to keep running until you [delete it](#capture-delete), otherwise it stops once the duration expires. See [Rotating Capture (Long-Running)](#rotating-capture-long-running) for examples and [how to retrieve the files](#retrieving-the-files-of-a-rotating-capture).
 
 The network traffic will be uploaded to the specified output location.
 
@@ -97,25 +108,26 @@ The network traffic will be uploaded to the specified output location.
 | Flag                  | Type       | Default  | Description                                                                 | Notes |
 |-----------------------|------------|----------|-----------------------------------------------------------------------------|-------|
 | `blob-upload`         | string     | ""       | Blob SAS URL with write permission to upload capture files.                  |       |
-| `cleanup-after-upload` | bool       | false    | Automatically clean up capture files from the node's host path after successful upload to remote storage (blob or S3). Requires a remote storage destination. |       |
+| `cleanup-after-upload` | bool       | false    | Automatically clean up capture files from the node's host path after successful upload to remote storage (blob, S3, or PVC). Requires a remote storage destination (`--blob-upload`, `--s3-bucket`, or `--pvc`). |       |
 | `debug`               | bool       | false    | When debug is true, a customized retina-agent image, determined by the environment variable RETINA_AGENT_IMAGE, is set. |       |
 | `duration`            | string     | 1m0s     | Maximum duration of the packet capture - in minutes / seconds.              |       |
 | `exclude-filter`      | string     | ""       | A comma-separated list of IP:Port pairs that are excluded from capturing network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:* | Only works on Linux.     |
 | `file-count`          | int        | 0        | Number of capture files in a rotating buffer. When set (minimum 1), creates a rolling capture where the oldest file is overwritten once the limit is reached. Requires `--max-size` to define per-file size. Useful for long-running captures of intermittent issues. | Only works on Linux. |
 | `help`                |            |          | Help for create command.                                                     |       |
-| `host-path`           | string     | /mnt/retina/captures | Store the capture file in the node's specified host path.                   |       |
+| `host-path`           | string     | retina   | Subpath name under `--host-path-base-dir` in which the capture files are stored on the node. | Must be a relative subpath; absolute paths and `..` are rejected. |
+| `host-path-base-dir`  | string     | /var/log/retina/captures | Absolute base directory on the node under which `--host-path` is joined. | The CLI creates the capture jobs with your own credentials, so you choose the base directory. When using the operator, the base directory is set by the cluster administrator with the Helm value `capture.hostPathBaseDir` and cannot be changed by the Capture author. |
 | `include-filter`      | string     | ""       | A comma-separated list of IP:Port pairs that are included from capturing network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:* | Only works on Linux.      |
 | `include-metadata`    | bool       | true     | Collect static network metadata into the capture file if true.              |       |
 | `job-num-limit`       | int        | 0        | The maximum number of jobs which can be created for each capture. The default value 0 indicates no limit. This can be configured by CLI flags for each CLI command, or by a config map consumed by the retina-operator. When creating a job requires job number exceeds this limit, it will fail with prompt like `Error: the number of capture jobs 3 exceeds the limit 2`. |       |
 | `max-size`            | int        | 100      | Maximum size of the capture file in MB. When used with `--file-count`, this becomes the per-file size limit for rotating captures. | Only works on Linux.      |
 | `name`                | string     | retina-capture | A name for the Retina Capture.                                              |       |
 | `namespace`           | string     | default  | Sets the namespace which hosts the capture job and the other Kubernetes resources for a network capture. | Ensure the namespace exists.      |
-| `namespace-selectors` | string     | ""       | Capture network captures on pods filtered by the provided namespace selectors. | Pair with `pod-selectors`.      |
-| `node-names`          | string     | ""       | A comma-separated list of node names to select nodes on which the network capture will be performed. | Overrides the default `node-selectors` value, allowing captures on nodes of any OS (including Windows). |
-| `node-selectors`      | string     | kubernetes.io/os=linux | A comma-separated list of node labels to select nodes on which the network capture will be performed. | Cleared automatically when `node-names`, `pod-selectors`, `pod-names`, or `namespace-selectors` are specified. |
+| `namespace-selectors` | string     | ""       | Capture network captures on pods filtered by the provided namespace selectors. | Requires `pod-selectors`; not compatible with `node-selectors`, `node-names`, or `pod-names`.      |
+| `node-names`          | string     | ""       | A comma-separated list of node names to select nodes on which the network capture will be performed. | Overrides the default `node-selectors` value, allowing captures on nodes of any OS (including Windows). Not compatible with `pod-selectors`, `namespace-selectors`, or `pod-names`. |
+| `node-selectors`      | string     | kubernetes.io/os=linux | A comma-separated list of node labels to select nodes on which the network capture will be performed. | The default value is cleared automatically when `node-names`, `pod-selectors`, `pod-names`, or `namespace-selectors` are specified. A non-default value is not compatible with `pod-selectors`, `namespace-selectors`, or `pod-names`. |
 | `no-wait`             | bool       | true     | By default, Retina capture CLI will exit before the jobs are completed. If false, the CLI will wait until the jobs are completed and clean up the Kubernetes resources created. |       |
 | `packet-size`         | int        | 0        | Limit the packet size in bytes. Packets longer than the defined maximum size will be truncated. The default value 0 indicates no limit. This is beneficial when the user wants to reduce the capture file size or hide customer data due to security concerns. | Only works on Linux.      |
-| `pod-names`           | string     | ""       | A comma-separated list of specific pod names to select pods on which the network capture will be performed. | Mutually exclusive with `node-selectors`, `pod-selectors`, and `namespace-selectors`. Pods are looked up in the namespace set by `--namespace`.      |
+| `pod-names`           | string     | ""       | A comma-separated list of specific pod names to select pods on which the network capture will be performed. | Mutually exclusive with `node-selectors`, `node-names`, `pod-selectors`, and `namespace-selectors`. Pods are looked up in the namespace set by `--namespace`.      |
 | `pod-selectors`       | string     | ""       | A comma-separated list of pod labels to select pods on which the network capture will be performed. | Can be paired with `namespace-selectors` to match pods across namespaces. If `namespace-selectors` is omitted, matching pods are looked up in the namespace set by `--namespace` only.      |
 | `pvc`                 | string     | ""       | PersistentVolumeClaim under the specified or default namespace to store capture files. |       |
 | `s3-access-key-id`    | string     | ""       | S3 access key id to upload capture files.                                   |       |
@@ -128,7 +140,7 @@ The network traffic will be uploaded to the specified output location.
 | `destination-ips`     | string     | ""       | A comma-separated list of destination IP addresses to filter captured packets by; a packet is captured if it matches any of these IPs. When combined with `--source-ips`, a packet must match at least one source IP **and** at least one destination IP to be captured. |       |
 | `interfaces`          | string     | ""       | Comma-separated list of network interfaces to capture on (e.g., "eth0,eth1"). By default, captures are performed on all network interfaces. |       |
 | `pcap-filter`         | string     | ""       | BPF filter expression for packet filtering (e.g., "host 10.0.0.1", "tcp port 443"). See [PCAP-FILTER](https://www.tcpdump.org/manpages/pcap-filter.7.html) for BPF syntax. Does NOT accept flags (arguments starting with '-'). |       |
-| `tcpdump-filter`      | string     | ""       | **DEPRECATED and will be removed.** Use `--pcap-filter` instead. BPF filter expression for packet filtering. Does NOT accept flags (arguments starting with '-'). |       |
+| `tcpdump-filter`      | string     | ""       | **DEPRECATED and will be removed.** Use `--pcap-filter` instead. BPF filter expression for packet filtering. Does NOT accept flags (arguments starting with '-'). | Cannot be combined with `--source-ips` or `--destination-ips`. |
 | `no-promiscuous`      | bool       | false    | Disable promiscuous mode (equivalent to tcpdump -p flag). |       |
 | `packet-buffered`     | bool       | false    | Enable packet-buffered output (equivalent to tcpdump -U flag). |       |
 | `immediate-mode`      | bool       | false    | Enable immediate mode for packet capture (equivalent to tcpdump --immediate-mode). |       |
@@ -224,7 +236,7 @@ kubectl retina capture create \
 
 Rotating captures are useful for debugging intermittent issues where you don't know when the problem will occur. The capture runs continuously, keeping only the most recent traffic in a fixed number of files.
 
-Basic rotating capture (10 files × 100MB = 1GB rolling buffer):
+Basic rotating capture (10 files × 100MB = 1GB rolling buffer, running until it is deleted):
 
 ```sh
 kubectl retina capture create \
@@ -232,8 +244,9 @@ kubectl retina capture create \
   --node-selectors "kubernetes.io/os=linux" \
   --max-size 100 \
   --file-count 10 \
+  --duration 0 \
   --no-wait \
-  --host-path /mnt/retina/captures
+  --host-path example-rotating
 ```
 
 Rotating capture with a time limit (stop after 4 hours):
@@ -246,7 +259,7 @@ kubectl retina capture create \
   --file-count 20 \
   --duration 4h \
   --no-wait \
-  --host-path /mnt/retina/captures
+  --host-path example-rotating-timed
 ```
 
 Once the issue is reproduced, stop the capture by deleting it:
@@ -255,7 +268,41 @@ Once the issue is reproduced, stop the capture by deleting it:
 kubectl retina capture delete --name example-rotating
 ```
 
-The captured files on the host path will contain the most recent network traffic (up to `file-count × max-size` MB total).
+###### Retrieving the files of a rotating capture
+
+The capture files are only written to the output location when the capture stops. While it runs, they exist only inside the capture pod. When the capture is deleted, each capture pod is signaled to stop, archives the rotating buffer (up to `file-count × max-size` MB) into a `<capture-name>-<node-name>-<start-timestamp>.tar.gz` tarball, and copies it to the output location. The pod has up to 30 minutes to finish, and the upload can take a while for large buffers.
+
+Deleting the capture also removes its jobs and pods, and `kubectl retina capture download --name` only works with pods that completed successfully. For a capture that you stop by deleting it, retrieve the tarballs from the output location instead:
+
+- **Remote storage (recommended)**: Create the capture with `--blob-upload`, `--s3-bucket`, or `--pvc` and download the tarballs from there once the capture pods are gone. For Azure Blob Storage, you can use [`kubectl retina capture download --blob-url`](#download-from-blob-storage). With S3, the tarballs are stored under the `--s3-path` prefix of the bucket. With a PVC, they are stored in the volume.
+
+- **Node host path**: If you only used the default `--host-path`, the tarballs are on each node that ran a capture pod, in `--host-path-base-dir`/`--host-path` (`/var/log/retina/captures/example-rotating` in the example above).
+
+  1. Before deleting the capture, note which nodes run the capture pods:
+
+     ```sh
+     kubectl get pods --namespace <capture-namespace> --selector capture-name=example-rotating --output wide
+     ```
+
+  2. Delete the capture and wait until its pods are gone, which means the tarballs have been written.
+
+  3. Start a debug pod on each node. The node's file system is available under `/host` in the debug pod. The command prints the name of the debug pod it creates:
+
+     ```sh
+     kubectl debug node/<node-name> --image=busybox -- sleep 3600
+     ```
+
+  4. Copy the tarball out of the debug pod, then delete the debug pod:
+
+     ```sh
+     kubectl exec <debug-pod-name> -- ls /host/var/log/retina/captures/example-rotating
+     kubectl cp <debug-pod-name>:/host/var/log/retina/captures/example-rotating/<tarball-name> ./<tarball-name>
+     kubectl delete pod <debug-pod-name>
+     ```
+
+  If you cannot use `kubectl debug`, you can read the same path through SSH or any other node access.
+
+If you know roughly how long you need to wait for the issue to occur, you can use a long but bounded `--duration` (as in the second example above) instead of `--duration 0`. The capture then completes on its own, its pods are kept, and `kubectl retina capture download --name` can be used to retrieve the files. See [Obtaining the output](#obtaining-the-output) for how to extract and read the tarball.
 
 ##### Output Configuration
 
@@ -264,7 +311,7 @@ Host Path
 ```sh
 kubectl retina capture create \
   --name example-host-path \
-  --host-path /mnt/retina/example/captures
+  --host-path example/captures
 ```
 
 PVC
@@ -379,7 +426,7 @@ Deleting the capture job before either of the terminating conditions have been m
 Example:
 
 ```sh
-kubectl retina capture delete --name retina-capture-zlx5v
+kubectl retina capture delete --name retina-capture
 ```
 
 ### Capture List
@@ -397,6 +444,8 @@ List by all namespaces:
 ```sh
 kubectl retina capture list --all-namespaces
 ```
+
+`-A` can be used as a shorthand for `--all-namespaces`.
 
 ### Capture Download
 
@@ -623,7 +672,7 @@ Use `ghcr.io` image in default debug mode:
 ```sh
 kubectl retina capture create \
   --name capture-test \
-  --host-path /mnt/test \
+  --host-path test \
   --namespace capture \
   --node-selectors "kubernetes.io/os=linux" \
   --debug
@@ -632,10 +681,10 @@ kubectl retina capture create \
 Use custom retina-agent image by specifying it in the `RETINA_AGENT_IMAGE` environment variable:
 
 ```sh
-RETINA_AGENT_IMAGE=<YOUR RETINA AGENT IMAGE>
+RETINA_AGENT_IMAGE=<YOUR RETINA AGENT IMAGE> \
 kubectl retina capture create \
   --name capture-test \
-  --host-path /mnt/test \
+  --host-path test \
   --namespace capture \
   --node-selectors "kubernetes.io/os=linux" \
   --debug
@@ -643,9 +692,9 @@ kubectl retina capture create \
 
 ## Cleanup
 
-When creating a capture, you can specify `--no-wait` to clean up the jobs after the Capture is completed.
+By default (`--no-wait=true`), the CLI exits right after creating the capture jobs and leaves them in the cluster. Delete them with `kubectl retina capture delete --name <capture-name>`, where `<capture-name>` is the value of `--name` (`retina-capture` by default).
 
-Otherwise, after creating a Capture, a random Capture name is returned, with which you can delete the jobs by running the `kubectl retina capture delete` command.
+When `--no-wait=false` is specified, the CLI waits for the jobs to complete, then deletes the jobs and the secrets it created. If the jobs do not complete in time, they are kept for debugging and must be deleted manually.
 
 ### Automatic Cleanup After Upload
 
