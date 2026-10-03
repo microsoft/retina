@@ -1,11 +1,11 @@
 # pinned base images
 
-# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.27-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
 # Pinned to $BUILDPLATFORM so the Go builds cross-compile natively from the
 # host arch (fast). The eBPF .o files, which cannot be cleanly cross-compiled
 # by bpf2go, are produced in the separate `bpf-gen` stage below (which runs
 # at $TARGETPLATFORM — native on same-arch, emulated under QEMU otherwise).
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:7e3429507d92bb1e12fe45b7650c3dd3f24a4f0d1ca45622b1452834f54d8020 AS golang
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.27-azurelinux3.0@sha256:0452a87b996c31987d673fda2fe348b7c61c190509a63a421dbb482be101d1da AS golang
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
 FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260923@sha256:1324a2cf7ed34e5f48a1022816b205782b86c7305651658e611dcd3d30756751 AS azurelinux-core
@@ -20,13 +20,12 @@ FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20260923@sha256:792ea6e
 # .o files via bpf2go/clang — those require native target-arch execution and
 # cannot be cross-compiled from an amd64 host cleanly. Isolating this work in a
 # small dedicated stage keeps the rest of the build fast at $BUILDPLATFORM.
-FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:7e3429507d92bb1e12fe45b7650c3dd3f24a4f0d1ca45622b1452834f54d8020 AS bpf-gen
+FROM mcr.microsoft.com/oss/go/microsoft/golang:1.27-azurelinux3.0@sha256:0452a87b996c31987d673fda2fe348b7c61c190509a63a421dbb482be101d1da AS bpf-gen
 ARG GOOS=linux
 ARG GOARCH=amd64
 ENV GOOS=${GOOS}
 ENV GOARCH=${GOARCH}
 ENV CGO_ENABLED=0
-ENV GOEXPERIMENT=ms_nocgo_opensslcrypto
 RUN if [ "$GOOS" = "linux" ] ; then \
     tdnf install -y clang lld bpftool libbpf-devel; \
     fi
@@ -50,10 +49,6 @@ RUN set -eu; \
 
 # intermediate go generate stage
 FROM golang AS intermediate 
-# systemcrypto without cgo — required for arm64 cross-compile from amd64 host
-# (Go auto-disables cgo when cross-compiling, and systemcrypto in Go <=1.26
-# requires cgo unless this experiment is set). Becomes redundant with Go 1.27+.
-ENV GOEXPERIMENT=ms_nocgo_opensslcrypto
 ARG APP_INSIGHTS_ID # set to enable AI telemetry
 ARG GOARCH=amd64 # default to amd64
 ARG GOOS=linux # default to linux
@@ -75,7 +70,6 @@ RUN if [ "$GOOS" = "linux" ] ; then \
 FROM golang AS hubble-bin
 ARG GOARCH=amd64
 ENV GOARCH=${GOARCH}
-ENV GOEXPERIMENT=ms_nocgo_opensslcrypto
 WORKDIR /go/src/github.com/microsoft/retina
 COPY ./go.mod ./go.sum ./
 RUN go mod download
