@@ -23,6 +23,12 @@ updates:
     # never becomes eligible.
     cooldown:
       default-days: 2
+    ignore:
+      # A Go minor version moves together with the go.mod toolchain line and
+      # the build changes it needs, so maintainers bump it by hand. Digest
+      # updates within a minor version still arrive here.
+      - dependency-name: "oss/go/microsoft/golang"
+        update-types: ["version-update:semver-minor"]
     groups:
       golang-base:
         patterns: ["*golang*"]
