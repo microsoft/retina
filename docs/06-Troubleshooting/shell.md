@@ -4,7 +4,7 @@
 
 The `retina shell` command allows you to start an interactive shell on a Kubernetes node or pod for adhoc debugging.
 
-This runs a container image built from the Dockerfile in the `/shell` directory, with many common networking tools installed (`ping`, `curl`, etc.), as well as specialized tools such as [bpftool](#bpftool), [bpftrace](#bpftrace) [pwru](#pwru) or [Inspektor Gadget](#inspektor-gadget-ig).
+This runs a container image built from the Dockerfile in the `/shell` directory, with many common networking tools installed (`ping`, `curl`, etc.), a text editor (`nano`), as well as specialized tools such as [bpftool](#bpftool), [bpftrace](#bpftrace), [crictl](#crictl), [pwru](#pwru) or [Inspektor Gadget](#inspektor-gadget-ig).
 
 Currently the Retina Shell only works in Linux environments. Windows support will be added in the future.
 
@@ -120,6 +120,8 @@ NOTICE.txt  bin  boot  dev  etc  home  lib  lib64  libx32  lost+found  media  mn
 
 The host filesystem is mounted read-only by default. If you need write access, use the `--allow-host-filesystem-write` flag.
 
+>NOTE: The host's `/run` is mounted separately and is always read-write, because tools such as [crictl](#crictl) need to write to the container runtime socket. `--allow-host-filesystem-write` controls only the `/host` mount.
+
 Symlinks between files on the host filesystem may not resolve correctly. If you see "No such file or directory" errors for symlinks, try following the instructions below to `chroot` to the host filesystem.
 
 ## Chroot to the host filesystem
@@ -164,6 +166,35 @@ root [ / ]# chroot /host systemctl status | head -n 2
 ```
 
 >NOTE: If `systemctl` shows an error "Failed to connect to bus: No data available", check that the `retina shell` command has `--host-pid` set and that you have chroot'd to /host.
+
+## [crictl](https://github.com/kubernetes-sigs/cri-tools)
+
+CLI for CRI-compatible container runtimes. Useful for inspecting the node's containers and pods from the runtime's point of view: which container owns a network namespace, why a container keeps restarting, or what it logged before it died.
+
+`crictl` talks to the container runtime socket under `/run`, which is mounted into the shell by `--mount-host-filesystem`. No extra capabilities are required.
+
+```shell
+kubectl retina shell <node-name> --mount-host-filesystem
+```
+
+You can then run, for example:
+
+```shell
+crictl ps
+crictl pods --namespace kube-system
+crictl inspect <container-id>
+crictl logs <container-id>
+```
+
+>NOTE: `crictl logs` reads the kubelet's log files at `/var/log/pods`, which exist only on the host filesystem. The image ships a symlink from `/var/log/pods` to `/host/var/log/pods`, so the command works when `--mount-host-filesystem` is set. The read-only `/host` mount is enough.
+
+The image ships an `/etc/crictl.yaml` pointing at the containerd socket. On clusters running a different CRI implementation, override the endpoint:
+
+```shell
+crictl --runtime-endpoint unix:///run/crio/crio.sock ps
+```
+
+>NOTE: Write access to the container runtime socket is equivalent to root on the node. `crictl` is inert without `--mount-host-filesystem`, which is the flag that exposes the socket.
 
 ## [pwru](https://github.com/cilium/pwru)
 
