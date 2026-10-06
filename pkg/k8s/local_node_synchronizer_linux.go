@@ -41,3 +41,8 @@ func (n *nodeSynchronizer) InitLocalNode(_ context.Context, ln *node.LocalNode) 
 func (n *nodeSynchronizer) SyncLocalNode(context.Context, *node.LocalNodeStore) {
 	n.l.Info("SyncLocalNode called")
 }
+
+// Retina seeds NODE_IP synchronously in InitLocalNode, so there is nothing to wait for.
+func (n *nodeSynchronizer) WaitForNodeInformation(context.Context, *node.LocalNodeStore) error {
+	return nil
+}

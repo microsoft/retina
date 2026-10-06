@@ -4,8 +4,8 @@ import (
 	"log/slog"
 	"os"
 
-	datapath "github.com/cilium/cilium/pkg/datapath/types"
 	"github.com/cilium/cilium/pkg/ipcache"
+	"github.com/cilium/cilium/pkg/node"
 	"github.com/cilium/cilium/pkg/node/types"
 	"github.com/cilium/hive/cell"
 	"github.com/microsoft/retina/pkg/config"
@@ -52,7 +52,7 @@ func newNodeController(params params) (*NodeReconciler, error) {
 		clusterName: params.Config.ClusterName,
 		l:           log.Logger().Named("node-controller"),
 		nodes:       make(map[string]types.Node),
-		handlers:    make(map[string]datapath.NodeHandler),
+		handlers:    make(map[node.Handler]struct{}),
 		c:           params.IPCache,
 		localNodeIP: os.Getenv("NODE_IP"),
 	}

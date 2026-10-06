@@ -4,10 +4,10 @@
 package ebpfwindows
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 
-	"github.com/cilium/cilium/pkg/byteorder"
 	"github.com/cilium/cilium/pkg/identity"
 )
 
@@ -111,7 +111,7 @@ func (n *PktmonDropNotify) decodePktmonDrop(data []byte) error {
 	if l := len(data); l < dropPktmonNotifyV1Len {
 		return fmt.Errorf("%w: expected at least %d but got %d", errUnexpectedDropNotifyLength, dropPktmonNotifyV1Len, l)
 	}
-	version := byteorder.Native.Uint16(data[2:4])
+	version := binary.NativeEndian.Uint16(data[2:4])
 
 	if version != DropNotifyVersion1 {
 		return fmt.Errorf("%w: Unrecognized drop event version %d", errInvalidPktmonDropNotifyVersion, version)
@@ -121,21 +121,21 @@ func (n *PktmonDropNotify) decodePktmonDrop(data []byte) error {
 	n.VersionHeader.Type = data[0]
 	n.VersionHeader.Version = version
 	n.PktmonHeader.EventID = data[4]
-	n.PktmonHeader.PacketDescriptor.PacketOriginalLength = byteorder.Native.Uint32(data[5:9])
-	n.PktmonHeader.PacketDescriptor.PacketLoggedLength = byteorder.Native.Uint32(data[9:13])
-	n.PktmonHeader.PacketDescriptor.PacketMetadataLength = byteorder.Native.Uint32(data[13:17])
-	n.PktmonHeader.Metadata.PktGroupID = byteorder.Native.Uint64(data[17:25])
-	n.PktmonHeader.Metadata.PktCount = byteorder.Native.Uint16(data[25:27])
-	n.PktmonHeader.Metadata.AppearanceCount = byteorder.Native.Uint16(data[27:29])
-	n.PktmonHeader.Metadata.DirectionName = byteorder.Native.Uint16(data[29:31])
-	n.PktmonHeader.Metadata.PacketType = byteorder.Native.Uint16(data[31:33])
-	n.PktmonHeader.Metadata.ComponentID = byteorder.Native.Uint16(data[33:35])
-	n.PktmonHeader.Metadata.EdgeID = byteorder.Native.Uint16(data[35:37])
-	n.PktmonHeader.Metadata.FilterID = byteorder.Native.Uint16(data[37:39])
-	n.PktmonHeader.Metadata.DropReason = byteorder.Native.Uint32(data[39:43])
-	n.PktmonHeader.Metadata.DropLocation = byteorder.Native.Uint32(data[43:47])
-	n.PktmonHeader.Metadata.ProcNum = byteorder.Native.Uint16(data[47:49])
-	n.PktmonHeader.Metadata.Timestamp = byteorder.Native.Uint64(data[49:57])
+	n.PktmonHeader.PacketDescriptor.PacketOriginalLength = binary.NativeEndian.Uint32(data[5:9])
+	n.PktmonHeader.PacketDescriptor.PacketLoggedLength = binary.NativeEndian.Uint32(data[9:13])
+	n.PktmonHeader.PacketDescriptor.PacketMetadataLength = binary.NativeEndian.Uint32(data[13:17])
+	n.PktmonHeader.Metadata.PktGroupID = binary.NativeEndian.Uint64(data[17:25])
+	n.PktmonHeader.Metadata.PktCount = binary.NativeEndian.Uint16(data[25:27])
+	n.PktmonHeader.Metadata.AppearanceCount = binary.NativeEndian.Uint16(data[27:29])
+	n.PktmonHeader.Metadata.DirectionName = binary.NativeEndian.Uint16(data[29:31])
+	n.PktmonHeader.Metadata.PacketType = binary.NativeEndian.Uint16(data[31:33])
+	n.PktmonHeader.Metadata.ComponentID = binary.NativeEndian.Uint16(data[33:35])
+	n.PktmonHeader.Metadata.EdgeID = binary.NativeEndian.Uint16(data[35:37])
+	n.PktmonHeader.Metadata.FilterID = binary.NativeEndian.Uint16(data[37:39])
+	n.PktmonHeader.Metadata.DropReason = binary.NativeEndian.Uint32(data[39:43])
+	n.PktmonHeader.Metadata.DropLocation = binary.NativeEndian.Uint32(data[43:47])
+	n.PktmonHeader.Metadata.ProcNum = binary.NativeEndian.Uint16(data[47:49])
+	n.PktmonHeader.Metadata.Timestamp = binary.NativeEndian.Uint64(data[49:57])
 	return nil
 }
 
@@ -149,7 +149,7 @@ func (n *DropNotify) decodeDropNotify(data []byte) error {
 		return fmt.Errorf("%w: expected at least %d but got %d", errUnexpectedDropNotifyLength, dropNotifyV1Len, l)
 	}
 
-	version := byteorder.Native.Uint16(data[14:16])
+	version := binary.NativeEndian.Uint16(data[14:16])
 
 	// Check against max version.
 	if version > DropNotifyVersion1 {
@@ -159,18 +159,18 @@ func (n *DropNotify) decodeDropNotify(data []byte) error {
 	// Decode logic for version >= v0/v1.
 	n.Type = data[0]
 	n.SubType = data[1]
-	n.Source = byteorder.Native.Uint16(data[2:4])
-	n.Hash = byteorder.Native.Uint32(data[4:8])
-	n.OrigLen = byteorder.Native.Uint32(data[8:12])
-	n.CapLen = byteorder.Native.Uint16(data[12:14])
+	n.Source = binary.NativeEndian.Uint16(data[2:4])
+	n.Hash = binary.NativeEndian.Uint32(data[4:8])
+	n.OrigLen = binary.NativeEndian.Uint32(data[8:12])
+	n.CapLen = binary.NativeEndian.Uint16(data[12:14])
 	n.Version = version
-	n.SrcLabel = identity.NumericIdentity(byteorder.Native.Uint32(data[16:20]))
-	n.DstLabel = identity.NumericIdentity(byteorder.Native.Uint32(data[20:24]))
-	n.DstID = byteorder.Native.Uint32(data[24:28])
-	n.Line = byteorder.Native.Uint16(data[28:30])
+	n.SrcLabel = identity.NumericIdentity(binary.NativeEndian.Uint32(data[16:20]))
+	n.DstLabel = identity.NumericIdentity(binary.NativeEndian.Uint32(data[20:24]))
+	n.DstID = binary.NativeEndian.Uint32(data[24:28])
+	n.Line = binary.NativeEndian.Uint16(data[28:30])
 	n.File = data[30]
 	n.ExtError = int8(data[31]) //nolint:gosec // data[31] is a bounded error code field that fits in int8
-	n.Ifindex = byteorder.Native.Uint32(data[32:36])
+	n.Ifindex = binary.NativeEndian.Uint32(data[32:36])
 
 	return nil
 }
