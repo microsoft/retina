@@ -54,6 +54,10 @@ type NetstatOpts struct {
 
 These are initialized in the linuxutil.go file.
 
+> **Note:** The current runtime sets `errOrDropKeysOnly: true` and
+> `addZeroVal: false`. Therefore, `interface_stats` includes only non-zero
+> counters containing `err` or `drop`, aggregated as `all_interfaces`.
+
 ## Label Values for `tcp_connection_stats`
 
 Below is a running list of all statistics for the metric `tcp_connection_stats`, captured from the `netstats` utility:
@@ -108,3 +112,8 @@ Below is a running list of all statistics for the metric `tcp_connection_stats`,
 - `TWRecycled`
 - `TcpDuplicateDataRehash`
 - `TcpTimeoutRehash`
+
+> **Note:** This is a source-level list, not the current emitted allowlist.
+> Production Linux emits only non-zero names in `netstatCuratedKeys`; for
+> example, `TCPTSReorder` is currently filtered out. `ResetCount` is a Windows
+> `hnsstats` statistic.
