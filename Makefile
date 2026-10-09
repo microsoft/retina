@@ -406,28 +406,29 @@ build-windows-binaries: ## Build Windows binaries
 # Command that creates a multi-arch index from per-platform image references.
 # The Azure DevOps pipeline has no docker CLI and passes hack/scripts/oras-index.sh.
 MANIFEST_CREATE ?= docker buildx imagetools create -t
+MANIFEST_TAG ?= $(TAG)
 
 manifest-retina-image: ## create a multiplatform manifest for the retina image
-	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_IMAGE):$(TAG))
-	$(eval FULL_INIT_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE):$(TAG))
-	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64 windows-ltsc2022-amd64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
-	$(MANIFEST_CREATE) $(FULL_INIT_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_INIT_IMAGE_NAME)-$(subst /,-,$(platform)))
+	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_IMAGE))
+	$(eval FULL_INIT_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE))
+	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,linux/amd64 linux/arm64 windows-ltsc2022-amd64, $(FULL_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
+	$(MANIFEST_CREATE) $(FULL_INIT_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,linux/amd64 linux/arm64, $(FULL_INIT_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
 
 manifest-operator-image: ## create a multiplatform manifest for the operator image
-	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE):$(TAG))
-	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE))
+	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
 
 manifest-shell-image:
-	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_SHELL_IMAGE):$(TAG))
-	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_SHELL_IMAGE))
+	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
 
 manifest-kubectl-retina-image:
-	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(KUBECTL_RETINA_IMAGE):$(TAG))
-	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(KUBECTL_RETINA_IMAGE))
+	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
 
 manifest-kubectl-retina-shell-image:
-	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(KUBECTL_RETINA_SHELL_IMAGE):$(TAG))
-	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(KUBECTL_RETINA_SHELL_IMAGE))
+	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
 
 manifest:
 	echo "Building for $(COMPONENT)"

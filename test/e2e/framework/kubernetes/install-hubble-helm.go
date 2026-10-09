@@ -75,9 +75,6 @@ func (v *InstallHubbleHelmChart) Run() error {
 
 	// value overrides; helm merges these onto the chart defaults
 	overrides := map[string]any{
-		"imagePullSecrets": []map[string]any{
-			{"name": "acr-credentials"},
-		},
 		"operator": map[string]any{
 			"enabled":    true,
 			"repository": imageRegistry + "/" + imageNamespace + "/retina-operator",
