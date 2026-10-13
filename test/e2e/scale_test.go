@@ -88,7 +88,10 @@ func TestE2ERetina_Scale(t *testing.T) {
 	infra := types.NewRunner(t, jobs.GetScaleTestInfra(subID, rg, clusterName, location, common.KubeConfigFilePath(rootDir), int32(nodes), *common.CreateInfra))
 
 	t.Cleanup(func() {
-		_ = jobs.DeleteTestInfra(subID, rg, location, *common.DeleteInfra).Run()
+		err := jobs.DeleteTestInfra(subID, rg, clusterName, location, *common.DeleteInfra).Run()
+		if err != nil {
+			t.Logf("Failed to delete scale test infrastructure: %v", err)
+		}
 	})
 
 	infra.Run(ctx)

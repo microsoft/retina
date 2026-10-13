@@ -175,7 +175,7 @@ func (p *Plugin) eventsMapCallback(data unsafe.Pointer, size uint32) {
 }
 
 func (p *Plugin) emitAdvancedEvent(e *v1.Event) {
-	if !p.cfg.RemoteContext {
+	if !p.cfg.BypassLookupIPOfInterest {
 		fl := e.GetFlow()
 		srcIP := net.ParseIP(fl.GetIP().GetSource())
 		dstIP := net.ParseIP(fl.GetIP().GetDestination())

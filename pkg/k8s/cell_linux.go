@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"log/slog"
 
-	daemonk8s "github.com/cilium/cilium/daemon/k8s"
 	cgmngr "github.com/cilium/cilium/pkg/cgroups/manager"
 	cmtypes "github.com/cilium/cilium/pkg/clustermesh/types"
-	fakedp "github.com/cilium/cilium/pkg/datapath/fake/types"
-	"github.com/cilium/cilium/pkg/datapath/iptables/ipset"
+	"github.com/cilium/cilium/pkg/datapath/iptables"
+	iptablesfake "github.com/cilium/cilium/pkg/datapath/iptables/fake"
+	ipsecfake "github.com/cilium/cilium/pkg/datapath/linux/ipsec/fake"
+	ipsectypes "github.com/cilium/cilium/pkg/datapath/linux/ipsec/types"
 	"github.com/cilium/cilium/pkg/datapath/tables"
-	datapath "github.com/cilium/cilium/pkg/datapath/types"
 	"github.com/cilium/cilium/pkg/endpointmanager"
 	"github.com/cilium/cilium/pkg/endpointstate"
 	"github.com/cilium/cilium/pkg/identity"
@@ -24,8 +24,8 @@ import (
 	"github.com/cilium/cilium/pkg/k8s/client"
 	"github.com/cilium/cilium/pkg/k8s/resource"
 	slim_corev1 "github.com/cilium/cilium/pkg/k8s/slim/k8s/api/core/v1"
-	slim_networkingv1 "github.com/cilium/cilium/pkg/k8s/slim/k8s/api/networking/v1"
 	"github.com/cilium/cilium/pkg/k8s/synced"
+	k8stables "github.com/cilium/cilium/pkg/k8s/tables"
 	k8sTypes "github.com/cilium/cilium/pkg/k8s/types"
 	"github.com/cilium/cilium/pkg/k8s/watchers"
 	"github.com/cilium/cilium/pkg/labelsfilter"
@@ -36,10 +36,10 @@ import (
 	policycell "github.com/cilium/cilium/pkg/policy/cell"
 	"github.com/cilium/cilium/pkg/promise"
 	testidentity "github.com/cilium/cilium/pkg/testutils/identity"
+	wgfake "github.com/cilium/cilium/pkg/wireguard/fake"
 	wgtypes "github.com/cilium/cilium/pkg/wireguard/types"
 	"github.com/cilium/hive/cell"
 	"github.com/cilium/statedb"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
 
 	"github.com/microsoft/retina/pkg/common"
@@ -60,25 +60,20 @@ var Cell = cell.Module(
 	stubsCell,
 )
 
-// infrastructureCell provides StateDB tables, metrics, cgroups, and other
-// foundational components that Cilium's internals depend on.
+// infrastructureCell provides the pod/namespace StateDB tables, metrics,
+// cgroups, and other foundational components that Cilium's internals depend on.
 // Breaks when: Cilium adds new table types or changes table registration APIs.
 var infrastructureCell = cell.Group(
-	daemonk8s.PodTableCell,
-	daemonk8s.NamespaceTableCell,
+	k8stables.PodTableCell,
+	k8stables.NamespaceTableCell,
 
+	// Node-address table consumed by Cilium's pod watcher.
 	cell.Provide(
-		tables.NewDeviceTable,
-		statedb.RWTable[*tables.Device].ToTable,
+		tables.NewNodeAddressTable,
+		statedb.RWTable[tables.NodeAddress].ToTable,
 	),
 
-	// Service cache tables
-	cell.Provide(func(db *statedb.DB) (statedb.RWTable[tables.NodeAddress], error) {
-		return statedb.NewTable(db, tables.NodeAddressTableName, tables.NodeAddressIndex)
-	}),
-	cell.Provide(statedb.RWTable[tables.NodeAddress].ToTable),
-
-	// Loadbalancer config (required by some Cilium cells)
+	// Load-balancer config for the pod watcher and frontend state for the K8s client.
 	loadbalancer.ConfigCell,
 	cell.Provide(newFrontendsTable),
 
@@ -91,7 +86,7 @@ var infrastructureCell = cell.Group(
 
 // ipcacheCell provides identity allocation and IPCache — the core
 // components Hubble uses to enrich flows with pod/namespace metadata.
-// Breaks when: Cilium changes identity allocator APIs or IPCache config.
+// Breaks when: Cilium changes identity, IPCache, or LocalNodeSynchronizer APIs.
 var ipcacheCell = cell.Group(
 	identitycachecell.Cell,
 	endpointmanager.Cell,
@@ -103,12 +98,11 @@ var ipcacheCell = cell.Group(
 	cell.Provide(newNodeSynchronizer),
 )
 
-// watcherCell sets up K8s resource watches for CiliumEndpoint, Services,
-// and Endpoints. These feed data into IPCache for flow enrichment.
+// watcherCell feeds CiliumEndpoint events into IPCache and Service events into
+// Retina's Hubble service resolver.
 // Breaks when: Cilium changes resource constructor signatures or watcher config.
 var watcherCell = cell.Group(
 	cell.Provide(newCiliumEndpointResource),
-	cell.Provide(newEndpointsResource),
 	cell.Provide(newServiceResource),
 
 	cell.Provide(func() watchers.WatcherConfiguration { return &watcherconfig{} }),
@@ -128,44 +122,26 @@ var watcherCell = cell.Group(
 var stubsCell = cell.Group(
 	// Fake K8s resources for features Retina doesn't watch
 	cell.Provide(
-		func() resource.Resource[*slim_corev1.Namespace] { return &fakeresource[*slim_corev1.Namespace]{} },
-		func() daemonk8s.LocalNodeResource { return &fakeresource[*slim_corev1.Node]{} },
-		func() daemonk8s.LocalCiliumNodeResource { return &fakeresource[*cilium_api_v2.CiliumNode]{} },
-		func() resource.Resource[*slim_networkingv1.NetworkPolicy] {
-			return &fakeresource[*slim_networkingv1.NetworkPolicy]{}
-		},
-		func() resource.Resource[*cilium_api_v2.CiliumNetworkPolicy] {
-			return &fakeresource[*cilium_api_v2.CiliumNetworkPolicy]{}
-		},
-		func() resource.Resource[*cilium_api_v2.CiliumClusterwideNetworkPolicy] {
-			return &fakeresource[*cilium_api_v2.CiliumClusterwideNetworkPolicy]{}
-		},
-		func() resource.Resource[*cilium_api_v2alpha1.CiliumCIDRGroup] {
-			return &fakeresource[*cilium_api_v2alpha1.CiliumCIDRGroup]{}
-		},
-		func() resource.Resource[*cilium_api_v2.CiliumCIDRGroup] {
-			return &fakeresource[*cilium_api_v2.CiliumCIDRGroup]{}
+		func() resource.Resource[*cilium_api_v2.CiliumNode] {
+			return &fakeresource[*cilium_api_v2.CiliumNode]{}
 		},
 		func() resource.Resource[*cilium_api_v2alpha1.CiliumEndpointSlice] {
 			return &fakeresource[*cilium_api_v2alpha1.CiliumEndpointSlice]{}
 		},
-		func() resource.Resource[*cilium_api_v2.CiliumNode] {
-			return &fakeresource[*cilium_api_v2.CiliumNode]{}
-		},
 	),
 
 	// No-op policy/datapath (Retina doesn't use Cilium's policy engine).
-	// Uses Cilium's own fake types from pkg/datapath/fake/types where available.
+	// Uses Cilium's own per-subsystem fake packages where available.
 	cell.Provide(
-		func() policy.PolicyRepository { return &NoOpPolicyRepository{} },
-		func() datapath.Orchestrator { return &fakedp.FakeOrchestrator{} },
 		func() policycell.IdentityUpdater { return &noOpIdentityUpdater{} },
+		// Safe only while no consumer calls IPCache.GetNamedPorts: that enables
+		// named-port updates, which would call this zero-value Updater and
+		// panic. Use policy.NewUpdater if that changes.
 		func() *policy.Updater { return &policy.Updater{} },
-		func() datapath.BandwidthManager { return &fakedp.BandwidthManager{} },
-		func() ipset.Manager { return &fakedp.IPSet{} },
-		func() wgtypes.WireguardConfig { return fakedp.WireguardConfig{} },
-		func() datapath.IPsecConfig { return fakedp.IPsecConfig{} },
-		func() datapath.IptablesManager { return fakedp.NewIptablesManager() },
+		func() wgtypes.Config { return wgfake.Config{} },
+		func() ipsectypes.Config { return ipsecfake.Config{} },
+		func() iptables.Manager { return iptablesfake.NewManager() },
+		// endpointmanager.Cell awaits this before starting its periodic controllers.
 		func() promise.Promise[endpointstate.Restorer] {
 			r, p := promise.New[endpointstate.Restorer]()
 			r.Resolve(&fakeRestorer{})
@@ -202,24 +178,19 @@ func newNodeSynchronizer(l *slog.Logger) node.LocalNodeSynchronizer {
 	return &nodeSynchronizer{l: l.With("module", "node-synchronizer")}
 }
 
+// CiliumSlimEndpointResource dereferences localNodeStore while indexing each
+// endpoint, so nil would panic on the first event.
 func newCiliumEndpointResource(
-	lc cell.Lifecycle, cs client.Clientset, mp workqueue.MetricsProvider,
+	l *slog.Logger, lc cell.Lifecycle, cs client.Clientset, mp workqueue.MetricsProvider,
+	localNodeStore *node.LocalNodeStore,
 ) (resource.Resource[*k8sTypes.CiliumEndpoint], error) {
 	//nolint:wrapcheck // wrapped error here is of dubious value
 	return ciliumk8s.CiliumSlimEndpointResource(ciliumk8s.CiliumResourceParams{
-		Lifecycle: lc,
-		ClientSet: cs,
-	}, nil, mp, func(*metav1.ListOptions) {})
-}
-
-func newEndpointsResource(
-	l *slog.Logger, lc cell.Lifecycle, cs client.Clientset, mp workqueue.MetricsProvider,
-) (resource.Resource[*ciliumk8s.Endpoints], error) {
-	//nolint:wrapcheck // wrapped error here is of dubious value
-	return ciliumk8s.EndpointsResource(l, lc, ciliumk8s.ConfigParams{
-		Config:      ciliumk8s.Config{K8sServiceProxyName: ""},
-		WatchConfig: ciliumk8s.ServiceWatchConfig{EnableHeadlessServiceWatch: true},
-	}, cs, mp)
+		Logger:          l,
+		Lifecycle:       lc,
+		ClientSet:       cs,
+		MetricsProvider: mp,
+	}, localNodeStore, mp)
 }
 
 func newServiceResource(
@@ -234,7 +205,6 @@ func newServiceResource(
 		},
 		cs,
 		mp,
-		func(*metav1.ListOptions) {},
 	)
 }
 

@@ -6,7 +6,7 @@ package capture
 import (
 	"errors"
 	"fmt"
-	"path/filepath"
+	"path"
 	"regexp"
 	"strings"
 )
@@ -56,8 +56,8 @@ func ValidateHostPathBaseDir(baseDir string) (string, error) {
 	if baseDir == "" {
 		baseDir = DefaultHostPathBaseDir
 	}
-	cleaned := filepath.Clean(baseDir)
-	if !filepath.IsAbs(cleaned) {
+	cleaned := path.Clean(baseDir)
+	if !path.IsAbs(cleaned) {
 		return "", fmt.Errorf("%w: %q must be absolute", ErrHostPathBaseDir, baseDir)
 	}
 	if UnsafePathChars.MatchString(cleaned) {
@@ -93,8 +93,8 @@ func validateHostPath(raw, baseDir string) (string, error) {
 
 	// Reject absolute paths up front, in both POSIX and Windows styles, so existing
 	// CRs that supplied an absolute host path fail loudly instead of being silently
-	// rewritten by filepath.Join.
-	if filepath.IsAbs(raw) ||
+	// rewritten by path.Join.
+	if path.IsAbs(raw) ||
 		strings.HasPrefix(raw, "/") ||
 		strings.HasPrefix(raw, `\`) ||
 		winDriveLetter.MatchString(raw) {
@@ -111,20 +111,19 @@ func validateHostPath(raw, baseDir string) (string, error) {
 		return "", fmt.Errorf("%w: %q", ErrHostPathTraversal, raw)
 	}
 
-	cleanedSub := filepath.Clean(raw)
+	cleanedSub := path.Clean(raw)
 	if cleanedSub == "." || cleanedSub == "" {
 		return "", ErrHostPathEmpty
 	}
-	if filepath.IsAbs(cleanedSub) || strings.HasPrefix(cleanedSub, "/") || strings.HasPrefix(cleanedSub, `\`) {
+	if path.IsAbs(cleanedSub) || strings.HasPrefix(cleanedSub, "/") || strings.HasPrefix(cleanedSub, `\`) {
 		return "", fmt.Errorf("%w: %q", ErrHostPathAbsolute, raw)
 	}
 	if containsParentSegment(cleanedSub) {
 		return "", fmt.Errorf("%w: %q", ErrHostPathTraversal, raw)
 	}
 
-	joined := filepath.Clean(filepath.Join(cleanedBase, cleanedSub))
-	rel, err := filepath.Rel(cleanedBase, joined)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+	joined := path.Clean(path.Join(cleanedBase, cleanedSub))
+	if cleanedBase != "/" && joined != cleanedBase && !strings.HasPrefix(joined, cleanedBase+"/") {
 		return "", fmt.Errorf("%w: %q resolves to %q (base %q)", ErrHostPathEscapesBase, raw, joined, cleanedBase)
 	}
 

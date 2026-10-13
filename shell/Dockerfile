@@ -2,7 +2,7 @@
 # its standard library tracks the golang base image instead of the upstream
 # release cadence. Upstream publishes binaries only on tags.
 # skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:3c78e9858004d1c43aea08829306c76c3bf870c26b98c8c07ea6ca74c54787cf AS pwru-build
+FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:7e3429507d92bb1e12fe45b7650c3dd3f24a4f0d1ca45622b1452834f54d8020 AS pwru-build
 RUN tdnf install -y make git clang llvm gcc glibc-static gawk file flex bison tar diffutils
 # https://github.com/cilium/pwru/releases/tag/v1.0.12
 ARG PWRU_COMMIT=f1d6cf8898953ac1560401e181f3ac5f0e33b486
@@ -26,11 +26,13 @@ RUN set -eux; \
     ./pwru --version
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260825@sha256:daa1142fc6b44e27c8112ec6b4c2d579ddb9bc6b3747504e666010a45a51faa4
+FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261005@sha256:bfd3e44899fe7c17f6fda42a6ef2a322f2178c2dafb88e69fd87675cdcac39ec
 
+# Keep this pin until the Azure Linux base includes pcre2 >= 10.48-1.azl3; verify both architectures before removing.
 RUN tdnf install -y \
 	bind-utils \
 	conntrack \
+	cri-tools \
 	curl \
 	ebtables-legacy \
 	ethtool \
@@ -42,11 +44,13 @@ RUN tdnf install -y \
 	jq \
 	ldns-utils \
 	less \
+	nano \
 	net-tools \
 	nftables \
 	nmap \
 	nmap-ncat \
 	openssh \
+	pcre2-10.48-1.azl3 \
 	procps-ng \
 	sysstat \
 	socat \
@@ -57,7 +61,11 @@ RUN tdnf install -y \
 	bpftool \
 	bpftrace \
 	ig \
-	&& tdnf clean all
+	&& tdnf clean all \
+	# cri-tools also installs critest, a CRI conformance suite binary as large
+	# as crictl itself and with no use in a debug shell. Remove it in the same
+	# layer so the image does not store it.
+	&& rm /usr/bin/critest
 
 # Create the entrypoint script to mount debugfs and tracefs
 SHELL ["/bin/bash", "-c"]
@@ -75,6 +83,19 @@ exec "$@"' > /usr/local/bin/entrypoint.sh;
 ENV HOST_ROOT=/host
 
 RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# Point crictl at the containerd socket, which is exposed under /run when the
+# shell is started with --mount-host-filesystem. Override with
+# `crictl --runtime-endpoint` on clusters running a different CRI implementation.
+RUN echo $'runtime-endpoint: unix:///run/containerd/containerd.sock\n\
+image-endpoint: unix:///run/containerd/containerd.sock\n\
+timeout: 10' > /etc/crictl.yaml
+
+# crictl logs opens the kubelet's log files at /var/log/pods itself; the CRI
+# API does not stream log content. The files exist only on the host, so
+# resolve the path through the read-only /host mount. The link dangles
+# harmlessly when --mount-host-filesystem is not set.
+RUN ln -s /host/var/log/pods /var/log/pods
 
 # Set the entrypoint
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
