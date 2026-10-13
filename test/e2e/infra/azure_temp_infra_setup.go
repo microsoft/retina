@@ -38,7 +38,7 @@ func CreateAzureTempK8sInfra(ctx context.Context, t *testing.T, rootDir string) 
 	// CreateTestInfra
 	createTestInfra := types.NewRunner(t, jobs.CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath, *common.CreateInfra))
 	t.Cleanup(func() {
-		err := jobs.DeleteTestInfra(subID, rg, location, *common.DeleteInfra).Run()
+		err := jobs.DeleteTestInfra(subID, rg, clusterName, location, *common.DeleteInfra).Run()
 		if err != nil {
 			t.Logf("Failed to delete test infrastructure: %v", err)
 		}

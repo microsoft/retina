@@ -43,6 +43,8 @@ The `Capture` CRD is defined with the following specifications:
       - `noTimestamp`, `unformattedTimestamp`, `deltaTimestamp`, `dateTimestamp`, `deltaSinceFirst`: Timestamp options (tcpdump -t, -tt, -ttt, -tttt, -ttttt). **Mutually exclusive** - set only one.
       - `dontVerifyChecksum`: Don't verify TCP checksums (tcpdump -K)
   - `captureTarget`: Defines the target on which the network packets will be captured. It includes namespace, node, and pod selectors, as well as specific pod names.
+    - If `podSelector` is set without `namespaceSelector`, matching Pods are only looked up in the Capture resource's own namespace (`metadata.namespace`).
+    - `podNames` are always looked up in the Capture resource's own namespace.
   - `filters`: Specifies filters for including or excluding network packets based on IP or port.
   - `includeMetadata`: Indicates whether networking metadata should be captured.
   - `tcpdumpFilter`: **DEPRECATED and will be removed.** Currently accepts BPF filter expressions only (no flags). Migrate to `captureOption.pcapFilter` for BPF expressions and `captureOption` boolean flags for display/output options (e.g., `noResolveDNS`, `packetBuffered`, `verbosity`).

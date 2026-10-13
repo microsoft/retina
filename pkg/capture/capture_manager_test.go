@@ -43,6 +43,7 @@ func TestCaptureNetwork(t *testing.T) {
 	os.Setenv(captureConstants.NodeHostNameEnvKey, nodeHostName)
 	os.Setenv(captureConstants.CaptureStartTimestampEnvKey, file.TimeToString(timestamp))
 	os.Setenv(captureConstants.TcpdumpFilterEnvKey, filter)
+	os.Setenv(captureConstants.NetshFilterEnvKey, filter)
 	os.Setenv(captureConstants.CaptureDurationEnvKey, "10s")
 	os.Setenv(captureConstants.CaptureMaxSizeEnvKey, strconv.Itoa(maxSize))
 
@@ -51,6 +52,7 @@ func TestCaptureNetwork(t *testing.T) {
 		os.Unsetenv(captureConstants.NodeHostNameEnvKey)
 		os.Unsetenv(captureConstants.CaptureStartTimestampEnvKey)
 		os.Unsetenv(captureConstants.TcpdumpFilterEnvKey)
+		os.Unsetenv(captureConstants.NetshFilterEnvKey)
 		os.Unsetenv(captureConstants.CaptureDurationEnvKey)
 		os.Unsetenv(captureConstants.CaptureMaxSizeEnvKey)
 	}()

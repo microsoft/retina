@@ -1,6 +1,5 @@
 # retina Performance Test pipeline (Azure DevOps).
 #
-# Mirrors .github/workflows/perf-schedule.yaml + perf-manual.yaml + perf-template.yaml.
 # Scheduled: twice-daily at 00:17 and 12:17 UTC (both basic and advanced).
 # Manual: single mode chosen at queue time.
 #

@@ -1,5 +1,5 @@
 # skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:3c78e9858004d1c43aea08829306c76c3bf870c26b98c8c07ea6ca74c54787cf AS builder
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:7e3429507d92bb1e12fe45b7650c3dd3f24a4f0d1ca45622b1452834f54d8020 AS builder
 
 # systemcrypto without cgo — required for arm64 cross-compile from amd64 host.
 # Becomes redundant with Go 1.27+ (auto-selected when CGO_ENABLED=0).
@@ -11,7 +11,12 @@ ARG APP_INSIGHTS_ID
 WORKDIR /workspace
 COPY . .
 
-RUN tdnf install -y jq
+# Keep this pin until the Azure Linux base includes pcre2 >= 10.48-1.azl3; verify both architectures before removing.
+RUN tdnf install -y \
+	jq \
+	libxml2-2.11.5-11.azl3 \
+	pcre2-10.48-1.azl3 \
+	util-linux-2.40.2-6.azl3
 
 # Default linux/architecture.
 ARG GOOS=linux
@@ -36,7 +41,7 @@ RUN --mount=type=cache,target="/root/.cache/go-build" \
 # Final image must be $TARGETPLATFORM (default), not $BUILDPLATFORM — the
 # retina-operator binary is cross-compiled for the target arch and would fail
 # to run inside a wrong-arch base image.
-FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20260809@sha256:4435f90009c17fb750e5518a3f43a24a629ac4c4f8c222b50f6adfe5e0d0bf2d
+FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20260923@sha256:792ea6ed971a69bbca863882354d4ff197ca461e0f699d0256653f7886a62d42
 WORKDIR /
 COPY --from=builder /lib /lib
 COPY --from=builder /usr/lib/ /usr/lib

@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -175,8 +176,8 @@ func getDownloadCmd(node *corev1.Node, hostPath, fileName string) (*DownloadCmd,
 			FileReadCommand:  []string{"cmd", "/c", "type", srcFilePath},
 		}, nil
 	case LinuxOS:
-		srcFilePath := "/" + filepath.Join("host", hostPath, fileName) + ".tar.gz"
-		mountPath := "/" + filepath.Join("host", hostPath)
+		srcFilePath := "/" + path.Join("host", hostPath, fileName) + ".tar.gz"
+		mountPath := "/" + path.Join("host", hostPath)
 		return &DownloadCmd{
 			ContainerImage:   "mcr.microsoft.com/azurelinux/busybox:1.36",
 			SrcFilePath:      srcFilePath,

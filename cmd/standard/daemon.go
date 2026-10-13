@@ -239,7 +239,7 @@ func (d *Daemon) Start() error {
 
 	// Setup RetinaEndpoint controller.
 	// TODO(mainred): This is to temporarily create a cache and pubsub for RetinaEndpoint, need to refactor this.
-	ctx := ctrl.SetupSignalHandler()
+	ctx := setupSignalHandler()
 	ctrl.SetLogger(zapr.NewLogger(zl.Logger.Named("controller-runtime")))
 
 	if daemonConfig.EnablePodLevel {

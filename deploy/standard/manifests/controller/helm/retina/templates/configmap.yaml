@@ -56,5 +56,6 @@ data:
     enablePodLevel: {{ .Values.enablePodLevel }}
     remoteContext: {{ .Values.remoteContext }}
     enableAnnotations: {{ .Values.enableAnnotations }}
+    bypassLookupIPOfInterest: {{ .Values.bypassLookupIPOfInterest }}
     telemetryInterval: {{ .Values.daemonset.telemetryInterval }}
 {{- end}}
