@@ -11,7 +11,7 @@ import (
 func TestGetConfig(t *testing.T) {
 	c, err := config.GetConfig("./testwith/config.yaml")
 	if err != nil {
-		t.Errorf("Expected no error, instead got %+v", err)
+		t.Fatalf("Expected no error, instead got %+v", err)
 	}
 
 	if !c.InstallCRDs ||
@@ -27,7 +27,7 @@ func TestGetConfig(t *testing.T) {
 func TestGetConfig_DefaultTelemetryInterval(t *testing.T) {
 	c, err := config.GetConfig("./testwith/config-without-telemetry-interval.yaml")
 	if err != nil {
-		t.Errorf("Expected no error, instead got %+v", err)
+		t.Fatalf("Expected no error, instead got %+v", err)
 	}
 
 	if c.TelemetryInterval != config.DefaultTelemetryInterval {

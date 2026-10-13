@@ -18,7 +18,6 @@ import (
 	"unsafe"
 
 	"github.com/cilium/cilium/api/v1/flow"
-	"github.com/cilium/cilium/pkg/byteorder"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	observerTypes "github.com/cilium/cilium/pkg/hubble/observer/types"
 	hubbleerrors "github.com/cilium/cilium/pkg/hubble/parser/errors"
@@ -355,6 +354,7 @@ func TestEmitAdvancedEvent(t *testing.T) {
 	tests := []struct {
 		name                string
 		remoteContext       bool
+		bypassLookup        bool
 		sourceSelected      bool
 		destinationSelected bool
 		wantWrite           bool
@@ -373,8 +373,24 @@ func TestEmitAdvancedEvent(t *testing.T) {
 			name: "local neither selected",
 		},
 		{
+			name:           "remote selected source",
+			remoteContext:  true,
+			sourceSelected: true,
+			wantWrite:      true,
+		},
+		{
 			name:          "remote neither selected",
 			remoteContext: true,
+		},
+		{
+			name:         "local bypasses lookup",
+			bypassLookup: true,
+			wantWrite:    true,
+		},
+		{
+			name:          "remote bypasses lookup",
+			remoteContext: true,
+			bypassLookup:  true,
 			wantWrite:     true,
 		},
 	}
@@ -393,7 +409,7 @@ func TestEmitAdvancedEvent(t *testing.T) {
 				},
 			}
 
-			if !tt.remoteContext {
+			if !tt.bypassLookup {
 				mockFilterManager.EXPECT().HasIP(net.ParseIP(sourceIP)).Return(tt.sourceSelected)
 				if !tt.sourceSelected {
 					mockFilterManager.EXPECT().HasIP(net.ParseIP(destinationIP)).Return(tt.destinationSelected)
@@ -405,7 +421,8 @@ func TestEmitAdvancedEvent(t *testing.T) {
 
 			p := &Plugin{
 				cfg: &kcfg.Config{
-					RemoteContext: tt.remoteContext,
+					RemoteContext:            tt.remoteContext,
+					BypassLookupIPOfInterest: tt.bypassLookup,
 				},
 				enricher:      mockEnricher,
 				filterManager: mockFilterManager,
@@ -458,9 +475,10 @@ func TestHandleTraceEvent_TraceNotify(t *testing.T) {
 
 	p := &Plugin{
 		cfg: &kcfg.Config{
-			MetricsInterval: 100 * time.Second,
-			EnablePodLevel:  true,
-			RemoteContext:   true,
+			MetricsInterval:          100 * time.Second,
+			EnablePodLevel:           true,
+			RemoteContext:            true,
+			BypassLookupIPOfInterest: true,
 		},
 		l: log.Logger().Named("test-ebpf"),
 	}
@@ -539,9 +557,10 @@ func TestHandleTraceEvent_DropNotify(t *testing.T) {
 
 	p := &Plugin{
 		cfg: &kcfg.Config{
-			MetricsInterval: 100 * time.Second,
-			EnablePodLevel:  true,
-			RemoteContext:   true,
+			MetricsInterval:          100 * time.Second,
+			EnablePodLevel:           true,
+			RemoteContext:            true,
+			BypassLookupIPOfInterest: true,
 		},
 		l: log.Logger().Named("test-ebpf"),
 	}
@@ -1175,9 +1194,10 @@ func TestHandleTraceEventWithEthPacket_PktmonDropNotify(t *testing.T) {
 
 	p := &Plugin{
 		cfg: &kcfg.Config{
-			MetricsInterval: 100 * time.Second,
-			EnablePodLevel:  true,
-			RemoteContext:   true,
+			MetricsInterval:          100 * time.Second,
+			EnablePodLevel:           true,
+			RemoteContext:            true,
+			BypassLookupIPOfInterest: true,
 		},
 		l: log.Logger().Named("test-ebpf"),
 	}
@@ -1264,9 +1284,10 @@ func TestHandleTraceEventWithIpPacket_PktmonDropNotify(t *testing.T) {
 
 	p := &Plugin{
 		cfg: &kcfg.Config{
-			MetricsInterval: 100 * time.Second,
-			EnablePodLevel:  true,
-			RemoteContext:   true,
+			MetricsInterval:          100 * time.Second,
+			EnablePodLevel:           true,
+			RemoteContext:            true,
+			BypassLookupIPOfInterest: true,
 		},
 		l: log.Logger().Named("test-ebpf"),
 	}
@@ -1355,9 +1376,10 @@ func TestHandleTraceEventWithIPv6Packet_PktmonDropNotify(t *testing.T) {
 
 	p := &Plugin{
 		cfg: &kcfg.Config{
-			MetricsInterval: 100 * time.Second,
-			EnablePodLevel:  true,
-			RemoteContext:   true,
+			MetricsInterval:          100 * time.Second,
+			EnablePodLevel:           true,
+			RemoteContext:            true,
+			BypassLookupIPOfInterest: true,
 		},
 		l: log.Logger().Named("test-ebpf"),
 	}
@@ -1446,9 +1468,10 @@ func TestHandleTraceEventWithUDPPacket_PktmonDropNotify(t *testing.T) {
 
 	p := &Plugin{
 		cfg: &kcfg.Config{
-			MetricsInterval: 100 * time.Second,
-			EnablePodLevel:  true,
-			RemoteContext:   true,
+			MetricsInterval:          100 * time.Second,
+			EnablePodLevel:           true,
+			RemoteContext:            true,
+			BypassLookupIPOfInterest: true,
 		},
 		l: log.Logger().Named("test-ebpf"),
 	}
@@ -1497,9 +1520,9 @@ func TestHandleTraceEventWithUDPPacket_PktmonDropNotify(t *testing.T) {
 func makePktmonDropHeader(version, packetType uint16) []byte {
 	header := make([]byte, dropPktmonNotifyV1Len)
 	header[0] = MessageTypePktmonDrop
-	byteorder.Native.PutUint16(header[2:4], version)
-	byteorder.Native.PutUint16(header[31:33], packetType)
-	byteorder.Native.PutUint32(header[39:43], 2)
+	binary.NativeEndian.PutUint16(header[2:4], version)
+	binary.NativeEndian.PutUint16(header[31:33], packetType)
+	binary.NativeEndian.PutUint32(header[39:43], 2)
 	return header
 }
 
@@ -1507,7 +1530,7 @@ func makePktmonDropHeader(version, packetType uint16) []byte {
 func makeDropNotifyHeader(version uint16) []byte {
 	header := make([]byte, dropNotifyV1Len)
 	header[0] = monitorapi.MessageTypeDrop
-	byteorder.Native.PutUint16(header[14:16], version)
+	binary.NativeEndian.PutUint16(header[14:16], version)
 	return header
 }
 
@@ -1515,7 +1538,7 @@ func makeDropNotifyHeader(version uint16) []byte {
 func makeTraceNotifyHeader(version uint16, length int) []byte {
 	header := make([]byte, length)
 	header[0] = monitorapi.MessageTypeTrace
-	byteorder.Native.PutUint16(header[14:16], version)
+	binary.NativeEndian.PutUint16(header[14:16], version)
 	return header
 }
 

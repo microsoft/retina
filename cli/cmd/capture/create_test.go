@@ -10,16 +10,25 @@ import (
 	"math/rand"
 	"strings"
 	"testing"
+	"time"
 
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+
+	retinacmd "github.com/microsoft/retina/cli/cmd"
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/internal/buildinfo"
 	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	"github.com/microsoft/retina/pkg/label"
+	retinalog "github.com/microsoft/retina/pkg/log"
 	"github.com/stretchr/testify/require"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 )
@@ -1235,6 +1244,302 @@ func TestCreateJobs_NoTTLWithoutCleanupFlag(t *testing.T) {
 	require.NotNil(t, createdJob)
 	require.Nil(t, createdJob.Spec.TTLSecondsAfterFinished,
 		"TTL should NOT be set without --cleanup-after-upload")
+}
+
+func TestWaitForJobsToStartReturnsFailedCreateEvent(t *testing.T) {
+	const (
+		jobName       = "capture-job"
+		jobUID        = types.UID("capture-job-uid")
+		denialMessage = "ValidatingAdmissionPolicy 'deny-pod-host-network' denied request: Host network usage is disallowed."
+	)
+	kubeClient := fake.NewClientset(
+		&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: jobName, Namespace: testNamespace, UID: jobUID}},
+		&corev1.Event{
+			ObjectMeta:     metav1.ObjectMeta{Name: "capture-job-failed-create", Namespace: testNamespace},
+			InvolvedObject: corev1.ObjectReference{Kind: "Job", Name: jobName, Namespace: testNamespace, UID: jobUID},
+			Type:           corev1.EventTypeWarning,
+			Reason:         "FailedCreate",
+			Message:        denialMessage,
+		},
+	)
+
+	err := waitForJobsToStartWithTimeout(context.Background(), kubeClient, []batchv1.Job{{
+		ObjectMeta: metav1.ObjectMeta{Name: jobName, Namespace: testNamespace, UID: jobUID},
+	}}, 20*time.Millisecond)
+
+	require.ErrorContains(t, err, denialMessage)
+}
+
+func TestWaitForJobsToStartReturnsWithNoJobs(t *testing.T) {
+	err := waitForJobsToStart(context.Background(), fake.NewClientset(), nil)
+
+	require.NoError(t, err)
+}
+
+func TestWaitForJobsToStartRetriesTransientEventError(t *testing.T) {
+	job := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "capture-job", Namespace: testNamespace, UID: types.UID("capture-job-uid")},
+	}
+	kubeClient := fake.NewClientset(&job, newJobEvent("failed", job, "admission denied"))
+	listCalls := 0
+	kubeClient.PrependReactor("list", "events", func(clienttesting.Action) (bool, runtime.Object, error) {
+		listCalls++
+		if listCalls == 1 {
+			return true, nil, apierrors.NewServiceUnavailable("temporary failure")
+		}
+		return false, nil, nil
+	})
+
+	err := waitForJobsToStartWithTimeout(context.Background(), kubeClient, []batchv1.Job{job}, time.Second)
+
+	require.ErrorContains(t, err, "admission denied")
+	require.GreaterOrEqual(t, listCalls, 2)
+}
+
+func TestWaitForJobsToStartFailureThenActiveJob(t *testing.T) {
+	job := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "capture-job", Namespace: testNamespace, UID: types.UID("capture-job-uid")},
+	}
+	kubeClient := fake.NewClientset(&job, newJobEvent("failed", job, "temporary denial"))
+	jobListCalls := 0
+	kubeClient.PrependReactor("list", "jobs", func(clienttesting.Action) (bool, runtime.Object, error) {
+		jobListCalls++
+		currentJob := job.DeepCopy()
+		if jobListCalls > 1 {
+			currentJob.Status.Active = 1
+		}
+		return true, &batchv1.JobList{Items: []batchv1.Job{*currentJob}}, nil
+	})
+
+	err := waitForJobsToStartWithTimeout(context.Background(), kubeClient, []batchv1.Job{job}, 1500*time.Millisecond)
+
+	require.NoError(t, err)
+	require.Equal(t, 2, jobListCalls)
+}
+
+func TestWaitForJobsToStartClearsPendingFromInitialJobStatus(t *testing.T) {
+	job := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "capture-job", Namespace: testNamespace, UID: types.UID("capture-job-uid")},
+		Status:     batchv1.JobStatus{Active: 1},
+	}
+
+	err := waitForJobsToStartWithTimeout(context.Background(), fake.NewClientset(&job), []batchv1.Job{job}, time.Second)
+
+	require.NoError(t, err)
+}
+
+func TestWaitForJobsToStartHandlesEventsAcrossMultipleJobs(t *testing.T) {
+	firstJob := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "first-job", Namespace: testNamespace, UID: types.UID("first-job-uid")},
+		Status:     batchv1.JobStatus{Active: 1},
+	}
+	secondJob := batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "second-job", Namespace: testNamespace, UID: types.UID("second-job-uid")}}
+	kubeClient := fake.NewClientset(&firstJob, &secondJob,
+		newJobEvent("second-failed", secondJob, "second job denied"))
+
+	err := waitForJobsToStartWithTimeout(context.Background(), kubeClient, []batchv1.Job{firstJob, secondJob}, 20*time.Millisecond)
+
+	require.ErrorContains(t, err, "second job denied")
+}
+
+func TestWaitForJobsToStartIgnoresUnrelatedJobEvents(t *testing.T) {
+	job := batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "capture-job", Namespace: testNamespace, UID: types.UID("capture-job-uid")}}
+	unrelatedJob := batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "unrelated-job", Namespace: testNamespace, UID: types.UID("unrelated-job-uid")}}
+	kubeClient := fake.NewClientset(&job, newJobEvent("unrelated-failed", unrelatedJob, "unrelated denial"))
+
+	err := waitForJobsToStartWithTimeout(context.Background(), kubeClient, []batchv1.Job{job}, 20*time.Millisecond)
+
+	require.NoError(t, err)
+}
+
+func TestWaitForJobsToStartSkipsWithoutEventAccess(t *testing.T) {
+	for name, eventErr := range map[string]error{
+		"forbidden":    apierrors.NewForbidden(schema.GroupResource{Resource: "events"}, "", nil),
+		"unauthorized": apierrors.NewUnauthorized("events are unavailable"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			job := batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "capture-job", Namespace: testNamespace, UID: types.UID("capture-job-uid")}}
+			kubeClient := fake.NewClientset(&job)
+			kubeClient.PrependReactor("list", "events", func(clienttesting.Action) (bool, runtime.Object, error) {
+				return true, nil, eventErr
+			})
+
+			err := waitForJobsToStartWithTimeout(context.Background(), kubeClient, []batchv1.Job{job}, time.Second)
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestWaitForJobsToStartCancellationWinsOverEventListDenial(t *testing.T) {
+	job := batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "capture-job", Namespace: testNamespace, UID: types.UID("capture-job-uid")}}
+	kubeClient := fake.NewClientset(&job)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	kubeClient.PrependReactor("list", "events", func(clienttesting.Action) (bool, runtime.Object, error) {
+		cancel()
+		return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "events"}, "", nil)
+	})
+
+	err := waitForJobsToStartWithTimeout(ctx, kubeClient, []batchv1.Job{job}, time.Second)
+
+	require.ErrorIs(t, err, context.Canceled)
+}
+
+func TestWaitForJobsToStartClearsRecoveredFailureFromJobStatus(t *testing.T) {
+	recoveredJob := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "recovered-job", Namespace: testNamespace, UID: types.UID("recovered-job-uid")},
+		Status:     batchv1.JobStatus{Active: 1},
+	}
+	pendingJob := batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "pending-job", Namespace: testNamespace, UID: types.UID("pending-job-uid")}}
+	kubeClient := fake.NewClientset(
+		&recoveredJob,
+		&pendingJob,
+		newJobEvent("recovered-failed", recoveredJob, "recovered denial"),
+	)
+
+	err := waitForJobsToStartWithTimeout(context.Background(), kubeClient, []batchv1.Job{recoveredJob, pendingJob}, 20*time.Millisecond)
+
+	require.NoError(t, err)
+}
+
+func TestWaitForJobsToStartReturnsParentCancellation(t *testing.T) {
+	job := batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "capture-job", Namespace: testNamespace, UID: types.UID("capture-job-uid")}}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := waitForJobsToStartWithTimeout(ctx, fake.NewClientset(&job), []batchv1.Job{job}, time.Second)
+
+	require.ErrorIs(t, err, context.Canceled)
+}
+
+func TestWaitForJobsToStartListsEventsOncePerPoll(t *testing.T) {
+	job := batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "capture-job", Namespace: testNamespace, UID: types.UID("capture-job-uid")}}
+	kubeClient := fake.NewClientset(&job)
+	listCalls := 0
+	kubeClient.PrependReactor("list", "events", func(clienttesting.Action) (bool, runtime.Object, error) {
+		listCalls++
+		return false, nil, nil
+	})
+
+	err := waitForJobsToStartWithTimeout(context.Background(), kubeClient, []batchv1.Job{job}, 20*time.Millisecond)
+
+	require.NoError(t, err)
+	require.Equal(t, 1, listCalls)
+}
+
+func TestWaitForJobsToStartPendingTimeoutIsBestEffort(t *testing.T) {
+	job := batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "capture-job", Namespace: testNamespace, UID: types.UID("capture-job-uid")}}
+
+	err := waitForJobsToStartWithTimeout(context.Background(), fake.NewClientset(&job), []batchv1.Job{job}, 20*time.Millisecond)
+
+	require.NoError(t, err)
+}
+
+func TestWaitForJobsToStartWarnsWhenStartupIsUnconfirmed(t *testing.T) {
+	job := batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "capture-job", Namespace: testNamespace, UID: types.UID("capture-job-uid")}}
+	core, observedLogs := observer.New(zap.WarnLevel)
+	originalLogger := retinacmd.Logger
+	retinacmd.Logger = &retinalog.ZapLogger{Logger: zap.New(core)}
+	defer func() { retinacmd.Logger = originalLogger }()
+
+	err := waitForJobsToStartWithTimeout(context.Background(), fake.NewClientset(&job), []batchv1.Job{job}, 20*time.Millisecond)
+
+	require.NoError(t, err)
+	timeoutLogs := observedLogs.FilterMessage("Capture job startup could not be confirmed before timeout").All()
+	require.Len(t, timeoutLogs, 1)
+	require.Equal(t, []interface{}{"capture-job"}, timeoutLogs[0].ContextMap()["jobs"])
+}
+
+func TestWaitForJobsToStartSucceedsWhenJobStatusCannotBeConfirmed(t *testing.T) {
+	job := batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "capture-job", Namespace: testNamespace, UID: types.UID("capture-job-uid")}}
+	kubeClient := fake.NewClientset(&job, newJobEvent("failed", job, "admission denied"))
+	kubeClient.PrependReactor("list", "jobs", func(clienttesting.Action) (bool, runtime.Object, error) {
+		return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "jobs"}, "", nil)
+	})
+
+	err := waitForJobsToStartWithTimeout(context.Background(), kubeClient, []batchv1.Job{job}, 20*time.Millisecond)
+
+	require.NoError(t, err)
+}
+
+func TestWaitForJobsToStartRetriesTransientJobListError(t *testing.T) {
+	job := batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "capture-job", Namespace: testNamespace, UID: types.UID("capture-job-uid")}}
+	kubeClient := fake.NewClientset(&job, newJobEvent("failed", job, "admission denied"))
+	jobListCalls := 0
+	kubeClient.PrependReactor("list", "jobs", func(clienttesting.Action) (bool, runtime.Object, error) {
+		jobListCalls++
+		if jobListCalls == 1 {
+			return true, nil, apierrors.NewServiceUnavailable("temporary failure")
+		}
+		currentJob := job.DeepCopy()
+		currentJob.Status.Active = 1
+		return true, &batchv1.JobList{Items: []batchv1.Job{*currentJob}}, nil
+	})
+
+	err := waitForJobsToStartWithTimeout(context.Background(), kubeClient, []batchv1.Job{job}, 1500*time.Millisecond)
+
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, jobListCalls, 2)
+}
+
+func TestWaitForJobsToStartUsesFailedCreateEventSelector(t *testing.T) {
+	job := batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "capture-job", Namespace: testNamespace, UID: types.UID("capture-job-uid")}}
+	kubeClient := fake.NewClientset(&job)
+	kubeClient.PrependReactor("list", "events", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		require.Equal(t, "involvedObject.kind=Job,reason=FailedCreate,type=Warning",
+			action.(clienttesting.ListAction).GetListRestrictions().Fields.String())
+		return true, &corev1.EventList{}, nil
+	})
+
+	err := waitForJobsToStartWithTimeout(context.Background(), kubeClient, []batchv1.Job{job}, 20*time.Millisecond)
+
+	require.NoError(t, err)
+}
+
+func TestWaitForJobsToStartLargeJobSetUsesSingleStatusList(t *testing.T) {
+	const jobCount = 100
+	objects := make([]runtime.Object, 0, jobCount)
+	jobs := make([]batchv1.Job, 0, jobCount)
+	for index := range jobCount {
+		job := batchv1.Job{ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("capture-job-%d", index),
+			Namespace: testNamespace,
+			UID:       types.UID(fmt.Sprintf("capture-job-uid-%d", index)),
+		}, Status: batchv1.JobStatus{Active: 1}}
+		jobs = append(jobs, job)
+		objects = append(objects, &jobs[index])
+	}
+	kubeClient := fake.NewClientset(objects...)
+
+	err := waitForJobsToStartWithTimeout(context.Background(), kubeClient, jobs, time.Second)
+
+	require.NoError(t, err)
+	jobListCalls := 0
+	jobGetCalls := 0
+	for _, action := range kubeClient.Actions() {
+		if action.GetResource().Resource != "jobs" {
+			continue
+		}
+		switch action.GetVerb() {
+		case "list":
+			jobListCalls++
+		case "get":
+			jobGetCalls++
+		}
+	}
+	require.Equal(t, 1, jobListCalls)
+	require.Zero(t, jobGetCalls)
+}
+
+func newJobEvent(name string, job batchv1.Job, message string) *corev1.Event {
+	return &corev1.Event{
+		ObjectMeta:     metav1.ObjectMeta{Name: name, Namespace: job.Namespace},
+		InvolvedObject: corev1.ObjectReference{Kind: "Job", Name: job.Name, Namespace: job.Namespace, UID: job.UID},
+		Type:           corev1.EventTypeWarning,
+		Reason:         "FailedCreate",
+		Message:        message,
+	}
 }
 
 func TestWaitUntilJobsComplete_ShortDuration(t *testing.T) {

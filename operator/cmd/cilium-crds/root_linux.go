@@ -16,8 +16,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
-	operatorOption "github.com/cilium/cilium/operator/option"
 	"github.com/cilium/cilium/pkg/hive"
 	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
 	"github.com/cilium/cilium/pkg/logging"
@@ -42,6 +42,13 @@ var (
 	cachedSlogLogger                   *slog.Logger
 	operatorIDLength                   = 10
 	errLeaderElectionNamespaceRequired = errors.New("--leader-election-namespace must be set")
+
+	// Populated by initEnv before the hive runs.
+	leaderElection struct {
+		LeaseDuration time.Duration
+		RenewDeadline time.Duration
+		RetryPeriod   time.Duration
+	}
 )
 
 // slogLogger returns a zap-backed slog logger. Resolved lazily so that
@@ -98,13 +105,16 @@ func registerOperatorHooks(
 func initEnv(vp *viper.Viper) {
 	// Prepopulate option.Config with options from CLI.
 
-	// NOTE: if the flag is not provided in operator/cmd/flags.go InitGlobalFlags(), these Populate methods override
-	// the default values provided in option.Config or operatorOption.Config respectively.
+	// NOTE: if the flag is not provided in operator/cmd/flags.go InitGlobalFlags(), this Populate method overrides
+	// the default values provided in option.Config.
 	// The values will be overridden to the "zero value".
 	// Maybe could create a cell.Config for these instead?
 	// slogloggercheck: using default logger for configuration initialization
 	option.Config.Populate(logging.DefaultSlogLogger, vp)
-	operatorOption.Config.Populate(logging.DefaultSlogLogger, vp)
+
+	leaderElection.LeaseDuration = vp.GetDuration(leaderElectionLeaseDuration)
+	leaderElection.RenewDeadline = vp.GetDuration(leaderElectionRenewDeadline)
+	leaderElection.RetryPeriod = vp.GetDuration(leaderElectionRetryPeriod)
 
 	// Bring up Retina's zap logger (stdout + Application Insights). We redirect
 	// Go's stdlib slog default at it now; the Cilium-side tee has to wait until
@@ -168,7 +178,7 @@ func runOperator(l *slog.Logger, lc *LeaderLifecycle, clientset k8sClient.Client
 			Identity: operatorID,
 		},
 		clientset.RestConfig(),
-		operatorOption.Config.LeaderElectionRenewDeadline)
+		leaderElection.RenewDeadline)
 	if err != nil {
 		logging.Fatal(l, "Failed to create resource lock for leader election", logfields.Error, err)
 	}
@@ -181,9 +191,9 @@ func runOperator(l *slog.Logger, lc *LeaderLifecycle, clientset k8sClient.Client
 		Lock:            leResourceLock,
 		ReleaseOnCancel: true,
 
-		LeaseDuration: operatorOption.Config.LeaderElectionLeaseDuration,
-		RenewDeadline: operatorOption.Config.LeaderElectionRenewDeadline,
-		RetryPeriod:   operatorOption.Config.LeaderElectionRetryPeriod,
+		LeaseDuration: leaderElection.LeaseDuration,
+		RenewDeadline: leaderElection.RenewDeadline,
+		RetryPeriod:   leaderElection.RetryPeriod,
 
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {

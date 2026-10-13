@@ -20,6 +20,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
@@ -208,6 +209,11 @@ func (o *Operator) Start() error {
 			ke := retinaendpointcontroller.New(mgr.GetClient(), retinaendpointchannel)
 			// start reconcile the cached Pod before manager starts to not miss any events
 			go ke.ReconcilePod(ctrlCtx)
+
+			// Clean up RetinaEndpoints orphaned before owner references were set on them.
+			if err = mgr.Add(manager.RunnableFunc(ke.DeleteOrphanedEndpoints)); err != nil {
+				return errors.Wrap(err, "unable to add retinaendpoint cleanup")
+			}
 
 			pc := podcontroller.New(mgr.GetClient(), mgr.GetScheme(), retinaendpointchannel)
 			if err = (pc).SetupWithManager(mgr); err != nil {
