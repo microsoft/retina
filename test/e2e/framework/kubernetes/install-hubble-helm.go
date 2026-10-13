@@ -87,6 +87,9 @@ func (v *InstallHubbleHelmChart) Run() error {
 	chart.Values["hubble"].(map[string]interface{})["tls"].(map[string]interface{})["enabled"] = false
 	chart.Values["hubble"].(map[string]interface{})["relay"].(map[string]interface{})["tls"].(map[string]interface{})["server"].(map[string]interface{})["enabled"] = false
 	chart.Values["hubble"].(map[string]interface{})["tls"].(map[string]interface{})["auto"].(map[string]interface{})["enabled"] = false
+	if err := applyImageOverrides(chart.Values, true); err != nil {
+		return err
+	}
 
 	getclient := action.NewGet(actionConfig)
 	release, err := getclient.Run(v.ReleaseName)

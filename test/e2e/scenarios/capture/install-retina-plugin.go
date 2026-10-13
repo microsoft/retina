@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/microsoft/retina/test/e2e/framework/generic"
 	"github.com/pkg/errors"
 )
 
@@ -24,6 +25,17 @@ type InstallRetinaPlugin struct{}
 
 // Run builds the kubectl-retina binary and adds it to PATH
 func (i *InstallRetinaPlugin) Run() error {
+	if os.Getenv(generic.KubectlImageEnv) != "" {
+		if _, err := generic.Image(generic.KubectlImageEnv, "kubectl-retina"); err != nil {
+			return err
+		}
+		output, err := exec.Command("kubectl-retina", "version").CombinedOutput()
+		if err != nil {
+			return errors.Wrapf(err, "failed to execute candidate CLI image: %s", output)
+		}
+		log.Printf("Using candidate CLI image: %s", output)
+		return nil
+	}
 	log.Print("Building kubectl-retina plugin...")
 
 	// Create binary directory if it doesn't exist

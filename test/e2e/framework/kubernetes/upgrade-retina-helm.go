@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/cli"
 	helmValues "helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/getter"
@@ -60,6 +61,10 @@ func (u *UpgradeRetinaHelmChart) Run() error {
 	values, err := options.MergeValues(provider)
 	if err != nil {
 		return fmt.Errorf("failed to merge values: %w", err)
+	}
+	values = chartutil.CoalesceTables(values, rel.Config)
+	if err := applyImageOverrides(values, false); err != nil {
+		return err
 	}
 	// logs values to be set during upgrade
 	log.Printf("values to be set during upgrade: %v\n", values)

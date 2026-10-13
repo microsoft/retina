@@ -38,7 +38,7 @@ spec:
       {{- end }}
       initContainers:
         - name: retina-agent-init
-          image: {{ .Values.agent.init.repository }}:{{ .Values.agent.init.tag }}
+          image: {{ default (printf "%s:%s" .Values.agent.init.repository .Values.agent.init.tag) .Values.agent.init.override | quote }}
           imagePullPolicy: {{ .Values.agent.pullPolicy }}
           args:
             - --config
@@ -58,7 +58,7 @@ spec:
             mountPath: /tmp
       containers:
         - name: {{ include "retina.name" . }} 
-          image: {{ .Values.agent.repository }}:{{ .Values.agent.tag }}
+          image: {{ default (printf "%s:%s" .Values.agent.repository .Values.agent.tag) .Values.agent.override | quote }}
           imagePullPolicy: {{ .Values.agent.pullPolicy }}
           {{- if .Values.agent.container.retina.command }}
           command:
@@ -218,7 +218,7 @@ spec:
       hostNetwork: true
       containers:
         - name: retinawin
-          image: {{ .Values.agent.repository }}:{{ .Values.agent.tag }}
+          image: {{ default (default (printf "%s:%s" .Values.agent.repository .Values.agent.tag) .Values.agent.override) .Values.agent.windowsOverride | quote }}
           ports:
             - containerPort: {{ .Values.agent.container.retina.ports.containerPort }}
           command:

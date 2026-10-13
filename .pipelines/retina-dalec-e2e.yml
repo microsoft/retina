@@ -1,0 +1,152 @@
+name: retina-dalec-e2e-$(Date:yyyyMMdd).$(Rev:r)
+
+trigger: none
+pr: none
+
+parameters:
+  - name: azureServiceConnection
+    type: string
+    default: retina-dalec-e2e
+  - name: location
+    type: string
+    default: westus2
+  - name: dalecProject
+    type: string
+    default: CloudNativeCompute
+  - name: dalecPipelineId
+    type: string
+    default: ""
+  - name: dalecBuildId
+    type: string
+    default: ""
+  - name: candidateImage
+    type: string
+    default: ""
+  - name: imageVersion
+    type: string
+    default: ""
+  - name: imageSet
+    type: object
+    default: {}
+
+pool:
+  vmImage: ubuntu-24.04
+
+jobs:
+  - job: RetinaE2E
+    timeoutInMinutes: 180
+    cancelTimeoutInMinutes: 20
+    variables:
+      CLUSTER_NAME: retina-dalec-$(Build.BuildId)-$(System.JobAttempt)
+      AZURE_RESOURCE_GROUP: retina-dalec-$(Build.BuildId)-$(System.JobAttempt)
+    steps:
+      - checkout: self
+        fetchDepth: 1
+
+      - task: GoTool@0
+        inputs:
+          versionSource: go.mod
+          goModFile: go.mod
+
+      - task: HelmInstaller@1
+        inputs:
+          helmVersionToInstall: 3.17.3
+
+      - task: KubectlInstaller@0
+        inputs:
+          kubectlVersion: 1.32.0
+
+      - ${{ if ne(parameters.dalecBuildId, '') }}:
+          - task: DownloadPipelineArtifact@2
+            displayName: Download candidate metadata from the originating Dalec build
+            inputs:
+              buildType: specific
+              project: ${{ parameters.dalecProject }}
+              definition: ${{ parameters.dalecPipelineId }}
+              buildVersionToDownload: specific
+              pipelineId: ${{ parameters.dalecBuildId }}
+              itemPattern: build-*/runtime-variables.json
+              targetPath: $(Agent.TempDirectory)/dalec-candidates
+
+      - task: AzureCLI@2
+        displayName: Resolve and validate the complete candidate image set
+        inputs:
+          azureSubscription: ${{ parameters.azureServiceConnection }}
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            set -euo pipefail
+            mkdir -p "$RESULTS_DIR"
+            python3 hack/dalec/prepare-images.py
+        env:
+          DALEC_METADATA_DIR: $(Agent.TempDirectory)/dalec-candidates
+          DALEC_BUILD_ID: ${{ parameters.dalecBuildId }}
+          CANDIDATE_IMAGE: ${{ parameters.candidateImage }}
+          IMAGE_SET_JSON: ${{ convertToJson(parameters.imageSet) }}
+          IMAGE_VERSION: ${{ parameters.imageVersion }}
+          RESULTS_DIR: $(Build.ArtifactStagingDirectory)/retina-e2e
+
+      - task: AzureCLI@2
+        displayName: Run Retina E2E against Dalec candidate images
+        inputs:
+          azureSubscription: ${{ parameters.azureServiceConnection }}
+          scriptType: bash
+          scriptLocation: scriptPath
+          scriptPath: hack/dalec/run-e2e.sh
+        env:
+          AZURE_LOCATION: ${{ parameters.location }}
+          CLUSTER_NAME: $(CLUSTER_NAME)
+          AZURE_RESOURCE_GROUP: $(AZURE_RESOURCE_GROUP)
+          RESULTS_DIR: $(Build.ArtifactStagingDirectory)/retina-e2e
+
+      - task: AzureCLI@2
+        displayName: Clean up only this run's resource group
+        condition: always()
+        inputs:
+          azureSubscription: ${{ parameters.azureServiceConnection }}
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            set -euo pipefail
+            if [[ "$(az group exists --name "$AZURE_RESOURCE_GROUP")" == true ]]; then
+              owner="$(az group show --name "$AZURE_RESOURCE_GROUP" --query tags.retinaE2ERun -o tsv)"
+              [[ "$owner" == "$BUILD_BUILDID" ]] || {
+                echo "Refusing to delete a resource group not owned by this run" >&2
+                exit 1
+              }
+              cleanup_status=0
+              if [[ -f "$RESULTS_DIR/registry-role-assignments.txt" ]]; then
+                while IFS= read -r assignment; do
+                  [[ -n "$assignment" ]] || continue
+                  if ! az role assignment delete --ids "$assignment"; then
+                    echo "Failed to delete this run's registry role assignment: $assignment" >&2
+                    cleanup_status=1
+                  fi
+                done < "$RESULTS_DIR/registry-role-assignments.txt"
+              fi
+              if ! az group delete --name "$AZURE_RESOURCE_GROUP" --yes; then
+                echo "Failed to delete this run's resource group" >&2
+                cleanup_status=1
+              fi
+              exit "$cleanup_status"
+            fi
+        env:
+          AZURE_RESOURCE_GROUP: $(AZURE_RESOURCE_GROUP)
+          RESULTS_DIR: $(Build.ArtifactStagingDirectory)/retina-e2e
+
+      - task: PublishTestResults@2
+        displayName: Publish Retina E2E test results
+        condition: succeededOrFailed()
+        inputs:
+          testResultsFormat: JUnit
+          testResultsFiles: $(Build.ArtifactStagingDirectory)/retina-e2e/junit.xml
+          failTaskOnFailedTests: true
+          failTaskOnMissingResultsFile: true
+          testRunTitle: Retina Dalec E2E $(Build.BuildId)
+
+      - task: PublishPipelineArtifact@1
+        displayName: Publish candidate manifest, test output and diagnostics
+        condition: always()
+        inputs:
+          targetPath: $(Build.ArtifactStagingDirectory)/retina-e2e
+          artifact: retina-e2e

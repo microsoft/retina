@@ -46,7 +46,7 @@ spec:
         runAsNonRoot: true
         runAsUser: 1000
       containers:
-        - image: {{ .Values.operator.repository }}:{{ .Values.operator.tag }}
+        - image: {{ default (printf "%s:%s" .Values.operator.repository .Values.operator.tag) .Values.operator.override | quote }}
           imagePullPolicy: {{ .Values.operator.pullPolicy }}
           name: retina-operator
           {{- if .Values.operator.container.command }}

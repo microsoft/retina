@@ -41,7 +41,7 @@ spec:
       securityContext:
         runAsNonRoot: true
       containers:
-        - image: {{ .Values.operator.repository }}:{{ .Values.operator.tag }}
+        - image: {{ default (printf "%s:%s" .Values.operator.repository .Values.operator.tag) .Values.operator.override | quote }}
           name: {{ .Values.operator.name }}
           {{- if .Values.operator.container.command }}
           command:
