@@ -1,0 +1,23 @@
+# Build context hygiene: none of this is needed to build the Retina images,
+# and shipping it makes the context transfer slow (and can break on
+# non-regular files produced by local tooling).
+
+.git
+.github
+.azure-pipelines
+
+# Docs site and its dependencies.
+site/
+docs/
+
+# Local build output and tooling artifacts.
+artifacts/
+output/
+vendor/
+bin/
+.certs/
+
+# Editor / OS noise.
+.vscode/
+.idea/
+**/.DS_Store

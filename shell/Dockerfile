@@ -8,6 +8,13 @@ RUN tdnf install -y make git clang llvm gcc glibc-static gawk file flex bison ta
 ARG PWRU_COMMIT=f1d6cf8898953ac1560401e181f3ac5f0e33b486
 RUN git clone https://github.com/cilium/pwru /pwru && git -C /pwru checkout "$PWRU_COMMIT"
 WORKDIR /pwru
+# pwru's pinned commit still resolves golang.org/x/net v0.57.0, which is
+# affected by CVE-2026-78669. Bump it in pwru's own module before building;
+# the retina modules are already on a fixed version via the root go.mod.
+# pwru vendors its dependencies, so the vendor tree must be regenerated to
+# stay consistent with the updated go.mod.
+RUN GOFLAGS=-mod=mod go get golang.org/x/net@v0.60.0 \
+    && GOFLAGS=-mod=mod go mod vendor
 ARG GOARCH=amd64
 RUN set -eux; \
     case "$GOARCH" in \
