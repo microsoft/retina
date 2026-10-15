@@ -11,8 +11,9 @@ site/
 docs/
 
 # Local build output and tooling artifacts.
+# NOTE: output/ is intentionally NOT ignored - the Windows agent image copies
+# pre-built binaries from output/windows_$(arch) via the BINARIES_PATH build arg.
 artifacts/
-output/
 vendor/
 bin/
 .certs/
