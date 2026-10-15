@@ -29,6 +29,44 @@ The initial onboarding selects upstream `v1.2.9`, resolved to commit
 not the separate Retina test-code commit configured below. The existing
 Dalec build templates are not rewritten by this E2E integration.
 
+## Component cohort and MCR endpoints
+
+Managed Dalec builds five Retina components, plus a sixth `windowscross` build
+target that produces the Windows agent image from the same `retina-agent`
+component directory. `hack/dalec/prepare-images.py` keys each candidate off the
+Dalec spec's parent directory name, so these names are the contract between this
+repository and `specs/containernetworking/` on the Dalec side:
+
+| Component | Candidate platforms | Published endpoint |
+| --- | --- | --- |
+| `retina-agent` | linux/amd64, linux/arm64, windows/amd64 | `mcr.microsoft.com/containernetworking/v2/retina-agent` |
+| `retina-init` | linux/amd64, linux/arm64 | `mcr.microsoft.com/containernetworking/v2/retina-init` |
+| `retina-operator` | linux/amd64, linux/arm64 | `mcr.microsoft.com/containernetworking/v2/retina-operator` |
+| `kubectl-retina` | linux/amd64, linux/arm64 | `mcr.microsoft.com/containernetworking/v2/kubectl-retina` |
+| `kubectl-retina-shell` | linux/amd64, linux/arm64 | `mcr.microsoft.com/containernetworking/v2/kubectl-retina-shell` |
+
+The `containernetworking/v2/` namespace is new. These are five new MCR
+repositories requiring onboarding and Discovery Portal decisions, not tag bumps
+on the existing `containernetworking/` images; `kubectl-retina-shell` has no
+pre-Dalec endpoint at all. Candidates reach this pipeline as
+`<registry>.azurecr.io/staging/build/<component>:<version>@sha256:<digest>` and
+are never published by it.
+
+Explicitly outside this cohort:
+
+- `retina-shell`. It is a distinct image from `kubectl-retina-shell`, and
+  `cli/cmd/shell.go` still defaults to
+  `mcr.microsoft.com/containernetworking/retina-shell`. Until it is onboarded,
+  `retina shell` and `retina bpftrace` keep pulling the non-Dalec image, so
+  this pipeline cannot exercise them against candidates. Onboarding it later
+  requires a sixth component directory, a `RETINA_SHELL_IMAGE` environment
+  name, and matching `COMPONENTS`/`ENV_NAMES` entries in
+  `hack/dalec/prepare-images.py`.
+- The Retina Enterprise (ACNS) images `retina-agent-enterprise` and
+  `retina-operator-enterprise`.
+- Hubble relay and Hubble UI images, and the E2E test workload images, which
+  are pulled from their upstream sources during the run.
+
 ## One-time setup
 
 Create a **new** YAML pipeline in the `msazure` Azure DevOps organization,
