@@ -17,7 +17,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Get latest tag
         id: get_latest_tag
@@ -45,7 +45,7 @@ jobs:
           helm pull oci://ghcr.io/microsoft/retina/charts/retina --version ${{ env.TAG }}
 
       - name: Setup kind cluster
-        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
+        uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
 
       # krew does not support installing a specific verison
       # so if this step fails it means there was something wrong

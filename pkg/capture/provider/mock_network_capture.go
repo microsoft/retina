@@ -41,17 +41,17 @@ func (m *MockNetworkCaptureProviderInterface) EXPECT() *MockNetworkCaptureProvid
 }
 
 // CaptureNetworkPacket mocks base method.
-func (m *MockNetworkCaptureProviderInterface) CaptureNetworkPacket(ctx context.Context, filter string, duration, maxSize int) error {
+func (m *MockNetworkCaptureProviderInterface) CaptureNetworkPacket(ctx context.Context, includeExcludeFilter string, duration, maxSize, fileCount int) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CaptureNetworkPacket", ctx, filter, duration, maxSize)
+	ret := m.ctrl.Call(m, "CaptureNetworkPacket", ctx, includeExcludeFilter, duration, maxSize, fileCount)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CaptureNetworkPacket indicates an expected call of CaptureNetworkPacket.
-func (mr *MockNetworkCaptureProviderInterfaceMockRecorder) CaptureNetworkPacket(ctx, filter, duration, maxSize any) *gomock.Call {
+func (mr *MockNetworkCaptureProviderInterfaceMockRecorder) CaptureNetworkPacket(ctx, includeExcludeFilter, duration, maxSize, fileCount any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CaptureNetworkPacket", reflect.TypeOf((*MockNetworkCaptureProviderInterface)(nil).CaptureNetworkPacket), ctx, filter, duration, maxSize)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CaptureNetworkPacket", reflect.TypeOf((*MockNetworkCaptureProviderInterface)(nil).CaptureNetworkPacket), ctx, includeExcludeFilter, duration, maxSize, fileCount)
 }
 
 // Cleanup mocks base method.

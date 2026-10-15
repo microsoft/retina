@@ -107,7 +107,25 @@ data:
 
 **Trade-off:** Disables host interface monitoring; API server latency metrics may be less reliable.
 
-### Option 4: Selective Deployment
+### Option 4: Increase the Conntrack Report Interval
+
+Raise the periodic conntrack report interval (default 30s) to thin out per-connection reports, which dominate the `packetparser` event rate for connection-heavy or high-churn workloads. This scales better than sampling for such workloads. See [Report interval](../03-Metrics/plugins/Linux/packetparser.md#report-interval) for details.
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: retina-config
+  namespace: kube-system
+data:
+  config.yaml: |
+    dataAggregationLevel: "high"
+    conntrackReportInterval: 60s
+```
+
+**Trade-off:** Coarser time resolution for long-lived flows. Byte and packet totals stay accurate, since they are aggregated in the kernel and reported on the next event.
+
+### Option 5: Selective Deployment
 
 Deploy Retina only on nodes where you need detailed observability:
 

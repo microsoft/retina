@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/microsoft/retina/pkg/log"
 	"go.uber.org/zap"
@@ -35,6 +36,28 @@ var (
 func VmlinuxHeaderDir() string {
 	dir := strings.TrimSpace(os.Getenv(VmlinuxHeaderDirEnv))
 	if dir == "" {
+		return DefaultVmlinuxHeaderDir
+	}
+
+	// Security: Prevent argument injection via environment variable
+	// Block any path containing whitespace that could be used to inject
+	// additional clang arguments (e.g., "--config /etc/passwd")
+	// Also block paths starting with dash (would be interpreted as a flag)
+	for _, r := range dir {
+		if unicode.IsSpace(r) {
+			log.Logger().Named("vmlinux").Warn(
+				"RETINA_VMLINUX_HEADER_DIR contains whitespace, using default",
+				zap.String("rejected_value", dir),
+			)
+			return DefaultVmlinuxHeaderDir
+		}
+	}
+
+	if strings.HasPrefix(dir, "-") {
+		log.Logger().Named("vmlinux").Warn(
+			"RETINA_VMLINUX_HEADER_DIR starts with dash (potential flag injection), using default",
+			zap.String("rejected_value", dir),
+		)
 		return DefaultVmlinuxHeaderDir
 	}
 

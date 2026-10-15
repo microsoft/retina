@@ -16,8 +16,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
-	operatorOption "github.com/cilium/cilium/operator/option"
 	"github.com/cilium/cilium/pkg/hive"
 	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
 	"github.com/cilium/cilium/pkg/logging"
@@ -26,6 +26,7 @@ import (
 	"github.com/cilium/cilium/pkg/option"
 	"github.com/cilium/hive/cell"
 	"github.com/microsoft/retina/internal/buildinfo"
+	"github.com/microsoft/retina/operator/cilium-crds/config"
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -36,10 +37,18 @@ import (
 
 var (
 	// set logger field: subsys=retina-operator
-	binaryName       = filepath.Base(os.Args[0])
-	slogLoggerOnce   sync.Once
-	cachedSlogLogger *slog.Logger
-	operatorIDLength = 10
+	binaryName                         = filepath.Base(os.Args[0])
+	slogLoggerOnce                     sync.Once
+	cachedSlogLogger                   *slog.Logger
+	operatorIDLength                   = 10
+	errLeaderElectionNamespaceRequired = errors.New("--leader-election-namespace must be set")
+
+	// Populated by initEnv before the hive runs.
+	leaderElection struct {
+		LeaseDuration time.Duration
+		RenewDeadline time.Duration
+		RetryPeriod   time.Duration
+	}
 )
 
 // slogLogger returns a zap-backed slog logger. Resolved lazily so that
@@ -64,13 +73,19 @@ func Execute(h *hive.Hive) {
 func registerOperatorHooks(
 	l *slog.Logger, lc cell.Lifecycle, llc *LeaderLifecycle,
 	clientset k8sClient.Clientset, shutdowner hive.Shutdowner,
-) {
+	cfg config.Config,
+) error {
+	leaderElectionNamespace := cfg.LeaderElectionNamespace
+	if leaderElectionNamespace == "" {
+		return errLeaderElectionNamespaceRequired
+	}
+	l.Info("using namespace for leader election lease", "namespace", leaderElectionNamespace)
 	var wg sync.WaitGroup
 	lc.Append(cell.Hook{
 		OnStart: func(cell.HookContext) error {
 			wg.Add(1)
 			go func() {
-				runOperator(l, llc, clientset, shutdowner)
+				runOperator(l, llc, clientset, shutdowner, leaderElectionNamespace)
 				wg.Done()
 			}()
 			return nil
@@ -84,18 +99,22 @@ func registerOperatorHooks(
 			return nil
 		},
 	})
+	return nil
 }
 
 func initEnv(vp *viper.Viper) {
 	// Prepopulate option.Config with options from CLI.
 
-	// NOTE: if the flag is not provided in operator/cmd/flags.go InitGlobalFlags(), these Populate methods override
-	// the default values provided in option.Config or operatorOption.Config respectively.
+	// NOTE: if the flag is not provided in operator/cmd/flags.go InitGlobalFlags(), this Populate method overrides
+	// the default values provided in option.Config.
 	// The values will be overridden to the "zero value".
 	// Maybe could create a cell.Config for these instead?
 	// slogloggercheck: using default logger for configuration initialization
 	option.Config.Populate(logging.DefaultSlogLogger, vp)
-	operatorOption.Config.Populate(logging.DefaultSlogLogger, vp)
+
+	leaderElection.LeaseDuration = vp.GetDuration(leaderElectionLeaseDuration)
+	leaderElection.RenewDeadline = vp.GetDuration(leaderElectionRenewDeadline)
+	leaderElection.RetryPeriod = vp.GetDuration(leaderElectionRetryPeriod)
 
 	// Bring up Retina's zap logger (stdout + Application Insights). We redirect
 	// Go's stdlib slog default at it now; the Cilium-side tee has to wait until
@@ -134,7 +153,7 @@ func doCleanup() {
 // runOperator implements the logic of leader election for cilium-operator using
 // built-in leader election capability in kubernetes.
 // See: https://github.com/kubernetes/client-go/blob/master/examples/leader-election/main.go
-func runOperator(l *slog.Logger, lc *LeaderLifecycle, clientset k8sClient.Clientset, shutdowner hive.Shutdowner) {
+func runOperator(l *slog.Logger, lc *LeaderLifecycle, clientset k8sClient.Clientset, shutdowner hive.Shutdowner, leaderElectionNamespace string) {
 	isLeader.Store(false)
 
 	leaderElectionCtx, leaderElectionCtxCancel = context.WithCancel(context.Background())
@@ -152,14 +171,14 @@ func runOperator(l *slog.Logger, lc *LeaderLifecycle, clientset k8sClient.Client
 
 	leResourceLock, err := resourcelock.NewFromKubeconfig(
 		resourcelock.LeasesResourceLock,
-		operatorK8sNamespace,
+		leaderElectionNamespace,
 		leaderElectionResourceLockName,
 		resourcelock.ResourceLockConfig{
 			// Identity name of the lock holder
 			Identity: operatorID,
 		},
 		clientset.RestConfig(),
-		operatorOption.Config.LeaderElectionRenewDeadline)
+		leaderElection.RenewDeadline)
 	if err != nil {
 		logging.Fatal(l, "Failed to create resource lock for leader election", logfields.Error, err)
 	}
@@ -172,9 +191,9 @@ func runOperator(l *slog.Logger, lc *LeaderLifecycle, clientset k8sClient.Client
 		Lock:            leResourceLock,
 		ReleaseOnCancel: true,
 
-		LeaseDuration: operatorOption.Config.LeaderElectionLeaseDuration,
-		RenewDeadline: operatorOption.Config.LeaderElectionRenewDeadline,
-		RetryPeriod:   operatorOption.Config.LeaderElectionRetryPeriod,
+		LeaseDuration: leaderElection.LeaseDuration,
+		RenewDeadline: leaderElection.RenewDeadline,
+		RetryPeriod:   leaderElection.RetryPeriod,
 
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {

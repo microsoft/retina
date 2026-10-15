@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"runtime"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/microsoft/retina/pkg/log"
 	pm "github.com/microsoft/retina/pkg/managers/pluginmanager"
 	plugin "github.com/microsoft/retina/pkg/plugin/mock"
+	_ "github.com/microsoft/retina/pkg/plugin/mockplugin"
 	"github.com/microsoft/retina/pkg/telemetry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,15 +30,19 @@ const (
 )
 
 func TestNewControllerManager(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Linux plugin configuration is not valid on Windows")
+	}
+
 	c, err := kcfg.GetConfig(testCfgFile)
-	assert.NoError(t, err, "Expected no error, instead got %+v", err)
-	assert.NotNil(t, c)
+	require.NoError(t, err, "Expected no error, instead got %+v", err)
+	require.NotNil(t, c)
 
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	kubeclient := k8sfake.NewSimpleClientset()
 	cm, err := NewControllerManager(c, kubeclient, telemetry.NewNoopTelemetry(), slog.Default())
-	assert.NoError(t, err, "Expected no error, instead got %+v", err)
-	assert.NotNil(t, cm)
+	require.NoError(t, err, "Expected no error, instead got %+v", err)
+	require.NotNil(t, cm)
 }
 
 func TestNewControllerManagerWin(t *testing.T) {
@@ -47,23 +53,29 @@ func TestNewControllerManagerWin(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	kubeclient := k8sfake.NewSimpleClientset()
 	cm, err := NewControllerManager(c, kubeclient, telemetry.NewNoopTelemetry(), slog.Default())
+	if runtime.GOOS == "windows" {
+		require.NoError(t, err, "Expected Windows plugin configuration to be recognized")
+		require.NotNil(t, cm)
+		return
+	}
+
 	assert.Error(t, err, "Expected error of not recognising windows plugins in linux, instead got no error")
 	assert.Nil(t, cm)
 }
 
 func TestNewControllerManagerInit(t *testing.T) {
 	c, err := kcfg.GetConfig(testMockCfgFile)
-	assert.NoError(t, err, "Expected no error, instead got %+v", err)
-	assert.NotNil(t, c)
+	require.NoError(t, err, "Expected no error, instead got %+v", err)
+	require.NotNil(t, c)
 
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	kubeclient := k8sfake.NewSimpleClientset()
 	cm, err := NewControllerManager(c, kubeclient, telemetry.NewNoopTelemetry(), slog.Default())
-	assert.NoError(t, err, "Expected no error, instead got %+v", err)
-	assert.NotNil(t, cm)
+	require.NoError(t, err, "Expected no error, instead got %+v", err)
+	require.NotNil(t, cm)
 
 	err = cm.Init(context.Background())
-	assert.NoError(t, err, "Expected no error, instead got %+v", err)
+	require.NoError(t, err, "Expected no error, instead got %+v", err)
 }
 
 func TestControllerPluginManagerStartFail(t *testing.T) {

@@ -126,8 +126,8 @@ func (e *Enricher) enrich(ev *v1.Event) {
 	// 0: IPVersion_IP_NOT_USED
 	// 1: IPVersion_IPv4
 	// 2: IPVersion_IPv6
-	if flow.IP.IpVersion > 1 {
-		e.l.Error("IP version is not supported", zap.Any("IPVersion", flow.IP.IpVersion))
+	if flow.GetIP().GetIpVersion() > 1 {
+		e.l.Debug("IP version is not supported", zap.Any("IPVersion", flow.GetIP().GetIpVersion()))
 		return
 	}
 	if flow.IP.Source == "" {

@@ -1,0 +1,15 @@
+# Install the Go version declared in the repo's go.mod.
+# ADO's GoTool@0 does not support "from go.mod" (unlike GitHub Actions'
+# setup-go@v6), so we parse it explicitly and pass the value.
+#
+# Assumes `checkout: self` has already run in the calling job.
+steps:
+  - bash: |
+      set -euo pipefail
+      GO_VER=$(awk '/^go [0-9]/ {print $2; exit}' go.mod)
+      echo "Detected Go version from go.mod: $GO_VER"
+      echo "##vso[task.setvariable variable=GO_VERSION_FROM_GO_MOD]$GO_VER"
+    displayName: Read Go version from go.mod
+  - task: GoTool@0
+    inputs:
+      version: $(GO_VERSION_FROM_GO_MOD)

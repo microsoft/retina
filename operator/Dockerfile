@@ -1,5 +1,9 @@
-# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.2-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26.2-azurelinux3.0@sha256:257614fe59a6e7fb56909eec9a59a6d0d0794a331ebc1d6dc93aa8ef995d34f5 AS builder
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:7e3429507d92bb1e12fe45b7650c3dd3f24a4f0d1ca45622b1452834f54d8020 AS builder
+
+# systemcrypto without cgo — required for arm64 cross-compile from amd64 host.
+# Becomes redundant with Go 1.27+ (auto-selected when CGO_ENABLED=0).
+ENV GOEXPERIMENT=ms_nocgo_opensslcrypto
 
 ARG VERSION
 ARG APP_INSIGHTS_ID
@@ -7,7 +11,12 @@ ARG APP_INSIGHTS_ID
 WORKDIR /workspace
 COPY . .
 
-RUN tdnf install -y jq
+# Keep this pin until the Azure Linux base includes pcre2 >= 10.48-1.azl3; verify both architectures before removing.
+RUN tdnf install -y \
+	jq \
+	libxml2-2.11.5-11.azl3 \
+	pcre2-10.48-1.azl3 \
+	util-linux-2.40.2-6.azl3
 
 # Default linux/architecture.
 ARG GOOS=linux
@@ -16,7 +25,11 @@ ENV GOOS=${GOOS}
 ARG GOARCH=amd64
 ENV GOARCH=${GOARCH}
 
-RUN make manifests
+# make manifests runs controller-gen, a build-time host tool that must be
+# compiled for and executed on the build host, not the target arch. Unset the
+# cross-compile env for this step so `go tool` doesn't produce an arm64 binary
+# and then fail to exec it on the amd64 builder.
+RUN env -u GOOS -u GOARCH make manifests
 RUN --mount=type=cache,target="/root/.cache/go-build" \
 	GOOS=$GOOS GOARCH=$GOARCH go build \
 	-ldflags "-X github.com/microsoft/retina/internal/buildinfo.Version="$VERSION" \
@@ -25,7 +38,10 @@ RUN --mount=type=cache,target="/root/.cache/go-build" \
 
 ##################### controller #######################
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/distroless/minimal:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/azurelinux/distroless/minimal:3.0@sha256:5a66f9f16ac675db2a8229dac72d83811b73b502d6ad192d8b374c7f3be498af
+# Final image must be $TARGETPLATFORM (default), not $BUILDPLATFORM — the
+# retina-operator binary is cross-compiled for the target arch and would fail
+# to run inside a wrong-arch base image.
+FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20260923@sha256:792ea6ed971a69bbca863882354d4ff197ca461e0f699d0256653f7886a62d42
 WORKDIR /
 COPY --from=builder /lib /lib
 COPY --from=builder /usr/lib/ /usr/lib

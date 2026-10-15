@@ -8,17 +8,35 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"strings"
 	"testing"
+	"time"
 
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+
+	retinacmd "github.com/microsoft/retina/cli/cmd"
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
+	"github.com/microsoft/retina/internal/buildinfo"
+	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	"github.com/microsoft/retina/pkg/label"
+	retinalog "github.com/microsoft/retina/pkg/log"
 	"github.com/stretchr/testify/require"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+)
+
+const (
+	testNamespace         = "test-ns"
+	testPodSelector       = "k8s-app=my-app"
+	testTcpdumpHostFilter = "host 10.0.0.1"
 )
 
 type testcase struct {
@@ -66,6 +84,7 @@ func NewNode(name string) *corev1.Node {
 			Name: name,
 			Labels: map[string]string{
 				"kubernetes.io/hostname": name,
+				"kubernetes.io/os":       "linux",
 			},
 		},
 	}
@@ -181,8 +200,8 @@ func TestCreateJobsWithNamespace(t *testing.T) {
 			wantNamespace:    "workload",
 			inputPodSelector: "service=A",
 			inputNsSelector:  "",
-			wantNodes:        []string{},
-			wantErr:          true,
+			wantNodes:        []string{"A1", "A2"},
+			wantErr:          false,
 		},
 		{
 			name:             "create --namespace=workload --namespace-selectors=name=workload",
@@ -338,28 +357,256 @@ func JobsCreatedCorrectly(t *testing.T, kubeClient *fake.Clientset, tc testcase)
 
 // Pod Names Tests - Tests for CLI pod name selection functionality
 
-func TestCreateCaptureCommand_PodNamesWithNodeSelector_ShouldFail(t *testing.T) {
-	// Test that when pod-names is specified with node-selectors, the node selector is overridden
-	// and the command attempts to use pod names. Since the pod doesn't exist, this will fail.
-	// This verifies that pod names take precedence over default node selectors.
-	cmd := NewCommand(fake.NewClientset())
-
-	cmd.SetArgs([]string{
-		"create",
-		"--name=test-capture",
-		"--namespace=default",
-		"--pod-names=nonexistent-pod",
-		"--node-selectors=kubernetes.io/os=linux",
-		"--duration=10s",
-		"--host-path=/tmp/capture",
+func TestCreateCaptureCommand_PodNamesClearsDefaultNodeSelector(t *testing.T) {
+	// When --pod-names is set together with the default --node-selectors,
+	// the default selector must be cleared so pod names take precedence.
+	savedNodeSelectors := opts.nodeSelectors
+	savedPodNames := opts.podNames
+	savedNamespace := opts.Namespace
+	savedName := opts.Name
+	t.Cleanup(func() {
+		opts.nodeSelectors = savedNodeSelectors
+		opts.podNames = savedPodNames
+		opts.Namespace = savedNamespace
+		opts.Name = savedName
 	})
 
-	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
+	name := "test-capture"
+	namespace := "default"
 
-	err := cmd.Execute()
-	require.Error(t, err, "command should fail when pod-names specifies a nonexistent pod")
-	require.Contains(t, err.Error(), "not found", "error should indicate the pod was not found")
+	opts.nodeSelectors = DefaultNodeSelectors
+	opts.podNames = "nonexistent-pod"
+	opts.Namespace = &namespace
+	opts.Name = &name
+
+	capture, err := createCaptureF(context.Background(), fake.NewClientset())
+	require.NoError(t, err)
+
+	require.Equal(t, []string{"nonexistent-pod"}, capture.Spec.CaptureConfiguration.CaptureTarget.PodNames)
+	require.Nil(t, capture.Spec.CaptureConfiguration.CaptureTarget.NodeSelector)
+}
+
+func TestParseIPList(t *testing.T) {
+	cases := []struct {
+		name    string
+		ipList  string
+		wantIPs []string
+		wantErr bool
+	}{
+		{
+			name:    "empty string",
+			ipList:  "",
+			wantIPs: nil,
+		},
+		{
+			name:    "single valid IPv4 address",
+			ipList:  "10.0.0.1",
+			wantIPs: []string{"10.0.0.1"},
+		},
+		{
+			name:    "multiple valid IPv4 addresses",
+			ipList:  "10.0.0.1,10.0.0.2",
+			wantIPs: []string{"10.0.0.1", "10.0.0.2"},
+		},
+		{
+			name:    "addresses with surrounding whitespace are trimmed",
+			ipList:  " 10.0.0.1 , 10.0.0.2 ",
+			wantIPs: []string{"10.0.0.1", "10.0.0.2"},
+		},
+		{
+			name:    "valid IPv6 address",
+			ipList:  "2001:db8::1",
+			wantIPs: []string{"2001:db8::1"},
+		},
+		{
+			name:    "invalid IP address returns error",
+			ipList:  "not-an-ip",
+			wantErr: true,
+		},
+		{
+			name:    "one invalid IP among valid ones returns error",
+			ipList:  "10.0.0.1,not-an-ip",
+			wantErr: true,
+		},
+		{
+			name:    "flag-like token is rejected as invalid IP",
+			ipList:  "-somtehing",
+			wantErr: true,
+		},
+		{
+			name:    "trailing comma yields an empty entry and is rejected",
+			ipList:  "10.0.0.1,",
+			wantErr: true,
+		},
+		{
+			name:    "empty entry between commas is rejected",
+			ipList:  "10.0.0.1,,10.0.0.2",
+			wantErr: true,
+		},
+		{
+			name:    "whitespace-only entry is rejected",
+			ipList:  "   ",
+			wantErr: true,
+		},
+		{
+			name:    "comma-only list is rejected",
+			ipList:  ",",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			ips, err := parseIPList(tt.ipList, "--source-ips")
+			if tt.wantErr {
+				require.Error(t, err)
+				require.ErrorIs(t, err, ErrInvalidIPAddress)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.wantIPs, ips)
+		})
+	}
+}
+
+func TestCreateCaptureCommand_SourceDestinationIPs(t *testing.T) {
+	savedSourceIPs := opts.sourceIPs
+	savedDestinationIPs := opts.destinationIPs
+	savedPodSelectors := opts.podSelectors
+	savedNamespace := opts.Namespace
+	savedName := opts.Name
+	t.Cleanup(func() {
+		opts.sourceIPs = savedSourceIPs
+		opts.destinationIPs = savedDestinationIPs
+		opts.podSelectors = savedPodSelectors
+		opts.Namespace = savedNamespace
+		opts.Name = savedName
+	})
+
+	name := "test-capture"
+	namespace := "default"
+
+	opts.podSelectors = testPodSelector
+	opts.Namespace = &namespace
+	opts.Name = &name
+	opts.sourceIPs = "10.0.0.1,10.0.0.2"
+	opts.destinationIPs = "10.0.0.3"
+
+	capture, err := createCaptureF(context.Background(), fake.NewClientset())
+	require.NoError(t, err)
+
+	require.Equal(t, []string{"10.0.0.1", "10.0.0.2"}, capture.Spec.CaptureConfiguration.CaptureOption.SourceIPs)
+	require.Equal(t, []string{"10.0.0.3"}, capture.Spec.CaptureConfiguration.CaptureOption.DestinationIPs)
+}
+
+func TestCreateCaptureCommand_InvalidSourceIPReturnsError(t *testing.T) {
+	savedSourceIPs := opts.sourceIPs
+	savedPodSelectors := opts.podSelectors
+	savedNamespace := opts.Namespace
+	savedName := opts.Name
+	t.Cleanup(func() {
+		opts.sourceIPs = savedSourceIPs
+		opts.podSelectors = savedPodSelectors
+		opts.Namespace = savedNamespace
+		opts.Name = savedName
+	})
+
+	name := "test-capture"
+	namespace := "default"
+
+	opts.podSelectors = testPodSelector
+	opts.Namespace = &namespace
+	opts.Name = &name
+	opts.sourceIPs = "not-an-ip"
+
+	_, err := createCaptureF(context.Background(), fake.NewClientset())
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrInvalidIPAddress)
+}
+
+func TestCreateCaptureCommand_TcpdumpFilterWithSourceIPReturnsError(t *testing.T) {
+	savedTcpdumpFilter := opts.tcpdumpFilter
+	savedSourceIPs := opts.sourceIPs
+	savedDestinationIPs := opts.destinationIPs
+	savedPodSelectors := opts.podSelectors
+	savedNamespace := opts.Namespace
+	savedName := opts.Name
+	t.Cleanup(func() {
+		opts.tcpdumpFilter = savedTcpdumpFilter
+		opts.sourceIPs = savedSourceIPs
+		opts.destinationIPs = savedDestinationIPs
+		opts.podSelectors = savedPodSelectors
+		opts.Namespace = savedNamespace
+		opts.Name = savedName
+	})
+
+	name := "test-capture"
+	namespace := "default"
+
+	opts.podSelectors = testPodSelector
+	opts.Namespace = &namespace
+	opts.Name = &name
+	opts.tcpdumpFilter = testTcpdumpHostFilter
+	opts.sourceIPs = "10.0.0.1"
+
+	_, err := createCaptureF(context.Background(), fake.NewClientset())
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrTcpdumpFilterIncompatibleWithSourceDestIPs)
+}
+
+func TestCreateCaptureCommand_TcpdumpFilterWithDestinationIPReturnsError(t *testing.T) {
+	savedTcpdumpFilter := opts.tcpdumpFilter
+	savedSourceIPs := opts.sourceIPs
+	savedDestinationIPs := opts.destinationIPs
+	savedPodSelectors := opts.podSelectors
+	savedNamespace := opts.Namespace
+	savedName := opts.Name
+	t.Cleanup(func() {
+		opts.tcpdumpFilter = savedTcpdumpFilter
+		opts.sourceIPs = savedSourceIPs
+		opts.destinationIPs = savedDestinationIPs
+		opts.podSelectors = savedPodSelectors
+		opts.Namespace = savedNamespace
+		opts.Name = savedName
+	})
+
+	name := "test-capture"
+	namespace := "default"
+
+	opts.podSelectors = testPodSelector
+	opts.Namespace = &namespace
+	opts.Name = &name
+	opts.tcpdumpFilter = testTcpdumpHostFilter
+	opts.destinationIPs = "10.0.0.2"
+
+	_, err := createCaptureF(context.Background(), fake.NewClientset())
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrTcpdumpFilterIncompatibleWithSourceDestIPs)
+}
+
+func TestCreateCaptureCommand_TcpdumpFilterAloneSucceeds(t *testing.T) {
+	savedTcpdumpFilter := opts.tcpdumpFilter
+	savedPodSelectors := opts.podSelectors
+	savedNamespace := opts.Namespace
+	savedName := opts.Name
+	t.Cleanup(func() {
+		opts.tcpdumpFilter = savedTcpdumpFilter
+		opts.podSelectors = savedPodSelectors
+		opts.Namespace = savedNamespace
+		opts.Name = savedName
+	})
+
+	name := "test-capture"
+	namespace := "default"
+
+	opts.podSelectors = testPodSelector
+	opts.Namespace = &namespace
+	opts.Name = &name
+	opts.tcpdumpFilter = testTcpdumpHostFilter
+
+	capture, err := createCaptureF(context.Background(), fake.NewClientset())
+	require.NoError(t, err)
+	require.Equal(t, testTcpdumpHostFilter, *capture.Spec.CaptureConfiguration.TcpdumpFilter)
 }
 
 func TestCreateCaptureWithPodNames_CRDStructure(t *testing.T) {
@@ -509,4 +756,835 @@ func TestCaptureTarget_PodNames_MutualExclusivity(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNodeNamesClearsDefaultNodeSelector(t *testing.T) {
+	// When --node-names is specified, the default kubernetes.io/os=linux node-selector
+	// must be cleared so that Windows nodes can be targeted by name.
+	winNode := NewWindowsNode("win-node-1")
+	linNode := NewNode("lin-node-1")
+
+	kubeClient := fake.NewClientset(winNode, linNode)
+	kubeClient.PrependReactor("create", "jobs", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+		createAction, ok := action.(clienttesting.CreateAction)
+		if !ok {
+			return false, nil, fmt.Errorf("expected CreateAction, got %T", action) //nolint:err113 // test code
+		}
+		job := createAction.GetObject().(*batchv1.Job)
+		if job.Name == "" {
+			job.Name = job.GenerateName + randomString(5)
+		}
+		return false, job, nil
+	})
+
+	cases := []struct {
+		name      string
+		args      []string
+		wantNodes []string
+		wantErr   bool
+	}{
+		{
+			name: "node-names targets a Windows node without explicit node-selectors",
+			args: []string{
+				"create",
+				"--name=test-win",
+				"--namespace=default",
+				"--node-names=win-node-1",
+				"--duration=10s",
+				"--host-path=capture",
+			},
+			wantNodes: []string{"win-node-1"},
+			wantErr:   false,
+		},
+		{
+			name: "node-names targets a Linux node without explicit node-selectors",
+			args: []string{
+				"create",
+				"--name=test-lin",
+				"--namespace=default",
+				"--node-names=lin-node-1",
+				"--duration=10s",
+				"--host-path=capture",
+			},
+			wantNodes: []string{"lin-node-1"},
+			wantErr:   false,
+		},
+		{
+			name: "node-names targets both Linux and Windows nodes",
+			args: []string{
+				"create",
+				"--name=test-both",
+				"--namespace=default",
+				"--node-names=lin-node-1,win-node-1",
+				"--duration=10s",
+				"--host-path=capture",
+			},
+			wantNodes: []string{"lin-node-1", "win-node-1"},
+			wantErr:   false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := NewCommand(kubeClient)
+			cmd.SetArgs(tc.args)
+			buf := new(bytes.Buffer)
+			cmd.SetOut(buf)
+
+			err := cmd.Execute()
+
+			if tc.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err, "capture create should succeed for node-names targeting %v", tc.wantNodes)
+
+			// Verify jobs were created for the expected nodes
+			jobs, err := kubeClient.BatchV1().Jobs("default").List(context.TODO(), metav1.ListOptions{
+				LabelSelector: fmt.Sprintf("%s=%s", label.CaptureNameLabel, strings.TrimPrefix(tc.args[1], "--name=")),
+			})
+			require.NoError(t, err)
+			require.Len(t, jobs.Items, len(tc.wantNodes), "should create one job per target node")
+
+			gotNodes := map[string]bool{}
+			for _, job := range jobs.Items {
+				nodeAffinity := job.Spec.Template.Spec.Affinity.NodeAffinity
+				require.NotNil(t, nodeAffinity)
+				for _, term := range nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+					for _, expr := range term.MatchExpressions {
+						if expr.Key == "kubernetes.io/hostname" {
+							for _, v := range expr.Values {
+								gotNodes[v] = true
+							}
+						}
+					}
+				}
+			}
+
+			for _, wantNode := range tc.wantNodes {
+				require.True(t, gotNodes[wantNode], "expected job targeting node %s", wantNode)
+			}
+		})
+	}
+}
+
+func TestGetCLICaptureConfig(t *testing.T) {
+	savedDebug, savedJobNumLimit, savedHostPathBaseDir := opts.debug, opts.jobNumLimit, opts.hostPathBaseDir
+	t.Cleanup(func() {
+		opts.debug = savedDebug
+		opts.jobNumLimit = savedJobNumLimit
+		opts.hostPathBaseDir = savedHostPathBaseDir
+	})
+
+	opts.debug = true
+	opts.jobNumLimit = 7
+	opts.hostPathBaseDir = "/mnt/captures"
+
+	got := getCLICaptureConfig()
+
+	require.Equal(t, buildinfo.Version, got.CaptureImageVersion)
+	require.Equal(t, captureUtils.VersionSourceCLIVersion, got.CaptureImageVersionSource)
+	require.True(t, got.CaptureDebug)
+	require.Equal(t, 7, got.CaptureJobNumLimit)
+	require.Equal(t, "/mnt/captures", got.CaptureHostPathBaseDir)
+}
+
+func TestCreateCaptureCommand_AbsoluteHostPath_ShouldFail(t *testing.T) {
+	// --host-path must be a bare subpath; absolute paths are rejected by the
+	// shared validateHostPath helper used by both the operator and the CLI.
+	cmd := NewCommand(fake.NewClientset())
+
+	cmd.SetArgs([]string{
+		"create",
+		"--name=hp-absolute",
+		"--namespace=default",
+		"--node-selectors=kubernetes.io/os=linux",
+		"--duration=10s",
+		"--host-path=/tmp/foo",
+	})
+
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+
+	err := cmd.Execute()
+	require.Error(t, err, "command should fail when --host-path is absolute")
+	require.Contains(t, err.Error(), "OutputConfiguration.HostPath",
+		"error should reference the rejected HostPath field; got: %v", err)
+}
+func TestHasRemoteDestination(t *testing.T) {
+	tests := []struct {
+		name string
+		opts Opts
+		want bool
+	}{
+		{
+			name: "blob upload is remote",
+			opts: Opts{blobUpload: "https://account.blob.core.windows.net/container"},
+			want: true,
+		},
+		{
+			name: "s3 bucket is remote",
+			opts: Opts{s3Bucket: "my-bucket"},
+			want: true,
+		},
+		{
+			name: "pvc is remote",
+			opts: Opts{pvc: "my-pvc"},
+			want: true,
+		},
+		{
+			name: "host-path only is not remote",
+			opts: Opts{hostPath: "/mnt/captures"},
+			want: false,
+		},
+		{
+			name: "empty opts is not remote",
+			opts: Opts{},
+			want: false,
+		},
+		{
+			name: "multiple remote destinations",
+			opts: Opts{blobUpload: "https://x.blob.core.windows.net/c", s3Bucket: "bucket"},
+			want: true,
+		},
+	}
+
+	for i := range tests {
+		t.Run(tests[i].name, func(t *testing.T) {
+			require.Equal(t, tests[i].want, hasRemoteDestination(&tests[i].opts))
+		})
+	}
+}
+
+func TestSetSecretOwnerReferences(t *testing.T) {
+	ns := testNamespace
+	secretName := "blob-secret-abc"
+
+	kubeClient := fake.NewClientset(
+		&corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: ns,
+			},
+		},
+	)
+
+	origNs := opts.Namespace
+	opts.Namespace = &ns
+	defer func() { opts.Namespace = origNs }()
+
+	blobUpload := secretName
+	capture := &retinav1alpha1.Capture{
+		Spec: retinav1alpha1.CaptureSpec{
+			OutputConfiguration: retinav1alpha1.OutputConfiguration{
+				BlobUpload: &blobUpload,
+			},
+		},
+	}
+
+	jobs := []batchv1.Job{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "job-1",
+				Namespace: ns,
+				UID:       "uid-1",
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "job-2",
+				Namespace: ns,
+				UID:       "uid-2",
+			},
+		},
+	}
+
+	err := setSecretOwnerReferences(context.Background(), kubeClient, capture, jobs)
+	require.NoError(t, err)
+
+	secret, err := kubeClient.CoreV1().Secrets(ns).Get(context.Background(), secretName, metav1.GetOptions{})
+	require.NoError(t, err)
+	require.Len(t, secret.OwnerReferences, 2, "secret should have owner references for both jobs")
+	require.Equal(t, "job-1", secret.OwnerReferences[0].Name)
+	require.Equal(t, "job-2", secret.OwnerReferences[1].Name)
+	require.Equal(t, "batch/v1", secret.OwnerReferences[0].APIVersion)
+	require.Equal(t, "Job", secret.OwnerReferences[0].Kind)
+}
+
+func TestSetSecretOwnerReferences_Idempotent(t *testing.T) {
+	ns := testNamespace
+	secretName := "blob-secret-idem"
+
+	kubeClient := fake.NewClientset(
+		&corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: ns,
+			},
+		},
+	)
+
+	origNs := opts.Namespace
+	opts.Namespace = &ns
+	defer func() { opts.Namespace = origNs }()
+
+	blobUpload := secretName
+	capture := &retinav1alpha1.Capture{
+		Spec: retinav1alpha1.CaptureSpec{
+			OutputConfiguration: retinav1alpha1.OutputConfiguration{
+				BlobUpload: &blobUpload,
+			},
+		},
+	}
+
+	jobs := []batchv1.Job{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "job-1",
+				Namespace: ns,
+				UID:       "uid-1",
+			},
+		},
+	}
+
+	// Call twice to simulate retry/re-reconcile.
+	err := setSecretOwnerReferences(context.Background(), kubeClient, capture, jobs)
+	require.NoError(t, err)
+	err = setSecretOwnerReferences(context.Background(), kubeClient, capture, jobs)
+	require.NoError(t, err)
+
+	secret, err := kubeClient.CoreV1().Secrets(ns).Get(context.Background(), secretName, metav1.GetOptions{})
+	require.NoError(t, err)
+	require.Len(t, secret.OwnerReferences, 1, "duplicate owner references should not be added")
+}
+
+func TestSetSecretOwnerReferences_NoSecrets(t *testing.T) {
+	kubeClient := fake.NewClientset()
+
+	capture := &retinav1alpha1.Capture{
+		Spec: retinav1alpha1.CaptureSpec{
+			OutputConfiguration: retinav1alpha1.OutputConfiguration{},
+		},
+	}
+
+	err := setSecretOwnerReferences(context.Background(), kubeClient, capture, []batchv1.Job{})
+	require.NoError(t, err)
+}
+
+func TestSetSecretOwnerReferences_S3Secret(t *testing.T) {
+	ns := testNamespace
+	secretName := "s3-secret-xyz"
+
+	kubeClient := fake.NewClientset(
+		&corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: ns,
+			},
+		},
+	)
+
+	origNs := opts.Namespace
+	opts.Namespace = &ns
+	defer func() { opts.Namespace = origNs }()
+
+	capture := &retinav1alpha1.Capture{
+		Spec: retinav1alpha1.CaptureSpec{
+			OutputConfiguration: retinav1alpha1.OutputConfiguration{
+				S3Upload: &retinav1alpha1.S3Upload{
+					SecretName: secretName,
+					Bucket:     "my-bucket",
+				},
+			},
+		},
+	}
+
+	jobs := []batchv1.Job{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "job-a",
+				Namespace: ns,
+				UID:       "uid-a",
+			},
+		},
+	}
+
+	err := setSecretOwnerReferences(context.Background(), kubeClient, capture, jobs)
+	require.NoError(t, err)
+
+	secret, err := kubeClient.CoreV1().Secrets(ns).Get(context.Background(), secretName, metav1.GetOptions{})
+	require.NoError(t, err)
+	require.Len(t, secret.OwnerReferences, 1, "secret should have owner reference for the job")
+	require.Equal(t, "job-a", secret.OwnerReferences[0].Name)
+	require.Equal(t, "batch/v1", secret.OwnerReferences[0].APIVersion)
+	require.Equal(t, "Job", secret.OwnerReferences[0].Kind)
+}
+
+func TestDeleteSecret_NotFound(t *testing.T) {
+	// deleteSecret should return nil when the secret doesn't exist
+	ns := testNamespace
+	kubeClient := fake.NewClientset() // no secrets pre-created
+
+	origNs := opts.Namespace
+	opts.Namespace = &ns
+	defer func() { opts.Namespace = origNs }()
+
+	name := "nonexistent-secret"
+	err := deleteSecret(context.Background(), kubeClient, &name)
+	require.NoError(t, err, "deleteSecret should not error on NotFound")
+}
+
+func TestDeleteSecret_NilName(t *testing.T) {
+	ns := testNamespace
+	kubeClient := fake.NewClientset()
+
+	origNs := opts.Namespace
+	opts.Namespace = &ns
+	defer func() { opts.Namespace = origNs }()
+
+	err := deleteSecret(context.Background(), kubeClient, nil)
+	require.NoError(t, err, "deleteSecret should return nil for nil secretName")
+}
+
+func TestDeleteSecret_ExistingSecret(t *testing.T) {
+	// deleteSecret should succeed when the secret exists
+	ns := testNamespace
+	secretName := "my-secret"
+	kubeClient := fake.NewClientset(
+		&corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: ns,
+			},
+		},
+	)
+
+	origNs := opts.Namespace
+	opts.Namespace = &ns
+	defer func() { opts.Namespace = origNs }()
+
+	err := deleteSecret(context.Background(), kubeClient, &secretName)
+	require.NoError(t, err)
+
+	// Verify secret is deleted
+	_, err = kubeClient.CoreV1().Secrets(ns).Get(context.Background(), secretName, metav1.GetOptions{})
+	require.Error(t, err, "secret should be gone after deleteSecret")
+}
+
+func TestCreateJobs_ActiveDeadlineSeconds(t *testing.T) {
+	// When duration > 0, jobs should have ActiveDeadlineSeconds set
+	kubeClient := newFakeClientForCleanupTests()
+
+	var createdJob *batchv1.Job
+	kubeClient.PrependReactor("create", "jobs", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+		createAction := action.(clienttesting.CreateAction)
+		job := createAction.GetObject().(*batchv1.Job)
+		if job.Name == "" {
+			job.Name = job.GenerateName + "test"
+		}
+		now := metav1.Now()
+		job.Status.CompletionTime = &now
+		createdJob = job
+		return false, job, nil
+	})
+
+	cmd := NewCommand(kubeClient)
+	cmd.SetArgs([]string{
+		"create",
+		"--name=test-deadline",
+		"--namespace=default",
+		"--node-names=node1",
+		"--host-path=captures",
+		"--no-wait=true",
+		"--duration=60s",
+	})
+
+	err := cmd.Execute()
+	require.NoError(t, err)
+	require.NotNil(t, createdJob)
+	require.NotNil(t, createdJob.Spec.ActiveDeadlineSeconds,
+		"ActiveDeadlineSeconds should be set when duration > 0")
+	// 60s + 1800s buffer = 1860
+	require.Equal(t, int64(1860), *createdJob.Spec.ActiveDeadlineSeconds)
+}
+
+func TestCreateJobs_NoTTLWithoutCleanupFlag(t *testing.T) {
+	// When --cleanup-after-upload is NOT set, TTL should NOT be set
+	// even with remote + no-wait.
+	kubeClient := newFakeClientForCleanupTests()
+
+	var createdJob *batchv1.Job
+	kubeClient.PrependReactor("create", "jobs", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+		createAction := action.(clienttesting.CreateAction)
+		job := createAction.GetObject().(*batchv1.Job)
+		if job.Name == "" {
+			job.Name = job.GenerateName + "test"
+		}
+		now := metav1.Now()
+		job.Status.CompletionTime = &now
+		createdJob = job
+		return false, job, nil
+	})
+
+	cmd := NewCommand(kubeClient)
+	cmd.SetArgs([]string{
+		"create",
+		"--name=test-no-cleanup",
+		"--namespace=default",
+		"--node-names=node1",
+		"--blob-upload=https://testaccount.blob.core.windows.net/container?sv=2021-06-08",
+		"--no-wait=true",
+		"--duration=5s",
+		// NOTE: --cleanup-after-upload is NOT set
+	})
+
+	err := cmd.Execute()
+	require.NoError(t, err)
+	require.NotNil(t, createdJob)
+	require.Nil(t, createdJob.Spec.TTLSecondsAfterFinished,
+		"TTL should NOT be set without --cleanup-after-upload")
+}
+
+func TestWaitForJobsToStartReturnsFailedCreateEvent(t *testing.T) {
+	const (
+		jobName       = "capture-job"
+		jobUID        = types.UID("capture-job-uid")
+		denialMessage = "ValidatingAdmissionPolicy 'deny-pod-host-network' denied request: Host network usage is disallowed."
+	)
+	kubeClient := fake.NewClientset(
+		&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: jobName, Namespace: testNamespace, UID: jobUID}},
+		&corev1.Event{
+			ObjectMeta:     metav1.ObjectMeta{Name: "capture-job-failed-create", Namespace: testNamespace},
+			InvolvedObject: corev1.ObjectReference{Kind: "Job", Name: jobName, Namespace: testNamespace, UID: jobUID},
+			Type:           corev1.EventTypeWarning,
+			Reason:         "FailedCreate",
+			Message:        denialMessage,
+		},
+	)
+
+	err := waitForJobsToStartWithTimeout(context.Background(), kubeClient, []batchv1.Job{{
+		ObjectMeta: metav1.ObjectMeta{Name: jobName, Namespace: testNamespace, UID: jobUID},
+	}}, 20*time.Millisecond)
+
+	require.ErrorContains(t, err, denialMessage)
+}
+
+func TestWaitForJobsToStartReturnsWithNoJobs(t *testing.T) {
+	err := waitForJobsToStart(context.Background(), fake.NewClientset(), nil)
+
+	require.NoError(t, err)
+}
+
+func TestWaitForJobsToStartRetriesTransientEventError(t *testing.T) {
+	job := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "capture-job", Namespace: testNamespace, UID: types.UID("capture-job-uid")},
+	}
+	kubeClient := fake.NewClientset(&job, newJobEvent("failed", job, "admission denied"))
+	listCalls := 0
+	kubeClient.PrependReactor("list", "events", func(clienttesting.Action) (bool, runtime.Object, error) {
+		listCalls++
+		if listCalls == 1 {
+			return true, nil, apierrors.NewServiceUnavailable("temporary failure")
+		}
+		return false, nil, nil
+	})
+
+	err := waitForJobsToStartWithTimeout(context.Background(), kubeClient, []batchv1.Job{job}, time.Second)
+
+	require.ErrorContains(t, err, "admission denied")
+	require.GreaterOrEqual(t, listCalls, 2)
+}
+
+func TestWaitForJobsToStartFailureThenActiveJob(t *testing.T) {
+	job := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "capture-job", Namespace: testNamespace, UID: types.UID("capture-job-uid")},
+	}
+	kubeClient := fake.NewClientset(&job, newJobEvent("failed", job, "temporary denial"))
+	jobListCalls := 0
+	kubeClient.PrependReactor("list", "jobs", func(clienttesting.Action) (bool, runtime.Object, error) {
+		jobListCalls++
+		currentJob := job.DeepCopy()
+		if jobListCalls > 1 {
+			currentJob.Status.Active = 1
+		}
+		return true, &batchv1.JobList{Items: []batchv1.Job{*currentJob}}, nil
+	})
+
+	err := waitForJobsToStartWithTimeout(context.Background(), kubeClient, []batchv1.Job{job}, 1500*time.Millisecond)
+
+	require.NoError(t, err)
+	require.Equal(t, 2, jobListCalls)
+}
+
+func TestWaitForJobsToStartClearsPendingFromInitialJobStatus(t *testing.T) {
+	job := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "capture-job", Namespace: testNamespace, UID: types.UID("capture-job-uid")},
+		Status:     batchv1.JobStatus{Active: 1},
+	}
+
+	err := waitForJobsToStartWithTimeout(context.Background(), fake.NewClientset(&job), []batchv1.Job{job}, time.Second)
+
+	require.NoError(t, err)
+}
+
+func TestWaitForJobsToStartHandlesEventsAcrossMultipleJobs(t *testing.T) {
+	firstJob := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "first-job", Namespace: testNamespace, UID: types.UID("first-job-uid")},
+		Status:     batchv1.JobStatus{Active: 1},
+	}
+	secondJob := batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "second-job", Namespace: testNamespace, UID: types.UID("second-job-uid")}}
+	kubeClient := fake.NewClientset(&firstJob, &secondJob,
+		newJobEvent("second-failed", secondJob, "second job denied"))
+
+	err := waitForJobsToStartWithTimeout(context.Background(), kubeClient, []batchv1.Job{firstJob, secondJob}, 20*time.Millisecond)
+
+	require.ErrorContains(t, err, "second job denied")
+}
+
+func TestWaitForJobsToStartIgnoresUnrelatedJobEvents(t *testing.T) {
+	job := batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "capture-job", Namespace: testNamespace, UID: types.UID("capture-job-uid")}}
+	unrelatedJob := batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "unrelated-job", Namespace: testNamespace, UID: types.UID("unrelated-job-uid")}}
+	kubeClient := fake.NewClientset(&job, newJobEvent("unrelated-failed", unrelatedJob, "unrelated denial"))
+
+	err := waitForJobsToStartWithTimeout(context.Background(), kubeClient, []batchv1.Job{job}, 20*time.Millisecond)
+
+	require.NoError(t, err)
+}
+
+func TestWaitForJobsToStartSkipsWithoutEventAccess(t *testing.T) {
+	for name, eventErr := range map[string]error{
+		"forbidden":    apierrors.NewForbidden(schema.GroupResource{Resource: "events"}, "", nil),
+		"unauthorized": apierrors.NewUnauthorized("events are unavailable"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			job := batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "capture-job", Namespace: testNamespace, UID: types.UID("capture-job-uid")}}
+			kubeClient := fake.NewClientset(&job)
+			kubeClient.PrependReactor("list", "events", func(clienttesting.Action) (bool, runtime.Object, error) {
+				return true, nil, eventErr
+			})
+
+			err := waitForJobsToStartWithTimeout(context.Background(), kubeClient, []batchv1.Job{job}, time.Second)
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestWaitForJobsToStartCancellationWinsOverEventListDenial(t *testing.T) {
+	job := batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "capture-job", Namespace: testNamespace, UID: types.UID("capture-job-uid")}}
+	kubeClient := fake.NewClientset(&job)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	kubeClient.PrependReactor("list", "events", func(clienttesting.Action) (bool, runtime.Object, error) {
+		cancel()
+		return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "events"}, "", nil)
+	})
+
+	err := waitForJobsToStartWithTimeout(ctx, kubeClient, []batchv1.Job{job}, time.Second)
+
+	require.ErrorIs(t, err, context.Canceled)
+}
+
+func TestWaitForJobsToStartClearsRecoveredFailureFromJobStatus(t *testing.T) {
+	recoveredJob := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "recovered-job", Namespace: testNamespace, UID: types.UID("recovered-job-uid")},
+		Status:     batchv1.JobStatus{Active: 1},
+	}
+	pendingJob := batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "pending-job", Namespace: testNamespace, UID: types.UID("pending-job-uid")}}
+	kubeClient := fake.NewClientset(
+		&recoveredJob,
+		&pendingJob,
+		newJobEvent("recovered-failed", recoveredJob, "recovered denial"),
+	)
+
+	err := waitForJobsToStartWithTimeout(context.Background(), kubeClient, []batchv1.Job{recoveredJob, pendingJob}, 20*time.Millisecond)
+
+	require.NoError(t, err)
+}
+
+func TestWaitForJobsToStartReturnsParentCancellation(t *testing.T) {
+	job := batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "capture-job", Namespace: testNamespace, UID: types.UID("capture-job-uid")}}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := waitForJobsToStartWithTimeout(ctx, fake.NewClientset(&job), []batchv1.Job{job}, time.Second)
+
+	require.ErrorIs(t, err, context.Canceled)
+}
+
+func TestWaitForJobsToStartListsEventsOncePerPoll(t *testing.T) {
+	job := batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "capture-job", Namespace: testNamespace, UID: types.UID("capture-job-uid")}}
+	kubeClient := fake.NewClientset(&job)
+	listCalls := 0
+	kubeClient.PrependReactor("list", "events", func(clienttesting.Action) (bool, runtime.Object, error) {
+		listCalls++
+		return false, nil, nil
+	})
+
+	err := waitForJobsToStartWithTimeout(context.Background(), kubeClient, []batchv1.Job{job}, 20*time.Millisecond)
+
+	require.NoError(t, err)
+	require.Equal(t, 1, listCalls)
+}
+
+func TestWaitForJobsToStartPendingTimeoutIsBestEffort(t *testing.T) {
+	job := batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "capture-job", Namespace: testNamespace, UID: types.UID("capture-job-uid")}}
+
+	err := waitForJobsToStartWithTimeout(context.Background(), fake.NewClientset(&job), []batchv1.Job{job}, 20*time.Millisecond)
+
+	require.NoError(t, err)
+}
+
+func TestWaitForJobsToStartWarnsWhenStartupIsUnconfirmed(t *testing.T) {
+	job := batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "capture-job", Namespace: testNamespace, UID: types.UID("capture-job-uid")}}
+	core, observedLogs := observer.New(zap.WarnLevel)
+	originalLogger := retinacmd.Logger
+	retinacmd.Logger = &retinalog.ZapLogger{Logger: zap.New(core)}
+	defer func() { retinacmd.Logger = originalLogger }()
+
+	err := waitForJobsToStartWithTimeout(context.Background(), fake.NewClientset(&job), []batchv1.Job{job}, 20*time.Millisecond)
+
+	require.NoError(t, err)
+	timeoutLogs := observedLogs.FilterMessage("Capture job startup could not be confirmed before timeout").All()
+	require.Len(t, timeoutLogs, 1)
+	require.Equal(t, []interface{}{"capture-job"}, timeoutLogs[0].ContextMap()["jobs"])
+}
+
+func TestWaitForJobsToStartSucceedsWhenJobStatusCannotBeConfirmed(t *testing.T) {
+	job := batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "capture-job", Namespace: testNamespace, UID: types.UID("capture-job-uid")}}
+	kubeClient := fake.NewClientset(&job, newJobEvent("failed", job, "admission denied"))
+	kubeClient.PrependReactor("list", "jobs", func(clienttesting.Action) (bool, runtime.Object, error) {
+		return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "jobs"}, "", nil)
+	})
+
+	err := waitForJobsToStartWithTimeout(context.Background(), kubeClient, []batchv1.Job{job}, 20*time.Millisecond)
+
+	require.NoError(t, err)
+}
+
+func TestWaitForJobsToStartRetriesTransientJobListError(t *testing.T) {
+	job := batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "capture-job", Namespace: testNamespace, UID: types.UID("capture-job-uid")}}
+	kubeClient := fake.NewClientset(&job, newJobEvent("failed", job, "admission denied"))
+	jobListCalls := 0
+	kubeClient.PrependReactor("list", "jobs", func(clienttesting.Action) (bool, runtime.Object, error) {
+		jobListCalls++
+		if jobListCalls == 1 {
+			return true, nil, apierrors.NewServiceUnavailable("temporary failure")
+		}
+		currentJob := job.DeepCopy()
+		currentJob.Status.Active = 1
+		return true, &batchv1.JobList{Items: []batchv1.Job{*currentJob}}, nil
+	})
+
+	err := waitForJobsToStartWithTimeout(context.Background(), kubeClient, []batchv1.Job{job}, 1500*time.Millisecond)
+
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, jobListCalls, 2)
+}
+
+func TestWaitForJobsToStartUsesFailedCreateEventSelector(t *testing.T) {
+	job := batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "capture-job", Namespace: testNamespace, UID: types.UID("capture-job-uid")}}
+	kubeClient := fake.NewClientset(&job)
+	kubeClient.PrependReactor("list", "events", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		require.Equal(t, "involvedObject.kind=Job,reason=FailedCreate,type=Warning",
+			action.(clienttesting.ListAction).GetListRestrictions().Fields.String())
+		return true, &corev1.EventList{}, nil
+	})
+
+	err := waitForJobsToStartWithTimeout(context.Background(), kubeClient, []batchv1.Job{job}, 20*time.Millisecond)
+
+	require.NoError(t, err)
+}
+
+func TestWaitForJobsToStartLargeJobSetUsesSingleStatusList(t *testing.T) {
+	const jobCount = 100
+	objects := make([]runtime.Object, 0, jobCount)
+	jobs := make([]batchv1.Job, 0, jobCount)
+	for index := range jobCount {
+		job := batchv1.Job{ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("capture-job-%d", index),
+			Namespace: testNamespace,
+			UID:       types.UID(fmt.Sprintf("capture-job-uid-%d", index)),
+		}, Status: batchv1.JobStatus{Active: 1}}
+		jobs = append(jobs, job)
+		objects = append(objects, &jobs[index])
+	}
+	kubeClient := fake.NewClientset(objects...)
+
+	err := waitForJobsToStartWithTimeout(context.Background(), kubeClient, jobs, time.Second)
+
+	require.NoError(t, err)
+	jobListCalls := 0
+	jobGetCalls := 0
+	for _, action := range kubeClient.Actions() {
+		if action.GetResource().Resource != "jobs" {
+			continue
+		}
+		switch action.GetVerb() {
+		case "list":
+			jobListCalls++
+		case "get":
+			jobGetCalls++
+		}
+	}
+	require.Equal(t, 1, jobListCalls)
+	require.Zero(t, jobGetCalls)
+}
+
+func newJobEvent(name string, job batchv1.Job, message string) *corev1.Event {
+	return &corev1.Event{
+		ObjectMeta:     metav1.ObjectMeta{Name: name, Namespace: job.Namespace},
+		InvolvedObject: corev1.ObjectReference{Kind: "Job", Name: job.Name, Namespace: job.Namespace, UID: job.UID},
+		Type:           corev1.EventTypeWarning,
+		Reason:         "FailedCreate",
+		Message:        message,
+	}
+}
+
+func TestWaitUntilJobsComplete_ShortDuration(t *testing.T) {
+	// Verifies that waitUntilJobsComplete uses a deadline of at least
+	// DefaultWaitTimeout (5min), and completes quickly when jobs are already done.
+	// This exercises the deadline calculation (duration + 5min, floored at DefaultWaitTimeout)
+	// and the period clamping logic.
+	kubeClient := newFakeClientForCleanupTests()
+
+	// The fake client's reactor already marks jobs as completed on create.
+	// For the "get" call inside waitUntilJobsComplete, we need the job to appear completed.
+	kubeClient.PrependReactor("get", "jobs", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+		getAction := action.(clienttesting.GetAction)
+		job := &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      getAction.GetName(),
+				Namespace: getAction.GetNamespace(),
+			},
+			Status: batchv1.JobStatus{
+				CompletionTime: &metav1.Time{},
+				Conditions: []batchv1.JobCondition{
+					{
+						Type:   batchv1.JobComplete,
+						Status: corev1.ConditionTrue,
+					},
+				},
+			},
+		}
+		return true, job, nil
+	})
+
+	cmd := NewCommand(kubeClient)
+	cmd.SetArgs([]string{
+		"create",
+		"--name=test-wait-short",
+		"--namespace=default",
+		"--node-names=node1",
+		"--host-path=captures",
+		"--no-wait=false",
+		"--duration=2s",
+	})
+
+	// This should complete quickly (within seconds) because the fake client
+	// reports jobs as already completed. If the deadline/period logic is broken,
+	// this would hang until the test timeout.
+	err := cmd.Execute()
+	require.NoError(t, err)
 }

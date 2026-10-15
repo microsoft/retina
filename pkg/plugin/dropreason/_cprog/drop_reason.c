@@ -420,7 +420,11 @@ int BPF_KRETPROBE(inet_csk_accept_ret, struct sock *sk)
     if (sk != NULL)
         return 0;
 
-    int err = (int)*err_ptr;
+    // *err_ptr holds the ADDRESS of the callee's errno output (the int *err
+    // parameter pre-6.10, &arg->err on 6.10+); the errno must be read through it.
+    int err = 0;
+    if (bpf_probe_read_kernel(&err, sizeof(err), (void *)(unsigned long)*err_ptr) < 0)
+        return 0;
     if (err >= 0)
         return 0;
 

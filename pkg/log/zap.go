@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/Azure/azure-container-networking/zapai"
-	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-logr/logr"
 	"github.com/go-logr/zapr"
 	logfmt "github.com/jsternberg/zap-logfmt"

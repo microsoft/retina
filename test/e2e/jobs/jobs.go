@@ -2,8 +2,10 @@ package retina
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork"
+	armnetwork "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v5"
 	"github.com/microsoft/retina/test/e2e/common"
 	"github.com/microsoft/retina/test/e2e/framework/azure"
 	"github.com/microsoft/retina/test/e2e/framework/generic"
@@ -23,6 +25,15 @@ import (
 )
 
 const IPPrefix = "serviceTaggedIp"
+
+func eventWriterImage() string {
+	return fmt.Sprintf(
+		"%s/%s/test/e2e-test-event-writer:%s",
+		strings.TrimSpace(os.Getenv(generic.DefaultImageRegistry)),
+		strings.TrimSpace(os.Getenv(generic.DefaultImageNamespace)),
+		strings.TrimSpace(os.Getenv(generic.DefaultTagEnv)),
+	)
+}
 
 func CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath string, createInfra bool) *types.Job {
 	job := types.NewJob("Create e2e test infrastructure")
@@ -92,13 +103,14 @@ func CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath string
 	return job
 }
 
-func DeleteTestInfra(subID, rg, location string, deleteInfra bool) *types.Job {
+func DeleteTestInfra(subID, rg, clusterName, location string, deleteInfra bool) *types.Job {
 	job := types.NewJob("Delete e2e test infrastructure")
 
 	if deleteInfra {
 		job.AddStep(&azure.DeleteResourceGroup{
 			SubscriptionID:    subID,
 			ResourceGroupName: rg,
+			ClusterName:       clusterName,
 			Location:          location,
 		}, nil)
 	}
@@ -130,6 +142,23 @@ func UninstallRetina(kubeConfigFilePath, chartPath string) *types.Job {
 		KubeConfigFilePath: kubeConfigFilePath,
 	}, nil)
 
+	return job
+}
+
+func InstallEbpfXdp(kubeConfigFilePath string) *types.Job {
+	job := types.NewJob("Install EBPF and XDP")
+	job.AddStep(&kubernetes.CreateNamespace{
+		KubeConfigFilePath: kubeConfigFilePath,
+		Namespace:          "install-ebpf-xdp",
+	}, nil)
+
+	job.AddStep(&kubernetes.ApplyYamlConfig{
+		KubeConfigFilePath: kubeConfigFilePath,
+		YamlFilePath:       "yaml/windows/install-ebpf-xdp.yaml",
+		ContainerImage:     eventWriterImage(),
+	}, &types.StepOptions{
+		SkipSavingParametersToJob: true,
+	})
 	return job
 }
 
@@ -193,9 +222,9 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, test
 			name := scenario.name + " - Arch: " + arch
 			job.AddScenario(dns.ValidateBasicDNSMetrics(name, scenario.req, scenario.resp, testPodNamespace, arch))
 		}
-
-		job.AddScenario(windows.ValidateWindowsBasicMetric())
 	}
+
+	job.AddScenario(windows.ValidateWindowsBasicMetric())
 
 	job.AddStep(&kubernetes.EnsureStableComponent{
 		PodNamespace:           common.KubeSystemNamespace,
@@ -208,6 +237,7 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, test
 
 func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFilePath string, testPodNamespace string) *types.Job {
 	job := types.NewJob("Upgrade and test Retina with advanced metrics")
+
 	// enable advanced metrics
 	job.AddStep(&kubernetes.UpgradeRetinaHelmChart{
 		Namespace:          common.KubeSystemNamespace,
@@ -259,6 +289,15 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 		},
 	}
 
+	// Validate Windows BPF Metrics
+	job.AddStep(&kubernetes.ApplyYamlConfig{
+		KubeConfigFilePath: kubeConfigFilePath,
+		YamlFilePath:       "yaml/windows/non-hpc-pod.yaml",
+		ContainerImage:     eventWriterImage(),
+	}, &types.StepOptions{
+		SkipSavingParametersToJob: true,
+	})
+
 	for _, arch := range common.Architectures {
 		for _, scenario := range dnsScenarios {
 			name := scenario.name + " - Arch: " + arch
@@ -266,6 +305,7 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 		}
 	}
 
+	job.AddScenario(windows.ValidateWinBpfMetricScenario())
 	job.AddScenario(latency.ValidateLatencyMetric(testPodNamespace))
 
 	job.AddStep(&kubernetes.EnsureStableComponent{
@@ -334,6 +374,28 @@ func LoadGenericFlags() *types.Job {
 		TagEnv:            generic.DefaultTagEnv,
 		ImageNamespaceEnv: generic.DefaultImageNamespace,
 		ImageRegistryEnv:  generic.DefaultImageRegistry,
+	}, nil)
+
+	return job
+}
+
+func LoadAndPinWinBPFJob(kubeConfigFilePath string) *types.Job {
+	job := types.NewJob("Load Windows BPF Maps")
+	job.AddStep(&kubernetes.LoadAndPinWinBPF{
+		KubeConfigFilePath:                 kubeConfigFilePath,
+		LoadAndPinWinBPFDeamonSetNamespace: "install-ebpf-xdp",
+		LoadAndPinWinBPFDeamonSetName:      "install-ebpf-xdp",
+	}, nil)
+
+	return job
+}
+
+func UnLoadAndPinWinBPFJob(kubeConfigFilePath string) *types.Job {
+	job := types.NewJob("Unload Windows BPF Maps")
+	job.AddStep(&kubernetes.UnLoadAndPinWinBPF{
+		KubeConfigFilePath:                   kubeConfigFilePath,
+		UnLoadAndPinWinBPFDeamonSetNamespace: "install-ebpf-xdp",
+		UnLoadAndPinWinBPFDeamonSetName:      "install-ebpf-xdp",
 	}, nil)
 
 	return job

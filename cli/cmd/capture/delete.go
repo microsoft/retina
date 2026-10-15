@@ -15,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
@@ -77,7 +78,9 @@ func NewDeleteSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 			for idx := range jobList.Items[0].Spec.Template.Spec.Volumes {
 				if jobList.Items[0].Spec.Template.Spec.Volumes[idx].Secret != nil {
 					if err := kubeClient.CoreV1().Secrets(*opts.Namespace).Delete(ctx, jobList.Items[0].Spec.Template.Spec.Volumes[idx].Secret.SecretName, metav1.DeleteOptions{}); err != nil {
-						return errors.Wrap(err, "failed to delete capture secret")
+						if !k8serrors.IsNotFound(err) {
+							return errors.Wrap(err, "failed to delete capture secret")
+						}
 					}
 					break
 				}

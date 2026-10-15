@@ -6,8 +6,6 @@ package standard
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"net/http/pprof"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -22,6 +20,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
@@ -211,6 +210,11 @@ func (o *Operator) Start() error {
 			// start reconcile the cached Pod before manager starts to not miss any events
 			go ke.ReconcilePod(ctrlCtx)
 
+			// Clean up RetinaEndpoints orphaned before owner references were set on them.
+			if err = mgr.Add(manager.RunnableFunc(ke.DeleteOrphanedEndpoints)); err != nil {
+				return errors.Wrap(err, "unable to add retinaendpoint cleanup")
+			}
+
 			pc := podcontroller.New(mgr.GetClient(), mgr.GetScheme(), retinaendpointchannel)
 			if err = (pc).SetupWithManager(mgr); err != nil {
 				return errors.Wrap(err, "unable to create controller - podcontroller")
@@ -241,20 +245,6 @@ func (o *Operator) Start() error {
 	}
 
 	return nil
-}
-
-func EnablePProf() {
-	pprofmux := http.NewServeMux()
-	pprofmux.HandleFunc("/debug/pprof/", pprof.Index)
-	pprofmux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	pprofmux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	pprofmux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	pprofmux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-	pprofmux.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
-
-	if err := http.ListenAndServe(":8082", pprofmux); err != nil { //nolint:gosec // TODO replace with secure server that supports timeout
-		panic(err)
-	}
 }
 
 func initLogging(cfg *config.OperatorConfig, applicationInsightsID string) (*log.ZapLogger, error) {

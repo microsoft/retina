@@ -7,9 +7,11 @@ import (
 	"testing"
 
 	"github.com/microsoft/retina/test/e2e/framework/generic"
-	"helm.sh/helm/v3/pkg/chart/loader"
-	"helm.sh/helm/v3/pkg/chartutil"
-	"helm.sh/helm/v3/pkg/engine"
+	helmcommon "helm.sh/helm/v4/pkg/chart/common"
+	chartutil "helm.sh/helm/v4/pkg/chart/common/util"
+	"helm.sh/helm/v4/pkg/chart/loader"
+	chartv2 "helm.sh/helm/v4/pkg/chart/v2"
+	"helm.sh/helm/v4/pkg/engine"
 )
 
 func TestCandidateImageRendering(t *testing.T) {
@@ -45,7 +47,7 @@ func TestCandidateImageRendering(t *testing.T) {
 					}
 					// An advanced upgrade must preserve the selected image values.
 					values = chartutil.CoalesceTables(map[string]interface{}{"enablePodLevel": true}, values)
-					renderValues, err := chartutil.ToRenderValues(chart, values, chartutil.ReleaseOptions{Name: "retina", Namespace: "kube-system"}, nil)
+					renderValues, err := chartutil.ToRenderValues(chart, values, helmcommon.ReleaseOptions{Name: "retina", Namespace: "kube-system"}, nil)
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -89,7 +91,7 @@ func TestEmptyImageOverrides(t *testing.T) {
 			"operator": map[string]interface{}{"enabled": true},
 			"os":       map[string]interface{}{"linux": true, "windows": true},
 		}
-		renderValues, err := chartutil.ToRenderValues(chart, values, chartutil.ReleaseOptions{Name: "retina", Namespace: "kube-system"}, nil)
+		renderValues, err := chartutil.ToRenderValues(chart, values, helmcommon.ReleaseOptions{Name: "retina", Namespace: "kube-system"}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -101,8 +103,12 @@ func TestEmptyImageOverrides(t *testing.T) {
 		if profile == "hubble" {
 			agentKey = "agent"
 		}
-		agent := chart.Values[agentKey].(map[string]interface{})
-		operator := chart.Values["operator"].(map[string]interface{})
+		defaults, ok := chart.(*chartv2.Chart)
+		if !ok {
+			t.Fatalf("unexpected chart type %T", chart)
+		}
+		agent := defaults.Values[agentKey].(map[string]interface{})
+		operator := defaults.Values["operator"].(map[string]interface{})
 		initRepository, initTag := agent["initRepository"], agent["tag"]
 		if profile == "hubble" {
 			init := agent["init"].(map[string]interface{})

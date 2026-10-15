@@ -56,6 +56,7 @@ image:
   tag: "v0.0.2"
 
 enableConntrackMetrics: false
+conntrackReportInterval: 30s
 enablePodLevel: false
 remoteContext: false
 enableAnnotations: false
@@ -183,6 +184,12 @@ capture:
   debug: true
   # jobNumLimit indicates the maximum number of jobs that can be created for each Capture.
   jobNumLimit: 0
+  # hostPathBaseDir is the absolute directory on every node under which Capture
+  # CRs may write artifacts. The CR field outputConfiguration.hostPath is treated
+  # as a relative subpath name and joined under this directory; CR authors
+  # cannot influence the base. Leave empty to use the operator default
+  # (/var/log/retina/captures).
+  hostPathBaseDir: ""
   # enableManagedStorageAccount toggles the use of managed storage account for storing artifacts.
   # If set to true, the following fields related to Azure credentials must be set.
   # Ref: docs/captures/managed-storage-account.md
@@ -310,7 +317,7 @@ metrics:
     tlsConfig: {}
     ## @param metrics.serviceMonitor.relabelings [array] Prometheus relabeling rules to apply to samples before scraping
     ##
-    relabelings: 
+    relabelings:
       - sourceLabels:
           [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
         separator: ":"
