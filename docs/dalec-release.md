@@ -69,10 +69,34 @@ Explicitly outside this cohort:
 
 ## One-time setup
 
-Create a **new** YAML pipeline in the `msazure` Azure DevOps organization,
-normally in `CloudNativeCompute`, connected to `microsoft/retina`. Select the
-published implementation branch and `.pipelines/retina-dalec-e2e.yml`. Record
-the new pipeline definition ID. No CI/PR triggers are enabled.
+The pipeline is registered as **definition ID `484261`**, `Retina Dalec E2E`,
+in the `msazure` Azure DevOps organization, project **`One`**, folder
+`\Custom\Networking\ContainerNetworking\NetworkObservability\Retina`. It is
+connected to `microsoft/retina` through the `Azure Container Networking - EMU`
+GitHub service connection and runs `.pipelines/retina-dalec-e2e.yml`. Its
+default branch is `refs/heads/itiagrawal/retina-dalec-standalone-e2e` until
+that implementation branch merges, after which it moves to `refs/heads/main`.
+It has no CI or PR triggers and its job authorization scope is
+`projectCollection`.
+
+The organization is not interchangeable. Retina's GitHub-triggered CI
+pipelines live in a *different* organization, `github-private`, under
+`\OneBranch\Retina OSS`. This pipeline cannot be registered alongside them.
+Its `DownloadPipelineArtifact@2` step uses `buildType: specific` with a
+`project` input, which resolves **across projects but never across
+organizations**, and the originating Dalec build it must read is
+`[aks-managed-dalec][build] containernetworking`, definition ID `452291`, in
+`msazure/CloudNativeCompute` under `\aks-managed-dalec\containernetworking`.
+Registering outside `msazure` silently reduces the pipeline to the manual
+`imageSet` mode below and permanently disables cohort completeness, version,
+and platform validation against the real build artifacts.
+
+Project `One` hosts it rather than `CloudNativeCompute` because registration
+requires a GitHub service connection to `microsoft/retina` in the hosting
+project, and `CloudNativeCompute` exposes no GitHub-type service connection.
+`One` already hosts Retina's other `msazure` pipelines in the same folder.
+`One` and `CloudNativeCompute` are both in `msazure`, so the cross-project
+artifact download is unaffected.
 
 Provision and authorize these distinct service connections:
 
@@ -81,11 +105,12 @@ Provision and authorize these distinct service connections:
 | `retina-dalec-e2e` | New pipeline's Azure identity: create/delete its resource groups, VNets and AKS clusters; obtain AKS admin credentials; read/pull staging ACR images; assign AcrPull on those registries to its newly created kubelet identity. Scope registry role-assignment permissions appropriately. |
 | `Dalec-to-Retina-E2E` | Dalec test-hook identity: Azure DevOps queue and view builds on the new pipeline. Azure authentication must allow obtaining an ADO token and the service principal must be admitted to the organization/project. |
 
-Authorize the new pipeline's project Build Service identity to view the
-originating Dalec pipeline and download its build artifacts, including
+Authorize this pipeline's project Build Service identity to view Dalec build
+`452291` in `CloudNativeCompute` and download its build artifacts, including
 artifacts already published by its completed Build stage while the parent
-TestAndStage stage is still running. Check cross-project job authorization
-settings when the pipelines are in different projects.
+TestAndStage stage is still running. The two pipelines **are** in different
+projects, so cross-project job authorization must be enabled; the definition
+is already registered with `projectCollection` job authorization scope.
 
 The subscription needs regional quota for Ubuntu amd64 nodes, Azure Linux
 FIPS nodes, Ubuntu arm64 `Standard_D4pds_v5` nodes, and Windows 2022 amd64
@@ -98,10 +123,10 @@ Configure these non-secret variables on the **Dalec wrapper pipeline**:
 
 | Variable | Value |
 |---|---|
-| `RETINA_E2E_PIPELINE_ID` | The newly registered pipeline ID, not an ACN pipeline ID. |
+| `RETINA_E2E_PIPELINE_ID` | `484261`, the registered Retina Dalec E2E pipeline, not an ACN pipeline ID. |
 | `RETINA_E2E_SOURCE_COMMIT` | Full 40-character SHA of the reviewed, pushed Retina test implementation. |
 | `RETINA_E2E_SOURCE_BRANCH` | Branch containing that commit, such as `refs/heads/itiagrawal/retina-dalec-standalone-e2e`. Default is `refs/heads/main`. |
-| `RETINA_E2E_PROJECT` | New pipeline's ADO project; default `CloudNativeCompute`. |
+| `RETINA_E2E_PROJECT` | `One`. This pipeline is registered in `msazure/One`, not `CloudNativeCompute`, so the `CloudNativeCompute` default must be overridden. |
 | `RETINA_E2E_TIMEOUT_SECONDS` | Optional hook timeout; default 14400 seconds. |
 | `RETINA_E2E_POLL_INTERVAL_SECONDS` | Optional polling interval; default 120 seconds. |
 
