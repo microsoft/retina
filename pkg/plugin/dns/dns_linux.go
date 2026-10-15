@@ -21,6 +21,7 @@ import (
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
+	_ "github.com/microsoft/retina/pkg/plugin/dns/_cprog" // nolint // This is needed so cprog is included when vendoring
 	"github.com/microsoft/retina/pkg/plugin/registry"
 	"github.com/microsoft/retina/pkg/utils"
 	"github.com/pkg/errors"
@@ -285,6 +286,7 @@ func (d *dns) handleDNSEvent(record perf.Record) {
 
 // parseDNSPayload extracts the query name, response addresses, and query type
 // from the raw DNS payload using gopacket.
+//
 //nolint:nonamedreturns // named returns used by defer recovery
 func (d *dns) parseDNSPayload(payload []byte, isResponse bool) (
 	dnsName string, addresses []string, qtype layers.DNSType,

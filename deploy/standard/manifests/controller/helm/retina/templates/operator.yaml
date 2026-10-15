@@ -24,6 +24,10 @@ spec:
         kubectl.kubernetes.io/default-container: {{ .Values.operator.name }}
         prometheus.io/port: "{{ .Values.operatorService.port }}"
         prometheus.io/scrape: "true"
+        # Roll the operator pod whenever its ConfigMap rendering changes,
+        # so `helm upgrade` applies new config values (e.g. `remoteContext`)
+        # without requiring a manual `kubectl rollout restart`.
+        checksum/config: {{ include (print $.Template.BasePath "/operator-configmap.yaml") . | sha256sum }}
       labels:
         app: {{ .Values.operator.name }}
         control-plane: {{ .Values.operator.name }}
@@ -282,24 +286,6 @@ subjects:
 - kind: ServiceAccount
   name: {{ .Values.operator.name }}
   namespace: {{ .Values.namespace }}
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: "{{ .Values.operator.name }}-config"
-  namespace: {{ .Values.namespace }}
-data:
-  operator-config.yaml: |-
-    installCRDs: {{ .Values.operator.installCRDs }}
-    enableTelemetry: {{ .Values.enableTelemetry }}
-    remoteContext: {{ .Values.remoteContext }}
-    captureDebug: {{ .Values.capture.debug }}
-    captureJobNumLimit: {{ .Values.capture.jobNumLimit }}
-    enableManagedStorageAccount: {{ .Values.capture.enableManagedStorageAccount }}
-    telemetryInterval: {{ .Values.operator.telemetryInterval }}
-{{- if .Values.capture.enableManagedStorageAccount }}
-    azureCredentialConfig: /etc/cloud-config/azure.json
-{{- end }}
 ---
 {{- if .Values.capture.enableManagedStorageAccount }}
 apiVersion: v1

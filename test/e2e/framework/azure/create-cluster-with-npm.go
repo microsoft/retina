@@ -21,7 +21,6 @@ const (
 	clusterTimeout       = 15 * time.Minute
 	clusterCreateTicker  = 30 * time.Second
 	pollFrequency        = 5 * time.Second
-	AgentARMSKU          = "Standard_D4pds_v5"
 	AuxilaryNodeCount    = 1
 	AuxilaryARMNodeCount = 2
 )
@@ -77,7 +76,7 @@ func (c *CreateNPMCluster) Run() error {
 		OSType:             to.Ptr(armcontainerservice.OSTypeLinux),
 		OSSKU:              to.Ptr(armcontainerservice.OSSKUAzureLinux),
 		ScaleDownMode:      to.Ptr(armcontainerservice.ScaleDownModeDelete),
-		VMSize:             to.Ptr(AgentSKU),
+		VMSize:             to.Ptr(AgentLinuxSKU),
 		Name:               to.Ptr("azlinux"),
 		MaxPods:            to.Ptr(int32(MaxPodsPerNode)),
 	})
@@ -90,7 +89,7 @@ func (c *CreateNPMCluster) Run() error {
 		Mode:               to.Ptr(armcontainerservice.AgentPoolModeUser),
 		OSType:             to.Ptr(armcontainerservice.OSTypeLinux),
 		ScaleDownMode:      to.Ptr(armcontainerservice.ScaleDownModeDelete),
-		VMSize:             to.Ptr(AgentARMSKU),
+		VMSize:             to.Ptr(AgentLinuxARMSKU),
 		Name:               to.Ptr("arm64"),
 		MaxPods:            to.Ptr(int32(MaxPodsPerNode)),
 	})

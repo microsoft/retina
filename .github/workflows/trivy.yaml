@@ -25,7 +25,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Get Tag
         env:
@@ -39,7 +39,7 @@ jobs:
           echo "TAG=$TAG" >> $GITHUB_ENV
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # 0.36.0
         with:
           image-ref: "ghcr.io/${{ github.repository }}/${{ matrix.image }}:${{ env.TAG }}"
           format: "template"
@@ -48,6 +48,11 @@ jobs:
           severity: "CRITICAL,HIGH"
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           sarif_file: "trivy-results.sarif"
+          # Scheduled/manual runs scan the latest release image; workflow_run
+          # runs scan the per-commit image just pushed by release-images.
+          # Separate SARIF categories keep the two artifacts' alerts from
+          # closing and reopening each other on every upload.
+          category: "image:${{ matrix.image }}/${{ github.event_name == 'workflow_run' && 'main' || 'release' }}"

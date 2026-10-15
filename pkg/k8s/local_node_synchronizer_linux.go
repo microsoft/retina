@@ -2,17 +2,17 @@ package k8s
 
 import (
 	"context"
+	"log/slog"
 	"net"
 	"os"
 
 	"github.com/cilium/cilium/pkg/node"
 	"github.com/cilium/cilium/pkg/node/addressing"
 	nodetypes "github.com/cilium/cilium/pkg/node/types"
-	"github.com/sirupsen/logrus"
 )
 
 type nodeSynchronizer struct {
-	l *logrus.Entry
+	l *slog.Logger
 }
 
 func (n *nodeSynchronizer) InitLocalNode(_ context.Context, ln *node.LocalNode) error {
@@ -40,4 +40,9 @@ func (n *nodeSynchronizer) InitLocalNode(_ context.Context, ln *node.LocalNode) 
 
 func (n *nodeSynchronizer) SyncLocalNode(context.Context, *node.LocalNodeStore) {
 	n.l.Info("SyncLocalNode called")
+}
+
+// Retina seeds NODE_IP synchronously in InitLocalNode, so there is nothing to wait for.
+func (n *nodeSynchronizer) WaitForNodeInformation(context.Context, *node.LocalNodeStore) error {
+	return nil
 }

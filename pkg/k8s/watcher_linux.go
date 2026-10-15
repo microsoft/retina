@@ -2,17 +2,18 @@ package k8s
 
 import (
 	"context"
+	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
 
 	"github.com/cilium/cilium/pkg/k8s"
 	"github.com/cilium/cilium/pkg/k8s/watchers"
-	"github.com/cilium/cilium/pkg/logging"
 	"github.com/cilium/cilium/pkg/logging/logfields"
 	"github.com/cilium/cilium/pkg/option"
-	"github.com/sirupsen/logrus"
+	retinalog "github.com/microsoft/retina/pkg/log"
 )
 
 func init() {
@@ -24,20 +25,25 @@ func init() {
 }
 
 var (
-	logger = logging.DefaultLogger.WithField(logfields.LogSubsys, "k8s-watcher")
+	loggerOnce sync.Once
+	cachedLog  *slog.Logger
 )
 
+// logger returns a zap-backed slog logger. Resolved lazily because
+// SetupZapLogger runs later in program startup than this package's init().
+func logger() *slog.Logger {
+	loggerOnce.Do(func() {
+		cachedLog = retinalog.SlogLogger().With(logfields.LogSubsys, "k8s-watcher")
+	})
+	return cachedLog
+}
+
 func Start(ctx context.Context, k *watchers.K8sWatcher) {
-	logger.Info("Starting Kubernetes watcher")
+	logger().Info("Starting Kubernetes watcher")
 
 	option.Config.K8sSyncTimeout = 3 * time.Minute //nolint:gomnd // this duration is self-explanatory
-	syncdCache := make(chan struct{})
-	go k.InitK8sSubsystem(ctx, syncdCache)
-	logger.WithField("k8s resources", k8sResources).Info("Kubernetes watcher started, will wait for cache sync")
-
-	// Wait for K8s watcher to sync. If doesn't complete in 3 minutes, causes fatal error.
-	<-syncdCache
-	logger.Info("Kubernetes watcher synced")
+	k.InitK8sSubsystem(ctx)
+	logger().Info("Kubernetes watcher synced")
 }
 
 // retinaK8sErrorHandler is a custom error handler for the watcher
@@ -46,17 +52,17 @@ func k8sWatcherErrorHandler(c context.Context, e error, s string, i ...interface
 	if e == nil {
 		// TODO: handle key/values pairs in a better way
 		// current example output: time="2009-11-10T23:00:00Z" level=error msg="msg: Some error message -- key/values: [int 1 str world]"
-		logger.WithContext(c).Errorf("msg: %s -- key/values: %+v", s, i)
+		logger().ErrorContext(c, "msg: "+s, "key_values", i)
 		return
 	}
 
 	errStr := e.Error()
 
 	logError := func(er, r string) {
-		logger.WithFields(logrus.Fields{
-			"underlyingError": er,
-			"resource":        r,
-		}).Error("Error watching k8s resource")
+		logger().Error("Error watching k8s resource",
+			"underlyingError", er,
+			"resource", r,
+		)
 	}
 
 	switch {

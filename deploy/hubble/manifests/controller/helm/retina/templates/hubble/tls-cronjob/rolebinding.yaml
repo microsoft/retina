@@ -12,7 +12,7 @@ metadata:
     app.kubernetes.io/part-of: cilium
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
+  kind: Role
   name: hubble-generate-certs
 subjects:
 - kind: ServiceAccount

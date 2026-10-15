@@ -11,7 +11,7 @@ import (
 func TestGetConfig(t *testing.T) {
 	c, err := config.GetConfig("./testwith/config.yaml")
 	if err != nil {
-		t.Errorf("Expected no error, instead got %+v", err)
+		t.Fatalf("Expected no error, instead got %+v", err)
 	}
 
 	if !c.InstallCRDs ||
@@ -27,7 +27,7 @@ func TestGetConfig(t *testing.T) {
 func TestGetConfig_DefaultTelemetryInterval(t *testing.T) {
 	c, err := config.GetConfig("./testwith/config-without-telemetry-interval.yaml")
 	if err != nil {
-		t.Errorf("Expected no error, instead got %+v", err)
+		t.Fatalf("Expected no error, instead got %+v", err)
 	}
 
 	if c.TelemetryInterval != config.DefaultTelemetryInterval {
@@ -39,5 +39,19 @@ func TestGetConfig_SmallTelemetryInterval(t *testing.T) {
 	_, err := config.GetConfig("./testwith/config-small-telemetry-interval.yaml")
 	if !errors.Is(err, config.ErrorTelemetryIntervalTooSmall) {
 		t.Errorf("Expected error %s, instead got %s", config.ErrorTelemetryIntervalTooSmall, err)
+	}
+}
+
+func TestGetConfig_InvalidHostPathBaseDirChars(t *testing.T) {
+	_, err := config.GetConfig("./testwith/config-invalid-hostpath-basedir.yaml")
+	if !errors.Is(err, config.ErrCaptureHostPathBaseDirInvalid) {
+		t.Errorf("Expected error %s, instead got %s", config.ErrCaptureHostPathBaseDirInvalid, err)
+	}
+}
+
+func TestGetConfig_InvalidHostPathBaseDirControlChar(t *testing.T) {
+	_, err := config.GetConfig("./testwith/config-invalid-hostpath-basedir-control-char.yaml")
+	if !errors.Is(err, config.ErrCaptureHostPathBaseDirInvalid) {
+		t.Errorf("Expected error %s, instead got %s", config.ErrCaptureHostPathBaseDirInvalid, err)
 	}
 }

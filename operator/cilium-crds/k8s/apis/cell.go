@@ -8,8 +8,8 @@ package apis
 
 import (
 	"fmt"
+	"log/slog"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 
 	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
@@ -48,7 +48,7 @@ type RegisterCRDsFunc func(k8sClient.Clientset) error
 type params struct {
 	cell.In
 
-	Logger    logrus.FieldLogger
+	Logger    *slog.Logger
 	Lifecycle cell.Lifecycle
 
 	Clientset k8sClient.Clientset

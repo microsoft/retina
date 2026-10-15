@@ -41,8 +41,6 @@ PLATFORM		?= $(OS)/$(ARCH)
 PLATFORMS		?= linux/amd64 linux/arm64 windows/amd64
 OS_VERSION		?= ltsc2022
 
-HUBBLE_VERSION ?= v1.20.2
-
 CONTAINER_BUILDER ?= docker
 CONTAINER_RUNTIME ?= docker
 YEAR 			  ?= 2022
@@ -75,7 +73,7 @@ RETINA_PLATFORM_TAG        = $(TAG)-windows-ltsc$(YEAR)-amd64
 endif
 
 qemu-user-static: ## Set up the host to run qemu multiplatform container builds.
-	sudo $(CONTAINER_RUNTIME) run --rm --privileged multiarch/qemu-user-static --reset -p yes
+	sudo $(CONTAINER_RUNTIME) run --rm --privileged tonistiigi/binfmt --install arm64
 
 .PHONY: version
 version: ## prints the root version
@@ -95,8 +93,7 @@ help: ## Display this help
 ##@ Tools 
 
 GOFUMPT			= go tool mvdan.cc/gofumpt
-GOLANGCI_LINT	= go tool github.com/golangci/golangci-lint/cmd/golangci-lint
-GORELEASER		= go tool github.com/goreleaser/goreleaser
+GOLANGCI_LINT	= go tool github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 CONTROLLER_GEN	= go tool sigs.k8s.io/controller-tools/cmd/controller-gen
 GINKGO			= go tool github.com/onsi/ginkgo
 MOCKGEN			= go tool go.uber.org/mock/mockgen
@@ -105,8 +102,6 @@ ENVTEST			= go tool sigs.k8s.io/controller-runtime/tools/setup-envtest
 gofumpt: $(GOFUMPT) ## Build gofumpt
 
 golangci-lint: $(GOLANGCI_LINT) ## Build golangci-lint
-
-goreleaser: $(GORELEASER) ## Build goreleaser
 
 controller-gen: $(CONTROLLER_GEN) ## Build controller-gen
 
@@ -135,6 +130,9 @@ generate-bpf-go: ## generate ebpf wrappers for plugins for all archs
 
 FMT_PKG  ?= .
 LINT_PKG ?= .
+
+empty-bpf-objects: ## truncate all tracked .o files to 0 bytes
+	git ls-files '*.o' | xargs truncate -s 0
 
 fmt: ## run gofumpt on $FMT_PKG (default "retina").
 	$(GOFUMPT) -w $(FMT_PKG)
@@ -233,7 +231,6 @@ container-docker: buildx # util target to build container images using docker bu
 		--build-arg GOARCH=$$arch \
 		--build-arg GOOS=$$os \
 		--build-arg OS_VERSION=$(OS_VERSION) \
-		--build-arg HUBBLE_VERSION=$(HUBBLE_VERSION) \
 		--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
 		--target=$(TARGET) \
 		-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
@@ -254,7 +251,6 @@ container-docker-windows: # util target to build Windows container images withou
 		--build-arg GOARCH=$$arch \
 		--build-arg GOOS=$$os \
 		--build-arg OS_VERSION=$(OS_VERSION) \
-		--build-arg HUBBLE_VERSION=$(HUBBLE_VERSION) \
 		--build-arg VERSION=$(VERSION) \
 		--build-arg REPO_PATH=$(REPO_PATH) \
 		--build-arg BINARIES_PATH=$(BINARIES_PATH) \
@@ -265,6 +261,7 @@ container-docker-windows: # util target to build Windows container images withou
 
 retina-image: ## build the retina linux container image.
 	echo "Building for $(PLATFORM)"
+	set -e; \
 	for target in $(AGENT_TARGETS); do \
 		echo "Building for $$target"; \
 		if [ "$$target" = "init" ]; then \
@@ -406,27 +403,32 @@ build-windows-binaries: ## Build Windows binaries
 
 ##@ Multiplatform
 
+# Command that creates a multi-arch index from per-platform image references.
+# The Azure DevOps pipeline has no docker CLI and passes hack/scripts/oras-index.sh.
+MANIFEST_CREATE ?= docker buildx imagetools create -t
+MANIFEST_TAG ?= $(TAG)
+
 manifest-retina-image: ## create a multiplatform manifest for the retina image
-	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_IMAGE):$(TAG))
-	$(eval FULL_INIT_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE):$(TAG))
-	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64 windows-ltsc2022-amd64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
-	docker buildx imagetools create -t $(FULL_INIT_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_INIT_IMAGE_NAME)-$(subst /,-,$(platform)))
+	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_IMAGE))
+	$(eval FULL_INIT_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE))
+	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,linux/amd64 linux/arm64 windows-ltsc2022-amd64, $(FULL_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
+	$(MANIFEST_CREATE) $(FULL_INIT_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,linux/amd64 linux/arm64, $(FULL_INIT_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
 
 manifest-operator-image: ## create a multiplatform manifest for the operator image
-	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE):$(TAG))
-	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE))
+	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
 
 manifest-shell-image:
-	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_SHELL_IMAGE):$(TAG))
-	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_SHELL_IMAGE))
+	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
 
 manifest-kubectl-retina-image:
-	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(KUBECTL_RETINA_IMAGE):$(TAG))
-	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(KUBECTL_RETINA_IMAGE))
+	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
 
 manifest-kubectl-retina-shell-image:
-	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(KUBECTL_RETINA_SHELL_IMAGE):$(TAG))
-	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(KUBECTL_RETINA_SHELL_IMAGE))
+	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
 
 manifest:
 	echo "Building for $(COMPONENT)"
@@ -459,8 +461,11 @@ COVER_PKG ?= .
 
 .PHONY: test
 test: # Run unit tests.
-	go build -o test-summary ./test/utsummary/main.go
-	bash -o pipefail -c 'KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit,dashboard -skip=TestE2E* -coverprofile=coverage.out -v -json ./... | ./test-summary --progress --verbose'
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit,dashboard -skip=TestE2E* -coverprofile=coverage.out -v ./...
+
+.PHONY: test-windows
+test-windows: # Run unit tests on Windows.
+	go test -tags=unit,dashboard -skip=TestE2E* -count=1 -v ./...
 
 .PHONY: test-ebpf
 test-ebpf: # Run eBPF program tests (requires root/CAP_BPF).
@@ -646,25 +651,3 @@ run-perf-test:
 
 run-e2e-test:
 	go test -v ./test/e2e/ -timeout 1h -tags=e2e -count=1  -args -image-tag=${TAG} -image-registry=${IMAGE_REGISTRY} -image-namespace=${IMAGE_NAMESPACE}
-
-.PHONY: update-hubble
-update-hubble:
-	@echo "Checking for Hubble updates..."
-	@latest_version=$$(curl -s https://api.github.com/repos/cilium/hubble/releases/latest | jq -r .tag_name); \
-    echo "Latest Hubble version: $$latest_version"; \
-    current_version=$$(grep -oP '(?<=ARG HUBBLE_VERSION=).*' controller/Dockerfile); \
-    echo "Current Hubble version: $$current_version"; \
-    if [ "$$latest_version" = "$$current_version" ]; then \
-        echo "Hubble version is up to date. No update needed."; \
-    else \
-        echo "Updating Hubble version from $$current_version to $$latest_version"; \
-        sed -i "s/^ARG HUBBLE_VERSION=.*/ARG HUBBLE_VERSION=$$latest_version/" controller/Dockerfile; \
-        sed -i "s/^HUBBLE_VERSION ?=.*/HUBBLE_VERSION ?= $$latest_version/" Makefile; \
-        echo ""; \
-        echo "Updated Hubble version in controller/Dockerfile and Makefile."; \
-        echo "Please create a branch and commit these changes:"; \
-        echo "  git checkout -b deps/update-hubble-to-$$latest_version"; \
-        echo "  git commit -am \"deps: bump Hubble version from $$current_version to $$latest_version\""; \
-        echo "  git push origin deps/update-hubble-to-$$latest_version"; \
-        echo "Then create a pull request on GitHub."; \
-    fi

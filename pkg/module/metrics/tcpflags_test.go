@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
+	"log/slog"
 )
 
 func TestNewTCPMetrics(t *testing.T) {
@@ -503,7 +504,7 @@ func TestNewTCPMetrics(t *testing.T) {
 		assert.Equal(t, 0, len(tcp.trackedMetricLabels()), "there should be no tracked metrics when TTL is infinite Test Name: %s", tc.name)
 
 		// Test TTL based expiration
-		metricsinit.InitializeMetrics()
+		metricsinit.InitializeMetrics(slog.Default())
 
 		// Set the TTL to something high to ensure that our call to expire is the only one that expires the metrics
 		tcp = NewTCPMetrics(tc.opts, log.Logger(), tc.localContext, time.Minute)

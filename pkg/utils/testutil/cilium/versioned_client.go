@@ -3,7 +3,7 @@
 package ciliumutil
 
 import (
-	"github.com/sirupsen/logrus"
+	"log/slog"
 
 	"k8s.io/client-go/rest"
 
@@ -23,11 +23,11 @@ var (
 // MockVersionedClient is a mock implementation of versioned.Interface
 // Currently it only returns a real value for CiliumV2()
 type MockVersionedClient struct {
-	l logrus.FieldLogger
+	l *slog.Logger
 	c *MockCiliumV2Client
 }
 
-func NewMockVersionedClient(l logrus.FieldLogger, ciliumEndpoints *MockResource[*v2.CiliumEndpoint]) *MockVersionedClient {
+func NewMockVersionedClient(l *slog.Logger, ciliumEndpoints *MockResource[*v2.CiliumEndpoint]) *MockVersionedClient {
 	return &MockVersionedClient{
 		l: l,
 		c: NewMockCiliumV2Client(l, ciliumEndpoints),
@@ -52,12 +52,12 @@ func (m *MockVersionedClient) CiliumV2alpha1() ciliumv2alpha1.CiliumV2alpha1Inte
 // MockCiliumV2Client is a mock implementation of ciliumv2.CiliumV2Interface.
 // Currently it only returns a real value for CiliumIdentities()
 type MockCiliumV2Client struct {
-	l               logrus.FieldLogger
+	l               *slog.Logger
 	identitiyClient *MockIdentityClient
 	ciliumEndpoints *MockResource[*v2.CiliumEndpoint]
 }
 
-func NewMockCiliumV2Client(l logrus.FieldLogger, ciliumEndpoints *MockResource[*v2.CiliumEndpoint]) *MockCiliumV2Client {
+func NewMockCiliumV2Client(l *slog.Logger, ciliumEndpoints *MockResource[*v2.CiliumEndpoint]) *MockCiliumV2Client {
 	return &MockCiliumV2Client{
 		l:               l,
 		identitiyClient: NewMockIdentityClient(l),
@@ -142,5 +142,15 @@ func (m *MockCiliumV2Client) CiliumBGPNodeConfigs() ciliumv2.CiliumBGPNodeConfig
 
 func (m *MockCiliumV2Client) CiliumBGPPeerConfigs() ciliumv2.CiliumBGPPeerConfigInterface {
 	m.l.Warn("MockCiliumV2Client.CiliumNetworkPoliciesForCRD() called but this returns nil because it's not implemented")
+	return nil
+}
+
+func (m *MockCiliumV2Client) CiliumCIDRGroups() ciliumv2.CiliumCIDRGroupInterface {
+	m.l.Warn("MockCiliumV2Client.CiliumCIDRGroups() called but this returns nil because it's not implemented")
+	return nil
+}
+
+func (m *MockCiliumV2Client) CiliumLoadBalancerIPPools() ciliumv2.CiliumLoadBalancerIPPoolInterface {
+	m.l.Warn("MockCiliumV2Client.CiliumLoadBalancerIPPools() called but this returns nil because it's not implemented")
 	return nil
 }

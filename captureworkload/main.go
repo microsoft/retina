@@ -45,9 +45,10 @@ func main() {
 		tel = telemetry.NewNoopTelemetry()
 	}
 
-	// Create a context that is canceled when a termination signal is received
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
-	defer cancel()
+	// Create a context that is canceled when a termination signal is received.
+	// This controls the capture duration - SIGTERM stops the capture.
+	captureCtx, captureCancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
+	defer captureCancel()
 
 	cm := capture.NewCaptureManager(l, tel)
 
@@ -56,12 +57,16 @@ func main() {
 			l.Error("Failed to cleanup network capture", zap.Error(err))
 		}
 	}()
-	srcDir, err := cm.CaptureNetwork(ctx)
+	srcDir, err := cm.CaptureNetwork(captureCtx)
 	if err != nil {
 		l.Error("Failed to capture network traffic", zap.Error(err))
 		os.Exit(1)
 	}
-	if err := cm.OutputCapture(ctx, srcDir); err != nil {
+
+	// Use a fresh context for output operations since captureCtx may be cancelled
+	// (e.g., rotating captures are stopped via SIGTERM). Output still needs to complete.
+	outputCtx := context.Background()
+	if err := cm.OutputCapture(outputCtx, srcDir); err != nil {
 		l.Error("Failed to output network traffic", zap.Error(err))
 	}
 	l.Info("Done for capturing network traffic")

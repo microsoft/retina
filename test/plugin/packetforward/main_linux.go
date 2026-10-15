@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/microsoft/retina/pkg/log"
@@ -21,7 +22,7 @@ func main() {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	l := log.Logger().Named("test-packetforward")
 
-	metrics.InitializeMetrics()
+	metrics.InitializeMetrics(slog.Default())
 
 	ctx := context.Background()
 

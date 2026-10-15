@@ -8,6 +8,8 @@ metadata:
   namespace: {{ .Values.namespace }}
   labels:
     k8s-app: {{ include "retina.name" . }}
+    app.kubernetes.io/name: {{ include "retina.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
   selector:
     matchLabels:
@@ -17,6 +19,8 @@ spec:
       labels:
         app: {{ include "retina.name" . }}
         k8s-app: {{ include "retina.name" . }}
+        app.kubernetes.io/name: {{ include "retina.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
       annotations:
         prometheus.io/port: "{{ .Values.retinaPort }}"
         prometheus.io/scrape: "true"
@@ -24,6 +28,7 @@ spec:
     spec:
       hostNetwork: true
       serviceAccountName: {{ .Values.serviceAccount.name }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
       {{- if .Values.priorityClassName }}
       priorityClassName: {{ .Values.priorityClassName }}
       {{- end }}
@@ -57,7 +62,7 @@ spec:
           - name: tmp
             mountPath: /tmp
       containers:
-        - name: {{ include "retina.name" . }} 
+        - name: {{ include "retina.name" . }}
           image: {{ .Values.agent.repository }}:{{ .Values.agent.tag }}
           imagePullPolicy: {{ .Values.agent.pullPolicy }}
           {{- if .Values.agent.container.retina.command }}
@@ -126,7 +131,7 @@ spec:
             - name: cilium
               mountPath: /var/run/cilium
             - name: host-os-release
-              mountPath: /etc/os-release  
+              mountPath: /etc/os-release
             - name: tmp
               mountPath: /tmp
           {{- if .Values.hubble.tls.enabled }}
@@ -158,7 +163,7 @@ spec:
       - name: host-os-release
         hostPath:
           path: /etc/os-release
-          type: FileOrCreate   
+          type: FileOrCreate
       - name: tmp
         emptyDir: {}
       {{- if .Values.hubble.tls.enabled }}
@@ -203,13 +208,15 @@ spec:
       namespace: {{ .Values.namespace }}
     spec:
       serviceAccountName: {{ .Values.serviceAccount.name }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+      terminationGracePeriodSeconds: 90 # Allow for retina to cleanup plugin resources.
       {{- with .Values.imagePullSecrets }}
       {{- if .Values.priorityClassName }}
       priorityClassName: {{ .Values.priorityClassName }}
       {{- end }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
-      {{- end }}      
+      {{- end }}
       securityContext:
         windowsOptions:
           hostProcess: true
@@ -229,6 +236,14 @@ spec:
             {{- else }}
             - .\setkubeconfigpath.ps1; ./controller.exe --config ./retina/config.yaml --kubeconfig ./kubeconfig
             {{- end }}
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - powershell.exe
+                  - -NoProfile
+                  - -Command
+                  - New-Item -ItemType File -Path (Join-Path $env:CONTAINER_SANDBOX_MOUNT_POINT '.retina-shutdown') -Force | Out-Null; Start-Sleep -Seconds 90
           readinessProbe:
             httpGet:
               path: /metrics

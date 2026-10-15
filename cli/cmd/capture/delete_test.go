@@ -11,6 +11,7 @@ import (
 
 	"github.com/microsoft/retina/pkg/label"
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -188,5 +189,66 @@ func TestDeleteCaptureJobs(t *testing.T) {
 			// Validate job is deleted correctly
 			jobDeletedCorrectly(t, kubeClient, tc)
 		})
+	}
+}
+
+func TestDeleteCaptureJobs_SecretAlreadyDeleted(t *testing.T) {
+	// When a secret referenced by a job's volume has already been deleted
+	// (e.g. via ownerRef GC), the delete command should still succeed.
+	deleteTestCapName := "test-secret-gone"
+	ns := "default"
+
+	kubeClient := newKubeclient()
+
+	// Create a job that references a secret volume, but don't create the secret itself.
+	secretName := "already-deleted-secret"
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      deleteTestCapName + "-node1-abcde",
+			Namespace: ns,
+			Labels: map[string]string{
+				label.CaptureNameLabel: deleteTestCapName,
+				label.AppLabel:         "capture",
+			},
+		},
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{Name: "capture", Image: "test"}},
+					Volumes: []corev1.Volume{
+						{
+							Name: "capture-secret",
+							VolumeSource: corev1.VolumeSource{
+								Secret: &corev1.SecretVolumeSource{
+									SecretName: secretName,
+								},
+							},
+						},
+					},
+					RestartPolicy: corev1.RestartPolicyNever,
+				},
+			},
+		},
+	}
+
+	_, err := kubeClient.BatchV1().Jobs(ns).Create(context.Background(), job, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create test job: %v", err)
+	}
+
+	// Run delete — the secret doesn't exist, so the NotFound check is exercised
+	deleteCmd := NewCommand(kubeClient)
+	deleteCmd.SetArgs([]string{"delete", "--name", deleteTestCapName, "--namespace", ns})
+	buf := new(bytes.Buffer)
+	deleteCmd.SetOut(buf)
+
+	err = deleteCmd.Execute()
+	if err != nil {
+		t.Fatalf("Delete should succeed even when secret is already gone, got: %v", err)
+	}
+
+	// Verify job was deleted
+	if jobExists(t, kubeClient, deleteTestCapName, ns) {
+		t.Error("Expected job to be deleted")
 	}
 }

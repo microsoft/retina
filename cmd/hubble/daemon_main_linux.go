@@ -8,20 +8,17 @@ package hubble
 import (
 	"context"
 	"fmt"
-	"io"
 	"log/slog"
-	"os"
 	"path/filepath"
 
-	zaphook "github.com/Sytten/logrus-zap-hook"
 	"github.com/cilium/cilium/pkg/hive"
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	hubblecell "github.com/cilium/cilium/pkg/hubble/cell"
 	"github.com/cilium/cilium/pkg/ipcache"
-	"github.com/cilium/cilium/pkg/k8s"
 	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
 	"github.com/cilium/cilium/pkg/k8s/watchers"
 	"github.com/cilium/cilium/pkg/logging"
+	"github.com/cilium/cilium/pkg/logging/logfields"
 	"github.com/cilium/cilium/pkg/metrics"
 	monitorAgent "github.com/cilium/cilium/pkg/monitor/agent"
 	"github.com/cilium/cilium/pkg/node"
@@ -38,7 +35,6 @@ import (
 	"github.com/microsoft/retina/pkg/managers/servermanager"
 	sharedconfig "github.com/microsoft/retina/pkg/shared/config"
 	"github.com/microsoft/retina/pkg/telemetry"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -64,7 +60,7 @@ func InitGlobalFlags(cmd *cobra.Command, vp *viper.Viper) {
 	vp.Set(option.EndpointGCInterval, 0)
 
 	if err := vp.BindPFlags(flags); err != nil {
-		logger.Fatalf("BindPFlags failed: %s", err)
+		logging.Fatal(logger(), fmt.Sprintf("BindPFlags failed: %s", err))
 	}
 }
 
@@ -76,13 +72,12 @@ type daemonParams struct {
 	MonitorAgent  monitorAgent.Agent
 	PluginManager *pluginmanager.PluginManager
 	HTTPServer    *servermanager.HTTPServer
-	Log           logrus.FieldLogger
+	Log           *slog.Logger
 	Client        client.Client
 	EventChan     chan *v1.Event
 	K8sWatcher    *watchers.K8sWatcher
 	Lnds          *node.LocalNodeStore
 	IPC           *ipcache.IPCache
-	SvcCache      k8s.ServiceCache
 	Telemetry     telemetry.Telemetry
 	Hubble        hubblecell.HubbleIntegration
 	Config        config.Config
@@ -101,7 +96,7 @@ func newDaemonPromise(params daemonParams) promise.Promise[*Daemon] {
 			daemon = d
 			daemonResolver.Resolve(daemon)
 
-			d.log.Info("starting Retina Enterprise version: ", buildinfo.Version)
+			d.log.Info("starting Retina", "version", buildinfo.Version)
 			err := d.Run(daemonCtx)
 			if err != nil {
 				return fmt.Errorf("daemon run failed: %w", err)
@@ -117,27 +112,32 @@ func newDaemonPromise(params daemonParams) promise.Promise[*Daemon] {
 	return daemonPromise
 }
 
-func initLogging() {
-	logger := setupDefaultLogger()
-	retinaConfig, _ := getRetinaConfig(logger)
+// initZap wires Retina's zap logger (including the Application Insights sink)
+// and redirects Go's stdlib slog default at it. The Cilium-side tee must wait
+// until *after* logging.SetupLogging runs, because SetupLogging calls
+// MultiSlogHandler.SetHandler which replaces the handler list.
+func initZap() {
+	retinaConfig, _ := getRetinaConfig()
 	k8sCfg, _ := sharedconfig.GetK8sConfig()
-	zapLogger := setupZapLogger(retinaConfig, k8sCfg)
-	setupLoggingHooks(logger, zapLogger)
-	bootstrapLogging(retinaConfig, logger)
+	setupZapLogger(retinaConfig, k8sCfg)
+
+	// Route Go's stdlib slog default through zap so any bare slog call hits AI.
+	log.SetDefaultSlog()
 }
 
-func setupDefaultLogger() *logrus.Logger {
-	logger := logging.DefaultLogger
-	logger.ReportCaller = true
-	logger.SetOutput(io.Discard)
-	return logger
+func initLogging() {
+	bootstrapLogging()
+	// Register zap + metrics hook AFTER SetupLogging so they survive its
+	// defaultMultiSlogHandler.SetHandler replace. From this point every
+	// logging.DefaultSlogLogger emission fans out to zap → Application Insights.
+	logging.AddHandlers(log.SlogHandler(), metrics.NewLoggingHook())
 }
 
-func getRetinaConfig(logger *logrus.Logger) (*config.Config, error) {
+func getRetinaConfig() (*config.Config, error) {
 	retinaConfigFile := filepath.Join(option.Config.ConfigDir, configFileName)
 	conf, err := config.GetConfig(retinaConfigFile)
 	if err != nil {
-		logger.WithError(err).Error("Failed to get config file")
+		logging.DefaultSlogLogger.Error("Failed to get config file", "error", err)
 		return nil, fmt.Errorf("getting config from file %q: %w", configFileName, err)
 	}
 	return conf, nil
@@ -164,7 +164,7 @@ func setupZapLogger(retinaConfig *config.Config, k8sCfg *rest.Config) *log.ZapLo
 
 	_, err := log.SetupZapLogger(logOpts, persistentFields...)
 	if err != nil {
-		logger.Fatalf("Failed to setup zap logger: %v", err)
+		logging.Fatal(logger(), fmt.Sprintf("Failed to setup zap logger: %v", err))
 	}
 
 	namedLogger := log.Logger().Named("retina-with-hubble")
@@ -173,52 +173,42 @@ func setupZapLogger(retinaConfig *config.Config, k8sCfg *rest.Config) *log.ZapLo
 	return namedLogger
 }
 
-func setupLoggingHooks(logger *logrus.Logger, zapLogger *log.ZapLogger) {
-	logger.Hooks.Add(metrics.NewLoggingHook())
-
-	zapHook, err := zaphook.NewZapHook(zapLogger.Logger)
-	if err != nil {
-		logger.WithError(err).Error("Failed to create zap hook")
-	} else {
-		logger.Hooks.Add(zapHook)
-	}
-}
-
-func bootstrapLogging(retinaConfig *config.Config, logger *logrus.Logger) {
+func bootstrapLogging() {
 	if err := logging.SetupLogging(option.Config.LogDriver, logging.LogOptions(option.Config.LogOpt), "retina-agent", option.Config.Debug); err != nil {
-		logger.Fatal(err)
+		logging.Fatal(logging.DefaultSlogLogger, err.Error())
 	}
-
-	logLevel, err := logrus.ParseLevel(retinaConfig.LogLevel)
-	if err != nil {
-		logLevel = logrus.InfoLevel
-	}
-	logger.SetLevel(logLevel)
 }
 
 func initDaemonConfig(vp *viper.Viper) {
-	option.Config.Populate(vp)
+	// slogloggercheck: using default logger for configuration initialization
+	option.Config.Populate(logging.DefaultSlogLogger, vp)
 
 	time.MaxInternalTimerDelay = vp.GetDuration(option.MaxInternalTimerDelay)
 }
 
 func Execute(cobraCmd *cobra.Command, h *hive.Hive) {
-	fn := option.InitConfig(cobraCmd, "retina-agent", "retina", h.Viper())
+	// slogloggercheck: using default logger for configuration initialization
+	fn := option.InitConfig(logging.DefaultSlogLogger, cobraCmd, "retina-agent", "retina", h.Viper())
 	fn()
 	initDaemonConfig(h.Viper())
+
+	// Bring up zap + Application Insights first, then tee Cilium's slog into it.
+	// Any subsequent log that flows through Cilium's DefaultSlogLogger (including
+	// SetupLogging output below) now reaches AI.
+	initZap()
 	initLogging()
 
-	hiveLogger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	hiveLogger := log.SlogLogger()
 
 	// Allow the current process to lock memory for eBPF resources.
 	if err := rlimit.RemoveMemlock(); err != nil {
-		logger.Fatal("failed to remove memlock", zap.Error(err))
+		logging.Fatal(logger(), "failed to remove memlock", logfields.Error, err)
 	}
 
 	//nolint:gocritic // without granular commits this commented-out code may be lost
 	// initEnv(h.Viper())
 
 	if err := h.Run(hiveLogger); err != nil {
-		logger.Fatal(err)
+		logging.Fatal(logger(), "Hive Run failed", logfields.Error, err)
 	}
 }

@@ -6,6 +6,7 @@ package capture
 import (
 	"context"
 	"fmt"
+	"net"
 	"os/signal"
 	"strings"
 	"syscall"
@@ -16,8 +17,11 @@ import (
 	"go.uber.org/zap"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -31,26 +35,71 @@ import (
 	"github.com/microsoft/retina/pkg/capture/file"
 	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	"github.com/microsoft/retina/pkg/config"
+	captureLabels "github.com/microsoft/retina/pkg/label"
 )
 
 const (
-	DefaultDebug           bool          = false
-	DefaultDuration        time.Duration = 1 * time.Minute
-	DefaultHostPath        string        = "/mnt/retina/captures"
+	DefaultCleanUpAfterUpload bool          = false
+	DefaultDebug              bool          = false
+	DefaultDuration           time.Duration = 1 * time.Minute
+	// DefaultHostPath is the default subpath (joined under DefaultHostPathBaseDir on
+	// the node) where capture artifacts are stored. It is a bare name, not an
+	// absolute path: absolute paths are rejected by the operator.
+	DefaultHostPath string = "retina"
+	// DefaultHostPathBaseDir is the default node-side parent directory for capture
+	// artifacts; the user-supplied --host-path subpath is joined under it.
+	DefaultHostPathBaseDir string        = "/var/log/retina/captures"
 	DefaultIncludeMetadata bool          = true
 	DefaultJobNumLimit     int           = 0
 	DefaultMaxSize         int           = 100
+	DefaultFileCount       int           = 0
 	DefaultNodeSelectors   string        = "kubernetes.io/os=linux"
 	DefaultNowait          bool          = true
 	DefaultPacketSize      int           = 0
 	DefaultS3Path          string        = "retina/captures"
 	DefaultWaitPeriod      time.Duration = 1 * time.Minute
 	DefaultWaitTimeout     time.Duration = 5 * time.Minute
+	// JobStartupTimeout is how long a no-wait capture checks whether its jobs'
+	// pods were admitted before giving up (best-effort).
+	JobStartupTimeout time.Duration = 5 * time.Second
+	// JobStartupPollPeriod is how often job status and events are polled
+	// while checking startup.
+	JobStartupPollPeriod time.Duration = 250 * time.Millisecond
+
+	// JobTTLSecondsAfterFinished is how long completed/failed jobs and their
+	// pods are kept before Kubernetes garbage-collects them (no-wait mode).
+	JobTTLSecondsAfterFinished int32 = 300 // 5 minutes
+
+	// JobActiveDeadlineBufferSeconds is added to the capture duration to form
+	// the Job's activeDeadlineSeconds. This buffer accounts for output upload
+	// and cleanup time after the capture itself finishes.
+	JobActiveDeadlineBufferSeconds int64 = 1800 // 30 minutes
+
+	// WaitDeadlineBuffer is extra time added to the capture duration when
+	// computing the wait deadline, to account for upload and scheduling overhead.
+	WaitDeadlineBuffer time.Duration = 5 * time.Minute
+
+	// MinPollAttempts is the minimum number of polling iterations before the
+	// wait deadline expires. Used to compute a fallback poll period.
+	MinPollAttempts = 4
 )
+
+var (
+	errCleanupRequiresRemoteStorage = errors.New("--cleanup-after-upload requires remote storage (--blob-upload, --s3-bucket, or --pvc)")
+	errFileCountTooSmall            = errors.New("--file-count must be at least 1")
+	errFileCountRequiresMaxSize     = errors.New("--file-count requires --max-size to be set as per-file size limit")
+)
+
+// hasRemoteDestination returns true if the capture options specify a remote
+// storage output (blob upload or S3 upload).
+func hasRemoteDestination(o *Opts) bool {
+	return o.blobUpload != "" || o.s3Bucket != "" || o.pvc != ""
+}
 
 var createExample = templates.Examples(i18n.T(`
 		# Select nodes by node name and copy the artifacts to the node host path
-		kubectl retina capture create --host-path /mnt/retina/testcapture --node-names "<nodename1>,<nodename2>"
+		# (joined under the operator-configured base directory; default /var/log/retina/captures/testcapture)
+		kubectl retina capture create --host-path testcapture --node-names "<nodename1>,<nodename2>"
 
 		# Select pods determined by pod-selectors and namespace-selectors
 		kubectl retina capture create --namespace capture --pod-selectors="k8s-app=kube-dns" --namespace-selectors="kubernetes.io/metadata.name=kube-system"
@@ -107,18 +156,32 @@ func create(kubeClient kubernetes.Interface) error {
 		return err
 	}
 
+	if opts.cleanUpAfterUpload {
+		if !hasRemoteDestination(&opts) {
+			return errCleanupRequiresRemoteStorage
+		}
+	}
+
 	jobsCreated, err := createJobs(ctx, kubeClient, capture)
 	if err != nil {
 		retinacmd.Logger.Error("Failed to create job", zap.Error(err))
 		return err
 	}
+
+	// Set owner references on secrets so they are garbage-collected when the
+	// jobs are removed (by TTL, explicit deletion, or manual kubectl delete).
+	if ownerRefErr := setSecretOwnerReferences(ctx, kubeClient, capture, jobsCreated); ownerRefErr != nil {
+		retinacmd.Logger.Error("Failed to set owner references on capture secrets", zap.Error(ownerRefErr))
+	}
+
 	if opts.nowait {
-		retinacmd.Logger.Info("Please manually delete all capture jobs")
-		if capture.Spec.OutputConfiguration.BlobUpload != nil {
-			retinacmd.Logger.Info("Please manually delete capture secret", zap.String("namespace", *opts.Namespace), zap.String("secret name", *capture.Spec.OutputConfiguration.BlobUpload))
+		if startupErr := waitForJobsToStart(ctx, kubeClient, jobsCreated); startupErr != nil {
+			return startupErr
 		}
-		if capture.Spec.OutputConfiguration.S3Upload != nil && capture.Spec.OutputConfiguration.S3Upload.SecretName != "" {
-			retinacmd.Logger.Info("Please manually delete capture secret", zap.String("namespace", *opts.Namespace), zap.String("secret name", capture.Spec.OutputConfiguration.S3Upload.SecretName))
+		if opts.cleanUpAfterUpload && hasRemoteDestination(&opts) {
+			retinacmd.Logger.Info("Capture jobs will be automatically cleaned up after upload (TTL-based)")
+		} else {
+			retinacmd.Logger.Info("Please manually delete all capture jobs (associated secrets will be garbage-collected automatically)")
 		}
 		printCaptureResult(jobsCreated)
 		return nil
@@ -190,12 +253,30 @@ func NewCreateSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 		Example: createExample,
 	}
 
+	var verbosityStr, timestampStr, printDataStr string
+
 	createCapture.RunE = func(*cobra.Command, []string) error {
+		// Validate enum flags
+		opts.verbosityLevel = VerbosityLevel(verbosityStr)
+		if err := opts.verbosityLevel.Validate(); err != nil {
+			return err
+		}
+		opts.timestampFormat = TimestampFormat(timestampStr)
+		if err := opts.timestampFormat.Validate(); err != nil {
+			return err
+		}
+		opts.printDataFormat = PrintDataFormat(printDataStr)
+		if err := opts.printDataFormat.Validate(); err != nil {
+			return err
+		}
 		return create(kubeClient)
 	}
 
 	createCapture.Flags().DurationVar(&opts.duration, "duration", DefaultDuration, "Duration of capturing packets")
-	createCapture.Flags().IntVar(&opts.maxSize, "max-size", DefaultMaxSize, "Limit the capture file to MB in size which works only for Linux") //nolint:gomnd // default
+	createCapture.Flags().IntVar(&opts.maxSize, "max-size", DefaultMaxSize,
+		"Limit the capture file to MB in size (per-file size when used with --file-count). Linux only") //nolint:gomnd // default
+	createCapture.Flags().IntVar(&opts.fileCount, "file-count", DefaultFileCount,
+		"Number of files in a rotating buffer (requires --max-size, min 1). Overwrites oldest file when full")
 	createCapture.Flags().IntVar(&opts.packetSize, "packet-size", DefaultPacketSize, "Limits the each packet to bytes in size which works only for Linux")
 	createCapture.Flags().StringVar(&opts.nodeNames, "node-names", "", "A comma-separated list of node names to select nodes on which the network capture will be performed")
 	createCapture.Flags().StringVar(&opts.nodeSelectors, "node-selectors", DefaultNodeSelectors, "A comma-separated list of node labels to select nodes on which the network capture will be performed")
@@ -205,7 +286,9 @@ func NewCreateSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 		"A comma-separated list of pod labels to select pods on which the network capture will be performed")
 	createCapture.Flags().StringVar(&opts.namespaceSelectors, "namespace-selectors", "",
 		"A comma-separated list of namespace labels to filter which namespaces will be targeted for packet capture (used with --pod-selectors)")
-	createCapture.Flags().StringVar(&opts.hostPath, "host-path", DefaultHostPath, "HostPath of the node to store the capture files")
+	createCapture.Flags().StringVar(&opts.hostPath, "host-path", DefaultHostPath,
+		"Subpath name (joined under --host-path-base-dir) for capture artifacts on the node. Must be a relative subpath and must not contain '..'.")
+	createCapture.Flags().StringVar(&opts.hostPathBaseDir, "host-path-base-dir", DefaultHostPathBaseDir, "Absolute base directory on the node under which --host-path is joined")
 	createCapture.Flags().StringVar(&opts.pvc, "pvc", "", "PersistentVolumeClaim under the specified or default namespace to store capture files")
 	createCapture.Flags().StringVar(&opts.blobUpload, "blob-upload", "", "Blob SAS URL with write permission to upload capture files")
 	createCapture.Flags().StringVar(&opts.s3Region, "s3-region", "", "Region where the S3 compatible bucket is located")
@@ -215,15 +298,46 @@ func NewCreateSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 	createCapture.Flags().StringVar(&opts.s3Path, "s3-path", DefaultS3Path, "Prefix path within the S3 bucket where captures will be stored")
 	createCapture.Flags().StringVar(&opts.s3AccessKeyID, "s3-access-key-id", "", "S3 access key id to upload capture files")
 	createCapture.Flags().StringVar(&opts.s3SecretAccessKey, "s3-secret-access-key", "", "S3 access secret key to upload capture files")
-	createCapture.Flags().StringVar(&opts.tcpdumpFilter, "tcpdump-filter", "", "Raw tcpdump flags which works only for Linux")
+	createCapture.Flags().StringVar(&opts.tcpdumpFilter, "tcpdump-filter", "",
+		"DEPRECATED and will be removed: Use --pcap-filter for BPF expressions. BPF filter expression without flags (e.g., 'host 10.0.0.1', 'tcp port 443')")
+	createCapture.Flags().StringVar(&opts.pcapFilter, "pcap-filter", "",
+		"BPF filter expression for packet filtering (e.g., 'host 10.0.0.1', 'tcp port 443'). See https://www.tcpdump.org/manpages/pcap-filter.7.html")
+	createCapture.Flags().StringVar(&opts.sourceIPs, "source-ips", "",
+		"A comma-separated list of source IP addresses to filter captured packets by; a packet is captured if it matches any of these IPs. "+
+			"When combined with --destination-ips, a packet must match at least one source IP AND at least one destination IP to be captured.")
+	createCapture.Flags().StringVar(&opts.destinationIPs, "destination-ips", "",
+		"A comma-separated list of destination IP addresses to filter captured packets by; a packet is captured if it matches any of these IPs. "+
+			"When combined with --source-ips, a packet must match at least one source IP AND at least one destination IP to be captured.")
 	createCapture.Flags().StringVar(&opts.interfaces, "interfaces", "", "Comma-separated list of network interfaces to capture on (e.g., eth0,eth1)")
+
+	// Tcpdump boolean flags for capture behavior and display options
+	createCapture.Flags().BoolVar(&opts.noPromiscuous, "no-promiscuous", false, "Disable promiscuous mode (tcpdump -p flag)")
+	createCapture.Flags().BoolVar(&opts.packetBuffered, "packet-buffered", false, "Enable packet-buffered output (tcpdump -U flag)")
+	createCapture.Flags().BoolVar(&opts.immediateMode, "immediate-mode", false, "Enable immediate mode for packet capture (tcpdump --immediate-mode)")
+	createCapture.Flags().BoolVar(&opts.noResolveDNS, "no-resolve-dns", false, "Don't resolve hostnames (tcpdump -n flag)")
+	createCapture.Flags().BoolVar(&opts.noResolvePort, "no-resolve-port", false, "Don't resolve hostnames or port names (tcpdump -nn flag)")
+	createCapture.Flags().BoolVar(&opts.printLinkHeader, "print-link-header", false, "Print link-level headers (tcpdump -e flag)")
+	createCapture.Flags().BoolVar(&opts.quietOutput, "quiet-output", false, "Quick/quiet output mode (tcpdump -q flag)")
+	createCapture.Flags().BoolVar(&opts.absoluteSeq, "absolute-seq", false, "Print absolute TCP sequence numbers (tcpdump -S flag)")
+	createCapture.Flags().BoolVar(&opts.dontVerifyChecksum, "dont-verify-checksum", false, "Don't verify TCP checksums (tcpdump -K flag)")
+
+	// Enum-based flags for mutually exclusive options
+	createCapture.Flags().StringVar(&verbosityStr, "verbosity", "", "Verbosity level: verbose, extra, max (tcpdump -v/-vv/-vvv)")
+	createCapture.Flags().StringVar(&timestampStr, "timestamp-format", "", "Timestamp format: none, unformatted, delta, date, delta-since-first (tcpdump -t/-tt/-ttt/-tttt/-ttttt)")
+	createCapture.Flags().StringVar(&printDataStr, "print-data", "", "Print packet data: hex, hex-with-link, ascii, ascii-with-link (tcpdump -x/-xx/-A/-AA)")
+
+	// Filters
 	createCapture.Flags().StringVar(&opts.excludeFilter, "exclude-filter", "", "A comma-separated list of IP:Port pairs that are "+
 		"excluded from capturing network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:*")
 	createCapture.Flags().StringVar(&opts.includeFilter, "include-filter", "", "A comma-separated list of IP:Port pairs that are "+
 		"used to filter capture network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:*")
+
+	// Capture options
 	createCapture.Flags().BoolVar(&opts.includeMetadata, "include-metadata", DefaultIncludeMetadata, "If true, collect static network metadata into capture file")
 	createCapture.Flags().IntVar(&opts.jobNumLimit, "job-num-limit", DefaultJobNumLimit, "The maximum number of jobs can be created for each capture. 0 means no limit")
 	createCapture.Flags().BoolVar(&opts.nowait, "no-wait", DefaultNowait, "Do not wait for the long-running capture job to finish")
+	createCapture.Flags().BoolVar(&opts.cleanUpAfterUpload, "cleanup-after-upload", DefaultCleanUpAfterUpload,
+		"Automatically clean up capture jobs and resources after successful upload to remote storage")
 	createCapture.Flags().BoolVar(&opts.debug, "debug", DefaultDebug, "When debug is true, a customized retina-agent image, determined by the environment variable RETINA_AGENT_IMAGE, is set")
 
 	return createCapture
@@ -275,10 +389,80 @@ func deleteSecret(ctx context.Context, kubeClient kubernetes.Interface, secretNa
 		return nil
 	}
 
-	return kubeClient.CoreV1().Secrets(*opts.Namespace).Delete(ctx, *secretName, metav1.DeleteOptions{}) //nolint:wrapcheck //internal return
+	err := kubeClient.CoreV1().Secrets(*opts.Namespace).Delete(ctx, *secretName, metav1.DeleteOptions{})
+	if k8serrors.IsNotFound(err) {
+		return nil
+	}
+	return err //nolint:wrapcheck //internal return
+}
+
+// validateBPFFilter checks that a BPF filter string doesn't contain flags (tokens starting with '-').
+// This prevents command injection attacks by ensuring only BPF expressions are provided.
+func validateBPFFilter(filter, filterName string) error {
+	if filter == "" {
+		return nil
+	}
+
+	trimmed := strings.TrimSpace(filter)
+	if trimmed == "" {
+		return fmt.Errorf("%s: %w", filterName, ErrBPFFilterEmpty)
+	}
+
+	// Check for flags (tokens starting with '-')
+	tokens := strings.Fields(trimmed)
+	for _, token := range tokens {
+		if strings.HasPrefix(token, "-") {
+			return fmt.Errorf("%s contains flag %q: %w", filterName, token, ErrBPFFilterContainsFlag)
+		}
+	}
+
+	return nil
+}
+
+// parseIPList splits a comma-separated list of IP addresses and validates that each entry
+// is a well-formed IP address. This ensures only IP literals (not BPF expressions or flags)
+// are accepted by --source-ips/--destination-ips, preventing filter/command injection.
+func parseIPList(ipList, flagName string) ([]string, error) {
+	if ipList == "" {
+		return nil, nil
+	}
+
+	entries := strings.Split(ipList, ",")
+	ips := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		trimmed := strings.TrimSpace(entry)
+		if trimmed == "" {
+			return nil, fmt.Errorf("%s: empty entry is not a valid IP address: %w", flagName, ErrInvalidIPAddress)
+		}
+		if net.ParseIP(trimmed) == nil {
+			return nil, fmt.Errorf("%s: %q is not a valid IP address: %w", flagName, trimmed, ErrInvalidIPAddress)
+		}
+		ips = append(ips, trimmed)
+	}
+
+	return ips, nil
 }
 
 func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*retinav1alpha1.Capture, error) {
+	// Validate filters early to provide immediate feedback
+	if err := validateBPFFilter(opts.tcpdumpFilter, "--tcpdump-filter"); err != nil {
+		return nil, err
+	}
+	if err := validateBPFFilter(opts.pcapFilter, "--pcap-filter"); err != nil {
+		return nil, err
+	}
+	if opts.tcpdumpFilter != "" && (opts.sourceIPs != "" || opts.destinationIPs != "") {
+		return nil, ErrTcpdumpFilterIncompatibleWithSourceDestIPs
+	}
+	sourceIPs, err := parseIPList(opts.sourceIPs, "--source-ips")
+	if err != nil {
+		return nil, err
+	}
+	destinationIPs, err := parseIPList(opts.destinationIPs, "--destination-ips")
+	if err != nil {
+		return nil, err
+	}
+
 	timestamp := file.Now()
 
 	capture := &retinav1alpha1.Capture{
@@ -306,10 +490,11 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 		capture.Spec.CaptureConfiguration.CaptureOption.Duration = &metav1.Duration{Duration: opts.duration}
 	}
 
-	if opts.namespaceSelectors != "" || opts.podSelectors != "" || opts.podNames != "" {
-		// if node selector is using the default value (aka hasn't been set by user), set it to nil to prevent clash with namespace and pod selector
+	if opts.namespaceSelectors != "" || opts.podSelectors != "" || opts.podNames != "" || opts.nodeNames != "" {
+		// if node selector is using the default value (aka hasn't been set by user), set it to nil to prevent clash
+		// with namespace/pod selectors, pod names, or explicit node names
 		if opts.nodeSelectors == DefaultNodeSelectors {
-			retinacmd.Logger.Info("Overriding default node selectors value and setting it to nil. Using namespace, pod selectors, or pod names. " +
+			retinacmd.Logger.Info("Overriding default node selectors value and setting it to nil. Using namespace, pod selectors, pod names, or node names. " +
 				"To use node selector, please remove namespace and pod selectors.")
 			opts.nodeSelectors = ""
 		}
@@ -374,6 +559,17 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 		capture.Spec.CaptureConfiguration.CaptureOption.MaxCaptureSize = &opts.maxSize
 	}
 
+	if opts.fileCount != 0 {
+		if opts.fileCount < 1 {
+			return nil, errFileCountTooSmall
+		}
+		if opts.maxSize == 0 {
+			return nil, errFileCountRequiresMaxSize
+		}
+		retinacmd.Logger.Info(fmt.Sprintf("The capture file count is set to %d (rotating buffer)", opts.fileCount))
+		capture.Spec.CaptureConfiguration.CaptureOption.FileCount = &opts.fileCount
+	}
+
 	if opts.packetSize != 0 {
 		retinacmd.Logger.Info(fmt.Sprintf("The capture packet size is set to %d bytes", opts.packetSize))
 		capture.Spec.CaptureConfiguration.CaptureOption.PacketSize = &opts.packetSize
@@ -386,6 +582,75 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 		}
 		retinacmd.Logger.Info(fmt.Sprintf("Capturing on specific interfaces: %v", interfaceSlice))
 		capture.Spec.CaptureConfiguration.CaptureOption.Interfaces = interfaceSlice
+	}
+
+	// Set pcap-filter if provided
+	if opts.pcapFilter != "" {
+		capture.Spec.CaptureConfiguration.CaptureOption.PcapFilter = &opts.pcapFilter
+	}
+
+	// Set source/destination IP filters if provided
+	if len(sourceIPs) > 0 {
+		retinacmd.Logger.Info(fmt.Sprintf("Capturing packets with source IP in: %v", sourceIPs))
+		capture.Spec.CaptureConfiguration.CaptureOption.SourceIPs = sourceIPs
+	}
+	if len(destinationIPs) > 0 {
+		retinacmd.Logger.Info(fmt.Sprintf("Capturing packets with destination IP in: %v", destinationIPs))
+		capture.Spec.CaptureConfiguration.CaptureOption.DestinationIPs = destinationIPs
+	}
+
+	// Set boolean capture and display flags
+	if opts.noPromiscuous {
+		capture.Spec.CaptureConfiguration.CaptureOption.NoPromiscuous = &opts.noPromiscuous
+	}
+
+	if opts.packetBuffered {
+		capture.Spec.CaptureConfiguration.CaptureOption.PacketBuffered = &opts.packetBuffered
+	}
+
+	if opts.immediateMode {
+		capture.Spec.CaptureConfiguration.CaptureOption.ImmediateMode = &opts.immediateMode
+	}
+
+	if opts.noResolveDNS {
+		capture.Spec.CaptureConfiguration.CaptureOption.NoResolveDNS = &opts.noResolveDNS
+	}
+	if opts.noResolvePort {
+		capture.Spec.CaptureConfiguration.CaptureOption.NoResolvePort = &opts.noResolvePort
+	}
+
+	// Set verbosity level enum field based on CLI value
+	if opts.verbosityLevel != VerbosityNormal {
+		verbosityStr := string(opts.verbosityLevel)
+		capture.Spec.CaptureConfiguration.CaptureOption.Verbosity = &verbosityStr
+	}
+
+	// Set print data format enum field based on CLI value
+	if opts.printDataFormat != PrintDataNone {
+		printDataStr := string(opts.printDataFormat)
+		capture.Spec.CaptureConfiguration.CaptureOption.PrintDataFormat = &printDataStr
+	}
+
+	if opts.printLinkHeader {
+		capture.Spec.CaptureConfiguration.CaptureOption.PrintLinkHeader = &opts.printLinkHeader
+	}
+
+	if opts.quietOutput {
+		capture.Spec.CaptureConfiguration.CaptureOption.QuietOutput = &opts.quietOutput
+	}
+
+	if opts.absoluteSeq {
+		capture.Spec.CaptureConfiguration.CaptureOption.AbsoluteSeq = &opts.absoluteSeq
+	}
+
+	// Set timestamp format enum field based on CLI value
+	if opts.timestampFormat != TimestampDefault {
+		timestampStr := string(opts.timestampFormat)
+		capture.Spec.CaptureConfiguration.CaptureOption.TimestampFormat = &timestampStr
+	}
+
+	if opts.dontVerifyChecksum {
+		capture.Spec.CaptureConfiguration.CaptureOption.DontVerifyChecksum = &opts.dontVerifyChecksum
 	}
 
 	if opts.hostPath != "" {
@@ -433,6 +698,8 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 		includeFilterSlice := strings.Split(opts.includeFilter, ",")
 		capture.Spec.CaptureConfiguration.Filters.Include = includeFilterSlice
 	}
+
+	capture.Spec.CleanUpAfterUpload = opts.cleanUpAfterUpload
 	return capture, nil
 }
 
@@ -442,6 +709,7 @@ func getCLICaptureConfig() config.CaptureConfig {
 		CaptureDebug:              opts.debug,
 		CaptureImageVersionSource: captureUtils.VersionSourceCLIVersion,
 		CaptureJobNumLimit:        opts.jobNumLimit,
+		CaptureHostPathBaseDir:    opts.hostPathBaseDir,
 	}
 }
 
@@ -454,6 +722,21 @@ func createJobs(ctx context.Context, kubeClient kubernetes.Interface, capture *r
 
 	jobsCreated := []batchv1.Job{}
 	for _, job := range jobs {
+		// In no-wait mode with a remote destination, set TTL so Kubernetes
+		// auto-deletes completed jobs and their pods. When host-path only,
+		// the job metadata is needed to locate the capture file.
+		if opts.nowait && opts.cleanUpAfterUpload && hasRemoteDestination(&opts) {
+			ttl := JobTTLSecondsAfterFinished
+			job.Spec.TTLSecondsAfterFinished = &ttl
+		}
+
+		// Set a hard deadline to prevent jobs from running indefinitely if the
+		// capture process hangs. Deadline = capture duration + upload buffer.
+		if opts.duration > 0 {
+			deadline := int64(opts.duration.Seconds()) + JobActiveDeadlineBufferSeconds
+			job.Spec.ActiveDeadlineSeconds = &deadline
+		}
+
 		jobCreated, err := kubeClient.BatchV1().Jobs(*opts.Namespace).Create(ctx, job, metav1.CreateOptions{})
 		if err != nil {
 			return nil, err
@@ -464,19 +747,166 @@ func createJobs(ctx context.Context, kubeClient kubernetes.Interface, capture *r
 	return jobsCreated, nil
 }
 
+func waitForJobsToStart(ctx context.Context, kubeClient kubernetes.Interface, jobs []batchv1.Job) error {
+	return waitForJobsToStartWithTimeout(ctx, kubeClient, jobs, JobStartupTimeout)
+}
+
+// waitForJobsToStartWithTimeout polls, for up to timeout, whether the capture jobs' pods
+// were admitted. Kubernetes accepts a Job even when its pod is rejected (e.g. by an
+// admission policy), so a successful Job creation does not guarantee the pod started; the
+// Job controller instead reports the rejection as a "FailedCreate" Job Event. This check is
+// best-effort: it returns nil without an error if the caller cannot list Job Events or Jobs
+// (a recorded failure can never be confirmed as final without Job status), and it only warns
+// (without failing) if a job's outcome is still unknown once timeout elapses.
+func waitForJobsToStartWithTimeout(ctx context.Context, kubeClient kubernetes.Interface, jobs []batchv1.Job, timeout time.Duration) error {
+	if len(jobs) == 0 {
+		return nil
+	}
+
+	pendingJobs := make(map[types.UID]batchv1.Job, len(jobs))
+	for i := range jobs {
+		pendingJobs[jobs[i].UID] = jobs[i]
+	}
+	failedCreates := map[types.UID]string{}
+
+	eventSelector := fields.AndSelectors(
+		fields.OneTermEqualSelector("involvedObject.kind", "Job"),
+		fields.OneTermEqualSelector("type", corev1.EventTypeWarning),
+		fields.OneTermEqualSelector("reason", "FailedCreate"),
+	).String()
+
+	startupCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(JobStartupPollPeriod)
+	defer ticker.Stop()
+
+	for {
+		if err := ctx.Err(); err != nil {
+			return err //nolint:wrapcheck //internal return
+		}
+
+		if err := removeStartedJobs(startupCtx, kubeClient, jobs, pendingJobs, failedCreates); err != nil {
+			if k8serrors.IsForbidden(err) || k8serrors.IsUnauthorized(err) {
+				// Without Job status we can never confirm whether a recorded FailedCreate
+				// later recovered, so a cached failure can no longer be trusted as final.
+				retinacmd.Logger.Warn("Cannot check capture job startup because jobs could not be listed", zap.Error(err))
+				if ctxErr := ctx.Err(); ctxErr != nil {
+					return ctxErr //nolint:wrapcheck //internal return
+				}
+				return nil
+			}
+			retinacmd.Logger.Warn("Failed to list jobs while checking capture job startup", zap.Error(err))
+		}
+
+		events, err := kubeClient.CoreV1().Events(jobs[0].Namespace).List(startupCtx, metav1.ListOptions{FieldSelector: eventSelector})
+		switch {
+		case err == nil:
+			recordFailedCreates(events.Items, pendingJobs, failedCreates)
+		case k8serrors.IsForbidden(err) || k8serrors.IsUnauthorized(err):
+			retinacmd.Logger.Warn("Cannot check capture job startup because events could not be listed", zap.Error(err))
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return ctxErr //nolint:wrapcheck //internal return
+			}
+			return jobStartupResult(jobs, failedCreates)
+		default:
+			retinacmd.Logger.Warn("Failed to list events while checking capture job startup", zap.Error(err))
+		}
+
+		if len(pendingJobs) == 0 {
+			return jobStartupResult(jobs, failedCreates)
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err() //nolint:wrapcheck //internal return
+		case <-startupCtx.Done():
+			return jobStartupTimeoutResult(jobs, pendingJobs, failedCreates)
+		case <-ticker.C:
+		}
+	}
+}
+
+// removeStartedJobs clears jobs whose pod has been admitted (Job status reports it as
+// Active or Succeeded) from pendingJobs and failedCreates, using a single batched List call.
+func removeStartedJobs(ctx context.Context, kubeClient kubernetes.Interface, jobs []batchv1.Job, pendingJobs map[types.UID]batchv1.Job, failedCreates map[types.UID]string) error {
+	listOptions := metav1.ListOptions{}
+	if captureName := jobs[0].Labels[captureLabels.CaptureNameLabel]; captureName != "" {
+		listOptions.LabelSelector = labels.Set{captureLabels.CaptureNameLabel: captureName}.String()
+	}
+	currentJobs, err := kubeClient.BatchV1().Jobs(jobs[0].Namespace).List(ctx, listOptions)
+	if err != nil {
+		return err //nolint:wrapcheck //internal return
+	}
+	for i := range currentJobs.Items {
+		currentJob := &currentJobs.Items[i]
+		uid := currentJob.UID
+		if _, ok := pendingJobs[uid]; ok && (currentJob.Status.Active > 0 || currentJob.Status.Succeeded > 0) {
+			delete(pendingJobs, uid)
+			delete(failedCreates, uid)
+		}
+	}
+	return nil
+}
+
+func recordFailedCreates(events []corev1.Event, pendingJobs map[types.UID]batchv1.Job, failedCreates map[types.UID]string) {
+	for i := range events {
+		event := &events[i]
+		if _, ok := pendingJobs[event.InvolvedObject.UID]; ok {
+			failedCreates[event.InvolvedObject.UID] = event.Message
+		}
+	}
+}
+
+func jobStartupResult(jobs []batchv1.Job, failedCreates map[types.UID]string) error {
+	for i := range jobs {
+		if message, ok := failedCreates[jobs[i].UID]; ok {
+			// Message is a Kubernetes Event message, not a static sentinel error.
+			return fmt.Errorf("capture job %s failed to create a pod: %s", jobs[i].Name, message) //nolint:err113 // dynamic Kubernetes Event message
+		}
+	}
+	return nil
+}
+
+func jobStartupTimeoutResult(jobs []batchv1.Job, pendingJobs map[types.UID]batchv1.Job, failedCreates map[types.UID]string) error {
+	if err := jobStartupResult(jobs, failedCreates); err != nil {
+		return err
+	}
+	if len(pendingJobs) == 0 {
+		return nil
+	}
+	pendingNames := make([]string, 0, len(pendingJobs))
+	for i := range jobs {
+		if _, ok := pendingJobs[jobs[i].UID]; ok {
+			pendingNames = append(pendingNames, jobs[i].Name)
+		}
+	}
+	retinacmd.Logger.Warn("Capture job startup could not be confirmed before timeout", zap.Strings("jobs", pendingNames))
+	return nil
+}
+
 func waitUntilJobsComplete(ctx context.Context, kubeClient kubernetes.Interface, jobs []batchv1.Job) bool {
 	allJobsCompleted := false
 
 	// TODO: let's make the timeout and period to wait for all job to finish configurable.
 	deadline := DefaultWaitTimeout
 	if opts.duration != 0 {
-		deadline = opts.duration * 2
+		// Allow time for capture + upload + scheduling overhead (Windows
+		// nodes in particular need extra time for image pull and pod start).
+		deadline = opts.duration + WaitDeadlineBuffer
+		if deadline < DefaultWaitTimeout {
+			deadline = DefaultWaitTimeout
+		}
 	}
 
 	period := DefaultWaitPeriod
 	// To print less noisy messages, we rely on duration to decide the wait period.
 	if period < opts.duration/10 {
 		period = opts.duration / 10
+	}
+	// Ensure poll period is less than the deadline so we get multiple checks.
+	if period >= deadline {
+		period = deadline / MinPollAttempts
 	}
 	retinacmd.Logger.Info(fmt.Sprintf("Waiting timeout is set to %s", deadline))
 
@@ -532,4 +962,52 @@ func deleteJobs(ctx context.Context, kubeClient kubernetes.Interface, jobs []bat
 		}
 	}
 	return jobsFailedtoDelete
+}
+
+// setSecretOwnerReferences adds ownerReferences from the given jobs to the
+// secrets used by the capture (blob or S3). This ensures secrets are garbage-
+// collected when the owning jobs are deleted (by TTL or explicitly).
+func setSecretOwnerReferences(ctx context.Context, kubeClient kubernetes.Interface, capture *retinav1alpha1.Capture, jobs []batchv1.Job) error {
+	var secretNames []string
+	if capture.Spec.OutputConfiguration.BlobUpload != nil {
+		secretNames = append(secretNames, *capture.Spec.OutputConfiguration.BlobUpload)
+	}
+	if capture.Spec.OutputConfiguration.S3Upload != nil && capture.Spec.OutputConfiguration.S3Upload.SecretName != "" {
+		secretNames = append(secretNames, capture.Spec.OutputConfiguration.S3Upload.SecretName)
+	}
+
+	if len(secretNames) == 0 || len(jobs) == 0 {
+		return nil
+	}
+
+	ownerRefs := make([]metav1.OwnerReference, 0, len(jobs))
+	for i := range jobs {
+		ownerRefs = append(ownerRefs, metav1.OwnerReference{
+			APIVersion: batchv1.SchemeGroupVersion.String(),
+			Kind:       "Job",
+			Name:       jobs[i].Name,
+			UID:        jobs[i].UID,
+		})
+	}
+
+	for _, secretName := range secretNames {
+		secret, err := kubeClient.CoreV1().Secrets(*opts.Namespace).Get(ctx, secretName, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to get secret %s: %w", secretName, err)
+		}
+		// Deduplicate owner references to avoid appending the same refs on retries.
+		existing := make(map[types.UID]struct{}, len(secret.OwnerReferences))
+		for _, ref := range secret.OwnerReferences {
+			existing[ref.UID] = struct{}{}
+		}
+		for _, ref := range ownerRefs {
+			if _, found := existing[ref.UID]; !found {
+				secret.OwnerReferences = append(secret.OwnerReferences, ref)
+			}
+		}
+		if _, err := kubeClient.CoreV1().Secrets(*opts.Namespace).Update(ctx, secret, metav1.UpdateOptions{}); err != nil {
+			return fmt.Errorf("failed to update secret %s with owner references: %w", secretName, err)
+		}
+	}
+	return nil
 }

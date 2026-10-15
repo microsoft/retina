@@ -9,6 +9,26 @@ See the [overview](./01-overview.md#capture-jobs) for a description of how the c
 ## Prerequisites
 
 - [Install Retina](../02-Installation/01-Setup.md#capture-support) **with capture support**.
+- Sufficient node storage for capture files when using the default host-path output, unless a remote output location (blob, S3, or PVC) is configured instead.
+
+### Cluster Access
+
+Unlike the [CLI](./02-cli.md#cluster-access), the CRD flow doesn't require your own user/context to hold Job/Secret/Pod permissions — the Retina **operator's** ServiceAccount (granted via its Helm chart `ClusterRole`) creates and manages the underlying Jobs, Secrets, and Pods on your behalf. You only need permission to manage the CRD itself in the target namespace:
+
+| Resource | Verbs | Scope |
+|---|---|---|
+| `captures.retina.sh` | `create`, `get`, `list`, `delete` | namespace |
+
+### Cluster Admission Policies
+
+The operator translates each `Capture` into the same underlying Job/Pod spec used by the CLI, so the same elevated Pod settings are required. If the cluster enforces restrictive admission policies (e.g. Azure Policy, Gatekeeper, Kyverno), the capture namespace/workload must be allowed to use:
+
+- **Host network** (`hostNetwork: true`) - required so the capture pod can see the node's network interfaces.
+- **Host IPC** (`hostIPC: true`) - required by the underlying capture tooling.
+- **`NET_ADMIN` and `SYS_ADMIN` Linux capabilities** - required to run the packet capture on the host's interfaces.
+- **The capture image's registry** - the default capture image is pulled from `ghcr.io/microsoft/retina/retina-agent`. If the cluster restricts pulls to an approved registry, allow-list this image/registry or mirror it into your approved registry.
+
+If your cluster denies any of these, the capture Job's pod will fail admission — check `kubectl get capture <capture-crd-name> -o yaml` for job status, and the pod events in the target namespace for the denial reason.
 
 ## Usage
 
@@ -77,7 +97,7 @@ spec:
         matchLabels:
           kubernetes.io/os: linux
   outputConfiguration:
-    hostPath: /captures
+    hostPath: example-capture
 ```
 
 Include / Exclude filters
@@ -105,8 +125,35 @@ spec:
         - 10.224.0.26:80
         - 10.224.0.34:8080
   outputConfiguration:
-    hostPath: /captures
+    hostPath: example-capture
 ```
+
+Source / Destination IP filters
+
+```yaml
+apiVersion: retina.sh/v1alpha1
+kind: Capture
+metadata:
+  name: example-source-destination-ip
+spec:
+  captureConfiguration:
+    captureOption:
+      duration: "5s"
+      maxCaptureSize: 100
+      sourceIPs:
+        - 10.224.0.42
+      destinationIPs:
+        - 10.224.0.33
+        - 10.224.0.34
+    captureTarget:
+      nodeSelector:
+        matchLabels:
+          kubernetes.io/os: linux
+  outputConfiguration:
+    hostPath: example-capture
+```
+
+This captures only packets whose source IP is `10.224.0.42` **and** whose destination IP is either `10.224.0.33` or `10.224.0.34`. `sourceIPs` and `destinationIPs` can each be used on their own, and work on both Linux and Windows nodes.
 
 Single Pod by Name
 
@@ -125,7 +172,7 @@ spec:
       podNames:
         - my-app-pod-abc123
   outputConfiguration:
-    hostPath: /captures
+    hostPath: example-capture
 ```
 
 Multiple Pods by Name
@@ -146,7 +193,60 @@ spec:
         - my-app-pod-abc123
         - my-app-pod-def456
   outputConfiguration:
-    hostPath: /captures
+    hostPath: example-capture
+```
+
+Rotating Capture (Long-Running)
+
+Use `fileCount` with `maxCaptureSize` to create a rotating buffer of capture files. This is useful for debugging intermittent issues — the capture runs continuously, retaining only the most recent traffic.
+
+```yaml
+apiVersion: retina.sh/v1alpha1
+kind: Capture
+metadata:
+  name: example-rotating-capture
+spec:
+  captureConfiguration:
+    captureOption:
+      # Per-file size limit in MB
+      maxCaptureSize: 100
+      # Number of rotating files (oldest overwritten when limit reached)
+      # Total buffer: 100MB × 10 = 1GB of recent traffic
+      fileCount: 10
+    captureTarget:
+      nodeSelector:
+        matchLabels:
+          kubernetes.io/os: linux
+  outputConfiguration:
+    hostPath: /mnt/retina/captures
+```
+
+To stop the rotating capture once the issue is reproduced:
+
+```shell
+kubectl delete capture example-rotating-capture
 ```
 
 Additional examples can also be found in the [GitHub capture samples](https://github.com/microsoft/retina/tree/main/samples/capture).
+
+## Automatic Cleanup After Upload
+
+Set `cleanUpAfterUpload: true` in the Capture spec to have the controller automatically delete the Capture resource and all associated jobs once all capture jobs complete successfully and data has been uploaded to remote storage (Blob, S3, or PVC).
+
+```yaml
+apiVersion: retina.sh/v1alpha1
+kind: Capture
+metadata:
+  name: my-capture
+spec:
+  captureConfiguration:
+    captureTarget:
+      nodeSelector:
+        matchLabels:
+          kubernetes.io/os: linux
+  outputConfiguration:
+    blobUpload: "<secret-name>"
+  cleanUpAfterUpload: true
+```
+
+If any job fails, the Capture resource and jobs are preserved for debugging. This option requires a remote storage output (`blobUpload`, `s3Upload`, or `persistentVolumeClaim`).

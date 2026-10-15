@@ -159,6 +159,17 @@ func TestNewCtxOps(t *testing.T) {
 			f:            &flow.Flow{},
 			expectedVals: []string{"unknown"},
 		},
+		{
+			name:     "port option with a non-TCP/UDP flow keeps values aligned with labels",
+			opts:     []string{"ip", "port"},
+			ctxType:  source,
+			expected: []string{"source_ip", "source_port"},
+			f: &flow.Flow{
+				IP: &flow.IP{Source: "10.0.0.1"},
+				L4: &flow.Layer4{Protocol: &flow.Layer4_ICMPv4{ICMPv4: &flow.ICMPv4{}}},
+			},
+			expectedVals: []string{"10.0.0.1", "unknown"},
+		},
 	}
 
 	for _, tc := range tt {
@@ -176,4 +187,28 @@ func flowWithZones(srcZone, dstZone string) *flow.Flow {
 	utils.AddZones(ext, srcZone, dstZone)
 	utils.SetExtensions(f, ext)
 	return f
+}
+
+// TestPortContextCardinalityAcrossL4 brute-forces every Layer4 variant in both
+// directions: the value count must equal the label count, or WithLabelValues panics.
+func TestPortContextCardinalityAcrossL4(t *testing.T) {
+	l4s := map[string]*flow.Layer4{
+		"nil":    nil,
+		"tcp":    {Protocol: &flow.Layer4_TCP{TCP: &flow.TCP{}}},
+		"udp":    {Protocol: &flow.Layer4_UDP{UDP: &flow.UDP{}}},
+		"sctp":   {Protocol: &flow.Layer4_SCTP{SCTP: &flow.SCTP{}}},
+		"icmpv4": {Protocol: &flow.Layer4_ICMPv4{ICMPv4: &flow.ICMPv4{}}},
+		"icmpv6": {Protocol: &flow.Layer4_ICMPv6{ICMPv6: &flow.ICMPv6{}}},
+	}
+	for _, ctxType := range []ctxOptionType{source, destination} {
+		c := NewCtxOption([]string{"ip", "port", "namespace"}, ctxType)
+		labels := c.getLabels()
+		for name, l4 := range l4s {
+			f := &flow.Flow{IP: &flow.IP{Source: "10.0.0.1", Destination: "10.0.0.2"}, L4: l4}
+			if values := c.getValues(f); len(values) != len(labels) {
+				t.Errorf("%s/%d: %d values %v vs %d labels %v -> WithLabelValues would panic",
+					name, ctxType, len(values), values, len(labels), labels)
+			}
+		}
+	}
 }

@@ -1,4 +1,4 @@
-// go:build ignore
+//go:build ignore
 
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.

@@ -9,17 +9,17 @@ package ciliumcrds
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync/atomic"
 
 	"github.com/microsoft/retina/internal/buildinfo"
+	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/shared/telemetry"
-	"github.com/sirupsen/logrus"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	zapf "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/microsoft/retina/operator/cilium-crds/config"
 	operatorK8s "github.com/microsoft/retina/operator/cilium-crds/k8s"
@@ -30,30 +30,41 @@ import (
 	"github.com/cilium/cilium/operator/endpointgc"
 	"github.com/cilium/cilium/operator/identitygc"
 	operatorMetrics "github.com/cilium/cilium/operator/metrics"
-	operatorOption "github.com/cilium/cilium/operator/option"
+	"github.com/cilium/cilium/operator/pkg/ztunnel"
 	cmtypes "github.com/cilium/cilium/pkg/clustermesh/types"
 	"github.com/cilium/cilium/pkg/controller"
 	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
+	"github.com/cilium/cilium/pkg/kvstore"
 	"github.com/cilium/cilium/pkg/kvstore/store"
 	"github.com/cilium/cilium/pkg/option"
 	"github.com/cilium/cilium/pkg/pprof"
 	"github.com/cilium/hive/cell"
+	"github.com/cilium/statedb"
 )
 
-const operatorK8sNamespace = "kube-system"
-
 var (
+	authenticationCell = cell.Module(
+		"operator-auth",
+		"Operator Authentication",
+		ztunnel.Cell,
+		auth.Cell,
+	)
+
 	Operator = cell.Module(
 		"operator",
 		"Retina Operator",
 
-		cell.Invoke(func(l logrus.FieldLogger) {
+		cell.Invoke(func(l *slog.Logger) {
 			// to help prevent user confusion, explain why logs may include lines referencing "cilium" or "cilium operator"
 			// e.g. level=info msg="Cilium Operator  go version go1.21.4 linux/amd64" subsys=retina-operator
 			l.Info("starting hive. Some logs will say 'cilium' since some code is derived from cilium")
 		}),
 		Infrastructure,
 		ControlPlane,
+
+		// Keep this last: registerOperatorHooks does not depend on every
+		// leader-only cell, so its hook could otherwise start them too early.
+		cell.Invoke(registerOperatorHooks),
 	)
 
 	Infrastructure = cell.Module(
@@ -91,20 +102,14 @@ var (
 		// Provides Clientset, API for accessing Kubernetes objects.
 		k8sClient.Cell,
 
-		// Provides the modular metrics registry, metric HTTP server and standard metrics cell.
-		// NOTE: no server/metrics are created when --enable-metrics=false (default)
-		operatorMetrics.Cell,
-		cell.Provide(func(
-			operatorCfg *operatorOption.OperatorConfig,
-		) operatorMetrics.SharedConfig {
-			return operatorMetrics.SharedConfig{
-				// Cloud provider specific allocators needs to read operatorCfg.EnableMetrics
-				// to add their metrics when it's set to true. Therefore, we leave the flag as global
-				// instead of declaring it as part of the metrics cell.
-				// This should be changed once the IPAM allocator is modularized.
-				EnableMetrics: operatorCfg.EnableMetrics,
-			}
+		// Provide in-memory kvstore client for identity GC (not using etcd in Retina)
+		cell.Provide(func(db *statedb.DB) kvstore.Client {
+			return kvstore.NewInMemoryClient(db, "default")
 		}),
+
+		// Provides the modular metrics registry, metric HTTP server and standard metrics cell.
+		// NOTE: the metrics server only runs when --enable-metrics is set (default false).
+		operatorMetrics.Cell,
 		cell.Provide(func() *k8sruntime.Scheme {
 			scheme := k8sruntime.NewScheme()
 
@@ -115,7 +120,7 @@ var (
 		}),
 	)
 
-	// ControlPlane implements the control functions.
+	// ControlPlane contains always-on wiring; only WithLeaderLifecycle starts after election.
 	ControlPlane = cell.Module(
 		"operator-controlplane",
 		"Operator Control Plane",
@@ -129,21 +134,12 @@ var (
 			return nil
 		}),
 
-		cell.Invoke(
-			registerOperatorHooks,
-		),
-
 		cell.Provide(func() *option.DaemonConfig {
 			return option.Config
 		}),
 
-		cell.Provide(func() *operatorOption.OperatorConfig {
-			return operatorOption.Config
-		}),
-
 		cell.Provide(func(
 			daemonCfg *option.DaemonConfig,
-			_ *operatorOption.OperatorConfig,
 		) identitygc.SharedConfig {
 			return identitygc.SharedConfig{
 				IdentityAllocationMode: daemonCfg.IdentityAllocationMode,
@@ -160,11 +156,9 @@ var (
 		// }),
 
 		cell.Provide(func(
-			operatorCfg *operatorOption.OperatorConfig,
 			daemonCfg *option.DaemonConfig,
 		) endpointgc.SharedConfig {
 			return endpointgc.SharedConfig{
-				Interval:                 operatorCfg.EndpointGCInterval,
 				DisableCiliumEndpointCRD: daemonCfg.DisableCiliumEndpointCRD,
 			}
 		}),
@@ -187,8 +181,8 @@ var (
 
 			// below cluster of cells carries out Retina's custom operator logic for creating Cilium Identities and Endpoints
 			cell.Provide(func(scheme *k8sruntime.Scheme) (ctrl.Manager, error) {
-				// controller-runtime requires its own logger
-				logf.SetLogger(zapf.New())
+				// Route controller-runtime logs through Retina's zap core so they reach AI.
+				logf.SetLogger(log.LogrLogger())
 
 				manager, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 					Scheme: scheme,
@@ -214,7 +208,7 @@ var (
 
 			// NOTE: gc cells require this auth cell
 			// this cell will do nothing since --mesh-auth-mutual-enabled=false
-			auth.Cell,
+			authenticationCell,
 
 			store.Cell,
 

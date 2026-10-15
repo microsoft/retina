@@ -1,0 +1,21 @@
+apiVersion: retina.sh/v1alpha1
+kind: Capture
+metadata:
+  name: rotating-capture
+spec:
+  captureConfiguration:
+    captureOption:
+      # Per-file size limit in MB. With fileCount, creates a rotating buffer.
+      maxCaptureSize: 100
+      # Number of files in the rotating buffer. Oldest file is overwritten when limit is reached.
+      # Total buffer size = maxCaptureSize × fileCount (e.g., 100MB × 10 = 1GB)
+      fileCount: 10
+      # Optional: stop capture after this duration. Without it, capture runs until deleted.
+      # duration: 4h
+    captureTarget:
+      nodeSelector:
+        matchLabels:
+          kubernetes.io/os: linux
+    includeMetadata: true
+  outputConfiguration:
+    hostPath: /mnt/retina/captures

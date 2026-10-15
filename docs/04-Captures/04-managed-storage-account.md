@@ -28,7 +28,7 @@ spec:
         matchLabels:
           kubernetes.io/hostname: aks-nodepool1-11396069-vmss000000
   outputConfiguration:
-    hostPath: "/tmp/retina"
+    hostPath: "retina"
     blobUpload: blob-sas-url
 ```
 

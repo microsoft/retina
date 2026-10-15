@@ -1,57 +1,93 @@
 # pinned base images
 
-# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.9-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:39876189c354904163b60a5d24e5bcce52e7285a43586cbdeb1bdc243e210d46 AS golang
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
+# Pinned to $BUILDPLATFORM so the Go builds cross-compile natively from the
+# host arch (fast). The eBPF .o files, which cannot be cleanly cross-compiled
+# by bpf2go, are produced in the separate `bpf-gen` stage below (which runs
+# at $TARGETPLATFORM — native on same-arch, emulated under QEMU otherwise).
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:39876189c354904163b60a5d24e5bcce52e7285a43586cbdeb1bdc243e210d46 AS golang
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/azurelinux/base/core@sha256:7292f2bcf52c3916758f1a45aba6e4dcb93f466027d7786900ea96c2d23c48e2 AS azurelinux-core
+FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261009@sha256:7292f2bcf52c3916758f1a45aba6e4dcb93f466027d7786900ea96c2d23c48e2 AS azurelinux-core
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/distroless/minimal:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/azurelinux/distroless/minimal@sha256:792ea6ed971a69bbca863882354d4ff197ca461e0f699d0256653f7886a62d42 AS azurelinux-distroless
+FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20260923@sha256:792ea6ed971a69bbca863882354d4ff197ca461e0f699d0256653f7886a62d42 AS azurelinux-distroless
 
 # build stages
 
-# Rebuild Hubble so release binaries cannot retain an older Go runtime or x/net.
-FROM golang AS hubble-bin
-ARG HUBBLE_VERSION=v1.20.2
+# bpf-gen stage: runs at $TARGETPLATFORM (native for same-arch builds, emulated
+# via QEMU for cross-arch builds). Only responsible for producing correct eBPF
+# .o files via bpf2go/clang — those require native target-arch execution and
+# cannot be cross-compiled from an amd64 host cleanly. Isolating this work in a
+# small dedicated stage keeps the rest of the build fast at $BUILDPLATFORM.
+FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:39876189c354904163b60a5d24e5bcce52e7285a43586cbdeb1bdc243e210d46 AS bpf-gen
+ARG GOOS=linux
 ARG GOARCH=amd64
-ENV GOTOOLCHAIN=local
-ENV CGO_ENABLED=0
-ENV GOEXPERIMENT=nosystemcrypto
-RUN go mod download github.com/cilium/hubble@${HUBBLE_VERSION} && \
-    cp -a "$(go env GOMODCACHE)/github.com/cilium/hubble@${HUBBLE_VERSION}" /hubble && \
-    chmod -R u+w /hubble
-WORKDIR /hubble
-RUN go get golang.org/x/net@v0.60.0
-RUN --mount=type=cache,target="/root/.cache/go-build" \
-    GOOS=linux GOARCH=${GOARCH} go build -mod=mod \
-    -ldflags "-s -w -X github.com/cilium/cilium/hubble/pkg.Version=${HUBBLE_VERSION}" \
-    -o /out/hubble .
-
-# intermediate go generate stage
-FROM golang AS intermediate 
-ARG APP_INSIGHTS_ID # set to enable AI telemetry
-ARG GOARCH=amd64 # default to amd64
-ARG GOOS=linux # default to linux
-ENV GOARCH=${GOARCH}
 ENV GOOS=${GOOS}
+ENV GOARCH=${GOARCH}
+ENV CGO_ENABLED=0
+ENV GOEXPERIMENT=ms_nocgo_opensslcrypto
 RUN if [ "$GOOS" = "linux" ] ; then \
     tdnf install -y clang lld bpftool libbpf-devel; \
     fi
 COPY ./pkg/plugin /go/src/github.com/microsoft/retina/pkg/plugin
 WORKDIR /go/src/github.com/microsoft/retina
-RUN if [ "$GOOS" = "linux" ] ; then \
+# Sanity-check every arch-specific BPF object bpf2go produced is non-empty.
+RUN set -eu; \
+    if [ "$GOOS" = "linux" ] ; then \
     go mod init github.com/microsoft/retina; \
     go generate -skip "mockgen" -x /go/src/github.com/microsoft/retina/pkg/plugin/...; \
+    if [ "$GOARCH" = "amd64" ]; then bpf_arch=x86; else bpf_arch="$GOARCH"; fi; \
+    objects="$(find ./pkg/plugin -type f -name "*_bpfel_${bpf_arch}.o" -print)"; \
+    test -n "$objects" || { echo "no BPF objects generated for ${bpf_arch}" >&2; exit 1; }; \
+    empty_objects="$(find ./pkg/plugin -type f -name "*_bpfel_${bpf_arch}.o" ! -size +0c -print)"; \
+    test -z "$empty_objects" || { printf 'empty BPF objects:\n%s\n' "$empty_objects" >&2; exit 1; }; \
     tar czf /gen.tar.gz ./pkg/plugin; \
     rm go.mod; \
+    else \
+    tar czf /gen.tar.gz --files-from /dev/null; \
     fi
+
+# intermediate go generate stage
+FROM golang AS intermediate 
+# systemcrypto without cgo — required for arm64 cross-compile from amd64 host
+# (Go auto-disables cgo when cross-compiling, and systemcrypto in Go <=1.26
+# requires cgo unless this experiment is set). Becomes redundant with Go 1.27+.
+ENV GOEXPERIMENT=ms_nocgo_opensslcrypto
+ARG APP_INSIGHTS_ID # set to enable AI telemetry
+ARG GOARCH=amd64 # default to amd64
+ARG GOOS=linux # default to linux
+ENV GOARCH=${GOARCH}
+ENV GOOS=${GOOS}
+WORKDIR /go/src/github.com/microsoft/retina
+# eBPF .o files were built in the bpf-gen stage (at $TARGETPLATFORM). Import
+# the tarball here and extract after `COPY . .` so bpf-gen's outputs replace
+# the zero-byte placeholders checked into the repo.
+COPY --from=bpf-gen /gen.tar.gz /gen.tar.gz
 COPY ./go.mod ./go.sum ./
 RUN go mod download
 COPY . .
 RUN if [ "$GOOS" = "linux" ] ; then \
     rm -rf ./pkg/plugin && tar xvf /gen.tar.gz ./pkg/plugin; \
     fi
+
+# Hubble CLI binary built from the Cilium source pinned in go.mod.
+FROM golang AS hubble-bin
+ARG GOARCH=amd64
+ENV GOARCH=${GOARCH}
+ENV GOEXPERIMENT=ms_nocgo_opensslcrypto
+WORKDIR /go/src/github.com/microsoft/retina
+COPY ./go.mod ./go.sum ./
+RUN go mod download
+COPY ./cmd/hubble-cli ./cmd/hubble-cli
+RUN CILIUM_VERSION="$(go list -m -f '{{.Version}}' github.com/cilium/cilium)" && \
+    test -n "$CILIUM_VERSION" && \
+    CGO_ENABLED=0 go build \
+    -trimpath \
+    -tags=osusergo \
+    -ldflags="-s -w -X github.com/cilium/cilium/hubble/pkg.Version=${CILIUM_VERSION}" \
+    -o /go/bin/hubble \
+    ./cmd/hubble-cli
 
 # capture binary
 FROM intermediate AS capture-bin
@@ -85,17 +121,16 @@ RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/ret
 
 # tools image
 FROM azurelinux-core AS tools
+# Keep this pin until the Azure Linux base includes pcre2 >= 10.48-1.azl3; verify both architectures before removing.
 RUN tdnf install -y \
     clang \
     bpftool \
     iproute \
     iptables \
+    pcre2-10.48-1.azl3 \
     tcpdump \
     which \
-    wget \
-    gnupg2 \
-    ca-certificates \
-    tar
+    ca-certificates
 RUN mkdir -p /tmp/bin
 RUN arr="clang tcpdump ip ss iptables-legacy iptables-legacy-save iptables-nft iptables-nft-save cp uname" ;\
     for i in $arr; do    \
@@ -117,15 +152,13 @@ ENTRYPOINT ["./retina/initretina"]
 # mcr.microsoft.com/azurelinux/distroless/minimal:3.0
 # mcr.microsoft.com/azurelinux/distroless/minimal@sha256:792ea6ed971a69bbca863882354d4ff197ca461e0f699d0256653f7886a62d42
 FROM azurelinux-distroless AS agent
+ENV HUBBLE_SERVER=unix:///var/run/cilium/hubble.sock
 COPY --from=tools /lib/ /lib
 COPY --from=tools /usr/lib/ /usr/lib
 COPY --from=tools /etc/pki/tls/ /etc/pki/tls/
 COPY --from=tools /tmp/bin/ /bin
+COPY --from=hubble-bin /go/bin/hubble /bin/hubble
 COPY --from=controller-bin /go/bin/retina/controller /retina/controller
 COPY --from=controller-bin /go/src/github.com/microsoft/retina/pkg/plugin /go/src/github.com/microsoft/retina/pkg/plugin
 COPY --from=capture-bin /go/bin/retina/captureworkload /retina/captureworkload
-# Copy Hubble.
-COPY --from=hubble-bin /out/hubble /bin/hubble
-# Set Hubble server.
-ENV HUBBLE_SERVER=unix:///var/run/cilium/hubble.sock
 ENTRYPOINT ["./retina/controller"]
