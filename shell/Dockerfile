@@ -1,5 +1,24 @@
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.9-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
+FROM mcr.microsoft.com/oss/go/microsoft/golang@sha256:39876189c354904163b60a5d24e5bcce52e7285a43586cbdeb1bdc243e210d46 AS pwru-builder
+
+ARG GOARCH=amd64
+ARG PWRU_TAG=v1.0.12
+ENV GOTOOLCHAIN=local
+ENV GOFLAGS=-mod=mod
+ENV GOEXPERIMENT=nosystemcrypto
+RUN tdnf install -y clang flex bison gawk glibc-static
+RUN go mod download github.com/cilium/pwru@${PWRU_TAG} && \
+    cp -a "$(go env GOMODCACHE)/github.com/cilium/pwru@${PWRU_TAG}" /pwru && \
+    chmod -R u+w /pwru && \
+    chmod u+x /pwru/libpcap/configure /pwru/libpcap/config.guess /pwru/libpcap/config.sub
+WORKDIR /pwru
+# Rebuild the embedded Go runtime and dependencies, not just the release archive.
+RUN go get golang.org/x/net@v0.60.0
+RUN --mount=type=cache,target="/root/.cache/go-build" \
+    make TARGET_GOARCH=${GOARCH} VERSION=${PWRU_TAG}
+
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/azurelinux/base/core@sha256:35149ae8dd179684f969944f54a337c665a64e702486154eb44253fb39c2505b
+FROM mcr.microsoft.com/azurelinux/base/core@sha256:7292f2bcf52c3916758f1a45aba6e4dcb93f466027d7786900ea96c2d23c48e2
 
 RUN tdnf install -y \
 	bind-utils \
@@ -52,26 +71,6 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 # Set the entrypoint
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
-# Re-use existing arg from Makefile target "container-docker"
-# https://github.com/microsoft/retina/blob/main/Makefile#L224
-ARG GOARCH=amd64
-ENV ARCH=${GOARCH}
-# https://github.com/cilium/pwru/releases
-ARG PWRU_TAG="v1.0.11"
-ENV PWRU_TAG=${PWRU_TAG}
-
-# Download and extract latest pwru release for the correct architecture (amd64 or arm64)
-RUN set -eux; \
-    case "$ARCH" in \
-        amd64|x86_64) PWRU_ARCH="amd64" ;; \
-        arm64|aarch64) PWRU_ARCH="arm64" ;; \
-        *) echo "Unsupported arch: $ARCH" && exit 1 ;; \
-    esac; \
-    PWRU_TAR="pwru-linux-${PWRU_ARCH}.tar.gz"; \
-    curl -fL -o /tmp/pwru.tar.gz "https://github.com/cilium/pwru/releases/download/${PWRU_TAG}/${PWRU_TAR}"; \
-    tar -xz -C /usr/local/bin -f /tmp/pwru.tar.gz pwru; \
-    chmod +x /usr/local/bin/pwru; \
-    rm /tmp/pwru.tar.gz; \
-    file /usr/local/bin/pwru | grep -q 'ELF'
+COPY --from=pwru-builder /pwru/pwru /usr/local/bin/pwru
 
 CMD ["/bin/bash", "-l"]

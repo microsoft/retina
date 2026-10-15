@@ -1,15 +1,32 @@
 # pinned base images
 
-# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.2-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:33d887d995c314d0efbc0e8693a6821495f7b1b92516316fd9c8b43f74579dbd AS golang
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26.9-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang@sha256:39876189c354904163b60a5d24e5bcce52e7285a43586cbdeb1bdc243e210d46 AS golang
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/azurelinux/base/core@sha256:35149ae8dd179684f969944f54a337c665a64e702486154eb44253fb39c2505b AS azurelinux-core
+FROM mcr.microsoft.com/azurelinux/base/core@sha256:7292f2bcf52c3916758f1a45aba6e4dcb93f466027d7786900ea96c2d23c48e2 AS azurelinux-core
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/distroless/minimal:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/azurelinux/distroless/minimal@sha256:5a66f9f16ac675db2a8229dac72d83811b73b502d6ad192d8b374c7f3be498af AS azurelinux-distroless
+FROM mcr.microsoft.com/azurelinux/distroless/minimal@sha256:792ea6ed971a69bbca863882354d4ff197ca461e0f699d0256653f7886a62d42 AS azurelinux-distroless
 
 # build stages
+
+# Rebuild Hubble so release binaries cannot retain an older Go runtime or x/net.
+FROM golang AS hubble-bin
+ARG HUBBLE_VERSION=v1.20.2
+ARG GOARCH=amd64
+ENV GOTOOLCHAIN=local
+ENV CGO_ENABLED=0
+ENV GOEXPERIMENT=nosystemcrypto
+RUN go mod download github.com/cilium/hubble@${HUBBLE_VERSION} && \
+    cp -a "$(go env GOMODCACHE)/github.com/cilium/hubble@${HUBBLE_VERSION}" /hubble && \
+    chmod -R u+w /hubble
+WORKDIR /hubble
+RUN go get golang.org/x/net@v0.60.0
+RUN --mount=type=cache,target="/root/.cache/go-build" \
+    GOOS=linux GOARCH=${GOARCH} go build -mod=mod \
+    -ldflags "-s -w -X github.com/cilium/cilium/hubble/pkg.Version=${HUBBLE_VERSION}" \
+    -o /out/hubble .
 
 # intermediate go generate stage
 FROM golang AS intermediate 
@@ -86,18 +103,6 @@ RUN arr="clang tcpdump ip ss iptables-legacy iptables-legacy-save iptables-nft i
     done
 RUN mkdir -p /tmp/init-bin
 RUN cp $(which bpftool) /tmp/init-bin
-# Download Hubble
-ARG GOARCH=amd64
-ENV HUBBLE_ARCH=${GOARCH}
-# ARG HUBBLE_VERSION may be modified via the update-hubble GitHub Action
-ARG HUBBLE_VERSION=v1.18.6
-ENV HUBBLE_VERSION=${HUBBLE_VERSION}
-RUN echo "Hubble version: $HUBBLE_VERSION" && \
-    wget --no-check-certificate https://github.com/cilium/hubble/releases/download/$HUBBLE_VERSION/hubble-linux-${HUBBLE_ARCH}.tar.gz && \
-    wget --no-check-certificate https://github.com/cilium/hubble/releases/download/$HUBBLE_VERSION/hubble-linux-${HUBBLE_ARCH}.tar.gz.sha256sum && \
-    sha256sum --check hubble-linux-${HUBBLE_ARCH}.tar.gz.sha256sum && \
-    tar xzvfC hubble-linux-${HUBBLE_ARCH}.tar.gz /usr/local && \
-    rm hubble-linux-${HUBBLE_ARCH}.tar.gz && rm hubble-linux-${HUBBLE_ARCH}.tar.gz.sha256sum
 
 # init final image
 FROM azurelinux-distroless AS init
@@ -110,7 +115,7 @@ ENTRYPOINT ["./retina/initretina"]
 
 # agent final image
 # mcr.microsoft.com/azurelinux/distroless/minimal:3.0
-# mcr.microsoft.com/azurelinux/distroless/minimal@sha256:5a66f9f16ac675db2a8229dac72d83811b73b502d6ad192d8b374c7f3be498af
+# mcr.microsoft.com/azurelinux/distroless/minimal@sha256:792ea6ed971a69bbca863882354d4ff197ca461e0f699d0256653f7886a62d42
 FROM azurelinux-distroless AS agent
 COPY --from=tools /lib/ /lib
 COPY --from=tools /usr/lib/ /usr/lib
@@ -120,7 +125,7 @@ COPY --from=controller-bin /go/bin/retina/controller /retina/controller
 COPY --from=controller-bin /go/src/github.com/microsoft/retina/pkg/plugin /go/src/github.com/microsoft/retina/pkg/plugin
 COPY --from=capture-bin /go/bin/retina/captureworkload /retina/captureworkload
 # Copy Hubble.
-COPY --from=tools /usr/local/hubble /bin/hubble
+COPY --from=hubble-bin /out/hubble /bin/hubble
 # Set Hubble server.
 ENV HUBBLE_SERVER=unix:///var/run/cilium/hubble.sock
 ENTRYPOINT ["./retina/controller"]

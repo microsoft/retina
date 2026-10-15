@@ -90,6 +90,30 @@ make retina-image # also pushes to image registry
 make retina-operator-image
 ```
 
+### Scanning container images
+
+Build and load all five Linux images locally before scanning them:
+
+```bash
+make retina-image retina-operator-image kubectl-retina-image retina-shell-image \
+  PLATFORM=linux/amd64 TAG=security-review OUTPUT_LOCAL= BUILDX_ACTION=--load
+
+for image in retina-agent retina-init retina-operator kubectl-retina retina-shell; do
+  trivy image --image-src docker --scanners vuln \
+    "ghcr.io/<owner>/retina/${image}:security-review-linux-amd64"
+done
+```
+
+Replace `<owner>` with the owner of your fork. Scan all severities, including
+unfixed findings, and keep before/after reports with the image IDs and Trivy
+database timestamp when updating dependencies. Package findings do not establish
+that a vulnerable function is reachable.
+
+The agent and shell images rebuild Hubble and pwru from their versioned Go
+modules using the pinned Go builder and patched `golang.org/x/net`. Updating only
+the root `go.mod` does not update these independent binaries. Keep the Hubble
+default in `Makefile` and `controller/Dockerfile` synchronized.
+
 To build binary of a plugin and test it
 
 ```bash
