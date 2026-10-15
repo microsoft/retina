@@ -101,8 +101,12 @@ var createExample = templates.Examples(i18n.T(`
 		# (joined under the operator-configured base directory; default /var/log/retina/captures/testcapture)
 		kubectl retina capture create --host-path testcapture --node-names "<nodename1>,<nodename2>"
 
-		# Select pods determined by pod-selectors and namespace-selectors
+		# Select pods determined by pod-selectors and namespace-selectors.
+		# --namespace is where the capture Jobs run; --namespace-selectors picks the namespaces that are searched for target pods.
 		kubectl retina capture create --namespace capture --pod-selectors="k8s-app=kube-dns" --namespace-selectors="kubernetes.io/metadata.name=kube-system"
+
+		# Select pods in several namespaces that share a label (namespace selectors are labels, not namespace names)
+		kubectl retina capture create --namespace capture --pod-selectors="app=my-app" --namespace-selectors="capture-group=my-group"
 
 		# Select specific pods by name
 		kubectl retina capture create --namespace default --pod-names "pod1,pod2" --duration 30s
@@ -137,6 +141,14 @@ var createExample = templates.Examples(i18n.T(`
 			--s3-secret-access-key "your-secret-access-key"
 		`))
 
+// logTargetNamespaceSelector explains that --namespace-selectors, not --namespace, decided which namespaces were searched for target pods.
+func logTargetNamespaceSelector() {
+	if opts.namespaceSelectors == "" {
+		return
+	}
+	retinacmd.Logger.Info(fmt.Sprintf("Target pods were selected from namespaces matching %q; --namespace only sets where the capture Jobs run", opts.namespaceSelectors))
+}
+
 func create(kubeClient kubernetes.Interface) error {
 	// Set namespace. If --namespace is not set, use namespace on user's context
 	ns, _, err := opts.ConfigFlags.ToRawKubeConfigLoader().Namespace()
@@ -167,6 +179,9 @@ func create(kubeClient kubernetes.Interface) error {
 		retinacmd.Logger.Error("Failed to create job", zap.Error(err))
 		return err
 	}
+
+	// Logged only once the target selection has been validated and resolved, so it never accompanies an invalid flag combination.
+	logTargetNamespaceSelector()
 
 	// Set owner references on secrets so they are garbage-collected when the
 	// jobs are removed (by TTL, explicit deletion, or manual kubectl delete).
@@ -281,11 +296,13 @@ func NewCreateSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 	createCapture.Flags().StringVar(&opts.nodeNames, "node-names", "", "A comma-separated list of node names to select nodes on which the network capture will be performed")
 	createCapture.Flags().StringVar(&opts.nodeSelectors, "node-selectors", DefaultNodeSelectors, "A comma-separated list of node labels to select nodes on which the network capture will be performed")
 	createCapture.Flags().StringVar(&opts.podNames, "pod-names", "",
-		"A comma-separated list of pod names to select specific pods on which the network capture will be performed (must be in the specified namespace)")
+		"A comma-separated list of pod names to select specific pods on which the network capture will be performed (looked up in the namespace set by --namespace)")
 	createCapture.Flags().StringVar(&opts.podSelectors, "pod-selectors", "",
-		"A comma-separated list of pod labels to select pods on which the network capture will be performed")
+		"A comma-separated list of pod labels (key=value, all must match) to select pods on which the network capture will be performed. "+
+			"Pods are looked up in the namespaces selected by --namespace-selectors, or in the namespace set by --namespace if it is not set")
 	createCapture.Flags().StringVar(&opts.namespaceSelectors, "namespace-selectors", "",
-		"A comma-separated list of namespace labels to filter which namespaces will be targeted for packet capture (used with --pod-selectors)")
+		"A comma-separated list of namespace labels (key=value, all must match) selecting the namespaces in which --pod-selectors are evaluated. "+
+			"These are label selectors, not namespace names. Requires --pod-selectors. When set, --namespace does not scope the target pods; it only sets where the capture Jobs run")
 	createCapture.Flags().StringVar(&opts.hostPath, "host-path", DefaultHostPath,
 		"Subpath name (joined under --host-path-base-dir) for capture artifacts on the node. Must be a relative subpath and must not contain '..'.")
 	createCapture.Flags().StringVar(&opts.hostPathBaseDir, "host-path-base-dir", DefaultHostPathBaseDir, "Absolute base directory on the node under which --host-path is joined")
@@ -489,6 +506,8 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 		retinacmd.Logger.Info(fmt.Sprintf("The capture duration is set to %s", opts.duration))
 		capture.Spec.CaptureConfiguration.CaptureOption.Duration = &metav1.Duration{Duration: opts.duration}
 	}
+
+	retinacmd.Logger.Info(fmt.Sprintf("Capture Jobs will be created in namespace %q", *opts.Namespace))
 
 	if opts.namespaceSelectors != "" || opts.podSelectors != "" || opts.podNames != "" || opts.nodeNames != "" {
 		// if node selector is using the default value (aka hasn't been set by user), set it to nil to prevent clash

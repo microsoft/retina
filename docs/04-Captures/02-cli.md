@@ -81,6 +81,31 @@ If nothing is set, `kubectl retina capture create` will use `--node-selectors` w
 
 You can find [target selection examples](#target-selection) below.
 
+##### `--namespace` vs `--namespace-selectors`
+
+These two flags answer different questions:
+
+| Flag | Question it answers | Value |
+|------|---------------------|-------|
+| `--namespace` | **Where do the capture Jobs run?** (Jobs, Secrets, PVC) | A single namespace name. Defaults to the namespace of your current kubeconfig context. |
+| `--namespace-selectors` | **Which namespaces are searched for target pods?** | Namespace *labels* (`key=value`, comma-separated, all must match), not namespace names. |
+
+How they interact when targeting pods:
+
+| Flags | Pods are looked up in |
+|-------|-----------------------|
+| `--pod-selectors` (no `--namespace-selectors`) | Only the `--namespace` namespace |
+| `--pod-selectors` and `--namespace-selectors` | All namespaces matching the namespace selector. `--namespace` is **not** included automatically and only sets where the Jobs run |
+| `--pod-names` | Only the `--namespace` namespace (pod names cannot span namespaces) |
+
+Notes:
+
+- `--namespace` accepts a single namespace; it is not a list. To capture pods in several namespaces, label those namespaces with a shared label and select it with `--namespace-selectors`.
+- Selector flags are not repeatable and do not support OR. `a=1,b=2` means label `a=1` **and** `b=2`. Repeating a key (for example `kubernetes.io/metadata.name=ns-a,kubernetes.io/metadata.name=ns-b`) does not select both values.
+- Capture Jobs run with host networking and filter by pod IP, so the namespace they run in does not change which traffic is captured when `--namespace-selectors` is used. It does determine which admission policies apply and where `capture list`, `delete`, and `download` find the Jobs.
+- If `--namespace-selectors` matches no namespaces, the command fails with `no namespaces match the namespace selector`.
+- The CLI logs the namespace where Jobs are created and, for pod selectors, the resolved target namespaces, pod count, and node count.
+
 #### Configuring the Output Location
 
 The output configuration indicates the location where the capture will be stored. At least one location needs to be specified. This can either be the host path on the node, or a remote storage option. `--host-path` has a default value, so captures are stored on the node unless it is explicitly set to an empty string.
@@ -121,8 +146,8 @@ The network traffic will be uploaded to the specified output location.
 | `job-num-limit`       | int        | 0        | The maximum number of jobs which can be created for each capture. The default value 0 indicates no limit. This can be configured by CLI flags for each CLI command, or by a config map consumed by the retina-operator. When creating a job requires job number exceeds this limit, it will fail with prompt like `Error: the number of capture jobs 3 exceeds the limit 2`. |       |
 | `max-size`            | int        | 100      | Maximum size of the capture file in MB. When used with `--file-count`, this becomes the per-file size limit for rotating captures. | Only works on Linux.      |
 | `name`                | string     | retina-capture | A name for the Retina Capture.                                              |       |
-| `namespace`           | string     | default  | Sets the namespace which hosts the capture job and the other Kubernetes resources for a network capture. | Ensure the namespace exists.      |
-| `namespace-selectors` | string     | ""       | Capture network captures on pods filtered by the provided namespace selectors. | Requires `pod-selectors`; not compatible with `node-selectors`, `node-names`, or `pod-names`.      |
+| `namespace`           | string     | default  | Namespace where the capture Jobs and other Kubernetes resources for a network capture are created (a single namespace; defaults to your kubeconfig context namespace). For `create`, it also scopes `pod-names` and `pod-selectors` when `namespace-selectors` is not set. | Ensure the namespace exists. See [`--namespace` vs `--namespace-selectors`](#--namespace-vs---namespace-selectors).      |
+| `namespace-selectors` | string     | ""       | Comma-separated namespace **labels** (`key=value`, all must match; not namespace names) selecting the namespaces in which `pod-selectors` are evaluated. When set, `--namespace` does not scope target pods. | Requires `pod-selectors`; not compatible with `node-selectors`, `node-names`, or `pod-names`.      |
 | `node-names`          | string     | ""       | A comma-separated list of node names to select nodes on which the network capture will be performed. | Overrides the default `node-selectors` value, allowing captures on nodes of any OS (including Windows). Not compatible with `pod-selectors`, `namespace-selectors`, or `pod-names`. |
 | `node-selectors`      | string     | kubernetes.io/os=linux | A comma-separated list of node labels to select nodes on which the network capture will be performed. | The default value is cleared automatically when `node-names`, `pod-selectors`, `pod-names`, or `namespace-selectors` are specified. A non-default value is not compatible with `pod-selectors`, `namespace-selectors`, or `pod-names`. |
 | `no-wait`             | bool       | true     | By default, Retina capture CLI will exit before the jobs are completed. If false, the CLI will wait until the jobs are completed and clean up the Kubernetes resources created. |       |
@@ -178,11 +203,25 @@ kubectl retina capture create \
 
 Pod Selectors & Namespace Selectors (Pairs)
 
+`--namespace` is where the capture Jobs run; `--namespace-selectors` selects the namespaces searched for target pods.
+
 ```sh
 kubectl retina capture create \
   --name example-pod-namespace-selectors \
   --pod-selectors="k8s-app=kube-dns" \
   --namespace-selectors="kubernetes.io/metadata.name=kube-system"
+```
+
+Pods in Several Namespaces (shared namespace label)
+
+```sh
+kubectl label namespace app-a app-b capture-group=my-group
+
+kubectl retina capture create \
+  --name example-multi-namespace \
+  --namespace retina-captures \
+  --pod-selectors="app=my-app" \
+  --namespace-selectors="capture-group=my-group"
 ```
 
 Pod Selectors without Namespace Selectors (scoped to `--namespace`)

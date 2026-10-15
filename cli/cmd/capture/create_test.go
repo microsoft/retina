@@ -386,6 +386,91 @@ func TestCreateCaptureCommand_PodNamesClearsDefaultNodeSelector(t *testing.T) {
 	require.Nil(t, capture.Spec.CaptureConfiguration.CaptureTarget.NodeSelector)
 }
 
+// observeLogs swaps the CLI logger for an in-memory one for the duration of the test.
+func observeLogs(t *testing.T) *observer.ObservedLogs {
+	t.Helper()
+	core, observedLogs := observer.New(zap.InfoLevel)
+	originalLogger := retinacmd.Logger
+	retinacmd.Logger = &retinalog.ZapLogger{Logger: zap.New(core)}
+	t.Cleanup(func() { retinacmd.Logger = originalLogger })
+	return observedLogs
+}
+
+func TestCreateCaptureLogsJobNamespaceButNotSelectorBeforeValidation(t *testing.T) {
+	savedNodeSelectors := opts.nodeSelectors
+	savedPodSelectors := opts.podSelectors
+	savedNamespaceSelectors := opts.namespaceSelectors
+	savedNamespace := opts.Namespace
+	savedName := opts.Name
+	t.Cleanup(func() {
+		opts.nodeSelectors = savedNodeSelectors
+		opts.podSelectors = savedPodSelectors
+		opts.namespaceSelectors = savedNamespaceSelectors
+		opts.Namespace = savedNamespace
+		opts.Name = savedName
+	})
+
+	name := "test-capture"
+	namespace := "capture-ns"
+	opts.nodeSelectors = DefaultNodeSelectors
+	opts.podSelectors = "app=my-app"
+	opts.namespaceSelectors = "capture-group=my-group"
+	opts.Namespace = &namespace
+	opts.Name = &name
+	observedLogs := observeLogs(t)
+
+	_, err := createCaptureF(context.Background(), fake.NewClientset())
+	require.NoError(t, err)
+
+	jobNamespaceLogs := observedLogs.FilterMessage(`Capture Jobs will be created in namespace "capture-ns"`).All()
+	require.Len(t, jobNamespaceLogs, 1)
+	require.Zero(t, observedLogs.FilterMessageSnippet("Target pods were selected").Len(),
+		"the selector message must wait until the target selection has been validated")
+}
+
+func TestLogTargetNamespaceSelector(t *testing.T) {
+	savedNamespaceSelectors := opts.namespaceSelectors
+	t.Cleanup(func() { opts.namespaceSelectors = savedNamespaceSelectors })
+
+	t.Run("logs which namespaces were searched when namespace selectors are set", func(t *testing.T) {
+		opts.namespaceSelectors = "capture-group=my-group"
+		observedLogs := observeLogs(t)
+
+		logTargetNamespaceSelector()
+
+		logs := observedLogs.All()
+		require.Len(t, logs, 1)
+		require.Contains(t, logs[0].Message, `"capture-group=my-group"`)
+		require.Contains(t, logs[0].Message, "--namespace only sets where the capture Jobs run")
+	})
+
+	t.Run("logs nothing without namespace selectors", func(t *testing.T) {
+		opts.namespaceSelectors = ""
+		observedLogs := observeLogs(t)
+
+		logTargetNamespaceSelector()
+
+		require.Zero(t, observedLogs.Len())
+	})
+}
+
+func TestNamespaceFlagsHelpExplainTheDifference(t *testing.T) {
+	capture := NewCommand(fake.NewClientset())
+
+	namespaceFlag := capture.PersistentFlags().Lookup("namespace")
+	require.NotNil(t, namespaceFlag)
+	require.Contains(t, namespaceFlag.Usage, "capture Jobs")
+	require.Contains(t, namespaceFlag.Usage, "--namespace-selectors")
+
+	createCmd, _, err := capture.Find([]string{"create"})
+	require.NoError(t, err)
+
+	namespaceSelectorsFlag := createCmd.Flags().Lookup("namespace-selectors")
+	require.NotNil(t, namespaceSelectorsFlag)
+	require.Contains(t, namespaceSelectorsFlag.Usage, "not namespace names")
+	require.Contains(t, namespaceSelectorsFlag.Usage, "--namespace does not scope the target pods")
+}
+
 func TestParseIPList(t *testing.T) {
 	cases := []struct {
 		name    string

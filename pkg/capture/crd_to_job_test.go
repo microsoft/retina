@@ -513,6 +513,29 @@ func Test_CaptureToPodTranslator_GetCaptureTargetsOnNode(t *testing.T) {
 	}
 }
 
+func Test_CaptureToPodTranslator_getCaptureTargetsOnNode_NoNamespacesMatchSelector(t *testing.T) {
+	ctx, cancel := TestContext(t)
+	defer cancel()
+
+	k8sClient := fakeclientset.NewSimpleClientset(
+		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "other-ns", Labels: map[string]string{"name": "other-ns"}}},
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "target", Namespace: "other-ns", Labels: map[string]string{"app": "target"}},
+			Spec:       corev1.PodSpec{NodeName: "node1"},
+			Status:     corev1.PodStatus{PodIPs: []corev1.PodIP{{IP: "10.244.0.9"}}},
+		},
+	)
+	captureToPodTranslator := NewCaptureToPodTranslatorForTest(k8sClient)
+
+	_, err := captureToPodTranslator.getCaptureTargetsOnNode(ctx, retinav1alpha1.CaptureTarget{
+		NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"name": "missing-ns"}},
+		PodSelector:       &metav1.LabelSelector{MatchLabels: map[string]string{"app": "target"}},
+	}, "default")
+
+	require.ErrorIs(t, err, errNoNamespacesMatch)
+	require.ErrorContains(t, err, "name=missing-ns")
+}
+
 func Test_CaptureToPodTranslator_updateCaptureTargetsOSOnNode(t *testing.T) {
 	ctx, cancel := TestContext(t)
 	defer cancel()
