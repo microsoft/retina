@@ -56,7 +56,9 @@ SUBSCRIPTION_ID=""
 RESOURCE_GROUP_NAME=""
 REGION=""
 MSI_CLIENT_ID=""
-helm upgrade --install retina ./deploy/standard/manifests/controller/helm/retina/ \
+VERSION=$( curl -sL https://api.github.com/repos/microsoft/retina/releases/latest | jq -r .name)
+helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
+  --version $VERSION \
   --set operator.enabled=true \
   --set capture.enableManagedStorageAccount=true \
   --set capture.tenantId=$TENANT_ID \

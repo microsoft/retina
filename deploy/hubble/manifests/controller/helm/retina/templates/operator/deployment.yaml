@@ -47,7 +47,7 @@ spec:
       securityContext:
         {{- toYaml .Values.operator.podSecurityContext | nindent 8 }}
       containers:
-        - image: {{ .Values.operator.repository }}:{{ .Values.operator.tag }}
+        - image: {{ .Values.operator.repository }}:{{ .Values.operator.tag | default .Chart.Version }}
           imagePullPolicy: {{ .Values.operator.pullPolicy }}
           name: retina-operator
           {{- if .Values.operator.container.command }}
