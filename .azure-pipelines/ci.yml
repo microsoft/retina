@@ -509,6 +509,8 @@ extends:
                 AZURE_RESOURCE_GROUP: retina-dalec-$(Build.BuildId)-$(System.JobAttempt)
               steps:
                 - checkout: self
+                  # OneBranch adds its own checkout; keep scripts at the source root.
+                  path: s
                   fetchDepth: 1
                 - bash: |
                     set -euo pipefail

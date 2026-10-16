@@ -37,6 +37,8 @@ class PipelineTests(unittest.TestCase):
         job = stage["jobs"][0]
         self.assertEqual(job["pool"], {"type": "linux", "runOnHost": True})
         steps = job["steps"]
+        checkout = next(step for step in steps if step.get("checkout") == "self")
+        self.assertEqual(checkout["path"], "s")
         self.assertFalse(any(step.get("task") == "DownloadPipelineArtifact@2" for step in steps))
         validation = next(
             step for step in steps
