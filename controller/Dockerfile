@@ -8,7 +8,7 @@
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:39876189c354904163b60a5d24e5bcce52e7285a43586cbdeb1bdc243e210d46 AS golang
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261009@sha256:7292f2bcf52c3916758f1a45aba6e4dcb93f466027d7786900ea96c2d23c48e2 AS azurelinux-core
+FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261015@sha256:af39b0587a0fd132e574faabf9aaf56833d69908b9ff227131d519ee219759e7 AS azurelinux-core
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/distroless/minimal:3.0 --format "{{.Name}}@{{.Digest}}"
 FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20260923@sha256:792ea6ed971a69bbca863882354d4ff197ca461e0f699d0256653f7886a62d42 AS azurelinux-distroless
