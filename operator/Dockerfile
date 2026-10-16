@@ -1,5 +1,5 @@
 # skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:2de38140ac3783ac72ea4481c51ca5c03943cfa032b1776769a1e185918bd027 AS builder
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:39876189c354904163b60a5d24e5bcce52e7285a43586cbdeb1bdc243e210d46 AS builder
 
 # systemcrypto without cgo — required for arm64 cross-compile from amd64 host.
 # Becomes redundant with Go 1.27+ (auto-selected when CGO_ENABLED=0).
