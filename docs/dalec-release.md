@@ -6,10 +6,9 @@ https://github-private.visualstudio.com/microsoft/_build?definitionId=1195
 
 Its YAML is `.azure-pipelines/ci.yml`. Set `runDalecE2E: true` to test supplied
 candidate images without rebuilding them. The default remains normal CI.
-The earlier standalone `.pipelines/retina-dalec-e2e.yml` and definitions
-1217 / 484261 are legacy alternatives, not the activation target. No new
-pipeline registration is needed. This integration does not use ACN's Function
-App or existing ACN E2E/release pipelines.
+No standalone E2E pipeline is introduced or required; no new pipeline
+registration is needed. This integration does not use ACN's Function App or
+existing ACN E2E/release pipelines.
 
 ## Release flow
 

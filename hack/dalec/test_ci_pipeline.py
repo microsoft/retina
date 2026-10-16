@@ -25,6 +25,9 @@ class PipelineTests(unittest.TestCase):
         self.assertIs(self.parameters["runDalecE2E"]["default"], False)
         self.assertIs(self.parameters["runE2EValidation"]["default"], False)
 
+    def test_no_standalone_pipeline_is_shipped(self):
+        self.assertFalse((ROOT / ".pipelines/retina-dalec-e2e.yml").exists())
+
     def test_normal_stages_are_excluded_from_dalec_mode(self):
         normal = self.stages[0]["${{ if eq(parameters.runDalecE2E, false) }}"]
         self.assertEqual([stage["stage"] for stage in normal], ["build", "test"])
