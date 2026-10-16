@@ -21,6 +21,9 @@ spec:
         k8s-app: {{ include "retina.name" . }}
         app.kubernetes.io/name: {{ include "retina.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name }}
+        {{- with .Values.agent.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       annotations:
         prometheus.io/port: "{{ .Values.retinaPort }}"
         prometheus.io/scrape: "true"
