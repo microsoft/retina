@@ -104,10 +104,6 @@ func (i *InstallHelmChart) Run() error {
 		overrides["logLevel"] = "error"
 	}
 
-	if err := applyImageOverrides(overrides, false); err != nil {
-		return err
-	}
-
 	getclient := action.NewGet(actionConfig)
 	_, err = getclient.Run(i.ReleaseName)
 	switch {

@@ -71,11 +71,6 @@ func (u *UpgradeRetinaHelmChart) Run() error {
 	if err != nil {
 		return fmt.Errorf("failed to merge values: %w", err)
 	}
-	// client.ReuseValues above already coalesces the release's stored values,
-	// so only the Dalec image overrides need to be layered on here.
-	if err := applyImageOverrides(values, false); err != nil {
-		return err
-	}
 	// logs values to be set during upgrade
 	log.Printf("values to be set during upgrade: %v\n", values)
 

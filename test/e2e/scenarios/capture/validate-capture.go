@@ -53,10 +53,9 @@ func (v *validateCapture) Run() error {
 	log.Print("Running retina capture create...")
 	ctx := context.TODO()
 
-	agentImage, err := generic.Image(generic.AgentImageEnv, "retina-agent")
-	if err != nil {
-		return err
-	}
+	imageRegistry := os.Getenv(generic.DefaultImageRegistry)
+	imageNamespace := os.Getenv(generic.DefaultImageNamespace)
+	imageTag := os.Getenv(generic.DefaultTagEnv)
 
 	os.Setenv("KUBECONFIG", v.KubeConfigPath)
 	log.Printf("KUBECONFIG: %s\n", os.Getenv("KUBECONFIG"))
@@ -69,7 +68,7 @@ func (v *validateCapture) Run() error {
 		args = append(args, "--destination-ips", v.DestinationIPs)
 	}
 	cmd := exec.CommandContext(ctx, "kubectl", args...) //#nosec
-	cmd.Env = append(os.Environ(), generic.AgentImageEnv+"="+agentImage)
+	cmd.Env = append(os.Environ(), "RETINA_AGENT_IMAGE="+filepath.Join(imageRegistry, imageNamespace, "retina-agent:"+imageTag))
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {

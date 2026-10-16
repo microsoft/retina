@@ -18,7 +18,6 @@ operator:
   enabled: true
   replicas: 1
   repository: acndev.azurecr.io/retina-operator
-  override: ""
   pullPolicy: Always
   tag: "latest"
   leaderElection: true
@@ -61,14 +60,11 @@ agent:
   enabled: true
   name: retina-agent
   repository: acndev.azurecr.io/retina-agent
-  override: ""
-  windowsOverride: ""
   tag: "latest"
   init:
     enabled: true
     name: retina-agent-init
     repository: ghcr.io/microsoft/retina/retina-init
-    override: ""
 
     tag: "latest"
   pullPolicy: Always

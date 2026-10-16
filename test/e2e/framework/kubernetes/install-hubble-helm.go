@@ -106,9 +106,6 @@ func (v *InstallHubbleHelmChart) Run() error {
 			},
 		},
 	}
-	if err := applyImageOverrides(overrides, true); err != nil {
-		return err
-	}
 
 	getclient := action.NewGet(actionConfig)
 	_, err = getclient.Run(v.ReleaseName)

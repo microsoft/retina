@@ -11,8 +11,6 @@ operator:
   name: retina-operator
   enabled: false
   repository: ghcr.io/microsoft/retina/retina-operator
-  # Full image reference; takes precedence over repository and tag.
-  override: ""
   tag: "v0.0.2"
   installCRDs: true
   enableRetinaEndpoint: false
@@ -48,9 +46,6 @@ operator:
 image:
   repository: ghcr.io/microsoft/retina/retina-agent
   initRepository: ghcr.io/microsoft/retina/retina-init
-  override: ""
-  initOverride: ""
-  windowsOverride: ""
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
   tag: "v0.0.2"
