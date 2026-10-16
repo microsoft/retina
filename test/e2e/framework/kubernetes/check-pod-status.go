@@ -61,6 +61,9 @@ func (w *WaitPodsReady) Stop() error {
 func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, namespace, labelSelector string) error {
 
 	printIterator := 0
+	// Retry a pod list error only when ctx has a deadline, so that the wait
+	// still ends if the API server does not come back.
+	_, retryListErrors := ctx.Deadline()
 	conditionFunc := wait.ConditionWithContextFunc(func(context.Context) (bool, error) {
 		defer func() {
 			printIterator++
@@ -68,7 +71,11 @@ func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, names
 		var podList *corev1.PodList
 		podList, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 		if err != nil {
-			return false, fmt.Errorf("error listing Pods: %w", err)
+			if !retryListErrors {
+				return false, fmt.Errorf("error listing Pods: %w", err)
+			}
+			log.Printf("error listing pods in namespace \"%s\" with label \"%s\", retrying: %v", namespace, labelSelector, err)
+			return false, nil
 		}
 
 		if len(podList.Items) == 0 {
