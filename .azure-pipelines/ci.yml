@@ -13,6 +13,8 @@
 #     requests on the Microsoft-hosted pool under the same pipeline name.
 #   - Manual queue from ADO UI -> build only by default. Set runE2EValidation
 #     to publish branch images, generate manifests, and run e2e.
+#   - Dalec hook or manual queue with runDalecE2E -> test the supplied immutable
+#     candidate imageSet only. No CI image builds, pushes, or manifests run.
 #
 # The pipeline extends the OneBranch NonOfficial template, so jobs run on the
 # OneBranch-managed pool instead of the Microsoft-hosted "Azure Pipelines"
@@ -53,6 +55,23 @@ parameters:
     displayName: Publish branch images and run E2E
     type: boolean
     default: false
+  - name: runDalecE2E
+    displayName: Test Dalec candidate images without rebuilding
+    type: boolean
+    default: false
+  - name: dalecAzureServiceConnection
+    displayName: Azure connection authorized for Dalec E2E
+    type: string
+    default: r2d
+  - name: dalecLocation
+    type: string
+    default: westus2
+  - name: imageVersion
+    type: string
+    default: ""
+  - name: imageSet
+    type: object
+    default: {}
 
 variables:
   - name: LinuxContainerImage
@@ -107,363 +126,491 @@ extends:
     # pipeline, for example "CI (Build Images) (Build Agent Images - Linux amd64)".
     # The stage and job display names below compose to exactly those names.
     stages:
-      - stage: build
-        displayName: Build
-        jobs:
-          - ${{ each arch in split('amd64,arm64', ',') }}:
-            - template: /.azure-pipelines/jobs/onebranch-linux-image.yml@self
-              parameters:
-                name: retina_linux_${{ arch }}
-                displayName: Agent Images - Linux ${{ arch }}
-                arch: ${{ arch }}
-                dockerfile: controller/Dockerfile
-                publish: ${{ or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}
-                images:
-                  - repository: retina-init
-                    target: init
-                  - repository: retina-agent
-                    target: agent
+      - ${{ if eq(parameters.runDalecE2E, false) }}:
+        - stage: build
+          displayName: Build
+          jobs:
+            - ${{ each arch in split('amd64,arm64', ',') }}:
+              - template: /.azure-pipelines/jobs/onebranch-linux-image.yml@self
+                parameters:
+                  name: retina_linux_${{ arch }}
+                  displayName: Agent Images - Linux ${{ arch }}
+                  arch: ${{ arch }}
+                  dockerfile: controller/Dockerfile
+                  publish: ${{ or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}
+                  images:
+                    - repository: retina-init
+                      target: init
+                    - repository: retina-agent
+                      target: agent
 
-            - template: /.azure-pipelines/jobs/onebranch-linux-image.yml@self
-              parameters:
-                name: operator_linux_${{ arch }}
-                displayName: Operator Images ${{ arch }}
-                arch: ${{ arch }}
-                dockerfile: operator/Dockerfile
-                publish: ${{ or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}
-                images:
-                  - repository: retina-operator
-                    target: ''
+              - template: /.azure-pipelines/jobs/onebranch-linux-image.yml@self
+                parameters:
+                  name: operator_linux_${{ arch }}
+                  displayName: Operator Images ${{ arch }}
+                  arch: ${{ arch }}
+                  dockerfile: operator/Dockerfile
+                  publish: ${{ or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}
+                  images:
+                    - repository: retina-operator
+                      target: ''
 
-            - template: /.azure-pipelines/jobs/onebranch-linux-image.yml@self
-              parameters:
-                name: shell_linux_${{ arch }}
-                displayName: Retina Shell Images ${{ arch }}
-                arch: ${{ arch }}
-                dockerfile: shell/Dockerfile
-                publish: ${{ or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}
-                images:
-                  - repository: retina-shell
-                    target: ''
+              - template: /.azure-pipelines/jobs/onebranch-linux-image.yml@self
+                parameters:
+                  name: shell_linux_${{ arch }}
+                  displayName: Retina Shell Images ${{ arch }}
+                  arch: ${{ arch }}
+                  dockerfile: shell/Dockerfile
+                  publish: ${{ or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}
+                  images:
+                    - repository: retina-shell
+                      target: ''
 
-            - template: /.azure-pipelines/jobs/onebranch-linux-image.yml@self
-              parameters:
-                name: kubectl_linux_${{ arch }}
-                displayName: Kubectl Retina Images ${{ arch }}
-                arch: ${{ arch }}
-                dockerfile: cli/Dockerfile
-                publish: ${{ or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}
-                images:
-                  - repository: kubectl-retina
-                    target: ''
+              - template: /.azure-pipelines/jobs/onebranch-linux-image.yml@self
+                parameters:
+                  name: kubectl_linux_${{ arch }}
+                  displayName: Kubectl Retina Images ${{ arch }}
+                  arch: ${{ arch }}
+                  dockerfile: cli/Dockerfile
+                  publish: ${{ or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}
+                  images:
+                    - repository: kubectl-retina
+                      target: ''
 
-          - job: windows_binaries
-            displayName: Windows Binaries
-            timeoutInMinutes: 30
-            pool:
-              type: linux
-            variables:
-              ob_outputDirectory: $(Build.SourcesDirectory)/out
-              # Dry runs embed no telemetry key, the same as the Linux image jobs.
-              ${{ if or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}:
-                appInsightsId: $(AZURE_APP_INSIGHTS_KEY)
-              ${{ else }}:
-                appInsightsId: ''
-            steps:
-              - bash: |
-                  set -euo pipefail
-                  make build-windows-binaries \
-                    GOOS=windows \
-                    GOARCH=amd64 \
-                    TAG=$(TAG) \
-                    APP_INSIGHTS_ID=$APP_INSIGHTS_ID
-                  mkdir -p "$(ob_outputDirectory)/windows_amd64"
-                  cp output/windows_amd64/*.exe "$(ob_outputDirectory)/windows_amd64/"
-                displayName: make build-windows-binaries
-                env:
-                  APP_INSIGHTS_ID: $(appInsightsId)
+            - job: windows_binaries
+              displayName: Windows Binaries
+              timeoutInMinutes: 30
+              pool:
+                type: linux
+              variables:
+                ob_outputDirectory: $(Build.SourcesDirectory)/out
+                # Dry runs embed no telemetry key, the same as the Linux image jobs.
+                ${{ if or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}:
+                  appInsightsId: $(AZURE_APP_INSIGHTS_KEY)
+                ${{ else }}:
+                  appInsightsId: ''
+              steps:
+                - bash: |
+                    set -euo pipefail
+                    make build-windows-binaries \
+                      GOOS=windows \
+                      GOARCH=amd64 \
+                      TAG=$(TAG) \
+                      APP_INSIGHTS_ID=$APP_INSIGHTS_ID
+                    mkdir -p "$(ob_outputDirectory)/windows_amd64"
+                    cp output/windows_amd64/*.exe "$(ob_outputDirectory)/windows_amd64/"
+                  displayName: make build-windows-binaries
+                  env:
+                    APP_INSIGHTS_ID: $(appInsightsId)
 
-          - job: retina_windows
-            displayName: Agent Image - Windows 2022
-            dependsOn: windows_binaries
-            timeoutInMinutes: 60
-            pool:
-              type: docker
-              os: windows
-            variables:
-              ob_outputDirectory: $(Build.SourcesDirectory)/out
-              ob_git_checkout: true
-            steps:
-              # The drop of the windows_binaries job holds windows_amd64/*.exe.
-              # OneBranch docker jobs check the repo out to s/dst, and that
-              # directory is the docker build context.
-              - task: DownloadPipelineArtifact@2
-                displayName: Download Windows binaries
-                inputs:
-                  artifact: drop_build_windows_binaries
-                  targetPath: $(Build.SourcesDirectory)/dst/output
-              - ${{ if or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}:
+            - job: retina_windows
+              displayName: Agent Image - Windows 2022
+              dependsOn: windows_binaries
+              timeoutInMinutes: 60
+              pool:
+                type: docker
+                os: windows
+              variables:
+                ob_outputDirectory: $(Build.SourcesDirectory)/out
+                ob_git_checkout: true
+              steps:
+                # The drop of the windows_binaries job holds windows_amd64/*.exe.
+                # OneBranch docker jobs check the repo out to s/dst, and that
+                # directory is the docker build context.
+                - task: DownloadPipelineArtifact@2
+                  displayName: Download Windows binaries
+                  inputs:
+                    artifact: drop_build_windows_binaries
+                    targetPath: $(Build.SourcesDirectory)/dst/output
+                - ${{ if or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}:
+                  - task: onebranch.pipeline.containercontrol@1
+                    displayName: Login to ACR
+                    inputs:
+                      command: login
+                      endpoint: Azure Container Networking - ACR Public Service Connection
+                - task: onebranch.pipeline.imagebuildinfo@1
+                  displayName: Build retina-agent windows/amd64
+                  inputs:
+                    dockerFileRelPath: controller/Dockerfile.windows-2022
+                    dockerFileContextPath: .
+                    registry: $(ACR_NAME)
+                    repositoryName: $(imageNamespace)/retina-agent
+                    build_tag: $(TAG)-windows-ltsc2022-amd64-$(System.JobAttempt)
+                    arguments: --platform windows/amd64 --target agent-win --build-arg GOOS=windows --build-arg GOARCH=amd64 --build-arg OS_VERSION=ltsc2022 --build-arg REPO_PATH=. --build-arg BINARIES_PATH=output/windows_amd64
+                    enable_network: true
+                    enable_service_tree_acr_path: false
+                    ${{ if or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}:
+                      enable_acr_push: true
+                      endpoint: Azure Container Networking - ACR Public Service Connection
+                      # The template saves every pushed image with `docker save`.
+                      # The Windows image is 5 GB, so skip the gzip pass.
+                      compress: false
+                      saveImageToPath: retina-agent-$(TAG)-windows-ltsc2022-amd64.tar
+
+            # The event writer is a native Windows build. The WDK and the Windows
+            # SDK come from NuGet packages, so the Visual Studio 2022 container
+            # only needs nuget.exe and LLVM 18.1.8 (clang compiles the eBPF
+            # program) on top of MSBuild. OneBranch network isolation blocks
+            # nuget.org inside the container, so the restore goes through the
+            # project's Azure Artifacts feed, which proxies the NuGet Gallery.
+            - job: event_writer_build
+              displayName: E2E Test Event Writer
+              condition: and(succeeded(), eq(variables['publishImagesAndRunE2E'], 'True'))
+              timeoutInMinutes: 60
+              pool:
+                type: windows
+                hostVersion:
+                  Version: 2022
+              variables:
+                ob_outputDirectory: $(Build.SourcesDirectory)\out
+                eventWriterPath: $(Build.SourcesDirectory)\test\e2e\tools\event-writer
+                ebpfVersion: '1.1.0'
+                nugetFeed: https://pkgs.dev.azure.com/github-private/microsoft/_packaging/microsoft_PublicPackages/nuget/v3/index.json
+              steps:
+                - task: NuGetToolInstaller@1
+                  displayName: Install nuget.exe
+                - task: NuGetAuthenticate@1
+                  displayName: Authenticate to Azure Artifacts
+                - powershell: |
+                    $ProgressPreference = 'SilentlyContinue'
+                    $llvmBin = 'C:\Program Files\LLVM\bin'
+                    $installer = Join-Path $env:TEMP 'LLVM-18.1.8-win64.exe'
+                    Invoke-WebRequest -Uri 'https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.exe' -OutFile $installer
+                    Start-Process -FilePath $installer -ArgumentList '/S' -Wait -NoNewWindow
+                    if (-not (Test-Path "$llvmBin\clang.exe")) {
+                      throw "clang.exe not found in $llvmBin"
+                    }
+                    Write-Host "##vso[task.prependpath]$llvmBin"
+                    Write-Host "##vso[task.prependpath]C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\bin"
+                  displayName: Install LLVM and configure build tools
+                # A NuGet.Config next to the solution replaces nuget.org with the
+                # internal feed for every restore below this directory. The eBPF
+                # custom build step spawns a nested MSBuild for the generated
+                # driver project, and that restore does not inherit command-line
+                # sources.
+                - powershell: |
+                    $config = @"
+                    <?xml version="1.0" encoding="utf-8"?>
+                    <configuration>
+                      <packageSources>
+                        <clear />
+                        <add key="microsoft_PublicPackages" value="$(nugetFeed)" />
+                      </packageSources>
+                    </configuration>
+                    "@
+                    Set-Content -Path NuGet.Config -Value $config -Encoding utf8
+                    nuget restore .\event_writer.sln
+                    if ($LASTEXITCODE -ne 0) {
+                      throw "Failed to restore event-writer packages"
+                    }
+                  displayName: NuGet restore
+                  workingDirectory: $(eventWriterPath)
+                - powershell: |
+                    .\export_program_info.exe --clear
+                    .\export_program_info.exe
+                  displayName: Configure eBPF store
+                  workingDirectory: $(eventWriterPath)\packages\eBPF-for-Windows.x64.$(ebpfVersion)\build\native\bin
+                - powershell: |
+                    msbuild /m /t:Clean /p:Configuration=Release /p:Platform=x64 /restore event_writer.sln
+                    if ($LASTEXITCODE -ne 0) {
+                      throw "Failed to clean event-writer solution"
+                    }
+                    msbuild /m /p:Configuration=Release /p:Platform=x64 /restore /v:detailed event_writer.sln
+                    if ($LASTEXITCODE -ne 0) {
+                      throw "Failed to build event-writer solution"
+                    }
+                  displayName: Build event writer
+                  workingDirectory: $(eventWriterPath)
+                # The image job downloads this drop into the Dockerfile context,
+                # so the layout below matches the COPY paths in the Dockerfile.
+                - task: CopyFiles@2
+                  displayName: Copy build output to drop
+                  inputs:
+                    SourceFolder: $(eventWriterPath)\x64\Release
+                    Contents: |
+                      bpf_event_writer.sys
+                      event_writer.exe
+                    TargetFolder: $(ob_outputDirectory)\x64\Release
+
+            - job: event_writer_image
+              displayName: E2E Test Event Writer Image
+              condition: and(succeeded(), eq(variables['publishImagesAndRunE2E'], 'True'))
+              dependsOn: event_writer_build
+              timeoutInMinutes: 60
+              pool:
+                type: docker
+                os: windows
+              variables:
+                ob_outputDirectory: $(Build.SourcesDirectory)/out
+                ob_git_checkout: true
+              steps:
+                - task: DownloadPipelineArtifact@2
+                  displayName: Download event-writer build output
+                  inputs:
+                    artifact: drop_build_event_writer_build
+                    targetPath: $(Build.SourcesDirectory)/dst/test/e2e/tools/event-writer
                 - task: onebranch.pipeline.containercontrol@1
                   displayName: Login to ACR
                   inputs:
                     command: login
                     endpoint: Azure Container Networking - ACR Public Service Connection
-              - task: onebranch.pipeline.imagebuildinfo@1
-                displayName: Build retina-agent windows/amd64
-                inputs:
-                  dockerFileRelPath: controller/Dockerfile.windows-2022
-                  dockerFileContextPath: .
-                  registry: $(ACR_NAME)
-                  repositoryName: $(imageNamespace)/retina-agent
-                  build_tag: $(TAG)-windows-ltsc2022-amd64-$(System.JobAttempt)
-                  arguments: --platform windows/amd64 --target agent-win --build-arg GOOS=windows --build-arg GOARCH=amd64 --build-arg OS_VERSION=ltsc2022 --build-arg REPO_PATH=. --build-arg BINARIES_PATH=output/windows_amd64
-                  enable_network: true
-                  enable_service_tree_acr_path: false
-                  ${{ if or(eq(parameters.runE2EValidation, true), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}:
+                - task: onebranch.pipeline.imagebuildinfo@1
+                  displayName: Build e2e-test-event-writer windows/amd64
+                  inputs:
+                    dockerFileRelPath: test/e2e/tools/event-writer/Dockerfile
+                    dockerFileContextPath: test/e2e/tools/event-writer
+                    registry: $(ACR_NAME)
+                    repositoryName: $(imageNamespace)/test/e2e-test-event-writer
+                    build_tag: $(TAG)-$(System.JobAttempt)
+                    arguments: --platform windows/amd64
+                    enable_network: true
+                    enable_service_tree_acr_path: false
                     enable_acr_push: true
                     endpoint: Azure Container Networking - ACR Public Service Connection
-                    # The template saves every pushed image with `docker save`.
-                    # The Windows image is 5 GB, so skip the gzip pass.
                     compress: false
-                    saveImageToPath: retina-agent-$(TAG)-windows-ltsc2022-amd64.tar
+                    saveImageToPath: e2e-test-event-writer-$(TAG).tar
 
-          # The event writer is a native Windows build. The WDK and the Windows
-          # SDK come from NuGet packages, so the Visual Studio 2022 container
-          # only needs nuget.exe and LLVM 18.1.8 (clang compiles the eBPF
-          # program) on top of MSBuild. OneBranch network isolation blocks
-          # nuget.org inside the container, so the restore goes through the
-          # project's Azure Artifacts feed, which proxies the NuGet Gallery.
-          - job: event_writer_build
-            displayName: E2E Test Event Writer
-            condition: and(succeeded(), eq(variables['publishImagesAndRunE2E'], 'True'))
-            timeoutInMinutes: 60
-            pool:
-              type: windows
-              hostVersion:
-                Version: 2022
-            variables:
-              ob_outputDirectory: $(Build.SourcesDirectory)\out
-              eventWriterPath: $(Build.SourcesDirectory)\test\e2e\tools\event-writer
-              ebpfVersion: '1.1.0'
-              nugetFeed: https://pkgs.dev.azure.com/github-private/microsoft/_packaging/microsoft_PublicPackages/nuget/v3/index.json
-            steps:
-              - task: NuGetToolInstaller@1
-                displayName: Install nuget.exe
-              - task: NuGetAuthenticate@1
-                displayName: Authenticate to Azure Artifacts
-              - powershell: |
-                  $ProgressPreference = 'SilentlyContinue'
-                  $llvmBin = 'C:\Program Files\LLVM\bin'
-                  $installer = Join-Path $env:TEMP 'LLVM-18.1.8-win64.exe'
-                  Invoke-WebRequest -Uri 'https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.exe' -OutFile $installer
-                  Start-Process -FilePath $installer -ArgumentList '/S' -Wait -NoNewWindow
-                  if (-not (Test-Path "$llvmBin\clang.exe")) {
-                    throw "clang.exe not found in $llvmBin"
-                  }
-                  Write-Host "##vso[task.prependpath]$llvmBin"
-                  Write-Host "##vso[task.prependpath]C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\bin"
-                displayName: Install LLVM and configure build tools
-              # A NuGet.Config next to the solution replaces nuget.org with the
-              # internal feed for every restore below this directory. The eBPF
-              # custom build step spawns a nested MSBuild for the generated
-              # driver project, and that restore does not inherit command-line
-              # sources.
-              - powershell: |
-                  $config = @"
-                  <?xml version="1.0" encoding="utf-8"?>
-                  <configuration>
-                    <packageSources>
-                      <clear />
-                      <add key="microsoft_PublicPackages" value="$(nugetFeed)" />
-                    </packageSources>
-                  </configuration>
-                  "@
-                  Set-Content -Path NuGet.Config -Value $config -Encoding utf8
-                  nuget restore .\event_writer.sln
-                  if ($LASTEXITCODE -ne 0) {
-                    throw "Failed to restore event-writer packages"
-                  }
-                displayName: NuGet restore
-                workingDirectory: $(eventWriterPath)
-              - powershell: |
-                  .\export_program_info.exe --clear
-                  .\export_program_info.exe
-                displayName: Configure eBPF store
-                workingDirectory: $(eventWriterPath)\packages\eBPF-for-Windows.x64.$(ebpfVersion)\build\native\bin
-              - powershell: |
-                  msbuild /m /t:Clean /p:Configuration=Release /p:Platform=x64 /restore event_writer.sln
-                  if ($LASTEXITCODE -ne 0) {
-                    throw "Failed to clean event-writer solution"
-                  }
-                  msbuild /m /p:Configuration=Release /p:Platform=x64 /restore /v:detailed event_writer.sln
-                  if ($LASTEXITCODE -ne 0) {
-                    throw "Failed to build event-writer solution"
-                  }
-                displayName: Build event writer
-                workingDirectory: $(eventWriterPath)
-              # The image job downloads this drop into the Dockerfile context,
-              # so the layout below matches the COPY paths in the Dockerfile.
-              - task: CopyFiles@2
-                displayName: Copy build output to drop
-                inputs:
-                  SourceFolder: $(eventWriterPath)\x64\Release
-                  Contents: |
-                    bpf_event_writer.sys
-                    event_writer.exe
-                  TargetFolder: $(ob_outputDirectory)\x64\Release
+        - stage: test
+          displayName: Run
+          # On pull requests the stage does not wait for the build stage, so
+          # the e2e check posts when the run starts. A failed build still
+          # blocks the merge through its own check.
+          ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+            dependsOn: []
+          ${{ else }}:
+            dependsOn: build
+          jobs:
+            # PR builds publish no images, so there is nothing to test. Main
+            # requires the check "CI (Build Images) (Run E2E Tests)" on every
+            # pull request, and Azure DevOps posts no check for a skipped job.
+            # A server job with the same name posts the check.
+            - ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+              - job: e2e
+                displayName: E2E Tests
+                pool:
+                  type: agentless
+                steps:
+                  - task: Delay@1
+                    inputs:
+                      delayForMinutes: '0'
+            - ${{ else }}:
+              # The multi-arch manifests are created at the start of the e2e job.
+              # A separate job would add several minutes of OneBranch job setup
+              # and scans to the critical path.
+              - job: e2e
+                displayName: E2E Tests
+                condition: and(succeeded(), eq(variables['publishImagesAndRunE2E'], 'True'))
+                timeoutInMinutes: 90
+                pool:
+                  type: linux
+                variables:
+                  ob_outputDirectory: $(Build.SourcesDirectory)/out
+                  CLUSTER_NAME: retina-e2e-$(Build.BuildId)-$(System.JobAttempt)
+                steps:
+                  # `make manifest` creates the multi-arch indexes from the
+                  # per-platform tags that the image jobs pushed. The OneBranch
+                  # Linux container has no docker CLI, so the oras script replaces
+                  # `docker buildx imagetools create` as the backend.
+                  - task: AzureCLI@2
+                    displayName: Create multi-arch manifests
+                    inputs:
+                      azureSubscription: $(azureServiceConnection)
+                      scriptType: bash
+                      scriptLocation: inlineScript
+                      inlineScript: |
+                        set -euo pipefail
+                        registry="$(ACR_NAME)"
+                        ns="$(imageNamespace)"
+                        tag="$(TAG)"
+                        source_tag="${BUILD_SOURCEVERSION:0:8}"
+                        retry_manifest() {
+                          local name="$1" attempt status
+                          shift
+                          for attempt in 1 2 3; do
+                            echo "Creating $name index (attempt $attempt of 3)"
+                            if "$@"; then
+                              return 0
+                            else
+                              status=$?
+                            fi
+                            if [ "$attempt" -lt 3 ]; then
+                              sleep $((2 ** attempt))
+                            fi
+                          done
+                          return "$status"
+                        }
+                        az acr login --name "$registry" --expose-token --query accessToken -o tsv \
+                          | oras login "$registry" --username 00000000-0000-0000-0000-000000000000 --password-stdin
+                        for component in retina operator shell kubectl-retina; do
+                          retry_manifest "$component" make manifest COMPONENT="$component" \
+                            IMAGE_REGISTRY="$registry" IMAGE_NAMESPACE="$ns" TAG="$tag" \
+                            MANIFEST_TAG="$source_tag" MANIFEST_CREATE=hack/scripts/oras-index.sh
+                        done
+                        # The event-writer job tags by attempt, so publish its newest
+                        # attempt under the source tag consumed by E2E and scale.
+                        retry_manifest event-writer hack/scripts/oras-index.sh \
+                          "$registry/$ns/test/e2e-test-event-writer:$source_tag" \
+                          "$registry/$ns/test/e2e-test-event-writer:$tag"
+                  # The capture scenario shells out to kubectl, which the OneBranch
+                  # Linux container does not ship.
+                  - bash: tdnf install -y kubernetes-client && kubectl version --client
+                    displayName: Install kubectl
+                  - task: AzureCLI@2
+                    displayName: Run E2E Tests
+                    env:
+                      AZURE_LOCATION: $(AZURE_LOCATION)
+                      AZURE_AGENT_LINUX_SKU: $(AZURE_AGENT_LINUX_SKU)
+                      AZURE_AGENT_WINDOWS_SKU: $(AZURE_AGENT_WINDOWS_SKU)
+                      AZURE_AGENT_LINUX_ARM_SKU: $(AZURE_AGENT_LINUX_ARM_SKU)
+                    inputs:
+                      azureSubscription: $(azureServiceConnection)
+                      scriptType: bash
+                      scriptLocation: inlineScript
+                      inlineScript: |
+                        set -euo pipefail
+                        SOURCE_TAG="${BUILD_SOURCEVERSION:0:8}"
+                        export TAG="$SOURCE_TAG"
+                        export AZURE_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+                        go test -v ./test/e2e/. -timeout 60m -tags=e2e -count=1 -args \
+                          -image-tag="$SOURCE_TAG" \
+                          -image-registry=$(ACR_NAME) \
+                          -image-namespace=$(imageNamespace)
+                  - task: AzureCLI@2
+                    displayName: Cleanup resource group
+                    condition: always()
+                    inputs:
+                      azureSubscription: $(azureServiceConnection)
+                      scriptType: bash
+                      scriptLocation: inlineScript
+                      inlineScript: |
+                        if az group exists --name "$(CLUSTER_NAME)" 2>/dev/null | grep -q true; then
+                          echo "Deleting resource group $(CLUSTER_NAME)..."
+                          az group delete --name "$(CLUSTER_NAME)" --yes --no-wait || true
+                        fi
 
-          - job: event_writer_image
-            displayName: E2E Test Event Writer Image
-            condition: and(succeeded(), eq(variables['publishImagesAndRunE2E'], 'True'))
-            dependsOn: event_writer_build
-            timeoutInMinutes: 60
-            pool:
-              type: docker
-              os: windows
-            variables:
-              ob_outputDirectory: $(Build.SourcesDirectory)/out
-              ob_git_checkout: true
-            steps:
-              - task: DownloadPipelineArtifact@2
-                displayName: Download event-writer build output
-                inputs:
-                  artifact: drop_build_event_writer_build
-                  targetPath: $(Build.SourcesDirectory)/dst/test/e2e/tools/event-writer
-              - task: onebranch.pipeline.containercontrol@1
-                displayName: Login to ACR
-                inputs:
-                  command: login
-                  endpoint: Azure Container Networking - ACR Public Service Connection
-              - task: onebranch.pipeline.imagebuildinfo@1
-                displayName: Build e2e-test-event-writer windows/amd64
-                inputs:
-                  dockerFileRelPath: test/e2e/tools/event-writer/Dockerfile
-                  dockerFileContextPath: test/e2e/tools/event-writer
-                  registry: $(ACR_NAME)
-                  repositoryName: $(imageNamespace)/test/e2e-test-event-writer
-                  build_tag: $(TAG)-$(System.JobAttempt)
-                  arguments: --platform windows/amd64
-                  enable_network: true
-                  enable_service_tree_acr_path: false
-                  enable_acr_push: true
-                  endpoint: Azure Container Networking - ACR Public Service Connection
-                  compress: false
-                  saveImageToPath: e2e-test-event-writer-$(TAG).tar
-
-      - stage: test
-        displayName: Run
-        # On pull requests the stage does not wait for the build stage, so
-        # the e2e check posts when the run starts. A failed build still
-        # blocks the merge through its own check.
-        ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+      - ${{ if eq(parameters.runDalecE2E, true) }}:
+        - stage: dalec
+          displayName: Dalec candidate validation
           dependsOn: []
-        ${{ else }}:
-          dependsOn: build
-        jobs:
-          # PR builds publish no images, so there is nothing to test. Main
-          # requires the check "CI (Build Images) (Run E2E Tests)" on every
-          # pull request, and Azure DevOps posts no check for a skipped job.
-          # A server job with the same name posts the check.
-          - ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
-            - job: e2e
+          jobs:
+            - job: RetinaDalecE2E
               displayName: E2E Tests
-              pool:
-                type: agentless
-              steps:
-                - task: Delay@1
-                  inputs:
-                    delayForMinutes: '0'
-          - ${{ else }}:
-            # The multi-arch manifests are created at the start of the e2e job.
-            # A separate job would add several minutes of OneBranch job setup
-            # and scans to the critical path.
-            - job: e2e
-              displayName: E2E Tests
-              condition: and(succeeded(), eq(variables['publishImagesAndRunE2E'], 'True'))
-              timeoutInMinutes: 90
+              timeoutInMinutes: 180
+              cancelTimeoutInMinutes: 20
               pool:
                 type: linux
+                # The candidate CLI wrapper uses docker run during capture tests.
+                runOnHost: true
               variables:
                 ob_outputDirectory: $(Build.SourcesDirectory)/out
-                CLUSTER_NAME: retina-e2e-$(Build.BuildId)-$(System.JobAttempt)
+                ob_artifactBaseName: retina-e2e
+                ob_artifacts_main_condition: always()
+                CLUSTER_NAME: retina-dalec-$(Build.BuildId)-$(System.JobAttempt)
+                AZURE_RESOURCE_GROUP: retina-dalec-$(Build.BuildId)-$(System.JobAttempt)
               steps:
-                # `make manifest` creates the multi-arch indexes from the
-                # per-platform tags that the image jobs pushed. The OneBranch
-                # Linux container has no docker CLI, so the oras script replaces
-                # `docker buildx imagetools create` as the backend.
-                - task: AzureCLI@2
-                  displayName: Create multi-arch manifests
-                  inputs:
-                    azureSubscription: $(azureServiceConnection)
-                    scriptType: bash
-                    scriptLocation: inlineScript
-                    inlineScript: |
-                      set -euo pipefail
-                      registry="$(ACR_NAME)"
-                      ns="$(imageNamespace)"
-                      tag="$(TAG)"
-                      source_tag="${BUILD_SOURCEVERSION:0:8}"
-                      retry_manifest() {
-                        local name="$1" attempt status
-                        shift
-                        for attempt in 1 2 3; do
-                          echo "Creating $name index (attempt $attempt of 3)"
-                          if "$@"; then
-                            return 0
-                          else
-                            status=$?
-                          fi
-                          if [ "$attempt" -lt 3 ]; then
-                            sleep $((2 ** attempt))
-                          fi
-                        done
-                        return "$status"
-                      }
-                      az acr login --name "$registry" --expose-token --query accessToken -o tsv \
-                        | oras login "$registry" --username 00000000-0000-0000-0000-000000000000 --password-stdin
-                      for component in retina operator shell kubectl-retina; do
-                        retry_manifest "$component" make manifest COMPONENT="$component" \
-                          IMAGE_REGISTRY="$registry" IMAGE_NAMESPACE="$ns" TAG="$tag" \
-                          MANIFEST_TAG="$source_tag" MANIFEST_CREATE=hack/scripts/oras-index.sh
-                      done
-                      # The event-writer job tags by attempt, so publish its newest
-                      # attempt under the source tag consumed by E2E and scale.
-                      retry_manifest event-writer hack/scripts/oras-index.sh \
-                        "$registry/$ns/test/e2e-test-event-writer:$source_tag" \
-                        "$registry/$ns/test/e2e-test-event-writer:$tag"
-                # The capture scenario shells out to kubectl, which the OneBranch
-                # Linux container does not ship.
-                - bash: tdnf install -y kubernetes-client && kubectl version --client
-                  displayName: Install kubectl
-                - task: AzureCLI@2
-                  displayName: Run E2E Tests
+                - checkout: self
+                  fetchDepth: 1
+                - bash: |
+                    set -euo pipefail
+                    mkdir -p "$RESULTS_DIR"
+                    [[ "$BUILD_REASON" == Manual ]] || {
+                        echo "Dalec mode must be queued explicitly, not by a CI or PR trigger" >&2
+                        exit 1
+                    }
+                    [[ "${RUN_CI_E2E,,}" == false ]] || {
+                        echo "Choose either runDalecE2E or runE2EValidation, not both" >&2
+                        exit 1
+                    }
+                    python3 hack/dalec/prepare-images.py --validate-only
+                  displayName: Validate Dalec request before accessing Azure
                   env:
-                    AZURE_LOCATION: $(AZURE_LOCATION)
-                    AZURE_AGENT_LINUX_SKU: $(AZURE_AGENT_LINUX_SKU)
-                    AZURE_AGENT_WINDOWS_SKU: $(AZURE_AGENT_WINDOWS_SKU)
-                    AZURE_AGENT_LINUX_ARM_SKU: $(AZURE_AGENT_LINUX_ARM_SKU)
+                    RUN_CI_E2E: ${{ parameters.runE2EValidation }}
+                    DALEC_BUILD_ID: ""
+                    IMAGE_SET_JSON: ${{ convertToJson(parameters.imageSet) }}
+                    IMAGE_VERSION: ${{ parameters.imageVersion }}
+                    RESULTS_DIR: $(Build.SourcesDirectory)/out/retina-e2e
+                - template: /.azure-pipelines/steps/setup-go.yml@self
+                - task: HelmInstaller@1
                   inputs:
-                    azureSubscription: $(azureServiceConnection)
-                    scriptType: bash
-                    scriptLocation: inlineScript
-                    inlineScript: |
-                      set -euo pipefail
-                      SOURCE_TAG="${BUILD_SOURCEVERSION:0:8}"
-                      export TAG="$SOURCE_TAG"
-                      export AZURE_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
-                      go test -v ./test/e2e/. -timeout 60m -tags=e2e -count=1 -args \
-                        -image-tag="$SOURCE_TAG" \
-                        -image-registry=$(ACR_NAME) \
-                        -image-namespace=$(imageNamespace)
+                    helmVersionToInstall: 3.17.3
+                - task: KubectlInstaller@0
+                  inputs:
+                    kubectlVersion: latest
+                - bash: |
+                    set -euo pipefail
+                    for tool in az docker jq openssl python3; do
+                        command -v "$tool"
+                    done
+                    docker info > /dev/null
+                  displayName: Verify host tools and Docker daemon
                 - task: AzureCLI@2
-                  displayName: Cleanup resource group
-                  condition: always()
+                  displayName: Resolve and validate the complete candidate image set
                   inputs:
-                    azureSubscription: $(azureServiceConnection)
+                    azureSubscription: ${{ parameters.dalecAzureServiceConnection }}
                     scriptType: bash
                     scriptLocation: inlineScript
                     inlineScript: |
-                      if az group exists --name "$(CLUSTER_NAME)" 2>/dev/null | grep -q true; then
-                        echo "Deleting resource group $(CLUSTER_NAME)..."
-                        az group delete --name "$(CLUSTER_NAME)" --yes --no-wait || true
-                      fi
+                        set -euo pipefail
+                        python3 hack/dalec/prepare-images.py
+                  env:
+                    DALEC_BUILD_ID: ""
+                    IMAGE_SET_JSON: ${{ convertToJson(parameters.imageSet) }}
+                    IMAGE_VERSION: ${{ parameters.imageVersion }}
+                    RESULTS_DIR: $(Build.SourcesDirectory)/out/retina-e2e
+                - bash: echo "##vso[task.setvariable variable=DalecE2EStarted]true"
+                  displayName: Enable run-owned infrastructure cleanup
+                - task: AzureCLI@2
+                  displayName: Run Retina Dalec E2E
+                  inputs:
+                    azureSubscription: ${{ parameters.dalecAzureServiceConnection }}
+                    scriptType: bash
+                    scriptLocation: scriptPath
+                    scriptPath: hack/dalec/run-e2e.sh
+                  env:
+                    AZURE_LOCATION: ${{ parameters.dalecLocation }}
+                    CLUSTER_NAME: $(CLUSTER_NAME)
+                    AZURE_RESOURCE_GROUP: $(AZURE_RESOURCE_GROUP)
+                    RESULTS_DIR: $(Build.SourcesDirectory)/out/retina-e2e
+                - task: AzureCLI@2
+                  displayName: Clean up only this run's resource group
+                  condition: and(always(), eq(variables['DalecE2EStarted'], 'true'))
+                  inputs:
+                    azureSubscription: ${{ parameters.dalecAzureServiceConnection }}
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                        set -euo pipefail
+                        if [[ "$(az group exists --name "$AZURE_RESOURCE_GROUP")" == true ]]; then
+                          owner="$(az group show --name "$AZURE_RESOURCE_GROUP" --query tags.retinaE2ERun -o tsv)"
+                          [[ "$owner" == "$BUILD_BUILDID" ]] || {
+                            echo "Refusing to delete a resource group not owned by this run" >&2
+                            exit 1
+                          }
+                          cleanup_status=0
+                          if [[ -f "$RESULTS_DIR/registry-role-assignments.txt" ]]; then
+                            while IFS= read -r assignment; do
+                              [[ -n "$assignment" ]] || continue
+                              if ! az role assignment delete --ids "$assignment"; then
+                                echo "Failed to delete this run's registry role assignment: $assignment" >&2
+                                cleanup_status=1
+                              fi
+                            done < "$RESULTS_DIR/registry-role-assignments.txt"
+                          fi
+                          if ! az group delete --name "$AZURE_RESOURCE_GROUP" --yes; then
+                            echo "Failed to delete this run's resource group" >&2
+                            cleanup_status=1
+                          fi
+                          exit "$cleanup_status"
+                        fi
+                  env:
+                    AZURE_RESOURCE_GROUP: $(AZURE_RESOURCE_GROUP)
+                    RESULTS_DIR: $(Build.SourcesDirectory)/out/retina-e2e
+                - task: PublishTestResults@2
+                  displayName: Publish Retina Dalec E2E test results
+                  condition: succeededOrFailed()
+                  inputs:
+                    testResultsFormat: JUnit
+                    testResultsFiles: $(Build.SourcesDirectory)/out/retina-e2e/junit.xml
+                    failTaskOnFailedTests: true
+                    failTaskOnMissingResultsFile: true
+                    testRunTitle: Retina Dalec E2E $(Build.BuildId)

@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -102,6 +103,25 @@ class CandidateTests(unittest.TestCase):
         ]
         with patch.object(images, "run", return_value=json.dumps(descriptors)):
             self.assertEqual(images.platforms("example/image"), LINUX)
+
+    def test_preflight_validates_without_registry_or_azure_access(self):
+        with patch.dict(os.environ, {
+            "IMAGE_SET_JSON": json.dumps(self.references),
+            "IMAGE_VERSION": "1.2.9",
+            "DALEC_BUILD_ID": "",
+        }), patch.object(images, "run") as command:
+            images.main(validate_only=True)
+        command.assert_not_called()
+
+    def test_preflight_rejects_missing_candidates_before_registry_access(self):
+        with patch.dict(os.environ, {
+            "IMAGE_SET_JSON": "{}",
+            "IMAGE_VERSION": "1.2.9",
+            "DALEC_BUILD_ID": "",
+        }), patch.object(images, "run") as command:
+            with self.assertRaisesRegex(ValueError, "exactly these image keys"):
+                images.main(validate_only=True)
+        command.assert_not_called()
 
 
 class ReportTests(unittest.TestCase):

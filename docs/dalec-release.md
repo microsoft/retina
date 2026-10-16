@@ -1,20 +1,31 @@
 # Managed Dalec release E2E
 
-Retina's standalone Azure DevOps pipeline is defined in
-`.pipelines/retina-dalec-e2e.yml` in this repository. It does not use ACN's
-Function App or existing ACN E2E/release pipelines.
+Retina reuses its existing **CI (Build Images)** pipeline, definition
+**1195**, in `github-private/microsoft`, folder `\OneBranch\Retina OSS`:
+https://github-private.visualstudio.com/microsoft/_build?definitionId=1195
+
+Its YAML is `.azure-pipelines/ci.yml`. Set `runDalecE2E: true` to test supplied
+candidate images without rebuilding them. The default remains normal CI.
+The earlier standalone `.pipelines/retina-dalec-e2e.yml` and definitions
+1217 / 484261 are legacy alternatives, not the activation target. No new
+pipeline registration is needed. This integration does not use ACN's Function
+App or existing ACN E2E/release pipelines.
 
 ## Release flow
 
 1. Managed Dalec resolves the selected Retina release and builds binaries,
    eBPF objects, and images using the existing component templates.
-2. The Dalec component test hook queues this new pipeline at an explicitly
-   configured, immutable Retina **test-code commit**.
-3. The pipeline downloads `build-*/runtime-variables.json` from that exact
-   originating Dalec build. All five components and the Windows agent target
-   must be built together. It resolves staging tags to SHA256 digests and
-   rejects missing companions, conflicting images, inconsistent versions,
-   missing platforms, or a triggering image absent from those artifacts.
+2. The Dalec component test hook queues pipeline 1195 at an explicitly
+   configured, immutable Retina **test-code commit**, with `runDalecE2E: true`,
+   `imageVersion`, and the complete digest-pinned `imageSet`.
+3. The caller must collect all five components and the Windows agent target
+   from the same originating build, verify their common source version, and
+   ensure the triggering image belongs to that cohort. Pipeline 1195 checks
+   the exact image keys, digest syntax, release version format, registry
+   access, and required platforms before provisioning AKS. It does not
+   independently prove source-build provenance from an explicit image set.
+   CI image builds, image pushes, and manifest creation are excluded at
+   template expansion time in Dalec mode.
 4. A dedicated, run-owned AKS cluster executes CLI packaging/version checks,
    standard metrics, advanced-profile upgrade, Hubble metrics, Windows HNS
    metrics, and Linux capture create/download/delete against candidate images.
@@ -69,48 +80,31 @@ Explicitly outside this cohort:
 
 ## One-time setup
 
-The pipeline is registered as **definition ID `484261`**, `Retina Dalec E2E`,
-in the `msazure` Azure DevOps organization, project **`One`**, folder
-`\Custom\Networking\ContainerNetworking\NetworkObservability\Retina`. It is
-connected to `microsoft/retina` through the `Azure Container Networking - EMU`
-GitHub service connection and runs `.pipelines/retina-dalec-e2e.yml`. Its
-default branch is `refs/heads/itiagrawal/retina-dalec-standalone-e2e` until
-that implementation branch merges, after which it moves to `refs/heads/main`.
-It has no CI or PR triggers and its job authorization scope is
-`projectCollection`.
+Keep definition 1195's existing YAML path, GitHub connection, default branch,
+triggers, and normal PR checks unchanged. Until the implementation merges,
+select `itiagrawal/retina-dalec-standalone-e2e` when queueing Dalec mode.
 
-The organization is not interchangeable. Retina's GitHub-triggered CI
-pipelines live in a *different* organization, `github-private`, under
-`\OneBranch\Retina OSS`. This pipeline cannot be registered alongside them.
-Its `DownloadPipelineArtifact@2` step uses `buildType: specific` with a
-`project` input, which resolves **across projects but never across
-organizations**, and the originating Dalec build it must read is
-`[aks-managed-dalec][build] containernetworking`, definition ID `452291`, in
-`msazure/CloudNativeCompute` under `\aks-managed-dalec\containernetworking`.
-Registering outside `msazure` silently reduces the pipeline to the manual
-`imageSet` mode below and permanently disables cohort completeness, version,
-and platform validation against the real build artifacts.
-
-Project `One` hosts it rather than `CloudNativeCompute` because registration
-requires a GitHub service connection to `microsoft/retina` in the hosting
-project, and `CloudNativeCompute` exposes no GitHub-type service connection.
-`One` already hosts Retina's other `msazure` pipelines in the same folder.
-`One` and `CloudNativeCompute` are both in `msazure`, so the cross-project
-artifact download is unaffected.
+The originating build is `[aks-managed-dalec][build] containernetworking`,
+definition ID `452291`, in `msazure/CloudNativeCompute`. That is a different
+organization. `DownloadPipelineArtifact@2` cannot read across organizations,
+so pipeline 1195 deliberately has no artifact-download step in Dalec mode.
+The trusted caller must resolve metadata in `msazure` and pass the explicit
+image set. Changing only the old hook's pipeline ID is **not sufficient**:
+its organization/project, queue parameters, and metadata handoff must also
+be updated before activating the hook.
 
 Provision and authorize these distinct service connections:
 
 | Connection | Purpose and permissions |
 |---|---|
-| `retina-dalec-e2e` | New pipeline's Azure identity: create/delete its resource groups, VNets and AKS clusters; obtain AKS admin credentials; read/pull staging ACR images; assign AcrPull on those registries to its newly created kubelet identity. Scope registry role-assignment permissions appropriately. |
-| `Dalec-to-Retina-E2E` | Dalec test-hook identity: Azure DevOps queue and view builds on the new pipeline. Azure authentication must allow obtaining an ADO token and the service principal must be admitted to the organization/project. |
+| `r2d`, or an explicitly selected `dalecAzureServiceConnection` | Pipeline 1195's Azure identity: create/delete run-owned resource groups, VNets and AKS clusters; obtain AKS admin credentials; read/pull staging ACR images; assign AcrPull on those registries to its newly created kubelet identity. Confirm these permissions; existing CI authorization does not prove staging-ACR access or role-assignment rights. |
+| `Dalec-to-Retina-E2E` | Dalec test-hook identity: queue and view builds on definition 1195 in `github-private/microsoft`. Azure authentication must allow obtaining an ADO token and the identity must be admitted to that organization/project. |
 
-Authorize this pipeline's project Build Service identity to view Dalec build
-`452291` in `CloudNativeCompute` and download its build artifacts, including
-artifacts already published by its completed Build stage while the parent
-TestAndStage stage is still running. The two pipelines **are** in different
-projects, so cross-project job authorization must be enabled; the definition
-is already registered with `projectCollection` job authorization scope.
+The caller, not 1195's Build Service, needs access to metadata from originating
+Dalec build 452291 in `msazure/CloudNativeCompute`, including artifacts already
+published while its TestAndStage stage is still running. The Dalec job uses
+the OneBranch Linux **host**, not its build container: the capture CLI wrapper
+requires a Docker daemon. Required host tools are checked explicitly.
 
 The subscription needs regional quota for Ubuntu amd64 nodes, Azure Linux
 FIPS nodes, Ubuntu arm64 `Standard_D4pds_v5` nodes, and Windows 2022 amd64
@@ -119,22 +113,49 @@ ACR must be reachable from the hosted runner and cluster. This implementation
 uses AKS `--attach-acr` with conventional AcrPull RBAC; ABAC-only registries
 or registries in another subscription require a deliberate access adaptation.
 
-Configure these non-secret variables on the **Dalec wrapper pipeline**:
+The caller's queue contract is:
 
-| Variable | Value |
-|---|---|
-| `RETINA_E2E_PIPELINE_ID` | `484261`, the registered Retina Dalec E2E pipeline, not an ACN pipeline ID. |
-| `RETINA_E2E_SOURCE_COMMIT` | Full 40-character SHA of the reviewed, pushed Retina test implementation. |
-| `RETINA_E2E_SOURCE_BRANCH` | Branch containing that commit, such as `refs/heads/itiagrawal/retina-dalec-standalone-e2e`. Default is `refs/heads/main`. |
-| `RETINA_E2E_PROJECT` | `One`. This pipeline is registered in `msazure/One`, not `CloudNativeCompute`, so the `CloudNativeCompute` default must be overridden. |
-| `RETINA_E2E_TIMEOUT_SECONDS` | Optional hook timeout; default 14400 seconds. |
-| `RETINA_E2E_POLL_INTERVAL_SECONDS` | Optional polling interval; default 120 seconds. |
+```text
+POST https://github-private.visualstudio.com/microsoft/_apis/pipelines/1195/runs?api-version=7.1
+```
 
-The companion Managed Dalec changes explicitly select `Dalec-to-Retina-E2E`
-on all five Retina onboarding entries and register that literal connection
-in the wrapper's exhaustive authorization list. The shared wrapper change
-only authorizes an additional connection; it adds no E2E jobs there and
-does not change ACN's connection or hooks.
+```json
+{
+  "resources": {
+    "repositories": {
+      "self": {
+        "refName": "refs/heads/itiagrawal/retina-dalec-standalone-e2e",
+        "version": "<full reviewed test-code commit SHA>"
+      }
+    }
+  },
+  "templateParameters": {
+    "runDalecE2E": true,
+    "runE2EValidation": false,
+    "dalecAzureServiceConnection": "r2d",
+    "dalecLocation": "westus2",
+    "imageVersion": "1.2.9",
+    "imageSet": {
+      "retinaAgentImage": "<digest-pinned Linux agent index>",
+      "retinaWindowsAgentImage": "<digest-pinned Windows agent>",
+      "retinaInitImage": "<digest-pinned init index>",
+      "retinaOperatorImage": "<digest-pinned operator index>",
+      "kubectlRetinaImage": "<digest-pinned CLI index>",
+      "kubectlRetinaShellImage": "<digest-pinned CLI shell index>"
+    }
+  }
+}
+```
+
+The placeholders above must be replaced with real values, not submitted as-is.
+Wait for the returned run's terminal result; only `succeeded` permits the hook
+to pass. A parked, canceled, failed, or timed-out run is not a passing result.
+
+The companion Managed Dalec changes must select `Dalec-to-Retina-E2E`
+on all five Retina onboarding entries, register that literal connection
+in the wrapper's authorization list, and implement the queue contract above.
+This Retina-side change does not modify the private Dalec wrapper or ACN's
+connection and hooks.
 
 Each component/target currently invokes its own strict queue/wait hook.
 Consequently a complete cohort can start several full E2E runs and clusters.
@@ -144,8 +165,10 @@ cohort gate must implement explicit concurrency-safe coordination.
 
 ## Manual candidate run
 
-Queue the new pipeline with `dalecBuildId` empty, `imageVersion` such as
-`1.2.9`, and this complete `imageSet` object. Every value must be a full,
+Open pipeline 1195, choose **Run pipeline**, select the implementation branch,
+enable **Test Dalec candidate images without rebuilding**, leave **Publish
+branch images and run E2E** unchecked, and supply `imageVersion` such as
+`1.2.9` and this complete `imageSet` object. Every value must be a full,
 digest-pinned image reference; tag-plus-digest is also accepted.
 
 | Key | Required platforms |
@@ -159,8 +182,10 @@ digest-pinned image reference; tag-plus-digest is also accepted.
 
 For example, a value has the form
 `registry.azurecr.io/staging/build/retina-agent:1.2.9@sha256:<64-hex-digest>`.
-Do not mix manual overrides with parent-build artifact mode. CLI version
-checks accept the optional leading `v` used by release tags.
+Pipeline 1195 has no `dalecBuildId` parameter or parent-build artifact mode.
+Do not enable both E2E modes; the request fails before testing. Empty or
+malformed image sets fail the input preflight without registry access or AKS
+creation. CLI version checks accept the optional leading `v` used by release tags.
 
 The image set is immutable during install, advanced upgrade, Hubble install,
 and capture. Helm supports independent full-reference overrides for agent,
@@ -190,9 +215,17 @@ and Go E2E compilation without provisioning a cluster. It cannot prove live
 ADO permissions, private registry access, AKS runtime behavior, Windows
 execution, ESRP signing, or official publication.
 
-Publish the reviewed Retina branch first, register/authorize the new ADO
-pipeline, configure the trusted commit and IDs, and perform a manual complete
-candidate run. Activate the companion Dalec hook only after that succeeds.
+Run the local regression checks with:
+
+```bash
+python3 -m pip install -r hack/dalec/requirements-test.txt
+python3 -m unittest discover -s hack/dalec -p 'test_*.py'
+```
+
+Publish the reviewed Retina branch first, verify pipeline 1195's selected
+Azure connection permissions, configure the trusted commit and queue contract,
+and perform a complete candidate run. Update and activate the companion Dalec
+hook only after that succeeds.
 Do not activate a hook with an unpushed test-code commit. Rollback is to
 disable the new integration or revert its Dalec configuration; it must not
 silently route candidates back to ACN or substitute published Retina images.

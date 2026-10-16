@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Resolve a complete Dalec candidate set without rebuilding any images."""
 
+import argparse
 import json
 import os
 from pathlib import Path
@@ -98,7 +99,9 @@ def collect(metadata_dir, candidate, registries):
     return images, versions.pop()
 
 
-def validate(images, version, registries):
+def validate_input(images, version):
+    if not isinstance(images, dict):
+        raise ValueError("imageSet must be an object")
     if set(images) != set(ENV_NAMES):
         raise ValueError(f"Expected exactly these image keys: {sorted(ENV_NAMES)}")
     if not re.fullmatch(r"v?\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?", version):
@@ -106,6 +109,11 @@ def validate(images, version, registries):
     for key, image in images.items():
         if not isinstance(image, str) or not PINNED_IMAGE.fullmatch(image):
             raise ValueError(f"{key} must be an immutable sha256 image reference")
+
+
+def validate(images, version, registries):
+    validate_input(images, version)
+    for key, image in images.items():
         login(image, registries)
         required = {("linux", "amd64"), ("linux", "arm64")}
         if key == "retinaWindowsAgentImage":
@@ -115,11 +123,17 @@ def validate(images, version, registries):
             raise ValueError(f"{key} is missing required platforms: {sorted(missing)}")
 
 
-def main():
+def main(validate_only=False):
     registries = set()
     images = json.loads(os.environ["IMAGE_SET_JSON"])
     version = os.environ.get("IMAGE_VERSION", "")
     build_id = os.environ.get("DALEC_BUILD_ID", "")
+    if validate_only:
+        if build_id:
+            raise ValueError("Preflight requires a complete explicit imageSet, not build artifacts")
+        validate_input(images, version)
+        print("Candidate input is complete and digest-pinned")
+        return
     if build_id:
         if images:
             raise ValueError("Do not mix manual image overrides with Dalec build artifacts")
@@ -140,8 +154,12 @@ def main():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--validate-only", action="store_true",
+                        help="Check explicit candidate input without Azure or registry access")
+    args = parser.parse_args()
     try:
-        main()
+        main(validate_only=args.validate_only)
     except (ValueError, KeyError, OSError, subprocess.CalledProcessError) as error:
         print(f"Candidate validation failed: {error}", file=sys.stderr)
         sys.exit(1)
