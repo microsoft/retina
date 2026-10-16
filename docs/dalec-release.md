@@ -116,11 +116,26 @@ or registries in another subscription require a deliberate access adaptation.
 The caller's queue contract is:
 
 ```text
-POST https://github-private.visualstudio.com/microsoft/_apis/pipelines/1195/runs?api-version=7.1
+POST https://github-private.visualstudio.com/microsoft/_apis/pipelines/1195/runs?api-version=7.1-preview.1
 ```
 
-```json
-{
+For this organization's Run API, encode template parameter values as strings,
+including JSON serialization of the `imageSet` object. For example, construct
+the request body in Python as follows, then send `json.dumps(body)` with
+`Content-Type: application/json` and the caller's ADO bearer token:
+
+```python
+import json
+
+image_set = {
+    "retinaAgentImage": "<digest-pinned Linux agent index>",
+    "retinaWindowsAgentImage": "<digest-pinned Windows agent>",
+    "retinaInitImage": "<digest-pinned init index>",
+    "retinaOperatorImage": "<digest-pinned operator index>",
+    "kubectlRetinaImage": "<digest-pinned CLI index>",
+    "kubectlRetinaShellImage": "<digest-pinned CLI shell index>",
+}
+body = {
   "resources": {
     "repositories": {
       "self": {
@@ -130,19 +145,12 @@ POST https://github-private.visualstudio.com/microsoft/_apis/pipelines/1195/runs
     }
   },
   "templateParameters": {
-    "runDalecE2E": true,
-    "runE2EValidation": false,
+    "runDalecE2E": "true",
+    "runE2EValidation": "false",
     "dalecAzureServiceConnection": "r2d",
     "dalecLocation": "westus2",
     "imageVersion": "1.2.9",
-    "imageSet": {
-      "retinaAgentImage": "<digest-pinned Linux agent index>",
-      "retinaWindowsAgentImage": "<digest-pinned Windows agent>",
-      "retinaInitImage": "<digest-pinned init index>",
-      "retinaOperatorImage": "<digest-pinned operator index>",
-      "kubectlRetinaImage": "<digest-pinned CLI index>",
-      "kubectlRetinaShellImage": "<digest-pinned CLI shell index>"
-    }
+    "imageSet": json.dumps(image_set)
   }
 }
 ```
