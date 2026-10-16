@@ -20,6 +20,7 @@ spec:
       namespace: retina
     spec:
       serviceAccountName: retina-agent
+      terminationGracePeriodSeconds: 90
       tolerations:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists
@@ -46,6 +47,14 @@ spec:
             {{- else }}
             - .\setkubeconfigpath.ps1; ./controller.exe --config ./retina/config.yaml --kubeconfig ./kubeconfig
             {{- end }}
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - powershell.exe
+                  - -NoProfile
+                  - -Command
+                  - New-Item -ItemType File -Path (Join-Path $env:CONTAINER_SANDBOX_MOUNT_POINT '.retina-shutdown') -Force | Out-Null; Start-Sleep -Seconds 90
           securityContext:
             privileged: true
           volumeMounts:

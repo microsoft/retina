@@ -212,6 +212,7 @@ spec:
     spec:
       serviceAccountName: {{ .Values.serviceAccount.name }}
       automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+      terminationGracePeriodSeconds: 90 # Allow for retina to cleanup plugin resources.
       {{- with .Values.imagePullSecrets }}
       {{- if .Values.priorityClassName }}
       priorityClassName: {{ .Values.priorityClassName }}
@@ -238,6 +239,14 @@ spec:
             {{- else }}
             - .\setkubeconfigpath.ps1; ./controller.exe --config ./retina/config.yaml --kubeconfig ./kubeconfig
             {{- end }}
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - powershell.exe
+                  - -NoProfile
+                  - -Command
+                  - New-Item -ItemType File -Path (Join-Path $env:CONTAINER_SANDBOX_MOUNT_POINT '.retina-shutdown') -Force | Out-Null; Start-Sleep -Seconds 90
           readinessProbe:
             httpGet:
               path: /metrics

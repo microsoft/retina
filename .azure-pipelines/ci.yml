@@ -402,16 +402,34 @@ extends:
                       registry="$(ACR_NAME)"
                       ns="$(imageNamespace)"
                       tag="$(TAG)"
+                      source_tag="${BUILD_SOURCEVERSION:0:8}"
+                      retry_manifest() {
+                        local name="$1" attempt status
+                        shift
+                        for attempt in 1 2 3; do
+                          echo "Creating $name index (attempt $attempt of 3)"
+                          if "$@"; then
+                            return 0
+                          else
+                            status=$?
+                          fi
+                          if [ "$attempt" -lt 3 ]; then
+                            sleep $((2 ** attempt))
+                          fi
+                        done
+                        return "$status"
+                      }
                       az acr login --name "$registry" --expose-token --query accessToken -o tsv \
                         | oras login "$registry" --username 00000000-0000-0000-0000-000000000000 --password-stdin
                       for component in retina operator shell kubectl-retina; do
-                        make manifest COMPONENT="$component" IMAGE_REGISTRY="$registry" \
-                          IMAGE_NAMESPACE="$ns" TAG="$tag" MANIFEST_CREATE=hack/scripts/oras-index.sh
+                        retry_manifest "$component" make manifest COMPONENT="$component" \
+                          IMAGE_REGISTRY="$registry" IMAGE_NAMESPACE="$ns" TAG="$tag" \
+                          MANIFEST_TAG="$source_tag" MANIFEST_CREATE=hack/scripts/oras-index.sh
                       done
-                      # The e2e tests pull the event writer at the run tag. Its image
-                      # job tags by attempt, so publish the newest attempt under the
-                      # run tag as a one-entry index.
-                      hack/scripts/oras-index.sh "$registry/$ns/test/e2e-test-event-writer:$tag" \
+                      # The event-writer job tags by attempt, so publish its newest
+                      # attempt under the source tag consumed by E2E and scale.
+                      retry_manifest event-writer hack/scripts/oras-index.sh \
+                        "$registry/$ns/test/e2e-test-event-writer:$source_tag" \
                         "$registry/$ns/test/e2e-test-event-writer:$tag"
                 # The capture scenario shells out to kubectl, which the OneBranch
                 # Linux container does not ship.
@@ -430,9 +448,11 @@ extends:
                     scriptLocation: inlineScript
                     inlineScript: |
                       set -euo pipefail
+                      SOURCE_TAG="${BUILD_SOURCEVERSION:0:8}"
+                      export TAG="$SOURCE_TAG"
                       export AZURE_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
                       go test -v ./test/e2e/. -timeout 60m -tags=e2e -count=1 -args \
-                        -image-tag=$(TAG) \
+                        -image-tag="$SOURCE_TAG" \
                         -image-registry=$(ACR_NAME) \
                         -image-namespace=$(imageNamespace)
                 - task: AzureCLI@2

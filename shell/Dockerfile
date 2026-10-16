@@ -2,7 +2,7 @@
 # its standard library tracks the golang base image instead of the upstream
 # release cadence. Upstream publishes binaries only on tags.
 # skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:7e3429507d92bb1e12fe45b7650c3dd3f24a4f0d1ca45622b1452834f54d8020 AS pwru-build
+FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:2de38140ac3783ac72ea4481c51ca5c03943cfa032b1776769a1e185918bd027 AS pwru-build
 RUN tdnf install -y make git clang llvm gcc glibc-static gawk file flex bison tar diffutils
 # https://github.com/cilium/pwru/releases/tag/v1.0.12
 ARG PWRU_COMMIT=f1d6cf8898953ac1560401e181f3ac5f0e33b486
@@ -26,7 +26,7 @@ RUN set -eux; \
     ./pwru --version
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260923@sha256:1324a2cf7ed34e5f48a1022816b205782b86c7305651658e611dcd3d30756751
+FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261009@sha256:7292f2bcf52c3916758f1a45aba6e4dcb93f466027d7786900ea96c2d23c48e2
 
 # Keep this pin until the Azure Linux base includes pcre2 >= 10.48-1.azl3; verify both architectures before removing.
 RUN tdnf install -y \

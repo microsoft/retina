@@ -1,6 +1,6 @@
 # Linux builder - runs natively on the target platform (amd64 or arm64)
 # skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26@sha256:4e652d1254a73a25bbc34dfda45dfca5dfae927f7245cc914310ff1057580499 AS builder
+FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26@sha256:16ab7d86243d5f40a2aaf6b7bbcdf4f0b73677e816745f9eb307f44fdf742085 AS builder
 
 WORKDIR /build
 ADD . .
@@ -17,7 +17,7 @@ CMD ["./kapinger"]
 
 # Windows builder - cross-compiles from Linux amd64 (GOOS=windows is not affected by systemcrypto)
 # skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26@sha256:4e652d1254a73a25bbc34dfda45dfca5dfae927f7245cc914310ff1057580499 AS windows-builder
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26@sha256:16ab7d86243d5f40a2aaf6b7bbcdf4f0b73677e816745f9eb307f44fdf742085 AS windows-builder
 
 WORKDIR /build
 ADD . .
