@@ -27,6 +27,10 @@ import (
 const IPPrefix = "serviceTaggedIp"
 
 func eventWriterImage() string {
+	if image := strings.TrimSpace(os.Getenv("EVENT_WRITER_IMAGE")); image != "" {
+		return image
+	}
+
 	return fmt.Sprintf(
 		"%s/%s/test/e2e-test-event-writer:%s",
 		strings.TrimSpace(os.Getenv(generic.DefaultImageRegistry)),

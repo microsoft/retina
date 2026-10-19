@@ -13,6 +13,9 @@
 #     requests on the Microsoft-hosted pool under the same pipeline name.
 #   - Manual queue from ADO UI -> build only by default. Set runE2EValidation
 #     to publish branch images, generate manifests, and run e2e.
+#     Alternatively, set usePrebuiltImages and supply imageRegistry,
+#     imageNamespace, imageTag, and eventWriterImage to run E2E without builds
+#     or manifest publication. See docs/08-Contributing/02-development.md.
 #
 # The pipeline extends the OneBranch NonOfficial template, so jobs run on the
 # OneBranch-managed pool instead of the Microsoft-hosted "Azure Pipelines"
@@ -53,6 +56,26 @@ parameters:
     displayName: Publish branch images and run E2E
     type: boolean
     default: false
+  - name: usePrebuiltImages
+    displayName: Run E2E with prebuilt images (skip builds and manifests)
+    type: boolean
+    default: false
+  - name: imageRegistry
+    displayName: Prebuilt image registry (hostname only)
+    type: string
+    default: ''
+  - name: imageNamespace
+    displayName: Prebuilt image namespace
+    type: string
+    default: ''
+  - name: imageTag
+    displayName: Prebuilt image tag (shared by Retina images)
+    type: string
+    default: ''
+  - name: eventWriterImage
+    displayName: Prebuilt Windows E2E event-writer image (full reference)
+    type: string
+    default: ''
 
 variables:
   - name: LinuxContainerImage
@@ -74,10 +97,10 @@ variables:
   # resolves the newest attempt when it creates the multi-arch indexes.
   - name: TAG
     value: ${{ substring(variables['Build.SourceVersion'], 0, 8) }}-$(Build.BuildId)
-  # Merge-queue runs and opted-in manual runs publish branch images and run E2E.
+  # Prebuilt mode runs E2E without publishing, even if runE2EValidation is off.
   # PR builds and manual queues with the checkbox off remain dry-run builds.
-  - name: publishImagesAndRunE2E
-    ${{ if eq(parameters.runE2EValidation, true) }}:
+  - name: runE2E
+    ${{ if or(parameters.usePrebuiltImages, parameters.runE2EValidation) }}:
       value: 'True'
     ${{ else }}:
       value: $[ startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/') ]
@@ -109,6 +132,7 @@ extends:
     stages:
       - stage: build
         displayName: Build
+        condition: and(succeeded(), ${{ not(parameters.usePrebuiltImages) }})
         jobs:
           - ${{ each arch in split('amd64,arm64', ',') }}:
             - template: /.azure-pipelines/jobs/onebranch-linux-image.yml@self
@@ -235,7 +259,7 @@ extends:
           # project's Azure Artifacts feed, which proxies the NuGet Gallery.
           - job: event_writer_build
             displayName: E2E Test Event Writer
-            condition: and(succeeded(), eq(variables['publishImagesAndRunE2E'], 'True'))
+            condition: and(succeeded(), eq(variables['runE2E'], 'True'))
             timeoutInMinutes: 60
             pool:
               type: windows
@@ -314,7 +338,7 @@ extends:
 
           - job: event_writer_image
             displayName: E2E Test Event Writer Image
-            condition: and(succeeded(), eq(variables['publishImagesAndRunE2E'], 'True'))
+            condition: and(succeeded(), eq(variables['runE2E'], 'True'))
             dependsOn: event_writer_build
             timeoutInMinutes: 60
             pool:
@@ -355,7 +379,7 @@ extends:
         # On pull requests the stage does not wait for the build stage, so
         # the e2e check posts when the run starts. A failed build still
         # blocks the merge through its own check.
-        ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+        ${{ if or(parameters.usePrebuiltImages, eq(variables['Build.Reason'], 'PullRequest')) }}:
           dependsOn: []
         ${{ else }}:
           dependsOn: build
@@ -364,7 +388,7 @@ extends:
           # requires the check "CI (Build Images) (Run E2E Tests)" on every
           # pull request, and Azure DevOps posts no check for a skipped job.
           # A server job with the same name posts the check.
-          - ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+          - ${{ if and(not(parameters.usePrebuiltImages), eq(variables['Build.Reason'], 'PullRequest')) }}:
             - job: e2e
               displayName: E2E Tests
               pool:
@@ -379,20 +403,48 @@ extends:
             # and scans to the critical path.
             - job: e2e
               displayName: E2E Tests
-              condition: and(succeeded(), eq(variables['publishImagesAndRunE2E'], 'True'))
+              condition: and(succeeded(), eq(variables['runE2E'], 'True'))
               timeoutInMinutes: 90
               pool:
                 type: linux
               variables:
                 ob_outputDirectory: $(Build.SourcesDirectory)/out
                 CLUSTER_NAME: retina-e2e-$(Build.BuildId)-$(System.JobAttempt)
+                ${{ if parameters.usePrebuiltImages }}:
+                  e2eImageRegistry: ${{ parameters.imageRegistry }}
+                  e2eImageNamespace: ${{ parameters.imageNamespace }}
+                  e2eImageTag: ${{ parameters.imageTag }}
+                ${{ else }}:
+                  e2eImageRegistry: $(ACR_NAME)
+                  e2eImageNamespace: $(imageNamespace)
+                  e2eImageTag: ${{ substring(variables['Build.SourceVersion'], 0, 8) }}
               steps:
+                - ${{ if parameters.usePrebuiltImages }}:
+                  - bash: |
+                      set -euo pipefail
+                      : "${IMAGE_REGISTRY:?imageRegistry is required in prebuilt mode}"
+                      : "${IMAGE_NAMESPACE:?imageNamespace is required in prebuilt mode}"
+                      : "${TAG:?imageTag is required in prebuilt mode}"
+                      : "${EVENT_WRITER_IMAGE:?eventWriterImage is required in prebuilt mode}"
+                      for input in "$IMAGE_REGISTRY" "$IMAGE_NAMESPACE" "$TAG" "$EVENT_WRITER_IMAGE"; do
+                        if [[ "$input" =~ [[:space:]] ]]; then
+                          echo "##vso[task.logissue type=error]Prebuilt image inputs must not contain whitespace"
+                          exit 1
+                        fi
+                      done
+                    displayName: Validate prebuilt image inputs
+                    env:
+                      IMAGE_REGISTRY: $(e2eImageRegistry)
+                      IMAGE_NAMESPACE: $(e2eImageNamespace)
+                      TAG: $(e2eImageTag)
+                      EVENT_WRITER_IMAGE: ${{ parameters.eventWriterImage }}
                 # `make manifest` creates the multi-arch indexes from the
                 # per-platform tags that the image jobs pushed. The OneBranch
                 # Linux container has no docker CLI, so the oras script replaces
                 # `docker buildx imagetools create` as the backend.
                 - task: AzureCLI@2
                   displayName: Create multi-arch manifests
+                  condition: and(succeeded(), ${{ not(parameters.usePrebuiltImages) }})
                   inputs:
                     azureSubscription: $(azureServiceConnection)
                     scriptType: bash
@@ -442,19 +494,22 @@ extends:
                     AZURE_AGENT_LINUX_SKU: $(AZURE_AGENT_LINUX_SKU)
                     AZURE_AGENT_WINDOWS_SKU: $(AZURE_AGENT_WINDOWS_SKU)
                     AZURE_AGENT_LINUX_ARM_SKU: $(AZURE_AGENT_LINUX_ARM_SKU)
+                    IMAGE_REGISTRY: $(e2eImageRegistry)
+                    IMAGE_NAMESPACE: $(e2eImageNamespace)
+                    TAG: $(e2eImageTag)
+                    ${{ if parameters.usePrebuiltImages }}:
+                      EVENT_WRITER_IMAGE: ${{ parameters.eventWriterImage }}
                   inputs:
                     azureSubscription: $(azureServiceConnection)
                     scriptType: bash
                     scriptLocation: inlineScript
                     inlineScript: |
                       set -euo pipefail
-                      SOURCE_TAG="${BUILD_SOURCEVERSION:0:8}"
-                      export TAG="$SOURCE_TAG"
                       export AZURE_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
                       go test -v ./test/e2e/. -timeout 60m -tags=e2e -count=1 -args \
-                        -image-tag="$SOURCE_TAG" \
-                        -image-registry=$(ACR_NAME) \
-                        -image-namespace=$(imageNamespace)
+                        -image-tag="$TAG" \
+                        -image-registry="$IMAGE_REGISTRY" \
+                        -image-namespace="$IMAGE_NAMESPACE"
                 - task: AzureCLI@2
                   displayName: Cleanup resource group
                   condition: always()
