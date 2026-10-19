@@ -424,9 +424,9 @@ extends:
                       set -euo pipefail
                       : "${IMAGE_REGISTRY:?imageRegistry is required in prebuilt mode}"
                       : "${IMAGE_NAMESPACE:?imageNamespace is required in prebuilt mode}"
-                      : "${TAG:?imageTag is required in prebuilt mode}"
+                      : "${E2E_IMAGE_TAG:?imageTag is required in prebuilt mode}"
                       : "${EVENT_WRITER_IMAGE:?eventWriterImage is required in prebuilt mode}"
-                      for input in "$IMAGE_REGISTRY" "$IMAGE_NAMESPACE" "$TAG" "$EVENT_WRITER_IMAGE"; do
+                      for input in "$IMAGE_REGISTRY" "$IMAGE_NAMESPACE" "$E2E_IMAGE_TAG" "$EVENT_WRITER_IMAGE"; do
                         if [[ "$input" =~ [[:space:]] ]]; then
                           echo "##vso[task.logissue type=error]Prebuilt image inputs must not contain whitespace"
                           exit 1
@@ -436,7 +436,7 @@ extends:
                     env:
                       IMAGE_REGISTRY: $(e2eImageRegistry)
                       IMAGE_NAMESPACE: $(e2eImageNamespace)
-                      TAG: $(e2eImageTag)
+                      E2E_IMAGE_TAG: $(e2eImageTag)
                       EVENT_WRITER_IMAGE: ${{ parameters.eventWriterImage }}
                 # `make manifest` creates the multi-arch indexes from the
                 # per-platform tags that the image jobs pushed. The OneBranch
@@ -496,7 +496,7 @@ extends:
                     AZURE_AGENT_LINUX_ARM_SKU: $(AZURE_AGENT_LINUX_ARM_SKU)
                     IMAGE_REGISTRY: $(e2eImageRegistry)
                     IMAGE_NAMESPACE: $(e2eImageNamespace)
-                    TAG: $(e2eImageTag)
+                    E2E_IMAGE_TAG: $(e2eImageTag)
                     ${{ if parameters.usePrebuiltImages }}:
                       EVENT_WRITER_IMAGE: ${{ parameters.eventWriterImage }}
                   inputs:
@@ -505,6 +505,8 @@ extends:
                     scriptLocation: inlineScript
                     inlineScript: |
                       set -euo pipefail
+                      # Keep the E2E tag independent of the pipeline's build TAG.
+                      export TAG="${E2E_IMAGE_TAG:?E2E image tag is required}"
                       export AZURE_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
                       go test -v ./test/e2e/. -timeout 60m -tags=e2e -count=1 -args \
                         -image-tag="$TAG" \

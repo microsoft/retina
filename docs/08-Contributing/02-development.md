@@ -182,6 +182,8 @@ Azure authentication does not grant nodes access to private registries.
 
 Registry, namespace, and tag flow through the existing E2E flags/environment into
 both Retina and Hubble Helm installs, Helm upgrades, and capture workloads.
+The task exports the selected E2E tag explicitly so the pipeline's build `TAG`
+cannot replace the supplied candidate tag.
 Retina image inputs currently accept a shared tag, not per-component full
 references or digests. This mode runs the existing source-checkout E2E suite and
 capture CLI; it does not add coverage for prebuilt `kubectl-retina` or
