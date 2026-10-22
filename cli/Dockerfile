@@ -29,7 +29,7 @@ RUN --mount=type=cache,target="/root/.cache/go-build" \
 # minimal libs stage — provides only the system libraries needed by the CGO-enabled binary,
 # without the bloat of the full Go SDK image (python, gcc, systemd, etc.)
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261015@sha256:af39b0587a0fd132e574faabf9aaf56833d69908b9ff227131d519ee219759e7 AS libs
+FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261022@sha256:bd88359666e3f20296e7fe639a480dfd3c3c8eba299b21f26e4560353e21a656 AS libs
 # Keep this pin until the Azure Linux base includes pcre2 >= 10.48-1.azl3; verify both architectures before removing.
 RUN tdnf install -y pcre2-10.48-1.azl3 && tdnf clean all
 
@@ -38,7 +38,7 @@ RUN tdnf install -y pcre2-10.48-1.azl3 && tdnf clean all
 # Final image must be $TARGETPLATFORM (default), not $BUILDPLATFORM — the
 # kubectl-retina binary is cross-compiled for the target arch and would fail
 # to run inside a wrong-arch base image.
-FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20260923@sha256:792ea6ed971a69bbca863882354d4ff197ca461e0f699d0256653f7886a62d42 AS distroless-target
+FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20261022@sha256:c91e907c537ad861cb90bc18aece90479b0754b090afd4eb8722dd15477dc9e8 AS distroless-target
 COPY --from=libs /lib/ /lib
 COPY --from=libs /usr/lib/ /usr/lib
 COPY --from=libs /etc/pki/tls/ /etc/pki/tls/
@@ -50,7 +50,7 @@ COPY --from=builder /workspace/kubectl-retina .
 # Final image must be $TARGETPLATFORM (default), not $BUILDPLATFORM — the
 # kubectl-retina binary is cross-compiled for the target arch and would fail
 # to run inside a wrong-arch base image.
-FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261015@sha256:af39b0587a0fd132e574faabf9aaf56833d69908b9ff227131d519ee219759e7 AS shell-target
+FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261022@sha256:bd88359666e3f20296e7fe639a480dfd3c3c8eba299b21f26e4560353e21a656 AS shell-target
 # Keep this pin until the Azure Linux base includes pcre2 >= 10.48-1.azl3; verify both architectures before removing.
 RUN tdnf install -y pcre2-10.48-1.azl3 && tdnf clean all
 WORKDIR /
