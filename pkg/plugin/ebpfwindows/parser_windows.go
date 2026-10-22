@@ -54,12 +54,27 @@ type Parser struct {
 }
 
 var (
-	errDataOffsetTooLarge          = errorTypes.New("data offset too large")
-	errNotEnoughBytes              = errorTypes.New("not enough bytes to decode")
-	errDropReasonOverflow          = errorTypes.New("drop reason exceeds int32 range")
-	errUnsupportedIPPacketType     = errorTypes.New("decode layers failed for unsupported IP packet type")
-	errUnsupportedPktmonPacketType = errorTypes.New("decode layers failed for unsupported packet type")
+	errDataOffsetTooLarge            = errorTypes.New("data offset too large")
+	errNotEnoughBytes                = errorTypes.New("not enough bytes to decode")
+	errDropReasonOverflow            = errorTypes.New("drop reason exceeds int32 range")
+	errUnsupportedIPPacketType       = errorTypes.New("decode layers failed for unsupported IP packet type")
+	errUnsupportedPktmonPacketType   = errorTypes.New("decode layers failed for unsupported packet type")
+	errKnownNonDecodablePktmonRecord = errorTypes.New("known non-decodable PktMon record")
 )
+
+func isKnownNonDecodablePktmonError(pdn *PktmonDropNotify, err error) bool {
+	if pdn == nil || err == nil {
+		return false
+	}
+
+	switch err.Error() {
+	case "IPv6 length 0, but next header is ICMPv6, not HopByHop",
+		"Invalid TCP data offset 1 < 5":
+		return true
+	default:
+		return false
+	}
+}
 
 // re-usable packet to avoid reallocating gopacket datastructures
 type packet struct {
@@ -270,6 +285,9 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error { //nolint:gocyclo 
 		}
 
 		if err != nil {
+			if isKnownNonDecodablePktmonError(pdn, err) {
+				return fmt.Errorf("%w: %v", errKnownNonDecodablePktmonRecord, err)
+			}
 			return fmt.Errorf("decode layers failed: %w", err)
 		}
 	} else {

@@ -34,6 +34,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 const (
@@ -1524,6 +1527,193 @@ func makePktmonDropHeader(version, packetType uint16) []byte {
 	binary.NativeEndian.PutUint16(header[31:33], packetType)
 	binary.NativeEndian.PutUint32(header[39:43], 2)
 	return header
+}
+
+func makePktmonDropEvent(packetType uint16, payload []byte) []byte {
+	return append(makePktmonDropHeader(DropNotifyVersion1, packetType), payload...)
+}
+
+func makeZeroLengthIPv6ICMPv6Packet() []byte {
+	packet := make([]byte, 40)
+	packet[0] = 0x60
+	packet[6] = byte(layers.IPProtocolICMPv6)
+	packet[7] = 64
+	return packet
+}
+
+func makeInvalidTCPDataOffsetPacket() []byte {
+	packet := makeMockIPv4TCPPacket()
+	packet[32] = (packet[32] & 0x0f) | 0x10
+	return packet
+}
+
+func newPktmonDecodeTestPlugin(t *testing.T) (*Plugin, *observer.ObservedLogs) {
+	t.Helper()
+
+	parser, err := NewParser(slog.Default())
+	require.NoError(t, err)
+
+	core, observedLogs := observer.New(zap.DebugLevel)
+	return &Plugin{
+		l:      &log.ZapLogger{Logger: zap.New(core)},
+		parser: parser,
+	}, observedLogs
+}
+
+func TestIsKnownNonDecodablePktmonError(t *testing.T) {
+	pdn := &PktmonDropNotify{}
+	tests := []struct {
+		name string
+		pdn  *PktmonDropNotify
+		err  error
+		want bool
+	}{
+		{
+			name: "exact zero-length IPv6 ICMPv6 error",
+			pdn:  pdn,
+			err:  errors.New("IPv6 length 0, but next header is ICMPv6, not HopByHop"),
+			want: true,
+		},
+		{
+			name: "exact invalid TCP data offset error",
+			pdn:  pdn,
+			err:  errors.New("Invalid TCP data offset 1 < 5"),
+			want: true,
+		},
+		{
+			name: "zero-length IPv6 near match",
+			pdn:  pdn,
+			err:  errors.New("IPv6 length 0, but next header is TCP, not HopByHop"),
+		},
+		{
+			name: "TCP data offset near match",
+			pdn:  pdn,
+			err:  errors.New("Invalid TCP data offset 2 < 5"),
+		},
+		{
+			name: "unrelated decoder error",
+			pdn:  pdn,
+			err:  errors.New("Ethernet packet too small"),
+		},
+		{
+			name: "nil decoder error",
+			pdn:  pdn,
+		},
+		{
+			name: "non-PktMon context",
+			err:  errors.New("Invalid TCP data offset 1 < 5"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, isKnownNonDecodablePktmonError(tt.pdn, tt.err))
+		})
+	}
+}
+
+func TestHandleTraceEvent_KnownNonDecodablePktmonErrors(t *testing.T) {
+	tests := []struct {
+		name        string
+		event       []byte
+		wantErrText string
+	}{
+		{
+			name: "zero-length IPv6 ICMPv6",
+			event: makePktmonDropEvent(
+				uint16(PktMonPayloadIP),
+				makeZeroLengthIPv6ICMPv6Packet(),
+			),
+			wantErrText: "IPv6 length 0, but next header is ICMPv6, not HopByHop",
+		},
+		{
+			name: "invalid TCP data offset",
+			event: makePktmonDropEvent(
+				uint16(PktMonPayloadIP),
+				makeInvalidTCPDataOffsetPacket(),
+			),
+			wantErrText: "Invalid TCP data offset 1 < 5",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p, _ := newPktmonDecodeTestPlugin(t)
+
+			err := p.handleTraceEvent(unsafe.Pointer(&tt.event[0]), uint32(len(tt.event))) //nolint:gosec
+
+			require.ErrorIs(t, err, errKnownNonDecodablePktmonRecord)
+			require.ErrorContains(t, err, tt.wantErrText)
+		})
+	}
+}
+
+func TestParserDecode_DoesNotClassifyNonPktmonEvent(t *testing.T) {
+	packet := makeMockEthernetIPv4TCPPacket()
+	packet[46] = (packet[46] & 0x0f) | 0x10
+	data := append(makeDropNotifyHeader(DropNotifyVersion1), packet...)
+	parser, err := NewParser(slog.Default())
+	require.NoError(t, err)
+
+	_, err = parser.Decode(&observerTypes.MonitorEvent{
+		Payload: &observerTypes.PerfEvent{Data: data},
+	})
+
+	require.Error(t, err)
+	require.NotErrorIs(t, err, errKnownNonDecodablePktmonRecord)
+	require.ErrorContains(t, err, "Invalid TCP data offset 1 < 5")
+}
+
+func TestEventsMapCallback_PktmonDecodeLogSeverity(t *testing.T) {
+	tests := []struct {
+		name       string
+		event      []byte
+		wantDebugs int
+		wantErrors int
+	}{
+		{
+			name: "zero-length IPv6 ICMPv6 logs debug",
+			event: makePktmonDropEvent(
+				uint16(PktMonPayloadIP),
+				makeZeroLengthIPv6ICMPv6Packet(),
+			),
+			wantDebugs: 1,
+		},
+		{
+			name: "invalid TCP data offset logs debug",
+			event: makePktmonDropEvent(
+				uint16(PktMonPayloadIP),
+				makeInvalidTCPDataOffsetPacket(),
+			),
+			wantDebugs: 1,
+		},
+		{
+			name: "unrelated malformed PktMon payload logs error",
+			event: makePktmonDropEvent(
+				uint16(PktMonPayloadEthernet),
+				[]byte{0, 1, 2, 3, 4, 5},
+			),
+			wantErrors: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p, observedLogs := newPktmonDecodeTestPlugin(t)
+
+			p.eventsMapCallback(unsafe.Pointer(&tt.event[0]), uint32(len(tt.event))) //nolint:gosec
+
+			require.Len(t, observedLogs.FilterLevelExact(zapcore.DebugLevel).All(), tt.wantDebugs)
+			require.Len(t, observedLogs.FilterLevelExact(zapcore.ErrorLevel).All(), tt.wantErrors)
+			if tt.wantDebugs == 1 {
+				require.Equal(t, "Skipping known non-decodable PktMon event", observedLogs.All()[0].Message)
+				require.Contains(t, observedLogs.All()[0].ContextMap()["error"], "could not convert pktmon dropnotify event to flow")
+			}
+			if tt.wantErrors == 1 {
+				require.Equal(t, "Error handling trace event", observedLogs.All()[0].Message)
+			}
+		})
+	}
 }
 
 // makeDropNotifyHeader builds a cilium drop notification header of the exact supported length.
