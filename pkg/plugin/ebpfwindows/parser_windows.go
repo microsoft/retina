@@ -286,7 +286,7 @@ func (p *Parser) decode(data []byte, decoded *pb.Flow) error { //nolint:gocyclo 
 
 		if err != nil {
 			if isKnownNonDecodablePktmonError(pdn, err) {
-				return fmt.Errorf("%w: %v", errKnownNonDecodablePktmonRecord, err)
+				return fmt.Errorf("%w: %w", errKnownNonDecodablePktmonRecord, err)
 			}
 			return fmt.Errorf("decode layers failed: %w", err)
 		}

@@ -58,6 +58,12 @@ var (
 	errTestFailure    = errors.New("test failure")
 	errModuleNotFound = errors.New("module not found")
 
+	errTestIPv6NoICMPv6Payload = errors.New("IPv6 length 0, but next header is ICMPv6, not HopByHop")
+	errTestTCPDataOffsetOne    = errors.New("Invalid TCP data offset 1 < 5") //nolint:staticcheck // preserve the exact gopacket decoder message
+	errTestIPv6NoTCPPayload    = errors.New("IPv6 length 0, but next header is TCP, not HopByHop")
+	errTestTCPDataOffsetTwo    = errors.New("Invalid TCP data offset 2 < 5") //nolint:staticcheck // preserve the exact gopacket decoder message
+	errTestEthernetTooSmall    = errors.New("Ethernet packet too small")     //nolint:staticcheck // preserve the exact gopacket decoder message
+
 	// testIsReplyTrue is used for flow expectations that require is_reply to be set.
 	testIsReplyTrue = true
 )
@@ -1571,29 +1577,29 @@ func TestIsKnownNonDecodablePktmonError(t *testing.T) {
 		{
 			name: "exact zero-length IPv6 ICMPv6 error",
 			pdn:  pdn,
-			err:  errors.New("IPv6 length 0, but next header is ICMPv6, not HopByHop"),
+			err:  errTestIPv6NoICMPv6Payload,
 			want: true,
 		},
 		{
 			name: "exact invalid TCP data offset error",
 			pdn:  pdn,
-			err:  errors.New("Invalid TCP data offset 1 < 5"),
+			err:  errTestTCPDataOffsetOne,
 			want: true,
 		},
 		{
 			name: "zero-length IPv6 near match",
 			pdn:  pdn,
-			err:  errors.New("IPv6 length 0, but next header is TCP, not HopByHop"),
+			err:  errTestIPv6NoTCPPayload,
 		},
 		{
 			name: "TCP data offset near match",
 			pdn:  pdn,
-			err:  errors.New("Invalid TCP data offset 2 < 5"),
+			err:  errTestTCPDataOffsetTwo,
 		},
 		{
 			name: "unrelated decoder error",
 			pdn:  pdn,
-			err:  errors.New("Ethernet packet too small"),
+			err:  errTestEthernetTooSmall,
 		},
 		{
 			name: "nil decoder error",
@@ -1601,7 +1607,7 @@ func TestIsKnownNonDecodablePktmonError(t *testing.T) {
 		},
 		{
 			name: "non-PktMon context",
-			err:  errors.New("Invalid TCP data offset 1 < 5"),
+			err:  errTestTCPDataOffsetOne,
 		},
 	}
 
@@ -1640,7 +1646,7 @@ func TestHandleTraceEvent_KnownNonDecodablePktmonErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p, _ := newPktmonDecodeTestPlugin(t)
 
-			err := p.handleTraceEvent(unsafe.Pointer(&tt.event[0]), uint32(len(tt.event))) //nolint:gosec
+			err := p.handleTraceEvent(unsafe.Pointer(&tt.event[0]), uint32(len(tt.event))) //nolint:gosec // test event lengths fit within uint32
 
 			require.ErrorIs(t, err, errKnownNonDecodablePktmonRecord)
 			require.ErrorContains(t, err, tt.wantErrText)
@@ -1701,7 +1707,7 @@ func TestEventsMapCallback_PktmonDecodeLogSeverity(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p, observedLogs := newPktmonDecodeTestPlugin(t)
 
-			p.eventsMapCallback(unsafe.Pointer(&tt.event[0]), uint32(len(tt.event))) //nolint:gosec
+			p.eventsMapCallback(unsafe.Pointer(&tt.event[0]), uint32(len(tt.event))) //nolint:gosec // test event lengths fit within uint32
 
 			require.Len(t, observedLogs.FilterLevelExact(zapcore.DebugLevel).All(), tt.wantDebugs)
 			require.Len(t, observedLogs.FilterLevelExact(zapcore.ErrorLevel).All(), tt.wantErrors)
