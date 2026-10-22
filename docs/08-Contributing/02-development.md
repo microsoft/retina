@@ -193,6 +193,28 @@ also exercises Windows and arm64.
 Leave `usePrebuiltImages=false` to retain normal PR, merge-queue, and manual
 build behavior. Prebuilt-only inputs are ignored in that mode.
 
+#### Dedicated Dalec E2E pipeline
+
+`.azure-pipelines/dalec-e2e.yml` is a manually queued, E2E-only entry point for
+Dalec candidates. It runs the same E2E suite and accepts `imageRegistry`,
+`imageNamespace`, `imageTag`, and `eventWriterImage` as above, without the
+`usePrebuiltImages` or `runE2EValidation` switches. It has no image build,
+publication, or manifest stage, and no automatic PR or push trigger.
+
+Configure its Azure DevOps definition with the
+`Azure Container Networking - Build Validations - Federated` Azure service
+connection and the `AZURE_LOCATION`, `AZURE_AGENT_LINUX_SKU`,
+`AZURE_AGENT_WINDOWS_SKU`, and `AZURE_AGENT_LINUX_ARM_SKU` variables. Authorize
+this pipeline to use the required GitHub and Azure service connections and the
+OneBranch governed-template repository without granting new access to every
+pipeline. The Azure identity must be allowed
+to create and delete the suite's AKS resources in its selected subscription.
+
+Use a branch containing the candidate test code and this entry point. The image
+tag selects the prebuilt images, not the source checkout. The coordinated-image
+platform requirements, node pull access, and coverage limitations above still
+apply. Resource-group cleanup is attempted even when E2E fails.
+
 ### Publishing Images and Charts
 
 To publish images to GHCR in your forked repository, simply push to `main`, or publish a tag. The `container-publish` action will run automatically and push images to your GitHub packages registry.
