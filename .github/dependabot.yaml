@@ -88,6 +88,12 @@ updates:
     cooldown:
       default-days: 7
       semver-major-days: 30
+    allow:
+      - dependency-type: "direct"
+      # go.mod marks tool dependencies as indirect, and Dependabot skips
+      # indirect dependencies unless an entry allows them by name.
+      - dependency-name: "sigs.k8s.io/kind"
+        dependency-type: "all"
     ignore:
       # hive/statedb/stream versions are pinned by cilium/cilium's go.mod;
       # they can only move when cilium/cilium moves.

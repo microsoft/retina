@@ -4,17 +4,15 @@
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2.16.1": {},
     "ghcr.io/devcontainers/features/github-cli:1.1.0": {},
+    // Keep both versions equal to go.mod: "version" to the go directive
+    // (CI checks this), and "golangciLintVersion" to the golangci-lint tool,
+    // so that the editor lints like CI.
     "ghcr.io/devcontainers/features/go:1.3.4": {
-      "version": "1.24.11"
+      "version": "1.26.0",
+      "golangciLintVersion": "2.11.4"
     },
     "ghcr.io/devcontainers/features/kubectl-helm-minikube:1.3.1": {},
-    "ghcr.io/devcontainers-extra/features/kind:1.0.15": {},
-    "ghcr.io/devcontainers/features/azure-cli:1.2.9": {},
-    // LLVM 17 is the minimum version available for Ubuntu Noble on apt.llvm.org.
-    // Provides clang and llvm-strip needed for eBPF compilation.
-    "ghcr.io/devcontainers-community/features/llvm:3.2.0": {
-      "version": "17"
-    }
+    "ghcr.io/devcontainers/features/azure-cli:1.2.9": {}
   },
   "hostRequirements": {
     "cpus": 4,
@@ -36,14 +34,14 @@
   ],
   // These commands run in parallel during container creation.
   "onCreateCommand": {
-    // The LLVM feature installs versioned binaries (clang-17, llvm-strip-17).
-    // Create unversioned symlinks so the build system can find them.
-    "symlinks": "sudo ln -sf /usr/bin/clang-17 /usr/bin/clang && sudo ln -sf /usr/bin/llvm-strip-17 /usr/bin/llvm-strip",
     // Fix ownership of volume mounts (created as root) and cache dirs,
-    // then download Go modules.
-    "go-setup": "sudo chown -R vscode:vscode /go /home/vscode/.cache && go mod download",
-    // Install jq (needed by some Makefile targets and scripts).
-    "apt-deps": "sudo apt-get update && sudo apt-get install -y --no-install-recommends jq && sudo rm -rf /var/lib/apt/lists/*"
+    // download Go modules, then install kind at the version in go.mod.
+    "go-setup": "sudo chown -R vscode:vscode /go /home/vscode/.cache && go mod download && go install sigs.k8s.io/kind",
+    // Install jq (needed by some Makefile targets and scripts), and clang and
+    // llvm-strip (needed for eBPF compilation) from the Ubuntu archive.
+    // The LLVM packages install versioned binaries (clang-17, llvm-strip-17),
+    // so create unversioned symlinks that the build system can find.
+    "apt-deps": "sudo apt-get update && sudo apt-get install -y --no-install-recommends jq clang-17 llvm-17 && sudo ln -sf /usr/bin/clang-17 /usr/bin/clang && sudo ln -sf /usr/bin/llvm-strip-17 /usr/bin/llvm-strip && sudo rm -rf /var/lib/apt/lists/*"
   },
   // Wait for Docker-in-Docker to be ready, then create a Kind cluster for local testing.
   "postStartCommand": {

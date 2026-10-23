@@ -35,7 +35,9 @@ jobs:
             llvm-strip --version
             go version
             EXPECTED_GO=$(grep '^go ' go.mod | awk '{print $2}')
-            ACTUAL_GO=$(go version | grep -oP '\d+\.\d+\.\d+')
+            # GOTOOLCHAIN=local reports the installed Go. Without it, go
+            # downloads the go.mod version and the check always passes.
+            ACTUAL_GO=$(GOTOOLCHAIN=local go version | grep -oP '\d+\.\d+\.\d+')
             if [ "$EXPECTED_GO" != "$ACTUAL_GO" ]; then
               echo "::error::Go version mismatch: devcontainer has $ACTUAL_GO but go.mod requires $EXPECTED_GO"
               exit 1
