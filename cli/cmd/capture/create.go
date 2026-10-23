@@ -142,11 +142,15 @@ var createExample = templates.Examples(i18n.T(`
 		`))
 
 // logTargetNamespaceSelector explains that --namespace-selectors, not --namespace, decided which namespaces were searched for target pods.
-func logTargetNamespaceSelector() {
-	if opts.namespaceSelectors == "" {
+// It logs the selector the capture actually uses, not the raw flag value, so input that is
+// normalized while parsing (for example a repeated key, where only the last value is kept) is visible.
+func logTargetNamespaceSelector(capture *retinav1alpha1.Capture) {
+	namespaceSelector := capture.Spec.CaptureConfiguration.CaptureTarget.NamespaceSelector
+	if namespaceSelector == nil {
 		return
 	}
-	retinacmd.Logger.Info(fmt.Sprintf("Target pods were selected from namespaces matching %q; --namespace only sets where the capture Jobs run", opts.namespaceSelectors))
+	retinacmd.Logger.Info(fmt.Sprintf("Target pods were selected from namespaces matching %q; --namespace only sets where the capture Jobs run",
+		metav1.FormatLabelSelector(namespaceSelector)))
 }
 
 func create(kubeClient kubernetes.Interface) error {
@@ -181,7 +185,7 @@ func create(kubeClient kubernetes.Interface) error {
 	}
 
 	// Logged only once the target selection has been validated and resolved, so it never accompanies an invalid flag combination.
-	logTargetNamespaceSelector()
+	logTargetNamespaceSelector(capture)
 
 	// Set owner references on secrets so they are garbage-collected when the
 	// jobs are removed (by TTL, explicit deletion, or manual kubectl delete).

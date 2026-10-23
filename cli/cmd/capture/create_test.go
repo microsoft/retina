@@ -429,14 +429,20 @@ func TestCreateCaptureLogsJobNamespaceButNotSelectorBeforeValidation(t *testing.
 }
 
 func TestLogTargetNamespaceSelector(t *testing.T) {
-	savedNamespaceSelectors := opts.namespaceSelectors
-	t.Cleanup(func() { opts.namespaceSelectors = savedNamespaceSelectors })
+	captureWithNamespaceSelector := func(selector *metav1.LabelSelector) *retinav1alpha1.Capture {
+		return &retinav1alpha1.Capture{Spec: retinav1alpha1.CaptureSpec{
+			CaptureConfiguration: retinav1alpha1.CaptureConfiguration{
+				CaptureTarget: retinav1alpha1.CaptureTarget{NamespaceSelector: selector},
+			},
+		}}
+	}
 
-	t.Run("logs which namespaces were searched when namespace selectors are set", func(t *testing.T) {
-		opts.namespaceSelectors = "capture-group=my-group"
+	t.Run("logs which namespaces were searched when a namespace selector is set", func(t *testing.T) {
 		observedLogs := observeLogs(t)
 
-		logTargetNamespaceSelector()
+		logTargetNamespaceSelector(captureWithNamespaceSelector(&metav1.LabelSelector{
+			MatchLabels: map[string]string{"capture-group": "my-group"},
+		}))
 
 		logs := observedLogs.All()
 		require.Len(t, logs, 1)
@@ -444,14 +450,48 @@ func TestLogTargetNamespaceSelector(t *testing.T) {
 		require.Contains(t, logs[0].Message, "--namespace only sets where the capture Jobs run")
 	})
 
-	t.Run("logs nothing without namespace selectors", func(t *testing.T) {
-		opts.namespaceSelectors = ""
+	t.Run("logs nothing without a namespace selector", func(t *testing.T) {
 		observedLogs := observeLogs(t)
 
-		logTargetNamespaceSelector()
+		logTargetNamespaceSelector(captureWithNamespaceSelector(nil))
 
 		require.Zero(t, observedLogs.Len())
 	})
+}
+
+func TestCreateCaptureLogsEffectiveNamespaceSelectorForRepeatedKeys(t *testing.T) {
+	savedNodeSelectors := opts.nodeSelectors
+	savedPodSelectors := opts.podSelectors
+	savedNamespaceSelectors := opts.namespaceSelectors
+	savedNamespace := opts.Namespace
+	savedName := opts.Name
+	t.Cleanup(func() {
+		opts.nodeSelectors = savedNodeSelectors
+		opts.podSelectors = savedPodSelectors
+		opts.namespaceSelectors = savedNamespaceSelectors
+		opts.Namespace = savedNamespace
+		opts.Name = savedName
+	})
+
+	name := "test-capture"
+	namespace := "capture-ns"
+	opts.nodeSelectors = DefaultNodeSelectors
+	opts.podSelectors = "app=my-app"
+	// A repeated key is not an OR: the last value wins, so only app-b is selected.
+	opts.namespaceSelectors = "kubernetes.io/metadata.name=app-a,kubernetes.io/metadata.name=app-b"
+	opts.Namespace = &namespace
+	opts.Name = &name
+
+	capture, err := createCaptureF(context.Background(), fake.NewClientset())
+	require.NoError(t, err)
+
+	observedLogs := observeLogs(t)
+	logTargetNamespaceSelector(capture)
+
+	logs := observedLogs.All()
+	require.Len(t, logs, 1)
+	require.Contains(t, logs[0].Message, `"kubernetes.io/metadata.name=app-b"`)
+	require.NotContains(t, logs[0].Message, "app-a")
 }
 
 func TestNamespaceFlagsHelpExplainTheDifference(t *testing.T) {
