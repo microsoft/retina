@@ -25,8 +25,8 @@
     "micromatch": "^4.0.8",
     "prism-react-renderer": "^2.4.1",
     "react": "^19.2.5",
-    "react-dom": "^19.3.0",
-    "sharp": "^0.35.3"
+    "react-dom": "^19.3.1",
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
     "@docusaurus/module-type-aliases": "^3.9.2",
@@ -53,7 +53,8 @@
   },
   "overrides": {
     "serialize-javascript": ">=7.0.5",
-    "sharp": "^0.35.3",
+    "sharp": "^0.35.5",
+    "tinypool": "^2.1.2",
     "uuid": "^11.1.1"
   }
 }
