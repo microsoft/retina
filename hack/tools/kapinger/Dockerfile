@@ -25,7 +25,7 @@ RUN go mod download
 RUN GOOS=windows go build -o kapinger.exe .
 
 # skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2022 --override-os windows --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/windows/servercore:ltsc2022@sha256:593cf4a5ef08cfff00a03637e45eba073b8fe9dc90b80af4449bc5f427c7cdcd AS windows
+FROM mcr.microsoft.com/windows/servercore:ltsc2022@sha256:b52799a67fa596d4bddcd82ae1dab0077a84767fbc33c7342b72b53ecc71ad09 AS windows
 WORKDIR /app
 COPY --from=windows-builder /build/kapinger.exe .
 ENTRYPOINT [ "cmd.exe" ]
