@@ -3,7 +3,7 @@ ARG OS_VERSION=ltsc2022
 # pinned base images
 
 # skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2022  --override-os windows --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/windows/servercore:ltsc2022@sha256:593cf4a5ef08cfff00a03637e45eba073b8fe9dc90b80af4449bc5f427c7cdcd AS ltsc2022
+FROM mcr.microsoft.com/windows/servercore:ltsc2022@sha256:b52799a67fa596d4bddcd82ae1dab0077a84767fbc33c7342b72b53ecc71ad09 AS ltsc2022
 
 FROM ${OS_VERSION} AS agent-win
 ARG GOARCH=amd64 # default to amd64
