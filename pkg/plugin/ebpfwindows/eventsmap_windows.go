@@ -1,6 +1,7 @@
 package ebpfwindows
 
 import (
+	"fmt"
 	"syscall"
 	"unsafe"
 
@@ -54,11 +55,12 @@ func (e *eventsMap) RegisterForCallback(l *log.ZapLogger, cb eventsMapCallback) 
 	callback := syscall.NewCallback(eventsMapSysCallCallback)
 
 	// Call the API
-	ret, _, err := callRegisterEventsMapCallback(uintptr(callback), uintptr(unsafe.Pointer(&e.perfBuffer)))
+	ret, _, _ := callRegisterEventsMapCallback(uintptr(callback), uintptr(unsafe.Pointer(&e.perfBuffer)))
 
 	if ret != 0 {
 		l.Error("Error registering for events map callback")
-		return err
+		status := syscall.Errno(ret)
+		return fmt.Errorf("RetinaRegisterEventsMapCallback failed with status %d: %w", ret, status)
 	}
 
 	return nil
