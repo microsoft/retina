@@ -167,6 +167,53 @@ func TestProcessFlow(t *testing.T) {
 	lm.Clean()
 }
 
+// TestCalculateLatencyAcrossSecondBoundary is a regression test for a bug where only
+// the sub-second part of the flow timestamp (Timestamp.Nanos) was used to compute
+// latency. When a request and its reply were observed in different seconds, the
+// result was a large negative value (e.g. -999ms instead of 1ms).
+func TestCalculateLatencyAcrossSecondBoundary(t *testing.T) {
+	apiServerIP := net.IPv4(1, 1, 1, 1)
+	nodeIP := net.IPv4(2, 2, 2, 2)
+
+	log.SetupZapLogger(log.GetDefaultLogOpts())
+	l := log.Logger().Named("test")
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	exporter.AdvancedRegistry = prometheus.NewRegistry()
+	lm := &LatencyMetrics{l: l}
+	lm.Init("latency")
+	defer lm.Clean()
+
+	lm.apiServerIps[apiServerIP.String()] = struct{}{}
+
+	// Exactly one observation of 1ms is expected.
+	mHist := metrics.NewMockHistogram(ctrl)
+	mHist.EXPECT().Observe(float64(1)).Return().Times(1)
+	lm.nodeAPIServerLatency = mHist
+
+	// The request leaves 0.5ms before a second boundary and the reply arrives 1ms
+	// later, i.e. 0.5ms into the next second.
+	t1 := time.Date(2026, time.January, 1, 12, 0, 0, 999_500_000, time.UTC).UnixNano()
+	t2 := t1 + time.Millisecond.Nanoseconds()
+
+	// Node -> Api server.
+	f1 := utils.ToFlow(l, t1, apiServerIP, nodeIP, 80, 443, 6, 3, 0)
+	ext1 := utils.NewExtensions()
+	utils.AddTCPID(ext1, 1234)
+	utils.SetExtensions(f1, ext1)
+
+	// Api server -> Node.
+	f2 := utils.ToFlow(l, t2, nodeIP, apiServerIP, 443, 80, 6, 2, 0)
+	ext2 := utils.NewExtensions()
+	utils.AddTCPID(ext2, 1234)
+	utils.SetExtensions(f2, ext2)
+
+	lm.ProcessFlow(f1)
+	lm.ProcessFlow(f2)
+}
+
 func value(c prometheus.Counter) float64 {
 	m := &dto.Metric{}
 	c.Write(m)
