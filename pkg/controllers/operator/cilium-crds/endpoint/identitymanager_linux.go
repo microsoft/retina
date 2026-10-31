@@ -89,7 +89,10 @@ func (im *IdentityManager) DecrementReference(ctx context.Context, lbls labels.L
 
 	idObj := im.alloc.LookupIdentityByID(ctx, id)
 	if idObj == nil {
+		// The allocator no longer knows this identity, so there is nothing left to release.
+		// Drop our mapping too, otherwise it would be kept for the lifetime of the process.
 		im.l.Warn("expected identity for id", "identity", id)
+		delete(im.labelIdentities, sortedLabels)
 		return
 	}
 
