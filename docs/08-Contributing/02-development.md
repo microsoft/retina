@@ -139,6 +139,60 @@ make test # run unit-tests locally
 make test-image # run tests in docker container
 ```
 
+### E2E with prebuilt images
+
+The Azure DevOps **CI (Build Images)** pipeline uses `.azure-pipelines/ci.yml`.
+Its default manual run builds images only. `runE2EValidation=true` builds and
+publishes new images, creates multi-platform manifests, and tests those images;
+it does not validate an externally supplied image.
+
+To test existing images instead, queue the same pipeline on a branch containing
+the prebuilt-mode changes with these template parameters:
+
+```json
+{
+  "usePrebuiltImages": true,
+  "imageRegistry": "mcr.microsoft.com",
+  "imageNamespace": "containernetworking",
+  "imageTag": "v1.2.9",
+  "eventWriterImage": "acnpublic.azurecr.io/microsoft/retina/test/e2e-test-event-writer:<published-tag>"
+}
+```
+
+Replace the example values with published images. Prebuilt mode enables E2E
+without requiring `runE2EValidation`; if both switches are enabled, prebuilt mode
+takes precedence. It skips the entire build stage (including Windows binaries
+and the event writer) and manifest creation. Missing image inputs fail before
+cluster provisioning. The authenticated Azure CLI E2E task, kubectl installation,
+and unconditional resource-group cleanup remain in place.
+
+The existing E2E suite consumes a coordinated image set under
+`<imageRegistry>/<imageNamespace>` with one shared `imageTag`:
+
+| Image | Required platforms |
+| --- | --- |
+| `retina-agent` | Linux amd64/arm64 and Windows amd64 (Server 2022) |
+| `retina-init` | Linux amd64/arm64 |
+| `retina-operator` | Linux amd64/arm64 |
+
+The Windows event writer is a test helper, not a Retina release image. Supply
+its complete image reference separately; it can use a different registry,
+namespace, tag, or digest. All images must be pullable by the AKS nodes; pipeline
+Azure authentication does not grant nodes access to private registries.
+
+Registry, namespace, and tag flow through the existing E2E flags/environment into
+both Retina and Hubble Helm installs, Helm upgrades, and capture workloads.
+The task exports the selected E2E tag explicitly so the pipeline's build `TAG`
+cannot replace the supplied candidate tag.
+Retina image inputs currently accept a shared tag, not per-component full
+references or digests. This mode runs the existing source-checkout E2E suite and
+capture CLI; it does not add coverage for prebuilt `kubectl-retina` or
+`retina-shell` images. A Linux-only candidate cannot pass the full suite, which
+also exercises Windows and arm64.
+
+Leave `usePrebuiltImages=false` to retain normal PR, merge-queue, and manual
+build behavior. Prebuilt-only inputs are ignored in that mode.
+
 ### Publishing Images and Charts
 
 To publish images to GHCR in your forked repository, simply push to `main`, or publish a tag. The `container-publish` action will run automatically and push images to your GitHub packages registry.
