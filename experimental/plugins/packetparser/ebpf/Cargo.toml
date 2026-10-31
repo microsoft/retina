@@ -1,0 +1,35 @@
+[package]
+name = "packetparser-ebpf"
+version = "0.1.0"
+edition = "2021"
+
+# Empty [workspace] table prevents Cargo from absorbing this crate into the
+# parent workspace. packetparser-ebpf is compiled separately by xtask for the
+# bpfel-unknown-none target and cannot share a workspace with userspace crates.
+[workspace]
+
+[features]
+default = []
+ringbuf = []
+
+[[bin]]
+name = "packetparser-ebpf"
+path = "src/main.rs"
+
+[dependencies]
+retina-common = { path = "../common" }
+aya-ebpf = { git = "https://github.com/aya-rs/aya", branch = "main" }
+aya-log-ebpf = { git = "https://github.com/aya-rs/aya", branch = "main" }
+network-types = "0.1"
+
+[profile.dev]
+opt-level = 2
+overflow-checks = false
+debug = false
+panic = "abort"
+incremental = false
+codegen-units = 1
+
+[profile.release]
+panic = "abort"
+lto = true

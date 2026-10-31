@@ -1,0 +1,101 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: retina-agent-config
+  namespace: {{ include "retina-rust.namespace" . }}
+  labels:
+    {{- include "retina-rust.labels" . | nindent 4 }}
+data:
+  dropreason-filter.yaml: |
+    suppressedDropReasons:
+    {{- range .Values.agent.dropReasonFilter.suppressedDropReasons }}
+      - {{ . | quote }}
+    {{- end }}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: retina-agent
+  namespace: {{ include "retina-rust.namespace" . }}
+  labels:
+    {{- include "retina-rust.agent.selectorLabels" . | nindent 4 }}
+    {{- include "retina-rust.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "retina-rust.agent.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "retina-rust.agent.selectorLabels" . | nindent 8 }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ .Values.agent.metricsPort | quote }}
+        prometheus.io/path: "/metrics"
+    spec:
+      hostNetwork: true
+      hostPID: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: retina-agent
+          image: {{ if .Values.agent.image.registry }}{{ .Values.agent.image.registry }}/{{ end }}{{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag }}
+          imagePullPolicy: {{ .Values.agent.image.pullPolicy }}
+          args:
+            - "--hubble-port={{ .Values.agent.hubblePort }}"
+            - "--log-level={{ .Values.agent.logLevel }}"
+            {{- range .Values.agent.extraInterfaces }}
+            - "--extra-interfaces={{ . }}"
+            {{- end }}
+            {{- if .Values.agent.podLevel }}
+            - "--pod-level"
+            {{- end }}
+            - "--sampling-rate={{ .Values.agent.samplingRate | int }}"
+            - "--ring-buffer-size={{ .Values.agent.ringBufferSize | int }}"
+            {{- if .Values.agent.enableDropReason }}
+            - "--enable-dropreason"
+            - "--dropreason-ring-buffer-size={{ .Values.agent.dropReasonRingBufferSize | int }}"
+            {{- end }}
+            - "--operator-addr={{ include "retina-rust.operator.addr" . }}"
+            - "--metrics-port={{ .Values.agent.metricsPort }}"
+          env:
+            - name: AYA_LOGS
+              value: {{ .Values.agent.ayaLogs | quote }}
+          securityContext:
+            privileged: true
+          ports:
+            - containerPort: {{ .Values.agent.hubblePort }}
+              name: hubble
+              protocol: TCP
+            - containerPort: {{ .Values.agent.metricsPort }}
+              name: retina
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: retina
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 1
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: retina
+            initialDelaySeconds: 2
+            periodSeconds: 3
+            timeoutSeconds: 1
+            failureThreshold: 3
+          volumeMounts:
+            - name: config
+              mountPath: /etc/retina
+              readOnly: true
+          {{- with .Values.agent.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: retina-agent-config
+      tolerations:
+        - operator: Exists
