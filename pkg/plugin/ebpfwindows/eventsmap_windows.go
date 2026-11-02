@@ -73,10 +73,11 @@ var callUnregisterEventsMapCallback = func(perfBuffer uintptr) (uintptr, uintptr
 
 func (e *eventsMap) UnregisterForCallback() error {
 	// Call the API
-	ret, _, err := callUnregisterEventsMapCallback(e.perfBuffer)
+	ret, _, _ := callUnregisterEventsMapCallback(e.perfBuffer)
 
 	if ret != 0 {
-		return err
+		status := syscall.Errno(ret)
+		return fmt.Errorf("RetinaUnregisterEventsMapCallback failed with status %d: %w", ret, status)
 	}
 
 	return nil

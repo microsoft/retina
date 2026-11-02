@@ -1046,39 +1046,50 @@ func TestIterateWithCallback_Success(t *testing.T) {
 	}
 }
 
-// TestUnregisterForCallback_Success tests the behavior of the UnregisterForCallback function
-// when retinaEBPFAPI successfully unregisters the callback.
-func TestUnregisterForCallback_Success(t *testing.T) {
-	// Mock the function variable
+func TestUnregisterForCallback_NativeStatusIsAuthoritative(t *testing.T) {
 	orig := callUnregisterEventsMapCallback
-	callUnregisterEventsMapCallback = func(_ uintptr) (uintptr, uintptr, error) {
-		return 0, 0, nil // Simulate success
+	t.Cleanup(func() { callUnregisterEventsMapCallback = orig })
+
+	tests := []struct {
+		name      string
+		status    uintptr
+		lastError error
+		wantErrno syscall.Errno
+	}{
+		{
+			name:      "zero status succeeds despite stale last-error",
+			lastError: syscall.Errno(5),
+		},
+		{
+			name:      "nonzero status fails despite zero last-error",
+			status:    1234,
+			lastError: syscall.Errno(0),
+			wantErrno: syscall.Errno(1234),
+		},
+		{
+			name:      "nonzero status overrides unrelated last-error",
+			status:    87,
+			lastError: syscall.Errno(5),
+			wantErrno: syscall.Errno(87),
+		},
 	}
-	defer func() { callUnregisterEventsMapCallback = orig }()
 
-	em := NewEventsMap()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			callUnregisterEventsMapCallback = func(_ uintptr) (uintptr, uintptr, error) {
+				return tt.status, 0, tt.lastError
+			}
 
-	err := em.UnregisterForCallback()
-	if err != nil {
-		t.Fatalf("expected no error when unregistering callback with eventmap, got %v", err)
-	}
-}
+			err := NewEventsMap().UnregisterForCallback()
+			if tt.wantErrno == 0 {
+				require.NoError(t, err)
+				return
+			}
 
-// TestUnregisterForCallback_Error tests the behavior of the UnregisterForCallback function
-// when retinaEBPFAPI fails to unregister the callback.
-func TestUnregisterForCallback_Error(t *testing.T) {
-	// Mock the function variable to simulate an error
-	orig := callUnregisterEventsMapCallback
-	callUnregisterEventsMapCallback = func(_ uintptr) (uintptr, uintptr, error) {
-		return 1, 0, fmt.Errorf("%w", errTestFailure)
-	}
-	defer func() { callUnregisterEventsMapCallback = orig }()
-
-	em := NewEventsMap()
-
-	err := em.UnregisterForCallback()
-	if err == nil {
-		t.Fatalf("expected error when unregistering callback with eventmap, got nothing")
+			require.ErrorIs(t, err, tt.wantErrno)
+			require.Contains(t, err.Error(), "RetinaUnregisterEventsMapCallback")
+			require.Contains(t, err.Error(), fmt.Sprint(tt.status))
+		})
 	}
 }
 
