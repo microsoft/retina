@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/retina/pkg/controllers/operator/cilium-crds/cache"
 
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -70,6 +71,10 @@ type endpointReconciler struct {
 	store *Store
 
 	wp *workerpool.WorkerPool
+
+	cfg Config
+	// windowsNodes caches whether a node runs Windows (node OS does not change). Guarded by Mutex.
+	windowsNodes map[string]bool
 }
 
 type params struct {
@@ -80,6 +85,7 @@ type params struct {
 	CiliumEndpoints resource.Resource[*ciliumv2.CiliumEndpoint]
 	Namespaces      resource.Resource[*slim_corev1.Namespace]
 	Pods            resource.Resource[*slim_corev1.Pod]
+	Config          Config
 }
 
 func registerEndpointController(p params) error {
@@ -97,7 +103,14 @@ func registerEndpointController(p params) error {
 		pods:                p.Pods,
 		namespaces:          p.Namespaces,
 		store:               NewStore(),
+		cfg:                 p.Config,
+		windowsNodes:        make(map[string]bool),
 	}
+
+	l.Info("endpoint controller config",
+		WindowsOnlyEndpoints, p.Config.WindowsOnlyEndpoints,
+		WindowsCIDRLabels, p.Config.WindowsCIDRLabels,
+	)
 
 	p.Lifecycle.Append(r)
 
@@ -296,6 +309,17 @@ func (r *endpointReconciler) reconcilePod(ctx context.Context, podKey resource.K
 	if pod.Status.PodIP == "" || pod.Status.HostIP == "" {
 		r.l.Debug("pod missing an IP, skipping", "podKey", podKey.String())
 		return nil
+	}
+
+	if r.cfg.WindowsOnlyEndpoints {
+		isWindows, err := r.isWindowsNode(ctx, pod.Spec.NodeName)
+		if err != nil {
+			return errors.Wrap(err, "failed to determine node OS")
+		}
+		if !isWindows {
+			r.l.Debug("pod is not on a Windows node, skipping", "podKey", podKey.String(), "node", pod.Spec.NodeName)
+			return nil
+		}
 	}
 
 	podLabels, err := r.ciliumEndpointsLabels(ctx, pod)
@@ -675,7 +699,7 @@ func (r *endpointReconciler) ciliumEndpointsLabels(ctx context.Context, pod *sli
 		)
 		return nil, errors.Wrap(err, "failed to get pod metadata")
 	}
-	lbls := make(labels.Labels, len(ciliumLabels))
+	lbls := make(labels.Labels, len(ciliumLabels)+1)
 	for k, v := range ciliumLabels {
 		lbls[k] = labels.Label{
 			Key:    k,
@@ -683,5 +707,39 @@ func (r *endpointReconciler) ciliumEndpointsLabels(ctx context.Context, pod *sli
 			Source: labels.LabelSourceK8s,
 		}
 	}
+
+	if r.cfg.WindowsCIDRLabels && pod.Status.PodIP != "" {
+		isWindows, err := r.isWindowsNode(ctx, pod.Spec.NodeName)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to determine node OS")
+		}
+		if isWindows {
+			// Cilium only matches CIDR selectors against identities carrying cidr: labels.
+			// Without this, giving a Windows Pod an endpoint identity makes it unselectable by CIDR policy.
+			cidrLabel, err := labels.IPStringToLabel(pod.Status.PodIP)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to build CIDR label")
+			}
+			lbls[cidrLabel.Key] = cidrLabel
+		}
+	}
 	return lbls, nil
+}
+
+// isWindowsNode reports whether the node runs Windows, based on the kubernetes.io/os node label.
+// Callers must hold r.Mutex.
+func (r *endpointReconciler) isWindowsNode(ctx context.Context, nodeName string) (bool, error) {
+	if nodeName == "" {
+		return false, nil
+	}
+	if isWindows, ok := r.windowsNodes[nodeName]; ok {
+		return isWindows, nil
+	}
+	node, err := r.ciliumSlimClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+	if err != nil {
+		return false, errors.Wrap(err, "failed to get node "+nodeName)
+	}
+	isWindows := node.Labels[corev1.LabelOSStable] == string(corev1.Windows)
+	r.windowsNodes[nodeName] = isWindows
+	return isWindows, nil
 }
