@@ -11,11 +11,13 @@
 #     with the pipeline access token, and Azure DevOps restricts that token
 #     for forks, so the validation fails. ci-fork.yml builds fork pull
 #     requests on the Microsoft-hosted pool under the same pipeline name.
-#   - Manual queue from ADO UI -> build only with E2E mode None. Select
-#     "Publish branch images and run E2E" for the normal build-and-test flow.
-#     Select "Run E2E with prebuilt images" and supply imageRegistry,
-#     imageNamespace, and eventWriterImage, then choose the Retina image tag
-#     on the Resources page. See docs/08-Contributing/02-development.md.
+#   - Manual queue from ADO UI -> "Build only" by default (no E2E).
+#     Select "Publish branch images and run E2E" to build, publish, and test
+#     images from the selected branch.
+#     Select "Run E2E with prebuilt images" to skip image builds and test
+#     existing images. Set imageRegistry (hostname only), imageNamespace,
+#     and eventWriterImage (full Windows image reference), then choose the
+#     shared Retina image tag for "prebuiltRetinaImages" on the Resources page.
 #
 # The pipeline extends the OneBranch NonOfficial template, so jobs run on the
 # OneBranch-managed pool instead of the Microsoft-hosted "Azure Pipelines"
@@ -55,9 +57,9 @@ parameters:
   - name: e2eMode
     displayName: E2E mode
     type: string
-    default: None
+    default: Build only
     values:
-      - None
+      - Build only
       - Publish branch images and run E2E
       - Run E2E with prebuilt images
   # The queue form requires nonempty string defaults even when prebuilt mode is off.
@@ -94,9 +96,9 @@ variables:
   # resolves the newest attempt when it creates the multi-arch indexes.
   - name: TAG
     value: ${{ substring(variables['Build.SourceVersion'], 0, 8) }}-$(Build.BuildId)
-  # Manual queues select one E2E mode. None preserves automatic merge-queue E2E.
+  # The default build-only mode still allows automatic merge-queue E2E.
   - name: runE2E
-    ${{ if ne(parameters.e2eMode, 'None') }}:
+    ${{ if ne(parameters.e2eMode, 'Build only') }}:
       value: 'True'
     ${{ else }}:
       value: $[ startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/') ]

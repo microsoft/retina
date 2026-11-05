@@ -1,4 +1,6 @@
-package retina
+//go:build pipeline
+
+package pipelines
 
 import (
 	"os"
@@ -12,7 +14,7 @@ import (
 
 func readPipeline(t *testing.T) *yaml.Node {
 	t.Helper()
-	data, err := os.ReadFile("../../../.azure-pipelines/ci.yml")
+	data, err := os.ReadFile("../../.azure-pipelines/ci.yml")
 	require.NoError(t, err)
 
 	var document yaml.Node
@@ -39,7 +41,7 @@ func findPipelineStep(t *testing.T, document *yaml.Node, displayName string) *ya
 	return nil
 }
 
-func TestE2EUsesSelectedImageTagInsteadOfBuildTag(t *testing.T) {
+func TestPipelineUsesSelectedImageTagInsteadOfBuildTag(t *testing.T) {
 	var step struct {
 		Env    map[string]yaml.Node `yaml:"env"`
 		Inputs struct {
@@ -157,7 +159,7 @@ func TestPrebuiltImageInputsAreOptionalAtQueueTimeButRequiredInPrebuiltMode(t *t
 	})
 }
 
-func TestE2EUsesSingleModeSelector(t *testing.T) {
+func TestPipelineUsesSingleModeSelector(t *testing.T) {
 	var pipeline struct {
 		Parameters []struct {
 			Name    string   `yaml:"name"`
@@ -175,9 +177,9 @@ func TestE2EUsesSingleModeSelector(t *testing.T) {
 		if parameter.Name == "e2eMode" {
 			found = true
 			require.Equal(t, "string", parameter.Type)
-			require.Equal(t, "None", parameter.Default)
+			require.Equal(t, "Build only", parameter.Default)
 			require.ElementsMatch(t, []string{
-				"None",
+				"Build only",
 				"Publish branch images and run E2E",
 				"Run E2E with prebuilt images",
 			}, parameter.Values)
