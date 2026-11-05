@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"net/netip"
 	"reflect"
 	"sync"
 	"time"
@@ -75,6 +76,12 @@ type endpointReconciler struct {
 	cfg Config
 	// windowsNodes caches whether a node runs Windows (node OS does not change). Guarded by Mutex.
 	windowsNodes map[string]bool
+
+	// cidrGroups is watched when WindowsCIDRLabels is set, to add CIDR group labels to Windows Pods.
+	cidrGroups         resource.Resource[*ciliumv2.CiliumCIDRGroup]
+	cidrGroupCache     *cidrGroupCache
+	cidrGroupsSynced   chan struct{}
+	cidrGroupsSyncOnce sync.Once
 }
 
 type params struct {
@@ -85,6 +92,7 @@ type params struct {
 	CiliumEndpoints resource.Resource[*ciliumv2.CiliumEndpoint]
 	Namespaces      resource.Resource[*slim_corev1.Namespace]
 	Pods            resource.Resource[*slim_corev1.Pod]
+	CIDRGroups      resource.Resource[*ciliumv2.CiliumCIDRGroup]
 	Config          Config
 }
 
@@ -105,6 +113,9 @@ func registerEndpointController(p params) error {
 		store:               NewStore(),
 		cfg:                 p.Config,
 		windowsNodes:        make(map[string]bool),
+		cidrGroups:          p.CIDRGroups,
+		cidrGroupCache:      newCIDRGroupCache(),
+		cidrGroupsSynced:    make(chan struct{}),
 	}
 
 	l.Info("endpoint controller config",
@@ -134,6 +145,12 @@ func (r *endpointReconciler) Start(ctx cell.HookContext) error {
 		return errors.Wrap(err, "failed to submit task to namespace workerpool")
 	}
 
+	if r.cidrGroupLabelsEnabled() {
+		if err := r.wp.Submit("cidrgroup-controller", r.runCIDRGroupEvents); err != nil {
+			return errors.Wrap(err, "failed to submit task to cidrgroup workerpool")
+		}
+	}
+
 	if err := r.wp.Submit("endpoint-reconciler", r.run); err != nil {
 		return errors.Wrap(err, "failed to submit task to endpoint workerpool")
 	}
@@ -152,6 +169,7 @@ func (r *endpointReconciler) Stop(_ cell.HookContext) error {
 func (r *endpointReconciler) run(pctx context.Context) error {
 	r.l.Info("start to reconcile Pods for CiliumEndpoints")
 
+	r.waitForCIDRGroups(pctx)
 	podEvents := r.pods.Events(pctx)
 
 	for {
@@ -721,6 +739,18 @@ func (r *endpointReconciler) ciliumEndpointsLabels(ctx context.Context, pod *sli
 				return nil, errors.Wrap(err, "failed to build CIDR label")
 			}
 			lbls[cidrLabel.Key] = cidrLabel
+
+			// cidrGroupRef/cidrGroupSelector rules match cidrgroup: labels, which Cilium only puts on its own prefix identities.
+			if r.cidrGroupLabelsEnabled() {
+				if addr, err := netip.ParseAddr(pod.Status.PodIP); err == nil {
+					for k, l := range r.cidrGroupCache.labelsFor(addr) {
+						// Labels are keyed without source; never let a group label replace a Pod label.
+						if _, exists := lbls[k]; !exists {
+							lbls[k] = l
+						}
+					}
+				}
+			}
 		}
 	}
 	return lbls, nil

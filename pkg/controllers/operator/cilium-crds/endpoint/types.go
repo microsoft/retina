@@ -138,6 +138,17 @@ func (s *Store) DeleteNamespace(key string) {
 	delete(s.Namespaces, key)
 }
 
+// ListPods returns all cached PodEndpoints.
+func (s *Store) ListPods() []*PodEndpoint {
+	s.RLock()
+	defer s.RUnlock()
+	pods := make([]*PodEndpoint, 0, len(s.Pods))
+	for _, pod := range s.Pods {
+		pods = append(pods, pod)
+	}
+	return pods
+}
+
 func (s *Store) ListPodKeysByNamespace(namespace string) []resource.Key {
 	s.RLock()
 	defer s.RUnlock()
