@@ -4,7 +4,9 @@
 
 .git
 .github
-.azure-pipelines
+.azure-pipelines/*
+# Pipeline regression tests need the CI YAML inside the test image.
+!.azure-pipelines/ci.yml
 
 # Docs site and its dependencies.
 site/
