@@ -86,16 +86,24 @@ jobs:
       - name: Install LLVM 18.1.8
         shell: pwsh
         run: |
-          # Install LLVM 18.1.8 to ensure consistent version across runners
-          try {
-            choco install llvm --version=18.1.8 --allow-downgrade -y --force
-            # Add installed LLVM to PATH first so it takes precedence
-            echo "C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-            Write-Host "Successfully installed LLVM 18.1.8"
-          } catch {
-            Write-Warning "Failed to install LLVM 18.1.8 via chocolatey: $($_.Exception.Message)"
-            Write-Host "Continuing with pre-installed LLVM version"
+          $installer = Join-Path $env:RUNNER_TEMP "LLVM-18.1.8-win64.exe"
+          curl.exe --fail --location --retry 5 --retry-all-errors --output $installer `
+            "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.exe"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to download LLVM 18.1.8: curl exited with code $LASTEXITCODE"
           }
+
+          $process = Start-Process -FilePath $installer -ArgumentList "/S" -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            throw "Failed to install LLVM 18.1.8: installer exited with code $($process.ExitCode)"
+          }
+
+          $clangVersion = & "$env:ProgramFiles\LLVM\bin\clang.exe" --version
+          if ($LASTEXITCODE -ne 0 -or "$clangVersion" -notmatch '^clang version 18\.1\.8(\s|$)') {
+            throw "Failed to verify LLVM 18.1.8: $clangVersion"
+          }
+          Write-Host $clangVersion
+          "$env:ProgramFiles\LLVM\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Nuget Restore
         shell: cmd
