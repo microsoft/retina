@@ -115,7 +115,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
-      CLUSTER_NAME: retina-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+      # The name must not contain "e2e", "kubernetes", "conformance",
+      # "cyclonus", or "pipeline-build". A daily cleanup job in the test
+      # subscription deletes such resource groups, also during a test run.
+      CLUSTER_NAME: retina-ci-${{ github.run_id }}-${{ github.run_attempt }}
 
     steps:
       - name: Checkout code
