@@ -35,6 +35,8 @@ For Advanced mode with *remote context*, default context labels are the followin
 - `destination_pod`
 - `destination_workload`
 
+Additionally, `source_zone` and `destination_zone` can be enabled by adding `zone` to `sourceLabels` and/or `destinationLabels` in the [MetricsConfiguration CRD](../../05-Concepts/CRDs/MetricsConfiguration.md). The value is read from the node's [`topology.kubernetes.io/zone`](https://kubernetes.io/docs/reference/labels-annotations-taints/#topologykubernetesiozone) label; flows whose zone cannot be resolved are labelled `unknown`.
+
 ### Local Context
 
 For Advanced mode with *local context*, default context labels are the following for *outgoing* traffic:

@@ -170,6 +170,10 @@ func (p *Plugin) metricsMapIterateCallback(key *MetricsKey, value *MetricsValue)
 func (p *Plugin) eventsMapCallback(data unsafe.Pointer, size uint32) {
 	err := p.handleTraceEvent(data, size)
 	if err != nil {
+		if errors.Is(err, errKnownNonDecodablePktmonRecord) {
+			p.l.Debug("Skipping known non-decodable PktMon event", zap.Error(err))
+			return
+		}
 		p.l.Error("Error handling trace event", zap.Error(err))
 	}
 }

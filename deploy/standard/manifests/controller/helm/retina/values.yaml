@@ -28,6 +28,8 @@ operator:
       - "--config"
       - "/retina/operator-config.yaml"
   telemetryInterval: "5m"
+  # -- Additional labels for retina-operator pods
+  podLabels: {}
   affinity:
     # TODO(user): Override the following values to configure the nodeAffinity expression
     # according to the platforms which are supported by your solution.
@@ -82,6 +84,8 @@ namespace: kube-system
 
 agent:
   name: retina-agent
+  # -- Additional labels for retina-agent pods (linux and windows)
+  podLabels: {}
 
 agent_win:
   name: retina-agent-win

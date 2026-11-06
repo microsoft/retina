@@ -86,9 +86,6 @@ func (i *InstallHelmChart) Run() error {
 
 	// value overrides; helm merges these onto the chart defaults
 	overrides := map[string]any{
-		"imagePullSecrets": []map[string]any{
-			{"name": "acr-credentials"},
-		},
 		"image": map[string]any{
 			"repository":     imageRegistry + "/" + imageNamespace + "/retina-agent",
 			"initRepository": imageRegistry + "/" + imageNamespace + "/retina-init",

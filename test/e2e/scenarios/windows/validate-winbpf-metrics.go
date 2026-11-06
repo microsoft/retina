@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -83,25 +85,50 @@ func (v *ValidateWinBpfMetric) GetPromMetrics() (string, error) {
 	return promOutput, nil
 }
 
+// lookupNonHpcValue runs a read-only helper command in the non HPC pod and
+// returns the trimmed reply. If valid rejects the reply, the command runs
+// again. After the last attempt, the error wraps errInvalid.
+func (v *ValidateWinBpfMetric) lookupNonHpcValue(cmd string, valid func(string) bool, errInvalid error) (string, error) {
+	nonHpcLabelSelector := "app=" + v.NonHpcAppName
+	attempts := 10
+
+	for attempt := 1; ; attempt++ {
+		output, err := kubernetes.ExecCommandInWinPod(
+			v.KubeConfigFilePath,
+			cmd,
+			v.NonHpcAppNamespace,
+			nonHpcLabelSelector,
+			v.targetNodeName,
+			true,
+		)
+		if err != nil {
+			return "", fmt.Errorf("executing EventWriter command: %w", err)
+		}
+
+		reply := strings.TrimSpace(output)
+		if valid(reply) {
+			return reply, nil
+		}
+		if attempt == attempts {
+			return "", fmt.Errorf("%w after %d attempts: %q", errInvalid, attempts, reply)
+		}
+		slog.Info("EventWriter command returned an invalid reply, retrying", "command", cmd, "attempt", attempt, "reply", reply)
+		time.Sleep(3 * time.Second)
+	}
+}
+
 func (v *ValidateWinBpfMetric) getNonHpcPodIPAddress() (string, error) {
 	slog.Info("Executing EventWriter-GetPodIpAddress")
-	nonHpcLabelSelector := "app=" + v.NonHpcAppName
 
-	nonHpcIPAddr, err := kubernetes.ExecCommandInWinPod(
-		v.KubeConfigFilePath,
+	nonHpcIPAddr, err := v.lookupNonHpcValue(
 		"C:\\event-writer-helper.bat EventWriter-GetPodIpAddress",
-		v.NonHpcAppNamespace,
-		nonHpcLabelSelector,
-		v.targetNodeName,
-		true,
+		func(reply string) bool {
+			return net.ParseIP(reply) != nil
+		},
+		ErrGetNonHpcIPAddr,
 	)
 	if err != nil {
-		return "", fmt.Errorf("executing EventWriter command: %w", err)
-	}
-	nonHpcIPAddr = strings.TrimSpace(nonHpcIPAddr)
-
-	if strings.Contains(nonHpcIPAddr, "failed") || strings.Contains(nonHpcIPAddr, "error") {
-		return "", ErrGetNonHpcIPAddr
+		return "", err
 	}
 	slog.Info("Non HPC IP Addr", "ip", nonHpcIPAddr)
 
@@ -110,23 +137,17 @@ func (v *ValidateWinBpfMetric) getNonHpcPodIPAddress() (string, error) {
 
 func (v *ValidateWinBpfMetric) getNonHpcPodIfIndex() (string, error) {
 	slog.Info("Executing EventWriter-GetPodIfIndex")
-	nonHpcLabelSelector := "app=" + v.NonHpcAppName
 
-	nonHpcIfIndex, err := kubernetes.ExecCommandInWinPod(
-		v.KubeConfigFilePath,
+	nonHpcIfIndex, err := v.lookupNonHpcValue(
 		"C:\\event-writer-helper.bat EventWriter-GetPodIfIndex",
-		v.NonHpcAppNamespace,
-		nonHpcLabelSelector,
-		v.targetNodeName,
-		true,
+		func(reply string) bool {
+			ifIndex, err := strconv.Atoi(reply)
+			return err == nil && ifIndex > 0
+		},
+		ErrGetNonHpcIfIndex,
 	)
 	if err != nil {
-		return "", fmt.Errorf("executing EventWriter command: %w", err)
-	}
-	nonHpcIfIndex = strings.TrimSpace(nonHpcIfIndex)
-
-	if strings.Contains(nonHpcIfIndex, "failed") || strings.Contains(nonHpcIfIndex, "error") {
-		return "", ErrGetNonHpcIfIndex
+		return "", err
 	}
 	slog.Info("Non HPC Interface Index", "InterfaceIndex", nonHpcIfIndex)
 

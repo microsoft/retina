@@ -19,6 +19,9 @@ spec:
         {{- include "retina.labels" . | nindent 8 }}
         app.kubernetes.io/component: workload
         k8s-app: {{ include "retina.name" . }}
+        {{- with .Values.agent.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       annotations:
         prometheus.io/port: "{{ .Values.retinaPort }}"
         prometheus.io/scrape: "true"
@@ -194,10 +197,14 @@ spec:
         {{- include "retina.labels" . | nindent 8 }}
         app.kubernetes.io/component: workload
         k8s-app: {{ include "retina.name" . }}
+        {{- with .Values.agent.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       name: {{ include "retina.name" . }}
       namespace: {{ .Values.namespace }}
     spec:
       serviceAccountName: {{ .Values.serviceAccount.name }}
+      terminationGracePeriodSeconds: 90 # Allow for retina to cleanup plugin resources.
       {{- if .Values.priorityClassName }}
       priorityClassName: {{ .Values.priorityClassName }}
       {{- end }}
@@ -222,6 +229,14 @@ spec:
             {{- else }}
             - .\setkubeconfigpath.ps1; ./controller.exe --config ./retina/config.yaml --kubeconfig ./kubeconfig
             {{- end }}
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - powershell.exe
+                  - -NoProfile
+                  - -Command
+                  - New-Item -ItemType File -Path (Join-Path $env:CONTAINER_SANDBOX_MOUNT_POINT '.retina-shutdown') -Force | Out-Null; Start-Sleep -Seconds 90
           env:
           {{- if .Values.daemonset.container.retina.env -}}
           {{ toYaml .Values.daemonset.container.retina.env | nindent 10 }}

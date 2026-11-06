@@ -2,12 +2,19 @@
 # its standard library tracks the golang base image instead of the upstream
 # release cadence. Upstream publishes binaries only on tags.
 # skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:7e3429507d92bb1e12fe45b7650c3dd3f24a4f0d1ca45622b1452834f54d8020 AS pwru-build
+FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:da5a59d8b7462abfdb98bdf47ec8bfb677d9f1cf8afac71dce9a91cbcecd003b AS pwru-build
 RUN tdnf install -y make git clang llvm gcc glibc-static gawk file flex bison tar diffutils
 # https://github.com/cilium/pwru/releases/tag/v1.0.12
 ARG PWRU_COMMIT=f1d6cf8898953ac1560401e181f3ac5f0e33b486
 RUN git clone https://github.com/cilium/pwru /pwru && git -C /pwru checkout "$PWRU_COMMIT"
 WORKDIR /pwru
+# pwru's pinned commit still resolves golang.org/x/net v0.57.0, which is
+# affected by CVE-2026-78669 and CVE-2026-78661. Bump it in pwru's own module before building;
+# the retina modules are already on a fixed version via the root go.mod.
+# pwru vendors its dependencies, so the vendor tree must be regenerated to
+# stay consistent with the updated go.mod.
+RUN GOFLAGS=-mod=mod go get golang.org/x/net@v0.62.0 \
+    && GOFLAGS=-mod=mod go mod vendor
 ARG GOARCH=amd64
 RUN set -eux; \
     case "$GOARCH" in \
@@ -26,7 +33,7 @@ RUN set -eux; \
     ./pwru --version
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260923@sha256:1324a2cf7ed34e5f48a1022816b205782b86c7305651658e611dcd3d30756751
+FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261027@sha256:88fc2b4a425801b3b4d8fe5342e24fb6134669fb718ec970340bdd36dee50c35
 
 # Keep this pin until the Azure Linux base includes pcre2 >= 10.48-1.azl3; verify both architectures before removing.
 RUN tdnf install -y \
