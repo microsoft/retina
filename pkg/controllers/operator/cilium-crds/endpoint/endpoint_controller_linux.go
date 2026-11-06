@@ -104,6 +104,9 @@ func registerEndpointController(p params) error {
 	if !p.Clientset.IsEnabled() {
 		return ErrClientsetDisabled
 	}
+	if err := p.Config.Validate(); err != nil {
+		return err
+	}
 
 	l := retinalog.SlogLogger().With("component", "endpointcontroller")
 	r := &endpointReconciler{

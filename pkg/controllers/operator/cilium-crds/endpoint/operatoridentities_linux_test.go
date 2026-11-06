@@ -25,6 +25,15 @@ import (
 )
 
 // useDefaultLabelFilter configures the process-global label filter; callers must not run in parallel.
+const (
+	testNamespaceLabel    = "io.kubernetes.pod.namespace"
+	testK8sNamespaceLabel = "k8s:" + testNamespaceLabel
+	testNamespace         = "prod"
+	testAppKey            = "app"
+	testOtherApp          = "other"
+	testWebApp            = "web"
+)
+
 func useDefaultLabelFilter(t *testing.T) {
 	t.Helper()
 	l := slog.Default()
@@ -42,18 +51,18 @@ func setClusterName(t *testing.T, name string) {
 func operatorTestPods() map[string]*v1.Pod {
 	pod := func(name string, lbls map[string]string) *v1.Pod {
 		return &v1.Pod{
-			ObjectMeta: slim_metav1.ObjectMeta{Name: name, Namespace: "prod", UID: types.UID("uid-" + name), Labels: lbls},
+			ObjectMeta: slim_metav1.ObjectMeta{Name: name, Namespace: testNamespace, UID: types.UID("uid-" + name), Labels: lbls},
 			Spec:       v1.PodSpec{ServiceAccountName: "web-sa"},
 			Status:     v1.PodStatus{PodIP: "10.244.1.57"},
 		}
 	}
 	return map[string]*v1.Pod{
-		"bare": pod("bare", map[string]string{"app": "web"}),
+		"bare": pod("bare", map[string]string{testAppKey: testWebApp}),
 		"deployment": pod("deploy-7d4b9c-x2x", map[string]string{
-			"app": "web", "pod-template-hash": "7d4b9c",
+			testAppKey: testWebApp, "pod-template-hash": "7d4b9c",
 		}),
 		"daemonset": pod("ds-abcde", map[string]string{
-			"app": "web", "controller-revision-hash": "6f7c8d", "pod-template-generation": "3",
+			testAppKey: testWebApp, "controller-revision-hash": "6f7c8d", "pod-template-generation": "3",
 		}),
 	}
 }
@@ -62,7 +71,7 @@ func newOperatorLabelsTestReconciler(t *testing.T, reuse bool) (*endpointReconci
 	t.Helper()
 	r, _ := newTestEndpointReconciler(t)
 	r.cfg = Config{ReuseOperatorIdentities: reuse}
-	ns := &v1.Namespace{ObjectMeta: slim_metav1.ObjectMeta{Name: "prod", Labels: map[string]string{"team": "payments"}}}
+	ns := &v1.Namespace{ObjectMeta: slim_metav1.ObjectMeta{Name: testNamespace, Labels: map[string]string{"team": "payments"}}}
 	_, err := r.ciliumSlimClientSet.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 	require.NoError(t, err)
 	return r, ns
@@ -93,7 +102,7 @@ func TestReuseOperatorIdentitiesKeyParity(t *testing.T) {
 			require.Equal(t, "aks-prod", lbls["io.cilium.k8s.policy.cluster"].Value)
 			require.Equal(t, "web-sa", lbls["io.cilium.k8s.policy.serviceaccount"].Value)
 			require.Equal(t, "payments", lbls["io.cilium.k8s.namespace.labels.team"].Value)
-			require.Equal(t, "web", lbls["app"].Value)
+			require.Equal(t, testWebApp, lbls[testAppKey].Value)
 		})
 	}
 }
@@ -124,12 +133,20 @@ func TestReuseOperatorIdentitiesStartupValidation(t *testing.T) {
 		r, _ := newTestEndpointReconciler(t)
 		r.identityManager = nil
 		r.cfg = Config{ReuseOperatorIdentities: true, WindowsCIDRLabels: true}
-		createCiliumConfig(t, r, map[string]string{ciliumConfigIdentityManagementMode: "operator"})
+		createCiliumConfig(t, r, map[string]string{ciliumConfigIdentityManagementMode: option.IdentityManagementModeOperator})
 
 		err := r.Start(context.TODO())
 		require.ErrorIs(t, err, ErrIncompatibleFlags)
 		require.Nil(t, r.identityManager)
 		require.Nil(t, r.wp, "no workers may start")
+	})
+
+	t.Run("incompatible flags rejected at registration, before leader election", func(t *testing.T) {
+		fakeClientSet, _ := ciliumclient.NewFakeClientset(slog.Default())
+		require.ErrorIs(t, registerEndpointController(params{
+			Clientset: fakeClientSet,
+			Config:    Config{ReuseOperatorIdentities: true, WindowsCIDRLabels: true},
+		}), ErrIncompatibleFlags)
 	})
 
 	t.Run("missing cilium-config", func(t *testing.T) {
@@ -151,7 +168,7 @@ func TestReuseOperatorIdentitiesStartupValidation(t *testing.T) {
 		r, _ := newTestEndpointReconciler(t)
 		r.cfg = Config{ReuseOperatorIdentities: true}
 		createCiliumConfig(t, r, map[string]string{
-			ciliumConfigIdentityManagementMode: "operator",
+			ciliumConfigIdentityManagementMode: option.IdentityManagementModeOperator,
 			ciliumConfigLabels:                 "k8s:app k8s:[",
 		})
 		require.Error(t, r.setupOperatorIdentities(context.TODO()))
@@ -164,7 +181,7 @@ func TestReuseOperatorIdentitiesStartupValidation(t *testing.T) {
 		r, _ := newTestEndpointReconciler(t)
 		r.cfg = Config{ReuseOperatorIdentities: true}
 		createCiliumConfig(t, r, map[string]string{
-			ciliumConfigIdentityManagementMode: "operator",
+			ciliumConfigIdentityManagementMode: option.IdentityManagementModeOperator,
 			ciliumConfigClusterName:            "aks-prod",
 			ciliumConfigLabels:                 "k8s:app  k8s:io.kubernetes.pod.namespace",
 		})
@@ -172,7 +189,7 @@ func TestReuseOperatorIdentitiesStartupValidation(t *testing.T) {
 		require.Equal(t, "aks-prod", option.Config.ClusterName)
 
 		identityLabels, _ := labelsfilter.Filter(labels.Map2Labels(map[string]string{
-			"app": "web", "team": "payments", "io.kubernetes.pod.namespace": "prod",
+			testAppKey: testWebApp, "team": "payments", testNamespaceLabel: testNamespace,
 		}, labels.LabelSourceK8s))
 		require.Equal(t, "k8s:app=web,k8s:io.kubernetes.pod.namespace=prod", identityLabels.String())
 	})
@@ -187,8 +204,8 @@ func TestOperatorManagedIdentityManagerOnlyLooksUp(t *testing.T) {
 	_, err := cids.Create(context.TODO(), &ciliumv2.CiliumIdentity{
 		ObjectMeta: metav1.ObjectMeta{Name: "21279"},
 		SecurityLabels: map[string]string{
-			"k8s:app":                         "web",
-			"k8s:io.kubernetes.pod.namespace": "prod",
+			"k8s:app":             testWebApp,
+			testK8sNamespaceLabel: testNamespace,
 		},
 	}, metav1.CreateOptions{})
 	require.NoError(t, err)
@@ -196,7 +213,7 @@ func TestOperatorManagedIdentityManagerOnlyLooksUp(t *testing.T) {
 	im, err := NewIdentityManager(context.TODO(), l, fakeClientSet.CiliumFakeClientset, true)
 	require.NoError(t, err)
 
-	lbls := labels.Map2Labels(map[string]string{"app": "web", "io.kubernetes.pod.namespace": "prod"}, labels.LabelSourceK8s)
+	lbls := labels.Map2Labels(map[string]string{testAppKey: testWebApp, testNamespaceLabel: testNamespace}, labels.LabelSourceK8s)
 	id, err := im.GetIdentityAndIncrementReference(context.TODO(), lbls)
 	require.NoError(t, err)
 	require.Equal(t, int64(21279), id)
@@ -205,7 +222,7 @@ func TestOperatorManagedIdentityManagerOnlyLooksUp(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 2*time.Second)
 	defer cancel()
 	_, err = im.GetIdentityAndIncrementReference(ctx,
-		labels.Map2Labels(map[string]string{"app": "other", "io.kubernetes.pod.namespace": "prod"}, labels.LabelSourceK8s))
+		labels.Map2Labels(map[string]string{testAppKey: testOtherApp, testNamespaceLabel: testNamespace}, labels.LabelSourceK8s))
 	require.Error(t, err)
 
 	list, err := cids.List(context.TODO(), metav1.ListOptions{})

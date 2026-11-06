@@ -36,8 +36,8 @@ var (
 // setupOperatorIdentities makes identity labels match the CiliumIdentities created by cilium-operator.
 // It configures the process-global label filter and cluster name from cilium-config, so it must run before any worker.
 func (r *endpointReconciler) setupOperatorIdentities(ctx context.Context) error {
-	if r.cfg.WindowsCIDRLabels {
-		return ErrIncompatibleFlags
+	if err := r.cfg.Validate(); err != nil {
+		return err
 	}
 	if r.k8sClient == nil {
 		return errors.Wrap(ErrClientsetDisabled, "kubernetes client is required to read "+ciliumConfigName)

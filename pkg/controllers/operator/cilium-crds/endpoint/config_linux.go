@@ -38,3 +38,11 @@ func (c Config) Flags(flags *pflag.FlagSet) {
 			"Requires identity-management-mode=operator in kube-system/cilium-config, whose cluster-name and labels are used to compute identity labels. "+
 			"Incompatible with --"+WindowsCIDRLabels)
 }
+
+// Validate rejects flag combinations that cannot work. It runs at startup, before leader election.
+func (c Config) Validate() error {
+	if c.ReuseOperatorIdentities && c.WindowsCIDRLabels {
+		return ErrIncompatibleFlags
+	}
+	return nil
+}
