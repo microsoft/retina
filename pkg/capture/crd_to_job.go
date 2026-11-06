@@ -53,6 +53,7 @@ var (
 	errPodTargetsNotRunning = errors.New("the selected Pods are not running or have no IP address (not scheduled, not started, or completed); target running Pods")
 	// errPodTargetWithoutIPs guards renderJob: a Pod target must always carry the Pod IPs that restrict its filter.
 	errPodTargetWithoutIPs = errors.New("refusing to render a Pod capture target without Pod IP addresses")
+	errNoNamespacesMatch   = errors.New("no namespaces match the namespace selector")
 	// errTcpdumpFilterIncompatibleWithSourceDestIPs: obtainAndValidateUserFilter gives the generated pcapFilter
 	// precedence over the deprecated tcpdumpFilter, so combining them would silently drop the tcpdumpFilter.
 	errTcpdumpFilterIncompatibleWithSourceDestIPs = errors.New("tcpdumpFilter (deprecated) cannot be combined with sourceIPs/destinationIPs; use pcapFilter instead")
@@ -867,10 +868,16 @@ func (translator *CaptureToPodTranslator) calculateCaptureTargetsByPodSelector(c
 			translator.l.Error("Failed to list Namespace", zap.String("namespaceSelector", captureTarget.NamespaceSelector.String()), zap.Error(err))
 			return nil, err
 		}
+		if len(nsList.Items) == 0 {
+			return nil, fmt.Errorf("%w %q", errNoNamespacesMatch, metav1.FormatLabelSelector(captureTarget.NamespaceSelector))
+		}
 	}
 
+	targetNamespaces := make([]string, 0, len(nsList.Items))
+	selectedPods := 0
 	skipped := &skippedPodTargets{}
 	for _, ns := range nsList.Items {
+		targetNamespaces = append(targetNamespaces, ns.Name)
 		labelSelector, _ := labels.Parse(metav1.FormatLabelSelector(captureTarget.PodSelector))
 		podListOpt := metav1.ListOptions{
 			LabelSelector: labelSelector.String(),
@@ -880,10 +887,17 @@ func (translator *CaptureToPodTranslator) calculateCaptureTargetsByPodSelector(c
 			translator.l.Error("Failed to list Pod.", zap.String("podSelector", captureTarget.PodSelector.String()), zap.Error(err))
 			return nil, err
 		}
+		selectedPods += len(podList.Items)
 		for i := range podList.Items {
 			skipped.addPod(captureTargetOnNode, &podList.Items[i])
 		}
 	}
+
+	translator.l.Info("Resolved pod targets",
+		zap.Strings("targetNamespaces", targetNamespaces),
+		zap.Int("pods", selectedPods-len(skipped.hostNetwork)-len(skipped.notRunning)),
+		zap.Int("nodes", len(*captureTargetOnNode)),
+	)
 
 	return translator.checkSkippedPodTargets(captureTargetOnNode, skipped)
 }
