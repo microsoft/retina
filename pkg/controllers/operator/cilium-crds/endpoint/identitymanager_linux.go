@@ -31,6 +31,9 @@ type IdentityManager struct {
 	alloc *cache.CachingIdentityAllocator
 	// labelIdentities maps sorted labels (via labels.Labels.String()) to allocated identity
 	labelIdentities map[string]identity.NumericIdentity
+	// operatorManaged means cilium-operator creates CiliumIdentities: the allocator only looks them up
+	// and never holds references, so Release is a no-op.
+	operatorManaged bool
 }
 
 // owner is a no-op implementation of IdentityAllocatorOwner
@@ -48,20 +51,24 @@ func (o *owner) GetNodeSuffix() string {
 	return ""
 }
 
-func NewIdentityManager(ctx context.Context, l *slog.Logger, client versioned.Interface) (*IdentityManager, error) {
+// NewIdentityManager creates the identity allocator. With operatorManaged, identities are never created:
+// allocation waits for cilium-operator to create the CiliumIdentity for the labels.
+func NewIdentityManager(ctx context.Context, l *slog.Logger, client versioned.Interface, operatorManaged bool) (*IdentityManager, error) {
 	// Configure the allocator with a reasonable timeout for identity operations
 	allocConfig := cache.AllocatorConfig{
-		Timeout:      identityAllocatorTimeout,
-		SyncInterval: 1 * time.Hour,
+		EnableOperatorManageCIDs: operatorManaged,
+		Timeout:                  identityAllocatorTimeout,
+		SyncInterval:             1 * time.Hour,
 	}
 
 	im := &IdentityManager{
 		l:               l.With("component", "identitymanager"),
 		alloc:           cache.NewCachingIdentityAllocator(l, &owner{}, allocConfig),
 		labelIdentities: make(map[string]identity.NumericIdentity),
+		operatorManaged: operatorManaged,
 	}
 
-	im.l.Info("initializing identity allocator")
+	im.l.Info("initializing identity allocator", "operatorManaged", operatorManaged)
 	initCh := im.alloc.InitIdentityAllocator(client, nil)
 
 	// Wait for the identity allocator to be initialized (backend is created)
@@ -81,6 +88,12 @@ func NewIdentityManager(ctx context.Context, l *slog.Logger, client versioned.In
 // Whenever reference count is not 0, then the identity will exist in the local store, and syncLocalKeys() will make sure it exists.
 func (im *IdentityManager) DecrementReference(ctx context.Context, lbls labels.Labels) {
 	sortedLabels := lbls.String()
+	if im.operatorManaged {
+		// No reference is held (Release would be a no-op and never report released). cilium-operator owns the identity's lifecycle.
+		delete(im.labelIdentities, sortedLabels)
+		return
+	}
+
 	id, ok := im.labelIdentities[sortedLabels]
 	if !ok {
 		im.l.Warn("expected identity for labels", "labels", sortedLabels)
