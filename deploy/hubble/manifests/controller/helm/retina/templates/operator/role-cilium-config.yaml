@@ -1,0 +1,25 @@
+{{- if .Values.operator.enabled -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app.kubernetes.io/name: role
+    app.kubernetes.io/instance: retina-operator-cilium-config
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: operator
+    app.kubernetes.io/part-of: operator
+    app.kubernetes.io/managed-by: kustomize
+  name: retina-operator-cilium-config
+  namespace: kube-system
+rules:
+  # for reusing cilium-operator identities (--reuse-operator-identities)
+  - apiGroups:
+    - ""
+    resources:
+    - configmaps
+    resourceNames:
+    - cilium-config
+    verbs:
+    - get
+
+{{- end -}}

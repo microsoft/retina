@@ -19,7 +19,9 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 
+	identitykey "github.com/cilium/cilium/pkg/identity/key"
 	"github.com/cilium/cilium/pkg/k8s"
 	ciliumv2 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2"
 	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
@@ -51,6 +53,8 @@ type endpointReconciler struct {
 	l                   *slog.Logger
 	clientset           versioned.Interface
 	ciliumSlimClientSet slim_clientset.Interface
+	// k8sClient reads kube-system/cilium-config when ReuseOperatorIdentities is set.
+	k8sClient kubernetes.Interface
 	// podEvents represents Pod CRUD events relayed from the Pod controller. If the Pod was deleted, the PodCacheObject.Pod field will be nil
 	podEvents chan cache.PodCacheObject
 	// ciliumEndpoints has a store of CiliumEndpoints in API Server
@@ -107,6 +111,7 @@ func registerEndpointController(p params) error {
 		l:                   l,
 		clientset:           p.Clientset,
 		ciliumSlimClientSet: p.Clientset.Slim(),
+		k8sClient:           p.Clientset,
 		ciliumEndpoints:     p.CiliumEndpoints,
 		pods:                p.Pods,
 		namespaces:          p.Namespaces,
@@ -121,6 +126,7 @@ func registerEndpointController(p params) error {
 	l.Info("endpoint controller config",
 		WindowsOnlyEndpoints, p.Config.WindowsOnlyEndpoints,
 		WindowsCIDRLabels, p.Config.WindowsCIDRLabels,
+		ReuseOperatorIdentities, p.Config.ReuseOperatorIdentities,
 	)
 
 	p.Lifecycle.Append(r)
@@ -129,9 +135,16 @@ func registerEndpointController(p params) error {
 }
 
 func (r *endpointReconciler) Start(ctx cell.HookContext) error {
+	if r.cfg.ReuseOperatorIdentities {
+		// Configures process-global label filtering, so it must happen before any worker runs.
+		if err := r.setupOperatorIdentities(ctx); err != nil {
+			return errors.Wrap(err, "failed to set up "+ReuseOperatorIdentities)
+		}
+	}
+
 	// NOTE: we must create IdentityManager on leader election since its allocator auto-starts on creation.
 	// There is a way to disable auto-start but then there is no exposed function to simply start().
-	im, err := NewIdentityManager(ctx, r.l, r.clientset)
+	im, err := NewIdentityManager(ctx, r.l, r.clientset, r.cfg.ReuseOperatorIdentities)
 	if err != nil {
 		return errors.Wrap(err, "failed to create identity manager")
 	}
@@ -717,12 +730,18 @@ func (r *endpointReconciler) ciliumEndpointsLabels(ctx context.Context, pod *sli
 		)
 		return nil, errors.Wrap(err, "failed to get pod metadata")
 	}
-	lbls := make(labels.Labels, len(ciliumLabels)+1)
-	for k, v := range ciliumLabels {
-		lbls[k] = labels.Label{
-			Key:    k,
-			Value:  v,
-			Source: labels.LabelSourceK8s,
+	var lbls labels.Labels
+	if r.cfg.ReuseOperatorIdentities {
+		// Same key as cilium-operator's CID controller, so the identity it created is found.
+		lbls = identitykey.GetCIDKeyFromLabels(ciliumLabels, labels.LabelSourceK8s).Labels()
+	} else {
+		lbls = make(labels.Labels, len(ciliumLabels)+1)
+		for k, v := range ciliumLabels {
+			lbls[k] = labels.Label{
+				Key:    k,
+				Value:  v,
+				Source: labels.LabelSourceK8s,
+			}
 		}
 	}
 

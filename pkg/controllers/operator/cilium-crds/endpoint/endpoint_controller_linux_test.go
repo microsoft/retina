@@ -679,6 +679,7 @@ func newTestEndpointReconciler(t *testing.T) (*endpointReconciler, *ciliumutil.M
 		podEvents:           nil,
 		ciliumEndpoints:     ciliumEndpoints,
 		ciliumSlimClientSet: fakeClientSet.SlimFakeClientset,
+		k8sClient:           fakeClientSet,
 		store:               NewStore(),
 		Mutex:               &sync.Mutex{},
 		windowsNodes:        make(map[string]bool),
@@ -687,7 +688,7 @@ func newTestEndpointReconciler(t *testing.T) (*endpointReconciler, *ciliumutil.M
 	// make sure to use CRD mode (this is referenced in InitIdentityAllocator)
 	option.Config.IdentityAllocationMode = option.IdentityAllocationModeCRD
 	// Use the Cilium fake clientset for identity manager since it has proper watch support
-	im, err := NewIdentityManager(context.Background(), l, fakeClientSet.CiliumFakeClientset)
+	im, err := NewIdentityManager(context.Background(), l, fakeClientSet.CiliumFakeClientset, false)
 	require.NoError(t, err)
 	r.identityManager = im
 

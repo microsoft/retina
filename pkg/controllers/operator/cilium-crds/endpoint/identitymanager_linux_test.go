@@ -24,7 +24,7 @@ func TestGetIdentities(t *testing.T) {
 
 	// make sure to use CRD mode (this is referenced in InitIdentityAllocator)
 	option.Config.IdentityAllocationMode = option.IdentityAllocationModeCRD
-	im, err := NewIdentityManager(ctx, l, fakeClientSet.CiliumFakeClientset)
+	im, err := NewIdentityManager(ctx, l, fakeClientSet.CiliumFakeClientset, false)
 	require.NoError(t, err)
 
 	lbls := labels.Labels{
@@ -111,7 +111,7 @@ func TestDecrementReference(t *testing.T) {
 	fakeClientSet, _ := ciliumclient.NewFakeClientset(l)
 	// make sure to use CRD mode (this is referenced in InitIdentityAllocator)
 	option.Config.IdentityAllocationMode = option.IdentityAllocationModeCRD
-	im, err := NewIdentityManager(ctx, l, fakeClientSet.CiliumFakeClientset)
+	im, err := NewIdentityManager(ctx, l, fakeClientSet.CiliumFakeClientset, false)
 	require.NoError(t, err)
 
 	lbls := labels.Labels{
