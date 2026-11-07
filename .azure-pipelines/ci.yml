@@ -385,7 +385,10 @@ extends:
                 type: linux
               variables:
                 ob_outputDirectory: $(Build.SourcesDirectory)/out
-                CLUSTER_NAME: retina-e2e-$(Build.BuildId)-$(System.JobAttempt)
+                # The name must not contain "e2e", "kubernetes", "conformance",
+                # "cyclonus", or "pipeline-build". A daily cleanup job in the test
+                # subscription deletes such resource groups, also during a test run.
+                CLUSTER_NAME: retina-ci-$(Build.BuildId)-$(System.JobAttempt)
               steps:
                 # `make manifest` creates the multi-arch indexes from the
                 # per-platform tags that the image jobs pushed. The OneBranch
