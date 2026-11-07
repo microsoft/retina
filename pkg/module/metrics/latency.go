@@ -54,8 +54,11 @@ type key struct {
 }
 
 type val struct {
-	// Time in nanoseconds.
-	t int32
+	// Time the packet was observed.
+	// This must be the full timestamp (seconds + nanos). Using only
+	// timestamppb.Timestamp.Nanos (the sub-second part, 0..999999999) breaks
+	// whenever a request/response pair straddles a second boundary.
+	t time.Time
 	// TCP flags. Required for handshake latency.
 	flags *flow.TCPFlags
 }
@@ -132,7 +135,7 @@ func (lm *LatencyMetrics) Init(metricName string) {
 				zap.Uint32("srcPort", k.srcP),
 				zap.Uint32("dstPort", k.dstP),
 				zap.Uint64("id", k.id),
-				zap.Int32("timestamp", v.t))
+				zap.Time("timestamp", v.t))
 			if lm.noResponseMetric != nil {
 				lm.noResponseMetric.WithLabelValues("no_response").Inc()
 				lm.l.Debug("Incremented no response metric", zap.String("metric", noResponseFromNodeAPIServerName))
@@ -264,6 +267,10 @@ func (lm *LatencyMetrics) ProcessFlow(f *flow.Flow) {
 +-------------------------------------------------+
 */
 func (lm *LatencyMetrics) calculateLatency(f *flow.Flow) {
+	if f.GetTime() == nil {
+		return
+	}
+
 	// Ignore all packets observed at endpoint.
 	// We only care about node-apiserver packets observed at eth0.
 	// TO_NETWORK: Packets leaving node via eth0.
@@ -279,7 +286,7 @@ func (lm *LatencyMetrics) calculateLatency(f *flow.Flow) {
 		// There will be multiple identical packets with same ID. Store only the first one.
 		if item := lm.cache.Get(k); item == nil {
 			lm.cache.Set(k, &val{
-				t:     f.Time.Nanos,
+				t:     f.GetTime().AsTime(),
 				flags: f.GetL4().GetTCP().GetFlags(),
 			}, TTL)
 		}
@@ -293,7 +300,7 @@ func (lm *LatencyMetrics) calculateLatency(f *flow.Flow) {
 		}
 		if item := lm.cache.Get(k); item != nil {
 			// Calculate latency in milliseconds.
-			latency := math.Round(float64(f.Time.Nanos-item.Value().t) / float64(1000000))
+			latency := math.Round(float64(f.GetTime().AsTime().Sub(item.Value().t)) / float64(time.Millisecond))
 
 			// Log continuous latency.
 			if lm.nodeAPIServerLatency != nil {
