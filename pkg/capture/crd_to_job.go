@@ -45,6 +45,7 @@ var (
 	errFileCountRequiresMaxSize = errors.New("fileCount requires maxCaptureSize to be set as per-file size limit")
 	errInvalidIPAddress         = errors.New("is not a valid IP address")
 	errEmptyCaptureNamespace    = errors.New("capture namespace must not be empty when resolving pod selector or pod names targets")
+	errNoNamespacesMatch        = errors.New("no namespaces match the namespace selector")
 	// errTcpdumpFilterIncompatibleWithSourceDestIPs: obtainAndValidateUserFilter gives the generated pcapFilter
 	// precedence over the deprecated tcpdumpFilter, so combining them would silently drop the tcpdumpFilter.
 	errTcpdumpFilterIncompatibleWithSourceDestIPs = errors.New("tcpdumpFilter (deprecated) cannot be combined with sourceIPs/destinationIPs; use pcapFilter instead")
@@ -851,9 +852,15 @@ func (translator *CaptureToPodTranslator) calculateCaptureTargetsByPodSelector(c
 			translator.l.Error("Failed to list Namespace", zap.String("namespaceSelector", captureTarget.NamespaceSelector.String()), zap.Error(err))
 			return nil, err
 		}
+		if len(nsList.Items) == 0 {
+			return nil, fmt.Errorf("%w %q", errNoNamespacesMatch, metav1.FormatLabelSelector(captureTarget.NamespaceSelector))
+		}
 	}
 
+	targetNamespaces := make([]string, 0, len(nsList.Items))
+	podCount := 0
 	for _, ns := range nsList.Items {
+		targetNamespaces = append(targetNamespaces, ns.Name)
 		labelSelector, _ := labels.Parse(metav1.FormatLabelSelector(captureTarget.PodSelector))
 		podListOpt := metav1.ListOptions{
 			LabelSelector: labelSelector.String(),
@@ -873,8 +880,15 @@ func (translator *CaptureToPodTranslator) calculateCaptureTargetsByPodSelector(c
 				podIPs = append(podIPs, podIP.IP)
 			}
 			captureTargetOnNode.AddPod(pod.Spec.NodeName, podIPs)
+			podCount++
 		}
 	}
+
+	translator.l.Info("Resolved pod targets",
+		zap.Strings("targetNamespaces", targetNamespaces),
+		zap.Int("pods", podCount),
+		zap.Int("nodes", len(*captureTargetOnNode)),
+	)
 
 	return captureTargetOnNode, nil
 }
