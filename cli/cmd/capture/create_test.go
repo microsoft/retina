@@ -114,6 +114,7 @@ func NewClientServerPods(service, namespace string) []*corev1.Pod {
 			Spec: corev1.PodSpec{
 				NodeName: service + "1",
 			},
+			Status: corev1.PodStatus{Phase: corev1.PodRunning, PodIPs: []corev1.PodIP{{IP: "10.0.1.1"}}},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -126,6 +127,7 @@ func NewClientServerPods(service, namespace string) []*corev1.Pod {
 			Spec: corev1.PodSpec{
 				NodeName: service + "2",
 			},
+			Status: corev1.PodStatus{Phase: corev1.PodRunning, PodIPs: []corev1.PodIP{{IP: "10.0.1.2"}}},
 		},
 	}
 }

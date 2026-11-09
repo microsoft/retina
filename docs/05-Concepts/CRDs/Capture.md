@@ -44,8 +44,11 @@ The `Capture` CRD is defined with the following specifications:
       - `dontVerifyChecksum`: Don't verify TCP checksums (tcpdump -K)
   - `captureTarget`: Defines the target on which the network packets will be captured. It includes namespace, node, and pod selectors, as well as specific pod names.
     - If `podSelector` is set without `namespaceSelector`, matching Pods are only looked up in the Capture resource's own namespace (`metadata.namespace`).
+    - Pods that use host networking (`hostNetwork: true`) share the node's IP and are skipped by `podSelector` and `podNames`; to capture node traffic, use `nodeSelector`.
+    - Pods that aren't scheduled yet, have no IP address yet, or have completed (`Succeeded`/`Failed`) are skipped too; if no selected Pod can be captured, the Capture reports an error.
+    - `nodeSelector` and `namespaceSelector` need extra cluster-scoped permissions (`capture-nodes` and `capture-namespaces`) when the chart's admission policy is enabled. See [Capture with CRD - Cluster Access](../../04-Captures/03-crd.md#cluster-access).
     - `podNames` are always looked up in the Capture resource's own namespace.
-  - `filters`: Specifies filters for including or excluding network packets based on IP or port.
+  - `filters`: Specifies filters for including or excluding network packets based on IP or port. When the target selects Pods, filters further narrow the capture within those Pods' traffic.
   - `includeMetadata`: Indicates whether networking metadata should be captured.
   - `tcpdumpFilter`: **DEPRECATED and will be removed.** Currently accepts BPF filter expressions only (no flags). Migrate to `captureOption.pcapFilter` for BPF expressions and `captureOption` boolean flags for display/output options (e.g., `noResolveDNS`, `packetBuffered`, `verbosity`).
 

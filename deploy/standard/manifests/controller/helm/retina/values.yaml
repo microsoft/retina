@@ -189,6 +189,14 @@ capture:
   # cannot influence the base. Leave empty to use the operator default
   # (/var/log/retina/captures).
   hostPathBaseDir: ""
+  admissionPolicy:
+    # enabled installs a ValidatingAdmissionPolicy (requires Kubernetes >= 1.30)
+    # that only lets users holding the cluster-scoped 'capture-nodes' /
+    # 'capture-namespaces' verbs on captures.retina.sh create Captures with
+    # captureTarget.nodeSelector / captureTarget.namespaceSelector. Grant them by
+    # binding the <operator.name>-capture-nodes / <operator.name>-capture-namespaces
+    # ClusterRoles with a ClusterRoleBinding. Only applies when operator.enabled=true.
+    enabled: true
   # enableManagedStorageAccount toggles the use of managed storage account for storing artifacts.
   # If set to true, the following fields related to Azure credentials must be set.
   # Ref: docs/captures/managed-storage-account.md
