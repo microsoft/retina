@@ -35,7 +35,7 @@ RUN set -eux; \
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
 FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261027@sha256:88fc2b4a425801b3b4d8fe5342e24fb6134669fb718ec970340bdd36dee50c35
 
-# Keep this pin until the Azure Linux base includes pcre2 >= 10.48-1.azl3; verify both architectures before removing.
+# Keep fixed RPM pins until the base image includes them; verify both architectures before removing.
 RUN tdnf install -y \
 	bind-utils \
 	conntrack \
@@ -49,6 +49,7 @@ RUN tdnf install -y \
 	iptables \
 	iputils \
 	jq \
+	krb5-1.21.3-6.azl3 \
 	ldns-utils \
 	less \
 	nano \
@@ -58,11 +59,13 @@ RUN tdnf install -y \
 	nmap-ncat \
 	openssh \
 	pcre2-10.48-1.azl3 \
+	popt-1.19-2.azl3 \
 	procps-ng \
 	sysstat \
 	socat \
 	tcpdump \
 	wget \
+	zlib-1.3.2-2.azl3 \
 	tar \
 	file \
 	bpftool \

@@ -11,12 +11,15 @@ ARG APP_INSIGHTS_ID
 WORKDIR /workspace
 COPY . .
 
-# Keep this pin until the Azure Linux base includes pcre2 >= 10.48-1.azl3; verify both architectures before removing.
+# Keep fixed RPM pins until the base image includes them; verify both architectures before removing.
 RUN tdnf install -y \
 	jq \
+	krb5-1.21.3-6.azl3 \
 	libxml2-2.11.5-11.azl3 \
 	pcre2-10.48-1.azl3 \
-	util-linux-2.40.2-6.azl3
+	popt-1.19-2.azl3 \
+	util-linux-2.40.2-6.azl3 \
+	zlib-1.3.2-2.azl3
 
 # Default linux/architecture.
 ARG GOOS=linux
