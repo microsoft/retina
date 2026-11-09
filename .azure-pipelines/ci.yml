@@ -360,7 +360,8 @@ extends:
                 displayName: Login to ACR
                 inputs:
                   command: login
-                  endpoint: Azure Container Networking - ACR Public Service Connection
+                  ${{ if ne(parameters.e2eMode, 'Run E2E with prebuilt images') }}:
+                    endpoint: Azure Container Networking - ACR Public Service Connection
               - task: onebranch.pipeline.imagebuildinfo@1
                 displayName: Build e2e-test-event-writer windows/amd64
                 inputs:
@@ -373,7 +374,8 @@ extends:
                   enable_network: true
                   enable_service_tree_acr_path: false
                   enable_acr_push: true
-                  endpoint: Azure Container Networking - ACR Public Service Connection
+                  ${{ if ne(parameters.e2eMode, 'Run E2E with prebuilt images') }}:
+                    endpoint: Azure Container Networking - ACR Public Service Connection
                   compress: false
                   saveImageToPath: e2e-test-event-writer-$(TAG).tar
 
