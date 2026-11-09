@@ -147,6 +147,11 @@ func NewCommand(kubeClient kubernetes.Interface) *cobra.Command {
 
 	opts.ConfigFlags = *genericclioptions.NewConfigFlags(true)
 	opts.AddFlags(capture.PersistentFlags())
+	if nsFlag := capture.PersistentFlags().Lookup("namespace"); nsFlag != nil {
+		nsFlag.Usage = "Namespace of the capture Jobs and related resources (Secrets, PVC). For create, it is where they are created and, unless --namespace-selectors is set, " +
+			"where --pod-names and --pod-selectors are looked up. " +
+			"If omitted, create and delete use the namespace of the current kubeconfig context, download uses 'default', and list shows captures in all namespaces"
+	}
 	capture.PersistentFlags().StringVar(opts.Name, "name", DefaultName, "The name of the Retina Capture")
 
 	capture.AddCommand(NewCreateSubCommand(kubeClient))
