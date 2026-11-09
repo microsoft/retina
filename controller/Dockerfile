@@ -121,16 +121,19 @@ RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/ret
 
 # tools image
 FROM azurelinux-core AS tools
-# Keep this pin until the Azure Linux base includes pcre2 >= 10.48-1.azl3; verify both architectures before removing.
+# Keep fixed RPM pins until the base image includes them; verify both architectures before removing.
 RUN tdnf install -y \
     clang \
     bpftool \
     iproute \
     iptables \
+    krb5-1.21.3-6.azl3 \
     pcre2-10.48-1.azl3 \
+    popt-1.19-2.azl3 \
     tcpdump \
     which \
-    ca-certificates
+    ca-certificates \
+    zlib-1.3.2-2.azl3
 RUN mkdir -p /tmp/bin
 RUN arr="clang tcpdump ip ss iptables-legacy iptables-legacy-save iptables-nft iptables-nft-save cp uname" ;\
     for i in $arr; do    \
