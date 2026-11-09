@@ -73,20 +73,21 @@ func (c *cidrGroupCache) delete(name string) {
 	delete(c.groups, name)
 }
 
-func (c *cidrGroupCache) contains(name string, addr netip.Addr) bool {
+// contains reports whether the group has a prefix containing any of addrs.
+func (c *cidrGroupCache) contains(name string, addrs ...netip.Addr) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	entry, ok := c.groups[name]
-	return ok && prefixesContain(entry.prefixes, addr)
+	return ok && prefixesContain(entry.prefixes, addrs...)
 }
 
-// labelsFor returns the merged labels of every group with a prefix containing addr.
-func (c *cidrGroupCache) labelsFor(addr netip.Addr) labels.Labels {
+// labelsFor returns the merged labels of every group with a prefix containing any of addrs.
+func (c *cidrGroupCache) labelsFor(addrs ...netip.Addr) labels.Labels {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	var lbls labels.Labels
 	for _, entry := range c.groups {
-		if !prefixesContain(entry.prefixes, addr) {
+		if !prefixesContain(entry.prefixes, addrs...) {
 			continue
 		}
 		if lbls == nil {
@@ -99,10 +100,12 @@ func (c *cidrGroupCache) labelsFor(addr netip.Addr) labels.Labels {
 	return lbls
 }
 
-func prefixesContain(prefixes []netip.Prefix, addr netip.Addr) bool {
+func prefixesContain(prefixes []netip.Prefix, addrs ...netip.Addr) bool {
 	for _, p := range prefixes {
-		if p.Contains(addr) {
-			return true
+		for _, addr := range addrs {
+			if p.Contains(addr) {
+				return true
+			}
 		}
 	}
 	return false
@@ -159,8 +162,8 @@ func (r *endpointReconciler) waitForCIDRGroups(ctx context.Context) {
 	}
 }
 
-// reconcilePodsForCIDRGroup recomputes labels for Pods that carry the group's label or whose IP
-// is in the group's current prefixes. Using the stored labels (updated only on success) means a
+// reconcilePodsForCIDRGroup recomputes labels for Pods that carry the group's label or with an IP
+// (IPv4 or IPv6) in the group's current prefixes. Using the stored labels (updated only on success) means a
 // retry still finds Pods that left the group even after the cache no longer has the old prefixes.
 func (r *endpointReconciler) reconcilePodsForCIDRGroup(pctx context.Context, name string) error {
 	r.Lock()
@@ -173,14 +176,13 @@ func (r *endpointReconciler) reconcilePodsForCIDRGroup(pctx context.Context, nam
 			continue
 		}
 		_, labelled := pod.lbls[refKey]
-		addr, err := netip.ParseAddr(pod.podObj.Status.PodIP)
-		inGroup := err == nil && r.cidrGroupCache.contains(name, addr)
+		inGroup := r.cidrGroupCache.contains(name, validAddrs(podAddrs(pod.podObj))...)
 		if !labelled && !inGroup {
 			continue
 		}
 
 		ctx, cancel := context.WithTimeout(pctx, RequestTimeout)
-		err = r.relabelPod(ctx, pod)
+		err := r.relabelPod(ctx, pod)
 		cancel()
 		if err != nil {
 			errs = append(errs, errors.Wrapf(err, "pod %s", pod.key.String()))

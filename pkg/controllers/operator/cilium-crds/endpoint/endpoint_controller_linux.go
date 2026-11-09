@@ -340,7 +340,8 @@ func (r *endpointReconciler) reconcilePod(ctx context.Context, podKey resource.K
 		return nil
 	}
 
-	if pod.Status.PodIP == "" || pod.Status.HostIP == "" {
+	ipv4, ipv6 := podAddrs(pod)
+	if (!ipv4.IsValid() && !ipv6.IsValid()) || pod.Status.HostIP == "" {
 		r.l.Debug("pod missing an IP, skipping", "podKey", podKey.String())
 		return nil
 	}
@@ -363,7 +364,8 @@ func (r *endpointReconciler) reconcilePod(ctx context.Context, podKey resource.K
 	newPEP := &PodEndpoint{
 		key:    podKey,
 		lbls:   podLabels,
-		ipv4:   pod.Status.PodIP,
+		ipv4:   addrString(ipv4),
+		ipv6:   addrString(ipv6),
 		nodeIP: pod.Status.HostIP,
 		// TODO: set to false if in follower mode
 		processedAsLeader: true,
@@ -447,10 +449,10 @@ func (r *endpointReconciler) handlePodUpsert(ctx context.Context, newPEP *PodEnd
 				"networking", oldCEP.Status.Networking,
 			)
 
-			if oldCEP.Status.Networking == nil || len(oldCEP.Status.Networking.Addressing) == 0 || oldCEP.Status.Networking.Addressing[0].IPV4 == "" {
-				// FIXME handle IPv6 and dual-stack
+			oldIPv4, oldIPv6 := cepAddrs(oldCEP.Status.Networking)
+			if oldIPv4 == "" && oldIPv6 == "" {
 				inStore = false
-				r.l.Warn("CiliumEndpoint has no ipv4 address, ignoring",
+				r.l.Warn("CiliumEndpoint has no IP address, ignoring",
 					"podKey", newPEP.key.String(),
 					"cep", oldCEP,
 				)
@@ -458,13 +460,14 @@ func (r *endpointReconciler) handlePodUpsert(ctx context.Context, newPEP *PodEnd
 				oldPEP = &PodEndpoint{
 					key:        newPEP.key,
 					endpointID: oldCEP.Status.ID,
-					ipv4:       oldCEP.Status.Networking.Addressing[0].IPV4,
+					ipv4:       oldIPv4,
+					ipv6:       oldIPv6,
 					nodeIP:     oldCEP.Status.Networking.NodeIP,
 				}
 
 				if oldCEP.Status.Identity != nil {
 					oldPEP.identityID = oldCEP.Status.Identity.ID
-					oldPEP.lbls = labels.NewLabelsFromModel(oldCEP.Status.Identity.Labels)
+					oldPEP.lbls = keyCIDRLabelsLikeCilium(labels.NewLabelsFromModel(oldCEP.Status.Identity.Labels))
 				}
 			}
 		}
@@ -476,7 +479,7 @@ func (r *endpointReconciler) handlePodUpsert(ctx context.Context, newPEP *PodEnd
 		newPEP.endpointID = oldPEP.endpointID
 		newPEP.identityID = oldPEP.identityID
 
-		sameNetworking := newPEP.ipv4 == oldPEP.ipv4 && newPEP.nodeIP == oldPEP.nodeIP
+		sameNetworking := newPEP.ipv4 == oldPEP.ipv4 && newPEP.ipv6 == oldPEP.ipv6 && newPEP.nodeIP == oldPEP.nodeIP
 		equalLabels := newPEP.lbls.Equals(oldPEP.lbls)
 
 		r.l.Debug("patching CiliumEndpoint",
@@ -748,7 +751,9 @@ func (r *endpointReconciler) ciliumEndpointsLabels(ctx context.Context, pod *sli
 		}
 	}
 
-	if r.cfg.WindowsCIDRLabels && pod.Status.PodIP != "" {
+	ipv4, ipv6 := podAddrs(pod)
+	addrs := validAddrs(ipv4, ipv6)
+	if r.cfg.WindowsCIDRLabels && len(addrs) > 0 {
 		isWindows, err := r.isWindowsNode(ctx, pod.Spec.NodeName)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to determine node OS")
@@ -756,20 +761,21 @@ func (r *endpointReconciler) ciliumEndpointsLabels(ctx context.Context, pod *sli
 		if isWindows {
 			// Cilium only matches CIDR selectors against identities carrying cidr: labels.
 			// Without this, giving a Windows Pod an endpoint identity makes it unselectable by CIDR policy.
-			cidrLabel, err := labels.IPStringToLabel(pod.Status.PodIP)
-			if err != nil {
-				return nil, errors.Wrap(err, "failed to build CIDR label")
+			// A dual-stack Pod gets one label per family, like a Cilium prefix identity per address.
+			for _, addr := range addrs {
+				cidrLabel, err := labels.IPStringToLabel(addr.String())
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to build CIDR label")
+				}
+				lbls[cidrLabel.Key] = cidrLabel
 			}
-			lbls[cidrLabel.Key] = cidrLabel
 
 			// cidrGroupRef/cidrGroupSelector rules match cidrgroup: labels, which Cilium only puts on its own prefix identities.
 			if r.cidrGroupLabelsEnabled() {
-				if addr, err := netip.ParseAddr(pod.Status.PodIP); err == nil {
-					for k, l := range r.cidrGroupCache.labelsFor(addr) {
-						// Labels are keyed without source; never let a group label replace a Pod label.
-						if _, exists := lbls[k]; !exists {
-							lbls[k] = l
-						}
+				for k, l := range r.cidrGroupCache.labelsFor(addrs...) {
+					// Labels are keyed without source; never let a group label replace a Pod label.
+					if _, exists := lbls[k]; !exists {
+						lbls[k] = l
 					}
 				}
 			}
@@ -794,4 +800,87 @@ func (r *endpointReconciler) isWindowsNode(ctx context.Context, nodeName string)
 	isWindows := node.Labels[corev1.LabelOSStable] == string(corev1.Windows)
 	r.windowsNodes[nodeName] = isWindows
 	return isWindows, nil
+}
+
+// podAddrs returns the Pod's first IPv4 and first IPv6 address from Status.PodIPs,
+// falling back to Status.PodIP. A missing family is returned as the zero netip.Addr.
+func podAddrs(pod *slim_corev1.Pod) (ipv4, ipv6 netip.Addr) {
+	ips := make([]string, 0, len(pod.Status.PodIPs)+1)
+	for _, ip := range pod.Status.PodIPs {
+		ips = append(ips, ip.IP)
+	}
+	if len(ips) == 0 {
+		ips = append(ips, pod.Status.PodIP)
+	}
+	for _, ip := range ips {
+		addr, err := netip.ParseAddr(ip)
+		if err != nil {
+			continue
+		}
+		switch {
+		case addr.Is4() && !ipv4.IsValid():
+			ipv4 = addr
+		case addr.Is6() && !ipv6.IsValid():
+			ipv6 = addr
+		}
+	}
+	return ipv4, ipv6
+}
+
+// validAddrs returns the valid addresses among addrs, in order.
+func validAddrs(addrs ...netip.Addr) []netip.Addr {
+	valid := make([]netip.Addr, 0, len(addrs))
+	for _, a := range addrs {
+		if a.IsValid() {
+			valid = append(valid, a)
+		}
+	}
+	return valid
+}
+
+// addrString returns the address in Cilium's CiliumEndpoint format, or "" for the zero netip.Addr.
+func addrString(addr netip.Addr) string {
+	if !addr.IsValid() {
+		return ""
+	}
+	return addr.String()
+}
+
+// cepAddrs returns the first IPv4 and first IPv6 address of a CiliumEndpoint. The Cilium agent
+// writes a single address pair holding both families, but every pair is checked.
+func cepAddrs(networking *ciliumv2.EndpointNetworking) (ipv4, ipv6 string) {
+	if networking == nil {
+		return "", ""
+	}
+	for _, pair := range networking.Addressing {
+		if pair == nil {
+			continue
+		}
+		if ipv4 == "" {
+			ipv4 = pair.IPV4
+		}
+		if ipv6 == "" {
+			ipv6 = pair.IPV6
+		}
+	}
+	return ipv4, ipv6
+}
+
+// keyCIDRLabelsLikeCilium re-keys cidr: labels parsed from a CiliumEndpoint. The printed IPv6 form
+// (cidr:fd00::1/128) parses to a different key than Cilium uses (fd00--1/128), which would make
+// unchanged labels compare unequal. IPv4 keys are unchanged.
+func keyCIDRLabelsLikeCilium(lbls labels.Labels) labels.Labels {
+	for k, l := range lbls {
+		pfx := l.GetCIDRPrefix()
+		if l.Source != labels.LabelSourceCIDR || pfx == nil {
+			continue
+		}
+		keyed, err := labels.IPStringToLabel(pfx.String())
+		if err != nil || keyed.Key == k {
+			continue
+		}
+		delete(lbls, k)
+		lbls[keyed.Key] = keyed
+	}
+	return lbls
 }

@@ -47,20 +47,30 @@ func TestCIDRGroupLabelsFor(t *testing.T) {
 	c.upsert(cidrGroup("a", map[string]string{teamLabel: "x"}, "10.244.1.0/24", "not-a-cidr"))
 	c.upsert(cidrGroup("b", nil, "10.244.1.57/32"))
 	c.upsert(cidrGroup("c", nil, "192.168.0.0/16"))
+	c.upsert(cidrGroup("v6", nil, "fd00:10:244:1::/64"))
 
 	tests := []struct {
-		ip   string
+		ips  []string
 		want []string
 	}{
-		{"10.244.2.1", nil},
-		{"10.244.1.9", []string{"a"}},
-		{"10.244.1.57", []string{"a", "b"}},
+		{[]string{"10.244.2.1"}, nil},
+		{[]string{"10.244.1.9"}, []string{"a"}},
+		{[]string{"10.244.1.57"}, []string{"a", "b"}},
+		{[]string{"fd00:10:244:1::39"}, []string{"v6"}},
+		{[]string{"fd00:10:244:2::39"}, nil},
+		{[]string{"10.244.2.1", "fd00:10:244:1::39"}, []string{"v6"}},
+		{[]string{"10.244.1.57", "fd00:10:244:1::39"}, []string{"a", "b", "v6"}},
 	}
 	for _, tt := range tests {
-		lbls := c.labelsFor(netip.MustParseAddr(tt.ip))
-		for _, name := range []string{"a", "b", "c"} {
+		addrs := make([]netip.Addr, 0, len(tt.ips))
+		for _, ip := range tt.ips {
+			addrs = append(addrs, netip.MustParseAddr(ip))
+		}
+		lbls := c.labelsFor(addrs...)
+		for _, name := range []string{"a", "b", "c", "v6"} {
 			_, ok := lbls[api.LabelForCIDRGroupRef(name).Key]
-			require.Equal(t, contains(tt.want, name), ok, "ip %s group %s", tt.ip, name)
+			require.Equal(t, contains(tt.want, name), ok, "ips %v group %s", tt.ips, name)
+			require.Equal(t, contains(tt.want, name), c.contains(name, addrs...), "ips %v group %s", tt.ips, name)
 		}
 		if contains(tt.want, "a") {
 			require.Contains(t, lbls, teamLabel, "plain group label for Exists selectors")
@@ -197,4 +207,52 @@ func TestCIDRGroupLabelDoesNotReplacePodLabel(t *testing.T) {
 	require.Equal(t, labels.NewLabel("k1", "v1", labels.LabelSourceK8s), lbls["k1"])
 	require.Contains(t, lbls, "k1"+labels.CIDRGroupEncodedSep+"other")
 	require.Contains(t, lbls, api.LabelForCIDRGroupRef("g").Key)
+}
+
+// TestDualStackLabelsMatchPolicySelectors checks the IPv6 cidr and cidrgroup labels of a
+// dual-stack Windows Pod against Cilium's own rule selectors.
+func TestDualStackLabelsMatchPolicySelectors(t *testing.T) {
+	saved := option.Config.PolicyCIDRMatchMode
+	option.Config.PolicyCIDRMatchMode = []string{"pods"}
+	t.Cleanup(func() { option.Config.PolicyCIDRMatchMode = saved })
+
+	r := newCIDRGroupTestReconciler(t, Config{WindowsCIDRLabels: true})
+	r.cidrGroupCache.upsert(cidrGroup("win6", nil, "fd00:10:244:1::/64"))
+	_, winPod := podOnNode("win-pod", "win-node", "")
+	withPodIPs(winPod, testIPv4, testIPv6)
+	r.Lock()
+	lbls, err := r.ciliumEndpointsLabels(context.TODO(), winPod)
+	r.Unlock()
+	require.NoError(t, err)
+	la := lbls.LabelArray()
+
+	sel := policytypes.ToSelector[api.CIDRRule]
+	require.True(t, sel(api.CIDRRule{Cidr: "10.244.1.0/24"}).Matches(la))
+	require.True(t, sel(api.CIDRRule{Cidr: "fd00:10:244:1::/64"}).Matches(la))
+	require.True(t, sel(api.CIDRRule{Cidr: testIPv6 + "/128"}).Matches(la))
+	require.False(t, sel(api.CIDRRule{Cidr: "fd00:10:244:2::/64"}).Matches(la))
+	require.True(t, sel(api.CIDRRule{CIDRGroupRef: "win6"}).Matches(la))
+}
+
+func TestCIDRGroupRelabelsDualStackPodByIPv6(t *testing.T) {
+	r := newCIDRGroupTestReconciler(t, Config{WindowsOnlyEndpoints: true, WindowsCIDRLabels: true})
+	refKey := api.LabelForCIDRGroupRef("g6").Key
+	ctx := context.TODO()
+
+	key, pod := podOnNode("win-ds", "win-node", "")
+	withPodIPs(pod, testIPv4, testIPv6)
+	require.NoError(t, r.ReconcilePod(ctx, key, pod))
+	before, _ := r.store.GetPod(key)
+
+	// Only the IPv6 address is in the group.
+	r.cidrGroupCache.upsert(cidrGroup("g6", nil, "fd00:10:244:1::/64"))
+	require.NoError(t, r.reconcilePodsForCIDRGroup(ctx, "g6"))
+	after, _ := r.store.GetPod(key)
+	require.Contains(t, after.lbls, refKey)
+	require.NotEqual(t, before.identityID, after.identityID)
+
+	r.cidrGroupCache.delete("g6")
+	require.NoError(t, r.reconcilePodsForCIDRGroup(ctx, "g6"))
+	after, _ = r.store.GetPod(key)
+	require.NotContains(t, after.lbls, refKey)
 }
