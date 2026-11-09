@@ -20,6 +20,7 @@ type PodEndpoint struct {
 	identityID int64
 	lbls       labels.Labels
 	ipv4       string
+	ipv6       string
 	nodeIP     string
 	// processedAsLeader will be used when implementing follower mode.
 	// Follower would process all pod events, but it won't use IdentityManager (increment identity references) until leading
@@ -47,6 +48,7 @@ func (pep *PodEndpoint) endpointStatus() ciliumv2.EndpointStatus {
 			Addressing: ciliumv2.AddressPairList{
 				{
 					IPV4: pep.ipv4,
+					IPV6: pep.ipv6,
 				},
 			},
 		},
@@ -62,6 +64,7 @@ func (pep *PodEndpoint) deepCopy() *PodEndpoint {
 		identityID:        pep.identityID,
 		lbls:              pep.lbls,
 		ipv4:              pep.ipv4,
+		ipv6:              pep.ipv6,
 		nodeIP:            pep.nodeIP,
 		processedAsLeader: pep.processedAsLeader,
 		uid:               pep.uid,
