@@ -16,8 +16,8 @@
 #     images from the selected branch.
 #     Select "Run E2E with prebuilt images" to skip image builds and test
 #     existing images. Set imageRegistry (hostname only), imageNamespace,
-#     and eventWriterImage (full Windows image reference), then choose the
-#     shared Retina image tag for "prebuiltRetinaImages" on the Resources page.
+#     imageTag (shared Retina image tag), and eventWriterImage (full Windows
+#     image reference).
 #
 # The pipeline extends the OneBranch NonOfficial template, so jobs run on the
 # OneBranch-managed pool instead of the Microsoft-hosted "Azure Pipelines"
@@ -71,6 +71,10 @@ parameters:
     displayName: Prebuilt image namespace
     type: string
     default: 'not-set'
+  - name: imageTag
+    displayName: Prebuilt Retina image tag
+    type: string
+    default: 'not-set'
   - name: eventWriterImage
     displayName: Prebuilt Windows E2E event-writer image (full reference)
     type: string
@@ -104,11 +108,6 @@ variables:
       value: $[ startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/') ]
 
 resources:
-  containers:
-    - ${{ if eq(parameters.e2eMode, 'Run E2E with prebuilt images') }}:
-      # The Resources picker selects the shared tag; no job runs in this image.
-      - container: prebuiltRetinaImages
-        image: ${{ format('{0}/{1}/retina-agent:not-set', parameters.imageRegistry, parameters.imageNamespace) }}
   repositories:
     - repository: templates
       type: git
@@ -416,7 +415,7 @@ extends:
                 ${{ if eq(parameters.e2eMode, 'Run E2E with prebuilt images') }}:
                   e2eImageRegistry: ${{ parameters.imageRegistry }}
                   e2eImageNamespace: ${{ parameters.imageNamespace }}
-                  e2eImageTag: $(resources.container.prebuiltRetinaImages.tag)
+                  e2eImageTag: ${{ parameters.imageTag }}
                 ${{ else }}:
                   e2eImageRegistry: $(ACR_NAME)
                   e2eImageNamespace: $(imageNamespace)
@@ -427,7 +426,7 @@ extends:
                       set -euo pipefail
                       : "${IMAGE_REGISTRY:?imageRegistry is required in prebuilt mode}"
                       : "${IMAGE_NAMESPACE:?imageNamespace is required in prebuilt mode}"
-                      : "${E2E_IMAGE_TAG:?Select a prebuilt image tag on the Resources page}"
+                      : "${E2E_IMAGE_TAG:?imageTag is required in prebuilt mode}"
                       : "${EVENT_WRITER_IMAGE:?eventWriterImage is required in prebuilt mode}"
                       for input in "$IMAGE_REGISTRY" "$IMAGE_NAMESPACE" "$E2E_IMAGE_TAG" "$EVENT_WRITER_IMAGE"; do
                         if [[ "$input" == 'not-set' ]]; then

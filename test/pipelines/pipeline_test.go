@@ -172,8 +172,8 @@ func TestPipelineUsesSingleModeSelector(t *testing.T) {
 
 	found := false
 	for _, parameter := range pipeline.Parameters {
-		require.NotContains(t, []string{"runE2EValidation", "usePrebuiltImages", "imageTag"}, parameter.Name,
-			"independent E2E switches and the tag input must not remain on the Parameters page")
+		require.NotContains(t, []string{"runE2EValidation", "usePrebuiltImages"}, parameter.Name,
+			"independent E2E switches must not remain on the Parameters page")
 		if parameter.Name == "e2eMode" {
 			found = true
 			require.Equal(t, "string", parameter.Type)
