@@ -1,6 +1,7 @@
 ---
 slug: how-nutanix-is-using-retina
 title: How Nutanix is using Retina for cloud-native network observability
+date: 2026-11-10
 authors:
   - name: "Joe Yostos"
     title: "Product Manager at Microsoft"
@@ -19,7 +20,7 @@ Most Kubernetes teams no longer run a single cluster on a single platform. A typ
 
 Network observability has often been tied to a particular data plane. The richest eBPF-based tooling grew up alongside specific CNIs, and Hubble is a good example: it has historically been tightly coupled with Cilium. If your platform uses a different CNI, you have two choices. You can give up that depth of visibility, or you can re-architect your networking to get it. For a platform vendor with an established, production-proven data path, neither choice works.
 
-Retina was built to remove that trade-off by decoupling observability from the data plane. This post covers how Nutanix used Retina to add eBPF-powered network observability to the Nutanix Kubernetes Platform (NKP) and its OVN-Kubernetes-based Flow CNI.
+Retina was built to remove that trade-off by decoupling observability from data plane. This post covers how Nutanix used Retina to add eBPF-powered network observability to the Nutanix Kubernetes Platform (NKP) and its OVN-Kubernetes-based Flow CNI.
 
 <!-- truncate -->
 
@@ -41,7 +42,7 @@ The Nutanix Flow team set out a clear requirement. They wanted an eBPF-based obs
 >
 > — **Aniket Daptari, Sr. Director of Product Management at Nutanix**
 
-## Bringing eBPF-powered observability to Flow CNI
+## Bringing eBPF-Powered Observability to Flow CNI
 
 Nutanix integrated Retina with Flow CNI to bring eBPF-powered network observability to NKP without requiring customers to change their networking stack. This gives Nutanix a portable observability layer while allowing Flow CNI to remain the Kubernetes data plane.
 
