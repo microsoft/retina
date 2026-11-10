@@ -308,8 +308,8 @@ func (dr *dropReason) processRecord(ctx context.Context, id int) {
 				}
 				continue
 			}
-			sourcePortShort := uint32(utils.HostToNetShort(bpfEvent.SrcPort))
-			destinationPortShort := uint32(utils.HostToNetShort(bpfEvent.DstPort))
+			sourcePortShort := uint32(bpfEvent.SrcPort)
+			destinationPortShort := uint32(bpfEvent.DstPort)
 
 			fl := utils.ToFlow(
 				dr.l,

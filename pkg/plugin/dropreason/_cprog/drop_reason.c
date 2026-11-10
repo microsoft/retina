@@ -267,7 +267,7 @@ static void get_packet_from_sock(struct packet *p, struct sock *sk)
     p->src_ip = saddr;
     p->dst_ip = daddr;
     p->dst_port = bpf_ntohs(dport);
-    p->src_port = bpf_ntohs(sport);
+    p->src_port = sport;
 }
 
 /*
