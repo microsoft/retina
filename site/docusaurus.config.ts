@@ -72,6 +72,11 @@ const config = {
           path: '../docs',
           editUrl: 'https://github.com/microsoft/retina/blob/main/docs',
         },
+        blog: {
+          routeBasePath: 'blog',
+          showReadingTime: true,
+          postsPerPage: 10,
+        },
         theme: {
           customCss: './src/css/custom.css',
         },
@@ -133,6 +138,11 @@ const config = {
           sidebarId: "mainSidebar",
           position: "left",
           label: "Docs",
+        },
+        {
+          to: '/blog',
+          label: 'Blogs',
+          position: 'left',
         },
         {
           href: 'https://github.com/microsoft/retina',
